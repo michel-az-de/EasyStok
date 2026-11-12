@@ -19,11 +19,13 @@
     var n = U.diasAte(s);
     return '<span class="pilula ' + (n < 0 ? "erro" : n <= 3 ? "alerta" : "") + '">' + (n < 0 ? "venceu " : "vence ") + quando(s) + "</span>";
   }
-  var CANAL = { whatsapp: { n: "WhatsApp", i: "whatsapp" }, email: { n: "E-mail", i: "email" }, ia: { n: "IA", i: "ia" }, sistema: { n: "Sistema", i: "sistema" } };
+  var CANAL = { whatsapp: { n: "WhatsApp", i: "whatsapp" }, email: { n: "E-mail", i: "email" }, ia: { n: "IA", i: "ia" }, sistema: { n: "Sistema", i: "sistema" },
+    linkedin: { n: "LinkedIn", i: "linkedin" }, instagram: { n: "Instagram", i: "instagram" }, blog: { n: "Blog", i: "blog" }, metricool: { n: "Metricool", i: "sistema" } };
   function canal(c) { var k = CANAL[c] || CANAL.sistema; return '<span class="canal ' + (CANAL[c] ? c : "sistema") + '" title="' + k.n + '">' + ic(k.i) + '<span class="sr">' + k.n + "</span></span>"; }
   var ROT = { AguardandoAssinatura: "Aguardando assinatura", EmExecucao: "Em execução", Substituida: "Substituída" };
   var TOM = { Enviada: "alerta", Aceita: "ok", Recusada: "erro", Expirada: "erro", AguardandoAssinatura: "alerta", Vigente: "info", Encerrado: "ok", Cancelado: "erro",
-    EmExecucao: "info", Entregue: "alerta", Aprovada: "alerta", Faturada: "ok", Paga: "ok", Aberta: "alerta", Anexada: "ok", Cancelada: "erro" };
+    EmExecucao: "info", Entregue: "alerta", Aprovada: "alerta", Faturada: "ok", Paga: "ok", Aberta: "alerta", Anexada: "ok", Cancelada: "erro",
+    Aprovado: "info", Agendado: "alerta", Publicado: "ok", Nova: "alerta", Lead: "ok", Novo: "alerta", Qualificado: "info", Proposta: "alerta", Ganho: "ok", Perdido: "erro" };
   function pilula(s) { return '<span class="pilula ' + (TOM[s] || "") + '">' + esc(ROT[s] || s) + "</span>"; }
   function botao(txt, acao, id, estilo, extra) {
     return '<button type="button" class="btn ' + (estilo || "suave") + '" data-acao="' + acao + '" data-id="' + esc(id || "") + '"' + (extra || "") + ">" + txt + "</button>";
@@ -35,101 +37,145 @@
   }
   function numero(rot, val, det, href) { return '<a class="numero" href="' + href + '"><span>' + rot + "</span><strong>" + val + "</strong><small>" + det + "</small></a>"; }
 
-  // Gráfico de caixa projetado (SVG puro).
-  var gid = 0;
-  function grafico(pontos, alto) {
-    var W = 640, H = alto || 200, P = 10, id = "gArea" + (++gid);
-    var vals = pontos.map(function (p) { return p.v; });
-    var max = Math.max.apply(null, vals.concat([0])), min = Math.min.apply(null, vals.concat([0]));
-    if (max === min) max = min + 1;
-    var x = function (i) { return P + i * (W - 2 * P) / (pontos.length - 1); };
-    var y = function (v) { return P + (max - v) * (H - 2 * P) / (max - min); };
-    var linha = pontos.map(function (p, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1); }).join(" ");
-    var area = linha + " L" + x(pontos.length - 1).toFixed(1) + " " + y(min).toFixed(1) + " L" + x(0).toFixed(1) + " " + y(min).toFixed(1) + " Z";
-    var ultimo = pontos[pontos.length - 1];
-    var marcas = pontos.map(function (p, i) {
-      return i && p.v !== pontos[i - 1].v ? '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="4" class="marca-ponto"><title>' + data(p.d) + ": " + brl(p.v) + "</title></circle>" : "";
-    }).join("");
-    return '<figure class="grafico"><svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" style="height:' + H + 'px" role="img" aria-label="Saldo projetado em 30 dias: ' + esc(brl(ultimo.v)) + '">' +
-      '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4A215" stop-opacity=".38"/><stop offset="1" stop-color="#D4A215" stop-opacity="0"/></linearGradient></defs>' +
-      '<line x1="' + P + '" x2="' + (W - P) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" class="zero"/>' +
-      '<path d="' + area + '" fill="url(#' + id + ')"/><path d="' + linha + '" class="traco"/>' + marcas +
-      '<circle cx="' + x(pontos.length - 1).toFixed(1) + '" cy="' + y(ultimo.v).toFixed(1) + '" r="6" class="ponto-final"/></svg>' +
-      '<figcaption><span>hoje</span><span>+15 dias</span><span>+30 dias: <strong>' + brl(ultimo.v) + "</strong></span></figcaption></figure>";
+  var FORMATO = { artigo: "Artigo", video: "Vídeo", carrossel: "Carrossel", post: "Post" };
+  var AREA = { conteudo: "conteudo", contatos: "clientes", contratos: "doc", contas: "financeiro" };
+  function redes(lista) { return '<span class="redes">' + lista.map(canal).join("") + "</span>"; }
+  function semana(d) { return new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""); }
+  function metricas(p) {
+    var m = p.metricas || {};
+    return '<dl class="metricas"><div><dt>Alcance</dt><dd>' + (m.alcance || 0).toLocaleString("pt-BR") + "</dd></div><div><dt>Reações</dt><dd>" + (m.reacoes || 0) +
+      "</dd></div><div><dt>Comentários</dt><dd>" + (m.comentarios || 0) + '</dd></div><div class="destaque"><dt>Leads</dt><dd>' + Q.leadsGerados(p.id) + "</dd></div></dl>";
   }
 
   var Telas = {};
 
-  // Hoje: o que a IA leu e o que pede o Felipe, em ordem de urgência.
-  Telas.hoje = function () {
-    var b = Q.briefing(), ar = Q.aReceber(), proj = Q.projecao(30);
-    var abertas = st.propostas.filter(function (p) { return p.status === "Enviada" || p.status === "Rascunho"; });
-    var h = new Date().getHours(), saud = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
-    var atv = st.atividades.slice(-6).reverse();
-    var lemb = st.lembretes.filter(function (m) { return m.status === "Pendente"; }).sort(function (a, c) { return a.quando < c.quando ? -1 : 1; }).slice(0, 4);
-    return '<section class="hero">' +
-        '<div class="hero-texto"><p class="hero-data">' + esc(new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })) + "</p>" +
-        '<h1 tabindex="-1">' + saud + ", Felipe.</h1>" +
-        '<p class="hero-ia">' + ic("ia") + "<span>Li " + st.conversas.length + " conversas, o caixa e os contratos. <strong>" + b.length + (b.length === 1 ? " coisa pede" : " coisas pedem") + " você hoje.</strong></span></p></div>" +
-        '<div class="hero-numeros">' +
-          numero("A receber", brl(soma(ar, function (r) { return r.valor; })), ar.length + " parcela(s)", "#/financeiro") +
-          numero("Caixa em 30 dias", brl(proj[proj.length - 1].v), "projetado", "#/financeiro") +
-          numero("Em negociação", brl(soma(abertas, U.totalProposta)), abertas.length + " proposta(s)", "#/funil") +
-        "</div></section>" +
-      '<div class="grade-hoje">' +
-        '<section class="painel"><div class="painel-topo"><h2>Pede você</h2><span class="dica">por urgência</span></div>' +
-          (b.length ? '<ol class="fila">' + b.map(function (x, i) {
-            return '<li class="fila-item' + (x.urgencia === "alta" ? " urgente" : "") + '" style="--i:' + i + '">' + canal(x.canal) +
-              '<div class="fila-texto"><strong>' + esc(x.titulo) + "</strong><span>" + esc(x.det) + "</span></div>" +
-              '<a class="btn ' + (i === 0 ? "primario" : "suave") + '" href="' + x.alvo + '">' + esc(x.acao) + ic("seta") + "</a></li>";
-          }).join("") + "</ol>" : '<div class="vazio">' + ic("check") + "<p>Nada pendente. Bom momento para prospectar.</p></div>") +
-        "</section>" +
-        '<div class="coluna">' +
-          '<section class="painel"><div class="painel-topo"><h2>Caixa, próximos 30 dias</h2><a href="#/financeiro" class="link">Detalhes</a></div>' + grafico(proj, 170) + "</section>" +
-          '<section class="painel"><div class="painel-topo"><h2>Feito sozinho</h2><a href="#/integracoes" class="link">Automações</a></div><ul class="feed">' +
-            atv.map(function (a) { return "<li>" + canal(a.canal) + '<div><a href="' + esc(a.alvo || "#/hoje") + '">' + esc(a.texto) + "</a><small>" + quando(a.em) + "</small></div></li>"; }).join("") +
-          "</ul></section>" +
-          (lemb.length ? '<section class="painel"><div class="painel-topo"><h2>Agenda</h2></div><ul class="agenda">' + lemb.map(function (m) {
-            return '<li><a href="' + esc(m.alvo) + '">' + esc(m.texto) + "</a>" + prazo(m.quando) + botao(ic("check") + '<span class="sr">Concluir: ' + esc(m.texto) + "</span>", "concluirLembrete", m.id, "icone") + "</li>";
-          }).join("") + "</ul></section>" : "") +
-        "</div></div>";
+  // Conteúdo: o centro da v4. Escrever, aprovar e agendar; a publicação passa pelo Metricool (simulado).
+  Telas.conteudo = function (id) {
+    if (id) return editorPost(id);
+    var hj = Q.hoje();
+    var faixa = '<section class="painel"><div class="painel-topo"><h2>Pede você hoje</h2><span class="dica">no máximo 5, por urgência</span></div>' +
+      (hj.length ? '<ol class="fila">' + hj.map(function (x, i) {
+        return '<li class="fila-item' + (x.urgencia === "alta" ? " urgente" : "") + '" style="--i:' + i + '"><span class="canal sistema">' + ic(AREA[x.area] || "sistema") + "</span>" +
+          '<div class="fila-texto"><strong>' + esc(x.titulo) + "</strong><span>" + esc(x.det) + "</span></div>" +
+          '<a class="btn ' + (i === 0 ? "primario" : "suave") + '" href="' + x.alvo + '">' + esc(x.acao) + ic("seta") + "</a></li>";
+      }).join("") + "</ol>" : '<div class="vazio">' + ic("check") + "<p>Nada pendente. Bom momento para escrever.</p></div>") + "</section>";
+    var dias14 = [];
+    for (var d = 0; d < 14; d++) dias14.push(U.dias(d));
+    var cal = '<section class="painel"><div class="painel-topo"><h2>Próximas duas semanas</h2><span class="dica">o que já está agendado</span></div><ol class="semana">' + dias14.map(function (dd, i) {
+      var ps = st.posts.filter(function (p) { return (p.status === "Agendado" && p.agendadoPara === dd) || (p.status === "Publicado" && p.publicadoEm === dd); });
+      return '<li class="dia' + (i === 0 ? " hoje" : "") + (ps.length ? " tem" : "") + '"><span class="dia-sem">' + (i === 0 ? "hoje" : semana(dd)) + "</span><b>" + dd.slice(8) + "</b>" +
+        ps.map(function (p) { return '<a class="chip-post" href="#/conteudo/' + p.id + '" title="' + esc(p.titulo) + '">' + esc(FORMATO[p.formato]) + "</a>"; }).join("") + "</li>";
+    }).join("") + "</ol></section>";
+    var PROX = { Ideia: "Rascunhar com IA", Rascunho: "Revisar e aprovar", Aprovado: "Escolher o dia" };
+    var prod = st.posts.filter(function (p) { return PROX[p.status]; });
+    var producao = '<section class="painel"><div class="painel-topo"><h2>Em produção</h2><span class="dica">' + prod.length + " peça(s)</span></div>" +
+      (prod.length ? '<ul class="posts">' + prod.map(function (p) {
+        return '<li><a class="post-card" href="#/conteudo/' + p.id + '"><span class="formato">' + esc(FORMATO[p.formato]) + "</span><strong>" + esc(p.titulo) + "</strong>" +
+          '<span class="post-pe">' + redes(p.redes) + pilula(p.status) + '<span class="proximo">' + PROX[p.status] + ic("seta") + "</span></span></a></li>";
+      }).join("") + "</ul>" : '<div class="vazio"><p>Nenhuma peça em produção. Comece por uma ideia.</p></div>') + "</section>";
+    var pub = st.posts.filter(function (p) { return p.status === "Publicado"; }).reverse();
+    var publicados = '<section class="painel"><div class="painel-topo"><h2>Publicados</h2><span class="dica">métricas fictícias</span></div>' +
+      (pub.length ? '<ul class="linhas">' + pub.map(function (p) {
+        return '<li class="pub"><div class="linha-texto"><strong><a href="#/conteudo/' + p.id + '">' + esc(p.titulo) + "</a></strong><small>" + esc(FORMATO[p.formato]) + " · " + data(p.publicadoEm) + " · " +
+          p.redes.map(function (r) { return CANAL[r].n; }).join(", ") + "</small></div>" + metricas(p) + "</li>";
+      }).join("") + "</ul>" : '<div class="vazio"><p>Nada publicado ainda.</p></div>') + "</section>";
+    return cabeca("Conteúdo", "Escreva, aprove e agende. A publicação passa pelo Metricool, pela API oficial; aqui é simulada.", botao(ic("mais") + "Nova ideia", "abrirNovaIdeia", "", "primario")) +
+      faixa + cal + '<div class="grade-duas">' + producao + publicados + "</div>";
   };
 
-  // Conversas: WhatsApp e e-mail numa caixa só, com a leitura da IA no topo da conversa.
-  var filtroInbox = "todos";
-  Telas.inbox = function (id) {
-    var lista = st.conversas.slice().sort(function (a, b) { return (b.naoLida - a.naoLida) || (a.atualizadaEm < b.atualizadaEm ? 1 : -1); })
-      .filter(function (c) { return filtroInbox === "todos" || c.canal === filtroInbox; });
-    var atual = id ? por(st.conversas, id) : null;
-    if (atual && atual.naoLida) { atual.naoLida = false; F.salvar(); }
-    return '<div class="inbox' + (atual ? " com-conversa" : "") + '">' +
-      '<section class="inbox-lista" aria-label="Lista de conversas"><div class="inbox-topo"><h1 tabindex="-1">Conversas</h1>' +
-        '<div class="segmentos" role="group" aria-label="Filtrar por canal">' + ["todos", "whatsapp", "email"].map(function (k) {
-          return '<button type="button" data-filtro="' + k + '" aria-pressed="' + (filtroInbox === k) + '">' + ({ todos: "Todas", whatsapp: "WhatsApp", email: "E-mail" })[k] + "</button>";
-        }).join("") + "</div></div><ul>" +
-        lista.map(function (c) {
-          var ult = c.mensagens[c.mensagens.length - 1], ativa = atual && atual.id === c.id;
-          return '<li><a href="#/inbox/' + c.id + '" class="conversa' + (c.naoLida ? " nao-lida" : "") + (ativa ? " ativa" : "") + '"' + (ativa ? ' aria-current="true"' : "") + ">" +
-            '<span class="avatar">' + iniciais(c.nome) + canal(c.canal) + "</span>" +
-            '<span class="conversa-texto"><span class="conversa-linha"><strong>' + esc(c.nome) + "</strong><small>" + quando(c.atualizadaEm) + "</small></span>" +
-            (c.assunto ? '<span class="assunto">' + esc(c.assunto) + "</span>" : "") +
-            '<span class="previa">' + (ult.de === "nos" ? "Você: " : "") + esc(ult.texto) + "</span>" +
-            (c.ia ? '<span class="intencao">' + ic("ia") + esc(c.ia.intencao) + "</span>" : "") + "</span>" +
-            (c.naoLida ? '<span class="ponto-novo"><span class="sr">não lida</span></span>' : "") + "</a></li>";
-        }).join("") + "</ul></section>" +
-      '<section class="inbox-conversa" aria-label="Conversa aberta">' + (atual ? conversa(atual) : '<div class="vazio grande">' + ic("inbox") + "<p>Escolha uma conversa. A IA já leu todas e marcou o que cada uma pede.</p></div>") + "</section></div>";
+  var PASSOS_POST = ["Ideia", "Rascunho", "Aprovado", "Agendado", "Publicado"];
+  function editorPost(id) {
+    var p = por(st.posts, id);
+    if (!p) { setTimeout(function () { location.hash = "#/conteudo"; }); return ""; }
+    var idx = PASSOS_POST.indexOf(p.status), editavel = p.status === "Rascunho" || p.status === "Aprovado";
+    var acoes = "";
+    if (p.status === "Ideia") acoes = botao(ic("ia") + "Rascunhar com IA", "rascunharPost", p.id, "primario");
+    if (p.status === "Rascunho") acoes = botao(ic("check") + "Aprovar texto", "aprovarPost", p.id, "primario");
+    if (p.status === "Agendado") acoes = botao("Desagendar", "desagendar", p.id, "suave") + botao(ic("enviar") + "Publicar agora", "publicarAgora", p.id, "primario");
+    var texto = editavel
+      ? '<form data-form="texto" data-id="' + p.id + '" novalidate><label class="sr" for="texto-post">Texto do post</label><textarea id="texto-post" name="texto" rows="11">' + esc(p.texto) +
+        '</textarea><div class="acoes entre"><span class="dica">' + (p.status === "Aprovado" ? "Editar volta o post para rascunho." : "A IA escreve; você decide o que sai.") + '</span><button class="btn suave" type="submit">Salvar texto</button></div></form>'
+      : p.status === "Ideia" ? '<div class="vazio">' + ic("ia") + "<p>Só o título por enquanto. A IA rascunha a partir dele e você revisa.</p></div>"
+      : '<div class="texto-final">' + esc(p.texto).replace(/\n/g, "<br>") + "</div>";
+    var lado = "";
+    if (p.status === "Aprovado") {
+      lado = '<section class="painel"><h2>Quando e onde</h2><form data-form="agendar" data-id="' + p.id + '" novalidate>' +
+        campo("a-quando", "Dia", 'name="quando" type="date" min="' + U.dias(0) + '" value="' + U.dias(2) + '"') +
+        '<fieldset class="redes-escolha" aria-describedby="a-redes-erro"><legend>Onde publicar</legend>' + ["linkedin", "instagram", "blog"].map(function (r) {
+          return '<label><input type="checkbox" name="redes" value="' + r + '"' + (p.redes.indexOf(r) >= 0 ? " checked" : "") + ">" + ic(CANAL[r].i) + CANAL[r].n + "</label>";
+        }).join("") + '<small id="a-redes-erro" class="erro-campo" role="alert" hidden></small></fieldset>' +
+        '<p class="dica">O Metricool publica pela API oficial do LinkedIn e do Instagram. Nada de robô de convite ou de mensagem.</p>' +
+        '<div class="acoes"><button class="btn primario" type="submit">' + ic("check") + "Agendar</button></div></form></section>";
+    } else if (p.status === "Agendado") {
+      lado = '<section class="painel"><h2>Agendado</h2><p class="grande">' + data(p.agendadoPara) + " · " + quando(p.agendadoPara) + "</p>" + redes(p.redes) + '<p class="dica">Simulado pelo Metricool.</p></section>';
+    } else if (p.status === "Publicado") {
+      lado = '<section class="painel"><h2>Resultado</h2>' + metricas(p) + '<p class="dica">Métricas fictícias.</p></section>';
+    } else {
+      lado = '<section class="painel"><h2>Próximo passo</h2><p class="dica">' + (p.status === "Ideia" ? "Peça o rascunho à IA." : "Revise o texto e aprove. Só texto aprovado pode ser agendado.") + "</p></section>";
+    }
+    var ints = st.interacoes.filter(function (i) { return i.postId === p.id; });
+    if (ints.length) lado += '<section class="painel"><h2>Quem reagiu</h2><ul class="linhas">' + ints.map(function (i) {
+      return '<li><span class="avatar pequeno">' + iniciais(i.nome) + '</span><div class="linha-texto"><strong>' + esc(i.nome) + (i.empresa ? " · " + esc(i.empresa) : "") + "</strong><small>" + esc(i.ia.intencao) + "</small></div>" + pilula(i.status) + "</li>";
+    }).join("") + '</ul><a class="link" href="#/contatos">Ver em Contatos</a></section>';
+    return cabeca(esc(p.titulo), esc(FORMATO[p.formato]) + " · " + pilula(p.status), acoes, ["#/conteudo", "Conteúdo"]) +
+      '<ol class="passos largo" aria-label="Situação do post">' + PASSOS_POST.map(function (s, i) { return '<li class="' + (i < idx ? "ok" : i === idx ? "agora" : "") + '"' + (i === idx ? ' aria-current="step"' : "") + "><span>" + s + "</span></li>"; }).join("") + "</ol>" +
+      '<div class="grade-proposta"><article class="post-previa" aria-label="Prévia do post"><header><span class="avatar">FS</span><div><strong>Felipe · FMA Software</strong><small>' + esc(FORMATO[p.formato]) + " · " + p.redes.map(function (r) { return CANAL[r].n; }).join(", ") + "</small></div></header>" +
+        (p.formato === "video" || p.formato === "carrossel" ? '<div class="midia">' + ic(p.formato === "video" ? "enviar" : "doc") + "<span>" + (p.formato === "video" ? "Vídeo de até 60 s" : "Carrossel em lâminas") + "</span></div>" : "") +
+        texto + '</article><div class="coluna">' + lado + "</div></div>";
+  }
+
+  // Contatos: o que chegou dos posts, as conversas e os leads. Prospecção é manual, até 5 por dia.
+  Telas.contatos = function () {
+    var novas = st.interacoes.filter(function (i) { return i.status === "Nova"; });
+    var hojeN = Q.abordagensHoje(), lim = Q.limiteDia();
+    var chegou = '<section class="painel"><div class="painel-topo"><h2>Chegou dos posts</h2><span class="dica">a IA marca a intenção; você decide</span></div>' +
+      (novas.length ? '<ul class="linhas">' + novas.map(function (i) {
+        var frio = i.ia.intencao === "Sem intenção comercial", post = por(st.posts, i.postId);
+        return '<li><span class="avatar pequeno">' + iniciais(i.nome) + canal(i.rede) + '</span><div class="linha-texto"><strong>' + esc(i.nome) + (i.empresa ? " · " + esc(i.empresa) : "") + " <small>" + esc(i.tipo) + " · " + quando(i.em) + "</small></strong>" +
+          '<span class="citacao">“' + esc(i.texto) + "”</span><small>" + '<span class="intencao' + (frio ? " fria" : "") + '">' + ic("ia") + esc(i.ia.intencao) + "</span>" + (post ? ' em <a href="#/conteudo/' + post.id + '">' + esc(post.titulo) + "</a>" : "") + "</small></div>" +
+          '<div class="acoes">' + botao("Ignorar", "ignorar", i.id, "suave") + (frio ? "" : botao(ic("mais") + "Virar lead", "virarLead", i.id, "primario")) + "</div></li>";
+      }).join("") + "</ul>" : '<div class="vazio">' + ic("check") + "<p>Nada novo dos posts.</p></div>") + "</section>";
+    var convs = st.conversas.slice().sort(function (a, b) { return (b.naoLida - a.naoLida) || (a.atualizadaEm < b.atualizadaEm ? 1 : -1); });
+    var conversas = '<section class="painel"><div class="painel-topo"><h2>Conversas</h2><span class="dica">WhatsApp e e-mail</span></div><ul class="lista-conversas">' + convs.map(function (c) {
+      var ult = c.mensagens[c.mensagens.length - 1];
+      return '<li><a href="#/conversa/' + c.id + '" class="conversa' + (c.naoLida ? " nao-lida" : "") + '"><span class="avatar">' + iniciais(c.nome) + canal(c.canal) + "</span>" +
+        '<span class="conversa-texto"><span class="conversa-linha"><strong>' + esc(c.nome) + "</strong><small>" + quando(c.atualizadaEm) + "</small></span>" +
+        '<span class="previa">' + (ult.de === "nos" ? "Você: " : "") + esc(ult.texto) + "</span></span>" + (c.naoLida ? '<span class="ponto-novo"><span class="sr">não lida</span></span>' : "") + "</a></li>";
+    }).join("") + "</ul></section>";
+    var ativos = st.leads.filter(function (l) { return l.status !== "Ganho" && l.status !== "Perdido"; }).reverse();
+    var leads = '<section class="painel"><div class="painel-topo"><h2>Leads</h2><span class="contador-msg' + (hojeN >= lim ? " cheio" : "") + '">' + hojeN + " de " + lim + " mensagens hoje</span></div>" +
+      '<ul class="linhas">' + ativos.map(function (l) {
+        var prop = st.propostas.filter(function (p) { return p.leadId === l.id; }).pop();
+        var a = botao(ic("enviar") + "Abordar", "abrirAbordar", l.id, "suave");
+        if (prop) a += '<a class="btn suave" href="#/propostas/' + prop.id + '">' + ic("doc") + "Proposta " + prop.id + "</a>";
+        else a += botao(ic("doc") + "Montar proposta", "criarProposta", l.id, "primario");
+        return '<li><span class="avatar pequeno">' + iniciais(l.empresa) + '</span><div class="linha-texto"><strong>' + esc(l.empresa) + " · " + esc(l.contato) + "</strong><small>" + esc(l.interesse) + " · " + esc(l.origem) + "</small></div>" +
+          '<div class="linha-valor">' + pilula(l.status) + '</div><div class="acoes">' + a + "</div></li>";
+      }).join("") + "</ul>" + '<p class="dica">O sistema não envia mensagem no LinkedIn: ele rascunha, conta e registra. Quem envia é você.</p></section>';
+    var perdidos = st.leads.filter(function (l) { return l.status === "Perdido"; });
+    return cabeca("Contatos", "Quem chegou pelos posts, quem está conversando e quem você está prospectando.", botao(ic("mais") + "Novo lead", "abrirNovoLead", "", "suave")) +
+      chegou + '<div class="grade-duas">' + leads + conversas + "</div>" +
+      (perdidos.length ? '<section class="painel"><h2>Perdidos</h2><ul class="linhas">' + perdidos.map(function (l) {
+        return '<li><span class="avatar pequeno escuro">' + iniciais(l.empresa) + '</span><div class="linha-texto"><strong>' + esc(l.empresa) + "</strong><small>" + esc(l.interesse) + '</small></div><div class="acoes">' + botao("Reabrir", "reabrirLead", l.id, "suave") + "</div></li>";
+      }).join("") + "</ul></section>" : "");
+  };
+  Telas.conversa = function (id) {
+    var c = por(st.conversas, id);
+    if (!c) { setTimeout(function () { location.hash = "#/contatos"; }); return ""; }
+    if (c.naoLida) { c.naoLida = false; F.salvar(); }
+    return '<div class="conversa-solo"><h1 class="sr" tabindex="-1">Conversa com ' + esc(c.nome) + "</h1>" + conversa(c) + "</div>";
   };
   function conversa(c) {
     var lead = c.leadId ? por(st.leads, c.leadId) : null;
     var cliente = lead && st.clientes.filter(function (k) { return k.leadId === lead.id; })[0];
-    var vinculo = cliente ? '<a class="pilula ok" href="#/clientes">Cliente</a>' : lead ? '<a class="pilula alerta" href="#/funil">Lead · ' + esc(lead.status) + "</a>" : '<span class="pilula">Contato novo</span>';
+    var vinculo = cliente ? '<a class="pilula ok" href="#/contratos">Cliente</a>' : lead ? '<a class="pilula alerta" href="#/contatos">Lead · ' + esc(lead.status) + "</a>" : '<span class="pilula">Contato novo</span>';
     var prop = lead && st.propostas.filter(function (p) { return p.leadId === lead.id; }).pop();
     var acoesIa = "";
     if (!cliente && c.ia && c.ia.etapas && !prop) acoesIa += botao(ic("ia") + "Montar proposta com IA", "propostaDaConversa", c.id, "primario");
     if (prop) acoesIa += '<a class="btn suave" href="#/propostas/' + prop.id + '">' + ic("doc") + "Proposta " + prop.id + "</a>";
     if (cliente && cliente.id) { var ct = st.contratos.filter(function (k) { return k.clienteId === cliente.id; }).pop(); if (ct) acoesIa += '<a class="btn suave" href="#/contratos/' + ct.id + '">' + ic("doc") + "Contrato " + ct.id + "</a>"; }
     if (c.ia) acoesIa += botao(ic("ia") + "Rascunhar resposta", "rascunhar", c.id, acoesIa ? "suave" : "primario");
-    return '<header class="conversa-topo"><a class="voltar so-celular" href="#/inbox">' + ic("voltar") + "Conversas</a>" +
+    return '<header class="conversa-topo"><a class="voltar" href="#/contatos">' + ic("voltar") + "Contatos</a>" +
         '<div class="conversa-quem"><span class="avatar grande">' + iniciais(c.nome) + '</span><div class="conversa-nome"><h2>' + esc(c.nome) + "</h2><p>" + canal(c.canal) + esc(c.contato) + (c.assunto ? " · " + esc(c.assunto) : "") + "</p></div>" + vinculo + "</div></header>" +
       '<div class="conversa-rolagem">' +
       (c.ia ? '<div class="leitura-ia"><div class="leitura-topo"><span class="orbe pequena">' + ic("ia") + "</span><strong>Leitura da IA</strong><span class=\"intencao\">" + esc(c.ia.intencao) + '</span><span class="pilula ' + (c.ia.urgencia === "alta" ? "erro" : c.ia.urgencia === "média" ? "alerta" : "") + '">urgência ' + esc(c.ia.urgencia) + "</span></div>" +
@@ -143,44 +189,10 @@
         '<div class="compor-acoes"><span class="dica">' + ic(CANAL[c.canal].i) + "Envio simulado</span><button class=\"btn primario\" type=\"submit\">" + ic("enviar") + "Enviar</button></div></form>";
   }
 
-  // Negócios: arrastar o card para a coluna seguinte executa a regra. "Avançar" faz o mesmo pelo teclado.
-  var COLUNAS = [["lead", "Leads"], ["proposta", "Proposta"], ["assinatura", "Assinatura"], ["execucao", "Execução"], ["concluido", "Concluído"]];
-  var DESTINO = { lead: "proposta", proposta: "assinatura", contrato: "execucao" };
-  Telas.funil = function () {
-    var cards = Q.funil();
-    return cabeca("Negócios", "Arraste para avançar. Cada passo dispara o seguinte: proposta, contrato, cobrança e nota.", botao(ic("mais") + "Novo lead", "abrirNovoLead", "", "primario")) +
-      '<div class="kanban">' + COLUNAS.map(function (col, ci) {
-        var cs = cards.filter(function (c) { return c.col === col[0]; });
-        var total = soma(cs, function (c) { return c.valor || 0; });
-        return '<section class="coluna-k" data-col="' + col[0] + '" aria-label="' + col[1] + '"><header><h2>' + col[1] + '</h2><span class="contagem">' + cs.length + "</span>" + (total ? "<small>" + brl(total) + "</small>" : "") + "</header>" +
-          '<ul class="zona">' + cs.map(function (c) {
-            var href = c.tipo === "lead" ? (c.lead.conversaId ? "#/inbox/" + c.lead.conversaId : "#/funil") : c.tipo === "proposta" ? "#/propostas/" + c.id : "#/contratos/" + c.id;
-            var pode = (c.tipo === "lead") || (c.tipo === "proposta" && c.p.status === "Enviada") || (c.tipo === "contrato" && c.col === "assinatura");
-            var rotulo = c.tipo === "proposta" && c.p.status === "Rascunho" ? '<span class="pilula">rascunho</span>' : "";
-            return '<li class="card-k" draggable="' + pode + '" data-tipo="' + c.tipo + '" data-id="' + c.id + '">' +
-              '<a href="' + href + '" class="card-k-corpo" draggable="false"><span class="avatar pequeno">' + iniciais(c.nome) + "</span><span><strong>" + esc(c.nome) + "</strong><small>" + esc(c.sub) + "</small></span></a>" +
-              '<div class="card-k-pe">' + (c.valor ? "<b>" + brl(c.valor) + "</b>" : '<span class="dica">sem valor</span>') + rotulo +
-              (pode ? botao(ic("seta") + '<span class="sr">Avançar ' + esc(c.nome) + " para " + COLUNAS[ci + 1][1] + "</span>", "avancar", c.tipo + "|" + c.id, "icone", ' title="Avançar para ' + COLUNAS[ci + 1][1] + '"') : "") + "</div></li>";
-          }).join("") + (cs.length ? "" : '<li class="zona-vazia">Nada aqui</li>') + "</ul></section>";
-      }).join("") + "</div>";
-  };
-  function avancar(tipo, id) {
-    if (tipo === "lead") return R.criarProposta(por(st.leads, id));
-    if (tipo === "proposta") {
-      var p = por(st.propostas, id);
-      if (p.status !== "Enviada") return "Envie a proposta antes de registrar o aceite.";
-      return confirmar("Cliente aceitou a " + p.id + "?", "Cria o contrato e envia para assinatura de " + U.leadDe(p).empresa + ".", "Registrar aceite").then(function (ok) { return ok ? R.aceitarProposta(p) : null; });
-    }
-    if (tipo === "contrato") {
-      var c = por(st.contratos, id);
-      return c.status === "AguardandoAssinatura" ? R.assinar(c) : "Abra o contrato para avançar as etapas.";
-    }
-  }
-
   // Proposta: documento em papel à esquerda, edição e o e-mail da IA à direita.
   Telas.propostas = function (id) {
     var p = por(st.propostas, id);
-    if (!p) { setTimeout(function () { location.hash = "#/funil"; }); return ""; }
+    if (!p) { setTimeout(function () { location.hash = "#/contatos"; }); return ""; }
     var lead = U.leadDe(p), rasc = p.status === "Rascunho";
     var contrato = st.contratos.filter(function (c) { return c.propostaId === p.id && c.status !== "Cancelado"; })[0];
     var acoes = "";
@@ -200,11 +212,11 @@
     } else if (p.status === "Enviada") {
       lado = '<section class="painel"><h2>' + ic("ia") + "Follow-up pronto</h2><p class=\"dica\">Enviada " + quando(p.enviadaEm) + ". Sem resposta em 3 dias, a IA manda este texto pelo canal da conversa.</p>" +
         '<blockquote class="rascunho">Oi ' + esc(lead.contato) + ", conseguiu ver a proposta? Se ajudar, explico as etapas numa chamada de 15 minutos.</blockquote>" +
-        (conv ? '<a class="btn suave" href="#/inbox/' + conv.id + '">' + ic(CANAL[conv.canal].i) + "Abrir conversa</a>" : "") + "</section>";
+        (conv ? '<a class="btn suave" href="#/conversa/' + conv.id + '">' + ic(CANAL[conv.canal].i) + "Abrir conversa</a>" : "") + "</section>";
     } else {
       lado = '<section class="painel"><h2>Situação</h2><p>' + pilula(p.status) + "</p>" + (contrato ? '<p class="dica">Virou o contrato ' + contrato.id + ".</p>" : "") + "</section>";
     }
-    return cabeca("Proposta " + p.id + ' <span class="versao">v' + p.versao + "</span>", esc(lead.empresa) + " · válida até " + data(p.validade) + " · " + pilula(p.status), acoes, ["#/funil", "Negócios"]) +
+    return cabeca("Proposta " + p.id + ' <span class="versao">v' + p.versao + "</span>", esc(lead.empresa) + " · válida até " + data(p.validade) + " · " + pilula(p.status), acoes, ["#/contatos", "Contatos"]) +
       '<div class="grade-proposta"><article class="papel" aria-label="Prévia do documento">' +
         '<header><img src="assets/fma-horizontal-reversa.svg" alt="FMA Software" width="150" height="34"><div><small>Proposta comercial</small><strong>' + p.id + " · v" + p.versao + "</strong></div></header>" +
         '<div class="papel-corpo"><p class="papel-para">Para <strong>' + esc(lead.empresa) + "</strong><br>" + esc(lead.interesse) + "</p>" +
@@ -218,7 +230,8 @@
   var PASSOS = ["Planejada", "EmExecucao", "Entregue", "Aprovada", "Faturada", "Paga"];
   Telas.contratos = function (id) {
     var c = por(st.contratos, id);
-    if (!c) { setTimeout(function () { location.hash = "#/funil"; }); return ""; }
+    if (!id) return listaContratos();
+    if (!c) { setTimeout(function () { location.hash = "#/contratos"; }); return ""; }
     var cli = U.clienteDe(c);
     var total = soma(c.etapas, function (e) { return e.valor; });
     var pago = soma(c.etapas.filter(function (e) { return e.status === "Paga"; }), function (e) { return e.valor; });
@@ -226,7 +239,7 @@
     var linha = c.eventos.map(function (e) { return { em: e.em, texto: e.texto, canal: "sistema" }; })
       .concat(st.atividades.filter(function (a) { return a.alvo && a.alvo.indexOf("/" + c.id) >= 0; }))
       .sort(function (a, b) { return a.em < b.em ? 1 : a.em > b.em ? -1 : 0; });
-    return cabeca("Contrato " + c.id, '<a href="#/clientes">' + esc(cli.nome) + '</a> · proposta <a href="#/propostas/' + c.propostaId + '">' + c.propostaId + "</a> · " + pilula(c.status), acao, ["#/funil", "Negócios"]) +
+    return cabeca("Contrato " + c.id, '<a href="#/contratos">' + esc(cli.nome) + '</a> · proposta <a href="#/propostas/' + c.propostaId + '">' + c.propostaId + "</a> · " + pilula(c.status), acao, ["#/contratos", "Contratos"]) +
       '<div class="progresso-contrato"><div><span>Recebido</span><strong>' + brl(pago) + "</strong><small>de " + brl(total) + '</small></div><div class="barra-prog" role="progressbar" aria-label="Recebido do contrato" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + pago + '" aria-valuetext="' + esc(brl(pago) + " de " + brl(total)) + '"><span style="width:' + (total ? pago / total * 100 : 0) + '%"></span></div></div>' +
       '<div class="grade-contrato"><section aria-label="Etapas"><ol class="jornada">' + c.etapas.map(function (e) {
         var idx = PASSOS.indexOf(e.status);
@@ -262,11 +275,29 @@
       '<div class="campo largo"><label for="' + p + '-arq">XML e PDF</label><input id="' + p + '-arq" name="arquivo" type="file" accept=".xml,.pdf" multiple aria-describedby="' + p + '-arq-erro"><small id="' + p + '-arq-erro" class="erro-campo" role="alert" hidden></small></div>' +
       '</div><div class="acoes"><button class="btn primario" type="submit">' + ic("check") + "Anexar e enviar</button></div></form>";
   }
+  function listaContratos() {
+    var abertas = st.propostas.filter(function (p) { return p.status === "Rascunho" || p.status === "Enviada"; });
+    var lemb = st.lembretes.filter(function (m) { return m.status === "Pendente"; }).sort(function (a, c) { return a.quando < c.quando ? -1 : 1; });
+    return cabeca("Contratos", "Proposta aceita vira contrato. Cada etapa aprovada pede a NFS-e e gera a cobrança.") +
+      '<section class="painel"><h2>Contratos</h2><ul class="linhas">' + st.contratos.slice().reverse().map(function (c) {
+        var cli = U.clienteDe(c), total = soma(c.etapas, function (e) { return e.valor; });
+        var pago = soma(c.etapas.filter(function (e) { return e.status === "Paga"; }), function (e) { return e.valor; });
+        var semNota = c.etapas.filter(function (e) { return (e.status === "Aprovada" || e.status === "Paga") && !e.notaId; }).length;
+        return '<li><span class="avatar pequeno">' + iniciais(cli.nome) + '</span><div class="linha-texto"><strong><a href="#/contratos/' + c.id + '">' + c.id + " · " + esc(cli.nome) + "</a></strong><small>" + c.etapas.length + " etapa(s) · recebido " + brl(pago) + " de " + brl(total) +
+          (semNota ? ' · <span class="txt-erro">' + semNota + " sem NFS-e</span>" : "") + '</small></div><div class="linha-valor">' + pilula(c.status) + '</div><div class="acoes"><a class="btn suave" href="#/contratos/' + c.id + '">Abrir' + ic("seta") + "</a></div></li>";
+      }).join("") + "</ul></section>" +
+      '<div class="grade-duas"><section class="painel"><h2>Propostas abertas</h2>' + (abertas.length ? '<ul class="linhas">' + abertas.map(function (p) {
+        return '<li class="sem-avatar"><div class="linha-texto"><strong><a href="#/propostas/' + p.id + '">' + p.id + " · " + esc(U.leadDe(p).empresa) + "</a></strong><small>v" + p.versao + " · válida até " + data(p.validade) + '</small></div><div class="linha-valor"><b>' + brl(U.totalProposta(p)) + "</b>" + pilula(p.status) + "</div></li>";
+      }).join("") + "</ul>" : '<div class="vazio"><p>Nenhuma proposta aberta.</p></div>') + "</section>" +
+      '<section class="painel"><h2>Lembretes</h2>' + (lemb.length ? '<ul class="agenda">' + lemb.map(function (m) {
+        return '<li><a href="' + esc(m.alvo) + '">' + esc(m.texto) + "</a>" + prazo(m.quando) + botao(ic("check") + '<span class="sr">Concluir: ' + esc(m.texto) + "</span>", "concluirLembrete", m.id, "icone") + "</li>";
+      }).join("") + "</ul>" : '<div class="vazio"><p>Nenhum lembrete pendente.</p></div>') + "</section></div>";
+  }
 
-  // Dinheiro: entra, sai e notas, em cartões de linha com a ação ao lado.
+  // Contas: entra, sai e notas, em cartões de linha com a ação ao lado.
   var abaFin = "receber";
-  Telas.financeiro = function () {
-    var ar = Q.aReceber(), ap = Q.aPagar(), pn = Q.pendentesNota(), proj = Q.projecao(30);
+  Telas.contas = function () {
+    var ar = Q.aReceber(), ap = Q.aPagar(), pn = Q.pendentesNota();
     var abas = { receber: "A receber", pagar: "A pagar", notas: "Notas fiscais" };
     var corpo = "";
     if (abaFin === "receber") corpo = '<ul class="linhas">' + st.receber.slice().reverse().map(function (r) {
@@ -286,62 +317,15 @@
           '<div class="linha-valor"><b>' + brl(n.valor) + "</b>" + (n.retencoes ? '<small class="dica">retido ' + brl(n.retencoes) + "</small>" : "") + pilula(n.status) + "</div>" +
           '<div class="acoes">' + (n.status === "Anexada" ? botao("Cancelar", "cancelarNota", n.id, "suave perigo") : "") + "</div></li>";
       }).join("") + "</ul>";
-    return cabeca("Dinheiro", "O que entra, o que sai e as notas. A cobrança nasce quando o cliente aprova a etapa.") +
+    return cabeca("Contas", "O que entra, o que sai e as notas. A cobrança nasce quando o cliente aprova a etapa.") +
       '<div class="faixa-numeros">' +
-        numero("A receber", brl(soma(ar, function (r) { return r.valor; })), ar.length + " parcela(s)", "#/financeiro") +
-        numero("A pagar", brl(soma(ap, function (g) { return g.valor; })), ap.length + " conta(s)", "#/financeiro") +
-        numero("Saldo em 30 dias", brl(proj[proj.length - 1].v), "projeção", "#/financeiro") +
-        numero("Notas pendentes", String(pn.length), pn.length ? "travam recebimento" : "tudo em dia", "#/financeiro") +
+        numero("A receber", brl(soma(ar, function (r) { return r.valor; })), ar.length + " parcela(s)", "#/contas") +
+        numero("A pagar", brl(soma(ap, function (g) { return g.valor; })), ap.length + " conta(s)", "#/contas") +
+        numero("Notas pendentes", String(pn.length), pn.length ? "travam recebimento" : "tudo em dia", "#/contas") +
       "</div>" +
-      '<section class="painel"><div class="painel-topo"><h2>Caixa projetado</h2><span class="dica">vencimentos em aberto</span></div>' + grafico(proj, 210) + "</section>" +
       '<section class="painel"><div class="abas" role="tablist" aria-label="Lançamentos">' + Object.keys(abas).map(function (k) {
         return '<button type="button" role="tab" id="aba-' + k + '" data-aba="' + k + '" aria-selected="' + (abaFin === k) + '" tabindex="' + (abaFin === k ? 0 : -1) + '">' + abas[k] + "</button>";
       }).join("") + '</div><div role="tabpanel" aria-labelledby="aba-' + abaFin + '">' + corpo + "</div></section>";
-  };
-
-  Telas.clientes = function () {
-    var perdidos = st.leads.filter(function (l) { return l.status === "Perdido"; });
-    return cabeca("Clientes", "Lead vira cliente quando assina o contrato.") +
-      '<div class="cartoes">' + st.clientes.map(function (k) {
-        var cs = st.contratos.filter(function (c) { return c.clienteId === k.id; });
-        var rec = soma(st.receber.filter(function (r) { return r.clienteId === k.id && r.status === "Paga"; }), function (r) { return r.valorPago || 0; });
-        var aberto = soma(st.receber.filter(function (r) { return r.clienteId === k.id && r.status === "Aberta"; }), function (r) { return r.valor; });
-        var conv = U.conversaDoLead(k.leadId);
-        return '<article class="cartao-cli"><header><span class="avatar grande">' + iniciais(k.nome) + "</span><div><h2>" + esc(k.nome) + "</h2><small>cliente desde " + data(k.desde) + " · " + esc(k.documento) + "</small></div></header>" +
-          "<dl><div><dt>Recebido</dt><dd>" + brl(rec) + "</dd></div><div><dt>Em aberto</dt><dd>" + brl(aberto) + "</dd></div><div><dt>Contratos</dt><dd>" + cs.length + "</dd></div></dl>" +
-          '<div class="acoes">' + cs.map(function (c) { return '<a class="btn suave" href="#/contratos/' + c.id + '">' + ic("doc") + c.id + "</a>"; }).join("") + (conv ? '<a class="btn suave" href="#/inbox/' + conv.id + '">' + ic(CANAL[conv.canal].i) + "Conversa</a>" : "") + "</div></article>";
-      }).join("") + "</div>" +
-      (perdidos.length ? '<section class="painel"><h2>Leads perdidos</h2><ul class="linhas">' + perdidos.map(function (l) {
-        return '<li><span class="avatar pequeno escuro">' + iniciais(l.empresa) + '</span><div class="linha-texto"><strong>' + esc(l.empresa) + "</strong><small>" + esc(l.interesse) + " · " + esc(l.origem) + '</small></div><div class="acoes">' + botao("Reabrir", "reabrirLead", l.id, "suave") + "</div></li>";
-      }).join("") + "</ul></section>" : "");
-  };
-
-  var AUTOS = [
-    ["triagemIa", "ia", "Ler cada conversa nova", "A IA resume, marca intenção e urgência e sugere o próximo passo."],
-    ["propostaEmail", "email", "Enviar a proposta por e-mail", "PDF da proposta com o texto rascunhado pela IA."],
-    ["followupIa", "ia", "Follow-up em 3 dias", "Sem resposta, a IA escreve e manda pelo canal da conversa."],
-    ["cobrancaWhatsApp", "whatsapp", "Avisar a parcela pelo WhatsApp", "Quando o cliente aprova a etapa, recebe valor, vencimento e Pix."],
-    ["lembreteNfse", "sistema", "Lembrar de emitir a NFS-e", "Etapa aprovada sem nota sobe para o topo do dia."],
-    ["agradecimento", "whatsapp", "Agradecer o pagamento", "Mensagem curta quando a parcela é recebida."]
-  ];
-  Telas.integracoes = function () {
-    var conexoes = [
-      ["email", "E-mail", "SMTP da FMA", "Reaproveita o SmtpEmailCanal do EasyStok"],
-      ["whatsapp", "WhatsApp", "API oficial ou WPPConnect", "Reaproveita o CanalWhatsApp do EasyStok"],
-      ["ia", "IA", "Claude", "Reaproveita o AnthropicMessagesClient do EasyStok"]
-    ];
-    return cabeca("Conexões", "Os canais que o sistema usa sozinho. No protótipo tudo é simulado: nada sai deste navegador.") +
-      '<div class="conexoes">' + conexoes.map(function (x) {
-        return '<article class="conexao ' + x[0] + '">' + canal(x[0]) + "<h2>" + x[1] + "</h2><p>" + x[2] + "</p><small>" + x[3] + '</small><span class="pilula alerta">Simulado</span></article>';
-      }).join("") + "</div>" +
-      '<section class="painel"><h2>Automações</h2><ul class="automacoes">' + AUTOS.map(function (a) {
-        var on = !!st.automacoes[a[0]];
-        return "<li>" + canal(a[1]) + '<div><strong id="au-' + a[0] + '">' + a[2] + "</strong><small>" + a[3] + '</small></div><button type="button" class="chave" role="switch" aria-checked="' + on + '" aria-labelledby="au-' + a[0] + '" data-acao="alternarAutomacao" data-id="' + a[0] + '"><span></span></button></li>';
-      }).join("") + "</ul></section>" +
-      '<section class="painel"><h2>Blog</h2><p class="sub">Levantado em 12/11/2026. Os artigos vivem no Levante; aqui só o estado.</p><ul class="linhas">' +
-        '<li><span class="avatar pequeno">LV</span><div class="linha-texto"><strong>Levante</strong><small>Blog pessoal técnico (.NET, Next.js, MongoDB). Último commit em 13/08/2026. Cutover do domínio em curso: faltam e-mail, redirect do www e indexação.</small></div><div class="linha-valor"><span class="pilula alerta">parado</span></div></li>' +
-        '<li><span class="avatar pequeno escuro">FS</span><div class="linha-texto"><strong>Blog da FMA Software</strong><small>Não existe: nenhum repositório, domínio ou plano editorial. Decisão do Felipe: dentro do Levante ou próprio.</small></div><div class="linha-valor"><span class="pilula erro">não existe</span></div></li>' +
-      "</ul></section>";
   };
 
   // ---------- diálogos ----------
@@ -361,74 +345,23 @@
     restaurar: ["Restaurar os dados de exemplo?", "Apaga o que você fez neste navegador.", "Restaurar"]
   };
 
-  // ---------- copiloto ----------
-  var copLog = document.getElementById("copiloto-log");
-  var CHIPS = ["Como está o caixa?", "O que vence esta semana?", "Quais notas faltam?", "Rascunhe o follow-up da Alfa"];
-  function abrirCopiloto(abrir) {
-    document.body.classList.toggle("copiloto-aberto", abrir);
-    document.getElementById("alternar-copiloto").setAttribute("aria-expanded", String(abrir));
-  }
-  function balao(de, texto) {
-    var el = document.createElement("div"); el.className = "bolha " + de; copLog.appendChild(el);
-    if (de === "ia" && !reduzir) {
-      var i = 0; el.classList.add("digitando");
-      (function passo() { i += 3; el.textContent = texto.slice(0, i); copLog.scrollTop = copLog.scrollHeight; if (i < texto.length) setTimeout(passo, 12); else el.classList.remove("digitando"); })();
-    } else { el.textContent = texto; }
-    copLog.scrollTop = copLog.scrollHeight;
-  }
-  function perguntar(q) {
-    abrirCopiloto(true); balao("eu", q);
-    var pensando = document.createElement("div"); pensando.className = "bolha ia pensando"; pensando.innerHTML = '<span></span><span></span><span></span><span class="sr">Pensando</span>'; copLog.appendChild(pensando);
-    setTimeout(function () { pensando.remove(); balao("ia", F.perguntar(q)); }, reduzir ? 0 : 600);
-  }
-  function iniciarCopiloto() {
-    balao("ia", "Oi, Felipe. Pergunte sobre caixa, propostas e notas, ou peça um rascunho. Respondo com o que está no sistema.");
-    document.getElementById("copiloto-chips").innerHTML = CHIPS.map(function (c) { return '<button type="button" data-pergunta="' + esc(c) + '">' + esc(c) + "</button>"; }).join("");
-  }
-
-  // ---------- paleta de comandos (Ctrl K) ----------
-  var pal = document.getElementById("paleta"), palQ = document.getElementById("paleta-q"), palL = document.getElementById("paleta-lista"), palSel = 0, palItens = [];
-  function comandos(q) {
-    var t = q.toLowerCase().trim();
-    var base = [
-      { r: "Ir para Hoje", h: "#/hoje", i: "hoje" }, { r: "Ir para Conversas", h: "#/inbox", i: "inbox" }, { r: "Ir para Negócios", h: "#/funil", i: "funil" },
-      { r: "Ir para Dinheiro", h: "#/financeiro", i: "financeiro" }, { r: "Ir para Clientes", h: "#/clientes", i: "clientes" }, { r: "Ir para Conexões", h: "#/integracoes", i: "integracoes" },
-      { r: "Criar lead", a: "abrirNovoLead", i: "mais" }, { r: "Criar conta a pagar", a: "abrirNovaConta", i: "mais" }
-    ];
-    st.conversas.forEach(function (c) { base.push({ r: "Conversa com " + c.nome, h: "#/inbox/" + c.id, i: CANAL[c.canal].i }); });
-    st.propostas.forEach(function (p) { base.push({ r: "Proposta " + p.id + " · " + U.leadDe(p).empresa, h: "#/propostas/" + p.id, i: "doc" }); });
-    st.contratos.forEach(function (c) { base.push({ r: "Contrato " + c.id + " · " + U.clienteDe(c).nome, h: "#/contratos/" + c.id, i: "doc" }); });
-    var achados = t ? base.filter(function (x) { return x.r.toLowerCase().indexOf(t) >= 0; }) : base.slice(0, 8);
-    if (t) achados.unshift({ r: "Perguntar à IA: " + q.trim(), p: q.trim(), i: "ia" });
-    return achados.slice(0, 9);
-  }
-  function desenharPaleta() {
-    palItens = comandos(palQ.value); palSel = Math.max(0, Math.min(palSel, palItens.length - 1));
-    palL.innerHTML = palItens.map(function (x, i) { return '<li role="option" id="op-' + i + '" aria-selected="' + (i === palSel) + '" data-i="' + i + '">' + ic(x.i) + "<span>" + esc(x.r) + "</span></li>"; }).join("");
-    palQ.setAttribute("aria-activedescendant", palItens.length ? "op-" + palSel : "");
-    var sel = palL.querySelector('[aria-selected="true"]'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: "nearest" });
-  }
-  function executarComando(x) {
-    pal.close();
-    if (!x) return;
-    if (x.h) location.hash = x.h; else if (x.a) executar(x.a, ""); else if (x.p) perguntar(x.p);
-  }
-  function abrirPaleta() { palQ.value = ""; palSel = 0; desenharPaleta(); pal.showModal(); palQ.focus(); }
-
   // ---------- roteamento e render ----------
   function rota() {
-    var partes = (location.hash || "#/hoje").replace(/^#\//, "").split("/");
-    return { nome: Telas[partes[0]] ? partes[0] : "hoje", id: partes[1] || null };
+    var partes = (location.hash || "#/conteudo").replace(/^#\//, "").split("/");
+    return { nome: Telas[partes[0]] ? partes[0] : "conteudo", id: partes[1] || null };
   }
+  var ATIVO = { propostas: "contatos", conversa: "contatos" };
   function contador() {
-    var n = st.conversas.filter(function (c) { return c.naoLida; }).length, el = document.getElementById("contador-inbox");
-    el.hidden = !n; el.textContent = n; el.setAttribute("aria-label", n + " não lidas");
+    var n = st.conversas.filter(function (c) { return c.naoLida; }).length +
+      st.interacoes.filter(function (i) { return i.status === "Nova" && i.ia.intencao !== "Sem intenção comercial"; }).length;
+    var el = document.getElementById("contador-contatos");
+    el.hidden = !n; el.textContent = n; el.setAttribute("aria-label", n + " novidade(s)");
   }
   function render(focar) {
     var r = rota(), main = document.getElementById("conteudo");
     main.innerHTML = Telas[r.nome](r.id);
     main.setAttribute("data-tela", r.nome);
-    var ativo = r.nome === "propostas" || r.nome === "contratos" ? "funil" : r.nome;
+    var ativo = ATIVO[r.nome] || r.nome;
     document.querySelectorAll(".trilho a[data-rota]").forEach(function (a) {
       if (a.getAttribute("data-rota") === ativo) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
@@ -446,7 +379,7 @@
   }
   function concluir(resultado) {
     var antes = location.hash;
-    Promise.resolve(resultado).then(function (m) { F.salvar(); render(location.hash !== antes); if (m) avisar(m); });
+    return Promise.resolve(resultado).then(function (m) { F.salvar(); render(location.hash !== antes); if (m) avisar(m); });
   }
 
   function executar(acao, id) {
@@ -456,18 +389,33 @@
     }
     executarJa(acao, id);
   }
-  var POR_COLECAO = { qualificarLead: "leads", perderLead: "leads", reabrirLead: "leads", enviarProposta: "propostas", aceitarProposta: "propostas", recusarProposta: "propostas", novaVersao: "propostas",
-    receber: "receber", cobrar: "receber", pagar: "pagar", concluirLembrete: "lembretes", cancelarNota: "notas", propostaDaConversa: "conversas" };
+  var POR_COLECAO = { qualificarLead: "leads", perderLead: "leads", reabrirLead: "leads", criarProposta: "leads", enviarProposta: "propostas", aceitarProposta: "propostas", recusarProposta: "propostas", novaVersao: "propostas",
+    receber: "receber", cobrar: "receber", pagar: "pagar", concluirLembrete: "lembretes", cancelarNota: "notas", propostaDaConversa: "conversas",
+    rascunharPost: "posts", aprovarPost: "posts", desagendar: "posts", publicarAgora: "posts", virarLead: "interacoes", ignorar: "interacoes" };
+  function botoes(ok) { return '<div class="acoes direita"><button class="btn suave" type="button" data-fechar>Cancelar</button><button class="btn primario" type="submit">' + ok + "</button></div>"; }
   function executarJa(acao, id) {
     var ids = (id || "").split("|");
-    if (acao === "restaurar") { st = F.restaurar(); filtroInbox = "todos"; abaFin = "receber"; if (location.hash === "#/hoje") render(true); else location.hash = "#/hoje"; avisar("Dados de exemplo restaurados."); return; }
-    if (acao === "abrirNovoLead") return abrirDialogo('<form class="dialogo-corpo" data-form="lead" novalidate><h2>Novo lead</h2>' + campo("l-empresa", "Empresa", 'name="empresa" maxlength="80" autocomplete="off"') + campo("l-contato", "Contato", 'name="contato" maxlength="60" autocomplete="off"') + campo("l-interesse", "O que precisa", 'name="interesse" maxlength="120" autocomplete="off"') + '<div class="acoes direita"><button class="btn suave" type="button" data-fechar>Cancelar</button><button class="btn primario" type="submit">Criar lead</button></div></form>');
-    if (acao === "abrirNovaConta") return abrirDialogo('<form class="dialogo-corpo" data-form="pagar" novalidate><h2>Nova conta a pagar</h2>' + campo("g-desc", "Descrição", 'name="descricao" maxlength="80" autocomplete="off"') + campo("g-valor", "Valor", 'name="valor" inputmode="decimal" placeholder="1.500,00"') + campo("g-venc", "Vencimento", 'name="vencimento" type="date" value="' + U.dias(10) + '"') + '<div class="campo"><label for="g-cat">Categoria</label><select id="g-cat" name="categoria"><option>Administrativo</option><option>Custo de projeto</option><option>Tributos</option><option>Ferramentas</option></select></div><div class="acoes direita"><button class="btn suave" type="button" data-fechar>Cancelar</button><button class="btn primario" type="submit">Criar conta</button></div></form>');
+    if (acao === "restaurar") { st = F.restaurar(); abaFin = "receber"; if (location.hash === "#/conteudo") render(true); else location.hash = "#/conteudo"; avisar("Dados de exemplo restaurados."); return; }
+    if (acao === "abrirNovoLead") return abrirDialogo('<form class="dialogo-corpo" data-form="lead" novalidate><h2>Novo lead</h2>' + campo("l-empresa", "Empresa", 'name="empresa" maxlength="80" autocomplete="off"') + campo("l-contato", "Contato", 'name="contato" maxlength="60" autocomplete="off"') + campo("l-interesse", "O que precisa", 'name="interesse" maxlength="120" autocomplete="off"') + botoes("Criar lead") + "</form>");
+    if (acao === "abrirNovaConta") return abrirDialogo('<form class="dialogo-corpo" data-form="pagar" novalidate><h2>Nova conta a pagar</h2>' + campo("g-desc", "Descrição", 'name="descricao" maxlength="80" autocomplete="off"') + campo("g-valor", "Valor", 'name="valor" inputmode="decimal" placeholder="1.500,00"') + campo("g-venc", "Vencimento", 'name="vencimento" type="date" value="' + U.dias(10) + '"') + '<div class="campo"><label for="g-cat">Categoria</label><select id="g-cat" name="categoria"><option>Administrativo</option><option>Custo de projeto</option><option>Tributos</option><option>Ferramentas</option></select></div>' + botoes("Criar conta") + "</form>");
+    if (acao === "abrirNovaIdeia") return abrirDialogo('<form class="dialogo-corpo" data-form="ideia" novalidate><h2>Nova ideia</h2>' + campo("i-titulo", "Título", 'name="titulo" maxlength="100" autocomplete="off" placeholder="Ex.: por que entrego protótipo antes do código"') +
+      '<div class="campo"><label for="i-formato">Formato</label><select id="i-formato" name="formato"><option value="post">Post</option><option value="artigo">Artigo (vai também para o blog)</option><option value="carrossel">Carrossel</option><option value="video">Vídeo</option></select></div>' + botoes("Criar ideia") + "</form>");
+    if (acao === "abrirAbordar") {
+      var ld = por(st.leads, id), n = Q.abordagensHoje(), lim = Q.limiteDia(), cheio = n >= lim;
+      var sug = "Oi " + ld.contato + ", tudo bem? Vi que vocês estão olhando " + ld.interesse.toLowerCase() + ". Eu trabalho por etapas pequenas, com protótipo antes do código. Faz sentido uma conversa de 15 minutos?";
+      return abrirDialogo('<form class="dialogo-corpo" data-form="abordar" data-id="' + ld.id + '" novalidate><h2>Abordar ' + esc(ld.contato) + " · " + esc(ld.empresa) + "</h2>" +
+        '<p class="contador-msg' + (cheio ? " cheio" : "") + '">' + n + " de " + lim + " mensagens hoje</p>" +
+        '<div class="campo"><label for="ab-texto">Mensagem (rascunho da IA, edite à vontade)</label><textarea id="ab-texto" name="texto" rows="6" aria-describedby="ab-texto-erro">' + esc(sug) + '</textarea><small id="ab-texto-erro" class="erro-campo" role="alert" hidden></small></div>' +
+        '<p class="dica">O sistema não envia nada. Copie e mande você mesmo pelo LinkedIn; aqui fica só o registro.</p>' + botoes(cheio ? "Limite de hoje atingido" : "Registrar envio") + "</form>");
+    }
     if (acao === "rascunhar") { var cv = por(st.conversas, id), ta = document.getElementById("resposta"); if (ta && cv && cv.ia) escrever(ta, cv.ia.resposta); return; }
-    if (acao === "avancar") return concluir(avancar(ids[0], ids[1]));
+    if (acao === "rascunharPost") {
+      var pr = por(st.posts, id), m0 = R.rascunharPost(pr);
+      return concluir(m0).then(function () { var t2 = document.getElementById("texto-post"); if (t2) escrever(t2, pr.texto); });
+    }
+    if (acao === "aprovarPost") { var pa = por(st.posts, id), tp = document.getElementById("texto-post"); if (tp) R.salvarTexto(pa, tp.value); return concluir(R.aprovarPost(pa)); }
     var msg;
-    if (acao === "alternarAutomacao") msg = R.alternarAutomacao(id);
-    else if (POR_COLECAO[acao]) msg = R[acao](por(st[POR_COLECAO[acao]], id));
+    if (POR_COLECAO[acao]) msg = R[acao](por(st[POR_COLECAO[acao]], id));
     else if (acao === "removerEtapa" || acao === "removerCusto") msg = R[acao](por(st.propostas, ids[0]), Number(ids[1]));
     else { var ct = por(st.contratos, ids[0]); msg = ids[1] ? R[acao](ct, por(ct.etapas, ids[1])) : R[acao](ct); }
     concluir(msg);
@@ -491,12 +439,8 @@
   document.addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-acao]");
     if (b) { ev.preventDefault(); executar(b.getAttribute("data-acao"), b.getAttribute("data-id")); return; }
-    var fil = ev.target.closest("[data-filtro]"); if (fil) { filtroInbox = fil.getAttribute("data-filtro"); render(); document.querySelector('[data-filtro="' + filtroInbox + '"]').focus(); return; }
     var aba = ev.target.closest("[data-aba]"); if (aba) { abaFin = aba.getAttribute("data-aba"); render(); document.querySelector('[data-aba="' + abaFin + '"]').focus(); return; }
-    var per = ev.target.closest("[data-pergunta]"); if (per) { perguntar(per.getAttribute("data-pergunta")); return; }
     if (ev.target.closest("[data-fechar]")) { dlg.close(); return; }
-    var op = ev.target.closest("#paleta-lista li"); if (op) { executarComando(palItens[+op.getAttribute("data-i")]); return; }
-    if (ev.target === pal) { pal.close(); return; }
     if (ev.target.closest(".pular")) { ev.preventDefault(); var h1 = document.querySelector("main h1"); if (h1) h1.focus(); }
   });
   // Setas entre abas (padrão WAI-ARIA de tabs).
@@ -509,18 +453,40 @@
   document.addEventListener("submit", function (ev) {
     var f = ev.target; if (f.getAttribute("method") === "dialog") return;
     ev.preventDefault(); limparErros(f);
-    var tipo = f.getAttribute("data-form"), v;
-    if (f.id === "copiloto-form") { var q = f.q.value.trim(); if (q) { perguntar(q); f.q.value = ""; } return; }
+    var tipo = f.getAttribute("data-form"), v, res;
     if (tipo === "responder") {
       var conv = por(st.conversas, f.getAttribute("data-id")), txt = f.texto.value.trim();
       if (!txt) { f.texto.focus(); return; }
       return concluir(R.responder(conv, txt));
     }
+    if (tipo === "ideia") {
+      var tit = f.titulo.value.trim();
+      if (!tit) return erroCampo(f, "titulo", "Dê um título à ideia.");
+      var fmt = f.formato.value, np = R.criarPost({ titulo: tit, formato: fmt, redes: fmt === "artigo" ? ["linkedin", "blog"] : fmt === "post" ? ["linkedin"] : ["linkedin", "instagram"] });
+      dlg.close(); F.salvar(); location.hash = "#/conteudo/" + np.id; avisar("Ideia criada. Peça o rascunho à IA."); return;
+    }
+    if (tipo === "texto") return concluir(R.salvarTexto(por(st.posts, f.getAttribute("data-id")), f.texto.value));
+    if (tipo === "agendar") {
+      var redesSel = Array.prototype.slice.call(f.querySelectorAll('input[name="redes"]:checked')).map(function (x) { return x.value; });
+      res = R.agendarPost(por(st.posts, f.getAttribute("data-id")), { redes: redesSel, quando: f.quando.value });
+      if (res && res.erro === "quando") return erroCampo(f, "quando", res.msg);
+      if (res && res.erro === "redes") {
+        var er = document.getElementById("a-redes-erro"); er.textContent = res.msg; er.hidden = false;
+        f.querySelector("fieldset").setAttribute("aria-invalid", "true"); f.querySelector('input[name="redes"]').focus(); return;
+      }
+      if (res && res.erro) return avisar(res.msg);
+      return concluir(res);
+    }
+    if (tipo === "abordar") {
+      res = R.abordar(por(st.leads, f.getAttribute("data-id")), f.texto.value.trim());
+      if (res && res.erro) return erroCampo(f, "texto", res.msg);
+      dlg.close(); return concluir(res);
+    }
     if (tipo === "lead") {
       var empresa = f.empresa.value.trim();
       if (!empresa) return erroCampo(f, "empresa", "Informe o nome da empresa.");
       R.criarLead({ empresa: empresa, contato: f.contato.value.trim(), interesse: f.interesse.value.trim() });
-      dlg.close(); return concluir("Lead " + empresa + " criado na coluna Leads.");
+      dlg.close(); return concluir("Lead " + empresa + " criado.");
     }
     if (tipo === "pagar") {
       var desc = f.descricao.value.trim(); v = U.lerValor(f.valor.value);
@@ -529,7 +495,7 @@
       if (!f.vencimento.value) return erroCampo(f, "vencimento", "Informe o vencimento.");
       var mm = R.criarPagar({ descricao: desc, valor: v, vencimento: f.vencimento.value, categoria: f.categoria.value });
       dlg.close(); abaFin = "pagar";
-      if (location.hash !== "#/financeiro") location.hash = "#/financeiro";
+      if (location.hash !== "#/contas") location.hash = "#/contas";
       return concluir(mm);
     }
     if (tipo === "etapa" || tipo === "custo") {
@@ -545,59 +511,13 @@
       var arqs = Array.prototype.slice.call(f.arquivo.files || []);
       var xml = arqs.filter(function (a) { return /\.xml$/i.test(a.name); })[0], pdf = arqs.filter(function (a) { return /\.pdf$/i.test(a.name); })[0];
       var ret = f.retencoes.value.trim() ? U.lerValor(f.retencoes.value) : 0;
-      var res = R.anexarNota(c, e, { numero: f.numero.value.trim(), valor: U.lerValor(f.valor.value), retencoes: ret, competencia: f.competencia.value, xml: xml && xml.name, pdf: pdf && pdf.name });
+      res = R.anexarNota(c, e, { numero: f.numero.value.trim(), valor: U.lerValor(f.valor.value), retencoes: ret, competencia: f.competencia.value, xml: xml && xml.name, pdf: pdf && pdf.name });
       if (res && res.erro) return erroCampo(f, res.erro, res.msg);
       concluir(res);
     }
   });
 
-  // Arrastar e soltar no funil.
-  var arrastando = null;
-  document.addEventListener("dragstart", function (ev) {
-    var c = ev.target.closest && ev.target.closest(".card-k"); if (!c) return;
-    arrastando = { tipo: c.getAttribute("data-tipo"), id: c.getAttribute("data-id") };
-    ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", arrastando.id);
-    c.classList.add("arrastando"); document.body.classList.add("modo-arraste");
-    var alvo = document.querySelector('.coluna-k[data-col="' + DESTINO[arrastando.tipo] + '"]'); if (alvo) alvo.classList.add("pode");
-  });
-  document.addEventListener("dragend", function () {
-    arrastando = null; document.body.classList.remove("modo-arraste");
-    document.querySelectorAll(".arrastando,.pode,.sobre").forEach(function (x) { x.classList.remove("arrastando", "pode", "sobre"); });
-  });
-  document.addEventListener("dragover", function (ev) {
-    var col = ev.target.closest && ev.target.closest(".coluna-k"); if (!col || !arrastando) return;
-    ev.preventDefault();
-    document.querySelectorAll(".sobre").forEach(function (x) { if (x !== col) x.classList.remove("sobre"); }); col.classList.add("sobre");
-  });
-  document.addEventListener("drop", function (ev) {
-    var col = ev.target.closest && ev.target.closest(".coluna-k"); if (!col || !arrastando) return;
-    ev.preventDefault();
-    var a = arrastando;
-    if (col.getAttribute("data-col") === DESTINO[a.tipo]) concluir(avancar(a.tipo, a.id));
-    else avisar("Um passo por vez: solte na coluna destacada.");
-  });
-
-  document.addEventListener("keydown", function (ev) {
-    if ((ev.ctrlKey || ev.metaKey) && ev.key && ev.key.toLowerCase() === "k") { ev.preventDefault(); if (pal.open) pal.close(); else abrirPaleta(); }
-    if (ev.key === "Escape" && document.body.classList.contains("copiloto-aberto") && !pal.open && !dlg.open && window.innerWidth < 1280) abrirCopiloto(false);
-  });
-  palQ.addEventListener("input", function () { palSel = 0; desenharPaleta(); });
-  palQ.addEventListener("keydown", function (ev) {
-    if (!palItens.length) return;
-    if (ev.key === "ArrowDown") { ev.preventDefault(); palSel = (palSel + 1) % palItens.length; desenharPaleta(); }
-    if (ev.key === "ArrowUp") { ev.preventDefault(); palSel = (palSel - 1 + palItens.length) % palItens.length; desenharPaleta(); }
-    if (ev.key === "Enter") { ev.preventDefault(); executarComando(palItens[palSel]); }
-  });
-  document.getElementById("abrir-paleta").addEventListener("click", abrirPaleta);
-  document.getElementById("alternar-copiloto").addEventListener("click", function () {
-    var abrir = !document.body.classList.contains("copiloto-aberto"); abrirCopiloto(abrir);
-    if (abrir) document.getElementById("copiloto-q").focus();
-  });
-  document.getElementById("fechar-copiloto").addEventListener("click", function () { abrirCopiloto(false); document.getElementById("alternar-copiloto").focus(); });
   document.getElementById("restaurar").addEventListener("click", function () { executar("restaurar", ""); });
   window.addEventListener("hashchange", function () { if (/^#\//.test(location.hash) || !location.hash) render(true); });
-
-  iniciarCopiloto();
-  abrirCopiloto(window.innerWidth >= 1280);
   render();
 })();
