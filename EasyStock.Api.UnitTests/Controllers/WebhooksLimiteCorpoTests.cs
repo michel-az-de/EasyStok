@@ -1,8 +1,10 @@
 using System.Reflection;
+using EasyStock.Api.Controllers;
 using EasyStock.Api.Controllers.Webhooks;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EasyStock.Api.UnitTests.Controllers;
@@ -22,14 +24,17 @@ public class WebhooksLimiteCorpoTests
         return dados;
     }
 
+    // #2401: os webhooks de pagamento (gateway e Pix) ficam fora do namespace Webhooks e tinham o mesmo furo.
     private static IEnumerable<MethodInfo> Acoes() =>
         typeof(WebhookWhatsAppController).Assembly.GetTypes()
-            .Where(t => t.Namespace == typeof(WebhookWhatsAppController).Namespace && typeof(ControllerBase).IsAssignableFrom(t))
+            .Where(t => (t.Namespace == typeof(WebhookWhatsAppController).Namespace
+                    || t == typeof(WebhookGatewayController) || t == typeof(WebhookPixController))
+                && typeof(ControllerBase).IsAssignableFrom(t))
             .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
             .Where(m => m.GetCustomAttribute<HttpPostAttribute>() is not null);
 
     [Fact]
-    public void HaWebhooksParaConferir() => Acoes().Should().HaveCountGreaterThanOrEqualTo(6);
+    public void HaWebhooksParaConferir() => Acoes().Should().HaveCountGreaterThanOrEqualTo(8);
 
     [Theory]
     [MemberData(nameof(PostsDeWebhook))]
@@ -42,6 +47,19 @@ public class WebhooksLimiteCorpoTests
 
         limite.Should().NotBeNull($"{acaoNome} é anônimo e, sem teto, o Kestrel aceita 30 MB antes da assinatura");
         BytesDoFiltro(limite!).Should().BeInRange(1, TetoBytes);
+    }
+
+    [Theory]
+    [MemberData(nameof(PostsDeWebhook))]
+    public void PostDeWebhook_TemRateLimit(string acaoNome)
+    {
+        var acao = Acoes().Single(a => $"{a.DeclaringType!.Name}.{a.Name}" == acaoNome);
+
+        var rate = acao.GetCustomAttribute<EnableRateLimitingAttribute>()
+            ?? acao.DeclaringType!.GetCustomAttribute<EnableRateLimitingAttribute>();
+
+        rate.Should().NotBeNull($"{acaoNome} é anônimo e precisa da política webhook-meta");
+        rate!.PolicyName.Should().Be("webhook-meta");
     }
 
     /// <summary>O atributo não expõe o valor e o filtro é interno: lê o `Bytes` do filtro que o atributo cria para a requisição.</summary>
