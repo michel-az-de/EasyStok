@@ -259,6 +259,20 @@ public class SyncMutationDispatcher(
             existing.LastOperatorName = operatorName;
             if (existing.EmpresaId == null && empresaId.HasValue) existing.EmpresaId = empresaId;
             if (existing.LojaId == null && lojaId.HasValue) existing.LojaId = lojaId;
+
+            // CLI-2: a edição no app chega ao Cliente do ERP ligado (mesma empresa).
+            if (existing.ErpClienteId is { } erpId && empresaId.HasValue)
+            {
+                var erp = await _db.Set<Cliente>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(c => c.Id == erpId && c.EmpresaId == empresaId.Value);
+                if (erp != null)
+                {
+                    erp.Nome = dto.Name;
+                    erp.Telefone = dto.Phone;
+                    erp.Apt = dto.Apt;
+                    erp.Endereco = dto.Address;
+                }
+            }
         }
     }
 
