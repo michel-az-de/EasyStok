@@ -9081,12 +9081,22 @@ function toggleUxDensity(ev) {
 }
 applyUxDensity();
 
-let products = load('cdb-products', null);
-if (!products) products = window.CDB_CONFIG?.isPilot ? [] : defaultProducts.map(p => ({...p}));
-// Garante que o catálogo oficial sempre está presente mesmo após limpar custom
-if (!window.CDB_CONFIG?.isPilot) defaultProducts.forEach(dp => {
-  if (!products.find(p => p.id === dp.id)) products.unshift({...dp});
-});
+// #2316 (SYNC-4): aparelho pareado com o ERP recebe o catalogo pelo pull; semear o
+// catalogo local duplicava os produtos (7 sementes + 9 do ERP).
+function catalogoLocalInicial(armazenado, sementes, ctx) {
+  const lista = armazenado ? armazenado : (ctx.isPilot || ctx.paired ? [] : sementes.map(p => ({...p})));
+  // Garante que o catálogo oficial sempre está presente mesmo após limpar custom
+  if (!ctx.isPilot && !ctx.paired) sementes.forEach(dp => {
+    if (!lista.find(p => p.id === dp.id)) lista.unshift({...dp});
+  });
+  return lista;
+}
+function aparelhoPareadoComErp() {
+  try { const pr = JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); return !!(pr && pr.apiKey); }
+  catch (_) { return false; }
+}
+let products = catalogoLocalInicial(load('cdb-products', null), defaultProducts,
+  { isPilot: !!window.CDB_CONFIG?.isPilot, paired: aparelhoPareadoComErp() });
 products = products.map(p => ({...p, count: 0, photo: null, stock: p.stock || 0}));
 
 let clients = load('cdb-clients', window.CDB_CONFIG?.isPilot ? [] : defaultClients);
@@ -12425,7 +12435,6 @@ function cancelOrder(id) {
       summary: `Pedido cancelado · ${money(o.total)} · vinha de ${prev}` + (wasDelivered ? ' (caixa estornado)' : '')
     });
     persistAll();
-    pendingSync++;
     updateSync();
     renderHome();
     renderOrdersFeed();
@@ -12466,7 +12475,6 @@ function cancelOrder(id) {
     },
     {
       onCommit: function () {
-        pendingSync++;
         updateSync();
         logAction({
           action: 'order.delete', entityType: 'order', entityId: id,
@@ -18788,7 +18796,6 @@ function adicionarFaltantesNaCompra(faltantes) {
   });
   if (added === 0) { showToast('Os faltantes já estão na lista de Compras.'); return 0; }
   persistAll();
-  pendingSync++;
   updateSync();
   if (typeof renderShoppingList === 'function') renderShoppingList();
   if (typeof renderHomeShopping === 'function') renderHomeShopping();
@@ -19303,7 +19310,6 @@ function confirmBatchDiscard() {
   const lote = batch.lote || batch.code || batch.id;
   logAction({ action: 'batch.discard', entityType: 'batch', entityId: batch.id, summary: 'Descarte: lote ' + lote + ' · ' + reason + (note ? ' · ' + note : '') });
   persistAll();
-  pendingSync++;
   updateSync();
   closeBatchDiscardModal();
   if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
@@ -19321,7 +19327,6 @@ function revertBatchDiscard(batchId) {
   ajustarSaldoDoLote(batch, contavaAntes);
   logAction({ action: 'batch.discard_revert', entityType: 'batch', entityId: batch.id, summary: 'Descarte revertido: lote ' + (batch.lote || batch.code || batch.id) });
   persistAll();
-  pendingSync++;
   updateSync();
   if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
   if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
@@ -19499,7 +19504,6 @@ function _proceedAdvance(id, nextStatus) {
   o.lastOperatorName = operatorName || null;
   addHistoryEvent(o, nextStatus, prev + ' → ' + nextStatus);
   persistAll();
-  pendingSync++;
   updateSync();
   renderHome();
   renderOrdersFeed();
@@ -22001,7 +22005,6 @@ function confirmProduction() {
 
   clearProduction(productionSelectionIds);
   closeProductionConfirm();
-  pendingSync += items.length;
   updateSync();
 
   // Audit log: produção registrada
@@ -22708,8 +22711,6 @@ function saveOrder() {
   setTimeout(() => { highlightOrderId = null; renderKanban(); }, 3200);
   // Apos salvar, vai automatico pra aba Andamento (kanban com o card novo)
   if (typeof goPedidosTab === 'function') goPedidosTab('andamento');
-
-  pendingSync++;
   updateSync();
 
   // Toast com próximas ações — cobrar é destaque no pedido normal.
@@ -23296,7 +23297,6 @@ function saveCashEntry() {
     entry.metodo = cashMetodo;
     entry.lastOperatorName = operatorName || null;
     persistAll();
-    pendingSync++;
     updateSync();
     logAction({
       action: 'cash.entry_edit', entityType: 'cash', entityId: entry.id,
@@ -23322,7 +23322,6 @@ function saveCashEntry() {
   };
   cashEntries.push(entry);
   persistAll();
-  pendingSync++;
   updateSync();
 
   // Audit log: lancamento manual no caixa
@@ -23374,7 +23373,6 @@ function deleteCashEntry(id) {
       onCommit: function () {
         // Sync e audit log so' depois do delay (commit definitivo)
         try { window.cdbSync.confirmarExclusaoLancamento(id); } catch (_) {}
-        pendingSync++;
         updateSync();
         logAction({
           action: 'cash.entry_delete', entityType: 'cash', entityId: id,
@@ -23418,7 +23416,6 @@ function addShop(forcedName) {
   });
   persistAll();
   if (input) input.value = '';
-  pendingSync++;
   updateSync();
   renderShoppingList();
   renderHomeShopping();
@@ -23819,7 +23816,7 @@ try {
 window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
-  bumpPendingSync: (n = 1) => { pendingSync += n; updateSync(); },
+  bumpPendingSync: () => { updateSync(); }, // #2316: contador deriva so da fila (sync.js)
   markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },
   getOperator: () => operatorName,
   showToast: function (msg) { if (typeof showToast === 'function') showToast(msg); },
