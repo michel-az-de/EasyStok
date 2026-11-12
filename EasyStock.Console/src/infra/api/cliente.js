@@ -29,17 +29,17 @@ function expirar(sessao) {
   window.dispatchEvent(new Event(EVENTO_SESSAO_EXPIRADA))
 }
 
-export async function garantirSessao() {
+export async function garantirSessao({ forcar = false } = {}) {
   const sessao = lerSessao()
   if (temSessaoNativa()) {
     if (sessao?.nativa && sessao.expiraEm > Date.now()) return sessao
     return gravarSessaoNativa(await obterSessaoNativa())
   }
-  if (!sessao?.persistente || sessao.expiraEm > Date.now()) return sessao
+  if (!sessao?.persistente || (!forcar && sessao.expiraEm > Date.now())) return sessao
   if (!renovacao) {
     const renovar = async () => {
       const atual = lerSessao()
-      if (!atual?.persistente || atual.expiraEm > Date.now()) return atual
+      if (!atual?.persistente || (!forcar && atual.expiraEm > Date.now())) return atual
       let dados
       try {
         dados = await chamarApi('/api/auth/refresh', {
@@ -115,7 +115,7 @@ const semResposta = (metodo) => new ErroApi(0, 'SEM_RESPOSTA',
   metodo === 'GET' ? MENSAGEM_LEITURA_SEM_RESPOSTA : MENSAGEM_ESCRITA_SEM_RESPOSTA)
 
 export async function chamarApi(caminho, {
-  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null, keepalive = false,
+  metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null, keepalive = false, repetida = false,
 } = {}) {
   const sessao = autenticado ? await garantirSessao() : null
   // Uma operação em etapas pertence à conta que a iniciou, mesmo durante a renovação do token.
@@ -158,6 +158,15 @@ export async function chamarApi(caminho, {
   const json = comoJson(bruto)
   if (resposta.ok) return envelope ? json : json?.data ?? null
 
+  if (resposta.status === 401 && autenticado && metodo === 'GET' && !repetida && sessao?.persistente && !temSessaoNativa()) {
+    // Leitura rejeitada com refresh válido (relógio atrasado, token revogado cedo): renova uma vez e repete
+    // a leitura uma vez. Escrita nunca repete: pode já ter tido efeito.
+    let renovada = null
+    try { renovada = lerSessao()?.token !== sessao.token ? lerSessao() : await garantirSessao({ forcar: true }) } catch { /* cai no 401 abaixo */ }
+    if (renovada?.token && renovada.token !== sessao.token) {
+      return chamarApi(caminho, { metodo, corpo, formulario, autenticado, texto, arquivo, chave, sinal, envelope, prazoComCancelamento, identidadeEsperada, keepalive, repetida: true })
+    }
+  }
   if (resposta.status === 401 && autenticado) {
     if (sessao?.nativa && temSessaoNativa() && lerSessao()?.token === sessao.token) {
       try {
