@@ -234,6 +234,10 @@ await confere('A5: perda sem custo é "sem custo", não R$ 0,00, e conta à part
   assert.equal(perdasSemCusto({ lancamentos: [lanc(), lanc({ quantidade: 12 }), lanc({ valor: 10.8 })] }), 2)
   assert.equal(textoDaPerda(lanc()), 'Perda no preparo', 'o motivo uma vez só')
   assert.equal(textoDaPerda(lanc({ motivo: 'Outro', descricao: 'Quebra da cadeia fria' })), 'Outro · Quebra da cadeia fria')
+  assert.equal(textoDaPerda(lanc({ motivo: 'Outro', descricao: 'Perda · Outro: Caiu no chão' })), 'Outro · Caiu no chão', 'o texto gerado pela API não repete o motivo')
+  for (const texto of ['Perda', 'Outro', 'LOT-TESTE']) {
+    assert.equal(textoDaPerda(lanc({ motivo: 'Outro', lote: 'LOT-TESTE', descricao: `Perda · Outro: ${texto}` })), `Outro · ${texto}`, 'preserva texto livre que coincide com metadados')
+  }
 })
 
 // === E9: custo do insumo ================================================================

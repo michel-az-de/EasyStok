@@ -26,6 +26,7 @@ export function textoDaPerda(l) {
   const rotulo = MOTIVOS_PERDA.find((m) => m.id === l.motivo)?.rotulo ?? l.motivo ?? ''
   const resto = String(l.descricao ?? '').split(' · ').map((p) => p.trim())
     .filter((p) => p && p.toLowerCase() !== 'perda' && p.toLowerCase() !== rotulo.toLowerCase() && p !== l.lote)
+    .map((p) => p.startsWith(`${rotulo}: `) ? p.slice(rotulo.length + 2) : p)
   return [rotulo, ...resto].filter(Boolean).join(' · ')
 }
 export const lerVencidos = async () => ((await obterVencidos()) ?? []).map(vencidoDaApi)
@@ -116,7 +117,7 @@ export function criarGestaoPerdas({ recarregar, aoErro, aoFeito = () => {}, gera
         quantidade: numero(rascunho.quantidade),
         motivo: rascunho.motivo,
         texto: rascunho.motivo === 'Outro' ? String(rascunho.texto).trim() : null,
-      }), (r) => `Perda lançada: ${r?.quantidade ?? rascunho.quantidade} de ${rascunho.nome ?? 'item'}.`)
+      }), (r) => `Perda lançada: ${r?.quantidade?.toLocaleString('pt-BR') ?? rascunho.quantidade} de ${rascunho.nome ?? 'item'}.`)
     },
     // Sugestão de lote vencido: lança o lote inteiro como Vencido, só quando ela confirma.
     lancarVencido: (v) => gravar(

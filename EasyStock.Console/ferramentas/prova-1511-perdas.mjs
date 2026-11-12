@@ -88,6 +88,7 @@ await confere('lançar manda produto, quantidade (vírgula vira ponto) e motivo,
     { produtoId: 'p-1', itemEstoqueId: null, quantidade: 1.5, motivo: 'Outro', texto: 'caiu' })
   assert.equal(m.relidas(), 1)
   assert.match(m.feitos[0], /Lasanha/)
+  assert.equal(m.feitos[0], 'Perda lançada: 1,5 de Lasanha.')
 })
 
 await confere('#2003 (estoque-09): a perda leva Idempotency-Key; reenvio igual repete a chave, perda diferente ganha outra', async () => {
