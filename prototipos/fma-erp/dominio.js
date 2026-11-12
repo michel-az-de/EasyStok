@@ -318,6 +318,8 @@
       if (!/^\d{4}-\d{2}$/.test(d.competencia || "")) return { erro: "competencia", msg: "Informe a competência (mês da prestação)." };
       if (!d.xml || !d.pdf) return { erro: "arquivo", msg: "Anexe o XML e o PDF da NFS-e." };
       var r = por(st.receber, e.receberId);
+      // Parcela já recebida pelo bruto: retenção agora deixaria nota e caixa divergentes.
+      if (d.retencoes > 0 && r && r.status === "Paga" && r.valorPago >= r.bruto) return { erro: "retencoes", msg: "Parcela já recebida pelo bruto de " + brl(r.bruto) + ". Emita a nota sem retenção ou acerte a devolução com o cliente antes." };
       var anterior = st.notas.filter(function (x) { return x.etapaId === e.id && x.status === "Cancelada"; }).pop();
       var n = { id: novoId("N"), numero: d.numero, contratoId: c.id, etapaId: e.id, receberId: e.receberId, valor: d.valor, retencoes: d.retencoes, competencia: d.competencia, xml: d.xml, pdf: d.pdf, status: "Anexada", substitui: anterior ? anterior.numero : null };
       st.notas.push(n); e.notaId = n.id;
