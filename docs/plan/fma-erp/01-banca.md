@@ -13,7 +13,7 @@ Veredito: a recomendação B da v1 **só se sustenta em parte**.
 | Risco da B para a CdB é Médio, não Baixo: migrações e enum entram no release da CdB | Spec 2.2 corrigida |
 | Seeds e jobs da CdB (`PerfisCasaDaBabaSeed`, `NotificacoesGlobaisSeed`, `MobileSchemaInitializer`, jobs de fundo) rodariam na instância FMA | Checklist na spec 2.3 |
 | Cliente PJ conflita com a poda B2B do ADR-0056 | Spec 2.1 |
-| `TenantFeatureFlag` não é lido em runtime: "desligado por flag" não existe | Spec 2.1 e 2.3 |
+| `TenantFeatureFlag` só é lido pelo atendimento: não há gate genérico de módulo (corrigido após revisão neutra) | Spec 2.1 e 2.3 |
 | ADR-0056 e ADR-0042 ainda Propostos | Ressalva na spec 2.1 |
 | Front não decidido | Linha na tabela 2.1 |
 | `OrigemContaFinanceira` exige migração; Lembrete acoplado | Marcados "Adaptar" |
@@ -27,7 +27,7 @@ Veredito: a recomendação B da v1 **só se sustenta em parte**.
 | Becos sem saída: proposta enviada sem ajuste, contrato sem cancelamento, entrega sem "pedir ajuste", lead perdido sem volta | `novaVersao`, `cancelarContrato`, `pedirAjuste`, `reabrirLead` |
 | Lembretes órfãos (follow-up seguia aberto após aceite) | Chave estável por lembrete; o fluxo fecha pela chave |
 | Sem formulário de lead, custo e conta a pagar | Formulários com validação por campo e `role=alert` |
-| Ações irreversíveis sem confirmação | `confirm` em aceite, recusa, perda, cancelamentos e restauração |
+| Ações irreversíveis sem confirmação | `confirm` em aceite, recusa, cancelamentos e restauração (perda de lead sem botão; corrigido o texto após revisão neutra) |
 | Cliente nascia no aceite | Cliente nasce na assinatura |
 | Foco perdido ao trocar de tela; skip link quebrado | `h1` recebe foco; skip link foca o `h1` |
 | Esteira sem semântica | `<ol>` com `aria-current` e texto para leitor de tela |
@@ -98,7 +98,7 @@ artigos e vídeos no LinkedIn e Instagram e uma leitura melhor do contexto dele.
 
 ## Prova da v4
 
-- `node prototipos/fma-erp/tests/regras.test.cjs`: 10 testes, todos passando.
+- `node prototipos/fma-erp/tests/regras.test.cjs`: 11 testes, todos passando, cada um partindo da semente.
 - Navegador, sem erro no console: ideia → rascunho da IA → aprovado → Instagram em post de texto
   recusado no campo → data passada recusada → agendado → publicado. Comentário vira lead, comentário
   frio é ignorado, 6ª abordagem do dia bloqueada ("Você já mandou 5 mensagens hoje").
@@ -118,3 +118,30 @@ artigos e vídeos no LinkedIn e Instagram e uma leitura melhor do contexto dele.
 | `07-contas.jpg` | Contas com recebimento registrado |
 | `08-celular-conteudo.jpg` | Conteúdo a 375 px |
 | `09-celular-post.jpg` | Post publicado a 375 px |
+
+## v4.1: identidade visual FMA e ressalvas da revisão neutra
+
+Felipe: componentes e navegação "genéricos, com cara de sistema feito com IA". Pedido: aplicar o
+design system FMA Software v1.0.0 de forma limpa, sem genérico. Referências: painel com números
+grandes e cards de fio, KPIs em faixa, painel de monitoração com números dominantes.
+
+| Antes (v4) | Agora |
+|---|---|
+| Trilho lateral escuro de ícones | Cabeçalho azul profundo do DS, sublinhado mostarda de 3 px na área ativa; no celular, barra inferior branca |
+| Botões em pílula, primário azul | Raio 8, primário mostarda com texto azul, secundário com contorno aço |
+| Gradiente, brilho, blur, entrada animada | Removidos; página névoa, cards brancos com fio prata e raio 16 |
+| Linhas em caixas cinza | Lista com fio de 1 px; urgente com barra lateral mostarda |
+| KPIs em cartões soltos | Uma faixa com divisórias e número grande tabular |
+| Título solto | Barra de acento 56x4 da marca acima do h1 |
+| Botão "Limite atingido" com cara de ação | Estado desabilitado do DS |
+
+| Ressalva | Tratamento |
+|---|---|
+| A1 `TenantFeatureFlag` | Spec 2.1, 2.3 e esta banca: lido só pelo atendimento; falta gate genérico de módulo |
+| A2 retenção após recebimento | Recusada quando a parcela já foi paga pelo bruto; teste novo |
+| A4 exposição em repo público | Caminho local, domínio pessoal e estado do blog saíram da spec; alinhamento comercial sem itens |
+| A5 testes dependentes de ordem | Cada teste chama `restaurar()`; CI segue sem rodar o arquivo (protótipo fora do build) |
+| A6 confirmação de perda | Texto da banca corrigido |
+| A3 proposta expirada | Adiado: a v4 não tem funil; a tela da proposta oferece "Gerar nova versão" |
+
+Prints 01 a 09 refeitos com a v4.1; 375 px sem rolagem horizontal nas telas medidas.
