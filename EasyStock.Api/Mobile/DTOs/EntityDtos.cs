@@ -43,7 +43,10 @@ public record ClientDto(
     string? Address,
     string? Phone,
     long LastOrder,
-    int OrderCount
+    int OrderCount,
+    // CLI-5 (#2321): CPF/CNPJ digitado no app. Opcional e no fim: APK antigo nao manda. Nao ha
+    // coluna em mobile_clients; o valor vai direto para Cliente.Documento do ERP.
+    string? Document = null
 );
 
 public record OrderItemDto(

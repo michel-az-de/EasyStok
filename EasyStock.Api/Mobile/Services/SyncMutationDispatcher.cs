@@ -272,6 +272,7 @@ public class SyncMutationDispatcher(
                     if (!string.IsNullOrWhiteSpace(dto.Phone)) erp.Telefone = dto.Phone;
                     if (!string.IsNullOrWhiteSpace(dto.Apt)) erp.Apt = dto.Apt;
                     if (!string.IsNullOrWhiteSpace(dto.Address)) erp.Endereco = dto.Address;
+                    if (DocumentoClienteMobile.Normalizar(dto.Document) is { } documento) erp.Documento = documento;
                 }
             }
         }
@@ -601,7 +602,7 @@ public class SyncMutationDispatcher(
     private static ClientDto CaberNasColunas(ClientDto d) => d with
     {
         Name = Cortar(d.Name, 120)!, Apt = Cortar(d.Apt, 32), Address = Cortar(d.Address, 255),
-        Phone = Cortar(d.Phone, 32)
+        Phone = Cortar(d.Phone, 32), Document = Cortar(d.Document, 32)
     };
 
     private static OrderDto CaberNasColunas(OrderDto d) => d with

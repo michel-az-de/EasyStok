@@ -36,7 +36,8 @@ public class SyncAutoLinker(
     public async Task RunAsync(
         HashSet<string> productIds, HashSet<string> clientIds,
         HashSet<string> orderIds, HashSet<string> batchIds, HashSet<string> cashIds,
-        Guid? empresaId)
+        Guid? empresaId,
+        IReadOnlyDictionary<string, string>? documentosDosClientes = null)
     {
         var autoLinkProd   = _appConfig.GetValue<bool>("MobileSync:AutoLink:Product", true);
         var autoLinkClient = _appConfig.GetValue<bool>("MobileSync:AutoLink:Client", true);
@@ -45,7 +46,7 @@ public class SyncAutoLinker(
         var autoLinkCash   = _appConfig.GetValue<bool>("MobileSync:AutoLink:CashEntry", true);
 
         if (autoLinkProd   && productIds.Count > 0) await _productLinker.ExecuteAsync(productIds, empresaId);
-        if (autoLinkClient && clientIds.Count  > 0) await _clientLinker.ExecuteAsync(clientIds, empresaId);
+        if (autoLinkClient && clientIds.Count  > 0) await _clientLinker.ExecuteAsync(clientIds, empresaId, documentosDosClientes);
         // F1/F2/F3 â€” promove orders/batches/cash DEPOIS de products/clients pra que
         // FKs (ErpProductId, ErpClienteId) jÃ¡ estejam preenchidas.
         if (_db.ChangeTracker.HasChanges()) await _db.SaveChangesAsync();

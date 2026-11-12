@@ -13,7 +13,8 @@ public sealed class ClientLinker(
     EasyStockDbContext db,
     ILogger<ClientLinker> log)
 {
-    public async Task ExecuteAsync(IEnumerable<string> mobileClientIds, Guid? empresaId)
+    public async Task ExecuteAsync(IEnumerable<string> mobileClientIds, Guid? empresaId,
+        IReadOnlyDictionary<string, string>? documentos = null)
     {
         var idsList = mobileClientIds as ICollection<string> ?? mobileClientIds.ToList();
         if (!empresaId.HasValue)
@@ -48,9 +49,20 @@ public sealed class ClientLinker(
                     : candidatos.FirstOrDefault(c => ChaveDeTelefone.De(c.Telefone).Length == 0
                         && string.Equals(c.Nome, mobileC.Name, StringComparison.OrdinalIgnoreCase))?.Id;
 
+                // CLI-5: documento que o app mandou neste envio (mobile_clients nao guarda).
+                string? documento = null;
+                if (documentos != null && documentos.TryGetValue(cid, out var bruto))
+                    documento = DocumentoClienteMobile.Normalizar(bruto);
+
                 if (matchId is { } erpMatchId)
                 {
                     mobileC.ErpClienteId = erpMatchId;
+                    if (documento != null)
+                    {
+                        var existente = await db.Set<Cliente>().IgnoreQueryFilters()
+                            .FirstOrDefaultAsync(c => c.Id == erpMatchId && c.EmpresaId == empresaId);
+                        if (existente != null) existente.Documento = documento;
+                    }
                     matched++;
                     log.LogInformation("AutoLink Cliente matched: mobile={MobileId} → erp={ErpId}", cid, erpMatchId);
                     db.Add(new ClienteAlteracao
@@ -73,6 +85,7 @@ public sealed class ClientLinker(
                 novoC.Telefone = mobileC.Phone;
                 novoC.LastOrderAt = mobileC.LastOrder;
                 novoC.OrderCount = mobileC.OrderCount;
+                novoC.Documento = documento;
                 db.Add(novoC);
                 mobileC.ErpClienteId = novoC.Id;
                 db.Add(new ClienteAlteracao
