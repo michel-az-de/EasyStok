@@ -147,7 +147,8 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
         // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
         var existing = await _db.Set<Product>().FindAsync(dto.Id);
-        if (existing != null && existing.EmpresaId != empresaId) existing = null;
+        if (existing != null && existing.EmpresaId != empresaId)
+            throw new CadastroDeOutraEmpresaException();
 
         // Onda 5: conflict detection. Tolerância de 2s pra clock skew.
         // #1520: compara com o carimbo do servidor (quando ele gravou), nao com UpdatedAt.
@@ -234,6 +235,9 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Client>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
+        // Id global: verifica apenas a existencia, sem carregar dados de outro tenant.
+        if (existing is null && await _db.Set<Client>().AnyAsync(c => c.Id == dto.Id && c.EmpresaId != empresaId))
+            throw new CadastroDeOutraEmpresaException();
         var lastOrderDate = DateTimeOffset.FromUnixTimeMilliseconds(dto.LastOrder).UtcDateTime;
         if (existing == null)
         {
