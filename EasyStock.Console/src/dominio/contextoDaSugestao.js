@@ -3,6 +3,7 @@
 export function revisaoDoContexto(conversa) {
   const p = conversa?.pedido
   return JSON.stringify([
+    conversa?.clienteId ?? null, conversa?.vinculoRevisao ?? 0, conversa?.estado, conversa?.assumidaPorUsuarioId,
     (conversa?.mensagens ?? []).slice(-20).map(m => [m.id, m.dir, m.texto, m.transcricao, m.assunto]),
     p ? [p.pedidoId, p.estado, p.statusApi, p.janela, p.meio, p.frete, p.totalApi, p.totalPagoApi, p.alocadoApi,
       p.observacoes, p.trocoPara, p.cobranca?.statusApi, p.cobranca?.valor,

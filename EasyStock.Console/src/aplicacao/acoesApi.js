@@ -103,7 +103,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     ...criarAcoesLembretesApi({ despachar }),
     ...criarAcoesConfiguracaoApi(),
     ...criarAcoesAssistenteApi(),
-    ...criarAcoesAgenteApi({ despachar }),
+    ...criarAcoesAgenteApi({ despachar, estadoRef }),
     ...criarAcoesConsentimentosApi(),
     ...criarAcoesOcorrenciasApi(),
     ...criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnviar: assumirDaConversa.antesDeEnviar }),

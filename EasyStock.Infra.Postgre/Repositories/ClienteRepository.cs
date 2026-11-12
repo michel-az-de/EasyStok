@@ -24,16 +24,20 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<(IEnumerable<Cliente> items, int total)> GetByEmpresaAsync(
             Guid empresaId, int page, int pageSize,
             bool? ativo = null, string? search = null,
-            string? sort = "nome", string? order = "asc")
+            string? sort = "nome", string? order = "asc", string? relacionamento = null)
         {
             var query = db.Clientes.AsNoTracking()
                 .Where(c => c.EmpresaId == empresaId);
 
             if (ativo.HasValue) query = query.Where(c => c.Ativo == ativo.Value);
+            if (relacionamento == "lead") query = query.Where(c => c.OrderCount == 0);
+            if (relacionamento == "cliente") query = query.Where(c => c.OrderCount > 0);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
+                var digitos = new string(termo.Where(char.IsAsciiDigit).ToArray());
+                if (digitos.Length is 12 or 13 && digitos.StartsWith("55", StringComparison.Ordinal)) digitos = digitos[2..];
                 // NomeFantasia entra na busca porque, para PJ, e por ele que o operador
                 // conhece o cliente — o Nome guarda a razao social, que raramente e o que
                 // se digita.
@@ -42,6 +46,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                     (c.NomeFantasia != null && EF.Functions.ILike(c.NomeFantasia, $"%{termo}%")) ||
                     (c.Documento != null && EF.Functions.ILike(c.Documento, $"%{termo}%")) ||
                     (c.Telefone != null && EF.Functions.ILike(c.Telefone, $"%{termo}%")) ||
+                    (digitos.Length >= 3 && c.Telefone != null && c.Telefone.Replace("(", "").Replace(")", "").Replace(" ", "").Replace("-", "").Replace("+", "").Contains(digitos)) ||
+                    (digitos.Length >= 3 && c.Telefones.Any(t => t.Numero.Replace("(", "").Replace(")", "").Replace(" ", "").Replace("-", "").Replace("+", "").Contains(digitos))) ||
                     (c.Email != null && EF.Functions.ILike(c.Email, $"%{termo}%")) ||
                     (c.Apt != null && EF.Functions.ILike(c.Apt, $"%{termo}%")));
             }
@@ -68,11 +74,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
             var pattern = $"%{termo}%";
+            var digitos = new string(termo.Where(char.IsAsciiDigit).ToArray());
+            if (digitos.Length is 12 or 13 && digitos.StartsWith("55", StringComparison.Ordinal)) digitos = digitos[2..];
             return await db.Clientes.AsNoTracking()
                 .Where(c => c.EmpresaId == empresaId && c.Ativo &&
                     (EF.Functions.ILike(c.Nome, pattern) ||
                      (c.NomeFantasia != null && EF.Functions.ILike(c.NomeFantasia, pattern)) ||
                      (c.Telefone != null && EF.Functions.ILike(c.Telefone, pattern)) ||
+                     (digitos.Length >= 3 && c.Telefone != null && c.Telefone.Replace("(", "").Replace(")", "").Replace(" ", "").Replace("-", "").Replace("+", "").Contains(digitos)) ||
+                     (digitos.Length >= 3 && c.Telefones.Any(t => t.Numero.Replace("(", "").Replace(")", "").Replace(" ", "").Replace("-", "").Replace("+", "").Contains(digitos))) ||
                      (c.Documento != null && EF.Functions.ILike(c.Documento, pattern))))
                 .OrderBy(c => c.Nome)
                 .Take(maxResults)
@@ -86,6 +96,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                             && (c.Telefone == telefone || c.Telefones.Any(t => t.Numero == telefone)))
                 .OrderBy(c => c.Telefone == telefone ? 0 : 1) // o telefone principal vence a lista
                 .FirstOrDefaultAsync();
+
+        public async Task<bool> TemTelefoneCompartilhadoAsync(Guid empresaId, IReadOnlyList<string> telefones,
+            IReadOnlyList<string> hashes, CancellationToken ct = default) =>
+            await db.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId
+                && ((c.TelefoneHash != null && hashes.Contains(c.TelefoneHash))
+                    || (c.Telefone != null && telefones.Contains(c.Telefone))
+                    || c.Telefones.Any(t => telefones.Contains(t.Numero))))
+                .Select(c => c.Id).Take(2).CountAsync(ct) > 1;
 
         public Task AddAsync(Cliente cliente) { db.Clientes.Add(cliente); return Task.CompletedTask; }
         public Task UpdateAsync(Cliente cliente) { db.Clientes.Update(cliente); return Task.CompletedTask; }

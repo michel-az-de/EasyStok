@@ -90,12 +90,12 @@ export const casosAtendimento = {
 
   [acao.TROCAR_MODO_AGENTE]: (estado, { modo }) => ({ ...estado, modoAgente: modo }),
 
-  [acao.AGENTE_PEDINDO]: (estado, { id }) => ({
-    ...estado, agente: { estado: 'pensando', sugestao: null, conversaId: id },
+  [acao.AGENTE_PEDINDO]: (estado, { id, contextoAssistencia }) => ({
+    ...estado, agente: { estado: 'pensando', sugestao: null, conversaId: id, contextoAssistencia },
   }),
 
-  [acao.AGENTE_RESPONDEU]: (estado, { id, sugestao }) => ({
-    ...estado, agente: { estado: 'pronto', sugestao, conversaId: id },
+  [acao.AGENTE_RESPONDEU]: (estado, { id, sugestao, contextoAssistencia }) => ({
+    ...estado, agente: { estado: 'pronto', sugestao, conversaId: id, contextoAssistencia },
   }),
 
   [acao.AGENTE_LIMPOU]: (estado) => ({
@@ -104,8 +104,8 @@ export const casosAtendimento = {
 
   // Transporte falhou (servidor local fora, sem credencial, modelo recusou).
   // A falha fica visível na tela em vez de deixar o painel em "Lendo" para sempre.
-  [acao.AGENTE_FALHOU]: (estado, { id, erro }) => ({
-    ...estado, agente: { estado: 'erro', sugestao: null, conversaId: id, erro },
+  [acao.AGENTE_FALHOU]: (estado, { id, erro, contextoAssistencia }) => ({
+    ...estado, agente: { estado: 'erro', sugestao: null, conversaId: id, erro, contextoAssistencia },
   }),
 
   // US-049: abertura automática, disparada de `consultarAgente`

@@ -35,6 +35,8 @@ public sealed record ConversaResumoResult(
 {
     /// <summary>#1432: assunto do último e-mail recebido (canal E-mail); nulo nos outros canais.</summary>
     public string? Assunto { get; init; }
+    public long VinculoRevisao { get; init; }
+    public bool VinculoEmRevisao { get; init; }
 
     internal static ConversaResumoResult De(ConversaInboxItem i, DateTime agora, int slaRespostaMinutos) => new(
         i.Id, i.Canal, i.ContatoIdExterno, i.ContatoNome, i.ClienteId, i.Situacao, i.NaoLidas,
@@ -42,7 +44,7 @@ public sealed record ConversaResumoResult(
         Conversa.DentroDaJanela(i.Canal, i.UltimaMensagemEntradaEm, agora),
         i.MotivoEscalada, i.UltimaMensagemEntradaEm, i.AguardaResposta, slaRespostaMinutos, i.AssumidaPorNome, i.PedidoStatus, i.NumeroComanda,
         i.ClienteId is { } clienteId ? EasyStock.Application.UseCases.Cliente.Foto.ClienteFotoUseCase.Url(i.EmpresaId, clienteId, i.FotoClienteChave) : null)
-    { Assunto = i.Assunto };
+    { Assunto = i.Assunto, VinculoRevisao = i.VinculoRevisao, VinculoEmRevisao = i.VinculoEmRevisao };
 }
 
 /// <summary>Mensagem como o console mostra. <c>MidiaChave</c> é interna: o arquivo é servido por endpoint autenticado.</summary>

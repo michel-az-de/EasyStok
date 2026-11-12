@@ -286,6 +286,7 @@ export const SINCRONIZAR_PEDIDO = 'sincronizar-pedido'
 export const FECHAR_AVISO_API = 'fechar-aviso-api'
 // #1276: o cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
 export const CLIENTE_DA_API = 'cliente-da-api'
+export const VINCULO_CLIENTE_DA_API = 'vinculo-cliente-da-api'
 // #1276: nome que a dona escreveu para o lead ainda sem cadastro; vai junto no cadastro.
 export const RENOMEAR_LEAD_API = 'renomear-lead-api'
 // #1430: nome e contato que o visitante do chat do site informou, até a dona confirmar o cadastro.

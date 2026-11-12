@@ -22,10 +22,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
             bool? ativo = null,
             string? search = null,
             string? sort = "nome",
-            string? order = "asc");
+            string? order = "asc",
+            string? relacionamento = null);
 
         Task<IEnumerable<Cliente>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
         Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone);
+        Task<bool> TemTelefoneCompartilhadoAsync(Guid empresaId, IReadOnlyList<string> telefones,
+            IReadOnlyList<string> hashes, CancellationToken ct = default);
 
         Task AddAsync(Cliente cliente);
         Task UpdateAsync(Cliente cliente);

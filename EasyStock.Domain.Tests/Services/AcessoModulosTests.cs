@@ -13,8 +13,8 @@ public class AcessoModulosTests
             [NivelAcesso.SuperAdmin] = Enum.GetValues<Modulo>(),
             [NivelAcesso.Admin] = Enum.GetValues<Modulo>(),
             [NivelAcesso.Gerente] = [Modulo.Cardapio, Modulo.Producao, Modulo.Atendimento, Modulo.Cozinha,
-                Modulo.Caixa, Modulo.Campanhas, Modulo.Entregas],
-            [NivelAcesso.Operador] = [Modulo.Atendimento, Modulo.Cozinha, Modulo.Caixa, Modulo.Entregas],
+                Modulo.Caixa, Modulo.Campanhas, Modulo.Entregas, Modulo.Cadastros],
+            [NivelAcesso.Operador] = [Modulo.Atendimento, Modulo.Cozinha, Modulo.Caixa, Modulo.Entregas, Modulo.Cadastros],
             [NivelAcesso.Visualizador] = []
         };
         foreach (var (nivel, liberados) in esperados)
@@ -27,8 +27,8 @@ public class AcessoModulosTests
         PoliticaPermissao.Tem(nivel, [], AcessoModulos.PermissaoDe(modulo)).Should().Be(esperado);
 
     [Theory]
-    [InlineData("Dona", "cardapio,producao,atendimento,cozinha,financeiro,campanhas,configuracoes,entregas", null)]
-    [InlineData("Atendimento", "cardapio,atendimento,cozinha,financeiro,entregas", "atendimento")]
+    [InlineData("Dona", "cardapio,producao,atendimento,cozinha,financeiro,campanhas,configuracoes,entregas,cadastros", null)]
+    [InlineData("Atendimento", "cardapio,atendimento,cozinha,financeiro,entregas,cadastros", "atendimento")]
     [InlineData("Cozinha", "producao,cozinha", "cozinha")]
     public void PerfisIniciais_TemSomenteOsModulosDecididos(string nome, string ids, string? entrada)
     {

@@ -64,6 +64,34 @@ public class ProcessarEventoWhatsAppUseCaseTests
         ConfigurarCenario();
     }
 
+    [Fact]
+    public async Task TelefoneCompartilhadoPreservaMensagensSemVincularOuDispararAgente()
+    {
+        _clienteRepository.TemTelefoneCompartilhadoAsync(_empresaId, Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(true);
+        Conversa? aberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => aberta = c), Arg.Any<CancellationToken>());
+
+        (await _useCase.ExecuteAsync(PayloadTexto("wamid.compartilhado1", "Sou Ana"))).Should().BeTrue();
+
+        aberta.Should().NotBeNull();
+        aberta!.ClienteId.Should().BeNull();
+        aberta.VinculoEmRevisao.Should().BeTrue();
+        aberta.Situacao.Should().Be(SituacaoConversa.Assumida);
+        var conversaId = aberta.Id;
+        _conversaRepository.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp,
+            ContatoWaId, Arg.Any<CancellationToken>()).Returns(aberta);
+        _conversaRepository.ObterPorIdComLockAsync(_empresaId, aberta.Id, Arg.Any<CancellationToken>()).Returns(aberta);
+        (await _useCase.ExecuteAsync(PayloadTexto("wamid.compartilhado2", "Quero pedir"))).Should().BeTrue();
+
+        await _conversaRepository.Received(2).AddMensagemAsync(Arg.Is<Mensagem>(m =>
+            m.Direcao == DirecaoMensagem.Entrada && m.ConversaId == conversaId), Arg.Any<CancellationToken>());
+        await _conversaRepository.Received(1).AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>());
+        await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
     private ProcessarEventoWhatsAppUseCase CriarUseCase(EasyStock.Application.Ports.Output.Ai.ITranscritorAudio? transcritor = null,
         PerfilClienteWhatsApp? perfil = null) =>
         new ProcessarEventoWhatsAppUseCase(

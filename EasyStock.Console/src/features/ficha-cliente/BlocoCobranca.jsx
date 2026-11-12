@@ -10,6 +10,7 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useEmissao } from '../../aplicacao/useEmissao'
+import { useMetodosPagamento } from '../../aplicacao/useMetodosPagamento'
 import {
   AVISO_BAIXA_COM_LINK, MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, aguardaSinalManual, baixaEsperaAprovacao, baixaCancelaCobrancaOnline, metodoDaCobranca,
   nomeDoMeio, podeAlterarMeio, situacaoDaCobranca, trocaDeFormaNoEasyStok, valorSugeridoParaBaixa,
@@ -134,7 +135,8 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
   const [metodo, setMetodo] = useState(() => metodoDaCobranca(pedido?.cobranca))
   const [enviando, setEnviando] = useState(false)
   const [recusa, setRecusa] = useState(null)
-  const valido = centavos > 0 && !excedeu && Boolean(metodo)
+  const formas = useMetodosPagamento()
+  const valido = centavos > 0 && !excedeu && formas.opcoes.some(o => o.valor === metodo) && !formas.carregando && !formas.erro
 
   if (baixaEsperaAprovacao(pedido)) {
     return (
@@ -184,12 +186,10 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
         </div>
       )}
       <CampoSelecao rotulo="Como recebeu" value={metodo} onChange={(e) => setMetodo(e.target.value)}
-        opcoes={[
-          { valor: '', rotulo: 'Selecione' }, { valor: 'pix', rotulo: 'Pix' },
-          { valor: 'dinheiro', rotulo: 'Dinheiro' }, { valor: 'credito', rotulo: 'Cartão de crédito' },
-          { valor: 'debito', rotulo: 'Cartão de débito' }, { valor: 'transferencia', rotulo: 'Transferência' },
-          { valor: 'outro', rotulo: 'Outro' },
-        ]} />
+        disabled={formas.carregando || enviando}
+        opcoes={[{ valor: '', rotulo: formas.carregando ? 'Carregando formas…' : 'Selecione' }, ...formas.opcoes]} />
+      {formas.erro && <div role="alert"><p>{formas.erro}</p><Botao onClick={formas.recarregar}>Tentar novamente</Botao></div>}
+      {!formas.carregando && !formas.erro && formas.opcoes.length === 0 && <p role="status">Nenhuma forma de pagamento ativa. Revise Cadastros.</p>}
       <CampoReais
         rotulo="Valor recebido"
         centavos={centavos}

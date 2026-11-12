@@ -141,7 +141,9 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     conta: resumo.clienteId ? 'cliente' : 'lead',
     // Chave do cadastro na API: consentimento (S38) e o que mais for por cliente.
     clienteId: resumo.clienteId ?? null,
-    nome: resumo.contatoNome || resumo.contatoIdExterno,
+    vinculoRevisao: resumo.vinculoRevisao ?? 0,
+    vinculoEmRevisao: resumo.vinculoEmRevisao === true,
+    nome: resumo.vinculoEmRevisao && !resumo.clienteId ? 'Identidade em revisão' : resumo.contatoNome || resumo.contatoIdExterno,
     contato: resumo.contatoIdExterno,
     assunto: resumo.assunto ?? null, // #1432: assunto do último e-mail (canal E-mail)
     canal: NOME_DO_CANAL[resumo.canal] ?? resumo.canal,

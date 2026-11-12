@@ -67,8 +67,8 @@ globalThis.__superbancaIA = hooks
 const modulo = source => 'data:text/javascript,' + encodeURIComponent(source)
 registerHooks({
   resolve(spec, contexto, proximo) {
-    if (spec === 'react' && contexto.parentURL?.endsWith('/features/assistente/useConversaAssistente.js')) {
-      return { url: modulo('const h=globalThis.__superbancaIA;export const useState=h.useState,useRef=h.useRef,useLayoutEffect=h.useEffect;'), shortCircuit: true }
+    if (spec === 'react' && ['/features/assistente/useConversaAssistente.js', '/aplicacao/useChaveDaSessao.js'].some(p => contexto.parentURL?.endsWith(p))) {
+      return { url: modulo('const h=globalThis.__superbancaIA;export const useState=h.useState,useRef=h.useRef,useLayoutEffect=h.useEffect,useSyncExternalStore=(_,ler)=>ler();'), shortCircuit: true }
     }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
       for (const ext of ['.js', '.jsx']) { try { return proximo(spec + ext, contexto) } catch { /* próximo formato */ } }
@@ -146,6 +146,24 @@ await provar('Desmontar antes da resposta invalida a consulta', async () => {
   const consulta = perguntarNo(h, 'Dúvida pendente'); h.desmontar(); espera.resolver('Atrasada')
   assert.equal(await consulta, false); assert.equal(h.resultado.trocas[0]?.resposta ?? null, null)
 })
+for (const alteracao of [{ clienteId: 'cliente-b' }, { vinculoRevisao: 1 }, { estado: 'Encerrado' }, { assumidaPorUsuarioId: 'outra-atendente' },
+  { mensagens: [{ id: 'nova', dir: 'in', texto: 'Mudou meu pedido' }] }, { pedido: { pedidoId: 'p', totalPagoApi: 50 } }]) {
+  await provar(`Correção na mesma conversa invalida consulta e proposta: ${JSON.stringify(alteracao)}`, async () => {
+    const espera = pendente(); let sinal, executadas = 0
+    const base = props({ perguntar: (_, __, ___, opcoes) => { sinal = opcoes?.sinal; return espera.promise }, executarAcao: async () => { executadas++; return true } })
+    const h = new Hospedeiro(useConversaAssistente, base)
+    const anterior = perguntarNo(h, 'Pergunta da pessoa anterior')
+    h.renderizar({ ...base, conversa: { ...conversa, ...alteracao } })
+    assert.equal(h.resultado.perguntando, false)
+    assert.equal(sinal?.aborted, true, 'a consulta anterior deve ser cancelada')
+    espera.resolver({ acoes: [{ tipo: 'nota_interna', texto: 'Nota anterior' }] })
+    assert.equal(await anterior, false)
+    assert.deepEqual(h.renderizar().trocas, [])
+    assert.equal(await h.resultado.aoExecutarAcao(1, { chave: 'antiga', tipo: 'nota_interna', texto: 'Nota anterior' }), false)
+    assert.equal(executadas, 0)
+    h.desmontar()
+  })
+}
 await provar('Resposta vazia permite retry e indisponibilidade não expõe configuração de servidor', async () => {
   const h = new Hospedeiro(useConversaAssistente, props({ perguntar: async () => ({ texto: '', acoes: [] }) }))
   assert.equal(await perguntarNo(h, 'Uma pergunta'), false)
@@ -201,7 +219,7 @@ globalThis.sessionStorage = { getItem: () => JSON.stringify({ token: 'fixture', 
 await provar('Adaptador de sugestão faz uma chamada no clique duplo e ignora resposta anterior', async () => {
   const a = pendente(), b = pendente(), chamadas = [], despachos = []
   globalThis.fetch = url => { chamadas.push(url); return url.includes('/a/') ? a.promise : b.promise }
-  const api = criarAcoesAgenteApi({ despachar: acao => despachos.push(acao) })
+  const api = criarAcoesAgenteApi({ despachar: acao => despachos.push(acao), estadoRef: { current: { conversas: [{ id: 'a' }, { id: 'b' }] } } })
   const primeira = api.consultarAgente('a'), repetida = api.consultarAgente('a')
   const segunda = api.consultarAgente('b')
   b.resolver(new Response(JSON.stringify({ data: { texto: 'Atual B' } }))); await segunda
@@ -212,7 +230,7 @@ await provar('Adaptador de sugestão faz uma chamada no clique duplo e ignora re
 await provar('Voltar ao primeiro cliente reutiliza consulta pendente e mostra a resposta do cliente atual', async () => {
   const a = pendente(), b = pendente(), chamadas = [], despachos = []
   globalThis.fetch = url => { chamadas.push(url); return url.includes('/a/') ? a.promise : b.promise }
-  const api = criarAcoesAgenteApi({ despachar: acao => despachos.push(acao) })
+  const api = criarAcoesAgenteApi({ despachar: acao => despachos.push(acao), estadoRef: { current: { conversas: [{ id: 'a' }, { id: 'b' }] } } })
   const primeira = api.consultarAgente('a'), segunda = api.consultarAgente('b'), retomada = api.consultarAgente('a')
   a.resolver(new Response(JSON.stringify({ data: { texto: 'Atual A' } }))); await retomada; await primeira
   b.resolver(new Response(JSON.stringify({ data: { texto: 'Antiga B' } }))); await segunda
@@ -220,6 +238,21 @@ await provar('Voltar ao primeiro cliente reutiliza consulta pendente e mostra a 
   assert.deepEqual(despachos.filter(d => d.tipo === 'agente-respondeu').map(d => [d.id, d.sugestao.texto]), [['a', 'Atual A']])
 })
 const painel = extra => renderToStaticMarkup(createElement(PainelAgente, { modo: 'api', estado: 'ocioso', aoConsultar() {}, aoDescartar() {}, ...extra }))
+await provar('Sugestão manual antiga não reaparece após corrigir a mesma conversa e a consulta nova funciona', async () => {
+  const antiga = pendente(), nova = pendente(), despachos = []
+  const estadoRef = { current: { conversas: [{ id: 'a', clienteId: 'primeiro', vinculoRevisao: 1 }] } }
+  let chamadas = 0
+  globalThis.fetch = () => (++chamadas === 1 ? antiga : nova).promise
+  const api = criarAcoesAgenteApi({ despachar: a => despachos.push(a), estadoRef })
+  const primeira = api.consultarAgente('a')
+  estadoRef.current.conversas[0] = { id: 'a', clienteId: 'segundo', vinculoRevisao: 2 }
+  const segunda = api.consultarAgente('a')
+  antiga.resolver(new Response(JSON.stringify({ data: { texto: 'Pessoa anterior' } }))); await primeira
+  assert.equal(despachos.filter(d => d.tipo === 'agente-respondeu').length, 0)
+  nova.resolver(new Response(JSON.stringify({ data: { texto: 'Pessoa corrigida' } }))); await segunda
+  assert.deepEqual(despachos.filter(d => d.tipo === 'agente-respondeu').map(d => d.sugestao.texto), ['Pessoa corrigida'])
+  assert.equal(chamadas, 2)
+})
 await provar('Erro do agente aparece aberto com retry e texto de suporte legível', async () => {
   const html = painel({ estado: 'erro', erro: 'Agente indisponível: configure Anthropic:Enabled=true e Anthropic:ApiKey no servidor.' })
   assert.match(html, /role="alert"/); assert.match(html, /Tentar novamente/)

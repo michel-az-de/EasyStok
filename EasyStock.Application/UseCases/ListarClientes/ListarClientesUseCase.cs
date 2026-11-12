@@ -10,7 +10,8 @@ public sealed record ListarClientesQuery(
     bool? Ativo = null,
     string? Search = null,
     string? Sort = "nome",
-    string? Order = "asc");
+    string? Order = "asc",
+    string? Relacionamento = null);
 
 public sealed record ListarClientesResult(
     IReadOnlyList<ClienteResult> Items,
@@ -23,11 +24,13 @@ public class ListarClientesUseCase(IClienteRepository repo)
     public async Task<ListarClientesResult> ExecuteAsync(ListarClientesQuery q)
     {
         UseCaseGuards.EnsureEmpresaId(q.EmpresaId);
+        if (q.Relacionamento is not (null or "lead" or "cliente"))
+            throw new UseCaseValidationException("Relacionamento deve ser lead ou cliente.");
         var page = Math.Max(1, q.Page);
         var size = Math.Clamp(q.PageSize, 1, 200);
 
         var (items, total) = await repo.GetByEmpresaAsync(
-            q.EmpresaId, page, size, q.Ativo, q.Search, q.Sort, q.Order);
+            q.EmpresaId, page, size, q.Ativo, q.Search, q.Sort, q.Order, q.Relacionamento);
 
         return new ListarClientesResult(
             items.Select(CriarClienteUseCase.Map).ToList(),

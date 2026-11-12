@@ -13,7 +13,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<bool> ExistsSkuBaseAsync(Guid empresaId, string skuBase, Guid? ignoreProdutoId = null);
         Task<bool> ExistsCodigoBarrasAsync(Guid empresaId, string codigoBarras, Guid? ignoreProdutoId = null);
         Task<bool> ExistsNomeAsync(Guid empresaId, string nome, Guid? ignoreProdutoId = null);
-        Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 100);
+        Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 100, StatusProduto? status = null);
 
         /// <summary>
         /// Listagem paginada com filtros opcionais server-side.

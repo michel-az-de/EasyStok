@@ -8,6 +8,7 @@ import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { ehRestricao, ordenarTags } from '../../dominio/cliente'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
+import { CorrecaoVinculoCliente } from './CorrecaoVinculoCliente'
 import { copiarTexto, linkDoMapa } from './apresentacaoDaFicha'
 import css from './ficha.module.css'
 import notasCss from './NotasDoCliente.module.css'
@@ -65,6 +66,7 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
         {lead && <span className={css.numerosCliente}>Contato sem cadastro</span>}
       </button>
       {cliente.endereco && <EnderecoDoCliente endereco={cliente.endereco} />}
+      {fonteApi && <CorrecaoVinculoCliente key={conversa.id} conversa={conversa} />}
       {mostrarEntrega && <div className={notasCss.acoesCliente}>
         {aoVerEntrega
           ? <Botao data-foco-reserva={focoFrete} variante="texto" icone="moto" aria-label="Ver frete e entrega" onClick={aoConsultarFrete ?? aoVerEntrega}>Frete</Botao>

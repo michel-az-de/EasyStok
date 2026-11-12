@@ -64,7 +64,7 @@ public sealed class AgenteAtendimentoService(
         if (dados is null) return ResultadoTurnoAgente.Ignorado;
 
         var conversa = dados.Conversa;
-        if (conversa.Situacao != SituacaoConversa.Automatica || !conversa.DentroDaJanela(agora))
+        if (conversa.Situacao != SituacaoConversa.Automatica || conversa.VinculoEmRevisao || !conversa.DentroDaJanela(agora))
             return ResultadoTurnoAgente.Ignorado;
 
         var pendentes = EntradasPendentes(dados.Mensagens);
@@ -148,28 +148,29 @@ public sealed class AgenteAtendimentoService(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
         var gravacao = new GravacaoSaidaTurno(conversaRepository, unitOfWork, logger, empresaId, dados.Mensagens, agora);
         var contexto = new ContextoTurnoAgente(empresaId, conversa, agora, gravacao.GravarAsync);
+        var protecao = new ProtecaoVinculoTurno(conversaRepository, unitOfWork, contexto);
+        var ferramentasProtegidas = _ferramentas.ToDictionary(par => par.Key,
+            par => (IFerramentaAgente)new FerramentaProtegida(par.Value, protecao));
 
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
-            llm, system, mensagens, _ferramentas, contexto, MaximoIteracoes, logger, ct);
+            llm, system, mensagens, ferramentasProtegidas, contexto, MaximoIteracoes, logger, ct);
         var tokens = geracao.Tokens;
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
 
+        var final = await protecao.ExecutarAsync(Finalizar, ct, gravar: false);
+        if (final is not null) return final;
+        if (tokens > 0) await RegistrarUsoAsync(empresaId, tokens, agora);
+        await unitOfWork.CommitAsync();
+        return new ResultadoTurnoAgente(true, contexto.HouveEnvio, false);
+
+        async Task<ResultadoTurnoAgente> Finalizar(CancellationToken token)
+        {
+        ct = token;
+
         // As entradas que foram ao LLM ficam processadas: um job repetido não responde de novo e a
         // mensagem que chegar durante o turno continua pendente para o próximo (#1288).
         await gravacao.MarcarProcessadasAsync(ct);
-
-        // A dona pode ter assumido (ou encerrado) enquanto o LLM respondia: a Situacao carregada no
-        // início está velha. Fora do automático o agente não envia nem escala (#1288).
-        if (await conversaRepository.ObterSituacaoAsync(empresaId, conversaId, ct) != SituacaoConversa.Automatica)
-        {
-            logger.LogInformation("Agente: conversa {ConversaId} saiu do automático durante o turno; resposta descartada.", conversaId);
-            if (tokens > 0)
-                await RegistrarUsoAsync(empresaId, tokens, agora);
-            await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: contexto.HouveEnvio,
-                Escalou: conversa.Situacao == SituacaoConversa.Assumida);
-        }
 
         var respondeu = contexto.HouveEnvio;
         // #2249: o texto de cada ação é molde da loja; quem não é cliente recebe o de encaminhamento.
@@ -216,6 +217,74 @@ public sealed class AgenteAtendimentoService(
         await unitOfWork.CommitAsync();
         return new ResultadoTurnoAgente(true, respondeu,
             motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida);
+        }
+    }
+
+    // A correção e cada efeito disputam a mesma linha. O LLM roda fora da transação;
+    // o lock continua retido durante envio/mutação, sem repetir um efeito externo.
+    private sealed class ProtecaoVinculoTurno(IConversaRepository conversas, IUnitOfWork uow, ContextoTurnoAgente contexto)
+    {
+        private readonly Guid? _clienteId = contexto.Conversa.ClienteId;
+        private readonly long _revisao = contexto.Conversa.VinculoRevisao;
+        private SituacaoConversa _situacao = contexto.Conversa.Situacao;
+
+        public async Task<string?> ExecutarPedidoAsync(Func<CancellationToken, Task<string>> efeito, CancellationToken ct)
+        {
+            // CriarPedidoAtendimento confere o snapshot e grava pedido+vínculo sob seu próprio lock.
+            // Depois desse commit, o histórico impede correção. A cobrança precisa rodar fora da transação.
+            if (await ExecutarAsync(_ => Task.FromResult("validado"), ct, gravar: false) is null) return null;
+            try { return await efeito(ct); }
+            catch
+            {
+                contexto.Interromper();
+                uow.DescartarAlteracoesPendentes();
+                throw;
+            }
+        }
+
+        public async Task<T?> ExecutarAsync<T>(Func<CancellationToken, Task<T>> efeito, CancellationToken ct, bool gravar = true) where T : class
+        {
+            if (contexto.Interrompido) return null;
+            try
+            {
+                return await uow.ExecuteInTransactionSemRetryAsync(async token =>
+                {
+                    var atual = await conversas.ObterPorIdComLockAsync(contexto.EmpresaId, contexto.Conversa.Id, token);
+                    if (atual is null || atual.EmpresaId != contexto.EmpresaId || atual.ClienteId != _clienteId
+                        || atual.VinculoRevisao != _revisao || atual.VinculoEmRevisao || atual.Situacao != _situacao
+                        || (_situacao == SituacaoConversa.Automatica
+                            && await conversas.ObterSituacaoAsync(contexto.EmpresaId, contexto.Conversa.Id, token) != SituacaoConversa.Automatica))
+                    {
+                        contexto.Interromper();
+                        return null;
+                    }
+                    var resultado = await efeito(token);
+                    if (gravar) await uow.CommitAsync();
+                    _situacao = contexto.Conversa.Situacao;
+                    return resultado;
+                }, ct);
+            }
+            catch
+            {
+                // Rollback SQL não limpa as entidades rastreadas, inclusive quando a ferramenta
+                // chama CommitAsync por dentro. Nenhuma delas pode vazar para o commit de consumo.
+                contexto.Interromper();
+                uow.DescartarAlteracoesPendentes();
+                throw;
+            }
+        }
+    }
+
+    private sealed class FerramentaProtegida(IFerramentaAgente ferramenta, ProtecaoVinculoTurno protecao) : IFerramentaAgente
+    {
+        public string Nome => ferramenta.Nome;
+        public string Descricao => ferramenta.Descricao;
+        public string SchemaJson => ferramenta.SchemaJson;
+        public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, System.Text.Json.JsonElement entrada, CancellationToken ct = default) =>
+            (ferramenta is CriarPedidoFerramenta
+                ? await protecao.ExecutarPedidoAsync(token => ferramenta.ExecutarAsync(contexto, entrada, token), ct)
+                : await protecao.ExecutarAsync(token => ferramenta.ExecutarAsync(contexto, entrada, token), ct))
+            ?? "O contexto da conversa mudou. Nenhuma ação foi executada.";
     }
 
     private async Task<bool> EnviarRespostaAsync(GravacaoSaidaTurno gravacao, Conversa conversa, string texto, CancellationToken ct)

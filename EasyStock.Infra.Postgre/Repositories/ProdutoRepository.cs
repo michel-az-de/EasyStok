@@ -86,7 +86,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AnyAsync();
         }
 
-        public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+        public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 20, StatusProduto? status = null)
         {
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
@@ -99,6 +99,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             return await dbContext.Produtos
                 .AsNoTracking()
+                .Where(p => !status.HasValue || p.Status == status.Value)
                 .Where(p => p.EmpresaId == empresaId &&
                     (EF.Functions.ILike(p.Nome, pattern) ||
                      (p.Marca != null && EF.Functions.ILike(p.Marca, pattern)) ||

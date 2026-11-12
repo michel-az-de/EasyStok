@@ -88,7 +88,7 @@ public class CorridasChatSiteIntegrationTests(PostgreSqlDatabaseFixture fixture)
 
         await MarcarLidaAsync(empresa, conversa.Id);
         var pedidoId = Guid.NewGuid();
-        await new ConversaChatSiteService(new ConversaRepository(dbCheckout), dbCheckout)
+        await new ConversaChatSiteService(new ConversaRepository(dbCheckout), dbCheckout, new SessaoChatSiteRepository(dbCheckout))
             .RegistrarPedidoAsync(empresa, lida.Id, pedidoId, "Pedido do site #1", DateTime.UtcNow);
 
         var salva = await LerAsync(empresa, conversa.Id);
@@ -108,7 +108,7 @@ public class CorridasChatSiteIntegrationTests(PostgreSqlDatabaseFixture fixture)
             await new GerenciarConversaAtendimentoUseCase(new ConversaRepository(dbConsole), dbConsole)
                 .EncerrarAsync(new AcaoConversaCommand(empresa, Guid.NewGuid(), conversa.Id));
         var pedidoId = Guid.NewGuid();
-        await new ConversaChatSiteService(new ConversaRepository(dbCheckout), dbCheckout)
+        await new ConversaChatSiteService(new ConversaRepository(dbCheckout), dbCheckout, new SessaoChatSiteRepository(dbCheckout))
             .RegistrarPedidoAsync(empresa, lida.Id, pedidoId, "Pedido do site #2", DateTime.UtcNow);
 
         var salva = await LerAsync(empresa, conversa.Id);
@@ -129,10 +129,12 @@ public class CorridasChatSiteIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var sessoes = Substitute.For<ISessaoChatSiteRepository>();
         sessoes.ObterPorTokenHashAsync(storefront.EmpresaId, AcessoChatSite.HashDoToken(Token), Arg.Any<CancellationToken>())
             .Returns(sessao);
+        sessoes.ObterSnapshotPorTokenHashAsync(storefront.EmpresaId, AcessoChatSite.HashDoToken(Token), Arg.Any<CancellationToken>())
+            .Returns(sessao);
         var conversas = new ConversaRepository(db);
         return new EnviarMensagemVisitanteUseCase(
             new AcessoChatSite(lojas, flags, Substitute.For<ITenantContextAccessor>(), sessoes),
             conversas, Substitute.For<IOperacaoEventPublisher>(), db, NullLogger<EnviarMensagemVisitanteUseCase>.Instance,
-            new ConversaChatSiteService(conversas, db));
+            new ConversaChatSiteService(conversas, db, sessoes));
     }
 }

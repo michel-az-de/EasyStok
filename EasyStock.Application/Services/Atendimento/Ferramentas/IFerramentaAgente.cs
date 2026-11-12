@@ -28,10 +28,15 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
 {
     public Guid EmpresaId { get; } = empresaId;
     public Conversa Conversa { get; } = conversa;
+    public Guid? ClienteIdEsperado { get; } = conversa.ClienteId;
+    public long VinculoRevisaoEsperada { get; } = conversa.VinculoRevisao;
+    public EasyStock.Domain.Enums.Atendimento.SituacaoConversa SituacaoEsperada { get; } = conversa.Situacao;
     public DateTime Agora { get; } = agora;
     public string? RespostaVerificada { get; private set; }
     public bool EnvioVerificado { get; private set; }
     public bool HouveEnvio { get; private set; }
+    public bool Interrompido { get; private set; }
+    public void Interromper() { Interrompido = true; LimparRespostaVerificada(); }
 
     /// <summary>Ferramenta desconhecida ou que lançou no turno: o texto livre que vier depois não sai (#1704).</summary>
     public bool FerramentaFalhou { get; private set; }

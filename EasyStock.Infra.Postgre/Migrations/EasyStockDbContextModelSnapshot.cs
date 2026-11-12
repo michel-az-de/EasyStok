@@ -473,6 +473,62 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("assinaturas_empresa", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.AlteracaoVinculoConversa", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Acao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("ClienteAnteriorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ClienteNovoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConversaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revisao")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RevisaoAnterior")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversaId");
+
+                    b.HasIndex("EmpresaId", "ConversaId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "ConversaId", "Revisao")
+                        .IsUnique();
+
+                    b.ToTable("alteracoes_vinculo_conversa", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ChamadoEntregador", b =>
                 {
                     b.Property<Guid>("Id")
@@ -670,6 +726,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("Canal")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("ClienteAnteriorId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ClienteId")
                         .HasColumnType("uuid");
 
@@ -703,6 +762,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime?>("EncerradaEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("HistoricoPedidosVerificado")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("IniciadaEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -722,6 +784,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<Guid?>("PedidoEmAndamentoId")
                         .HasColumnType("uuid");
 
+                    b.PrimitiveCollection<Guid[]>("PedidosHistoricoIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]");
+
                     b.Property<int>("Situacao")
                         .HasColumnType("integer");
 
@@ -730,6 +796,13 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime?>("UltimaMensagemEntradaEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("VinculoEmRevisao")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("VinculoRevisao")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
@@ -3690,6 +3763,68 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("centros_custo", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Financeiro.ContaBancaria", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Agencia")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AlteradoPor")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Conta")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Instituicao")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<long>("Revisao")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Titular")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<Guid>("UltimaOperacaoId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "Ativo");
+
+                    b.ToTable("contas_bancarias", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Financeiro.ContaFinanceiraEvento", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4082,6 +4217,44 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasDatabaseName("ix_contas_receber_alteracoes_conta_data");
 
                     b.ToTable("contas_receber_alteracoes", (string)null);
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Financeiro.MetodoPagamentoEmpresa", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AlteradoPor")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revisao")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("UltimaOperacaoId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "Codigo")
+                        .IsUnique();
+
+                    b.ToTable("metodos_pagamento_empresa", (string)null);
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Financeiro.PagamentoParcela", b =>
@@ -11221,6 +11394,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Plano");
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.AlteracaoVinculoConversa", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Atendimento.Conversa", null)
+                        .WithMany()
+                        .HasForeignKey("ConversaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.ChamadoEntregador", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Atendimento.Viagem", null)
@@ -11747,6 +11929,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Navigation("Loja");
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Financeiro.ContaBancaria", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Financeiro.ContaFinanceiraEvento", b =>
                 {
                     b.HasOne("EasyStock.Domain.Entities.Financeiro.ContaPagar", "ContaPagar")
@@ -11871,6 +12062,15 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .IsRequired();
 
                     b.Navigation("ContaReceber");
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Financeiro.MetodoPagamentoEmpresa", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Empresa", null)
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Financeiro.PagamentoParcela", b =>

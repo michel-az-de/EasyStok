@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   closestCenter, DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
@@ -21,6 +21,7 @@ import { gravarVisita, lerVisita } from '../infra/api/visitaDaSessao'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
 import { useRascunhosDeNotas } from '../aplicacao/useRascunhosDeNotas'
 import { useNotificacoesDaSessao } from '../aplicacao/useNotificacoesDaSessao'
+import { identidadeDaAssistencia, useContextoAssistencia } from '../aplicacao/contextoAssistencia'
 import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
@@ -95,7 +96,7 @@ function Composicao({ rota }) {
   } = useAtendimento()
   const {
     salvarNota, adicionarItem, ajustarQuantidade, alternarRegra, fecharEncerramento,
-    consultarAgente, limparAgente, trocarModoAgente, definirRascunho, selecionar,
+    consultarAgente, interromperConsultaAgente, limparAgente, trocarModoAgente, definirRascunho, selecionar,
   } = useAcoes()
   const { canais, janelas } = useCatalogo()
 
@@ -237,20 +238,28 @@ function Composicao({ rota }) {
   // montado aqui, não em `features/assistente/`, porque feature nenhuma
   // importa outra feature (`ferramentas/verificar-camadas.mjs`); o balão só
   // recebe o resultado pronto pelo slot `sugestaoAgente`.
+  const { chave: chaveAssistencia, identidade: identidadeAssistencia } = useContextoAssistencia(selecionada)
+  const contextoAssistenciaRef = useRef(chaveAssistencia)
+  useLayoutEffect(() => { contextoAssistenciaRef.current = chaveAssistencia }, [chaveAssistencia])
+  useEffect(() => () => interromperConsultaAgente?.(), [chaveAssistencia, interromperConsultaAgente])
+  const agenteAtual = agente.conversaId === selecionada?.id && (!FONTE_API || agente.contextoAssistencia === chaveAssistencia)
   const sugestaoAgente = selecionada ? (
     <PainelAgente
-      key={selecionada.id}
+      key={chaveAssistencia}
       passouParaVoce={precisaDeVoce(selecionada, agora, automaticoPausado[selecionada.id] ?? false, aberta, janelas, horarioDaLoja)}
       // #2185 (E11): "Usar no rascunho" também não vale com o campo fechado (janela de 24 h, concluída, bloqueio).
       bloqueada={!permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).pode}
       modo={FONTE_API ? 'api' : modoAgente}
-      estado={agente.conversaId === selecionada.id ? agente.estado : 'ocioso'}
-      sugestao={agente.conversaId === selecionada.id ? agente.sugestao : null}
-      erro={agente.conversaId === selecionada.id ? agente.erro : null}
+      estado={agenteAtual ? agente.estado : 'ocioso'}
+      sugestao={agenteAtual ? agente.sugestao : null}
+      erro={agenteAtual ? agente.erro : null}
       esperado={selecionada.esperado ?? null}
       aoConsultar={() => consultarAgente(selecionada.id)}
       aoTrocarModo={trocarModoAgente}
-      aoUsar={(texto) => { definirRascunho(selecionada.id, juntarAoRascunho(rascunho, texto)); limparAgente() }}
+      aoUsar={(texto) => {
+        if (!agenteAtual || contextoAssistenciaRef.current !== chaveAssistencia || identidadeDaAssistencia() !== identidadeAssistencia) return
+        definirRascunho(selecionada.id, juntarAoRascunho(rascunho, texto)); limparAgente()
+      }}
       aoDescartar={limparAgente}
     />
   ) : null
@@ -416,6 +425,11 @@ function Composicao({ rota }) {
 
 const SEM_CONVERSAS = []
 
+function AvisoDaRota({ rota }) {
+  return rota.aviso ? <Vazio como="output" variante="linha" titulo={rota.aviso}
+    acao={<Botao onClick={() => { window.location.hash = HASH_HALL }}>Voltar ao início</Botao>} /> : null
+}
+
 // Modo demonstração parte do instante fixo da massa; modo API usa o relógio real.
 const INICIO_DO_RELOGIO = FONTE_API ? Date.now() : INSTANTE_INICIAL
 
@@ -434,7 +448,7 @@ function TelaDaRota({ rota }) {
   return (
     <>
       {rota.tipo === ROTA_HALL
-        ? <LimiteDeErro parte="Início"><HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} painel={<AgoraDoHall />} /></LimiteDeErro>
+        ? <LimiteDeErro parte="Início"><HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} painel={<><AvisoDaRota rota={rota} /><AgoraDoHall /></>} /></LimiteDeErro>
         : (
           <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} ajuda={<ControleAjuda rota={rota} />}>
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
@@ -642,7 +656,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     </Vazio>
     </main>
   )
-  else if (rota.tipo === ROTA_HALL) tela = <LimiteDeErro parte="Início"><HallDeModulos fonteApi sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} /></LimiteDeErro>
+  else if (rota.tipo === ROTA_HALL) tela = <LimiteDeErro parte="Início"><HallDeModulos fonteApi sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} painel={<AvisoDaRota rota={rota} />} /></LimiteDeErro>
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />

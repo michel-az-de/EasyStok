@@ -55,6 +55,40 @@ public class ClaudeCliMontagemFichaClientTests
     }
 
     [Fact]
+    public async Task Cadastro_usa_schema_canonico_e_retorna_ferramenta_correta_com_mesmas_restricoes()
+    {
+        var cadastro = SugerirCadastroConversaUseCase.Ferramenta;
+        var requisicao = Requisicao() with { Ferramentas = [cadastro] };
+        var client = Criar((inicio, _, _, _) =>
+        {
+            var args = inicio.ArgumentList.ToArray();
+            args[Array.IndexOf(args, "--json-schema") + 1].Should().Be(cadastro.SchemaJson);
+            args[Array.IndexOf(args, "--tools") + 1].Should().BeEmpty();
+            args[Array.IndexOf(args, "--mcp-config") + 1].Should().Be("{\"mcpServers\":{}}");
+            args.Should().Contain("--no-session-persistence").And.Contain("--safe-mode");
+            return Task.FromResult(new ResultadoMontagemCli(0,
+                """{"subtype":"success","is_error":false,"permission_denials":[],"structured_output":{"campos":[]},"usage":{"input_tokens":10,"output_tokens":5}}"""));
+        });
+        var resposta = await client.EnviarAsync(requisicao);
+        var uso = resposta.Conteudo.Should().ContainSingle().Which.Should().BeOfType<BlocoUsoFerramentaLlm>().Subject;
+        uso.Nome.Should().Be(cadastro.Nome);
+        uso.Entrada.GetProperty("campos").GetArrayLength().Should().Be(0);
+        resposta.TokensEntrada.Should().Be(10);
+        resposta.TokensSaida.Should().Be(5);
+    }
+
+    [Theory]
+    [InlineData("criar_pedido", "{}")]
+    [InlineData("propor_cadastro", "{}")]
+    [InlineData("montar_ficha", "{}")]
+    public async Task Nome_ou_schema_nao_permitido_nao_inicia_cli(string nome, string schema)
+    {
+        var client = Criar((_, _, _, _) => throw new Exception("não deve executar"));
+        var requisicao = Requisicao() with { Ferramentas = [new FerramentaLlm(nome, "Teste", schema)] };
+        await FluentActions.Invoking(() => client.EnviarAsync(requisicao)).Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
     public async Task DesligadoOuCaminhoRelativoNaoIniciaProcesso()
     {
         foreach (var opcoes in new[] { new MontagemFichaCliOptions(), new MontagemFichaCliOptions { Enabled = true, ExecutablePath = "claude.exe" },
@@ -156,5 +190,17 @@ public class ClaudeCliMontagemFichaClientTests
         using var provider = services.BuildServiceProvider();
         provider.GetRequiredService<IMontagemFichaLlmClient>().Should().BeOfType<ClaudeCliMontagemFichaClient>();
         provider.GetRequiredService<IAgenteLlmClient>().Should().BeOfType<AnthropicMessagesClient>().Which.Disponivel.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Sem_opt_in_assistencia_tipificada_reutiliza_cliente_api()
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+            ["MontagemFicha:Cli:Enabled"] = "false", ["Anthropic:Enabled"] = "true", ["Anthropic:ApiKey"] = "chave-controlada" }).Build();
+        var services = new ServiceCollection(); services.AddLogging(); services.AddEasyStockAgenteLlm(config);
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<IMontagemFichaLlmClient>().Should().NotBeOfType<ClaudeCliMontagemFichaClient>();
+        provider.GetRequiredService<IMontagemFichaLlmClient>().Disponivel.Should().BeTrue();
+        provider.GetRequiredService<IAgenteLlmClient>().Should().BeOfType<AnthropicMessagesClient>();
     }
 }

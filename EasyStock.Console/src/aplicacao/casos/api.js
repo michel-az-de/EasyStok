@@ -1,4 +1,5 @@
 import { legendaDoItem } from '../../dominio/vitrineCardapio'
+import { aplicarVinculoConfirmado } from '../../dominio/vinculoCliente'
 import * as acao from '../acoes'
 import { mesmoConteudo } from '../igualdade'
 import { mapear } from '../reducer/auxiliares'
@@ -9,6 +10,7 @@ import { mesclarDoServidor, mesmaLista, pedidoMesclado } from '../reducer/mescla
 const VOLTAS_DA_SELECAO_PENDENTE = 3
 
 export const casosApi = {
+  [acao.VINCULO_CLIENTE_DA_API]: (estado, { id, vinculo }) => mapear(estado, id, c => aplicarVinculoConfirmado(c, vinculo)),
   [acao.CONFIRMAR_RESPONSAVEL_API]: (estado, { id, situacao, confirmadaEm }) => ({
     ...mapear(estado, id, (c) => ({ ...c, ...situacao, ...(confirmadaEm != null ? { confirmadaEm } : null) })),
     automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },

@@ -183,3 +183,32 @@ aditiva em `KdsPedidoDto`, com `EmpresaId` no WHERE da leitura do cliente e test
 
 **Fora.** Arrastar parada, editar entregador, editar janela e zona já criadas (só ativar e desativar),
 relatório por bairro e o endereço de `ClienteEndereco` (a leitura usa os campos primários do cliente).
+
+## R4 · Cadastros no contexto do Atendimento (#2395)
+
+Cadastros reutiliza os contratos de clientes, produtos, fornecedores, respostas prontas, etiquetas e
+impressão. O menu compartilha o acesso ao Atendimento; cada recurso mantém sua autorização própria.
+Leads são clientes persistidos sem pedidos. Conversas sem `ClienteId` aparecem como “Sem cadastro”.
+Filtros de relacionamento e produto são aplicados no servidor antes da paginação.
+
+- `api/cadastros/contas-bancarias` e `metodos-pagamento`: tenant do JWT, revisão concorrente e
+  `requestId`. Gestão exige perfil de gerência e permissão financeira; recebimento usa apenas métodos
+  ativos. Recibos repetidos e pagamentos confirmados pelo provedor continuam recuperáveis.
+- `api/atendimento/conversas/{id}/vinculo-cliente`: retirada, restauração ou escolha explícita com
+  revisão esperada, motivo e ator. Qualquer pedido histórico bloqueia a correção; conversas legadas
+  sem histórico verificável também bloqueiam. Auditoria, expiração de links e revogação das sessões
+  daquele chat são transacionais. Cadastros, OTP pessoal, mensagens e rascunhos são preservados.
+- `candidatos-cliente`: telefone compartilhado não escolhe nem funde pessoas automaticamente.
+- `api/atendimento/assistente/cadastro`: propõe até três campos com evidência literal de mensagens
+  recebidas. Reutiliza `IMontagemFichaLlmClient`, sua configuração e o adaptador CLI restrito ou API;
+  não grava cadastro nem envia mensagens. Mudança de sessão, conversa, cliente ou revisão invalida a
+  sugestão e impede aplicar uma resposta atrasada.
+- Modelos de notificação mantêm a versão publicada enquanto a próxima é rascunho. Aprovar a versão
+  atual publica e desativa a anterior na mesma transação; `apenasAtuais=true` filtra antes da paginação.
+
+Provas reproduzíveis: `prova-2395-cadastros.mjs`, `prova-2395-vinculo.mjs` e
+`prova-2395-navegador.mjs` cobrem regras e componentes. `prova-2395-api-real.mjs` e
+`prova-2395-jornada-api.mjs` usam a fixture opt-in `R4_FixtureLocalComLoginReal` com PostgreSQL e JWT.
+Somente provedores externos são substituídos nessa fixture. `CadastroClaudeCliRealTests` é uma prova
+opt-in separada do provedor real com dados sintéticos; não equivale à homologação de mensagens ou
+pagamentos. Evidências de execução e aceite ficam na issue e na PR.

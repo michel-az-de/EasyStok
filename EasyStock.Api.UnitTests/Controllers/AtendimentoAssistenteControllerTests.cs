@@ -9,6 +9,7 @@ using EasyStock.Domain.Entities.Atendimento;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -17,6 +18,17 @@ namespace EasyStock.Api.UnitTests.Controllers;
 /// <summary>Assistente da dona (S47): contrato HTTP. O LLM é substituto; nenhuma chamada de rede.</summary>
 public class AtendimentoAssistenteControllerTests
 {
+    [Theory]
+    [InlineData(nameof(AtendimentoAssistenteController.Perguntar))]
+    [InlineData(nameof(AtendimentoAssistenteController.MontarFicha))]
+    [InlineData(nameof(AtendimentoAssistenteController.SugerirCadastro))]
+    public void ConsultasUsamLimiteExistenteDeIa(string metodo)
+    {
+        var limite = typeof(AtendimentoAssistenteController).GetMethod(metodo)!
+            .GetCustomAttributes(typeof(EnableRateLimitingAttribute), true).Cast<EnableRateLimitingAttribute>().Single();
+        limite.PolicyName.Should().Be("ai");
+    }
+
     private readonly IAgenteLlmClient _llm = Substitute.For<IAgenteLlmClient>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IConversaRepository _conversas = Substitute.For<IConversaRepository>();

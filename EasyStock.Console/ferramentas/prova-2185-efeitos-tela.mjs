@@ -58,6 +58,7 @@ import { ModalNota } from '/src/features/notas/ModalNota.jsx'
 import { criarRascunhosDeNotas } from '/src/aplicacao/rascunhosDeNotas.js'
 import { BlocoColaborativoIa } from '/src/features/ficha-cliente/AreaColaborativaIa.jsx'
 import { identidadeDaMontagem } from '/src/aplicacao/montagemFicha.js'
+import { chaveDaAssistencia } from '/src/aplicacao/contextoAssistencia.js'
 import { useTamanhoTela } from '/src/hooks/useTamanhoTela.js'
 import { CANAIS } from '/src/infra/catalogo.js'
 import { REGRAS_PADRAO } from '/src/dominio/automacao.js'
@@ -190,7 +191,7 @@ function Cena() {
       {cena === 'ficha' && selecionada && <ModalCliente conversa={nomeSincronizado ? { ...selecionada, nome: nomeSincronizado } : selecionada} aoFechar={() => chamadas.push(['fecharFicha'])} />}
       {cena === 'bloco' && selecionada && (
         <BlocoColaborativoIa
-          bloco={{ id: 'b1', geracaoId: 'g1', tipo: 'resposta', acao: 'rascunho', texto: 'Confirmo às 12h.', conversaId: selecionada.id, identidadeSessao: identidadeDaMontagem() }}
+          bloco={{ id: 'b1', geracaoId: 'g1', tipo: 'resposta', acao: 'rascunho', texto: 'Confirmo às 12h.', conversaId: selecionada.id, identidadeSessao: identidadeDaMontagem(), contextoAssistencia: chaveDaAssistencia(selecionada, identidadeDaMontagem()) }}
           aoRascunho={(texto) => { chamadas.push(['rascunhoDaFicha', texto]); return true }}
         />
       )}

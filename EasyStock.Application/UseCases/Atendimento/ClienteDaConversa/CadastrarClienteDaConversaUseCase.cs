@@ -109,7 +109,7 @@ public sealed class CadastrarClienteDaConversaUseCase(
             var nomeDoCadastro = nome ?? NomeDoContato(conversa.ContatoNome);
             var identificacao = await identificarCliente.ExecuteAsync(
                 new IdentificarClientePorTelefoneInput(command.EmpresaId, telefone.TrimStart('+'), nomeDoCadastro, command.ReutilizarCadastro), ct);
-            cliente = identificacao.Cliente;
+            cliente = identificacao.Cliente ?? throw new TelefoneCompartilhadoException();
             novo = identificacao.EhNovo;
             // #1430: o telefone do formulário não prova que o visitante é o dono do cadastro. Sem a operadora
             // confirmar, nada é ligado nem gravado (quem achou não criou, e o commit só vem depois daqui).

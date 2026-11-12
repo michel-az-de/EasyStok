@@ -1,4 +1,5 @@
 import { mensagemSoLocal } from '../../dominio/mensagem'
+import { preservarVinculoConfirmado } from '../../dominio/vinculoCliente'
 import { pedidoEncerrado } from '../../dominio/pedido'
 import { mesmoConteudo } from '../igualdade'
 
@@ -59,6 +60,7 @@ const semConfirmacao = (local) => {
 // conversa vazia: ficam as mensagens da tela e o que se calcula delas (janela de 24 h, atraso).
 export function mesclarDoServidor(local, lida, semMensagens = false, lidaEm = undefined) {
   if (!local) return lida
+  lida = preservarVinculoConfirmado(local, lida)
   const leituraAtrasada = local.confirmadaEm != null && lidaEm != null && lidaEm <= local.confirmadaEm
   const base = local.confirmadaEm != null && !leituraAtrasada ? semConfirmacao(local) : local
   const doServidor = {

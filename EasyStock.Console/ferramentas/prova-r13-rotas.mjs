@@ -42,6 +42,7 @@ confere('sem hash (carga normal) é o hall de módulos', () => {
   assert.equal(rotaDaHash('').tipo, ROTA_HALL)
   assert.equal(rotaDaHash(undefined).tipo, ROTA_HALL)
   assert.equal(rotaDaHash(null).tipo, ROTA_HALL)
+  for (const hash of ['', '#', '#/', undefined, null]) assert.equal(rotaDaHash(hash).aviso, undefined)
 })
 
 confere('hash de Entregas dá a rota de Entregas', () => {
@@ -59,8 +60,12 @@ confere('hash do cardápio por link dá a rota do cliente, nunca a do Balcão', 
   assert.equal(rota.conversaId, 'c1')
 })
 
-confere('hash desconhecida cai no hall, não trava nem finge outra tela', () => {
-  assert.equal(rotaDaHash('#/nada-a-ver').tipo, ROTA_HALL)
+confere('rota desconhecida ou indisponível volta com aviso explícito', () => {
+  for (const hash of ['#/nada-a-ver', '#/m/invalido/tela', '#/m/campanhas', '#/m/cadastros/invalida']) {
+    const rota = rotaDaHash(hash, { fonteApi: true })
+    assert.equal(rota.tipo, ROTA_HALL)
+    assert.equal(rota.aviso, 'Esta página não existe ou não está disponível. Escolha uma área para continuar.')
+  }
 })
 
 confere('mesma hash, chamadas diferentes: a rota é sempre recalculada (nada de cache preso na primeira leitura)', () => {

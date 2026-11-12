@@ -1,4 +1,5 @@
 import * as acao from '../acoes'
+import { alterarVinculoCliente } from '../../infra/api/vinculoClienteApi'
 import {
   adicionarNotaCliente, bloquearClienteApi, cadastrarClienteDaConversa, desbloquearClienteApi, obterDossie,
 } from '../../infra/api/conversasApi'
@@ -30,8 +31,9 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
   const lendoDossie = new Map()
 
-  async function carregar(id) {
+  async function carregar(id, revisao = conversaDe(id)?.vinculoRevisao ?? 0) {
     const dossie = await obterDossie(id)
+    if ((conversaDe(id)?.vinculoRevisao ?? 0) !== revisao) return
     const cliente = clienteDoDossie(dossie)
     if (cliente) despachar({ tipo: acao.CLIENTE_DA_API, id, ...cliente })
     const contato = contatoInformadoDoDossie(dossie)
@@ -111,6 +113,15 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
   }
 
   return {
+    corrigirVinculoClienteConversa: async (id, corpo) => {
+      const vinculo = await alterarVinculoCliente(id, corpo)
+      despachar({ tipo: acao.VINCULO_CLIENTE_DA_API, id, vinculo })
+      if (vinculo.clienteId) {
+        try { await carregar(id, vinculo.vinculoRevisao) }
+        catch { avisar('Vínculo salvo. Abra a ficha novamente para atualizar os dados do cliente.') }
+      }
+      return vinculo
+    },
     bloquearCliente: (_nome, motivo, conversaId) => mudarBloqueio(conversaId, (clienteId) => bloquearClienteApi(clienteId, motivo?.trim() || null), 'bloquear'),
     desbloquearCliente: (_nome, conversaId) => mudarBloqueio(conversaId, desbloquearClienteApi, 'desbloquear'),
 
