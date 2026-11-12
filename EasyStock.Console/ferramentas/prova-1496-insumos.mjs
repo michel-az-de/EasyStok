@@ -109,13 +109,14 @@ await confere('sem ser Gerente, o 403 do EasyStok vira aviso', async () => {
   assert.ok(m.erros.some((e) => /permissão/i.test(e)))
 })
 
-await confere('custo com fração de centavo não grava um valor que o ERP arredondaria', async () => {
+// #2363: o ERP guarda o custo do insumo com 6 casas; a sétima casa seria arredondada.
+await confere('custo com mais de seis casas não grava um valor que o ERP arredondaria', async () => {
   const m = montar([])
-  assert.equal(await m.gestao.criar({ nome: 'Molho', unidade: 'G', custo: '0,005' }), false)
-  assert.equal(await m.gestao.atualizar('p1', { custo: '2,125' }), false)
+  assert.equal(await m.gestao.criar({ nome: 'Molho', unidade: 'G', custo: '0,0000005' }), false)
+  assert.equal(await m.gestao.atualizar('p1', { custo: '2,1234567' }), false)
   assert.equal(m.chamadas.length, 0)
   assert.equal(m.erros.length, 2)
-  assert.ok(m.erros.every((e) => /duas casas decimais/.test(e)))
+  assert.ok(m.erros.every((e) => /seis casas decimais/.test(e)))
 })
 
 await confere('custo em centavos aceita vírgula, milhar e zeros finais sem falso arredondamento', async () => {

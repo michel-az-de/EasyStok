@@ -22,6 +22,20 @@ namespace EasyStock.Domain.Entities
         public Dimensoes? Dimensoes { get; set; }
 
         public Dinheiro? CustoReferencia { get; set; }
+
+        /// <summary>#2363: custo do insumo por unidade-base com 6 casas (R$ 45 por 10 kg = R$ 0,0045/g).
+        /// <see cref="CustoReferencia"/> guarda centavos e zeraria esse valor.</summary>
+        public decimal? CustoUnitarioInsumo { get; set; }
+
+        /// <summary>#2363: o custo que a ficha técnica usa: o de 6 casas quando informado, senão o de referência.</summary>
+        public decimal? CustoDaFicha => CustoUnitarioInsumo ?? CustoReferencia?.Valor;
+
+        /// <summary>#2363: grava o custo do insumo nas duas colunas; nulo apaga as duas.</summary>
+        public void DefinirCustoDoInsumo(decimal? custo)
+        {
+            CustoUnitarioInsumo = custo is { } c ? Math.Round(c, 6, MidpointRounding.AwayFromZero) : null;
+            CustoReferencia = custo is { } v ? Dinheiro.FromDecimal(v) : null;
+        }
         public Dinheiro? PrecoReferencia { get; set; }
         public decimal? MargemEstimada { get; set; }
 

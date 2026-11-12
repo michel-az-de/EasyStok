@@ -101,10 +101,10 @@ public sealed class ReceitasDaProducaoUseCase(
     private static LinhaDaReceita Linha(ProdutoComposicao c)
     {
         var insumo = c.Insumo!;
-        decimal? custo = insumo.CustoReferencia is { } custoRef
-            ? CalculoProducaoCore.CustoNaUnidadeDoInsumo(c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custoRef.Valor)
+        decimal? custo = insumo.CustoDaFicha is { } custoRef
+            ? CalculoProducaoCore.CustoNaUnidadeDoInsumo(c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custoRef)
             : null;
-        return new LinhaDaReceita(c.InsumoId, insumo.Nome, c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custo, insumo.CustoReferencia?.Valor);
+        return new LinhaDaReceita(c.InsumoId, insumo.Nome, c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custo, insumo.CustoDaFicha);
     }
 
     // Custo só fecha se TODA linha tem custo: total parcial pareceria barato demais.
