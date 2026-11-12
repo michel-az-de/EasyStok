@@ -141,10 +141,14 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       // #2185 (F12): cardápio, Assistente e campo assumem antes de falar; sem o que assumir, sai na hora.
       return assumirDaConversa.antesDeEnviar(id, () => {
         const mensagemId = proximoId('msg')
-        despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
-        return chaves.enviar(id, { texto }, (chave) => enviarTexto(id, texto, { chave }))
+        let chaveEnvio
+        return chaves.enviar(id, { texto }, (chave) => {
+          chaveEnvio = chave
+          despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, chaveEnvio, agora: agoraRef.current })
+          return enviarTexto(id, texto, { chave })
+        })
           .then((m) => {
-            despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
+            despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, chaveEnvio, mensagem: mensagemDaApi(m) })
             return true
           })
           .catch((erro) => {

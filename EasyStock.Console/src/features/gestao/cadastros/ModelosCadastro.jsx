@@ -63,7 +63,7 @@ function ListaModelos({ contexto }) {
       <div><small>{NOMES_CANAIS_MODELO[m.canal] ?? m.canal} · versão {m.versao}</small><h3>{m.nome}</h3><p className={css.amostra}>{m.assuntoTemplate || m.corpoTemplate}</p><Pilula tom={m.aprovado ? 'sucesso' : 'alerta'}>{m.aprovado ? 'Aprovado na loja' : 'Aguardando revisão'}</Pilula></div>
       <div className={css.acoes}><Botao disabled={ocupado} onClick={() => abrir(m)}>Editar</Botao>{!m.aprovado && <Botao disabled={ocupado} onClick={() => aprovar(m)}>Aprovar na loja</Botao>}</div>
     </li>)}</ul>}
-    <div className={css.rodape}><span>{consulta.total} modelos</span><div className={css.acoes}><Botao disabled={memoria.pagina <= 1 || consulta.carregando} onClick={() => mudar({ pagina: memoria.pagina - 1 })}>Anterior</Botao><span>Página {memoria.pagina}</span><Botao disabled={memoria.pagina * 20 >= consulta.total || consulta.carregando} onClick={() => mudar({ pagina: memoria.pagina + 1 })}>Próxima</Botao></div></div>
+    <div className={css.rodape}><span>{consulta.total} {consulta.total === 1 ? 'modelo' : 'modelos'}</span><div className={css.acoes}><Botao disabled={memoria.pagina <= 1 || consulta.carregando} onClick={() => mudar({ pagina: memoria.pagina - 1 })}>Anterior</Botao><span>Página {memoria.pagina}</span><Botao disabled={memoria.pagina * 20 >= consulta.total || consulta.carregando} onClick={() => mudar({ pagina: memoria.pagina + 1 })}>Próxima</Botao></div></div>
     {memoria.editor && <EditorModelo contexto={contexto} editor={memoria.editor} aoMudar={editor => mudar({ editor })} aoFechar={() => mudar({ editor: null })} aoSalvo={() => { mudar({ editor: null }); avisar('Modelo salvo para revisão.'); consulta.recarregar() }} />}
   </div>
 }

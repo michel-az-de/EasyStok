@@ -87,14 +87,16 @@ export const casosApi = {
 
   // Sync que já trouxe a mensagem do servidor: o balão local sai, senão ficam dois com o
   // mesmo id (#1287).
-  [acao.CONFIRMAR_ENVIO_API]: (estado, { id, mensagemId, mensagem }) =>
+  [acao.CONFIRMAR_ENVIO_API]: (estado, { id, mensagemId, mensagem, chaveEnvio }) =>
     mapear(estado, id, (c) => {
-      const jaVeio = c.mensagens.some((m) => m.id === mensagem.id && m.id !== mensagemId)
+      // Resposta perdida deixa um balão local sem ID do servidor. Só o replay da MESMA intenção o resolve.
+      const mensagens = c.mensagens.filter(m => !chaveEnvio || m.chaveEnvio !== chaveEnvio || m.id === mensagemId)
+      const jaVeio = mensagens.some((m) => m.id === mensagem.id && m.id !== mensagemId)
       return {
         ...c,
         mensagens: jaVeio
-          ? c.mensagens.filter((m) => m.id !== mensagemId)
-          : c.mensagens.map((m) => (m.id === mensagemId ? { ...mensagem, aguardandoSync: true } : m)),
+          ? mensagens.filter((m) => m.id !== mensagemId)
+          : mensagens.map((m) => (m.id === mensagemId ? { ...mensagem, aguardandoSync: true } : m)),
       }
     }),
 

@@ -67,10 +67,12 @@ public class CadastrosFinanceirosIntegrationTests(PostgreSqlDatabaseFixture fixt
         var empresa = await SemearAsync();
         var outra = await SemearAsync();
         await using var db = fixture.CreateDbContext();
+        var comprador = Cliente.Criar(empresa, "Cliente");
         db.Clientes.AddRange(new Cliente { Id = Guid.NewGuid(), EmpresaId = empresa, Nome = "Lead A", OrderCount = 0 },
             new Cliente { Id = Guid.NewGuid(), EmpresaId = empresa, Nome = "Lead B", Telefone = "(11) 91234-5678", OrderCount = 0, Ativo = true },
-            new Cliente { Id = Guid.NewGuid(), EmpresaId = empresa, Nome = "Cliente", OrderCount = 1 },
+            comprador,
             new Cliente { Id = Guid.NewGuid(), EmpresaId = outra, Nome = "Lead estrangeiro", OrderCount = 0 });
+        db.Pedidos.Add(Pedido.Criar(empresa, comprador));
         await db.SaveChangesAsync();
         db.SetMobileTenantContext(empresa);
         var repo = new ClienteRepository(db);
@@ -82,13 +84,26 @@ public class CadastrosFinanceirosIntegrationTests(PostgreSqlDatabaseFixture fixt
         (await repo.GetByEmpresaAsync(empresa, 1, 20, search: "+5511912345678")).items.Should().ContainSingle().Which.Nome.Should().Be("Lead B");
         (await repo.SearchAsync(empresa, "+55 (11) 91234-5678")).Should().ContainSingle().Which.Nome.Should().Be("Lead B");
         var cliente = await db.Clientes.SingleAsync(c => c.Nome == "Lead A");
+        cliente.Telefone = "5511912342395";
         db.AtendimentoConversas.Add(EasyStock.Domain.Entities.Atendimento.Conversa.Abrir(empresa, "5511912342395", DateTime.UtcNow, cliente.Nome, cliente.Id));
         await db.SaveChangesAsync();
         (await repo.GetByEmpresaAsync(empresa, 1, 20, relacionamento: "lead")).total.Should().Be(2);
-        cliente.OrderCount = 1;
+        var pedido = Pedido.Criar(empresa, cliente);
+        db.Pedidos.Add(pedido);
         await db.SaveChangesAsync();
+        cliente.OrderCount.Should().Be(0, "o contador legado não foi atualizado pelo canal");
         (await repo.GetByEmpresaAsync(empresa, 1, 20, relacionamento: "lead")).total.Should().Be(1);
-        (await repo.GetByEmpresaAsync(empresa, 1, 20, relacionamento: "cliente")).total.Should().Be(2);
+        var clientes = await repo.GetByEmpresaAsync(empresa, 1, 20, relacionamento: "cliente");
+        clientes.total.Should().Be(2);
+        clientes.items.Single(c => c.Id == cliente.Id).OrderCount.Should().Be(1);
+        var detalhe = await new EasyStock.Application.UseCases.ObterClienteDetalhes.ObterClienteDetalhesUseCase(repo)
+            .ExecuteAsync(new(empresa, cliente.Id));
+        detalhe!.Cliente.OrderCount.Should().Be(1);
+        detalhe.Cliente.LastOrderAt.Should().BeCloseTo(pedido.CriadoEm, TimeSpan.FromMicroseconds(1));
+        (await repo.ObterMetricasPedidosAsync(outra, cliente.Id)).OrderCount.Should().Be(0);
+        var candidatos = await new EasyStock.Infra.Postgre.Repositories.Atendimento.VinculoClienteConversaRepository(db)
+            .ListarCandidatosAsync(empresa, [cliente.Telefone], [], default);
+        candidatos.Should().ContainSingle().Which.EhLead.Should().BeFalse();
     }
 
     [SkippableFact]

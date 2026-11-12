@@ -7,6 +7,7 @@ registerHooks({
 })
 const { criarAcoesComandaApi } = await import('../src/aplicacao/api/comanda.js')
 const { situacaoDoEnvio } = await import('../src/dominio/resumoPedido.js')
+const identidade = { clienteId: 'cliente-da-comanda', vinculoRevisao: 2 }
 globalThis.sessionStorage = { getItem: () => JSON.stringify({ token: 'teste', expiraEm: Date.now() + 60000, empresa: { id: 'empresa' } }) }
 for (const enviarAoCliente of [false, true]) {
   const pedidos = [], despachados = []
@@ -15,8 +16,8 @@ for (const enviarAoCliente of [false, true]) {
     if (opcoes.method === 'POST') { pedidos.push(JSON.parse(opcoes.body)); return new Response(JSON.stringify({ data: { pedidoId: 'pedido', cobranca, enviadoAoCliente: enviarAoCliente } })) }
     return new Response(JSON.stringify({ data: { pedidoId: 'pedido', status: 'aguardando_pagamento', total: 50, frete: 0, itens: [], totalPago: 0, pagamentos: [], cobranca } }))
   }
-  const pedido = { estado: 'aguardando', itens: [{ sku: 'massa', qtd: 1, obs: '' }], janela: 'j1|2026-10-16', meio: 'pix' }
-  const acoes = criarAcoesComandaApi({}, { despachar: a => despachados.push(a), estadoRef: { current: { conversas: [{ id: 'conversa', pedido }] } } })
+  const pedido = { estado: 'aguardando', identidadeProposta: { ...identidade }, itens: [{ sku: 'massa', qtd: 1, obs: '' }], janela: 'j1|2026-10-16', meio: 'pix' }
+  const acoes = criarAcoesComandaApi({}, { despachar: a => despachados.push(a), estadoRef: { current: { conversas: [{ id: 'conversa', ...identidade, pedido }] } } })
   if (enviarAoCliente) await acoes.gerarPedido('conversa', 'pix')
   else await acoes.gerarCobranca('conversa', pedido, 'pix', false)
   assert.equal(pedidos.length, 1)

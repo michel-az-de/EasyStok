@@ -57,7 +57,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
                 avisos.Add(call.Arg<string>());
             });
         await using var provider = CriarProvider(cenario, eventos);
-        var input = new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId,
+        var input = new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId, cenario.ClienteId, cenario.VinculoRevisao,
             [new ItemPedidoCheckout(cenario.ItemId, 2, "Sem molho")], cenario.JanelaId, cenario.Data, Forma: forma);
         Guid pedidoId;
         await using (var scope = provider.CreateAsyncScope())
@@ -148,7 +148,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         {
             DefinirEmpresa(scope, cenario.EmpresaId);
             pedidoId = (await scope.ServiceProvider.GetRequiredService<GerarPedidoConversaUseCase>().ExecuteAsync(
-                new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId,
+                new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId, cenario.ClienteId, cenario.VinculoRevisao,
                     [new ItemPedidoCheckout(cenario.ItemId, 2, null)], cenario.JanelaId, cenario.Data, Forma: "na_entrega"))).PedidoId;
         }
         async Task Receber(decimal valor)
@@ -243,7 +243,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         await using var scope = provider.CreateAsyncScope();
         DefinirEmpresa(scope, cenario.EmpresaId);
         return (await scope.ServiceProvider.GetRequiredService<GerarPedidoConversaUseCase>().ExecuteAsync(
-            new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId,
+            new GerarPedidoConversaInput(cenario.EmpresaId, cenario.ConversaId, cenario.ClienteId, cenario.VinculoRevisao,
                 [new ItemPedidoCheckout(cenario.ItemId, 2, null)], cenario.JanelaId, cenario.Data, Forma: "na_entrega"))).PedidoId;
     }
 
@@ -258,7 +258,8 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
             .ExecuteAsync(new ListarPedidosKdsQuery(cenario.EmpresaId, Data: cenario.Data));
     }
 
-    private sealed record Cenario(Guid EmpresaId, Guid ConversaId, Guid ItemId, Guid JanelaId, DateOnly Data, long NumeroComanda);
+    private sealed record Cenario(Guid EmpresaId, Guid ConversaId, Guid ItemId, Guid JanelaId, DateOnly Data, long NumeroComanda,
+        Guid ClienteId, long VinculoRevisao);
 
     private async Task<Cenario> SemearAsync()
     {
@@ -283,7 +284,7 @@ public sealed class AtendimentoCozinhaIntegrationTests(PostgreSqlDatabaseFixture
         var conversa = Conversa.Abrir(empresaId, "5511999998888", agora, cliente.Nome, cliente.Id);
         db.AtendimentoConversas.Add(conversa);
         await db.SaveChangesAsync();
-        return new Cenario(empresaId, conversa.Id, item.Id, janela.Id, data, conversa.NumeroComanda);
+        return new Cenario(empresaId, conversa.Id, item.Id, janela.Id, data, conversa.NumeroComanda, cliente.Id, conversa.VinculoRevisao);
     }
 
     private ServiceProvider CriarProvider(Cenario cenario, IOperacaoEventPublisher eventos, IPublicadorEventoIntegracao? publicador = null)

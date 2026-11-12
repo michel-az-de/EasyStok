@@ -82,7 +82,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
             new IdentidadeR4(Guid.NewGuid(), outraEmpresa, "Dona de outra empresa", "outra.r4@fixture.test", "R4-Outra-2026!", "Dona")
         };
         Guid conversaSemCadastroId;
+        Guid conversaConferenciaId;
         Guid conversaOutraEmpresaId;
+        Guid janelaAlternativaId;
         var produtos = new List<object>();
         using (var scope = factory.Services.CreateScope())
         {
@@ -130,6 +132,13 @@ public sealed partial class PedidoConversaConcorrenciaTests
             db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, semCadastro.Id, agora, TipoConteudoMensagem.Texto,
                 "Meu nome é Ana Pereira. Meu telefone é 11999998888 e meu email é ana@fixture.test.", "wamid.r4.sem-cadastro"));
             conversaSemCadastroId = semCadastro.Id;
+            var conferencia = Conversa.Abrir(EmpresaId, "5511912345679", agora, "Conferência R4", clienteOriginal.Id);
+            conferencia.Assumir(agora, UsuarioId);
+            conferencia.RegistrarEntrada(agora);
+            db.AtendimentoConversas.Add(conferencia);
+            db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conferencia.Id, agora, TipoConteudoMensagem.Texto,
+                "Mensagem sintética recebida para conferir as exceções R4.", "wamid.r4.conferencia"));
+            conversaConferenciaId = conferencia.Id;
             var estrangeiro = Cliente.Criar(outraEmpresa, "Cliente isolado R4");
             estrangeiro.Telefone = clienteOriginal.Telefone;
             db.Clientes.Add(estrangeiro);
@@ -141,20 +150,25 @@ public sealed partial class PedidoConversaConcorrenciaTests
             var loja = Loja.Criar(EmpresaId, "Cozinha R4");
             db.Lojas.Add(loja);
             var storefront = await db.Storefronts.SingleAsync(x => x.EmpresaId == EmpresaId);
-            foreach (var nome in new[] { "Lasanha bolonhesa R4", "Lasanha de legumes R4" })
+            var janelaAlternativa = JanelaEntrega.Criar(storefront.Id, (int)cenario.DataEntrega.DayOfWeek,
+                new TimeOnly(13, 0), new TimeOnly(16, 0), 10, "Tarde R4");
+            db.JanelasEntrega.Add(janelaAlternativa);
+            janelaAlternativaId = janelaAlternativa.Id;
+            foreach (var nome in new[] { "Lasanha bolonhesa R4", "Lasanha de legumes R4", "Lasanha da prova de falta R4" })
             {
+                var saldo = nome == "Lasanha da prova de falta R4" ? 1 : 8;
                 var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = EmpresaId, CategoriaId = categoria.Id,
                     Nome = nome, Status = StatusProduto.Ativo, PrecoReferencia = Dinheiro.FromDecimal(32m), CriadoEm = agora, AlteradoEm = agora };
                 db.Produtos.Add(produto);
                 var item = new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = EmpresaId, ProdutoId = produto.Id, LojaId = loja.Id,
-                    QuantidadeInicial = Quantidade.From(8), QuantidadeAtual = Quantidade.From(8), CustoUnitario = Dinheiro.FromDecimal(12m),
+                    QuantidadeInicial = Quantidade.From(saldo), QuantidadeAtual = Quantidade.From(saldo), CustoUnitario = Dinheiro.FromDecimal(12m),
                     Status = StatusItemEstoque.Ok, EntradaEm = agora, CriadoEm = agora, AlteradoEm = agora };
                 db.ItensEstoque.Add(item);
                 var cardapio = CardapioItem.CriarAvulso(storefront.Id, nome, 32m, categoria.Nome);
                 cardapio.VincularProduto(produto.Id);
                 cardapio.TornarVisivel();
                 db.CardapioItens.Add(cardapio);
-                produtos.Add(new { produtoId = produto.Id, itemEstoqueId = item.Id, cardapioItemId = cardapio.Id, nome, saldo = 8 });
+                produtos.Add(new { produtoId = produto.Id, itemEstoqueId = item.Id, cardapioItemId = cardapio.Id, nome, saldo });
             }
             db.Fornecedores.Add(Fornecedor.Criar(EmpresaId, "Fornecedor R4"));
             db.TenantFeatureFlags.Add(TenantFeatureFlag.Criar(EmpresaId, FeatureCatalogo.ModuloAtendimento, true, identidades[0].Email));
@@ -177,8 +191,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         await File.WriteAllTextAsync(destino, JsonSerializer.Serialize(new
         {
             api = client.BaseAddress!.ToString().TrimEnd('/'), empresaId = EmpresaId, outraEmpresaId = outraEmpresa,
-            conversaId = cenario.ConversaId, clienteId = cenario.ClienteId, conversaSemCadastroId, conversaOutraEmpresaId,
-            janelaId = cenario.JanelaId, dataEntrega = cenario.DataEntrega, produtos, identidades,
+            conversaId = cenario.ConversaId, clienteId = cenario.ClienteId, conversaSemCadastroId, conversaConferenciaId, conversaOutraEmpresaId,
+            janelaId = cenario.JanelaId, janelaAlternativaId, dataEntrega = cenario.DataEntrega, produtos, produtoExcecao = produtos[2], identidades,
             autenticacao = "POST api/auth/login, JWT Bearer e CurrentUserAccessor reais",
             provedores = "MP, Meta e LLM controlados; nenhuma homologação externa; workers desativados"
         }, ComandaClienteUseCase.Json));

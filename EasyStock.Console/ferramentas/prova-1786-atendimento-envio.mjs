@@ -30,6 +30,7 @@ registerHooks({
 
 const acao = await import('../src/aplicacao/acoes.js')
 const { comApi } = await import('../src/aplicacao/acoesApi.js')
+const { reducer } = await import('../src/aplicacao/reducer.js')
 const plano = await import('../src/aplicacao/planoDeSincronizacao.js')
 
 let passou = 0
@@ -76,6 +77,26 @@ await confere('1. texto: resposta perdida e o mesmo envio de novo levam a MESMA 
   assert.equal(chamadas.length, 2)
   assert.ok(chamadas[0].chave, 'o envio não levou Idempotency-Key')
   assert.equal(chamadas[1].chave, chamadas[0].chave)
+})
+
+for (const sincronizarAntes of [false, true]) await confere(`M01. replay deixa um balão e preserva outra intenção de texto igual (sync=${sincronizarAntes})`, async () => {
+  const original = { id: 'anterior-legitima', dir: 'out', texto: 'x', status: 'enviada', em: '2026-10-14T11:00:00Z' }
+  const estadoRef = { current: { conversas: [{ id: 'conv-1', canal: 'WhatsApp', estado: 'Em atendimento', pausaApi: true, mensagens: [original] }], catalogo: { canais: [] }, rascunhos: {}, sincronizacao: {}, selecionadaId: 'conv-1', selecaoPendente: null } }
+  const despachar = a => { estadoRef.current = reducer(estadoRef.current, a) }
+  const api = comApi({}, { despachar, agoraRef: { current: Date.now() }, estadoRef })
+  const chamadas = rede(['cair', json(enviada()), json(enviada('srv-2'))])
+  assert.equal(await api.enviar('conv-1', 'x'), false)
+  assert.equal(estadoRef.current.conversas[0].mensagens.filter(m => m.status === 'falhou').length, 1)
+  if (sincronizarAntes) despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [{ ...estadoRef.current.conversas[0], mensagens: [original,
+    { id: 'srv-1', dir: 'out', texto: 'x', status: 'enviada', em: '2026-10-14T12:00:00Z' }] }] })
+  assert.equal(await api.enviar('conv-1', 'x'), true)
+  const mensagens = estadoRef.current.conversas[0].mensagens
+  assert.deepEqual(mensagens.map(m => m.id), ['anterior-legitima', 'srv-1'], `Balões atuais: ${JSON.stringify(mensagens.map(m => m.id))}`)
+  assert.equal(mensagens.some(m => m.status === 'falhou'), false)
+  assert.equal(chamadas[0].chave, chamadas[1].chave)
+  assert.equal(await api.enviar('conv-1', 'x'), true)
+  assert.deepEqual(estadoRef.current.conversas[0].mensagens.map(m => m.id), ['anterior-legitima', 'srv-1', 'srv-2'])
+  assert.notEqual(chamadas[2].chave, chamadas[0].chave)
 })
 
 await confere('1. texto: depois de confirmado, o mesmo texto é outra mensagem e ganha outra chave', async () => {

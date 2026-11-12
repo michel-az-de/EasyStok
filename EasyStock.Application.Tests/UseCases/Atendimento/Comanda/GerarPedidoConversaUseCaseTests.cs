@@ -8,6 +8,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Tests.Services.Storefront;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -32,6 +33,7 @@ public class GerarPedidoConversaUseCaseTests
     {
         public CheckoutCoreServiceTests.Cenario Checkout { get; } = new();
         public Cliente Cliente { get; }
+        public IClienteRepository ClienteRepo { get; } = Substitute.For<IClienteRepository>();
         public Conversa Conversa { get; }
         public IConversaRepository ConversaRepo { get; } = Substitute.For<IConversaRepository>();
         public IPedidoRepository Pedidos { get; } = Substitute.For<IPedidoRepository>();
@@ -48,13 +50,13 @@ public class GerarPedidoConversaUseCaseTests
             Cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Maria" };
             if (comEndereco)
                 Cliente.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = Cliente.Id, Cep = cep, Padrao = true });
-            var clienteRepo = Substitute.For<IClienteRepository>();
-            clienteRepo.GetByIdWithDetailsAsync(EmpresaId, Cliente.Id).Returns(Cliente);
+            ClienteRepo.GetByIdWithDetailsAsync(EmpresaId, Cliente.Id).Returns(Cliente);
 
             var agora = DateTime.UtcNow.AddDays(janelaFechada ? -2 : 0);
             Conversa = Conversa.Abrir(EmpresaId, WaId, agora.AddMinutes(-2), "Maria", Cliente.Id);
             Conversa.RegistrarEntrada(agora.AddMinutes(-1));
             ConversaRepo.ObterPorIdAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>()).Returns(Conversa);
+            ConversaRepo.EspelharLeituraComLock();
             ConversaRepo.When(r => r.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>()))
                 .Do(ci => Mensagens.Add(ci.Arg<Mensagem>()));
 
@@ -88,18 +90,65 @@ public class GerarPedidoConversaUseCaseTests
                 .Returns(_ => Conversa.PedidoEmAndamentoId);
 
             UseCase = new GerarPedidoConversaUseCase(
-                ConversaRepo, clienteRepo,
-                Checkout.CriarPedidoAtendimento(ConversaRepo, clienteRepo, Uow, Pedidos),
+                ConversaRepo, ClienteRepo,
+                Checkout.CriarPedidoAtendimento(ConversaRepo, ClienteRepo, Uow, Pedidos),
                 gerar, trocar, aviso, TimeProvider.System);
         }
 
         public GerarPedidoConversaInput Input(Guid? empresaId = null, string? forma = null) => new(
             EmpresaId: empresaId ?? EmpresaId,
             ConversaId: Conversa.Id,
+            ClienteId: Cliente.Id,
+            VinculoRevisao: Conversa.VinculoRevisao,
             Itens: new List<ItemPedidoCheckout> { new(Checkout.CardapioItemId, 2, "sem granulado") },
             JanelaId: Checkout.JanelaId,
             DataEntrega: Checkout.DataEntrega,
             Forma: forma);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ComandaElaboradaAntesDaCorrecaoRecusaTrocaDePessoaERevisaoAba(bool restaurarMesmaPessoa)
+    {
+        var c = new Cenario();
+        var proposta = c.Input();
+        var outra = new Cliente { Id = Guid.NewGuid(), EmpresaId = c.EmpresaId, Nome = "Outra pessoa" };
+        outra.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = outra.Id, Cep = "01310-100", Padrao = true });
+        c.ClienteRepo.GetByIdWithDetailsAsync(c.EmpresaId, outra.Id).Returns(outra);
+        c.Conversa.CorrigirVinculoCliente(null, proposta.VinculoRevisao);
+        c.Conversa.CorrigirVinculoCliente(restaurarMesmaPessoa ? c.Cliente.Id : outra.Id, c.Conversa.VinculoRevisao);
+
+        await c.UseCase.Invoking(u => u.ExecuteAsync(proposta)).Should().ThrowAsync<ContextoPedidoAtendimentoAlteradoException>();
+
+        c.Checkout.PedidosAdicionados.Should().BeEmpty();
+        c.Cobrancas.Should().BeEmpty();
+        c.Mensagens.Should().BeEmpty();
+        await c.Mp.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task CorrecaoAbaDepoisDaLeituraDaComandaAindaRecusaSobLock()
+    {
+        var c = new Cenario();
+        var proposta = c.Input();
+        var leituras = 0;
+        c.ClienteRepo.GetByIdWithDetailsAsync(c.EmpresaId, c.Cliente.Id).Returns(_ =>
+        {
+            if (++leituras == 1)
+            {
+                c.Conversa.CorrigirVinculoCliente(null, proposta.VinculoRevisao);
+                c.Conversa.CorrigirVinculoCliente(c.Cliente.Id, c.Conversa.VinculoRevisao);
+            }
+            return c.Cliente;
+        });
+
+        await c.UseCase.Invoking(u => u.ExecuteAsync(proposta)).Should().ThrowAsync<ContextoPedidoAtendimentoAlteradoException>();
+
+        await c.ConversaRepo.Received().ObterPorIdComLockAsync(c.EmpresaId, c.Conversa.Id, Arg.Any<CancellationToken>());
+        c.Checkout.PedidosAdicionados.Should().BeEmpty();
+        c.Cobrancas.Should().BeEmpty();
+        await c.Mp.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
     }
 
     [Theory]

@@ -26,11 +26,11 @@ export const casosAtendimento = {
   [acao.DEFINIR_RASCUNHO]: (estado, { id, texto, doCampo = false, escritaVista, adotar = false }) =>
     (doCampo ? comRascunhoDoCampo(estado, { id, texto, escritaVista, adotar }) : comRascunhoDeFora(estado, id, texto)),
 
-  [acao.ENVIAR_MENSAGEM]: (estado, { id, texto, agora, mensagemId, modelo = false, automatica = false, regra = null }) => {
+  [acao.ENVIAR_MENSAGEM]: (estado, { id, texto, agora, mensagemId, chaveEnvio, modelo = false, automatica = false, regra = null }) => {
     if (recusaEnvio(estado, id, agora)) return estado
     const base = mapear(estado, id, (c) => ({
       ...comMensagem(c, {
-        dir: 'out', texto, automatica, modelo, regra,
+        dir: 'out', texto, automatica, modelo, regra, ...(chaveEnvio ? { chaveEnvio } : {}),
         status: automatica ? 'lida' : 'enviando',
       }, { id: mensagemId, agora }),
       estado: c.estado === 'Aberto' ? 'Em atendimento' : c.estado,

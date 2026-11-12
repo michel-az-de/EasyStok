@@ -225,6 +225,7 @@ export function corpoDoPedido(pedido) {
   // Entregas leem). Outro meio não manda o campo: o corpo segue o de antes.
   const observacoes = observacaoDoPagamentoNaEntrega({ meio: pedido?.meio, trocoPara: pedido?.trocoPara })
   return {
+    ...(pedido?.identidadeProposta ? { clienteId: pedido.identidadeProposta.clienteId, vinculoRevisao: pedido.identidadeProposta.vinculoRevisao } : {}),
     ...(observacoes ? { observacoes } : {}),
     itens: (pedido?.itens ?? []).map((l) => {
       const { itemSku, variacaoId } = partesDoSku(l.sku)

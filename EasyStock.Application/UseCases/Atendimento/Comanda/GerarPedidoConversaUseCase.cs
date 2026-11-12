@@ -18,6 +18,8 @@ namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 public sealed record GerarPedidoConversaInput(
     Guid EmpresaId,
     Guid ConversaId,
+    Guid ClienteId,
+    long VinculoRevisao,
     IReadOnlyList<ItemPedidoCheckout> Itens,
     Guid JanelaId,
     DateOnly DataEntrega,
@@ -63,6 +65,8 @@ public sealed class GerarPedidoConversaUseCase(
     {
         ArgumentNullException.ThrowIfNull(input);
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
+        UseCaseGuards.EnsureNotEmpty(input.ClienteId, "ClienteId");
+        if (input.VinculoRevisao < 0) throw new UseCaseValidationException("Informe a revisão da pessoa conferida na comanda.");
         var forma = CobrancaDoPedidoReservado.NormalizarForma(input.Forma);
         if (input.Itens is null || input.Itens.Count == 0)
             throw new UseCaseValidationException("A comanda está vazia.");
@@ -72,16 +76,17 @@ public sealed class GerarPedidoConversaUseCase(
         if (!conversa.EstaAberta)
             throw new RegraDeDominioVioladaException("A conversa está encerrada.");
 
-        if (conversa.ClienteId is not { } clienteId)
-            throw new RegraDeDominioVioladaException("Cadastre o cliente desta conversa antes de gerar o pedido.");
-        var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, clienteId)
+        if (conversa.VinculoEmRevisao || conversa.VinculoRevisao != input.VinculoRevisao
+            || conversa.ClienteId != input.ClienteId)
+            throw new ContextoPedidoAtendimentoAlteradoException("A identidade mudou. Confira a pessoa e a comanda antes de gerar o pedido.");
+        var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.ClienteId)
             ?? throw new RegraDeDominioVioladaException("Cadastre o cliente desta conversa antes de gerar o pedido.");
         var enderecoId = input.EnderecoId ?? CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente)
             ?? throw new RegraDeDominioVioladaException("Cadastre o endereço de entrega do cliente antes de gerar o pedido.");
 
         var reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
-            input.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId,
-            input.Observacoes, input.FreteCombinado), ct);
+            input.EmpresaId, conversa.Id, input.ClienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId,
+            input.Observacoes, input.FreteCombinado, VinculoRevisaoEsperada: input.VinculoRevisao), ct);
 
         var cobranca = await CobrancaDoPedidoReservado.CobrarAsync(gerarCobranca, trocarForma, reservado, conversa.Id, forma,
             QuemCobra.Atendente, input.UsuarioNome ?? "console", ct);

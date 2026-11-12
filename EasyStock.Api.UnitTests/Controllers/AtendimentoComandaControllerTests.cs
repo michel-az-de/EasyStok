@@ -64,13 +64,49 @@ public class AtendimentoComandaControllerTests
 
     private Conversa ConversaDaEmpresa(Guid empresaId)
     {
-        var conversa = Conversa.Abrir(empresaId, "5511999998888", DateTime.UtcNow.AddMinutes(-5), "Maria");
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", DateTime.UtcNow.AddMinutes(-5), "Maria", Guid.NewGuid());
         _conversas.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
         return conversa;
     }
 
-    private static GerarPedidoConversaBody Comanda() => new(
-        [new ItemComandaBody(Guid.NewGuid(), 1)], Guid.NewGuid(), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)));
+    private static GerarPedidoConversaBody Comanda(Conversa? conversa = null)
+    {
+        conversa ??= Conversa.Abrir(Guid.NewGuid(), "5511999998888", DateTime.UtcNow, clienteId: Guid.NewGuid());
+        return new([new ItemComandaBody(Guid.NewGuid(), 1)], Guid.NewGuid(), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
+            ClienteId: conversa.ClienteId, VinculoRevisao: conversa.VinculoRevisao);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GerarPedidoSemSnapshotCompletoRecusaAntesDeConsultar(bool semCliente)
+    {
+        var conversa = ConversaDaEmpresa(_empresaId);
+        var corpo = Comanda(conversa);
+        corpo = semCliente ? corpo with { ClienteId = null } : corpo with { VinculoRevisao = null };
+        _conversas.ClearReceivedCalls();
+
+        var resultado = await _controller.GerarPedido(conversa.Id, corpo);
+
+        resultado.Should().BeOfType<BadRequestObjectResult>();
+        _conversas.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GerarPedidoComSnapshotAnteriorRecusaAntesDeResolverNovoCliente(bool mesmaPessoa)
+    {
+        var conversa = ConversaDaEmpresa(_empresaId);
+        var corpo = Comanda(conversa);
+        conversa.CorrigirVinculoCliente(null, conversa.VinculoRevisao);
+        conversa.CorrigirVinculoCliente(mesmaPessoa ? corpo.ClienteId : Guid.NewGuid(), conversa.VinculoRevisao);
+
+        var resultado = await _controller.GerarPedido(conversa.Id, corpo);
+
+        resultado.Should().BeOfType<ConflictObjectResult>().Which.Value.Should().BeOfType<ApiErrorResponse>()
+            .Which.Error.Code.Should().Be("VINCULO_CLIENTE_ALTERADO");
+    }
 
     [Fact]
     public async Task PedidoDeConversaDeOutraEmpresaDevolve404()
@@ -90,7 +126,7 @@ public class AtendimentoComandaControllerTests
     {
         var alheia = ConversaDaEmpresa(Guid.NewGuid());
 
-        var resultado = await _controller.GerarPedido(alheia.Id, Comanda());
+        var resultado = await _controller.GerarPedido(alheia.Id, Comanda(alheia));
 
         resultado.Should().BeOfType<NotFoundObjectResult>();
     }
@@ -101,7 +137,7 @@ public class AtendimentoComandaControllerTests
         var conversa = ConversaDaEmpresa(_empresaId);
         _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
 
-        var resultado = await _controller.GerarPedido(conversa.Id, Comanda());
+        var resultado = await _controller.GerarPedido(conversa.Id, Comanda(conversa));
 
         resultado.Should().BeOfType<ForbidResult>();
     }

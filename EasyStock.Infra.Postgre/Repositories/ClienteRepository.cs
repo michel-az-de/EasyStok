@@ -21,6 +21,16 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(c => c.Documentos)
                 .FirstOrDefaultAsync(c => c.EmpresaId == empresaId && c.Id == id);
 
+        public async Task<(int OrderCount, DateTime? LastOrderAt)> ObterMetricasPedidosAsync(Guid empresaId, Guid clienteId)
+        {
+            var metricas = await db.Pedidos.AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && p.ClienteId == clienteId)
+                .GroupBy(p => p.ClienteId)
+                .Select(g => new { Quantidade = g.Count(), UltimoEm = (DateTime?)g.Max(p => p.CriadoEm) })
+                .SingleOrDefaultAsync();
+            return (metricas?.Quantidade ?? 0, metricas?.UltimoEm);
+        }
+
         public async Task<(IEnumerable<Cliente> items, int total)> GetByEmpresaAsync(
             Guid empresaId, int page, int pageSize,
             bool? ativo = null, string? search = null,
@@ -30,8 +40,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(c => c.EmpresaId == empresaId);
 
             if (ativo.HasValue) query = query.Where(c => c.Ativo == ativo.Value);
-            if (relacionamento == "lead") query = query.Where(c => c.OrderCount == 0);
-            if (relacionamento == "cliente") query = query.Where(c => c.OrderCount > 0);
+            if (relacionamento == "lead") query = query.Where(c => !db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id));
+            if (relacionamento == "cliente") query = query.Where(c => db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id));
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -58,14 +68,27 @@ namespace EasyStock.Infra.Postgre.Repositories
             var ordenada = sort?.ToLowerInvariant() switch
             {
                 "criadoem"    => desc ? query.OrderByDescending(c => c.CriadoEm)    : query.OrderBy(c => c.CriadoEm),
-                "lastorderat" => desc ? query.OrderByDescending(c => c.LastOrderAt) : query.OrderBy(c => c.LastOrderAt),
-                "ordercount"  => desc ? query.OrderByDescending(c => c.OrderCount)  : query.OrderBy(c => c.OrderCount),
+                "lastorderat" => desc
+                    ? query.OrderByDescending(c => db.Pedidos.Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm))
+                    : query.OrderBy(c => db.Pedidos.Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm)),
+                "ordercount" => desc
+                    ? query.OrderByDescending(c => db.Pedidos.Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id))
+                    : query.OrderBy(c => db.Pedidos.Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id)),
                 _             => desc ? query.OrderByDescending(c => c.Nome)        : query.OrderBy(c => c.Nome),
             };
 
             var clientes = await ordenada.ThenByDescending(c => c.Id)
-                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-            return (clientes, total);
+                .Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(c => new
+                {
+                    Cliente = c,
+                    Quantidade = db.Pedidos.Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id),
+                    UltimoEm = db.Pedidos.Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm)
+                }).ToListAsync();
+            // Apenas o retrato sem tracking recebe as métricas; o contador legado não inclui todos os canais.
+            foreach (var item in clientes)
+                (item.Cliente.OrderCount, item.Cliente.LastOrderAt) = (item.Quantidade, item.UltimoEm);
+            return (clientes.Select(item => item.Cliente), total);
         }
 
         public async Task<IEnumerable<Cliente>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)

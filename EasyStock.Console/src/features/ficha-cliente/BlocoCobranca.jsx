@@ -194,7 +194,7 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
         rotulo="Valor recebido"
         centavos={centavos}
         ler={lerMoeda}
-        erro={excedeu ? 'Valor alto demais' : null}
+        erro={excedeu ? 'Valor alto demais' : centavos <= 0 ? 'Informe um valor maior que zero.' : null}
         aoMudar={(valor) => setCentavos(valor ?? 0)}
       />
       {recusa && <p className={css.motivoDesabilitado} role="alert">{recusa}</p>}

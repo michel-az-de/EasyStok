@@ -190,6 +190,8 @@ Cadastros reutiliza os contratos de clientes, produtos, fornecedores, respostas 
 impressão. O menu compartilha o acesso ao Atendimento; cada recurso mantém sua autorização própria.
 Leads são clientes persistidos sem pedidos. Conversas sem `ClienteId` aparecem como “Sem cadastro”.
 Filtros de relacionamento e produto são aplicados no servidor antes da paginação.
+Listagem e detalhe de clientes calculam quantidade e última compra pelos pedidos da empresa,
+incluindo Atendimento; o contador legado não determina se a pessoa continua sendo lead.
 
 - `api/cadastros/contas-bancarias` e `metodos-pagamento`: tenant do JWT, revisão concorrente e
   `requestId`. Gestão exige perfil de gerência e permissão financeira; recebimento usa apenas métodos
@@ -199,6 +201,15 @@ Filtros de relacionamento e produto são aplicados no servidor antes da paginaç
   sem histórico verificável também bloqueiam. Auditoria, expiração de links e revogação das sessões
   daquele chat são transacionais. Cadastros, OTP pessoal, mensagens e rascunhos são preservados.
 - `candidatos-cliente`: telefone compartilhado não escolhe nem funde pessoas automaticamente.
+- Criar pedido pela comanda exige `clienteId` e `vinculoRevisao` da proposta vista no Console.
+  O servidor confere esse snapshot novamente sob lock, inclusive após retirar e restaurar a mesma pessoa.
+- Salvar nome, telefone ou endereço pela ficha também exige a identidade capturada ao abrir a edição.
+  `clienteId: null` é explícito para cadastro inicial; ausência dos campos recebe 400 e revisão obsoleta
+  recebe 409 `VINCULO_CLIENTE_ALTERADO`. Reconferir o destino preserva o texto sem gravar automaticamente.
+- Desfazer a edição de uma conta bancária gera uma nova alteração somente nessa conta, usando a revisão
+  da gravação original. Uma edição posterior recebe 409; alterações independentes permanecem.
+- Falha de armazenamento local mantém a proposta em memória e avisa que ela não será retomada após
+  recarregar. Pagamento na entrega sem recebimento não dispara confirmação de pagamento.
 - `api/atendimento/assistente/cadastro`: propõe até três campos com evidência literal de mensagens
   recebidas. Reutiliza `IMontagemFichaLlmClient`, sua configuração e o adaptador CLI restrito ou API;
   não grava cadastro nem envia mensagens. Mudança de sessão, conversa, cliente ou revisão invalida a

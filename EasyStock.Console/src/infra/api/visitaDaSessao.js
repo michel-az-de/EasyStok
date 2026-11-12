@@ -9,9 +9,13 @@ function comandaLocal(pedido) {
   const itens = pedido.itens.filter(i => typeof i?.sku === 'string' && Number.isInteger(i.qtd) && i.qtd > 0)
     .map(i => ({ sku: i.sku, qtd: i.qtd, obs: typeof i.obs === 'string' ? i.obs : '' }))
   if (!itens.length) return null
-  // Só a montagem: nenhum token, cadastro, endereço, pagamento ou retrato do cliente.
+  // Só montagem e versão do vínculo: nenhum token, dado pessoal, endereço ou pagamento.
   const numero = typeof pedido.numero === 'string' || typeof pedido.numero === 'number' ? pedido.numero : null
+  const identidade = pedido.identidadeProposta
+  const identidadeValida = identidade && (identidade.clienteId === null || typeof identidade.clienteId === 'string' && identidade.clienteId.trim())
+    && Number.isInteger(identidade.vinculoRevisao) && identidade.vinculoRevisao >= 0
   return { ...novoPedido(numero), itens, janela: typeof pedido.janela === 'string' ? pedido.janela : null,
+    ...(identidadeValida ? { identidadeProposta: { clienteId: identidade.clienteId, vinculoRevisao: identidade.vinculoRevisao } } : {}),
     meio: typeof pedido.meio === 'string' ? pedido.meio : null,
     observacoes: typeof pedido.observacoes === 'string' ? pedido.observacoes : '' }
 }
@@ -31,9 +35,9 @@ export function lerVisita(sessao) {
 
 export function gravarVisita(sessao, visita) {
   const chave = chaveDe(sessao)
-  if (!chave) return
-  try { sessionStorage.setItem(chave, JSON.stringify(visitaDe(visita))) }
-  catch { /* Sem storage: a montagem continua nesta carga. */ }
+  if (!chave) return false
+  try { sessionStorage.setItem(chave, JSON.stringify(visitaDe(visita))); return true }
+  catch { return false }
 }
 
 export function esquecerVisitas() {

@@ -52,7 +52,7 @@ async function link(pagina, href) {
 }
 async function abrirConversa(nome) {
   const todas = page.getByRole('button', { name: /^Todas\b/ })
-  if (await todas.count()) await todas.click()
+  await todas.waitFor(); await todas.click()
   await page.getByRole('button', { name: new RegExp(`^${nome}\\b`) }).first().click()
   await page.getByRole('button', { name: 'Conferir identidade', exact: true }).waitFor()
 }

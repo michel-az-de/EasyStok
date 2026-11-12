@@ -9,8 +9,8 @@ registerHooks({ resolve(id, context, next) {
 } })
 const { filtrarModulos, modulosDoHall } = await import('../src/dominio/modulos.js')
 const hall = modulosDoHall({ fonteApi: true })
-// #1891: Campanhas congelado não entra no hall; ficam sete.
-assert.equal(filtrarModulos(hall, '  ').length, 7)
+// #2395: Cadastros entrou no hall; Campanhas continua congelado.
+assert.equal(filtrarModulos(hall, '  ').length, 8)
 // #2258 (A2): a ordem segue o caminho do pedido, Cozinha antes de Produção.
 assert.deepEqual(filtrarModulos(hall, 'PRODUCAO').map((m) => m.id), ['cozinha', 'producao'])
 assert.deepEqual(filtrarModulos(hall, 'JANELAS ENTREGA').map((m) => m.id), ['entregas'])

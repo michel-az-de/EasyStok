@@ -503,7 +503,7 @@ function RestaurarConversa({ ultimaConversa, aoLembrarConversa }) {
   return null
 }
 
-function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco }) {
+function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco, visitaSoNaMemoria }) {
   const agora = useRelogio(INICIO_DO_RELOGIO, undefined, { real: FONTE_API })
   const { permite } = useAcessoModulos()
   return (
@@ -511,9 +511,8 @@ function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComa
     <AtendimentoProvider key={identidadeDaSessao(sessao)} agora={agora} sessao={sessao} atendimentoAtivo={permite('atendimento')} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={aoGuardarComandas} memoriaDoLaco={memoriaDoLaco}>
       {ultimaConversa && <RestaurarConversa ultimaConversa={ultimaConversa} aoLembrarConversa={aoLembrarConversa} />}
       <LimparAvisoAoNavegar />
-      <TelaDaRota rota={rota} />
+      <AvisosDoDispositivo visitaSoNaMemoria={visitaSoNaMemoria}><TelaDaRota rota={rota} /></AvisosDoDispositivo>
       {permite('atendimento') && <PilhaDeAvisos />}
-      <AvisosDoDispositivo />
     </AtendimentoProvider>
   )
 }
@@ -594,6 +593,7 @@ export function App() {
 
 function AppComAcesso({ rota, sessao, aoSair }) {
   const [visitaInicial] = useState(() => lerVisita(sessao))
+  const [visitaSoNaMemoria, definirVisitaSoNaMemoria] = useState(false)
   const ultimaConversa = useRef(visitaInicial.ultimaConversa)
   const comandasDaVisita = useRef(visitaInicial.comandas)
   const [rascunhosDosAjustes, setRascunhosDosAjustes] = useState({})
@@ -627,11 +627,13 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   const lerComandasDaVisita = useCallback(() => comandasDaVisita.current, [])
   const guardarComandas = useCallback((comandas) => {
     comandasDaVisita.current = comandas
-    gravarVisita(sessao, { comandas, ultimaConversa: ultimaConversa.current })
+    const gravada = gravarVisita(sessao, { comandas, ultimaConversa: ultimaConversa.current })
+    definirVisitaSoNaMemoria(Object.keys(comandas).length > 0 && !gravada)
   }, [sessao])
   const lembrarConversa = useCallback((id) => {
     ultimaConversa.current = id
-    gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: id })
+    const gravada = gravarVisita(sessao, { comandas: comandasDaVisita.current, ultimaConversa: id })
+    definirVisitaSoNaMemoria(Object.keys(comandasDaVisita.current).length > 0 && !gravada)
   }, [sessao])
   const avisos = useNotificacoesDaSessao()
   const avisosNoAparelho = useAvisosNoAparelho({ sessao })
@@ -660,7 +662,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />
-  else tela = <AppPrincipal rota={rota} sessao={sessao} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} memoriaDoLaco={memoriaDoLaco} />
+  else tela = <AppPrincipal rota={rota} sessao={sessao} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} memoriaDoLaco={memoriaDoLaco} visitaSoNaMemoria={visitaSoNaMemoria} />
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
       {tela}{confirmacaoSaida}

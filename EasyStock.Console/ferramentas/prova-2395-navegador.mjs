@@ -17,8 +17,9 @@ import { PainelCadastros } from '../../src/features/gestao/cadastros/PainelCadas
 import { Combobox } from '../../src/componentes/Combobox';
 import '../../src/estilos/base.css';
 document.body.style.cssText = 'margin:0;padding:16px;box-sizing:border-box;background:var(--fundo);font-family:var(--f-corpo);color:var(--tinta)';
-function Teste() { const [rascunhos, definir] = useState({}); const gravacoes = useGravacoesDosAjustes(); const [valor, escolher] = useState('0');
-return <ContextoAcessoModulos.Provider value={{ acoes: {}, permite: () => true }}><ContextoEstado.Provider value={{ fonteApi:true, conversas:[], selecionada:null, sessao:{empresa:{id:'empresa'},usuario:{id:'operador'}} }}><ContextoAcoes.Provider value={{ selecionar:()=>{},carregarClienteDaConversa:()=>{} }}><ContextoRascunhosDosAjustes.Provider value={{ rascunhos, definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes }}>
+function Teste() { const [rascunhos, definir] = useState({}); const gravacoes = useGravacoesDosAjustes(); const [valor, escolher] = useState('0'); const [selecionada, selecionar] = useState(null);
+return <ContextoAcessoModulos.Provider value={{ acoes: {}, permite: () => true }}><ContextoEstado.Provider value={{ fonteApi:true, conversas:[], selecionada, sessao:{empresa:{id:'empresa'},usuario:{id:'operador'}} }}><ContextoAcoes.Provider value={{ selecionar:()=>{},carregarClienteDaConversa:()=>{} }}><ContextoRascunhosDosAjustes.Provider value={{ rascunhos, definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes }}>
+<button onClick={()=>setTimeout(()=>selecionar({id:'contexto-restaurado',nome:'Contato restaurado',clienteId:null,mensagens:[]}),1000)}>Restaurar contexto após abrir editor</button>
 <PainelCadastros tela="clientes" /><div style={{maxWidth:400,marginTop:24}}><Combobox rotulo="Opções para testar teclado" valor={valor} aoMudar={escolher} opcoes={Array.from({length:40},(_,i)=>({valor:String(i),rotulo:'Opção '+i}))} /></div>
 </ContextoRascunhosDosAjustes.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider> }
 createRoot(document.getElementById('root')).render(<Teste/>);
@@ -36,6 +37,16 @@ await context.route('**/api/clientes?*', route => route.fulfill({ json: { data: 
 await context.route('**/api/clientes/cliente?*', async route => { detalhePendente = true; await new Promise(resolve => { resolverDetalhe = resolve }); await route.fulfill({ json: { data: { cliente, alteracoes: [] } } }).catch(() => {}) })
 try {
   await page.goto(`${origem}/.build/2395/index.html`)
+  await page.getByText('Ana Fixture', { exact: true }).waitFor()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Restaurar contexto após abrir editor', exact: true }).click()
+  await page.getByRole('button', { name: 'Leads', exact: true }).click()
+  await page.getByPlaceholder('Nome, telefone ou documento', { exact: true }).fill('Ana')
+  await page.waitForTimeout(1200)
+  assert.equal(await page.getByRole('button', { name: 'Leads', exact: true }).getAttribute('aria-pressed'), 'true', 'Restauração tardia não substitui filtro escolhido')
+  assert.equal(await page.getByPlaceholder('Nome, telefone ou documento', { exact: true }).inputValue(), 'Ana')
+  resultados.push('390px: Leads e busca escolhidos antes de restaurar contexto continuam ativos')
+  await page.reload(); await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByText('Ana Fixture', { exact: true }).waitFor()
   await page.getByRole('button', { name: 'Editar Ana Fixture' }).click()
   while (!detalhePendente) await new Promise(resolve => setTimeout(resolve, 10))
@@ -58,6 +69,19 @@ try {
   await combo.press('Enter'); assert.equal(await combo.inputValue(), 'Opção 39')
   await combo.focus(); await combo.press('ArrowDown'); await combo.press('Escape'); assert.equal(await combo.getAttribute('aria-expanded'), 'false')
   resultados.push('Combobox setas/End/Enter/Escape e opção ativa visível')
+  await page.getByRole('button', { name: 'Restaurar contexto após abrir editor', exact: true }).click()
+  await page.getByRole('button', { name: 'Novo cliente', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Nome', exact: true }).fill('Nome digitado antes da restauração')
+  await page.waitForTimeout(1200)
+  assert.equal(await page.getByRole('textbox', { name: 'Nome', exact: true }).inputValue(), 'Nome digitado antes da restauração')
+  assert.equal(await page.getByRole('button', { name: 'Consultar com IA', exact: true }).count(), 0, 'Nova identidade não introduz IA no editor de outro contexto')
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await page.getByRole('button', { name: 'Continuar editando', exact: true }).click()
+  assert.equal(await page.getByRole('textbox', { name: 'Nome', exact: true }).inputValue(), 'Nome digitado antes da restauração')
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await page.getByRole('button', { name: 'Descartar', exact: true }).click()
+  await page.getByText('Contato restaurado', { exact: true }).waitFor()
+  resultados.push('Restauração assíncrona da conversa preserva editor, campos e contexto de IA até fechar')
   for (const largura of [1440, 390]) {
     await page.setViewportSize({ width: largura, height: largura === 390 ? 844 : 900 })
     const tamanho = await page.evaluate(() => ({ conteudo: document.documentElement.scrollWidth, tela: innerWidth }))

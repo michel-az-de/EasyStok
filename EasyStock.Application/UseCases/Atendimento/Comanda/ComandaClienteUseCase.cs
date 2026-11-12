@@ -621,7 +621,8 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
     private Task<bool> ConfirmarCadastroAsync(LinkCardapioConversa acesso, int revisao, CancellationToken ct, bool exigirEndereco = true) =>
         uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
-            await conversas.ObterPorIdComLockAsync(acesso.EmpresaId, acesso.ConversaId, t);
+            var conversa = await conversas.ObterPorIdComLockAsync(acesso.EmpresaId, acesso.ConversaId, t)
+                ?? throw new LinkCardapioConversaIndisponivelException();
             var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();
             if (link.Revisao != revisao) throw new ComandaClienteConflitoException("A seleção mudou. Confira antes de enviar.");
             var estado = await EstadoAsync(link, t);
@@ -634,7 +635,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 throw new UseCaseValidationException("Informe seu nome e telefone para a Casa acompanhar seu pedido.");
             var endereco = exigirEndereco ? dados.Endereco?.Validar() : Valido(dados.Endereco);
             if (endereco is null && exigirEndereco) throw new UseCaseValidationException("Informe seu endereço de entrega.");
-            await cadastrarCliente.ExecuteAsync(new(acesso.EmpresaId, acesso.ConversaId, dados.Nome, dados.Telefone,
+            await cadastrarCliente.ExecuteAsync(new(acesso.EmpresaId, acesso.ConversaId, conversa.ClienteId, conversa.VinculoRevisao, dados.Nome, dados.Telefone,
                 endereco is null ? null : new(endereco.Cep, endereco.Logradouro, endereco.Numero, endereco.Complemento, endereco.Bairro, endereco.Cidade, endereco.Uf),
                 ReutilizarCadastro: false), t);
             return true;
@@ -702,7 +703,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             if (estado.Rascunho.Itens.Count == 0) throw new UseCaseValidationException("Escolha ao menos um prato.");
             var endereco = Valido(estado.Rascunho.Endereco);
             if (endereco is not null)
-                await cadastrarCliente.ExecuteAsync(new(acesso.EmpresaId, acesso.ConversaId, null, null,
+                await cadastrarCliente.ExecuteAsync(new(acesso.EmpresaId, acesso.ConversaId, conversa.ClienteId, conversa.VinculoRevisao, null, null,
                     new(endereco.Cep, endereco.Logradouro, endereco.Numero, endereco.Complemento, endereco.Bairro, endereco.Cidade, endereco.Uf)), t);
             if (ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, revisao)) return true;
             var agora = relogio.GetUtcNow().UtcDateTime;

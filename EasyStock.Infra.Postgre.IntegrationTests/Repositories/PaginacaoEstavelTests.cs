@@ -56,6 +56,12 @@ public sealed class PaginacaoEstavelTests(PostgreSqlDatabaseFixture fixture)
             cliente.LastOrderAt = grupo == 0 ? null : Instante;
             cliente.OrderCount = grupo;
             db.Clientes.Add(cliente);
+            if (grupo > 0)
+            {
+                var pedido = Pedido.Criar(empresaId, cliente);
+                pedido.CriadoEm = Instante;
+                db.Pedidos.Add(pedido);
+            }
         }
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();

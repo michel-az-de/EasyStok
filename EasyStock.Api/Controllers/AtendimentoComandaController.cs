@@ -68,9 +68,11 @@ public class AtendimentoComandaController(
             return Task.FromResult<IActionResult>(Forbid());
         if (body?.Itens is not { Count: > 0 })
             return Task.FromResult(DataBadRequest("A comanda está vazia."));
+        if (body.ClienteId is not { } clienteId || clienteId == Guid.Empty || body.VinculoRevisao is not { } revisao || revisao < 0)
+            return Task.FromResult(DataBadRequest("Informe o cliente e a revisão da pessoa conferida na comanda."));
 
         return Tratar(async () => DataOk(await gerarPedidoUseCase.ExecuteAsync(new GerarPedidoConversaInput(
-            currentUser.EmpresaId, id,
+            currentUser.EmpresaId, id, clienteId, revisao,
             body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
             body.JanelaId, body.DataEntrega, body.EnderecoId, body.Forma, body.Observacoes,
             EnviarAoCliente: body.EnviarAoCliente,
@@ -148,6 +150,7 @@ public class AtendimentoComandaController(
         CepSemCoberturaException => ("CEP_SEM_COBERTURA", ex.Message),
         ClienteBloqueadoException => ("CLIENTE_BLOQUEADO", MensagemClienteBloqueado),
         PedidoEmAndamentoException => ("PEDIDO_EM_ANDAMENTO", ex.Message),
+        ContextoPedidoAtendimentoAlteradoException => ("VINCULO_CLIENTE_ALTERADO", ex.Message),
         _ => null,
     };
 }
@@ -162,7 +165,9 @@ public sealed record GerarPedidoConversaBody(
     string? Forma = null,
     string? Observacoes = null,
     bool EnviarAoCliente = true,
-    decimal? FreteCombinado = null);
+    decimal? FreteCombinado = null,
+    Guid? ClienteId = null,
+    long? VinculoRevisao = null);
 
 /// <summary>Comanda a simular (#1884): o mesmo corpo do pedido, sem forma de pagamento nem envio.</summary>
 public sealed record SimularPedidoConversaBody(

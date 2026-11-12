@@ -24,6 +24,7 @@ import { permissaoDeEscrita } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { chavesDaFicha, primeiroPassoAntesDaVenda } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
+import { ConferenciaPessoaDaComanda } from './ConferenciaPessoaDaComanda'
 import { focarCampoDaFicha } from './focarCampoDaFicha'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoDevolucoes } from './BlocoDevolucoes'
@@ -326,12 +327,14 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
         {cliente.enderecoCapturado && !cliente.endereco && (
           <BlocoEnderecoCapturado
+            key={selecionada.id}
+            conversa={fonteApi ? selecionada : undefined}
             endereco={cliente.enderecoCapturado}
             // #1474 (R9): no modo API os prefixos de CEP são da demonstração; quem diz se o
             // endereço está na área é o EasyStok, ao cadastrar (aviso "fora da área").
             situacaoArea={fonteApi ? null : situacaoDoCep(cliente.enderecoCapturado, prefixosCepAtendidos)}
             faixasDeDistancia={fonteApi ? null : faixasDeDistancia(cliente.enderecoCapturado, prefixosCepAtendidos)}
-            aoConfirmar={() => cadastrarEndereco(selecionada.id)}
+            aoConfirmar={(identidade, endereco) => cadastrarEndereco(selecionada.id, identidade, endereco)}
             aoDecidirArea={(decisao) => decidirAreaEntrega(selecionada.id, decisao, agora)}
           />
         )}
@@ -417,6 +420,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         {!fonteApi && !pedido.ocorrencia && <p>Nenhum problema registrado neste pedido.</p>}
       </Modal>}
 
+      {fonteApi && pedido && editavel && <ConferenciaPessoaDaComanda key={selecionada.id} conversa={selecionada} aoAbrirCadastro={() => setSecao('cliente')} />}
       {pedido && editavel && (
         <BarraProximoPasso
           key={`${selecionada.id}:${avancoEm ?? 'sem-avanco'}`}

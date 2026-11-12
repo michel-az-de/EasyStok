@@ -78,6 +78,8 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 assumidaPorNome = "Ana",
                 numeroComanda = cenario.ComPedido.NumeroComanda,
                 fotoUrl = (string?)null,
+                vinculoRevisao = cenario.ComPedido.VinculoRevisao,
+                vinculoEmRevisao = cenario.ComPedido.VinculoEmRevisao,
             },
             new
             {
@@ -100,6 +102,8 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 assumidaPorNome = (string?)null,
                 numeroComanda = cenario.Escalada.NumeroComanda,
                 fotoUrl = (string?)null,
+                vinculoRevisao = cenario.Escalada.VinculoRevisao,
+                vinculoEmRevisao = cenario.Escalada.VinculoEmRevisao,
             },
         }, Json)!;
 

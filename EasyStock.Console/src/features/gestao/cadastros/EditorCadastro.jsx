@@ -59,8 +59,8 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     const concluir = iniciar(); if (!concluir) return
     falhar(null)
     try {
-      await salvarCadastro(tela, dados, contexto)
-      if (montado.current) aoSalvo()
+      const atual = await salvarCadastro(tela, dados, contexto)
+      if (montado.current) aoSalvo({ anterior: inicial, atual })
     } catch (e) {
       if (!montado.current) return
       const semConfirmacao = !id && tela !== 'bancos' && (e.status === 0 || e.status >= 500)

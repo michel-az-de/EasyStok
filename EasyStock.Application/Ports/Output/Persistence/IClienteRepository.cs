@@ -15,6 +15,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>Carrega cliente com todas as coleções (endereços, telefones, etc) — pra tela de detalhe.</summary>
         Task<Cliente?> GetByIdWithDetailsAsync(Guid empresaId, Guid id);
 
+        Task<(int OrderCount, DateTime? LastOrderAt)> ObterMetricasPedidosAsync(Guid empresaId, Guid clienteId);
+
         Task<(IEnumerable<Cliente> items, int total)> GetByEmpresaAsync(
             Guid empresaId,
             int page,

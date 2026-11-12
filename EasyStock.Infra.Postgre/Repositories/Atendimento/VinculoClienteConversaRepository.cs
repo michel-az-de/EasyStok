@@ -29,7 +29,8 @@ public sealed class VinculoClienteConversaRepository(EasyStockDbContext db) : IV
             && ((c.TelefoneHash != null && hashes.Contains(c.TelefoneHash))
                 || (c.Telefone != null && telefones.Contains(c.Telefone)) || c.Telefones.Any(t => telefones.Contains(t.Numero))))
             .OrderBy(c => c.Nome).ThenBy(c => c.Id)
-            .Select(c => new CandidatoClienteConversa(c.Id, c.Nome, c.Telefone, c.OrderCount == 0, c.Bloqueado))
+            .Select(c => new CandidatoClienteConversa(c.Id, c.Nome, c.Telefone,
+                !db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id), c.Bloqueado))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<AlteracaoVinculoConversa>> ListarHistoricoAsync(Guid empresaId, Guid conversaId, CancellationToken ct) =>

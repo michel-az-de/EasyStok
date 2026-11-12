@@ -19,6 +19,7 @@
 .identidade { display: flex; gap: var(--e-3); align-items: center; }
 .icone { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: var(--r-1); background: var(--preenchimento); color: var(--marca-forte); }
 .acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.lista .acoes button { white-space: nowrap; }
 .rodape { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--e-3); padding: var(--e-3) var(--e-4); border-top: 1px solid var(--linha); color: var(--tinta-2); font-size: var(--t-micro); }
 .links { display: flex; gap: var(--e-4); flex-wrap: wrap; }
 .links a { color: var(--marca-forte); min-height: var(--toque); display: inline-flex; align-items: center; text-underline-offset: 3px; }

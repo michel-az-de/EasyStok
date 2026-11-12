@@ -150,10 +150,14 @@ public sealed partial class PedidoConversaConcorrenciaTests
         final.PrecisaCadastro.Should().BeFalse();
         final.Pedido.Should().BeNull();
         final.Rascunho.Endereco.Should().BeNull();
+        Guid? clienteIdFicha;
+        long revisaoFicha;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             var conversa = await db.AtendimentoConversas.SingleAsync(x => x.Id == conversaId);
+            clienteIdFicha = conversa.ClienteId;
+            revisaoFicha = conversa.VinculoRevisao;
             conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
             (await db.Clientes.Include(x => x.Enderecos).SingleAsync(x => x.Id == conversa.ClienteId)).Enderecos.Should().BeEmpty();
             (await db.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId && x.Texto!.Contains("Endereço pendente"))).Should().Be(1);
@@ -163,6 +167,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         // A atendente registra o endereço pela Ficha e a comanda passa a mostrá-lo.
         (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/cliente", new
         {
+            ClienteId = clienteIdFicha, VinculoRevisao = revisaoFicha,
             Endereco = new { Cep = "01310100", Logradouro = "Av. Paulista", Numero = "900", Bairro = "Bela Vista", Cidade = "São Paulo", Uf = "SP" },
         })).StatusCode.Should().Be(HttpStatusCode.OK);
         (await Estado(client, token)).Rascunho.Endereco!.Numero.Should().Be("900");
@@ -204,6 +209,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         // A atendente registra o endereço pela Ficha, combina o frete e a cliente confirma o pedido.
         (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/cliente", new
         {
+            conversa.ClienteId, conversa.VinculoRevisao,
             Endereco = new { Cep = "01310100", Logradouro = "Av. Paulista", Numero = "900", Bairro = "Bela Vista", Cidade = "São Paulo", Uf = "SP" },
         })).StatusCode.Should().Be(HttpStatusCode.OK);
         var comFicha = await Estado(client, token);

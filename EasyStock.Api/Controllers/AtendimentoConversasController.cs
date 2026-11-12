@@ -305,9 +305,14 @@ public class AtendimentoConversasController(
     public Task<IActionResult> CadastrarCliente(
         Guid id, [FromBody] CadastrarClienteConversaBody body,
         [FromServices] CadastrarClienteDaConversaUseCase cadastrarUseCase, CancellationToken ct = default)
-        => Atendendo(async () => DataOk(await cadastrarUseCase.ExecuteAsync(
-            new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body?.Nome, body?.Telefone, body?.Endereco, body?.Email,
-                body?.ConfirmarVinculoExistente ?? false), ct)));
+        => Atendendo(async () =>
+        {
+            if (body is null || body.ClienteId == Guid.Empty || body.VinculoRevisao is not { } revisao || revisao < 0)
+                return DataBadRequest("Informe o cliente e a revisão da pessoa conferida na ficha.");
+            return DataOk(await cadastrarUseCase.ExecuteAsync(
+                new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body.ClienteId, revisao,
+                    body.Nome, body.Telefone, body.Endereco, body.Email, body.ConfirmarVinculoExistente), ct));
+        });
 
     [SwaggerOperation(Summary = "Close the conversation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -393,6 +398,10 @@ public class AtendimentoConversasController(
         {
             return DataBadRequest(ex);
         }
+        catch (CadastroClienteConversaAlteradoException ex)
+        {
+            return Conflict(new ApiErrorResponse(new ApiError(CadastroClienteConversaAlteradoException.Codigo, ex.Message, null, null)));
+        }
         catch (RegraDeDominioVioladaException ex)
         {
             return DataConflict(ex.Message);
@@ -434,4 +443,6 @@ public sealed record TransferirConversaBody(Guid ParaUsuarioId, bool Confirmar =
 public sealed record LiberarForaDeAreaBody(string? Motivo);
 
 public sealed record CadastrarClienteConversaBody(
+    [property: System.Text.Json.Serialization.JsonRequired] Guid? ClienteId,
+    [property: System.Text.Json.Serialization.JsonRequired] long? VinculoRevisao,
     string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco, string? Email = null, bool ConfirmarVinculoExistente = false);

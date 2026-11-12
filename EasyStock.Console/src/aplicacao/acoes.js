@@ -11,6 +11,7 @@ export const CADASTRAR_ENDERECO = 'cadastrar-endereco'
 export const ADICIONAR_ITEM = 'adicionar-item'
 // #1686 (item 3): comanda nova na mesma conversa depois de o pedido anterior terminar.
 export const NOVA_COMANDA = 'nova-comanda'
+export const RECONFERIR_PESSOA_COMANDA = 'reconferir-pessoa-comanda'
 export const REMOVER_ITEM = 'remover-item'
 export const GERAR_PEDIDO = 'gerar-pedido'
 export const SALVAR_NOTA = 'salvar-nota'
