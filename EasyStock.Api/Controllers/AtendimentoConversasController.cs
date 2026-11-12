@@ -122,7 +122,7 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/mensagens")]
     public Task<IActionResult> EnviarMensagem(Guid id, [FromBody] EnviarMensagemConsoleBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await enviarUseCase.EnviarTextoAsync(
-            new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty, currentUser.Nivel), ct)));
+            new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty, currentUser.Nivel, body?.Confirmar ?? false), ct)));
 
     [HttpGet("~/api/atendimento/modelos")]
     [ValidateEmpresaId]
@@ -257,8 +257,8 @@ public class AtendimentoConversasController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [HttpPost("{id:guid}/assumir")]
-    public Task<IActionResult> Assumir(Guid id, CancellationToken ct = default)
-        => Atendendo(async () => DataOk(await gerenciarUseCase.AssumirAsync(Acao(id), ct)));
+    public Task<IActionResult> Assumir(Guid id, [FromQuery] bool confirmar = false, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await gerenciarUseCase.AssumirAsync(Acao(id) with { Confirmada = confirmar }, ct)));
 
     [SwaggerOperation(Summary = "Transfer the conversation to another attendant",
         Description = "O destino precisa ser usuário ativo da empresa com permissão de atender; senão 422.")]
@@ -270,7 +270,7 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/transferir")]
     public Task<IActionResult> Transferir(Guid id, [FromBody] TransferirConversaBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await transferirUseCase.ExecuteAsync(
-            new TransferirConversaCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.ParaUsuarioId ?? Guid.Empty, User.NomeExibicao()), ct)));
+            new TransferirConversaCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.ParaUsuarioId ?? Guid.Empty, User.NomeExibicao(), body?.Confirmar ?? false), ct)));
 
     [SwaggerOperation(Summary = "Give the conversation back to the agent")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -370,6 +370,10 @@ public class AtendimentoConversasController(
         {
             return DataNotFound(ex.Message);
         }
+        catch (ConversaAtribuidaOutraException ex)
+        {
+            return Conflict(new ApiErrorResponse(new ApiError(ConversaAtribuidaOutraException.Codigo, ex.Message, null, null)));
+        }
         catch (DestinoNaoAtendenteException ex)
         {
             return UnprocessableEntity(new ApiErrorResponse(new ApiError("DESTINO_NAO_ATENDE", ex.Message, null, null)));
@@ -416,7 +420,7 @@ public class AtendimentoConversasController(
     }
 }
 
-public sealed record EnviarMensagemConsoleBody(string Texto);
+public sealed record EnviarMensagemConsoleBody(string Texto, bool Confirmar = false);
 
 public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
 
@@ -425,7 +429,7 @@ public sealed record IniciarConversaClienteBody(
 
 public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda);
 
-public sealed record TransferirConversaBody(Guid ParaUsuarioId);
+public sealed record TransferirConversaBody(Guid ParaUsuarioId, bool Confirmar = false);
 
 public sealed record LiberarForaDeAreaBody(string? Motivo);
 
