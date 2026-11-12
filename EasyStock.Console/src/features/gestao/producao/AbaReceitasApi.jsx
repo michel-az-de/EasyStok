@@ -13,6 +13,7 @@ import { PesquisaReceitaIa } from './PesquisaProducao'
 import { moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
+import botaoCss from '../../../componentes/Botao.module.css'
 
 // M2 › Receitas (M2.4a, #1498). Por prato do cardápio ligado ao estoque: quanto rende e os insumos
 // com quantidade e unidade. O custo por porção vem do EasyStok, com a unidade convertida (a receita
@@ -90,6 +91,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
   const unidadesDoRendimento = UNIDADES_RENDIMENTO.some((u) => u.valor === unidade)
     ? UNIDADES_RENDIMENTO
     : [...UNIDADES_RENDIMENTO, { valor: unidade, rotulo: unidade || 'Conferir unidade do rendimento' }]
+  const semInsumos = insumos.length === 0
   const orientacoes = orientacoesDaReceita({ prato, unidadeRendimento: unidade, linhas, insumos })
   const referencias = detalhe.linhas.filter((l) => !insumos.some((s) => s.id === l.insumoId))
     .map((l) => ({ id: l.insumoId, unidade: l.unidadeDoInsumo, custo: l.custoReferencia }))
@@ -135,12 +137,14 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
         Não foi possível salvar a receita. {aviso}
         {' '}<Botao variante="texto" onClick={aoFecharAviso}>Fechar aviso</Botao>
       </p>}
+      {semInsumos && <p className={css.descricao}>Para montar a receita, cadastre primeiro os insumos.</p>}
       <div className={css.acoesReceita}>
         <Botao icone="plus" disabled={salvando} onClick={() => setLinhas((atual) => [...atual, { insumoId: '', quantidade: '', unidade: 'G', custo: null }])}>Mais um insumo</Botao>
         <Botao variante="texto" disabled={salvando} onClick={aoFechar}>Cancelar</Botao>
-        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar receita'}</Botao>
+        {/* #2362: sem insumo, salvar não leva a nada; a ação principal é ir cadastrá-los. */}
+        {semInsumos && <a className={`${botaoCss.botao} ${botaoCss.primario} ${css.linkBotao}`} href={hashDoModulo('producao', 'insumos')}>Cadastrar insumos</a>}
+        <Botao tipo="submit" variante={semInsumos ? 'secundario' : 'primario'} icone="check" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar receita'}</Botao>
       </div>
-      {insumos.length === 0 && <p className={css.descricao}>Para montar a receita, cadastre os insumos em <a className={css.link} href={hashDoModulo('producao', 'insumos')}>Insumos</a>.</p>}
     </form></>
   )
 }

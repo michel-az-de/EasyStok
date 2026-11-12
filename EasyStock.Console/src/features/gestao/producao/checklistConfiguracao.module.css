@@ -1,0 +1,34 @@
+/* #2362: checklist de configuração da Produção. Tokens do tema (gestao.module.css). */
+
+.checklist {
+  display: grid; gap: var(--e-3); padding: var(--e-4);
+  border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
+  margin-bottom: var(--e-4);
+}
+
+.titulo { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
+
+.passos {
+  display: grid; gap: var(--e-3); margin: 0; padding: 0; list-style: none;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.passo { display: flex; gap: var(--e-3); align-items: flex-start; min-width: 0; }
+
+.marca {
+  flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px;
+  border-radius: 50%; border: 1px solid var(--linha-forte); color: var(--tinta-2); font-weight: 700;
+}
+.ativo .marca { border-color: var(--marca); background: var(--marca); color: var(--marca-contraste); }
+.feito .marca { border-color: var(--sucesso); color: var(--sucesso); }
+
+.texto { display: grid; gap: 2px; min-width: 0; }
+
+.link {
+  color: var(--tinta); font-size: var(--t-corpo); font-weight: 600; text-decoration: underline;
+  text-underline-offset: 3px; min-height: 28px; display: inline-flex; align-items: center;
+}
+.ativo .link { color: var(--marca-forte); }
+.feito .link { color: var(--tinta-2); font-weight: 400; }
+
+.detalhe { color: var(--tinta-2); font-size: var(--t-apoio); }
