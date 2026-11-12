@@ -16,7 +16,7 @@ namespace EasyStock.Api.UnitTests.Mobile;
 
 /// <summary>
 /// #2318 (PROD-4): a divergencia, o contador do painel e a reconciliacao do app comparam a MESMA soma
-/// do estoque da loja (ProdutoId, LojaId). Item sem loja nao entra na soma de loja nenhuma.
+/// do estoque da loja (ProdutoId, LojaId). Item sem loja pertence a qualquer loja da empresa (regra da baixa de venda).
 /// </summary>
 public sealed class EstoqueDaLojaDivergenciaTests : IDisposable
 {
@@ -95,17 +95,54 @@ public sealed class EstoqueDaLojaDivergenciaTests : IDisposable
     }
 
     [Fact]
-    public async Task Item_sem_loja_nao_entra_na_soma_da_loja()
+    public async Task Item_sem_loja_pertence_a_qualquer_loja_da_empresa_como_na_baixa_de_venda()
     {
-        Mobile(_lojaA, stock: 10);
+        Mobile(_lojaA, stock: 17);
         Mobile(_lojaB, stock: 5);
         Item(_lojaA, 10);
         Item(_lojaB, 5);
         Item(null, 7);
         await _db.SaveChangesAsync();
 
+        var lista = await Divergencias();
+        // A: 10 da loja + 7 sem loja = 17 bate; B: 5 + 7 = 12 diverge do app (5).
+        lista.Should().ContainSingle().Which.ErpStock.Should().Be(12);
+        (await ContadorDoPainel()).Should().Be(lista.Length);
+    }
+
+    [Fact]
+    public async Task Estoque_so_em_item_sem_loja_nao_aparece_como_erp_zero()
+    {
+        Mobile(_lojaA, stock: 8);
+        Item(null, 8);
+        await _db.SaveChangesAsync();
+
         (await Divergencias()).Should().BeEmpty();
         (await ContadorDoPainel()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Reconciliar_com_estoque_so_em_item_sem_loja_nao_da_400_nem_zera_o_app()
+    {
+        var p = Mobile(_lojaA, stock: 3);
+        Item(null, 8);
+        await _db.SaveChangesAsync();
+
+        var r = await Produtos().ReconcileStock(p.Id, _empresaId, default);
+
+        r.Should().BeOfType<OkObjectResult>();
+        (await _db.Set<Product>().AsNoTracking().SingleAsync(x => x.Id == p.Id)).Stock.Should().Be(8);
+    }
+
+    [Fact]
+    public async Task Produto_do_app_sem_loja_enxerga_o_estoque_da_empresa_toda()
+    {
+        Mobile(null, stock: 15);
+        Item(_lojaA, 10);
+        Item(null, 5);
+        await _db.SaveChangesAsync();
+
+        (await Divergencias()).Should().BeEmpty();
     }
 
     [Fact]

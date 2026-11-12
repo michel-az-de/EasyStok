@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Specifications;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Controllers;
@@ -155,7 +156,7 @@ public class MobileProductsController(
             .Where(i => i.EmpresaId == emp && produtoIds.Contains(i.ProdutoId))
             .ToListAsync(ct);
 
-        // Match (ProdutoId, LojaId) estrito: item sem loja nao entra na soma de loja nenhuma.
+        // Match (ProdutoId, loja): item sem loja pertence a qualquer loja da empresa (EstoqueDaLoja, #2318).
         var divergences = new List<StockDivergence>();
         foreach (var mp in mobileLinked)
         {
@@ -197,9 +198,8 @@ public class MobileProductsController(
 
         // PROD-4 (#2318): mesma soma por (ProdutoId, LojaId) da lista de divergencias.
         var itensDaLoja = await _db.Set<ItemEstoque>().AsNoTracking()
-            .Where(i => i.EmpresaId == product.EmpresaId &&
-                        i.ProdutoId == product.ErpProductId &&
-                        i.LojaId == product.LojaId)
+            .Where(i => i.EmpresaId == product.EmpresaId && i.ProdutoId == product.ErpProductId)
+            .Where(EstoqueDaLoja.Pertence(product.LojaId))
             .ToListAsync(ct);
 
         if (itensDaLoja.Count == 0)

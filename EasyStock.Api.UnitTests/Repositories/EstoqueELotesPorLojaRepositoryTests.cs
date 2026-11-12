@@ -34,7 +34,7 @@ public sealed class EstoqueELotesPorLojaRepositoryTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    private void Item(Guid lojaId, int qtd)
+    private void Item(Guid? lojaId, int qtd)
     {
         var produto = new Produto { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Marmita", Status = StatusProduto.Ativo };
         _db.Add(produto);
@@ -66,6 +66,26 @@ public sealed class EstoqueELotesPorLojaRepositoryTests : IDisposable
         cadastrados.Should().Be(2);
         comSaldo.Should().Be(1);
         cadastradosEmpresa.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Item_sem_loja_aparece_na_listagem_e_nos_contadores_de_qualquer_loja_da_empresa()
+    {
+        Item(_lojaA, 5);
+        Item(_lojaB, 7);
+        Item(null, 3);
+        await _db.SaveChangesAsync();
+        var repo = new ItemEstoqueRepository(_db);
+
+        var (daLojaA, totalA) = await repo.GetItensEstoquePaginadosAsync(_empresaId, lojaId: _lojaA);
+        var (daLojaB, _) = await repo.GetItensEstoquePaginadosAsync(_empresaId, lojaId: _lojaB);
+        var (cadastradosA, comSaldoA) = await repo.GetContadoresEstoqueAsync(_empresaId, lojaId: _lojaA);
+
+        totalA.Should().Be(2);
+        daLojaA.Should().Contain(i => i.LojaId == null).And.Contain(i => i.LojaId == _lojaA).And.NotContain(i => i.LojaId == _lojaB);
+        daLojaB.Should().Contain(i => i.LojaId == null);
+        cadastradosA.Should().Be(2);
+        comSaldoA.Should().Be(2);
     }
 
     [Fact]
