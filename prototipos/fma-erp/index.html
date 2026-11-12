@@ -4,40 +4,86 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FMA Gestão</title>
+  <meta name="color-scheme" content="light">
   <link rel="icon" href="assets/fma-simbolo-reversa.svg" type="image/svg+xml">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-hoje" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></symbol>
+      <symbol id="i-funil" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></symbol>
+      <symbol id="i-financeiro" viewBox="0 0 24 24"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H3z"/><path d="M3 7l12-3v3"/><path d="M16 13.5h2"/></symbol>
+      <symbol id="i-clientes" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5 6.5-5s5.7 1.5 6.5 5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 15c2 .6 3.2 2.2 3.5 5"/></symbol>
+      <symbol id="i-integracoes" viewBox="0 0 24 24"><path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/></symbol>
+      <symbol id="i-busca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+      <symbol id="i-ia" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
+      <symbol id="i-whatsapp" viewBox="0 0 24 24"><path d="M4 20l1.3-3.9A8 8 0 1 1 8.1 19z"/><path d="M9 9.5c.3 2.2 2.3 4.3 4.5 4.6l1.2-1.1 1.6.8-.3 1.4c-3.6.2-6.9-3.1-6.7-6.7l1.4-.3.8 1.6z"/></symbol>
+      <symbol id="i-email" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 7l8.5 6 8.5-6"/></symbol>
+      <symbol id="i-sistema" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></symbol>
+      <symbol id="i-restaurar" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/></symbol>
+      <symbol id="i-enviar" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-3-7z"/><path d="M11 13l9-9"/></symbol>
+      <symbol id="i-seta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-voltar" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+      <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-fechar" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h7M9 17h5"/></symbol>
+    </defs>
+  </svg>
+
   <a class="pular" href="#conteudo">Pular para o conteúdo</a>
-  <div class="casca">
-    <header class="lateral">
-      <a class="marca" href="#/painel" aria-label="FMA Gestão, painel">
-        <img src="assets/fma-horizontal-reversa.svg" alt="FMA Software" width="180" height="40">
-      </a>
-      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
-      <nav id="nav" aria-label="Módulos">
-        <a href="#/painel" data-rota="painel">Painel</a>
-        <p class="nav-grupo">Comercial</p>
-        <a href="#/leads" data-rota="leads">Leads</a>
-        <a href="#/propostas" data-rota="propostas">Propostas</a>
-        <a href="#/contratos" data-rota="contratos">Contratos</a>
-        <a href="#/clientes" data-rota="clientes">Clientes</a>
-        <p class="nav-grupo">Financeiro</p>
-        <a href="#/receber" data-rota="receber">A receber</a>
-        <a href="#/pagar" data-rota="pagar">A pagar</a>
-        <a href="#/notas" data-rota="notas">NFS-e</a>
-        <p class="nav-grupo">Rotina</p>
-        <a href="#/lembretes" data-rota="lembretes">Lembretes</a>
-        <a href="#/blog" data-rota="blog">Blog</a>
-      </nav>
-      <div class="aviso-ficticio">
-        <p>Protótipo com dados fictícios. Nada aqui é real.</p>
-        <button id="restaurar" type="button" class="btn pequeno">Restaurar dados de exemplo</button>
+  <div class="app">
+    <nav class="trilho" aria-label="Principal">
+      <a class="trilho-marca" href="#/hoje" aria-label="FMA Gestão, início"><img src="assets/fma-simbolo-reversa.svg" alt="" width="40" height="40"></a>
+      <a href="#/hoje" data-rota="hoje"><svg aria-hidden="true"><use href="#i-hoje"/></svg><span>Hoje</span></a>
+      <a href="#/inbox" data-rota="inbox"><svg aria-hidden="true"><use href="#i-inbox"/></svg><span>Conversas</span><b class="contador" id="contador-inbox" hidden></b></a>
+      <a href="#/funil" data-rota="funil"><svg aria-hidden="true"><use href="#i-funil"/></svg><span>Negócios</span></a>
+      <a href="#/financeiro" data-rota="financeiro"><svg aria-hidden="true"><use href="#i-financeiro"/></svg><span>Dinheiro</span></a>
+      <a href="#/clientes" data-rota="clientes"><svg aria-hidden="true"><use href="#i-clientes"/></svg><span>Clientes</span></a>
+      <a href="#/integracoes" data-rota="integracoes"><svg aria-hidden="true"><use href="#i-integracoes"/></svg><span>Conexões</span></a>
+      <button id="restaurar" class="trilho-rodape" type="button" title="Restaurar dados de exemplo"><svg aria-hidden="true"><use href="#i-restaurar"/></svg><span>Restaurar</span></button>
+    </nav>
+
+    <div class="palco">
+      <header class="barra">
+        <button class="busca" id="abrir-paleta" type="button" aria-haspopup="dialog">
+          <svg aria-hidden="true"><use href="#i-busca"/></svg>
+          <span>Pergunte, busque ou crie</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+        <span class="selo-prototipo" title="Nada aqui é real: clientes, valores e envios são simulados">Protótipo · dados fictícios</span>
+        <button class="btn-ia" id="alternar-copiloto" type="button" aria-controls="copiloto" aria-expanded="false">
+          <svg aria-hidden="true"><use href="#i-ia"/></svg><span>Copiloto</span>
+        </button>
+      </header>
+      <main id="conteudo" tabindex="-1"></main>
+    </div>
+
+    <aside class="copiloto" id="copiloto" aria-label="Copiloto">
+      <div class="copiloto-topo">
+        <div class="copiloto-titulo"><span class="orbe" aria-hidden="true"><svg><use href="#i-ia"/></svg></span><div><strong>Copiloto</strong><small>IA simulada no protótipo</small></div></div>
+        <button class="icone" id="fechar-copiloto" type="button" aria-label="Fechar copiloto"><svg aria-hidden="true"><use href="#i-fechar"/></svg></button>
       </div>
-    </header>
-    <main id="conteudo" tabindex="-1"></main>
+      <div class="copiloto-log" id="copiloto-log" aria-live="polite"></div>
+      <div class="copiloto-chips" id="copiloto-chips"></div>
+      <form class="copiloto-form" id="copiloto-form">
+        <label class="sr" for="copiloto-q">Pergunte ao copiloto</label>
+        <input id="copiloto-q" name="q" autocomplete="off" placeholder="Pergunte sobre caixa, clientes, notas…">
+        <button class="icone primario" type="submit" aria-label="Perguntar"><svg aria-hidden="true"><use href="#i-enviar"/></svg></button>
+      </form>
+    </aside>
   </div>
+
+  <dialog id="paleta" class="paleta" aria-label="Busca e comandos">
+    <div class="paleta-campo"><svg aria-hidden="true"><use href="#i-busca"/></svg><input id="paleta-q" autocomplete="off" placeholder="Ir para, criar, ou perguntar à IA…" aria-controls="paleta-lista" role="combobox" aria-expanded="true"></div>
+    <ul id="paleta-lista" role="listbox"></ul>
+  </dialog>
+  <dialog id="dialogo" class="dialogo"></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="dominio.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
