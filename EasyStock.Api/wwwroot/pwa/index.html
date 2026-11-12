@@ -10868,24 +10868,6 @@ const STATE_LABEL = {
 // Renderizadores usam as primeiras 1-2 acoes; o resto fica disponivel
 // pelos botoes/menus existentes (cobrar, imprimir, historico, cancelar).
 // Status desconhecido → retorna [] (callers caem no layout antigo).
-// #2307: o servidor manda quanto falta receber (aReceber). Sem o campo (servidor antigo), nada muda.
-function saldoAReceber(o) {
-  if (!o || o.aReceber === undefined || o.aReceber === null) return null;
-  const n = Number(o.aReceber);
-  return Number.isFinite(n) ? Math.max(0, n) : null;
-}
-function pedidoQuitado(o) {
-  const falta = saldoAReceber(o);
-  return falta !== null && falta < 0.005 && (Number(o.total) || 0) > 0;
-}
-function seloPagamentoPedido(o) {
-  const falta = saldoAReceber(o);
-  if (falta === null || (Number(o.total) || 0) <= 0) return '';
-  if (falta < 0.005) return '<span class="k-confer-badge conferido" title="Pagamento recebido">Pago</span>';
-  if (falta < (Number(o.total) || 0) - 0.005) return `<span class="k-confer-badge pendente" title="Parte já paga">Falta ${money(falta)}</span>`;
-  return '';
-}
-
 function getOrderPrimaryActions(o) {
   if (!o || typeof o !== 'object') return [];
   const acoes = acoesDoPedidoPorEtapa(o);
@@ -14589,6 +14571,24 @@ function renderKanbanCard(o, col) {
 // Mantemos a antiga renderOrdersFeed apontando para renderKanban para
 // não quebrar quem chama pelo nome antigo.
 function renderOrdersFeed() { renderKanban(); }
+
+// #2307: o servidor manda quanto falta receber (aReceber). Sem o campo (servidor antigo), nada muda.
+function saldoAReceber(o) {
+  if (!o || o.aReceber === undefined || o.aReceber === null) return null;
+  const n = Number(o.aReceber);
+  return Number.isFinite(n) ? Math.max(0, n) : null;
+}
+function pedidoQuitado(o) {
+  const falta = saldoAReceber(o);
+  return falta !== null && falta < 0.005 && (Number(o.total) || 0) > 0;
+}
+function seloPagamentoPedido(o) {
+  const falta = saldoAReceber(o);
+  if (falta === null || (Number(o.total) || 0) <= 0) return '';
+  if (falta < 0.005) return '<span class="k-confer-badge conferido" title="Pagamento recebido">Pago</span>';
+  if (falta < (Number(o.total) || 0) - 0.005) return `<span class="k-confer-badge pendente" title="Parte já paga">Falta ${money(falta)}</span>`;
+  return '';
+}
 
 // ================================================================
 // Progress dots (status visual 4-etapas) — usado na Home e no Kanban
