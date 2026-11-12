@@ -1,7 +1,7 @@
 # ERP interno da FMA Software: spec do domínio e decisão de arquitetura
 
 - Issue: #2387
-- Status: protótipo revisado pela banca (`01-banca.md`); a decisão de arquitetura depende do Felipe (seção 2)
+- Status: v4 do protótipo, revisada pela banca (`01-banca.md`); a decisão de arquitetura depende do Felipe (seção 2)
 - Data: 2026-11-12
 
 ## 1. Problema
@@ -138,7 +138,32 @@ não a entidade `Pedido` (ADR-0042 mantém o pedido de varejo canônico).
 - A confirmar com o contador: fato gerador (aprovação ou entrega), sinal e parcelamento dentro da
   etapa, multa, juros e reajuste de contrato longo.
 
-## 6. Integrações e IA (v3)
+## 6. Conteúdo e redes sociais (v4)
+
+Felipe reprovou a v3 por ser "muito carregada". O contexto real: a FMA vende pela autoridade do
+Felipe no LinkedIn, Instagram e blog. Então o centro do ERP é **publicar conteúdo** e transformar
+quem reage em lead. A v4 tem só 4 áreas.
+
+| Área | Faz |
+|---|---|
+| Conteúdo | Calendário de 14 dias; artigo, post, vídeo ou carrossel; ideia → rascunho da IA → aprovado → agendado → publicado; métricas e leads gerados por post |
+| Contatos | Comentário e DM viram lead; abordagem que o Felipe envia ele mesmo; conversas; lead vira proposta |
+| Contratos | Proposta aceita vira contrato; etapas, NFS-e anexada, lembretes |
+| Contas | A receber, a pagar e notas fiscais |
+
+| Regra | Por quê |
+|---|---|
+| Publicação só por API oficial, via Metricool (simulado) | Automação não oficial no LinkedIn bane a conta |
+| Instagram não publica só texto: exige vídeo ou carrossel | Limite da plataforma |
+| Agendar nunca no passado | Erro no campo, sem salvar |
+| No máximo 5 abordagens por dia, enviadas pelo próprio Felipe | Ritmo humano; o sistema só registra e conta |
+| Comentário sem intenção comercial não vira lead | A IA marca "Sem intenção comercial"; Felipe pode ignorar |
+| IA rascunha, Felipe aprova | Nada é publicado ou enviado sem clique |
+
+Cortado na v4: copiloto, Ctrl+K, kanban, gráfico de projeção, "Feito sozinho", tela de automações e
+conexões. As integrações abaixo seguem valendo, agora atrás dessas 4 áreas.
+
+## 7. Integrações e IA (v3)
 
 O ERP parte da conversa, não do formulário. Felipe reprovou a v2 por parecer CRUD; a v3 troca a tela
 de cadastro por fila do que pede decisão.
@@ -160,13 +185,13 @@ Decisões do Felipe antes da fatia real: enviar conversa de cliente a um LLM ext
 **privacidade** (consentimento, LGPD, retenção); número de WhatsApp oficial (Cloud API) ou WppConnect;
 remetente de e-mail com SPF e DKIM.
 
-## 7. Fora do escopo do protótipo
+## 8. Fora do escopo do protótipo
 
 Backend, migração, auth, emissão de NFS-e, envio real de e-mail ou WhatsApp, chamada real a LLM,
 assinatura eletrônica, deploy. O protótipo é estático em `prototipos/fma-erp/`, com dados **fictícios** (nenhum cliente,
 CNPJ ou preço real).
 
-## 8. Blog do Felipe
+## 9. Blog do Felipe
 
 | Item | Estado |
 |---|---|
@@ -176,11 +201,11 @@ CNPJ ou preço real).
 | Rigor Sistemas | Blog de outra empresa (6 artigos em código), não é da FMA |
 
 Não foram consultados: Hostinger, Google Drive, GitLab, repos fora de `michel-az-de`. O ERP
-**não** inclui blog: o protótipo só mostra o estado e o link, para não duplicar o Levante.
+**não** hospeda o blog: na v4 o blog é só um canal de publicação (simulado), para não duplicar o Levante.
 
-## 9. Próximos passos
+## 10. Próximos passos
 
-1. Felipe escolhe A, B, C ou D, onde fica o blog da FMA e a política de envio de dados ao LLM.
+1. Felipe escolhe A, B, C ou D, onde fica o blog da FMA, a política de envio de dados ao LLM e a conta Metricool.
 2. ADR da opção escolhida; spec da fatia 1 (Lead → Proposta → Contrato), tier alto.
 3. Validar com o contador: retenções, competência, fato gerador, imposto.
 4. As regras do protótipo têm teste executável: `node prototipos/fma-erp/tests/regras.test.cjs`.
