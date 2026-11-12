@@ -214,6 +214,19 @@ public class ItemEstoqueTests
         item.QuantidadeAtual.Value.Should().Be(4);
     }
 
+    [Fact]
+    public void RecalcularIndicadores_MovimentoEReferenciaNoMesmoDiaEmBrasilia_NaoContaDiaParado()
+    {
+        // #2401: 20:00 BRT (23:00 UTC do dia 10) e 22:00 BRT (01:00 UTC do dia 11) são o mesmo dia operacional;
+        // o .Date em UTC contava 1 dia parado.
+        var item = CriarItem(StatusItemEstoque.Ok);
+        item.UltimaMovimentacaoEm = new DateTime(2026, 4, 10, 23, 0, 0, DateTimeKind.Utc);
+
+        item.RecalcularIndicadores(new DateTime(2026, 4, 11, 1, 0, 0, DateTimeKind.Utc));
+
+        item.DiasSemMovimentacao.Should().Be(0);
+    }
+
     private static ItemEstoque CriarItem(StatusItemEstoque status, int quantidadeAtual = 10, Validade? validade = null) =>
         new()
         {

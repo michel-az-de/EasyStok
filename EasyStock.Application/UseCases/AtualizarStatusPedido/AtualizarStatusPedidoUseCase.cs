@@ -70,112 +70,126 @@ public class AtualizarStatusPedidoUseCase(
             return await cancelarPedido.ExecuteAsync(new CancelarPedidoCommand(cmd.EmpresaId, cmd.Id,
                 cmd.UsuarioId, cmd.UsuarioNome, "Cancelado pela troca de status", cmd.Origem, cmd.NivelSolicitante, cmd.OcorridoEm));
 
-        // CRITICAL: usar GetByIdWithDetailsAsync para carregar Itens (Include).
-        // Sem isso, pedido.Itens vem vazio e a integração com estoque vira
-        // no-op silencioso quando a transição deveria descontar.
-        var pedido = await pedidoRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.Id);
-        if (pedido == null || pedido.EmpresaId != cmd.EmpresaId) return null;
-
-        var statusAtual = pedido.StatusEnum;
-
-        if (statusAtual == statusNovo)
-            return CriarPedidoUseCase.Map(pedido); // idempotente
-
-        // Validação de transição (lança TransicaoInvalidaException se inválida).
-        // Convertemos pra UseCaseValidationException pra preservar o contrato
-        // HTTP atual (400 Bad Request) que clients (PWA, mobile, MAUI) esperam.
-        try
+        // #2401: o FOR UPDATE do estoque e o status só valem dentro de transação. Trava o pedido (mesmo lock do
+        // recebimento e do cancelamento), relê, desconta e grava tudo junto; eventos de UI e CAR só depois do commit.
+        Domain.Entities.Pedido? pedido = null;
+        var mudou = false;
+        string statusAntigoStr = "", statusNovoStr = "";
+        var resultado = await uow.ExecuteInTransactionSemRetryAsync(async ct =>
         {
-            PedidoStateMachine.EnsureTransicaoValida(statusAtual, statusNovo);
-        }
-        catch (TransicaoInvalidaException ex)
-        {
-            throw new UseCaseValidationException(ex.Message);
-        }
+            pedido = null; mudou = false;
+            await pedidoRepo.TravarAsync(cmd.EmpresaId, cmd.Id, ct);
+            // CRITICAL: usar GetByIdWithDetailsAsync para carregar Itens (Include).
+            // Sem isso, pedido.Itens vem vazio e a integração com estoque vira
+            // no-op silencioso quando a transição deveria descontar.
+            pedido = await pedidoRepo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.Id);
+            if (pedido == null || pedido.EmpresaId != cmd.EmpresaId) return null;
 
-        // #1726: liberar sem pagamento um pedido com link pendente é trocar a forma para "na entrega". O link
-        // morre, a dívida continua, a trilha guarda quem liberou e o pedido de exceção ainda espera a dona.
-        // Tardio de propósito: só este ramo precisa do provedor de pagamento; os demais hosts e status não.
-        if (statusAtual == StatusPedido.AguardandoPagamento && statusNovo == StatusPedido.Aguardando
-            && cobrancas is not null && trocarForma is not null
-            && (await cobrancas.ListarDoPedidoAsync(cmd.EmpresaId, pedido.Id)).Any(c => c.EstaPendente && c.EhOnline))
-        {
+            var statusAtual = pedido.StatusEnum;
+
+            if (statusAtual == statusNovo)
+                return CriarPedidoUseCase.Map(pedido); // idempotente
+
+            // Validação de transição (lança TransicaoInvalidaException se inválida).
+            // Convertemos pra UseCaseValidationException pra preservar o contrato
+            // HTTP atual (400 Bad Request) que clients (PWA, mobile, MAUI) esperam.
             try
             {
-                await trocarForma.Value.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, pedido.Id,
-                    TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, cmd.UsuarioId, cmd.UsuarioNome));
+                PedidoStateMachine.EnsureTransicaoValida(statusAtual, statusNovo);
             }
-            catch (CobrancaPedidoConflitoException ex)
+            catch (TransicaoInvalidaException ex)
             {
-                // Mesmo contrato das transições inválidas: 400, não erro interno.
                 throw new UseCaseValidationException(ex.Message);
             }
+
+            // #1726: liberar sem pagamento um pedido com link pendente é trocar a forma para "na entrega". O link
+            // morre, a dívida continua, a trilha guarda quem liberou e o pedido de exceção ainda espera a dona.
+            // Tardio de propósito: só este ramo precisa do provedor de pagamento; os demais hosts e status não.
+            if (statusAtual == StatusPedido.AguardandoPagamento && statusNovo == StatusPedido.Aguardando
+                && cobrancas is not null && trocarForma is not null
+                && (await cobrancas.ListarDoPedidoAsync(cmd.EmpresaId, pedido.Id)).Any(c => c.EstaPendente && c.EhOnline))
+            {
+                try
+                {
+                    await trocarForma.Value.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(cmd.EmpresaId, pedido.Id,
+                        TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega, cmd.UsuarioId, cmd.UsuarioNome));
+                }
+                catch (CobrancaPedidoConflitoException ex)
+                {
+                    // Mesmo contrato das transições inválidas: 400, não erro interno.
+                    throw new UseCaseValidationException(ex.Message);
+                }
+                return CriarPedidoUseCase.Map(pedido);
+            }
+
+            // #1776 (item 19): o toque de "Marcar entregue" do console (Cozinha, Balcão) confere o saldo; com valor a
+            // receber, só com a confirmação de quem marca. Balcão, PWA e mobile seguem como antes (não pedem conferência).
+            if (statusNovo == StatusPedido.Entregue && cmd.ConferirSaldoNaEntrega && saldos is not null)
+                await saldos.ExigirQuitadoParaEntregarAsync(pedido, cmd.SaldoAReceberConfirmado, CancellationToken.None);
+
+            statusAntigoStr = pedido.Status;
+            var eraEstoqueDescontado = PedidoStateMachine.DescontaEstoque(statusAtual);
+            var seraEstoqueDescontado = PedidoStateMachine.DescontaEstoque(statusNovo);
+
+            // Integração estoque PRIMEIRO — se falhar (ex: estoque insuficiente),
+            // status não é alterado e o caller recebe a exceção. Atomicidade
+            // a nível de aplicação: ou ambos (status + estoque) mudam, ou nada.
+            // Idempotência via DocumentoReferencia evita double-debit em retries.
+            if (!eraEstoqueDescontado && seraEstoqueDescontado)
+            {
+                await estoqueIntegration.DescontarAsync(pedido);
+            }
+
+            // Estoque OK — agora aplica transição no agregado. MudarStatus é
+            // idempotente e re-valida (defesa em profundidade); como já validamos
+            // acima, o re-check é apenas paranoia barata.
+            pedido.MudarStatus(statusNovo);
+            // #1230: AguardandoPagamento -> Aguardando pela troca genérica (a dona recebeu por fora) entra na
+            // fila com início previsto; o início do preparo numera quem ainda não tem número (#1641-2); nos demais
+            // status é no-op sem consulta.
+            await inicioPrevisto.AplicarNaFilaAsync(pedido);
+
+            statusNovoStr = StatusPedidoMapper.Format(statusNovo);
+            await pedidoRepo.AddEventoAsync(new PedidoEvento
+            {
+                Id = Guid.NewGuid(),
+                PedidoId = pedido.Id,
+                Tipo = "status_changed",
+                StatusAntigo = statusAntigoStr,
+                StatusNovo = statusNovoStr,
+                UsuarioId = cmd.UsuarioId,
+                UsuarioNome = cmd.UsuarioNome,
+                Origem = cmd.Origem,
+                OcorridoEm = OcorridoEmAuditoria(cmd.OcorridoEm)
+            });
+
+            // Ponto de integracao unico da esteira (ADR-0042, Onda 4): publica a transicao no
+            // outbox, na MESMA transacao do commit de status. Hiram/marketplaces consomem este
+            // evento em vez de observar a coluna Status (issue 866).
+            await publicadorEventos.PublicarAsync(
+                empresaId: pedido.EmpresaId,
+                tipoEvento: "pedido.mudou_status",
+                aggregateType: "pedido",
+                aggregateId: pedido.Id,
+                payload: new PedidoMudouStatusEvent(
+                    PedidoId: pedido.Id,
+                    EmpresaId: pedido.EmpresaId,
+                    LojaId: pedido.LojaId,
+                    StatusAntigo: statusAntigoStr,
+                    StatusNovo: statusNovoStr,
+                    Origem: cmd.Origem,
+                    UsuarioId: cmd.UsuarioId,
+                    UsuarioNome: cmd.UsuarioNome,
+                    OcorridoEm: DateTime.UtcNow),
+                correlationId: pedido.Id.ToString(), ct: ct);
+
+            await pedidoRepo.UpdateAsync(pedido);
+            await uow.CommitAsync();
+            mudou = true;
             return CriarPedidoUseCase.Map(pedido);
-        }
-
-        // #1776 (item 19): o toque de "Marcar entregue" do console (Cozinha, Balcão) confere o saldo; com valor a
-        // receber, só com a confirmação de quem marca. Balcão, PWA e mobile seguem como antes (não pedem conferência).
-        if (statusNovo == StatusPedido.Entregue && cmd.ConferirSaldoNaEntrega && saldos is not null)
-            await saldos.ExigirQuitadoParaEntregarAsync(pedido, cmd.SaldoAReceberConfirmado, CancellationToken.None);
-
-        var statusAntigoStr = pedido.Status;
-        var eraEstoqueDescontado = PedidoStateMachine.DescontaEstoque(statusAtual);
-        var seraEstoqueDescontado = PedidoStateMachine.DescontaEstoque(statusNovo);
-
-        // Integração estoque PRIMEIRO — se falhar (ex: estoque insuficiente),
-        // status não é alterado e o caller recebe a exceção. Atomicidade
-        // a nível de aplicação: ou ambos (status + estoque) mudam, ou nada.
-        // Idempotência via DocumentoReferencia evita double-debit em retries.
-        if (!eraEstoqueDescontado && seraEstoqueDescontado)
-        {
-            await estoqueIntegration.DescontarAsync(pedido);
-        }
-
-        // Estoque OK — agora aplica transição no agregado. MudarStatus é
-        // idempotente e re-valida (defesa em profundidade); como já validamos
-        // acima, o re-check é apenas paranoia barata.
-        pedido.MudarStatus(statusNovo);
-        // #1230: AguardandoPagamento -> Aguardando pela troca genérica (a dona recebeu por fora) entra na
-        // fila com início previsto; o início do preparo numera quem ainda não tem número (#1641-2); nos demais
-        // status é no-op sem consulta.
-        await inicioPrevisto.AplicarNaFilaAsync(pedido);
-
-        var statusNovoStr = StatusPedidoMapper.Format(statusNovo);
-        await pedidoRepo.AddEventoAsync(new PedidoEvento
-        {
-            Id = Guid.NewGuid(),
-            PedidoId = pedido.Id,
-            Tipo = "status_changed",
-            StatusAntigo = statusAntigoStr,
-            StatusNovo = statusNovoStr,
-            UsuarioId = cmd.UsuarioId,
-            UsuarioNome = cmd.UsuarioNome,
-            Origem = cmd.Origem,
-            OcorridoEm = OcorridoEmAuditoria(cmd.OcorridoEm)
         });
 
-        // Ponto de integracao unico da esteira (ADR-0042, Onda 4): publica a transicao no
-        // outbox, na MESMA transacao do commit de status. Hiram/marketplaces consomem este
-        // evento em vez de observar a coluna Status (issue 866).
-        await publicadorEventos.PublicarAsync(
-            empresaId: pedido.EmpresaId,
-            tipoEvento: "pedido.mudou_status",
-            aggregateType: "pedido",
-            aggregateId: pedido.Id,
-            payload: new PedidoMudouStatusEvent(
-                PedidoId: pedido.Id,
-                EmpresaId: pedido.EmpresaId,
-                LojaId: pedido.LojaId,
-                StatusAntigo: statusAntigoStr,
-                StatusNovo: statusNovoStr,
-                Origem: cmd.Origem,
-                UsuarioId: cmd.UsuarioId,
-                UsuarioNome: cmd.UsuarioNome,
-                OcorridoEm: DateTime.UtcNow),
-            correlationId: pedido.Id.ToString());
-
-        await pedidoRepo.UpdateAsync(pedido);
-        await uow.CommitAsync();
+        if (!mudou || pedido is null) return resultado;
 
         logger.LogInformation("Pedido {Id} status {Antigo} → {Novo}.", pedido.Id, statusAntigoStr, statusNovoStr);
 
@@ -208,7 +222,7 @@ public class AtualizarStatusPedidoUseCase(
             }
         }
 
-        return CriarPedidoUseCase.Map(pedido);
+        return resultado;
     }
 
     /// <summary>

@@ -390,8 +390,9 @@ namespace EasyStock.Domain.Entities
 
         private void AtualizarDiasSemMovimentacao(DateTime dataReferencia)
         {
-            var baseDate = (UltimaMovimentacaoEm ?? EntradaEm).Date;
-            DiasSemMovimentacao = Math.Max(0, (dataReferencia.Date - baseDate).Days);
+            // #2401: dias contados no dia operacional de Brasília, não no dia UTC (ADR-0032).
+            var baseDate = OperacionalFuso.DataOperacional(UltimaMovimentacaoEm ?? EntradaEm);
+            DiasSemMovimentacao = Math.Max(0, OperacionalFuso.DataOperacional(dataReferencia).DayNumber - baseDate.DayNumber);
         }
 
         private void AtualizarPrevisao()
