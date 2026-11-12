@@ -103,5 +103,5 @@ A retenção limita só por tempo (30 dias) e o disco é o mesmo do Postgres. O 
 
 ### LGPD
 
-- Base legal dos 30 dias: legítimo interesse (art. 7º, IX) para segurança, diagnóstico e prevenção de fraude, com a redação acima minimizando o dado pessoal (art. 6º, III). A confirmar pelo responsável pelo tratamento.
+- Base legal dos 30 dias: legítimo interesse (art. 7º, IX) para segurança, diagnóstico e prevenção de fraude, com a redação acima minimizando o dado pessoal (art. 6º, III). Confirmada pelo responsável pelo tratamento (Felipe) em 12/11/2026 (#2404).
 - Eliminação sob demanda (art. 18): o OpenObserve v1.1 não apaga registro por titular. Resposta padrão: o dado expira sozinho em até 30 dias. Se a eliminação imediata for exigida, apague o stream `easystok` na UI (perde-se toda a telemetria, aceitável por ser descartável) e registre o pedido.
