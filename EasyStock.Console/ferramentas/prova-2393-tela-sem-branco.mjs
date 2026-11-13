@@ -54,6 +54,11 @@ assert.equal(TEXTO_DA_FALHA, 'Algo falhou. Confira o que estava fazendo.')
   ouvintes.error({ error: new Error('y'), message: 'y' })
   assert.equal(faixa.ver().falhou, true)
   assert.equal(avisos, 3)
+  // #2431: eventos benignos não acendem a faixa.
+  ouvintes.error({ message: 'ResizeObserver loop completed with undelivered notifications.' })
+  ouvintes.error({ error: new Error('ResizeObserver loop limit exceeded'), message: 'ResizeObserver loop limit exceeded' })
+  ouvintes.unhandledrejection({ reason: Object.assign(new Error('cancelado'), { name: 'AbortError' }) })
+  assert.equal(faixa.ver().total, 2, 'ResizeObserver e AbortError são ignorados')
   desinstalar()
   assert.deepEqual(Object.keys(ouvintes), [])
 }

@@ -62,11 +62,13 @@ await confere('registrarPagamentoManual sai com keepalive', async () => {
 })
 
 // 2. prazo por método
-await confere('prazo: leitura 20 s, escrita 30 s, sem prazo para keepalive, arquivo, upload e sinal próprio', () => {
+await confere('prazo: leitura 20 s, escrita 30 s, keepalive com prazo, sem prazo para arquivo, upload e sinal próprio', () => {
   const prazoDaChamada = exige(prazo, 'prazoDaChamada')
   assert.equal(prazoDaChamada({ metodo: 'GET' }), 20000)
   for (const metodo of ['POST', 'PUT', 'PATCH', 'DELETE']) assert.equal(prazoDaChamada({ metodo }), 30000, metodo)
-  assert.equal(prazoDaChamada({ metodo: 'POST', keepalive: true }), null)
+  // #2431: keepalive também tem prazo (o timer não roda após a aba fechar, o envio pendente continua).
+  assert.equal(prazoDaChamada({ metodo: 'POST', keepalive: true }), 30000)
+  assert.equal(prazoDaChamada({ metodo: 'POST', keepalive: true, prazoMs: 45000 }), 45000)
   assert.equal(prazoDaChamada({ metodo: 'GET', arquivo: true }), null)
   assert.equal(prazoDaChamada({ metodo: 'POST', formulario: {} }), null)
   assert.equal(prazoDaChamada({ metodo: 'POST', sinal: new AbortController().signal }), null)
