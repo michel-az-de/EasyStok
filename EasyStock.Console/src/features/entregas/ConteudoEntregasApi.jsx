@@ -389,30 +389,42 @@ function Entregadores({ entregadores, ocupado, acoes }) {
       if (ok) { setForm(ENTREGADOR_VAZIO); setConfirmacao('Entregador cadastrado. Você já pode selecioná-lo nas viagens.') }
     })
   }
+  // #2423: formulário em duas colunas (nome e telefone, tipo e empresa, veículo e placa) e a lista
+  // de ativos abaixo de uma divisória, com o estado vazio centralizado.
   return (
-    <section className={css.secao} aria-label="Entregadores">
-      <h3>Novo entregador</h3>
-      <form className={css.formulario} onSubmit={salvar}>
-        <CampoTexto rotulo="Nome" {...campo('nome')} required />
-        <CampoSelecao rotulo="Tipo" opcoes={TIPOS_ENTREGADOR} {...campo('tipo')} />
-        <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_ENTREGADOR} {...campo('empresa')} />
-        <CampoTexto rotulo="Telefone" tipo="tel" {...campo('telefone')} />
-        <CampoTexto rotulo="Veículo" {...campo('veiculo')} />
-        <CampoTexto rotulo="Placa" {...campo('placa')} />
-        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar entregador</Botao>
-      </form>
-      {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
-      <h3>Ativos</h3>
-      {entregadores.length === 0 && <p className={css.vazio}>Nenhum entregador cadastrado.</p>}
-      <ul className={css.lista}>
-        {entregadores.map((e) => (
-          <li key={e.id} className={`${css.cartao} ${css.linha}`}>
-            <span className={css.cresce}>{e.nome}</span>
-            <span className={css.apoio}>{[e.veiculo, e.placa, e.telefone].filter(Boolean).join(' · ')}</span>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desativarEntregador(e.id)}>Desativar</Botao>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <div className={css.abaEntregadores}>
+      <section className={css.secao} aria-label="Novo entregador">
+        <h3>Novo entregador</h3>
+        <form className={css.formEntregador} onSubmit={salvar}>
+          <CampoTexto rotulo="Nome" placeholder="Nome do entregador" {...campo('nome')} required />
+          <CampoTexto rotulo="Telefone" tipo="tel" placeholder="(00) 00000-0000" {...campo('telefone')} />
+          <CampoSelecao rotulo="Tipo" opcoes={TIPOS_ENTREGADOR} {...campo('tipo')} />
+          <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_ENTREGADOR} {...campo('empresa')} />
+          <CampoTexto rotulo="Veículo" placeholder="Modelo do veículo" {...campo('veiculo')} />
+          <CampoTexto rotulo="Placa" placeholder="Ex.: ABC1D23" {...campo('placa')} />
+          <Botao tipo="submit" variante="primario" icone="plus" disabled={ocupado || !form.nome.trim()}>Cadastrar entregador</Botao>
+        </form>
+        {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
+      </section>
+      <section className={`${css.secao} ${css.ativos}`} aria-label="Entregadores ativos">
+        <h3>Entregadores ativos <span className={css.contagem}>{entregadores.length}</span></h3>
+        {entregadores.length === 0 && (
+          <div className={css.vazioCentral}>
+            <Icone nome="moto" tamanho={32} />
+            <p className={css.tituloCartao}>Nenhum entregador cadastrado</p>
+            <p className={css.apoio}>Os entregadores cadastrados aparecerão aqui.</p>
+          </div>
+        )}
+        <ul className={css.lista}>
+          {entregadores.map((e) => (
+            <li key={e.id} className={`${css.cartao} ${css.linha}`}>
+              <span className={css.cresce}>{e.nome}</span>
+              <span className={css.apoio}>{[e.veiculo, e.placa, e.telefone].filter(Boolean).join(' · ')}</span>
+              <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desativarEntregador(e.id)}>Desativar</Botao>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
   )
 }

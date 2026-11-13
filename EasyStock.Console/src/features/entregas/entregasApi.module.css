@@ -1,9 +1,10 @@
 /* Entregas no modo API (F04): painéis simples sobre os dados reais. */
 .conteudo { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4); display: flex; flex-direction: column; gap: var(--e-3); }
 .navegacao { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
-.abas { display: flex; gap: var(--e-1); flex: 0 1 auto; min-width: 0; border-bottom: var(--b-1) solid var(--linha); }
+/* #2423: a divisória das abas ocupa a largura toda; as abas ficam do tamanho do texto. */
+.abas { display: flex; gap: var(--e-1); flex: 1 1 auto; min-width: 0; border-bottom: var(--b-1) solid var(--linha); }
 .abaInterna { flex: 1 1 auto; min-width: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); }
-.abas .abaInterna { border-radius: 0; border: 0; border-bottom: var(--b-2) solid transparent; box-shadow: none; }
+.abas .abaInterna { flex: 0 1 auto; border-radius: 0; border: 0; border-bottom: var(--b-2) solid transparent; box-shadow: none; }
 .abaInterna[aria-selected='true'], .abaInterna[aria-selected='true']:hover { background: transparent; color: var(--marca); border-bottom-color: var(--marca); font-weight: 700; }
 .painel { display: flex; flex-direction: column; gap: var(--e-4); min-width: 0; }
 .secao { display: flex; flex-direction: column; gap: var(--e-2); }
@@ -117,6 +118,17 @@
 .acoesCartao { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-3); flex-wrap: wrap; }
 .acaoPerigo, .acaoPerigo:hover:not(:disabled) { color: var(--erro); }
 
+/* #2423: aba Entregadores com o formulário em duas colunas e a lista abaixo da divisória. */
+.abaEntregadores { display: flex; flex-direction: column; gap: var(--e-5); }
+.abaEntregadores .secao > h3 { font-size: var(--t-titulo); font-weight: 800; }
+.formEntregador { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3) var(--e-4); }
+.formEntregador > button { grid-column: 1 / -1; justify-self: end; }
+.ativos { padding-top: var(--e-5); border-top: var(--b-1) solid var(--linha); }
+.contagem { margin-left: var(--e-2); font-size: var(--t-corpo); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tinta-2); }
+.vazioCentral { display: flex; flex-direction: column; align-items: center; gap: var(--e-1); padding: var(--e-5) var(--e-3); text-align: center; }
+.vazioCentral > svg { color: var(--tinta-2); margin-bottom: var(--e-2); }
+.vazioCentral p { margin: 0; }
+
 .agenda { container: agenda / inline-size; }
 .periodoAgenda { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
 .controlesAgenda { display: grid; grid-template-columns: var(--toque) minmax(0, 160px) var(--toque); align-items: center; gap: var(--e-1); }
@@ -161,7 +173,7 @@
 @media (max-width: 640px) {
   .navegacao { gap: var(--e-1); }
   .abas { flex-basis: 100%; }
-  .abaInterna { padding-inline: var(--e-1); font-size: .875rem; line-height: 1.25; }
+  .abas .abaInterna { flex: 1 1 auto; padding-inline: var(--e-1); font-size: .875rem; line-height: 1.25; }
   .navegacao > .apoio { font-size: .8125rem; }
   .painelDia { gap: var(--e-3); }
   .painelDia .cartao > .linha:first-child .cresce { flex-basis: 8rem; }
@@ -174,4 +186,6 @@
   /* #2418: no celular o papel e o PDF abrem na linha de baixo, sem cartão flutuante cortado na borda. */
   .impressaoDoDia[open] { flex-basis: 100%; }
   .impressaoDoDia > .linha { position: static; flex-wrap: wrap; margin-top: var(--e-2); box-shadow: none; }
+  .formEntregador { grid-template-columns: minmax(0, 1fr); }
+  .formEntregador > button { justify-self: stretch; }
 }
