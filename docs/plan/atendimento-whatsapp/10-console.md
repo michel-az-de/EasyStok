@@ -276,6 +276,26 @@ suas versões e não são apresentadas como novas execuções.
 O smoke do delta identificou alvos de 32 px nos botões de porção do Banco de imagens;
 o ajuste usa `--toque` na mesma condição móvel dos tokens, preservando os 32 px no desktop com mouse.
 
+Na integração do master `93ab2afd5` (13/11), os quatro filtros `SyncPull*` focais passaram
+com 23 testes; o PWA teve 492 aprovações e um skip por IndexedDB indisponível na VM, que também
+não executa dois módulos ESM. Logs: `.build/r4-sync-pull-5cda7203.log` e `.build/r4-pwa-5cda7203.log`.
+O novo prazo de escrita com keepalive revelou uma certeza indevida na Cozinha após perder o ACK.
+A prova 2005 reproduziu o defeito (43/44); o ramo `SEM_RESPOSTA` passou a conservar o aviso de
+incerteza, e a releitura confirma o estado aplicado sem repetir o PATCH (44/44).
+A prova 2379 passou em 18 casos, incluindo timeout do recebimento, GET do saldo e repetição
+explícita com a mesma chave. São transportes controlados; a persistência idempotente continua
+coberta por `PagamentoRespostaPerdidaIntegrationTests` com HTTP/PostgreSQL.
+Qualidade completa: 229 provas, zero falhas, 55 exceções e zero puladas por Chromium,
+em `EasyStock.Console/.build/2395/qualidade-keepalive-final.log`.
+
+O complemento `.build/2395/mobile-sync-b8c51734/resultado.json` passou em quatro etapas e 23
+requisições HTTP/Kestrel/PostgreSQL reais, na API `1.11.0+b8c51734e9c842119342509e2114d4dc3547b621`.
+O pagamento sintético pela rota usada pelo Console produz uma única `order.aReceber=0` no
+aparelho autor; novo pull não repete a mutação nem reescreve pedido/pagamento/espelho mobile.
+Outra empresa não recebe os dados, o pedido retorna 404 e o pull anônimo retorna 401.
+O pagamento foi por HTTP, sem clique na UI; a preservação de edição local e a ausência de
+criação de pedido no PWA são provas complementares da suíte de VM. Nenhum provedor externo foi chamado.
+
 W5-01: `Agente_PedidoEVagaCommitadosSobrevivemAFalhaSqlDepoisDoProvedor` passou em PostgreSQL real,
 com serviço de agente resolvido por DI e UoW reais; LLM e Mercado Pago controlados. Outra unidade
 de trabalho vê pedido/vaga antes do retorno do provedor; SQL 22012 injetado no INSERT posterior

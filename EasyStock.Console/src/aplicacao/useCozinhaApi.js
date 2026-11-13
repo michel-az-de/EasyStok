@@ -182,7 +182,7 @@ export function useCozinhaApi({ data = null } = {}) {
       .then(() => recarga.depoisDaAcao(marca))
       .catch((e) => (pedeConfirmacaoDoSaldo(e)
         ? setSaldoPendente({ id, status, valor: Number(e.dados?.valor) || 0 })
-        : setErro(`O pedido não mudou: ${e.message}`)))
+        : setErro(e.codigo === 'SEM_RESPOSTA' ? e.message : `O pedido não mudou: ${e.message}`)))
       .finally(() => setMovendo((s) => comId(s, id, false)))
   }, [])
   // #1686 (item 5): o avanço espera alguns segundos com "Desfazer" à vista; a confirmação do saldo a
