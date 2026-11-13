@@ -1,0 +1,144 @@
+/* #2168: chamada e acompanhamento da corrida da Lalamove no cartão da viagem. Plano como o resto do
+   console (raio 0, linha fina, sem sombra): a hierarquia vem do tamanho do preço, do Selo e da linha
+   do tempo. Números em fonte de dado e tabulares, para o preço e a contagem não dançarem. */
+
+.painel {
+  display: grid; gap: var(--e-3); min-width: 0;
+  padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  background: var(--papel);
+}
+
+/* Cabeça: marca do serviço, título e o trajeto em uma linha. */
+.cabeca { display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
+.marcador {
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  width: var(--toque); height: var(--toque); border-radius: var(--r-pilula);
+  background: var(--marca-claro); color: var(--marca);
+}
+.titulo { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.titulo strong { font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
+.trajeto {
+  display: flex; align-items: center; gap: var(--e-1); min-width: 0;
+  font-size: var(--t-apoio); color: var(--tinta-2);
+}
+.trajeto > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* Moto ou carro: Chip de escolha (um toque, o escolhido marcado). */
+.veiculos { display: inline-flex; flex-wrap: wrap; gap: var(--e-2); }
+
+.linha { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
+.cresce { flex: 1; min-width: 0; }
+.apoio { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); overflow-wrap: anywhere; }
+
+/* Cotação: o preço é o que se lê primeiro. */
+.cotacao { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
+.preco {
+  margin: 0; font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 800;
+  font-variant-numeric: tabular-nums; color: var(--tinta); line-height: 1.1;
+}
+.precoVencido { color: var(--tinta-3); text-decoration: line-through; text-decoration-thickness: 2px; }
+.detalhes { margin: var(--e-1) 0 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.validade {
+  display: inline-flex; align-items: center; gap: var(--e-1);
+  padding: 2px var(--e-3); border-radius: var(--r-pilula);
+  background: var(--preenchimento); color: var(--tinta-2);
+  font-size: var(--t-apoio); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.validadeCurta { background: var(--alerta-pastel); color: var(--alerta); }
+
+/* Corrida chamada. */
+.corrida { composes: painel; }
+.corridaEncerrada { padding: var(--e-3) var(--e-4); background: transparent; }
+.custo {
+  margin: 0; font-family: var(--f-dado); font-size: var(--t-forte); font-weight: 800;
+  font-variant-numeric: tabular-nums; color: var(--tinta); white-space: nowrap;
+}
+.custo small { display: block; font-family: var(--f-corpo); font-size: var(--t-micro); font-weight: 400; color: var(--tinta-2); text-align: right; }
+
+/* Linha do tempo: quatro etapas, a atual marcada, as feitas cheias. */
+.etapas {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+  margin: 0; padding: 0; list-style: none; counter-reset: etapa;
+}
+.etapa {
+  position: relative; display: grid; justify-items: start; gap: var(--e-2); min-width: 0;
+  font-size: var(--t-micro); color: var(--tinta-3);
+}
+.etapa::before {
+  /* Ponto de estado, redondo como os outros do console: quadrado leria como caixa de marcar. */
+  content: ''; width: 12px; height: 12px; border-radius: 50%;
+  border: var(--b-2) solid var(--linha-forte); background: var(--papel); z-index: 1;
+}
+.etapa::after {
+  content: ''; position: absolute; top: 5px; left: 12px; right: 0; height: 2px; background: var(--linha);
+}
+.etapa:last-child::after { content: none; }
+.etapaFeita { color: var(--tinta-2); }
+.etapaFeita::before { border-color: var(--marca); background: var(--marca); }
+.etapaFeita::after { background: var(--marca); }
+.etapaAtual { color: var(--tinta); font-weight: 700; }
+.etapaAtual::before { border-color: var(--marca); background: var(--marca-claro); box-shadow: 0 0 0 4px var(--marca-claro); }
+
+/* Motorista: iniciais, nome, placa como placa e o telefone num toque. */
+.motorista {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--e-3);
+  padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha);
+}
+.avatar {
+  display: inline-grid; place-items: center; width: var(--toque); height: var(--toque);
+  border-radius: var(--r-pilula); background: var(--avatar-fundo, var(--preenchimento-forte));
+  color: var(--tinta); font-weight: 700; font-size: var(--t-apoio);
+}
+.quem { display: grid; gap: 2px; min-width: 0; }
+.quem strong { font-weight: 700; color: var(--tinta); overflow-wrap: anywhere; }
+.placa {
+  justify-self: start; padding: 0 var(--e-2); border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-1);
+  font-family: var(--f-dado); font-size: var(--t-micro); font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--tinta);
+}
+.contatos { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--e-2); }
+
+/* Link com cara de botão secundário: telefone e mapa saem do console. */
+.linkAcao {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: var(--toque); padding: var(--e-2) var(--e-16, 16px); border-radius: var(--r-1);
+  background: var(--preenchimento); color: var(--tinta);
+  font-size: var(--t-apoio); font-weight: 600; text-decoration: none;
+}
+.linkAcao:hover { background: var(--preenchimento-forte); }
+.corrida > .linkAcao { justify-self: start; }
+
+/* Ações que custam ou desfazem: em bloco próprio, separadas do que só informa. */
+.acoes { display: grid; gap: var(--e-2); padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
+.gorjetas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.rotulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); }
+
+/* Confirmação em linha: o que acontece, o botão que faz e o que desiste. */
+.confirmacao {
+  display: grid; gap: var(--e-2); padding: var(--e-3);
+  border-left: var(--b-3, 4px) solid var(--alerta); background: var(--alerta-pastel);
+}
+.confirmacao p { margin: 0; color: var(--tinta); font-size: var(--t-apoio); }
+.confirmacaoPerigo { border-left-color: var(--erro); background: var(--erro-pastel); }
+
+.aviso {
+  display: grid; gap: var(--e-2); margin: 0; padding: var(--e-3);
+  border-left: var(--b-3, 4px) solid var(--alerta); background: var(--alerta-pastel); color: var(--tinta);
+  font-size: var(--t-apoio);
+}
+.erro { margin: 0; color: var(--erro); font-size: var(--t-apoio); }
+
+.rodape { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
+.rodape .apoio { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 480px) {
+  .painel { padding: var(--e-3); }
+  .veiculos { display: flex; }
+  .veiculos > button { flex: 1; }
+  .etapa { font-size: .75rem; }
+  .cotacao > :last-child { flex-basis: 100%; }
+  .cotacao > :last-child > button { flex: 1; }
+}
+.painelInterno { display: grid; gap: var(--e-3); min-width: 0; }
+/* Dentro do aviso, a confirmação não ganha outra moldura amarela. */
+.aviso .confirmacao { padding: var(--e-2) 0 0; border: 0; border-top: var(--b-1) solid var(--linha-media); background: transparent; }

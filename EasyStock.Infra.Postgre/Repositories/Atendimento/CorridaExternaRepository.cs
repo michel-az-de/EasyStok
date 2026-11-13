@@ -33,8 +33,10 @@ public sealed class CorridaExternaRepository(EasyStockDbContext db) : ICorridaEx
     public async Task<IReadOnlyList<CorridaLocalizada>> ListarEmCursoAsync(int maximo, CancellationToken ct = default)
     {
         using var _ = db.UseRowLevelSecurityBypass();
+        // #2168: a "solicitando" sem id do pedido não tem o que reconsultar (só a atendente a libera); fora da rodada,
+        // ela não ocupa a fila na frente das corridas novas.
         return await db.CorridasExternas.IgnoreQueryFilters().AsNoTracking()
-            .Where(c => c.Origem == OrigemCorridaExterna.Api
+            .Where(c => c.Origem == OrigemCorridaExterna.Api && c.IdExterno != null
                         && (c.Status == StatusCorrida.Solicitando || c.Status == StatusCorrida.ProcurandoMotorista
                             || c.Status == StatusCorrida.MotoristaACaminho || c.Status == StatusCorrida.Coletada))
             .OrderBy(c => c.RegistradoEm)
