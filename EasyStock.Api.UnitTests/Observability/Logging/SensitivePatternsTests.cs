@@ -155,6 +155,11 @@ public class SensitivePatternsTests
     [InlineData("enviado para 5511987654321", "5511987654321")]
     [InlineData("enviado para +55 (11) 98765-4321", "98765-4321")]
     [InlineData("/api/atendimento/conversas/11987654321/mensagens", "11987654321")]
+    [InlineData("ligar (11) 3333-4444 hoje", "3333-4444")]                       // #2440: fixo com DDD entre parênteses
+    [InlineData("ligar 11 3333-4444 hoje", "3333-4444")]                         // fixo com DDD e espaço
+    [InlineData("ligar +55 11 3333-4444 hoje", "3333-4444")]                     // fixo com DDI
+    [InlineData("ligar 11 98888 7766 hoje", "98888 7766")]                       // celular com espaço no lugar do hífen
+    [InlineData("ligar 11 9 8888-7766 hoje", "8888-7766")]                       // celular com o 9 separado
     [InlineData("email de maria.souza+loja@exemplo.com.br recusado", "maria.souza+loja@exemplo.com.br")]
     public void Redact_DeveMascarar_DadoPessoal(string entrada, string dado)
     {
@@ -169,6 +174,10 @@ public class SensitivePatternsTests
     [InlineData("chave 35261112345678000199550010000012341000012345")]           // chave da NF-e
     [InlineData("CNPJ 12.345.678/0001-95")]                                      // empresa, não pessoa
     [InlineData("pedido 20261112 e valor 1234.56")]
+    [InlineData("criado em 1731420000 s")]                                       // #2440: unix em segundos (10 dígitos crus)
+    [InlineData("chave 3526 1112 3456 7800 0199 5500 1000 0012 3410 0001 2345")] // NF-e em blocos de 4
+    [InlineData("chave 35261112345678000199550010000012341000012345 ok")]
+    [InlineData("emitido em 2026-11-12T10:30:00")]
     public void Redact_NaoMascaraNumeroQueNaoEDadoPessoal(string entrada)
     {
         SensitivePatterns.Redact(entrada).Should().Be(entrada);

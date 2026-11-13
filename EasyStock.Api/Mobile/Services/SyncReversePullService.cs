@@ -136,7 +136,10 @@ public class SyncReversePullService(
             {
                 var itensDoProduto = itensEstoque.Where(i => i.ProdutoId == p.Id).ToList();
                 // Sem estoque ERP, o produto criado no app conserva seu saldo, inclusive no pull do criador.
-                var saldo = itensDoProduto.Count > 0
+                // #2440: alterar so o cadastro (nome, preco) nao troca o saldo do app; o saldo do ERP
+                // so vai quando algum item de estoque mudou depois do cursor (AlteradoEm e do servidor).
+                var estoqueErpMudou = itensDoProduto.Any(i => i.AlteradoEm > sinceDate);
+                var saldo = itensDoProduto.Count > 0 && estoqueErpMudou
                     ? itensDoProduto.Sum(i => i.QuantidadeAtual?.Value ?? 0m) : espelho.Stock;
                 var dto = new ProductDto(
                     Id: espelho.Id,

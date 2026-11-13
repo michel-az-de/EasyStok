@@ -1,15 +1,20 @@
 import { chamarApi } from './cliente'
+import { comConfirmacaoDeOutra } from './conversasApi'
 import { identidadeDaSessao, lerSessao } from './sessao'
 
 export const listarModelos = (atualizar = false) => chamarApi(`/api/atendimento/modelos?atualizar=${atualizar}`, { sinal: AbortSignal.timeout(25000) })
-export const enviarModelo = (id, corpo) => chamarApi(`/api/atendimento/conversas/${id}/mensagens/modelo`, {
-  metodo: 'POST', corpo, sinal: AbortSignal.timeout(45000),
-})
+// #2440: modelo em conversa de outra atendente pede confirmação; a repetição leva a mesma `tentativaId` do corpo.
+export const enviarModelo = (id, corpo) => comConfirmacaoDeOutra((confirmar) =>
+  chamarApi(`/api/atendimento/conversas/${id}/mensagens/modelo`, {
+    metodo: 'POST', corpo: confirmar ? { ...corpo, confirmar } : corpo, sinal: AbortSignal.timeout(45000),
+  }))
 
 // #1408: abre (ou reaproveita) a conversa do cliente cadastrado e envia o modelo; devolve { conversaId, mensagem }.
-export const iniciarConversaComModelo = (corpo) => chamarApi('/api/atendimento/conversas/iniciar', {
-  metodo: 'POST', corpo, sinal: AbortSignal.timeout(45000),
-})
+// #2440: a conversa reaproveitada pode ser de outra atendente; pergunta e repete com a mesma `tentativaId`.
+export const iniciarConversaComModelo = (corpo) => comConfirmacaoDeOutra((confirmar) =>
+  chamarApi('/api/atendimento/conversas/iniciar', {
+    metodo: 'POST', corpo: confirmar ? { ...corpo, confirmar } : corpo, sinal: AbortSignal.timeout(45000),
+  }))
 // Pede 20: quem já tem conversa aberta sai no console, e a lista mostra até 5.
 export const buscarClientes = (termo) =>
   chamarApi(`/api/clientes/buscar?termo=${encodeURIComponent(termo)}&max=20`, { sinal: AbortSignal.timeout(15000) })

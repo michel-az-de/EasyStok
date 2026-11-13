@@ -62,8 +62,15 @@ public class RegistrarMovimentoCaixaUseCase(
 
         if (cmd.ExigirCaixaAberto)
         {
-            var abertura = await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId)
-                ?? throw new UseCaseValidationException(CaixaAbertoMensagem);
+            var abertura = await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId);
+            // #2440: a abertura da empresa (sem loja) vale para a loja, como o fechamento (#1562) e o pix (#2341).
+            // Sem lojaId o repositório não filtra por loja: só vale a abertura gravada sem loja.
+            if (abertura is null && cmd.LojaId.HasValue)
+            {
+                var daEmpresa = await repo.GetAberturaPendenteAsync(cmd.EmpresaId);
+                if (daEmpresa?.LojaId == null) abertura = daEmpresa;
+            }
+            if (abertura is null) throw new UseCaseValidationException(CaixaAbertoMensagem);
             // ADR-0034: o fechamento cobre o dia da abertura; movimentos de hoje ficam no caixa de hoje.
             var diaDaAbertura = HorarioBrasil.DataOperacional(abertura.DataMovimento);
             if (data != diaDaAbertura && data != HorarioBrasil.Hoje())

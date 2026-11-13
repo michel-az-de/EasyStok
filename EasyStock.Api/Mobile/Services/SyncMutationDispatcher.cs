@@ -253,6 +253,13 @@ public class SyncMutationDispatcher(
         }
         else
         {
+            // CLI-2: a edição no app chega ao Cliente do ERP ligado (mesma empresa).
+            var erp = existing.ErpClienteId is { } erpId && empresaId.HasValue
+                ? await _db.Set<Cliente>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(c => c.Id == erpId && c.EmpresaId == empresaId.Value)
+                : null;
+            if (erp != null) await RecusarSeOConsoleEditouDepoisAsync(m, erp, existing);
+
             existing.Name = dto.Name;
             existing.Apt = dto.Apt;
             existing.Address = dto.Address;
@@ -265,22 +272,44 @@ public class SyncMutationDispatcher(
             if (existing.EmpresaId == null && empresaId.HasValue) existing.EmpresaId = empresaId;
             if (existing.LojaId == null && lojaId.HasValue) existing.LojaId = lojaId;
 
-            // CLI-2: a edição no app chega ao Cliente do ERP ligado (mesma empresa).
-            if (existing.ErpClienteId is { } erpId && empresaId.HasValue)
+            if (erp != null)
             {
-                var erp = await _db.Set<Cliente>().IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(c => c.Id == erpId && c.EmpresaId == empresaId.Value);
-                if (erp != null)
-                {
-                    // Campo vazio no app nao apaga o dado do ERP: o app nem sempre o recebeu.
-                    if (!string.IsNullOrWhiteSpace(dto.Name)) erp.Nome = dto.Name;
-                    if (!string.IsNullOrWhiteSpace(dto.Phone)) erp.Telefone = dto.Phone;
-                    if (!string.IsNullOrWhiteSpace(dto.Apt)) erp.Apt = dto.Apt;
-                    if (!string.IsNullOrWhiteSpace(dto.Address)) erp.Endereco = dto.Address;
-                    if (DocumentoClienteMobile.Normalizar(dto.Document) is { } documento) erp.Documento = documento;
-                }
+                // Campo vazio no app nao apaga o dado do ERP: o app nem sempre o recebeu.
+                if (!string.IsNullOrWhiteSpace(dto.Name)) erp.Nome = dto.Name;
+                if (!string.IsNullOrWhiteSpace(dto.Phone)) erp.Telefone = dto.Phone;
+                if (!string.IsNullOrWhiteSpace(dto.Apt)) erp.Apt = dto.Apt;
+                if (!string.IsNullOrWhiteSpace(dto.Address)) erp.Endereco = dto.Address;
+                if (DocumentoClienteMobile.Normalizar(dto.Document) is { } documento) erp.Documento = documento;
             }
         }
+    }
+
+    // Campos que o CLI-2 grava no Cliente do ERP; so a edicao deles pelo console conta como conflito.
+    private static readonly string[] CamposDoClienteVindosDoApp = ["Nome", "Telefone", "Apt", "Endereco", "Documento"];
+
+    /// <summary>
+    /// #2440: um aparelho que ficou offline reenviava um <c>client.upsert</c> velho e apagava a edicao
+    /// mais nova do console. Como no produto, a mutacao mais antiga que a ultima edicao do console
+    /// (fora a do proprio app) vira conflito; o aparelho recebe a versao do ERP para decidir.
+    /// <c>Cliente.AlteradoEm</c> nao serve: muda a cada pedido e acesso da loja virtual.
+    /// </summary>
+    private async Task RecusarSeOConsoleEditouDepoisAsync(MutationDto m, Cliente erp, Client espelho)
+    {
+        if (m.Ts <= 0) return;
+        var ultimaEdicao = await _db.Set<ClienteAlteracao>().IgnoreQueryFilters().AsNoTracking()
+            .Where(a => a.ClienteId == erp.Id && a.EmpresaId == erp.EmpresaId && a.Origem != "mobile"
+                && CamposDoClienteVindosDoApp.Contains(a.Campo))
+            .MaxAsync(a => (DateTime?)a.AlteradoEm);
+        if (ultimaEdicao is null) return;
+        var edicaoMs = CarimboMs(DateTime.SpecifyKind(ultimaEdicao.Value, DateTimeKind.Utc));
+        if (edicaoMs <= m.Ts + 2000) return;
+        var versaoDoErp = SyncDtoConverters.ToDto(espelho) with
+        {
+            Name = erp.Nome, Phone = erp.Telefone, Apt = erp.Apt, Address = erp.Endereco
+        };
+        throw new ConflictException(
+            $"Servidor já tem versão mais nova do cliente ({DateTimeOffset.FromUnixTimeMilliseconds(edicaoMs):HH:mm:ss}) editada no console",
+            SyncDtoConverters.Serialize(versaoDoErp));
     }
 
     // #2343 (R2-API-11): campos que, ausentes, estouravam NullReferenceException no meio do apply.

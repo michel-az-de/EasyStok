@@ -278,6 +278,25 @@ public class CalcularProducaoUseCaseTests
         resultado.CustoEstimadoTotal.Should().Be(0.2m * custoReferencia);
     }
 
+    // #2440: insumo com saldo inicial e sem custo nasce com lote de custo 0; isso é "sem custo", não R$ 0 conhecido.
+    [Fact]
+    public async Task Lote_com_custo_zero_conta_como_insumo_sem_custo()
+    {
+        var resultado = await CalcularFarinhaAsync(null, Lote(1m, 0m));
+
+        resultado.Insumos[0].CustoUnitarioReferencia.Should().BeNull();
+        resultado.Insumos[0].CustoEstimadoLinha.Should().BeNull();
+        resultado.CustoEstimadoTotal.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Custo_pula_lote_de_custo_zero_e_usa_o_proximo_com_custo()
+    {
+        var resultado = await CalcularFarinhaAsync(null, Lote(1m, 0m), Lote(1m, 5m));
+
+        resultado.Insumos[0].CustoUnitarioReferencia.Should().Be(5m);
+    }
+
     private static ItemEstoque Lote(decimal saldo, decimal custo, StatusItemEstoque status = StatusItemEstoque.Ok, int diasValidade = 5) => new()
     {
         Id = Guid.NewGuid(), QuantidadeAtual = Quantidade.From(saldo), CustoUnitario = Dinheiro.FromDecimal(custo),

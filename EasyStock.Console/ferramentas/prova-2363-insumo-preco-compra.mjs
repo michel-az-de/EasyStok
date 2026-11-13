@@ -102,6 +102,8 @@ await confere('preço sem quantidade, preço com fração de centavo e saldo neg
   assert.equal(await m.gestao.criar({ nome: 'Farinha', unidade: 'G', preco: '45', quantidade: '10', unidadeCompra: 'Kg', saldo: '-1' }), false)
   assert.equal(m.chamadas.length, 0)
   assert.equal(m.erros.length, 3)
+  // #2440: a recusa de 2 casas orienta o caminho (preço da embalagem maior), não só nega.
+  assert.match(String(m.erros[1]), /embalagem maior/, 'a mensagem orienta a informar o preço da embalagem maior')
 })
 
 await confere('a edição reabre o custo no formato de compra e grava o mesmo valor', async () => {

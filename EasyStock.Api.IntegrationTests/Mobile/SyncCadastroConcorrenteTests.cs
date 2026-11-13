@@ -22,7 +22,7 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     [SkippableFact]
-    public async Task ProdutoDeOutraEmpresa_JaExistente_RecusaCom400ExplicitoSemAlterarDados()
+    public async Task ProdutoDeOutraEmpresa_JaExistente_RecusaSoOCadastroSemAlterarDadosNemTravarOLote()
     {
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         var (empresaA, lojaA) = await fixture.SeedEmpresaELojaAsync();
@@ -39,10 +39,17 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
             await db.SaveChangesAsync();
         }
         using var client = fixture.CreateMobileClient(device.ApiKey);
-        var resposta = await client.PostAsJsonAsync("/api/mobile/sync", Requisicao(device.DeviceId, "product", id, saldoId, 3));
+        var pedido = Requisicao(device.DeviceId, "product", id, saldoId, 3);
+        var resposta = await client.PostAsJsonAsync("/api/mobile/sync", pedido);
 
-        resposta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await resposta.Content.ReadAsStringAsync()).Should().Contain("Cadastro indisponivel para esta empresa.");
+        // #2440: o 400 reprovava o lote inteiro e o aparelho o reenviava para sempre. Agora so o
+        // cadastro (e o movimento que depende dele) e recusado; o aparelho manda os dois para a deadletter.
+        resposta.StatusCode.Should().Be(HttpStatusCode.OK);
+        var resultado = (await resposta.Content.ReadFromJsonAsync<SyncPushResponse>(Json))!;
+        var (cadastro, deltaDoSaldo, deltaDoCadastro) = (pedido.Mutations[0].Id, pedido.Mutations[1].Id, pedido.Mutations[2].Id);
+        resultado.Rejected.Should().Contain(r => r.MutationId == cadastro && r.Reason == "Cadastro indisponivel para esta empresa.");
+        resultado.Rejected!.Select(r => r.MutationId).Should().BeEquivalentTo(new[] { cadastro, deltaDoCadastro });
+        resultado.AcceptedIds.Should().Equal(deltaDoSaldo);
         using var check = fixture.Factory!.Services.CreateScope();
         var leitura = check.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var protegido = await leitura.Set<Product>().IgnoreQueryFilters().SingleAsync(p => p.Id == id);
@@ -50,7 +57,10 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
         protegido.LojaId.Should().Be(lojaA);
         protegido.Name.Should().Be("Cadastro protegido");
         protegido.Stock.Should().Be(7);
-        (await leitura.Set<Product>().IgnoreQueryFilters().SingleAsync(p => p.Id == saldoId)).Stock.Should().Be(5);
+        (await leitura.Set<Product>().IgnoreQueryFilters().SingleAsync(p => p.Id == saldoId)).Stock.Should().Be(8,
+            "o movimento do proprio produto nao pode ficar refem do cadastro recusado");
+        (await client.PostAsJsonAsync("/api/mobile/sync", pedido)).StatusCode.Should().Be(HttpStatusCode.OK, "o reenvio repete a recusa gravada");
+        (await leitura.Set<Product>().IgnoreQueryFilters().AsNoTracking().SingleAsync(p => p.Id == saldoId)).Stock.Should().Be(8);
     }
 
     [SkippableFact]
@@ -135,30 +145,37 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
         var respostas = await Task.WhenAll(
             clientA.PostAsJsonAsync("/api/mobile/sync", pedidoA),
             clientB.PostAsJsonAsync("/api/mobile/sync", pedidoB));
-        if (mesmaEmpresa)
-            respostas.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK,
-                "a corrida de cadastro dentro da empresa nao pode rejeitar o lote inteiro");
-        else
-            respostas.Select(r => r.StatusCode).Should().BeEquivalentTo(new[] { HttpStatusCode.OK, HttpStatusCode.BadRequest },
-                "o Id global de outra empresa deve continuar rejeitado, sem alterar seu cadastro");
+        // #2440: nem a corrida entre empresas reprova o lote inteiro; o Id global de outra empresa
+        // rejeita so o cadastro perdedor (e o movimento que depende dele), sem alterar o do vencedor.
+        respostas.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK,
+            "a corrida de cadastro nao pode rejeitar o lote inteiro");
+        var resultados = new List<SyncPushResponse>();
+        foreach (var resposta in respostas)
+            resultados.Add((await resposta.Content.ReadFromJsonAsync<SyncPushResponse>(Json))!);
+        var aVenceu = resultados[0].Rejected is null or { Count: 0 };
+        if (!mesmaEmpresa)
+            resultados.Count(r => r.Rejected is { Count: > 0 }).Should().Be(1, "so um dos dois cadastros pode ficar com o Id");
 
-        foreach (var (resposta, pedido) in respostas.Zip(new[] { pedidoA, pedidoB }))
+        foreach (var (resultado, pedido, perdeu) in resultados.Zip(new[] { pedidoA, pedidoB }, new[] { !aVenceu, aVenceu }))
         {
-            if (resposta.StatusCode != HttpStatusCode.OK)
+            if (mesmaEmpresa || !perdeu)
             {
-                (await resposta.Content.ReadAsStringAsync()).Should().Contain("Cadastro indisponivel para esta empresa.");
+                resultado.AcceptedIds.Should().BeEquivalentTo(pedido.Mutations.Select(m => m.Id),
+                    "o cadastro e todos os movimentos, inclusive o dependente, precisam ser aplicados");
+                resultado.Rejected.Should().BeNullOrEmpty();
                 continue;
             }
-            var resultado = (await resposta.Content.ReadFromJsonAsync<SyncPushResponse>(Json))!;
-            resultado.AcceptedIds.Should().BeEquivalentTo(pedido.Mutations.Select(m => m.Id),
-                "o cadastro e todos os movimentos, inclusive o dependente, precisam ser aplicados");
-            resultado.Rejected.Should().BeNullOrEmpty();
+            // O cadastro e o movimento sobre o mesmo Id sao recusados; o movimento do proprio saldo segue.
+            var doCadastro = new[] { pedido.Mutations[0].Id }.Concat(pedido.Mutations.Skip(2).Select(m => m.Id)).ToList();
+            resultado.Rejected!.Select(r => r.MutationId).Should().BeEquivalentTo(doCadastro);
+            resultado.Rejected.Should().Contain(r => r.MutationId == pedido.Mutations[0].Id && r.Reason == "Cadastro indisponivel para esta empresa.");
+            resultado.AcceptedIds.Should().Equal(pedido.Mutations[1].Id);
         }
 
         await ConferirAsync();
         // Reenvia os MESMOS MutationIds, inclusive o cadastro que perdeu a corrida.
-        (await clientA.PostAsJsonAsync("/api/mobile/sync", pedidoA)).StatusCode.Should().Be(respostas[0].StatusCode);
-        (await clientB.PostAsJsonAsync("/api/mobile/sync", pedidoB)).StatusCode.Should().Be(respostas[1].StatusCode);
+        (await clientA.PostAsJsonAsync("/api/mobile/sync", pedidoA)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await clientB.PostAsJsonAsync("/api/mobile/sync", pedidoB)).StatusCode.Should().Be(HttpStatusCode.OK);
         await ConferirAsync();
 
         async Task ConferirAsync()
@@ -167,10 +184,10 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             var saldos = await db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                 .Where(p => p.Id == saldoA || p.Id == saldoB).ToDictionaryAsync(p => p.Id);
-            saldos[saldoA].Stock.Should().Be(mesmasMutacoes || respostas[0].StatusCode == HttpStatusCode.OK ? 7 : 5);
+            saldos[saldoA].Stock.Should().Be(7);
             saldos[saldoA].EmpresaId.Should().Be(empresaA);
             saldos[saldoA].LojaId.Should().Be(lojaA);
-            saldos[saldoB].Stock.Should().Be(!mesmasMutacoes && respostas[1].StatusCode == HttpStatusCode.OK ? 8 : 5);
+            saldos[saldoB].Stock.Should().Be(mesmasMutacoes ? 5 : 8);
             saldos[saldoB].EmpresaId.Should().Be(empresaB);
             saldos[saldoB].LojaId.Should().Be(lojaB);
             var registros = tipo == "product"
@@ -181,18 +198,18 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
             ((dono.EmpresaId == empresaA && dono.LojaId == lojaA) || (dono.EmpresaId == empresaB && dono.LojaId == lojaB)).Should().BeTrue();
             if (!mesmaEmpresa)
             {
-                dono.EmpresaId.Should().Be(respostas[0].StatusCode == HttpStatusCode.OK ? empresaA : empresaB);
-                dono.LojaId.Should().Be(respostas[0].StatusCode == HttpStatusCode.OK ? lojaA : lojaB);
+                dono.EmpresaId.Should().Be(aVenceu ? empresaA : empresaB);
+                dono.LojaId.Should().Be(aVenceu ? lojaA : lojaB);
             }
             if (tipo == "product")
             {
                 var saldoDependente = await db.Set<Product>().IgnoreQueryFilters().Where(p => p.Id == id).Select(p => p.Stock).SingleAsync();
-                saldoDependente.Should().Be(mesmasMutacoes ? 2 : mesmaEmpresa ? 5 : respostas[0].StatusCode == HttpStatusCode.OK ? 2 : 3,
+                saldoDependente.Should().Be(mesmasMutacoes ? 2 : mesmaEmpresa ? 5 : aVenceu ? 2 : 3,
                     "a delta do produto criado no mesmo lote nao pode ser perdida nem duplicada");
             }
             var mutationIds = pedidoA.Mutations.Concat(pedidoB.Mutations).Select(m => m.Id).Distinct().ToList();
-            var esperados = new[] { pedidoA, pedidoB }.Zip(respostas).Where(par => par.Second.StatusCode == HttpStatusCode.OK)
-                .SelectMany(par => par.First.Mutations).Select(m => m.Id).Distinct().Count();
+            // Aceitas e recusadas ficam gravadas pelo MutationId; o reenvio repete a mesma resposta.
+            var esperados = mutationIds.Count;
             (await db.MobileProcessedMutations.IgnoreQueryFilters().CountAsync(m => mutationIds.Contains(m.MutationId))).Should().Be(esperados);
         }
     }

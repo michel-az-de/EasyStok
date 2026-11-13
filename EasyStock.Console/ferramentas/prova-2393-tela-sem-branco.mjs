@@ -30,7 +30,12 @@ assert.match(main, /instalarFalhaGlobal\(window\)/, 'main.jsx instala os handler
 assert.match(ler('src/componentes/LimiteDeErro.jsx'), /Recarregar'/, 'a raiz oferece "Recarregar"')
 const app = ler('src/app/App.jsx')
 assert.equal((app.match(/<LimiteDeErro parte="Início"><HallDeModulos/g) ?? []).length, 2, 'App.jsx: os dois Halls ficam em LimiteDeErro')
-assert.match(app, /<LimiteDeErro parte="Janela aberta">[\s\S]*PainelGaleria[\s\S]*ModalEncerrar[\s\S]*<\/LimiteDeErro>/, 'App.jsx: os modais ficam em LimiteDeErro')
+// #2440: um limite só para todas as janelas, sem key, deixava uma janela quebrada travar as outras e o "Encerrar".
+const janelas = app.match(/<LimiteDeErro key=\{[^}]+\} parte="Janela aberta">([\s\S]*?)<\/LimiteDeErro>/)
+assert.ok(janelas, 'App.jsx: o limite das janelas tem key (troca de janela remonta o limite)')
+assert.match(janelas[1], /PainelGaleria/, 'App.jsx: as janelas ficam em LimiteDeErro')
+assert.doesNotMatch(janelas[1], /ModalEncerrar/, 'App.jsx: o ModalEncerrar não divide o limite das janelas')
+assert.match(app, /<LimiteDeErro key=\{[^}]+\} parte="Encerramento">\s*\{encerrando && \(\s*<ModalEncerrar/, 'App.jsx: o ModalEncerrar tem limite próprio, com key')
 
 // 2. Falha global
 const { criarFaixaDeFalha, instalarFalhaGlobal, TEXTO_DA_FALHA } = await import('../src/infra/falhaGlobal.js')

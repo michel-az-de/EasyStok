@@ -79,7 +79,7 @@ function custoInformado({ preco, quantidade, unidadeCompra, unidade, custo }) {
   if (vazio(preco)) return { custo: lerCusto(custo) }
   const valor = lerCusto(preco)
   if (!Number.isFinite(valor) || valor < 0) return { erro: 'Preço pago inválido.' }
-  if (!temAteDuasCasas(valor)) return { erro: 'Informe o preço pago com até duas casas decimais.' }
+  if (!temAteDuasCasas(valor)) return { erro: 'Informe o preço pago com até duas casas decimais. Para custo abaixo de um centavo, informe o preço da embalagem maior (ex.: R$ 4,50 por 1 kg).' }
   const qtd = numeroOuNulo(quantidade)
   if (!(qtd > 0)) return { erro: 'Informe quanto veio na compra.' }
   return { custo: custoPelaCompra({ preco: valor, quantidade: qtd, unidadeCompra: unidadeCompra || unidade, unidade }) }
