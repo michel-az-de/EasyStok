@@ -8,7 +8,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { lerMoeda } from '../../../dominio/formato'
-import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
+import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, categoriasRaiz, subcategoriasDe, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
 const pessoa = [{ valor: 'fisica', rotulo: 'Pessoa física' }, { valor: 'juridica', rotulo: 'Pessoa jurídica' }]
@@ -68,6 +68,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const documento = (rotulo) => campo('documento', rotulo, { value: documentoNaTela(dados.documento), onChange: e => mudar('documento', mesmoDocumento(e.target.value) ? inicial.documento : e.target.value) })
   const area = (chave, rotulo) => <div className={css.larguraTotal}><CampoArea rotulo={rotulo} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} erro={erroDo(chave)} /></div>
   const selecao = (chave, rotulo, opcoes) => <Combobox rotulo={rotulo} obrigatorio={obrigatorio(chave)} valor={dados[chave]} aoMudar={valor => mudar(chave, valor)} opcoes={opcoes} erro={erros[chave]} disabled={salvando || !podeEditar} />
+  const subcategorias = tela === 'produtos' ? subcategoriasDe(categorias, dados.categoriaId) : []
   const dinheiro = (chave, rotulo) => <CampoReais rotulo={rotulo} centavos={dados[chave] == null ? null : Math.round(dados[chave] * 100)} aoMudar={valor => mudar(chave, valor == null ? null : valor / 100)} ler={lerMoeda} erro={erros[chave]} />
 
   async function carregarVersaoAtual() {
@@ -166,7 +167,8 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
           {area('observacoes', 'Observações')}
         </>}
         {tela === 'produtos' && <>
-          {selecao('categoriaId', 'Categoria', categorias.filter(c => !c.categoriaPaiId).map(c => ({ valor: c.id, rotulo: c.nome })))}
+          {selecao('categoriaId', 'Categoria', categoriasRaiz(categorias))}
+          {subcategorias.length > 0 && <Combobox rotulo="Subcategoria" valor={dados.subcategoriaId ?? ''} aoMudar={valor => mudar('subcategoriaId', valor)} opcoes={subcategorias} disabled={salvando || !podeEditar} />}
           {erroCategorias && <div className={css.erro}><p>{erroCategorias}</p><Botao onClick={() => recarregarCategorias(n => n + 1)}>Carregar categorias</Botao></div>}
           {selecao('tipo', 'Tipo de produto', tiposProduto)}{campo('marca', 'Marca')}
           {campo('skuBase', 'Código interno (SKU)')}{campo('codigoBarras', 'Código de barras')}
