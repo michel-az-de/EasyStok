@@ -123,6 +123,32 @@ public class AtualizarStatusPedidoUseCaseTests
         pedido.Status.Should().Be("entregue");
     }
 
+    // #2441: a conferência do saldo roda dentro da transação e tem de usar o token dela, não CancellationToken.None.
+    [Fact]
+    public async Task Entregue_ConferenciaDoSaldo_UsaOTokenDaTransacao()
+    {
+        var pedidos = Substitute.For<IPedidoRepository>();
+        pedidos.ListarEstornosManuaisAsync(default, default, default).ReturnsForAnyArgs([]);
+        var estornos = Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository>();
+        estornos.ListarAsync(default, default, default).ReturnsForAnyArgs([]);
+        estornos.RecebimentosAsync(default, default, default).ReturnsForAnyArgs([]);
+        var creditos = Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICreditoClienteComandaRepository>();
+        creditos.TotaisDoPedidoAsync(default, default, default).ReturnsForAnyArgs((0m, 0m));
+        var (uc, repo, _, _, uow, _) = Build(saldos: new SaldoFinanceiroPedido(pedidos, estornos, creditos));
+        using var cts = new CancellationTokenSource();
+        uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(cts.Token));
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 5, "saiu_para_entrega");
+        pedido.Total = Dinheiro.FromDecimal(50m);
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 50m });
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "entregue", ConferirSaldoNaEntrega: true));
+
+        await pedidos.Received().ListarEstornosManuaisAsync(empresaId, pedido.Id, cts.Token);
+    }
+
     // #1863: o lote da fila offline (status-lote) não é porta lateral da trava; recusa o item com o código
     // e o valor, e os demais itens seguem.
     [Fact]

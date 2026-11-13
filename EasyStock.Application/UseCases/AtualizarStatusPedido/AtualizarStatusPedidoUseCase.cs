@@ -117,7 +117,7 @@ public class AtualizarStatusPedidoUseCase(
             // #1776 (item 19): o toque de "Marcar entregue" do console (Cozinha, Balcão) confere o saldo; com valor a
             // receber, só com a confirmação de quem marca. Balcão, PWA e mobile seguem como antes (não pedem conferência).
             if (statusNovo == StatusPedido.Entregue && cmd.ConferirSaldoNaEntrega && saldos is not null)
-                await saldos.ExigirQuitadoParaEntregarAsync(pedido, cmd.SaldoAReceberConfirmado, CancellationToken.None);
+                await saldos.ExigirQuitadoParaEntregarAsync(pedido, cmd.SaldoAReceberConfirmado, ct);
 
             statusAntigoStr = pedido.Status;
             var eraEstoqueDescontado = PedidoStateMachine.DescontaEstoque(statusAtual);
