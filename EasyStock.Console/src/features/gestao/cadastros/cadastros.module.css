@@ -9,11 +9,17 @@
 .abas { display: flex; gap: var(--e-2); flex-wrap: wrap; padding: var(--e-3); border-bottom: 1px solid var(--linha); }
 .abas [aria-pressed='true'] { background: var(--marca-claro); color: var(--marca-forte); border-color: var(--marca); }
 .filtros { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 240px) auto; gap: var(--e-3); align-items: end; padding: var(--e-4); }
+/* #2495 (S1): Situação e Ordem lado a lado, Atualizar na mesma linha. */
+.filtros.comOrdem { grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(160px, 220px)) auto; }
 .lista { overflow: auto; max-height: 62vh; min-width: 0; }
 .lista table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--t-apoio); }
 .lista th { padding: var(--e-3) var(--e-4); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; background: var(--elevado); }
 .lista td { border-top: 1px solid var(--linha); padding: var(--e-4); vertical-align: middle; overflow-wrap: anywhere; }
 .lista th:first-child { width: 38%; }
+/* #2495 (S1): o cabeçalho Nome ordena; alvo de 44px e foco visível. */
+.ordenar { display: inline-flex; align-items: center; gap: var(--e-2); min-height: 44px; margin: calc(var(--e-3) * -1) 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.ordenar:hover { color: var(--tinta); }
+.ordenar:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .lista td small { display: block; margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-micro); }
 .clicavel { cursor: pointer; }
 .clicavel:hover td { background: var(--elevado); }
@@ -57,7 +63,7 @@
 @media (max-width: 700px) {
   .cabecalho { align-items: stretch; flex-direction: column; }
   .cabecalho h2 { font-size: var(--t-valor); }
-  .filtros { grid-template-columns: minmax(0, 1fr); padding: var(--e-3); }
+  .filtros, .filtros.comOrdem { grid-template-columns: minmax(0, 1fr); padding: var(--e-3); }
   .lista table { table-layout: fixed; }
   .lista th, .lista td { padding: var(--e-3) var(--e-2); }
   .lista th:first-child { width: 39%; }

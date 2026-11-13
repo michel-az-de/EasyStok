@@ -1,17 +1,17 @@
 import { chamarApi } from './cliente'
 import { identidadeDaSessao, lerSessao } from './sessao'
-import { chaveDeCriacaoCadastro, corpoCliente, corpoFornecedor, corpoProduto, TAMANHO_PAGINA_CADASTRO, termoBuscaCadastro } from '../../dominio/cadastros'
+import { chaveDeCriacaoCadastro, corpoCliente, corpoFornecedor, corpoProduto, parametrosDaOrdem, TAMANHO_PAGINA_CADASTRO, termoBuscaCadastro } from '../../dominio/cadastros'
 
 const rotas = { clientes: '/api/clientes', produtos: '/api/produtos', fornecedores: '/api/fornecedores', bancos: '/api/cadastros/contas-bancarias', pagamentos: '/api/cadastros/metodos-pagamento', modelos: '/api/notificacoes/templates', etiquetas: '/api/etiquetas/templates' }
 export const contextoCadastro = () => { const sessao = lerSessao(); return { empresaId: sessao?.empresa?.id, identidade: identidadeDaSessao(sessao) } }
 const opcoes = (contexto, sinal) => ({ identidadeEsperada: contexto.identidade, sinal, prazoComCancelamento: true })
 const query = (dados) => new URLSearchParams(Object.entries(dados).filter(([, v]) => v !== '' && v !== null && v !== undefined)).toString()
 
-export async function listarCadastro(tela, { busca = '', pagina = 1, filtro = '', relacionamento = '' }, contexto, sinal) {
+export async function listarCadastro(tela, { busca = '', pagina = 1, filtro = '', relacionamento = '', ordem = '' }, contexto, sinal) {
   const simples = ['bancos', 'pagamentos', 'etiquetas'].includes(tela)
   const pesquisaProduto = tela === 'produtos' && busca.trim()
   const parametros = simples ? '' : query({ empresaId: contexto.empresaId, page: pagina, pageSize: TAMANHO_PAGINA_CADASTRO,
-    ...(pesquisaProduto ? { termo: busca, limite: 100 } : { search: termoBuscaCadastro(busca) }),
+    ...(pesquisaProduto ? { termo: busca, limite: 100 } : { search: termoBuscaCadastro(busca), ...parametrosDaOrdem(tela, ordem) }),
     ...(['clientes', 'fornecedores'].includes(tela) && filtro ? { ativo: filtro === 'ativos' } : {}),
     ...(tela === 'clientes' && relacionamento ? { relacionamento } : {}),
     ...(tela === 'produtos' && filtro ? { status: filtro === 'ativos' ? 'Ativo' : 'Inativo' } : {}),

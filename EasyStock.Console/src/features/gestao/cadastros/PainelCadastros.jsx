@@ -13,7 +13,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
-import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, situacaoDaLinha, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
+import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
 import { ModelosCadastro } from './ModelosCadastro'
 import { MetodosCadastro } from './MetodosCadastro'
@@ -47,16 +47,16 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const { selecionar, carregarClienteDaConversa } = useAcoes()
   const chave = chaveContextoCadastro(tela, conversa?.id)
   const [editor, guardarEditor] = useRascunhoDoAjuste(chave)
-  const [memoria, guardarVisual] = useContextoVisualCadastro(chave, contexto.identidade, { busca: '', pagina: 1, filtro: '', tipo: 'todos', posicao: 0 })
-  const { busca, pagina, filtro, tipo } = memoria
+  const [memoria, guardarVisual] = useContextoVisualCadastro(chave, contexto.identidade, { busca: '', pagina: 1, filtro: '', tipo: 'todos', ordem: '', posicao: 0 })
+  const { busca, pagina, filtro, tipo, ordem = '' } = memoria
   const definir = (valores) => {
     const { editor: novoEditor, ...visuais } = valores
     if (Object.hasOwn(valores, 'editor')) guardarEditor(novoEditor)
-    if (['busca', 'pagina', 'filtro', 'tipo'].some(campo => Object.hasOwn(visuais, campo))) aoFixarConsulta()
+    if (['busca', 'pagina', 'filtro', 'tipo', 'ordem'].some(campo => Object.hasOwn(visuais, campo))) aoFixarConsulta()
     if (Object.keys(visuais).length) guardarVisual({ ...memoria, ...visuais })
   }
   const soLeads = tela === 'clientes' && tipo === 'sem-cadastro'
-  const consulta = useListaCadastros(tela, { busca, pagina, filtro, relacionamento: tela === 'clientes' && ['lead', 'cliente'].includes(tipo) ? tipo : '' }, contexto, !soLeads)
+  const consulta = useListaCadastros(tela, { busca, pagina, filtro, ordem, relacionamento: tela === 'clientes' && ['lead', 'cliente'].includes(tipo) ? tipo : '' }, contexto, !soLeads)
   const [aviso, avisar] = useState(null)
   const [reversao, prepararReversao] = useState(null)
   const [desfazendo, iniciarDesfazer] = useGravacaoDoAjuste(`cadastros:bancos:${reversao?.id}`)
@@ -67,6 +67,9 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const podeEditar = !CHAVE_EDICAO[tela] || acoes[CHAVE_EDICAO[tela]] === true
   const leads = filtrarSemCadastro(conversas ?? [], busca)
   const lista = soLeads ? leads : consulta.itens
+  // #2495 (S1, I6): a busca de produto usa outra rota, sem ordem; ali a escolha fica parada.
+  const ordenavel = !soLeads && Boolean(ORDENS_CADASTRO[tela]) && !(tela === 'produtos' && busca.trim())
+  const ordenar = (valor) => definir({ ordem: valor, pagina: 1, posicao: 0 })
   useEffect(() => () => pedido.current?.abort(), [])
   useEffect(() => { if (tabela.current && !consulta.carregando) tabela.current.scrollTop = memoria.posicao ?? 0 }, [consulta.carregando])
 
@@ -124,16 +127,18 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
     {(erro || consulta.erro) && <div className={css.erro} role="alert"><p>{erro || consulta.erro}</p><Botao onClick={() => { falhar(null); consulta.recarregar() }}>Tentar de novo</Botao></div>}
     <div className={css.superficie}>
       {tela === 'clientes' && <div className={css.abas} aria-label="Pessoas">{[['todos', 'Todos'], ['lead', 'Leads'], ['cliente', 'Clientes'], ['sem-cadastro', 'Sem cadastro']].map(([valor, rotulo]) => <Botao key={valor} aria-pressed={tipo === valor} onClick={() => definir({ tipo: valor, pagina: 1, filtro: '', posicao: 0 })}>{rotulo}</Botao>)}</div>}
-      <div className={css.filtros}>
+      <div className={!soLeads && ORDENS_CADASTRO[tela] ? `${css.filtros} ${css.comOrdem}` : css.filtros}>
         {soLeads ? <CampoTexto rotulo="Buscar" placeholder="Nome ou telefone" value={busca} onChange={e => definir({ busca: e.target.value, pagina: 1, posicao: 0 })} /> : <BuscaComSugestoes placeholder={TEXTOS_CADASTRO[tela].busca} valor={busca} aoMudar={valor => definir({ busca: valor, pagina: 1, posicao: 0 })} carregando={consulta.carregando}
           opcoes={consulta.busca === busca ? lista.slice(0, 6).map(item => ({ id: item.id ?? item.produtoId, rotulo: nome(item), descricao: telefone(item) || emailCadastro(item) || item.marca || item.instituicao, item })) : []} aoEscolher={editar} />}
         {!soLeads && ['clientes', 'produtos', 'fornecedores'].includes(tela) && <Combobox rotulo="Situação" valor={filtro} opcoes={FILTROS} aoMudar={valor => definir({ filtro: valor, pagina: 1, posicao: 0 })} />}
+        {!soLeads && ORDENS_CADASTRO[tela] && <Combobox rotulo="Ordem" valor={ordem} opcoes={ORDENS_CADASTRO[tela]} disabled={!ordenavel} aoMudar={ordenar} />}
         <Botao icone="refresh-cw" disabled={consulta.carregando || soLeads} onClick={consulta.recarregar}>Atualizar</Botao>
       </div>
       {consulta.carregando && !soLeads ? <Vazio titulo="Carregando cadastros">Aguarde um instante.</Vazio> : lista.length === 0 ? <Vazio titulo={busca ? 'Nenhum resultado para esta busca' : soLeads ? 'Nenhum contato sem cadastro nesta lista de conversas' : 'Nenhum cadastro encontrado'}
         acao={busca ? <Botao onClick={() => definir({ busca: '', pagina: 1, posicao: 0 })}>Limpar busca</Botao> : !soLeads && podeEditar ? <Botao variante="primario" icone="mais" onClick={novo}>{TEXTOS_CADASTRO[tela].novo}</Botao> : undefined}>
         {busca ? 'Tente outro nome ou contato.' : soLeads ? 'As pessoas que ainda não têm cadastro aparecem aqui ao chegar no Atendimento.' : TEXTOS_CADASTRO[tela].vazio}</Vazio> : <div ref={tabela} className={css.lista} onScroll={e => definir({ posicao: e.currentTarget.scrollTop })}>
-        <table><thead><tr><th>{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th><th>{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th>Situação</th><th><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
+        <table><thead><tr>{ordenavel ? <th aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={14} /></button></th>
+          : <th>{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th>}<th>{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th>Situação</th><th><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
           const id = item.id ?? item.produtoId
           const c = soLeads ? item : (conversas ?? []).find(c => c.clienteId === id)
           const situacao = situacaoDaLinha(tela, item, soLeads)
