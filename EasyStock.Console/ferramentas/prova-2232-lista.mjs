@@ -77,6 +77,8 @@ confere('L7  avatar sem "!" e iniciais só de letras', () => {
   // #2420: o traço lateral saiu; atenção e atraso ficam nos ícones ao lado da hora.
   assert.doesNotMatch(css, /\.cartao[^{}]*::before/)
   assert.match(regra('.sinalAtencao'), /color:\s*var\(--alerta\)/)
+  // #2427: sem o traço vermelho, o motivo `perigo` (`.atrasada`) mantém a gravidade no ícone.
+  assert.match(regra('.cartao.atrasada .sinalAtencao'), /color:\s*var\(--erro\)/)
 })
 
 confere('L8  hora da lista: "21:48" hoje, "ontem", "26 out"', () => {

@@ -32,7 +32,7 @@
 .cartao { position: relative; }
 /* Avatar com o selo do canal no canto (rodada 6c). */
 .avatarCartao { position: relative; flex-shrink: 0; margin-top: 1px; }
-/* O prazo vencido mantém o trilho e o texto acessível, sem piscar. */
+/* O prazo vencido mantém o ícone e o texto acessível, sem piscar. */
 .cartao.slaEstourado { box-shadow: none; }
 .cartao.slaEstourado[aria-current='true'] { box-shadow: none; }
 
@@ -216,7 +216,9 @@
 
 /* #2185 (R04): o número é a `Pilula contagem`; aqui só a entrada do contador de mensagens sem resposta. */
 .naoLidas { animation: estalarPonto var(--dur-longa) var(--ease-pulo) both; }
-/* #2258 (T7): ícone ao lado da hora. A cor do trilho lateral não é o único sinal do prazo estourado
-   (vermelho) nem da vez da equipe (âmbar). */
+/* #2258 (T7): ícone ao lado da hora, com nome acessível: a cor não é o único sinal do prazo
+   estourado (vermelho) nem da vez da equipe (âmbar). */
 .sinalPrazo { flex-shrink: 0; display: inline-grid; place-items: center; color: var(--erro); line-height: 0; }
 .sinalAtencao { color: var(--alerta); }
+/* #2427: o motivo `perigo` era o traço vermelho; sem o traço, a gravidade fica no ícone. */
+.cartao.atrasada .sinalAtencao { color: var(--erro); }

@@ -169,6 +169,8 @@ confere('4  restrição de formato permanece acessível e problemas de envio con
   assert.match(composer, /motivo: motivoDeFormato\(canal, 'foto'\)/)
   assert.match(composer, /motivo: !podeAnexar \? restricao : null/)
   assert.match(composer, /\{motivo && \([\s\S]*?<(?:p|div) className=\{`\$\{css\.bloqueio\}[^`]*`\}>[\s\S]*?<strong>\{motivo\.titulo\}<\/strong>\s*<span>\{motivo\.detalhe\}<\/span>/, 'bloqueio e janela fora do prazo não ficam só no leitor de tela')
+  // #2427: com a janela fechada, Escolher modelo fica no aviso, e só quando o modelo pode sair.
+  assert.match(composer, /\{motivo\.acao === 'janela' && podeEnviarModelo && aoAbrirModelos && \(\s*<Botao className=\{css\.escolherModelo\} aria-haspopup="dialog" onClick=\{aoAbrirModelos\}>\s*<Icone nome="modelo" \/> Escolher modelo/)
   for (const erro of ['erroAnexo', 'variavelSobrando']) assert.match(composer, new RegExp(`\\{${erro} && <p className=\\{css\\.restricao\\} role="alert">\\{${erro}\\}`))
   assert.match(composer, /\{erroAssumir && <p className=\{css\.erroAssumir\} role="alert">\{erroAssumir\}/)
   const css = fonte('features/atendimento/atendimento.module.css')

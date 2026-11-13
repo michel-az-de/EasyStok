@@ -282,14 +282,13 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
           {aDevolver > 0 && <p className={css.saldoFicha}>{moeda(aDevolver)} a devolver</p>}
           {/* #2420: a ação de montar mora dentro do cartão da comanda. */}
           {editavel && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
+          {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. #2427: no cartão. */}
+          {editavel && fonteApi && posVenda && novaComanda && (
+            <div className={css.acaoMontar}>
+              <Botao largo variante="secundario" icone="plus" onClick={() => novaComanda(selecionada.id)}>Nova comanda</Botao>
+            </div>
+          )}
         </section>
-
-        {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. */}
-        {editavel && fonteApi && posVenda && novaComanda && (
-          <div className={css.acaoMontar}>
-            <Botao largo variante="secundario" icone="plus" onClick={() => novaComanda(selecionada.id)}>Nova comanda</Botao>
-          </div>
-        )}
         <nav className={css.acessosFicha} aria-label="Detalhes do atendimento">
           {pedido && <AcessoDaFicha painel={comandaMovel.chave} icone="shopping-cart" titulo={editavel ? tituloPedido : 'Consultar pedido vinculado'}
             resumo={editavel ? faixa || 'Itens, horário e acompanhamento' : 'Consultar sem alterar o pedido'} aoAbrir={abrirComanda} />}

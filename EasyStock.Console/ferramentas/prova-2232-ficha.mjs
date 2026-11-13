@@ -225,6 +225,19 @@ confere('F7  a barra do pedido não tem mais o ⋮ ao lado de "Marcar pago"', ()
   assert.doesNotMatch(fonte('features/ficha-cliente/BarraProximoPasso.jsx'), /MenuDoPedido/)
   assert.equal(existsSync(new URL('../src/features/ficha-cliente/MenuDoPedido.jsx', import.meta.url)), false)
 })
+confere('F8  a comanda não cola nas Notas quando a lista de acessos está vazia (#2427)', () => {
+  const regras = fonte('features/ficha-cliente/ficha.module.css')
+  // `.acessosFicha:empty` sai do grid; a margem que cancela o gap só vale com a lista visível.
+  assert.match(regras, /\.acessosFicha:empty \{ display: none; \}/)
+  assert.doesNotMatch(regras, /\.acessosFicha \+/, 'margem negativa só depois de lista com itens')
+  assert.match(regras, /\.acessosFicha:not\(:empty\) \+ \.notasDaFicha/)
+})
+confere('F8  Nova comanda fica dentro do cartão da comanda, como a ação de montar (#2427)', () => {
+  const painel = fonte('features/ficha-cliente/PainelFicha.jsx')
+  const cartao = painel.match(/<section ref=\{receberPrato\} className=\{css\.resumoAtual\}[\s\S]*?<\/section>/)?.[0] ?? ''
+  assert.match(cartao, />Nova comanda<\/Botao>/)
+  assert.match(cartao, /editavel && acaoMontar && <div className=\{css\.acaoMontar\}>/)
+})
 confere('F7  as ações do pedido moram no menu do cabeçalho e abrem a mesma confirmação da barra', () => {
   const acoes = ficha.acoesDoPedido({ pedido: pedidoDemo(), fonteApi: false })
   assert.equal(acoes.podeEstornar, true)
