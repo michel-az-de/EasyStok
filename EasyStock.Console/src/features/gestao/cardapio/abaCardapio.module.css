@@ -25,6 +25,13 @@
 .semQuebra { white-space: nowrap; }
 .acoesDireita { display: flex; justify-content: flex-end; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 
+/* #2424: categorias antigas sem caixa: título, estado em âmbar, nomes com divisórias e a ação no fim. */
+.antigas { display: grid; gap: var(--e-2); min-width: 0; }
+.cabecalhoAntigas { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2) var(--e-3); flex-wrap: wrap; }
+.pendenteConversao { color: var(--marca-forte); font-size: var(--t-apoio); font-weight: 650; }
+.nomesAntigos { list-style: none; margin: var(--e-2) 0 0; padding: 0; border-top: var(--b-1) solid var(--linha); }
+.nomesAntigos li { padding: var(--e-3) 0; border-bottom: var(--b-1) solid var(--linha); color: var(--tinta); font-size: var(--t-corpo); overflow-wrap: anywhere; }
+.converter { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding-top: var(--e-2); }
 .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .acoesFormulario { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding-top: var(--e-4); border-top: var(--b-1) solid var(--linha); }
 .acoesReceita { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
