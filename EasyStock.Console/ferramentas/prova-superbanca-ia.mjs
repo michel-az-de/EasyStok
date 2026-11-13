@@ -164,6 +164,16 @@ for (const alteracao of [{ clienteId: 'cliente-b' }, { vinculoRevisao: 1 }, { es
     h.desmontar()
   })
 }
+await provar('#2446 (M9): mensagem nova na mesma conversa não apaga a pergunta que a dona está digitando', async () => {
+  const base = props()
+  const h = new Hospedeiro(useConversaAssistente, base)
+  h.resultado.setPergunta('Ela pediu sem cebola?'); h.renderizar()
+  h.renderizar({ ...base, conversa: { ...conversa, mensagens: [{ id: 'nova', dir: 'in', texto: 'Oi, mudei o pedido' }] } })
+  assert.equal(h.resultado.pergunta, 'Ela pediu sem cebola?')
+  h.renderizar({ ...base, conversa: { ...conversa, id: 'b', nome: 'Bruno fixture' } })
+  assert.equal(h.resultado.pergunta, '', 'outra conversa começa com o campo vazio')
+  h.desmontar()
+})
 await provar('Resposta vazia permite retry e indisponibilidade não expõe configuração de servidor', async () => {
   const h = new Hospedeiro(useConversaAssistente, props({ perguntar: async () => ({ texto: '', acoes: [] }) }))
   assert.equal(await perguntarNo(h, 'Uma pergunta'), false)

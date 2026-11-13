@@ -29,9 +29,13 @@ export function useConversaAssistente({ conversa, historico, perguntar, executar
   useLayoutEffect(() => { contextoRef.current = chaveContexto }, [chaveContexto])
   const contextoAtual = () => contextoRef.current === chaveContexto && identidadeDaAssistencia() === identidade
 
+  // #2446 (M9): a revisão do contexto muda a cada mensagem nova. Ela invalida respostas e propostas, mas o texto
+  // que a dona ainda está digitando só some quando muda a conversa ou a sessão.
+  const [escopo, setEscopo] = useState(() => JSON.stringify([identidade, conversa?.id ?? null]))
+  const escopoAtual = JSON.stringify([identidade, conversa?.id ?? null])
   if (contexto !== chaveContexto) {
     setContexto(chaveContexto)
-    setPergunta('')
+    if (escopo !== escopoAtual) { setEscopo(escopoAtual); setPergunta('') }
     setTrocas([])
     setPerguntando(false)
   }
