@@ -16,7 +16,7 @@ public class ObterDiasAlertaParadoUseCase(
             return new ObterDiasAlertaParadoResult(config.DiasItemParado);
         }
 
-        var configuracao = await configuracaoLojaRepository.GetByLojaIdAsync(cmd.LojaId.Value);
+        var configuracao = await configuracaoLojaRepository.GetDaLojaAsync(cmd.EmpresaId, cmd.LojaId.Value);
         var dias = configuracao?.DiasAlertaParado ?? config.DiasItemParado;
 
         logger.LogInformation("Retrieved idle item alert days for loja {LojaId}: {Dias}", cmd.LojaId, dias);

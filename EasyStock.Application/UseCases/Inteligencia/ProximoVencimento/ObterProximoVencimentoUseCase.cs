@@ -16,7 +16,7 @@ public class ObterProximoVencimentoUseCase(
         var stopwatch = Stopwatch.StartNew();
 
         var configuracao = cmd.LojaId.HasValue
-            ? await configuracaoRepository.GetByLojaIdAsync(cmd.LojaId.Value).ConfigureAwait(false)
+            ? await configuracaoRepository.GetDaLojaAsync(cmd.EmpresaId, cmd.LojaId.Value).ConfigureAwait(false)
             : null;
 
         var diasEfetivos = cmd.Dias
