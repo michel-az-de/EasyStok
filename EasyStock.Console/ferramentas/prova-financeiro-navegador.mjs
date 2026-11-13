@@ -66,8 +66,10 @@ async function capturarTela(page, modulo, tela, tema) {
 // #1871: o Sair e quem está logado moram atrás do avatar; a prova abre o menu da conta e confere os dois.
 async function conferirSessao(page) {
   // #2258 (A9): em qualquer largura não há Sair solto; ele e a conta moram atrás do avatar à vista.
-  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 0)
+  // #2432: depois de um reload, a tela "Carregando seus módulos" tem Sair próprio; conte só com o shell no ar.
   const avatar = page.getByRole('button', { name: /^Conta de / }).locator('visible=true').first()
+  await avatar.waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 0)
   await avatar.click()
   const camada = page.getByRole('group', { name: 'Conta', exact: true })
   assert.equal(await camada.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
