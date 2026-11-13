@@ -39,10 +39,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
+                var padrao = PadraoILike.Contendo(termo);
                 q = q.Where(l =>
-                    EF.Functions.ILike(l.Codigo, $"%{termo}%") ||
-                    (l.OperadorNome != null && EF.Functions.ILike(l.OperadorNome, $"%{termo}%")) ||
-                    (l.Observacoes != null && EF.Functions.ILike(l.Observacoes, $"%{termo}%")));
+                    EF.Functions.ILike(l.Codigo, padrao, PadraoILike.Escape) ||
+                    (l.OperadorNome != null && EF.Functions.ILike(l.OperadorNome, padrao, PadraoILike.Escape)) ||
+                    (l.Observacoes != null && EF.Functions.ILike(l.Observacoes, padrao, PadraoILike.Escape)));
             }
 
             var total = await q.CountAsync();

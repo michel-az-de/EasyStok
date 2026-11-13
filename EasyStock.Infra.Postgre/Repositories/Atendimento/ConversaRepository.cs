@@ -169,13 +169,13 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         if (!string.IsNullOrWhiteSpace(busca))
         {
             var termo = busca.Trim();
-            var padrao = $"%{BuscaTextual.Normalizar(termo)}%";
+            var padrao = PadraoILike.Contendo(BuscaTextual.Normalizar(termo));
             var digitos = BuscaTextual.DigitosTelefone(termo);
             var buscaId = Guid.TryParse(termo, out var id);
             var buscaNumero = long.TryParse(termo.TrimStart('#'), out var numero);
             query = query.Where(c => (buscaId && c.Id == id) || (buscaNumero && c.NumeroComanda == numero)
-                                     || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto((c.ContatoNome ?? string.Empty).ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao)
-                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao)
+                                     || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto((c.ContatoNome ?? string.Empty).ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)
+                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao, PadraoILike.Escape)
                                      || (digitos.Length >= 3 && EasyStockDbContext.TraduzirTexto(c.ContatoIdExterno, BuscaTextual.MascaraTelefone, "").Contains(digitos)));
         }
 

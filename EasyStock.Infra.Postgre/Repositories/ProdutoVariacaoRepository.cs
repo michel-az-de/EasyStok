@@ -38,7 +38,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
-            var pattern = $"%{termo}%";
+            var pattern = PadraoILike.Contendo(termo);
 
             CodigoSku? skuExato = null;
             try { skuExato = CodigoSku.From(termo); } catch (ArgumentException) { /* termo invalido para SKU */ }
@@ -46,12 +46,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             return await dbContext.ProdutosVariacao
                 .AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId &&
-                    (EF.Functions.ILike(v.Nome, pattern) ||
-                     (v.Cor != null && EF.Functions.ILike(v.Cor, pattern)) ||
-                     (v.Tamanho != null && EF.Functions.ILike(v.Tamanho, pattern)) ||
-                     (v.DescricaoComercial != null && EF.Functions.ILike(v.DescricaoComercial, pattern)) ||
+                    (EF.Functions.ILike(v.Nome, pattern, PadraoILike.Escape) ||
+                     (v.Cor != null && EF.Functions.ILike(v.Cor, pattern, PadraoILike.Escape)) ||
+                     (v.Tamanho != null && EF.Functions.ILike(v.Tamanho, pattern, PadraoILike.Escape)) ||
+                     (v.DescricaoComercial != null && EF.Functions.ILike(v.DescricaoComercial, pattern, PadraoILike.Escape)) ||
                      (skuExato != null && v.Sku == skuExato) ||
-                     (v.CodigoBarras != null && EF.Functions.ILike(v.CodigoBarras, pattern))))
+                     (v.CodigoBarras != null && EF.Functions.ILike(v.CodigoBarras, pattern, PadraoILike.Escape))))
                 .Take(maxResults)
                 .ToListAsync();
         }
