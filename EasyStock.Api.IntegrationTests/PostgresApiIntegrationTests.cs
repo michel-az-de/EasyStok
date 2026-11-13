@@ -348,6 +348,48 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         );
     }
 
+    // ─── Idempotência na criação de cadastro (#2462) ──────────────────────────
+
+    [SkippableFact]
+    public async Task Criar_fornecedor_duas_vezes_com_a_mesma_chave_grava_um_so_e_o_segundo_e_replay()
+    {
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
+        Skip.IfNot(await SeedDemoDisponivelAsync(),
+            "Seed demo (admin) indisponível neste ambiente — fluxo autenticado web→API pulado.");
+
+        await using var factory = CriarFactory();
+        using var client = await ClienteAutenticadoAdminAsync(factory);
+        var nome = $"Fornecedor idempotente {Guid.NewGuid():N}";
+        var chave = Guid.NewGuid().ToString();
+
+        Task<HttpResponseMessage> Criar(object corpo)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/fornecedores") { Content = JsonContent.Create(corpo) };
+            request.Headers.Add("Idempotency-Key", chave);
+            return client.SendAsync(request);
+        }
+
+        using var primeira = await Criar(new { nome, origem = "console" });
+        primeira.StatusCode.Should().Be(HttpStatusCode.Created, await primeira.Content.ReadAsStringAsync());
+        primeira.Headers.Contains("X-Idempotent-Replay").Should().BeFalse();
+
+        using var segunda = await Criar(new { nome, origem = "console" });
+        segunda.StatusCode.Should().Be(HttpStatusCode.Created, await segunda.Content.ReadAsStringAsync());
+        segunda.Headers.GetValues("X-Idempotent-Replay").Should().ContainSingle().Which.Should().Be("true");
+
+        var id1 = (await primeira.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data").GetProperty("id").GetString();
+        var id2 = (await segunda.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data").GetProperty("id").GetString();
+        id2.Should().Be(id1, "a repetição devolve o cadastro já gravado");
+
+        using var divergente = await Criar(new { nome = nome + " outro", origem = "console" });
+        divergente.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await divergente.Content.ReadAsStringAsync()).Should().Contain("IDEMPOTENCY_PAYLOAD_MISMATCH");
+
+        var lista = await client.GetFromJsonAsync<JsonElement>($"/api/fornecedores?search={Uri.EscapeDataString(nome)}&pageSize=50");
+        lista.GetProperty("data").EnumerateArray()
+            .Count(f => f.GetProperty("nome").GetString()!.StartsWith(nome)).Should().Be(1, "só um fornecedor foi gravado");
+    }
+
     // ─── Migrations ───────────────────────────────────────────────────────────
 
     [SkippableFact]
