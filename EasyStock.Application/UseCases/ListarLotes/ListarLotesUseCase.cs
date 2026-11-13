@@ -30,7 +30,7 @@ public class ListarLotesUseCase(ILoteRepository repo)
         var size = Math.Clamp(q.PageSize, 1, 200);
 
         var (items, total) = await repo.ListAsync(q.EmpresaId, page, size,
-            q.Status, q.Desde, q.Ate, q.Search, q.Sort, q.Order, q.LojaId);
+            q.Status, DataUtc.InicioDoPeriodoUtc(q.Desde), DataUtc.FimDoPeriodoUtc(q.Ate), q.Search, q.Sort, q.Order, q.LojaId);
 
         return new ListarLotesResult(
             items.Select(CriarLoteUseCase.Map).ToList(), total, page, size);
