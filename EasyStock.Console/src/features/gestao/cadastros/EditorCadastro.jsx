@@ -8,7 +8,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { lerMoeda } from '../../../dominio/formato'
-import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, telefoneNaTela } from '../../../dominio/cadastros'
+import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
 const pessoa = [{ valor: 'fisica', rotulo: 'Pessoa física' }, { valor: 'juridica', rotulo: 'Pessoa jurídica' }]
@@ -56,8 +56,11 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   // #2457 (U2): o conflito mostra o telefone como a pessoa digitou, não o E.164 gravado.
   // Voltar ao mesmo número não conta como alteração nem entra no conflito (revisão da #2460).
   const mesmoTelefone = (valor) => telefoneNaTela(valor) === telefoneNaTela(inicial.telefone)
-  const naTela = (campo, valor) => (campo === 'telefone' ? telefoneNaTela(valor) : String(valor ?? '')) || 'Vazio'
+  // #2476 (U2): CPF e CNPJ na máscara; digitar o mesmo número de volta não conta como mudança.
+  const mesmoDocumento = (valor) => documentoNaTela(valor) === documentoNaTela(inicial.documento)
+  const naTela = (campo, valor) => (campo === 'telefone' ? telefoneNaTela(valor) : campo === 'documento' ? documentoNaTela(valor) : String(valor ?? '')) || 'Vazio'
   const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => mudar('telefone', mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value)} erro={erroDo('telefone')} />
+  const documento = (rotulo) => campo('documento', rotulo, { value: documentoNaTela(dados.documento), onChange: e => mudar('documento', mesmoDocumento(e.target.value) ? inicial.documento : e.target.value) })
   const area = (chave, rotulo) => <div className={css.larguraTotal}><CampoArea rotulo={rotulo} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} erro={erroDo(chave)} /></div>
   const selecao = (chave, rotulo, opcoes) => <Combobox rotulo={rotulo} obrigatorio={obrigatorio(chave)} valor={dados[chave]} aoMudar={valor => mudar(chave, valor)} opcoes={opcoes} erro={erros[chave]} disabled={salvando || !podeEditar} />
   const dinheiro = (chave, rotulo) => <CampoReais rotulo={rotulo} centavos={dados[chave] == null ? null : Math.round(dados[chave] * 100)} aoMudar={valor => mudar(chave, valor == null ? null : valor / 100)} ler={lerMoeda} erro={erros[chave]} />
@@ -131,14 +134,14 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
         {tela === 'clientes' && <>
           {selecao('tipoPessoa', 'Tipo de pessoa', pessoa)}
           {telefone()}{campo('email', 'E-mail', { tipo: 'email' })}
-          {campo('documento', dados.tipoPessoa === 'juridica' ? 'CNPJ' : 'CPF ou documento')}
+          {documento(dados.tipoPessoa === 'juridica' ? 'CNPJ' : 'CPF ou documento')}
           {dados.tipoPessoa === 'juridica' && <>{campo('nomeFantasia', 'Nome fantasia')}{campo('inscricaoEstadual', 'Inscrição estadual')}</>}
           {campo('endereco', 'Endereço')}{campo('apt', 'Apartamento ou referência')}
           {area('observacoes', 'Observações')}
         </>}
         {tela === 'fornecedores' && <>
           {campo('contato', 'Pessoa de contato')}{telefone()}{campo('email', 'E-mail', { tipo: 'email' })}
-          {campo('documento', 'CNPJ ou CPF')}{campo('categoria', 'Categoria')}
+          {documento('CNPJ ou CPF')}{campo('categoria', 'Categoria')}
           {campo('tipo', 'Tipo de fornecimento')}{campo('siteUrl', 'Site', { tipo: 'url' })}
           <CampoTexto rotulo="Prazo de entrega (dias)" tipo="number" min="0" value={dados.leadTimeEstimadoDias ?? ''} onChange={e => mudar('leadTimeEstimadoDias', e.target.value === '' ? null : Number(e.target.value))} />
           {campo('pedidoMinimo', 'Pedido mínimo')}{campo('fretePadrao', 'Condição de frete')}

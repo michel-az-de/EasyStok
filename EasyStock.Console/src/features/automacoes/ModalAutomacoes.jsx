@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea, CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
@@ -7,7 +7,7 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { automacoesEditaveis } from '../../dominio/acessoModulos'
 import {
-  VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, contextoDePrevia, textoDaRegra, variaveisForaDaApi,
+  VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica, contextoDePrevia, textoDaRegra,
 } from '../../dominio/automacao'
 import { ROTULO_DO_SOM, listaDeEventosDeSom } from '../../dominio/automatico'
 import { canalDaConversa } from '../../dominio/canal'
@@ -34,7 +34,10 @@ function Regra({
   const editando = valor.texto !== regra.texto
   const previa = textoDaRegra({ ...regra, texto: valor.texto }, fonteApi ? soDaApi(contexto) : contexto)
   const variaveis = fonteApi ? VARIAVEIS_DA_API : VARIAVEIS
-  const foraDaApi = fonteApi ? variaveisForaDaApi(valor.texto) : []
+  // #2476 (U8): variável que o EasyStok não preenche sairia escrita para o cliente: não salva nem liga.
+  const bloqueio = fonteApi ? bloqueioDaAutomatica(valor.texto, editavel) : null
+  const idBloqueio = useId()
+  const naoLiga = !regra.ativa && fonteApi && Boolean(bloqueioDaAutomatica(regra.texto))
   const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
 
   const mudar = (campo, novo) => {
@@ -71,7 +74,8 @@ function Regra({
             type="checkbox"
             aria-label={`Regra ${regra.nome}, ${regra.ativa ? 'ligada' : 'desligada'}`}
             checked={regra.ativa}
-            disabled={!editavel}
+            disabled={!editavel || naoLiga}
+            aria-describedby={naoLiga ? idBloqueio : undefined}
             onChange={() => aoAlternar(regra.id)}
           />
           {regra.ativa ? 'ligada' : 'desligada'}
@@ -89,11 +93,7 @@ function Regra({
         <span>Campos automáticos:</span>
         {variaveis.map((v) => <span key={v.chave} className={css.tokenVariavel}>{`{${v.chave}}`}</span>)}
       </p>
-      {foraDaApi.length > 0 && (
-        <p className={css.alerta} role="alert">
-          O cliente receberá {foraDaApi.map((v) => `{${v}}`).join(', ')} sem preenchimento automático.
-        </p>
-      )}
+      {bloqueio && <p id={idBloqueio} className={css.alerta} role="alert">{bloqueio}</p>}
       {avisoEntrada && <p className={css.alerta}>{avisoEntrada}</p>}
 
       {/* Prévia em bolha: é o que o cliente lê agora, com os dados desta conversa. */}
@@ -117,7 +117,7 @@ function Regra({
       {/* #1966: salvar é da gerência do atendimento; para o Operador o texto fica só para ler. */}
       {editavel && (
       <div className={css.acoes}>
-        <Botao variante="primario" className={css.toque} disabled={!editando || gravacao === 'salvando'} onClick={salvar}>
+        <Botao variante="primario" className={css.toque} disabled={!editando || gravacao === 'salvando' || Boolean(bloqueio)} aria-describedby={bloqueio ? idBloqueio : undefined} onClick={salvar}>
           {gravacao === 'salvando' ? 'Salvando…' : 'Salvar texto'}
         </Botao>
         <Botao className={css.toque} disabled={!editando || gravacao === 'salvando'} onClick={() => { setRascunho(null); setGravacao('ocioso') }}>
