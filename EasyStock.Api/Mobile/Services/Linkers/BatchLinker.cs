@@ -27,6 +27,18 @@ public sealed class BatchLinker(
     ILogger<BatchLinker> log,
     BaixaDeInsumosDaProducao? baixaDeInsumos = null)
 {
+    internal static string CodigoDoLote(Batch batch)
+    {
+        // #2317: só o namespace novo usa UUID integral. Não altera códigos dos lotes legados.
+        if (batch.Id.Length == 39 && batch.Id.StartsWith("b2-", StringComparison.Ordinal)
+            && Guid.TryParseExact(batch.Id[3..], "D", out var uuid))
+            return uuid.ToString("N").ToUpperInvariant();
+
+        var codigoBase = !string.IsNullOrWhiteSpace(batch.Lote) ? batch.Lote
+            : !string.IsNullOrWhiteSpace(batch.Code) ? batch.Code : $"LOT-{batch.CreatedAt:yyMMdd}";
+        var sufixo = new string(batch.Id.TakeLast(6).Where(char.IsLetterOrDigit).ToArray());
+        return string.IsNullOrEmpty(sufixo) ? codigoBase : codigoBase + "-" + sufixo;
+    }
     public async Task ExecuteAsync(IEnumerable<string> mobileBatchIds, Guid? empresaId)
     {
         var idsList = mobileBatchIds as ICollection<string> ?? mobileBatchIds.ToList();
@@ -66,16 +78,7 @@ public sealed class BatchLinker(
                     continue;
                 }
 
-                var codigoBase = !string.IsNullOrWhiteSpace(mobileB.Lote)
-                    ? mobileB.Lote!
-                    : !string.IsNullOrWhiteSpace(mobileB.Code)
-                        ? mobileB.Code!
-                        : $"LOT-{mobileB.CreatedAt:yyMMdd}";
-                var sufixo = mobileB.Id.Length >= 6
-                    ? mobileB.Id.Substring(mobileB.Id.Length - 6)
-                    : mobileB.Id;
-                sufixo = new string(sufixo.Where(c => char.IsLetterOrDigit(c)).ToArray());
-                var codigo = string.IsNullOrEmpty(sufixo) ? codigoBase : (codigoBase + "-" + sufixo);
+                var codigo = CodigoDoLote(mobileB);
 
                 var lote = Lote.Criar(empresaId.Value, codigo, mobileB.CreatedAt, mobileB.LojaId);
                 lote.MobileBatchId = mobileB.Id;
@@ -87,9 +90,12 @@ public sealed class BatchLinker(
                     Guid? produtoIdResolved = null;
                     if (!string.IsNullOrWhiteSpace(item.ProductId))
                     {
-                        var mProd = await db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
-                            .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-                        produtoIdResolved = mProd?.ErpProductId;
+                        // A referencia mobile e a ponte ERP precisam pertencer a mesma empresa do lote.
+                        produtoIdResolved = await db.Set<Product>().IgnoreQueryFilters()
+                            .Where(p => p.Id == item.ProductId && p.EmpresaId == empresaId)
+                            .Join(db.Set<Produto>().IgnoreQueryFilters().Where(p => p.EmpresaId == empresaId),
+                                p => p.ErpProductId, p => (Guid?)p.Id, (_, p) => (Guid?)p.Id)
+                            .FirstOrDefaultAsync();
                     }
                     lote.Itens.Add(new LoteItem
                     {
@@ -249,7 +255,7 @@ public sealed class BatchLinker(
                 }
 
                 var produto = await db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
-                    .FirstOrDefaultAsync(p => p.Id == item.ProdutoId);
+                    .FirstOrDefaultAsync(p => p.Id == item.ProdutoId && p.EmpresaId == lote.EmpresaId);
                 if (produto == null)
                 {
                     log.LogWarning("F8-A: produto {ProdutoId} nao existe; pulando entrada do lote {LoteId}",

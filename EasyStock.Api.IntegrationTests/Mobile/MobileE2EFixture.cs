@@ -57,6 +57,10 @@ public class MobileE2EFixture : IAsyncLifetime
                 // PedidoConversaConcorrenciaTests.
                 b.UseSetting("Database:Provider", "PostgreSql");
                 b.UseSetting("ConnectionStrings:DefaultConnection", _pg!.GetConnectionString());
+                // O registro JWT le estes valores antes de ConfigureAppConfiguration.
+                b.UseSetting("Jwt:SecretKey", "EasyStock-Test-SuperSecretKey-Min32Chars!!");
+                b.UseSetting("Jwt:Issuer", "EasyStock");
+                b.UseSetting("Jwt:Audience", "EasyStock");
                 b.ConfigureAppConfiguration((_, cfg) =>
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
@@ -116,6 +120,7 @@ public class MobileE2EFixture : IAsyncLifetime
             Id = Guid.NewGuid(),
             EmpresaId = empresa.Id,
             Nome = "Loja Teste",
+            Ativa = true,
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow
         };

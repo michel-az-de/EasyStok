@@ -25,7 +25,7 @@ public class AnthropicMessagesClientTests
     {
         opcoes ??= new AnthropicAgenteOptions { Enabled = true, ApiKey = "chave-de-teste", ModeloAgente = "claude-sonnet-5" };
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://anthropic.test/") };
-        return new AnthropicMessagesClient(http, Options.Create(opcoes), NullLogger<AnthropicMessagesClient>.Instance);
+        return new AnthropicMessagesClient(http, Options.Create(opcoes), PipelinesDeTeste.Reais(), NullLogger<AnthropicMessagesClient>.Instance);
     }
 
     [Fact]

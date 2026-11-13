@@ -43,13 +43,25 @@ public sealed record LalamoveContato(
     [property: JsonPropertyName("stopId")] string StopId,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("phone")] string Phone);
+/// <summary><c>metadata</c> leva o id da corrida no EasyStok (#2160, R4): é por ele que se reconhece o pedido num timeout.</summary>
 public sealed record LalamoveEntregaRequest(
     [property: JsonPropertyName("quotationId")] string QuotationId,
     [property: JsonPropertyName("sender")] LalamoveContato Sender,
     [property: JsonPropertyName("recipients")] IReadOnlyList<LalamoveContato> Recipients,
-    [property: JsonPropertyName("isPODEnabled")] bool IsPodEnabled = true);
+    [property: JsonPropertyName("isPODEnabled")] bool IsPodEnabled = true,
+    [property: JsonPropertyName("isRecipientSMSEnabled")] bool IsRecipientSmsEnabled = true,
+    [property: JsonPropertyName("metadata"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, string>? Metadata = null);
 public sealed record LalamoveEntregaResponse(
     [property: JsonPropertyName("orderId")] string OrderId,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("shareLink")] string? ShareLink,
-    [property: JsonPropertyName("priceBreakdown")] LalamovePreco PriceBreakdown);
+    [property: JsonPropertyName("priceBreakdown")] LalamovePreco PriceBreakdown,
+    [property: JsonPropertyName("driverId")] string? DriverId = null,
+    [property: JsonPropertyName("metadata")] IReadOnlyDictionary<string, string>? Metadata = null);
+/// <summary><c>GET /v3/orders/{id}/drivers/{driverId}</c>.</summary>
+public sealed record LalamoveMotorista(
+    [property: JsonPropertyName("driverId")] string? DriverId,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("phone")] string? Phone,
+    [property: JsonPropertyName("plateNumber")] string? PlateNumber);
+public sealed record LalamoveGorjeta([property: JsonPropertyName("priorityFee")] string PriorityFee);

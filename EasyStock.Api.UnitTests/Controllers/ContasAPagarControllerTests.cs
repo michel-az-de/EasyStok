@@ -142,4 +142,24 @@ public class ContasAPagarControllerTests
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
+
+    // ── #2095 (F6): documento repetido ───────────────────────────────────────
+
+    [Fact]
+    public async Task Criar_com_documento_ja_usado_responde_409_com_a_mensagem()
+    {
+        var cat = EasyStock.Domain.Entities.Financeiro.CategoriaFinanceira.Criar(_empresaId, "Compras",
+            EasyStock.Domain.Enums.Financeiro.TipoCategoriaFinanceira.Despesa);
+        _categoriaRepo.GetByIdAsync(_empresaId, cat.Id, Arg.Any<CancellationToken>()).Returns(cat);
+        var existente = EasyStock.Domain.Entities.Financeiro.ContaPagar.Criar(_empresaId, null, cat.Id, "NF 123", DateTime.UtcNow,
+            documentoReferencia: "NF 123");
+        _contaRepo.GetByDocumentoReferenciaAsync(_empresaId, "NF 123", Arg.Any<CancellationToken>()).Returns(existente);
+
+        var result = await _controller.Criar(new CriarContaPagarCommand(_empresaId, null, cat.Id, "NF 123 outra", DateTime.UtcNow,
+            [new EasyStock.Application.UseCases.Financeiro.Common.ParcelaSpec(1, 10m, DateTime.UtcNow.AddDays(5))],
+            DocumentoReferencia: "NF 123"));
+
+        var conflito = result.Should().BeOfType<ConflictObjectResult>().Subject;
+        conflito.Value.Should().BeOfType<ApiErrorResponse>().Which.Error.Message.Should().Be("Já existe conta com o documento NF 123.");
+    }
 }

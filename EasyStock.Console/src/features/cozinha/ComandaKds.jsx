@@ -5,7 +5,9 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { Modal } from '../../componentes/Modal'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
-import { ETAPAS_KDS, avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds } from '../../dominio/kds'
+import {
+  ETAPAS_KDS, avisoDeInicio, colunaDoStatusKds, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds,
+} from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
 
@@ -20,7 +22,7 @@ export function ComandaKds({
 }) {
   const proximo = proximoStatusKds(pedido.status)
   const aviso = avisoDeInicio(pedido, agora)
-  const atual = ETAPAS_KDS.findIndex((e) => e.status === pedido.status)
+  const atual = ETAPAS_KDS.findIndex((e) => e.status === colunaDoStatusKds(pedido.status))
   // #1584: "Reimprimir na fila" não dava retorno. A ação guarda a própria falha no erro da
   // tela, então o erro antigo sai antes e a confirmação só vale se nenhum erro voltar.
   const [reimpressao, setReimpressao] = useState(null) // null | 'enviando' | 'feita'
@@ -77,7 +79,7 @@ export function ComandaKds({
             const estado = i < atual ? 'feita' : i === atual ? 'atual' : 'futura'
             return (
               <li key={etapa.status} className={css[`etapa-${estado}`]} aria-current={estado === 'atual' ? 'step' : undefined}>
-                <span className={css.marcaEtapa}>{estado === 'feita' ? <Icone nome="check" tamanho={14} /> : i + 1}</span>
+                <span className={css.marcaEtapa}>{estado === 'feita' ? <Icone nome="check" tamanho={16} /> : i + 1}</span>
                 {etapa.rotulo}
               </li>
             )

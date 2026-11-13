@@ -155,7 +155,7 @@ public class TenantVitrineEntregaController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
         catch (RegraDeDominioVioladaException ex)
         {

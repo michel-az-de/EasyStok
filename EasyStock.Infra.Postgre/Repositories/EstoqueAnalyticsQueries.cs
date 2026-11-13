@@ -296,8 +296,9 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
                 && i.Status != StatusItemEstoque.Bloqueado
                 && i.Status != StatusItemEstoque.Descartado
                 && (i.ValidadeEm == null || (DateTime?)i.ValidadeEm >= hoje));
+        // O lote sem loja (produção do console, #2054) é da empresa toda e conta em qualquer loja.
         if (lojaId.HasValue)
-            saldoQuery = saldoQuery.Where(i => i.LojaId == lojaId.Value);
+            saldoQuery = saldoQuery.Where(i => i.LojaId == lojaId.Value || i.LojaId == null);
 
         var saldosPorProduto = await saldoQuery
             .GroupBy(i => i.ProdutoId)
@@ -315,7 +316,8 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
                 && m.DataMovimentacao >= deVenda
                 && m.DataMovimentacao <= agora);
         if (lojaId.HasValue)
-            vendaQuery = vendaQuery.Where(m => m.ItemEstoque != null && m.ItemEstoque.LojaId == lojaId.Value);
+            vendaQuery = vendaQuery.Where(m => m.ItemEstoque != null
+                && (m.ItemEstoque.LojaId == lojaId.Value || m.ItemEstoque.LojaId == null));
 
         var vendasPorProduto = await vendaQuery
             .GroupBy(m => m.ProdutoId)
@@ -342,7 +344,7 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
                 && i.Status != StatusItemEstoque.Descartado
                 && (i.ValidadeEm == null || (DateTime?)i.ValidadeEm >= hoje));
         if (lojaId.HasValue)
-            lotesQuery = lotesQuery.Where(i => i.LojaId == lojaId.Value);
+            lotesQuery = lotesQuery.Where(i => i.LojaId == lojaId.Value || i.LojaId == null);
 
         var lotesRaw = await lotesQuery
             .GroupJoin(

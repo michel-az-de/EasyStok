@@ -3,12 +3,14 @@ using System.Reflection;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Middleware;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.HealthChecks;
 using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
 using EasyStock.Infra.Notifications.Hosting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using Serilog.Context;
@@ -225,9 +227,13 @@ public static class PipelineExtensions
                     servePath = absBase.AbsolutePath;
                 servePath = "/" + servePath.Trim('/');
 
+                var tiposUpload = new FileExtensionContentTypeProvider();
+                tiposUpload.Mappings[".ogg"] = "audio/ogg";
+
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     FileProvider = new PublicUploadFileProvider(rootPath),
+                    ContentTypeProvider = tiposUpload,
                     RequestPath = servePath
                 });
             }
@@ -301,9 +307,17 @@ public static class PipelineExtensions
             }
         });
 
+        // /health/disco (#2376): espaço livre do disco da VPS, dividido pelo Postgres e pelo OpenObserve. Fora de /health e
+        // de /health/ready: disco apertado avisa pelo vigia externo, mas não tira a API do LB.
+        app.MapHealthChecks("/health/disco", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains(DiscoHealthCheck.Tag),
+            ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
+        });
+
         app.MapHealthChecks("/health", new HealthCheckOptions
         {
-            Predicate = check => !check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag),
+            Predicate = check => !check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag) && !check.Tags.Contains(DiscoHealthCheck.Tag),
             ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
         });
 

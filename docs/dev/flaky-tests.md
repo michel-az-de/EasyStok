@@ -10,6 +10,27 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#2433): prova do Financeiro contava o Sair da tela de carregamento
+
+Visto em `EasyStock.Console/ferramentas/prova-financeiro-navegador.mjs:69`, no job `console` do master em
+`7edefc785` (run 43349117808). A tentativa 1 falhou com `1 !== 0` e a 2 passou com o mesmo SHA.
+
+- **Por que era flaky:** a prova passou a rodar no CI com a #2410. Logo depois do `page.reload()`, o App
+  mostra "Carregando seus módulos / Aguarde um instante.", e essa tela tem um botão Sair próprio
+  (`App.jsx`, `if (!dados)`). Depois do segundo reload, a prova só esperava textos sumirem. Esses textos
+  também não existem na tela de carregamento, e a `conferirSessao` contava Sair solto antes de a
+  moldura montar. O log da falha mostra "Aguarde um instante.".
+- **Como foi confirmado:** com `/api/auth/me/modulos` atrasado em 1,5 s, a prova falhava em 1 de 1, na
+  mesma linha e com o mesmo `1 !== 0`.
+- **Fix (#2433):**
+  - A `conferirSessao` espera o avatar da conta à vista antes de contar. A tela de carregamento e a
+    moldura nunca aparecem juntas, e com a tela pronta o Sair solto continua proibido.
+  - O atraso de 1,5 s ficou na prova, no segundo reload. Assim, quem tirar a espera vê a falha sempre,
+    não de vez em quando.
+- **Se voltar a falhar:** não é mais a carga dos módulos. Ver qual tela tinha o Sair na captura.
+
+---
+
 ## ✅ CORRIGIDO (#1680) — teste do canário de telemetria dependia do timeout de produção
 
 Visto em `TelemetriaGeocodingTests.Sem_a_protecao_o_canario_vaza_no_span_e_no_log` (os três testes da

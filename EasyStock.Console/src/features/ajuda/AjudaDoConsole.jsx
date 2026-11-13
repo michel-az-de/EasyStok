@@ -5,18 +5,18 @@ import { IconeDoModulo } from '../../componentes/IconeDoModulo'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Modal } from '../../componentes/Modal'
 import { guiaDoConsole } from '../../dominio/guiaDoConsole'
-import { HASH_HALL } from '../../dominio/rota'
-import { hashDoModulo } from '../../dominio/modulos'
+import { HASH_HALL, ROTA_HALL } from '../../dominio/rota'
+import { NOME_INICIO, hashDoModulo } from '../../dominio/modulos'
 import { contextoDaAjuda, copiarDiagnostico, diagnosticoDoConsole } from './diagnosticoDoConsole'
 import css from './ajuda.module.css'
 
 export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
-  const { permite } = useAcessoModulos()
+  const { permite, acoes } = useAcessoModulos()
   const [aviso, setAviso] = useState('')
   const [diagnostico, setDiagnostico] = useState('')
   const dadosRef = useRef(null)
-  const contexto = contextoDaAjuda(rota, fonteApi)
-  const guia = guiaDoConsole({ rota, fonteApi, permite })
+  const contexto = contextoDaAjuda(rota, fonteApi, { acoes, permite })
+  const guia = guiaDoConsole({ rota, fonteApi, permite, acoes })
 
   async function copiar() {
     const texto = diagnosticoDoConsole({
@@ -31,20 +31,21 @@ export function AjudaDoConsole({ rota, fonteApi, aoFechar }) {
   }
 
   return (
-    <Modal titulo="Ajuda" descricao={contexto.titulo} aoFechar={aoFechar} largura="620px"
-      rodape={<Botao onClick={aoFechar}>Voltar ao trabalho</Botao>}>
+    <Modal titulo="Ajuda" descricao={contexto.titulo} aoFechar={aoFechar}
+      rodape={<Botao onClick={aoFechar}>Fechar ajuda</Botao>}>
       <div className={css.corpo}>
         <section aria-labelledby="ajuda-por-aqui">
           <h3 id="ajuda-por-aqui" className={css.titulo}><MarcaIcone nome="informacao" /> Como usar esta tela</h3>
           <ol className={css.passos}>{contexto.passos.map(passo => <li key={passo}>{passo}</li>)}</ol>
           <div className={css.caminhos}>
-            <a href={HASH_HALL} onClick={aoFechar}><MarcaIcone nome="grade" tamanho={20} />Ver módulos</a>
-            {permite('atendimento') && rota.tipo !== 'principal' && <a href={hashDoModulo('atendimento', 'balcao')} onClick={aoFechar}><MarcaIcone nome="mensagem" tamanho={20} />Voltar ao Balcão</a>}
+            {/* #2258 (auditoria A3): na própria home o link levava a ela mesma. */}
+            {rota.tipo !== ROTA_HALL && <a href={HASH_HALL} onClick={aoFechar}><MarcaIcone nome="grade" tamanho={20} />{NOME_INICIO}</a>}
+            {permite('atendimento') && rota.tipo !== 'principal' && <a href={hashDoModulo('atendimento', 'balcao')} onClick={aoFechar}><MarcaIcone nome="mensagem" tamanho={20} />Voltar às conversas</a>}
             {contexto.atalho && permite(contexto.atalho.modulo) && <a href={hashDoModulo(contexto.atalho.modulo, contexto.atalho.tela)} onClick={aoFechar}><MarcaIcone nome="producao" tamanho={20} />{contexto.atalho.rotulo}</a>}
           </div>
         </section>
         <section aria-labelledby="ajuda-guia" className={css.guia}>
-          <h3 id="ajuda-guia" className={css.titulo}><MarcaIcone nome="grade" /> Guia do Console</h3>
+          <h3 id="ajuda-guia" className={css.titulo}><MarcaIcone nome="grade" /> Guia dos módulos</h3>
           <p className={css.apoio}>O que cada módulo faz e por onde começar.</p>
           {guia.map(modulo => (
             <details key={modulo.id} className={css.modulo} open={modulo.aberto} data-guia-modulo={modulo.id}>

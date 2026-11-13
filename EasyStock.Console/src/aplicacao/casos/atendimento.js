@@ -36,7 +36,10 @@ export const casosAtendimento = {
       estado: c.estado === 'Aberto' ? 'Em atendimento' : c.estado,
       responsavel: c.responsavel ?? ATENDENTE,
     }))
-    const comRascunhoLimpo = comRascunhoDeFora(base, id, '')
+    // #2185 (F2): só o envio do próprio rascunho esvazia o campo. Cardápio, Assistente e despedida mandam
+    // outro texto, e o que ela estava digitando continua lá.
+    const doRascunho = (estado.rascunhos?.[id] ?? '').trim() === (texto ?? '').trim()
+    const comRascunhoLimpo = doRascunho ? comRascunhoDeFora(base, id, '') : base
     if (automatica) return comRascunhoLimpo
     return {
       ...comRascunhoLimpo,

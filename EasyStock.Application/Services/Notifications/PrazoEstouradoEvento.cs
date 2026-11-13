@@ -1,17 +1,21 @@
 using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 
 namespace EasyStock.Application.Services.Notifications;
 
-/// <summary>Os quatro prazos vivos do <see cref="TipoEventoNotificacao.PrazoEstourado"/> (N11).</summary>
+/// <summary>Os prazos vivos do <see cref="TipoEventoNotificacao.PrazoEstourado"/> (N11).</summary>
 public enum TipoPrazo
 {
     ClienteSemResposta,
     PedidoAtrasado,
     ImpressaoTravada,
     CaixaEsquecido,
+
+    /// <summary>#2096: pedido pronto, para entrega, sem viagem com entregador há mais que o tempo da loja.</summary>
+    ProntoSemEntregador,
 }
 
 /// <summary>
@@ -25,10 +29,11 @@ public static class PrazoEstouradoEvento
 {
     public static string Nome(TipoPrazo tipo) => tipo switch
     {
-        TipoPrazo.ClienteSemResposta => "cliente_sem_resposta",
-        TipoPrazo.PedidoAtrasado => "pedido_atrasado",
-        TipoPrazo.ImpressaoTravada => "impressao_travada",
-        TipoPrazo.CaixaEsquecido => "caixa_esquecido",
+        TipoPrazo.ClienteSemResposta => CodigosAviso.ClienteSemResposta,
+        TipoPrazo.PedidoAtrasado => CodigosAviso.PedidoAtrasado,
+        TipoPrazo.ImpressaoTravada => CodigosAviso.ImpressaoTravada,
+        TipoPrazo.CaixaEsquecido => CodigosAviso.CaixaEsquecido,
+        TipoPrazo.ProntoSemEntregador => CodigosAviso.ProntoSemEntregador,
         _ => throw new ArgumentOutOfRangeException(nameof(tipo), tipo, null),
     };
 
@@ -38,15 +43,16 @@ public static class PrazoEstouradoEvento
         TipoPrazo.PedidoAtrasado => "Pedido sem início de preparo",
         TipoPrazo.ImpressaoTravada => "Impressão travada",
         TipoPrazo.CaixaEsquecido => "Caixa aberto de ontem",
+        TipoPrazo.ProntoSemEntregador => "Pedido pronto sem entregador",
         _ => throw new ArgumentOutOfRangeException(nameof(tipo), tipo, null),
     };
 
     public static string ChaveIdempotencia(TipoPrazo tipo, Guid referenciaId) => $"prazo:{Nome(tipo)}:{referenciaId}";
 
-    public static string CorrelationId(TipoPrazo tipo, Guid referenciaId) => $"prazo:{Nome(tipo)}:{referenciaId:N}";
+    public static string CorrelationId(TipoPrazo tipo, Guid referenciaId) => $"{PrefixoCorrelationId(tipo)}{referenciaId:N}";
 
-    /// <summary>Código curto de 8 caracteres exibido ao operador.</summary>
-    public static string Referencia(Guid id) => id.ToString("N")[..8].ToUpperInvariant();
+    /// <summary>#2258: o começo do <c>CorrelationId</c> de um tipo, para achar os eventos dele sem conhecer o id.</summary>
+    public static string PrefixoCorrelationId(TipoPrazo tipo) => $"prazo:{Nome(tipo)}:";
 
     /// <summary>Duração em pt-BR: "35 minutos", "1 hora e 5 minutos", "2 dias".</summary>
     public static string Duracao(TimeSpan d)
@@ -72,14 +78,18 @@ public static class PrazoEstouradoEvento
 
     /// <param name="cliente">#1765-8: nome do cliente que espera, para a equipe saber de quem é (só no cliente sem resposta).</param>
     /// <param name="link">Onde resolver no console (<see cref="PrazosOptions.LinkPara"/>).</param>
+    /// <param name="detalhe">#2258: texto pronto para o sino, no lugar da frase padrão (que repete o título e traz o código
+    /// técnico). Só o caixa esquecido usa; sem ele, o aviso segue como era.</param>
     /// <param name="fatoId">De quem é a chave de idempotência; sem ele, <paramref name="referenciaId"/>. O cliente sem resposta
     /// usa a conversa: o aviso sai uma vez por conversa, não uma por mensagem do cliente.</param>
     public static string Payload(
         TipoPrazo tipo, Guid referenciaId, string referenciaCurta, string prazoTexto, string atrasoTexto, Guid? usuarioId = null,
-        string? cliente = null, string? link = null, Guid? fatoId = null)
+        string? cliente = null, string? link = null, Guid? fatoId = null, string? detalhe = null)
     {
         var dados = new Dictionary<string, object?>
         {
+            // #2096: o interruptor da loja (NotificadorComAvisosDaLoja) lê este código.
+            [AlertaOperacaoEvento.ChaveAviso] = Nome(tipo),
             ["tipo_legivel"] = Legivel(tipo),
             ["referencia"] = referenciaCurta,
             ["prazo_texto"] = prazoTexto,
@@ -89,6 +99,7 @@ public static class PrazoEstouradoEvento
         };
         // Nome de perfil que é telefone não vai: o e-mail leva o nome, nunca o contato do cliente.
         if (!string.IsNullOrWhiteSpace(cliente) && !cliente.Any(char.IsDigit)) dados["cliente"] = cliente.Trim();
+        if (!string.IsNullOrWhiteSpace(detalhe)) dados["detalhe"] = detalhe;
         if (usuarioId is { } u) dados["usuarioId"] = u;
         return JsonSerializer.Serialize(dados);
     }
@@ -102,12 +113,12 @@ public static class PrazoEstouradoEvento
         INotificadorService notificador, PrazosOptions opcoes,
         TipoPrazo tipo, Guid empresaId, Guid referenciaId, string referenciaCurta,
         string prazoTexto, string atrasoTexto, Guid? usuarioId, CancellationToken ct,
-        string? cliente = null, Guid? fatoId = null)
+        string? cliente = null, Guid? fatoId = null, string? detalhe = null)
     {
         if (!opcoes.Habilitado) return false;
         await notificador.EnfileirarEventoAsync(
             TipoEventoNotificacao.PrazoEstourado, empresaId,
-            Payload(tipo, referenciaId, referenciaCurta, prazoTexto, atrasoTexto, usuarioId, cliente, opcoes.LinkPara(tipo), fatoId),
+            Payload(tipo, referenciaId, referenciaCurta, prazoTexto, atrasoTexto, usuarioId, cliente, opcoes.LinkPara(tipo), fatoId, detalhe),
             referenciaId, ct, CorrelationId(tipo, referenciaId));
         return true;
     }

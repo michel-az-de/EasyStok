@@ -2,11 +2,13 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Endereco;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento;
 
@@ -78,11 +80,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         decimal? freteCombinado = null, bool peloAtendimento = false)
     {
         ArgumentNullException.ThrowIfNull(input);
-        var forma = string.IsNullOrWhiteSpace(input.Forma)
-            ? TrocarFormaPagamentoPedidoUseCase.FormaOnline
-            : input.Forma.Trim().ToLowerInvariant();
-        if (forma is not (TrocarFormaPagamentoPedidoUseCase.FormaOnline or TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega))
-            throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
+        var forma = CobrancaDoPedidoReservado.NormalizarForma(input.Forma);
 
         var agora = relogio.GetUtcNow().UtcDateTime;
         if (!link.EstaValido(agora)) throw new LinkCardapioConversaIndisponivelException();
@@ -104,15 +102,31 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
 
         await linkService.ConsumirAsync(link, agora, ct);
         PedidoReservado reservado;
+        Mensagem? resumo = null;
         try
         {
-            if (endereco is not null)
-                enderecoId = await confirmarEndereco.ExecuteAsync(new ConfirmarEnderecoClienteCommand(
-                    link.EmpresaId, clienteId, endereco.Normalizado()), ct)
-                    ?? throw new RegraDeDominioVioladaException("Não foi possível confirmar o endereço de entrega.");
-            reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
-                link.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId!.Value,
-                endereco?.Snapshot(input.Observacoes) ?? input.Observacoes, FreteCombinado: freteCombinado), ct);
+            // #2368: pedido e resumo na mesma transação. Com dois commits, uma falha no segundo deixava o pedido
+            // criado sem o resumo na conversa; agora tudo se desfaz e o link volta para o cliente reenviar.
+            reservado = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+            {
+                if (endereco is not null)
+                    enderecoId = await confirmarEndereco.ExecuteAsync(new ConfirmarEnderecoClienteCommand(
+                        link.EmpresaId, clienteId, endereco.Normalizado()), token)
+                        ?? throw new RegraDeDominioVioladaException("Não foi possível confirmar o endereço de entrega.");
+                var criado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
+                    link.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId!.Value,
+                    endereco?.Snapshot(input.Observacoes) ?? input.Observacoes, FreteCombinado: freteCombinado), token);
+
+                conversa.RegistrarSaida(agora);
+                resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                    // #2007: aqui a encomenda na entrega ainda cobra o sinal pelo link (CobrancaDoPedidoReservado); o resumo diz o mesmo.
+                    ResumoPedidoConversa.Texto(criado, input.DataEntrega,
+                        CobrancaDoPedidoReservado.FormaEfetiva(forma, criado.Pedido, QuemCobra.ClientePeloLink),
+                        peloAtendimento ? "Pedido confirmado pelo atendimento a partir da seleção compartilhada:" : "Pedido montado pelo cliente no cardápio do site:"));
+                await conversaRepository.AddMensagemAsync(resumo, token);
+                await unitOfWork.CommitAsync();
+                return criado;
+            }, ct);
         }
         catch
         {
@@ -120,17 +134,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
             throw;
         }
 
-        conversa.RegistrarSaida(agora);
-        var resumo = Mensagem.Saida(link.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
-            // #2007: aqui a encomenda na entrega ainda cobra o sinal pelo link (CobrarAsync); o resumo diz o mesmo.
-            ResumoPedidoConversa.Texto(reservado, input.DataEntrega,
-                forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
-                && EasyStock.Application.Services.Pedidos.PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)
-                    ? TrocarFormaPagamentoPedidoUseCase.FormaOnline : forma,
-                peloAtendimento ? "Pedido confirmado pelo atendimento a partir da seleção compartilhada:" : "Pedido montado pelo cliente no cardápio do site:"));
-        await conversaRepository.AddMensagemAsync(resumo, ct);
-        await unitOfWork.CommitAsync();
-        if (!input.SemCobranca) await AvisarConsoleAsync(reservado, resumo, ct);
+        if (!input.SemCobranca) await AvisarConsoleAsync(reservado, resumo!, ct);
 
         if (input.SemCobranca)
             return new PedidoPeloCardapioConversaResult(reservado.Pedido.Id, reservado.Total, forma, null, null);
@@ -138,7 +142,8 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         CobrancaPedidoResult? cobranca;
         try
         {
-            cobranca = await CobrarAsync(reservado, conversa.Id, forma, ct);
+            cobranca = await CobrancaDoPedidoReservado.CobrarAsync(gerarCobranca, trocarForma, reservado, conversa.Id, forma,
+                QuemCobra.ClientePeloLink, "cardápio da conversa", ct);
         }
         catch (MercadoPagoIndisponivelException ex)
         {
@@ -159,7 +164,7 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         {
             await eventPublisher.PublicarAsync(EventosOperacao.ConversaPedidoPelaPagina, pedido.EmpresaId,
                 new ConversaPedidoPelaPaginaOperacao(resumo.ConversaId, pedido.Id,
-                    pedido.Id.ToString("N")[..8].ToUpperInvariant(), reservado.Total), ct);
+                    CodigoCurto.De(pedido.Id), reservado.Total), ct);
             await eventPublisher.PublicarAsync(EventosOperacao.ConversaMensagemRecebida, pedido.EmpresaId,
                 new { conversaId = resumo.ConversaId, mensagemId = resumo.Id }, ct);
         }
@@ -167,16 +172,5 @@ public sealed class CriarPedidoPeloCardapioConversaUseCase(
         {
             logger.LogWarning(ex, "Cardapio da conversa: pedido {PedidoId} gravado, aviso ao console falhou.", pedido.Id);
         }
-    }
-
-    private async Task<CobrancaPedidoResult?> CobrarAsync(
-        PedidoReservado reservado, Guid conversaId, string forma, CancellationToken ct)
-    {
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega
-            && !EasyStock.Application.Services.Pedidos.PlanoPagamentoEncomenda.TemSinal(
-                reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
-            return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
-                reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: "cardápio da conversa"), ct)).Cobranca;
-        return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
     }
 }

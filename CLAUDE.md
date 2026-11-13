@@ -32,7 +32,7 @@ Reporte em até 5 linhas: branch, ahead/behind, working tree, worktrees extras (
 2. Branch, stage, gate e commit conforme o AGENTS.md. Antes do commit: `git diff --cached --stat` e o fragmento `changelog.d/<issue>.md` (ADR-0055).
 3. `git push -u origin HEAD`, `gh pr create --base master` com `closes #N`, `gh pr checks --watch`, `/code-review`, aceite da issue todo marcado.
 4. Merge por tier: `gh pr view --json mergeable,mergeStateStatus` = `MERGEABLE`, master local em `--ff-only`, `gh pr merge --squash --delete-branch`. Conflito: `git merge origin/master`, gate de novo, push.
-5. Limpeza: worktree remove + prune, branch local `-d`. ADR se houve decisão.
+5. Limpeza: worktree remove + prune, branch local pelo critério da linha Limpeza do AGENTS.md. ADR se houve decisão.
 
 Vermelho (CI falhou, review Critical, aceite aberto): PR fica aberta com os achados comentados, sem merge.
 Comente na issue: plano, decisão não óbvia, premissa refutada, fechamento.

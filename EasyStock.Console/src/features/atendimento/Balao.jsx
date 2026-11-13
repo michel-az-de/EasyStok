@@ -3,6 +3,7 @@ import { Icone } from '../../componentes/Icone'
 import { mesmasProps } from '../../aplicacao/igualdade'
 import { horaCurta } from '../../dominio/formato'
 import { partesComLinkDoCardapio } from '../../dominio/cardapioLink'
+import { comLinksDePagamento, resumoDoPedidoNoTexto, rotuloDaComanda } from '../../dominio/conteudoDaMensagem'
 import { falhaDeEnvio, fraseDoReenvio, TIPOS_DE_FALHA } from '../../dominio/falhaDeEnvio'
 import { tiqueDaMensagem } from '../../dominio/mensagem'
 import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
@@ -13,7 +14,7 @@ import css from './atendimento.module.css'
 
 const CLASSE = { in: css.entrada, out: css.saida }
 
-function Corpo({ mensagem }) {
+function Corpo({ mensagem, numeroComanda }) {
   // Modo API: arquivo do canal servido pelo endpoint autenticado (#1287).
   if (mensagem.midia) return <BolhaMidiaApi mensagem={mensagem} />
   if (mensagem.formato === 'figurinha') {
@@ -38,34 +39,94 @@ function Corpo({ mensagem }) {
   // bolha própria, nunca texto livre (achado P2.7).
   if (mensagem.formato === 'avaliacaoPedido') return <BolhaAvaliacaoPedido mensagem={mensagem} />
   if (mensagem.formato === 'avaliacaoResposta') return <BolhaAvaliacaoResposta mensagem={mensagem} />
+  // #2232 (C1): resumo do pedido reconhecido no texto vira cartão; o que vier depois (a cobrança) segue como texto.
+  const resumo = mensagem.dir === 'in' ? null : resumoDoPedidoNoTexto(mensagem.texto)
+  if (resumo) {
+    return (
+      <>
+        {resumo.cabecalho && <p className={css.tituloPedido}>{resumo.cabecalho}</p>}
+        <CartaoDoPedido resumo={resumo} />
+        {resumo.depois && <TextoComLinks texto={resumo.depois} mensagem={mensagem} numeroComanda={numeroComanda} />}
+      </>
+    )
+  }
+  return <TextoComLinks texto={mensagem.texto} mensagem={mensagem} numeroComanda={numeroComanda} />
+}
+
+// #1510: mensagem que chega do cliente nunca vira link; a nossa, só da própria origem.
+// #2232 (B2, C2): o link da comanda e o de pagamento viram botão com rótulo, não a URL crua.
+function TextoComLinks({ texto, mensagem, numeroComanda }) {
+  const doCliente = mensagem.dir === 'in'
+  const base = partesComLinkDoCardapio(texto, doCliente ? null : window.location.origin)
+  const partes = doCliente ? base : comLinksDePagamento(base, mensagem.texto)
   return (
     <p className={mensagem.regra === 'resumo' ? css.resumo : undefined}>
-      {/* #1510: mensagem que chega do cliente nunca vira link; a nossa, só da própria origem. */}
-      {partesComLinkDoCardapio(mensagem.texto, mensagem.dir === 'in' ? null : window.location.origin).map((parte, i) => (parte.tipo === 'link'
-        ? <LinkDoCardapio key={i} url={parte.texto} />
-        : parte.texto))}
+      {partes.map((parte, i) => {
+        if (parte.tipo === 'link') return <LinkDoCardapio key={i} url={parte.texto} rotulo={rotuloDaComanda(mensagem.texto, numeroComanda)} />
+        if (parte.tipo === 'pagamento') return <LinkDePagamento key={i} url={parte.texto} rotulo={parte.rotulo} />
+        return parte.texto
+      })}
     </p>
+  )
+}
+
+// #2232 (C1): números em coluna à direita e tabulares; descrição à esquerda. Um <dl> por cartão.
+function CartaoDoPedido({ resumo }) {
+  return (
+    <dl className={css.cartaoPedido}>
+      {resumo.itens.map((item, i) => (
+        <div key={i} className={css.linhaPedido}>
+          <dt>{item.qtd}× {item.descricao}</dt>
+          {item.valor && <dd className={css.valorPedido}>{item.valor}</dd>}
+        </div>
+      ))}
+      {resumo.rodape.map((linha, i) => (
+        <div key={i} className={`${css.linhaPedido} ${css.rodapePedido} ${linha.forte ? css.totalPedido : ''}`}>
+          <dt>{linha.rotulo}</dt>
+          <dd className={css.valorRodape}>
+            {linha.tipo === 'valor'
+              ? <><span className={css.valorPedido}>{linha.valor}</span>{linha.nota ? ' ' + linha.nota : ''}</>
+              : linha.texto}
+          </dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 
 // Rodada 12 (#19): o link do convite do cardápio abre a página do cliente
 // numa janela do tamanho de um celular, a mesma que o cliente recebe. Antes
 // era texto puro e não dava para ver o que o cliente vê a partir da conversa.
-function LinkDoCardapio({ url }) {
+function LinkDoCardapio({ url, rotulo }) {
   const abrir = (evento) => {
     evento.preventDefault()
     window.open(url, 'cdb-cardapio-cliente', 'width=420,height=860,noopener')
   }
   return (
-    <a className={css.linkCardapio} href={url} target="_blank" rel="noopener noreferrer" title="Abrir como o cliente vê" onClick={abrir}>
-      {url}
+    <a className={css.linkCardapio} href={url} target="_blank" rel="noopener noreferrer" title={`Abrir como o cliente vê · ${url}`} onClick={abrir}>
+      <Icone nome="external-link" tamanho={16} /> {rotulo}
     </a>
   )
 }
 
+// #2232 (C2): o href é a URL como veio; abre em nova aba, sem dar acesso à janela do console.
+function LinkDePagamento({ url, rotulo }) {
+  return (
+    <a className={css.linkCardapio} href={url} target="_blank" rel="noopener noreferrer" title={url}>
+      <Icone nome="external-link" tamanho={16} /> {rotulo}
+    </a>
+  )
+}
+
+// #2185 (R08): quem responde sozinho é o Assistente, qualquer que seja a origem. O `title` só diz de onde veio.
+const TITULO_DO_ASSISTENTE = Object.freeze({
+  agente: 'Escrita pelo Assistente',
+  regra: 'Enviada pelo Assistente, por uma regra de Automáticas',
+})
+
 // #1577: em `memo`. Mensagem nova na conversa não re-renderiza os balões antigos (até 100, cada um com a
 // regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
-export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos }) {
+export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, numeroComanda = null }) {
   // #1761: o Reenviar não dava retorno nenhum. O botão diz "Reenviando…", trava o segundo toque
   // e, se o canal recusar de novo, a bolha diz que a nova tentativa também não saiu.
   const [reenvio, setReenvio] = useState(null)
@@ -104,26 +165,31 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
   const falha = mensagem.status === 'falhou' ? falhaDeEnvio(mensagem.erro) : null
   return (
     <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
-      <Corpo mensagem={mensagem} />
+      <Corpo mensagem={mensagem} numeroComanda={numeroComanda} />
       <span className={css.meta}>
         {/* Item D (banca 10, pedido 24/09 04h12 "editar ali na hora"): a
             etiqueta que já marcava "automática" vira um botão que abre a
             definição correspondente na biblioteca de Respostas. */}
-        {mensagem.automatica && !mensagem.modelo && (
+        {/* #2185 (E25): sem regra (fala do agente, aviso do sistema) não há definição a abrir; o selo só informa. */}
+        {mensagem.automatica && !mensagem.modelo && (mensagem.regra ? (
           <button
             type="button"
             className={`${css.selo} ${css.seloBotao}`}
-            title={mensagem.origemAutomatica === 'agente' ? 'Escrita pelo agente do EasyStok' : 'Mensagem automática do sistema'}
+            title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}
             onClick={() => aoAbrirDefinicaoAutomatica?.(mensagem.regra)}
           >
-            <Icone nome="raio" /> automática
+            <Icone nome="sparkles" /> Assistente
           </button>
-        )}
+        ) : (
+          <span className={css.selo} title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}>
+            <Icone nome="sparkles" /> Assistente
+          </span>
+        ))}
         {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}
         {mensagem.programada && <span className={css.selo}><Icone nome="relogio" /> programada</span>}
         <time dateTime={mensagem.em}>{horaCurta(mensagem.em)}</time>
         {mensagem.status === 'falhou' && (
-          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={14} /> {falha.texto}</span>
+          <span className={css.falhou} role="alert"><Icone nome="alerta" tamanho={16} /> {falha.texto}</span>
         )}
         {falha?.tipo === TIPOS_DE_FALHA.FORA_DA_JANELA && mensagem.dir === 'out' && aoAbrirModelos && (
           <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} aria-haspopup="dialog" onClick={aoAbrirModelos}>
@@ -134,7 +200,7 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
         {mensagem.porSms && <span className={css.selo}><Icone nome="check" /> saiu por SMS</span>}
         {mensagem.status === 'falhou' && mensagem.dir === 'out' && aoReenviar && !mensagem.modelo && !mensagem.semIdServidor && !mensagem.midia && !mensagem.aguardaCliente && (
           <button type="button" className={`${css.selo} ${css.seloBotao} ${css.acaoDaBolha}`} disabled={reenvio === 'indo'} onClick={reenviar}>
-            <Icone nome="raio" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
+            <Icone nome="refresh-cw" /> {reenvio === 'indo' ? 'Reenviando…' : 'Reenviar'}
           </button>
         )}
         {mensagem.status === 'falhou' && reenvio === 'falhou' && (
@@ -143,10 +209,10 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
         {mensagem.dir === 'out' && mensagem.status === 'enviando' && (
           <span className={css.enviando}>{mensagem.modelo ? 'envio sem confirmação' : 'enviando'}</span>
         )}
+        {/* #2232 (C3): ícone e palavra sempre à vista; a cor sozinha não informa (WCAG 1.4.1). */}
         {tique && (
-          <span className={tique.lida ? css.tiqueLida : undefined} title={`Mensagem ${tique.rotulo}`}>
-            <span aria-hidden="true">{tique.marca}</span>
-            <span className={tique.lida ? undefined : 'sr'}> {tique.rotulo}</span>
+          <span className={tique.lida ? css.tiqueLida : css.tique} title={`Mensagem ${tique.rotulo}`}>
+            <span aria-hidden="true">{tique.marca}</span> {tique.rotulo}
           </span>
         )}
       </span>

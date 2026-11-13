@@ -12,4 +12,5 @@ namespace EasyStock.Infra.Postgre.Security;
 public sealed class RowLevelSecurityBypass(EasyStockDbContext db) : IRowLevelSecurityBypass
 {
     public IDisposable Begin() => db.UseRowLevelSecurityBypass();
+    public ValueTask<IAsyncDisposable> BeginAsync(CancellationToken ct = default) => db.UseRowLevelSecurityBypassAsync(ct);
 }

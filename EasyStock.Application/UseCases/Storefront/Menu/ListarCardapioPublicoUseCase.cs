@@ -106,7 +106,7 @@ public sealed class ListarCardapioPublicoUseCase(
                 // #1171: segue flag manual. Saldo 0 NÃO esgota o item: o checkout recusa
                 // !Disponivel (#1158) e falta de estoque avisa, não trava o pedido (S17).
                 // Porções todas esgotadas: o checkout recusa, então o site não oferece o prato.
-                Disponivel: i.Disponivel && (!i.TemVariacoes() || i.Variacoes.Any(v => v.Disponivel)),
+                Disponivel: i.EstaOfertado(),
                 Tag: i.Tag,
                 PesoExibicao: i.PesoExibicao,
                 Linha: i.Linha.ParaContrato(),

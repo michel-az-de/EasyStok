@@ -6,6 +6,7 @@
 // chega injetado em `executarAcaoDoAssistente`.
 import { primeiroNome } from './mensagem.js'
 import { textoConviteCardapio } from './cardapioLink.js'
+import { juntarAoRascunho } from './rascunho.js'
 
 export const ACOES_DO_ASSISTENTE = {
   RETOMAR_AUTOMATICO: 'retomar_automatico',
@@ -49,12 +50,17 @@ export function respostaDoAssistente(resposta) {
   return { texto: textoLimpo(resposta?.texto), acoes }
 }
 
+// #2185: o modelo propõe sem saber a situação da conversa. A proposta de devolver só aparece onde a
+// barra oferece Devolver; a já executada fica à vista, para o "feito" não sumir com o estado novo.
+export const acoesPropostasVisiveis = (propostas, acoesDaTela) => (propostas ?? []).filter((proposta) =>
+  proposta.tipo !== ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO || acoesDaTela.devolver || proposta.estado === 'feita')
+
 // Rótulos do cartão. `saiParaCliente` marca o único botão que manda algo ao cliente.
 export function descreverAcaoDoAssistente(acao, nomeCliente) {
   const nome = nomeCliente ? primeiroNome(nomeCliente) : 'o cliente'
   switch (acao.tipo) {
     case ACOES_DO_ASSISTENTE.RETOMAR_AUTOMATICO:
-      return { titulo: 'IA no atendimento', detalhe: `Continuar a conversa com ${nome} no modo automático.`, botao: 'IA assumir atendimento', feito: 'Atendimento automático retomado', saiParaCliente: false }
+      return { titulo: 'Assistente', detalhe: `O Assistente volta a responder a conversa com ${nome}.`, botao: 'Devolver ao Assistente', feito: 'Devolvida ao Assistente', saiParaCliente: false }
     case ACOES_DO_ASSISTENTE.ENVIAR_CARDAPIO:
       return { titulo: 'Mandar o cardápio', detalhe: `Link do cardápio para ${nome}.`, botao: 'Enviar ao cliente', feito: 'Cardápio enviado', saiParaCliente: true }
     case ACOES_DO_ASSISTENTE.NOTA_INTERNA:
@@ -71,7 +77,7 @@ export function descreverAcaoDoAssistente(acao, nomeCliente) {
 }
 
 // Executa a ação confirmada pela atendente. `portas` são as ações da tela:
-// { obterLinkCardapio, enviar, salvarNota, definirRascunho, abrirTela }.
+// { obterLinkCardapio, enviar, salvarNota, definirRascunho, rascunhoAtual, abrirTela }.
 // O cardápio sai com o mesmo convite e o mesmo link do botão do compositor (#1353).
 export async function executarAcaoDoAssistente(acao, conversa, portas) {
   switch (acao.tipo) {
@@ -92,7 +98,8 @@ export async function executarAcaoDoAssistente(acao, conversa, portas) {
       }
       return
     case ACOES_DO_ASSISTENTE.RASCUNHO:
-      portas.definirRascunho(conversa.id, acao.texto)
+      // #2185 (F13): soma ao que ela já escreveu, como o botão Respostas.
+      portas.definirRascunho(conversa.id, juntarAoRascunho(portas.rascunhoAtual?.(conversa.id), acao.texto))
       return
     case ACOES_DO_ASSISTENTE.ABRIR_TELA:
       portas.abrirTela(acao.tela)

@@ -427,4 +427,37 @@ confere('K-11a "Entrega própria" não repete a empresa entre parênteses', () =
   assert.equal(roteiroMod.textoDeQuemLeva({ nome: 'Lucas Uber', empresa: 'Uber' }), 'Lucas Uber (Uber)')
 })
 
+// #2055: o pedido fora da área pago e aprovado pela dona (`aprovado_baba`) espera o preparo como o pago
+// comum: fica em "Na fila", o toque é "Começar preparo" e vai a `preparando` (a API aceita a transição).
+confere('#2055 pedido aprovado pela dona fica em Na fila e o próximo toque é Começar preparo', () => {
+  const aprovado = pedido({ id: 'ap', status: 'aprovado_baba', statusRotulo: 'Aprovado' })
+  assert.deepEqual(kds.proximoStatusKds('aprovado_baba'), { status: 'preparando', toque: 'Começar preparo' })
+  assert.deepEqual(kds.filtrarPorColunaKds([aprovado, pedido({ id: 'pr', status: 'preparando' })], 'aguardando').map((p) => p.id), ['ap'])
+  assert.equal(kds.rotuloDoStatusKds(aprovado), 'Na fila')
+  assert.deepEqual(respostaAoSoltarKds('aprovado_baba', 'preparando'), { aceita: true, motivo: null })
+  assert.deepEqual(respostaAoSoltarKds('aprovado_baba', 'aguardando'), { aceita: false, motivo: null })
+  // O que a API manda (ListarPedidosKdsUseCase.Atrasado): aprovado com o início vencido vem atrasado.
+  const vencido = pedido({ id: 'av', status: 'aprovado_baba', inicioPrevistoEm: '2026-10-07T13:00:00Z', atrasado: true })
+  assert.equal(urgenciaDoPedido(vencido, Date.parse('2026-10-07T13:20:00Z')), 'atrasado')
+  assert.equal(avisoDeInicio(vencido, Date.parse('2026-10-07T13:20:00Z')).texto, 'Atrasado 20 min: devia ter começado')
+  assert.equal(tempoAteInicio(aprovado, Date.parse('2026-10-07T13:00:00Z')), 1)
+  assert.match(avisoDeInicio(aprovado, Date.parse('2026-10-07T13:00:00Z')).texto, /Começar em 30 min/)
+  const fila = [{ id: 'c1', pedidoId: 'ap', status: 'pendente', criadaEm: '2026-10-07T13:01:00Z' }]
+  assert.deepEqual(impressoesDaCozinha(fila, [aprovado]).map((i) => i.id), ['c1'], 'o canhoto do aprovado aparece')
+  const tela = fonte('features/cozinha/TelaCozinhaApi.jsx')
+  assert.match(tela, /filtrarPorColunaKds\(visiveis, coluna\.status\)/, 'a coluna junta os status dela')
+})
+
+// #2079 (C1): na Cozinha, "Marcar entregue" com saldo só confirmava o saldo; o Caixa nunca via o dinheiro.
+confere('#2079-C1 a pergunta do saldo da Cozinha é a da porta: "Recebi R$ X" lança o pagamento', () => {
+  const tela = fonte('features/cozinha/TelaCozinhaApi.jsx')
+  assert.doesNotMatch(tela, /Marque entregue se recebeu na porta/, 'o texto prometia um recebimento que não era gravado')
+  assert.match(tela, /receberEEntregar\(saldoPendente\.id, saldoPendente\.status, saldoPendente\.valor, metodo\)/)
+  assert.match(tela, /Recebi \{moeda\(saldo\.valor\)\}/)
+  assert.match(tela, /opcoes=\{METODOS_NA_PORTA\}/)
+  assert.match(tela, /metodoSugeridoNaPorta\(pedido\.observacoes\)/)
+  assert.match(tela, />Entregue sem receber</, 'confirmar sem receber continua, como saída explícita')
+  assert.match(tela, /disabled=\{ocupado \|\| !metodo\}/, 'sem forma escolhida, nada sai')
+})
+
 console.log(`prova #1446 (cozinha viva no modo API): ${passou} conferências ok`)

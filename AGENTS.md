@@ -29,6 +29,7 @@ issue -> branch `tipo/slug-N` -> commits -> push -> PR `closes #N` -> CI + revie
 | Artefatos | bin/, obj/, publish/, dist/, admin/, .claude/projects/, *.dll, *.exe, *.pdb nunca entram no commit. |
 | Assinatura | Mudou assinatura pública: todos os call-sites no mesmo commit (`git grep` antes). |
 | Worktree | Paralelo ou arriscado: `C:\rep\.worktrees\EasyStok\<slug>`, 1 worktree = 1 branch = 1 issue. WIP alheio não se descarta nem se reaproveita. |
+| Limpeza | Worktrees vivem em `C:\rep\.worktrees\EasyStok\`, `.claude/worktrees/` (harness) e `~/.codex/worktrees/` (Codex). Integrada = limpa e PR `MERGED` com head local igual ao `headRefOid`; squash não é ancestral, então `branch -d` recusa e só nesse caso vale `-D`. PR fechada sem merge: remove o worktree e mantém a branch. Antes do `worktree remove`, `git config core.longpaths true`. |
 | Inacabado | Fica na branch e na issue aberta. Stash não é memória. |
 | Pronto | Só com PR `MERGEABLE` no instante do relatório, checks verdes e aceite marcado. CI verde não prova integração com o trunk atual. |
 | Medir | Toda afirmação de estado exige comando antes (git, build, gh). Premissa refutada: pare e reporte. |

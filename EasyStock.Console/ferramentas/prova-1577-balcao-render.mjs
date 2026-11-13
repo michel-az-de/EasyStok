@@ -87,6 +87,15 @@ class Elemento extends No {
   removeAttributeNS(_ns, nome) { this.atributos.delete(nome) }
   getAttribute(nome) { return this.atributos.get(nome) ?? null }
   hasAttribute(nome) { return this.atributos.has(nome) }
+  matches(seletor) {
+    return seletor.split(',').some((parte) => {
+      const formato = /^(\w+)?(?:\[([\w-]+)(?:="([^"]*)")?\])?$/.exec(parte.trim())
+      if (!formato) throw new Error(`Seletor ainda não suportado pelo DOM da prova: ${parte}`)
+      const [, tag, atributo, valor] = formato
+      return (!tag || this.localName === tag) && (!atributo || (valor === undefined
+        ? this.hasAttribute(atributo) : this.getAttribute(atributo) === valor))
+    })
+  }
   focus() { documento.activeElement = this }
   blur() { documento.activeElement = documento.body }
   scrollIntoView() {}
@@ -138,13 +147,20 @@ const arquivosDe = (dir) => readdirSync(dir, { withFileTypes: true })
   .flatMap((e) => (e.isDirectory() ? arquivosDe(join(dir, e.name)) : [join(dir, e.name)]))
 const jsx = new Map()
 await Promise.all(arquivosDe(raiz).filter((a) => a.endsWith('.jsx')).map(async (arquivo) => {
-  const codigo = readFileSync(arquivo, 'utf8').replaceAll('import.meta.env.DEV', 'false')
+  let codigo = readFileSync(arquivo, 'utf8').replaceAll('import.meta.env.DEV', 'false')
+  // Conta também o pai e o fio reais, sem trocar componentes por doubles nem alterar o `memo`.
+  const componente = ['PainelAtendimento', 'Thread'].find((nome) => arquivo.endsWith(`${nome}.jsx`))
+  if (componente) {
+    const inicio = new RegExp(`export function ${componente}\\([\\s\\S]*?\\) \\{`)
+    assert.match(codigo, inicio, `entrada de ${componente} encontrada para contar renders`)
+    codigo = codigo.replace(inicio, (cabecalho) => `${cabecalho}\n  globalThis.__prova1577.${componente} += 1;`)
+  }
   jsx.set(pathToFileURL(arquivo).href, (await transformWithOxc(codigo, arquivo, { jsx: { runtime: 'automatic' } })).code)
 }))
 
 // Espiões de render: a função que cada componente chama uma vez por render passa a anotar a chamada.
 // O cartão chama `previaDaConversa(conversa)`; o balão de texto, `partesComLinkDoCardapio(texto)` (a regex de link).
-const renders = { cartoes: [], baloes: [], vizinho: 0 }
+const renders = { cartoes: [], baloes: [], vizinho: 0, PainelAtendimento: 0, Thread: 0 }
 globalThis.__prova1577 = renders
 const ESPIOES = [
   { de: '/features/caixa-de-entrada/CartaoConversa.jsx', modulo: '../../dominio/conversa', funcao: 'previaDaConversa', anota: 'cartoes.push(a[0].id)' },
@@ -247,7 +263,9 @@ await confere('A. reducer: despacho do campo com o texto que o global já tem de
 })
 
 await confere('A. reducer de verdade: sugestão soma o carimbo, o campo atrasado perde para ela e o envio limpa somando', () => {
-  const partida = estadoInicial({ conversas: carregarConversas(), catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' })
+  // #2135: a tela abre sem conversa escolhida; aqui a atendente já abriu a primeira.
+  const conversas = carregarConversas()
+  const partida = { ...estadoInicial({ conversas, catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' }), selecionadaId: conversas[0].id }
   const id = partida.selecionadaId
   assert.deepEqual(partida.escritasDeFora, {})
   const digitou = reducer(partida, { tipo: acao.DEFINIR_RASCUNHO, id, texto: 'vou ver', doCampo: true, escritaVista: 0 })
@@ -511,17 +529,23 @@ async function montar(filhos) {
   mock.timers.enable({ apis: ['setTimeout'] })
   const banca = {
     despachos: [], guardados: [], erros: [],
-    inicial: () => estadoInicial({ conversas: carregarConversas(), catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' }),
+    // #2135: a tela abre sem conversa escolhida; a prova começa com a primeira aberta, como a atendente faria.
+    inicial: () => {
+      const conversas = carregarConversas()
+      const base = estadoInicial({ conversas, catalogo: carregarCatalogo(), regras: [], modoAgente: 'simulado' })
+      // #2232 (L5): a lista abre em "Precisa de você"; a prova mede o re-render com a massa inteira, em "Todas".
+      return { ...base, filtros: { ...base.filtros, aba: 'todas' }, selecionadaId: conversas[0].id }
+    },
   }
   const recipiente = documento.body.appendChild(new Elemento('div'))
-  Object.assign(renders, { cartoes: [], baloes: [], vizinho: 0 })
+  Object.assign(renders, { cartoes: [], baloes: [], vizinho: 0, PainelAtendimento: 0, Thread: 0 })
   const raizReact = createRoot(recipiente, {
     onUncaughtError: (erro) => banca.erros.push(erro), onCaughtError: (erro) => banca.erros.push(erro),
   })
   try {
     flushSync(() => raizReact.render(h(Provedor, { banca }, filhos(banca))))
     await assentar()
-    assert.deepEqual(banca.erros.map((e) => e.stack ?? e.message), [], 'a tela montou sem erro')
+    assert.equal(banca.erros.length, 0, ['a tela montou sem erro', ...banca.erros.map((e) => e.stack ?? e.message)].join('\n'))
   } catch (erro) {
     mock.timers.reset()
     throw erro
@@ -555,18 +579,27 @@ const FRASE = ['B', 'Bo', 'Bom', 'Bom ', 'Bom d', 'Bom di', 'Bom dia']
 
 await confere('A. tela: sete teclas não acordam o resto do Balcão; a pausa de 400 ms acorda uma vez', naTela(atendimento, async (t) => {
   const id = t.estado.selecionadaId
-  renders.vizinho = 0
+  assert.ok(renders.PainelAtendimento > 0 && renders.Thread > 0, 'os contadores observaram a montagem dos componentes reais')
+  Object.assign(renders, { vizinho: 0, PainelAtendimento: 0, Thread: 0, baloes: [] })
   for (const texto of FRASE) {
     t.teclar(texto)
     assert.equal(t.noCampo(), texto, 'a tecla aparece no campo na hora')
   }
   assert.equal(renders.vizinho, 0, `o resto do Balcão re-renderizou ${renders.vizinho} vez(es) enquanto ela digitava`)
+  assert.equal(renders.PainelAtendimento, 0, 'digitar não re-renderiza o pai do campo')
+  assert.equal(renders.Thread, 0, 'digitar não re-renderiza o fio')
+  assert.equal(renders.baloes.length, 0, 'digitar não re-renderiza balões antigos')
   assert.equal(t.rascunhosDoCampo().length, 0, 'nenhum despacho no estado global por tecla')
   await andar(399)
   assert.equal(renders.vizinho, 0)
+  assert.equal(renders.PainelAtendimento, 0)
+  assert.equal(renders.Thread, 0)
   await andar(1)
   assert.equal(t.estado.rascunhos[id], 'Bom dia')
   assert.equal(renders.vizinho, 1, 'a pausa leva o texto ao estado global uma vez')
+  assert.equal(renders.PainelAtendimento, 1, 'o pai recebe o despacho único da pausa')
+  assert.equal(renders.Thread, 1, 'o fio recebe o despacho único da pausa')
+  assert.equal(renders.baloes.length, 0, 'o memo conserva os balões após o despacho da pausa')
   assert.equal(t.noCampo(), 'Bom dia')
 }))
 
@@ -620,9 +653,23 @@ await confere('A. tela: "usar sugestão" no meio da digitação chega ao campo e
   assert.equal(t.estado.rascunhos[id], 'Sua marmita sai às 12h, Maria. Pode ser?', 'depois da sugestão ela segue digitando')
 }))
 
-await confere('A. tela: mensagem que sai por outro botão limpa o campo, como antes, mesmo no meio da digitação', naTela(atendimento, async (t) => {
+// #2185 (F2): mudou de propósito. Antes qualquer envio (cardápio, Assistente, despedida) apagava o que ela
+// estava digitando; agora só o envio do próprio rascunho esvazia o campo (ver o caso abaixo).
+await confere('A. tela: mensagem que sai por outro botão NÃO apaga o que ela estava digitando', naTela(atendimento, async (t) => {
   const id = t.estado.selecionadaId
   t.teclar('estava digitan')
+  t.agir(() => t.acoes.enviar(id, 'Segue o cardápio de hoje.'))
+  await assentar()
+  assert.equal(t.noCampo(), 'estava digitan')
+  await andar(1000)
+  assert.equal(t.noCampo(), 'estava digitan')
+  assert.equal(t.estado.rascunhos[id], 'estava digitan')
+}))
+
+await confere('A. tela: enviar o próprio rascunho limpa o campo', naTela(atendimento, async (t) => {
+  const id = t.estado.selecionadaId
+  t.teclar('Segue o cardápio de hoje.')
+  await andar(500)
   t.agir(() => t.acoes.enviar(id, 'Segue o cardápio de hoje.'))
   await assentar()
   assert.equal(t.noCampo(), '')
@@ -693,7 +740,8 @@ await confere('B. mudou uma conversa: só o cartão dela re-renderiza', naTela(b
 
 await confere('B. pagamento novo de uma conversa: só o cartão dela ganha o selo', naTela(balcao, async (t) => {
   const alvo = t.estado.conversas[1]
-  const comSelo = () => todos(t.recipiente, (no) => no.atributos?.get('aria-label') === 'Pagamento novo, ainda não visto').length
+  // #2232 (X1): o aviso falado mora no nome acessível do cartão; o selo visual guarda o title.
+  const comSelo = () => todos(t.recipiente, (no) => no.atributos?.get('title') === 'Pagamento novo, ainda não visto').length
   assert.equal(comSelo(), 0)
   renders.cartoes.length = 0
   t.agir(() => t.setPagamentosNaoVistos(new Set([alvo.id])))

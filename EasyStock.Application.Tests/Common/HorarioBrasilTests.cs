@@ -1,4 +1,5 @@
 using EasyStock.Application.Common;
+using EasyStock.Domain.Defaults;
 
 namespace EasyStock.Application.Tests.Common;
 
@@ -72,6 +73,23 @@ public class HorarioBrasilTests
             id == "America/Sao_Paulo" ? throw new TimeZoneNotFoundException() : sentinela);
         fonte.Should().Be(FonteFuso.Windows);
         tz.Should().BeSameAs(sentinela);
+    }
+
+    [Fact]
+    public void Formatar_mostra_data_e_hora_de_Brasilia_como_o_aviso_de_seguranca_da_conta()
+    {
+        // #2018: os e-mails de reset de senha e troca de contato usam esta formatacao (antes, copia propria com
+        // FindSystemTimeZoneById e, sem tzdata, hora em UTC).
+        HorarioBrasil.Formatar(new DateTime(2026, 10, 24, 15, 30, 0, DateTimeKind.Utc)).Should().Be("24/10/2026 12:30");
+        HorarioBrasil.Formatar(NoiteUtc).Should().Be("09/06/2026 23:30");
+    }
+
+    [Fact]
+    public void HorarioBrasil_e_OperacionalFuso_sao_a_mesma_zona()
+    {
+        HorarioBrasil.ZonaId.Should().Be(EasyStock.Domain.Defaults.OperacionalFuso.Zona.Id);
+        HorarioBrasil.DataOperacional(NoiteUtc).Should().Be(EasyStock.Domain.Defaults.OperacionalFuso.DataOperacional(NoiteUtc));
+        HorarioBrasil.Fonte.Should().Be(EasyStock.Domain.Defaults.OperacionalFuso.Fonte);
     }
 
     [Fact]

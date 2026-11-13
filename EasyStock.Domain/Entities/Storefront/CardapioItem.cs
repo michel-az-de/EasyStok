@@ -182,6 +182,20 @@ public class CardapioItem
     public bool EmSecaoOculta => Secao is { Visivel: false };
 
     /// <summary>
+    /// #2018 (comanda-09): a ÚNICA regra de "o prato pode ser vendido agora": visível, não arquivado, marcado como
+    /// disponível, com ao menos uma porção à venda (<see cref="TemDisponibilidade"/>) e fora de categoria escondida
+    /// (<see cref="EmSecaoOculta"/>, que precisa da <see cref="Secao"/> carregada; sem ela, não barra). A listagem do site e
+    /// da comanda, o checkout, o agente e o aviso de interesse chamam isto.
+    /// </summary>
+    public bool EstaOfertado() => Visivel && !EstaArquivado && Disponivel && TemDisponibilidade() && !EmSecaoOculta;
+
+    /// <summary>
+    /// Há disponibilidade para venda: item sem opções segue <see cref="Disponivel"/>;
+    /// item guarda-chuva precisa de ao menos uma opção disponível. Parte de <see cref="EstaOfertado"/>.
+    /// </summary>
+    public bool TemDisponibilidade() => !TemVariacoes() || Variacoes.Any(v => v.Disponivel);
+
+    /// <summary>
     /// Liga o prato avulso a um produto do estoque (M2.2, D-M1-01: o que a casa produz é vinculado).
     /// O nome e o preço do cardápio continuam os do item. Prato já vinculado não troca de produto.
     /// </summary>

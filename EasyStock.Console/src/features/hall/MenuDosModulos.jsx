@@ -1,33 +1,36 @@
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { Icone } from '../../componentes/Icone'
+import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { MenuDaConta } from '../../componentes/MenuDaConta'
 import { Marca } from '../../componentes/Marca'
 import { HASH_HALL } from '../../dominio/rota'
-import { MODULOS, hashDoModulo, telasDoMenu } from '../../dominio/modulos'
+import { MODULOS, NOME_INICIO, NOME_RESPOSTAS_AUTOMATICAS, emOrdemDosModulos, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import { IconeDoModulo } from './IconeDoModulo'
 import css from './moldura.module.css'
 
 export function MenuDosModulos({ moduloId, telaId, fonteApi, aoNavegar, semMenu = false }) {
   const { permite, aoSair, sessaoPersistente, conta, acoes } = useAcessoModulos()
   const modulo = MODULOS.find((item) => item.id === moduloId)
-  const areas = MODULOS.filter((item) => permite(item.id) && telasDoMenu(item, { fonteApi, acoes }).length)
+  // #2258 (auditoria A2): a ordem dos módulos é a mesma do Início, da Ajuda e da Busca.
+  const areas = emOrdemDosModulos(MODULOS).filter((item) => permite(item.id) && telasDoMenu(item, { fonteApi, acoes }).length)
   return <>
     <nav className={css.trilho} aria-label="Módulos da loja">
-      <a className={css.inicioTrilho} href={HASH_HALL} onClick={aoNavegar} aria-label="Ir para os módulos"><Marca compacta /><span>Módulos</span></a>
-      {areas.map((item) => <a key={item.id} href={hashDoModulo(item.id)} onClick={aoNavegar} className={`${css.itemTrilho} ${item.id === moduloId ? css.moduloAtivo : ''}`} aria-current={item.id === moduloId ? 'true' : undefined}>
+      <a className={css.inicioTrilho} href={HASH_HALL} onClick={aoNavegar} aria-label={`Ir para o ${NOME_INICIO}`}><Marca compacta /><span>{NOME_INICIO}</span></a>
+      {areas.map((item) => <a key={item.id} href={hashDoModulo(item.id)} onClick={aoNavegar} className={`${css.itemTrilho} ${item.id === moduloId ? css.moduloAtivo : ''}`} aria-current={item.id === moduloId ? 'true' : undefined} title={item.nome}>
         <IconeDoModulo modulo={item} /><span>{item.nome}</span>
       </a>)}
       {/* #1839 (F1): as automáticas só abriam pelo trilho do Balcão. O atalho leva à tela que as liga e escreve. */}
       {permite('atendimento') && <a href={hashDoModulo('atendimento', 'respostas')} onClick={aoNavegar}
-        className={css.itemTrilho} title="Respostas e mensagens automáticas">
-        <Icone nome="raio" tamanho={24} /><span>Automáticas</span>
+        className={css.itemTrilho} title={NOME_RESPOSTAS_AUTOMATICAS}>
+        <IconeDoModulo modulo={moduloPorId('atendimento')} telaId="respostas" /><span>{NOME_RESPOSTAS_AUTOMATICAS}</span>
       </a>}
       {/* #1870: o Sair mora atrás do avatar, no pé do trilho, como no Balcão. */}
       <span className={css.espacoTrilho} />
       <div className={css.avatarTrilho}>
         <MenuDaConta nome={conta?.nome} detalhe={conta?.casa} aoSair={aoSair}
           rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}
-          tituloSair={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined} />
+          tituloSair={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined}>
+          <InterruptorTema />
+        </MenuDaConta>
       </div>
     </nav>
     {!semMenu && <nav className={css.menu} aria-label={`Telas de ${modulo.nome}`}>

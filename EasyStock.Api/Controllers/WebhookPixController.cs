@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,6 +15,8 @@ public class WebhookPixController(
     IWebHostEnvironment env) : ControllerBase
 {
     [HttpPost("pix")]
+    [RequestSizeLimit(2_000_000)] // #2401: anônimo; sem teto o Kestrel aceita 30 MB antes da assinatura.
+    [EnableRateLimiting("webhook-meta")]
     [AllowAnonymous]
     public async Task<IActionResult> Pix(CancellationToken ct)
     {

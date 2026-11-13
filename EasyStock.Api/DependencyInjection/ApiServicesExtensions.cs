@@ -61,7 +61,10 @@ public static class ApiServicesExtensions
         services.Replace(ServiceDescriptor.Singleton(EasyStock.Api.Configuration.ReservaSmsConfiguracao.Ler(configuration)));
         // SyncController decomposition: mutation dispatch, auto-link pipeline, reverse pull.
         services.AddScoped<SyncMutationDispatcher>();
+        services.AddScoped<LegacySnapshotImportService>();
         services.AddScoped<SyncAutoLinker>();
+        // #2209: número curto do lote do ERP no push e no pull do app.
+        services.AddScoped<NumeroCurtoDosLotesMobile>();
         // F8: linkers especializados extraidos do facade SyncAutoLinker.
         services.AddScoped<EasyStock.Api.Mobile.Services.Linkers.CashEntryLinker>();
         services.AddScoped<EasyStock.Api.Mobile.Services.Linkers.ClientLinker>();

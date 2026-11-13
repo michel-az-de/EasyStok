@@ -4,6 +4,7 @@
 // feature nenhuma importa outra feature (ferramentas/verificar-camadas.mjs) —
 // mesmo motivo que já vale para o picker de "Prato" dentro do Composer.
 import { useRef, useState } from 'react'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { formatarDuracao, formatarTamanho, fracaoTocada } from '../../dominio/anexos'
 import css from './bolhaAnexo.module.css'
@@ -54,14 +55,9 @@ export function BolhaAudio({ mensagem }) {
 
   return (
     <div className={css.audio}>
-      <button
-        type="button"
-        className={css.audioBotao}
-        onClick={alternar}
-        aria-label={tocando ? 'Pausar áudio' : 'Tocar áudio'}
-      >
-        <Icone nome={tocando ? 'pause' : 'play'} />
-      </button>
+      <BotaoIcone
+        tom="secundario" onClick={alternar} rotulo={tocando ? 'Pausar áudio' : 'Tocar áudio'} icone={tocando ? 'pause' : 'play'}
+      />
       <span className={css.audioOnda} aria-hidden="true">
         {Array.from({ length: BARRAS_ONDA }, (_, indice) => (
           <span

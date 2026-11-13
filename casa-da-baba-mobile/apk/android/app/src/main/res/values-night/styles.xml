@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema escuro do Android: barras na mesma cor de fundo do app escuro (pilot.css). -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <item name="android:statusBarColor">#24221D</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#24221D</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

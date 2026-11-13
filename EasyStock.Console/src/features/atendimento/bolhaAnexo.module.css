@@ -21,16 +21,9 @@
 .peca figcaption span { font-size: var(--t-apoio); color: var(--tinta-3); }
 
 .audio { display: flex; align-items: center; gap: var(--e-2); min-width: 220px; }
-.audioBotao {
-  flex-shrink: 0; display: grid; place-items: center;
-  width: var(--toque); height: var(--toque); border-radius: 999px;
-  border: 0; background: var(--elevado); color: var(--tinta); cursor: pointer;
-  transition: background 180ms ease;
-}
-.audioBotao:hover { background: var(--linha); }
 .audioOnda { display: flex; align-items: center; gap: 2px; height: 22px; flex: 1 1 auto; }
 .audioOnda span {
-  width: 3px; border-radius: 2px; background: var(--linha-forte);
+  width: 3px; border-radius: var(--r-ponta); background: var(--linha-forte);
   transition: background 180ms ease, height 180ms ease;
 }
 .ondaFutura { height: 40%; }

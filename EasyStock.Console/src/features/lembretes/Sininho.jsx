@@ -1,8 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
+import { Pilula } from '../../componentes/Pilula'
 import { useEscape } from '../../hooks/useEscape'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { anunciarAberturaDeConversa } from '../../aplicacao/aberturaDeConversa'
 import { faixaDaJanela } from '../../dominio/entrega'
 import {
   ORIGENS, chaveLembrete, descreverPrazo, encaixeNaJanela, novoLembrete, tempoDoItem, vencido,
@@ -61,13 +64,7 @@ function ItemAtivo({ lembrete, agora, conversas, comPonto, aoAbrir, aoConcluir, 
         <strong>{lembrete.titulo}</strong>
         <em>{subtituloDoItem(lembrete, agora, conversas)}</em>
       </button>
-      <Botao
-        variante="texto" className={css.acaoItem} title="Concluir" aria-label="Concluir"
-        disabled={concluindo}
-        onClick={() => aoConcluir(lembrete)}
-      >
-        <Icone nome="check" tamanho={24} />
-      </Botao>
+      <BotaoIcone rotulo="Concluir" icone="check" tamanhoIcone={24} disabled={concluindo} onClick={() => aoConcluir(lembrete)} />
     </li>
   )
 }
@@ -161,7 +158,7 @@ export function Sininho({ comRotulo = false }) {
     return undefined
   }, [lembretes])
 
-  useEscape(aberto, fecharPainel)
+  useEscape(aberto && !modalAberta, fecharPainel)
 
   useEffect(() => {
     if (!aberto) return undefined
@@ -184,9 +181,15 @@ export function Sininho({ comRotulo = false }) {
   useLayoutEffect(() => {
     const painel = painelRef.current
     if (!aberto || !painel) return undefined
-    const encaixar = () => {
+    const encaixar = (evento) => {
+      if (evento?.type === 'scroll' && painel.contains(evento.target)) return
       painel.style.top = ''
       painel.style.maxHeight = ''
+      // O trilho rola em telas baixas; a camada fixa escapa do recorte e segue o sino.
+      if (comRotulo) {
+        const ancora = sinoRef.current.getBoundingClientRect()
+        Object.assign(painel.style, { position: 'fixed', top: `${Math.max(12, ancora.top)}px`, left: `${ancora.right + 10}px`, right: 'auto' })
+      }
       const topoDaAncora = painel.offsetParent?.getBoundingClientRect().top ?? 0
       const encaixe = encaixeNaJanela({ topo: topoDaAncora + painel.offsetTop, altura: painel.offsetHeight, janela: window.innerHeight })
       if (!encaixe) return
@@ -195,8 +198,12 @@ export function Sininho({ comRotulo = false }) {
     }
     encaixar()
     window.addEventListener('resize', encaixar)
-    return () => window.removeEventListener('resize', encaixar)
-  }, [aberto, tamanhoDaLista])
+    document.addEventListener('scroll', encaixar, true)
+    return () => {
+      window.removeEventListener('resize', encaixar)
+      document.removeEventListener('scroll', encaixar, true)
+    }
+  }, [aberto, tamanhoDaLista, comRotulo])
 
   const alternarPainel = () => {
     if (aberto) { fecharPainel(); return }
@@ -211,6 +218,7 @@ export function Sininho({ comRotulo = false }) {
   const abrirConversa = (conversaId) => {
     if (!conversaId) return
     selecionar(conversaId)
+    anunciarAberturaDeConversa(conversaId)
     fecharPainel()
   }
 
@@ -248,7 +256,6 @@ export function Sininho({ comRotulo = false }) {
     finally { conclusao.current = false; setConcluindo(false) }
   }
 
-  const rotuloBadge = contagem > 9 ? '9+' : String(contagem)
   const rotuloSino = contagem > 0 ? `Lembretes, ${contagem} ${contagem === 1 ? 'novo' : 'novos'}` : 'Lembretes'
 
   return (
@@ -268,19 +275,15 @@ export function Sininho({ comRotulo = false }) {
             quem clicava em "Avisos" abrir Lembretes. */}
         <Icone nome="relogio" tamanho={24} />
         {comRotulo && <span>Lembretes</span>}
-        {contagem > 0 && <span className={css.badge} aria-hidden="true">{rotuloBadge}</span>}
+        {/* #2232 (L2) + #2185 (R04): o contador unico do app e a Pilula contagem; `data-contador-sino` leva o posicionamento do trilho. */}
+        {contagem > 0 && <Pilula contagem={contagem > 9 ? '9+' : contagem} tom="perigo" className={css.badge} data-contador-sino aria-hidden="true" />}
       </Botao>
 
       {aberto && (
         <section className={css.painel} aria-label="Lembretes" ref={painelRef}>
           <div className={css.cabecalho}>
             <h2>Lembretes</h2>
-            <Botao
-              variante="texto" className={css.mais} aria-label="Programar lembrete" title="Programar lembrete"
-              onClick={() => setModalAberta(true)}
-            >
-              <Icone nome="mais" tamanho={24} />
-            </Botao>
+            <BotaoIcone rotulo="Programar lembrete" icone="mais" tamanhoIcone={24} onClick={() => setModalAberta(true)} />
           </div>
 
           {erro && <p role="alert" className={css.erro}>{erro}</p>}
@@ -364,7 +367,7 @@ export function Sininho({ comRotulo = false }) {
 
           {sonsRecentes.length > 0 && (
             <div className={css.secao}>
-              <p className={css.tituloSecao}>Sons de agora há pouco</p>
+              <p className={css.tituloSecao}>Sons recentes</p>
               <ul className={css.lista}>
                 {sonsRecentes.map((som) => {
                   const conversa = conversas.find((c) => c.id === som.conversaId)

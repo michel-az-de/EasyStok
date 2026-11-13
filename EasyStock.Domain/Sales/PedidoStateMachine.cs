@@ -78,6 +78,16 @@ public static class PedidoStateMachine
             StatusPedido.AguardandoAprovacaoBaba, StatusPedido.AprovadoBaba,
         };
 
+    /// <summary>
+    /// Status em que um pedido pode nascer (#2174): o fluxo do ERP começa em Aguardando, o checkout
+    /// pago do storefront em Rascunho (ADR-0014) e o cardápio guest em AguardandoAprovacaoBaba.
+    /// </summary>
+    public static IReadOnlySet<StatusPedido> Entradas { get; } =
+        new HashSet<StatusPedido>
+        {
+            StatusPedido.Aguardando, StatusPedido.Rascunho, StatusPedido.AguardandoAprovacaoBaba,
+        };
+
     /// <summary>Status terminais — não há mais transição saindo.</summary>
     public static IReadOnlySet<StatusPedido> Finais { get; } =
         new HashSet<StatusPedido> { StatusPedido.Entregue, StatusPedido.Cancelado };

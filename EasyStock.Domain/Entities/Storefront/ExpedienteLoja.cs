@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using EasyStock.Domain.Defaults;
 using EasyStock.Domain.Enums.Storefront;
 
 namespace EasyStock.Domain.Entities.Storefront;
@@ -33,7 +34,7 @@ public class ExpedienteLoja
     public const int MensagemTamanhoMaximo = 500;
     public const string MarcadorAbre = "{abre}";
 
-    private static readonly TimeZoneInfo Fuso = ResolverFuso();
+    private static TimeZoneInfo Fuso => OperacionalFuso.Zona;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public Guid EmpresaId { get; private set; }
@@ -257,18 +258,6 @@ public class ExpedienteLoja
         DateTimeKind.Local => d.ToUniversalTime(),
         _ => DateTime.SpecifyKind(d, DateTimeKind.Utc),
     };
-
-    private static TimeZoneInfo ResolverFuso()
-    {
-        foreach (var id in new[] { "America/Sao_Paulo", "E. South America Standard Time" })
-        {
-            try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
-            catch (TimeZoneNotFoundException) { }
-            catch (InvalidTimeZoneException) { }
-        }
-        // Brasília sem horário de verão desde 2019: -03:00 fixo é o comportamento real.
-        return TimeZoneInfo.CreateCustomTimeZone("America/Sao_Paulo (fixo -03:00)", TimeSpan.FromHours(-3), "Brasília", "BRT");
-    }
 
     private sealed record HorarioDto(int Dia, string Abre, string Fecha);
 }

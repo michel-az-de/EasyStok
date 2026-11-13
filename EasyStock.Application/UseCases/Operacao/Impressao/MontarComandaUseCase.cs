@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Operacao;
 using EasyStock.Domain.Enums.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
@@ -55,7 +56,7 @@ public sealed class MontarComandaUseCase(IPedidoImpressoQueries queries, TimePro
             .ToList();
 
         return new ComandaDto(
-            p.Id.ToString("N")[..8].ToUpperInvariant(),
+            CodigoCurto.De(p.Id),
             p.NumeroDoDia,
             PrazoImpresso.Calcular(p),
             Limpo(p.Cliente.Nome),

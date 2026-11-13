@@ -7,7 +7,7 @@ namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 public sealed record AtendenteResult(Guid UsuarioId, string Nome, string Email);
 
-public sealed record TransferirConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, Guid ParaUsuarioId, string? UsuarioNome = null);
+public sealed record TransferirConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, Guid ParaUsuarioId, string? UsuarioNome = null, bool Confirmada = false);
 
 /// <summary>Destino da transferência não é usuário ativo da empresa com permissão de atender: 422.</summary>
 public sealed class DestinoNaoAtendenteException(Guid usuarioId)
@@ -65,6 +65,7 @@ public sealed class TransferirConversaUseCase(
             if (destino is null || !RegraAtendente.Atende(destino))
                 throw new DestinoNaoAtendenteException(command.ParaUsuarioId);
 
+            await GuardaAtribuicaoConversa.GarantirAsync(atendenteRepository, conversa, command.UsuarioId, command.Confirmada, token);
             var agora = DateTime.UtcNow;
             conversa.Transferir(destino.UsuarioId, agora);
             await conversaRepository.AddMensagemAsync(

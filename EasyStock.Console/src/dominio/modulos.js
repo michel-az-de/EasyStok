@@ -17,6 +17,22 @@ import { moduloCongelado, telaCongelada } from './congelados'
 import { podeAjustarEntrega } from './acessoModulos'
 import { partesNoFuso } from './formato'
 
+// #2258 (auditoria de UX, dicionário de nomes): um nome por conceito, em constante única. A tela
+// inicial é "Início" em todo lugar; as respostas e mensagens que saem sozinhas são "Respostas automáticas".
+export const NOME_INICIO = 'Início'
+export const NOME_RESPOSTAS_AUTOMATICAS = 'Respostas automáticas'
+// A tela de regras do Atendimento não pode se chamar "Avisos", como o sino do cabeçalho.
+export const NOME_REGRAS_DE_AVISO = 'Regras de aviso'
+
+// #2258 (A2): a ordem dos módulos segue o caminho do pedido e vale na home, na Ajuda, no Menu e na
+// Busca. A lista `MODULOS` guarda a numeração do plano (ADR-0056) e não muda; quem lista ordena por aqui.
+export const ORDEM_DOS_MODULOS = ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro', 'configuracoes', 'campanhas']
+const posicaoNaOrdem = (id) => {
+  const posicao = ORDEM_DOS_MODULOS.indexOf(id)
+  return posicao < 0 ? ORDEM_DOS_MODULOS.length : posicao
+}
+export const emOrdemDosModulos = (modulos) => [...modulos].sort((a, b) => posicaoNaOrdem(a.id) - posicaoNaOrdem(b.id))
+
 export const TELA_OPERACAO = 'operacao'
 export const TELA_AJUSTE = 'ajuste'
 
@@ -56,10 +72,12 @@ export const MODULOS = [
     numero: 3, id: 'atendimento', nome: 'Atendimento', icone: 'conversa',
     resumo: 'Conversas, pedidos e clientes',
     telas: [
-      { id: 'balcao', rotulo: 'Balcão', tipo: TELA_OPERACAO },
+      { id: 'balcao', rotulo: 'Conversas', tipo: TELA_OPERACAO },
       { id: 'horarios', rotulo: 'Horários e mensagens', tipo: TELA_AJUSTE, aba: 'atendimento', soApi: true },
+      // #2096: o que chama a dona e o gerente (aparelho, e-mail e sino); mesma permissão do módulo.
+      { id: 'avisos', rotulo: NOME_REGRAS_DE_AVISO, tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
       // #1441: criar, editar e arquivar respostas prontas; ligar e escrever as automáticas.
-      { id: 'respostas', rotulo: 'Respostas e automáticas', tipo: TELA_AJUSTE, aba: 'respostas' },
+      { id: 'respostas', rotulo: NOME_RESPOSTAS_AUTOMATICAS, tipo: TELA_AJUSTE, aba: 'respostas' },
     ],
   },
   {
@@ -72,17 +90,18 @@ export const MODULOS = [
   },
   {
     numero: 5, id: 'financeiro', nome: 'Financeiro', icone: 'dollar-sign',
-    // #1891: enquanto o financeiro gerencial está congelado, o resumo fala só do que abre.
-    resumo: 'Caixa do dia',
+    resumo: 'Caixa, contas a pagar e receber, extrato e relatórios',
     telas: [
       { id: 'caixa', rotulo: 'Caixa do dia', tipo: TELA_AJUSTE, aba: 'caixa' },
-      { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true },
-      { id: 'pagar', rotulo: 'Contas a pagar', tipo: TELA_AJUSTE, aba: 'financeiro-pagar', soApi: true },
-      { id: 'receber', rotulo: 'Contas a receber', tipo: TELA_AJUSTE, aba: 'financeiro-receber', soApi: true },
-      { id: 'extrato', rotulo: 'Extrato', tipo: TELA_AJUSTE, aba: 'financeiro-extrato', soApi: true },
-      { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true },
-      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true },
-      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true },
+      // #2095 (F17): o Operador abre o Financeiro pelo Caixa do dia, mas a API recusa o gerencial;
+      // cada tela pede a ação que a API exige, e quem não tem vê só o Caixa.
+      { id: 'visao-geral', rotulo: 'Visão geral', tipo: TELA_AJUSTE, aba: 'financeiro-resumo', soApi: true, acao: 'verContas' },
+      { id: 'pagar', rotulo: 'Contas a pagar', tipo: TELA_AJUSTE, aba: 'financeiro-pagar', soApi: true, acao: 'verContasPagar' },
+      { id: 'receber', rotulo: 'Contas a receber', tipo: TELA_AJUSTE, aba: 'financeiro-receber', soApi: true, acao: 'verContasReceber' },
+      { id: 'extrato', rotulo: 'Extrato', tipo: TELA_AJUSTE, aba: 'financeiro-extrato', soApi: true, acao: 'verContas' },
+      { id: 'relatorios', rotulo: 'Relatórios', tipo: TELA_AJUSTE, aba: 'financeiro-relatorios', soApi: true, acao: 'verContas' },
+      { id: 'categorias', rotulo: 'Categorias financeiras', tipo: TELA_AJUSTE, aba: 'financeiro-categorias', soApi: true, acao: 'verCategoriasFinanceiras' },
+      { id: 'centros-custo', rotulo: 'Centros de custo', tipo: TELA_AJUSTE, aba: 'financeiro-centros', soApi: true, acao: 'verCentrosCusto' },
     ],
   },
   {
@@ -93,7 +112,7 @@ export const MODULOS = [
     ],
   },
   {
-    numero: 7, id: 'configuracoes', nome: 'Configurações', icone: 'automacao',
+    numero: 7, id: 'configuracoes', nome: 'Configurações', icone: 'settings',
     resumo: 'Usuários, canais e integrações da loja',
     telas: [
       { id: 'canais', rotulo: 'Canais', tipo: TELA_AJUSTE, aba: 'canais', soApi: true },
@@ -126,7 +145,16 @@ export const hashDoModulo = (moduloId, telaId) => `#/m/${moduloId}${telaId ? '/'
 // congelada sai do menu do módulo vivo.
 // #1921: tela com `acao` só aparece no modo API para quem a matriz libera (`podeNaTela`); sem a matriz
 // (`acoes` ausente: demonstração, catálogo do guia) a tela fica.
-const PODE_NA_TELA = { ajustarEntrega: podeAjustarEntrega }
+const verContas = (acoes) => acoes?.visualizarContasPagar === true || acoes?.visualizarContasReceber === true
+const PODE_NA_TELA = {
+  ajustarEntrega: podeAjustarEntrega,
+  verContas,
+  verContasPagar: (acoes) => acoes?.visualizarContasPagar === true,
+  verContasReceber: (acoes) => acoes?.visualizarContasReceber === true,
+  // O GET de categorias e de centros exige visualizar contas (a pagar ou a receber); só gerenciar não lista (#2105, achado 8).
+  verCategoriasFinanceiras: verContas,
+  verCentrosCusto: verContas,
+}
 const podeNaTela = (tela, { fonteApi, acoes }) => !tela.acao || !fonteApi || !acoes || PODE_NA_TELA[tela.acao]?.(acoes) === true
 export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
   moduloCongelado(modulo?.id) ? [] : (modulo?.telas ?? []).filter((t) => (fonteApi || !t.soApi) && !telaCongelada(modulo.id, t.id)
@@ -135,7 +163,7 @@ export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
 // Cartões do hall: disponível = tem pelo menos uma tela no modo atual. Módulo congelado
 // (#1891) não vira cartão; `MODULOS` segue inteiro para quem precisa do catálogo.
 export function modulosDoHall({ fonteApi = false, acoes = null } = {}) {
-  return MODULOS.filter((modulo) => !moduloCongelado(modulo.id)).map((modulo) => {
+  return emOrdemDosModulos(MODULOS.filter((modulo) => !moduloCongelado(modulo.id))).map((modulo) => {
     const telas = telasDoMenu(modulo, { fonteApi, acoes })
     const disponivel = telas.length > 0
     return {

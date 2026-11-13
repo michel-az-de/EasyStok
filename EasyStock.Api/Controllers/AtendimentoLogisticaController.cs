@@ -58,7 +58,7 @@ public sealed class AtendimentoLogisticaController(
     private async Task<IActionResult> Executar(Func<Task<IActionResult>> acao)
     {
         try { return await acao(); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (RegraDeDominioVioladaException ex) { return DataBadRequest(ex.Message); }
         catch (FreteProviderException ex) { return DataBadRequest(ex.Message); }
         catch (HttpRequestException) { return StatusCode(502, new { message = "Não foi possível confirmar o serviço de entrega. Atualize antes de tentar novamente." }); }

@@ -55,9 +55,9 @@ confere('o hall fica só com o nome da casa e não herda contagem de outra tela'
 
 confere('o Balcão leva a contagem na frente e some com ela quando zera', () => {
   const balcao = rota('#/m/atendimento/balcao')
-  assert.equal(tituloDaAba(balcao, 3), `(3) Balcão · ${TITULO_BASE}`)
-  assert.equal(tituloDaAba(balcao, 0), `Balcão · ${TITULO_BASE}`)
-  assert.equal(tituloDaAba(balcao), `Balcão · ${TITULO_BASE}`)
+  assert.equal(tituloDaAba(balcao, 3), `(3) Conversas · ${TITULO_BASE}`)
+  assert.equal(tituloDaAba(balcao, 0), `Conversas · ${TITULO_BASE}`)
+  assert.equal(tituloDaAba(balcao), `Conversas · ${TITULO_BASE}`)
 })
 
 confere('janela avulsa pelo apelido também diz o que é', () => {
@@ -84,8 +84,8 @@ confere('quem escreve o título: o App pela rota e o Balcão com a contagem', ()
 confere('o topo do Balcão tem link para os módulos (tablet de 1024 a 1179 px, sem Mais e sem trilho)', () => {
   const moldura = fonte('app/Moldura.jsx')
   const cabecalho = moldura.slice(moldura.indexOf('function Cabecalho('), moldura.indexOf('function Trilho('))
-  assert.match(cabecalho, /<a className=\{css\.marca\} href=\{HASH_HALL\} aria-label="Ir para os módulos"/)
-  assert.match(cabecalho, /<h1 className="sr">Casa da Baba<\/h1>/)
+  assert.match(cabecalho, /<a className=\{css\.marca\} href=\{HASH_HALL\} aria-label=\{`Ir para o \$\{NOME_INICIO\}`\}/) // #2258 (auditoria T9): Início no lugar de Módulos
+  assert.match(cabecalho, /<h1 className="sr">Casa da Babá<\/h1>/)
 })
 
 // ---------------------------------------------------------------- Ajuda e Sair no celular
@@ -96,7 +96,8 @@ for (const [arquivo, grade] of [['features/hall/hall.module.css', '.topo'], ['fe
     const celular = css.slice(css.indexOf('@media (max-width: 640px)'))
     assert.match(celular, new RegExp(`\\${grade} \\{ display: grid; grid-template-columns: minmax\\(0, 1fr\\) auto auto;`))
     assert.match(celular, /\[data-ajuda-console\]\) \{ grid-row: 1; grid-column: 2; \}/)
-    assert.match(celular, /\.sair \{ grid-row: 1; grid-column: 3;/)
+    // #2258 (auditoria A9): na moldura dos módulos o Sair solto virou a conta (avatar) da barra.
+    assert.match(celular, /\.(sair|contaNaBarra) \{ grid-row: 1; grid-column: 3;/)
     // O deslocamento fixo era o defeito: supunha um Ajuda de 84 px, e ele mede 104 px.
     assert.doesNotMatch(css, /\.sair \{[^}]*margin-left/)
   })

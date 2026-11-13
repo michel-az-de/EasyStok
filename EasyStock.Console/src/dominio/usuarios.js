@@ -12,12 +12,14 @@ export const situacaoDoUsuario = (usuario) =>
   !usuario.ativo ? SITUACAO.desativado : usuario.convite?.estado === 'pendente' ? SITUACAO.convite : SITUACAO.ativo
 
 // A API recusa mexer no próprio acesso (USUARIO_PROPRIO); a tela nem oferece.
-export function acoesDoUsuario(usuario, meuId) {
+export function acoesDoUsuario(usuario, meuId, souSuporte = false) {
   const eu = usuario.usuarioId === meuId
   const pendente = usuario.convite?.estado === 'pendente'
   return {
     trocarPerfil: !eu && usuario.ativo,
     reenviarConvite: !eu && usuario.ativo && pendente,
+    // #2201: código de acesso de uso único, para quem entra pelo app sem e-mail e senha. Para administrador, só o suporte.
+    gerarCodigo: !eu && usuario.ativo && (souSuporte || !['Admin', 'SuperAdmin'].includes(usuario.nivel)),
     desativar: !eu && usuario.ativo,
     reativar: !eu && !usuario.ativo,
   }
@@ -50,6 +52,7 @@ export function erroDoConvite({ nome, email, perfilId }) {
 const FEITO = {
   convite: (u) => `Convite enviado para ${u.email}. Chega em até um minuto.`,
   reenviar: (u) => `Convite reenviado para ${u.email}. O link anterior deixou de valer.`,
+  codigo: (u) => `Código de acesso de ${u.nome} gerado. Vale uma vez, por 30 dias. O código anterior deixou de valer.`,
   perfil: (u, perfil) => (u.ultimoAcessoEm
     ? `${u.nome} agora tem o perfil ${perfil}. A mudança vale na próxima vez que entrar.`
     : `${u.nome} agora tem o perfil ${perfil}.`),
@@ -61,6 +64,7 @@ const FEITO = {
 }
 const FALHOU = {
   reenviar: 'O convite não foi reenviado',
+  codigo: 'O código de acesso não foi gerado',
   perfil: 'O perfil não mudou',
   desativar: 'O acesso continua ativo',
   reativar: 'O acesso continua desativado',

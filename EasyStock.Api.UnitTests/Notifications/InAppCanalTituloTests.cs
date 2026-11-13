@@ -13,13 +13,15 @@ namespace EasyStock.Api.UnitTests.Notifications;
 public class InAppCanalTituloTests
 {
     [Theory]
-    [InlineData(CategoriaConteudoNotificacao.Operacional, "Caixa aberto fora do horário", "Caixa aberto fora do horário", SeveridadeNotificacao.Media)]
-    [InlineData(CategoriaConteudoNotificacao.Seguranca, "Senha alterada", "Senha alterada", SeveridadeNotificacao.Media)]
-    [InlineData(CategoriaConteudoNotificacao.Transacional, "Pedido em preparo", "Pedido em preparo", SeveridadeNotificacao.Informativa)]
-    [InlineData(CategoriaConteudoNotificacao.Operacional, "", "Validade Próxima", SeveridadeNotificacao.Media)]
-    [InlineData(CategoriaConteudoNotificacao.Operacional, "  ", "Validade Próxima", SeveridadeNotificacao.Media)]
+    [InlineData(CategoriaConteudoNotificacao.Operacional, "Caixa aberto fora do horário", "Caixa aberto fora do horário", SeveridadeNotificacao.Media, TipoAlertaEstoque.AvisoOperacional)]
+    [InlineData(CategoriaConteudoNotificacao.Seguranca, "Senha alterada", "Senha alterada", SeveridadeNotificacao.Media, TipoAlertaEstoque.AvisoOperacional)]
+    [InlineData(CategoriaConteudoNotificacao.Transacional, "Pedido em preparo", "Pedido em preparo", SeveridadeNotificacao.Informativa, TipoAlertaEstoque.PedidoRecebido)]
+    // #2301: aviso operacional sem assunto não vira "Validade Próxima".
+    [InlineData(CategoriaConteudoNotificacao.Operacional, "", "Aviso", SeveridadeNotificacao.Media, TipoAlertaEstoque.AvisoOperacional)]
+    [InlineData(CategoriaConteudoNotificacao.Operacional, "  ", "Aviso", SeveridadeNotificacao.Media, TipoAlertaEstoque.AvisoOperacional)]
     public async Task PreservaAssuntoRealComFallbackSemMudarSeveridadeOuCorrelacao(
-        CategoriaConteudoNotificacao categoria, string assunto, string tituloEsperado, SeveridadeNotificacao severidade)
+        CategoriaConteudoNotificacao categoria, string assunto, string tituloEsperado, SeveridadeNotificacao severidade,
+        TipoAlertaEstoque tipoEsperado)
     {
         var repo = Substitute.For<INotificacaoRepository>();
         var usuarioId = Guid.NewGuid();
@@ -29,7 +31,7 @@ public class InAppCanalTituloTests
         var resultado = await new InAppCanal(repo, NullLogger<InAppCanal>.Instance).EnviarAsync(mensagem);
 
         resultado.Sucesso.Should().BeTrue();
-        await repo.Received(1).AddAsync(Arg.Is<Notificacao>(n => n.Titulo == tituloEsperado
+        await repo.Received(1).AddAsync(Arg.Is<Notificacao>(n => n.Titulo == tituloEsperado && n.TipoAlerta == tipoEsperado
             && n.Mensagem == mensagem.Corpo && n.Severidade == severidade && n.EmpresaId == mensagem.EmpresaId
             && n.UsuarioId == usuarioId && n.OutboxMensagemId == mensagem.OutboxId && n.ReferenciaId == mensagem.OutboxId));
     }

@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.Options;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Caixa;
 
@@ -10,6 +11,12 @@ namespace EasyStock.Application.UseCases.Caixa;
 /// Miolo do <c>CaixaEsquecidoJob</c> (ADR-0034 / #641): caixa aberto de dia anterior vira o aviso in-app
 /// <see cref="TipoEventoNotificacao.CaixaAbertoEsquecido"/> (sino) e, desde a N11, também o
 /// <see cref="TipoEventoNotificacao.PrazoEstourado"/> (e-mail e WhatsApp para a equipe). Só avisa, não fecha.
+///
+/// <para>
+/// #2258 (F1): o sino não pode contar outra história que a tela do caixa. O aviso só sai se o caixa segue aberto pelo
+/// mesmo critério da tela (nenhum fechamento da loja depois da abertura), o dinheiro vai em reais e cada rodada resolve
+/// os avisos de caixas que já fecharam (o fechamento também os resolve na hora, em <c>FecharCaixaUseCase</c>).
+/// </para>
 ///
 /// <para>
 /// Cross-tenant: o job liga o bypass de RLS antes de abrir a conexão e segura o advisory lock. Gate: sem rotina
@@ -26,6 +33,7 @@ public sealed class AvisarCaixasEsquecidasUseCase(
     ICaixaRepository caixaRepository,
     IRotinaRepository rotinaRepository,
     IEventoNotificacaoRepository eventoRepository,
+    INotificacaoRepository notificacaoRepository,
     INotificadorService notificador,
     IUnitOfWork unitOfWork,
     IOptions<PrazosOptions> prazos,
@@ -41,6 +49,8 @@ public sealed class AvisarCaixasEsquecidasUseCase(
             return 0;
         }
 
+        await ResolverAvisosDeCaixasFechadosAsync(ct);
+
         var agora = relogio.GetUtcNow().UtcDateTime;
         var hoje = HorarioBrasil.DataOperacional(agora);
         var esquecidas = await caixaRepository.GetAberturasEsquecidasAsync(HorarioBrasil.InicioRealDoDiaUtc(hoje), ct);
@@ -50,6 +60,15 @@ public sealed class AvisarCaixasEsquecidasUseCase(
         {
             if (abertura.NotificadoEsquecidoEm != null) continue; // dedup: já avisado
             if (ct.IsCancellationRequested) break;
+
+            // #2258 (F1): a consulta pode atrasar frente ao fechamento (ou o marcador faltar); o último fechamento da
+            // loja, o mesmo que a tela usa, decide: depois da abertura, o caixa já fechou e não há o que avisar.
+            var ultimoFechamento = await caixaRepository.GetUltimoFechamentoDaLojaAsync(abertura.EmpresaId, abertura.LojaId);
+            if (ultimoFechamento is not null && ultimoFechamento.FechadoEm > abertura.DataMovimento)
+            {
+                logger.LogInformation("CaixaEsquecidoJob: abertura {Id} já tem fechamento posterior — não avisa.", abertura.Id);
+                continue;
+            }
 
             var usuarioId = abertura.RegistradoPorUserId
                 ?? await caixaRepository.ResolverResponsavelPadraoAsync(abertura.EmpresaId, ct);
@@ -66,7 +85,7 @@ public sealed class AvisarCaixasEsquecidasUseCase(
                 usuarioId = usuarioId.Value,            // resolve o destinatário do sino in-app
                 aberturaId = abertura.Id,
                 data_abertura = diaAbertura.ToString("dd/MM/yyyy"),
-                valor_abertura = abertura.Valor,
+                valor_abertura = Reais(abertura.Valor),
                 loja_nome = string.Empty
             });
 
@@ -74,8 +93,8 @@ public sealed class AvisarCaixasEsquecidasUseCase(
             {
                 await notificador.PublicarEventoAsync(
                     TipoEventoNotificacao.CaixaAbertoEsquecido, abertura.EmpresaId,
-                    usuarioDestinoId: usuarioId, payloadJson: payload, ct: ct);
-                await EnfileirarPrazoAsync(abertura.EmpresaId, abertura.Id, diaAbertura, hoje, ct);
+                    usuarioDestinoId: usuarioId, payloadJson: payload, ct: ct, refEntidadeId: abertura.Id);
+                await EnfileirarPrazoAsync(abertura.EmpresaId, abertura.Id, diaAbertura, abertura.Valor, hoje, ct);
             }
             catch (Exception ex)
             {
@@ -96,7 +115,8 @@ public sealed class AvisarCaixasEsquecidasUseCase(
 
     // N11: ao lado do sino. A audiência é a da rotina (gestores); sem usuarioId no payload. A chave determinística
     // faz o segundo passe, depois de uma queda entre publicar e carimbar, não repetir o aviso externo.
-    private async Task EnfileirarPrazoAsync(Guid empresaId, Guid aberturaId, DateOnly diaAbertura, DateOnly hoje, CancellationToken ct)
+    private async Task EnfileirarPrazoAsync(
+        Guid empresaId, Guid aberturaId, DateOnly diaAbertura, decimal valorAbertura, DateOnly hoje, CancellationToken ct)
     {
         var opcoes = prazos.Value;
         if (!opcoes.Habilitado) return;
@@ -106,8 +126,28 @@ public sealed class AvisarCaixasEsquecidasUseCase(
 
         var dias = Math.Max(1, hoje.DayNumber - diaAbertura.DayNumber);
         await PrazoEstouradoEvento.EnfileirarAsync(notificador, opcoes, TipoPrazo.CaixaEsquecido,
-            empresaId, aberturaId, PrazoEstouradoEvento.Referencia(aberturaId),
-            diaAbertura.ToString("dd/MM/yyyy"), PrazoEstouradoEvento.Duracao(TimeSpan.FromDays(dias)), usuarioId: null, ct);
+            empresaId, aberturaId, CodigoCurto.De(aberturaId),
+            diaAbertura.ToString("dd/MM/yyyy"), PrazoEstouradoEvento.Duracao(TimeSpan.FromDays(dias)), usuarioId: null, ct,
+            detalhe: $"Aberto desde {diaAbertura:dd/MM/yyyy}, saldo de abertura {Reais(valorAbertura)}. " +
+                     "Feche-o para não acumular vendas no dia errado.");
         await unitOfWork.CommitAsync();
     }
+
+    // #2258 (F1): falhar aqui não pode impedir os avisos novos; a próxima rodada varre de novo.
+    private async Task ResolverAvisosDeCaixasFechadosAsync(CancellationToken ct)
+    {
+        try
+        {
+            var resolvidos = await notificacaoRepository.ResolverAvisosDeCaixaFechadoAsync(null, ct);
+            if (resolvidos > 0)
+                logger.LogInformation("CaixaEsquecidoJob: {Resolvidos} aviso(s) de caixa já fechado marcado(s) como lido(s).", resolvidos);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "CaixaEsquecidoJob: não consegui resolver os avisos de caixas já fechados.");
+        }
+    }
+
+    // "R$ 300,03" com espaço comum (o espaço sem quebra do pt-BR some em alguns renderizadores do sino).
+    private static string Reais(decimal valor) => valor.ToString("C2", Cultura.PtBr).Replace(' ', ' ');
 }

@@ -47,7 +47,6 @@ const fronteiras = new Map([
   ['/componentes/EscolhaDeEntregador', 'export function EscolhaDeEntregador(){}'],
   ['/componentes/Icone', 'export function Icone(){}'],
   ['/features/ficha-cliente/BlocoCobranca', 'export function BaixaAMao(){}'],
-  ['/features/ficha-cliente/MenuDoPedido', 'export function MenuDoPedido(){}'],
   ['/features/ficha-cliente/EscolhaDeMeio', 'export function EscolhaDeMeio(){}'],
 ])
 registerHooks({
@@ -101,7 +100,8 @@ const provar = async (nome, fn) => { await fn(); resultados.push({ nome, resulta
 await provar('abrir uma comanda em andamento não celebra uma ação que não ocorreu agora', () => {
   const tela = new Tela(props({ estado: 'entregue' }))
   assert.ok(!atualizou(tela)); assert.equal(tela.arvore.props['data-etapa-confirmada'], undefined)
-  assert.ok(botao(tela, 'Encerrar atendimento')); tela.encerrar()
+  const concluir = botao(tela, 'Concluir conversa')
+  assert.ok(concluir); assert.equal(concluir.props.icone, 'circle-check'); tela.encerrar()
 })
 await provar('posição da jornada vem de cada estado real, sem pontos ou porcentagem inventados', () => {
   for (const [i, passo] of PASSOS.entries()) {

@@ -92,11 +92,9 @@ internal static class CalculoProducaoCore
                 tudoDisponivel = false;
             }
 
-            decimal? custoUnit = null;
-            if (lotes is { Count: > 0 })
-                custoUnit = lotes.First().CustoUnitario.Valor;
-            else if (insumo.CustoReferencia != null)
-                custoUnit = insumo.CustoReferencia.Valor;
+            // #2363: o custo de 6 casas do insumo vence o do lote, que guarda centavos e zera R$ 0,0045/g.
+            decimal? custoUnit = insumo.CustoUnitarioInsumo
+                ?? (lotes is { Count: > 0 } ? lotes.First().CustoUnitario.Valor : insumo.CustoReferencia?.Valor);
 
             decimal? custoLinha = custoUnit.HasValue
                 ? CustoNaUnidadeDoInsumo(qtdNecessaria, comp.Unidade, insumo.UnidadeMedidaBase, custoUnit.Value)

@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
 import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
-import { abaVisivel, alvoDoEvento, avisoDoCardapio, deveVarrerAoVoltar } from './planoDeSincronizacao'
+import { abaVisivel, alvoDoEvento, avisoDoCardapio, criarRastroDaConexao, deveVarrerAoVoltar } from './planoDeSincronizacao'
 import { criarCicloDeSincronizacao, criarMemoriaDoLaco } from './cicloDeSincronizacao'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
+import { criarEsperaDeReconexao } from './recargaAoVivo'
 
 // Polling da inbox (F01), com releitura dirigida pelos eventos de pedido (S18).
 // A volta está em `cicloDeSincronizacao.js` e o que ela relê em
@@ -57,6 +58,8 @@ export function useSincronizacaoApi({
     let reconexao = null
     let ocultaDesde = null
     let fecharEventos = () => {}
+    const esperaDeReconexao = criarEsperaDeReconexao({ base: INTERVALO_MS })
+    const rastro = criarRastroDaConexao()
     const sincronizar = criarCicloDeSincronizacao({
       despachar, comConversas, memoria: memoria ?? criarMemoriaDoLaco(), dono: usuarioId,
       lerSelecionada: () => selecionadaRef.current, lerUsuario: () => usuarioRef.current, estaVivo: () => vivo,
@@ -122,6 +125,17 @@ export function useSincronizacaoApi({
     function conectar() {
       fecharEventos = conectarEventosOperacao({
         aoEvento: ({ evento, dados }) => {
+          if (evento === 'ready') {
+            esperaDeReconexao.zerar()
+            // #2285: sem replay na API, o que chegou com o SSE caído só vem lendo de novo: a conversa aberta
+            // (mensagens e ficha) e a inbox inteira, já, em vez de esperar a próxima volta.
+            if (vivo && rastro.aoReady()) {
+              sincronizar.atualizarConversa(selecionadaRef.current)
+              if (selecionadaRef.current) aoConversaAtualizadaRef.current?.(selecionadaRef.current)
+              ciclos = 0
+              ciclo()
+            }
+          }
           const alvo = alvoDoEvento(evento, dados)
           if (!vivo || !alvo) return
           // #1966: a volta seguinte (no ritmo de sempre) lê até a página da conversa e traz o nome. O contato
@@ -136,7 +150,7 @@ export function useSincronizacaoApi({
           clearTimeout(esperaPedidos)
           esperaPedidos = setTimeout(() => ciclo(true), AGRUPAR_EVENTOS_MS)
         },
-        aoCair: () => { if (vivo) reconexao = setTimeout(conectar, INTERVALO_MS) },
+        aoCair: () => { rastro.aoCair(); if (vivo) reconexao = setTimeout(conectar, esperaDeReconexao.proxima()) },
       })
     }
 

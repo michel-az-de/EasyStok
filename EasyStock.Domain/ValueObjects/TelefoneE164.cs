@@ -21,6 +21,21 @@ public sealed record TelefoneE164
 
     private TelefoneE164(string value) => Value = value;
 
+    /// <summary>
+    /// Só os dígitos de qualquer grafia (<c>+55 (11) 99757-3992</c> vira <c>5511997573992</c>), sem validar. É a extração
+    /// única de dígitos de telefone do sistema: o <c>wa_id</c> do WhatsApp, a máscara do convite e a impressão a usam.
+    /// </summary>
+    public static string SoDigitos(string? telefone)
+    {
+        if (string.IsNullOrEmpty(telefone)) return string.Empty;
+        var sb = new StringBuilder(telefone.Length);
+        foreach (var c in telefone)
+        {
+            if (char.IsDigit(c)) sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
     /// <summary>Normaliza e valida. Lança <see cref="TelefoneInvalidoException"/> quando não é E.164 BR.</summary>
     public static TelefoneE164 From(string? telefone)
     {

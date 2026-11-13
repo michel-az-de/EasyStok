@@ -1,27 +1,31 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
-import { contagemInicial, porcaoSugerida, porcoesParaAjuste, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
+import { contagemInicial, detalheDoLote, podeRegistrarPerda, podeReimprimir, motivoDaContagem, porcaoQueNaoRepete, porcaoSugerida, porcoesParaAjuste, quandoVence, resumoDoEstoque, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
+import { producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
+import { PreviaDasEtiquetas } from './etiqueta/PreviaDasEtiquetas'
 
 // M2 › Estoque do dia (M2.1, #1490). O que a Thati usa todo dia, lido do EasyStok: os alertas de
 // venda sem saldo (avisa, não trava; RN-48), o saldo em porções por prato e os lotes com o
 // vencimento destacado (US-065). "Ajustar" é a contagem dela com o motivo e fecha o alerta.
 // Em prato com porções (#1542) a contagem é de uma porção: o saldo é dela.
-const porcoes = (n) => (n === 1 ? '1 porção' : `${n} porções`)
+const porcoes = (n) => (n === 1 ? '1 porção' : `${Number(n).toLocaleString('pt-BR')} porções`)
 const saldoDaPorcao = (s) => `${s.rotulo}: ${s.saldo}${s.descoberto > 0 ? ` (${s.descoberto} sem saldo)` : ''}`
-const dataCurta = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : 'sem validade')
 
-function quandoVence(lote) {
-  if (!lote.validade) return 'Sem validade informada'
-  if (lote.vencido) return 'Venceu'
-  if (lote.diasParaVencer === 0) return 'Vence hoje'
-  if (lote.diasParaVencer === 1) return 'Vence amanhã'
-  return `Vence ${dataCurta(lote.validade)}`
+// #2235 (banca T1-1): o número que pede ação ganha a cor do estado, com o texto dizendo o porquê.
+function NumeroDoResumo({ rotulo, valor, tom, dica }) {
+  return (
+    <div className={tom ? css[`resumo${tom}`] : undefined}>
+      <dt>{rotulo}</dt>
+      <dd>{valor}</dd>
+      {dica && <dd className={css.dicaDoResumo}>{dica}</dd>}
+    </div>
+  )
 }
 
 function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) {
@@ -36,6 +40,8 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
   const [motivo, setMotivo] = useState('')
   const [salvando, setSalvando] = useState(false)
   const vencidas = vencidasNaContagem(contado)
+  // #2258 (auditoria P6): parado, o botão diz o que falta em vez de ficar apagado sem explicação.
+  const parado = motivoDaContagem({ salvando, contagem, motivo, porPorcao, contado: Boolean(contado) })
 
   const trocarPorcao = (evento) => {
     const chave = evento.target.value
@@ -88,7 +94,7 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
       </p>}
       <div className={css.rodapeForm}>
         <Botao variante="texto" disabled={salvando} onClick={aoCancelar}>Cancelar</Botao>
-        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || !motivo.trim() || contagem === '' || (porPorcao && !contado)}>{salvando ? 'Salvando…' : 'Salvar contagem'}</Botao>
+        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando || Boolean(parado)} motivo={parado ?? undefined}>{salvando ? 'Salvando…' : 'Salvar contagem'}</Botao>
       </div>
     </form>
   )
@@ -99,6 +105,47 @@ export function AbaEstoqueDoDiaApi() {
   const [ajustando, setAjustando] = useState(null)
   const [avisoDaContagem, setAvisoDaContagem] = useState(null)
   const avisoNoFormulario = ajustando !== null && ajustando === avisoDaContagem
+  // #2235 (banca T1-5): a perda do lote vencido é lançada na própria linha, depois de confirmar.
+  const [perdaDoLote, setPerdaDoLote] = useState(null)
+  const [lancandoPerda, setLancandoPerda] = useState(false)
+  const confirmandoPerda = (lote) => perdaDoLote !== null && perdaDoLote === lote.itemEstoqueId
+  const avisoNaPerda = perdaDoLote !== null && Boolean(estoque.aviso)
+  const abrirPerda = (id) => { estoque.fecharAviso(); setAvisoDaContagem(null); setPerdaDoLote(id) }
+  const registrarPerda = async (lote) => {
+    estoque.fecharAviso()
+    setAvisoDaContagem(null)
+    setLancandoPerda(true)
+    try { if (await estoque.registrarPerda(lote)) setPerdaDoLote(null) } finally { setLancandoPerda(false) }
+  }
+  // Ao abrir a confirmação, o foco vai para "Manter lote"; ao cancelar, volta ao "Registrar perda".
+  const perdaAnterior = useRef(null)
+  useEffect(() => {
+    const anterior = perdaAnterior.current
+    perdaAnterior.current = perdaDoLote
+    if (typeof document === 'undefined') return
+    const alvo = perdaDoLote !== null ? `manter-${perdaDoLote}` : anterior !== null ? `perda-${anterior}` : null
+    if (alvo) document.getElementById(alvo)?.focus()
+  }, [perdaDoLote])
+  // #2081 (A8): reimprimir as etiquetas de um lote ativo. { loteId } buscando, com `folha` pronta, com `erro` falhou.
+  // #2247 (v3): a reimpressão abre a mesma prévia da Produção do dia; quem imprime é o botão dela.
+  const [impressao, setImpressao] = useState(null)
+  const [previa, setPrevia] = useState(null)
+  const montada = useRef(true)
+  useEffect(() => {
+    montada.current = true
+    return () => { montada.current = false }
+  }, [])
+
+  async function reimprimir(lote) {
+    setPrevia({ loteId: lote.id, codigo: lote.codigo, quantas: lote.quantidade })
+    setImpressao({ loteId: lote.id })
+    try {
+      const folha = await producaoDoDia.folhaDeEtiquetas(lote.id)
+      if (montada.current) setImpressao({ loteId: lote.id, folha })
+    } catch (e) {
+      if (montada.current) setImpressao({ loteId: lote.id, erro: e.message })
+    }
+  }
 
   const trocarAjuste = (alvo) => {
     setAvisoDaContagem(null)
@@ -113,7 +160,7 @@ export function AbaEstoqueDoDiaApi() {
   if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
   if (estoque.estado === 'erro' && estoque.pratos.length === 0) {
     return (
-      <Vazio icone="alerta" role="alert" titulo="Não consegui ler o estoque"
+      <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar o estoque"
         acao={<Botao icone="refresh-cw" onClick={estoque.recarregar}>Tentar de novo</Botao>}>
         {estoque.erro}
       </Vazio>
@@ -125,29 +172,31 @@ export function AbaEstoqueDoDiaApi() {
   const lotes = estoque.pratos
     .flatMap((p) => p.lotes.map((l) => ({ ...l, prato: p.nome })))
     .sort((a, b) => (a.validade ?? '9999').localeCompare(b.validade ?? '9999'))
+  const resumo = resumoDoEstoque(estoque.pratos, estoque.alertas)
+  const semPorcao = estoque.pratos.length > 0 && resumo.porcoes === 0
 
   return (
     <div className={css.aba}>
-      <dl className={css.resumoOperacao} aria-label="Resumo do estoque">
-        <div><dt>Pratos no estoque</dt><dd>{estoque.pratos.length}</dd></div>
-        <div><dt>Lotes com saldo</dt><dd>{lotes.length}</dd></div>
-        <div><dt>Alertas de saldo</dt><dd>{estoque.alertas.length}</dd></div>
+      <dl className={css.resumoOperacao}>
+        <NumeroDoResumo rotulo="Porções disponíveis" valor={resumo.porcoes} tom={semPorcao ? 'Perigo' : null} dica={semPorcao ? 'produza ou ajuste' : null} />
+        <NumeroDoResumo rotulo={resumo.vencidos === 1 ? 'Lote vencido' : 'Lotes vencidos'} valor={resumo.vencidos} tom={resumo.vencidos > 0 ? 'Atencao' : null} dica={resumo.vencidos > 0 ? 'registre a perda' : null} />
+        <NumeroDoResumo rotulo="Vendas sem saldo" valor={resumo.vendasSemSaldo} tom={resumo.vendasSemSaldo > 0 ? 'Atencao' : null} dica={resumo.vendasSemSaldo > 0 ? 'ajuste a contagem' : null} />
       </dl>
       {estoque.estado === 'erro' && <p className={css.aviso} role="alert">
         O estoque não foi atualizado. Os saldos abaixo podem estar desatualizados. {estoque.erro}
         {' '}<Botao variante="texto" icone="refresh-cw" onClick={estoque.recarregar}>Recarregar estoque</Botao>
       </p>}
-      {estoque.aviso && !avisoNoFormulario && (
+      {estoque.aviso && !avisoNoFormulario && !avisoNaPerda && (
         <p className={css.aviso} role="alert">
           {estoque.aviso} <Botao variante="texto" onClick={estoque.fecharAviso}>Fechar</Botao>
         </p>
       )}
+      <div className={css.vivo} role="status">{estoque.feito && <p className={css.descricao}>{estoque.feito}</p>}</div>
 
+      {/* #2235 (banca T1-6): sem venda sem saldo, a seção some; o zero do topo já diz que está certo. */}
+      {estoque.alertas.length > 0 && (
       <section className={css.secao} aria-labelledby="estoque-alertas">
         <h3 id="estoque-alertas" className={css.tituloSecao}>Venda sem saldo</h3>
-        {estoque.alertas.length === 0 ? (
-          <p className={css.descricao}>Nenhum prato vendido sem produção lançada.</p>
-        ) : (
           <ul className={css.lista}>
             {estoque.alertas.map((a) => (
               <li key={a.produtoId} className={css.linha}>
@@ -171,28 +220,31 @@ export function AbaEstoqueDoDiaApi() {
               </li>
             ))}
           </ul>
-        )}
       </section>
+      )}
 
       <section className={css.secao} aria-labelledby="estoque-saldo">
         <h3 id="estoque-saldo" className={css.tituloSecao}>Saldo por prato</h3>
         {estoque.pratos.length === 0 ? (
-          <p className={css.descricao}>Nenhum prato do cardápio está ligado ao estoque ainda. A primeira produção liga: lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
+          <p className={css.descricao}>Nenhum prato com estoque cadastrado. Registre o primeiro lote em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
         ) : (
           <ul className={css.lista}>
             {estoque.pratos.map((p) => (
               <li key={p.sku} className={css.linha}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{p.nome}</span>
-                  <span className={css.detalhe}>
-                    {p.porcoes.length > 0 ? p.porcoes.map(saldoDaPorcao).join(' · ') : p.porcao}
-                  </span>
+                  {/* #2081 (A16): a porção só aparece quando o nome ainda não diz qual é. */}
+                  {(p.porcoes.length > 0 || porcaoQueNaoRepete(p.nome, p.porcao)) && <span className={css.detalhe}>
+                    {p.porcoes.length > 0 ? p.porcoes.map(saldoDaPorcao).join(' · ') : porcaoQueNaoRepete(p.nome, p.porcao)}
+                  </span>}
                 </div>
                 <span className={css.preco}>{porcoes(p.saldo)}</span>
+                {/* #2235 (banca T1-2): chip com ícone, texto e cor por estado; vencido é âmbar, sem saldo é vermelho. */}
                 <div className={css.estados}>
-                  {p.saldo === 0 && <Pilula tom="perigo" fina>Sem saldo</Pilula>}
-                  {p.descoberto > 0 && <Pilula tom="aviso" fina>{porcoes(p.descoberto)} vendidas sem saldo</Pilula>}
-                  {p.lotes.some((l) => l.vencendo) && <Pilula tom="aviso" fina>Lote vencendo</Pilula>}
+                  {p.saldo === 0 && <Pilula tom="perigo" icone="circle-x">Sem saldo</Pilula>}
+                  {p.descoberto > 0 && <Pilula tom="aviso" icone="alerta">{porcoes(p.descoberto)} vendidas sem saldo</Pilula>}
+                  {p.lotes.some((l) => l.vencido) && <Pilula tom="aviso" icone="relogio">Lote vencido</Pilula>}
+                  {p.lotes.some((l) => l.vencendo) && <Pilula tom="aviso" icone="hourglass">Lote vencendo</Pilula>}
                 </div>
                 {ajustando === p.sku ? (
                   <FormularioAjuste
@@ -204,7 +256,7 @@ export function AbaEstoqueDoDiaApi() {
                   />
                 ) : (
                   <div className={css.acoes}>
-                    <Botao variante="texto" icone="lapis" aria-label={`Ajustar contagem de ${p.nome}`} onClick={() => trocarAjuste(p.sku)}>Ajustar</Botao>
+                    <Botao variante="secundario" icone="lapis" aria-label={`Ajustar contagem de ${p.nome}`} onClick={() => trocarAjuste(p.sku)}>Ajustar</Botao>
                   </div>
                 )}
               </li>
@@ -214,7 +266,7 @@ export function AbaEstoqueDoDiaApi() {
       </section>
 
       <section className={css.secao} aria-labelledby="estoque-lotes">
-        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes ativos</h3>
+        <h3 id="estoque-lotes" className={css.tituloSecao}>Lotes</h3>
         {lotes.length === 0 ? (
           <p className={css.descricao}>Nenhum lote com saldo.</p>
         ) : (
@@ -223,17 +275,46 @@ export function AbaEstoqueDoDiaApi() {
               <li key={`${l.codigo}-${i}`} className={css.linha}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{l.prato}</span>
-                  <span className={css.detalhe}>{l.codigo ?? 'sem código'}</span>
+                  {/* #2081 (A10), #2235 (T1-4): código e tamanho, de onde veio, quem lançou e a fabricação. */}
+                  <span className={css.detalhe}>{detalheDoLote(l)}</span>
                 </div>
                 <span className={css.preco}>{porcoes(l.quantidade)}</span>
                 <div className={css.estados}>
-                  <Pilula tom={l.vencido ? 'perigo' : l.vencendo ? 'aviso' : 'neutro'} fina>{quandoVence(l)}</Pilula>
+                  {l.vencido || l.vencendo
+                    ? <Pilula tom="aviso" icone={l.vencido ? 'relogio' : 'hourglass'}>{quandoVence(l)}</Pilula>
+                    : <Pilula tom="neutro" fina>{quandoVence(l)}</Pilula>}
                 </div>
+                {(podeReimprimir(l) || podeRegistrarPerda(l)) && !confirmandoPerda(l) && (
+                  <div className={css.acoes}>
+                    {podeRegistrarPerda(l) && (
+                      <Botao id={`perda-${l.itemEstoqueId}`} variante="secundario" icone="lixeira" disabled={lancandoPerda}
+                        aria-label={`Registrar perda do lote ${l.codigo ?? ''} de ${l.prato}`} onClick={() => abrirPerda(l.itemEstoqueId)}>Registrar perda</Botao>
+                    )}
+                    {podeReimprimir(l) && (
+                      <Botao variante="texto" icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
+                        aria-label={`Etiquetas do lote ${l.codigo} de ${l.prato}`} onClick={() => reimprimir(l)}>Etiquetas</Botao>
+                    )}
+                  </div>
+                )}
+                {confirmandoPerda(l) && (
+                  <div className={`${css.acoes} ${css.linhaCompleta}`} role="group" aria-label={`Confirmar perda do lote ${l.codigo ?? ''} de ${l.prato}`}>
+                    <span className={css.descricao}>Lançar {porcoes(l.quantidade)} de {l.prato} como vencido? O saldo do lote vai a zero.</span>
+                    <Botao id={`manter-${l.itemEstoqueId}`} variante="texto" disabled={lancandoPerda} onClick={() => setPerdaDoLote(null)}>Manter lote</Botao>
+                    <Botao variante="perigo" icone="lixeira" disabled={lancandoPerda} onClick={() => registrarPerda(l)}>{lancandoPerda ? 'Lançando…' : 'Lançar perda'}</Botao>
+                    {avisoNaPerda && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">{estoque.aviso}</p>}
+                  </div>
+                )}
+                {impressao?.loteId === l.id && impressao.erro && (
+                  <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">Não foi possível carregar as etiquetas deste lote. {impressao.erro}</p>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {previa && <PreviaDasEtiquetas loteId={previa.loteId} codigo={previa.codigo} quantas={previa.quantas}
+        impressao={impressao} aoFechar={() => setPrevia(null)} />}
     </div>
   )
 }

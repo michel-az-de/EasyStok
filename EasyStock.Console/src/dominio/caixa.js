@@ -11,9 +11,11 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
-import { inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { dataIsoNoFuso, inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { aDevolverDe } from './cobranca.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
+import { numeroDoDiaNaTela } from './pedido.js'
 
 export const TIPOS_MOVIMENTO = {
   ABERTURA: 'abertura', ENTRADA: 'entrada', SAIDA: 'saida', FECHAMENTO: 'fechamento',
@@ -34,12 +36,43 @@ export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechar, o caixa de hoje não rea
 // J2 (#1990), item 5: devolução pendente não trava o fechamento (o dinheiro pode sair amanhã), mas o
 // modal diz quanto e onde se resolve. Sem nada a devolver, nada.
 // Pedido que não deu para conferir (`falhas`) é dito, para "nada a devolver" não ser presumido.
-export function avisoDeDevolucoesPendentes({ total = 0, pedidos = 0, falhas = 0 } = {}) {
+function avisoDeDevolucoes({ total = 0, pedidos = 0, falhas = 0 } = {}, orientacao) {
   const semConferir = falhas > 0 ? ` ${plural(falhas, 'pedido cancelado não foi conferido', 'pedidos cancelados não foram conferidos')}.` : ''
   if (!(total > 0)) return semConferir ? `Não deu para conferir tudo:${semConferir}` : null
-  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}. `
-    + `O fechamento não espera: registre a devolução no Pós-venda de cada pedido.${semConferir}`
+  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}. ${orientacao}${semConferir}`
 }
+
+export const avisoDeDevolucoesPendentes = (leitura) =>
+  avisoDeDevolucoes(leitura, 'O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
+
+// #2267: no Caixa do dia e no Extrato o pagamento do pedido cancelado parecia receita comum.
+export const avisoDeDevolucoesNasTelas = (leitura) =>
+  avisoDeDevolucoes(leitura, 'Esse dinheiro entrou e está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido.')
+
+// #2275: o Extrato lê os cancelados dos últimos 90 dias, não o período da tela: o aviso diz isso e não
+// afirma que o valor está nos totais.
+export const avisoDeDevolucoesNoExtrato = (leitura) =>
+  avisoDeDevolucoes(leitura, 'São pedidos cancelados dos últimos 90 dias: registre a devolução no Pós-venda de cada pedido.')
+
+// #2275: o aviso do Caixa do dia conta só o que está nos totais: o pagamento que entrou no período
+// (o mesmo recorte dos totais), sem o que já foi devolvido dele, limitado ao que ainda falta devolver.
+// Período é "AAAA-MM-DD" de `de` a `ate` (o dia; ou desde a abertura, no caixa esquecido aberto).
+// Cancelado de fora do período não some: segue no Pós-venda e no Extrato. Pagamento sem data válida não conta.
+export function aDevolverDoDia(dados, de, ate = de) {
+  const aDevolver = aDevolverDe(dados)
+  const noPeriodo = (dados?.pagamentos ?? [])
+    .filter((p) => {
+      const ms = Date.parse(p.pagoEm)
+      if (!Number.isFinite(ms)) return false
+      const dia = dataIsoNoFuso(ms)
+      return dia >= de && dia <= ate
+    })
+    .reduce((soma, p) => soma + Math.max(0, (Number(p.valor) || 0) - (Number(p.devolvido) || 0)), 0)
+  return Math.round(Math.min(aDevolver, noPeriodo) * 100) / 100
+}
+
+// #2275: um token só para o status do caixa, no topo e na tabela. O caixa esquecido aberto é aviso.
+export const tomDoCaixa = ({ fechado = false, esquecido = false } = {}) => (fechado ? 'neutro' : esquecido ? 'aviso' : 'ok')
 
 // #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
 // rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.
@@ -52,11 +85,15 @@ export function categoriaAoTrocarTipo(categoria, novoTipo) {
 // meio da cobrança por conversa: pix/dinheiro/credito/debito/transferencia/outro).
 export const METODOS_CAIXA = ['pix', 'dinheiro', 'credito', 'debito', 'transferencia', 'outro']
 
+// #2305: o servidor compara a forma sem caixa e sem espaço nas pontas (`MetodosPagamentoCaixa.Normalizar`);
+// comparar estrito aqui dava gaveta diferente da do servidor com "Dinheiro " gravado.
+export const normalizarMetodoCaixa = (metodo) => (typeof metodo === 'string' ? metodo.trim().toLowerCase() : metodo)
+
 const NOME_DO_METODO_CAIXA = {
   pix: 'Pix', dinheiro: 'Dinheiro', credito: 'Crédito', debito: 'Débito',
   transferencia: 'Transferência', outro: 'Outro',
 }
-export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[metodo] ?? 'Outro'
+export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[normalizarMetodoCaixa(metodo)] ?? 'Outro'
 
 // Proposta ajustável para a Thati: o protótipo nasceu antes deste caixa
 // existir e a cobrança por conversa (F4, `dominio/cobranca.js`) guarda um meio
@@ -322,7 +359,7 @@ export function fecharCaixaMovimento(resumo, contado, agora, autorNome) {
 // não conta. Movimento sem método é do caixa físico (nasceu antes de o método existir);
 // pagamento sem método fica fora da gaveta, porque ninguém sabe onde ele caiu.
 const centavos = (v) => Math.round((Number(v) || 0) * 100)
-const ehDinheiro = (meio, semMetodoEhDinheiro) => meio === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
+const ehDinheiro = (meio, semMetodoEhDinheiro) => normalizarMetodoCaixa(meio) === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
 const sinalDoMovimento = (tipo) => (tipo === TIPOS_MOVIMENTO.ENTRADA ? 1 : tipo === TIPOS_MOVIMENTO.SAIDA ? -1 : 0)
 
 // #1627: o que veio sem forma de pagamento fica à parte (`semForma`). A venda do pedido entregue
@@ -402,7 +439,8 @@ export const temMovimentoNoDia = (dia) =>
 
 // Lançamentos do dia numa lista só, na ordem da hora (movimentos e pagamentos vinham em
 // dois blocos e a sangria das 20:30 aparecia entre 20:18 e 20:28). DateTime sem fuso vem
-// da API em UTC: o Z completa antes de comparar.
+// da API em UTC: o Z completa antes de comparar. #2078 (B15): o mais recente primeiro; num dia de
+// 18 lançamentos o último ficava em 18º, abaixo da dobra.
 const instanteDe = (valor) => Date.parse(/[zZ]|[+-]\d{2}:\d{2}$/.test(valor ?? '') ? valor : `${valor}Z`)
 
 export function lancamentosEmOrdem(dia) {
@@ -410,16 +448,46 @@ export function lancamentosEmOrdem(dia) {
     .filter((m) => m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
     .map((m) => ({ ...m, origemLinha: 'movimento' }))
   const extras = (dia?.linhasExtras ?? []).map((l) => ({ ...l, origemLinha: 'extra' }))
-  return [...movimentos, ...extras].sort((a, b) => instanteDe(a.em) - instanteDe(b.em))
+  return [...movimentos, ...extras].sort((a, b) => instanteDe(b.em) - instanteDe(a.em))
 }
 
 // Conferência da gaveta (#1474): o campo "contei" nasce vazio (`null`), porque nascer com o
 // esperado mostrava "bate certo" sem ninguém contar. Diferença dita do jeito que ela fala:
 // faltam, sobram ou bate certo. Até 5 reais de diferença é aviso; acima, perigo.
+// #2078 (E5): a gravidade também vai em palavra; "Faltam R$ 3" e "Faltam R$ 300" só mudavam a cor.
 export function conferenciaDaGaveta(centavosContados, esperado) {
-  if (centavosContados == null) return { pronta: false, texto: null, tom: 'neutro', diferenca: null }
+  if (centavosContados == null) return { pronta: false, texto: null, tom: 'neutro', diferenca: null, gravidade: null }
   const diferenca = (centavosContados - centavos(esperado)) / 100
-  if (diferenca === 0) return { pronta: true, texto: 'Bate certo', tom: 'ok', diferenca }
+  if (diferenca === 0) return { pronta: true, texto: 'Bate certo', tom: 'ok', diferenca, gravidade: null }
   const texto = `${diferenca < 0 ? 'Faltam' : 'Sobram'} ${moeda(Math.abs(diferenca))}`
-  return { pronta: true, texto, tom: Math.abs(diferenca) <= 5 ? 'aviso' : 'perigo', diferenca }
+  const pequena = Math.abs(diferenca) <= 5
+  return {
+    pronta: true, texto, tom: pequena ? 'aviso' : 'perigo', diferenca,
+    gravidade: pequena ? 'Diferença pequena.' : 'Diferença grande: conte de novo antes de fechar.',
+  }
+}
+
+// #2113 (D1 da #2084): no caixa esquecido, a API diz o esperado do dia da abertura (o que o fechamento
+// retrata, ADR-0034) e o dinheiro de hoje que já está na gaveta e fica no caixa de hoje. Sem os campos
+// (API anterior à #2084), nulo, e a conferência é a de sempre.
+export const ROTULO_ENTROU_DEPOIS = 'Entrou depois, fica no caixa de hoje'
+export const ROTULO_CONTADO_DO_ESQUECIDO = 'Quanto você contou na gaveta (todo o dinheiro)'
+export function esperadoDoEsquecido(dia) {
+  if (!dia?.esquecidoAberto || dia.dinheiroEsperadoNoFechamento == null) return null
+  return { esperado: dia.dinheiroEsperadoNoFechamento, entrouDepois: dia.dinheiroEntrouDepois ?? 0 }
+}
+
+// Ela conta a gaveta inteira; no caixa esquecido, a conferência tira o que entrou depois e compara com o
+// esperado do dia da abertura. O contado continua indo inteiro para a API, que faz a mesma separação.
+export function conferenciaDoFechamento(centavosContados, naGaveta, esquecido = null) {
+  if (!esquecido) return conferenciaDaGaveta(centavosContados, naGaveta)
+  return conferenciaDaGaveta(centavosContados == null ? null : centavosContados - centavos(esquecido.entrouDepois), esquecido.esperado)
+}
+
+// #2113 (#2098): a linha do pagamento de pedido diz qual pedido, com o número que a cozinha fala.
+export function tituloDaLinhaExtra(linha) {
+  if (linha.tipo === 'estorno') return 'Estorno de venda'
+  if (linha.origem !== 'Pedido') return 'Venda'
+  const numero = numeroDoDiaNaTela(linha.pedidoNumeroDoDia)
+  return numero ? `Pagamento do pedido nº ${numero}` : 'Pagamento de pedido'
 }

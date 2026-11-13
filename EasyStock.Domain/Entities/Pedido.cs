@@ -220,6 +220,38 @@ namespace EasyStock.Domain.Entities
             return true;
         }
 
+        // ── Confirmação da encomenda pelo cliente (#2096) ───────────────
+
+        /// <summary>Quando o cliente confirmou a encomenda (pela equipe ou pelo agente). Nulo = ainda não.</summary>
+        public DateTime? ConfirmadoPeloClienteEm { get; private set; }
+
+        /// <summary>
+        /// Marca a encomenda como confirmada pelo cliente. Só pedido com data marcada e em aberto; confirmar de novo é
+        /// no-op (devolve <c>false</c>) para guardar o primeiro instante.
+        /// </summary>
+        public bool ConfirmarPeloCliente(DateTime agoraUtc)
+        {
+            if (AgendadoParaEm is null)
+                throw new RegraDeDominioVioladaException("Só encomenda com data marcada pode ser confirmada pelo cliente.");
+            if (EstaFinalizado)
+                throw new RegraDeDominioVioladaException("Pedido finalizado não muda a confirmação do cliente.");
+            if (ConfirmadoPeloClienteEm is not null) return false;
+            ConfirmadoPeloClienteEm = agoraUtc;
+            AlteradoEm = DateTime.UtcNow;
+            return true;
+        }
+
+        /// <summary>Desfaz a confirmação marcada por engano. Sem confirmação é no-op.</summary>
+        public bool DesfazerConfirmacaoDoCliente()
+        {
+            if (ConfirmadoPeloClienteEm is null) return false;
+            if (EstaFinalizado)
+                throw new RegraDeDominioVioladaException("Pedido finalizado não muda a confirmação do cliente.");
+            ConfirmadoPeloClienteEm = null;
+            AlteradoEm = DateTime.UtcNow;
+            return true;
+        }
+
         // ── Número do dia (S53) ─────────────────────────────────────────
 
         /// <summary>
@@ -256,8 +288,13 @@ namespace EasyStock.Domain.Entities
         public ICollection<PedidoEvento> Eventos { get; set; } = new List<PedidoEvento>();
         public ICollection<PedidoPagamento> Pagamentos { get; set; } = new List<PedidoPagamento>();
 
-        public static Pedido Criar(Guid empresaId, Cliente? cliente = null, Guid? lojaId = null, string? origem = "web")
+        public static Pedido Criar(
+            Guid empresaId, Cliente? cliente = null, Guid? lojaId = null, string? origem = "web",
+            StatusPedido statusInicial = StatusPedido.Aguardando)
         {
+            if (!PedidoStateMachine.Entradas.Contains(statusInicial))
+                throw new RegraDeDominioVioladaException($"Pedido não pode nascer em {statusInicial}.");
+
             var agora = DateTime.UtcNow;
             return new Pedido
             {
@@ -268,7 +305,7 @@ namespace EasyStock.Domain.Entities
                 ClienteNome = cliente?.Nome,
                 ClienteApt = cliente?.Apt,
                 ClienteTelefone = cliente?.Telefone,
-                Status = StatusPedidoMapper.Aguardando,
+                Status = StatusPedidoMapper.Format(statusInicial),
                 Total = Dinheiro.Zero,
                 Origem = origem,
                 CriadoEm = agora,
@@ -278,15 +315,34 @@ namespace EasyStock.Domain.Entities
 
         public void RecalcularTotal()
         {
-            decimal soma = 0m;
-            foreach (var i in Itens) soma += i.Subtotal;
-            // Subtotais teoricamente nunca são negativos (Quantidade*PrecoUnitario
-            // de itens válidos). Se vier soma < 0 por bug em PedidoItem,
-            // FromDecimal lança ArgumentOutOfRangeException — sinaliza
-            // dado corrompido em vez de propagar silenciosamente.
-            Total = Dinheiro.FromDecimal(soma);
+            Total = TotalDe(Itens.Select(i => i.Subtotal));
             AlteradoEm = DateTime.UtcNow;
         }
+
+        /// <summary>
+        /// #2018: a ÚNICA fórmula do total do pedido: a soma dos subtotais de TODAS as linhas, frete incluído. O checkout, a
+        /// simulação, a comanda do cliente e o aceite da alteração chamam isto em vez de somar de novo.
+        /// Subtotais teoricamente nunca são negativos (Quantidade*PrecoUnitario de itens válidos). Se vier soma &lt; 0 por bug em
+        /// PedidoItem, <see cref="Dinheiro.FromDecimal"/> lança ArgumentOutOfRangeException: sinaliza dado corrompido em vez de
+        /// propagar silenciosamente.
+        /// </summary>
+        public static Dinheiro TotalDe(IEnumerable<decimal> subtotaisDasLinhas)
+        {
+            ArgumentNullException.ThrowIfNull(subtotaisDasLinhas);
+            return Dinheiro.FromDecimal(subtotaisDasLinhas.Sum());
+        }
+
+        /// <summary>#2018: o frete do pedido: a soma das linhas de frete (<see cref="PedidoItem.EhLinhaDeFrete"/>).</summary>
+        public decimal Frete => Itens.Where(i => i.EhLinhaDeFrete).Sum(i => i.Subtotal);
+
+        /// <summary>
+        /// #2018 (comanda-12): o que o pedido tem além dos pratos do cardápio: o frete e a linha que a casa lançou à mão (PWA,
+        /// ERP). A alteração da comanda troca só os pratos; o resto continua no pedido.
+        /// </summary>
+        public decimal ValorForaDoCardapio => Itens.Where(i => i.CardapioItemId is null).Sum(i => i.Subtotal);
+
+        /// <summary>#2018: o total do pedido se os pratos do cardápio passassem a valer <paramref name="valorDosPratos"/>.</summary>
+        public decimal TotalComPratos(decimal valorDosPratos) => valorDosPratos + ValorForaDoCardapio;
 
         public bool EstaFinalizado => PedidoStateMachine.EstaFinalizado(StatusEnum);
 
@@ -368,12 +424,29 @@ namespace EasyStock.Domain.Entities
     /// <summary>Item do pedido. Snapshot de nome/preço pra preservar histórico.</summary>
     public class PedidoItem
     {
+        /// <summary>Início do nome da linha de frete que o checkout grava: <c>Entrega — {zona}</c>.</summary>
+        public const string PrefixoDoFrete = "Entrega — ";
+
         /// <summary>
-        /// Linha de frete do checkout ("Entrega — Zona"): sem item de cardápio, produto nem linha
-        /// de preparo. Não é prato; cozinha e PWA não a tratam como item (#1474).
+        /// #2018: a ÚNICA definição de "linha de frete": sem item de cardápio, produto nem linha de preparo, e com o nome do
+        /// checkout (<see cref="PrefixoDoFrete"/>). Aceita os campos soltos para quem lê só uma projeção (sem a entidade).
+        /// Linha sem produto e sem cardápio que não é frete (item avulso da casa) NÃO é frete.
         /// </summary>
-        public bool EhLinhaDeFrete => CardapioItemId is null && ProdutoId is null && LinhaSnapshot is null
-            && Nome.StartsWith("Entrega — ", StringComparison.Ordinal);
+        public static bool EhFrete(Guid? cardapioItemId, Guid? produtoId, string? linhaSnapshot, string? nome) =>
+            cardapioItemId is null && produtoId is null && linhaSnapshot is null
+            && nome is not null && nome.StartsWith(PrefixoDoFrete, StringComparison.Ordinal);
+
+        /// <summary>
+        /// Linha de frete do checkout ("Entrega — Zona"). Não é prato; cozinha e PWA não a tratam como item (#1474).
+        /// Ver <see cref="EhFrete"/>.
+        /// </summary>
+        public bool EhLinhaDeFrete => EhFrete(CardapioItemId, ProdutoId, LinhaSnapshot, Nome);
+
+        /// <summary>
+        /// #2018: linha de produção: prato do cardápio (com linha de preparo congelada) ou produto do ERP. É o que o canhoto e
+        /// a comanda impressa agrupam; frete e linha avulsa ficam de fora.
+        /// </summary>
+        public bool EhProduto => !string.IsNullOrWhiteSpace(LinhaSnapshot) || CardapioItemId is not null || ProdutoId is not null;
 
         public Guid Id { get; set; }
         public Guid PedidoId { get; set; }

@@ -61,10 +61,11 @@ public sealed class ImpressaoController(
     public async Task<IActionResult> Pendentes(
         [FromQuery] int limite = ListarImpressoesPendentesUseCase.LimitePadrao,
         [FromQuery] Guid? empresaId = null,
+        [FromQuery] DateTimeOffset? desde = null,
         CancellationToken ct = default)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
-        return DataOk(await listarPendentes.ExecuteAsync(new ListarImpressoesPendentesInput(emp, limite), ct));
+        return DataOk(await listarPendentes.ExecuteAsync(new ListarImpressoesPendentesInput(emp, limite, desde?.UtcDateTime), ct));
     }
 
     [SwaggerOperation(Summary = "Confirmar que o canhoto saiu (idempotente)")]

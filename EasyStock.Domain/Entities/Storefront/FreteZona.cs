@@ -1,7 +1,7 @@
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities.Storefront;
 
@@ -173,7 +173,7 @@ public class FreteZona
         if (CepInicio is null || CepFim is null) return false;
         if (string.IsNullOrWhiteSpace(cep)) return false;
 
-        var cepNorm = NormalizarCep(cep);
+        var cepNorm = EnderecoBr.NormalizarCep(cep);
         if (!CepRegex.IsMatch(cepNorm)) return false;
 
         return string.CompareOrdinal(cepNorm, CepInicio) >= 0
@@ -190,7 +190,7 @@ public class FreteZona
         if (string.IsNullOrWhiteSpace(BairrosJson)) return false;
         if (string.IsNullOrWhiteSpace(bairro)) return false;
 
-        var bairroNorm = NormalizarBairro(bairro);
+        var bairroNorm = EnderecoBr.NormalizarBairro(bairro);
 
         using var doc = JsonDocument.Parse(BairrosJson);
         foreach (var el in doc.RootElement.EnumerateArray())
@@ -266,8 +266,8 @@ public class FreteZona
 
     private static (string Inicio, string Fim) FaixaCepValidada(string cepInicio, string cepFim)
     {
-        var inicioNorm = NormalizarCep(cepInicio);
-        var fimNorm = NormalizarCep(cepFim);
+        var inicioNorm = EnderecoBr.NormalizarCep(cepInicio);
+        var fimNorm = EnderecoBr.NormalizarCep(cepFim);
         ValidarCep(inicioNorm, nome: "CEP inicial");
         ValidarCep(fimNorm, nome: "CEP final");
 
@@ -292,7 +292,7 @@ public class FreteZona
                 throw new RegraDeDominioVioladaException(
                     "bairro em branco não é permitido na lista.");
 
-            var norm = NormalizarBairro(b);
+            var norm = EnderecoBr.NormalizarBairro(b);
             if (seen.Add(norm))
                 normalizados.Add(norm);
         }
@@ -343,31 +343,5 @@ public class FreteZona
         if (!CepRegex.IsMatch(cepNormalizado))
             throw new RegraDeDominioVioladaException(
                 $"{nome} inválido: '{cepNormalizado}'. Esperado: 8 dígitos (com ou sem máscara).");
-    }
-
-    /// <summary>Remove tudo que não for dígito — aceita "05500-000", " 05500000 ", "05500000".</summary>
-    internal static string NormalizarCep(string? cep)
-    {
-        if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
-        var sb = new StringBuilder(cep.Length);
-        foreach (var c in cep)
-        {
-            if (char.IsDigit(c)) sb.Append(c);
-        }
-        return sb.ToString();
-    }
-
-    /// <summary>Lowercase + remove acentos + trim. "Butantã" → "butanta".</summary>
-    internal static string NormalizarBairro(string bairro)
-    {
-        var trimmed = bairro.Trim();
-        var formD = trimmed.Normalize(NormalizationForm.FormD);
-        var sb = new StringBuilder(formD.Length);
-        foreach (var ch in formD)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
-                sb.Append(ch);
-        }
-        return sb.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
     }
 }

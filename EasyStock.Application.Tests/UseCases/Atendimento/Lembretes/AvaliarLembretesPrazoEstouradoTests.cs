@@ -38,7 +38,8 @@ public class AvaliarLembretesPrazoEstouradoTests
     }
 
     private AvaliarLembretesUseCase Avaliador() =>
-        new(_repo, _candidatos, _notificador, _publisher, _uow, _relogio, Options.Create(_opcoes));
+        new(_repo, _candidatos, _notificador, _publisher, _uow, _relogio, Options.Create(_opcoes),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.INotificacaoRepository>());
 
     private Lembrete Vencido(TipoLembrete tipo, Guid? atendente = null)
     {
@@ -151,6 +152,21 @@ public class AvaliarLembretesPrazoEstouradoTests
         Payload(Prazos().Single()).GetProperty("prazo_texto").GetString().Should().Be("15 minutos");
     }
 
+    // #2302: o atraso é a espera medida no disparo, não o SLA repetido.
+    [Fact]
+    public async Task AtrasoDoPrazoEstouradoEAEsperaRealDoCliente()
+    {
+        EsperandoDesde(47, slaDaLoja: 15);
+        _repo.When(r => r.AddAsync(Arg.Any<Lembrete>(), Arg.Any<CancellationToken>()))
+            .Do(c => _vencidos.Add(c.Arg<Lembrete>()));
+
+        await Avaliador().ExecuteAsync();
+
+        var payload = Payload(Prazos().Single());
+        payload.GetProperty("prazo_texto").GetString().Should().Be("15 minutos");
+        payload.GetProperty("atraso_texto").GetString().Should().Be("47 minutos");
+    }
+
     [Fact]
     public async Task AtendenteAssumidoViraODestinatarioDoAviso()
     {
@@ -188,7 +204,7 @@ public class AvaliarLembretesPrazoEstouradoTests
 
         var payload = Payload(Prazos().Single());
         payload.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(
-            "tipo_legivel", "referencia", "prazo_texto", "atraso_texto", "cliente", "link", "chaveIdempotencia");
+            "aviso", "tipo_legivel", "referencia", "prazo_texto", "atraso_texto", "cliente", "link", "chaveIdempotencia");
         payload.GetProperty("cliente").GetString().Should().Be("Mariana Souza");
         payload.GetProperty("link").GetString().Should().Be("https://app.easystok.online/#/m/atendimento/balcao");
         payload.GetProperty("chaveIdempotencia").GetString().Should().Be($"prazo:cliente_sem_resposta:{conversaId}");

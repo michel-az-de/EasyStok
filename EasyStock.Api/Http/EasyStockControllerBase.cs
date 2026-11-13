@@ -26,6 +26,13 @@ public abstract class EasyStockControllerBase : ControllerBase
     protected IActionResult DataBadRequest(string message, string? detail = null) =>
         base.BadRequest(new ApiErrorResponse(new ApiError("BAD_REQUEST", message, detail, null)));
 
+    /// <summary>
+    /// 400 de uma <see cref="UseCaseValidationException"/>: o mesmo envelope que o <c>GlobalExceptionHandler</c> devolve para a
+    /// rota que não a pega (<see cref="ApiErrors.Validacao"/>), com o <c>code</c> e os <c>details</c> da exceção.
+    /// </summary>
+    protected IActionResult DataBadRequest(EasyStock.Application.UseCases.Common.UseCaseValidationException ex) =>
+        base.BadRequest(ApiErrors.Validacao(ex));
+
     /// <summary>404 with { error: { code: NOT_FOUND, ... } }</summary>
     protected IActionResult DataNotFound(string message = "Recurso não encontrado.", string? detail = null) =>
         base.NotFound(new ApiErrorResponse(new ApiError("NOT_FOUND", message, detail, null)));

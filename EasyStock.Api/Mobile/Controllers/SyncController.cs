@@ -1,9 +1,12 @@
+using System.Text.Json;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Security;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Services.Operacao;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
+using Npgsql;
 
 namespace EasyStock.Api.Mobile.Controllers;
 
@@ -34,8 +37,12 @@ public class SyncController(
     IProdutoRepository produtoRepo,
     IConfiguration appConfig,
     TimeProvider relogio,
-    ILogger<SyncController> log) : ControllerBase
+    NumeroCurtoDosLotesMobile numerosCurtos,
+    ILogger<SyncController> log,
+    SaldoFinanceiroPedido? saldos = null) : ControllerBase
 {
+    private readonly SaldoFinanceiroPedido? _saldos = saldos;
+    private readonly NumeroCurtoDosLotesMobile _numerosCurtos = numerosCurtos;
     private readonly EasyStockDbContext _db = db;
     private readonly SyncMutationDispatcher _dispatcher = dispatcher;
     private readonly SyncAutoLinker _autoLinker = autoLinker;
@@ -46,10 +53,38 @@ public class SyncController(
     private readonly TimeProvider _relogio = relogio;
     private readonly ILogger<SyncController> _log = log;
 
+    // deviceId, type e id vêm do corpo do push: sem CR e LF não dá para forjar uma linha de log (CodeQL cs/log-forging).
+    private static string SemQuebraDeLinha(string? valor) =>
+        (valor ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+
+    // #2317 (SYNC-9): erro transitório no push volta para a fila; não é rejeição permanente.
+    // Classificação estreita: só falha de rede, timeout e SqlState transitório (40001, 40P01, 57P01...).
+    // Erro permanente do banco (22P02, 23505, 23503...) segue como rejeição, senão o aparelho reenvia para sempre.
+    public static bool EhErroTransitorio(Exception ex) => ex switch
+    {
+        DbUpdateConcurrencyException => true,
+        NpgsqlException npgsql => npgsql.IsTransient,
+        TimeoutException or IOException => true,
+        DbUpdateException or InvalidOperationException => ex.InnerException is { } inner && EhErroTransitorio(inner),
+        _ => false,
+    };
+
+    private sealed class LoteNaoGravadoException(ActionResult<SyncPushResponse> resposta) : Exception
+    {
+        public ActionResult<SyncPushResponse> Resposta { get; } = resposta;
+    }
+
+    private static string? ChaveDoCadastro(MutationDto mutation) =>
+        mutation.Type is "product.upsert" or "client.upsert"
+        && mutation.Payload.ValueKind == System.Text.Json.JsonValueKind.Object
+        && mutation.Payload.TryGetProperty("id", out var id) && id.ValueKind == System.Text.Json.JsonValueKind.String
+            ? "mobile-cadastro:" + mutation.Type + ":" + id.GetString() : null;
+
     [HttpPost]
     public async Task<ActionResult<SyncPushResponse>> Push([FromBody] SyncPushRequest req)
     {
         if (req == null || req.Mutations == null) return BadRequest("Payload invalido.");
+        if (req.Mutations.Any(m => m.Id?.StartsWith("legacy:", StringComparison.Ordinal) == true)) return BadRequest("Prefixo de id reservado a primeira migracao.");
 
         var device = HttpContext.GetMobileDevice();
         var empresaId = device?.EmpresaId;
@@ -59,122 +94,199 @@ public class SyncController(
         var rejected = new List<SyncConflict>();
         var autoLinkProductIds = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkClientIds  = new HashSet<string>(StringComparer.Ordinal);
+        // CLI-5 (#2321): CPF/CNPJ do client.upsert; mobile_clients nao tem coluna, o linker o leva ao ERP.
+        var documentosDosClientes = new Dictionary<string, string>(StringComparer.Ordinal);
         var autoLinkOrderIds   = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkBatchIds   = new HashSet<string>(StringComparer.Ordinal);
         var autoLinkCashIds    = new HashSet<string>(StringComparer.Ordinal);
+        // #2209: lotes que recebem o número curto na resposta, inclusive o reenvio de quem perdeu a resposta anterior.
+        var numeroBatchIds     = new HashSet<string>(StringComparer.Ordinal);
 
-        // F10-C-3 — Idempotency: pre-check mutations já processadas.
-        // Dedup por MutationId GLOBAL (não por device). Os ids são UUID v4
-        // ('mut_' + crypto.randomUUID, ver pwa/sync.js) — globalmente únicos.
-        // Antes a checagem exigia DeviceId == req.DeviceId; após re-pareamento
-        // (novo deviceId, mesmos mutationIds) a dedup falhava e a mutation era
-        // reaplicada → Venda + baixa de estoque DUPLICADAS. Como o id é único,
-        // basta o MutationId; nunca descarta mutation legítima de outro device.
-        var mutationIds = req.Mutations.Select(m => m.Id).Where(id => !string.IsNullOrEmpty(id)).ToList();
-        var alreadyProcessed = new Dictionary<string, MobileProcessedMutation>(StringComparer.Ordinal);
-        if (mutationIds.Count > 0)
+        async Task AplicarLoteAsync(CancellationToken ct)
         {
-            var existing = await _db.MobileProcessedMutations
-                .AsNoTracking()
-                .Where(p => mutationIds.Contains(p.MutationId))
-                .ToListAsync();
-            foreach (var e in existing)
-                alreadyProcessed[e.MutationId] = e;
-        }
-
-        // #1520 (ADR-0060): movimento de estoque por ultimo no lote. A fila do aparelho reordena
-        // o cadastro do produto (dedup por id), entao o "stock.delta" pode chegar antes do produto
-        // que ele mexe. E, por ultimo, ele so e gravado no SaveChanges final, junto do registro do
-        // MutationId: um commit no meio do lote (ha quem faca) nao o deixa sem dedup para o reenvio.
-        foreach (var m in req.Mutations.OrderBy(m => m.Type?.StartsWith("stock.", StringComparison.Ordinal) == true ? 1 : 0))
-        {
-            if (!string.IsNullOrEmpty(m.Id) && alreadyProcessed.TryGetValue(m.Id, out var prev))
+            // F10-C-3 — Idempotency: pre-check mutations já processadas.
+            // Dedup por MutationId GLOBAL (não por device). Os ids são UUID v4
+            // ('mut_' + crypto.randomUUID, ver pwa/sync.js) — globalmente únicos.
+            // Antes a checagem exigia DeviceId == req.DeviceId; após re-pareamento
+            // (novo deviceId, mesmos mutationIds) a dedup falhava e a mutation era
+            // reaplicada → Venda + baixa de estoque DUPLICADAS. Como o id é único,
+            // basta o MutationId; nunca descarta mutation legítima de outro device.
+            var mutationIds = req.Mutations.Select(m => m.Id).Where(id => !string.IsNullOrEmpty(id)).ToList();
+            var alreadyProcessed = new Dictionary<string, MobileProcessedMutation>(StringComparer.Ordinal);
+            if (mutationIds.Count > 0)
             {
-                if (prev.Outcome == "accepted")
-                    accepted.Add(m.Id);
-                else
-                    rejected.Add(new SyncConflict(m.Id, prev.Outcome));
-                continue;
+                var existing = await _db.MobileProcessedMutations
+                    .AsNoTracking()
+                    .Where(p => mutationIds.Contains(p.MutationId))
+                    .ToListAsync();
+                foreach (var e in existing)
+                    alreadyProcessed[e.MutationId] = e;
             }
 
             try
             {
-                await _dispatcher.ApplyMutationAsync(m, req.DeviceId, req.OperatorName, empresaId, lojaId);
-                accepted.Add(m.Id);
-                var typePrefix = m.Type?.Split('.')[0];
-                if (typePrefix == "product" || typePrefix == "client" || typePrefix == "order"
-                    || typePrefix == "batch" || typePrefix == "cashEntry")
+                foreach (var mutation in req.Mutations.Where(m => !alreadyProcessed.ContainsKey(m.Id)))
+                    await _dispatcher.ValidateLegacyHistoryAsync(mutation, empresaId);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.StartsWith("LEGACY_HISTORY_READ_ONLY:", StringComparison.Ordinal))
+            {
+                // Preserva ACKs antigos; nada novo deste envio foi aplicado, inclusive stock.delta.
+                throw new LoteNaoGravadoException(Ok(new SyncPushResponse(
+                    req.Mutations.Where(m => alreadyProcessed.TryGetValue(m.Id, out var p) && p.Outcome == "accepted").Select(m => m.Id).ToList(),
+                    req.Mutations.Where(m => !alreadyProcessed.TryGetValue(m.Id, out var p) || p.Outcome != "accepted")
+                        .Select(m => new SyncConflict(m.Id, ex.Message)).ToList())));
+            }
+
+            // #1520 (ADR-0060): movimento de estoque por ultimo no lote. A fila do aparelho reordena
+            // o cadastro do produto (dedup por id), entao o "stock.delta" pode chegar antes do produto
+            // que ele mexe. E, por ultimo, ele so e gravado no SaveChanges final, junto do registro do
+            // MutationId: um commit no meio do lote (ha quem faca) nao o deixa sem dedup para o reenvio.
+            foreach (var m in req.Mutations.OrderBy(m => m.Type?.StartsWith("stock.", StringComparison.Ordinal) == true ? 1 : 0))
+            {
+                if (!string.IsNullOrEmpty(m.Id) && alreadyProcessed.TryGetValue(m.Id, out var prev))
                 {
-                    try
+                    if (prev.Outcome == "accepted")
                     {
-                        if (m.Payload.TryGetProperty("id", out var idEl) && idEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                        accepted.Add(m.Id);
+                        if (IdDoLote(m) is { } reenviado) numeroBatchIds.Add(reenviado);
+                    }
+                    else
+                        rejected.Add(new SyncConflict(m.Id, prev.Outcome));
+                    continue;
+                }
+
+                try
+                {
+                    await _dispatcher.ApplyMutationAsync(m, req.DeviceId, req.OperatorName, empresaId, lojaId);
+                    accepted.Add(m.Id);
+                    var typePrefix = m.Type?.Split('.')[0];
+                    if (typePrefix == "product" || typePrefix == "client" || typePrefix == "order"
+                        || typePrefix == "batch" || typePrefix == "cashEntry")
+                    {
+                        try
                         {
-                            var payloadId = idEl.GetString();
-                            if (!string.IsNullOrEmpty(payloadId))
+                            if (m.Payload.TryGetProperty("id", out var idEl) && idEl.ValueKind == System.Text.Json.JsonValueKind.String)
                             {
-                                if (typePrefix == "product")        autoLinkProductIds.Add(payloadId);
-                                else if (typePrefix == "client")    autoLinkClientIds.Add(payloadId);
-                                else if (typePrefix == "order")     autoLinkOrderIds.Add(payloadId);
-                                else if (typePrefix == "batch")     autoLinkBatchIds.Add(payloadId);
-                                else                                 autoLinkCashIds.Add(payloadId);
+                                var payloadId = idEl.GetString();
+                                if (!string.IsNullOrEmpty(payloadId))
+                                {
+                                    if (typePrefix == "product")        autoLinkProductIds.Add(payloadId);
+                                    else if (typePrefix == "client")
+                                    {
+                                        autoLinkClientIds.Add(payloadId);
+                                        if (m.Payload.TryGetProperty("document", out var docEl)
+                                            && docEl.ValueKind == System.Text.Json.JsonValueKind.String
+                                            && !string.IsNullOrWhiteSpace(docEl.GetString()))
+                                            documentosDosClientes[payloadId] = docEl.GetString()!;
+                                    }
+                                    else if (typePrefix == "order")     autoLinkOrderIds.Add(payloadId);
+                                    else if (typePrefix == "batch")     autoLinkBatchIds.Add(payloadId);
+                                    else                                 autoLinkCashIds.Add(payloadId);
+                                }
                             }
                         }
+                        catch (Exception ex) { _log.LogWarning(ex, "Falha extraindo id de payload pra auto-link"); }
                     }
-                    catch (Exception ex) { _log.LogWarning(ex, "Falha extraindo id de payload pra auto-link"); }
+                }
+                catch (CadastroDeOutraEmpresaException)
+                {
+                    // HTTP 400 do contrato de tenant; desfaz o lote, inclusive gravacoes intermediarias.
+                    throw;
+                }
+                catch (ConflictException cex)
+                {
+                    rejected.Add(new SyncConflict(m.Id, "conflict: " + cex.Message, cex.WinningPayload));
+                    _log.LogInformation(
+                        "SyncMutation REJECTED conflict deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: {Mensagem}",
+                        req.DeviceId, empresaId, m.Type, m.Id, cex.Message);
+                }
+                // #2317 (SYNC-9): falha transitória (banco, timeout, rede) não é rejeição permanente.
+                catch (Exception ex) when (EhErroTransitorio(ex))
+                {
+                    // A mutação que falhou pode ter deixado entidades rastreadas no DbContext. Gravá-las sem o
+                    // MutationId reaplicaria o efeito no reenvio (ex.: baixa de estoque em dobro). Por isso o lote
+                    // inteiro é abandonado sem SaveChanges; o aparelho trata 5xx como 'retry' e reenvia a fila toda.
+                    _log.LogWarning(ex,
+                        "SyncMutation erro transitorio deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: lote abandonado, sera reenviado",
+                        SemQuebraDeLinha(req.DeviceId), empresaId, SemQuebraDeLinha(m.Type), SemQuebraDeLinha(m.Id));
+                    _db.ChangeTracker.Clear();
+                    throw new LoteNaoGravadoException(StatusCode(StatusCodes.Status503ServiceUnavailable, "Falha transitória ao sincronizar; reenvie."));
+                }
+                catch (Exception ex)
+                {
+                    rejected.Add(new SyncConflict(m.Id, ex.Message));
+                    // Antes: silencioso (so adicionava em rejected). Agora: log explicito
+                    // pra diagnose. Exception aqui = mutation invalida (tenant guard,
+                    // validacao de payload, FK quebrada). PWA mostra como rejected mas
+                    // sem este log o operador/admin nao tem como descobrir o motivo.
+                    _log.LogError(ex,
+                        "SyncMutation REJECTED error deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId} exType={ExType}: {Mensagem}",
+                        req.DeviceId, empresaId, m.Type, m.Id, ex.GetType().Name, ex.Message);
                 }
             }
-            catch (ConflictException cex)
+
+            // F10-C-3 — Registra mutations processadas (antes do SaveChanges pra mesma tx).
+            if (!string.IsNullOrEmpty(req.DeviceId))
             {
-                rejected.Add(new SyncConflict(m.Id, "conflict: " + cex.Message, cex.WinningPayload));
-                _log.LogInformation(
-                    "SyncMutation REJECTED conflict deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}: {Mensagem}",
-                    req.DeviceId, empresaId, m.Type, m.Id, cex.Message);
+                var now = DateTime.UtcNow;
+                foreach (var aId in accepted)
+                {
+                    if (string.IsNullOrEmpty(aId) || alreadyProcessed.ContainsKey(aId)) continue;
+                    _db.MobileProcessedMutations.Add(new MobileProcessedMutation
+                    {
+                        MutationId = aId,
+                        DeviceId = req.DeviceId,
+                        EmpresaId = empresaId ?? Guid.Empty,
+                        Outcome = "accepted",
+                        CriadoEm = now,
+                    });
+                }
+                foreach (var r in rejected)
+                {
+                    if (string.IsNullOrEmpty(r.MutationId) || alreadyProcessed.ContainsKey(r.MutationId)) continue;
+                    _db.MobileProcessedMutations.Add(new MobileProcessedMutation
+                    {
+                        MutationId = r.MutationId,
+                        DeviceId = req.DeviceId,
+                        EmpresaId = empresaId ?? Guid.Empty,
+                        Outcome = (r.Reason?.StartsWith("conflict:") == true ? "rejected:conflict" : "rejected:validation"),
+                        ResponseMeta = r.Reason,
+                        CriadoEm = now,
+                    });
+                }
             }
-            catch (Exception ex)
-            {
-                rejected.Add(new SyncConflict(m.Id, ex.Message));
-                // Antes: silencioso (so adicionava em rejected). Agora: log explicito
-                // pra diagnose. Exception aqui = mutation invalida (tenant guard,
-                // validacao de payload, FK quebrada). PWA mostra como rejected mas
-                // sem este log o operador/admin nao tem como descobrir o motivo.
-                _log.LogError(ex,
-                    "SyncMutation REJECTED error deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId} exType={ExType}: {Mensagem}",
-                    req.DeviceId, empresaId, m.Type, m.Id, ex.GetType().Name, ex.Message);
-            }
+
+            await _db.SaveChangesAsync(ct);
         }
 
-        // F10-C-3 — Registra mutations processadas (antes do SaveChanges pra mesma tx).
-        if (!string.IsNullOrEmpty(req.DeviceId))
+        // #2343: Id é global. Aguarda o mesmo tipo/id antes do apply e da deduplicação;
+        // o cadastro e as deltas dependentes são aplicados juntos, sem pular mutações.
+        // Ordem fixa evita deadlock; SemRetry não reaplica o lote. Auto-link fica fora.
+        var chaves = req.Mutations.Select(ChaveDoCadastro).OfType<string>().Distinct().Order(StringComparer.Ordinal).ToArray();
+        try
         {
-            var now = DateTime.UtcNow;
-            foreach (var aId in accepted)
-            {
-                if (string.IsNullOrEmpty(aId) || alreadyProcessed.ContainsKey(aId)) continue;
-                _db.MobileProcessedMutations.Add(new MobileProcessedMutation
+            if (_db.Database.IsNpgsql() && chaves.Length > 0)
+                await _db.ExecuteInTransactionSemRetryAsync(async ct =>
                 {
-                    MutationId = aId,
-                    DeviceId = req.DeviceId,
-                    EmpresaId = empresaId ?? Guid.Empty,
-                    Outcome = "accepted",
-                    CriadoEm = now,
-                });
-            }
-            foreach (var r in rejected)
-            {
-                if (string.IsNullOrEmpty(r.MutationId) || alreadyProcessed.ContainsKey(r.MutationId)) continue;
-                _db.MobileProcessedMutations.Add(new MobileProcessedMutation
-                {
-                    MutationId = r.MutationId,
-                    DeviceId = req.DeviceId,
-                    EmpresaId = empresaId ?? Guid.Empty,
-                    Outcome = (r.Reason?.StartsWith("conflict:") == true ? "rejected:conflict" : "rejected:validation"),
-                    ResponseMeta = r.Reason,
-                    CriadoEm = now,
-                });
-            }
+                    foreach (var chave in chaves)
+                        await _db.Database.ExecuteSqlInterpolatedAsync(
+                            $"SELECT pg_advisory_xact_lock(hashtextextended({chave}, 0))", ct);
+                    await AplicarLoteAsync(ct);
+                    return true;
+                }, HttpContext.RequestAborted);
+            else
+                await AplicarLoteAsync(HttpContext.RequestAborted);
         }
-
-        await _db.SaveChangesAsync();
+        catch (LoteNaoGravadoException ex)
+        {
+            return ex.Resposta;
+        }
+        catch (Exception ex) when (EhErroTransitorio(ex))
+        {
+            _db.ChangeTracker.Clear();
+            _log.LogWarning(ex, "Falha transitoria ao persistir lote mobile; transacao revertida");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Falha transitória ao sincronizar; reenvie.");
+        }
 
         // F0/F1/F2/F3 — auto-link Product/Client/Order/Batch/CashEntry ↔ ERP.
         if (autoLinkProductIds.Count > 0 || autoLinkClientIds.Count > 0
@@ -186,7 +298,7 @@ public class SyncController(
                 await _autoLinker.RunAsync(
                     autoLinkProductIds, autoLinkClientIds,
                     autoLinkOrderIds, autoLinkBatchIds, autoLinkCashIds,
-                    empresaId);
+                    empresaId, documentosDosClientes);
             }
             catch (Exception ex)
             {
@@ -209,8 +321,23 @@ public class SyncController(
             await _eventBroker.NotifyMutationsAppliedAsync(empresaId, lojaId, req.DeviceId, accepted.Count);
         }
 
-        return Ok(new SyncPushResponse(accepted, rejected.Count > 0 ? rejected : null));
+        // #2209: o pull não devolve ao aparelho o lote que ele mesmo enviou, então o número do Lote do ERP, dado na
+        // promoção acima, volta aqui.
+        numeroBatchIds.UnionWith(autoLinkBatchIds);
+        var numeros = empresaId is { } empresaDoAparelho && lojaId is { } lojaDoAparelho && numeroBatchIds.Count > 0
+            ? await _numerosCurtos.DosLotesDoAparelhoAsync(empresaDoAparelho, lojaDoAparelho, numeroBatchIds, CancellationToken.None)
+            : null;
+
+        return Ok(new SyncPushResponse(accepted, rejected.Count > 0 ? rejected : null,
+            numeros is { Count: > 0 } ? numeros : null));
     }
+
+    private static string? IdDoLote(MutationDto m) =>
+        m.Type?.StartsWith("batch.", StringComparison.Ordinal) == true
+        && m.Payload.ValueKind == JsonValueKind.Object
+        && m.Payload.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
+            ? id.GetString()
+            : null;
 
     /// <summary>
     /// F5 — Backfill auto-link mobile→ERP de entidades pre-existentes. Idempotente.
@@ -235,6 +362,51 @@ public class SyncController(
                 cashEntries = counts.CashEntries
             }
         });
+    }
+
+    private async Task<Dictionary<Guid, decimal>> AReceberDosPedidosAsync(List<Guid> pedidoIds)
+    {
+        var resultado = new Dictionary<Guid, decimal>();
+        if (pedidoIds.Count == 0) return resultado;
+        var pedidos = await _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .Include(p => p.Pagamentos)
+            .Where(p => pedidoIds.Contains(p.Id))
+            .ToListAsync();
+        foreach (var p in pedidos)
+            resultado[p.Id] = await AReceberDoPedidoMobile.CalcularAsync(p, _saldos, CancellationToken.None);
+        return resultado;
+    }
+
+    /// <summary>
+    /// #2431: pedido do app pago no console ou no Mercado Pago. O pagamento muda o Pedido do ERP, nunca o
+    /// mobile_orders, entao nenhum aparelho (nem o que criou) recebia o aReceber. Vai so o campo, numa
+    /// operacao que o app aplica sem trocar o pedido; APK antigo ignora a operacao desconhecida.
+    /// </summary>
+    private async Task AdicionarAReceberDosPedidosPagosNoErpAsync(List<MutationDto> mutations, List<Order> jaEnviados,
+        DateTime sinceDate, Guid? empresaId, Guid? lojaId, long serverTime)
+    {
+        if (empresaId is null) return;
+        var idsJaEnviados = jaEnviados.Select(o => o.Id).ToHashSet();
+        var ordersQ = _db.Set<Order>().AsNoTracking()
+            .Where(o => o.EmpresaId == empresaId && o.ErpPedidoId != null);
+        if (lojaId.HasValue)
+            ordersQ = ordersQ.Where(o => o.LojaId == lojaId || o.LojaId == null);
+        var orders = (await ordersQ.Select(o => new { o.Id, ErpPedidoId = o.ErpPedidoId!.Value }).ToListAsync())
+            .Where(o => !idsJaEnviados.Contains(o.Id)).ToList();
+        if (orders.Count == 0) return;
+        // Parte dos pedidos do app, pela chave: pedido da web e do PDV fica fora da conta de cada pull.
+        var pedidoIds = orders.Select(o => o.ErpPedidoId).Distinct().ToList();
+        var alterados = await _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && pedidoIds.Contains(p.Id) && (p.AlteradoEm > sinceDate
+                || p.Eventos.Any(e => e.OcorridoEm > sinceDate)
+                || p.Pagamentos.Any(g => g.PagoEm > sinceDate)))
+            .Select(p => p.Id).ToListAsync();
+        if (alterados.Count == 0) return;
+        var aReceberPorPedido = await AReceberDosPedidosAsync(alterados);
+        foreach (var o in orders)
+            if (aReceberPorPedido.TryGetValue(o.ErpPedidoId, out var aReceber))
+                mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "server", "order.aReceber",
+                    SyncDtoConverters.Serialize(new { id = o.Id, aReceber }), serverTime));
     }
 
     [HttpGet("pull")]
@@ -263,6 +435,20 @@ public class SyncController(
         if (lojaId.HasValue)
             productsQ = productsQ.Where(p => p.LojaId == lojaId || p.LojaId == null);
         var products = await productsQ.ToListAsync();
+        // SYNC-3 (#2316): espelho de Produto inativado no ERP nunca sai como upsert, mesmo que um
+        // aparelho tenha mexido nele (venda, ajuste) depois da inativacao. O product.delete sai do
+        // pull reverso; aqui o espelho so e omitido, senao o produto ressuscitaria no outro aparelho.
+        var erpIdsDosEspelhos = products.Where(p => p.ErpProductId.HasValue)
+            .Select(p => p.ErpProductId!.Value).Distinct().ToList();
+        if (erpIdsDosEspelhos.Count > 0)
+        {
+            var inativosErp = (await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.EmpresaId == empresaId && erpIdsDosEspelhos.Contains(p.Id)
+                    && p.Status != StatusProduto.Ativo)
+                .Select(p => p.Id).ToListAsync()).ToHashSet();
+            if (inativosErp.Count > 0)
+                products = products.Where(p => !p.ErpProductId.HasValue || !inativosErp.Contains(p.ErpProductId.Value)).ToList();
+        }
         // C2 (RDC 727): batch lookup TipoEmbalagem dos Produtos ERP linkados.
         var erpProductIds = products.Where(p => p.ErpProductId.HasValue)
             .Select(p => p.ErpProductId!.Value).Distinct().ToList();
@@ -288,20 +474,40 @@ public class SyncController(
         if (lojaId.HasValue)
             ordersQ = ordersQ.Where(o => o.LojaId == lojaId || o.LojaId == null);
         var orders = await ordersQ.ToListAsync();
+        // #2307: pedido pago no console ou no Mercado Pago chega ao app com o saldo a receber, para o
+        // card nao oferecer cobranca de novo.
+        var aReceberPorPedido = await AReceberDosPedidosAsync(
+            orders.Where(o => o.ErpPedidoId.HasValue).Select(o => o.ErpPedidoId!.Value).Distinct().ToList());
         foreach (var o in orders)
+        {
+            var dto = SyncDtoConverters.ToDto(o);
+            if (o.ErpPedidoId is { } pedidoId && aReceberPorPedido.TryGetValue(pedidoId, out var aReceber))
+                dto = dto with { AReceber = aReceber };
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), o.LastDeviceId ?? "server",
-                "order.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(o)),
+                "order.upsert", SyncDtoConverters.Serialize(dto),
                 new DateTimeOffset(o.ServerUpdatedAt).ToUnixTimeMilliseconds()));
+        }
+        await AdicionarAReceberDosPedidosPagosNoErpAsync(mutations, orders, sinceDate, empresaId, lojaId, serverTime);
 
         var batchesQ = _db.Set<Batch>().Include(b => b.Items)
             .Where(b => b.EmpresaId == empresaId && b.ServerUpdatedAt > sinceDate && b.LastDeviceId != deviceId);
         if (lojaId.HasValue)
             batchesQ = batchesQ.Where(b => b.LojaId == lojaId || b.LojaId == null);
         var batches = await batchesQ.ToListAsync();
+        // #2209: o número curto do Lote do ERP ligado; o lote antigo, sem número, ganha um aqui.
+        var numerosDosLotes = empresaId is { } empresaDoPull
+            ? await _numerosCurtos.DosLotesAsync(empresaDoPull,
+                batches.Where(b => b.ErpLoteId.HasValue).Select(b => b.ErpLoteId!.Value).ToList(), CancellationToken.None)
+            : new Dictionary<Guid, string>();
         foreach (var b in batches)
+        {
+            var dto = SyncDtoConverters.ToDto(b);
+            if (b.ErpLoteId is { } loteId && numerosDosLotes.TryGetValue(loteId, out var numero))
+                dto = dto with { NumeroCurto = numero };
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), b.LastDeviceId ?? "server",
-                "batch.upsert", SyncDtoConverters.Serialize(SyncDtoConverters.ToDto(b)),
+                "batch.upsert", SyncDtoConverters.Serialize(dto),
                 new DateTimeOffset(b.ServerUpdatedAt).ToUnixTimeMilliseconds()));
+        }
 
         var cashQ = _db.Set<CashEntry>().Where(c => c.EmpresaId == empresaId && c.ServerUpdatedAt > sinceDate && c.LastDeviceId != deviceId);
         if (lojaId.HasValue)
@@ -325,6 +531,26 @@ public class SyncController(
             }
         }
 
+        // A protecao acompanha o historico tambem em reinstalacao/outro aparelho, apos o pull reverso.
+        if (mutations.Any(m => m.Type == "order.upsert"))
+        {
+            var history = await _db.Set<Order>().Where(o => o.EmpresaId == empresaId && (o.LojaId == lojaId || o.LojaId == null))
+                .Join(_db.Set<Pedido>().Where(p => p.EmpresaId == empresaId && p.Origem == LegacySnapshotImportService.HistoryOrigin),
+                    o => o.ErpPedidoId, p => (Guid?)p.Id, (o, p) => new { o.Id, ErpId = p.Id, o.Status }).ToListAsync();
+            var tags = new Dictionary<string, string>();
+            foreach (var row in history) { tags[row.Id] = row.Status; tags[row.ErpId.ToString()] = row.Status; }
+            mutations = mutations.Select(m => m.Type == "order.upsert" && m.Payload.TryGetProperty("id", out var id) && tags.TryGetValue(id.GetString()!, out var status)
+                ? m with { Payload = SyncDtoConverters.Serialize(m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)! with { LegacyHistoryStatus = status }) } : m).ToList();
+        }
+        if (mutations.Any(m => m.Type == "batch.upsert"))
+        {
+            var history = await _db.Set<Batch>().Where(b => b.EmpresaId == empresaId && (b.LojaId == lojaId || b.LojaId == null))
+                .Join(_db.Set<Lote>().Where(l => l.EmpresaId == empresaId && l.Origem == LegacySnapshotImportService.HistoryOrigin),
+                    b => b.ErpLoteId, l => (Guid?)l.Id, (b, l) => new { b.Id, ErpId = l.Id }).ToListAsync();
+            var tags = history.SelectMany(x => new[] { x.Id, x.ErpId.ToString() }).ToHashSet();
+            mutations = mutations.Select(m => m.Type == "batch.upsert" && m.Payload.TryGetProperty("id", out var id) && tags.Contains(id.GetString()!)
+                ? m with { Payload = SyncDtoConverters.Serialize(m.Payload.Deserialize<BatchDto>(SyncDtoConverters.JsonOpts)! with { LegacyImported = true }) } : m).ToList();
+        }
         return Ok(new SyncPullResponse(serverTime, mutations));
     }
 }

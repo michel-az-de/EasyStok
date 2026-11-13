@@ -66,6 +66,7 @@ namespace EasyStock.Domain.Entities
             TipoAlertaEstoque.PedidoAtrasado => "Pedido Atrasado",
             TipoAlertaEstoque.PedidoRecebido => "Pedido Recebido",
             TipoAlertaEstoque.ProdutoVencido => "Produto Vencido",
+            TipoAlertaEstoque.AvisoOperacional => "Aviso",
             _ => "Notificação"
         };
 
@@ -78,6 +79,7 @@ namespace EasyStock.Domain.Entities
             TipoAlertaEstoque.ReposicaoSugerida => SeveridadeNotificacao.Media,
             TipoAlertaEstoque.PedidoAtrasado => SeveridadeNotificacao.Alta,
             TipoAlertaEstoque.PedidoRecebido => SeveridadeNotificacao.Informativa,
+            TipoAlertaEstoque.AvisoOperacional => SeveridadeNotificacao.Media,
             _ => SeveridadeNotificacao.Media
         };
     }

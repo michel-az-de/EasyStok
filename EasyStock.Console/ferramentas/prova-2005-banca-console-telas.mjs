@@ -89,6 +89,8 @@ class Elemento extends No {
   get parentElement() { return this.parentNode?.nodeType === 1 ? this.parentNode : null }
   get isConnected() { return documento.contains(this) }
   closest() { return null }
+  // #2078: o Modal de dinheiro procura o campo do foco inicial; este DOM não tem seletor, nem foco de verdade.
+  querySelector() { return null }
 }
 class Dialogo extends Elemento {
   showModal() { this.open = true }
@@ -168,10 +170,13 @@ registerHooks({
     return proximo(especificador, contexto)
   },
   load(url, contexto, proximo) {
-    if (url.endsWith('/features/ficha-cliente/MenuDoPedido.jsx')) {
+    // #2232 (F7): o ⋮ do pedido (MenuDoPedido) virou item do menu "Ações da ficha" (MenuDaFicha). O Popover dele mede
+    // layout (getBoundingClientRect, portal) que este DOM de prova não tem; então o menu vira uma lista de botões, um
+    // por item recebido. O menu real tem prova própria em `prova-2232-ficha.mjs`.
+    if (url.endsWith('/features/ficha-cliente/MenuDaFicha.jsx')) {
       return {
         format: 'module', shortCircuit: true,
-        source: "import { createElement as h } from 'react'\nexport const MenuDoPedido = ({ podeEstornar, aoEscolher }) => (podeEstornar ? h('button', { type: 'button', onClick: () => aoEscolher('estornar') }, 'Marcar estorno') : null)\n",
+        source: "import { createElement as h } from 'react'\nexport const MenuDaFicha = ({ itens, aoEscolher }) => h('div', null, itens.map((i) => h('button', { key: i.chave, type: 'button', onClick: () => aoEscolher(i.chave) }, i.rotulo)))\n",
       }
     }
     if (jsx.has(url)) return { format: 'module', shortCircuit: true, source: jsx.get(url) }
@@ -253,6 +258,8 @@ const { ESTADOS_OCORRENCIA } = await import('../src/dominio/ocorrencia.js')
 const { pedidoDaApi } = await import('../src/infra/api/comandaApi.js')
 const { AbaCaixaApi } = await import('../src/features/gestao/caixa/AbaCaixaApi.jsx')
 const { BarraProximoPasso } = await import('../src/features/ficha-cliente/BarraProximoPasso.jsx')
+const { MenuDaFicha } = await import('../src/features/ficha-cliente/MenuDaFicha.jsx')
+const { acoesDoPedido, itensDoMenuDaFicha } = await import('../src/features/ficha-cliente/apresentacaoDaFicha.js')
 const { CANAIS, LINHAS_PRODUTO } = await import('../src/infra/catalogo.js')
 
 // ================================================================================================
@@ -388,6 +395,23 @@ const SINAL_PAGO = {
 }
 const AGORA = Date.parse('2026-10-23T15:00:00Z')
 
+// #2079 (C5): encomenda de R$ 118 com o link do sinal (R$ 59) pendente: a Cobrança dizia "Total R$ 59,00".
+await confere('#2079-C5 link do sinal pendente: a Cobrança diz "Sinal agora", não "Total"', () => {
+  const pedido = pedidoDaApi({
+    pedidoId: NO_PEDIDO, status: 'aguardando_pagamento', total: 118, frete: 12, itens: [], totalPago: 0, alocado: 0, sinalNaReserva: true,
+    pagamentos: [],
+    cobranca: { cobrancaId: 'cb2', provedor: 'mercadopago', status: 'Pendente', valor: 59, tentativa: 1,
+      criadaEm: '2026-10-23T14:50:00Z', expiraEm: '2026-10-23T15:20:00Z', linkPagamento: 'https://pagamento.exemplo/cb2' },
+  })
+  const html = renderToStaticMarkup(noContexto({}, h(BlocoCobranca, {
+    pedido, agora: AGORA, editavel: true, nomeCliente: 'Ana', conversaId: 'c1', aoGerar() {}, aoReenviar() {}, aoMarcarComprovante() {},
+    aoAceitarDivergencia() {}, aoAbrirCardapio() {}, aoCancelarPedido() {}, aoEncerrarAtendimento() {}, aoAlterarMeio() {},
+  }))).replaceAll(' ', ' ')
+  assert.doesNotMatch(html, />Total<\/span><b[^>]*>R\$ 59,00/, 'o valor do sinal vinha rotulado "Total"')
+  assert.match(html, />Sinal agora<\/span><b[^>]*>R\$ 59,00/)
+  assert.match(html, /Total do pedido: R\$ 118,00\. Restante na entrega: R\$ 59,00\./)
+})
+
 await confere('01. sinal pago na Cobrança: diz o restante da entrega, sem "item novo" e sem Cobrar diferença', () => {
   const pedido = pedidoDaApi(SINAL_PAGO)
   const html = renderToStaticMarkup(noContexto({}, h(BlocoCobranca, {
@@ -497,13 +521,25 @@ await confere('04. estorno da Barra do pedido: "Valor a devolver" nasce com o pa
     estado: 'pago', itens: [], pagamentos: [], meio: 'pix', numero: '1',
     cobranca: { id: 'cb', meio: 'pix', pagaEm: 1, valor: 100, valorPago: 100, criadaEm: 1, expiraEm: 2 },
   }
+  // #2232 (F7): o ⋮ do pedido (MenuDoPedido) saiu da Barra. "Marcar estorno" é item do menu "Ações da ficha" no
+  // cabeçalho (MenuDaFicha), que pede a confirmação em linha da Barra pela prop `pedidoDeAcao`. Esta tela de
+  // prova faz o papel do PainelFicha: o item vem de `itensDoMenuDaFicha`, o toque nele vira `pedidoDeAcao`, e
+  // a Barra segue real. Os asserts de valor abaixo não mudaram.
+  const FichaComMenu = () => {
+    const [pedidoDeAcao, setPedidoDeAcao] = useState({ chave: null, n: 0 })
+    const itens = itensDoMenuDaFicha({ acoes: acoesDoPedido({ pedido, fonteApi: false }), comPedido: true })
+    return h('div', null,
+      h(MenuDaFicha, { itens, aoEscolher: (chave) => setPedidoDeAcao(({ n }) => ({ chave, n: n + 1 })) }),
+      h(BarraProximoPasso, {
+        pedido, conversaId: 'c1', nomeCliente: 'Ana', agora: AGORA, emDesfazer: false, aoAvancar() {}, aoDesfazer() {},
+        pedidoDeAcao: pedidoDeAcao.chave ? pedidoDeAcao : null,
+        aoMarcarEstorno: (...a) => estornos.push(a),
+      }))
+  }
   const barra = h(ContextoAcessoModulos.Provider, { value: { acoes: {} } },
     h(ContextoEstado.Provider, { value: { agora: AGORA, fonteApi: false, conversas: [], selecionada: null } },
       h(ContextoCatalogo.Provider, { value: { entregadores: [], cardapio: [], meiosDePagamento: [] } },
-        h(ContextoAcoes.Provider, { value: {} }, h(BarraProximoPasso, {
-          pedido, conversaId: 'c1', nomeCliente: 'Ana', agora: AGORA, emDesfazer: false, aoAvancar() {}, aoDesfazer() {},
-          aoMarcarEstorno: (...a) => estornos.push(a),
-        })))))
+        h(ContextoAcoes.Provider, { value: {} }, h(FichaComMenu)))))
   await comTela(barra, async (tela) => {
     clicar(tela, 'Marcar estorno')
     assert.equal(valorDe(tela, 'Valor a devolver'), '100,00')
@@ -514,6 +550,56 @@ await confere('04. estorno da Barra do pedido: "Valor a devolver" nasce com o pa
     flushSync(() => propsDe(formulario).onSubmit({ preventDefault() {} }))
     await esperar()
     assert.deepEqual(estornos, [['Cliente desistiu', 58]])
+  })
+})
+
+// #2232 (revisão 2): com as ações no menu do cabeçalho, a Barra pode receber o pedido em qualquer estado dela.
+// A escolha vale na hora: durante o "Desfazer · N" a confirmação aparece já (não 10 s depois, sozinha), e com
+// "Marcar pago" aberto o formulário dele dá lugar ao da ação (nunca dois formulários empilhados).
+const fichaComMenu = (pedido, extra = {}) => {
+  const FichaComMenu = () => {
+    const [pedidoDeAcao, setPedidoDeAcao] = useState({ chave: null, n: 0 })
+    const itens = itensDoMenuDaFicha({ acoes: acoesDoPedido({ pedido, fonteApi: false }), comPedido: true })
+    return h('div', null,
+      h(MenuDaFicha, { itens, aoEscolher: (chave) => setPedidoDeAcao(({ n }) => ({ chave, n: n + 1 })) }),
+      h(BarraProximoPasso, {
+        pedido, conversaId: 'c1', nomeCliente: 'Ana', agora: AGORA, emDesfazer: false, aoAvancar() {}, aoDesfazer() {},
+        pedidoDeAcao: pedidoDeAcao.chave ? pedidoDeAcao : null, aoMarcarEstorno() {}, ...extra,
+      }))
+  }
+  return h(ContextoAcessoModulos.Provider, { value: { acoes: {} } },
+    h(ContextoEstado.Provider, { value: { agora: AGORA, fonteApi: false, conversas: [], selecionada: null } },
+      h(ContextoCatalogo.Provider, { value: { entregadores: [], cardapio: [], meiosDePagamento: [] } },
+        h(ContextoAcoes.Provider, { value: {} }, h(FichaComMenu)))))
+}
+const formularios = (tela) => descendentes(tela.recipiente).filter((no) => no.localName === 'form').length
+
+await confere('05. ação do menu durante o "Desfazer · N": a confirmação aparece na hora', async () => {
+  const pedido = {
+    estado: 'pago', itens: [], pagamentos: [], meio: 'pix', numero: '1',
+    cobranca: { id: 'cb', meio: 'pix', pagaEm: 1, valor: 100, valorPago: 100, criadaEm: 1, expiraEm: 2 },
+  }
+  await comTela(fichaComMenu(pedido, { emDesfazer: true }), async (tela) => {
+    assert.match(textoDe(tela), /Desfazer · \d+/)
+    clicar(tela, 'Marcar estorno')
+    assert.equal(valorDe(tela, 'Valor a devolver'), '100,00')
+    assert.doesNotMatch(textoDe(tela), /Desfazer · \d+/)
+  })
+})
+
+await confere('05. ação do menu com "Marcar pago" aberto: um formulário só, o da ação', async () => {
+  const pedido = {
+    estado: 'aguardando', itens: [], pagamentos: [], meio: 'pix', numero: '1',
+    cobranca: { id: 'cb', meio: 'pix', valor: 100, criadaEm: AGORA - 60000, expiraEm: AGORA + 3600000 },
+  }
+  await comTela(fichaComMenu(pedido, { aoMarcarPago() {} }), async (tela) => {
+    const marcarPago = descendentes(tela.recipiente).find((no) => no.localName === 'button' && /^Marcar pago/.test(no.textContent.trim()))
+    assert.ok(marcarPago, 'sem botão "Marcar pago": ' + descendentes(tela.recipiente).filter((no) => no.localName === 'button').map((b) => b.textContent.trim()).join(' | '))
+    flushSync(() => propsDe(marcarPago).onClick({ preventDefault() {} }))
+    const comBaixa = formularios(tela)
+    assert.ok(comBaixa >= 1, 'o "Marcar pago" não abriu formulário')
+    clicar(tela, 'Cancelar pedido')
+    assert.equal(formularios(tela), 1, `formulários na tela: ${formularios(tela)}`)
   })
 })
 

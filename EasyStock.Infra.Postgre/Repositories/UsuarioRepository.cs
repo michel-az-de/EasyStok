@@ -130,12 +130,17 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(u => new SessaoDoUsuario(u.Ativo, u.SessoesValidasDesde))
                 .FirstOrDefaultAsync();
 
+        public async Task AtualizarUltimoAcessoAsync(Guid usuarioId, DateTime agora) =>
+            await dbContext.Usuarios.Where(u => u.Id == usuarioId).ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.UltimoAcessoEm, agora).SetProperty(u => u.AlteradoEm, agora));
+
         public Task<int> AtualizarSessoesValidasDesdeAsync(Guid usuarioId, DateTime desde) =>
-            // UPDATE atômico e monotônico: só avança. Revogações concorrentes e relógios diferentes entre
-            // réplicas nunca fazem o corte recuar.
+            // Sempre trava a linha, inclusive com corte igual/anterior. O login nativo espera essa mesma linha
+            // antes de reler o acesso; o valor continua monotônico entre réplicas e revogações concorrentes.
             dbContext.Usuarios
-                .Where(u => u.Id == usuarioId && (u.SessoesValidasDesde == null || u.SessoesValidasDesde < desde))
-                .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessoesValidasDesde, desde));
+                .Where(u => u.Id == usuarioId)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessoesValidasDesde,
+                    u => u.SessoesValidasDesde == null || u.SessoesValidasDesde < desde ? desde : u.SessoesValidasDesde));
 
         public async Task<bool> ReservarTentativaDeSenhaAsync(Guid usuarioId, DateTime agora)
         {

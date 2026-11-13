@@ -1,6 +1,8 @@
 .vazio {
   padding: var(--e-6) var(--e-4); margin: 0; text-align: center;
-  display: grid; justify-items: center; gap: var(--e-3);
+  /* #2135: `align-content: start` porque, em pai que estica (a coluna da Ficha), as linhas da grade se
+     repartiam pela altura toda e o botão virava um bloco de 220 px. */
+  display: grid; justify-items: center; align-content: start; gap: var(--e-3);
   animation: surgirVazio var(--dur-media) var(--ease-saida) both;
 }
 .icone { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--r-2); color: var(--marca); background: var(--preenchimento); }
@@ -18,4 +20,10 @@
 @keyframes surgirVazio {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
+}
+
+/* #2185 (R13): vazio em linha. A frase em secundário (13) e a ação, texto da marca, na mesma linha. */
+.linha {
+  margin: 0; padding: var(--e-3) var(--e-4); display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-1) var(--e-2);
+  font-size: var(--t-apoio); color: var(--tinta-3);
 }

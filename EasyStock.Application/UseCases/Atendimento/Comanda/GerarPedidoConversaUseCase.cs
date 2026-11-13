@@ -14,6 +14,7 @@ namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 /// <param name="EnviarAoCliente">False cria a cobrança para copiar, sem mensagem ou falsa falha de envio (#1847).</param>
 /// <param name="Forma"><c>online</c> (padrão, link do Mercado Pago) ou <c>na_entrega</c>.</param>
 /// <param name="UsuarioId">Quem gerou pelo console (#1991-7): o resumo ao cliente sai em nome dele, não como automática.</param>
+/// <param name="FreteCombinado">#2219: frete em reais combinado pela equipe com o cliente (CEP fora da área). Nulo usa a cotação.</param>
 public sealed record GerarPedidoConversaInput(
     Guid EmpresaId,
     Guid ConversaId,
@@ -25,7 +26,8 @@ public sealed record GerarPedidoConversaInput(
     string? Observacoes = null,
     string? UsuarioNome = null,
     bool EnviarAoCliente = true,
-    Guid? UsuarioId = null);
+    Guid? UsuarioId = null,
+    decimal? FreteCombinado = null);
 
 /// <param name="Cobranca">Cobrança da forma escolhida. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido já desfeito (#1301).</param>
 /// <param name="EnviadoAoCliente">O resumo saiu pelo canal da conversa (falso fora da janela ou com o canal fora).</param>
@@ -61,11 +63,7 @@ public sealed class GerarPedidoConversaUseCase(
     {
         ArgumentNullException.ThrowIfNull(input);
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
-        var forma = string.IsNullOrWhiteSpace(input.Forma)
-            ? TrocarFormaPagamentoPedidoUseCase.FormaOnline
-            : input.Forma.Trim().ToLowerInvariant();
-        if (forma is not (TrocarFormaPagamentoPedidoUseCase.FormaOnline or TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega))
-            throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
+        var forma = CobrancaDoPedidoReservado.NormalizarForma(input.Forma);
         if (input.Itens is null || input.Itens.Count == 0)
             throw new UseCaseValidationException("A comanda está vazia.");
 
@@ -83,24 +81,15 @@ public sealed class GerarPedidoConversaUseCase(
 
         var reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
             input.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId,
-            input.Observacoes), ct);
+            input.Observacoes, input.FreteCombinado), ct);
 
-        var cobranca = await CobrarAsync(reservado, conversa.Id, forma, input.UsuarioNome, ct);
+        var cobranca = await CobrancaDoPedidoReservado.CobrarAsync(gerarCobranca, trocarForma, reservado, conversa.Id, forma,
+            QuemCobra.Atendente, input.UsuarioNome ?? "console", ct);
         var texto = TextoAoCliente(reservado, input.DataEntrega, forma, cobranca);
         var enviado = input.EnviarAoCliente && await aviso.EnviarAsync(input.EmpresaId, conversa.Id, texto,
             relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
 
         return new PedidoConversaGeradoResult(reservado.Pedido.Id, reservado.Total, forma, cobranca, enviado);
-    }
-
-    /// <summary>Mercado Pago fora propaga: a cobrança já desfez o pedido e a vaga, e a operadora tenta de novo (#1301).</summary>
-    private async Task<CobrancaPedidoResult?> CobrarAsync(
-        PedidoReservado reservado, Guid conversaId, string forma, string? usuarioNome, CancellationToken ct)
-    {
-        if (forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
-            return (await trocarForma.ExecuteAsync(new TrocarFormaPagamentoPedidoInput(
-                reservado.Pedido.EmpresaId, reservado.Pedido.Id, forma, UsuarioNome: usuarioNome ?? "console"), ct)).Cobranca;
-        return await gerarCobranca.ExecuteAsync(reservado, conversaId, ct);
     }
 
     private static string TextoAoCliente(PedidoReservado reservado, DateOnly dataEntrega, string forma, CobrancaPedidoResult? cobranca)

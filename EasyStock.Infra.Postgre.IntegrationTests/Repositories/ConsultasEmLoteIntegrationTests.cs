@@ -87,7 +87,7 @@ public sealed class ConsultasEmLoteIntegrationTests(PostgreSqlDatabaseFixture fi
                     ? null
                     : string.Join(", ", new[] { cliente.Endereco, cliente.Bairro, cliente.Cidade }
                         .Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s!.Trim()));
-                paradas.Add(new ParadaViagemResult(p.PedidoId, ObterViagemUseCase.NumeroPedido(p.PedidoId), p.Ordem,
+                paradas.Add(new ParadaViagemResult(p.PedidoId, CodigoCurto.De(p.PedidoId), p.Ordem,
                     cliente?.Nome ?? pedido?.ClienteNome, pedido?.EnderecoEntrega ?? enderecoDoCadastro,
                     p.EntregueEm, p.EntregadorNome, p.Veiculo, p.Placa, p.EmpresaEntregador));
             }

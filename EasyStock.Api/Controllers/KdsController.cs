@@ -57,7 +57,7 @@ public class KdsController(
         catch (UseCaseValidationException ex)
         {
             // Transição inválida chega aqui com a mensagem da TransicaoInvalidaException.
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 

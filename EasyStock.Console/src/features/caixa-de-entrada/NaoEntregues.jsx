@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
@@ -9,7 +10,10 @@ import {
   RECARGA_NAO_ENTREGUES_MS, assinaturaDeFalhas, falhaDeEnvio, falhaNovaNaTela, textoDaFalhaDeEnvio, TIPOS_DE_FALHA,
 } from '../../dominio/falhaDeEnvio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { anunciarAberturaDeConversa } from '../../aplicacao/aberturaDeConversa'
 import css from './caixa.module.css'
+import { useChaveDaSessao } from '../../aplicacao/useChaveDaSessao'
+import { assinaturaDaDispensa, chaveDaDispensa, faixaDispensada, gravarDispensa, lerDispensa } from './dispensaNaoEntregues'
 
 // S59 (#1391): mensagens que não chegaram ao cliente, de todas as conversas. Só aparece no modo API
 // (a massa local não envia de verdade) e só quando há alguma: a faixa abre a lista com Reenviar e
@@ -110,7 +114,22 @@ export function NaoEntregues({ aoAbrir }) {
     }
   }, [ocupado, carregando, itens])
 
+  // #2285: a troca de usuário na mesma aba muda a chave e, com ela, a dispensa lida.
+  // #2232 (L11): dispensada vale até aparecer mensagem que não estava na lista dispensada.
+  const chaveDispensa = useChaveDaSessao(chaveDaDispensa)
+  const [guardada, setGuardada] = useState(() => ({ chave: chaveDispensa, vistas: lerDispensa(chaveDispensa) }))
+  const vistas = guardada.chave === chaveDispensa ? guardada.vistas : lerDispensa(chaveDispensa)
+  const dispensada = !aberto && !erro && itens.length > 0 && faixaDispensada(itens, vistas)
+
   if (!listarNaoEntregues || (itens.length === 0 && !aberto && !erro && !carregando)) return null
+
+  function dispensar() {
+    const assinatura = assinaturaDaDispensa(itens)
+    setGuardada({ chave: chaveDispensa, vistas: assinatura })
+    gravarDispensa(assinatura, chaveDispensa)
+    // O botão some com a faixa: o foco volta ao início da tela em vez de cair no corpo.
+    document.querySelector('[data-inicio-tela]')?.focus()
+  }
 
   async function reenviarItem(item) {
     setOcupado(item.mensagem.id)
@@ -133,6 +152,7 @@ export function NaoEntregues({ aoAbrir }) {
   function abrirConversa(item) {
     setAberto(false)
     selecionar(item.conversaId)
+    anunciarAberturaDeConversa(item.conversaId)
     aoAbrir?.(item.conversaId)
   }
 
@@ -144,15 +164,22 @@ export function NaoEntregues({ aoAbrir }) {
 
   return (
     <>
-      <button type="button" className={css.faixaNaoEntregues} onFocus={(evento) => { focoFaixaRef.current = evento.currentTarget }} onClick={() => { setAberto(true); carregar() }}>
-        <Icone nome="message-square-warning" tamanho={20} />
-        {erro ? 'Mensagens sem atualizar' : carregando && itens.length === 0 ? 'Conferindo mensagens…' : itens.length === 1 ? '1 mensagem não entregue' : `${itens.length} mensagens não entregues`}
-        <span className={css.verNaoEntregues}>Ver</span>
-      </button>
+      {!dispensada && (
+        <div className={css.faixaNaoEntregues}>
+          <button type="button" className={css.abrirNaoEntregues} onFocus={(evento) => { focoFaixaRef.current = evento.currentTarget }} onClick={() => { setAberto(true); carregar() }}>
+            <Icone nome="message-square-warning" tamanho={20} />
+            {erro ? 'Mensagens sem atualizar' : carregando && itens.length === 0 ? 'Conferindo mensagens…' : itens.length === 1 ? '1 mensagem não entregue' : `${itens.length} mensagens não entregues`}
+            <span className={css.verNaoEntregues}>Revisar</span>
+          </button>
+          {itens.length > 0 && !erro && (
+            <BotaoIcone icone="x" rotulo="Dispensar aviso de não entregues" dica="Dispensar até chegar outra falha" onClick={dispensar} />
+          )}
+        </div>
+      )}
       {aberto && (
         <Modal
           titulo="Não entregues"
-          largura="min(740px, calc(100vw - 24px))"
+          largura="md"
           descricao="Mensagens que o WhatsApp não entregou. Falha temporária tenta de novo sozinha por até 6 h."
           aoFechar={fechar}
           rodape={<><Botao ref={atualizarRef} disabled={carregando || Boolean(ocupado)} onClick={() => carregar()}>Atualizar lista</Botao><Botao onClick={fechar}>Fechar</Botao></>}

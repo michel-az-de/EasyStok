@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 // Prova da issue #1442: Balcão, banner de pausa e Ficha mais simples.
-//   1. o Balcão abre em "Todas" (estado inicial do reducer);
+//   1. o Balcão abre em "Precisa de você" (estado inicial do reducer; #2232 L5 reverteu "Todas");
 //   2. a linha da conversa diz o estado em uma palavra (automático, com você,
 //      outro atendente, encerrada, bloqueado) e o motivo de precisar vence;
 //   3. o número da linha é o de mensagens sem resposta, com a API de reserva;
@@ -11,6 +11,7 @@
 //   node ferramentas/prova-1442-balcao-simples.mjs
 
 import { registerHooks } from 'node:module'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 
 registerHooks({
@@ -19,6 +20,12 @@ registerHooks({
       try { return proximo(especificador + '.js', contexto) } catch { /* cai no original */ }
     }
     return proximo(especificador, contexto)
+  },
+  load(url, contexto, proximo) {
+    if (url.endsWith('/infra/fonteDados.js')) return { format: 'module', shortCircuit: true,
+      source: readFileSync(new URL(url), 'utf8').replaceAll('import.meta.env', '({ VITE_FONTE_DADOS: "demonstracao" })') }
+    if (url.endsWith('.json')) return { format: 'module', shortCircuit: true, source: 'export default ' + readFileSync(new URL(url), 'utf8') }
+    return proximo(url, contexto)
   },
 })
 
@@ -34,7 +41,7 @@ const confere = async (descricao, fn) => {
     console.log(`FALHA ${descricao}\n      ${erro.message.split('\n').filter(Boolean).slice(0, 3).join(' ')}`)
   }
 }
-const importar = (caminho) => import(caminho).catch(() => ({}))
+const importar = (caminho) => import(caminho)
 
 const { estadoInicial } = await importar('../src/aplicacao/reducer.js')
 const linha = await importar('../src/dominio/linhaDoBalcao.js')
@@ -53,17 +60,19 @@ const conversa = (extra = {}) => ({
 })
 
 // --- 1. Todas é a aba padrão ------------------------------------------------------
-await confere('1. o Balcão abre em "Todas", não em "Precisa de você"', () => {
+// #2232 (banca UX, L5): a banca pediu a fila de ação primeiro; reverte a decisão de 07/10.
+await confere('1. o Balcão abre em "Precisa de você"', () => {
   assert.ok(estadoInicial, 'estadoInicial não exportado')
   const inicio = estadoInicial({ conversas: [], catalogo: { cardapio: [], janelas: [], canais: [] }, regras: [] })
-  assert.equal(inicio.filtros.aba, 'todas')
+  assert.equal(inicio.filtros.aba, 'precisa')
 })
 
 // --- 2. Estado da linha ---------------------------------------------------------
 await confere('2. automático ligado: "Automático"', () => {
   const e = linha.estadoDaLinha(conversa(), { pausado: false })
   assert.equal(e.chave, 'automatico')
-  assert.equal(e.texto, 'Automático')
+  assert.equal(e.texto, 'Assistente')
+  assert.equal(e.icone, 'sparkles')
 })
 await confere('2. ela assumiu ou escreveu: "Com você"', () => {
   assert.equal(linha.estadoDaLinha(conversa(), { pausado: PAUSA_POR_ASSUMIR }).texto, 'Com você')
@@ -75,7 +84,8 @@ await confere('2. outro atendente assumiu: não diz que é ela', () => {
   assert.equal(e.texto, 'Outro atendente')
 })
 await confere('2. encerrada e bloqueado vencem a pausa', () => {
-  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).texto, 'Encerrada')
+  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).texto, 'Concluída')
+  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).icone, 'circle-check')
   assert.equal(linha.estadoDaLinha(conversa(), { grupo: 'encerradas' }).chave, 'encerrada')
   assert.equal(linha.estadoDaLinha(conversa({ bloqueio: { motivo: 'x' } }), { pausado: true }).texto, 'Bloqueado')
 })
@@ -161,15 +171,16 @@ await confere(`5. todas as linhas do banner cabem em ${LIMITE} caracteres`, () =
     assert.doesNotMatch(r.linha, /Próximo passo sugerido/)
   }
 })
-await confere('5. você assumiu: "Com você", automático pausado, aviso do pedido segue', () => {
+await confere('5. você assumiu: "Você respondendo", automático pausado, aviso do pedido segue', () => {
   const r = modo.resumoDoModo(conversa(), PAUSA_POR_ASSUMIR, false)
-  assert.equal(r.rotulo, 'Com você')
+  assert.equal(r.rotulo, 'Você respondendo')
   assert.match(r.linha, /pausado/i)
-  assert.match(r.detalhe, /Pausado porque você assumiu/)
+  assert.match(r.detalhe, /Você respondendo/)
+  assert.match(r.detalhe, /avisos de preparo e entrega do pedido continuam saindo/)
 })
 await confere('5. você respondeu, sem pedido: encerrar ou devolver, e oferece Encerrar', () => {
   const r = modo.resumoDoModo(respondeu(), PAUSA_POR_ASSUMIR, false)
-  assert.match(r.linha, /encerre/i)
+  assert.match(r.linha, /conclua/i)
   assert.match(r.linha, /devolva/i)
   assert.equal(r.sugereEncerrar, true)
   assert.match(r.detalhe, /Próximo passo sugerido/, 'a frase inteira fica no detalhe (title)')

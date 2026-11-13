@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/casa_da_baba_splash"
+    android:clickable="true">
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:translationY="112dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+        <ProgressBar
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:indeterminate="true"
+            android:indeterminateTint="#496b56"
+            android:importantForAccessibility="no" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:maxWidth="280dp"
+            android:gravity="center"
+            android:text="@string/startup_loading"
+            android:textColor="#65533c"
+            android:textSize="14sp"
+            android:accessibilityLiveRegion="polite" />
+    </LinearLayout>
+</FrameLayout>

@@ -3,7 +3,7 @@ import { respostaDoAssistente } from '../../dominio/acoesDoAssistente'
 
 function mensagemDaFalha(erro) {
   if (erro?.codigo === 'ASSISTENTE_INDISPONIVEL') {
-    return 'O assistente está indisponível. Peça ao responsável pelo sistema para verificar a conexão com a IA.'
+    return 'O Assistente está indisponível. Peça ao responsável pelo sistema para verificar a conexão.'
   }
   if (erro?.codigo === 'SEM_CONEXAO') {
     return 'Sem conexão com o EasyStok. Sua pergunta continua acima; tente novamente quando a conexão voltar.'

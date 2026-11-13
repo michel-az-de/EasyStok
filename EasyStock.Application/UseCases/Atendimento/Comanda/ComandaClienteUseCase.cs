@@ -57,7 +57,7 @@ public sealed record ComandaClienteResult(Guid LinkId, string Nome, DateOnly Dia
     EnvioComandaCliente? Envio, IReadOnlyList<CupomComandaCliente> Cupons, decimal? TotalPrevisto = null,
     long NumeroComanda = 0, Guid ConversaId = default, SaldoFinanceiroComanda? Financeiro = null, AcertoComandaCliente? Acerto = null,
     bool PrecisaCadastro = false, bool EntregaACombinar = false, decimal? FreteCombinado = null,
-    bool AjudaSolicitada = false, DateTime? AjudaSolicitadaEm = null, string? PedidoEncerrado = null);
+    bool AjudaSolicitada = false, DateTime? AjudaSolicitadaEm = null, string? PedidoEncerrado = null, bool ChatSite = false);
 public sealed record FreteCombinadoComanda(Guid LinkId, int Revisao, decimal Valor);
 public sealed record EntregaACombinarComanda(Guid LinkId, int Revisao);
 public sealed class ComandaClienteConflitoException(string mensagem) : Exception(mensagem);
@@ -244,13 +244,13 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         var cupons = cliente is null ? [] : await leitura.ObterAsync("cupons", cliente.Id, async () =>
             (IReadOnlyList<CupomComandaCliente>)(await creditos.ListarAsync(link.EmpresaId, cliente.Id, ct))
                 .Select(c => new CupomComandaCliente(c.Codigo, c.Saldo, c.Valor, c.CriadoEm)).ToList());
-        return new(link.Id, (cliente?.Nome ?? conversa.ContatoNome ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "",
+        return new(link.Id, NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome) ?? "",
             HorarioBrasil.DataOperacional(link.CriadoEm), link.ExpiraEm, link.Revisao, pode, dados, selecao, detalhe,
             envio, cupons,
-            selecao.Sum(i => i.Qtd * i.Preco) + (pedido is null ? valorCombinado ?? 0m : ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido)), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
+            pedido is null ? selecao.Sum(i => i.Qtd * i.Preco) + (valorCombinado ?? 0m) : pedido.TotalComPratos(selecao.Sum(i => i.Qtd * i.Preco)), conversa.NumeroComanda, conversa.Id, financeiro, acerto,
             cliente is null, valorCombinado is null && ContextoConversaJson.Ler<EntregaACombinarComanda>(conversa, RevisaoEntregaACombinar) == new EntregaACombinarComanda(link.Id, link.Revisao), valorCombinado,
             ajudaEm is not null && conversa.Situacao == SituacaoConversa.Assumida, ajudaEm,
-            encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum));
+            encerrado is null ? null : StatusPedidoMapper.Format(encerrado.StatusEnum), conversa.Canal == CanalConversa.ChatSite);
     }
 
     /// <summary>E11: o complemento pago quita o pedido; o envio deixa de pedir pagamento e de oferecer o link antigo.</summary>
@@ -394,7 +394,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
                 if (!PodeAlterar(pedido) || pedido.AlteradoEm != dados.PedidoAtualizadoEm)
                     throw new ComandaClienteConflitoException("O pedido mudou. Recarregue antes de enviar a alteração.");
                 var selecao = await SelecionarAsync(link.EmpresaId, dados.Itens, pedido, t);
-                var total = selecao.Sum(i => i.Qtd * i.Preco) + ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido);
+                var total = pedido.TotalComPratos(selecao.Sum(i => i.Qtd * i.Preco));
                 link.Consumir(agora);
                 resultado = new(pedido.Id, "alteracao_aguardando_confirmacao", total,
                     total - (await saldoFinanceiro.ConsultarAsync(pedido, t)).Alocado);
@@ -865,7 +865,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
         if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega }
             && PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm))
         {
-            var sinal = Math.Min(envio.Saldo, Math.Max(0, PlanoPagamentoEncomenda.Sinal(envio.Total) - (envio.Total - envio.Saldo)));
+            var sinal = PlanoPagamentoEncomenda.SinalRestante(envio.Total, envio.Saldo);
             return texto + $"\n\nSinal a receber: {sinal.ToString("C", Cultura.PtBr)} por Pix, dinheiro ou maquininha. Restante na entrega: {(envio.Saldo - sinal).ToString("C", Cultura.PtBr)}. Combine o pagamento com a equipe.";
         }
         if (cobranca is { Provedor: CobrancaPedido.ProvedorNaEntrega })
@@ -888,7 +888,7 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
 
     public static void Validar(RascunhoComandaCliente dados)
     {
-        if (dados?.Itens is null || dados.Itens.Count > 50 || dados.Itens.Any(i => i.CardapioItemId == Guid.Empty || i.Qtd is < 1 or > 99 || i.Observacao?.Length > 500)
+        if (dados?.Itens is null || dados.Itens.Count > CheckoutCoreService.MaximoPratosDistintos || dados.Itens.Any(i => i.CardapioItemId == Guid.Empty || i.Qtd < 1 || i.Qtd > CheckoutCoreService.QuantidadeMaximaPorItem || i.Observacao?.Length > 500)
             || dados.Itens.GroupBy(i => (i.CardapioItemId, i.VariacaoId)).Any(g => g.Count() > 1)
             || dados.Observacoes?.Length > 2000 || dados.Acerto is not ("estorno" or "cupom") || dados.CodigoCupom?.Length > 35)
             throw new UseCaseValidationException("Confira os itens, quantidades e observações da comanda.");

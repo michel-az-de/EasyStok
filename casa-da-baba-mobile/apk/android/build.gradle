@@ -1,0 +1,12 @@
+buildscript {
+    repositories { google(); mavenCentral() }
+    dependencies { classpath 'com.android.tools.build:gradle:8.2.1' }
+}
+apply from: "variables.gradle"
+allprojects { repositories { google(); mavenCentral() } }
+
+// Usa o Build Tools instalado também nos módulos dos plugins Capacitor.
+subprojects {
+    plugins.withId('com.android.application') { android.buildToolsVersion '36.0.0' }
+    plugins.withId('com.android.library') { android.buildToolsVersion '36.0.0' }
+}

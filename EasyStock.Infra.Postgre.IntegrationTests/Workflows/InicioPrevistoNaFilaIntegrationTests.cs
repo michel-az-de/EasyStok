@@ -121,9 +121,13 @@ public sealed class InicioPrevistoNaFilaIntegrationTests(PostgreSqlDatabaseFixtu
         services.AddSingleton(Substitute.For<ICacheService>());
         services.AddEasyStockPostgreInfrastructure(fixture.ConnectionString, config);
         services.AddEasyStockApplication();
+        // #2211: a quitação avisa a equipe; o renderer real vem de AddNotificationsInfra (API e Worker), aqui basta o dublê.
+        services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.Notifications.IRendererTemplate>());
         // #1560: criar pedido registra o endereco de entrega; CEP e geocoding sao registrados pela API, nao por este provedor.
         services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.Lookup.ICepLookupClient>());
         services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.Lookup.IGeocodingClient>());
+        // #2211: quitar o pedido avisa a equipe pelo motor; o renderer e registrado pela infra de notificacoes.
+        services.AddSingleton(Substitute.For<EasyStock.Application.Ports.Output.Notifications.IRendererTemplate>());
         return services.BuildServiceProvider();
     }
 }

@@ -147,4 +147,30 @@ public class SensitivePatternsTests
         output.Should().Contain("/api/storefront/cardapio-conversa/{token}/comanda");
         SensitivePatterns.Redact("/api/storefront/cardapio-conversa/{token}/stream").Should().Be("/api/storefront/cardapio-conversa/{token}/stream");
     }
+
+    // #2376: dado pessoal no texto do log e no caminho do span (telefone na rota de conversa, CPF no cadastro).
+    [Theory]
+    [InlineData("cliente 123.456.789-09 cadastrado", "123.456.789-09")]
+    [InlineData("/api/clientes/cpf/12345678909", "12345678909")]
+    [InlineData("enviado para 5511987654321", "5511987654321")]
+    [InlineData("enviado para +55 (11) 98765-4321", "98765-4321")]
+    [InlineData("/api/atendimento/conversas/11987654321/mensagens", "11987654321")]
+    [InlineData("email de maria.souza+loja@exemplo.com.br recusado", "maria.souza+loja@exemplo.com.br")]
+    public void Redact_DeveMascarar_DadoPessoal(string entrada, string dado)
+    {
+        var saida = SensitivePatterns.Redact(entrada);
+
+        saida.Should().NotContain(dado).And.Contain(SensitivePatterns.RedactedToken);
+    }
+
+    [Theory]
+    [InlineData("criado em 1731420000000 ms")]                                  // unix em milissegundos
+    [InlineData("pedido 3f2504e0-4f89-11d3-9a0c-0305e82c3301")]                 // GUID
+    [InlineData("chave 35261112345678000199550010000012341000012345")]           // chave da NF-e
+    [InlineData("CNPJ 12.345.678/0001-95")]                                      // empresa, não pessoa
+    [InlineData("pedido 20261112 e valor 1234.56")]
+    public void Redact_NaoMascaraNumeroQueNaoEDadoPessoal(string entrada)
+    {
+        SensitivePatterns.Redact(entrada).Should().Be(entrada);
+    }
 }

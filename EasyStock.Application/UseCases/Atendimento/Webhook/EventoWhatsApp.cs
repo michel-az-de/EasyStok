@@ -26,7 +26,24 @@ public sealed record MensagemRecebidaWhatsApp(
     string? MidiaId,
     string? MidiaMime,
     string? BotaoRespostaId,
-    string? BotaoPayload);
+    string? BotaoPayload,
+    LocalizacaoWhatsApp? Localizacao = null);
+
+/// <summary>Mensagem do tipo <c>location</c>: as coordenadas e, quando o cliente escolheu um lugar, nome e endereço.</summary>
+public sealed record LocalizacaoWhatsApp(double Latitude, double Longitude, string? Nome, string? Endereco)
+{
+    /// <summary>Latitude e longitude dentro do globo; payload com coordenada inventada não vira localização.</summary>
+    public static LocalizacaoWhatsApp? Criar(double? latitude, double? longitude, string? nome, string? endereco) =>
+        latitude is { } lat && longitude is { } lng && lat is >= -90 and <= 90 && lng is >= -180 and <= 180
+            && !(lat == 0 && lng == 0)
+            ? new(lat, lng, Limpo(nome), Limpo(endereco))
+            : null;
+
+    /// <summary>"lat,long" com ponto decimal, como a Meta escreve no texto da mensagem.</summary>
+    public string Coordenadas => FormattableString.Invariant($"{Latitude},{Longitude}");
+
+    private static string? Limpo(string? valor) => string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
+}
 
 /// <summary><see cref="Status"/> é o status bruto da Meta (sent, delivered, read, failed).</summary>
 public sealed record StatusRecebidoWhatsApp(

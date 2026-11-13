@@ -105,6 +105,10 @@ internal sealed class ServidorSmtpDeTeste : IAsyncDisposable
         catch (SocketException)
         {
         }
+        catch (InvalidOperationException) when (_parar.IsCancellationRequested)
+        {
+            // O DisposeAsync parou o listener entre o teste do laço e o Accept ("Not listening"): é o fim normal.
+        }
     }
 
     private async Task AtenderAsync(TcpClient cliente, CancellationToken ct)

@@ -308,7 +308,8 @@ await confere('#1776/22: faixa ou bairro já coberto por outra zona ativa vira a
 })
 await confere('#1776/22: editar a zona volta o formulário cheio, e editar e excluir falam com PUT e DELETE', async () => {
   const campos = entregasApi.camposDaZona({ ...ZONAS[1], valor: 8.5, tempoEstimadoMinutos: 30, ordem: 2 })
-  assert.deepEqual(campos, { label: 'Centro', valor: '8,5', tempoEstimadoMinutos: '30', ordem: '2', cobertura: 'bairros', cepInicio: '', cepFim: '', bairros: 'Centro, São Domingos' })
+  // #2080: o valor volta escrito como o campo de reais escreve (centavos sempre), não "8,5".
+  assert.deepEqual(campos, { label: 'Centro', valor: '8,50', tempoEstimadoMinutos: '30', ordem: '2', cobertura: 'bairros', cepInicio: '', cepFim: '', bairros: 'Centro, São Domingos' })
   assert.deepEqual(entregasApi.corpoZona(campos).bairros, ['Centro', 'São Domingos'])
   chamadas.length = 0
   await infra.atualizarZona('z2', entregasApi.corpoZona(campos))

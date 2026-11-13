@@ -31,7 +31,7 @@ dialog .destaque > h3 { color: var(--alerta); }
 }
 .gatilho > span:first-child { flex-shrink: 0; white-space: nowrap; }
 .gatilho:hover { color: var(--tinta); }
-.gatilho:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-ponta); }
+.gatilho:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .resumo {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 400; color: var(--tinta-3);
@@ -41,5 +41,5 @@ dialog .destaque > h3 { color: var(--alerta); }
 .recolhido > h3 { margin-bottom: 0; }
 
 @media (max-width: 759px), (pointer: coarse) {
-  .gatilho { min-height: 44px; }
+  .gatilho { min-height: var(--toque); }
 }

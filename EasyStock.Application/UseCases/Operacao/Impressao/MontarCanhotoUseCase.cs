@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Enums.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
@@ -49,7 +50,7 @@ public sealed class MontarCanhotoUseCase(
             : null;
 
         var grupos = pedido.Itens
-            .Where(EhProducao)
+            .Where(i => i.EhProduto)
             .OrderBy(i => i.CriadoEm)
             .GroupBy(i => string.IsNullOrWhiteSpace(i.LinhaSnapshot) ? LinhaOutros : i.LinhaSnapshot!)
             .OrderBy(g => OrdemDaLinha(g.Key))
@@ -66,7 +67,7 @@ public sealed class MontarCanhotoUseCase(
         var pagoEm = pedido.Pagamentos.Count == 0 ? (DateTime?)null : pedido.Pagamentos.Max(p => p.PagoEm);
         var cabecalho = new CanhotoCabecalhoDto(
             storefront?.TituloPublico ?? string.Empty,
-            pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            CodigoCurto.De(pedido.Id),
             Limpo(pedido.ClienteNome) ?? Limpo(cliente?.Nome),
             Limpo(pedido.ClienteTelefone) ?? Limpo(cliente?.Telefone),
             pedido.EnderecoEntrega ?? MontarEndereco(cliente, pedido.ClienteApt),
@@ -75,9 +76,6 @@ public sealed class MontarCanhotoUseCase(
 
         return new CanhotoDto(cabecalho, grupos, Limpo(pedido.Observacoes), Rodape);
     }
-
-    private static bool EhProducao(PedidoItem i) =>
-        !string.IsNullOrWhiteSpace(i.LinhaSnapshot) || i.CardapioItemId is not null || i.ProdutoId is not null;
 
     private static int OrdemDaLinha(string linha)
     {

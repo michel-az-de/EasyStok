@@ -69,7 +69,7 @@ public sealed class AgendamentoController(
         catch (UseCaseValidationException ex)
         {
             SetNoStore();
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
         catch (StorefrontNaoEncontradoException ex)
         {

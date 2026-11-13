@@ -60,6 +60,6 @@ public sealed class InAppCanal(
         {
             CategoriaConteudoNotificacao.Transacional => TipoAlertaEstoque.PedidoRecebido,
             CategoriaConteudoNotificacao.Marketing => TipoAlertaEstoque.PedidoRecebido,
-            _ => TipoAlertaEstoque.ValidadeProxima
+            _ => TipoAlertaEstoque.AvisoOperacional
         };
 }

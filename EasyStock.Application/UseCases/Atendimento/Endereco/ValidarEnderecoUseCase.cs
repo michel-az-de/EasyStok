@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Endereco;
 
@@ -68,7 +69,7 @@ public sealed class ValidarEnderecoUseCase(
         ArgumentNullException.ThrowIfNull(input);
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
 
-        var cep = new string((input.Cep ?? string.Empty).Where(char.IsDigit).ToArray());
+        var cep = EnderecoBr.NormalizarCep(input.Cep);
         if (cep.Length != 8)
             return Fora(Normalizar(input, cep, null), MotivoCepInvalido, null);
 

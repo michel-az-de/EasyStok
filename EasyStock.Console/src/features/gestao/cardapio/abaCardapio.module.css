@@ -3,12 +3,35 @@
 .aba { display: grid; gap: var(--e-24); min-width: 0; container-type: inline-size; }
 .secao { display: grid; gap: var(--e-3); min-width: 0; }
 .tituloSecao { margin: 0; color: var(--tinta); font-size: var(--t-forte); line-height: var(--lh-compacto); font-weight: 750; letter-spacing: var(--ls-titulo); }
-.resumoOperacao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding-block: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha); gap: var(--e-4); }
-.resumoOperacao > div { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
-.resumoOperacao > div + div { padding-left: var(--e-4); border-left: var(--b-1) solid var(--linha); }
+.resumoOperacao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding-block: var(--e-3) var(--e-4); border-bottom: 0; gap: var(--e-4); }
+/* #2258 (auditoria P3): os três números têm o mesmo fundo de cartão; o tom do estado troca só a cor. */
+.resumoOperacao > div { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); }
 .resumoOperacao dt { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-compacto); }
 .resumoOperacao dd { order: -1; margin: 0; color: var(--tinta); font-size: var(--t-valor); font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; letter-spacing: var(--ls-display); }
+/* #2235 (banca T1-1): o número que pede ação ganha fundo e cor do estado; o texto diz o que fazer. */
+.resumoOperacao > .resumoPerigo { background: var(--erro-pastel); }
+.resumoPerigo dd, .resumoPerigo dt { color: var(--erro); }
+.resumoOperacao > .resumoAtencao { background: var(--alerta-pastel); }
+.resumoAtencao dd, .resumoAtencao dt { color: var(--alerta); }
+.resumoOperacao dd.dicaDoResumo { order: 0; font-size: var(--t-micro); font-weight: 600; letter-spacing: 0; line-height: var(--lh-compacto); }
+.resumoPerigo dd.dicaDoResumo { color: var(--erro); }
+.resumoAtencao dd.dicaDoResumo { color: var(--alerta); }
+/* Região viva sempre montada; vazia, não ocupa lugar na tela. */
+.vivo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.rodapeForm.acoesDireita { justify-content: flex-end; }
+.saibaMais { font-size: var(--t-apoio); color: var(--tinta-2); max-width: 70ch; }
+.saibaMais summary { width: fit-content; min-height: var(--toque); display: flex; align-items: center; color: var(--marca); font-weight: 600; cursor: pointer; }
+.saibaMais[open] summary { margin-bottom: var(--e-1); }
+.semQuebra { white-space: nowrap; }
+.acoesDireita { display: flex; justify-content: flex-end; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 
+/* #2424: categorias antigas sem caixa: título, estado em âmbar, nomes com divisórias e a ação no fim. */
+.antigas { display: grid; gap: var(--e-2); min-width: 0; }
+.cabecalhoAntigas { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2) var(--e-3); flex-wrap: wrap; }
+.pendenteConversao { color: var(--marca-forte); font-size: var(--t-apoio); font-weight: 650; }
+.nomesAntigos { list-style: none; margin: var(--e-2) 0 0; padding: 0; border-top: var(--b-1) solid var(--linha); }
+.nomesAntigos li { padding: var(--e-3) 0; border-bottom: var(--b-1) solid var(--linha); color: var(--tinta); font-size: var(--t-corpo); overflow-wrap: anywhere; }
+.converter { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding-top: var(--e-2); }
 .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .acoesFormulario { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding-top: var(--e-4); border-top: var(--b-1) solid var(--linha); }
 .acoesReceita { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
@@ -33,7 +56,7 @@
   background: var(--alerta-pastel); color: var(--alerta); font-size: var(--t-apoio);
 }
 
-.lista { list-style: none; margin: 0; padding: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); overflow: clip; }
+.lista { list-style: none; margin: 0; padding: 0; border: 0; border-radius: var(--r-2); background: var(--papel); overflow: clip; }
 .linha {
   display: flex; align-items: center; gap: var(--e-3) var(--e-4); flex-wrap: wrap;
   padding: var(--e-4); min-width: 0;
@@ -49,7 +72,8 @@
 .nome { margin: 0; font-size: var(--t-corpo); font-weight: 750; color: var(--tinta); line-height: var(--lh-compacto); overflow-wrap: anywhere; }
 .detalhe { margin: 0; font-size: var(--t-micro); color: var(--tinta-3); overflow-wrap: anywhere; line-height: var(--lh-corpo); }
 .preco { font-size: var(--t-forte); font-weight: 750; color: var(--tinta); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.estados { display: flex; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
+/* #2258 (auditoria P4): base curta e crescimento livre; com a base do conteúdo inteiro, as pílulas empurravam o botão da linha para baixo. */
+.estados { display: flex; gap: var(--e-2); flex: 1 1 8rem; flex-wrap: wrap; min-width: 0; }
 
 .acoes { display: flex; align-items: center; gap: var(--e-1); margin-left: auto; flex-wrap: wrap; max-width: 100%; }
 .acoes > button { font-size: var(--t-micro); }
@@ -64,24 +88,29 @@
 .resumoBusca { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
 .campos { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); align-items: end; width: 100%; }
 .campos > * { min-width: 0; }
-.formulario { padding: var(--e-24); margin: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
-.cabecalhoFormulario { display: flex; align-items: center; gap: var(--e-3); grid-column: 1 / -1; padding-bottom: var(--e-4); margin-bottom: var(--e-2); border-bottom: var(--b-1) solid var(--linha); }
-.numeroPrato { align-self: flex-start; color: var(--marca); font-family: var(--f-papel); font-size: var(--t-titulo); line-height: var(--lh-compacto); }
+.formulario { padding: var(--e-24); margin: 0; border: 0; border-radius: var(--r-2); background: var(--papel); }
+.cabecalhoFormulario { display: flex; align-items: center; gap: var(--e-3); grid-column: 1 / -1; padding-bottom: var(--e-4); margin-bottom: var(--e-2); border-bottom: 0; }
+.numeroPrato { align-self: flex-start; color: var(--marca); font-family: var(--f-corpo); font-size: var(--t-titulo); line-height: var(--lh-compacto); }
 .tituloFormulario { margin: 0; color: var(--tinta); font-size: var(--t-forte); font-weight: 750; line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo); }
 .cabecalhoFormulario .detalhe { margin-top: var(--e-1); }
 .listaFormularios { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
 .listaFormularios > .formulario { margin: 0; }
 .linhaReceita { grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); }
 .cadastroCurto { grid-template-columns: minmax(0, 1fr) auto; }
-.cadastroInsumo { grid-template-columns: minmax(0, 2fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1.3fr); }
+.cadastroInsumo { grid-template-columns: minmax(0, 2fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1.3fr); align-items: start; }
+/* #2258 (auditoria P5): dentro do modal o formulário não repete o recuo do corpo; o conteúdo alinha com o título. */
+.formulario.cadastroInsumo, .formulario.ajusteInsumo { padding: 0; background: transparent; }
 .ajusteInsumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ajusteEstoque { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .lancamentoPerda { grid-template-columns: minmax(0, 2fr) minmax(0, .8fr) minmax(0, 1.2fr); }
-.linhaCompleta { grid-column: 1 / -1; }
+.linhaCompleta { grid-column: 1 / -1; flex-basis: 100%; }
+/* #2363: "Paguei R$ __ por __ [kg]" numa linha; em tela estreita o preço fica sozinho em cima. */
+.compra { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, 1fr); gap: var(--e-3); align-items: end; min-width: 0; margin: 0; padding: 0; border: 0; }
+.compra > legend { padding: 0; margin-bottom: var(--e-2); color: var(--tinta); font-size: var(--t-corpo); font-weight: 650; }
+@container (max-width: 420px) { .compra { grid-template-columns: repeat(2, minmax(0, 1fr)); } .compra > :nth-child(2) { grid-column: 1 / -1; } }
 .ajudaEmbalagem { display: block; max-width: 44ch; color: var(--tinta-2); font-size: var(--t-micro); }
 .dataPlanejamento { display: grid; gap: var(--e-2); width: min(100%, 280px); }
 .rodapeForm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
-.formulario .acaoDiscreta:disabled, .acoes .acaoDiscreta:disabled { background: transparent; }
 .campoQuantidade { width: 180px; max-width: 100%; }
 .rendimentoDaReceita { grid-template-columns: repeat(2, minmax(0, 220px)); align-items: start; }
 .link { color: var(--marca); text-underline-offset: 3px; }
@@ -105,12 +134,13 @@
 
 @container (max-width: 360px) {
   .resumoOperacao { gap: var(--e-2); }
-  .resumoOperacao > div + div { padding-left: var(--e-2); }
+  .resumoOperacao > div { padding: var(--e-2); }
   .resumoOperacao dd { font-size: var(--t-titulo); }
-  .resumoOperacao dt { font-size: var(--t-minimo); }
+  .resumoOperacao dt { font-size: var(--t-micro); }
   .formulario, .linha { padding: var(--e-3); }
   .cadastroInsumo { grid-template-columns: minmax(0, 1fr); }
   .resumo { flex-basis: 100%; }
   .estados { flex-basis: 100%; }
   .acoes > button { padding-inline: var(--e-2); }
 }
+.linkBotao { text-decoration: none; }

@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 
 namespace EasyStock.Application.UseCases.FecharCaixa;
 
@@ -8,7 +9,9 @@ public sealed record FecharCaixaCommand(
     Guid? LojaId = null,
     string? Observacoes = null,
     Guid? FechadoPorUserId = null,
-    [property: MaxLength(120)] string? FechadoPorNome = null);
+    [property: MaxLength(120)] string? FechadoPorNome = null,
+    // #2084 (B3): o dinheiro que a gerente contou na gaveta. Opcional: quem não conta fecha como antes.
+    decimal? ValorContado = null);
 
 /// <summary>
 /// Fecha a sessão de caixa ABERTA (server-authoritative): resolve a sessão via
@@ -30,11 +33,16 @@ public sealed record FecharCaixaCommand(
 public class FecharCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
-    ILogger<FecharCaixaUseCase> logger)
+    ILogger<FecharCaixaUseCase> logger,
+    ObterCaixaDiaUseCase? caixaDia = null,
+    INotificacaoRepository? avisos = null)
 {
     public async Task<FechamentoCaixaResult> ExecuteAsync(FecharCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        if (cmd.ValorContado is { } contado && (contado < 0 || contado != decimal.Round(contado, 2)))
+            throw new UseCaseValidationException("O valor contado deve ser positivo e ter até duas casas decimais.");
+        if (cmd.ValorContado is { } contadoMax) ValidacaoCaixa.ExigirValorMonetario(contadoMax, "O valor contado");
 
         var hoje = HorarioBrasil.Hoje();   // dia operacional em Brasilia (alinha com o card; BUG-09)
 
@@ -91,9 +99,10 @@ public class FecharCaixaUseCase(
                 var pagInter = await repo.GetTotalPagamentosPedidosNoIntervaloAsync(cmd.EmpresaId, iniInter, fimInter, cmd.LojaId);
                 if (movsInter.Any() || vendasInter != 0m || pagInter != 0m)
                 {
-                    var aviso = $"Atencao: ha lancamentos entre {dia.AddDays(1):dd/MM/yyyy} e " +
-                                $"{hoje.AddDays(-1):dd/MM/yyyy} sob esta sessao que NAO foram incluidos " +
-                                "neste fechamento (revisar/reconciliar manualmente).";
+                    // #2256: o aviso aparece na tela do fechamento; português correto e sem caixa alta.
+                    var aviso = $"Atenção: há lançamentos entre {dia.AddDays(1):dd/MM/yyyy} e " +
+                                $"{hoje.AddDays(-1):dd/MM/yyyy} nesta sessão que não entraram neste fechamento. " +
+                                "Revise e reconcilie manualmente.";
                     observacoes = string.IsNullOrWhiteSpace(observacoes) ? aviso : $"{observacoes}\n{aviso}";
                     logger.LogWarning(
                         "Fechamento {Dia} (empresa {Empresa}, loja {Loja}): lancamentos em dias intermediarios nao cobertos.",
@@ -108,6 +117,8 @@ public class FecharCaixaUseCase(
         fechamento.FechadoPorUserId = cmd.FechadoPorUserId;
         fechamento.FechadoPorNome = cmd.FechadoPorNome;
         fechamento.Observacoes = observacoes;
+        fechamento.ValorContado = cmd.ValorContado;
+        (fechamento.DinheiroEsperado, fechamento.DinheiroEntrouDepois) = await GavetaDoFechamentoAsync(cmd, dia, hoje);
 
         // Cria movimento "fechamento" como marcador (não move saldo). Usa o instante real
         // do fechamento (DateTime.UtcNow, Kind=Utc): data.ToDateTime(TimeOnly.MaxValue) produz
@@ -142,12 +153,49 @@ public class FecharCaixaUseCase(
 
         logger.LogInformation("Caixa {Data} fechado (saldo final={Saldo}, vendas={Vendas}).",
             dia, fechamento.SaldoFinal, totalVendas);
+        await ResolverAvisosDoSinoAsync(cmd.EmpresaId);
         return Map(fechamento);
+    }
+
+    // #2258 (F1): o aviso "caixa aberto desde ..." do sino sai de circulação quando o caixa fecha. O fechamento já está
+    // gravado; se resolver o aviso falhar, o job diário varre de novo, então nunca desfaz nem falha o fechamento.
+    private async Task ResolverAvisosDoSinoAsync(Guid empresaId)
+    {
+        if (avisos is null) return;
+        try
+        {
+            await avisos.ResolverAvisosDeCaixaFechadoAsync(empresaId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Caixa fechado, mas os avisos do sino não foram resolvidos (empresa {Empresa}).", empresaId);
+        }
+    }
+
+    /// <summary>
+    /// #2084 (D1): grava os dois números que a tela mostrou. Num caixa esquecido, a leitura de hoje é a sessão
+    /// inteira; o esperado é o dia da abertura e o que entrou hoje fica no caixa de hoje. No caixa do próprio dia
+    /// nada entrou depois. Sem a leitura do dia (testes de unidade antigos), fica nulo como nos fechamentos antigos.
+    /// </summary>
+    private async Task<(decimal? Esperado, decimal? EntrouDepois)> GavetaDoFechamentoAsync(FecharCaixaCommand cmd, DateOnly dia, DateOnly hoje)
+    {
+        if (caixaDia is null) return (null, null);
+        if (dia < hoje)
+        {
+            var sessao = await caixaDia.ExecuteAsync(new ObterCaixaDiaQuery(cmd.EmpresaId, hoje, cmd.LojaId));
+            if (sessao is { AberturaPendenteCrossDay: true, DinheiroEsperadoNoFechamento: { } esperado })
+                return (esperado, sessao.DinheiroEntrouDepois ?? 0m);
+        }
+        var doDia = await caixaDia.ExecuteAsync(new ObterCaixaDiaQuery(cmd.EmpresaId, dia, cmd.LojaId));
+        return (GavetaCaixa.DinheiroNaGaveta(doDia), 0m);
     }
 
     internal static FechamentoCaixaResult Map(FechamentoCaixa f) => new(
         f.Id, f.EmpresaId, f.LojaId, f.Data,
         f.SaldoInicial, f.TotalVendas, f.TotalPagamentosPedidos,
         f.TotalEntradasExtras, f.TotalSaidasExtras, f.SaldoFinal,
-        f.FechadoPorUserId, f.FechadoPorNome, f.Observacoes, f.FechadoEm);
+        f.FechadoPorUserId, f.FechadoPorNome, f.Observacoes, f.FechadoEm,
+        ValorContado: f.ValorContado,
+        DinheiroEsperado: f.DinheiroEsperado,
+        DinheiroEntrouDepois: f.DinheiroEntrouDepois);
 }

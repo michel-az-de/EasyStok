@@ -269,6 +269,28 @@ public class PedidosControllerTests
         await _pedidoRepo.Received(1).AddPagamentoAsync(Arg.Is<PedidoPagamento>(p => p.RegistradoPorNome == "Ana"));
     }
 
+    [Fact]
+    public async Task RemovePagamento_EventoGuardaONomeDaSessao()
+    {
+        _uow.SetupExecuteInTransactionSemRetry<EasyStock.Application.UseCases.Pedidos.PedidoResult?>();
+        var pedido = MakePedido(_empresaId, "aguardando_pagamento");
+        var pag = new PedidoPagamento { Id = Guid.NewGuid(), Valor = 10m, Metodo = "dinheiro" };
+        pedido.Pagamentos.Add(pag);
+        _pedidoRepo.GetByIdWithDetailsAsync(_empresaId, pedido.Id).Returns(pedido);
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                User = new System.Security.Claims.ClaimsPrincipal(
+                    new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("nome", "Ana")], "test"))
+            }
+        };
+
+        await _controller.RemovePagamento(pedido.Id, pag.Id, _empresaId);
+
+        await _pedidoRepo.Received(1).AddEventoAsync(Arg.Is<PedidoEvento>(e => e.Tipo == "pagamento_removido" && e.UsuarioNome == "Ana"));
+    }
+
     /// <summary>
     /// #1940-5: o middleware grava a entrada de idempotência com a empresa do token; o SuperAdmin agindo em outra
     /// empresa resolve a empresa do corpo. A repetição tem de achar o recibo pela empresa da gravação, senão o

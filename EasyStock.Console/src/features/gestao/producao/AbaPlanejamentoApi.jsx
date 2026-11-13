@@ -19,7 +19,7 @@ const porQue = (p) => [
   p.agendados ? `${qtd(p.agendados)} ${p.agendados === 1 ? 'porção agendada' : 'porções agendadas'}` : null,
   p.descoberto ? `${qtd(p.descoberto)} ${p.descoberto === 1 ? 'porção vendida sem saldo' : 'porções vendidas sem saldo'}` : null,
   `saldo ${qtd(p.saldo)}`,
-].filter(Boolean).join(' · ')
+].filter(Boolean).join(' · ').replace(/^./, (c) => c.toUpperCase())
 
 export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   const { cardapio } = useCatalogo()
@@ -111,8 +111,8 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
   if (carga.estado === 'carregando') return <output className={css.descricao}>Calculando a sugestão…</output>
   if (carga.estado === 'erro' && linhas.length === 0) return (
     <div className={css.aba} role="alert">
-      <p className={css.aviso}>Não consegui ler a sugestão: {carga.erro}</p>
-      <Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar novamente</Botao>
+      <p className={css.aviso}>Não foi possível carregar a sugestão. {carga.erro}</p>
+      <Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar de novo</Botao>
     </div>
   )
 
@@ -121,23 +121,24 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
 
   return (
     <div className={css.aba}>
+      {/* #2235 (banca A2): a sugestão diz de onde vem, para o zero não parecer erro. */}
       <p className={css.descricao}>
-        Quanto produzir de cada prato para atender os pedidos agendados até a data, cobrir o que saiu sem saldo e
-        voltar ao mínimo. Mude as porções à vontade: calcular não mexe no estoque.
+        A sugestão soma os pedidos agendados até a data, o estoque mínimo e o que foi vendido sem saldo, e tira o que já está no estoque.
+        Zero quer dizer que nada pede produção: o estoque cobre os pedidos e o mínimo, ou o prato não tem pedido nem mínimo cadastrado. Ajuste as porções; calcular não altera o estoque.
       </p>
-      <label className={css.dataPlanejamento}>
-        <span className={css.nome}>Pedidos até</span>
-        <input className={css.busca} type="date" aria-label="Pedidos até" disabled={ocupado || atualizando} value={ate} onChange={(e) => consultar(e.target.value)} />
-      </label>
+      {/* #2235 (banca A1): a data usa o mesmo campo das outras telas. */}
+      <div className={css.dataPlanejamento}>
+        <CampoTexto tipo="date" rotulo="Pedidos até" disabled={ocupado || atualizando} value={ate} onChange={(e) => consultar(e.target.value)} />
+      </div>
       {atualizando && <output className={css.descricao}>Atualizando a sugestão para a data escolhida…</output>}
       {carga.estado === 'erro' && <p className={css.aviso} role="alert">
-        Não consegui atualizar a sugestão. As porções abaixo são da consulta anterior. {carga.erro}
-        {' '}<Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar novamente</Botao>
+        Não foi possível atualizar a sugestão. As porções abaixo são da consulta anterior. {carga.erro}
+        {' '}<Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar de novo</Botao>
       </p>}
       {aviso && <p className={css.aviso} role="alert">{aviso} <Botao variante="texto" onClick={() => setAviso(null)}>Fechar</Botao></p>}
 
       {linhas.length === 0 ? (
-        <p className={css.descricao}>Nenhum prato ligado ao estoque ainda: a primeira produção liga o prato. Lance em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
+        <p className={css.descricao}>Registre a primeira produção em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a> para planejar os pratos.</p>
       ) : (
         <ul className={css.lista}>
           {linhas.map((l) => (
@@ -157,9 +158,10 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
         </ul>
       )}
 
-      <div className={css.topo}>
-        <Botao variante="primario" icone="nota" onClick={calcular} disabled={bloqueado || linhas.length === 0}>Calcular insumos</Botao>
-        <Botao icone="cooking-pot" onClick={lancar} disabled={bloqueado || linhas.length === 0}>Revisar na produção</Botao>
+      {/* #2235 (banca A3): as duas ações do mesmo fluxo juntas à direita, a principal por último. */}
+      <div className={css.acoesDireita}>
+        <Botao icone="nota" onClick={calcular} disabled={bloqueado || linhas.length === 0}>Calcular insumos</Botao>
+        <Botao variante="primario" icone="cooking-pot" onClick={lancar} disabled={bloqueado || linhas.length === 0}>Revisar na produção</Botao>
       </div>
 
       {plano && (

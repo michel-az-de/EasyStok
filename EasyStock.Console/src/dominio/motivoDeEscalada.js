@@ -5,7 +5,7 @@
 
 import { dataHora } from './formato'
 
-export const AUTOMATICO_DESLIGADO = 'o atendimento automático está desligado'
+export const AUTOMATICO_DESLIGADO = 'o Assistente está desligado'
 
 const MOTIVOS_CONHECIDOS = [
   [/^agente desligado/i, AUTOMATICO_DESLIGADO],

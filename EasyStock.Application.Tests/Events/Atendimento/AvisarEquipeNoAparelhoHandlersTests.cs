@@ -196,7 +196,7 @@ public class AvisarEquipeNoAparelhoHandlersTests
     [InlineData("+55 11 98888-7777", "Cliente")]
     [InlineData("5511988887777", "Cliente")]
     public void PrimeiroNomeNuncaLevaTelefone(string? nome, string esperado) =>
-        AvisoEquipeNoAparelho.PrimeiroNome(nome).Should().Be(esperado);
+        NomesDeContato.PrimeiroNome(nome, AvisoEquipeNoAparelho.NomeSemContato).Should().Be(esperado);
 
     private async Task ContatoNovoAsync(Guid conversaId)
     {

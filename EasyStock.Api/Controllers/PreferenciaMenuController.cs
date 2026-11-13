@@ -28,7 +28,7 @@ public class PreferenciaMenuController(
                 new ObterFavoritosMenuQuery(currentUser.UsuarioId, currentUser.EmpresaId, lojaId));
             return DataOk(result);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [SwaggerOperation(Summary = "Replace menu favorites for the current user + store")]
@@ -42,7 +42,7 @@ public class PreferenciaMenuController(
                 request.Favoritos ?? new List<string>()));
             return DataOk(new { favoritos });
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     public sealed record SalvarFavoritosMenuRequest(Guid LojaId, List<string>? Favoritos);

@@ -58,6 +58,33 @@ public static class DataUtc
             : HorarioBrasil.InicioRealDoDiaUtc(dia.AddDays(1)).AddTicks(-10);
     }
 
+    /// <summary>
+    /// Início de filtro por período numa coluna de DATA CIVIL (ex.: <c>DataVencimento</c>), para <c>coluna &gt;= valor</c>.
+    /// O dia civil vem de <see cref="InicioDoPeriodoUtc"/> (data pura é o dia de Brasília; ISO com "Z" é o instante) e
+    /// vira a meia-noite UTC desse dia: a coluna guarda a data civil como 00:00Z (legado) ou 03:00Z (console), e as
+    /// duas formas caem no mesmo dia UTC (#2095, F4).
+    /// </summary>
+    public static DateTime? InicioDoDiaCivilUtc(DateTime? desde)
+    {
+        var inicio = InicioDoPeriodoUtc(desde);
+        if (!inicio.HasValue) return null;
+        if (inicio.Value <= DateTime.MinValue.AddDays(1)) return inicio;
+        return HorarioBrasil.CivilComoInstanteUtc(HorarioBrasil.DataOperacional(inicio.Value));
+    }
+
+    /// <summary>
+    /// Fim de filtro por período numa coluna de DATA CIVIL, inclusivo (<c>coluna &lt;= valor</c>): o último instante do
+    /// dia UTC que representa o dia civil de <see cref="FimDoPeriodoUtc"/>. Ver <see cref="InicioDoDiaCivilUtc"/>.
+    /// </summary>
+    public static DateTime? FimDoDiaCivilUtc(DateTime? ate)
+    {
+        var fim = FimDoPeriodoUtc(ate);
+        if (!fim.HasValue) return null;
+        if (fim.Value >= DateTime.MaxValue.AddDays(-2)) return fim;
+        var dia = HorarioBrasil.DataOperacional(fim.Value);
+        return HorarioBrasil.CivilComoInstanteUtc(dia.AddDays(1)).AddTicks(-10);
+    }
+
     /// <summary>Instante UTC de uma data/hora de parede em Brasília; os extremos do <see cref="DateTime"/> saturam em vez de estourar.</summary>
     private static DateTime DeBrasiliaParaUtc(DateTime d)
     {

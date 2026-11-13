@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Integration.Conexao;
 using EasyStock.Domain.Integration;
 using EasyStock.Infra.Integrations.Conexao;
 using EasyStock.Infra.Integrations.Logistica.Lalamove;
+using EasyStock.Infra.Integrations.WhatsApp;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -109,17 +110,20 @@ public class TestadoresIntegracaoTests
 
     // ─── WhatsApp (Meta) ─────────────────────────────────────────────────────
 
-    private static TestadorWhatsApp WhatsApp(HandlerFalso handler) =>
+    private static TestadorWhatsApp WhatsApp(HandlerFalso handler, WhatsAppCloudOptions? opcoes = null) =>
         new(new HttpClient(handler), Microsoft.Extensions.Options.Options.Create(
-            new EasyStock.Infra.Integrations.WhatsApp.WhatsAppCloudOptions { BaseUrl = "https://graph.test/v19.0" }));
+            opcoes ?? new WhatsAppCloudOptions { BaseUrl = "https://graph.test/v19.0" }));
 
-    [Fact]
-    public async Task WhatsAppConsultaONumeroSemEnviarNada()
+    [Theory]
+    [InlineData("https://graph.test/v19.0")]
+    [InlineData("https://graph.test/v19.0/")]
+    public async Task WhatsAppConsultaONumeroSemEnviarNada(string baseUrl)
     {
         var handler = new HandlerFalso(HttpStatusCode.OK,
             """{"display_phone_number":"+55 11 99999-0000","verified_name":"Casa da Baba","quality_rating":"GREEN","id":"1098765"}""");
 
-        var r = await WhatsApp(handler).TestarAsync(Chave("whatsapp", campos: [("accessToken", "token-meta"), ("phoneNumberId", "1098765")]));
+        var r = await WhatsApp(handler, new WhatsAppCloudOptions { BaseUrl = baseUrl, ApiVersion = "v25.0" })
+            .TestarAsync(Chave("whatsapp", campos: [("accessToken", "token-meta"), ("phoneNumberId", "1098765")]));
 
         r.Ok.Should().BeTrue();
         r.Mensagem.Should().Contain("+55 11 99999-0000").And.Contain("Casa da Baba");
@@ -127,6 +131,58 @@ public class TestadoresIntegracaoTests
         req.Metodo.Should().Be(HttpMethod.Get, "o teste não pode mandar mensagem a ninguém");
         req.Url.Should().Be("https://graph.test/v19.0/1098765?fields=display_phone_number,verified_name,quality_rating");
         req.Cabecalhos["Authorization"].Should().Be("Bearer token-meta");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task WhatsAppSemOverrideConsultaGraphNaVersaoPadrao(string? baseUrl)
+    {
+        var handler = new HandlerFalso(HttpStatusCode.OK,
+            """{"display_phone_number":"+55 11 99999-0000","quality_rating":"GREEN"}""");
+
+        var r = await WhatsApp(handler, new WhatsAppCloudOptions { BaseUrl = baseUrl })
+            .TestarAsync(Chave("whatsapp", campos: [("accessToken", "token-meta"), ("phoneNumberId", "1098765")]));
+
+        r.Ok.Should().BeTrue(r.Mensagem);
+        r.Mensagem.Should().Contain("+55 11 99999-0000").And.Contain("qualidade alta");
+        var req = handler.Requisicoes.Should().ContainSingle().Subject;
+        req.Metodo.Should().Be(HttpMethod.Get, "o diagnóstico apenas consulta o número");
+        req.Url.Should().Be("https://graph.facebook.com/v26.0/1098765?fields=display_phone_number,verified_name,quality_rating");
+        req.Cabecalhos["Authorization"].Should().Be("Bearer token-meta");
+        req.Corpo.Should().BeNull("o diagnóstico não envia mensagens");
+    }
+
+    [Fact]
+    public async Task WhatsAppSemOverrideRespeitaAVersaoConfigurada()
+    {
+        var handler = new HandlerFalso(HttpStatusCode.OK, """{"verified_name":"Casa da Baba"}""");
+
+        var r = await WhatsApp(handler, new WhatsAppCloudOptions { ApiVersion = "v25.0" })
+            .TestarAsync(Chave("whatsapp", campos: [("accessToken", "token-meta"), ("phoneNumberId", "1098765")]));
+
+        r.Ok.Should().BeTrue(r.Mensagem);
+        var req = handler.Requisicoes.Should().ContainSingle().Subject;
+        req.Metodo.Should().Be(HttpMethod.Get);
+        req.Url.Should().Be("https://graph.facebook.com/v25.0/1098765?fields=display_phone_number,verified_name,quality_rating");
+        req.Corpo.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task WhatsAppSemOverridePreservaOErroRealDaMeta()
+    {
+        var handler = new HandlerFalso(HttpStatusCode.Unauthorized,
+            """{"error":{"message":"Token expired","code":190}}""");
+
+        var r = await WhatsApp(handler, new WhatsAppCloudOptions())
+            .TestarAsync(Chave("whatsapp", campos: [("accessToken", "token-velho"), ("phoneNumberId", "1098765")]));
+
+        r.Ok.Should().BeFalse();
+        r.Mensagem.Should().Contain("token da Meta").And.Contain("190").And.NotContain("token-velho");
+        var req = handler.Requisicoes.Should().ContainSingle().Subject;
+        req.Metodo.Should().Be(HttpMethod.Get);
+        req.Corpo.Should().BeNull();
     }
 
     [Fact]

@@ -17,6 +17,7 @@ public class AtualizarCentroCustoUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.Id, nameof(cmd.Id));
+        CriarCentroCustoUseCase.ValidarTextos(null, cmd.Nome, cmd.Descricao);
 
         var c = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (c is null) return null;

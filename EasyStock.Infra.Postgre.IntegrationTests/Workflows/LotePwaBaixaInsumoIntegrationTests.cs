@@ -274,6 +274,47 @@ public class LotePwaBaixaInsumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
             await sp.GetRequiredService<BatchLinker>().ExecuteAsync([batchId], s.EmpresaId);
         });
 
+    [SkippableTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task LoteNaoVinculaProdutoDeOutraEmpresa(bool produtoMobileDeOutraEmpresa)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var outraEmpresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var outroProdutoId = Guid.NewGuid();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Add(new Empresa { Id = outraEmpresaId, Nome = "Outra empresa" });
+            seed.Add(new Categoria { Id = categoriaId, EmpresaId = outraEmpresaId, Nome = "Outra categoria" });
+            seed.Add(new Produto
+            {
+                Id = outroProdutoId, EmpresaId = outraEmpresaId, CategoriaId = categoriaId,
+                Nome = "Produto alheio", Status = StatusProduto.Ativo
+            });
+            seed.Add(new Product
+            {
+                Id = "p-outra-empresa", Name = "Produto alheio", Category = "massa",
+                EmpresaId = produtoMobileDeOutraEmpresa ? outraEmpresaId : s.EmpresaId,
+                ErpProductId = outroProdutoId
+            });
+            await seed.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await Sincronizar(provider, s, "b-referencia-alheia", 3,
+            aoCriar: b => b.Items.Single().ProductId = "p-outra-empresa");
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var lote = await leitura.Set<Lote>().Include(l => l.Itens)
+            .SingleAsync(l => l.MobileBatchId == "b-referencia-alheia");
+        lote.Itens.Should().ContainSingle().Which.ProdutoId.Should().BeNull(
+            "o isolamento deve valer nos dois lados da ponte mobile para ERP");
+        (await leitura.Set<ItemEstoque>().IgnoreQueryFilters().AnyAsync(i => i.ProdutoId == outroProdutoId)).Should().BeFalse();
+        (await leitura.Set<MovimentacaoEstoque>().IgnoreQueryFilters().AnyAsync(m => m.ProdutoId == outroProdutoId)).Should().BeFalse();
+    }
     private sealed record Semente(Guid EmpresaId, Guid PratoId, Guid MolhoId, Guid BandejaId);
 
     private async Task Sincronizar(

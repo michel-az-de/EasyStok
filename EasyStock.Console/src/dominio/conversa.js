@@ -1,5 +1,6 @@
 import { precisaDeVoce, respostaAtrasada } from './automatico'
 import { inicioDoPedidoAtivo } from './entrega'
+import { pedidoEncerrado } from './pedido'
 
 export const ehLead = (conversa) => conversa.conta === 'lead'
 
@@ -11,19 +12,25 @@ const ROTULO_DO_FORMATO = {
 }
 
 // Prefixo em 600 diz quem escreveu por último sem abrir a conversa:
-// "Automático:" quando foi a regra que respondeu, "Você:" quando foi a mão da
-// dona, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
+// "Assistente:" quando foi automático, "Você:" quando o usuário enviou,
+// Nome confirmado ou "Equipe:" para outro autor humano, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
 // string só porque só o prefixo é 600 (seção 1); quem monta o texto plano
 // (título, aria-label) faz `prefixo + corpo`.
 //
 // #1474 (R11): nota de sistema ("escalado para a dona", "retomado pelo usuário") é evento da
 // conversa, não fala. A prévia mostra a última mensagem do cliente ou da loja.
-export function previaDaConversa(conversa) {
+export function previaDaConversa(conversa, usuario = null) {
   const ultima = conversa.mensagens.findLast((m) => m.dir !== 'sistema')
   // Modo API: conversa encerrada não carrega mensagens na inbox; o resumo traz o texto (#1287).
   if (!ultima) return { prefixo: '', corpo: conversa.ultimaMensagemTexto || 'Sem mensagens' }
+  const deOutro = ultima.enviadaPorUsuarioId
+    ? ultima.enviadaPorUsuarioId !== usuario?.id
+    : Boolean(conversa.situacaoApi)
+  const nomeDaAutora = usuario?.id && ultima.enviadaPorUsuarioId && deOutro
+    && ultima.enviadaPorUsuarioId === conversa.assumidaPorUsuarioId
+    ? conversa.assumidaPorNome : null
   const prefixo = ultima.dir === 'out'
-    ? (ultima.automatica ? 'Automático: ' : 'Você: ')
+    ? (ultima.automatica ? 'Assistente: ' : deOutro ? `${nomeDaAutora || 'Equipe'}: ` : 'Você: ')
     : ''
   return { prefixo, corpo: ROTULO_DO_FORMATO[ultima.formato] ?? ultima.texto }
 }
@@ -31,11 +38,14 @@ export function previaDaConversa(conversa) {
 export const conversaEncerrada = (conversa) => conversa?.estado === 'Encerrado'
 
 // Contagens do cabeçalho. Ficam aqui para o layout não conhecer estado nenhum.
+// #2185 (F19): "em andamento" é o que o Balcão lista em cima, sem a bloqueada (o chip também não a conta);
+// "na esteira" é pedido de verdade e em curso: nem cancelado, nem entregue. No modo API a comanda ainda
+// em montagem (sem pedido no EasyStok) não está na esteira.
 export const contarAbertas = (conversas) =>
-  conversas.filter((c) => c.estado !== 'Encerrado').length
+  conversas.filter((c) => c.estado !== 'Encerrado' && !estaBloqueada(c)).length
 
-export const contarNaEsteira = (conversas) =>
-  conversas.filter((c) => c.pedido && c.pedido.estado !== 'entregue').length
+export const contarNaEsteira = (conversas, { fonteApi = false } = {}) =>
+  conversas.filter((c) => c.pedido && !pedidoEncerrado(c.pedido) && (!fonteApi || c.pedido.pedidoId)).length
 
 // --- Balcão (seção 1, rodada 5) ---------------------------------------------
 // Duas abas (Precisa de você / Todas), chips de canal que ligam mais de um ao
@@ -112,6 +122,14 @@ export const conversasEncerradasDoBalcao = (conversas, filtros, usuario = null) 
 export const conversasBloqueadasDoBalcao = (conversas, filtros, usuario = null) =>
   conversas.filter((c) =>
     estaBloqueada(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca) && combinaResponsavel(c, filtros.responsavel, usuario))
+
+// #2185 (F18): UM número para "Conversas" no título, no chip "Todas" e na aba do celular: o que o Balcão
+// lista em cima (nem encerrada, nem bloqueada), com a busca, o canal e o responsável ligados e sem a aba
+// "Precisa de você". Encerradas e bloqueadas têm a contagem própria nos grupos do fim da lista.
+export const contarAbertasDoBalcao = (conversas, filtros, usuario = null) =>
+  conversas.filter((c) =>
+    !foraDoTopo(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca)
+    && combinaResponsavel(c, filtros.responsavel, usuario)).length
 
 // Contador por canal do topo do Balcão (issue #2). Conta o que está aberto na
 // lista de cima (nem encerrada nem bloqueada) e, dentro disso, quantas

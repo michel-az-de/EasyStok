@@ -13,30 +13,38 @@
 .inicio {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   border-radius: var(--r-1); color: var(--tinta-2); text-decoration: none;
-  font-size: var(--t-minimo); font-weight: 600;
+  font-size: .75rem; font-weight: 600;
 }
 .inicio:hover { color: var(--marca); }
-/* `letter-spacing: inherit`: o rótulo "Atendimento" tem 76 px no espaçamento do corpo (-0,1 px) e só cabe no item de 84 px assim;
-   com 0 ele passava de 76 e quebrava em "Atendi-mento". */
+/* Rótulos de 12 px com espaçamento óptico para caber no item de 68 px. */
 /* `.filhos` marca o contêiner de botões que outro componente desenha (avisos e lembretes). */
 .item, .filhos > button, .filhos > div > button {
-  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  width: var(--largura-item-trilho); min-height: var(--altura-item-trilho); padding: 4px;
-  border: 0; border-radius: 14px; background: transparent; color: var(--tinta-2); box-shadow: none;
-  font-size: var(--t-minimo); font-weight: 600; letter-spacing: inherit; line-height: 1.1; text-align: center; text-decoration: none;
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex-shrink: 0;
+  width: var(--largura-item-trilho); min-height: max(var(--toque), var(--altura-item-trilho)); padding: 4px 0;
+  border: 0; border-radius: var(--r-1); background: transparent; color: var(--tinta-2); box-shadow: none;
+  font-size: .75rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.2; text-align: center; text-decoration: none;
 }
-.item > span { max-width: 100%; overflow-wrap: anywhere; hyphens: auto; }
+/* #2326: rótulo longo quebra em até 2 linhas, com hifenização do pt-BR, em vez de virar
+   "Configuraç…" e "Respostas …". Sem dicionário de hifenização (WebKit no Windows), a palavra
+   não quebra no meio ("Configuraçõe / s") e sai cortada na borda. O `title` tem o nome inteiro. */
+.item > span {
+  max-width: 100%; overflow: hidden; white-space: normal; overflow-wrap: normal; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  -webkit-hyphens: auto; hyphens: auto;
+}
 .item > svg { flex: none; }
 .item:hover:not(:disabled), .filhos > button:hover:not(:disabled), .filhos > div > button:hover:not(:disabled) {
   background: var(--preenchimento); color: var(--tinta);
 }
 .inicio:focus-visible, .item:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-/* O item da tela em que a pessoa está: fundo forte e a barrinha no canto do trilho. */
-.ativo, .ativo:hover:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
-.ativo::before {
-  content: ''; position: absolute; left: calc(-1 * var(--respiro-trilho)); top: 14px; bottom: 14px; width: 3px;
-  border-radius: 0 3px 3px 0; background: var(--tinta);
+/* O preenchimento identifica a tela atual sem uma borda decorativa. */
+/* #2256: no trilho o contador de Avisos e de Lembretes fica no canto do ícone, fora do fluxo,
+   e não empurra nem cobre o rótulo; o ponto de avisos do aparelho fica no canto oposto. */
+.filhos [data-contador-sino] {
+  position: absolute; top: 4px; left: calc(50% + 6px); right: auto; box-shadow: 0 0 0 2px var(--fundo);
 }
+.filhos [data-aparelho-desligado] { position: absolute; top: 8px; right: calc(50% + 10px); margin: 0; }
+.ativo, .ativo:hover:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
 .espaco { flex: 1; }
 /* Quem está logado, no pé do trilho; a conta (e o Sair) abre dele. */
 .avatar { margin-top: var(--e-2); display: grid; place-items: center; }

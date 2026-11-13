@@ -1,3 +1,4 @@
+using EasyStock.Observabilidade;
 using Npgsql;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -31,8 +32,10 @@ public static class TelemetrySetup
                 .AddHttpClientInstrumentation()
                 .AddNpgsql()
                 // Jobs de polling geram spans Npgsql como raiz o tempo todo; 25%
-                // mantém amostra útil sem inundar o OpenObserve (retenção 7d).
+                // mantém amostra útil sem inundar o OpenObserve (retenção de 30 dias).
                 .SetSampler(new ParentBasedSampler(new TraceIdRatioBasedSampler(0.25)))
+                // #2376: o span sai com o mesmo mascaramento do log; antes do exporter.
+                .AddProcessor(new SpanQueRedige())
                 .AddOtlpExporter(options => options.Endpoint = otlp))
             .WithMetrics(metrics => metrics
                 .AddHttpClientInstrumentation()

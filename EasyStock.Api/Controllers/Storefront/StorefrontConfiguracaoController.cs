@@ -101,7 +101,7 @@ public class StorefrontConfiguracaoController(
         catch (StorefrontNaoEncontradoException) { return DataNotFound(SemVitrine); }
         catch (DominioCustomEmUsoException ex) { return DataConflict(ex.Message); }
         catch (RegraDeDominioVioladaException ex) { return DataBadRequest(ex.Message); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
 
         return DataOk(await obter.ExecuteAsync(new ObterStorefrontAdminCommand(vitrine.Id)));
     }

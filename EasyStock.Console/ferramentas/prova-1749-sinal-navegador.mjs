@@ -61,7 +61,7 @@ await context.route('**/api/**', async route => {
 const page = await context.newPage()
 page.setDefaultTimeout(10000)
 page.on('pageerror', erro => erros.push(erro.message))
-const aviso = page.getByText('Maquininha na entrega: Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.', { exact: true })
+const aviso = page.getByText('Maquininha na entrega: Encomenda com antecedência: sinal de 50% antes da produção. Restante na entrega.', { exact: true })
 const escolherDia = async data => {
   await Promise.all([
     page.waitForResponse(r => r.url().includes('/comanda/janelas?') && new URL(r.url()).searchParams.get('dataInicio') === data),
@@ -73,6 +73,8 @@ const escolherDia = async data => {
 try {
   await page.goto(origem + '/#/m/atendimento/balcao')
   await page.getByText('Maria', { exact: true }).first().waitFor()
+  // #2135: a tela abre sem conversa escolhida; a atendente abre a Maria.
+  await page.getByText('Maria', { exact: true }).first().click()
   await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
   await page.getByRole('button', { name: /^Lasanha Bolonhesa Clássica 600 g/ }).click()
   await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()

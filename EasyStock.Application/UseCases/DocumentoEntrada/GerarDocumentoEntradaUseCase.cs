@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Pdf;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.DocumentoEntrada
 {
@@ -30,7 +31,7 @@ namespace EasyStock.Application.UseCases.DocumentoEntrada
             var quantidade = item.QuantidadeAtual.Value;
             var custo = (decimal)item.CustoUnitario;
             var lote = item.CodigoLote?.Value;
-            var numero = item.Id.ToString("N")[..8].ToUpperInvariant();
+            var numero = CodigoCurto.De(item.Id);
 
             var data = new DocumentoEntradaPdfData(
                 EmpresaNome: empresa?.Nome ?? "EasyStok",

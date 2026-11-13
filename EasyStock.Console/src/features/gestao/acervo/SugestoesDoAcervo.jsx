@@ -37,13 +37,15 @@ export function SugestoesDoAcervo({ acervo: a }) {
 
   return <section className={css.fotosCardapio} aria-label="Sugestões de imagem para os pratos">
     <div className={css.cabecalho}>
-      <div><h3>Sugestões de imagem para os pratos</h3><p>A IA compara o nome do prato com o título das imagens aprovadas. Nada é publicado sem a sua confirmação.</p></div>
-      <Botao disabled={pedindo || a.ocupado} title="Pede à IA pares de imagem aprovada e prato. Você confere cada um antes de publicar." onClick={sugerir}>{pedindo ? 'Procurando pares…' : 'Sugerir imagens para os pratos'}</Botao>
+      <div><h3>Sugestões de imagem para os pratos</h3><p>Confira as imagens sugeridas antes de publicar.</p></div>
+      <Botao disabled={pedindo || a.ocupado} title="Sugere imagens aprovadas do acervo. Você confere antes de publicar." onClick={sugerir}>{pedindo ? 'Buscando sugestões…' : 'Sugerir imagens'}</Botao>
     </div>
     {erro && <p role="alert" className={css.erro}>{erro}</p>}
     {aviso && <output>{aviso}</output>}
     {resultado && <>
-      <output>{resultado.porIa ? 'Pares sugeridos pela IA.' : 'IA não configurada ou indisponível: pares sugeridos pelas palavras do nome.'} {resultado.sugestoes.length ? `${resultado.sugestoes.length} para conferir.` : 'Nenhum par encontrado.'}</output>
+      <output>{resultado.sugestoes.length
+        ? `${resultado.porIa ? 'Sugestões da IA.' : 'Sugestões sem IA.'} ${resultado.sugestoes.length} para conferir.`
+        : 'Nenhuma sugestão encontrada.'}</output>
       <div className={css.grade}>{resultado.sugestoes.map((s) => <article key={`${s.imagemId}:${s.itemId}`} className={css.grupoFoto}>
         <Miniatura id={s.imagemId} titulo={s.titulo} />
         <strong>{s.prato}</strong>

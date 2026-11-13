@@ -147,7 +147,7 @@ public class Conversa
     /// </summary>
     private static string NormalizarWaId(string? waId)
     {
-        var digitos = new string((waId ?? string.Empty).Where(char.IsDigit).ToArray());
+        var digitos = TelefoneE164.SoDigitos(waId);
         if (digitos.Length < ContatoWaIdTamanhoMinimo || digitos.Length > ContatoWaIdTamanhoMaximo)
             throw new RegraDeDominioVioladaException(
                 $"ContatoWaId invalido: esperado entre {ContatoWaIdTamanhoMinimo} e {ContatoWaIdTamanhoMaximo} digitos (recebido '{waId}').");
@@ -265,7 +265,7 @@ public class Conversa
     {
         GarantirAberta("liberar o automatico de");
         if (!TemAgente)
-            throw new RegraDeDominioVioladaException($"O canal {Canal} nao tem agente: a conversa fica com a dona.");
+            throw new RegraDeDominioVioladaException($"O canal {Canal} não tem atendimento automático: a conversa continua com você.");
         Situacao = SituacaoConversa.Automatica;
         AssumidaPorUsuarioId = null;
         MotivoEscalada = null;

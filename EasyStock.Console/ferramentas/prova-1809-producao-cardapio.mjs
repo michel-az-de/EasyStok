@@ -4,7 +4,7 @@
 //   Produção do dia:
 //   - o cartão traz a foto do prato (a mesma do cardápio), com reserva quando não há foto ou ela falha;
 //   - passos visíveis no topo: tocar, conferir, registrar;
-//   - o "−" e o contador do cartão têm tooltip e rótulo;
+//   - o "−" e o contador do cartão têm tooltip e rótulo (#2364: o contador abre a quantidade);
 //   - sem pratos, a tela diz o que fazer e onde.
 //   Itens do cardápio:
 //   - categorias distintas, com contagem, combinando com a disponibilidade e com a busca;
@@ -47,6 +47,8 @@ const hooks = {
     atual.efeitos.push(() => { antes?.limpar?.(); atual.valores[i].limpar = fn() })
   },
 }
+// #2258 (auditoria C1): a aba Itens do cardápio escuta `hashchange` (link da home); o Node não tem `window`.
+globalThis.window ??= { location: { hash: '' }, addEventListener() {}, removeEventListener() {} }
 const g = globalThis.__prova1809 = { hooks, catalogo: { cardapio: [] }, gestao: null, acesso: { acoes: { editarCardapio: true, editarProducao: true }, permite: () => true } }
 const DE_FORA = 'globalThis.__prova1809'
 const inline = (source) => ({ format: 'module', shortCircuit: true, source })
@@ -201,11 +203,11 @@ await confere('cardápio: categoria combina com a disponibilidade e com a busca'
 await confere('cardápio: cada contagem aplica os outros recortes; as categorias não somem do lugar', async () => {
   const { contagensDoCardapio } = await import('../src/dominio/filtroDoCardapio.js')
   const emMassas = contagensDoCardapio(ITENS, { categoria: 'Massas' })
-  assert.deepEqual(emMassas.filtros, { todos: 2, hoje: 1, fora: 1, 'sem-foto': 1 })
+  assert.deepEqual(emMassas.filtros, { todos: 2, hoje: 1, fora: 1, 'sem-foto': 1, pendencia: 0 }) // #2258 (auditoria C1): o filtro "Com pendência" entrou na contagem
   assert.deepEqual(emMassas.categorias, [{ nome: 'Massas', total: 2 }, { nome: 'Molhos', total: 1 }, { nome: 'Sobremesas', total: 1 }])
   assert.equal(emMassas.todas, 5)
   const hoje = contagensDoCardapio(ITENS, { filtro: 'hoje' })
-  assert.deepEqual(hoje.filtros, { todos: 5, hoje: 3, fora: 2, 'sem-foto': 3 })
+  assert.deepEqual(hoje.filtros, { todos: 5, hoje: 3, fora: 2, 'sem-foto': 3, pendencia: 0 })
   assert.deepEqual(hoje.categorias.map((c) => c.total), [1, 1, 1])
   assert.equal(hoje.todas, 3)
   const pudim = contagensDoCardapio(ITENS, { filtro: 'sem-foto', busca: 'pudim' })
@@ -282,9 +284,12 @@ await confere('Produção do dia: o "−" e o contador do cartão têm tooltip e
   assert.ok(menos, 'o "−" existe')
   assert.equal(menos.props.title, 'Tirar 1 porção de Talharim 500 g')
   const contador = daClasse(cartao, 'contagem')[0]
-  assert.equal(contador.props.title, '2 porções de Talharim 500 g na seleção')
-  assert.equal(contador.props['aria-label'], '2 porções de Talharim 500 g na seleção')
+  // #2364: o contador virou botão que abre a quantidade; a contagem segue como descrição do cartão.
+  assert.equal(contador.props.title, '2 porções de Talharim 500 g no lote. Toque para digitar a quantidade.')
+  assert.equal(contador.props['aria-label'], 'Digitar a quantidade de Talharim 500 g')
   assert.match(limpo(contador), /^2/)
+  const descricao = andar(cartao, (n) => n.props?.id === comRotulo(cartao, 'Somar 1 porção de Talharim 500 g')[0].props['aria-describedby'].split(' ').at(-1))[0]
+  assert.equal(texto(descricao), '2 porções de Talharim 500 g no lote')
 })
 
 await confere('Produção do dia: sem pratos, o estado vazio explica e leva aos Itens do cardápio', async () => {
@@ -307,36 +312,60 @@ const abrirCardapio = () => {
 const grupo = (t, legenda) => doTipo(t.arvore, 'fieldset').find((f) => limpo(doTipo(f, 'legend')[0]) === legenda)
 const chips = (t, legenda) => doTipo(grupo(t, legenda), 'button').map((b) => [limpo(b), b.props['aria-pressed']])
 const tocarChip = (t, legenda, rotulo) => { doTipo(grupo(t, legenda), 'button').find((b) => limpo(b).startsWith(rotulo)).props.onClick(); return t.renderizar() }
+const categoriaNaTela = (t) => doTipo(t.arvore, 'CampoSelecao').find((c) => c.props.rotulo === 'Categoria')
+const escolherCategoria = (t, valor) => { categoriaNaTela(t).props.onChange({ target: { value: valor } }); return t.renderizar() }
+const limparFiltros = (t) => doTipo(t.arvore, 'Botao').find((b) => limpo(b) === 'Limpar filtros')
 const pratosNaTela = (t) => andar(t.arvore, (n) => n.type === 'h3').map(limpo)
 
-await confere('Itens do cardápio: chips de categoria com contagem, Todas por padrão', async () => {
+await confere('Itens do cardápio: seletor de categoria com contagem, Todas por padrão e sem limpar inativo', async () => {
   const t = abrirCardapio()
-  assert.ok(grupo(t, 'Categoria'), 'há o grupo de categorias')
-  assert.deepEqual(chips(t, 'Categoria'), [['Todas 5', true], ['Massas 2', false], ['Molhos 1', false], ['Sobremesas 1', false]])
+  assert.ok(categoriaNaTela(t), 'o seletor de categoria permanece visível')
+  assert.equal(categoriaNaTela(t).props.value, '')
+  assert.deepEqual(categoriaNaTela(t).props.opcoes, [
+    { valor: '', rotulo: 'Todas (5)' }, { valor: 'Massas', rotulo: 'Massas (2)' },
+    { valor: 'Molhos', rotulo: 'Molhos (1)' }, { valor: 'Sobremesas', rotulo: 'Sobremesas (1)' },
+  ])
+  assert.equal(limparFiltros(t), undefined)
 })
 
 await confere('Itens do cardápio: categoria, disponibilidade e busca combinam; contagens acompanham', async () => {
   const t = abrirCardapio()
-  tocarChip(t, 'Categoria', 'Massas')
+  escolherCategoria(t, 'Massas')
   assert.deepEqual(pratosNaTela(t), ['Lasanha', 'Talharim'])
-  assert.deepEqual(chips(t, 'Filtrar pratos').map(([r]) => r), ['Todos 2', 'Disponíveis hoje 1', 'Fora de hoje 1', 'Sem foto 1'])
+  assert.deepEqual(chips(t, 'Filtrar pratos').map(([r]) => r), ['Todos 2', 'Disponíveis hoje 1', 'Fora de hoje 1', 'Sem foto 1', 'Com pendência 0']) // #2258 (auditoria C1): chip novo
   tocarChip(t, 'Filtrar pratos', 'Disponíveis hoje')
   assert.deepEqual(pratosNaTela(t), ['Lasanha'])
-  assert.deepEqual(chips(t, 'Categoria'), [['Todas 3', false], ['Massas 1', true], ['Molhos 1', false], ['Sobremesas 1', false]])
-  tocarChip(t, 'Categoria', 'Todas')
+  assert.equal(categoriaNaTela(t).props.value, 'Massas', 'o filtro ativo permanece visível no seletor')
+  assert.deepEqual(categoriaNaTela(t).props.opcoes, [
+    { valor: '', rotulo: 'Todas (3)' }, { valor: 'Massas', rotulo: 'Massas (1)' },
+    { valor: 'Molhos', rotulo: 'Molhos (1)' }, { valor: 'Sobremesas', rotulo: 'Sobremesas (1)' },
+  ])
+  escolherCategoria(t, '')
   doTipo(t.arvore, 'CampoTexto')[0].props.onChange({ target: { value: 'pudim' } })
   t.renderizar()
   assert.deepEqual(pratosNaTela(t), ['Pudim'])
+  limparFiltros(t).props.onClick(); t.renderizar()
+  assert.deepEqual(pratosNaTela(t), nomes(ITENS), 'limpar restaura a lista completa')
+  assert.equal(categoriaNaTela(t).props.value, '')
+  assert.equal(doTipo(t.arvore, 'CampoTexto')[0].props.value, '')
+  assert.equal(chips(t, 'Filtrar pratos')[0][1], true)
+  assert.equal(limparFiltros(t), undefined)
 })
 
 await confere('Itens do cardápio: reordenar pede Todos, Todas as categorias e busca vazia', async () => {
   const t = abrirCardapio()
-  assert.ok(comRotulo(t.arvore, 'Subir Lasanha').length === 1, 'com tudo à mostra, dá para ordenar')
-  tocarChip(t, 'Categoria', 'Massas')
-  assert.equal(comRotulo(t.arvore, 'Subir Lasanha').length, 0, 'com uma categoria escolhida, não')
-  assert.match(limpo(t.arvore), /Todas as categorias/)
-  tocarChip(t, 'Categoria', 'Todas')
-  assert.ok(comRotulo(t.arvore, 'Subir Lasanha').length === 1)
+  // #2185: a ordem mora no menu "Mais opções" do prato (`MenuDeAcoes`): Subir e Descer quando dá, e o motivo
+  // escrito num item desligado quando não dá.
+  const itensDe = (nome) => (doTipo(t.arvore, 'MenuDeAcoes').find((m) => m.props.rotulo === `Mais opções de ${nome}`)?.props.itens ?? []).filter(Boolean)
+  const sobeEDesce = (nome) => itensDe(nome).filter((i) => i.chave === 'subir' || i.chave === 'descer').length
+  assert.ok(sobeEDesce('Lasanha') === 2, 'com tudo à mostra, dá para ordenar')
+  escolherCategoria(t, 'Massas')
+  assert.equal(sobeEDesce('Lasanha'), 0, 'com uma categoria escolhida, não')
+  const semOrdem = itensDe('Lasanha').find((i) => i.chave === 'ordem')
+  assert.match(semOrdem?.motivo ?? '', /Todas as categorias/)
+  assert.equal(semOrdem?.desabilitado, true)
+  escolherCategoria(t, '')
+  assert.ok(sobeEDesce('Lasanha') === 2)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

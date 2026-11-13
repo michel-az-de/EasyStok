@@ -31,10 +31,10 @@ public class TomTomClientsTests
     }
 
     private static TomTomGeocodingClient Geo(HttpStatusCode status, string body, out StubHandler handler) =>
-        new(Http(status, body, out handler), Chave, NullLogger<TomTomGeocodingClient>.Instance);
+        new(Http(status, body, out handler), Chave, PipelinesDeTeste.Reais(), NullLogger<TomTomGeocodingClient>.Instance);
 
     private static TomTomRotasClient Rotas(HttpStatusCode status, string body, out StubHandler handler) =>
-        new(Http(status, body, out handler), Chave, NullLogger<TomTomRotasClient>.Instance);
+        new(Http(status, body, out handler), Chave, PipelinesDeTeste.Reais(), NullLogger<TomTomRotasClient>.Instance);
 
     private static string Geocode(string tipo, bool comNumero)
     {

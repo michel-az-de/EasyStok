@@ -47,7 +47,7 @@ try {
       } else {
         assert.doesNotMatch(texto, /pedido continua valendo|Item novo depois do pagamento|a cobrar|clique em Marcar pago/i)
         assert.equal(await page.getByRole('button', { name: /Marcar pago|Cobrar diferença|Reenviar cobrança|Registrar sinal/ }).count(), 0)
-        await page.getByRole('button', { name: 'Encerrar atendimento', exact: true }).click()
+        await page.getByRole('button', { name: 'Concluir conversa', exact: true }).click()
         assert.deepEqual(await page.evaluate(() => window.acoesDaProva), [{nome:'encerrar'}])
         const retrato = await page.evaluate(() => window.retratoDaProva)
         assert.equal(retrato.estado, 'cancelado')

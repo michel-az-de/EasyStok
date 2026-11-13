@@ -24,7 +24,7 @@ public class ToggleVisibilidadeCardapioItemAdminUseCase(
         var item = await cardapioRepository.GetByIdAndScopeAsync(command.StorefrontId, command.ItemId, command.EmpresaId)
             ?? throw new CardapioItemNaoEncontradoException(command.StorefrontId, command.ItemId);
 
-        var ofertadoAntes = AvisoItemComInteresse.Ofertado(item);
+        var ofertadoAntes = item.EstaOfertado();
         if (command.Alvo ?? !item.Visivel) item.TornarVisivel();
         else item.Ocultar();
 

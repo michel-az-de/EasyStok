@@ -111,7 +111,7 @@ await provar('cada tela real recebe ajuda com título do catálogo e passos', ()
 await provar('hash/histórico usam rotas existentes; origem inválida volta ao catálogo seguro', () => {
   const destinos = ['#/', '#/m/atendimento/balcao', '#/m/cozinha', '#/m/entregas', '#/m/atendimento/balcao', '#/']
   assert.deepEqual(destinos.map(hash => rotaDaHash(hash, { fonteApi: true }).tipo), ['hall', 'principal', 'cozinha', 'entregas', 'principal', 'hall'])
-  assert.equal(contextoDaAjuda({ tipo: 'foo', modulo: 'https://invalido/?token=secreto' }, true).titulo, 'Módulos')
+  assert.equal(contextoDaAjuda({ tipo: 'foo', modulo: 'https://invalido/?token=secreto' }, true).titulo, 'Início') // #2258 (auditoria T9): a home se chama Início
 })
 // #1891: a produção antiga da Cozinha (Em preparação) está congelada; a rota cai na Fila de preparo
 // e a ajuda é a da Fila, sem atalho para outro módulo.
@@ -126,13 +126,13 @@ await provar('produção antiga da Cozinha congelada: a rota cai na Fila e a aju
 await provar('diagnóstico usa allowlist e nunca inclui sessão, URL ou erro arbitrário', () => {
   const texto = diagnosticoDoConsole({ rota: { ...rota, conversaId: 'cliente-secreto', query: 'token-secreto' }, fonteApi: true, versao: '97f3e157', onLine: true,
     token: 'JWT-secreto', url: 'https://servidor/?cpf=cpf-secreto', empresa: 'empresa-secreta', erro: 'nome-secreto', usuario: 'pessoa-secreta' })
-  assert.match(texto, /Atendimento · Balcão/)
+  assert.match(texto, /Atendimento · Conversas/)
   assert.match(texto, /serviço ainda não verificado/)
   assert.doesNotMatch(texto, /secreto|secreta|servidor|cpf=|JWT/)
 })
 await provar('diagnóstico recusa versão não canônica e distingue offline, serviço e rede ausente', () => {
   assert.match(diagnosticoDoConsole({ rota, fonteApi: true, versao: 'valor-pessoal', onLine: false }), /Versão: não informada[\s\S]*offline indicado/)
-  assert.match(diagnosticoDoConsole({ rota: null, fonteApi: false }), /Tela: Módulos[\s\S]*demonstração[\s\S]*não informada/)
+  assert.match(diagnosticoDoConsole({ rota: null, fonteApi: false }), /Tela: Início[\s\S]*demonstração[\s\S]*não informada/)
 })
 await provar('cópia só confirma depois de writeText resolver', async () => {
   let resolver, enviado
@@ -149,17 +149,33 @@ await provar('clipboard ausente ou recusado permite cópia manual sem alegar suc
   assert.equal(await copiarDiagnostico('fixture', undefined), false)
   assert.equal(await copiarDiagnostico('fixture', { writeText: () => Promise.reject(new Error('permissão recusada fixture')) }), false)
 })
+const documentoDeFoco = (dialogos, destino) => ({
+  querySelector: seletor => seletor === 'dialog[open]' ? dialogos[0] ?? null : seletor === '[data-inicio-tela]' ? destino : null,
+  querySelectorAll: seletor => { assert.equal(seletor, 'dialog[open]'); return dialogos },
+})
+const dialogoDeFoco = modal => ({ getAttribute: atributo => { assert.equal(atributo, 'aria-modal'); return modal } })
 await provar('foco de navegação chega ao início real da tela e não altera o hash', () => {
   let foco = null
-  const documento = { querySelector: seletor => seletor === '[data-inicio-tela]' ? { focus: opcoes => { foco = opcoes } } : null }
+  const documento = documentoDeFoco([], { focus: opcoes => { foco = opcoes } })
   assert.equal(focarInicioDaTela(documento), true)
   assert.deepEqual(foco, { preventScroll: true })
 })
 await provar('foco não rouba interação de modal aberto nem tenta focar tela inexistente', () => {
-  let consultas = 0
-  assert.equal(focarInicioDaTela({ querySelector: seletor => { consultas++; assert.equal(seletor, 'dialog[open]'); return {} } }), false)
-  assert.equal(consultas, 1)
-  assert.equal(focarInicioDaTela({ querySelector: () => null }), false)
+  for (const modal of [null, 'true']) {
+    assert.equal(focarInicioDaTela(documentoDeFoco([dialogoDeFoco(modal)], { focus: () => assert.fail('modal conserva o foco') })), false)
+  }
+  assert.equal(focarInicioDaTela(documentoDeFoco([], null)), false)
+})
+await provar('Ficha explicitamente não modal permite pular ao conteúdo sem ignorar modal sobreposto', () => {
+  let focos = 0
+  const destino = { focus: opcoes => { assert.deepEqual(opcoes, { preventScroll: true }); focos++ } }
+  const ficha = dialogoDeFoco('false')
+  assert.equal(focarInicioDaTela(documentoDeFoco([ficha], destino)), true)
+  assert.equal(focos, 1)
+  for (const modal of [null, 'true']) {
+    assert.equal(focarInicioDaTela(documentoDeFoco([ficha, dialogoDeFoco(modal)], destino)), false)
+  }
+  assert.equal(focos, 1, 'o modal sobre a Ficha mantém a interação')
 })
 
 const resumo = { provas: resultados.length, aprovadas: resultados.length, telasCatalogadas: telasCatalogadas.length, resultados,

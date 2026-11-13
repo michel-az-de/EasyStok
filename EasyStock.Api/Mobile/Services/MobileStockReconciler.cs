@@ -1,6 +1,7 @@
 using EasyStock.Application.Services;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Services;
+using EasyStock.Domain.Specifications;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
@@ -53,6 +54,8 @@ public class MobileStockReconciler(
         try
         {
             if (Alvo(produtoDoAparelho) is not { } alvo || quantidade <= 0) return false;
+            if (!await db.Set<Produto>().IgnoreQueryFilters()
+                    .AnyAsync(p => p.Id == alvo.ProdutoId && p.EmpresaId == alvo.EmpresaId, ct)) return false;
             if ((await SaidasAbertasAsync(alvo.EmpresaId, alvo.ProdutoId, pedidoId, null, ct)).Count > 0) return false;
 
             var aBaixar = (decimal)quantidade;
@@ -169,16 +172,16 @@ public class MobileStockReconciler(
     private static AlvoNoErp? Alvo(Product p) =>
         p is { ErpProductId: { } produtoId, EmpresaId: { } empresaId } ? new AlvoNoErp(empresaId, produtoId) : null;
 
-    // Lotes da loja do pedido, para a venda de uma loja nao consumir o estoque de outra; pedido sem
-    // loja enxerga todos os lotes da empresa (mesma regra de PedidoEstoqueIntegrationService, #1534).
-    // A loja e a do pedido, nao a de quem cadastrou o produto. IgnoreQueryFilters: o sync do aparelho
-    // nao tem JWT; o isolamento e o filtro por empresa, que vem do proprio aparelho. A ordem de consumo
-    // e de ConsumoDeLotes (#2003), nao daqui.
+    // Lotes da loja do pedido, para a venda de uma loja nao consumir o estoque de outra. Regra unica
+    // EstoqueDaLoja (#2318): lote sem loja vale para qualquer loja da empresa e pedido sem loja enxerga
+    // todos (#1534). A loja e a do pedido, nao a de quem cadastrou o produto. IgnoreQueryFilters: o sync
+    // do aparelho nao tem JWT; o isolamento e o filtro por empresa, que vem do proprio aparelho. A ordem
+    // de consumo e de ConsumoDeLotes (#2003), nao daqui.
     private async Task<List<ItemEstoque>> LotesDaLojaAsync(AlvoNoErp alvo, Guid? lojaDoPedido, CancellationToken ct) =>
         await db.Set<ItemEstoque>().IgnoreQueryFilters()
             .Where(i => i.EmpresaId == alvo.EmpresaId && i.ProdutoId == alvo.ProdutoId
-                        && (lojaDoPedido == null || i.LojaId == lojaDoPedido)
                         && i.Status != StatusItemEstoque.Bloqueado && i.Status != StatusItemEstoque.Descartado)
+            .Where(EstoqueDaLoja.Pertence(lojaDoPedido))
             .ToListAsync(ct);
 
     // FifoAtivo da loja do pedido (ou da loja unica da empresa, pedido sem loja). Sem configuracao, FEFO.

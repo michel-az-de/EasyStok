@@ -63,7 +63,7 @@ export function FaixaApi() {
   const aviso = !carregando && !falhou ? avisoDeAcao ?? sincronizacao?.avisoFixo ?? null : null
   if (!falhou && !aviso && !integracaoParada && !vencimento) return null
   const texto = falhou
-    ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} A próxima tentativa é automática.`
+    ? `Conversas sem atualização: ${sincronizacao.mensagem || 'a consulta não foi concluída.'} Tento de novo em instantes.`
     : aviso
   return (
     <output className={`${css.faixa} ${falhou ? css.falha : aviso ? css.aviso : ''}`}>

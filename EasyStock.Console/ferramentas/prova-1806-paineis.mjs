@@ -140,9 +140,9 @@ if (paineis && preferencia && larguras) {
     assert.equal(CONVERSA_MINIMA, 320)
   })
 
-  // #1870: trilho de 84 para 100 px; cada máxima que não bate no teto do painel cede os 16 px.
-  const telas = [{ tela: 1280, esperado: { cardEsq: 476, cardDir: 516, assEsq: 456, assDir: 508 } },
-    { tela: 1440, esperado: { cardEsq: 576, cardDir: CARDAPIO.max, assEsq: 556, assDir: ASSISTENTE.max } }]
+  // Trilho de 76 px e colunas aprovadas: a conversa mantém pelo menos 320 px ao abrir painéis.
+  const telas = [{ tela: 1280, esperado: { cardEsq: 568, cardDir: CARDAPIO.max, assEsq: 552, assDir: ASSISTENTE.max } },
+    { tela: 1440, esperado: { cardEsq: CARDAPIO.max, cardDir: CARDAPIO.max, assEsq: ASSISTENTE.max, assDir: ASSISTENTE.max } }]
   for (const { tela, esperado } of telas) {
     const { balcao, ficha } = larguras.padraoPorTela(tela)
     const area = { tela, balcao, ficha, colunas: true }

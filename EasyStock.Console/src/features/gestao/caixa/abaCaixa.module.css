@@ -27,6 +27,19 @@
   display: block; margin: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); color: var(--tinta);
   background: var(--alerta-pastel); border-radius: var(--r-1);
 }
+/* #2275: alerta da tela com ícone, título curto e a ação dele. Os pares de cor são os de avisoFechado
+   e avisoAtencao (pastel de fundo, ícone na cor forte). */
+.alerta {
+  display: flex; align-items: flex-start; gap: var(--e-2); margin: 0; padding: var(--e-2) var(--e-3);
+  font-size: var(--t-apoio); color: var(--tinta); border-radius: var(--r-1); flex-wrap: wrap;
+}
+.alertaErro { background: var(--erro-pastel); }
+.alertaErro .alertaIcone { color: var(--erro); }
+.alertaAtencao { background: var(--alerta-pastel); }
+.alertaAtencao .alertaIcone { color: var(--alerta); }
+.alertaIcone { flex-shrink: 0; margin-top: 2px; }
+.alertaCorpo { margin: 0; flex: 1 1 240px; min-width: 0; }
+.alertaTitulo { font-weight: 700; }
 
 .resumoLista {
   margin: 0; display: grid; gap: var(--e-5) var(--e-4);
@@ -36,7 +49,8 @@
   display: flex; flex-direction: column; gap: var(--e-1);
   justify-content: center; padding: 0; min-width: 0;
 }
-.resumoLista dt { font-size: var(--t-micro); color: var(--tinta-2); }
+/* #2275: rótulo numa linha só, com tooltip (o title); assim os valores ficam na mesma linha de base. */
+.resumoLista dt { font-size: var(--t-micro); color: var(--tinta-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .resumoLista dd { margin: 0; font-size: var(--t-titulo); font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }
 .resumoForte dd { font-size: clamp(1.75rem, 2.4cqi, 2rem); letter-spacing: var(--ls-display); }
 @container (min-width: 1100px) {
@@ -59,11 +73,11 @@
 }
 
 .tiposLancamento { display: flex; gap: var(--e-2); }
-.tiposLancamento button { border: 0; border-radius: var(--e-1); background: transparent; }
+.tiposLancamento button { border: 0; border-radius: var(--r-1); background: transparent; }
 .tiposLancamento button[aria-checked='true'] { background: var(--preenchimento); color: var(--tinta); font-weight: 800; }
 
 .categoriasSugeridas { display: flex; gap: var(--e-1); flex-wrap: wrap; }
-.categoriasSugeridas button { font-size: var(--t-micro); border: 0; border-radius: var(--e-1); background: transparent; padding-inline: var(--e-2); text-decoration: underline; text-underline-offset: 3px; }
+.categoriasSugeridas button { font-size: var(--t-micro); border: 0; border-radius: var(--r-1); background: transparent; padding-inline: var(--e-2); text-decoration: underline; text-underline-offset: 3px; }
 .categoriasSugeridas button[aria-pressed='true'] { color: var(--tinta); font-weight: 800; }
 
 .formGrade { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
@@ -105,7 +119,9 @@
 .qtdControle button { min-height: var(--toque); min-width: var(--toque); padding: 0; }
 .qtdValor { min-width: 1.5em; text-align: center; font-weight: 700; }
 
-.corpoDiferenca { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); }
+.corpoDiferenca { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); font-size: var(--t-apoio); }
+/* #2078 (B12): corpo do modal em grade; o aviso de devolução colava no rótulo do campo. */
+.corpoModal { display: grid; gap: var(--e-4); }
 
 @media (max-width: 640px) {
   .resumoLista { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -119,10 +135,14 @@
 .identificacao { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; min-width: 0; }
 .caixaApi .cabecalho { align-items: center; }
 .caixaApi > .resumoLista { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-4); }
-.caixaApi > .resumoLista div { justify-content: flex-start; }
+/* #2078 (E6): rótulo colado ao valor. O item desce para o pé da célula (os valores da linha seguem
+   alinhados pela base quando um rótulo quebra em duas linhas), em vez de reservar duas linhas para
+   todo rótulo e deixar o número a meio caminho entre o seu rótulo e o da linha de baixo. */
+.caixaApi > .resumoLista div { justify-content: flex-end; }
 .caixaApi > .resumoLista dt { line-height: var(--lh-corpo); }
 .caixaApi > .resumoLista dd { font-size: var(--t-forte); line-height: var(--lh-compacto); white-space: nowrap; }
-.caixaApi > .resumoLista .resumoForte dd { font-size: var(--t-titulo); }
+/* #2078 (E6): o número herói (a gaveta) com o tamanho de valor do Hall, não o de título. */
+.caixaApi > .resumoLista .resumoForte dd { font-size: var(--t-valor); letter-spacing: var(--ls-display); }
 .caixaApi > .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; padding: 0; }
 .notaGaveta { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); }
 .caixaApi .extrato { gap: var(--e-6); }
@@ -136,7 +156,10 @@
 .valorSaida { color: var(--erro); }
 
 /* #1624: fluxo dos últimos 7 dias. Tabela de verdade (dia, entrou, saiu, saldo, situação). */
-.rolagemFluxo { overflow-x: auto; }
+/* #2078 (B5/E1): âncora do `thead` visualmente oculto da tela estreita (`position: absolute`). Sem
+   ancestral posicionado ele ia parar no fim do documento, fora da rolagem da tela, e esticava a
+   página (scrollHeight 1893 numa tela de 844): o modal abria cortado. */
+.rolagemFluxo { overflow-x: auto; position: relative; }
 .fluxo { width: 100%; border-collapse: collapse; font-size: var(--t-apoio); font-variant-numeric: tabular-nums; }
 .fluxo th, .fluxo td { padding: var(--e-3); text-align: right; white-space: nowrap; color: var(--tinta); font-weight: 400; }
 .fluxo th:first-child, .fluxo th:last-child, .fluxo td:last-child { text-align: left; }
@@ -169,18 +192,15 @@
   .caixaApi > .resumoLista.resumoEmQuatro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
-@container (min-width: 601px) {
-  .caixaApi > .resumoLista dt { min-height: calc(2em * var(--lh-corpo)); }
-}
-
 @container (min-width: 1040px) {
   .caixaApi > .resumoLista { grid-template-columns: minmax(150px, 1.2fr) repeat(6, minmax(0, 1fr)); }
 }
 
 @container (max-width: 600px) {
   .caixaApi > .resumoLista { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
+  .caixaApi > .resumoLista dt { white-space: normal; }
   .caixaApi > .resumoLista .resumoForte { grid-column: auto; }
-  .caixaApi > .resumoLista .resumoTotal { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: var(--e-2); }
+  .caixaApi > .resumoLista .resumoTotal { grid-column: 1 / -1; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: var(--e-2); }
   .caixaApi .linha { gap: var(--e-2); padding-inline: var(--e-2); }
   .caixaApi .linhaInfo strong, .caixaApi .linhaValor { font-size: var(--t-apoio); }
 }
@@ -191,3 +211,12 @@
   .caixaApi > .resumoLista .resumoForte { grid-column: 1 / -1; }
   .caixaApi > .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; gap: var(--e-1); }
 }
+
+/* #2258 (F3): esqueleto do valor do resumo enquanto o dado não chegou (mesmos tokens do T2 do Atendimento). */
+.esqueletoValor {
+  display: inline-block; width: 6ch; height: 1em; vertical-align: middle; border-radius: var(--r-2);
+  background: var(--preenchimento-forte);
+  animation: esqueletoValorPulso calc(var(--dur-longa) * 4) var(--ease-padrao) infinite alternate;
+}
+@keyframes esqueletoValorPulso { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .esqueletoValor { animation: none; } }

@@ -13,12 +13,20 @@ export const COLUNAS_KDS = [
   { status: 'saiu_para_entrega', rotulo: 'Saiu para entrega', toque: 'Marcar entregue' },
 ]
 
+// #2055: o pedido fora da área pago e aprovado pela dona (`aprovado_baba`) espera o preparo como o
+// pago comum: cai em "Na fila" e anda com o mesmo "Começar preparo" (a API aceita `aprovado_baba -> preparando`).
+const COLUNA_DO_STATUS = { aprovado_baba: 'aguardando' }
+export const colunaDoStatusKds = (status) => COLUNA_DO_STATUS[status] ?? status
+export const filtrarPorColunaKds = (pedidos, coluna) => pedidos.filter((p) => colunaDoStatusKds(p.status) === coluna)
+const naFila = (status) => colunaDoStatusKds(status) === 'aguardando'
+
 // O cartão escreve o rótulo da própria coluna; o da API ("Aguardando") só vale fora delas.
 export function rotuloDoStatusKds(pedido) {
-  return COLUNAS_KDS.find((c) => c.status === pedido.status)?.rotulo ?? pedido.statusRotulo
+  return COLUNAS_KDS.find((c) => c.status === colunaDoStatusKds(pedido.status))?.rotulo ?? pedido.statusRotulo
 }
 
 const PROXIMO = {
+  aprovado_baba: 'preparando',
   aguardando: 'preparando',
   preparando: 'pronto',
   pronto: 'saiu_para_entrega',
@@ -32,7 +40,7 @@ export const rotuloDoDestinoKds = (status) => (status === 'entregue' ? 'Entregue
 export function proximoStatusKds(status) {
   const proximo = PROXIMO[status]
   if (!proximo) return null
-  return { status: proximo, toque: COLUNAS_KDS.find((c) => c.status === status).toque }
+  return { status: proximo, toque: COLUNAS_KDS.find((c) => c.status === colunaDoStatusKds(status)).toque }
 }
 
 const UMA_HORA_MS = 60 * 60 * 1000
@@ -44,7 +52,7 @@ const minutos = (ms) => Math.max(1, Math.round(Math.abs(ms) / 60000))
 // tem as datas) segue como antes.
 export function avisoDeInicio({ inicioPrevistoEm, atrasado, status }, agora) {
   if (!inicioPrevistoEm) return atrasado ? { atrasado: true, texto: 'Atrasado: pedido de outro dia' } : null
-  if (status && status !== 'aguardando' && !atrasado) return null
+  if (status && !naFila(status) && !atrasado) return null
   const falta = Date.parse(inicioPrevistoEm) - agora
   if (atrasado) return { atrasado: true, texto: `Atrasado ${minutos(falta)} min: devia ter começado` }
   if (falta <= 0) return { atrasado: false, texto: 'Começar agora' }
@@ -120,7 +128,7 @@ export function transicaoDaFila(anterior, atual) {
 // Soltar = o mesmo toque do botão: só a coluna do próximo passo aceita. Soltar na própria
 // coluna não é recusa, o cartão só volta.
 export function respostaAoSoltarKds(status, destino) {
-  if (destino === status) return { aceita: false, motivo: null }
+  if (destino === colunaDoStatusKds(status)) return { aceita: false, motivo: null }
   const proximo = proximoStatusKds(status)
   if (!proximo) return { aceita: false, motivo: 'Pedido entregue não anda mais na esteira.' }
   if (destino !== proximo.status) {
@@ -135,7 +143,7 @@ export const MINUTOS_DE_AVISO = 15
 // Urgência do cartão que ainda aguarda: atrasado (a API decide), agora (o início chegou),
 // logo (faltam até 15 min) ou nada. Depois de começar o preparo, não há mais urgência.
 export function urgenciaDoPedido(pedido, agora) {
-  if (pedido.status !== 'aguardando') return null
+  if (!naFila(pedido.status)) return null
   if (pedido.atrasado) return 'atrasado'
   if (!pedido.inicioPrevistoEm) return null
   const falta = Date.parse(pedido.inicioPrevistoEm) - agora
@@ -155,7 +163,7 @@ export function impressoesDaCozinha(fila, pedidos) {
 // Barra de tempo do cartão que aguarda: fração (1 a 0) do tempo entre o pagamento (ou a
 // criação) e o início previsto que ainda falta. Sem início previsto, nada a medir.
 export function tempoAteInicio(pedido, agora) {
-  if (pedido.status !== 'aguardando' || !pedido.inicioPrevistoEm) return null
+  if (!naFila(pedido.status) || !pedido.inicioPrevistoEm) return null
   const inicio = Date.parse(pedido.inicioPrevistoEm)
   const base = Date.parse(pedido.pagoEm ?? pedido.criadoEm)
   const total = inicio - base
@@ -163,11 +171,11 @@ export function tempoAteInicio(pedido, agora) {
   return Math.min(1, Math.max(0, (inicio - agora) / total))
 }
 
-// Fila vazia (#1474): a cozinha mostra um dia por vez. O pedido pago para amanhã não aparece
+// Fila vazia (#1474): a cozinha mostra um dia por vez. O pedido liberado para amanhã não aparece
 // em Hoje, e a tela dizia "Cozinha em dia" como se nada faltasse.
 export const textoDaCozinhaVazia = ({ amanha }) => (amanha
-  ? 'Nenhum pedido pago para amanhã ainda.'
-  : 'Cozinha em dia hoje. O pedido pago para hoje aparece aqui sozinho; o de amanhã, em Amanhã.')
+  ? 'Nenhum pedido liberado para o preparo de amanhã ainda.'
+  : 'Cozinha em dia hoje. Os pedidos liberados para o preparo de hoje aparecem aqui; os de amanhã, em Amanhã.')
 
 // Dia da fila (#1584): "Amanhã" vale só no dia da loja em que foi escolhido (`amanhaDesde`,
 // YYYY-MM-DD). Virou o dia, a fila volta para Hoje: o amanhã de ontem é o hoje de agora, e o

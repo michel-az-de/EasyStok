@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useRef } from 'react'
+import { BotaoIcone } from './BotaoIcone'
 import { Icone } from './Icone'
 import css from './Toast.module.css'
 
@@ -7,9 +9,51 @@ import css from './Toast.module.css'
 // desenho, o X e o clique que leva aonde o aviso aponta.
 //
 // itens: [{ id, titulo, corpo, icone?, tom?: 'marca' | 'sucesso' | 'alerta' | 'info', abrivel? }]
-export function Toast({ itens, aoFechar, aoAbrir, rotulo = 'Avisos', rodape = null }) {
+// #2185 (F28): `aoPausar` e `aoRetomar` seguram o relógio dos avisos enquanto o ponteiro ou o foco estão na
+// pilha (o teclado não alcança um aviso de 6 s a tempo). Foco de clique não conta: o mouse já pausa pelo
+// ponteiro, e um clique deixaria o foco na pilha, segurando os avisos depois de o ponteiro sair.
+export function Toast({ itens, aoFechar, aoAbrir, aoPausar, aoRetomar, rotulo = 'Avisos', rodape = null }) {
+  const pilha = useRef(null)
+  const dentro = useRef({ ponteiro: false, foco: false })
+  const mudou = useCallback((parte, valor) => {
+    const antes = dentro.current.ponteiro || dentro.current.foco
+    dentro.current[parte] = valor
+    const agora = dentro.current.ponteiro || dentro.current.foco
+    if (agora && !antes) aoPausar?.()
+    if (!agora && antes) aoRetomar?.()
+  }, [aoPausar, aoRetomar])
+  // Os ouvintes entram direto no nó: a região viva é só leitura para o leitor de tela, não um controle.
+  useEffect(() => {
+    const no = pilha.current
+    if (!no) return undefined
+    const entrouPonteiro = () => mudou('ponteiro', true)
+    const saiuPonteiro = () => mudou('ponteiro', false)
+    const entrouFoco = (evento) => { if (evento.target.matches?.(':focus-visible')) mudou('foco', true) }
+    const saiuFoco = (evento) => { if (!no.contains(evento.relatedTarget)) mudou('foco', false) }
+    no.addEventListener('pointerenter', entrouPonteiro)
+    no.addEventListener('pointerleave', saiuPonteiro)
+    no.addEventListener('focusin', entrouFoco)
+    no.addEventListener('focusout', saiuFoco)
+    return () => {
+      no.removeEventListener('pointerenter', entrouPonteiro)
+      no.removeEventListener('pointerleave', saiuPonteiro)
+      no.removeEventListener('focusin', entrouFoco)
+      no.removeEventListener('focusout', saiuFoco)
+    }
+  }, [mudou])
+  // O botão focado saiu com o aviso: nem todo navegador avisa com focusout.
+  useEffect(() => {
+    if (dentro.current.foco && !pilha.current?.contains(document.activeElement)) mudou('foco', false)
+  }, [itens, mudou])
+  // Pilha vazia: o ponteiro que estava em cima de um aviso que saiu não segura o próximo.
+  const vazia = itens.length === 0
+  useEffect(() => {
+    if (!vazia) return
+    dentro.current = { ponteiro: false, foco: false }
+    aoRetomar?.()
+  }, [vazia, aoRetomar])
   return (
-    <section className={css.pilha} role="status" aria-live="polite" aria-label={rotulo}>
+    <section ref={pilha} className={css.pilha} role="status" aria-live="polite" aria-label={rotulo}>
       {itens.map((item) => (
         <div key={item.id} className={`${css.aviso} ${css[item.tom ?? 'marca'] ?? ''}`}>
           {item.icone && <span className={css.icone} aria-hidden="true"><Icone nome={item.icone} tamanho={20} /></span>}
@@ -24,9 +68,7 @@ export function Toast({ itens, aoFechar, aoAbrir, rotulo = 'Avisos', rodape = nu
               <span>{item.corpo}</span>
             </p>
           )}
-          <button type="button" className={css.fechar} aria-label={`Fechar aviso: ${item.titulo}`} title="Fechar" onClick={() => aoFechar(item.id)}>
-            <Icone nome="x" tamanho={18} />
-          </button>
+          <BotaoIcone rotulo={`Fechar aviso: ${item.titulo}`} dica="Fechar" icone="x" onClick={() => aoFechar(item.id)} />
         </div>
       ))}
       {itens.length > 0 && rodape}

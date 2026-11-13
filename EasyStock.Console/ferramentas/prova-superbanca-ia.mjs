@@ -227,7 +227,7 @@ await provar('Erro do agente aparece aberto com retry e texto de suporte legíve
 })
 await provar('Consulta aberta anuncia espera sem inventar leitura de ficha ou cardápio', async () => {
   const html = painel({ estado: 'pensando' })
-  assert.match(html, /<output/); assert.match(html, /Consultando a IA/)
+  assert.match(html, /<output/); assert.match(html, /Consultando o Assistente/)
 })
 await provar('Sugestão pronta diz que não foi enviada e oferece apenas rascunho', async () => {
   const html = painel({ estado: 'pronto', sugestao: { texto: 'Texto fixture', acao: 'propor', intencao: { rotulo: 'Sugestão' } } })

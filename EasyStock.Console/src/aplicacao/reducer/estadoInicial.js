@@ -1,12 +1,14 @@
 import { FUNCIONAMENTO_PADRAO } from '../../dominio/funcionamento'
 import { REGRA_FIDELIDADE_PADRAO } from '../../dominio/fidelidade'
-import { FIDELIDADE_SEMENTE } from '../../infra/fidelidadeSemente'
+
 
 export const ATENDENTE = 'Thatiane'
 
 export function estadoInicial({
   conversas, catalogo, regras, modoAgente, som = true,
   funcionamento = FUNCIONAMENTO_PADRAO, lojaAberta = null,
+  // Exemplos de fidelidade vêm só da demonstração (#2391); produção nasce vazia.
+  fidelidadeSemente = { cupons: [], recompensas: [], sorteios: [] },
 }) {
   return {
     conversas,
@@ -18,12 +20,14 @@ export function estadoInicial({
     // primeiro toque no controle do topo.
     funcionamento,
     lojaAberta,
-    selecionadaId: conversas[0]?.id ?? null,
+    // #2135: abre sem conversa escolhida. A primeira do array não é a primeira da fila (a massa abria na
+    // 34ª linha, fora da lista visível), e a seleção que a atendente já fez volta pela visita da sessão.
+    selecionadaId: null,
     // Balcão (seção 1, rodada 5): duas abas, canais que ligam mais de um ao
     // mesmo tempo e uma ordem só. `MUDAR_FILTRO` é genérico (chave/valor), a
-    // forma nova só muda o que mora em cada chave. #1442: abre em "Todas";
-    // "Precisa de você" virou filtro com contador.
-    filtros: { busca: '', aba: 'todas', canais: [], ordenacao: 'urgencia', responsavel: 'todas' },
+    // forma nova só muda o que mora em cada chave. #2232 (banca UX, L5): abre em "Precisa de você",
+    // o que pede ação; "Todas" fica a um toque. Revê o #1442, que abria em "Todas".
+    filtros: { busca: '', aba: 'precisa', canais: [], ordenacao: 'urgencia', responsavel: 'todas' },
     rascunhos: {},
     // #1577: quantas vezes cada rascunho foi escrito de fora do campo (ver rascunhoLocal.js).
     escritasDeFora: {},
@@ -70,10 +74,10 @@ export function estadoInicial({
     // cadastro (pontos GANHOS são derivados do histórico, não moram aqui, ver
     // dominio/fidelidade.js).
     fidelidade: {
-      cupons: FIDELIDADE_SEMENTE.cupons,
+      cupons: fidelidadeSemente.cupons,
       config: REGRA_FIDELIDADE_PADRAO,
-      recompensas: FIDELIDADE_SEMENTE.recompensas,
-      sorteios: FIDELIDADE_SEMENTE.sorteios,
+      recompensas: fidelidadeSemente.recompensas,
+      sorteios: fidelidadeSemente.sorteios,
       resgatesPorCadastro: {},
     },
   }

@@ -8,9 +8,15 @@ import { transformWithOxc } from 'vite'
 
 const fontes = new Map()
 const base = process.argv.includes('--base') ? process.argv[process.argv.indexOf('--base') + 1] : null
+// #2232 (L11) + #2185 (R04): a BarraDeAbas usa a Pilula contagem, o contador único do app (stub abaixo).
 for (const nome of ['AlcaLargura', 'Popover', 'Modal', 'Chip', 'Icone', 'Campo', 'Botao', 'BarraDeAbas', 'EscolhaDeEntregador', 'EscolhaDeProvedorEntrega', 'InterruptorTema']) {
   const url = new URL(`../src/componentes/${nome}.jsx`, import.meta.url)
-  const fonte = base ? execFileSync('git', ['show', `${base}:EasyStock.Console/src/componentes/${nome}.jsx`], { encoding: 'utf8' }) : readFileSync(url, 'utf8')
+  let fonte
+  try {
+    fonte = base ? execFileSync('git', ['show', `${base}:EasyStock.Console/src/componentes/${nome}.jsx`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }) : readFileSync(url, 'utf8')
+  } catch (erro) {
+    throw erro
+  }
   fontes.set(url.href, (await transformWithOxc(fonte, url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
 const urlSeletor = new URL('../src/features/atendimento/SeletorRespostas.jsx', import.meta.url)
@@ -33,9 +39,18 @@ const dados = codigo => 'data:text/javascript,' + encodeURIComponent(codigo)
 registerHooks({
   resolve(spec, contexto, proximo) {
     if (spec === 'react') return { url: dados('const h=globalThis.__provaSuperbancaAcessibilidade.hooks; export const useRef=h.useRef,useId=h.useId,useState=h.useState,useEffect=h.useEffect,useLayoutEffect=h.useLayoutEffect,forwardRef=h.forwardRef;'), shortCircuit: true }
-    if (spec === 'react/jsx-runtime') return { url: dados('export const jsx=(type,props)=>({type,props}),jsxs=jsx,Fragment="fragment";'), shortCircuit: true }
+    // #2185: `BotaoIcone` e `Pilula` entram como componentes transparentes: viram o próprio elemento, com o nome em
+    // `aria-label`, para a árvore continuar sendo a do que o leitor de tela encontra.
+    if (spec === 'react/jsx-runtime') return { url: dados('export const jsx=(type,props)=>type&&type.transparente?type(props):({type,props}),jsxs=jsx,Fragment="fragment";'), shortCircuit: true }
+    if (/(^|\/)BotaoIcone(\.jsx)?$/.test(spec)) return { url: dados('export const BotaoIcone=Object.assign(({rotulo,icone,tom,pressionado,dica,tamanhoIcone,...resto})=>({type:"button",props:{...resto,"aria-label":rotulo,"aria-pressed":pressionado}}),{transparente:true});'), shortCircuit: true }
+    if (/(^|\/)Pilula(\.jsx)?$/.test(spec)) return { url: dados('export const Pilula=Object.assign(({contagem,children,className,titulo})=>({type:"span",props:{className,title:titulo,children:contagem??children}}),{transparente:true});'), shortCircuit: true }
     if (spec === 'react-dom') return { url: dados('export const createPortal=(elemento)=>elemento;'), shortCircuit: true }
     if (spec === '../hooks/useTema') return { url: dados('export const useTema=()=>["light", globalThis.__provaSuperbancaAcessibilidade.trocarTema];'), shortCircuit: true }
+    // #2145: o Icone virou fachada do lucide-react (CJS que pede o React real); aqui basta o svg decorativo.
+    if (/(^|\/)Icone(\.jsx)?$/.test(spec)) return { url: dados('export const Icone=({rotulo})=>({type:"svg",props:{role:rotulo?"img":"presentation","aria-label":rotulo,"aria-hidden":rotulo?undefined:"true"}});'), shortCircuit: true }
+    // #2185: o SeletorRespostas pergunta quem pode editar; a acessibilidade dele não depende da resposta.
+    if (/aplicacao\/contextos$/.test(spec)) return { url: dados('export const useAtendimento=()=>({fonteApi:false});'), shortCircuit: true }
+    if (/aplicacao\/acessoModulos$/.test(spec)) return { url: dados('export const useAcessoModulos=()=>({acoes:{}});'), shortCircuit: true }
     if (spec.endsWith('.css')) return { url: dados('export default new Proxy({}, {get:(_,k)=>k});'), shortCircuit: true }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) {
       for (const extensao of ['.js', '.jsx']) { try { return proximo(spec + extensao, contexto) } catch { /* próxima extensão */ } }
@@ -217,6 +232,104 @@ for (const protegido of [true, false]) {
     assert.equal(dialogo.open, false); assert.equal(eventos.size, 0)
   })
 }
+
+// #2078 (B11/E4): modal de dinheiro. Opt-in: sem as props, nenhum modal muda (o laço acima).
+const dialogoFalso = (eventos, campo = null) => ({ open: false, parentElement: { closest: () => null }, buscas: [],
+  showModal() { this.open = true }, close() { this.open = false },
+  addEventListener(nome, fn) { eventos.set(nome, fn) }, removeEventListener(nome) { eventos.delete(nome) },
+  querySelector(seletor) { this.buscas.push(seletor); return campo },
+})
+provar('Modal: segurarFechamento ignora Escape e fundo com valor digitado; o X e o Cancelar continuam fechando', () => {
+  let fechou = 0
+  const eventos = new Map(), m = montar(Modal, { titulo: 'Fechar o caixa', segurarFechamento: true, aoFechar: () => fechou++ })
+  const dialogo = dialogoFalso(eventos)
+  m.elemento.props.ref.current = dialogo
+  m.efeitos()
+  try {
+    const cancelamento = tecla('Escape', dialogo)
+    eventos.get('cancel')(cancelamento)
+    assert.equal(cancelamento.prevenido, true, 'o navegador não fecha o dialog sozinho')
+    eventos.get('click')({ target: dialogo })
+    assert.equal(fechou, 0, 'Escape e clique no fundo não perdem o valor digitado')
+    const fechar = andar(m.elemento, elemento => elemento.props['aria-label'] === 'Fechar janela')[0]
+    assert.equal(Boolean(fechar.props.disabled), false)
+    fechar.props.onClick()
+    assert.equal(fechou, 1, 'o X é um gesto explícito e fecha')
+  } finally { m.desmontar() }
+})
+// #2258 (auditoria F4, T17): com algo digitado, Esc, fundo e X perguntam antes de descartar; nenhum fecha direto.
+provar('Modal: confirmarDescarte faz Esc, fundo e X perguntarem antes de fechar', () => {
+  let fechou = 0
+  const eventos = new Map(), m = montar(Modal, { titulo: 'Nova conta', confirmarDescarte: true, aoFechar: () => fechou++ })
+  const dialogo = dialogoFalso(eventos)
+  m.elemento.props.ref.current = dialogo
+  m.efeitos()
+  try {
+    const cancelamento = tecla('Escape', dialogo)
+    eventos.get('cancel')(cancelamento)
+    assert.equal(cancelamento.prevenido, true, 'o navegador não fecha o dialog sozinho')
+    eventos.get('click')({ target: dialogo })
+    const fechar = andar(m.elemento, elemento => elemento.props['aria-label'] === 'Fechar janela')[0]
+    fechar.props.onClick()
+    assert.equal(fechou, 0, 'nenhum dos três gestos descarta sem perguntar')
+  } finally { m.desmontar() }
+})
+// #2078 (revisão R2): no Chromium o 2º Esc seguido, sem ativação do usuário, não pode ser cancelado:
+// o dialog fecha sozinho e o React não sabia. O `close` nativo agora é ouvido.
+for (const caso of ['segurando', 'livre', 'protegido']) {
+  provar(`Modal: close nativo (Esc não cancelável) ${caso === 'livre' ? 'avisa o pai' : 'reabre a folha sem perder o valor'}`, () => {
+    let fechou = 0
+    const props = { titulo: 'Fechar o caixa', segurarFechamento: caso === 'segurando', aoFechar: caso === 'protegido' ? undefined : () => fechou++ }
+    const eventos = new Map(), m = montar(Modal, props)
+    const dialogo = dialogoFalso(eventos)
+    let reaberto = 0
+    dialogo.showModal = function () { this.open = true; reaberto++ }
+    m.elemento.props.ref.current = dialogo
+    m.efeitos()
+    try {
+      assert.ok(eventos.has('close'), 'o modal ouve o close nativo')
+      dialogo.open = false
+      eventos.get('close')({ target: dialogo })
+      if (caso === 'livre') { assert.equal(fechou, 1); assert.equal(reaberto, 1, 'só a abertura') }
+      else { assert.equal(fechou, 0); assert.equal(dialogo.open, true); assert.equal(reaberto, 2) }
+    } finally { m.desmontar() }
+    assert.equal(eventos.size, 0, 'desmontar tira o ouvinte antes do close() da limpeza')
+  })
+}
+provar('Modal: focarCampo põe o foco no campo marcado (ou no primeiro campo), sem rolar a página; sem a prop, o foco é o do navegador', () => {
+  const focos = []
+  const campo = { focus(opcoes) { focos.push(opcoes) } }
+  const eventos = new Map(), m = montar(Modal, { titulo: 'Lançar', focarCampo: true, aoFechar() {} })
+  const dialogo = dialogoFalso(eventos, campo)
+  m.elemento.props.ref.current = dialogo
+  m.efeitos()
+  try {
+    assert.deepEqual(focos, [{ preventScroll: true }])
+    assert.deepEqual(dialogo.buscas, ['[data-foco-inicial]:not(:disabled)'], 'o campo marcado vem antes de qualquer outro')
+  } finally { m.desmontar() }
+  // Sem campo marcado, o primeiro campo do modal.
+  const focosSemMarca = []
+  const eventosSemMarca = new Map(), semMarca = montar(Modal, { titulo: 'Lançar', focarCampo: true, aoFechar() {} })
+  const dialogoSemMarca = dialogoFalso(eventosSemMarca, null)
+  dialogoSemMarca.querySelector = function (seletor) { this.buscas.push(seletor); return seletor.startsWith('input') ? { focus: (o) => focosSemMarca.push(o) } : null }
+  semMarca.elemento.props.ref.current = dialogoSemMarca
+  semMarca.efeitos()
+  try {
+    assert.deepEqual(focosSemMarca, [{ preventScroll: true }])
+    assert.match(dialogoSemMarca.buscas[1], /^input:not\(:disabled\), select:not\(:disabled\), textarea:not\(:disabled\)$/)
+  } finally { m.desmontar() }
+  const semProp = new Map(), outro = montar(Modal, { titulo: 'Nota', aoFechar() {} })
+  const dialogoOutro = dialogoFalso(semProp, campo)
+  outro.elemento.props.ref.current = dialogoOutro
+  outro.efeitos()
+  try { assert.equal(dialogoOutro.buscas.length, 0, 'os outros modais seguem com o foco que o showModal dá') } finally { outro.desmontar() }
+})
+provar('Modal: a folha não é posicionada como relativa no top layer (vira absoluta e rola com a página em 390 px)', () => {
+  const cssModal = readFileSync(new URL('../src/componentes/Modal.module.css', import.meta.url), 'utf8')
+  const posicoes = [...cssModal.matchAll(/\.caixa\s*\{[^}]*?position:\s*([a-z]+)/g)].map(m => m[1])
+  assert.ok(posicoes.length > 0, 'a folha declara a posição')
+  assert.ok(posicoes.every(p => p === 'fixed'), `posições da .caixa: ${posicoes.join(', ')}`)
+})
 
 const propsAlca = aoMudar => ({ rotulo: 'Largura do Balcão', valor: 320, min: 280, max: 440, padrao: 360, aoMudar })
 const iniciar = montagem => montagem.elemento.props.onPointerDown({ button: 0, pointerId: 1, clientX: 100, preventDefault() {}, currentTarget: origem })

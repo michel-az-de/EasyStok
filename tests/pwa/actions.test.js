@@ -22,7 +22,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.deepStrictEqual(r[0].args, ['o1', 'pronto']);
   });
 
-  test('actions: pronto sem conferencia -> primary "Conferir" + secondary "Cobrar"', () => {
+  test('actions: pronto sem conferencia -> primary "Conferir" + secondary "Preparar cobrança"', () => {
     const r = JSON.parse(runInSandbox(`
       JSON.stringify(getOrderPrimaryActions({
         id: 'o1', status: 'pronto', confirmedAt: null
@@ -35,6 +35,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(r[1].key, 'charge');
     assert.strictEqual(r[1].primary, false);
     assert.strictEqual(r[1].handler, 'openCobranca');
+    assert.strictEqual(r[1].label, 'Preparar cobrança');
   });
 
   test('actions: pronto JA conferido -> primary "Marcar entregue"', () => {
@@ -87,5 +88,66 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     Object.entries(checks).forEach(([handler, exists]) => {
       assert.ok(exists, 'handler ' + handler + ' deve ser funcao no escopo');
     });
+  });
+  test('actions: cards de pedidos priorizam a etapa e mantêm cobrança fora de Mais ações', () => {
+    for (const [status, next, expected] of [
+      ['aguardando', 'Iniciar preparo', 'Iniciar preparo'],
+      ['preparando', 'Marcar pronto', 'Marcar pronto'],
+      ['pronto', 'Marcar entregue', 'Conferir entrega'],
+    ]) {
+      const html = runInSandbox(`renderKanbanCard({
+        id: 'pedido-densidade', status: ${JSON.stringify(status)}, total: 34,
+        items: [{ name: 'Massa', qty: 1 }], clientSnapshot: { name: 'Cliente' }, createdAt: Date.now()
+      }, { key: ${JSON.stringify(status)}, label: 'Etapa', next: ${JSON.stringify(next)} });`);
+      const details = html.match(/<details class="k-more-actions">([\s\S]*?)<\/details>/);
+      assert.ok(details, 'ações secundárias ficam em disclosure nativo');
+      const visible = html.slice(0, details.index);
+      assert.match(visible, new RegExp(`onclick="advanceOrder\\(&quot;pedido-densidade&quot;\\)">${expected}</button>`));
+      assert.match(visible, /onclick="openCobranca\(&quot;pedido-densidade&quot;\)"/);
+      assert.match(visible, /Conf\. pendente/, 'conferência pendente continua visível sem abrir o menu');
+      for (const handler of ['openConfer', 'printEtiqueta', 'openHistorico', 'cancelOrder']) {
+        assert.ok(details[1].includes(`${handler}(&quot;pedido-densidade&quot;)`), handler + ' permanece disponível');
+        assert.ok(!visible.includes(`${handler}(&quot;pedido-densidade&quot;)`), handler + ' não compete com a próxima etapa');
+      }
+      assert.match(details[1], />Cancelar pedido<\/button>/, 'cancelamento tem rótulo explícito');
+      assert.strictEqual(details[1].includes("openCestaCalcFromOrder(&quot;pedido-densidade&quot;)"), status !== 'pronto');
+    }
+  });
+
+  test('actions: pedido sem valor mantém Mais ações e não oferece cobrança', () => {
+    const html = runInSandbox(`renderKanbanCard({
+      id: 'pedido-zero', status: 'aguardando', total: 0, items: [],
+      clientSnapshot: { name: 'Cliente' }, createdAt: Date.now()
+    }, { key: 'aguardando', label: 'Aguardando', next: 'Iniciar preparo' });`);
+    assert.ok(!html.includes('openCobranca('));
+    assert.match(html, /<summary aria-label="Mais ações do pedido ido-zero">Mais ações<\/summary>/);
+    assert.match(html, /onclick="advanceOrder\(&quot;pedido-zero&quot;\)"/);
+    assert.match(html, /onclick="cancelOrder\(&quot;pedido-zero&quot;\)"/);
+  });
+
+  // #2307: pedido quitado no console ou no Mercado Pago nao oferece cobranca de novo.
+  const cardPago = (aReceber, status) => runInSandbox(`renderKanbanCard({
+      id: 'pedido-pago', status: '${status || 'aguardando'}', total: 45.9, aReceber: ${aReceber}, items: [],
+      clientSnapshot: { name: 'Cliente' }, createdAt: Date.now()
+    }, { key: 'aguardando', label: 'Aguardando', next: 'Iniciar preparo' });`);
+
+  test('actions: pedido quitado mostra Pago e não oferece cobrança', () => {
+    const html = cardPago(0);
+    assert.ok(!html.includes('openCobranca('), 'cobrança some do card quitado');
+    assert.match(html, />Pago<\/span>/);
+    const acoes = JSON.parse(runInSandbox(`JSON.stringify(getOrderPrimaryActions({ id: 'p', status: 'pronto', total: 45.9, aReceber: 0, confirmedAt: null }))`));
+    assert.ok(!acoes.some(a => a.key === 'charge'), 'ação de cobrança some do pedido quitado');
+  });
+
+  test('actions: pedido com sinal mostra quanto falta e mantém a cobrança', () => {
+    const html = cardPago(20.9);
+    assert.match(html, /onclick="openCobranca\(&quot;pedido-pago&quot;\)"/);
+    assert.match(html, /Falta R\$\s?20,90/);
+  });
+
+  test('actions: pedido sem aReceber (servidor antigo) segue como hoje', () => {
+    const html = cardPago('undefined');
+    assert.match(html, /onclick="openCobranca\(&quot;pedido-pago&quot;\)"/);
+    assert.ok(!html.includes('>Pago</span>'));
   });
 };

@@ -30,7 +30,8 @@ public sealed record ConversaInboxItem(
     string? AssumidaPorNome = null,
     string? PedidoStatus = null,
     long NumeroComanda = 0,
-    string? Assunto = null)
+    string? Assunto = null,
+    string? FotoClienteChave = null)
 {
     /// <summary>Linha a partir da entidade carregada. Sem <paramref name="aguardaResposta"/> vale a regra do dominio.</summary>
     public static ConversaInboxItem De(Conversa c, string? ultimaMensagemTexto, bool? aguardaResposta = null, string? assumidaPorNome = null, string? pedidoStatus = null) => new(
@@ -87,6 +88,9 @@ public interface IConversaRepository
     /// para a entrada depois do encerramento voltar ao atendimento que ainda tem pedido em andamento.
     /// </summary>
     Task<Conversa?> ObterUltimaEncerradaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default);
+
+    /// <summary>#2285: respostas do agente (saída, autor Agente) na conversa desde <paramref name="desde"/>; base do anti-loop.</summary>
+    Task<int> ContarRespostasDoAgenteDesdeAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default);
 
     Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default);
 

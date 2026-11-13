@@ -168,6 +168,39 @@ public class RemetenteWhatsAppDoTenantIntegrationTests(PostgreSqlDatabaseFixture
             .Should().NotBeNull("a telemetria de uso continua gravada, isolada");
     }
 
+    [SkippableFact]
+    public async Task SessaoWppConnect_cifrada_e_isolada_por_empresa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        await fixture.ResetDatabaseAsync();
+        var a = Empresa.Criar("Piloto A", "11111111000191");
+        var b = Empresa.Criar("Piloto B", "22222222000191");
+        await SeedAsync(a, b);
+        await using var provider = BuildProvider(new()
+        {
+            ["Crypto:CurrentKekId"] = "wpp-teste",
+            ["Crypto:Keks:wpp-teste"] = Convert.ToBase64String(Enumerable.Repeat((byte)7, 32).ToArray())
+        });
+        foreach (var empresa in new[] { a, b })
+        {
+            await using var scope = provider.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(empresa.Id);
+            await scope.ServiceProvider.GetRequiredService<IIntegrationCredentialResolver>().SalvarAsync(
+                empresa.Id, CategoriaIntegracao.Mensageria, CredencialWppConnect.ProviderKey,
+                AmbienteIntegracao.Production, new CredencialWppConnect(CredencialWppConnect.NomeSessao(empresa.Id),
+                    "token-" + empresa.Id), Guid.NewGuid());
+        }
+        foreach (var empresa in new[] { a, b })
+        {
+            await using var scope = provider.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(empresa.Id);
+            var sessao = await scope.ServiceProvider.GetRequiredService<IRemetenteWhatsApp>().ObterSessaoWebAsync();
+            sessao.Should().Be(new CredencialWppConnect(CredencialWppConnect.NomeSessao(empresa.Id), "token-" + empresa.Id));
+        }
+        await using var semTenant = provider.CreateAsyncScope();
+        (await semTenant.ServiceProvider.GetRequiredService<IRemetenteWhatsApp>().ObterSessaoWebAsync()).Should().BeNull();
+    }
+
     private static async Task<string?> TokenAsync(ServiceProvider provider, Guid? tenant)
     {
         await using var scope = provider.CreateAsyncScope();

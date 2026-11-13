@@ -9,20 +9,21 @@ export const simulacaoVale = (pedido) =>
   Boolean(pedido && !pedido.pedidoId && pedido.itens?.length > 0 && String(pedido.janela ?? '').includes('|'))
 
 // Linhas da comanda, na ordem em que se lê: frete, total com frete e, na encomenda, o sinal e o restante.
-// Fora da área não há número de frete, e nenhum total ou sinal é inventado.
-export function linhasDaSimulacao(simulacao) {
+// Sem cotação não há número de frete, e nenhum total ou sinal é inventado.
+// #2219: `combinado` marca o frete que a equipe digitou (CEP fora da área), para não parecer cotação.
+export function linhasDaSimulacao(simulacao, { combinado = false } = {}) {
   if (!simulacao) return null
   if (simulacao.freteACombinar) {
-    return [{ chave: 'frete', texto: 'Frete a combinar com a equipe: o endereço está fora da área de entrega.' }]
+    return [{ chave: 'frete', texto: 'Frete a combinar com o cliente.' }]
   }
   const linhas = [
-    { chave: 'frete', texto: `Frete ${moeda(simulacao.frete)}` },
+    { chave: 'frete', texto: `${combinado ? 'Frete combinado' : 'Frete'} ${moeda(simulacao.frete)}` },
     { chave: 'total', texto: `Total com frete ${moeda(simulacao.total)}` },
   ]
   if (simulacao.encomenda && simulacao.sinal != null) {
     linhas.push({
       chave: 'sinal',
-      texto: `Encomenda para outro dia: sinal de ${moeda(simulacao.sinal)} antes da produção e ${moeda(simulacao.restante)} na entrega.`,
+      texto: `Encomenda com antecedência: sinal de ${moeda(simulacao.sinal)} antes da produção e ${moeda(simulacao.restante)} na entrega.`,
     })
   }
   return linhas

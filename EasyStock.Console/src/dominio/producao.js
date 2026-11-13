@@ -197,8 +197,11 @@ export function erroDaLinha(linha) {
   if (!linha.sku) return 'Escolha o prato.'
   // M1.4c (#1537): prato com porções produz uma porção; o saldo é dela.
   if (linha.exigePorcao && !linha.variacaoId) return 'Escolha a porção produzida.'
-  if (!Number.isInteger(linha.porcoes) || linha.porcoes <= 0) return 'Quantas porções saíram?'
+  if (linha.porcoes == null) return 'Quantas porções saíram?'
+  if (!Number.isInteger(linha.porcoes) || linha.porcoes <= 0) return 'Informe porções inteiras maiores que zero.'
+  if (linha.porcoes > 9999) return 'O lote aceita até 9.999 porções.'
   if (!Number.isInteger(linha.validadeDias) || linha.validadeDias <= 0) return 'Validade em dias inteiros.'
+  if (linha.validadeDias > 3650) return 'Validade de até 3.650 dias.'
   // "350g" ou "350,5" viram NaN, que não é <= 0: o lote nascia sem peso e a etiqueta sem gramas.
   if (linha.pesoPorPorcaoG != null && !(Number.isInteger(linha.pesoPorPorcaoG) && linha.pesoPorPorcaoG > 0)) return 'Peso da porção em gramas inteiros.'
   if (linha.pesoRealG != null && !(Number.isInteger(linha.pesoRealG) && linha.pesoRealG > 0)) return 'Peso real em gramas inteiros.'

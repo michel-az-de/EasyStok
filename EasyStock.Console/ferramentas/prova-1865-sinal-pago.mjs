@@ -8,5 +8,5 @@ assert.equal(rotuloDoResumo('aprovado baba', 44), 'Sinal pago')
 assert.equal(rotuloDoResumo('aprovado baba', 0), 'Pago')
 assert.equal(rotuloDoResumo('aguardando pagamento', 88), 'Aguardando pagamento')
 assert.equal(motivoAntesDeCobrar({ pedido: { itens: [{ qtd: 1 }], janela: null }, clienteId: 'c', endereco: {} }, { fonteApi: true }),
-  'Escolha a janela de entrega em Seleção do atendimento.')
+  'Escolha a janela de entrega em Pedido e entrega.')
 console.log('4 cenários do sinal pago e da dica da janela aprovados.')

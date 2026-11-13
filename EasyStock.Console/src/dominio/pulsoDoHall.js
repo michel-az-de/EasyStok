@@ -1,8 +1,22 @@
+import { gavetaDoDia } from './caixa'
+import { colunaDoStatusKds } from './kds'
+
 // Contagens da leitura atual. Não interpreta SLA sem o expediente da loja.
 const aguardandoResposta = (dados) => dados.itens.filter((c) => c.situacao === 'Assumida' && (c.aguardaResposta || !c.assumidaPorUsuarioId)).length
-const naFila = (dados) => dados.itens.filter((p) => ['aguardando', 'preparando'].includes(p.status)).length
+// #2055: `colunaDoStatusKds` põe o aprovado pela dona (`aprovado_baba`) em Na fila, como a Cozinha.
+const naFila = (dados) => dados.itens.filter((p) => ['aguardando', 'preparando'].includes(colunaDoStatusKds(p.status))).length
 const prontos = (dados) => dados.itens.filter((p) => p.status === 'pronto').length
 const plural = (n, um, varios, mais = '') => `${n}${mais} ${n === 1 ? um : varios}`
+
+// #2258 (H2/H3): um nome só para o que pede a dona, no cartão, na linha de baixo e no leitor de tela, e
+// no número certo ("1 pronto para sair", "6 prontos para sair").
+export const ROTULO_PRECISA_DE_VOCE = 'Precisa de você'
+export const precisaDeVoce = (n, mais = '') => `${n}${mais} ${n === 1 ? 'precisa' : 'precisam'} de você`
+export { plural }
+
+// #2258 (P1): `href` leva o alerta ao ponto exato do módulo; sem ele o cartão abre o módulo.
+export const HASH_LOTES_VENCIDOS = '#/m/producao/estoque'
+export const HASH_PRATOS_COM_PENDENCIA = '#/m/cardapio/itens/pendencia'
 
 // #1839 D: a linha viva do cartão de cada módulo. Só módulo com fonte lida tem linha; leitura que
 // falhou some do cartão (o contador de cima já avisa). `atencao` pede o olhar da dona.
@@ -14,7 +28,7 @@ export function pendenciaDoModulo(id, fontes) {
   if (id === 'atendimento') {
     const n = aguardandoResposta(dados)
     if (!n && dados.parcial) return null
-    return n ? { texto: `${plural(n, 'conversa', 'conversas', mais)} sem resposta`, atencao: true } : { texto: 'Nenhuma conversa esperando', atencao: false }
+    return n ? { texto: `${plural(n, 'conversa', 'conversas', mais)} ${n === 1 ? 'precisa' : 'precisam'} de você`, atencao: true } : { texto: 'Nenhuma conversa esperando', atencao: false }
   }
   if (id === 'cozinha') {
     const n = naFila(dados)
@@ -27,14 +41,20 @@ export function pendenciaDoModulo(id, fontes) {
     return n ? { texto: `${plural(n, 'pedido pronto', 'pedidos prontos', mais)} para sair`, atencao: true } : { texto: 'Nada pronto para sair', atencao: false }
   }
   if (id === 'financeiro') {
-    if (dados.aberturaPendenteCrossDay) return { texto: 'Caixa de outro dia aberto', atencao: true }
-    return { texto: dados.aberto ? 'Caixa aberto' : dados.fechado ? 'Caixa fechado hoje' : 'Caixa do dia ainda fechado', atencao: false }
+    if (dados.esquecidoAberto) return { texto: 'Caixa de outro dia aberto', atencao: true }
+    // #2078 (B2): a API manda `aberto` também no dia que já fechou; fechado vem primeiro (`caixa.js: linhaDoFluxo`).
+    return { texto: dados.fechado ? 'Caixa fechado hoje' : dados.aberto ? 'Caixa aberto' : 'Caixa do dia ainda fechado', atencao: false }
   }
   if (id === 'cardapio' && Array.isArray(dados.itens)) {
     const ativos = dados.itens.filter((item) => !item.arquivado)
     const pendentes = ativos.filter((item) => item.pendencias?.length).length
-    if (pendentes) return { texto: `${plural(pendentes, 'prato', 'pratos')} com pendência`, atencao: true }
+    if (pendentes) return { texto: `${plural(pendentes, 'prato', 'pratos')} com pendência`, atencao: true, href: HASH_PRATOS_COM_PENDENCIA }
     return { texto: `${plural(ativos.filter((item) => item.hoje).length, 'prato', 'pratos')} no cardápio de hoje`, atencao: false }
+  }
+  // #2258 (P1): lotes vencidos são o que a dona precisa tirar do estoque; sem a leitura não há linha.
+  if (id === 'producao' && Array.isArray(dados.vencidos)) {
+    const n = dados.vencidos.length
+    return n ? { texto: plural(n, 'lote vencido', 'lotes vencidos'), atencao: true, href: HASH_LOTES_VENCIDOS } : { texto: 'Nenhum lote vencido', atencao: false }
   }
   return null
 }
@@ -47,21 +67,31 @@ export function indicadoresDoHall(fontes, ids) {
     let detalhe = ''
     // #1810: o que pede ação e aparece escrito no hall; o detalhe vai só no título do cartão.
     let alerta = null
+    let rotulo = null
     if (id === 'atendimento') {
+      rotulo = ROTULO_PRECISA_DE_VOCE
       if (dados) valor = aguardandoResposta(dados)
       detalhe = 'Assumidas com resposta pendente ou sem responsável.'
     } else if (id === 'cozinha') {
+      rotulo = 'Em preparo ou na fila'
       if (dados) valor = naFila(dados)
       detalhe = 'Fila de hoje e pendências de ontem.'
     } else if (id === 'entregas') {
       if (dados) valor = prontos(dados)
+      rotulo = valor === 1 ? 'Pronto para sair' : 'Prontos para sair'
       detalhe = 'Pedidos prontos na fila de hoje e de ontem.'
     } else {
-      if (Number.isFinite(dados?.saldoEsperado)) valor = dados.saldoEsperado
-      if (dados?.aberturaPendenteCrossDay) alerta = 'Caixa de outro dia ainda aberto. Confira o fechamento.'
-      detalhe = !dados ? '' : dados.aberturaPendenteCrossDay ? 'Caixa de outro dia ainda aberto. Confira o fechamento.' : dados.aberto ? 'Total do caixa, incluindo Pix e cartão. Confira a gaveta no financeiro.' : dados.fechado ? 'Caixa fechado hoje.' : 'Caixa do dia ainda não aberto.'
+      // #2078 (B7/E3/D7): o número é o que a tela do Caixa destaca, com o mesmo rótulo: o dinheiro da
+      // gaveta (`gavetaDoDia`). O `saldoEsperado` soma Pix e cartão e não é o que ela confere. Sem abrir
+      // o caixa ninguém disse quanto havia na gaveta: a tela diz "Em dinheiro", e o Hall também.
+      rotulo = dados && !dados.aberto && !dados.fechado ? 'Em dinheiro' : 'Na gaveta (dinheiro)'
+      if (Number.isFinite(dados?.saldoEsperado)) valor = gavetaDoDia(dados).naGaveta
+      if (dados?.esquecidoAberto) alerta = 'Caixa de outro dia ainda aberto. Confira o fechamento.'
+      detalhe = !dados ? '' : dados.esquecidoAberto ? 'Caixa de outro dia ainda aberto. Confira o fechamento.'
+        : dados.fechado ? 'Caixa fechado hoje. Dinheiro que ficou na gaveta.'
+          : dados.aberto ? 'Dinheiro na gaveta agora. Pix e cartão ficam no Caixa do dia.' : 'Caixa do dia ainda não aberto. Dinheiro que já entrou hoje.'
     }
     const atual = fonte?.estado === 'ok' && valor !== null
-    return { id, valor, detalhe, alerta, atual, parcial: Boolean(dados?.parcial), estado: fonte?.estado ?? 'carregando', em: fonte?.em, erro: fonte?.erro }
+    return { id, valor, rotulo, detalhe, alerta, atual, parcial: Boolean(dados?.parcial), estado: fonte?.estado ?? 'carregando', em: fonte?.em, erro: fonte?.erro }
   })
 }

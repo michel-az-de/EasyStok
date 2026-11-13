@@ -88,7 +88,7 @@ export function useGravadorAudio({ escolherTipo } = {}) {
 
   // Devolve null quando não havia gravação em curso (clique duplo em
   // "Enviar", por exemplo); quem chama já sabe tratar esse caso como cancelar.
-  const finalizar = useCallback(() => new Promise((resolve) => {
+  const finalizar = useCallback(() => new Promise((resolve, reject) => {
     limparTimer()
     const gravador = gravadorRef.current
     if (!gravador || gravador.state === 'inactive') { resolve(null); return }
@@ -102,7 +102,14 @@ export function useGravadorAudio({ escolherTipo } = {}) {
         setDuracaoMs(0)
         resolve({ dataUrl: leitor.result, duracaoMs: duracaoFinal })
       }
-      leitor.readAsDataURL(blob)
+      const falhar = (erro) => {
+        setEstado('ocioso')
+        setDuracaoMs(0)
+        reject(erro)
+      }
+      leitor.onerror = () => falhar(leitor.error ?? new Error('Falha ao ler o áudio.'))
+      leitor.onabort = () => falhar(new DOMException('Leitura do áudio cancelada.', 'AbortError'))
+      try { leitor.readAsDataURL(blob) } catch (erro) { falhar(erro) }
     }
     gravador.stop()
   }), [])

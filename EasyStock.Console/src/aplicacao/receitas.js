@@ -1,4 +1,4 @@
-import { detalheDaReceitaDaApi, marcarBaixaAutomatica, obterReceita, receitaDaApi, listarReceitas, salvarReceita } from '../infra/api/producaoApi'
+import { detalheDaReceitaDaApi, ligarPratoAoEstoque, marcarBaixaAutomatica, obterReceita, receitaDaApi, listarReceitas, salvarReceita } from '../infra/api/producaoApi'
 import { numeroDaReceita } from './calculosReceita'
 
 // Receitas no modo API (M2.4a, #1498). A receita é gravada inteira (o EasyStok substitui as linhas
@@ -44,6 +44,25 @@ export function orientacoesDaReceita({ prato, unidadeRendimento, linhas = [], in
 export const lerReceitas = async () => ((await listarReceitas()) ?? []).map(receitaDaApi)
 export const lerReceita = async (produtoId) => detalheDaReceitaDaApi(await obterReceita(produtoId))
 
+// #2235 (banca A1): o prato do cardápio ainda sem estoque abre com a receita em branco. O produto de
+// estoque só nasce ao salvar a receita: abrir e fechar não deixa nada no estoque.
+export const receitaEmBranco = (prato) => ({
+  produtoId: null, nome: prato?.nome ?? '', rendimento: 1, unidadeRendimento: 'Un', unidadeMedidaBase: null,
+  linhas: [], custoTotal: null, custoPorRendimento: null,
+})
+
+// #2235 (banca A1-A3): quantos pratos já têm receita e qual o próximo a montar.
+export const temReceita = (r) => (r?.linhas ?? 0) > 0
+export function progressoDasReceitas(receitas = []) {
+  const comReceita = receitas.filter(temReceita).length
+  return { comReceita, total: receitas.length, proximo: receitas.find((r) => !temReceita(r))?.sku ?? null }
+}
+export function textoDoProgresso({ comReceita, total }) {
+  if (total === 0) return ''
+  if (comReceita === total) return total === 1 ? 'O prato do cardápio tem receita.' : `Todos os ${total} pratos têm receita.`
+  return `${comReceita} de ${total} ${total === 1 ? 'prato' : 'pratos'} com receita.`
+}
+
 // O teclado decimal em pt-BR só tem vírgula: "1,2" é um vírgula dois.
 const numero = numeroDaReceita
 
@@ -60,11 +79,14 @@ export function erroDaReceita({ rendimento, unidadeRendimento, linhas }) {
 
 export function criarGestaoReceitas({ recarregar, aoErro }) {
   return {
-    salvar: async (produtoId, rascunho) => {
-      const erro = erroDaReceita(rascunho)
+    // Sem produtoId, o prato é ligado ao estoque aqui, depois de a receita passar na validação.
+    salvar: async (produtoId, rascunho, prato) => {
+      const erro = erroDaReceita(rascunho) ?? (!produtoId && (rascunho.linhas ?? []).length === 0
+        ? 'Escolha ao menos um insumo: o prato só entra no estoque com a receita montada.' : null)
       if (erro) { aoErro(erro); return false }
       try {
-        await salvarReceita(produtoId, {
+        const id = produtoId ?? await ligarPratoAoEstoque(prato.sku)
+        await salvarReceita(id, {
           rendimentoBase: numero(rascunho.rendimento),
           rendimentoUnidade: rascunho.unidadeRendimento ?? 'Un',
           unidadeMedidaBase: rascunho.unidadeMedidaBase ?? 'Un',

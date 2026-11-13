@@ -6,6 +6,7 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Entregas;
 
@@ -64,7 +65,7 @@ public sealed class ObterViagemUseCase(IViagemRepository viagens, IPedidoReposit
             var pedido = pedidosPorId.GetValueOrDefault(p.PedidoId);
             var cliente = pedido?.ClienteId is { } cid ? clientesPorId.GetValueOrDefault(cid) : null;
             paradas.Add(new ParadaViagemResult(
-                p.PedidoId, NumeroPedido(p.PedidoId), p.Ordem, cliente?.Nome ?? pedido?.ClienteNome,
+                p.PedidoId, CodigoCurto.De(p.PedidoId), p.Ordem, cliente?.Nome ?? pedido?.ClienteNome,
                 pedido?.EnderecoEntrega ?? Endereco(cliente),
                 p.EntregueEm, p.EntregadorNome, p.Veiculo, p.Placa, p.EmpresaEntregador,
                 // #2007: o troco do dinheiro na entrega e o número do dia chegam à parada mesmo com o pedido fora
@@ -74,9 +75,6 @@ public sealed class ObterViagemUseCase(IViagemRepository viagens, IPedidoReposit
         return new ViagemResult(viagem.Id, viagem.EntregadorId, viagem.Situacao, viagem.CriadaEm, viagem.SaiuEm,
             viagem.ConcluidaEm, RotaMaps.Montar(paradas.Select(p => p.Endereco)), paradas);
     }
-
-    /// <summary>Número curto do pedido: 8 primeiros caracteres do id, maiúsculos (o que o cliente vê).</summary>
-    public static string NumeroPedido(Guid pedidoId) => pedidoId.ToString("N")[..8].ToUpperInvariant();
 
     private static string? Endereco(Domain.Entities.Cliente? c)
     {
@@ -212,7 +210,7 @@ internal static class TransicaoPedidoViagem
         }
         catch (TransicaoInvalidaException ex)
         {
-            throw new UseCaseValidationException($"Pedido {ObterViagemUseCase.NumeroPedido(pedidoId)}: {ex.Message}");
+            throw new UseCaseValidationException($"Pedido {CodigoCurto.De(pedidoId)}: {ex.Message}");
         }
         pedido.MudarStatus(novo);
         var novoStr = StatusPedidoMapper.Format(novo);
@@ -282,7 +280,7 @@ public sealed class SairParaEntregaUseCase(
 
         return new ViagemResult(viagem.Id, viagem.EntregadorId, viagem.Situacao, viagem.CriadaEm, viagem.SaiuEm, viagem.ConcluidaEm,
             null, viagem.Paradas.OrderBy(p => p.Ordem).Select(p => new ParadaViagemResult(
-                p.PedidoId, ObterViagemUseCase.NumeroPedido(p.PedidoId), p.Ordem, null, null, p.EntregueEm,
+                p.PedidoId, CodigoCurto.De(p.PedidoId), p.Ordem, null, null, p.EntregueEm,
                 p.EntregadorNome, p.Veiculo, p.Placa, p.EmpresaEntregador)).ToList());
     }
 }

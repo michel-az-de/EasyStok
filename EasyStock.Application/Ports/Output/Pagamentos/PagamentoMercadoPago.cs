@@ -16,6 +16,9 @@ public sealed record PagamentoMercadoPago(
     decimal TransactionAmountRefunded = 0,
     string? CollectorId = null)
 {
+    /// <summary>transaction_details.transaction_id; referencia bancaria E2E do Pix, sem derivar ids.</summary>
+    public string? TransactionId { get; init; }
+
     public const string Approved = "approved";
     public const string Pending = "pending";
     public const string InProcess = "in_process";

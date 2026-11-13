@@ -44,6 +44,7 @@ public class ConsultarCardapioFerramentaTests
         public CardapioItem Item(string nome, string? alergenos = null, string? ingredientes = null)
         {
             var item = CardapioItem.CriarAvulso(_storefront.Id, nome, 30m);
+            item.TornarVisivel(); // o repositório devolve só os visíveis (GetVisiveisDoStorefrontAsync)
             item.AtualizarMetadata(alergenos: alergenos, ingredientes: ingredientes);
             _itens.Add(item);
             return item;

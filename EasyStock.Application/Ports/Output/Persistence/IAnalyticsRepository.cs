@@ -454,6 +454,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// produto nunca-estocado vem com QuantidadeVigente=0 (a função pura o classifica como
         /// ESGOTADO). Traz os limiares BRUTOS (produto/categoria + os de configuração da loja em
         /// configMinima/configCritica) para o domínio resolver a hierarquia via LimiarEstoqueResolver.
+        /// Com <paramref name="lojaId"/>, saldo e venda somam os lotes da loja e os sem loja (produção do console, #2054).
         /// </summary>
         Task<IReadOnlyList<ProdutoReposicaoSnapshot>> GetSnapshotReposicaoAsync(
             Guid empresaId,

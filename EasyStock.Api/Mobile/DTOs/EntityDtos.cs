@@ -43,7 +43,10 @@ public record ClientDto(
     string? Address,
     string? Phone,
     long LastOrder,
-    int OrderCount
+    int OrderCount,
+    // CLI-5 (#2321): CPF/CNPJ digitado no app. Opcional e no fim: APK antigo nao manda. Nao ha
+    // coluna em mobile_clients; o valor vai direto para Cliente.Documento do ERP.
+    string? Document = null
 );
 
 public record OrderItemDto(
@@ -75,7 +78,10 @@ public record OrderDto(
     // F5 — agendamento de pedido (MVP). NULL = pedido pra agora (caso padrão).
     long? ScheduledDeliveryAt = null,
     // #1493 — forma de pagamento escolhida no PWA ao entregar. NULL = aparelho antigo.
-    string? Metodo = null
+    string? Metodo = null,
+    string? LegacyHistoryStatus = null,
+    // #2307: quanto falta receber do Pedido ERP (desconta estorno e cupom). NULL = o servidor nao sabe.
+    decimal? AReceber = null
 );
 
 public record BatchItemDto(
@@ -106,7 +112,10 @@ public record BatchDto(
     bool? Discarded = null,
     long? DiscardedAt = null,
     string? DiscardedBy = null,
-    string? DiscardReason = null
+    string? DiscardReason = null,
+    bool? LegacyImported = null,
+    // #2209: número curto do Lote do ERP, o da barra Code128 C. Só o servidor preenche; no push ele é ignorado.
+    string? NumeroCurto = null
 );
 
 public record CashEntryDto(

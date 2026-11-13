@@ -23,7 +23,7 @@ import { totalDoPedido } from '../../dominio/pedido'
 import { encontrarCupom, validarCupom } from '../../dominio/fidelidade'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { RelogioPix } from './RelogioPix'
-import { cobrancaRepeteExtrato } from './apresentacaoDaFicha'
+import { cobrancaRepeteExtrato, perguntaDaBaixa } from './apresentacaoDaFicha'
 import { ConferirPagamento } from './ConferirPagamento'
 import css from './ficha.module.css'
 
@@ -176,6 +176,8 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
       evento.preventDefault()
       return valido && !enviando ? registrar() : undefined
     }}>
+      {/* #2232 (F6): tocar em "Marcar pago" abre a pergunta com o valor que vai ser lançado. */}
+      <p className={css.perguntaDaBaixa}>{perguntaDaBaixa(centavos / 100, { sinal: aguardaSinalManual(pedido) })}</p>
       {baixaCancelaCobrancaOnline(pedido) && (
         <div className={css.avisoDiferenca} role="note">
           <p className={css.corpoBloco}><Icone nome="alerta" /> {AVISO_BAIXA_COM_LINK}</p>
@@ -465,19 +467,21 @@ export function BlocoCobranca({
     )
   }
 
+  // #2079 (C5): o link do sinal cobra metade; rotulado "Total", R$ 59 de um pedido de R$ 118 enganava.
+  const sinalAgora = !cancelado && fonteApi && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm
   return (
     <Bloco
       titulo={cancelado ? 'Cobrança original' : 'Cobrança'}
       destaque={situacao.chave === 'expirada' || situacao.chave === 'divergente' || diferencaPosPagamento > 0}
     >
       <div className={css.cabecaCobranca}>
-        <span className={css.rotuloTotal}>Total</span>
+        <span className={css.rotuloTotal}>{sinalAgora ? 'Sinal agora' : 'Total'}</span>
         <b className={css.valorForte}>{moeda(cobranca.valor)}</b>
         <Pilula tom="neutro" fina>{nome}</Pilula>
         {cobranca.tentativa > 1 && <span className={css.tentativa}>{cobranca.tentativa}ª cobrança</span>}
       </div>
-      {!cancelado && fonteApi && pedido.sinalNaReserva && !cobranca.diferenca && pedido.totalApi > cobranca.valor && !cobranca.pagaEm && (
-        <p className={css.corpoBloco}>Sinal agora: {moeda(cobranca.valor)}. Restante na entrega: {moeda(pedido.totalApi - cobranca.valor)}.</p>
+      {sinalAgora && (
+        <p className={css.corpoBloco}>Total do pedido: {moeda(pedido.totalApi)}. Restante na entrega: {moeda(pedido.totalApi - cobranca.valor)}.</p>
       )}
 
       {restanteDoSinal(pedido) > 0 && (

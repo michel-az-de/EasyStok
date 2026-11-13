@@ -27,7 +27,8 @@ export const casosApi = {
     // saiu antes dela existir não pode devolver a seleção à primeira da lista: espera algumas voltas pela conversa.
     const pendente = estado.selecaoPendente
     const esperando = !aindaExiste && pendente?.id === estado.selecionadaId && pendente.voltas < VOLTAS_DA_SELECAO_PENDENTE
-    const selecionadaId = aindaExiste || esperando ? estado.selecionadaId : (mescladas[0]?.id ?? null)
+    // #2135: sem a escolhida, nenhuma. A primeira do servidor não é a primeira da fila exibida.
+    const selecionadaId = aindaExiste || esperando ? estado.selecionadaId : null
     const selecaoPendente = esperando ? { id: pendente.id, voltas: pendente.voltas + 1 } : null
     const pausas = Object.fromEntries(mescladas.map((c) => [c.id, c.pausaApi ?? false]))
     const automaticoPausado = mesmoConteudo(estado.automaticoPausado, pausas) ? estado.automaticoPausado : pausas
@@ -44,16 +45,21 @@ export const casosApi = {
   },
 
   // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
-  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente, bloqueio }) =>
-    mapear(estado, id, (c) => ({
+  // #2185 (F4): o cadastro é um só. Bloqueio, nome e notas lidos numa conversa valem em todas as do mesmo
+  // cliente (WhatsApp e chat do site); antes a outra seguia com o bloqueio antigo e o campo liberado.
+  [acao.CLIENTE_DA_API]: (estado, { id, clienteId, nome, cliente, bloqueio }) => ({
+    ...estado,
+    conversas: estado.conversas.map((c) => (c.id !== id && !(clienteId && c.clienteId === clienteId) ? c : {
       ...c,
       clienteId,
       conta: 'cliente',
       nome: nome || c.nome,
       // #1474: o bloqueio do cadastro vem do dossiê; sem o campo, fica o que estava.
       bloqueio: bloqueio === undefined ? c.bloqueio : bloqueio,
-      cliente: { ...c.cliente, ...cliente, enderecoCapturado: null, daApi: true },
+      // O endereço que o automático captou numa conversa só some daquela; a outra mantém o dela.
+      cliente: { ...c.cliente, ...cliente, enderecoCapturado: c.id === id ? null : (c.cliente?.enderecoCapturado ?? null), daApi: true },
     })),
+  }),
 
   [acao.CONTATO_INFORMADO_API]: (estado, { id, contato }) =>
     mapear(estado, id, (c) => ({ ...c, contatoInformado: contato })),

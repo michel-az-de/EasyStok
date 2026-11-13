@@ -1,4 +1,5 @@
 import { prepararGeometriaImpresso } from './geometriaImpresso.js'
+import { medirPrint } from './medirPrint.js'
 
 // Manda imprimir uma página HTML pronta (#1632, impressos servidos pela API). A página já traz
 // o `@page` da folha; a bobina recebe aqui o comprimento medido (#1756), então o diálogo abre no
@@ -31,7 +32,8 @@ function removerQuadro(quadro) {
 
 // Resolve quando o diálogo de impressão foi chamado (ou a aba do plano B abriu); rejeita com
 // mensagem legível quando nem o plano B deu certo.
-export function imprimirHtml(html, { sinal } = {}) {
+// `semAbaNova` (#2096): a impressão automática não tem clique; sem diálogo, falha em vez de abrir aba.
+export function imprimirHtml(html, { sinal, semAbaNova = false } = {}) {
   if (typeof html !== 'string' || !html.trim()) return Promise.reject(new Error('O impresso veio vazio.'))
   return new Promise((resolve, reject) => {
     const abortado = () => { if (sinal?.aborted) throw new DOMException('Impressão cancelada.', 'AbortError') }
@@ -39,7 +41,10 @@ export function imprimirHtml(html, { sinal } = {}) {
     const falhar = (erro) => { sinal?.removeEventListener('abort', cancelar); reject(erro) }
     // A aba do plano B leva a cópia já medida, quando houver.
     let paraImprimir = html
-    const planoB = () => { try { abortado(); abrirEmAba(paraImprimir); concluir('aba') } catch (erro) { falhar(erro) } }
+    const planoB = () => {
+      if (semAbaNova) { falhar(new Error('O canhoto não abriu para imprimir neste aparelho.')); return }
+      try { abortado(); abrirEmAba(paraImprimir); concluir('aba') } catch (erro) { falhar(erro) }
+    }
     if (quadroAnterior) removerQuadro(quadroAnterior)
     const quadro = document.createElement('iframe')
     quadro.title = 'Impressão'
@@ -78,8 +83,9 @@ export function imprimirHtml(html, { sinal } = {}) {
         if (raiz) paraImprimir = '<!DOCTYPE html>' + raiz.outerHTML
         quadro.contentWindow.addEventListener('afterprint', () => removerQuadro(quadro), { once: true })
         quadro.contentWindow.focus()
-        quadro.contentWindow.print()
-        concluir('dialogo')
+        // #2377: `print()` lento = diálogo humano; só a impressão sem clique distingue, a manual já pergunta "Saiu certo?".
+        const destino = medirPrint(() => quadro.contentWindow.print())
+        concluir(semAbaNova ? destino : 'dialogo')
       } catch (erro) {
         removerQuadro(quadro)
         if (sinal?.aborted) falhar(erro)

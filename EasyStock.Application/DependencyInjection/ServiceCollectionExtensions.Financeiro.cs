@@ -61,6 +61,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ReconciliarPixParcelaReceberUseCase>();
 
         // Dashboard (Onda 5)
+        services.AddScoped<RealizadoDoCaixa>();
         services.AddScoped<ObterDashboardFinanceiroUseCase>();
         services.AddScoped<ObterFluxoCaixaUseCase>();
 

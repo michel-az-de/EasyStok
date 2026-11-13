@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { Icone } from './Icone'
+import { Pilula } from './Pilula'
 import css from './BarraDeAbas.module.css'
 
 // Ícone de cada aba (banca estética, item 6): mesmo desenho do trilho do desktop.
 const ICONE_DA_ABA = { balcao: 'inbox', atendimento: 'conversa', ficha: 'ficha' }
 
 // Navegação entre painéis quando a tela não comporta as três colunas.
+// #2232 (X1/X3): `aba.nome` é o nome acessível composto com o número ("Conversas, 11 precisam de você");
+// o contador visível é a `Pilula contagem` do app e fica fora da leitura quando o nome já o traz.
 export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba', prefixoId = 'aba', desabilitada = false }) {
   const [focada, setFocada] = useState(null)
   const entrada = abas.some((aba) => aba.id === focada) ? focada : ativa
@@ -37,6 +40,7 @@ export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba',
             role="tab"
             disabled={desabilitada}
             id={`${prefixoId}-${aba.id}`}
+            aria-label={aba.nome}
             aria-selected={aba.id === ativa}
             aria-controls={idPainel}
             tabIndex={aba.id === entrada ? 0 : -1}
@@ -47,7 +51,14 @@ export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba',
           >
             {ICONE_DA_ABA[aba.id] && <Icone nome={ICONE_DA_ABA[aba.id]} tamanho={24} />}
             <span>{aba.rotulo}</span>
-            {aba.contador != null && <span className={css.contador}>{aba.contador}</span>}
+            {aba.contador != null && (
+              <Pilula
+                contagem={aba.contador > 99 ? '99+' : aba.contador}
+                tom={aba.tom === 'alerta' ? 'perigo' : 'neutro'}
+                className={css.contador}
+                aria-hidden={aba.nome ? 'true' : undefined}
+              />
+            )}
           </button>
         ))}
       </div>

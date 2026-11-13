@@ -2,11 +2,15 @@ using EasyStock.Api.BackgroundServices;
 using EasyStock.Api.Services;
 using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
+using Castle.DynamicProxy;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -176,6 +180,260 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
         (await NotificacoesAsync(b.Empresa.Id)).Select(n => n.Id).Should().Contain(deOutraEmpresa, "a rodada de A não toca em B");
     }
 
+    /// <summary>
+    /// #2031: a limpeza (retenção e condição resolvida) e a gravação dos alertas saem numa transação só. Se o commit cai (um
+    /// lote mexido por outra operação no meio da rodada, token xmin), nada do que a rodada apagou fica apagado.
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Commit_que_cai_por_xmin_desfaz_tambem_a_limpeza_dos_alertas(bool rls)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var c = await SemearAsync("Atomicidade da rodada");
+        var agora = DateTime.UtcNow;
+        var resolvido = Notificacao.Criar(c.Empresa.Id, TipoAlertaEstoque.EstoqueCritico, "Estoque Crítico", "Produto reposto.",
+            SeveridadeNotificacao.Alta, Guid.NewGuid()); // a condição não vale mais
+        await GravarAsync(resolvido);
+        var expurgavel = await GravarAlertaAsync(c.Empresa.Id, agora.AddDays(-10), lida: true); // lido, fora da janela de 7 dias
+
+        // Antes do primeiro alerta novo ser gravado, outra operação mexe no lote que a rodada marcou como vencido.
+        var conflito = new AntesDaChamada("AddAsync", 1, () => MexerNoLoteAsync(c.Empresa.Id, c.Vencido.Id));
+        await using var provider = BuildProvider(rls, aoInterceptar: (s, tipo, alvo) =>
+            tipo == typeof(INotificacaoRepository) ? Proxy((INotificacaoRepository)alvo, conflito) : alvo);
+
+        await using (var escopo = provider.CreateAsyncScope())
+        {
+            escopo.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(c.Empresa.Id);
+            var rodada = () => escopo.ServiceProvider.GetRequiredService<GeradorNotificacoesAutomaticas>().ExecutarAsync(c.Empresa.Id);
+
+            await rodada.Should().ThrowAsync<DbUpdateConcurrencyException>();
+        }
+
+        var depois = (await NotificacoesAsync(c.Empresa.Id)).Select(n => n.Id).ToList();
+        depois.Should().Contain(resolvido.Id, "o commit caiu: o alerta resolvido não pode ter saído sozinho");
+        depois.Should().Contain(expurgavel, "o commit caiu: a retenção também volta");
+    }
+
+    /// <summary>
+    /// #2031: a paginação por <c>Skip</c> deixava um lote para trás quando outro saía da fila entre duas páginas, e o
+    /// alerta dele era lido como "condição resolvida" e apagado. A leitura passa a ser por chave (Id): o que muda de
+    /// lugar na fila não desloca os demais.
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Lote_que_sai_da_fila_entre_as_paginas_nao_leva_o_alerta_de_outro_junto(bool rls)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Paginação estável", null);
+        var loja = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Loja", Ativa = true, CriadoEm = agora, AlteradoEm = agora };
+        var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Massas", CriadoEm = agora, AlteradoEm = agora };
+        var produto = NovoProduto(empresa, categoria, "Lasanha", agora);
+        // 105 lotes perto de vencer (2 páginas de 100). A ordem é fixa nas duas leituras: o Id do lote i cresce com i e a
+        // validade não decresce com i, então "validade, Id" e "Id" põem os lotes na mesma sequência (0 a 104).
+        var prefixo = Guid.NewGuid().ToString("N")[..8]; // o mesmo em todos os lotes: a ordem é a do sufixo; muda a cada execução
+        var lotes = Enumerable.Range(0, 105).Select(i =>
+        {
+            var lote = NovoLote(empresa, loja, produto, saldo: 5, validade: agora.Date.AddDays(1 + i / 11), agora);
+            lote.Id = new Guid($"{prefixo}-0000-0000-0000-{i:D12}");
+            return lote;
+        }).ToList();
+        var avisos = lotes.ToDictionary(l => l.Id, l => Notificacao.Criar(empresa.Id, TipoAlertaEstoque.ValidadeProxima, "Validade Próxima",
+            "Vence em breve.", SeveridadeNotificacao.Media, l.Id));
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa.Id);
+            seed.Empresas.Add(empresa);
+            seed.Lojas.Add(loja);
+            seed.Categorias.Add(categoria);
+            seed.Produtos.Add(produto);
+            seed.ItensEstoque.AddRange(lotes);
+            seed.Notificacoes.AddRange(avisos.Values);
+            await seed.SaveChangesAsync();
+        }
+
+        // Entre a primeira e a segunda página, dois lotes acabam (saldo zerado) e saem da condição:
+        //  - o 0, que a primeira página já leu (o aviso dele vale nesta rodada e só se resolve na próxima), e
+        //  - o 104, que ainda não foi lido (fica de fora dos candidatos: o aviso dele é resolvido e sai).
+        // Com o lote 0 fora da fila, o lote 100 sobe uma posição: com Skip ele caía no buraco entre as páginas.
+        var saiuJaLido = lotes[0].Id;
+        var saiuNaoLido = lotes[104].Id;
+        var mudouDePagina = lotes[100].Id;
+        var saida = new AntesDaChamada("GetProximoVencimento", 2, async () =>
+        {
+            await DefinirSaldoAsync(empresa.Id, saiuJaLido, 0);
+            await DefinirSaldoAsync(empresa.Id, saiuNaoLido, 0);
+        });
+        await using var provider = BuildProvider(rls, aoInterceptar: (s, tipo, alvo) =>
+            tipo == typeof(IItemEstoqueRepository) ? Proxy((IItemEstoqueRepository)alvo, saida) : alvo);
+
+        await using (var escopo = provider.CreateAsyncScope())
+        {
+            escopo.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(empresa.Id);
+            await escopo.ServiceProvider.GetRequiredService<GeradorNotificacoesAutomaticas>().ExecutarAsync(empresa.Id);
+        }
+
+        saida.Disparou.Should().BeTrue("o teste só vale se a fila mudou entre as duas páginas");
+        var restantes = (await NotificacoesAsync(empresa.Id)).Where(n => n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima).ToList();
+
+        // Resultado exato: 104 avisos, os mesmos ids de antes (nenhum apagado e recriado), um por lote; só o do lote 104 sai.
+        restantes.Select(n => n.Id).Should().BeEquivalentTo(
+            avisos.Where(a => a.Key != saiuNaoLido).Select(a => a.Value.Id),
+            "só o aviso do lote que saiu da condição sem ser lido sai; os outros 104 seguem com o mesmo id");
+        restantes.GroupBy(n => n.ReferenciaId).Should().OnlyContain(g => g.Count() == 1, "um aviso por lote, sem duplicar");
+        restantes.Should().ContainSingle(n => n.ReferenciaId == mudouDePagina && n.Id == avisos[mudouDePagina].Id,
+            "o lote que mudou de página segue com o aviso de antes: nem apagado nem recriado");
+        restantes.Should().NotContain(n => n.ReferenciaId == saiuNaoLido);
+        restantes.Should().ContainSingle(n => n.ReferenciaId == saiuJaLido, "o lote 0 já tinha sido lido como condição ativa");
+    }
+
+    /// <summary>
+    /// #2054: a produção do console grava o lote sem loja (<c>LojaId = null</c>). A rodada percorre as lojas ativas e só lia
+    /// o lote da loja: o prato vencendo não ia para o sino e o prato com saldo aparecia como Esgotado. O lote sem loja conta
+    /// em toda loja ativa, e o aviso sai uma vez só por (tipo, item), com uma ou várias lojas.
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    public async Task Lote_sem_loja_da_producao_do_console_entra_nos_alertas_uma_vez_so(bool rls, int lojasAtivas)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Produção sem loja", null);
+        var lojas = Enumerable.Range(1, lojasAtivas)
+            .Select(i => new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = $"Loja {i}", Ativa = true, CriadoEm = agora, AlteradoEm = agora })
+            .ToList();
+        var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Pratos", CriadoEm = agora, AlteradoEm = agora };
+        var vencendo = NovoProduto(empresa, categoria, "Escondidinho", agora);
+        var comSaldo = NovoProduto(empresa, categoria, "Lasanha", agora, minima: 10, critica: 3);
+        var loteVencendo = NovoLote(empresa, null, vencendo, saldo: 5, validade: agora.Date.AddDays(1), agora);
+        var loteComSaldo = NovoLote(empresa, null, comSaldo, saldo: 40, validade: null, agora);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa.Id);
+            seed.Empresas.Add(empresa);
+            seed.Lojas.AddRange(lojas);
+            seed.Categorias.Add(categoria);
+            seed.Produtos.AddRange(vencendo, comSaldo);
+            seed.ItensEstoque.AddRange(loteVencendo, loteComSaldo);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProvider(rls);
+        await using (var escopo = provider.CreateAsyncScope())
+        {
+            escopo.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(empresa.Id);
+            await escopo.ServiceProvider.GetRequiredService<GeradorNotificacoesAutomaticas>().ExecutarAsync(empresa.Id);
+        }
+
+        var avisos = await NotificacoesAsync(empresa.Id);
+        using var _ = new AssertionScope(); // os três alertas falham ou passam juntos, cada um com o seu motivo
+        avisos.Count(n => n.TipoAlerta == TipoAlertaEstoque.ValidadeProxima && n.ReferenciaId == loteVencendo.Id)
+            .Should().Be(1, "o lote sem loja vence amanhã: um aviso, mesmo com várias lojas ativas");
+        avisos.Count(n => n.TipoAlerta == TipoAlertaEstoque.ProdutoParado && n.ReferenciaId == loteComSaldo.Id)
+            .Should().Be(1, "o lote sem loja parado também entra, uma vez só");
+        avisos.Count(n => n.TipoAlerta == TipoAlertaEstoque.EstoqueCritico && n.ReferenciaId == comSaldo.Id)
+            .Should().Be(0, "40 na prateleira com mínimo 10: o prato não está crítico nem esgotado");
+    }
+
+    /// <summary>
+    /// #2054, fronteira entre lojas: a leitura da loja A traz o lote de A e o sem loja, nunca o da loja B. Vale para as
+    /// leituras por chave do gerador (validade e parado) e para o snapshot de reposição (saldo e velocidade de venda).
+    /// </summary>
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Leitura_da_loja_inclui_o_lote_sem_loja_e_deixa_de_fora_o_da_outra_loja(bool rls)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var agora = DateTime.UtcNow;
+        var empresa = Empresa.Criar("Fronteira entre lojas", null);
+        var lojaA = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Loja A", Ativa = true, CriadoEm = agora, AlteradoEm = agora };
+        var lojaB = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Loja B", Ativa = true, CriadoEm = agora, AlteradoEm = agora };
+        var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Pratos", CriadoEm = agora, AlteradoEm = agora };
+        var produto = NovoProduto(empresa, categoria, "Lasanha", agora);
+        var semLoja = NovoLote(empresa, null, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        var daA = NovoLote(empresa, lojaA, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        var daB = NovoLote(empresa, lojaB, produto, saldo: 10, validade: agora.Date.AddDays(1), agora);
+        MovimentacaoEstoque Venda(ItemEstoque lote, int quantidade) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresa.Id, ItemEstoqueId = lote.Id, ProdutoId = produto.Id,
+            Tipo = TipoMovimentacaoEstoque.Saida, Natureza = NaturezaMovimentacaoEstoque.Venda, Quantidade = Quantidade.From(quantidade),
+            DataMovimentacao = agora.AddDays(-5), CriadoEm = agora,
+        };
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa.Id);
+            seed.Empresas.Add(empresa);
+            seed.Lojas.AddRange(lojaA, lojaB);
+            seed.Categorias.Add(categoria);
+            seed.Produtos.Add(produto);
+            seed.ItensEstoque.AddRange(semLoja, daA, daB);
+            seed.MovimentacoesEstoque.AddRange(Venda(semLoja, 30), Venda(daA, 15), Venda(daB, 60));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProvider(rls);
+        await using var escopo = provider.CreateAsyncScope();
+        escopo.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(empresa.Id);
+        var lotes = escopo.ServiceProvider.GetRequiredService<IItemEstoqueRepository>();
+        var analytics = escopo.ServiceProvider.GetRequiredService<IAnalyticsRepository>();
+
+        var vencendoNaA = await lotes.GetProximoVencimentoComSaldoAsync(empresa.Id, 7, lojaA.Id, null, 100);
+        var paradosNaA = await lotes.GetItensParadosComSaldoAsync(empresa.Id, 30, lojaA.Id, null, 100);
+        var snapshotDaA = (await analytics.GetSnapshotReposicaoAsync(empresa.Id, lojaA.Id, 30, 7, null, null))
+            .Single(s => s.ProdutoId == produto.Id);
+
+        using var _ = new AssertionScope();
+        vencendoNaA.Select(l => l.Id).Should().BeEquivalentTo([semLoja.Id, daA.Id], "o lote da loja B não é da leitura da loja A");
+        paradosNaA.Select(l => l.Id).Should().BeEquivalentTo([semLoja.Id, daA.Id], "o lote da loja B não é da leitura da loja A");
+        snapshotDaA.QuantidadeVigente.Should().Be(20m, "10 da loja A + 10 sem loja; os 10 da loja B ficam de fora");
+        snapshotDaA.VelocidadeMediaDia.Should().Be(1.5m, "(15 da loja A + 30 sem loja) / 30 dias; as 60 da loja B ficam de fora");
+    }
+
+    private async Task GravarAsync(Notificacao alerta)
+    {
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(alerta.EmpresaId);
+        db.Notificacoes.Add(alerta);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Mexe na linha do lote por outra conexão: o xmin muda e o commit de quem leu antes cai.</summary>
+    private async Task MexerNoLoteAsync(Guid empresaId, Guid loteId)
+    {
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresaId);
+        var lote = await db.ItensEstoque.SingleAsync(i => i.Id == loteId);
+        lote.Observacoes = "mexido por outra operação";
+        await db.SaveChangesAsync();
+    }
+
+    private static T Proxy<T>(T alvo, AntesDaChamada antes) where T : class =>
+        new ProxyGenerator().CreateInterfaceProxyWithTarget(alvo, antes);
+
+    /// <summary>Roda o efeito, uma vez, imediatamente antes da n-ésima chamada de um método (pelo prefixo do nome).</summary>
+    private sealed class AntesDaChamada(string prefixoDoMetodo, int ocorrencia, Func<Task> efeito) : IInterceptor
+    {
+        private int _chamadas;
+        public bool Disparou { get; private set; }
+
+        public void Intercept(IInvocation invocation)
+        {
+            if (!Disparou && invocation.Method.Name.StartsWith(prefixoDoMetodo, StringComparison.Ordinal) && ++_chamadas == ocorrencia)
+            {
+                Disparou = true;
+                efeito().GetAwaiter().GetResult();
+            }
+
+            invocation.Proceed();
+        }
+    }
+
     private sealed class RelogioDeTeste(DateTimeOffset inicio) : TimeProvider
     {
         private DateTimeOffset _agora = inicio;
@@ -294,7 +552,8 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
     private async Task<StatusItemEstoque> StatusAsync(Guid empresaId, Guid loteId) => (await LoteAsync(empresaId, loteId)).Status;
 
     /// <summary>DI de produção. Com <paramref name="rls"/>, o login do banco é sujeito a RLS, como o da aplicação.</summary>
-    private ServiceProvider BuildProvider(bool rls, TimeProvider? relogio = null)
+    private ServiceProvider BuildProvider(
+        bool rls, TimeProvider? relogio = null, Func<IServiceProvider, Type, object, object>? aoInterceptar = null)
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection([]).Build();
         var services = new ServiceCollection();
@@ -308,6 +567,14 @@ public sealed class AlertasDeEstoquePorEmpresaIntegrationTests(PostgreSqlDatabas
         services.AddEasyStockApplication();
         if (relogio is not null)
             services.Replace(ServiceDescriptor.Singleton(relogio));
+        if (aoInterceptar is not null)
+        {
+            // Envolve o repositório real num proxy que roda um efeito no meio da rodada (simula outra operação concorrente).
+            services.Replace(ServiceDescriptor.Scoped<IItemEstoqueRepository>(sp =>
+                (IItemEstoqueRepository)aoInterceptar(sp, typeof(IItemEstoqueRepository), ActivatorUtilities.CreateInstance<ItemEstoqueRepository>(sp))));
+            services.Replace(ServiceDescriptor.Scoped<INotificacaoRepository>(sp =>
+                (INotificacaoRepository)aoInterceptar(sp, typeof(INotificacaoRepository), ActivatorUtilities.CreateInstance<NotificacaoRepository>(sp))));
+        }
         services.AddScoped<GeradorNotificacoesAutomaticas>();
         return services.BuildServiceProvider();
     }

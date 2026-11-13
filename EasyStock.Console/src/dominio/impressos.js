@@ -66,7 +66,14 @@ export function normalizarPreferenciasImpressao(valor) {
     const perfil = PERFIS_IMPRESSAO.find((p) => p.valor === valor?.perfis?.[documento])
     perfis[documento] = perfil?.papeis.includes(papeis[documento]) ? perfil.valor : perfilDedicado(papeis[documento])
   }
-  return { versao: 2, papeis, perfis, logoTermica: valor?.logoTermica === true }
+  // #2096: canhoto impresso sozinho neste aparelho, desde quando (as pendentes de antes não saem).
+  const desde = typeof valor?.canhotoAutomaticoDesde === 'string' && Number.isFinite(Date.parse(valor.canhotoAutomaticoDesde))
+    ? valor.canhotoAutomaticoDesde : null
+  const canhotoAutomatico = valor?.canhotoAutomatico === true
+  return {
+    versao: 2, papeis, perfis, logoTermica: valor?.logoTermica === true,
+    canhotoAutomatico, canhotoAutomaticoDesde: canhotoAutomatico ? desde : null,
+  }
 }
 
 export function trocarPapelPadrao(preferencias, documento, papel) {
@@ -85,6 +92,13 @@ export function trocarPerfilPadrao(preferencias, documento, valor) {
 
 export function trocarLogoNaTermica(preferencias, ligado) {
   return { ...normalizarPreferenciasImpressao(preferencias), logoTermica: ligado === true }
+}
+
+// #2096: ligar guarda o instante, para a fila antiga não sair toda de uma vez no primeiro minuto.
+export function trocarCanhotoAutomatico(preferencias, ligado, agora) {
+  const atual = normalizarPreferenciasImpressao(preferencias)
+  if (ligado !== true) return { ...atual, canhotoAutomatico: false, canhotoAutomaticoDesde: null }
+  return { ...atual, canhotoAutomatico: true, canhotoAutomaticoDesde: atual.canhotoAutomaticoDesde ?? new Date(agora).toISOString() }
 }
 
 // Endereço do impresso na API. O canhoto de cozinha tem rota própria (`comanda`); os outros

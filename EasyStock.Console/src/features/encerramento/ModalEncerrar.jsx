@@ -5,11 +5,13 @@ import { Modal } from '../../componentes/Modal'
 import { FolhaImpressao } from '../../componentes/FolhaImpressao'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoResumo } from '../../aplicacao/impressos'
+import { useAviso } from '../../componentes/Aviso'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { falhaAoCancelarNoEncerramento, pedidoAoEncerrar, rotuloCancelarAoEncerrar } from '../../aplicacao/api/encerramentoEMidia'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
+import { permissaoDeEscrita } from '../../dominio/janela'
 import { pedidoEncerrado } from '../../dominio/pedido'
 import {
   PEDE_TEXTO_DA_DESPEDIDA, avisoDoPedidoAoEncerrar, faltaTextoDaDespedida, montarResumoAtendimento, resumoParaImpresso,
@@ -50,7 +52,11 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   // (gatilho ENCERRAMENTO) já editável na hora. Reseta ao trocar de conversa,
   // mesmo padrão do formulário de cadastro rápido em BlocoCliente.jsx.
   const regraEncerramento = regraDoGatilho(regras, GATILHOS.ENCERRAMENTO)
-  const [enviarMensagem, setEnviarMensagem] = useState(Boolean(regraEncerramento))
+  // #2185 (E08): janela de 24 h fechada, cadastro bloqueado ou canal sem regra: a despedida não sai. A caixa
+  // nasce desmarcada e desligada, com o motivo, em vez de concluir "com ressalva" depois do toque.
+  const escrita = permissaoDeEscrita(conversa, agora, canalDaConversa(canais, conversa))
+  const podeDespedir = !conversa || escrita.pode
+  const [enviarMensagem, setEnviarMensagem] = useState(Boolean(regraEncerramento) && podeDespedir)
   const [textoMensagem, setTextoMensagem] = useState(() => (regraEncerramento
     ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora))
     : ''))
@@ -61,7 +67,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   useEffect(() => {
     setCancelarMarcado(false)
     pedidoJaCancelado.current = false
-    setEnviarMensagem(Boolean(regraEncerramento))
+    setEnviarMensagem(Boolean(regraEncerramento) && podeDespedir)
     setTextoMensagem(regraEncerramento ? textoDaRegra(regraEncerramento, contextoDePrevia(conversa, null, agora)) : '')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só reseta ao trocar de conversa, não a cada tecla
   }, [conversaId])
@@ -88,6 +94,17 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const [cobrouDespedida, setCobrouDespedida] = useState(false)
   const campoDespedida = useRef(null)
 
+  // #2185 (F32): conversa que sumiu ou foi concluída por outro atendente (na API não há resumo a ler) deixava
+  // `ui.encerrando` marcado com o modal em branco, e ele reaparecia sozinho ao reabrir. Fecha de verdade.
+  const semResumo = Boolean(conversaId) && (!conversa || !resumo)
+  const aviso = useAviso()
+  useEffect(() => {
+    if (!semResumo) return
+    // Quem escreveu a despedida precisa saber por que a janela fechou.
+    aviso.mostrar({ texto: 'Esta conversa já não está aberta.' })
+    aoFechar()
+  }, [semResumo, aoFechar, aviso])
+
   if (!conversaId || !conversa || !resumo) return null
 
   const pedido = conversa.pedido
@@ -103,7 +120,8 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   const avisoEmailLigado = Boolean(conversa.cliente?.avisos?.email)
   const avisoSmsLigado = Boolean(conversa.cliente?.avisos?.sms)
 
-  const semDespedida = faltaTextoDaDespedida(enviarMensagem && !despedidaJaSaiu.current, textoMensagem)
+  const despedir = enviarMensagem && podeDespedir
+  const semDespedida = faltaTextoDaDespedida(despedir && !despedidaJaSaiu.current, textoMensagem)
 
   const clicarEncerrar = async () => {
     if (emVoo.current) return
@@ -125,7 +143,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
         pedidoJaCancelado.current = true
       }
       const resultado = await encerrarComResumo(conversa.id, agora, {
-        enviarMensagem: enviarMensagem && !despedidaJaSaiu.current,
+        enviarMensagem: despedir && !despedidaJaSaiu.current,
         textoMensagem,
         avisoEmail: avisoEmailLigado,
         avisoSms: avisoSmsLigado,
@@ -138,7 +156,7 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
           : resultado.erro)
       }
     } catch (erro) {
-      setErroAoEncerrar(erro.message || 'Não foi possível encerrar. Tente de novo.')
+      setErroAoEncerrar(erro.message || 'Não foi possível concluir a conversa. Tente de novo.')
     } finally {
       emVoo.current = false
       setEncerrandoAgora(false)
@@ -155,12 +173,12 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
   return (
     <>
       <Modal
-        titulo={leitura ? `Resumo do atendimento ${resumo.numero}` : 'Encerrar atendimento'}
+        titulo={leitura ? `Resumo do atendimento ${resumo.numero}` : 'Concluir conversa'}
         aoFechar={aoFechar}
         rodape={(
           <>
             {erroAoEncerrar && <p className={css.erroAoEncerrar} role="alert">{erroAoEncerrar}</p>}
-            <Botao variante="texto" onClick={aoFechar}>Voltar</Botao>
+            <Botao variante="texto" onClick={aoFechar}>{leitura ? 'Fechar' : 'Cancelar'}</Botao>
             {/* #1839: no EasyStok o resumo sai pelo mesmo modal, papel e prévia dos impressos; o
                 "Salvar como PDF" fica no diálogo. A demonstração segue com a folha da tela. */}
             {fonteApi
@@ -171,8 +189,8 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
                 </Botao>
               )}
             {!encerrada && (
-              <Botao variante="primario" icone="log-out" disabled={encerrandoAgora} onClick={clicarEncerrar}>
-                {encerrandoAgora ? 'Encerrando…' : 'Encerrar'}
+              <Botao variante="primario" icone="circle-check" disabled={encerrandoAgora} onClick={clicarEncerrar}>
+                {encerrandoAgora ? 'Concluindo…' : 'Concluir conversa'}
               </Botao>
             )}
           </>
@@ -201,12 +219,19 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
                 <label>
                   <input
                     type="checkbox"
-                    checked={enviarMensagem}
+                    checked={despedir}
+                    disabled={!podeDespedir}
+                    aria-describedby={podeDespedir ? undefined : 'sem-despedida'}
                     onChange={(e) => setEnviarMensagem(e.target.checked)}
                   />
                   Mandar mensagem de encerramento ao cliente
                 </label>
-                {enviarMensagem && (
+                {!podeDespedir && (
+                  <p id="sem-despedida" className={css.avisosConfigurados}>
+                    A despedida não pode sair agora. {[escrita.motivo?.titulo, escrita.motivo?.detalhe].filter(Boolean).join(' ')}
+                  </p>
+                )}
+                {despedir && (
                   <div ref={campoDespedida}>
                     <CampoArea
                       rotulo="Mensagem de encerramento"
@@ -229,15 +254,18 @@ export function ModalEncerrar({ conversaId, numeroAtendimento = null, aoFechar }
                 )}
               </div>
             )}
-            <FolhaResumo
-              {...propsDaFolha}
-              editavel={!encerrada}
-              comAvaliacaoEAnotacao={guardaAvaliacaoEAnotacao}
-              aoMarcarAvaliacaoCliente={(valor) => salvarAvaliacaoCliente(conversa.id, valor)}
-              aoMarcarAutoavaliacao={(valor) => salvarAutoavaliacao(conversa.id, valor)}
-              aoMudarAnotacao={(texto) => salvarAnotacaoFechamento(conversa.id, { texto })}
-              aoMudarGuardarNota={(guardarNota) => salvarAnotacaoFechamento(conversa.id, { guardarNota })}
-            />
+            <details open={leitura || undefined} className={css.detalhesResumo}>
+              <summary>Ver resumo da conversa</summary>
+              <FolhaResumo
+                {...propsDaFolha}
+                editavel={!encerrada}
+                comAvaliacaoEAnotacao={guardaAvaliacaoEAnotacao}
+                aoMarcarAvaliacaoCliente={(valor) => salvarAvaliacaoCliente(conversa.id, valor)}
+                aoMarcarAutoavaliacao={(valor) => salvarAutoavaliacao(conversa.id, valor)}
+                aoMudarAnotacao={(texto) => salvarAnotacaoFechamento(conversa.id, { texto })}
+                aoMudarGuardarNota={(guardarNota) => salvarAnotacaoFechamento(conversa.id, { guardarNota })}
+              />
+            </details>
           </div>
         </div>
       </Modal>

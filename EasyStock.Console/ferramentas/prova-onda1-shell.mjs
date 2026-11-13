@@ -11,7 +11,8 @@ const { filtrarModulos, modulosDoHall } = await import('../src/dominio/modulos.j
 const hall = modulosDoHall({ fonteApi: true })
 // #1891: Campanhas congelado não entra no hall; ficam sete.
 assert.equal(filtrarModulos(hall, '  ').length, 7)
-assert.deepEqual(filtrarModulos(hall, 'PRODUCAO').map((m) => m.id), ['producao', 'cozinha'])
+// #2258 (A2): a ordem segue o caminho do pedido, Cozinha antes de Produção.
+assert.deepEqual(filtrarModulos(hall, 'PRODUCAO').map((m) => m.id), ['cozinha', 'producao'])
 assert.deepEqual(filtrarModulos(hall, 'JANELAS ENTREGA').map((m) => m.id), ['entregas'])
 assert.deepEqual(filtrarModulos(hall, 'xyz'), [])
 assert.deepEqual(filtrarModulos(hall, 'caixa').map((m) => m.id), ['financeiro'])

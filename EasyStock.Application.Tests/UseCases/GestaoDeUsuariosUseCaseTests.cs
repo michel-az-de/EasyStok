@@ -35,6 +35,11 @@ public class GestaoDeUsuariosUseCaseTests
         _atual.Nivel.Returns(NivelAcesso.Admin);
         _usuariosPerfis.RemoveAsync(Arg.Do<UsuarioPerfil>(_removidos.Add)).Returns(Task.CompletedTask);
         _usuariosPerfis.AddAsync(Arg.Do<UsuarioPerfil>(_adicionados.Add)).Returns(Task.CompletedTask);
+        _c.Usuarios.AtualizarSessoesValidasDesdeAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(_ =>
+        {
+            _c.UnitOfWork.EmTransacao.Should().BeTrue("corte e alteração do acesso precisam do mesmo commit");
+            return 1;
+        });
     }
 
     private Usuario Atendente(bool ativo = true, params Perfil[] perfis)

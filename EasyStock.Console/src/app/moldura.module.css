@@ -15,10 +15,10 @@
 .topo {
   position: relative; z-index: 10;
   display: flex; align-items: center; gap: var(--e-16); flex-wrap: wrap;
-  min-height: 64px;
+  min-height: var(--altura-regiao);
   padding: var(--e-2) var(--e-4); padding-top: calc(var(--e-2) + env(safe-area-inset-top, 0px));
   background: var(--vidro);
-  border-bottom: var(--b-1) solid var(--linha); flex-shrink: 0;
+  border-bottom: 0; flex-shrink: 0;
 }
 /* Assinatura oficial completa, com placa clara também no tema escuro. */
 .marca { display: flex; align-items: center; margin: 0; }
@@ -26,28 +26,32 @@
 /* Grupo de controles com prioridade. margin-left:auto empurra pro fim do
    topo, sempre à direita, sem precisar de um irmão espaçador antes dele. */
 .controles { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin-left: auto; }
-/* Contagem dentro de botão: pastilha arredondada, não número solto. */
-.conta {
-  display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px;
-  border-radius: var(--r-pilula); background: var(--preenchimento-forte);
-  font-family: var(--f-dado); font-weight: 700; color: var(--tinta-2);
-}
-
-/* Estado da loja: um toque, Aberta ou Fechada, sempre visível no topo
-   (pedido do dono, 24/09/2026). Botão sem casca própria, a Pilula já dá cor
-   e texto; só precisa de área de toque e cursor de botão. */
+/* Estado da loja: um toque, sempre visível no topo (pedido do dono, 24/09/2026).
+   #2232 (L1): "Loja aberta"/"Loja fechada" por escrito, com o ponto de estado. A cor do ponto
+   acompanha o texto, nunca o substitui. Botão sem casca própria; área de toque de --toque. */
 .controleLoja {
-  display: inline-flex; min-height: var(--toque); padding: 0;
-  border: 0; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding: 0 var(--e-2);
+  border: 0; background: none; cursor: pointer; color: var(--tinta); font: inherit;
+  font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto);
 }
+.lojaPonto { flex-shrink: 0; width: var(--ponto); height: var(--ponto); background: var(--tinta-3); }
+.topoAberta .lojaPonto { background: var(--sucesso); }
+.topoFechada .lojaPonto { background: var(--erro); }
+.lojaTexto { white-space: nowrap; }
+
+/* Automáticas (#2232, L3): o estado vem escrito. Desktop: "Automáticas · ligadas" numa linha.
+   Celular (regra mais abaixo): "Auto" sobre "ligadas", em duas linhas curtas. */
+.autoTexto { display: inline-flex; align-items: baseline; gap: var(--e-1); }
+.autoEstado { font-weight: 400; color: var(--tinta-2); }
+.autoEstado::before { content: '·'; margin-right: var(--e-1); }
 
 /* Palco: nas três colunas, os painéis flutuam sobre o fundo com raio de
    painel e sombra curta; o vão entre eles é a própria alça de largura. */
 .palco { display: flex; flex: 1; min-height: 0; position: relative; }
-.palcoTres { padding: var(--e-3) var(--e-3) var(--e-3); }
+.palcoTres { padding: 0; }
 .palcoTres > .coluna {
-  border-radius: var(--r-2); border: var(--b-1) solid var(--linha);
-  box-shadow: var(--sombra);
+  border-radius: var(--r-2); border: 0;
+  box-shadow: none;
   animation: painelEntra var(--dur-longa) var(--ease-saida) backwards;
 }
 .palcoTres > .coluna:nth-of-type(2) { animation-delay: 40ms; }
@@ -62,22 +66,27 @@
 }
 /* Largura padrão --coluna (320 px); no layout de três colunas a moldura
    sobrescreve --largura-balcao e --largura-ficha pela alça (seção 9). */
-.entrada { width: var(--largura-balcao, var(--coluna)); flex-shrink: 0; border-right: var(--b-1) solid var(--linha); }
+.entrada { width: var(--largura-balcao, var(--coluna)); flex-shrink: 0; border-right: 0; }
 /* Colunas cedem espaço respeitando a leitura mínima, inclusive após redimensionar.
    O mínimo antigo de 420 px no centro cortava a Ficha já em 1280 px. */
 .centro { flex: 1; min-width: 0; background: var(--chao-conversa); }
 .palcoTres > .centro { min-width: 320px; }
-.palcoTres > .entrada { min-width: 280px; flex-shrink: 1; }
-.palcoTres > .ficha { min-width: 320px; flex-shrink: 1; }
-.ficha { width: var(--largura-ficha, var(--coluna)); flex-shrink: 0; border-left: var(--b-1) solid var(--linha); }
+.palcoTres > .entrada { min-width: 260px; flex-shrink: 1; }
+.palcoTres > .ficha { min-width: 292px; flex-shrink: 1; }
+.ficha { width: var(--largura-ficha, var(--coluna)); flex-shrink: 0; border-left: 0; }
 .rolavel { overflow-y: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
 .painelFicha { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.disposicao { position: relative; }
+.ajusteDisposicao { display: grid; gap: var(--e-3); width: min(300px, 80vw); padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta); }
+.ajusteDisposicao label { display: grid; grid-template-columns: 1fr auto; gap: var(--e-2); }
+.ajusteDisposicao input { grid-column: 1 / -1; width: 100%; min-height: var(--toque); accent-color: var(--marca); }
+.ajusteDisposicao output, .ajusteDisposicao small { font-size: var(--t-micro); color: var(--tinta-2); }
 
 /* Título de coluna: rótulo de seção discreto, no estilo da barra lateral do
    macOS, sem ícone e sem linha pesada. */
 .tituloColuna {
   display: flex; align-items: center; gap: var(--e-2); flex-shrink: 0;
-  min-height: 52px; padding: var(--e-3) var(--e-4); border-bottom: var(--b-1) solid var(--linha);
+  min-height: 52px; padding: var(--e-3) var(--e-4); border-bottom: 0;
   font-family: var(--f-corpo); font-size: var(--t-titulo); color: var(--tinta); font-weight: 700;
   line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo);
 }
@@ -88,30 +97,23 @@
   display: flex; gap: var(--e-3); flex-wrap: wrap; align-items: center; flex-shrink: 0;
   padding: var(--e-2) var(--e-4); padding-bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px));
   background: var(--vidro);
-  border-top: var(--b-1) solid var(--linha);
+  border-top: 0;
   font-size: var(--t-apoio); color: var(--tinta-3);
 }
 /* Tablet: a ficha vira gaveta sobre o atendimento, deslizando da direita. */
 .gaveta.gaveta {
-  position: fixed; inset: 0 0 0 auto; margin: 0 0 0 auto;
-  height: 100dvh; max-height: 100dvh; max-width: 90vw; border-radius: 0;
-  border: 0; border-left: var(--b-1) solid var(--linha);
-  box-shadow: var(--sombra-alta);
+  position: fixed; inset: auto; margin: 0; padding: 0; z-index: 110;
+  max-height: calc(100dvh - 16px); max-width: calc(100vw - 16px); border: 0; border-radius: var(--r-3);
+  display: flex; flex-direction: column; background: var(--papel); color: var(--tinta); box-shadow: var(--sombra-alta);
 }
 .gaveta.gaveta[open] { animation: gavetaEntra var(--dur-media) var(--ease-saida) both; }
 /* A Ficha já tem seus próprios recuos e rolagem dentro da janela. */
-.gaveta > h2 + div { padding: 0; }
-/* #1551: o rodapé da gaveta só existe para o aviso da ação da API; sem aviso, some. */
-.gaveta > h2 + div + div:empty { display: none; }
+.conteudoGaveta { flex: 1; min-height: 0; overflow: hidden; }
 @keyframes gavetaEntra { from { transform: translateX(100%); } to { transform: none; } }
 .espaco { margin-left: auto; }
-/* Âncora do popover do topo. Sem isto a camada se posiciona pela barra toda. */
-.comPopover { position: relative; display: inline-flex; }
 /* Abaixo de 1024 px o topo já está compacto no JSX, com Lembretes e Automáticas
    visíveis e o resto no menu Mais. Aqui a assinatura sai, para os controles
    caberem na MESMA linha da marca. */
-@media (max-width: 1023px) {
-}
 /* Celular: gap mais apertado, o resto do topo já empurra sozinho pra direita. */
 @media (max-width: 759px) {
   .topo { gap: var(--e-1); padding-inline: var(--e-2); }
@@ -123,7 +125,7 @@
   position: fixed; left: var(--e-5); bottom: var(--e-5); z-index: 30;
   border-radius: var(--r-pilula) !important;
   background: var(--vidro) !important; -webkit-backdrop-filter: var(--desfoque); backdrop-filter: var(--desfoque);
-  border: var(--b-1) solid var(--linha) !important; box-shadow: var(--sombra-media);
+  border: 0 !important; box-shadow: var(--sombra-media);
 }
 /* Tablet e celular têm rodapé (botão da Ficha ou barra de abas): a pílula
    sobe para cima dele em vez de cobrir o botão. */
@@ -147,6 +149,9 @@
   composes: trilho from '../componentes/Trilho.module.css';
   padding-top: calc(var(--e-3) + env(safe-area-inset-top, 0px));
   position: relative; z-index: 20;
+  overflow-y: auto; overflow-x: hidden;
+  /* Reserva espaço para a barra sem comprimir os alvos de toque. */
+  padding-inline: 0;
 }
 .inicioTrilho { composes: inicio from '../componentes/Trilho.module.css'; }
 .itemTrilho { composes: item from '../componentes/Trilho.module.css'; }
@@ -154,18 +159,8 @@
 .itemTrilho svg, .sinoTrilho > div > button svg { transition: transform var(--dur-media) var(--ease-mola); }
 .itemTrilho:hover svg, .sinoTrilho > div > button:hover svg { transform: translateY(-2px) scale(1.06); }
 .itemAtual { composes: ativo from '../componentes/Trilho.module.css'; cursor: default; }
+.itemAtual::before { left: 0; }
 .itemTrilho[aria-pressed='true'] { color: var(--tinta); background: var(--preenchimento-forte); }
-.contaTrilho, .seloTrilho {
-  position: absolute; top: 3px; left: calc(50% + 6px);
-  min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pilula);
-  display: grid; place-items: center; font-size: 11px; font-weight: 700;
-  box-shadow: 0 0 0 2px var(--fundo);
-}
-.contaTrilho { background: var(--preenchimento-forte); color: var(--tinta-2); }
-.seloTrilho {
-  left: calc(50% + 2px); background: var(--erro); color: var(--sobre-erro);
-  white-space: nowrap; animation: seloPulso 2.4s var(--ease-padrao) infinite;
-}
 @keyframes seloPulso {
   0% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 2px color-mix(in srgb, var(--erro) 50%, transparent); }
   70% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 9px transparent; }
@@ -180,11 +175,12 @@
 @media (max-width: 759px) {
   .topo { flex-wrap: nowrap; }
   .controles { flex-wrap: nowrap; gap: var(--e-1); }
-  .controles > .comPopover > button { padding: 0; width: var(--toque); }
-}
+  }
 @media (max-width: 759px) {
   .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }
-  .controles .conta { font-size: var(--t-micro); min-width: 22px; height: 22px; }
+  /* O aviso do aparelho fica no sino sem alargar o cabeçalho e empurrar Mais para fora. */
+  .controles > button:has([data-aparelho-desligado]) { position: relative; }
+  .controles > button > [data-aparelho-desligado] { position: absolute; top: 6px; right: 6px; margin-left: 0; }
 }
 /* #1940 (item 3): a 375 px o "Mais" passava 16 px da borda (marca 66 + loja 32 + controles 277 +
    recuos = 399 px). Abaixo de 400 px os vãos e o recuo lateral dos botões de ícone apertam
@@ -207,23 +203,17 @@
 .rotuloCurto { display: none; }
 @media (max-width: 759px) {
   .rotuloLongo { display: none; }
-  .rotuloCurto { display: inline; font-size: var(--t-minimo); }
+  .rotuloCurto { display: inline; font-size: var(--t-micro); }
 }
 
-/* Rodada 6d (banca estética, item 4): UM desenho de contador no app todo.
-   Neutro para quantidade; carmim só para o que está vencido ou estourado. */
-.conta, .contaTrilho { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-minimo); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); }
-.seloTrilho { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pilula); display: inline-grid; place-items: center; font-size: var(--t-minimo); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; background: var(--preenchimento-forte); color: var(--tinta-2); background: var(--erro); color: var(--sobre-erro); }
-.contaTrilho, .seloTrilho { position: absolute; top: 4px; left: calc(50% + 6px); box-shadow: 0 0 0 2px var(--fundo); }
 
 /* Rodada 6d (banca estética, itens 13, 15 e 12). */
 /* 13: as três colunas com a mesma faixa de título, de 64 px, e ícone antes. */
-.tituloColuna { min-height: 64px; gap: 10px; }
+.tituloColuna { min-height: var(--altura-regiao); gap: 10px; }
 .tituloColuna > svg { color: var(--tinta-3); }
-.tituloCompacto { min-height: 52px; padding-block: 2px; }
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
-.espacoTrilho::after { content: ''; width: 32px; height: 1px; margin-bottom: 4px; background: var(--linha-media); }
+.espacoTrilho::after { content: none; }
 .atendente { composes: avatar from '../componentes/Trilho.module.css'; }
 /* 12: no celular, o painel que entra desliza brevemente da direita. */
 @keyframes painelDesliza { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
@@ -238,9 +228,18 @@
 .lojaAberta:hover:not(:disabled) { color: var(--sucesso); background: var(--sucesso-pastel); filter: brightness(.97); }
 .lojaFechada:hover:not(:disabled) { color: var(--erro); background: var(--erro-pastel); filter: brightness(.97); }
 
-/* Integração: no celular o controle da loja vira só o ícone, para a linha de
-   cima caber em 390 px; o texto continua no nome acessível. */
+/* Celular (#2232, L1 e L3): o texto da loja e o estado das automáticas quebram em duas linhas curtas
+   ("Loja" sobre "aberta"; "Auto" sobre "ligadas") para a linha de cima caber em 390 px com o "Mais"
+   dentro da tela. O alvo de toque segue com --toque de altura. */
 @media (max-width: 759px) {
-  .controleLoja > span { font-size: 0; gap: 0; padding: 6px; }
-  .controleLoja svg { width: 20px; height: 20px; }
+  .controleLoja { gap: var(--e-1); padding: 0 var(--e-1); font-size: var(--t-micro); }
+  .lojaTexto { width: min-content; white-space: normal; }
+  .automaticas > svg { display: none; }
+  .autoTexto { display: grid; justify-items: start; gap: 0; line-height: var(--lh-compacto); }
+  .autoEstado::before { content: none; }
+  .autoEstado { font-size: var(--t-micro); }
 }
+
+/* #2185 (R04): o número é a `Pilula contagem`; aqui só o lugar dele sobre o ícone do trilho. */
+.contaTrilho, .seloTrilho { position: absolute; top: 4px; left: calc(50% + 6px); box-shadow: 0 0 0 2px var(--fundo); }
+.seloTrilho { white-space: nowrap; animation: seloPulso 2.4s var(--ease-padrao) infinite; }

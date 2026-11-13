@@ -1,9 +1,13 @@
+using System.Text.Json;
 using EasyStock.Domain.Entities.Atendimento;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace EasyStock.Infra.Postgre.Data.Configurations.Atendimento;
 
 public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<ConfiguracaoAtendimento>
 {
+    private static readonly JsonSerializerOptions AvisosJson = new(JsonSerializerDefaults.Web);
+
     public void Configure(EntityTypeBuilder<ConfiguracaoAtendimento> builder)
     {
         builder.ToTable("configuracoes_atendimento");
@@ -14,6 +18,11 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
         builder.Property(x => x.SaudacaoRetorno).IsRequired().HasMaxLength(500);
         builder.Property(x => x.FraseEspera).IsRequired().HasMaxLength(200);
         builder.Property(x => x.MensagemForaArea).IsRequired().HasMaxLength(500);
+        // #2249: moldes das ações do robô; linha antiga ganha o texto padrão.
+        builder.Property(x => x.MensagemEscalada).IsRequired().HasMaxLength(ConfiguracaoAtendimento.MoldeTamanhoMaximo)
+            .HasDefaultValue(ConfiguracaoAtendimento.MensagemEscaladaPadrao);
+        builder.Property(x => x.MensagemEncaminhamento).IsRequired().HasMaxLength(ConfiguracaoAtendimento.MoldeTamanhoMaximo)
+            .HasDefaultValue(ConfiguracaoAtendimento.MensagemEncaminhamentoPadrao);
         builder.Property(x => x.NivelSugestao).HasConversion<int>();
         builder.Property(x => x.RespiroMinutos).HasDefaultValue(40);
         builder.Property(x => x.TempoPreparoPadraoMinutos).HasDefaultValue(60);
@@ -24,6 +33,16 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
         builder.Property(x => x.ModeloRetomadaNome).HasMaxLength(ConfiguracaoAtendimento.ModeloNomeTamanhoMaximo);
         builder.Property(x => x.ModeloRetomadaIdioma).IsRequired().HasMaxLength(16)
             .HasDefaultValue(ConfiguracaoAtendimento.IdiomaModeloPadrao);
+        // #2096: avisos da operação num documento só; linha antiga ('{}') lê o padrão de cada campo.
+        builder.Property(x => x.Avisos)
+            .HasColumnName("avisos_operacao")
+            .HasColumnType("jsonb")
+            .IsRequired()
+            .HasDefaultValueSql("'{}'::jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, AvisosJson),
+                v => JsonSerializer.Deserialize<AvisosOperacao>(v, AvisosJson) ?? AvisosOperacao.Padrao,
+                new ValueComparer<AvisosOperacao>((a, b) => a == b, v => v.GetHashCode(), v => v));
         builder.Property(x => x.CriadoEm).IsRequired();
         builder.Property(x => x.AlteradoEm).IsRequired();
 

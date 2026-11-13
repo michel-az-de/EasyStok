@@ -121,7 +121,7 @@ public sealed class CheckoutCoreService(
     /// </summary>
     public static string ValidarEntrada(string? cep, IReadOnlyCollection<(Guid CardapioItemId, int Qtd)>? itens)
     {
-        var cepNormalizado = NormalizarCep(cep);
+        var cepNormalizado = EnderecoBr.NormalizarCep(cep);
         if (!CepDigitosRegex.IsMatch(cepNormalizado))
             throw new CepInvalidoException();
 
@@ -188,11 +188,11 @@ public sealed class CheckoutCoreService(
 
         var pedido = DomainPedido.Criar(
             empresaId: storefront.EmpresaId,
-            origem: input.Origem);
+            origem: input.Origem,
+            statusInicial: StatusPedido.Rascunho);
 
         // Sobrescrever campos com dados do cliente Storefront
         pedido.ClienteId = input.ClienteId;
-        pedido.Status = StatusPedidoMapper.Rascunho;
         pedido.Observacoes = input.Observacoes;
         pedido.AgendadoParaEm = HorarioBrasil.InstanteUtc(input.DataEntrega, janela.HoraInicio);
         await enderecoEntrega.RegistrarAsync(pedido,
@@ -208,8 +208,8 @@ public sealed class CheckoutCoreService(
         // 0 (coleção vazia); por isso atribuímos o Total diretamente. É o mesmo somatório
         // cobrado no MercadoPago (Fase 3), reutilizado aqui.
         // M1.4b (#1531): soma o que foi gravado em cada linha (preço da porção quando há).
-        decimal total = itens.Sum(i => i.Subtotal) + valorFrete;
-        pedido.Total = Dinheiro.FromDecimal(total);
+        pedido.Total = Pedido.TotalDe(itens.Select(i => i.Subtotal).Append(itemFrete.Subtotal));
+        var total = pedido.Total.Valor;
         pedido.AlteradoEm = DateTime.UtcNow;
         await pedidoRepository.UpdateAsync(pedido, ct);
 
@@ -234,9 +234,7 @@ public sealed class CheckoutCoreService(
         catch (JanelaSemVagasException)
         {
             // Rollback fase 1: cancela pedido (status Rascunho → Cancelado)
-            pedido.Status = StatusPedidoMapper.Cancelado;
-            pedido.CanceladoEm = DateTime.UtcNow;
-            pedido.AlteradoEm = DateTime.UtcNow;
+            pedido.Cancelar();
             await pedidoRepository.UpdateAsync(pedido, ct);
 
             // Busca janelas alternativas (best-effort)
@@ -254,8 +252,7 @@ public sealed class CheckoutCoreService(
                     : "Escolha outro horário."));
         }
 
-        pedido.Status = StatusPedidoMapper.AguardandoPagamento;
-        pedido.AlteradoEm = DateTime.UtcNow;
+        pedido.MudarStatus(StatusPedido.AguardandoPagamento);
         await pedidoRepository.UpdateAsync(pedido, ct);
 
         logger.LogInformation(
@@ -373,45 +370,44 @@ public sealed class CheckoutCoreService(
 
     /// <summary>
     /// Janela existe, é da loja, atende o dia da semana e não está bloqueada (dia ou janela). Compartilhada pela
-    /// criação do pedido e pela simulação (#1884), para as duas recusarem igual.
+    /// criação do pedido e pela simulação (#1884), para as duas recusarem igual. A decisão é de
+    /// <see cref="JanelaEntrega.MotivoEstruturalEm"/> (#2018), a mesma da listagem de janelas.
     /// </summary>
     private async Task<JanelaEntrega> ValidarJanelaAsync(
         StorefrontEntity storefront, Guid janelaId, DateOnly dataEntrega, CancellationToken ct)
     {
         var janela = await janelaEntregaRepository.GetByIdAsync(janelaId, ct);
-        if (janela is null || !janela.Ativa || janela.StorefrontId != storefront.Id)
-            throw new RegraDeDominioVioladaException(
-                "A janela de entrega escolhida não está mais disponível. Escolha outro horário.");
-
-        if (janela.DiaDaSemana != (int)dataEntrega.DayOfWeek)
-            throw new RegraDeDominioVioladaException(
-                $"A janela {janela.Label} não atende o dia {dataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outro horário.");
+        if (janela is null || janela.StorefrontId != storefront.Id)
+            throw new RegraDeDominioVioladaException(JanelaIndisponivel);
 
         var bloqueios = await bloqueioEntregaRepository.GetByStorefrontPeriodoAsync(
             storefront.Id, dataEntrega, dataEntrega, ct);
 
-        var diaBloqueado = bloqueios.Any(b => b.JanelaEspecificaId == null);
-        var janelaEspecificaBloqueada = bloqueios.Any(b => b.JanelaEspecificaId == janelaId);
-
-        if (diaBloqueado || janelaEspecificaBloqueada)
-            throw new RegraDeDominioVioladaException(
-                $"Não há entrega no dia {dataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outra data.");
+        switch (janela.MotivoEstruturalEm(dataEntrega, bloqueios))
+        {
+            case DisponibilidadeDaJanela.Inativa:
+                throw new RegraDeDominioVioladaException(JanelaIndisponivel);
+            case DisponibilidadeDaJanela.OutroDiaDaSemana:
+                throw new RegraDeDominioVioladaException(
+                    $"A janela {janela.Label} não atende o dia {dataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outro horário.");
+            case DisponibilidadeDaJanela.DiaBloqueado or DisponibilidadeDaJanela.JanelaBloqueada:
+                throw new RegraDeDominioVioladaException(
+                    $"Não há entrega no dia {dataEntrega.ToString("dd/MM/yyyy", PtBr)}. Escolha outra data.");
+        }
         return janela;
     }
 
+    private const string JanelaIndisponivel = "A janela de entrega escolhida não está mais disponível. Escolha outro horário.";
+
     /// <summary>
     /// Janela já encerrada nunca vale (#1506) e, com ou sem prazo mínimo, a janela que já começou também não
-    /// (site, #1874). Compartilhada pela criação do pedido e pela simulação (#1884).
+    /// (site, #1874). Compartilhada pela criação do pedido e pela simulação (#1884). A decisão é de
+    /// <see cref="JanelaEntrega.MotivoDeTempoEm"/> (#2018), a mesma da listagem de janelas.
     /// </summary>
     private void ValidarEncerramentoEPrazo(
         JanelaEntrega janela, DateOnly dataEntrega, PrazoPreparoCheckout? prazoInput,
         IReadOnlyDictionary<Guid, CardapioItem> cardapioItens)
     {
-        // #1506: janela já encerrada (ou data passada) nunca vale, com ou sem prazo mínimo.
-        if (CalculadoraPrazoPedido.JanelaJaPassou(dataEntrega, janela.HoraFim, timeProvider.GetUtcNow().UtcDateTime))
-            throw new RegraDeDominioVioladaException(
-                $"A janela {janela.Label} de {dataEntrega.ToString("dd/MM/yyyy", PtBr)} já passou. Escolha outro horário.");
-
         // ── Prazo mínimo (S16, RN-21) ─────────────────────────────────────
         // Revalida o corte da listagem: a janela pode ter ficado curta entre listar e criar. Sem prazo
         // (site) vale 0, como na listagem (#1874): a janela que já começou não é aceita.
@@ -421,9 +417,15 @@ public sealed class CheckoutCoreService(
                 prazo.TempoPreparoPadraoMinutos,
                 prazo.RespiroMinutos)
             : 0;
-        if (!CalculadoraPrazoPedido.AtendePrazo(
-                dataEntrega, janela.HoraInicio, timeProvider.GetUtcNow().UtcDateTime, prazoMinimo))
-            throw new RegraDeDominioVioladaException(JanelaAbaixoDoPrazo);
+        switch (janela.MotivoDeTempoEm(dataEntrega, timeProvider.GetUtcNow().UtcDateTime, prazoMinimo))
+        {
+            // #1506: janela já encerrada (ou data passada) nunca vale, com ou sem prazo mínimo.
+            case DisponibilidadeDaJanela.JaPassou:
+                throw new RegraDeDominioVioladaException(
+                    $"A janela {janela.Label} de {dataEntrega.ToString("dd/MM/yyyy", PtBr)} já passou. Escolha outro horário.");
+            case DisponibilidadeDaJanela.AbaixoDoPrazo:
+                throw new RegraDeDominioVioladaException(JanelaAbaixoDoPrazo);
+        }
     }
 
     public async Task<IReadOnlyDictionary<Guid, CardapioItem>> CarregarItensCardapioAsync(
@@ -444,7 +446,7 @@ public sealed class CheckoutCoreService(
             var ci = lidos.GetValueOrDefault(itemId);
             // M1.2 (#1482): item arquivado não se vende, nem por link antigo. M1.3 (#1483): nem o de categoria escondida.
             // #2002: o prato que o pedido já reservou (alteração sem acrescentar nada dele) só precisa existir.
-            if (ci is null || jaNoPedido?.Contains(itemId) != true && (!ci.Visivel || !ci.Disponivel || ci.EstaArquivado || ci.EmSecaoOculta))
+            if (ci is null || jaNoPedido?.Contains(itemId) != true && !ci.EstaOfertado())
                 throw new RegraDeDominioVioladaException(ci?.NomeEfetivo() is { Length: > 0 } nome
                     ? $"{nome} está indisponível no cardápio agora."
                     : "Um item do pedido não está mais no cardápio.");
@@ -543,14 +545,6 @@ public sealed class CheckoutCoreService(
         return itemFrete;
     }
 
-    public static string NormalizarCep(string? cep)
-    {
-        if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
-        var sb = new System.Text.StringBuilder(cep.Length);
-        foreach (var c in cep)
-            if (char.IsDigit(c)) sb.Append(c);
-        return sb.ToString();
-    }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 

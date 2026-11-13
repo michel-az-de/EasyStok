@@ -127,6 +127,8 @@ public class ContaReceber
             throw new RegraDeDominioVioladaException("So e possivel remover parcelas em conta Rascunho.");
         var p = Parcelas.FirstOrDefault(x => x.Id == parcelaId)
                 ?? throw new RegraDeDominioVioladaException("Parcela nao encontrada.");
+        // #2095 (F1): remover a parcela apagava o pagamento em cascata e o movimento do caixa ficava sem estorno.
+        RegrasContaFinanceira.GarantirSemPagamentoConfirmado(p.ValorPago, p.Pagamentos);
         Parcelas.Remove(p);
         RecalcularValorTotal();
         AlteradoEm = DateTime.UtcNow;
@@ -174,6 +176,25 @@ public class ContaReceber
         CanceladaPorUserId = userId;
         MotivoCancelamento = motivo.Trim();
         AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>#2095 (F1): só conta emitida e não quitada aceita recebimento; a parcela não conhece o status da conta.</summary>
+    public void GarantirAceitaPagamento() => RegrasContaFinanceira.GarantirAceitaPagamento(Status, "recebimento");
+
+    /// <summary>
+    /// #2095 (F2): reavalia a parcela depois de um estorno. Em conta cancelada a parcela sem pagamento confirmado é
+    /// cancelada, em vez de voltar a Pendente (aceitando pagamento novo e entrando no job de vencimento), e a conta
+    /// não reabre.
+    /// </summary>
+    public void ReavaliarParcelaAposEstorno(ParcelaReceber parcela, DateTime hojeUtc)
+    {
+        parcela.AtualizarStatusPorPagamentos(hojeUtc);
+        if (Status == StatusContaFinanceira.Cancelada && parcela.ValorPago == 0m)
+        {
+            parcela.Cancelar();
+            RecalcularValorTotal();
+        }
+        AtualizarStatusPorParcelas();
     }
 
     public void AtualizarStatusPorParcelas()

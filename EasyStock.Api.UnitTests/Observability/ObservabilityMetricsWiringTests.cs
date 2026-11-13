@@ -30,7 +30,10 @@ public class ObservabilityMetricsWiringTests
         var services = new ServiceCollection();
         services.AddMetrics();   // garante IMeterFactory (idempotente)
         services.AddLogging();
-        var config = new ConfigurationBuilder().Build();
+        // Com endpoint: a telemetria da API e opt-in (#2107) e este teste prova a fiacao quando ela esta ligada.
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["OpenTelemetry:OtlpEndpoint"] = "http://localhost:4317" })
+            .Build();
         var env = Substitute.For<IWebHostEnvironment>();
         env.EnvironmentName.Returns("Production");   // evita ConsoleExporter de dev
 

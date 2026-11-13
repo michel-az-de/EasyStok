@@ -10,6 +10,8 @@ import {
 export function criarAcoesCaixaApi({ gerarChave } = {}) {
   // Sangria repetida depois de "sem conexão" não pode virar duas saídas.
   const envio = criarChaveDeEnvio(gerarChave)
+  // #2378: estorno repetido depois de "sem conexão" também não pode virar dois.
+  const envioDoEstorno = criarChaveDeEnvio(gerarChave)
 
   return {
     abrirCaixa: (_agora, saldoInicial, observacoes) => abrirCaixa({ saldoInicial, observacoes }),
@@ -26,10 +28,16 @@ export function criarAcoesCaixaApi({ gerarChave } = {}) {
       return resposta
     },
 
-    estornarMovimentoCaixa: (_agora, movimentoId, motivo) => estornarMovimento(movimentoId, (motivo ?? '').trim()),
+    estornarMovimentoCaixa: async (_agora, movimentoId, motivo) => {
+      const texto = (motivo ?? '').trim()
+      const chave = envioDoEstorno.para({ movimentoId, motivo: texto })
+      const resposta = await estornarMovimento(movimentoId, texto, chave)
+      envioDoEstorno.confirmar(chave)
+      return resposta
+    },
 
-    // A API não guarda o contado: ele vai nas observações junto da diferença.
+    // #2113: o contado vai em `valorContado` (a API grava desde a #2084) e continua nas observações, com a diferença.
     fecharCaixa: (_agora, contado, saldoEsperado, nota) =>
-      fecharCaixa({ observacoes: observacaoDoFechamento({ contado, saldoEsperado, nota }) }),
+      fecharCaixa({ observacoes: observacaoDoFechamento({ contado, saldoEsperado, nota }), valorContado: contado }),
   }
 }

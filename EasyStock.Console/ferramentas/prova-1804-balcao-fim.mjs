@@ -5,7 +5,7 @@
 //
 // Frente C da #1889 (restos do atendimento, 22/10), no fim do arquivo:
 //   #1765-10 "Não entregues" anda sozinha; #1940-2 cartão sem "Falta" na montagem; contenção de erro
-//   por coluna e por tela; #1239 "Passar para…"; #1686-3/4 nova comanda e caminho para trocar item;
+//   por coluna e por tela; #1239 "Passar conversa"; #1686-3/4 nova comanda e caminho para trocar item;
 //   #1686-9 motivo da barra leva ao campo; #1686-10 devolução em dinheiro sem referência.
 //
 //   node ferramentas/prova-1804-balcao-fim.mjs
@@ -145,7 +145,7 @@ await confere('contenção de erro: cada coluna do Balcão e cada tela de módul
   assert.match(modulo, /<LimiteDeErro parte=\{tela\.rotulo\}>\{children\}<\/LimiteDeErro>/)
 })
 
-await confere('#1239 "Passar para…": a conversa vai ao atendente escolhido e a tela recebe o novo dono', async () => {
+await confere('#1239 "Passar conversa": a conversa vai ao atendente escolhido e a tela recebe o novo dono', async () => {
   const acao = await import('../src/aplicacao/acoes.js')
   const { comApi } = await import('../src/aplicacao/acoesApi.js')
   const { atendentesParaPassar } = await import('../src/features/atendimento/apresentacaoDaConversa.js')
@@ -163,8 +163,10 @@ await confere('#1239 "Passar para…": a conversa vai ao atendente escolhido e a
   resposta = () => new Response(JSON.stringify({ error: { message: 'O usuário não atende conversas nesta empresa.' } }), { status: 422 })
   assert.deepEqual(await api.transferirConversa('c1', 'ze'), { erro: 'O usuário não atende conversas nesta empresa.' })
   assert.deepEqual(atendentesParaPassar([{ usuarioId: 'eu', nome: 'Eu' }, { usuarioId: 'ana', nome: 'Ana' }, { usuarioId: 'bia', nome: 'Bia' }], { usuarioId: 'eu', responsavelId: 'bia' }).map((a) => a.nome), ['Ana'])
-  assert.match(fonte('features/atendimento/PainelAtendimento.jsx'), /\{fonteApi && !encerrada && !bloqueada && <PassarConversa key=\{'passar-' \+ selecionada\.id\} conversa=\{selecionada\} \/>\}/)
-  assert.match(fonte('features/atendimento/PassarConversa.jsx'), /Passar para…/)
+  const painel = fonte('features/atendimento/PainelAtendimento.jsx')
+  assert.match(painel, /acoesTela\.passar && \{ chave: 'passar', rotulo: 'Passar conversa'/)
+  assert.match(painel, /permitePassar: Boolean\(transferirConversa\)/)
+  assert.match(painel, /modalAberto === 'passar' && <ModalPassarConversa conversa=\{selecionada\}/)
 })
 
 await confere('#1686-3 nova comanda na mesma conversa depois do pedido entregue ou cancelado', async () => {
@@ -208,12 +210,13 @@ await confere('#1686-9 o motivo que segura a barra é link: abre a seção e foc
   assert.deepEqual(r.pendenciaAntesDeCobrar({ pedido, clienteId: null }, { fonteApi: true }).alvo, 'cadastro')
   assert.deepEqual(r.pendenciaAntesDeCobrar({ pedido, clienteId: 'c', endereco: null }, { fonteApi: true }).alvo, 'endereco')
   assert.deepEqual(r.pendenciaAntesDeCobrar({ pedido, clienteId: 'c', endereco: 'Rua A' }, { fonteApi: true }).alvo, 'janela')
-  assert.equal(r.motivoAntesDeCobrar({ pedido, clienteId: 'c', endereco: 'Rua A' }, { fonteApi: true }), 'Escolha a janela de entrega em Seleção do atendimento.', 'o texto não muda')
+  assert.equal(r.motivoAntesDeCobrar({ pedido, clienteId: 'c', endereco: 'Rua A' }, { fonteApi: true }), 'Escolha a janela de entrega em Pedido e entrega.', 'o texto não muda')
   const barra = fonte('features/ficha-cliente/BarraProximoPasso.jsx')
   assert.match(barra, /<button type="button" className=\{css\.linkMotivo\} data-alvo-motivo=\{alvoDoPrerequisito\}\s+onClick=\{\(\) => aoIrParaMotivo\(alvoDoPrerequisito\)\}>\{info\.motivo\}<\/button>/)
   const ficha = fonte('features/ficha-cliente/PainelFicha.jsx')
   assert.match(ficha, /abrirSecao\('contato'\)\s+setSecao\('cliente'\)\s+focarCampoDaFicha\(alvo\)/)
-  assert.match(ficha, /setSecao\('pedido'\); focarCampoDaFicha\('janela'\)/)
+  assert.match(ficha, /abrirComanda\(\); focarCampoDaFicha\('janela'\)/)
+  assert.doesNotMatch(ficha, /setSecao\('pedido'\)/, 'a comanda móvel substitui a seção antiga')
   const cliente = fonte('features/ficha-cliente/BlocoCliente.jsx')
   for (const marca of ['data-campo-ficha="cadastro"', 'data-campo-ficha="endereco"', 'data-campo-ficha="telefone cadastro"']) assert.ok(cliente.includes(marca), marca)
   assert.match(fonte('features/ficha-cliente/SeletorJanelaApi.jsx'), /data-campo-ficha="janela"/)
@@ -265,7 +268,8 @@ await confere('#1966 Devoluções mostra o valor a devolver do pedido cancelado'
   assert.doesNotMatch(textoADevolver({ comOnline: false }), /online/, 'mandava ao estorno online que esta tela não mostra')
   assert.match(textoADevolver({ comOnline: false }), /devolução manual/)
   assert.match(bloco, /const comOnline = dados\?\.pagamentos\.some\(\(p\) => !p\.manual\) \?\? false/)
-  assert.match(bloco, /\{comOnline && <EstornosOnline pedidoId=\{pedidoId\} \/>\}/)
+  // #2079 (C4): o EstornosOnline ganhou o aviso de mudança (`aoAlterado`); continua só com pagamento online.
+  assert.match(bloco, /\{comOnline && <EstornosOnline pedidoId=\{pedidoId\} aoAlterado=\{mudou\} \/>\}/)
   assert.match(bloco, /\{aDevolver > 0 && <output className=\{css\.corpoBloco\}><strong>A devolver: \{moeda\(aDevolver\)\}<\/strong>\. \{textoADevolver\(\{ comOnline \}\)\}<\/output>\}/)
   const caso = readFileSync(new URL('../../EasyStock.Application/UseCases/Pedidos/Cobranca/ConsultarEstornosManuaisUseCase.cs', import.meta.url), 'utf8')
   assert.match(caso, /IReadOnlyList<PedidoEstornoManual> Estornos, decimal ADevolver = 0m\)/, 'o contrato da API mudou')
@@ -308,12 +312,12 @@ await confere('#1989-7 respondeu no meio da venda: a faixa não sugere encerrar'
 
 await confere('#1989-4 cabeçalho da conversa: um "Link de compra" e nenhuma chave repetida entre irmãos', () => {
   const painel = fonte('features/atendimento/PainelAtendimento.jsx')
-  const de = painel.indexOf('<div className={css.direita} data-ancora-assistente>')
+  const de = painel.indexOf('<div className={css.direita}>')
   const direita = painel.slice(de, painel.indexOf('</header>', de))
   assert.ok(de >= 0 && direita.length > 0, 'cabeçalho não encontrado')
   const chaves = [...direita.matchAll(/key=\{([^}]+)\}/g)].map((m) => m[1].trim())
   assert.equal(new Set(chaves).size, chaves.length, `chaves repetidas entre irmãos: ${chaves.join(' | ')}`)
-  assert.equal((direita.match(/<CompartilharComanda\b/g) ?? []).length, 1, 'um botão só no cabeçalho')
+  assert.equal((direita.match(/chave: 'cardapio'/g) ?? []).length, 1, 'um item só no cabeçalho')
   // O botão que a Moldura passa à Ficha também não usa o id puro como chave.
   assert.doesNotMatch(fonte('app/Moldura.jsx'), /<CompartilharComanda key=\{selecionada\.id\}/)
 })

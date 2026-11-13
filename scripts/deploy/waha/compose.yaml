@@ -1,0 +1,40 @@
+# Ponte provisória do WhatsApp (#2072, ADR-0062): WAHA com motor GOWS (whatsmeow), aparelho vinculado ao número da loja.
+# Stack própria em /opt/stacks/waha, na rede "edge" do ez-api. A API chama http://ez-waha:3000 e o WAHA entrega os
+# eventos em http://ez-api:8080/api/webhooks/waha, assinados com HMAC sha512. Porta só no loopback da VPS, para o
+# painel por túnel SSH. Segredos em /opt/stacks/waha/.env (chmod 600), gerados pelo scripts/deploy/waha-deploy.sh.
+name: waha
+services:
+  waha:
+    image: devlikeapro/waha:gows-2026.9.2
+    container_name: ez-waha
+    restart: unless-stopped
+    environment:
+      TZ: America/Sao_Paulo
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      WAHA_API_KEY: "sha512:${WAHA_API_KEY_SHA512:?gere com scripts/deploy/waha-deploy.sh}"
+      WAHA_DASHBOARD_ENABLED: "True"
+      WAHA_DASHBOARD_USERNAME: waha
+      WAHA_DASHBOARD_PASSWORD: "${WAHA_DASHBOARD_PASSWORD:?gere com scripts/deploy/waha-deploy.sh}"
+      WHATSAPP_SWAGGER_ENABLED: "False"
+      WAHA_PRINT_QR: "False"
+      WHATSAPP_RESTART_ALL_SESSIONS: "True"
+      WAHA_BASE_URL: http://ez-waha:3000
+      WHATSAPP_FILES_LIFETIME: "3600"
+      WHATSAPP_HOOK_URL: http://ez-api:8080/api/webhooks/waha
+      WHATSAPP_HOOK_EVENTS: message.any,message.ack,session.status
+      WHATSAPP_HOOK_HMAC_KEY: "${EZ_WAHA_HMAC_KEY:?gere com scripts/deploy/waha-deploy.sh}"
+      WHATSAPP_HOOK_RETRIES_POLICY: exponential
+      WHATSAPP_HOOK_RETRIES_DELAY_SECONDS: "2"
+      WHATSAPP_HOOK_RETRIES_ATTEMPTS: "8"
+    volumes:
+      - sessions:/app/.sessions
+    ports:
+      - "127.0.0.1:3100:3000"
+    cpus: "1"
+    mem_limit: 1g
+    networks: [edge]
+volumes:
+  sessions:
+networks:
+  edge:
+    external: true

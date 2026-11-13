@@ -149,7 +149,7 @@ public sealed class RecusarPedidoStorefrontUseCase(
 
             // 6. Aplicar transição + audit trail.
             var statusAntigo = pedido.Status;
-            pedido.Status = StatusPedidoMapper.Cancelado;
+            pedido.Cancelar();
             pedido.CanceladoEm = agora;
             pedido.RecusadoEm = agora;
             pedido.RecusadoPorUsuarioId = input.UsuarioId;

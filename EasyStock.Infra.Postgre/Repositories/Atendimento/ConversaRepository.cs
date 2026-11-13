@@ -202,6 +202,8 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                     .Select(m => m.Texto)
                     .FirstOrDefault(),
                 // O mesmo texto que a rota do pedido da conversa devolve em "status" (Pedido.Status, sem conversão).
+                FotoClienteChave = db.Clientes.Where(cliente => cliente.EmpresaId == empresaId && cliente.Id == c.ClienteId)
+                    .Select(cliente => cliente.FotoChave).FirstOrDefault(),
                 PedidoStatus = db.Pedidos
                     .Where(p => p.EmpresaId == empresaId && p.Id == c.PedidoEmAndamentoId)
                     .Select(p => p.Status).FirstOrDefault(),
@@ -211,7 +213,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         return linhas.Select(l => new ConversaInboxItem(
             l.Id, l.EmpresaId, l.Canal, l.ContatoIdExterno, l.ContatoNome, l.ClienteId, l.Situacao, l.NaoLidas,
             l.UltimaMensagemEm, l.UltimaMensagemEntradaEm, l.PedidoEmAndamentoId, l.AssumidaPorUsuarioId, l.MotivoEscalada,
-            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto)).ToList();
+            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto, l.FotoClienteChave)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(
@@ -325,6 +327,11 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                 """)
             .IgnoreQueryFilters()
             .ToListAsync(ct);
+
+    // #2285: usa o índice (ConversaId, EnviadaEm).
+    public Task<int> ContarRespostasDoAgenteDesdeAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default) =>
+        db.AtendimentoMensagens.CountAsync(m => m.EmpresaId == empresaId && m.ConversaId == conversaId
+            && m.Direcao == DirecaoMensagem.Saida && m.Autor == AutorMensagem.Agente && m.EnviadaEm >= desde, ct);
 
     public Task<bool> ExisteAguardandoClienteAsync(
         Guid empresaId, CanalConversa canal, string contatoIdExterno, Guid? clienteId, DateTime desde, CancellationToken ct = default) =>

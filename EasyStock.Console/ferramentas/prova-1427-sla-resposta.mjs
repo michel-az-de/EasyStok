@@ -172,13 +172,17 @@ confere('o cartão ganha a classe de pisca só com o SLA estourado', () => {
   assert.equal(classesDoCartao(css), 'c')
 })
 
-confere('com movimento reduzido não pisca: fica só o destaque de cor', () => {
+confere('prazo vencido mantém destaque estático sem piscar sobre a seleção', () => {
   const folha = readFileSync(new URL('../src/features/caixa-de-entrada/caixa.module.css', import.meta.url), 'utf8')
-  // #1577: quem pisca é a placa atrás do conteúdo (`::before`), só em `opacity`.
-  assert.match(folha, /\.cartao\.slaEstourado::before\s*\{[^}]*animation:[^}]*piscaSla[^}]*infinite/)
-  const reduzido = folha.slice(folha.indexOf('@media (prefers-reduced-motion: reduce)'))
-  assert.match(reduzido, /\.cartao\.slaEstourado\s*\{\s*animation:\s*none;\s*background:\s*var\(--erro-pastel\)/)
-  assert.match(reduzido, /\.cartao\.slaEstourado::before\s*\{\s*display:\s*none/)
+  // #2420: sem traço lateral no cartão; o prazo vencido é o ícone de relógio em erro ao lado da hora.
+  assert.doesNotMatch(folha, /\.cartao[^{}]*::before/)
+  assert.match(folha, /\.sinalPrazo\s*\{[^}]*color:\s*var\(--erro\)/)
+  const cartao = readFileSync(new URL('../src/features/caixa-de-entrada/CartaoConversa.jsx', import.meta.url), 'utf8')
+  // #2232 (X1): o prazo vai no nome acessível composto do cartão.
+  assert.match(cartao, /atrasada: slaEstourado/)
+  assert.doesNotMatch(folha, /piscaSla|infinite/)
+  // #2420: a seleção passou ao âmbar claro da marca, sem traço lateral.
+  assert.match(folha, /\.cartao\[aria-current='true'\]\s*\{[^}]*background:\s*var\(--marca-claro\)/)
 })
 
 confere('um segundo além do SLA já estoura, sem minuto extra', () => {

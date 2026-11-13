@@ -1,8 +1,9 @@
-using System.Text;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Storefront.Agendamento;
 
@@ -54,7 +55,7 @@ public sealed class ListarJanelasDisponiveisUseCase(
         string? cepNormalizado = null;
         if (!string.IsNullOrWhiteSpace(input.Cep))
         {
-            cepNormalizado = NormalizarCep(input.Cep);
+            cepNormalizado = EnderecoBr.NormalizarCep(input.Cep);
             if (!CepDigitosRegex.IsMatch(cepNormalizado))
                 throw new CepInvalidoException();
         }
@@ -97,15 +98,6 @@ public sealed class ListarJanelasDisponiveisUseCase(
         var bloqueios = await bloqueioRepository.GetByStorefrontPeriodoAsync(
             storefront.Id, inicio, fim, ct);
 
-        var diaInteiroBloqueado = bloqueios
-            .Where(b => b.JanelaEspecificaId == null)
-            .Select(b => b.Data)
-            .ToHashSet();
-
-        var bloqueioEspecifico = bloqueios
-            .Where(b => b.JanelaEspecificaId != null)
-            .ToLookup(b => (b.Data, b.JanelaEspecificaId!.Value));
-
         // 8. Contar vagas ocupadas — query única anti-N+1
         var janelaIds = janelas.Select(j => j.Id).ToList();
         var contagens = await vagaOcupadaRepository.ContarPorJanelaPeriodoAsync(
@@ -115,22 +107,11 @@ public sealed class ListarJanelasDisponiveisUseCase(
         var resultado = new List<JanelaDisponivelDto>();
         for (var data = inicio; data <= fim; data = data.AddDays(1))
         {
-            if (diaInteiroBloqueado.Contains(data))
-                continue;
-
             foreach (var janela in janelas)
             {
-                if (janela.DiaDaSemana != (int)data.DayOfWeek)
-                    continue;
-
-                if (bloqueioEspecifico[(data, janela.Id)].Any())
-                    continue;
-
-                if (CalculadoraPrazoPedido.JanelaJaPassou(data, janela.HoraFim, agoraUtc))
-                    continue;
-
-                // #1874: sem prazo informado (site) vale 0, e janela cujo início já passou não é oferecida.
-                if (!CalculadoraPrazoPedido.AtendePrazo(data, janela.HoraInicio, agoraUtc, input.PrazoMinimoMinutos ?? 0))
+                // #2018: a mesma regra do checkout (JanelaEntrega.AvaliarEm). #1874: sem prazo informado (site) vale 0, e
+                // janela cujo início já passou não é oferecida.
+                if (janela.AvaliarEm(data, bloqueios, agoraUtc, input.PrazoMinimoMinutos ?? 0) != DisponibilidadeDaJanela.Atende)
                     continue;
 
                 var ocupadas = contagens.TryGetValue((janela.Id, data), out var c) ? c : 0;
@@ -153,14 +134,4 @@ public sealed class ListarJanelasDisponiveisUseCase(
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
-    private static string NormalizarCep(string? cep)
-    {
-        if (string.IsNullOrWhiteSpace(cep)) return string.Empty;
-        var sb = new StringBuilder(cep.Length);
-        foreach (var c in cep)
-        {
-            if (char.IsDigit(c)) sb.Append(c);
-        }
-        return sb.ToString();
-    }
 }

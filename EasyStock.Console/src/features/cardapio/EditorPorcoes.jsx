@@ -1,4 +1,6 @@
 import { Botao } from '../../componentes/Botao'
+import { CampoReais } from '../../componentes/CampoReais'
+import { centavosDoTexto, lerMoeda, textoDosCentavos } from '../../dominio/formato'
 import { comPadrao, porcaoNova } from '../../dominio/porcoes'
 import css from './editorItem.module.css'
 
@@ -24,7 +26,8 @@ export function EditorPorcoes({ linhas, aoMudar, desabilitado = false, embalagen
         <div key={l.chave} className={css.porcao}>
           <label className={css.campo}>Nome da porção<input placeholder="Ex.: Individual" maxLength={60} value={l.rotulo} onChange={(e) => mudar(l.chave, 'rotulo', e.target.value)} /></label>
           <label className={css.campo}>Peso para mostrar<input placeholder="Ex.: 300 g" maxLength={40} value={l.peso} onChange={(e) => mudar(l.chave, 'peso', e.target.value)} /></label>
-          <label className={css.campo}>Preço<input aria-label={`Preço de ${l.rotulo || 'porção'}`} inputMode="decimal" placeholder="0,00" value={l.preco} onChange={(e) => mudar(l.chave, 'preco', e.target.value)} /></label>
+          <CampoReais rotulo="Preço" aria-label={`Preço de ${l.rotulo || 'porção'}`} centavos={centavosDoTexto(l.preco)} ler={lerMoeda} mostrarZero
+            aoMudar={(centavos) => mudar(l.chave, 'preco', textoDosCentavos(centavos))} />
           {opcoesDeEmbalagem(l).length > 0 && (
             <label className={`${css.campo} ${css.embalagemDaPorcao}`}>Embalagem
               <select aria-label={`Embalagem de ${l.rotulo || 'porção'}`} value={l.embalagemId ?? ''} onChange={(e) => mudar(l.chave, 'embalagemId', e.target.value || null)}>

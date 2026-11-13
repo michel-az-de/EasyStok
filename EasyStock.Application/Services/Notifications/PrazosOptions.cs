@@ -26,9 +26,15 @@ public sealed class PrazosOptions
     public string ConsoleUrl { get; set; } = "https://app.easystok.online";
 
     /// <summary>Onde o aviso abre: o cliente sem resposta vai direto ao Balcão; o resto, ao console.</summary>
-    public string LinkPara(TipoPrazo tipo)
-    {
-        var console = (string.IsNullOrWhiteSpace(ConsoleUrl) ? "https://app.easystok.online" : ConsoleUrl.Trim()).TrimEnd('/');
-        return tipo == TipoPrazo.ClienteSemResposta ? $"{console}/#/m/atendimento/balcao" : $"{console}/";
-    }
+    public string LinkPara(TipoPrazo tipo) =>
+        tipo == TipoPrazo.ClienteSemResposta ? LinkBalcao() : LinkConsole();
+
+    /// <summary>Raiz do console, com barra no fim.</summary>
+    public string LinkConsole() => $"{Console()}/";
+
+    /// <summary>O Balcão do atendimento, onde a equipe responde a conversa.</summary>
+    public string LinkBalcao() => $"{Console()}/#/m/atendimento/balcao";
+
+    private string Console() =>
+        (string.IsNullOrWhiteSpace(ConsoleUrl) ? "https://app.easystok.online" : ConsoleUrl.Trim()).TrimEnd('/');
 }

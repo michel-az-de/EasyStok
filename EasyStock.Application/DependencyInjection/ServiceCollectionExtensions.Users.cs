@@ -56,6 +56,11 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AtualizarConfiguracaoLojaUseCase>();
         services.AddScoped<ResetarConfiguracaoLojaUseCase>();
 
+        // Regra de impressão da loja (#2199)
+        services.AddScoped<EasyStock.Application.UseCases.ImpressaoLoja.ObterRegraImpressaoLojaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.ImpressaoLoja.GravarRegraImpressaoLojaUseCase>();
+        services.AddScoped<EasyStock.Application.UseCases.Lotes.GarantirNumeroCurtoLoteUseCase>();
+
         // Favoritos do menu lateral / "Meu dia" (ADR-0032, fatia 4)
         services.AddScoped<EasyStock.Application.UseCases.MenuFavoritos.ObterFavoritosMenuUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.MenuFavoritos.SalvarFavoritosMenuUseCase>();
