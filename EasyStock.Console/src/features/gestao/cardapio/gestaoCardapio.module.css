@@ -28,11 +28,13 @@
 .contador { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
 .contador .link { min-height: 0; padding: 0 0 0 var(--e-3); border-left: var(--b-1) solid var(--linha-forte); border-radius: 0; background: transparent; color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
 .contador .link:hover { color: var(--tinta); background: transparent; }
-.ajuda { position: relative; }
+/* O balão ancora na linha inteira, não no link: assim não vaza da tela quando a linha quebra. */
+.leitura { position: relative; }
+.ajuda { position: static; }
 .ajuda summary { list-style: none; cursor: pointer; min-height: var(--toque); align-content: center; text-decoration: underline; text-underline-offset: 3px; }
 .ajuda summary::-webkit-details-marker { display: none; }
 .ajuda summary:hover { color: var(--tinta); }
-.ajuda p { position: absolute; right: 0; top: 100%; z-index: 5; width: min(32rem, 85cqi); margin: 0; padding: var(--e-3) var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); box-shadow: var(--sombra); color: var(--tinta-2); line-height: var(--lh-corpo); }
+.ajuda p { position: absolute; right: 0; top: 100%; z-index: 5; width: min(32rem, 100%); box-sizing: border-box; margin: 0; padding: var(--e-3) var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--papel); box-shadow: var(--sombra); color: var(--tinta-2); line-height: var(--lh-corpo); }
 
 .aviso { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; padding: var(--e-3); background: var(--alerta-pastel); color: var(--alerta); border-radius: var(--r-2); font-size: var(--t-apoio); }
 .aviso span { min-width: 0; overflow-wrap: anywhere; }
@@ -78,7 +80,8 @@ button.abrirFoto:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--marca-claro)
 .rotuloPendencia { color: var(--marca-forte); font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto); }
 .pedirDica { color: var(--tinta-3); }
 .dica { grid-area: dica; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-2); margin: var(--e-2) 0 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
-.dica:empty { display: none; }
+/* Vazia, a região viva sai do fluxo sem sumir da árvore de acessibilidade, para a dica ser anunciada. */
+.dica:empty { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); }
 .dica small { color: var(--tinta-3); }
 
 /* #2258 (auditoria C5): lápis e ⋮ juntos à direita, não um em cada ponta da linha. */
