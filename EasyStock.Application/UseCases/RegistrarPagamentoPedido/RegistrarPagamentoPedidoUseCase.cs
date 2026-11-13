@@ -40,7 +40,8 @@ public class RegistrarPagamentoPedidoUseCase(
     ICaixaRepository? caixaRepo = null,
     SaldoFinanceiroPedido? saldos = null,
     Lazy<EasyStock.Application.Services.Atendimento.AvisoStatusPedidoCliente>? avisoCliente = null,
-    EasyStock.Application.UseCases.ListarFechamentosCaixa.ListarFechamentosCaixaUseCase? fechamentos = null)
+    EasyStock.Application.UseCases.ListarFechamentosCaixa.ListarFechamentosCaixaUseCase? fechamentos = null,
+    ICadastrosFinanceirosRepository? cadastrosFinanceiros = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -80,6 +81,16 @@ public class RegistrarPagamentoPedidoUseCase(
             // Um takeover pode ter ocorrido enquanto o primeiro recebimento segurava este lock.
             // O recibo e o pagamento foram gravados juntos; releia antes de aplicar outro parcial.
             if (recuperarRecibo is not null && await recuperarRecibo(token) is { } recibo) return recibo;
+
+            // Configuração vale para novas confirmações manuais. Recibos e dinheiro já recebido pelo
+            // provedor permanecem recuperáveis mesmo depois de a loja desativar o método.
+            if (!cmd.ConfirmadoPeloProvedor && cadastrosFinanceiros is not null
+                && await cadastrosFinanceiros.ObterMetodoAsync(cmd.EmpresaId, metodo, token) is { } configurado)
+            {
+                if (configurado.EmpresaId != cmd.EmpresaId) throw new UseCaseValidationException("Método de outra empresa.");
+                if (!configurado.Ativo)
+                    throw new UseCaseValidationException("Esta forma de pagamento está inativa. Escolha outra forma ou revise Cadastros.");
+            }
 
             // Pagamento manual so em pedido operacional: pre-operacional (montagem / pagamento
             // online pendente / aprovacao do cardapio guest) ainda nao e recebivel. Fecha o

@@ -43,6 +43,8 @@ export const cotarCorrida = (id, veiculo) => chamarApi(`${V}/${id}/corridas/cota
 export const chamarCorrida = (id, corpo) => chamarApi(`${V}/${id}/corridas/chamar`, { metodo: 'POST', corpo })
 export const atualizarCorrida = (id, corridaId) => chamarApi(`${V}/${id}/corridas/${corridaId}`)
 export const cancelarCorrida = (id, corridaId) => chamarApi(`${V}/${id}/corridas/${corridaId}/cancelar`, { metodo: 'POST' })
+// #2168: a corrida que a Lalamove não confirmou só sai com a atendente dizendo que conferiu o painel.
+export const liberarCorrida = (id, corridaId) => chamarApi(`${V}/${id}/corridas/${corridaId}/liberar`, { metodo: 'POST' })
 export const gorjetaCorrida = (id, corridaId, centavos) =>
   chamarApi(`${V}/${id}/corridas/${corridaId}/gorjeta`, { metodo: 'POST', corpo: { centavos } })
 // #1776 (item 19): com saldo a receber a API responde 409 SALDO_A_RECEBER até `confirmarSaldoAReceber`.

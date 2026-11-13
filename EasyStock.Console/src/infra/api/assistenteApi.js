@@ -1,5 +1,11 @@
 import { chamarApi } from './cliente'
 
+export function inferirCadastroDaConversa(conversaId, { sinal, identidadeEsperada } = {}) {
+  return chamarApi('/api/atendimento/assistente/cadastro', {
+    metodo: 'POST', corpo: { conversaId }, sinal, identidadeEsperada,
+  })
+}
+
 // Assistente da dona (S47): `api/atendimento/assistente`. A resposta volta só para o console e
 // nunca vai ao cliente. Com conversa, traz também as ações que o modelo propôs (#1445:
 // `{ tipo, texto, tela }`), que só rodam no clique da atendente. Sem a chave da Anthropic na API,

@@ -37,6 +37,8 @@ public sealed class ConsultarPedidoFerramenta(
         var pedidoId = Guid.TryParse(FerramentaJson.LerTexto(entrada, "pedido_id"), out var informado)
             ? informado
             : conversa.PedidoEmAndamentoId;
+        if (pedidoId == Guid.Empty)
+            return FerramentaJson.Serializar(new { erro = "pedido_nao_encontrado" });
         if (pedidoId is null)
         {
             var ultimos = await pedidoRepository.ListByClienteAsync(contexto.EmpresaId, clienteId, max: 1);

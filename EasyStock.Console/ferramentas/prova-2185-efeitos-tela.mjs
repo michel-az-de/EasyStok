@@ -43,6 +43,7 @@ import React, { useMemo, useReducer, useState, useSyncExternalStore } from 'reac
 import { createRoot } from 'react-dom/client'
 import { ContextoAcoes, ContextoCatalogo, ContextoEstado } from '/src/aplicacao/contextos.js'
 import { ContextoAcessoModulos } from '/src/aplicacao/acessoModulos.jsx'
+import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '/src/aplicacao/rascunhosDosAjustes.js'
 import { reducer } from '/src/aplicacao/reducer.js'
 import { estadoInicial } from '/src/aplicacao/reducer/estadoInicial.js'
 import * as A from '/src/aplicacao/acoes.js'
@@ -51,6 +52,7 @@ import { BalaoAssistente } from '/src/features/assistente/BalaoAssistente.jsx'
 import { PainelConversas } from '/src/features/caixa-de-entrada/PainelConversas.jsx'
 import { ModalEncerrar } from '/src/features/encerramento/ModalEncerrar.jsx'
 import { ModalCliente } from '/src/features/ficha-cliente/ModalCliente.jsx'
+import { ModalGestao } from '/src/features/gestao/ModalGestao.jsx'
 import { ProvedorDeAviso } from '/src/componentes/Aviso.jsx'
 import { PilhaDeAvisos } from '/src/app/PilhaDeAvisos.jsx'
 import { Moldura } from '/src/app/Moldura.jsx'
@@ -58,6 +60,7 @@ import { ModalNota } from '/src/features/notas/ModalNota.jsx'
 import { criarRascunhosDeNotas } from '/src/aplicacao/rascunhosDeNotas.js'
 import { BlocoColaborativoIa } from '/src/features/ficha-cliente/AreaColaborativaIa.jsx'
 import { identidadeDaMontagem } from '/src/aplicacao/montagemFicha.js'
+import { chaveDaAssistencia } from '/src/aplicacao/contextoAssistencia.js'
 import { useTamanhoTela } from '/src/hooks/useTamanhoTela.js'
 import { CANAIS } from '/src/infra/catalogo.js'
 import { REGRAS_PADRAO } from '/src/dominio/automacao.js'
@@ -124,6 +127,7 @@ function Nota() {
 
 function Cena() {
   const tamanho = useTamanhoTela()
+  const [gestaoAberta, abrirGestao] = useState(false)
   const [estado, despachar] = useReducer(reducer, null, iniciar)
   const [ocultoNoCelular, setOculto] = useState(false)
   const [avisos, setAvisos] = useState(q.get('aviso') === '1' ? [
@@ -190,7 +194,7 @@ function Cena() {
       {cena === 'ficha' && selecionada && <ModalCliente conversa={nomeSincronizado ? { ...selecionada, nome: nomeSincronizado } : selecionada} aoFechar={() => chamadas.push(['fecharFicha'])} />}
       {cena === 'bloco' && selecionada && (
         <BlocoColaborativoIa
-          bloco={{ id: 'b1', geracaoId: 'g1', tipo: 'resposta', acao: 'rascunho', texto: 'Confirmo às 12h.', conversaId: selecionada.id, identidadeSessao: identidadeDaMontagem() }}
+          bloco={{ id: 'b1', geracaoId: 'g1', tipo: 'resposta', acao: 'rascunho', texto: 'Confirmo às 12h.', conversaId: selecionada.id, identidadeSessao: identidadeDaMontagem(), contextoAssistencia: chaveDaAssistencia(selecionada, identidadeDaMontagem()) }}
           aoRascunho={(texto) => { chamadas.push(['rascunhoDaFicha', texto]); return true }}
         />
       )}
@@ -199,11 +203,12 @@ function Cena() {
         <>
           <Moldura
             tamanho={tamanho} aoAbrirNota={noop} aoAbrirGaleria={noop} aoAbrirBiblioteca={noop} aoAbrirCardapio={noop}
-            aoAbrirAutomacoes={noop} aoAbrirGestao={noop} aoAbrirEntregas={noop} aoAbrirAjuda={noop} aoRascunho={noop}
+            aoAbrirAutomacoes={noop} aoAbrirGestao={() => abrirGestao(true)} aoAbrirEntregas={noop} aoAbrirAjuda={noop} aoRascunho={noop}
             simulando={false} aoAlternarSimulacoes={null} larguras={{ balcao: 320, ficha: 360, cardapio: 420 }} aoRedimensionar={noop}
             slotEditorNota={null} solicitacaoPainel={null}
           />
           <PilhaDeAvisos />
+          {gestaoAberta && <ModalGestao aoFechar={() => abrirGestao(false)} />}
         </>
       )}
       {cena === 'painel' && (
@@ -223,7 +228,12 @@ function Cena() {
     </ContextoCatalogo></ContextoAcoes></ContextoEstado></ContextoAcessoModulos.Provider>
   )
 }
-createRoot(document.getElementById('root')).render(<Cena />)
+function Ajustes() {
+  const [rascunhos, definir] = useState({})
+  const gravacoes = useGravacoesDosAjustes()
+  return <ContextoRascunhosDosAjustes.Provider value={{ rascunhos, definir: (chave, valor) => definir(atual => ({ ...atual, [chave]: valor })), ...gravacoes }}><Cena /></ContextoRascunhosDosAjustes.Provider>
+}
+createRoot(document.getElementById('root')).render(<Ajustes />)
 `)
 
 process.env.VITE_FONTE_DADOS = 'api'
@@ -503,7 +513,7 @@ try {
   })
   await confere('F16. Ficha: cadastro rápido pela metade não fecha com Esc; sem digitar, fecha', async () => {
     const { ctx, p } = await abrir('cena=ficha&inicial=lead')
-    const janela = p.getByRole('dialog', { name: 'Cadastro do cliente' }) // #2437: a janela da ficha é "Cadastro do cliente" desde a #2260
+    const janela = p.getByRole('dialog', { name: 'Cadastro do cliente' })
     await janela.waitFor()
     await janela.getByLabel('Endereço', { exact: true }).first().fill('Rua das Flores, 120, Centro')
     await p.keyboard.press('Escape')
@@ -582,19 +592,18 @@ try {
   await confere('F25. conversa aberta a partir de "Concluídas" ganha o destaque da selecionada', async () => {
     const { ctx, p } = await abrir('inicial=meu')
     await esperarPainel(p)
-    await p.getByRole('button', { name: /^Todas/ }).click() // #2437: a lista abre em "Precisa de você"; "Concluídas" só existe em "Todas"
+    await p.getByRole('button', { name: /^Todas/ }).click()
     await p.getByRole('button', { name: /^Concluídas/ }).click()
     await p.getByText('Cliente fechada0').first().click()
     await p.waitForFunction(() => document.querySelector('[aria-current="true"]') !== null)
     assert.match(await p.locator('[aria-current="true"]').first().innerText(), /fechada0/)
     await ctx.close()
   })
-  await confere('F18. chip "Todas" conta só as abertas, sem encerradas nem bloqueadas; o título não repete o número', async () => {
+  await confere('F18. chip "Todas" conta abertas sem encerradas nem bloqueadas; título não duplica o número', async () => {
     const { ctx, p } = await abrir('inicial=meu')
     await esperarPainel(p)
     const abertas = await p.evaluate(() => window.estadoCena().conversas.filter((c) => c.estado !== 'Encerrado' && !c.bloqueio).length)
-    // #2437: o título deixou de trazer número na #2232 (L1); o total fica só no chip "Todas".
-    assert.equal((await p.locator('h2', { hasText: 'Conversas' }).first().innerText()).replace(/\D/g, ''), '')
+    assert.equal(await p.locator('h2', { hasText: 'Conversas' }).first().innerText(), 'Conversas')
     assert.equal((await p.getByRole('button', { name: /^Todas/ }).innerText()).replace(/\D/g, ''), String(abertas))
     await ctx.close()
   })
@@ -694,7 +703,22 @@ try {
   // --- Moldura (celular): F8, E29 e a contagem da aba ---------------------------------------------------
   const celular = { width: 390, height: 780 }
   const aba = (p, nome) => p.getByRole('tab', { name: nome, exact: nome !== 'Conversas' })
-  await confere('F8. no celular, abrir a conversa pelo aviso na tela leva à aba Conversa', async () => {
+  await confere('R4. Gestão aberta da aba Conversas volta às Mensagens pelo canal real, com toque390', async () => {
+    const { ctx, p } = await abrir('cena=moldura&inicial=meu', { ...celular, toque: true })
+    await aba(p, 'Conversas').waitFor()
+    assert.equal(await aba(p, 'Conversas').getAttribute('aria-selected'), 'true')
+    await p.getByRole('button', { name: 'Mais opções', exact: true }).tap()
+    await p.getByRole('menuitem', { name: 'Gestão', exact: true }).tap()
+    const gestao = p.getByRole('dialog', { name: 'Gestão da loja', exact: true })
+    await gestao.getByRole('button', { name: 'Leads e clientes', exact: true }).tap()
+    await gestao.getByRole('button', { name: 'Voltar à conversa', exact: true }).tap()
+    assert.equal(await gestao.count(), 0)
+    assert.equal(await aba(p, 'Mensagens').getAttribute('aria-selected'), 'true')
+    await campo(p).tap()
+    await p.screenshot({ path: resolve(raiz, '.build/2395/retorno-mensagens-390.png') })
+    await ctx.close()
+  })
+  await confere('F8. no celular, abrir a conversa pelo aviso na tela leva à aba Mensagens', async () => {
     const { ctx, p } = await abrir('cena=moldura&inicial=nenhuma&aviso=1', celular)
     await aba(p, 'Conversas').waitFor()
     assert.equal(await aba(p, 'Conversas').getAttribute('aria-selected'), 'true')
@@ -702,12 +726,12 @@ try {
     await p.waitForFunction(() => [...document.querySelectorAll('[role="tab"]')].find((t) => /^Mensagens$/.test(t.textContent.trim()))?.getAttribute('aria-selected') === 'true')
     await ctx.close()
   })
-  await confere('F24. no celular, o painel da conversa só conta como à vista na aba Conversa', async () => {
+  await confere('F24. no celular, o painel da conversa só conta como à vista na aba Mensagens', async () => {
     const { ctx, p } = await abrir('cena=moldura&inicial=meu', celular)
     await aba(p, 'Conversas').waitFor()
     const naTela = async () => (await chamadasDe(p)).filter((c) => c[0] === 'painelNaTela').at(-1)?.[1]
     assert.equal(await naTela(), false)
-    await aba(p, 'Mensagens').click() // #2437: a aba da conversa se chama "Mensagens" desde a #2232
+    await aba(p, 'Mensagens').click()
     await p.waitForFunction(() => window.chamadas.filter((c) => c[0] === 'painelNaTela').at(-1)?.[1] === true)
     await aba(p, 'Conversas').click()
     await p.waitForFunction(() => window.chamadas.filter((c) => c[0] === 'painelNaTela').at(-1)?.[1] === false)
@@ -719,16 +743,15 @@ try {
     assert.equal((await chamadasDe(p)).filter((c) => c[0] === 'painelNaTela').at(-1)?.[1], true)
     await ctx.close()
   })
-  await confere('F18. a aba "Conversas" do celular mostra o mesmo número do chip "Precisa de você" (#2232 L11)', async () => {
+  await confere('F18. a aba "Conversas" do celular conta quem precisa de você, mesmo ao listar todas', async () => {
     const { ctx, p } = await abrir('cena=moldura&inicial=nenhuma', celular)
     await aba(p, 'Conversas').waitFor()
-    // #2437: desde a #2232 (L11) a aba conta o que pede ação, o mesmo número do chip "Precisa de você", e não o total de abertas.
-    const precisam = (await p.getByRole('button', { name: /^Precisa de você/ }).innerText()).replace(/\D/g, '')
-    assert.ok(Number(precisam) > 0)
-    assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), precisam)
-    await p.evaluate(() => window.filtrar('aba', 'todas'))
+    const esperadas = '10' // Nesta massa, 12 abertas e 10 que precisam da atendente.
+    assert.equal((await p.getByRole('button', { name: /^Precisa de você/ }).innerText()).replace(/[^0-9]/g, ''), esperadas)
+    assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), esperadas)
+    await p.getByRole('button', { name: /^Todas/ }).click()
     await p.waitForTimeout(100)
-    assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), precisam, 'trocar a aba da lista não muda o número da aba do celular')
+    assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), esperadas, 'listar todas não muda o total que precisa da atendente')
     await ctx.close()
   })
   await confere('E29. no modo API o F2 não é capturado (não há Simular)', async () => {

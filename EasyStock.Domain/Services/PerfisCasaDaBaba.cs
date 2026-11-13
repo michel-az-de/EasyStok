@@ -18,7 +18,7 @@ public static class PerfisCasaDaBaba
     [
         new("Dona", NivelAcesso.Admin, null,
         [
-            .. Enum.GetValues<Modulo>().Select(AcessoModulos.PermissaoDe),
+            .. Enum.GetValues<Modulo>().Select(AcessoModulos.PermissaoDe).Distinct(),
             Permissao.GerenciarUsuarios, Permissao.GerenciarProdutos, Permissao.GerenciarEstoque,
             Permissao.VisualizarRelatorios, Permissao.VisualizarContasAPagar, Permissao.GerenciarContasAPagar,
             Permissao.VisualizarContasAReceber, Permissao.GerenciarContasAReceber,

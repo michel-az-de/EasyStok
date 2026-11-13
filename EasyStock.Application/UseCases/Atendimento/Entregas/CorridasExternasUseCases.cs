@@ -14,13 +14,15 @@ public sealed record CorridaExternaResult(
     Guid Id, Guid ViagemId, EmpresaEntregador Provedor, OrigemCorridaExterna Origem, int CustoCentavos, string? Motorista,
     Guid RegistradoPorUsuarioId, DateTime RegistradoEm, Guid? CorrigidoPorUsuarioId, DateTime? CorrigidoEm,
     StatusCorrida? Status = null, VeiculoCorrida? Veiculo = null, int? CustoCotadoCentavos = null, string? LinkRastreio = null,
-    string? MotoristaTelefone = null, string? MotoristaPlaca = null, bool Ativa = false, bool PodeCancelar = false)
+    string? MotoristaTelefone = null, string? MotoristaPlaca = null, bool Ativa = false, bool PodeCancelar = false,
+    int GorjetaCentavos = 0, DateTime? CancelaSemCustoAte = null, bool ConferirNoProvedor = false)
 {
     internal static CorridaExternaResult De(CorridaExterna c, DateTime? agora = null) => new(
         c.Id, c.ViagemId, c.Provedor, c.Origem, c.CustoCentavos, c.Motorista,
         c.RegistradoPorUsuarioId, c.RegistradoEm, c.CorrigidoPorUsuarioId, c.CorrigidoEm,
         c.Status, c.Veiculo, c.CustoCotadoCentavos, c.LinkRastreio, c.MotoristaTelefone, c.MotoristaPlaca, c.Ativa,
-        agora is { } instante && c.PodeCancelar(instante));
+        agora is { } instante && c.PodeCancelar(instante), c.GorjetaCentavos, c.CancelaSemCustoAte,
+        agora is { } momento && c.AguardaConferencia(momento));
 }
 
 public sealed record RegistrarCorridaExternaInput(

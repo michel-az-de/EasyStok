@@ -50,6 +50,27 @@ public class ObterPedidoConversaUseCaseTests
         return pedido;
     }
 
+    [Theory]
+    [InlineData("Dona R4")]
+    [InlineData(null)]
+    public async Task PagamentoPreservaAutorRegistradoSemInventarAutorParaLegado(string? autor)
+    {
+        var conversa = NovaConversa();
+        var pedido = NovoPedido(conversa, StatusPedidoMapper.Aguardando);
+        var pagamento = new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix",
+            Valor = 10m, PagoEm = Agora, RegistradoPorNome = autor };
+        pedido.Pagamentos.Add(pagamento);
+
+        var resultado = await _useCase.ExecuteAsync(_empresaId, conversa.Id);
+
+        var recebido = resultado!.Pagamentos.Should().ContainSingle().Subject;
+        recebido.Id.Should().Be(pagamento.Id);
+        recebido.Valor.Should().Be(10m);
+        recebido.Metodo.Should().Be("pix");
+        recebido.PagoEm.Should().Be(Agora);
+        recebido.RegistradoPorNome.Should().Be(autor);
+    }
+
     [Fact]
     public async Task PedidoQueRequerAprovacao_AvisaOConsoleAntesDaBaixa()
     {

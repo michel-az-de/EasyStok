@@ -3,14 +3,18 @@ import { Bloco } from '../../componentes/Bloco'
 import { Botao } from '../../componentes/Botao'
 import { partesDoEndereco } from '../../dominio/formato'
 import { DECISOES_DE_EXCECAO, SITUACOES } from '../../dominio/areaEntrega'
+import { identidadeDaEdicao } from '../../dominio/identidadeDaEdicao'
+import { ConferirDestinoDaEdicao } from './ConferirDestinoDaEdicao'
 import css from './ficha.module.css'
 
 // UC-02: quando o CEP capturado está fora ou no limite, o botão único de
 // confirmar vira as três ações de um toque da dona (liberar, virar encomenda
 // agendada, recusar com cortesia), com o bairro à mostra para ela decidir.
 export function BlocoEnderecoCapturado({
-  endereco, situacaoArea, faixasDeDistancia = null, aoConfirmar, aoDecidirArea,
+  endereco: enderecoAtual, situacaoArea, faixasDeDistancia = null, aoConfirmar, aoDecidirArea, conversa,
 }) {
+  const [edicao, guardarEdicao] = useState(() => ({ identidade: conversa ? identidadeDaEdicao(conversa) : null, endereco: enderecoAtual }))
+  const endereco = conversa ? edicao.endereco : enderecoAtual
   const foraOuLimite = situacaoArea === SITUACOES.FORA || situacaoArea === SITUACOES.LIMITE
   const { bairro } = partesDoEndereco(endereco)
   // Rodada 10, item 5: US-013 pede endereço E distância. Sem geocodificação
@@ -36,7 +40,7 @@ export function BlocoEnderecoCapturado({
     setConfirmando(true)
     setRecusa(null)
     try {
-      const resultado = await aoConfirmar()
+      const resultado = await aoConfirmar(edicao.identidade, endereco)
       if (resultado?.erro) setRecusa({ endereco, texto: resultado.erro })
     } catch (falha) {
       setRecusa({ endereco, texto: falha.message || 'Não foi possível cadastrar. Tente de novo.' })
@@ -49,6 +53,7 @@ export function BlocoEnderecoCapturado({
   return (
     <Bloco titulo="Endereço capturado" destaque>
       <p className={css.enderecoLiteral}>{endereco}</p>
+      {conversa && <ConferirDestinoDaEdicao identidade={edicao.identidade} conversa={conversa} aoConferir={identidade => { guardarEdicao({ ...edicao, identidade }); setRecusa(null) }} />}
       {foraOuLimite ? (
         <>
           <p className={css.rodapeBloco} style={{ marginTop: 0 }}>

@@ -89,7 +89,7 @@ provar('ordenar não reintroduz módulos proibidos em nenhuma combinação de ac
 provar('mover para frente conserva todos os módulos, favoritos e snapshot anterior', () => {
   const atual = alternarFavoritoDoHall(inicial, 'entregas')
   const antes = structuredClone(atual)
-  const movida = moverModuloDoHall(atual, 'entregas', 'cardapio')
+  const movida = moverModuloDoHall(atual, 'entregas', catalogo[0])
   assert.equal(movida.ordem[0], 'entregas')
   assert.deepEqual(movida.favoritos, ['entregas'])
   assert.deepEqual(new Set(movida.ordem), new Set(catalogo))

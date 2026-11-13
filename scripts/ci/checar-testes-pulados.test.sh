@@ -34,7 +34,9 @@ caso "tudo passou: verde" 0 "$TMP/verde"
 mkdir -p "$TMP/optin"; trx "$TMP/optin/a.trx" "Passed|" \
   "NotExecuted|Defina EASYSTOCK_PERF_PG com a connection string de um Postgres real para rodar a medição." \
   "NotExecuted|Ensaio opt-in requer EASYSTOK_COMANDA_GO_LIVE_FIXTURE explícito." \
-  "NotExecuted|Fixture interativa requer EASYSTOK_COMANDA_BROWSER_FIXTURE explícito."
+  "NotExecuted|Fixture interativa requer EASYSTOK_COMANDA_BROWSER_FIXTURE explícito." \
+  "NotExecuted|Fixture opt-in: informe EASYSTOK_R4_BROWSER_FIXTURE." \
+  "NotExecuted|Inferência real desligada. Exige opt-in EASYSTOK_TEST_CADASTRO_CLI_REAL=1 e EASYSTOK_TEST_CLAUDE_PATH absoluto."
 caso "pulo opt-in por variável: verde" 0 "$TMP/optin"
 
 mkdir -p "$TMP/pg"; trx "$TMP/pg/a.trx" "Passed|" "NotExecuted|Docker/PostgreSQL unavailable"
@@ -45,6 +47,14 @@ caso "motivo livre da fixture (ex.Message): vermelho" 1 "$TMP/motivo"
 
 mkdir -p "$TMP/varios"; trx "$TMP/varios/a.trx" "Passed|"; trx "$TMP/varios/b.trx" "NotExecuted|PG indisponível"
 caso "pulo em outro assembly: vermelho" 1 "$TMP/varios"
+
+mkdir -p "$TMP/cli-sem-optin"; trx "$TMP/cli-sem-optin/a.trx" "NotExecuted|Caminho EASYSTOK_TEST_CLAUDE_PATH não configurado."
+caso "caminho do CLI não é opt-in: vermelho" 1 "$TMP/cli-sem-optin"
+
+mkdir -p "$TMP/optin-e-pg"; trx "$TMP/optin-e-pg/a.trx" \
+  "NotExecuted|Fixture opt-in: informe EASYSTOK_R4_BROWSER_FIXTURE." \
+  "NotExecuted|Docker/PostgreSQL indisponível."
+caso "opt-in não encobre Docker indisponível: vermelho" 1 "$TMP/optin-e-pg"
 
 mkdir -p "$TMP/vazio"
 caso "sem trx: vermelho (não prova nada)" 1 "$TMP/vazio"

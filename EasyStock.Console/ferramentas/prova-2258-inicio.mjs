@@ -194,7 +194,7 @@ caso('P1: Produção é medida pelos lotes vencidos e nunca diz "Tudo em dia" se
 })
 
 caso('A2: a ordem padrão da home segue ORDEM_DOS_MODULOS; a ordem salva pela usuária continua valendo', () => {
-  assert.deepEqual(modulos.ORDEM_DOS_MODULOS.slice(0, 7), ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro', 'configuracoes'])
+  assert.deepEqual(modulos.ORDEM_DOS_MODULOS.slice(0, 8), ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro', 'cadastros', 'configuracoes'])
   assert.deepEqual(estado.comOrdemPorUso(null).ordem, modulos.ORDEM_DOS_MODULOS)
   assert.deepEqual(estado.restaurarOrdemPorUso(null).ordem, modulos.ORDEM_DOS_MODULOS)
   const ids = modulos.modulosDoHall({ fonteApi: true }).map((modulo) => modulo.id)

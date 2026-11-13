@@ -72,6 +72,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
 
         var corpo = new
         {
+            clienteId = cenario.ClienteId, vinculoRevisao = cenario.VinculoRevisao,
             itens = new[] { new { cardapioItemId = cenario.CardapioItemId, qtd = 1 } },
             janelaId = cenario.JanelaId,
             dataEntrega = cenario.DataEntrega.ToString("yyyy-MM-dd"),
@@ -96,7 +97,53 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
         conversa.PedidoEmAndamentoId.Should().Be(pedidos[0]);
     }
 
-    private sealed record Cenario(Guid ConversaId, Guid ClienteId, Guid CardapioItemId, Guid JanelaId, DateOnly DataEntrega);
+    private sealed record Cenario(Guid ConversaId, Guid ClienteId, Guid CardapioItemId, Guid JanelaId, DateOnly DataEntrega, long VinculoRevisao);
+
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GerarPedido_SnapshotAnteriorARequisicao_RecusaTrocaEAbaSemCriarPedido(bool mesmaPessoa)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()));
+        using var client = factory.CreateClient();
+        var proposta = await SemearAsync(factory);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            var conversa = await db.AtendimentoConversas.SingleAsync(c => c.Id == proposta.ConversaId);
+            var clienteDestino = proposta.ClienteId;
+            if (!mesmaPessoa)
+            {
+                var outra = Cliente.Criar(EmpresaId, "Outra pessoa conferida");
+                var endereco = await db.Set<ClienteEndereco>().SingleAsync(e => e.ClienteId == proposta.ClienteId);
+                outra.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = outra.Id,
+                    Logradouro = endereco.Logradouro, Numero = endereco.Numero, Cep = endereco.Cep,
+                    Bairro = endereco.Bairro, Cidade = endereco.Cidade, Estado = endereco.Estado, Padrao = true,
+                    CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+                db.Clientes.Add(outra);
+                clienteDestino = outra.Id;
+            }
+            conversa.CorrigirVinculoCliente(null, conversa.VinculoRevisao);
+            conversa.CorrigirVinculoCliente(clienteDestino, conversa.VinculoRevisao);
+            await db.SaveChangesAsync();
+        }
+
+        using var resposta = await client.PostAsJsonAsync($"/api/atendimento/conversas/{proposta.ConversaId}/pedido", new
+        {
+            proposta.ClienteId, proposta.VinculoRevisao,
+            itens = new[] { new { cardapioItemId = proposta.CardapioItemId, qtd = 1 } },
+            proposta.JanelaId, proposta.DataEntrega, forma = "na_entrega",
+        });
+
+        resposta.StatusCode.Should().Be(HttpStatusCode.Conflict, await resposta.Content.ReadAsStringAsync());
+        using var erro = System.Text.Json.JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+        erro.RootElement.GetProperty("error").GetProperty("code").GetString().Should().Be("VINCULO_CLIENTE_ALTERADO");
+        using var verificar = factory.Services.CreateScope();
+        var estado = verificar.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        (await estado.Pedidos.IgnoreQueryFilters().AnyAsync(p => p.EmpresaId == EmpresaId)).Should().BeFalse();
+        (await estado.CobrancasPedido.IgnoreQueryFilters().AnyAsync(c => c.EmpresaId == EmpresaId)).Should().BeFalse();
+    }
 
     private static async Task<Cenario> SemearAsync(WebApplicationFactory<Program> factory, string? slug = null, DateOnly? dataEntrega = null)
     {
@@ -156,7 +203,7 @@ public sealed partial class PedidoConversaConcorrenciaTests : IAsyncLifetime
         db.ConfiguracoesAtendimento.Add(atendimento);
 
         await db.SaveChangesAsync();
-        return new Cenario(conversa.Id, cliente.Id, item.Id, janela.Id, dia);
+        return new Cenario(conversa.Id, cliente.Id, item.Id, janela.Id, dia, conversa.VinculoRevisao);
     }
 
     private WebApplicationFactory<Program> CriarFactory(EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient? mp = null, NivelAcesso nivel = NivelAcesso.Operador)

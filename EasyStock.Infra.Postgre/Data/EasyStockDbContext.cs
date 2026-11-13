@@ -17,6 +17,9 @@ namespace EasyStock.Infra.Postgre.Data
 {
     public class EasyStockDbContext : DbContext, IUnitOfWork, IDataProtectionKeyContext
     {
+        [DbFunction(Name = "translate", IsBuiltIn = true)]
+        public static string TraduzirTexto(string texto, string origem, string destino) => throw new NotSupportedException();
+
         private readonly ILogger<EasyStockDbContext>? _logger;
         private readonly ICurrentUserAccessor? _currentUser;
 

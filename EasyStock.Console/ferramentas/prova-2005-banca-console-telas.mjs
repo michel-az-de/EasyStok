@@ -170,6 +170,9 @@ registerHooks({
     return proximo(especificador, contexto)
   },
   load(url, contexto, proximo) {
+    // O recebimento lê os métodos da loja; esta prova de campo usa um catálogo controlado.
+    if (url.endsWith('/aplicacao/useMetodosPagamento.js')) return { format: 'module', shortCircuit: true,
+      source: 'export const useMetodosPagamento=()=>({opcoes:[{valor:"pix",rotulo:"Pix"},{valor:"dinheiro",rotulo:"Dinheiro"}],carregando:false,erro:null})' }
     // #2232 (F7): o ⋮ do pedido (MenuDoPedido) virou item do menu "Ações da ficha" (MenuDaFicha). O Popover dele mede
     // layout (getBoundingClientRect, portal) que este DOM de prova não tem; então o menu vira uma lista de botões, um
     // por item recebido. O menu real tem prova própria em `prova-2232-ficha.mjs`.

@@ -42,10 +42,14 @@ public sealed class AbrirOcorrenciaUseCase(
             throw new UseCaseValidationException("Pedido sem cliente não abre ocorrência.");
 
         Conversa? conversa = null;
-        if (input.ConversaId is { } conversaId)
+        var conversaDoPedido = input.ConversaId
+            ?? await conversas.ObterIdPorPedidoAsync(input.EmpresaId, pedido.Id, ct);
+        if (conversaDoPedido is { } conversaId)
         {
             conversa = await conversas.ObterPorIdAsync(input.EmpresaId, conversaId, ct)
                 ?? throw new UseCaseValidationException("Conversa não encontrada.");
+            if (conversa.EmpresaId != input.EmpresaId)
+                throw new UseCaseValidationException("Conversa não encontrada.");
         }
 
         var agora = relogio.GetUtcNow().UtcDateTime;

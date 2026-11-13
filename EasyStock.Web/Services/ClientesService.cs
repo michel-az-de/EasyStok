@@ -45,7 +45,7 @@ public class ClientesService(ApiClient api, SessionService session) : TenantServ
     public Task<ApiResult<Cliente>> EditarAsync(string id,
         string nome, string? apt, string? endereco, string? telefone,
         string? email, string? documento, string? observacoes,
-        bool pessoaJuridica = false, string? nomeFantasia = null, string? inscricaoEstadual = null)
+        bool pessoaJuridica = false, string? nomeFantasia = null, string? inscricaoEstadual = null, uint? revisao = null)
     {
         if (!Guid.TryParse(id, out var cid))
             return Task.FromResult(ApiResult<Cliente>.Fail("INVALID_ID", "ID de cliente inválido."));
@@ -55,7 +55,7 @@ public class ClientesService(ApiClient api, SessionService session) : TenantServ
 
         return api.PatchAsync<Cliente>($"clientes/{id}", new
         {
-            id = cid, empresaId, nome, apt, endereco, telefone, email, documento, observacoes,
+            id = cid, empresaId, nome, apt, endereco, telefone, email, documento, observacoes, revisao,
             pessoaJuridica, nomeFantasia, inscricaoEstadual,
             origem = "web"
         });

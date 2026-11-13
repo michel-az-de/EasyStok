@@ -1,22 +1,26 @@
 import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
-import { Pilula } from '../../componentes/Pilula'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { CampoReais } from '../../componentes/CampoReais'
 import { useCorridasDaViagem } from '../../aplicacao/useCorridasDaViagem'
 import {
-  EMPRESAS_DE_CORRIDA, GORJETAS_CENTAVOS, VEICULOS_CORRIDA, corpoCorrida, corridaDaApi, custoDasCorridas,
-  empresaPadraoDaCorrida, erroDoFormularioCorrida, formularioDaCorrida, motivoSemChamada, motoristaDaCorrida,
-  podeChamarLalamove, resumoDaCorrida, resumoDaCotacao, statusDaCorrida,
+  EMPRESAS_DE_CORRIDA, corpoCorrida, corridaDaApi, corridaEmCurso, custoDasCorridas, empresaPadraoDaCorrida, erroDoFormularioCorrida,
+  formularioDaCorrida, motivoSemChamada, resumoDaCorrida,
 } from '../../dominio/entregasApi'
 import { centavosDoTexto, lerMoeda, moeda, textoDosCentavos } from '../../dominio/formato'
+import { ChamadaLalamove } from './ChamadaLalamove'
+import { CorridaLalamove } from './CorridaLalamove'
 import css from './entregasApi.module.css'
 
 // Corrida pedida por fora (I9.2, #1691): a atendente chama a 99 ou a Uber pelo app e anota aqui a
 // empresa, o custo e o motorista. Três toques: abrir, digitar o custo, salvar. A Lalamove, com a loja
 // conectada, é chamada daqui pela API (#2162): cotar, chamar, e o status passa a vir sozinho.
-export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
-  const { corridas, conectada, erro, enviando, registrar, corrigir, cotar, chamar, cancelar, gorjeta } = useCorridasDaViagem(viagem.id)
+// `pedido`: o pedido da parada, quando a tela o conhece, para não oferecer a Lalamove antes de ele ficar pronto.
+export function CorridasDaViagem({ viagem, entregadores, ocupado, pedido = null }) {
+  const {
+    corridas, conectada, erro, erroLeitura, enviando, atualizadaEm, semResposta, recarregar, atualizarAgora,
+    registrar, corrigir, cotar, chamar, cancelar, gorjeta, liberar,
+  } = useCorridasDaViagem(viagem.id)
   // null = fechado; { id: null, ... } = corrida nova; { id, ... } = corrigindo.
   const [form, setForm] = useState(null)
   const [aviso, setAviso] = useState(null)
@@ -37,12 +41,20 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
   }
 
   const total = custoDasCorridas(corridas)
+  const motivo = corridas === null ? null : motivoSemChamada(viagem, corridas, conectada, pedido)
   return (
     <section className={css.secao} aria-label="Corridas desta viagem">
+      {erroLeitura && corridas === null && (
+        <div className={css.linha} role="alert">
+          <span className={`${css.erroCampo} ${css.cresce}`}>{erroLeitura}</span>
+          <Botao variante="secundario" icone="refresh-cw" onClick={recarregar}>Tentar de novo</Botao>
+        </div>
+      )}
       {(corridas ?? []).length > 0 && (
         <ul className={css.lista}>
           {corridas.map((corrida) => corridaDaApi(corrida) ? (
-            <CorridaPelaApi key={corrida.id} corrida={corrida} travado={travado} cancelar={cancelar} gorjeta={gorjeta} />
+            <CorridaLalamove key={corrida.id} corrida={corrida} travado={travado} atualizadaEm={atualizadaEm} semResposta={semResposta}
+              cancelar={cancelar} gorjeta={gorjeta} liberar={liberar} atualizarAgora={atualizarAgora} />
           ) : (
             <li key={corrida.id} className={`${css.cartao} ${css.linha}`}>
               <span className={css.cresce}>{resumoDaCorrida(corrida)}</span>
@@ -54,9 +66,10 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
       {(corridas ?? []).length > 1 && <p className={css.apoio}>Custo das corridas desta viagem: <strong>{moeda(total / 100)}</strong></p>}
       {erro && <p className={css.erroCampo} role="alert">{erro}</p>}
 
-      {!form && corridas !== null && (podeChamarLalamove(viagem, corridas, conectada)
-        ? <ChamadaLalamove travado={travado} cotar={cotar} chamar={chamar} />
-        : motivoSemChamada(viagem, corridas, conectada) && <p className={css.apoio}>{motivoSemChamada(viagem, corridas, conectada)}</p>)}
+      {!form && motivo === '' && (
+        <ChamadaLalamove travado={travado} cotar={cotar} chamar={chamar} destino={viagem.paradas?.[0]?.endereco} />
+      )}
+      {!form && motivo && <p className={css.apoio}>{motivo}</p>}
 
       {form ? (
         <form className={css.formulario} onSubmit={salvar} noValidate>
@@ -70,75 +83,13 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado }) {
           </div>
           {aviso && <p className={css.erroCampo} role="alert">{aviso}</p>}
         </form>
-      ) : (
+      ) : !corridaEmCurso(corridas) && (
+        // Com a Lalamove a caminho, anotar outra corrida à mão só confunde o custo da viagem.
         <div className={css.linha}>
           <Botao variante="secundario" icone="plus" disabled={travado || corridas === null} onClick={abrirNova}>Registrar corrida</Botao>
           {corridas !== null && corridas.length === 0 && <span className={css.apoio}>Chamou 99 ou Uber pelo app? Anote o custo aqui.</span>}
         </div>
       )}
     </section>
-  )
-}
-
-// Cotar e chamar: a cotação mostra preço e distância, e a chamada usa a cotação relida no servidor (o preço
-// nunca sai daqui). A cotação vale 5 min; vencida, a API pede para cotar de novo.
-function ChamadaLalamove({ travado, cotar, chamar }) {
-  const [veiculo, setVeiculo] = useState('Moto')
-  const [cotacao, setCotacao] = useState(null)
-  const [observacao, setObservacao] = useState('')
-  const cotarAgora = () => cotar(veiculo).then((c) => { if (c && c !== true) setCotacao(c) })
-  const chamarAgora = () => chamar({ cotacaoId: cotacao.cotacaoId, veiculo, observacao: observacao.trim() || null })
-    .then((ok) => { if (ok) setCotacao(null) })
-  if (!cotacao) {
-    return (
-      <div className={css.linha}>
-        <CampoSelecao rotulo="Veículo" opcoes={VEICULOS_CORRIDA} value={veiculo} disabled={travado} onChange={(e) => setVeiculo(e.target.value)} />
-        <Botao variante="primario" icone="moto" disabled={travado} onClick={cotarAgora}>Cotar Lalamove</Botao>
-      </div>
-    )
-  }
-  return (
-    <div className={css.formulario} aria-label="Cotação da Lalamove">
-      <p><strong>Lalamove de {veiculo.toLowerCase()}: {resumoDaCotacao(cotacao)}</strong></p>
-      <p className={css.apoio}>Vale até {new Date(cotacao.expiraEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. A coleta é na cozinha e a entrega no endereço do pedido.</p>
-      <CampoTexto rotulo="Recado para o motorista (opcional)" maxLength={120} value={observacao} disabled={travado} onChange={(e) => setObservacao(e.target.value)} />
-      <div className={css.linha}>
-        <Botao variante="primario" disabled={travado} onClick={chamarAgora}>Chamar por {moeda(cotacao.valorCentavos / 100)}</Botao>
-        <Botao variante="texto" disabled={travado} onClick={() => setCotacao(null)}>Desistir</Botao>
-      </div>
-    </div>
-  )
-}
-
-// A corrida chamada pela API: status do provedor, motorista e o que a Lalamove ainda aceita (cancelar só sem
-// custo, gorjeta só procurando motorista). Atualiza sozinha a cada 15 s enquanto está em curso.
-function CorridaPelaApi({ corrida, travado, cancelar, gorjeta }) {
-  const status = statusDaCorrida(corrida)
-  const motorista = motoristaDaCorrida(corrida)
-  return (
-    <li className={css.cartao} aria-label={`Corrida Lalamove: ${status.rotulo}`}>
-      <div className={css.linha}>
-        <Pilula tom={status.tom}>{status.rotulo}</Pilula>
-        <span className={css.cresce}>Lalamove · {moeda(corrida.custoCentavos / 100)}{corrida.veiculo === 'Carro' ? ' · carro' : ''}</span>
-        {corrida.linkRastreio && <a href={corrida.linkRastreio} target="_blank" rel="noopener noreferrer"
-          aria-label="Acompanhar no mapa da Lalamove (abre em nova aba)">Acompanhar ↗</a>}
-      </div>
-      {motorista && (
-        <p className={css.apoio}>
-          Motorista: {motorista}
-          {corrida.motoristaTelefone && <> · <a href={`tel:${corrida.motoristaTelefone}`}>{corrida.motoristaTelefone}</a></>}
-        </p>
-      )}
-      {corrida.ativa && (corrida.podeCancelar || corrida.status === 'ProcurandoMotorista') && (
-        <div className={css.linha}>
-          {corrida.status === 'ProcurandoMotorista' && <span className={css.apoio}>Gorjeta para achar motorista:</span>}
-          {corrida.status === 'ProcurandoMotorista' && GORJETAS_CENTAVOS.map((centavos) => (
-            <Botao key={centavos} variante="texto" disabled={travado} aria-label={`Dar gorjeta de ${moeda(centavos / 100)} para achar motorista`}
-              onClick={() => gorjeta(corrida.id, centavos)}>+ {moeda(centavos / 100)}</Botao>
-          ))}
-          {corrida.podeCancelar && <Botao variante="texto" disabled={travado} onClick={() => cancelar(corrida.id)}>Cancelar corrida</Botao>}
-        </div>
-      )}
-    </li>
   )
 }

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { respostaDoAssistente } from '../../dominio/acoesDoAssistente'
+import { identidadeDaAssistencia, useContextoAssistencia } from '../../aplicacao/contextoAssistencia'
 
 function mensagemDaFalha(erro) {
   if (erro?.codigo === 'ASSISTENTE_INDISPONIVEL') {
@@ -14,8 +15,8 @@ function mensagemDaFalha(erro) {
 // Cada consulta pertence à conversa em que nasceu. A chamada anterior pode terminar,
 // mas não ocupa o campo nem substitui a resposta de outro cliente.
 export function useConversaAssistente({ conversa, historico, perguntar, executarAcao }) {
-  const conversaId = conversa?.id ?? null
-  const [contexto, setContexto] = useState(conversaId)
+  const { identidade, chave: chaveContexto } = useContextoAssistencia(conversa)
+  const [contexto, setContexto] = useState(chaveContexto)
   const [pergunta, setPergunta] = useState('')
   const [trocas, setTrocas] = useState([])
   const [perguntando, setPerguntando] = useState(false)
@@ -23,9 +24,13 @@ export function useConversaAssistente({ conversa, historico, perguntar, executar
   const consultandoRef = useRef(false)
   const acoesRef = useRef(new Set())
   const proximoIdRef = useRef(1)
+  const consultaRef = useRef(null)
+  const contextoRef = useRef(chaveContexto)
+  useLayoutEffect(() => { contextoRef.current = chaveContexto }, [chaveContexto])
+  const contextoAtual = () => contextoRef.current === chaveContexto && identidadeDaAssistencia() === identidade
 
-  if (contexto !== conversaId) {
-    setContexto(conversaId)
+  if (contexto !== chaveContexto) {
+    setContexto(chaveContexto)
     setPergunta('')
     setTrocas([])
     setPerguntando(false)
@@ -34,14 +39,17 @@ export function useConversaAssistente({ conversa, historico, perguntar, executar
   useLayoutEffect(() => {
     consultandoRef.current = false
     acoesRef.current = new Set()
-    return () => { geracaoRef.current += 1 }
-  }, [conversaId])
+    return () => { geracaoRef.current += 1; consultaRef.current?.abort(); consultaRef.current = null }
+  }, [chaveContexto])
 
   async function consultar(texto, trocaId = null) {
     texto = texto?.trim()
-    if (!texto || !conversa || consultandoRef.current) return false
+    if (!texto || !conversa || !contextoAtual() || consultandoRef.current) return false
     consultandoRef.current = true
+    const controle = new AbortController()
+    consultaRef.current = controle
     const geracao = geracaoRef.current
+    const aindaAtual = () => !controle.signal.aborted && geracao === geracaoRef.current && contextoAtual()
     const id = trocaId ?? proximoIdRef.current++
     setPerguntando(true)
     if (trocaId === null) {
@@ -51,18 +59,19 @@ export function useConversaAssistente({ conversa, historico, perguntar, executar
       setTrocas(atual => atual.map(t => t.id === id ? { ...t, resposta: null, acoes: [], erro: null } : t))
     }
     try {
-      const resposta = respostaDoAssistente(await perguntar(texto, conversa, historico))
-      if (geracao !== geracaoRef.current) return false
+      const resposta = respostaDoAssistente(await perguntar(texto, conversa, historico, { sinal: controle.signal, identidadeEsperada: identidade }))
+      if (!aindaAtual()) return false
       if (!resposta.texto && !resposta.acoes.length) throw new Error('O assistente não trouxe uma resposta. Tente novamente.')
       setTrocas(atual => atual.map(t => t.id === id ? { ...t, resposta: resposta.texto, acoes: resposta.acoes } : t))
       return true
     } catch (erro) {
-      if (geracao === geracaoRef.current) {
+      if (aindaAtual()) {
         setTrocas(atual => atual.map(t => t.id === id ? { ...t, erro: mensagemDaFalha(erro) } : t))
       }
       return false
     } finally {
-      if (geracao === geracaoRef.current) {
+      if (aindaAtual()) {
+        consultaRef.current = null
         consultandoRef.current = false
         setPerguntando(false)
       }
@@ -76,20 +85,21 @@ export function useConversaAssistente({ conversa, historico, perguntar, executar
   async function aoExecutarAcao(id, proposta) {
     const chave = `${id}:${proposta.chave}`
     const acoes = acoesRef.current
-    if (!conversa || acoes.has(chave)) return false
+    if (!conversa || !contextoAtual() || acoes.has(chave)
+      || !trocas.some(t => t.id === id && t.acoes.some(a => a.chave === proposta.chave))) return false
     acoes.add(chave)
     const geracao = geracaoRef.current
-    const contextoAtual = () => geracao === geracaoRef.current
+    const aindaAtual = () => geracao === geracaoRef.current && contextoAtual()
     marcarAcao(id, proposta.chave, { estado: 'executando', erro: null })
     try {
-      const resultado = await executarAcao(proposta, conversa, contextoAtual)
-      if (!contextoAtual()) return false
+      const resultado = await executarAcao(proposta, conversa, aindaAtual)
+      if (!aindaAtual()) return false
       if (resultado === false) throw new Error('A ação não foi confirmada. Confira a conversa antes de tentar novamente.')
       marcarAcao(id, proposta.chave, { estado: 'feita' })
       return true
     } catch (erro) {
       acoes.delete(chave)
-      if (contextoAtual()) marcarAcao(id, proposta.chave, { estado: 'falhou', erro: mensagemDaFalha(erro) })
+      if (aindaAtual()) marcarAcao(id, proposta.chave, { estado: 'falhou', erro: mensagemDaFalha(erro) })
       return false
     }
   }

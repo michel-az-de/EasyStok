@@ -1,3 +1,4 @@
+import { comSnapshotDaFicha } from './snapshotDaFichaNaProva.mjs'
 /* eslint-disable no-console */
 // Prova da issue #1761 (simulação de atendimento de 13/10/2026): o que a tela dizia errado ou em
 // língua de sistema durante um atendimento de ponta a ponta. Só regra pura e tradução da API,
@@ -248,7 +249,7 @@ await confere('G  a ação devolve a recusa e não manda POST com endereço nulo
     return new Response(JSON.stringify({ data: { novo: false, nome: 'Joao Pedro', dentroDaArea: true, cliente: { id: 'cl2' }, enderecos: [] } }), { status: 200 })
   }
   const estadoRef = { current: { conversas: [{ id: 'c2', clienteId: 'cl2', canal: 'WhatsApp', nome: 'Joao Pedro', cliente: {} }] } }
-  const acoes = criarAcoesClienteApi({ despachar: () => {}, estadoRef })
+  const acoes = comSnapshotDaFicha(criarAcoesClienteApi({ despachar: () => {}, estadoRef }), estadoRef.current.conversas)
   const recusado = await acoes.editarDadoCliente('c2', 'endereco', SEM_VIRGULA)
   assert.equal(recusado?.erro, FORMATO_DO_ENDERECO)
   assert.equal(chamadas.filter((c) => c.metodo === 'POST').length, 0, 'nenhum POST saiu')

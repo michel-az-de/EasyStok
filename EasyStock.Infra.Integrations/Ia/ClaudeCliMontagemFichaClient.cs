@@ -30,8 +30,8 @@ public sealed class ClaudeCliMontagemFichaClient : IMontagemFichaLlmClient
     public async Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default)
     {
         if (!Disponivel) throw new InvalidOperationException("O provedor CLI da ficha não está disponível.");
-        if (requisicao.Ferramentas.Count != 1 || requisicao.Ferramentas[0].Nome != BlocosMontagemFicha.NomeFerramenta)
-            throw new InvalidOperationException("O CLI aceita apenas a composição tipada da ficha.");
+        if (requisicao.Ferramentas.Count != 1 || !FerramentaPermitida(requisicao.Ferramentas[0]))
+            throw new InvalidOperationException("O CLI aceita apenas os schemas tipados da ficha e da sugestão de cadastro.");
         if (requisicao.Mensagens.Count != 1 || requisicao.Mensagens[0].Papel != MensagemLlm.Usuario
             || requisicao.Mensagens[0].Conteudo.Count != 1 || requisicao.Mensagens[0].Conteudo[0] is not BlocoTextoLlm)
             throw new InvalidOperationException("A composição exige um único contexto textual.");
@@ -48,9 +48,9 @@ public sealed class ClaudeCliMontagemFichaClient : IMontagemFichaLlmClient
             var inicio = CriarInicio(requisicao, pasta);
             var resultado = await _executar(inicio, entrada, _opcoes, ct);
             if (resultado.ExitCode != 0) throw new InvalidOperationException("O CLI não conseguiu organizar a ficha.");
-            var resposta = Traduzir(resultado.Stdout);
-            _logger.LogInformation("Montagem da ficha por Claude CLI: {LatenciaMs} ms, {Entrada}+{Saida} tokens, execução isolada",
-                tempo.ElapsedMilliseconds, resposta.TokensEntrada, resposta.TokensSaida);
+            var resposta = Traduzir(resultado.Stdout, requisicao.Ferramentas[0].Nome);
+            _logger.LogInformation("Assistência {Ferramenta} por Claude CLI: {LatenciaMs} ms, {Entrada}+{Saida} tokens, execução isolada",
+                requisicao.Ferramentas[0].Nome, tempo.ElapsedMilliseconds, resposta.TokensEntrada, resposta.TokensSaida);
             return resposta;
         }
         finally
@@ -60,6 +60,10 @@ public sealed class ClaudeCliMontagemFichaClient : IMontagemFichaLlmClient
             _unica.Release();
         }
     }
+
+    private static bool FerramentaPermitida(FerramentaLlm ferramenta) =>
+        new[] { BlocosMontagemFicha.Ferramenta, SugerirCadastroConversaUseCase.Ferramenta }
+            .Any(permitida => permitida.Nome == ferramenta.Nome && permitida.SchemaJson == ferramenta.SchemaJson);
 
     internal ProcessStartInfo CriarInicio(RequisicaoLlm requisicao, string pasta)
     {
@@ -91,7 +95,7 @@ public sealed class ClaudeCliMontagemFichaClient : IMontagemFichaLlmClient
         inicio.Environment["DO_NOT_TRACK"] = "1";
     }
 
-    internal static RespostaLlm Traduzir(string stdout)
+    internal static RespostaLlm Traduzir(string stdout, string ferramenta = BlocosMontagemFicha.NomeFerramenta)
     {
         using var doc = JsonDocument.Parse(stdout);
         var raiz = doc.RootElement;
@@ -110,8 +114,8 @@ public sealed class ClaudeCliMontagemFichaClient : IMontagemFichaLlmClient
             if (uso.TryGetProperty("output_tokens", out var valorSaida) && valorSaida.TryGetInt32(out var n) && n > 0) saida = n;
         }
         var resposta = new RespostaLlm(RespostaLlm.StopToolUse,
-            [new BlocoUsoFerramentaLlm("cli-ficha", BlocosMontagemFicha.NomeFerramenta, estrutura.Clone())], entrada, saida);
-        _ = BlocosMontagemFicha.Traduzir(resposta);
+            [new BlocoUsoFerramentaLlm("cli-ficha", ferramenta, estrutura.Clone())], entrada, saida);
+        if (ferramenta == BlocosMontagemFicha.NomeFerramenta) _ = BlocosMontagemFicha.Traduzir(resposta);
         return resposta;
     }
 }

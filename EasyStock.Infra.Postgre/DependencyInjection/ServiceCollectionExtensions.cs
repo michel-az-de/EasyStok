@@ -72,6 +72,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IProdutoVariacaoRepository, ProdutoVariacaoRepository>();
             services.AddScoped<IProdutoCaracteristicaRepository, ProdutoCaracteristicaRepository>();
             services.AddScoped<IProdutoEmbalagemRepository, ProdutoEmbalagemRepository>();
+            services.AddScoped<ICadastrosFinanceirosRepository, CadastrosFinanceirosRepository>();
             services.AddScoped<IItemEstoqueRepository, ItemEstoqueRepository>();
             services.AddScoped<IContagemRepository, ContagemRepository>();
             services.AddScoped<IItemVendaRepository, ItemVendaRepository>();
@@ -263,6 +264,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // Atendimento (S04, ADR-0050)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConversaRepository,
                 Repositories.Atendimento.ConversaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository,
+                Repositories.Atendimento.VinculoClienteConversaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAtendenteRepository,
                 Repositories.Atendimento.AtendenteRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ISessaoChatSiteRepository,

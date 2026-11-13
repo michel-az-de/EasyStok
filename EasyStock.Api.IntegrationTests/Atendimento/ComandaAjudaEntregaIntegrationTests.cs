@@ -108,7 +108,14 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-            (await db.AtendimentoConversas.SingleAsync(x => x.Id == conversaId)).Situacao.Should().Be(SituacaoConversa.Assumida);
+            var conversa = await db.AtendimentoConversas.SingleAsync(x => x.Id == conversaId);
+            conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+            var cliente = await db.Clientes.Include(x => x.Enderecos).SingleAsync(x => x.Id == conversa.ClienteId);
+            cliente.Revisao.Should().BeGreaterThan(0u);
+            cliente.Nome.Should().Be("Lead sem janela");
+            cliente.Cep.Should().Be("20040002");
+            cliente.Enderecos.Should().ContainSingle().Which.Numero.Should().Be("42");
+            (await db.Clientes.CountAsync(x => x.EmpresaId == EmpresaId && x.Telefone == cliente.Telefone)).Should().Be(1);
             (await db.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId && x.Texto!.StartsWith("Cliente enviou a comanda"))).Should().Be(1);
             (await db.Pedidos.CountAsync()).Should().Be(0);
             (await db.CobrancasPedido.CountAsync()).Should().Be(0);
@@ -150,10 +157,14 @@ public sealed partial class PedidoConversaConcorrenciaTests
         final.PrecisaCadastro.Should().BeFalse();
         final.Pedido.Should().BeNull();
         final.Rascunho.Endereco.Should().BeNull();
+        Guid? clienteIdFicha;
+        long revisaoFicha;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             var conversa = await db.AtendimentoConversas.SingleAsync(x => x.Id == conversaId);
+            clienteIdFicha = conversa.ClienteId;
+            revisaoFicha = conversa.VinculoRevisao;
             conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
             (await db.Clientes.Include(x => x.Enderecos).SingleAsync(x => x.Id == conversa.ClienteId)).Enderecos.Should().BeEmpty();
             (await db.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId && x.Texto!.Contains("Endereço pendente"))).Should().Be(1);
@@ -163,6 +174,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         // A atendente registra o endereço pela Ficha e a comanda passa a mostrá-lo.
         (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/cliente", new
         {
+            ClienteId = clienteIdFicha, VinculoRevisao = revisaoFicha,
             Endereco = new { Cep = "01310100", Logradouro = "Av. Paulista", Numero = "900", Bairro = "Bela Vista", Cidade = "São Paulo", Uf = "SP" },
         })).StatusCode.Should().Be(HttpStatusCode.OK);
         (await Estado(client, token)).Rascunho.Endereco!.Numero.Should().Be("900");
@@ -204,6 +216,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         // A atendente registra o endereço pela Ficha, combina o frete e a cliente confirma o pedido.
         (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/cliente", new
         {
+            conversa.ClienteId, conversa.VinculoRevisao,
             Endereco = new { Cep = "01310100", Logradouro = "Av. Paulista", Numero = "900", Bairro = "Bela Vista", Cidade = "São Paulo", Uf = "SP" },
         })).StatusCode.Should().Be(HttpStatusCode.OK);
         var comFicha = await Estado(client, token);

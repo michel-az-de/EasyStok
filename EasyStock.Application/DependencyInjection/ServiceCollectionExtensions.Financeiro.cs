@@ -24,6 +24,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ListarCategoriasFinanceirasUseCase>();
         services.AddScoped<MoverCategoriaFinanceiraUseCase>();
 
+        services.AddScoped<EasyStock.Application.UseCases.Financeiro.Cadastros.CadastrosFinanceirosUseCase>();
+
         // Centros de Custo
         services.AddScoped<CriarCentroCustoUseCase>();
         services.AddScoped<AtualizarCentroCustoUseCase>();

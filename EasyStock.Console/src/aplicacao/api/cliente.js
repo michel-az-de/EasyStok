@@ -1,4 +1,5 @@
 import * as acao from '../acoes'
+import { alterarVinculoCliente, obterVinculoCliente } from '../../infra/api/vinculoClienteApi'
 import {
   adicionarNotaCliente, bloquearClienteApi, cadastrarClienteDaConversa, desbloquearClienteApi, obterDossie,
 } from '../../infra/api/conversasApi'
@@ -6,6 +7,7 @@ import { clienteDoDossie, contatoInformadoDoDossie, enderecoParaApi } from '../.
 import { deveCarregarDossie } from '../planoDeSincronizacao'
 import { textoNaoLigado } from './naoLigadas'
 import { nomeConhecidoDoLead, nomeGenerico, recusaDoEndereco } from '../../dominio/cliente'
+import { ERRO_IDENTIDADE_DA_EDICAO, mesmaIdentidadeDaEdicao } from '../../dominio/identidadeDaEdicao'
 
 // Cadastro do cliente da conversa no modo API (#1276). Sem cliente vinculado o EasyStok não
 // gera pedido; aqui a dona cadastra nome, telefone e endereço pela Ficha. Nada muda na tela
@@ -28,10 +30,12 @@ const TELEFONE_JA_CADASTRADO = 'TELEFONE_JA_CADASTRADO'
 export function criarAcoesClienteApi({ despachar, estadoRef }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
+  const conferirIdentidade = (id, identidade) => mesmaIdentidadeDaEdicao(identidade, conversaDe(id)) ? null : { erro: ERRO_IDENTIDADE_DA_EDICAO, codigo: 'VINCULO_CLIENTE_ALTERADO' }
   const lendoDossie = new Map()
 
-  async function carregar(id) {
+  async function carregar(id, revisao = conversaDe(id)?.vinculoRevisao ?? 0) {
     const dossie = await obterDossie(id)
+    if ((conversaDe(id)?.vinculoRevisao ?? 0) !== revisao) return
     const cliente = clienteDoDossie(dossie)
     if (cliente) despachar({ tipo: acao.CLIENTE_DA_API, id, ...cliente })
     const contato = contatoInformadoDoDossie(dossie)
@@ -57,15 +61,22 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
   // `confirmarVinculoExistente` (#1430): o telefone que o visitante informou já é de um cadastro e
   // a dona, depois de conferir com o cliente, manda ligar a conversa a ele. Sem isso a API não
   // liga: responde de quem é o telefone, e isso volta em `jaCadastrado` para o cartão perguntar.
-  function cadastrar(id, { nome = null, telefone = null, endereco = null, email = null, confirmarVinculoExistente = false }) {
+  function cadastrar(id, { nome = null, telefone = null, endereco = null, email = null, confirmarVinculoExistente = false }, identidade) {
+    const conflito = conferirIdentidade(id, identidade)
+    if (conflito) return Promise.resolve(conflito)
     // #1761: texto que não vira endereço não vai como nulo no lugar do que ela digitou.
     const recusa = recusaDoEndereco(endereco)
     if (recusa) return Promise.resolve({ erro: recusa })
-    const corpo = { nome: nome?.trim() || null, telefone: telefone || null, endereco: endereco ? enderecoParaApi(endereco) : null }
+    const corpo = { clienteId: identidade.clienteId, vinculoRevisao: identidade.vinculoRevisao, nome: nome?.trim() || null, telefone: telefone || null, endereco: endereco ? enderecoParaApi(endereco) : null }
     if (email?.trim()) corpo.email = email.trim()
     if (confirmarVinculoExistente) corpo.confirmarVinculoExistente = true
     return cadastrarClienteDaConversa(id, corpo)
       .then(async (salvo) => {
+        const atual = conversaDe(id)
+        const mesmoResultado = Boolean(salvo?.clienteId && salvo.clienteId === atual?.clienteId
+          && Number.isInteger(salvo.vinculoRevisao) && salvo.vinculoRevisao === atual.vinculoRevisao)
+        if (!mesmaIdentidadeDaEdicao(identidade, atual) && !mesmoResultado) return { erro: 'O cadastro foi salvo, mas o vínculo mudou depois. Confira a ficha atual antes de continuar.' }
+        if (Number.isInteger(salvo?.vinculoRevisao)) despachar({ tipo: acao.VINCULO_CLIENTE_DA_API, id, vinculo: { clienteId: salvo.clienteId, clienteNome: salvo.nome, vinculoRevisao: salvo.vinculoRevisao } })
         // O telefone já era de outro cadastro: a conversa foi ligada a ele, com o nome dele.
         // Quando foi a dona que mandou ligar, ela já sabe.
         if (!confirmarVinculoExistente && salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
@@ -75,14 +86,21 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
           avisar(`Cadastro salvo, mas o endereço está fora da área de entrega. ${salvo.mensagemForaArea ?? ''}`.trim())
         }
         // O cadastro já foi gravado: falha na leitura não é recusa (mesma regra da nota, abaixo).
-        try { await carregar(id) }
+        try { await carregar(id, salvo?.vinculoRevisao ?? identidade.vinculoRevisao) }
         catch (erro) { avisar(`Cadastro salvo, mas a ficha não atualizou: ${erro.message}`) }
         return undefined
-      }, (erro) => {
+      }, async (erro) => {
+        if (erro.codigo === 'VINCULO_CLIENTE_ALTERADO') {
+          try {
+            const vinculo = await obterVinculoCliente(id)
+            despachar({ tipo: acao.VINCULO_CLIENTE_DA_API, id, vinculo })
+            if (vinculo.clienteId) await carregar(id, vinculo.vinculoRevisao)
+          } catch { /* A recusa mantém o texto; nova tentativa pode atualizar a ficha. */ }
+        }
         // Não é falha, é pergunta: nada foi ligado e a faixa fica quieta.
         if (erro.codigo === TELEFONE_JA_CADASTRADO) return { erro: erro.message, jaCadastrado: { nome: erro.dados?.nome ?? null } }
         avisar(`Cadastro do cliente: ${erro.message}`)
-        return { erro: erro.message }
+        return { erro: erro.codigo === 'VINCULO_CLIENTE_ALTERADO' ? ERRO_IDENTIDADE_DA_EDICAO : erro.message, codigo: erro.codigo }
       })
   }
 
@@ -111,12 +129,23 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
   }
 
   return {
+    corrigirVinculoClienteConversa: async (id, corpo) => {
+      const vinculo = await alterarVinculoCliente(id, corpo)
+      despachar({ tipo: acao.VINCULO_CLIENTE_DA_API, id, vinculo })
+      if (vinculo.clienteId) {
+        try { await carregar(id, vinculo.vinculoRevisao) }
+        catch { avisar('Vínculo salvo. Abra a ficha novamente para atualizar os dados do cliente.') }
+      }
+      return vinculo
+    },
     bloquearCliente: (_nome, motivo, conversaId) => mudarBloqueio(conversaId, (clienteId) => bloquearClienteApi(clienteId, motivo?.trim() || null), 'bloquear'),
     desbloquearCliente: (_nome, conversaId) => mudarBloqueio(conversaId, desbloquearClienteApi, 'desbloquear'),
 
     // O nome que vale é o que a dona escreveu no lápis (rascunho do lead). No chat do site sem
     // o formulário (#1430) o nome do contato é genérico ("Visitante do site"): sem o dela, não cadastra.
-    salvarCadastroRapido: (id, dados) => {
+    salvarCadastroRapido: (id, dados, _agora, identidade) => {
+      const conflito = conferirIdentidade(id, identidade)
+      if (conflito) return conflito
       const c = conversaDe(id)
       if (c?.canal === 'Chat do site' && !c.nomeDaDona && !c.contatoInformado) {
         const mensagem = 'Escreva o nome do cliente (lápis ao lado do nome) antes de salvar o cadastro.'
@@ -126,25 +155,29 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
       // #1966: nome genérico (o "Visitante do site" que a Ficha manda quando o visitante não disse o nome) não vira
       // nome do cadastro: vai o do cartão "Informado pelo visitante" ou nulo, e a API usa o do contato (PR #1962).
       const nome = c?.nomeDaDona ? c.nome : nomeGenerico(dados?.nome) ? nomeConhecidoDoLead(c) : dados.nome
-      return cadastrar(id, { ...dados, nome })
+      return cadastrar(id, { ...dados, nome }, identidade)
     },
 
     // Endereço que o automático capturou na conversa; no WhatsApp o telefone vem do canal.
-    cadastrarEndereco: (id) => {
+    cadastrarEndereco: (id, identidade, endereco) => {
+      const conflito = conferirIdentidade(id, identidade)
+      if (conflito) return conflito
       const c = conversaDe(id)
-      const capturado = c?.cliente?.enderecoCapturado
+      const capturado = endereco ?? c?.cliente?.enderecoCapturado
       if (!capturado) return undefined
       const telefone = c.cliente.telefone || (c.canal === 'WhatsApp' ? c.cliente.telefoneCanal : null)
-      return cadastrar(id, { nome: c.clienteId ? null : nomeConhecidoDoLead(c), telefone, endereco: capturado })
+      return cadastrar(id, { nome: c.clienteId ? null : nomeConhecidoDoLead(c), telefone, endereco: capturado }, identidade)
     },
 
     // Nome, telefone e endereço vão ao EasyStok; os avisos do cliente ainda não têm endpoint.
     // Lead sem cadastro: o nome fica como rascunho até o "Salvar cadastro" (que traz o telefone).
-    editarDadoCliente: (id, campo, valor) => {
+    editarDadoCliente: (id, campo, valor, _agora, identidade) => {
       if (!['nome', 'telefone', 'endereco'].includes(campo)) {
         avisar(textoNaoLigado('Avisos do cliente'))
         return undefined
       }
+      const conflito = conferirIdentidade(id, identidade)
+      if (conflito) return conflito
       const c = conversaDe(id)
       if (campo === 'nome' && !c?.clienteId) {
         despachar({ tipo: acao.RENOMEAR_LEAD_API, id, nome: valor })
@@ -158,11 +191,11 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
           return cadastrar(id, {
             nome: nomeConhecidoDoLead(c),
             telefone, email: c?.contatoInformado?.email ?? null, endereco: valor,
-          })
+          }, identidade)
         }
       }
       // #1643 (item 3): lead sem cadastro leva o nome conhecido; sem ele a API gravava "Cliente WhatsApp".
-      return cadastrar(id, { ...(c?.clienteId ? null : { nome: nomeConhecidoDoLead(c) }), [campo]: valor })
+      return cadastrar(id, { ...(c?.clienteId ? null : { nome: nomeConhecidoDoLead(c) }), [campo]: valor }, identidade)
     },
 
     // #1436: nota interna vai ao cadastro do cliente; a Ficha relê o dossiê. Lead não tem cadastro.

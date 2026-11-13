@@ -22,8 +22,15 @@ public sealed record EnderecoDaConversaInput(string? Cep, string? Logradouro, st
 /// pelo visitante. Sem isso, <see cref="TelefoneJaCadastradoException"/>.
 /// </param>
 public sealed record CadastrarClienteDaConversaCommand(
-    Guid EmpresaId, Guid ConversaId, string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco,
+    Guid EmpresaId, Guid ConversaId, Guid? ClienteId, long VinculoRevisao,
+    string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco,
     string? Email = null, bool ConfirmarVinculoExistente = false, bool ReutilizarCadastro = true);
+
+public sealed class CadastroClienteConversaAlteradoException() : RegraDeDominioVioladaException(
+    "A identidade da conversa mudou. Confira a pessoa antes de salvar a ficha.")
+{
+    public const string Codigo = "VINCULO_CLIENTE_ALTERADO";
+}
 
 /// <summary>
 /// #1430: o telefone que o visitante do chat do site digitou já é de um cadastro. Ninguém verificou que o
@@ -43,7 +50,7 @@ public sealed class TelefoneJaCadastradoException(Guid clienteId, string nome)
 /// <param name="DentroDaArea">Nulo sem endereço; falso quando o CEP está fora da área de entrega.</param>
 public sealed record ClienteDaConversaResult(
     Guid ClienteId, string Nome, string? Telefone, string? Endereco, string? Cep, bool Novo,
-    bool? DentroDaArea, string? MensagemForaArea, string? Email = null);
+    bool? DentroDaArea, string? MensagemForaArea, string? Email = null, long VinculoRevisao = 0);
 
 /// <summary>
 /// #1276: a dona cadastra pelo console o cliente de uma conversa que chegou sem ele (chat do site,
@@ -77,14 +84,45 @@ public sealed class CadastrarClienteDaConversaUseCase(
     {
         ArgumentNullException.ThrowIfNull(command);
         UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+        if (command.ClienteId == Guid.Empty || command.VinculoRevisao < 0)
+            throw new UseCaseValidationException("Informe o cliente e a revisão da pessoa conferida na ficha.");
 
         var conversa = await conversaRepository.ObterPorIdAsync(command.EmpresaId, command.ConversaId, ct)
             ?? throw new ConversaNaoEncontradaException(command.ConversaId);
+        ConferirVinculo(conversa, command);
 
         var telefone = TelefoneE164(command.Telefone);
         var nome = NomeLimpo(command.Nome);
         var email = EmailValido(command.Email);
+        ValidarEnderecoResult? validacao = null;
+        if (!string.IsNullOrWhiteSpace(command.Endereco?.Cep))
+        {
+            var e = command.Endereco;
+            validacao = await validarEndereco.ExecuteAsync(
+                new ValidarEnderecoInput(command.EmpresaId, e.Cep, e.Logradouro, e.Numero, e.Complemento, e.Bairro, e.Cidade, e.Uf), ct);
+            if (validacao.Motivo == ValidarEnderecoUseCase.MotivoCepInvalido)
+                throw new UseCaseValidationException("CEP inválido: informe os 8 dígitos.");
+        }
 
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            var atual = await conversaRepository.ObterPorIdComLockAsync(command.EmpresaId, command.ConversaId, token)
+                ?? throw new ConversaNaoEncontradaException(command.ConversaId);
+            ConferirVinculo(atual, command);
+            return await SalvarAsync(command, atual, telefone, nome, email, validacao, token);
+        }, ct);
+    }
+
+    private static void ConferirVinculo(Conversa conversa, CadastrarClienteDaConversaCommand command)
+    {
+        if (conversa.EmpresaId != command.EmpresaId) throw new ConversaNaoEncontradaException(command.ConversaId);
+        if (conversa.ClienteId != command.ClienteId || conversa.VinculoRevisao != command.VinculoRevisao || conversa.VinculoEmRevisao)
+            throw new CadastroClienteConversaAlteradoException();
+    }
+
+    private async Task<ClienteDaConversaResult> SalvarAsync(CadastrarClienteDaConversaCommand command, Conversa conversa,
+        string? telefone, string? nome, string? email, ValidarEnderecoResult? validacao, CancellationToken ct)
+    {
         ClienteEntity cliente;
         var novo = false;
         if (conversa.ClienteId is { } clienteId)
@@ -109,7 +147,7 @@ public sealed class CadastrarClienteDaConversaUseCase(
             var nomeDoCadastro = nome ?? NomeDoContato(conversa.ContatoNome);
             var identificacao = await identificarCliente.ExecuteAsync(
                 new IdentificarClientePorTelefoneInput(command.EmpresaId, telefone.TrimStart('+'), nomeDoCadastro, command.ReutilizarCadastro), ct);
-            cliente = identificacao.Cliente;
+            cliente = identificacao.Cliente ?? throw new TelefoneCompartilhadoException();
             novo = identificacao.EhNovo;
             // #1430: o telefone do formulário não prova que o visitante é o dono do cadastro. Sem a operadora
             // confirmar, nada é ligado nem gravado (quem achou não criou, e o commit só vem depois daqui).
@@ -130,25 +168,15 @@ public sealed class CadastrarClienteDaConversaUseCase(
         // O endereço relê o cliente do banco: o cadastro novo precisa estar gravado antes.
         await unitOfWork.CommitAsync();
 
-        bool? dentroDaArea = null;
-        string? mensagemForaArea = null;
-        if (!string.IsNullOrWhiteSpace(command.Endereco?.Cep))
+        if (validacao is not null)
         {
-            var e = command.Endereco;
-            var validacao = await validarEndereco.ExecuteAsync(
-                new ValidarEnderecoInput(command.EmpresaId, e.Cep, e.Logradouro, e.Numero, e.Complemento, e.Bairro, e.Cidade, e.Uf), ct);
-            if (validacao.Motivo == ValidarEnderecoUseCase.MotivoCepInvalido)
-                throw new UseCaseValidationException("CEP inválido: informe os 8 dígitos.");
-
             await confirmarEndereco.ExecuteAsync(
                 new ConfirmarEnderecoClienteCommand(command.EmpresaId, cliente.Id, validacao.EnderecoNormalizado), ct);
-            dentroDaArea = validacao.DentroDaArea;
-            mensagemForaArea = validacao.MensagemForaArea;
         }
 
         return new ClienteDaConversaResult(
-            cliente.Id, cliente.Nome, cliente.Telefone, cliente.Endereco, cliente.Cep, novo, dentroDaArea, mensagemForaArea,
-            cliente.Email);
+            cliente.Id, cliente.Nome, cliente.Telefone, cliente.Endereco, cliente.Cep, novo, validacao?.DentroDaArea, validacao?.MensagemForaArea,
+            cliente.Email, conversa.VinculoRevisao);
     }
 
     private static bool TelefoneVeioDoVisitante(Conversa conversa, string telefoneE164) =>

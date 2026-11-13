@@ -787,6 +787,57 @@ const aoEsconder = () => {
   globalThis.document.dispatchEvent(new Event('visibilitychange'))
 }
 
+// #2395: o transporte perdeu o ACK, mas o servidor aplicou o status. A fronteira HTTP desta
+// prova devolve SEM_RESPOSTA; o prazo/keepalive real do wrapper é exercitado na prova-2379.
+await confere('E10. Cozinha: ACK perdido avisa incerteza; a conferência lê Pronto sem repetir o PATCH', async () => {
+  const antes = [{ id: 'p-incerto', status: 'preparando' }]
+  responder('GET', '/api/kds/pedidos', () => antes)
+  responder('GET', '/api/kds/pedidos', () => antes)
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    responder('PATCH', '/api/kds/pedidos/p-incerto/status', () => {
+      throw Object.assign(new Error('Não houve resposta. Confira antes de repetir.'), { status: 0, codigo: 'SEM_RESPOSTA' })
+    })
+    h.resultado.avancar('p-incerto', 'pronto')
+    globalThis.window.dispatchEvent(new Event('pagehide'))
+    await h.estabilizar()
+    assert.equal(escritas().length, 1)
+    assert.equal(escritas()[0].opcoes.keepalive, true)
+    assert.equal(h.resultado.erro, 'Não houve resposta. Confira antes de repetir.')
+    assert.doesNotMatch(h.resultado.erro, /não mudou/)
+    assert.equal(h.resultado.pedidos[0].status, 'preparando', 'não inventa confirmação local')
+    assert.equal(h.resultado.movendo.has('p-incerto'), false)
+    responder('GET', '/api/kds/pedidos', () => [{ id: 'p-incerto', status: 'pronto' }])
+    andar(29699)
+    await h.estabilizar()
+    assert.equal(daFila().length, 0)
+    andar(1)
+    await h.estabilizar()
+    assert.equal(daFila().length, 1)
+    assert.equal(h.resultado.pedidos[0].status, 'pronto', 'a leitura confirma o efeito já aplicado')
+    assert.equal(h.resultado.erro, null)
+    assert.equal(escritas().length, 1, 'reconciliação não repete a mudança de status')
+  } finally { h.desmontar() }
+})
+
+await confere('E10. Cozinha: recusa definitiva preserva o motivo e o status anterior', async () => {
+  const antes = [{ id: 'p-recusado', status: 'preparando' }]
+  responder('GET', '/api/kds/pedidos', () => antes)
+  responder('GET', '/api/kds/pedidos', () => antes)
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    responder('PATCH', '/api/kds/pedidos/p-recusado/status', () => {
+      throw Object.assign(new Error('Estoque insuficiente.'), { status: 409, codigo: 'BUSINESS_RULE_VIOLATION' })
+    })
+    h.resultado.avancar('p-recusado', 'pronto')
+    globalThis.window.dispatchEvent(new Event('pagehide'))
+    await h.estabilizar()
+    assert.equal(h.resultado.erro, 'O pedido não mudou: Estoque insuficiente.')
+    assert.equal(h.resultado.pedidos[0].status, 'preparando')
+    assert.equal(escritas().length, 1)
+  } finally { h.desmontar() }
+})
+
 await confere('E10. Cozinha: fechar a aba (pagehide) com "Pronto" pendente manda o toque na hora, com keepalive', async () => {
   const h = await montar(useCozinhaApi, { data: null })
   try {

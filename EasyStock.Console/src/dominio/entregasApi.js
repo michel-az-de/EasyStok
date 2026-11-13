@@ -2,7 +2,7 @@
 // do KDS (S19, com endereço e aprovação da S12/S14) e viagens da S44. Nada de
 // rede aqui; quem busca é `infra/api/entregasApi.js`.
 import { faixaDeHorarios, minutosDoDia } from './entrega'
-import { dataIsoNoFuso, lerReais, moeda, textoDosCentavos } from './formato'
+import { dataIsoNoFuso, horaCurta, lerReais, moeda, textoDosCentavos } from './formato'
 import { normalizarBusca } from './respostas'
 
 // Status que a gaveta pede ao KDS: aprovação manual, pronto e em rota.
@@ -345,46 +345,77 @@ export const viagensConcluidasNoDia = (viagens, dia) => (viagens ?? [])
 export const custoDasCorridas = (corridas) => (corridas ?? []).reduce((soma, c) => soma + (c.custoCentavos ?? 0), 0)
 
 // #2162: corrida chamada pela API da Lalamove (`CorridaExternaResult` com `origem: 'Api'`). O status vem do
-// provedor; a tela só mostra e oferece o que a Lalamove ainda aceita.
+// provedor; a tela só mostra e oferece o que a Lalamove ainda aceita. #2168: cada status vira Selo (tom, ícone e
+// texto, ADR-0063 D3) e uma das quatro etapas da linha do tempo.
 const STATUS_CORRIDA = {
-  Solicitando: { rotulo: 'Confirmando com a Lalamove', tom: 'info' },
-  ProcurandoMotorista: { rotulo: 'Procurando motorista', tom: 'aviso' },
-  MotoristaACaminho: { rotulo: 'Motorista a caminho da coleta', tom: 'info' },
-  Coletada: { rotulo: 'Saiu para entrega', tom: 'info' },
-  Entregue: { rotulo: 'Entregue', tom: 'ok' },
-  Cancelada: { rotulo: 'Cancelada', tom: 'neutro' },
-  Rejeitada: { rotulo: 'Recusada pelos motoristas', tom: 'perigo' },
-  Expirada: { rotulo: 'Expirou sem motorista', tom: 'perigo' },
-  Falha: { rotulo: 'Não foi criada', tom: 'perigo' },
+  Solicitando: { rotulo: 'Confirmando com a Lalamove', tom: 'neutro', icone: 'hourglass', etapa: 0 },
+  ProcurandoMotorista: { rotulo: 'Procurando motorista', tom: 'alerta', icone: 'lupa', etapa: 1 },
+  MotoristaACaminho: { rotulo: 'Motorista a caminho da cozinha', tom: 'marca', icone: 'moto', etapa: 2 },
+  Coletada: { rotulo: 'Saiu para entrega', tom: 'marca', icone: 'package', etapa: 3 },
+  Entregue: { rotulo: 'Entregue', tom: 'sucesso', icone: 'circle-check', etapa: 4 },
+  Cancelada: { rotulo: 'Cancelada', tom: 'neutro', icone: 'circle-x', etapa: null },
+  Rejeitada: { rotulo: 'Recusada pelos motoristas', tom: 'erro', icone: 'alerta', etapa: null },
+  Expirada: { rotulo: 'Expirou sem motorista', tom: 'erro', icone: 'alerta', etapa: null },
+  Falha: { rotulo: 'Não foi criada', tom: 'erro', icone: 'circle-x', etapa: null },
 }
+export const ETAPAS_CORRIDA = ['Motorista', 'A caminho', 'Coletou', 'Entregue']
 export const VEICULOS_CORRIDA = [{ valor: 'Moto', rotulo: 'Moto' }, { valor: 'Carro', rotulo: 'Carro' }]
+// Na Lalamove a gorjeta nova substitui a anterior e precisa ser maior (#2168): estes são totais, não acréscimos.
 export const GORJETAS_CENTAVOS = [300, 500, 1000]
 export const INTERVALO_CORRIDA_MS = 15000
 
 export const corridaDaApi = (corrida) => corrida?.origem === 'Api'
-export const statusDaCorrida = (corrida) => STATUS_CORRIDA[corrida?.status] ?? { rotulo: corrida?.status ?? '', tom: 'neutro' }
+export const statusDaCorrida = (corrida) =>
+  STATUS_CORRIDA[corrida?.status] ?? { rotulo: corrida?.status ?? '', tom: 'neutro', icone: 'ajuda', etapa: null }
 export const corridaEmCurso = (corridas) => (corridas ?? []).some((c) => corridaDaApi(c) && c.ativa)
+export const corridaDaApiEmCurso = (corridas) => (corridas ?? []).find((c) => corridaDaApi(c) && c.ativa) ?? null
 
 // "Chamar Lalamove" só faz sentido com a loja conectada, a viagem montando, um pedido só (uma parada por corrida,
-// R7) e nenhuma corrida em curso. O motivo vira texto de apoio quando o botão não aparece.
-export function motivoSemChamada(viagem, corridas, conectada) {
+// R7), o pedido pronto (R8, quando a tela sabe o status) e nenhuma corrida em curso. O motivo vira texto de apoio.
+export function motivoSemChamada(viagem, corridas, conectada, pedido = null) {
   if (!conectada) return null
   if (viagem?.situacao !== 'Montando') return null
   if ((viagem.paradas ?? []).length !== 1) return 'A Lalamove leva um pedido por vez: deixe uma parada só nesta viagem para chamar.'
   if (corridaEmCurso(corridas)) return null
+  if (pedido?.status && pedido.status !== 'pronto') return 'O pedido ainda não está pronto. Chame a Lalamove quando ele sair da cozinha.'
   return ''
 }
-export const podeChamarLalamove = (viagem, corridas, conectada) => motivoSemChamada(viagem, corridas, conectada) === ''
+export const podeChamarLalamove = (viagem, corridas, conectada, pedido) => motivoSemChamada(viagem, corridas, conectada, pedido) === ''
 
 export const validadeDaCotacao = (cotacao, agoraMs) =>
   Math.max(0, Math.floor((Date.parse(cotacao?.expiraEm ?? '') - agoraMs) / 1000)) || 0
+export const cotacaoVencida = (cotacao, agoraMs) => validadeDaCotacao(cotacao, agoraMs) === 0
+// "4:05" de 245 s. Abaixo de um minuto a contagem ganha o tom de alerta na tela.
+export const relogioDaCotacao = (segundos) => `${Math.floor(segundos / 60)}:${String(segundos % 60).padStart(2, '0')}`
 
-export const resumoDaCotacao = (cotacao) => [
-  moeda(cotacao.valorCentavos / 100),
-  cotacao.distanciaMetros ? `${(cotacao.distanciaMetros / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km` : null,
-].filter(Boolean).join(' · ')
+export const distanciaDaCotacao = (cotacao) => (cotacao?.distanciaMetros
+  ? `${(cotacao.distanciaMetros / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km` : null)
+export const resumoDaCotacao = (cotacao) => [moeda(cotacao.valorCentavos / 100), distanciaDaCotacao(cotacao)].filter(Boolean).join(' · ')
 
 export const motoristaDaCorrida = (corrida) => [corrida.motorista, corrida.motoristaPlaca].filter(Boolean).join(' · ')
+export const iniciaisDoMotorista = (nome) => String(nome ?? '').trim().split(/\s+/).filter(Boolean)
+  .slice(0, 2).map((p) => p[0].toUpperCase()).join('')
+
+// Gorjetas que a Lalamove ainda aceita: só total maior que o já dado.
+export const gorjetasDaCorrida = (corrida) => GORJETAS_CENTAVOS
+  .map((centavos) => ({ centavos, disponivel: centavos > (corrida?.gorjetaCentavos ?? 0) }))
+
+// O link de rastreio vem do provedor: só https vira link (javascript: ou http não entram no href).
+export const linkDeRastreio = (corrida) => (/^https:\/\/\S+$/i.test(corrida?.linkRastreio ?? '') ? corrida.linkRastreio : null)
+
+// O que a atendente ainda pode fazer, e por quê não, numa frase.
+export function cancelamentoDaCorrida(corrida) {
+  if (!corrida?.ativa) return null
+  if (corrida.podeCancelar) {
+    return corrida.cancelaSemCustoAte
+      ? { pode: true, texto: `Cancela sem custo até ${horaCurta(corrida.cancelaSemCustoAte)}.` }
+      : { pode: true, texto: null }
+  }
+  if (corrida.status === 'MotoristaACaminho' || corrida.status === 'Coletada') {
+    return { pode: false, texto: 'Passou a janela sem custo: para cancelar agora, fale com o motorista ou com o suporte da Lalamove.' }
+  }
+  return null
+}
 
 export const resumoDaCorrida = (corrida) => [
   rotuloEmpresaEntregador(corrida.provedor), moeda(corrida.custoCentavos / 100), corrida.motorista, corrida.corrigidoEm ? 'corrigida' : null,

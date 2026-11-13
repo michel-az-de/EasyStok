@@ -37,7 +37,7 @@ const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.
 
 // #1942 (#1923): 409 que o EasyStok recusou antes de criar o pedido. Mostra o motivo, sem reler. O resto dos
 // 409 (PEDIDO_EM_ANDAMENTO, a corrida do clique duplo, e código desconhecido) pode ter criado: relê.
-const RECUSA_DEFINITIVA = new Set(['LOJA_FECHADA', 'JANELA_ESGOTADA', 'CEP_SEM_COBERTURA', 'CLIENTE_BLOQUEADO'])
+const RECUSA_DEFINITIVA = new Set(['LOJA_FECHADA', 'JANELA_ESGOTADA', 'CEP_SEM_COBERTURA', 'CLIENTE_BLOQUEADO', 'VINCULO_CLIENTE_ALTERADO'])
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'forcarEncaixe']
 
@@ -130,9 +130,16 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
   // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e
   // manda o resumo pela conversa. Só o POST decide "não criado" (#1287): a recarga que
   // falha depois dele é só a tela atrasada, a polling traz o pedido.
-  const criarPedido = (id, meio = null, enviarAoCliente = true) => umaPorConversa(id, 'criarPedido', () => {
-    const pedido = pedidoDe(id)
+  const criarPedido = (id, meio = null, enviarAoCliente = true, pedido = pedidoDe(id)) => umaPorConversa(id, 'criarPedido', () => {
     if (!pedido || pedidoCriado(id)) return undefined
+    const conversa = estadoRef.current.conversas.find(c => c.id === id)
+    const identidade = pedido.identidadeProposta
+    if (!identidade?.clienteId || !Number.isInteger(identidade.vinculoRevisao) || identidade.vinculoRevisao < 0
+      || identidade.clienteId !== conversa?.clienteId || identidade.vinculoRevisao !== conversa?.vinculoRevisao) {
+      const erro = 'Confira a pessoa da comanda na ficha antes de gerar a cobrança. Os itens foram preservados.'
+      avisar(erro)
+      return { erro }
+    }
     // #1683: o erro volta como `{ erro }` para a barra mostrar ao lado do botão; o aviso fica.
     if (!janelaDoId(pedido.janela)) {
       const erro = 'Escolha a janela de entrega antes de enviar ao cliente.'
@@ -208,9 +215,10 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
   // atendendo, assume antes. Gerar sem enviar não fala com ninguém.
   const cobrar = (id, meio, enviarAoCliente = true) => {
     if (!pedidoCriado(id)) {
+      const proposta = pedidoDe(id)
       return enviarAoCliente
-        ? antesDeEnviar(id, () => criarPedido(id, meio, enviarAoCliente), { erro: 'Não consegui assumir a conversa, então a cobrança não saiu.' })
-        : criarPedido(id, meio, enviarAoCliente)
+        ? antesDeEnviar(id, () => criarPedido(id, meio, enviarAoCliente, proposta), { erro: 'Não consegui assumir a conversa, então a cobrança não saiu.' })
+        : criarPedido(id, meio, enviarAoCliente, proposta)
     }
     if (recusaPorStatusDesconhecido(id)) return undefined
     const atual = pedidoDe(id)

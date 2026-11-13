@@ -295,7 +295,8 @@ await confere('C13 vitrine desligada vira aviso acionável', () => {
 })
 await confere('C13 escolher janela e criar pedido limpam o aviso velho', async () => {
   const despachos = []
-  const conversa = { id: 'c1', pedido: { numero: 'x', janela: null, itens: [{ sku: 's', qtd: 1, obs: '' }], meio: 'pix' } }
+  const identidade = { clienteId: 'cliente-da-comanda', vinculoRevisao: 2 }
+  const conversa = { id: 'c1', ...identidade, pedido: { numero: 'x', identidadeProposta: { ...identidade }, janela: null, itens: [{ sku: 's', qtd: 1, obs: '' }], meio: 'pix' } }
   const estadoRef = { current: { conversas: [conversa] } }
   const api = criarAcoesComandaApi({ escolherJanela: () => {} }, { despachar: (a) => despachos.push(a), estadoRef })
   api.gerarPedido('c1')

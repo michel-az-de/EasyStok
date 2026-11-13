@@ -1,3 +1,4 @@
+using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Domain.Financeiro;
 
 /// <summary>
@@ -63,7 +64,7 @@ public sealed class LancamentoBaixa
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             LancamentoId = lancamentoId,
-            Valor = decimal.Round(valor, 2, MidpointRounding.ToEven),
+            Valor = Dinheiro.Arredondar(valor),
             DataBaixa = dataBaixa,
             MeioPagamento = string.IsNullOrWhiteSpace(meioPagamento) ? "outro" : meioPagamento.Trim().ToLowerInvariant(),
             ContaBancariaId = contaBancariaId,

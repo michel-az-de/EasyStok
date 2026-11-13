@@ -61,7 +61,8 @@ public sealed class IniciarCheckoutGuestUseCase(
     public async Task<IniciarCheckoutGuestResult> ExecuteAsync(
         IniciarCheckoutGuestInput input,
         CancellationToken ct = default,
-        Func<Guid, CancellationToken, Task>? pedidoCriado = null)
+        Func<Guid, CancellationToken, Task>? pedidoCriado = null,
+        Func<CancellationToken, Task>? antesCriarPedido = null)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -93,46 +94,57 @@ public sealed class IniciarCheckoutGuestUseCase(
         if (input.JanelaId is null)
             await checkoutCore.GarantirLojaAbertaAsync(storefront.EmpresaId, ct);
 
-        // ── Cadastro guest isolado; telefone informado não equivale a OTP ──
-        var (cliente, clienteNovo) = await ResolverClienteAsync(storefront.EmpresaId, nome, telefoneE164, cep, input.EnderecoEntrega, ct);
+        async Task<(PedidoReservado? Reservado, IniciarCheckoutGuestResult? Legado)> CriarAsync(CancellationToken token)
+        {
+            if (antesCriarPedido is not null) await antesCriarPedido(token);
+            // ── Cadastro guest isolado; telefone informado não equivale a OTP ──
+            var (cliente, clienteNovo) = await ResolverClienteAsync(storefront.EmpresaId, nome, telefoneE164, cep, input.EnderecoEntrega, ct);
 
-        // #1291: o bloqueio vale em todos os canais (S24); nada de vaga ocupada nem pedido.
-        if (cliente.Bloqueado)
-            throw new ClienteBloqueadoException(cliente.Id);
+            // #1291: o bloqueio vale em todos os canais (S24); nada de vaga ocupada nem pedido.
+            if (cliente.Bloqueado)
+                throw new ClienteBloqueadoException(cliente.Id);
 
-        if (input.JanelaId is not { } janelaId || input.DataEntrega is not { } dataEntrega)
-            return await CriarSemJanelaAsync(storefront.Id, storefront.EmpresaId, cliente, clienteNovo, nome, telefoneE164,
-                cep, input, sw, ct, pedidoCriado);
+            if (input.JanelaId is not { } janelaId || input.DataEntrega is not { } dataEntrega)
+                return (Reservado: (PedidoReservado?)null, Legado: (IniciarCheckoutGuestResult?)await CriarSemJanelaAsync(storefront.Id, storefront.EmpresaId, cliente, clienteNovo, nome, telefoneE164,
+                    cep, input, sw, ct, pedidoCriado));
 
-        // ── Fases 1 e 2: pedido, frete cotado e vaga (S10) ───────────────
-        var reservado = await checkoutCore.CriarPedidoComReservaAsync(
-            new CheckoutCoreInput(
-                ClienteId: cliente.Id,
-                Itens: input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList(),
-                JanelaId: janelaId,
-                DataEntrega: dataEntrega,
-                Cep: cep,
-                Origem: OrigemPedido.StorefrontGuest,
-                Slug: input.Slug,
-                Observacoes: MontarObservacoes(input.Observacoes, cep, input.Numero),
-                Numero: input.Numero,
-                EnderecoEntrega: input.EnderecoEntrega),
-            ct);
+            // ── Fases 1 e 2: pedido, frete cotado e vaga (S10) ───────────────
+            var reservaNova = await checkoutCore.CriarPedidoComReservaAsync(
+                new CheckoutCoreInput(
+                    ClienteId: cliente.Id,
+                    Itens: input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList(),
+                    JanelaId: janelaId,
+                    DataEntrega: dataEntrega,
+                    Cep: cep,
+                    Origem: OrigemPedido.StorefrontGuest,
+                    Slug: input.Slug,
+                    Observacoes: MontarObservacoes(input.Observacoes, cep, input.Numero),
+                    Numero: input.Numero,
+                    EnderecoEntrega: input.EnderecoEntrega),
+                ct);
 
+            var pedidoNovo = reservaNova.Pedido;
+            pedidoNovo.ClienteNome = nome;          // snapshot do nome fornecido AGORA
+            pedidoNovo.ClienteTelefone = telefoneE164;
+            await pedidoRepository.UpdateAsync(pedidoNovo, ct);
+
+            // #1226: mesma conversão da campanha que o pedido da conversa (S30); requisição anônima, o tenant
+            // da loja liga o filtro e a RLS. Commit antes da fase 3, que pode falhar com o pedido já criado
+            // (mesma ordem do checkout logado).
+            tenantContext.SetCurrentTenant(storefront.EmpresaId);
+            await atribuicaoCampanha.AtribuirAsync(storefront.EmpresaId, cliente.Id, pedidoNovo.Id, ct);
+            await unitOfWork.CommitAsync();
+
+            if (pedidoCriado is not null) await pedidoCriado(pedidoNovo.Id, token);
+            return (Reservado: (PedidoReservado?)reservaNova, Legado: (IniciarCheckoutGuestResult?)null);
+        }
+        var criacao = antesCriarPedido is null ? await CriarAsync(ct)
+            : await unitOfWork.ExecuteInTransactionSemRetryAsync(CriarAsync, ct);
+        if (criacao.Legado is not null) return criacao.Legado;
+        var reservado = criacao.Reservado!;
         var pedido = reservado.Pedido;
-        pedido.ClienteNome = nome;          // snapshot do nome fornecido AGORA
-        pedido.ClienteTelefone = telefoneE164;
-        await pedidoRepository.UpdateAsync(pedido, ct);
-
-        // #1226: mesma conversão da campanha que o pedido da conversa (S30); requisição anônima, o tenant
-        // da loja liga o filtro e a RLS. Commit antes da fase 3, que pode falhar com o pedido já criado
-        // (mesma ordem do checkout logado).
-        tenantContext.SetCurrentTenant(storefront.EmpresaId);
-        await atribuicaoCampanha.AtribuirAsync(storefront.EmpresaId, cliente.Id, pedido.Id, ct);
-        await unitOfWork.CommitAsync();
 
         // ── Fase 3: cobranca do Mercado Pago (S11) ─────────────────────────
-        if (pedidoCriado is not null) await pedidoCriado(pedido.Id, ct);
         var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: input.ConversaId, ct);
 
         var token = tokenService.Gerar(pedido.Id);
@@ -141,7 +153,7 @@ public sealed class IniciarCheckoutGuestUseCase(
 
         logger.LogInformation(
             "Checkout guest ok pedidoId={PedidoId} numeroCurto={Numero} storefrontId={StorefrontId} clienteNovo={Novo} frete={Frete} elapsedMs={Ms}",
-            pedido.Id, numeroCurto, storefront.Id, clienteNovo, frete, sw.ElapsedMilliseconds);
+            pedido.Id, numeroCurto, storefront.Id, true, frete, sw.ElapsedMilliseconds);
 
         return new IniciarCheckoutGuestResult(
             pedido.Id, numeroCurto, token, frete, cobranca.LinkPagamento, ExpiresInSeconds);

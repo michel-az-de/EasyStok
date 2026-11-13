@@ -14,6 +14,7 @@ import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { AbaAvisos } from './avisos/AbaAvisos'
 import { AbaImpressao } from './impressao/AbaImpressao'
+import { PainelCadastros } from './cadastros/PainelCadastros'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
 import { AbaUsuarios } from './usuarios/AbaUsuarios'
@@ -222,7 +223,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
               className={css.painelGestao}
               onClickCapture={seguirLink}
             >
-              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} horariosAtendimento={horariosAtendimento} abasDaDemonstracao={abasDaDemonstracao} />
+              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} aoAbrirConversa={aoFechar} renderizarEditorCardapio={renderizarEditorCardapio} horariosAtendimento={horariosAtendimento} abasDaDemonstracao={abasDaDemonstracao} />
             </div>
           </section>
         </div>
@@ -263,7 +264,7 @@ function AbaNaoLigada({ texto, saida = null }) {
 // da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
 // `abasDaDemonstracao` (#2017): as abas que só a demonstração tem (caixa, janelas, integrações, produção e
 // fidelidade com dados do navegador). O App as entrega; no build de produção não existem.
-export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
+export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, aoAbrirConversa = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
   const { fonteApi } = useAtendimento()
   const { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao } = abasDaDemonstracao ?? {}
   const painelDaAba = useMemo(() => ({
@@ -304,6 +305,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     perdas: <AbaPerdasApi />,
   }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento, AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao])
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
+  if (fonteApi && aba?.startsWith('cadastros-')) return <PainelCadastros key={aba} tela={aba.slice('cadastros-'.length)} respostas={<AbaRespostas />} impressao={<AbaImpressao />} aoAbrirConversa={aoAbrirConversa} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />
   // #2362: toda tela da Produção mostra no topo o que falta configurar, nas duas casas (rota e Gestão).

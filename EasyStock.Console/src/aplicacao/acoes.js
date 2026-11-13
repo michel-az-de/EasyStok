@@ -11,6 +11,7 @@ export const CADASTRAR_ENDERECO = 'cadastrar-endereco'
 export const ADICIONAR_ITEM = 'adicionar-item'
 // #1686 (item 3): comanda nova na mesma conversa depois de o pedido anterior terminar.
 export const NOVA_COMANDA = 'nova-comanda'
+export const RECONFERIR_PESSOA_COMANDA = 'reconferir-pessoa-comanda'
 export const REMOVER_ITEM = 'remover-item'
 export const GERAR_PEDIDO = 'gerar-pedido'
 export const SALVAR_NOTA = 'salvar-nota'
@@ -286,6 +287,7 @@ export const SINCRONIZAR_PEDIDO = 'sincronizar-pedido'
 export const FECHAR_AVISO_API = 'fechar-aviso-api'
 // #1276: o cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
 export const CLIENTE_DA_API = 'cliente-da-api'
+export const VINCULO_CLIENTE_DA_API = 'vinculo-cliente-da-api'
 // #1276: nome que a dona escreveu para o lead ainda sem cadastro; vai junto no cadastro.
 export const RENOMEAR_LEAD_API = 'renomear-lead-api'
 // #1430: nome e contato que o visitante do chat do site informou, até a dona confirmar o cadastro.

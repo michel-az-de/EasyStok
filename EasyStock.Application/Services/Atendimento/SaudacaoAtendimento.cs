@@ -24,7 +24,7 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
         ArgumentNullException.ThrowIfNull(identificacao);
 
         var link = await ResolverLinkCardapioAsync(empresaId, ct);
-        var primeiroNome = identificacao.EhNovo ? null : NomesDeContato.PrimeiroNome(identificacao.Cliente.Nome);
+        var primeiroNome = identificacao.EhNovo ? null : NomesDeContato.PrimeiroNome(identificacao.Cliente?.Nome);
         return Montar(configuracao, primeiroNome, link);
     }
 

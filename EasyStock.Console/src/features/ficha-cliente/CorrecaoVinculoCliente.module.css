@@ -1,0 +1,21 @@
+.conteudo { display: grid; gap: var(--e-4); min-width: 0; }
+.identidade { display: grid; gap: var(--e-1); padding: var(--e-4); background: var(--preenchimento); border-radius: var(--r-2); }
+.identidade span, .identidade small, .historico small { color: var(--tinta-2); font-size: var(--t-apoio); }
+.identidade strong { font-size: var(--t-titulo); overflow-wrap: anywhere; }
+.erro { background: var(--erro-pastel); color: var(--erro); padding: var(--e-3); border-radius: var(--r-1); margin: 0; }
+.sucesso { background: var(--sucesso-pastel); color: var(--sucesso); padding: var(--e-3); border-radius: var(--r-1); margin: 0; }
+.acoes { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.busca { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-3); align-items: end; }
+.candidatos { grid-column: 1 / -1; display: grid; gap: var(--e-2); }
+.candidato { display: flex; align-items: center; gap: var(--e-3); min-height: var(--toque); padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-1); cursor: pointer; }
+.candidato span { display: grid; gap: var(--e-1); }
+.candidato small { color: var(--tinta-2); }
+.revisao { display: grid; gap: var(--e-3); padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); }
+.revisao p { margin: 0; color: var(--tinta-2); }
+.confirmacao { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
+.confirmacao input, .candidato input { width: 20px; height: 20px; flex: none; accent-color: var(--marca); }
+.historico { padding-left: var(--e-5); }
+.historico li { margin-bottom: var(--e-4); }
+.historico small { display: block; margin-top: var(--e-1); }
+.historico p { margin-block: var(--e-1); overflow-wrap: anywhere; }
+@media (max-width: 600px) { .busca { grid-template-columns: minmax(0, 1fr); } .acoes > button { width: 100%; } }

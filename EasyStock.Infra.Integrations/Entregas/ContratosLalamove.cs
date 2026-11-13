@@ -39,10 +39,12 @@ public sealed record LalamoveCidade(
 public sealed record LalamoveServico(
     [property: JsonPropertyName("key")] string Key,
     [property: JsonPropertyName("description")] string? Description);
+/// <summary><c>remarks</c> é o recado para o motorista na parada (#2168), até 1.500 caracteres.</summary>
 public sealed record LalamoveContato(
     [property: JsonPropertyName("stopId")] string StopId,
     [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("phone")] string Phone);
+    [property: JsonPropertyName("phone")] string Phone,
+    [property: JsonPropertyName("remarks"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Remarks = null);
 /// <summary><c>metadata</c> leva o id da corrida no EasyStok (#2160, R4): é por ele que se reconhece o pedido num timeout.</summary>
 public sealed record LalamoveEntregaRequest(
     [property: JsonPropertyName("quotationId")] string QuotationId,

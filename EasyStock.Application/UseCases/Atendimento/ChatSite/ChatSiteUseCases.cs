@@ -150,6 +150,7 @@ public sealed class EnviarMensagemVisitanteUseCase(
                     ?? throw new SessaoChatSiteInvalidaException();
                 if (conversa.EmpresaId != sessao.EmpresaId || !conversa.EstaAberta || conversa.Canal != CanalConversa.ChatSite)
                     throw new SessaoChatSiteInvalidaException();
+                await conversaChat.GarantirSessaoAsync(sessao, agora, tokenCt);
             }
             else
             {

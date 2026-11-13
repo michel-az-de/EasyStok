@@ -89,27 +89,54 @@ public class OcorrenciaUseCasesTests
     private ResolverOcorrenciaUseCase Resolver() =>
         new(_repo, Reembolsar(), _uow, new RelogioFixo(Agora));
 
-    [Fact]
-    public async Task AbrirOcorrencia_EscalaConversa()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AbrirOcorrencia_EscalaConversa(bool resolverPeloPedido)
     {
         var pedido = NovoPedido();
         var conversa = Conversa.Abrir(_empresaId, "5511999990000", Agora.AddHours(-1), clienteId: _clienteId);
         _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        _conversas.ObterIdPorPedidoAsync(_empresaId, pedido.Id, Arg.Any<CancellationToken>()).Returns(conversa.Id);
         Ocorrencia? criada = null;
         _repo.When(r => r.AddAsync(Arg.Any<Ocorrencia>(), Arg.Any<CancellationToken>()))
             .Do(ci => criada = ci.Arg<Ocorrencia>());
 
         var r = await Abrir().ExecuteAsync(new AbrirOcorrenciaInput(
-            _empresaId, pedido.Id, OrigemOcorrencia.Avaliacao, CategoriaOcorrencia.Atraso, "nota 1: chegou frio", conversa.Id));
+            _empresaId, pedido.Id, OrigemOcorrencia.Avaliacao, CategoriaOcorrencia.Atraso, "nota 1: chegou frio", resolverPeloPedido ? null : conversa.Id));
 
         criada.Should().NotBeNull();
         criada!.Status.Should().Be(StatusOcorrencia.Aberta);
         criada.Origem.Should().Be(OrigemOcorrencia.Avaliacao);
         criada.ClienteId.Should().Be(_clienteId);
+        criada.ConversaId.Should().Be(conversa.Id);
         r.Id.Should().Be(criada.Id);
         await _escalador.Received(1).EscalarAsync(_empresaId, conversa, Arg.Is<string>(m => m.Contains("ocorrência")), Agora, Arg.Any<CancellationToken>());
         await _uow.Received(1).CommitAsync();
         await _eventos.Received(1).PublicarAsync(EventosOperacao.OcorrenciaAberta, _empresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
+        await _conversas.Received(resolverPeloPedido ? 1 : 0).ObterIdPorPedidoAsync(_empresaId, pedido.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AbrirOcorrencia_ResolucaoPeloPedidoNaoAceitaEntidadesDeOutraEmpresa(bool pedidoAlheio)
+    {
+        var pedido = NovoPedido();
+        if (pedidoAlheio) pedido.EmpresaId = Guid.NewGuid();
+        var conversaAlheia = Conversa.Abrir(Guid.NewGuid(), "5511999990000", Agora, clienteId: _clienteId);
+        _conversas.ObterIdPorPedidoAsync(_empresaId, pedido.Id, Arg.Any<CancellationToken>()).Returns(conversaAlheia.Id);
+        _conversas.ObterPorIdAsync(_empresaId, conversaAlheia.Id, Arg.Any<CancellationToken>()).Returns(conversaAlheia);
+
+        var executar = () => Abrir().ExecuteAsync(new AbrirOcorrenciaInput(
+            _empresaId, pedido.Id, OrigemOcorrencia.Dona, CategoriaOcorrencia.Atraso, "Atraso registrado na cozinha", null));
+
+        await executar.Should().ThrowAsync<UseCaseValidationException>();
+        await _repo.DidNotReceive().AddAsync(Arg.Any<Ocorrencia>(), Arg.Any<CancellationToken>());
+        await _escalador.DidNotReceive().EscalarAsync(Arg.Any<Guid>(), Arg.Any<Conversa>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await _uow.DidNotReceive().CommitAsync();
+        if (pedidoAlheio)
+            await _conversas.DidNotReceive().ObterIdPorPedidoAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

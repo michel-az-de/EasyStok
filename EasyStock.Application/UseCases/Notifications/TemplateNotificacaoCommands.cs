@@ -27,17 +27,23 @@ public sealed class CriarTemplateUseCase(
 {
     public async Task<TemplateResult> ExecuteAsync(CriarTemplateCommand command)
     {
-        var template = TemplateNotificacao.Criar(
-            command.Codigo, command.Nome, command.Canal, command.TipoEvento,
-            command.AssuntoTemplate, command.CorpoTemplate,
-            command.EmpresaId, command.Idioma, command.CriadoPor);
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(async ct =>
+        {
+            var familia = await templateRepository.ListarFamiliaComLockAsync(command.EmpresaId, command.Codigo, ct);
+            if (familia.Count != 0)
+                throw new InvalidOperationException("Este código já possui um modelo. Edite sua versão atual.");
+            var template = TemplateNotificacao.Criar(
+                command.Codigo, command.Nome, command.Canal, command.TipoEvento,
+                command.AssuntoTemplate, command.CorpoTemplate,
+                command.EmpresaId, command.Idioma, command.CriadoPor);
 
-        await templateRepository.AddAsync(template);
-        await unitOfWork.CommitAsync();
+            await templateRepository.AddAsync(template);
+            await unitOfWork.CommitAsync();
 
-        logger.LogInformation(
-            "Template criado: {Codigo} v{Versao} canal={Canal}", template.Codigo, template.Versao, template.Canal);
-        return new TemplateResult(template.Id, template.Codigo, template.Versao);
+            logger.LogInformation(
+                "Template criado: {Codigo} v{Versao} canal={Canal}", template.Codigo, template.Versao, template.Canal);
+            return new TemplateResult(template.Id, template.Codigo, template.Versao);
+        });
     }
 }
 
@@ -59,24 +65,27 @@ public sealed class AtualizarTemplateUseCase(
     public async Task<TemplateResult> ExecuteAsync(AtualizarTemplateCommand command)
     {
         var original = await templateRepository.ObterDaEmpresaAsync(command.TemplateId, command.EmpresaId);
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(async ct =>
+        {
+            var familia = await templateRepository.ListarFamiliaComLockAsync(command.EmpresaId, original.Codigo, ct);
+            var atual = familia.OrderByDescending(t => t.Versao).FirstOrDefault();
+            if (atual is null || atual.Id != command.TemplateId)
+                throw new InvalidOperationException("Este modelo possui uma versão mais recente. Atualize a lista antes de editar.");
+            var novaVersao = TemplateNotificacao.Criar(
+                atual.Codigo, atual.Nome, atual.Canal, atual.TipoEvento,
+                command.NovoAssunto, command.NovoCorpo,
+                atual.EmpresaId, atual.Idioma, command.AtualizadoPor);
+            novaVersao.Versao = atual.Versao + 1;
+            novaVersao.DefinirMetadados(atual.MetadadosJson);
 
-        // Cria nova versão incrementando a versão do original
-        var novaVersao = TemplateNotificacao.Criar(
-            original.Codigo, original.Nome, original.Canal, original.TipoEvento,
-            command.NovoAssunto, command.NovoCorpo,
-            original.EmpresaId, original.Idioma, command.AtualizadoPor);
-        novaVersao.Versao = original.Versao + 1;
+            // A versão publicada continua resolvível enquanto a nova aguarda aprovação.
+            await templateRepository.AddAsync(novaVersao);
+            await unitOfWork.CommitAsync();
 
-        // Desativa versão anterior
-        original.Desativar();
-
-        await templateRepository.UpdateAsync(original);
-        await templateRepository.AddAsync(novaVersao);
-        await unitOfWork.CommitAsync();
-
-        logger.LogInformation(
-            "Template {Codigo} atualizado para v{Versao}", novaVersao.Codigo, novaVersao.Versao);
-        return new TemplateResult(novaVersao.Id, novaVersao.Codigo, novaVersao.Versao);
+            logger.LogInformation(
+                "Template {Codigo} atualizado para v{Versao}", novaVersao.Codigo, novaVersao.Versao);
+            return new TemplateResult(novaVersao.Id, novaVersao.Codigo, novaVersao.Versao);
+        });
     }
 }
 
@@ -93,12 +102,24 @@ public sealed class AprovarTemplateUseCase(
     public async Task<AprovarTemplateResult> ExecuteAsync(AprovarTemplateCommand command)
     {
         var template = await templateRepository.ObterDaEmpresaAsync(command.TemplateId, command.EmpresaId);
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(async ct =>
+        {
+            var familia = await templateRepository.ListarFamiliaComLockAsync(command.EmpresaId, template.Codigo, ct);
+            var atual = familia.OrderByDescending(t => t.Versao).FirstOrDefault();
+            if (atual is null || atual.Id != command.TemplateId)
+                throw new InvalidOperationException("Este modelo possui uma versão mais recente. Atualize a lista antes de aprovar.");
+            foreach (var anterior in familia.Where(t => t.Id != atual.Id && t.Ativo))
+            {
+                anterior.Desativar();
+                await templateRepository.UpdateAsync(anterior);
+            }
+            atual.Aprovar(command.AprovadoPor);
+            atual.Ativar();
+            await templateRepository.UpdateAsync(atual);
+            await unitOfWork.CommitAsync();
 
-        template.Aprovar(command.AprovadoPor);
-        await templateRepository.UpdateAsync(template);
-        await unitOfWork.CommitAsync();
-
-        return new AprovarTemplateResult(true);
+            return new AprovarTemplateResult(true);
+        });
     }
 }
 

@@ -20,7 +20,8 @@ export function gravarRascunhos(sessao, rascunhos) {
     const comTexto = Object.entries(rascunhos ?? {}).filter(([, texto]) => typeof texto === 'string' && texto.trim())
     if (comTexto.length === 0) sessionStorage.removeItem(chaveDe(sessao))
     else sessionStorage.setItem(chaveDe(sessao), JSON.stringify(Object.fromEntries(comTexto)))
-  } catch { /* sem storage: o rascunho vale só nesta carga */ }
+    return true
+  } catch { return false }
 }
 
 export function esquecerRascunhos() {

@@ -11,7 +11,13 @@ public sealed record IdentificarClientePorTelefoneInput(Guid EmpresaId, string W
 
 /// <param name="EhLead">Ainda não comprou (<c>OrderCount == 0</c>), RN-03.</param>
 /// <param name="EhNovo">O cadastro foi criado agora, nesta identificação.</param>
-public sealed record IdentificacaoCliente(ClienteEntity Cliente, bool EhLead, bool EhNovo);
+public sealed record IdentificacaoCliente(ClienteEntity? Cliente, bool EhLead, bool EhNovo)
+{
+    public bool IdentidadePendente => Cliente is null;
+}
+
+public sealed class TelefoneCompartilhadoException() : RegraDeDominioVioladaException(
+    "Este telefone está em mais de um cadastro. Confira a pessoa e escolha explicitamente no Atendimento.");
 
 public sealed class TelefoneExigeVerificacaoException() : Exception(
     "Para continuar com este telefone, confirme o código enviado pelo WhatsApp. Sua seleção está salva.");
@@ -38,6 +44,10 @@ public sealed class IdentificarClientePorTelefoneUseCase(
         ArgumentNullException.ThrowIfNull(input);
 
         var candidatos = NormalizadorTelefone.CandidatosDeWaId(input.WaId);
+        var telefones = candidatos.SelectMany(GrafiasDoCadastro).Distinct().ToArray();
+        var hashes = candidatos.Select(ClienteOtp.CalcularTelefoneHash).ToArray();
+        if (await clienteRepository.TemTelefoneCompartilhadoAsync(input.EmpresaId, telefones, hashes, ct))
+            return new IdentificacaoCliente(null, EhLead: false, EhNovo: false);
 
         var existente = await ProcurarAsync(input.EmpresaId, candidatos, input.ReutilizarCadastro, ct);
         if (existente is not null && !input.ReutilizarCadastro)
