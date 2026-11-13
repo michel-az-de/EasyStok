@@ -192,7 +192,9 @@ public sealed class SyncPullCarimboServidorTests : IDisposable
         mutacao.Ts.Should().BeGreaterThan(cursor).And.BeLessThan(resposta.ServerTime);
         _db.ChangeTracker.Clear();
 
-        var seguinte = await sync.Pull(resposta.ServerTime, "dev-a");
+        // #2477: o pull rele a faixa de SobreposicaoDoCursor antes do cursor; passada a folga, nada se repete.
+        var depoisDaFolga = resposta.ServerTime + (long)SyncController.SobreposicaoDoCursor.TotalMilliseconds;
+        var seguinte = await sync.Pull(depoisDaFolga, "dev-a");
         (seguinte.Result as OkObjectResult)!.Value.Should().BeOfType<SyncPullResponse>().Subject.Mutations.Should().BeEmpty();
         (await _db.Set<Product>().SingleAsync(p => p.Id == "p-outra-empresa")).Stock.Should().Be(90);
         (await _db.Set<Product>().SingleAsync(p => p.Id == "p-outra-loja")).Stock.Should().Be(90);
