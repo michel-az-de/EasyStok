@@ -12,6 +12,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
         IUsuarioRepository usuarioRepository,
         IUsuarioPerfilRepository usuarioPerfilRepository,
         IPerfilRepository perfilRepository,
+        ILojaRepository lojaRepository,
         RevogadorSessoes revogadorSessoes,
         ICurrentUserAccessor currentUser,
         IAuditLogRepository auditLogRepository,
@@ -39,6 +40,15 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
                 ?? throw new UseCaseValidationException("Perfil invalido.");
             if (perfil.Nivel == NivelAcesso.SuperAdmin || (perfil.EmpresaId is not null && perfil.EmpresaId != command.EmpresaId))
                 throw new UseCaseValidationException("Perfil invalido.");
+
+            // #2448: a rota só confere a empresa de quem chama. Fora o SuperAdmin, o usuário alvo precisa ter vínculo
+            // com a empresa (ativo ou não, como na reativação); a mesma mensagem do inexistente não revela contas alheias.
+            if (currentUser.Nivel != NivelAcesso.SuperAdmin && !usuario.Empresas.Any(e => e.EmpresaId == command.EmpresaId))
+                throw new UseCaseValidationException("Usuario nao encontrado.");
+
+            // O token leva a loja do perfil; loja de outra empresa não entra, nem pelo SuperAdmin.
+            if (command.LojaId is { } lojaId && await lojaRepository.GetByIdAsync(command.EmpresaId, lojaId) is null)
+                throw new UseCaseValidationException("Loja invalida.");
 
             var vinculoAtivo = usuario.Empresas.Any(e => e.EmpresaId == command.EmpresaId && e.Ativo);
 

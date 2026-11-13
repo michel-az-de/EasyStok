@@ -171,6 +171,7 @@ public sealed class SyncPullCarimboServidorTests : IDisposable
         var usuario = Substitute.For<ICurrentUserAccessor>();
         usuario.IsAuthenticated.Returns(true);
         usuario.EmpresaId.Returns(_empresaId);
+        usuario.TemPermissao(Permissao.GerenciarEstoque).Returns(true);
         var produtos = new MobileProductsController(_db, usuario, NullLogger<MobileProductsController>.Instance);
         var cursor = HaCincoMinutos();
         (await produtos.ReconcileStock("p-outra-empresa", _empresaId, CancellationToken.None)).Should().BeOfType<NotFoundResult>();

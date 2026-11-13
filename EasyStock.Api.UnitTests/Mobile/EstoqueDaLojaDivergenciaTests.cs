@@ -33,6 +33,7 @@ public sealed class EstoqueDaLojaDivergenciaTests : IDisposable
     {
         _currentUser.IsAuthenticated.Returns(true);
         _currentUser.EmpresaId.Returns(_empresaId);
+        _currentUser.TemPermissao(Permissao.GerenciarEstoque).Returns(true);
         _db = new EasyStockDbContext(
             new DbContextOptionsBuilder<EasyStockDbContext>()
                 .UseInMemoryDatabase($"estoque-loja-{Guid.NewGuid()}").Options,
@@ -180,5 +181,20 @@ public sealed class EstoqueDaLojaDivergenciaTests : IDisposable
         r.Should().BeOfType<OkObjectResult>();
         (await _db.Set<Product>().AsNoTracking().SingleAsync(x => x.Id == p.Id)).Stock.Should().Be(10);
         (await Divergencias()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Reconciliar_sem_GerenciarEstoque_responde_403_e_nao_mexe_no_app()
+    {
+        // #2448: mesma permissão do ajuste de desacerto no web.
+        _currentUser.TemPermissao(Permissao.GerenciarEstoque).Returns(false);
+        var p = Mobile(_lojaA, stock: 3);
+        Item(_lojaA, 6);
+        await _db.SaveChangesAsync();
+
+        var r = await Produtos().ReconcileStock(p.Id, _empresaId, default);
+
+        r.Should().BeOfType<ForbidResult>();
+        (await _db.Set<Product>().AsNoTracking().SingleAsync(x => x.Id == p.Id)).Stock.Should().Be(3);
     }
 }

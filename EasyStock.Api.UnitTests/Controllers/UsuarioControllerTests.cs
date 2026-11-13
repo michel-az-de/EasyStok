@@ -74,7 +74,7 @@ public class UsuarioControllerTests
         _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), revogadorSessoes, _unitOfWork, passwordHasher, alterarSenhaLogger);
         _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, convites, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, desativarLogger);
         _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);
-        _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, Substitute.For<IPerfilRepository>(), revogadorSessoes, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, atribuirPerfilLogger);
+        _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, Substitute.For<IPerfilRepository>(), Substitute.For<ILojaRepository>(), revogadorSessoes, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, atribuirPerfilLogger);
 
         _reenviarConviteUseCase = new ReenviarConviteUseCase(
             _usuarioRepository, _currentUser, convites, Substitute.For<ITenantContextAccessor>(),

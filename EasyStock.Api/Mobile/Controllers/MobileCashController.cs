@@ -46,6 +46,7 @@ public class MobileCashController(
     /// tem que ser representado 1:1 no ERP — sempre promove se não estiver linkado.)
     /// </summary>
     [HttpPost("{id}/promover")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Promover(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -100,6 +101,7 @@ public class MobileCashController(
     }
 
     [HttpPost("{id}/unlink")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
