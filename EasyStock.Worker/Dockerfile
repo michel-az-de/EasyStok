@@ -3,7 +3,7 @@
 # FrameworkReference Microsoft.AspNetCore.App (IHttpContextAccessor etc.). Com a
 # base runtime:10.0 o container crasha no launch ("No frameworks were found:
 # Microsoft.AspNetCore.App 10.0.0"). Mesma base da API.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS base
+FROM mcr.microsoft.com/dotnet/aspnet:11.0@sha256:bc0d6653979efba491ab3d6f589d691f96c309c3c3ef81325efa6978e7b7f242 AS base
 WORKDIR /app
 # Mesmo uid e gid do appuser da API (Dockerfile da raiz): os dois gravam no volume
 # uploads-data, que pertence a ele. Com o usuario padrao da imagem (app, 1654) o worker
