@@ -143,6 +143,7 @@ public class MobileBatchesController(
         var device = HttpContext.Items["mobile-device"] as MobileDevice;
         if (device == null) return Unauthorized();
         var empresaId = device.EmpresaId;
+        if (!IdSeguro(id)) return NotFound(new { error = "Batch not found" });
 
         // Busca o batch
         var batch = await db.Set<Batch>().Include(b => b.Items)
@@ -153,7 +154,7 @@ public class MobileBatchesController(
             return BadRequest(new { error = "photo is required" });
 
         // Upload para file storage — sanitize hash to prevent path traversal
-        var bucketPath = $"mobile-photos/{empresaId}/{id}";
+        var bucketPath = PastaFotos(empresaId, id);
         var ext = photo.ContentType.Contains("png") ? ".png" : ".jpg";
         var safeHash = SanitizeFileName(hash);
         var fileName = $"{safeHash}{ext}";
@@ -173,10 +174,13 @@ public class MobileBatchesController(
             IsPublic: false
         ), ct);
 
+        // #2459: a URL é a da rota autenticada; result.Url apontaria para o /files público.
+        var url = $"/api/mobile/batches/{Uri.EscapeDataString(id)}/photos/{result.StorageKey[(result.StorageKey.LastIndexOf('/') + 1)..]}";
+
         // Atualiza o campo correto no batch
         if (field == "batchPhoto")
         {
-            batch.BatchPhoto = result.Url;
+            batch.BatchPhoto = url;
         }
         else if (field != null && field.StartsWith("item:"))
         {
@@ -185,17 +189,49 @@ public class MobileBatchesController(
                 // Items ordenados por Id — match pelo índice
                 var sortedItems = batch.Items.OrderBy(i => i.Id).ToList();
                 if (idx < sortedItems.Count)
-                    sortedItems[idx].Photo = result.Url;
+                    sortedItems[idx].Photo = url;
             }
         }
 
         await db.SaveChangesAsync(ct);
 
         log.LogInformation("Photo uploaded for batch {BatchId} field {Field} hash {Hash} → {Url}",
-            id, field, hash, result.Url);
+            id, field, hash, url);
 
-        return Ok(new { url = result.Url, hash });
+        return Ok(new { url, hash });
     }
+
+    /// <summary>
+    /// #2459: serve a foto gravada por <see cref="UploadPhoto"/>. O <c>/files</c> público bloqueia
+    /// <c>mobile-photos</c>; aqui só o aparelho da empresa dona do lote lê.
+    /// </summary>
+    [HttpGet("{id}/photos/{arquivo}")]
+    [AllowAnonymous]
+    [MobileApiKey]
+    public async Task<IActionResult> ObterFoto(string id, string arquivo, CancellationToken ct)
+    {
+        if (HttpContext.Items[MobileAuth.HttpContextItemDevice] is not MobileDevice device) return Unauthorized();
+        var ext = Path.GetExtension(arquivo);
+        var nome = Path.GetFileNameWithoutExtension(arquivo);
+        var contentType = ext switch { ".jpg" => "image/jpeg", ".png" => "image/png", _ => null };
+        if (!IdSeguro(id) || contentType is null || nome.Length == 0 || arquivo != nome + ext || SanitizeFileName(nome) != nome)
+            return NotFound();
+
+        var empresaId = device.EmpresaId;
+        if (!await db.Set<Batch>().AnyAsync(b => b.Id == id && b.EmpresaId == empresaId, ct)) return NotFound();
+
+        var chave = $"{PastaFotos(empresaId, id)}/{nome}{ext}";
+        if (!await fileStorage.ExistsAsync(chave, ct)) return NotFound();
+
+        Response.Headers.CacheControl = "private, max-age=86400";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(await fileStorage.DownloadStreamAsync(chave, ct), contentType);
+    }
+
+    private static string PastaFotos(Guid? empresaId, string batchId) => $"mobile-photos/{empresaId}/{batchId}";
+
+    // O id do lote vem do aparelho e vira pasta: separador ou ".." tiraria a chave da pasta da empresa.
+    private static bool IdSeguro(string id) => id.IndexOfAny(['/', '\\']) < 0 && !id.Contains("..");
 
     /// <summary>
     /// Sanitiza hash para uso seguro em filename — remove path traversal e caracteres especiais.
