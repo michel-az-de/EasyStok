@@ -78,7 +78,8 @@ try {
   await pagina.getByRole('button', { name: 'Anotação para Lasanha da quota', exact: true }).click()
   assert.equal(await pagina.getByRole('textbox', { name: 'Observação de Lasanha da quota', exact: true }).inputValue(), observacao)
   await pagina.screenshot({ path: resolve(pasta, 'quota-restaurada.png'), fullPage: true })
-  assert.ok(chamadas.every(c => c.metodo === 'GET' || c.path.endsWith('/marcar-lida')), 'Nenhum pedido/cadastro foi gravado')
+  // Sugestão usa POST somente de consulta; aqui também tem HTTP controlado.
+  assert.ok(chamadas.every(c => c.metodo === 'GET' || c.path.endsWith('/marcar-lida') || c.path === '/api/atendimento/conversas/conversa/sugestao'), 'Nenhum pedido/cadastro foi gravado')
   assert.deepEqual(erros, [])
   writeFileSync(resolve(pasta, 'resultado.json'), JSON.stringify({ appReal: true, httpControlado: true, quotaBloqueada: true, propostaPreservadaNaPagina: true, avisoVisivel: true, restauradaAposReloadSemArmazenamento: false, armazenamentoRestaurado: true, propostaOriginalPersistida: true, quantidadeEObservacaoRestauradasAposReload: true }, null, 2))
   console.log('Quota bloqueada e restaurada: aviso honesto; proposta mantida é persistida e recuperada integralmente após reload.')

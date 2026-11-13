@@ -2,7 +2,7 @@
 // Nenhum endpoint de falha é criado. As outras chamadas diretas são leituras de reconciliação.
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -45,13 +45,34 @@ const perda = new Promise((resolve, reject) => { confirmarPerda = resolve; recus
 // A rejeição é observada no passo de envio; evita unhandled rejection enquanto o clique termina.
 perda.catch(() => {})
 const modulos = ['src/aplicacao/acoesApi.js', 'src/aplicacao/chavesDeMensagem.js', 'src/aplicacao/casos/atendimento.js', 'src/aplicacao/casos/api.js', 'src/aplicacao/reducer/mesclaDoServidor.js', 'src/infra/api/traducaoConversas.js']
+const hashDoConteudo = sha256
 async function hashesServidos() {
-  const resultado = {}
+  const resposta = await page.request.get(origem + '/'); assert.ok(resposta.ok())
+  const html = await resposta.text()
+  const meta = [...html.matchAll(/<meta\b[^>]*>/gi)].map(m => m[0]).find(m => /name=["']easystok-console-sha["']/i.test(m))
+  const fontesLocais = Object.fromEntries(modulos.map(m => [m, hashDoConteudo(readFileSync(m))]))
+  if (meta) {
+    const shaDeclarado = meta.match(/content=["']([^"']+)["']/i)?.[1]
+    assert.equal(shaDeclarado, execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), 'HTML deve declarar o HEAD da candidata')
+    const nomes = readdirSync('dist/assets').filter(n => /\.(js|css)$/.test(n)).sort()
+    assert.ok(nomes.length > 0, 'Build local precisa dos assets publicados')
+    const assetsServidos = {}
+    for (const nome of nomes) {
+      const r = await page.request.get(`${origem}/assets/${nome}`); assert.ok(r.ok())
+      const servido = hashDoConteudo(await r.body()), local = hashDoConteudo(readFileSync(`dist/assets/${nome}`))
+      assert.equal(servido, local, `Asset servido deve ser idêntico ao build local: ${nome}`)
+      assetsServidos[nome] = { servido, local }
+    }
+    return { modo: 'build', shaDeclarado, htmlSha256: hashDoConteudo(html), fontesLocais, assetsServidos }
+  }
+  assert.notEqual(process.env.R4_CONSOLE_BUILD, '1', 'Build sem meta easystok-console-sha não serve como prova de candidata')
+  const modulosServidos = {}
   for (const modulo of modulos) {
     const r = await page.request.get(`${origem}/${modulo}`); assert.ok(r.ok())
-    resultado[modulo] = { servido: sha256(await r.body()), fonte: sha256(readFileSync(modulo)) }
+    assert.match(r.headers()['content-type'] ?? '', /javascript/, 'Vite dev deve servir JavaScript; HTML de fallback não é um módulo')
+    modulosServidos[modulo] = hashDoConteudo(await r.body())
   }
-  return resultado
+  return { modo: 'dev', fontesLocais, modulosServidos }
 }
 page.on('response', async r => {
   const u = new URL(r.url())

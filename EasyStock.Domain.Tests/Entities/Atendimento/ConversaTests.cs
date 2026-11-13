@@ -423,10 +423,13 @@ public class ConversaTests
 
     // F08 item 13 (#1238): o motivo da escalada aparece no resumo da inbox e some quando alguém pega.
 
-    [Fact]
-    public void Escalar_AssumeSemResponsavelEGuardaOMotivo()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Escalar_AssumeSemResponsavelEGuardaOMotivo(bool jaAssumida)
     {
         var conversa = Nova();
+        if (jaAssumida) conversa.Assumir(Agora, Guid.NewGuid());
 
         conversa.Escalar(Agora.AddMinutes(1), "  cliente pediu desconto  ");
 

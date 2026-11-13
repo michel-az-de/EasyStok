@@ -29,3 +29,7 @@
 
 .quadro { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .conteudo { flex: 1; min-height: 0; }
+
+/* FaixaApi é irmã da moldura dentro deste contêiner, não mais de #root. */
+.conteudo:has(> :global([data-conteudo-console])) { display: flex; flex-direction: column; }
+.conteudo > :global([data-conteudo-console]) { flex: 1; min-height: 0; height: auto; }

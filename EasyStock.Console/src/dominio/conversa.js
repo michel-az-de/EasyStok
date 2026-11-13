@@ -1,6 +1,7 @@
 import { precisaDeVoce, respostaAtrasada } from './automatico'
 import { inicioDoPedidoAtivo } from './entrega'
 import { pedidoEncerrado } from './pedido'
+import { normalizarBuscaCadastro, termoBuscaCadastro, telefoneCadastro } from './cadastros'
 
 export const ehLead = (conversa) => conversa.conta === 'lead'
 
@@ -62,15 +63,26 @@ export const contarNaEsteira = (conversas, { fonteApi = false } = {}) =>
 // a partir de `infra/historicoPedidos.js`), não só contra a conversa de hoje.
 // Sem isso, quem só falou de lasanha meses atrás e hoje só troca mensagem
 // sobre outra coisa nunca aparecia buscando "lasanha", mesmo tendo comprado.
+// Busca somente no retrato de conversas já carregadas nesta sessão; não consulta outra empresa ou a API.
+const telefoneDaBusca = valor => {
+  const digitos = String(valor ?? '').replace(/\D/g, '')
+  return /^55\d{10,11}$/.test(digitos) ? digitos.slice(2) : digitos
+}
+
 export const combinaBusca = (conversa, busca) => {
-  const termo = (busca ?? '').trim().toLowerCase()
+  const termo = normalizarBuscaCadastro(busca).trim()
   if (!termo) return true
-  return conversa.nome.toLowerCase().includes(termo)
+  const buscaNumerica = termoBuscaCadastro(busca)
+  const telefone = /^\d+$/.test(buscaNumerica) ? telefoneDaBusca(buscaNumerica) : ''
+  const contem = valor => normalizarBuscaCadastro(valor).includes(termo)
+  return contem(conversa.nome)
+    || [conversa.id, conversa.clienteId, conversa.pedido?.pedidoId].some(id => id && normalizarBuscaCadastro(id) === termo)
     || conversa.numeroComanda != null && ('comanda ' + conversa.numeroComanda).includes(termo)
-    || (conversa.cliente?.telefone ?? '').includes(termo)
-    || (conversa.cliente?.tags ?? []).some((tag) => tag.toLowerCase().includes(termo))
-    || conversa.mensagens.some((m) => (m.texto ?? '').toLowerCase().includes(termo))
-    || (conversa.historico ?? []).some((pedido) => pedido.itens.some((item) => item.toLowerCase().includes(termo)))
+    || [conversa.cliente?.telefone, telefoneCadastro(conversa)].some(valor => contem(valor)
+      || telefone && telefoneDaBusca(valor).includes(telefone))
+    || (conversa.cliente?.tags ?? []).some(contem)
+    || conversa.mensagens.some(m => contem(m.texto))
+    || (conversa.historico ?? []).some(pedido => pedido.itens.some(contem))
 }
 
 // Qual tag respondeu pela busca (US-016): usado só pra mostrar no cartão o
@@ -78,9 +90,9 @@ export const combinaBusca = (conversa, busca) => {
 // "Marina" por causa da tag "Gosta de lasanha"). `null` quando não foi a tag
 // que achou.
 export function tagCorrespondida(conversa, busca) {
-  const termo = (busca ?? '').trim().toLowerCase()
+  const termo = normalizarBuscaCadastro(busca).trim()
   if (!termo) return null
-  return (conversa.cliente?.tags ?? []).find((tag) => tag.toLowerCase().includes(termo)) ?? null
+  return (conversa.cliente?.tags ?? []).find(tag => normalizarBuscaCadastro(tag).includes(termo)) ?? null
 }
 
 // Chip de canal liga e desliga (zero ou mais). Nenhum ligado é "todos", por

@@ -690,9 +690,11 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
 
     private async Task<ComandaClienteResult> EncaminharEntregaAsync(LinkCardapioConversa acesso, int revisao, CancellationToken ct)
     {
-        await ConfirmarCadastroAsync(acesso, revisao, ct, exigirEndereco: false);
         await uow.ExecuteInTransactionSemRetryAsync(async t =>
         {
+            // Cadastro e encaminhamento conservam o mesmo lock conversa→link: outro envio não pode
+            // gravar o cliente entre as etapas e deixar o xmin rastreado desta requisição obsoleto.
+            await ConfirmarCadastroAsync(acesso, revisao, t, exigirEndereco: false);
             var conversa = await conversas.ObterPorIdComLockAsync(acesso.EmpresaId, acesso.ConversaId, t)
                 ?? throw new LinkCardapioConversaIndisponivelException();
             var link = await links.ObterComLockAsync(acesso.EmpresaId, acesso.Id, t) ?? throw new LinkCardapioConversaIndisponivelException();

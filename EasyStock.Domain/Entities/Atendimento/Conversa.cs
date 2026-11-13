@@ -273,6 +273,7 @@ public class Conversa
     public void Escalar(DateTime agora, string? motivo)
     {
         Assumir(agora);
+        AssumidaPorUsuarioId = null;
         var limpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
         MotivoEscalada = limpo is { Length: > MotivoEscaladaTamanhoMaximo } ? limpo[..MotivoEscaladaTamanhoMaximo] : limpo;
     }

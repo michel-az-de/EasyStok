@@ -33,6 +33,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
             db.Pedidos.Add(pedido);
             var conversa = await db.AtendimentoConversas.SingleAsync(c => c.Id == cenario.ConversaId);
             conversa.DefinirPedidoEmAndamento(pedido.Id);
+            conversa.Assumir(DateTime.UtcNow, UsuarioId);
             pedidoId = pedido.Id;
             var outraEmpresa = Guid.NewGuid();
             var agora = DateTime.UtcNow;
@@ -68,6 +69,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         (await atual.Set<Ocorrencia>().CountAsync(o => o.PedidoId == pedidoId)).Should().Be(1);
         var conversaAtual = await atual.AtendimentoConversas.AsNoTracking().SingleAsync(c => c.Id == cenario.ConversaId);
         conversaAtual.MotivoEscalada.Should().Contain(relato);
+        conversaAtual.AssumidaPorUsuarioId.Should().BeNull("o atraso volta à fila humana mesmo quando a dona já havia assumido");
         (await atual.AtendimentoMensagens.CountAsync(m => m.ConversaId == cenario.ConversaId && m.Texto != null && m.Texto.Contains(relato))).Should().Be(1);
 
         async Task<HttpResponseMessage> Enviar(Guid pedido, string tentativa)

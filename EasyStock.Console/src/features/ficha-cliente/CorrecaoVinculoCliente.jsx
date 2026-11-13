@@ -79,7 +79,7 @@ function ConferenciaVinculo({ conversa, aoFechar }) {
       avisar('Vínculo atualizado e registrado no histórico.')
     } catch (e) {
       if (!montado.current) return
-      if (e.status === 409) { marcarConflito(true); confirmar(false); guardarPendente(null); falhar('A conversa mudou. Atualize e confira a identidade novamente.') }
+      if (e.status === 409) { marcarConflito(true); confirmar(false); guardarPendente(null); falhar(e.message) }
       else { if (e.status === 0 || e.status >= 500) guardarPendente(corpo); falhar(e.message) }
     } finally { emVoo.current = false; if (montado.current) salvarEstado(false) }
   }
