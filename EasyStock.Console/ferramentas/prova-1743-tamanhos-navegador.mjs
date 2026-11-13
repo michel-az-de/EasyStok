@@ -81,7 +81,7 @@ page.on('pageerror', erro => erros.push(erro.message))
 try {
   await page.goto(origem + '/#/m/atendimento/balcao')
   // #2437: a lista abre em "Precisa de você"; as conversas da prova já estão assumidas, então vêm em "Todas".
-  await page.getByRole('button', { name: /^Todas/ }).click()
+  await page.getByRole('button', { name: /^Todas/ }).click({ timeout: 30000 }) // a primeira carga, com a suíte em paralelo, passa de 10s
   await page.getByRole('button', { name: /^Maria/ }).first().waitFor() // #2437: o nome visível vem em dois spans; o botão da lista é o alvo estável
   // #2135: a tela abre sem conversa escolhida; a atendente abre a Maria.
   await page.getByRole('button', { name: /^Maria/ }).first().click()
@@ -101,6 +101,9 @@ try {
     await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 600 g na comanda', exact: true }).click()
     // #2437: a comanda da Ficha é um resumo; o alvo do arrasto (#comanda-pedido) só existe com ela aberta.
     await page.getByRole('button', { name: /^Revisar comanda/ }).click()
+    // #2437: a comanda aberta flutua sobre o cardápio e cobre o prato; a atendente encolhe o painel pela alça.
+    await page.getByRole('button', { name: /^Redimensionar Comanda/ }).focus()
+    for (let i = 0; i < 9; i++) await page.keyboard.press('Shift+ArrowUp')
     const tamanho = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g na comanda', exact: true })
     const r = await tamanho.boundingBox(), alvo = await page.locator('#comanda-pedido').boundingBox()
     await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2)

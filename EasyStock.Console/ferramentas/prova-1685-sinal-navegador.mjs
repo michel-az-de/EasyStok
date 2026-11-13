@@ -42,6 +42,8 @@ try {
     const rotulo=caso.sinal ? 'Registrar sinal' : 'Marcar pago'
     const context=await browser.newContext({viewport:{width,height:960},reducedMotion:'reduce'})
     await context.grantPermissions(['local-network-access'],{origin:origem})
+    // #2437: desde a #2400 o "Como recebeu" lista as formas ativas de Cadastros pela API.
+    await context.route('**/api/cadastros/metodos-pagamento*', route => route.fulfill({ json: { data: ['pix','dinheiro','credito','debito'].map(codigo => ({ codigo, nome: codigo, ativo: true, revisao: 0 })) } }))
     const page=await context.newPage(); page.setDefaultTimeout(8000)
     const erros=[]; page.on('pageerror',erro=>erros.push(erro.message))
     try {

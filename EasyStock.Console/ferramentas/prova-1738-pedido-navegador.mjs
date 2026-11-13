@@ -74,14 +74,24 @@ try {
   await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
   await page.setViewportSize({ width: 390, height: 844 })
   // #2437: no celular não há mais a aba "Pedido"; a comanda abre pela ficha do cliente.
-  if (!(await page.getByText('Joana · Sem janela', { exact: true }).isVisible())) {
-    if (await page.getByText('Joana', { exact: true }).first().isVisible()) await page.getByText('Joana', { exact: true }).first().click()
-    await page.getByRole('tab', { name: 'Cliente', exact: true }).click()
-    // O painel da comanda pode reabrir sozinho (fica lembrado); só abre se não abriu.
-    await page.waitForTimeout(500)
-    if (!(await page.getByText('Joana · Sem janela', { exact: true }).isVisible())) await page.getByRole('button', { name: /^Revisar comanda/ }).click()
+  // O painel pode reabrir sozinho (fica lembrado) depois da troca de layout: tenta até a anotação aparecer.
+  const anotacao = page.getByRole('button', { name: 'Anotação para Prato 1', exact: true })
+  // A troca de layout pode fechar o painel um instante depois de mostrado: só conta visível duas vezes seguidas.
+  const estavel = async () => (await anotacao.isVisible()) && (await page.waitForTimeout(1000), await anotacao.isVisible())
+  for (let tentativa = 0; tentativa < 15 && !(await estavel()); tentativa++) {
+    const aba = page.getByRole('tab', { name: 'Cliente', exact: true })
+    const revisar = page.getByRole('button', { name: /^Revisar comanda/ })
+    if (await revisar.isVisible()) await revisar.click()
+    else if ((await aba.getAttribute('aria-selected')) !== 'true') await aba.click()
+    else {
+      // Na ficha sem conversa aberta: volta à lista, abre a Joana e retorna à ficha.
+      await page.getByRole('tab', { name: 'Conversas', exact: true }).click()
+      await page.getByText('Joana', { exact: true }).first().click()
+      await aba.click()
+    }
+    await page.waitForTimeout(1000)
   }
-  await page.getByRole('button', { name: 'Anotação para Prato 1', exact: true }).waitFor()
+  await anotacao.waitFor()
   assert.equal(await totalVisivel(page), true, 'Total deve ficar visível com cinco itens em390px')
   await foto(page, '02-montagem-390')
   writeFileSync(join(pasta, 'montagem-390.txt'), await page.locator('body').innerText())

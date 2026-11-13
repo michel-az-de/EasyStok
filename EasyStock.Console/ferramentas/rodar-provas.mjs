@@ -72,8 +72,13 @@ const deNavegador = aRodar.filter((nome) => readFileSync(`${pasta}${nome}`, 'utf
 // Sem o Chromium, fora do CI, as de navegador são puladas com aviso; no CI (CI=true) a falta derruba o script.
 const semNavegador = deNavegador.length > 0 && !chromiumInstalado()
 if (semNavegador && process.env.CI) throw new Error('Chromium ausente: rode `npx playwright install --with-deps chromium` antes das provas.')
+// O createServer do Vite grava NODE_ENV=development no processo; o filho que compila o próprio harness com
+// build() herdaria isso e geraria JSX de desenvolvimento contra o React de produção (#2437).
+const nodeEnvOriginal = process.env.NODE_ENV
 const vite = deNavegador.length > 0 && !semNavegador ? await subirVite() : null
-const ambiente = vite ? { ...process.env, CONSOLE_URL: vite.url, CONSOLE_TEST_URL: vite.url } : process.env
+const ambiente = vite ? { ...process.env, CONSOLE_URL: vite.url, CONSOLE_TEST_URL: vite.url } : { ...process.env }
+if (nodeEnvOriginal === undefined) delete ambiente.NODE_ENV
+else ambiente.NODE_ENV = nodeEnvOriginal
 const puladas = semNavegador ? deNavegador : []
 
 function chromiumInstalado() {
