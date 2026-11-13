@@ -78,7 +78,8 @@ public class TenantVitrineCardapioControllerTests
         vitrinesQueFalham.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns<StorefrontEntity?>(_ => throw new InvalidOperationException("Host=10.0.0.5;Password=segredo"));
         var adicionar = new AdicionarCardapioItemAdminUseCase(
-            vitrinesQueFalham, _cardapio, Substitute.For<IProdutoRepository>(), Substitute.For<IUnitOfWork>());
+            vitrinesQueFalham, _cardapio, Substitute.For<IProdutoRepository>(),
+            Substitute.For<ICardapioSecaoRepository>(), Substitute.For<IUnitOfWork>());
 
         var resposta = await Controller(adicionar).Adicionar(new(null, "Lasanha", null, 1, true, null, null, null, null,
             null, null, 35m, null, null, null, null, null));
