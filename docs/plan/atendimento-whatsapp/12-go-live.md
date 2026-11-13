@@ -80,7 +80,8 @@ Rollback = restaurar o `index.html` e o `versao.json` do mesmo timestamp e confe
 Falha na conferência pública pode retornar erro após a troca: confira a versão servida antes de restaurar.
 Nunca publicar cópia manual de pasta de sessão: em 01/10 isso deixou o console atrás da API sem
 ninguém ver. Alternativa em contêiner:
-`Dockerfile.web` com `--build-arg VITE_FONTE_DADOS=api` e `API_UPSTREAM=http://ez-api:8080`
+`Dockerfile.web` com `--build-arg VITE_FONTE_DADOS=api --build-arg CONSOLE_SHA=$(git rev-parse HEAD)`
+e `API_UPSTREAM=http://ez-api:8080` (sem o SHA o build do modo API falha: o `.git` fica fora do contexto)
 (o nginx já repassa o SSE sem buffer; validado em 01/10).
 
 ### 5. Conferência
