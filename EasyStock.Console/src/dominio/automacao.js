@@ -221,10 +221,14 @@ export function variaveisForaDaApi(texto) {
 }
 
 // #2476 (U8): a automática sai sozinha, sem ninguém revisar. Com variável que o EasyStok não preenche, o cliente
-// leria "{linkCardapio}"; por isso ela não liga nem salva assim. Devolve o motivo, ou null quando pode.
-export function bloqueioDaAutomatica(texto) {
-  const soltas = variaveisForaDaApi(texto)
-  return soltas.length ? `Troque ou apague ${soltas.map((v) => `{${v}}`).join(', ')}: o EasyStok não preenche e o cliente leria assim.` : null
+// leria "{linkCardapio}"; por isso ela não liga nem salva assim. Devolve o motivo, ou null quando pode. Quem não
+// edita (Operador) não recebe a ordem de trocar o texto, só o porquê.
+export function bloqueioDaAutomatica(texto, editavel = true) {
+  const soltas = variaveisForaDaApi(texto).map((v) => `{${v}}`).join(', ')
+  if (!soltas) return null
+  return editavel
+    ? `Troque ou apague ${soltas}: o EasyStok não preenche e o cliente leria assim.`
+    : `Tem ${soltas}, que o EasyStok não preenche: assim ela não liga.`
 }
 
 // O que a casa mandou sozinha nesta conversa, do mais novo ao mais antigo:

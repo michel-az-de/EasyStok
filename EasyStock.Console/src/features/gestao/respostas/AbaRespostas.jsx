@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
@@ -158,7 +158,8 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
   const [salvando, setSalvando] = useState(false)
   const editando = rascunho !== null
   // #2476 (U8): variável que o EasyStok não preenche sairia escrita para o cliente: não salva nem liga.
-  const bloqueio = fonteApi ? bloqueioDaAutomatica(rascunho ?? regra.texto) : null
+  const bloqueio = fonteApi ? bloqueioDaAutomatica(rascunho ?? regra.texto, editavel) : null
+  const idBloqueio = useId()
   const naoLiga = !regra.ativa && fonteApi && Boolean(bloqueioDaAutomatica(regra.texto))
   // #1474: no modo API a saudação de Horários e mensagens sai sempre na primeira mensagem.
   const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
@@ -189,6 +190,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
             aria-label={`${regra.nome}, ${regra.ativa ? 'ligada' : 'desligada'}`}
             checked={regra.ativa}
             disabled={salvando || !editavel || naoLiga}
+            aria-describedby={naoLiga ? idBloqueio : undefined}
             onChange={() => alternarRegra(regra.id)}
           />
           {regra.ativa ? 'Ligada' : 'Desligada'}
@@ -200,7 +202,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
             : !avisoEntrada && <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
         )}
         {avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
-        {bloqueio && <span className={css.alerta} role={editando ? 'alert' : undefined}>{bloqueio}</span>}
+        {bloqueio && <span id={idBloqueio} className={css.alerta} role={editando ? 'alert' : undefined}>{bloqueio}</span>}
       </div>
 
       {editando ? (
@@ -216,7 +218,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
             autoFocus
           />
           <div className={css.acoes}>
-            <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando || Boolean(bloqueio)} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+            <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando || Boolean(bloqueio)} aria-describedby={bloqueio ? idBloqueio : undefined} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
             <Botao variante="texto" disabled={salvando} onClick={() => setRascunho(null)}>Cancelar</Botao>
           </div>
         </div>

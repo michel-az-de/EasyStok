@@ -80,22 +80,23 @@ export function telefoneParaApi(valor) {
   return digitos && /^[\d\s().-]+$/.test(bruto) ? digitos : bruto
 }
 
-// #2476 (U2): CPF "123.456.789-00" e CNPJ "12.345.678/0001-99" na tela, também no meio da digitação. O campo
-// aceita outro documento (RG, passaporte): com letra, ou com mais de 14 dígitos, fica como foi escrito.
-// A API recebe só os dígitos do que é numérico; ela já normaliza 11 e 14 dígitos (`Cnpj.TryFrom`).
+// #2476 (U2): CPF "123.456.789-00" e CNPJ "12.345.678/0001-99" na tela. Só com 11 ou 14 dígitos, os que a API
+// já normaliza (`Cnpj.TryFrom`): RG ou passaporte gravado (com letra, ou numérico de outro tamanho) fica como foi
+// escrito e volta à API igual, para salvar outro campo não regravar o documento.
 const SO_NUMERO_DE_DOCUMENTO = /^[\d\s./-]+$/
 const juntarPartes = (partes, separadores) => partes.filter(Boolean).map((parte, i) => (i ? separadores[i - 1] : '') + parte).join('')
 export function documentoNaTela(valor) {
   const bruto = String(valor ?? '').trim()
   const d = bruto.replace(/\D/g, '')
-  if (!d || !SO_NUMERO_DE_DOCUMENTO.test(bruto) || d.length > 14) return bruto
-  if (d.length <= 11) return juntarPartes([d.slice(0, 3), d.slice(3, 6), d.slice(6, 9), d.slice(9)], ['.', '.', '-'])
+  if (!SO_NUMERO_DE_DOCUMENTO.test(bruto) || (d.length !== 11 && d.length !== 14)) return bruto
+  if (d.length === 11) return juntarPartes([d.slice(0, 3), d.slice(3, 6), d.slice(6, 9), d.slice(9)], ['.', '.', '-'])
   return juntarPartes([d.slice(0, 2), d.slice(2, 5), d.slice(5, 8), d.slice(8, 12), d.slice(12)], ['.', '.', '/', '-'])
 }
 export function documentoParaApi(valor) {
   const bruto = String(valor ?? '').trim()
-  if (!bruto) return null
-  return SO_NUMERO_DE_DOCUMENTO.test(bruto) ? bruto.replace(/\D/g, '') : bruto
+  const d = bruto.replace(/\D/g, '')
+  if (!bruto || (!d && SO_NUMERO_DE_DOCUMENTO.test(bruto))) return null
+  return SO_NUMERO_DE_DOCUMENTO.test(bruto) && (d.length === 11 || d.length === 14) ? d : bruto
 }
 
 // #2476 (U6): a pílula é só do estado que pede ação (Pilula.module.css): o contato sem cadastro e o Lead, que
