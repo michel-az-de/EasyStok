@@ -323,7 +323,7 @@ function Composicao({ rota }) {
       {/* Rodada 7 · frente Anexos: substitui o antigo "Prato" do composer
           (registro em auditoria/decisoes/61-anexos.md). */}
       {/* #2393: janela que quebra no render não derruba o Balcão inteiro. */}
-      <LimiteDeErro parte="Janela aberta">
+      <LimiteDeErro key={modal ?? 'nenhuma'} parte="Janela aberta">
       {modal === 'galeria' && selecionada && <PainelGaleria aoFechar={fechar} />}
       {modal === 'cardapio' && selecionada && (
         <PainelCardapio
@@ -384,6 +384,9 @@ function Composicao({ rota }) {
 
       {/* Rodada 5, seção 5 (passo zero): abre de qualquer lugar por
           `ui.encerrando`, hoje vazia até a F5 construir o resumo. */}
+      </LimiteDeErro>
+      {/* #2440: limite próprio; erro numa janela não trava o "Encerrar" nem o contrário. */}
+      <LimiteDeErro key={encerrando ?? 'nenhum'} parte="Encerramento">
       {encerrando && (
         <ModalEncerrar conversaId={encerrando} numeroAtendimento={encerrandoNumero} aoFechar={fecharEncerramento} />
       )}
