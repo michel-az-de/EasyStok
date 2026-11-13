@@ -8,7 +8,7 @@
 #              (VITE_API_BASE vazio = mesma origem: o nginx repassa /api/ para a API real).
 #              O .git fica fora do contexto (.dockerignore), então sem CONSOLE_SHA o build
 #              do modo API falha cedo (#2393, #2440) em vez de sair sem a meta de versão.
-FROM node:24-alpine AS build
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS build
 ARG VITE_FONTE_DADOS=
 ARG VITE_API_BASE=
 ENV VITE_FONTE_DADOS=$VITE_FONTE_DADOS VITE_API_BASE=$VITE_API_BASE
@@ -19,7 +19,7 @@ COPY . .
 ARG CONSOLE_SHA=
 RUN CONSOLE_SHA="$CONSOLE_SHA" npm run build
 
-FROM nginx:alpine
+FROM nginx:alpine@sha256:fed7e14be83cbd2661a75cdc5b872d936cf155d46c327084d30b8df19ae88d72
 # O nginx oficial passa /etc/nginx/templates/*.template pelo envsubst ao subir
 # (só as variáveis definidas, então $host e afins ficam como estão).
 ENV API_UPSTREAM=http://api-falsa:5245
