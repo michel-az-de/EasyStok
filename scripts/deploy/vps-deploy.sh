@@ -123,6 +123,12 @@ healthy() {
       [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = healthy ] || ok=0
     done
     [ "$(docker inspect -f '{{.State.Running}}' ez-worker 2>/dev/null)" = true ] || ok=0
+    # #2372: com healthcheck (arquivo de vida, #2107) o Worker precisa ficar healthy; Running nao prova loop vivo.
+    # Sem healthcheck no compose, vale so o Running acima.
+    case "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}sem{{end}}' ez-worker 2>/dev/null)" in
+      healthy|sem) ;;
+      *) ok=0 ;;
+    esac
     # I4.1 (#1674): Worker em laco de restart fica "Running" entre uma queda e outra. O container acabou
     # de ser recriado, entao qualquer restart ja e falha; nao adianta esperar o resto do prazo.
     reinicios=$(docker inspect -f '{{.RestartCount}}' ez-worker 2>/dev/null || echo 0)
@@ -148,7 +154,7 @@ if healthy && [ "$(sha_no_ar)" = "$SHA_FULL" ]; then
   exit 0
 fi
 
-echo "ERRO: $SHA nao passou na verificacao (api e web healthy, worker rodando sem reiniciar) em ${HEALTH_TIMEOUT}s; voltando para vps-prev-$TS" >&2
+echo "ERRO: $SHA nao passou na verificacao (api e web healthy, worker healthy ou rodando sem healthcheck, sem reiniciar) em ${HEALTH_TIMEOUT}s; voltando para vps-prev-$TS" >&2
 docker logs --tail 40 ez-api >&2 || true
 # I4.1 (#1674): a falha pode ser so do Worker; sem o log dele o motivo fica na VPS.
 docker logs --tail 40 ez-worker >&2 || true
