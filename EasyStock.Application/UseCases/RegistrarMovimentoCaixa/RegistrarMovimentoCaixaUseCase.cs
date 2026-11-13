@@ -26,7 +26,8 @@ public class RegistrarMovimentoCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
     ObterCaixaDiaUseCase obterCaixaDia,
-    ILogger<RegistrarMovimentoCaixaUseCase> logger)
+    ILogger<RegistrarMovimentoCaixaUseCase> logger,
+    ILojaRepository? lojas = null)
 {
     public const string CaixaAbertoMensagem = "Abra o caixa antes de lançar.";
 
@@ -35,6 +36,10 @@ public class RegistrarMovimentoCaixaUseCase(
     public async Task<MovimentoCaixaResult> ExecuteAsync(RegistrarMovimentoCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
+        // #2481: a loja vem do corpo. De outra empresa ou inexistente vira 400, como na abertura (#2343), não
+        // movimento gravado com loja alheia nem FK (500) no insert.
+        if (cmd.LojaId is { } lojaId && lojas is not null && await lojas.GetByIdAsync(cmd.EmpresaId, lojaId) is null)
+            throw new UseCaseValidationException("Loja nao encontrada nesta empresa.");
 
         var tipo = (cmd.Tipo ?? "").Trim().ToLowerInvariant();
         if (tipo != "entrada" && tipo != "saida")

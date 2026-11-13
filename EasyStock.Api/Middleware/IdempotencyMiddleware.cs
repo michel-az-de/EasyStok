@@ -176,7 +176,7 @@ public sealed class IdempotencyMiddleware(
             // issue 917: com INSERT-first, uma falha sem finalizacao travaria a chave por
             // 24h (Status permanece Pendente). Marca Falhou pra permitir reenvio.
             context.Response.Body = originalBody;
-            await MarcarFalhouSemQuebrarAsync(repo, idParaFinalizar, context.RequestAborted);
+            await MarcarFalhouSemQuebrarAsync(repo, idParaFinalizar);
             throw;
         }
         finally
@@ -195,7 +195,10 @@ public sealed class IdempotencyMiddleware(
 
             try
             {
-                await repo.MarcarConcluidoAsync(idParaFinalizar, context.Response.StatusCode, respostaJson, context.RequestAborted);
+                // #2481: o efeito já foi gravado; o desfecho não pode depender da conexão do cliente. Com o token da
+                // requisição, quem caía depois do commit deixava a chave Pendente e o reenvio, passado o lease,
+                // repetia o efeito (cadastro em dobro).
+                await repo.MarcarConcluidoAsync(idParaFinalizar, context.Response.StatusCode, respostaJson, CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -206,7 +209,7 @@ public sealed class IdempotencyMiddleware(
         }
         else
         {
-            await MarcarFalhouSemQuebrarAsync(repo, idParaFinalizar, context.RequestAborted);
+            await MarcarFalhouSemQuebrarAsync(repo, idParaFinalizar);
         }
 
         await LimparExpiradasDaEmpresaAsync(repo, empresaId, context.RequestAborted);
@@ -247,11 +250,12 @@ public sealed class IdempotencyMiddleware(
         }
     }
 
-    private async Task MarcarFalhouSemQuebrarAsync(IIdempotencyKeyRepository repo, Guid id, CancellationToken ct)
+    // #2481: como o Concluido, o Falhou não usa o token da requisição: chave Pendente bloqueia o reenvio até o lease.
+    private async Task MarcarFalhouSemQuebrarAsync(IIdempotencyKeyRepository repo, Guid id)
     {
         try
         {
-            await repo.MarcarFalhouAsync(id, ct);
+            await repo.MarcarFalhouAsync(id, CancellationToken.None);
         }
         catch (Exception ex)
         {
