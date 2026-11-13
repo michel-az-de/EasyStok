@@ -154,6 +154,29 @@ public class PedidoEstoqueIntegrationServiceTests
         await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(m => m.ItemEstoqueId == segundo.Id && m.Quantidade.Value == 1m));
     }
 
+    [Fact] // #2373: cada lote arredondado sozinho somava R$ 9,99; o resíduo vai para o último lote.
+    public async Task DescontarAsync_rateio_entre_tres_lotes_soma_o_total_sem_perder_centavo()
+    {
+        var (svc, itemRepo, movRepo) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = PedidoComItem(empresaId, lojaId, produtoId, qty: 0.9999m); // R$ 10/kg -> R$ 10,00
+        ItemEstoque Lote(int dias) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId,
+            QuantidadeAtual = Quantidade.From(0.3333m), ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(dias))
+        };
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { Lote(1), Lote(2), Lote(3) });
+        var totais = new List<decimal>();
+        await movRepo.InsertAsync(Arg.Do<MovimentacaoEstoque>(m => totais.Add(m.ValorTotal.Valor)));
+
+        await svc.DescontarAsync(pedido);
+
+        totais.Should().Equal(3.33m, 3.33m, 3.34m);
+        totais.Sum().Should().Be(10.00m);
+    }
+
     [Fact]
     public async Task DevolverItemAsync_restaura_os_lotes_originais_e_abate_descoberto()
     {
