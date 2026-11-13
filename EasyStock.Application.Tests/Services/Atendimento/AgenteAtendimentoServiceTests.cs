@@ -1216,4 +1216,25 @@ public class AgenteAtendimentoServiceTests
         await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, AgenteAtendimentoService.MotivoContatoDaEquipe,
             Agora, Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task ContatoDaEquipeComConversaDevolvidaAoRoboRecebeResposta()
+    {
+        // #2493: "devolver ao robô" era desfeito na mensagem seguinte pela regra da #2211.
+        var equipe = Substitute.For<EasyStock.Application.Services.Notifications.IContatoDaEquipeAvisada>();
+        equipe.EhInscritoAsync(_empresaId, WaId, Arg.Any<CancellationToken>()).Returns(true);
+        _conversa.Assumir(Agora.AddMinutes(-5), Guid.NewGuid());
+        _conversa.LiberarAutomatico();
+        var servico = new AgenteAtendimentoService(
+            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
+            [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+            _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos, equipe);
+
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        await _escalador.DidNotReceive().EscalarAsync(_empresaId, _conversa, AgenteAtendimentoService.MotivoContatoDaEquipe,
+            Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+    }
 }

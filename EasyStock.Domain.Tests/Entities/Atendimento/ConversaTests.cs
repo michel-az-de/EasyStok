@@ -179,6 +179,23 @@ public class ConversaTests
     }
 
     [Fact]
+    public void LiberarAutomatico_MarcaQueAEquipeDevolveuSemApagarOutroContexto()
+    {
+        // #2493: a devolução ao robô é decisão da equipe e vale para a conversa inteira.
+        var conversa = Nova();
+        conversa.DefinirContexto("""{"carrinho":{"itens":[1]}}""");
+        conversa.AutomaticoLiberadoPelaEquipe.Should().BeFalse();
+        conversa.Assumir(Agora, Guid.NewGuid());
+
+        conversa.LiberarAutomatico();
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+
+        conversa.AutomaticoLiberadoPelaEquipe.Should().BeTrue();
+        using var contexto = System.Text.Json.JsonDocument.Parse(conversa.ContextoJson);
+        contexto.RootElement.GetProperty("carrinho").GetProperty("itens").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
     public void LiberarAutomatico_EmEncerrada_Lanca()
     {
         var conversa = Nova();
