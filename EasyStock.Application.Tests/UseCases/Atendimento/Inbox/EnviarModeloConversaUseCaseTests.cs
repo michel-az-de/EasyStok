@@ -22,7 +22,8 @@ public class EnviarModeloConversaUseCaseTests
     private readonly Conversa _conversa;
     private readonly Cliente _cliente;
     private EnviarModeloConversaCommand Command => new(_empresa, _usuario, _conversa.Id, Guid.NewGuid(), "retomar", "pt_BR", ["Ana"]);
-    private EnviarModeloConversaUseCase UseCase => new(_conversas, _clientes, _catalogo, new(_consentimentos), new([_canal]), _uow, TimeProvider.System);
+    private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
+    private EnviarModeloConversaUseCase UseCase => new(_conversas, _clientes, _catalogo, new(_consentimentos), new([_canal]), _uow, TimeProvider.System, _atendentes);
 
     public EnviarModeloConversaUseCaseTests()
     {
@@ -66,6 +67,39 @@ public class EnviarModeloConversaUseCaseTests
         await UseCase.ExecuteAsync(command);
         _mensagens.Should().ContainSingle();
         await _canal.Received(1).EnviarModeloAsync(Arg.Any<string>(), "retomar", "pt_BR", Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // #2440 (A1): o modelo passa pela mesma guarda do texto (ATD-1, #2305).
+    [Fact]
+    public async Task ConversaDeOutraSemConfirmacao_RecusaENadaSai()
+    {
+        _conversa.Assumir(DateTime.UtcNow, Guid.NewGuid());
+
+        var act = () => UseCase.ExecuteAsync(Command);
+
+        await act.Should().ThrowAsync<ConversaAtribuidaOutraException>();
+        _mensagens.Should().BeEmpty();
+        _uow.CommitCount.Should().Be(0);
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task ConversaDeOutraComConfirmacao_EnviaETomaAConversa()
+    {
+        _conversa.Assumir(DateTime.UtcNow, Guid.NewGuid());
+
+        var m = await UseCase.ExecuteAsync(Command with { Confirmada = true });
+
+        m.Status.Should().Be(StatusMensagem.Enviada);
+        _conversa.AssumidaPorUsuarioId.Should().Be(_usuario);
+    }
+
+    [Fact]
+    public async Task ConversaPropria_NaoPedeConfirmacao()
+    {
+        _conversa.Assumir(DateTime.UtcNow, _usuario);
+
+        (await UseCase.ExecuteAsync(Command)).Status.Should().Be(StatusMensagem.Enviada);
     }
 
     [Theory]

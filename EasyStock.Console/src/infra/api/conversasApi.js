@@ -40,21 +40,10 @@ export const listarMensagens = (id, { limite = MENSAGENS_POR_LEITURA, antesDe = 
 export const baixarMidia = (conversaId, mensagemId) =>
   chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/midia`, { arquivo: true })
 
-// #1786: `chave` (Idempotency-Key) é a do balão. Repetir o mesmo envio depois de uma resposta perdida devolve a
-// mensagem já gravada em vez de mandar outra ao cliente.
-export const enviarTexto = (id, texto, { chave = null } = {}) =>
-  chamarApi(`${BASE}/${id}/mensagens`, { metodo: 'POST', corpo: { texto }, chave })
-
-// Reenvio de texto que falhou (S57): devolve a mensagem atualizada (enviada, ou com o novo erro).
-export const reenviarMensagem = (conversaId, mensagemId) =>
-  chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/reenviar`, { metodo: 'POST' })
-
-// Mensagens que não chegaram ao cliente, de todas as conversas (S59).
-export const listarNaoEntregues = ({ limite = 50 } = {}) => chamarApi(`${BASE}/nao-entregues?limite=${limite}`)
-
-// ATD-1 (#2305): assumir ou transferir conversa de outra atendente pede confirmação. A API responde 409
-// CONVERSA_DE_OUTRA; a dona confirma aqui e a mesma ação repete com `confirmar`.
-const comConfirmacaoDeOutra = async (chamada) => {
+// ATD-1 (#2305, #2440): assumir, transferir ou responder (texto, foto, áudio, cardápio, modelo) em conversa de outra
+// atendente pede confirmação. A API responde 409 CONVERSA_DE_OUTRA; a dona confirma aqui e a mesma ação repete
+// com `confirmar`, com a mesma `chave` de idempotência.
+export const comConfirmacaoDeOutra = async (chamada) => {
   try {
     return await chamada(false)
   } catch (erro) {
@@ -62,6 +51,19 @@ const comConfirmacaoDeOutra = async (chamada) => {
     return chamada(true)
   }
 }
+
+// #1786: `chave` (Idempotency-Key) é a do balão. Repetir o mesmo envio depois de uma resposta perdida devolve a
+// mensagem já gravada em vez de mandar outra ao cliente.
+export const enviarTexto = (id, texto, { chave = null } = {}) =>
+  comConfirmacaoDeOutra((confirmar) =>
+    chamarApi(`${BASE}/${id}/mensagens`, { metodo: 'POST', corpo: confirmar ? { texto, confirmar } : { texto }, chave }))
+
+// Reenvio de texto que falhou (S57): devolve a mensagem atualizada (enviada, ou com o novo erro).
+export const reenviarMensagem = (conversaId, mensagemId) =>
+  chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/reenviar`, { metodo: 'POST' })
+
+// Mensagens que não chegaram ao cliente, de todas as conversas (S59).
+export const listarNaoEntregues = ({ limite = 50 } = {}) => chamarApi(`${BASE}/nao-entregues?limite=${limite}`)
 
 export const assumir = (id) => comConfirmacaoDeOutra((confirmar) =>
   chamarApi(`${BASE}/${id}/assumir${confirmar ? '?confirmar=true' : ''}`, { metodo: 'POST' }))
@@ -114,7 +116,8 @@ export async function enviarImagem(id, { dataUrl, nomeArquivo, legenda }, { chav
   const formulario = new FormData()
   formulario.append('file', blob, nome)
   if (legenda?.trim()) formulario.append('legenda', legenda.trim())
-  return chamarApi(`${BASE}/${id}/mensagens/imagem`, { metodo: 'POST', formulario, chave })
+  return comConfirmacaoDeOutra((confirmar) =>
+    chamarApi(`${BASE}/${id}/mensagens/imagem${confirmar ? '?confirmar=true' : ''}`, { metodo: 'POST', formulario, chave }))
 }
 
 // Áudio gravado no console (#1444). Vai como veio do navegador; o EasyStok converte o WebM do
@@ -124,12 +127,13 @@ export async function enviarAudio(id, { dataUrl }, { chave = null } = {}) {
   const { blob } = arquivoDoDataUrl(dataUrl)
   const formulario = new FormData()
   formulario.append('file', blob, nomeDoArquivoDeAudio(blob.type))
-  return chamarApi(`${BASE}/${id}/mensagens/audio`, { metodo: 'POST', formulario, chave })
+  return comConfirmacaoDeOutra((confirmar) =>
+    chamarApi(`${BASE}/${id}/mensagens/audio${confirmar ? '?confirmar=true' : ''}`, { metodo: 'POST', formulario, chave }))
 }
 
 // Foto da galeria do cardápio (#1437): o EasyStok lê a foto do storage pelo id do item e o índice;
 // o navegador não baixa a URL (cross-origin, host gravado pode estar fora do ar).
 export const enviarImagemCardapio = (id, { cardapioItemId, indice, legenda }, { chave = null } = {}) =>
-  chamarApi(`${BASE}/${id}/mensagens/imagem-cardapio`, {
-    metodo: 'POST', corpo: { cardapioItemId, indice, legenda: legenda?.trim() || null }, chave,
-  })
+  comConfirmacaoDeOutra((confirmar) => chamarApi(`${BASE}/${id}/mensagens/imagem-cardapio`, {
+    metodo: 'POST', corpo: { cardapioItemId, indice, legenda: legenda?.trim() || null, ...(confirmar && { confirmar }) }, chave,
+  }))

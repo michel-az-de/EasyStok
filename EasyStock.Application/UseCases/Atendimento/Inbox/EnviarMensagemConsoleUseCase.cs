@@ -12,10 +12,10 @@ namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto, NivelAcesso? Nivel = null, bool Confirmada = false, string? ChaveEnvio = null);
 
 public sealed record EnviarImagemConsoleCommand(
-    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda, NivelAcesso? Nivel = null);
+    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda, NivelAcesso? Nivel = null, bool Confirmada = false);
 
 /// <summary>Áudio gravado no console (#1444): os bytes como vieram do navegador; o formato sai dos bytes.</summary>
-public sealed record EnviarAudioConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, byte[] Conteudo, NivelAcesso? Nivel = null);
+public sealed record EnviarAudioConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, byte[] Conteudo, NivelAcesso? Nivel = null, bool Confirmada = false);
 
 /// <summary>
 /// A dona responde pelo console (S07, RN-04, D4): envia pela porta do canal da conversa (S34), grava
@@ -81,7 +81,7 @@ public sealed class EnviarMensagemConsoleUseCase(
             throw new UseCaseValidationException($"Legenda excede {Mensagem.TextoTamanhoMaximo} caracteres.");
 
         var agora = DateTime.UtcNow;
-        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, agora, ct);
+        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, command.UsuarioId, command.Confirmada, agora, ct);
         if (!conversa.Capacidades.AceitaImagem)
             throw new UseCaseValidationException($"O canal {conversa.Canal} não aceita imagem.");
         var canal = resolvedorCanal.Obter(conversa.Canal);
@@ -107,7 +107,7 @@ public sealed class EnviarMensagemConsoleUseCase(
     public async Task<MensagemAtendimentoResult> EnviarAudioAsync(EnviarAudioConsoleCommand command, CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
-        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, agora, ct);
+        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, command.UsuarioId, command.Confirmada, agora, ct);
         if (!conversa.Capacidades.AceitaAudio || resolvedorCanal.Obter(conversa.Canal) is not ICanalComAudio canal)
             throw new UseCaseValidationException($"O canal {conversa.Canal} ainda não envia áudio pelo EasyStok.");
 
@@ -128,9 +128,12 @@ public sealed class EnviarMensagemConsoleUseCase(
     public static AutorMensagem AutorDe(NivelAcesso? nivel) =>
         nivel is null or NivelAcesso.SuperAdmin or NivelAcesso.Admin ? AutorMensagem.Dona : AutorMensagem.Atendente;
 
-    private async Task<Conversa> ObterParaEnvioAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
+    private async Task<Conversa> ObterParaEnvioAsync(
+        Guid empresaId, Guid conversaId, Guid usuarioId, bool confirmada, DateTime agora, CancellationToken ct)
     {
         var conversa = await ObterAbertaAsync(empresaId, conversaId, ct);
+        // #2440: imagem, áudio e foto do cardápio passam pela mesma guarda do texto (ATD-1, #2305), antes de subir o arquivo.
+        await GuardaAtribuicaoConversa.GarantirAsync(atendentes, conversa, usuarioId, confirmada, ct);
         GarantirJanela(conversa, agora, tag: null);
         return conversa;
     }

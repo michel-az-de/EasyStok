@@ -51,7 +51,9 @@ public sealed class IniciarConversaClienteUseCase(
 
         var conversaId = await ConversaDoClienteAsync(command.EmpresaId, cliente, contato, ct);
         var mensagem = await envio.ExecuteAsync(new EnviarModeloConversaCommand(
-            command.EmpresaId, command.UsuarioId, conversaId, command.TentativaId, command.Nome, command.Idioma, command.Parametros), ct);
+            command.EmpresaId, command.UsuarioId, conversaId, command.TentativaId, command.Nome, command.Idioma, command.Parametros,
+            // #2440: chamar o cliente é ação explícita (como antes); a rota não tem passo de confirmação.
+            Confirmada: true), ct);
         return new ConversaIniciadaResult(conversaId, mensagem);
     }
 

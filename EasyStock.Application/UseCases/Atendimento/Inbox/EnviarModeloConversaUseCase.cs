@@ -8,11 +8,11 @@ using EasyStock.Domain.Enums.Atendimento;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 public sealed record EnviarModeloConversaCommand(
-    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros);
+    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, bool Confirmada = false);
 
 public sealed partial class EnviarModeloConversaUseCase(
     IConversaRepository conversas, IClienteRepository clientes, ICatalogoModelosAtendimento catalogo,
-    PoliticaEnvioCliente politica, ResolvedorCanal canais, IUnitOfWork unitOfWork, TimeProvider relogio)
+    PoliticaEnvioCliente politica, ResolvedorCanal canais, IUnitOfWork unitOfWork, TimeProvider relogio, IAtendenteRepository? atendentes = null)
 {
     /// <summary>Aviso da falha incerta: ninguém sabe se o modelo saiu, e por isso ele nunca é reenviado sozinho.</summary>
     public const string AvisoEnvioIncerto = "Confira a conversa no WhatsApp antes de iniciar outro envio.";
@@ -26,6 +26,8 @@ public sealed partial class EnviarModeloConversaUseCase(
         var existente = await ObterTentativaAsync(command, modelo, ct);
         if (existente is not null) return MensagemAtendimentoResult.De(existente);
         GarantirAbertaComModelo(conversa);
+        // #2440: modelo em conversa de outra atendente pede confirmação, como o texto (ATD-1, #2305).
+        await GuardaAtribuicaoConversa.GarantirAsync(atendentes, conversa, command.UsuarioId, command.Confirmada, ct);
 
         // Aprovação é conferida novamente no envio, sem o cache curto da listagem da tela.
         var aprovado = await ModeloAprovadoAsync(catalogo, command.EmpresaId, modelo, ct);

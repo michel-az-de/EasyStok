@@ -148,7 +148,7 @@ public class AtendimentoConversasController(
     public Task<IActionResult> EnviarModelo(Guid id, [FromBody] EnviarModeloConversaBody body,
         [FromServices] EnviarModeloConversaUseCase useCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await useCase.ExecuteAsync(new EnviarModeloConversaCommand(
-            currentUser.EmpresaId, currentUser.UsuarioId, id, body.TentativaId, body.Nome, body.Idioma, body.Parametros), ct)));
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body.TentativaId, body.Nome, body.Idioma, body.Parametros, body.Confirmar), ct)));
 
     [SwaggerOperation(Summary = "Start a WhatsApp conversation with a registered client (#1408)",
         Description = "Abre (ou reaproveita) a conversa do telefone do cliente e envia um modelo aprovado. Sem a conexão do WhatsApp: 409 WHATSAPP_NAO_CONECTADO.")]
@@ -187,7 +187,7 @@ public class AtendimentoConversasController(
     [RequestSizeLimit(TamanhoMaximoImagem)]
     [RequestFormLimits(MultipartBodyLengthLimit = TamanhoMaximoImagem)]
     [HttpPost("{id:guid}/mensagens/imagem")]
-    public Task<IActionResult> EnviarImagem(Guid id, IFormFile file, [FromForm] string? legenda, CancellationToken ct = default)
+    public Task<IActionResult> EnviarImagem(Guid id, IFormFile file, [FromForm] string? legenda, [FromQuery] bool confirmar = false, CancellationToken ct = default)
         => Atendendo(async () =>
         {
             if (file is null || file.Length == 0)
@@ -198,7 +198,7 @@ public class AtendimentoConversasController(
             await using var memoria = new MemoryStream();
             await file.CopyToAsync(memoria, ct);
             return DataOk(await enviarUseCase.EnviarImagemAsync(new EnviarImagemConsoleCommand(
-                currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda, currentUser.Nivel), ct));
+                currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda, currentUser.Nivel, confirmar), ct));
         });
 
     [SwaggerOperation(Summary = "Send a recorded audio as the owner (multipart; takes over the conversation)",
@@ -212,7 +212,7 @@ public class AtendimentoConversasController(
     [RequestSizeLimit(TamanhoMaximoAudio)]
     [RequestFormLimits(MultipartBodyLengthLimit = TamanhoMaximoAudio)]
     [HttpPost("{id:guid}/mensagens/audio")]
-    public Task<IActionResult> EnviarAudio(Guid id, IFormFile file, CancellationToken ct = default)
+    public Task<IActionResult> EnviarAudio(Guid id, IFormFile file, [FromQuery] bool confirmar = false, CancellationToken ct = default)
         => Atendendo(async () =>
         {
             if (file is null || file.Length == 0)
@@ -223,7 +223,7 @@ public class AtendimentoConversasController(
             await using var memoria = new MemoryStream();
             await file.CopyToAsync(memoria, ct);
             return DataOk(await enviarUseCase.EnviarAudioAsync(new EnviarAudioConsoleCommand(
-                currentUser.EmpresaId, currentUser.UsuarioId, id, memoria.ToArray(), currentUser.Nivel), ct));
+                currentUser.EmpresaId, currentUser.UsuarioId, id, memoria.ToArray(), currentUser.Nivel, confirmar), ct));
         });
 
     /// <remarks>Use case por <c>[FromServices]</c>: o construtor fica como está para os testes que o montam.</remarks>
@@ -242,7 +242,7 @@ public class AtendimentoConversasController(
         Guid id, [FromBody] EnviarImagemCardapioBody body,
         [FromServices] EnviarImagemCardapioConsoleUseCase imagemCardapioUseCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await imagemCardapioUseCase.ExecuteAsync(new EnviarImagemCardapioConsoleCommand(
-            currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda, currentUser.Nivel), ct)));
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda, currentUser.Nivel, body?.Confirmar ?? false), ct)));
 
     [SwaggerOperation(Summary = "Reopen a closed conversation in the human queue without renewing the channel window")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -433,12 +433,12 @@ public class AtendimentoConversasController(
 
 public sealed record EnviarMensagemConsoleBody(string Texto, bool Confirmar = false);
 
-public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
+public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null, bool Confirmar = false);
 
 public sealed record IniciarConversaClienteBody(
     Guid ClienteId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
 
-public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda);
+public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda, bool Confirmar = false);
 
 public sealed record TransferirConversaBody(Guid ParaUsuarioId, bool Confirmar = false);
 
