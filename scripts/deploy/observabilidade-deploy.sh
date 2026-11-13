@@ -69,7 +69,21 @@ REMOTO
     remoto bash -s -- "$DESTINO" "$PORTA" <<'REMOTO' || exit 4
 set -euo pipefail
 env="$1/.env"
-grep -q '^OO_INGEST_NOME=' "$env" && { echo "    já existe"; exit 0; }
+# #2440: a marca no .env não prova que o token vale (revogado, OpenObserve recriado); o collector tomaria 401 em silêncio.
+# POST vazio no endpoint de logs: o OpenObserve autentica antes de olhar o corpo. O cabeçalho vai por stdin (-K -).
+confere_ingestao() {
+  [ -n "${OO_AUTH:-}" ] || { echo "ERRO: OO_AUTH ausente no .env; apague OO_INGEST_NOME e rode subir" >&2; exit 4; }
+  local http
+  http=$(printf 'header = "Authorization: Basic %s"
+' "$OO_AUTH" | curl -s -m 10 -K - -o /dev/null -w '%{http_code}'     -H 'Content-Type: application/json' "http://127.0.0.1:$2/api/default/v1/logs" -d '{"resourceLogs":[]}' || true)
+  case "$http" in
+    401|403|000|"") echo "ERRO: token de ingestão recusado; apague OO_INGEST_NOME e rode subir" >&2; exit 4 ;;
+  esac
+}
+if grep -q '^OO_INGEST_NOME=' "$env"; then
+  . "$env"; confere_ingestao "$@"
+  echo "    já existe; ingestão aceita"; exit 0
+fi
 . "$env"
 nome=coletor-otel
 resp=$(printf 'user = "%s:%s"\n' "$ZO_ROOT_USER_EMAIL" "$ZO_ROOT_USER_PASSWORD" | curl -s -m 10 -K - \
@@ -81,7 +95,8 @@ auth=$(printf '%s:%s' "$nome" "$token" | base64 -w0)
 tmp=$(mktemp "$1/.env.XXXX"); chmod 600 "$tmp"
 grep -v '^OO_AUTH=' "$env" >"$tmp"; printf 'OO_AUTH=%s\nOO_INGEST_NOME=%s\n' "$auth" "$nome" >>"$tmp"
 mv "$tmp" "$env"
-echo "    criado; OO_AUTH não deriva mais do root"
+. "$env"; confere_ingestao "$@"
+echo "    criado; OO_AUTH não deriva mais do root; ingestão aceita"
 REMOTO
     remoto "cd '$DESTINO' && docker compose up -d otel"
     "$0" status
