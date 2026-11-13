@@ -94,7 +94,14 @@ namespace EasyStock.Domain.Entities
         public string? Emoji { get; set; }
         public string? Unidade { get; set; }
 
+        /// <summary>Unidades (porções/embalagens): 1 etiqueta por unidade e base da baixa de insumos.</summary>
         public int Quantidade { get; set; }
+
+        /// <summary>
+        /// #2373: quantidade exata na unidade de medida do produto (ex.: 0,3 kg) quando o item vem de uma entrada
+        /// de estoque. <see cref="Quantidade"/> segue inteira para as etiquetas. Null = item de produção (só unidades).
+        /// </summary>
+        public decimal? QuantidadeMedida { get; set; }
         /// <summary>Peso unitário em gramas (vai na etiqueta).</summary>
         public int? PesoG { get; set; }
 

@@ -205,8 +205,8 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
 
         private static LoteItem MontarLoteItem(Guid loteId, Produto produto, RegistrarEntradaEstoqueCommand command)
         {
-            // LoteItem.Quantidade e int (unidades); entrada pode ser decimal (ex.: 2,5 kg).
-            // Arredonda para int >= 1 no lote; a quantidade exata fica na MovimentacaoEstoque.
+            // LoteItem.Quantidade e int (unidades/etiquetas); entrada pode ser decimal (ex.: 2,5 kg).
+            // Arredonda para int >= 1 so para as etiquetas; a medida exata vai em QuantidadeMedida (#2373).
             var qtd = (int)Math.Max(1m, Math.Round(command.Quantidade, MidpointRounding.AwayFromZero));
 
             int? validadeDias = null;
@@ -226,6 +226,8 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
                 ProdutoId = produto.Id,
                 Nome = nome,
                 Quantidade = qtd,
+                QuantidadeMedida = command.Quantidade,
+                Unidade = produto.UnidadeMedidaBase.ToString().ToLowerInvariant(),
                 ValidadeDias = validadeDias,
                 ExpiraEm = expira,
                 CriadoEm = DateTime.UtcNow

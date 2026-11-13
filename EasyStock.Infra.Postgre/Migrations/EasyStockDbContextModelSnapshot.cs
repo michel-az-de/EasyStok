@@ -5289,6 +5289,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("Quantidade")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("QuantidadeMedida")
+                        .HasColumnType("numeric(14,3)");
+
                     b.Property<string>("Unidade")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");

@@ -46,6 +46,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.Nome).IsRequired().HasMaxLength(150);
             b.Property(x => x.Emoji).HasMaxLength(16);
             b.Property(x => x.Unidade).HasMaxLength(32);
+            b.Property(x => x.QuantidadeMedida).HasColumnType("numeric(14,3)"); // #2373
             b.Property(x => x.FotoUrl).HasColumnType("text");
 
             b.HasOne(x => x.Produto).WithMany().HasForeignKey(x => x.ProdutoId).OnDelete(DeleteBehavior.SetNull);

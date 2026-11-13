@@ -38,7 +38,9 @@ public sealed record LoteItemResult(
     string? FotoUrl, DateTime CriadoEm,
     // C2 (RDC 727/2022): tipo do produto vinculado (Avulso default | Embalado).
     // Usado pela UI para exibir badge "Sem peso" e habilitar backfill.
-    string TipoEmbalagem = "Avulso"
+    string TipoEmbalagem = "Avulso",
+    // #2373: medida exata da entrada (ex.: 0,3 kg); null = item de produção, vale Quantidade.
+    decimal? QuantidadeMedida = null
 );
 
 public sealed record LoteEtiquetaResult(
