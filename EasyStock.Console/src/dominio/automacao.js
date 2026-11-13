@@ -220,6 +220,13 @@ export function variaveisForaDaApi(texto) {
   return [...new Set(chaves.filter((c) => !conhecidas.has(c)))]
 }
 
+// #2476 (U8): a automática sai sozinha, sem ninguém revisar. Com variável que o EasyStok não preenche, o cliente
+// leria "{linkCardapio}"; por isso ela não liga nem salva assim. Devolve o motivo, ou null quando pode.
+export function bloqueioDaAutomatica(texto) {
+  const soltas = variaveisForaDaApi(texto)
+  return soltas.length ? `Troque ou apague ${soltas.map((v) => `{${v}}`).join(', ')}: o EasyStok não preenche e o cliente leria assim.` : null
+}
+
 // O que a casa mandou sozinha nesta conversa, do mais novo ao mais antigo:
 // agente (IA) e mensagens do sistema (automáticas, avisos de pedido).
 export const enviosAutomaticos = (mensagens) => (mensagens ?? [])

@@ -35,7 +35,7 @@ export const relacionamentoCadastro = (cliente) => !Number.isInteger(cliente.ord
 
 export function corpoCliente(dados, empresaId) {
   if (dados.id && (!Number.isInteger(dados.revisao) || dados.revisao < 0)) throw new Error('Reabra o cadastro para conferir a versão antes de salvar.')
-  return { ...campos(dados, ['nome', 'apt', 'endereco', 'telefone', 'email', 'documento', 'observacoes', 'nomeFantasia', 'inscricaoEstadual']), telefone: telefoneParaApi(dados.telefone), empresaId,
+  return { ...campos(dados, ['nome', 'apt', 'endereco', 'telefone', 'email', 'documento', 'observacoes', 'nomeFantasia', 'inscricaoEstadual']), telefone: telefoneParaApi(dados.telefone), documento: documentoParaApi(dados.documento), empresaId,
     ...(dados.id ? { id: dados.id, revisao: dados.revisao } : {}), pessoaJuridica: dados.tipoPessoa === 'juridica', origem: 'console' }
 }
 export const CAMPOS_CLIENTE = { nome: 'Nome', tipoPessoa: 'Tipo de pessoa', telefone: 'Telefone', email: 'E-mail', documento: 'Documento', nomeFantasia: 'Nome fantasia', inscricaoEstadual: 'Inscrição estadual', endereco: 'Endereço', apt: 'Apartamento ou referência', observacoes: 'Observações' }
@@ -46,7 +46,7 @@ export function reconferirCadastroCliente(editor, atual) {
   return { ...editor, inicial: atual, dados: { ...atual, ...Object.fromEntries(alterados.map(campo => [campo, editor.dados[campo]])) }, conflito: false, reconferido: true }
 }
 export function corpoFornecedor(dados, empresaId) {
-  return { ...campos(dados, ['nome', 'documento', 'email', 'telefone', 'contato', 'categoria', 'tipo', 'siteUrl', 'pedidoMinimo', 'fretePadrao', 'observacoes']), telefone: telefoneParaApi(dados.telefone),
+  return { ...campos(dados, ['nome', 'documento', 'email', 'telefone', 'contato', 'categoria', 'tipo', 'siteUrl', 'pedidoMinimo', 'fretePadrao', 'observacoes']), telefone: telefoneParaApi(dados.telefone), documento: documentoParaApi(dados.documento),
     empresaId, ...(dados.id ? { fornecedorId: dados.id } : {}), leadTimeEstimadoDias: dados.leadTimeEstimadoDias === '' ? null : dados.leadTimeEstimadoDias ?? null, origem: 'console' }
 }
 export function corpoProduto(dados, empresaId) {
@@ -79,6 +79,39 @@ export function telefoneParaApi(valor) {
   if (bruto.startsWith('+')) return `+${digitos}`
   return digitos && /^[\d\s().-]+$/.test(bruto) ? digitos : bruto
 }
+
+// #2476 (U2): CPF "123.456.789-00" e CNPJ "12.345.678/0001-99" na tela, também no meio da digitação. O campo
+// aceita outro documento (RG, passaporte): com letra, ou com mais de 14 dígitos, fica como foi escrito.
+// A API recebe só os dígitos do que é numérico; ela já normaliza 11 e 14 dígitos (`Cnpj.TryFrom`).
+const SO_NUMERO_DE_DOCUMENTO = /^[\d\s./-]+$/
+const juntarPartes = (partes, separadores) => partes.filter(Boolean).map((parte, i) => (i ? separadores[i - 1] : '') + parte).join('')
+export function documentoNaTela(valor) {
+  const bruto = String(valor ?? '').trim()
+  const d = bruto.replace(/\D/g, '')
+  if (!d || !SO_NUMERO_DE_DOCUMENTO.test(bruto) || d.length > 14) return bruto
+  if (d.length <= 11) return juntarPartes([d.slice(0, 3), d.slice(3, 6), d.slice(6, 9), d.slice(9)], ['.', '.', '-'])
+  return juntarPartes([d.slice(0, 2), d.slice(2, 5), d.slice(5, 8), d.slice(8, 12), d.slice(12)], ['.', '.', '/', '-'])
+}
+export function documentoParaApi(valor) {
+  const bruto = String(valor ?? '').trim()
+  if (!bruto) return null
+  return SO_NUMERO_DE_DOCUMENTO.test(bruto) ? bruto.replace(/\D/g, '') : bruto
+}
+
+// #2476 (U6): a pílula é só do estado que pede ação (Pilula.module.css): o contato sem cadastro e o Lead, que
+// ainda não comprou. Ativo, Inativo e Cliente são texto.
+export const emAtividadeCadastro = (item) => item.ativo !== false && item.status !== 'Inativo' && item.status !== 1
+export function situacaoDaLinha(tela, item, soLeads) {
+  if (soLeads) return { texto: 'Sem cadastro', tom: 'aviso' }
+  if (!emAtividadeCadastro(item)) return { texto: 'Inativo', tom: null }
+  if (tela !== 'clientes') return { texto: 'Ativo', tom: null }
+  const relacao = relacionamentoCadastro(item)
+  return { texto: relacao, tom: relacao === 'Lead' ? 'marca' : null }
+}
+
+// #2476 (A4): um tamanho de página para o pedido à API e para o "Próxima" das listas.
+export const TAMANHO_PAGINA_CADASTRO = 20
+export const temProximaPagina = (pagina, total) => pagina * TAMANHO_PAGINA_CADASTRO < total
 
 // #2457 (U3): o limite de cada coluna vira erro no próprio campo, com o tamanho atual. `maxLength` cortava o
 // texto colado sem avisar (direção visual, seção 2). Fornecedor: e-mail com 150, o tamanho da coluna (B2).

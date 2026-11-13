@@ -6,11 +6,11 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contex
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { automacoesEditaveis, respostasEditaveis } from '../../../dominio/acessoModulos'
 import {
-  VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, variaveisForaDaApi,
+  VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica,
 } from '../../../dominio/automacao'
 import { plural } from '../../../dominio/formato'
 import { gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
-import { NOME_RESPOSTAS_AUTOMATICAS } from '../../../dominio/modulos'
+import { hashDoModulo, NOME_RESPOSTAS_AUTOMATICAS } from '../../../dominio/modulos'
 import css from './abaRespostas.module.css'
 
 // Mesmo editor na janela contextual do Balcão e na rota direta de Atendimento.
@@ -157,7 +157,9 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const editando = rascunho !== null
-  const foraDaApi = fonteApi ? variaveisForaDaApi(rascunho ?? regra.texto) : []
+  // #2476 (U8): variável que o EasyStok não preenche sairia escrita para o cliente: não salva nem liga.
+  const bloqueio = fonteApi ? bloqueioDaAutomatica(rascunho ?? regra.texto) : null
+  const naoLiga = !regra.ativa && fonteApi && Boolean(bloqueioDaAutomatica(regra.texto))
   // #1474: no modo API a saudação de Horários e mensagens sai sempre na primeira mensagem.
   const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
 
@@ -171,7 +173,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
   }, [emFoco])
 
   function salvar() {
-    if (salvando || !rascunho?.trim()) return
+    if (salvando || !rascunho?.trim() || bloqueio) return
     setSalvando(true)
     depois(editarRegra(regra.id, { texto: rascunho.trim() }), () => setRascunho(null)).finally(() => setSalvando(false))
   }
@@ -186,7 +188,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
             type="checkbox"
             aria-label={`${regra.nome}, ${regra.ativa ? 'ligada' : 'desligada'}`}
             checked={regra.ativa}
-            disabled={salvando || !editavel}
+            disabled={salvando || !editavel || naoLiga}
             onChange={() => alternarRegra(regra.id)}
           />
           {regra.ativa ? 'Ligada' : 'Desligada'}
@@ -198,11 +200,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
             : !avisoEntrada && <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
         )}
         {avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
-        {foraDaApi.length > 0 && (
-          <span className={css.alerta} role={editando ? 'alert' : undefined}>
-            {foraDaApi.map((v) => `{${v}}`).join(', ')} não é preenchida pelo EasyStok e sai escrita assim para o cliente.
-          </span>
-        )}
+        {bloqueio && <span className={css.alerta} role={editando ? 'alert' : undefined}>{bloqueio}</span>}
       </div>
 
       {editando ? (
@@ -218,7 +216,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
             autoFocus
           />
           <div className={css.acoes}>
-            <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+            <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando || Boolean(bloqueio)} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
             <Botao variante="texto" disabled={salvando} onClick={() => setRascunho(null)}>Cancelar</Botao>
           </div>
         </div>
@@ -269,11 +267,16 @@ function SecaoAutomaticas({ focoInicial }) {
   )
 }
 
-export function AbaRespostas({ focoInicial = null }) {
+// #2476 (U8): em Cadastros › Modelos só as respostas prontas; as automáticas têm lugar próprio e não se repetem.
+export function AbaRespostas({ focoInicial = null, comAutomaticas = true }) {
   return (
     <div className={css.aba}>
       <SecaoRespostas />
-      <SecaoAutomaticas focoInicial={focoInicial} />
+      {comAutomaticas ? <SecaoAutomaticas focoInicial={focoInicial} /> : (
+        <p className={css.descricao}>
+          As mensagens que saem sozinhas ficam em <a href={hashDoModulo('atendimento', 'respostas')}>{NOME_RESPOSTAS_AUTOMATICAS}</a>.
+        </p>
+      )}
     </div>
   )
 }

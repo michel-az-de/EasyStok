@@ -13,7 +13,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
-import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, relacionamentoCadastro, telefoneCadastro, telefoneNaTela, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
+import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, situacaoDaLinha, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
 import { ModelosCadastro } from './ModelosCadastro'
 import { MetodosCadastro } from './MetodosCadastro'
@@ -23,13 +23,9 @@ const FILTROS = [{ valor: '', rotulo: 'Todos os cadastros' }, { valor: 'ativos',
 const ICONE = { clientes: 'usuarios', produtos: 'package', fornecedores: 'house', bancos: 'dollar-sign' }
 const CHAVE_LEITURA = { produtos: 'verCadastrosProdutos', fornecedores: 'verCadastrosFornecedores', bancos: 'verCadastrosFinanceiros', pagamentos: 'verCadastrosFinanceiros' }
 const CHAVE_EDICAO = { produtos: 'editarCadastrosProdutos', fornecedores: 'editarCadastrosFornecedores', bancos: 'gerenciarCadastrosFinanceiros' }
-const emAtividade = (item) => item.ativo !== false && item.status !== 'Inativo' && item.status !== 1
 const nome = (c) => c.nome || c.contatoInformado?.nome || 'Contato sem nome'
 // #2457 (U2): telefone na máscara da tela, não no E.164 que a API grava.
 const telefone = (item) => telefoneNaTela(telefoneCadastro(item))
-// #2457 (B4): só os tons que a Pílula conhece. Lead é o estado que pede ação (marca).
-const tomDaSituacao = (tela, item, soLeads) => soLeads ? 'aviso' : !emAtividade(item) ? 'neutro'
-  : tela === 'clientes' && relacionamentoCadastro(item) === 'Lead' ? 'marca' : 'ok'
 
 export function PainelCadastros({ tela, respostas, impressao, aoAbrirConversa }) {
   const { selecionada, conversas } = useAtendimento()
@@ -140,16 +136,17 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
         <table><thead><tr><th>{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th><th>{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th>Situação</th><th><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
           const id = item.id ?? item.produtoId
           const c = soLeads ? item : (conversas ?? []).find(c => c.clienteId === id)
+          const situacao = situacaoDaLinha(tela, item, soLeads)
           // #2457 (U9): a linha inteira abre o cadastro; o botão Editar continua sendo o alvo do teclado.
           return <tr key={id} className={soLeads ? undefined : css.clicavel} onClick={soLeads ? undefined : e => { if (!e.target.closest('button, a')) editar(item) }}>
             <td><div className={css.identidade}><span className={css.icone}><Icone nome={ICONE[tela]} tamanho={20} /></span><div><strong>{nome(item)}</strong><small>{soLeads ? item.canal : item.nomeFantasia || item.marca || item.contato || item.titular || (item.orderCount ? `${item.orderCount} pedido${item.orderCount === 1 ? '' : 's'}` : '')}</small><small className={css.contatoMovel}>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : telefone(item) || emailCadastro(item) || item.instituicao}</small></div></div></td>
             <td>{tela === 'produtos' ? moeda(item.precoReferencia ?? 0) : tela === 'bancos' ? item.instituicao || 'Não informada' : <><span>{telefone(item) || emailCadastro(item) || 'Contato não informado'}</span>{telefone(item) && <small>{emailCadastro(item)}</small>}</>}</td>
-            <td><Pilula tom={tomDaSituacao(tela, item, soLeads)}>{soLeads ? 'Sem cadastro' : tela === 'clientes' && emAtividade(item) ? relacionamentoCadastro(item) : emAtividade(item) ? 'Ativo' : 'Inativo'}</Pilula></td>
+            <td>{situacao.tom ? <Pilula tom={situacao.tom}>{situacao.texto}</Pilula> : <span className={css.situacao}>{situacao.texto}</span>}</td>
             <td><div className={css.acoes}>{!soLeads && <Botao disabled={Boolean(abrindo)} onClick={() => editar(item)} aria-label={`${podeEditar ? 'Editar' : 'Ver'} ${nome(item)}`}>{abrindo === id ? 'Abrindo…' : podeEditar ? 'Editar' : 'Ver'}</Botao>}{c && <Botao variante="texto" onClick={() => abrirConversa(c.id)}>Conversa</Botao>}</div></td>
           </tr>
         })}</tbody></table>
       </div>}
-      <footer className={css.rodape}><span>{soLeads ? `${leads.length} contatos sem cadastro nas conversas carregadas` : consulta.pesquisaLimitada ? `${lista.length} resultados, até 100 por busca` : `${consulta.total} cadastros`}</span>{!soLeads && !consulta.pesquisaLimitada && tela !== 'bancos' && <div className={css.acoes}><Botao disabled={pagina <= 1 || consulta.carregando} onClick={() => definir({ pagina: pagina - 1, posicao: 0 })}>Anterior</Botao><span>Página {pagina}</span><Botao disabled={pagina * 20 >= consulta.total || consulta.carregando} onClick={() => definir({ pagina: pagina + 1, posicao: 0 })}>Próxima</Botao></div>}</footer>
+      <footer className={css.rodape}><span>{soLeads ? `${leads.length} contatos sem cadastro nas conversas carregadas` : consulta.pesquisaLimitada ? `${lista.length} resultados, até 100 por busca` : `${consulta.total} cadastros`}</span>{!soLeads && !consulta.pesquisaLimitada && tela !== 'bancos' && <div className={css.acoes}><Botao disabled={pagina <= 1 || consulta.carregando} onClick={() => definir({ pagina: pagina - 1, posicao: 0 })}>Anterior</Botao><span>Página {pagina}</span><Botao disabled={!temProximaPagina(pagina, consulta.total) || consulta.carregando} onClick={() => definir({ pagina: pagina + 1, posicao: 0 })}>Próxima</Botao></div>}</footer>
     </div>
     {tela === 'produtos' && <div className={css.links}><a href={hashDoModulo('cardapio', 'itens')}>Abrir itens do cardápio</a><a href={hashDoModulo('producao', 'estoque')}>Conferir estoque do dia</a></div>}
     {editor && <EditorCadastro tela={tela} editor={editor} aoMudar={valor => definir({ editor: valor })} contexto={contexto} conversa={tela === 'clientes' && ((editor.dados.id && conversa?.clienteId === editor.dados.id) || (!editor.dados.id && !conversa?.clienteId && editor.origemConversa?.id === conversa?.id && editor.origemConversa?.vinculoRevisao === (conversa?.vinculoRevisao ?? 0))) ? conversa : null} podeEditar={podeEditar} aoFechar={() => { definir({ editor: null }); aoFixarContexto(false) }} aoSalvo={salvo} />}

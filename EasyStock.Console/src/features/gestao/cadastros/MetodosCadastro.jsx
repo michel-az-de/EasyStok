@@ -3,7 +3,6 @@ import { ativarMetodoCadastro, useListaCadastros } from '../../../aplicacao/cada
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { Botao } from '../../../componentes/Botao'
 import { Modal } from '../../../componentes/Modal'
-import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import css from './cadastros.module.css'
 
@@ -30,7 +29,7 @@ export function MetodosCadastro({ contexto }) {
     {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
     {consulta.erro && <div className={css.erro} role="alert">{consulta.erro}<Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>}
     {consulta.carregando ? <Vazio titulo="Carregando formas de pagamento" /> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.codigo}>
-      <div><h3>{m.nome}</h3><Pilula tom={m.ativo ? 'ok' : 'neutro'}>{m.ativo ? 'Ativa' : 'Inativa'}</Pilula></div>
+      <div><h3>{m.nome}</h3><span className={css.situacao}>{m.ativo ? 'Ativa' : 'Inativa'}</span></div>
       {acoes.gerenciarCadastrosFinanceiros && <Botao onClick={() => { falhar(null); escolher({ metodo: m, ativo: !m.ativo, requestId: crypto.randomUUID() }) }}>{m.ativo ? 'Inativar' : 'Ativar'}</Botao>}
     </li>)}</ul>}
     {intencao && <Modal titulo={`${intencao.ativo ? 'Ativar' : 'Inativar'} ${intencao.metodo.nome}?`} aoFechar={ocupado ? undefined : () => escolher(null)} segurarFechamento={ocupado}

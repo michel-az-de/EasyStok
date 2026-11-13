@@ -8,7 +8,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
-import { EVENTOS_MODELO, MENSAGEM_CADASTRO_REPETIDO, NOMES_CANAIS_MODELO, novoModeloCadastro } from '../../../dominio/cadastros'
+import { EVENTOS_MODELO, MENSAGEM_CADASTRO_REPETIDO, NOMES_CANAIS_MODELO, novoModeloCadastro, temProximaPagina } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
 const CANAIS = [{ valor: '', rotulo: 'Todos os canais' }, { valor: 'Email', rotulo: 'E-mail' }, { valor: 'Sms', rotulo: 'SMS' }, { valor: 'WhatsApp', rotulo: 'WhatsApp' }]
@@ -60,10 +60,10 @@ function ListaModelos({ contexto }) {
     {sucesso && <p role="status" className={css.sucesso}>{sucesso}</p>}
     {(erro || consulta.erro) && <div role="alert" className={css.erro}>{erro || consulta.erro}<Botao onClick={() => { falhar(null); consulta.recarregar() }}>Tentar de novo</Botao></div>}
     {consulta.carregando ? <Vazio titulo="Carregando modelos" /> : consulta.itens.length === 0 ? <Vazio titulo="Nenhum modelo neste canal">Crie o primeiro modelo da loja.</Vazio> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.id}>
-      <div><small>{NOMES_CANAIS_MODELO[m.canal] ?? m.canal} · versão {m.versao}</small><h3>{m.nome}</h3><p className={css.amostra}>{m.assuntoTemplate || m.corpoTemplate}</p><Pilula tom={m.aprovado ? 'ok' : 'aviso'}>{m.aprovado ? 'Aprovado na loja' : 'Aguardando revisão'}</Pilula></div>
+      <div><small>{NOMES_CANAIS_MODELO[m.canal] ?? m.canal} · versão {m.versao}</small><h3>{m.nome}</h3><p className={css.amostra}>{m.assuntoTemplate || m.corpoTemplate}</p>{m.aprovado ? <span className={css.situacao}>Aprovado na loja</span> : <Pilula tom="aviso">Aguardando revisão</Pilula>}</div>
       <div className={css.acoes}><Botao disabled={ocupado} onClick={() => abrir(m)}>Editar</Botao>{!m.aprovado && <Botao disabled={ocupado} onClick={() => aprovar(m)}>Aprovar na loja</Botao>}</div>
     </li>)}</ul>}
-    <div className={css.rodape}><span>{consulta.total} {consulta.total === 1 ? 'modelo' : 'modelos'}</span><div className={css.acoes}><Botao disabled={memoria.pagina <= 1 || consulta.carregando} onClick={() => mudar({ pagina: memoria.pagina - 1 })}>Anterior</Botao><span>Página {memoria.pagina}</span><Botao disabled={memoria.pagina * 20 >= consulta.total || consulta.carregando} onClick={() => mudar({ pagina: memoria.pagina + 1 })}>Próxima</Botao></div></div>
+    <div className={css.rodape}><span>{consulta.total} {consulta.total === 1 ? 'modelo' : 'modelos'}</span><div className={css.acoes}><Botao disabled={memoria.pagina <= 1 || consulta.carregando} onClick={() => mudar({ pagina: memoria.pagina - 1 })}>Anterior</Botao><span>Página {memoria.pagina}</span><Botao disabled={!temProximaPagina(memoria.pagina, consulta.total) || consulta.carregando} onClick={() => mudar({ pagina: memoria.pagina + 1 })}>Próxima</Botao></div></div>
     {memoria.editor && <EditorModelo contexto={contexto} editor={memoria.editor} aoMudar={editor => mudar({ editor })} aoFechar={() => mudar({ editor: null })} aoSalvo={() => { mudar({ editor: null }); avisar('Modelo salvo para revisão.'); consulta.recarregar() }} />}
   </div>
 }
@@ -120,7 +120,7 @@ function EtiquetasCadastro({ contexto }) {
     {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
     {(erro || consulta.erro) && <p className={css.erro} role="alert">{erro || consulta.erro}</p>}
     <div className={css.barra}><p>Modelos de etiqueta usados pela loja.</p><Botao onClick={consulta.recarregar} disabled={consulta.carregando}>Atualizar</Botao></div>
-    {consulta.carregando ? <Vazio titulo="Carregando etiquetas" /> : consulta.itens.length === 0 ? <Vazio titulo="Nenhum modelo de etiqueta disponível" /> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={`${m.origem}:${m.id}`}><div><small>{m.origem === 'Sistema' ? 'Modelo de origem' : 'Modelo da loja'}</small><h3>{m.nome}</h3><p>{m.descricao}</p>{m.isDefault && <Pilula tom="ok">Padrão</Pilula>}</div><div className={css.acoes}>{m.origem === 'Empresa' && <Botao disabled={ocupado} onClick={() => abrir(m, true)}>Editar textos</Botao>}<Botao disabled={ocupado} onClick={() => abrir(m, false)}>Criar a partir deste</Botao><Botao disabled={ocupado || m.isDefault} onClick={() => executar(m)}>Usar como padrão</Botao></div></li>)}</ul>}
+    {consulta.carregando ? <Vazio titulo="Carregando etiquetas" /> : consulta.itens.length === 0 ? <Vazio titulo="Nenhum modelo de etiqueta disponível" /> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={`${m.origem}:${m.id}`}><div><small>{m.origem === 'Sistema' ? 'Modelo de origem' : 'Modelo da loja'}</small><h3>{m.nome}</h3><p>{m.descricao}</p>{m.isDefault && <span className={css.situacao}>Padrão</span>}</div><div className={css.acoes}>{m.origem === 'Empresa' && <Botao disabled={ocupado} onClick={() => abrir(m, true)}>Editar textos</Botao>}<Botao disabled={ocupado} onClick={() => abrir(m, false)}>Criar a partir deste</Botao><Botao disabled={ocupado || m.isDefault} onClick={() => executar(m)}>Usar como padrão</Botao></div></li>)}</ul>}
     {copiar && <Modal titulo={edicao ? 'Editar modelo de etiqueta' : 'Criar modelo de etiqueta'} largura="md" aoFechar={ocupado ? undefined : () => escolher(null)} segurarFechamento={ocupado} confirmarDescarte={nome !== copiar.nome || JSON.stringify(desenho) !== copiar.layoutJson}
       rodape={<><Botao disabled={ocupado} onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))}>Cancelar</Botao><Botao variante="primario" disabled={ocupado || !nome.trim()} onClick={() => executar(copiar, true)}>{ocupado ? 'Salvando…' : 'Salvar modelo'}</Botao></>}>
       <div className={css.painel}><CampoTexto rotulo="Nome" disabled={ocupado} value={nome} onChange={e => nomear(e.target.value)} /><p>Formato: {desenho.size.w_mm} × {desenho.size.h_mm} mm. Posições e códigos serão preservados.</p>
