@@ -37,4 +37,22 @@ public class MovimentacaoControllerTests
         await _movRepo.DidNotReceiveWithAnyArgs()
             .GetByEmpresaAsync(Guid.Empty, null, null, null, null, 0, 0);
     }
+
+    // #2487: data pura é o dia de Brasília; o "até" inclui o dia inteiro em vez de parar em 00:00 UTC.
+    [Fact]
+    public async Task GetAll_data_pura_inclui_o_ultimo_dia_inteiro_de_Brasilia()
+    {
+        var empresaId = Guid.NewGuid();
+        _currentUser.EmpresaId.Returns(empresaId);
+        _movRepo.GetByEmpresaAsync(default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs((Enumerable.Empty<EasyStock.Domain.Entities.MovimentacaoEstoque>(), 0));
+
+        await _controller.GetAll(empresaId, de: new DateTime(2026, 11, 1), ate: new DateTime(2026, 11, 13),
+            tipo: null, natureza: null);
+
+        await _movRepo.Received(1).GetByEmpresaAsync(empresaId,
+            new DateTime(2026, 11, 1, 3, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 14, 3, 0, 0, DateTimeKind.Utc).AddTicks(-10),
+            null, null, 1, 20);
+    }
 }

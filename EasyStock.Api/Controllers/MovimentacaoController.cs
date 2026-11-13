@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Common;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
@@ -35,7 +36,7 @@ public class MovimentacaoController(
 
         var (p, ps) = NormalisePage(page, pageSize);
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
-            resolvedEmpresaId, de, ate, tipo, natureza, p, ps);
+            resolvedEmpresaId, DataUtc.InicioDoPeriodoUtc(de), DataUtc.FimDoPeriodoUtc(ate), tipo, natureza, p, ps);
 
         var dtos = items.Select(m => new
         {

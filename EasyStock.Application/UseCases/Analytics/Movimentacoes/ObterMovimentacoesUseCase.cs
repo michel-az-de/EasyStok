@@ -8,8 +8,9 @@ public class ObterMovimentacoesUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
-        var dataAte = cmd.DataAte ?? DateTime.UtcNow;
-        var dataDe = cmd.DataDe ?? dataAte.AddDays(-cmd.DiasPadrao);
+        // #2487: data pura é o dia de Brasília; o "até" inclui o dia inteiro.
+        var dataAte = DataUtc.FimDoPeriodoUtc(cmd.DataAte) ?? DateTime.UtcNow;
+        var dataDe = DataUtc.InicioDoPeriodoUtc(cmd.DataDe) ?? dataAte.AddDays(-cmd.DiasPadrao);
 
         var items = await analyticsRepository.GetMovimentacoesResumoAsync(cmd.EmpresaId, dataDe, dataAte, cmd.Tipo, cmd.LojaId);
         var results = items.Select(ObterMovimentacoesResult.FromDto).ToList();
