@@ -66,7 +66,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(p => p.Pagamentos)
                 .Where(p => p.EmpresaId == empresaId);
 
-            if (!string.IsNullOrWhiteSpace(status)) query = query.Where(p => p.Status == status);
+            // #2478: uma situação ou várias separadas por vírgula ("aguardando,aprovado_baba" é a "Na fila" da Cozinha).
+            var situacoes = (status ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (situacoes.Length == 1) query = query.Where(p => p.Status == situacoes[0]);
+            else if (situacoes.Length > 1) query = query.Where(p => situacoes.Contains(p.Status));
             if (clienteId.HasValue && clienteId.Value != Guid.Empty)
                 query = query.Where(p => p.ClienteId == clienteId);
             if (desde.HasValue) query = query.Where(p => p.CriadoEm >= desde.Value);
