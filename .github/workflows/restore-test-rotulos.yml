@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # #1796: o Postgres sobe num passo, e não em `services:`, para a imagem vir por espelhos com
       # nova tentativa (scripts/ci/puxar-imagem.sh). O `services:` puxa de uma fonte só e reprova o
