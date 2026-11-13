@@ -2,6 +2,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Repositories;
 
 namespace EasyStock.Api.Mobile.Services.Linkers;
 
@@ -65,7 +66,8 @@ public sealed class ProductLinker(
                     .FirstOrDefaultAsync(p =>
                         p.EmpresaId == empresaId
                         && p.Status == StatusProduto.Ativo
-                        && EF.Functions.ILike(p.Nome, nomeLimpo));
+                        // #2477: "%" e "_" no nome do app são texto; sem escape, "Bolo_" casava com "Bolos".
+                        && EF.Functions.ILike(p.Nome, PadraoILike.Literal(nomeLimpo), PadraoILike.Escape));
 
                 if (webP != null)
                 {

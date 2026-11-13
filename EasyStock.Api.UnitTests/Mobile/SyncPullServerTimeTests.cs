@@ -96,5 +96,49 @@ public sealed class SyncPullServerTimeTests : IDisposable
             "o instante do cursor e lido uma vez, antes de qualquer consulta");
     }
 
+    /// <summary>
+    /// #2477: o carimbo ServerUpdatedAt nasce no SavingChanges, antes do commit do lote do push. Um pull que roda
+    /// nesse intervalo devolve cursor maior que o carimbo de uma linha que ele ainda nao via. O pull seguinte
+    /// precisa reler essa faixa, senao a linha nunca chega ao aparelho.
+    /// </summary>
+    [Fact]
+    public async Task Pull_ReleLinhaCarimbadaPoucoAntesDoCursor()
+    {
+        _db.Set<Product>().Add(new Product
+        {
+            Id = "p-commit-tardio", Name = "Quiche", LastDeviceId = "outro-aparelho", EmpresaId = _empresaId
+        });
+        await _db.SaveChangesAsync();
+        var carimbo = (await _db.Set<Product>().SingleAsync(p => p.Id == "p-commit-tardio")).ServerUpdatedAt;
+        _db.ChangeTracker.Clear();
+
+        // Cursor devolvido por um pull que rodou 5 s depois do carimbo, antes do commit.
+        var cursor = new DateTimeOffset(DateTime.SpecifyKind(carimbo, DateTimeKind.Utc)).AddSeconds(5).ToUnixTimeMilliseconds();
+        var resultado = await NovoController(new RelogioEspiao(_db, DateTimeOffset.UtcNow)).Pull(cursor, "este-aparelho");
+
+        var corpo = (resultado.Result as OkObjectResult)!.Value.Should().BeOfType<SyncPullResponse>().Subject;
+        corpo.Mutations.Should().ContainSingle(m => m.Type == "product.upsert",
+            "a linha carimbada antes do cursor e commitada depois tem de voltar no pull seguinte");
+    }
+
+    private SyncController NovoController(TimeProvider relogio)
+    {
+        var http = new DefaultHttpContext();
+        http.Items[MobileAuth.HttpContextItemDevice] = new MobileDevice
+        {
+            Id = "este-aparelho", ApiKeyHash = "h", EmpresaId = _empresaId, LojaId = Guid.Empty
+        };
+        return new SyncController(
+            _db, null!, null!, null!, null!,
+            Substitute.For<IProdutoRepository>(),
+            new ConfigurationBuilder().Build(),
+            relogio,
+            new EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile(_db, Substitute.For<ILoteNumeroCurtoRepository>(), NullLogger<EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile>.Instance),
+            NullLogger<SyncController>.Instance)
+        {
+            ControllerContext = new ControllerContext { HttpContext = http }
+        };
+    }
+
     public void Dispose() => _db.Dispose();
 }
