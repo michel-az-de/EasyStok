@@ -307,7 +307,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
   }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento, AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao])
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
   if (fonteApi && aba === 'cadastros-pedidos') return <PainelPedidos key={aba} aoAbrirConversa={aoAbrirConversa} />
-  if (fonteApi && aba?.startsWith('cadastros-')) return <PainelCadastros key={aba} tela={aba.slice('cadastros-'.length)} respostas={<AbaRespostas />} impressao={<AbaImpressao />} aoAbrirConversa={aoAbrirConversa} />
+  if (fonteApi && aba?.startsWith('cadastros-')) return <PainelCadastros key={aba} tela={aba.slice('cadastros-'.length)} respostas={<AbaRespostas comAutomaticas={false} />} impressao={<AbaImpressao />} aoAbrirConversa={aoAbrirConversa} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />
   // #2362: toda tela da Produção mostra no topo o que falta configurar, nas duas casas (rota e Gestão).

@@ -414,10 +414,18 @@ public class SyncController(
                     SyncDtoConverters.Serialize(new { id = o.Id, aReceber }), serverTime));
     }
 
+    /// <summary>Folga do cursor do pull: cobre o intervalo entre o carimbo e o commit de uma gravacao concorrente.</summary>
+    public static readonly TimeSpan SobreposicaoDoCursor = TimeSpan.FromSeconds(30);
+
     [HttpGet("pull")]
     public async Task<ActionResult<SyncPullResponse>> Pull([FromQuery] long since, [FromQuery] string deviceId)
     {
-        var sinceDate = DateTimeOffset.FromUnixTimeMilliseconds(since).UtcDateTime;
+        // #2477: ServerUpdatedAt e carimbado no SavingChanges, antes do commit do lote do push. Um pull que roda
+        // entre o carimbo e o commit nao ve a linha e devolve cursor maior que o carimbo dela; sem sobreposicao a
+        // mutacao nunca mais chegava aos outros aparelhos. O upsert do PWA e idempotente (#1474).
+        var sinceDate = since > 0
+            ? DateTimeOffset.FromUnixTimeMilliseconds(since).UtcDateTime - SobreposicaoDoCursor
+            : DateTime.UnixEpoch;
         // #1474: o cursor devolvido ao aparelho e o instante ANTES das consultas. Lido depois, uma
         // linha gravada durante a consulta (carimbo menor que esse instante) ficava atras do
         // cursor e nunca mais vinha. O upsert do PWA e idempotente; repetir alguns registros nao faz mal.
