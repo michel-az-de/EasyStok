@@ -1,3 +1,5 @@
+using EasyStock.Application.Common;
+using EasyStock.Domain.Defaults;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
@@ -62,13 +64,13 @@ public sealed class MapMensalHandler(
         MapMensalParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-        var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
+        // #2441: dia civil de Brasília em UTC real; timestamptz não aceita Kind=Unspecified.
+        var (de, ate) = HorarioBrasil.JanelaPeriodoUtc(parametros.De, parametros.Ate);
 
         // Passo 1: Carregar todos os documentos do período (max ~31 dias × 500 NFC-e/dia = ~15k rows).
         var docs = await tenantQuery.Query<NfeDocumento>()
             .Where(n => (n.Status == StatusNfe.Autorizada || n.Status == StatusNfe.Cancelada)
-                        && n.DataAutorizacao >= de && n.DataAutorizacao <= ate)
+                        && n.DataAutorizacao >= de && n.DataAutorizacao < ate)
             .AsNoTracking()
             .ToListAsync(ct);
 
@@ -95,7 +97,7 @@ public sealed class MapMensalHandler(
 
         // Passo 3: Agrupar por dia e gerar linhas.
         var porDia = docs
-            .GroupBy(d => DateOnly.FromDateTime(d.DataAutorizacao!.Value))
+            .GroupBy(d => OperacionalFuso.DataOperacional(d.DataAutorizacao!.Value)) // #2441: dia de Brasília, não o UTC
             .OrderBy(g => g.Key);
 
         foreach (var dia in porDia)

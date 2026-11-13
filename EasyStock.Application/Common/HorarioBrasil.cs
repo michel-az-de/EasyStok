@@ -72,6 +72,13 @@ public static class HorarioBrasil
         return (InicioRealDoDiaUtc(d), InicioRealDoDiaUtc(d.AddDays(1)));
     }
 
+    /// <summary>
+    /// #2441: janela UTC [ini, fim) do periodo civil de Brasilia de <paramref name="de"/> a <paramref name="ate"/>
+    /// (inclusive), para relatorios sobre colunas timestamptz. Use `col &gt;= ini &amp;&amp; col &lt; fim`.
+    /// </summary>
+    public static (DateTime IniUtc, DateTime FimUtc) JanelaPeriodoUtc(DateOnly de, DateOnly ate) =>
+        (InicioRealDoDiaUtc(de), InicioRealDoDiaUtc(ate.AddDays(1)));
+
     /// <summary>#2268: janela UTC [ini, fim) do mes civil de Brasilia que contem o dia, para colunas de instante real.</summary>
     public static (DateTime IniUtc, DateTime FimUtc) JanelaMesUtc(DateOnly dia)
     {
