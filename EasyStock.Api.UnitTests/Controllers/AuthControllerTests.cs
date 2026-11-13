@@ -240,6 +240,8 @@ public class AuthControllerTests
     [InlineData(NivelAcesso.Gerente, Modulo.Atendimento, true, false, false, false)]
     [InlineData(NivelAcesso.Operador, Modulo.Atendimento, true, false, false, false)]
     [InlineData(NivelAcesso.Admin, Modulo.Atendimento, false, false, false, false)]
+    [InlineData(NivelAcesso.Visualizador, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Cadastros, true, false, false, false)]
     public void CapacidadesDeEdicaoExigemNivelEmpresaEModulo(
         NivelAcesso nivel, Modulo modulo, bool comEmpresa, bool producao, bool caixa, bool cardapio)
     {
@@ -269,6 +271,10 @@ public class AuthControllerTests
             comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
         acoes.GetProperty("devolverPagamentoManual").GetBoolean().Should().Be(
             comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+        // #2478: a tela Pedidos de Cadastros lê `GET api/pedidos`, que pede policy Operador, módulo Atendimento e empresa.
+        // Cadastros entra pela mesma permissão de Atendimento (AcessoModulos), então quem abre Cadastros lê pedidos.
+        acoes.GetProperty("verPedidos").GetBoolean().Should().Be(
+            comEmpresa && modulo is Modulo.Atendimento or Modulo.Cadastros && nivel is not NivelAcesso.Visualizador);
     }
 
     [Theory]

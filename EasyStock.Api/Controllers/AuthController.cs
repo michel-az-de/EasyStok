@@ -439,6 +439,9 @@ public class AuthController(
                 controlarLoja = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 cancelarPedidoPago = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 devolverPagamentoManual = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                // #2478: a tela Pedidos de Cadastros lê `GET api/pedidos` (policy Operador, módulo Atendimento, empresa).
+                verPedidos = usuario.EmpresaId != Guid.Empty && (gerente || usuario.Nivel == NivelAcesso.Operador)
+                    && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 estornarPagamentoOnline = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 gerenciarOcorrencias = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 reabrirConversa = usuario.TemPermissao(Permissao.AtenderConversas)

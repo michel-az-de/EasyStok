@@ -7,6 +7,7 @@ import { hashDoModulo, modulosDoHall } from './modulos'
 const PASSOS_POR_TELA = {
   cadastros: {
     clientes: 'Em Leads e clientes, busque a pessoa, confira os contatos e volte à conversa quando necessário.',
+    pedidos: 'Em Pedidos, ache qualquer pedido pelo número, nome ou telefone e abra para ver itens, pagamentos e histórico.',
     produtos: 'Em Produtos, confira os dados e a situação antes de salvar o cadastro.',
     fornecedores: 'Em Fornecedores, mantenha contatos e condições de compra.',
     bancos: 'Em Contas bancárias, confira os dados da conta antes de salvar ou inativar.',

@@ -42,6 +42,8 @@ export const MODULOS = [
     resumo: 'Leads, clientes e dados da operação',
     telas: [
       { id: 'clientes', rotulo: 'Leads e clientes', tipo: TELA_AJUSTE, aba: 'cadastros-clientes', soApi: true },
+      // #2478: todos os pedidos, de qualquer canal e dia; a API libera pela policy de `GET api/pedidos`.
+      { id: 'pedidos', rotulo: 'Pedidos', tipo: TELA_AJUSTE, aba: 'cadastros-pedidos', soApi: true, acao: 'verPedidos' },
       { id: 'produtos', rotulo: 'Produtos', tipo: TELA_AJUSTE, aba: 'cadastros-produtos', soApi: true, acao: 'verCadastrosProdutos' },
       { id: 'fornecedores', rotulo: 'Fornecedores', tipo: TELA_AJUSTE, aba: 'cadastros-fornecedores', soApi: true, acao: 'verCadastrosFornecedores' },
       { id: 'bancos', rotulo: 'Contas bancárias', tipo: TELA_AJUSTE, aba: 'cadastros-bancos', soApi: true, acao: 'verCadastrosFinanceiros' },
@@ -162,6 +164,7 @@ const PODE_NA_TELA = {
   verCadastrosProdutos: (acoes) => acoes?.verCadastrosProdutos === true,
   verCadastrosFornecedores: (acoes) => acoes?.verCadastrosFornecedores === true,
   verCadastrosFinanceiros: (acoes) => acoes?.verCadastrosFinanceiros === true,
+  verPedidos: (acoes) => acoes?.verPedidos === true,
   ajustarEntrega: podeAjustarEntrega,
   verContas,
   verContasPagar: (acoes) => acoes?.visualizarContasPagar === true,

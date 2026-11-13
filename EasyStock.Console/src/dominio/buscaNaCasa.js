@@ -1,8 +1,11 @@
+import { rotuloDaSituacao, tituloDoPedido } from './pedidosCadastro'
+
 export const LIMITE_BUSCA_CASA = 10
 export const nomesDaBusca = { clientes: 'Pessoas', conversas: 'Conversas', pedidos: 'Pedidos', produtos: 'Produtos', telas: 'Telas' }
 
+// #2478: pedidos só para quem a API deixa ler (`verPedidos`); antes o Visualizador via "parte indisponível".
 export function categoriasDaBusca({ permite, acoes = {} }) {
-  return [permite('cadastros') && 'clientes', permite('atendimento') && 'conversas', permite('atendimento') && 'pedidos', acoes.verCadastrosProdutos === true && 'produtos'].filter(Boolean)
+  return [permite('cadastros') && 'clientes', permite('atendimento') && 'conversas', acoes.verPedidos === true && 'pedidos', acoes.verCadastrosProdutos === true && 'produtos'].filter(Boolean)
 }
 
 export function requisicoesDaBusca(termo, acesso, empresaId) {
@@ -20,7 +23,7 @@ export function requisicoesDaBusca(termo, acesso, empresaId) {
 export function resultadoDaBusca(tipo, item) {
   if (!item?.id) throw new Error('O resultado chegou sem identidade. Tente buscar novamente.')
   const rotulo = tipo === 'conversas' ? item.contatoNome || item.contatoIdExterno
-    : tipo === 'pedidos' ? `Pedido${item.numeroDoDia ? ` ${item.numeroDoDia}` : ''} · ${item.clienteNome || 'Sem nome'}` : item.nome
-  const detalhe = tipo === 'conversas' ? item.contatoIdExterno : tipo === 'pedidos' ? item.status : tipo === 'clientes' ? item.telefone : item.skuBase
+    : tipo === 'pedidos' ? `${tituloDoPedido(item)} · ${item.clienteNome || 'Sem nome'}` : item.nome
+  const detalhe = tipo === 'conversas' ? item.contatoIdExterno : tipo === 'pedidos' ? rotuloDaSituacao(item.status) : tipo === 'clientes' ? item.telefone : item.skuBase
   return { id: `${tipo}:${item.id}`, tipo, rotulo: rotulo || 'Sem nome', descricao: [nomesDaBusca[tipo], detalhe, `ID ${item.id}`].filter(Boolean).join(' · '), item }
 }
