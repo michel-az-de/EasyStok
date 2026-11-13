@@ -15,8 +15,14 @@ public sealed class AtendimentoVinculoClienteController(VinculoClienteConversaUs
     public Task<IActionResult> Obter(Guid id, CancellationToken ct) => Tratar(async () =>
         DataOk(await useCase.ObterAsync(usuario.EmpresaId, id, ct)));
 
+    // #2447: o telefone vai no corpo, fora da URL que o proxy grava no log. O GET fica só enquanto o console
+    // publicado antes desta versão ainda estiver aberto; o console atual usa o POST.
+    [HttpPost("candidatos-cliente")]
+    public Task<IActionResult> Candidatos(Guid id, [FromBody] CandidatosClienteBody body, CancellationToken ct) => Tratar(async () =>
+        DataOk(await useCase.CandidatosAsync(usuario.EmpresaId, id, body.Telefone, ct)));
+
     [HttpGet("candidatos-cliente")]
-    public Task<IActionResult> Candidatos(Guid id, [FromQuery] string telefone, CancellationToken ct) => Tratar(async () =>
+    public Task<IActionResult> CandidatosLegado(Guid id, [FromQuery] string telefone, CancellationToken ct) => Tratar(async () =>
         DataOk(await useCase.CandidatosAsync(usuario.EmpresaId, id, telefone, ct)));
 
     [HttpPost("vinculo-cliente")]
@@ -41,6 +47,8 @@ public sealed class AtendimentoVinculoClienteController(VinculoClienteConversaUs
         }
     }
 }
+
+public sealed record CandidatosClienteBody(string Telefone);
 
 public sealed record CorrigirVinculoClienteBody(Guid RequestId, long VinculoRevisao, Guid? ClienteId,
     string Acao, Guid? DestinoClienteId, string Motivo, Guid? EmpresaId = null);
