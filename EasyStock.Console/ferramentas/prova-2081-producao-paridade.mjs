@@ -175,6 +175,7 @@ await confere('A10: sem a lista de lotes o estoque continua servindo, sem reimpr
   assert.equal(r.pratos[0].lotes.some(podeReimprimir), false)
 })
 
+
 await confere('A16: a porção que o nome já diz não se repete embaixo', async () => {
   const { porcaoQueNaoRepete } = await import('../src/aplicacao/estoqueDoDia.js')
   assert.equal(porcaoQueNaoRepete('Lasanha Bolonhesa Clássica 1 kg', '1 kg'), '')
@@ -412,7 +413,8 @@ await confere('A8/A10: Estoque do dia mostra a origem e reimprime o lote do cons
   globalThis.window = { print: () => { impressoes += 1 } }
   const t = montar(await tela('AbaEstoqueDoDiaApi'))
   await t.assentar()
-  const linhas = andar(t.arvore, (n) => n.type === 'li' && /LOT-/.test(texto(n)))
+  // #2439: o Estoque do dia virou tabela; a linha do lote é o `tr`.
+  const linhas = andar(t.arvore, (n) => n.type === 'tr' && /LOT-/.test(texto(n)))
   assert.match(texto(linhas.find((l) => /LOT-251026-200000/.test(texto(l)))), /Lançado no aparelho por Rosa · fab\. 25\/10/)
   assert.match(texto(linhas.find((l) => /LOT-261026-001/.test(texto(l)))), /Lançado por você · fab\. 26\/10/)
   // #2235 (banca T1-3): o botão diz "Etiquetas" na tela, não só no ícone.
@@ -431,7 +433,16 @@ await confere('A8/A10: Estoque do dia mostra a origem e reimprime o lote do cons
   await andar(previa.props.rodape, (n) => n.type === 'Botao' && texto(n) === 'Imprimir 11 etiquetas')[0].props.onClick()
   assert.equal(impressoes, 1)
   assert.ok(chamadas.some((c) => c.url.endsWith('/api/lotes/l-con/etiquetas/render')))
-  assert.doesNotMatch(texto(andar(t.arvore, (n) => n.type === 'li' && /Lasanha Bolonhesa Clássica 1 kg/.test(texto(n)) && !/LOT-/.test(texto(n)))[0]), /1 kg1 kg/, 'A16: a porção não se repete')
+  assert.doesNotMatch(texto(andar(t.arvore, (n) => n.type === 'tr' && /Lasanha Bolonhesa Clássica 1 kg/.test(texto(n)) && !/LOT-/.test(texto(n)))[0]), /1 kg1 kg/, 'A16: a porção não se repete')
+})
+
+// #2439: lote fora da lista de recentes não tem id; a tela comparava `impressao?.loteId === l.id`
+// (undefined === undefined) e lia `impressao.erro` de null, derrubando o Estoque do dia inteiro.
+await confere('#2439: lote sem id na lista de recentes não derruba o Estoque do dia', async () => {
+  montarFetch([[ESTOQUE, estoque], [LOTES, { status: 500, error: { code: 'X', message: 'falhou' } }]])
+  const t = montar(await tela('AbaEstoqueDoDiaApi'))
+  await t.assentar()
+  assert.match(texto(t.arvore), /LOT-261026-001/)
 })
 
 await confere('A5/E7/E11: Perdas mostra o total em destaque, "sem custo" na linha e o botão no topo', async () => {
