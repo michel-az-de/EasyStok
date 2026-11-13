@@ -165,6 +165,59 @@ public sealed class ClienteSyncErpTests : IDisposable
         erp.Telefone.Should().Be(esperado);
     }
 
+    // #2440: o aparelho que ficou offline reenviava um client.upsert velho e apagava a edicao do console.
+    [Fact]
+    public async Task EdicaoAntigaDoApp_ClienteEditadoNoConsoleDepois_RecusaComConflitoSemApagarOErp()
+    {
+        var erp = Erp("Maria Souza", "11955554444");
+        var app = App("c-9", "Maria Silva", "11988887777");
+        app.ErpClienteId = erp.Id;
+        var agora = DateTime.UtcNow;
+        Alteracao(erp.Id, "Nome", agora, "web");
+        await _db.SaveChangesAsync();
+
+        var aplicar = () => Dispatcher().ApplyMutationAsync(
+            Mutacao("c-9", "Maria Silva", "11988887777", "Apto 1", null, agora.AddMinutes(-10)),
+            "dev-a", null, _empresaId, Guid.NewGuid());
+
+        var conflito = (await aplicar.Should().ThrowAsync<ConflictException>()).Which;
+        conflito.WinningPayload.Should().NotBeNull();
+        conflito.WinningPayload!.Value.GetProperty("name").GetString().Should().Be("Maria Souza",
+            "o aparelho precisa ver a versao do console para decidir");
+        conflito.WinningPayload.Value.GetProperty("phone").GetString().Should().Be("11955554444");
+        erp.Nome.Should().Be("Maria Souza");
+        erp.Telefone.Should().Be("11955554444");
+        erp.Apt.Should().BeNull();
+        app.Name.Should().Be("Maria Silva", "a mutacao recusada nao altera nem o espelho do app");
+        app.Apt.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(-10, "web")]      // console editou ANTES da edicao do app: o app vence
+    [InlineData(+10, "mobile")]   // registro do proprio app (vinculo): nao e edicao do console
+    public async Task EdicaoDoApp_SemEdicaoMaisNovaDoConsole_AtualizaOErp(int minutosDaAlteracao, string origem)
+    {
+        var erp = Erp("Maria Silva", "11988887777");
+        var app = App("c-10", "Maria Silva", "11988887777");
+        app.ErpClienteId = erp.Id;
+        var agora = DateTime.UtcNow;
+        Alteracao(erp.Id, "Nome", agora.AddMinutes(minutosDaAlteracao), origem);
+        await _db.SaveChangesAsync();
+
+        await Dispatcher().ApplyMutationAsync(Mutacao("c-10", "Maria Souza", null, null, null, agora),
+            "dev-a", null, _empresaId, Guid.NewGuid());
+        await _db.SaveChangesAsync();
+
+        erp.Nome.Should().Be("Maria Souza");
+    }
+
+    private void Alteracao(Guid clienteId, string campo, DateTime em, string origem)
+        => _db.Add(new ClienteAlteracao
+        {
+            Id = Guid.NewGuid(), EmpresaId = _empresaId, ClienteId = clienteId, Campo = campo,
+            ValorAntigo = "antes", ValorNovo = "depois", AlteradoEm = em, Origem = origem
+        });
+
     private SyncMutationDispatcher Dispatcher()
         => new(
             _db,
@@ -176,9 +229,9 @@ public sealed class ClienteSyncErpTests : IDisposable
             DispatcherDeTeste.EstornoDeCaixa(_db),
             NullLogger<SyncMutationDispatcher>.Instance);
 
-    private static MutationDto Mutacao(string id, string nome, string? fone, string? apt, string? end)
+    private static MutationDto Mutacao(string id, string nome, string? fone, string? apt, string? end, DateTime? em = null)
     {
-        var agora = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var agora = new DateTimeOffset(em ?? DateTime.UtcNow).ToUnixTimeMilliseconds();
         var payload = JsonSerializer.SerializeToElement(new ClientDto(id, nome, apt, end, fone, agora, 1));
         return new MutationDto(Guid.NewGuid().ToString(), "dev-a", "client.upsert", payload, agora);
     }

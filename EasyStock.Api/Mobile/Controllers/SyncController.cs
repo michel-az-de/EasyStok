@@ -188,10 +188,15 @@ public class SyncController(
                         catch (Exception ex) { _log.LogWarning(ex, "Falha extraindo id de payload pra auto-link"); }
                     }
                 }
-                catch (CadastroDeOutraEmpresaException)
+                catch (CadastroDeOutraEmpresaException ex)
                 {
-                    // HTTP 400 do contrato de tenant; desfaz o lote, inclusive gravacoes intermediarias.
-                    throw;
+                    // #2440: recusa so esta mutacao. O 400 desfazia o lote inteiro e o aparelho o reenviava
+                    // para sempre; agora a recusa fica gravada e o aparelho a manda para a deadletter.
+                    // O guard lanca antes de qualquer gravacao, entao nao sobra entidade rastreada.
+                    rejected.Add(new SyncConflict(m.Id, ex.Message));
+                    _log.LogWarning(
+                        "SyncMutation REJECTED tenant deviceId={DeviceId} empresaId={EmpresaId} type={Type} mutationId={MutationId}",
+                        SemQuebraDeLinha(req.DeviceId), empresaId, SemQuebraDeLinha(m.Type), SemQuebraDeLinha(m.Id));
                 }
                 catch (ConflictException cex)
                 {

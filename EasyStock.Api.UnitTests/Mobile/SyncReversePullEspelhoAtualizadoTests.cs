@@ -71,7 +71,7 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         return produto;
     }
 
-    private void ItemEstoqueDoErp(Guid produtoId, Guid? lojaId, decimal quantidade) => _db.Add(new ItemEstoque
+    private void ItemEstoqueDoErp(Guid produtoId, Guid? lojaId, decimal quantidade, DateTime? alteradoEm = null) => _db.Add(new ItemEstoque
     {
         Id = Guid.NewGuid(),
         EmpresaId = _empresaId,
@@ -80,7 +80,27 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         QuantidadeInicial = Quantidade.From(quantidade),
         QuantidadeAtual = Quantidade.From(quantidade),
         CustoUnitario = Dinheiro.FromDecimal(1m),
+        CriadoEm = alteradoEm ?? DateTime.UtcNow,
+        AlteradoEm = alteradoEm ?? DateTime.UtcNow,
     });
+
+    // #2440: renomear o produto no console reenviava o saldo do ERP e apagava o saldo do app,
+    // mesmo sem nenhum movimento de estoque depois do cursor.
+    [Fact]
+    public async Task ProdutoErpRenomeado_SemMovimentoDeEstoqueAposOCursor_MantemOSaldoDoApp()
+    {
+        var cursor = DateTime.UtcNow.AddDays(-1);
+        var produto = ProdutoErpComEspelho("Nome novo do console", DateTime.UtcNow);
+        ItemEstoqueDoErp(produto.Id, null, 4m, cursor.AddDays(-3));
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, cursor, _empresaId, null);
+
+        var upsert = mutations.Should().ContainSingle(m => m.Type == "product.upsert").Subject;
+        upsert.Payload.GetProperty("name").GetString().Should().Be("Nome novo do console");
+        upsert.Payload.GetProperty("stock").GetInt32().Should().Be(7, "so movimento de estoque depois do cursor troca o saldo do app");
+    }
 
     [Fact]
     public async Task ProdutoErpAlterado_ComEspelho_EmiteUpsertComIdDoEspelhoEEstoqueDele()
