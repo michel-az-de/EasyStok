@@ -3,8 +3,11 @@
 #
 # F13 (#1243): o mesmo arquivo gera os dois modos.
 #   Demonstração (padrão): sem build args; /api/ vai para o api-falsa do protótipo.
-#   Modo API:  --build-arg VITE_FONTE_DADOS=api  e, no contêiner,  API_UPSTREAM=http://ez-api:8080
+#   Modo API:  --build-arg VITE_FONTE_DADOS=api --build-arg CONSOLE_SHA=$(git rev-parse HEAD)
+#              e, no contêiner,  API_UPSTREAM=http://ez-api:8080
 #              (VITE_API_BASE vazio = mesma origem: o nginx repassa /api/ para a API real).
+#              O .git fica fora do contexto (.dockerignore), então sem CONSOLE_SHA o build
+#              do modo API falha cedo (#2393, #2440) em vez de sair sem a meta de versão.
 FROM node:24-alpine AS build
 ARG VITE_FONTE_DADOS=
 ARG VITE_API_BASE=
@@ -13,7 +16,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+ARG CONSOLE_SHA=
+RUN CONSOLE_SHA="$CONSOLE_SHA" npm run build
 
 FROM nginx:alpine
 # O nginx oficial passa /etc/nginx/templates/*.template pelo envsubst ao subir
