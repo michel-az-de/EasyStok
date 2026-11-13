@@ -16,8 +16,10 @@ internal sealed class PublicUploadFileProvider(string root) : IFileProvider
             var pasta = relative.Split('/')[0];
             // Só imagens/áudios gerados para envio usam Guid no formato D. Recebidos WPP/Meta e
             // anexos de e-mail ficam acessíveis pelo endpoint autenticado da conversa.
+            // #2459: foto de lote mobile sai por GET api/mobile/batches/{id}/photos/{arquivo}, com o aparelho.
             if (pasta.Equals("acervo", StringComparison.OrdinalIgnoreCase) ||
                 pasta.Equals("clientes", StringComparison.OrdinalIgnoreCase) ||
+                pasta.Equals("mobile-photos", StringComparison.OrdinalIgnoreCase) ||
                 pasta.Equals("atendimento", StringComparison.OrdinalIgnoreCase) &&
                 !Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "D", out _))
                 return new NotFoundFileInfo(subpath);

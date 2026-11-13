@@ -17590,7 +17590,8 @@ function openConferProducao(batchId, idxStr) {
   const fotoSegura = et.photo ? safePhotoUrl(et.photo) : '';
   if (fotoSegura) {
     photoWrap.style.display = 'block';
-    photoWrap.innerHTML = '<img src="' + escapeHtml(fotoSegura) + '" alt="Foto" style="max-width:100%;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:8px"/>';
+    photoWrap.innerHTML = '<img ' + fotoImgSrcAttr(fotoSegura) + ' alt="Foto" style="max-width:100%;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:8px"/>';
+    if (window.cdbPhotoUpload) window.cdbPhotoUpload.hidratarFotos(photoWrap);
   } else {
     photoWrap.style.display = 'none';
   }
@@ -20105,17 +20106,26 @@ function etiquetasFromBatch(batch) {
 
 function safePhotoUrl(url) {
   if (!url || typeof url !== 'string') return '';
+  // #2459: foto de lote do servidor; a <img> nasce com data-foto-auth (fotoImgSrcAttr).
+  if (window.cdbPhotoUpload && window.cdbPhotoUpload.ehFotoAutenticada(url)) return url;
   try {
     const u = new URL(url);
     return (u.protocol === 'https:' || u.protocol === 'data:') ? url : '';
   } catch { return ''; }
 }
 
+// #2459: a rota autenticada não aceita <img src> (sem header); hidratarFotos preenche depois.
+function fotoImgSrcAttr(url) {
+  return window.cdbPhotoUpload && window.cdbPhotoUpload.ehFotoAutenticada(url)
+    ? `data-foto-auth="${escapeHtml(url)}"`
+    : `src="${escapeHtml(url)}"`;
+}
+
 function etiquetaProducaoHtml(et, nota) {
   const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
   const { showQr, showBars: showBarcode } = scanModeFlags();
   const photoSrc = safePhotoUrl(et.photo);
-  const photo = photoSrc ? `<div class="et-photo-wrap"><img class="et-photo" src="${photoSrc}" alt="Foto do produto"/></div>` : '';
+  const photo = photoSrc ? `<div class="et-photo-wrap"><img class="et-photo" ${fotoImgSrcAttr(photoSrc)} alt="Foto do produto"/></div>` : '';
   const hasCodes = showQr || showBarcode;
   const horiz = currentEtqOrient === 'horizontal';
 
@@ -20440,7 +20450,9 @@ function etiquetasToPng(etiquetas, kind, note) {
       const img = new Image();
       img.onload = () => resolve(img);
       img.onerror = () => resolve(null);
-      img.src = et.photo;
+      // #2459: foto de lote do servidor vem por fetch com a chave do aparelho.
+      const fonte = window.cdbPhotoUpload ? window.cdbPhotoUpload.srcAutenticado(et.photo) : Promise.resolve(et.photo);
+      fonte.then(src => { if (src) img.src = src; else resolve(null); });
     });
   });
 
@@ -21138,6 +21150,7 @@ function refreshEtqPreview() {
     body.innerHTML = currentEtiquetas.map(et =>
       `<div class="etq-card-wrap"><div class="${cls}">${etiquetaProducaoHtml(et, nota)}</div></div>`
     ).join('');
+    if (window.cdbPhotoUpload) window.cdbPhotoUpload.hidratarFotos(body);
   }
   // setTimeout em vez de rAF: garante que o layout ja foi calculado antes de medir
   setTimeout(scaleEtqCards, 0);
@@ -23862,7 +23875,7 @@ window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.carregarFonte({ base: '
 <script src="impressora-tspl.js?v=20261112a"></script>
 <script src="queue-store.js?v=20260514a"></script>
 <script src="photo-store.js?v=20260514b"></script>
-<script src="upload-photos.js?v=20261112b"></script>
+<script src="upload-photos.js?v=20261113a"></script>
 <script src="sync.js?v=20261112a"></script>
 <script>
 // LiveUpdater (@capgo/capacitor-updater): notifica que o bundle subiu OK.
