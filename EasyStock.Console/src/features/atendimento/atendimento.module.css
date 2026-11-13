@@ -582,9 +582,9 @@
 }
 .chamarClienteNome { min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); color: var(--tinta-2); }
 
-/* #2232 (A2): a transferência é uma faixa de uma linha: quem passou e por quê. A direção vem de uma
-   barra lateral, com o canto dela quase reto (#2246). A frase longa fica no title. */
-/* #2420: a faixa vira um cartão âmbar com ícone, título, motivo e o Assumir dentro dele, à direita. */
+/* #2232 (A2): a transferência diz quem passou e por quê; a frase longa fica no title.
+   #2420: a faixa vira um cartão âmbar com ícone, título, motivo e o Assumir dentro dele, à direita.
+   Sem traço na borda; o fio curto em `.faixaTexto` é a divisória do mockup entre ícone e texto. */
 .modo:has(.faixaTransferencia) { padding-block: var(--e-2); }
 .modoLinha:has(.faixaTransferencia) {
   gap: 0 var(--e-3); overflow: hidden;

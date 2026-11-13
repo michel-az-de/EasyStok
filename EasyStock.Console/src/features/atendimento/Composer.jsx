@@ -255,8 +255,8 @@ export function Composer({
       )}
 
       {/* #1761 (L9): fixo acima do campo só perto do fim da janela de 24 h ou com ela fechada. */}
-      {/* #1839: com a janela fechada os modelos moram em Respostas, como no protótipo; o botão à
-          parte fica só no aviso de fim de janela, quando ainda dá para escrever. */}
+      {/* #1839: perto do fim da janela, quando ainda dá para escrever, o botão à parte fica aqui.
+          #2420: com a janela fechada, o Escolher modelo mora no aviso junto do campo, além de Respostas. */}
       {modelosFixos && podeEnviarModelo && podeEscrever && <Botao className={css.abrirModelos} aria-haspopup="dialog" onClick={aoAbrirModelos}>
         <Icone nome="modelo" /> Modelos aprovados
       </Botao>}
