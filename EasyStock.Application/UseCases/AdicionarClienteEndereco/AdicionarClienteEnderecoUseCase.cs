@@ -49,6 +49,8 @@ public class AdicionarClienteEnderecoUseCase(
         };
 
         await repo.AddEnderecoAsync(endereco);
+        cliente.AlteradoEm = agora;
+        await repo.UpdateAsync(cliente);
         await uow.CommitAsync();
 
         logger.LogInformation("Endereco {Id} adicionado ao cliente {ClienteId}.", endereco.Id, cliente.Id);

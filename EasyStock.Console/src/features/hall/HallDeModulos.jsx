@@ -91,7 +91,7 @@ export function HallDeModulos(props) {
 }
 
 function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, painel = null, chavePreferencia }) {
-  const { permite, aoSair, notificacoes, conta, acoes } = useAcessoModulos()
+  const { permite, aoSair, notificacoes, busca: buscaDaCasa, conta, acoes } = useAcessoModulos()
   const [busca, setBusca] = useState('')
   const [organizar, setOrganizar] = useState(false)
   const [preferenciaSalva, setPreferencia] = useState(() => lerPreferenciasHall(chavePreferencia))
@@ -178,6 +178,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         {/* #2232 (H1): uma marca só no canto, a da loja. */}
         <Marca compacta />
         <div className={css.acoes}>
+          {buscaDaCasa}
           {ajuda}
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
           {/* #1870: o Sair fica atrás do avatar, como no pé do trilho do Balcão e dos módulos.

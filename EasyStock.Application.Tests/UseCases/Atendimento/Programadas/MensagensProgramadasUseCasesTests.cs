@@ -44,11 +44,11 @@ public class MensagensProgramadasUseCasesTests
             new ResolvedorCanal([_whats, _sms]), Substitute.For<IOperacaoEventPublisher>(), _uow, _relogio,
             NullLogger<DispararMensagemProgramadaUseCase>.Instance);
 
-    private Conversa ConversaAberta(DateTime ultimaEntrada)
+    private Conversa ConversaAberta(DateTime ultimaEntrada, Guid? clienteId = null)
     {
         var conversa = Conversa.Abrir(_empresaId, "5511988887777", ultimaEntrada.AddMinutes(-1));
         conversa.RegistrarEntrada(ultimaEntrada);
-        conversa.VincularCliente(_cliente.Id);
+        conversa.VincularCliente(clienteId ?? _cliente.Id);
         _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(conversa);
         return conversa;
@@ -171,8 +171,7 @@ public class MensagensProgramadasUseCasesTests
         var antiga = Conversa.Abrir(_empresaId, "5511988887777", Agora.AddDays(-3));
         antiga.VincularCliente(_cliente.Id);
         antiga.Encerrar(Agora.AddDays(-2));
-        var alheia = ConversaAberta(Agora.AddHours(-1));
-        alheia.VincularCliente(Guid.NewGuid());
+        ConversaAberta(Agora.AddHours(-1), Guid.NewGuid());
         var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, antiga.Id, CanalConversa.WhatsApp,
             FinalidadeContato.Transacional, "Chegou o bolo", null, Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddDays(-3));
         mensagem.Reservar(Agora);

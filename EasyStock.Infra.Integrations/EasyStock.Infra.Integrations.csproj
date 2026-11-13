@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="EasyStock.Infra.Integrations.UnitTests" />
+    <InternalsVisibleTo Include="EasyStock.Api.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -9,7 +9,7 @@ using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 // #2007 (item 10): `Nivel` de quem envia decide o autor (Dona ou Atendente); sem ele, Dona, como antes.
-public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto, NivelAcesso? Nivel = null, bool Confirmada = false);
+public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto, NivelAcesso? Nivel = null, bool Confirmada = false, string? ChaveEnvio = null);
 
 public sealed record EnviarImagemConsoleCommand(
     Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda, NivelAcesso? Nivel = null);
@@ -59,12 +59,19 @@ public sealed class EnviarMensagemConsoleUseCase(
         var tag = TagHumanaForaDaJanela(conversa, canal, agora);
         GarantirJanela(conversa, agora, tag);
 
+        var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorDe(command.Nivel), agora,
+            TipoConteudoMensagem.Texto, texto);
+        mensagem.RegistrarChaveEnvio(command.ChaveEnvio);
+
         return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
             token => tag is not null && canal is ICanalComTagHumana comTag
                 ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, token)
                 : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, token),
-            externoId => Mensagem.Saida(command.EmpresaId, conversa.Id, AutorDe(command.Nivel), agora,
-                TipoConteudoMensagem.Texto, texto, externoId));
+            externoId =>
+            {
+                if (externoId is not null) mensagem.ConfirmarEnvio(externoId);
+                return mensagem;
+            });
     }
 
     public async Task<MensagemAtendimentoResult> EnviarImagemAsync(EnviarImagemConsoleCommand command, CancellationToken ct = default)

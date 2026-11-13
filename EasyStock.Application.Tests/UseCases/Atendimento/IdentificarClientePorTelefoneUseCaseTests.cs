@@ -25,6 +25,29 @@ public class IdentificarClientePorTelefoneUseCaseTests
     }
 
     [Fact]
+    public async Task TelefoneCompartilhadoFicaPendenteSemEscolherPrimeiroNemAlterarHash()
+    {
+        var donoOtp = ClienteEntity.Criar(_empresaId, "Ana");
+        donoOtp.TelefoneHash = ClienteOtp.CalcularTelefoneHash(TelefoneE164);
+        _clienteRepository.TemTelefoneCompartilhadoAsync(_empresaId,
+            Arg.Is<IReadOnlyList<string>>(t => t.Contains(TelefoneE164) && t.Contains("11997573992")),
+            Arg.Is<IReadOnlyList<string>>(h => h.Contains(donoOtp.TelefoneHash)), Arg.Any<CancellationToken>())
+            .Returns(true);
+        _clienteStorefrontRepository.GetByTelefoneHashAsync(_empresaId, donoOtp.TelefoneHash, Arg.Any<CancellationToken>())
+            .Returns(donoOtp);
+
+        var resultado = await _useCase.ExecuteAsync(new(_empresaId, WaId, "Outra pessoa"));
+
+        resultado.IdentidadePendente.Should().BeTrue();
+        resultado.Cliente!.Should().BeNull();
+        resultado.EhNovo.Should().BeFalse();
+        await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        await _clienteRepository.DidNotReceiveWithAnyArgs().UpdateAsync(default!);
+        await _clienteStorefrontRepository.DidNotReceiveWithAnyArgs().GetByTelefoneHashAsync(default, default!, default);
+        donoOtp.TelefoneHash.Should().Be(ClienteOtp.CalcularTelefoneHash(TelefoneE164));
+    }
+
+    [Fact]
     public async Task ConhecidoRetornaExistente()
     {
         var existente = ClienteEntity.Criar(_empresaId, "Maria Silva");
@@ -36,7 +59,7 @@ public class IdentificarClientePorTelefoneUseCaseTests
         var resultado = await _useCase.ExecuteAsync(
             new IdentificarClientePorTelefoneInput(_empresaId, WaId, "Maria do Zap"));
 
-        resultado.Cliente.Id.Should().Be(existente.Id);
+        resultado.Cliente!.Id.Should().Be(existente.Id);
         resultado.EhNovo.Should().BeFalse();
         resultado.EhLead.Should().BeFalse();
         await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
@@ -52,7 +75,7 @@ public class IdentificarClientePorTelefoneUseCaseTests
         var resultado = await _useCase.ExecuteAsync(
             new IdentificarClientePorTelefoneInput(_empresaId, WaId, null));
 
-        resultado.Cliente.Id.Should().Be(existente.Id);
+        resultado.Cliente!.Id.Should().Be(existente.Id);
         resultado.EhNovo.Should().BeFalse();
         resultado.EhLead.Should().BeTrue("OrderCount == 0 define lead");
     }
@@ -67,7 +90,7 @@ public class IdentificarClientePorTelefoneUseCaseTests
         var resultado = await _useCase.ExecuteAsync(
             new IdentificarClientePorTelefoneInput(_empresaId, WaId, null));
 
-        resultado.Cliente.Id.Should().Be(existente.Id);
+        resultado.Cliente!.Id.Should().Be(existente.Id);
         resultado.EhNovo.Should().BeFalse();
         await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
     }
@@ -108,7 +131,7 @@ public class IdentificarClientePorTelefoneUseCaseTests
         var resultado = await _useCase.ExecuteAsync(
             new IdentificarClientePorTelefoneInput(_empresaId, "551197573992", null));
 
-        resultado.Cliente.Id.Should().Be(existente.Id);
+        resultado.Cliente!.Id.Should().Be(existente.Id);
     }
 
     [Fact]
@@ -139,7 +162,7 @@ public class IdentificarClientePorTelefoneUseCaseTests
         var resultado = await _useCase.ExecuteAsync(
             new IdentificarClientePorTelefoneInput(_empresaId, WaId, "   "));
 
-        resultado.Cliente.Nome.Should().Be(IdentificarClientePorTelefoneUseCase.NomePadraoLead);
+        resultado.Cliente!.Nome.Should().Be(IdentificarClientePorTelefoneUseCase.NomePadraoLead);
     }
 
     [Theory]
@@ -167,6 +190,7 @@ public class IdentificarClientePorTelefoneUseCaseTests
     {
         var resultado = await _useCase.ExecuteAsync(new(_empresaId, WaId, "Nova cliente", ReutilizarCadastro: false));
         resultado.EhNovo.Should().BeTrue();
-        await _clienteRepository.Received(1).AddAsync(resultado.Cliente);
+        resultado.Cliente.Should().NotBeNull();
+        await _clienteRepository.Received(1).AddAsync(resultado.Cliente!);
     }
 }

@@ -5,6 +5,8 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { Modal } from '../../componentes/Modal'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { RegistrarAtraso } from './RegistrarAtraso'
 import {
   ETAPAS_KDS, avisoDeInicio, colunaDoStatusKds, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds,
 } from '../../dominio/kds'
@@ -20,6 +22,7 @@ import css from './cozinha.module.css'
 export function ComandaKds({
   pedido, agora, linhas, movendo, erro, aoAvancar, aoReimprimir, aoLimparErro, aoFechar, adiado = null, aoDesfazer = null,
 }) {
+  const { acoes } = useAcessoModulos()
   const proximo = proximoStatusKds(pedido.status)
   const aviso = avisoDeInicio(pedido, agora)
   const atual = ETAPAS_KDS.findIndex((e) => e.status === colunaDoStatusKds(pedido.status))
@@ -103,6 +106,7 @@ export function ComandaKds({
         ))}
 
         {pedido.observacoes && <p className={css.obsPedido}>{pedido.observacoes}</p>}
+        {acoes.gerenciarOcorrencias && <RegistrarAtraso key={pedido.id} pedidoId={pedido.id} />}
         {pedido.requerAprovacao && (
           <p className={css.motivoRecusa}>
             <Icone nome="alerta" tamanho={16} /> {pedido.motivoRequerAprovacao ?? 'Pedido aguarda aprovação da dona.'}

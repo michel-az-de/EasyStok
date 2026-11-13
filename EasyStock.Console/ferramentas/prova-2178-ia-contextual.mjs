@@ -143,6 +143,8 @@ const contexto = contextoDaSugestao(conversa, identidade)
 assert.ok(contexto?.chave.includes('m1'))
 assert.notEqual(contexto.chave, contextoDaSugestao(conversa, 'empresa-b:ana').chave)
 assert.notEqual(contexto.chave, contextoDaSugestao(conversa, 'empresa-a:bia').chave)
+for (const mudanca of [{ clienteId: 'outra-pessoa' }, { vinculoRevisao: 1 }, { estado: 'Com IA' }, { assumidaPorUsuarioId: 'outra-atendente' }])
+  assert.notEqual(contexto.chave, contextoDaSugestao({ ...conversa, ...mudanca }, identidade).chave, 'identidade e situação invalidam a sugestão')
 assert.notEqual(revisaoDoContexto(conversa), revisaoDoContexto({ ...conversa, mensagens: [...conversa.mensagens, { id: 'm2', dir: 'in', texto: 'Na verdade, quero retirar.' }] }))
 assert.notEqual(revisaoDoContexto(conversa), revisaoDoContexto({ ...conversa, mensagens: [{ ...conversa.mensagens[0], transcricao: 'Dois pratos.' }] }))
 const comPedido = { ...conversa, pedido: { pedidoId: 'p1', estado: 'aguardando', totalPagoApi: 0, itens: [] } }

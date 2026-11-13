@@ -48,7 +48,8 @@ public partial class AtendimentoConversasControllerTests
     // #1792: envio, reenvio e ações do console rodam em transação; o dublê executa o bloco.
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>()
         .SetupExecuteInTransactionSemRetry<MensagemAtendimentoResult>()
-        .SetupExecuteInTransactionSemRetry<ConversaSituacaoResult>();
+        .SetupExecuteInTransactionSemRetry<ConversaSituacaoResult>()
+        .SetupExecuteInTransactionSemRetry<ClienteDaConversaResult>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IAtendenteRepository _atendentes = Substitute.For<IAtendenteRepository>();
     private readonly ILinkCardapioConversaRepository _links = Substitute.For<ILinkCardapioConversaRepository>();
@@ -119,6 +120,32 @@ public partial class AtendimentoConversasControllerTests
     }
 
     [Fact]
+    public async Task ChaveDoEnvioVemDoHeaderEPermanenceNoPostENaListagem()
+    {
+        var conversa = ConversaComClienteAgora();
+        var chave = new string('a', 120);
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        _controller.Request.Headers["Idempotency-Key"] = chave;
+        var enviada = Dados<MensagemAtendimentoResult>(await _controller.EnviarMensagem(conversa.Id, new("Oi")));
+        enviada.ChaveEnvio.Should().Be(chave);
+        var listadas = Dados<IReadOnlyList<MensagemAtendimentoResult>>(await _controller.ListarMensagens(conversa.Id, null));
+        listadas.Should().ContainSingle(m => m.Id == enviada.Id && m.ChaveEnvio == chave);
+        _repositorio.Mensagens.Single(m => m.Id == enviada.Id).ChaveEnvio.Should().Be(chave);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(121)]
+    public async Task ChaveDoEnvioInvalidaNaoChamaCanal(int tamanho)
+    {
+        var conversa = ConversaComClienteAgora();
+        var enviar = () => _enviarUseCase.EnviarTextoAsync(new(_empresaId, _usuarioId, conversa.Id, "Oi",
+            ChaveEnvio: new string('a', tamanho)));
+        await enviar.Should().ThrowAsync<EasyStock.Domain.Exceptions.RegraDeDominioVioladaException>();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task EnviarMarcaAssumida()
     {
         var conversa = ConversaComClienteAgora();
@@ -126,6 +153,7 @@ public partial class AtendimentoConversasControllerTests
         var result = await _controller.EnviarMensagem(conversa.Id, new EnviarMensagemConsoleBody("Oi Maria, é a Baba!"), default);
 
         result.Should().BeOfType<OkObjectResult>();
+        Dados<MensagemAtendimentoResult>(result).ChaveEnvio.Should().BeNull();
         await _canal.Received(1).EnviarTextoAsync(WaId, "Oi Maria, é a Baba!", Arg.Any<CancellationToken>());
         conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
         conversa.AssumidaPorUsuarioId.Should().Be(_usuarioId);
@@ -660,12 +688,13 @@ public partial class AtendimentoConversasControllerTests
         var conversa = ConversaDoSite();
 
         var dados = Dados<ClienteDaConversaResult>(await _controller.CadastrarCliente(
-            conversa.Id, new CadastrarClienteConversaBody("Maria Souza", "(11) 98765-4321", null), CadastroDoCliente().UseCase, default));
+            conversa.Id, new CadastrarClienteConversaBody(conversa.ClienteId, conversa.VinculoRevisao, "Maria Souza", "(11) 98765-4321", null), CadastroDoCliente().UseCase, default));
 
         dados.Nome.Should().Be("Maria Souza");
         dados.Telefone.Should().Be("+5511987654321");
         dados.Novo.Should().BeTrue();
         conversa.ClienteId.Should().Be(dados.ClienteId);
+        dados.VinculoRevisao.Should().Be(conversa.VinculoRevisao);
     }
 
     [Fact]
@@ -674,7 +703,7 @@ public partial class AtendimentoConversasControllerTests
         var conversa = ConversaDoSite();
 
         var result = await _controller.CadastrarCliente(
-            conversa.Id, new CadastrarClienteConversaBody("Maria", null, null), CadastroDoCliente().UseCase, default);
+            conversa.Id, new CadastrarClienteConversaBody(conversa.ClienteId, conversa.VinculoRevisao, "Maria", null, null), CadastroDoCliente().UseCase, default);
 
         result.Should().BeOfType<BadRequestObjectResult>();
         conversa.ClienteId.Should().BeNull();
@@ -687,7 +716,7 @@ public partial class AtendimentoConversasControllerTests
         var conversa = ConversaDoSite();
 
         var result = await _controller.CadastrarCliente(
-            conversa.Id, new CadastrarClienteConversaBody("Maria", "11987654321", null), CadastroDoCliente().UseCase, default);
+            conversa.Id, new CadastrarClienteConversaBody(conversa.ClienteId, conversa.VinculoRevisao, "Maria", "11987654321", null), CadastroDoCliente().UseCase, default);
 
         result.Should().BeOfType<ForbidResult>();
         conversa.ClienteId.Should().BeNull();
@@ -696,10 +725,64 @@ public partial class AtendimentoConversasControllerTests
     [Fact]
     public async Task CadastrarClienteConversaInexistente404()
     {
+        var ausente = Conversa.Abrir(_empresaId, "visitante-ausente", DateTime.UtcNow, canal: CanalConversa.ChatSite);
         var result = await _controller.CadastrarCliente(
-            Guid.NewGuid(), new CadastrarClienteConversaBody("Maria", "11987654321", null), CadastroDoCliente().UseCase, default);
+            ausente.Id, new CadastrarClienteConversaBody(ausente.ClienteId, ausente.VinculoRevisao, "Maria", "11987654321", null), CadastroDoCliente().UseCase, default);
 
         result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CadastrarFichaAnteriorATrocaOuAbaDevolve409SemEscrever(bool restaurarOriginal)
+    {
+        var conversa = ConversaDoSite();
+        var original = Guid.NewGuid();
+        conversa.VincularCliente(original);
+        var body = new CadastrarClienteConversaBody(conversa.ClienteId, conversa.VinculoRevisao,
+            "Nome antigo", "11911112222", new EnderecoDaConversaInput("01310100", "Rua antiga", "10", null, "Centro"));
+        conversa.CorrigirVinculoCliente(null, conversa.VinculoRevisao);
+        conversa.CorrigirVinculoCliente(Guid.NewGuid(), conversa.VinculoRevisao);
+        if (restaurarOriginal)
+        {
+            conversa.CorrigirVinculoCliente(null, conversa.VinculoRevisao);
+            conversa.CorrigirVinculoCliente(original, conversa.VinculoRevisao);
+        }
+        var (useCase, clientes) = CadastroDoCliente();
+
+        var result = await _controller.CadastrarCliente(conversa.Id, body, useCase, default);
+
+        result.Should().BeOfType<ConflictObjectResult>().Which.Value.Should().BeOfType<ApiErrorResponse>()
+            .Which.Error.Code.Should().Be(CadastroClienteConversaAlteradoException.Codigo);
+        await clientes.DidNotReceive().UpdateAsync(Arg.Any<ClienteEntity>());
+        await clientes.DidNotReceive().AddAsync(Arg.Any<ClienteEntity>());
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Theory]
+    [InlineData("{\"vinculoRevisao\":0}")]
+    [InlineData("{\"clienteId\":null}")]
+    public void CadastroExigePresencaDosDoisCamposDoSnapshot(string json)
+    {
+        var ler = () => System.Text.Json.JsonSerializer.Deserialize<CadastrarClienteConversaBody>(json,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+        ler.Should().Throw<System.Text.Json.JsonException>();
+    }
+
+    [Fact]
+    public void CadastroSemVinculoAceitaClienteIdExplicitamenteNulo()
+    {
+        var conversa = ConversaDoSite();
+        var json = System.Text.Json.JsonSerializer.Serialize(new { conversa.ClienteId, conversa.VinculoRevisao });
+
+        var body = System.Text.Json.JsonSerializer.Deserialize<CadastrarClienteConversaBody>(json,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+        body.Should().NotBeNull();
+        body!.ClienteId.Should().BeNull();
+        body.VinculoRevisao.Should().Be(conversa.VinculoRevisao);
     }
 
     // #1430: o telefone do formulário do chat do site já é de um cadastro. 409 com o nome, e nada é ligado
@@ -722,7 +805,7 @@ public partial class AtendimentoConversasControllerTests
         var (conversa, existente, useCase) = VisitanteComTelefoneDeCadastro();
 
         var result = await _controller.CadastrarCliente(
-            conversa.Id, new CadastrarClienteConversaBody("Maria do site", "+5511987654321", null, "maria@exemplo.com"), useCase, default);
+            conversa.Id, new CadastrarClienteConversaBody(conversa.ClienteId, conversa.VinculoRevisao, "Maria do site", "+5511987654321", null, "maria@exemplo.com"), useCase, default);
 
         var erro = result.Should().BeOfType<ConflictObjectResult>().Which.Value.Should().BeOfType<ApiErrorResponse>().Which.Error;
         erro.Code.Should().Be(TelefoneJaCadastradoException.Codigo);
@@ -738,7 +821,7 @@ public partial class AtendimentoConversasControllerTests
 
         var dados = Dados<ClienteDaConversaResult>(await _controller.CadastrarCliente(
             conversa.Id,
-            new CadastrarClienteConversaBody("Maria do site", "+5511987654321", null, "maria@exemplo.com", ConfirmarVinculoExistente: true),
+            new CadastrarClienteConversaBody(conversa.ClienteId, conversa.VinculoRevisao, "Maria do site", "+5511987654321", null, "maria@exemplo.com", ConfirmarVinculoExistente: true),
             useCase, default));
 
         dados.ClienteId.Should().Be(existente.Id);

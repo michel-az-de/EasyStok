@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Vazio } from '../../componentes/Vazio'
@@ -136,12 +136,19 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
   // #2227: antes da primeira leitura a lista vazia não é "nenhuma conversa".
   const carga = cargaDaLista({ fonteApi, estado: sincronizacao?.estado, total: conversas.length })
   const vazia = lista.length === 0 && !carga
+  const rolagem = useRef(null)
+  const chaveDaLista = JSON.stringify([filtros.busca, filtros.aba, filtros.canais, filtros.ordenacao, filtros.responsavel])
+  useLayoutEffect(() => {
+    if (!carga && rolagem.current) rolagem.current.scrollTop = filtros.posicao ?? 0
+  }, [carga, chaveDaLista])
 
   return (
     <>
       <BarraBalcao filtros={filtros} aoMudar={mudarFiltro} acoesCabecalho={acoesCabecalho} semContagem={Boolean(carga)} />
       <NaoEntregues aoAbrir={aoAbrir} />
       <div
+        ref={rolagem}
+        onScroll={e => mudarFiltro('posicao', e.currentTarget.scrollTop)}
         className={css.rolagem}
         onMouseEnter={travar}
         onMouseLeave={destravarComAtraso}

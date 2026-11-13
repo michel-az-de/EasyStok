@@ -113,13 +113,13 @@ await provar('hash/histórico usam rotas existentes; origem inválida volta ao c
   assert.deepEqual(destinos.map(hash => rotaDaHash(hash, { fonteApi: true }).tipo), ['hall', 'principal', 'cozinha', 'entregas', 'principal', 'hall'])
   assert.equal(contextoDaAjuda({ tipo: 'foo', modulo: 'https://invalido/?token=secreto' }, true).titulo, 'Início') // #2258 (auditoria T9): a home se chama Início
 })
-// #1891: a produção antiga da Cozinha (Em preparação) está congelada; a rota cai na Fila de preparo
-// e a ajuda é a da Fila, sem atalho para outro módulo.
-await provar('produção antiga da Cozinha congelada: a rota cai na Fila e a ajuda é a da Fila', () => {
+// #2395 (N01): rota congelada volta ao início com aviso explícito.
+await provar('produção antiga da Cozinha congelada: a rota avisa e a ajuda é a do Início', () => {
   const caminho = rotaDaHash('#/m/cozinha/producao', { fonteApi: true })
-  assert.equal(caminho.tela, 'fila')
+  assert.equal(caminho.tipo, 'hall')
+  assert.match(caminho.aviso, /não existe ou não está disponível/)
   const api = contextoDaAjuda(caminho, true)
-  assert.equal(api.titulo, 'Cozinha · Fila de preparo')
+  assert.equal(api.titulo, 'Início')
   assert.equal(api.atalho, null)
   assert.equal(contextoDaAjuda(caminho, false).atalho, null)
 })

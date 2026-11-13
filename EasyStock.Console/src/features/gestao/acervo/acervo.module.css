@@ -29,6 +29,7 @@
 .porcaoUnica { padding: 4px var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-pilula); color: var(--tinta); }
 .tamanhos { display: flex; flex-wrap: wrap; gap: var(--e-1); }
 .tamanhos button { min-height: 32px; padding: 4px var(--e-3); color: var(--tinta); background: transparent; border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-pilula); font: inherit; font-size: var(--t-apoio); cursor: pointer; }
+@media (max-width: 759px), (pointer: coarse) { .tamanhos button { min-height: var(--toque); } }
 .tamanhos button[aria-pressed="true"] { color: var(--marca-forte); background: var(--marca-claro); border-color: var(--marca); font-weight: 650; }
 .tamanhos button:focus-visible, .trocar:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .trocar { display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding: 0; border: 0; background: transparent; color: var(--marca-forte); font: inherit; font-size: var(--t-apoio); font-weight: 600; cursor: pointer; }

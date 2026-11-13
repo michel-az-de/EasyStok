@@ -416,6 +416,15 @@ public class AuthController(
             portaDeEntrada = modulos.Any(m => m.id == inicial && m.liberado) ? inicial : null,
             acoes = new
             {
+                verCadastrosFinanceiros = Application.UseCases.Financeiro.Cadastros.CadastrosFinanceirosUseCase.PodeVer(usuario),
+                gerenciarCadastrosFinanceiros = Application.UseCases.Financeiro.Cadastros.CadastrosFinanceirosUseCase.PodeGerenciar(usuario),
+                verCadastrosProdutos = modulos.Any(m => m.id == "cardapio" && m.liberado),
+                verCadastrosEtiquetas = modulos.Any(m => m.id == "producao" && m.liberado),
+                editarCadastrosProdutos = (gerente || usuario.Nivel == NivelAcesso.Operador) && modulos.Any(m => m.id == "cardapio" && m.liberado),
+                verCadastrosFornecedores = usuario.EmpresaId != Guid.Empty && (gerente || usuario.Nivel == NivelAcesso.Operador),
+                editarCadastrosFornecedores = usuario.EmpresaId != Guid.Empty && gerente,
+                verModelosNotificacao = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin && modulos.Any(m => m.id == "configuracoes" && m.liberado),
+                corrigirVinculoClienteConversa = Application.UseCases.Atendimento.ClienteDaConversa.VinculoClienteConversaUseCase.PodeCorrigir(usuario),
                 editarCardapio = gerente && modulos.Any(m => m.id == "cardapio" && m.liberado),
                 editarProducao = gerente && modulos.Any(m => m.id == "producao" && m.liberado),
                 gerenciarCaixa = gerente && modulos.Any(m => m.id == "financeiro" && m.liberado),

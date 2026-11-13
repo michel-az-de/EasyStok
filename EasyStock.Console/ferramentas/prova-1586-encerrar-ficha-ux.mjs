@@ -1,3 +1,4 @@
+import { comSnapshotDaFicha } from './snapshotDaFichaNaProva.mjs'
 /* eslint-disable no-console */
 // Prova da issue #1586 (banca de navegação e UX de 2026-10-11): encerramento, ficha e dinheiro
 // com o retorno no lugar da ação. No modo API a faixa do rodapé fica atrás da cortina do modal.
@@ -66,10 +67,12 @@ globalThis.__prova1586 = ctx
 
 const codigo = (texto) => 'data:text/javascript,' + encodeURIComponent(texto)
 const REACT = 'const h=globalThis.__prova1586.hooks; export const useState=h.useState,useRef=h.useRef,useId=h.useId,'
-  + 'useMemo=h.useMemo,useEffect=h.useEffect,useLayoutEffect=h.useEffect,useCallback=(f)=>f,forwardRef=(f)=>f,memo=(f)=>f,createContext=(defaultValue)=>({defaultValue}),useContext=(c)=>c.defaultValue'
+  + 'useMemo=h.useMemo,useEffect=h.useEffect,useLayoutEffect=h.useEffect,useCallback=(f)=>f,useSyncExternalStore=(_,getSnapshot)=>getSnapshot(),forwardRef=(f)=>f,memo=(f)=>f,createContext=(defaultValue)=>({defaultValue}),useContext=(c)=>c.defaultValue'
 const fronteiras = new Map([
   ['/aplicacao/contextos', 'const c=globalThis.__prova1586; export const useAtendimento=()=>c.atendimento, useCatalogo=()=>c.catalogo, useAcoes=()=>c.acoes'],
   ['/aplicacao/acessoModulos', 'export const useAcessoModulos=()=>({acoes:{cancelarPedidoPago:true}})'],
+  // O caso cobre recusa/preservação da baixa, com Pix disponível; o catálogo tem prova própria.
+  ['/aplicacao/useMetodosPagamento', 'export const useMetodosPagamento=()=>({opcoes:[{valor:"pix",rotulo:"Pix"}],carregando:false,erro:null})'],
   // #2185 (F32): o modal avisa quando a conversa deixa de estar aberta; a casca genérica devolveria `null` no gancho.
   ['/componentes/Aviso', 'export const useAviso=()=>({mostrar(){},dispensar(){}}); export function ProvedorDeAviso(){return null}'],
 ])
@@ -170,7 +173,7 @@ function montarAcoes() {
     conversaBase({ id: 'pg', pedido: pedidoDaApi(PEDIDO_NA_ENTREGA) }),
     conversaBase({ id: 'lead', conta: 'lead', clienteId: null, nomeDaDona: true, cliente: { telefone: null, endereco: null, enderecoCapturado: 'Rua X, 1, Centro, 01001-000', telefoneCanal: '5511988887777', notas: [], tags: [] } }),
   ] } }
-  const api = comApi({}, { despachar: (d) => despachos.push(d), agoraRef: { current: AGORA }, estadoRef })
+  const api = comSnapshotDaFicha(comApi({}, { despachar: (d) => despachos.push(d), agoraRef: { current: AGORA }, estadoRef }), estadoRef.current.conversas)
   chamadas.length = 0
   return { api, despachos }
 }

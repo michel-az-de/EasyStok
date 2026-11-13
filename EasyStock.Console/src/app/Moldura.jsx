@@ -140,7 +140,7 @@ const MODULO_COZINHA = moduloPorId('cozinha')
 function Cabecalho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, aoAbrirAjuda, atendente = null,
 }) {
-  const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
+  const { permite, notificacoes, busca, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   const compacto = useTopoCompacto()
   const celular = useTamanhoTela() === CELULAR
   const botaoMaisRef = useRef(null)
@@ -159,6 +159,7 @@ function Cabecalho({
         {/* Sininho é o primeiro do grupo, à esquerda de Automáticas (seção 8
             da direção visual). A faixa de lembretes abaixo do topo saiu. */}
         <Sininho comRotulo={!compacto} />
+        {busca}
         {notificacoes}
         {/* #2232 (L2): no celular a Cozinha era um ícone solto; ela passa a item com nome no Mais. */}
         {!celular && permite('cozinha') && <Botao variante="texto" onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
@@ -240,7 +241,7 @@ function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
   atendente, aoAbrirAjuda, disposicao,
 }) {
-  const { permite, notificacoes, aoSair, sessaoPersistente, conta } = useAcessoModulos()
+  const { permite, notificacoes, busca, aoSair, sessaoPersistente, conta } = useAcessoModulos()
   return (
     <nav className={css.trilho} aria-label="Navegação">
       <a className={css.inicioTrilho} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
@@ -285,7 +286,7 @@ function Trilho({
       {/* #1807: Avisos (sino) e Lembretes (relógio) com ícone e rótulo próprios, cada rótulo
           dentro do próprio botão. Antes o "Lembretes" vinha de CSS e ficava colado ao sino de
           Avisos logo abaixo, e quem clicava em Avisos abria Lembretes. */}
-      <div className={css.avisosTrilho}>{notificacoes}</div>
+      <div className={css.avisosTrilho}>{busca}{notificacoes}</div>
       <div className={css.sinoTrilho}><Sininho comRotulo /></div>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda">
         <MarcaIcone nome="informacao" tamanho={24} /><span>Ajuda</span>

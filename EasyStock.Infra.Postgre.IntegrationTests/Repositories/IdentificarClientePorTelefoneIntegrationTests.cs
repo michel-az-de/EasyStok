@@ -43,7 +43,7 @@ public class IdentificarClientePorTelefoneIntegrationTests(PostgreSqlDatabaseFix
             var primeira = await CriarUseCase(db).ExecuteAsync(new IdentificarClientePorTelefoneInput(empresaId, waId, "Fulano"));
             await db.SaveChangesAsync();
             primeira.EhNovo.Should().BeTrue();
-            clienteId = primeira.Cliente.Id;
+            clienteId = primeira.Cliente!.Id;
         }
 
         await using (var db = fixture.CreateDbContext())
@@ -57,7 +57,7 @@ public class IdentificarClientePorTelefoneIntegrationTests(PostgreSqlDatabaseFix
             var segunda = await CriarUseCase(db).ExecuteAsync(new IdentificarClientePorTelefoneInput(empresaId, waId, "Fulano"));
             segunda.EhNovo.Should().BeFalse();
             segunda.EhLead.Should().BeTrue();
-            segunda.Cliente.Id.Should().Be(clienteId);
+            segunda.Cliente!.Id.Should().Be(clienteId);
         }
     }
 
@@ -82,7 +82,7 @@ public class IdentificarClientePorTelefoneIntegrationTests(PostgreSqlDatabaseFix
             db.SetMobileTenantContext(empresaId);
             var resultado = await CriarUseCase(db).ExecuteAsync(
                 new IdentificarClientePorTelefoneInput(empresaId, "5511977776666", "Maria"));
-            resultado.Cliente.Id.Should().Be(cadastrado.Id);
+            resultado.Cliente!.Id.Should().Be(cadastrado.Id);
             resultado.EhNovo.Should().BeFalse();
             resultado.EhLead.Should().BeFalse();
         }

@@ -41,6 +41,8 @@ public class AdicionarClienteTelefoneUseCase(
         };
 
         await repo.AddTelefoneAsync(tel);
+        cliente.AlteradoEm = agora;
+        await repo.UpdateAsync(cliente);
         await uow.CommitAsync();
 
         logger.LogInformation("Telefone {Id} adicionado ao cliente {ClienteId}.", tel.Id, cliente.Id);

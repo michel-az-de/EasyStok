@@ -51,7 +51,7 @@ public sealed class CriarPedidoFerramenta(
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
         var conversa = contexto.Conversa;
-        if (conversa.ClienteId is not { } clienteId)
+        if (contexto.ClienteIdEsperado is not { } clienteId)
             return Erro("cliente_nao_identificado");
 
         var itens = LerItens(entrada);
@@ -96,11 +96,18 @@ public sealed class CriarPedidoFerramenta(
         {
             reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
                 contexto.EmpresaId, conversa.Id, clienteId, itens, janelaId.Value, dataEntrega, enderecoId.Value,
-                FerramentaJson.LerTexto(entrada, "observacoes")), ct);
+                FerramentaJson.LerTexto(entrada, "observacoes"),
+                VinculoRevisaoEsperada: contexto.VinculoRevisaoEsperada,
+                SituacaoEsperada: contexto.SituacaoEsperada), ct);
         }
         catch (ClienteBloqueadoException)
         {
             return Erro(ClienteBloqueadoException.CodigoErro);
+        }
+        catch (ContextoPedidoAtendimentoAlteradoException)
+        {
+            contexto.Interromper();
+            return Erro("contexto_alterado");
         }
         catch (RegraDeDominioVioladaException ex)
         {

@@ -1,0 +1,5 @@
+.busca { min-height: 20rem; }
+.busca p { color: var(--tinta-2); }
+.busca [role="listbox"] { position: static; }
+.busca [role="option"] > span { min-width: 0; overflow-wrap: anywhere; }
+.detalhe { overflow-wrap: anywhere; }

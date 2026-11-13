@@ -21,6 +21,7 @@ public class ListarConversasAtendimentoUseCaseTests
         var repo = Substitute.For<IConversaRepository>();
         var config = Substitute.For<IConfiguracaoAtendimentoRepository>();
         var conversa = Conversa.Abrir(empresa, "5511999990001", DateTime.UtcNow);
+        conversa.ExigirConferenciaCliente();
         conversa.Assumir(DateTime.UtcNow, Guid.NewGuid());
         var alheia = Conversa.Abrir(Guid.NewGuid(), "5511999990002", DateTime.UtcNow);
         repo.ListarInboxAsync(default, default, default, default, default, default, default)
@@ -39,6 +40,8 @@ public class ListarConversasAtendimentoUseCaseTests
         resumo.AguardaResposta.Should().BeTrue();
         resumo.AssumidaPorNome.Should().Be("Ana");
         resumo.AssumidaPorUsuarioId.Should().Be(conversa.AssumidaPorUsuarioId);
+        resumo.VinculoEmRevisao.Should().BeTrue();
+        resumo.VinculoRevisao.Should().Be(1);
     }
 
     [Fact]

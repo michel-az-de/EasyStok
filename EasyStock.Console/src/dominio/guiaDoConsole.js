@@ -5,6 +5,14 @@ import { moduloDaRota } from './acessoModulos'
 import { hashDoModulo, modulosDoHall } from './modulos'
 
 const PASSOS_POR_TELA = {
+  cadastros: {
+    clientes: 'Em Leads e clientes, busque a pessoa, confira os contatos e volte à conversa quando necessário.',
+    produtos: 'Em Produtos, confira os dados e a situação antes de salvar o cadastro.',
+    fornecedores: 'Em Fornecedores, mantenha contatos e condições de compra.',
+    bancos: 'Em Contas bancárias, confira os dados da conta antes de salvar ou inativar.',
+    pagamentos: 'Em Formas de pagamento, escolha os métodos disponíveis para recebimento.',
+    modelos: 'Em Modelos, confira a prévia e aprove a versão para publicá-la na loja.',
+  },
   entregas: {
     painel: 'No Painel de entregas, acompanhe os pedidos e as viagens do dia.',
     agenda: 'Na Agenda de encomendas, veja as reservas dos próximos sete dias.',
@@ -19,6 +27,10 @@ const PASSOS_POR_TELA = {
 }
 
 export const GUIA_POR_MODULO = {
+  cadastros: {
+    faz: 'Pessoas, produtos, fornecedores e dados usados no atendimento e na operação da loja.',
+    passos: Object.values(PASSOS_POR_TELA.cadastros),
+  },
   atendimento: {
     faz: 'Conversas com os clientes, a ficha de cada um e a comanda do pedido, tudo na tela Conversas.',
     passos: [

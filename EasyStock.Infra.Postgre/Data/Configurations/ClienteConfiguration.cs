@@ -6,6 +6,8 @@
         {
             builder.ToTable("clientes");
             builder.HasKey(c => c.Id);
+            builder.Property(c => c.Revisao).HasColumnName("xmin").HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
             builder.Property(c => c.Nome).IsRequired().HasMaxLength(150);
             builder.Property(c => c.FotoChave).HasMaxLength(512);
             builder.Property(c => c.Apt).HasMaxLength(32);

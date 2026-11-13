@@ -49,7 +49,8 @@ public sealed class IniciarCheckoutUseCase(
     public async Task<CheckoutCriadoDto> ExecuteAsync(
         IniciarCheckoutInput input,
         CancellationToken ct = default,
-        Func<Guid, CancellationToken, Task>? pedidoCriado = null)
+        Func<Guid, CancellationToken, Task>? pedidoCriado = null,
+        Func<CancellationToken, Task>? antesCriarPedido = null)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -74,26 +75,37 @@ public sealed class IniciarCheckoutUseCase(
         // FASES 1 e 2 — Pedido (Rascunho) + vaga → AguardandoPagamento (S10)
         // ═══════════════════════════════════════════════════════════════════
 
-        var reservado = await checkoutCore.CriarPedidoComReservaAsync(
-            new CheckoutCoreInput(
-                ClienteId: input.ClienteId,
-                Itens: input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList(),
-                JanelaId: input.JanelaId,
-                DataEntrega: input.DataEntrega,
-                Cep: input.Cep,
-                Origem: OrigemPedido.Storefront,
-                Slug: input.Slug,
-                Observacoes: input.Observacoes, Numero: input.Numero, EnderecoEntrega: input.EnderecoEntrega),
-            ct);
+        async Task<PedidoReservado> CriarAsync(CancellationToken token)
+        {
+            if (antesCriarPedido is not null) await antesCriarPedido(token);
+            var criado = await checkoutCore.CriarPedidoComReservaAsync(
+                new CheckoutCoreInput(
+                    ClienteId: input.ClienteId,
+                    Itens: input.Items!.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd)).ToList(),
+                    JanelaId: input.JanelaId,
+                    DataEntrega: input.DataEntrega,
+                    Cep: input.Cep,
+                    Origem: OrigemPedido.Storefront,
+                    Slug: input.Slug,
+                    Observacoes: input.Observacoes, Numero: input.Numero, EnderecoEntrega: input.EnderecoEntrega),
+                ct);
+            var pedidoNovo = criado.Pedido;
+            var loja = criado.Storefront;
+
+            // #1226: mesma conversão da campanha que o pedido da conversa (S30). A requisição é do cliente do
+            // site, sem tenant do ERP: o da loja liga o filtro e a RLS. Commit antes da fase 3, que pode falhar
+            // com o pedido já criado.
+            tenantContext.SetCurrentTenant(loja.EmpresaId);
+            await atribuicaoCampanha.AtribuirAsync(loja.EmpresaId, input.ClienteId, pedidoNovo.Id, ct);
+            await unitOfWork.CommitAsync();
+
+            if (pedidoCriado is not null) await pedidoCriado(pedidoNovo.Id, token);
+            return criado;
+        }
+        var reservado = antesCriarPedido is null ? await CriarAsync(ct)
+            : await unitOfWork.ExecuteInTransactionSemRetryAsync(CriarAsync, ct);
         var pedido = reservado.Pedido;
         var storefront = reservado.Storefront;
-
-        // #1226: mesma conversão da campanha que o pedido da conversa (S30). A requisição é do cliente do
-        // site, sem tenant do ERP: o da loja liga o filtro e a RLS. Commit antes da fase 3, que pode falhar
-        // com o pedido já criado.
-        tenantContext.SetCurrentTenant(storefront.EmpresaId);
-        await atribuicaoCampanha.AtribuirAsync(storefront.EmpresaId, input.ClienteId, pedido.Id, ct);
-        await unitOfWork.CommitAsync();
 
         // ═══════════════════════════════════════════════════════════════════
         // FASE 3 — Criar Preference MP (fora de transação, timeout 5 s)
@@ -101,7 +113,6 @@ public sealed class IniciarCheckoutUseCase(
 
         // S11: a cobrança passa pelo mesmo use case da conversa e grava a CobrancaPedido. Falha ou timeout
         // do MP → a cobrança desfaz pedido e vaga e relança MercadoPagoIndisponivelException (503, #1301).
-        if (pedidoCriado is not null) await pedidoCriado(pedido.Id, ct);
         var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: input.ConversaId, ct);
         var initPointUrl = cobranca.LinkPagamento!;
 

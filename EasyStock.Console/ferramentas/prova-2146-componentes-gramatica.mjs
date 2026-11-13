@@ -108,15 +108,23 @@ if (!pastaDoPlaywright) {
     await contexto.route(`${ORIGEM}/**`, (rota) => {
       const url = new URL(rota.request().url())
       if (url.pathname.startsWith('/api/')) return rota.fulfill({ json: { data: [] } })
+      // #2254: o build publica JS/CSS separados; servir HTML para assets impede o React de montar.
+      if (url.pathname.startsWith('/assets/')) {
+        const contentType = url.pathname.endsWith('.js') ? 'text/javascript' : url.pathname.endsWith('.css') ? 'text/css' : undefined
+        return rota.fulfill({ body: readFileSync(join(pasta, url.pathname.slice(1))), contentType })
+      }
       return rota.fulfill({ body: html, contentType: 'text/html' })
     })
     const pagina = await contexto.newPage()
     await pagina.goto(`${ORIGEM}/#/m/atendimento`)
+    await pagina.getByRole('button', { name: /^Todas/ }).click()
     const cartao = pagina.locator('button[aria-current]').filter({ has: pagina.locator('time') }).filter({ hasText: 'José Moretti' })
     if (celular) await cartao.tap()
     else await cartao.click()
     const campo = pagina.getByRole('textbox', { name: 'Mensagem para o cliente' })
     await campo.waitFor()
+    const dispensarAvisos = pagina.getByRole('button', { name: 'Dispensar avisos do aparelho' })
+    if (await dispensarAvisos.isVisible()) await dispensarAvisos.click()
     const composer = pagina.locator('[class*="_composer_"]').filter({ has: campo }).last()
     return { contexto, pagina, campo, composer }
   }

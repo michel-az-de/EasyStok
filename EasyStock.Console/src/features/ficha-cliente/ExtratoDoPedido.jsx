@@ -21,7 +21,7 @@ export function ExtratoDoPedido({ pedido, aDevolver = 0 }) {
         {extrato.frete > 0 && <div><dt>Frete</dt><dd>{moeda(extrato.frete)}</dd></div>}
         <div className={css.extratoTotal}><dt>{extrato.cancelado ? 'Total original' : 'Total'}</dt><dd>{moeda(extrato.total)}</dd></div>
         {extrato.pagamentos.map((p) => (
-          <div key={p.id}><dt>{p.em ? quando(p.em) : 'Pagamento'} · {nomeDoMeio(p.meio)}</dt><dd>− {moeda(p.valor)}</dd></div>
+          <div key={p.id}><dt>{p.em ? quando(p.em) : 'Pagamento'} · {nomeDoMeio(p.meio)}{p.autorNome && <> · {p.autorNome}</>}</dt><dd>− {moeda(p.valor)}</dd></div>
         ))}
         {extrato.ajuste !== 0 && <div><dt>Ajuste de saldo</dt><dd>{extrato.ajuste < 0 ? '+ ' : '− '}{moeda(Math.abs(extrato.ajuste))}</dd></div>}
         {extrato.cancelado && extrato.pago > 0 && <div><dt>Saldo em pagamentos e créditos</dt><dd>{moeda(extrato.pago)}</dd></div>}

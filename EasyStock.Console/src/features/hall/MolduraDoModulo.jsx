@@ -47,7 +47,7 @@ function voltarAoBalcao(fonteApi) {
 }
 
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, ajuda, children }) {
-  const { permite, aoSair, sessaoPersistente, notificacoes, acoes, conta } = useAcessoModulos()
+  const { permite, aoSair, sessaoPersistente, notificacoes, busca, acoes, conta } = useAcessoModulos()
   const modulo = moduloPorId(moduloId)
   const telas = telasDoMenu(modulo, { fonteApi, acoes })
   const tela = telas.find((t) => t.id === telaId) ?? null
@@ -111,6 +111,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
           )}
         </div>
         <div className={css.acoes}>
+          {busca}
           {ajuda}
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
           {/* #2258 (auditoria A9, G4): tema e Sair moram só atrás do avatar, como no Balcão. Com o trilho à vista

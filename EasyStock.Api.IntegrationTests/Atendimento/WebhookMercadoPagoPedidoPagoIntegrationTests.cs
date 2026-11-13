@@ -126,6 +126,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
 
         using var gerar = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/pedido", new
         {
+            clienteId = c.ClienteId, vinculoRevisao = c.VinculoRevisao,
             itens = new[] { new { cardapioItemId = c.CardapioItemId, qtd = 2 } },
             janelaId = c.JanelaId,
             dataEntrega = c.DataEntrega.ToString("yyyy-MM-dd"),

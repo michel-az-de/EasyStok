@@ -91,7 +91,7 @@ await confere('prazo: chamada com prazoMs usa o prazo próprio e as rotas de IA 
   }
 })
 
-await confere('escrita sem resposta no prazo vira erro status 0 com a frase da casa', async () => {
+for (const keepalive of [false, true]) await confere(`escrita ${keepalive ? 'com' : 'sem'} keepalive sem resposta no prazo vira SEM_RESPOSTA com a frase da casa`, async () => {
   const original = AbortSignal.timeout
   const pedidos = []
   AbortSignal.timeout = (ms) => { pedidos.push(ms); return original.call(AbortSignal, 5) }
@@ -101,7 +101,7 @@ await confere('escrita sem resposta no prazo vira erro status 0 com a frase da c
   })
   try {
     const corrida = Promise.race([
-      chamarApi('/api/x', { metodo: 'POST', corpo: {} }).then(() => null, (e) => e),
+      chamarApi('/api/x', { metodo: 'POST', corpo: {}, keepalive }).then(() => null, (e) => e),
       new Promise((resolver) => setTimeout(() => resolver('pendurada'), 300)),
     ])
     const erro = await corrida
@@ -132,6 +132,52 @@ function cenario(falhaDoPost) {
   const acoes = criarAcoesComandaApi({}, { despachar: (a) => despachados.push(a), estadoRef: { current: { conversas: [{ id: 'conversa', pedido }] } } })
   return { acoes, chamadas, despachados }
 }
+// Timeout do POST real (keepalive) não confirma nem gera retry automático. A leitura mostra
+// o saldo do servidor; se a pessoa repetir explicitamente a mesma intenção, a chave é mantida.
+await confere('recebimento keepalive: timeout, GET do saldo e retry explícito conservam a mesma Idempotency-Key', async () => {
+  const original = AbortSignal.timeout
+  const prazos = [], chamadas = [], despachados = []
+  const inicial = { ...dados, totalPago: 0, pagamentos: [], cobranca: { ...dados.cobranca, status: 'Pendente', valorPago: 0, pagaEm: null } }
+  const estadoRef = { current: { conversas: [{ id: 'conversa', pedido: pedidoDaApi(inicial) }] } }
+  const acoes = criarAcoesComandaApi({}, { estadoRef, despachar: (a) => {
+    despachados.push(a)
+    if (a.pedido) estadoRef.current.conversas[0].pedido = a.pedido
+  } })
+  let postagens = 0, protecao
+  AbortSignal.timeout = (ms) => { prazos.push(ms); return original.call(AbortSignal, 5) }
+  globalThis.fetch = (url, o = {}) => {
+    chamadas.push({ url, metodo: o.method ?? 'GET', keepalive: o.keepalive, chave: o.headers?.['Idempotency-Key'], corpo: o.body })
+    if ((o.method ?? 'GET') === 'GET') return Promise.resolve(new Response(JSON.stringify({ data: dados })))
+    postagens++
+    if (postagens > 1) return Promise.resolve(new Response(JSON.stringify({ data: {} })))
+    return new Promise((_, rejeitar) => o.signal.addEventListener('abort', () => rejeitar(new DOMException('ACK perdido', 'TimeoutError')), { once: true }))
+  }
+  try {
+    const resultado = await Promise.race([
+      acoes.confirmarPagamento('conversa', 25, 'dinheiro'),
+      new Promise((_, rejeitar) => { protecao = setTimeout(() => rejeitar(new Error('Recebimento permaneceu pendurado')), 500) }),
+    ])
+    assert.match(resultado.erro, /Não foi possível confirmar.*Conferindo o pedido/)
+    assert.deepEqual(chamadas.map(c => c.metodo), ['POST', 'GET'], 'só uma escrita e a reconciliação')
+    assert.equal(chamadas[0].keepalive, true)
+    assert.ok(chamadas[0].chave)
+    assert.deepEqual(prazos, [30000, 20000])
+    const confirmado = estadoRef.current.conversas[0].pedido
+    assert.equal(confirmado.totalPagoApi, 25)
+    assert.equal(confirmado.totalApi - confirmado.totalPagoApi, 0, 'saldo confirmado antes de repetir')
+    assert.equal(confirmado.pagamentosApi.length, 1)
+    assert.ok(despachados.some(a => /veja o saldo antes de tentar novamente/.test(a.mensagem ?? '')))
+    const repeticao = await acoes.confirmarPagamento('conversa', 25, 'dinheiro')
+    assert.ok(!repeticao?.erro)
+    assert.deepEqual(chamadas.map(c => c.metodo), ['POST', 'GET', 'POST', 'GET'])
+    assert.equal(chamadas[2].keepalive, true)
+    assert.equal(chamadas[2].chave, chamadas[0].chave, 'retry explícito mantém a intenção após timeout')
+    assert.equal(chamadas[2].corpo, chamadas[0].corpo)
+    assert.equal(estadoRef.current.conversas[0].pedido.pagamentosApi.length, 1)
+    assert.equal(estadoRef.current.conversas[0].pedido.totalPagoApi, 25)
+  } finally { clearTimeout(protecao); AbortSignal.timeout = original }
+})
+
 const semConexao = () => { throw new TypeError('rede caiu') }
 const erro500 = () => new Response(JSON.stringify({ error: { message: 'Falha ao gravar' } }), { status: 500 })
 const erro422 = () => new Response(JSON.stringify({ error: { message: 'Motivo inválido' } }), { status: 422 })

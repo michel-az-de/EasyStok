@@ -30,6 +30,8 @@ export const SO_DA_TELA = [
   // #1686 (item 3): comanda nova depois do pedido entregue ou cancelado. É rascunho da tela; o
   // pedido nasce no EasyStok no "Gerar cobrança e enviar", como o primeiro.
   'novaComanda',
+  // #2395: confirmação da pessoa preserva o rascunho; o snapshot segue no POST do pedido.
+  'reconferirPessoaDaComanda',
 ]
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))

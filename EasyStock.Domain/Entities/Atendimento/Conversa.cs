@@ -32,6 +32,11 @@ public class Conversa
     public long NumeroComanda { get; private set; }
     public Guid EmpresaId { get; private set; }
     public Guid? ClienteId { get; private set; }
+    public Guid? ClienteAnteriorId { get; private set; }
+    public long VinculoRevisao { get; private set; }
+    public bool VinculoEmRevisao { get; private set; }
+    public bool HistoricoPedidosVerificado { get; private set; }
+    public Guid[] PedidosHistoricoIds { get; private set; } = [];
 
     /// <summary>
     /// Quem e o contato no canal: <c>wa_id</c> e telefone de SMS em digitos E.164, IGSID do
@@ -117,6 +122,7 @@ public class Conversa
             Id = Guid.NewGuid(),
             EmpresaId = empresaId,
             ClienteId = clienteId,
+            HistoricoPedidosVerificado = true,
             ContatoIdExterno = NormalizarContato(canal, contatoIdExterno),
             ContatoNome = NormalizarNome(contatoNome),
             Canal = canal,
@@ -176,7 +182,36 @@ public class Conversa
     {
         if (clienteId == Guid.Empty)
             throw new RegraDeDominioVioladaException("ClienteId e obrigatorio para vincular.");
+        if (VinculoEmRevisao)
+            throw new RegraDeDominioVioladaException("A identidade desta conversa está em revisão. Confirme a pessoa no Atendimento.");
+        if (ClienteId is not null && ClienteId != clienteId)
+            throw new RegraDeDominioVioladaException("Retire o vínculo atual antes de confirmar outra pessoa.");
+        if (ClienteId != clienteId) VinculoRevisao++;
         ClienteId = clienteId;
+    }
+
+    public void ExigirConferenciaCliente()
+    {
+        if (ClienteId is not null)
+            throw new RegraDeDominioVioladaException("Retire o vínculo atual antes de conferir outra pessoa.");
+        if (!VinculoEmRevisao) VinculoRevisao++;
+        VinculoEmRevisao = true;
+    }
+
+    public void CorrigirVinculoCliente(Guid? clienteId, long revisao)
+    {
+        if (!HistoricoPedidosVerificado)
+            throw new RegraDeDominioVioladaException("O histórico antigo desta conversa não permite confirmar a ausência de pedidos.");
+        if (PedidosHistoricoIds.Length > 0 || PedidoEmAndamentoId is not null)
+            throw new RegraDeDominioVioladaException("Esta conversa já possui pedido. Confira o histórico antes de continuar.");
+        if (revisao != VinculoRevisao || clienteId == ClienteId || clienteId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("A identidade mudou. Atualize a conversa e confira novamente.");
+        if (ClienteId is not null && clienteId is not null)
+            throw new RegraDeDominioVioladaException("Retire o vínculo atual antes de confirmar outra pessoa.");
+        if (clienteId is null) ClienteAnteriorId = ClienteId;
+        ClienteId = clienteId;
+        VinculoEmRevisao = clienteId is null;
+        VinculoRevisao++;
     }
 
     public void AtualizarContatoNome(string? nome) => ContatoNome = NormalizarNome(nome);
@@ -238,6 +273,7 @@ public class Conversa
     public void Escalar(DateTime agora, string? motivo)
     {
         Assumir(agora);
+        AssumidaPorUsuarioId = null;
         var limpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
         MotivoEscalada = limpo is { Length: > MotivoEscaladaTamanhoMaximo } ? limpo[..MotivoEscaladaTamanhoMaximo] : limpo;
     }
@@ -341,6 +377,8 @@ public class Conversa
         if (pedidoId == Guid.Empty)
             throw new RegraDeDominioVioladaException("PedidoId nao pode ser Guid.Empty; use null para limpar.");
         PedidoEmAndamentoId = pedidoId;
+        if (pedidoId is { } id && !PedidosHistoricoIds.Contains(id))
+            PedidosHistoricoIds = [.. PedidosHistoricoIds, id];
     }
 
     public CapacidadesCanal Capacidades => CapacidadesCanal.Para(Canal);

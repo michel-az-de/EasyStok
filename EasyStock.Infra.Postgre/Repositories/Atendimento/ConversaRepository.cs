@@ -13,7 +13,7 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 public sealed class ConversaRepository(EasyStockDbContext db) : IConversaRepository
 {
     public Task<Guid?> ObterIdPorPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
-        db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && (c.PedidoEmAndamentoId == pedidoId
+        db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && (c.PedidoEmAndamentoId == pedidoId || c.PedidosHistoricoIds.Contains(pedidoId)
             || db.LinksCardapioConversa.Any(l => l.EmpresaId == empresaId && l.ConversaId == c.Id && l.PedidoRegistradoId == pedidoId)))
             .Select(c => (Guid?)c.Id).FirstOrDefaultAsync(ct);
 
@@ -168,9 +168,15 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
 
         if (!string.IsNullOrWhiteSpace(busca))
         {
-            var padrao = $"%{busca.Trim()}%";
-            query = query.Where(c => EF.Functions.ILike(c.ContatoNome ?? string.Empty, padrao)
-                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao));
+            var termo = busca.Trim();
+            var padrao = $"%{BuscaTextual.Normalizar(termo)}%";
+            var digitos = BuscaTextual.DigitosTelefone(termo);
+            var buscaId = Guid.TryParse(termo, out var id);
+            var buscaNumero = long.TryParse(termo.TrimStart('#'), out var numero);
+            query = query.Where(c => (buscaId && c.Id == id) || (buscaNumero && c.NumeroComanda == numero)
+                                     || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto((c.ContatoNome ?? string.Empty).ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao)
+                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao)
+                                     || (digitos.Length >= 3 && EasyStockDbContext.TraduzirTexto(c.ContatoIdExterno, BuscaTextual.MascaraTelefone, "").Contains(digitos)));
         }
 
         // #1575: só as colunas do resumo. O ContextoJson (jsonb do carrinho) fica no banco: a inbox faz polling.
@@ -183,7 +189,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             {
                 c.Id, c.NumeroComanda, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
                 c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
-                c.Assunto, // #1432: assunto do último e-mail, para o cartão da conversa
+                c.Assunto, c.VinculoRevisao, c.VinculoEmRevisao, // #1432: assunto do último e-mail, para o cartão da conversa
                 AssumidaPorNome = db.UsuariosEmpresas
                     .Where(ue => ue.EmpresaId == empresaId && ue.UsuarioId == c.AssumidaPorUsuarioId)
                     .Select(ue => ue.Usuario!.Nome).FirstOrDefault(),
@@ -213,7 +219,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         return linhas.Select(l => new ConversaInboxItem(
             l.Id, l.EmpresaId, l.Canal, l.ContatoIdExterno, l.ContatoNome, l.ClienteId, l.Situacao, l.NaoLidas,
             l.UltimaMensagemEm, l.UltimaMensagemEntradaEm, l.PedidoEmAndamentoId, l.AssumidaPorUsuarioId, l.MotivoEscalada,
-            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto, l.FotoClienteChave)).ToList();
+            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto, l.FotoClienteChave, l.VinculoRevisao, l.VinculoEmRevisao)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(

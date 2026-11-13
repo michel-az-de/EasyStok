@@ -26,7 +26,7 @@ export const NOME_REGRAS_DE_AVISO = 'Regras de aviso'
 
 // #2258 (A2): a ordem dos módulos segue o caminho do pedido e vale na home, na Ajuda, no Menu e na
 // Busca. A lista `MODULOS` guarda a numeração do plano (ADR-0056) e não muda; quem lista ordena por aqui.
-export const ORDEM_DOS_MODULOS = ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro', 'configuracoes', 'campanhas']
+export const ORDEM_DOS_MODULOS = ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro', 'cadastros', 'configuracoes', 'campanhas']
 const posicaoNaOrdem = (id) => {
   const posicao = ORDEM_DOS_MODULOS.indexOf(id)
   return posicao < 0 ? ORDEM_DOS_MODULOS.length : posicao
@@ -37,6 +37,18 @@ export const TELA_OPERACAO = 'operacao'
 export const TELA_AJUSTE = 'ajuste'
 
 export const MODULOS = [
+  {
+    numero: 9, id: 'cadastros', nome: 'Cadastros', icone: 'usuarios',
+    resumo: 'Leads, clientes e dados da operação',
+    telas: [
+      { id: 'clientes', rotulo: 'Leads e clientes', tipo: TELA_AJUSTE, aba: 'cadastros-clientes', soApi: true },
+      { id: 'produtos', rotulo: 'Produtos', tipo: TELA_AJUSTE, aba: 'cadastros-produtos', soApi: true, acao: 'verCadastrosProdutos' },
+      { id: 'fornecedores', rotulo: 'Fornecedores', tipo: TELA_AJUSTE, aba: 'cadastros-fornecedores', soApi: true, acao: 'verCadastrosFornecedores' },
+      { id: 'bancos', rotulo: 'Contas bancárias', tipo: TELA_AJUSTE, aba: 'cadastros-bancos', soApi: true, acao: 'verCadastrosFinanceiros' },
+      { id: 'pagamentos', rotulo: 'Formas de pagamento', tipo: TELA_AJUSTE, aba: 'cadastros-pagamentos', soApi: true, acao: 'verCadastrosFinanceiros' },
+      { id: 'modelos', rotulo: 'Modelos', tipo: TELA_AJUSTE, aba: 'cadastros-modelos', soApi: true },
+    ],
+  },
   {
     numero: 1, id: 'cardapio', nome: 'Cardápio', icone: 'cardapio',
     resumo: 'Pratos, preços, combos e fotos',
@@ -147,6 +159,9 @@ export const hashDoModulo = (moduloId, telaId) => `#/m/${moduloId}${telaId ? '/'
 // (`acoes` ausente: demonstração, catálogo do guia) a tela fica.
 const verContas = (acoes) => acoes?.visualizarContasPagar === true || acoes?.visualizarContasReceber === true
 const PODE_NA_TELA = {
+  verCadastrosProdutos: (acoes) => acoes?.verCadastrosProdutos === true,
+  verCadastrosFornecedores: (acoes) => acoes?.verCadastrosFornecedores === true,
+  verCadastrosFinanceiros: (acoes) => acoes?.verCadastrosFinanceiros === true,
   ajustarEntrega: podeAjustarEntrega,
   verContas,
   verContasPagar: (acoes) => acoes?.visualizarContasPagar === true,

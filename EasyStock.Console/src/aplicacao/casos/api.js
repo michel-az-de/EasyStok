@@ -1,4 +1,5 @@
 import { legendaDoItem } from '../../dominio/vitrineCardapio'
+import { aplicarVinculoConfirmado } from '../../dominio/vinculoCliente'
 import * as acao from '../acoes'
 import { mesmoConteudo } from '../igualdade'
 import { mapear } from '../reducer/auxiliares'
@@ -9,6 +10,7 @@ import { mesclarDoServidor, mesmaLista, pedidoMesclado } from '../reducer/mescla
 const VOLTAS_DA_SELECAO_PENDENTE = 3
 
 export const casosApi = {
+  [acao.VINCULO_CLIENTE_DA_API]: (estado, { id, vinculo }) => mapear(estado, id, c => aplicarVinculoConfirmado(c, vinculo)),
   [acao.CONFIRMAR_RESPONSAVEL_API]: (estado, { id, situacao, confirmadaEm }) => ({
     ...mapear(estado, id, (c) => ({ ...c, ...situacao, ...(confirmadaEm != null ? { confirmadaEm } : null) })),
     automaticoPausado: { ...estado.automaticoPausado, [id]: situacao.pausaApi ?? false },
@@ -85,14 +87,16 @@ export const casosApi = {
 
   // Sync que já trouxe a mensagem do servidor: o balão local sai, senão ficam dois com o
   // mesmo id (#1287).
-  [acao.CONFIRMAR_ENVIO_API]: (estado, { id, mensagemId, mensagem }) =>
+  [acao.CONFIRMAR_ENVIO_API]: (estado, { id, mensagemId, mensagem, chaveEnvio }) =>
     mapear(estado, id, (c) => {
-      const jaVeio = c.mensagens.some((m) => m.id === mensagem.id && m.id !== mensagemId)
+      // A sincronização pode confirmar a intenção antes do ACK. Preserve esse balão e seu estado mais recente.
+      const mensagens = c.mensagens.filter(m => !chaveEnvio || m.chaveEnvio !== chaveEnvio || m.id === mensagemId || m.id === mensagem.id)
+      const jaVeio = mensagens.some((m) => m.id === mensagem.id && (m.id !== mensagemId || ['enviada', 'entregue', 'lida'].includes(m.status)))
       return {
         ...c,
         mensagens: jaVeio
-          ? c.mensagens.filter((m) => m.id !== mensagemId)
-          : c.mensagens.map((m) => (m.id === mensagemId ? { ...mensagem, aguardandoSync: true } : m)),
+          ? mensagens.filter((m) => m.id !== mensagemId || m.id === mensagem.id)
+          : mensagens.map((m) => (m.id === mensagemId ? { ...mensagem, aguardandoSync: true } : m)),
       }
     }),
 
@@ -106,7 +110,7 @@ export const casosApi = {
     mapear(estado, id, (c) => ({
       ...c,
       mensagens: c.mensagens.map((m) => {
-        if (m.id !== mensagemId) return m
+        if (m.id !== mensagemId || ['enviada', 'entregue', 'lida'].includes(m.status)) return m
         if (mensagem) return { ...m, ...mensagem, status: 'falhou', erro }
         return { ...m, status: 'falhou', erro, ...(semIdServidor ? { semIdServidor: true } : {}) }
       }),

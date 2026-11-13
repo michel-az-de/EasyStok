@@ -65,6 +65,7 @@ export function mensagemDaApi(m, conversaId = null) {
   const avaliacao = !saida && m.tipoConteudo === 'Botao' ? BOTAO_DE_AVALIACAO.exec(m.botaoId ?? '')?.[1].toLowerCase() : null
   return {
     id: m.id,
+    ...(saida && m.chaveEnvio ? { chaveEnvio: m.chaveEnvio } : {}),
     ...(m.enviadaPorUsuarioId ? { enviadaPorUsuarioId: m.enviadaPorUsuarioId } : {}),
     dir: saida ? 'out' : 'in',
     texto: m.texto?.trim() ? m.texto : avaliacao ? `Avaliação ${avaliacao}` : ROTULO_DO_CONTEUDO[m.tipoConteudo] || 'Conteúdo não disponível nesta mensagem.',
@@ -141,7 +142,9 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     conta: resumo.clienteId ? 'cliente' : 'lead',
     // Chave do cadastro na API: consentimento (S38) e o que mais for por cliente.
     clienteId: resumo.clienteId ?? null,
-    nome: resumo.contatoNome || resumo.contatoIdExterno,
+    vinculoRevisao: resumo.vinculoRevisao ?? 0,
+    vinculoEmRevisao: resumo.vinculoEmRevisao === true,
+    nome: resumo.vinculoEmRevisao && !resumo.clienteId ? 'Identidade em revisão' : resumo.contatoNome || resumo.contatoIdExterno,
     contato: resumo.contatoIdExterno,
     assunto: resumo.assunto ?? null, // #1432: assunto do último e-mail (canal E-mail)
     canal: NOME_DO_CANAL[resumo.canal] ?? resumo.canal,

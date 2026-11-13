@@ -21,7 +21,7 @@ export function CampoReais({
   const [texto, setTexto] = useState(() => mostrar(centavos))
   // #2080: "1,500" não cabe (centavos têm 2 casas): o campo diz o que ficou em vez de calar.
   const [cortou, setCortou] = useState(false)
-  const lido = (valor) => (valor.trim() ? ler(valor) : null)
+  const lido = (valor) => (valor.trim() ? (valor.trim().startsWith('-') ? -Math.abs(ler(valor)) : ler(valor)) : null)
 
   // Valor trocado por fora (zerou depois de lançar, a sugestão chegou): o texto acompanha. O que
   // ela mesma digitou não volta formatado no meio da digitação.
@@ -32,14 +32,14 @@ export function CampoReais({
   }
 
   function aoDigitar(evento) {
-    const novo = textoDigitadoEmReais(evento.target.value)
+    const novo = (/[-−]/.test(evento.target.value) ? '-' : '') + textoDigitadoEmReais(evento.target.value)
     setCortou(centavosCortados(evento.target.value))
     setTexto(novo)
     aoMudar(lido(novo))
   }
 
   function aoSair(evento) {
-    if (texto.trim()) setTexto(textoDosCentavos(ler(texto)))
+    if (texto.trim()) setTexto(textoDosCentavos(lido(texto)))
     onBlur?.(evento)
   }
 

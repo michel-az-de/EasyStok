@@ -51,7 +51,14 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
     {
         EnvioComandaCliente resultado;
         try { resultado = await comanda.EnviarAsync(token, body.Revisao, ct); }
-        catch (CepSemCoberturaException) { return await comanda.EncaminharEntregaAsync(token, body.Revisao, ct); }
+        catch (CepSemCoberturaException)
+        {
+            // O pedido fez rollback, inclusive do endereço. Não reutilizar o xmin que o SaveChanges
+            // devolveu para a versão revertida; o encaminhamento relê o cadastro em outra unidade de trabalho.
+            await using var escopoEntrega = escopos.CreateAsyncScope();
+            return await escopoEntrega.ServiceProvider.GetRequiredService<ComandaClienteUseCase>()
+                .EncaminharEntregaAsync(token, body.Revisao, ct);
+        }
         // A regra de "só acréscimo passa direto" é do use case (ConfirmarAlteracaoComandaUseCase), não deste controller.
         if (resultado.Situacao != ConfirmarAlteracaoComandaUseCase.SituacaoAguardandoConfirmacao) return resultado;
         await using var escopo = escopos.CreateAsyncScope();

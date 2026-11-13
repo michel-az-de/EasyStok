@@ -97,7 +97,7 @@ assert.deepEqual(avisosDoDispositivo({ som: true, audioBloqueado: false, permiss
 assert.deepEqual(avisosDoDispositivo({ som: false, audioBloqueado: true, permissaoNotificacao: 'default' }), [], 'som desligado não incomoda')
 assert.deepEqual(avisosDoDispositivo({ som: true, audioBloqueado: true, permissaoNotificacao: 'denied' }).map((a) => a.id), ['som', 'notificacao'])
 assert.match(avisosDoDispositivo({ permissaoNotificacao: 'denied' })[0].texto, /cadeado/, 'diz como reativar')
-assert.match(app, /<AvisosDoDispositivo \/>/, 'App.jsx mostra os avisos')
+assert.match(app, /<AvisosDoDispositivo[^>]*><TelaDaRota/, 'App.jsx reserva espaço para avisos sem sobrepor a tela')
 
 // 5. Build sem SHA
 const { resolverShaDoConsole, plugin } = await import('./shaDoConsole.mjs')

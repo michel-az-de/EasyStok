@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { telefoneDoE164 } from '../../dominio/formato'
+import { identidadeDaEdicao } from '../../dominio/identidadeDaEdicao'
+import { ConferirDestinoDaEdicao } from './ConferirDestinoDaEdicao'
 import css from './cliente.module.css'
 
 export const SELO_INFORMADO = 'Informado pelo visitante'
@@ -13,7 +15,8 @@ export const SELO_INFORMADO = 'Informado pelo visitante'
 // `aoConfirmar(opcoes)` devolve o que a ação devolveu: nada no sucesso, `{ erro }` na recusa e
 // `{ erro, jaCadastrado: { nome } }` quando o telefone já é de um cadastro. A Ficha remonta o
 // cartão a cada conversa (`key`), então a espera e a pergunta não passam de uma para a outra.
-export function ContatoInformado({ contato, aoConfirmar }) {
+export function ContatoInformado({ contato, aoConfirmar, conversa }) {
+  const [identidade, guardarIdentidade] = useState(() => conversa ? identidadeDaEdicao(conversa) : null)
   // #1586: espera a resposta, trava o segundo toque e mostra a recusa junto do botão.
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState(null)
@@ -26,7 +29,7 @@ export function ContatoInformado({ contato, aoConfirmar }) {
     setSalvando(true)
     setErro(null)
     try {
-      const resultado = await aoConfirmar(opcoes)
+      const resultado = await aoConfirmar(opcoes, identidade)
       if (resultado?.jaCadastrado) setDono({ nome: resultado.jaCadastrado.nome, pergunta: resultado.erro })
       else if (resultado?.erro) setErro(resultado.erro)
     } catch (falha) {
@@ -45,6 +48,7 @@ export function ContatoInformado({ contato, aoConfirmar }) {
   return (
     <section className={css.contatoInformado} aria-label={SELO_INFORMADO}>
       <span className={css.seloInformado}>{SELO_INFORMADO}</span>
+      {conversa && <ConferirDestinoDaEdicao identidade={identidade} conversa={conversa} aoConferir={valor => { guardarIdentidade(valor); setDono(null); setErro(null) }} />}
       <dl className={css.listaInformado}>
         {contato.nome && (
           <>

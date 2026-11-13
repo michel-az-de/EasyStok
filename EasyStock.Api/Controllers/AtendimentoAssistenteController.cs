@@ -18,6 +18,24 @@ public class AtendimentoAssistenteController(
     AssistenteDonaUseCase assistenteUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
+    [HttpPost("cadastro")]
+    [EnableRateLimiting("ai")]
+    public async Task<IActionResult> SugerirCadastro([FromBody] SugestaoCadastroBody body,
+        [FromServices] SugerirCadastroConversaUseCase sugestao, CancellationToken ct = default)
+    {
+        try
+        {
+            return DataOk(await sugestao.ExecuteAsync(new(currentUser.EmpresaId, body?.ConversaId ?? Guid.Empty), ct));
+        }
+        catch (AssistenteDonaIndisponivelException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new ApiErrorResponse(new ApiError("ASSISTENTE_INDISPONIVEL", ex.Message, null, null)));
+        }
+        catch (ConversaNaoEncontradaException) { return DataNotFound("Conversa não encontrada."); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
+    }
+
     [HttpPost("ficha")]
     [EnableRateLimiting("ai")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -48,6 +66,7 @@ public class AtendimentoAssistenteController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     [HttpPost]
+    [EnableRateLimiting("ai")]
     public async Task<IActionResult> Perguntar([FromBody] PerguntarAssistenteBody body, CancellationToken ct = default)
     {
         try
@@ -73,3 +92,4 @@ public class AtendimentoAssistenteController(
 
 public sealed record PerguntarAssistenteBody(string Pergunta, Guid? ConversaId);
 public sealed record MontagemFichaBody(Guid ConversaId, string? Orientacao = null);
+public sealed record SugestaoCadastroBody(Guid ConversaId);

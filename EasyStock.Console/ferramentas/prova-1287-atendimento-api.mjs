@@ -55,6 +55,7 @@ const esperar = (ms = 20) => new Promise((r) => setTimeout(r, ms))
 const JANELA = '22222222-2222-2222-2222-222222222222'
 const ITEM = '11111111-1111-1111-1111-111111111111'
 const PEDIDO_ID = 'a1b2c3d4-e5f6-4711-8899-aabbccddeeff'
+const IDENTIDADE = { clienteId: '33333333-3333-3333-3333-333333333333', vinculoRevisao: 2 }
 const json = (data, status = 200) => new Response(JSON.stringify(status < 300 ? { data } : data), { status })
 
 const pedidoApi = (cobranca = null) => ({
@@ -78,12 +79,12 @@ function rede(rotas) {
 
 function montarComanda(pedido) {
   const despachados = []
-  const estadoRef = { current: { conversas: [{ id: 'conv-1', pedido }] } }
+  const estadoRef = { current: { conversas: [{ id: 'conv-1', ...IDENTIDADE, pedido }] } }
   const acoes = criarAcoesComandaApi({}, { despachar: (a) => despachados.push(a), estadoRef })
   const avisos = () => despachados.filter((a) => a.tipo === acao.AVISO_API).map((a) => a.mensagem)
   return { acoes, despachados, avisos }
 }
-const rascunho = (meio = 'cartao-link') => ({ pedidoId: null, janela: `${JANELA}|2026-10-02`, meio, itens: [{ sku: ITEM, qtd: 1, obs: '' }] })
+const rascunho = (meio = 'cartao-link') => ({ pedidoId: null, identidadeProposta: { ...IDENTIDADE }, janela: `${JANELA}|2026-10-02`, meio, itens: [{ sku: ITEM, qtd: 1, obs: '' }] })
 
 // --- 1. Pedido sem link nunca recebe cobrança ----------------------------------
 await confere('1a. pedido online criado sem cobrança avisa que o link não saiu', async () => {

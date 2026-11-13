@@ -109,10 +109,10 @@ public class ClientesController(ClientesService svc, SessionService session) : B
     public async Task<IActionResult> Editar(string id,
         string nome, string? apt, string? endereco, string? telefone,
         string? email, string? documento, string? observacoes,
-        bool pessoaJuridica = false, string? nomeFantasia = null, string? inscricaoEstadual = null)
+        bool pessoaJuridica = false, string? nomeFantasia = null, string? inscricaoEstadual = null, uint? revisao = null)
     {
         var result = await svc.EditarAsync(id, nome, apt, endereco, telefone, email, documento, observacoes,
-            pessoaJuridica, nomeFantasia, inscricaoEstadual);
+            pessoaJuridica, nomeFantasia, inscricaoEstadual, revisao);
         if (HasErrorVerbose(result, "Editar cliente")) return RedirectToAction(nameof(Detail), new { id });
 
         Toast("success", "Cliente atualizado com sucesso!");
