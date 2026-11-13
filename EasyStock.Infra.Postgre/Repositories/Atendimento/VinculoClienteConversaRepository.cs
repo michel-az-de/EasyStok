@@ -30,7 +30,10 @@ public sealed class VinculoClienteConversaRepository(EasyStockDbContext db) : IV
                 || (c.Telefone != null && telefones.Contains(c.Telefone)) || c.Telefones.Any(t => telefones.Contains(t.Numero))))
             .OrderBy(c => c.Nome).ThenBy(c => c.Id)
             .Select(c => new CandidatoClienteConversa(c.Id, c.Nome, c.Telefone,
-                !db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id), c.Bloqueado))
+                !db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id), c.Bloqueado,
+                db.Pedidos.Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id),
+                db.Pedidos.Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm),
+                c.Ativo))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<AlteracaoVinculoConversa>> ListarHistoricoAsync(Guid empresaId, Guid conversaId, CancellationToken ct) =>

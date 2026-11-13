@@ -23,6 +23,8 @@ OPT_IN = (
     "EASYSTOCK_PERF_PG",                  # FluxoBucketsPerfTests: medição contra um Postgres real
     "EASYSTOK_COMANDA_GO_LIVE_FIXTURE",   # ensaio de go-live da comanda
     "EASYSTOK_COMANDA_BROWSER_FIXTURE",   # fixture interativa do navegador
+    "EASYSTOK_R4_BROWSER_FIXTURE",        # fixture local de Cadastros R4 com login real
+    "EASYSTOK_TEST_CADASTRO_CLI_REAL",    # inferência sintética explícita no CLI autenticado
 )
 
 

@@ -69,6 +69,74 @@ public sealed class VinculoClienteConversaIntegrationTests(PostgreSqlDatabaseFix
         return (empresa.Id, conversa, link, sessao);
     }
 
+    [SkippableTheory]
+    [InlineData("(11) 99999-0001")]
+    [InlineData("+5511999990001")]
+    public async Task CandidatosMostramHistoricoRealESituacaoSemMisturarEmpresas(string telefone)
+    {
+        var c = await SemearAsync();
+        var alheia = await SemearAsync();
+        var primeiroEm = new DateTime(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc);
+        Guid umId;
+        Guid doisId;
+        Guid inativoId;
+        await using (var db = Contexto(c.Empresa))
+        {
+            var zero = await db.Clientes.SingleAsync();
+            zero.Ativo = true;
+            zero.OrderCount = 99; // O contador legado não decide o resumo nem a classificação.
+            var um = Cliente.Criar(c.Empresa, "Um pedido");
+            var dois = Cliente.Criar(c.Empresa, "Dois pedidos");
+            var inativo = Cliente.Criar(c.Empresa, "Pessoa inativa");
+            foreach (var pessoa in new[] { um, dois, inativo }) pessoa.Telefone = zero.Telefone;
+            um.Ativo = dois.Ativo = true;
+            inativo.Ativo = false;
+            db.Clientes.AddRange(um, dois, inativo);
+            db.Pedidos.AddRange(Historico(um, primeiroEm), Historico(dois, primeiroEm), Historico(dois, primeiroEm.AddDays(1)));
+            await db.SaveChangesAsync();
+            (umId, doisId, inativoId) = (um.Id, dois.Id, inativo.Id);
+        }
+        await using (var db = Contexto(alheia.Empresa))
+        {
+            var pessoa = await db.Clientes.SingleAsync();
+            pessoa.Ativo = true;
+            db.Pedidos.Add(Historico(pessoa, primeiroEm.AddDays(10)));
+            await db.SaveChangesAsync();
+        }
+        await using var leitura = Contexto(c.Empresa);
+        var candidatos = await UseCase(leitura, c.Empresa).CandidatosAsync(c.Empresa, c.Conversa.Id, telefone);
+        candidatos.Should().HaveCount(4);
+        candidatos.Should().NotContain(x => x.Id == alheia.Conversa.ClienteId);
+        var zeroResumo = candidatos.Single(x => x.Id == c.Conversa.ClienteId);
+        zeroResumo.QuantidadePedidos.Should().Be(0);
+        zeroResumo.UltimoPedidoEm.Should().BeNull();
+        zeroResumo.EhLead.Should().BeTrue();
+        zeroResumo.Ativo.Should().BeTrue();
+        var umResumo = candidatos.Single(x => x.Id == umId);
+        umResumo.QuantidadePedidos.Should().Be(1);
+        umResumo.UltimoPedidoEm.Should().Be(primeiroEm);
+        umResumo.EhLead.Should().BeFalse();
+        var doisResumo = candidatos.Single(x => x.Id == doisId);
+        doisResumo.QuantidadePedidos.Should().Be(2);
+        doisResumo.UltimoPedidoEm.Should().Be(primeiroEm.AddDays(1));
+        doisResumo.EhLead.Should().BeFalse();
+        candidatos.Single(x => x.Id == inativoId).Ativo.Should().BeFalse();
+        (await leitura.Pedidos.CountAsync()).Should().Be(3);
+        (await leitura.AtendimentoConversas.SingleAsync()).ClienteId.Should().Be(c.Conversa.ClienteId);
+
+        static Pedido Historico(Cliente pessoa, DateTime em)
+        {
+            var pedido = Pedido.Criar(pessoa.EmpresaId, pessoa, origem: "fixture-r4-i01");
+            pedido.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "Histórico sintético",
+                Quantidade = 1, PrecoUnitario = 10m, Subtotal = 10m, CriadoEm = em });
+            pedido.RecalcularTotal();
+            pedido.Cancelar();
+            pedido.CriadoEm = em;
+            pedido.CanceladoEm = pedido.AlteradoEm = em.AddHours(1);
+            return pedido;
+        }
+    }
+
     private static CorrigirVinculoClienteCommand Retirar(Guid empresa, Conversa conversa) =>
         new(empresa, conversa.Id, Guid.NewGuid(), conversa.VinculoRevisao, conversa.ClienteId, "retirar", null, "Pessoa conferida no atendimento");
 

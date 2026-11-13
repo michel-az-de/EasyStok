@@ -99,12 +99,13 @@ async function agir(caminho, metodo, gesto) {
   return texto ? JSON.parse(texto).data : null
 }
 async function preparar(quantidade = 1, abrirConfirmacao = true) {
-  await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
+  await page.getByRole('button', { name: 'Adicionar itens', exact: true }).first().click()
   for (let i = 0; i < quantidade; i++) await page.getByRole('button', { name: new RegExp(`^(Somar )?${rx(produto.nome).source}`, 'i') }).first().click()
   await fecharPaineis(); await page.getByRole('button', { name: /^Revisar comanda/ }).first().click()
   await page.getByLabel('Dia da entrega (opcional)', { exact: true }).fill(fixture.dataEntrega)
   const janela = page.getByRole('button', { name: /Manhã.*vagas? livres?/ }).first()
   const janelaExibida = await janela.innerText(); await janela.click()
+  await page.locator('[data-simulacao-total]').waitFor()
   const apresentacao = await page.locator('body').innerText()
   await foto(quantidade === 2 ? 'J02-proposta-duas-unidades' : 'E01-alternativa-preco-prazo')
   await fecharPaineis()
@@ -251,7 +252,7 @@ try {
     assert.equal((await estoque(fixture.produtoSemEstoque)).qty, 0)
     assert.equal(await ler(`/api/atendimento/conversas/${conversaId}/pedido`), null)
     const msgsAntes = await mensagens(conversaId)
-    await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
+    await page.getByRole('button', { name: 'Adicionar itens', exact: true }).first().click()
     await page.getByRole('button', { name: new RegExp(`^(Somar )?${rx(fixture.produtoSemEstoque.nome).source}`, 'i') }).first().click()
     await page.getByText(/Sem saldo, mas ainda vende\. No lugar dele:/).waitFor(); await foto('E01-falta-antes-promessa')
     await fecharPaineis(); await page.getByRole('button', { name: /^Revisar comanda/ }).first().click()
@@ -265,11 +266,20 @@ try {
     assert.deepEqual(await mensagens(conversaId), msgsAntes); assert.equal(await ler(`/api/atendimento/conversas/${conversaId}/pedido`), null)
     registrar('E01', { produtoId: fixture.produtoSemEstoque.produtoId, saldo: 0, decisao: 'Escolha do cliente explicitamente SIMULADA aceita alternativa de37 com preço e prazo conferidos; nenhum pedido até a decisão.', alternativa: prova.alternativaPronta, notaSimulacao: prova.escolhaSimulada, politica: 'Venda sem saldo permitida com aviso pelo produto existente, sem bloqueio inventado.' })
   }
+  if (!prova.pedidos.excecoes && feito('E01')) {
+    const existente = await ler(`/api/atendimento/conversas/${conversaId}/pedido`)
+    if (existente) {
+      assert.equal(existente.total, 37); assert.equal(existente.frete, 5)
+      prova.pedidos.excecoes = existente.pedidoId; prova.recuperacaoPedidoExcecoes = existente; salvar()
+    }
+  }
   if (!prova.pedidos.excecoes) {
     assert.ok(prova.alternativaPronta, 'Alternativa deve ter sido conferida e aceita de forma SIMULADA')
     await abrirCobranca()
     const p = await agir(`/api/atendimento/conversas/${conversaId}/pedido`, 'POST', () => page.getByRole('button', { name: 'Confirmar e enviar', exact: true }).click())
-    assert.equal(p.total, 37); assert.equal(p.frete, 5); prova.pedidos.excecoes = p.pedidoId; salvar()
+    prova.pedidos.excecoes = p.pedidoId; salvar(); assert.equal(p.total, 37)
+    const confirmado = await ler(`/api/atendimento/conversas/${conversaId}/pedido`)
+    assert.equal(confirmado.pedidoId, p.pedidoId); assert.equal(confirmado.frete, 5)
   }
   etapa = 'E02'
   if (!feito('E02')) {
@@ -380,7 +390,7 @@ try {
     const recusa = `R4 E03 pedido ${id}: recuso cancelamento imediato; confirmar com cliente o novo horário. Próximo passo: Atendimento consultar disponibilidade e retornar antes de alterar pedido.`
     const notaRecusa = await nota(recusa); assert.deepEqual(await detalhe(id), antes)
     await login('Atendimento', fixture.conversaExcecoesId)
-    await page.getByRole('button', { name: /^Notas\b/ }).first().click(); await page.getByText(recusa, { exact: true }).first().waitFor()
+    await page.getByRole('button', { name: /^Notas\b/ }).first().click()
     await page.getByRole('article').filter({ hasText: recusa }).getByRole('button', { name: 'Destacar nota', exact: true }).click()
     await page.getByRole('complementary', { name: /^Nota ·/ }).filter({ hasText: recusa }).waitFor()
     await foto('E03-recusa-proximo-passo')
@@ -389,9 +399,9 @@ try {
     assert.deepEqual(await detalhe(id), antes)
     const recusaPersistida = await ler(`/api/clientes/${antes.pedido.clienteId}/notas/${notaRecusa.id}`)
     const solicitacaoPersistida = await ler(`/api/clientes/${antes.pedido.clienteId}/notas/${solicitacao.id}`)
-    assert.equal(recusaPersistida.texto, recusa)
-    assert.equal(recusaPersistida.autor, fixture.identidades.find(i => i.perfil === 'Dona' && i.empresaId === empresa).nome)
-    assert.equal(solicitacaoPersistida.autor, fixture.identidades.find(i => i.perfil === 'Atendimento' && i.empresaId === empresa).nome)
+    assert.equal(recusaPersistida.nota.texto, recusa)
+    assert.equal(recusaPersistida.nota.autor, fixture.identidades.find(i => i.perfil === 'Dona' && i.empresaId === empresa).nome)
+    assert.equal(solicitacaoPersistida.nota.autor, fixture.identidades.find(i => i.perfil === 'Atendimento' && i.empresaId === empresa).nome)
     registrar('E03', { pedidoId: id, recusa, negativa, recusaPersistida, solicitacaoPersistida, limite: 'Decisão e próximo passo em nota contextual; sem alegar workflow formal de aprovação.' })
   }
   etapa = 'E04'

@@ -69,12 +69,25 @@ const telefoneDaBusca = valor => {
   return /^55\d{10,11}$/.test(digitos) ? digitos.slice(2) : digitos
 }
 
+
+const telefoneDoTermo = busca => {
+  const numero = termoBuscaCadastro(busca)
+  return /^\d+$/.test(numero) ? telefoneDaBusca(numero) : ''
+}
+
+const contemTextoOuTelefone = (valor, termo, telefone) => {
+  const texto = normalizarBuscaCadastro(valor)
+  if (!/^\d{10,11}$/.test(telefone)) return texto.includes(termo)
+  // Conserva a substring textual e reconhece cada telefone formatado, sem juntar números do parágrafo.
+  const numeros = texto.matchAll(/(?:\+?55[\s.-]*)?(?:\(\d{2}\)|\d{2})[\s.-]*\d{4,5}[\s.-]*\d{4}/g)
+  return texto.includes(telefone) || [...numeros].some(([numero]) => telefoneDaBusca(numero) === telefone)
+}
+
 export const combinaBusca = (conversa, busca) => {
   const termo = normalizarBuscaCadastro(busca).trim()
   if (!termo) return true
-  const buscaNumerica = termoBuscaCadastro(busca)
-  const telefone = /^\d+$/.test(buscaNumerica) ? telefoneDaBusca(buscaNumerica) : ''
-  const contem = valor => normalizarBuscaCadastro(valor).includes(termo)
+  const telefone = telefoneDoTermo(busca)
+  const contem = valor => contemTextoOuTelefone(valor, termo, telefone)
   return contem(conversa.nome)
     || [conversa.id, conversa.clienteId, conversa.pedido?.pedidoId].some(id => id && normalizarBuscaCadastro(id) === termo)
     || conversa.numeroComanda != null && ('comanda ' + conversa.numeroComanda).includes(termo)
@@ -92,7 +105,7 @@ export const combinaBusca = (conversa, busca) => {
 export function tagCorrespondida(conversa, busca) {
   const termo = normalizarBuscaCadastro(busca).trim()
   if (!termo) return null
-  return (conversa.cliente?.tags ?? []).find(tag => normalizarBuscaCadastro(tag).includes(termo)) ?? null
+  return (conversa.cliente?.tags ?? []).find(tag => contemTextoOuTelefone(tag, termo, telefoneDoTermo(busca))) ?? null
 }
 
 // Chip de canal liga e desliga (zero ou mais). Nenhum ligado é "todos", por

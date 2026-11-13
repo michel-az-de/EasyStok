@@ -304,7 +304,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         </div>
         <nav className={css.acessosFicha} aria-label="Histórico e pós-venda">
           <AcessoDaFicha icone="historico" titulo="Histórico do cliente"
-            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'pedido' : 'pedidos'}` : 'Pedidos, notas e conversas'} aoAbrir={() => setSecao('cliente')} />
+            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'compra válida' : 'compras válidas'}` : 'Pedidos, notas e conversas'} aoAbrir={() => setSecao('cliente')} />
           {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha icone="undo-2" titulo="Pós-venda"
             resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
         </nav>

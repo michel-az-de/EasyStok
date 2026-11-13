@@ -3,7 +3,8 @@ using EasyStock.Domain.Entities.Atendimento;
 namespace EasyStock.Application.Ports.Output.Persistence.Atendimento;
 
 public sealed record PedidoDoVinculo(Guid Id, string Status, decimal Total);
-public sealed record CandidatoClienteConversa(Guid Id, string Nome, string? Telefone, bool EhLead, bool Bloqueado);
+public sealed record CandidatoClienteConversa(Guid Id, string Nome, string? Telefone, bool EhLead, bool Bloqueado,
+    int QuantidadePedidos, DateTime? UltimoPedidoEm, bool Ativo);
 
 public interface IVinculoClienteConversaRepository
 {

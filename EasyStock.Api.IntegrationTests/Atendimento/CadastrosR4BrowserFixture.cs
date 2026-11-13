@@ -183,13 +183,22 @@ public sealed partial class PedidoConversaConcorrenciaTests
 
             var pessoaI01 = ClienteI01("I01 Pessoa original", "+5511912345690");
             var pessoaAlternativa = ClienteI01("I01 Pessoa alternativa", pessoaI01.Telefone);
-            var pessoaInativa = ClienteI01("I01 Pessoa inativa", pessoaI01.Telefone, false);
+            var pessoaTerceira = ClienteI01("I01 Pessoa terceira", pessoaI01.Telefone);
+            var pessoaInativa = ClienteI01("I01 Pessoa inativa", "+5511912345693", false);
+            var ultimoAlternativa = HistoricoI01(pessoaAlternativa, 1);
+            var ultimoTerceira = HistoricoI01(pessoaTerceira, 2);
             var pessoaOutroTelefone = ClienteI01("I01 Pessoa outro telefone", "+5511912345691");
             var pessoaSemTelefone = ClienteI01("I01 Pessoa sem telefone", null);
             var conversaI01 = ConversaI01(pessoaI01, "5511912345690");
             var conversaSemTelefone = ConversaI01(pessoaSemTelefone, "5511912345692");
             i01 = new { conversaId = conversaI01.Id, conversaSemTelefoneId = conversaSemTelefone.Id,
                 clienteOriginalId = pessoaI01.Id, clienteAlternativoId = pessoaAlternativa.Id,
+                clienteTerceiroId = pessoaTerceira.Id, telefoneInativo = pessoaInativa.Telefone,
+                historicos = new { origem = "fixture-r4-i01", observacao = "Pedidos sintéticos cancelados, sem movimentos de estoque, pagamentos ou vínculo com a conversa de correção.",
+                    clientes = new[] {
+                        new { clienteId = pessoaI01.Id, quantidadePedidos = 0, ultimoPedidoEm = (DateTime?)null },
+                        new { clienteId = pessoaAlternativa.Id, quantidadePedidos = 1, ultimoPedidoEm = ultimoAlternativa },
+                        new { clienteId = pessoaTerceira.Id, quantidadePedidos = 2, ultimoPedidoEm = ultimoTerceira } } },
                 clienteInativoId = pessoaInativa.Id, clienteOutroTelefoneId = pessoaOutroTelefone.Id,
                 clienteSemTelefoneId = pessoaSemTelefone.Id, telefone = pessoaI01.Telefone,
                 telefoneDiferente = pessoaOutroTelefone.Telefone };
@@ -203,6 +212,26 @@ public sealed partial class PedidoConversaConcorrenciaTests
                 db.AtendimentoConversas.Add(fila);
                 db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, fila.Id, em, TipoConteudoMensagem.Texto,
                     $"Entrada sintética R01 número {indice:D2}.", $"wamid.r4.fila.{indice}"));
+            }
+
+            DateTime? HistoricoI01(Cliente pessoa, int quantidade)
+            {
+                DateTime? ultimoEm = null;
+                for (var indice = 0; indice < quantidade; indice++)
+                {
+                    var em = agora.Date.AddDays(-quantidade * 3 + indice).AddHours(12);
+                    var pedidoHistorico = Pedido.Criar(EmpresaId, pessoa, origem: "fixture-r4-i01");
+                    pedidoHistorico.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedidoHistorico.Id,
+                        Nome = "Histórico sintético I01", Quantidade = 1, PrecoUnitario = 10m, Subtotal = 10m, CriadoEm = em });
+                    pedidoHistorico.RecalcularTotal();
+                    pedidoHistorico.Cancelar();
+                    pedidoHistorico.CriadoEm = em;
+                    pedidoHistorico.CanceladoEm = pedidoHistorico.AlteradoEm = em.AddHours(1);
+                    pedidoHistorico.Observacoes = "Fixture opt-in I01: histórico sintético cancelado; sem reserva, estoque ou pagamento.";
+                    db.Pedidos.Add(pedidoHistorico);
+                    ultimoEm = em;
+                }
+                return ultimoEm;
             }
 
             Cliente ClienteI01(string nome, string? telefone, bool ativo = true)
