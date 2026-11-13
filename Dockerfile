@@ -54,7 +54,7 @@ RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget \
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────
 # Migrations sao aplicadas pelo proprio app no startup (Program.cs com logging
 # gritante + MigrationsFailFast). Sem bundle EF separado pra encurtar build.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0@sha256:bc0d6653979efba491ab3d6f589d691f96c309c3c3ef81325efa6978e7b7f242 AS runtime
 WORKDIR /app
 
 # gosu: o entrypoint inicia como root para dar chown no volume de uploads (no Fly o
