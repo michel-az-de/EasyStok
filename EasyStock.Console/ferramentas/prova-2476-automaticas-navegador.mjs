@@ -30,7 +30,7 @@ function Cena(){
   return <ContextoAcessoModulos.Provider value={{acoes:{editarAutomacoes:gerente,editarRespostas:gerente},permite:()=>true}}>
     <ContextoEstado.Provider value={{fonteApi:true,regras,cargaDasRegras:{estado:'pronto'},conversas:[],selecionada:null}}>
     <ContextoCatalogo.Provider value={{respostasProntas:[]}}><ContextoAcoes.Provider value={acoes}>
-    <AbaRespostas/></ContextoAcoes.Provider></ContextoCatalogo.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>
+    <AbaRespostas comAutomaticas={!location.search.includes('modelos')}/></ContextoAcoes.Provider></ContextoCatalogo.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>
 }
 createRoot(document.getElementById('root')).render(<Cena/>);
 `)
@@ -79,8 +79,16 @@ try {
   await chave('Cardápio').waitFor()
   await pagina.getByText('Tem {linkCardapio}, que o EasyStok não preenche: assim ela não liga.').first().waitFor()
   assert.equal(await pagina.getByText(/^Troque ou apague/).count(), 0, 'Operador não recebe ordem de editar')
+
+  // Cadastros › Modelos (comAutomaticas false): só as respostas prontas e o caminho para as automáticas.
+  await pagina.goto(`${endereco}?modelos`)
+  const caminho = pagina.getByRole('link', { name: 'Respostas automáticas', exact: true })
+  await caminho.waitFor()
+  assert.match(await caminho.getAttribute('href'), /atendimento/, 'Aponta para as automáticas do Atendimento')
+  assert.equal(await pagina.getByRole('heading', { name: 'Respostas automáticas' }).count(), 0, 'Sem a seção de automáticas em Modelos')
+  assert.equal(await chave('Cardápio').count(), 0, 'Nenhuma chave de automática em Modelos')
   assert.deepEqual(erros, [])
-  writeFileSync(resolve(pasta, 'resultado.json'), JSON.stringify({ naoLiga: true, desligaLigada: true, salvarTravado: true, motivoNaChave: true, operador: true }, null, 2))
+  writeFileSync(resolve(pasta, 'resultado.json'), JSON.stringify({ naoLiga: true, desligaLigada: true, salvarTravado: true, motivoNaChave: true, operador: true, modelosSemAutomaticas: true }, null, 2))
   console.log('#2476 automáticas: variável solta não liga nem salva; a ligada desliga; motivo ligado à chave; Operador lê o porquê.')
 } catch (erro) { await pagina.screenshot({ path: resolve(pasta, 'falha.png'), fullPage: true }); console.error(erros.join('\n')); throw erro }
 finally { await contexto.close(); await browser.close() }
