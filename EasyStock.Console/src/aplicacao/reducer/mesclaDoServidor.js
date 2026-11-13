@@ -42,6 +42,11 @@ const clienteDaApiMantido = (local, doServidor) =>
   local.cliente?.daApi && local.clienteId && local.clienteId === doServidor.clienteId
 
 // #1565: `leitura` é só a ordem em que a consulta saiu; o mesmo pedido relido não é mudança.
+// #2446 (A1): o resumo da inbox não traz bloqueio, contato informado nem captura, então o spread manteria os do
+// cliente anterior quando outro operador troca ou retira o vínculo. Lead que ganha cadastro mantém o que informou.
+const SO_DO_CLIENTE = { bloqueio: null, contatoInformado: null, captura: null }
+const trocouDeCliente = (local, doServidor) => Boolean(local.clienteId) && local.clienteId !== (doServidor.clienteId ?? null)
+
 const mesmoPedido = (a, b) => Boolean(a) && Boolean(b) && mesmoConteudo({ ...a, leitura: null }, { ...b, leitura: null })
 
 // #2005 (console-08): o que a atendente acabou de mudar (assumir, devolver, encerrar, reabrir) e o servidor
@@ -89,6 +94,7 @@ export function mesclarDoServidor(local, lida, semMensagens = false, lidaEm = un
   if (pedido !== lido && lido.leitura > leituraDe(pedido)) confirmadoNaLeitura.set(pedido, lido.leitura)
   const mesclada = {
     ...base,
+    ...(trocouDeCliente(local, doServidor) ? SO_DO_CLIENTE : null),
     ...doServidor,
     ...(mantido ? { nome: local.nome, cliente: local.cliente } : {}),
     ...(rascunhoDoNome ? { nome: local.nome, nomeDaDona: true } : {}),

@@ -10,6 +10,12 @@ export const filtrarSemCadastro = (conversas, busca) => {
   return conversas.filter(c => !c.clienteId && (normalizarBuscaCadastro([c.nome, telefoneCadastro(c), emailCadastro(c), c.canal].join(' ')).includes(termo)
     || String(telefoneCadastro(c) ?? '').replace(/\D/g, '').includes(termo)))
 }
+// #2446 (M4): o `requestId` nasce ao abrir o editor e vale para a abertura inteira. Trocá-lo a cada tecla fazia a
+// conta bancária duplicar quando a dona editava e salvava de novo depois de um timeout que tinha gravado.
+export const mudarDadosCadastro = (tela, dados, campo, valor) => ({ ...dados, [campo]: valor,
+  ...(tela === 'produtos' && campo === 'categoriaId' && valor !== dados.categoriaId ? { subcategoriaId: null } : {}) })
+export const abrirEdicaoCadastro = (tela, item, novaOperacao = () => crypto.randomUUID()) =>
+  tela === 'bancos' ? { ...item, requestId: novaOperacao() } : item
 export const relacionamentoCadastro = (cliente) => !Number.isInteger(cliente.orderCount) || cliente.orderCount < 0 ? 'Histórico não informado' : cliente.orderCount === 0 ? 'Lead' : 'Cliente'
 
 export function corpoCliente(dados, empresaId) {

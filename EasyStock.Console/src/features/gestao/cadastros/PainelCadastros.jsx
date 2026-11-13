@@ -13,7 +13,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
-import { chaveContextoCadastro, emailCadastro, filtrarSemCadastro, relacionamentoCadastro, telefoneCadastro, TITULOS_CADASTROS } from '../../../dominio/cadastros'
+import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, relacionamentoCadastro, telefoneCadastro, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
 import { ModelosCadastro } from './ModelosCadastro'
 import { MetodosCadastro } from './MetodosCadastro'
@@ -77,7 +77,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
     falhar(null); abrir(item.id ?? item.produtoId)
     const abortar = new AbortController(); pedido.current = abortar
     try {
-      const dados = tela === 'bancos' ? item : await obterCadastro(tela, item.id ?? item.produtoId, contexto, abortar.signal)
+      const dados = tela === 'bancos' ? abrirEdicaoCadastro(tela, item) : await obterCadastro(tela, item.id ?? item.produtoId, contexto, abortar.signal)
       if (!abortar.signal.aborted) definir({ editor: { dados, inicial: dados } })
     } catch (e) { if (!abortar.signal.aborted) { falhar(e.message); aoFixarContexto(false) } }
     finally { if (!abortar.signal.aborted) abrir(null) }

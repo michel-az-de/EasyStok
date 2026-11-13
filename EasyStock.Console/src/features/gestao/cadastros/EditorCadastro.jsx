@@ -8,7 +8,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { lerMoeda } from '../../../dominio/formato'
-import { CAMPOS_CLIENTE, reconferirCadastroCliente } from '../../../dominio/cadastros'
+import { CAMPOS_CLIENTE, mudarDadosCadastro, reconferirCadastroCliente } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
 const pessoa = [{ valor: 'fisica', rotulo: 'Pessoa física' }, { valor: 'juridica', rotulo: 'Pessoa jurídica' }]
@@ -34,7 +34,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const montado = useRef(true)
   useEffect(() => { montado.current = true; return () => { montado.current = false; leituraAtual.current?.abort() } }, [])
   const mudar = (campo, valor, manual = true) => {
-    aoMudar({ ...editor, dados: { ...dados, [campo]: valor, ...(campo === 'categoriaId' && valor !== dados.categoriaId ? { subcategoriaId: null } : {}), ...(tela === 'bancos' ? { requestId: crypto.randomUUID() } : {}) } })
+    aoMudar({ ...editor, dados: mudarDadosCadastro(tela, dados, campo, valor) })
     definirErros(anteriores => ({ ...anteriores, [campo]: null }))
     if (manual) revisarFormulario(r => r + 1)
   }
