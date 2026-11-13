@@ -1,6 +1,8 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -64,7 +66,8 @@ public sealed class GerarCobrancaPedidoUseCase(
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
     ILogger<GerarCobrancaPedidoUseCase> logger,
-    SaldoFinanceiroPedido? saldoFinanceiro = null)
+    SaldoFinanceiroPedido? saldoFinanceiro = null,
+    IConversaRepository? conversaRepository = null)
 {
     public static readonly TimeSpan Validade = TimeSpan.FromMinutes(30);
 
@@ -82,7 +85,8 @@ public sealed class GerarCobrancaPedidoUseCase(
         var itens = reservado.Itens.Append(reservado.ItemFrete).ToList();
         var dados = new DadosCobranca(
             reservado.Pedido.EmpresaId, reservado.Pedido.Id, reservado.Storefront.Id,
-            reservado.Storefront.TituloPublico, reservado.Total, itens, reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm);
+            reservado.Storefront.TituloPublico, reservado.Total, itens, reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm,
+            RetornoWhatsApp: reservado.Storefront.LinkWhatsAppPedidos());
         try
         {
             return await CobrarAsync(dados, conversaId, tentativa: 1, ct);
@@ -156,7 +160,7 @@ public sealed class GerarCobrancaPedidoUseCase(
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
             pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, cobrarSaldo,
-            input.NaEntregaSemProvedor);
+            input.NaEntregaSemProvedor, storefront?.LinkWhatsAppPedidos());
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
 
@@ -212,9 +216,11 @@ public sealed class GerarCobrancaPedidoUseCase(
             ValorTotal: valorCobrado,
             Items: valorCobrado == dados.Total
                 ? dados.Itens.Where(i => i.PrecoUnitario > 0m).Select(ItemDaPreferencia).ToList()
-                : [new PreferenceItemCommand(dados.CobrarSaldo ? "Restante do pedido" :"Sinal da encomenda (50%)", 1, valorCobrado)],
+                : [new PreferenceItemCommand(await TituloDaParcelaAsync(dados, conversaId, ct), 1, valorCobrado)],
             ExpiraEm: expiraEm,
-            IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}");
+            IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}",
+            // #2228: da conversa, o checkout devolve o cliente ao WhatsApp da loja; do site, as back_urls do site.
+            RetornoUrl: conversaId is null ? null : dados.RetornoWhatsApp);
 
         PreferenceCriadaResult preferencia;
         try
@@ -290,8 +296,21 @@ public sealed class GerarCobrancaPedidoUseCase(
         }
     }
 
+    /// <summary>
+    /// #2228: o Mercado Pago mostra "Pague por &lt;item&gt;" no checkout e na prévia do link. A parcela (sinal ou restante)
+    /// leva o pedido e a loja, com o número que o cliente lê na conversa; o resumo no WhatsApp explica sinal e restante.
+    /// </summary>
+    private async Task<string> TituloDaParcelaAsync(DadosCobranca dados, Guid? conversaId, CancellationToken ct)
+    {
+        var conversa = conversaId is { } id && conversaRepository is not null
+            ? await conversaRepository.ObterPorIdAsync(dados.EmpresaId, id, ct)
+            : null;
+        var pedido = $"Pedido {VariaveisAtendimento.NumeroDoPedido(dados.PedidoId, conversa)}";
+        return string.IsNullOrWhiteSpace(dados.StorefrontNome) ? pedido : $"{pedido} · {dados.StorefrontNome}";
+    }
+
     private sealed record DadosCobranca(
         Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,
         IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, DateTime CriadoEm, decimal Alocado = 0m, bool CobrarSaldo = false,
-        bool NaEntregaSemProvedor = false);
+        bool NaEntregaSemProvedor = false, string? RetornoWhatsApp = null);
 }

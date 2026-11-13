@@ -7,7 +7,7 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { respostasEditaveis } from '../../dominio/acessoModulos'
 import { dataHora } from '../../dominio/formato'
-import { primeiroNome } from '../../dominio/mensagem'
+import { primeiroNomeDaConversa } from '../../dominio/nomeDoContato'
 import {
   FINALIDADES, SITUACOES, faltaParaProgramar, horarioLocalPadrao, horarioLocalParaUtc,
   parametrosDoTexto, podeCancelar,
@@ -25,7 +25,8 @@ export function ModalProgramarMensagem({
   const { acoes } = useAcessoModulos()
   // #1992: agendar e cancelar é da gerência (a API recusa o Operador); a atendente consulta as programadas.
   const editavel = respostasEditaveis({ fonteApi, acoes })
-  const [quando, setQuando] = useState(() => horarioLocalPadrao(Date.now()))
+  const [quandoInicial] = useState(() => horarioLocalPadrao(Date.now()))
+  const [quando, setQuando] = useState(quandoInicial)
   const [texto, setTexto] = useState(rascunho ?? '')
   const [finalidade, setFinalidade] = useState(FINALIDADES[0].valor)
   const [usarModelo, setUsarModelo] = useState(false)
@@ -62,6 +63,8 @@ export function ModalProgramarMensagem({
   const agendadaPara = horarioLocalParaUtc(quando)
   const bloqueado = Boolean(conversa.bloqueio)
   const fechar = () => { if (!ocupado.current) aoFechar() }
+  // #2185 (F16): horário, texto ou modelo mexidos e ainda não programados: Esc e toque no fundo não descartam.
+  const sujo = quando !== quandoInicial || texto !== (rascunho ?? '') || usarModelo || nomeModelo !== '' || parametros !== ''
 
   async function programar() {
     if (ocupado.current || bloqueado || !editavel) return
@@ -116,9 +119,9 @@ export function ModalProgramarMensagem({
   return (
     <Modal
       titulo="Programar mensagem"
-      largura="480px"
-      descricao={`Tentaremos enviar para ${primeiroNome(conversa.nome)} pelo ${canal.nome}, mesmo com o console fechado.`}
+      descricao={`Tentaremos enviar para ${primeiroNomeDaConversa(conversa)} pelo ${canal.nome}, mesmo com o console fechado.`}
       aoFechar={fechar}
+      segurarFechamento={sujo}
       rodape={(
         <>
           <Botao onClick={fechar} disabled={salvando}>Fechar</Botao>
@@ -129,7 +132,7 @@ export function ModalProgramarMensagem({
       )}
     >
       <div className={css.programar}>
-        {bloqueado && <p className={css.programarErro}>Cliente bloqueado. Desbloqueie na ficha para programar. Você pode consultar e cancelar os agendamentos existentes.</p>}
+        {bloqueado && <p className={css.programarErro}>Cliente bloqueado. Novas mensagens não podem ser programadas.</p>}
         {!editavel && <p className={css.restricao}>Só a dona ou um gerente programa e cancela mensagens. Aqui você consulta as programadas desta conversa.</p>}
         <fieldset className={css.programarCampos} disabled={salvando || bloqueado || !editavel}>
         <div className={css.programarQuando}>

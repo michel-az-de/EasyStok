@@ -54,13 +54,14 @@ confere('a chave ainda troca com a conversa, o pedido e os pagamentos (o bloco r
   assert.notEqual(base.devolucoes, maisUmPagamento.devolucoes)
 })
 
-// 2. Endereço fora da área: o EasyStok responde com a frase do cliente ("Vamos combinar a
+// 2. Sem cotação: o EasyStok responde com a frase do cliente ("Vamos combinar a
 //    entrega e o frete com a equipe."). Quem lê no console É a equipe, e ficava sem saída.
-confere('pedido recusado por área de entrega diz ao operador o que fazer', () => {
+confere('pedido recusado sem cotação diz ao operador o que fazer sem presumir área', () => {
   const motivo = funcao(pedido, 'dominio/pedido.js', 'motivoDoPedidoNaoCriado')
   const texto = motivo({ status: 409, message: 'Vamos combinar a entrega e o frete com a equipe.' })
   assert.match(texto, /^Pedido não criado: /)
-  assert.match(texto, /fora da área de entrega/)
+  assert.match(texto, /frete está a combinar/)
+  assert.doesNotMatch(texto, /fora da área de entrega/)
   assert.match(texto, /Link de compra/)
   assert.match(texto, /Janelas de entrega/)
   assert.doesNotMatch(texto, /com a equipe/)

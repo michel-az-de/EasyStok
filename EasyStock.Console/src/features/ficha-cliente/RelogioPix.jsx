@@ -86,7 +86,8 @@ export function RelogioPix({
     return (
       <div className={css.relogio}>
         <output className="sr" aria-live="polite">{situacao.rotulo}.</output>
-        <p className={css.recolhido}>
+        {/* #2079 (C7): estorno e cancelamento em tom neutro; o verde é só do dinheiro que ficou. */}
+        <p className={`${css.recolhido} ${css.encerrado}`}>
           <Icone nome="circle-x" tamanho={20} />
           {situacao.rotulo}
         </p>
@@ -123,7 +124,7 @@ export function RelogioPix({
       <div className={css.relogio}>
         {anuncioRegiao}
         <Anel tamanho={DIAMETRO} traco={TRACO} fracao={1} tom="ok">
-          <Icone nome="check" tamanho={40} rotulo="Pago" />
+          <Icone nome="check" tamanho={32} rotulo="Pago" />
         </Anel>
         <p className={css.pago}>
           <span className={css.rotuloPago}>{rotuloPago}</span>
@@ -204,8 +205,8 @@ export function RelogioPix({
                 Cancelar pedido
               </Botao>
             )}
-            <Botao largo variante="secundario" icone="log-out" onClick={aoEncerrarAtendimento}>
-              Encerrar atendimento
+            <Botao largo variante="secundario" icone="circle-check" onClick={aoEncerrarAtendimento}>
+              Concluir conversa
             </Botao>
           </div>
         )}

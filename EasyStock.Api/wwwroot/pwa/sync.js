@@ -163,6 +163,219 @@
   // Apos pareamento, server retorna { apiKey, empresaId, lojaId, ... }.
   // Persistimos tudo em cdb-pairing pra usar em todo request subsequente.
   const PAIRING_KEY = 'cdb-pairing';
+  const PILOT_CONTEXT_KEY = 'cdb-pilot-data-context';
+  const IMPORT_REVIEW_KEY = 'cdb-import-review';
+  let _importPaused = false;
+  function importReview() {
+    try { const raw = localStorage.getItem(IMPORT_REVIEW_KEY); if (!raw) return null; const review = JSON.parse(raw); return review && typeof review === 'object' && !Array.isArray(review) ? review : { invalid: true }; }
+    catch (_) { return { invalid: true }; }
+  }
+  function syncHeldForImport() { return _importPaused || !!importReview(); }
+  function emitSyncStateChange() {
+    try { window.dispatchEvent(new CustomEvent('cdb-sync-state-change')); } catch (_) {}
+  }
+  async function beginBackupImport() {
+    if (_importPaused) throw new Error('Outra importação está em andamento.');
+    _importPaused = true;
+    stopRealtime();
+    try {
+      if (flushPromise) await flushPromise;
+      if (pullPromise) await pullPromise;
+      if (!_queueStoreReady) await window.cdbSync.localReady;
+      if (!_queueStoreReady) throw new Error('A fila local ainda não está disponível.');
+    } catch (error) { _importPaused = false; throw error; }
+  }
+  function snapshotForSync(state) {
+    return JSON.parse(JSON.stringify({ products: state.products.map(({count, photo, ...r}) => r), clients: state.clients,
+      orders: state.orders, cashEntries: state.cashEntries, batches: state.batches.map(stripBatchPhotoBytes) }));
+  }
+  function finishBackupImport(queue, state) {
+    // O snapshot já foi persistido: importar não é uma nova venda ou movimento de estoque.
+    _queueCache = JSON.parse(JSON.stringify(queue));
+    lastSnapshot = snapshotForSync(state);
+    if (window.cdbQueueStore && window.cdbQueueStore.ready && !window.cdbQueueStore.degraded)
+      window.cdbQueueStore.saveAll(_queueCache).catch(e => console.warn('[import] fila preservada no localStorage:', e && e.message));
+    updatePendingCount();
+  }
+  function endBackupImport() { _importPaused = false; emitSyncStateChange(); if (!importReview()) startRealtime(); }
+  async function confirmImportedDataContext() {
+    const review = importReview(), pairing = loadPairing();
+    if (!review) return;
+    if (review.invalid || !pairing || !pairing.apiKey || !pairing.empresaId || !pairing.lojaId || _pairingInvalid)
+      throw new Error('Conecte este aparelho à empresa e loja corretas antes de confirmar a importação.');
+    if (review.sourceContext && (String(review.sourceContext.empresaId) !== String(pairing.empresaId) || String(review.sourceContext.lojaId) !== String(pairing.lojaId)))
+      throw new Error('O backup pertence a outra empresa ou loja. Os dados continuam preservados e sem envio.');
+    if (review.requiresReconciliation) throw new Error('Este backup não comprova a fila completa. A equipe precisa conferir os dados do Android de origem e concluir a migração inicial para o EasyStok. Reexportar o arquivo não confirma que o histórico chegou ao servidor. Os registros continuam preservados offline.');
+    localStorage.removeItem(IMPORT_REVIEW_KEY);
+    emitSyncStateChange();
+    await flush();
+    await pull();
+    startRealtime();
+  }
+
+  const IMPORT_SOURCE_KEY = 'cdb-import-source';
+  const IMPORT_RECEIPT_KEY = 'cdb-last-legacy-import';
+  function importedLegacySource() {
+    try { const raw = localStorage.getItem(IMPORT_SOURCE_KEY); return raw ? JSON.parse(raw) : null; }
+    catch (_) { return null; }
+  }
+  function getLastLegacyMigration() {
+    try { return JSON.parse(localStorage.getItem(IMPORT_RECEIPT_KEY) || 'null'); } catch (_) { return null; }
+  }
+  function getLegacyHistoryRules() {
+    const result = { batchIds: [], orderStates: Object.create(null) }, batches = new Set();
+    const merge = rules => {
+      if (!rules || !Array.isArray(rules.batchIds) || !rules.orderStates || typeof rules.orderStates !== 'object') return;
+      rules.batchIds.forEach(id => { if (typeof id === 'string') batches.add(id); });
+      Object.entries(rules.orderStates).forEach(([id, status]) => {
+        if (['pronto', 'entregue', 'cancelado'].includes(status) && !['entregue', 'cancelado'].includes(result.orderStates[id])) result.orderStates[id] = status;
+      });
+    };
+    const receipt = getLastLegacyMigration(), source = importedLegacySource(), review = importReview();
+    merge(receipt && receipt.historyRules); merge(source && source.historyRules);
+    if (review && review.requiresReconciliation && source) {
+      try {
+        const state = JSON.parse(source.snapshotJson);
+        merge({ batchIds: (state.batches || []).map(row => row.id), orderStates: Object.fromEntries((state.orders || []).map(row => [row.id, row.status])) });
+      } catch (_) {}
+    }
+    result.batchIds = Array.from(batches);
+    return result;
+  }
+  function legacyArchiveWarning(source) {
+    return source && Array.isArray(source.archivedStorageKeys) && source.archivedStorageKeys.length
+      ? ['Compras e auditoria antigas preservadas como anexos no backup; não alteram as listas atuais do app nem do EasyStok.'] : [];
+  }
+  function getImportedMigrationState() {
+    const review = importReview(), source = importedLegacySource(), pairing = loadPairing();
+    const state = { available: false, reason: '', counts: source && source.counts || {}, prepared: !!(source && source.preparedRequest),
+      importId: source && source.importId || null, sourceNeverSyncedConfirmationRequired: true, archiveOnlyCollections: [], warnings: [] };
+    if (state.counts.cashClosings > 0) {
+      state.archiveOnlyCollections = ['cashClosings'];
+      state.warnings = ['Fechamentos antigos serão preservados no backup; não reabrem nem recalculam caixa do EasyStok.'];
+    }
+    state.warnings.push(...legacyArchiveWarning(source));
+    if (!review || !review.requiresReconciliation || review.invalid) state.reason = 'Não há histórico local aguardando primeira migração.';
+    else if (!source || !source.importId || typeof source.snapshotJson !== 'string' || !Array.isArray(source.originMutationIds)) state.reason = 'Importe novamente o arquivo original para capturar o histórico antes de migrar.';
+    else if (!pairing || !pairing.apiKey || !pairing.empresaId || !pairing.lojaId || _pairingInvalid) state.reason = 'Conecte este aparelho à empresa e loja corretas antes de migrar.';
+    else if (review.sourceContext && (String(review.sourceContext.empresaId) !== String(pairing.empresaId) || String(review.sourceContext.lojaId) !== String(pairing.lojaId))) state.reason = 'O arquivo e a conexão pertencem a empresas ou lojas diferentes.';
+    else if (source.preparedRequest && (String(source.preparedRequest.expectedEmpresaId) !== String(pairing.empresaId) || String(source.preparedRequest.expectedLojaId) !== String(pairing.lojaId))) state.reason = 'Retome a migração na mesma empresa e loja em que ela foi preparada.';
+    else if (!navigator.onLine) state.reason = 'Conecte à internet para enviar e conferir a primeira migração.';
+    else if (_importPaused) state.reason = 'Aguarde a operação de importação em andamento.';
+    else state.available = true;
+    return state;
+  }
+  async function migrateImportedLegacyData(options) {
+    if (!options || options.sourceNeverSynced !== true) throw new Error('Confirme que este histórico do Android nunca foi enviado ao EasyStok.');
+    const initial = getImportedMigrationState();
+    if (!initial.available) throw new Error(initial.reason);
+    const pairing = loadPairing();
+    if (String(options.expectedEmpresaId) !== String(pairing.empresaId) || String(options.expectedLojaId) !== String(pairing.lojaId)) throw new Error('A empresa ou loja mudou. Confira novamente o destino da migração.');
+    await beginBackupImport();
+    let receipt;
+    try {
+      const source = importedLegacySource();
+      const digest = async text => Array.from(new Uint8Array(await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))), byte => byte.toString(16).padStart(2, '0')).join('');
+      if (!source || await digest(source.snapshotJson) !== source.snapshotSha256) throw new Error('A captura do histórico foi alterada. Preserve o arquivo e peça revisão à equipe.');
+      const request = source.preparedRequest || { importId: source.importId, snapshotJson: source.snapshotJson, snapshotSha256: source.snapshotSha256,
+        originMutationIds: source.originMutationIds, sourceNeverSynced: true, expectedEmpresaId: pairing.empresaId, expectedLojaId: pairing.lojaId,
+        operatorName: window.cdbApp && window.cdbApp.getOperator ? window.cdbApp.getOperator() : localStorage.getItem('cdb-operator-name') || null };
+      const sameId = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
+      if (!sameId(request.importId, source.importId) || request.snapshotJson !== source.snapshotJson || request.snapshotSha256 !== source.snapshotSha256
+        || request.sourceNeverSynced !== true || JSON.stringify(request.originMutationIds) !== JSON.stringify(source.originMutationIds)
+        || !sameId(String(request.expectedEmpresaId), String(pairing.empresaId)) || !sameId(String(request.expectedLojaId), String(pairing.lojaId))) throw new Error('A solicitação preparada não corresponde mais à captura ou ao destino. Nada novo foi enviado.');
+      source.preparedRequest = request;
+      const review = importReview();
+      review.undoBlocked = true; review.migrationStartedAt = review.migrationStartedAt || Date.now();
+      // Persistir antes da rede permite repetir exatamente a solicitação após timeout/reabertura.
+      window.writeBackupImportEntries([[IMPORT_SOURCE_KEY, JSON.stringify(source)], [IMPORT_REVIEW_KEY, JSON.stringify(review)]]);
+      emitSyncStateChange();
+      const stillSameDestination = () => { const current = loadPairing(); return current && sameId(String(current.empresaId), String(request.expectedEmpresaId)) && sameId(String(current.lojaId), String(request.expectedLojaId)); };
+      if (!stillSameDestination()) throw new Error('A conexão mudou durante a preparação. Retome na mesma empresa e loja.');
+      const send = async (url, init) => {
+        const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60000);
+        try {
+          const response = await fetch(url, Object.assign({}, init, { signal: ctrl.signal }));
+          let data = null; try { data = await response.json(); } catch (_) {}
+          return { response, data };
+        } catch (_) { throw new Error('Não foi possível confirmar a comunicação com o EasyStok. Retome a mesma migração; os dados locais continuam preservados.'); }
+        finally { clearTimeout(timer); }
+      };
+      const { response, data } = await send(API_BASE_URL + API_PREFIX + '/legacy-import', { method: 'POST', headers: baseHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(request) });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) _pairingInvalid = true;
+        const error = new Error(data && (data.message || data.detail || data.title || data.error) || 'O EasyStok não confirmou a migração (HTTP ' + response.status + '). O histórico continua preservado.');
+        if (data && data.code) error.code = data.code;
+        throw error;
+      }
+      const requested = new Set(request.originMutationIds);
+      const covered = data && Array.isArray(data.coveredMutationIds) && data.coveredMutationIds.every(id => typeof id === 'string') ? new Set(data.coveredMutationIds) : null;
+      if (!data || !sameId(data.importId, request.importId) || !sameId(data.snapshotSha256, request.snapshotSha256)
+        || !sameId(String(data.empresaId), String(request.expectedEmpresaId)) || !sameId(String(data.lojaId), String(request.expectedLojaId))
+        || !covered || covered.size !== requested.size || Array.from(covered).some(id => !requested.has(id))) throw new Error('O recibo da migração não corresponde ao envio. O histórico continua em revisão; retome a mesma migração com a equipe.');
+      const { response: readbackResponse, data: readback } = await send(API_BASE_URL + API_PREFIX + '/legacy-import/' + encodeURIComponent(request.importId) + '/snapshot', { headers: baseHeaders() });
+      if (!readbackResponse.ok || !readback || !sameId(readback.importId, request.importId) || !sameId(readback.snapshotSha256, request.snapshotSha256) || readback.snapshotJson !== request.snapshotJson) throw new Error('O EasyStok recebeu o envio, mas a cópia do histórico ainda não pôde ser conferida. Retome esta mesma migração; os dados locais continuam preservados.');
+      if (!stillSameDestination()) throw new Error('O envio foi conferido, mas a conexão mudou. Retome a mesma empresa e loja antes de liberar a fila.');
+      // Recarregar a fila conserva operações criadas no APK durante a chamada.
+      const remaining = loadQueue().filter(m => !covered.has(m.id));
+      receipt = { importId: data.importId, snapshotSha256: data.snapshotSha256, empresaId: data.empresaId, lojaId: data.lojaId,
+        counts: data.counts, coveredMutationIds: data.coveredMutationIds, replayed: !!data.replayed,
+        archiveOnlyCollections: data.archiveOnlyCollections || [], warnings: (data.warnings || []).concat(legacyArchiveWarning(source)), archivedStorageKeys: source.archivedStorageKeys || [], historyRules: getLegacyHistoryRules(), acknowledgedAt: Date.now() };
+      window.writeBackupImportEntries([[QUEUE_KEY, JSON.stringify(remaining)], [IMPORT_RECEIPT_KEY, JSON.stringify(receipt)], [IMPORT_REVIEW_KEY, null], [IMPORT_SOURCE_KEY, null]]);
+      finishBackupImport(remaining, window.cdbApp.getState());
+    } finally { endBackupImport(); }
+    await flush(); await pull(); startRealtime();
+    return receipt;
+  }
+
+  function pilotDataContext() {
+    if (!window.CDB_CONFIG?.isPilot) return null;
+    const pairing = loadPairing();
+    if (pairing?.empresaId && pairing?.lojaId) return pairing;
+    try {
+      const stored = localStorage.getItem(PILOT_CONTEXT_KEY);
+      if (stored !== null) {
+        const context = JSON.parse(stored);
+        return context?.empresaId && context?.lojaId ? context : { invalid: true };
+      }
+      return localStorage.getItem(PAIRING_KEY) === null ? null : { invalid: true };
+    } catch (_) { return { invalid: true }; }
+  }
+
+  function guardPilotContextChange() {
+    if (!pilotDataContext()) return;
+    const hasData = loadQueue().length > 0 || ['cdb-products', 'cdb-clients', 'cdb-orders', 'cdb-batches', 'cdb-cash', 'cdb-cash-closings', 'cdb-shopping', 'cdb-audit-log']
+      .some(key => {
+        try { const data = JSON.parse(localStorage.getItem(key) || '[]'); return !Array.isArray(data) || data.length > 0; }
+        catch (_) { return true; }
+      });
+    if (hasData) throw new Error('Este aparelho já tem dados vinculados. A equipe precisa revisar a conexão antes de parear novamente ou trocar de loja. Seus dados foram mantidos; não desinstale o app.');
+  }
+
+  // A autenticação não autoriza escolher outra origem para uma fila já existente.
+  // Na retomada da mesma origem só a credencial muda, nunca os dados ou os IDs.
+  function applySessionPairing(data, options) {
+    const reject = (code, message) => { throw Object.assign(new Error(message), { code }); };
+    const sameContextId = (first, second) => String(first).toLowerCase() === String(second).toLowerCase();
+    if (!data || typeof data.apiKey !== 'string' || !data.apiKey || typeof data.empresaId !== 'string' || !data.empresaId
+      || typeof data.lojaId !== 'string' || !data.lojaId || data.deviceId !== deviceId)
+      reject('SESSION_PAIRING_INVALID', 'A conexão da conta não corresponde a este aparelho. Seus dados foram mantidos.');
+    const origin = pilotDataContext();
+    if (origin && (origin.invalid || !sameContextId(origin.empresaId, data.empresaId) || !sameContextId(origin.lojaId, data.lojaId)))
+      reject('LOCAL_CONTEXT_MISMATCH', 'Os dados deste aparelho pertencem a outra empresa ou loja. Nenhum dado foi enviado.');
+    const hasData = loadQueue().length > 0 || ['cdb-products', 'cdb-clients', 'cdb-orders', 'cdb-batches', 'cdb-cash', 'cdb-cash-closings', 'cdb-shopping', 'cdb-audit-log']
+      .some(key => { try { const rows = JSON.parse(localStorage.getItem(key) || '[]'); return !Array.isArray(rows) || rows.length > 0; } catch (_) { return true; } });
+    if (!origin && hasData && options?.confirmLocalContext !== true)
+      reject('LOCAL_CONTEXT_REQUIRED', 'Confira a empresa e a loja dos dados já existentes antes de sincronizar.');
+    savePairing({ apiKey: data.apiKey, empresaId: data.empresaId, lojaId: data.lojaId, deviceId,
+      label: data.label || null, defaultOperatorName: data.defaultOperatorName || null, pairedAt: data.pairedAt || null,
+      empresaNome: data.empresaNome || null, lojaNome: data.lojaNome || null });
+    if (!origin) resetPullCursor();
+    applyEmpresaNomeDoPareamento(data.empresaNome);
+    _pairingInvalid = false;
+    emitSyncStateChange();
+    return { paired: true };
+  }
 
   // ---- Device ID (primeiro boot gera um UUID, persiste) ----
   function getDeviceId() {
@@ -180,9 +393,28 @@
     try { return JSON.parse(localStorage.getItem(PAIRING_KEY) || 'null'); } catch (e) { return null; }
   }
   function savePairing(p) {
+    const review = importReview();
+    if (review && (review.invalid || (review.sourceContext && (String(review.sourceContext.empresaId) !== String(p.empresaId) || String(review.sourceContext.lojaId) !== String(p.lojaId)))))
+      throw new Error('O pareamento não corresponde à empresa e loja do backup. Nenhum dado foi enviado.');
+    if (window.CDB_CONFIG?.isPilot) {
+      try {
+        if (p?.empresaId && p?.lojaId) {
+          localStorage.setItem(PILOT_CONTEXT_KEY, JSON.stringify({ empresaId: p.empresaId, lojaId: p.lojaId }));
+        }
+        localStorage.setItem(PAIRING_KEY, JSON.stringify(p));
+        emitSyncStateChange();
+      } catch (_) {
+        _pairingInvalid = true;
+        throw new Error('A conexão não pôde ser salva no aparelho. Seus dados foram mantidos. Procure a equipe para recuperar o vínculo; não desinstale o app.');
+      }
+      return;
+    }
     try { localStorage.setItem(PAIRING_KEY, JSON.stringify(p)); } catch (e) {}
   }
   function clearPairing() {
+    // O piloto conserva o contexto mesmo após desconectar, sem apagar dados ou fila.
+    const context = pilotDataContext();
+    if (context) localStorage.setItem(PILOT_CONTEXT_KEY, JSON.stringify({ empresaId: context.empresaId, lojaId: context.lojaId }));
     // INVARIANTE: clearPairing remove APENAS PAIRING_KEY (cdb-pairing).
     // NAO toca em cdb-sync-queue (fila offline), cdb-device-id (identidade
     // do device), cdb-products / cdb-orders / cdb-batches / cdb-cash etc
@@ -198,6 +430,7 @@
     // Reseta flag de invalido — sem pairing, comportamento volta ao
     // legado (request anonimo). App segue offline-first.
     _pairingInvalid = false;
+    emitSyncStateChange();
   }
   // #1474: troca o "Minha empresa" do topo pelo nome que o pareamento devolveu.
   // Nao sobrescreve nome que o operador ja personalizou em Ajustes.
@@ -214,6 +447,7 @@
     return true;
   }
   function getApiKey() {
+    if (window.CDB_CONFIG?.requiresGoogleSession && window.cdbAuth?.canSync?.() !== true) return null;
     const p = loadPairing();
     return (p && p.apiKey) || null;
   }
@@ -573,6 +807,7 @@
   function updatePendingCount() {
     const q = loadQueue();
     if (window.cdbApp) window.cdbApp.setPendingSync(q.length);
+    emitSyncStateChange();
   }
 
   // ---- #1520 (ADR-0060): exclusao de lancamento de caixa ----
@@ -689,8 +924,27 @@
   // server caido por 1h causaria ~120 reqs/h por device — com backoff cai
   // pra ~6 reqs/h apos 5 falhas consecutivas.
   let _consecutiveFlushFailures = 0;
+  const PERIODIC_PULL_MIN_INTERVAL_MS = 60000; // #2347: mínimo entre pulls do laço (não dobra com o SSE)
   const FLUSH_DELAY_NORMAL_MS = 30000;   // 30s — delay padrao
   const FLUSH_DELAY_CAP_MS = 600000;     // 10min — cap maximo do backoff
+  // #2184: backup 'pre-sync' antes de enviar a fila (ver _flushInner).
+  let _chaveBackupPreSync = null;
+  let _ultimoAvisoBackupFalhou = 0;
+  function _temCanalDeBackupNativo() {
+    return !!(_getPublicBackupPlugin() || _getFilesystemPlugin());
+  }
+  function _avisarBackupFalhou() {
+    // O flush de 30s repete a falha: avisa no maximo a cada 5 min.
+    const agora = Date.now();
+    if (agora - _ultimoAvisoBackupFalhou < 300000) return;
+    _ultimoAvisoBackupFalhou = agora;
+    try {
+      if (window.cdbApp && window.cdbApp.showToast) {
+        window.cdbApp.showToast('Não foi possível salvar o backup deste aparelho. Nada foi enviado; as alterações continuam na fila.');
+      }
+    } catch (_) {}
+  }
+
   async function flush() {
     // F10-C-1: re-entry retorna a MESMA promise pendente. Sem race.
     if (flushPromise) return flushPromise;
@@ -699,6 +953,8 @@
   }
 
   async function _flushInner() {
+    if (syncHeldForImport()) return 'review';
+    if (window.CDB_CONFIG?.isPilot && !getApiKey()) return 'auth';
     if (_pairingInvalid) return 'auth'; // backoff até re-parear
     const queue = loadQueue();
     if (queue.length === 0) {
@@ -706,6 +962,22 @@
       return 'empty';
     }
     if (!navigator.onLine) return 'offline';
+
+    // #2184: backup local antes de qualquer envio. Sem canal nativo (navegador)
+    // nao ha onde gravar, entao segue como antes. A mesma fila ja coberta pelo
+    // ultimo backup pre-sync (ex: retry) nao grava de novo.
+    if (_temCanalDeBackupNativo()) {
+      const chaveFila = queue.map((m) => m.id).join('|');
+      if (chaveFila !== _chaveBackupPreSync) {
+        let backup = null;
+        try { backup = await localBackupToFile('pre-sync'); } catch (_) { backup = null; }
+        if (!backup || !backup.ok) {
+          _avisarBackupFalhou();
+          return 'backup-failed';
+        }
+        _chaveBackupPreSync = chaveFila;
+      }
+    }
 
     try {
       const url = API_BASE_URL + API_PREFIX + '/sync';
@@ -774,6 +1046,10 @@
         saveQueue(remaining);
       }
       // Se acceptedIds ausente, mantém a fila intacta (melhor reenviar do que perder).
+      // #2209: o pull nunca devolve a este aparelho o lote que ele lançou; o número vem aqui.
+      if (result.numerosCurtos && typeof result.numerosCurtos === 'object') {
+        try { _gravarNumerosCurtos(result.numerosCurtos); } catch (e) { console.warn('[sync] número do lote:', e && e.message); }
+      }
       // F4 — feedback visual: avisa o app pra mostrar toast com qtd sincronizada.
       if (acceptedCount > 0) {
         try {
@@ -791,7 +1067,7 @@
           // Server retorna { mutationId, reason } — usar mutationId, não id.
           const conflictIds = new Set(conflicts.map(c => c.mutationId));
           // #1509: guarda copia na fila de conflitos antes de tirar da fila (sumia sem rastro).
-          _guardarConflitos(loadQueue().filter(m => conflictIds.has(m.id)), conflicts);
+          await _guardarConflitos(loadQueue().filter(m => conflictIds.has(m.id)), conflicts);
           const remaining = loadQueue().filter(m => !conflictIds.has(m.id));
           saveQueue(remaining);
           // C3: server pode incluir winningPayload com a versao server vencedora;
@@ -817,7 +1093,7 @@
         const recusadas = result.rejected.filter(r => r && r.mutationId && r.reason
           && !r.reason.startsWith('conflict:') && !r.reason.startsWith('migrate:'));
         if (recusadas.length > 0) {
-          _moverRecusadasParaDeadletter(recusadas);
+          await _moverRecusadasParaDeadletter(recusadas);
         }
       }
       localStorage.setItem(LAST_FULL_SYNC_KEY, String(Date.now()));
@@ -846,41 +1122,29 @@
     // F10-C-1: o reset do flushPromise mora no `.finally(...)` do wrapper flush().
   }
 
-  function _guardarConflitos(itens, conflicts) {
+  async function _guardarConflitos(itens, conflicts) {
     const qs = window.cdbQueueStore;
-    if (!qs || typeof qs.addConflict !== 'function') return;
+    if (!qs || !qs.ready || qs.degraded || typeof qs.addConflict !== 'function') throw new Error('Não foi possível preservar os conflitos. A fila original foi mantida.');
     const porId = new Map((conflicts || []).map(c => [c.mutationId, c]));
-    itens.forEach(m => {
+    for (const m of itens) {
       const c = porId.get(m.id) || {};
-      const copia = Object.assign({}, m, { conflictReason: c.reason || null, winningPayload: c.winningPayload || null });
-      try {
-        Promise.resolve(qs.addConflict(copia)).catch(e => console.warn('[sync] addConflict falhou:', e && e.message));
-      } catch (e) { console.warn('[sync] addConflict falhou:', e && e.message); }
-    });
+      await qs.addConflict(Object.assign({}, m, { conflictReason: c.reason || null, winningPayload: c.winningPayload || null }));
+    }
   }
 
-  function _moverRecusadasParaDeadletter(recusadas) {
+  async function _moverRecusadasParaDeadletter(recusadas) {
     const motivos = new Map(recusadas.map(r => [r.mutationId, r.reason]));
-    const fila = loadQueue();
-    const itens = fila.filter(m => motivos.has(m.id));
+    const fila = loadQueue(), itens = fila.filter(m => motivos.has(m.id));
     if (itens.length === 0) return;
-    saveQueue(fila.filter(m => !motivos.has(m.id)));
     const qs = window.cdbQueueStore;
-    itens.forEach(m => {
-      try {
-        if (qs && typeof qs.moveToDeadletter === 'function') {
-          Promise.resolve(qs.moveToDeadletter([m], motivos.get(m.id)))
-            .catch(e => console.warn('[sync] moveToDeadletter falhou:', e && e.message));
-        }
-      } catch (e) { console.warn('[sync] moveToDeadletter falhou:', e && e.message); }
-    });
+    if (!qs || !qs.ready || qs.degraded || typeof qs.moveToDeadletter !== 'function') throw new Error('Não foi possível preservar as alterações recusadas. A fila original foi mantida.');
+    for (const m of itens) await qs.moveToDeadletter([m], motivos.get(m.id));
+    saveQueue(loadQueue().filter(m => !motivos.has(m.id)));
     _trace('flush', 'recusadas -> dead-letter', { items: itens.length });
     try {
-      if (window.cdbApp && typeof window.cdbApp.showToast === 'function') {
-        window.cdbApp.showToast(itens.length === 1
-          ? '1 alteração não foi aceita pelo servidor. Veja em Ajustes > Diagnóstico.'
-          : itens.length + ' alterações não foram aceitas pelo servidor. Veja em Ajustes > Diagnóstico.');
-      }
+      if (window.cdbApp && typeof window.cdbApp.showToast === 'function') window.cdbApp.showToast(itens.length === 1
+        ? '1 alteração não foi aceita pelo servidor. Veja em Ajustes > Diagnóstico.'
+        : itens.length + ' alterações não foram aceitas pelo servidor. Veja em Ajustes > Diagnóstico.');
     } catch (_) {}
   }
 
@@ -888,7 +1152,17 @@
   // OFFLINE-FIRST: silencioso quando offline ou pairing invalido.
   // F7: contador de falhas consecutivas — abre ticket auto apos 5.
   let _consecutivePullFailures = 0;
+  let pullPromise = null;
+  let _lastPullAt = 0;
+  let _pullDeferred = false;
   async function pull() {
+    if (pullPromise) return pullPromise;
+    pullPromise = _pullInner().finally(() => { pullPromise = null; });
+    return pullPromise;
+  }
+  async function _pullInner() {
+    _lastPullAt = Date.now();
+    if (syncHeldForImport() || (window.CDB_CONFIG?.isPilot && !getApiKey())) return;
     if (!navigator.onLine) return;
     if (_pairingInvalid) return;
     let since = null;
@@ -922,8 +1196,13 @@
       const serverTime = data && Number(data.serverTime);
       if (!Number.isFinite(serverTime) || serverTime <= 0 || !Array.isArray(data.mutations))
         throw new Error('Resposta de sincronização inválida.');
-      if (!applyServerMutations(data.mutations))
+      let unresolved = [];
+      const qs = window.cdbQueueStore;
+      if (qs && qs.ready && !qs.degraded) unresolved = (await qs.getConflicts()).concat(await qs.getDeadletter());
+      if (!applyServerMutations(data.mutations, unresolved)) {
+        if (_pullDeferred) return;
         throw new Error('Não foi possível gravar todos os dados recebidos. A sincronização será repetida.');
+      }
       localStorage.setItem(PULL_CURSOR_KEY, String(serverTime));
       localStorage.removeItem(FULL_PULL_TIMEOUTS_KEY);
       _consecutivePullFailures = 0;
@@ -956,10 +1235,39 @@
     // F7-C: fechamento de caixa snapshot. Mobile mantem em cashClosings[].
     closing:   { stateKey: 'cashClosings', storage: 'cdb-cash-closings' }
   };
-  const _MARCAS_DE_LOTE = ['deleted', 'deletedAt', 'deletedBy', 'discarded', 'discardedAt', 'discardedBy', 'discardReason'];
+  const _MARCAS_DE_LOTE = ['deleted', 'deletedAt', 'deletedBy', 'discarded', 'discardedAt', 'discardedBy', 'discardReason', 'legacyImported'];
   let _consecutiveApplyFailures = 0;
 
-  function applyServerMutations(mutations) {
+  // #2209: número curto do lote (#2199), o da chave de 12 dígitos da barra. Só o servidor o dá
+  // (8 dígitos, 10 depois de 99.999.999). Gravá-lo não é mudança do aparelho: o snapshot também
+  // o recebe, para o próximo save não devolver o lote ao servidor, e a tela não recarrega.
+  const _NUMERO_CURTO = /^(\d{8}|\d{10})$/;
+  function _numeroCurtoValido(n) { return typeof n === 'string' && _NUMERO_CURTO.test(n); }
+  function _numeroNoSnapshot(id, n) {
+    const s = lastSnapshot && Array.isArray(lastSnapshot.batches) ? lastSnapshot.batches.find(x => x && x.id === id) : null;
+    if (s) s.numeroCurto = n;
+  }
+  function _gravarNumerosCurtos(numeros) {
+    if (!window.cdbApp) return;
+    const state = window.cdbApp.getState();
+    if (!state || !Array.isArray(state.batches)) return;
+    let mudou = false;
+    state.batches.forEach(b => {
+      if (!b || !Object.prototype.hasOwnProperty.call(numeros, b.id)) return;
+      const n = numeros[b.id];
+      if (!_numeroCurtoValido(n) || b.numeroCurto === n) return;
+      b.numeroCurto = n;
+      _numeroNoSnapshot(b.id, n);
+      mudou = true;
+    });
+    if (mudou) localStorage.setItem(_SERVER_MUTATION_MAP.batch.storage, JSON.stringify(state.batches));
+  }
+
+  function applyServerMutations(mutations, unresolved = []) {
+    _pullDeferred = syncHeldForImport();
+    if (_pullDeferred) return false;
+    const pending = new Set(loadQueue().concat(unresolved).map(m => m.type === 'stock.delta'
+      ? 'product:' + m.payload.productId : m.type.split('.')[0] + ':' + m.payload.id));
     if (!mutations.length) return true;
     if (!window.cdbApp) return false;
     const state = window.cdbApp.getState();
@@ -968,6 +1276,7 @@
     mutations.forEach(m => {
       try {
         const [type, op] = m.type.split('.');
+        if (pending.has(type + ':' + m.payload.id)) { _pullDeferred = true; return; }
         const map = _SERVER_MUTATION_MAP[type];
         if (!map) return; // tipo desconhecido — ignora silenciosamente
         const coll = state[map.stateKey];
@@ -983,6 +1292,22 @@
           return;
         }
 
+        // #2431: pedido do app pago no console ou no Mercado Pago. Desce so o saldo a receber; trocar o
+        // pedido inteiro apagaria o que o aparelho ainda nao enviou. O snapshot do diff recebe o mesmo
+        // valor, senao um save antes do reload devolveria o pedido ao servidor como edicao deste aparelho.
+        if (type === 'order' && op === 'aReceber') {
+          const bruto = m.payload.aReceber;
+          const valor = bruto == null ? NaN : Number(bruto);
+          if (idx < 0 || !Number.isFinite(valor) || coll[idx].aReceber === valor) return;
+          coll[idx].aReceber = valor;
+          const base = lastSnapshot && Array.isArray(lastSnapshot.orders)
+            ? lastSnapshot.orders.find(x => x && x.id === m.payload.id) : null;
+          if (base) base.aReceber = valor;
+          changed = true;
+          localStorage.setItem(map.storage, JSON.stringify(coll));
+          return;
+        }
+
         // #1520: lote que o aparelho ja tem recebe so as marcas de exclusao e descarte, como
         // o servidor faz (itens sao imutaveis). Trocar o lote inteiro apagava a foto e o status
         // locais, que o servidor nao guarda. O saldo vem pelo produto, nao daqui.
@@ -993,11 +1318,22 @@
             if (novo === undefined) delete coll[idx][k]; else coll[idx][k] = novo;
             changed = true;
           });
+          // #2209: o número entra sem recarregar; o servidor antigo, sem o campo, não o apaga.
+          const numero = m.payload.numeroCurto;
+          if (_numeroCurtoValido(numero) && coll[idx].numeroCurto !== numero) {
+            coll[idx].numeroCurto = numero;
+            _numeroNoSnapshot(coll[idx].id, numero);
+          }
           localStorage.setItem(map.storage, JSON.stringify(coll));
           return;
         }
+        if (type === 'batch' && op === 'upsert' && m.payload.numeroCurto != null && !_numeroCurtoValido(m.payload.numeroCurto)) {
+          m.payload = Object.assign({}, m.payload);
+          delete m.payload.numeroCurto;
+        }
 
         if (op === 'upsert') {
+          if (type === 'product' && idx >= 0 && !Object.prototype.hasOwnProperty.call(m.payload, 'photo') && coll[idx].photo) m.payload = { ...m.payload, photo: coll[idx].photo };
           if (idx >= 0) coll[idx] = m.payload;
           else coll.push(m.payload);
           changed = true;
@@ -1006,7 +1342,8 @@
           if (type === 'product') {
             const base = lastSnapshot ? lastSnapshot.products : _produtosNoBoot;
             const i = base.findIndex(x => x.id === m.payload.id);
-            const copia = JSON.parse(JSON.stringify(m.payload));
+            const { count, photo, ...syncedProduct } = m.payload;
+            const copia = JSON.parse(JSON.stringify(syncedProduct));
             if (i >= 0) base[i] = copia; else base.push(copia);
           }
         } else if (op === 'delete') {
@@ -1047,20 +1384,13 @@
         setTimeout(() => location.reload(), 100);
       })();
     }
-    return errorsThisBatch === 0;
+    return errorsThisBatch === 0 && !_pullDeferred;
   }
 
   // ---- Hook de persistência: chamado pelo app a cada save ----
   window.cdbOnPersist = function (state) {
     const muts = computeMutations(lastSnapshot, state);
-    lastSnapshot = JSON.parse(JSON.stringify({
-      products: state.products.map(({count, photo, ...r}) => r),
-      clients: state.clients,
-      orders: state.orders,
-      cashEntries: state.cashEntries,
-      // A6: snapshot stripado pra bater com o diff em computeMutations.
-      batches: state.batches.map(stripBatchPhotoBytes)
-    }));
+    lastSnapshot = snapshotForSync(state);
     if (muts.length) {
       enqueue(muts);
       // Tenta sincronizar na hora (se online)
@@ -1073,7 +1403,7 @@
   //   ok / empty     → 30s (normal)
   //   retry          → 30s * 2^(failures-1), cap 10min (60/120/240/480/600)
   //   auth           → 10min (so re-pareamento destrava; loop checa de vez em quando)
-  //   offline / busy → 30s (sem mudar contador — proximo tick vai tentar)
+  //   offline / busy / backup-failed → 30s (sem mudar contador — proximo tick vai tentar)
   function computeFlushDelay(status) {
     if (status === 'auth') return FLUSH_DELAY_CAP_MS;
     if (status === 'retry') {
@@ -1131,8 +1461,7 @@
     flushIntervalId = setTimeout(async function flushTick() {
       let status = 'ok';
       try {
-        status = (await flush()) || 'ok';
-        fetchAndProcessCommands();
+        status = await runSyncCycle();
       } catch (e) {
         try { console.warn('[sync] tick falhou:', e && e.message); } catch (_) {}
         status = 'retry';
@@ -1140,6 +1469,19 @@
         scheduleNextFlush(computeFlushDelay(status));
       }
     }, delay);
+  }
+  // Um ciclo do laço: flush, comandos remotos, regra de impressão e, passado o intervalo mínimo, pull.
+  async function runSyncCycle() {
+    const status = (await flush()) || 'ok';
+    fetchAndProcessCommands();
+    // #2209: a regra de impressão da loja; o próprio atualizar segura o intervalo de 10 min.
+    atualizarRegraImpressao();
+    // #2347: mudança feita no servidor (console, site, pagamento) não gera SSE para este aparelho.
+    // Sem 'review'/'auth' (import ou pareamento inválido); falha do pull não vira retry do flush.
+    if (status !== 'review' && status !== 'auth' && Date.now() - _lastPullAt >= PERIODIC_PULL_MIN_INTERVAL_MS) {
+      pull().catch(() => {});
+    }
+    return status;
   }
   function stop() {
     if (flushIntervalId) { clearTimeout(flushIntervalId); flushIntervalId = null; }
@@ -1162,45 +1504,74 @@
     }
   } catch (_) {}
 
+  let resolveLocalReady;
+  const localReady = new Promise(resolve => { resolveLocalReady = resolve; });
   setTimeout(() => {
-    if (window.cdbApp) {
-      const s = window.cdbApp.getState();
-      lastSnapshot = JSON.parse(JSON.stringify({
-        products: s.products.map(({count, photo, ...r}) => r),
-        clients: s.clients,
-        orders: s.orders,
-        cashEntries: s.cashEntries,
-        // A6: snapshot inicial tambem stripado, senao o primeiro diff
-        // gerado por cdbOnPersist comparar inflated vs stripped e enfileirar
-        // batch inteira como "novidade".
-        batches: s.batches.map(stripBatchPhotoBytes)
-      }));
-    }
-    updatePendingCount();
-    // #1520: exclusao de lancamento que ficou no "Desfazer" quando o app fechou.
-    confirmarExclusoesPendentes();
-    // A5: detecta reinstalacao + oferece restore via backup local. Roda em
-    // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
-    // index.html escuta. Falha silenciosa nao bloqueia o app.
-    maybeOfferRestoreOnReinstall();
-    // F10-C-2: inicializa queue-store IDB antes do primeiro flush.
-    _initQueueStore().then(function () {
+    try {
+      if (window.cdbApp) {
+        const s = window.cdbApp.getState();
+        lastSnapshot = JSON.parse(JSON.stringify({
+          products: s.products.map(({count, photo, ...r}) => r),
+          clients: s.clients,
+          orders: s.orders,
+          cashEntries: s.cashEntries,
+          // A6: snapshot inicial tambem stripado, senao o primeiro diff
+          // gerado por cdbOnPersist comparar inflated vs stripped e enfileirar
+          // batch inteira como "novidade".
+          batches: s.batches.map(stripBatchPhotoBytes)
+        }));
+      }
       updatePendingCount();
-    }).catch(function (e) {
-      _trace('boot', 'queue-store init error (continuing with localStorage)', { error: e && e.message });
-    });
-    // F10-C-7: inicializa photo-store IDB (separado do queue-store).
-    if (window.cdbPhotoStore && typeof window.cdbPhotoStore.init === 'function') {
-      window.cdbPhotoStore.init().catch(function (e) {
-        _trace('boot', 'photo-store init error (fotos nao persistirao)', { error: e && e.message });
+      // #1520: exclusao de lancamento que ficou no "Desfazer" quando o app fechou.
+      confirmarExclusoesPendentes();
+      // A5: detecta reinstalacao + oferece restore via backup local. Roda em
+      // paralelo com o resto do boot — emite evento cdb-restore-prompt que o
+      // index.html escuta. Falha silenciosa nao bloqueia o app.
+      maybeOfferRestoreOnReinstall();
+      // #2066: modo da fila na sessao anterior, gravado pela queue-store. Lido antes do
+      // init, que o sobrescreve. 'ls-fallback' indica aparelho que ja operava sem IDB.
+      let filaAnterior = null;
+      try { filaAnterior = localStorage.getItem('cdb-queue-storage'); } catch (_) {}
+      // F10-C-2: inicializa queue-store IDB antes do primeiro flush.
+      const queueReady = _initQueueStore().then(function (result) {
+        updatePendingCount();
+        if (!_queueStoreReady || !Array.isArray(_queueCache)) return 'unavailable';
+        if (result.storage === 'idb' && !result.degraded
+          && window.cdbQueueStore.ready && !window.cdbQueueStore.degraded) return 'ready';
+        // Falha que ja existia antes desta versao e do aparelho, nao do pacote novo.
+        return filaAnterior === 'ls-fallback' ? 'degraded' : 'unavailable';
+      }).catch(function (e) {
+        _trace('boot', 'queue-store init error (continuing with localStorage)', { error: e && e.message });
+        return 'unavailable';
       });
+      // init de fotos pode resolver mesmo em falha; confira o estado ao concluir.
+      const photoReady = Promise.resolve().then(async function () {
+        const store = window.cdbPhotoStore;
+        if (!store || typeof store.init !== 'function') return false;
+        await store.init();
+        return store.ready === true;
+      }).catch(function (e) {
+        _trace('boot', 'photo-store init error (fotos nao persistirao)', { error: e && e.message });
+        return false;
+      });
+      // Confirma apenas o bootstrap local. Rede, pareamento e fila vazia nao sao gates de OTA.
+      // Sem IDB no aparelho, as fotos tambem nao abrem: o modo degradado ja era o da versao anterior.
+      Promise.all([queueReady, photoReady]).then(function ([fila, fotos]) {
+        if (fila === 'ready' && fotos) resolveLocalReady({ ready: true });
+        else if (fila === 'degraded') resolveLocalReady({ ready: true, degraded: true });
+        else resolveLocalReady({ ready: false, reason: 'local-storage-unavailable' });
+      });
+      flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup)
+        .then(function () { atualizarRegraImpressao(); });
+      // Loop self-rescheduling com backoff exponencial em erro (substitui o
+      // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
+      // longo do server escala ate 10min entre tentativas, economizando
+      // bateria/rede sem perder mutations (fila persiste).
+      scheduleNextFlush(FLUSH_DELAY_NORMAL_MS);
+    } catch (error) {
+      resolveLocalReady({ ready: false, reason: 'local-bootstrap-failed' });
+      throw error;
     }
-    flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
-    // Loop self-rescheduling com backoff exponencial em erro (substitui o
-    // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
-    // longo do server escala ate 10min entre tentativas, economizando
-    // bateria/rede sem perder mutations (fila persiste).
-    scheduleNextFlush(FLUSH_DELAY_NORMAL_MS);
   }, 500);
 
   // ---- Version ping (Onda 0): verifica compat + capabilities do servidor ----
@@ -1230,6 +1601,7 @@
   }
 
   async function uploadBackup(note) {
+    if (syncHeldForImport()) throw new Error('Confira a loja dos dados importados antes de enviar backup ao servidor.');
     if (!navigator.onLine) throw new Error('sem rede');
     if (!getApiKey()) throw new Error('nao pareado');
     const snap = _collectSnapshot();
@@ -1267,6 +1639,7 @@
 
   // Tenta backup automatico se passou >24h desde o ultimo. Falha silenciosa.
   async function maybeAutoBackup() {
+    if (syncHeldForImport()) return;
     if (!navigator.onLine) return;
     if (!getApiKey()) return;
     if (_pairingInvalid) return;
@@ -1590,10 +1963,66 @@
     } finally { clearTimeout(timeoutId); }
   }
 
+  // #2209 (F4): regra de impressão da loja do pareamento, por GET api/mobile/impressao. O servidor
+  // acha a loja pela chave do aparelho; aqui só se confere que a resposta é da loja pareada. Sem
+  // rede, 404 ou resposta de outra loja, fica a regra guardada; a loja sem regra (null) volta ao
+  // padrão do aparelho. Uma busca por vez e no máximo uma a cada 10 min, salvo forcar; a que
+  // falhou tenta de novo em 1 min. A forçada durante outra espera a outra acabar e busca de novo,
+  // para a troca de loja não ficar com a resposta da loja antiga.
+  const REGRA_IMPRESSAO_KEY = 'cdb-regra-impressao.v1';
+  const REGRA_IMPRESSAO_INTERVALO_MS = 10 * 60 * 1000;
+  const REGRA_IMPRESSAO_RETRY_MS = 60 * 1000;
+  let _regraImpressaoProxima = 0;
+  let _regraImpressaoPromise = null;
+  function esquecerRegraImpressao() {
+    _regraImpressaoProxima = 0;
+    try { localStorage.removeItem(REGRA_IMPRESSAO_KEY); } catch (_) {}
+  }
+  function atualizarRegraImpressao(opts) {
+    const forcar = !!(opts && opts.forcar);
+    if (_regraImpressaoPromise) return forcar ? _regraImpressaoPromise.then(() => atualizarRegraImpressao(opts)) : _regraImpressaoPromise;
+    if (!forcar && Date.now() < _regraImpressaoProxima) return Promise.resolve(false);
+    _regraImpressaoProxima = Date.now() + REGRA_IMPRESSAO_RETRY_MS;
+    _regraImpressaoPromise = _buscarRegraImpressao()
+      .then(ok => { if (ok) _regraImpressaoProxima = Date.now() + REGRA_IMPRESSAO_INTERVALO_MS; return ok; })
+      .catch(e => { console.warn('[impressao] regra da loja:', e && e.message); return false; })
+      .finally(() => { _regraImpressaoPromise = null; });
+    return _regraImpressaoPromise;
+  }
+  async function _buscarRegraImpressao() {
+    const pareamento = loadPairing();
+    if (!pareamento || !pareamento.apiKey || !pareamento.lojaId) return false;
+    // A loja é a do pareamento de agora, não a do começo da busca: o switchLoja pode trocá-la no meio.
+    const mesmaLoja = id => { const atual = loadPairing(); return !!(atual && atual.lojaId) && String(id || '').toLowerCase() === String(atual.lojaId).toLowerCase(); };
+    try {
+      const guardada = JSON.parse(localStorage.getItem(REGRA_IMPRESSAO_KEY) || 'null');
+      if (guardada && guardada.lojaId && !mesmaLoja(guardada.lojaId)) localStorage.removeItem(REGRA_IMPRESSAO_KEY);
+    } catch (_) {}
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const limite = ctrl ? setTimeout(() => ctrl.abort(), 10000) : null;
+    let resp;
+    try {
+      // #2321: a carga chama antes do login Google; baseHeaders() então sai sem a chave e o servidor responde 401.
+      // A chave é a do pareamento, a mesma credencial do aparelho nas outras chamadas mobile.
+      resp = await fetch(API_BASE_URL + API_PREFIX + '/impressao', { method: 'GET', headers: { 'X-Device-Id': deviceId, 'X-Mobile-Api-Key': pareamento.apiKey }, signal: ctrl ? ctrl.signal : undefined });
+    } finally { if (limite) clearTimeout(limite); }
+    if (!resp || !resp.ok) return false;
+    const corpo = await resp.json();
+    const d = corpo && corpo.data;
+    if (!d || !mesmaLoja(d.lojaId)) return false;
+    if (d.impressao == null) { localStorage.removeItem(REGRA_IMPRESSAO_KEY); return true; }
+    const I = window.cdbImpressoras;
+    if (!I || typeof I.normalizarRegra !== 'function') return false;
+    localStorage.setItem(REGRA_IMPRESSAO_KEY, JSON.stringify(Object.assign({}, I.normalizarRegra(d.impressao),
+      { lojaId: d.lojaId, versao: d.versao, alteradoEm: d.alteradoEm || null })));
+    return true;
+  }
+
   async function switchLoja(lojaId) {
     if (!navigator.onLine) throw new Error('sem rede');
     if (!getApiKey()) throw new Error('nao pareado');
     if (!lojaId) throw new Error('lojaId obrigatorio');
+    if (lojaId !== loadPairing()?.lojaId) guardPilotContextChange();
 
     // Pre-drain: se fila tem mutations pendentes, drenar ANTES do switch.
     // Sem isto, mutations da loja antiga sobem APOS o POST switch-loja e
@@ -1639,11 +2068,14 @@
         p.label = p.label; // preserva
         savePairing(p);
       }
+      // #2209: a regra de impressão era da loja antiga; a da nova vem logo depois do pull.
+      esquecerRegraImpressao();
       // #1474: loja nova = pull completo, nao a partir do cursor da antiga.
       resetPullCursor();
       // Drena fila atual + pega dados da loja nova
       try { await flush(); } catch (_) {}
       try { await pull(); } catch (_) {}
+      atualizarRegraImpressao({ forcar: true });
       // Reinicia SSE pra pegar grupo da nova loja
       try { stopRealtime(); startRealtime(); } catch (_) {}
     }
@@ -1697,6 +2129,7 @@
   }
 
   async function startRealtime() {
+    if (syncHeldForImport() || (window.CDB_CONFIG?.isPilot && !getApiKey())) return;
     if (_sseSource) return; // já conectado
     if (!navigator.onLine) return;
     if (typeof EventSource === 'undefined') return; // browser sem suporte
@@ -1706,6 +2139,7 @@
     // Tenta token efemero. Se servidor antigo (404) ou rede falha, cai no
     // fallback ?apiKey= pra nao perder realtime durante a transicao.
     const token = await fetchSseToken();
+    if (apiKey !== getApiKey()) return;
     const queryParam = token ? ('token=' + encodeURIComponent(token))
                               : ('apiKey=' + encodeURIComponent(apiKey));
 
@@ -1786,6 +2220,7 @@
   // reload, message). Processamos sempre que online + pareado, depois do
   // ciclo flush+pull. Falha silenciosa pra não interferir offline-first.
   async function fetchAndProcessCommands() {
+    if (syncHeldForImport() || (window.CDB_CONFIG?.isPilot && !getApiKey())) return;
     if (!navigator.onLine) return;
     if (_pairingInvalid) return;
     if (!getApiKey()) return; // só pareados recebem comandos
@@ -1834,7 +2269,11 @@
       } else if (type === 'pwa_update') {
         // Onda 9 — gestor força atualizacao do bundle pelo painel web.
         // Drena fila antes; trigger com {force:true} limpa caches e reload.
-        flush().finally(() => triggerPwaUpdate({ reason: 'remote-command', force: true }));
+        if (window.CDB_CONFIG?.isPilot) {
+          triggerPwaUpdate({ reason: 'remote-command', force: true }).catch(() => {});
+        } else {
+          flush().finally(() => triggerPwaUpdate({ reason: 'remote-command', force: true }));
+        }
       } else if (type === 'clear_cache') {
         // Debug remoto: limpa caches do SW sem reload (operador continua trabalhando).
         try {
@@ -2064,6 +2503,8 @@
   }
 
   async function maybeApplyPwaUpdate(versionPayload) {
+    // No piloto o conteúdo segue o canal OTA do APK, que já checa sozinho; PwaCacheVersion é do Console.
+    if (window.CDB_CONFIG?.isPilot) return;
     if (_pwaUpdating) return;
     if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistration) return;
 
@@ -2099,6 +2540,10 @@
   // index.html cuida do reload. Se {force:true} (comando remoto pwa_update),
   // limpa caches antes pra garantir que ate index.html cacheado seja descartado.
   async function triggerPwaUpdate(opts) {
+    if (window.CDB_CONFIG?.isPilot) {
+      const updater = window.Capacitor?.Plugins?.PilotUpdater;
+      return updater?.check ? updater.check() : { prepared: false, reason: 'updater-unavailable' };
+    }
     opts = opts || {};
     if (_pwaUpdating) return;
 
@@ -2239,6 +2684,7 @@
       _trace('pair-auto', 'abort: offline', null);
       throw new Error('sem rede');
     }
+    guardPilotContextChange();
     const url = API_BASE_URL + API_PREFIX + '/devices/pair-auto';
     _trace('pair-auto', 'fetch ' + url, { secretLen: (provisioningSecret || '').length, deviceId });
     const ctrl = new AbortController();
@@ -2321,6 +2767,7 @@
 
   async function pairWithCode(code, label) {
     if (!navigator.onLine) throw new Error('sem rede');
+    guardPilotContextChange();
     const url = API_BASE_URL + API_PREFIX + '/devices/pair';
     const ctrl = new AbortController();
     const timeoutId = setTimeout(() => ctrl.abort(), 12000);
@@ -2373,7 +2820,7 @@
     // do periodo offline / sem pairing.
     try { flush(); } catch (_) {}
     // Pull inicial pra trazer produtos/clientes/pedidos. Sem isso a UI
-    // fica vazia ate o ciclo de 30s do sync loop disparar o proximo pull.
+    // fica vazia ate o laço periódico (a cada 60s no minimo) puxar de novo.
     try { await pull(); } catch (_) {}
     if (typeof window !== 'undefined') {
       try {
@@ -2428,6 +2875,7 @@
   // Idempotente no servidor: SyncController faz upsert por (Id, EmpresaId).
   // Mutations ja na fila NAO sao removidas — bootstrap adiciona por cima.
   function pushAll() {
+    if (syncHeldForImport()) throw new Error('Revise a importação antes de reenviar os cadastros. A fila original foi mantida.');
     if (!window.cdbApp || typeof window.cdbApp.getState !== 'function') {
       throw new Error('cdbApp.getState indisponivel');
     }
@@ -2641,9 +3089,11 @@
 
   // Expõe utilitários pra debug + integração com Diagnóstico
   window.cdbSync = {
-    flush, pull, stop,
+    flush, pull, stop, localReady,
     pingVersion, uploadErrorLog,
-    pairWithCode, pairAuto,
+    pairWithCode, pairAuto, applySessionPairing, runSyncCycle,
+    getDeviceId: () => deviceId,
+    getDataContext: pilotDataContext,
     openTicketAuto,
     // Contingência: trace + diagnóstico expostos pro Diagnóstico UI usar
     getTrace, clearTrace, exportTraceText,
@@ -2657,6 +3107,9 @@
       if (code) return await pairWithCode(code, cfg.forcedPairingLabel || 'Casa da Baba');
       throw new Error('Nenhum secret/codigo embutido no APK — não é possível parear automaticamente.');
     })(); },
+    importReview, confirmImportedDataContext, beginBackupImport, finishBackupImport, endBackupImport, isSyncHeldForImport: syncHeldForImport,
+    getImportedMigrationState, migrateImportedLegacyData, getLastLegacyMigration, getLegacyHistoryRules,
+    getBackupQueue: () => JSON.parse(JSON.stringify(loadQueue())),
     getPairing: loadPairing,
     clearPairing,
     isPairingInvalid: () => _pairingInvalid,
@@ -2664,6 +3117,7 @@
     startRealtime, stopRealtime,
     realtimeConnected: () => _sseSource && _sseSource.readyState === 1,
     listLojasDisponiveis, switchLoja,
+    atualizarRegraImpressao, esquecerRegraImpressao,
     uploadBackup, maybeAutoBackup,
     localBackupToFile, readLocalBackup, scheduleLocalBackup,
     pickBackupViaSAF,

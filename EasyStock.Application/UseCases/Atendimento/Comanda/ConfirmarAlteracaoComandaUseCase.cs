@@ -28,6 +28,29 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
     ExpiracaoPreferenciaMercadoPago expiracao, ILogger<ConfirmarAlteracaoComandaUseCase> logger,
     IVagaOcupadaRepository vagas, TrocarJanelaPedidoUseCase trocarJanela)
 {
+    public const string SituacaoAguardandoConfirmacao = "alteracao_aguardando_confirmacao";
+
+    /// <summary>
+    /// #2018 (comanda-13): depois que o cliente envia a alteração pelo link, tenta confirmá-la sozinha. Quem decide é
+    /// <see cref="ExecuteAsync"/> com <see cref="ConfirmarAlteracaoComandaInput.Automatico"/>: o que não passa direto volta como
+    /// estava (<paramref name="enviado"/>, aguardando a equipe). Conflito (o pedido mudou) também deixa para a equipe.
+    /// </summary>
+    public async Task<EnvioComandaCliente> TentarAutomaticoAsync(string token, EnvioComandaCliente enviado, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(enviado);
+        if (enviado.Situacao != SituacaoAguardandoConfirmacao) return enviado;
+        var acesso = await comanda.AcessoAsync(token, ct);
+        try
+        {
+            return await ExecuteAsync(new(acesso.EmpresaId, acesso.ConversaId, acesso.Id, true, Guid.Empty, "Cliente pelo link",
+                NivelAcesso.Operador, Automatico: true), ct);
+        }
+        catch (ComandaClienteConflitoException)
+        {
+            return enviado;
+        }
+    }
+
     public async Task<EnvioComandaCliente> ExecuteAsync(ConfirmarAlteracaoComandaInput input, CancellationToken ct)
     {
         var estornosParaRetomar = new List<Guid>();
@@ -78,7 +101,7 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             var pratosMantidos = ComandaClienteUseCase.PratosMantidos(dados.Itens, pedido);
             var linhasMantidas = ComandaClienteUseCase.LinhasMantidas(dados.Itens, pedido);
             var antigos = pedido.Itens.Where(i => i.CardapioItemId is not null).ToList();
-            var novoTotal = selecao.Sum(i => i.Qtd * i.Preco) + ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido);
+            var novoTotal = pedido.TotalComPratos(selecao.Sum(i => i.Qtd * i.Preco));
             var saldoAnterior = await saldos.ConsultarAsync(pedido, t);
             if (saldoAnterior.Reservado > 0) throw new ComandaClienteConflitoException("Aguarde a devolução em andamento antes de alterar de novo.");
             var devolucao = Math.Max(0, saldoAnterior.Alocado - novoTotal);
@@ -88,7 +111,11 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             var novaJanela = vagaAtual is { LiberadoEm: null }
                 ? dados.DataPedidaPeloCliente(vagaAtual.JanelaEntregaId, vagaAtual.DataEntrega)
                 : dados.DataPedidaPeloCliente(null, null);
-            if (input.Automatico && (devolucao > 0 || novaJanela is not null || (EnderecoCheckout.SemRetratoDaEntrega(dados.Observacoes) ?? "") != (EnderecoCheckout.SemRetratoDaEntrega(pedido.Observacoes) ?? "")
+            // #2018 (comanda-13): a regra "só acréscimo passa direto" é esta e só esta (o controller anônimo não a repete):
+            // sem devolução, sem troca de data ou janela, sem mudar as observações, sem baixar o total e sem tirar nem trocar
+            // prato nem observação (SomenteAcrescimos). O resto espera a conferência da equipe.
+            if (input.Automatico && (devolucao > 0 || novaJanela is not null || novoTotal < pedido.Total.Valor
+                || (EnderecoCheckout.SemRetratoDaEntrega(dados.Observacoes) ?? "") != (EnderecoCheckout.SemRetratoDaEntrega(pedido.Observacoes) ?? "")
                 || !SomenteAcrescimos(antigos, selecao)))
                 return anterior;
             if (devolucao > 0 && input.Nivel is not (NivelAcesso.Gerente or NivelAcesso.Admin or NivelAcesso.SuperAdmin))

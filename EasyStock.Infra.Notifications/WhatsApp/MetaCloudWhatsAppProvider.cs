@@ -80,15 +80,18 @@ public sealed class MetaCloudWhatsAppProvider(
                 return Falha(ErroForaDaJanelaSemTemplate, permanente: true, sw);
 
             var canal = resolvedorCanal.Obter(CanalConversa.WhatsApp);
+            // #2072 (ADR-0062): a ponte não oficial não tem modelo aprovado. Onde a Meta mandaria o modelo, sai o texto
+            // da própria mensagem; sem modelo, fora da janela continua recusado acima: a ponte manda o que a Meta mandaria.
+            var semModelo = canal is ICanalSemModeloAprovado;
             chamouAMeta = true;
             string wamid;
-            if (template is { } t && !dentroDaJanela)
+            if (template is { } t && !dentroDaJanela && !semModelo)
                 wamid = botoes.Count > 0
                     ? await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, botoes, ct)
                     : imagem is not null
                         ? await canal.EnviarModeloComImagemAsync(contato, t.Nome, t.Idioma, t.Parametros, imagem, ct)
                         : await canal.EnviarModeloAsync(contato, t.Nome, t.Idioma, t.Parametros, ct);
-            else if (botoes.Count > 0 && dentroDaJanela)
+            else if (botoes.Count > 0 && (dentroDaJanela || semModelo))
                 wamid = await canal.EnviarBotoesAsync(contato, mensagem.Corpo, botoes, ct);
             else if (imagem is not null)
                 wamid = await EnviarImagemComTextoAsync(canal, contato, imagem, mensagem.Corpo, ct);

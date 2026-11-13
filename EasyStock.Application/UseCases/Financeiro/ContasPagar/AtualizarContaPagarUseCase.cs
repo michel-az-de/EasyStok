@@ -17,12 +17,16 @@ public class AtualizarContaPagarUseCase(
     IContaPagarRepository repo,
     ICategoriaFinanceiraRepository categoriaRepo,
     ICentroCustoRepository centroRepo,
-    IUnitOfWork uow)
+    IUnitOfWork uow,
+    IFornecedorRepository? fornecedores = null)
 {
     public async Task<ContaPagarResult?> ExecuteAsync(AtualizarContaPagarCommand cmd, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.Id, nameof(cmd.Id));
+
+        // #2095 (F7): tamanho antes do banco (estourar a coluna respondia 500).
+        ValidacaoFinanceira.TextosDaConta(cmd.Descricao, cmd.Observacoes);
 
         var conta = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (conta is null) return null;
@@ -52,6 +56,7 @@ public class AtualizarContaPagarUseCase(
                 throw new UseCaseValidationException("Centro de custo invalido ou inativo.");
             conta.CentroCustoId = centro.Id;
         }
+        await ValidacaoFinanceira.GarantirReferenciasAsync(cmd.EmpresaId, fornecedorId: cmd.FornecedorId, fornecedores: fornecedores);
         if (cmd.FornecedorId.HasValue) conta.FornecedorId = cmd.FornecedorId.Value == Guid.Empty ? null : cmd.FornecedorId;
 
         conta.AlteradoEm = DateTime.UtcNow;

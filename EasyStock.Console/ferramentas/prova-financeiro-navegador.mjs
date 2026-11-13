@@ -12,13 +12,38 @@ registerHooks({ resolve(spec, contexto, proximo) {
   return proximo(spec, contexto)
 } })
 const { MODULOS, hashDoModulo, telasDoMenu } = await import('../src/dominio/modulos.js')
-const { telaCongelada } = await import('../src/dominio/congelados.js')
+const { telaCongelada, moduloCongelado } = await import('../src/dominio/congelados.js')
 const { HASH_HALL } = await import('../src/dominio/rota.js')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5186'
 const evidencias = process.env.EVIDENCIAS_UX ?? 'builds/prova-financeiro'
 mkdirSync(evidencias, { recursive: true })
 const capturas = []
+// #2258: o tema mora atrás do avatar da conta; abre o menu, escolhe e fecha.
+async function escolherTema(page, nome) {
+  await page.getByRole('button', { name: /^Conta de / }).locator('visible=true').first().click()
+  await page.getByRole('group', { name: 'Conta', exact: true }).getByRole('radio', { name: nome, exact: true }).click()
+  await page.keyboard.press('Escape')
+  await page.getByRole('group', { name: 'Conta', exact: true }).waitFor({ state: 'hidden' })
+}
+
+// #2258 (F4): com algo digitado, o Esc pergunta antes de descartar.
+async function descartarDigitado(page, modal) {
+  await page.keyboard.press('Escape')
+  await modal.getByRole('button', { name: 'Descartar', exact: true }).click()
+  await modal.waitFor({ state: 'hidden' })
+}
+
+// Chip das contas pelo nome exato; o "✓" do ativo é decorativo e fica fora do nome (#2272).
+function chip(page, nome, pressionado) {
+  const grupo = page.getByRole('group', { name: 'Mostrar contas', exact: true })
+  return grupo.getByRole('button', { name: nome, exact: true, ...(pressionado ? { pressed: true } : {}) })
+}
+
+function moduloAtivoNoTrilho(page, modulo) {
+  return page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).locator(`a[href="${hashDoModulo(modulo.id)}"][aria-current="true"]`)
+}
+
 async function capturarTela(page, modulo, tela, tema) {
   if (tela.indisponivelNaApi) {
     const principal = page.getByRole('main')
@@ -38,6 +63,21 @@ async function capturarTela(page, modulo, tela, tema) {
   capturas.push({ modulo: modulo.id, tela: tela.id, rota: hashDoModulo(modulo.id, tela.id), arquivo, viewport, tema, tipoProva: 'HTTP controlado' })
   writeFileSync(join(evidencias, 'indice-telas.json'), JSON.stringify(capturas, null, 2))
 }
+// #1871: o Sair e quem está logado moram atrás do avatar; a prova abre o menu da conta e confere os dois.
+async function conferirSessao(page) {
+  // #2433: logo após o reload, "Carregando seus módulos" tem o próprio Sair. Conta só com a moldura pronta (avatar à vista).
+  const avatar = page.getByRole('button', { name: /^Conta de / }).locator('visible=true').first()
+  await avatar.waitFor()
+  // #2258 (A9): em qualquer largura não há Sair solto; ele e a conta moram atrás do avatar à vista.
+  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 0)
+  await avatar.click()
+  const camada = page.getByRole('group', { name: 'Conta', exact: true })
+  assert.equal(await camada.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
+  await camada.getByText('Dona de teste', { exact: true }).waitFor()
+  await camada.getByText('Empresa de teste', { exact: true }).waitFor()
+  await avatar.click()
+  await camada.waitFor({ state: 'hidden' })
+}
 const empresaId = '11111111-1111-4111-8111-111111111111'
 const categoriaId = '33333333-3333-4333-8333-333333333333'
 const contaId = '44444444-4444-4444-8444-444444444444'
@@ -55,7 +95,10 @@ let modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
 const escritas = []
 const erros = []
 let falhaDeGravacao = false
+let falhaDoPagamento = false
 let falhaDeConversas = false
+// #2433: atrasa a carga dos módulos para a prova ver a tela "Carregando seus módulos", que tem um Sair próprio.
+let atrasoDosModulos = 0
 let shaDoDocumento, versaoPublicada, respostaInvalida = false
 const browser = await chromium.launch({ headless: true })
 let paginaProva
@@ -87,6 +130,7 @@ try {
     if (metodo !== 'GET') {
       const corpo = request.postDataJSON()
       escritas.push({ caminho, metodo, corpo })
+      if (falhaDoPagamento && caminho.endsWith('/pagamentos')) return route.fulfill({ status: 400, json: { error: { message: 'Rede indisponível na prova' } } })
       if (falhaDeGravacao && caminho === '/api/contas-a-pagar') return route.fulfill({ status: 400, json: { error: { message: 'Categoria de teste indisponível' } } })
       if (caminho.startsWith('/api/contas-a-') || caminho.startsWith('/api/financeiro/')) {
         if (corpo) assert.equal(corpo.empresaId, empresaId)
@@ -103,6 +147,7 @@ try {
       }
       return ok(contaAtual)
     }
+    if (caminho === '/api/auth/me/modulos' && atrasoDosModulos) await new Promise(resolve => setTimeout(resolve, atrasoDosModulos))
     if (caminho === '/api/auth/me/modulos') return ok({ modulos: MODULOS.map(({ id }) => ({ id, liberado: modulosPermitidos.has(id) })), acoes })
     if (caminho === '/api/financeiro/categorias') return ok([{ id: categoriaId, nome: 'Operação', tipo: 'Ambas', ativa: true }])
     if (caminho === '/api/financeiro/centros-custo') return ok([])
@@ -111,6 +156,8 @@ try {
     if (/^\/api\/contas-a-(pagar|receber)$/.test(caminho)) return ok([contaAtual], { total: 1, page: 1, limit: 20 })
     if (/^\/api\/contas-a-(pagar|receber)\//.test(caminho)) return ok(contaAtual)
     if (caminho === '/api/caixa/movimentos') return ok([{ id: '88888888-8888-4888-8888-888888888888', tipo: 'saida', descricao: 'Despesa avulsa', valor: 30, dataMovimento: instante, metodo: 'dinheiro' }], { total: 1, page: 1, limit: 100 })
+    // #2262: o Pix do pedido pago pelo Mercado Pago chega pelas linhas do Caixa, fora dos movimentos.
+    if (caminho === '/api/caixa/linhas') return ok([{ hora: instante, tipo: 'pagamento', valor: 19, metodo: 'pix', origem: 'Pedido', pedidoNumeroDoDia: 5 }])
     if (caminho === '/api/caixa/dia') return ok({ data: url.searchParams.get('data') ?? hoje, aberto: true, fechado: false, saldoInicial: 100, saldoEsperado: 100, movimentos: [], linhasExtras: [] })
     if (caminho === '/api/atendimento/configuracao') return ok({})
     if (caminho === '/api/atendimento/agenda') return ok({ lojaDisponivel: false, dias: [] })
@@ -130,6 +177,8 @@ try {
   let telasVerificadas = 0
   for (const modulo of MODULOS) {
     const telas = telasDoMenu(modulo, { fonteApi: true })
+    // Módulo congelado (#1891) não tem menu nem rota; a prova-congelados cobre que ele cai no hall.
+    if (!telas.length) continue
     for (const telaId of [undefined, ...telas.map(tela => tela.id)]) {
       await page.goto(origem + '/' + hashDoModulo(modulo.id, telaId))
       // O Balcão é a referência aprovada e conserva seu próprio painel lateral.
@@ -139,20 +188,27 @@ try {
         telasVerificadas++
         continue
       }
-      const navegacao = page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true })
-      await navegacao.waitFor()
-      await navegacao.locator(`a[href="${hashDoModulo(modulo.id, telaId ?? telas[0].id)}"][aria-current="page"]`).waitFor()
-      assert.equal(await navegacao.getByRole('link').count(), telas.length, `${modulo.id}/${telaId ?? '(entrada)'}`)
-      const ativa = navegacao.locator('[aria-current="page"]')
-      assert.equal(await ativa.getAttribute('href'), hashDoModulo(modulo.id, telaId ?? telas[0].id))
+      // #2258 (K2): módulo de uma tela só não tem menu de telas; o trilho marca o módulo ativo.
+      if (telas.length > 1) {
+        const navegacao = page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true })
+        await navegacao.waitFor()
+        await navegacao.locator(`a[href="${hashDoModulo(modulo.id, telaId ?? telas[0].id)}"][aria-current="page"]`).waitFor()
+        assert.equal(await navegacao.getByRole('link').count(), telas.length, `${modulo.id}/${telaId ?? '(entrada)'}`)
+        const ativa = navegacao.locator('[aria-current="page"]')
+        assert.equal(await ativa.getAttribute('href'), hashDoModulo(modulo.id, telaId ?? telas[0].id))
+      } else {
+        await moduloAtivoNoTrilho(page, modulo).waitFor()
+        assert.equal(await page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true }).count(), 0)
+      }
       assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), MODULOS.length + 1)
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-      if (modulo.id === MODULOS[0].id && telaId === undefined) await page.getByRole('radio', { name: 'Claro', exact: true }).click()
+      if (modulo.id === MODULOS[0].id && telaId === undefined) await escolherTema(page, 'Claro')
       if (telaId) await capturarTela(page, modulo, telas.find(tela => tela.id === telaId), 'light')
       telasVerificadas++
     }
     await page.goto(origem + '/' + hashDoModulo(modulo.id))
     if (modulo.id === 'atendimento') await page.getByRole('navigation', { name: 'Navegação', exact: true }).waitFor()
+    else if (telas.length <= 1) await moduloAtivoNoTrilho(page, modulo).waitFor()
     else await page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true }).locator(`a[href="${hashDoModulo(modulo.id, telas[0].id)}"][aria-current="page"]`).waitFor()
     if (modulo.id === 'cardapio') await page.getByRole('button', { name: 'Novo prato', exact: true }).first().waitFor()
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
@@ -170,7 +226,7 @@ try {
     }
   }
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole('radio', { name: 'Escuro', exact: true }).click()
+  await escolherTema(page, 'Escuro')
   for (const modulo of MODULOS) {
     for (const tela of telasDoMenu(modulo, { fonteApi: true })) {
       await page.goto(origem + '/' + hashDoModulo(modulo.id, tela.id))
@@ -179,7 +235,7 @@ try {
     }
   }
   await page.setViewportSize({ width: 1440, height: 960 })
-  await page.getByRole('radio', { name: 'Claro', exact: true }).click()
+  await escolherTema(page, 'Claro')
   // #1891: o financeiro gerencial (contas, extrato, relatórios, categorias) está congelado em
   // dominio/congelados.js. O percurso abaixo só vale quando as telas voltarem à lista viva.
   if (telaCongelada('financeiro', 'pagar')) {
@@ -191,22 +247,10 @@ try {
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   await page.getByRole('main', { name: 'Contas a pagar', exact: true }).waitFor()
-  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
+  await conferirSessao(page)
   await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
-  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
-  modulosPermitidos = new Set(['cozinha'])
-  await page.goto(origem + '/#/m/cozinha/producao')
-  await page.reload()
-  const preparacao = page.getByRole('main')
-  await preparacao.getByText('Em preparação', { exact: true }).waitFor()
-  assert.equal(await preparacao.locator('a[href="#/m/producao/producao"]').count(), 0)
-  assert.equal(await preparacao.getByRole('link', { name: 'Ver módulos', exact: true }).count(), 1)
-  const voltarAosModulos = preparacao.getByRole('link', { name: 'Ver módulos', exact: true })
-  assert.ok(await voltarAosModulos.evaluate(no => no.getBoundingClientRect().height >= 44))
-  await page.keyboard.press('Tab')
-  await voltarAosModulos.focus()
-  assert.equal(await voltarAosModulos.evaluate(no => document.activeElement === no && getComputedStyle(no).outlineStyle === 'solid'), true)
-  await page.screenshot({ path: join(evidencias, 'cozinha-preparacao-sem-acesso-producao.png') })
+  // Resíduo da #1891: aqui havia a checagem do aviso "Em preparação" de Cozinha/Produção, tela congelada
+  // que não abre mais (a prova-congelados cobre a rota). Removida por ser código morto.
   modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.reload()
@@ -216,13 +260,17 @@ try {
   let modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
   await modal.getByLabel('Descrição', { exact: true }).fill('Conta criada pela prova')
   await modal.getByLabel('Categoria financeira', { exact: true }).selectOption(categoriaId)
-  await modal.getByLabel('Valor total', { exact: true }).fill('10000')
+  await modal.getByLabel('Valor total', { exact: true }).fill('100')
   await page.screenshot({ path: join(evidencias, 'financeiro-modal-nova-conta.png') })
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.waitFor({ state: 'hidden' })
   assert.equal(escritas.find((item) => item.caminho === '/api/contas-a-pagar').corpo.parcelas[0].valor, 100)
-  await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).click()
+  // #2095 (C7): depois de salvar, a conta criada abre sozinha (o mock devolve a Compra de embalagens).
   modal = page.getByRole('dialog', { name: 'Compra de embalagens', exact: true })
+  await modal.waitFor()
+  await page.keyboard.press('Escape')
+  await modal.waitFor({ state: 'hidden' })
+  await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).click()
   await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).click()
   const pagamento = page.getByRole('dialog', { name: 'Registrar pagamento', exact: true })
   await pagamento.getByRole('button', { name: 'Confirmar registro', exact: true }).click()
@@ -238,6 +286,26 @@ try {
   await modal.waitFor({ state: 'hidden' })
   assert.equal(await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).evaluate((no) => no === document.activeElement), true)
   await page.screenshot({ path: join(evidencias, 'financeiro-contas-desktop.png') })
+  // #2095: "Pagar" na linha abre o registro da próxima parcela direto (2 cliques em vez de 3).
+  await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).click()
+  const pagamentoDireto = page.getByRole('dialog', { name: 'Registrar pagamento', exact: true })
+  await pagamentoDireto.getByRole('button', { name: 'Confirmar registro', exact: true }).click()
+  await pagamentoDireto.waitFor({ state: 'hidden' })
+  assert.equal(escritas.filter((item) => item.caminho === `/api/contas-a-pagar/${contaId}/parcelas/${parcelaId}/pagamentos`).length, 2)
+  // Revisão #2105 (2): a conta selecionada não fica presa na lista ao trocar de chip.
+  await chip(page, 'Todas').click()
+  await page.getByRole('button', { name: /^Compra de embalagens/ }).first().click()
+  await chip(page, 'Em aberto').click()
+  await chip(page, 'Em aberto', true).waitFor()
+  await page.getByText(/^0 contas/).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).count(), 0, 'conta paga selecionada em Todas não aparece em Em aberto')
+  Object.assign(conta, { status: 'Aberta', pendente: 100, totalPago: 0 }); Object.assign(conta.parcelas[0], { saldo: 100, valorPago: 0, pagamentos: [] })
+  // Chips de vencimento: o filtro vai como instante (a API recusa data pura, F4).
+  const pedidoHoje = page.waitForRequest((pedido) => new URL(pedido.url()).pathname === '/api/contas-a-pagar' && new URL(pedido.url()).searchParams.has('vencimentoDe'))
+  await chip(page, 'Vencem hoje').click()
+  assert.match(new URL((await pedidoHoje).url()).searchParams.get('vencimentoDe'), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+  await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).waitFor()
+  assert.equal(await chip(page, 'Vencem hoje').getAttribute('aria-pressed'), 'true')
   await page.goto(origem + '/#/m/financeiro/receber')
   await page.getByRole('button', { name: 'Abrir conta Venda de encomenda' }).click()
   modal = page.getByRole('dialog', { name: 'Venda de encomenda', exact: true })
@@ -260,6 +328,11 @@ try {
   await page.getByRole('button', { name: 'Detalhes de Despesa avulsa' }).click()
   await page.getByRole('dialog', { name: 'Movimento financeiro', exact: true }).waitFor()
   await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Detalhes de Pagamento do pedido nº 005' }).click()
+  const recebimentoDoPedido = page.getByRole('dialog', { name: 'Movimento financeiro', exact: true })
+  await recebimentoDoPedido.getByText('R$ 19,00').waitFor()
+  assert.equal(await recebimentoDoPedido.getByRole('link').count(), 0, '#2262: recebimento de pedido não tem conta para consultar')
+  await page.keyboard.press('Escape')
   await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link', { name: 'Relatórios', exact: true }).click()
   await page.getByRole('button', { name: 'Ampliar relatório', exact: true }).click()
   await page.getByRole('dialog', { name: 'Relatório de fluxo de caixa', exact: true }).waitFor()
@@ -281,7 +354,9 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   // Duas modais abertas: Escape fecha a filha e o foco volta ao botão da conta.
   await page.setViewportSize({ width: 1440, height: 960 })
-  await page.goto(origem + '/#/m/financeiro/pagar')
+  // #2095 (C5): a API só edita rascunho; "Editar conta" aparece só nele.
+  conta.status = 'Rascunho'
+  await page.goto(origem + '/#/m/financeiro/pagar/todas')
   await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).click()
   modal = page.getByRole('dialog', { name: 'Compra de embalagens', exact: true })
   await modal.getByRole('button', { name: 'Editar conta', exact: true }).click()
@@ -290,19 +365,43 @@ try {
   assert.equal(await modal.isVisible(), true)
   assert.equal(await modal.getByRole('button', { name: 'Editar conta', exact: true }).evaluate((no) => no === document.activeElement), true)
   await page.keyboard.press('Escape')
+  conta.status = 'Aberta'
   falhaDeGravacao = true
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
   await modal.getByLabel('Descrição', { exact: true }).fill('Conta recusada')
   await modal.getByLabel('Categoria financeira', { exact: true }).selectOption(categoriaId)
-  await modal.getByLabel('Valor total', { exact: true }).fill('10000')
+  await modal.getByLabel('Valor total', { exact: true }).fill('100')
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).waitFor()
   assert.equal(await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).isVisible(), true)
   await page.screenshot({ path: join(evidencias, 'financeiro-erro-preservado.png') })
   assert.equal(await modal.getByLabel('Descrição', { exact: true }).inputValue(), 'Conta recusada')
-  await page.keyboard.press('Escape')
+  await descartarDigitado(page, modal)
   falhaDeGravacao = false
+  // Revisão #2105 (3): "Já foi paga" com falha no registro: a lista recarrega, a conta trava e, ao fechar, abre.
+  falhaDoPagamento = true
+  await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
+  modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
+  await modal.getByLabel('Descrição', { exact: true }).fill('Conta paga sem rede')
+  await modal.getByLabel('Categoria financeira', { exact: true }).selectOption(categoriaId)
+  await modal.getByLabel('Valor total', { exact: true }).fill('100')
+  await modal.getByLabel('Já foi paga', { exact: true }).check()
+  const criacoesAntes = escritas.filter((item) => item.caminho === '/api/contas-a-pagar').length
+  const recarga = page.waitForRequest((pedido) => pedido.method() === 'GET' && new URL(pedido.url()).pathname === '/api/contas-a-pagar')
+  await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
+  await modal.getByRole('alert').filter({ hasText: 'A conta foi salva' }).waitFor()
+  await recarga
+  assert.equal(await modal.getByLabel('Descrição', { exact: true }).isDisabled(), true, 'campos da conta criada travados')
+  await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).click()
+  await modal.getByRole('alert').filter({ hasText: 'A conta foi salva' }).waitFor()
+  assert.equal(escritas.filter((item) => item.caminho === '/api/contas-a-pagar').length, criacoesAntes + 1, 'a nova tentativa não cria outra conta')
+  falhaDoPagamento = false
+  await modal.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await modal.waitFor({ state: 'hidden' })
+  await page.getByRole('dialog', { name: 'Compra de embalagens', exact: true }).waitFor()
+  await page.keyboard.press('Escape')
+  await page.getByRole('dialog', { name: 'Compra de embalagens', exact: true }).waitFor({ state: 'hidden' })
   for (const [rota, botao, titulo] of [
     ['producao/insumos', 'Cadastrar insumo', 'Cadastrar insumo'],
     ['producao/insumos', 'Ajustar Molho sugo', 'Ajustar Molho sugo'],
@@ -323,13 +422,19 @@ try {
   }
   await page.goto(origem + '/#/m/financeiro/visao-geral')
   await page.getByText('Pago no mês', { exact: true }).waitFor()
-  await page.getByRole('radio', { name: 'Escuro', exact: true }).click()
+  // #2095 (C1): a visão geral responde o que vence hoje, com o atalho para a lista filtrada.
+  await page.getByRole('heading', { name: /^Vence hoje/ }).first().waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).isVisible(), true)
+  assert.equal(await page.locator('a[href="#/m/financeiro/pagar/hoje"]').count(), 1)
+  await escolherTema(page, 'Escuro')
   await page.screenshot({ path: join(evidencias, 'financeiro-visao-geral-escuro.png') })
   await page.goto(origem + '/#/m/atendimento/balcao')
   await page.getByRole('button', { name: 'Gestão', exact: true }).click()
   const gestao = page.getByRole('dialog', { name: 'Gestão da loja', exact: true })
-  await gestao.getByRole('tab', { name: 'Financeiro', exact: true }).click()
-  await gestao.getByRole('tab', { name: 'Contas a pagar', exact: true }).click()
+  // #2143: a Gestão abre na busca de tarefas; a escolha da tela leva às abas.
+  await gestao.getByRole('region', { name: 'Financeiro', exact: true }).getByRole('button', { name: 'Contas a pagar', exact: true }).click()
+  await gestao.getByRole('tab', { name: 'Financeiro', exact: true, selected: true }).waitFor()
+  await gestao.getByRole('tab', { name: 'Contas a pagar', exact: true, selected: true }).waitFor()
   await gestao.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   await page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true }).waitFor()
   await page.keyboard.press('Escape')
@@ -341,12 +446,18 @@ try {
   await page.reload()
   await page.getByRole('button', { name: 'Abrir conta Compra de embalagens' }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).count(), 0)
+  assert.equal(await page.getByRole('button', { name: 'Pagar Compra de embalagens', exact: true }).count(), 0, '#476: quem só consulta não registra pagamento')
   acoes.visualizarContasPagar = false
   await page.reload()
-  await page.getByText('Seu perfil não pode consultar estas contas', { exact: true }).waitFor()
+  // #2095 (F17): sem visualizar, a tela sai do menu do Financeiro e a rota digitada cai no Caixa do dia (#1921).
+  await page.waitForURL((url) => url.hash === '#/m/financeiro/caixa')
+  assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).locator('a[href="#/m/financeiro/pagar"]').count(), 0)
   acoes.visualizarContasPagar = true
   acoes.gerenciarContasPagar = true
+  // Recarrega a matriz antes de pedir a tela: com a matriz velha a moldura devolveria ao Caixa.
   await page.reload()
+  await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).locator('a[href="#/m/financeiro/pagar"]').waitFor()
+  await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).count(), 0)
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
@@ -367,7 +478,7 @@ try {
   await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).waitFor({ state: 'attached' })
   assert.equal(await modal.getByLabel('Descrição', { exact: true }).inputValue(), 'Rascunho preservado durante publicação')
   assert.equal(new URL(page.url()).searchParams.has('versao'), false)
-  await page.keyboard.press('Escape')
+  await descartarDigitado(page, modal)
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
   await page.screenshot({ path: join(evidencias, 'aviso-atualizacao-celular.png') })
@@ -381,14 +492,15 @@ try {
   falhaDeConversas = true
   await page.reload()
   await page.getByText(/Conversas sem atualização:.*Consulta de conversas indisponível na prova/).waitFor()
-  assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
-  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
+  await conferirSessao(page)
   await page.screenshot({ path: join(evidencias, 'financeiro-aviso-global-preservado.png') })
   falhaDeConversas = false
+  atrasoDosModulos = 1500
   await page.reload()
   await page.getByText(/Conversas sem atualização:/).waitFor({ state: 'hidden' })
   await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
-  await page.getByText('Dona de teste · Empresa de teste', { exact: true }).waitFor()
+  await conferirSessao(page)
+  atrasoDosModulos = 0
   assert.deepEqual(erros, [])
   const demonstracao = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce' })
   await demonstracao.grantPermissions(['local-network-access'], { origin: origem })
@@ -401,7 +513,7 @@ try {
     ['cozinha', 'producao', 'Saldo por item, a partir dos lotes'],
     ['campanhas', 'fidelidade', 'BEMVINDA10'],
     ['configuracoes', 'integracoes', 'Entregador próprio'],
-  ]) {
+  ].filter(([modulo, tela]) => !moduloCongelado(modulo) && !telaCongelada(modulo, tela))) {
     await paginaDemo.goto(origem + '/' + hashDoModulo(modulo, tela))
     await paginaDemo.getByText(texto, { exact: true }).first().waitFor()
     assert.equal(await paginaDemo.getByRole('main').getByText('Em preparação', { exact: true }).count(), 0)

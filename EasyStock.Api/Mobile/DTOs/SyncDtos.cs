@@ -22,8 +22,13 @@ public record MutationDto(string Id, string DeviceId, string Type, JsonElement P
 /// <summary>
 /// Resposta do push. <c>AcceptedIds</c> lista os IDs das mutations aplicadas.
 /// Rejeitadas (conflito irreconciliável) vão em <c>Rejected</c>.
+/// <c>NumerosCurtos</c> (#2209) leva, por id do lote do aparelho, o número curto do Lote do ERP ligado a ele:
+/// o pull não devolve ao aparelho o lote que ele mesmo enviou, então o número volta aqui.
 /// </summary>
-public record SyncPushResponse(List<string> AcceptedIds, List<SyncConflict>? Rejected = null);
+public record SyncPushResponse(
+    List<string> AcceptedIds,
+    List<SyncConflict>? Rejected = null,
+    IReadOnlyDictionary<string, string>? NumerosCurtos = null);
 
 /// <summary>
 /// Mutation rejeitada. <c>Reason</c> tem prefixo: "conflict:..." (last-write-loser),

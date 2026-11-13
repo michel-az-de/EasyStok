@@ -37,7 +37,7 @@ export function ModalVendaAvulsa({ cardapio, aoFechar, aoLancar }) {
   return (
     <Modal
       titulo="Venda avulsa"
-      descricao="Balcão ou combinada fora do WhatsApp. Entra na mesma fila da cozinha e baixa o mesmo estoque."
+      descricao="Registre vendas fora do WhatsApp. O pedido entra na fila da cozinha e baixa o estoque."
       aoFechar={aoFechar}
       rodape={(
         <>

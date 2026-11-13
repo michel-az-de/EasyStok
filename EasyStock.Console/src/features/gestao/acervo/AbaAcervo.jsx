@@ -46,7 +46,7 @@ function EscolhaDeImagem({ listar, ocupado, pratoId, aoEscolher }) {
       <Botao disabled={imagens.length < 60 || carregando || ocupado} onClick={() => setPagina(pagina + 1)}>Próxima</Botao>
       {busca && <Botao disabled={ocupado} onClick={() => { setBusca(''); setPagina(0) }}>Limpar busca</Botao>}
     </div>
-    {carregando ? <output>Carregando imagens…</output> : erro ? <div><p role="alert" className={css.erro}>{erro}</p><Botao disabled={ocupado} onClick={() => setTentativa(tentativa + 1)}>Tentar novamente</Botao></div> : <>
+    {carregando ? <output>Carregando imagens…</output> : erro ? <div><p role="alert" className={css.erro}>{erro}</p><Botao disabled={ocupado} onClick={() => setTentativa(tentativa + 1)}>Tentar de novo</Botao></div> : <>
       <div className={css.grade}>{imagens.filter(i => i.aprovadoEm).map(i =>
         <button type="button" key={i.id} className={css.cartao} disabled={ocupado} onClick={() => aoEscolher(i)}>
           <Foto imagem={i} /><strong>{i.titulo}</strong><span>{ids(i).includes(pratoId) ? 'Já vinculada a este prato' : i.origem + ' · ' + i.formato}</span>
@@ -124,14 +124,15 @@ export function AbaAcervo() {
     await executar(() => a.api.adicionarImagem(f.get('file'), dados), 'Imagem guardada. Confira esta versão antes de aprovar.')
   }
   return <section className={css.raiz}>
-    <div className={css.cabecalho}><p>Fotos, originais e peças do Canva.</p>
-      <div className={css.acoes}><Botao disabled={a.ocupado || a.carregando} onClick={() => a.carregar().catch((e) => a.setErro(e.message))}>Atualizar acervo</Botao><Botao disabled={a.ocupado} onClick={() => { setSolicitacaoId(crypto.randomUUID()); setDialogo('solicitar') }}>Solicitar imagem</Botao><Botao variante="primario" disabled={a.ocupado} onClick={() => setDialogo('upload')}>Adicionar imagem</Botao></div></div>
+    <p className={css.descricaoAba}>Fotos dos produtos e suas porções.</p>
     {a.erro && <p role="alert" className={css.erro}>{a.erro}</p>}
     {aviso && <p role="status">{aviso}</p>}
     {a.aviso && <p role="status">{a.aviso}</p>}
     <FotosCardapio acervo={a} aoEscolherPrato={escolherImagemParaPrato} />
     <SugestoesDoAcervo acervo={a} />
-    <h3>Originais e versões do acervo</h3>
+    {/* #2424: as ações do acervo moram com o acervo; o topo da tela fica só com as fotos dos produtos. */}
+    <div className={css.cabecalho}><h3>Originais e versões do acervo</h3>
+      <div className={css.acoes}><Botao disabled={a.ocupado || a.carregando} onClick={() => a.carregar().catch((e) => a.setErro(e.message))}>Atualizar acervo</Botao><Botao disabled={a.ocupado} onClick={() => { setSolicitacaoId(crypto.randomUUID()); setDialogo('solicitar') }}>Solicitar imagem</Botao><Botao variante="primario" disabled={a.ocupado} onClick={() => setDialogo('upload')}>Adicionar imagem</Botao></div></div>
     <label className={css.campo}>Buscar em todo o acervo<input value={busca} disabled={a.ocupado} onChange={(e) => setBusca(e.target.value)} placeholder="Título da imagem" /></label>
     <div className={css.filtros}>{[
       ['origem', 'Origem da imagem', [['Fotografia', 'Foto real'], ['IA', 'Imagem gerada'], ['Canva', 'Exportação Canva']]],

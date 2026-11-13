@@ -9,14 +9,15 @@ namespace EasyStock.Application.UseCases.GerenciarProduto.Comandos;
 /// </summary>
 public sealed class AtualizarLimiaresProdutoUseCase(
     IProdutoRepository produtoRepository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    ICacheService? cacheService = null)
 {
     public async Task ExecuteAsync(Guid empresaId, Guid produtoId, int? quantidadeMinima, int? quantidadeCritica)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);
         UseCaseGuards.EnsureNotEmpty(produtoId, "ProdutoId");
 
-        var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
+        var produto = await produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
         if (quantidadeMinima.HasValue && quantidadeMinima.Value < 0)
@@ -32,5 +33,8 @@ public sealed class AtualizarLimiaresProdutoUseCase(
 
         await produtoRepository.UpdateAsync(produto);
         await unitOfWork.CommitAsync();
+
+        if (cacheService is not null)
+            await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
     }
 }

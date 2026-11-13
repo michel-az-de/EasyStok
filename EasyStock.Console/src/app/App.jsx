@@ -11,7 +11,7 @@ import { CARDAPIO, larguraDoCardapio, larguraMaxima, normalizarCardapio } from '
 import { useHash } from '../hooks/useHash'
 import { useLarguras } from '../hooks/useLarguras'
 import { useRelogio } from '../hooks/useRelogio'
-import { DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
+import { CELULAR, DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
 import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { demonstracao } from '../infra/demonstracao'
@@ -19,6 +19,7 @@ import { telasDaDemonstracao } from './demonstracao'
 import { identidadeDaSessao } from '../infra/api/sessao'
 import { gravarVisita, lerVisita } from '../infra/api/visitaDaSessao'
 import { useSessaoApi } from '../aplicacao/useSessaoApi'
+import { useRascunhosDeNotas } from '../aplicacao/useRascunhosDeNotas'
 import { useNotificacoesDaSessao } from '../aplicacao/useNotificacoesDaSessao'
 import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
@@ -27,6 +28,7 @@ import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModul
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
 import { Modal } from '../componentes/Modal'
+import { LimiteDeErro } from '../componentes/LimiteDeErro'
 import { TelaLogin } from '../features/login/TelaLogin'
 import { TelaConvite } from '../features/login/TelaConvite'
 import { ehRotaDeConvite, tokenDoConvite } from '../dominio/usuarios'
@@ -36,7 +38,9 @@ import { useTituloDaAba } from '../aplicacao/useTituloDaAba'
 import { TITULO_BASE, tituloDaAba } from '../dominio/tituloDaAba'
 import { pedidoAcabouDeNascer } from '../dominio/pedido'
 import { canalDaConversa } from '../dominio/canal'
-import { envioBloqueado } from '../dominio/janela'
+import { permissaoDeEscrita } from '../dominio/janela'
+import { juntarAoRascunho } from '../dominio/rascunho'
+import { conversaEncerrada } from '../dominio/conversa'
 import {
   HASH_HALL, ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_HALL, ROTA_PRINCIPAL, rotaDaHash,
 } from '../dominio/rota'
@@ -59,12 +63,14 @@ import { TelaCozinhaApi } from '../features/cozinha/TelaCozinhaApi'
 import { AvisoCardapioDoSite } from '../features/cardapio-link/AvisoCardapioDoSite'
 import { ModalEncerrar } from '../features/encerramento/ModalEncerrar'
 import { FilaCanhotos } from '../features/ficha-cliente/FilaCanhotos'
+import { ImpressaoAutomatica } from '../features/impressao-automatica/ImpressaoAutomatica'
 import { GestoLoja } from '../features/loja/GestoLoja'
 import { ModalLoteDePapel } from '../features/lote-papel/ModalLoteDePapel'
 import { PainelAgente } from '../features/agente/PainelAgente'
 import { BalaoAssistente } from '../features/assistente/BalaoAssistente'
 import { Moldura } from './Moldura'
 import { PilhaDeAvisos } from './PilhaDeAvisos'
+import { AvisosDoDispositivo } from './AvisosDoDispositivo'
 import { AjudaDoConsole } from '../features/ajuda/AjudaDoConsole'
 import { NavegacaoDoConsole } from './NavegacaoDoConsole'
 import css from './moldura.module.css'
@@ -85,11 +91,11 @@ const abasDaDemonstracao = { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas
 function Composicao({ rota }) {
   const {
     selecionada, regras, encerrando, encerrandoNumero, agente, modoAgente, agora, aberta, horarioDaLoja,
-    conversas, automaticoPausado,
+    conversas, automaticoPausado, sessao, rascunho,
   } = useAtendimento()
   const {
     salvarNota, adicionarItem, ajustarQuantidade, alternarRegra, fecharEncerramento,
-    consultarAgente, limparAgente, trocarModoAgente, definirRascunho,
+    consultarAgente, limparAgente, trocarModoAgente, definirRascunho, selecionar,
   } = useAcoes()
   const { canais, janelas } = useCatalogo()
 
@@ -97,8 +103,9 @@ function Composicao({ rota }) {
   // para quem trocou de janela no mesmo computador (US-010, saber sem olhar).
   useTituloDaAba(tituloDaAba(rota, contarPrecisaDeVoce(conversas, agora, automaticoPausado, aberta, janelas, horarioDaLoja)))
   const [modal, setModal] = useState(null)
-  // #1847: o rascunho pertence ao cliente escolhido ao abrir, mesmo ao navegar ou salvar.
-  const [nota, setNota] = useState(null)
+  const { rascunhos: notas, ativa: notaAtiva, memoria: memoriaNotas } = useRascunhosDeNotas(sessao)
+  const [solicitacaoPainel, setSolicitacaoPainel] = useState(null)
+  const solicitarPainel = (aba, destino = 'comanda', conversaId = selecionada?.id) => setSolicitacaoPainel((atual) => ({ aba, destino, conversaId, sequencia: (atual?.sequencia ?? 0) + 1 }))
   // #1761 (L3): gerada a cobrança, o cardápio virava "Consulta do cardápio" com tudo desligado,
   // cobrindo a lista e apertando a conversa. Fecha sozinho; "Ver cardápio" na Ficha reabre.
   const pedidoNaTela = { conversaId: selecionada?.id ?? null, pedidoId: selecionada?.pedido?.pedidoId ?? null }
@@ -130,6 +137,61 @@ function Composicao({ rota }) {
   // nota/cardápio/automáticas/entregas (esses sim se excluem entre si).
   const [simulando, setSimulando] = useState(false)
   const tamanho = useTamanhoTela()
+  const celular = tamanho === CELULAR
+  const notaSelecionada = notas.find((nota) => nota.id === selecionada?.id)
+  const editorNotaVisivel = celular && modal === 'nota' && notaAtiva === notaSelecionada?.chave
+  // Outra conversa abre no atendimento; o rascunho privado continua pertencendo à anterior.
+  const conversaDaNota = useRef(selecionada?.id)
+  useEffect(() => {
+    if (celular && conversaDaNota.current !== selecionada?.id) {
+      memoriaNotas.pausar()
+      setModal((atual) => atual === 'nota' ? null : atual)
+    }
+    conversaDaNota.current = selecionada?.id
+  }, [celular, selecionada?.id, memoriaNotas])
+
+  const precisaCadastrarParaNota = (id) => FONTE_API && !conversas.find((conversa) => conversa.id === id)?.clienteId
+  const pausarNota = (chave, aba = 'atendimento', destino = 'comanda') => {
+    if (memoriaNotas.ler().ativa !== chave) return
+    const dona = notas.find((nota) => nota.chave === chave)
+    memoriaNotas.pausar()
+    setModal((atual) => atual === 'nota' ? null : atual)
+    if (destino === 'cadastro' && dona?.id !== selecionada?.id) selecionar(dona.id)
+    if (celular || destino === 'cadastro') solicitarPainel(aba, destino, dona?.id)
+  }
+  const editoresNotas = notas.map((nota) => (
+    <ModalNota
+      key={nota.chave}
+      visivel={modal === 'nota' && notaAtiva === nota.chave && (!celular || selecionada?.id === nota.id)}
+      embutida={celular}
+      nomeCliente={nota.nome}
+      rascunho={nota}
+      outraConversa={selecionada?.id !== nota.id}
+      precisaCadastrar={precisaCadastrarParaNota(nota.id)}
+      aoCadastrar={() => pausarNota(nota.chave, 'ficha', 'cadastro')}
+      aoGuardar={(campo) => memoriaNotas.guardar(nota.chave, campo)}
+      aoFechar={() => pausarNota(nota.chave)}
+      aoComanda={() => pausarNota(nota.chave, 'ficha')}
+      aoSalvar={async (texto) => {
+        if (precisaCadastrarParaNota(nota.id)) return false
+        if (!memoriaNotas.iniciarGravacao(nota.chave)) return false
+        try {
+          const resultado = await salvarNota(nota.id, texto)
+          const confirmado = resultado === true || (!FONTE_API && resultado !== false)
+          const eraAtiva = memoriaNotas.ler().ativa === nota.chave
+          if (memoriaNotas.concluir(nota.chave, confirmado) && eraAtiva) {
+            setModal((atual) => atual === 'nota' ? null : atual)
+            if (celular) solicitarPainel('atendimento')
+          }
+          if (!confirmado) memoriaNotas.falharGravacao(nota.chave, 'Sem confirmação da nota. Seu texto continua aqui. Confira a ficha antes de tentar de novo.')
+          return confirmado
+        } catch (erro) {
+          memoriaNotas.falharGravacao(nota.chave, erro.message || 'Não foi possível salvar a nota. Seu texto continua aqui.')
+          throw erro
+        }
+      }}
+    />
+  ))
   // Larguras redimensionáveis por alça (seção 9): um hook só, aqui em cima,
   // porque Moldura e o painel do cardápio leem a mesma chave de localStorage
   // e duas instâncias do hook se pisariam na hora de gravar.
@@ -178,8 +240,9 @@ function Composicao({ rota }) {
   const sugestaoAgente = selecionada ? (
     <PainelAgente
       key={selecionada.id}
-      passouParaVoce={precisaDeVoce(selecionada, agora, true, aberta, janelas, horarioDaLoja)}
-      bloqueada={envioBloqueado(selecionada, agora, canalDaConversa(canais, selecionada))}
+      passouParaVoce={precisaDeVoce(selecionada, agora, automaticoPausado[selecionada.id] ?? false, aberta, janelas, horarioDaLoja)}
+      // #2185 (E11): "Usar no rascunho" também não vale com o campo fechado (janela de 24 h, concluída, bloqueio).
+      bloqueada={!permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).pode}
       modo={FONTE_API ? 'api' : modoAgente}
       estado={agente.conversaId === selecionada.id ? agente.estado : 'ocioso'}
       sugestao={agente.conversaId === selecionada.id ? agente.sugestao : null}
@@ -187,7 +250,7 @@ function Composicao({ rota }) {
       esperado={selecionada.esperado ?? null}
       aoConsultar={() => consultarAgente(selecionada.id)}
       aoTrocarModo={trocarModoAgente}
-      aoUsar={(texto) => { definirRascunho(selecionada.id, texto); limparAgente() }}
+      aoUsar={(texto) => { definirRascunho(selecionada.id, juntarAoRascunho(rascunho, texto)); limparAgente() }}
       aoDescartar={limparAgente}
     />
   ) : null
@@ -195,12 +258,12 @@ function Composicao({ rota }) {
   // #1445: "abrir o cardápio/comanda" pedido ao assistente, só depois do clique no cartão.
   // A comanda mora na Ficha (`#comanda-pedido`); sem ela na tela (sem pedido ainda, ou Ficha
   // em gaveta fechada), abre o cardápio, que é por onde a comanda começa.
+  // #2185 (E10): a comanda abre pelo mesmo pedido de painel da Ficha (`solicitarPainel`), que a solta nas três
+  // larguras; procurar `#comanda-pedido` só achava a comanda com o painel solto e, fora disso, abria o Cardápio.
+  // Conversa concluída não monta comanda.
   const abrirTelaDoAssistente = (tela) => {
-    const comanda = tela === 'comanda' ? document.getElementById('comanda-pedido') : null
-    if (comanda) {
-      comanda.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' })
-      return
-    }
+    if (conversaEncerrada(selecionada)) return
+    if (tela === 'comanda' && selecionada?.pedido) { solicitarPainel('ficha', 'comanda'); return }
     setModal('cardapio')
   }
 
@@ -215,15 +278,22 @@ function Composicao({ rota }) {
       <div className={css.areaAtendimento} data-conteudo-console>
       <Moldura
         tamanho={tamanho}
-        aoAbrirNota={() => {
-          if (selecionada) setNota((atual) => atual ?? { id: selecionada.id, nome: selecionada.nome })
+        aoAbrirNota={(texto) => {
+          if (!selecionada) return
+          memoriaNotas.abrir(selecionada.id, selecionada.nome, typeof texto === 'string' ? texto : '')
           setModal('nota')
+          if (celular) solicitarPainel('atendimento')
         }}
+        slotEditorNota={editoresNotas}
+        editorNotaVisivel={editorNotaVisivel}
+        notaEmRascunho={Boolean(notaSelecionada)}
+        solicitacaoPainel={solicitacaoPainel}
+        aoRascunho={(texto) => { if (selecionada && typeof texto === 'string') definirRascunho(selecionada.id, juntarAoRascunho(rascunho, texto)) }}
         aoAbrirGaleria={() => setModal('galeria')}
         aoAbrirBiblioteca={(foco) => { setFocoBiblioteca(foco ?? null); setModal('respostas') }}
         aoAbrirCardapio={() => setModal('cardapio')}
         aoAbrirAutomacoes={() => setModal('automacoes')}
-        aoAbrirGestao={() => setModal('gestao')}
+        aoAbrirGestao={() => { setAbaGestao(null); setModal('gestao') }}
         aoAbrirEntregas={() => setModal('entregas')}
         aoAbrirAjuda={() => setModal('ajuda')}
         simulando={simulando}
@@ -237,18 +307,11 @@ function Composicao({ rota }) {
         cardapioAberto={modal === 'cardapio' && selecionada ? prefCardapio.lado : null}
       />
 
-      {nota && (
-        <ModalNota
-          visivel={modal === 'nota'}
-          nomeCliente={nota.nome}
-          outraConversa={selecionada?.id !== nota.id}
-          aoFechar={() => { setNota(null); setModal((atual) => atual === 'nota' ? null : atual) }}
-          aoSalvar={(texto) => salvarNota(nota.id, texto)}
-        />
-      )}
 
       {/* Rodada 7 · frente Anexos: substitui o antigo "Prato" do composer
           (registro em auditoria/decisoes/61-anexos.md). */}
+      {/* #2393: janela que quebra no render não derruba o Balcão inteiro. */}
+      <LimiteDeErro parte="Janela aberta">
       {modal === 'galeria' && selecionada && <PainelGaleria aoFechar={fechar} />}
       {modal === 'cardapio' && selecionada && (
         <PainelCardapio
@@ -295,7 +358,7 @@ function Composicao({ rota }) {
       {modal === 'respostas' && (
         <Modal
           titulo="Respostas e automáticas"
-          largura="min(880px, calc(100vw - 24px))"
+          largura="lg"
           aoFechar={fechar}
           rodape={<><AvisoDaAcaoApi /><Botao onClick={fechar}>Fechar</Botao></>}
         >
@@ -312,6 +375,7 @@ function Composicao({ rota }) {
       {encerrando && (
         <ModalEncerrar conversaId={encerrando} numeroAtendimento={encerrandoNumero} aoFechar={fecharEncerramento} />
       )}
+      </LimiteDeErro>
 
       {/* Rodada 5, seção 7 (passo zero): painel vazio, a F7 constrói os
           cenários. Só existe para o botão "Simular" ter o que abrir. */}
@@ -370,7 +434,7 @@ function TelaDaRota({ rota }) {
   return (
     <>
       {rota.tipo === ROTA_HALL
-        ? <HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} painel={<AgoraDoHall />} />
+        ? <LimiteDeErro parte="Início"><HallDeModulos fonteApi={FONTE_API} sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} painel={<AgoraDoHall />} /></LimiteDeErro>
         : (
           <MolduraDoModulo moduloId={rota.modulo} telaId={rota.tela} fonteApi={FONTE_API} ajuda={<ControleAjuda rota={rota} />}>
             {/* #1440: no modo API, Entregas › Janelas de entrega é o cadastro da S45 (o mesmo de
@@ -435,6 +499,7 @@ function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComa
       <LimparAvisoAoNavegar />
       <TelaDaRota rota={rota} />
       {permite('atendimento') && <PilhaDeAvisos />}
+      <AvisosDoDispositivo />
     </AtendimentoProvider>
   )
 }
@@ -449,7 +514,7 @@ function NoModulo({ rota, children }) {
 
 function ControleAjuda({ rota }) {
   const [aberta, setAberta] = useState(false)
-  return <><Botao variante="texto" icone="ajuda" data-ajuda-console aria-label="Ajuda" title="Ajuda e guia do Console" aria-haspopup="dialog" onClick={() => setAberta(true)}>Ajuda</Botao>
+  return <><Botao variante="texto" icone="ajuda" data-ajuda-console aria-label="Ajuda" title="Ajuda" aria-haspopup="dialog" onClick={() => setAberta(true)}>Ajuda</Botao>
     {aberta && <AjudaDoConsole rota={rota} fonteApi={FONTE_API} aoFechar={() => setAberta(false)} />}</>
 }
 
@@ -478,7 +543,7 @@ const CHAVE_DO_CONVITE = 'easystok.convite'
 
 export function App() {
   const hash = useHash()
-  const { sessao, entrarNaEmpresa, google, encerrarSessao, avisoSaida } = useSessaoApi()
+  const { sessao, entrarNaEmpresa, entrarPorCodigo, google, encerrarSessao, avisoSaida, retomando, erroRetomada } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
   // #1582: cada tela diz o próprio nome na aba. No Balcão quem escreve é a `Composicao`, com a contagem.
   useTituloDaAba(FONTE_API && !sessao ? TITULO_BASE : rota.tipo === ROTA_PRINCIPAL ? null : tituloDaAba(rota))
@@ -504,7 +569,7 @@ export function App() {
     }
     return <TelaConvite key={token ?? 'sem-token'} token={token} aoConcluir={aoConcluir} />
   }
-  if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} google={google} avisoSaida={avisoSaida} />
+  if (FONTE_API && !sessao) return <TelaLogin entrarNaEmpresa={entrarNaEmpresa} entrarPorCodigo={entrarPorCodigo} google={google} avisoSaida={avisoSaida} retomando={retomando} erroRetomada={erroRetomada} />
   if (FONTE_API) return <><NavegacaoDoConsole hash={hash} /><AppComAcesso key={identidadeDaSessao(sessao)} rota={rota} sessao={sessao} aoSair={encerrarSessao} /></>
   if (!FONTE_API && rota.modulo) return <AppPrincipal rota={rota} sessao={sessao} />
   if (rota.tipo === ROTA_ENTREGAS) return FONTE_API ? <EntregasApi rota={rota} sessao={sessao} /> : <NoModulo rota={rota}><TelaEntregas /></NoModulo>
@@ -539,7 +604,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   }, [temRascunhos])
   const sair = () => temRascunhos ? setConfirmandoSaida(true) : aoSair()
   const confirmacaoSaida = confirmandoSaida && <Modal titulo="Sair sem salvar os ajustes?"
-    descricao="Há ajustes não concluídos em Horários e mensagens. Você pode continuar trabalhando e voltar a eles. Sair descarta os rascunhos; uma gravação já enviada pode ser concluída. Confira os valores ao entrar novamente."
+    descricao="Há alterações ou notas não salvas nesta sessão. Você pode continuar trabalhando e voltar a elas. Sair descarta os rascunhos; uma gravação já enviada pode ser concluída. Confira os valores ao entrar novamente."
     aoFechar={() => setConfirmandoSaida(false)}
     rodape={<><Botao onClick={() => setConfirmandoSaida(false)}>Continuar trabalhando</Botao><Botao variante="texto" onClick={aoSair}>Sair e descartar ajustes</Botao></>} />
   // #1576: mensagens e pedidos já lidos ficam aqui enquanto a dona está no Hall, na Cozinha ou nas
@@ -577,7 +642,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
     </Vazio>
     </main>
   )
-  else if (rota.tipo === ROTA_HALL) tela = <HallDeModulos fonteApi sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} />
+  else if (rota.tipo === ROTA_HALL) tela = <LimiteDeErro parte="Início"><HallDeModulos fonteApi sessao={sessao} agora={agora} ajuda={<ControleAjuda rota={rota} />} /></LimiteDeErro>
   else if (rota.tipo === ROTA_COZINHA) tela = <CozinhaApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_ENTREGAS) tela = <EntregasApi rota={rota} sessao={sessao} />
   else if (rota.tipo === ROTA_CARDAPIO_LINK) tela = <AvisoCardapioDoSite />
@@ -585,6 +650,8 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
       {tela}{confirmacaoSaida}
+      {/* #2096: o canhoto sai sozinho no aparelho em que a dona ligou, em qualquer tela. */}
+      <ImpressaoAutomatica />
     </ContextoRascunhosDosAjustes.Provider>
   </ContextoAcessoModulos.Provider>
 }

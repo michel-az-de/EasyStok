@@ -1058,6 +1058,10 @@ public partial class AtendimentoConversasControllerTests
                 c.EmpresaId == empresaId && c.Canal == canal && c.ContatoIdExterno == contato && c.EstaAberta));
         }
 
+        public Task<int> ContarRespostasDoAgenteDesdeAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default) =>
+            Task.FromResult(Mensagens.Count(m => m.EmpresaId == empresaId && m.ConversaId == conversaId
+                && m.Direcao == DirecaoMensagem.Saida && m.Autor == AutorMensagem.Agente && m.EnviadaEm >= desde));
+
         public async Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default)
         {
             var conversa = await ObterPorIdAsync(empresaId, id, ct);

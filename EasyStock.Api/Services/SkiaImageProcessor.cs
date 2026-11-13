@@ -36,7 +36,7 @@ public sealed class SkiaImageProcessor(ILogger<SkiaImageProcessor> logger) : IIm
                 {
                     logger.LogWarning("SkiaSharp falhou ao redimensionar {W}x{H} -> {NW}x{NH}. Usando original.",
                         original.Width, original.Height, newWidth, newHeight);
-                    target = original;
+                    return FallbackOriginal(source, originalContentType);
                 }
             }
             else
@@ -82,9 +82,9 @@ public sealed class SkiaImageProcessor(ILogger<SkiaImageProcessor> logger) : IIm
         double ratio = (double)origWidth / origHeight;
 
         if (origWidth >= origHeight)
-            return (maxSide, (int)Math.Round(maxSide / ratio));
+            return (maxSide, Math.Max(1, (int)Math.Round(maxSide / ratio)));
         else
-            return ((int)Math.Round(maxSide * ratio), maxSide);
+            return (Math.Max(1, (int)Math.Round(maxSide * ratio)), maxSide);
     }
 
     private static (byte[] Data, string ContentType, string Extension) FallbackOriginal(

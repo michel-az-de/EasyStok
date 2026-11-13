@@ -67,18 +67,24 @@ public sealed class ConsultarPedidoFerramenta(
         var cupons = await creditos.ListarAsync(contexto.EmpresaId, clienteId, ct);
         var titulo = conversa.NumeroComanda > 0 && conversa.PedidoEmAndamentoId == p.Id
             ? $"Comanda #{conversa.NumeroComanda}" : $"Pedido registrado em {Brasilia(p.CriadoEm)}";
+        // #2126: devolução e cupom zerados fora de um acerto de devolução são ruído para o cliente.
+        var temDevolucao = financeiro.Devolvido > 0 || financeiro.Reservado > 0 || estado?.Acerto?.Tipo == "estorno";
         var resposta = new List<string>
         {
             $"{titulo}. Situação registrada: {StatusPedidoVocabulario.RotuloLojista(StatusPedidoMapper.Parse(pedido.Status))}.",
             $"Total: {FerramentaJson.FormatarReais(p.Total)}. Cobertura atual: {FerramentaJson.FormatarReais(financeiro.Alocado)}. Falta pagar: {FerramentaJson.FormatarReais(Math.Max(0, p.Total - financeiro.Alocado))}.",
-            $"Dinheiro recebido registrado: {FerramentaJson.FormatarReais(financeiro.Recebido)}. Devoluções registradas: {FerramentaJson.FormatarReais(financeiro.Devolvido)}. Reservado para devolução: {FerramentaJson.FormatarReais(financeiro.Reservado)}.",
-            $"Crédito emitido em cupom: {FerramentaJson.FormatarReais(financeiro.ConvertidoEmCupom)}. Crédito aplicado ao pedido: {FerramentaJson.FormatarReais(financeiro.CupomAplicado)}.",
+            temDevolucao
+                ? $"Dinheiro recebido registrado: {FerramentaJson.FormatarReais(financeiro.Recebido)}. Devoluções registradas: {FerramentaJson.FormatarReais(financeiro.Devolvido)}. Reservado para devolução: {FerramentaJson.FormatarReais(financeiro.Reservado)}."
+                : $"Dinheiro recebido registrado: {FerramentaJson.FormatarReais(financeiro.Recebido)}.",
+        };
+        if (financeiro.ConvertidoEmCupom > 0 || financeiro.CupomAplicado > 0)
+            resposta.Add($"Crédito emitido em cupom: {FerramentaJson.FormatarReais(financeiro.ConvertidoEmCupom)}. Crédito aplicado ao pedido: {FerramentaJson.FormatarReais(financeiro.CupomAplicado)}.");
+        resposta.Add(
             estado?.Pedido?.Janela is { } janela
                 ? $"Entrega agendada para {janela.Data:dd/MM/yyyy}, das {janela.HoraInicio:HH:mm} às {janela.HoraFim:HH:mm}."
                 : p.AgendadoParaEm is { } agendado
                     ? $"Data de entrega registrada: {HorarioBrasil.ConverterParaBrasilia(agendado):dd/MM/yyyy}. A equipe pode conferir a janela com você."
-                    : "Sem previsão de entrega registrada."
-        };
+                    : "Sem previsão de entrega registrada.");
         if (estado?.Acerto is { Tipo: "estorno" } acerto)
             foreach (var devolucao in acerto.Devolucoes)
                 resposta.Add($"Solicitação de devolução desta alteração: {FerramentaJson.FormatarReais(devolucao.Valor)}, " +

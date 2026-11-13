@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Domain.Enums.Notifications;
@@ -36,6 +35,8 @@ public sealed class ConcluidorDeReset(
 
         // Usar um dos segredos mata o outro, e qualquer pedido anterior ainda aberto.
         await tokens.InvalidarAbertosAsync(usuario.Id, agora);
+        // #2201: reset é a resposta a conta comprometida; a chave de acesso aberta cai junto.
+        await tokens.InvalidarChavesDeAcessoAbertasAsync(usuario.Id);
 
         await auditLog.AddAsync(AuditLog.Criar(
             usuario.Id, acao, true, $"Senha redefinida. {tokensRevogados} refresh tokens revogados.", ip, userAgent));
@@ -61,16 +62,5 @@ public sealed class ConcluidorDeReset(
             }));
     }
 
-    private static string FormatarInstante(DateTime utc)
-    {
-        try
-        {
-            var local = TimeZoneInfo.ConvertTimeFromUtc(utc, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
-            return local.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"));
-        }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-        {
-            return utc.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"));
-        }
-    }
+    private static string FormatarInstante(DateTime utc) => HorarioBrasil.Formatar(utc);
 }

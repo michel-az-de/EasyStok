@@ -15,6 +15,15 @@ public static class MobileModelRegistrar
 {
     public static ModelBuilder RegisterMobileModels(this ModelBuilder mb)
     {
+        // Pré-pareamento, somente avisos públicos. Schema SQL 013, sem acesso a tenant.
+        mb.Entity<PushInstallation>().ToTable("mobile_push_installations", t => t.ExcludeFromMigrations());
+        mb.Entity<PushMessage>().ToTable("mobile_push_messages", t => t.ExcludeFromMigrations());
+        mb.Entity<PushMessage>().HasIndex(x => x.Nonce).IsUnique();
+        mb.Entity<PushMessage>().HasIndex(x => new { x.InstallationId, x.ExpiresAt });
+        mb.Entity<PushReceipt>().ToTable("mobile_push_receipts", t => t.ExcludeFromMigrations());
+        mb.Entity<PushReceipt>().HasIndex(x => new { x.MessageId, x.InstallationId, x.Event, x.Source }).IsUnique();
+        mb.Entity<PushProviderEvent>().ToTable("mobile_push_provider_events", t => t.ExcludeFromMigrations());
+        mb.Entity<PushProviderEvent>().HasIndex(x => x.MessageId);
         mb.Entity<Product>();
         mb.Entity<Client>();
 
@@ -70,6 +79,7 @@ public static class MobileModelRegistrar
         //   - empresa_id (listagem no painel /dispositivos)
         mb.Entity<MobileDevice>(b =>
         {
+            b.HasOne<SessaoNativa>().WithMany().HasForeignKey(d => d.SessaoNativaId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(d => d.ApiKeyHash).IsUnique().HasDatabaseName("ux_mobile_devices_api_key_hash");
             b.HasIndex(d => d.PairingCode).HasDatabaseName("ix_mobile_devices_pairing_code");
             b.HasIndex(d => d.EmpresaId).HasDatabaseName("ix_mobile_devices_empresa_id");

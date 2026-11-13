@@ -16,6 +16,17 @@ namespace EasyStock.Api.UnitTests.Authorization;
 public class ModulosTests
 {
     [Theory]
+    [InlineData("Enviar")]
+    [InlineData("Obter")]
+    [InlineData("Remover")]
+    public void Foto_cliente_exige_operador_e_modulo_atendimento(string acao)
+    {
+        var tipo = typeof(Api.Controllers.ClientesFotoController);
+        tipo.GetCustomAttributes<AuthorizeAttribute>().Should().Contain(a => a.Policy == "Operador");
+        ModulosConvention.ModulosDe(tipo, acao)!.Should().Equal(Modulo.Atendimento);
+    }
+
+    [Theory]
     [InlineData("Apurar")]
     [InlineData("Resolver")]
     [InlineData("Abrir")]

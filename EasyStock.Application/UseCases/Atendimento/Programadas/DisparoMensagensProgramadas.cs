@@ -71,26 +71,51 @@ public sealed class DispararMensagemProgramadaUseCase(
                 : await canal.EnviarTextoAsync(contato, mensagem.Texto!, ct);
 
             mensagem.RegistrarEnvio(idExterno, agora);
-            if (conversa is not null)
-                await RegistrarNoHistoricoAsync(empresaId, conversa, mensagem, idExterno, agora, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             // #1787: o timeout do HttpClient também é OperationCanceledException; só o desligamento relança.
             logger.LogWarning(ex, "Mensagem programada {Id} não saiu.", id);
             // #1765-11: o código estável (o console traduz); o texto do provedor, em inglês e com host, fica só no log.
-            mensagem.RegistrarFalha(ClassificadorFalhaEnvio.Motivo(ex), agora);
+            var motivo = ClassificadorFalhaEnvio.Motivo(ex);
+            // #2285: só a falha em que sabidamente nada saiu (Temporaria) tenta de novo, com recuo. Timeout, 5xx e erro
+            // desconhecido são Incerta (a mensagem pode ter chegado, #1292/#1915): reenviar duplicaria, fica Falhou.
+            if (ClassificadorFalhaEnvio.Classificar(ex) == TipoFalhaEnvio.Temporaria)
+                mensagem.ReagendarPorFalhaTransitoria(motivo, agora, agora + RecuoEntreTentativas(mensagem.Tentativas));
+            else
+                mensagem.RegistrarFalha(motivo, agora);
+        }
+
+        // #2280: o histórico vem depois do envio e fora dele. A mensagem já chegou ao cliente: falhar aqui não a rebaixa
+        // para "Falhou", senão a dona reenviaria e o cliente receberia duas vezes.
+        if (mensagem.Situacao == SituacaoMensagemProgramada.Enviada && conversa is not null)
+        {
+            try
+            {
+                await RegistrarNoHistoricoAsync(empresaId, conversa, mensagem, mensagem.IdExterno, agora, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Mensagem programada {Id} saiu, mas não entrou no histórico da conversa {ConversaId}.", id, conversa.Id);
+            }
         }
 
         await unitOfWork.CommitAsync();
+
+        // Reagendada para nova tentativa: ainda não há desfecho a publicar.
+        if (mensagem.Situacao == SituacaoMensagemProgramada.Agendada) return;
 
         await publisher.PublicarAsync(
             mensagem.Situacao == SituacaoMensagemProgramada.Enviada ? "mensagem_programada.enviada" : "mensagem_programada.falhou",
             empresaId, new { id = mensagem.Id, clienteId = mensagem.ClienteId, conversaId = conversa?.Id, erro = mensagem.Erro }, ct);
     }
 
+    /// <summary>Recuo crescente entre as tentativas: 1 min depois da primeira, 5 min depois da segunda.</summary>
+    private static TimeSpan RecuoEntreTentativas(int tentativasFeitas) =>
+        tentativasFeitas <= 1 ? TimeSpan.FromMinutes(1) : TimeSpan.FromMinutes(5);
+
     private async Task RegistrarNoHistoricoAsync(
-        Guid empresaId, Conversa conversa, MensagemProgramada mensagem, string idExterno, DateTime agora, CancellationToken ct)
+        Guid empresaId, Conversa conversa, MensagemProgramada mensagem, string? idExterno, DateTime agora, CancellationToken ct)
     {
         var texto = mensagem.Texto ?? $"[modelo {mensagem.ModeloNome}]";
         var saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Dona, agora, TipoConteudoMensagem.Texto, texto, idExterno);

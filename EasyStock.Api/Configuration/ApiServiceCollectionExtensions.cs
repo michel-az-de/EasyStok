@@ -1,11 +1,14 @@
 using EasyStock.Api.Authorization;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.HealthChecks;
 using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
+using EasyStock.Observabilidade;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using EasyStock.Infra.Integrations.DependencyInjection;
@@ -197,6 +200,12 @@ public static class ApiServiceCollectionExtensions
             // evitar abuso (tentativa de adivinhar pairing code, flood).
             // Limites generosos pra não atrapalhar uso legítimo (PWA pinga
             // version no boot a cada reload).
+            // Recibos em fila de aparelhos na mesma rede. O cadastro continua limitado separadamente.
+            options.AddPolicy("mobile-push-receipts", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "anon",
+                    _ => new FixedWindowRateLimiterOptions
+                    { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             options.AddPolicy("mobile-anonymous", context =>
             {
                 var partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "anon";
@@ -421,12 +430,17 @@ public static class ApiServiceCollectionExtensions
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddEnderecoForaDoLogHttp();
+        // #2376: espaço livre do disco no /health/disco, vigiado de fora (scripts/uptime/alvos.txt).
+        services.AddHealthChecks().Add(new HealthCheckRegistration(
+            "Disco", _ => DiscoHealthCheck.DoSistema(configuration), HealthStatus.Unhealthy, [DiscoHealthCheck.Tag]));
 
-        // string.IsNullOrWhiteSpace (nao `??`): o compose da VM injeta a env como string
-        // vazia quando OTEL_COLLECTOR_ENDPOINT nao esta no .env, e new Uri("") lanca
-        // UriFormatException derrubando a API no startup (issue 1002).
+        // Opt-in, como no Web e no Worker (issue 1002): sem endpoint nao ha provider nem exporter.
+        // Antes caia em localhost:4317 e mandava traces e metricas para o vazio em producao (#2107).
+        // string.IsNullOrWhiteSpace: o compose injeta a env como string vazia.
         var otlpConfigured = configuration[ConfigurationKeys.OtlpEndpoint];
-        var otlpEndpoint = new Uri(string.IsNullOrWhiteSpace(otlpConfigured) ? "http://localhost:4317" : otlpConfigured);
+        if (string.IsNullOrWhiteSpace(otlpConfigured))
+            return services;
+        var otlpEndpoint = new Uri(otlpConfigured);
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService("EasyStock.Api"))
@@ -443,6 +457,8 @@ public static class ApiServiceCollectionExtensions
                     .AddHttpClientInstrumentation(http =>
                         http.EnrichWithHttpRequestMessage = EnderecoForaDaTelemetria.OcultarUrlNoSpan(configuration))
                     .AddNpgsql()
+                    // #2376: o span sai com o mesmo mascaramento do log; antes do exporter.
+                    .AddProcessor(new SpanQueRedige())
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);
 
                 if (environment.IsDevelopment())

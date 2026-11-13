@@ -2,14 +2,16 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using EasyStock.Infra.Integrations.Resilience;
 using Microsoft.Extensions.Logging;
+using Polly.CircuitBreaker;
 using Polly.Registry;
+using Polly.Timeout;
 
 namespace EasyStock.Infra.Integrations.Meta;
 
 /// <summary>
 /// <c>POST /me/messages</c> com o page token (o "me" do token é a página; o Instagram ligado a ela usa
-/// o mesmo endpoint com o IGSID). Só a chamada HTTP passa pelo Polly: erro de aplicação da Meta não é
-/// reenviado sozinho.
+/// o mesmo endpoint com o IGSID). Só a chamada HTTP passa pelo Polly, no pipeline sem retry
+/// (<see cref="IntegrationCategories.MetaEnvio"/>): o POST não é idempotente e nada é reenviado sozinho (#2025).
 /// </summary>
 public sealed class MetaMensageriaHttpTransporte(
     HttpClient httpClient,
@@ -18,9 +20,25 @@ public sealed class MetaMensageriaHttpTransporte(
 {
     public async Task<string> EnviarAsync(object payload, CancellationToken ct = default)
     {
-        var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.WhatsApp);
-        using var response = await pipeline.ExecuteAsync(
-            async pollyCt => await httpClient.PostAsJsonAsync("me/messages", payload, pollyCt), ct);
+        var pipeline = pipelineProvider.GetPipeline(IntegrationCategories.MetaEnvio);
+        HttpResponseMessage resposta;
+        try
+        {
+            resposta = await pipeline.ExecuteAsync(
+                async pollyCt => await httpClient.PostAsJsonAsync("me/messages", payload, pollyCt), ct);
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            // Como no WhatsAppCloudClient (#1765-1): o POST pode ter chegado, o atendimento registra falha incerta.
+            throw new TimeoutException("A Meta não respondeu ao envio a tempo; a mensagem pode ter saído.", ex);
+        }
+        catch (BrokenCircuitException ex)
+        {
+            // Como o #2004 no WhatsApp: com o disjuntor aberto o POST nem sai. Falha temporária, o atendimento reagenda.
+            throw new HttpRequestException(HttpRequestError.ConnectionError,
+                "O canal está temporariamente indisponível; a mensagem não foi enviada.", ex);
+        }
+        using var response = resposta;
 
         if (!response.IsSuccessStatusCode)
         {

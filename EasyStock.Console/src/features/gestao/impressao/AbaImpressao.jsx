@@ -9,8 +9,9 @@ import {
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao } from '../../../componentes/Campo'
 import {
-  DOCUMENTOS, PAPEIS, PERFIS_IMPRESSAO, orientacaoDoPapel, perfilDeImpressao, trocarLogoNaTermica, trocarPapelPadrao, trocarPerfilPadrao,
+  DOCUMENTOS, PAPEIS, PERFIS_IMPRESSAO, orientacaoDoPapel, perfilDeImpressao, trocarCanhotoAutomatico, trocarLogoNaTermica, trocarPapelPadrao, trocarPerfilPadrao,
 } from '../../../dominio/impressos'
+import { atalhoDoChrome } from '../../../dominio/impressaoAutomatica'
 import css from './abaImpressao.module.css'
 
 const TIPOS_DE_LOGO = ['image/png', 'image/jpeg']
@@ -73,11 +74,49 @@ function LogoDaLoja() {
               {enviando ? 'Enviando…' : loja?.logoUrl ? 'Trocar logo' : 'Enviar logo'}
             </Botao>
           </div>
-        ) : <p className={css.descricao}>O logo é enviado pela dona.</p>}
+        ) : <p className={css.descricao}>Peça à administração da loja para enviar o logo.</p>}
       </div>
       {situacao.estado === 'enviado' && <output className={css.retorno}>Logo salvo no EasyStok. Os próximos impressos já saem com ele.</output>}
       {situacao.estado === 'erro' && <p className={css.erro} role="alert">{situacao.mensagem}</p>}
     </section>
+  )
+}
+
+// #2096: o canhoto sai sozinho no PC da cozinha. Sem --kiosk-printing o Chrome abre o diálogo a cada folha.
+const enderecoDoConsole = () => `${window.location.origin}${window.location.pathname}`
+
+function CanhotoSozinho({ ligado, aoMudar }) {
+  const id = useId()
+  return (
+    <div className={css.automatico}>
+      <label className={css.chave}>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={ligado}
+          aria-checked={ligado}
+          aria-describedby={`${id}-automatico`}
+          onChange={(evento) => aoMudar(evento.target.checked)}
+        />
+        Imprimir pedidos automaticamente neste aparelho
+      </label>
+      <p id={`${id}-automatico`} className={css.descricao}>
+        Pedidos pagos são impressos enquanto o sistema estiver aberto. Só uma aba imprime.
+      </p>
+      {ligado && (
+        <div className={css.aviso}>
+          <p className={css.passo}>Para imprimir sem a janela de confirmação:</p>
+          <ol className={css.passos}>
+            <li>Escolha a impressora térmica como padrão do Windows.</li>
+            <li>
+              Abra o Chrome deste PC por um atalho com <code>--kiosk-printing</code>. No destino do atalho:
+              <code className={css.atalho}>{atalhoDoChrome(enderecoDoConsole())}</code>
+            </li>
+            <li>Abra o sistema por esse atalho e mantenha a janela aberta.</li>
+          </ol>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -95,8 +134,7 @@ function PapeisDoAparelho() {
     <section className={css.secao} aria-labelledby={`${id}-papeis`}>
       <h3 id={`${id}-papeis`}>Impressora e papel neste aparelho</h3>
       <p className={css.descricao}>
-        Cada aparelho guarda o seu: o tablet da cozinha pode sair na bobina e o computador do balcão na A4.
-        A impressora escolhida já define o papel. Na hora de imprimir ainda dá para trocar.
+        Escolha o padrão deste aparelho. Você pode trocar a impressora e o papel ao imprimir.
       </p>
       <div className={css.papeis}>
         {DOCUMENTOS.map((documento) => {
@@ -135,6 +173,7 @@ function PapeisDoAparelho() {
         A térmica só imprime preto: logo colorido pode sair falhado. O padrão é o nome da casa em texto,
         que sai sempre nítido.
       </p>
+      <CanhotoSozinho ligado={preferencias.canhotoAutomatico} aoMudar={(ligado) => aplicar(trocarCanhotoAutomatico(preferencias, ligado, Date.now()))} />
       {guardou === true && <output className={css.retorno}>Guardado neste aparelho.</output>}
       {guardou === false && (
         <output className={css.retorno}>O navegador não deixou guardar. A escolha vale até fechar esta aba.</output>

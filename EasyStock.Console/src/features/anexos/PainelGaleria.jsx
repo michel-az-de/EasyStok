@@ -26,27 +26,31 @@ import css from './anexos.module.css'
 // clique (só o <label> conta).
 function CampoFoto({ foto, aoEscolher, erro }) {
   const { ler } = useArquivoComoDataUrl()
+  const [erroLeitura, setErroLeitura] = useState(null)
+  const problema = erroLeitura ?? erro
   return (
     <div>
-      <label className={`${css.campoFoto} ${erro ? css.campoFotoInvalido : ''}`}>
+      <label className={`${css.campoFoto} ${problema ? css.campoFotoInvalido : ''}`}>
         {foto ? <img src={foto} alt="" /> : <span className={css.campoFotoVazio}><Icone nome="imagem" /> Escolher foto</span>}
         <input
           type="file"
           className="sr"
           data-campo="foto"
-          aria-invalid={Boolean(erro)}
+          aria-invalid={Boolean(problema)}
           accept="image/jpeg,image/png,image/webp,image/gif"
           onChange={async (evento) => {
             const arquivo = evento.target.files?.[0]
             evento.target.value = ''
             if (!arquivo) return
+            setErroLeitura(null)
             const { aceito } = validarArquivo({ tipo: arquivo.type, tamanho: arquivo.size })
             if (!aceito || tipoDeArquivo(arquivo.type) !== 'imagem') return
-            aoEscolher(await ler(arquivo))
+            try { aoEscolher(await ler(arquivo)) }
+            catch { setErroLeitura('Não consegui ler a foto. Escolha novamente ou tente outro arquivo.') }
           }}
         />
       </label>
-      {erro && <p className={css.dicaFoto}>{erro}</p>}
+      {problema && <p className={css.dicaFoto} role={erroLeitura ? 'alert' : undefined}>{problema}</p>}
     </div>
   )
 }
@@ -168,7 +172,7 @@ export function PainelGaleria({ aoFechar }) {
       descricao={fonteApi
         ? 'Fotos dos pratos do cardápio, prontas para enviar na conversa.'
         : 'Fotos prontas para enviar na conversa: prato, horário de funcionamento, ou o que você cadastrar.'}
-      largura="720px"
+      largura="md"
       aoFechar={aoFechar}
       rodape={<Botao onClick={aoFechar}>Fechar</Botao>}
     >
@@ -228,7 +232,7 @@ export function PainelGaleria({ aoFechar }) {
               {falhouId === peca.id && <p className={css.cartaoFalha} role="alert">{FOTO_NAO_ENVIADA}</p>}
             </li>
           ))}
-          {!fonteApi && <li className={css.cartaoNovo}>
+          {!fonteApi && <li>
             <button type="button" onClick={() => setModal({ modo: 'novo' })}>
               <Icone nome="plus" /> Nova peça
             </button>

@@ -106,4 +106,28 @@ public class PasswordPolicyTests
         // Este teste documenta o teto atual e cobre o caminho default do switch.
         PasswordPolicy.CalculateStrength("Senha@123456789Z!#$%").Should().Be(PasswordStrength.Medium);
     }
+
+    [Fact]
+    public void Falhas_VaziaQuandoCumpreTodosOsCriterios() =>
+        PasswordPolicy.Falhas("Senha@12345").Should().BeEmpty();
+
+    [Fact]
+    public void Falhas_ListaCadaCriterioQueNaoCumpre()
+    {
+        PasswordPolicy.Falhas("abc").Should().BeEquivalentTo(
+            [FalhaDeSenha.Curta, FalhaDeSenha.SemMaiuscula, FalhaDeSenha.SemNumero, FalhaDeSenha.SemSimbolo]);
+        PasswordPolicy.Falhas("  ").Should().Equal(FalhaDeSenha.Vazia);
+        PasswordPolicy.Falhas(null).Should().Equal(FalhaDeSenha.Vazia);
+        PasswordPolicy.Falhas("Aa1!" + new string('x', PasswordPolicy.MaxLength)).Should().Equal(FalhaDeSenha.Longa);
+    }
+
+    [Theory]
+    [InlineData("Abcdefgh1_")] // o sublinhado conta como símbolo
+    [InlineData("ÇÃÕçãõççç1!")] // letra acentuada conta como maiúscula e minúscula
+    public void Falhas_TratamLetraESimboloPeloUnicode(string senha) =>
+        PasswordPolicy.Falhas(senha).Should().BeEmpty();
+
+    [Fact]
+    public void ContaDePlataforma_ExigeMaisQueOUsuarioComum() =>
+        PasswordPolicy.MinLengthDaContaDePlataforma.Should().BeGreaterThan(PasswordPolicy.MinLength);
 }

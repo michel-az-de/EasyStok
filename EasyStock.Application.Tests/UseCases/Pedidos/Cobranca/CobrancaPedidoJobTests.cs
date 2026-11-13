@@ -136,6 +136,11 @@ public class CobrancaPedidoJobTests
             EasyStock.Domain.Enums.Notifications.TipoEventoNotificacao.CobrancaAguardandoEquipe, f.EmpresaId,
             Arg.Is<string>(p => p.Contains(referencia) && !p.Contains("5511")),
             f.Pedido.Id, Arg.Any<CancellationToken>(), $"cobranca-aguardando-equipe:{vencida.Id:N}");
+        // #2211: e o WhatsApp da equipe inscrita, uma vez por cobrança.
+        await f.Notificador.Received(1).EnfileirarEventoAsync(
+            EasyStock.Domain.Enums.Notifications.TipoEventoNotificacao.AvisoEquipeProblemaPagamento, f.EmpresaId,
+            Arg.Is<string>(p => p.Contains("venceu")), f.Pedido.Id, Arg.Any<CancellationToken>(),
+            $"aviso-equipe-pagamento:vencida:{vencida.Id:N}");
     }
 
     [Fact]

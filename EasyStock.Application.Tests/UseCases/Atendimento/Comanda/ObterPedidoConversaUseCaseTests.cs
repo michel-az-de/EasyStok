@@ -74,10 +74,26 @@ public class ObterPedidoConversaUseCaseTests
         pedido.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = Guid.NewGuid(),
             Nome = "Embalagem térmica", Quantidade = 1, PrecoUnitario = 4m, Subtotal = 4m });
 
-        ObterPedidoConversaUseCase.ValorForaDoCardapio(pedido).Should().Be(12m, "frete 8 + linha da casa 4");
+        pedido.ValorForaDoCardapio.Should().Be(12m, "frete 8 + linha da casa 4");
         var resultado = await _useCase.ExecuteAsync(_empresaId, conversa.Id);
         resultado!.Frete.Should().Be(8m, "a tela separa só o frete; a linha da casa aparece entre os itens");
         resultado.Itens.Should().Contain(i => i.Nome == "Embalagem térmica");
+    }
+
+    [Fact]
+    public async Task LinhaAvulsaDaCasaSemProduto_EItemNaFicha_NaoEFrete()
+    {
+        // #2018: antes, a linha sem produto e sem cardapio que nao era frete ("Taxa extra") entrava na conta do frete da tela.
+        var conversa = NovaConversa();
+        var pedido = NovoPedido(conversa);
+        pedido.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id,
+            Nome = "Taxa extra", Quantidade = 1, PrecoUnitario = 3m, Subtotal = 3m });
+
+        var resultado = await _useCase.ExecuteAsync(_empresaId, conversa.Id);
+
+        resultado!.Frete.Should().Be(8m);
+        resultado.Itens.Should().Contain(i => i.Nome == "Taxa extra").And.NotContain(i => i.Nome.StartsWith("Entrega"));
+        pedido.TotalComPratos(25m).Should().Be(36m, "frete 8 + avulsa 3 + pratos 25");
     }
 
     [Fact]

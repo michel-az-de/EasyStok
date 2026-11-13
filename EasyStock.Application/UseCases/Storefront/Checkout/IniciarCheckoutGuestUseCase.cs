@@ -136,7 +136,7 @@ public sealed class IniciarCheckoutGuestUseCase(
         var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversaId: input.ConversaId, ct);
 
         var token = tokenService.Gerar(pedido.Id);
-        var numeroCurto = pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        var numeroCurto = CodigoCurto.De(pedido.Id);
         var frete = reservado.ItemFrete.PrecoUnitario;
 
         logger.LogInformation(
@@ -161,12 +161,13 @@ public sealed class IniciarCheckoutGuestUseCase(
             storefrontId, itensPedidos.Select(i => i.CardapioItemId), ct);
         CheckoutCoreService.ValidarItens(itensPedidos, cardapioItens);
 
-        var pedido = DomainPedido.Criar(empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest);
+        var pedido = DomainPedido.Criar(
+            empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest,
+            statusInicial: StatusPedido.AguardandoAprovacaoBaba);
         await enderecoEntrega.RegistrarAsync(pedido,
             input.EnderecoEntrega ?? new EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega(null, input.Numero, null, null, null, null, input.Cep), ct);
         pedido.ClienteNome = nome;
         pedido.ClienteTelefone = telefoneE164;
-        pedido.Status = StatusPedidoMapper.AguardandoAprovacaoBaba;
         pedido.Observacoes = MontarObservacoes(input.Observacoes, cep, input.Numero);
         await pedidoRepository.AddAsync(pedido, ct);
 
@@ -183,7 +184,7 @@ public sealed class IniciarCheckoutGuestUseCase(
         await atribuicaoCampanha.AtribuirAsync(empresaId, cliente.Id, pedido.Id, ct);
         await unitOfWork.CommitAsync();
 
-        var numeroCurto = pedido.Id.ToString("N")[..8].ToUpperInvariant();
+        var numeroCurto = CodigoCurto.De(pedido.Id);
         logger.LogInformation(
             "Checkout guest sem janela (ponte #1306) pedidoId={PedidoId} numeroCurto={Numero} storefrontId={StorefrontId} clienteNovo={Novo} elapsedMs={Ms}",
             pedido.Id, numeroCurto, storefrontId, clienteNovo, sw.ElapsedMilliseconds);

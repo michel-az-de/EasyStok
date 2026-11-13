@@ -1,4 +1,5 @@
 using System.Globalization;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Inventario.Desacertos;
 
@@ -67,7 +68,7 @@ public sealed class ListarDesacertosEstoqueUseCase(IDesacertosEstoqueQueries que
             ? partes[1]
             : partes[0];
         return Guid.TryParse(candidato, out var id)
-            ? id.ToString("N")[..8].ToUpperInvariant()
+            ? CodigoCurto.De(id)
             : null;
     }
 }

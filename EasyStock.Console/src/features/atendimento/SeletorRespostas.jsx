@@ -1,5 +1,8 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { Popover } from '../../componentes/Popover'
+import { useAtendimento } from '../../aplicacao/contextos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { respostasEditaveis } from '../../dominio/acessoModulos'
 import css from './seletorRespostas.module.css'
 
 // Lista compacta de respostas prontas acima do compositor (#1441). Uma linha por
@@ -12,10 +15,14 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
   const idLista = idInformado ?? idGerado
   const idDe = (indice) => `${idLista}-${indice}`
   const { itens, destaque } = seletor
+  const { fonteApi } = useAtendimento()
+  const { acoes } = useAcessoModulos()
+  // #2185: quem não edita abre a biblioteca só para consultar.
+  const editavel = respostasEditaveis({ fonteApi, acoes })
   const opcaoAtiva = useRef(null)
   useLayoutEffect(() => {
     const opcao = opcaoAtiva.current
-    const caixa = opcao?.closest('[role="group"]')
+    const caixa = opcao?.closest('[role="listbox"]')
     if (!caixa) return
     const item = opcao.getBoundingClientRect()
     const janela = caixa.getBoundingClientRect()
@@ -27,7 +34,6 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
   return (
     <Popover rotulo="Respostas rápidas" papel="group" aoFechar={seletor.fechar} semAutoFoco portal>
       <div className={css.seletor}>
-        <p className={css.orientacao}>A resposta entra no rascunho. Confira o texto antes de enviar.</p>
         {!seletor.pelaBarra && (
           <input
             autoFocus
@@ -74,14 +80,14 @@ export function SeletorRespostas({ seletor, aoGerenciar, aoInserido, idLista: id
         )}
 
         <div className={css.rodape}>
-          <span className={css.dica}>↑↓ escolhe · Enter insere · Esc fecha</span>
+          <span className={css.dica}>Enter insere no rascunho</span>
           <button
             type="button"
             className={css.gerenciar}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => { seletor.fechar(); aoGerenciar?.() }}
           >
-            Gerenciar respostas
+            {editavel ? 'Gerenciar respostas' : 'Ver respostas'}
           </button>
         </div>
       </div>

@@ -1,16 +1,18 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { CampoTexto } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { IconeDoModulo } from '../../componentes/IconeDoModulo'
 import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { MODULOS, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { MODULOS, NOME_INICIO, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import { HASH_HALL, ROTA_PRINCIPAL, rotaDaHash } from '../../dominio/rota'
 import { AbaCaixaApi } from './caixa/AbaCaixaApi'
 import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
 import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
+import { AbaAvisos } from './avisos/AbaAvisos'
 import { AbaImpressao } from './impressao/AbaImpressao'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
@@ -26,6 +28,7 @@ import { AbaReceitasApi } from './producao/AbaReceitasApi'
 import { AbaCalculadoraApi } from './producao/AbaCalculadoraApi'
 import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
 import { AbaPerdasApi } from './producao/AbaPerdasApi'
+import { ChecklistConfiguracao } from './producao/ChecklistConfiguracao'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -55,13 +58,30 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
     .map((modulo) => ({ ...modulo, telas: telasDoMenu(modulo, { fonteApi, acoes }).filter((tela) => tela.tipo === TELA_AJUSTE) }))
     .filter((modulo) => modulo.telas.length > 0), [fonteApi, permite, acoes])
   const [abaAtiva, setAbaAtiva] = useState(abaInicial)
+  const [inicio, setInicio] = useState(!abaInicial)
+  const [busca, setBusca] = useState('')
+  const termo = busca.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
+  const encontradas = areas.map((modulo) => ({
+    ...modulo,
+    telas: modulo.telas.filter((item) => `${modulo.nome} ${item.rotulo}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').includes(termo)),
+  })).filter((modulo) => modulo.telas.length > 0)
   const area = areas.find((modulo) => modulo.telas.some((tela) => tela.aba === abaAtiva)) ?? areas[0]
   const tela = area?.telas.find((item) => item.aba === abaAtiva) ?? area?.telas[0]
   const id = useId()
   const botoesArea = useRef({})
   const botoesTela = useRef({})
   const painelRef = useRef(null)
+  const buscaRef = useRef(null)
+  const mudarFoco = useRef(false)
+  useEffect(() => {
+    if (!mudarFoco.current) return
+    mudarFoco.current = false
+    if (inicio) buscaRef.current?.querySelector('input')?.focus({ preventScroll: true })
+    else painelRef.current?.focus({ preventScroll: true })
+  }, [inicio, abaAtiva])
   function escolherTela(item) {
+    mudarFoco.current = inicio
+    setInicio(false)
     setAbaAtiva(item.aba)
     aoTrocarAba?.(item.aba)
   }
@@ -102,14 +122,37 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
           {avisosApi && <div className={css.avisosGestao}>{avisosApi}</div>}
           <div className={css.acoesGestao}>
             <a className={css.verModulos} href={HASH_HALL} onClick={aoFechar}>
-              <Icone nome="painel" tamanho={18} /> Ver módulos
+              <Icone nome="painel" tamanho={20} /> {NOME_INICIO}
             </a>
             <Botao onClick={aoFechar}>Fechar</Botao>
           </div>
         </div>
       )}
     >
-      {area ? (
+      {area && inicio ? (
+        <div className={css.inicioGestao}>
+          <div ref={buscaRef}><CampoTexto rotulo="O que você quer fazer?" placeholder="Buscar por respostas, estoque, caixa…" value={busca} onChange={(evento) => setBusca(evento.target.value)} /></div>
+          <div className={css.tarefasGestao}>
+            {encontradas.map((modulo) => (
+              <section key={modulo.id} aria-label={modulo.nome}>
+                <h3 className={css.tituloArea}><IconeDoModulo modulo={modulo} />{modulo.nome}</h3>
+                <div className={css.listaTarefas}>
+                  {modulo.telas.map((item) => (
+                    <button key={item.id} type="button" className={css.tarefaGestao} onClick={() => escolherTela(item)}>
+                      <IconeDoModulo modulo={modulo} telaId={item.id} />
+                      <span>{item.rotulo}{fonteApi && item.indisponivelNaApi ? ' · Em preparação' : ''}</span>
+                      <Icone nome="chevron-right" tamanho={16} />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+          {encontradas.length === 0 && <Vazio titulo="Nenhuma tela encontrada">Tente outro nome.</Vazio>}
+        </div>
+      ) : area ? (
+        <>
+        <Botao variante="texto" icone="arrow-left" onClick={() => { mudarFoco.current = true; setInicio(true) }}>Gestão da loja</Botao>
         <div className={css.janelaGestao}>
           <div className={css.areasGestao}>
             <p className={css.rotuloAreas}>Áreas da loja</p>
@@ -149,7 +192,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
             <header className={css.cabecalhoArea}>
               <h3 className={css.tituloArea}><IconeDoModulo modulo={area} />{area.nome}</h3>
               {area.telas.length > 1 ? (
-                <div className={css.subtelasGestao} role="tablist" aria-label={`Telas de ${area.nome}`} aria-orientation="vertical">
+                <div className={css.subtelasGestao} role="tablist" aria-label={`Telas de ${area.nome}`}>
                   {area.telas.map((item, indice) => (
                     <button
                       key={item.id}
@@ -162,7 +205,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
                       tabIndex={item.id === tela.id ? 0 : -1}
                       className={css.subtelaGestao}
                       onClick={() => escolherTela(item)}
-                      onKeyDown={(evento) => navegarAbas(evento, area.telas, indice, escolherTela, botoesTela, true)}
+                      onKeyDown={(evento) => navegarAbas(evento, area.telas, indice, escolherTela, botoesTela)}
                     >
                       <IconeDoModulo modulo={area} telaId={item.id} />{item.rotulo}{fonteApi && item.indisponivelNaApi ? ' · Em preparação' : ''}
                     </button>
@@ -183,8 +226,9 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
             </div>
           </section>
         </div>
+        </>
       ) : (
-        <Vazio titulo="Nenhum ajuste disponível">Consulte as telas disponíveis em Ver módulos.</Vazio>
+        <Vazio titulo="Nenhum ajuste disponível">Consulte as telas disponíveis no {NOME_INICIO}.</Vazio>
       )}
     </Modal>
   )
@@ -208,7 +252,7 @@ function AbaNaoLigada({ texto, saida = null }) {
   return (
     <Vazio titulo="Em preparação" acao={telas.length > 0
       ? telas.map(tela => <a className={css.saidaPreparacao} key={tela.id} href={hashDoModulo(modulo.id, tela.id)}>{tela.rotulo}</a>)
-      : <a className={css.saidaPreparacao} href={HASH_HALL}>Ver módulos</a>}>
+      : <a className={css.saidaPreparacao} href={HASH_HALL}>{NOME_INICIO}</a>}>
       {texto}
     </Vazio>
   )
@@ -224,6 +268,8 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
   const { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao } = abasDaDemonstracao ?? {}
   const painelDaAba = useMemo(() => ({
     atendimento: <AbaAtendimento horariosAtendimento={horariosAtendimento} />,
+    // #2096: avisos da operação para a dona e o gerente (só modo API).
+    avisos: <AbaAvisos />,
     // #1441: respostas prontas e automáticas, fora do caminho do atendimento.
     respostas: <AbaRespostas focoInicial={focoInicial} />,
     producao: AbaProducao && <AbaProducao />,
@@ -260,5 +306,9 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />
+  // #2362: toda tela da Produção mostra no topo o que falta configurar, nas duas casas (rota e Gestão).
+  if (fonteApi && ABAS_DA_PRODUCAO.has(aba)) return <><ChecklistConfiguracao key={aba} />{painel}</>
   return painel
 }
+
+const ABAS_DA_PRODUCAO = new Set(moduloPorId('producao')?.telas.map((t) => t.aba) ?? [])

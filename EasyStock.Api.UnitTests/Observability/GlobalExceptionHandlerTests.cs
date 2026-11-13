@@ -29,8 +29,9 @@ public class GlobalExceptionHandlerTests
 
         var payload = await LerRespostaAsync(context);
         var error = payload.RootElement.GetProperty("error");
-        Assert.Equal("VALIDATION_ERROR", error.GetProperty("code").GetString());
-        Assert.Equal("Requisição inválida", error.GetProperty("message").GetString());
+        // #2018: o mesmo envelope do catch dos controllers (ApiErrors.Validacao): o texto vai em message.
+        Assert.Equal("BAD_REQUEST", error.GetProperty("code").GetString());
+        Assert.Equal("EmpresaId é obrigatório.", error.GetProperty("message").GetString());
         Assert.Equal("EmpresaId é obrigatório.", error.GetProperty("detail").GetString());
         Assert.Equal("corr-123", error.GetProperty("correlationId").GetString());
     }
@@ -207,6 +208,27 @@ public class GlobalExceptionHandlerTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
         metrics.DidNotReceive().IncrementFalhasOperacao(Arg.Any<string>());
+    }
+
+    [Theory]
+    [InlineData(StatusCodes.Status413PayloadTooLarge)]
+    [InlineData(StatusCodes.Status400BadRequest)]
+    public async Task Requisicao_malformada_do_Kestrel_responde_o_status_dela_sem_virar_5xx(int status)
+    {
+        // #2288: o webhook anônimo com corpo acima do RequestSizeLimit voltava 500, contava como falha e gravava
+        // SystemErrorLog. O Kestrel já diz o status certo na exceção.
+        var metrics = Substitute.For<IOperationalMetrics>();
+        var handler = CriarHandler(metrics);
+        var context = CriarHttpContext("/api/webhooks/whatsapp", "corr-413");
+
+        var handled = await handler.TryHandleAsync(
+            context, new BadHttpRequestException("Request body too large.", status), CancellationToken.None);
+
+        Assert.True(handled);
+        Assert.Equal(status, context.Response.StatusCode);
+        metrics.DidNotReceive().IncrementFalhasOperacao(Arg.Any<string>());
+        var error = (await LerRespostaAsync(context)).RootElement.GetProperty("error");
+        error.GetProperty("code").GetString().Should().NotBe("INTERNAL_ERROR");
     }
 
     private static GlobalExceptionHandler CriarHandler(IOperationalMetrics? metrics = null) =>

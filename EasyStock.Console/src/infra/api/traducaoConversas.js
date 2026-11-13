@@ -65,6 +65,7 @@ export function mensagemDaApi(m, conversaId = null) {
   const avaliacao = !saida && m.tipoConteudo === 'Botao' ? BOTAO_DE_AVALIACAO.exec(m.botaoId ?? '')?.[1].toLowerCase() : null
   return {
     id: m.id,
+    ...(m.enviadaPorUsuarioId ? { enviadaPorUsuarioId: m.enviadaPorUsuarioId } : {}),
     dir: saida ? 'out' : 'in',
     texto: m.texto?.trim() ? m.texto : avaliacao ? `Avaliação ${avaliacao}` : ROTULO_DO_CONTEUDO[m.tipoConteudo] || 'Conteúdo não disponível nesta mensagem.',
     ...(avaliacao ? { formato: 'avaliacaoResposta', valor: avaliacao } : {}),
@@ -109,7 +110,9 @@ function passagemDaApi(resumo) {
     // #1761: o motivo gravado pelo EasyStok é texto de sistema; cartão, faixa e lembrete leem o traduzido.
     motivo: motivoDeEscalada(resumo.motivoEscalada), em: null, assumida: false,
     ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' }
-      : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' } : {}),
+      : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' }
+        // #2185: só o WhatsApp tem Assistente; nos outros canais a conversa já nasce na fila da equipe.
+        : resumo.canal !== 'WhatsApp' ? { origem: 'fila', motivo: resumo.motivoEscalada || 'Cliente aguardando atendimento da equipe.' } : {}),
   }
 }
 
@@ -119,6 +122,7 @@ export function situacaoConversaDaApi(resumo, usuario) {
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,
     assumidaPorUsuarioId: resumo.assumidaPorUsuarioId ?? null,
+    assumidaPorNome: resumo.assumidaPorNome?.trim() || null,
     responsavel: resumo.assumidaPorUsuarioId ? (resumo.assumidaPorNome?.trim() || (minha ? usuario.nome : 'Outro atendente')) : null,
     pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
     passagem: passagemDaApi(resumo),
@@ -151,7 +155,7 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     slaMinutos: resumo.slaRespostaMinutos ?? null,
     aguardaResposta: resumo.aguardaResposta ?? false,
     ultimaEntradaEm: resumo.ultimaMensagemEntradaEm ? instante(resumo.ultimaMensagemEntradaEm) : null,
-    cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [] },
+    cliente: { desde: null, endereco: null, enderecoCapturado: null, pedidos: 0, tags: [], notas: [], fotoUrl: resumo.fotoUrl ?? null },
     pedido: null,
     mensagens,
     // #2005 (console-09): página cheia, pode haver mensagens mais antigas para abrir.

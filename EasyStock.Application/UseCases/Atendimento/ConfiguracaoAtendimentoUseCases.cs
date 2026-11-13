@@ -18,7 +18,9 @@ public sealed record ConfiguracaoAtendimentoResult(
     bool Ativo,
     string? ModeloRetomadaNome = null,
     string ModeloRetomadaIdioma = ConfiguracaoAtendimento.IdiomaModeloPadrao,
-    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos);
+    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos,
+    string MensagemEscalada = ConfiguracaoAtendimento.MensagemEscaladaPadrao,
+    string MensagemEncaminhamento = ConfiguracaoAtendimento.MensagemEncaminhamentoPadrao);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -41,7 +43,7 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
         c.EmpresaId, c.Tom, c.NivelSugestao, c.SaudacaoPrimeiroContato, c.SaudacaoRetorno,
         c.FraseEspera, c.MensagemForaArea, c.RespiroMinutos, c.TempoPreparoPadraoMinutos,
         c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo, c.ModeloRetomadaNome, c.ModeloRetomadaIdioma,
-        c.SlaRespostaMinutos);
+        c.SlaRespostaMinutos, c.MensagemEscalada, c.MensagemEncaminhamento);
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -55,7 +57,9 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     int? RespiroMinutos,
     int? TempoPreparoPadraoMinutos,
     bool? Ativo,
-    int? SlaRespostaMinutos = null);
+    int? SlaRespostaMinutos = null,
+    string? MensagemEscalada = null,
+    string? MensagemEncaminhamento = null);
 
 public sealed class AtualizarConfiguracaoAtendimentoUseCase(
     IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork, ICacheService? cacheService = null,
@@ -81,8 +85,9 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
                 command.TempoPreparoPadraoMinutos,
                 command.Ativo,
                 command.SlaRespostaMinutos);
+            configuracao.DefinirMoldes(command.MensagemEscalada, command.MensagemEncaminhamento);
         }
-        catch (ArgumentOutOfRangeException ex)
+        catch (Exception ex) when (ex is ArgumentOutOfRangeException or RegraDeDominioVioladaException)
         {
             throw new UseCaseValidationException(ex.Message);
         }

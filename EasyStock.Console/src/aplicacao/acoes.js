@@ -104,6 +104,8 @@ export const DESPACHAR_MESMO_ASSIM = 'despachar-mesmo-assim'
 export const ESCOLHER_MEIO_PAGAMENTO = 'escolher-meio-pagamento'
 // J2 (#1990): "troco para R$" do dinheiro na entrega, antes de o pedido nascer.
 export const DEFINIR_TROCO = 'definir-troco'
+// #2219: frete combinado pela equipe com o cliente quando o CEP está fora da área.
+export const DEFINIR_FRETE_COMBINADO = 'definir-frete-combinado'
 // Rodada 12 (issue #13): trocar a forma depois que a cobrança saiu (cancela a
 // pendente e emite outra) e desfazer a baixa marcada por engano.
 export const ALTERAR_MEIO_PAGAMENTO = 'alterar-meio-pagamento'

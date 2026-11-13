@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore.Metadata;
+
 namespace EasyStock.Infra.Postgre.Data.Configurations
 {
     public class LoteConfiguration : IEntityTypeConfiguration<Lote>
@@ -15,6 +17,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.MobileBatchId).HasMaxLength(64);
 
             b.HasIndex(x => new { x.EmpresaId, x.Codigo }).IsUnique();
+
+            // #2199 (D4): o banco gera no INSERT e a aplicação nunca regrava (nem num Update de entidade destacada).
+            b.Property(x => x.NumeroCurto).HasMaxLength(10).ValueGeneratedOnAdd()
+                .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+            // Único por loja. LojaId nulo fica fora (NULLS DISTINCT): a loja apagada vira SET NULL sem colidir.
+            b.HasIndex(x => new { x.EmpresaId, x.LojaId, x.NumeroCurto }).IsUnique();
             // Suporta GetProducaoPorOperadorAsync (filtra Status + DataProducao por período).
             b.HasIndex(x => new { x.EmpresaId, x.Status, x.DataProducao });
 

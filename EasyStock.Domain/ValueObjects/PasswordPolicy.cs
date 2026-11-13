@@ -17,34 +17,35 @@ public static class PasswordPolicy
     public const int MaxLength = 128;
 
     /// <summary>
-    /// Valida se a senha atende à política de segurança.
-    /// Regras: mínimo 10 caracteres, pelo menos uma maiúscula, minúscula, número e caractere especial.
+    /// Mínimo da senha da conta de plataforma (SuperAdmin) semeada em produção: acima do <see cref="MinLength"/> dos usuários
+    /// (OWASP recomenda 12). O seed e a política leem a mesma constante.
     /// </summary>
-    public static bool IsValid(string? password)
+    public const int MinLengthDaContaDePlataforma = 12;
+
+    /// <summary>
+    /// Valida se a senha atende à política de segurança.
+    /// Regras: de 10 a 128 caracteres, pelo menos uma maiúscula, minúscula, número e caractere especial.
+    /// </summary>
+    public static bool IsValid(string? password) => Falhas(password).Count == 0;
+
+    /// <summary>
+    /// #2018: os critérios que a senha não cumpre, vazio quando cumpre todos. É a ÚNICA regra: <see cref="IsValid"/> e os
+    /// validators (<c>SenhaRules.AplicarPoliticaSenha</c>) leem daqui, cada um com a sua mensagem. Letra e dígito são os do
+    /// Unicode (Ç é maiúscula) e símbolo é tudo que não é letra nem dígito (o sublinhado conta).
+    /// </summary>
+    public static IReadOnlyList<FalhaDeSenha> Falhas(string? password)
     {
         if (string.IsNullOrWhiteSpace(password))
-            return false;
+            return [FalhaDeSenha.Vazia];
 
-        if (password.Length < MinLength || password.Length > MaxLength)
-            return false;
-
-        // Verifica presença de maiúscula
-        if (!password.Any(char.IsUpper))
-            return false;
-
-        // Verifica presença de minúscula
-        if (!password.Any(char.IsLower))
-            return false;
-
-        // Verifica presença de dígito
-        if (!password.Any(char.IsDigit))
-            return false;
-
-        // Verifica presença de caractere especial (não é alfanumérico)
-        if (!password.Any(ch => !char.IsLetterOrDigit(ch)))
-            return false;
-
-        return true;
+        var falhas = new List<FalhaDeSenha>();
+        if (password.Length < MinLength) falhas.Add(FalhaDeSenha.Curta);
+        if (password.Length > MaxLength) falhas.Add(FalhaDeSenha.Longa);
+        if (!password.Any(char.IsUpper)) falhas.Add(FalhaDeSenha.SemMaiuscula);
+        if (!password.Any(char.IsLower)) falhas.Add(FalhaDeSenha.SemMinuscula);
+        if (!password.Any(char.IsDigit)) falhas.Add(FalhaDeSenha.SemNumero);
+        if (!password.Any(ch => !char.IsLetterOrDigit(ch))) falhas.Add(FalhaDeSenha.SemSimbolo);
+        return falhas;
     }
 
     /// <summary>
@@ -80,6 +81,18 @@ public static class PasswordPolicy
             _ => PasswordStrength.Strong
         };
     }
+}
+
+/// <summary>#2018: critério da <see cref="PasswordPolicy"/> que a senha não cumpre.</summary>
+public enum FalhaDeSenha
+{
+    Vazia,
+    Curta,
+    Longa,
+    SemMaiuscula,
+    SemMinuscula,
+    SemNumero,
+    SemSimbolo,
 }
 
 /// <summary>

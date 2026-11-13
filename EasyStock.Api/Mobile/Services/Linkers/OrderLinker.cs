@@ -101,7 +101,7 @@ public sealed class OrderLinker(
                         if (!string.IsNullOrWhiteSpace(mobileO.ClientId))
                         {
                             mClient = await db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
-                                .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId);
+                                .FirstOrDefaultAsync(c => c.Id == mobileO.ClientId && c.EmpresaId == empresaId);
                         }
 
                         var itens = mobileO.Items.Select(i => new CriarPedidoItemInput(
@@ -153,6 +153,8 @@ public sealed class OrderLinker(
                                 .Select(i => i.ProductId).Distinct().ToList();
                             var produtoMap = await db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                                 .Where(p => productIds.Contains(p.Id) && p.EmpresaId == empresaId)
+                                .Join(db.Set<Produto>().IgnoreQueryFilters().Where(p => p.EmpresaId == empresaId),
+                                    p => p.ErpProductId, p => (Guid?)p.Id, (mobile, produto) => new { mobile.Id, ErpProductId = (Guid?)produto.Id })
                                 .ToDictionaryAsync(p => p.Id, p => p.ErpProductId);
 
                             // #1571: o id do item é sorteado, então casar por posição na ordem do id ligava
@@ -192,6 +194,20 @@ public sealed class OrderLinker(
                 }
 
                 if (!pedidoIdResolvido.HasValue) continue;
+                // Historico da primeira carga nao recria pagamento, venda ou baixa no backfill.
+                if (await db.Set<Pedido>().AnyAsync(p => p.Id == pedidoIdResolvido.Value && p.Origem == LegacySnapshotImportService.HistoryOrigin))
+                {
+                    // So o pronto importado que foi entregue depois pode registrar recebimento novo.
+                    // O estoque desse pedido ja estava incluido no saldo inicial do snapshot.
+                    if (mobileO.Status == "entregue" && mobileO.Metodo is not null
+                        && await db.Set<PedidoEvento>().AnyAsync(e => e.PedidoId == pedidoIdResolvido.Value && e.Tipo == "importado" && e.StatusNovo == "pronto"))
+                    {
+                        if (!await LevarStatusAEsteiraAsync(pedidoIdResolvido.Value, mobileO)) continue;
+                        await EnsurePagamentoEntregueAsync(pedidoIdResolvido.Value, mobileO);
+                        await EnsureVendaAsync(mobileO);
+                    }
+                    continue;
+                }
 
                 // O vinculo fica gravado antes do status: se a esteira recusar a troca, o que ela
                 // deixou pela metade e descartado sem levar o vinculo junto.

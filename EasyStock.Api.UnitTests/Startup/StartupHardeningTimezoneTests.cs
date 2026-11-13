@@ -1,5 +1,5 @@
 using EasyStock.Api.Startup;
-using EasyStock.Application.Common;
+using EasyStock.Domain.Defaults;
 using FluentAssertions;
 
 namespace EasyStock.Api.UnitTests.Startup;

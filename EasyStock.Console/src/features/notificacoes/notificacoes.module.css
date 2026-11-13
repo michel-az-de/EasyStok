@@ -2,6 +2,8 @@
 .aviso { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--e-4); padding-block: var(--e-4); overflow-wrap: anywhere; }
 .aviso + .aviso { border-top: var(--b-1) solid var(--linha); }
 .texto { min-width: 0; display: grid; justify-items: start; gap: var(--e-2); }
+.cabecaAviso { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.quando { font-size: var(--t-apoio); color: var(--tinta-2); }
 .texto h3 { margin: 0; font-size: var(--t-forte); line-height: var(--lh-compacto); }
 .texto p { margin: 0; color: var(--tinta-2); line-height: var(--lh-corpo); }
 .resumo { display: grid; gap: var(--e-1); margin-block: var(--e-3); }
@@ -16,4 +18,4 @@
   .aparelho { padding: var(--e-3); }
 }
 /* #1989: ponto discreto no sino de quem ainda não ativou os avisos neste aparelho. */
-.pontoAparelho { display: inline-block; width: 8px; height: 8px; margin-left: var(--e-1); border-radius: var(--r-pilula); background: var(--alerta); vertical-align: middle; }
+.pontoAparelho { display: inline-block; width: 10px; height: 10px; margin-left: var(--e-1); border-radius: var(--r-pilula); background: var(--alerta); vertical-align: middle; }

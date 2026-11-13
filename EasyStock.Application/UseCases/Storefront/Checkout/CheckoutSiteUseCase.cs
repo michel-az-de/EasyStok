@@ -9,6 +9,7 @@ using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Storefront.Checkout.Idempotency;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Storefront.Checkout;
 
@@ -71,8 +72,8 @@ public sealed class CheckoutSiteUseCase(
         {
             var pedido = await pedidos.GetByIdComItensAsync(anterior.PedidoId, ct);
             if (pedido is null || pedido.EmpresaId != sessao.EmpresaId) throw new IdempotencyMismatchException();
-            var frete = pedido.Itens.FirstOrDefault(i => i.Nome.StartsWith("Entrega ", StringComparison.Ordinal))?.PrecoUnitario;
-            return new IniciarCheckoutGuestResult(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+            var frete = pedido.Itens.FirstOrDefault(i => i.EhLinhaDeFrete)?.PrecoUnitario;
+            return new IniciarCheckoutGuestResult(pedido.Id, CodigoCurto.De(pedido.Id),
                 acompanhamento.Gerar(pedido.Id), frete, anterior.InitPointUrl == "sem-cobranca" ? null : anterior.InitPointUrl,
                 anterior.InitPointUrl == "sem-cobranca" ? 0 : anterior.ExpiresIn);
         }
@@ -158,7 +159,7 @@ public sealed class CheckoutSiteUseCase(
         try
         {
             await eventos.PublicarAsync(EventosOperacao.ConversaPedidoPelaPagina, sessao.EmpresaId,
-                new ConversaPedidoPelaPaginaOperacao(conversa.Id, pedidoId, pedidoId.ToString("N")[..8].ToUpperInvariant(), pedido.Total), ct);
+                new ConversaPedidoPelaPaginaOperacao(conversa.Id, pedidoId, CodigoCurto.De(pedidoId), pedido.Total), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -170,7 +171,7 @@ public sealed class CheckoutSiteUseCase(
     public static string NotaDoPedido(Domain.Entities.Pedido pedido)
     {
         var linhas = string.Join("; ", pedido.Itens.Select(i => $"{i.Quantidade.ToString("0.###", Cultura.PtBr)} × {i.Nome}"));
-        return $"Pedido do site #{pedido.Id.ToString("N")[..8].ToUpperInvariant()}: {linhas}. Total {pedido.Total.Valor.ToString("C", Cultura.PtBr)}. {pedido.Observacoes}".TrimEnd();
+        return $"Pedido do site #{CodigoCurto.De(pedido.Id)}: {linhas}. Total {pedido.Total.Valor.ToString("C", Cultura.PtBr)}. {pedido.Observacoes}".TrimEnd();
     }
 
     private async Task CheckpointAsync(SessaoChatSite sessao, Conversa conversa, Guid chave, string hash, Guid pedidoId, CancellationToken ct)

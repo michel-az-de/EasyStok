@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
@@ -30,7 +31,8 @@ namespace EasyStock.Application.UseCases.Atendimento;
 public sealed class EscalarConversaUseCase(
     IConversaRepository conversaRepository,
     INotificadorService notificador,
-    IOperacaoEventPublisher eventPublisher) : IEscaladorConversa
+    IOperacaoEventPublisher eventPublisher,
+    IContatoDaEquipeAvisada? equipe = null) : IEscaladorConversa
 {
     public const string PrefixoMotivo = "escalado para a dona: ";
     public const string EventoSse = "conversa.escalada";
@@ -40,6 +42,13 @@ public sealed class EscalarConversaUseCase(
         string.IsNullOrWhiteSpace(cliente.MotivoBloqueio)
             ? "cliente bloqueado"
             : $"cliente bloqueado: {cliente.MotivoBloqueio}";
+
+    /// <summary>#2249: motivo interno da conversa de quem foi encaminhado à responsável (nunca vai ao contato).</summary>
+    public static string MotivoContatoPausado(EasyStock.Domain.Entities.Cliente cliente) =>
+        (string.IsNullOrWhiteSpace(cliente.MotivoPausaAtendimento)
+            ? "contato encaminhado à responsável"
+            : $"contato encaminhado à responsável ({cliente.MotivoPausaAtendimento})")
+        + "; o robô volta quando a equipe devolver a conversa";
 
     public async Task EscalarAsync(Guid empresaId, Conversa conversa, string motivo, DateTime agora, CancellationToken ct = default)
     {
@@ -62,10 +71,13 @@ public sealed class EscalarConversaUseCase(
             cliente,
             motivo = motivoLimpo,
             // #1807: o Push mostra só o primeiro nome (nunca o telefone nem o motivo) com a tag do console.
-            nome = AvisoEquipeNoAparelho.PrimeiroNome(conversa.ContatoNome),
+            nome = NomesDeContato.PrimeiroNome(conversa.ContatoNome, AvisoEquipeNoAparelho.NomeSemContato),
             tag = AvisoEquipeNoAparelho.Tag(AvisoEquipeNoAparelho.TagPassouParaVoce, conversa.Id),
         });
         await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ConversaEscalada, empresaId, payload, conversa.Id, ct);
+        // #2211: o WhatsApp da equipe inscrita. A conversa da própria pessoa avisada não gera aviso (laço).
+        if (equipe is null || !await equipe.EhInscritoAsync(empresaId, conversa.ContatoIdExterno, ct))
+            await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(empresaId, conversa.Id, cliente, motivoLimpo, ct);
 
         await eventPublisher.PublicarAsync(EventoSse, empresaId,
             new { conversaId = conversa.Id, cliente, motivo = motivoLimpo }, ct);

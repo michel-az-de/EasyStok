@@ -1,0 +1,23 @@
+/* #2247 (impressão v3, G1 item 7): a etiqueta é a imagem do motor do app em tamanho real (mm). A
+   página do papel tem o tamanho da etiqueta, sem margem: uma etiqueta por página. */
+@page etiqueta-producao {
+  size: 80mm 40mm;
+  margin: 0;
+}
+
+.etiqueta { display: block; image-rendering: pixelated; background: var(--impressao-papel); }
+.situacao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+.recusa {
+  margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-2); max-width: 60ch;
+  background: var(--alerta-pastel); color: var(--alerta); font-size: var(--t-apoio); font-weight: 700;
+}
+
+/* Na prévia a etiqueta tem moldura; no papel, uma por página. */
+.previa { display: grid; justify-items: center; gap: var(--e-3); }
+.moldura { border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); box-shadow: var(--sombra-media); overflow: hidden; }
+.folha .etiqueta { break-after: page; }
+.folha .etiqueta:last-child { break-after: auto; }
+
+@media print {
+  .folha .etiqueta { page: etiqueta-producao; }
+}

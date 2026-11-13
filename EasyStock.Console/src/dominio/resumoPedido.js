@@ -1,5 +1,5 @@
 import { itensDetalhados, totalDoPedido } from './pedido'
-import { dataIsoNoFuso, horaCurta, moeda } from './formato'
+import { dataIsoNoFuso, horaCurta, moeda, somarDiasIso } from './formato'
 import { faixaDepoisDeEntre } from './entrega'
 import { nomeDoMeio, sinalDeEncomenda } from './cobranca'
 
@@ -41,18 +41,19 @@ export function caminhoParaTrocarItem(pedido) {
 export const podeCancelarParaRefazer = (pedido, { fonteApi = false } = {}) =>
   fonteApi && Boolean(pedido?.pedidoId) && pedido.estado === 'aguardando' && !pedido.cobranca?.pagaEm
 
-// Pedido ainda não criado, no modo API, com janela de um dia depois de hoje: é encomenda e tem sinal.
-function ehEncomendaDeOutroDia(pedido, { fonteApi, agora }) {
+// Pedido ainda não criado, no modo API, com janela 2 dias ou mais depois de hoje: é encomenda e tem sinal.
+// #2259: a mesma regra do servidor (PlanoPagamentoEncomenda.TemSinal); o pedido para amanhã paga o valor integral.
+function ehEncomendaComSinal(pedido, { fonteApi, agora }) {
   if (!fonteApi || pedido?.pedidoId || pedido?.cobranca || pedido?.estado !== 'aguardando' || !pedido.itens?.length) return false
   const [janelaId, data] = String(pedido.janela ?? '').split('|')
   return Boolean(janelaId) && /^\d{4}-\d{2}-\d{2}$/.test(data) && Number.isFinite(Date.parse(data + 'T12:00:00Z'))
-    && data > dataIsoNoFuso(agora)
+    && data >= somarDiasIso(dataIsoNoFuso(agora), 2)
 }
 
 export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Date.now(), meio = pedido?.meio } = {}) {
   // J2 (#1990): dinheiro na entrega é a mesma forma da maquininha no EasyStok; a encomenda pede sinal igual.
-  if ((meio && meio !== 'maquininha' && meio !== 'dinheiro-entrega') || !ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
-  return 'Encomenda para outro dia: sinal de 50% antes da produção. Restante na entrega.'
+  if ((meio && meio !== 'maquininha' && meio !== 'dinheiro-entrega') || !ehEncomendaComSinal(pedido, { fonteApi, agora })) return null
+  return 'Encomenda com antecedência: sinal de 50% antes da produção. Restante na entrega.'
 }
 
 // #1875 ("Quanto fica?"): o que o console já sabe antes de gerar a cobrança. O frete depende da zona do
@@ -60,7 +61,7 @@ export function avisoDeSinalAntesDeGerar(pedido, { fonteApi = false, agora = Dat
 // dos itens, um piso, e a tela diz isso.
 // Vale para qualquer meio: o servidor cobra o sinal da encomenda também no Pix e no cartão por link.
 export function previaDoSinal(pedido, { fonteApi = false, agora = Date.now(), total = 0 } = {}) {
-  if (!ehEncomendaDeOutroDia(pedido, { fonteApi, agora })) return null
+  if (!ehEncomendaComSinal(pedido, { fonteApi, agora })) return null
   const sinal = sinalDeEncomenda(total)
   return { sinal, restante: Math.round((total - sinal) * 100) / 100 }
 }
@@ -75,13 +76,13 @@ export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi 
   if (simulacao && !simulacao.freteACombinar) {
     const base = `Pedido de ${moeda(simulacao.total)} com o frete de ${moeda(simulacao.frete)}`
     if (simulacao.encomenda && simulacao.sinal != null)
-      return `${base}. Encomenda para outro dia: sinal de ${moeda(simulacao.sinal)} por ${rotuloMeio}; ${moeda(simulacao.restante)} ficam para a entrega.`
+      return `${base}. Encomenda com antecedência: sinal de ${moeda(simulacao.sinal)} por ${rotuloMeio}; ${moeda(simulacao.restante)} ficam para a entrega.`
     return `${base}, cobrança por ${rotuloMeio}.`
   }
   const itens = `Pedido de ${moeda(total)}${fonteApi && !pedido?.pedidoId ? ' nos itens (o frete entra ao gerar)' : ''}`
   const previa = previaDoSinal(pedido, { fonteApi, agora, total })
   if (!previa) return `${itens}, cobrança por ${rotuloMeio}.`
-  return `${itens}. Encomenda para outro dia: sinal de 50% do total com o frete por ${rotuloMeio} (nos itens, ${moeda(previa.sinal)}); o restante fica para a entrega.`
+  return `${itens}. Encomenda com antecedência: sinal de 50% do total com o frete por ${rotuloMeio} (nos itens, ${moeda(previa.sinal)}); o restante fica para a entrega.`
 }
 
 // #1474 (R3): o que falta antes de gerar a cobrança, na ordem em que a dona resolve, para o
@@ -90,18 +91,26 @@ export function resumoDaCobrancaEscolhida(pedido, { rotuloMeio, total, fonteApi 
 // #1847: a janela de mensagens não impede criar uma cobrança para copiar, sem envio.
 // #1686 (item 9): cada motivo diz também onde se resolve (`alvo`): a barra o mostra como link que
 // abre a seção e põe o foco no campo. `cardapio` abre o cardápio; `cadastro` e `endereco`, a seção
-// Contato e endereço de "Cliente e histórico"; `janela`, a "Seleção do atendimento".
+// Contato e endereço da Ficha; `janela`, a seção Pedido e entrega.
 export const ALVOS_DO_MOTIVO = { CARDAPIO: 'cardapio', CADASTRO: 'cadastro', ENDERECO: 'endereco', JANELA: 'janela' }
-export function pendenciaAntesDeCobrar({ pedido, clienteId, endereco }, { fonteApi = false } = {}) {
+// #2185 (E05): cadastro bloqueado não recebe nada em canal nenhum; o botão nasce desabilitado com o motivo
+// em vez de falhar depois do clique, nos dois modos.
+export function pendenciaAntesDeCobrar({ pedido, clienteId, endereco, bloqueado = false }, { fonteApi = false } = {}) {
   if (!pedido?.itens?.length) return { motivo: 'A comanda está vazia.', alvo: ALVOS_DO_MOTIVO.CARDAPIO }
+  if (bloqueado) return { motivo: 'Cliente bloqueado: a gerência desbloqueia na ficha.', alvo: ALVOS_DO_MOTIVO.CADASTRO }
   if (!fonteApi) return null
   if (!clienteId) return { motivo: 'Salve o cadastro do cliente (Contato e endereço).', alvo: ALVOS_DO_MOTIVO.CADASTRO }
   if (!endereco) return { motivo: 'Falta o endereço de entrega (Contato e endereço).', alvo: ALVOS_DO_MOTIVO.ENDERECO }
-  // #1865: a barra fica fora do modal; o seletor de janela está em "Seleção do atendimento".
-  if (!pedido.janela) return { motivo: 'Escolha a janela de entrega em Seleção do atendimento.', alvo: ALVOS_DO_MOTIVO.JANELA }
+  // #1865: a barra fica fora do modal; o seletor de janela está em Pedido e entrega.
+  if (!pedido.janela) return { motivo: 'Escolha a janela de entrega em Pedido e entrega.', alvo: ALVOS_DO_MOTIVO.JANELA }
   return null
 }
 export const motivoAntesDeCobrar = (dados, opcoes) => pendenciaAntesDeCobrar(dados, opcoes)?.motivo ?? null
+
+// #2185 (E30): no modo API o rascunho da comanda ainda não é pedido (o frete e o número saem ao gerar a cobrança);
+// imprimir o canhoto dele seria mostrar algo que não existe. A demonstração imprime a comanda local.
+export const podeVerCanhoto = (pedido, { fonteApi = false } = {}) =>
+  (pedido?.itens?.length ?? 0) > 0 && (!fonteApi || Boolean(pedido.pedidoId))
 
 // #1474 (R5): antes de o pedido existir o frete ainda não foi calculado (é da zona, no EasyStok).
 export const rotuloDoTotal = (pedido, { fonteApi = false } = {}) =>

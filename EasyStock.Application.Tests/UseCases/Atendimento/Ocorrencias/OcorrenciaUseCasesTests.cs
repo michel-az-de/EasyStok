@@ -84,7 +84,7 @@ public class OcorrenciaUseCasesTests
         new(_repo, _pedidos, _conversas, _escalador, _eventos, _uow, new RelogioFixo(Agora));
 
     private ReembolsarPedidoUseCase Reembolsar() =>
-        new(_cobrancas, _estornos, _crm, _notificador);
+        new(_cobrancas, _estornos, _crm, _notificador, _conversas);
 
     private ResolverOcorrenciaUseCase Resolver() =>
         new(_repo, Reembolsar(), _uow, new RelogioFixo(Agora));
@@ -168,6 +168,32 @@ public class OcorrenciaUseCasesTests
         json.GetProperty("nome").GetString().Should().Be("Maria");
         json.GetProperty("numero").GetString().Should().Be(pedido.Id.ToString("N")[..8].ToUpperInvariant());
         json.GetProperty("valor").GetString().Should().Be("R$ 30,00");
+    }
+
+    [Fact]
+    public async Task ReembolsarPedido_AvisoLeVendoAComandaQuandoAConversaEDoPedido()
+    {
+        // #2018 (atendimento-10): o cliente lê "Comanda 12" nos outros avisos; o reembolso não pode falar em outro número.
+        var pedido = NovoPedido();
+        CobrancaPaga(pedido.Id, 80m);
+        ClienteComTelefone();
+        var conversa = Conversa.Abrir(_empresaId, "5511999990001", Agora.AddHours(-1), clienteId: _clienteId);
+        typeof(Conversa).GetProperty(nameof(Conversa.NumeroComanda))!.SetValue(conversa, 12L);
+        conversa.DefinirPedidoEmAndamento(pedido.Id);
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var ocorrencia = Ocorrencia.Abrir(_empresaId, pedido.Id, _clienteId, conversa.Id, OrigemOcorrencia.Dona,
+            CategoriaOcorrencia.ProdutoImproprio, "bolo chegou azedo", Agora.AddMinutes(-5));
+        _repo.ObterAsync(_empresaId, ocorrencia.Id, Arg.Any<CancellationToken>()).Returns(ocorrencia);
+        _repo.ObterTravadaAsync(_empresaId, ocorrencia.Id, Arg.Any<CancellationToken>()).Returns(ocorrencia);
+        _estornos.SolicitarAsync(Arg.Any<SolicitarEstornoOnlineInput>(), Arg.Any<CancellationToken>())
+            .Returns(new PedidoEstornoOnline { Id = ocorrencia.Id, Valor = 30m, Situacao = PedidoEstornoOnline.Confirmado, EstornoExternoId = "ref-9" });
+        string? payload = null;
+        await _notificador.EnfileirarEventoAsync(TipoEventoNotificacao.ReembolsoEfetuado, _empresaId,
+            Arg.Do<string>(p => payload = p), ocorrencia.Id, Arg.Any<CancellationToken>());
+
+        await Resolver().ExecuteAsync(new(_empresaId, ocorrencia.Id, Guid.NewGuid(), "bolo azedo", true, 30m, NivelAcesso.Admin, "Dona"));
+
+        System.Text.Json.JsonDocument.Parse(payload!).RootElement.GetProperty("numero").GetString().Should().Be("12");
     }
 
     [Fact]

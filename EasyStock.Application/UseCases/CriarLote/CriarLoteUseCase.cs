@@ -143,6 +143,6 @@ public class CriarLoteUseCase(
             l.Origem, l.MobileBatchId,
             l.Itens.Count, l.TotalUnidades,
             conferidas, divergentes,
-            l.CriadoEm, l.AlteradoEm, l.FinalizadoEm);
+            l.CriadoEm, l.AlteradoEm, l.FinalizadoEm, l.NumeroCurto);
     }
 }

@@ -41,6 +41,11 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
 
     public void RegistrarFalhaDeFerramenta() => FerramentaFalhou = true;
 
+    /// <summary>#2249: a conversa foi para a responsável porque o contato não é cliente; sai o molde de encaminhamento.</summary>
+    public bool Encaminhou { get; private set; }
+
+    public void RegistrarEncaminhamento() => Encaminhou = true;
+
     public void RegistrarRespostaVerificada(string texto) => RespostaVerificada = texto;
 
     public void RegistrarEnvioVerificado() => EnvioVerificado = HouveEnvio = true;

@@ -40,7 +40,7 @@ public sealed class ContaReceberPixReconciliacaoJob(
             {
                 await RunWithAdvisoryLockAsync(LockKeyJob, ProcessarAsync, stoppingToken);
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
                 logger.LogError(ex, "ContaReceberPixReconciliacaoJob: erro — aguardando 1h.");

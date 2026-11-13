@@ -12,9 +12,21 @@ const data = (valor) => new Date(valor).toLocaleString('pt-BR')
 const podeDescartar = (estorno) => estorno.situacao === 'pendente' && estorno.enviadoEm == null
 const situacoes = { pendente: 'Aguardando confirmação', confirmado: 'Confirmado', recusado: 'Recusado' }
 
-export function EstornosOnline({ pedidoId }) {
+// #2079 (C4): `aoAlterado` avisa quem mostra o "A devolver" (bloco Devoluções e Ficha) depois que a API respondeu.
+export function EstornosOnline({ pedidoId, aoAlterado = null }) {
   const { acoes } = useAcessoModulos()
-  const { dados, erro, aviso, semResposta, ocupado, atualizar, solicitar, retomar, descartar } = useEstornosOnline(pedidoId)
+  const {
+    dados, erro, aviso, semResposta, ocupado, atualizar,
+    solicitar: solicitarNoGancho, retomar: retomarNoGancho, descartar: descartarNoGancho,
+  } = useEstornosOnline(pedidoId)
+  const depoisAvisar = (fazer) => async (...args) => {
+    const ok = await fazer(...args)
+    if (ok) aoAlterado?.()
+    return ok
+  }
+  const solicitar = depoisAvisar(solicitarNoGancho)
+  const retomar = depoisAvisar(retomarNoGancho)
+  const descartar = depoisAvisar(descartarNoGancho)
   const [descartando, setDescartando] = useState(null)
   const [aberto, setAberto] = useState(false)
   const [pagamentoId, setPagamentoId] = useState('')

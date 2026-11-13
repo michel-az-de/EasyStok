@@ -8,6 +8,14 @@ namespace EasyStock.Domain.Tests.ValueObjects;
 public class TelefoneE164Tests
 {
     [Theory]
+    [InlineData("+55 (11) 99757-3992", "5511997573992")]
+    [InlineData("11 99757-3992", "11997573992")]
+    [InlineData("abc", "")]
+    [InlineData(null, "")]
+    public void SoDigitos_ExtraiOsDigitosDeQualquerGrafiaSemValidar(string? entrada, string esperado) =>
+        TelefoneE164.SoDigitos(entrada).Should().Be(esperado);
+
+    [Theory]
     [InlineData("+5511997573992", "+5511997573992")]
     [InlineData("(11) 99757-3992", "+5511997573992")]
     [InlineData("11 99757-3992", "+5511997573992")]

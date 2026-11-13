@@ -1,0 +1,48 @@
+# Copiar para /opt/stacks/easystok/compose.wppconnect.yaml após homologar.
+# COMPOSE_FILE=compose.yaml:compose.override.yaml:compose.wppconnect.yaml no .env
+# mantém a integração nos próximos deploys canônicos. Segredos somente na VPS.
+x-wppconnect-cliente: &wppconnect-cliente
+  Atendimento__WppConnect__Habilitado: 'true'
+  Atendimento__WppConnect__BaseUrl: http://wppconnect:21465/
+  Atendimento__WppConnect__SecretKey: '${WPP_SECRET_KEY:?Informe WPP_SECRET_KEY}'
+  Atendimento__WppConnect__WebhookToken: '${WPP_WEBHOOK_TOKEN:?Informe WPP_WEBHOOK_TOKEN}'
+services:
+  api:
+    environment: *wppconnect-cliente
+    networks:
+      whatsapp:
+  worker:
+    environment: *wppconnect-cliente
+    networks:
+      whatsapp:
+  wppconnect:
+    image: wppconnect/wppconnect-server:2.10.68@sha256:efeb3bbb73cc1443942e309d01cca9d70d0a4a13002d9d4f60d86e525eab610f
+    restart: unless-stopped
+    init: true
+    shm_size: 512mb
+    entrypoint: ['flock', '-n', '/usr/src/wpp-server/userDataDir/.easystok.lock', 'node', '--require', './easystok.cjs', 'dist/server.js']
+    environment:
+      SECRET_KEY: '${WPP_SECRET_KEY:?Informe WPP_SECRET_KEY}'
+      WEBHOOK_URL: 'http://api:8080/api/webhooks/wppconnect?token=${WPP_WEBHOOK_TOKEN:?Informe WPP_WEBHOOK_TOKEN}'
+      WEBHOOK_RETRY_ATTEMPTS: '5'
+      WEBHOOK_RETRY_DELAY: '5000'
+      MANAGER_ENABLED: 'false'
+    volumes:
+      - wppconnect-tokens:/usr/src/wpp-server/tokens
+      - wppconnect-user-data:/usr/src/wpp-server/userDataDir
+      - ./wppconnect/configurar.cjs:/usr/src/wpp-server/easystok.cjs:ro
+    networks:
+      whatsapp:
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://127.0.0.1:21465/healthz || exit 1']
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+networks:
+  whatsapp:
+volumes:
+  wppconnect-tokens:
+    name: easystok-wppconnect-tokens
+  wppconnect-user-data:
+    name: easystok-wppconnect-user-data

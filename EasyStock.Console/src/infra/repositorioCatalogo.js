@@ -6,7 +6,6 @@ import {
   TEMPLATES_INTERNOS,
 } from './catalogo'
 import { cartaDoItem } from './imagensCardapio'
-import { ENTREGADORES_CADASTRADOS } from './entregadoresSemente'
 import { tituloDaCarta } from '../dominio/arteCardapio'
 import { configuracaoPadraoIntegracoes } from '../dominio/integracoes'
 import { FONTE_API } from './fonteDados'
@@ -75,7 +74,7 @@ export function carregarCatalogo() {
     minutosConferir: MINUTOS_CONFERIR,
     // Rodada 12 (issue #17): entregadores de um toque no despacho (ficha,
     // cozinha e Entregas), pela mesma porta do catálogo.
-    entregadores: ENTREGADORES_CADASTRADOS,
+    entregadores: [],
     // Rodada 13 (issue #46, registro 108): provedores de logística (Lalamove,
     // 99 Entregas, Entregador próprio) que a aba de Gestão liga/desliga.
     // Nasce só com "próprio" ligado, o mesmo comportamento que já existia.

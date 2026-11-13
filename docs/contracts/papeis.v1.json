@@ -1,0 +1,217 @@
+{
+  "contrato": "Catálogo de papéis v1 (#2247, impressão v3, G1 item 6). Gerado; não edite à mão.",
+  "fonte": "EasyStock.Api/wwwroot/pwa/impressao-papeis.js",
+  "gerar": "node tools/contratos/gerar-papeis.js",
+  "v": 1,
+  "cabecaMm": 104,
+  "padroes": {
+    "tspl": "continuo-80",
+    "escpos": "bobina-58"
+  },
+  "aparelho": [
+    {
+      "id": "continuo-52",
+      "classe": "etiqueta",
+      "tipo": "continuo",
+      "larguraMm": 52,
+      "compr": {
+        "vertical": 75,
+        "horizontal": 75
+      },
+      "rotulo": "Rolo contínuo de 52 mm"
+    },
+    {
+      "id": "continuo-80",
+      "classe": "etiqueta",
+      "tipo": "continuo",
+      "larguraMm": 80,
+      "compr": {
+        "vertical": 100,
+        "horizontal": 50
+      },
+      "rotulo": "Rolo contínuo de 80 mm"
+    },
+    {
+      "id": "continuo-100",
+      "classe": "etiqueta",
+      "tipo": "continuo",
+      "larguraMm": 100,
+      "compr": {
+        "vertical": 150,
+        "horizontal": 150
+      },
+      "rotulo": "Rolo contínuo de 100 mm (10x15)"
+    },
+    {
+      "id": "etiqueta-40x25",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 40,
+      "alturaMm": 25,
+      "gapMm": 2,
+      "rotulo": "Etiqueta 40 x 25 mm"
+    },
+    {
+      "id": "etiqueta-50x30",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 50,
+      "alturaMm": 30,
+      "gapMm": 2,
+      "rotulo": "Etiqueta 50 x 30 mm"
+    },
+    {
+      "id": "etiqueta-52x30",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 52,
+      "alturaMm": 30,
+      "gapMm": 2,
+      "rotulo": "Etiqueta 52 x 30 mm"
+    },
+    {
+      "id": "etiqueta-52x80",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 52,
+      "alturaMm": 80,
+      "gapMm": 2,
+      "rotulo": "Etiqueta 52 x 80 mm"
+    },
+    {
+      "id": "etiqueta-60x40",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 60,
+      "alturaMm": 40,
+      "gapMm": 2,
+      "rotulo": "Etiqueta 60 x 40 mm"
+    },
+    {
+      "id": "etiqueta-80x40",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 80,
+      "alturaMm": 40,
+      "gapMm": 2,
+      "rotulo": "Etiqueta 80 x 40 mm"
+    },
+    {
+      "id": "etiqueta-80x50",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 80,
+      "alturaMm": 50,
+      "gapMm": 2,
+      "rotulo": "Etiqueta 80 x 50 mm"
+    },
+    {
+      "id": "etiqueta-100x50",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 100,
+      "alturaMm": 50,
+      "gapMm": 2,
+      "rotulo": "Etiqueta 100 x 50 mm"
+    },
+    {
+      "id": "etiqueta-100x100",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 100,
+      "alturaMm": 100,
+      "gapMm": 3,
+      "rotulo": "Etiqueta 100 x 100 mm"
+    },
+    {
+      "id": "etiqueta-100x150",
+      "classe": "etiqueta",
+      "tipo": "etiqueta",
+      "larguraMm": 100,
+      "alturaMm": 150,
+      "gapMm": 3,
+      "rotulo": "Etiqueta 100 x 150 mm (10x15)"
+    },
+    {
+      "id": "bobina-58",
+      "classe": "cupom",
+      "tipo": "bobina",
+      "larguraMm": 58,
+      "utilMm": 48,
+      "rotulo": "Bobina de 58 mm"
+    },
+    {
+      "id": "bobina-80",
+      "classe": "cupom",
+      "tipo": "bobina",
+      "larguraMm": 80,
+      "utilMm": 72,
+      "rotulo": "Bobina de 80 mm"
+    }
+  ],
+  "loja": [
+    {
+      "id": "cupom-58",
+      "classe": "cupom",
+      "larguraMm": 58,
+      "alturaMm": null,
+      "utilMm": 48,
+      "aparelho": "bobina-58",
+      "folha": "s-58"
+    },
+    {
+      "id": "cupom-80",
+      "classe": "cupom",
+      "larguraMm": 80,
+      "alturaMm": null,
+      "utilMm": 72,
+      "aparelho": "bobina-80",
+      "folha": "s-80"
+    },
+    {
+      "id": "etiqueta-52",
+      "classe": "etiqueta",
+      "larguraMm": 52,
+      "alturaMm": null,
+      "utilMm": 52,
+      "aparelho": "continuo-52",
+      "folha": null
+    },
+    {
+      "id": "etiqueta-80",
+      "classe": "etiqueta",
+      "larguraMm": 80,
+      "alturaMm": null,
+      "utilMm": 80,
+      "aparelho": "continuo-80",
+      "folha": null
+    },
+    {
+      "id": "etiqueta-10x15",
+      "classe": "etiqueta",
+      "larguraMm": 100,
+      "alturaMm": 150,
+      "utilMm": 100,
+      "aparelho": "etiqueta-100x150",
+      "folha": "s-1015"
+    },
+    {
+      "id": "a4",
+      "classe": "folha",
+      "larguraMm": 210,
+      "alturaMm": 297,
+      "utilMm": 210,
+      "aparelho": null,
+      "folha": "s-a4"
+    },
+    {
+      "id": "a5",
+      "classe": "folha",
+      "larguraMm": 148,
+      "alturaMm": 210,
+      "utilMm": 148,
+      "aparelho": null,
+      "folha": "s-a5"
+    }
+  ]
+}

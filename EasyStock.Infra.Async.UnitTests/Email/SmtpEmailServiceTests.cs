@@ -97,6 +97,9 @@ public class SmtpEmailServiceTests
         mime.Subject.Should().Be("Confirmação de cadastro");
         mime.HtmlBody.Should().NotBeNull();
         mime.HtmlBody!.TrimEnd(SemQuebraFinal).Should().Be("<p>Olá, <b>Maria</b>! Ação concluída.</p>");
+        // #2074: e-mail só com HTML pontua pior nos filtros de spam; a parte texto vai junto.
+        mime.TextBody.Should().NotBeNull();
+        mime.TextBody!.TrimEnd(SemQuebraFinal).Should().Be("Olá, Maria! Ação concluída.");
     }
 
     [Fact]

@@ -41,6 +41,7 @@ public sealed class JwtBearerSessaoRevogavelTests
 
     private readonly Guid _usuarioId = Guid.NewGuid();
     private readonly IUsuarioRepository _usuarios = Substitute.For<IUsuarioRepository>();
+    private readonly IRefreshTokenRepository _refreshTokens = Substitute.For<IRefreshTokenRepository>();
     private readonly DateTime _corte = TruncarAoSegundo(DateTime.UtcNow.AddMinutes(-5));
 
     private static DateTime TruncarAoSegundo(DateTime dataHora) =>
@@ -167,6 +168,82 @@ public sealed class JwtBearerSessaoRevogavelTests
         opcoes.MapInboundClaims.Should().BeFalse("o validador lê sub e iat com o nome do JWT");
     }
 
+    [Fact]
+    public async Task PareamentoDeSessaoMantem403ParaOperadorEnquantoAtendimentoViaJwtContinuaAutenticado()
+    {
+        _usuarios.ObterSessaoAsync(_usuarioId).Returns(new SessaoDoUsuario(true, null));
+        var sessao = new SessaoNativa { UsuarioId = _usuarioId, EmpresaId = Guid.NewGuid(), DispositivoId = "android-2184", CriadaEm = DateTime.UtcNow };
+        _refreshTokens.ObterSessaoNativaAsync(sessao.Id).Returns(sessao);
+        var metodo = typeof(EasyStock.Api.Mobile.Controllers.DevicePairingController).GetMethod("PairSession")!;
+        var autorizacao = metodo.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>().Single();
+        autorizacao.Policy.Should().Be("Gerente");
+        await using var app = await SubirAsync();
+        var token = Token(DateTime.UtcNow, sessao, "Operador");
+        (await Chamar(app, token)).Should().Be(HttpStatusCode.OK);
+        (await Chamar(app, token, "/pair-policy")).Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task FamiliaNativaRevogadaBloqueiaJwtImediatamente_SemDerrubarWeb()
+    {
+        _usuarios.ObterSessaoAsync(_usuarioId).Returns(new SessaoDoUsuario(true, null));
+        var sessao = new SessaoNativa { UsuarioId = _usuarioId, EmpresaId = Guid.NewGuid(), DispositivoId = "android-2184", CriadaEm = DateTime.UtcNow.AddMinutes(-1) };
+        _refreshTokens.ObterSessaoNativaAsync(sessao.Id).Returns(sessao);
+        await using var app = await SubirAsync(new() { ["Auth:SessoesRevogaveis"] = "false" });
+        var nativo = Token(DateTime.UtcNow, sessao);
+        (await Chamar(app, nativo)).Should().Be(HttpStatusCode.OK);
+        sessao.RevogadaEm = DateTime.UtcNow;
+        (await Chamar(app, nativo)).Should().Be(HttpStatusCode.Unauthorized, "a flag legada não desliga revogação nativa");
+        (await Chamar(app, Token(DateTime.UtcNow))).Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task SessaoNativaNovaUsaUsuarioAtualMesmoComCacheWebInativo()
+    {
+        _usuarios.ObterSessaoAsync(_usuarioId).Returns(new SessaoDoUsuario(true, null));
+        var cache = Substitute.For<ICacheService>();
+        cache.GetAsync<SessaoDoUsuario>(Arg.Any<string>()).Returns(new SessaoDoUsuario(false, null));
+        var sessao = new SessaoNativa { UsuarioId = _usuarioId, EmpresaId = Guid.NewGuid(), DispositivoId = "android-2184", CriadaEm = DateTime.UtcNow };
+        _refreshTokens.ObterSessaoNativaAsync(sessao.Id).Returns(sessao);
+        await using var app = await SubirAsync(cache: cache);
+        (await Chamar(app, Token(DateTime.UtcNow, sessao))).Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task CorteDoUsuarioInvalidaFamiliaNativaMesmoSeCacheWebAindaEstaAntigo()
+    {
+        _usuarios.ObterSessaoAsync(_usuarioId).Returns(new SessaoDoUsuario(true, null));
+        var sessao = new SessaoNativa { UsuarioId = _usuarioId, EmpresaId = Guid.NewGuid(), DispositivoId = "android-2184", CriadaEm = DateTime.UtcNow.AddMinutes(-1) };
+        _refreshTokens.ObterSessaoNativaAsync(sessao.Id).Returns(sessao);
+        await using var app = await SubirAsync();
+        var token = Token(DateTime.UtcNow, sessao);
+        (await Chamar(app, token)).Should().Be(HttpStatusCode.OK);
+        // Outra réplica corta o usuário antes do INSERT da nova família e o cache local ainda não foi invalidado.
+        _usuarios.ObterSessaoAsync(_usuarioId).Returns(new SessaoDoUsuario(true, DateTime.UtcNow));
+        (await Chamar(app, token)).Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task FamiliaNativaNaoTrocaEmpresaNemAparelhoENaoRessuscitaComIatNovo()
+    {
+        _usuarios.ObterSessaoAsync(_usuarioId).Returns(new SessaoDoUsuario(true, _corte));
+        var sessao = new SessaoNativa { UsuarioId = _usuarioId, EmpresaId = Guid.NewGuid(), DispositivoId = "android-2184", CriadaEm = _corte.AddMinutes(-1) };
+        _refreshTokens.ObterSessaoNativaAsync(sessao.Id).Returns(sessao);
+        await using var app = await SubirAsync();
+        (await Chamar(app, Token(DateTime.UtcNow, sessao))).Should().Be(HttpStatusCode.Unauthorized);
+        sessao.CriadaEm = _corte.AddMinutes(1);
+        var token = Token(DateTime.UtcNow, sessao);
+        (await Chamar(app, token)).Should().Be(HttpStatusCode.OK);
+        sessao.EmpresaId = Guid.NewGuid();
+        (await Chamar(app, token)).Should().Be(HttpStatusCode.Unauthorized);
+        var outroToken = Token(DateTime.UtcNow, sessao);
+        sessao.DispositivoId = "outro-aparelho";
+        (await Chamar(app, outroToken)).Should().Be(HttpStatusCode.Unauthorized);
+        _refreshTokens.DispositivoRevogadoAsync(sessao.DispositivoId).Returns(true);
+        (await Chamar(app, Token(DateTime.UtcNow, sessao))).Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     // ── infraestrutura do teste ───────────────────────────────────────────────────────────────
 
     private async Task<WebApplication> SubirAsync(Dictionary<string, string?>? configuracao = null, ICacheService? cache = null)
@@ -184,6 +261,7 @@ public sealed class JwtBearerSessaoRevogavelTests
             builder.Configuration.AddInMemoryCollection(configuracao);
 
         builder.Services.AddSingleton(_usuarios);
+        builder.Services.AddSingleton(_refreshTokens);
         builder.Services.AddSingleton(cache ?? new RedisCacheService(
             new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())), NullLogger<RedisCacheService>.Instance));
         builder.Services.AddEasyStockAuth(builder.Configuration);
@@ -192,26 +270,29 @@ public sealed class JwtBearerSessaoRevogavelTests
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapGet(Rota, () => "ok").RequireAuthorization();
+        app.MapGet("/pair-policy", () => "ok").RequireAuthorization("Gerente");
         await app.StartAsync();
         return app;
     }
 
-    private static async Task<HttpStatusCode> Chamar(WebApplication app, string? token)
+    private static async Task<HttpStatusCode> Chamar(WebApplication app, string? token, string rota = Rota)
     {
         var endereco = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
         using var http = new HttpClient { BaseAddress = new Uri(endereco) };
-        using var pedido = new HttpRequestMessage(HttpMethod.Get, Rota);
+        using var pedido = new HttpRequestMessage(HttpMethod.Get, rota);
         if (token is not null) pedido.Headers.Authorization = new("Bearer", token);
         using var resposta = await http.SendAsync(pedido);
         return resposta.StatusCode;
     }
 
     /// <summary>JWT como o da API (sub, nivel, iat, exp, emissor e audiência), emitido em <paramref name="emitidoEm"/>.</summary>
-    private string Token(DateTime emitidoEm)
+    private string Token(DateTime emitidoEm, SessaoNativa? sessao = null, string nivel = "Admin")
     {
+        List<Claim> claims = [new("sub", _usuarioId.ToString()), new("nivel", nivel)];
+        if (sessao is not null) claims.AddRange([new("sid", sessao.Id.ToString()), new("dispositivoId", sessao.DispositivoId), new("empresaId", sessao.EmpresaId.ToString()), new("sessaoNativa", "true")]);
         var descritor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity([new Claim("sub", _usuarioId.ToString()), new Claim("nivel", "Admin")]),
+            Subject = new ClaimsIdentity(claims),
             NotBefore = emitidoEm,
             IssuedAt = emitidoEm,
             Expires = DateTime.UtcNow.AddHours(1),

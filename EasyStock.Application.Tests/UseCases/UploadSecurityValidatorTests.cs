@@ -6,6 +6,27 @@ namespace EasyStock.Application.Tests.UseCases;
 
 public class UploadSecurityValidatorTests
 {
+    [Fact]
+    public async Task AudioDoConsolePassaPelaValidacaoRealDoStoragePublico()
+    {
+        var storage = Substitute.For<IFileStorage>();
+        storage.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Returns(c =>
+            {
+                var req = c.Arg<FileUploadRequest>();
+                UploadSecurityValidator.SanitizeFileName(req.FileName);
+                UploadSecurityValidator.EnsureValidMime(req);
+                return Task.FromResult(new StoredFileResult("audio.ogg", "https://storage.test/audio.ogg", req.ContentType, req.Content.Length));
+            });
+        var sut = new GerenciarUploadsUseCase(storage, null!, null!, null!, null!, null!, null!, null!);
+
+        var resultado = await sut.UploadAudioAtendimentoAsync(Guid.NewGuid(), Guid.NewGuid(),
+            EasyStock.Application.Tests.Services.Atendimento.Audio.AmostrasWebmChrome.MonoCurto);
+
+        resultado.ContentType.Should().Be("audio/ogg");
+        resultado.NotaDeVoz.Should().BeTrue();
+        await storage.Received(1).UploadAsync(Arg.Is<FileUploadRequest>(r => r.IsPublic && r.ContentType == "audio/ogg"), Arg.Any<CancellationToken>());
+    }
     // ── SanitizeFileName — aceitos ───────────────────────────────────────────
 
     [Theory]
@@ -144,12 +165,12 @@ public class UploadSecurityValidatorTests
     [Fact]
     public void EnsureValidMime_publico_ignora_allowlist_privada()
     {
-        var act = () => UploadSecurityValidator.EnsureValidMime(Upload("audio/ogg", publico: true, ArmazenadorMidiaWhatsApp.MimesPermitidos));
+        var act = () => UploadSecurityValidator.EnsureValidMime(Upload("video/mp4", publico: true, ArmazenadorMidiaWhatsApp.MimesPermitidos));
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Theory]
-    [InlineData("audio/ogg")]
+    [InlineData("video/mp4")]
     [InlineData("text/html")]
     public void EnsureValidMime_privado_sem_allowlist_usa_whitelist_publica(string mime)
     {

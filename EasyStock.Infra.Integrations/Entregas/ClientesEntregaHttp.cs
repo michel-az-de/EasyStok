@@ -84,6 +84,19 @@ public sealed class LalamoveHttpClient(HttpClient http, string apiKey, string se
     public Task<LalamoveEntregaResponse> ConsultarAsync(string id, CancellationToken ct = default) =>
         EnviarAsync<LalamoveEntregaResponse>(HttpMethod.Get, "/v3/orders/" + Uri.EscapeDataString(id), null, ct);
 
+    /// <summary>A cotação relida no provedor: o preço da corrida nunca vem do navegador (#2160).</summary>
+    public Task<LalamoveCotacaoResponse> ObterCotacaoAsync(string id, CancellationToken ct = default) =>
+        EnviarAsync<LalamoveCotacaoResponse>(HttpMethod.Get, "/v3/quotations/" + Uri.EscapeDataString(id), null, ct);
+
+    public Task<LalamoveMotorista> ObterMotoristaAsync(string orderId, string driverId, CancellationToken ct = default) =>
+        EnviarAsync<LalamoveMotorista>(HttpMethod.Get,
+            "/v3/orders/" + Uri.EscapeDataString(orderId) + "/drivers/" + Uri.EscapeDataString(driverId), null, ct);
+
+    /// <summary>Gorjeta (priority fee) em reais, como string: a Lalamove só aceita enquanto procura motorista.</summary>
+    public Task<LalamoveEntregaResponse> AdicionarGorjetaAsync(string orderId, string valorReais, CancellationToken ct = default) =>
+        EnviarAsync<LalamoveEntregaResponse>(HttpMethod.Post, "/v3/orders/" + Uri.EscapeDataString(orderId) + "/priority-fee",
+            new LalamoveEnvelope<LalamoveGorjeta>(new LalamoveGorjeta(valorReais)), ct);
+
     public Task<IReadOnlyList<LalamoveCidade>> ListarCidadesAsync(CancellationToken ct = default) =>
         EnviarAsync<IReadOnlyList<LalamoveCidade>>(HttpMethod.Get, "/v3/cities", null, ct);
 
@@ -125,10 +138,10 @@ public sealed class LalamoveHttpClient(HttpClient http, string apiKey, string se
     private HttpRequestMessage CriarRequest(HttpMethod metodo, string caminho, object? dados)
     {
         var corpo = dados is null ? "" : JsonSerializer.Serialize(dados);
-        var timestamp = relogio.GetUtcNow().ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var assinatura = AssinaturasEntrega.Lalamove(secret, timestamp, metodo.Method, caminho, corpo);
+        var timestamp = relogio.GetUtcNow().ToUnixTimeMilliseconds();
         var request = new HttpRequestMessage(metodo, caminho);
-        request.Headers.TryAddWithoutValidation("Authorization", $"hmac {apiKey}:{timestamp}:{assinatura}");
+        request.Headers.TryAddWithoutValidation("Authorization",
+            Logistica.Lalamove.AssinadorLalamove.Autorizacao(apiKey, secret, timestamp, metodo.Method, caminho, corpo));
         request.Headers.Add("Market", "BR");
         request.Headers.Add("Request-ID", Guid.NewGuid().ToString());
         if (dados is not null) request.Content = new StringContent(corpo, Encoding.UTF8, "application/json");
@@ -145,11 +158,6 @@ public sealed class LalamoveErroException(System.Net.HttpStatusCode status, stri
 
 public static class AssinaturasEntrega
 {
-    // https://developers.lalamove.com/#signature
-    public static string Lalamove(string secret, string timestamp, string metodo, string caminho, string corpo) =>
-        Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret),
-            Encoding.UTF8.GetBytes($"{timestamp}\r\n{metodo}\r\n{caminho}\r\n\r\n{corpo}")));
-
     // https://developer.uber.com/docs/deliveries/guides/webhooks
     public static bool VerificarWebhookUber(string signingKey, ReadOnlySpan<byte> corpoOriginal, string assinatura)
     {

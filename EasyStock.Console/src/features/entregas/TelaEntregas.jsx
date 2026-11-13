@@ -39,6 +39,7 @@ function TelaEntregasPronta({ estado, acoes }) {
   // Achado 1 (rodada 10, P0): mesmo som e destaque da Cozinha, nesta janela.
   const destacados = useAvisoSonoro({
     conversas: estado.conversas, som: estado.som, agora, aberta, janelas: estado.catalogo.janelas,
+    automaticoPausado: estado.automaticoPausado,
   })
 
   const acoesComAgora = {

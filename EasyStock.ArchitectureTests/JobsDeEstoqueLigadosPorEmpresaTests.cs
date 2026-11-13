@@ -65,7 +65,9 @@ public class JobsDeEstoqueLigadosPorEmpresaTests
         gerador.Should().Contain("GetAlertasAutomaticosAsync", "os alertas vigentes vêm numa consulta por empresa, não uma por item");
         gerador.Should().Contain("ExpurgarAlertasAutomaticosAsync", "a retenção roda na própria rodada do job");
         gerador.Should().Contain("RemoverAlertasAsync", "a condição resolvida sai do sino");
-        gerador.Should().Contain("apenasComSaldo: true", "lote sem saldo não alerta");
+        gerador.Should().Contain("GetProximoVencimentoComSaldoAsync", "lote sem saldo não alerta, e a leitura é por chave");
+        gerador.Should().Contain("GetItensParadosComSaldoAsync", "lote sem saldo não alerta, e a leitura é por chave");
+        gerador.Should().Contain("ExecuteInTransactionSemRetryAsync", "a limpeza e a gravação saem numa transação só");
 
         var provas = File.ReadAllText(Path.Combine(
             raiz, "EasyStock.Infra.Postgre.IntegrationTests", "Tenancy", "AlertasDeEstoquePorEmpresaIntegrationTests.cs"));

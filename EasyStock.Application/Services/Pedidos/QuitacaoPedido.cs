@@ -1,13 +1,16 @@
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Operacao;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Domain.Entities.Operacao;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.Services.Pedidos;
 
@@ -26,7 +29,8 @@ public sealed class QuitacaoPedido(
     IOperacaoEventPublisher eventos,
     CalculadoraInicioPrevistoPedido inicioPrevisto,
     SaldoFinanceiroPedido? saldos = null,
-    ExpiracaoPreferenciaMercadoPago? expiracao = null)
+    ExpiracaoPreferenciaMercadoPago? expiracao = null,
+    INotificadorService? notificador = null)
 {
     public const string Marco = "quitacao_confirmada";
 
@@ -97,7 +101,7 @@ public sealed class QuitacaoPedido(
             new PedidoPagoEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, pedido.ClienteId, conversaId, cobranca.Id,
                 cobranca.Provedor, cobranca.PagamentoExternoId!, cobranca.MetodoPagamento!, cobranca.ValorPago!.Value,
                 pedido.Status, agora), correlationId: pedido.Id.ToString(), ct: ct);
-        return new(new PedidoPagoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+        return new(new PedidoPagoOperacao(pedido.Id, CodigoCurto.De(pedido.Id),
             pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await PrepararCanhotoAsync(pedido, agora, ct));
     }
 
@@ -106,6 +110,10 @@ public sealed class QuitacaoPedido(
         if (await impressoes.ExisteCanhotoAsync(pedido.EmpresaId, pedido.Id, ct)) return null;
         var canhoto = ImpressaoPendente.CriarCanhoto(pedido.EmpresaId, pedido.LojaId, pedido.Id, agora);
         await impressoes.AddAsync(canhoto, ct);
+        // #2211: todo pedido com canhoto avisa a equipe inscrita, com o canhoto em imagem.
+        if (notificador is not null)
+            await new PublicadorAvisoEquipe(notificador).PedidoComCanhotoAsync(
+                pedido.EmpresaId, pedido.Id, pedido.ClienteNome, pedido.Total.Valor, ct);
         return new(canhoto.Id, pedido.Id);
     }
 
@@ -118,7 +126,7 @@ public sealed class QuitacaoPedido(
         await publicador.PublicarAsync(pedido.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", pedido.Id,
             new PedidoPagoEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, pedido.ClienteId, conversaId, Guid.Empty,
                 "credito_cliente", "cupom", "cupom", 0m, pedido.Status, agora), correlationId: pedido.Id.ToString(), ct: ct);
-        return new(new PedidoPagoOperacao(pedido.Id, pedido.Id.ToString("N")[..8].ToUpperInvariant(),
+        return new(new PedidoPagoOperacao(pedido.Id, CodigoCurto.De(pedido.Id),
             pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await PrepararCanhotoAsync(pedido, agora, ct));
     }
 

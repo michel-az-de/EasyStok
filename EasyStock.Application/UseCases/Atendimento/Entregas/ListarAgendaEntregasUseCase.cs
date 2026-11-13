@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Entregas;
 
@@ -50,7 +51,7 @@ public sealed class ListarAgendaEntregasUseCase(
                     x.Janela.CapacidadeMaxima, x.Ocupadas, x.Janela.Ativa,
                     doDia.FirstOrDefault(b => b.JanelaEspecificaId == x.Janela.Id)?.Motivo ?? fechado,
                     porJanela[(data, x.Janela.Id)].Select(p => new AgendaPedido(
-                        p.PedidoId, p.PedidoId.ToString("N")[..8].ToUpperInvariant(), p.ClienteNome, p.Status, p.NumeroComanda,
+                        p.PedidoId, CodigoCurto.De(p.PedidoId), p.ClienteNome, p.Status, p.NumeroComanda,
                         p.NumeroDoDia)).ToList()))
                 .ToList();
             dias.Add(new AgendaDia(data, fechado, faixas));

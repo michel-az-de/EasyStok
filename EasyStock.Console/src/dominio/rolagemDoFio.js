@@ -29,3 +29,17 @@ export function deveRolarParaOFim(antes, depois, estavaNoFim) {
   const entrouNoFim = depois.total > antes.total && depois.ultimaId !== antes.ultimaId
   return entrouNoFim && depois.ultimaDaCasa
 }
+
+// #2232 (A5): no celular o painel da conversa fica `hidden` enquanto a lista está aberta. Escondido, o
+// navegador não rola nada e perde a posição; ao voltar, a conversa aparecia no topo. Ao ficar visível, o fio
+// vai para a última mensagem.
+export const deveRolarAoFicarVisivel = (visivelAntes, visivelAgora) => visivelAntes === false && visivelAgora === true
+
+// Quantas falas entraram no fim sem que o fio rolasse: quem lê mais acima não é arrastado, mas vê o botão
+// "Novas mensagens". Zero quando o fio rolou (já está à vista), na troca de conversa e para histórico antigo
+// que entra por cima (`total` e `ultimaId` mudam juntos só quando a fala é do fim).
+export function novasForaDaVista(antes, depois, rolou) {
+  if (rolou || !antes || antes.conversaId !== depois.conversaId) return 0
+  const entrouNoFim = depois.total > antes.total && depois.ultimaId !== antes.ultimaId
+  return entrouNoFim ? depois.total - antes.total : 0
+}

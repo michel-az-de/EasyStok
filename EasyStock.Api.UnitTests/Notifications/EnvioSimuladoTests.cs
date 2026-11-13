@@ -101,8 +101,7 @@ public class EnvioSimuladoTests
     [Fact]
     public async Task O_nome_do_console_continua_o_mesmo_e_so_ele_diz_que_nada_saiu()
     {
-        // O diagnostico decide "SMTP configurado?" por GetType().Name == "ConsoleEmailService" (ver
-        // DiagnosticoController e DiagnosticoEmailReportJob): o nome e contrato. A marcadora IEmailServiceSimulado da
+        // O nome da classe e contrato (quem decide "SMTP configurado?" olha GetType().Name == "ConsoleEmailService"). A marcadora IEmailServiceSimulado da
         // N2 saiu na N3: o console devolve Simulado direto no EnviarAsync e o canal so repassa.
         var console = new ConsoleEmailService(NullLogger<ConsoleEmailService>.Instance);
 

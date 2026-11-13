@@ -189,6 +189,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FornecedorAlteracao> FornecedorAlteracoes { get; set; } = null!;
         public DbSet<VendaAlteracao> VendaAlteracoes { get; set; } = null!;
         public DbSet<Lote> Lotes { get; set; } = null!;
+        public DbSet<LoteNumeroContador> LoteNumeroContadores { get; set; } = null!; // #2199
         public DbSet<EtiquetaTemplateSistema> EtiquetaTemplatesSistema { get; set; } = null!;
         public DbSet<EtiquetaTemplate> EtiquetaTemplates { get; set; } = null!;
         public DbSet<EtiquetaEmpresaDefault> EtiquetaEmpresaDefaults { get; set; } = null!;

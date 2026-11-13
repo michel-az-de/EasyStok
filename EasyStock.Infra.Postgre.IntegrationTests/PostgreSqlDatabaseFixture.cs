@@ -16,6 +16,7 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     private const string RlsClientPassword = "rls_test_pwd";
 
     private PostgreSqlContainer? _container;
+    private string? _conexaoLocal;
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
 
@@ -23,6 +24,17 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     {
         try
         {
+            // Opt-in exclusivo do laboratório descartável #2184; o reset abaixo nunca aceita outro destino.
+            if (Environment.GetEnvironmentVariable("EASYSTOK_2184_TEST_POSTGRES") is { Length: > 0 } local)
+            {
+                var destino = new NpgsqlConnectionStringBuilder(local);
+                if (destino.Host != "127.0.0.1" || destino.Port != 25484 || destino.Database != "easystock_it_2184")
+                    throw new InvalidOperationException("O laboratório 2184 só aceita 127.0.0.1:25484/easystock_it_2184.");
+                _conexaoLocal = destino.ConnectionString;
+                IsAvailable = true;
+                await ResetDatabaseAsync();
+                return;
+            }
             _container = new PostgreSqlBuilder("postgres:16-alpine")
                 .WithDatabase("easystock_tests")
                 .WithUsername("postgres")
@@ -48,10 +60,8 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
 
     public EasyStockDbContext CreateDbContext()
     {
-        if (_container is null) throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
-
         var options = new DbContextOptionsBuilder<EasyStockDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
+            .UseNpgsql(ConnectionString)
             .Options;
 
         return new EasyStockDbContext(options);
@@ -63,7 +73,7 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     /// (AddEasyStockPostgreInfrastructure) para validar o wiring dos interceptors.
     /// </summary>
     public string ConnectionString =>
-        _container?.GetConnectionString() ?? throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
+        _conexaoLocal ?? _container?.GetConnectionString() ?? throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
 
     /// <summary>
     /// Connection string de um login NOSUPERUSER/NOBYPASSRLS — sujeito as policies
@@ -76,8 +86,7 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     {
         get
         {
-            if (_container is null) throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
-            return new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
+            return new NpgsqlConnectionStringBuilder(ConnectionString)
             {
                 Username = RlsClientRole,
                 Password = RlsClientPassword,
@@ -103,7 +112,7 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
 
     public async Task ResetDatabaseAsync()
     {
-        if (!IsAvailable || _container is null) return;
+        Skip.IfNot(IsAvailable, UnavailableReason ?? "PostgreSQL de teste indisponível.");
 
         await using var context = CreateDbContext();
         await context.Database.EnsureDeletedAsync();

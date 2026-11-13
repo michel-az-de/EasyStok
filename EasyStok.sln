@@ -57,6 +57,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyStock.Infra.Integration
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyStock.Inventario.IntegrationTests", "EasyStock.Inventario.IntegrationTests\EasyStock.Inventario.IntegrationTests.csproj", "{38AE912C-93AC-458B-A59B-D50D9EB798AF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyStock.Observabilidade", "EasyStock.Observabilidade\EasyStock.Observabilidade.csproj", "{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -331,6 +333,18 @@ Global
 		{38AE912C-93AC-458B-A59B-D50D9EB798AF}.Release|x64.Build.0 = Release|Any CPU
 		{38AE912C-93AC-458B-A59B-D50D9EB798AF}.Release|x86.ActiveCfg = Release|Any CPU
 		{38AE912C-93AC-458B-A59B-D50D9EB798AF}.Release|x86.Build.0 = Release|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Debug|x64.Build.0 = Debug|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Debug|x86.Build.0 = Debug|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Release|x64.ActiveCfg = Release|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Release|x64.Build.0 = Release|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Release|x86.ActiveCfg = Release|Any CPU
+		{9C757812-D31E-4CCB-A10A-1AC598E7DF6A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

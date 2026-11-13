@@ -9,7 +9,7 @@ import { pagamentoNaEntregaDasObservacoes, textoDoTroco } from './cobranca'
 import { aReceberDoCartao, quitadoNoCartao } from './pagamento'
 import { nomeDoPedido } from './pedido'
 
-const SEM_JANELA = 'sem-janela'
+export const SEM_JANELA = 'sem-janela'
 const hhmm = (h) => String(h ?? '').slice(0, 5)
 const chaveDaJanela = (label, inicio, fim) => `${hhmm(inicio)}|${hhmm(fim)}|${String(label ?? '').trim().toLowerCase()}`
 
@@ -19,6 +19,11 @@ export const diaDaSemanaDaData = (data) => new Date(`${data}T12:00:00Z`).getUTCD
 // "quinta-feira, 08/10/2026", para o cabeçalho da tela e do papel.
 export const rotuloDaData = (data) => new Date(`${data}T12:00:00Z`).toLocaleDateString('pt-BR', {
   weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC',
+})
+
+// #2418: na tela, por extenso ("quinta-feira, 12 de novembro"); o ano só aparece quando não é o de `hoje`.
+export const rotuloDoDiaPorExtenso = (data, hoje) => new Date(`${data}T12:00:00Z`).toLocaleDateString('pt-BR', {
+  weekday: 'long', day: 'numeric', month: 'long', ...(data.slice(0, 4) === String(hoje ?? '').slice(0, 4) ? {} : { year: 'numeric' }), timeZone: 'UTC',
 })
 
 // Dia de produção do pedido, como o KDS calcula: a data da vaga; sem vaga, o agendamento;
@@ -107,7 +112,20 @@ function linhaDoPedido(p, achado, entregadores) {
     entregador: entregadorDe(achado, entregadores),
     viagem: viagem ? { id: viagem.id, situacao: viagem.situacao } : null,
     podePorNaViagem: p.status === 'pronto' && !viagem,
+    // #2096: encomenda que o cliente confirmou (ISO) e o horário agendado, para o selo e o botão.
+    agendadoParaEm: p.agendadoParaEm ?? null,
+    confirmadoPeloClienteEm: p.confirmadoPeloClienteEm ?? null,
   }
+}
+
+// #2096: confirmação do cliente numa encomenda. 'confirmada' mostra o selo; 'pendente' mostra o
+// botão "Cliente confirmou" (agendada para depois de agora, ainda não saiu nem acabou); null, nada.
+const SEM_CONFIRMACAO = new Set(['saiu_para_entrega', 'entregue', 'cancelado'])
+export function confirmacaoDoCliente(pedido, agora) {
+  if (!pedido || SEM_CONFIRMACAO.has(pedido.status)) return null
+  if (pedido.confirmadoPeloClienteEm) return 'confirmada'
+  const quando = Date.parse(pedido.agendadoParaEm ?? '')
+  return Number.isFinite(quando) && quando > agora ? 'pendente' : null
 }
 
 function novoGrupo({ chave, label, inicio, fim, capacidade = null, janelaId = null }) {

@@ -1,9 +1,11 @@
+using EasyStock.Api.Authentication;
 using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
+using EasyStock.Application.UseCases.ListarLinhasCaixa;
 using EasyStock.Application.UseCases.ListarMovimentosCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
@@ -24,6 +26,7 @@ public class CaixaController(
     ListarMovimentosCaixaUseCase listarMovUseCase,
     ObterCaixaDiaUseCase obterDiaUseCase,
     ListarFechamentosCaixaUseCase listarFechUseCase,
+    ListarLinhasCaixaUseCase listarLinhasUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Cash summary for a day (open or closed)")]
@@ -51,9 +54,12 @@ public class CaixaController(
         {
             EmpresaId = emp,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            RegistradoPorNome = NomeDaSessao(),
             // Origem server-side (trilha de auditoria), NUNCA do body — o caminho mobile
             // legitimo abre caixa via MobileCashController. #766
             Origem = "web",
+            // #2084 (A3): só gerente ou dona confirma a abertura automática; nunca do corpo.
+            PodeConfirmarAberturaAutomatica = currentUser.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin or NivelAcesso.Gerente,
             // #1615: a abertura e sempre de agora. Com data futura no body ela virava para sempre
             // o ultimo evento do caixa e nenhum dia fechava mais.
             DataMovimento = null
@@ -70,7 +76,10 @@ public class CaixaController(
         var result = await fecharUseCase.ExecuteAsync(command with
         {
             EmpresaId = emp,
-            FechadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null
+            FechadoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            // #2082 B13: o nome sai do token, nunca do corpo (o corpo atribuiria o fechamento a outra pessoa).
+            // A coluna tem 120 caracteres.
+            FechadoPorNome = User.NomeExibicao() is { } nome ? nome[..Math.Min(nome.Length, 120)] : null
         });
         return DataOk(result);
     }
@@ -93,6 +102,21 @@ public class CaixaController(
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
     }
 
+    // #2262: recebimentos de pedido (Mercado Pago e baixa manual), vendas e estornos de venda do período, as
+    // linhas que o /dia soma fora dos movimentos. O Extrato do Financeiro junta estas linhas aos movimentos.
+    [SwaggerOperation(Summary = "Order payments, sales and sale refunds counted by the cash outside its movements")]
+    [HttpGet("linhas")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> ListarLinhas(
+        [FromQuery] Guid? empresaId, [FromQuery] DateTime? desde = null, [FromQuery] DateTime? ate = null)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        if (desde is null || ate is null) return DataBadRequest("Informe o início e o fim do período.");
+        var result = await listarLinhasUseCase.ExecuteAsync(new ListarLinhasCaixaQuery(
+            emp, DataUtc.InicioDoPeriodoUtc(desde)!.Value, DataUtc.FimDoPeriodoUtc(ate)!.Value));
+        return DataOk(result);
+    }
+
     [SwaggerOperation(Summary = "Register entry/exit (sangria, suprimento, despesa)")]
     [HttpPost("movimentos")]
     [Authorize(Policy = "Operador")]
@@ -103,10 +127,13 @@ public class CaixaController(
         {
             EmpresaId = emp,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            RegistradoPorNome = NomeDaSessao(),
             // Origem server-side, NUNCA do body: origem="mobile" no corpo burlaria as
             // guardas FIN-003 (metodo/justificativa + anti-caixa-negativo), que so sao
             // puladas no caminho mobile legitimo (MobileCashController seta "mobile"). #766
-            Origem = "web"
+            Origem = "web",
+            // #2319: lançamento manual exige caixa aberto; a abertura posterior não absorve mais entrada solta.
+            ExigirCaixaAberto = true
         });
         return DataCreated($"/api/caixa/movimentos/{result.Id}", result);
     }
@@ -141,5 +168,12 @@ public class CaixaController(
         var result = await listarFechUseCase.ExecuteAsync(new ListarFechamentosCaixaQuery(
             emp, p, sz, desde, ate));
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
+    }
+
+    // A coluna do autor aceita 120 caracteres; o nome da sessão, 150.
+    private string? NomeDaSessao()
+    {
+        var nome = User?.FindFirst("nome")?.Value;
+        return nome is { Length: > 120 } ? nome[..120] : nome;
     }
 }

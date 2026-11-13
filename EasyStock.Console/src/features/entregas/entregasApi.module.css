@@ -1,10 +1,11 @@
 /* Entregas no modo API (F04): painéis simples sobre os dados reais. */
 .conteudo { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4); display: flex; flex-direction: column; gap: var(--e-3); }
 .navegacao { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
-.abas { display: flex; gap: var(--e-1); flex: 0 1 auto; min-width: 0; border-bottom: var(--b-1) solid var(--linha); }
+/* #2423: a divisória das abas ocupa a largura toda; as abas ficam do tamanho do texto. */
+.abas { display: flex; gap: var(--e-1); flex: 1 1 auto; min-width: 0; border-bottom: var(--b-1) solid var(--linha); }
 .abaInterna { flex: 1 1 auto; min-width: 0; padding: var(--e-2) var(--e-3); font-size: var(--t-apoio); }
-.abas .abaInterna { border-radius: 0; border: 0; border-bottom: var(--b-2) solid transparent; box-shadow: none; }
-.abaInterna[aria-selected='true'], .abaInterna[aria-selected='true']:hover { background: transparent; color: var(--marca); border-bottom-color: var(--marca); }
+.abas .abaInterna { flex: 0 1 auto; border-radius: 0; border: 0; border-bottom: var(--b-2) solid transparent; box-shadow: none; }
+.abaInterna[aria-selected='true'], .abaInterna[aria-selected='true']:hover { background: transparent; color: var(--marca); border-bottom-color: var(--marca); font-weight: 700; }
 .painel { display: flex; flex-direction: column; gap: var(--e-4); min-width: 0; }
 .secao { display: flex; flex-direction: column; gap: var(--e-2); }
 /* #1868: "Organizar transportes" esticava sozinho numa linha de 1.060 px, centralizado. */
@@ -13,7 +14,7 @@
 .lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-2); }
 .cartao {
   display: flex; flex-direction: column; gap: var(--e-2); min-width: 0;
-  padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--e-1); background: var(--papel);
+  padding: var(--e-4); border: 0; border-radius: var(--r-1); background: var(--preenchimento);
 }
 .cartao > button { align-self: flex-start; }
 .linha { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
@@ -60,17 +61,73 @@
 .painelDia .cartao .linha > svg { flex-shrink: 0; }
 .painelDia .cartao p { margin: 0; overflow-wrap: anywhere; }
 .painelDia .cartao > .linha:first-child .cresce { font-weight: 700; flex-basis: 12rem; }
-.painelDia .janelaDoDia { gap: var(--e-2); }
 .painelDia .janelaDoDia .lista { display: flex; gap: 0; }
-.painelDia .janelaDoDia > .linha:first-child { padding-bottom: var(--e-2); border-bottom: var(--b-1) solid var(--linha); }
 .painelDia .cabecalhoDoDia { gap: var(--e-2); }
 .escolhaDoDia > .campoData { flex: 1 1 140px; min-width: 140px; max-width: 160px; }
 .escolhaDoDia [role='radiogroup'] button { padding-inline: var(--e-3); }
-.impressaoDoDia { max-width: 100%; }
-.impressaoDoDia summary { min-height: var(--toque); padding-block: var(--e-3); color: var(--tinta-2); font-size: var(--t-apoio); cursor: pointer; }
-.impressaoDoDia summary:hover { color: var(--marca); }
-.impressaoDoDia[open] { flex-basis: 100%; }
-.impressaoDoDia > .linha { padding-bottom: var(--e-2); }
+.impressaoDoDia { position: relative; max-width: 100%; }
+/* #2418: o resumo tem cara de botão secundário; papel e PDF abrem num cartão logo abaixo, à direita. */
+.impressaoDoDia summary {
+  display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding: 0 var(--e-4);
+  list-style: none; cursor: pointer; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta);
+  background: var(--papel); border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-2);
+}
+.impressaoDoDia summary::-webkit-details-marker { display: none; }
+.impressaoDoDia summary:hover { background: var(--preenchimento); }
+.impressaoDoDia summary:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: 2px; }
+.impressaoDoDia > .linha {
+  position: absolute; right: 0; top: calc(100% + var(--e-1)); z-index: 3; flex-wrap: nowrap;
+  padding: var(--e-3); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); box-shadow: var(--sombra-media);
+}
+.impressaoDoDia > .linha button { white-space: nowrap; }
+
+/* #2418: o painel do dia em cartões (layout aprovado, claro e escuro pelos tokens). */
+.painelDia .secao > .linha > h3, .painelDia .secao > h3 { font-size: var(--t-titulo); font-weight: 800; }
+.painelDia .cabecalhoDoDia { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding-bottom: 0; border-bottom: 0; }
+.painelDia .dataDoDia { font-size: var(--t-titulo); font-weight: 800; }
+.gradeJanelas { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: var(--e-3); }
+.janelaDoDia, .vazioCartao, .cartaoChamar, .cartaoChamado {
+  background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-3);
+}
+.painelDia .janelaDoDia { gap: var(--e-2); padding: var(--e-3) var(--e-4); }
+.janelaDoDia h4 { margin: 0; font-size: var(--t-forte); font-weight: 800; color: var(--tinta); }
+.janelaDoDia .numero { font-weight: 400; color: var(--tinta-2); }
+/* Janela com pedido ocupa a linha inteira: o cartão do pedido não cabe em meia gaveta. */
+.janelaComPedidos { grid-column: 1 / -1; }
+.topoCartao { display: flex; align-items: flex-start; gap: var(--e-3); min-width: 0; }
+.topoCartao p { margin: 0; }
+.iconeJanela { display: inline-flex; padding-top: 2px; color: var(--marca); }
+.ocupacao { font-weight: 600; color: var(--tinta); }
+.selo {
+  padding: 2px var(--e-2); border-radius: var(--r-1); white-space: nowrap; flex-shrink: 0;
+  background: var(--preenchimento-forte); color: var(--tinta-2); font-weight: 500;
+}
+.selo::before { content: none; }
+.cartaoChamado .selo { background: var(--alerta-pastel); color: var(--alerta); }
+.seloAoVivo { display: inline-flex; }
+.vivo { color: var(--sucesso); }
+.vazioCartao { display: flex; align-items: center; gap: var(--e-4); padding: var(--e-3) var(--e-4); }
+.vazioCartao > svg { flex-shrink: 0; color: var(--tinta-2); padding-right: var(--e-4); border-right: var(--b-1) solid var(--linha); box-sizing: content-box; }
+.vazioCartao p, .cartaoChamar p { margin: 0; }
+.tituloCartao { font-weight: 700; color: var(--tinta); overflow-wrap: anywhere; }
+.cartaoChamar { padding: var(--e-4); gap: var(--e-1); }
+.formChamado { display: flex; flex-direction: column; gap: var(--e-3); margin-top: var(--e-2); }
+.formChamado > button { align-self: flex-end; }
+.listaCartoes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-3); }
+.cartaoChamado { display: flex; flex-direction: column; gap: var(--e-3); padding: var(--e-3) var(--e-4); }
+.acoesCartao { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-3); flex-wrap: wrap; }
+.acaoPerigo, .acaoPerigo:hover:not(:disabled) { color: var(--erro); }
+
+/* #2423: aba Entregadores com o formulário em duas colunas e a lista abaixo da divisória. */
+.abaEntregadores { display: flex; flex-direction: column; gap: var(--e-5); }
+.abaEntregadores .secao > h3 { font-size: var(--t-titulo); font-weight: 800; }
+.formEntregador { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3) var(--e-4); }
+.formEntregador > button { grid-column: 1 / -1; justify-self: end; }
+.ativos { padding-top: var(--e-5); border-top: var(--b-1) solid var(--linha); }
+.contagem { margin-left: var(--e-2); font-size: var(--t-corpo); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tinta-2); }
+.vazioCentral { display: flex; flex-direction: column; align-items: center; gap: var(--e-1); padding: var(--e-5) var(--e-3); text-align: center; }
+.vazioCentral > svg { color: var(--tinta-2); margin-bottom: var(--e-2); }
+.vazioCentral p { margin: 0; }
 
 .agenda { container: agenda / inline-size; }
 .periodoAgenda { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
@@ -116,7 +173,7 @@
 @media (max-width: 640px) {
   .navegacao { gap: var(--e-1); }
   .abas { flex-basis: 100%; }
-  .abaInterna { padding-inline: var(--e-1); font-size: .875rem; line-height: 1.25; }
+  .abas .abaInterna { flex: 1 1 auto; padding-inline: var(--e-1); font-size: .875rem; line-height: 1.25; }
   .navegacao > .apoio { font-size: .8125rem; }
   .painelDia { gap: var(--e-3); }
   .painelDia .cartao > .linha:first-child .cresce { flex-basis: 8rem; }
@@ -126,4 +183,9 @@
   .periodoAgenda > button { padding-inline: var(--e-1); font-size: .875rem; }
   .faixa { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
   .faixa > button { grid-column: 2; justify-self: start; }
+  /* #2418: no celular o papel e o PDF abrem na linha de baixo, sem cartão flutuante cortado na borda. */
+  .impressaoDoDia[open] { flex-basis: 100%; }
+  .impressaoDoDia > .linha { position: static; flex-wrap: wrap; margin-top: var(--e-2); box-shadow: none; }
+  .formEntregador { grid-template-columns: minmax(0, 1fr); }
+  .formEntregador > button { justify-self: stretch; }
 }

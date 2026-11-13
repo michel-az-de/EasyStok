@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using System.Text.Json;
 using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Ports.Output.Pagamentos;
@@ -23,6 +24,12 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
     [EnableRateLimiting("comanda-leitura")]
     public Task<IActionResult> Obter(string token, CancellationToken ct) => Tratar(async () => await comanda.ObterAsync(token, ct));
 
+    [HttpPost("chat")]
+    [EnableRateLimiting("comanda-envio")]
+    public Task<IActionResult> RetomarChat(string token, [FromHeader(Name = "X-Chat-Token")] string? chatToken,
+        [FromServices] RetomarChatDaComandaUseCase chat, CancellationToken ct) =>
+        Tratar(async () => await chat.ExecuteAsync(token, chatToken, ct));
+
     [HttpGet("cardapio")]
     [EnableRateLimiting("comanda-leitura")]
     public Task<IActionResult> Cardapio(string token, CancellationToken ct) => Tratar(async () =>
@@ -45,23 +52,10 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         EnvioComandaCliente resultado;
         try { resultado = await comanda.EnviarAsync(token, body.Revisao, ct); }
         catch (CepSemCoberturaException) { return await comanda.EncaminharEntregaAsync(token, body.Revisao, ct); }
-        if (resultado.Situacao == "alteracao_aguardando_confirmacao")
-        {
-            var estado = await comanda.ObterAsync(token, ct);
-            // Só acréscimos preservando pratos e observações passam direto. Trocas têm conferência humana.
-            if (estado.Pedido is { } pedido && resultado.Total >= pedido.Total
-                && (estado.Rascunho.Observacoes ?? "") == (pedido.Observacoes ?? "")
-                && pedido.Itens.GroupBy(a => (a.CardapioItemId, a.VariacaoId)).All(g => estado.Selecao.Any(n => n.CardapioItemId == g.Key.CardapioItemId
-                    && n.VariacaoId == g.Key.VariacaoId && n.Qtd >= g.Sum(a => a.Quantidade) && g.All(a => (n.Observacao ?? "") == (a.Observacao ?? "")))))
-            {
-                await using var escopo = escopos.CreateAsyncScope();
-                var acesso = await escopo.ServiceProvider.GetRequiredService<ComandaClienteUseCase>().AcessoAsync(token, ct);
-                resultado = await escopo.ServiceProvider.GetRequiredService<ConfirmarAlteracaoComandaUseCase>().ExecuteAsync(new(acesso.EmpresaId,
-                    acesso.ConversaId, estado.LinkId, true, Guid.Empty, "Cliente pelo link",
-                    NivelAcesso.Operador, Automatico: true), ct);
-            }
-        }
-        return resultado;
+        // A regra de "só acréscimo passa direto" é do use case (ConfirmarAlteracaoComandaUseCase), não deste controller.
+        if (resultado.Situacao != ConfirmarAlteracaoComandaUseCase.SituacaoAguardandoConfirmacao) return resultado;
+        await using var escopo = escopos.CreateAsyncScope();
+        return await escopo.ServiceProvider.GetRequiredService<ConfirmarAlteracaoComandaUseCase>().TentarAutomaticoAsync(token, resultado, ct);
     });
 
     [HttpPost("nova-edicao")]
@@ -150,6 +144,7 @@ public sealed class ComandaClienteController(ComandaClienteUseCase comanda, List
         Response.Headers.CacheControl = "no-store";
         try { return Ok(await acao()); }
         catch (LinkCardapioConversaIndisponivelException e) { return Problem(e.Message, statusCode: 410); }
+        catch (ChatSiteIndisponivelException e) { return Problem(e.Message, statusCode: 404); }
         catch (ComandaClienteConflitoException e) { return Problem(e.Message, statusCode: 409); }
         catch (TelefoneExigeVerificacaoException e) { return ExigirVerificacao(e.Message); }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505", ConstraintName: "ix_clientes_empresa_telefone_hash" })

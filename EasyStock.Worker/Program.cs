@@ -119,6 +119,8 @@ builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
 // Sem este registro o Worker não resolvia IFileStorage e o ReportRunner falhava em runtime
 // (gap fechado — provider lido de "FileStorage:Provider", default Local).
 builder.Services.AddEasyStockFileStorageCore(builder.Configuration);
+// #2211: anexo dos avisos (canhoto em PNG/PDF), gerado aqui porque o Worker avalia os eventos.
+builder.Services.AddAnexosDeNotificacao();
 
 // Motor de relatórios assíncrono (PR-C0 — ADR-R02/R03/R04/R06/R07)
 // Registra ReportRunnerBackgroundService + ReportWatchdogBackgroundService +
@@ -158,6 +160,8 @@ builder.Services.AddHealthChecks()
     .AddNotificacoesBacklog();
 builder.Services.AddHttpClient(HealthchecksPingService.NomeDoCliente);
 builder.Services.AddHostedService<HealthchecksPingService>();
+// #2107: sinal de vida para o healthcheck do Docker (Notifications:Monitoring:ArquivoDeVida; vazio desliga).
+builder.Services.AddHostedService<ArquivoDeVidaService>();
 
 // Validação de DI sob demanda (CI/diagnóstico): `dotnet run -- --validate-di` constrói
 // o grafo com ValidateOnBuild + ValidateScopes, pegando captive dependencies

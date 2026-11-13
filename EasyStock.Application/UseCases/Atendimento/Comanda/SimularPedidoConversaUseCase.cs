@@ -7,19 +7,21 @@ using EasyStock.Application.UseCases.CriarPedido;
 namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 
 /// <param name="EnderecoId">Opcional: sem ele vale o endereço padrão (ou o único) do cliente, como no pedido.</param>
+/// <param name="FreteCombinado">#2219: frete em reais combinado pela equipe; a conta usa este valor, como o pedido.</param>
 public sealed record SimularPedidoConversaInput(
     Guid EmpresaId,
     Guid ConversaId,
     IReadOnlyList<ItemPedidoCheckout> Itens,
     Guid JanelaId,
     DateOnly DataEntrega,
-    Guid? EnderecoId = null);
+    Guid? EnderecoId = null,
+    decimal? FreteCombinado = null);
 
 /// <param name="Itens">Soma dos itens, com o preço da porção quando há.</param>
 /// <param name="Frete">Frete em reais; nulo quando a entrega e o frete são combinados com a equipe.</param>
 /// <param name="FreteACombinar">CEP fora de qualquer zona ou raio: o frete não tem número.</param>
 /// <param name="Total">Itens mais frete; nulo com o frete a combinar.</param>
-/// <param name="Encomenda">Entrega em outro dia: o servidor cobra o sinal de 50% (<c>PlanoPagamentoEncomenda</c>).</param>
+/// <param name="Encomenda">Entrega com 2 dias ou mais de antecedência: o servidor cobra o sinal de 50% (<c>PlanoPagamentoEncomenda</c>).</param>
 /// <param name="Sinal">Metade do total com o frete; nulo fora da encomenda.</param>
 /// <param name="Restante">O que fica para a entrega; nulo fora da encomenda.</param>
 public sealed record SimulacaoPedidoConversaResult(
@@ -71,13 +73,13 @@ public sealed class SimularPedidoConversaUseCase(
             Origem: OrigemPedido.WhatsApp,
             EmpresaId: input.EmpresaId,
             Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos),
-            Numero: endereco.Numero), ct);
+            Numero: endereco.Numero, FreteCombinado: input.FreteCombinado), ct);
 
         var encomenda = PlanoPagamentoEncomenda.TemSinal(simulado.AgendadoParaEm, relogio.GetUtcNow().UtcDateTime);
         if (simulado.Frete is not { } frete)
             return new SimulacaoPedidoConversaResult(simulado.Itens, null, true, null, encomenda, null, null);
 
-        var total = simulado.Itens + frete;
+        var total = Domain.Entities.Pedido.TotalDe([simulado.Itens, frete]).Valor;
         var sinal = encomenda ? PlanoPagamentoEncomenda.Sinal(total) : (decimal?)null;
         return new SimulacaoPedidoConversaResult(
             simulado.Itens, frete, false, total, encomenda, sinal, sinal is { } metade ? total - metade : null);

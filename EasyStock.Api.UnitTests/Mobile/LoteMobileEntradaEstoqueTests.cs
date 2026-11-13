@@ -164,6 +164,38 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
         (entrada.QuantidadeMinima, entrada.QuantidadeCritica).Should().Be((12, 4));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task LoteNaoVinculaProdutoDeOutraEmpresa(bool produtoMobileDeOutraEmpresa)
+    {
+        var outraEmpresaId = Guid.NewGuid();
+        var outroProdutoId = Guid.NewGuid();
+        _db.Add(new Produto
+        {
+            Id = outroProdutoId, EmpresaId = outraEmpresaId, Nome = "Produto de outra empresa",
+            Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CategoriaId = Guid.NewGuid()
+        });
+        _db.Add(new Product
+        {
+            Id = "p-outra-empresa", Name = "Produto de outra empresa", Category = "massa",
+            EmpresaId = produtoMobileDeOutraEmpresa ? outraEmpresaId : _empresaId,
+            ErpProductId = outroProdutoId
+        });
+        await _db.SaveChangesAsync();
+
+        await SincronizarAsync(Lote("b-referencia-alheia", 3) with
+        {
+            Items = [new BatchItemDto("p-outra-empresa", "Massa", null, "un", 3, null)]
+        });
+
+        var lote = await _db.Set<Lote>().IgnoreQueryFilters().Include(l => l.Itens)
+            .SingleAsync(l => l.MobileBatchId == "b-referencia-alheia");
+        lote.Itens.Should().ContainSingle().Which.ProdutoId.Should().BeNull(
+            "nem o produto mobile nem seu vinculo ERP podem pertencer a outra empresa");
+        _db.Set<ItemEstoque>().IgnoreQueryFilters().Should().NotContain(i => i.ProdutoId == outroProdutoId);
+        _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters().Should().NotContain(m => m.ProdutoId == outroProdutoId);
+    }
     private List<MovimentacaoEstoque> Saidas(NaturezaMovimentacaoEstoque natureza) =>
         _db.Set<MovimentacaoEstoque>().IgnoreQueryFilters()
             .Where(m => m.EmpresaId == _empresaId && m.ProdutoId == _produtoErpId

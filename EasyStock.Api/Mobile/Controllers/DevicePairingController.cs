@@ -1,3 +1,4 @@
+using EasyStock.Infra.Postgre.Security;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using EasyStock.Api.Mobile.Security;
@@ -32,6 +33,82 @@ public class DevicePairingController(
     private readonly ICurrentUserAccessor _currentUser = currentUser;
     private readonly IConfiguration _appConfig = appConfig;
     private readonly ILogger<DevicePairingController> _log = log;
+    private const int TamanhoMinimoSegredo = 32;
+    private static readonly TimeSpan IntervaloMinimoRotacao = TimeSpan.FromMinutes(10);
+
+    /// <summary>Pareia somente o aparelho da sessão Google nativa atual, com a autorização Gerente existente.</summary>
+    [HttpPost("pair-session")]
+    [Authorize(Policy = "Gerente")]
+    public async Task<IActionResult> PairSession(
+        [FromBody] PairSessionRequest req,
+        [FromServices] EasyStock.Application.Ports.Output.Persistence.IRefreshTokenRepository tokens,
+        [FromServices] EasyStock.Application.Ports.Output.Persistence.IUnitOfWork unitOfWork,
+        CancellationToken ct)
+    {
+        if (req is null || string.IsNullOrWhiteSpace(req.DispositivoId) || req.DispositivoId.Length > 64 || req.Label?.Length > 120)
+            return BadRequest(new { error = new { code = "DISPOSITIVO_INVALIDO", message = "Dados do aparelho inválidos." } });
+        if (User.FindFirstValue("sessaoNativa") != "true" || !Guid.TryParse(User.FindFirstValue("sid"), out var sid)
+            || User.FindFirstValue("dispositivoId") != req.DispositivoId || ResolveUserId() is not { } usuarioId
+            || _currentUser.EmpresaId == Guid.Empty) return Forbid();
+
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync<IActionResult>(async token =>
+        {
+            // Ordem única: aparelho, depois família. A revogação administrativa usa a mesma ordem.
+            var device = await _db.Set<MobileDevice>()
+                .FromSqlInterpolated($"SELECT * FROM mobile_devices WHERE \"Id\" = {req.DispositivoId} FOR UPDATE")
+                .IgnoreQueryFilters().SingleOrDefaultAsync(token);
+            var sessao = await tokens.ObterSessaoNativaComLockAsync(sid);
+            if (sessao is null || sessao.RevogadaEm is not null || sessao.UsuarioId != usuarioId
+                || sessao.EmpresaId != _currentUser.EmpresaId || sessao.DispositivoId != req.DispositivoId)
+                return Unauthorized();
+            var empresaId = sessao.EmpresaId;
+            var lojas = await _db.Set<Loja>().IgnoreQueryFilters().AsNoTracking()
+                .Where(l => l.EmpresaId == empresaId && l.Ativa).OrderBy(l => l.Nome)
+                .Select(l => new { id = l.Id, nome = l.Nome }).ToListAsync(token);
+            if (req.LojaId is null && lojas.Count > 1)
+                return Conflict(new { error = new { code = "LOJA_REQUIRED", message = "Escolha a loja deste aparelho.", lojas } });
+            var lojaId = req.LojaId ?? lojas.SingleOrDefault()?.id;
+            if (lojaId is null || !lojas.Any(l => l.id == lojaId))
+                return BadRequest(new { error = new { code = "LOJA_INVALIDA", message = "Loja inativa ou fora desta empresa." } });
+
+            if (device is not null && (device.Revoked || device.EmpresaId != empresaId || device.LojaId != lojaId))
+                return Conflict(new { error = new { code = device.Revoked ? "DISPOSITIVO_REVOGADO" : "CONTEXTO_DIVERGENTE",
+                    message = "O vínculo existente do aparelho precisa ser conferido." } });
+            if (device?.SessaoNativaId is { } anteriorId && anteriorId != sid)
+            {
+                var anterior = await tokens.ObterSessaoNativaAsync(anteriorId);
+                if (anterior is null || anterior.UsuarioId != usuarioId)
+                    return Conflict(new { error = new { code = "DISPOSITIVO_OUTRO_USUARIO", message = "Aparelho vinculado a outro usuário." } });
+            }
+            var reaproveitar = Request.Headers.ContainsKey(MobileAuth.HeaderName);
+            var chaveAtual = Request.Headers[MobileAuth.HeaderName].ToString().Trim();
+            if (reaproveitar && (device is null || string.IsNullOrWhiteSpace(chaveAtual)
+                || !CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(device.ApiKeyHash),
+                    System.Text.Encoding.UTF8.GetBytes(TokenHashHelper.ComputeSha256Hash(chaveAtual)))))
+                return Unauthorized(new { error = new { code = "MOBILE_KEY_INVALID", message = "A credencial atual não corresponde ao aparelho." } });
+            var agora = DateTime.UtcNow;
+            // A posse autoriza a adoção do vínculo, mas não ressuscita a credencial de uma família encerrada.
+            var preservarChave = reaproveitar && (device!.SessaoNativaId is null || device.SessaoNativaId == sid);
+            var apiKey = preservarChave ? chaveAtual : GenerateApiKey();
+            if (device is null)
+            {
+                device = new MobileDevice { Id = req.DispositivoId, EmpresaId = empresaId, LojaId = lojaId.Value, CreatedAt = agora };
+                _db.Set<MobileDevice>().Add(device);
+            }
+            device.ApiKeyHash = TokenHashHelper.ComputeSha256Hash(apiKey);
+            device.SessaoNativaId = sid;
+            device.Label = req.Label ?? device.Label;
+            device.PairedByUserId = usuarioId;
+            device.PairingCode = null;
+            device.PairingExpiresAt = null;
+            device.PairedAt = agora;
+            device.UpdatedAt = agora;
+            await _db.SaveChangesAsync(token);
+            var (empresaNome, lojaNome) = await NomesEmpresaELojaAsync(empresaId, lojaId.Value, token);
+            return Ok(new PairResponse(device.Id, apiKey, empresaId, lojaId.Value, device.Label,
+                device.DefaultOperatorName, agora, empresaNome, lojaNome));
+        }, ct);
+    }
 
     /// <summary>
     /// Auditoria 2026-04-30 — valida que o EmpresaId requerido pelo endpoint
@@ -75,6 +152,11 @@ public class DevicePairingController(
         // Auditoria 2026-04-30 (CRITICAL fix): TODO antigo era brecha real.
         // Agora valida que o usuário logado pode parear devices nessa empresa.
         if (!RequestedEmpresaMatchesCurrentUser(req.EmpresaId)) return Forbid();
+        // #2033: a loja também precisa ser da empresa. Com a de outra, o aparelho assinava o SSE com ela e recebia
+        // os pedidos prontos de lá (o broker entrega por loja).
+        // Loja desativada também não, como no pair-auto e no switch-loja.
+        if (!await _db.Set<Loja>().IgnoreQueryFilters().AnyAsync(l => l.Id == req.LojaId && l.EmpresaId == req.EmpresaId && l.Ativa, ct))
+            return BadRequest(new { error = "loja não pertence à empresa ou está desativada" });
         var userId = ResolveUserId();
 
         var code = GeneratePairingCode();
@@ -100,8 +182,10 @@ public class DevicePairingController(
         _db.Set<MobileDevice>().Add(device);
         await _db.SaveChangesAsync(ct);
 
-        _log.LogInformation("Pair code criado por user={UserId} empresa={EmpresaId} loja={LojaId} code={Code}",
-            userId, req.EmpresaId, req.LojaId, code);
+        // O código vale 10 min e troca pela apiKey: não vai para o log em claro (#2033). O id do registro pode vir do
+        // corpo (DeviceId) e também fica de fora (CodeQL cs/log-forging); empresa e loja são Guids já conferidos.
+        _log.LogInformation("Pair code criado por user={UserId} empresa={EmpresaId} loja={LojaId}",
+            userId, req.EmpresaId, req.LojaId);
 
         return Ok(new PairCodeResponse(
             PairingCode: code,
@@ -136,14 +220,14 @@ public class DevicePairingController(
 
         if (device == null)
         {
-            _log.LogWarning("Pair tentado com código inválido. code={Code} ip={IP}",
-                code, HttpContext.Connection.RemoteIpAddress);
+            _log.LogWarning("Pair tentado com código inválido. ip={IP}",
+                HttpContext.Connection.RemoteIpAddress);
             return Unauthorized(new { error = "código inválido ou já usado" });
         }
 
         if (device.PairingExpiresAt == null || device.PairingExpiresAt < DateTime.UtcNow)
         {
-            _log.LogWarning("Pair tentado com código expirado. code={Code}", code);
+            _log.LogWarning("Pair tentado com código expirado. ip={IP}", HttpContext.Connection.RemoteIpAddress);
             return Unauthorized(new { error = "código expirado, gere um novo no painel" });
         }
 
@@ -165,6 +249,7 @@ public class DevicePairingController(
                 return Conflict(new { error = "dispositivo já pertence a outra empresa" });
 
             jaPareado.ApiKeyHash = apiKeyHash;
+            jaPareado.SessaoNativaId = null; // código manual autoriza uma credencial independente da sessão encerrada
             jaPareado.EmpresaId = device.EmpresaId;
             jaPareado.LojaId = device.LojaId;
             jaPareado.PairedByUserId = device.PairedByUserId;
@@ -212,6 +297,7 @@ public class DevicePairingController(
         else
         {
             device.ApiKeyHash = apiKeyHash;
+            device.SessaoNativaId = null;
             device.PairingCode = null;
             device.PairingExpiresAt = null;
             device.PairedAt = now;
@@ -249,12 +335,14 @@ public class DevicePairingController(
     ///
     /// Server precisa de 3 env vars (ou seção `AppProvisioning` em
     /// appsettings):
-    ///   <c>AppProvisioning:Secret</c>     — token compartilhado (>= 16 chars)
+    ///   <c>AppProvisioning:Secret</c>     — token compartilhado (>= 32 chars; mais curto desliga o endpoint)
     ///   <c>AppProvisioning:EmpresaId</c>  — Guid da empresa default
     ///   <c>AppProvisioning:LojaId</c>     — Guid da loja default
     /// Se qualquer uma faltar, retorna 503. Comparação do secret é
     /// time-constant. Rate limit `mobile-anonymous` cobre brute-force.
-    /// Idempotente: mesmo deviceId chamando 2x rotaciona apiKey sem duplicar.
+    /// Idempotente: mesmo deviceId chamando 2x rotaciona apiKey sem duplicar (o "Desparear" do
+    /// Diagnóstico depende disso). #2367: como o secret vem embutido no APK, a rotação de um aparelho
+    /// ativo fica limitada a 1 a cada 10 min (429) e avisa a dona no sino.
     /// </summary>
     [HttpPost("pair-auto")]
     [AllowAnonymous]
@@ -278,6 +366,12 @@ public class DevicePairingController(
             || string.IsNullOrWhiteSpace(lojaIdStr))
         {
             _log.LogWarning("pair-auto chamado mas AppProvisioning não configurado no server");
+            return StatusCode(503, new { error = "auto-provisioning desabilitado neste servidor" });
+        }
+
+        if (expectedSecret.Trim().Length < TamanhoMinimoSegredo)
+        {
+            _log.LogWarning("pair-auto desligado: AppProvisioning:Secret tem menos de {Minimo} caracteres", TamanhoMinimoSegredo);
             return StatusCode(503, new { error = "auto-provisioning desabilitado neste servidor" });
         }
 
@@ -328,6 +422,13 @@ public class DevicePairingController(
                 return Conflict(new { error = "dispositivo já pertence a outra empresa" });
             if (existing.Revoked)
                 return Conflict(new { error = "dispositivo revogado, gere um novo código no painel" });
+            if (existing.PairedAt > now - IntervaloMinimoRotacao)
+            {
+                _log.LogWarning("pair-auto: rotação recusada, aparelho {DeviceId} pareado há menos de {Minutos} min",
+                    existing.Id, IntervaloMinimoRotacao.TotalMinutes);
+                return StatusCode(StatusCodes.Status429TooManyRequests,
+                    new { error = "aparelho pareado há pouco, aguarde alguns minutos e tente de novo" });
+            }
 
             existing.ApiKeyHash = apiKeyHash;
             existing.EmpresaId = empresaId;
@@ -338,8 +439,17 @@ public class DevicePairingController(
             existing.LastSeenAt = now;
             existing.LastSeenIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             existing.UpdatedAt = now;
+            var nomeAntesDaTroca = existing.Label ?? existing.Id;
             if (!string.IsNullOrWhiteSpace(req.Label)) existing.Label = req.Label;
-            await _db.SaveChangesAsync(ct);
+            _db.Set<Notificacao>().Add(Notificacao.Criar(
+                empresaId,
+                TipoAlertaEstoque.AvisoOperacional,
+                "Aparelho reconectado",
+                $"A chave do aparelho '{nomeAntesDaTroca}' foi trocada pelo pareamento automático. Se não foi você, revogue o aparelho no painel.",
+                SeveridadeNotificacao.Alta));
+            // Endpoint anônimo: sem tenant na conexão, a policy RLS da notificação recusaria o INSERT.
+            using (_db.UseRowLevelSecurityBypass())
+                await _db.SaveChangesAsync(ct);
 
             _log.LogInformation("Device re-auto-pareado: id={DeviceId} empresa={EmpresaId} loja={LojaId}",
                 existing.Id, empresaId, lojaId);
@@ -650,17 +760,29 @@ public class DevicePairingController(
         // Auditoria 2026-04-30 (CRITICAL fix): só revoga devices da própria empresa.
         if (!await DeviceBelongsToCurrentTenantAsync(id, ct)) return Forbid();
 
-        var device = await _db.Set<MobileDevice>().FirstOrDefaultAsync(d => d.Id == id, ct);
-        if (device == null) return NotFound();
-
-        device.Revoked = true;
-        device.RevokedAt = DateTime.UtcNow;
-        device.RevokedByUserId = ResolveUserId();
-        device.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
-
-        _log.LogInformation("Device revogado: id={DeviceId} by={UserId}", id, device.RevokedByUserId);
-        return NoContent();
+        return await _db.ExecuteInTransactionSemRetryAsync<IActionResult>(async token =>
+        {
+            var device = await _db.Set<MobileDevice>()
+                .FromSqlInterpolated($"SELECT * FROM mobile_devices WHERE \"Id\" = {id} FOR UPDATE").SingleOrDefaultAsync(token);
+            if (device == null) return NotFound();
+            var agora = DateTime.UtcNow;
+            // SuperAdmin pode revogar outro tenant: autorização acima, escrita limitada ao aparelho e empresa dele.
+            await using (await _db.UseRowLevelSecurityBypassAsync(token))
+            {
+                var familias = _db.Set<SessaoNativa>().IgnoreQueryFilters()
+                    .Where(s => s.DispositivoId == id && s.EmpresaId == device.EmpresaId);
+                await familias.Where(s => s.RevogadaEm == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.RevogadaEm, agora), token);
+                await _db.Set<RefreshToken>().Where(r => !r.Revogado && familias.Any(s => s.Id == r.SessaoNativaId))
+                    .ExecuteUpdateAsync(r => r.SetProperty(x => x.Revogado, true).SetProperty(x => x.RevogadoEm, agora), token);
+            }
+            device.Revoked = true;
+            device.RevokedAt = agora;
+            device.RevokedByUserId = ResolveUserId();
+            device.UpdatedAt = agora;
+            await _db.SaveChangesAsync(token);
+            _log.LogInformation("Device revogado: id={DeviceId} by={UserId}", id, device.RevokedByUserId);
+            return NoContent();
+        }, ct);
     }
 
     // ---------- Helpers ----------
@@ -705,6 +827,8 @@ public record PairCodeResponse(string PairingCode, DateTime ExpiresAt, string De
 public record PairRequest(string PairingCode, string DeviceId, string? Label);
 
 public record PairAutoRequest(string ProvisioningSecret, string DeviceId, string? Label);
+
+public record PairSessionRequest(string DispositivoId, Guid? LojaId = null, string? Label = null);
 
 public record PairResponse(
     string DeviceId,

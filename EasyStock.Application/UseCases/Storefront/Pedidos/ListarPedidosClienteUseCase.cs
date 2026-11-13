@@ -46,7 +46,6 @@ public sealed class ListarPedidosClienteUseCase(
     private const int DefaultLimit = 20;
     private const int MaxLimit = 50;
     private const int MinLimit = 1;
-    private const string FreteNomePrefix = "Entrega";
 
     public async Task<ListarPedidosClienteResult> ExecuteAsync(
         ListarPedidosClienteInput input,
@@ -124,11 +123,9 @@ public sealed class ListarPedidosClienteUseCase(
         (VagaOcupada Vaga, JanelaEntrega Janela) vagaInfo,
         string? linkPagamento = null)
     {
-        // Item de frete = ProdutoId null + Nome começa com "Entrega" (convenção do
-        // IniciarCheckoutUseCase). Snapshot, então pode haver pedido legado sem item de frete.
-        var itemFrete = pedido.Itens.FirstOrDefault(i =>
-            i.ProdutoId is null
-            && i.Nome.StartsWith(FreteNomePrefix, StringComparison.OrdinalIgnoreCase));
+        // Item de frete = PedidoItem.EhLinhaDeFrete (a única definição). Snapshot, então pode haver pedido legado sem
+        // item de frete.
+        var itemFrete = pedido.Itens.FirstOrDefault(i => i.EhLinhaDeFrete);
 
         var itensProdutos = pedido.Itens
             .Where(i => i != itemFrete)

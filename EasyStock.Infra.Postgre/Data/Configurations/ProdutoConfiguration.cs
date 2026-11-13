@@ -48,6 +48,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                     dinheiro => dinheiro == null ? (decimal?)null : dinheiro.Valor,
                     value => value.HasValue ? Dinheiro.FromDecimal(value.Value) : null)
                 .HasColumnType("decimal(18,2)");
+            // #2363: custo do insumo por grama ou ml precisa de mais que centavos.
+            builder.Property(p => p.CustoUnitarioInsumo).HasColumnType("decimal(18,6)");
             builder.Property(p => p.PrecoReferencia)
                 .HasConversion(
                     dinheiro => dinheiro == null ? (decimal?)null : dinheiro.Valor,

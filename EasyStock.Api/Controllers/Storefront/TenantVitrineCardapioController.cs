@@ -147,7 +147,7 @@ public class TenantVitrineCardapioController(
         catch (EmpresaJaTemStorefrontException) { return DataBadRequest("Você já tem uma vitrine."); }
         catch (StorefrontSlugDuplicadoException) { return DataBadRequest("Esse endereço já está em uso. Escolha outro."); }
         catch (RegraDeDominioVioladaException ex) { return DataBadRequest(ex.Message); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [HttpGet("cardapio")]
@@ -174,6 +174,9 @@ public class TenantVitrineCardapioController(
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
     }
+
+    /// <summary>#2285: o 500 não devolve ex.Message (texto do driver ou do banco); o detalhe fica no log.</summary>
+    private const string ErroInesperado = "Não foi possível salvar o item agora. Tente de novo em instantes.";
 
     [HttpPost("cardapio")]
     public async Task<IActionResult> Adicionar([FromBody] AdicionarItemRequest req)
@@ -212,13 +215,13 @@ public class TenantVitrineCardapioController(
             return DataCreated($"/api/minha-vitrine/cardapio/{result.ItemId}", result);
         }
         catch (StorefrontNaoEncontradoException) { return DataNotFound(SemVitrine); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
         catch (PostgresException ex) when (CardapioPostgresErrors.Traduzir(ex) is { } msg) { return DataBadRequest(msg); }
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao adicionar item à vitrine {StorefrontId}", sf.Id);
-            return Problem(detail: ex.Message, statusCode: 500);
+            return Problem(detail: ErroInesperado, statusCode: 500);
         }
     }
 
@@ -257,7 +260,7 @@ public class TenantVitrineCardapioController(
             return DataOk(result);
         }
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (RegraDeDominioVioladaException ex) { return UnprocessableEntity(new { error = new { code = "DOMAIN_RULE", message = ex.Message } }); }
         // Editar preserva o comportamento original: 23514 (nome obrigatório) NÃO é tratado aqui
         // e segue para o handler genérico (500) — mesmo padrão do Admin. As demais violações viram 400.
@@ -265,7 +268,7 @@ public class TenantVitrineCardapioController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao editar item {ItemId} da vitrine", itemId);
-            return Problem(detail: ex.Message, statusCode: 500);
+            return Problem(detail: ErroInesperado, statusCode: 500);
         }
     }
 

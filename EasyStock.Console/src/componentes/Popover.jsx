@@ -1,17 +1,29 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEscape } from '../hooks/useEscape'
+import { proximaFrentePainel } from '../hooks/estadoPainelMovel'
+import { Icone } from './Icone'
 import css from './Popover.module.css'
 
 const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
 const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) ?? [])]
   .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true')
 
+// #2258 (T1): `alinhamento` diz a que borda do gatilho a camada se prende. O padrão, 'direita', é o
+// do cabeçalho (gatilho no canto direito, a camada cresce para a esquerda). Gatilho que mora na
+// coluna da esquerda (o filtro das conversas) pede 'esquerda', senão a camada nasce para fora da
+// tela; em qualquer dos dois a medição do `portal` mantém a camada inteira dentro da viewport.
+//
 // `posicao` decide de que lado a camada abre. O padrão continua sendo acima,
 // que é onde o composer precisa; 'abaixo' serve para gatilho no topo da tela.
 // `children` substitui `grupos`/`aoEscolher` quando o conteúdo não é lista de
 // texto (UX-05: grade de foto ou figurinha, por exemplo). Ancoragem, Esc e
 // clique fora continuam os mesmos para os dois casos.
+//
+// #2232 (M1, M4): `item.marcado` (booleano) faz do item uma opção de grupo de escolha única
+// (`menuitemradio`, `aria-checked` e a marca visível); `grupo.disposicao === 'linha'` põe os itens do
+// grupo lado a lado; `folha` faz o menu `abaixo` abrir como folha inferior de largura cheia no celular,
+// sem rolagem interna para o conteúdo atual (o chamador mantém os itens curtos).
 //
 // `portal` (achado do Composer, generalizado aqui): um ancestral com
 // overflow-y ou overflow-x diferente de `visible` recorta este popover
@@ -27,12 +39,15 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 // CSS de .popover continua o mesmo (bottom/top: 100% relativo ao wrapper
 // plantado), então quem não passa `portal` renderiza exatamente como antes.
 export function Popover({
-  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu',
+  rotulo, grupos, aoEscolher, aoFechar, posicao = 'acima', children, semAutoFoco = false, portal = false, papel = 'menu', folha = false,
+  alinhamento = 'direita', largura: larguraPedida = 360,
 }) {
+  const aEsquerda = alinhamento === 'esquerda'
   const caixaRef = useRef(null)
   const marcadorRef = useRef(null)
-  const origemRef = useRef(null)
+  const origemRef = useRef(globalThis.document?.activeElement ?? null)
   const [retangulo, setRetangulo] = useState(null)
+  const [frente, setFrente] = useState(proximaFrentePainel)
   useEscape(true, (evento) => {
     if (evento.isComposing || evento.keyCode === 229) return
     // Uma janela aberta sobre este menu recebe seu próprio Escape nativo.
@@ -99,8 +114,10 @@ export function Popover({
     const margem = parseFloat(estilo.getPropertyValue('--e-4'))
     const espaco = parseFloat(estilo.getPropertyValue('--e-2'))
     const { larguraLimite, alturaLimite, inicioX, inicioY } = retangulo
-    const largura = Math.max(1, Math.min(360, larguraLimite - 2 * margem))
-    const esquerda = Math.max(inicioX + margem, Math.min(retangulo.left + retangulo.width - largura, inicioX + larguraLimite - largura - margem))
+    const largura = Math.max(1, Math.min(larguraPedida, larguraLimite - 2 * margem))
+    // O menu cresce a partir da borda do gatilho que fica do lado de dentro da tela.
+    const encosto = aEsquerda ? retangulo.left : retangulo.left + retangulo.width - largura
+    const esquerda = Math.max(inicioX + margem, Math.min(encosto, inicioX + larguraLimite - largura - margem))
     // O limite é o dialog ou a viewport. Menus do rodapé também precisam abrir para cima.
     Object.assign(caixa.style, {
       position: 'absolute', width: `${largura}px`, left: `${esquerda - retangulo.left}px`, right: 'auto',
@@ -113,9 +130,9 @@ export function Popover({
       top: inverter ? 'auto' : `${retangulo.height + espaco}px`,
       bottom: inverter ? `${retangulo.height + espaco}px` : 'auto',
       maxHeight: `${Math.max(1, inverter ? acima : abaixo)}px`,
-      transformOrigin: inverter ? 'bottom right' : 'top right',
+      transformOrigin: `${inverter ? 'bottom' : 'top'} ${aEsquerda ? 'left' : 'right'}`,
     })
-  }, [retangulo, posicao])
+  }, [retangulo, posicao, aEsquerda, larguraPedida])
 
   // Sugestão presa ao campo de texto (atalho "/" do composer) não pode
   // roubar o foco: ela está digitando, e o Popover de clique de sempre foca
@@ -142,8 +159,8 @@ export function Popover({
   const corpo = (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Papel explícito varia entre menu de ações e grupo com busca/listbox.
     <div
-      className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''}`}
-      role={papel === 'group' ? 'group' : 'menu'}
+      className={`${css.popover} ${posicao === 'abaixo' ? css.abaixo : ''} ${aEsquerda ? css.alinharEsquerda : ''} ${folha ? css.folha : ''}`}
+      role={papel === 'group' ? 'group' : papel === 'dialog' ? 'dialog' : 'menu'}
       tabIndex={-1}
       aria-label={rotulo}
       ref={caixaRef}
@@ -170,29 +187,34 @@ export function Popover({
         itens[proximo]?.focus()
       }}
     >
-      {children ?? grupos.map((grupo) => (
-        <div className={css.grupo} key={grupo.titulo}>
-          <p className={css.titulo}>{grupo.titulo}</p>
-          {grupo.itens.map((item) => item.informativo ? (
-            <div className={`${css.item} ${css.informativo}`} key={item.chave}>
-              <strong>{item.titulo}</strong>
-              <span>{item.detalhe}</span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className={css.item}
-              key={item.chave}
-              onClick={() => aoEscolher(item)}
-            >
-              <strong>{item.titulo}</strong>
-              <span>{item.detalhe}</span>
-            </button>
-          ))}
-        </div>
-      ))}
+      {children ?? grupos.map((grupo) => {
+        const linhas = grupo.itens.map((item) => item.informativo ? (
+          <div className={`${css.item} ${css.informativo}`} key={item.chave}>
+            <strong>{item.titulo}</strong>
+            <span>{item.detalhe}</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            role={item.marcado === undefined ? 'menuitem' : 'menuitemradio'}
+            aria-checked={item.marcado === undefined ? undefined : item.marcado}
+            tabIndex={-1}
+            className={`${css.item} ${item.marcado ? css.ativo : ''}`}
+            key={item.chave}
+            onClick={() => aoEscolher(item)}
+          >
+            <strong>{item.titulo}</strong>
+            {item.detalhe && <span>{item.detalhe}</span>}
+            {item.marcado && <Icone nome="check" tamanho={16} className={css.marca} />}
+          </button>
+        ))
+        return (
+          <div className={css.grupo} key={grupo.titulo}>
+            <p className={css.titulo}>{grupo.titulo}</p>
+            {grupo.disposicao === 'linha' ? <div className={css.linha}>{linhas}</div> : linhas}
+          </div>
+        )
+      })}
     </div>
   )
 
@@ -208,10 +230,11 @@ export function Popover({
           width: retangulo.width,
           top: retangulo.top,
           height: retangulo.height,
-          zIndex: 70,
+          zIndex: frente,
           pointerEvents: 'none',
         }}
-        >
+        onFocusCapture={() => setFrente(proximaFrentePainel())}
+        onPointerDownCapture={() => setFrente(proximaFrentePainel())}>
           {corpo}
         </div>,
         retangulo.destino,

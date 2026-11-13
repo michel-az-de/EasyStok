@@ -20,6 +20,7 @@ public class CancelarContaPagarUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (string.IsNullOrWhiteSpace(cmd.Motivo))
             throw new UseCaseValidationException("Motivo do cancelamento e obrigatorio.");
+        ValidacaoFinanceira.Texto(cmd.Motivo, ValidacaoFinanceira.MotivoMax, "Motivo do cancelamento");
 
         var c = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id, ct);
         if (c is null) return null;

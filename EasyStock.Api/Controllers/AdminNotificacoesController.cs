@@ -50,7 +50,7 @@ public class AdminNotificacoesController(
         }
         catch (UseCaseValidationException ex)
         {
-            return BadRequest(new ApiErrorResponse(new ApiError(ex.Code ?? "BAD_REQUEST", ex.Message, null, null) { Details = ex.Details }));
+            return DataBadRequest(ex);
         }
 
         // Sem endereço no registro: o destinatário é o próprio superadmin e a auditoria já guarda quem chamou.
@@ -78,7 +78,7 @@ public class AdminNotificacoesController(
         }
         catch (UseCaseValidationException ex)
         {
-            return BadRequest(new ApiErrorResponse(new ApiError(ex.Code ?? "BAD_REQUEST", ex.Message, null, null) { Details = ex.Details }));
+            return DataBadRequest(ex);
         }
     }
 

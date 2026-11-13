@@ -1,4 +1,5 @@
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Api.Data;
 
@@ -66,10 +67,10 @@ public static class SuperAdminSeed
                 throw new InvalidOperationException(
                     "[SuperAdminSeed][PROD] SEED_SUPERADMIN_EMAIL e obrigatoria em Production.");
             }
-            if (senhaEnvRaw.Length < 12)
+            if (senhaEnvRaw.Length < PasswordPolicy.MinLengthDaContaDePlataforma)
             {
                 throw new InvalidOperationException(
-                    "[SuperAdminSeed][PROD] SEED_SUPERADMIN_PASSWORD deve ter no minimo 12 caracteres.");
+                    $"[SuperAdminSeed][PROD] SEED_SUPERADMIN_PASSWORD deve ter no minimo {PasswordPolicy.MinLengthDaContaDePlataforma} caracteres.");
             }
             if (SenhasProibidasEmProducao.Contains(senhaEnvRaw))
             {

@@ -18,7 +18,7 @@ public sealed record ObterCaixaDiaQuery(Guid EmpresaId, DateOnly Data, Guid? Loj
 /// eliminando a divergência "dashboard diz aberto / caixa diz não aberto". Dias
 /// históricos mantêm a semântica estrita do dia civil (não distorce relatório retroativo).
 /// </summary>
-public class ObterCaixaDiaUseCase(ICaixaSaldoCalculator calc)
+public class ObterCaixaDiaUseCase(ICaixaSaldoCalculator calc, ICaixaRepository? repo = null)
 {
     public async Task<CaixaDiaResult> ExecuteAsync(ObterCaixaDiaQuery q)
     {
@@ -32,18 +32,56 @@ public class ObterCaixaDiaUseCase(ICaixaSaldoCalculator calc)
         // "Movimentos do dia" reconciliar com o saldo (BUG-5): movimentos + linhas == saldo.
         var linhasExtras = await calc.GetLinhasExtrasAsync(q.EmpresaId, b.JanelaInicioUtc, b.JanelaFimUtc, q.LojaId);
 
-        FechamentoCaixaResult? fechResult = b.Fechamento == null ? null : new FechamentoCaixaResult(
-            b.Fechamento.Id, b.Fechamento.EmpresaId, b.Fechamento.LojaId, b.Fechamento.Data,
-            b.Fechamento.SaldoInicial, b.Fechamento.TotalVendas, b.Fechamento.TotalPagamentosPedidos,
-            b.Fechamento.TotalEntradasExtras, b.Fechamento.TotalSaidasExtras, b.Fechamento.SaldoFinal,
-            b.Fechamento.FechadoPorUserId, b.Fechamento.FechadoPorNome, b.Fechamento.Observacoes,
-            b.Fechamento.FechadoEm);
+        var fechResult = b.Fechamento == null ? null : FecharCaixa.FecharCaixaUseCase.Map(b.Fechamento);
 
-        return new CaixaDiaResult(
+        var dia = new CaixaDiaResult(
             b.Data, q.EmpresaId, q.LojaId,
             b.SaldoInicial, b.TotalVendas, b.TotalPagamentosPedidos, b.TotalEntradas, b.TotalSaidas,
             b.SaldoEsperado, b.Aberto, b.Fechado, fechResult,
             b.Movimentos.Select(AbrirCaixaUseCase.Map).ToList(),
-            b.AberturaPendenteCrossDay, b.AbertoDesde, linhasExtras, b.PosFechamento);
+            b.AberturaPendenteCrossDay, b.AbertoDesde, linhasExtras, b.PosFechamento,
+            AberturaAConfirmar: b.Movimentos.Any(m => m.Tipo == "abertura" && m.EstornadoEm == null && m.ConfirmacaoPendente));
+
+        return await ComGavetaEntreDiasAsync(dia, b, q);
+    }
+
+    /// <summary>
+    /// #2084: os números de dinheiro que passam de um caixa para o outro.
+    /// D1, caixa esquecido: a gaveta da sessão tem o dia da abertura (o que o fechamento retrata, ADR-0034) e o que
+    /// entrou hoje (fica no caixa de hoje). Dias intermediários seguem o aviso do FecharCaixaUseCase.
+    /// B4, dia fechado: o dinheiro que entrou depois de fechar, que as linhas do dia não mostram.
+    /// </summary>
+    private async Task<CaixaDiaResult> ComGavetaEntreDiasAsync(CaixaDiaResult dia, CaixaSaldoBreakdown b, ObterCaixaDiaQuery q)
+    {
+        if (b.AberturaPendenteCrossDay && b.AbertoDesde is { } diaDaAbertura)
+        {
+            var fimDoDiaDaAbertura = HorarioBrasil.JanelaDiaUtc(diaDaAbertura).FimUtc;
+            var inicioDeHoje = HorarioBrasil.JanelaDiaUtc(b.Data).IniUtc;
+            return dia with
+            {
+                DinheiroEsperadoNoFechamento = GavetaCaixa.DinheiroNaJanela(dia, null, fimDoDiaDaAbertura, comSaldoInicial: true),
+                DinheiroEntrouDepois = GavetaCaixa.DinheiroNaJanela(dia, inicioDeHoje, null, comSaldoInicial: false)
+            };
+        }
+
+        if (b.Fechamento is not { } fechamento) return dia;
+        var fimDoDia = HorarioBrasil.JanelaDiaUtc(b.Data).FimUtc;
+        var linhasDepois = fechamento.FechadoEm < fimDoDia
+            ? await calc.GetLinhasExtrasAsync(q.EmpresaId, fechamento.FechadoEm, fimDoDia, q.LojaId)
+            : [];
+        // Os movimentos depois de fechar vêm do banco, não do retrato: com o corte do #2082 (D9) o dia fechado só
+        // lista o que é até o FechadoEm; sem ele, a lista traz tudo. Nos dois casos, entra aqui só o que é depois.
+        var movimentosDepois = repo is null || fechamento.FechadoEm >= fimDoDia
+            ? []
+            : (await repo.GetMovimentosNoIntervaloAsync(q.EmpresaId, fechamento.FechadoEm, fimDoDia, q.LojaId))
+                .Where(m => m.DataMovimento > fechamento.FechadoEm)
+                .Select(AbrirCaixaUseCase.Map).ToList();
+        var depois = dia with { Movimentos = movimentosDepois, LinhasExtras = linhasDepois };
+        var posFechamento = GavetaCaixa.DinheiroNaJanela(depois, null, null, comSaldoInicial: false);
+        return dia with
+        {
+            DinheiroPosFechamento = posFechamento,
+            Fechamento = dia.Fechamento! with { DinheiroPosFechamento = posFechamento }
+        };
     }
 }

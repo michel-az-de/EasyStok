@@ -77,7 +77,8 @@ public static class GeracaoAgenteAtendimento
             RespostaLlm resposta;
             try
             {
-                resposta = await llm.EnviarAsync(new RequisicaoLlm(system, [.. mensagens], definicoes), ct);
+                resposta = await EnviarComUmaNovaTentativaAsync(
+                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes), contexto.Conversa.Id, logger, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -113,6 +114,28 @@ public static class GeracaoAgenteAtendimento
 
         return new GeracaoAgente(null, tokens, false, null);
     }
+
+    /// <summary>
+    /// #2285: um blip do LLM (reset de conexão, 5xx, timeout) não manda a conversa para a dona: 1 nova tentativa da mesma
+    /// chamada. Só a chamada ao LLM se repete: a ferramenta que o turno já executou não roda de novo, porque o laço segue
+    /// adiante a partir da resposta e não de volta. O desligamento (<paramref name="ct"/> cancelado) sobe sem tentar.
+    /// </summary>
+    private static async Task<RespostaLlm> EnviarComUmaNovaTentativaAsync(
+        IAgenteLlmClient llm, RequisicaoLlm requisicao, Guid conversaId, ILogger logger, CancellationToken ct)
+    {
+        try
+        {
+            return await llm.EnviarAsync(requisicao, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Agente de atendimento: a chamada ao LLM falhou na conversa {ConversaId}; tenta de novo uma vez.", conversaId);
+            await Task.Delay(EsperaAntesDaNovaTentativa, ct);
+            return await llm.EnviarAsync(requisicao, ct);
+        }
+    }
+
+    private static readonly TimeSpan EsperaAntesDaNovaTentativa = TimeSpan.FromMilliseconds(300);
 
     private static async Task<BlocoResultadoFerramentaLlm> ExecutarFerramentaAsync(
         IReadOnlyDictionary<string, IFerramentaAgente> ferramentas, ContextoTurnoAgente contexto,
@@ -157,13 +180,16 @@ public static class GeracaoAgenteAtendimento
             var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
             var texto = msg.Autor switch
             {
-                AutorMensagem.Cliente => TextoDoCliente(msg),
+                AutorMensagem.Cliente => TextoExternoPrompt.Neutralizar(TextoDoCliente(msg)),
                 AutorMensagem.Dona => $"(dona) {msg.Texto}",
                 AutorMensagem.Atendente => $"(equipe) {msg.Texto}",
                 _ => msg.Texto ?? string.Empty
             };
             if (string.IsNullOrWhiteSpace(texto)) continue;
             if (msg.Status == StatusMensagem.Falhou) texto = $"{MarcadorNaoConfirmada} {texto}";
+
+            var origem = pendentes.Contains(msg) ? "entrada nova" : "histórico";
+            texto = $"[{origem} de {HorarioBrasil.ConverterParaBrasilia(msg.EnviadaEm):dd/MM/yyyy HH:mm}]\n{texto}";
 
             AcrescentarTexto(resultado, papel, texto);
         }
@@ -226,16 +252,18 @@ public static class GeracaoAgenteAtendimento
         sb.AppendLine("Dossiê desta conversa (contexto para você, não para citar):");
         sb.AppendLine($"- Agora: {HorarioBrasil.ConverterParaBrasilia(agora):dd/MM/yyyy HH:mm} (horário de Brasília).");
 
-        var nome = cliente?.Nome is { } n && n != IdentificarClientePorTelefoneUseCase.NomePadraoLead ? n : conversa.ContatoNome;
-        sb.AppendLine($"- Nome: {(string.IsNullOrWhiteSpace(nome) ? "não informado" : nome)}.");
+        // #2280: o nome do perfil é escrito pelo cliente; numa linha só, não abre item novo no dossiê.
+        var nome = TextoExternoPrompt.Linha(
+            cliente?.Nome is { } n && n != IdentificarClientePorTelefoneUseCase.NomePadraoLead ? n : conversa.ContatoNome);
+        sb.AppendLine($"- Nome: {(nome.Length == 0 ? "não informado" : nome)}.");
         sb.AppendLine(cliente is null || cliente.OrderCount == 0
             ? "- Situação: lead (ainda não comprou)."
             : $"- Situação: cliente com {cliente.OrderCount} pedido(s).");
         sb.AppendLine(conversa.PedidoEmAndamentoId is { } pedidoId
-            ? $"- Pedido em andamento: {pedidoId}."
+            ? $"- Pedido vinculado à conversa: {pedidoId}. Consulte consultar_pedido para saber a situação atual; o vínculo não comprova pedido em andamento."
             : "- Pedido em andamento: nenhum registrado nesta conversa.");
         if (conversa.ContextoJson != "{}")
-            sb.AppendLine($"- Contexto salvo: {conversa.ContextoJson}");
+            sb.AppendLine($"- Contexto salvo: {TextoExternoPrompt.Linha(conversa.ContextoJson)}");
         if (!string.IsNullOrWhiteSpace(cliente?.Observacoes))
             sb.AppendLine($"- {interno} Observações do cadastro: {cliente.Observacoes}");
 
@@ -251,7 +279,7 @@ public static class GeracaoAgenteAtendimento
         if (automaticas.Count > 0)
         {
             sb.AppendLine("Mensagens automáticas já enviadas ao cliente:");
-            foreach (var auto in automaticas) sb.AppendLine($"- {auto.Texto}");
+            foreach (var auto in automaticas) sb.AppendLine($"- {HorarioBrasil.ConverterParaBrasilia(auto.EnviadaEm):dd/MM/yyyy HH:mm}: {auto.Texto}");
         }
 
         return sb.ToString().TrimEnd();

@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.Financeiro.Common;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
 using EasyStock.Domain.Enums.Financeiro;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Financeiro.Integracao;
 
@@ -62,7 +63,7 @@ public class GerarContaPagarDePedidoFornecedorUseCase(
             return null;
         }
 
-        var descricao = $"Compra {pedido.Id.ToString("N")[..8]}";
+        var descricao = $"Compra {CodigoCurto.De(pedido.Id)}";
         var hoje = DateTime.UtcNow;
 
         try

@@ -45,10 +45,6 @@ const porcoesDaLinha = (linha) => {
   return Number.isInteger(n) && n > 0 ? n : 0
 }
 
-// Campo de quantidade (porções, dias de validade): só dígitos, até 4. O toque no cartão soma em
-// cima do que está no campo; texto como "12a" contava zero e o toque seguinte trocava por 1.
-export const soDigitos = (texto, maximo = 4) => String(texto ?? '').replace(/\D/g, '').slice(0, maximo)
-
 // O lote segue a ordem do cardápio, não a dos toques: ela acha o prato onde ele está na grade, e
 // o corpo enviado é o mesmo para o mesmo lote. Com a ordem dos toques, refazer o lote depois de
 // uma resposta perdida mudava o corpo, a chave de idempotência e gravava em dobro.
@@ -117,6 +113,22 @@ export function somarNoLote(linhas, cartao, delta, apoio) {
 export function resumoDoLote(linhas) {
   const comPrato = linhas.filter((l) => l.sku)
   return { pratos: comPrato.length, porcoes: comPrato.reduce((soma, l) => soma + porcoesDaLinha(l), 0) }
+}
+
+// #2364: o mesmo teto da API (RegistrarProducaoUseCase.TetoPorcoesPorLote), que soma o lote todo:
+// uma etiqueta por porção.
+export const TETO_PORCOES_POR_LOTE = 9999
+
+// #2364: a quantidade digitada no cartão. Só porção inteira (#1776 item 5); o que cabe é o teto
+// menos as porções dos outros pratos do lote. 0 é válido e tira o prato.
+export function quantidadeDigitada(texto, linhas, cartao) {
+  const limpo = String(texto ?? '').trim()
+  if (limpo === '') return { erro: 'Digite quantas porções ficaram prontas.' }
+  if (!/^\d+$/.test(limpo)) return { erro: 'Use um número inteiro de porções, sem vírgula.' }
+  const valor = Number(limpo)
+  const cabe = TETO_PORCOES_POR_LOTE - (resumoDoLote(linhas).porcoes - porcoesNoLote(linhas, cartao))
+  if (valor > cabe) return { erro: `O lote vai até ${TETO_PORCOES_POR_LOTE} porções. Para este prato cabem ${cabe}.` }
+  return { valor }
 }
 
 export const categoriasDaGrade = (cartoes) => categoriasComContagem(cartoes).map((c) => c.nome)

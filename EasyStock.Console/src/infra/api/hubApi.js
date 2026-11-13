@@ -1,3 +1,4 @@
+import { caixaDiaDaApi } from './caixaApi'
 import { chamarApi } from './cliente'
 
 // Só resumos, sem mensagens, clientes ou alterações. Teto da inbox é explícito.
@@ -28,5 +29,6 @@ export async function lerCardapioDoHub(sinal) {
 export async function lerCaixaDoHub(sinal) {
   const dados = await chamarApi('/api/caixa/dia', { sinal })
   if (!Number.isFinite(dados?.saldoEsperado) || typeof dados.aberto !== 'boolean') throw new Error('O saldo do caixa não foi informado.')
-  return dados
+  // #2078: a mesma tradução da tela do Caixa (`meio`, `esquecidoAberto`), para o Hall contar a gaveta igual.
+  return caixaDiaDaApi(dados)
 }

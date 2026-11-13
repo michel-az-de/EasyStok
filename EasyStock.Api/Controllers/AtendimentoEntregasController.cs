@@ -69,7 +69,7 @@ public class AtendimentoEntregadoresController(
     private async Task<IActionResult> Executar(Func<Task<IActionResult>> acao)
     {
         try { return await acao(); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (EntregadorNaoEncontradoException ex) { return DataNotFound(ex.Message); }
     }
 }
@@ -190,7 +190,7 @@ public class AtendimentoViagensController(
     private async Task<IActionResult> Executar(Func<Task<IActionResult>> acao)
     {
         try { return await acao(); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (ViagemNaoEncontradaException ex) { return DataNotFound(ex.Message); }
         catch (EntregadorNaoEncontradoException ex) { return DataNotFound(ex.Message); }
         catch (PedidoNaoEncontradoParaViagemException ex) { return DataNotFound(ex.Message); }
@@ -221,7 +221,7 @@ public class AtendimentoRelatoriosEntregaController(
         }
         catch (UseCaseValidationException ex)
         {
-            return DataBadRequest(ex.Message);
+            return DataBadRequest(ex);
         }
     }
 }
@@ -241,7 +241,7 @@ public sealed class AtendimentoAgendaController(
     {
         if (de is null || ate is null) return DataBadRequest("Informe 'de' e 'ate'.");
         try { return DataOk(await listarUseCase.ExecuteAsync(currentUser.EmpresaId, de.Value, ate.Value, ct)); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 }
 

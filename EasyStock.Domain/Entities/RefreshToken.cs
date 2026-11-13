@@ -4,6 +4,7 @@ namespace EasyStock.Domain.Entities
     {
         public Guid Id { get; set; }
         public Guid UsuarioId { get; set; }
+        public Guid? SessaoNativaId { get; set; }
         public string TokenHash { get; set; } = null!;
         public DateTime CriadoEm { get; set; }
         public DateTime ExpiraEm { get; set; }

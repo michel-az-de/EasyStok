@@ -12,6 +12,9 @@ const loteDaApi = (l) => ({
   diasParaVencer: l.diasParaVencer ?? null,
   vencendo: l.vencendo === true,
   vencido: l.vencido === true,
+  // #2235 (banca T1-4/T1-5): o tamanho da porção do lote e o item de estoque para lançar a perda.
+  itemEstoqueId: l.itemEstoqueId ?? null,
+  porcao: l.porcao ?? null,
 })
 
 export const estoqueDoDiaDaApi = (r) => ({
@@ -77,6 +80,27 @@ export const etiquetasDaApi = (r) => (r?.etiquetas ?? []).map((e) => ({
   validadeEm: e.loteValidadeEm ?? null,
 }))
 
+// #2081 (A4): a folha leva o nome da empresa, que a etiqueta do aparelho imprime no topo. O
+// `layoutJson` da API fica de fora: o padrão dele traz a marca EasyStok e só o QR, e a etiqueta do
+// console copia a do APK (QR e barras, 80x40 mm).
+export const folhaDeEtiquetasDaApi = (r) => ({
+  empresa: r?.empresa?.nome ?? '',
+  etiquetas: etiquetasDaApi(r),
+})
+
+// #2081 (A8, A10): os lotes recentes, para a tela achar o id (reimprimir) e dizer de onde veio cada
+// lote, quem registrou e quando foi fabricado. O Estoque do dia só manda o código do lote.
+export const listarLotesRecentes = () => chamarApi('/api/lotes?pageSize=200&sort=dataproducao&order=desc')
+
+export const loteDaListaDaApi = (l) => ({
+  id: l.id,
+  codigo: l.codigo,
+  origem: l.origem ?? null,
+  operadorNome: l.operadorNome ?? null,
+  operadorUserId: l.operadorUserId ?? null,
+  fabricadoEm: l.dataProducao ?? null,
+})
+
 // M2.3 (#1496): insumos da produção (intermediário e embalagem). Cadastro e ajuste são do Gerente.
 export const listarInsumos = () => chamarApi(`${PRODUCAO}/insumos`)
 export const criarInsumo = (dados) => chamarApi(`${PRODUCAO}/insumos`, { metodo: 'POST', corpo: dados })
@@ -113,13 +137,18 @@ export const salvarReceita = (produtoId, { rendimentoBase, rendimentoUnidade, un
     },
   })
 
+// #2235 (banca A1): a receita vem antes da produção. O prato ainda sem estoque é ligado ao montar a
+// receita (Gerente); o prato já ligado devolve o produto que tem.
+export const ligarPratoAoEstoque = async (cardapioItemId) =>
+  (await chamarApi(`${PRODUCAO}/receitas/pratos/${cardapioItemId}/ligar`, { metodo: 'POST' }))?.produtoId ?? null
+
 // D-M2-01 (#1499): produzir o prato baixa os insumos da receita (Gerente liga e desliga).
 export const marcarBaixaAutomatica = (produtoId, ligada) =>
   chamarApi(`${PRODUCAO}/receitas/${produtoId}/baixa-automatica`, { metodo: 'PUT', corpo: { ligada } })
 
 export const receitaDaApi = (r) => ({
   sku: r.cardapioItemId,
-  produtoId: r.produtoId,
+  produtoId: r.produtoId ?? null,
   nome: r.nome,
   rendimento: r.rendimentoBase,
   unidadeRendimento: r.rendimentoUnidade,

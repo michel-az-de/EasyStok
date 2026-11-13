@@ -10,12 +10,12 @@
 // Puro. Conversa antiga, sem os campos novos, cai no padrão seguro: automático
 // ligado e nada de "precisa de você".
 
-import { situacaoDaCobranca } from './cobranca'
+import { aguardaAprovacao, situacaoDaCobranca } from './cobranca'
 import { prazoDoPagamento } from './lembrete'
 import { duracao } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
 import { pedidoAtrasado } from './cozinha.js'
-import { MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
+import { AGUARDANDO_EQUIPE, MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
 import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
@@ -46,6 +46,12 @@ export function pausaDaSituacao({ situacao, assumidaPorUsuarioId } = {}, usuario
   return assumidaPorUsuarioId === usuarioId ? PAUSA_POR_ASSUMIR : PAUSA_POR_OUTRO
 }
 
+// #2135: a pausa que vale para a conversa. No modo API o servidor manda (`pausaApi`, lida da situação
+// da conversa a cada sincronização) e o `pausado` do chamador só vale na demonstração. Assim o chip, o
+// cartão, o som e o painel do agente dão a mesma resposta mesmo que um deles passe a pausa errada.
+export const pausaDaConversa = (conversa, pausado = true) =>
+  conversa?.situacaoApi != null ? (conversa.pausaApi ?? false) : pausado
+
 // Os três momentos que pedem som na cozinha (D6). O nome mora aqui, no
 // domínio, porque a tela precisa listar e infra precisa tocar, e nenhuma das
 // duas pode depender da outra.
@@ -65,38 +71,38 @@ export const listaDeEventosDeSom = () => Object.values(EVENTOS_DE_SOM)
 
 const DESCRICOES = {
   [MODOS.LIGADO]: {
-    rotulo: 'Automático ligado',
+    rotulo: 'Assistente respondendo',
     tom: 'ok',
     // Rodada 12 (issue #16): sem linha, "Automático ligado" não dizia o que
     // isso muda para ela.
-    detalhe: 'O atendimento automático responde esta conversa sozinho. Toque em Assumir para responder você.',
+    detalhe: 'O Assistente responde esta conversa. Toque em Assumir para responder você.',
   },
   [MODOS.PAUSADO]: {
-    rotulo: 'Pausado porque você escreveu',
+    rotulo: 'Você respondendo',
     tom: 'info',
     detalhe: 'Os avisos de preparo e entrega do pedido continuam saindo. O resto espera você devolver.',
   },
   // Mesma pausa, outra porta de entrada: ela apertou Assumir sem escrever nada.
   assumiu: {
-    rotulo: 'Pausado porque você assumiu',
+    rotulo: 'Você respondendo',
     tom: 'info',
     detalhe: 'Os avisos de preparo e entrega do pedido continuam saindo. O resto espera você devolver.',
   },
   // Modo API: a conversa está com outro atendente (F07, item 3).
   outro: {
-    rotulo: 'Pausado porque outro atendente assumiu',
+    rotulo: 'Outro atendente respondendo',
     tom: 'info',
-    detalhe: 'O automático não responde enquanto outro atendente cuida desta conversa.',
+    detalhe: 'O Assistente não responde enquanto outro atendente cuida desta conversa.',
   },
   [MODOS.COM_VOCE]: {
     rotulo: 'Passou para você',
     tom: 'aviso',
-    detalhe: 'O agente não responde isso sozinho.',
+    detalhe: 'O Assistente precisa da sua ajuda nesta conversa.',
   },
   [MODOS.ENCERRADO]: {
-    rotulo: 'Conversa encerrada',
+    rotulo: 'Conversa concluída',
     tom: 'neutro',
-    detalhe: 'Reabra a conversa para o automático voltar a valer.',
+    detalhe: 'Reabra a conversa para retomar o atendimento.',
   },
   // Cadastro bloqueado não tem botão de reabrir nem de assumir: a única porta
   // é o desbloqueio na ficha. Mandar reabrir aqui era prometer um botão que a
@@ -104,7 +110,7 @@ const DESCRICOES = {
   [MODOS.BLOQUEADO]: {
     rotulo: 'Cadastro bloqueado',
     tom: 'perigo',
-    detalhe: 'Nada sai em nenhum canal. Desbloqueie na ficha, bloco Cliente.',
+    detalhe: 'Envios bloqueados em todos os canais. A gerência desbloqueia na ficha.',
   },
 }
 
@@ -128,7 +134,7 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
   if (passagemPendente(conversa)) {
     const base = DESCRICOES[MODOS.COM_VOCE]
     return { chave: MODOS.COM_VOCE, ...base,
-      ...(conversa.passagem.origem === 'chat-site' ? { rotulo: 'Aguardando equipe' } : {}),
+      ...(['chat-site', 'fila'].includes(conversa.passagem.origem) ? { rotulo: AGUARDANDO_EQUIPE } : {}),
       detalhe: origemDaPassagem(conversa.passagem).longo }
   }
   if (pausado) {
@@ -145,12 +151,12 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
 // Motivo curto da passagem, na voz da casa. É o que aparece no cartão do
 // balcão, então cabe em uma linha.
 const MOTIVO_POR_INTENCAO = {
-  restricao: 'Restrição alimentar, o automático não responde isso',
+  restricao: 'Restrição alimentar, o Assistente não responde isso',
   'elogio-ou-queixa': 'Retorno sobre o pedido, precisa da sua voz',
   'pergunta-entrega': 'Pergunta de entrega fora do combinado',
-  'fechar-pedido': 'Fechamento de pedido que o automático não conclui',
+  'fechar-pedido': 'Fechamento de pedido que o Assistente não conclui',
   acompanhar: 'Cobrança de prazo que só você pode confirmar',
-  'pedido-especial': 'Pede algo que o automático não resolve sozinho',
+  'pedido-especial': 'Pede algo que o Assistente não resolve sozinho',
 }
 
 
@@ -163,7 +169,7 @@ const MOTIVO_AREA_FORA = 'Lead fora da área de entrega insistiu, decida a exce�
 export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida = false, textoDoPedido = null) {
   if (areaForaInsistida) return MOTIVO_AREA_FORA
   if (semSaldo.length > 0) {
-    return `${semSaldo[0].nome} sem saldo, o automático não vende`
+    return `${semSaldo[0].nome} sem saldo, o Assistente não vende`
   }
   if (textoDoPedido) return textoDoPedido
   return MOTIVO_POR_INTENCAO[intencaoChave] ?? MOTIVO_PADRAO
@@ -189,7 +195,7 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
     return {
       chave: 'aguardar',
       texto: 'Você respondeu. Próximo passo sugerido: aguardar o cliente. O pedido ainda está em andamento, '
-        + 'então não encerre; devolva ao automático se quiser que ele responda quando o cliente voltar.',
+        + 'então não conclua; devolva ao Assistente se quiser que ele responda quando o cliente voltar.',
     }
   }
   // #1989: a venda começa antes do primeiro item na comanda (o cliente pediu, mandou o endereço ou
@@ -201,13 +207,13 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
     return {
       chave: 'aguardar-venda',
       texto: 'Você respondeu. Próximo passo sugerido: montar o pedido ou aguardar o cliente. A venda está em andamento, '
-        + 'então não encerre.',
+        + 'então não conclua.',
     }
   }
   return {
     chave: 'encerrar-ou-aguardar',
-    texto: 'Você respondeu. Próximo passo sugerido: se o assunto acabou, encerre a conversa; '
-      + 'se ainda espera o cliente, devolva ao automático para ele responder quando o cliente voltar.',
+    texto: 'Você respondeu. Próximo passo sugerido: se o assunto acabou, conclua a conversa; '
+      + 'se ainda espera o cliente, devolva ao Assistente para ele responder quando o cliente voltar.',
   }
 }
 
@@ -334,6 +340,18 @@ function pedidoAtrasadoVisivel(conversa, janelas, agora) {
   }
 }
 
+// #2185 (F3): pedido de fora da área espera a aprovação da loja. A Ficha já dizia "Esperando sua aprovação";
+// a lista mostrava "Pago" e o chip não contava. Quem decide é a dona, então entra em "Precisa de você".
+function aguardandoAprovacao(conversa) {
+  if (!aguardaAprovacao(conversa.pedido)) return null
+  return {
+    chave: 'aprovacao',
+    rotulo: 'Aguardando aprovação',
+    tom: 'aviso',
+    texto: `Pedido ${conversa.pedido.numero} espera a aprovação da loja`,
+  }
+}
+
 // Cobrança vencida nos dois mundos: com Pix emitido vale o relógio dele, e sem
 // Pix vale o prazo da comanda gerada, que é o mesmo do lembrete de pagamento.
 function cobrancaVencida(conversa, agora) {
@@ -437,8 +455,15 @@ function leituraDaPergunta(mensagem) {
 // atrasado simplesmente não entra na conta, nunca quebra).
 // `expediente` (#1427) é `{ funcionamento, lojaAberta }`: com ele, o SLA de
 // resposta pausa fora do horário. Default `null` conta o relógio inteiro.
+//
+// #2135: UMA decisão para o chip, o destaque do cartão, a ordem, o som e o painel do agente. Encerrada
+// e bloqueada saem antes de tudo (a lista de cima nunca as mostra, então o chip não pode contá-las). No
+// modo API o servidor manda primeiro: a passagem que ele gravou vence, e a pausa vem da situação da
+// conversa (`pausaDaConversa`), não do que o chamador supõe. A leitura de texto do navegador
+// (`sinalUrgente`, o classificador do agente) só entra depois, onde o servidor não escalou.
 export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true, janelas = [], expediente = null) {
   if (!conversa) return null
+  if (foraDeAlcance(conversa)) return null
   if (passagemPendente(conversa)) {
     return {
       chave: 'passagem',
@@ -447,12 +472,12 @@ export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true,
       texto: conversa.passagem.motivo ?? MOTIVO_PADRAO,
     }
   }
-  if (foraDeAlcance(conversa)) return null
   return aguardandoAbertura(conversa, aberta)
     ?? ocorrenciaPendente(conversa)
     ?? sinalUrgente(conversa, agora)
+    ?? aguardandoAprovacao(conversa)
     ?? pedidoAtrasadoVisivel(conversa, janelas, agora)
-    ?? esperaDoCliente(conversa, agora, pausado, expediente)
+    ?? esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente)
     ?? cobrancaVencida(conversa, agora)
 }
 
@@ -467,7 +492,8 @@ export const motivoVisivel = (conversa, agora, pausado = true, aberta = true, ja
 // passagem ou reclamação com o cliente esperando além do prazo também piscam,
 // porque quem espera é o mesmo cliente.
 export const respostaAtrasada = (conversa, agora, pausado = true, expediente = null) =>
-  Boolean(conversa) && !foraDeAlcance(conversa) && esperaDoCliente(conversa, agora, pausado, expediente) != null
+  Boolean(conversa) && !foraDeAlcance(conversa)
+  && esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente) != null
 
 // A Frente A do Balcão (rodada 5) passa o valor real de `automaticoPausado`
 // aqui: contar com o default (automático pausado) inflava "Precisa de você"

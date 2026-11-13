@@ -26,7 +26,7 @@ assert.equal(situacaoConversaDaApi({...base,situacao:'Encerrada'},{}).passagem,n
 const reabertura = situacaoConversaDaApi({...base,motivoEscalada:'Conversa reaberta para atendimento.'},{}).passagem
 assert.equal(reabertura.origem,'reabertura'); assert.equal(origemDaPassagem(reabertura).curto,reabertura.motivo)
 const real = situacaoConversaDaApi({...base,canal:'WhatsApp',motivoEscalada:'Restrição alimentar'},{}).passagem
-assert.match(origemDaPassagem(real).curto,/Automático não soube/)
+assert.match(origemDaPassagem(real).curto,/Assistente não soube/)
 const nota = {id:'ack',direcao:'Saida',autor:'Sistema',status:'Enviada',externoId:'chatsite:recepcao:c',texto:'Recebemos sua mensagem.',enviadaEm:'2026-10-13T12:01:00Z'}
 assert.equal(mensagemDaApi(nota).dir,'sistema')
 const conversa = conversaDaApi(base,[{id:'entrada',direcao:'Entrada',autor:'Cliente',texto:'Dúvida',enviadaEm:'2026-10-13T12:00:00Z'},nota],{})

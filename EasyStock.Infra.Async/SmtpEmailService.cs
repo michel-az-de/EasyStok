@@ -187,7 +187,11 @@ public sealed class SmtpEmailService : IEmailService
 
             var corpo = new BodyBuilder();
             if (mensagem.Html)
+            {
                 corpo.HtmlBody = mensagem.Corpo;
+                // #2074: parte texto junto (multipart/alternative); só HTML pontua pior nos filtros de spam.
+                corpo.TextBody = TextoDoHtml.Converter(mensagem.Corpo);
+            }
             else
                 corpo.TextBody = mensagem.Corpo;
 

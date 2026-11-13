@@ -73,7 +73,7 @@ public sealed class OcorrenciasController(
                 currentUser.EmpresaId, body.PedidoId, OrigemOcorrencia.Dona, categoria, body.Relato ?? string.Empty, body.ConversaId), ct);
             return DataCreated($"api/ocorrencias/{o.Id}", o);
         }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
     [SwaggerOperation(Summary = "Iniciar apuração da ocorrência")]
@@ -106,6 +106,6 @@ public sealed class OcorrenciasController(
         }
         catch (EasyStock.Application.UseCases.Pedidos.Cobranca.CobrancaPedidoConflitoException ex)
         { return Conflict(new ApiErrorResponse(new ApiError(ex.Codigo, ex.Message, null, null))); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 }

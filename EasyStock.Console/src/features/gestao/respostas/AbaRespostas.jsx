@@ -10,6 +10,7 @@ import {
 } from '../../../dominio/automacao'
 import { plural } from '../../../dominio/formato'
 import { gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
+import { NOME_RESPOSTAS_AUTOMATICAS } from '../../../dominio/modulos'
 import css from './abaRespostas.module.css'
 
 // Mesmo editor na janela contextual do Balcão e na rota direta de Atendimento.
@@ -85,7 +86,7 @@ function SecaoRespostas() {
         <div>
           <h3 id="gestao-respostas">Respostas prontas</h3>
           <p className={css.descricao}>{plural(ativas, 'ativa', 'ativas')}. No atendimento, digite / no campo ou toque em Respostas.</p>
-          {!editavel && <p className={css.descricao}>Só a dona ou um gerente cria, edita e arquiva respostas prontas.</p>}
+          {!editavel && <p className={css.descricao}>Somente a gerência pode criar, editar e arquivar respostas prontas.</p>}
         </div>
         {editavel && <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando !== null}>Nova resposta</Botao>}
       </header>
@@ -114,7 +115,7 @@ function SecaoRespostas() {
 
       {lista.length === 0 ? (
         <Vazio icone={busca ? 'search' : 'respostas'} titulo={busca ? 'Nada com essa busca.' : 'Nenhuma resposta pronta ainda.'}>
-          {busca ? 'Tente outro título, atalho ou trecho da resposta.' : editavel ? 'Use Nova resposta para guardar as mensagens que você envia com frequência.' : 'A dona ou um gerente cadastra as respostas prontas.'}
+          {busca ? 'Busque outro título, atalho ou trecho.' : editavel ? 'Use Nova resposta para salvar mensagens frequentes.' : 'Peça à gerência para cadastrar respostas prontas.'}
         </Vazio>
       ) : (
         <ul className={css.lista}>
@@ -247,13 +248,13 @@ function SecaoAutomaticas({ focoInicial }) {
     <section className={css.secao} aria-labelledby="gestao-automaticas">
       <header className={css.topo}>
         <div>
-          <h3 id="gestao-automaticas">Mensagens automáticas</h3>
+          <h3 id="gestao-automaticas">{NOME_RESPOSTAS_AUTOMATICAS}</h3>
           <p className={css.descricao}>
             Saem sozinhas, só até 24 h depois da última mensagem do cliente e nunca para cliente bloqueado.
             Na conversa aparecem com a etiqueta automática.
           </p>
           {!editavel && (
-            <p className={css.descricao}>Só a dona ou um gerente liga, desliga e muda o texto das automáticas.</p>
+            <p className={css.descricao}>Somente a gerência pode ativar, desativar e editar mensagens automáticas.</p>
           )}
         </div>
       </header>

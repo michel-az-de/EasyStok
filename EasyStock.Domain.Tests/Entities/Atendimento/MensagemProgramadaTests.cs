@@ -141,6 +141,21 @@ public class MensagemProgramadaTests
     }
 
     [Fact]
+    public void RegistrarFalha_DepoisDeEnviada_RecusaEMantemEnviada()
+    {
+        // #2280: o que já saiu para o cliente não volta a "Falhou"; a dona reenviaria e o cliente receberia duas vezes.
+        var mensagem = Texto(CanalConversa.Email);
+        mensagem.Reservar(Agora.AddHours(2));
+        mensagem.RegistrarEnvio("id-externo", Agora.AddHours(2));
+
+        var acao = () => mensagem.RegistrarFalha("falha depois do envio", Agora.AddHours(2));
+
+        acao.Should().Throw<RegraDeDominioVioladaException>();
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Enviada);
+        mensagem.Erro.Should().BeNull();
+    }
+
+    [Fact]
     public void Cancelar_SoAgendada()
     {
         var agendada = Texto(CanalConversa.Email);

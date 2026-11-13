@@ -16,7 +16,7 @@ const ICONE = {
 // #1445: o que o assistente propôs fazer, uma linha por ação, com um botão só. Nada roda
 // antes do clique; o único botão que manda algo ao cliente é o primário ("Enviar ao cliente").
 // Ignorar a linha é descartar: sem botão a mais.
-export function AcoesPropostas({ acoes, nomeCliente, aoExecutar, motivoDeEnvio, semCadastro }) {
+export function AcoesPropostas({ acoes, nomeCliente, aoExecutar, motivoDeEnvio, semCadastro, encerrada = false }) {
   const prefixoId = useId()
   const origensRef = useRef(new Map())
   useLayoutEffect(() => {
@@ -33,8 +33,11 @@ export function AcoesPropostas({ acoes, nomeCliente, aoExecutar, motivoDeEnvio, 
       {acoes.map((acao, indice) => {
         const rotulo = descreverAcaoDoAssistente(acao, nomeCliente)
         if (!rotulo) return null
-        const impedimento = (rotulo.saiParaCliente && motivoDeEnvio)
+        // #2185 (E11): o rascunho também não entra num campo fechado (janela de 24 h, conversa concluída ou cadastro bloqueado).
+        const impedimento = ((rotulo.saiParaCliente || acao.tipo === ACOES_DO_ASSISTENTE.RASCUNHO) && motivoDeEnvio)
           || (acao.tipo === ACOES_DO_ASSISTENTE.NOTA_INTERNA && semCadastro && 'Salve o cadastro do cliente na Ficha antes de anotar.')
+          // #2185 (E10): conversa concluída não monta comanda; o cartão diz isso em vez de abrir um painel que não adiciona nada.
+          || (acao.tipo === ACOES_DO_ASSISTENTE.ABRIR_TELA && encerrada && 'Conversa concluída: não há comanda para montar.')
         const erroId = `${prefixoId}-${indice}-erro`
         return (
           <li key={acao.chave} className={css.acaoProposta}>
@@ -42,7 +45,7 @@ export function AcoesPropostas({ acoes, nomeCliente, aoExecutar, motivoDeEnvio, 
               <span className={css.acaoTitulo}><Icone nome={ICONE[acao.tipo]} tamanho={16} /> {rotulo.titulo}</span>
               {rotulo.detalhe && <span className={css.acaoDetalhe}>{rotulo.detalhe}</span>}
               {acao.estado === 'falhou' && (
-                <span className={css.acaoErro} id={erroId} role="alert"><Icone nome="alerta" tamanho={14} /> {acao.erro}</span>
+                <span className={css.acaoErro} id={erroId} role="alert"><Icone nome="alerta" tamanho={16} /> {acao.erro}</span>
               )}
               {impedimento && acao.estado !== 'feita' && <span className={css.acaoDetalhe} id={`${erroId}-impedimento`}>{impedimento}</span>}
             </div>

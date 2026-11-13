@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Operacao;
 using EasyStock.Application.Services.Notifications;
 using Microsoft.Extensions.Options;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
@@ -33,7 +34,7 @@ public sealed class NotificarImpressaoTravadaUseCase(
 
         var parada = relogio.GetUtcNow().UtcDateTime - impressao.CriadaEm;
         await PrazoEstouradoEvento.EnfileirarAsync(notificador, opcoes, TipoPrazo.ImpressaoTravada,
-            impressao.EmpresaId, impressao.ImpressaoId, PrazoEstouradoEvento.Referencia(impressao.ImpressaoId),
+            impressao.EmpresaId, impressao.ImpressaoId, CodigoCurto.De(impressao.ImpressaoId),
             PrazoEstouradoEvento.Duracao(opcoes.ImpressaoPendente), PrazoEstouradoEvento.Duracao(parada), usuarioId: null, ct);
         await unitOfWork.CommitAsync();
         return true;

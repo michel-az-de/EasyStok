@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Operacao;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Operacao.Impressao;
 
@@ -36,7 +37,7 @@ public sealed class MontarPedidoImpressoUseCase(IPedidoImpressoQueries queries, 
 
         return new PedidoImpressoDto(
             new PedidoImpressoCasaDto(p.Casa.Nome, Limpo(p.Casa.Documento), Limpo(p.Casa.Site), Limpo(p.Casa.WhatsApp), Limpo(p.Casa.LogoUrl)),
-            p.Id.ToString("N")[..8].ToUpperInvariant(),
+            CodigoCurto.De(p.Id),
             PrazoImpresso.Calcular(p),
             new PedidoImpressoClienteDto(
                 c.Id is { } id ? id.ToString("N")[..6].ToUpperInvariant() : null,

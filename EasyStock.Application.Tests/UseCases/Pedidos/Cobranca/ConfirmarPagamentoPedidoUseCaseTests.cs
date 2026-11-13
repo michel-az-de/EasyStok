@@ -3,6 +3,7 @@ using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Application.Services.Pedidos;
@@ -626,6 +627,145 @@ public class ConfirmarPagamentoPedidoUseCaseTests
         var act = () => uc.ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-10" });
 
         await act.Should().ThrowAsync<EstornoAutomaticoFalhouException>();
+        f.Pedido.Pagamentos.Should().ContainSingle();
+    }
+
+    // ── #2056: link pago depois de devolução online integral ──────────────
+
+    /// <summary>
+    /// Devolução online integral confirmada (<c>EstornosOnlineService</c>): a cobrança fica <c>Estornada</c>, o
+    /// <c>PedidoPagamento</c> fica e o estorno confirmado tira o valor do saldo.
+    /// </summary>
+    private static void DevolverIntegral(CobrancaPedidoFixture f, CobrancaPedido cobranca, string pagamentoExterno)
+    {
+        var pagamento = f.Pedido.Pagamentos.Single(p => p.Referencia == pagamentoExterno);
+        cobranca.MarcarEstornada("Devolução integral confirmada no Mercado Pago", CobrancaPedidoFixture.Agora);
+        f.Estornos.ListarAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns(new List<PedidoEstornoOnline>
+        {
+            new() { Id = Guid.NewGuid(), EmpresaId = f.EmpresaId, PedidoId = f.Pedido.Id, PagamentoId = pagamento.Id,
+                PagamentoExternoId = pagamentoExterno, Valor = pagamento.Valor, Situacao = PedidoEstornoOnline.Confirmado },
+        });
+        f.Estornos.RecebimentosAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns(new List<RecebimentoOnline>
+        {
+            new(pagamento.Id, cobranca.Id, pagamentoExterno, pagamento.Valor, "pix", pagamento.PagoEm, null, true),
+        });
+    }
+
+    [Fact]
+    public async Task LinkNovo_PagoDepoisDeDevolucaoOnlineIntegral_ConfirmaSemEstornar()
+    {
+        // O TotalPago cru ainda contava o pagamento devolvido: o novo era tratado como duplicado e devolvido sozinho.
+        var f = new CobrancaPedidoFixture();
+        f.PedidoRepo.ExisteEventoAsync(f.EmpresaId, f.Pedido.Id, QuitacaoPedido.Marco, Arg.Any<CancellationToken>())
+            .Returns(_ => f.Eventos.Any(e => e.Tipo == QuitacaoPedido.Marco));
+        var primeira = f.AdicionarOnline(referencia: "pref-1");
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-1", ReferenciaExterna = "pref-1" }))
+            .Confirmado.Should().BeTrue();
+        DevolverIntegral(f, primeira, "pay-1");
+        var nova = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+        nova.Valor.Should().Be(25m);
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with
+        {
+            PagamentoExternoId = "pay-2", PagoEm = CobrancaPedidoFixture.Agora.AddMinutes(10),
+        });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.Confirmado);
+        await f.Estorno.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
+        f.Pedido.Pagamentos.Select(p => p.Referencia).Should().BeEquivalentTo("pay-1", "pay-2");
+        f.Cobrancas.Single(c => c.Id == nova.CobrancaId).Status.Should().Be(StatusCobrancaPedido.Paga);
+        primeira.Status.Should().Be(StatusCobrancaPedido.Estornada);
+        // A quitação (com o saldo, como na DI) quita de novo, mas o marco da primeira vale: um só "pedido pago".
+        f.Eventos.Should().ContainSingle(e => e.Tipo == QuitacaoPedido.Marco);
+        await f.Publicador.Received(1).PublicarAsync(
+            f.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", f.Pedido.Id,
+            Arg.Any<PedidoPagoEvent>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SinalNovo_PagoDepoisDeDevolverOSinal_NaoQuitaEDeixaOSaldoNaEntrega()
+    {
+        // O TotalPago cru (12,50 devolvidos + 12,50 novos) cobria os 25: o pedido saía quitado e o saldo da porta sumia.
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        var sinal = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, sinal.Valor) with { PagamentoExternoId = "pay-1" }))
+            .Confirmado.Should().BeTrue();
+        DevolverIntegral(f, f.Cobrancas.Single(c => c.Id == sinal.CobrancaId), "pay-1");
+        // A atendente volta o pedido para o link: a cobrança da entrega cai e nasce o sinal de novo.
+        var novoSinal = (await f.Trocar(saldos: f.Saldos()).ExecuteAsync(
+            new TrocarFormaPagamentoPedidoInput(f.EmpresaId, f.Pedido.Id, TrocarFormaPagamentoPedidoUseCase.FormaOnline))).Cobranca;
+        novoSinal.Valor.Should().Be(12.50m);
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, 12.50m) with { PagamentoExternoId = "pay-2" });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.Confirmado);
+        await f.Estorno.DidNotReceiveWithAnyArgs().EstornarAsync(default!, default, default!, default);
+        await f.Publicador.DidNotReceive().PublicarAsync(
+            f.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", f.Pedido.Id,
+            Arg.Any<PedidoPagoEvent>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        var saldo = f.Cobrancas.Should().ContainSingle(c => c.Provedor == "na_entrega" && c.EstaPendente).Subject;
+        saldo.Valor.Should().Be(12.50m);
+    }
+
+    [Fact]
+    public async Task MesmaPreferencia_PagaDeNovoDepoisDaDevolucaoIntegral_EstornaComoDuplicado()
+    {
+        // Sem link novo, o webhook (sem preferência) cai na cobrança estornada. MarcarPaga recusaria e o webhook
+        // daria 500 em laço, sem estorno nem trilha: o pagamento volta ao cliente como duplicado.
+        var f = new CobrancaPedidoFixture();
+        var cobranca = f.AdicionarOnline(referencia: "pref-1");
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-1" })).Confirmado.Should().BeTrue();
+        DevolverIntegral(f, cobranca, "pay-1");
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-3" });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync("pay-3", 25m, "estorno-duplicado-pay-3", Arg.Any<CancellationToken>());
+        f.Estorno.ReceivedCalls().Should().ContainSingle(c => c.GetMethodInfo().Name == nameof(IEstornoPedidoGateway.EstornarAsync));
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be("pay-1");
+        cobranca.Status.Should().Be(StatusCobrancaPedido.Estornada);
+        f.Eventos.Should().Contain(e => e.Tipo == "pagamento_divergente" && e.Detalhes!.Contains("pay-3"));
+    }
+
+    [Fact]
+    public async Task SinalDevolvido_PagoDeNovoSemSinalNovo_EstornaComoDuplicado()
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
+        f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(2);
+        var sinal = await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+        (await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, sinal.Valor) with { PagamentoExternoId = "pay-1" }))
+            .Confirmado.Should().BeTrue();
+        DevolverIntegral(f, f.Cobrancas.Single(c => c.Id == sinal.CobrancaId), "pay-1");
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id, 12.50m) with { PagamentoExternoId = "pay-3" });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync("pay-3", 12.50m, "estorno-duplicado-pay-3", Arg.Any<CancellationToken>());
+        f.Estorno.ReceivedCalls().Should().ContainSingle(c => c.GetMethodInfo().Name == nameof(IEstornoPedidoGateway.EstornarAsync));
+        f.Pedido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be("pay-1");
+    }
+
+    [Fact]
+    public async Task SegundoPagamento_ComODevolvidoSoEmPendencia_ContinuaEstornando()
+    {
+        // Devolução pedida e não confirmada não libera o pedido: a cobrança segue paga e o saldo ainda conta o pagamento.
+        var f = new CobrancaPedidoFixture();
+        f.AdicionarOnline(referencia: "pref-1");
+        await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-1", ReferenciaExterna = "pref-1" });
+        var pagamento = f.Pedido.Pagamentos.Single();
+        f.Estornos.ListarAsync(f.EmpresaId, f.Pedido.Id, Arg.Any<CancellationToken>()).Returns(new List<PedidoEstornoOnline>
+        {
+            new() { Id = Guid.NewGuid(), EmpresaId = f.EmpresaId, PedidoId = f.Pedido.Id, PagamentoId = pagamento.Id,
+                PagamentoExternoId = "pay-1", Valor = 25m, Situacao = PedidoEstornoOnline.Pendente },
+        });
+
+        var r = await f.Confirmar().ExecuteAsync(Aprovado(f.Pedido.Id) with { PagamentoExternoId = "pay-2" });
+
+        r.Situacao.Should().Be(SituacaoConfirmacaoPagamento.PagamentoDuplicado);
+        await f.Estorno.Received(1).EstornarAsync("pay-2", 25m, "estorno-duplicado-pay-2", Arg.Any<CancellationToken>());
         f.Pedido.Pagamentos.Should().ContainSingle();
     }
 }

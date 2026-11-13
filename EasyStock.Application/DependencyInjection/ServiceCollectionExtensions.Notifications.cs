@@ -18,8 +18,13 @@ public static partial class ServiceCollectionExtensions
         // Quarentena (N1): prazos por tipo; sobrescritas em Notifications:Quarentena:Prazos (bind em AddNotificationsCore).
         services.TryAddSingleton<PoliticaValidadeNotificacao>();
         services.AddScoped<IResolvedorAudiencia, ResolvedorAudiencia>();
+        // #2211: avisos da equipe pelo WhatsApp da loja (quem é inscrito, para o robô não atender a resposta dela).
+        services.AddScoped<IContatoDaEquipeAvisada, ContatoDaEquipeAvisada>();
         services.AddScoped<NotificadorService>();
-        services.AddScoped<INotificadorService>(sp => sp.GetRequiredService<NotificadorService>());
+        // #2096: o interruptor da loja (tela Avisos) fica na frente do motor; sem a chave "aviso" no payload, passa direto.
+        services.AddScoped(sp => new NotificadorComAvisosDaLoja(sp.GetRequiredService<NotificadorService>(), sp,
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<NotificadorComAvisosDaLoja>>()));
+        services.AddScoped<INotificadorService>(sp => sp.GetRequiredService<NotificadorComAvisosDaLoja>());
         // N10: porta única dos avisos de problema no sistema (monitor de endpoint, snapshot de saúde, coletor de 5xx).
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IPublicadorIncidenteSistema, PublicadorIncidenteSistema>();

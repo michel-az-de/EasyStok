@@ -2,8 +2,11 @@ using System.Net;
 using System.Text;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.ValueObjects;
+using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.Meta;
+using EasyStock.Infra.Integrations.Resilience;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Polly;
@@ -98,6 +101,81 @@ public class CanalMetaMensageriaTests
     {
         var act = () => new CanalMessenger(new StubMetaMensageriaTransporte()).EnviarModeloAsync("PSID-3", "x", "pt_BR", []);
         await act.Should().ThrowAsync<NotSupportedException>();
+    }
+
+    [Fact]
+    public async Task Envio_que_falhou_no_transporte_nao_se_repete()
+    {
+        // #2025: o POST pode ter chegado à Meta; repetir mandava a mesma mensagem até 4 vezes ao cliente.
+        var services = new ServiceCollection();
+        services.AddEasyStockIntegrationResilience();
+        var pipelines = services.BuildServiceProvider().GetRequiredService<ResiliencePipelineProvider<string>>();
+        var queda = new HandlerQueCai();
+        var transporte = new MetaMensageriaHttpTransporte(
+            new HttpClient(queda) { BaseAddress = new Uri("https://graph.test/v25.0/") }, pipelines,
+            NullLogger<MetaMensageriaHttpTransporte>.Instance);
+
+        var act = () => transporte.EnviarAsync(new { recipient = new { id = "PSID-1" } });
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+        queda.Chamadas.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Disjuntor_aberto_e_falha_temporaria_e_nao_fecha_o_WhatsApp()
+    {
+        // #2025: com o disjuntor aberto nada sai; o atendimento reagenda (#2004). O disjuntor é só da Meta.
+        var services = new ServiceCollection();
+        services.AddEasyStockIntegrationResilience();
+        var pipelines = services.BuildServiceProvider().GetRequiredService<ResiliencePipelineProvider<string>>();
+        var queda = new HandlerQueCai();
+        var transporte = new MetaMensageriaHttpTransporte(
+            new HttpClient(queda) { BaseAddress = new Uri("https://graph.test/v25.0/") }, pipelines,
+            NullLogger<MetaMensageriaHttpTransporte>.Instance);
+        for (var i = 0; i < 8; i++)
+            await FluentActions.Awaiting(() => transporte.EnviarAsync(new { })).Should().ThrowAsync<HttpRequestException>();
+
+        var aberto = await FluentActions.Awaiting(() => transporte.EnviarAsync(new { })).Should().ThrowAsync<HttpRequestException>();
+
+        aberto.Which.HttpRequestError.Should().Be(HttpRequestError.ConnectionError);
+        queda.Chamadas.Should().Be(8, "com o disjuntor aberto o POST nem sai");
+        var whatsApp = await pipelines.GetPipeline(IntegrationCategories.WhatsAppEnvio).ExecuteAsync(_ => ValueTask.FromResult(1));
+        whatsApp.Should().Be(1, "a falha da Meta não abre o disjuntor do WhatsApp");
+    }
+
+    [Fact]
+    public async Task Timeout_do_envio_vira_TimeoutException_para_o_atendimento_registrar_falha_incerta()
+    {
+        var pipelines = Substitute.For<ResiliencePipelineProvider<string>>();
+        pipelines.GetPipeline(Arg.Any<string>())
+            .Returns(new ResiliencePipelineBuilder().AddTimeout(TimeSpan.FromMilliseconds(50)).Build());
+        var transporte = new MetaMensageriaHttpTransporte(
+            new HttpClient(new HandlerLento()) { BaseAddress = new Uri("https://graph.test/v25.0/") }, pipelines,
+            NullLogger<MetaMensageriaHttpTransporte>.Instance);
+
+        var act = () => transporte.EnviarAsync(new { recipient = new { id = "PSID-1" } });
+
+        await act.Should().ThrowAsync<TimeoutException>();
+    }
+
+    private sealed class HandlerLento : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
+    private sealed class HandlerQueCai : HttpMessageHandler
+    {
+        public int Chamadas { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Chamadas++;
+            throw new HttpRequestException("conexão caiu depois do envio");
+        }
     }
 
     private sealed class Handler : HttpMessageHandler

@@ -62,13 +62,13 @@ confere('quem abre e quem reconhece a janela usam o mesmo nome', () => {
   }
 })
 
-confere('na janela avulsa a barra do módulo troca os links por "Voltar ao Balcão"', () => {
+confere('na janela avulsa a barra do módulo troca os links por "Voltar às conversas"', () => {
   const moldura = fonte('features/hall/MolduraDoModulo.jsx')
   const contexto = moldura.slice(moldura.indexOf('<div className={css.contexto}>'), moldura.indexOf('<span className={css.modulo}>'))
   const [ramoAvulsa, ramoComum] = contexto.split(') : (')
   assert.match(ramoAvulsa, /\{avulsa \? \(/)
   assert.match(ramoAvulsa, /onClick=\{\(\) => voltarAoBalcao\(fonteApi\)\}/)
-  assert.match(ramoAvulsa, /Voltar ao Balcão/)
+  assert.match(ramoAvulsa, /Voltar às conversas/)
   assert.doesNotMatch(ramoAvulsa, /href=/)
   assert.match(ramoComum, /href=\{HASH_HALL\}/)
   assert.match(ramoComum, /href=\{HASH_BALCAO\}/)

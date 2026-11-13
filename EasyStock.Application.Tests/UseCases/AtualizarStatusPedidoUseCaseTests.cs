@@ -282,6 +282,37 @@ public class AtualizarStatusPedidoUseCaseTests
     }
 
     [Fact]
+    public async Task Status_para_pronto_trava_o_pedido_e_desconta_estoque_dentro_da_transacao()
+    {
+        // #2401: o FOR UPDATE do estoque só vale dentro de transação; fora dela é no-op.
+        var (uc, repo, itemRepo, movRepo, uow, _) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, lojaId, produtoId, 2, "preparando");
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(10) }
+        });
+        var dentro = false;
+        uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(async ci =>
+            {
+                dentro = true;
+                try { return await ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(ci.Arg<CancellationToken>()); }
+                finally { dentro = false; }
+            });
+        var descontouDentro = false;
+        movRepo.When(m => m.InsertAsync(Arg.Any<MovimentacaoEstoque>())).Do(_ => descontouDentro = dentro);
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "pronto"));
+
+        descontouDentro.Should().BeTrue("o desconto de estoque precisa rodar dentro da transação");
+        await repo.Received(1).TravarAsync(empresaId, pedido.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Transicao_invalida_lanca_e_status_nao_muda()
     {
         var (uc, repo, _, _, _, publicador) = Build();

@@ -257,6 +257,28 @@ public class MensagensProgramadasUseCasesTests
     }
 
     [Fact]
+    public async Task Disparar_SaiuMasOHistoricoFalhou_ContinuaEnviada()
+    {
+        // #2280: a mensagem chegou ao cliente; a falha ao gravar no histórico não pode virar "Falhou" e convidar a reenviar.
+        var conversa = ConversaAberta(Agora.AddHours(-1));
+        var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, conversa.Id, CanalConversa.WhatsApp,
+            FinalidadeContato.Transacional, "Lembrete", null, Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddMinutes(-10));
+        mensagem.Reservar(Agora);
+        _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        _whats.EnviarTextoAsync("5511988887777", "Lembrete", Arg.Any<CancellationToken>()).Returns("wamid.prog2");
+        _conversas.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("histórico indisponível"));
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Enviada);
+        mensagem.IdExterno.Should().Be("wamid.prog2");
+        mensagem.Erro.Should().BeNull();
+        _uow.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Disparar_FalhaDoCanal_GravaOCodigoEstavelEmVezDoTextoCruDoProvedor()
     {
         // #2004 atendimento-08: o console traduz o código; o texto da exceção (inglês, com host) fica só no log.
@@ -273,5 +295,75 @@ public class MensagensProgramadasUseCasesTests
 
         mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
         mensagem.Erro.Should().Contain("CANAL_SEM_CONEXAO").And.NotContain("graph.facebook.com");
+    }
+
+    private MensagemProgramada ReservadaParaDisparo(int tentativasAnteriores = 0)
+    {
+        var conversa = ConversaAberta(Agora.AddHours(-1));
+        var mensagem = MensagemProgramada.Agendar(_empresaId, _cliente.Id, conversa.Id, CanalConversa.WhatsApp,
+            FinalidadeContato.Transacional, "Lembrete", null, Agora.AddMinutes(1), Guid.NewGuid(), Agora.AddMinutes(-10));
+        for (var i = 0; i < tentativasAnteriores; i++)
+        {
+            mensagem.Reservar(Agora);
+            mensagem.ReagendarPorFalhaTransitoria("x", Agora, Agora);
+        }
+        mensagem.Reservar(Agora);
+        _repo.ObterAsync(_empresaId, mensagem.Id, Arg.Any<CancellationToken>()).Returns(mensagem);
+        _conversas.ObterPorIdAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        return mensagem;
+    }
+
+    [Fact]
+    public async Task Disparar_FalhaDeConexaoAntesDoEnvio_VoltaAAgendadaComRecuo()
+    {
+        // #2285: nada saiu (conexão recusada): nova tentativa depois, em vez de Falhou definitivo.
+        var mensagem = ReservadaParaDisparo();
+        _whats.EnviarTextoAsync("5511988887777", "Lembrete", Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new HttpRequestException(HttpRequestError.ConnectionError, "refused"));
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Agendada);
+        mensagem.AgendadaPara.Should().Be(Agora.AddMinutes(1));
+        mensagem.Erro.Should().Contain("CANAL_SEM_CONEXAO");
+        _uow.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Disparar_LimiteDeTaxaDaMeta_VoltaAAgendada()
+    {
+        var mensagem = ReservadaParaDisparo();
+        _whats.EnviarTextoAsync("5511988887777", "Lembrete", Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new WhatsAppCloudException(130429, "rate limit", ehPermanente: false, statusHttp: 429));
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Agendada);
+    }
+
+    [Fact]
+    public async Task Disparar_FalhaTransitoriaNaUltimaTentativa_ViraFalhou()
+    {
+        var mensagem = ReservadaParaDisparo(tentativasAnteriores: MensagemProgramada.TentativasMaximas - 1);
+        mensagem.Tentativas.Should().Be(MensagemProgramada.TentativasMaximas);
+        _whats.EnviarTextoAsync("5511988887777", "Lembrete", Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new HttpRequestException(HttpRequestError.ConnectionError, "refused"));
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
+    }
+
+    [Fact]
+    public async Task Disparar_Erro5xxDaMeta_ContinuaFalhou_PoisAMensagemPodeTerSaido()
+    {
+        // Incerta (#1915): reenviar sozinho poderia duplicar para o cliente.
+        var mensagem = ReservadaParaDisparo();
+        _whats.EnviarTextoAsync("5511988887777", "Lembrete", Arg.Any<CancellationToken>())
+            .Returns<Task<string>>(_ => throw new WhatsAppCloudException(0, "bad gateway", ehPermanente: false, statusHttp: 502));
+
+        await Disparar().ExecuteAsync(_empresaId, mensagem.Id);
+
+        mensagem.Situacao.Should().Be(SituacaoMensagemProgramada.Falhou);
     }
 }

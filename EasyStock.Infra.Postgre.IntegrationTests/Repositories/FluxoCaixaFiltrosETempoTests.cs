@@ -11,7 +11,10 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 [Collection("PostgreSqlTestCollection")]
 public sealed class FluxoCaixaFiltrosETempoTests(PostgreSqlDatabaseFixture fixture)
 {
-    private static readonly DateTime Inicio = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+    // #2095 (F13): as linhas do fluxo são dias civis de Brasília; 03:00Z é a meia-noite de Brasília de 01/06.
+    private static readonly DateTime Inicio = new(2026, 6, 1, 3, 0, 0, DateTimeKind.Utc);
+    // #2268: o KPI do mês usa o mês civil de Brasília (como o Extrato); a referência é a data civil 00:00Z.
+    private static readonly DateTime InicioMesUtc = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
     [SkippableTheory]
     [InlineData(TipoLadoFinanceiro.Pagar, true, false, 40)]
@@ -85,28 +88,61 @@ public sealed class FluxoCaixaFiltrosETempoTests(PostgreSqlDatabaseFixture fixtu
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason);
         await using var db = fixture.CreateDbContext();
         var (empresaId, categoriaId, centroCustoId) = Preparar(db, lado);
-        var virada = Inicio.AddMonths(1);
+        var virada = Inicio.AddMonths(1); // 01/07 03:00Z, meia-noite de Brasília
         AdicionarPagamento(db, lado, empresaId, categoriaId, centroCustoId, virada.AddMilliseconds(-500), 10m);
         AdicionarPagamento(db, lado, empresaId, categoriaId, centroCustoId, virada, 20m);
         await db.SaveChangesAsync();
 
-        var kpis = await new FluxoCaixaQueries(db).KpisDashboardAsync(empresaId, Inicio);
+        var kpis = await new FluxoCaixaQueries(db).KpisDashboardAsync(empresaId, InicioMesUtc);
 
         (lado == TipoLadoFinanceiro.Pagar ? kpis.TotalPagoMes : kpis.TotalRecebidoMes).Should().Be(10m);
     }
 
+    /// <summary>
+    /// #2268: o realizado soma o movimento avulso do Caixa; o que um pagamento de parcela referencia já conta como
+    /// pagamento de conta e não entra de novo. Estornado, abertura e outra empresa ficam fora.
+    /// </summary>
     [SkippableFact]
-    public async Task Periodo_muito_longo_para_no_limite_de_24_buckets()
+    public async Task Movimentos_avulsos_do_caixa_excluem_o_vinculado_a_parcela()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason);
+        await using var db = fixture.CreateDbContext();
+        var (empresaId, categoriaId, centroCustoId) = Preparar(db, TipoLadoFinanceiro.Receber);
+        var vinculado = MovimentoCaixa.Criar(empresaId, "entrada", 10m, Inicio.AddHours(1));
+        var estornado = MovimentoCaixa.Criar(empresaId, "entrada", 100m, Inicio.AddHours(1));
+        estornado.EstornadoEm = Inicio.AddHours(2);
+        db.MovimentosCaixa.AddRange(vinculado, estornado,
+            MovimentoCaixa.Criar(empresaId, "entrada", 7m, Inicio.AddHours(1)),
+            MovimentoCaixa.Criar(empresaId, "saida", 3m, Inicio.AddHours(2)),
+            MovimentoCaixa.Criar(empresaId, "abertura", 50m, Inicio.AddMinutes(1)),
+            MovimentoCaixa.Criar(empresaId, "entrada", 5m, Inicio.AddDays(1)));
+        AdicionarPagamento(db, TipoLadoFinanceiro.Receber, empresaId, categoriaId, centroCustoId, Inicio.AddHours(1), 10m);
+        await db.SaveChangesAsync();
+        var pagamento = db.PagamentosParcela.Local.Single(p => p.EmpresaId == empresaId);
+        pagamento.MovimentoCaixaId = vinculado.Id;
+        var (outraEmpresa, _, _) = Preparar(db, TipoLadoFinanceiro.Receber);
+        db.MovimentosCaixa.Add(MovimentoCaixa.Criar(outraEmpresa, "entrada", 999m, Inicio.AddHours(1)));
+        await db.SaveChangesAsync();
+        db.SetMobileTenantContext(empresaId);
+
+        var linhas = await new FluxoCaixaQueries(db).MovimentosAvulsosDoCaixaAsync(empresaId, Inicio, Inicio.AddDays(1));
+
+        linhas.Select(l => l.Valor).Should().BeEquivalentTo([7m, -3m]);
+    }
+
+    [SkippableFact]
+    public async Task Periodo_muito_longo_e_recusado_com_mensagem_e_sem_laco_infinito()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason);
         await using var db = fixture.CreateDbContext();
         var (empresaId, _, _) = Preparar(db, TipoLadoFinanceiro.Pagar);
         await db.SaveChangesAsync();
 
-        var buckets = await new FluxoCaixaQueries(db).FluxoBucketsAsync(empresaId,
+        // #2095 (F13): antes cortava calado em 24 linhas; agora o teto é 366 e passar dele responde com mensagem.
+        var acao = () => new FluxoCaixaQueries(db).FluxoBucketsAsync(empresaId,
             PeriodicidadeFluxo.Diario, Inicio, DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc));
 
-        buckets.Count.Should().Be(24);
+        (await acao.Should().ThrowAsync<ArgumentException>()).Which.Message.Should().Contain("no máximo 366 linhas");
     }
 
     private static (Guid EmpresaId, Guid CategoriaId, Guid CentroCustoId) Preparar(EasyStockDbContext db, TipoLadoFinanceiro lado)

@@ -1,3 +1,5 @@
+using EasyStock.Domain.ValueObjects;
+
 ﻿namespace EasyStock.Domain.Entities
 {
     /// <summary>
@@ -17,6 +19,7 @@
         public Guid EmpresaId { get; set; }
 
         public string Nome { get; set; } = null!;
+        public string? FotoChave { get; set; }
 
         // ── Campos primários (snapshot rápido — usado pelo app) ─────────
         public string? Apt { get; set; }
@@ -100,6 +103,16 @@
 
         public DateTime? BloqueadoEm { get; private set; }
         public string? MotivoBloqueio { get; private set; }
+
+        public const int MotivoPausaTamanhoMaximo = 255;
+
+        /// <summary>
+        /// #2249: a IA encaminhou a pessoa à responsável (fornecedor, orçamento, assunto pessoal). Em toda conversa o
+        /// robô não saúda nem responde; a conversa nasce com a equipe. Sai quando a equipe devolve a conversa ao robô.
+        /// </summary>
+        public DateTime? AtendimentoAutomaticoPausadoEm { get; private set; }
+        public string? MotivoPausaAtendimento { get; private set; }
+        public bool AtendimentoAutomaticoPausado => AtendimentoAutomaticoPausadoEm is not null;
 
         /// <summary>
         /// Avisos de andamento do pedido (preparando, saiu para entrega). O agradecimento da entrega sai
@@ -282,6 +295,22 @@
             AlteradoEm = em;
         }
 
+        public void PausarAtendimentoAutomatico(string? motivo, DateTime em)
+        {
+            var motivoLimpo = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
+            if (motivoLimpo?.Length > MotivoPausaTamanhoMaximo) motivoLimpo = motivoLimpo[..MotivoPausaTamanhoMaximo];
+            AtendimentoAutomaticoPausadoEm = em;
+            MotivoPausaAtendimento = motivoLimpo;
+            AlteradoEm = em;
+        }
+
+        public void RetomarAtendimentoAutomatico(DateTime em)
+        {
+            AtendimentoAutomaticoPausadoEm = null;
+            MotivoPausaAtendimento = null;
+            AlteradoEm = em;
+        }
+
         public void DefinirAvisosStatus(bool ativos, DateTime em)
         {
             AvisosStatusAtivos = ativos;
@@ -349,11 +378,11 @@
         /// </summary>
         public static string? ChaveDomicilio(string? cep, string? numero, string? complemento)
         {
-            var cepNorm = Storefront.FreteZona.NormalizarCep(cep);
+            var cepNorm = EnderecoBr.NormalizarCep(cep);
             if (cepNorm.Length != 8) return null;
-            var numeroNorm = Storefront.FreteZona.NormalizarBairro(numero ?? string.Empty);
+            var numeroNorm = EnderecoBr.NormalizarBairro(numero ?? string.Empty);
             if (numeroNorm.Length == 0) return null;
-            var complementoNorm = Storefront.FreteZona.NormalizarBairro(complemento ?? string.Empty);
+            var complementoNorm = EnderecoBr.NormalizarBairro(complemento ?? string.Empty);
             return $"{cepNorm}|{numeroNorm}|{complementoNorm}";
         }
     }

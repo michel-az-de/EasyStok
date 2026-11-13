@@ -18,7 +18,7 @@ public class AtendimentoProducaoPesquisaController(IPesquisaProducaoWeb pesquisa
     {
         if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
         try { return DataOk(await pesquisa.BuscarInsumosAsync(SugerirReceitaUseCase.ValidarTermo(texto), ct)); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException || ex is OperationCanceledException && !ct.IsCancellationRequested)
         { return StatusCode(503, new { error = new { message = "A pesquisa pública está indisponível. Continue o cadastro manualmente." } }); }
     }
@@ -28,7 +28,7 @@ public class AtendimentoProducaoPesquisaController(IPesquisaProducaoWeb pesquisa
     {
         if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
         try { return DataOk(await sugestao.ExecuteAsync(request.Nome, ct)); }
-        catch (UseCaseValidationException ex) { return DataBadRequest(ex.Message); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException || ex is OperationCanceledException && !ct.IsCancellationRequested)
         { return StatusCode(503, new { error = new { message = "A IA ou a pesquisa pública está indisponível. Sua receita foi preservada." } }); }
     }

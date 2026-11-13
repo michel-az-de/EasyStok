@@ -3,11 +3,15 @@ import {
   confirmarImpressao, listarImpressoesPendentes, listarPedidosKds, mudarStatusKds, reimprimirCanhoto,
 } from '../infra/api/kdsApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
-import { CONFERENCIA_AO_VIVO_MS, POLLING_SEM_SSE_MS, RECONECTAR_MS } from './recargaAoVivo'
+import { CONFERENCIA_AO_VIVO_MS, POLLING_SEM_SSE_MS, RECONECTAR_MS, criarEsperaDeReconexao } from './recargaAoVivo'
 import { transicaoDaFila } from '../dominio/kds'
 import { pedeConfirmacaoDoSaldo } from '../dominio/pagamento'
 import { criarRecargaDeAcao } from './recargaDeAcao'
 import { criarEnvioComDesfazer, enviarPendentesAoSair } from './envioComDesfazer'
+import { criarChaveDeEnvio } from './chaveDeEnvio'
+import { criarGeracao } from './geracaoDeLeitura'
+import { receberEEntregar as receberNaPortaEEntregar } from './recebimentoNaEntrega'
+import { registrarPagamentoManual } from '../infra/api/pagamentosPedidoApi'
 
 // Cozinha no modo API (F05). A fila vem do KDS sobre Pedido (S19) e recarrega a
 // cada evento de pedido do SSE de operação (S18). Com o SSE caído, a tela não
@@ -31,16 +35,7 @@ const comId = (conjunto, id, liga) => {
   return novo
 }
 
-// Geração da leitura (#1474): cada troca de dia abre uma geração nova; a resposta que chega de
-// uma geração velha (Hoje respondendo depois de Amanhã) é descartada em vez de sobrescrever.
-export function criarGeracao() {
-  let atual = 0
-  return {
-    nova: () => { atual += 1; return atual },
-    agora: () => atual,
-    vale: (geracao) => geracao === atual,
-  }
-}
+export { criarGeracao }
 
 // `data` (YYYY-MM-DD ou null para hoje, #1474): o dia da fila. Trocar o dia relê e não anima
 // a troca como se os pedidos tivessem entrado ou saído.
@@ -64,6 +59,11 @@ export function useCozinhaApi({ data = null } = {}) {
   const [envio] = useState(() => criarEnvioComDesfazer({
     aoMudar: (lista) => setAdiados(new Map(lista.map((a) => [a.chave, { status: a.dados.status, ate: a.ate }]))),
   }))
+  // #2079 (C1): o "Recebi R$ X" da Cozinha é o mesmo das Entregas (J2): chave idempotente do pagamento,
+  // `recebidos` lembra o que já entrou e `emVoo` segura o clique duplo antes da primeira resposta.
+  const [envioDoPagamento] = useState(() => criarChaveDeEnvio())
+  const [recebidosNaPorta] = useState(() => new Set())
+  const emVooRef = useRef(new Map())
   useEffect(() => {
     const soltar = enviarPendentesAoSair(envio)
     return () => { soltar(); envio.descarregar() }
@@ -128,6 +128,7 @@ export function useCozinhaApi({ data = null } = {}) {
     let reconexao = null
     let polling = null
     let noAr = false
+    const esperaDeReconexao = criarEsperaDeReconexao({ base: RECONECTAR_MS })
     // #1577: o evento da própria ação já relê a fila; a ação não relê de novo na resposta.
     const recarga = criarRecargaDeAcao({ recarregar: () => recarregar(), aoVivo: () => noAr })
     recargaRef.current = recarga
@@ -138,6 +139,7 @@ export function useCozinhaApi({ data = null } = {}) {
           if (evento === 'ready') {
             noAr = true
             setAoVivo(true)
+            esperaDeReconexao.zerar()
             // #2005 (console-20): SSE vivo e mudo não avisa o que não vira evento; a fila é conferida a cada 30 s.
             clearInterval(polling)
             polling = setInterval(recarregar, CONFERENCIA_AO_VIVO_MS)
@@ -150,7 +152,7 @@ export function useCozinhaApi({ data = null } = {}) {
           setAoVivo(false)
           clearInterval(polling)
           polling = setInterval(recarregar, POLLING_SEM_SSE_MS)
-          reconexao = setTimeout(conectar, RECONECTAR_MS)
+          reconexao = setTimeout(conectar, esperaDeReconexao.proxima())
         },
       })
     }
@@ -192,6 +194,42 @@ export function useCozinhaApi({ data = null } = {}) {
   }, [envio, enviarStatus])
   const desfazerAvanco = useCallback((id) => envio.desfazer(id), [envio])
 
+  // #2079 (C1): "Marcar entregue" com saldo só confirmava o saldo e o Caixa nunca via o dinheiro. Agora a
+  // pergunta lança o recebido (a rota do "Marcar pago" do Balcão) e só então marca entregue; se o
+  // pagamento falha, a entrega não sai e a pergunta continua. Vai na hora: é o segundo toque da decisão.
+  const receberEEntregar = useCallback((id, status, valor, metodo) => {
+    const emVoo = emVooRef.current
+    if (emVoo.has(id)) return emVoo.get(id)
+    setMovendo((s) => comId(s, id, true))
+    const recarga = recargaRef.current
+    const marca = recarga.marcar()
+    const chave = envioDoPagamento.para({ pedidoId: id, valor, metodo })
+    let pagou = false
+    const ida = receberNaPortaEEntregar(
+      {
+        registrarPagamento: (...args) => registrarPagamentoManual(...args).then((r) => { pagou = true; return r }),
+        marcarEntregue: (_viagem, pedidoId) => mudarStatusKds(pedidoId, status, { confirmarSaldoAReceber: true }),
+        recebidos: recebidosNaPorta,
+      },
+      { viagemId: null, pedidoId: id, valor, metodo, chave },
+    )
+      .then(() => {
+        envioDoPagamento.confirmar(chave)
+        setSaldoPendente(null)
+        return recarga.depoisDaAcao(marca)
+      })
+      .catch((e) => {
+        if (pagou || recebidosNaPorta.has(`${id}|${valor}`)) setErro(e.message)
+        else setErro(`O pagamento não entrou: ${e.message} A entrega não foi marcada.`)
+      })
+      .finally(() => {
+        emVoo.delete(id)
+        setMovendo((s) => comId(s, id, false))
+      })
+    emVoo.set(id, ida)
+    return ida
+  }, [envioDoPagamento, recebidosNaPorta])
+
   const reimprimir = useCallback((id) => reimprimirCanhoto(id)
     .then(() => recarregarImpressoes())
     .catch((e) => setErro(`Não voltou para a fila de impressão: ${e.message}`)), [recarregarImpressoes])
@@ -209,6 +247,6 @@ export function useCozinhaApi({ data = null } = {}) {
   return {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente, adiados, desfazerAvanco,
     descartarSaldoPendente: () => setSaldoPendente(null),
-    avancar, recarregar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
+    avancar, receberEEntregar, recarregar, reimprimir, confirmarImpressao: confirmar, avisar: setErro, limparErro,
   }
 }

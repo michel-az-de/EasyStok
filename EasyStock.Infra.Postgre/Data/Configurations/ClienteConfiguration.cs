@@ -7,6 +7,7 @@
             builder.ToTable("clientes");
             builder.HasKey(c => c.Id);
             builder.Property(c => c.Nome).IsRequired().HasMaxLength(150);
+            builder.Property(c => c.FotoChave).HasMaxLength(512);
             builder.Property(c => c.Apt).HasMaxLength(32);
             builder.Property(c => c.Endereco).HasMaxLength(255);
             builder.Property(c => c.Telefone).HasMaxLength(32);
@@ -33,6 +34,9 @@
             // ── CRM leve (S24) ─────────────────────────────────────────
             builder.Property(c => c.Bloqueado).HasDefaultValue(false);
             builder.Property(c => c.MotivoBloqueio).HasMaxLength(Cliente.MotivoBloqueioTamanhoMaximo);
+            // #2249: pessoa encaminhada à responsável; o robô não atende até a equipe devolver.
+            builder.Property(c => c.MotivoPausaAtendimento).HasMaxLength(Cliente.MotivoPausaTamanhoMaximo);
+            builder.Ignore(c => c.AtendimentoAutomaticoPausado);
             // Default true no banco para as linhas existentes. Sentinela true: sem ela o EF omitiria o
             // false (valor CLR padrão) no INSERT e o banco gravaria true.
             builder.Property(c => c.AvisosStatusAtivos).HasDefaultValue(true).HasSentinel(true);

@@ -86,7 +86,10 @@ public class NotificacoesGlobaisSeedTests
 
         rotina.TipoEvento.Should().Be(tipo);
         rotina.Categoria.Should().Be(categoria);
-        rotina.CanaisOrdemFallbackJson.Should().Be("[\"Email\",\"WhatsApp\"]");
+        // #2096: o prazo estourado também chega no aparelho da dona e do gerente.
+        rotina.CanaisOrdemFallbackJson.Should().Be(tipo == TipoEventoNotificacao.PrazoEstourado
+            ? "[\"Push\",\"Email\",\"WhatsApp\"]"
+            : "[\"Email\",\"WhatsApp\"]");
         rotina.EmpresaId.Should().BeNull();
         rotina.Ativa.Should().Be(ativa);
 
@@ -210,11 +213,11 @@ public class NotificacoesGlobaisSeedTests
     }
 
     [Fact]
-    public void ConviteAcessoEmailMantemOCodigoESobeParaAVersao2ComAMarcaDaCasa()
+    public void ConviteAcessoEmailMantemOCodigoESobeParaAVersao3ComAMarcaDaCasa()
     {
         var template = NotificacoesGlobaisSeed.BuildDefaultTemplates().Single(t => t.Codigo == "convite_acesso_email_v1");
 
-        template.Versao.Should().Be(2);
+        template.Versao.Should().Be(3); // #2074: validade e o que fazer depois dela.
         template.AssuntoTemplate.Should().Be("{{ empresa }}: seu convite para entrar no sistema");
         template.CorpoTemplate.Should().Contain("link_convite").And.Contain("Seu convite chegou");
         (template.AssuntoTemplate + template.CorpoTemplate).Should().NotContain("EasyStok").And.NotContain("convidado");

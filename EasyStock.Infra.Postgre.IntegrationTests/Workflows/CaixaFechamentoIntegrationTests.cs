@@ -3,8 +3,10 @@ using EasyStock.Application.DependencyInjection;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
+using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
@@ -31,6 +33,98 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Workflows;
 public class CaixaFechamentoIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Caixa_agregado_reflete_a_sessao_apos_fechamento_de_loja_e_nova_abertura(bool aberturaOntem)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        var empresaId = Guid.NewGuid();
+        var lojaA = Guid.NewGuid();
+        var lojaB = Guid.NewGuid();
+        var agora = DateTime.UtcNow;
+        var hoje = HorarioBrasil.DataOperacional(agora);
+        var inicioDoDia = HorarioBrasil.JanelaDiaUtc(hoje).IniUtc;
+        var instante = inicioDoDia.AddTicks((agora - inicioDoDia).Ticks / 2).AddDays(aberturaOntem ? -1 : 0);
+        var instanteDaLoja = agora.AddDays(aberturaOntem ? -1 : 0);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Set<Empresa>().Add(new Empresa
+            {
+                Id = empresaId, Nome = "Empresa Caixa Agregado",
+                Documento = $"{Random.Shared.Next(100000, 999999)}",
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            });
+            foreach (var lojaId in new[] { lojaA, lojaB })
+                seed.Set<Loja>().Add(new Loja
+                {
+                    Id = lojaId, EmpresaId = empresaId, Nome = "Loja Caixa Agregado", Ativa = true,
+                    CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+                });
+            seed.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, instante));
+            seed.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 20m, instanteDaLoja, lojaA));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var provider = BuildProductionProvider();
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            var obter = scope.ServiceProvider.GetRequiredService<ObterCaixaDiaUseCase>();
+            var antes = await obter.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+            antes.Aberto.Should().BeTrue();
+            antes.AberturaPendenteCrossDay.Should().Be(aberturaOntem);
+            antes.SaldoInicial.Should().Be(120m, "sem loja continua sendo o agregado da empresa");
+            await scope.ServiceProvider.GetRequiredService<FecharCaixaUseCase>()
+                .ExecuteAsync(new FecharCaixaCommand(empresaId, LojaId: lojaA));
+        }
+
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+            var repo = new CaixaRepository(db);
+            (await repo.GetAberturaPendenteAsync(empresaId)).Should().BeNull();
+            var registrar = scope.ServiceProvider.GetRequiredService<RegistrarMovimentoCaixaUseCase>();
+            var lancar = () => registrar.ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+                empresaId, "entrada", 1m, ExigirCaixaAberto: true));
+            await lancar.Should().ThrowAsync<UseCaseValidationException>()
+                .WithMessage(RegistrarMovimentoCaixaUseCase.CaixaAbertoMensagem);
+
+            var obter = scope.ServiceProvider.GetRequiredService<ObterCaixaDiaUseCase>();
+            var agregado = await obter.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+            agregado.Aberto.Should().BeFalse("o GET nao pode oferecer lancamento recusado pela guarda da mesma sessao");
+            agregado.Fechado.Should().BeFalse("fechar a loja nao cria snapshot global");
+            agregado.AberturaPendenteCrossDay.Should().BeFalse();
+            agregado.SaldoInicial.Should().Be(aberturaOntem ? 0m : 120m, "a correcao nao muda a soma financeira");
+            var daLoja = await obter.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje, lojaA));
+            daLoja.Aberto.Should().BeFalse();
+            daLoja.Fechado.Should().Be(!aberturaOntem);
+        }
+
+        // Uma abertura nova VALIDA (outra loja, sem reabrir o mesmo caixa fechado) muda o ultimo evento.
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(empresaId);
+            await scope.ServiceProvider.GetRequiredService<AbrirCaixaUseCase>()
+                .ExecuteAsync(new AbrirCaixaCommand(empresaId, 5m, LojaId: lojaB));
+            var obter = scope.ServiceProvider.GetRequiredService<ObterCaixaDiaUseCase>();
+            var agregado = await obter.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje));
+            agregado.Aberto.Should().BeTrue();
+            agregado.Fechado.Should().BeFalse();
+            agregado.SaldoInicial.Should().Be(aberturaOntem ? 5m : 125m);
+            (await obter.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje, lojaB))).Aberto.Should().BeTrue();
+            (await obter.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje, lojaA))).Aberto.Should().BeFalse();
+            await scope.ServiceProvider.GetRequiredService<RegistrarMovimentoCaixaUseCase>()
+                .ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 1m, ExigirCaixaAberto: true));
+            (await new CaixaRepository(db).GetMovimentosDoDiaAsync(empresaId, hoje))
+                .Count(m => m.Tipo == "entrada" && m.Valor == 1m).Should().Be(1);
+        }
+    }
+
     [SkippableFact]
     public async Task FecharCaixa_persiste_marcador_timestamptz_e_encerra_sessao()
     {

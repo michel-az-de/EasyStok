@@ -29,7 +29,7 @@ public sealed partial class TestadorWhatsApp(HttpClient http, IOptions<WhatsAppC
         if (string.IsNullOrWhiteSpace(numero) || !FormatoPhoneNumberId().IsMatch(numero))
             return ResultadoTesteIntegracao.Falhou("O número de WhatsApp da loja não está vinculado. Fale com a FMA.");
 
-        var baseUrl = opcoes.Value.BaseUrl?.TrimEnd('/');
+        var baseUrl = opcoes.Value.BaseUrlEfetiva.TrimEnd('/');
         if (string.IsNullOrWhiteSpace(baseUrl))
             return ResultadoTesteIntegracao.Falhou("O endereço do provedor WhatsApp não está configurado.");
         using var requisicao = new HttpRequestMessage(HttpMethod.Get,

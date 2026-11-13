@@ -15,7 +15,7 @@ namespace EasyStock.Domain.Entities
         public static string WhatsApp(TelefoneE164 telefone)
         {
             ArgumentNullException.ThrowIfNull(telefone);
-            var digitos = new string(telefone.Value.Where(char.IsDigit).ToArray());
+            var digitos = TelefoneE164.SoDigitos(telefone.Value);
             return $"+{digitos[..2]}•••{digitos[^4..]}";
         }
     }

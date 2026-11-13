@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { AvatarAssistente } from '../../componentes/AvatarAssistente'
 import { Pilula } from '../../componentes/Pilula'
 import { MODOS, listaDeModos } from '../../dominio/modosDeConexao'
 import css from './agente.module.css'
@@ -65,9 +66,9 @@ export function PainelAgente({
   }, [estado, sugestao])
 
   return (
-    <section className={css.painel} aria-label="Agente de atendimento">
+    <section className={css.painel} aria-label="Assistente">
       <div className={css.cabeca}>
-        <h3><Icone nome="agente" /> Sugestão de resposta</h3>
+        <h3><AvatarAssistente tamanho={28} /> Sugestão de resposta</h3>
         {!aberto && (
           <span className={`${css.resumoFechado} ${chamaAtencao ? css.pendente : ''}`}>
             {pendencias}
@@ -92,14 +93,14 @@ export function PainelAgente({
             <output className={css.pensando}>
               {modo === 'simulado'
                 ? 'Preparando uma sugestão de demonstração…'
-                : 'Consultando a IA sobre esta conversa…'}
+                : 'Consultando o Assistente sobre esta conversa…'}
             </output>
           )}
 
           {estado === 'erro' && (
             <p className={css.erro} role="alert">
               <Icone nome="alerta" /> {erro?.includes('Anthropic:')
-                ? 'A conexão com a IA está indisponível. Peça ao responsável pelo sistema para verificar.'
+                ? 'A conexão com o Assistente está indisponível. Peça ao responsável pelo sistema para verificar.'
                 : erro || 'Não foi possível gerar uma sugestão. Tente novamente.'}
             </p>
           )}
@@ -116,7 +117,7 @@ export function PainelAgente({
                   foram para a bancada de teste, no fim do painel. */}
               <p className={css.marcaSugestao}>
                 {passarParaDona
-                  ? <Pilula tom="aviso">o automático não responde isso</Pilula>
+                  ? <Pilula tom="aviso">o Assistente não responde isso</Pilula>
                   : <Pilula tom="info" fina>{sugestao.intencao.rotulo}</Pilula>}
               </p>
               <div className={css.rodapeSugestao}>

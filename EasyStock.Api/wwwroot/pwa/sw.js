@@ -17,12 +17,22 @@
 // recebido com cdb-pwa-installed-version local; quando diferente, pede update.
 // Web Admin pode forçar isso via comando remoto pwa_update (ver sync.js).
 
-const CACHE_VERSION = 'cdb-v27-calculadora-cesta';
+const CACHE_VERSION = 'cdb-v29-harmonia';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './harmonia.css',
+  './fontes/NunitoSans-400.woff2',
+  './fontes/NunitoSans-600.woff2',
+  './fontes/NunitoSans-700.woff2',
   './qrcode.min.js',
+  './etiqueta-termica.js',
+  './impressora-tspl.js',
+  './impressao-papeis.js',
+  './impressoras.js',
+  './etiqueta-resolver.js',
+  './etiqueta-canvas.js',
   './queue-store.js',
   './photo-store.js',
   './upload-photos.js',
@@ -154,18 +164,8 @@ self.addEventListener('message', (event) => {
   // F6 — Logout: limpa caches de API do usuário anterior (escopo por userId)
   // Mantém assets estáticos (CACHE_VERSION). Protege contra aba fechada antes do logout.
   if (type === 'LOGOUT_CLEAR') {
-    const loggedOutUserId = data.userId;
-    event.waitUntil(
-      caches.open(ETQ_RENDER_CACHE).then(c =>
-        c.keys().then(keys =>
-          Promise.all(
-            keys
-              .filter(req => !loggedOutUserId || req.url.includes(`userId=${loggedOutUserId}`))
-              .map(req => c.delete(req))
-          )
-        )
-      )
-    );
+    // #2401: a URL do render não carrega usuário; ao sair, o cache inteiro vai embora.
+    event.waitUntil(caches.delete(ETQ_RENDER_CACHE));
     return;
   }
 });

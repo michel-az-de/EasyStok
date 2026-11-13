@@ -6,7 +6,8 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import {
-  avisoDeInicio, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds, rotuloDoStatusKds, tempoAteInicio, urgenciaDoPedido,
+  avisoDeInicio, colunaDoStatusKds, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds, rotuloDoStatusKds, tempoAteInicio,
+  urgenciaDoPedido,
 } from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
@@ -20,7 +21,7 @@ import css from './cozinha.module.css'
 const COR_DA_URGENCIA = { atrasado: 'cor-atraso', agora: 'cor-agora', logo: 'cor-esperando' }
 
 const corDoCartao = (pedido, urgencia) => COR_DA_URGENCIA[urgencia]
-  ?? (pedido.status === 'aguardando' ? 'cor-esperando' : 'cor-preparo')
+  ?? (colunaDoStatusKds(pedido.status) === 'aguardando' ? 'cor-esperando' : 'cor-preparo')
 
 export function CartaoKds({
   pedido, agora, linhas, linhaFiltro, movendo = false, novo = false, mudou = false, saindo = false, recusa = null,
@@ -86,7 +87,7 @@ export function CartaoKds({
         <div className={css.acoesCartao}>
           <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)}>Ver comanda</Botao>
           {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}
-          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" rotulo="Canhoto" />
+          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" rotulo="Imprimir pedido" />
         </div>
       )}
     </li>

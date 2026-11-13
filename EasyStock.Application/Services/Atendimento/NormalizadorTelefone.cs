@@ -31,7 +31,7 @@ public static class NormalizadorTelefone
 
     /// <summary>#1408: celular BR com o nono dígito (dígitos ou E.164). Fixo não tem WhatsApp de cliente.</summary>
     public static bool EhCelularBr(string telefone) =>
-        CelularBrComNonoDigitoRegex.IsMatch(new string((telefone ?? string.Empty).Where(char.IsDigit).ToArray()));
+        CelularBrComNonoDigitoRegex.IsMatch(TelefoneE164.SoDigitos(telefone));
 
     /// <summary>
     /// Números E.164 a procurar para um <c>wa_id</c> da Meta (dígitos, sem <c>+</c>), o canônico
@@ -40,7 +40,7 @@ public static class NormalizadorTelefone
     /// </summary>
     public static IReadOnlyList<string> CandidatosDeWaId(string waId)
     {
-        var digitos = new string((waId ?? string.Empty).Where(char.IsDigit).ToArray());
+        var digitos = TelefoneE164.SoDigitos(waId);
         if (digitos.Length == 0)
             throw new TelefoneInvalidoException();
 

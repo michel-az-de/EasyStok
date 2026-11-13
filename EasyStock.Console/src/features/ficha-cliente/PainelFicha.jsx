@@ -1,30 +1,34 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { abrirSecao } from '../../hooks/useRecolhido'
 import { useDroppable } from '@dnd-kit/core'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
+import { PainelMovel, usePainelMovel } from '../../componentes/PainelMovel'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useSimulacaoDoPedido } from '../../aplicacao/useSimulacaoDoPedido'
+import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useADevolver } from '../../aplicacao/useADevolver'
 import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
-import { faltaDaCobranca } from '../../dominio/cobranca'
+import { faltaDaCobranca, situacaoDaCobranca, valorSugeridoParaBaixa } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
 import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoResumo, totalDoPedido } from '../../dominio/pedido'
 import { faltaPagar, totalPago } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
 import { ALVOS_DO_MOTIVO, pendenciaAntesDeCobrar } from '../../dominio/resumoPedido'
+import { pedidoMudou } from '../../dominio/cicloDaFicha'
 import { permissaoDeEscrita } from '../../dominio/janela'
-import { canalDaConversa } from '../../dominio/canal'
+import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import { chavesDaFicha, primeiroPassoAntesDaVenda } from '../../dominio/ficha'
 import { BarraProximoPasso } from './BarraProximoPasso'
 import { focarCampoDaFicha } from './focarCampoDaFicha'
 import { BlocoCobranca } from './BlocoCobranca'
 import { BlocoDevolucoes } from './BlocoDevolucoes'
 import { BlocoCapturaAutomatica } from './BlocoCapturaAutomatica'
-import { BlocoCliente } from './BlocoCliente'
+import { ModalCliente } from './ModalCliente'
 import { BlocoEnderecoCapturado } from './BlocoEnderecoCapturado'
 import { BlocoOcorrencia } from './BlocoOcorrencia'
 import { BlocoOcorrenciasApi } from './BlocoOcorrenciasApi'
@@ -32,67 +36,131 @@ import { BlocoEntrega } from './BlocoEntrega'
 import { BlocoFreteApi } from './BlocoFreteApi'
 import { BlocoPedido } from './BlocoPedido'
 import { CartaoDoCliente } from './CartaoDoCliente'
+import { NotasDoCliente } from './NotasDoCliente'
+import { MenuDaFicha } from './MenuDaFicha'
+import { useBaixarFicha } from './useBaixarFicha'
+import { AreaColaborativaIa, BlocoColaborativoIa } from './AreaColaborativaIa'
+import { ConsultaFreteCliente } from './ConsultaFreteCliente'
+import { MapaDaViagem } from './MapaViagem'
+import { useViagemDoCliente } from '../../aplicacao/useViagemDoCliente'
 import { ExtratoDoPedido } from './ExtratoDoPedido'
 import { ComandaDoCliente } from './ComandaDoCliente'
-import { resumoDoPagamento, saldoEmDestaque } from './apresentacaoDaFicha'
+import {
+  acoesDoPedido, bairroDoEndereco, itensDoMenuDaFicha, linhaDoResumo, resumoDaEntrega, resumoDoPagamento, saldoEmDestaque,
+} from './apresentacaoDaFicha'
 import css from './ficha.module.css'
 
 export function PainelFicha(props) {
   const { selecionada } = useAtendimento()
   // Nenhum formulário ou modal do ciclo anterior atravessa a troca de contexto.
-  const chave = `${selecionada?.id}:${conversaEncerrada(selecionada)}:${selecionada?.pedido?.pedidoId ?? selecionada?.pedido?.numero ?? ''}`
-  return <FichaDoAtendimento key={chave} {...props} />
+  // #2185 (F5): o rascunho que vira pedido (`pedidoId` aparece) segue o mesmo ciclo; antes a chave trocava e a
+  // Ficha remontava com o cadastro pela metade.
+  const agora = {
+    conversa: selecionada?.id, encerrada: conversaEncerrada(selecionada),
+    pedidoId: selecionada?.pedido?.pedidoId ?? null, numero: selecionada?.pedido?.numero ?? null,
+  }
+  const [visto, setVisto] = useState({ ...agora, ciclo: 0 })
+  const recomeca = visto.conversa !== agora.conversa || visto.encerrada !== agora.encerrada || pedidoMudou(visto, agora)
+  if (recomeca) setVisto({ ...agora, ciclo: visto.ciclo + 1 })
+  else if (visto.pedidoId !== agora.pedidoId || visto.numero !== agora.numero) setVisto({ ...visto, pedidoId: agora.pedidoId, numero: agora.numero })
+  return <FichaDoAtendimento key={`${visto.conversa}:${visto.ciclo}`} {...props} />
 }
 
-function AcessoDaFicha({ titulo, resumo, aoAbrir }) {
-  return <button type="button" className={css.acessoFicha} onClick={aoAbrir} aria-haspopup="dialog">
+function AcessoDaFicha({ titulo, resumo, icone, aoAbrir, painel, focoReserva = painel }) {
+  return <button type="button" className={css.acessoFicha} onClick={aoAbrir} aria-haspopup={painel ? undefined : 'dialog'} data-foco-reserva={focoReserva}>
+    {icone && <Icone nome={icone} tamanho={20} />}
     <span><strong>{titulo}</strong><small>{resumo}</small></span>
-    <Icone nome="chevron-right" tamanho={18} />
+    <Icone nome="chevron-right" tamanho={20} />
   </button>
 }
 
-function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
+function BlocoIaMovel({ bloco, escopoId, aoRecolher, visivel, ...acoes }) {
+  const controle = usePainelMovel(escopoId, `ia:${bloco.geracaoId}:${bloco.id}`)
+  const soltar = controle.soltar
+  useEffect(() => { soltar() }, [soltar])
+  const controleComFoco = { ...controle, devolverFoco: () => {
+    if (controle.devolverFoco()) return true
+    const alvo = [...document.querySelectorAll('[data-organizar-ficha-ia]')]
+      .find(no => no.dataset.organizarFichaIa === bloco.conversaId && !no.disabled && no.getClientRects().length)
+    if (!alvo) return false
+    alvo.focus({ preventScroll: true }); return true
+  } }
+  return <PainelMovel controle={controleComFoco} titulo="Você + Assistente" larguraInicial={360} alturaInicial={360} focar aoRecolher={aoRecolher} visivel={visivel}>
+    <BlocoColaborativoIa bloco={bloco} conversaId={bloco.conversaId} {...acoes} />
+  </PainelMovel>
+}
+
+function MapaMovelDaFicha({ controle, dados, clienteId, visivel }) {
+  const acompanhamento = useViagemDoCliente({ clienteId: dados?.clienteId ?? clienteId, pedidoId: dados?.pedidoId, ativo: visivel && controle.solto && Boolean(dados?.pedidoId) })
+  if (!dados) return null
+  return <PainelMovel controle={controle} titulo={`Viagem · ${dados.nomeCliente}`} larguraInicial={520} alturaInicial={560} visivel={visivel}>
+    <MapaDaViagem {...dados} viagem={acompanhamento.lida ? acompanhamento.viagem : dados.viagem} />
+    {acompanhamento.erro && <p role="status">Não foi possível atualizar a viagem. <Botao variante="texto" onClick={acompanhamento.atualizar}>Tentar de novo</Botao></p>}
+  </PainelMovel>
+}
+
+function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoCompartilhar, acoesCabecalho,
+  visivel = true, comandaVisivel = visivel, solicitacaoFicha, aoConsumirSolicitacaoFicha }) {
   const {
-    selecionada, visiveis, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi,
+    selecionada, alertasEstoque, ultimoAvanco, agora, automaticoPausado, fonteApi, sessao,
   } = useAtendimento()
   const {
     avancarEsteira, cadastrarEndereco, fecharAlerta,
-    ajustarQuantidade, ajustarObservacao, gerarPedido, desfazerEsteira, corrigirPasso, selecionar,
+    ajustarQuantidade, ajustarObservacao, gerarPedido, desfazerEsteira, corrigirPasso,
     gerarCobranca, reenviarCobranca, confirmarPagamento,
     marcarComprovante, aceitarDivergencia, escolherJanela, forcarEncaixe,
     cancelarPedido, marcarEstorno, abrirEncerramento, decidirAreaEntrega, escolherMeioPagamento,
-    alterarMeioPagamento, desfazerPagamento, aprovarPedido, novaComanda,
+    alterarMeioPagamento, desfazerPagamento, aprovarPedido, novaComanda, recarregarPedido,
   } = useAcoes()
   const { janelas, prefixosCepAtendidos, cardapio, canais } = useCatalogo()
   // #1884 ("Quanto fica?"): uma simulação por comanda, para a comanda e a barra mostrarem os mesmos números.
   const simulacao = useSimulacaoDoPedido({
-    conversaId: selecionada?.id, pedido: selecionada?.pedido, ativo: Boolean(fonteApi && selecionada && !conversaEncerrada(selecionada)),
+    conversaId: selecionada?.id, clienteId: selecionada?.clienteId, endereco: selecionada?.cliente?.endereco,
+    pedido: selecionada?.pedido, ativo: Boolean(fonteApi && selecionada && !conversaEncerrada(selecionada)),
   })
   // J2 (#1990): pedido pago cancelado diz no Resumo e no Pagamento quanto falta devolver.
   const aDevolver = useADevolver(fonteApi ? selecionada?.pedido : null)
   const [secao, setSecao] = useState(null)
+  // #2232 (F1, F7): o menu "Ações da ficha" reúne cadastro, PDF e as ações do pedido.
+  const disponivel = useAcaoDisponivel()
+  const { acoes: capacidades } = useAcessoModulos()
+  const pdfDaFicha = useBaixarFicha({ clienteId: selecionada?.clienteId, fonteApi })
+  const [pedidoDeAcao, setPedidoDeAcao] = useState({ chave: null, n: 0 })
+  const [blocosSoltos, setBlocosSoltos] = useState([])
+  const [freteAberto, setFreteAberto] = useState(false)
+  const [mapaAoLado, setMapaAoLado] = useState(null)
+  const escopoMovel = `ficha:${sessao?.empresa?.id ?? 'demo'}:${sessao?.usuario?.id ?? 'demo'}:${selecionada?.id ?? 'sem-conversa'}`
+  const comandaMovel = usePainelMovel(escopoMovel, 'comanda')
+  const mapaMovel = usePainelMovel(escopoMovel, 'mapa')
+  const soltarComanda = comandaMovel.soltar
+  useEffect(() => {
+    if (!visivel || !solicitacaoFicha || solicitacaoFicha.conversaId !== selecionada?.id) return
+    if (solicitacaoFicha.destino === 'cadastro') setSecao('cliente')
+    else {
+      setSecao(null)
+      if (selecionada?.pedido) soltarComanda()
+    }
+    aoConsumirSolicitacaoFicha?.()
+  }, [visivel, solicitacaoFicha, selecionada?.id, selecionada?.pedido, soltarComanda, aoConsumirSolicitacaoFicha])
+  const abrirComanda = () => comandaMovel.soltar()
+  const abrirMapaAoLado = (dados) => {
+    setMapaAoLado(dados); setFreteAberto(false)
+    mapaMovel.soltar({ x: Math.max(8, window.innerWidth - 540), y: 96 })
+  }
   // #1686 (item 4): "Cancelar e refazer" na Seleção abre a confirmação de cancelar da barra.
   const [pedidoDeCancelar, setPedidoDeCancelar] = useState(0)
   // #1683: conversa em que o cliente está escolhendo pelo link (quem sabe é a ComandaDoCliente).
   const [conversaEscolhendo, setConversaEscolhendo] = useState(null)
   const { setNodeRef: receberPrato, isOver: recebendoPrato } = useDroppable({
     id: 'comanda-resumo', data: { type: 'comanda' },
-    disabled: Boolean(secao) || !selecionada?.pedido || conversaEncerrada(selecionada) || pedidoEncerrado(selecionada?.pedido)
+    disabled: Boolean(secao) || comandaMovel.solto || !selecionada?.pedido || conversaEncerrada(selecionada) || pedidoEncerrado(selecionada?.pedido)
       || comandaTravada(selecionada?.pedido, { fonteApi }) || conversaEscolhendo === selecionada?.id,
   })
 
   if (!selecionada) {
-    const primeira = visiveis[0]
     return (
-      <Vazio
-        titulo="Sem ficha na tela"
-        acao={primeira && (
-          <Botao variante="primario" onClick={() => selecionar(primeira.id)}>
-            Abrir ficha de {primeira.nome.split(' ')[0]}
-          </Botao>
-        )}
-      >
-        Selecione uma conversa para ver o próximo passo do atendimento.
+      <Vazio titulo="Ficha">
+        Escolha uma conversa para ver o cliente e o pedido.
       </Vazio>
     )
   }
@@ -106,9 +174,11 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   const numero = selecionada.numeroComanda || (pedido ? numeroDaComanda(pedido, { fonteApi }) : null)
   const posVenda = pedido && pedidoEncerrado(pedido)
   const pedidoCriado = Boolean(pedido && (fonteApi ? pedido.pedidoId : pedido.cobranca || pedido.estado !== 'aguardando'))
-  const tituloPedido = pedidoCriado ? 'Pedido e entrega' : 'Seleção do atendimento'
+  const tituloPedido = 'Revisar comanda'
   const total = pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
   const saldo = faltaPagar(pedido, cardapio)
+  const estadoDoResumo = pedido?.estado === 'aguardando' && pedido.cobranca && situacaoDaCobranca(pedido.cobranca, agora).chave === 'aguardando'
+    ? 'Cobrança pendente' : rotuloDoResumo(pedido?.estado, saldo, Array.isArray(pedido?.pagamentosApi) ? totalPago(pedido) : null)
   const itens = pedido?.itens?.reduce((soma, item) => soma + item.qtd, 0) ?? 0
   // #1868: o saldo ganha linha própria no Resumo; o acesso Pagamento não repete o valor.
   const destacaSaldo = saldoEmDestaque({ editavel, pedidoCriado, saldo, cancelado: pedido?.estado === 'cancelado' })
@@ -117,11 +187,22 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   // mostra o motivo e desabilita o botão em vez de deixar o EasyStok recusar depois.
   const gerarSemEnviar = fonteApi && permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)).motivo?.acao === 'janela'
   const pendencia = pedido
-    ? pendenciaAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco }, {
+    ? pendenciaAntesDeCobrar({ pedido, clienteId: selecionada.clienteId, endereco: cliente.endereco, bloqueado: estaBloqueada(selecionada) }, {
       fonteApi,
     })
     : null
   const prerequisito = pendencia?.motivo ?? null
+  // #2232 (F3): com o sinal da encomenda a receber, a linha de apoio diz o sinal e o destaque diz o saldo.
+  const sinalDoResumo = pedido?.sinalNaReserva && pedido.statusApi === 'aguardando_pagamento' && pedido.cobranca && !pedido.cobranca.pagaEm
+    ? valorSugeridoParaBaixa(pedido) : null
+  // #2232 (F7): o que o ⋮ da barra oferecia, agora no menu do cabeçalho.
+  const acoesDoMenu = acoesDoPedido({ pedido: editavel ? pedido : null, fonteApi, disponivel, capacidades })
+  const escolherNoMenu = (chave) => {
+    if (chave === 'editar') setSecao('cliente')
+    else if (chave === 'baixar') pdfDaFicha.baixar()
+    else if (chave === 'encerrar') aoEncerrarAtendimento()
+    else setPedidoDeAcao(({ n }) => ({ chave, n: n + 1 }))
+  }
 
   // Texto pronto que o cliente lê ao cancelar (mesmo padrão de ENVIAR_MIDIA e
   // GERAR_PEDIDO: o domínio não escreve copy, quem monta é a tela). Reusado
@@ -138,7 +219,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   // #1686 (item 9): o link do motivo abre onde ele se resolve e põe o foco no campo.
   const irParaMotivo = (alvo) => {
     if (alvo === ALVOS_DO_MOTIVO.CARDAPIO) { abrirCardapio(); return }
-    if (alvo === ALVOS_DO_MOTIVO.JANELA) { setSecao('pedido'); focarCampoDaFicha('janela'); return }
+    if (alvo === ALVOS_DO_MOTIVO.JANELA) { abrirComanda(); focarCampoDaFicha('janela'); return }
     abrirSecao('contato')
     setSecao('cliente')
     focarCampoDaFicha(alvo)
@@ -150,21 +231,29 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
   // #1761 (L10): sem pedido, "Adicionar itens" é o próximo passo e mora no bloco da comanda.
   // #1806: lead sem cadastro cadastra primeiro, com o formulário já preenchido pela conversa.
   const cadastrarPrimeiro = primeiroPassoAntesDaVenda({ conversa: selecionada, pedido, fonteApi }) === 'cadastro'
-  const acaoMontar = !pedido && !clienteEscolhendo
+  const acaoMontar = !clienteEscolhendo && (!pedido || (!pedidoCriado && !comandaTravada(pedido, { fonteApi })))
     ? (cadastrarPrimeiro
       ? <>
         <Botao largo variante="primario" disabled={!editavel} onClick={() => setSecao('cliente')}>Cadastrar cliente</Botao>
-        <Botao largo disabled={!editavel} onClick={aoAbrirCardapio}>Adicionar itens</Botao>
+        <Botao largo icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>
       </>
-      : <Botao largo variante="primario" disabled={!editavel} onClick={aoAbrirCardapio}>Adicionar itens</Botao>)
+      : <Botao largo variante="primario" icone="plus" aria-label="Adicionar itens" disabled={!editavel} onClick={aoAbrirCardapio}>Itens</Botao>)
     : null
   const comandaCompartilhada = <ComandaDoCliente key={chaves.comandaCompartilhada} conversaId={selecionada.id} compacta
     nomeCliente={selecionada.nome}
-    numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar} acaoMontar={acaoMontar}
+    numeroComanda={numero} ativo={fonteApi} acaoCompartilhar={acaoCompartilhar}
     pedido={pedido} aoMudarEscolha={setConversaEscolhendo} />
 
   return (
     <div className={css.painel}>
+      <header className={css.cabecalhoFicha} data-cabecalho-ficha>
+        <h2>Cliente</h2>
+        <span className={css.ferramentasFicha}>
+          <MenuDaFicha itens={itensDoMenuDaFicha({ acoes: acoesDoMenu, comPedido: Boolean(pedido && editavel) })} pdf={pdfDaFicha}
+            aoEscolher={escolherNoMenu} />
+          {acoesCabecalho}
+        </span>
+      </header>
       {/* Alerta no topo, em corpo de texto e como região viva. Estava nascendo
           a 1140 px de altura, em 13 px, invisível na prática. Lista, não campo
           único: um segundo desacerto de saldo não pode apagar o primeiro antes
@@ -178,40 +267,57 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
       ))}
 
       <div className={css.conteudo}>
+        {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
+        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} mostrarEntrega={false} foto={fotoDoCliente(canalDaConversa(canais, selecionada), cliente)} aoAbrir={() => setSecao('cliente')}
+          aoVerEntrega={pedidoCriado ? abrirComanda : undefined} aoVerAoLado={abrirMapaAoLado} focoFrete={mapaMovel.chave}
+          aoConsultarFrete={() => setFreteAberto(true)} />
+
         <section ref={receberPrato} className={css.resumoAtual} data-recebendo-prato={recebendoPrato || undefined} aria-label="Resumo do atendimento">
-          <p className={css.fase}>{!editavel ? 'Conversa encerrada' : posVenda ? 'Pós-venda' : pedidoCriado ? 'Pedido criado' : 'Antes da venda'}</p>
-          <h3>{!editavel ? 'Atendimento encerrado' : pedidoCriado ? `${fonteApi ? 'Comanda' : 'Pedido'} ${numero ?? ''}`.trim() : pedido ? 'Seleção não confirmada' : 'Vamos atender ' + primeiroNome}</h3>
-          <p>{!editavel ? 'O histórico está guardado. Reabra a conversa para retomar o atendimento.'
-            : pedido ? `${pedidoCriado ? rotuloDoResumo(pedido.estado, saldo, Array.isArray(pedido.pagamentosApi) ? totalPago(pedido) : null) : 'Em montagem'} · ${itens} ${itens === 1 ? 'item' : 'itens'} · ${moeda(total)}`
-              : cadastrarPrimeiro ? 'Primeiro o cadastro: o pedido só nasce para cliente cadastrado. O que a conversa trouxe já vem preenchido.'
-                : 'Monte o pedido por aqui ou acompanhe a escolha do cliente pelo link.'}</p>
+          <h3>{!editavel ? 'Conversa concluída' : numero ? `Comanda ${numero}` : 'Comanda'}</h3>
+          <p>{!editavel ? 'O histórico está guardado.'
+            : pedido ? linhaDoResumo({ estado: pedidoCriado ? estadoDoResumo : 'Em montagem', itens, total, saldo, destaque: destacaSaldo, sinal: sinalDoResumo })
+              : cadastrarPrimeiro ? 'Cadastre o cliente para montar o pedido.'
+                : 'Adicione itens ou envie o cardápio ao cliente.'}</p>
           {destacaSaldo && <p className={css.saldoFicha}>{moeda(saldo)} a receber</p>}
           {aDevolver > 0 && <p className={css.saldoFicha}>{moeda(aDevolver)} a devolver</p>}
+          {/* #2420: a ação de montar mora dentro do cartão da comanda. */}
+          {editavel && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
+          {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. #2427: no cartão. */}
+          {editavel && fonteApi && posVenda && novaComanda && (
+            <div className={css.acaoMontar}>
+              <Botao largo variante="secundario" icone="plus" onClick={() => novaComanda(selecionada.id)}>Nova comanda</Botao>
+            </div>
+          )}
         </section>
-
-        {/* #1839: o cliente sempre à vista (resumo da IA, total de pedidos, tags e a última nota). */}
-        <CartaoDoCliente conversa={selecionada} fonteApi={fonteApi} aoAbrir={() => setSecao('cliente')} />
-
-        {editavel && comandaCompartilhada}
-        {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. */}
-        {editavel && fonteApi && posVenda && novaComanda && (
-          <div className={css.acaoMontar}>
-            <Botao largo variante="secundario" icone="plus" onClick={() => novaComanda(selecionada.id)}>Nova comanda</Botao>
-          </div>
-        )}
-        {editavel && !pedido && !fonteApi && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
         <nav className={css.acessosFicha} aria-label="Detalhes do atendimento">
-          {pedido && <AcessoDaFicha titulo={editavel ? tituloPedido : 'Consultar pedido vinculado'}
-            resumo={editavel ? faixa || 'Itens, horário e acompanhamento' : 'Consultar sem alterar o pedido'} aoAbrir={() => setSecao('pedido')} />}
-          {editavel && pedidoCriado && <AcessoDaFicha titulo="Pagamento" resumo={resumoPagamento} aoAbrir={() => setSecao('pagamento')} />}
-          <AcessoDaFicha titulo="Cliente e histórico"
-            resumo={!cliente.endereco ? 'Conferir cadastro e endereço' : 'Cadastro, endereço e conversas anteriores'} aoAbrir={() => setSecao('cliente')} />
-          {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha titulo="Pós-venda"
+          {pedido && <AcessoDaFicha painel={comandaMovel.chave} icone="shopping-cart" titulo={editavel ? tituloPedido : 'Consultar pedido vinculado'}
+            resumo={editavel ? faixa || 'Itens, horário e acompanhamento' : 'Consultar sem alterar o pedido'} aoAbrir={abrirComanda} />}
+          {(pedidoCriado || (fonteApi && selecionada.clienteId)) && <AcessoDaFicha icone="map-pin" titulo="Entrega" focoReserva={mapaMovel.chave}
+            resumo={resumoDaEntrega({ faixa: pedido ? faixa : null, endereco: cliente.endereco, bairro: bairroDoEndereco(cliente.endereco) })} aoAbrir={() => cliente.endereco ? setFreteAberto(true) : setSecao('cliente')} />}
+          {editavel && pedidoCriado && <AcessoDaFicha icone="credit-card" titulo="Pagamento" resumo={resumoPagamento} aoAbrir={() => setSecao('pagamento')} />}
+        </nav>
+        <div className={css.notasDaFicha}>
+          <NotasDoCliente key={selecionada.id} conversaId={selecionada.id} clienteId={selecionada.clienteId ?? selecionada.id}
+            clienteNome={selecionada.nome} fonteApi={fonteApi && Boolean(selecionada.clienteId)} notas={cliente.notas ?? []}
+            aoCriarNota={editavel ? aoAbrirNota : undefined} podeCriarNota={!fonteApi || Boolean(selecionada.clienteId)} />
+        </div>
+        <nav className={css.acessosFicha} aria-label="Histórico e pós-venda">
+          <AcessoDaFicha icone="historico" titulo="Histórico do cliente"
+            resumo={cliente.pedidos != null ? `${cliente.pedidos} ${cliente.pedidos === 1 ? 'pedido' : 'pedidos'}` : 'Pedidos, notas e conversas'} aoAbrir={() => setSecao('cliente')} />
+          {editavel && pedidoCriado && (fonteApi || posVenda || pedido.ocorrencia) && <AcessoDaFicha icone="undo-2" titulo="Pós-venda"
             resumo={pedido.ocorrencia ? 'Acompanhar problema relatado' : 'Ocorrências e devoluções'} aoAbrir={() => setSecao('pos-venda')} />}
         </nav>
+        {editavel && fonteApi && <details className={css.linkCompartilhado}><summary>Link do cliente<Icone nome="chevron-down" tamanho={16} /></summary>{comandaCompartilhada}</details>}
+        {fonteApi && editavel && <AreaColaborativaIa conversaId={selecionada.id}
+          aoAbrirComanda={pedido ? abrirComanda : undefined} aoProporNota={aoAbrirNota}
+          aoCalcularFrete={() => setFreteAberto(true)} aoAbrirCardapio={aoAbrirCardapio} aoRascunho={aoRascunho}
+          blocosSoltos={blocosSoltos.map((b) => `${b.geracaoId}:${b.id}`)}
+          aoSoltar={(bloco) => setBlocosSoltos((atuais) => atuais.some((b) => b.geracaoId === bloco.geracaoId && b.id === bloco.id) ? atuais : [...atuais, bloco])} />}
+
+
       </div>
 
-      {secao === 'cliente' && <Modal titulo={`Cliente e histórico · ${selecionada.nome}`} largura="760px" aoFechar={() => setSecao(null)}>
+      {secao === 'cliente' && <ModalCliente conversa={selecionada} aoFechar={() => setSecao(null)}>
         {/* Rodada 11 (registro 92): onde o automático está no caminho do
             UC-01, enquanto ele monta o cadastro pela conversa. */}
         {selecionada.captura && selecionada.conta === 'lead' && (
@@ -230,12 +336,11 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           />
         )}
 
-        <BlocoCliente key={selecionada.id} conversa={selecionada} />
-      </Modal>}
+      </ModalCliente>}
 
-      {secao === 'pedido' && pedido && <Modal titulo={`${editavel ? tituloPedido : 'Pedido vinculado'} · ${selecionada.nome}`} largura="760px" aoFechar={() => setSecao(null)}>
+      {pedido && <PainelMovel controle={comandaMovel} titulo={`Comanda · ${selecionada.nome}`} larguraInicial={480} alturaInicial={480} alinharDireita visivel={comandaVisivel}>
         {editavel && !pedidoCriado && <p>Estes itens ainda estão em montagem. O pedido será criado ao gerar a cobrança.</p>}
-        {!editavel && <p>Consulta do atendimento encerrado. Reabra a conversa para fazer alterações.</p>}
+        {!editavel && <p>Consulta da conversa concluída.</p>}
         <BlocoPedido
           pedido={pedido}
           editavel={editavel}
@@ -253,7 +358,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           faixa={faixa}
           bloqueado={estaBloqueada(selecionada)}
           conversaId={selecionada.id}
-          numeroComanda={numero}
+          numeroComanda={pedidoCriado ? numero : null}
           clienteEscolhendo={clienteEscolhendo}
           simulacao={simulacao}
         />
@@ -262,9 +367,17 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
             {fonteApi && pedido.pedidoId && <BlocoFreteApi key={chaves.frete} pedido={pedido}
               cliente={selecionada.nome} numero={numero} endereco={cliente.endereco} />}
         </>}
-      </Modal>}
+      </PainelMovel>}
 
-      {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="680px" aoFechar={() => setSecao(null)}>
+      {freteAberto && <ConsultaFreteCliente conversa={selecionada} pedidoId={pedido?.pedidoId} aoFechar={() => setFreteAberto(false)}
+        aoEditarEndereco={() => { setFreteAberto(false); setSecao('cliente') }} aoVerAoLado={abrirMapaAoLado} />}
+      <MapaMovelDaFicha controle={mapaMovel} dados={mapaAoLado ?? (mapaMovel.solto ? { pedidoId: pedido?.pedidoId, endereco: cliente.endereco, nomeCliente: selecionada.nome } : null)} clienteId={selecionada.clienteId} visivel={visivel} />
+      {blocosSoltos.filter((b) => b.conversaId === selecionada.id).map((bloco) => <BlocoIaMovel key={`${bloco.geracaoId}:${bloco.id}`} bloco={bloco} escopoId={escopoMovel} visivel={visivel}
+        aoAbrirComanda={pedido ? abrirComanda : undefined} aoProporNota={aoAbrirNota} aoCalcularFrete={() => setFreteAberto(true)}
+        aoAbrirCardapio={aoAbrirCardapio} aoRascunho={aoRascunho}
+        aoRecolher={() => setBlocosSoltos((atuais) => atuais.filter((b) => b !== bloco))} />)}
+
+      {secao === 'pagamento' && editavel && pedido && <Modal titulo={`Pagamento · ${selecionada.nome}`} largura="md" aoFechar={() => setSecao(null)}>
         {fonteApi && <ExtratoDoPedido pedido={pedido} aDevolver={aDevolver} />}
         <BlocoCobranca
           key={chaves.cobranca}
@@ -284,11 +397,12 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
         />
       </Modal>}
 
-      {secao === 'pos-venda' && editavel && pedido && <Modal titulo={`Pós-venda · ${selecionada.nome}`} largura="760px" aoFechar={() => setSecao(null)}>
+      {secao === 'pos-venda' && editavel && pedido && <Modal titulo={`Pós-venda · ${selecionada.nome}`} largura="md" aoFechar={() => setSecao(null)}>
             {fonteApi && pedido.pedidoId && <BlocoDevolucoes
               key={chaves.devolucoes}
               pedidoId={pedido.pedidoId}
               cancelado={pedido.estado === 'cancelado'}
+              aoAlterado={() => recarregarPedido?.(selecionada.id)}
             />}
             {fonteApi && pedido.pedidoId && <BlocoOcorrenciasApi key={chaves.ocorrenciasApi} pedidoId={pedido.pedidoId} conversaId={selecionada.id} />}
             {!fonteApi && pedido.ocorrencia && (
@@ -317,9 +431,11 @@ function FichaDoAtendimento({ aoAbrirCardapio, acaoCompartilhar }) {
           alvoDoPrerequisito={pendencia?.alvo ?? null}
           aoIrParaMotivo={irParaMotivo}
           pedidoDeCancelar={pedidoDeCancelar}
+          pedidoDeAcao={pedidoDeAcao.chave ? pedidoDeAcao : null}
           aoAvancar={(passo, entregador, opcoes) => avancarEsteira(selecionada.id, passo, entregador, opcoes)}
           aoDesfazer={() => desfazerEsteira(selecionada.id, ultimoAvanco.mensagemId, ultimoAvanco.posEntregaId)}
           gerarSemEnviar={gerarSemEnviar}
+          aoPedirMeio={() => { if (comandaMovel.solto) comandaMovel.recolher() }}
           aoGerarPix={(meio) => { escolherMeioPagamento(selecionada.id, meio); return gerarCobranca(selecionada.id, pedido, meio, !gerarSemEnviar) }}
           aoReenviarPix={(valorForcado) => reenviarCobranca(selecionada.id, pedido, valorForcado ?? null)}
           aoAprovarPedido={aprovarPedido ? () => aprovarPedido(selecionada.id) : null}

@@ -15,8 +15,8 @@ namespace EasyStock.Api.Mobile.Services;
 /// Estratégia:
 ///   - Idempotência via <see cref="Order.ErpVendaId"/>: se já tem Venda,
 ///     não cria de novo (re-envio de mutation é seguro).
-///   - Só cria itens pra produtos linkados ao ERP (<see cref="Product.ErpProductId"/>);
-///     itens não-linkados são ignorados (entram só na Venda como observação).
+///   - Só consolida a Venda quando todos os itens têm produto vinculado ao ERP.
+///     Até lá, o recebimento integral continua no PedidoPagamento; relatórios só de Venda aguardam os vínculos.
 ///   - ValorTotal vem da somatória dos PrecoTotal — agregação automática.
 ///   - Canal=<see cref="CanalVenda.Outro"/> + Observacoes="Mobile" pra
 ///     filtros futuros.
@@ -54,6 +54,8 @@ public class MobileSaleSyncService(
             var mobileIds = items.Select(i => i.ProductId).Distinct().ToList();
             var products = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                 .Where(p => p.EmpresaId == order.EmpresaId && mobileIds.Contains(p.Id))
+                .Join(_db.Set<Produto>().IgnoreQueryFilters().Where(p => p.EmpresaId == order.EmpresaId),
+                    p => p.ErpProductId, p => (Guid?)p.Id, (mobile, _) => mobile)
                 .ToListAsync(ct);
 
             var linkedItems = items
@@ -65,10 +67,12 @@ public class MobileSaleSyncService(
                 .Where(x => x.Product?.ErpProductId != null)
                 .ToList();
 
-            if (linkedItems.Count == 0)
+            // #2049: uma Venda parcial excluiria o pagamento integral do Caixa (Pedido.VendaId).
+            // O estoque dos itens vinculados continua pela esteira própria; não se fabrica item para o avulso.
+            if (linkedItems.Count != items.Count)
             {
                 _log.LogInformation(
-                    "Onda 3: pedido {OrderId} entregue mas nenhum produto está linkado ao ERP. Venda não criada (vai aparecer só nos analytics quando produtos forem aprovados).",
+                    "Onda 3: pedido {OrderId} entregue com item sem vínculo ERP. Venda não consolidada; recebimento permanece no pedido até todos os itens terem vínculo.",
                     order.Id);
                 return false;
             }
@@ -109,7 +113,7 @@ public class MobileSaleSyncService(
                     // e perde-se rastreabilidade. Saldo negativo é a verdade —
                     // produto vendido sem entrada registrada.
                     var produto = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
-                        .FirstOrDefaultAsync(p => p.Id == produtoId, ct);
+                        .FirstOrDefaultAsync(p => p.Id == produtoId && p.EmpresaId == order.EmpresaId, ct);
                     if (produto == null)
                     {
                         _log.LogWarning(

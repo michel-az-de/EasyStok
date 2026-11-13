@@ -41,7 +41,8 @@ public sealed class AtualizarProdutoUseCase(
         if (!string.IsNullOrWhiteSpace(command.DescricaoBase))
             UseCaseGuards.EnsureSemTagsHtml(command.DescricaoBase, "Descrição do produto");
 
-        var produto = await produtoRepository.GetByIdAsync(command.EmpresaId, command.ProdutoId)
+        // SYNC-5 (#2318): o xmin (RowVersion) so entra no UPDATE com o produto rastreado; AsNoTracking zerava a versao e dava 409 sempre.
+        var produto = await produtoRepository.GetByIdParaAtualizarAsync(command.EmpresaId, command.ProdutoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
         // Captura estado anterior para auditoria
@@ -121,6 +122,12 @@ public sealed class AtualizarProdutoUseCase(
         produto.ControlaValidade = command.ControlaValidade;
         produto.Dimensoes = command.Dimensoes.ToValueObjectOrNull();
         produto.CustoReferencia = command.CustoReferencia.HasValue ? Dinheiro.FromDecimal(command.CustoReferencia.Value) : null;
+        // #2401: custo editado não pode deixar o de 6 casas velho: a ficha (CustoDaFicha) o prefere.
+        if (command.CustoReferencia != custoAntes)
+        {
+            if (produto.EhInsumo) produto.DefinirCustoDoInsumo(command.CustoReferencia);
+            else produto.CustoUnitarioInsumo = null;
+        }
         produto.PrecoReferencia = command.PrecoReferencia.HasValue ? Dinheiro.FromDecimal(command.PrecoReferencia.Value) : null;
         produto.MargemEstimada = command.MargemEstimada;
         // Preserva ficha tecnica quando o command omite AtributosJson. Form.cshtml de

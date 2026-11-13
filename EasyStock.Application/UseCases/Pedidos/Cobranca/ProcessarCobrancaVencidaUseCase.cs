@@ -10,6 +10,7 @@ using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
@@ -198,15 +199,18 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     public static string CorrelacaoAvisoEquipe(Guid cobrancaId) => $"cobranca-aguardando-equipe:{cobrancaId:N}";
 
     // Sem usuarioId: vale a audiência da rotina. Só primeiro nome e referência, como os avisos do Balcão.
-    private Task AvisarEquipeAsync(EasyStock.Domain.Entities.Pedido pedido, CobrancaPedido cobranca, CancellationToken ct)
+    private async Task AvisarEquipeAsync(EasyStock.Domain.Entities.Pedido pedido, CobrancaPedido cobranca, CancellationToken ct)
     {
         var payload = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
         {
-            ["nome"] = AvisoEquipeNoAparelho.PrimeiroNome(pedido.ClienteNome),
-            ["referencia"] = PrazoEstouradoEvento.Referencia(pedido.Id),
+            ["nome"] = NomesDeContato.PrimeiroNome(pedido.ClienteNome, AvisoEquipeNoAparelho.NomeSemContato),
+            ["referencia"] = CodigoCurto.De(pedido.Id),
             [NotificadorService.ChaveIdempotenciaPayload] = CorrelacaoAvisoEquipe(cobranca.Id),
         });
-        return notificador.EnfileirarEventoAsync(TipoEventoNotificacao.CobrancaAguardandoEquipe, pedido.EmpresaId, payload,
+        await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.CobrancaAguardandoEquipe, pedido.EmpresaId, payload,
             pedido.Id, ct, CorrelacaoAvisoEquipe(cobranca.Id));
+        // #2211: o WhatsApp da equipe inscrita.
+        await new PublicadorAvisoEquipe(notificador).ProblemaNoPagamentoAsync(pedido.EmpresaId, pedido.Id,
+            pedido.ClienteNome, "o link de pagamento venceu sem pagamento", $"vencida:{cobranca.Id:N}", ct);
     }
 }

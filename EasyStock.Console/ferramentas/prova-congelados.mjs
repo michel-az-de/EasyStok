@@ -107,11 +107,24 @@ confere('(b) cada tela congelada existe no catálogo, some do menu e da busca, e
   }
 })
 
-confere('Financeiro fica só com o Caixa do dia e a entrada do módulo abre nele', () => {
-  assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).map((t) => t.id), ['caixa'])
+confere('Financeiro descongelado: o gerencial volta no modo API e a demonstração fica só com o Caixa', () => {
+  assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).map((t) => t.id), ['caixa', 'visao-geral', 'pagar', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo'])
   assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: false }).map((t) => t.id), ['caixa'])
   assert.equal(rotaDaHash('#/m/financeiro', { fonteApi: true }).aba, 'caixa')
-  assert.equal(rotaDaHash('#/m/financeiro/pagar', { fonteApi: true }).aba, 'caixa')
+  assert.equal(rotaDaHash('#/m/financeiro/pagar', { fonteApi: true }).aba, 'financeiro-pagar')
+})
+
+confere('Financeiro por perfil (#2095, F17): o Operador vê só o Caixa; cada tela pede a ação que a API exige', () => {
+  const telas = (acoes) => telasDoMenu(moduloPorId('financeiro'), { fonteApi: true, acoes }).map((t) => t.id)
+  const operador = { visualizarContasPagar: false, visualizarContasReceber: false, gerenciarCategoriasFinanceiras: false, gerenciarCentrosCusto: false, gerenciarCaixa: true }
+  assert.deepEqual(telas(operador), ['caixa'])
+  assert.deepEqual(telas({}), ['caixa'], 'matriz sem as ações do financeiro não abre o gerencial')
+  assert.deepEqual(telas({ visualizarContasPagar: true }), ['caixa', 'visao-geral', 'pagar', 'extrato', 'relatorios', 'categorias', 'centros-custo'])
+  assert.deepEqual(telas({ visualizarContasReceber: true }), ['caixa', 'visao-geral', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo'])
+  // O GET de categorias e centros exige visualizar contas: só gerenciar abriria uma tela sem saída.
+  assert.deepEqual(telas({ gerenciarCategoriasFinanceiras: true }), ['caixa'])
+  assert.deepEqual(telas({ gerenciarCentrosCusto: true }), ['caixa'])
+  assert.deepEqual(telas({ visualizarContasPagar: true, visualizarContasReceber: true }), ['caixa', 'visao-geral', 'pagar', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo'])
 })
 
 // ---------------------------------------------------------------- textos que mentiriam
@@ -168,11 +181,15 @@ function exigirGate(arquivo, chave, literais) {
   return ocorrencias
 }
 
-confere('(c) Lalamove nas Entregas, na Ficha e na Comanda só existe atrás de congelado(\'lalamove\')', () => {
-  assert.ok(congelado('lalamove'), 'a chave lalamove está na lista')
-  assert.ok(exigirGate('features/entregas/EntregasDoDia.jsx', 'lalamove', ['Organizar transportes', 'Cotar esta janela', 'lalamove']) >= 2)
-  assert.ok(exigirGate('features/ficha-cliente/BlocoFreteApi.jsx', 'lalamove', ['web\\.lalamove\\.com', 'Consultar Lalamove', 'lalamove']) >= 3)
-  assert.ok(exigirGate('features/ficha-cliente/ComandaDoCliente.jsx', 'lalamove', ['lalamove']) >= 1)
+confere('(c) Lalamove descongelada (#2162): a comparação só na demonstração; o link externo não volta à Ficha nem à comanda', () => {
+  assert.ok(!congelado('lalamove'), 'a chave lalamove saiu da lista (decisão do Felipe, 31/10)')
+  const dia = semComentarios(fonte('features/entregas/EntregasDoDia.jsx'))
+  assert.match(dia, /\{demonstracao && <Botao[^\n]*Organizar transportes/, 'Organizar transportes só na loja de demonstração')
+  assert.match(dia, /aoCotar=\{demonstracao \?/, 'Cotar esta janela só na loja de demonstração')
+  for (const arquivo of ['features/ficha-cliente/BlocoFreteApi.jsx', 'features/ficha-cliente/ComandaDoCliente.jsx']) {
+    // Homologação B5 (#1839): o pedido do cliente não repete o atalho da Lalamove.
+    assert.doesNotMatch(semComentarios(fonte(arquivo)), /web\.lalamove\.com|Consultar Lalamove/i, `${arquivo} sem link externo da Lalamove`)
+  }
 })
 
 const { NOMES_DE_CANAL } = await import('../src/infra/catalogo.js')

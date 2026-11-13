@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
-import { escolhidasDoSalvo, largurasDaTela, padraoPorTela } from './larguras'
+import { escolhidasDoSalvo, largurasDaTela, migrarLargurasAntigas, padraoPorTela } from './larguras'
 
 // Largura das colunas Balcão e Ficha, e do painel do cardápio (seção 9 da
 // direção visual). Uma chave só no localStorage para as três, lida e escrita
 // dentro de try/catch: o navegador pode negar o acesso (modo privado, cota
 // cheia), e a tela precisa continuar de pé sem a memória.
-const CHAVE = 'cdb.larguras.v1'
+const CHAVE = 'cdb.larguras.v2'
 
 function ler() {
   try {
-    return escolhidasDoSalvo(JSON.parse(localStorage.getItem(CHAVE) ?? 'null'))
+    const atual = localStorage.getItem(CHAVE)
+    if (atual != null) return escolhidasDoSalvo(JSON.parse(atual))
+    const migradas = migrarLargurasAntigas(JSON.parse(localStorage.getItem('cdb.larguras.v1') ?? 'null'))
+    localStorage.setItem(CHAVE, JSON.stringify(migradas))
+    return migradas
   } catch {
     return {}
   }

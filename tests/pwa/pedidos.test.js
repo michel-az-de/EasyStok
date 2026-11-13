@@ -2,6 +2,73 @@
 'use strict';
 
 module.exports = function ({ test, runInSandbox, sandbox, assert }) {
+  function control(id, dataset = {}) {
+    const classes = new Set(), attributes = {};
+    return {
+      id, dataset, value: '', textContent: '',
+      classList: {
+        toggle(name, active) { if (active) classes.add(name); else classes.delete(name); },
+        contains(name) { return classes.has(name); }
+      },
+      setAttribute(name, value) { attributes[name] = String(value); },
+      getAttribute(name) { return attributes[name] ?? null; }
+    };
+  }
+
+  for (const [name, prefix, action, icon] of [
+    ['retroativo', 'retro', 'setRetroActive', '🕐'],
+    ['agendamento', 'schedule', 'setAgendaActive', '📅']
+  ]) {
+    test(`pedidos: ${name} anuncia estado e preserva um unico icone`, () => {
+      const nodes = Object.fromEntries(['Fields', 'Toggle', 'ToggleLabel', 'Datetime']
+        .map(suffix => [prefix + suffix, control(prefix + suffix)]));
+      const originalGet = sandbox.document.getElementById;
+      const originalUpdate = sandbox.updateSaveOrderBtn;
+      sandbox.document.getElementById = id => nodes[id] || originalGet(id);
+      sandbox.updateSaveOrderBtn = () => {};
+      try {
+        for (const active of [true, false]) {
+          runInSandbox(`${action}(${active})`);
+          assert.strictEqual(nodes[prefix + 'Toggle'].getAttribute('aria-pressed'), String(active));
+          assert.strictEqual(nodes[prefix + 'Fields'].classList.contains('show'), active);
+          assert.strictEqual(nodes[prefix + 'Toggle'].classList.contains('active'), active);
+          const renderedText = icon + ' ' + nodes[prefix + 'ToggleLabel'].textContent;
+          assert.strictEqual(renderedText.split(icon).length - 1, 1, 'icone estatico nao deve ser repetido pelo texto dinamico');
+          assert.ok(nodes[prefix + 'ToggleLabel'].textContent.length > 0);
+          assert.strictEqual(Boolean(nodes[prefix + 'Datetime'].value), active);
+        }
+      } finally {
+        sandbox.document.getElementById = originalGet;
+        sandbox.updateSaveOrderBtn = originalUpdate;
+      }
+    });
+  }
+
+  for (const [group, key, action, values] of [
+    ['finFilter', 'f', 'setFinFilter', ['hoje', '7d', '30d', 'all']],
+    ['finStatus', 's', 'setFinStatus', ['todos', 'entregue', 'cancelado']]
+  ]) {
+    test(`pedidos: ${group} anuncia o mesmo filtro destacado visualmente`, () => {
+      const buttons = values.map(value => control(value, { [key]: value }));
+      const originalQuery = sandbox.document.querySelectorAll;
+      const originalRender = sandbox.renderFinalizadosScreen;
+      sandbox.document.querySelectorAll = selector => selector === `#${group} button` ? buttons : originalQuery(selector);
+      sandbox.renderFinalizadosScreen = () => {};
+      try {
+        for (const value of [...values, values[0]]) {
+          runInSandbox(`${action}('${value}')`);
+          for (const button of buttons) {
+            assert.strictEqual(button.classList.contains('active'), button.dataset[key] === value);
+            assert.strictEqual(button.getAttribute('aria-pressed'), String(button.dataset[key] === value));
+          }
+        }
+      } finally {
+        sandbox.document.querySelectorAll = originalQuery;
+        sandbox.renderFinalizadosScreen = originalRender;
+      }
+    });
+  }
+
   test('pedidos: STATUS contem todos os estados esperados', () => {
     const s = JSON.parse(runInSandbox(`JSON.stringify(STATUS)`));
     ['AGUARDANDO', 'PREPARANDO', 'PRONTO', 'ENTREGUE', 'CANCELADO', 'CRIADO'].forEach(k => {

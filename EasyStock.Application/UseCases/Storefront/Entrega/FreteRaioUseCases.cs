@@ -5,6 +5,7 @@ using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Frete;
 using EasyStock.Domain.Storefront.Frete;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Storefront.Entrega;
 
@@ -58,7 +59,7 @@ internal static class EnderecoParaGeocode
 {
     public static async Task<GeocodeQuery> MontarAsync(ICepLookupClient ceps, string? cep, string? numero, CancellationToken ct)
     {
-        var cepNormalizado = new string((cep ?? string.Empty).Where(char.IsDigit).ToArray());
+        var cepNormalizado = EnderecoBr.NormalizarCep(cep);
         if (cepNormalizado.Length != 8)
             throw new UseCaseValidationException("CEP inválido. Informe os 8 dígitos.");
         if (string.IsNullOrWhiteSpace(numero))

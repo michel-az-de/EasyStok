@@ -5,10 +5,14 @@ import {
 import { useRelogio } from '../../hooks/useRelogio'
 import { dataIsoNoFuso, horaCurta, moeda } from '../../dominio/formato'
 import {
-  COLUNAS_KDS, avisoDeFilaNoTeto, diaDaFilaDaCozinha, filtrarPorLinha, impressoesDaCozinha, respostaAoSoltarKds, textoDaCozinhaVazia,
+  COLUNAS_KDS, avisoDeFilaNoTeto, colunaDoStatusKds, diaDaFilaDaCozinha, filtrarPorColunaKds, filtrarPorLinha, impressoesDaCozinha,
+  respostaAoSoltarKds, textoDaCozinhaVazia,
 } from '../../dominio/kds'
 import { ORDEM_DAS_LINHAS, nomeDoPedido } from '../../dominio/pedido'
 import { useCozinhaApi } from '../../aplicacao/useCozinhaApi'
+import { METODOS_NA_PORTA, metodoSugeridoNaPorta } from '../../aplicacao/recebimentoNaEntrega'
+import { trocoDaPorta } from '../../dominio/roteiroDoDia'
+import { CampoSelecao } from '../../componentes/Campo'
 import { SEGUNDOS_PARA_DESFAZER_ETAPA } from '../../aplicacao/envioComDesfazer'
 import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
@@ -40,7 +44,7 @@ const reduzMovimento = () => typeof window !== 'undefined'
   && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 const VOLTA_AO_LUGAR = { duration: 220, easing: 'cubic-bezier(.2, 0, 0, 1)' }
 
-const rotuloDaColuna = (status) => COLUNAS_KDS.find((c) => c.status === status)?.rotulo ?? status
+const rotuloDaColuna = (status) => COLUNAS_KDS.find((c) => c.status === colunaDoStatusKds(status))?.rotulo ?? status
 const ANUNCIOS = {
   onDragStart: ({ active }) => `Pegou o pedido ${active.data.current.numero} de ${active.data.current.nome}.`,
   onDragOver: ({ active, over }) => {
@@ -69,7 +73,7 @@ export function TelaCozinhaApi({ linhas }) {
   const { amanha, data: dataDaFila } = diaDaFilaDaCozinha(amanhaDesde, agora)
   const {
     pedidos, erro, aoVivo, movendo, novos, mudaram, saindo, impressoes, saldoPendente, descartarSaldoPendente,
-    avancar, recarregar, reimprimir, limparErro, adiados = SEM_ADIADOS, desfazerAvanco,
+    avancar, receberEEntregar, recarregar, reimprimir, limparErro, adiados = SEM_ADIADOS, desfazerAvanco,
   } = useCozinhaApi({ data: dataDaFila })
   const [linhaFiltro, setLinhaFiltro] = useState(null)
   const [abertoId, setAbertoId] = useState(null)
@@ -148,8 +152,8 @@ export function TelaCozinhaApi({ linhas }) {
       <header className={css.topoPagina}>
         <h1>Cozinha</h1>
         <div className={css.chipsFiltro} role="radiogroup" aria-label="Dia da fila">
-          <Chip papel="escolha" reservarIcone ativo={!amanha} onClick={() => setAmanhaDesde(null)}>Hoje</Chip>
-          <Chip papel="escolha" reservarIcone ativo={amanha} onClick={() => setAmanhaDesde(dataIsoNoFuso(agora))}>Amanhã</Chip>
+          <Chip papel="escolha" ativo={!amanha} onClick={() => setAmanhaDesde(null)}>Hoje</Chip>
+          <Chip papel="escolha" ativo={amanha} onClick={() => setAmanhaDesde(dataIsoNoFuso(agora))}>Amanhã</Chip>
         </div>
         <span className={`${css.aoVivo} ${aoVivo ? css.aoVivoLigado : ''}`}>
           <span className={css.pontoVivo} aria-hidden="true" />
@@ -165,17 +169,13 @@ export function TelaCozinhaApi({ linhas }) {
         </p>
       )}
       {saldoPendente && (
-        <div className={css.motivoRecusa} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
-          <Icone nome="alerta" tamanho={16} />
-          <span>
-            {nomeDoPedido((pedidos ?? []).find((p) => p.id === saldoPendente.id) ?? {}).frase}: falta receber {moeda(saldoPendente.valor)}.
-            Marque entregue se recebeu na porta ou combinou a cobrança.
-          </span>
-          <span>
-            <Botao variante="primario" onClick={() => avancar(saldoPendente.id, saldoPendente.status, true)}>Marcar entregue</Botao>
-            <Botao variante="texto" onClick={descartarSaldoPendente}>Voltar</Botao>
-          </span>
-        </div>
+        <PerguntaDoSaldo
+          key={`${saldoPendente.id}|${saldoPendente.valor}`} saldo={saldoPendente}
+          pedido={lista.find((p) => p.id === saldoPendente.id) ?? {}} ocupado={movendo.has(saldoPendente.id)}
+          aoReceber={(metodo) => receberEEntregar(saldoPendente.id, saldoPendente.status, saldoPendente.valor, metodo)}
+          aoEntregarSemReceber={() => avancar(saldoPendente.id, saldoPendente.status, true)}
+          aoVoltar={descartarSaldoPendente}
+        />
       )}
       {avisoDeFilaNoTeto(lista.length) && (
         <p className={css.motivoRecusa} role="alert">
@@ -231,13 +231,13 @@ export function TelaCozinhaApi({ linhas }) {
               )}
               <div className={css.colunas}>
                 {COLUNAS_KDS.map((coluna) => {
-                  const cartoes = visiveis.filter((p) => p.status === coluna.status)
-                  const saindoDaqui = fantasmas.filter((p) => p.status === coluna.status)
+                  const cartoes = filtrarPorColunaKds(visiveis, coluna.status)
+                  const saindoDaqui = filtrarPorColunaKds(fantasmas, coluna.status)
                   return (
                     <ColunaKds
                       key={coluna.status} coluna={coluna} resposta={respostaPara(coluna.status)}
                       arrastando={Boolean(arrastado)}
-                      acao={arrastado && COLUNAS_KDS.find((c) => c.status === arrastado.status)?.toque}
+                      acao={arrastado && COLUNAS_KDS.find((c) => c.status === colunaDoStatusKds(arrastado.status))?.toque}
                     >
                       <h2>
                         {coluna.rotulo}{' '}
@@ -281,6 +281,31 @@ export function TelaCozinhaApi({ linhas }) {
           aoFechar={() => setAbertoId(null)}
         />
       )}
+    </div>
+  )
+}
+
+// #2079 (C1): a pergunta do saldo é a da porta das Entregas (J2): "Recebi R$ X" lança o pagamento e marca
+// entregue; "Entregue sem receber" é a saída explícita de quem combinou a cobrança para depois.
+function PerguntaDoSaldo({ saldo, pedido, ocupado, aoReceber, aoEntregarSemReceber, aoVoltar }) {
+  const [metodo, setMetodo] = useState(() => metodoSugeridoNaPorta(pedido.observacoes))
+  const troco = trocoDaPorta(pedido.observacoes, saldo.valor)
+  return (
+    <div className={css.motivoRecusa} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
+      <Icone nome="alerta" tamanho={16} />
+      <span>
+        {nomeDoPedido(pedido).frase}: falta receber {moeda(saldo.valor)}. Recebeu na porta? Diga como e o pagamento
+        entra no Caixa junto com a entrega.{troco && <> {troco}.</>}
+      </span>
+      <span>
+        <CampoSelecao rotulo="Como recebeu" rotuloOculto opcoes={METODOS_NA_PORTA} value={metodo}
+          disabled={ocupado} onChange={(e) => setMetodo(e.target.value)} />
+        <Botao variante="primario" disabled={ocupado || !metodo} onClick={() => aoReceber(metodo)}>
+          Recebi {moeda(saldo.valor)}
+        </Botao>
+        <Botao variante="secundario" disabled={ocupado} onClick={aoEntregarSemReceber}>Entregue sem receber</Botao>
+        <Botao variante="texto" disabled={ocupado} onClick={aoVoltar}>Voltar</Botao>
+      </span>
     </div>
   )
 }

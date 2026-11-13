@@ -14,6 +14,7 @@ namespace EasyStock.Application.UseCases.Operacao.Kds;
 /// <param name="NumeroComanda">#1883: "Comanda N", o número da conversa dona do pedido (o mesmo de
 /// <c>/api/atendimento/conversas</c>). Nulo quando nenhuma conversa é dona dele; aí só o <c>NumeroCurto</c> identifica.</param>
 /// <param name="NumeroDoDia">#1641-1: número do dia (S53) para falar na cozinha; nulo sem número.</param>
+/// <param name="ConfirmadoPeloClienteEm">#2096: quando o cliente confirmou a encomenda; nulo ainda não.</param>
 public sealed record KdsPedidoDto(
     Guid Id,
     string NumeroCurto,
@@ -35,7 +36,8 @@ public sealed record KdsPedidoDto(
     string? MotivoRequerAprovacao,
     decimal? AReceber = null,
     long? NumeroComanda = null,
-    int? NumeroDoDia = null);
+    int? NumeroDoDia = null,
+    DateTime? ConfirmadoPeloClienteEm = null);
 
 public sealed record KdsJanelaDto(string Label, DateOnly Data, TimeOnly Inicio, TimeOnly Fim);
 

@@ -6,6 +6,7 @@ using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Services;
@@ -38,7 +39,17 @@ public class SyncMutationDispatcher(
     // inclui os movimentos que vieram no mesmo lote; soma-los de novo contaria em dobro.
     private readonly HashSet<string> _nascidosComSaldoDoAparelho = new(StringComparer.Ordinal);
 
-    public async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
+    private bool _snapshotImport;
+
+    // Usado apenas pela primeira carga transacional, depois da prova de que os IDs nao existem.
+    public async Task ApplySnapshotAsync(MutationDto mutation, string deviceId, string? operatorName, Guid empresaId, Guid lojaId)
+    {
+        _snapshotImport = true;
+        try { await ApplyMutationAsync(mutation, deviceId, operatorName, empresaId, lojaId); }
+        finally { _snapshotImport = false; }
+    }
+
+    public virtual async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
         var parts = m.Type.Split('.');
@@ -62,6 +73,70 @@ public class SyncMutationDispatcher(
         }
     }
 
+    // Executada antes do push: uma entidade historica recusada nao pode deixar o stock.delta
+    // do mesmo envio ser aceito separadamente (cancelamento/descarte no PWA gera ambos).
+    public async Task ValidateLegacyHistoryAsync(MutationDto m, Guid? empresaId)
+    {
+        if (m.Type is not ("order.upsert" or "batch.upsert") || m.Payload.ValueKind != System.Text.Json.JsonValueKind.Object) return;
+        // O DTO aceita Id/id; a pre-validacao precisa usar a mesma identidade antes de qualquer delta.
+        var keys = m.Payload.EnumerateObject().Where(p => string.Equals(p.Name, "id", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (keys.Length > 1) throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: identificacao ambigua; envio inteiro preservado sem aplicar.");
+        if (keys.Length == 0 || keys[0].Value.ValueKind != System.Text.Json.JsonValueKind.String) return;
+        var entityId = keys[0].Value.GetString();
+        if (m.Type == "order.upsert")
+        {
+            var order = await _db.Set<Order>().Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == entityId && x.EmpresaId == empresaId);
+            if (order?.ErpPedidoId is { } id && await _db.Set<Pedido>().AnyAsync(p => p.Id == id && p.Origem == LegacySnapshotImportService.HistoryOrigin))
+            {
+                OrderDto? dto;
+                try { dto = m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts); }
+                catch (System.Text.Json.JsonException) { throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: alteracao historica malformada; envio inteiro preservado sem aplicar."); }
+                if (dto is null) throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: pedido historico invalido.");
+                await AssertHistoricalOrderUpdateAsync(order, dto);
+            }
+        }
+        else if (m.Type == "batch.upsert")
+        {
+            var batch = await _db.Set<Batch>().FirstOrDefaultAsync(x => x.Id == entityId && x.EmpresaId == empresaId);
+            if (batch?.ErpLoteId is { } id && await _db.Set<Lote>().AnyAsync(l => l.Id == id && l.Origem == LegacySnapshotImportService.HistoryOrigin))
+            {
+                BatchDto? dto;
+                try { dto = m.Payload.Deserialize<BatchDto>(SyncDtoConverters.JsonOpts); }
+                catch (System.Text.Json.JsonException) { throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: alteracao historica malformada; envio inteiro preservado sem aplicar."); }
+                if (dto is null || batch.Excluido != (dto.Deleted == true) || batch.Descartado != (dto.Discarded == true))
+                    throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: lote historico importado exige reconciliacao para excluir ou descartar.");
+            }
+        }
+    }
+
+    private async Task AssertHistoricalOrderUpdateAsync(Order existing, OrderDto dto)
+    {
+        var erpStatus = await _db.Set<Pedido>().AsNoTracking()
+            .Where(p => p.Id == existing.ErpPedidoId && p.EmpresaId == existing.EmpresaId).Select(p => p.Status).SingleOrDefaultAsync();
+        if (erpStatus != existing.Status)
+            throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: o pedido mudou no ERP; confira a esteira antes de alterar o historico no aparelho.");
+        AssertHistoricalOrderUpdate(existing, dto);
+    }
+    private static void AssertHistoricalOrderUpdate(Order existing, OrderDto dto)
+    {
+        var sameItems = dto.Items is not null && existing.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).Order()
+            .SequenceEqual(dto.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).Order());
+        var sameBase = sameItems && existing.Total == dto.Total && existing.ClientId == dto.ClientId
+            && existing.ClientSnapshotName == dto.ClientSnapshot?.Name && existing.ClientSnapshotRef == dto.ClientSnapshot?.Ref
+            && CarimboMs(existing.CreatedAt) == dto.CreatedAt;
+        if (sameBase && existing.Status == "pronto"
+            && (dto.Status == "pronto" || dto.Status == "entregue" && FormaPagamentoMobile.Normalizar(dto.Metodo) is not null)) return;
+        // Um reenvio integral identico e inofensivo; nao confundir eco com reabertura do historico.
+        var historyEqual = System.Text.Json.Nodes.JsonNode.DeepEquals(
+            System.Text.Json.Nodes.JsonNode.Parse(existing.HistoryJson ?? "null"),
+            dto.History.HasValue ? System.Text.Json.Nodes.JsonNode.Parse(dto.History.Value.GetRawText()) : null);
+        if (sameBase && existing.Status == dto.Status && existing.Notes == dto.Notes && existing.Metodo == FormaPagamentoMobile.Normalizar(dto.Metodo)
+            && CarimboMs(existing.UpdatedAt) == dto.UpdatedAt && existing.ConfirmedBy == dto.ConfirmedBy
+            && existing.ConfirmedAt == MsParaUtc(dto.ConfirmedAt) && existing.FactAt == MsParaUtc(dto.FactAt)
+            && existing.ScheduledDeliveryAt == MsParaUtc(dto.ScheduledDeliveryAt) && historyEqual) return;
+        throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: pedido historico importado; apenas conferencia e entrega de um pedido pronto, sem alterar itens/cliente e com pagamento informado na entrega, podem continuar automaticamente.");
+    }
+
     private async Task ApplyProduct(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
@@ -72,7 +147,8 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
         // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
         var existing = await _db.Set<Product>().FindAsync(dto.Id);
-        if (existing != null && existing.EmpresaId != empresaId) existing = null;
+        if (existing != null && existing.EmpresaId != empresaId)
+            throw new CadastroDeOutraEmpresaException();
 
         // Onda 5: conflict detection. Tolerância de 2s pra clock skew.
         // #1520: compara com o carimbo do servidor (quando ele gravou), nao com UpdatedAt.
@@ -159,6 +235,9 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Client>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
+        // Id global: verifica apenas a existencia, sem carregar dados de outro tenant.
+        if (existing is null && await _db.Set<Client>().AnyAsync(c => c.Id == dto.Id && c.EmpresaId != empresaId))
+            throw new CadastroDeOutraEmpresaException();
         var lastOrderDate = DateTimeOffset.FromUnixTimeMilliseconds(dto.LastOrder).UtcDateTime;
         if (existing == null)
         {
@@ -185,16 +264,60 @@ public class SyncMutationDispatcher(
             existing.LastOperatorName = operatorName;
             if (existing.EmpresaId == null && empresaId.HasValue) existing.EmpresaId = empresaId;
             if (existing.LojaId == null && lojaId.HasValue) existing.LojaId = lojaId;
+
+            // CLI-2: a edição no app chega ao Cliente do ERP ligado (mesma empresa).
+            if (existing.ErpClienteId is { } erpId && empresaId.HasValue)
+            {
+                var erp = await _db.Set<Cliente>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(c => c.Id == erpId && c.EmpresaId == empresaId.Value);
+                if (erp != null)
+                {
+                    // Campo vazio no app nao apaga o dado do ERP: o app nem sempre o recebeu.
+                    if (!string.IsNullOrWhiteSpace(dto.Name)) erp.Nome = dto.Name;
+                    if (!string.IsNullOrWhiteSpace(dto.Phone)) erp.Telefone = dto.Phone;
+                    if (!string.IsNullOrWhiteSpace(dto.Apt)) erp.Apt = dto.Apt;
+                    if (!string.IsNullOrWhiteSpace(dto.Address)) erp.Endereco = dto.Address;
+                    if (DocumentoClienteMobile.Normalizar(dto.Document) is { } documento) erp.Documento = documento;
+                }
+            }
         }
+    }
+
+    // #2343 (R2-API-11): campos que, ausentes, estouravam NullReferenceException no meio do apply.
+    private static readonly string[] CamposObrigatoriosDoPedido = ["id", "clientSnapshot", "items"];
+
+    private static OrderDto DeserializarOrderUpsert(MutationDto m)
+    {
+        if (m.Payload.ValueKind != System.Text.Json.JsonValueKind.Object)
+            throw new ArgumentException("order.upsert: o payload precisa ser um objeto.");
+        // #2343: campo nulo conta como ausente; tipo errado vira motivo legivel, nao NullReference/JsonException.
+        var ausentes = CamposObrigatoriosDoPedido
+            .Where(c => !m.Payload.TryGetProperty(c, out var v) || v.ValueKind is System.Text.Json.JsonValueKind.Null)
+            .ToList();
+        if (ausentes.Count > 0)
+            throw new ArgumentException($"order.upsert sem campos obrigatorios: {string.Join(", ", ausentes)}.");
+        ExigirTipo(m.Payload, "id", System.Text.Json.JsonValueKind.String, "texto");
+        ExigirTipo(m.Payload, "clientSnapshot", System.Text.Json.JsonValueKind.Object, "objeto");
+        ExigirTipo(m.Payload, "items", System.Text.Json.JsonValueKind.Array, "lista");
+        return m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)
+            ?? throw new ArgumentException("order.upsert: payload invalido.");
+    }
+
+    private static void ExigirTipo(System.Text.Json.JsonElement payload, string campo, System.Text.Json.JsonValueKind tipo, string nome)
+    {
+        if (payload.GetProperty(campo).ValueKind != tipo)
+            throw new ArgumentException($"order.upsert: campo {campo} deve ser {nome}.");
     }
 
     private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = CaberNasColunas(m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)!);
+        var dto = CaberNasColunas(DeserializarOrderUpsert(m));
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Order>().Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);
+        if (existing?.ErpPedidoId is { } erpId && await _db.Set<Pedido>().AnyAsync(p => p.Id == erpId && p.Origem == LegacySnapshotImportService.HistoryOrigin))
+            await AssertHistoricalOrderUpdateAsync(existing, dto);
         var createdAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.CreatedAt).UtcDateTime;
         var updatedAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.UpdatedAt).UtcDateTime;
 
@@ -257,10 +380,10 @@ public class SyncMutationDispatcher(
                 });
             _db.Add(order);
             // #1543: pedido que ja chega "pronto" (ou adiante) baixa aqui; antes so a troca de status baixava.
-            await ApplyStockRule(null, dto.Status, dto.Items, empresaId, dto.Id, lojaId);
+            if (!_snapshotImport) await ApplyStockRule(null, dto.Status, dto.Items, empresaId, dto.Id, lojaId);
             // Onda 3 — pedido criado direto como "entregue" (retroativo) cria Venda. #1543: a do pedido
             // que nasceu no ERP so nasce depois que a esteira aceita a entrega (OrderLinker).
-            if (order.Status == "entregue" && !await NasceuNoErpAsync(dto.Id, null, empresaId))
+            if (!_snapshotImport && order.Status == "entregue" && !await NasceuNoErpAsync(dto.Id, null, empresaId))
             {
                 await _saleSync.CreateVendaForDeliveredOrderAsync(order, dto.Items);
             }
@@ -402,6 +525,10 @@ public class SyncMutationDispatcher(
         if (existing != null)
         {
             // Itens sao imutaveis; o re-envio so traz as marcas de exclusao/descarte (#1464).
+            if (existing.ErpLoteId is { } loteId
+                && await _db.Set<Lote>().AnyAsync(l => l.Id == loteId && l.Origem == LegacySnapshotImportService.HistoryOrigin)
+                && (existing.Excluido != (dto.Deleted == true) || existing.Descartado != (dto.Discarded == true)))
+                throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: lote historico importado; o saldo inicial nao permite recalcular descarte ou exclusao automaticamente.");
             var marcasAntes = (existing.DeletedAt, existing.DeletedBy, existing.DiscardedAt, existing.DiscardedBy, existing.DiscardReason);
             AplicarMarcas(existing, dto);
             // #1520: a marca agora desce no pull (carimbo do servidor). Quem marcou passa a ser o
@@ -506,7 +633,7 @@ public class SyncMutationDispatcher(
     private static ClientDto CaberNasColunas(ClientDto d) => d with
     {
         Name = Cortar(d.Name, 120)!, Apt = Cortar(d.Apt, 32), Address = Cortar(d.Address, 255),
-        Phone = Cortar(d.Phone, 32)
+        Phone = Cortar(Telefone.TryFrom(d.Phone)?.Value ?? d.Phone, 32), Document = Cortar(d.Document, 32)
     };
 
     private static OrderDto CaberNasColunas(OrderDto d) => d with

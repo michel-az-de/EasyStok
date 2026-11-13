@@ -1,102 +1,85 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { MODOS } from '../../dominio/automatico'
+import { faixaDaTransferencia } from '../../dominio/faixaDeTransferencia'
 import { resumoDoModo } from '../../dominio/resumoDoModo'
-import { primeiroNome } from '../../dominio/mensagem'
 import { automaticoDesligadoNaConversa } from '../../dominio/motivoDeEscalada'
 import css from './atendimento.module.css'
 
-// Quem responde esta conversa. Um lugar só, no topo da thread, com os três
-// estados e os dois toques: Assumir e Devolver ao automático (RN-04, D4).
-// O log do automático saiu daqui (corte #39): cada mensagem automática já vem
-// marcada como tal na própria conversa, contar de novo era ruído.
-// Cadastro bloqueado não oferece toque nenhum: a conversa só volta a andar
-// pelo desbloqueio na ficha.
+// Quem responde esta conversa: o estado e, quando cabe, o Assumir. Uma linha, um lugar só, no topo
+// da conversa (RN-04, D4). O que cada estado oferece vem de `acoesDaConversa`; Devolver e Concluir
+// moram no menu ⋮ do cabeçalho (#2185: a faixa tinha um segundo menu para a mesma conversa).
 //
-// Rodada 12 (issue #16, dúvidas da Thatiane): "Devolver ao automático" agora
-// explica o efeito e pede confirmação, e depois que ela responde a barra
-// sugere o próximo passo (encerrar x aguardar o cliente).
-//
-// #1442 (homologação de 07/10, "muito prolixo"): uma linha só. Rótulo curto,
-// uma frase objetiva e as ações; a frase inteira fica no `title` da linha.
-export function BarraModo({
-  conversa, pausado, bloqueada = false, aoAssumir, aoDevolver, aoEncerrar,
-}) {
-  const [confirmandoDevolver, setConfirmandoDevolver] = useState(false)
-  const resumo = resumoDoModo(conversa, pausado, bloqueada)
-  const encerrada = resumo.chave === MODOS.ENCERRADO
-  // Assumir só faz sentido em conversa que ainda está no automático ou que
-  // acabou de ser devolvida. Devolver só onde o automático está parado.
-  const podeAssumir = resumo.chave === MODOS.LIGADO || resumo.chave === MODOS.COM_VOCE
-  // #1761 (L6): com o automático desligado na loja não há para quem devolver.
-  const semAutomatico = automaticoDesligadoNaConversa(conversa)
-  const podeDevolver = (resumo.chave === MODOS.PAUSADO || resumo.chave === MODOS.COM_VOCE) && !semAutomatico
-  // Automático desligado não está "pausado" nem "volta": a faixa diz só o que é verdade.
-  const linha = semAutomatico && !encerrada && resumo.chave !== MODOS.LIGADO ? 'O atendimento automático está desligado.' : resumo.linha
-  const sugereEncerrar = resumo.sugereEncerrar && Boolean(aoEncerrar)
-  // #1870: "Passou para você" já é o estado e o Assumir, a ação; a frase repetia os dois (e o
-  // cartão do Balcão). Fica para o leitor de tela e no title da pílula; a faixa é uma linha só.
-  const fraseRepetida = resumo.chave === MODOS.COM_VOCE && linha === resumo.linha
-  const nome = primeiroNome(conversa.nome)
+// #2232 (A2): quando o Assistente passou a conversa, a faixa diz quem passou, por quê e quando, em
+// vez da pílula "Passou para você". #2232 (A4): o Assumir é "Assumir conversa".
+// O motivo da passagem fica à vista: "Passou para você" sem dizer "alergia a camarão" obrigava a
+// procurar o porquê. A frase dos outros estados repetia a pílula e fica para o leitor de tela e o
+// `title` (#1442, #1870). Cadastro bloqueado é explicado junto do campo de mensagem.
+export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = true, acoes, aoAssumir }) {
+  const [confirmando, setConfirmando] = useState(null)
+  // A barra não remonta ao trocar de conversa: o Assumir em andamento é de uma conversa só (#2185 F22).
+  const [assumindo, setAssumindo] = useState(() => new Set())
+  const emVoo = useRef(new Set())
+  const resumo = resumoDoModo(conversa, pausado, bloqueada, { podeReabrir })
+  const faixa = resumo.chave === MODOS.COM_VOCE ? faixaDaTransferencia(conversa.passagem) : null
+  // Com o Assistente desligado na loja, "pausado" e "volta" prometem o que não acontece.
+  const semAssistente = automaticoDesligadoNaConversa(conversa) && resumo.chave !== MODOS.ENCERRADO && resumo.chave !== MODOS.LIGADO
+  const linha = semAssistente ? 'O Assistente está desligado.' : resumo.linha
+  const mostrarLinha = semAssistente || resumo.chave === MODOS.COM_VOCE
 
-  const devolver = () => {
-    setConfirmandoDevolver(false)
-    aoDevolver()
+  async function assumir() {
+    setConfirmando(null)
+    const id = conversa.id
+    if (emVoo.current.has(id)) return
+    emVoo.current.add(id)
+    setAssumindo(new Set(emVoo.current))
+    try { await aoAssumir() } finally {
+      emVoo.current.delete(id)
+      setAssumindo(new Set(emVoo.current))
+    }
   }
 
   return (
-    <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} aria-label="Quem responde esta conversa">
+    <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} data-controle-conversa aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
-        <span title={fraseRepetida ? linha : undefined}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
-        <p className={fraseRepetida ? 'sr' : css.modoTexto} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>
-        {!encerrada && !bloqueada && (
-          <span className={css.modoAcoes}>
-            {podeAssumir && (
-              <Botao variante="primario" className={css.acaoModo} onClick={aoAssumir}>
-                Assumir
-              </Botao>
-            )}
-            {sugereEncerrar && (
-              <Botao variante="padrao" icone="log-out" className={css.acaoModo} onClick={aoEncerrar}>
-                Encerrar
-              </Botao>
-            )}
-            {podeDevolver && (
-              <Botao
-                // #1761 (L5): nunca é o próximo passo; o primário da tela é o do pedido.
-                variante="padrao"
-                className={css.acaoModo}
-                title="O atendimento automático volta a responder esta conversa"
-                aria-haspopup="dialog"
-                onClick={() => setConfirmandoDevolver(true)}
-              >
-                Devolver ao automático
-              </Botao>
-            )}
-          </span>
+        {/* #2420: título em negrito e motivo embaixo; o " · " fica para o leitor de tela ler a frase inteira. */}
+        {faixa ? (
+          <p className={css.faixaTransferencia} title={faixa.longo}>
+            <Icone nome="hand" className={css.faixaIcone} />
+            <span className={css.faixaTexto}>
+              <strong>{faixa.titulo}</strong><span className="sr"> · </span><span className={css.faixaMotivo}>{faixa.motivo}</span>
+            </span>
+          </p>
+        ) : (
+          <span className={css.modoEstado} title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
+        )}
+        {!faixa && <p className={mostrarLinha ? css.modoTexto : 'sr'} title={linha === resumo.linha ? resumo.detalhe : linha}>{linha}</p>}
+        {acoes.assumir && (
+          <Botao
+            variante="primario" className={css.modoAssumir} disabled={assumindo.has(conversa.id)}
+            aria-haspopup={acoes.confirmarAoAssumir ? 'dialog' : undefined}
+            onClick={acoes.confirmarAoAssumir ? () => setConfirmando({ conversaId: conversa.id }) : assumir}
+          >
+            Assumir conversa
+          </Botao>
         )}
       </div>
 
-      {confirmandoDevolver && (
+      {confirmando?.conversaId === conversa.id && acoes.confirmarAoAssumir && (
         <Modal
-          titulo="Devolver ao atendimento automático?"
-          descricao={`O atendimento automático volta a responder as próximas mensagens de ${nome}, sem você.`}
-          aoFechar={() => setConfirmandoDevolver(false)}
+          titulo="Assumir esta conversa?"
+          descricao={`Ela está com ${conversa.responsavel ?? 'outro atendente'}. As próximas respostas passam a ser suas.`}
+          aoFechar={() => setConfirmando(null)}
           rodape={(
             <>
-              <Botao onClick={() => setConfirmandoDevolver(false)}>Continuar comigo</Botao>
-              <Botao variante="primario" onClick={devolver}>Devolver ao automático</Botao>
+              <Botao onClick={() => setConfirmando(null)}>Cancelar</Botao>
+              <Botao variante="primario" onClick={assumir}>Assumir conversa</Botao>
             </>
           )}
-        >
-          <ul className={css.listaEfeito}>
-            <li>Ele responde sozinho dúvida de cardápio, horário, entrega e pagamento.</li>
-            <li>Restrição alimentar, reclamação e prato sem saldo continuam vindo para você.</li>
-            <li>Você pode assumir de novo a qualquer momento, pelo botão Assumir.</li>
-          </ul>
-        </Modal>
+        />
       )}
     </section>
   )

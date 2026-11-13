@@ -2,6 +2,7 @@ import {
   ajustarSaldo, alternarDisponibilidade, baixarSaldo, devolverSaldo, itemPorSku, situacaoDeEstoque,
   textoDoAlerta,
 } from '../../dominio/cardapio'
+import { conversaEncerrada } from '../../dominio/conversa'
 import { comItem, comObservacao, novoPedido, pedidoEncerrado, semItem } from '../../dominio/pedido'
 import * as acao from '../acoes'
 import { comBaixaDeProducao, comDevolucaoDeProducao, comMensagem, mapear } from '../reducer/auxiliares'
@@ -25,6 +26,8 @@ export const casosRascunhoDaComanda = {
     // Pedido cancelado não edita comanda (dominio/pedido.js, pedidoEncerrado):
     // sem esta trava, um item novo entrava numa comanda que já morreu.
     if (pedidoEncerrado(conversa?.pedido)) return estado
+    // #2185 (E10): conversa concluída não monta comanda (o painel do cardápio ainda abria nela).
+    if (conversaEncerrada(conversa)) return estado
     const situacao = situacaoDeEstoque(item)
     const comProduto = mapear(estado, id, (c) => ({
       ...c,
