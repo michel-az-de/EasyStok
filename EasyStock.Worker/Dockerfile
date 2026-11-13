@@ -3,7 +3,7 @@
 # FrameworkReference Microsoft.AspNetCore.App (IHttpContextAccessor etc.). Com a
 # base runtime:10.0 o container crasha no launch ("No frameworks were found:
 # Microsoft.AspNetCore.App 10.0.0"). Mesma base da API.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e AS base
 WORKDIR /app
 # Mesmo uid e gid do appuser da API (Dockerfile da raiz): os dois gravam no volume
 # uploads-data, que pertence a ele. Com o usuario padrao da imagem (app, 1654) o worker
@@ -13,7 +13,7 @@ RUN groupadd --system --gid 1001 appgroup \
  && mkdir -p /app/uploaded-files && chown -R appuser:appgroup /app
 USER appuser
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb AS build
 WORKDIR /src
 
 # .csproj primeiro (cache de restore)
