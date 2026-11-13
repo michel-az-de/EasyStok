@@ -20,7 +20,7 @@ const storage = new Map()
 globalThis.sessionStorage = { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) }
 sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'sintetico', empresa: { id: 'a' }, usuario: { id: 'u' }, expiraEm: Date.now() + 60000 }))
 const { enviarTexto, enviarImagem, enviarAudio, enviarImagemCardapio } = await import('../src/infra/api/conversasApi.js')
-const { enviarModelo } = await import('../src/infra/api/modelosApi.js')
+const { enviarModelo, iniciarConversaComModelo } = await import('../src/infra/api/modelosApi.js')
 
 const MENSAGEM = 'Conversa com Bia. Confirme para assumir.'
 let chamadas = []
@@ -43,8 +43,9 @@ const casos = {
   audio: () => enviarAudio('c1', { dataUrl: 'data:audio/webm;base64,GkXfow==' }, { chave: 'k-audio' }),
   cardapio: () => enviarImagemCardapio('c1', { cardapioItemId: 'i1', indice: 0 }, { chave: 'k-card' }),
   modelo: () => enviarModelo('c1', { tentativaId: 't1', nome: 'retomar', idioma: 'pt_BR', parametros: ['Ana'] }),
+  iniciar: () => iniciarConversaComModelo({ clienteId: 'cli1', tentativaId: 't1', nome: 'retomar', idioma: 'pt_BR', parametros: ['Ana'] }),
 }
-const chaves = { texto: 'k-texto', foto: 'k-foto', audio: 'k-audio', cardapio: 'k-card', modelo: undefined }
+const chaves = { texto: 'k-texto', foto: 'k-foto', audio: 'k-audio', cardapio: 'k-card', modelo: undefined, iniciar: undefined }
 
 for (const [nome, enviar] of Object.entries(casos)) {
   chamadas = []; perguntas = []; resposta = true
@@ -55,7 +56,7 @@ for (const [nome, enviar] of Object.entries(casos)) {
   assert.equal(chamadas[1].confirmou, true, `${nome}: a repetição leva confirmar`)
   assert.equal(chamadas[0].chave, chaves[nome], `${nome}: chave na primeira`)
   assert.equal(chamadas[1].chave, chaves[nome], `${nome}: a MESMA chave na repetição`)
-  if (nome === 'modelo') assert.equal(chamadas[1].corpo.tentativaId, 't1', 'modelo: mesma tentativa')
+  if (nome === 'modelo' || nome === 'iniciar') assert.equal(chamadas[1].corpo.tentativaId, 't1', `${nome}: mesma tentativa`)
 
   chamadas = []; perguntas = []; resposta = false
   await assert.rejects(enviar(), (e) => e.codigo === 'CONVERSA_DE_OUTRA', `${nome}: recusar a pergunta mantém o erro`)

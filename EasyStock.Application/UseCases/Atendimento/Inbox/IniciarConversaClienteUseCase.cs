@@ -8,7 +8,8 @@ using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 public sealed record IniciarConversaClienteCommand(
-    Guid EmpresaId, Guid UsuarioId, Guid ClienteId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros);
+    Guid EmpresaId, Guid UsuarioId, Guid ClienteId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros,
+    bool Confirmada = false);
 
 public sealed record ConversaIniciadaResult(Guid ConversaId, MensagemAtendimentoResult Mensagem);
 
@@ -52,8 +53,8 @@ public sealed class IniciarConversaClienteUseCase(
         var conversaId = await ConversaDoClienteAsync(command.EmpresaId, cliente, contato, ct);
         var mensagem = await envio.ExecuteAsync(new EnviarModeloConversaCommand(
             command.EmpresaId, command.UsuarioId, conversaId, command.TentativaId, command.Nome, command.Idioma, command.Parametros,
-            // #2440: chamar o cliente é ação explícita (como antes); a rota não tem passo de confirmação.
-            Confirmada: true), ct);
+            // #2440: a conversa aberta reaproveitada pode ser de outra atendente; pede a mesma confirmação do texto.
+            command.Confirmada), ct);
         return new ConversaIniciadaResult(conversaId, mensagem);
     }
 

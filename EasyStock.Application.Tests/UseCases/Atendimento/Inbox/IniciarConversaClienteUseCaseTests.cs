@@ -62,8 +62,8 @@ public class IniciarConversaClienteUseCaseTests
         return new(_conversas, _clientes, _catalogo, new(_consentimentos), envio, _uow, TimeProvider.System);
     }
 
-    private IniciarConversaClienteCommand Command(Guid? tentativa = null, string modelo = "boas_vindas") =>
-        new(_empresa, _usuario, _cliente.Id, tentativa ?? Guid.NewGuid(), modelo, "pt_BR", ["Ana"]);
+    private IniciarConversaClienteCommand Command(Guid? tentativa = null, string modelo = "boas_vindas", bool confirmada = false) =>
+        new(_empresa, _usuario, _cliente.Id, tentativa ?? Guid.NewGuid(), modelo, "pt_BR", ["Ana"], confirmada);
 
     [Fact]
     public async Task ClienteSemConversa_AbreConversaVinculadaEEnviaOModelo()
@@ -116,6 +116,35 @@ public class IniciarConversaClienteUseCaseTests
         await _canal.Received(1).EnviarModeloAsync("551188887777", "boas_vindas", "pt_BR",
             Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>());
         await _conversas.DidNotReceive().AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>());
+    }
+
+    // #2440: chamar o cliente cuja conversa aberta e de outra atendente pede a mesma confirmacao do texto (ATD-1).
+    [Fact]
+    public async Task ConversaAbertaDoClienteComOutraAtendente_SemConfirmar_RecusaSemEnviar()
+    {
+        var daOutra = Conversa.Abrir(_empresa, "5511988887777", DateTime.UtcNow.AddDays(-1), "Ana", _cliente.Id);
+        daOutra.Assumir(DateTime.UtcNow, Guid.NewGuid());
+        _abertas.Add(daOutra);
+
+        var act = () => UseCase().ExecuteAsync(Command());
+
+        await act.Should().ThrowAsync<ConversaAtribuidaOutraException>();
+        await _canal.DidNotReceive().EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConversaAbertaDoClienteComOutraAtendente_Confirmada_EnviaNaMesmaConversa()
+    {
+        var daOutra = Conversa.Abrir(_empresa, "5511988887777", DateTime.UtcNow.AddDays(-1), "Ana", _cliente.Id);
+        daOutra.Assumir(DateTime.UtcNow, Guid.NewGuid());
+        _abertas.Add(daOutra);
+
+        var r = await UseCase().ExecuteAsync(Command(confirmada: true));
+
+        r.ConversaId.Should().Be(daOutra.Id);
+        await _canal.Received(1).EnviarModeloAsync("5511988887777", "boas_vindas", "pt_BR",
+            Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
