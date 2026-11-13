@@ -192,6 +192,14 @@ public class RevogacaoDeSessaoTests
     private void VincularA(Guid empresaId, bool ativo = true) =>
         _usuario.Empresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = _usuario.Id, EmpresaId = empresaId, Ativo = ativo, CriadoEm = DateTime.UtcNow });
 
+    // Estes testes tratam da revogação; a loja da atribuição é sempre da empresa.
+    private static ILojaRepository LojaQualquer()
+    {
+        var repo = Substitute.For<ILojaRepository>();
+        repo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns(c => new Loja { Id = c.ArgAt<Guid>(1), EmpresaId = c.ArgAt<Guid>(0), Nome = "Loja" });
+        return repo;
+    }
+
     private static IPerfilRepository PerfilComum(NivelAcesso nivel = NivelAcesso.Admin, Guid? empresaId = null)
     {
         var repo = Substitute.For<IPerfilRepository>();
@@ -203,7 +211,7 @@ public class RevogacaoDeSessaoTests
     public async Task AtribuirPerfil_DeveRecusarPerfilSuperAdmin()
     {
         var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
-            PerfilComum(NivelAcesso.SuperAdmin), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            PerfilComum(NivelAcesso.SuperAdmin), LojaQualquer(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
             Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
         var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
@@ -215,7 +223,7 @@ public class RevogacaoDeSessaoTests
     public async Task AtribuirPerfil_DeveRecusarPerfilDeOutraEmpresa()
     {
         var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
-            PerfilComum(NivelAcesso.Admin, Guid.NewGuid()), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            PerfilComum(NivelAcesso.Admin, Guid.NewGuid()), LojaQualquer(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
             Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
         var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
@@ -224,7 +232,7 @@ public class RevogacaoDeSessaoTests
     }
 
     private AtribuirPerfilUsuarioUseCase AtribuirPerfil(IUsuarioPerfilRepository perfis) =>
-        new(_usuarios, perfis, PerfilComum(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+        new(_usuarios, perfis, PerfilComum(), LojaQualquer(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
             Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
     [Fact]

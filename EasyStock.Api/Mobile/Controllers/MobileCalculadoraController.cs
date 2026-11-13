@@ -99,6 +99,7 @@ public class MobileCalculadoraController(
     }
 
     [HttpPost("criar-compra")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> CriarCompra(
         [FromBody] CriarCompraRequest body,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,

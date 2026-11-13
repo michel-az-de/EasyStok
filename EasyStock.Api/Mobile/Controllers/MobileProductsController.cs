@@ -72,6 +72,7 @@ public class MobileProductsController(
     /// precisa entrar no catálogo principal.
     /// </summary>
     [HttpPost("{id}/approve")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Approve(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -96,6 +97,7 @@ public class MobileProductsController(
     /// for ativada — também valor de estoque.
     /// </summary>
     [HttpPost("{id}/link")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Link(string id, [FromBody] LinkRequest req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (req == null || req.ErpProductId == Guid.Empty)
@@ -191,6 +193,8 @@ public class MobileProductsController(
     public async Task<IActionResult> ReconcileStock(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        // #2448: mesma permissão do ajuste de desacerto no web (EstoqueDesacertosController.Ajustar).
+        if (!CurrentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
         var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id && p.EmpresaId == emp, ct);
         if (product == null) return NotFound();
         if (product.ErpProductId == null)
@@ -225,6 +229,7 @@ public class MobileProductsController(
     /// Desfaz a aprovação/link. Útil em caso de erro de operador.
     /// </summary>
     [HttpPost("{id}/unlink")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;

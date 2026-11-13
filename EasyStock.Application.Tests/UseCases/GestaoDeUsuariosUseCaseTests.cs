@@ -19,6 +19,7 @@ public class GestaoDeUsuariosUseCaseTests
     private readonly IUsuarioEmpresaRepository _vinculos = Substitute.For<IUsuarioEmpresaRepository>();
     private readonly IUsuarioPerfilRepository _usuariosPerfis = Substitute.For<IUsuarioPerfilRepository>();
     private readonly IPerfilRepository _perfis = Substitute.For<IPerfilRepository>();
+    private readonly ILojaRepository _lojas = Substitute.For<ILojaRepository>();
     private readonly IAssinaturaEmpresaRepository _assinaturas = Substitute.For<IAssinaturaEmpresaRepository>();
     private readonly List<UsuarioPerfil> _removidos = [];
     private readonly List<UsuarioPerfil> _adicionados = [];
@@ -71,7 +72,7 @@ public class GestaoDeUsuariosUseCaseTests
         _c.Usuarios, _vinculos, _assinaturas, _atual, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<ReativarUsuarioUseCase>>());
 
     private AtribuirPerfilUsuarioUseCase Atribuir() => new(
-        _c.Usuarios, _usuariosPerfis, _perfis, _c.Revogador(), _atual, _c.Auditoria, _c.UnitOfWork,
+        _c.Usuarios, _usuariosPerfis, _perfis, _lojas, _c.Revogador(), _atual, _c.Auditoria, _c.UnitOfWork,
         Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
     [Fact]
@@ -201,5 +202,46 @@ public class GestaoDeUsuariosUseCaseTests
 
         (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("USUARIO_PROPRIO");
         _adicionados.Should().BeEmpty();
+    }
+    [Fact]
+    public async Task AdminNaoAtribuiPerfilAUsuarioSemVinculoComAEmpresa()
+    {
+        // #2448: a rota confere só a empresa de quem chama; o usuário alvo também precisa ser da empresa.
+        var cozinha = NovoPerfil("Cozinha");
+        var deFora = Usuario.Criar("Bia", "bia@outra.com", "$2a$11$hash");
+        deFora.Empresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = deFora.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        _c.Usuarios.GetByIdAsync(deFora.Id).Returns(deFora);
+
+        var acao = () => Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(deFora.Id, _empresaId, cozinha.Id, null));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>();
+        _adicionados.Should().BeEmpty();
+        _c.Auditorias.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task NaoAtribuiPerfilComLojaDeOutraEmpresa()
+    {
+        var cozinha = NovoPerfil("Cozinha");
+        var ana = Atendente();
+        var lojaDeOutraEmpresa = Guid.NewGuid();
+
+        var acao = () => Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(ana.Id, _empresaId, cozinha.Id, lojaDeOutraEmpresa));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>();
+        _adicionados.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AtribuiPerfilComLojaDaEmpresa()
+    {
+        var cozinha = NovoPerfil("Cozinha");
+        var ana = Atendente();
+        var loja = new Loja { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Centro" };
+        _lojas.GetByIdAsync(_empresaId, loja.Id).Returns(loja);
+
+        await Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(ana.Id, _empresaId, cozinha.Id, loja.Id));
+
+        _adicionados.Should().ContainSingle().Which.LojaId.Should().Be(loja.Id);
     }
 }

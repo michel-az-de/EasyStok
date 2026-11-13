@@ -201,7 +201,7 @@ public sealed class SessoesNativasConcorrenciaTests(PostgreSqlDatabaseFixture fi
         if (corteJaAtual)
             await usuarios.AtualizarSessoesValidasDesdeAsync(dados.Usuario, new DateTime(agora.Ticks - agora.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc));
         var revogador = new RevogadorSessoes(usuarios, new RefreshTokenRepository(admin), cache, new RelogioDoCorte2184(agora), NullLogger<RevogadorSessoes>.Instance);
-        var atribuir = new AtribuirPerfilUsuarioUseCase(usuarios, new UsuarioPerfilRepository(admin), new PerfilRepository(admin), revogador,
+        var atribuir = new AtribuirPerfilUsuarioUseCase(usuarios, new UsuarioPerfilRepository(admin), new PerfilRepository(admin), new LojaRepository(admin), revogador,
             current, new AuditLogRepository(admin), admin, NullLogger<AtribuirPerfilUsuarioUseCase>.Instance);
         var convites = new ConvitesDeAcesso(new ResetTokenRepository(admin), null!, null!, null!, new ConfigurationBuilder().Build(),
             TimeProvider.System, NullLogger<ConvitesDeAcesso>.Instance);

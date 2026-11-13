@@ -43,6 +43,7 @@ public class MobileBatchesController(
     }
 
     [HttpPost("{id}/link")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Link(string id, [FromBody] LinkLoteRequest? req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -110,6 +111,7 @@ public class MobileBatchesController(
     }
 
     [HttpPost("{id}/unlink")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;

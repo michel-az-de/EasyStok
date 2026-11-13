@@ -50,8 +50,29 @@ public sealed class ModulosConvention : IApplicationModelConvention
         // #2199: quem imprime lê a regra da loja; só Configurações grava.
         if (chave == "LojaImpressao" && acao == "Obter")
             return [Modulo.Configuracoes, Modulo.Producao, Modulo.Atendimento, Modulo.Caixa, Modulo.Cozinha, Modulo.Entregas];
+        if (EscritaGestaoMobile.TryGetValue((chave, acao), out var mobile)) return mobile;
         return Mapa.GetValueOrDefault(chave);
     }
+
+    // #2448: a escrita da gestão mobile leva ao ERP o mesmo que a ação web equivalente, então exige o mesmo módulo.
+    // Leitura e rotas do aparelho pareado seguem transversais.
+    private static readonly Dictionary<(string Controller, string Acao), Modulo[]> EscritaGestaoMobile = new()
+    {
+        [("Mobile.MobileCash", "Promover")] = [Modulo.Caixa],
+        [("Mobile.MobileCash", "Unlink")] = [Modulo.Caixa],
+        [("Mobile.MobileProducts", "Approve")] = [Modulo.Cardapio],
+        [("Mobile.MobileProducts", "Link")] = [Modulo.Cardapio],
+        [("Mobile.MobileProducts", "Unlink")] = [Modulo.Cardapio],
+        [("Mobile.MobileProducts", "ReconcileStock")] = [Modulo.Producao],
+        [("Mobile.MobileOrders", "Link")] = [Modulo.Atendimento],
+        [("Mobile.MobileOrders", "Unlink")] = [Modulo.Atendimento],
+        [("Mobile.MobileOrders", "BackfillVendas")] = [Modulo.Caixa],
+        [("Mobile.MobileBatches", "Link")] = [Modulo.Producao],
+        [("Mobile.MobileBatches", "Unlink")] = [Modulo.Producao],
+        [("Mobile.MobileClients", "Link")] = [Modulo.Atendimento],
+        [("Mobile.MobileClients", "Unlink")] = [Modulo.Atendimento],
+        [("Mobile.MobileCalculadora", "CriarCompra")] = [Modulo.Producao],
+    };
 
     public void Apply(ApplicationModel application)
     {

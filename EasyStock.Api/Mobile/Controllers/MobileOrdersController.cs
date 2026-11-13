@@ -52,6 +52,7 @@ public class MobileOrdersController(
     /// (com snapshot do cliente + items) e linka.
     /// </summary>
     [HttpPost("{id}/link")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Link(string id, [FromBody] LinkPedidoRequest? req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -135,6 +136,7 @@ public class MobileOrdersController(
     }
 
     [HttpPost("{id}/unlink")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -162,6 +164,7 @@ public class MobileOrdersController(
     /// Resposta inclui <c>hasMore</c> pra cliente saber se precisa repaginar.
     /// </summary>
     [HttpPost("backfill-vendas")]
+    [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> BackfillVendas(
         [FromQuery] Guid? empresaId,
         [FromQuery] int? limit,
