@@ -169,7 +169,7 @@ public class PedidoEstoqueIntegrationServiceTests
         };
         itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[] { Lote(1), Lote(2), Lote(3) });
         var totais = new List<decimal>();
-        await movRepo.InsertAsync(Arg.Do<MovimentacaoEstoque>(m => totais.Add(m.ValorTotal.Valor)));
+        await movRepo.InsertAsync(Arg.Do<MovimentacaoEstoque>(m => totais.Add(m.ValorTotal!.Valor)));
 
         await svc.DescontarAsync(pedido);
 
