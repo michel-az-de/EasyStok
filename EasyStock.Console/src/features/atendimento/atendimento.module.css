@@ -58,7 +58,8 @@
 }
 /* Troca de remetente respira mais. */
 .trocaDeVoz { margin-top: var(--e-5); }
-.balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-corpo); }
+/* #2420: entrelinha do corpo para a leitura longa. */
+.balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-corpo); line-height: var(--lh-corpo); }
 .meta {
   display: flex; gap: var(--e-2); align-items: center; justify-content: flex-end;
   margin-top: 6px; font-size: var(--t-micro); color: var(--tinta-3);
@@ -80,9 +81,10 @@
   animation: girarMeta .8s linear infinite;
 }
 @keyframes girarMeta { to { transform: rotate(360deg); } }
+/* #2420: o recebido ganha a sombra fina do sistema para se destacar do chão da conversa. */
 .entrada {
   align-self: flex-start; background: var(--papel); border: 0;
-  box-shadow: none;
+  box-shadow: var(--sombra);
 }
 /* #2232 (A6): o enviado tem cor própria (verde-pastel); o do automático segue neutro, mais abaixo. */
 .saida {
@@ -144,10 +146,14 @@
 .grupoDia { display: flex; flex-direction: column; }
 /* #2258 (auditoria T3): fundo opaco, camada acima das bolhas e respiro; transparente, "26 de outubro"
    ficava por cima do texto da mensagem que rolava por baixo. */
+/* #2420: linha fina dos dois lados da data, como a divisória entre atendimentos. */
 .separadorDia {
-  display: flex; justify-content: center; padding: var(--e-2) 0; margin: 0 0 var(--e-2);
+  display: flex; justify-content: center; align-items: center; gap: var(--e-3); padding: var(--e-2) 0; margin: 0 0 var(--e-2);
   position: sticky; top: 0; z-index: 2; pointer-events: none;
   background: var(--chao-conversa);
+}
+.separadorDia::before, .separadorDia::after {
+  content: ''; flex: 1 1 auto; height: var(--b-1); background: var(--linha);
 }
 
 /* #2258 (auditoria T2): esqueleto do painel da conversa enquanto a primeira leitura não chega. */
@@ -216,14 +222,21 @@
   background: var(--papel); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600;
 }
 
-/* Aviso janela fechada: raio 12, padding vertical curto, ícone ao topo. */
+/* Aviso junto do campo (#2420): ícone, título em cima, explicação embaixo e, com a janela fechada,
+   "Escolher modelo" à direita. Quebra para baixo em coluna estreita. */
 .bloqueio {
-  display: flex; gap: var(--e-2); align-items: flex-start; flex-wrap: wrap;
-  padding: 10px 16px; margin: 0 0 var(--e-3);
+  display: flex; gap: var(--e-2) var(--e-3); align-items: center; flex-wrap: wrap;
+  padding: var(--e-3); margin: 0;
   background: var(--alerta-pastel); color: var(--alerta);
-  border: 0; border-radius: var(--r-1); font-size: var(--t-apoio);
+  border: 0; border-radius: var(--r-2); font-size: var(--t-apoio);
+}
+.bloqueioIcone { flex: none; align-self: flex-start; margin-top: 2px; }
+.bloqueioTexto {
+  flex: 1 1 24ch; min-width: 0; margin: 0; display: grid; gap: 2px;
+  color: var(--tinta-2); line-height: var(--lh-compacto); overflow-wrap: anywhere;
 }
 .bloqueio strong { color: var(--tinta); font-weight: 600; }
+.escolherModelo { flex: none; margin-left: auto; }
 
 @media (max-width: 759px) {
   .balao { max-width: 90%; }
@@ -571,12 +584,29 @@
 
 /* #2232 (A2): a transferência é uma faixa de uma linha: quem passou e por quê. A direção vem de uma
    barra lateral, com o canto dela quase reto (#2246). A frase longa fica no title. */
-.faixaTransferencia {
-  flex: 1 1 auto; min-width: 0; margin: 0; padding: var(--e-1) var(--e-3);
-  border-left: var(--trilho) solid var(--alerta); border-radius: var(--r-ponta) var(--r-1) var(--r-1) var(--r-ponta);
-  background: var(--alerta-pastel); color: var(--tinta);
-  font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto); overflow-wrap: anywhere;
+/* #2420: a faixa vira um cartão âmbar com ícone, título, motivo e o Assumir dentro dele, à direita. */
+.modo:has(.faixaTransferencia) { padding-block: var(--e-2); }
+.modoLinha:has(.faixaTransferencia) {
+  gap: 0 var(--e-3); overflow: hidden;
+  border: var(--b-1) solid color-mix(in srgb, var(--alerta) 28%, transparent); border-radius: var(--r-2);
+  background: var(--alerta-pastel);
 }
+.modoLinha:has(.faixaTransferencia) > .modoAssumir { margin: var(--e-2) var(--e-3) var(--e-2) auto; }
+/* Sem traço lateral (#2420, pedido do Felipe): a direção vem do ícone e do divisor curto antes do texto. */
+.faixaTransferencia {
+  flex: 1 1 auto; min-width: 0; margin: 0; padding: var(--e-2) var(--e-3) var(--e-2) var(--e-4);
+  display: flex; align-items: center; gap: var(--e-3);
+  border: 0;
+  background: transparent; color: var(--tinta);
+  font-size: var(--t-apoio); line-height: var(--lh-compacto); overflow-wrap: anywhere;
+}
+.faixaIcone { flex: none; color: var(--alerta); }
+.faixaTexto {
+  display: grid; gap: 2px; min-width: 0; padding-left: var(--e-3);
+  border-left: var(--b-1) solid color-mix(in srgb, var(--alerta) 30%, transparent);
+}
+.faixaTexto strong { font-weight: 600; }
+.faixaMotivo { color: var(--tinta-2); }
 
 /* #2232 (A5): "Novas mensagens" fica no pé da área que rola, à vista de quem está lendo mais acima. */
 .novasMensagens {

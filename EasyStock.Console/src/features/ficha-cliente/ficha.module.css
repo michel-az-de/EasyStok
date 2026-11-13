@@ -152,8 +152,8 @@
 .gatilhoAcoes { min-height: var(--toque); padding-inline: var(--e-3); gap: var(--e-1); }
 .pdfDaFicha { display: inline-flex; position: relative; }
 .erroPdf { position: absolute; top: 100%; right: 0; z-index: 20; width: min(280px, 80vw); padding: var(--e-3); background: var(--erro-pastel); color: var(--erro); font-size: var(--t-micro); }
-.notasDaFicha { padding-inline: var(--e-4); }
-.linkCompartilhado { margin: 0 var(--e-4); }
+.notasDaFicha { margin-inline: var(--e-4); padding-block: var(--e-1); border-bottom: var(--b-1) solid var(--linha); }
+.linkCompartilhado { margin: 0 var(--e-4); border-bottom: var(--b-1) solid var(--linha); }
 .linkCompartilhado > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: var(--toque); cursor: pointer; font-size: var(--t-apoio); color: var(--tinta-2); list-style: none; }
 .linkCompartilhado > summary::-webkit-details-marker { display: none; }
 .linkCompartilhado[open] > summary svg { transform: rotate(180deg); }
@@ -165,7 +165,9 @@
   padding: 0 0 var(--e-3);
 }
 
-.resumoAtual { padding: 0; margin: 0 var(--e-4); background: transparent; }
+/* #2420: a comanda é um cartão com contorno, e a ação de montar fica dentro dele. */
+.resumoAtual { padding: var(--e-3); margin: 0 var(--e-4); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); }
+.resumoAtual .acaoMontar { margin-top: var(--e-3); padding: 0; }
 .resumoAtual[data-recebendo-prato] { outline: 2px solid var(--marca); outline-offset: -2px; background: var(--fundo); }
 .resumoAtual h3 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2); margin: 0 0 var(--e-2); font-size: var(--t-corpo); }
 .resumoAtual h3 small { color: var(--tinta-2); font-size: var(--t-micro); font-weight: 400; }
@@ -177,9 +179,14 @@
   font-size: var(--t-valor); font-weight: 700; line-height: var(--lh-compacto); font-variant-numeric: tabular-nums;
 }
 .acessosFicha { padding: 0 var(--e-4); }
+/* #2420: Entrega, Notas, Histórico e Link do cliente são uma lista com divisória entre as linhas.
+   A margem negativa desfaz o vão da grade entre elas, para a linha ficar no meio do respiro. */
+.acessosFicha:empty { display: none; }
+.acessosFicha + .notasDaFicha, .notasDaFicha + .acessosFicha,
+.acessosFicha + .acessosFicha, .acessosFicha + .linkCompartilhado { margin-top: calc(-1 * var(--e-3)); }
 .acessoFicha {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-3);
-  width: 100%; min-height: var(--toque); padding: var(--e-2) 0; border: 0; border-radius: var(--r-1);
+  width: 100%; min-height: var(--toque); padding: var(--e-3) 0; border: 0; border-bottom: var(--b-1) solid var(--linha); border-radius: 0;
   background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
 }
 .acessoFicha span { min-width: 0; }

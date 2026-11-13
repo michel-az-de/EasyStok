@@ -280,9 +280,10 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
                 : 'Adicione itens ou envie o cardápio ao cliente.'}</p>
           {destacaSaldo && <p className={css.saldoFicha}>{moeda(saldo)} a receber</p>}
           {aDevolver > 0 && <p className={css.saldoFicha}>{moeda(aDevolver)} a devolver</p>}
+          {/* #2420: a ação de montar mora dentro do cartão da comanda. */}
+          {editavel && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
         </section>
 
-        {editavel && acaoMontar && <div className={css.acaoMontar}>{acaoMontar}</div>}
         {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. */}
         {editavel && fonteApi && posVenda && novaComanda && (
           <div className={css.acaoMontar}>

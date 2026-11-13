@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { MODOS } from '../../dominio/automatico'
@@ -44,8 +45,14 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
   return (
     <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} data-controle-conversa aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
+        {/* #2420: título em negrito e motivo embaixo; o " · " fica para o leitor de tela ler a frase inteira. */}
         {faixa ? (
-          <p className={css.faixaTransferencia} title={faixa.longo}>{faixa.texto}</p>
+          <p className={css.faixaTransferencia} title={faixa.longo}>
+            <Icone nome="hand" className={css.faixaIcone} />
+            <span className={css.faixaTexto}>
+              <strong>{faixa.titulo}</strong><span className="sr"> · </span><span className={css.faixaMotivo}>{faixa.motivo}</span>
+            </span>
+          </p>
         ) : (
           <span className={css.modoEstado} title={resumo.detalhe}><Pilula tom={resumo.tom} fina>{resumo.rotulo}</Pilula></span>
         )}
