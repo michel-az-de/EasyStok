@@ -125,6 +125,21 @@ public class DinheiroTests
         Dinheiro.Ratear(2.50m, new[] { 3m }).Select(p => p.Valor).Should().Equal(7.50m);
     }
 
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(100)]
+    public void Ratear_meios_centavos_nao_ultrapassa_o_total(int quantidadeDeLotes)
+    {
+        var quantidades = Enumerable.Repeat(0.5m, quantidadeDeLotes).ToArray();
+
+        var partes = Dinheiro.Ratear(0.01m, quantidades);
+
+        partes.Should().HaveCount(quantidadeDeLotes);
+        partes.Should().OnlyContain(parte => parte.Valor >= 0m);
+        partes.Sum(parte => parte.Valor).Should().Be(0.01m * quantidadeDeLotes / 2);
+    }
+
     [Fact]
     public void Ratear_sem_lotes_devolve_lista_vazia()
     {
