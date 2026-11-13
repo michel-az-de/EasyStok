@@ -4,7 +4,7 @@
 - Base medida: `origin/master` `efc107517`
 - Issue: #2495. Ondas anteriores: #2457 (onda 1), #2476 (onda 2).
 - Origem: revisão de Cadastros de 13/11, itens I1, I2, I3, I4, I6 e B6.
-- Status: proposta. As fatias só começam depois que o Felipe aprovar esta spec no chat. Com a aprovação, cada fatia entra como tier baixo (spec S/P de plano aprovado).
+- Status: aprovado pelo Felipe no chat em 2026-11-13 ("Aprovo, seguir"). Cada fatia entra como tier baixo (spec S/P de plano aprovado).
 
 ## 1. Decisões do Felipe (13/11)
 
