@@ -64,7 +64,8 @@ try {
       await page.screenshot({path:join(evidencias,nome+'.png'),fullPage:true})
       await page.getByRole('button',{name:rotulo,exact:true}).click()
       const campo=page.getByRole('textbox',{name:'Valor recebido',exact:true})
-      await campo.waitFor(); assert.equal((await campo.inputValue()).replace(/\s/g,' '), 'R$ '+caso.valor.toFixed(2).replace('.',','))
+      await campo.waitFor(); // #2437: desde #2005/#2008 o campo é digitado em reais e o 'R$' é um prefixo à parte; o valor do input vem sem ele.
+      assert.equal((await campo.inputValue()).replace(/\s/g,' '), caso.valor.toFixed(2).replace('.',','))
       await page.getByRole('combobox',{name:'Como recebeu',exact:true}).selectOption(caso.metodo)
       await page.getByRole('button',{name:rotulo,exact:true}).click()
       assert.deepEqual(await page.evaluate(()=>window.recebimentosDaProva),[{valor:caso.valor,metodo:caso.metodo}])

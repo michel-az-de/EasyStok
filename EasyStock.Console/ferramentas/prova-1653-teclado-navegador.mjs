@@ -7,8 +7,17 @@ import { join, resolve } from 'node:path'
 
 const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
-const origem = process.env.CONSOLE_DEMO_URL ?? 'http://127.0.0.1:5199'
 const pastaConsole = resolve(import.meta.dirname, '..')
+// #2437: a prova usa os dados de demonstração; o Vite do runner está no modo API e abre o login.
+// Sem CONSOLE_DEMO_URL, sobe um Vite próprio em demonstração.
+let servidorDemo = null
+if (!process.env.CONSOLE_DEMO_URL) {
+  delete process.env.VITE_FONTE_DADOS
+  const { createServer } = await import('vite')
+  servidorDemo = await createServer({ root: pastaConsole, logLevel: 'silent', server: { host: '127.0.0.1', port: 0, strictPort: false } })
+  await servidorDemo.listen()
+}
+const origem = process.env.CONSOLE_DEMO_URL ?? servidorDemo.resolvedUrls.local[0].replace(/\/$/, '')
 const evidencias = resolve(pastaConsole, '../.build/1653/acessibilidade')
 const temporarios = resolve(pastaConsole, '.build/1653')
 mkdirSync(evidencias, { recursive: true })
@@ -51,7 +60,7 @@ async function opcaoVisivel(page, campo) {
     if (!opcao) return null
     const caixa = opcao.closest('[role="group"]')
     const item = opcao.getBoundingClientRect(), janela = caixa.getBoundingClientRect()
-    return { id, selecionada: opcao.getAttribute('aria-selected'), top: item.top, bottom: item.bottom, limiteTop: janela.top, limiteBottom: janela.bottom, scrollTop: caixa.scrollTop }
+    return { id, selecionada: opcao.getAttribute('aria-selected'), top: item.top, bottom: item.bottom, limiteTop: janela.top, limiteBottom: janela.bottom, scrollTop: caixa.scrollTop, rola: caixa.scrollHeight > caixa.clientHeight + 1 }
   }, id)
   assert.ok(medida, 'aria-activedescendant precisa referenciar um elemento existente')
   assert.equal(medida.selecionada, 'true')
@@ -63,10 +72,11 @@ async function opcaoVisivel(page, campo) {
 try {
   const { context, page } = await novaPagina()
   await context.route(url => url.pathname.startsWith('/api/'), route => route.fulfill({ json: { data: [] } }))
-  await page.goto(origem + '/#/m/atendimento')
-  // #2135: a tela abre sem conversa escolhida; a atendente abre a José Moretti, que está no automático.
-  await page.locator('button[aria-current]', { hasText: 'José Moretti' }).click()
-  await page.getByRole('button', { name: 'Assumir', exact: true }).click()
+  await page.goto(origem + '/#/m/atendimento', { waitUntil: 'networkidle', timeout: 90000 }) // #2437: o Vite frio otimiza dependências na primeira carga
+  // #2135: a tela abre sem conversa escolhida; a atendente abre a do Renan Okamoto, que está no automático.
+  // #2437: a demonstração da Casa da Babá não traz mais o José Moretti, e o botão virou "Assumir conversa" (#2232).
+  await page.locator('button[aria-current]', { hasText: 'Renan Okamoto' }).click()
+  await page.getByRole('button', { name: 'Assumir conversa', exact: true }).click()
   const campo = page.getByRole('textbox', { name: 'Mensagem para o cliente', exact: true })
   await campo.fill('/')
   const lista = page.getByRole('listbox', { name: 'Respostas prontas' })
@@ -81,7 +91,8 @@ try {
     await repousar(page)
     percurso.push(await opcaoVisivel(page, campo))
   }
-  assert.ok(percurso.at(-1).scrollTop > percurso[0].scrollTop, 'percorrer a lista deve revelar o último item')
+  // #2437: com a lista inteira à vista não há o que rolar; cada passo acima já confere que a opção ativa está visível.
+  if (percurso[0].rola) assert.ok(percurso.at(-1).scrollTop > percurso[0].scrollTop, 'percorrer a lista deve revelar o último item')
   await foto(page, '01-respostas-ultima-opcao')
   await campo.press('Escape')
   await lista.waitFor({ state: 'detached' })
@@ -126,9 +137,10 @@ try {
   await campo.press('Escape')
   registrar('App: eventos IME de Enter/setas/Escape não enviam, inserem nem fecham sugestões')
 
-  const gatilho = page.getByRole('button', { name: 'Mais opções do pedido', exact: true })
+  // #2437: o menu do rodapé hoje é o "Mais ferramentas" do composer; o "Mais opções do pedido" saiu na #2185.
+  const gatilho = page.getByRole('button', { name: 'Mais ferramentas', exact: true })
   await gatilho.click()
-  const menu = page.getByRole('menu', { name: 'Mais opções do pedido', exact: true })
+  const menu = page.getByRole('menu', { name: 'Mais ferramentas', exact: true })
   await menu.waitFor()
   await page.keyboard.press('ArrowDown')
   await menuInteiroVisivel(menu)
@@ -151,13 +163,14 @@ try {
   registrar('App: Popover do rodapé abre inteiro na viewport e acompanha resize sem trocar foco', { antes, redimensionado, menuVisivel })
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole('tab', { name: 'Ficha', exact: true }).click()
-  const blocos = await page.locator('h3 > button[aria-controls]').evaluateAll(ns => ns.filter(n => n.getClientRects().length).map(n => ({ nome: n.textContent, altura: n.getBoundingClientRect().height })))
-  assert.ok(blocos.length >= 4)
+  await page.getByRole('tab', { name: 'Cliente', exact: true }).click() // #2437: a aba Ficha virou Cliente
+  // #2437: a Ficha (agora aba Cliente) trocou os blocos sanfonados por gatilhos que abrem/fecham (Ações, Assistente, Notas).
+  const blocos = await page.locator('button[aria-expanded]').evaluateAll(ns => ns.filter(n => n.getClientRects().length).map(n => ({ nome: n.textContent, altura: n.getBoundingClientRect().height })))
+  assert.ok(blocos.length >= 3, JSON.stringify(blocos))
   assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true)
   assert.ok(blocos.every(bloco => bloco.altura >= 44), JSON.stringify(blocos))
   await foto(page, '04-ficha-toque')
-  registrar('App: cabeçalhos da Ficha têm pelo menos 44 px no celular com toque', { blocos })
+  registrar('App: gatilhos da aba Cliente têm pelo menos 44 px no celular com toque', { blocos })
   await context.close()
 
   const htmlHarness = arquivo => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div><script type="module" src="/.build/1653/${arquivo}.jsx"></script></body></html>`
@@ -242,4 +255,5 @@ try {
   throw erro
 } finally {
   await browser.close()
+  await servidorDemo?.close()
 }

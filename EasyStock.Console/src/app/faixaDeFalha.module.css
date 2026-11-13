@@ -17,6 +17,8 @@
 
 .empilhada {
   bottom: 56px;
+  /* #2437: no celular a faixa cai sobre o "Gerar cobrança" da barra; ela só informa, então o toque passa. */
+  pointer-events: none;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;

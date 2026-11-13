@@ -503,7 +503,7 @@ try {
   })
   await confere('F16. Ficha: cadastro rápido pela metade não fecha com Esc; sem digitar, fecha', async () => {
     const { ctx, p } = await abrir('cena=ficha&inicial=lead')
-    const janela = p.getByRole('dialog', { name: 'Ficha' })
+    const janela = p.getByRole('dialog', { name: 'Cadastro do cliente' }) // #2437: a janela da ficha é "Cadastro do cliente" desde a #2260
     await janela.waitFor()
     await janela.getByLabel('Endereço', { exact: true }).first().fill('Rua das Flores, 120, Centro')
     await p.keyboard.press('Escape')
@@ -511,7 +511,7 @@ try {
     assert.deepEqual((await chamadasDe(p)).filter((c) => c[0] === 'fecharFicha'), [])
     await ctx.close()
     const outra = await abrir('cena=ficha&inicial=lead')
-    const fresca = outra.p.getByRole('dialog', { name: 'Ficha' })
+    const fresca = outra.p.getByRole('dialog', { name: 'Cadastro do cliente' })
     await fresca.waitFor()
     await outra.p.keyboard.press('Escape')
     await outra.p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'fecharFicha'))
@@ -519,7 +519,7 @@ try {
   })
   await confere('F16. Ficha: dado que chega da sincronização sem ninguém digitar não segura a janela', async () => {
     const { ctx, p } = await abrir('cena=ficha&inicial=lead')
-    const janela = p.getByRole('dialog', { name: 'Ficha' })
+    const janela = p.getByRole('dialog', { name: 'Cadastro do cliente' })
     await janela.waitFor()
     await p.evaluate(() => window.sincronizarNome('Nome que veio do WhatsApp'))
     await janela.getByText('Nome que veio do WhatsApp').first().waitFor()
@@ -582,17 +582,19 @@ try {
   await confere('F25. conversa aberta a partir de "Concluídas" ganha o destaque da selecionada', async () => {
     const { ctx, p } = await abrir('inicial=meu')
     await esperarPainel(p)
+    await p.getByRole('button', { name: /^Todas/ }).click() // #2437: a lista abre em "Precisa de você"; "Concluídas" só existe em "Todas"
     await p.getByRole('button', { name: /^Concluídas/ }).click()
     await p.getByText('Cliente fechada0').first().click()
     await p.waitForFunction(() => document.querySelector('[aria-current="true"]') !== null)
     assert.match(await p.locator('[aria-current="true"]').first().innerText(), /fechada0/)
     await ctx.close()
   })
-  await confere('F18. título "Conversas" e chip "Todas" dizem o mesmo número, sem encerradas nem bloqueadas', async () => {
+  await confere('F18. chip "Todas" conta só as abertas, sem encerradas nem bloqueadas; o título não repete o número', async () => {
     const { ctx, p } = await abrir('inicial=meu')
     await esperarPainel(p)
     const abertas = await p.evaluate(() => window.estadoCena().conversas.filter((c) => c.estado !== 'Encerrado' && !c.bloqueio).length)
-    assert.equal((await p.locator('h2', { hasText: 'Conversas' }).first().innerText()).replace(/\D/g, ''), String(abertas))
+    // #2437: o título deixou de trazer número na #2232 (L1); o total fica só no chip "Todas".
+    assert.equal((await p.locator('h2', { hasText: 'Conversas' }).first().innerText()).replace(/\D/g, ''), '')
     assert.equal((await p.getByRole('button', { name: /^Todas/ }).innerText()).replace(/\D/g, ''), String(abertas))
     await ctx.close()
   })
@@ -697,7 +699,7 @@ try {
     await aba(p, 'Conversas').waitFor()
     assert.equal(await aba(p, 'Conversas').getAttribute('aria-selected'), 'true')
     await p.getByRole('status', { name: 'Avisos do atendimento' }).getByRole('button', { name: 'Cliente meu Oi de novo' }).click()
-    await p.waitForFunction(() => [...document.querySelectorAll('[role="tab"]')].find((t) => /^Conversa$/.test(t.textContent.trim()))?.getAttribute('aria-selected') === 'true')
+    await p.waitForFunction(() => [...document.querySelectorAll('[role="tab"]')].find((t) => /^Mensagens$/.test(t.textContent.trim()))?.getAttribute('aria-selected') === 'true')
     await ctx.close()
   })
   await confere('F24. no celular, o painel da conversa só conta como à vista na aba Conversa', async () => {
@@ -705,7 +707,7 @@ try {
     await aba(p, 'Conversas').waitFor()
     const naTela = async () => (await chamadasDe(p)).filter((c) => c[0] === 'painelNaTela').at(-1)?.[1]
     assert.equal(await naTela(), false)
-    await aba(p, 'Conversa').click()
+    await aba(p, 'Mensagens').click() // #2437: a aba da conversa se chama "Mensagens" desde a #2232
     await p.waitForFunction(() => window.chamadas.filter((c) => c[0] === 'painelNaTela').at(-1)?.[1] === true)
     await aba(p, 'Conversas').click()
     await p.waitForFunction(() => window.chamadas.filter((c) => c[0] === 'painelNaTela').at(-1)?.[1] === false)
@@ -717,14 +719,16 @@ try {
     assert.equal((await chamadasDe(p)).filter((c) => c[0] === 'painelNaTela').at(-1)?.[1], true)
     await ctx.close()
   })
-  await confere('F18. a aba "Conversas" do celular mostra o mesmo número do título da lista', async () => {
+  await confere('F18. a aba "Conversas" do celular mostra o mesmo número do chip "Precisa de você" (#2232 L11)', async () => {
     const { ctx, p } = await abrir('cena=moldura&inicial=nenhuma', celular)
     await aba(p, 'Conversas').waitFor()
-    const abertas = await p.evaluate(() => window.estadoCena().conversas.filter((c) => c.estado !== 'Encerrado' && !c.bloqueio).length)
-    assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), String(abertas))
-    await p.evaluate(() => window.filtrar('aba', 'precisa'))
+    // #2437: desde a #2232 (L11) a aba conta o que pede ação, o mesmo número do chip "Precisa de você", e não o total de abertas.
+    const precisam = (await p.getByRole('button', { name: /^Precisa de você/ }).innerText()).replace(/\D/g, '')
+    assert.ok(Number(precisam) > 0)
+    assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), precisam)
+    await p.evaluate(() => window.filtrar('aba', 'todas'))
     await p.waitForTimeout(100)
-    assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), String(abertas), 'a aba Precisa de você não muda o total de abertas')
+    assert.equal((await aba(p, 'Conversas').innerText()).replace(/[^0-9]/g, ''), precisam, 'trocar a aba da lista não muda o número da aba do celular')
     await ctx.close()
   })
   await confere('E29. no modo API o F2 não é capturado (não há Simular)', async () => {

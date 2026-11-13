@@ -12,7 +12,6 @@ import { acoesDaConversa } from '../../dominio/acoesDaConversa'
 import { conversaEncerrada, fronteirasDoFio } from '../../dominio/conversa'
 import { MOTIVO_BLOQUEIO, modelosAVista, permissaoDeEscrita, prazoNoCabecalho } from '../../dominio/janela'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
-import { Pilula } from '../../componentes/Pilula'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
@@ -185,7 +184,7 @@ export function PainelAtendimento({
           </h2>
         </span>
         <div className={css.direita}>
-          {bloqueada && <Pilula tom="perigo"><Icone nome="bloqueio" /> Bloqueado</Pilula>}
+          {/* #2437: "Bloqueado" fica só na barra de modo, com o motivo; aqui repetia a palavra (#2185). */}
           {/* O balão planta o gatilho do Assistente aqui. Com lugar próprio, ele não troca de lado com
               o menu conforme a conversa (#2185: a ordem dependia de quem montou por último). */}
           <span className={css.ancoraAssistente} data-ancora-assistente />
