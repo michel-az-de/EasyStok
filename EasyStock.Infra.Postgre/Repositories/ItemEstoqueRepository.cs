@@ -47,18 +47,18 @@ namespace EasyStock.Infra.Postgre.Repositories
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
-            var pattern = $"%{termo}%";
+            var pattern = PadraoILike.Contendo(termo);
 
             return await dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId &&
-                    ((i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern)) ||
-                     (i.CodigoMarketplace != null && EF.Functions.ILike(i.CodigoMarketplace, pattern)) ||
-                     (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern)) ||
-                     (i.VariacaoDescricao != null && EF.Functions.ILike(i.VariacaoDescricao, pattern)) ||
-                     (i.Cor != null && EF.Functions.ILike(i.Cor, pattern)) ||
-                     (i.Tamanho != null && EF.Functions.ILike(i.Tamanho, pattern)) ||
-                     (i.DescricaoAnuncio != null && EF.Functions.ILike(i.DescricaoAnuncio, pattern))))
+                    ((i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern, PadraoILike.Escape)) ||
+                     (i.CodigoMarketplace != null && EF.Functions.ILike(i.CodigoMarketplace, pattern, PadraoILike.Escape)) ||
+                     (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern, PadraoILike.Escape)) ||
+                     (i.VariacaoDescricao != null && EF.Functions.ILike(i.VariacaoDescricao, pattern, PadraoILike.Escape)) ||
+                     (i.Cor != null && EF.Functions.ILike(i.Cor, pattern, PadraoILike.Escape)) ||
+                     (i.Tamanho != null && EF.Functions.ILike(i.Tamanho, pattern, PadraoILike.Escape)) ||
+                     (i.DescricaoAnuncio != null && EF.Functions.ILike(i.DescricaoAnuncio, pattern, PadraoILike.Escape))))
                 .OrderBy(i => i.ChavePesquisa)
                 .ThenBy(i => i.Id)
                 .Take(maxResults)
@@ -200,18 +200,18 @@ namespace EasyStock.Infra.Postgre.Repositories
         private static IQueryable<ItemEstoque> AplicarFiltroBusca(IQueryable<ItemEstoque> query, string termo)
         {
             var t = termo.Trim();
-            var pattern = $"%{t}%";
+            var pattern = PadraoILike.Contendo(t);
 
             EasyStock.Domain.ValueObjects.CodigoSku? skuExato = null;
             try { skuExato = EasyStock.Domain.ValueObjects.CodigoSku.From(t); }
             catch (ArgumentException) { /* termo nao e um SKU valido (espaco/caractere) — ignora o ramo de SKU exato */ }
 
             return query.Where(i =>
-                (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern)) ||
-                (i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern)) ||
+                (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern, PadraoILike.Escape)) ||
+                (i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern, PadraoILike.Escape)) ||
                 (i.Produto != null &&
-                    (EF.Functions.ILike(i.Produto.Nome, pattern) ||
-                     (i.Produto.CodigoBarras != null && EF.Functions.ILike(i.Produto.CodigoBarras, pattern)) ||
+                    (EF.Functions.ILike(i.Produto.Nome, pattern, PadraoILike.Escape) ||
+                     (i.Produto.CodigoBarras != null && EF.Functions.ILike(i.Produto.CodigoBarras, pattern, PadraoILike.Escape)) ||
                      (skuExato != null && i.Produto.SkuBase == skuExato))));
         }
 

@@ -79,17 +79,18 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
-                var padrao = $"%{BuscaTextual.Normalizar(termo)}%";
+                var padrao = PadraoILike.Contendo(BuscaTextual.Normalizar(termo));
+                var padraoLiteral = PadraoILike.Contendo(termo);
                 var digitos = BuscaTextual.DigitosTelefone(termo);
                 var buscaId = Guid.TryParse(termo, out var id);
                 var buscaNumero = int.TryParse(termo.TrimStart('#'), out var numero);
                 query = query.Where(p =>
                     (buscaId && p.Id == id) || (buscaNumero && p.NumeroDoDia == numero) ||
-                    (p.ClienteNome != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.ClienteNome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao)) ||
-                    (p.ClienteApt  != null && EF.Functions.ILike(p.ClienteApt,  $"%{termo}%")) ||
-                    (p.ClienteTelefone != null && EF.Functions.ILike(p.ClienteTelefone, $"%{termo}%")) ||
+                    (p.ClienteNome != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.ClienteNome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)) ||
+                    (p.ClienteApt  != null && EF.Functions.ILike(p.ClienteApt,  padraoLiteral, PadraoILike.Escape)) ||
+                    (p.ClienteTelefone != null && EF.Functions.ILike(p.ClienteTelefone, padraoLiteral, PadraoILike.Escape)) ||
                     (digitos.Length >= 3 && p.ClienteTelefone != null && EasyStockDbContext.TraduzirTexto(p.ClienteTelefone, BuscaTextual.MascaraTelefone, "").Contains(digitos)) ||
-                    (p.Observacoes != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Observacoes.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao)));
+                    (p.Observacoes != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Observacoes.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)));
             }
 
             var total = await query.CountAsync();

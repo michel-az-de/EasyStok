@@ -46,7 +46,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
-                var padrao = $"%{BuscaTextual.Normalizar(termo)}%";
+                var padrao = PadraoILike.Contendo(BuscaTextual.Normalizar(termo));
                 var digitos = BuscaTextual.DigitosTelefone(termo);
                 var buscaId = Guid.TryParse(termo, out var id);
                 // NomeFantasia entra na busca porque, para PJ, e por ele que o operador
@@ -54,14 +54,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 // se digita.
                 query = query.Where(c =>
                     (buscaId && c.Id == id) ||
-                    EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao) ||
-                    (c.NomeFantasia != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.NomeFantasia.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao)) ||
-                    (c.Documento != null && EF.Functions.ILike(c.Documento, padrao)) ||
-                    (c.Telefone != null && EF.Functions.ILike(c.Telefone, padrao)) ||
+                    EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape) ||
+                    (c.NomeFantasia != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.NomeFantasia.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)) ||
+                    (c.Documento != null && EF.Functions.ILike(c.Documento, padrao, PadraoILike.Escape)) ||
+                    (c.Telefone != null && EF.Functions.ILike(c.Telefone, padrao, PadraoILike.Escape)) ||
                     (digitos.Length >= 3 && c.Telefone != null && EasyStockDbContext.TraduzirTexto(c.Telefone, BuscaTextual.MascaraTelefone, "").Contains(digitos)) ||
                     (digitos.Length >= 3 && c.Telefones.Any(t => EasyStockDbContext.TraduzirTexto(t.Numero, BuscaTextual.MascaraTelefone, "").Contains(digitos))) ||
-                    (c.Email != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Email.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao)) ||
-                    (c.Apt != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Apt.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao)));
+                    (c.Email != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Email.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)) ||
+                    (c.Apt != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Apt.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)));
             }
 
             var total = await query.CountAsync();
@@ -98,17 +98,17 @@ namespace EasyStock.Infra.Postgre.Repositories
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
-            var pattern = $"%{BuscaTextual.Normalizar(termo)}%";
+            var pattern = PadraoILike.Contendo(BuscaTextual.Normalizar(termo));
             var digitos = BuscaTextual.DigitosTelefone(termo);
             var buscaId = Guid.TryParse(termo, out var id);
             return await db.Clientes.AsNoTracking()
                 .Where(c => c.EmpresaId == empresaId && c.Ativo &&
-                    ((buscaId && c.Id == id) || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern) ||
-                     (c.NomeFantasia != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.NomeFantasia.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern)) ||
-                     (c.Telefone != null && EF.Functions.ILike(c.Telefone, pattern)) ||
+                    ((buscaId && c.Id == id) || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern, PadraoILike.Escape) ||
+                     (c.NomeFantasia != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.NomeFantasia.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern, PadraoILike.Escape)) ||
+                     (c.Telefone != null && EF.Functions.ILike(c.Telefone, pattern, PadraoILike.Escape)) ||
                      (digitos.Length >= 3 && c.Telefone != null && EasyStockDbContext.TraduzirTexto(c.Telefone, BuscaTextual.MascaraTelefone, "").Contains(digitos)) ||
                      (digitos.Length >= 3 && c.Telefones.Any(t => EasyStockDbContext.TraduzirTexto(t.Numero, BuscaTextual.MascaraTelefone, "").Contains(digitos))) ||
-                     (c.Documento != null && EF.Functions.ILike(c.Documento, pattern))))
+                     (c.Documento != null && EF.Functions.ILike(c.Documento, pattern, PadraoILike.Escape))))
                 .OrderBy(c => c.Nome)
                 .Take(maxResults)
                 .ToListAsync();

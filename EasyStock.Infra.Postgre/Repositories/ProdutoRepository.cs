@@ -91,7 +91,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
-            var pattern = $"%{BuscaTextual.Normalizar(termo)}%";
+            var pattern = PadraoILike.Contendo(BuscaTextual.Normalizar(termo));
             var buscaId = Guid.TryParse(termo, out var id);
 
             // SKU usa Value Object com HasConversion — busca exata pelo VO
@@ -102,11 +102,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Where(p => !status.HasValue || p.Status == status.Value)
                 .Where(p => p.EmpresaId == empresaId &&
-                    ((buscaId && p.Id == id) || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern) ||
-                     (p.Marca != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Marca.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern)) ||
-                     (p.DescricaoBase != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.DescricaoBase.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern)) ||
+                    ((buscaId && p.Id == id) || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern, PadraoILike.Escape) ||
+                     (p.Marca != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Marca.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern, PadraoILike.Escape)) ||
+                     (p.DescricaoBase != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.DescricaoBase.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern, PadraoILike.Escape)) ||
                      (skuExato != null && p.SkuBase == skuExato) ||
-                     (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, pattern))))
+                     (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, pattern, PadraoILike.Escape))))
                 .OrderBy(p => p.Nome)
                 .Take(maxResults)
                 .ToListAsync();
@@ -199,7 +199,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(p => p.EmpresaId == empresaId && p.Marca != null && p.Marca.Trim() != "");
 
             if (!string.IsNullOrWhiteSpace(filtro))
-                query = query.Where(p => EF.Functions.ILike(p.Marca!, $"%{filtro}%"));
+            {
+                var padrao = PadraoILike.Contendo(filtro);
+                query = query.Where(p => EF.Functions.ILike(p.Marca!, padrao, PadraoILike.Escape));
+            }
 
             return await query
                 .Select(p => p.Marca!)

@@ -168,12 +168,12 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IEnumerable<Usuario>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {
-            var pattern = $"%{termo.Trim()}%";
+            var pattern = PadraoILike.Contendo(termo.Trim());
             return await dbContext.Usuarios
                 .AsNoTracking()
                 .Where(u => u.Empresas!.Any(ue => ue.EmpresaId == empresaId) &&
-                    (EF.Functions.ILike(u.Nome, pattern) ||
-                     EF.Functions.ILike(u.Email, pattern)))
+                    (EF.Functions.ILike(u.Nome, pattern, PadraoILike.Escape) ||
+                     EF.Functions.ILike(u.Email, pattern, PadraoILike.Escape)))
                 .OrderBy(u => u.Nome)
                 .Take(maxResults)
                 .ToListAsync();

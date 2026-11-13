@@ -26,11 +26,12 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
+                var padrao = PadraoILike.Contendo(termo);
                 query = query.Where(f =>
-                    EF.Functions.ILike(f.Nome, $"%{termo}%") ||
-                    (f.Documento != null && EF.Functions.ILike(f.Documento, $"%{termo}%")) ||
-                    (f.Email != null && EF.Functions.ILike(f.Email, $"%{termo}%")) ||
-                    (f.Contato != null && EF.Functions.ILike(f.Contato, $"%{termo}%")));
+                    EF.Functions.ILike(f.Nome, padrao, PadraoILike.Escape) ||
+                    (f.Documento != null && EF.Functions.ILike(f.Documento, padrao, PadraoILike.Escape)) ||
+                    (f.Email != null && EF.Functions.ILike(f.Email, padrao, PadraoILike.Escape)) ||
+                    (f.Contato != null && EF.Functions.ILike(f.Contato, padrao, PadraoILike.Escape)));
             }
 
             var total = await query.CountAsync();
@@ -55,15 +56,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
-            var pattern = $"%{termo}%";
+            var pattern = PadraoILike.Contendo(termo);
 
             return await dbContext.Fornecedores
                 .AsNoTracking()
                 .Where(f => f.EmpresaId == empresaId && f.Ativo &&
-                    (EF.Functions.ILike(f.Nome, pattern) ||
-                     (f.Documento != null && EF.Functions.ILike(f.Documento, pattern)) ||
-                     (f.Email != null && EF.Functions.ILike(f.Email, pattern)) ||
-                     (f.Contato != null && EF.Functions.ILike(f.Contato, pattern))))
+                    (EF.Functions.ILike(f.Nome, pattern, PadraoILike.Escape) ||
+                     (f.Documento != null && EF.Functions.ILike(f.Documento, pattern, PadraoILike.Escape)) ||
+                     (f.Email != null && EF.Functions.ILike(f.Email, pattern, PadraoILike.Escape)) ||
+                     (f.Contato != null && EF.Functions.ILike(f.Contato, pattern, PadraoILike.Escape))))
                 .OrderBy(f => f.Nome)
                 .Take(maxResults)
                 .ToListAsync();
