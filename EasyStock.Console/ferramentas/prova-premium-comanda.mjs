@@ -47,7 +47,6 @@ const fronteiras = new Map([
   ['/componentes/EscolhaDeEntregador', 'export function EscolhaDeEntregador(){}'],
   ['/componentes/Icone', 'export function Icone(){}'],
   ['/features/ficha-cliente/BlocoCobranca', 'export function BaixaAMao(){}'],
-  ['/features/ficha-cliente/MenuDoPedido', 'export function MenuDoPedido(){}'],
   ['/features/ficha-cliente/EscolhaDeMeio', 'export function EscolhaDeMeio(){}'],
 ])
 registerHooks({

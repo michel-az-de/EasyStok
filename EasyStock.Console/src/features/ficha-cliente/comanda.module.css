@@ -5,7 +5,7 @@
   position: relative;
   background: var(--comanda);
   border: 0;
-  border-radius: 0;
+  border-radius: var(--r-2);
   box-shadow: 0 3px 12px rgb(0 0 0 / 6%);
   padding: var(--e-4);
   margin-bottom: var(--e-3);
@@ -29,7 +29,6 @@
 .anotacaoCompartilhada summary small { display: block; padding-left: var(--e-3); color: var(--tinta); overflow-wrap: anywhere; }
 .anotacaoCompartilhada[open] summary small { display: none; }
 .anotacaoCompartilhada summary:focus-visible, .enderecoCompartilhado summary:focus-visible, .historicoCompartilhado > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-.clienteCompartilhado .estadoCompartilhado { font-size: var(--t-apoio); color: var(--tinta-2); }
 .clienteCompartilhado .totalCompartilhado { padding-block: var(--e-2); border-block: 0; }
 .salvarCompartilhado { display: flex; flex-wrap: wrap; gap: var(--e-2); position: sticky; bottom: 0; padding: var(--e-2) 0; background: var(--papel); }
 .adicionarCompartilhado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); }

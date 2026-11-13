@@ -10,7 +10,7 @@ const path = require('node:path');
 const { pilotIcon, applyConsoleIcons } = require('../pilot.js');
 const components = path.resolve(__dirname, '../../../EasyStock.Console/src/componentes');
 const brand = fs.readFileSync(path.join(components, 'MarcaIcone.jsx'), 'utf8');
-const moduleIcons = fs.readFileSync(path.join(components, 'IconeDoModulo.jsx'), 'utf8');
+const moduleIcons = fs.readFileSync(path.join(components, 'iconesDoConsole.js'), 'utf8');
 for (const name of ['producao', 'mensagem', 'pedido-em-preparo', 'produto', 'caixa', 'estoque']) {
   test('geometria V4 canônica do Console: ' + name, () => {
     const source = brand.match(new RegExp('^\\s*(?:\'' + name + '\'|' + name + '):\\s*(<g[^\\n]+</g>),', 'm'));

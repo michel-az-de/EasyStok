@@ -20,6 +20,12 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
     {
         public async Task ExecuteAsync(AtribuirPerfilUsuarioCommand command)
         {
+            var revogou = await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => ExecutarAsync(command));
+            if (revogou) await revogadorSessoes.ApagarCacheAsync(command.UsuarioId);
+        }
+
+        private async Task<bool> ExecutarAsync(AtribuirPerfilUsuarioCommand command)
+        {
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
 
             logger.LogInformation("Atribuindo perfil {PerfilId} ao usuario {UsuarioId}", command.PerfilId, command.UsuarioId);
@@ -48,13 +54,13 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
             if (mantido is not null && anteriores.Count == 0)
             {
                 // O perfil é o mesmo: não há troca a registrar. Só a loja muda o que o token carrega.
-                if (mantido.LojaId == command.LojaId) return;
+                if (mantido.LojaId == command.LojaId) return false;
                 mantido.LojaId = command.LojaId;
                 mantido.AtribuidoEm = DateTime.UtcNow;
                 await usuarioPerfilRepository.UpdateAsync(mantido);
                 if (vinculoAtivo) await revogadorSessoes.RevogarAsync(usuario);
                 await unitOfWork.CommitAsync();
-                return;
+                return vinculoAtivo;
             }
 
             foreach (var anterior in anteriores)
@@ -87,6 +93,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
                 usuario.Id, RastroDeUsuarios.PerfilTrocado, $"Perfil trocado de {de} para {perfil.Nome} por {autor}", currentUser, command.EmpresaId));
 
             await unitOfWork.CommitAsync();
+            return vinculoAtivo;
         }
     }
 }

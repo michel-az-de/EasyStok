@@ -53,6 +53,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
+    <ProjectReference Include="..\EasyStock.Observabilidade\EasyStock.Observabilidade.csproj" />
     <ProjectReference Include="..\EasyStock.Infra.Postgre\EasyStock.Infra.Postgre.csproj" />
   </ItemGroup>
 

@@ -30,8 +30,14 @@ export const textoDosCentavos = (centavos) => (centavos == null
   ? ''
   : (centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 
-export const horaCurta = (iso) =>
-  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO })
+// #2258 (auditoria G1): sempre HH:MM com dois pontos, no fuso da loja. `toLocaleTimeString` troca o
+// separador conforme o navegador e o sistema ("16.23" apareceu em Canais).
+export const horaCurta = (iso) => {
+  const ms = new Date(iso).getTime()
+  if (Number.isNaN(ms)) return ''
+  const { horas, minutos } = partesNoFuso(ms)
+  return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`
+}
 
 const DIA_DA_SEMANA = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
 const PARTES = new Intl.DateTimeFormat('en-US', {
@@ -92,6 +98,14 @@ export const horaMono = (ms) => {
   return `${horas}h${String(minutos).padStart(2, '0')}`
 }
 
+// #2185 (F27): nota, post-it e histórico no fuso da casa, o mesmo do balão ao lado (#1600). O aparelho da
+// atendente pode estar em outro fuso.
+export const diaMesHora = (iso) =>
+  new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: FUSO })
+
+export const diaMes = (iso) =>
+  new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO })
+
 export const dataHora = (ms) =>
   new Date(ms).toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: FUSO,
@@ -111,6 +125,20 @@ export function haQuantoTempo(iso, agora) {
   const horas = Math.floor(minutos / 60)
   if (horas < 24) return horas + ' h'
   return Math.floor(horas / 24) + ' d'
+}
+
+// #2303: a idade de um aviso do sino, por extenso. Sem data válida devolve null: melhor não dizer do
+// que inventar que é novo.
+export function idadeDoAviso(iso, agora) {
+  const instante = iso ? new Date(iso).getTime() : NaN
+  if (Number.isNaN(instante)) return null
+  const minutos = Math.floor((agora - instante) / 60000)
+  if (minutos < 1) return 'agora'
+  if (minutos < 60) return `há ${minutos} min`
+  const horas = Math.floor(minutos / 60)
+  if (horas < 24) return `há ${horas} h`
+  const dias = Math.floor(horas / 24)
+  return dias === 1 ? 'há 1 dia' : `há ${dias} dias`
 }
 
 // Rodada 2 · plural. "1 porções" é o tipo de descuido que faz a tela parecer

@@ -16,16 +16,16 @@ function NotaDoCliente({ conversaId, nota, indice }) {
   function soltar(e) {
     const r = e.currentTarget.closest('article').getBoundingClientRect()
     setFocar(true)
-    controle.soltar({ x: r.left + (indice % 6) * 12, y: r.top })
+    controle.soltar(Number.isFinite(controle.x) && Number.isFinite(controle.y) ? {} : { x: r.left + (indice % 6) * 12, y: r.top })
   }
   return <>
     <article className={controle.solto ? css.referencia : css.nota}>
-      {controle.solto ? <><Icone nome="nota" tamanho={18} /><span>Nota solta{nota.autor ? ` · ${nota.autor.trim().split(/\s+/)[0]}` : ''}</span></>
+      {controle.solto ? <><Icone nome="nota" tamanho={20} /><span>Nota solta{nota.autor ? ` · ${nota.autor.trim().split(/\s+/)[0]}` : ''}</span></>
         : <><small>Nota{nota.autor ? ` · ${nota.autor}` : ''}</small><p className={css.texto}>{nota.texto}</p></>}
       {nota.id && <button type="button" ref={botao} className={controle.solto ? css.recolher : css.soltar}
         aria-label={controle.solto ? 'Recolher nota à ficha' : undefined} title={controle.solto ? 'Recolher à ficha' : undefined}
         onClick={(e) => controle.solto ? controle.recolher() : soltar(e)}>
-        {controle.solto ? <Icone nome="arrow-left" tamanho={18} /> : 'Destacar nota'}
+        {controle.solto ? <Icone nome="arrow-left" tamanho={20} /> : 'Destacar nota'}
       </button>}
       {controle.erro && !controle.solto && <output className={css.erro}>{controle.erro}</output>}
     </article>
@@ -40,12 +40,12 @@ function NotaDoCliente({ conversaId, nota, indice }) {
 function NotaRegistrada({ mesa, conversaId, clienteId, clienteNome, nota }) {
   const solta = mesa.estaSolta(clienteId, nota.id)
   return <article className={solta ? css.referencia : css.nota}>
-    {solta ? <><Icone nome="nota" tamanho={18} /><span>Nota solta{nota.autor ? ` · ${nota.autor.trim().split(/\s+/)[0]}` : ''}</span></>
+    {solta ? <><Icone nome="nota" tamanho={20} /><span>Nota solta{nota.autor ? ` · ${nota.autor.trim().split(/\s+/)[0]}` : ''}</span></>
       : <><small>Nota{nota.autor ? ` · ${nota.autor}` : ''}</small><p className={css.texto}>{nota.texto}</p></>}
     {nota.id && <button type="button" className={solta ? css.recolher : css.soltar} data-foco-reserva={mesa.chaveDeFoco(clienteId, nota.id)}
       aria-label={solta ? 'Recolher nota à ficha' : undefined} title={solta ? 'Recolher à ficha' : undefined}
       onClick={(e) => solta ? mesa.recolher(clienteId, nota.id) : mesa.soltar({ conversaId, clienteId, clienteNome, nota }, e)}>
-      {solta ? <Icone nome="arrow-left" tamanho={18} /> : 'Destacar nota'}</button>}
+      {solta ? <Icone nome="arrow-left" tamanho={20} /> : 'Destacar nota'}</button>}
   </article>
 }
 

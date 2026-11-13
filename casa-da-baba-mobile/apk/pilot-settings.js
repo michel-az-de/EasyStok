@@ -22,6 +22,8 @@
     if (!modal || modal.dataset.pilotSettings) return;
     modal.dataset.pilotSettings = 'true';
     const title = modal.querySelector('.ajustes-head h3');
+    title.id = title.id || 'pilotSettingsTitle'; title.setAttribute('tabindex', '-1');
+    modal.setAttribute('aria-labelledby', title.id);
     const tabs = modal.querySelector('.ajustes-tabs');
     const head = modal.querySelector('.ajustes-head');
     const back = doc.createElement('button');
@@ -29,29 +31,69 @@
     back.innerHTML = icon('chevron-right'); back.setAttribute('aria-label', 'Voltar');
     head.prepend(back);
     const open = environment.openAjustes, tab = environment.setAjustesTab;
+    const close = environment.closeAjustes, save = environment.saveAjustes;
+    const fields = ['ajusteOperator', 'ajusteEmpresa', 'ajustePixType', 'ajustePixKey', 'ajustePixHolder']
+      .map(id => doc.getElementById(id)).filter(Boolean);
+    fields.forEach(field => field.closest('.field')?.querySelector('label')?.setAttribute('for', field.id));
+    let originalValues = null, returnFocus, saving = false, closingConfirmed = false;
+    function updateDirty() {
+      const dirty = !!originalValues && fields.some((field, i) => field.value !== originalValues[i]);
+      modal.dataset.dirty = String(dirty);
+      return dirty;
+    }
+    const canClose = () => !updateDirty() || environment.confirm('Descartar as alterações não salvas?');
     const sheet = modal.querySelector('.ajustes-sheet');
     function showRoot() {
       modal.dataset.view = 'root';
       title.innerHTML = icon('settings') + '<span>Configurações</span>';
       sheet.scrollTop = 0;
+      if (modal.classList.contains('show')) title.focus();
     }
-    environment.openAjustes = function () { const result = open.apply(this, arguments); modal.dataset.dirty = 'false'; showRoot(); return result; };
-    modal.addEventListener('input', () => { modal.dataset.dirty = 'true'; });
-    modal.addEventListener('change', () => { modal.dataset.dirty = 'true'; });
+    environment.openAjustes = function () {
+      returnFocus = doc.activeElement;
+      const result = open.apply(this, arguments);
+      originalValues = fields.map(field => field.value); updateDirty();
+      modal.dataset.entry = 'root'; showRoot(); return result;
+    };
+    environment.closeAjustes = function () {
+      if (modal.classList.contains('show') && !saving && !closingConfirmed && !canClose()) return false;
+      const result = close.apply(this, arguments);
+      originalValues = null; updateDirty();
+      if (returnFocus?.isConnected) returnFocus.focus();
+      return result;
+    };
+    environment.saveAjustes = function () {
+      saving = true;
+      try { return save.apply(this, arguments); }
+      finally { saving = false; }
+    };
+    // Atalho direto (ex.: Impressoras no Início): Voltar devolve a quem abriu, sem passar pela lista.
+    environment.cdbOpenAjustesAt = function (group) { environment.openAjustes(); environment.setAjustesTab(group); modal.dataset.entry = 'direct'; };
+    const leaveSection = () => modal.dataset.entry === 'direct' ? environment.closeAjustes() : showRoot();
+    modal.addEventListener('input', updateDirty);
+    modal.addEventListener('change', updateDirty);
     environment.setAjustesTab = function (group) {
       if (!GROUPS[group]) return showRoot();
       const result = tab.call(this, group);
       modal.dataset.view = group;
       title.innerHTML = icon(GROUPS[group][1]) + '<span>' + GROUPS[group][0] + '</span>';
       sheet.scrollTop = 0;
+      if (modal.classList.contains('show')) title.focus();
       return result;
     };
-    back.addEventListener('click', () => modal.dataset.view === 'root' ? environment.closeAjustes() : showRoot());
+    back.addEventListener('click', () => modal.dataset.view === 'root' ? environment.closeAjustes() : leaveSection());
     // O botão Voltar do Android retorna à lista antes de fechar Configurações.
     const nativeBack = environment.cdbHandleNativeBack;
     environment.cdbHandleNativeBack = function () {
-      if (modal.classList.contains('show') && modal.dataset.view !== 'root'
-          && !doc.querySelector('#diagnosticsModal.show, #printerPickerModal.show, #etiquetasPreview.show')) { showRoot(); return true; }
+      if (modal.classList.contains('show')
+          && !doc.querySelector('#diagnosticsModal.show, #printerPickerModal.show, #etiquetasPreview.show')) {
+        if (modal.dataset.view !== 'root') { leaveSection(); return true; }
+        // Cancelar não pode chegar ao handler que reabre o Início após consumir Voltar.
+        if (!environment.cdbIsPrinting?.() && !canClose()) return true;
+        closingConfirmed = true;
+        try { return nativeBack?.apply(this, arguments); }
+        finally { closingConfirmed = false; }
+      }
       return nativeBack?.apply(this, arguments);
     };
     tabs.querySelectorAll('button').forEach(button => {
@@ -65,7 +107,7 @@
       + environment.cdbMenuButton('guide', 'Sistema Antigo', 'ajuda');
     support.addEventListener('click', event => {
       const action = event.target.closest('[data-action]')?.dataset.action;
-      if (action === 'diagnostics') { environment.closeAjustes(); environment.openDiagnostics(); }
+      if (action === 'diagnostics') environment.openDiagnostics();
       if (action === 'guide') environment.cdbOpenMigrationGuide();
     });
     tabs.after(support);
@@ -76,7 +118,7 @@
       if (heading?.textContent.includes('Diagnóstico')) section.classList.add('pilot-out-of-scope');
     }
     const update = modal.querySelector('[onclick="forceCheckUpdate()"]');
-    if (update) update.onclick = () => { environment.closeAjustes(); environment.go('home'); environment.forceCheckUpdate(); };
+    if (update) update.onclick = () => { if (environment.closeAjustes() === false) return; environment.go('home'); environment.forceCheckUpdate(); };
     const actions = { Exportar: 'download', Importar: 'upload', Recuperar: 'undo-2', Atualizar: 'refresh-cw', Diagnóstico: 'activity' };
     for (const button of modal.querySelectorAll('.ajustes-actions-stack > button')) {
       const label = button.dataset.command;
@@ -85,8 +127,10 @@
       button.innerHTML = environment.cdbMenuContents(label, actions[label]);
     }
     const diagnostics = environment.openDiagnostics;
+    const printerDiagnostics = modal.querySelector('[onclick="printerDiagnostics()"]');
+    if (printerDiagnostics) printerDiagnostics.onclick = () => environment.openDiagnostics();
     environment.openDiagnostics = function () {
-      environment.closeAjustes();
+      if (environment.closeAjustes() === false) return;
       const result = diagnostics.apply(this, arguments);
       doc.querySelectorAll('#diagnosticsModal .diag-head-btn').forEach(button => {
         button.innerHTML = icon(button.getAttribute('title') === 'Atualizar' ? 'refresh-cw' : 'copy');

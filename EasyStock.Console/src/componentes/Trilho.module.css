@@ -24,13 +24,26 @@
   border: 0; border-radius: var(--r-1); background: transparent; color: var(--tinta-2); box-shadow: none;
   font-size: .75rem; font-weight: 600; letter-spacing: -.035em; line-height: 1.2; text-align: center; text-decoration: none;
 }
-.item > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* #2326: rótulo longo quebra em até 2 linhas, com hifenização do pt-BR, em vez de virar
+   "Configuraç…" e "Respostas …". Sem dicionário de hifenização (WebKit no Windows), a palavra
+   não quebra no meio ("Configuraçõe / s") e sai cortada na borda. O `title` tem o nome inteiro. */
+.item > span {
+  max-width: 100%; overflow: hidden; white-space: normal; overflow-wrap: normal; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  -webkit-hyphens: auto; hyphens: auto;
+}
 .item > svg { flex: none; }
 .item:hover:not(:disabled), .filhos > button:hover:not(:disabled), .filhos > div > button:hover:not(:disabled) {
   background: var(--preenchimento); color: var(--tinta);
 }
 .inicio:focus-visible, .item:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 /* O preenchimento identifica a tela atual sem uma borda decorativa. */
+/* #2256: no trilho o contador de Avisos e de Lembretes fica no canto do ícone, fora do fluxo,
+   e não empurra nem cobre o rótulo; o ponto de avisos do aparelho fica no canto oposto. */
+.filhos [data-contador-sino] {
+  position: absolute; top: 4px; left: calc(50% + 6px); right: auto; box-shadow: 0 0 0 2px var(--fundo);
+}
+.filhos [data-aparelho-desligado] { position: absolute; top: 8px; right: calc(50% + 10px); margin: 0; }
 .ativo, .ativo:hover:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
 .espaco { flex: 1; }
 /* Quem está logado, no pé do trilho; a conta (e o Sair) abre dele. */

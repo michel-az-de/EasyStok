@@ -44,7 +44,17 @@
     ctx.fillRect(MARGEM, y, LARGURA - MARGEM * 2, espessura);
   }
 
-  function linhaDado(ctx, y, rotulo, valor) {
+  function quebrarCodigo(ctx, texto, largura) {
+    const linhas = []; let linha = '';
+    for (const letra of texto) {
+      if (linha && ctx.measureText(linha + letra).width > largura) { linhas.push(linha); linha = letra; }
+      else linha += letra;
+    }
+    if (linha) linhas.push(linha);
+    return linhas;
+  }
+
+  function linhaDado(ctx, y, rotulo, valor, quebra) {
     const util = LARGURA - MARGEM * 2;
     ctx.fillStyle = PRETO;
     ctx.textAlign = 'left';
@@ -54,9 +64,10 @@
     const { tamanho } = ajustar(ctx, valor, espacoValor, [24, 22, 20, 18, 16], 800, 1);
     fonte(ctx, 800, tamanho);
     ctx.textAlign = 'right';
-    ctx.fillText(valor, LARGURA - MARGEM, y);
+    const linhas = quebra ? quebrarCodigo(ctx, valor, espacoValor) : [valor];
+    linhas.forEach((linha, i) => ctx.fillText(linha, LARGURA - MARGEM, y + i * (tamanho + 4)));
     ctx.textAlign = 'left';
-    return 32;
+    return Math.max(32, linhas.length * (tamanho + 4));
   }
 
   function desenharQr(ctx, dado, y) {
@@ -111,7 +122,7 @@
 
     y += linhaDado(ctx, y, 'Fabricação', fmt.data(et.productionDate));
     y += linhaDado(ctx, y, 'Validade', et.expiresAt ? fmt.data(et.expiresAt) : '—');
-    y += linhaDado(ctx, y, 'Lote', String(et.lote || ''));
+    y += linhaDado(ctx, y, 'Lote', String(et.lote || ''), true);
     if (et.weightG) y += linhaDado(ctx, y, 'Peso', fmt.peso(et.weightG));
 
     if (o.nota) {
@@ -144,8 +155,10 @@
       ctx.textAlign = 'center';
       const codigo = ajustar(ctx, et.codigoBarras, util, [16, 14, 12], 700, 1);
       fonte(ctx, 700, codigo.tamanho);
-      ctx.fillText(et.codigoBarras, LARGURA / 2, y + 2);
-      y += codigo.tamanho + 8;
+      for (const linha of quebrarCodigo(ctx, et.codigoBarras, util)) {
+        ctx.fillText(linha, LARGURA / 2, y + 2);
+        y += codigo.tamanho + 8;
+      }
     }
     ctx.textAlign = 'left';
     return { altura: Math.ceil(y + MARGEM), qr };

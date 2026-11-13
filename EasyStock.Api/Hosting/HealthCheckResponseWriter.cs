@@ -16,6 +16,8 @@ public static class HealthCheckResponseWriter
     public static Task WriteJsonAsync(HttpContext context, HealthReport report)
     {
         context.Response.ContentType = "application/json; charset=utf-8";
+        // #2401: endpoint público; descrição e exceção podem vazar host e string de conexão. Só em Development.
+        var detalhar = context.RequestServices.GetService<IHostEnvironment>()?.IsDevelopment() == true;
         var result = new
         {
             status = report.Status.ToString(),
@@ -24,9 +26,9 @@ public static class HealthCheckResponseWriter
             {
                 name = e.Key,
                 status = e.Value.Status.ToString(),
-                description = e.Value.Description,
+                description = detalhar ? e.Value.Description : null,
                 duration = e.Value.Duration.TotalMilliseconds.ToString("0") + "ms",
-                error = e.Value.Exception?.Message
+                error = detalhar ? e.Value.Exception?.Message : null
             })
         };
         return context.Response.WriteAsJsonAsync(result, new JsonSerializerOptions

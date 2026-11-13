@@ -10,7 +10,7 @@ registerHooks({
     return proximo(url, contexto)
   },
 })
-const { parcelasFinanceiras, diaFinanceiro, extratoFinanceiro } = await import('../src/dominio/financeiro.js')
+const { parcelasFinanceiras, diaFinanceiro, extratoFinanceiro, janelasDoPeriodo } = await import('../src/dominio/financeiro.js')
 const parcelas = parcelasFinanceiras(10001, 3, '2026-01-31')
 assert.equal(parcelas.reduce((total, item) => total + Math.round(item.valor * 100), 0), 10001)
 assert.deepEqual(parcelas.map((item) => diaFinanceiro(item.dataVencimento)), ['2026-01-31', '2026-02-28', '2026-03-31'])
@@ -26,6 +26,31 @@ assert.equal(linhas.find((item) => item.id === 'saida').lado, 'pagar')
 pagamento.status = 'Estornado'
 assert.equal(extratoFinanceiro(contas, movimentos, '2026-10-11', '2026-10-11')[0].estornado, true)
 assert.equal(extratoFinanceiro(contas, movimentos, '2026-10-12', '2026-10-12').length, 0)
+
+// #2262: o recebimento de pedido (Mercado Pago ou baixa manual) e a venda moram nas linhas do Caixa, fora dos
+// movimentos. O Extrato mostrava a devolução do Mercado Pago como saída sem a entrada que ela devolve.
+const devolucao = { id: 'devolucao', tipo: 'saida', valor: 19, metodo: 'pix', categoria: 'Devolução de pedido', dataMovimento: '2026-11-06T01:00:00Z' }
+const linhasDoCaixa = [
+  { hora: '2026-11-06T00:39:34Z', tipo: 'pagamento', valor: 19, metodo: 'pix', origem: 'Pedido', pedidoNumeroDoDia: 5 },
+  { hora: '2026-11-05T15:00:00Z', tipo: 'venda', valor: 30, metodo: 'dinheiro', origem: 'Venda' },
+  { hora: '2026-11-05T16:00:00Z', tipo: 'estorno', valor: -30, metodo: 'dinheiro', origem: 'Venda' },
+]
+const extratoDoDia = extratoFinanceiro([], [devolucao], '2026-11-05', '2026-11-05', linhasDoCaixa)
+const sinal = extratoDoDia.find((item) => item.descricao === 'Pagamento do pedido nº 005')
+assert.ok(sinal, 'o Pix do pedido pago pelo Mercado Pago entra no Extrato')
+assert.equal(sinal.lado, 'receber')
+assert.equal(sinal.valor, 19)
+assert.equal(sinal.metodo, 'pix')
+assert.equal(extratoDoDia.find((item) => item.id === 'devolucao').lado, 'pagar', 'a devolução continua saindo')
+const estornoDeVenda = extratoDoDia.find((item) => item.descricao === 'Estorno de venda')
+assert.deepEqual([estornoDeVenda.lado, estornoDeVenda.valor], ['pagar', 30], 'o estorno de venda sai em valor positivo')
+assert.equal(extratoDoDia.length, 4)
+assert.equal(new Set(extratoDoDia.map((item) => item.id)).size, 4, 'cada linha tem id próprio para a lista')
+assert.equal(extratoFinanceiro([], [], '2026-11-04', '2026-11-04', linhasDoCaixa).length, 0, 'linha fora do período não entra')
+// /api/caixa/linhas aceita até 366 dias por consulta: o período livre do Extrato vira janelas que se encostam.
+assert.deepEqual(janelasDoPeriodo('2026-11-05', '2026-11-05'), [{ inicio: '2026-11-05', fim: '2026-11-05' }])
+assert.deepEqual(janelasDoPeriodo('2025-01-01', '2026-12-31'), [{ inicio: '2025-01-01', fim: '2026-01-01' }, { inicio: '2026-01-02', fim: '2026-12-31' }])
+assert.deepEqual(janelasDoPeriodo('2026-11-06', '2026-11-05'), [], 'período invertido não consulta')
 
 // #2095: lista orientada a vencimento, rótulos honestos, formulário e período.
 const fin = await import('../src/dominio/financeiro.js')
@@ -104,6 +129,14 @@ assert.deepEqual(fin.paginaDaLista([1, 2, 3, 4, 5], 2, 2), [3, 4])
 assert.equal(fin.podeEditarConta({ status: 'Aberta' }, true), false, 'C5: a API só edita rascunho')
 assert.equal(fin.podeEditarConta({ status: 'Rascunho' }, true), true)
 assert.equal(fin.podeEditarConta({ status: 'Rascunho' }, false), false)
+// #2360: o domínio exige estorno da parcela parcial antes do cancelamento.
+const exigeEstorno = (parcela) => fin.cancelamentoExigeEstorno({ parcelas: [parcela] })
+assert.equal(exigeEstorno({ status: 'ParcialmentePaga', valorPago: 10, pagamentos: [] }), true)
+assert.equal(exigeEstorno({ status: 'Aberta', valorPago: 0, pagamentos: [{ status: 'Confirmado' }] }), true)
+assert.equal(exigeEstorno({ status: 'Paga', valorPago: 10, pagamentos: [{ status: 'Confirmado' }] }), false, 'a conta preserva parcelas já quitadas ao cancelar as restantes')
+assert.equal(exigeEstorno({ status: 'Cancelada', valorPago: 10, pagamentos: [{ status: 'Confirmado' }] }), false)
+assert.equal(exigeEstorno({ status: 'Aberta', valorPago: 0, pagamentos: [{ status: 'Estornado' }] }), false, 'após estornar, o cancelamento volta a ser permitido')
+assert.equal(fin.cancelamentoExigeEstorno(null), false)
 assert.equal(fin.podeRegistrarNaConta(contasDoDia[1], true), true)
 assert.equal(fin.podeRegistrarNaConta(contasDoDia[1], false), false, '#476: só quem gerencia registra pagamento')
 assert.equal(fin.podeRegistrarNaConta(contasDoDia[5], true), false, 'rascunho não recebe pagamento (F1)')
@@ -143,6 +176,7 @@ globalThis.fetch = async (caminho, opcoes) => {
   const url = new URL(caminho, 'http://localhost'), corpo = opcoes.body && JSON.parse(opcoes.body)
   chamadas.push({ caminho: url.pathname, query: url.searchParams, metodo: opcoes.method, corpo })
   if (opcoes.method !== 'GET') { assert.equal(corpo.empresaId, empresaId); return new Response(JSON.stringify({ data: {} }), { status: 200 }) }
+  if (url.pathname === '/api/caixa/linhas') return new Response(JSON.stringify({ data: [] }), { status: 200 })
   if (url.pathname === '/api/caixa/movimentos' || url.pathname === '/api/contas-a-receber') return new Response(JSON.stringify({ data: [], meta: { total: 0 } }), { status: 200 })
   const numero = Number(url.searchParams.get('page'))
   if (numero === 2 && falharPagina) return new Response(JSON.stringify({ error: { message: 'Falha na página 2' } }), { status: 503 })
@@ -152,6 +186,16 @@ globalThis.fetch = async (caminho, opcoes) => {
 await api.obterExtratoFinanceiro({ inicio: '2026-10-01', fim: '2026-10-31' }, { visualizarContasPagar: true, visualizarContasReceber: false })
 assert.deepEqual(chamadas.filter((item) => item.caminho === '/api/contas-a-pagar').map((item) => item.query.get('page')), ['1', '2'])
 assert.equal(chamadas.some((item) => item.caminho === '/api/contas-a-receber'), false, 'não consulta o lado sem permissão')
+const pedidoDeLinhas = chamadas.find((item) => item.caminho === '/api/caixa/linhas')
+assert.ok(pedidoDeLinhas, '#2262: o Extrato lê as linhas do Caixa (recebimentos de pedido e vendas)')
+assert.deepEqual([pedidoDeLinhas.query.get('desde'), pedidoDeLinhas.query.get('ate')], ['2026-10-01T03:00:00.000Z', '2026-11-01T02:59:59.999Z'])
+const linhasAntes = chamadas.length
+await api.obterExtratoFinanceiro({ inicio: '2025-01-01', fim: '2026-12-31' }, {})
+assert.deepEqual(chamadas.slice(linhasAntes).filter((item) => item.caminho === '/api/caixa/linhas').map((item) => [item.query.get('desde'), item.query.get('ate')]),
+  [['2025-01-01T03:00:00.000Z', '2026-01-02T02:59:59.999Z'], ['2026-01-02T03:00:00.000Z', '2027-01-01T02:59:59.999Z']], 'dois anos viram duas consultas de até 366 dias')
+const invertidoAntes = chamadas.length
+await api.obterExtratoFinanceiro({ inicio: '2026-11-06', fim: '2026-11-05' }, {})
+assert.equal(chamadas.slice(invertidoAntes).some((item) => item.caminho === '/api/caixa/linhas'), false, 'período invertido não chama as linhas')
 falharPagina = true
 await assert.rejects(() => api.obterExtratoFinanceiro({ inicio: '2026-10-01', fim: '2026-10-31' }, { visualizarContasPagar: true }), /Falha na página 2/)
 await api.adicionarParcelaFinanceira('pagar', 'conta', { numero: 2, valor: 10, dataVencimento: parcelas[0].dataVencimento })

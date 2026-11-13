@@ -7,22 +7,53 @@
 // "Precisa de você" no trilho lateral do cartão e no chip do filtro.
 
 import { origemDaPassagem } from '../../dominio/passagem'
-import { sinalVerde } from '../../dominio/cobranca'
+import { aguardaAprovacao, sinalVerde } from '../../dominio/cobranca'
 import { faltaPagar } from '../../dominio/pagamento'
 import { ehLead } from '../../dominio/conversa'
 import { passoPorId } from '../../dominio/esteira'
 import { moeda } from '../../dominio/formato'
+import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 
 export const NOME_DO_VISITANTE = 'Visitante do site'
 
-// Nome do cartão. O genérico do visitante cede o lugar à comanda, que é o que
-// distingue um visitante do outro; o nome inteiro segue no `title`.
+// Nome do cartão (#2258, T4 e T5). "Visitante do site" vira "Visitante" com a comanda numa cápsula
+// ("#16"), a mesma do cabeçalho da conversa e da ficha; quem tem nome mantém "· Comanda N" ao lado.
+// Telefone cru no lugar do nome sai com a máscara (#2232, L10) e a cápsula "Sem nome". O nome
+// inteiro segue no `title`, e `curto` é a forma que a tela usa quando o espaço aperta.
 export function nomeDoCartao(conversa) {
-  const nome = conversa?.nome ?? ''
+  const apresentacao = apresentacaoDoNome(nomeDaConversa(conversa), { comanda: conversa?.numeroComanda })
   const comanda = conversa?.numeroComanda ? `Comanda ${conversa.numeroComanda}` : null
-  const titulo = comanda ? `${nome} · ${comanda}` : nome
-  if (comanda && nome.trim() === NOME_DO_VISITANTE) return { principal: comanda, complemento: null, titulo }
-  return { principal: nome, complemento: comanda, titulo }
+  const visitante = apresentacao.completo === 'Visitante'
+  const titulo = visitante || !comanda ? apresentacao.titulo : `${apresentacao.titulo} · ${comanda}`
+  return {
+    principal: apresentacao.completo,
+    curto: apresentacao.curto,
+    capsula: apresentacao.capsula,
+    complemento: visitante ? null : comanda,
+    titulo,
+  }
+}
+
+// Motivo de precisar no cartão (#2258, T6): o rótulo cabe em 18 caracteres; a frase inteira vai no
+// `title`. Mora aqui, e não no domínio, porque o texto de linha é decisão do cartão.
+const MOTIVO_NO_CARTAO = {
+  reclamacao: { texto: 'Reclamação', icone: 'message-square-warning' },
+  passagem: { texto: 'Passou para você', icone: 'hand' },
+  esperando: { texto: 'Esperando você', icone: 'relogio' },
+  cobranca: { texto: 'Cobrança venceu', icone: 'dollar-sign' },
+  // #1474 (R12): o cliente escreveu fora do horário; "Loja abriu" parecia aviso da loja.
+  'aguardando-abertura': { texto: 'Loja fechada', icone: 'relogio', titulo: 'Escreveu com a loja fechada' },
+  // Rodada 10, itens 3 e 4: pedido atrasado (ainda na cozinha) e entrega atrasada (já em rota).
+  'pedido-atrasado': { texto: 'Pedido atrasado', icone: 'cooking-pot' },
+  'atraso-entrega': { texto: 'Entrega atrasada', icone: 'moto' },
+}
+
+export function motivoResumido(chave, origem = null) {
+  const apresentacao = chave === 'passagem' && origem === 'chat-site'
+    ? { texto: 'Aguardando equipe', icone: 'relogio' }
+    : MOTIVO_NO_CARTAO[chave]
+  if (!apresentacao) return null
+  return { texto: apresentacao.texto, icone: apresentacao.icone, titulo: apresentacao.titulo ?? apresentacao.texto }
 }
 
 // Origem da passagem no contexto do cartão. "Chat do site" repete o selo do
@@ -40,6 +71,23 @@ export function origemNoCartao(passagem) {
 const ESTADOS_SEM_ETIQUETA = ['passagem', 'automatico', 'voce']
 export function mostraEtiquetaDoEstado(estado) {
   return !ESTADOS_SEM_ETIQUETA.includes(estado?.chave)
+}
+
+// #2232 (banca UX, X1, WCAG 4.1.2): nome acessível do item da lista numa frase só, na ordem em
+// que se decide: quem, quanto espera, por quê, quando. Antes o leitor de tela lia o botão inteiro,
+// prévia incluída.
+export function rotuloDoCartao({ nome, estado = null, pendentes = 0, motivo = null, contexto = [], atrasada = false, pagamentoNaoVisto = false, hora, selecionada = false }) {
+  return [
+    nome,
+    estado,
+    pendentes > 0 ? (pendentes === 1 ? '1 mensagem sem resposta' : `${pendentes} mensagens sem resposta`) : null,
+    motivo,
+    ...contexto,
+    atrasada ? 'prazo de resposta estourado' : null,
+    pagamentoNaoVisto ? 'pagamento novo' : null,
+    hora,
+    selecionada ? 'conversa aberta' : null,
+  ].filter(Boolean).join(', ')
 }
 
 // A terceira linha só existe se sobrar o que dizer nela.
@@ -63,6 +111,8 @@ export function marcaDoPedido(conversa, cardapio, { fonteApi = false } = {}) {
   const passo = conversa.pedido ? passoPorId(conversa.pedido.estado) : null
   if (passo) {
     if (fonteApi && !conversa.pedido.pedidoId) return MARCA_EM_MONTAGEM
+    // #2185 (F3): o status da API cai em "pago" na esteira, mas a loja ainda não aprovou o pedido.
+    if (aguardaAprovacao(conversa.pedido)) return { texto: 'Aguardando aprovação', icone: 'alerta', tom: 'aviso' }
     const saldo = faltaPagar(conversa.pedido, cardapio)
     if (saldo > 0 && conversa.pedido.sinalNaReserva && conversa.pedido.cobranca?.pagaEm
       && Math.round(conversa.pedido.cobranca.valor * 100) === Math.round((conversa.pedido.totalApi - saldo) * 100)) {

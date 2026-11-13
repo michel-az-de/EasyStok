@@ -12,7 +12,40 @@
 //      nao contam;
 //   d. duracao (ms, s) ou easing (cubic-bezier, ease*) literal em transition/animation
 //      nos .css de src/. `var(--...)` nao conta e tokens.css fica fora: e la que os
-//      tokens de movimento moram.
+//      tokens de movimento moram;
+//   e. menu de opcoes fora do `MenuDeAcoes` (#2185): icone de reticencias ou o rotulo
+//      "Mais acoes" em outro componente. Eram 7 implementacoes, 5 rotulos e 3 icones.
+//   f. vocabulario do Atendimento (#2185, R07 e R08): quem responde sozinho e o "Assistente"
+//      (nao "automatico", nem "agente") e o fim da conversa e "Concluir conversa", "Concluida",
+//      "Concluidas" (nao "Encerrada", nem "Encerrar atendimento"). "Automaticas" no plural e o
+//      modulo de regras e continua valendo. Conta texto visivel (JSX, atributos e literais) nas
+//      pastas e arquivos da tela; identificador, rota e chave de dado nao contam.
+//   g. icone fora da escala (#2185, R03): `<Icone tamanho={N}>` so com 16, 20, 24 ou 32 e
+//      `tamanhoIcone={N}` so com 16, 20 ou 24, e `svg { width }` em CSS no mesmo conjunto. Sem
+//      `tamanho`, o Icone acompanha a fonte do pai e encaixa no degrau mais proximo.
+//   i. contador desenhado a mao (#2185, R04): regra de CSS com numero tabular, altura ou largura
+//      minima em px e raio fora de `Pilula.module.css`. O contador e a `Pilula contagem`; a folha
+//      da tela so diz o lugar dele (position, margin).
+//   j. fonte fora da escala (#2185, R09): `font-size` so por token (`--t-micro` 13, `--t-apoio` 14,
+//      `--t-corpo` 15, `--t-forte` 17, `--t-titulo` 20, `--t-valor` 24), nas folhas da casca, dos
+//      componentes e das telas do Atendimento. `--t-minimo` era `--t-micro` com outro nome e
+//      deixou de existir. As excecoes tem motivo escrito em FONTE_EXCECOES.
+//   k. referencia quebrada (#2185, R16): `css.nome` ou `css['nome']` que a folha .module.css do
+//      componente nao define (o estilo some, em silencio) e `var(--token)` sem fallback que nenhuma
+//      folha nem script define. Classe montada por concatenacao nao e lida.
+//   l. raio e ponto fora do token (#2185, R17): `border-radius` so por `--r-*` (ou 0), e ponto de
+//      estado so com `--ponto`, nas folhas da casca, dos componentes e das telas do Atendimento.
+//   m. elevacao e borda das camadas (#2185, R19): camada flutuante (painel do Assistente, painel de
+//      Lembretes) separa por sombra (`--sombra-media`, `--sombra-alta`) e por espaco, nunca por
+//      borda de 1px nem pela sombra pequena de superficie.
+//   n. largura de Modal fora das tres (#2185, R14): `largura="sm"`, `"md"` ou `"lg"` (tokens
+//      --modal-sm/md/lg) nas telas do Atendimento, nos componentes e na casca. Numero ou `min(...)`
+//      so com motivo escrito em LARGURA_DE_MODAL_EXCECOES.
+//   h. botao so de icone fora do `BotaoIcone` (#2185, R02): `<Botao>` ou `<button>` cujo unico
+//      filho e um `<Icone/>`, ou `<Botao icone=... />` sem texto. O BotaoIcone da o nome acessivel,
+//      a dica e o alvo de `--toque`.
+//   o. icone do ator na tela do Atendimento (#2185, plano secao 3.2): o Assistente e `sparkles`,
+//      concluir e `circle-check`. `raio` fica com o modulo Automaticas e `log-out` com sair da conta.
 //
 // Le o codigo como texto, sem dependencia. As contagens b, c e d sao heuristicas de
 // proposito: o que importa e que o numero so desca.
@@ -26,9 +59,20 @@ import { fileURLToPath } from 'node:url'
 
 const TETOS = {
   chaveForaDoDicionario: 0,
-  botaoCru: 16,
+  botaoCru: 11,
   termoProibido: 19,
-  movimentoLiteral: 40,
+  movimentoLiteral: 38,
+  menuForaDoComponente: 0,
+  atorForaDoVocabulario: 0,
+  iconeForaDaEscala: 0,
+  botaoSoIconeForaDoComponente: 23,
+  contadorProprio: 0,
+  fonteForaDaEscala: 0,
+  referenciaQuebrada: 0,
+  raioForaDoToken: 0,
+  camadaComBordaOuSombraPequena: 0,
+  larguraDeModalLiteral: 0,
+  iconeDoAtorForaDoPlano: 0,
 }
 
 const CONSOLE = fileURLToPath(new URL('..', import.meta.url))
@@ -37,6 +81,35 @@ const ICONE = join(RAIZ, 'componentes', 'Icone.jsx')
 const MARCA_ICONE = join(RAIZ, 'componentes', 'MarcaIcone.jsx')
 const PASTAS_SEM_BOTAO_CRU = ['features/atendimento', 'features/caixa-de-entrada']
 const TOKENS = 'estilos/tokens.css'
+// Superficies do Atendimento (conversa, lista, ficha, encerramento, assistente) e o dominio que
+// escreve o texto delas. Gestao, Automaticas, Hall e Ajuda falam de regra, nao de quem responde.
+const PASTAS_DO_VOCABULARIO = [
+  'features/atendimento', 'features/caixa-de-entrada', 'features/ficha-cliente', 'features/encerramento',
+  'features/agente', 'features/assistente', 'features/lembretes', 'features/notas',
+]
+const ARQUIVOS_DO_VOCABULARIO = [
+  'dominio/conversa.js', 'dominio/linhaDoBalcao.js', 'dominio/automatico.js', 'dominio/agente.js',
+  'dominio/captura.js', 'dominio/mensagem.js', 'dominio/motivoDeEscalada.js', 'dominio/resumoAtendimento.js',
+  'dominio/resumoDoModo.js', 'dominio/janela.js', 'dominio/simulacoes.js', 'dominio/acoesDaConversa.js',
+  'aplicacao/casos/atendimentoLocal.js', 'aplicacao/api/encerramentoEMidia.js',
+]
+// A ocorrencia (reclamacao do cliente) tem o proprio vocabulario: ela "encerra", a conversa "conclui".
+const SEM_ENCERRADA = ['features/ficha-cliente/BlocoOcorrencia']
+const PASTAS_DA_ESCALA_DE_FONTE = ['app/', 'componentes/', 'estilos/', ...PASTAS_DO_VOCABULARIO.map((pasta) => pasta + '/')]
+const FONTE_EXCECOES = {
+  'componentes/Trilho.module.css': 'o trilho tem 12 px aprovado na prancha (plano balcao-ux, secao 15)',
+  'componentes/Campo.module.css': '16 px no celular: abaixo disso o iOS amplia a tela ao focar o campo',
+  'componentes/CampoMascarado.module.css': '16 px no celular: abaixo disso o iOS amplia a tela ao focar o campo',
+}
+const LARGURA_DE_MODAL_EXCECOES = {
+  'componentes/ImprimirPedido.jsx': 'a previa do impresso tem a largura do papel',
+  'componentes/ModalFrete.jsx': 'demonstracao congelada (Lalamove), fora do Atendimento',
+}
+const ATOR_FORA_DO_VOCABULARIO = [
+  ['automático/automática', /(?<![\p{L}\d_])autom[áà]tic[oa](?![\p{L}\d_])/iu],
+  ['agente', /(?<![\p{L}\d_-])agentes?(?![\p{L}\d_-])/iu],
+  ['Encerrada/Encerrar atendimento', /(?<![\p{L}\d_])Encerradas?(?![\p{L}\d_])|Encerrar atendimento|[Cc]onversa encerrada|encerrado por/u],
+]
 const TERMOS = [
   ['Canhoto', /(?<![\p{L}\d_])[Cc]anhotos?(?![\p{L}\d_])/u],
   ['Lead', /(?<![\p{L}\d_])[Ll]eads?(?![\p{L}\d_])/u],
@@ -229,6 +302,232 @@ function contarMovimentoLiteral(estilos) {
   return faltas
 }
 
+// --- e. menu de opcoes fora do MenuDeAcoes ---------------------------------------------
+
+function contarMenusForaDoComponente(fontes) {
+  const faltas = []
+  for (const arquivo of fontes) {
+    if (!arquivo.endsWith('.jsx') || /componentes[\\/](MenuDeAcoes|Icone)\.jsx$/.test(arquivo)) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+    for (const m of codigo.matchAll(/(?:nome|icone)=["']ellipsis(?:-vertical)?["']|Mais ações|\srole=["']menu["']/g)) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} ${m[0]}`)
+  }
+  return faltas
+}
+
+// --- f. vocabulario do Atendimento ------------------------------------------------------
+
+function contarForaDoVocabularioDoAtendimento(fontes) {
+  const faltas = []
+  for (const arquivo of fontes) {
+    const rel = relativo(arquivo)
+    if (!PASTAS_DO_VOCABULARIO.some((pasta) => rel.startsWith(pasta + '/')) && !ARQUIVOS_DO_VOCABULARIO.includes(rel)) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+    const trechos = []
+    for (const m of codigo.matchAll(/(?<![=-])>([^<>{}]+)(?=<|\{)|\}([^<>{}]+)(?=<\/?[A-Za-z])/g)) {
+      const texto = m[1] ?? m[2]
+      if (/\p{L}/u.test(texto) && !/[=;]/.test(texto)) trechos.push([texto, m.index + 1])
+    }
+    for (const m of codigo.matchAll(/(['"`])((?:\\.|(?!\1)[^\n])*)\1/g)) {
+      const inicioDaLinha = codigo.lastIndexOf('\n', m.index) + 1
+      if (/^\s*(import|export)\b|\bfrom\s*$/.test(codigo.slice(inicioDaLinha, m.index))) continue
+      // Chave de dado (`'agente'`, `'encerrada'`): um token minusculo, sem espaco.
+      if (/^[a-z][\w-]*$/.test(m[2])) continue
+      trechos.push([m[2], m.index])
+    }
+    for (const [texto, indice] of trechos) {
+      for (const [termo, padrao] of ATOR_FORA_DO_VOCABULARIO) {
+        if (termo.startsWith('Encerrada') && SEM_ENCERRADA.some((p) => rel.startsWith(p))) continue
+        for (const achado of texto.matchAll(new RegExp(padrao.source, padrao.flags + 'g'))) {
+          const linha = linhaDe(codigo, indice) + texto.slice(0, achado.index).split('\n').length - 1
+          faltas.push(`${rel}:${linha} "${termo}": ${texto.trim().slice(0, 70)}`)
+        }
+      }
+    }
+  }
+  return faltas
+}
+
+// --- g. icone fora da escala -------------------------------------------------------------
+
+const ESCALA_DO_ICONE = [16, 20, 24, 32]
+const ESCALA_DO_BOTAO_ICONE = [16, 20, 24]
+
+function contarIconesForaDaEscala(fontes, estilos) {
+  const faltas = []
+  for (const arquivo of fontes) {
+    if (!arquivo.endsWith('.jsx')) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+    // `MarcaIcone` e `IconeDoModulo` tambem seguem a escala, nas pastas da tela (Hall e Gestao ainda nao migraram).
+    const dasPastas = PASTAS_DA_ESCALA_DE_FONTE.some((pasta) => relativo(arquivo).startsWith(pasta))
+    for (const m of codigo.matchAll(dasPastas ? /<(Icone|MarcaIcone|IconeDoModulo)(?=[\s/>])([^>]*?)\/?>/gs : /<(Icone)(?=[\s/>])([^>]*?)\/?>/gs)) {
+      const tamanho = /\btamanho=\{(\d+)\}/.exec(m[2])
+      if (tamanho && !ESCALA_DO_ICONE.includes(Number(tamanho[1]))) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} ${m[1]} tamanho ${tamanho[1]}`)
+    }
+    for (const m of codigo.matchAll(/\btamanhoIcone=\{(\d+)\}/g)) {
+      if (!ESCALA_DO_BOTAO_ICONE.includes(Number(m[1]))) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} tamanhoIcone ${m[1]}`)
+    }
+  }
+  for (const arquivo of estilos) {
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'), { css: true })
+    for (const m of codigo.matchAll(/[^{}]*\bsvg\b[^{}]*\{([^}]*)\}/g)) {
+      const largura = /(?<![\w-])width:\s*(\d+)px/.exec(m[1])
+      if (largura && !ESCALA_DO_ICONE.includes(Number(largura[1]))) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} svg width ${largura[1]}px`)
+    }
+  }
+  return faltas
+}
+
+// --- h. botao so de icone fora do BotaoIcone ------------------------------------------------
+
+function contarBotoesSoIcone(fontes) {
+  const faltas = []
+  const atributos = '((?:[^<>{}]|\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\})*)'
+  const filhoUnico = new RegExp(`<(Botao|button)(?=[\\s>])${atributos}>\\s*<Icone\\b(?:[^<>{}]|\\{[^{}]*\\})*\\/>\\s*<\\/\\1>`, 'gs')
+  const semTexto = new RegExp(`<Botao(?=[\\s>])${atributos}\\/>`, 'gs')
+  for (const arquivo of fontes) {
+    if (!arquivo.endsWith('.jsx') || /componentes[\\/]BotaoIcone\.jsx$/.test(arquivo)) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+    for (const m of codigo.matchAll(filhoUnico)) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} <${m[1]}> so com icone`)
+    for (const m of codigo.matchAll(semTexto)) if (/\bicone=/.test(m[1])) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} <Botao icone=... /> sem texto`)
+  }
+  return faltas
+}
+
+// --- i. contador desenhado a mao ------------------------------------------------------------
+
+function contarContadoresProprios(estilos) {
+  const faltas = []
+  for (const arquivo of estilos) {
+    if (relativo(arquivo) === 'componentes/Pilula.module.css') continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'), { css: true })
+    for (const m of codigo.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (/font-variant-numeric:\s*tabular-nums/.test(m[2]) && /(min-width|height):\s*\d+px/.test(m[2]) && /border-radius/.test(m[2])) {
+        faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index + m[1].length - m[1].trimStart().length)} ${m[1].trim().replace(/\s+/g, ' ')}`)
+      }
+    }
+  }
+  return faltas
+}
+
+// --- j. fonte fora da escala ----------------------------------------------------------------
+
+function contarFontesForaDaEscala(estilos) {
+  const faltas = []
+  for (const arquivo of estilos) {
+    const rel = relativo(arquivo)
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'), { css: true })
+    for (const m of codigo.matchAll(/--t-minimo/g)) faltas.push(`${rel}:${linhaDe(codigo, m.index)} --t-minimo (use --t-micro)`)
+    if (!PASTAS_DA_ESCALA_DE_FONTE.some((pasta) => rel.startsWith(pasta)) || rel in FONTE_EXCECOES || rel === TOKENS) continue
+    for (const m of codigo.matchAll(/(?<![\w-])font-size:\s*([^;}]+)/g)) {
+      const valor = m[1].trim()
+      if (/^(var\(--t-[a-z]+\)|inherit|0|1em|initial|unset)$/.test(valor)) continue
+      faltas.push(`${rel}:${linhaDe(codigo, m.index)} font-size: ${valor}`)
+    }
+  }
+  return faltas
+}
+
+// --- k. referencia quebrada -----------------------------------------------------------------
+
+function contarReferenciasQuebradas(fontes, estilos) {
+  const faltas = []
+  const definidos = new Set()
+  const cssPorCaminho = new Map()
+  for (const arquivo of estilos) {
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'), { css: true })
+    cssPorCaminho.set(arquivo, codigo)
+    for (const m of codigo.matchAll(/(--[\w-]+)\s*:/g)) definidos.add(m[1])
+  }
+  const codigoDosFontes = new Map(fontes.map((arquivo) => [arquivo, semComentarios(readFileSync(arquivo, 'utf8'))]))
+  // Token escrito por script: `style={{ '--peso': x }}` e `setProperty('--x', ...)`.
+  for (const codigo of codigoDosFontes.values()) {
+    for (const m of codigo.matchAll(/['"`](--[\w-]+)['"`]/g)) definidos.add(m[1])
+  }
+  for (const [arquivo, codigo] of cssPorCaminho) {
+    for (const m of codigo.matchAll(/var\(\s*(--[\w-]+)\s*\)/g)) {
+      if (!definidos.has(m[1])) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, m.index)} var(${m[1]}) sem definicao`)
+    }
+  }
+  for (const [arquivo, codigo] of codigoDosFontes) {
+    if (!arquivo.endsWith('.jsx')) continue
+    for (const importado of codigo.matchAll(/import\s+(\w+)\s+from\s+['"]([^'"]+\.module\.css)['"]/g)) {
+      const caminhoDoCss = join(arquivo, '..', importado[2])
+      const folha = cssPorCaminho.get(caminhoDoCss)
+      if (folha === undefined) continue
+      const classes = new Set([...folha.matchAll(/\.([A-Za-z_][\w-]*)/g)].map((m) => m[1]))
+      const usos = [
+        ...codigo.matchAll(new RegExp(`(?<![\\w./])${importado[1]}\\.([A-Za-z_]\\w*)`, 'g')),
+        ...codigo.matchAll(new RegExp(`(?<![\\w.])${importado[1]}\\[\\s*['"]([\\w-]+)['"]\\s*\\]`, 'g')),
+      ]
+      for (const uso of usos) {
+        if (!classes.has(uso[1])) faltas.push(`${relativo(arquivo)}:${linhaDe(codigo, uso.index)} ${importado[1]}.${uso[1]} nao existe em ${relativo(caminhoDoCss)}`)
+      }
+    }
+  }
+  return faltas
+}
+
+// --- l. raio e ponto fora do token ------------------------------------------------------------
+
+function contarRaiosForaDoToken(estilos) {
+  const faltas = []
+  for (const arquivo of estilos) {
+    const rel = relativo(arquivo)
+    if (!PASTAS_DA_ESCALA_DE_FONTE.some((pasta) => rel.startsWith(pasta)) || rel === TOKENS) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'), { css: true })
+    for (const m of codigo.matchAll(/(?<![\w-])border(?:-[a-z]+)*-radius:\s*([^;}]+)/g)) {
+      if (/\d(px|%|rem|em)\b/.test(m[1].replace(/var\([^)]*\)/g, ''))) faltas.push(`${rel}:${linhaDe(codigo, m.index)} border-radius: ${m[1].trim()}`)
+    }
+    for (const m of codigo.matchAll(/(?<![\w-])width:\s*(7|9|10)px;\s*height:\s*\1px/g)) faltas.push(`${rel}:${linhaDe(codigo, m.index)} ponto de ${m[1]}px (use --ponto)`)
+  }
+  return faltas
+}
+
+// --- m. elevacao e borda das camadas ---------------------------------------------------------
+
+const CAMADAS_FLUTUANTES = ['features/assistente/', 'features/lembretes/']
+
+function contarCamadasComBordaOuSombraPequena(estilos) {
+  const faltas = []
+  for (const arquivo of estilos) {
+    const rel = relativo(arquivo)
+    if (!CAMADAS_FLUTUANTES.some((pasta) => rel.startsWith(pasta))) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'), { css: true })
+    for (const m of codigo.matchAll(/(?<![\w-])border(?:-(?:top|bottom|left|right))?:\s*var\(--b-1\)\s+solid[^;}]*/g)) faltas.push(`${rel}:${linhaDe(codigo, m.index)} ${m[0].trim()}`)
+    for (const m of codigo.matchAll(/box-shadow:\s*var\(--sombra\)/g)) faltas.push(`${rel}:${linhaDe(codigo, m.index)} ${m[0].trim()}`)
+  }
+  return faltas
+}
+
+// --- n. largura de Modal fora das tres ---------------------------------------------------------
+
+function contarLarguraDeModalLiteral(fontes) {
+  const faltas = []
+  for (const arquivo of fontes) {
+    const rel = relativo(arquivo)
+    if (!arquivo.endsWith('.jsx') || !PASTAS_DA_ESCALA_DE_FONTE.some((pasta) => rel.startsWith(pasta)) || rel in LARGURA_DE_MODAL_EXCECOES) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+    for (const m of codigo.matchAll(/<Modal\b(?:[^<>{}]|\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})*?\slargura=(?:"([^"]*)"|\{([^}]*)\})/gs)) {
+      const valor = m[1] ?? m[2]
+      if (!/^(sm|md|lg)$/.test(valor) && !/^['"]?(sm|md|lg)['"]?(\s*[?:]|$)/.test(valor) && /\d/.test(valor)) faltas.push(`${rel}:${linhaDe(codigo, m.index)} largura=${valor}`)
+    }
+  }
+  return faltas
+}
+
+// --- o. icone do ator ---------------------------------------------------------------------
+
+function contarIconeDoAtorForaDoPlano(fontes) {
+  const faltas = []
+  for (const arquivo of fontes) {
+    const rel = relativo(arquivo)
+    if (!PASTAS_DO_VOCABULARIO.some((pasta) => rel.startsWith(pasta + '/')) && !ARQUIVOS_DO_VOCABULARIO.includes(rel)) continue
+    const codigo = semComentarios(readFileSync(arquivo, 'utf8'))
+    for (const m of codigo.matchAll(/\b(?:nome|icone)(?:=|:\s*)(?:\{\s*)?['"](raio|log-out)['"]/g)) faltas.push(`${rel}:${linhaDe(codigo, m.index)} icone ${m[1]}`)
+  }
+  return faltas
+}
+
 // --- tetos ----------------------------------------------------------------------------
 
 const fontes = arquivos(RAIZ, /\.(jsx?|mjs)$/)
@@ -239,6 +538,17 @@ const GUARDAS = [
   ['botaoCru', '<button cru em atendimento e caixa de entrada', contarBotoesCrus(fontes)],
   ['termoProibido', 'termo interno na tela (secao 3.1)', contarTermosProibidos(fontes)],
   ['movimentoLiteral', 'duracao ou easing literal em transition/animation', contarMovimentoLiteral(estilos)],
+  ['menuForaDoComponente', 'menu de opcoes fora do MenuDeAcoes', contarMenusForaDoComponente(fontes)],
+  ['atorForaDoVocabulario', 'ator ou fim de conversa fora do vocabulario do Atendimento', contarForaDoVocabularioDoAtendimento(fontes)],
+  ['iconeForaDaEscala', 'icone fora da escala 16, 20, 24 e 32', contarIconesForaDaEscala(fontes, estilos)],
+  ['botaoSoIconeForaDoComponente', 'botao so de icone fora do BotaoIcone', contarBotoesSoIcone(fontes)],
+  ['contadorProprio', 'contador desenhado a mao fora da Pilula contagem', contarContadoresProprios(estilos)],
+  ['fonteForaDaEscala', 'font-size fora da escala por token (e --t-minimo)', contarFontesForaDaEscala(estilos)],
+  ['referenciaQuebrada', 'classe de css module ou token que nao existe', contarReferenciasQuebradas(fontes, estilos)],
+  ['raioForaDoToken', 'border-radius literal ou ponto fora de --ponto', contarRaiosForaDoToken(estilos)],
+  ['camadaComBordaOuSombraPequena', 'camada flutuante com borda de 1px ou sombra pequena', contarCamadasComBordaOuSombraPequena(estilos)],
+  ['larguraDeModalLiteral', 'Modal com largura fora de sm, md e lg', contarLarguraDeModalLiteral(fontes)],
+  ['iconeDoAtorForaDoPlano', 'icone do Assistente ou de concluir fora do plano (secao 3.2)', contarIconeDoAtorForaDoPlano(fontes)],
 ]
 
 let reprovou = false

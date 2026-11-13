@@ -2,10 +2,11 @@
 'use strict';
 
 module.exports = function ({ test, runInSandbox, sandbox, assert }) {
-  test('producao: getProdScanMode default = both', () => {
+  // #2247: o padrão é o da regra (D4 da v2: só QR até o número curto do lote).
+  test('producao: getProdScanMode default = qr', () => {
     sandbox.localStorage.removeItem('cdb-prod-scan-mode');
     const r = runInSandbox(`getProdScanMode()`);
-    assert.strictEqual(r, 'both');
+    assert.strictEqual(r, 'qr');
   });
 
   test('producao: getProdScanMode retorna valor valido', () => {
@@ -15,9 +16,9 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(runInSandbox(`getProdScanMode()`), 'barcode');
   });
 
-  test('producao: getProdScanMode normaliza valor invalido pra both', () => {
+  test('producao: getProdScanMode normaliza valor invalido pra qr', () => {
     sandbox.localStorage.setItem('cdb-prod-scan-mode', 'lixo');
-    assert.strictEqual(runInSandbox(`getProdScanMode()`), 'both');
+    assert.strictEqual(runInSandbox(`getProdScanMode()`), 'qr');
   });
 
   test('producao: scanModeFlags reflete cada modo', () => {
@@ -138,6 +139,28 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
     assert.strictEqual(ets[2].idxStr, '003');
     assert.match(ets[0].codigoBarras, /-001$/);
   });
+
+  for (const pilot of [false, true]) {
+    for (const id of ['b2-a9bf7120-5f72-4973-a631-4efaf58f0e8e', 'b-1728412345678']) {
+      test(`producao: lista e etiqueta identificam o mesmo lote (${pilot ? 'piloto' : 'base'}, ${id})`, () => {
+        const resultado = JSON.parse(runInSandbox(`
+          (function () {
+            const configAnterior = window.CDB_CONFIG;
+            try {
+              window.CDB_CONFIG = { ...(configAnterior || {}), isPilot: ${pilot} };
+              products = [{ id: 'p1', name: 'Pao', sku: 'PAO', archived: false }];
+              const batch = { id: ${JSON.stringify(id)}, lote: 'LOT-261112', createdAt: Date.now(),
+                items: [{ productId: 'p1', name: 'Pao', qty: 1, unit: 'un' }] };
+              return JSON.stringify({ cartao: batchCardHtml(batch), etiqueta: etiquetasFromBatch(batch)[0].lote });
+            } finally { window.CDB_CONFIG = configAnterior; }
+          })()
+        `));
+        const cabecalho = resultado.cartao.match(/<div class="bc-lote">([^<]+)/)?.[1];
+        assert.ok(cabecalho, 'o cartão renderiza a identificação do lote');
+        assert.strictEqual(cabecalho.split(' · ')[0], resultado.etiqueta, 'o lote escolhido na lista é o impresso na etiqueta');
+      });
+    }
+  }
 
   // #1471 — mesma regra do BatchLinker: base + '-' + ultimos 6 do id, so letras e digitos.
   test('producao: codigoDoLote bate com o codigo do Lote no ERP', () => {

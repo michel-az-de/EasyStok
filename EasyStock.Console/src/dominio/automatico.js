@@ -10,12 +10,12 @@
 // Puro. Conversa antiga, sem os campos novos, cai no padrão seguro: automático
 // ligado e nada de "precisa de você".
 
-import { situacaoDaCobranca } from './cobranca'
+import { aguardaAprovacao, situacaoDaCobranca } from './cobranca'
 import { prazoDoPagamento } from './lembrete'
 import { duracao } from './formato'
 import { ehAtrasoDeEntrega, motivoParaAutomatico, ocorrenciaAberta } from './ocorrencia.js'
 import { pedidoAtrasado } from './cozinha.js'
-import { MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
+import { AGUARDANDO_EQUIPE, MOTIVO_PADRAO, origemDaPassagem, passagemPendente } from './passagem.js'
 import { pedidoEncerrado } from './pedido.js'
 import { ehPerguntaSemResposta, mensagensSemRespostaReal, ultimaFala } from './mensagem.js'
 import { minutosAbertos } from './funcionamento.js'
@@ -110,7 +110,7 @@ const DESCRICOES = {
   [MODOS.BLOQUEADO]: {
     rotulo: 'Cadastro bloqueado',
     tom: 'perigo',
-    detalhe: 'Envios bloqueados em todos os canais. Desbloqueie na ficha.',
+    detalhe: 'Envios bloqueados em todos os canais. A gerência desbloqueia na ficha.',
   },
 }
 
@@ -134,7 +134,7 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
   if (passagemPendente(conversa)) {
     const base = DESCRICOES[MODOS.COM_VOCE]
     return { chave: MODOS.COM_VOCE, ...base,
-      ...(conversa.passagem.origem === 'chat-site' ? { rotulo: 'Aguardando equipe' } : {}),
+      ...(['chat-site', 'fila'].includes(conversa.passagem.origem) ? { rotulo: AGUARDANDO_EQUIPE } : {}),
       detalhe: origemDaPassagem(conversa.passagem).longo }
   }
   if (pausado) {
@@ -151,12 +151,12 @@ export function modoDoAtendimento(conversa, pausado = false, bloqueada = false) 
 // Motivo curto da passagem, na voz da casa. É o que aparece no cartão do
 // balcão, então cabe em uma linha.
 const MOTIVO_POR_INTENCAO = {
-  restricao: 'Restrição alimentar, o automático não responde isso',
+  restricao: 'Restrição alimentar, o Assistente não responde isso',
   'elogio-ou-queixa': 'Retorno sobre o pedido, precisa da sua voz',
   'pergunta-entrega': 'Pergunta de entrega fora do combinado',
-  'fechar-pedido': 'Fechamento de pedido que o automático não conclui',
+  'fechar-pedido': 'Fechamento de pedido que o Assistente não conclui',
   acompanhar: 'Cobrança de prazo que só você pode confirmar',
-  'pedido-especial': 'Pede algo que o automático não resolve sozinho',
+  'pedido-especial': 'Pede algo que o Assistente não resolve sozinho',
 }
 
 
@@ -169,7 +169,7 @@ const MOTIVO_AREA_FORA = 'Lead fora da área de entrega insistiu, decida a exce�
 export function motivoDaPassagem(intencaoChave, semSaldo = [], areaForaInsistida = false, textoDoPedido = null) {
   if (areaForaInsistida) return MOTIVO_AREA_FORA
   if (semSaldo.length > 0) {
-    return `${semSaldo[0].nome} sem saldo, o automático não vende`
+    return `${semSaldo[0].nome} sem saldo, o Assistente não vende`
   }
   if (textoDoPedido) return textoDoPedido
   return MOTIVO_POR_INTENCAO[intencaoChave] ?? MOTIVO_PADRAO
@@ -195,7 +195,7 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
     return {
       chave: 'aguardar',
       texto: 'Você respondeu. Próximo passo sugerido: aguardar o cliente. O pedido ainda está em andamento, '
-        + 'então não encerre; devolva ao automático se quiser que ele responda quando o cliente voltar.',
+        + 'então não conclua; devolva ao Assistente se quiser que ele responda quando o cliente voltar.',
     }
   }
   // #1989: a venda começa antes do primeiro item na comanda (o cliente pediu, mandou o endereço ou
@@ -207,13 +207,13 @@ export function proximoPassoDepoisDeResponder(conversa, pausado) {
     return {
       chave: 'aguardar-venda',
       texto: 'Você respondeu. Próximo passo sugerido: montar o pedido ou aguardar o cliente. A venda está em andamento, '
-        + 'então não encerre.',
+        + 'então não conclua.',
     }
   }
   return {
     chave: 'encerrar-ou-aguardar',
-    texto: 'Você respondeu. Próximo passo sugerido: se o assunto acabou, encerre a conversa; '
-      + 'se ainda espera o cliente, devolva ao automático para ele responder quando o cliente voltar.',
+    texto: 'Você respondeu. Próximo passo sugerido: se o assunto acabou, conclua a conversa; '
+      + 'se ainda espera o cliente, devolva ao Assistente para ele responder quando o cliente voltar.',
   }
 }
 
@@ -340,6 +340,18 @@ function pedidoAtrasadoVisivel(conversa, janelas, agora) {
   }
 }
 
+// #2185 (F3): pedido de fora da área espera a aprovação da loja. A Ficha já dizia "Esperando sua aprovação";
+// a lista mostrava "Pago" e o chip não contava. Quem decide é a dona, então entra em "Precisa de você".
+function aguardandoAprovacao(conversa) {
+  if (!aguardaAprovacao(conversa.pedido)) return null
+  return {
+    chave: 'aprovacao',
+    rotulo: 'Aguardando aprovação',
+    tom: 'aviso',
+    texto: `Pedido ${conversa.pedido.numero} espera a aprovação da loja`,
+  }
+}
+
 // Cobrança vencida nos dois mundos: com Pix emitido vale o relógio dele, e sem
 // Pix vale o prazo da comanda gerada, que é o mesmo do lembrete de pagamento.
 function cobrancaVencida(conversa, agora) {
@@ -463,6 +475,7 @@ export function motivoDePrecisar(conversa, agora, pausado = true, aberta = true,
   return aguardandoAbertura(conversa, aberta)
     ?? ocorrenciaPendente(conversa)
     ?? sinalUrgente(conversa, agora)
+    ?? aguardandoAprovacao(conversa)
     ?? pedidoAtrasadoVisivel(conversa, janelas, agora)
     ?? esperaDoCliente(conversa, agora, pausaDaConversa(conversa, pausado), expediente)
     ?? cobrancaVencida(conversa, agora)

@@ -35,7 +35,7 @@ export const REGRAS_PADRAO = [
     // verdade, o mesmo que o botão "Enviar cardápio" do composer monta
     // (dominio/cardapioLink.js, linkDoCardapio). Antes só prometia em texto,
     // sem anexar nada (achado P0.1, banca10/simulacao).
-    texto: 'Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. '
+    texto: 'Olá! Aqui é a Casa da Babá, massa artesanal com entrega agendada. '
       + 'Segue nosso cardápio de hoje, é só escolher: {linkCardapio} '
       + 'Me chama quando escolher que eu já anoto.',
   },
@@ -87,7 +87,7 @@ export const REGRAS_PADRAO = [
     id: 'encerramento',
     nome: 'Encerramento do atendimento',
     gatilho: GATILHOS.ENCERRAMENTO,
-    descricao: 'Oferecida na confirmação de Encerrar, só sai quando a dona marca "mandar mensagem".',
+    descricao: 'Oferecida na confirmação de Concluir conversa, só sai quando a dona marca "mandar mensagem".',
     ativa: true,
     texto: 'Por hoje é só, {nome}! Qualquer coisa é só chamar de novo por aqui. Até a próxima!',
   },

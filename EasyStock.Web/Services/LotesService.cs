@@ -10,7 +10,9 @@ public class LotesService(ApiClient api, SessionService session) : TenantService
 
     public Task<ApiResult<List<Lote>>> ListarAsync(string? status = null, string? search = null)
     {
+        // #2318 (PROD-2): lotes da loja corrente da sessao; sem loja na sessao, a empresa toda.
         var qs = $"lotes?empresaId={GetEmpresaId()}&page=1&pageSize=100";
+        if (Guid.TryParse(Session.GetLojaId(), out var lojaId) && lojaId != Guid.Empty) qs += $"&lojaId={lojaId}";
         if (!string.IsNullOrEmpty(status)) qs += $"&status={Uri.EscapeDataString(status)}";
         if (!string.IsNullOrEmpty(search)) qs += $"&search={Uri.EscapeDataString(search)}";
         return api.GetAsync<List<Lote>>(qs);

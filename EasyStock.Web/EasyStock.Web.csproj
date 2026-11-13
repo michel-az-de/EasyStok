@@ -18,6 +18,11 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
   </ItemGroup>
 
+  <!-- #2390: redação do trace e do log OTLP (SpanQueRedige, LogQueRedige). Projeto leve: Application + SDK do OTel. -->
+  <ItemGroup>
+    <ProjectReference Include="..\EasyStock.Observabilidade\EasyStock.Observabilidade.csproj" />
+  </ItemGroup>
+
   <!-- Tailwind: gera wwwroot/css/tailwind.dist.css antes do build.
        Inputs disparam rebuild quando config/CSS-fonte/views mudam.
        Pula em CI quando SkipTailwind=true (Docker já compila no stage Node). -->

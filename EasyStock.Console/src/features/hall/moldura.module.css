@@ -12,7 +12,7 @@
 .item { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); padding: var(--e-2); border-radius: var(--r-1); text-decoration: none; color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600; }
 .item:hover { background: var(--preenchimento); color: var(--tinta); }
 .item > span { min-width: 0; overflow-wrap: anywhere; }
-.preparacao { display: block; font-size: var(--t-minimo); font-weight: 400; color: var(--tinta-2); margin-top: var(--e-1); }
+.preparacao { display: block; font-size: var(--t-micro); font-weight: 400; color: var(--tinta-2); margin-top: var(--e-1); }
 .itemAtivo, .itemAtivo:hover { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
 .item > svg, .modulo > svg, .titulo > svg { flex: none; }
 .item:focus-visible, .voltar:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
@@ -44,25 +44,27 @@
 .telaAtiva, .telaAtiva:hover { background: var(--preenchimento-forte); color: var(--tinta); }
 .abrirMenu { display: none; }
 .nomeNoMenu { display: none; }
+.contaNaBarra { display: flex; align-items: center; }
 .menuModal { display: flex; min-height: 0; }
 .menuModal .menu { flex: 1; width: auto; margin: 0; box-shadow: none; border: 0; }
 .menuModal .trilho { max-height: 60dvh; }
 /* #1870: com o trilho à vista, o Sair é o do avatar no pé dele; a barra não repete. */
 /* O trilho já leva aos módulos e ao Atendimento (Balcão): a barra não repete os dois links. */
 @media (min-width: 1101px) {
-  .barra .sair, .contexto > a.voltar { display: none; }
+  .barra .contaNaBarra, .contexto > a.voltar { display: none; }
 }
 @media (max-width: 1100px) {
   .lateral > .trilho { display: none; }
-  .abrirMenu { display: inline-flex; }
 }
 @media (max-width: 759px) {
   .lateral { display: none; }
   .barra { gap: var(--e-1); padding: var(--e-2); }
   .modulo, .contexto > a { display: none; }
-  .abrirMenu { min-width: 0; max-width: 100%; text-align: left; }
+  /* #2258 (auditoria G3, F6): o botão Menu só existe onde o menu lateral some (celular). Com ele à vista o
+     Menu abria um modal que repetia o que já estava na tela. */
+  .abrirMenu { display: inline-flex; min-width: 0; max-width: 100%; text-align: left; }
   .abrirMenu > span { min-width: 0; overflow-wrap: anywhere; }
-  .nomeNoMenu { display: block; font-size: var(--t-minimo); font-weight: 400; }
+  .nomeNoMenu { display: block; font-size: var(--t-micro); font-weight: 400; }
   .acoes { gap: var(--e-1); }
   .acoes > :global([data-ajuda-console]) { font-size: 0; gap: 0; width: var(--toque); padding: 0; }
   .ajuste { padding: 0 var(--e-2) var(--e-2); }
@@ -70,10 +72,10 @@
 }
 @media (max-width: 640px) {
   .barra { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--e-2); }
+  .telaNaBarra { flex: 0 0 auto; max-width: 100%; white-space: normal; }
   .contexto { grid-row: 1; grid-column: 1; }
   .acoes { display: contents; }
-  .acoes > [role='radiogroup'] { grid-row: 2; grid-column: 1 / -1; justify-self: start; }
   .acoes > :global([data-ajuda-console]) { grid-row: 1; grid-column: 2; }
-  .avisos { grid-row: 2; grid-column: 2 / -1; justify-self: end; }
-  .sair { grid-row: 1; grid-column: 3; max-width: 140px; padding-inline: var(--e-2); }
+  .avisos { grid-row: 2; grid-column: 1 / -1; justify-self: end; }
+  .contaNaBarra { grid-row: 1; grid-column: 3; }
 }

@@ -1,17 +1,19 @@
 name: console
 
 # Console do operador (ADR-0054): lint (oxlint), fronteira de camadas e build.
-# Roda só quando a pasta do console muda; o gate .NET fica no ci.yml.
+# Inclui a guarda da publicação do Console; o gate .NET fica no ci.yml.
 on:
   pull_request:
     paths:
       - 'EasyStock.Console/**'
       - '.github/workflows/console.yml'
+      - 'scripts/deploy/console-deploy*.sh'
   push:
     branches: [master]
     paths:
       - 'EasyStock.Console/**'
       - '.github/workflows/console.yml'
+      - 'scripts/deploy/console-deploy*.sh'
   workflow_dispatch:
 
 permissions:
@@ -30,7 +32,10 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: EasyStock.Console/package-lock.json
+      - run: bash ../scripts/deploy/console-deploy.test.sh
       - run: npm ci
+      # #2410: as provas de navegador do `npm run provas` abrem o console no Chromium.
+      - run: npx playwright install --with-deps chromium
       - run: npm run qualidade
       - run: node ferramentas/prova-2146-componentes-gramatica.mjs
       - run: node --test ferramentas/prova-2021-frete.mjs ferramentas/prova-2021-midias.mjs ferramentas/prova-2021-galeria.mjs
@@ -45,10 +50,16 @@ jobs:
       - run: node ferramentas/prova-ficha-cliente-pdf.mjs
       - run: node ferramentas/prova-postits-cliente.mjs
       - run: node ferramentas/prova-painel-movel.mjs
+      - run: node ferramentas/prova-2185-acoes-da-conversa.mjs
       - run: node ferramentas/prova-ficha-colaborativa-ia.mjs
       - run: node ferramentas/prova-mapa-viagem.mjs
       - run: node ferramentas/prova-1683-operacao.mjs
       - run: node ferramentas/prova-1420-sugestao-agente-api.mjs
+      - run: node ferramentas/prova-2178-ia-contextual.mjs
+      - run: node ferramentas/prova-2178-rascunhos-notas.mjs
+      - run: node ferramentas/prova-2178-notas-sessao.mjs
+      - run: node ferramentas/prova-2184-sessao-nativa.mjs
+      - run: node ferramentas/prova-2184-api-sessao-nativa.mjs
       - run: node ferramentas/prova-1432-atendimento-email.mjs
       - run: node ferramentas/prova-f06-honestidade.mjs
       - run: node ferramentas/prova-f11-lote-papel.mjs
@@ -137,8 +148,10 @@ jobs:
       - run: node ferramentas/prova-1808-ia-cardapio.mjs
       - run: node ferramentas/prova-2081-producao-paridade.mjs
       - run: node ferramentas/prova-1809-producao-cardapio.mjs
+      - run: node ferramentas/prova-2185-efeitos.mjs
       - run: node ferramentas/prova-1806-paineis.mjs
       - run: node ferramentas/prova-1806-lead-cadastro.mjs
       - run: node ferramentas/prova-1807-avisos.mjs
       - run: node ferramentas/prova-1810-entrada-google.mjs
+      - run: node ferramentas/prova-2225-google-celular.mjs
       - run: node ferramentas/prova-r11-impressao.mjs

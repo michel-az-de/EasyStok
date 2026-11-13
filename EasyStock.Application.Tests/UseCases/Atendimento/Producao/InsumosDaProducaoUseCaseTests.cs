@@ -2,6 +2,8 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Atendimento.Producao;
 using EasyStock.Application.UseCases.CadastrarProduto;
+using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -30,6 +32,7 @@ public class InsumosDaProducaoUseCaseTests
         _produtos.When(r => r.InsertAsync(Arg.Any<Produto>())).Do(c => _gravados[c.Arg<Produto>().Id] = c.Arg<Produto>());
         _produtos.GetByIdAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
         _produtos.GetByIdParaAtualizarAsync(EmpresaId, Arg.Any<Guid>()).Returns(c => _gravados.GetValueOrDefault(c.ArgAt<Guid>(1)));
+        _uow.SetupExecuteInTransactionSemRetry<Guid>();
     }
 
     private readonly IStorefrontRepository _storefronts = Substitute.For<IStorefrontRepository>();
@@ -39,7 +42,107 @@ public class InsumosDaProducaoUseCaseTests
         new CadastrarProdutoUseCase(_produtos, _categorias, Substitute.For<IProdutoCaracteristicaRepository>(),
             Substitute.For<IProdutoEmbalagemRepository>(), Substitute.For<IProdutoVariacaoRepository>(), _uow,
             Substitute.For<ILogger<CadastrarProdutoUseCase>>()),
-        _uow, _storefronts, _cardapio);
+        _uow, _storefronts, _cardapio, _entrada);
+
+    private readonly RegistrarEntradaEstoqueUseCase _entrada = Substitute.For<RegistrarEntradaEstoqueUseCase>(
+        Substitute.For<IProdutoRepository>(), Substitute.For<IProdutoVariacaoRepository>(), Substitute.For<IItemEstoqueRepository>(),
+        Substitute.For<IMovimentacaoEstoqueRepository>(), Substitute.For<IUnitOfWork>(), Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>(),
+        null, null, null, null, null);
+
+    private void ListaVazia(params Produto[] insumos)
+    {
+        _produtos.GetInsumosAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(insumos.ToList());
+        _estoque.GetSaldoDisponivelPorProdutosAsync(EmpresaId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, decimal>());
+        _composicao.ContarReceitasPorInsumoAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(new Dictionary<Guid, int>());
+    }
+
+    [Fact]
+    public async Task Criar_ComCustoPorGrama_GuardaSeisCasas_ENaListaVoltaIgual()
+    {
+        // #2363: "paguei R$ 45 por 10 kg" é R$ 0,0045 por grama. Em centavos viraria zero.
+        var id = await Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Farinha", UnidadeMedida.G, null, 0.0045m));
+
+        var p = _gravados[id];
+        p.CustoUnitarioInsumo.Should().Be(0.0045m);
+        p.CustoDaFicha.Should().Be(0.0045m);
+        ListaVazia(p);
+        (await Sut().ListarAsync(EmpresaId)).Should().ContainSingle().Which.Custo.Should().Be(0.0045m);
+    }
+
+    [Fact]
+    public async Task Atualizar_CustoPorGrama_GuardaSeisCasas_ELimparApagaOsDois()
+    {
+        var farinha = Insumo("Farinha", null);
+        farinha.CustoReferencia = Dinheiro.FromDecimal(0.01m);
+        _gravados[farinha.Id] = farinha;
+
+        await Sut().AtualizarAsync(EmpresaId, farinha.Id, new InsumoInput(null, null, null, 0.0045m));
+        farinha.CustoDaFicha.Should().Be(0.0045m);
+
+        await Sut().AtualizarAsync(EmpresaId, farinha.Id, new InsumoInput(null, null, null, null, LimparCusto: true));
+        farinha.CustoUnitarioInsumo.Should().BeNull();
+        farinha.CustoReferencia.Should().BeNull();
+        farinha.CustoDaFicha.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Criar_ComSaldoInicial_LancaAEntradaDeAjuste_NaUnidadeDoInsumo()
+    {
+        // #2363: "quanto tem hoje" entra pelo caminho de movimentação que já existe (auditado).
+        var id = await Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Farinha", UnidadeMedida.G, null, 0.0045m, SaldoInicial: 2500m));
+
+        await _entrada.Received(1).ExecuteAsync(Arg.Is<RegistrarEntradaEstoqueCommand>(c =>
+            c.EmpresaId == EmpresaId && c.ProdutoId == id && c.Quantidade == 2500m
+            && c.Natureza == NaturezaMovimentacaoEstoque.Ajuste && c.Observacoes == "Saldo inicial do insumo"));
+    }
+
+    [Fact]
+    public async Task Criar_ComSaldoInicial_GravaInsumoEEntradaNaMesmaTransacao_EFalhaDaEntradaDesfazOCadastro()
+    {
+        // #2408: o insumo e o saldo inicial são uma gravação só. Se a entrada falhar, a transação desfaz o cadastro
+        // em vez de deixar o insumo sem o saldo que ela digitou.
+        var dentro = false;
+        var gravadoDentro = new List<string>();
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Guid>>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                dentro = true;
+                try { return await call.Arg<Func<CancellationToken, Task<Guid>>>()(call.Arg<CancellationToken>()); }
+                finally { dentro = false; }
+            });
+        _produtos.When(r => r.InsertAsync(Arg.Any<Produto>())).Do(_ => gravadoDentro.Add($"insumo:{dentro}"));
+        _entrada.ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>())
+            .Returns<Task<RegistrarEntradaEstoqueResult>>(_ =>
+            {
+                gravadoDentro.Add($"entrada:{dentro}");
+                throw new InvalidOperationException("estoque indisponível");
+            });
+
+        var acao = () => Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Farinha", UnidadeMedida.G, null, 0.0045m, SaldoInicial: 2500m));
+
+        await acao.Should().ThrowAsync<InvalidOperationException>();
+        gravadoDentro.Should().Equal("insumo:True", "entrada:True");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    public async Task Criar_SemSaldoInicial_NaoCriaMovimentacao(int? saldo)
+    {
+        await Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Farinha", UnidadeMedida.G, null, null, SaldoInicial: saldo));
+
+        await _entrada.DidNotReceiveWithAnyArgs().ExecuteAsync(default!);
+    }
+
+    [Fact]
+    public async Task Criar_SaldoInicialNegativo_400()
+    {
+        var acao = () => Sut().CriarAsync(EmpresaId, Guid.NewGuid(), new InsumoInput("Farinha", UnidadeMedida.G, null, null, SaldoInicial: -1m));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>();
+        _gravados.Should().BeEmpty();
+    }
 
     [Fact]
     public async Task Listar_ContaAsPorcoesQueUsamAEmbalagem_SemContarPratoArquivado()

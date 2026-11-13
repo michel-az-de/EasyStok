@@ -6,6 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { adaptAppMarkup } = require('../scripts/app-markup.cjs');
 const { pilotIcon } = require('../pilot.js');
+const { commandFor } = require('../pilot-ui.js');
 const { loadConsoleIcons, geometry } = require('./helpers/console-icons.cjs');
 
 const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
@@ -32,6 +33,8 @@ function restoreOrdersEmpty(html) {
 }
 function restoreWelcomeTitle(html) {
   return restoreOrdersEmpty(html).replace("textContent = 'Quem vai usar o app?';", "textContent = 'Bem-vinda à Casa da Baba';")
+    .replace('Recomendo fazer um backup. Em Configurações > Backup, toque em "Exportar".', 'Recomendo fazer um backup. Em Ajustes > Backup, toque em "Exportar".')
+    .replace('Configure o PIX em Configurações ou use o Atendimento online para cobrar.', 'Configure o PIX em Ajustes ou use o Atendimento online para cobrar.')
     .replace(/<svg class="pilot-billing-whatsapp"[\s\S]*?<\/svg> Compartilhar no WhatsApp/, '<span>📤</span> Compartilhar no WhatsApp');
 }
 function restoreProductionChrome(html) {
@@ -49,11 +52,42 @@ function restoreOrdersHeader(html) {
   return html.replace(/<div class="pilot-orders-header"[\s\S]*?<\/div>/, before);
 }
 
+function restoreItemPickerHeader(html) {
+  return html.replace(/<div class="pilot-item-picker-header"[^>]*>(<div class="modal-title">Adicionar <span class="accent">item<\/span><\/div>)<button[^>]*onclick="closeItemPicker\(\)"[^>]*>Fechar<\/button><\/div>/, '$1');
+}
+
 test('adapta o formulário real preservando todos os IDs uma única vez', () => {
   assert.deepEqual(ids(adapted), ids(original));
   assert.equal(new Set(ids(adapted)).size, ids(adapted).length);
   assert.match(adapted, /Dados do produto e validade\./);
   assert.match(adapted, /<summary>Mais opções do produto<\/summary>/);
+});
+
+test('criar produto na produção anuncia cadastro e lote antes de abrir etiquetas', () => {
+  const rotulo = adapted.match(/<button[^>]*id="saveProductBtn"[^>]*>([^<]+)<\/button>/)[1];
+  assert.deepEqual(commandFor(rotulo, 'saveNewProduct()'), { label: 'Criar e etiquetar', icon: 'printer' });
+  assert.match(adapted, /Criar e etiquetar cadastra o produto, registra esta produção e abre as etiquetas para impressão\./);
+  assert.deepEqual(commandFor('Criar e adicionar', 'saveNewProduct()'), { label: 'Adicionar', icon: 'plus' });
+});
+
+test('seletor de item oferece Fechar usando o fechamento existente sem escolher um item', () => {
+  const picker = result.slice(result.indexOf('id="itemPickerModal"'), result.indexOf('<!-- Modal Calculadora de Cesta'));
+  assert.match(picker, /<button type="button" class="cta-btn" onclick="closeItemPicker\(\)">Fechar<\/button>/);
+  const removidos = [];
+  const fechar = result.match(/function closeItemPicker\(\) \{[\s\S]*?\n\}/)[0];
+  vm.runInNewContext(fechar + '; closeItemPicker();', { document: { getElementById(id) {
+    assert.equal(id, 'itemPickerModal'); return { classList: { remove: classe => removidos.push(classe) } };
+  } } });
+  assert.deepEqual(removidos, ['show']);
+});
+
+test('aviso de backup aponta Configurações sem alterar a ação Backup', () => {
+  const aviso = result.match(/showHealthBanner\('info',\s*'(Recomendo fazer um backup\.[^']*)',\s*'([^']*)'\)/);
+  assert.deepEqual(aviso.slice(1), ['Recomendo fazer um backup. Em Configurações > Backup, toque em "Exportar".', 'Backup']);
+});
+
+test('aviso PIX aponta Configurações e mantém o status inicialmente oculto', () => {
+  assert.match(result, /<p id="cobrancaPixWarning" role="status" hidden>Dados PIX não configurados\. Você pode copiar o resumo\. Configure o PIX em Configurações ou use o Atendimento online para cobrar\.<\/p>/);
 });
 
 test('demanda recolhida preserva todos os dados e a ação para conferir insumos', () => {
@@ -96,7 +130,7 @@ test('essenciais e preço ficam fora de details, opções sem obrigatórios fica
 test('preserva documento fora das áreas adaptadas, com única troca textual no bootstrap', () => {
   assert.equal(result.slice(0, result.indexOf(welcomeStart)).replace(splash(result), splash(source)), source.slice(0, source.indexOf(welcomeStart)));
   assert.equal(restoreProductionChrome(result.slice(result.indexOf(welcomeEnd), result.indexOf(start))), source.slice(source.indexOf(welcomeEnd), source.indexOf(start)));
-  assert.equal(restoreWelcomeTitle(result.slice(result.indexOf(end))), source.slice(source.indexOf(end)));
+  assert.equal(restoreItemPickerHeader(restoreWelcomeTitle(result.slice(result.indexOf(end)))), source.slice(source.indexOf(end)));
 });
 
 test('splash HTML usa marca oficial sem alterar spinner, eventos ou tempos de saída', () => {
@@ -119,7 +153,7 @@ test('splash incompleto ou duplicado impede empacotar abertura inconsistente', (
 
 test('produção preserva IDs e botões completos, mantendo estoque baixo no resumo acessível', () => {
   assert.deepEqual(ids(result), ids(source));
-  assert.deepEqual(tags(restoreOrdersHeader(restoreOrdersEmpty(result)), /<(?:input|button|select|textarea)\b[^>]*>/g), tags(source, /<(?:input|button|select|textarea)\b[^>]*>/g));
+  assert.deepEqual(tags(restoreItemPickerHeader(restoreOrdersHeader(restoreOrdersEmpty(result))), /<(?:input|button|select|textarea)\b[^>]*>/g), tags(source, /<(?:input|button|select|textarea)\b[^>]*>/g));
   const metrics = result.match(/<details class="pilot-production-metrics">([\s\S]*?)<\/details>/)[1];
   const summary = metrics.match(/<summary>([\s\S]*?)<\/summary>/)[1];
   assert.match(summary, /Estoque baixo: <strong id="prodMetricLow">0<\/strong>/);
@@ -235,6 +269,6 @@ test('aceita LF e CRLF mantendo o restante do documento intacto', () => {
     const input = source.replace(/\r?\n/g, newline);
     const output = adaptAppMarkup(input);
     assert.deepEqual(ids(modal(output)), ids(modal(input)));
-    assert.equal(restoreWelcomeTitle(output.slice(output.indexOf(end))), input.slice(input.indexOf(end)));
+    assert.equal(restoreItemPickerHeader(restoreWelcomeTitle(output.slice(output.indexOf(end)))), input.slice(input.indexOf(end)));
   }
 });

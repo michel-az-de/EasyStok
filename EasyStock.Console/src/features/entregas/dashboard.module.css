@@ -32,7 +32,10 @@
   min-height: 64px; padding: var(--e-3) var(--e-4); border-bottom: 0;
   background: var(--papel); -webkit-backdrop-filter: none; backdrop-filter: none;
 }
-.topoGaveta h2 { margin: 0; flex: 1; font-size: var(--t-titulo); font-weight: 700; letter-spacing: var(--ls-titulo); }
+.topoGaveta h2 { margin: 0; font-size: var(--t-titulo); font-weight: 800; letter-spacing: var(--ls-titulo); }
+/* #2418: título, selo "Ao vivo" ao lado e os botões de ícone empurrados para a direita. */
+.topoGaveta > svg { flex-shrink: 0; color: var(--tinta); }
+.topoGaveta .empurra { margin-left: auto; }
 
 .pagina {
   display: flex; flex-direction: column; height: 100%; min-height: 0;
@@ -194,7 +197,6 @@
 .anelNumero { font-family: var(--f-dado); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--t-micro); }
 
 /* --- Menu ⋯ (mesmo espírito de MenuDoPedido) ----------------------------- */
-.comMenu { position: relative; flex-shrink: 0; }
 .gatilhoMenu {
   padding: 0; min-width: var(--toque); min-height: var(--toque); border-radius: var(--r-pilula);
   background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--tinta-3);

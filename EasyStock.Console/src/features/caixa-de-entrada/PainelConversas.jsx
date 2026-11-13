@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
+import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { useChamadaEstavel } from '../../hooks/useChamadaEstavel'
+import { useAoAbrirConversa } from '../../aplicacao/aberturaDeConversa'
 import { CELULAR, useTamanhoTela } from '../../hooks/useTamanhoTela'
 import { CartaoConversa } from './CartaoConversa'
 import { BarraBalcao } from './BarraBalcao'
@@ -13,7 +17,7 @@ import css from './caixa.module.css'
 // um com sua própria lista e sua própria memória de aberto/fechado — abrir um
 // não deve fechar o outro.
 function GrupoRecolhido({
-  titulo, conversas, aberto, aoAlternar, agora, automaticoPausado, pagamentosNaoVistos, aoAbrir, chave, busca,
+  titulo, conversas, aberto, aoAlternar, agora, automaticoPausado, pagamentosNaoVistos, aoAbrir, chave, busca, selecionadaId, usuario,
 }) {
   if (conversas.length === 0) return null
   return (
@@ -31,11 +35,12 @@ function GrupoRecolhido({
         <CartaoConversa
           key={conversa.id}
           conversa={conversa}
-          selecionada={false}
+          selecionada={conversa.id === selecionadaId}
           agora={agora}
           pausado={automaticoPausado?.[conversa.id] ?? false}
           pagamentoNaoVisto={pagamentosNaoVistos?.has(conversa.id) ?? false}
           grupo={chave}
+          usuario={usuario}
           busca={busca}
           aoAbrir={aoAbrir}
         />
@@ -44,21 +49,16 @@ function GrupoRecolhido({
   )
 }
 
-// Lista vazia em uma linha de texto e um link (#1442).
+// Lista vazia em uma linha de texto e uma ação (#1442): o `Vazio` em linha (#2185, R13).
 function VazioEmLinha({ texto, acao, aoAgir }) {
-  return (
-    <p className={css.vazioLinha}>
-      {texto}
-      {acao && <button type="button" className={css.linkVazio} onClick={aoAgir}>{acao}</button>}
-    </p>
-  )
+  return <Vazio variante="linha" titulo={texto} acao={acao && <Botao variante="texto" onClick={aoAgir}>{acao}</Botao>} />
 }
 
 // #1408: `buscaDeClientes` é o componente que a Moldura entrega para a busca achar cliente cadastrado sem conversa.
 export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = null, acoesCabecalho }) {
   const {
     conversas, visiveis, encerradasDoBalcao, bloqueadasDoBalcao, selecionadaId, filtros, agora,
-    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi,
+    automaticoPausado, aberta, horarioDaLoja, pagamentosNaoVistos, fonteApi, sincronizacao, sessao,
   } = useAtendimento()
   const { mudarFiltro, selecionar } = useAcoes()
   const [gruposAbertos, setGruposAbertos] = useState({ encerradas: false, bloqueados: false })
@@ -80,6 +80,12 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
   useEffect(() => {
     if (pedidosDeFoco > 0) focarCampoDeMensagem()
   }, [pedidosDeFoco])
+
+  // #2185 (F26): sino, aviso na tela e "Não entregues" abrem a conversa por fora da lista; o foco vai ao
+  // campo igual (antes ficava no sino ou caía no corpo da página, e a digitação se perdia).
+  useAoAbrirConversa(() => {
+    if (focaOCampoAoAbrir({ celular: tamanho === CELULAR, ponteiroFino: temPonteiroFino() })) setPedidosDeFoco((n) => n + 1)
+  })
 
   // #1577: identidade fixa, senão o `memo` do cartão não segura.
   const abrir = useChamadaEstavel((id) => {
@@ -127,10 +133,13 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
 
   const semCanal = filtros.canais.length === 0
   const semBusca = !filtros.busca.trim()
+  // #2227: antes da primeira leitura a lista vazia não é "nenhuma conversa".
+  const carga = cargaDaLista({ fonteApi, estado: sincronizacao?.estado, total: conversas.length })
+  const vazia = lista.length === 0 && !carga
 
   return (
     <>
-      <BarraBalcao filtros={filtros} aoMudar={mudarFiltro} acoesCabecalho={acoesCabecalho} />
+      <BarraBalcao filtros={filtros} aoMudar={mudarFiltro} acoesCabecalho={acoesCabecalho} semContagem={Boolean(carga)} />
       <NaoEntregues aoAbrir={aoAbrir} />
       <div
         className={css.rolagem}
@@ -139,26 +148,31 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
         onFocusCapture={travar}
         onBlurCapture={destravarComAtraso}
       >
+        {carga && (
+          <VazioEmLinha texto={carga === 'erro'
+            ? 'Não consegui carregar as conversas. Tento de novo em instantes.'
+            : 'Carregando as conversas…'} />
+        )}
         {/* #1442: vazio em uma linha, com o atalho certo. O bloco grande
             "Ninguém esperando você" ocupava a coluna e escondia o resto. */}
-        {lista.length === 0 && !semBusca
+        {vazia && !semBusca
           && (filtros.aba === 'precisa' || encerradasDoBalcao.length + bloqueadasDoBalcao.length === 0) && (
           <VazioEmLinha texto={`Nada com "${filtros.busca.trim()}".`} acao="Limpar busca" aoAgir={() => mudarFiltro('busca', '')} />
         )}
-        {lista.length === 0 && semBusca && !semCanal && (
+        {vazia && semBusca && !semCanal && (
           <VazioEmLinha
             texto={`${filtros.aba === 'precisa' ? 'Ninguém esperando você' : 'Nada aberto'} no ${filtros.canais.join(', ')}.`}
             acao="Ver todos os canais"
             aoAgir={() => mudarFiltro('canais', [])}
           />
         )}
-        {lista.length === 0 && semBusca && semCanal && filtros.aba === 'precisa' && (
+        {vazia && semBusca && semCanal && filtros.aba === 'precisa' && (
           <VazioEmLinha texto="Ninguém esperando você." acao="Ver todas" aoAgir={() => mudarFiltro('aba', 'todas')} />
         )}
-        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && filtros.responsavel && filtros.responsavel !== 'todas' && (
+        {vazia && semBusca && semCanal && filtros.aba !== 'precisa' && filtros.responsavel && filtros.responsavel !== 'todas' && (
           <VazioEmLinha texto={filtros.responsavel === 'minhas' ? 'Nenhuma conversa sua aberta agora.' : 'Nenhuma conversa sem dono aberta agora.'} acao="Ver todas" aoAgir={() => mudarFiltro('responsavel', 'todas')} />
         )}
-        {lista.length === 0 && semBusca && semCanal && filtros.aba !== 'precisa' && (!filtros.responsavel || filtros.responsavel === 'todas') && (
+        {vazia && semBusca && semCanal && filtros.aba !== 'precisa' && (!filtros.responsavel || filtros.responsavel === 'todas') && (
           <VazioEmLinha texto="Nenhuma conversa aberta agora." />
         )}
         {lista.map((conversa) => (
@@ -174,13 +188,15 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
             busca={filtros.busca}
             aoAbrir={abrir}
             fonteApi={fonteApi}
+            usuario={sessao?.usuario}
           />
         ))}
         {filtros.aba === 'todas' && (
           <>
             <GrupoRecolhido
               chave="encerradas"
-              titulo="Encerradas"
+              usuario={sessao?.usuario}
+              titulo="Concluídas"
               conversas={encerradasDoBalcao}
               aberto={gruposAbertos.encerradas}
               aoAlternar={() => alternarGrupo('encerradas')}
@@ -189,9 +205,11 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
               pagamentosNaoVistos={pagamentosNaoVistos}
               busca={filtros.busca}
               aoAbrir={abrir}
+              selecionadaId={selecionadaId}
             />
             <GrupoRecolhido
               chave="bloqueados"
+              usuario={sessao?.usuario}
               titulo="Bloqueados"
               conversas={bloqueadasDoBalcao}
               aberto={gruposAbertos.bloqueados}
@@ -201,6 +219,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
               pagamentosNaoVistos={pagamentosNaoVistos}
               busca={filtros.busca}
               aoAbrir={abrir}
+              selecionadaId={selecionadaId}
             />
           </>
         )}

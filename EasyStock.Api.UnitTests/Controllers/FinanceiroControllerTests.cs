@@ -2,6 +2,7 @@ using EasyStock.Api.Controllers;
 using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Financeiro.Dashboard;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
@@ -15,6 +16,7 @@ public class FinanceiroControllerTests
     private readonly IFluxoCaixaQueries _queries = Substitute.For<IFluxoCaixaQueries>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly FinanceiroController _controller;
+    private readonly RealizadoDoCaixa _caixa;
 
     private static readonly Guid _empresaId = Guid.NewGuid();
 
@@ -24,10 +26,14 @@ public class FinanceiroControllerTests
     {
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);
         _currentUser.TemPermissao(Permissao.VisualizarContasAReceber).Returns(true);
+        var calc = Substitute.For<ICaixaSaldoCalculator>();
+        calc.GetLinhasExtrasAsync(default, default, default).ReturnsForAnyArgs((IReadOnlyList<CaixaLinhaExtraResult>)[]);
+        _queries.MovimentosAvulsosDoCaixaAsync(default, default, default).ReturnsForAnyArgs((IReadOnlyList<RealizadoNoCaixaDto>)[]);
+        _caixa = new RealizadoDoCaixa(calc, _queries);
 
         _controller = new FinanceiroController(
-            new ObterDashboardFinanceiroUseCase(_queries),
-            new ObterFluxoCaixaUseCase(_queries),
+            new ObterDashboardFinanceiroUseCase(_queries, _caixa),
+            new ObterFluxoCaixaUseCase(_queries, _caixa),
             _currentUser);
     }
 

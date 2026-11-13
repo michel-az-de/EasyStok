@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/entregasApi'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
-import { CONFERENCIA_AO_VIVO_MS, POLLING_SEM_SSE_MS, RECONECTAR_MS } from './recargaAoVivo'
+import { CONFERENCIA_AO_VIVO_MS, POLLING_SEM_SSE_MS, RECONECTAR_MS, criarEsperaDeReconexao } from './recargaAoVivo'
 import {
   STATUS_KDS_DIA, STATUS_KDS_ENTREGAS, recarregaEntregasCom, releCadastroDeEntregas,
 } from '../dominio/entregasApi'
@@ -11,6 +11,8 @@ import { registrarPagamentoManual } from '../infra/api/pagamentosPedidoApi'
 import { criarRecargaDeAcao } from './recargaDeAcao'
 import { chaveDaEntrega, chaveDaSaida, criarEnvioComDesfazer, enviarPendentesAoSair } from './envioComDesfazer'
 import { criarChaveDeEnvio } from './chaveDeEnvio'
+import { criarGeracao } from './geracaoDeLeitura'
+import { criarContadorEmVoo } from './contadorEmVoo'
 import { receberEEntregar, usarEntregaPropria } from './recebimentoNaEntrega'
 
 // Entregas no modo API (F04). Pedidos e viagens recarregam a cada evento de
@@ -46,7 +48,12 @@ export function useEntregasApi({ comVitrine = true } = {}) {
   const [chamados, setChamados] = useState([])
   const [erro, setErro] = useState(null)
   const [aoVivo, setAoVivo] = useState(false)
-  const [ocupado, setOcupado] = useState(false)
+  const [emVoo, setEmVoo] = useState(0)
+  // #2379: ação em voo é contada; o boolean soltava os botões quando a primeira terminava, com outra viajando.
+  const [contador] = useState(() => criarContadorEmVoo(setEmVoo))
+  const ocupado = emVoo > 0
+  // #2379: leitura lenta e antiga não sobrescreve a nova (a mais recente vale).
+  const [geracao] = useState(criarGeracao)
   const vivoRef = useRef(true)
   // #1440: o dia do roteiro (hoje por padrão; amanhã para preparar a véspera). Pedidos do dia
   // em todos os status, janelas e bloqueios da S45 (Admin: sem permissão, a tela agrupa só
@@ -81,6 +88,7 @@ export function useEntregasApi({ comVitrine = true } = {}) {
       setDoDia(null)
     }
     const data = diaRef.current
+    const minha = geracao.nova()
     const comCadastro = releCadastroDeEntregas({
       soOperacao: alcance === SO_OPERACAO, dia: data, cadastro: cadastroRef.current, agora: Date.now(),
     })
@@ -92,8 +100,9 @@ export function useEntregasApi({ comVitrine = true } = {}) {
       comCadastro ? lerCadastro(data, comVitrineRef.current) : null,
     ])
       .then(([p, v, c, pedidosDoDia, lido]) => {
-        if (!vivoRef.current) return
-        if (lido) cadastroRef.current = lido
+        // O cadastro lido vale mesmo numa leitura superada, desde que não seja mais velho que o guardado.
+        if (lido && (!cadastroRef.current || lido.lidoEm >= cadastroRef.current.lidoEm)) cadastroRef.current = lido
+        if (!vivoRef.current || !geracao.vale(minha)) return
         // Lido só aqui: uma leitura inteira pode ter chegado enquanto esta, só de operação, viajava.
         const cadastro = cadastroRef.current
         setPedidos(p ?? [])
@@ -105,8 +114,8 @@ export function useEntregasApi({ comVitrine = true } = {}) {
         }
         setErro(null)
       })
-      .catch((e) => { if (vivoRef.current) setErro(`As entregas não carregaram: ${e.message}`) })
-  }, [])
+      .catch((e) => { if (vivoRef.current && geracao.vale(minha)) setErro(`As entregas não carregaram: ${e.message}`) })
+  }, [geracao])
 
   const mudarDia = useCallback((data) => {
     if (!data) return
@@ -124,6 +133,7 @@ export function useEntregasApi({ comVitrine = true } = {}) {
     let reconexao = null
     let polling = null
     let noAr = false
+    const esperaDeReconexao = criarEsperaDeReconexao({ base: RECONECTAR_MS })
     const recarga = criarRecargaDeAcao({
       recarregar: (inteira) => recarregar(inteira ? undefined : SO_OPERACAO),
       aoVivo: () => noAr,
@@ -136,6 +146,7 @@ export function useEntregasApi({ comVitrine = true } = {}) {
           if (evento === 'ready') {
             noAr = true
             setAoVivo(true)
+            esperaDeReconexao.zerar()
             // #2005 (console-20): SSE vivo e mudo não avisa o que não vira evento; a operação é conferida a cada 30 s.
             clearInterval(polling)
             polling = setInterval(() => recarregar(SO_OPERACAO), CONFERENCIA_AO_VIVO_MS)
@@ -148,7 +159,7 @@ export function useEntregasApi({ comVitrine = true } = {}) {
           setAoVivo(false)
           clearInterval(polling)
           polling = setInterval(() => recarregar(SO_OPERACAO), POLLING_SEM_SSE_MS)
-          reconexao = setTimeout(conectar, RECONECTAR_MS)
+          reconexao = setTimeout(conectar, esperaDeReconexao.proxima())
         },
       })
     }
@@ -168,7 +179,7 @@ export function useEntregasApi({ comVitrine = true } = {}) {
   // #1776 (item 19): a recusa que só pede confirmação (saldo a receber) não é erro: volta para a tela
   // perguntar, como `{ confirmar: valor }`.
   const executar = useCallback((chamada, falha, rele, pedeConfirmacao = null) => {
-    setOcupado(true)
+    const soltar = contador.iniciar()
     const recarga = recargaRef.current
     const marca = recarga.marcar()
     return chamada()
@@ -182,8 +193,8 @@ export function useEntregasApi({ comVitrine = true } = {}) {
         setErro(`${falha}: ${e.message}`)
         return false
       })
-      .finally(() => setOcupado(false))
-  }, [recarregar])
+      .finally(soltar)
+  }, [recarregar, contador])
 
   const acoes = {
     // Pedido de quem está na tela (botão, reagendamento): a leitura inteira.

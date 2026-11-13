@@ -695,10 +695,10 @@ await confere('4. "ao vivo" do KDS anima só opacity/transform; SLA vencido cons
   const folha = folhaDe('features/caixa-de-entrada/caixa.module.css')
   assert.equal(quadrosDe(folha, 'piscaSla'), null, 'SLA vencido não pisca sobre a conversa selecionada')
   assert.doesNotMatch(folha, /\.slaEstourado[^{}]*\{[^}]*animation/, 'o alerta de prazo permanece estático')
-  assert.match(folha, /\.cartao\.slaEstourado \.avatarCartao::after\s*\{[^}]*content:\s*'!'/, 'o prazo vencido tem marcador visível no avatar')
-  assert.match(folha, /\.cartao\.slaEstourado \.avatarCartao::after\s*\{[^}]*background:\s*var\(--erro\)/, 'o marcador usa o tom de perigo')
-  assert.match(folhaDe('features/caixa-de-entrada/CartaoConversa.jsx'), /slaEstourado && <span className="sr">, prazo de resposta estourado<\/span>/, 'o prazo vencido também é anunciado ao leitor de tela')
-  assert.doesNotMatch(folha, /\[aria-current='true'\][^{]*\.avatarCartao::after\s*\{[^}]*(?:display:\s*none|visibility:\s*hidden|content:\s*(?:none|''|""))/, 'selecionar a conversa não esconde o marcador')
+  // #2420: o traço lateral saiu do cartão; o prazo vencido é o ícone em erro e o texto vai no nome acessível.
+  assert.doesNotMatch(folha, /\.cartao[^{}]*::before/, 'o cartão não tem traço lateral')
+  assert.match(folha, /\.sinalPrazo\s*\{[^}]*color:\s*var\(--erro\)/, 'o prazo vencido tem ícone no tom de perigo')
+  assert.match(folhaDe('features/caixa-de-entrada/CartaoConversa.jsx'), /atrasada: slaEstourado/, 'o prazo vencido também é anunciado ao leitor de tela')
 })
 
 await confere('4. topo e rodapé da moldura sem desfoque de fundo; o botão flutuante mantém', () => {

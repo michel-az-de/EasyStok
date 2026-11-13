@@ -9,6 +9,7 @@ import { CampoReais } from '../../../componentes/CampoReais'
 import { Chip } from '../../../componentes/Chip'
 import { DiferencaDaGaveta } from '../../../componentes/DiferencaDaGaveta'
 import { Pilula } from '../../../componentes/Pilula'
+import { Icone } from '../../../componentes/Icone'
 import { Modal } from '../../../componentes/Modal'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useCaixaDoDiaApi } from '../../../aplicacao/useCaixaDoDiaApi'
@@ -16,19 +17,21 @@ import { useConfirmacaoDaAbertura } from '../../../aplicacao/useConfirmacaoDaAbe
 import { useFluxoDeCaixaApi } from '../../../aplicacao/useFluxoDeCaixaApi'
 import { relerParaFechar } from '../../../aplicacao/fechamentoDoCaixa'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import {
   ROTULO_GAVETA_CONTADA_AGORA, avisoDaAberturaAConfirmar, diaMes, dicaDoSaldoInicial, gavetaDoFechamento, observacaoDaAbertura,
   observacaoDaConfirmacao, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
-  nomeDoMetodoCaixa, temMovimentoNoDia, tituloDaLinhaExtra, totaisDoFluxo,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, avisoDeDevolucoesNasTelas, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
+  nomeDoMetodoCaixa, temMovimentoNoDia, tituloDaLinhaExtra, tomDoCaixa, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
   horaCurta, lerMoeda, moeda, moedaAltaDemais, plural,
 } from '../../../dominio/formato'
 import { PromptEstorno } from './PromptEstorno'
 import { ModalFecharCaixa } from './ModalFecharCaixa'
+import { valorDoResumo } from './ValorDoResumo'
 import css from './abaCaixa.module.css'
 
 const OPCOES_METODO = METODOS_CAIXA.map((id) => ({ valor: id, rotulo: nomeDoMetodoCaixa(id) }))
@@ -186,7 +189,7 @@ function ModalLancamento({ executar, enviando, erro, aoFechar }) {
   const digitado = Boolean(categoria.trim() || centavos > 0 || descricao.trim())
 
   return (
-    <Modal titulo="Lançar entrada ou saída" aoFechar={enviando ? undefined : aoFechar} focarCampo segurarFechamento={digitado || enviando}>
+    <Modal titulo="Lançar entrada ou saída" aoFechar={enviando ? undefined : aoFechar} focarCampo segurarFechamento={enviando} confirmarDescarte={digitado}>
       {erro}
       <form
         className={css.formLancamento}
@@ -340,9 +343,9 @@ function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
       {/* Sete itens cabem numa linha só; com outro número, quatro colunas não deixam o total sozinho. */}
       <dl className={`${css.resumoLista} ${linhas.length === 6 ? '' : css.resumoEmQuatro}`}>
         {linhas.map((l) => (
-          <div key={l.rotulo} className={l.forte ? css.resumoForte : undefined}><dt>{l.rotulo}</dt><dd>{moeda(l.valor)}</dd></div>
+          <div key={l.rotulo} className={l.forte ? css.resumoForte : undefined}><dt title={l.rotulo}>{l.rotulo}</dt><dd>{valorDoResumo(l.valor)}</dd></div>
         ))}
-        <div className={css.resumoTotal}><dt>{ROTULO_TOTAL_DO_CAIXA}</dt><dd>{moeda(dia.saldoEsperado)}</dd></div>
+        <div className={css.resumoTotal}><dt>{ROTULO_TOTAL_DO_CAIXA}</dt><dd>{valorDoResumo(dia.saldoEsperado)}</dd></div>
       </dl>
       <p className={css.notaGaveta}>
         {semAbertura
@@ -402,7 +405,7 @@ function FluxoDaSemana({ hoje }) {
                 <td data-rotulo="Saiu">{moeda(l.saiu)}</td>
                 <td data-rotulo="Resultado do dia" className={l.saldo < 0 ? css.valorSaida : undefined}>{moeda(l.saldo)}</td>
                 <td data-rotulo="Caixa">
-                  <Pilula tom={SITUACAO_DO_DIA[l.situacao].tom} fina>{SITUACAO_DO_DIA[l.situacao].rotulo}</Pilula>
+                  <Pilula tom={l.desde ? tomDoCaixa({ esquecido: true }) : SITUACAO_DO_DIA[l.situacao].tom} fina>{SITUACAO_DO_DIA[l.situacao].rotulo}</Pilula>
                   {/* O dia fechado vem com os números do fechamento; o que entrou depois vem à parte (#1630). */}
                   {l.depoisDoFechamento !== 0 && (
                     <span className={css.dicaItem}>{moeda(Math.abs(l.depoisDoFechamento))} {l.depoisDoFechamento > 0 ? 'depois de fechar' : 'a menos depois de fechar'}</span>
@@ -434,6 +437,17 @@ export function AbaCaixaApi() {
   const { agora } = useAtendimento()
   const { fecharCaixa } = useAcoes()
   const caixa = useCaixaDoDiaApi({ fechamentos: 7 })
+  // #2275: o aviso soma o mesmo período dos totais: o dia, ou desde a abertura no caixa esquecido aberto.
+  const inicioDevolucoes = caixa.dia?.esquecidoAberto && caixa.dia?.abertoDesde ? caixa.dia.abertoDesde : caixa.dia?.data
+  // #2267: o pagamento do pedido cancelado está nos totais; o aviso diz que ele não é da loja.
+  const avisoDevolucoes = avisoDeDevolucoesNasTelas(useDevolucoesPendentes(Boolean(caixa.dia?.data), inicioDevolucoes, caixa.dia?.data))
+  // #2275: alerta com ícone e título curto; o corpo é o aviso de sempre.
+  const devolucoesPendentes = avisoDevolucoes && (
+    <p className={`${css.alerta} ${css.alertaAtencao}`} role="status">
+      <Icone nome="alerta" tamanho={20} className={css.alertaIcone} />
+      <span className={css.alertaCorpo}><strong className={css.alertaTitulo}>Devolução a fazer.</strong> {avisoDevolucoes}</span>
+    </p>
+  )
   const [acao, executar, limparErro] = useAcaoComRecarga(caixa.recarregar)
   const [fecharAberto, setFecharAberto] = useState(false)
   const [lancamentoAberto, setLancamentoAberto] = useState(false)
@@ -512,13 +526,14 @@ export function AbaCaixaApi() {
             ? <p className={css.corpoBloco}>Já tem dinheiro no dia, mesmo sem abrir o caixa. Ao abrir, informe só o troco: o que entrou hoje já está na conta.</p>
             : <p className={css.corpoBloco}>Nada entrou nem saiu hoje ainda.</p>}
           {comMovimento && <ResumoDoDia dia={dia} gaveta={gaveta} semAbertura />}
+          {devolucoesPendentes}
         </>
       ) : (
         <>
           <header className={css.cabecalho}>
             <div className={css.identificacao}>
               <p className={css.tituloSecao}>{titulo}</p>
-              <Pilula tom={dia.fechado ? 'neutro' : dia.esquecidoAberto ? 'aviso' : 'ok'} icone={dia.fechado ? 'lock' : undefined}>
+              <Pilula tom={tomDoCaixa({ fechado: dia.fechado, esquecido: dia.esquecidoAberto })} icone={dia.fechado ? 'lock' : undefined}>
                 {dia.fechado ? 'Fechado' : 'Aberto'}
               </Pilula>
             </div>
@@ -537,8 +552,18 @@ export function AbaCaixaApi() {
           </header>
 
           {dia.esquecidoAberto && (
-            <p className={css.avisoFechado}>
-              Este caixa ficou aberto desde {diaMes(dia.abertoDesde)}. {podeGerenciar ? 'Confira a gaveta e feche aquele dia para abrir o de hoje.' : 'Peça à gerência para fechar aquele dia antes de abrir o de hoje.'}
+            // #2275: alerta com ícone, título curto e a ação dele; quem não gerencia só lê.
+            <p className={`${css.alerta} ${css.alertaErro}`} role="alert">
+              <Icone nome="alerta" tamanho={20} className={css.alertaIcone} />
+              <span className={css.alertaCorpo}>
+                <strong className={css.alertaTitulo}>Caixa de {diaMes(dia.abertoDesde)} ainda aberto.</strong>{' '}
+                {podeGerenciar ? 'Confira a gaveta e feche aquele dia para abrir o de hoje.' : 'Peça à gerência para fechar aquele dia antes de abrir o de hoje.'}
+              </span>
+              {podeGerenciar && (
+                <Botao variante="primario" icone="lock" disabled={acao.enviando || conferindo} onClick={abrirFechamento}>
+                  Fechar o caixa de {diaMes(dia.abertoDesde)}
+                </Botao>
+              )}
             </p>
           )}
           {dia.fechado && dia.fechamento && (
@@ -559,6 +584,7 @@ export function AbaCaixaApi() {
           )}
 
           <ResumoDoDia dia={dia} gaveta={gaveta} />
+          {devolucoesPendentes}
           {!fecharAberto && avisoDoFechamento && <p className={css.avisoFechado} role="alert">{avisoDoFechamento}</p>}
           {!(podeLancar && lancamentoAberto) && acao.origem !== 'abertura' && erro}
           {avisoDePermissao}

@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output;
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace EasyStock.Infra.Async;
 
@@ -14,7 +15,7 @@ namespace EasyStock.Infra.Async;
 /// quando a fila fica vazia. Para processamento contínuo em produção, utilize um
 /// <c>BackgroundService</c> que invoque este método em loop com um intervalo de polling.
 /// </remarks>
-public sealed class BackgroundQueueService : IQueueService, IDisposable
+public sealed class BackgroundQueueService(ILogger<BackgroundQueueService>? logger = null) : IQueueService, IDisposable
 {
     private readonly ConcurrentDictionary<string, ConcurrentQueue<string>> _queues = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
@@ -47,8 +48,8 @@ public sealed class BackgroundQueueService : IQueueService, IDisposable
             }
             catch (Exception ex)
             {
-                // Log error and continue processing remaining messages
-                Console.Error.WriteLine($"Erro processando mensagem da fila {queueName}: {ex.Message}");
+                // #2285: segue com o resto da fila, mas com a exceção inteira no log (Console.Error perdia a stack).
+                logger?.LogError(ex, "Erro processando mensagem da fila {Fila}.", queueName);
             }
         }
     }

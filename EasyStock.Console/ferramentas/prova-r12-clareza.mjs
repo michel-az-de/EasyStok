@@ -45,18 +45,18 @@ let passos = 0
 const ok = (texto) => { passos += 1; console.log(`ok ${passos} - ${texto}`) }
 
 // --- 1. Origem da passagem ---------------------------------------------------
-const passagem = { motivo: 'Restrição alimentar, o automático não responde isso', em: iso(0), assumida: false }
+const passagem = { motivo: 'Restrição alimentar, o Assistente não responde isso', em: iso(0), assumida: false }
 const origem = origemDaPassagem(passagem)
 assert.equal(origem.hora, '11:05')
-assert.match(origem.longo, /^O atendimento automático não soube responder e passou para você às 11:05\./)
-assert.match(origem.longo, /Motivo: restrição alimentar, o automático não responde isso\.$/)
-assert.equal(origem.curto, 'Automático não soube responder (11:05): restrição alimentar, o automático não responde isso')
+assert.match(origem.longo, /^O Assistente não soube responder e passou para você às 11:05\./)
+assert.match(origem.longo, /Motivo: restrição alimentar, o Assistente não responde isso\.$/)
+assert.equal(origem.curto, 'Assistente não soube responder (11:05): restrição alimentar, o Assistente não responde isso')
 ok('origem da passagem diz quem passou, a hora e o motivo')
 
 assert.equal(origemDaPassagem(null), null)
 const semHora = origemDaPassagem({ motivo: null, assumida: false })
 assert.equal(semHora.hora, null)
-assert.match(semHora.curto, /^Automático não soube responder: o agente preferiu não responder sozinho$/)
+assert.match(semHora.curto, /^Assistente não soube responder: o Assistente preferiu não responder sozinho$/)
 ok('passagem antiga, sem hora nem motivo, cai no texto padrão sem inventar hora')
 
 // --- 2. A barra da conversa conta a mesma origem ------------------------------
@@ -96,15 +96,15 @@ assert.equal(proximoPassoDepoisDeResponder(respondeu(), false), null, 'automáti
 const semPedido = proximoPassoDepoisDeResponder(respondeu(), PAUSA_POR_ASSUMIR)
 assert.equal(semPedido.chave, 'encerrar-ou-aguardar')
 assert.match(semPedido.texto, /Você respondeu\./)
-assert.match(semPedido.texto, /encerre/)
-assert.match(semPedido.texto, /devolva ao automático/)
+assert.match(semPedido.texto, /conclua a conversa/)
+assert.match(semPedido.texto, /devolva ao Assistente/)
 ok('sem pedido em andamento: sugere encerrar se acabou, ou devolver e aguardar o cliente')
 
 const comPedido = proximoPassoDepoisDeResponder(respondeu({ pedido: { estado: 'preparo', itens: [] } }), true)
 assert.equal(comPedido.chave, 'aguardar')
 assert.match(comPedido.texto, /aguardar o cliente/)
-assert.match(comPedido.texto, /não encerre/)
-assert.doesNotMatch(comPedido.texto, /acabou, encerre/)
+assert.match(comPedido.texto, /não conclua/)
+assert.doesNotMatch(comPedido.texto, /acabou, conclua/)
 ok('pedido em andamento: sugere aguardar o cliente, nunca encerrar')
 
 const entregue = proximoPassoDepoisDeResponder(respondeu({ pedido: { estado: 'entregue', itens: [] } }), true)
@@ -132,7 +132,7 @@ assert.deepEqual(resumo.porMeio.map((m) => [m.nome, m.valor]), [['Pix', 85], ['m
 ok('resumo soma só os entregues, separa por meio e mostra o que falta receber')
 
 const texto = textoDoResumoDoDia(resumo, AGORA)
-assert.match(texto, /^Casa da Baba · resumo do dia 22\/09\/2026/)
+assert.match(texto, /^Casa da Babá · resumo do dia 22\/09\/2026/)
 assert.match(texto, /Entregues: 3 pedidos/)
 assert.match(texto, /0181 Ana Souza/)
 assert.doesNotMatch(texto, /Davi|Eva|Lead/)

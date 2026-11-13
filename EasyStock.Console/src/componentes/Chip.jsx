@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import css from './Chip.module.css'
+import { BotaoIcone } from './BotaoIcone'
 import { Icone } from './Icone'
 
 const radiosHabilitados = (grupo) => [...(grupo?.querySelectorAll('[role="radio"]') ?? [])]
@@ -58,9 +59,7 @@ export function Chip({
         {icone && <Icone nome={icone} tamanho={20} />}
         <span className={css.textoTag}>{children}</span>
         {onRemover && (
-          <button type="button" className={css.remover} aria-label={rotuloRemover} onClick={onRemover}>
-            <Icone nome="x" tamanho={20} />
-          </button>
+          <BotaoIcone rotulo={rotuloRemover} icone="x" className={css.remover} onClick={onRemover} />
         )}
       </span>
     )

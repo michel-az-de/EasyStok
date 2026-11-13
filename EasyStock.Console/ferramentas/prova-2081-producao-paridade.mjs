@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 // Prova da #2081: o registro de produção do console igual ao do APK piloto (banca #2073, revisor A e E).
-//   - A4: etiqueta 80x40 com QR e Code 128 do código da etiqueta, empresa no topo; a prévia abre sozinha;
+//   - A4: etiqueta 80x40 (desde a #2247, a imagem do motor do app, só com QR); a prévia abre sozinha;
 //   - A8/A10: lote ativo diz origem, quem registrou e fabricação, e reimprime (o do aparelho não);
 //   - A6: "Conectar aparelho" gera o código pela API, sem o código na URL nem no log;
 //   - A5/E7: perda sem custo diz "sem custo" e fica fora do total, que é o número da tela;
@@ -17,7 +17,8 @@ import { transformWithOxc } from 'vite'
 
 const pastaDasTelas = new URL('../src/features/gestao/producao/', import.meta.url)
 const telasCompiladas = new Map()
-for (const nome of readdirSync(pastaDasTelas).filter((n) => n.endsWith('Api.jsx'))) {
+// #2247 (v3): a prévia das etiquetas é a mesma nas duas telas e roda de verdade aqui.
+for (const nome of [...readdirSync(pastaDasTelas).filter((n) => n.endsWith('Api.jsx')), 'etiqueta/PreviaDasEtiquetas.jsx']) {
   const url = new URL(nome, pastaDasTelas)
   telasCompiladas.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
@@ -47,7 +48,7 @@ const hooks = {
     atual.efeitos.push(() => { antes?.limpar?.(); atual.valores[i].limpar = fn() })
   },
 }
-globalThis.__prova2081 = { hooks, catalogo: { cardapio: [] } }
+globalThis.__prova2081 = { motor: { png: 'data:image/png;base64,', larguraMm: 80, alturaMm: 40, recusa: null }, hooks, catalogo: { cardapio: [] } }
 const inline = (source) => ({ format: 'module', shortCircuit: true, source })
 
 registerHooks({
@@ -65,6 +66,8 @@ registerHooks({
     if (url.endsWith('/infra/fonteDados.js')) return inline("export const FONTE_API = true\nexport const API_BASE = ''\n")
     if (url.endsWith('/aplicacao/contextos.js')) return inline('export const useCatalogo=()=>globalThis.__prova2081.catalogo')
     if (url.includes('/aplicacao/acessoModulos.')) return inline('export const useAcessoModulos=()=>({acoes:{editarProducao:true},permite:()=>true})')
+    // #2247 (v3): o motor da etiqueta pede canvas e fonte, que só o navegador tem; aqui ele devolve a imagem pronta.
+    if (url.includes('/aplicacao/etiquetaDoMotor.')) return inline('export const useEtiquetaDoMotor=(e)=>(e?globalThis.__prova2081.motor:{png:null,recusa:null})')
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>String(p)})')
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))
     // Componente de fora das telas (Botao, Modal, a etiqueta) vira o próprio nome: aparece na árvore sem rodar.
@@ -121,28 +124,13 @@ const ETIQUETAS = (codigoLote = 'LOT-261026-001', quantas = 2) => ({ data: {
 } })
 
 // === A4: códigos e folha da etiqueta ==================================================
-await confere('A4: Code 128 (conjunto B) com início, verificador e fim, como o PWA', async () => {
-  const { valoresCode128, barrasDoCode128 } = await import('../src/features/gestao/producao/etiqueta/codigos.js')
-  const valores = valoresCode128('LOT-261026-001-0001')
-  assert.equal(valores[0], 104, 'começa no conjunto B')
-  assert.equal(valores.at(-1), 106, 'termina no fim')
-  const dados = valores.slice(1, -2)
-  assert.deepEqual(dados.map((v) => String.fromCharCode(v + 32)).join(''), 'LOT-261026-001-0001')
-  assert.equal(valores.at(-2), (104 + dados.reduce((s, v, i) => s + v * (i + 1), 0)) % 103)
-  const { barras, total } = barrasDoCode128('LOT-261026-001-0001')
-  // 22 símbolos de 11 módulos, o fim de 13 e 10 de silêncio de cada lado.
-  assert.equal(total, 21 * 11 + 13 + 20)
-  assert.equal(barras.reduce((s, b) => s + b.largura, 0) % 1, 0)
-  assert.equal(barras[0].x, 10)
-})
-
-await confere('A4: QR do código da etiqueta, com os três padrões de posição', async () => {
-  const { matrizDoQr, caminhoDoQr } = await import('../src/features/gestao/producao/etiqueta/codigos.js')
-  const m = matrizDoQr('LOT-261026-001-0001')
-  assert.equal(m.length, 25, 'versão 2 no nível M')
-  const quadro = (y, x) => [0, 6].every((d) => m[y][x + d] && m[y + d][x] && m[y + 6][x + d] && m[y + d][x + 6])
-  assert.ok(quadro(0, 0) && quadro(0, 18) && quadro(18, 0))
-  assert.match(caminhoDoQr(m, 2), /^M2 2h1v1h-1z/)
+// #2247 (impressão v3, G1 item 7): a etiqueta saiu do SVG próprio e passou a ser a imagem do motor
+// do app; QR, campos e recusas ficam na prova-2247-etiqueta-motor. Aqui, que a pasta não guarda mais
+// os desenhos antigos.
+await confere('A4 (#2247): a etiqueta não tem mais desenho próprio de QR e barras', async () => {
+  const pasta = readdirSync(new URL('etiqueta/', pastaDasTelas))
+  assert.equal(pasta.includes('codigos.js'), false)
+  assert.equal(pasta.includes('qrcode.js'), false)
 })
 
 await confere('A4: a folha leva a empresa e as etiquetas; a produção busca a folha do lote', async () => {
@@ -172,8 +160,8 @@ await confere('A10: lote ativo diz de onde veio, quem registrou e quando foi fab
   const { lerEstoqueDoDia, podeReimprimir } = await import('../src/aplicacao/estoqueDoDia.js')
   montarFetch([[ESTOQUE, estoque], [LOTES, lotes]])
   const [doAparelho, doConsole] = (await lerEstoqueDoDia()).pratos[0].lotes
-  assert.equal(doAparelho.origem, 'Aparelho · Rosa · fab. 25/10', '01:30 UTC é 22:30 do dia 25 em Brasília')
-  assert.equal(doConsole.origem, 'Console · você · fab. 26/10')
+  assert.equal(doAparelho.origem, 'Lançado no aparelho por Rosa · fab. 25/10', '01:30 UTC é 22:30 do dia 25 em Brasília')
+  assert.equal(doConsole.origem, 'Lançado por você · fab. 26/10')
   assert.equal(doConsole.id, 'l-con')
   assert.equal(podeReimprimir(doConsole), true)
   assert.equal(podeReimprimir(doAparelho), false, 'a etiqueta do aparelho não existe no EasyStok')
@@ -246,10 +234,14 @@ await confere('A5: perda sem custo é "sem custo", não R$ 0,00, e conta à part
   assert.equal(perdasSemCusto({ lancamentos: [lanc(), lanc({ quantidade: 12 }), lanc({ valor: 10.8 })] }), 2)
   assert.equal(textoDaPerda(lanc()), 'Perda no preparo', 'o motivo uma vez só')
   assert.equal(textoDaPerda(lanc({ motivo: 'Outro', descricao: 'Quebra da cadeia fria' })), 'Outro · Quebra da cadeia fria')
+  assert.equal(textoDaPerda(lanc({ motivo: 'Outro', descricao: 'Perda · Outro: Caiu no chão' })), 'Outro · Caiu no chão', 'o texto gerado pela API não repete o motivo')
+  for (const texto of ['Perda', 'Outro', 'LOT-TESTE']) {
+    assert.equal(textoDaPerda(lanc({ motivo: 'Outro', lote: 'LOT-TESTE', descricao: `Perda · Outro: ${texto}` })), `Outro · ${texto}`, 'preserva texto livre que coincide com metadados')
+  }
 })
 
 // === E9: custo do insumo ================================================================
-await confere('E9: o custo lê "1.500" como mil e quinhentos e guarda as casas do grama', async () => {
+await confere('E9: o custo lê "1.500" como mil e quinhentos sem arredondar antes de validar', async () => {
   const { lerCusto, criarGestaoInsumos } = await import('../src/aplicacao/insumos.js')
   assert.equal(lerCusto('1.500'), 1500)
   assert.equal(lerCusto('1.500,25'), 1500.25)
@@ -322,6 +314,15 @@ const evento = { preventDefault() {} }
 globalThis.window = { print: () => {} }
 const tela = async (nome) => (await import(new URL(`${nome}.jsx`, pastaDasTelas).href))[nome]
 
+await confere('#2305: a primeira visita mostra a grade com o passo a passo recolhido', async () => {
+  montarFetch()
+  const t = montar(await tela('AbaProducaoDoDiaApi'))
+  await t.assentar()
+  const ajuda = doTipo(t.arvore, 'details').find((no) => texto(no).includes('passo a passo'))
+  assert.equal(ajuda.props.open, false)
+  assert.ok(texto(ajuda).includes('Ver passo a passo'))
+})
+
 // === R1/R2 da revisão: alérgenos na etiqueta e o mesmo código nos três lugares =============
 const renderizarEtiqueta = async (props) => {
   const { EtiquetaDeProducao } = await import(`${urlDaEtiqueta.href}?real`)
@@ -338,22 +339,30 @@ const renderizarEtiqueta = async (props) => {
 const etiquetaBase = { id: 'e-1', sequencial: 1, codigo: 'LOT-261026-001-0001', nome: 'Lasanha Bolonhesa Clássica 1 kg', pesoG: 1000, lote: 'LOT-261026-001',
   produzidoEm: '2026-10-26T23:06:08Z', validadeEm: '2026-10-31T23:06:08Z', alergenos: [] }
 
-await confere('R1: a etiqueta declara os alérgenos que a ficha traz, em português e sem tirar QR nem barras', async () => {
-  const a = await renderizarEtiqueta({ etiqueta: { ...etiquetaBase, alergenos: ['gluten', 'lactose', 'ovo'] }, empresa: 'Casa da Baba', total: 12 })
-  assert.match(texto(a), /ALÉRGICOS: CONTÉM GLÚTEN, LACTOSE E OVO\./)
-  assert.equal(doTipo(a, 'svg').length, 2, 'QR e barras continuam')
-  const sem = await renderizarEtiqueta({ etiqueta: etiquetaBase, empresa: 'Casa da Baba', total: 12 })
-  assert.doesNotMatch(texto(sem), /ALÉRGICOS/)
+await confere('R1: a etiqueta declara os alérgenos que a ficha traz, em português; sem caber, não sai', async () => {
+  const { camposDaEtiqueta } = await import('../src/dominio/etiquetaDeProducao.js')
+  const campos = camposDaEtiqueta({ etiqueta: { ...etiquetaBase, alergenos: ['gluten', 'lactose', 'ovo'] }, empresa: 'Casa da Baba' })
+  assert.equal(campos.nota, 'ALÉRGICOS: CONTÉM GLÚTEN, LACTOSE E OVO.')
+  assert.equal(camposDaEtiqueta({ etiqueta: etiquetaBase, empresa: '' }).nota, '')
+  // #2247: a etiqueta da tela é a imagem do motor; a recusa aparece com o motivo, sem imagem.
+  const img = await renderizarEtiqueta({ etiqueta: etiquetaBase, empresa: 'Casa da Baba', total: 12 })
+  assert.equal(img.type, 'img')
+  assert.equal(img.props.alt, 'Etiqueta 1 de 12, lote LOT-261026-001')
+  assert.deepEqual(img.props.style, { width: '80mm', height: '40mm' })
+  const antes = globalThis.__prova2081.motor
+  globalThis.__prova2081.motor = { png: null, recusa: 'os alérgenos não cabem nesta etiqueta' }
+  try {
+    const recusa = await renderizarEtiqueta({ etiqueta: etiquetaBase, empresa: '', total: 1 })
+    assert.equal(recusa.props.role, 'alert')
+    assert.match(texto(recusa), /não vai sair: os alérgenos não cabem/)
+  } finally { globalThis.__prova2081.motor = antes }
 })
 
-await confere('R2: QR, barras e texto usam o mesmo código saneado', async () => {
-  const { codigoDaEtiqueta, valoresCode128 } = await import('../src/features/gestao/producao/etiqueta/codigos.js')
+await confere('R2: o QR leva o código saneado', async () => {
+  const { camposDaEtiqueta, codigoDaEtiqueta } = await import('../src/dominio/etiquetaDeProducao.js')
   assert.equal(codigoDaEtiqueta('LOT-AÇÚCAR-0001'), 'LOT-ACUCAR-0001')
   assert.equal(codigoDaEtiqueta('LOT-261026-001-0001'), 'LOT-261026-001-0001')
-  assert.deepEqual(valoresCode128('LOT-AÇÚCAR-0001'), valoresCode128('LOT-ACUCAR-0001'))
-  const e = await renderizarEtiqueta({ etiqueta: { ...etiquetaBase, codigo: 'LOT-AÇÚCAR-0001' }, empresa: '', total: 1 })
-  assert.match(texto(e), /LOT-ACUCAR-0001/)
-  assert.doesNotMatch(texto(e), /AÇÚCAR/)
+  assert.equal(camposDaEtiqueta({ etiqueta: { ...etiquetaBase, codigo: 'LOT-AÇÚCAR-0001' }, empresa: '' }).qr, 'LOT-ACUCAR-0001')
 })
 
 await confere('A4: confirmar a produção abre a prévia da etiqueta de verdade, que imprime o lote todo', async () => {
@@ -404,15 +413,22 @@ await confere('A8/A10: Estoque do dia mostra a origem e reimprime o lote do cons
   const t = montar(await tela('AbaEstoqueDoDiaApi'))
   await t.assentar()
   const linhas = andar(t.arvore, (n) => n.type === 'li' && /LOT-/.test(texto(n)))
-  assert.match(texto(linhas.find((l) => /LOT-251026-200000/.test(texto(l)))), /Aparelho · Rosa · fab\. 25\/10/)
-  assert.match(texto(linhas.find((l) => /LOT-261026-001/.test(texto(l)))), /Console · você · fab\. 26\/10/)
-  const reimprimir = doTipo(t.arvore, 'BotaoIcone').filter((b) => b.props.rotulo?.startsWith('Etiquetas do lote '))
+  assert.match(texto(linhas.find((l) => /LOT-251026-200000/.test(texto(l)))), /Lançado no aparelho por Rosa · fab\. 25\/10/)
+  assert.match(texto(linhas.find((l) => /LOT-261026-001/.test(texto(l)))), /Lançado por você · fab\. 26\/10/)
+  // #2235 (banca T1-3): o botão diz "Etiquetas" na tela, não só no ícone.
+  const reimprimir = andar(t.arvore, (n) => n.props?.icone === 'printer' && String(n.props['aria-label']).startsWith('Etiquetas do lote '))
   assert.equal(reimprimir.length, 1, 'só o lote do console')
-  assert.equal(reimprimir[0].props.rotulo, 'Etiquetas do lote LOT-261026-001')
+  assert.equal(reimprimir[0].props['aria-label'], 'Etiquetas do lote LOT-261026-001 de Lasanha Bolonhesa Clássica 1 kg')
+  assert.equal(texto(reimprimir[0]), 'Etiquetas')
   await reimprimir[0].props.onClick()
   await new Promise((r) => setTimeout(r, 80))
-  const folha = doTipo(t.renderizar(), 'FolhaImpressao')[0]
+  // #2247 (v3): reimprimir abre a mesma prévia da Produção do dia; quem imprime é o botão dela.
+  const previa = doTipo(t.renderizar(), 'Modal').find((m) => m.props.titulo === 'Etiquetas do lote LOT-261026-001')
+  assert.ok(previa, 'a reimpressão abre a prévia')
+  assert.equal(impressoes, 0, 'abrir a prévia não imprime')
+  const folha = doTipo(t.arvore, 'FolhaImpressao')[0]
   assert.equal(doTipo(folha, 'EtiquetaDeProducao').length, 11)
+  await andar(previa.props.rodape, (n) => n.type === 'Botao' && texto(n) === 'Imprimir 11 etiquetas')[0].props.onClick()
   assert.equal(impressoes, 1)
   assert.ok(chamadas.some((c) => c.url.endsWith('/api/lotes/l-con/etiquetas/render')))
   assert.doesNotMatch(texto(andar(t.arvore, (n) => n.type === 'li' && /Lasanha Bolonhesa Clássica 1 kg/.test(texto(n)) && !/LOT-/.test(texto(n)))[0]), /1 kg1 kg/, 'A16: a porção não se repete')
@@ -439,13 +455,27 @@ await confere('A5/E7/E11: Perdas mostra o total em destaque, "sem custo" na linh
   assert.ok(doTipo(topo, 'Botao').some((b) => texto(b) === 'Lançar perda'), 'o botão fica no topo, ao lado do texto')
 })
 
+const insumoDaLista = { produtoId: 's-1', nome: 'Molho sugo', unidade: 'G', saldo: 500, minimo: null, custo: null, abaixoDoMinimo: false, receitas: 0, porcoes: 0, embalagem: false }
 await confere('E11: Insumos tem "Cadastrar insumo" no topo, não uma barra solta no fim', async () => {
-  montarFetch([[(m, u) => m === 'GET' && u.includes('/producao/insumos'), { data: [] }]])
+  montarFetch([[(m, u) => m === 'GET' && u.includes('/producao/insumos'), { data: [insumoDaLista] }]])
   const t = montar(await tela('AbaInsumosApi'))
   await t.assentar()
   const topo = daClasse(t.arvore, 'topo')[0]
   assert.ok(doTipo(topo, 'Botao').some((b) => texto(b) === 'Cadastrar insumo'))
   assert.equal(doTipo(t.arvore, 'Botao').filter((b) => texto(b) === 'Cadastrar insumo').length, 1)
+})
+
+// #2235 (banca B1-B3): sem insumo, o botão mora no estado vazio com o exemplo, e "Comprar" some.
+await confere('#2235: Insumos vazio mostra exemplo e o botão no próprio bloco, sem "Comprar"', async () => {
+  montarFetch([[(m, u) => m === 'GET' && u.includes('/producao/insumos'), { data: [] }]])
+  const t = montar(await tela('AbaInsumosApi'))
+  await t.assentar()
+  const vazio = doTipo(t.arvore, 'Vazio')[0]
+  assert.ok(vazio, 'estado vazio')
+  assert.equal(texto(vazio.props.acao), 'Cadastrar insumo')
+  assert.match(texto(vazio), /molho de tomate/)
+  assert.equal(doTipo(daClasse(t.arvore, 'topo')[0], 'Botao').length, 0, 'sem botão repetido no topo')
+  assert.ok(!texto(t.arvore).includes('Comprar'), 'sem seção Comprar')
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

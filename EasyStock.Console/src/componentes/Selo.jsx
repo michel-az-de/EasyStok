@@ -4,7 +4,7 @@ import { Pilula } from './Pilula'
 // a variante do cartão do Balcão), sem CSS próprio: o Selo só fecha os tons e exige o ícone, para a
 // cor nunca informar sozinha e o estado se ler sem cor. O texto vai como filho.
 const TONS_DO_SELO = Object.freeze({
-  sucesso: 'ok', alerta: 'aviso', erro: 'perigo', marca: 'marca', neutro: 'neutro',
+  sucesso: 'ok', alerta: 'aviso', erro: 'perigo', marca: 'marca', neutro: 'neutro', info: 'info',
 })
 
 export function Selo({ tom = 'neutro', icone, children }) {

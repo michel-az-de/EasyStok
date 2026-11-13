@@ -7,11 +7,21 @@ import { permissaoDeEscrita } from '../../dominio/janela'
 import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { ModalEnviarCardapio } from './ModalEnviarCardapio'
 
+// O botão da Ficha e o item do menu ⋮ abrem o mesmo modal.
 export function CompartilharComanda({ conversa }) {
+  const [aberto, setAberto] = useState(false)
+  if (conversaEncerrada(conversa) || estaBloqueada(conversa)) return null
+  return <>
+    <Botao icone="cardapio" variante="secundario" aria-haspopup="dialog"
+      onClick={() => setAberto(true)}>Enviar cardápio</Botao>
+    {aberto && <ModalCompartilharComanda conversa={conversa} aoFechar={() => setAberto(false)} />}
+  </>
+}
+
+export function ModalCompartilharComanda({ conversa, aoFechar }) {
   const { obterLinkCardapio, enviar } = useAcoes()
   const { agora } = useAtendimento()
   const { canais } = useCatalogo()
-  const [aberto, setAberto] = useState(false)
   const canal = canalDaConversa(canais, conversa)
   const podeEnviar = permissaoDeEscrita(conversa, agora, canal).pode
   async function gerar() {
@@ -21,12 +31,7 @@ export function CompartilharComanda({ conversa }) {
     return { link: resultado.url, daLoja: resultado.daLoja, numeroComanda: numero,
       texto: textoConviteCardapio(conversa.nome, resultado.url, numero) }
   }
-  if (conversaEncerrada(conversa) || estaBloqueada(conversa)) return null
-  return <>
-    <Botao icone="cardapio" variante="secundario" aria-haspopup="dialog"
-      onClick={() => setAberto(true)}>Enviar cardápio</Botao>
-    {aberto && <ModalEnviarCardapio nomeCliente={conversa.nome} canalNome={canal.nome}
-      numeroComanda={conversa.numeroComanda} aoGerar={gerar}
-      podeEnviar={podeEnviar} aoEnviar={texto => enviar(conversa.id, texto)} aoFechar={() => setAberto(false)} />}
-  </>
+  return <ModalEnviarCardapio nomeCliente={conversa.nome} canalNome={canal.nome}
+    numeroComanda={conversa.numeroComanda} aoGerar={gerar}
+    podeEnviar={podeEnviar} aoEnviar={texto => enviar(conversa.id, texto)} aoFechar={aoFechar} />
 }

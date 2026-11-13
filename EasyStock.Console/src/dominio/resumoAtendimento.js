@@ -155,7 +155,7 @@ export function vendaDoTrecho(pedido, cardapio, desde) {
 // destes IDs); sem rótulo mapeado, mostra o próprio ID em vez de inventar
 // texto.
 const ROTULO_MARCO = {
-  'boas-vindas': 'primeira resposta automática',
+  'boas-vindas': 'primeira resposta do Assistente',
   recibo: 'pagamento confirmado',
   agradecimento: 'agradecimento enviado',
   'cobranca-pix': 'cobrança enviada',
@@ -219,9 +219,9 @@ export function avisoDoPedidoAoEncerrar(conversa, { fonteApi = false } = {}) {
   const comanda = fonteApi ? conversa.numeroComanda : null
   const quem = comanda ? `A comanda ${comanda}` : `O pedido Nº ${pedido.numero}`
   if (pedido.estado === 'aguardando') {
-    return `${quem} ainda não foi ${comanda ? 'paga' : 'pago'}. ${comanda ? 'Ela' : 'Ele'} continua valendo depois de encerrar.`
+    return `${quem} ainda não foi ${comanda ? 'paga' : 'pago'}. ${comanda ? 'Ela' : 'Ele'} continua valendo depois de concluir.`
   }
-  return `${quem} segue em preparo e entrega depois de encerrar.`
+  return `${quem} segue em preparo e entrega depois de concluir.`
 }
 
 export const ROTULO_CONVERTEU = {

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Pagamentos;
@@ -46,6 +47,8 @@ public class WebhookGatewayController(
     private static string? ErroParaGravar(string? erro) => erro is null ? null : SensitivePatterns.Redact(erro);
 
     [HttpPost("{provedor}")]
+    [RequestSizeLimit(2_000_000)] // #2401: anônimo; sem teto o Kestrel aceita 30 MB antes da assinatura.
+    [EnableRateLimiting("webhook-meta")]
     public async Task<IActionResult> Receber(string provedor, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(provedor)) return BadRequest();

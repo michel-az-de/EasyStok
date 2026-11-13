@@ -67,8 +67,8 @@ confere('o aviso entra uma vez só e a gaveta só existe no arranjo de tablet (d
   assert.ok(gaveta > tablet && gaveta < celular, '<Gaveta> fora do arranjo de tablet')
 })
 confere('sem aviso, o rodapé vazio da gaveta não ocupa espaço', () => {
-  const css = ler('app/moldura.module.css')
-  assert.match(css, /\.gaveta > h2 \+ div \+ div:empty \{ display: none; \}/)
+  const moldura = ler('app/Moldura.jsx')
+  assert.match(moldura, /<div className=\{css\.conteudoGaveta\}>\{children\}<\/div>\s*<AvisoDaAcaoApi \/>/)
 })
 confere('o aviso continua calado na demonstração e sem aviso pendente', () => {
   const faixa = semComentarios(ler('app/FaixaApi.jsx'))
@@ -84,9 +84,13 @@ confere('#1242-D1 a faixa só aparece com aviso, falha, integração parada ou s
   assert.ok(corpoDe(faixa, 'FaixaApi').includes('if (!falhou && !aviso && !integracaoParada && !vencimento) return null'))
   assert.doesNotMatch(corpoDe(faixa, 'FaixaApi'), />Sair</)
   const moldura = semComentarios(ler('app/Moldura.jsx'))
-  assert.match(corpoDe(moldura, 'MenuMais'), /chave: '__sair', titulo: sessaoPersistente \? 'Sair deste aparelho' : 'Sair'/)
-  assert.match(corpoDe(moldura, 'MenuMais'), /if \(item\.chave === '__sair'\) aoSair\?\.\(\)/)
-  assert.match(corpoDe(moldura, 'Cabecalho'), /\{aoSair && <MenuDaConta nome=\{atendente\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\} lado="abaixo"/)
+  // #2232 (M1, M2): os grupos do menu Mais moram em app/menuMais.js; a Moldura só despacha a chave.
+  const menuMais = semComentarios(ler('app/menuMais.js'))
+  assert.match(menuMais, /sair: '__sair'/)
+  assert.match(menuMais, /chave: CHAVES_DO_MENU\.sair,\s*titulo: rotuloDoSair\(sessaoPersistente\)/) // #2258 (A9/G4): o rótulo vem de componentes/contaDoMenu
+  assert.match(corpoDe(moldura, 'MenuMais'), /if \(item\.chave === CHAVES_DO_MENU\.sair\) aoSair\?\.\(\)/)
+  // #2258 (auditoria A9): tema e Sair só atrás do avatar; o avatar não depende mais de `aoSair &&`.
+  assert.match(corpoDe(moldura, 'Cabecalho'), /<MenuDaConta nome=\{atendente\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\} lado="abaixo"/)
 })
 
 // --- 2. Dia da entrega por conversa -------------------------------------------------------

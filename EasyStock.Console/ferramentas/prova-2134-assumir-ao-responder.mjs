@@ -88,7 +88,7 @@ function Cena() {
         {q.get('cena') === 'cardapio'
           ? <PainelCardapio pedido={null} aoFechar={noop} aoEscolher={noop} aoAjustar={noop} />
           : <section className={moldura.coluna + ' ' + moldura.centro}>
-              <PainelAtendimento aoAbrirNota={noop} aoAbrirGaleria={noop} aoAbrirBiblioteca={noop} />
+              <PainelAtendimento notaEmRascunho={q.get('nota') === '1'} aoAbrirNota={noop} aoAbrirGaleria={noop} aoAbrirBiblioteca={noop} />
             </section>}
       </div>
     </ContextoCatalogo></ContextoAcoes></ContextoEstado>
@@ -128,9 +128,14 @@ async function contexto({ width = 1280, height = 720 } = {}) {
     sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'prova', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa' }, usuario: { id: u } }))
   })
   const chamadasIA = []
+  const chamadasProativas = []
   await ctx.route(ORIGEM + '/**', async (rota) => {
     const url = new URL(rota.request().url())
     if (!url.pathname.startsWith('/api/')) return rota.fulfill({ contentType: 'text/html', body: pagina })
+    if (url.pathname.endsWith('/sugestao')) {
+      chamadasProativas.push(url.pathname)
+      return rota.fulfill({ json: { success: true, data: { texto: 'Vou verificar o horário de retirada para você.' } } })
+    }
     if (url.pathname.endsWith('/assistente')) {
       const corpo = rota.request().postDataJSON()
       chamadasIA.push(corpo)
@@ -139,7 +144,7 @@ async function contexto({ width = 1280, height = 720 } = {}) {
     }
     return rota.fulfill({ json: { success: true, data: [] } })
   })
-  return { ctx, chamadasIA }
+  return { ctx, chamadasIA, chamadasProativas }
 }
 async function abrir(ctx, consulta = '') {
   const pagina = await ctx.newPage()
@@ -245,11 +250,16 @@ try {
     await p.getByRole('button', { name: 'Usar sugestão' }).waitFor({ timeout: 6000 })
     assert.equal(chamadasIA.length, 1, 'ligado: uma chamada ao provedor')
 
-    const chave = p.getByRole('button', { name: /completar com tab/i })
-    assert.equal(await chave.count(), 1, 'falta a chave para desligar o completar com Tab')
-    assert.equal(await chave.getAttribute('aria-pressed'), 'true')
-    await chave.click()
-    assert.equal(await chave.getAttribute('aria-pressed'), 'false')
+    // #2185: a chave é item do menu "Mais ferramentas", e o menu fecha ao escolher.
+    const chaveDe = (pagina) => pagina.getByRole('menuitemcheckbox', { name: /sugestões de ia/i })
+    const ferramentas = (pagina) => pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
+    await ferramentas(p).click()
+    assert.equal(await chaveDe(p).count(), 1, 'falta a chave para desligar o completar com Tab')
+    assert.equal(await chaveDe(p).getAttribute('aria-checked'), 'true')
+    await chaveDe(p).click()
+    await ferramentas(p).click()
+    assert.equal(await chaveDe(p).getAttribute('aria-checked'), 'false')
+    await p.keyboard.press('Escape')
     assert.equal(await p.getByRole('button', { name: 'Usar sugestão' }).count(), 0, 'a sugestão em tela some ao desligar')
 
     chamadasIA.length = 0
@@ -258,13 +268,41 @@ try {
     assert.equal(chamadasIA.length, 0, 'desligado: nenhuma chamada ao provedor')
 
     const p2 = await abrir(ctx, 'pausado=1&u=usuario-1')
-    assert.equal(await p2.getByRole('button', { name: /completar com tab/i }).getAttribute('aria-pressed'), 'false', 'a escolha sobrevive ao recarregar')
+    await ferramentas(p2).click()
+    assert.equal(await chaveDe(p2).getAttribute('aria-checked'), 'false', 'a escolha sobrevive ao recarregar')
     const p3 = await abrir(ctx, 'pausado=1&u=usuario-2')
-    assert.equal(await p3.getByRole('button', { name: /completar com tab/i }).getAttribute('aria-pressed'), 'true', 'outro usuário no mesmo navegador segue com o padrão')
+    await ferramentas(p3).click()
+    assert.equal(await chaveDe(p3).getAttribute('aria-checked'), 'true', 'outro usuário no mesmo navegador segue com o padrão')
     await ctx.close()
   })
 
   // --- 4. fechar do cardápio com nome -----------------------------------------------------------
+  await confere('2178. sugestão ativa só preenche o rascunho após toque humano', async () => {
+    const { ctx, chamadasProativas } = await contexto({ width: 390, height: 844 })
+    const p = await abrir(ctx, 'pausado=1')
+    const usar = p.getByRole('button', { name: 'Usar no rascunho', exact: true })
+    await usar.waitFor({ timeout: 6000 })
+    assert.equal(chamadasProativas.length, 1)
+    const campo = p.getByLabel('Mensagem para o cliente', { exact: true })
+    assert.equal(await campo.inputValue(), '')
+    await usar.click()
+    assert.equal(await campo.inputValue(), 'Vou verificar o horário de retirada para você.')
+    assert.deepEqual(await ordemDe(p), [], 'aceitar não assume nem envia')
+    await ctx.close()
+  })
+  for (const width of [320, 390, 1024, 1440]) {
+    await confere(`2178. ${width}px: retomar nota e enviar cabem na tela`, async () => {
+      const { ctx } = await contexto({ width, height: 844 })
+      const p = await abrir(ctx, 'demo=1&nota=1&pausado=1')
+      await p.getByLabel('Mensagem para o cliente', { exact: true }).fill('Mensagem de teste')
+      for (const nome of ['Retomar nota interna', 'Enviar mensagem']) {
+        const caixa = await p.getByRole('button', { name: nome, exact: true }).boundingBox()
+        assert.ok(caixa && caixa.x >= 0 && caixa.x + caixa.width <= width, `${nome} fora da tela`)
+      }
+      assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      await ctx.close()
+    })
+  }
   await confere('4. o botão de fechar do cardápio tem aria-label e title', async () => {
     const { ctx } = await contexto()
     const p = await ctx.newPage()

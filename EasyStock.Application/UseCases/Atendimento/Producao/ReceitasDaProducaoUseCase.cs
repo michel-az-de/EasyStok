@@ -8,8 +8,9 @@ namespace EasyStock.Application.UseCases.Atendimento.Producao;
 /// <param name="BaixaAutomatica">D-M2-01 (#1499): produzir o prato baixa os insumos da receita.</param>
 /// <param name="Porcoes">M1.4e (#1552): quantos tamanhos de porção o prato tem. Com mais de um, a receita deve render em peso.</param>
 /// <param name="PorcoesComEmbalagem">M1.4e (#1552): quantas porções têm embalagem própria (elas não usam a embalagem da receita).</param>
+/// <param name="ProdutoId">#2235: null = prato ainda sem estoque. Montar a receita liga o prato (<see cref="LigarPratoAoEstoqueUseCase"/>).</param>
 public sealed record ReceitaDoPrato(
-    Guid CardapioItemId, Guid ProdutoId, string Nome, decimal RendimentoBase, UnidadeMedida RendimentoUnidade,
+    Guid CardapioItemId, Guid? ProdutoId, string Nome, decimal RendimentoBase, UnidadeMedida RendimentoUnidade,
     int Linhas, decimal? CustoTotal, decimal? CustoPorRendimento, bool BaixaAutomatica = false,
     int Porcoes = 0, int PorcoesComEmbalagem = 0);
 
@@ -42,18 +43,27 @@ public sealed class ReceitasDaProducaoUseCase(
         var storefront = await storefrontRepository.GetByEmpresaAsync(empresaId, ct);
         if (storefront is null || !storefront.Ativo) throw new StorefrontNaoEncontradoException();
 
+        // #2235 (banca A1): a receita vem antes da produção. Todo prato do cardápio entra; o que ainda
+        // não tem estoque vem sem produto e sem receita, e montar a receita o liga.
         var pratos = (await cardapioRepository.GetTodosDoStorefrontAsync(storefront.Id, ct))
-            .Where(i => i.ProdutoId.HasValue && !i.EstaArquivado)
+            .Where(i => !i.EstaArquivado)
             .OrderBy(i => i.OrdemExibicao).ThenBy(i => i.CriadoEm).ThenBy(i => i.Id);
 
         var lista = new List<ReceitaDoPrato>();
         foreach (var prato in pratos)
         {
-            var produto = await produtoRepository.GetByIdAsync(empresaId, prato.ProdutoId!.Value);
+            if (prato.ProdutoId is null)
+            {
+                lista.Add(new ReceitaDoPrato(prato.Id, null, LigarPratoAoEstoqueUseCase.Exibicao(prato.NomeEfetivo()),
+                    1, UnidadeMedida.Un, 0, null, null, false,
+                    prato.Variacoes.Count, prato.Variacoes.Count(v => v.EmbalagemProdutoId.HasValue)));
+                continue;
+            }
+            var produto = await produtoRepository.GetByIdAsync(empresaId, prato.ProdutoId.Value);
             if (produto is null) continue;
             var linhas = await composicaoRepository.GetByProdutoFinalAsync(empresaId, produto.Id, null, ct);
             var (total, porRendimento) = Custos(linhas.Select(Linha).ToList(), produto.RendimentoBase);
-            lista.Add(new ReceitaDoPrato(prato.Id, produto.Id, prato.NomeEfetivo() ?? produto.Nome,
+            lista.Add(new ReceitaDoPrato(prato.Id, produto.Id, LigarPratoAoEstoqueUseCase.Exibicao(prato.NomeEfetivo() ?? produto.Nome),
                 produto.RendimentoBase, produto.RendimentoUnidade, linhas.Count, total, porRendimento, produto.BaixaInsumoAutomatica,
                 prato.Variacoes.Count, prato.Variacoes.Count(v => v.EmbalagemProdutoId.HasValue)));
         }
@@ -91,10 +101,10 @@ public sealed class ReceitasDaProducaoUseCase(
     private static LinhaDaReceita Linha(ProdutoComposicao c)
     {
         var insumo = c.Insumo!;
-        decimal? custo = insumo.CustoReferencia is { } custoRef
-            ? CalculoProducaoCore.CustoNaUnidadeDoInsumo(c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custoRef.Valor)
+        decimal? custo = insumo.CustoDaFicha is { } custoRef
+            ? CalculoProducaoCore.CustoNaUnidadeDoInsumo(c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custoRef)
             : null;
-        return new LinhaDaReceita(c.InsumoId, insumo.Nome, c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custo, insumo.CustoReferencia?.Valor);
+        return new LinhaDaReceita(c.InsumoId, insumo.Nome, c.Quantidade, c.Unidade, insumo.UnidadeMedidaBase, custo, insumo.CustoDaFicha);
     }
 
     // Custo só fecha se TODA linha tem custo: total parcial pareceria barato demais.

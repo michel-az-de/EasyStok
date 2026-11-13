@@ -8,6 +8,7 @@ COPY EasyStock.Domain/EasyStock.Domain.csproj                 EasyStock.Domain/
 COPY EasyStock.Application/EasyStock.Application.csproj       EasyStock.Application/
 COPY EasyStock.Infra.Postgre/EasyStock.Infra.Postgre.csproj   EasyStock.Infra.Postgre/
 COPY EasyStock.Infra.Async/EasyStock.Infra.Async.csproj       EasyStock.Infra.Async/
+COPY EasyStock.Observabilidade/EasyStock.Observabilidade.csproj EasyStock.Observabilidade/
 COPY EasyStock.Infra.Notifications/EasyStock.Infra.Notifications.csproj EasyStock.Infra.Notifications/
 COPY EasyStock.Contracts/EasyStock.Contracts.csproj           EasyStock.Contracts/
 COPY EasyStock.Infra.Integrations/EasyStock.Infra.Integrations.csproj EasyStock.Infra.Integrations/
@@ -22,6 +23,7 @@ COPY EasyStock.Domain/             EasyStock.Domain/
 COPY EasyStock.Application/        EasyStock.Application/
 COPY EasyStock.Infra.Postgre/      EasyStock.Infra.Postgre/
 COPY EasyStock.Infra.Async/        EasyStock.Infra.Async/
+COPY EasyStock.Observabilidade/    EasyStock.Observabilidade/
 COPY EasyStock.Infra.Notifications/ EasyStock.Infra.Notifications/
 COPY EasyStock.Infra.Integrations/ EasyStock.Infra.Integrations/
 COPY EasyStock.Contracts/          EasyStock.Contracts/

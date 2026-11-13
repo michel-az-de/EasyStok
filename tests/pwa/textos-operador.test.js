@@ -162,7 +162,8 @@ module.exports = function ({ test, sandbox, runInSandbox, assert }) {
       sandbox.Date = RealDate;
       sandbox.document.getElementById = getOriginal;
     }
-    assert.ok(/LOT-261008-/.test(r.naAbertura), 'abertura mostrou o lote do dia 8: ' + r.naAbertura);
+    assert.ok(/^lote 08\/10 às /.test(r.naAbertura), 'abertura mostrou a fabricação no dia 8: ' + r.naAbertura);
+    assert.ok(r.naAbertura.includes(r.codigo), 'a identidade do lote permanece a mesma ao atravessar meia-noite');
     assert.strictEqual(r.lote, 'LOT-261008', 'lote preserva a data de fabricação escolhida');
     assert.ok(subtitulo.textContent.includes(r.codigo),
       'subtitulo mostra o mesmo codigo da etiqueta: ' + subtitulo.textContent + ' vs ' + r.codigo);

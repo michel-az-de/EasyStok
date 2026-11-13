@@ -1,24 +1,32 @@
 import { useId } from 'react'
 import css from './Campo.module.css'
 
-const descricao = (id, dica, adicional) => [dica && `${id}-dica`, adicional].filter(Boolean).join(' ') || undefined
+const descricao = (id, dica, adicional, erro) => [erro ? `${id}-erro` : dica && `${id}-dica`, adicional].filter(Boolean).join(' ') || undefined
 
-function Envelope({ id, rotulo, rotuloOculto, dica, children }) {
+// #2258 (auditoria T12, padrão "erro embaixo do próprio campo"): `erro` liga borda, aria-invalid e
+// aria-describedby no próprio campo, e o texto do erro fica colado nele, no lugar da dica.
+function Envelope({ id, rotulo, rotuloOculto, dica, erro, children }) {
   return (
     <div className={css.campo}>
       <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}</label>
       {children}
-      {dica && <p id={`${id}-dica`} className={css.dica}>{dica}</p>}
+      {erro
+        ? <p id={`${id}-erro`} className={css.erro} role="alert">{erro}</p>
+        : dica && <p id={`${id}-dica`} className={css.dica}>{dica}</p>}
     </div>
   )
 }
 
-export function CampoTexto({ rotulo, rotuloOculto, dica, tipo = 'text', id: idInformado, className, ...resto }) {
+export function CampoTexto({ rotulo, rotuloOculto, dica, erro, tipo = 'text', id: idInformado, className, ...resto }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
   return (
-    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica}>
-      <input id={id} type={tipo} className={[css.controle, className].filter(Boolean).join(' ')} {...resto} aria-describedby={descricao(id, dica, resto['aria-describedby'])} />
+    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica} erro={erro}>
+      <input
+        id={id} type={tipo} className={[css.controle, className].filter(Boolean).join(' ')}
+        aria-invalid={erro ? true : undefined} {...resto}
+        aria-describedby={descricao(id, dica, resto['aria-describedby'], erro)}
+      />
     </Envelope>
   )
 }

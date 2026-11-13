@@ -181,6 +181,34 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
     }
 
     [SkippableFact]
+    public async Task ContarRespostasDoAgente_SoSaidaDoAgenteDaConversaNaJanela()
+    {
+        // #2285: base do anti-loop de custo. Entrada, resposta da dona, outra conversa e resposta velha não contam.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa);
+        var conversa = Conversa.Abrir(empresa, "5511999990009", Agora.AddHours(-3));
+        var outra = Conversa.Abrir(empresa, "5511999990010", Agora.AddHours(-3));
+        db.AtendimentoConversas.AddRange(conversa, outra);
+        Mensagem Saida(Conversa c, AutorMensagem autor, DateTime em, string id) =>
+            Mensagem.Saida(empresa, c.Id, autor, em, TipoConteudoMensagem.Texto, "oi", externoId: id);
+        db.AtendimentoMensagens.AddRange(
+            Saida(conversa, AutorMensagem.Agente, Agora.AddMinutes(-10), "wamid.a1"),
+            Saida(conversa, AutorMensagem.Agente, Agora.AddMinutes(-50), "wamid.a2"),
+            Saida(conversa, AutorMensagem.Agente, Agora.AddMinutes(-61), "wamid.velha"),
+            Saida(conversa, AutorMensagem.Dona, Agora.AddMinutes(-5), "wamid.dona"),
+            Saida(outra, AutorMensagem.Agente, Agora.AddMinutes(-5), "wamid.outra"),
+            Mensagem.Entrada(empresa, conversa.Id, Agora.AddMinutes(-4), TipoConteudoMensagem.Texto, "oi", externoId: "wamid.in"));
+        await db.SaveChangesAsync();
+
+        var total = await new ConversaRepository(db).ContarRespostasDoAgenteDesdeAsync(empresa, conversa.Id, Agora.AddHours(-1));
+
+        total.Should().Be(2);
+    }
+
+    [SkippableFact]
     public async Task Inbox_TrazUltimaMensagemEFiltraPorBusca()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");

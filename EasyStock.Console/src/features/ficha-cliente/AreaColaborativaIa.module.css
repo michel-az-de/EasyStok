@@ -1,11 +1,12 @@
-.area { display: grid; gap: var(--e-2); margin-inline: var(--e-4); padding: var(--e-3); background: var(--elevado); min-width: 0; }
+.area { display: grid; gap: var(--e-2); margin-inline: var(--e-4); padding: var(--e-3); background: var(--elevado); border-radius: var(--r-2); min-width: 0; }
 .cabecalho { display: flex; gap: var(--e-2); align-items: center; }
 .cabecalho h3, .cabecalhoBloco h4 { margin: 0; }
 .cabecalho h3 { font-size: var(--t-apoio); flex: 1; }
-.data { color: var(--tinta-2); font-size: var(--t-minimo); }
+.data { color: var(--tinta-2); font-size: var(--t-micro); }
 .area form { display: grid; gap: var(--e-2); }
-.orientar summary { color: var(--tinta-2); min-height: var(--toque); display: flex; align-items: center; cursor: pointer; font-size: var(--t-minimo); }
-.blocos { display: grid; gap: var(--e-3); max-height: 36vh; overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+.orientar summary { color: var(--tinta-2); min-height: var(--toque); display: flex; align-items: center; cursor: pointer; font-size: var(--t-micro); }
+/* #2232 (F5): os blocos do assistente crescem com o conteúdo; quem rola é a Ficha (.conteudo). */
+.blocos { display: grid; gap: var(--e-3); min-width: 0; }
 .bloco { min-width: 0; padding: var(--e-3); background: var(--preenchimento); animation: inserir 150ms var(--ease-padrao); }
 .cabecalhoBloco { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
 .cabecalhoBloco h4 { font-size: var(--t-apoio); }

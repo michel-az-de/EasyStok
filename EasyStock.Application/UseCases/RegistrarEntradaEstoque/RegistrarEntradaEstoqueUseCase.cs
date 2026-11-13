@@ -61,6 +61,7 @@ namespace EasyStock.Application.UseCases.RegistrarEntradaEstoque
             logger.LogInformation("Registrando entrada de estoque. ProdutoId: {ProdutoId}, Quantidade: {Quantidade}", command.ProdutoId, command.Quantidade);
 
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
+            command = command with { DataEntrada = DataUtc.ParaUtc(command.DataEntrada) };
             if (command.Quantidade <= 0) throw new QuantidadeInvalidaException(command.Quantidade);
 
             var produto = await produtoRepository.GetByIdAsync(command.ProdutoId)

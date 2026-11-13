@@ -171,11 +171,11 @@ export function tempoAteInicio(pedido, agora) {
   return Math.min(1, Math.max(0, (inicio - agora) / total))
 }
 
-// Fila vazia (#1474): a cozinha mostra um dia por vez. O pedido pago para amanhã não aparece
+// Fila vazia (#1474): a cozinha mostra um dia por vez. O pedido liberado para amanhã não aparece
 // em Hoje, e a tela dizia "Cozinha em dia" como se nada faltasse.
 export const textoDaCozinhaVazia = ({ amanha }) => (amanha
-  ? 'Nenhum pedido pago para amanhã ainda.'
-  : 'Cozinha em dia hoje. O pedido pago para hoje aparece aqui sozinho; o de amanhã, em Amanhã.')
+  ? 'Nenhum pedido liberado para o preparo de amanhã ainda.'
+  : 'Cozinha em dia hoje. Os pedidos liberados para o preparo de hoje aparecem aqui; os de amanhã, em Amanhã.')
 
 // Dia da fila (#1584): "Amanhã" vale só no dia da loja em que foi escolhido (`amanhaDesde`,
 // YYYY-MM-DD). Virou o dia, a fila volta para Hoje: o amanhã de ontem é o hoje de agora, e o

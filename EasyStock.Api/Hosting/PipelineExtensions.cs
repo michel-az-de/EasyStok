@@ -3,6 +3,7 @@ using System.Reflection;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Middleware;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.HealthChecks;
 using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Storage;
@@ -306,9 +307,17 @@ public static class PipelineExtensions
             }
         });
 
+        // /health/disco (#2376): espaço livre do disco da VPS, dividido pelo Postgres e pelo OpenObserve. Fora de /health e
+        // de /health/ready: disco apertado avisa pelo vigia externo, mas não tira a API do LB.
+        app.MapHealthChecks("/health/disco", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains(DiscoHealthCheck.Tag),
+            ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
+        });
+
         app.MapHealthChecks("/health", new HealthCheckOptions
         {
-            Predicate = check => !check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag),
+            Predicate = check => !check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag) && !check.Tags.Contains(DiscoHealthCheck.Tag),
             ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
         });
 

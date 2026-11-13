@@ -17,6 +17,32 @@ export function dicaEstatica(pendencias) {
   return texto[0].toLocaleUpperCase('pt-BR') + texto.slice(1)
 }
 
+// #2424: na lista a pendência vira um rótulo curto na coluna Pendência; a nota de rodapé explica
+// só os rótulos que aparecem na tela.
+const ROTULO_DA_PENDENCIA = {
+  SemFoto: 'Sem foto',
+  SemCategoria: 'Sem categoria',
+  SemDescricao: 'Sem descrição',
+  DescricaoCurta: 'Descrição curta',
+}
+
+const LEGENDA_DA_PENDENCIA = {
+  SemFoto: 'adicione uma foto do prato pronto',
+  SemCategoria: 'escolha uma categoria',
+  SemDescricao: 'escreva o que vem no prato',
+  DescricaoCurta: `use pelo menos ${DESCRICAO_MINIMA} caracteres`,
+}
+
+export function rotuloDasPendencias(pendencias) {
+  return (pendencias ?? []).map((p) => ROTULO_DA_PENDENCIA[p]).filter(Boolean).join(', ')
+}
+
+export function legendaDasPendencias(itens) {
+  const codigos = new Set((itens ?? []).flatMap((i) => i.pendencias ?? []))
+  return Object.keys(ROTULO_DA_PENDENCIA).filter((c) => codigos.has(c))
+    .map((c) => ({ codigo: c, rotulo: ROTULO_DA_PENDENCIA[c], texto: LEGENDA_DA_PENDENCIA[c] }))
+}
+
 export const EXPLICACAO_DOS_CONTROLES = {
   filtros: 'Mostra só os pratos de hoje, os desligados ou os que ainda não têm foto.',
   categoria: 'Mostra só os pratos de uma categoria; combina com o filtro e com a busca.',

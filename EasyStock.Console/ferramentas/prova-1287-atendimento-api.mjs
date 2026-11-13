@@ -243,6 +243,37 @@ await confere('9b. cartão sem mensagens carregadas usa ultimaMensagemTexto do r
   assert.equal(previaDaConversa(conversaDaApi(resumo, [], null)).corpo, 'Obrigada!')
 })
 
+// --- #2320 ATD-6. Autoria na prévia -------------------------------------------------
+await confere('#2320 ATD-6: tradução preserva o ID de quem enviou a mensagem', () => {
+  const mensagem = mensagemDaApi({ id: 'm-equipe', direcao: 'Saida', autor: 'Dona', texto: 'Olá', enviadaPorUsuarioId: 'u-outra' })
+  assert.equal(mensagem.enviadaPorUsuarioId, 'u-outra')
+})
+
+await confere('#2320 ATD-6: prévia distingue minha mensagem da equipe pelo ID', () => {
+  const usuario = { id: 'u-atual', nome: 'Ana' }
+  const conversa = (usuarioId) => ({
+    situacaoApi: 'Assumida', assumidaPorUsuarioId: usuario.id, responsavel: usuario.nome,
+    mensagens: [mensagemDaApi({ id: 'm-equipe', direcao: 'Saida', autor: 'Dona', texto: 'Olá', enviadaPorUsuarioId: usuarioId })],
+  })
+  assert.deepEqual(previaDaConversa(conversa('u-outra'), usuario), { prefixo: 'Equipe: ', corpo: 'Olá' })
+  assert.equal(previaDaConversa(conversa(usuario.id), usuario).prefixo, 'Você: ')
+  assert.equal(previaDaConversa(conversa(null), usuario).prefixo, 'Equipe: ', 'sem autoria não atribui a mim')
+  assert.equal(previaDaConversa(conversa(usuario.id)).prefixo, 'Equipe: ', 'sem sessão não atribui a mim')
+  assert.equal(previaDaConversa(conversa(usuario.id), { nome: 'Ana' }).prefixo, 'Equipe: ', 'nome igual sem ID não comprova autoria')
+})
+
+await confere('#2320 ATD-6: prévia conserva assistente, cliente, notas e modo local', () => {
+  const usuario = { id: 'u-atual' }
+  for (const autor of ['Agente', 'Sistema']) {
+    const mensagem = mensagemDaApi({ id: 'm-auto', direcao: 'Saida', autor, status: 'Enviada', externoId: 'wamid.1', texto: 'Aviso', enviadaPorUsuarioId: usuario.id })
+    assert.equal(previaDaConversa({ situacaoApi: 'Assumida', mensagens: [mensagem] }, usuario).prefixo, 'Assistente: ')
+  }
+  const cliente = mensagemDaApi({ id: 'm-in', direcao: 'Entrada', autor: 'Cliente', texto: 'Quero uma lasanha' })
+  const nota = mensagemDaApi({ id: 'm-nota', direcao: 'Saida', autor: 'Sistema', status: 'Pendente', texto: 'Conversa assumida' })
+  assert.deepEqual(previaDaConversa({ mensagens: [cliente, nota] }, usuario), { prefixo: '', corpo: 'Quero uma lasanha' })
+  assert.equal(previaDaConversa({ mensagens: [{ dir: 'out', texto: 'Olá' }] }).prefixo, 'Você: ')
+})
+
 // --- 10. Mídia recebida ------------------------------------------------------------
 await confere('10a. mensagem com mídia traz o que o balão precisa para buscar o arquivo', () => {
   const m = mensagemDaApi({ id: 'm-foto', direcao: 'Entrada', tipoConteudo: 'Imagem', midiaChave: 'k', midiaMime: 'image/jpeg', enviadaEm: '2026-10-01T12:00:00Z' }, 'conv-1')

@@ -15,6 +15,8 @@ import { semearRespostasProntas } from '../dominio/respostas.js'
 export const CANAIS = [
   {
     nome: 'WhatsApp',
+    // #2185: só este canal tem o Assistente (`Conversa.TemAgente` no servidor).
+    temAssistente: true,
     icone: 'whatsapp',
     temJanela: true,
     horasJanela: 24,

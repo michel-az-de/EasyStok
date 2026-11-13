@@ -1,1 +1,8 @@
 .icone { flex-shrink: 0; display: block; }
+
+/* #2185 (R03): sem tamanho explícito, 1.15em da fonte do pai encaixado no degrau mais próximo da
+   escala (16, 20 ou 24 px). A primeira linha é o que navegador sem round() ainda lê. */
+.acompanha {
+  width: 1.15em; height: 1.15em;
+  width: clamp(16px, round(1.15em, 4px), 24px); height: clamp(16px, round(1.15em, 4px), 24px);
+}

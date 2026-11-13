@@ -23,8 +23,8 @@ jobs:
   build-and-test:
     name: Build + dotnet test
     runs-on: ubuntu-latest
-    # O gate atingiu 20 min no post-cache após testes aprovados; reserve tempo para finalizar o job.
-    timeout-minutes: 30
+    # Em 11/11/2026 os runs verdes levaram 29:45 a 29:56 e o limite de 30 cortou jobs sem teste falhando (#2299).
+    timeout-minutes: 45
     # Postgres efemero para os testes de integracao (EasyStock.Inventario.IntegrationTests,
     # ADR Inventario/Fatia 0). O fixture le a conn string de EASYSTOCK_IT_PG (setada no
     # step Test) e cria o role NOSUPERUSER rls_test_client sujeito a RLS. Sem este service,
@@ -97,9 +97,17 @@ jobs:
           dotnet test EasyStok.CI.slnf
           -c Release --no-build --no-restore
           --filter "Category!=ArchitectureDebt"
-          --logger "trx;LogFileName=test-results.trx"
+          --logger "trx;LogFilePrefix=test-results"
           --logger "console;verbosity=normal"
           --results-directory ./TestResults
+
+      # #2371: um teste pulado no CI não prova nada. Com o Postgres ou o Docker fora, os SkippableFact
+      # pulavam e o job ficava verde. Só passa pulo de ensaio opt-in (lista no script). O LogFilePrefix
+      # acima grava um trx por assembly; com LogFileName cada assembly sobrescrevia o anterior.
+      - name: Nenhum teste pulado fora do opt-in
+        run: |
+          bash scripts/ci/checar-testes-pulados.test.sh
+          python3 scripts/ci/checar-testes-pulados.py ./TestResults
 
       - name: Upload test results
         if: always()
@@ -119,7 +127,8 @@ jobs:
   api-integration:
     name: Api.IntegrationTests (Postgres real)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Cortado em exatos 30 min na etapa Test no master (fbda77c1f, 11/11/2026), sem teste falhando (#2299).
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -158,6 +167,9 @@ jobs:
           --logger "trx;LogFileName=api-integration.trx"
           --logger "console;verbosity=normal"
           --results-directory ./TestResults
+
+      - name: Nenhum teste pulado fora do opt-in
+        run: python3 scripts/ci/checar-testes-pulados.py ./TestResults
 
       - name: Upload test results
         if: always()

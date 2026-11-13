@@ -45,3 +45,15 @@ test('autoria do lote é atualizada em ambos os cadastros e nomes nunca viram HT
   refreshOperatorReview(document, '');
   assert.ok(labels.every(label => label.textContent === 'Não identificado'));
 });
+
+// Início é um dialog modal: navegar para outra tela por código (aviso, push,
+// salvar pedido) precisa fechá-lo, senão ele continua cobrindo a tela nova.
+test('navegar para outra tela fecha o Início que estiver aberto', () => {
+  const header = { hidden: false };
+  const document = { getElementById: () => null, querySelector: selector => (selector === '.phone > .header' ? header : null) };
+  const events = [], environment = { document, go(screen) { events.push('go:' + screen); } };
+  installAppChrome(environment, () => events.push('open'), () => events.push('close'));
+  environment.go('pedidos');
+  environment.go('home');
+  assert.deepEqual(events, ['go:pedidos', 'close', 'go:home', 'open']);
+});

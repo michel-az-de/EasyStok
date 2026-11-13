@@ -64,6 +64,9 @@ public sealed class ConvitesDeAcesso(
     /// <summary>Revoga os convites abertos do usuário (todos os canais) e devolve quantos caíram.</summary>
     public Task<int> RevogarAbertosAsync(Guid usuarioId) => tokens.InvalidarConvitesAbertosAsync(usuarioId);
 
+    /// <summary>#2201: a chave de acesso é um convite de uso único para entrar; cai com a desativação.</summary>
+    public Task<int> RevogarChavesDeAcessoAbertasAsync(Guid usuarioId) => tokens.InvalidarChavesDeAcessoAbertasAsync(usuarioId);
+
     /// <summary>
     /// Emite o convite: revoga os abertos (salvo <paramref name="revogarAbertos"/> falso, usuário recém-criado), grava um
     /// token por canal e enfileira o evento. Quem chama confere a base de link antes (<see cref="ExigirBaseDeLink"/>).

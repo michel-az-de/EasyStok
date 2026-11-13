@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -96,6 +97,93 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var devolucao = await estornos.SolicitarAsync(new SolicitarEstornoOnlineInput(EmpresaId, pedidoId, Guid.NewGuid(),
             pagamento.Id, 60m, "Pagamento a menor", UsuarioId, "Gerente", NivelAcesso.Gerente));
         devolucao.Situacao.Should().Be(PedidoEstornoOnline.Confirmado);
+    }
+
+    /// <summary>
+    /// #2262: o Extrato do Financeiro só lia contas e <c>movimentos_caixa</c>, e o recebimento de pedido mora em
+    /// <c>pedido_pagamentos</c>. O sinal pago pelo Mercado Pago tem de chegar uma vez às linhas do Caixa que o Extrato
+    /// lê, também com o webhook repetido. A devolução online confirmada sai em movimentos e não apaga a entrada.
+    /// </summary>
+    [SkippableFact]
+    public async Task SinalPagoPeloMercadoPago_EntraUmaVezNoExtratoEADevolucaoSai()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        var mp = Provedor(new());
+        await using var factory = CriarFactory(mp, NivelAcesso.Gerente);
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var pedidoId = await SemearPedidoAsync(factory, c.ClienteId, 38m, "preferencia-sinal-2262", 19m,
+            agendadoParaEm: DateTime.UtcNow.AddDays(3));
+        mp.ConsultarPagamentoAsync("pagamento-sinal-2262", Arg.Any<CancellationToken>())
+            .Returns(new PagamentoMercadoPago("pagamento-sinal-2262", "approved", null, pedidoId.ToString(), 19m,
+                DateTime.UtcNow, "pix", "bank_transfer"));
+        mp.ListarEstornosAsync("pagamento-sinal-2262", Arg.Any<CancellationToken>()).Returns((IReadOnlyList<EstornoMercadoPagoResult>)[]);
+        mp.EstornarAsync("pagamento-sinal-2262", 19m, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new EstornoMercadoPagoResult("22622262", 19m, "approved", "pagamento-sinal-2262", DateTime.UtcNow));
+
+        using (var webhook = factory.Services.CreateScope())
+        {
+            var confirmar = webhook.ServiceProvider.GetRequiredService<ConfirmarPagamentoPedidoUseCase>();
+            var input = new ConfirmarPagamentoPedidoInput(pedidoId, "pagamento-sinal-2262", "approved", 19m, "pix", "bank_transfer");
+            (await confirmar.ExecuteAsync(input)).Situacao.Should().Be(SituacaoConfirmacaoPagamento.Confirmado);
+            (await confirmar.ExecuteAsync(input)).Situacao.Should().Be(SituacaoConfirmacaoPagamento.JaConfirmado);
+        }
+
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje().ToString("yyyy-MM-dd");
+        var periodo = $"desde={hoje}&ate={hoje}";
+        var entradas = await LinhasDoCaixaAsync(client, periodo);
+        var entrada = entradas.Should().ContainSingle("o webhook repetido não duplica a entrada").Subject;
+        entrada.GetProperty("tipo").GetString().Should().Be("pagamento");
+        entrada.GetProperty("origem").GetString().Should().Be("Pedido");
+        entrada.GetProperty("metodo").GetString().Should().Be("pix");
+        entrada.GetProperty("valor").GetDecimal().Should().Be(19m);
+
+        Guid pagamentoId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(EmpresaId);
+            var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            db.SetMobileTenantContext(EmpresaId);
+            pagamentoId = (await db.Pedidos.AsNoTracking().Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId))
+                .Pagamentos.Single().Id;
+            var estornos = scope.ServiceProvider.GetRequiredService<IEstornosOnlineService>();
+            (await estornos.SolicitarAsync(new SolicitarEstornoOnlineInput(EmpresaId, pedidoId, Guid.NewGuid(),
+                pagamentoId, 19m, "Teste da devolução", UsuarioId, "Gerente", NivelAcesso.Gerente)))
+                .Situacao.Should().Be(PedidoEstornoOnline.Confirmado);
+        }
+
+        using var movimentos = JsonDocument.Parse(await client.GetStringAsync($"/api/caixa/movimentos?{periodo}"));
+        var saida = movimentos.RootElement.GetProperty("data").EnumerateArray().Should().ContainSingle().Subject;
+        saida.GetProperty("tipo").GetString().Should().Be("saida");
+        saida.GetProperty("valor").GetDecimal().Should().Be(19m);
+        (await LinhasDoCaixaAsync(client, periodo)).Should().ContainSingle("a devolução sai à parte e a entrada fica no histórico")
+            .Which.GetProperty("valor").GetDecimal().Should().Be(19m);
+        using var dia = JsonDocument.Parse(await client.GetStringAsync("/api/caixa/dia"));
+        var caixa = dia.RootElement.GetProperty("data");
+        caixa.GetProperty("totalPagamentosPedidos").GetDecimal().Should().Be(19m, "o Extrato e o Caixa somam a mesma entrada");
+        caixa.GetProperty("totalSaidasExtras").GetDecimal().Should().Be(19m, "e a mesma saída");
+
+        // #2268: o realizado dos Relatórios e a visão geral somam o mesmo que o Extrato no período.
+        // Como o Console: início e fim do dia de Brasília em UTC.
+        var (iniDia, fimDia) = EasyStock.Application.Common.HorarioBrasil.JanelaDiaUtc();
+        using var fluxo = JsonDocument.Parse(await client.GetStringAsync(
+            $"/api/financeiro/fluxo-caixa?periodicidade=Diario&inicio={iniDia:yyyy-MM-ddTHH:mm:ss.fffZ}&fim={fimDia.AddMilliseconds(-1):yyyy-MM-ddTHH:mm:ss.fffZ}"));
+        var linha = fluxo.RootElement.GetProperty("data").EnumerateArray().Should().ContainSingle().Subject;
+        linha.GetProperty("realizadoReceber").GetDecimal().Should().Be(19m, "o sinal do Mercado Pago entra no Recebido");
+        linha.GetProperty("realizadoPagar").GetDecimal().Should().Be(19m, "a devolução entra no Pago");
+        linha.GetProperty("realizadoReceberCaixa").GetDecimal().Should().Be(19m);
+        using var visao = JsonDocument.Parse(await client.GetStringAsync("/api/financeiro/dashboard"));
+        var resumo = visao.RootElement.GetProperty("data");
+        resumo.GetProperty("totalRecebidoMes").GetDecimal().Should().Be(19m, "o Recebido no mês inclui o sinal");
+        resumo.GetProperty("totalPagoMes").GetDecimal().Should().Be(19m, "e o Pago no mês a devolução");
+    }
+
+    private static async Task<List<JsonElement>> LinhasDoCaixaAsync(HttpClient client, string periodo)
+    {
+        using var resposta = await client.GetAsync($"/api/caixa/linhas?{periodo}");
+        resposta.StatusCode.Should().Be(HttpStatusCode.OK, await resposta.Content.ReadAsStringAsync());
+        using var json = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("data").EnumerateArray().Select(l => l.Clone()).ToList();
     }
 
     private static async Task<Guid> SemearPedidoAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory,

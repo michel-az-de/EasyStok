@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
+using EasyStock.Domain.Financeiro;
 
 namespace EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 
@@ -16,7 +17,10 @@ public sealed record RegistrarMovimentoCaixaCommand(
     DateTime? DataMovimento = null,
     Guid? RegistradoPorUserId = null,
     [property: MaxLength(120)] string? RegistradoPorNome = null,
-    [property: MaxLength(20)] string? Origem = "web");
+    [property: MaxLength(20)] string? Origem = "web",
+    // #2319: só o lançamento manual do operador liga isto (o controller força, nunca vem do body). Pagamento de pedido,
+    // webhook, estorno e sync do app seguem sem exigir caixa aberto.
+    bool ExigirCaixaAberto = false);
 
 public class RegistrarMovimentoCaixaUseCase(
     ICaixaRepository repo,
@@ -24,6 +28,8 @@ public class RegistrarMovimentoCaixaUseCase(
     ObterCaixaDiaUseCase obterCaixaDia,
     ILogger<RegistrarMovimentoCaixaUseCase> logger)
 {
+    public const string CaixaAbertoMensagem = "Abra o caixa antes de lançar.";
+
     private static readonly TimeSpan ToleranciaDeRelogio = TimeSpan.FromMinutes(5);
 
     public async Task<MovimentoCaixaResult> ExecuteAsync(RegistrarMovimentoCaixaCommand cmd)
@@ -36,15 +42,34 @@ public class RegistrarMovimentoCaixaUseCase(
 
         if (cmd.Valor <= 0)
             throw new UseCaseValidationException("Valor deve ser maior que zero.");
-
-        var dataMov = cmd.DataMovimento ?? DateTime.UtcNow;   // timestamp do movimento (UTC, armazenado)
-        var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
         var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
+        // O mobile envia fato já gravado no aparelho: arredonda em vez de recusar, para a mutação não virar rejeição permanente.
+        if (origem == "mobile") cmd = cmd with { Valor = decimal.Round(cmd.Valor, 2, MidpointRounding.AwayFromZero) };
+        ValidacaoCaixa.ExigirValorMonetario(cmd.Valor, "Valor");
+
+        var dataMov = DataUtc.ParaUtc(cmd.DataMovimento ?? DateTime.UtcNow);
+        var data = HorarioBrasil.DataOperacional(dataMov);    // dia operacional em Brasilia (alinha com o card; BUG-09)
+
+        // O mobile promove fatos já gravados no aparelho: não recusa forma antiga, só normaliza a conhecida.
+        cmd = cmd with { Metodo = origem == "mobile"
+            ? MetodosPagamentoCaixa.Normalizar(cmd.Metodo) ?? cmd.Metodo
+            : ValidacaoCaixa.NormalizarMetodo(cmd.Metodo) };
 
         // #1615: lançamento retroativo é uso legítimo; no futuro ele some do caixa de hoje e cai num
         // dia que ainda não abriu. O mobile fica de fora: a hora vem do relógio do aparelho.
         if (origem != "mobile" && dataMov > DateTime.UtcNow.Add(ToleranciaDeRelogio))
             throw new UseCaseValidationException("Data do lançamento não pode estar no futuro.");
+
+        if (cmd.ExigirCaixaAberto)
+        {
+            var abertura = await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId)
+                ?? throw new UseCaseValidationException(CaixaAbertoMensagem);
+            // ADR-0034: o fechamento cobre o dia da abertura; movimentos de hoje ficam no caixa de hoje.
+            var diaDaAbertura = HorarioBrasil.DataOperacional(abertura.DataMovimento);
+            if (data != diaDaAbertura && data != HorarioBrasil.Hoje())
+                throw new UseCaseValidationException(
+                    $"O lançamento manual deve usar o dia da abertura ({diaDaAbertura:dd/MM/yyyy}) ou hoje. Revise a data informada.");
+        }
 
         // Bloquear lançamento em dia já fechado (preserva integridade do snapshot).
         await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId,

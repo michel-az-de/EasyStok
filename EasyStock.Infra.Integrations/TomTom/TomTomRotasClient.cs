@@ -2,7 +2,10 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using EasyStock.Application.Ports.Output.Lookup;
+using EasyStock.Infra.Integrations.Resilience;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Registry;
 
 namespace EasyStock.Infra.Integrations.TomTom;
 
@@ -20,13 +23,15 @@ public sealed class TomTomRotasClient : IRotaClient
 {
     private readonly HttpClient _http;
     private readonly string _apiKey;
+    private readonly ResiliencePipelineProvider<string> _pipelines;
     private readonly ILogger<TomTomRotasClient> _logger;
 
-    public TomTomRotasClient(HttpClient http, string apiKey, ILogger<TomTomRotasClient> logger)
+    public TomTomRotasClient(HttpClient http, string apiKey, ResiliencePipelineProvider<string> pipelines, ILogger<TomTomRotasClient> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
         _http = http;
         _apiKey = apiKey;
+        _pipelines = pipelines;
         _logger = logger;
     }
 
@@ -40,7 +45,9 @@ public sealed class TomTomRotasClient : IRotaClient
 
         try
         {
-            using var resp = await _http.GetAsync(url, ct);
+            // #2177: GET repete 1 vez a falha passageira; o disjuntor é da TomTom, separado do Google.
+            using var resp = await _pipelines.GetPipeline(IntegrationCategories.TomTom)
+                .ExecuteAsync(async pollyCt => await _http.GetAsync(url, pollyCt), ct);
             if (!resp.IsSuccessStatusCode)
             {
                 TomTomLog.Http(_logger, "Routing", (int)resp.StatusCode);
@@ -57,6 +64,11 @@ public sealed class TomTomRotasClient : IRotaClient
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             _logger.LogDebug("TomTom Routing timeout");
+            return null;
+        }
+        catch (ExecutionRejectedException)
+        {
+            _logger.LogDebug("TomTom Routing recusado pelo Polly (disjuntor aberto ou timeout)");
             return null;
         }
         catch (HttpRequestException ex)

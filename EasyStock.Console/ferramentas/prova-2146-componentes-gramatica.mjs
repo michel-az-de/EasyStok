@@ -123,13 +123,13 @@ if (!pastaDoPlaywright) {
   const dicaVisivel = (pagina) => pagina.locator('[role="tooltip"]').filter({ visible: true })
   const esperar = (pagina, ms) => pagina.waitForTimeout(ms)
   async function abrirFerramentas(pagina, celular = false) {
-    const resumo = pagina.locator('summary[aria-label="Mais ferramentas"]')
-    await resumo.waitFor({ state: 'visible' })
-    if (!await resumo.evaluate((el) => el.closest('details').open)) {
-      if (celular) await resumo.tap()
-      else await resumo.click()
+    const gatilho = pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
+    await gatilho.waitFor({ state: 'visible' })
+    if (await gatilho.getAttribute('aria-expanded') !== 'true') {
+      if (celular) await gatilho.tap()
+      else await gatilho.click()
     }
-    await pagina.getByRole('button', { name: 'Nota interna', exact: true }).waitFor({ state: 'visible' })
+    await pagina.getByRole('menu', { name: 'Mais ferramentas', exact: true }).waitFor({ state: 'visible' })
   }
 
   try {
@@ -207,7 +207,7 @@ if (!pastaDoPlaywright) {
       assert.ok(Math.round(tempo.abriu - tempo.inicio) >= 500, 'o relógio do navegador confirmou a espera de500ms')
       const dica = dicaVisivel(pagina)
       assert.equal(await dica.count(), 1, 'não apareceu depois de 500 ms')
-      assert.equal(await dica.innerText(), 'Nota interna: fica na ficha, o cliente nunca vê')
+      assert.equal(await dica.innerText(), 'Anotar para a equipe sem sair da conversa')
       const descrito = (await nota.getAttribute('aria-describedby')) ?? ''
       assert.ok(descrito.split(' ').includes(await dica.getAttribute('id')), 'o botão não aponta para a dica')
       // Acima do botão (cabe acima).
@@ -233,25 +233,49 @@ if (!pastaDoPlaywright) {
       await contexto.close()
     })
 
-    await confere('3. nota no menu: teclado mostra a dica, Escape fecha menu e devolve foco ao abridor', async () => {
-      const { contexto, pagina } = await abrir()
-      await abrirFerramentas(pagina)
+    await confere('3. nota direta: teclado mostra a dica e Escape fecha a dica', async () => {
+      const { contexto, pagina, campo } = await abrir()
+      const nota = pagina.getByRole('button', { name: 'Nota interna', exact: true })
+      await campo.click()
       await pagina.keyboard.press('Tab')
-      await pagina.getByRole('button', { name: 'Nota interna', exact: true }).focus()
+      await pagina.keyboard.press('Tab')
+      assert.equal(await nota.evaluate((el) => document.activeElement === el), true)
       await esperar(pagina, 700)
-      assert.equal(await dicaVisivel(pagina).innerText(), 'Nota interna: fica na ficha, o cliente nunca vê')
+      assert.equal(await dicaVisivel(pagina).innerText(), 'Anotar para a equipe sem sair da conversa')
       await pagina.keyboard.press('Escape')
       await esperar(pagina, 50)
       assert.equal(await dicaVisivel(pagina).count(), 0)
-      const resumo = pagina.locator('summary[aria-label="Mais ferramentas"]')
-      assert.equal(await resumo.evaluate((el) => document.activeElement === el), true)
-      assert.equal(await resumo.evaluate((el) => el.closest('details').open), false)
+      assert.equal(await nota.evaluate((el) => document.activeElement === el), true)
       await contexto.close()
     })
+
+    await confere('3. ferramentas: Escape fecha menu e devolve foco ao abridor', async () => {
+      const { contexto, pagina } = await abrir()
+      await abrirFerramentas(pagina)
+      await pagina.keyboard.press('Escape')
+      const gatilho = pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
+      assert.equal(await gatilho.evaluate((el) => document.activeElement === el), true)
+      assert.equal(await gatilho.getAttribute('aria-expanded'), 'false')
+      await contexto.close()
+    })
+
+    for (const [texto, menuAberto] of [['Rascunho interrompido', true], ['/cardapio', false]]) {
+      await confere(`2178. nota preserva "${texto}" e recolhe ferramentas`, async () => {
+        const { contexto, pagina, campo } = await abrir()
+        await campo.fill(texto)
+        if (menuAberto) await abrirFerramentas(pagina)
+        await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+        assert.equal(await campo.inputValue(), texto)
+        assert.equal(await pagina.getByRole('button', { name: 'Mais ferramentas', exact: true }).getAttribute('aria-expanded'), 'false')
+        await contexto.close()
+      })
+    }
 
     await confere('3. toque (hasTouch, isMobile): nem hover nem foco mostram a dica', async () => {
       const { contexto, pagina, campo } = await abrir({ largura: 390, altura: 844, celular: true })
       await abrirFerramentas(pagina, true)
+      // #2185: no celular o menu vira folha no pé da tela, por cima da barra; fecha antes do hover.
+      await pagina.keyboard.press('Escape')
       await pagina.getByRole('button', { name: 'Nota interna', exact: true }).hover()
       await esperar(pagina, 700)
       assert.equal(await dicaVisivel(pagina).count(), 0, 'apareceu no hover em toque')

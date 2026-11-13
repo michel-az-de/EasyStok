@@ -24,22 +24,15 @@
 }
 .cartao:hover { background: var(--preenchimento); }
 .cartao:active:not(:disabled) { background: var(--preenchimento-forte); }
-/* Selecionada: fundo tinto, pastilha suave. */
-.cartao[aria-current='true'] { background: var(--preenchimento-forte); box-shadow: none; }
-/* Atenção e atraso usam marcador no avatar; o preenchimento identifica a seleção. */
+/* #2420: selecionada no âmbar claro da marca, sem traço lateral. */
+.cartao[aria-current='true'] { background: var(--marca-claro); box-shadow: none; }
+/* #2420 (pedido do Felipe, 12/11): o trilho lateral de atenção e atraso saiu do cartão. O sinal fica
+   no ícone ao lado da hora (`.sinalPrazo` em erro, `.sinalAtencao` em alerta, #2258 T7), na hora em
+   vermelho do prazo estourado e no nome acessível (WCAG 1.4.1). */
+.cartao { position: relative; }
 /* Avatar com o selo do canal no canto (rodada 6c). */
 .avatarCartao { position: relative; flex-shrink: 0; margin-top: 1px; }
-.cartao.precisa .avatarCartao::after,
-.cartao.atrasada .avatarCartao::after,
-.cartao.slaEstourado .avatarCartao::after {
-  content: '!'; position: absolute; inset: -3px -3px auto auto;
-  display: grid; place-items: center; width: 18px; height: 18px;
-  border-radius: var(--r-1); background: var(--alerta); color: var(--papel);
-  font-size: var(--t-minimo); font-weight: 800;
-}
-.cartao.atrasada .avatarCartao::after,
-.cartao.slaEstourado .avatarCartao::after { background: var(--erro); color: var(--sobre-erro); }
-/* O prazo vencido mantém o marcador e o texto acessível, sem piscar. */
+/* O prazo vencido mantém o ícone e o texto acessível, sem piscar. */
 .cartao.slaEstourado { box-shadow: none; }
 .cartao.slaEstourado[aria-current='true'] { box-shadow: none; }
 
@@ -48,7 +41,7 @@
 /* Linha 1: nome à esquerda, hora à direita. */
 .topo { display: flex; align-items: center; gap: var(--e-2); min-width: 0; width: 100%; }
 .topo strong {
-  font-family: var(--f-corpo); font-weight: 600; font-size: var(--t-corpo);
+  font-family: var(--f-corpo); font-weight: 600; font-size: var(--t-forte);
   line-height: var(--lh-compacto); min-width: 0; color: var(--tinta);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
 }
@@ -60,9 +53,8 @@
   font-family: var(--f-dado); font-size: var(--t-micro); font-weight: 400;
   color: var(--tinta-3); font-variant-numeric: tabular-nums;
 }
-/* Mensagem esperando: a hora ganha a cor da marca, como o contador. */
-.topo time.horaNova { color: var(--marca); font-weight: 600; }
-.cartao[aria-current='true'] .topo time.horaNova { color: var(--tinta); }
+/* #2232 (L8): a hora é neutra; só o prazo de resposta estourado pede a cor de alerta. */
+.topo time.horaAtrasada { color: var(--erro); font-weight: 600; }
 
 /* Linha 2: prévia em largura cheia e o número de mensagens sem resposta. */
 .linhaPrevia { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -70,54 +62,25 @@
 .previa {
   flex: 1; min-width: 0; display: block;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  color: var(--tinta-2); font-size: var(--t-apoio);
+  color: var(--tinta-2); font-size: var(--t-corpo);
 }
 .prefixo { display: inline-flex; align-items: center; gap: 2px; margin-right: 4px; color: var(--tinta-3); vertical-align: -2px; }
 
-/* Contador de mensagens sem resposta: o número no círculo da marca. O texto
-   inteiro vai no rótulo acessível e no title. */
-.naoLidas {
-  flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 6px;
-  display: inline-grid; place-items: center; border-radius: var(--r-1);
-  background: var(--acao); color: var(--sobre-acao);
-  font-size: var(--t-minimo); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;
-  animation: estalarPonto var(--dur-longa) var(--ease-pulo) both;
-}
 @keyframes estalarPonto { from { transform: scale(0); } to { transform: none; } }
 
 /* Linha 3, miúda: quem está com a conversa (ou o motivo de precisar dela)
-   e o contexto que existir, separados por ponto. Sem caixa, exceto o que
-   espera ação dela, que ganha a pastilha esfumaçada âmbar ou vermelha. */
+   e o contexto que existir, cada um na sua `Pilula` em linha. */
 /* #1761 (L16): etiqueta de contexto que não cabe inteira some, em vez de cortar em "Automático
    não s…". A linha quebra e só a primeira fileira aparece; o texto todo segue no `title`. */
 .contextoLinha {
-  display: flex; flex-wrap: wrap; align-items: center; min-width: 0; overflow: hidden;
+  display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
   font-size: var(--t-micro); line-height: 1.35; height: 1.5em; color: var(--tinta-3); white-space: nowrap;
 }
-/* Uma linha só: o estado nunca encolhe; o contexto encolhe com reticência e
-   vai inteiro no `title` da linha. */
-.estado, .itemContexto { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
-.estado { font-weight: 600; flex-shrink: 0; }
-.estado, .itemContexto { height: 1.5em; padding-inline: 6px; border-radius: var(--r-1); background: var(--preenchimento); }
-.itemContexto { flex-shrink: 0; max-width: 100%; }
-.itemContexto svg { flex-shrink: 0; }
-.textoContexto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.itemContexto::before { content: none; margin: 0; color: var(--tinta-3); font-weight: 400; }
-/* #1868: sem a etiqueta do estado, o contexto abre a linha sem o ponto na frente. */
-.contextoLinha > .itemContexto:first-child::before { content: none; }
-.estado_ok { color: var(--sucesso); }
-.estado_marca { color: var(--marca); }
-.estado_aviso, .estado_perigo { padding: 0 7px; border-radius: var(--r-1); }
-.estado_aviso { color: var(--alerta); background: var(--alerta-pastel); }
-.estado_perigo { color: var(--erro); background: var(--erro-pastel); }
-.contexto_ok { color: var(--sucesso); }
-.contexto_aviso { color: var(--alerta); }
-.contexto_marca { color: var(--marca); }
 
 /* Rodada 10, item 2: selo "novo, não visto" do pagamento, independente do
    sinal verde (RN-25) já ter expirado. Some assim que ela abre a conversa. */
 .pontoNaoVisto {
-  width: 8px; height: 8px; border-radius: 50%; background: var(--sucesso); flex-shrink: 0;
+  width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula); background: var(--sucesso); flex-shrink: 0;
   animation: estalarPonto var(--dur-longa) var(--ease-pulo) both;
 }
 
@@ -126,30 +89,12 @@
   padding: 0 var(--e-3) var(--e-2); display: grid; gap: var(--e-2);
   background: var(--papel); flex-shrink: 0;
 }
-.cabecalhoLista { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: 64px; }
+.cabecalhoLista { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); min-height: var(--altura-regiao); }
 .cabecalhoLista h2 { margin: 0 auto 0 0; font-size: var(--t-titulo); font-weight: 700; }
-.cabecalhoLista h2 span { margin-left: var(--e-1); color: var(--tinta-2); font-size: var(--t-minimo); font-weight: 400; }
 .painelFiltros { display: grid; gap: var(--e-3); }
 .canaisNoFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; margin: 0; padding: 0; border: 0; }
-.canaisNoFiltro legend { color: var(--tinta-2); font-size: var(--t-minimo); margin-bottom: var(--e-2); }
+.canaisNoFiltro legend { color: var(--tinta-2); font-size: var(--t-micro); margin-bottom: var(--e-2); }
 .filtroResponsavel { display: flex; align-items: center; gap: var(--e-2); color: var(--tinta-2); font-size: var(--t-micro); }
-/* #1868: linha B com os chips e o Responsável. Em linha de 396 px ou mais, na mesma linha (o
-   rótulo vira texto de leitor de tela); mais estreita, o Responsável desce inteiro, com o rótulo.
-   O contêiner é a própria linha: nada nela abre popover que a contenção prenderia. */
-.linhaB {
-  container-type: inline-size; container-name: linha-balcao;
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); min-width: 0;
-}
-.linhaB > .filtros { flex: 1 1 100%; }
-@container linha-balcao (min-width: 396px) {
-  .linhaB > .filtros { flex: 1 1 0; }
-  .linhaB > .filtroResponsavel { flex-shrink: 0; margin-left: auto; }
-  .linhaB > .filtroResponsavel select { min-width: 0; }
-  .linhaB .rotuloResponsavel {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-  }
-}
 .filtroResponsavel select { min-width: 100px; min-height: var(--toque); padding: 0 var(--e-2); border: 0; border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta); font: inherit; }
 
 /* Linha A: busca com lupa e × dentro do campo, botão de ordenar do lado. */
@@ -166,15 +111,12 @@
 }
 .entradaBusca:focus { outline: none; }
 .entradaBusca::-webkit-search-cancel-button { display: none; }
-.limparBusca {
-  flex-shrink: 0; width: var(--toque); height: var(--toque); margin: 0 calc(-1 * var(--e-3));
-  display: grid; place-items: center; background: none; border: 0; color: var(--tinta-2);
-}
+.limparBusca { margin: 0 calc(-1 * var(--e-3)); }
 .comOrdenar { position: relative; flex-shrink: 0; }
 .botaoOrdenar { position: relative; width: var(--toque); height: var(--toque); padding: 0; }
 .pontoOrdem {
-  position: absolute; top: 6px; right: 6px; width: 10px; height: 10px;
-  border-radius: var(--r-1); background: var(--marca); border: var(--b-1) solid var(--papel);
+  position: absolute; top: 6px; right: 6px; width: var(--ponto); height: var(--ponto);
+  border-radius: var(--r-pilula); background: var(--marca); border: var(--b-1) solid var(--papel);
 }
 .menuOrdem { display: grid; min-width: 260px; }
 .itemOrdem {
@@ -196,34 +138,26 @@
   mask-image: none;
 }
 .filtros::-webkit-scrollbar { display: none; }
-/* Mesmo alvo dos controles: parado é
-   preenchimento sem contorno, ligado ganha fundo e anel da marca. A forma
-   muda junto com a cor (WCAG 1.4.1). */
+/* #2232 (L6): parado tem contorno visível (era texto solto, não parecia tocável); ligado é a
+   cor de ação cheia. A forma muda junto com a cor (WCAG 1.4.1). */
 .chipFiltro {
   flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
-  min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-1);
-  border: 0; background: transparent; color: var(--tinta-2);
+  min-height: var(--toque); padding: 0 var(--e-3); border-radius: var(--r-pilula);
+  border: var(--b-1) solid var(--linha-media); background: transparent; color: var(--tinta-2);
   font-size: var(--t-micro); font-weight: 600; white-space: nowrap;
   transition: background-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao);
 }
 .chipFiltro:hover:not(.chipLigado) { background: var(--preenchimento-forte); color: var(--tinta); }
 .chipLigado {
-  background: var(--marca-claro); color: var(--marca);
+  background: var(--acao); color: var(--sobre-acao); border-color: var(--acao);
   box-shadow: none;
 }
-.numeroChip {
-  display: inline-block; font-family: var(--f-dado); font-weight: 700;
-  font-variant-numeric: tabular-nums; color: inherit;
-}
-/* Alguém espera ação dela: o número do filtro fica âmbar, sem gritar. */
-.chipAtencao:not(.chipLigado) .numeroChip { color: var(--alerta); }
 .chipCanal { position: relative; padding: 0 10px; gap: 5px; }
 .chipCanal svg { width: 16px; height: 16px; flex-shrink: 0; }
 .pontoPrecisa {
-  position: absolute; top: 3px; right: 3px; width: 7px; height: 7px;
-  border-radius: var(--r-1); background: var(--alerta); box-shadow: 0 0 0 2px var(--elevado);
+  position: absolute; top: 3px; right: 3px; width: var(--ponto); height: var(--ponto);
+  border-radius: var(--r-pilula); background: var(--alerta); box-shadow: 0 0 0 2px var(--elevado);
 }
-.divisorFiltros { flex-shrink: 0; width: 1px; height: 18px; background: var(--linha-media); margin: 0 2px; }
 /* Pulso breve quando o número sobe. O global de prefers-reduced-motion
    (base.css) esmaga a duração, então quem pediu menos movimento não vê pulo. */
 .pulso { animation: pulsoContador var(--dur-longa) var(--ease-pulo); }
@@ -232,16 +166,6 @@
   to { transform: none; }
 }
 
-/* Lista vazia em uma linha (#1442), no lugar do bloco grande. */
-.vazioLinha {
-  margin: 0; padding: var(--e-4) var(--e-4) var(--e-3);
-  font-size: var(--t-apoio); color: var(--tinta-3);
-}
-.linkVazio {
-  margin-left: 6px; padding: 0; border: 0; background: none;
-  color: var(--marca); font: inherit; font-weight: 600; cursor: pointer;
-}
-.linkVazio:hover, .linkVazio:focus-visible { text-decoration: underline; }
 
 /* Grupos recolhidos do fim de "Todas": Encerradas e Bloqueados (seção 1). */
 .grupo { border-top: var(--b-1) solid var(--linha); }
@@ -260,13 +184,21 @@
 .canal_instagram { color: var(--c-instagram); }
 
 /* S59 (#1391): faixa e lista de "Não entregues". */
+/* #2232 (L11): a faixa encolhe (ocupava a altura de dois cartões), diz a ação ("Revisar") e pode
+   ser dispensada até chegar falha nova. */
+/* #2420: alerta separado dos estados de atendimento, numa caixa própria acima da lista. */
 .faixaNaoEntregues {
-  display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--toque);
-  padding: 8px 16px; border: 0; border-bottom: 1px solid var(--linha);
+  display: flex; align-items: center; gap: var(--e-2); width: calc(100% - 2 * var(--e-2));
+  margin: var(--e-2); border: var(--b-1) solid color-mix(in srgb, var(--erro) 24%, transparent); border-radius: var(--r-1);
   background: var(--erro-pastel); color: var(--erro);
-  font: inherit; font-size: 1rem; font-weight: 600; text-align: left; cursor: pointer;
+  font-size: var(--t-apoio); font-weight: 600;
 }
-.faixaNaoEntregues:hover, .faixaNaoEntregues:focus-visible { text-decoration: underline; }
+.abrirNaoEntregues {
+  display: flex; align-items: center; gap: var(--e-2); flex: 1; min-width: 0; min-height: var(--toque);
+  padding: 0 0 0 var(--e-3); border: 0; background: transparent; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.abrirNaoEntregues:hover, .abrirNaoEntregues:focus-visible { text-decoration: underline; }
 .verNaoEntregues { margin-left: auto; }
 .listaNaoEntregues { list-style: none; margin: 0; padding: 0; }
 .itemNaoEntregue { padding-block: var(--e-4); display: grid; gap: var(--e-3); overflow-wrap: anywhere; }
@@ -281,3 +213,12 @@
 /* #1899: <output> de situação em bloco, como o <p> que substituiu. */
 .bloco { display: block; }
 .resumoNaoEntregues strong { color: var(--tinta); font-size: var(--t-titulo); }
+
+/* #2185 (R04): o número é a `Pilula contagem`; aqui só a entrada do contador de mensagens sem resposta. */
+.naoLidas { animation: estalarPonto var(--dur-longa) var(--ease-pulo) both; }
+/* #2258 (T7): ícone ao lado da hora, com nome acessível: a cor não é o único sinal do prazo
+   estourado (vermelho) nem da vez da equipe (âmbar). */
+.sinalPrazo { flex-shrink: 0; display: inline-grid; place-items: center; color: var(--erro); line-height: 0; }
+.sinalAtencao { color: var(--alerta); }
+/* #2427: o motivo `perigo` era o traço vermelho; sem o traço, a gravidade fica no ícone. */
+.cartao.atrasada .sinalAtencao { color: var(--erro); }

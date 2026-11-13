@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAtendimento } from '../../../aplicacao/contextos'
 import {
-  convidarUsuario, desativarUsuario, listarPerfis, listarUsuarios, reativarUsuario, reenviarConvite, trocarPerfil,
+  convidarUsuario, desativarUsuario, gerarCodigoDeAcesso, listarPerfis, listarUsuarios, reativarUsuario, reenviarConvite,
+  trocarPerfil,
 } from '../../../aplicacao/usuarios'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
@@ -67,7 +68,31 @@ function Convite({ perfis, aoConvidar, aoCancelar }) {
   )
 }
 
-function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirmacao }) {
+// #2201: mostrado uma vez. A dona copia e manda pelo WhatsApp; a pessoa cola em "Entrar com código de acesso".
+function CodigoGerado({ codigo, aoCopiar, aoFechar }) {
+  const campo = useRef(null)
+  const validade = new Date(codigo.expiraEm).toLocaleDateString('pt-BR')
+  useEffect(() => { campo.current?.select() }, [])
+  async function copiar() {
+    try { await navigator.clipboard.writeText(codigo.chave); aoCopiar() }
+    catch { campo.current?.select() }
+  }
+  return (
+    <section className={css.convite} aria-label={`Código de acesso de ${codigo.nome}`}>
+      <CampoTexto
+        ref={campo} rotulo={`Código de acesso de ${codigo.nome}`} readOnly value={codigo.chave}
+        autoComplete="off" spellCheck={false} onFocus={(e) => e.target.select()}
+        dica={`Vale uma vez, até ${validade}. Mande só para ${codigo.nome}. Ele não aparece de novo.`}
+      />
+      <div className={css.botoesDoConvite}>
+        <Botao variante="primario" onClick={copiar}>{codigo.copiado ? 'Copiado' : 'Copiar código'}</Botao>
+        <Botao variante="texto" onClick={aoFechar}>Fechar</Botao>
+      </div>
+    </section>
+  )
+}
+
+function Pessoa({ usuario, perfis, meuId, souSuporte, agora, ocupado, aoAgir, aoAbrirConfirmacao }) {
   const linha = useRef(null)
   const cancelar = useRef(null)
   const jaAbriu = useRef(false)
@@ -75,7 +100,7 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
   // Escolher no select não troca nada: seta do teclado num select fechado já mudava o perfil e derrubava a sessão da pessoa.
   const [perfilEscolhido, setPerfilEscolhido] = useState(null)
   const situacao = situacaoDoUsuario(usuario)
-  const pode = acoesDoUsuario(usuario, meuId)
+  const pode = acoesDoUsuario(usuario, meuId, souSuporte)
   const eu = usuario.usuarioId === meuId
   const ultimo = instanteDaApi(usuario.ultimoAcessoEm)
   const aberta = confirmando || perfilEscolhido !== null
@@ -123,6 +148,9 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
         {pode.reenviarConvite && !aberta && (
           <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reenviar', usuario)}>Reenviar convite</Botao>
         )}
+        {pode.gerarCodigo && !aberta && (
+          <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('codigo', usuario)}>Gerar código de acesso</Botao>
+        )}
         {pode.desativar && !aberta && (
           <Botao variante="texto" disabled={ocupado} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>Desativar</Botao>
         )}
@@ -151,6 +179,7 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
 export function AbaUsuarios() {
   const { sessao, agora } = useAtendimento()
   const meuId = sessao?.usuario?.id ?? null
+  const souSuporte = sessao?.usuario?.nivel === 'SuperAdmin'
   const titulo = useRef(null)
   const lista = useRef(null)
   const botaoConvidar = useRef(null)
@@ -161,6 +190,8 @@ export function AbaUsuarios() {
   const [convidando, setConvidando] = useState(false)
   // Para onde o foco volta depois de uma ação: a linha da pessoa, ou o título quando a linha mudou de lugar.
   const [foco, setFoco] = useState(null)
+  // #2201: o código aparece uma vez, só na memória desta tela. Fechar ou sair da aba apaga.
+  const [codigo, setCodigo] = useState(null)
 
   const carregar = useCallback(async (sinal) => {
     try {
@@ -204,6 +235,10 @@ export function AbaUsuarios() {
     try {
       if (acao === 'perfil') await trocarPerfil(usuario.usuarioId, valor)
       else if (acao === 'reenviar') await reenviarConvite(usuario.usuarioId)
+      else if (acao === 'codigo') {
+        const gerado = await gerarCodigoDeAcesso(usuario.usuarioId)
+        setCodigo({ nome: usuario.nome, chave: gerado.chave, expiraEm: gerado.expiraEm, copiado: false })
+      }
       else if (acao === 'desativar') await desativarUsuario(usuario.usuarioId)
       else await reativarUsuario(usuario.usuarioId)
       const perfil = estado.perfis.find((p) => p.perfilId === valor)?.nome
@@ -248,6 +283,7 @@ export function AbaUsuarios() {
           )}
         </div>
         {convidando && <Convite perfis={estado.perfis} aoConvidar={convidar} aoCancelar={() => setConvidando(false)} />}
+        {codigo && <CodigoGerado codigo={codigo} aoCopiar={() => setCodigo((c) => c && { ...c, copiado: true })} aoFechar={() => setCodigo(null)} />}
         {/* Sempre montado e com a altura reservada: a lista não pula quando o aviso chega. */}
         <div className={css.aviso}>
           <output className={css.retorno} data-tom={retorno?.tom} role={retorno?.tom === 'erro' ? 'alert' : undefined}>{retorno?.texto}</output>
@@ -261,7 +297,7 @@ export function AbaUsuarios() {
         <ul ref={lista} className={css.pessoas}>
           {pessoas.map((usuario) => (
             <Pessoa
-              key={usuario.usuarioId} usuario={usuario} perfis={estado.perfis} meuId={meuId} agora={agora} ocupado={ocupado}
+              key={usuario.usuarioId} usuario={usuario} perfis={estado.perfis} meuId={meuId} souSuporte={souSuporte} agora={agora} ocupado={ocupado}
               aoAgir={agir} aoAbrirConfirmacao={limparRetorno}
             />
           ))}

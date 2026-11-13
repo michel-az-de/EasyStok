@@ -6,7 +6,7 @@ import { IconeDoModulo } from '../../componentes/IconeDoModulo'
 import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { MODULOS, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { MODULOS, NOME_INICIO, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import { HASH_HALL, ROTA_PRINCIPAL, rotaDaHash } from '../../dominio/rota'
 import { AbaCaixaApi } from './caixa/AbaCaixaApi'
 import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
@@ -28,6 +28,7 @@ import { AbaReceitasApi } from './producao/AbaReceitasApi'
 import { AbaCalculadoraApi } from './producao/AbaCalculadoraApi'
 import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
 import { AbaPerdasApi } from './producao/AbaPerdasApi'
+import { ChecklistConfiguracao } from './producao/ChecklistConfiguracao'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -121,7 +122,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
           {avisosApi && <div className={css.avisosGestao}>{avisosApi}</div>}
           <div className={css.acoesGestao}>
             <a className={css.verModulos} href={HASH_HALL} onClick={aoFechar}>
-              <Icone nome="painel" tamanho={18} /> Ver módulos
+              <Icone nome="painel" tamanho={20} /> {NOME_INICIO}
             </a>
             <Botao onClick={aoFechar}>Fechar</Botao>
           </div>
@@ -227,7 +228,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
         </div>
         </>
       ) : (
-        <Vazio titulo="Nenhum ajuste disponível">Consulte as telas disponíveis em Ver módulos.</Vazio>
+        <Vazio titulo="Nenhum ajuste disponível">Consulte as telas disponíveis no {NOME_INICIO}.</Vazio>
       )}
     </Modal>
   )
@@ -251,7 +252,7 @@ function AbaNaoLigada({ texto, saida = null }) {
   return (
     <Vazio titulo="Em preparação" acao={telas.length > 0
       ? telas.map(tela => <a className={css.saidaPreparacao} key={tela.id} href={hashDoModulo(modulo.id, tela.id)}>{tela.rotulo}</a>)
-      : <a className={css.saidaPreparacao} href={HASH_HALL}>Ver módulos</a>}>
+      : <a className={css.saidaPreparacao} href={HASH_HALL}>{NOME_INICIO}</a>}>
       {texto}
     </Vazio>
   )
@@ -305,5 +306,9 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />
+  // #2362: toda tela da Produção mostra no topo o que falta configurar, nas duas casas (rota e Gestão).
+  if (fonteApi && ABAS_DA_PRODUCAO.has(aba)) return <><ChecklistConfiguracao key={aba} />{painel}</>
   return painel
 }
+
+const ABAS_DA_PRODUCAO = new Set(moduloPorId('producao')?.telas.map((t) => t.aba) ?? [])

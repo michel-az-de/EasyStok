@@ -11,7 +11,8 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
-import { inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { dataIsoNoFuso, inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { aDevolverDe } from './cobranca.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
 import { numeroDoDiaNaTela } from './pedido.js'
@@ -35,12 +36,43 @@ export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechar, o caixa de hoje não rea
 // J2 (#1990), item 5: devolução pendente não trava o fechamento (o dinheiro pode sair amanhã), mas o
 // modal diz quanto e onde se resolve. Sem nada a devolver, nada.
 // Pedido que não deu para conferir (`falhas`) é dito, para "nada a devolver" não ser presumido.
-export function avisoDeDevolucoesPendentes({ total = 0, pedidos = 0, falhas = 0 } = {}) {
+function avisoDeDevolucoes({ total = 0, pedidos = 0, falhas = 0 } = {}, orientacao) {
   const semConferir = falhas > 0 ? ` ${plural(falhas, 'pedido cancelado não foi conferido', 'pedidos cancelados não foram conferidos')}.` : ''
   if (!(total > 0)) return semConferir ? `Não deu para conferir tudo:${semConferir}` : null
-  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}. `
-    + `O fechamento não espera: registre a devolução no Pós-venda de cada pedido.${semConferir}`
+  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}. ${orientacao}${semConferir}`
 }
+
+export const avisoDeDevolucoesPendentes = (leitura) =>
+  avisoDeDevolucoes(leitura, 'O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
+
+// #2267: no Caixa do dia e no Extrato o pagamento do pedido cancelado parecia receita comum.
+export const avisoDeDevolucoesNasTelas = (leitura) =>
+  avisoDeDevolucoes(leitura, 'Esse dinheiro entrou e está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido.')
+
+// #2275: o Extrato lê os cancelados dos últimos 90 dias, não o período da tela: o aviso diz isso e não
+// afirma que o valor está nos totais.
+export const avisoDeDevolucoesNoExtrato = (leitura) =>
+  avisoDeDevolucoes(leitura, 'São pedidos cancelados dos últimos 90 dias: registre a devolução no Pós-venda de cada pedido.')
+
+// #2275: o aviso do Caixa do dia conta só o que está nos totais: o pagamento que entrou no período
+// (o mesmo recorte dos totais), sem o que já foi devolvido dele, limitado ao que ainda falta devolver.
+// Período é "AAAA-MM-DD" de `de` a `ate` (o dia; ou desde a abertura, no caixa esquecido aberto).
+// Cancelado de fora do período não some: segue no Pós-venda e no Extrato. Pagamento sem data válida não conta.
+export function aDevolverDoDia(dados, de, ate = de) {
+  const aDevolver = aDevolverDe(dados)
+  const noPeriodo = (dados?.pagamentos ?? [])
+    .filter((p) => {
+      const ms = Date.parse(p.pagoEm)
+      if (!Number.isFinite(ms)) return false
+      const dia = dataIsoNoFuso(ms)
+      return dia >= de && dia <= ate
+    })
+    .reduce((soma, p) => soma + Math.max(0, (Number(p.valor) || 0) - (Number(p.devolvido) || 0)), 0)
+  return Math.round(Math.min(aDevolver, noPeriodo) * 100) / 100
+}
+
+// #2275: um token só para o status do caixa, no topo e na tabela. O caixa esquecido aberto é aviso.
+export const tomDoCaixa = ({ fechado = false, esquecido = false } = {}) => (fechado ? 'neutro' : esquecido ? 'aviso' : 'ok')
 
 // #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
 // rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.
@@ -53,11 +85,15 @@ export function categoriaAoTrocarTipo(categoria, novoTipo) {
 // meio da cobrança por conversa: pix/dinheiro/credito/debito/transferencia/outro).
 export const METODOS_CAIXA = ['pix', 'dinheiro', 'credito', 'debito', 'transferencia', 'outro']
 
+// #2305: o servidor compara a forma sem caixa e sem espaço nas pontas (`MetodosPagamentoCaixa.Normalizar`);
+// comparar estrito aqui dava gaveta diferente da do servidor com "Dinheiro " gravado.
+export const normalizarMetodoCaixa = (metodo) => (typeof metodo === 'string' ? metodo.trim().toLowerCase() : metodo)
+
 const NOME_DO_METODO_CAIXA = {
   pix: 'Pix', dinheiro: 'Dinheiro', credito: 'Crédito', debito: 'Débito',
   transferencia: 'Transferência', outro: 'Outro',
 }
-export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[metodo] ?? 'Outro'
+export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[normalizarMetodoCaixa(metodo)] ?? 'Outro'
 
 // Proposta ajustável para a Thati: o protótipo nasceu antes deste caixa
 // existir e a cobrança por conversa (F4, `dominio/cobranca.js`) guarda um meio
@@ -323,7 +359,7 @@ export function fecharCaixaMovimento(resumo, contado, agora, autorNome) {
 // não conta. Movimento sem método é do caixa físico (nasceu antes de o método existir);
 // pagamento sem método fica fora da gaveta, porque ninguém sabe onde ele caiu.
 const centavos = (v) => Math.round((Number(v) || 0) * 100)
-const ehDinheiro = (meio, semMetodoEhDinheiro) => meio === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
+const ehDinheiro = (meio, semMetodoEhDinheiro) => normalizarMetodoCaixa(meio) === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
 const sinalDoMovimento = (tipo) => (tipo === TIPOS_MOVIMENTO.ENTRADA ? 1 : tipo === TIPOS_MOVIMENTO.SAIDA ? -1 : 0)
 
 // #1627: o que veio sem forma de pagamento fica à parte (`semForma`). A venda do pedido entregue

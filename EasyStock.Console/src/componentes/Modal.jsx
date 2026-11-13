@@ -1,11 +1,13 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react'
-import { Icone } from './Icone'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { Botao } from './Botao'
+import { BotaoIcone } from './BotaoIcone'
 import css from './Modal.module.css'
 
 // Camada sobreposta. Usa <dialog>.showModal(), que entrega trap de foco e
 // fundo inerte pelo próprio navegador, em vez de imitar isso na mão.
-// `largura` é opcional (F2, ModalHistorico pede 880px): sem ela, o CSS padrão
-// de 560px de `Modal.module.css` continua valendo para todo o resto da tela.
+// `largura` é opcional e vale um de três nomes (#2185, R14): `sm` (560, a padrão), `md` (760) e `lg` (880),
+// definidos em `estilos/tokens.css`. Sem ela, o CSS padrão de `Modal.module.css` continua valendo. Um
+// valor CSS qualquer ainda é aceito para as telas fora do Atendimento que ainda não migraram.
 //
 // `aoFechar` fica numa ref (rodada 8, defeito 65 "fora do escopo"): o efeito
 // que chama showModal() só roda no mount, nunca de novo quando o pai
@@ -26,18 +28,50 @@ import css from './Modal.module.css'
 //     para o X, que o showModal() escolhe por ser o primeiro botão. Sem rolar a página.
 //   `segurarFechamento`: com valor digitado, Esc e clique no fundo não fecham (perdiam o que ela
 //     contou). O X e o Cancelar do rodapé continuam fechando: são gestos de propósito.
-export function Modal({ titulo, descricao, aoFechar, rodape, largura, className, focarCampo = false, segurarFechamento = false, children }) {
+//
+// #2258 (auditoria F4, T17): `confirmarDescarte` é o "Descartar alterações?" do sistema inteiro. Com
+//   dado digitado, Esc, clique no fundo e o X não fecham calados nem descartam calados: o modal pergunta
+//   ali mesmo, e o foco vai para "Continuar editando". Esc na pergunta volta para a edição.
+//   `segurarFechamento` segue para o caso em que nem descartar pode (envio em andamento).
+export const LARGURAS_DO_MODAL = Object.freeze({ sm: 'var(--modal-sm)', md: 'var(--modal-md)', lg: 'var(--modal-lg)' })
+
+export function Modal({
+  titulo, descricao, aoFechar, rodape, largura, className, focarCampo = false, segurarFechamento = false, confirmarDescarte = false, children,
+}) {
   const id = useId()
   const dialogoRef = useRef(null)
   // Capture antes do commit: um campo com autoFocus já terá foco quando o efeito rodar.
   const focoAnterior = useRef(typeof document === 'undefined' ? null : document.activeElement)
   const aoFecharRef = useRef(aoFechar)
   const segurarRef = useRef(segurarFechamento)
+  const descarteRef = useRef(confirmarDescarte)
+  const [perguntando, setPerguntando] = useState(false)
+  const perguntandoRef = useRef(false)
+  // #2258 (banca a11y): a pergunta guarda o campo que estava em edição; "Continuar editando" e Esc
+  //   devolvem o foco a ele, em vez de deixá-lo cair no body quando a pergunta some.
+  const campoAntesDaPergunta = useRef(null)
+  const abrirPergunta = () => {
+    const ativo = typeof document === 'undefined' ? null : document.activeElement
+    campoAntesDaPergunta.current = ativo?.matches?.('input, textarea, select, [contenteditable="true"]') ? ativo : null
+    setPerguntando(true)
+  }
+  const voltarAEdicao = () => {
+    setPerguntando(false)
+    const dialogo = dialogoRef.current
+    const campo = campoAntesDaPergunta.current?.isConnected ? campoAntesDaPergunta.current
+      : dialogo?.querySelector('[data-foco-inicial]:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')
+    campo?.focus({ preventScroll: true })
+  }
   // Só vale na abertura, como o foco que o showModal() dá.
   const focarCampoRef = useRef(focarCampo)
   // Grava a versão mais nova fora do corpo de render (linter: nada de ref
   // escrita durante o render), mas ainda síncrono, antes de qualquer clique.
-  useLayoutEffect(() => { aoFecharRef.current = aoFechar; segurarRef.current = segurarFechamento })
+  useLayoutEffect(() => {
+    aoFecharRef.current = aoFechar; segurarRef.current = segurarFechamento; descarteRef.current = confirmarDescarte
+    perguntandoRef.current = perguntando
+  })
+  // Sem nada digitado, a pergunta não tem mais objeto.
+  const perguntaValida = perguntando && confirmarDescarte && !segurarFechamento
 
   useEffect(() => {
     const dialogo = dialogoRef.current
@@ -49,7 +83,12 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, className,
       campo?.focus({ preventScroll: true })
     }
 
-    const fecharSeLivre = () => { if (!segurarRef.current) aoFecharRef.current?.() }
+    const fecharSeLivre = () => {
+      if (segurarRef.current || !aoFecharRef.current) return
+      if (perguntandoRef.current) { voltarAEdicao(); return }
+      if (descarteRef.current) { abrirPergunta(); return }
+      aoFecharRef.current()
+    }
     const aoCancelar = (evento) => { evento.preventDefault(); fecharSeLivre() }
     // Clique no ::backdrop chega no próprio <dialog>, nunca no conteúdo.
     const aoClicar = (evento) => { if (evento.target === dialogo) fecharSeLivre() }
@@ -60,8 +99,10 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, className,
     const aoFecharNativo = () => {
       // O close anterior pode chegar depois da reabertura (inclusive no StrictMode).
       if (dialogo.open) return
-      if (segurarRef.current || !aoFecharRef.current) { if (!dialogo.open) dialogo.showModal() }
-      else aoFecharRef.current()
+      if (segurarRef.current || descarteRef.current || !aoFecharRef.current) {
+        if (!dialogo.open) dialogo.showModal()
+        if (descarteRef.current && !segurarRef.current) abrirPergunta()
+      } else aoFecharRef.current()
     }
     dialogo.addEventListener('cancel', aoCancelar)
     dialogo.addEventListener('click', aoClicar)
@@ -91,20 +132,29 @@ export function Modal({ titulo, descricao, aoFechar, rodape, largura, className,
     <dialog
       ref={dialogoRef}
       className={[css.caixa, className].filter(Boolean).join(' ')}
-      style={largura ? { width: largura } : undefined}
+      style={largura ? { width: LARGURAS_DO_MODAL[largura] ?? largura } : undefined}
       aria-labelledby={`${id}-titulo`}
       aria-describedby={descricao ? `${id}-descricao` : undefined}
       aria-modal="true"
     >
       {/* Distingue fechar a janela de sair da sessão e do botão do rodapé. */}
-      <button type="button" className={css.fecharCanto} aria-label="Fechar janela" title="Fechar (Esc)" disabled={!aoFechar} onClick={aoFechar}>
-        <Icone nome="x" tamanho={18} />
-      </button>
+      <BotaoIcone rotulo="Fechar janela" dica="Fechar (Esc)" icone="x" tom="secundario" className={css.fecharCanto} disabled={!aoFechar}
+        onClick={() => { if (confirmarDescarte && !segurarFechamento) abrirPergunta(); else aoFechar?.() }} />
       {/* Integração: título e rodapé fora da rolagem. Folha comprida (resumo
           do Encerrar, canhoto) rolava o título para fora e escondia o botão de
           ação lá embaixo; agora só o miolo rola. */}
       <h2 id={`${id}-titulo`} className={css.titulo}>{titulo}</h2>
       <div className={css.conteudo}>
+        {perguntaValida && (
+          <div className={css.descarte} role="alert">
+            <p>Descartar o que foi digitado?</p>
+            <div className={css.descarteAcoes}>
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus -- o foco vai para a opção que não perde nada */}
+              <Botao variante="secundario" autoFocus onClick={voltarAEdicao}>Continuar editando</Botao>
+              <Botao variante="perigo" onClick={() => { setPerguntando(false); aoFechar?.() }}>Descartar</Botao>
+            </div>
+          </div>
+        )}
         {descricao && <p id={`${id}-descricao`} className={css.sub}>{descricao}</p>}
         {children}
       </div>

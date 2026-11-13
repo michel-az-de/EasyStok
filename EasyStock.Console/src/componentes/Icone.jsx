@@ -1,14 +1,14 @@
 import {
-  Archive, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
-  Camera, Car, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
-  Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink,
+  Archive, ArrowDown, ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
+  Calendar, Camera, Car, ChartColumn, ChartLine, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
+  ClipboardList, Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink, EyeOff,
   FlaskConical, Frown, Gift, Globe, GripVertical, Hand, History, Hourglass, House, Image, Inbox,
   LayoutDashboard, LayoutTemplate, Lightbulb, Link, ListFilter, Lock, LogOut, Mail, MapPin,
-  Maximize2, Meh, MessageSquareText, MessageSquareWarning, Mic, Minimize2, Minus, Moon, Package,
-  PanelLeft, PanelRight, Paperclip, Pause, Pencil, Phone, PictureInPicture2, Play, Plus, Printer,
-  RefreshCw, Search, SendHorizontal, Settings, ShoppingCart, Smile, Sparkles, Star, Sticker,
-  StickyNote, Sun, Thermometer, ThumbsDown, ThumbsUp, Trash, TriangleAlert, Undo2, UserRound,
-  UserRoundPlus, X, Zap,
+  Maximize2, Meh, MessageSquareText, MessageSquareWarning, Mic, Minimize2, Minus, Moon, NotepadText, Package,
+  PanelLeft, PanelRight, Paperclip, Pause, Pencil, Phone, PictureInPicture2, Play, Plug, Plus, Printer, Radio, Receipt,
+  RefreshCw, ScrollText, Search, SendHorizontal, Settings, ShoppingCart, Smile, Sparkles, Star, Sticker,
+  StickyNote, Sun, Sunset, Tag, Target, Thermometer, ThumbsDown, ThumbsUp, Trash, TriangleAlert, Truck, Undo2, UserRound,
+  UserRoundPlus, Users, X, Zap,
   createLucideIcon,
 } from 'lucide-react'
 import css from './Icone.module.css'
@@ -88,10 +88,19 @@ const ICONES = {
   panela: CookingPot, 'cooking-pot': CookingPot,
   house: House,
   'map-pin': MapPin,
+  // #2418: carro de entrega (viagem vazia) e o fim da tarde (janela da tarde).
+  caminhao: Truck,
   printer: Printer,
   'flask-conical': FlaskConical,
   hourglass: Hourglass,
   historico: History,
+  // #2258 (A1, G2): um ícone por tela do Financeiro e de Configurações (componentes/iconesDoConsole.js).
+  'folha-cardapio': NotepadText,
+  'grafico-barras': ChartColumn, 'grafico-linha': ChartLine,
+  recibo: Receipt, entrada: ArrowDownToLine, extrato: ScrollText,
+  etiqueta: Tag, alvo: Target,
+  usuarios: Users, plug: Plug, canal: Radio,
+  agenda: Calendar, planejamento: ClipboardList,
 
   // Estado e confirmação.
   check: Check,
@@ -113,10 +122,11 @@ const ICONES = {
   download: Download,
   'external-link': ExternalLink,
   play: Play, pause: Pause,
-  sun: Sun, moon: Moon,
+  sun: Sun, sunset: Sunset, moon: Moon,
 
   // Navegação e ordem.
   'arrow-up': ArrowUp,
+  'arrow-down': ArrowDown,
   'arrow-up-down': ArrowUpDown,
   'chevron-up': ChevronUp, 'chevron-down': ChevronDown, 'chevron-right': ChevronRight,
   painel: LayoutDashboard,
@@ -125,6 +135,7 @@ const ICONES = {
   ampliar: Maximize2,
   reduzir: Minimize2,
   trocarLado: ArrowLeftRight,
+  ocultoNoSite: EyeOff,
   encaixarEsquerda: PanelLeft,
   encaixarDireita: PanelRight,
   solto: PictureInPicture2,
@@ -133,16 +144,28 @@ const ICONES = {
   ...PROPRIOS,
 }
 
-export function Icone({ nome, tamanho = '1.15em', rotulo, className }) {
+// #2185 (R03): quatro degraus, sempre o mesmo vocabulário. 16 vai junto de texto de 13 a 15 px (selo,
+// linha de contexto, item de lista); 20 é o do controle (padrão do Botao e do BotaoIcone); 24 é o de
+// destaque de região (trilho, Vazio compacto); 32 é o de tile e de estado vazio. O `tamanho` aceita o
+// número ou o nome do degrau; fora da escala, só o aviso de desenvolvimento reclama.
+export const TAMANHOS_DE_ICONE = Object.freeze({ pequeno: 16, medio: 20, grande: 24, destaque: 32 })
+const ESCALA = new Set(Object.values(TAMANHOS_DE_ICONE))
+
+// Sem `tamanho`, o ícone acompanha a fonte do pai (era 1.15em) e encaixa no degrau mais próximo
+// (16, 20 ou 24): ninguém fica com 17,25 px ao lado de um texto de 15.
+export function Icone({ nome, tamanho, rotulo, className }) {
   const Desenho = ICONES[nome]
   if (!Desenho) return null
-  // `tamanho` aceita número em px (secao 10 da direção visual), além do `em`
-  // de sempre para crescer com a fonte do sistema.
-  const medida = typeof tamanho === 'number' ? `${tamanho}px` : tamanho
+  const medida = TAMANHOS_DE_ICONE[tamanho] ?? tamanho
+  if (import.meta.env?.DEV && typeof medida === 'number' && !ESCALA.has(medida)) {
+    // oxlint-disable-next-line no-console -- aviso só de desenvolvimento.
+    console.warn(`Icone "${nome}" com ${medida}px: a escala é ${[...ESCALA].join(', ')}.`)
+  }
+  const classes = [css.icone, medida === undefined ? css.acompanha : '', className].filter(Boolean).join(' ')
   return (
     <Desenho
-      className={className ? `${css.icone} ${className}` : css.icone}
-      size={medida}
+      className={classes}
+      size={typeof medida === 'number' ? `${medida}px` : medida}
       strokeWidth={1.75}
       role={rotulo ? 'img' : 'presentation'}
       aria-label={rotulo}

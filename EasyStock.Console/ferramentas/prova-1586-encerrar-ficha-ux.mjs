@@ -70,6 +70,8 @@ const REACT = 'const h=globalThis.__prova1586.hooks; export const useState=h.use
 const fronteiras = new Map([
   ['/aplicacao/contextos', 'const c=globalThis.__prova1586; export const useAtendimento=()=>c.atendimento, useCatalogo=()=>c.catalogo, useAcoes=()=>c.acoes'],
   ['/aplicacao/acessoModulos', 'export const useAcessoModulos=()=>({acoes:{cancelarPedidoPago:true}})'],
+  // #2185 (F32): o modal avisa quando a conversa deixa de estar aberta; a casca genérica devolveria `null` no gancho.
+  ['/componentes/Aviso', 'export const useAviso=()=>({mostrar(){},dispensar(){}}); export function ProvedorDeAviso(){return null}'],
 ])
 // Componente de `componentes/` vira casca com o mesmo nome: a árvore guarda o tipo e as props.
 function cascaDoComponente(arquivo) {
@@ -107,7 +109,7 @@ globalThis.sessionStorage = {
   getItem: () => JSON.stringify({ token: 't', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa' } }),
   setItem: () => {}, removeItem: () => {},
 }
-globalThis.window = globalThis.window ?? { dispatchEvent: () => {} }
+globalThis.window = globalThis.window ?? { innerWidth: 1000, innerHeight: 900, dispatchEvent: () => {}, addEventListener: () => {}, removeEventListener: () => {} }
 
 let passou = 0
 const falhas = []
@@ -144,6 +146,7 @@ const clienteDom = await import('../src/dominio/cliente.js')
 const cobrancaDom = await import('../src/dominio/cobranca.js')
 const { GATILHOS } = await import('../src/dominio/automacao.js')
 const { montarResumoAtendimento } = await import('../src/dominio/resumoAtendimento.js')
+const { CANAIS } = await import('../src/infra/catalogo.js')
 
 const AGORA = Date.parse('2026-10-11T15:00:00Z')
 const MENSAGEM_API = { id: 'm-api', direcao: 'Saida', status: 'Enviada', autor: 'Dona', enviadaEm: '2026-10-11T15:00:00Z', tipoConteudo: 'Texto', texto: 'ok' }
@@ -178,7 +181,7 @@ await confere('A  encerrar recusado devolve { erro } ao modal e não fecha a con
   const { api, despachos } = montarAcoes()
   atender = (c) => (c.url.endsWith('/encerrar') ? resposta('A conversa mudou em outra tela.', 409) : resposta(MENSAGEM_API))
   const r = await api.encerrarComResumo('c1', AGORA, { enviarMensagem: true, textoMensagem: 'Obrigada!' })
-  assert.equal(r?.erro, 'Atendimento não encerrado: A conversa mudou em outra tela.')
+  assert.equal(r?.erro, 'Conversa não concluída: A conversa mudou em outra tela.')
   assert.equal(r.despedidaSaiu, true, 'o modal precisa saber que a despedida já foi')
   assert.ok(!despachos.some((d) => d.tipo === acao.ENCERRAR_ATENDIMENTO || d.tipo === acao.FECHAR_ENCERRAMENTO))
 })
@@ -216,7 +219,7 @@ await confere('B  "segue aberto" só sai quando o modal não cancelou o pedido s
   const aberto = montarAcoes()
   await aberto.api.encerrarComResumo('c2', AGORA, { pedidoCancelado: false })
   assert.equal(avisos(aberto.despachos).length, 1)
-  assert.match(avisos(aberto.despachos)[0], /^Atendimento encerrado no EasyStok\. O pedido sem pagamento segue aberto/)
+  assert.match(avisos(aberto.despachos)[0], /^Conversa concluída no EasyStok\. O pedido sem pagamento segue aberto/)
   assert.doesNotMatch(avisos(aberto.despachos)[0], /não são guardados/)
 })
 await confere('B  avaliação e anotação do encerramento não estão disponíveis no modo API', () => {
@@ -260,8 +263,10 @@ await confere('E  bloquear sem cadastro: motivo escrito só no modo API e só pa
   assert.equal(clienteDom.motivoParaNaoBloquear({ clienteId: null }, { fonteApi: false }), null)
   const fonte = readFileSync(new URL('features/ficha-cliente/BlocoCliente.jsx', src), 'utf8')
   assert.match(fonte, /motivoSemBloqueio = bloqueada \? null : motivoParaNaoBloquear\(conversa, \{ fonteApi \}\)/)
-  assert.match(fonte, /disabled=\{Boolean\(motivoSemBloqueio\)\}/)
-  assert.match(fonte, /\{motivoSemBloqueio && <p id=\{idMotivoBloqueio\}[^>]*>\{motivoSemBloqueio\}<\/p>\}/)
+  assert.match(fonte, /desabilitado: Boolean\(motivoSemBloqueio\), motivo: motivoSemBloqueio/)
+  // #2185: bloquear é da gerência; para a atendente o item não aparece.
+  assert.match(fonte, /const podeBloquear = !fonteApi \|\| capacidades\?\.controlarLoja === true/)
+  assert.match(fonte, /podeBloquear && \{/)
 })
 await confere('F  link vencido: o texto diz o que o job do EasyStok faz em cada tentativa', () => {
   // #1683: o job só reemite e cancela com o pedido esperando o pagamento; o status entra na pergunta.
@@ -277,6 +282,7 @@ const { ModalEncerrar } = await import('../src/features/encerramento/ModalEncerr
 const { FolhaResumo } = await import('../src/features/encerramento/FolhaResumo.jsx')
 const { CampoEmLinha } = await import('../src/features/ficha-cliente/CampoEmLinha.jsx')
 const { BarraProximoPasso } = await import('../src/features/ficha-cliente/BarraProximoPasso.jsx')
+const { acoesDoPedido, itensDoMenuDaFicha } = await import('../src/features/ficha-cliente/apresentacaoDaFicha.js')
 const { BaixaAMao } = await import('../src/features/ficha-cliente/BlocoCobranca.jsx')
 const { ModalHistorico } = await import('../src/features/ficha-cliente/ModalHistorico.jsx')
 const { ModalNota } = await import('../src/features/notas/ModalNota.jsx')
@@ -303,14 +309,16 @@ const nos = (arvore) => (Array.isArray(arvore) ? arvore.flatMap(nos)
 const texto = (arvore) => (Array.isArray(arvore) ? arvore.map(texto).join('')
   : arvore == null || typeof arvore === 'boolean' ? '' : typeof arvore !== 'object' ? String(arvore) : texto(arvore.props?.children))
 const doTipo = (tela, nome) => nos(tela.arvore).filter((n) => n.type === nome || n.type?.name === nome)
-const botao = (tela, rotulo) => nos(tela.arvore).find((n) => (n.type === 'button' || n.type?.name === 'Botao')
-  && (texto(n).includes(rotulo) || n.props['aria-label'] === rotulo))
+// #2185: o salvar e o desfazer do campo em linha são `BotaoIcone` (o nome vai em `rotulo`).
+const botao = (tela, rotulo) => nos(tela.arvore).find((n) => (n.type === 'button' || n.type?.name === 'Botao' || n.type?.name === 'BotaoIcone')
+  && (texto(n).includes(rotulo) || n.props['aria-label'] === rotulo || n.props.rotulo === rotulo))
 const alertas = (tela) => nos(tela.arvore).filter((n) => n.props?.role === 'alert').map(texto)
 
 const REGRA_ENCERRAMENTO = { id: 'encerramento', gatilho: GATILHOS.ENCERRAMENTO, ativa: true, texto: 'Obrigada, {nome}!' }
 const comoApi = (conversas = [conversaBase()]) => {
   ctx.atendimento = { fonteApi: true, conversas, agora: AGORA, regras: [REGRA_ENCERRAMENTO] }
-  ctx.catalogo = { canais: [], cardapio: [], entregadores: [] }
+  // #2185 (E08): a despedida só nasce marcada se o canal da conversa existe no catálogo e aceita escrever.
+  ctx.catalogo = { canais: CANAIS, cardapio: [], entregadores: [] }
 }
 const comoDemonstracao = (conversas = [conversaBase()]) => { comoApi(conversas); ctx.atendimento.fonteApi = false }
 const nada = () => {}
@@ -336,14 +344,14 @@ await confere('A  modal: o segundo toque em Encerrar não chama de novo, e o bot
 await confere('A  modal: o erro aparece dentro dele e a nova tentativa não repete a despedida', async () => {
   comoApi()
   const idas = []
-  let devolver = { erro: 'Atendimento não encerrado: Sem conexão com o EasyStok.', despedidaSaiu: true }
+  let devolver = { erro: 'Conversa não concluída: Sem conexão com o EasyStok.', despedidaSaiu: true }
   ctx.acoes = acoesDoModal({ encerrarComResumo: async (...args) => { idas.push(args); return devolver } })
   const tela = new Tela(ModalEncerrar, { conversaId: 'c1', aoFechar: nada })
   await botao(tela, 'Concluir conversa').props.onClick()
   tela.renderizar()
   const rodape = doTipo(tela, 'Modal')[0].props.rodape
   assert.match(nos(rodape).filter((n) => n.props?.role === 'alert').map(texto).join(''),
-    /Atendimento não encerrado: Sem conexão com o EasyStok\. A despedida já foi enviada: tentar de novo não manda outra\./)
+    /Conversa não concluída: Sem conexão com o EasyStok\. A despedida já foi enviada: tentar de novo não manda outra\./)
   assert.equal(botao(tela, 'Concluir conversa').props.disabled, false, 'o botão volta para a nova tentativa')
   devolver = undefined
   await botao(tela, 'Concluir conversa').props.onClick()
@@ -434,7 +442,7 @@ await confere('A  modal: pedido já cancelado não é cancelado de novo quando s
   const comPedido = conversaBase({ pedido: { pedidoId: 'p1', estado: 'aguardando', numero: 'P1ABCDEF', itens: [], cobranca: null } })
   comoApi([comPedido])
   const ordem = []
-  let devolver = { erro: 'Atendimento não encerrado: Sem conexão com o EasyStok.' }
+  let devolver = { erro: 'Conversa não concluída: Sem conexão com o EasyStok.' }
   ctx.acoes = acoesDoModal({
     cancelarPedido: async () => { ordem.push('cancelar'); return { ok: true } },
     encerrarComResumo: async (_id, _agora, opcoes) => { ordem.push('encerrar'); assert.equal(opcoes.pedidoCancelado, true); return devolver },
@@ -577,7 +585,8 @@ await confere('C  "Salvar cadastro" espera a resposta, trava o segundo toque e m
   const fonte = readFileSync(new URL('features/ficha-cliente/BlocoCliente.jsx', src), 'utf8')
   assert.match(fonte, /async function aoSalvarCadastro\(\) \{\s+if \(cadastrando\.current\) return\s+cadastrando\.current = true/)
   assert.match(fonte, /const resultado = await salvarCadastroRapido\(/)
-  assert.match(fonte, /disabled=\{!podeSalvarCadastro \|\| cadastro\.salvando\}/)
+  // #2258 (auditoria T14): o botão só para durante o envio; telefone ou CEP inválido vira erro no campo.
+  assert.match(fonte, /disabled=\{cadastro\.salvando\} onClick=\{aoPedirSalvar\}/)
   assert.match(fonte, /\{salvandoCadastro \? 'Salvando…' : 'Salvar cadastro'\}/)
   assert.match(fonte, /\{erroCadastro && <p className=\{css\.erroEmLinha\} role="alert">\{erroCadastro\}<\/p>\}/)
 })
@@ -634,10 +643,12 @@ await confere('D  "Desfazer pagamento" espera, trava o segundo toque e só fecha
   const espera = pendente()
   const idas = []
   const tela = new Tela(BarraProximoPasso, propsDaBarra(pago, { aoDesfazerPagamento: (motivo) => { idas.push(motivo); return idas.length === 1 ? espera.promise : Promise.resolve(undefined) } }))
-  const menu = doTipo(tela, 'MenuDoPedido')[0]
-  assert.equal(menu.props.podeDesfazerPagamento, true)
-  menu.props.aoEscolher('desfazer')
-  tela.renderizar()
+  // #2232 (F7): o ⋮ do pedido (MenuDoPedido) saiu; "Desfazer pagamento" é item do menu "Ações da ficha" no
+  // cabeçalho (MenuDaFicha), que pede a confirmação em linha da barra pela prop `pedidoDeAcao`. A prova confere
+  // que o item é oferecido para este pedido e depois escolhe o item, como o PainelFicha faz.
+  const itens = itensDoMenuDaFicha({ acoes: acoesDoPedido({ pedido: pago, fonteApi: true }), comPedido: true })
+  assert.ok(itens.some((i) => i.chave === 'desfazer' && i.rotulo === 'Desfazer pagamento'), 'o menu da ficha oferece Desfazer pagamento')
+  tela.renderizar({ ...tela.props, pedidoDeAcao: { chave: 'desfazer', n: 1 } })
   const campo = () => doTipo(tela, 'CampoArea').find((n) => n.props.rotulo === 'Motivo')
   campo().props.onChange({ target: { value: 'Lançamento errado' } })
   tela.renderizar()
@@ -843,12 +854,12 @@ async function comFocoDaNota(provar) {
   }
 }
 
-await confere('nota: Cancelar e Escape retornam ao abridor capturado antes do autofocus; cleanup não foca', async () => {
+await confere('nota: Recolher e Escape retornam ao abridor capturado antes do autofocus; cleanup não foca', async () => {
   await comFocoDaNota(async ({ abrir, abridor, documento }) => {
-    for (const gesto of ['cancelar', 'escape']) {
+    for (const gesto of ['recolher', 'escape']) {
       let fechou = 0
       const tela = abrir({ aoFechar: () => { fechou++ } })
-      if (gesto === 'cancelar') botao(tela, 'Cancelar').props.onClick()
+      if (gesto === 'recolher') botao(tela, 'Recolher').props.onClick()
       else doTipo(tela, 'dialog')[0].props.onKeyDown({ key: 'Escape', defaultPrevented: false, stopPropagation: nada })
       assert.equal(fechou, 1); assert.equal(documento.activeElement, abridor); assert.equal(abridor.focos, 1)
       tela.encerrar(); assert.equal(abridor.focos, 1, 'desmontar não repete o foco')
@@ -895,6 +906,60 @@ await confere('nota: contexto trocado, retorno após unmount e abridor indispon�
       abridor.isConnected = true; abridor.disabled = false; abridor.getClientRects = () => [{}]
     }
   })
+})
+
+await confere('nota: ao sair da aba Ficha retorna ao campo ou às ferramentas se a janela estiver fechada', async () => {
+  await comFocoDaNota(async ({ abrir, abridor, externo, documento }) => {
+    for (const caso of ['aberta', 'aberta-com-botao-antes', 'fechada']) {
+      const janelaFechada = caso === 'fechada'
+      abridor.isConnected = true
+      externo.focos = 0
+      const campo = { isConnected: true, disabled: false, getClientRects: () => [{}], focus() { documento.activeElement = this } }
+      const tela = abrir({ aoFechar: () => { documento.activeElement = documento.body } })
+      abridor.isConnected = false
+      documento.querySelector = seletor => seletor.includes(',') && caso === 'aberta-com-botao-antes' ? externo
+        : seletor.includes('textarea') && !janelaFechada ? campo : seletor.includes('button') ? externo : null
+      doTipo(tela, 'dialog')[0].props.onKeyDown({ key: 'Escape', defaultPrevented: false, stopPropagation: nada })
+      assert.equal(documento.activeElement, janelaFechada ? externo : campo, 'o foco permanece no compositor com ou sem campo habilitado')
+      tela.encerrar()
+    }
+  })
+})
+
+await confere('nota nova e reativada fica à frente dos painéis móveis', async () => {
+  const { proximaFrentePainel } = await import('../src/hooks/estadoPainelMovel.js')
+  const frenteAnterior = proximaFrentePainel()
+  const tela = new Tela(ModalNota, { nomeCliente: 'Ana', aoSalvar: nada, aoFechar: nada })
+  assert.ok(doTipo(tela, 'dialog')[0].props.style?.zIndex > frenteAnterior, 'nota abre acima do painel existente')
+  const outraFrente = proximaFrentePainel()
+  doTipo(tela, 'dialog')[0].props.onFocusCapture()
+  tela.renderizar()
+  assert.ok(doTipo(tela, 'dialog')[0].props.style.zIndex > outraFrente, 'retorno do foco traz o editor para frente')
+  const frentePonteiro = proximaFrentePainel()
+  doTipo(tela, 'dialog')[0].props.onPointerDownCapture()
+  tela.renderizar()
+  assert.ok(doTipo(tela, 'dialog')[0].props.style.zIndex > frentePonteiro)
+  tela.encerrar()
+})
+
+await confere('nota embutida: recolher restaura envio aberto/fechado e preserva foco externo após confirmação tardia', () => {
+  const fonte = readFileSync(new URL('features/atendimento/PainelAtendimento.jsx', src), 'utf8')
+  const corpo = fonte.match(/useEffect\(\(\) => \{(\s+const anterior = contextoDaNota\.current[\s\S]*?)\}, \[editorNotaVisivel, visivel, focarAoTrocar, selecionada\?\.id\]\)/)?.[1]
+  assert.ok(corpo, 'o efeito real de retorno de foco foi localizado')
+  const executar = new Function('contextoDaNota', 'editorNotaVisivel', 'visivel', 'focarAoTrocar', 'selecionada', 'compositorPublicoRef', 'document', corpo)
+  for (const fechada of [false, true]) for (const fora of [false, true]) {
+    const documento = { body: {}, documentElement: {} }
+    const no = (visivel = true) => ({ getClientRects: () => visivel ? [{}] : [], focus() { documento.activeElement = this } })
+    const campo = { ...no(), selectionStart: 2, selectionEnd: 4, selectionDirection: 'forward', scrollTop: 12,
+      setSelectionRange(inicio, fim, direcao) { this.selecao = [inicio, fim, direcao] } }
+    const ferramenta = no(), externo = no()
+    documento.activeElement = fora ? externo : documento.body
+    executar({ current: { id: 'a', visivel: true } }, false, true, true, { id: 'a' }, { current: {
+      querySelector: () => fechada ? null : campo, querySelectorAll: () => [no(false), ferramenta],
+    } }, documento)
+    assert.equal(documento.activeElement, fora ? externo : fechada ? ferramenta : campo)
+    if (!fechada && !fora) assert.deepEqual(campo.selecao, [2, 4, 'forward'])
+  }
 })
 
 if (falhas.length > 0) {

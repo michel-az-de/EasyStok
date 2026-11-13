@@ -34,13 +34,15 @@ public class FecharCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
     ILogger<FecharCaixaUseCase> logger,
-    ObterCaixaDiaUseCase? caixaDia = null)
+    ObterCaixaDiaUseCase? caixaDia = null,
+    INotificacaoRepository? avisos = null)
 {
     public async Task<FechamentoCaixaResult> ExecuteAsync(FecharCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (cmd.ValorContado is { } contado && (contado < 0 || contado != decimal.Round(contado, 2)))
             throw new UseCaseValidationException("O valor contado deve ser positivo e ter até duas casas decimais.");
+        if (cmd.ValorContado is { } contadoMax) ValidacaoCaixa.ExigirValorMonetario(contadoMax, "O valor contado");
 
         var hoje = HorarioBrasil.Hoje();   // dia operacional em Brasilia (alinha com o card; BUG-09)
 
@@ -97,9 +99,10 @@ public class FecharCaixaUseCase(
                 var pagInter = await repo.GetTotalPagamentosPedidosNoIntervaloAsync(cmd.EmpresaId, iniInter, fimInter, cmd.LojaId);
                 if (movsInter.Any() || vendasInter != 0m || pagInter != 0m)
                 {
-                    var aviso = $"Atencao: ha lancamentos entre {dia.AddDays(1):dd/MM/yyyy} e " +
-                                $"{hoje.AddDays(-1):dd/MM/yyyy} sob esta sessao que NAO foram incluidos " +
-                                "neste fechamento (revisar/reconciliar manualmente).";
+                    // #2256: o aviso aparece na tela do fechamento; português correto e sem caixa alta.
+                    var aviso = $"Atenção: há lançamentos entre {dia.AddDays(1):dd/MM/yyyy} e " +
+                                $"{hoje.AddDays(-1):dd/MM/yyyy} nesta sessão que não entraram neste fechamento. " +
+                                "Revise e reconcilie manualmente.";
                     observacoes = string.IsNullOrWhiteSpace(observacoes) ? aviso : $"{observacoes}\n{aviso}";
                     logger.LogWarning(
                         "Fechamento {Dia} (empresa {Empresa}, loja {Loja}): lancamentos em dias intermediarios nao cobertos.",
@@ -150,7 +153,23 @@ public class FecharCaixaUseCase(
 
         logger.LogInformation("Caixa {Data} fechado (saldo final={Saldo}, vendas={Vendas}).",
             dia, fechamento.SaldoFinal, totalVendas);
+        await ResolverAvisosDoSinoAsync(cmd.EmpresaId);
         return Map(fechamento);
+    }
+
+    // #2258 (F1): o aviso "caixa aberto desde ..." do sino sai de circulação quando o caixa fecha. O fechamento já está
+    // gravado; se resolver o aviso falhar, o job diário varre de novo, então nunca desfaz nem falha o fechamento.
+    private async Task ResolverAvisosDoSinoAsync(Guid empresaId)
+    {
+        if (avisos is null) return;
+        try
+        {
+            await avisos.ResolverAvisosDeCaixaFechadoAsync(empresaId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Caixa fechado, mas os avisos do sino não foram resolvidos (empresa {Empresa}).", empresaId);
+        }
     }
 
     /// <summary>

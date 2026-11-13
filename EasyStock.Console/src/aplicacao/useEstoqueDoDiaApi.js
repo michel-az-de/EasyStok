@@ -3,7 +3,7 @@ import { criarEstoqueDoDia, lerEstoqueDoDia } from './estoqueDoDia'
 
 // Estoque do dia lido da API (M2.1, #1490). estado: carregando | ok | erro
 export function useEstoqueDoDiaApi() {
-  const [carga, setCarga] = useState({ estado: 'carregando', pratos: [], alertas: [], erro: null, aviso: null })
+  const [carga, setCarga] = useState({ estado: 'carregando', pratos: [], alertas: [], erro: null, aviso: null, feito: null })
 
   const recarregar = useCallback(() => lerEstoqueDoDia()
     .then((r) => setCarga((atual) => ({ ...atual, ...r, estado: 'ok', erro: null })))
@@ -19,9 +19,10 @@ export function useEstoqueDoDiaApi() {
 
   const acoes = useMemo(() => criarEstoqueDoDia({
     recarregar,
-    aoErro: (mensagem) => setCarga((atual) => ({ ...atual, aviso: mensagem })),
+    aoErro: (mensagem) => setCarga((atual) => ({ ...atual, aviso: mensagem, feito: null })),
+    aoFeito: (mensagem) => setCarga((atual) => ({ ...atual, feito: mensagem, aviso: null })),
   }), [recarregar])
 
-  const fecharAviso = useCallback(() => setCarga((atual) => ({ ...atual, aviso: null })), [])
+  const fecharAviso = useCallback(() => setCarga((atual) => ({ ...atual, aviso: null, feito: null })), [])
   return { ...carga, recarregar, fecharAviso, ...acoes }
 }

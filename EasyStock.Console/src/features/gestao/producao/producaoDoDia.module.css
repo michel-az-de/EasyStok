@@ -2,6 +2,11 @@
 
 .chips { display: flex; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
 
+@media (max-width: 600px) {
+  .filtros .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--e-2); }
+  .filtros .chips > * { flex-shrink: 0; }
+}
+
 /* #1809: os três passos à vista, lado a lado no computador e empilhados na tela estreita. */
 .passos {
   list-style: none; margin: 0; padding: var(--e-3) var(--e-4); display: grid; gap: var(--e-2) var(--e-4);
@@ -16,18 +21,18 @@
 }
 
 /* #2081 (A14, A6): os passos recolhem numa linha depois do primeiro lote; "Conectar aparelho" fica ao lado. */
-.topoDaProducao { position: relative; min-width: 0; }
+.topoDaProducao { min-width: 0; display: grid; gap: var(--e-1); }
+/* #2235 (banca): dica e aparelho na mesma linha, lado a lado; em tela estreita o aparelho desce. */
+.linhaDoTopo { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2) var(--e-4); flex-wrap: wrap; min-width: 0; }
+.dicaDosPassos { flex: 1 1 280px; margin: 0; min-width: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-corpo); }
 .ajudaDosPassos { min-width: 0; }
-/* O botão fica na linha do "Como registrar", à direita; os passos abertos ocupam a largura toda embaixo. */
-.acoesDoTopo { position: absolute; top: 0; right: 0; display: flex; align-items: center; min-height: var(--toque); }
+.acoesDoTopo { flex: none; display: flex; align-items: center; justify-content: flex-end; min-height: var(--toque); max-width: 100%; }
 .acoesDoTopo:empty { display: none; }
-@media (max-width: 759px) {
-  .acoesDoTopo { position: static; justify-content: flex-end; margin-top: var(--e-2); }
-}
 .ajudaDosPassos > summary {
-  width: fit-content; min-height: var(--toque); display: flex; align-items: center; cursor: pointer;
-  color: var(--marca); font-size: var(--t-apoio); font-weight: 600;
+  width: fit-content; min-height: var(--toque); display: flex; align-items: center; cursor: pointer; font-size: var(--t-apoio);
 }
+.ajudaDosPassos > summary::marker, .ajudaDosPassos > summary::-webkit-details-marker { display: none; content: ''; }
+.verPassos { color: var(--marca); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .ajudaDosPassos > summary:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .ajudaDosPassos[open] > summary { margin-bottom: var(--e-2); }
 
@@ -40,8 +45,8 @@
 .palco { display: block; min-width: 0; }
 .bancada { display: grid; gap: var(--e-5); grid-template-columns: minmax(0, 1fr); align-items: start; }
 .cardapio, .colunaDoLote { display: grid; gap: var(--e-3); min-width: 0; }
-.filtros { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
-.busca { flex: 0 1 260px; min-width: 0; }
+.filtros { display: flex; align-items: center; justify-content: flex-start; gap: var(--e-3); flex-wrap: wrap; min-width: 0; }
+.busca { flex: 0 1 320px; min-width: 0; }
 
 /* O foco do teclado não pode parar atrás da barra fixa: quem recebe foco rola com folga embaixo. */
 .bancada :is(button, input, select, summary, a) { scroll-margin-block-end: 200px; }
@@ -58,7 +63,9 @@
   border: var(--b-1) solid transparent; border-radius: var(--r-2); background: var(--papel); overflow: clip;
 }
 .noLote { border-color: var(--marca); background: var(--marca-claro); }
+.noLote .tamanho { background: var(--papel); }
 .tocar {
+  -webkit-touch-callout: none; user-select: none; /* #2364: segurar o cartão abre a quantidade, não o menu do aparelho */
   display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: var(--e-1);
   min-width: 0; width: 100%; padding: var(--e-3); padding-bottom: calc(var(--toque) + var(--e-3));
   border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
@@ -67,14 +74,29 @@
 /* #1809: a foto ocupa a largura do cartão numa proporção fixa. O lugar existe antes de a imagem
    chegar e continua igual sem foto: nada abaixo dela se mexe. */
 .fotoDoPrato {
+  position: relative;
   display: grid; place-items: center; align-self: stretch; aspect-ratio: 4 / 3; margin-bottom: var(--e-1); overflow: hidden;
   border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta-2);
 }
 .fotoDoPrato img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .tocar:focus-visible, .menos:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: -2px; }
 .tocar:disabled, .menos:disabled { cursor: default; opacity: .6; }
-.nomeDoPrato { color: var(--tinta); font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); overflow-wrap: anywhere; }
-.tamanho { color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-compacto); white-space: nowrap; }
+/* #2235 (banca T3-7): o nome reserva duas linhas; nome mais longo cresce em vez de ser cortado (WCAG 1.4.12). */
+.nomeDoPrato {
+  min-height: 2lh;
+  color: var(--tinta); font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); overflow-wrap: anywhere;
+}
+/* #2235 (banca T3-5): sem foto, o tamanho é um selo forte embaixo do nome; com foto, vai sobre ela. */
+.tamanho {
+  display: inline-flex; align-items: center; padding: 2px var(--e-2); border-radius: var(--r-pilula);
+  background: var(--marca-claro); color: var(--tinta); font-size: var(--t-corpo); font-weight: 750; line-height: var(--lh-compacto); white-space: nowrap;
+}
+.tamanhoComFoto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.seloDoTamanho {
+  position: absolute; top: var(--e-2); left: var(--e-2); padding: var(--e-1) var(--e-2); border-radius: var(--r-pilula);
+  background: var(--tinta); color: var(--papel); font-size: var(--t-corpo); font-weight: 750; line-height: 1; box-shadow: var(--sombra);
+  max-width: calc(100% - 2 * var(--e-2)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .saldo { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); font-variant-numeric: tabular-nums; }
 .saldo strong { color: var(--tinta); font-weight: 700; }
 
@@ -84,10 +106,14 @@
   position: absolute; inset: auto var(--e-2) var(--e-2) var(--e-2);
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); pointer-events: none;
 }
+/* #2364: o contador é botão (abre o campo da quantidade), com a mesma área de toque do "−". */
 .contagem {
-  min-width: 2.25em; padding: var(--e-1) var(--e-2); border-radius: var(--r-pilula); background: var(--acao); color: var(--sobre-acao);
+  min-width: max(2.25em, var(--toque)); min-height: var(--toque); padding: var(--e-1) var(--e-2); pointer-events: auto;
+  border: 0; border-radius: var(--r-pilula); background: var(--acao); color: var(--sobre-acao); cursor: pointer; font-family: inherit;
   font-size: var(--t-forte); font-weight: 750; line-height: var(--lh-compacto); text-align: center; font-variant-numeric: tabular-nums;
 }
+.contagem:focus-visible { outline: var(--b-2) solid var(--tinta); outline-offset: 2px; }
+.contagem:disabled { cursor: default; opacity: .6; }
 .menos {
   display: grid; place-items: center; min-width: var(--toque); min-height: var(--toque); pointer-events: auto;
   border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); background: var(--papel); color: var(--tinta); cursor: pointer;

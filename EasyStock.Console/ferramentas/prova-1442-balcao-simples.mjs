@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 // Prova da issue #1442: Balcão, banner de pausa e Ficha mais simples.
-//   1. o Balcão abre em "Todas" (estado inicial do reducer);
+//   1. o Balcão abre em "Precisa de você" (estado inicial do reducer; #2232 L5 reverteu "Todas");
 //   2. a linha da conversa diz o estado em uma palavra (automático, com você,
 //      outro atendente, encerrada, bloqueado) e o motivo de precisar vence;
 //   3. o número da linha é o de mensagens sem resposta, com a API de reserva;
@@ -60,17 +60,19 @@ const conversa = (extra = {}) => ({
 })
 
 // --- 1. Todas é a aba padrão ------------------------------------------------------
-await confere('1. o Balcão abre em "Todas", não em "Precisa de você"', () => {
+// #2232 (banca UX, L5): a banca pediu a fila de ação primeiro; reverte a decisão de 07/10.
+await confere('1. o Balcão abre em "Precisa de você"', () => {
   assert.ok(estadoInicial, 'estadoInicial não exportado')
   const inicio = estadoInicial({ conversas: [], catalogo: { cardapio: [], janelas: [], canais: [] }, regras: [] })
-  assert.equal(inicio.filtros.aba, 'todas')
+  assert.equal(inicio.filtros.aba, 'precisa')
 })
 
 // --- 2. Estado da linha ---------------------------------------------------------
 await confere('2. automático ligado: "Automático"', () => {
   const e = linha.estadoDaLinha(conversa(), { pausado: false })
   assert.equal(e.chave, 'automatico')
-  assert.equal(e.texto, 'Automático')
+  assert.equal(e.texto, 'Assistente')
+  assert.equal(e.icone, 'sparkles')
 })
 await confere('2. ela assumiu ou escreveu: "Com você"', () => {
   assert.equal(linha.estadoDaLinha(conversa(), { pausado: PAUSA_POR_ASSUMIR }).texto, 'Com você')
@@ -82,7 +84,8 @@ await confere('2. outro atendente assumiu: não diz que é ela', () => {
   assert.equal(e.texto, 'Outro atendente')
 })
 await confere('2. encerrada e bloqueado vencem a pausa', () => {
-  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).texto, 'Encerrada')
+  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).texto, 'Concluída')
+  assert.equal(linha.estadoDaLinha(conversa({ estado: 'Encerrado' }), { pausado: true }).icone, 'circle-check')
   assert.equal(linha.estadoDaLinha(conversa(), { grupo: 'encerradas' }).chave, 'encerrada')
   assert.equal(linha.estadoDaLinha(conversa({ bloqueio: { motivo: 'x' } }), { pausado: true }).texto, 'Bloqueado')
 })

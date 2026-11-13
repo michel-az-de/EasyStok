@@ -1,11 +1,14 @@
 using EasyStock.Api.Authorization;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.HealthChecks;
 using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
+using EasyStock.Observabilidade;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using EasyStock.Infra.Integrations.DependencyInjection;
@@ -427,6 +430,9 @@ public static class ApiServiceCollectionExtensions
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddEnderecoForaDoLogHttp();
+        // #2376: espaço livre do disco no /health/disco, vigiado de fora (scripts/uptime/alvos.txt).
+        services.AddHealthChecks().Add(new HealthCheckRegistration(
+            "Disco", _ => DiscoHealthCheck.DoSistema(configuration), HealthStatus.Unhealthy, [DiscoHealthCheck.Tag]));
 
         // Opt-in, como no Web e no Worker (issue 1002): sem endpoint nao ha provider nem exporter.
         // Antes caia em localhost:4317 e mandava traces e metricas para o vazio em producao (#2107).
@@ -451,6 +457,8 @@ public static class ApiServiceCollectionExtensions
                     .AddHttpClientInstrumentation(http =>
                         http.EnrichWithHttpRequestMessage = EnderecoForaDaTelemetria.OcultarUrlNoSpan(configuration))
                     .AddNpgsql()
+                    // #2376: o span sai com o mesmo mascaramento do log; antes do exporter.
+                    .AddProcessor(new SpanQueRedige())
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);
 
                 if (environment.IsDevelopment())

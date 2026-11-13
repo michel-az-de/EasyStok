@@ -6,21 +6,24 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { lerReceita, orientacoesDaReceita, rotuloDoRendimento, UNIDADES_RECEITA, UNIDADES_RENDIMENTO } from '../../../aplicacao/receitas'
+import { lerReceita, orientacoesDaReceita, progressoDasReceitas, receitaEmBranco, rotuloDoRendimento, temReceita, textoDoProgresso, UNIDADES_RECEITA, UNIDADES_RENDIMENTO } from '../../../aplicacao/receitas'
 import { lerInsumos } from '../../../aplicacao/insumos'
 import { custoDoRascunho, rascunhoDaSugestao } from '../../../aplicacao/calculosReceita'
 import { PesquisaReceitaIa } from './PesquisaProducao'
 import { moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
+import botaoCss from '../../../componentes/Botao.module.css'
 
 // M2 › Receitas (M2.4a, #1498). Por prato do cardápio ligado ao estoque: quanto rende e os insumos
 // com quantidade e unidade. O custo por porção vem do EasyStok, com a unidade convertida (a receita
 // pode pedir 1,2 kg de um molho que custa por grama). Na API "ficha técnica" é a nutricional; aqui
 // é a receita. Gravar é do Gerente. D-M2-01 (#1499): o prato marcado baixa os insumos ao produzir.
 // M1.4e (#1552): a receita pode render em porções ou em peso; em peso, a baixa acompanha o tamanho da porção.
+// #2235 (banca A1-A3): todo prato do cardápio aparece; o ainda sem estoque é ligado ao salvar a receita.
+// Um estado só por prato: "Sem receita" ou o custo.
 const custoPor = (r) => (r.custoPorRendimento == null
-  ? (r.linhas === 0 ? 'sem receita' : 'custo incompleto (insumo sem custo)')
+  ? 'Custo incompleto (insumo sem custo)'
   : `${moeda(r.custoPorRendimento)} por ${r.unidadeRendimento === 'Un' ? 'porção' : rotuloDoRendimento(r.unidadeRendimento)}`)
 
 function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharAviso }) {
@@ -32,10 +35,14 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState(null)
   const [tentativa, setTentativa] = useState(0)
+  // A receita é lida uma vez, pelo produto que o prato tinha ao abrir. Se o salvar ligar o prato e
+  // falhar, a lista relida traz o produto novo sem apagar o que já foi digitado aqui.
+  const [produtoAoAbrir] = useState(prato.produtoId)
 
   useEffect(() => {
     let vivo = true
-    Promise.all([lerReceita(prato.produtoId), podeEditar ? lerInsumos() : []]).then(([d, i]) => {
+    const receita = produtoAoAbrir ? lerReceita(produtoAoAbrir) : Promise.resolve(receitaEmBranco({ nome: prato.nome }))
+    Promise.all([receita, podeEditar ? lerInsumos() : []]).then(([d, i]) => {
       if (!vivo) return
       setDetalhe(d)
       setInsumos(i)
@@ -44,7 +51,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
       setLinhas(d.linhas.map((l) => ({ ...l, quantidade: String(l.quantidade) })))
     }).catch((e) => { if (vivo) setErro(e.message) })
     return () => { vivo = false }
-  }, [prato.produtoId, podeEditar, tentativa])
+  }, [prato.sku, prato.nome, produtoAoAbrir, podeEditar, tentativa])
 
   if (erro) return <div className={css.aba} role="alert">
     <p className={css.descricao}>Não foi possível carregar a receita{podeEditar ? ' e os insumos' : ''}. {erro}</p>
@@ -78,12 +85,13 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
     setSalvando(true)
     Promise.resolve(aoSalvar(prato.produtoId, {
       rendimento, unidadeRendimento: unidade, unidadeMedidaBase: detalhe.unidadeMedidaBase, linhas,
-    })).then((ok) => { if (ok !== false) aoFechar() }).finally(() => setSalvando(false))
+    }, prato)).then((ok) => { if (ok !== false) aoFechar() }).finally(() => setSalvando(false))
   }
   // A receita que já rende em litro ou mililitro mantém a unidade dela na lista.
   const unidadesDoRendimento = UNIDADES_RENDIMENTO.some((u) => u.valor === unidade)
     ? UNIDADES_RENDIMENTO
     : [...UNIDADES_RENDIMENTO, { valor: unidade, rotulo: unidade || 'Conferir unidade do rendimento' }]
+  const semInsumos = insumos.length === 0
   const orientacoes = orientacoesDaReceita({ prato, unidadeRendimento: unidade, linhas, insumos })
   const referencias = detalhe.linhas.filter((l) => !insumos.some((s) => s.id === l.insumoId))
     .map((l) => ({ id: l.insumoId, unidade: l.unidadeDoInsumo, custo: l.custoReferencia }))
@@ -107,7 +115,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
       {orientacoes.map((texto) => <p key={texto} className={css.aviso}>{texto}</p>)}
       <section aria-label="Custo estimado do rascunho">
         <p className={css.descricao}>{custos.total == null ? 'Custo incompleto: escolha os insumos e confira as quantidades, unidades e custos cadastrados.' : `Custo estimado da receita: ${moeda(custos.total)}`}
-          {custos.porRendimento != null && ` · ${moeda(custos.porRendimento)} por ${rotuloDoRendimento(unidade)}`}</p>
+          {custos.porRendimento != null && ` · ${moeda(custos.porRendimento)} por ${unidade === 'Un' ? 'porção' : rotuloDoRendimento(unidade)}`}</p>
       </section>
       <ul className={css.listaFormularios}>
         {linhas.map((l, i) => (
@@ -129,12 +137,14 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
         Não foi possível salvar a receita. {aviso}
         {' '}<Botao variante="texto" onClick={aoFecharAviso}>Fechar aviso</Botao>
       </p>}
+      {semInsumos && <p className={css.descricao}>Para montar a receita, cadastre primeiro os insumos.</p>}
       <div className={css.acoesReceita}>
         <Botao icone="plus" disabled={salvando} onClick={() => setLinhas((atual) => [...atual, { insumoId: '', quantidade: '', unidade: 'G', custo: null }])}>Mais um insumo</Botao>
         <Botao variante="texto" disabled={salvando} onClick={aoFechar}>Cancelar</Botao>
-        <Botao tipo="submit" variante="primario" icone="check" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar receita'}</Botao>
+        {/* #2362: sem insumo, salvar não leva a nada; a ação principal é ir cadastrá-los. */}
+        {semInsumos && <a className={`${botaoCss.botao} ${botaoCss.primario} ${css.linkBotao}`} href={hashDoModulo('producao', 'insumos')}>Cadastrar insumos</a>}
+        <Botao tipo="submit" variante={semInsumos ? 'secundario' : 'primario'} icone="check" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar receita'}</Botao>
       </div>
-      {insumos.length === 0 && <p className={css.descricao}>Para montar a receita, cadastre os insumos em <a className={css.link} href={hashDoModulo('producao', 'insumos')}>Insumos</a>.</p>}
     </form></>
   )
 }
@@ -147,15 +157,16 @@ export function AbaReceitasApi() {
   const [salvando, setSalvando] = useState(false)
   const [avisoDaEdicao, setAvisoDaEdicao] = useState(null)
   const avisoNoEditor = editando !== null && editando === avisoDaEdicao
+  const progresso = progressoDasReceitas(gestao.receitas)
 
-  const trocarEditor = (produtoId) => {
+  const trocarEditor = (sku) => {
     setAvisoDaEdicao(null)
-    setEditando(produtoId)
+    setEditando(sku)
   }
 
   const salvarReceita = async (...args) => {
     gestao.fecharAviso()
-    setAvisoDaEdicao(args[0])
+    setAvisoDaEdicao(editando)
     setSalvando(true)
     try { return await gestao.salvar(...args) } finally { setSalvando(false) }
   }
@@ -177,9 +188,9 @@ export function AbaReceitasApi() {
         {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar receitas</Botao>
       </p>}
       <p className={css.descricao}>
-        Rendimento e insumos para estimar o custo por porção. Os pratos aparecem após o primeiro registro em
-        {' '}<a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.
+        Monte a receita de cada prato do cardápio: quanto rende e os insumos. Com ela, o sistema calcula o custo por porção e pode baixar os insumos ao produzir.
       </p>
+      {progresso.total > 0 && <p className={css.nome} aria-live="polite">{textoDoProgresso(progresso)}</p>}
       {!podeEditar && <p className={css.descricao}>Seu perfil permite apenas consultar as receitas.</p>}
       {gestao.aviso && !avisoNoEditor && (
         <p className={css.aviso} role="alert">
@@ -187,34 +198,41 @@ export function AbaReceitasApi() {
         </p>
       )}
       {gestao.receitas.length === 0 ? (
-        <Vazio icone="nota" titulo="Nenhum prato para cadastrar receita">
-          Registre a primeira produção em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.
+        <Vazio icone="nota" titulo="Nenhum prato no cardápio">
+          Cadastre os pratos em <a className={css.link} href={hashDoModulo('cardapio', 'itens')}>Itens do cardápio</a> e volte para montar a receita de cada um.
         </Vazio>
       ) : (
         <ul className={css.lista}>
           {gestao.receitas.map((r) => (
-            <li key={r.produtoId} className={`${css.linha} ${css.receita}`}>
+            <li key={r.sku} className={`${css.linha} ${css.receita}`}>
               <div className={css.resumo}>
                 <span className={css.nome}>{r.nome}</span>
-                <span className={css.detalhe}>
-                  {r.linhas === 0 ? 'sem insumos' : `${r.linhas} ${r.linhas === 1 ? 'insumo' : 'insumos'} · rende ${r.rendimento} ${rotuloDoRendimento(r.unidadeRendimento)}`}
-                </span>
+                {temReceita(r) && <span className={css.detalhe}>
+                  {`${r.linhas} ${r.linhas === 1 ? 'insumo' : 'insumos'} · rende ${r.rendimento} ${rotuloDoRendimento(r.unidadeRendimento)}`}
+                </span>}
               </div>
               <div className={css.estados}>
-                <Pilula tom={r.custoPorRendimento == null ? 'neutro' : 'ok'} fina>{custoPor(r)}</Pilula>
-                {r.baixaAutomatica && <Pilula tom="ok" fina>baixa insumos ao produzir</Pilula>}
+                {temReceita(r)
+                  ? <Pilula tom={r.custoPorRendimento == null ? 'aviso' : 'ok'} fina>{custoPor(r)}</Pilula>
+                  : <Pilula tom="neutro" icone="nota">Sem receita</Pilula>}
+                {r.baixaAutomatica && <Pilula tom="ok" fina>Baixa insumos ao produzir</Pilula>}
               </div>
               <div className={`${css.acoes} ${css.acoesDaReceita}`}>
-                <Botao variante="texto" disabled={salvando} icone={podeEditar ? 'lapis' : 'nota'} aria-expanded={editando === r.produtoId} onClick={() => trocarEditor(editando === r.produtoId ? null : r.produtoId)}>
-                  {!podeEditar ? 'Ver receita' : r.linhas === 0 ? 'Montar receita' : 'Editar receita'}
-                </Botao>
-                {podeEditar && r.linhas > 0 && (
+                {(podeEditar || temReceita(r)) && (
+                  <Botao variante={podeEditar && r.sku === progresso.proximo ? 'primario' : 'secundario'} disabled={salvando}
+                    icone={!podeEditar ? 'nota' : temReceita(r) ? 'lapis' : 'mais'} aria-expanded={editando === r.sku}
+                    aria-label={`${!podeEditar ? 'Ver receita' : temReceita(r) ? 'Editar receita' : 'Montar receita'} de ${r.nome}`}
+                    onClick={() => trocarEditor(editando === r.sku ? null : r.sku)}>
+                    {!podeEditar ? 'Ver receita' : temReceita(r) ? 'Editar receita' : 'Montar receita'}
+                  </Botao>
+                )}
+                {podeEditar && temReceita(r) && (
                   <Botao variante="texto" disabled={salvando} onClick={() => { setAvisoDaEdicao(null); gestao.marcarBaixa(r.produtoId, !r.baixaAutomatica) }}>
                     {r.baixaAutomatica ? 'Parar de baixar insumos' : 'Baixar insumos ao produzir'}
                   </Botao>
                 )}
               </div>
-              {editando === r.produtoId && (
+              {editando === r.sku && (
                 <Modal titulo={`Receita de ${r.nome}`} aoFechar={salvando ? undefined : () => trocarEditor(null)} largura="min(900px, calc(100vw - 24px))">
                 <EditorReceita prato={r} aoSalvar={salvarReceita} aoFechar={() => trocarEditor(null)} podeEditar={podeEditar}
                   aviso={avisoNoEditor ? gestao.aviso : null} aoFecharAviso={gestao.fecharAviso} />

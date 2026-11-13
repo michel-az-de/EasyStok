@@ -9,7 +9,7 @@ import { pagamentoNaEntregaDasObservacoes, textoDoTroco } from './cobranca'
 import { aReceberDoCartao, quitadoNoCartao } from './pagamento'
 import { nomeDoPedido } from './pedido'
 
-const SEM_JANELA = 'sem-janela'
+export const SEM_JANELA = 'sem-janela'
 const hhmm = (h) => String(h ?? '').slice(0, 5)
 const chaveDaJanela = (label, inicio, fim) => `${hhmm(inicio)}|${hhmm(fim)}|${String(label ?? '').trim().toLowerCase()}`
 
@@ -19,6 +19,11 @@ export const diaDaSemanaDaData = (data) => new Date(`${data}T12:00:00Z`).getUTCD
 // "quinta-feira, 08/10/2026", para o cabeçalho da tela e do papel.
 export const rotuloDaData = (data) => new Date(`${data}T12:00:00Z`).toLocaleDateString('pt-BR', {
   weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC',
+})
+
+// #2418: na tela, por extenso ("quinta-feira, 12 de novembro"); o ano só aparece quando não é o de `hoje`.
+export const rotuloDoDiaPorExtenso = (data, hoje) => new Date(`${data}T12:00:00Z`).toLocaleDateString('pt-BR', {
+  weekday: 'long', day: 'numeric', month: 'long', ...(data.slice(0, 4) === String(hoje ?? '').slice(0, 4) ? {} : { year: 'numeric' }), timeZone: 'UTC',
 })
 
 // Dia de produção do pedido, como o KDS calcula: a data da vaga; sem vaga, o agendamento;

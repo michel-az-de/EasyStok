@@ -74,7 +74,8 @@ public class AtendimentoComandaController(
             body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
             body.JanelaId, body.DataEntrega, body.EnderecoId, body.Forma, body.Observacoes,
             EnviarAoCliente: body.EnviarAoCliente,
-            UsuarioId: currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null), ct)));
+            UsuarioId: currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            FreteCombinado: body.FreteCombinado), ct)));
     }
 
     [SwaggerOperation(Summary = "Quote of the order before creating it: freight, total, deposit and rest (#1884)",
@@ -94,7 +95,7 @@ public class AtendimentoComandaController(
         return Tratar(async () => DataOk(await simularPedidoUseCase.ExecuteAsync(new SimularPedidoConversaInput(
             currentUser.EmpresaId, id,
             body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
-            body.JanelaId, body.DataEntrega, body.EnderecoId), ct)));
+            body.JanelaId, body.DataEntrega, body.EnderecoId, body.FreteCombinado), ct)));
     }
 
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)
@@ -151,7 +152,8 @@ public class AtendimentoComandaController(
     };
 }
 
-/// <summary>Comanda fechada pela operadora. <c>Forma</c>: <c>online</c> (padrão) ou <c>na_entrega</c>.</summary>
+/// <summary>Comanda fechada pela operadora. <c>Forma</c>: <c>online</c> (padrão) ou <c>na_entrega</c>.
+/// <c>FreteCombinado</c> (#2219): frete em reais combinado com o cliente quando o CEP está fora da área.</summary>
 public sealed record GerarPedidoConversaBody(
     IReadOnlyList<ItemComandaBody> Itens,
     Guid JanelaId,
@@ -159,14 +161,16 @@ public sealed record GerarPedidoConversaBody(
     Guid? EnderecoId = null,
     string? Forma = null,
     string? Observacoes = null,
-    bool EnviarAoCliente = true);
+    bool EnviarAoCliente = true,
+    decimal? FreteCombinado = null);
 
 /// <summary>Comanda a simular (#1884): o mesmo corpo do pedido, sem forma de pagamento nem envio.</summary>
 public sealed record SimularPedidoConversaBody(
     IReadOnlyList<ItemComandaBody> Itens,
     Guid JanelaId,
     DateOnly DataEntrega,
-    Guid? EnderecoId = null);
+    Guid? EnderecoId = null,
+    decimal? FreteCombinado = null);
 
 /// <param name="VariacaoId">M1.4b (#1531): a porção escolhida; null em prato com porções usa a padrão.</param>
 public sealed record ItemComandaBody(Guid CardapioItemId, int Qtd, string? Observacao = null, Guid? VariacaoId = null);

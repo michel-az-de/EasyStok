@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { NomeInsumoPesquisado } from './PesquisaProducao'
+import { useRef, useState } from 'react'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
@@ -7,16 +6,40 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useInsumosApi } from '../../../aplicacao/useInsumosApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { ondeOInsumoEUsado, rotuloDaEmbalagem, UNIDADES_INSUMO } from '../../../aplicacao/insumos'
-import { moeda } from '../../../dominio/formato'
+import { compraDoCusto, ondeOInsumoEUsado, rotuloDaEmbalagem, rotuloDaUnidade, UNIDADES_INSUMO, unidadesDeCompra } from '../../../aplicacao/insumos'
+import { moeda, textoDosCentavos } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
 
 // M2 › Insumos (M2.3, #1496). O intermediário (molho, recheio, massa laminada) e a embalagem, com o
 // saldo, o mínimo e em quantas receitas entra. Abaixo do mínimo aparece em "Comprar". Farinha e ovo
 // ficam fora (US-067). A Cozinha consulta; cadastrar e ajustar exigem a capacidade da sessão.
 const formatar = (n) => (Number.isInteger(n) ? String(n) : n.toLocaleString('pt-BR', { maximumFractionDigits: 2 }))
-// #2081 (E9): o custo volta ao campo com vírgula, como ela digita; "2.125" seria lido como milhar.
-const custoNoCampo = (custo) => (custo == null ? '' : String(custo).replace('.', ','))
+// #2363: o custo aparece e volta ao campo no formato de compra ("R$ 4,50 por kg"), não por grama.
+// O preço vai ao campo com vírgula, como ela digita (#2081: "2.125" seria lido como milhar).
+const precoNoCampo = (preco) => textoDosCentavos(Math.round(preco * 100))
+const compraNoCampo = (custo, unidade) => {
+  const compra = compraDoCusto(custo, unidade)
+  return compra
+    ? { preco: precoNoCampo(compra.preco), quantidade: String(compra.quantidade), unidadeCompra: compra.unidadeCompra }
+    : { preco: '', quantidade: '1', unidadeCompra: unidadesDeCompra(unidade)[0] }
+}
+const custoNaLista = (custo, unidade) => {
+  const compra = compraDoCusto(custo, unidade)
+  return `custo ${moeda(compra.preco)} por ${compra.quantidade > 1 ? `${compra.quantidade} ` : ''}${rotuloDaUnidade(compra.unidadeCompra)}`
+}
+
+// "Paguei R$ __ por __ [kg]": o sistema faz a conta até a unidade do insumo.
+function CamposDaCompra({ valores, aoMudar, unidade, disabled, nome = '' }) {
+  return (
+    <fieldset className={`${css.compra} ${css.linhaCompleta}`} disabled={disabled}>
+      <legend>Preço de compra (opcional)</legend>
+      <CampoTexto inputMode="decimal" rotulo="Paguei (R$)" aria-label={`Preço pago${nome && ` por ${nome}`}`} value={valores.preco} onChange={aoMudar('preco')} />
+      <CampoTexto inputMode="decimal" rotulo="por" aria-label={`Quantidade comprada${nome && ` de ${nome}`}`} value={valores.quantidade} onChange={aoMudar('quantidade')} />
+      <CampoSelecao rotulo="Unidade da compra" value={valores.unidadeCompra} onChange={aoMudar('unidadeCompra')}
+        opcoes={unidadesDeCompra(unidade).map((u) => ({ valor: u, rotulo: rotuloDaUnidade(u) }))} />
+    </fieldset>
+  )
+}
 
 // #1585: o aviso sai junto do formulário que o causou, como no Estoque do dia e nas Receitas.
 // `avisarEm(origem)` fecha o aviso anterior e diz onde sai o próximo: no cadastro, no ajuste do
@@ -26,8 +49,9 @@ const CADASTRO = 'cadastro'
 function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
   const [editando, setEditando] = useState(false)
   const [minimo, setMinimo] = useState(insumo.minimo ?? '')
-  const [custo, setCusto] = useState(() => custoNoCampo(insumo.custo))
+  const [compra, setCompra] = useState(() => compraNoCampo(insumo.custo, insumo.unidade))
   const [ocupado, setOcupado] = useState(false)
+  const un = rotuloDaUnidade(insumo.unidade)
 
   const fazer = async (acao) => {
     if (ocupado) return false
@@ -38,7 +62,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
   const salvar = (evento) => {
     evento.preventDefault()
     avisarEm(insumo.id)
-    fazer(() => gestao.atualizar(insumo.id, { minimo, custo })).then((ok) => { if (ok !== false) setEditando(false) })
+    fazer(() => gestao.atualizar(insumo.id, { minimo, ...compra, unidade: insumo.unidade })).then((ok) => { if (ok !== false) setEditando(false) })
   }
 
   return (
@@ -47,20 +71,21 @@ function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
         <span className={css.nome}>{insumo.nome}</span>
         <span className={css.detalhe}>
           {ondeOInsumoEUsado(insumo)}
-          {insumo.custo != null ? ` · custo ${moeda(insumo.custo)} por ${insumo.unidade}` : ''}
+          {insumo.custo != null ? ` · ${custoNaLista(insumo.custo, insumo.unidade)}` : ''}
         </span>
       </div>
-      <span className={css.preco}>{formatar(insumo.saldo)} {insumo.unidade}</span>
+      <span className={css.preco}>{formatar(insumo.saldo)} {un}</span>
       <div className={css.estados}>
-        {insumo.comprar && <Pilula tom="aviso" fina>Abaixo do mínimo ({insumo.minimo} {insumo.unidade})</Pilula>}
-        {!insumo.comprar && insumo.minimo != null && <Pilula tom="neutro" fina>Mínimo {insumo.minimo} {insumo.unidade}</Pilula>}
+        {insumo.comprar && <Pilula tom="aviso" fina>Abaixo do mínimo ({insumo.minimo} {un})</Pilula>}
+        {!insumo.comprar && insumo.minimo != null && <Pilula tom="neutro" fina>Mínimo {insumo.minimo} {un}</Pilula>}
         {insumo.embalagem && <Pilula tom="marca" fina>{rotuloDaEmbalagem(insumo)}</Pilula>}
       </div>
       {podeEditar && editando && (
         <Modal titulo={`Ajustar ${insumo.nome}`} aoFechar={ocupado ? undefined : () => { avisarEm(null); setEditando(false) }}>
         <form className={`${css.campos} ${css.formulario} ${css.ajusteInsumo}`} onSubmit={salvar}>
-          <CampoTexto disabled={ocupado} inputMode="numeric" rotulo={`Mínimo (${insumo.unidade})`} aria-label={`Mínimo de ${insumo.nome}`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
-          <CampoTexto disabled={ocupado} inputMode="decimal" rotulo={`Custo por ${insumo.unidade} (R$)`} aria-label={`Custo de ${insumo.nome}`} value={custo} onChange={(e) => setCusto(e.target.value)} />
+          <CampoTexto disabled={ocupado} inputMode="numeric" rotulo={`Mínimo (${un})`} aria-label={`Mínimo de ${insumo.nome}`} value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+          <CamposDaCompra disabled={ocupado} nome={insumo.nome} unidade={insumo.unidade} valores={compra}
+            aoMudar={(campo) => (e) => setCompra((atual) => ({ ...atual, [campo]: e.target.value }))} />
           {aviso && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">
             Não foi possível salvar o ajuste. {aviso}
             {' '}<Botao variante="texto" onClick={() => avisarEm(null)}>Fechar aviso</Botao>
@@ -75,7 +100,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
       {podeEditar && (
         <div className={css.acoes}>
           <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Ajustar ${insumo.nome}`} aria-haspopup="dialog" onClick={() => {
-            setMinimo(insumo.minimo ?? ''); setCusto(custoNoCampo(insumo.custo)); setEditando(true)
+            setMinimo(insumo.minimo ?? ''); setCompra(compraNoCampo(insumo.custo, insumo.unidade)); setEditando(true)
           }}>Ajustar</Botao>
           <Botao variante="texto" disabled={ocupado} onClick={() => { avisarEm(null); fazer(() => gestao.marcarEmbalagem(insumo.id, !insumo.embalagem)) }}>
             {insumo.embalagem ? 'Não é embalagem' : 'É embalagem'}
@@ -90,10 +115,14 @@ export function AbaInsumosApi() {
   const { acoes } = useAcessoModulos()
   const podeEditar = acoes.editarProducao === true
   const gestao = useInsumosApi()
-  const [novo, setNovo] = useState({ nome: '', unidade: 'G', minimo: '', custo: '', embalagem: false })
+  const NOVO = { nome: '', unidade: 'G', minimo: '', preco: '', quantidade: '', unidadeCompra: 'Kg', saldo: '', embalagem: false }
+  const [novo, setNovo] = useState(NOVO)
   const [criando, setCriando] = useState(false)
   const [cadastroAberto, setCadastroAberto] = useState(false)
   const [origemDoAviso, setOrigemDoAviso] = useState(null)
+  // #2258 (auditoria P6): o nome vazio não apaga o botão; o clique mostra o erro sob o campo e foca nele.
+  const [erroDoNome, setErroDoNome] = useState(null)
+  const nomeRef = useRef(null)
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando os insumos…</output>
   if (gestao.estado === 'erro' && gestao.insumos.length === 0) {
@@ -112,15 +141,26 @@ export function AbaInsumosApi() {
   }
   // Sem formulário para receber o aviso (o insumo saiu da lista), ele volta ao topo.
   const avisoNoFormulario = origemDoAviso === CADASTRO ? podeEditar && cadastroAberto : gestao.insumos.some((i) => i.id === origemDoAviso)
-  const mudarNovo = (campo) => (e) => setNovo((atual) => ({ ...atual, [campo]: e.target.value }))
+  const mudarNovo = (campo) => (e) => {
+    if (campo === 'nome') setErroDoNome(null)
+    const valor = e.target.value
+    // A unidade da compra segue a família da unidade do insumo (g com kg, ml com L).
+    setNovo((atual) => ({ ...atual, [campo]: valor, ...(campo === 'unidade' ? { unidadeCompra: unidadesDeCompra(valor)[0] } : {}) }))
+  }
+  const fecharCadastro = () => { avisarEm(null); setErroDoNome(null); setCadastroAberto(false) }
   const cadastrar = (evento) => {
     evento.preventDefault()
     if (criando) return
+    if (!novo.nome.trim()) { setErroDoNome('Informe o nome do insumo.'); nomeRef.current?.focus(); return }
     avisarEm(CADASTRO)
     setCriando(true)
-    Promise.resolve(gestao.criar(novo)).then((ok) => { if (ok !== false) { setNovo({ nome: '', unidade: novo.unidade, minimo: '', custo: '', embalagem: novo.embalagem }); setCadastroAberto(false) } }).finally(() => setCriando(false))
+    Promise.resolve(gestao.criar(novo)).then((ok) => { if (ok !== false) { setNovo({ ...NOVO, unidade: novo.unidade, unidadeCompra: novo.unidadeCompra, embalagem: novo.embalagem }); setCadastroAberto(false) } }).finally(() => setCriando(false))
   }
 
+  const semInsumo = gestao.insumos.length === 0
+  // Embalagem conta por unidade: o saldo e a compra seguem em un.
+  const unidadeDoNovo = novo.embalagem ? 'Un' : novo.unidade
+  const abrirCadastro = <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setErroDoNome(null); setCadastroAberto(true) }}>Cadastrar insumo</Botao>
   return (
     <div className={css.aba}>
       {gestao.estado === 'erro' && <p className={css.aviso} role="alert">
@@ -134,22 +174,29 @@ export function AbaInsumosApi() {
       )}
 
       {/* #2081 (E11): a ação principal é um botão do tamanho do texto no topo, não uma barra da largura da tela. */}
+      {/* #2235 (banca B1-B3): sem insumo, a tela é um estado vazio com exemplo e o botão junto da frase;
+          "Comprar" só aparece quando há insumo para comparar com o mínimo. */}
       <div className={css.topo}>
         <p className={css.descricao}>Saldo, estoque mínimo e uso nas receitas.</p>
-        {podeEditar && <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { avisarEm(CADASTRO); setCadastroAberto(true) }}>Cadastrar insumo</Botao>}
+        {podeEditar && semInsumo === false && abrirCadastro}
       </div>
 
+      {!semInsumo && (
       <section className={css.secao} aria-labelledby="insumos-comprar">
         <h3 id="insumos-comprar" className={css.tituloSecao}>Comprar</h3>
         {comprar.length === 0
           ? <p className={css.descricao}>Nenhum insumo abaixo do mínimo.</p>
-          : <p className={css.descricao}>{comprar.map((i) => `${i.nome} (tem ${formatar(i.saldo)} ${i.unidade}, mínimo ${i.minimo})`).join(' · ')}</p>}
+          : <p className={css.descricao}>{comprar.map((i) => `${i.nome} (tem ${formatar(i.saldo)} ${rotuloDaUnidade(i.unidade)}, mínimo ${i.minimo})`).join(' · ')}</p>}
       </section>
+      )}
 
       <section className={css.secao} aria-labelledby="insumos-lista">
         <h3 id="insumos-lista" className={css.tituloSecao}>Insumos cadastrados</h3>
-        {gestao.insumos.length === 0 ? (
-          <p className={css.descricao}>Nenhum insumo cadastrado.{podeEditar && ' Use Cadastrar insumo para incluir molho, recheio ou embalagem.'}</p>
+        {semInsumo ? (
+          <Vazio icone="nota" titulo="Nenhum insumo cadastrado" acao={podeEditar ? abrirCadastro : null}>
+            Insumo é o que entra na receita: molho de tomate em gramas, massa fresca em quilos, embalagem em unidades.
+            {podeEditar ? ' Com eles, a receita calcula o custo por porção.' : ' Quem gerencia a produção cadastra os insumos.'}
+          </Vazio>
         ) : (
           <ul className={css.lista}>
             {gestao.insumos.map((i) => <LinhaInsumo key={i.id} insumo={i} gestao={gestao} podeEditar={podeEditar}
@@ -159,21 +206,24 @@ export function AbaInsumosApi() {
       </section>
 
       {podeEditar ? <>
-      {cadastroAberto && <Modal titulo="Cadastrar insumo" aoFechar={criando ? undefined : () => { avisarEm(null); setCadastroAberto(false) }} largura="min(720px, calc(100vw - 24px))"><form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
-        <NomeInsumoPesquisado disabled={criando} value={novo.nome} onChange={mudarNovo('nome')} />
-        <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: u }))} />
+      {cadastroAberto && <Modal titulo="Cadastrar insumo" aoFechar={criando ? undefined : fecharCadastro} largura="min(720px, calc(100vw - 24px))"><form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
+        <CampoTexto ref={nomeRef} erro={erroDoNome} disabled={criando} rotulo="Nome do insumo" placeholder="Ex.: farinha de trigo" maxLength={180} value={novo.nome} onChange={mudarNovo('nome')} />
+        <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: rotuloDaUnidade(u) }))} />
         <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo (opcional)" value={novo.minimo} onChange={mudarNovo('minimo')} />
-        <CampoTexto disabled={criando} inputMode="decimal" rotulo="Custo por unidade (R$)" aria-label="Custo por unidade" value={novo.custo} onChange={mudarNovo('custo')} />
+        <CampoTexto disabled={criando} inputMode="decimal" rotulo={`Quanto tem hoje (${rotuloDaUnidade(unidadeDoNovo)}, opcional)`} dica="Vira o saldo inicial no Estoque" value={novo.saldo} onChange={mudarNovo('saldo')} />
+        <CamposDaCompra disabled={criando} unidade={unidadeDoNovo} valores={novo} aoMudar={mudarNovo} />
+        <label className={`${css.chave} ${css.linhaCompleta}`}>
+          <input type="checkbox" disabled={criando} checked={novo.embalagem} onChange={(e) => { const embalagem = e.target.checked; setNovo((atual) => ({ ...atual, embalagem, unidadeCompra: unidadesDeCompra(embalagem ? 'Un' : atual.unidade)[0] })) }} />
+          <span>É embalagem<span className={css.ajudaEmbalagem}>Bandeja, selo ou pote. Conta por unidade e é descontada em toda produção.</span></span>
+        </label>
         {origemDoAviso === CADASTRO && gestao.aviso && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">
           Não foi possível cadastrar o insumo. {gestao.aviso}
           {' '}<Botao variante="texto" onClick={gestao.fecharAviso}>Fechar aviso</Botao>
         </p>}
+        {/* Mesmo rodapé da edição: Cancelar à esquerda, o primário à direita. */}
         <div className={css.rodapeForm}>
-          <label className={css.chave}>
-            <input type="checkbox" disabled={criando} checked={novo.embalagem} onChange={(e) => setNovo((atual) => ({ ...atual, embalagem: e.target.checked }))} />
-            <span>É embalagem<span className={css.ajudaEmbalagem}>Bandeja, selo ou pote. Conta por unidade e é descontada em toda produção.</span></span>
-          </label>
-          <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !novo.nome.trim()}>{criando ? 'Cadastrando…' : 'Cadastrar insumo'}</Botao>
+          <Botao variante="texto" disabled={criando} onClick={fecharCadastro}>Cancelar</Botao>
+          <Botao tipo="submit" variante="primario" icone="check" disabled={criando}>{criando ? 'Cadastrando…' : 'Salvar insumo'}</Botao>
         </div>
       </form></Modal>}</> : <p className={css.descricao}>Seu perfil permite apenas consultar os insumos.</p>}
     </div>

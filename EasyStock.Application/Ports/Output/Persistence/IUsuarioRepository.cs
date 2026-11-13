@@ -17,6 +17,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// revogação não desfazê-la (#1352).
         /// </summary>
         Task UpdateAsync(Usuario usuario);
+        /// <summary>Registra acesso sem sobrescrever status, senha ou outros dados lidos antes de uma alteração concorrente.</summary>
+        Task AtualizarUltimoAcessoAsync(Guid usuarioId, DateTime agora);
         Task<IEnumerable<Usuario>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
 
         /// <summary>
@@ -30,7 +32,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// #1352: grava o corte das sessões num UPDATE atômico que nunca recua (só vale se for posterior ao
         /// que já está gravado), imediato como o <c>RevogarSessoesAtivasAsync</c> dos refresh tokens.
         /// </summary>
-        /// <returns>Linhas alteradas: 1 quando o corte avançou, 0 quando já havia um igual ou posterior.</returns>
+        /// <returns>Linhas travadas/atualizadas: 1 quando o usuário existe, mesmo se o corte já era igual ou posterior.</returns>
         Task<int> AtualizarSessoesValidasDesdeAsync(Guid usuarioId, DateTime desde);
 
         /// <summary>

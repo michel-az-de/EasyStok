@@ -43,6 +43,7 @@ module.exports = function ({ test, assert }) {
     const context = {
       navigator: { onLine: online }, pendingSync: queue.length,
       flushPromise: null, _pairingInvalid: false, _consecutiveFlushFailures: 0,
+      _temCanalDeBackupNativo: () => false, // #2184: gate de backup pre-sync coberto em sync-backup-pre-envio.test.js
       syncHeldForImport: () => review, getApiKey: () => paired ? 'fixture' : null,
       loadQueue: () => queue.slice(), saveQueue: items => { queue = items; },
       API_BASE_URL: 'https://example.invalid', API_PREFIX: '/api/mobile', deviceId: 'fixture',

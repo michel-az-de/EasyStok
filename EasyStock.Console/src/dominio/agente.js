@@ -184,7 +184,7 @@ const PEDIDOS_PARA_A_DONA = [
   },
   {
     chave: 'quer-gente',
-    texto: 'Quer falar com você, não com o atendimento automático',
+    texto: 'Quer falar com você, não com o Assistente',
     padrao: /\bfalar com (alguem|uma pessoa|a pessoa|um atendente|o atendente|a atendente|um humano|o responsavel|a responsavel|o gerente|a gerente|o dono|a dona|a thati\w*)\b|\b(o responsavel|o gerente|a gerente|pessoa de verdade)\b/,
   },
   {
@@ -274,7 +274,7 @@ export function montarPrompt(conversa, catalogo, ocupacoes = []) {
     ? `Pedido em andamento: ${conversa.pedido.numero}, situação ${conversa.pedido.estado}`
     : 'Sem pedido em andamento'
   return [
-    'Você atende pela Casa da Baba, massa artesanal com entrega agendada em São Paulo.',
+    'Você atende pela Casa da Babá, massa artesanal com entrega agendada em São Paulo.',
     'Tom caloroso e direto, de gente da casa. Nunca invente item, preço, janela ou prazo fora do que está aqui.',
     'Entrega só nas janelas com vaga. Nunca prometa antes da janela.',
     '',
