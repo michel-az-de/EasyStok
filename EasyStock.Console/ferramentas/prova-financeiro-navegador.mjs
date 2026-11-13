@@ -90,7 +90,8 @@ const contaReceber = structuredClone(conta)
 contaReceber.id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 contaReceber.descricao = 'Venda de encomenda'
 contaReceber.parcelas[0].id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
-const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasReceber', 'gerenciarContasPagar', 'gerenciarContasReceber', 'gerenciarCategoriasFinanceiras', 'gerenciarCentrosCusto', 'gerenciarCaixa', 'editarProducao', 'editarCardapio', 'editarAtendimento'].map((nome) => [nome, true]))
+// #2395: a Dona da navegação recebe as leituras de Cadastros expostas por /auth/me/modulos.
+const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasReceber', 'gerenciarContasPagar', 'gerenciarContasReceber', 'gerenciarCategoriasFinanceiras', 'gerenciarCentrosCusto', 'gerenciarCaixa', 'editarProducao', 'editarCardapio', 'editarAtendimento', 'verCadastrosProdutos', 'verCadastrosFornecedores', 'verCadastrosFinanceiros'].map((nome) => [nome, true]))
 let modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
 const escritas = []
 const erros = []

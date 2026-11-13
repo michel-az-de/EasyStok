@@ -263,6 +263,17 @@ Console: 213 provas executadas verdes e 71 excetuadas pelo runner, discriminadas
 `EasyStock.Console/.build/2395/qualidade-final-integrada.log`; não são 284 execuções. Domain/Conversa
 teve 50 aprovações na d70 (`.build/r4-domain-onda3.log`).
 
+Após integrar o master `601d48502`, o executor passou a fornecer `CONSOLE_URL` e
+`CONSOLE_TEST_URL` para o mesmo Vite e incluiu as doze provas R4 com HTTP controlado.
+As dez jornadas R4 de API/PostgreSQL reais continuam opt-in. A prova de navegação financeira
+recebeu no mock da Dona as três permissões de leitura de Cadastros já expostas pela API;
+preserva a exigência das seis entradas e seus destinos, sem ampliar permissões do produto.
+Qualidade e build passaram com 229 provas, zero falhas, 55 exceções explícitas e zero puladas
+por ausência de Chromium (`EasyStock.Console/.build/2395/qualidade-pos-master-601d.log`).
+O gate do rebase passou com 69 testes (`.build/r4-gate-4653b901.log`). O delta do master
+não altera .NET, migrations nem contratos financeiros; as evidências anteriores mantêm
+suas versões e não são apresentadas como novas execuções.
+
 W5-01: `Agente_PedidoEVagaCommitadosSobrevivemAFalhaSqlDepoisDoProvedor` passou em PostgreSQL real,
 com serviço de agente resolvido por DI e UoW reais; LLM e Mercado Pago controlados. Outra unidade
 de trabalho vê pedido/vaga antes do retorno do provedor; SQL 22012 injetado no INSERT posterior

@@ -49,27 +49,15 @@ const EXCECOES = new Map([
   ['prova-2096-avisos-operacao.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
   ['prova-2256-onda1-ux.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
   ['prova-2395-api-real.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
-  ['prova-2395-aviso-dispositivo-navegador.mjs', 'precisa de Playwright e Vite; navegador com contexto controlado'],
   ['prova-2395-cadastros-concorrencia.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
-  ['prova-2395-clientes-concorrencia-navegador.mjs', 'precisa de Playwright e Vite; duas abas de clientes com HTTP controlado'],
-  ['prova-2395-busca-na-casa-navegador.mjs', 'precisa de Playwright e Vite; busca transversal no App real com HTTP controlado'],
   ['prova-2395-operacao-complementos.mjs', 'opt-in: Playwright e fixture R4 real final; requer R4_EXECUTAR_COMPLEMENTOS=1 e grava operações'],
-  ['prova-2395-memoria-atendimento-navegador.mjs', 'precisa de Playwright e Vite; App real com HTTP e quota de rascunhos controlados'],
-  ['prova-2395-atraso-origem.mjs', 'precisa de Playwright e Vite; atraso com componentes reais e HTTP controlado'],
   ['prova-2395-textos-navegador.mjs', 'opt-in: R4_EXECUTAR_TEXTOS=1, Playwright e fixture API real; grava notas sintéticas'],
   ['prova-2395-desfazer-conta-api-real.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava contas bancárias'],
-  ['prova-2395-desfazer-conta-navegador.mjs', 'precisa de Playwright e Vite; duas abas com HTTP controlado'],
   ['prova-2395-entregas-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera entregas da jornada de teste'],
   ['prova-2395-excecoes-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera a jornada de teste'],
-  ['prova-2395-ficha-navegador.mjs', 'precisa de Playwright e Vite; ficha com HTTP controlado'],
   ['prova-2395-jornada-api.mjs', 'opt-in: fixture R4 com API/PostgreSQL reais; cria pedidos e altera pagamentos e estoque'],
   ['prova-2395-jornada-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera a jornada de teste'],
   ['prova-2395-mensagem-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; envia mensagens ao transporte de teste'],
-  ['prova-2395-navegador.mjs', 'precisa de Playwright e Vite; cadastros com HTTP controlado'],
-  ['prova-2395-recebimento-invalido.mjs', 'precisa de Playwright e Vite; recebimento com contexto controlado'],
-  ['prova-2395-reconferencia-navegador.mjs', 'precisa de Playwright e Vite; reconferência com contexto controlado'],
-  ['prova-2395-retorno-gestao.mjs', 'precisa de Playwright e Vite; gestão com HTTP controlado'],
-  ['prova-2395-storage-navegador.mjs', 'precisa de Playwright e Vite; App com quota bloqueada e HTTP controlado'],
   ['prova-bloqueio-preparo.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
   ['prova-contadores-canal.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
   ['prova-producao-ia-navegador.mjs', 'precisa de servidor Vite no ar na porta 5187 e navegador (já falha no master)'],
@@ -101,7 +89,7 @@ const deNavegador = aRodar.filter((nome) => readFileSync(`${pasta}${nome}`, 'utf
 const semNavegador = deNavegador.length > 0 && !chromiumInstalado()
 if (semNavegador && process.env.CI) throw new Error('Chromium ausente: rode `npx playwright install --with-deps chromium` antes das provas.')
 const vite = deNavegador.length > 0 && !semNavegador ? await subirVite() : null
-const ambiente = vite ? { ...process.env, CONSOLE_URL: vite.url } : process.env
+const ambiente = vite ? { ...process.env, CONSOLE_URL: vite.url, CONSOLE_TEST_URL: vite.url } : process.env
 const puladas = semNavegador ? deNavegador : []
 
 function chromiumInstalado() {
