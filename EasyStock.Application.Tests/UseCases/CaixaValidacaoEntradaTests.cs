@@ -120,6 +120,39 @@ public class CaixaValidacaoEntradaTests
         await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
+    // #2440: a abertura da empresa (sem loja) vale para o lançamento com loja, como já vale no fechamento (#1562) e no pix (#2341).
+    [Fact]
+    public async Task RegistrarMovimento_Manual_ComLoja_AceitaAberturaDaEmpresaSemLoja()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _repo.GetAberturaPendenteAsync(empresaId, lojaId).Returns((MovimentoCaixa?)null);
+        _repo.GetAberturaPendenteAsync(empresaId, null)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 50m, DateTime.UtcNow, null));
+
+        await Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+            empresaId, "entrada", 10m, LojaId: lojaId, Metodo: "dinheiro", ExigirCaixaAberto: true));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimento_Manual_ComLoja_NaoAceitaAberturaDeOutraLoja()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        _repo.GetAberturaPendenteAsync(empresaId, lojaId).Returns((MovimentoCaixa?)null);
+        // Com lojaId nulo o repositório não filtra por loja: pode devolver a abertura de outra loja.
+        _repo.GetAberturaPendenteAsync(empresaId, null)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 50m, DateTime.UtcNow, Guid.NewGuid()));
+
+        var act = () => Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(
+            empresaId, "entrada", 10m, LojaId: lojaId, Metodo: "dinheiro", ExigirCaixaAberto: true));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("Abra o caixa antes de lançar*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
     [Theory]
     [InlineData(-4)]
     [InlineData(-2)]
