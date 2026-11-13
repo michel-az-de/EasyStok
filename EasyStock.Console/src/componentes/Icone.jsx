@@ -1,7 +1,7 @@
 import {
   Archive, ArrowDown, ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
   Calendar, Camera, ChartColumn, ChartLine, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
-  ClipboardList, Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink,
+  ClipboardList, Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink, EyeOff,
   FlaskConical, Frown, Gift, Globe, GripVertical, Hand, History, Hourglass, House, Image, Inbox,
   LayoutDashboard, LayoutTemplate, Lightbulb, Link, ListFilter, Lock, LogOut, Mail, MapPin,
   Maximize2, Meh, MessageSquareText, MessageSquareWarning, Mic, Minimize2, Minus, Moon, NotepadText, Package,
@@ -134,6 +134,7 @@ const ICONES = {
   ampliar: Maximize2,
   reduzir: Minimize2,
   trocarLado: ArrowLeftRight,
+  ocultoNoSite: EyeOff,
   encaixarEsquerda: PanelLeft,
   encaixarDireita: PanelRight,
   solto: PictureInPicture2,

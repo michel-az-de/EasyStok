@@ -132,24 +132,30 @@ export function AbaCategoriasApi() {
         As categorias não foram atualizadas. A lista abaixo pode estar desatualizada. {gestao.erro}
         {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar categorias</Botao>
       </p>}
+      {/* #2424: descrição curta e "Nova categoria" secundário no topo; a regra de ocultar e excluir mora no "Sobre". */}
       <div className={css.topo}>
-        <p className={css.descricao}>
-          As categorias que o cliente vê no site e que agrupam a comanda, nesta ordem. Ocultar tira a categoria
-          inteira do site sem apagar os pratos. Só dá para excluir categoria vazia.
-        </p>
-        {!antigas && !gestao.previa && (
-          <Botao disabled={convertendo} onClick={converter}>{convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}</Botao>
-        )}
+        <p className={css.descricao}>Organize os pratos no site e na comanda.</p>
+        <div className={css.acoesDireita}>
+          {!antigas && !gestao.previa && (
+            <Botao variante="texto" disabled={convertendo} onClick={converter}>{convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}</Botao>
+          )}
+          <Botao icone="mais" aria-haspopup="dialog" onClick={() => { gestao.fecharAviso(); setCadastroAberto(true) }}>Nova categoria</Botao>
+        </div>
       </div>
 
       {antigas && (
-        <section className={css.secao} aria-labelledby="categorias-antigas">
-          <p id="categorias-antigas" className={css.nome}>{antigas.texto}</p>
-          <p id="efeito-conversao" className={css.descricao}>{antigas.efeito}</p>
-          <div>
-            <Botao variante={gestao.secoes.length === 0 ? 'primario' : undefined} disabled={convertendo}
+        <section className={css.antigas} aria-labelledby="categorias-antigas" aria-describedby="resumo-antigas">
+          <div className={css.cabecalhoAntigas}>
+            <h3 id="categorias-antigas" className={css.tituloSecao}>{antigas.titulo}</h3>
+            <span className={css.pendenteConversao}>Conversão pendente</span>
+          </div>
+          <p id="resumo-antigas" className={css.descricao}>{antigas.subtitulo}<span className="sr"> {antigas.texto}</span></p>
+          <ul className={css.nomesAntigos}>{antigas.nomes.map((nome) => <li key={nome}>{nome}</li>)}</ul>
+          <div className={css.converter}>
+            <p id="efeito-conversao" className={css.descricao}>{antigas.efeito}</p>
+            <Botao variante="primario" disabled={convertendo}
               aria-describedby="efeito-conversao" onClick={converter}>
-              {convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}
+              {convertendo ? 'Convertendo…' : antigas.botao}
             </Botao>
           </div>
         </section>
@@ -161,7 +167,6 @@ export function AbaCategoriasApi() {
         </output>
       )}
 
-      <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { gestao.fecharAviso(); setCadastroAberto(true) }}>Nova categoria</Botao>
       {cadastroAberto && <Modal titulo="Nova categoria do cardápio" aoFechar={criando ? undefined : () => setCadastroAberto(false)}><form className={`${css.campos} ${css.formulario} ${css.cadastroCurto}`} onSubmit={criar}>
         <CampoTexto
           rotulo="Nome da nova categoria"
@@ -194,6 +199,10 @@ export function AbaCategoriasApi() {
           ))}
         </ol>
       )}
+      <details className={css.saibaMais}>
+        <summary>Sobre ocultar e excluir categorias</summary>
+        <p>A ordem desta lista é a do site e da comanda. Ocultar tira a categoria inteira do site sem apagar os pratos. Só dá para excluir categoria vazia.</p>
+      </details>
     </div>
   )
 }
