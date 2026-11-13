@@ -1,6 +1,6 @@
 # A correção de vínculo vale para as próximas conversas do telefone (#2492)
 
-Status: proposta, aguardando a aprovação do Felipe. M2 da revisão R4 de Cadastros (#2395).
+Status: aprovada pelo Felipe em 13/11/2026 (D1 a D5 como propostos). M2 da revisão R4 de Cadastros (#2395).
 
 ## Problema
 
@@ -113,7 +113,7 @@ lookup volta ao de hoje. As correções feitas nesse intervalo continuam na tril
 
 ## Decisões para o Felipe
 
-| # | Pergunta | Proposta |
+| # | Pergunta | Decisão (aprovada em 13/11) |
 |---|---|---|
 | D1 | Só sobrou o recusado: criar lead novo ou ficar sem vínculo? | Sem vínculo, com a identidade pendente |
 | D2 | A decisão expira? | Não. Sai por `restaurar` ou por nova correção |
