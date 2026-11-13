@@ -136,8 +136,9 @@ const itensDoMenu = async (p) => {
 }
 const chamadas = (p) => p.evaluate(() => window.chamadas.slice())
 
-const TODOS = ['Enviar cardápio', 'Passar conversa', 'Concluir conversa']
-const COM_DEVOLVER = ['Enviar cardápio', 'Passar conversa', 'Devolver ao Assistente', 'Concluir conversa']
+// #2496: "Checar o Assistente" em toda conversa aberta (modo API), antes de Concluir; concluída segue sem menu.
+const TODOS = ['Enviar cardápio', 'Passar conversa', 'Checar o Assistente', 'Concluir conversa']
+const COM_DEVOLVER = ['Enviar cardápio', 'Passar conversa', 'Devolver ao Assistente', 'Checar o Assistente', 'Concluir conversa']
 const MATRIZ = [
   ['robo', TODOS, true],
   ['meu', COM_DEVOLVER, false],
@@ -145,7 +146,7 @@ const MATRIZ = [
   ['fila', COM_DEVOLVER, true],
   ['site', TODOS, true],
   ['concluida', [], false],
-  ['bloqueada', ['Concluir conversa'], false],
+  ['bloqueada', ['Checar o Assistente', 'Concluir conversa'], false],
 ]
 
 try {

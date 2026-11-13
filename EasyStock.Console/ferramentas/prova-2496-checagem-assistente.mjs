@@ -65,9 +65,10 @@ assert.equal(chamadas[1].metodo, 'PUT')
 assert.deepEqual(chamadas[1].corpo, { ativo: true }, 'só a chave: tom, saudações e mensagens não vão no corpo')
 assert.deepEqual(chamadas[2].corpo, { ativo: false })
 
-// Tela: o item do menu existe só no modo API e abre a modal; a modal pergunta antes de desligar a loja toda.
+// Tela: o item do menu existe só no modo API e em conversa aberta (concluída fica sem menu, #2185) e abre a
+// modal; a modal pergunta antes de desligar a loja toda. A matriz do menu está em prova-2185-menu-de-acoes.
 const painel = readFileSync(new URL('../src/features/atendimento/PainelAtendimento.jsx', import.meta.url), 'utf8')
-assert.match(painel, /fonteApi && \{ chave: 'assistente', rotulo: 'Checar o Assistente'/)
+assert.match(painel, /fonteApi && !encerrada && \{ chave: 'assistente', rotulo: 'Checar o Assistente'/)
 assert.match(painel, /modalAberto === 'assistente' && <ModalAssistente/)
 const modal = readFileSync(new URL('../src/features/atendimento/ModalAssistente.jsx', import.meta.url), 'utf8')
 assert.match(modal, /if \(!ativo && !window\.confirm\(PERGUNTA_AO_DESLIGAR\)\) return/)

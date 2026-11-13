@@ -195,9 +195,10 @@ export function PainelAtendimento({
               acoesTela.enviarCardapio && { chave: 'cardapio', rotulo: 'Enviar cardápio', icone: 'cardapio', abreJanela: true, aoEscolher: () => abrirModal('cardapio') },
               acoesTela.passar && { chave: 'passar', rotulo: 'Passar conversa', icone: 'user-plus', abreJanela: true, aoEscolher: () => abrirModal('passar') },
               acoesTela.devolver && { chave: 'devolver', rotulo: 'Devolver ao Assistente', icone: 'sparkles', abreJanela: true, aoEscolher: () => abrirModal('devolver') },
+              // #2496: só a API sabe as etapas do robô; na demonstração não há o que checar. Conversa concluída
+              // fica sem menu (#2185): a próxima mensagem abre outra, que começa com o robô.
+              fonteApi && !encerrada && { chave: 'assistente', rotulo: 'Checar o Assistente', icone: 'settings', abreJanela: true, aoEscolher: () => abrirModal('assistente') },
               acoesTela.concluir && { chave: 'concluir', rotulo: 'Concluir conversa', icone: 'circle-check', abreJanela: true, aoEscolher: () => abrirEncerramento(selecionada.id) },
-              // #2496: só a API sabe as etapas do robô; na demonstração não há o que checar.
-              fonteApi && { chave: 'assistente', rotulo: 'Checar o Assistente', icone: 'settings', abreJanela: true, aoEscolher: () => abrirModal('assistente') },
             ]}
           />
         </div>
