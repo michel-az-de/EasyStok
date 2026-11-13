@@ -197,6 +197,57 @@ public sealed class SyncPullCarimboServidorTests : IDisposable
         (await _db.Set<Product>().SingleAsync(p => p.Id == "p-outra-loja")).Stock.Should().Be(90);
     }
 
+    // ---------- #2431: pedido do app pago no ERP leva o que falta receber ----------
+
+    [Fact]
+    public async Task PedidoDoAppPagoNoErp_LevaOAReceber_InclusiveAoAparelhoQueCriou()
+    {
+        var pedidoId = SemearPedidoDoApp("o-1", total: 50m, deviceQueCriou: "dev-a");
+        var cursor = HaCincoMinutos();
+
+        // O pagamento (console ou Mercado Pago) grava o pagamento e o evento; nao toca o mobile_orders.
+        RegistrarPagamentoNoErp(pedidoId, 50m);
+
+        foreach (var aparelho in new[] { "dev-a", "dev-b" })
+            (await Pull(aparelho, cursor)).Should().ContainSingle(m => m.Type == "order.aReceber" && Id(m) == "o-1",
+                    "o card de {0} precisa saber que o pedido foi pago", aparelho)
+                .Which.Payload.GetProperty("aReceber").GetDecimal().Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task PedidoDoAppSemMudancaNoErp_NaoVoltaNoPull()
+    {
+        SemearPedidoDoApp("o-1", total: 50m, deviceQueCriou: "dev-a");
+
+        (await Pull("dev-a", HaCincoMinutos())).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PedidoDoAppDeOutraLoja_NaoLevaOAReceber()
+    {
+        var pedidoId = SemearPedidoDoApp("o-1", total: 50m, deviceQueCriou: "dev-a", loja: Guid.NewGuid());
+        var cursor = HaCincoMinutos();
+
+        RegistrarPagamentoNoErp(pedidoId, 50m);
+
+        (await Pull("dev-a", cursor)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PedidoDoAppQueJaVoltaInteiro_NaoRepeteOAReceber()
+    {
+        var pedidoId = SemearPedidoDoApp("o-1", total: 50m, deviceQueCriou: "dev-a");
+        var cursor = HaCincoMinutos();
+
+        RegistrarPagamentoNoErp(pedidoId, 20m);
+        await Push("dev-a", Pedido("o-1", "preparando", horaDoAparelho: DateTime.UtcNow));
+
+        var recebido = await Pull("dev-b", cursor);
+        recebido.Should().ContainSingle(m => m.Type == "order.upsert" && Id(m) == "o-1")
+            .Which.Payload.GetProperty("aReceber").GetDecimal().Should().Be(30m);
+        recebido.Should().NotContain(m => m.Type == "order.aReceber");
+    }
+
     [Fact]
     public async Task RegistroQueNaoMudou_NaoVoltaNoPull()
     {
@@ -333,6 +384,31 @@ public sealed class SyncPullCarimboServidorTests : IDisposable
 
     private MutationDto Pedido(string id, string status, DateTime horaDoAparelho) => Mutation("order.upsert", new OrderDto(
         id, null, new ClientSnapshotDto("Ana", null), [], null, 10m, status, Ms(horaDoAparelho), Ms(horaDoAparelho)));
+
+    /// <summary>Pedido criado no app e ja ligado ao Pedido do ERP, tudo gravado "ontem".</summary>
+    private Guid SemearPedidoDoApp(string orderId, decimal total, string deviceQueCriou, Guid? loja = null)
+    {
+        var pedido = EasyStock.Domain.Entities.Pedido.Criar(_empresaId);
+        pedido.LojaId = loja ?? _lojaId;
+        pedido.MobileOrderId = orderId;
+        pedido.Total = Dinheiro.FromDecimal(total);
+        pedido.AlteradoEm = _ontem;
+        Semear(pedido);
+        Semear(new Order
+        {
+            Id = orderId, ClientSnapshotName = "Ana", Total = total, Status = "aguardando",
+            CreatedAt = _ontem, UpdatedAt = _ontem, ServerUpdatedAt = _ontem, LastDeviceId = deviceQueCriou,
+            EmpresaId = _empresaId, LojaId = loja ?? _lojaId, ErpPedidoId = pedido.Id
+        });
+        return pedido.Id;
+    }
+
+    /// <summary>O que o RegistrarPagamentoPedidoUseCase grava: pagamento e evento, sem mexer no AlteradoEm.</summary>
+    private void RegistrarPagamentoNoErp(Guid pedidoId, decimal valor)
+    {
+        Semear(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedidoId, Metodo = "pix", Valor = valor, PagoEm = DateTime.UtcNow });
+        Semear(new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedidoId, Tipo = "pagamento", OcorridoEm = DateTime.UtcNow, Origem = "console" });
+    }
 
     private static string? Id(MutationDto m) => m.Payload.GetProperty("id").GetString();
     private static long Ms(DateTime utc) => new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToUnixTimeMilliseconds();

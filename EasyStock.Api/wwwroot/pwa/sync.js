@@ -1292,6 +1292,22 @@
           return;
         }
 
+        // #2431: pedido do app pago no console ou no Mercado Pago. Desce so o saldo a receber; trocar o
+        // pedido inteiro apagaria o que o aparelho ainda nao enviou. O snapshot do diff recebe o mesmo
+        // valor, senao um save antes do reload devolveria o pedido ao servidor como edicao deste aparelho.
+        if (type === 'order' && op === 'aReceber') {
+          const bruto = m.payload.aReceber;
+          const valor = bruto == null ? NaN : Number(bruto);
+          if (idx < 0 || !Number.isFinite(valor) || coll[idx].aReceber === valor) return;
+          coll[idx].aReceber = valor;
+          const base = lastSnapshot && Array.isArray(lastSnapshot.orders)
+            ? lastSnapshot.orders.find(x => x && x.id === m.payload.id) : null;
+          if (base) base.aReceber = valor;
+          changed = true;
+          localStorage.setItem(map.storage, JSON.stringify(coll));
+          return;
+        }
+
         // #1520: lote que o aparelho ja tem recebe so as marcas de exclusao e descarte, como
         // o servidor faz (itens sao imutaveis). Trocar o lote inteiro apagava a foto e o status
         // locais, que o servidor nao guarda. O saldo vem pelo produto, nao daqui.

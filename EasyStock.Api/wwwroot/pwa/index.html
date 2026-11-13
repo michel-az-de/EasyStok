@@ -12232,8 +12232,8 @@ function renderOpenOrders() {
         ? `${primaryAction.icon} ${escapeHtml(primaryAction.label)}`
         : (NEXT_LABEL[o.status] || '');
       const advanceClick = primaryAction
-        ? `runOrderAction('${o.id}', '${primaryAction.key}')`
-        : `advanceOrder('${o.id}')`;
+        ? `runOrderAction(${jsString(o.id)}, ${jsString(primaryAction.key)})`
+        : `advanceOrder(${jsString(o.id)})`;
       const secondaryActions = calm
         ? `<button class="open-full" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)">Abrir</button>`
         : `${pedidoQuitado(o) ? '' : `<button onclick="openCobranca(${jsString(o.id)})" title="Preparar cobrança">Preparar cobrança</button>`}
@@ -12521,7 +12521,7 @@ function renderProductionDemand() {
     // Só permite tap se o produto existe no catálogo (productId resolve)
     const inCatalog = i.productId && products.some(p => p.id === i.productId);
     const dataAttr = inCatalog ? `data-pid="${escapeHtml(i.productId)}" data-qty="${i.qty}"` : 'aria-disabled="true"';
-    const onclick = inCatalog ? `onclick="prefillFromDemand('${i.productId}', ${i.qty})"` : '';
+    const onclick = inCatalog ? `onclick="prefillFromDemand(${jsString(i.productId)}, ${i.qty})"` : '';
     const emoji = i.emoji ? `<span class="pd-emoji">${escapeHtml(i.emoji)}</span>` : '';
     const title = inCatalog ? `Tocar pra pré-selecionar ${i.qty} no catálogo` : 'Item não está no catálogo de produção';
     return `<button type="button" class="pd-chip" ${dataAttr} ${onclick} title="${title}" style="${inCatalog ? '' : 'opacity:0.5;cursor:default'}">
@@ -17051,7 +17051,8 @@ function openMapsPedidoRef(ref) {
 // Compat com botao existente em Ajustes > Equipamento.
 // Antes era alert(); agora abre o modal completo (operador encontra a
 // secao Impressora rolando, mas tambem ve o resto do estado do app).
-function printerDiagnostics() { if (window.CDB_CONFIG?.isPilot) if (closeAjustes() !== false) openDiagnostics(); }
+// #2431: fora do piloto não há Ajustes a fechar; só o piloto respeita o "Descartar?" cancelado.
+function printerDiagnostics() { if (window.CDB_CONFIG?.isPilot && closeAjustes() === false) return; openDiagnostics(); }
 
 // Step logger persistente — sobrevive a native crash (JNI), permite ver
 // onde o app morreu reabrindo Ajustes > Diagnóstico apos restart.
@@ -18209,7 +18210,7 @@ function batchCardHtml(batch) {
       ${discardBtn}
     </div>`;
   return `<div class="batch-card${isClosed ? ' closed' : ''}" id="bc-${batch.id}">
-    <div class="batch-card-head" ${pilot ? '' : `onclick="document.getElementById('bc-${batch.id}').classList.toggle('open')"`}>
+    <div class="batch-card-head" ${pilot ? '' : `onclick="document.getElementById(${jsString('bc-' + batch.id)}).classList.toggle('open')"`}>
       <div class="bc-info">
         <div class="bc-lote">${escapeHtml(codigoDoLote(batch))} · ${escapeHtml(dateStr)} ${statusBadge}</div>
         <div class="bc-summary">${escapeHtml(items)}</div>

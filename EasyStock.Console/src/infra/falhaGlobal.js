@@ -18,10 +18,17 @@ export function criarFaixaDeFalha() {
 export const faixaDeFalha = criarFaixaDeFalha()
 
 export function instalarFalhaGlobal(janela, faixa = faixaDeFalha, log = console) {
-  const aoRejeitar = (evento) => { log.error('[falha global] promessa sem tratamento:', evento?.reason); faixa.registrar() }
+  const aoRejeitar = (evento) => {
+    // #2431: AbortError é cancelamento esperado (troca de tela, sinal próprio), não falha.
+    if (evento?.reason?.name === 'AbortError') return
+    log.error('[falha global] promessa sem tratamento:', evento?.reason)
+    faixa.registrar()
+  }
   const aoErro = (evento) => {
     // Erro de carregamento de imagem ou script chega sem `error`: não é falha de ação.
     if (!evento?.error && !evento?.message) return
+    // #2431: ResizeObserver loop é aviso benigno do navegador.
+    if (/ResizeObserver loop/.test(String(evento.message ?? evento.error?.message ?? ''))) return
     log.error('[falha global] erro não tratado:', evento.error ?? evento.message)
     faixa.registrar()
   }
