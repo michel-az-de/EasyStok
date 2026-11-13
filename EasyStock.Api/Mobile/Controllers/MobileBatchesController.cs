@@ -196,7 +196,7 @@ public class MobileBatchesController(
         await db.SaveChangesAsync(ct);
 
         log.LogInformation("Photo uploaded for batch {BatchId} field {Field} hash {Hash} → {Url}",
-            SanitizarParaLog(id), SanitizarParaLog(field), safeHash, SanitizarParaLog(url));
+            SanitizarParaLog(id), SanitizarParaLog(field), SanitizarParaLog(safeHash), SanitizarParaLog(url));
 
         return Ok(new { url, hash });
     }
@@ -230,7 +230,7 @@ public class MobileBatchesController(
 
     private static string PastaFotos(Guid? empresaId, string batchId) => $"mobile-photos/{empresaId}/{batchId}";
 
-    // id, field e url vêm do aparelho: sem quebra de linha não forjam entrada de log.
+    // id, field, hash e url vêm do aparelho: sem quebra de linha não forjam entrada de log.
     private static string SanitizarParaLog(string? valor) =>
         (valor ?? "").Replace("\r", "").Replace("\n", "");
 
