@@ -65,9 +65,11 @@ async function capturarTela(page, modulo, tela, tema) {
 }
 // #1871: o Sair e quem está logado moram atrás do avatar; a prova abre o menu da conta e confere os dois.
 async function conferirSessao(page) {
+  // #2433: logo após o reload, "Carregando seus módulos" tem o próprio Sair. Conta só com a moldura pronta (avatar à vista).
+  const avatar = page.getByRole('button', { name: /^Conta de / }).locator('visible=true').first()
+  await avatar.waitFor()
   // #2258 (A9): em qualquer largura não há Sair solto; ele e a conta moram atrás do avatar à vista.
   assert.equal(await page.getByRole('button', { name: 'Sair', exact: true }).count(), 0)
-  const avatar = page.getByRole('button', { name: /^Conta de / }).locator('visible=true').first()
   await avatar.click()
   const camada = page.getByRole('group', { name: 'Conta', exact: true })
   assert.equal(await camada.getByRole('button', { name: 'Sair', exact: true }).count(), 1)
@@ -95,6 +97,8 @@ const erros = []
 let falhaDeGravacao = false
 let falhaDoPagamento = false
 let falhaDeConversas = false
+// #2433: atrasa a carga dos módulos para a prova ver a tela "Carregando seus módulos", que tem um Sair próprio.
+let atrasoDosModulos = 0
 let shaDoDocumento, versaoPublicada, respostaInvalida = false
 const browser = await chromium.launch({ headless: true })
 let paginaProva
@@ -143,6 +147,7 @@ try {
       }
       return ok(contaAtual)
     }
+    if (caminho === '/api/auth/me/modulos' && atrasoDosModulos) await new Promise(resolve => setTimeout(resolve, atrasoDosModulos))
     if (caminho === '/api/auth/me/modulos') return ok({ modulos: MODULOS.map(({ id }) => ({ id, liberado: modulosPermitidos.has(id) })), acoes })
     if (caminho === '/api/financeiro/categorias') return ok([{ id: categoriaId, nome: 'Operação', tipo: 'Ambas', ativa: true }])
     if (caminho === '/api/financeiro/centros-custo') return ok([])
@@ -490,10 +495,12 @@ try {
   await conferirSessao(page)
   await page.screenshot({ path: join(evidencias, 'financeiro-aviso-global-preservado.png') })
   falhaDeConversas = false
+  atrasoDosModulos = 1500
   await page.reload()
   await page.getByText(/Conversas sem atualização:/).waitFor({ state: 'hidden' })
   await page.getByText('Conversas ao vivo do EasyStok', { exact: true }).waitFor({ state: 'hidden' })
   await conferirSessao(page)
+  atrasoDosModulos = 0
   assert.deepEqual(erros, [])
   const demonstracao = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce' })
   await demonstracao.grantPermissions(['local-network-access'], { origin: origem })
