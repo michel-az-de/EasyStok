@@ -153,7 +153,7 @@ try {
     await confere(`1. ${cena}: menu ${JSON.stringify(esperado)}, Assumir ${assumir ? 'à vista' : 'ausente'}`, async () => {
       const { ctx, p } = await abrir(cena)
       assert.deepEqual(await itensDoMenu(p), esperado)
-      assert.equal(await p.getByRole('button', { name: 'Assumir', exact: true }).count(), assumir ? 1 : 0)
+      assert.equal(await p.getByRole('button', { name: 'Assumir conversa', exact: true }).count(), assumir ? 1 : 0) // #2437: "Assumir conversa" desde a #2232
       await ctx.close()
     })
   }
@@ -220,13 +220,13 @@ try {
   await confere('4. conversa de colega: Assumir confirma, nomeia o colega e Cancelar não assume', async () => {
     const { ctx, p } = await abrir('outro')
     assert.match(await p.getByRole('region', { name: 'Quem responde esta conversa' }).innerText(), /Com Ana Lima/)
-    await p.getByRole('button', { name: 'Assumir', exact: true }).click()
+    await p.getByRole('button', { name: 'Assumir conversa', exact: true }).click()
     const janela = p.getByRole('dialog', { name: 'Assumir esta conversa?' })
     await janela.waitFor()
     assert.match(await janela.innerText(), /Ela está com Ana Lima/)
     await janela.getByRole('button', { name: 'Cancelar', exact: true }).click()
     assert.deepEqual(await chamadas(p), [])
-    await p.getByRole('button', { name: 'Assumir', exact: true }).click()
+    await p.getByRole('button', { name: 'Assumir conversa', exact: true }).click()
     await p.getByRole('dialog').getByRole('button', { name: 'Assumir conversa', exact: true }).click()
     assert.deepEqual(await chamadas(p), ['assumir:outro'])
     await ctx.close()
@@ -234,7 +234,7 @@ try {
 
   await confere('5. Assumir com toque duplo chama o servidor uma vez', async () => {
     const { ctx, p } = await abrir('robo')
-    await p.getByRole('button', { name: 'Assumir', exact: true }).dblclick({ force: true })
+    await p.getByRole('button', { name: 'Assumir conversa', exact: true }).dblclick({ force: true })
     await p.waitForTimeout(150)
     assert.deepEqual(await chamadas(p), ['assumir:robo'])
     await ctx.close()
@@ -243,10 +243,10 @@ try {
   await confere('5. Assumir em andamento numa conversa não trava o Assumir de outra', async () => {
     const { ctx, p } = await abrir('robo')
     await p.evaluate(() => { window.atrasoAssumir = 800 })
-    await p.getByRole('button', { name: 'Assumir', exact: true }).click()
+    await p.getByRole('button', { name: 'Assumir conversa', exact: true }).click()
     await p.evaluate(() => window.trocar('fila'))
     await p.getByText('Passou para você').waitFor()
-    const assumir = p.getByRole('button', { name: 'Assumir', exact: true })
+    const assumir = p.getByRole('button', { name: 'Assumir conversa', exact: true })
     assert.equal(await assumir.isDisabled(), false)
     await assumir.click()
     assert.deepEqual(await chamadas(p), ['assumir:robo', 'assumir:fila'])
@@ -324,7 +324,7 @@ try {
     const anexar = p.getByRole('menuitem', { name: 'Anexar' })
     assert.equal(await anexar.isDisabled(), false)
     const id = await anexar.getAttribute('aria-describedby')
-    assert.equal(await p.locator(`[id="${id}"]`).innerText(), 'Foto do computador (imagem, até 8 MB)')
+    assert.equal(await p.locator(`[id="${id}"]`).innerText(), 'Foto do computador (imagem, até 6 MB)') // #2437: modo API aceita só imagem, até 6 MB (#2284)
     await ctx.close()
   })
   await confere('11. conversa sem ação no menu não mostra o gatilho', async () => {

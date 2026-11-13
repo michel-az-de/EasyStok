@@ -56,11 +56,15 @@ const page = await context.newPage()
 page.on('pageerror', erro => erros.push(erro.message))
 try {
   await page.goto(origem + '/#/m/atendimento/balcao')
+  // #2437: a Caixa de entrada abre em "Precisa de você"; as conversas da prova já estão assumidas, então ela abre em "Todas".
+  await page.getByRole('button', { name: /^Todas/ }).click()
   await page.getByText('Maria', { exact: true }).first().waitFor({ timeout: 5000 })
   await foto(page, '01-inicial')
   await page.getByText('Joana', { exact: true }).first().click()
   await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
   for (let i = 1; i <= 5; i++) await page.getByRole('button', { name: new RegExp('^Prato ' + i + '\\b') }).click()
+  // #2437: os itens, a anotação e o horário moram no painel "Revisar comanda" desde a #2232.
+  await page.getByRole('button', { name: /^Revisar comanda/ }).click()
   await page.getByRole('button', { name: 'Anotação para Prato 1', exact: true }).click()
   await page.getByRole('textbox', { name: 'Observação de Prato 1', exact: true }).fill('Molho à parte')
   await page.getByRole('textbox', { name: 'Observação de Prato 1', exact: true }).press('Tab')
@@ -69,7 +73,25 @@ try {
   writeFileSync(join(pasta, 'montagem.txt'), await page.locator('body').innerText())
   await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
+  // #2437: no celular não há mais a aba "Pedido"; a comanda abre pela ficha do cliente.
+  // O painel pode reabrir sozinho (fica lembrado) depois da troca de layout: tenta até a anotação aparecer.
+  const anotacao = page.getByRole('button', { name: 'Anotação para Prato 1', exact: true })
+  // A troca de layout pode fechar o painel um instante depois de mostrado: só conta visível duas vezes seguidas.
+  const estavel = async () => (await anotacao.isVisible()) && (await page.waitForTimeout(1000), await anotacao.isVisible())
+  for (let tentativa = 0; tentativa < 15 && !(await estavel()); tentativa++) {
+    const aba = page.getByRole('tab', { name: 'Cliente', exact: true })
+    const revisar = page.getByRole('button', { name: /^Revisar comanda/ })
+    if (await revisar.isVisible()) await revisar.click()
+    else if ((await aba.getAttribute('aria-selected')) !== 'true') await aba.click()
+    else {
+      // Na ficha sem conversa aberta: volta à lista, abre a Joana e retorna à ficha.
+      await page.getByRole('tab', { name: 'Conversas', exact: true }).click()
+      await page.getByText('Joana', { exact: true }).first().click()
+      await aba.click()
+    }
+    await page.waitForTimeout(1000)
+  }
+  await anotacao.waitFor()
   assert.equal(await totalVisivel(page), true, 'Total deve ficar visível com cinco itens em390px')
   await foto(page, '02-montagem-390')
   writeFileSync(join(pasta, 'montagem-390.txt'), await page.locator('body').innerText())
@@ -96,7 +118,9 @@ try {
   assert.equal(await page.getByRole('button', { name: /^Prato \d+\b/ }).evaluateAll(els => els.every(el => el.disabled)), true)
   await foto(page, '05-pedido-criado-consulta')
   await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
-  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  // #2437: o Sair fica no menu da conta desde a #2258.
+  await page.getByRole('button', { name: /^Conta de / }).first().click()
+  await page.getByRole('button', { name: 'Sair', exact: true }).or(page.getByRole('menuitem', { name: 'Sair', exact: true })).first().click()
   assert.equal(await page.evaluate(() => Object.keys(sessionStorage).filter(k => k.startsWith('easystok.visita:')).length), 0, 'Sair limpa a memória da visita')
   assert.deepEqual(erros, [])
   console.log('ok total1280/390, cinco itens e conversa apósF5, prioridadeAPI, consulta43 pratos e limpezaSair')

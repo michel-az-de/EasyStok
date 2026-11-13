@@ -15,6 +15,7 @@ const configuracaoInicial = {
   empresaId: empresa, ativo: true, tom: 'acolhedor, direto, sem gíria', nivelSugestao: 'Discreto',
   saudacaoPrimeiroContato: 'Olá! Veja nosso cardápio: {link}', saudacaoRetorno: 'Olá, {nome}! Veja: {link}',
   fraseEspera: 'Só um instante que já te ajudo!', mensagemForaArea: 'Por enquanto entregamos em algumas regiões.',
+  mensagemEscalada: 'Já chamo alguém da equipe, {nome}.', mensagemEncaminhamento: 'Oi, {nome}! Vou passar seu recado para a responsável.', // #2437: obrigatório desde a #2249
   respiroMinutos: 40, tempoPreparoPadraoMinutos: 60, slaRespostaMinutos: 5,
   modeloRetomadaNome: null, modeloRetomadaIdioma: 'pt_BR', webhookVerificadoEm: null, ultimaMensagemRecebidaEm: null,
 }
@@ -101,12 +102,17 @@ try {
     await page.getByRole('heading', { name: 'Impressão', exact: true }).waitFor()
     assert.ok((await page.locator('[data-inicio-tela]').evaluate(el => el === document.activeElement)))
   })
-  await conferir('menu mostra contexto no celular e avisa os recursos em preparação', async () => {
+  await conferir('menu mostra contexto no celular e não anuncia recurso em preparação', async () => {
     await page.setViewportSize({ width: 320, height: 740 })
     const menu = page.getByRole('button', { name: 'Menu de Configurações' })
     assert.match(await menu.innerText(), /Configurações/)
     await menu.click()
-    await page.getByRole('dialog').getByRole('link', { name: /Integrações de entrega.*Em preparação/ }).waitFor()
+    // #2437: "Integrações de entrega" saiu do menu quando as chaves por loja ganharam tela (#1304) e as telas marcadas
+    // "Em preparação" estão congeladas (#1891), então nenhum menu mostra o aviso hoje. A prova confere que o menu do celular
+    // lista a tela real, sem o aviso.
+    const dialogo = page.getByRole('dialog')
+    await dialogo.getByRole('link', { name: 'Integrações', exact: true }).waitFor()
+    assert.equal(await dialogo.getByText('Em preparação').count(), 0)
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
     await foto(page, 'menu-celular-320')
     await page.keyboard.press('Escape')
@@ -117,14 +123,17 @@ try {
   const fora = page.getByLabel('Fora do horário', { exact: true })
   await conferir('rascunho das mensagens sobrevive à ida ao início e volta', async () => {
     await fora.fill('Rascunho para um dia difícil.')
-    await page.getByRole('link', { name: 'Módulos', exact: true }).click()
+    // #2437: o link do trilho que leva ao hall ('Módulos') hoje se chama 'Ir para o Início' (#2258).
+    await page.getByRole('link', { name: 'Ir para o Início', exact: true }).click()
     await ajustes(page)
     await esperarValor(fora, 'Rascunho para um dia difícil.')
     const storage = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))
     assert.ok(!storage.includes('Rascunho para um dia difícil.'))
   })
   await conferir('sair pede decisão e cancelar preserva a edição', async () => {
-    await page.getByRole('banner').getByRole('button', { name: 'Sair', exact: true }).click()
+    // #2437: desde #1870 o Sair mora atrás do avatar da conta, no pé do trilho, e não mais no cabeçalho.
+    await page.getByRole('button', { name: /^Conta de / }).click()
+    await page.getByRole('group', { name: 'Conta' }).getByRole('button', { name: 'Sair', exact: true }).click()
     const dialogo = page.getByRole('dialog', { name: 'Sair sem salvar os ajustes?' })
     await dialogo.getByRole('button', { name: 'Continuar trabalhando' }).click()
     assert.equal(await fora.inputValue(), 'Rascunho para um dia difícil.')
@@ -166,7 +175,7 @@ try {
     const segunda = dialogo.getByLabel('Abre, Segunda', { exact: true })
     await segunda.fill('09:30')
     await dialogo.getByRole('button', { name: 'Fechar', exact: true }).click()
-    await page.getByRole('link', { name: 'Módulos', exact: true }).click()
+    await page.getByRole('link', { name: 'Ir para o Início', exact: true }).click()
     await page.getByLabel('Buscar módulo ou tela').waitFor()
     await ajustes(page)
     await page.getByRole('button', { name: 'Ajustar horários da semana' }).click()
@@ -238,7 +247,7 @@ try {
     const respostaPendente = page.waitForResponse(resposta => resposta.url().endsWith('/api/atendimento/configuracao') && resposta.request().method() === 'PUT', { timeout: 30000 }).then(() => null, erro => erro)
     await config.getByRole('button', { name: 'Salvar configuração', exact: true }).click()
     await config.getByText('Salvando…', { exact: true }).waitFor()
-    await page.getByRole('link', { name: 'Módulos', exact: true }).click()
+    await page.getByRole('link', { name: 'Ir para o Início', exact: true }).click()
     await page.getByLabel('Buscar módulo ou tela').waitFor()
     await ajustes(page)
     await tom.fill('Edição nova preservada')
@@ -248,7 +257,7 @@ try {
     const erroResposta = await respostaPendente
     if (erroResposta) throw erroResposta
     await esperarValor(tom, 'Edição nova preservada')
-    await page.getByRole('link', { name: 'Módulos', exact: true }).click()
+    await page.getByRole('link', { name: 'Ir para o Início', exact: true }).click()
     await page.getByLabel('Buscar módulo ou tela').waitFor()
     await ajustes(page)
     await esperarValor(tom, 'Edição nova preservada')
@@ -258,7 +267,10 @@ try {
   })
   await conferir('celular, tema escuro e fonte a 200% mantêm os controles acessíveis', async () => {
     await page.setViewportSize({ width: 390, height: 844 })
+    // #2437: o tema mora no menu da conta desde a #2258.
+    if (!(await page.getByRole('radio', { name: 'Escuro', exact: true }).isVisible())) await page.getByRole('button', { name: /^Conta de / }).first().click()
     await page.getByRole('radio', { name: 'Escuro', exact: true }).click()
+    await page.keyboard.press('Escape')
     await page.getByRole('heading', { name: 'Horários e mensagens', exact: true }).scrollIntoViewIfNeeded()
     await foto(page, 'configuracoes-celular-escuro')
     await page.evaluate(() => { document.documentElement.style.fontSize = '200%' })

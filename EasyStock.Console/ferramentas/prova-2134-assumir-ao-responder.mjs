@@ -162,7 +162,7 @@ try {
       const { ctx } = await contexto({ width, height })
       const p = await abrir(ctx)
       await p.evaluate(() => { const r = document.querySelector('[role="log"]').parentElement; r.scrollTop = r.scrollHeight })
-      const caixa = await p.getByRole('button', { name: 'Assumir', exact: true }).boundingBox()
+      const caixa = await p.getByRole('button', { name: 'Assumir conversa', exact: true }).boundingBox() // #2437: o botão é "Assumir conversa" desde a #2232
       assert.ok(caixa, 'o botão Assumir não existe')
       if (process.env.EVIDENCIAS_2134) await p.screenshot({ path: resolve(process.env.EVIDENCIAS_2134, `assumir-fixo-${width}.png`) })
       assert.ok(caixa.y >= 0 && caixa.y + caixa.height <= height, `Assumir fora da tela: y=${Math.round(caixa.y)} (janela de ${height} px)`)
@@ -251,7 +251,7 @@ try {
     assert.equal(chamadasIA.length, 1, 'ligado: uma chamada ao provedor')
 
     // #2185: a chave é item do menu "Mais ferramentas", e o menu fecha ao escolher.
-    const chaveDe = (pagina) => pagina.getByRole('menuitemcheckbox', { name: /sugestões de ia/i })
+    const chaveDe = (pagina) => pagina.getByRole('menuitemcheckbox', { name: /sugestões do assistente/i }) // #2437: rótulo da #2187
     const ferramentas = (pagina) => pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
     await ferramentas(p).click()
     assert.equal(await chaveDe(p).count(), 1, 'falta a chave para desligar o completar com Tab')

@@ -31,6 +31,8 @@ await context.addInitScript(({ empresa, usuario }) => {
 const chamadas = [], erros = []
 const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
 const amanha = new Date(new Date(hoje + 'T12:00:00Z').getTime() + 86400000).toISOString().slice(0, 10)
+// #2259: o sinal vale com 2 dias de antecedência; amanhã já não pede sinal.
+const depois = new Date(new Date(hoje + 'T12:00:00Z').getTime() + 2 * 86400000).toISOString().slice(0, 10)
 let pedidoCriado = false
 await context.route('**/api/**', async route => {
   const path = new URL(route.request().url()).pathname
@@ -62,7 +64,22 @@ const page = await context.newPage()
 page.setDefaultTimeout(10000)
 page.on('pageerror', erro => erros.push(erro.message))
 const aviso = page.getByText('Maquininha na entrega: Encomenda com antecedência: sinal de 50% antes da produção. Restante na entrega.', { exact: true })
+// #2437: dia, meios e aviso moram no painel "Revisar comanda" (#2232); no celular a aba "Pedido" virou "Cliente".
+const abrirComanda = async () => {
+  const dia = page.getByLabel('Dia da entrega (opcional)', { exact: true })
+  if (await dia.isVisible()) return
+  const aba = page.getByRole('tab', { name: 'Cliente', exact: true })
+  if (await aba.isVisible()) { await aba.click(); await page.waitForTimeout(500) }
+  if (!(await dia.isVisible())) await page.getByRole('button', { name: /^Revisar comanda/ }).click()
+  await dia.waitFor()
+}
+// O painel da comanda flutua sobre a barra no celular; recolhe antes de usar o "Gerar cobrança".
+const recolherComanda = async () => {
+  const b = page.getByRole('button', { name: /^Recolher Comanda/ })
+  if (await b.isVisible()) { await b.click(); await page.waitForTimeout(400) }
+}
 const escolherDia = async data => {
+  await abrirComanda()
   await Promise.all([
     page.waitForResponse(r => r.url().includes('/comanda/janelas?') && new URL(r.url()).searchParams.get('dataInicio') === data),
     page.getByLabel('Dia da entrega (opcional)', { exact: true }).fill(data),
@@ -71,65 +88,52 @@ const escolherDia = async data => {
   await page.getByRole('button', { name: new RegExp(diaMes + '.*Janela de prova') }).click()
 }
 try {
+  // #2437: desde a #2232 o meio só se escolhe no seletor do "Gerar cobrança e enviar" (a escolha já gera),
+  // então a prova confere o aviso nesse seletor, sem clicar em meio nenhum. Os outros meios ficam na prova-1749-aviso-sinal.
   await page.goto(origem + '/#/m/atendimento/balcao')
+  // #2437: a Caixa de entrada abre em "Precisa de você"; as conversas da prova já estão assumidas, então ela abre em "Todas".
+  await page.getByRole('button', { name: /^Todas/ }).click()
   await page.getByText('Maria', { exact: true }).first().waitFor()
   // #2135: a tela abre sem conversa escolhida; a atendente abre a Maria.
   await page.getByText('Maria', { exact: true }).first().click()
   await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
   await page.getByRole('button', { name: /^Lasanha Bolonhesa Clássica 600 g/ }).click()
   await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
-  await escolherDia(amanha)
-  assert.equal(await aviso.count(), 0, 'A escolha normal ainda sem meio não duplica o aviso da barra')
-  await page.getByRole('radio', { name: 'Maquininha na entrega', exact: true }).click()
-  if (process.env.ANTES) {
-    assert.equal(await aviso.count(), 0)
-    await page.getByRole('radio', { name: 'Maquininha na entrega', exact: true }).scrollIntoViewIfNeeded()
-  } else { await aviso.waitFor(); await aviso.scrollIntoViewIfNeeded() }
-  await foto(page, '01-maquininha-futuro-1280')
-  await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
-  if (process.env.ANTES) await page.getByRole('radio', { name: 'Maquininha na entrega', exact: true }).scrollIntoViewIfNeeded()
-  else await aviso.scrollIntoViewIfNeeded()
-  await foto(page, '02-maquininha-futuro-390')
-  if (!process.env.ANTES) {
-  const box = await aviso.boundingBox()
-  assert.ok(box.x >= 0 && box.x + box.width <= 390, 'O aviso cabe na coluna do celular')
-  for (const meio of ['Pix', 'Cartão por link', 'Vale-refeição · na maquininha']) {
-    await page.getByRole('radio', { name: meio, exact: true }).click()
-    assert.equal(await aviso.count(), 0, 'Outro meio não mostra aviso da maquininha: ' + meio)
-  }
-  await page.getByRole('radio', { name: 'Maquininha na entrega', exact: true }).click()
-  await escolherDia(hoje)
-  assert.equal(await aviso.count(), 0, 'Entrega hoje não mostra aviso de sinal')
-  await foto(page, '03-maquininha-hoje-390')
-  // Outra conversa começa sem meio: o seletor da barra precisa avisar antes de seu clique de envio.
-  await page.setViewportSize({ width: 1280, height: 720 })
-  await page.getByText('Joana', { exact: true }).first().click()
-  await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
-  await page.getByRole('button', { name: /^Lasanha Bolonhesa Clássica 600 g/ }).click()
-  await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
-  await escolherDia(amanha)
+  await escolherDia(depois)
+  assert.equal(await aviso.count(), 0, 'Sem abrir o seletor não há aviso')
   await page.getByRole('button', { name: 'Gerar cobrança e enviar', exact: true }).click()
   await aviso.waitFor()
-  assert.equal(await aviso.count(), 1, 'Um aviso no picker da barra antes de gerar')
+  assert.equal(await aviso.count(), 1, 'Um aviso no seletor da barra antes de gerar')
   await aviso.scrollIntoViewIfNeeded()
-  await foto(page, '04-picker-antes-gerar-1280')
+  await foto(page, '01-picker-2-dias-1280')
+  await escolherDia(amanha)
+  await page.waitForTimeout(300)
+  assert.equal(await aviso.count(), 0, 'Entrega amanhã não pede sinal (#2259)')
+  await escolherDia(hoje)
+  await page.waitForTimeout(300)
+  assert.equal(await aviso.count(), 0, 'Entrega hoje não mostra aviso de sinal')
+  await foto(page, '02-picker-hoje-1280')
+  await escolherDia(depois)
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
   // A troca de layout remonta a barra: reabrimos seu seletor pela ação real.
-  await page.getByRole('button', { name: 'Gerar cobrança e enviar', exact: true }).click()
+  await page.getByRole('tab', { name: 'Cliente', exact: true }).click()
+  await recolherComanda()
+  if (!(await aviso.isVisible())) await page.getByRole('button', { name: 'Gerar cobrança e enviar', exact: true }).click()
+  await aviso.waitFor()
   await aviso.scrollIntoViewIfNeeded()
-  await foto(page, '05-picker-antes-gerar-390')
+  const box = await aviso.boundingBox()
+  assert.ok(box.x >= 0 && box.x + box.width <= 390, 'O aviso cabe na coluna do celular')
+  await foto(page, '03-picker-2-dias-390')
   pedidoCriado = true
   await page.reload()
-  await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
-  await page.getByRole('button', { name: 'Ver cardápio', exact: true }).waitFor()
+  await page.getByRole('tab', { name: 'Cliente', exact: true }).click()
+  await page.getByRole('button', { name: /^Revisar comanda/ }).waitFor()
+  await page.waitForTimeout(500)
   assert.equal(await aviso.count(), 0, 'Pedido criado não mostra aviso de geração')
-  await foto(page, '06-pedido-criado-sem-aviso-390')
-  assert.equal(chamadas.filter(c => c.metodo !== 'GET').every(c => c.path.endsWith('/marcar-lida')), true, 'Nenhum pedido foi gerado pela prova')
+  await foto(page, '04-pedido-criado-sem-aviso-390')
+  assert.equal(chamadas.filter(c => c.metodo !== 'GET').every(c => /\/(marcar-lida|sugestao|pedido\/simulacao)$/.test(c.path)), true, 'Nenhum pedido foi gerado pela prova')
   assert.deepEqual(erros, [])
-  console.log('ok sinal antes de gerar: seleção normal e picker da barra; hoje/outros meios sem aviso; 1280/390; zero envio de pedido')
-  }
+  console.log('ok sinal no seletor da barra: 2 dias com aviso, amanhã e hoje sem; 1280/390; pedido criado sem aviso; zero envio de pedido')
 } finally {
   await foto(page, '99-estado-final')
   writeFileSync(join(pasta, 'estado-final.txt'), await page.locator('body').innerText())

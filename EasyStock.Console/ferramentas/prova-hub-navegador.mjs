@@ -48,7 +48,7 @@ async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bl
     if (path === '/api/kds/pedidos') return ok(controle.modo === 'parcial'
       ? Array.from({ length: 200 }, (_, i) => ({ id: String(i), status: 'pronto' }))
       : [{ id: 'a', status: 'aguardando' }, { id: 'b', status: 'preparando' }, { id: 'c', status: 'pronto' }])
-    if (path === '/api/caixa/dia') return ok({ saldoEsperado, aberto: true, fechado: false })
+    if (path === '/api/caixa/dia') return ok({ saldoEsperado: saldoEsperado + 50, saldoInicial: saldoEsperado, aberto: true, fechado: false, linhasExtras: [{ hora: '10:00', tipo: 'entrada', valor: 50, metodo: 'pix', descricao: 'Pix' }] }) // #2437: o Hall mostra só o dinheiro da gaveta (#2078); o Pix de 50 não entra no número
     if (path === '/api/atendimento/configuracao') return ok({})
     return ok([])
   })
@@ -85,8 +85,8 @@ try {
   assert.equal(await page.locator('[data-indicador="cozinha"] strong').innerText(), '2')
   assert.equal(await page.locator('[data-indicador="entregas"] strong').innerText(), '1')
   assert.match(await page.locator('[data-indicador="financeiro"]').innerText(), /300,03/)
-  assert.match(await page.locator('[data-indicador="financeiro"]').getAttribute('title'), /incluindo Pix e cartão/)
-  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'entregas', 'cozinha', 'financeiro'])
+  assert.match(await page.locator('[data-indicador="financeiro"]').getAttribute('title'), /Pix e cartão ficam no Caixa do dia/)
+  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'cozinha', 'entregas', 'financeiro']) // #2258 A2: atender, preparar, entregar
   assert.equal(await page.getByRole('progressbar').count(), 0)
   await page.setViewportSize({ width: 390, height: 844 })
   await conferirDobra(page)
@@ -103,7 +103,7 @@ try {
   await page.getByRole('button', { name: 'Aplicar ajustes' }).click()
   assert.deepEqual(await ordemIndicadores(page), ['financeiro', 'atendimento', 'entregas', 'cozinha'])
   await page.getByRole('button', { name: 'Desfazer', exact: true }).click()
-  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'entregas', 'cozinha', 'financeiro'])
+  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'cozinha', 'entregas', 'financeiro'])
   await personalizar.click()
   await page.getByLabel('Produção e entregas', { exact: true }).check()
   await page.getByRole('status').filter({ hasText: 'No painel: Cozinha → Entregas → Atendimento → Financeiro.' }).waitFor()
@@ -167,7 +167,10 @@ try {
   await page.evaluate(() => document.querySelector('main').scrollIntoView())
   await foto(page, 'hub-celular-compacto')
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+  // #2437: desde #2258 (A9) o tema mora atrás do avatar da conta.
+  await page.getByRole('button', { name: /^Conta de / }).first().click()
   await page.getByRole('radio', { name: 'Escuro', exact: true }).click()
+  await page.keyboard.press('Escape')
   await foto(page, 'hub-celular-escuro')
   await conferirDobra(page)
   await page.setViewportSize({ width: 320, height: 844 })
@@ -223,7 +226,7 @@ try {
     sessionStorage.setItem('easystok.sessao', JSON.stringify(sessao)); window.dispatchEvent(new Event('easystok:sessao-alterada'))
   }, { empresa, usuario })
   await page.getByRole('heading', { name: /Outra/ }).waitFor()
-  assert.equal((await ordem(page))[0], 'cardapio')
+  assert.equal((await ordem(page))[0], 'atendimento') // #2258 A2: ordem padrão começa pelo Atendimento
   assert.equal(await atendimento.locator('strong').innerText(), '—')
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')

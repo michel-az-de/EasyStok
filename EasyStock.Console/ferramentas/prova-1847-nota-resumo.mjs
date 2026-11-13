@@ -3,24 +3,28 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
-import { servirDist } from './servirDist.mjs'
 import { resolve } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { build } from 'vite'
+import { build, createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const raiz = fileURLToPath(new URL('..', import.meta.url)).replaceAll('\\', '/')
 const artefatos = resolve(raiz, '../.build/harmonia-ux')
 const fatos = { tipo: 'Console em demonstração e componentes reais com respostas controladas; sem API real', etapas: [], requisicoesHttpBloqueadas: 0, passou: false }
 // O dist/ local é servido por HTTP (#2254); só ele passa, o resto da rede é bloqueado.
-const dist = await servirDist(raiz)
+// #2437: serve o código-fonte por um Vite próprio em modo demonstração (sem VITE_FONTE_DADOS=api), em vez de exigir o dist/
+// do build, que no `npm run qualidade` só roda depois das provas. O DOM é o mesmo.
+delete process.env.VITE_FONTE_DADOS
+const servidor = await createServer({ root: raiz, logLevel: 'silent', server: { host: '127.0.0.1', port: 0, strictPort: false } })
+await servidor.listen()
+const dist = { url: servidor.resolvedUrls.local[0], fechar: () => servidor.close() }
 const bloquearRede = pagina => pagina.route(rota => /^https?:\/\//.test(rota.href) && !rota.href.startsWith(dist.url), rota => { fatos.requisicoesHttpBloqueadas++; return rota.abort() })
 const navegador = await chromium.launch({ headless: true })
 try {
   const pagina = await navegador.newPage({ viewport: { width: 1440, height: 1000 } })
   await bloquearRede(pagina)
   pagina.setDefaultTimeout(5000)
-  await pagina.goto(dist.url)
+  await pagina.goto(dist.url, { waitUntil: 'networkidle', timeout: 90000 }) // #2437: o Vite frio otimiza dependências na primeira carga
   await pagina.getByText('Abrir Atendimento', { exact: true }).click()
   await pagina.getByRole('button', { name: /Renan Okamoto/ }).click()
   await pagina.getByRole('button', { name: 'Adicionar nota', exact: true }).click()
@@ -81,6 +85,7 @@ React.createElement('section',{'aria-label':'Cobrança em teste'},React.createEl
 React.createElement(ExtratoDoPedido,{pedido:{pedidoId:'pedido',totalApi:100,frete:0,...pedidos[caso]}}),
 !terminou&&React.createElement(ModalNota,{visivel,nomeCliente:'Maria',outraConversa:true,aoFechar:()=>terminar(true),aoSalvar:async texto=>{window.textoSalvo=texto;await new Promise(r=>window.responder=r);return true}}),
 React.createElement(CartaoDoCliente,{conversa:{id:'cliente-cache',clienteId:'cliente',nome:'Maria',cliente:{pedidos:2,totalGasto:100,notas}},fonteApi:true,aoAbrir:()=>{}}))};createRoot(document.getElementById('root')).render(React.createElement(Prova));`
+  process.env.NODE_ENV = 'production' // #2437: o Vite de dev acima deixou NODE_ENV=development; o plugin React geraria jsxDEV, que este bundle não tem.
   const compilado = await build({ root: raiz, configFile: false, logLevel: 'silent', define: { 'process.env.NODE_ENV': '"production"' }, plugins: [react(), {
     name: 'prova-isolada', enforce: 'pre',
     resolveId(id) { if (/(^|\/)contextos(?:\.js)?$/.test(id)) return '\0contextos'; if (id.endsWith('/infra/api/conversasApi')) return '\0api-resumo'; if (id === 'prova' || id.replaceAll('\\', '/').endsWith('/prova')) return '\0prova' },
