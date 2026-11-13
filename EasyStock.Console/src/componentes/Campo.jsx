@@ -5,10 +5,11 @@ const descricao = (id, dica, adicional, erro) => [erro ? `${id}-erro` : dica && 
 
 // #2258 (auditoria T12, padrão "erro embaixo do próprio campo"): `erro` liga borda, aria-invalid e
 // aria-describedby no próprio campo, e o texto do erro fica colado nele, no lugar da dica.
-function Envelope({ id, rotulo, rotuloOculto, dica, erro, children }) {
+// #2457 (U4): `obrigatorio` mostra o * fora do nome acessível e liga aria-required no campo.
+function Envelope({ id, rotulo, rotuloOculto, dica, erro, obrigatorio, children }) {
   return (
     <div className={css.campo}>
-      <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}</label>
+      <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}{obrigatorio && <span aria-hidden="true"> *</span>}</label>
       {children}
       {erro
         ? <p id={`${id}-erro`} className={css.erro} role="alert">{erro}</p>
@@ -17,14 +18,14 @@ function Envelope({ id, rotulo, rotuloOculto, dica, erro, children }) {
   )
 }
 
-export function CampoTexto({ rotulo, rotuloOculto, dica, erro, tipo = 'text', id: idInformado, className, ...resto }) {
+export function CampoTexto({ rotulo, rotuloOculto, dica, erro, obrigatorio, tipo = 'text', id: idInformado, className, ...resto }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
   return (
-    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica} erro={erro}>
+    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica} erro={erro} obrigatorio={obrigatorio}>
       <input
         id={id} type={tipo} className={[css.controle, className].filter(Boolean).join(' ')}
-        aria-invalid={erro ? true : undefined} {...resto}
+        aria-invalid={erro ? true : undefined} aria-required={obrigatorio || undefined} {...resto}
         aria-describedby={descricao(id, dica, resto['aria-describedby'], erro)}
       />
     </Envelope>
@@ -32,17 +33,17 @@ export function CampoTexto({ rotulo, rotuloOculto, dica, erro, tipo = 'text', id
 }
 
 export function CampoArea({
-  rotulo, rotuloOculto, dica, className, id: idInformado, ...resto
+  rotulo, rotuloOculto, dica, erro, obrigatorio, className, id: idInformado, ...resto
 }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
   return (
-    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica}>
+    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica} erro={erro} obrigatorio={obrigatorio}>
       <textarea
         id={id}
         className={[css.controle, css.area, className].filter(Boolean).join(' ')}
-        {...resto}
-        aria-describedby={descricao(id, dica, resto['aria-describedby'])}
+        aria-invalid={erro ? true : undefined} aria-required={obrigatorio || undefined} {...resto}
+        aria-describedby={descricao(id, dica, resto['aria-describedby'], erro)}
       />
     </Envelope>
   )

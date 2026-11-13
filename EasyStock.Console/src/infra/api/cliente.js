@@ -3,6 +3,7 @@ import { atualizarTokens, empresaDoToken, gravarSessao, gravarSessaoNativa, iden
 import { obterSessaoNativa, temSessaoNativa } from '../sessaoNativa'
 import { combinarSinais } from './sinais'
 import { MENSAGEM_ESCRITA_SEM_RESPOSTA, MENSAGEM_LEITURA_SEM_RESPOSTA, prazoDaChamada } from './prazo'
+import { camposDoErro } from './errosDeCampo.js'
 
 // Erro de chamada à API com o que a tela precisa para falar com a dona:
 // status HTTP, código da API (`error.code` ou `erro`), mensagem legível e o detalhe
@@ -187,5 +188,8 @@ export async function chamarApi(caminho, {
   }
   const codigo = json?.error?.code ?? json?.erro ?? `HTTP_${resposta.status}`
   const mensagem = mensagemDoErro(json, resposta.status)
-  throw new ErroApi(resposta.status, codigo, mensagem, json?.error?.detail ?? null, json?.error?.details ?? null)
+  const erro = new ErroApi(resposta.status, codigo, mensagem, json?.error?.detail ?? null, json?.error?.details ?? null)
+  // #2457 (B5): o formulário mostra cada erro de validação embaixo do próprio campo.
+  erro.campos = camposDoErro(json)
+  throw erro
 }

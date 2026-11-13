@@ -30,7 +30,9 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
         UnidadeMedida UnidadeMedidaBase = UnidadeMedida.Un,
         int? QuantidadeMinima = null,
         // D-M2-03 (#1523): embalagem é insumo que desce em toda produção.
-        bool EhEmbalagem = false);
+        bool EhEmbalagem = false,
+        // #2457 (B1): a observação digitada no cadastro novo sumia, porque o comando não tinha o campo.
+        string? ObservacaoInterna = null);
 
     public sealed record CadastrarProdutoResult(
         Guid ProdutoId,
@@ -162,6 +164,7 @@ namespace EasyStock.Application.UseCases.CadastrarProduto
                 MargemEstimada = command.MargemEstimada,
                 AtributosJson = command.AtributosJson,
                 FotosJson = command.FotosJson,
+                ObservacaoInterna = string.IsNullOrWhiteSpace(command.ObservacaoInterna) ? null : command.ObservacaoInterna.Trim(),
                 Status = statusInicial,
                 CriadoEm = agora,
                 AlteradoEm = agora,
