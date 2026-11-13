@@ -94,7 +94,9 @@ case "$1" in
   inspect)
     atual=$(grep "^easystok-api:vps " "$STATE/tags" | cut -d' ' -f2)
     case "$3" in
-      *Health*) if [ "${FAKE_BAD:-0}" = 1 ] && [[ "$atual" != *vps-prev* && "$atual" != *vps-antiga* ]]; then echo unhealthy; else echo healthy; fi ;;
+      # #2372: o Worker tem health proprio (arquivo de vida); FAKE_WORKER_HEALTH=sem simula container sem healthcheck.
+      *Health*) if [ "$4" = ez-worker ] && [[ "$atual" != *vps-prev* && "$atual" != *vps-antiga* ]] && [ -n "${FAKE_WORKER_HEALTH:-}" ]; then echo "$FAKE_WORKER_HEALTH";
+                elif [ "${FAKE_BAD:-0}" = 1 ] && [[ "$atual" != *vps-prev* && "$atual" != *vps-antiga* ]]; then echo unhealthy; else echo healthy; fi ;;
       *Running*) echo true ;;
       *RestartCount*) if [[ "$atual" != *vps-prev* && "$atual" != *vps-antiga* ]]; then echo "${FAKE_WORKER_RESTARTS:-0}"; else echo 0; fi ;;
       *Env*) echo "GIT_SHA=$SHA_FULL" ;;
@@ -135,6 +137,11 @@ r=$(run FAKE_WORKER_RESTARTS=3); confere "worker em laco de restart: exit 6"    
                               confere "worker em laco: volta a imagem"   "imagem=easystok-api:vps-antiga" "$r"
                               confere "worker em laco: nao marca current" "current=$" "$r"
                               confere "worker em laco: mostra o log do worker" "log_worker=1" "$r"
+r=$(run FAKE_WORKER_HEALTH=unhealthy); confere "worker unhealthy: exit 6"     "rc=6" "$r"
+                              confere "worker unhealthy: volta a imagem" "imagem=easystok-api:vps-antiga" "$r"
+                              confere "worker unhealthy: mostra o log do worker" "log_worker=1" "$r"
+r=$(run FAKE_WORKER_HEALTH=starting); confere "worker sem ficar healthy no prazo: exit 6" "rc=6" "$r"
+r=$(run FAKE_WORKER_HEALTH=sem); confere "worker sem healthcheck: aceita Running" "rc=0" "$r"
 r=$(run FAKE_BAD=1);         confere "falha de health: exit 6"          "rc=6" "$r"
                               confere "falha de health: volta a imagem"  "imagem=easystok-api:vps-antiga" "$r"
                               confere "falha de health: sobe 2 vezes"    "up=2" "$r"
