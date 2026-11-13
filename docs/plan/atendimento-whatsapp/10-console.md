@@ -273,6 +273,8 @@ por ausência de Chromium (`EasyStock.Console/.build/2395/qualidade-pos-master-6
 O gate do rebase passou com 69 testes (`.build/r4-gate-4653b901.log`). O delta do master
 não altera .NET, migrations nem contratos financeiros; as evidências anteriores mantêm
 suas versões e não são apresentadas como novas execuções.
+O smoke do delta identificou alvos de 32 px nos botões de porção do Banco de imagens;
+o ajuste usa `--toque` na mesma condição móvel dos tokens, preservando os 32 px no desktop com mouse.
 
 W5-01: `Agente_PedidoEVagaCommitadosSobrevivemAFalhaSqlDepoisDoProvedor` passou em PostgreSQL real,
 com serviço de agente resolvido por DI e UoW reais; LLM e Mercado Pago controlados. Outra unidade
