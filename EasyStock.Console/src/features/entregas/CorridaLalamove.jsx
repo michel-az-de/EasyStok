@@ -75,13 +75,13 @@ export function CorridaLalamove({ corrida, travado, atualizadaEm, semResposta, c
             {corrida.motoristaTelefone && (
               <a className={css.linkAcao} href={`tel:${corrida.motoristaTelefone.replace(/[^\d+]/g, '')}`}
                 aria-label={`Ligar para ${corrida.motorista}, ${telefoneDoE164(corrida.motoristaTelefone)}`}>
-                <Icone nome="phone" tamanho={18} />{telefoneDoE164(corrida.motoristaTelefone) || corrida.motoristaTelefone}
+                <Icone nome="phone" tamanho={20} />{telefoneDoE164(corrida.motoristaTelefone) || corrida.motoristaTelefone}
               </a>
             )}
             {link && (
               <a className={css.linkAcao} href={link} target="_blank" rel="noopener noreferrer"
                 aria-label="Acompanhar no mapa da Lalamove (abre em nova aba)">
-                <Icone nome="external-link" tamanho={18} />Acompanhar no mapa
+                <Icone nome="external-link" tamanho={20} />Acompanhar no mapa
               </a>
             )}
           </div>
@@ -90,7 +90,7 @@ export function CorridaLalamove({ corrida, travado, atualizadaEm, semResposta, c
       {!corrida.motorista && link && (
         <a className={css.linkAcao} href={link} target="_blank" rel="noopener noreferrer"
           aria-label="Acompanhar no mapa da Lalamove (abre em nova aba)">
-          <Icone nome="external-link" tamanho={18} />Acompanhar no mapa
+          <Icone nome="external-link" tamanho={20} />Acompanhar no mapa
         </a>
       )}
 

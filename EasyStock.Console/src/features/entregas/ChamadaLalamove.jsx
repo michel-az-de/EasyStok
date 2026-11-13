@@ -31,7 +31,7 @@ export function ChamadaLalamove({ travado, cotar, chamar, destino }) {
         <div className={css.titulo}>
           <strong>Chamar pela Lalamove</strong>
           {destino && (
-            <span className={css.trajeto}><Icone nome="map-pin" tamanho={14} /><span>Da cozinha até {destino}</span></span>
+            <span className={css.trajeto}><Icone nome="map-pin" tamanho={16} /><span>Da cozinha até {destino}</span></span>
           )}
         </div>
       </div>
@@ -75,7 +75,7 @@ function Cotacao({ cotacao, veiculo, observacao, travado, aoMudarObservacao, aoC
           ? <Selo tom="alerta" icone="relogio">Cotação vencida</Selo>
           : (
             <span className={`${css.validade} ${segundos < 60 ? css.validadeCurta : ''}`} aria-live="off">
-              <Icone nome="relogio" tamanho={14} />Vale por {relogioDaCotacao(segundos)}
+              <Icone nome="relogio" tamanho={16} />Vale por {relogioDaCotacao(segundos)}
             </span>
           )}
       </div>
