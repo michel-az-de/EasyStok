@@ -377,6 +377,35 @@ public class SyncController(
         return resultado;
     }
 
+    /// <summary>
+    /// #2431: pedido do app pago no console ou no Mercado Pago. O pagamento muda o Pedido do ERP, nunca o
+    /// mobile_orders, entao nenhum aparelho (nem o que criou) recebia o aReceber. Vai so o campo, numa
+    /// operacao que o app aplica sem trocar o pedido; APK antigo ignora a operacao desconhecida.
+    /// </summary>
+    private async Task AdicionarAReceberDosPedidosPagosNoErpAsync(List<MutationDto> mutations, List<Order> jaEnviados,
+        DateTime sinceDate, Guid? empresaId, Guid? lojaId, long serverTime)
+    {
+        if (empresaId is null) return;
+        var idsJaEnviados = jaEnviados.Select(o => o.Id).ToHashSet();
+        var pedidosAlterados = _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && (p.AlteradoEm > sinceDate
+                || p.Eventos.Any(e => e.OcorridoEm > sinceDate)
+                || p.Pagamentos.Any(g => g.PagoEm > sinceDate)))
+            .Select(p => p.Id);
+        var ordersQ = _db.Set<Order>().AsNoTracking()
+            .Where(o => o.EmpresaId == empresaId && o.ErpPedidoId != null && pedidosAlterados.Contains(o.ErpPedidoId.Value));
+        if (lojaId.HasValue)
+            ordersQ = ordersQ.Where(o => o.LojaId == lojaId || o.LojaId == null);
+        var orders = (await ordersQ.Select(o => new { o.Id, ErpPedidoId = o.ErpPedidoId!.Value }).ToListAsync())
+            .Where(o => !idsJaEnviados.Contains(o.Id)).ToList();
+        if (orders.Count == 0) return;
+        var aReceberPorPedido = await AReceberDosPedidosAsync(orders.Select(o => o.ErpPedidoId).Distinct().ToList());
+        foreach (var o in orders)
+            if (aReceberPorPedido.TryGetValue(o.ErpPedidoId, out var aReceber))
+                mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "server", "order.aReceber",
+                    SyncDtoConverters.Serialize(new { id = o.Id, aReceber }), serverTime));
+    }
+
     [HttpGet("pull")]
     public async Task<ActionResult<SyncPullResponse>> Pull([FromQuery] long since, [FromQuery] string deviceId)
     {
@@ -455,6 +484,7 @@ public class SyncController(
                 "order.upsert", SyncDtoConverters.Serialize(dto),
                 new DateTimeOffset(o.ServerUpdatedAt).ToUnixTimeMilliseconds()));
         }
+        await AdicionarAReceberDosPedidosPagosNoErpAsync(mutations, orders, sinceDate, empresaId, lojaId, serverTime);
 
         var batchesQ = _db.Set<Batch>().Include(b => b.Items)
             .Where(b => b.EmpresaId == empresaId && b.ServerUpdatedAt > sinceDate && b.LastDeviceId != deviceId);

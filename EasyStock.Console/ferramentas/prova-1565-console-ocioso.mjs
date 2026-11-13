@@ -317,10 +317,10 @@ async function sinalDe(caminho, opcoes) {
   return visto
 }
 
-await confere('4. GET sai com prazo; escrita ganhou o seu (#2379); arquivo e keepalive ficam sem', async () => {
+await confere('4. GET sai com prazo; escrita ganhou o seu (#2379); keepalive também (#2431); arquivo fica sem', async () => {
   assert.ok(await sinalDe('/api/atendimento/lembretes') instanceof AbortSignal, 'GET sem prazo')
   assert.ok(await sinalDe('/api/pedidos', { metodo: 'POST', corpo: {} }) instanceof AbortSignal, 'escrita sem prazo (#2379)')
-  assert.equal(await sinalDe('/api/pedidos', { metodo: 'POST', corpo: {}, keepalive: true }), undefined)
+  assert.ok(await sinalDe('/api/pedidos', { metodo: 'POST', corpo: {}, keepalive: true }) instanceof AbortSignal, 'keepalive sem prazo (#2431)')
   assert.equal(await sinalDe('/api/atendimento/conversas/c/mensagens/m/midia', { arquivo: true }), undefined)
   const proprio = AbortSignal.timeout(45000)
   assert.equal(await sinalDe('/api/atendimento/modelos', { sinal: proprio }), proprio, 'quem passa o seu prazo fica com ele')
