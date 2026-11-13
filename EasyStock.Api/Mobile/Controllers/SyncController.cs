@@ -387,19 +387,22 @@ public class SyncController(
     {
         if (empresaId is null) return;
         var idsJaEnviados = jaEnviados.Select(o => o.Id).ToHashSet();
-        var pedidosAlterados = _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
-            .Where(p => p.EmpresaId == empresaId && (p.AlteradoEm > sinceDate
-                || p.Eventos.Any(e => e.OcorridoEm > sinceDate)
-                || p.Pagamentos.Any(g => g.PagoEm > sinceDate)))
-            .Select(p => p.Id);
         var ordersQ = _db.Set<Order>().AsNoTracking()
-            .Where(o => o.EmpresaId == empresaId && o.ErpPedidoId != null && pedidosAlterados.Contains(o.ErpPedidoId.Value));
+            .Where(o => o.EmpresaId == empresaId && o.ErpPedidoId != null);
         if (lojaId.HasValue)
             ordersQ = ordersQ.Where(o => o.LojaId == lojaId || o.LojaId == null);
         var orders = (await ordersQ.Select(o => new { o.Id, ErpPedidoId = o.ErpPedidoId!.Value }).ToListAsync())
             .Where(o => !idsJaEnviados.Contains(o.Id)).ToList();
         if (orders.Count == 0) return;
-        var aReceberPorPedido = await AReceberDosPedidosAsync(orders.Select(o => o.ErpPedidoId).Distinct().ToList());
+        // Parte dos pedidos do app, pela chave: pedido da web e do PDV fica fora da conta de cada pull.
+        var pedidoIds = orders.Select(o => o.ErpPedidoId).Distinct().ToList();
+        var alterados = await _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && pedidoIds.Contains(p.Id) && (p.AlteradoEm > sinceDate
+                || p.Eventos.Any(e => e.OcorridoEm > sinceDate)
+                || p.Pagamentos.Any(g => g.PagoEm > sinceDate)))
+            .Select(p => p.Id).ToListAsync();
+        if (alterados.Count == 0) return;
+        var aReceberPorPedido = await AReceberDosPedidosAsync(alterados);
         foreach (var o in orders)
             if (aReceberPorPedido.TryGetValue(o.ErpPedidoId, out var aReceber))
                 mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "server", "order.aReceber",
