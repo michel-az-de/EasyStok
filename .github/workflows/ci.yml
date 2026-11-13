@@ -97,9 +97,17 @@ jobs:
           dotnet test EasyStok.CI.slnf
           -c Release --no-build --no-restore
           --filter "Category!=ArchitectureDebt"
-          --logger "trx;LogFileName=test-results.trx"
+          --logger "trx;LogFilePrefix=test-results"
           --logger "console;verbosity=normal"
           --results-directory ./TestResults
+
+      # #2371: um teste pulado no CI não prova nada. Com o Postgres ou o Docker fora, os SkippableFact
+      # pulavam e o job ficava verde. Só passa pulo de ensaio opt-in (lista no script). O LogFilePrefix
+      # acima grava um trx por assembly; com LogFileName cada assembly sobrescrevia o anterior.
+      - name: Nenhum teste pulado fora do opt-in
+        run: |
+          bash scripts/ci/checar-testes-pulados.test.sh
+          python3 scripts/ci/checar-testes-pulados.py ./TestResults
 
       - name: Upload test results
         if: always()
@@ -159,6 +167,9 @@ jobs:
           --logger "trx;LogFileName=api-integration.trx"
           --logger "console;verbosity=normal"
           --results-directory ./TestResults
+
+      - name: Nenhum teste pulado fora do opt-in
+        run: python3 scripts/ci/checar-testes-pulados.py ./TestResults
 
       - name: Upload test results
         if: always()
