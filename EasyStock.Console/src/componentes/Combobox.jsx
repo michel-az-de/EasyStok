@@ -5,7 +5,7 @@ import css from './Combobox.module.css'
 const normalizar = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
 
 // Uma seleção, com busca, mantém o foco no campo e anuncia a opção ativa para o leitor de tela.
-export function Combobox({ rotulo, valor, opcoes, aoMudar, erro, disabled = false, placeholder = 'Selecione', id: informado }) {
+export function Combobox({ rotulo, obrigatorio, valor, opcoes, aoMudar, erro, disabled = false, placeholder = 'Selecione', id: informado }) {
   const gerado = useId(), id = informado ?? gerado
   const campo = useRef(null)
   const [aberto, abrir] = useState(false)
@@ -27,11 +27,11 @@ export function Combobox({ rotulo, valor, opcoes, aoMudar, erro, disabled = fals
     } else if (evento.key === 'Enter' && aberto) { evento.preventDefault(); escolher(lista[indice]) }
   }
   return <div className={css.campo} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) { abrir(false); buscar('') } }}>
-    <label className={css.rotulo} htmlFor={id}>{rotulo}</label>
+    <label className={css.rotulo} htmlFor={id}>{rotulo}{obrigatorio && <span aria-hidden="true"> *</span>}</label>
     <div className={css.controle}>
       <input ref={campo} id={id} role="combobox" aria-autocomplete="list" autoComplete="off" aria-expanded={aberto}
         aria-controls={`${id}-opcoes`} aria-activedescendant={aberto && lista.length ? `${id}-opcao-${indice}` : undefined}
-        aria-invalid={erro ? true : undefined} aria-describedby={erro ? `${id}-erro` : undefined} disabled={disabled}
+        aria-invalid={erro ? true : undefined} aria-required={obrigatorio || undefined} aria-describedby={erro ? `${id}-erro` : undefined} disabled={disabled}
         value={aberto ? busca : selecionado?.rotulo ?? ''} placeholder={aberto ? 'Buscar opção' : placeholder}
         onFocus={iniciar} onClick={() => { if (!aberto) iniciar() }} onKeyDown={navegar}
         onChange={e => { buscar(e.target.value); ativar(0); abrir(true) }} />

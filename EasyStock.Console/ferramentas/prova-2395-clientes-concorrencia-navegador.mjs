@@ -64,7 +64,7 @@ try {
   assert.equal(await mb.getByRole('button', { name: 'Salvar cadastro', exact: true }).isDisabled(), true)
   let escritas = patches.length
   await mb.getByRole('button', { name: 'Conferir versão atual', exact: true }).tap()
-  await mb.getByText('Atual: 11977776666', { exact: false }).waitFor()
+  await mb.getByText('Atual: (11) 97777-6666', { exact: false }).waitFor()
   assert.equal(patches.length, escritas, 'Conferir é somente leitura')
   await b.screenshot({ path: resolve(pasta, 'conflito-reconferencia-390.png'), fullPage: true })
   // Outra gravação entre a leitura de conferência e a nova confirmação exige conferir de novo.
@@ -74,7 +74,7 @@ try {
   escritas = patches.length
   await mb.getByRole('button', { name: 'Manter minhas alterações sobre esta versão', exact: true }).tap()
   assert.equal(patches.length, escritas, 'Adotar a versão não grava')
-  assert.equal(await mb.getByRole('textbox', { name: 'Telefone', exact: true }).inputValue(), '11977776666')
+  assert.equal(await mb.getByRole('textbox', { name: 'Telefone', exact: true }).inputValue(), '(11) 97777-6666')
   await salvar(mb, true)
   assert.equal(pessoas.get('A').nome, 'Pessoa A')
   await mb.getByRole('button', { name: 'Conferir versão atual', exact: true }).tap()
