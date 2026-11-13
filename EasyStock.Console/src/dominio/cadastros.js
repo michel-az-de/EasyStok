@@ -102,6 +102,29 @@ export function documentoParaApi(valor) {
 // #2476 (U6): a pílula é só do estado que pede ação (Pilula.module.css): o contato sem cadastro e o Lead, que
 // ainda não comprou. Ativo, Inativo e Cliente são texto.
 export const emAtividadeCadastro = (item) => item.ativo !== false && item.status !== 'Inativo' && item.status !== 1
+// #2495 (S2, I1): inativar e reativar pelo editor. Só cliente e fornecedor usam DELETE e /reativar; produto tem
+// a Situação no formulário e conta bancária a caixa Conta ativa.
+const SINGULAR_ATIVIDADE = { clientes: 'cliente', fornecedores: 'fornecedor' }
+export const temAtividadeNoEditor = (tela, dados) => Boolean(SINGULAR_ATIVIDADE[tela] && dados?.id)
+export function confirmacaoDeAtividade(tela, item) {
+  const ativar = !emAtividadeCadastro(item)
+  const nome = item.nome || `este ${SINGULAR_ATIVIDADE[tela]}`
+  const verbo = ativar ? 'Reativar' : 'Inativar'
+  return {
+    ativar,
+    titulo: `${verbo} ${nome}?`,
+    texto: ativar ? `${nome} volta para a lista de ativos.`
+      : `${nome} deixa de aparecer entre os ativos. O histórico e os pedidos ficam guardados, e dá para reativar depois.`,
+    botao: `${verbo} ${SINGULAR_ATIVIDADE[tela]}`,
+    sucesso: `${item.nome ? `O cadastro de ${item.nome}` : 'O cadastro'} foi ${ativar ? 'reativado' : 'inativado'}.`,
+  }
+}
+// A API responde sem acento e o 403 chega sem corpo: a frase diz o que fazer.
+export function mensagemDeAtividade(tela, ativar, erro) {
+  if (erro?.status === 403) return `Seu acesso não permite ${ativar ? 'reativar' : 'inativar'} ${SINGULAR_ATIVIDADE[tela]}. Peça a quem administra a loja.`
+  if (tela === 'fornecedores' && !ativar && /pedido aberto/i.test(erro?.message ?? '')) return 'Este fornecedor tem pedido de compra aberto ou em trânsito. Conclua ou cancele o pedido antes de inativar.'
+  return erro?.message || 'Não deu para concluir agora. Tente de novo.'
+}
 export function situacaoDaLinha(tela, item, soLeads) {
   if (soLeads) return { texto: 'Sem cadastro', tom: 'aviso' }
   if (!emAtividadeCadastro(item)) return { texto: 'Inativo', tom: null }

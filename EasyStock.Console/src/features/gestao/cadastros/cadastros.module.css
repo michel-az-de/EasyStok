@@ -34,6 +34,8 @@
 .links a { color: var(--marca-forte); min-height: var(--toque); display: inline-flex; align-items: center; text-underline-offset: 3px; }
 .erro { color: var(--erro); padding: var(--e-3); background: var(--erro-pastel); border-radius: var(--r-1); margin: 0; overflow-wrap: anywhere; }
 .erro p { margin: 0 0 var(--e-2); }
+/* #2495 (S2): Inativar e Reativar ficam à esquerda do rodapé do editor, longe de Salvar. */
+.acaoAtividade { margin-inline-end: auto; }
 .sucesso { margin: 0; padding: var(--e-3); color: var(--sucesso); background: var(--sucesso-pastel); border-radius: var(--r-1); }
 .formulario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-4); padding: var(--e-3) 0; margin: 0; border: 0; min-width: 0; }
 .larguraTotal { grid-column: 1 / -1; }
