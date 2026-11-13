@@ -26,11 +26,11 @@ export function MetodosCadastro({ contexto }) {
     finally { emVoo.current = false; ocupar(false) }
   }
   return <section className={css.painel} aria-label="Formas de pagamento">
-    <header className={css.cabecalho}><div><p className={css.eyebrow}>CADASTROS</p><h2>Formas de pagamento</h2><p>Escolha os meios aceitos pela loja.</p></div><Botao icone="refresh-cw" onClick={consulta.recarregar} disabled={consulta.carregando}>Atualizar</Botao></header>
+    <header className={css.cabecalho}><div><h2>Formas de pagamento</h2><p>Escolha os meios aceitos pela loja.</p></div><Botao icone="refresh-cw" onClick={consulta.recarregar} disabled={consulta.carregando}>Atualizar</Botao></header>
     {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
     {consulta.erro && <div className={css.erro} role="alert">{consulta.erro}<Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>}
     {consulta.carregando ? <Vazio titulo="Carregando formas de pagamento" /> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.codigo}>
-      <div><h3>{m.nome}</h3><Pilula tom={m.ativo ? 'sucesso' : 'neutro'}>{m.ativo ? 'Ativa' : 'Inativa'}</Pilula></div>
+      <div><h3>{m.nome}</h3><Pilula tom={m.ativo ? 'ok' : 'neutro'}>{m.ativo ? 'Ativa' : 'Inativa'}</Pilula></div>
       {acoes.gerenciarCadastrosFinanceiros && <Botao onClick={() => { falhar(null); escolher({ metodo: m, ativo: !m.ativo, requestId: crypto.randomUUID() }) }}>{m.ativo ? 'Inativar' : 'Ativar'}</Botao>}
     </li>)}</ul>}
     {intencao && <Modal titulo={`${intencao.ativo ? 'Ativar' : 'Inativar'} ${intencao.metodo.nome}?`} aoFechar={ocupado ? undefined : () => escolher(null)} segurarFechamento={ocupado}

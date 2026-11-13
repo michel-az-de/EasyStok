@@ -1,3 +1,4 @@
+import { mascaraTelefone } from './formato.js'
 const texto = (v) => typeof v === 'string' ? v.trim() || null : v ?? null
 const campos = (dados, nomes) => Object.fromEntries(nomes.map(nome => [nome, texto(dados[nome])]))
 export const normalizarBuscaCadastro = (valor) => String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
@@ -34,7 +35,7 @@ export const relacionamentoCadastro = (cliente) => !Number.isInteger(cliente.ord
 
 export function corpoCliente(dados, empresaId) {
   if (dados.id && (!Number.isInteger(dados.revisao) || dados.revisao < 0)) throw new Error('Reabra o cadastro para conferir a versão antes de salvar.')
-  return { ...campos(dados, ['nome', 'apt', 'endereco', 'telefone', 'email', 'documento', 'observacoes', 'nomeFantasia', 'inscricaoEstadual']), empresaId,
+  return { ...campos(dados, ['nome', 'apt', 'endereco', 'telefone', 'email', 'documento', 'observacoes', 'nomeFantasia', 'inscricaoEstadual']), telefone: telefoneParaApi(dados.telefone), empresaId,
     ...(dados.id ? { id: dados.id, revisao: dados.revisao } : {}), pessoaJuridica: dados.tipoPessoa === 'juridica', origem: 'console' }
 }
 export const CAMPOS_CLIENTE = { nome: 'Nome', tipoPessoa: 'Tipo de pessoa', telefone: 'Telefone', email: 'E-mail', documento: 'Documento', nomeFantasia: 'Nome fantasia', inscricaoEstadual: 'Inscrição estadual', endereco: 'Endereço', apt: 'Apartamento ou referência', observacoes: 'Observações' }
@@ -45,7 +46,7 @@ export function reconferirCadastroCliente(editor, atual) {
   return { ...editor, inicial: atual, dados: { ...atual, ...Object.fromEntries(alterados.map(campo => [campo, editor.dados[campo]])) }, conflito: false, reconferido: true }
 }
 export function corpoFornecedor(dados, empresaId) {
-  return { ...campos(dados, ['nome', 'documento', 'email', 'telefone', 'contato', 'categoria', 'tipo', 'siteUrl', 'pedidoMinimo', 'fretePadrao', 'observacoes']),
+  return { ...campos(dados, ['nome', 'documento', 'email', 'telefone', 'contato', 'categoria', 'tipo', 'siteUrl', 'pedidoMinimo', 'fretePadrao', 'observacoes']), telefone: telefoneParaApi(dados.telefone),
     empresaId, ...(dados.id ? { fornecedorId: dados.id } : {}), leadTimeEstimadoDias: dados.leadTimeEstimadoDias === '' ? null : dados.leadTimeEstimadoDias ?? null, origem: 'console' }
 }
 export function corpoProduto(dados, empresaId) {
@@ -56,6 +57,56 @@ export function corpoProduto(dados, empresaId) {
     margemEstimada: dados.margemEstimada ?? null, tipoEmbalagem: dados.tipoEmbalagem ?? 'Avulso',
     // O contrato interpreta coleções não nulas como substituição integral. Cadastro não recria IDs com estoque.
     caracteristicas: null, embalagens: null, variacoes: null }
+}
+
+// #2457 (U2): a tela mostra "(11) 98225-4398"; a API recebe só os dígitos, como recebia antes da máscara. O DDI
+// nunca é inventado: um telefone gravado sem "+" volta sem "+" (revisão da #2460). Com "+", segue E.164.
+// Número de outro país (DDI que não é 55) fica como foi digitado; o que não parece telefone vai cru e a API diz o motivo.
+const BRASIL_COM_DDI = /^55\d{10,11}$/
+export function telefoneNaTela(valor) {
+  const bruto = String(valor ?? '').trim()
+  const digitos = bruto.replace(/\D/g, '')
+  if (!digitos) return bruto.startsWith('+') ? bruto : ''
+  if (bruto.startsWith('+') && !digitos.startsWith('55')) return bruto
+  const nacional = bruto.startsWith('+') || BRASIL_COM_DDI.test(digitos) ? digitos.slice(2) : digitos
+  if (!nacional) return bruto
+  return nacional.length > 11 ? bruto : mascaraTelefone(nacional)
+}
+export function telefoneParaApi(valor) {
+  const bruto = String(valor ?? '').trim()
+  if (!bruto) return null
+  const digitos = bruto.replace(/\D/g, '')
+  if (bruto.startsWith('+')) return `+${digitos}`
+  return digitos && /^[\d\s().-]+$/.test(bruto) ? digitos : bruto
+}
+
+// #2457 (U3): o limite de cada coluna vira erro no próprio campo, com o tamanho atual. `maxLength` cortava o
+// texto colado sem avisar (direção visual, seção 2). Fornecedor: e-mail com 150, o tamanho da coluna (B2).
+const LIMITES_CADASTRO = {
+  clientes: { nome: 150, telefone: 32, email: 255, documento: 30, nomeFantasia: 150, inscricaoEstadual: 20, endereco: 255, apt: 32 },
+  fornecedores: { nome: 150, contato: 150, telefone: 20, email: 150, documento: 30, categoria: 120, tipo: 60, siteUrl: 255, pedidoMinimo: 120, fretePadrao: 120 },
+  produtos: { nome: 180 },
+  bancos: { nome: 150 },
+}
+export const OBRIGATORIOS_CADASTRO = { clientes: ['nome'], fornecedores: ['nome'], produtos: ['nome', 'categoriaId'], bancos: ['nome'] }
+export function errosDoFormularioCadastro(tela, dados) {
+  const erros = {}
+  for (const [campo, limite] of Object.entries(LIMITES_CADASTRO[tela] ?? {})) {
+    const tamanho = String(dados[campo] ?? '').trim().length
+    if (tamanho > limite) erros[campo] = `Use até ${limite} caracteres. Agora tem ${tamanho}.`
+  }
+  if (!String(dados.nome ?? '').trim()) erros.nome = 'Informe o nome.'
+  if (tela === 'produtos' && !dados.categoriaId) erros.categoriaId = 'Escolha uma categoria.'
+  if (tela === 'produtos' && dados.id && dados.status === 'Ativo' && !(dados.precoReferencia > 0)) erros.precoReferencia = 'Informe o preço para ativar o produto.'
+  return erros
+}
+
+// #2457 (U5): textos de cada lista. Conta bancária não tem telefone nem documento para buscar.
+export const TEXTOS_CADASTRO = {
+  clientes: { busca: 'Nome, telefone ou documento', novo: 'Novo cliente', vazio: 'Cadastre a primeira pessoa ou traga um contato do Atendimento.' },
+  produtos: { busca: 'Nome, marca, código ou SKU', novo: 'Novo produto', vazio: 'Cadastre o primeiro produto para usar no cardápio e no estoque.' },
+  fornecedores: { busca: 'Nome, telefone ou documento', novo: 'Novo fornecedor', vazio: 'Cadastre o primeiro fornecedor para registrar compras.' },
+  bancos: { busca: 'Nome ou instituição', novo: 'Nova conta', vazio: 'Cadastre a conta que recebe os pagamentos da loja.' },
 }
 
 export const TITULOS_CADASTROS = { clientes: 'Leads e clientes', produtos: 'Produtos', fornecedores: 'Fornecedores', bancos: 'Contas bancárias', pagamentos: 'Formas de pagamento', modelos: 'Modelos' }
