@@ -151,7 +151,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                 // A loja puxou a conversa pelo celular: identifica (ou cria o lead) como na 1ª mensagem do cliente.
                 var identificacao = await identificarCliente.ExecuteAsync(
                     new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, conversa.ContatoNome), ct);
-                conversa.VincularCliente(identificacao.Cliente.Id);
+                if (identificacao.Cliente is { } cliente) conversa.VincularCliente(cliente.Id);
+                else conversa.ExigirConferenciaCliente();
                 await conversaRepository.AddAsync(conversa, ct);
             }
 
@@ -270,7 +271,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
     /// <summary>S24 e #2249: bloqueado ou encaminhado à responsável não recebe nada automático.</summary>
     private static bool SemAutomatico(IdentificacaoCliente? identificacao) =>
-        identificacao?.Cliente is { Bloqueado: true } or { AtendimentoAutomaticoPausado: true };
+        identificacao?.IdentidadePendente == true
+        || identificacao?.Cliente is { Bloqueado: true } or { AtendimentoAutomaticoPausado: true };
 
     private async Task<(Conversa, Mensagem, ConfiguracaoAtendimento, IdentificacaoCliente?)> GravarEntradaAsync(
         Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, DateTime enviadaEm, CancellationToken ct)
@@ -288,7 +290,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // S05: identifica (ou cria o lead) na mesma transação que abre a conversa.
             identificacao = await identificarCliente.ExecuteAsync(
                 new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil), ct);
-            conversa.VincularCliente(identificacao.Cliente.Id);
+            if (identificacao.Cliente is { } cliente) conversa.VincularCliente(cliente.Id);
+            else conversa.ExigirConferenciaCliente();
         }
 
         conversa.RegistrarEntrada(enviadaEm);
@@ -324,10 +327,13 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
         // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
-        if (identificacao?.Cliente.Bloqueado == true)
+        if (identificacao?.IdentidadePendente == true)
+            await escalador.EscalarAsync(empresaId, conversa,
+                "Telefone compartilhado: confira a pessoa e escolha o cadastro antes de continuar.", DateTime.UtcNow, ct);
+        else if (identificacao?.Cliente is { Bloqueado: true })
             await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
         // #2249: quem foi encaminhado à responsável também nasce com a equipe, sem saudação de cliente.
-        else if (identificacao?.Cliente.AtendimentoAutomaticoPausado == true)
+        else if (identificacao?.Cliente is { AtendimentoAutomaticoPausado: true })
             await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoContatoPausado(identificacao.Cliente), DateTime.UtcNow, ct);
 
         // S42: conversa nova dispara a automática de entrada (primeiro contato, fora do horário ou loja
@@ -391,7 +397,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             }
 
             // S24: conversa de cliente bloqueado já nasceu com a dona; nada automático responde.
-            if (SemAutomatico(identificacao))
+            if (conversa.VinculoEmRevisao || SemAutomatico(identificacao))
             {
                 await eventPublisher.PublicarAsync("conversa.mensagem_recebida", empresaId,
                     new { conversaId = conversa.Id, mensagemId = mensagem.Id }, ct);

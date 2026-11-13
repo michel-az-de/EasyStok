@@ -39,6 +39,7 @@ public class ChatSiteUseCasesTests
         _flags.ListarAtivasAsync(_loja.EmpresaId, Arg.Any<CancellationToken>())
             .Returns([FeatureCatalogo.ModuloAtendimento, FeatureCatalogo.CanalChatSite]);
         _acesso = new AcessoChatSite(_lojas, _flags, _tenant, _sessoes);
+        _sessoes.ObterSnapshotPorTokenHashAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(c => _sessoes.ObterPorTokenHashAsync(c.Arg<Guid>(), c.Arg<string>(), c.Arg<CancellationToken>()));
         // #1797: a mensagem relê a conversa travada; no dublê, a já cadastrada ou a recém-criada.
         var criadas = new List<Conversa>();
         _conversas.When(x => x.AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>())).Do(ci => criadas.Add(ci.Arg<Conversa>()));
@@ -60,7 +61,7 @@ public class ChatSiteUseCasesTests
     }
 
     private EnviarMensagemVisitanteUseCase Enviar() => new(
-        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new ConversaChatSiteService(_conversas, _uow, _pedidos));
+        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new ConversaChatSiteService(_conversas, _uow, _sessoes, _pedidos));
 
     /// <summary>
     /// #1918: o visitante escreve depois do encerramento com o pedido feito pela página ainda em andamento. A conversa
@@ -296,6 +297,28 @@ public class ChatSiteUseCasesTests
         // #1448: dependência do widget (repo casa-da-baba). Ligar só quando ele desenhar `tipo: imagem`.
         EasyStock.Domain.ValueObjects.CapacidadesCanal.Para(CanalConversa.ChatSite).AceitaImagem.Should().BeFalse();
     }
+    [Fact]
+    public async Task MensagemNaConversaRecusaSessaoRevogadaEnquantoAguardavaLock()
+    {
+        var (sessao, token) = SessaoValida();
+        var conversa = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, DateTime.UtcNow, canal: CanalConversa.ChatSite);
+        sessao.VincularConversa(conversa.Id);
+        var revogada = false;
+        _sessoes.ObterSnapshotPorTokenHashAsync(_loja.EmpresaId, sessao.TokenHash, Arg.Any<CancellationToken>())
+            .Returns(_ => revogada ? null : sessao);
+        _conversas.ObterPorIdComLockAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            revogada = true;
+            return conversa;
+        });
+
+        await Enviar().Invoking(s => s.ExecuteNaConversaAsync(Slug, token, "Mensagem antiga", conversa.Id))
+            .Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("A sessão mudou*");
+
+        await _conversas.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
     [Fact]
     public async Task Stream_UsaSnapshotAtualENaoSessaoRastreadaAntesDoLogout()
     {

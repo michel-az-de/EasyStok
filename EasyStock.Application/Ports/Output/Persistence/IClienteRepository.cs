@@ -15,6 +15,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>Carrega cliente com todas as coleções (endereços, telefones, etc) — pra tela de detalhe.</summary>
         Task<Cliente?> GetByIdWithDetailsAsync(Guid empresaId, Guid id);
 
+        Task<(int OrderCount, DateTime? LastOrderAt)> ObterMetricasPedidosAsync(Guid empresaId, Guid clienteId);
+
         Task<(IEnumerable<Cliente> items, int total)> GetByEmpresaAsync(
             Guid empresaId,
             int page,
@@ -22,10 +24,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
             bool? ativo = null,
             string? search = null,
             string? sort = "nome",
-            string? order = "asc");
+            string? order = "asc",
+            string? relacionamento = null);
 
         Task<IEnumerable<Cliente>> SearchAsync(Guid empresaId, string termo, int maxResults = 20);
         Task<Cliente?> FindByTelefoneAsync(Guid empresaId, string telefone);
+        Task<bool> TemTelefoneCompartilhadoAsync(Guid empresaId, IReadOnlyList<string> telefones,
+            IReadOnlyList<string> hashes, CancellationToken ct = default);
 
         Task AddAsync(Cliente cliente);
         Task UpdateAsync(Cliente cliente);

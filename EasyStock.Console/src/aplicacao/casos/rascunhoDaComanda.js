@@ -9,13 +9,21 @@ import { comBaixaDeProducao, comDevolucaoDeProducao, comMensagem, mapear } from 
 
 // A comanda que a dona monta antes de o pedido existir no EasyStok (rascunho local) e o saldo do dia. O modo API
 // também despacha estes casos: `aplicacao/api/comanda.js` e `api/cardapio.js` usam as ações locais correspondentes.
+const comIdentidadeDaProposta = (pedido, conversa) => ({ ...pedido,
+  identidadeProposta: { clienteId: conversa.clienteId ?? null, vinculoRevisao: conversa.vinculoRevisao ?? 0 },
+})
 
 export const casosRascunhoDaComanda = {
+  [acao.RECONFERIR_PESSOA_COMANDA]: (estado, { id, identidade }) => mapear(estado, id, c => (
+    c.pedido && !c.pedido.pedidoId && identidade?.clienteId && Number.isInteger(identidade.vinculoRevisao)
+      && identidade.vinculoRevisao >= 0 && identidade.clienteId === c.clienteId && identidade.vinculoRevisao === c.vinculoRevisao
+      ? { ...c, pedido: comIdentidadeDaProposta(c.pedido, identidade) } : c
+  )),
   // #1686 (item 3): pedido entregue ou cancelado não recebe item (a trava do ADICIONAR_ITEM fica),
   // mas a mesma conversa abre uma comanda nova, em rascunho. O pedido antigo segue no EasyStok e
   // a leitura dele não apaga o rascunho (`pedidoMesclado`). Pedido em andamento não é trocado.
   [acao.NOVA_COMANDA]: (estado, { id, numeroPedido }) => mapear(estado, id, (c) => (
-    c.pedido && !pedidoEncerrado(c.pedido) ? c : { ...c, pedido: novoPedido(numeroPedido) }
+    c.pedido && !pedidoEncerrado(c.pedido) ? c : { ...c, pedido: comIdentidadeDaProposta(novoPedido(numeroPedido), c) }
   )),
 
   // Saldo zero avisa, nunca trava a venda.
@@ -31,7 +39,7 @@ export const casosRascunhoDaComanda = {
     const situacao = situacaoDeEstoque(item)
     const comProduto = mapear(estado, id, (c) => ({
       ...c,
-      pedido: comItem(c.pedido ?? novoPedido(numeroPedido), item.sku),
+      pedido: comItem(c.pedido?.identidadeProposta || c.pedido?.itens?.length ? c.pedido : comIdentidadeDaProposta(c.pedido ?? novoPedido(numeroPedido), c), item.sku),
     }))
     return {
       ...comProduto,

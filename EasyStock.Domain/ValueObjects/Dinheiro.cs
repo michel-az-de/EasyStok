@@ -9,9 +9,34 @@ namespace EasyStock.Domain.ValueObjects
     {
         public decimal Valor { get; }
 
+        /// <summary>Regra única de arredondamento monetário do domínio (#2373): 2 casas, meio para longe do zero.</summary>
+        public const MidpointRounding Arredondamento = MidpointRounding.AwayFromZero;
+
+        public static decimal Arredondar(decimal valor) => Math.Round(valor, 2, Arredondamento);
+
         private Dinheiro(decimal valor)
         {
-            Valor = Math.Round(valor, 2, MidpointRounding.AwayFromZero);
+            Valor = Arredondar(valor);
+        }
+
+        /// <summary>
+        /// Rateia <paramref name="precoUnitario"/> × quantidade entre os lotes sem perder centavo (#2373): cada lote
+        /// leva o próprio valor arredondado e o último leva o resíduo, para a soma bater com o total arredondado.
+        /// </summary>
+        public static IReadOnlyList<Dinheiro> Ratear(decimal precoUnitario, IReadOnlyList<decimal> quantidades)
+        {
+            if (quantidades.Count == 0) return Array.Empty<Dinheiro>();
+
+            var total = Arredondar(precoUnitario * quantidades.Sum());
+            var partes = new Dinheiro[quantidades.Count];
+            var acumulado = 0m;
+            for (var i = 0; i < quantidades.Count - 1; i++)
+            {
+                partes[i] = FromDecimal(precoUnitario * quantidades[i]);
+                acumulado += partes[i].Valor;
+            }
+            partes[^1] = FromDecimal(Math.Max(0m, total - acumulado));
+            return partes;
         }
 
         public static Dinheiro FromDecimal(decimal valor)

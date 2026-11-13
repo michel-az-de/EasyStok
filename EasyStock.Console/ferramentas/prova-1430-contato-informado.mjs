@@ -1,3 +1,4 @@
+import { comSnapshotDaFicha } from './snapshotDaFichaNaProva.mjs'
 /* eslint-disable no-console */
 // Prova da issue #1430: o visitante do chat do site informa nome, telefone e e-mail antes de
 // conversar. No modo API, abrir a conversa do lead lê o dossiê e guarda o contato informado
@@ -41,6 +42,7 @@ registerHooks({
       if (especificador === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx'), shortCircuit: true }
       if (especificador.endsWith('.css')) return { url: codigo('export default new Proxy({},{get:(_,chave)=>String(chave)})'), shortCircuit: true }
       if (especificador.endsWith('/componentes/Botao')) return { url: codigo('export function Botao(){return null}'), shortCircuit: true }
+      if (especificador.endsWith('/ConferirDestinoDaEdicao')) return { url: codigo('export function ConferirDestinoDaEdicao(){return null}'), shortCircuit: true }
     }
     if (especificador.startsWith('.') && !/\.[a-z]+$/i.test(especificador)) {
       try { return proximo(especificador + '.js', contexto) } catch { /* cai no original */ }
@@ -123,7 +125,7 @@ const lead = (extra = {}) => ({
 function montar(conversa) {
   const despachados = []
   const estadoRef = { current: { conversas: [conversa], sincronizacao: { estado: 'ok', aviso: null } } }
-  const acoes = modulo.criarAcoesClienteApi({ despachar: (a) => despachados.push(a), estadoRef })
+  const acoes = comSnapshotDaFicha(modulo.criarAcoesClienteApi({ despachar: (a) => despachados.push(a), estadoRef }), [conversa])
   return { acoes, despachados }
 }
 
@@ -254,7 +256,7 @@ await confere('Confirmar cadastro manda nome, telefone e e-mail informados, sem 
   const post = chamadas.find((c) => c.metodo === 'POST')
   assert.ok(post, 'sem POST')
   assert.match(post.url, /\/api\/atendimento\/conversas\/conv-1\/cliente$/)
-  assert.deepEqual(post.corpo, { nome: 'Maria Souza', telefone: '+5511987654321', endereco: null, email: 'maria@exemplo.com' })
+  assert.deepEqual(post.corpo, { clienteId: null, vinculoRevisao: 0, nome: 'Maria Souza', telefone: '+5511987654321', endereco: null, email: 'maria@exemplo.com' })
   assert.ok(despachados.some((a) => a.tipo === acao.CLIENTE_DA_API), 'não releu o cliente')
   assert.ok(!despachados.some((a) => a.tipo === acao.AVISO_API), 'avisou sem motivo')
 })
@@ -264,7 +266,7 @@ await confere('cadastro sem e-mail manda o corpo de antes (sem a chave email)', 
   const { acoes } = montar(lead({ clienteId: CLIENTE, conta: 'cliente' }))
   acoes.editarDadoCliente('conv-1', 'telefone', '(11) 91111-2222', 0)
   await esperar()
-  assert.deepEqual(chamadas.find((c) => c.metodo === 'POST')?.corpo, { nome: null, telefone: '(11) 91111-2222', endereco: null })
+  assert.deepEqual(chamadas.find((c) => c.metodo === 'POST')?.corpo, { clienteId: CLIENTE, vinculoRevisao: 0, nome: null, telefone: '(11) 91111-2222', endereco: null })
 })
 
 await confere('chat do site sem formulário continua pedindo o nome da dona', async () => {
@@ -284,7 +286,7 @@ await confere('telefone já é de um cadastro: a ação devolve de quem é, sem 
   const { acoes, despachados } = montar(lead({ contatoInformado: INFORMADO }))
   const resultado = await acoes.salvarCadastroRapido('conv-1', CONFIRMAR, 0)
   assert.deepEqual(resultado, { erro: PERGUNTA, jaCadastrado: { nome: DONA_DO_TELEFONE } })
-  assert.deepEqual(chamadas.filter((c) => c.metodo === 'POST').map((c) => c.corpo), [{ nome: 'Maria Souza', telefone: '+5511987654321', endereco: null, email: 'maria@exemplo.com' }])
+  assert.deepEqual(chamadas.filter((c) => c.metodo === 'POST').map((c) => c.corpo), [{ clienteId: null, vinculoRevisao: 0, nome: 'Maria Souza', telefone: '+5511987654321', endereco: null, email: 'maria@exemplo.com' }])
   assert.ok(!despachados.some((a) => a.tipo === acao.CLIENTE_DA_API), 'ligou a conversa sem a dona confirmar')
   assert.ok(!despachados.some((a) => a.tipo === acao.AVISO_API), 'a pergunta é do cartão, não da faixa')
 })
@@ -295,7 +297,7 @@ await confere('"Ligar ao cadastro" repete o POST com confirmarVinculoExistente e
   const resultado = await acoes.salvarCadastroRapido('conv-1', { ...CONFIRMAR, confirmarVinculoExistente: true }, 0)
   assert.equal(resultado, undefined)
   assert.deepEqual(chamadas.find((c) => c.metodo === 'POST').corpo,
-    { nome: 'Maria Souza', telefone: '+5511987654321', endereco: null, email: 'maria@exemplo.com', confirmarVinculoExistente: true })
+    { clienteId: null, vinculoRevisao: 0, nome: 'Maria Souza', telefone: '+5511987654321', endereco: null, email: 'maria@exemplo.com', confirmarVinculoExistente: true })
   assert.equal(despachados.find((a) => a.tipo === acao.CLIENTE_DA_API)?.nome, DONA_DO_TELEFONE)
   assert.ok(!despachados.some((a) => a.tipo === acao.AVISO_API), 'avisou do que a dona acabou de mandar fazer')
 })
@@ -353,7 +355,7 @@ await confere('telefone de outro cadastro: o cartão pergunta, "Não ligar" desi
 await confere('a Ficha entrega ao cartão a escolha da dona e o reinicia a cada conversa', () => {
   const fonte = readFileSync(new URL('features/ficha-cliente/BlocoCliente.jsx', src), 'utf8')
   assert.match(fonte, /<ContatoInformado\s+key=\{conversa\.id\}/)
-  assert.match(fonte, /aoConfirmar=\{\(opcoes\) => salvarCadastroRapido\(conversa\.id, \{[^}]*\.\.\.opcoes,?\s*\}, agora\)\}/)
+  assert.match(fonte, /aoConfirmar=\{\(opcoes, identidade\) => salvarCadastroRapido\(conversa\.id, \{[^}]*\.\.\.opcoes,?\s*\}, agora, identidade\)\}/)
 })
 
 // ── Lead que já abre selecionado (restaurado na carga) não passa por `selecionar` ──

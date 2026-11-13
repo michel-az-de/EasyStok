@@ -67,6 +67,7 @@ public class CriarPedidoPeloCardapioConversaUseCaseTests
 
             Conversa = Conversa.Abrir(EmpresaId, "5511999998888", Agora, "Maria", Cliente.Id);
             ConversaRepo.ObterPorIdAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>()).Returns(Conversa);
+            ConversaRepo.ObterPorIdComLockAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>()).Returns(Conversa);
             ConversaRepo.When(r => r.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>()))
                 .Do(ci => { Mensagens.Add(ci.Arg<Mensagem>()); Linha.Add("mensagem"); });
             Uow.When(u => u.CommitAsync()).Do(_ => Linha.Add("commit"));

@@ -13,9 +13,6 @@
 .resumoPerigo dd, .resumoPerigo dt { color: var(--erro); }
 .resumoOperacao > .resumoAtencao { background: var(--alerta-pastel); }
 .resumoAtencao dd, .resumoAtencao dt { color: var(--alerta); }
-.resumoOperacao dd.dicaDoResumo { order: 0; font-size: var(--t-micro); font-weight: 600; letter-spacing: 0; line-height: var(--lh-compacto); }
-.resumoPerigo dd.dicaDoResumo { color: var(--erro); }
-.resumoAtencao dd.dicaDoResumo { color: var(--alerta); }
 /* Região viva sempre montada; vazia, não ocupa lugar na tela. */
 .vivo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .rodapeForm.acoesDireita { justify-content: flex-end; }
@@ -37,10 +34,6 @@
 .acoesReceita { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .acoesReceita > :last-child { margin-left: auto; }
 .editorReceita { width: 100%; padding-top: var(--e-4); border-top: var(--b-1) solid var(--linha); }
-.receita { align-items: flex-start; }
-.receita > .resumo { flex-basis: 50%; }
-.receita > .estados { padding-top: var(--e-1); }
-.receita > .acoesDaReceita { flex-basis: 100%; margin-left: 0; padding-top: 0; }
 .descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 70ch; line-height: var(--lh-corpo); }
 .orientacoes { flex: 1 1 320px; min-width: 0; }
 .ajudaControles { margin-top: var(--e-1); font-size: var(--t-apoio); }

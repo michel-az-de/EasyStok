@@ -166,6 +166,7 @@ export function pedidoDaApi(p, anterior = null) {
     sinalNaReserva: Boolean(p.sinalNaReserva),
     pagamentosApi: p.pagamentos?.map((pag) => ({
       valor: pag.valor, coberto: pag.valor, em: ms(pag.pagoEm), meio: pag.metodo, pagamentoId: pag.id,
+      ...(pag.registradoPorNome ? { autorNome: pag.registradoPorNome } : {}),
     })),
     meio: cobranca?.meio ?? anterior?.meio ?? null,
     cobranca,
@@ -225,6 +226,7 @@ export function corpoDoPedido(pedido) {
   // Entregas leem). Outro meio não manda o campo: o corpo segue o de antes.
   const observacoes = observacaoDoPagamentoNaEntrega({ meio: pedido?.meio, trocoPara: pedido?.trocoPara })
   return {
+    ...(pedido?.identidadeProposta ? { clienteId: pedido.identidadeProposta.clienteId, vinculoRevisao: pedido.identidadeProposta.vinculoRevisao } : {}),
     ...(observacoes ? { observacoes } : {}),
     itens: (pedido?.itens ?? []).map((l) => {
       const { itemSku, variacaoId } = partesDoSku(l.sku)

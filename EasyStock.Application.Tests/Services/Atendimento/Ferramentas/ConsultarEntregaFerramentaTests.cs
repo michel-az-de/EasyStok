@@ -24,8 +24,9 @@ public sealed class ConsultarEntregaFerramentaTests
     public async Task Cliente_divergente_nao_expoe_entrega()
     {
         var fixture = new Cenario();
-        fixture.Conversa.VincularCliente(Guid.NewGuid());
-        var contexto = fixture.Contexto();
+        var conversaAlheia = Conversa.Abrir(fixture.Empresa, "5511988887777", DateTime.UtcNow, "Outro cliente", Guid.NewGuid());
+        conversaAlheia.DefinirPedidoEmAndamento(fixture.Pedido.Id);
+        var contexto = new ContextoTurnoAgente(fixture.Empresa, conversaAlheia, DateTime.UtcNow);
         var resposta = await fixture.Ferramenta.ExecutarAsync(contexto, JsonSerializer.SerializeToElement(new { }));
         resposta.Should().Contain("pedido_nao_encontrado");
         contexto.RespostaVerificada.Should().BeNull();

@@ -31,13 +31,16 @@ public sealed record ConversaInboxItem(
     string? PedidoStatus = null,
     long NumeroComanda = 0,
     string? Assunto = null,
-    string? FotoClienteChave = null)
+    string? FotoClienteChave = null,
+    long VinculoRevisao = 0,
+    bool VinculoEmRevisao = false)
 {
     /// <summary>Linha a partir da entidade carregada. Sem <paramref name="aguardaResposta"/> vale a regra do dominio.</summary>
     public static ConversaInboxItem De(Conversa c, string? ultimaMensagemTexto, bool? aguardaResposta = null, string? assumidaPorNome = null, string? pedidoStatus = null) => new(
         c.Id, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
         c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
-        ultimaMensagemTexto, aguardaResposta ?? c.AguardaResposta, assumidaPorNome, pedidoStatus, c.NumeroComanda, c.Assunto);
+        ultimaMensagemTexto, aguardaResposta ?? c.AguardaResposta, assumidaPorNome, pedidoStatus, c.NumeroComanda, c.Assunto,
+        VinculoRevisao: c.VinculoRevisao, VinculoEmRevisao: c.VinculoEmRevisao);
 }
 
 /// <summary>Mensagem que não chegou ao cliente, com a conversa dela (S59).</summary>

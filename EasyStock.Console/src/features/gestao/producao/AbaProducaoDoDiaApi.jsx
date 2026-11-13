@@ -81,6 +81,14 @@ function resumoDaLinha(linha, faltaPorcao) {
 // #2081 (A14): quando nenhum prato da grade tem foto, a reserva some e o cartão fica compacto; no
 // tablet eram 43 cartões de 250 px com o mesmo desenho vazio.
 // #2235 (banca T3-5): 600 g, 800 g e 1 kg usam a mesma foto; o tamanho vai em selo grande sobre ela.
+// O nome do prato da linha do lote, com o tamanho escolhido: no painel do lote e na conferência.
+function nomeDaLinha(linha, pratos) {
+  const prato = pratos.find((p) => p.sku === linha.sku)
+  const porcoesDoPrato = prato?.porcoes ?? []
+  const tamanho = porcoesDoPrato.length > 0 ? porcoesDoPrato.find((v) => v.id === linha.variacaoId)?.rotulo : prato?.porcao
+  return nomeDoCartao({ nome: prato?.nome ?? 'Prato fora do cardápio', tamanho: tamanho ?? '' })
+}
+
 function FotoDoCartao({ foto, selo }) {
   const [falhou, setFalhou] = useState(null)
   return (
@@ -286,7 +294,7 @@ export function AbaProducaoDoDiaApi() {
         {/* #2235 (banca P2-1): uma linha de dica; o passo a passo abre a pedido. Fechar à mão também conta como visto.
             A dica e o aparelho dividem a primeira linha; o "Ver passo a passo" vem embaixo, só com o rótulo. */}
         <div className={grade.linhaDoTopo}>
-          <p className={grade.dicaDosPassos}>Toque nos pratos prontos, confira e confirme. O estoque só muda ao confirmar.</p>
+          <p className={grade.dicaDosPassos}>Selecione os pratos prontos. O estoque só muda após confirmar.</p>
           <div className={grade.acoesDoTopo}><ConectarAparelho /></div>
         </div>
         <details className={grade.ajudaDosPassos} open={passosAbertos} onToggle={(e) => {
@@ -332,12 +340,11 @@ export function AbaProducaoDoDiaApi() {
               <div className={grade.busca}>
                 <CampoTexto rotulo="Buscar prato" rotuloOculto tipo="search" placeholder="Buscar prato" value={busca} onChange={(e) => setBusca(e.target.value)} />
               </div>
+              {/* #2439: a categoria é uma seleção ao lado da busca; os chips quebravam em várias linhas. */}
               {categorias.length > 1 && (
-                <div className={grade.chips}>
-                  <Chip papel="filtro" ativo={!categoria} onClick={() => setCategoria(null)}>Todos</Chip>
-                  {categorias.map((c) => (
-                    <Chip key={c} papel="filtro" ativo={categoria === c} onClick={() => setCategoria(categoria === c ? null : c)}>{c}</Chip>
-                  ))}
+                <div className={grade.categoria}>
+                  <CampoSelecao rotulo="Categoria" rotuloOculto value={categoria ?? ''} onChange={(e) => setCategoria(e.target.value || null)}
+                    opcoes={[{ valor: '', rotulo: 'Todas as categorias' }, ...categorias.map((c) => ({ valor: c, rotulo: c }))]} />
                 </div>
               )}
             </div>
@@ -379,7 +386,11 @@ export function AbaProducaoDoDiaApi() {
                         onPointerDown={comecarASegurar(cartao)} onPointerUp={soltar} onPointerLeave={soltar} onPointerCancel={soltar}
                         onContextMenu={(e) => e.preventDefault()}>
                         {gradeComFoto && <FotoDoCartao foto={cartao.foto} selo={tamanho} />}
-                        <span className={grade.nomeDoPrato}>{nomeVisual}</span>
+                        <span className={grade.linhaDoNome}>
+                          <span className={grade.nomeDoPrato}>{nomeVisual}</span>
+                          {/* #2439: o "+" mostra que o toque soma; o botão é o cartão inteiro. */}
+                          <span className={grade.mais} aria-hidden="true"><Icone nome="mais" tamanho={20} /></span>
+                        </span>
                         {tamanho && <span className={gradeComFoto ? grade.tamanhoComFoto : grade.tamanho}>{tamanho}</span>}
                         {cartao.saldo != null && (
                           <span id={idDoSaldo} className={grade.saldo}>
@@ -444,8 +455,7 @@ export function AbaProducaoDoDiaApi() {
                   {linhas.map((l, indice) => {
                     const prato = pratos.find((p) => p.sku === l.sku)
                     const porcoesDoPrato = prato?.porcoes ?? []
-                    const tamanho = porcoesDoPrato.length > 0 ? porcoesDoPrato.find((v) => v.id === l.variacaoId)?.rotulo : prato?.porcao
-                    const nome = nomeDoCartao({ nome: prato?.nome ?? 'Prato fora do cardápio', tamanho: tamanho ?? '' })
+                    const nome = nomeDaLinha(l, pratos)
                     const faltaPorcao = porcoesDoPrato.length > 0 && !l.variacaoId
                     const sobra = sobraDaLinha(paraEnviar(l))
                     const campoComErro = erro ? CAMPO_DO_ERRO[erroDaLinha(paraEnviar(l, pratos))] : null
@@ -501,7 +511,12 @@ export function AbaProducaoDoDiaApi() {
           </div>
         </div>
 
-        <div className={grade.barraDoLote}>
+        {/* #2439: "Lote a registrar" fica ao lado da grade no largo, sempre à vista; no estreito, é a barra fixa do rodapé. */}
+        <aside className={grade.barraDoLote} aria-labelledby="titulo-do-lote">
+          <h3 id="titulo-do-lote" className={grade.tituloDoLote}>
+            <Icone nome="package" tamanho={20} />
+            <span>Lote a registrar <span className={grade.itensDoLote}>· {plural(resumo.pratos, 'item', 'itens')}</span></span>
+          </h3>
           {confirmandoLimpar ? (
             <>
               <p className={grade.resumoDoLote} role="alert">Tirar {linhas.length === 1 ? 'o prato' : `os ${linhas.length} pratos`} do lote?</p>
@@ -512,8 +527,17 @@ export function AbaProducaoDoDiaApi() {
             </>
           ) : (
             <>
+              {semLote ? (
+                <span className={grade.loteVazio} aria-hidden="true"><Icone nome="package" tamanho={32} /></span>
+              ) : (
+                <ul className={grade.listaDoLote}>
+                  {linhas.map((l) => (
+                    <li key={l.id}><span>{nomeDaLinha(l, pratos)}</span><strong>{String(l.porcoes).trim() || '0'}</strong></li>
+                  ))}
+                </ul>
+              )}
               <p className={grade.resumoDoLote} aria-live="polite">
-                {resumo.pratos === 0 ? 'Lote vazio: toque nos pratos que ficaram prontos' : `No lote: ${plural(resumo.porcoes, 'porção', 'porções')} · ${plural(resumo.pratos, 'prato', 'pratos')}`}
+                {semLote ? 'Lote vazio. Selecione os pratos que ficaram prontos.' : `No lote: ${plural(resumo.porcoes, 'porção', 'porções')} · ${plural(resumo.pratos, 'prato', 'pratos')}`}
               </p>
               <div className={grade.acoesDoLote}>
                 {/* #2235 (banca T3-8): sem nada no lote, não há o que limpar. */}
@@ -521,9 +545,10 @@ export function AbaProducaoDoDiaApi() {
                 <Botao variante="primario" icone="check" disabled={semLote}
                   onClick={() => setRevisando(true)}>Conferir produção</Botao>
               </div>
+              <p className={grade.notaDoLote}>O estoque será atualizado após a confirmação.</p>
             </>
           )}
-        </div>
+        </aside>
       </div>
 
       {digitando && (

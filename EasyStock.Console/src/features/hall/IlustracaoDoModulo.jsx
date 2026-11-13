@@ -112,7 +112,7 @@ const DESENHOS = {
 }
 
 export function IlustracaoDoModulo({ id, className }) {
-  const desenho = DESENHOS[id]
+  const desenho = DESENHOS[id] ?? (id === 'cadastros' ? DESENHOS.cardapio : null)
   if (!desenho) return null
   return <svg className={className} viewBox="0 0 120 80" aria-hidden="true" focusable="false" data-ilustracao={id}>
     <path d="M20 40C18 20 40 8 62 10 88 12 106 22 104 44 102 64 80 72 58 70 34 68 22 58 20 40Z" fill="var(--il-fundo)" />

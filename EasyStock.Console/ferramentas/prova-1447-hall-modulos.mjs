@@ -35,11 +35,11 @@ const confere = (descricao, fn) => { fn(); passou += 1; console.log('ok  ' + des
 
 // ---------------------------------------------------------------- catálogo
 
-confere('o hall lista os oito módulos do plano, numerados de 1 a 8 e na ordem', () => {
-  assert.deepEqual(MODULOS.map((m) => m.numero), [1, 2, 3, 4, 5, 6, 7, 8])
+confere('o catálogo inclui Cadastros e conserva os oito módulos anteriores', () => {
+  assert.deepEqual(MODULOS.map((m) => m.numero), [9, 1, 2, 3, 4, 5, 6, 7, 8])
   assert.deepEqual(
     MODULOS.map((m) => m.id),
-    ['cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas'],
+    ['cadastros', 'cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'campanhas', 'configuracoes', 'entregas'],
   )
   for (const m of MODULOS) {
     assert.ok(m.nome && m.resumo && m.icone, `módulo ${m.id} com nome, resumo e ícone`)
@@ -56,13 +56,13 @@ confere('Cardápio e Produção abrem só no modo API; Campanhas congelado não 
     assert.equal(demonstracao[id].disponivel, false, `${id}: sem API não há o que gerir`)
     assert.equal(demonstracao[id].href, null, `${id}: card em breve não navega`)
   }
-  for (const id of ['cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'configuracoes', 'entregas']) {
+  for (const id of ['cadastros', 'cardapio', 'producao', 'atendimento', 'cozinha', 'financeiro', 'configuracoes', 'entregas']) {
     assert.equal(porId[id].disponivel, true, `${id} abre`)
     assert.ok(porId[id].href.startsWith('#/m/' + id), `${id} aponta para a própria rota`)
   }
   assert.equal(porId.campanhas, undefined, 'Campanhas congelado (#1891) não entra no hall')
   assert.equal(demonstracao.campanhas, undefined, 'nem na demonstração')
-  assert.equal(hall.length, 7, 'o hall mostra os sete módulos vivos')
+  assert.equal(hall.length, 8, 'o hall mostra Cadastros e os sete módulos vivos anteriores')
   assert.deepEqual(telasDoMenu(moduloPorId('campanhas'), { fonteApi: true }), [], 'módulo congelado não tem menu (trilho e Gestão)')
 })
 
@@ -145,8 +145,9 @@ confere('os apelidos de hoje continuam: #/cozinha, #/entregas e o cardápio por 
 confere('tela de ajuste abre dentro do módulo, com o módulo vindo da rota', () => {
   const rota = rotaDaHash('#/m/entregas/janelas')
   assert.deepEqual(rota, { tipo: ROTA_MODULO, modulo: 'entregas', tela: 'janelas', aba: 'janelas' })
-  // #1891: Produção e cardápio do dia (Em preparação) está congelada; a rota cai na Fila de preparo.
-  assert.equal(rotaDaHash('#/m/cozinha/producao').tipo, ROTA_COZINHA)
+  // A tela congelada não é substituída silenciosamente pela Fila de preparo.
+  assert.equal(rotaDaHash('#/m/cozinha/producao').tipo, ROTA_HALL)
+  assert.ok(rotaDaHash('#/m/cozinha/producao').aviso)
   assert.equal(rotaDaHash('#/m/financeiro', { fonteApi: true }).aba, 'caixa', 'A entrada mantém o Caixa disponível ao Atendimento')
   // #2095: o financeiro gerencial foi descongelado (revoga a #1891 nessas telas); a visão geral abre a própria aba.
   assert.equal(rotaDaHash('#/m/financeiro/visao-geral', { fonteApi: true }).aba, 'financeiro-resumo', 'Visão geral descongelada abre a própria tela')
@@ -156,9 +157,10 @@ confere('tela de ajuste abre dentro do módulo, com o módulo vindo da rota', ()
   assert.equal(rotaDaHash('#/m/configuracoes/canais', { fonteApi: true }).aba, 'canais')
 })
 
-confere('tela desconhecida (ou só da API, no modo demonstração) cai na primeira tela do módulo', () => {
-  assert.equal(rotaDaHash('#/m/entregas/xyz').tipo, ROTA_ENTREGAS)
-  assert.equal(rotaDaHash('#/m/atendimento/horarios', { fonteApi: false }).tipo, ROTA_PRINCIPAL)
+confere('tela desconhecida ou indisponível mostra aviso em vez de outra tela do módulo', () => {
+  assert.equal(rotaDaHash('#/m/entregas/xyz').tipo, ROTA_HALL)
+  assert.ok(rotaDaHash('#/m/entregas/xyz').aviso)
+  assert.equal(rotaDaHash('#/m/atendimento/horarios', { fonteApi: false }).tipo, ROTA_HALL)
   assert.equal(rotaDaHash('#/m/atendimento/horarios', { fonteApi: true }).aba, 'atendimento')
 })
 

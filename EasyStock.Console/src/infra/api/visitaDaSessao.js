@@ -9,16 +9,30 @@ function comandaLocal(pedido) {
   const itens = pedido.itens.filter(i => typeof i?.sku === 'string' && Number.isInteger(i.qtd) && i.qtd > 0)
     .map(i => ({ sku: i.sku, qtd: i.qtd, obs: typeof i.obs === 'string' ? i.obs : '' }))
   if (!itens.length) return null
-  // Só a montagem: nenhum token, cadastro, endereço, pagamento ou retrato do cliente.
+  // Só montagem e versão do vínculo: nenhum token, dado pessoal, endereço ou pagamento.
   const numero = typeof pedido.numero === 'string' || typeof pedido.numero === 'number' ? pedido.numero : null
+  const identidade = pedido.identidadeProposta
+  const identidadeValida = identidade && (identidade.clienteId === null || typeof identidade.clienteId === 'string' && identidade.clienteId.trim())
+    && Number.isInteger(identidade.vinculoRevisao) && identidade.vinculoRevisao >= 0
   return { ...novoPedido(numero), itens, janela: typeof pedido.janela === 'string' ? pedido.janela : null,
+    ...(identidadeValida ? { identidadeProposta: { clienteId: identidade.clienteId, vinculoRevisao: identidade.vinculoRevisao } } : {}),
     meio: typeof pedido.meio === 'string' ? pedido.meio : null,
     observacoes: typeof pedido.observacoes === 'string' ? pedido.observacoes : '' }
 }
 
 function visitaDe(salva) {
   const comandas = salva?.comandas && typeof salva.comandas === 'object' && !Array.isArray(salva.comandas) ? salva.comandas : {}
+  const f = salva?.filtros
+  const filtros = f && typeof f === 'object' && !Array.isArray(f) ? {
+    busca: typeof f.busca === 'string' ? f.busca : '',
+    aba: ['precisa', 'todas'].includes(f.aba) ? f.aba : 'precisa',
+    canais: Array.isArray(f.canais) ? f.canais.filter(c => typeof c === 'string') : [],
+    ordenacao: ['urgencia', 'recentes', 'entrega'].includes(f.ordenacao) ? f.ordenacao : 'urgencia',
+    responsavel: ['todas', 'minhas', 'sem-dono'].includes(f.responsavel) ? f.responsavel : 'todas',
+    posicao: Number.isFinite(f.posicao) && f.posicao >= 0 ? f.posicao : 0,
+  } : null
   return { ultimaConversa: typeof salva?.ultimaConversa === 'string' ? salva.ultimaConversa : null,
+    ...(filtros ? { filtros } : {}),
     comandas: Object.fromEntries(Object.entries(comandas).map(([id, p]) => [id, comandaLocal(p)]).filter(([, p]) => p)) }
 }
 
@@ -31,9 +45,9 @@ export function lerVisita(sessao) {
 
 export function gravarVisita(sessao, visita) {
   const chave = chaveDe(sessao)
-  if (!chave) return
-  try { sessionStorage.setItem(chave, JSON.stringify(visitaDe(visita))) }
-  catch { /* Sem storage: a montagem continua nesta carga. */ }
+  if (!chave) return false
+  try { sessionStorage.setItem(chave, JSON.stringify(visitaDe(visita))); return true }
+  catch { return false }
 }
 
 export function esquecerVisitas() {

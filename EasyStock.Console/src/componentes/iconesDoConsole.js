@@ -32,6 +32,13 @@ const MARCA_DO_CONSOLE = {
 }
 
 const ICONE_DO_CONSOLE = {
+  cadastros: 'usuarios',
+  'cadastros/clientes': 'usuarios',
+  'cadastros/produtos': 'package',
+  'cadastros/fornecedores': 'house',
+  'cadastros/bancos': 'dollar-sign',
+  'cadastros/pagamentos': 'credit-card',
+  'cadastros/modelos': 'modelo',
   cozinha: 'cooking-pot',
   cardapio: 'folha-cardapio',
   configuracoes: 'settings',

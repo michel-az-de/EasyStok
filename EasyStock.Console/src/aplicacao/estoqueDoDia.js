@@ -69,6 +69,32 @@ export function quandoVence(lote) {
   return `Vence em ${dataCurta(lote.validade)}`
 }
 
+// #2439: a validade do lote na coluna da tabela. Vencido fica em duas linhas: a data com o tom e,
+// apagado embaixo, que ele já saiu do saldo.
+export function validadeDoLote(lote) {
+  if (lote?.vencido && lote.validade) return { texto: `Vencido em ${dataCurta(lote.validade)}`, apoio: 'Fora do saldo', tom: 'atencao' }
+  return { texto: quandoVence(lote), apoio: null, tom: lote?.vencendo ? 'atencao' : 'neutro' }
+}
+
+// #2439: a situação do prato numa frase só ("Sem saldo · lote vencido"), com o ícone e o tom da pior.
+// Sem saldo e sem outra causa é vermelho; com lote vencido ou venda sem saldo é âmbar, porque há o
+// que fazer (registrar a perda, ajustar a contagem).
+export function situacaoDoPrato(prato) {
+  const lotes = prato?.lotes ?? []
+  const vencido = lotes.some((l) => l.vencido)
+  const partes = [
+    prato?.saldo === 0 && 'sem saldo',
+    prato?.descoberto > 0 && `${prato.descoberto === 1 ? '1 vendida' : `${prato.descoberto} vendidas`} sem saldo`,
+    vencido && 'lote vencido',
+    lotes.some((l) => l.vencendo) && 'lote vencendo',
+  ].filter(Boolean)
+  if (partes.length === 0) return { texto: 'Disponível', tom: 'ok', icone: 'check' }
+  const texto = partes.join(' · ')
+  const soSemSaldo = partes.length === 1 && prato.saldo === 0
+  const soVencendo = partes.length === 1 && !vencido && prato.saldo !== 0 && !(prato.descoberto > 0)
+  return { texto: texto[0].toUpperCase() + texto.slice(1), tom: soSemSaldo ? 'perigo' : 'atencao', icone: soSemSaldo ? 'circle-x' : soVencendo ? 'hourglass' : 'alerta' }
+}
+
 // #2258 (auditoria P6): "Salvar contagem" parado diz o que falta, em vez de ficar apagado sem explicação.
 // Nulo: pode salvar (ou já está salvando).
 export function motivoDaContagem({ salvando = false, contagem = '', motivo = '', porPorcao = false, contado = true } = {}) {

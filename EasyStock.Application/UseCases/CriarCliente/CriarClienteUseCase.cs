@@ -60,5 +60,5 @@ public class CriarClienteUseCase(
         c.Documento, c.Observacoes, c.OrderCount, c.LastOrderAt, c.Ativo,
         c.CriadoEm, c.AlteradoEm,
         c.TipoPessoa, c.NomeFantasia, c.InscricaoEstadual,
-        EasyStock.Application.UseCases.Cliente.Foto.ClienteFotoUseCase.Url(c));
+        EasyStock.Application.UseCases.Cliente.Foto.ClienteFotoUseCase.Url(c)) { Revisao = c.Revisao };
 }

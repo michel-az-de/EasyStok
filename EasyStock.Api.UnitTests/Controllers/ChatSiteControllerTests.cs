@@ -51,7 +51,7 @@ public class ChatSiteControllerTests
             acesso,
             new AbrirSessaoChatSiteUseCase(acesso, _sessoes, uow),
             new EnviarMensagemVisitanteUseCase(acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), uow,
-                NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new EasyStock.Application.Services.Atendimento.ConversaChatSiteService(_conversas, uow)),
+                NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new EasyStock.Application.Services.Atendimento.ConversaChatSiteService(_conversas, uow, _sessoes)),
             new ListarMensagensChatSiteUseCase(acesso, _sessoes, _conversas));
         var http = new DefaultHttpContext();
         http.Response.Body = _corpo;

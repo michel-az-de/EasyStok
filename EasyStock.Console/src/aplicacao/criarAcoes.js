@@ -37,6 +37,16 @@ export function criarAcoesLocais({ despachar, agoraRef, estadoRef, pedirNotifica
     // 24/09: "Nº 1" no canhoto).
     // #1686 (item 3): segunda compra na mesma conversa, depois do pedido entregue ou cancelado.
     novaComanda: (id) => despachar({ tipo: acao.NOVA_COMANDA, id, numeroPedido: proximoNumeroPedido() }),
+    reconferirPessoaDaComanda: (id, identidade) => {
+      const conversa = estadoRef.current.conversas.find(c => c.id === id)
+      if (!conversa?.pedido || conversa.pedido.pedidoId || !identidade?.clienteId
+        || !Number.isInteger(identidade.vinculoRevisao) || identidade.vinculoRevisao < 0
+        || identidade.clienteId !== conversa.clienteId || identidade.vinculoRevisao !== conversa.vinculoRevisao) {
+        return { erro: 'O cadastro mudou durante a conferência. Feche e confira novamente.' }
+      }
+      despachar({ tipo: acao.RECONFERIR_PESSOA_COMANDA, id, identidade })
+      return { ok: true }
+    },
     adicionarItem: (id, item) => despachar({
       tipo: acao.ADICIONAR_ITEM, id, item, numeroPedido: proximoNumeroPedido(), alertaId: proximoId('alerta'),
       agora: agoraRef.current,

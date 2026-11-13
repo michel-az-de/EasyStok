@@ -103,6 +103,7 @@ public static class GeracaoAgenteAtendimento
             foreach (var uso in resposta.Conteudo.OfType<BlocoUsoFerramentaLlm>())
             {
                 resultados.Add(await ExecutarFerramentaAsync(ferramentas, contexto, uso, logger, ct));
+                if (contexto.Interrompido) return new GeracaoAgente(null, tokens, false, "o contexto da conversa mudou");
                 if (situacaoInicial == SituacaoConversa.Automatica && contexto.Conversa.Situacao != SituacaoConversa.Automatica)
                 {
                     if (contexto.Conversa.Situacao != SituacaoConversa.Encerrada) contexto.LimparRespostaVerificada();

@@ -3,6 +3,7 @@ import { sugerirResposta } from '../../infra/api/conversasApi'
 import { sugestaoDaApi } from '../../infra/api/traducaoConversas'
 import { EVENTO_SESSAO_ALTERADA, identidadeDaSessao, lerSessao } from '../../infra/api/sessao'
 import { combinarSinais } from '../../infra/api/sinais'
+import { chaveDaAssistencia } from '../contextoAssistencia'
 
 export function identidadeDaSugestao() {
   const sessao = lerSessao()
@@ -121,26 +122,36 @@ export function criarConsultaProativa({ aoMudar, agora = Date.now, agendar = set
 // Nada sai ao cliente: o texto chega ao painel, e "Usar no rascunho" o põe no campo de escrever.
 // A marca "Precisa de você" e a ocorrência do modo simulado não nascem aqui: no modo API quem as
 // grava é o EasyStok, e o navegador não finge o que o servidor não fez (F06).
-export function criarAcoesAgenteApi({ despachar }) {
+export function criarAcoesAgenteApi({ despachar, estadoRef }) {
   let consultaAtual = 0
   let conversaAtual = null
   const pendentes = new Map()
+  const chaveAtual = id => chaveDaAssistencia(estadoRef.current.conversas.find(c => c.id === id), identidadeDaSessao(lerSessao()))
   return {
+    interromperConsultaAgente: () => {
+      consultaAtual++
+      for (const registro of pendentes.values()) registro.controle.abort()
+      pendentes.clear()
+    },
     consultarAgente: (id) => {
-      if (pendentes.has(id) && conversaAtual === id) return pendentes.get(id).resposta
+      const contextoAssistencia = chaveAtual(id)
+      if (pendentes.has(contextoAssistencia) && conversaAtual === contextoAssistencia) return pendentes.get(contextoAssistencia).resposta
       const consulta = ++consultaAtual
-      conversaAtual = id
-      despachar({ tipo: acao.AGENTE_PEDINDO, id })
-      const registro = { chamada: pendentes.get(id)?.chamada ?? sugerirResposta(id) }
+      conversaAtual = contextoAssistencia
+      despachar({ tipo: acao.AGENTE_PEDINDO, id, contextoAssistencia })
+      const anterior = pendentes.get(contextoAssistencia)
+      const controle = anterior?.controle ?? new AbortController()
+      const registro = { controle, chamada: anterior?.chamada ?? sugerirResposta(id, { sinal: controle.signal, identidadeEsperada: identidadeDaSessao(lerSessao()) }) }
+      const valido = () => !controle.signal.aborted && consulta === consultaAtual && chaveAtual(id) === contextoAssistencia
       registro.resposta = registro.chamada
         .then(dados => {
-          if (consulta === consultaAtual) despachar({ tipo: acao.AGENTE_RESPONDEU, id, sugestao: sugestaoDaApi(dados) })
+          if (valido()) despachar({ tipo: acao.AGENTE_RESPONDEU, id, contextoAssistencia, sugestao: sugestaoDaApi(dados) })
         })
         .catch(erro => {
-          if (consulta === consultaAtual) despachar({ tipo: acao.AGENTE_FALHOU, id, erro: erro.message })
+          if (valido()) despachar({ tipo: acao.AGENTE_FALHOU, id, contextoAssistencia, erro: erro.message })
         })
-        .finally(() => { if (pendentes.get(id) === registro) pendentes.delete(id) })
-      pendentes.set(id, registro)
+        .finally(() => { if (pendentes.get(contextoAssistencia) === registro) pendentes.delete(contextoAssistencia) })
+      pendentes.set(contextoAssistencia, registro)
       return registro.resposta
     },
   }

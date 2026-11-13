@@ -22,7 +22,14 @@ public sealed record AtualizarClienteCommand(
     // Pessoa jurídica (ADR-0048) — no fim e com default: este Command É o corpo HTTP.
     bool PessoaJuridica = false,
     [property: MaxLength(150)] string? NomeFantasia = null,
-    [property: MaxLength(20)]  string? InscricaoEstadual = null);
+    [property: MaxLength(20)]  string? InscricaoEstadual = null,
+    [property: Required] uint? Revisao = null);
+
+public sealed class ClienteCadastroAlteradoException() : UseCaseConcurrencyException(
+    "Este cadastro foi alterado. Confira a versão atual antes de salvar suas alterações.")
+{
+    public const string Codigo = "CLIENTE_ALTERADO";
+}
 
 public class AtualizarClienteUseCase(
     IClienteRepository repo,
@@ -33,9 +40,12 @@ public class AtualizarClienteUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureSemTagsHtml(cmd.Nome, "Nome do cliente");
+        if (cmd.Revisao is not { } revisao)
+            throw new UseCaseValidationException("Informe a revisão do cadastro aberto para edição.");
 
         var cliente = await repo.GetByIdAsync(cmd.EmpresaId, cmd.Id);
-        if (cliente == null) return null;
+        if (cliente is null || cliente.EmpresaId != cmd.EmpresaId) return null;
+        if (cliente.Revisao != revisao) throw new ClienteCadastroAlteradoException();
 
         if (!string.IsNullOrWhiteSpace(cmd.Email))
             EmailValidator.EnsureValid(cmd.Email, "Email do cliente");

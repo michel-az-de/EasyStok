@@ -23,8 +23,9 @@ export function ChecklistConfiguracao() {
   if (!config?.visivel) return null
 
   return (
-    <nav className={css.checklist} aria-label="Configuração da Produção">
-      <p className={css.titulo}>Para a Produção funcionar, configure nesta ordem:</p>
+    // #2439: faixa compacta, o rótulo à esquerda e os passos em linha, na ordem da dependência.
+    <nav className={css.checklist} aria-label="Configuração inicial da Produção">
+      <p className={css.titulo}>Configuração inicial</p>
       <ol className={css.passos}>
         {config.passos.map((p, i) => {
           const ativo = p.id === config.ativo

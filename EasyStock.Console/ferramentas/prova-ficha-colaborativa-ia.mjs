@@ -24,7 +24,7 @@ g.hooks = {
 const codigo = (texto) => 'data:text/javascript,' + encodeURIComponent(texto)
 registerHooks({
   resolve(spec, ctx, proximo) {
-    if (spec === 'react') return { url: codigo('const h=globalThis.__fichaIa.hooks; export const useState=h.useState,useRef=h.useRef,useEffect=h.useEffect,useLayoutEffect=h.useEffect'), shortCircuit: true }
+    if (spec === 'react') return { url: codigo('const h=globalThis.__fichaIa.hooks; export const useState=h.useState,useRef=h.useRef,useEffect=h.useEffect,useLayoutEffect=h.useEffect,useSyncExternalStore=(_,ler)=>ler()'), shortCircuit: true }
     if (spec === 'react/jsx-runtime') return { url: codigo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key});export const jsxs=jsx'), shortCircuit: true }
     if (spec.startsWith('.') && !/\.[a-z]+$/i.test(spec)) for (const ext of ['.js', '.jsx']) { try { return proximo(spec + ext, ctx) } catch { /* próximo formato */ } }
     return proximo(spec, ctx)
@@ -34,7 +34,7 @@ registerHooks({
     if (url === arquivo.href) return inline(compilado)
     if (url.endsWith('/aplicacao/contextos.js')) return inline('const g=globalThis.__fichaIa;export const useAtendimento=()=>g.estado,useCatalogo=()=>g.catalogo')
     if (url.endsWith('/infra/api/cliente.js')) return inline('export const chamarApi=(rota,opcoes)=>{const g=globalThis.__fichaIa;g.chamadas.push({rota,opcoes});return g.proxima.promise}')
-    if (url.endsWith('/infra/api/sessao.js')) return inline('export const lerSessao=()=>globalThis.__fichaIa.identidade,identidadeDaSessao=s=>s')
+    if (url.endsWith('/infra/api/sessao.js')) return inline('export const lerSessao=()=>globalThis.__fichaIa.identidade,identidadeDaSessao=s=>s,EVENTO_SESSAO_ALTERADA="sessao"')
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>String(p)})')
     if (url.includes('/componentes/') && url.endsWith('.jsx')) {
       const nomes = [...readFileSync(new URL(url), 'utf8').matchAll(/export (?:function|const) (\w+)/g)].map(m => m[1])
@@ -46,6 +46,8 @@ registerHooks({
 const { AreaColaborativaIa, BlocoColaborativoIa } = await import(arquivo.href)
 const { validarMontagemFicha, comandaDaFichaIa } = await import('../src/dominio/montagemFicha.js')
 const { organizarFicha } = await import('../src/aplicacao/montagemFicha.js')
+const { chaveDaAssistencia } = await import('../src/aplicacao/contextoAssistencia.js')
+const { useSugestaoCadastro } = await import('../src/aplicacao/useSugestaoCadastro.js')
 const resposta = () => ({ conversaId: conversa, geracaoId: geracao, geradoEm: '2026-10-29T15:20:00Z', blocos: [
   { id: 'nota-1', tipo: 'nota', texto: 'Prefere retirar no sábado.', acao: null },
   { id: 'comanda-1', tipo: 'comanda', texto: 'Confira os itens atuais.', acao: null },
@@ -95,7 +97,7 @@ await provar('montagem só acontece no clique explícito; espera, evita duplica�
 })
 
 await provar('comanda mostra itens e total da API, sem recalcular pelo preço atual do catálogo', () => {
-  const bloco = { ...resposta().blocos[1], conversaId: conversa, geracaoId: geracao, identidadeSessao: g.identidade }
+  const bloco = { ...resposta().blocos[1], conversaId: conversa, geracaoId: geracao, identidadeSessao: g.identidade, contextoAssistencia: chaveDaAssistencia(g.estado.selecionada, g.identidade) }
   const h = host(BlocoColaborativoIa, { bloco, aoAbrirComanda() {} })
   assert.match(texto(h.arvore), /2 × Lasanha/)
   assert.match(texto(h.arvore), /87,00/)
@@ -106,7 +108,7 @@ await provar('comanda mostra itens e total da API, sem recalcular pelo preço at
 })
 
 await provar('nota só passa ao callback por clique; bloqueia repetição e sessão/conversa antiga', async () => {
-  const nota = { ...resposta().blocos[0], conversaId: conversa, geracaoId: geracao, identidadeSessao: g.identidade }
+  const nota = { ...resposta().blocos[0], conversaId: conversa, geracaoId: geracao, identidadeSessao: g.identidade, contextoAssistencia: chaveDaAssistencia(g.estado.selecionada, g.identidade) }
   const final = pendente(), chamadas = []
   const h = host(BlocoColaborativoIa, { bloco: nota, aoProporNota: t => { chamadas.push(t); return final.promise } })
   assert.equal(chamadas.length, 0)
@@ -157,6 +159,32 @@ await provar('fronteira rejeita dados financeiros/modelos/ações/código fora d
   g.proxima.resolver(resposta()); await assert.rejects(emCurso, /sessão mudou/)
   g.identidade = 'empresa:atendente'
 })
+for (const alteracao of [{ clienteId: 'cliente-corrigido' }, { vinculoRevisao: 2 },
+  { mensagens: [{ id: 'nova', dir: 'in', texto: 'Troque a retirada' }] }, { pedido: { pedidoId: 'outro', totalPagoApi: 50 } }]) {
+  await provar(`corrigir identidade na mesma conversa invalida inferência e bloco solto: ${JSON.stringify(alteracao)}`, async () => {
+    const original = g.estado.selecionada
+    g.proxima = pendente()
+    const h = host(AreaColaborativaIa, { conversaId: conversa })
+    const emCurso = enviar(h), sinal = g.chamadas.at(-1).opcoes.sinal
+    g.estado.selecionada = { ...original, ...alteracao }; h.render()
+    assert.equal(sinal.aborted, true)
+    g.proxima.resolver(resposta()); await emCurso; h.render()
+    assert.equal(doTipo(h, BlocoColaborativoIa).length, 0)
+    h.desmontar(); g.estado.selecionada = original
+
+    g.proxima = pendente()
+    const area = host(AreaColaborativaIa, { conversaId: conversa })
+    const montagem = enviar(area); g.proxima.resolver(resposta()); await montagem; area.render()
+    const bloco = doTipo(area, BlocoColaborativoIa)[0].props.bloco
+    let chamadas = 0
+    const solto = host(BlocoColaborativoIa, { bloco, aoProporNota: () => { chamadas++ } })
+    const cliqueAntigo = botao(solto, 'Revisar nota').props.onClick
+    g.estado.selecionada = { ...original, ...alteracao }; solto.render()
+    assert.equal(solto.arvore, null)
+    await cliqueAntigo(); assert.equal(chamadas, 0)
+    solto.desmontar(); area.desmontar(); g.estado.selecionada = original
+  })
+}
 
 await provar('comanda, frete, cardápio, rascunho e soltar usam apenas callbacks explícitos da conversa atual', async () => {
   const chamadas = [], antes = g.chamadas.length
@@ -166,7 +194,7 @@ await provar('comanda, frete, cardápio, rascunho e soltar usam apenas callbacks
     [{ id: 'acao-2', tipo: 'acao', acao: 'abrir_cardapio', texto: 'Confira os pratos.' }, 'Abrir cardápio', 'cardapio', []],
     [resposta().blocos[3], 'Usar no rascunho', 'rascunho', ['Qual horário você prefere?']],
   ]) {
-    const payload = { ...bloco, conversaId: conversa, geracaoId: geracao, identidadeSessao: g.identidade }
+    const payload = { ...bloco, conversaId: conversa, geracaoId: geracao, identidadeSessao: g.identidade, contextoAssistencia: chaveDaAssistencia(g.estado.selecionada, g.identidade) }
     const h = host(BlocoColaborativoIa, { bloco: payload,
       aoAbrirComanda: (...a) => chamadas.push(['comanda', a]), aoCalcularFrete: (...a) => chamadas.push(['frete', a]),
       aoAbrirCardapio: (...a) => chamadas.push(['cardapio', a]), aoRascunho: (...a) => chamadas.push(['rascunho', a]),
@@ -184,4 +212,57 @@ await provar('comanda, frete, cardápio, rascunho e soltar usam apenas callbacks
   assert.equal(g.chamadas.length, antes, 'ações de bloco não chamam a API de inferência nem uma rota de envio')
 })
 
-console.log(`${grupos} grupos da ficha colaborativa aprovados; inferência do provedor real continua fora deste teste.`)
+await provar('cadastro consulta o harness e aplica cada campo somente com revisão no contexto atual', async () => {
+  g.proxima = pendente(); const aplicadas = []
+  const h = host(useSugestaoCadastro, { conversaId: conversa, clienteId: null, vinculoRevisao: 0, aoAplicar: (...args) => aplicadas.push(args) })
+  const consulta = h.arvore.consultar(); await h.arvore.consultar()
+  assert.equal(g.chamadas.at(-1).rota, '/api/atendimento/assistente/cadastro')
+  const campo = { campo: 'nome', valor: 'Ana', evidencia: 'Sou Ana', mensagemId: outra }
+  g.proxima.resolver({ conversaId: conversa, clienteId: null, vinculoRevisao: 0, campos: [campo] })
+  assert.equal(await consulta, true); h.render(); assert.deepEqual(aplicadas, [])
+  assert.equal(await h.arvore.aplicar(campo), true); h.render()
+  assert.deepEqual(aplicadas, [['nome', 'Ana']]); assert.deepEqual(h.arvore.campos, [])
+  g.proxima = pendente(); const atrasada = h.arvore.consultar(), sinal = g.chamadas.at(-1).opcoes.sinal
+  h.render({ ...h.props, vinculoRevisao: 1 }); assert.equal(sinal.aborted, true)
+  g.proxima.resolver({ conversaId: conversa, clienteId: null, vinculoRevisao: 0, campos: [campo] })
+  assert.equal(await atrasada, false); h.render(); assert.deepEqual(h.arvore.campos, [])
+  assert.equal(await h.arvore.aplicar(campo), false); h.desmontar()
+})
+
+await provar('cadastro recusa resposta com revisão divergente e não consulta sem conversa', async () => {
+  g.proxima = pendente()
+  const h = host(useSugestaoCadastro, { conversaId: conversa, vinculoRevisao: 0 })
+  const consulta = h.arvore.consultar()
+  g.proxima.resolver({ conversaId: conversa, clienteId: null, vinculoRevisao: 9, campos: [] })
+  assert.equal(await consulta, false); h.render(); assert.match(h.arvore.erro, /vínculo.*mudou/)
+  h.render({ conversaId: null }); const antes = g.chamadas.length
+  assert.equal(await h.arvore.consultar(), false); assert.equal(g.chamadas.length, antes); h.desmontar()
+})
+
+await provar('aplica três campos revisados separadamente sem consultar novamente', async () => {
+  g.proxima = pendente(); const dados = {}, antes = g.chamadas.length
+  const h = host(useSugestaoCadastro, { conversaId: conversa, revisaoFormulario: 0, aoAplicar: (campo, valor) => { dados[campo] = valor } })
+  const consulta = h.arvore.consultar()
+  g.proxima.resolver({ conversaId: conversa, clienteId: null, vinculoRevisao: 0, campos:
+    [['nome', 'Ana'], ['telefone', '11999998888'], ['email', 'ana@example.com']].map(([campo, valor]) => ({ campo, valor, evidencia: valor, mensagemId: outra })) })
+  await consulta; h.render()
+  for (const campo of ['nome', 'telefone', 'email']) { assert.equal(await h.arvore.aplicar(campo), true); h.render() }
+  assert.deepEqual(dados, { nome: 'Ana', telefone: '11999998888', email: 'ana@example.com' })
+  assert.deepEqual(h.arvore.campos, []); assert.equal(g.chamadas.length, antes + 1); h.desmontar()
+})
+
+for (const mudanca of [{ revisaoFormulario: 'nome digitado' }, { conversa: { mensagens: [{ id: 'nova', dir: 'in', texto: 'Meu nome mudou' }] } }]) {
+  await provar('edição de cadastro ou mensagem nova invalida proposta e callback de aplicar', async () => {
+    g.proxima = pendente(); const aplicadas = []
+    const h = host(useSugestaoCadastro, { conversaId: conversa, aoAplicar: (...args) => aplicadas.push(args) })
+    const consulta = h.arvore.consultar()
+    g.proxima.resolver({ conversaId: conversa, clienteId: null, vinculoRevisao: 0,
+      campos: [{ campo: 'nome', valor: 'Ana', evidencia: 'Sou Ana', mensagemId: outra }] })
+    await consulta; h.render(); const aplicarAntigo = h.arvore.aplicar
+    h.render({ ...h.props, ...mudanca })
+    assert.deepEqual(h.arvore.campos, []); assert.equal(await aplicarAntigo('nome'), false)
+    assert.deepEqual(aplicadas, []); h.desmontar()
+  })
+}
+
+console.log(`${grupos} grupos da ficha colaborativa e cadastro aprovados; inferência do provedor real continua fora deste teste.`)

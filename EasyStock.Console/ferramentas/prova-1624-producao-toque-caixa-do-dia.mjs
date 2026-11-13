@@ -379,10 +379,12 @@ await confere('Produção do dia: o filtro por categoria muda a grade; a linha d
   montarFetch(rotasDaProducao())
   const t = montar(AbaProducaoDoDiaApi)
   await t.assentar()
-  const filtro = (rotulo) => doTipo(t.renderizar(), 'Chip').find((c) => c.props.papel === 'filtro' && texto(c) === rotulo)
-  filtro('Molhos').props.onClick()
+  // #2439: a categoria é uma seleção ("Todas as categorias" é o valor vazio), não mais chips.
+  const categoria = () => doTipo(t.renderizar(), 'CampoSelecao').find((c) => c.props.rotulo === 'Categoria')
+  assert.deepEqual(categoria().props.opcoes.map((o) => o.rotulo), ['Todas as categorias', 'Massas', 'Molhos'])
+  categoria().props.onChange(digitar('Molhos'))
   assert.deepEqual(cartoesDaTela(t.renderizar()).map((c) => texto(doTipo(c, 'button')[0])), ['Molho sugo300 gAinda sem estoque'])
-  filtro('Todos').props.onClick()
+  categoria().props.onChange(digitar(''))
   assert.equal(cartoesDaTela(t.renderizar()).length, 4)
   revisar(t)
   const item = () => itensDoLote(t.renderizar())[0]

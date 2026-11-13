@@ -86,12 +86,13 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AnyAsync();
         }
 
-        public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+        public async Task<IEnumerable<Produto>> SearchAsync(Guid empresaId, string termo, int maxResults = 20, StatusProduto? status = null)
         {
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
-            var pattern = $"%{termo}%";
+            var pattern = $"%{BuscaTextual.Normalizar(termo)}%";
+            var buscaId = Guid.TryParse(termo, out var id);
 
             // SKU usa Value Object com HasConversion — busca exata pelo VO
             CodigoSku? skuExato = null;
@@ -99,10 +100,11 @@ namespace EasyStock.Infra.Postgre.Repositories
 
             return await dbContext.Produtos
                 .AsNoTracking()
+                .Where(p => !status.HasValue || p.Status == status.Value)
                 .Where(p => p.EmpresaId == empresaId &&
-                    (EF.Functions.ILike(p.Nome, pattern) ||
-                     (p.Marca != null && EF.Functions.ILike(p.Marca, pattern)) ||
-                     (p.DescricaoBase != null && EF.Functions.ILike(p.DescricaoBase, pattern)) ||
+                    ((buscaId && p.Id == id) || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern) ||
+                     (p.Marca != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Marca.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern)) ||
+                     (p.DescricaoBase != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.DescricaoBase.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern)) ||
                      (skuExato != null && p.SkuBase == skuExato) ||
                      (p.CodigoBarras != null && EF.Functions.ILike(p.CodigoBarras, pattern))))
                 .OrderBy(p => p.Nome)

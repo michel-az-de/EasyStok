@@ -4,6 +4,6 @@ import { perguntarAssistente } from '../../infra/api/assistenteApi'
 // então o histórico local não vai junto. O erro sobe para o balão, que mostra a mensagem.
 export function criarAcoesAssistenteApi() {
   return {
-    perguntarAssistente: (pergunta, conversa) => perguntarAssistente(pergunta, conversa?.id ?? null),
+    perguntarAssistente: (pergunta, conversa, _historico, opcoes) => perguntarAssistente(pergunta, conversa?.id ?? null, opcoes),
   }
 }

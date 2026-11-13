@@ -1,0 +1,64 @@
+/* #2439: tabela das telas da Produção (Estoque do dia, Receitas e Planejamento). No largo, as colunas
+   alinham nome, número, situação e ações; no estreito, cada linha vira um bloco empilhado e a célula
+   mostra o nome da coluna (data-rotulo), para o número não ficar solto. */
+.moldura { min-width: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-2); overflow: hidden; background: var(--papel); }
+.tabela { width: 100%; border-collapse: collapse; color: var(--tinta); font-size: var(--t-apoio); }
+.tabela th {
+  padding: var(--e-2) var(--e-3); background: var(--preenchimento); color: var(--tinta-2);
+  font-size: var(--t-micro); font-weight: 700; text-align: left; white-space: nowrap;
+}
+.tabela td { padding: var(--e-3); border-top: var(--b-1) solid var(--linha); vertical-align: middle; }
+.tabela .numero { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabela .colunaAcoes { text-align: right; }
+.valor { font-size: var(--t-corpo); font-weight: 700; }
+.nome { display: block; color: var(--tinta); font-size: var(--t-corpo); font-weight: 700; line-height: var(--lh-compacto); overflow-wrap: anywhere; }
+.apoio { display: block; margin-top: var(--e-1); color: var(--tinta-3); font-size: var(--t-micro); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
+.acoes { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; }
+.acoes > button { font-size: var(--t-micro); }
+/* Cada prato é um tbody: a linha dele e, quando abre, a de baixo (formulário de ajuste, confirmação de perda e aviso). */
+.tabela .extra { border-top: 0; padding-top: 0; }
+
+/* Situação: texto com ícone, o tom só na cor. Várias situações juntam com " · ". */
+.situacao { display: inline-flex; align-items: center; gap: var(--e-1); font-weight: 650; }
+.tomPerigo { color: var(--erro); }
+.tomAtencao { color: var(--alerta); }
+.tomOk { color: var(--sucesso); }
+.tomNeutro { color: var(--tinta-2); font-weight: 500; }
+
+/* Três números do topo, sem cartão: divisória vertical entre eles e a cor do estado só no número. */
+.numeros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.numeros > div { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; padding: var(--e-1) var(--e-4); border-left: var(--b-1) solid var(--linha); }
+.numeros > div:first-child { padding-left: 0; border-left: 0; }
+.numeros dt { color: var(--tinta-2); font-size: var(--t-apoio); }
+.numeros dd { margin: 0; color: var(--tinta); font-size: var(--t-valor); font-weight: 750; font-variant-numeric: tabular-nums; line-height: var(--lh-compacto); }
+.numeros dd.dica { color: var(--tinta-3); font-size: var(--t-micro); font-weight: 500; }
+.numeros .tomPerigo dd:not(.dica) { color: var(--erro); }
+.numeros .tomAtencao dd:not(.dica) { color: var(--alerta); }
+
+/* Planejamento: a data e o "como calcula" na mesma linha; o contador − campo + na coluna das porções;
+   o rodapé com a nota à esquerda e as ações à direita, o efeito de calcular escrito embaixo. */
+.topoDoPlano { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e-2) var(--e-5); }
+.contador { display: inline-flex; align-items: center; gap: var(--e-1); }
+.contador input { width: 4.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+.rodapeDoPlano { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--e-3); }
+.notaDoPlano { display: inline-flex; align-items: center; gap: var(--e-2); max-width: 52ch; margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.notaDoPlano > svg { flex: none; color: var(--marca); }
+.acoesDoPlano { display: flex; flex-direction: column; align-items: flex-end; gap: var(--e-1); margin-left: auto; }
+
+@container (max-width: 640px) {
+  .tabela thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .tabela, .tabela tbody, .tabela tr, .tabela td { display: block; width: 100%; }
+  .tabela tbody + tbody { border-top: var(--b-1) solid var(--linha); }
+  .tabela tbody > tr + tr:not(:has(> .extra)) { border-top: var(--b-1) solid var(--linha); }
+  .tabela td { padding: var(--e-1) var(--e-3); border-top: 0; }
+  .tabela td:first-child { padding-top: var(--e-3); }
+  .tabela td:last-child { padding-bottom: var(--e-3); }
+  .tabela td[data-rotulo] { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); }
+  .tabela td[data-rotulo]::before { content: attr(data-rotulo); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 500; }
+  .tabela .numero, .tabela .colunaAcoes { text-align: left; }
+  .acoes { justify-content: flex-start; padding-top: var(--e-1); }
+  .acoesDoPlano { align-items: stretch; width: 100%; }
+  .numeros > div { padding-inline: var(--e-2); }
+  .numeros dd { font-size: var(--t-titulo); }
+  .numeros dt { font-size: var(--t-micro); }
+}

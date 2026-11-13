@@ -3,6 +3,8 @@ import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { mascaraTelefone, telefoneDoE164 } from '../../dominio/formato'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
+import { ERRO_IDENTIDADE_DA_EDICAO, identidadeDaEdicao, mesmaIdentidadeDaEdicao } from '../../dominio/identidadeDaEdicao'
+import { ConferirDestinoDaEdicao } from './ConferirDestinoDaEdicao'
 import css from './cliente.module.css'
 
 const SEGUNDOS_SALVOU = 2
@@ -23,7 +25,7 @@ const FALHA_AO_SALVAR = 'Não foi possível salvar. Tente de novo.'
 // recebe o foco de volta e a mensagem fica ligada a ele por aria-describedby.
 // `dica` vira o placeholder e `limite` o maxLength (nome: "Nome e sobrenome", 80).
 export function CampoEmLinha({
-  rotulo, valor, vazio = 'Sem valor', tipo = 'texto', validar, aoSalvar, dica, limite, aoMudarSujo, chaveRascunho,
+  rotulo, valor, vazio = 'Sem valor', tipo = 'texto', validar, aoSalvar, dica, limite, aoMudarSujo, chaveRascunho, conversa,
 }) {
   const idCampo = useId()
   const idErro = `${idCampo}-erro`
@@ -32,8 +34,9 @@ export function CampoEmLinha({
   const editando = edicao !== null
   const rascunho = edicao?.valor ?? ''
   const erro = edicao?.erro ?? null
-  const setRascunho = (valor) => setEdicao(valor === null ? null : { valor, erro: null })
-  const setErro = (mensagem) => setEdicao({ valor: rascunho, erro: mensagem })
+  const erroDoVinculo = erro === ERRO_IDENTIDADE_DA_EDICAO && conversa && !mesmaIdentidadeDaEdicao(edicao?.identidade, conversa)
+  const setRascunho = (valor) => setEdicao(valor === null ? null : { ...edicao, valor, erro: null })
+  const setErro = (mensagem) => setEdicao({ ...edicao, valor: rascunho, erro: mensagem })
   const [salvou, setSalvou] = useState(false)
   // #2365: texto e trava pertencem ao cliente/campo, inclusive após remontar no celular.
   const [salvando, iniciarGravacao, estaGravando] = useGravacaoDoAjuste(chave)
@@ -68,7 +71,7 @@ export function CampoEmLinha({
   }, [salvou])
 
   function abrir() {
-    setRascunho(exibido)
+    setEdicao({ valor: exibido, erro: null, ...(conversa ? { identidade: identidadeDaEdicao(conversa) } : {}) })
   }
 
   function cancelar() {
@@ -84,10 +87,11 @@ export function CampoEmLinha({
 
   function confirmar() {
     if (estaGravando()) return
+    if (conversa && !mesmaIdentidadeDaEdicao(edicao?.identidade, conversa)) { setErro(ERRO_IDENTIDADE_DA_EDICAO); return }
     const mensagem = validar?.(rascunho) ?? null
     if (mensagem) { setErro(mensagem); return }
     if (rascunho === exibido) { setRascunho(null); return }
-    const ida = aoSalvar(rascunho)
+    const ida = aoSalvar(rascunho, edicao?.identidade)
     if (!ida?.then) { concluir(ida); return }
     const liberar = iniciarGravacao()
     setErro(null)
@@ -143,7 +147,8 @@ export function CampoEmLinha({
         <BotaoIcone rotulo="Desfazer" icone="x" disabled={salvando} onMouseDown={(e) => e.preventDefault()} onClick={cancelar} />
       </div>
       {salvando && <output className={css.salvandoEmLinha}>Salvando…</output>}
-      {erro && <p id={idErro} className={css.erroEmLinha} role="alert">{erro}</p>}
+      {erro && !erroDoVinculo && <p id={idErro} className={css.erroEmLinha} role="alert">{erro}</p>}
+      {conversa && <ConferirDestinoDaEdicao idMensagem={erroDoVinculo ? idErro : undefined} identidade={edicao?.identidade} conversa={conversa} aoConferir={identidade => setEdicao({ ...edicao, identidade, erro: null })} />}
     </div>
   )
 }

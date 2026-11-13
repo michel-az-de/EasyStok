@@ -182,6 +182,10 @@ public sealed class PedidoEstoqueIntegrationService(
                 agora.AddDays(-ItemEstoque.JanelaVelocidadeDias), agora);
             var velocidadeAtualizada = ItemEstoque.VelocidadeAposSaida(taxaAnterior, qtd);
 
+            // #2373: o resíduo do arredondamento vai para o último lote, para a soma bater com o total.
+            var totaisPorLote = EasyStock.Domain.ValueObjects.Dinheiro.Ratear(
+                item.PrecoUnitario, plano.Consumos.Select(c => c.Quantidade).ToList());
+            var indiceLote = 0;
             foreach (var (lote, quantidadeLote, descoberto) in plano.Consumos)
             {
                 lote.AtualizarVelocidadeSaida(velocidadeAtualizada, agora);
@@ -199,7 +203,7 @@ public sealed class PedidoEstoqueIntegrationService(
                     Natureza = NaturezaMovimentacaoEstoque.Venda,
                     Quantidade = EasyStock.Domain.ValueObjects.Quantidade.From(quantidadeLote),
                     ValorUnitario = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario),
-                    ValorTotal = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(item.PrecoUnitario * quantidadeLote),
+                    ValorTotal = totaisPorLote[indiceLote++],
                     DocumentoReferencia = refDocItem,
                     DataMovimentacao = agora,
                     Descricao = temFalta

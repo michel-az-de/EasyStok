@@ -10,6 +10,25 @@ namespace EasyStock.Application.Tests.Services.Atendimento.Ferramentas;
 
 public sealed class ConsultarPedidoFerramentaTests
 {
+    [Fact]
+    public async Task IdVazioRetornaErroDaFerramentaSemConsultarPedido()
+    {
+        var empresa = Guid.NewGuid();
+        var conversa = Conversa.Abrir(empresa, "5511999998888", DateTime.UtcNow, "Maria", Guid.NewGuid());
+        var pedidos = Substitute.For<IPedidoRepository>();
+        var creditos = Substitute.For<ICreditoClienteComandaRepository>();
+        var ferramenta = new ConsultarPedidoFerramenta(pedidos, new(pedidos), Substitute.For<IConfiguracaoAtendimentoRepository>(),
+            new SaldoFinanceiroPedido(pedidos, Substitute.For<IEstornoOnlineRepository>(), creditos), creditos);
+        var contexto = new ContextoTurnoAgente(empresa, conversa, DateTime.UtcNow);
+
+        var resultado = await ferramenta.ExecutarAsync(contexto, JsonSerializer.SerializeToElement(new { pedido_id = Guid.Empty }));
+
+        resultado.Should().Contain("pedido_nao_encontrado");
+        contexto.Interrompido.Should().BeFalse();
+        contexto.RespostaVerificada.Should().BeNull();
+        pedidos.ReceivedCalls().Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -58,8 +77,9 @@ public sealed class ConsultarPedidoFerramentaTests
             .And.Contain("Dinheiro recebido registrado: R$ 25,00").And.NotContain("crédito na sua conta")
             .And.Contain("Crédito emitido em cupom: R$ 10,00").And.NotContain("Devoluções registradas");
 
-        conversa.VincularCliente(Guid.NewGuid());
-        var outroCliente = new ContextoTurnoAgente(empresa, conversa, DateTime.UtcNow);
+        var conversaAlheia = Conversa.Abrir(empresa, "5511988887777", DateTime.UtcNow, "Outro cliente", Guid.NewGuid());
+        conversaAlheia.DefinirPedidoEmAndamento(pedido.Id);
+        var outroCliente = new ContextoTurnoAgente(empresa, conversaAlheia, DateTime.UtcNow);
         (await ferramenta.ExecutarAsync(outroCliente, JsonSerializer.SerializeToElement(new { })))
             .Should().Contain("pedido_nao_encontrado");
         outroCliente.RespostaVerificada.Should().BeNull();

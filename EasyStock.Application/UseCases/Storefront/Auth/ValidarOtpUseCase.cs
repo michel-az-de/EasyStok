@@ -156,7 +156,7 @@ public sealed class ValidarOtpUseCase(
                 // Só após comprovar posse pelo OTP pode reutilizar o cadastro do WhatsApp/ERP.
                 var identificacao = await identificarCliente.ExecuteAsync(
                     new IdentificarClientePorTelefoneInput(empresaId, telefoneE164.TrimStart('+'), null), token);
-                cliente = identificacao.Cliente;
+                cliente = identificacao.Cliente ?? throw new TelefoneCompartilhadoException();
                 clienteNovo = identificacao.EhNovo;
                 logger.LogInformation(
                     "Novo cliente storefront criado: empresaId={EmpresaId} clienteId={ClienteId} telefone={Telefone}",

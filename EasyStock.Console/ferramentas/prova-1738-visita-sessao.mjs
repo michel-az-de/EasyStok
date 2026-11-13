@@ -15,6 +15,9 @@ globalThis.sessionStorage = {
 }
 const sessao = { empresa: { id: 'empresa-a' }, usuario: { id: 'usuario-a' } }
 const vazio = { ultimaConversa: null, comandas: {} }
+const filtros = { busca: 'João', aba: 'todas', canais: ['WhatsApp'], ordenacao: 'recentes', responsavel: 'minhas', posicao: 720 }
+gravarVisita(sessao, { filtros, comandas: {} })
+assert.deepEqual(lerVisita(sessao).filtros, filtros, 'Busca, filtros e posição da lista sobrevivem ao reload')
 gravarVisita(sessao, { ultimaConversa: 'conversa-a', comandas: { 'conversa-a': {
   numero: 72, itens: [{ sku: 'prato', qtd: 2, obs: 'Molho à parte', nome: 'Não guardar nome' }],
   janela: 'janela-dia', meio: 'pix', observacoes: 'Sem talheres',
@@ -41,7 +44,9 @@ dados.set('easystok.sessao', 'sessão existente')
 esquecerVisitas()
 assert.equal([...dados.keys()].some(k => k.startsWith('easystok.visita:')), false)
 assert.equal(dados.get('easystok.sessao'), 'sessão existente', 'Limpeza da visita não cria nem altera tokens')
+assert.equal(gravarVisita(sessao, restaurada), true, 'A tela sabe quando a visita foi gravada')
 globalThis.sessionStorage = { getItem() { throw new Error('Storage bloqueado') }, setItem() { throw new Error('Storage bloqueado') } }
 assert.deepEqual(lerVisita(sessao), vazio)
 assert.doesNotThrow(() => gravarVisita(sessao, restaurada))
+assert.equal(gravarVisita(sessao, restaurada), false, 'Storage bloqueado não confirma persistência')
 console.log('ok restauração completa, isolamento por empresa/usuário, ausência de cadastro/token, rejeição de pedido e dados inválidos, limpeza e storage bloqueado')

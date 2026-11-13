@@ -11,6 +11,8 @@ import { Icone } from '../../componentes/Icone'
 import { MenuDeAcoes } from '../../componentes/MenuDeAcoes'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
+import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
+import { identidadeDaEdicao } from '../../dominio/identidadeDaEdicao'
 import {
   bloqueioDe, conversasDoCadastro, ehLead, estaBloqueada, resumoDoBloqueio,
 } from '../../dominio/conversa'
@@ -37,6 +39,7 @@ import { ModalBloqueio, ModalDesbloqueio } from './ModalBloqueio'
 import { ModalFidelidade } from './ModalFidelidade'
 import { AvisosDoCliente } from './AvisosDoCliente'
 import { ContatoInformado } from './ContatoInformado'
+import { ConferirDestinoDaEdicao } from './ConferirDestinoDaEdicao'
 import css from './cliente.module.css'
 
 const dataCurta = (iso) =>
@@ -80,7 +83,7 @@ function SecaoCliente({ integrado, titulo, chave, children, ...resto }) {
 
 export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado = false, resumoIa, fotoCadastro, aoEscolherFoto, aoRemoverFoto, alterandoFoto = false, aoMudarSujo, rodapeDoCadastro }) {
   const { cliente } = conversa
-  const chaveCadastro = `cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`
+  const chaveCadastro = `cadastro-conversa:${conversa.id}`
   const { conversas, historico, agora, automaticoPausado, fidelidade, fonteApi } = useAtendimento()
   // #1474 (R2): no modo API, mudar a entrega do pedido e os pontos não têm endpoint e somem.
   const disponivel = useAcaoDisponivel()
@@ -92,7 +95,14 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
 
   const [modal, setModal] = useState(null)
   const [avisoEndereco, setAvisoEndereco] = useState(null)
-  const [form, setForm] = useState(() => estadoInicialDoForm(conversa))
+  const [baseForm, setBaseForm] = useState(() => estadoInicialDoForm(conversa))
+  const [identidadeInicial, definirIdentidadeInicial] = useState(() => identidadeDaEdicao(conversa))
+  const [rascunhoRapido, guardarRapido] = useRascunhoDoAjuste(`${chaveCadastro}:rapido`)
+  const [edicaoTelefone] = useRascunhoDoAjuste(`${chaveCadastro}:telefone`)
+  const [edicaoEndereco] = useRascunhoDoAjuste(`${chaveCadastro}:endereco`)
+  const form = rascunhoRapido?.form ?? baseForm
+  const identidadeForm = rascunhoRapido ? rascunhoRapido.identidade : identidadeInicial
+  const setForm = mudar => guardarRapido({ form: typeof mudar === 'function' ? mudar(form) : mudar, identidade: identidadeForm })
   // #1586: espera e erro do "Salvar cadastro", presos à conversa que iniciou (a Ficha troca de
   // conversa sem remontar este bloco). A ref trava o segundo toque.
   const [cadastro, setCadastro] = useState({ id: null, salvando: false, erro: null })
@@ -111,7 +121,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   useEffect(() => {
     const inicial = estadoInicialDoForm(conversa)
     formCarregado.current = inicial
-    setForm(inicial)
+    setBaseForm(inicial)
+    definirIdentidadeInicial(identidadeDaEdicao(conversa))
     setAvisoEndereco(null)
     setTocados({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,8 +150,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
   const automaticoCaptando = automaticoConduzindo(conversa, automaticoPausado[conversa.id])
   // #1430: o visitante do chat do site já informou nome e contato; a confirmação toma o lugar do formulário.
   const informado = lead ? conversa.contatoInformado : null
-  const precisaCadastro = lead && (!cliente.telefone || !cliente.endereco) && !cliente.enderecoCapturado
-    && !conversa.captura && !informado
+  const precisaCadastro = Boolean(rascunhoRapido) || (!edicaoTelefone && !edicaoEndereco && lead && (!cliente.telefone || !cliente.endereco) && !cliente.enderecoCapturado
+    && !conversa.captura && !informado)
   const domicilio = mesmoDomicilio(conversa, conversas)
   const financeiro = resumoFinanceiro(historico)
 
@@ -192,8 +203,9 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
     setCadastro({ id, salvando: true, erro: null })
     let erro = null
     try {
-      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco }, agora)
+      const resultado = await salvarCadastroRapido(id, { nome: conversa.nome, telefone: form.telefone, endereco }, agora, identidadeForm)
       erro = resultado?.erro ?? null
+      if (!erro) guardarRapido(null)
     } catch (falha) {
       erro = falha.message || 'Não foi possível salvar o cadastro. Tente de novo.'
     } finally {
@@ -235,8 +247,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
 
   // #1586: devolve a ida ao EasyStok para o campo esperar; o aviso sobre o pedido só vale
   // depois de o cadastro mudar de verdade.
-  function aoSalvarEndereco(valor) {
-    const ida = editarDadoCliente(conversa.id, 'endereco', valor, agora)
+  function aoSalvarEndereco(valor, identidade) {
+    const ida = editarDadoCliente(conversa.id, 'endereco', valor, agora, identidade)
     if (!ida?.then) { avisarDoEnderecoNoPedido(); return ida }
     return ida.then((resultado) => {
       if (!resultado?.erro) avisarDoEnderecoNoPedido()
@@ -257,8 +269,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
           <Avatar nome={conversa.nome} foto={fotoCadastro ?? fotoDoCliente(canal, cliente)} tamanho="enorme" />
           <div className={css.identidadeTextos}>
             <div key={`nome-${captado.nome ?? ''}`} ref={nomeRef} className={captado.nome ? css.captadoAgora : undefined}>
-              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:nome`} rotulo="Nome do cliente" aoMudarSujo={sujoEmLinha.nome} valor={conversa.nome} validar={validarNome} dica="Nome e sobrenome" limite={LIMITE_DO_NOME}
-                aoSalvar={(v) => editarDadoCliente(conversa.id, 'nome', v.trim(), agora)} />
+              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:nome`} conversa={fonteApi ? conversa : undefined} rotulo="Nome do cliente" aoMudarSujo={sujoEmLinha.nome} valor={conversa.nome} validar={validarNome} dica="Nome e sobrenome" limite={LIMITE_DO_NOME}
+                aoSalvar={(v, identidade) => editarDadoCliente(conversa.id, 'nome', v.trim(), agora, identidade)} />
               <SeloCaptado quando={captado.nome} />
               {errosDoCadastro.nome && <p className={css.erroEmLinha} role="alert">{errosDoCadastro.nome}</p>}
             </div>
@@ -312,17 +324,19 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
           <div data-campo-ficha="cadastro" className={css.contents}>
           <ContatoInformado
             key={conversa.id}
+            conversa={fonteApi ? conversa : undefined}
             contato={informado}
-            aoConfirmar={(opcoes) => salvarCadastroRapido(conversa.id, {
+            aoConfirmar={(opcoes, identidade) => salvarCadastroRapido(conversa.id, {
               nome: informado.nome ?? conversa.nome, telefone: informado.telefone, email: informado.email, endereco: null, ...opcoes,
-            }, agora)}
+            }, agora, identidade)}
           />
           </div>
         )}
 
         {precisaCadastro ? (
           <div className={css.cadastroRapido} data-campo-ficha="cadastro">
-            {!cliente.telefone && (
+            {fonteApi && <ConferirDestinoDaEdicao identidade={identidadeForm} conversa={conversa} aoConferir={identidade => guardarRapido({ form, identidade })} />}
+            {(!cliente.telefone || rascunhoRapido) && (
               <CampoMascarado
                 tipo="telefone" rotulo="Telefone"
                 valor={form.telefone}
@@ -334,7 +348,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
                 onBlur={() => marcarTocado('telefone')}
               />
             )}
-            {!cliente.endereco && (
+            {(!cliente.endereco || rascunhoRapido) && (
               <div data-campo-ficha="endereco" className={css.contents}>
                 <CampoTexto
                   rotulo="Endereço"
@@ -363,9 +377,9 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
             <div key={`tel-${captado.telefone ?? ''}`} data-campo-ficha="telefone cadastro" className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
               <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={16} /></span>
               <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
-              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:telefone`} rotulo="Telefone" aoMudarSujo={sujoEmLinha.telefone} valor={cliente.telefone}
+              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:telefone`} conversa={fonteApi ? conversa : undefined} rotulo="Telefone" aoMudarSujo={sujoEmLinha.telefone} valor={cliente.telefone}
                 vazio={automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
-                validar={validarTelefone} aoSalvar={(v) => editarDadoCliente(conversa.id, 'telefone', v, agora)} />
+                validar={validarTelefone} aoSalvar={(v, identidade) => editarDadoCliente(conversa.id, 'telefone', v, agora, identidade)} />
             </div>
             <div
               key={`end-${captado.endereco ?? ''}`}
@@ -374,7 +388,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
             >
               <span className={`${css.azulejo} ${css.azAzul}`} aria-hidden="true"><Icone nome="map-pin" tamanho={16} /></span>
               <span className={css.rotuloDado}>Endereço <SeloCaptado quando={captado.endereco} /></span>
-              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:endereco`} rotulo="Endereço" aoMudarSujo={sujoEmLinha.endereco} valor={cliente.endereco}
+              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:endereco`} conversa={fonteApi ? conversa : undefined} rotulo="Endereço" aoMudarSujo={sujoEmLinha.endereco} valor={cliente.endereco}
                 vazio={enderecoPendente ? 'Aguardando confirmação acima'
                   : automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar endereço'}
                 validar={fonteApi ? recusaDoEndereco : undefined}

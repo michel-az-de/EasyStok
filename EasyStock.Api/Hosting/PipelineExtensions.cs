@@ -447,6 +447,7 @@ public static class PipelineExtensions
         // quebra outras mutacoes de pedido contra double-submit, o que e' estritamente
         // seguro (opt-in por header -- sem Idempotency-Key a rota segue como sempre).
         .Add("/api/pedidos")
+        .Add("/api/ocorrencias")
         // S23 (#1137): producao em porcoes cria lote + entrada; retry nao pode duplicar.
         .Add("/api/producao")
         // M2.2 (#1491): producao do dia pelo console (lote + entrada); retry nao pode duplicar.

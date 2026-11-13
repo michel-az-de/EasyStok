@@ -25,7 +25,8 @@ export function ModalCliente({ conversa, aoFechar, children }) {
   const [cadastroSujo, setCadastroSujo] = useState(false)
   const [notaSuja, setNotaSuja] = useState(false)
   const [, definirNota] = useRascunhoDoAjuste(`nota-cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`)
-  const chaveCadastro = `cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`
+  const chaveCadastro = `cadastro-conversa:${conversa.id}`
+  const [, definirRapido] = useRascunhoDoAjuste(`${chaveCadastro}:rapido`)
   const [, definirNome] = useRascunhoDoAjuste(`${chaveCadastro}:nome`)
   const [, definirTelefone] = useRascunhoDoAjuste(`${chaveCadastro}:telefone`)
   const [, definirEndereco] = useRascunhoDoAjuste(`${chaveCadastro}:endereco`)
@@ -68,7 +69,7 @@ export function ModalCliente({ conversa, aoFechar, children }) {
 
   // O Fechar do rodapé passa pela mesma pergunta do Esc e do X (Modal.confirmarDescarte).
   const pedirFechamento = (evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
-  const fechar = () => { definirNota(null); definirNome(null); definirTelefone(null); definirEndereco(null); aoFechar() }
+  const fechar = () => { definirNota(null); definirNome(null); definirTelefone(null); definirEndereco(null); definirRapido(null); aoFechar() }
 
   // Um só caminho para "texto não salvo": confirmarDescarte (a pergunta do Modal), o mesmo do resto do sistema.
   // O segurarFechamento da PR (que travava Esc e fundo sem perguntar) saiu: a pergunta já protege o digitado.

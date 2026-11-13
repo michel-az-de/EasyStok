@@ -52,9 +52,13 @@ public class PreviewSugestaoCompraUseCase(
                     .FirstOrDefault();
             }
 
-            // Custo chain: ItemEstoque.CustoUnitario (mais recente) -> Produto.CustoReferencia
+            // Custo chain: insumo usa o custo da ficha (6 casas, #2363), como o CalculoProducaoCore; o lote guarda só
+            // 2 casas e zera o insumo comprado por grama (#2441). Demais: ItemEstoque.CustoUnitario (mais recente)
+            // -> Produto.CustoReferencia.
             decimal? custo = null;
-            if (lotes is { Count: > 0 })
+            if (produto.EhInsumo && produto.CustoDaFicha is { } custoDaFicha)
+                custo = custoDaFicha;
+            else if (lotes is { Count: > 0 })
                 custo = lotes.First().CustoUnitario.Valor;
             else if (produto.CustoReferencia != null)
                 custo = produto.CustoReferencia.Valor;

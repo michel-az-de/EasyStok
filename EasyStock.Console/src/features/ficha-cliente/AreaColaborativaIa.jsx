@@ -7,6 +7,7 @@ import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import { identidadeDaMontagem, organizarFicha } from '../../aplicacao/montagemFicha'
+import { useContextoAssistencia } from '../../aplicacao/contextoAssistencia'
 import { comandaDaFichaIa, tituloDoBlocoIa } from '../../dominio/montagemFicha'
 import { horaCurta, moeda } from '../../dominio/formato'
 import { conversaEncerrada } from '../../dominio/conversa'
@@ -19,12 +20,13 @@ export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAb
   const [ocupado, setOcupado] = useState(false)
   const executando = useRef(false)
   const atual = useRef(null)
-  const identidade = identidadeDaMontagem()
+  const { identidade, chave } = useContextoAssistencia(selecionada)
   const aberta = !conversaEncerrada(selecionada)
-  const valido = Boolean(fonteApi && aberta && selecionada?.id === conversaId && bloco.identidadeSessao === identidade)
-  useLayoutEffect(() => { atual.current = { conversaId: selecionada?.id, identidade, aberta } }, [selecionada?.id, identidade, aberta])
+  const valido = Boolean(fonteApi && aberta && selecionada?.id === conversaId && bloco.identidadeSessao === identidade && bloco.contextoAssistencia === chave)
+  useLayoutEffect(() => { atual.current = { conversaId: selecionada?.id, identidade, aberta, chave } }, [selecionada?.id, identidade, aberta, chave])
   const aindaAtual = () => valido && atual.current?.conversaId === conversaId
-    && atual.current?.aberta && atual.current?.identidade === bloco.identidadeSessao && identidadeDaMontagem() === bloco.identidadeSessao
+    && atual.current?.aberta && atual.current?.chave === bloco.contextoAssistencia
+    && atual.current?.identidade === bloco.identidadeSessao && identidadeDaMontagem() === bloco.identidadeSessao
   async function agir(callback, ...args) {
     if (!callback || !aindaAtual() || executando.current) return
     executando.current = true; setOcupado(true); setErro(null)
@@ -73,15 +75,15 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
   const pedido = useRef(null)
   const contexto = useRef(null)
   const sequencia = useRef(0)
-  const identidade = identidadeDaMontagem()
+  const { identidade, chave } = useContextoAssistencia(selecionada)
   const aberta = !conversaEncerrada(selecionada)
-  useLayoutEffect(() => { contexto.current = { conversaId, identidade, aberta } }, [conversaId, identidade, aberta])
+  useLayoutEffect(() => { contexto.current = { conversaId, identidade, aberta, chave } }, [conversaId, identidade, aberta, chave])
   useEffect(() => {
     setOrientacao(''); setMontagem(null); setErro(null); setCarregando(false)
     return () => { pedido.current?.abort(); pedido.current = null; sequencia.current++ }
-  }, [conversaId, identidade, aberta])
+  }, [conversaId, identidade, aberta, chave])
   const mesmaConversa = () => contexto.current?.conversaId === conversaId && contexto.current?.identidade === identidade
-    && contexto.current?.aberta && identidadeDaMontagem() === identidade
+    && contexto.current?.aberta && contexto.current?.chave === chave && identidadeDaMontagem() === identidade
   async function organizar(evento) {
     evento.preventDefault()
     if (!fonteApi || selecionada?.id !== conversaId || pedido.current || !mesmaConversa()) return
@@ -89,14 +91,14 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
     pedido.current = controle; setCarregando(true); setErro(null)
     try {
       const proposta = await organizarFicha(conversaId, orientacao, { sinal: controle.signal, identidadeEsperada: identidade })
-      if (!controle.signal.aborted && mesmaConversa() && numero === sequencia.current) setMontagem(proposta)
+      if (!controle.signal.aborted && mesmaConversa() && numero === sequencia.current) setMontagem({ ...proposta, contextoAssistencia: chave })
     } catch (e) {
       if (!controle.signal.aborted && mesmaConversa() && numero === sequencia.current) setErro(e.message || 'Não foi possível organizar a ficha com IA agora.')
     } finally {
       if (numero === sequencia.current) { pedido.current = null; if (!controle.signal.aborted) setCarregando(false) }
     }
   }
-  const visivel = montagem?.conversaId === conversaId && montagem.identidadeSessao === identidade ? montagem : null
+  const visivel = montagem?.conversaId === conversaId && montagem.identidadeSessao === identidade && montagem.contextoAssistencia === chave ? montagem : null
   const movidos = new Set(blocosSoltos)
   if (!aberta) return null
   return <section className={css.area} aria-label="Organizar a ficha com o Assistente">
@@ -115,7 +117,7 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
     {visivel && <><p className={css.data}>Proposta das {horaCurta(visivel.geradoEm)}</p><div className={css.blocos}>
       {visivel.blocos.filter((b) => !movidos.has(`${visivel.geracaoId}:${b.id}`)).map((b) => <BlocoColaborativoIa
         key={`${visivel.geracaoId}:${b.id}`} {...callbacks} conversaId={conversaId}
-        bloco={{ ...b, conversaId, geracaoId: visivel.geracaoId, geradoEm: visivel.geradoEm, identidadeSessao: visivel.identidadeSessao }} />)}
+        bloco={{ ...b, conversaId, geracaoId: visivel.geracaoId, geradoEm: visivel.geradoEm, identidadeSessao: visivel.identidadeSessao, contextoAssistencia: chave }} />)}
     </div></>}
   </section>
 }

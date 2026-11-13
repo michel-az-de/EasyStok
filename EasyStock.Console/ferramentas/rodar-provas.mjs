@@ -17,29 +17,13 @@ import { cpus } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const EXCECOES = new Map([
-  ['prova-1653-experiencia-navegador.mjs', '#2410: espera elemento que a tela atual não tem (timeout no waitFor)'],
-  ['prova-1653-teclado-navegador.mjs', '#2410: fixa a URL em 127.0.0.1:5199 e ignora CONSOLE_URL'],
-  ['prova-1685-sinal-navegador.mjs', '#2410: espera elemento que a tela atual não tem (timeout no waitFor)'],
-  ['prova-1693-frete-api-real.mjs', '#2410: lê .build/logistica-browser.json gerado por outra prova'],
-  ['prova-1693-frete-navegador.mjs', '#2410: asserção velha (a tela mudou e a prova não acompanhou)'],
-  ['prova-1728-teste-email-navegador.mjs', '#2410: espera elemento que a tela atual não tem (timeout)'],
-  ['prova-1733-conferencia-navegador.mjs', '#2410: espera elemento que a tela atual não tem (timeout no waitFor)'],
-  ['prova-1738-pedido-navegador.mjs', '#2410: espera elemento que a tela atual não tem (timeout no waitFor)'],
-  ['prova-1739-pedido-final.mjs', '#2410: lê evidência em .build/pedido-final gerada por outra execução'],
-  ['prova-1742-chat-recepcao.mjs', '#2410: exige variável de ambiente de pasta de evidência sem padrão (paths[0] undefined)'],
-  ['prova-1743-tamanhos-navegador.mjs', '#2410: lê .build/1743/menu-publico-auditoria.json gerado por outra prova'],
-  ['prova-1747-acerto-cancelado.mjs', '#2410: lê evidência em .build/acerto-cancelado gerada por outra execução'],
-  ['prova-1748-chat-comanda.mjs', '#2410: exige variável de ambiente de pasta de evidência sem padrão (paths[0] undefined)'],
-  ['prova-1749-sinal-navegador.mjs', '#2410: espera elemento que a tela atual não tem (timeout no waitFor)'],
-  ['prova-1841-cardapio-acervo.mjs', '#2410: chama uma API real (fetch failed sem servidor)'],
-  ['prova-1846-seletor-acervo.mjs', '#2410: chama uma API real (fetch failed sem servidor)'],
-  ['prova-1847-nota-resumo.mjs', '#2410: clica em elemento que a tela atual não tem (timeout)'],
-  ['prova-2134-assumir-ao-responder.mjs', '#2410: não acha o campo "Mensagem para o cliente" no console do modo API'],
-  ['prova-2145-icones-lucide.mjs', '#2410: exige dist/ (npm run build) antes, e o build roda depois das provas'],
-  ['prova-2178-editor-nota.mjs', '#2410: o Vite próprio dela não resolve react/jsx-dev-runtime a partir da pasta temporária'],
-  ['prova-2185-efeitos-tela.mjs', '#2410: não acha o campo "Mensagem para o cliente" no console do modo API'],
-  ['prova-2185-menu-de-acoes.mjs', '#2410: não acha a região "Quem responde esta conversa" no console do modo API'],
-  ['prova-hub-navegador.mjs', '#2410: asserção velha de valor (espera 300,03)'],
+  ['prova-1693-frete-api-real.mjs', 'manual (#2437): lê .build/logistica-browser.json gerado por outra prova'],
+  ['prova-1739-pedido-final.mjs', 'manual (#2437): confere evidência de .build/pedido-final gerada por outra execução'],
+  ['prova-1742-chat-recepcao.mjs', 'manual (#2437): precisa de EVIDENCIAS_CHAT_RECEPCAO e do SITE_URL de uma vitrine no ar'],
+  ['prova-1747-acerto-cancelado.mjs', 'manual (#2437): confere evidência de .build/acerto-cancelado gerada por outra execução'],
+  ['prova-1748-chat-comanda.mjs', 'manual (#2437): precisa de EVIDENCIAS_CHAT_COMANDA e do SITE_URL de uma vitrine no ar'],
+  ['prova-1841-cardapio-acervo.mjs', 'manual (#2437): chama a API de homologação (HOMOLOGACAO_API_URL)'],
+  ['prova-1846-seletor-acervo.mjs', 'manual (#2437): chama a API de homologação (HOMOLOGACAO_API_URL)'],
   ['prova-1693-dez-cenarios-api-real.mjs', 'lê .build/logistica-browser.json gerado por outra prova de navegador (Playwright e API real)'],
   ['prova-1712-comanda-operador.mjs', 'precisa de DOM (document) que o Node puro não tem (já falha no master)'],
   ['prova-1753-usuarios.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
@@ -48,6 +32,16 @@ const EXCECOES = new Map([
   ['prova-1920-tela-real.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
   ['prova-2096-avisos-operacao.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
   ['prova-2256-onda1-ux.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
+  ['prova-2395-api-real.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
+  ['prova-2395-cadastros-concorrencia.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
+  ['prova-2395-operacao-complementos.mjs', 'opt-in: Playwright e fixture R4 real final; requer R4_EXECUTAR_COMPLEMENTOS=1 e grava operações'],
+  ['prova-2395-textos-navegador.mjs', 'opt-in: R4_EXECUTAR_TEXTOS=1, Playwright e fixture API real; grava notas sintéticas'],
+  ['prova-2395-desfazer-conta-api-real.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava contas bancárias'],
+  ['prova-2395-entregas-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera entregas da jornada de teste'],
+  ['prova-2395-excecoes-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera a jornada de teste'],
+  ['prova-2395-jornada-api.mjs', 'opt-in: fixture R4 com API/PostgreSQL reais; cria pedidos e altera pagamentos e estoque'],
+  ['prova-2395-jornada-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera a jornada de teste'],
+  ['prova-2395-mensagem-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; envia mensagens ao transporte de teste'],
   ['prova-bloqueio-preparo.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
   ['prova-contadores-canal.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
   ['prova-producao-ia-navegador.mjs', 'precisa de servidor Vite no ar na porta 5187 e navegador (já falha no master)'],
@@ -78,8 +72,13 @@ const deNavegador = aRodar.filter((nome) => readFileSync(`${pasta}${nome}`, 'utf
 // Sem o Chromium, fora do CI, as de navegador são puladas com aviso; no CI (CI=true) a falta derruba o script.
 const semNavegador = deNavegador.length > 0 && !chromiumInstalado()
 if (semNavegador && process.env.CI) throw new Error('Chromium ausente: rode `npx playwright install --with-deps chromium` antes das provas.')
+// O createServer do Vite grava NODE_ENV=development no processo; o filho que compila o próprio harness com
+// build() herdaria isso e geraria JSX de desenvolvimento contra o React de produção (#2437).
+const nodeEnvOriginal = process.env.NODE_ENV
 const vite = deNavegador.length > 0 && !semNavegador ? await subirVite() : null
-const ambiente = vite ? { ...process.env, CONSOLE_URL: vite.url } : process.env
+const ambiente = vite ? { ...process.env, CONSOLE_URL: vite.url, CONSOLE_TEST_URL: vite.url } : { ...process.env }
+if (nodeEnvOriginal === undefined) delete ambiente.NODE_ENV
+else ambiente.NODE_ENV = nodeEnvOriginal
 const puladas = semNavegador ? deNavegador : []
 
 function chromiumInstalado() {

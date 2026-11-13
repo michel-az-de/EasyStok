@@ -57,6 +57,8 @@ const raizReact=createRoot(document.getElementById('root'));raizReact.render(<Pr
 window.mostrarCadastroReal=()=>{window.gravacoesCadastro=[];window.gravacoesCampos=[];raizReact.render(<ProvaCadastro/>)};`
 const arquivoEntrada = join(tmpdir(), `easystok-prova-2178-${process.pid}.jsx`)
 await writeFile(arquivoEntrada, entrada)
+// #2437: o runner herda NODE_ENV=development do Vite dele; o plugin React geraria jsxDEV, que o bundle de produção não tem.
+process.env.NODE_ENV = 'production'
 let compilado
 try {
   compilado = await build({ root: raiz, configFile: false, logLevel: 'silent',
