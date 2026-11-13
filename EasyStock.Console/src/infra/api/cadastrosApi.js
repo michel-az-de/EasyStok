@@ -1,6 +1,6 @@
 import { chamarApi } from './cliente'
 import { identidadeDaSessao, lerSessao } from './sessao'
-import { corpoCliente, corpoFornecedor, corpoProduto, termoBuscaCadastro } from '../../dominio/cadastros'
+import { chaveDeCriacaoCadastro, corpoCliente, corpoFornecedor, corpoProduto, termoBuscaCadastro } from '../../dominio/cadastros'
 
 const rotas = { clientes: '/api/clientes', produtos: '/api/produtos', fornecedores: '/api/fornecedores', bancos: '/api/cadastros/contas-bancarias', pagamentos: '/api/cadastros/metodos-pagamento', modelos: '/api/notificacoes/templates', etiquetas: '/api/etiquetas/templates' }
 export const contextoCadastro = () => { const sessao = lerSessao(); return { empresaId: sessao?.empresa?.id, identidade: identidadeDaSessao(sessao) } }
@@ -40,7 +40,8 @@ export async function salvarCadastro(tela, dados, contexto) {
     corpo = id ? { novoAssunto: dados.assuntoTemplate, novoCorpo: dados.corpoTemplate }
       : { codigo: dados.codigo, nome: dados.nome, canal: dados.canal, tipoEvento: dados.tipoEvento, assuntoTemplate: dados.assuntoTemplate ?? '', corpoTemplate: dados.corpoTemplate, idioma: 'pt-BR' }
   }
-  return chamarApi(`${rotas[tela]}${id ? `/${encodeURIComponent(id)}` : ''}`, { ...opcoes(contexto), metodo, corpo })
+  const chave = chaveDeCriacaoCadastro(tela, dados)
+  return chamarApi(`${rotas[tela]}${id ? `/${encodeURIComponent(id)}` : ''}`, { ...opcoes(contexto), metodo, corpo, ...(chave ? { chave } : {}) })
 }
 export const ativarMetodoCadastro = (metodo, ativo, requestId, contexto) => chamarApi(`${rotas.pagamentos}/${encodeURIComponent(metodo.codigo)}`, {
   ...opcoes(contexto), metodo: 'PUT', corpo: { ativo, revisao: metodo.revisao, requestId },

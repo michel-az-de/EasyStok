@@ -459,6 +459,12 @@ public static class PipelineExtensions
         .Add("/api/atendimento/conversas")
         // #1540: sangria ou suprimento repetido depois de resposta perdida virava dois lançamentos.
         .Add("/api/caixa/movimentos")
+        // #2462: cadastro criado num timeout e salvo de novo virava dois. O console manda a chave ao criar;
+        // as outras ações sob estes prefixos, sem header, seguem como sempre.
+        .Add("/api/clientes")
+        .Add("/api/fornecedores")
+        .Add("/api/produtos")
+        .Add("/api/notificacoes/templates")
         // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.
         .Add("/api/impressao");
 }

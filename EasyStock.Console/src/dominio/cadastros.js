@@ -17,6 +17,20 @@ export const mudarDadosCadastro = (tela, dados, campo, valor) => ({ ...dados, [c
   ...(tela === 'produtos' && campo === 'categoriaId' && valor !== dados.categoriaId ? { subcategoriaId: null } : {}) })
 export const abrirEdicaoCadastro = (tela, item, novaOperacao = () => crypto.randomUUID()) =>
   tela === 'bancos' ? { ...item, requestId: novaOperacao() } : item
+// #2462 (M5): criar cadastro manda o `requestId` da abertura como Idempotency-Key. Repetir depois de um timeout
+// devolve o cadastro já gravado; se os dados mudaram no meio (422), a dona confere a lista antes de repetir.
+const CRIACAO_IDEMPOTENTE = ['clientes', 'fornecedores', 'produtos', 'modelos']
+export const chaveDeCriacaoCadastro = (tela, dados) =>
+  CRIACAO_IDEMPOTENTE.includes(tela) && !(dados.id ?? dados.produtoId) ? dados.requestId ?? null : null
+export const bloqueiaRepeticaoDoCadastro = (tela, dados, erro) => {
+  if (dados.id ?? dados.produtoId) return false
+  if (erro?.codigo === 'IDEMPOTENCY_PAYLOAD_MISMATCH') return true
+  const semResposta = erro?.status === 0 || erro?.status >= 500
+  return semResposta && tela !== 'bancos' && !chaveDeCriacaoCadastro(tela, dados)
+}
+export const MENSAGEM_CADASTRO_REPETIDO = 'Este cadastro já foi enviado com outros dados. Confira a lista antes de salvar de novo.'
+export const novoModeloCadastro = (novaOperacao = () => crypto.randomUUID()) =>
+  ({ nome: '', codigo: '', canal: 'Email', tipoEvento: 'PedidoEntregue', assuntoTemplate: '', corpoTemplate: '', requestId: novaOperacao() })
 export const relacionamentoCadastro = (cliente) => !Number.isInteger(cliente.orderCount) || cliente.orderCount < 0 ? 'Histórico não informado' : cliente.orderCount === 0 ? 'Lead' : 'Cliente'
 
 export function corpoCliente(dados, empresaId) {
