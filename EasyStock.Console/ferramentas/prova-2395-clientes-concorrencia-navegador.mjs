@@ -54,7 +54,7 @@ try {
   await ma.getByRole('textbox', { name: 'E-mail', exact: true }).fill('a@fixture.test')
   await mb.getByRole('textbox', { name: 'Telefone', exact: true }).fill('11999998888')
   await salvar(ma); await salvar(mb)
-  assert.equal(pessoas.get('A').email, 'a@fixture.test'); assert.equal(pessoas.get('B').telefone, '+5511999998888') // #2457: a tela digita com máscara, a API recebe E.164
+  assert.equal(pessoas.get('A').email, 'a@fixture.test'); assert.equal(pessoas.get('B').telefone, '11999998888')
   const pessoaB = structuredClone(pessoas.get('B'))
   ma = await abrir(a, 'Pessoa A'); mb = await abrir(b, 'Pessoa A')
   await ma.getByRole('textbox', { name: 'Telefone', exact: true }).fill('11977776666')
@@ -82,7 +82,7 @@ try {
   assert.equal(await mb.getByRole('textbox', { name: 'E-mail', exact: true }).inputValue(), 'posterior@fixture.test')
   await salvar(mb)
   assert.equal(pessoas.get('A').nome, 'Pessoa A digitada')
-  assert.equal(pessoas.get('A').telefone, '+5511977776666')
+  assert.equal(pessoas.get('A').telefone, '11977776666')
   assert.equal(pessoas.get('A').email, 'posterior@fixture.test')
   assert.deepEqual(pessoas.get('B'), pessoaB)
   assert.deepEqual(erros, [])

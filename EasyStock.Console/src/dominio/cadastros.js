@@ -45,7 +45,8 @@ export function corpoProduto(dados, empresaId) {
     caracteristicas: null, embalagens: null, variacoes: null }
 }
 
-// #2457 (U2): a tela mostra "(11) 98225-4398" e a API continua recebendo o E.164 ("+5511982254398") que ela grava.
+// #2457 (U2): a tela mostra "(11) 98225-4398"; a API recebe só os dígitos, como recebia antes da máscara. O DDI
+// nunca é inventado: um telefone gravado sem "+" volta sem "+" (revisão da #2460). Com "+", segue E.164.
 // Número de outro país (DDI que não é 55) fica como foi digitado; o que não parece telefone vai cru e a API diz o motivo.
 const BRASIL_COM_DDI = /^55\d{10,11}$/
 export function telefoneNaTela(valor) {
@@ -62,8 +63,7 @@ export function telefoneParaApi(valor) {
   if (!bruto) return null
   const digitos = bruto.replace(/\D/g, '')
   if (bruto.startsWith('+')) return `+${digitos}`
-  if (/^\d{10,11}$/.test(digitos)) return `+55${digitos}`
-  return BRASIL_COM_DDI.test(digitos) ? `+${digitos}` : bruto
+  return digitos && /^[\d\s().-]+$/.test(bruto) ? digitos : bruto
 }
 
 // #2457 (U3): o limite de cada coluna vira erro no próprio campo, com o tamanho atual. `maxLength` cortava o
