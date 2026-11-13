@@ -393,6 +393,24 @@ public class CaixaUseCasesTests
             .WithMessage("*maior que zero*");
     }
 
+    // #2481: a loja vem do corpo do lançamento. Loja de outra empresa ou inexistente vira 400, não movimento com
+    // loja alheia nem FK (500) no insert, como já faz a abertura (#2343).
+    [Fact]
+    public async Task RegistrarMovimento_DeveLancarValidation_QuandoLojaNaoEhDaEmpresa()
+    {
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns((EasyStock.Domain.Entities.Loja?)null);
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>(), lojas);
+
+        var act = () => useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(Guid.NewGuid(), "entrada", 50m, LojaId: Guid.NewGuid()));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*encontrada*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<EasyStock.Domain.Entities.MovimentoCaixa>());
+    }
+
     [Fact]
     public async Task RegistrarMovimento_DeveLancarValidation_QuandoCaixaJaFechado()
     {
