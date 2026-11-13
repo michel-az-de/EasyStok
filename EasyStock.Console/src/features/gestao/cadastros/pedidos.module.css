@@ -1,0 +1,57 @@
+/* #2478: Pedidos em Cadastros. A base (painel, superfície, lista, rodapé) vem de cadastros.module.css. */
+.filtros { display: grid; grid-template-columns: minmax(200px, 1fr) repeat(3, minmax(150px, 190px)) auto; gap: var(--e-3); align-items: end; padding: var(--e-4); }
+.tabela th:first-child { width: 26%; }
+.tabela td > strong { display: block; font-variant-numeric: tabular-nums; }
+.tabela[aria-busy='true'] tbody { opacity: 0.6; transition: opacity var(--dur-curta) var(--ease-padrao); }
+.valor { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.falta { color: var(--alerta); font-weight: 600; }
+/* O saldo é a pergunta da dona: vence o cinza de `.lista td small` da base. */
+.tabela td small.falta { color: var(--alerta); font-weight: 600; }
+.tabela .soCelular { display: none; }
+
+.detalhe { display: grid; gap: var(--e-5); min-width: 0; color: var(--tinta); }
+.detalhe h3 { margin: 0 0 var(--e-3); font-size: var(--t-titulo); }
+.detalhe h3 small { color: var(--tinta-2); font-weight: 400; font-size: var(--t-apoio); }
+.resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: var(--e-4); margin: 0; padding: var(--e-4); border-radius: var(--r-2); background: var(--elevado); }
+.resumo dt { color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; margin-bottom: var(--e-1); }
+.resumo dd { margin: 0; overflow-wrap: anywhere; }
+.resumo small, .itens small, .lista small, .historico small { display: block; margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-micro); }
+.itens { width: 100%; border-collapse: collapse; font-size: var(--t-apoio); }
+.itens th { padding: var(--e-2) var(--e-3); text-align: left; color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; background: var(--elevado); }
+.itens th.valor { text-align: right; }
+.itens td { padding: var(--e-3); border-top: 1px solid var(--linha); vertical-align: top; overflow-wrap: anywhere; }
+.itens td:first-child { width: 4.5rem; font-variant-numeric: tabular-nums; }
+.totais { display: grid; justify-content: end; gap: var(--e-2); margin: var(--e-4) 0 0; }
+.totais > div { display: flex; justify-content: space-between; gap: var(--e-6); min-width: 240px; }
+.totais dt { color: var(--tinta-2); }
+.totais dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.totais .falta dt, .totais .falta dd { color: var(--alerta); }
+.totais .pago dd { color: var(--sucesso); }
+.lista { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+.lista li { display: flex; justify-content: space-between; align-items: center; gap: var(--e-3); padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-1); }
+.lista li > span { min-width: 0; overflow-wrap: anywhere; }
+.apoio { margin: 0; color: var(--tinta-2); }
+.observacoes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--e-3); border-radius: var(--r-1); background: var(--preenchimento); }
+.historico { border-top: 1px solid var(--linha); padding-top: var(--e-3); }
+.historico summary { cursor: pointer; min-height: var(--toque); display: flex; align-items: center; font-weight: 600; }
+.historico ol { margin: var(--e-3) 0 0; padding-left: var(--e-5); display: grid; gap: var(--e-3); }
+.historico li { overflow-wrap: anywhere; }
+
+@media (max-width: 1100px) {
+  .filtros { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .filtros > :first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  /* Busca na linha toda; período, situação, ordem e Atualizar dois a dois, para a lista aparecer sem rolar. */
+  .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-2); padding: var(--e-3); }
+  /* Pedido (com cliente e situação embaixo), Total e Abrir: as colunas Cliente e Situação saem. */
+  .tabela table { table-layout: fixed; }
+  .tabela th:first-child { width: auto; }
+  .tabela th:nth-child(2), .tabela td:nth-child(2), .tabela th:nth-child(3), .tabela td:nth-child(3) { display: none; }
+  .tabela th:nth-child(4) { width: 6.5rem; }
+  .tabela th:last-child { width: 5.75rem; }
+  .tabela .soCelular { display: grid; gap: var(--e-1); margin-top: var(--e-1); }
+  .tabela .soCelular small:first-child { color: var(--tinta); }
+  .totais { justify-content: stretch; }
+  .totais > div { min-width: 0; }
+}

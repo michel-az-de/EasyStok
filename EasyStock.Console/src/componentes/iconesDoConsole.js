@@ -34,6 +34,7 @@ const MARCA_DO_CONSOLE = {
 const ICONE_DO_CONSOLE = {
   cadastros: 'usuarios',
   'cadastros/clientes': 'usuarios',
+  'cadastros/pedidos': 'shopping-cart',
   'cadastros/produtos': 'package',
   'cadastros/fornecedores': 'house',
   'cadastros/bancos': 'dollar-sign',

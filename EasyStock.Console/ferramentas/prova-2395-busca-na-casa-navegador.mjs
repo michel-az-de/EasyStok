@@ -23,7 +23,7 @@ async function preparar(restrito = false) {
     chamadas.push({ path, query: url.search, metodo: req.method(), restrito })
     assert.ok(req.method() === 'GET' || path.endsWith('/marcar-lida'), `Escrita inesperada: ${path}`)
     const ok = data => route.fulfill({ json: { data } })
-    if (path === '/api/auth/me/modulos') return ok({ modulos: (restrito ? ['cozinha'] : ['atendimento', 'cadastros', 'cardapio']).map(id => ({ id, liberado: true })), acoes: restrito ? {} : { verCadastrosProdutos: true, editarCadastrosProdutos: true } })
+    if (path === '/api/auth/me/modulos') return ok({ modulos: (restrito ? ['cozinha'] : ['atendimento', 'cadastros', 'cardapio']).map(id => ({ id, liberado: true })), acoes: restrito ? {} : { verCadastrosProdutos: true, editarCadastrosProdutos: true, verPedidos: true } })
     if (path === '/api/clientes/buscar') {
       if (['lenta', 'Leads'].includes(url.searchParams.get('termo'))) await new Promise(r => setTimeout(r, 700))
       return ok(url.searchParams.get('termo') === 'nada' ? [] : [pessoa])
@@ -90,9 +90,11 @@ try {
   assert.equal(await produtoMovel.getByRole('textbox', { name: 'Nome', exact: true }).inputValue(), produto.nome)
   await produtoMovel.getByRole('button', { name: 'Cancelar', exact: true }).tap()
   await dialogo.getByRole('combobox').focus()
-  await page.getByRole('option').filter({ hasText: 'Pedido 42' }).tap()
-  const detalhe = page.getByRole('dialog', { name: 'Pedido 42', exact: true }); await detalhe.waitFor()
-  assert.match(await detalhe.innerText(), /Lasanha/); assert.match(await detalhe.innerText(), /ID pedido/)
+  await page.getByRole('option').filter({ hasText: 'Pedido Nº 042' }).tap()
+  // #2478: o detalhe é o mesmo da tela Pedidos de Cadastros (itens, totais e saldo), sem o atalho de conversa fora do Atendimento.
+  const detalhe = page.getByRole('dialog', { name: 'Pedido Nº 042', exact: true }); await detalhe.waitFor()
+  assert.match(await detalhe.innerText(), /Lasanha/); assert.match(await detalhe.innerText(), /Falta receber/)
+  assert.equal(await detalhe.getByRole('button', { name: 'Abrir conversa' }).count(), 0)
   await detalhe.getByRole('button', { name: /Fechar/ }).first().tap()
   await buscar('falha')
   await dialogo.getByRole('alert').filter({ hasText: 'Pedidos' }).waitFor()

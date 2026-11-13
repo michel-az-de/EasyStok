@@ -56,6 +56,7 @@ import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
 import { BuscaNaCasa } from '../features/busca/BuscaNaCasa'
 import { EditorCadastro } from '../features/gestao/cadastros/EditorCadastro'
+import { DetalhePedido } from '../features/gestao/cadastros/DetalhePedido'
 import { PainelAgora } from '../features/agora/PainelAgora'
 import { avisoDeResponder, filasDoAgora } from '../dominio/agora'
 import { hashDoModulo } from '../dominio/modulos'
@@ -710,7 +711,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
       {tela}{confirmacaoSaida}
-      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={props => <EditorCadastro {...props} />} aoAbrirConversa={resumo => {
+      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={props => <EditorCadastro {...props} />} renderizarPedido={props => <DetalhePedido {...props} />} aoAbrirConversa={resumo => {
         memoriaDoLaco.dono = sessao.usuario?.id ?? null
         memoriaDoLaco.resumos.set(resumo.id, resumo)
         guardarConversaEncontrada(resumo)

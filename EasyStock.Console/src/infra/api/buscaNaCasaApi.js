@@ -15,6 +15,5 @@ export async function buscarNaCasa(termo, acesso, contexto, sinal) {
   }
 }
 
-export const obterPedidoDaBusca = (id, contexto, sinal) => chamarApi(`/api/pedidos/${encodeURIComponent(id)}?empresaId=${contexto.empresaId}`, {
-  sinal, identidadeEsperada: contexto.identidade, prazoComCancelamento: true,
-})
+// #2478: um só lugar lê o detalhe do pedido (tela Pedidos de Cadastros e Busca na Casa).
+export { obterPedido as obterPedidoDaBusca } from './pedidosCadastroApi'

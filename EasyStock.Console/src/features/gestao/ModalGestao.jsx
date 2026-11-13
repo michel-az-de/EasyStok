@@ -15,6 +15,7 @@ import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { AbaAvisos } from './avisos/AbaAvisos'
 import { AbaImpressao } from './impressao/AbaImpressao'
 import { PainelCadastros } from './cadastros/PainelCadastros'
+import { PainelPedidos } from './cadastros/PainelPedidos'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
 import { AbaUsuarios } from './usuarios/AbaUsuarios'
@@ -305,6 +306,7 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     perdas: <AbaPerdasApi />,
   }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento, AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao])
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
+  if (fonteApi && aba === 'cadastros-pedidos') return <PainelPedidos key={aba} aoAbrirConversa={aoAbrirConversa} />
   if (fonteApi && aba?.startsWith('cadastros-')) return <PainelCadastros key={aba} tela={aba.slice('cadastros-'.length)} respostas={<AbaRespostas />} impressao={<AbaImpressao />} aoAbrirConversa={aoAbrirConversa} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />

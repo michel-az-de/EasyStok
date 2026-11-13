@@ -1,8 +1,22 @@
 import assert from 'node:assert/strict'
-import { categoriasDaBusca, resultadoDaBusca, requisicoesDaBusca } from '../src/dominio/buscaNaCasa.js'
+import { registerHooks } from 'node:module'
 
-const acesso = { permite: id => ['cadastros', 'atendimento'].includes(id), acoes: { verCadastrosProdutos: true } }
+// #2478: a busca usa o domínio de pedidos, que importa sem extensão (padrão do Vite); o Node puro precisa do `.js`.
+registerHooks({
+  resolve(especificador, contexto, proximo) {
+    if (especificador.startsWith('.') && !/\.[a-z]+$/i.test(especificador)) {
+      try { return proximo(especificador + '.js', contexto) } catch { /* cai no original */ }
+    }
+    return proximo(especificador, contexto)
+  },
+})
+const { categoriasDaBusca, resultadoDaBusca, requisicoesDaBusca } = await import('../src/dominio/buscaNaCasa.js')
+
+const acesso = { permite: id => ['cadastros', 'atendimento'].includes(id), acoes: { verCadastrosProdutos: true, verPedidos: true } }
 assert.deepEqual(categoriasDaBusca(acesso), ['clientes', 'conversas', 'pedidos', 'produtos'])
+// #2478: sem `verPedidos` (Visualizador) a busca não pede pedidos, que a API negaria com 403.
+assert.deepEqual(categoriasDaBusca({ ...acesso, acoes: { verCadastrosProdutos: true } }), ['clientes', 'conversas', 'produtos'])
+assert.equal(resultadoDaBusca('pedidos', { id: 'p', status: 'saiu_para_entrega' }).descricao.includes('saiu_para_entrega'), false, 'situação legível, não o código')
 assert.deepEqual(categoriasDaBusca({ permite: () => false, acoes: {} }), [])
 assert.deepEqual(categoriasDaBusca({ permite: id => id === 'cadastros', acoes: {} }), ['clientes'])
 const consultas = requisicoesDaBusca(' +55 (11) 99999-1234 ', acesso, 'empresa')

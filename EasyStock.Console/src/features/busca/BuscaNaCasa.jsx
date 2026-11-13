@@ -6,10 +6,9 @@ import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { LIMITE_BUSCA_CASA, nomesDaBusca } from '../../dominio/buscaNaCasa'
 import { buscarDestinosDoConsole, modulosDoHall } from '../../dominio/modulos'
-import { moeda } from '../../dominio/formato'
 import css from './busca.module.css'
 
-export function BuscaNaCasa({ aoFechar, aoAbrirConversa, renderizarCadastro }) {
+export function BuscaNaCasa({ aoFechar, aoAbrirConversa, renderizarCadastro, renderizarPedido }) {
   const acesso = useAcessoModulos()
   const [contexto] = useState(contextoDaBusca)
   const [termo, mudar] = useState('')
@@ -72,12 +71,7 @@ export function BuscaNaCasa({ aoFechar, aoAbrirConversa, renderizarCadastro }) {
     </Modal>
     {editor && renderizarCadastro({ tela: editor.tela, editor, aoMudar: editar, contexto, podeEditar: editor.tela === 'clientes' || acoes.editarCadastrosProdutos === true,
       aoFechar: () => editar(null), aoSalvo: () => { editar(null); tentar(t => t + 1) } })}
-    {pedido && <Modal titulo={`Pedido${pedido.pedido.numeroDoDia ? ` ${pedido.pedido.numeroDoDia}` : ''}`} aoFechar={() => mostrarPedido(null)} largura="md">
-      <div className={css.detalhe}><h3>{pedido.pedido.clienteNome || 'Sem nome'}</h3><p>{pedido.pedido.clienteTelefone}</p><p>ID {pedido.pedido.id}</p><p>Situação: {pedido.pedido.status}</p>
-        <ul>{pedido.itens.map(item => <li key={item.id}>{item.quantidade} × {item.nome} · {moeda(item.subtotal)}</li>)}</ul>
-        <p>Total: {moeda(pedido.pedido.total)} · Recebido: {moeda(pedido.pedido.totalPago)}</p>
-        {pedido.pedido.observacoes && <p>{pedido.pedido.observacoes}</p>}
-      </div>
-    </Modal>}
+    {/* #2478: o mesmo detalhe da tela Pedidos de Cadastros, injetado pelo App. */}
+    {pedido && renderizarPedido({ dados: pedido, aoFechar: () => mostrarPedido(null) })}
   </>
 }
