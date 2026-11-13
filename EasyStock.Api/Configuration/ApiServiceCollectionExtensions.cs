@@ -442,6 +442,9 @@ public static class ApiServiceCollectionExtensions
             return services;
         var otlpEndpoint = new Uri(otlpConfigured);
 
+        // #2440: a exceção que o Npgsql grava no span sai redigida (o evento não passa pelo SpanQueRedige).
+        ExcecaoDoSpanQueRedige.Instalar("Npgsql");
+
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService("EasyStock.Api"))
             .WithTracing(tracing =>

@@ -60,4 +60,59 @@ public class SpanQueRedigeTests
 
         span.DisplayName.Should().NotContain("12345678909").And.Contain(SensitivePatterns.RedactedToken);
     }
+
+    // #2440: o Npgsql grava a exceção no span (AddException + SetStatus) com a mensagem crua, e o RecordException
+    // desligado só vale para o AspNetCore e o HttpClient.
+    [Fact]
+    public void OnEnd_RedigeADescricaoDoStatus()
+    {
+        using var span = NovoSpan();
+        span.SetStatus(ActivityStatusCode.Error, "falha para o cliente 11987654321");
+        span.Stop();
+
+        new SpanQueRedige().OnEnd(span);
+
+        span.Status.Should().Be(ActivityStatusCode.Error);
+        span.StatusDescription.Should().NotContain("11987654321").And.Contain(SensitivePatterns.RedactedToken);
+    }
+
+    [Fact]
+    public void ExcecaoDoNpgsql_SaiRedigidaNoEventoENoStatus()
+    {
+        ExcecaoDoSpanQueRedige.Instalar("Npgsql");
+        using var fonte = new ActivitySource("Npgsql");
+        // Quem decide ligar o span é o OpenTelemetry; no teste, um listener de amostragem faz esse papel.
+        using var amostra = new ActivityListener
+        {
+            ShouldListenTo = f => f.Name == "Npgsql",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+        };
+        ActivitySource.AddActivityListener(amostra);
+
+        using var span = fonte.StartActivity("SELECT")!;
+        var erro = new InvalidOperationException("cliente 11987654321");
+        span.AddException(erro);
+        span.SetStatus(ActivityStatusCode.Error, erro.Message);
+        span.Stop();
+
+        new SpanQueRedige().OnEnd(span);
+
+        var evento = span.Events.Single(e => e.Name == "exception");
+        var tags = evento.Tags.ToDictionary(t => t.Key, t => t.Value?.ToString());
+        tags["exception.message"].Should().NotContain("11987654321").And.Contain(SensitivePatterns.RedactedToken);
+        tags["exception.stacktrace"].Should().NotContain("11987654321");
+        tags["exception.type"].Should().Be(typeof(InvalidOperationException).FullName);
+        span.StatusDescription.Should().NotContain("11987654321");
+    }
+
+    [Fact]
+    public void ListenerDeExcecao_NaoLigaSpanSozinho()
+    {
+        ExcecaoDoSpanQueRedige.Instalar("Npgsql");
+        using var fonte = new ActivitySource("Npgsql");
+
+        using var span = fonte.StartActivity("SELECT");
+
+        span.Should().BeNull();
+    }
 }

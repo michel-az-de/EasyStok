@@ -26,6 +26,9 @@ public static class TelemetrySetup
 
         var otlp = new Uri(endpoint);
 
+        // #2440: a exceção que o Npgsql grava no span sai redigida (o evento não passa pelo SpanQueRedige).
+        ExcecaoDoSpanQueRedige.Instalar("Npgsql");
+
         builder.Services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(serviceName))
             .WithTracing(tracing => tracing
