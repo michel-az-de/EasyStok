@@ -8,7 +8,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
-import { EVENTOS_MODELO, NOMES_CANAIS_MODELO } from '../../../dominio/cadastros'
+import { EVENTOS_MODELO, MENSAGEM_CADASTRO_REPETIDO, NOMES_CANAIS_MODELO, novoModeloCadastro } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
 const CANAIS = [{ valor: '', rotulo: 'Todos os canais' }, { valor: 'Email', rotulo: 'E-mail' }, { valor: 'Sms', rotulo: 'SMS' }, { valor: 'WhatsApp', rotulo: 'WhatsApp' }]
@@ -54,7 +54,7 @@ function ListaModelos({ contexto }) {
     try { await aprovarModeloCadastro(item.id, contexto); avisar('Modelo aprovado na loja.'); consulta.recarregar() }
     catch (e) { falhar(e.message) } finally { emVoo.current = false; ocupar(false) }
   }
-  const novo = () => { const dados = { nome: '', codigo: '', canal: 'Email', tipoEvento: 'PedidoEntregue', assuntoTemplate: '', corpoTemplate: '' }; mudar({ editor: { dados, inicial: dados } }) }
+  const novo = () => { const dados = novoModeloCadastro(); mudar({ editor: { dados, inicial: dados } }) }
   return <div className={css.painel}>
     <div className={css.barra}><Combobox rotulo="Canal" valor={memoria.filtro} opcoes={CANAIS} aoMudar={filtro => mudar({ filtro, pagina: 1 })} /><Botao variante="primario" icone="mais" onClick={novo}>Novo modelo</Botao></div>
     {sucesso && <p role="status" className={css.sucesso}>{sucesso}</p>}
@@ -81,7 +81,7 @@ function EditorModelo({ contexto, editor, aoMudar, aoFechar, aoSalvo }) {
     try {
       if (salvar) { await salvarCadastro('modelos', dados, contexto); aoSalvo() }
       else mostrarPrevia(await previaModeloCadastro(dados, contexto))
-    } catch (e) { falhar(e.message) } finally { emVoo.current = false; ocupar(false) }
+    } catch (e) { falhar(e.codigo === 'IDEMPOTENCY_PAYLOAD_MISMATCH' ? MENSAGEM_CADASTRO_REPETIDO : e.message) } finally { emVoo.current = false; ocupar(false) }
   }
   return <Modal titulo={dados.id ? 'Editar modelo' : 'Novo modelo'} largura="lg" focarCampo aoFechar={ocupado ? undefined : aoFechar} segurarFechamento={ocupado} confirmarDescarte={JSON.stringify(dados) !== JSON.stringify(inicial)}
     rodape={<><Botao disabled={ocupado} onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))}>Cancelar</Botao><Botao disabled={ocupado || !dados.corpoTemplate?.trim()} onClick={() => executar(false)}>Ver prévia</Botao><Botao variante="primario" tipo="submit" form={id} disabled={ocupado}>{ocupado ? 'Aguarde…' : 'Salvar modelo'}</Botao></>}>

@@ -33,6 +33,18 @@ public class IdempotencyOptionsTests
             .PathMatchesAny($"/api/atendimento/conversas/{Guid.NewGuid()}/{sufixo}").Should().BeTrue();
     }
 
+    // #2462: timeout que gravou e o mesmo cadastro enviado de novo criavam um segundo registro.
+    [Theory]
+    [InlineData("/api/clientes")]
+    [InlineData("/api/fornecedores")]
+    [InlineData("/api/produtos")]
+    [InlineData("/api/notificacoes/templates")]
+    public void Criacao_de_cadastro_usa_a_protecao_de_retentativa(string rota)
+    {
+        EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
+            .PathMatchesAny(rota).Should().BeTrue();
+    }
+
     [Fact]
     public void Lancamento_de_caixa_usa_a_protecao_de_retentativa()
     {

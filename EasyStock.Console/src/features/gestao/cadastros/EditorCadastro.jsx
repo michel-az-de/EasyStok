@@ -8,7 +8,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { lerMoeda } from '../../../dominio/formato'
-import { CAMPOS_CLIENTE, mudarDadosCadastro, reconferirCadastroCliente } from '../../../dominio/cadastros'
+import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, reconferirCadastroCliente } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
 const pessoa = [{ valor: 'fisica', rotulo: 'Pessoa física' }, { valor: 'juridica', rotulo: 'Pessoa jurídica' }]
@@ -83,9 +83,9 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
       if (montado.current) aoSalvo({ anterior: inicial, atual })
     } catch (e) {
       if (!montado.current) return
-      const semConfirmacao = !id && tela !== 'bancos' && (e.status === 0 || e.status >= 500)
+      const semConfirmacao = bloqueiaRepeticaoDoCadastro(tela, dados, e)
       const conflitoCliente = e.status === 409 && tela === 'clientes' && id
-      falhar(e.status === 409 ? conflitoCliente ? 'Este cadastro mudou. O que você digitou continua aqui. Confira a versão atual antes de salvar novamente.' : 'Este cadastro mudou. Feche e abra novamente para conferir a versão atual. O que você digitou continua aqui.' : e.message)
+      falhar(e.codigo === 'IDEMPOTENCY_PAYLOAD_MISMATCH' ? MENSAGEM_CADASTRO_REPETIDO : e.status === 409 ? conflitoCliente ? 'Este cadastro mudou. O que você digitou continua aqui. Confira a versão atual antes de salvar novamente.' : 'Este cadastro mudou. Feche e abra novamente para conferir a versão atual. O que você digitou continua aqui.' : e.message)
       if (conflitoCliente) { aoMudar({ ...editor, conflito: true, reconferido: false }); definirVersaoAtual(null) }
       if (semConfirmacao) aoMudar({ ...editor, semConfirmacao: true })
     } finally { concluir() }
