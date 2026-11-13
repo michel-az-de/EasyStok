@@ -7,6 +7,14 @@ const BASE = '/api/atendimento/configuracao'
 
 export const obterConfiguracao = () => chamarApi(BASE, { sinal: AbortSignal.timeout(15000) })
 
+// #2496: a chave "Atendimento automático" sozinha, da checagem do Assistente. Só `ativo` no corpo: o resto fica.
+export const salvarAtendimentoAutomatico = (ativo) => chamarApi(BASE, {
+  metodo: 'PUT',
+  identidadeEsperada: identidadeDaSessao(lerSessao()),
+  sinal: AbortSignal.timeout(15000),
+  corpo: { ativo: Boolean(ativo) },
+})
+
 // S58 (#1391): o modelo de retomada vai num PUT próprio; a resposta dele é a configuração inteira gravada.
 export const salvarConfiguracao = async (c) => {
   const identidadeEsperada = identidadeDaSessao(lerSessao())

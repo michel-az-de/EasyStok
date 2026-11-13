@@ -112,6 +112,18 @@ public class AtendimentoConversasController(
         catch (ConversaNaoEncontradaException) { return DataNotFound("Conversa não encontrada."); }
     }
 
+    [SwaggerOperation(Summary = "Check whether the assistant answers this conversation",
+        Description = "#2496: etapas do turno do robô (passa, barra, não se aplica), se responde à próxima mensagem, " +
+            "a chave da loja, o prompt exato e as ferramentas. Só lê: não escala, não chama o modelo, não grava.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id:guid}/assistente")]
+    public async Task<IActionResult> Assistente(Guid id, [FromServices] ChecarAssistenteConversaUseCase checar, CancellationToken ct = default)
+    {
+        try { return DataOk(await checar.ExecuteAsync(currentUser.EmpresaId, id, DateTime.UtcNow, ct)); }
+        catch (ConversaNaoEncontradaException) { return DataNotFound("Conversa não encontrada."); }
+    }
+
     [SwaggerOperation(Summary = "Send a text message as the owner (takes over the conversation)",
         Description = "Fora da janela de 24 h: 409 { erro: \"fora_da_janela_24h\", sugestao: \"template\" } e nada gravado.")]
     [ProducesResponseType(StatusCodes.Status200OK)]

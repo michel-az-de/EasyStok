@@ -2,7 +2,6 @@ using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
-using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -64,7 +63,7 @@ public sealed class AgenteAtendimentoService(
         if (dados is null) return ResultadoTurnoAgente.Ignorado;
 
         var conversa = dados.Conversa;
-        if (conversa.Situacao != SituacaoConversa.Automatica || conversa.VinculoEmRevisao || !conversa.DentroDaJanela(agora))
+        if (PortoesDoAssistente.DaConversa(conversa, agora).Any(e => e.Barra))
             return ResultadoTurnoAgente.Ignorado;
 
         var pendentes = EntradasPendentes(dados.Mensagens);
@@ -78,13 +77,11 @@ public sealed class AgenteAtendimentoService(
         // (Anthropic:Enabled=false ou sem chave) ou canal sem agente (o agente envia pelo cliente do WhatsApp;
         // em outro canal sairia pelo canal errado). Passa de fato para a dona, senão a conversa fica
         // Automatica sem ninguém e fora do lembrete (#1288).
-        // #2211: quem recebe os avisos pelo número da loja e responde a eles fala com gente, nunca com o robô.
-        var motivoSemAgente = !configuracao.Ativo ? MotivoAtendimentoAutomaticoDesligado
-            : !llm.Disponivel ? MotivoAgenteDesligado
-            : !conversa.TemAgente ? $"o canal {conversa.Canal} não tem agente"
-            : !conversa.AutomaticoLiberadoPelaEquipe && equipe is not null
-                && await equipe.EhInscritoAsync(empresaId, conversa.ContatoIdExterno, ct) ? MotivoContatoDaEquipe
-            : null;
+        // #2211: quem recebe os avisos pelo número da loja e responde a eles fala com gente, nunca com o robô,
+        // até a equipe devolver a conversa a ele (#2493). As etapas são as mesmas da checagem do console (#2496).
+        var portoes = new PortoesDoAssistente(llm, conversaRepository, equipe, limiteRespostas);
+        var motivoSemAgente = (await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct))
+            .FirstOrDefault(e => e.Barra)?.MotivoEscalada;
         if (motivoSemAgente is not null)
         {
             logger.LogInformation("Agente: conversa {ConversaId} fica para a dona ({Motivo}).", conversaId, motivoSemAgente);
@@ -102,30 +99,21 @@ public sealed class AgenteAtendimentoService(
             : null;
 
         // S24: bloqueado no meio da conversa → a dona assume; o agente não responde.
-        if (cliente?.Bloqueado == true)
-        {
-            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(cliente), agora, ct);
-            await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
-        }
-
         // #2249: pessoa encaminhada à responsável. Fica com a equipe até alguém devolver a conversa ao robô.
-        if (cliente?.AtendimentoAutomaticoPausado == true)
+        if (PortoesDoAssistente.DaPessoa(cliente).FirstOrDefault(e => e.Barra)?.MotivoEscalada is { } motivoPessoa)
         {
-            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoContatoPausado(cliente), agora, ct);
+            await escalador.EscalarAsync(empresaId, conversa, motivoPessoa, agora, ct);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
 
         // #2285: anti-loop de custo. Outro robô do lado do cliente (ou um loop de mensagens) faria o agente
         // responder e gastar sem fim; no limite da hora, a conversa para nele e a escalada avisa a dona.
-        var maximoPorHora = limiteRespostas?.Value.MaximoPorHora ?? LimiteRespostasAgenteOptions.PadraoPorHora;
-        if (maximoPorHora > 0
-            && await conversaRepository.ContarRespostasDoAgenteDesdeAsync(empresaId, conversaId, agora.AddHours(-1), ct) >= maximoPorHora)
+        if (await portoes.DoLimiteAsync(empresaId, conversaId, agora, ct) is { Barra: true, MotivoEscalada: { } motivoLimite })
         {
-            logger.LogWarning("Agente: conversa {ConversaId} chegou a {Maximo} respostas do robô na última hora; fica para a dona.",
-                conversaId, maximoPorHora);
-            await escalador.EscalarAsync(empresaId, conversa, MotivoLimiteRespostas(maximoPorHora), agora, ct);
+            logger.LogWarning("Agente: conversa {ConversaId} chegou ao limite de respostas do robô na última hora; fica para a dona.",
+                conversaId);
+            await escalador.EscalarAsync(empresaId, conversa, motivoLimite, agora, ct);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
@@ -350,7 +338,7 @@ public sealed class AgenteAtendimentoService(
     /// antiga: qualquer resposta posterior, do agente ou da dona, conta. Resposta que falhou ao enviar (#2004) não conta:
     /// o cliente não a recebeu.
     /// </summary>
-    private static IReadOnlyList<Mensagem> EntradasPendentes(IReadOnlyList<Mensagem> historico)
+    internal static IReadOnlyList<Mensagem> EntradasPendentes(IReadOnlyList<Mensagem> historico)
     {
         var legado = !historico.Any(m => m.Autor == AutorMensagem.Cliente && m.ProcessadaEm is not null);
         var pendentes = new List<Mensagem>();
