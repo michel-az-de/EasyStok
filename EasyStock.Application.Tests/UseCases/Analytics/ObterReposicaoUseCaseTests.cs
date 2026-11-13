@@ -35,7 +35,7 @@ public class ObterReposicaoUseCaseTests
         configuracao.QuantidadeCriticaPadrao = 2;
         configuracao.DiasCoberturaAlvo = 10;
         configuracao.LeadTimePadraoDias = 3;
-        _config.GetByLojaIdAsync(lojaId).Returns(configuracao);
+        _config.GetDaLojaAsync(empresaId, lojaId, Arg.Any<CancellationToken>()).Returns(configuracao);
 
         var snapshot = new List<ProdutoReposicaoSnapshot>
         {
@@ -88,7 +88,7 @@ public class ObterReposicaoUseCaseTests
 
         // Sem LojaId nao consulta config; passa limiares nulos a porta e lead time padrao global (7).
         resultado.Should().BeEmpty();
-        await _config.DidNotReceive().GetByLojaIdAsync(Arg.Any<Guid>());
+        await _config.DidNotReceive().GetDaLojaAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
         await _analytics.Received(1).GetSnapshotReposicaoAsync(
             empresaId, null, 30, 7, null, null, Arg.Any<CancellationToken>());
     }

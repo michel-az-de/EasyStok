@@ -157,7 +157,7 @@ public class AnalyticsController(
         var diasEfetivos = dias;
         if (!diasEfetivos.HasValue)
         {
-            var daysResult = await obterDiasAlertaValidadeUseCase.ExecuteAsync(new ObterDiasAlertaValidadeCommand(lojaId));
+            var daysResult = await obterDiasAlertaValidadeUseCase.ExecuteAsync(new ObterDiasAlertaValidadeCommand(resolvedEmpresaId, lojaId));
             diasEfetivos = daysResult.Dias;
         }
 
@@ -236,7 +236,7 @@ public class AnalyticsController(
         var diasEfetivos = dias;
         if (!diasEfetivos.HasValue)
         {
-            var daysResult = await obterDiasAlertaValidadeUseCase.ExecuteAsync(new ObterDiasAlertaValidadeCommand(lojaId));
+            var daysResult = await obterDiasAlertaValidadeUseCase.ExecuteAsync(new ObterDiasAlertaValidadeCommand(resolvedEmpresaId, lojaId));
             diasEfetivos = daysResult.Dias;
         }
 
@@ -262,7 +262,7 @@ public class AnalyticsController(
         var diasEfetivos = diasSemMovimento;
         if (!diasEfetivos.HasValue)
         {
-            var daysResult = await obterDiasAlertaParadoUseCase.ExecuteAsync(new ObterDiasAlertaParadoCommand(lojaId));
+            var daysResult = await obterDiasAlertaParadoUseCase.ExecuteAsync(new ObterDiasAlertaParadoCommand(resolvedEmpresaId, lojaId));
             diasEfetivos = daysResult.Dias;
         }
 
