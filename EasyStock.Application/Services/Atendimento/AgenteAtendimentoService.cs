@@ -82,7 +82,8 @@ public sealed class AgenteAtendimentoService(
         var motivoSemAgente = !configuracao.Ativo ? MotivoAtendimentoAutomaticoDesligado
             : !llm.Disponivel ? MotivoAgenteDesligado
             : !conversa.TemAgente ? $"o canal {conversa.Canal} não tem agente"
-            : equipe is not null && await equipe.EhInscritoAsync(empresaId, conversa.ContatoIdExterno, ct) ? MotivoContatoDaEquipe
+            : !conversa.AutomaticoLiberadoPelaEquipe && equipe is not null
+                && await equipe.EhInscritoAsync(empresaId, conversa.ContatoIdExterno, ct) ? MotivoContatoDaEquipe
             : null;
         if (motivoSemAgente is not null)
         {

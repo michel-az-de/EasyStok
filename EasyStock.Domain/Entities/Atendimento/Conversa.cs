@@ -27,6 +27,7 @@ public class Conversa
     public const int ContatoNomeTamanhoMaximo = 120;
     public const int MotivoEscaladaTamanhoMaximo = 500;
     public const string ChaveAjudaComandaSolicitadaEm = "comandaAjudaSolicitadaEm";
+    public const string ChaveAutomaticoLiberadoPelaEquipe = "automaticoLiberadoPelaEquipe";
 
     public Guid Id { get; private set; }
     public long NumeroComanda { get; private set; }
@@ -307,8 +308,20 @@ public class Conversa
         MotivoEscalada = null;
         // Um novo atendimento humano não reativa a solicitação já encerrada.
         var contexto = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson)!;
-        if (contexto.Remove(ChaveAjudaComandaSolicitadaEm)) ContextoJson = JsonSerializer.Serialize(contexto);
+        contexto.Remove(ChaveAjudaComandaSolicitadaEm);
+        // #2493: a devolução é da equipe e não pode ser desfeita pela regra do contato da equipe (#2211).
+        contexto[ChaveAutomaticoLiberadoPelaEquipe] = JsonSerializer.SerializeToElement(true);
+        ContextoJson = JsonSerializer.Serialize(contexto);
     }
+
+    /// <summary>
+    /// #2493: a equipe devolveu esta conversa ao robô. Vale para a conversa inteira e se sobrepõe à regra do contato
+    /// da equipe (#2211), que sem isto desfazia a devolução na mensagem seguinte.
+    /// </summary>
+    public bool AutomaticoLiberadoPelaEquipe =>
+        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson) is { } contexto
+        && contexto.TryGetValue(ChaveAutomaticoLiberadoPelaEquipe, out var valor)
+        && valor.ValueKind == JsonValueKind.True;
 
     /// <summary>Idempotente: preserva o carimbo até uma reabertura explícita.</summary>
     public void Encerrar(DateTime agora)
