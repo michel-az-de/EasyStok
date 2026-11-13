@@ -2,28 +2,31 @@ import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
-import { Pilula } from '../../../componentes/Pilula'
+import { Icone } from '../../../componentes/Icone'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
-import { contagemInicial, detalheDoLote, podeRegistrarPerda, podeReimprimir, motivoDaContagem, porcaoQueNaoRepete, porcaoSugerida, porcoesParaAjuste, quandoVence, resumoDoEstoque, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
+import { contagemInicial, detalheDoLote, podeRegistrarPerda, podeReimprimir, motivoDaContagem, porcaoQueNaoRepete, porcaoSugerida, porcoesParaAjuste, resumoDoEstoque, situacaoDoPrato, validadeDoLote, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
 import { producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
 import { PreviaDasEtiquetas } from './etiqueta/PreviaDasEtiquetas'
+import tabela from './tabelaProducao.module.css'
 
 // M2 › Estoque do dia (M2.1, #1490). O que a Thati usa todo dia, lido do EasyStok: os alertas de
 // venda sem saldo (avisa, não trava; RN-48), o saldo em porções por prato e os lotes com o
 // vencimento destacado (US-065). "Ajustar" é a contagem dela com o motivo e fecha o alerta.
 // Em prato com porções (#1542) a contagem é de uma porção: o saldo é dela.
 const porcoes = (n) => (n === 1 ? '1 porção' : `${Number(n).toLocaleString('pt-BR')} porções`)
+// #2439: o tom da situação vira só a cor do texto, no número do topo e na tabela.
+const TOM = { perigo: tabela.tomPerigo, atencao: tabela.tomAtencao, ok: tabela.tomOk, neutro: tabela.tomNeutro }
 const saldoDaPorcao = (s) => `${s.rotulo}: ${s.saldo}${s.descoberto > 0 ? ` (${s.descoberto} sem saldo)` : ''}`
 
 // #2235 (banca T1-1): o número que pede ação ganha a cor do estado, com o texto dizendo o porquê.
 function NumeroDoResumo({ rotulo, valor, tom, dica }) {
   return (
-    <div className={tom ? css[`resumo${tom}`] : undefined}>
+    <div className={tom ? TOM[tom] : undefined}>
       <dt>{rotulo}</dt>
       <dd>{valor}</dd>
-      {dica && <dd className={css.dicaDoResumo}>{dica}</dd>}
+      {dica && <dd className={tabela.dica}>{dica}</dd>}
     </div>
   )
 }
@@ -177,10 +180,10 @@ export function AbaEstoqueDoDiaApi() {
 
   return (
     <div className={css.aba}>
-      <dl className={css.resumoOperacao}>
-        <NumeroDoResumo rotulo="Porções disponíveis" valor={resumo.porcoes} tom={semPorcao ? 'Perigo' : null} dica={semPorcao ? 'produza ou ajuste' : null} />
-        <NumeroDoResumo rotulo={resumo.vencidos === 1 ? 'Lote vencido' : 'Lotes vencidos'} valor={resumo.vencidos} tom={resumo.vencidos > 0 ? 'Atencao' : null} dica={resumo.vencidos > 0 ? 'registre a perda' : null} />
-        <NumeroDoResumo rotulo="Vendas sem saldo" valor={resumo.vendasSemSaldo} tom={resumo.vendasSemSaldo > 0 ? 'Atencao' : null} dica={resumo.vendasSemSaldo > 0 ? 'ajuste a contagem' : null} />
+      <dl className={tabela.numeros}>
+        <NumeroDoResumo rotulo="Porções disponíveis" valor={resumo.porcoes} tom={semPorcao ? 'perigo' : null} dica={semPorcao ? 'produza ou ajuste' : null} />
+        <NumeroDoResumo rotulo={resumo.vencidos === 1 ? 'Lote vencido' : 'Lotes vencidos'} valor={resumo.vencidos} tom={resumo.vencidos > 0 ? 'atencao' : null} dica={resumo.vencidos > 0 ? 'registre a perda' : null} />
+        <NumeroDoResumo rotulo="Vendas sem saldo" valor={resumo.vendasSemSaldo} tom={resumo.vendasSemSaldo > 0 ? 'atencao' : null} dica={resumo.vendasSemSaldo > 0 ? 'ajuste a contagem' : null} />
       </dl>
       {estoque.estado === 'erro' && <p className={css.aviso} role="alert">
         O estoque não foi atualizado. Os saldos abaixo podem estar desatualizados. {estoque.erro}
@@ -228,40 +231,48 @@ export function AbaEstoqueDoDiaApi() {
         {estoque.pratos.length === 0 ? (
           <p className={css.descricao}>Nenhum prato com estoque cadastrado. Registre o primeiro lote em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a>.</p>
         ) : (
-          <ul className={css.lista}>
-            {estoque.pratos.map((p) => (
-              <li key={p.sku} className={css.linha}>
-                <div className={css.resumo}>
-                  <span className={css.nome}>{p.nome}</span>
-                  {/* #2081 (A16): a porção só aparece quando o nome ainda não diz qual é. */}
-                  {(p.porcoes.length > 0 || porcaoQueNaoRepete(p.nome, p.porcao)) && <span className={css.detalhe}>
-                    {p.porcoes.length > 0 ? p.porcoes.map(saldoDaPorcao).join(' · ') : porcaoQueNaoRepete(p.nome, p.porcao)}
-                  </span>}
-                </div>
-                <span className={css.preco}>{porcoes(p.saldo)}</span>
-                {/* #2235 (banca T1-2): chip com ícone, texto e cor por estado; vencido é âmbar, sem saldo é vermelho. */}
-                <div className={css.estados}>
-                  {p.saldo === 0 && <Pilula tom="perigo" icone="circle-x">Sem saldo</Pilula>}
-                  {p.descoberto > 0 && <Pilula tom="aviso" icone="alerta">{porcoes(p.descoberto)} vendidas sem saldo</Pilula>}
-                  {p.lotes.some((l) => l.vencido) && <Pilula tom="aviso" icone="relogio">Lote vencido</Pilula>}
-                  {p.lotes.some((l) => l.vencendo) && <Pilula tom="aviso" icone="hourglass">Lote vencendo</Pilula>}
-                </div>
-                {ajustando === p.sku ? (
-                  <FormularioAjuste
-                    alvo={p}
-                    aoSalvar={(contagem, motivo, porcao) => salvarContagem(p.sku, p.sku, contagem, motivo, porcao)}
-                    aoCancelar={() => trocarAjuste(null)}
-                    aviso={avisoNoFormulario ? estoque.aviso : null}
-                    aoFecharAviso={estoque.fecharAviso}
-                  />
-                ) : (
-                  <div className={css.acoes}>
-                    <Botao variante="secundario" icone="lapis" aria-label={`Ajustar contagem de ${p.nome}`} onClick={() => trocarAjuste(p.sku)}>Ajustar</Botao>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className={tabela.moldura}>
+            <table className={tabela.tabela} aria-labelledby="estoque-saldo">
+              <thead><tr><th scope="col">Prato</th><th scope="col" className={tabela.numero}>Saldo</th><th scope="col">Situação</th><th scope="col" className={tabela.colunaAcoes}>Ações</th></tr></thead>
+                {estoque.pratos.map((p) => {
+                  const situacao = situacaoDoPrato(p)
+                  return (
+                    <tbody key={p.sku}>
+                      <tr>
+                        <td>
+                          <span className={tabela.nome}>{p.nome}</span>
+                          {/* #2081 (A16): a porção só aparece quando o nome ainda não diz qual é. */}
+                          {(p.porcoes.length > 0 || porcaoQueNaoRepete(p.nome, p.porcao)) && <span className={tabela.apoio}>
+                            {p.porcoes.length > 0 ? p.porcoes.map(saldoDaPorcao).join(' · ') : porcaoQueNaoRepete(p.nome, p.porcao)}
+                          </span>}
+                        </td>
+                        <td data-rotulo="Saldo" className={`${tabela.numero} ${tabela.valor}`}>{porcoes(p.saldo)}</td>
+                        {/* #2235 (banca T1-2) + #2439: ícone, texto e cor por estado, numa frase só. */}
+                        <td data-rotulo="Situação">
+                          <span className={`${tabela.situacao} ${TOM[situacao.tom]}`}><Icone nome={situacao.icone} />{situacao.texto}</span>
+                        </td>
+                        <td className={tabela.colunaAcoes}>
+                          {ajustando !== p.sku && <div className={tabela.acoes}>
+                            <Botao variante="secundario" icone="lapis" aria-label={`Ajustar contagem de ${p.nome}`} onClick={() => trocarAjuste(p.sku)}>Ajustar</Botao>
+                          </div>}
+                        </td>
+                      </tr>
+                      {ajustando === p.sku && (
+                        <tr><td colSpan={4} className={tabela.extra}>
+                          <FormularioAjuste
+                            alvo={p}
+                            aoSalvar={(contagem, motivo, porcao) => salvarContagem(p.sku, p.sku, contagem, motivo, porcao)}
+                            aoCancelar={() => trocarAjuste(null)}
+                            aviso={avisoNoFormulario ? estoque.aviso : null}
+                            aoFecharAviso={estoque.fecharAviso}
+                          />
+                        </td></tr>
+                      )}
+                    </tbody>
+                  )
+                })}
+            </table>
+          </div>
         )}
       </section>
 
@@ -270,46 +281,64 @@ export function AbaEstoqueDoDiaApi() {
         {lotes.length === 0 ? (
           <p className={css.descricao}>Nenhum lote com saldo.</p>
         ) : (
-          <ul className={css.lista}>
-            {lotes.map((l, i) => (
-              <li key={`${l.codigo}-${i}`} className={css.linha}>
-                <div className={css.resumo}>
-                  <span className={css.nome}>{l.prato}</span>
-                  {/* #2081 (A10), #2235 (T1-4): código e tamanho, de onde veio, quem lançou e a fabricação. */}
-                  <span className={css.detalhe}>{detalheDoLote(l)}</span>
-                </div>
-                <span className={css.preco}>{porcoes(l.quantidade)}</span>
-                <div className={css.estados}>
-                  {l.vencido || l.vencendo
-                    ? <Pilula tom="aviso" icone={l.vencido ? 'relogio' : 'hourglass'}>{quandoVence(l)}</Pilula>
-                    : <Pilula tom="neutro" fina>{quandoVence(l)}</Pilula>}
-                </div>
-                {(podeReimprimir(l) || podeRegistrarPerda(l)) && !confirmandoPerda(l) && (
-                  <div className={css.acoes}>
-                    {podeRegistrarPerda(l) && (
-                      <Botao id={`perda-${l.itemEstoqueId}`} variante="secundario" icone="lixeira" disabled={lancandoPerda}
-                        aria-label={`Registrar perda do lote ${l.codigo ?? ''} de ${l.prato}`} onClick={() => abrirPerda(l.itemEstoqueId)}>Registrar perda</Botao>
-                    )}
-                    {podeReimprimir(l) && (
-                      <Botao variante="texto" icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
-                        aria-label={`Etiquetas do lote ${l.codigo} de ${l.prato}`} onClick={() => reimprimir(l)}>Etiquetas</Botao>
-                    )}
-                  </div>
-                )}
-                {confirmandoPerda(l) && (
-                  <div className={`${css.acoes} ${css.linhaCompleta}`} role="group" aria-label={`Confirmar perda do lote ${l.codigo ?? ''} de ${l.prato}`}>
-                    <span className={css.descricao}>Lançar {porcoes(l.quantidade)} de {l.prato} como vencido? O saldo do lote vai a zero.</span>
-                    <Botao id={`manter-${l.itemEstoqueId}`} variante="texto" disabled={lancandoPerda} onClick={() => setPerdaDoLote(null)}>Manter lote</Botao>
-                    <Botao variante="perigo" icone="lixeira" disabled={lancandoPerda} onClick={() => registrarPerda(l)}>{lancandoPerda ? 'Lançando…' : 'Lançar perda'}</Botao>
-                    {avisoNaPerda && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">{estoque.aviso}</p>}
-                  </div>
-                )}
-                {impressao?.loteId === l.id && impressao.erro && (
-                  <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">Não foi possível carregar as etiquetas deste lote. {impressao.erro}</p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className={tabela.moldura}>
+            <table className={tabela.tabela} aria-labelledby="estoque-lotes">
+              <thead><tr><th scope="col">Prato e lote</th><th scope="col" className={tabela.numero}>Quantidade</th><th scope="col">Validade</th><th scope="col" className={tabela.colunaAcoes}>Ações</th></tr></thead>
+                {lotes.map((l, i) => {
+                  const validade = validadeDoLote(l)
+                  return (
+                    <tbody key={`${l.codigo}-${i}`}>
+                      <tr>
+                        <td>
+                          <span className={tabela.nome}>{l.prato}</span>
+                          {/* #2081 (A10), #2235 (T1-4): código e tamanho, de onde veio, quem lançou e a fabricação. */}
+                          <span className={tabela.apoio}>{detalheDoLote(l)}</span>
+                        </td>
+                        <td data-rotulo="Quantidade" className={`${tabela.numero} ${tabela.valor}`}>{porcoes(l.quantidade)}</td>
+                        <td data-rotulo="Validade">
+                          <span>
+                            <span className={`${tabela.situacao} ${TOM[validade.tom]}`}>
+                              {validade.tom === 'atencao' && <Icone nome={l.vencido ? 'relogio' : 'hourglass'} />}{validade.texto}
+                            </span>
+                            {validade.apoio && <span className={tabela.apoio}>{validade.apoio}</span>}
+                          </span>
+                        </td>
+                        <td className={tabela.colunaAcoes}>
+                          {(podeReimprimir(l) || podeRegistrarPerda(l)) && !confirmandoPerda(l) && (
+                            <div className={tabela.acoes}>
+                              {podeRegistrarPerda(l) && (
+                                <Botao id={`perda-${l.itemEstoqueId}`} variante="secundario" icone="lixeira" disabled={lancandoPerda}
+                                  aria-label={`Registrar perda do lote ${l.codigo ?? ''} de ${l.prato}`} onClick={() => abrirPerda(l.itemEstoqueId)}>Registrar perda</Botao>
+                              )}
+                              {podeReimprimir(l) && (
+                                <Botao variante="secundario" icone="printer" disabled={impressao !== null && !impressao.folha && !impressao.erro}
+                                  aria-label={`Etiquetas do lote ${l.codigo} de ${l.prato}`} onClick={() => reimprimir(l)}>Etiquetas</Botao>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                      {confirmandoPerda(l) && (
+                        <tr><td colSpan={4} className={tabela.extra}>
+                          <div className={css.acoes} role="group" aria-label={`Confirmar perda do lote ${l.codigo ?? ''} de ${l.prato}`}>
+                            <span className={css.descricao}>Lançar {porcoes(l.quantidade)} de {l.prato} como vencido? O saldo do lote vai a zero.</span>
+                            <Botao id={`manter-${l.itemEstoqueId}`} variante="texto" disabled={lancandoPerda} onClick={() => setPerdaDoLote(null)}>Manter lote</Botao>
+                            <Botao variante="perigo" icone="lixeira" disabled={lancandoPerda} onClick={() => registrarPerda(l)}>{lancandoPerda ? 'Lançando…' : 'Lançar perda'}</Botao>
+                            {avisoNaPerda && <p className={`${css.aviso} ${css.linhaCompleta}`} role="alert">{estoque.aviso}</p>}
+                          </div>
+                        </td></tr>
+                      )}
+                      {/* #2439: lote fora da lista de recentes não tem id; sem a guarda, undefined === undefined lia o erro de null. */}
+                      {impressao && l.id && impressao.loteId === l.id && impressao.erro && (
+                        <tr><td colSpan={4} className={tabela.extra}>
+                          <p className={css.aviso} role="alert">Não foi possível carregar as etiquetas deste lote. {impressao.erro}</p>
+                        </td></tr>
+                      )}
+                    </tbody>
+                  )
+                })}
+            </table>
+          </div>
         )}
       </section>
 

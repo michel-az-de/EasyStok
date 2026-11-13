@@ -1,34 +1,43 @@
-/* #2362: checklist de configuração da Produção. Tokens do tema (gestao.module.css). */
+/* #2362: checklist de configuração da Produção. Tokens do tema (gestao.module.css).
+   #2439: faixa compacta numa linha: "Configuração inicial" à esquerda e os passos separados por divisória. */
 
 .checklist {
-  display: grid; gap: var(--e-3); padding: var(--e-4);
+  display: flex; align-items: center; gap: var(--e-3) var(--e-4); flex-wrap: wrap; padding: var(--e-2) var(--e-4);
   border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
   margin-bottom: var(--e-4);
 }
 
-.titulo { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
-
-.passos {
-  display: grid; gap: var(--e-3); margin: 0; padding: 0; list-style: none;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.titulo {
+  margin: 0; padding-right: var(--e-4); border-right: 1px solid var(--linha);
+  font-size: var(--t-apoio); font-weight: 700; color: var(--tinta);
 }
 
-.passo { display: flex; gap: var(--e-3); align-items: flex-start; min-width: 0; }
+.passos { display: flex; flex-wrap: wrap; gap: var(--e-2) var(--e-4); flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; list-style: none; }
+
+.passo { display: flex; gap: var(--e-2); align-items: center; min-width: 0; }
+.passo + .passo { padding-left: var(--e-4); border-left: 1px solid var(--linha); }
 
 .marca {
-  flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px;
-  border-radius: 50%; border: 1px solid var(--linha-forte); color: var(--tinta-2); font-weight: 700;
+  flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px;
+  border-radius: 50%; border: 1px solid var(--linha-forte); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 700;
 }
 .ativo .marca { border-color: var(--marca); background: var(--marca); color: var(--marca-contraste); }
 .feito .marca { border-color: var(--sucesso); color: var(--sucesso); }
 
-.texto { display: grid; gap: 2px; min-width: 0; }
+.texto { display: grid; gap: 0; min-width: 0; }
 
 .link {
-  color: var(--tinta); font-size: var(--t-corpo); font-weight: 600; text-decoration: underline;
-  text-underline-offset: 3px; min-height: 28px; display: inline-flex; align-items: center;
+  color: var(--tinta); font-size: var(--t-apoio); font-weight: 600; text-decoration: underline;
+  text-underline-offset: 3px; display: inline-flex; align-items: center; min-height: 24px;
 }
 .ativo .link { color: var(--marca-forte); }
 .feito .link { color: var(--tinta-2); font-weight: 400; }
 
-.detalhe { color: var(--tinta-2); font-size: var(--t-apoio); }
+.detalhe { color: var(--tinta-2); font-size: var(--t-micro); }
+
+@media (max-width: 640px) {
+  .checklist { display: grid; padding: var(--e-3); }
+  .titulo { padding-right: 0; border-right: 0; }
+  .passos { display: grid; gap: var(--e-3); }
+  .passo + .passo { padding-left: 0; border-left: 0; }
+}

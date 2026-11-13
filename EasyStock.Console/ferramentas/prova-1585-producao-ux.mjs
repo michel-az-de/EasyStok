@@ -551,6 +551,30 @@ await confere('Planejamento: a lista gerada aparece na tela e o botão só destr
   assert.equal(listasCriadas(), 2)
 })
 
+// #2439: o − e o + ajustam uma porção na linha do prato; o − para no zero e porção mudada invalida o cálculo.
+await confere('Planejamento: − e + mexem uma porção, o − trava no zero e o cálculo antigo sai', async () => {
+  montarFetch([
+    [(m, u) => m === 'GET' && u.includes('/producao/sugestao'), { data: { ate: '2026-10-12', pratos: [{ cardapioItemId: 'i-1', produtoId: 'p-1', nome: 'Ravióli', minimo: 0, saldo: 0, agendados: 0, descoberto: 0, sugestao: 1 }] } }],
+    [(m, u) => m === 'POST' && u.endsWith('/producao/planejamento'), { data: { itens: [{ produtoFinalId: 'p-1', status: 'Ok' }], tudoDisponivel: true, custoEstimadoTotal: 10, consolidado: [] } }],
+  ])
+  const t = montar(await tela('AbaPlanejamentoApi'))
+  await t.assentar()
+  const botao = (rotulo) => andar(t.arvore, (n) => n.type === 'BotaoIcone' && n.props.rotulo === rotulo)[0]
+  const porcoes = () => campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value
+  botao('Somar 1 porção de Ravióli').props.onClick()
+  t.renderizar()
+  assert.equal(porcoes(), '2')
+  await botoes(t.arvore, 'Calcular insumos')[0].props.onClick()
+  t.renderizar()
+  assert.equal(andar(t.arvore, (n) => n.type === 'section' && n.props['aria-label'] === 'Insumos do planejamento').length, 1)
+  botao('Tirar 1 porção de Ravióli').props.onClick()
+  botao('Tirar 1 porção de Ravióli').props.onClick()
+  t.renderizar()
+  assert.equal(porcoes(), '0')
+  assert.equal(botao('Tirar 1 porção de Ravióli').props.disabled, true, 'no zero, o − trava')
+  assert.equal(andar(t.arvore, (n) => n.type === 'section' && n.props['aria-label'] === 'Insumos do planejamento').length, 0, 'porção mudada tira o cálculo antigo')
+})
+
 await confere('os textos de Estoque do dia, Receitas e Planejamento têm link para a tela citada', async () => {
   const PRODUCAO_DO_DIA = [hashDoModulo('producao', 'producao'), 'Produção do dia']
   assert.equal(rotaDaHash(PRODUCAO_DO_DIA[0], { fonteApi: true }).aba, 'producao-do-dia')

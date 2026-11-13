@@ -3,7 +3,7 @@ import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
-import { Pilula } from '../../../componentes/Pilula'
+import { Icone } from '../../../componentes/Icone'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { lerReceita, orientacoesDaReceita, progressoDasReceitas, receitaEmBranco, rotuloDoRendimento, temReceita, textoDoProgresso, UNIDADES_RECEITA, UNIDADES_RENDIMENTO } from '../../../aplicacao/receitas'
@@ -13,6 +13,7 @@ import { PesquisaReceitaIa } from './PesquisaProducao'
 import { moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
+import tabela from './tabelaProducao.module.css'
 import botaoCss from '../../../componentes/Botao.module.css'
 
 // M2 › Receitas (M2.4a, #1498). Por prato do cardápio ligado ao estoque: quanto rende e os insumos
@@ -202,45 +203,58 @@ export function AbaReceitasApi() {
           Cadastre os pratos em <a className={css.link} href={hashDoModulo('cardapio', 'itens')}>Itens do cardápio</a> e volte para montar a receita de cada um.
         </Vazio>
       ) : (
-        <ul className={css.lista}>
-          {gestao.receitas.map((r) => (
-            <li key={r.sku} className={`${css.linha} ${css.receita}`}>
-              <div className={css.resumo}>
-                <span className={css.nome}>{r.nome}</span>
-                {temReceita(r) && <span className={css.detalhe}>
-                  {`${r.linhas} ${r.linhas === 1 ? 'insumo' : 'insumos'} · rende ${r.rendimento} ${rotuloDoRendimento(r.unidadeRendimento)}`}
-                </span>}
-              </div>
-              <div className={css.estados}>
-                {temReceita(r)
-                  ? <Pilula tom={r.custoPorRendimento == null ? 'aviso' : 'ok'} fina>{custoPor(r)}</Pilula>
-                  : <Pilula tom="neutro" icone="nota">Sem receita</Pilula>}
-                {r.baixaAutomatica && <Pilula tom="ok" fina>Baixa insumos ao produzir</Pilula>}
-              </div>
-              <div className={`${css.acoes} ${css.acoesDaReceita}`}>
-                {(podeEditar || temReceita(r)) && (
-                  <Botao variante={podeEditar && r.sku === progresso.proximo ? 'primario' : 'secundario'} disabled={salvando}
-                    icone={!podeEditar ? 'nota' : temReceita(r) ? 'lapis' : 'mais'} aria-expanded={editando === r.sku}
-                    aria-label={`${!podeEditar ? 'Ver receita' : temReceita(r) ? 'Editar receita' : 'Montar receita'} de ${r.nome}`}
-                    onClick={() => trocarEditor(editando === r.sku ? null : r.sku)}>
-                    {!podeEditar ? 'Ver receita' : temReceita(r) ? 'Editar receita' : 'Montar receita'}
-                  </Botao>
-                )}
-                {podeEditar && temReceita(r) && (
-                  <Botao variante="texto" disabled={salvando} onClick={() => { setAvisoDaEdicao(null); gestao.marcarBaixa(r.produtoId, !r.baixaAutomatica) }}>
-                    {r.baixaAutomatica ? 'Parar de baixar insumos' : 'Baixar insumos ao produzir'}
-                  </Botao>
-                )}
-              </div>
-              {editando === r.sku && (
-                <Modal titulo={`Receita de ${r.nome}`} aoFechar={salvando ? undefined : () => trocarEditor(null)} largura="min(900px, calc(100vw - 24px))">
-                <EditorReceita prato={r} aoSalvar={salvarReceita} aoFechar={() => trocarEditor(null)} podeEditar={podeEditar}
-                  aviso={avisoNoEditor ? gestao.aviso : null} aoFecharAviso={gestao.fecharAviso} />
-                </Modal>
-              )}
-            </li>
-          ))}
-        </ul>
+        // #2439: tabela com o rendimento, a situação e as ações alinhados em colunas.
+        <div className={tabela.moldura}>
+          <table className={tabela.tabela} aria-label="Receitas por prato">
+            <thead><tr><th scope="col">Prato</th><th scope="col">Rendimento</th><th scope="col">Situação</th><th scope="col" className={tabela.colunaAcoes}>Ações</th></tr></thead>
+            <tbody>
+              {gestao.receitas.map((r) => (
+                <tr key={r.sku}>
+                  <td>
+                    <span className={tabela.nome}>{r.nome}</span>
+                    {temReceita(r) && <span className={tabela.apoio}>{`${r.linhas} ${r.linhas === 1 ? 'insumo' : 'insumos'}`}</span>}
+                  </td>
+                  <td data-rotulo="Rendimento" className={tabela.valor}>
+                    {temReceita(r) ? `${r.rendimento} ${rotuloDoRendimento(r.unidadeRendimento)}` : <span className={tabela.tomNeutro}>—</span>}
+                  </td>
+                  <td data-rotulo="Situação">
+                    <span>
+                      {temReceita(r)
+                        ? <span className={`${tabela.situacao} ${r.custoPorRendimento == null ? tabela.tomAtencao : tabela.tomOk}`}>
+                          <Icone nome={r.custoPorRendimento == null ? 'alerta' : 'check'} />{custoPor(r)}
+                        </span>
+                        : <span className={`${tabela.situacao} ${tabela.tomNeutro}`}><Icone nome="nota" />Sem receita</span>}
+                      {r.baixaAutomatica && <span className={tabela.apoio}>Baixa insumos ao produzir</span>}
+                    </span>
+                  </td>
+                  <td className={tabela.colunaAcoes}>
+                    <div className={tabela.acoes}>
+                      {(podeEditar || temReceita(r)) && (
+                        <Botao variante={podeEditar && r.sku === progresso.proximo ? 'primario' : 'secundario'} disabled={salvando}
+                          icone={!podeEditar ? 'nota' : temReceita(r) ? 'lapis' : 'mais'} aria-expanded={editando === r.sku}
+                          aria-label={`${!podeEditar ? 'Ver receita' : temReceita(r) ? 'Editar receita' : 'Montar receita'} de ${r.nome}`}
+                          onClick={() => trocarEditor(editando === r.sku ? null : r.sku)}>
+                          {!podeEditar ? 'Ver receita' : temReceita(r) ? 'Editar receita' : 'Montar receita'}
+                        </Botao>
+                      )}
+                      {podeEditar && temReceita(r) && (
+                        <Botao variante="texto" disabled={salvando} onClick={() => { setAvisoDaEdicao(null); gestao.marcarBaixa(r.produtoId, !r.baixaAutomatica) }}>
+                          {r.baixaAutomatica ? 'Parar de baixar insumos' : 'Baixar insumos ao produzir'}
+                        </Botao>
+                      )}
+                    </div>
+                    {editando === r.sku && (
+                      <Modal titulo={`Receita de ${r.nome}`} aoFechar={salvando ? undefined : () => trocarEditor(null)} largura="min(900px, calc(100vw - 24px))">
+                      <EditorReceita prato={r} aoSalvar={salvarReceita} aoFechar={() => trocarEditor(null)} podeEditar={podeEditar}
+                        aviso={avisoNoEditor ? gestao.aviso : null} aoFecharAviso={gestao.fecharAviso} />
+                      </Modal>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

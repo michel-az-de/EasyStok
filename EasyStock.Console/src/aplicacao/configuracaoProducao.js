@@ -11,13 +11,13 @@ function passoInsumos(insumos) {
   const detalhe = n === 0 ? 'Nenhum insumo cadastrado'
     : semCusto > 0 ? `${n} ${n === 1 ? 'insumo' : 'insumos'}, ${semCusto} sem custo`
       : `${n} ${n === 1 ? 'insumo' : 'insumos'} com custo`
-  return { id: 'insumos', rotulo: 'Cadastre os insumos com o custo', tela: 'insumos', feito: n > 0 && semCusto === 0, detalhe }
+  return { id: 'insumos', rotulo: 'Cadastrar insumos e custos', tela: 'insumos', feito: n > 0 && semCusto === 0, detalhe }
 }
 
 function passoReceitas(receitas) {
   const { comReceita, total } = progressoDasReceitas(receitas)
   const detalhe = total === 0 ? 'Nenhum prato no cardápio' : `${comReceita} de ${total} ${total === 1 ? 'prato' : 'pratos'} com receita`
-  return { id: 'receitas', rotulo: 'Monte a receita de cada prato', tela: 'receitas', feito: total > 0 && comReceita === total, detalhe }
+  return { id: 'receitas', rotulo: 'Montar receitas', tela: 'receitas', feito: total > 0 && comReceita === total, detalhe }
 }
 
 export function configuracaoDaProducao({ insumos = [], receitas = [] }) {

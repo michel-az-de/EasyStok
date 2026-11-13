@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { BotaoIcone } from '../../../componentes/BotaoIcone'
 import { CampoTexto } from '../../../componentes/Campo'
+import { Icone } from '../../../componentes/Icone'
 import { Pilula } from '../../../componentes/Pilula'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { assinaturaDoPlano, comprasGuardadas, erroDasPorcoes, gerarCompras, guardarCompras, itensDeCompra, lerSugestao, levarParaProducao, motivosDosPendentes, planejar } from '../../../aplicacao/planejamento'
@@ -8,17 +10,19 @@ import { lerInsumos } from '../../../aplicacao/insumos'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
+import tabela from './tabelaProducao.module.css'
 
 // M2 › Planejamento (M2.5, #1502). O EasyStok sugere quanto produzir por prato até a data:
 // mínimo + pedidos agendados + descoberto − saldo (D-M2-05). Ela muda as porções, calcula os
 // insumos e as faltas (mesma conta da calculadora do PWA), gera a lista de compras e leva as
 // porções para a Produção do dia. Nada aqui mexe no estoque.
 const qtd = (n) => Number(n ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+// #2439: o saldo tem coluna própria; o apoio diz só de onde vem a sugestão.
 const porQue = (p) => [
+  p.sugestao > 0 ? `sugestão ${qtd(p.sugestao)}` : null,
   p.minimo ? `mínimo ${qtd(p.minimo)}` : null,
   p.agendados ? `${qtd(p.agendados)} ${p.agendados === 1 ? 'porção agendada' : 'porções agendadas'}` : null,
   p.descoberto ? `${qtd(p.descoberto)} ${p.descoberto === 1 ? 'porção vendida sem saldo' : 'porções vendidas sem saldo'}` : null,
-  `saldo ${qtd(p.saldo)}`,
 ].filter(Boolean).join(' · ').replace(/^./, (c) => c.toUpperCase())
 
 export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
@@ -75,6 +79,14 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
     setPlano(null)
   }
 
+  // #2439: − e + mexem uma porção; o vazio ou o texto inválido conta como zero.
+  const porcoesDe = (l) => Math.max(0, Number.parseInt(String(l.porcoes).trim(), 10) || 0)
+  const somar = (sku, delta) => () => {
+    if (bloqueado) return
+    setLinhas((atual) => atual.map((l) => (l.sku === sku ? { ...l, porcoes: String(Math.max(0, porcoesDe(l) + delta)) } : l)))
+    setPlano(null)
+  }
+
   async function calcular() {
     if (bloqueado) return
     const erro = erroDasPorcoes(linhas)
@@ -121,14 +133,19 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
 
   return (
     <div className={css.aba}>
-      {/* #2235 (banca A2): a sugestão diz de onde vem, para o zero não parecer erro. */}
-      <p className={css.descricao}>
-        A sugestão soma os pedidos agendados até a data, o estoque mínimo e o que foi vendido sem saldo, e tira o que já está no estoque.
-        Zero quer dizer que nada pede produção: o estoque cobre os pedidos e o mínimo, ou o prato não tem pedido nem mínimo cadastrado. Ajuste as porções; calcular não altera o estoque.
-      </p>
+      {/* #2439: a frase curta diz o que fazer; a explicação da sugestão fica recolhida ao lado da data. */}
+      <p className={css.descricao}>Ajuste as porções antes de calcular os insumos.</p>
       {/* #2235 (banca A1): a data usa o mesmo campo das outras telas. */}
-      <div className={css.dataPlanejamento}>
-        <CampoTexto tipo="date" rotulo="Pedidos até" disabled={ocupado || atualizando} value={ate} onChange={(e) => consultar(e.target.value)} />
+      <div className={tabela.topoDoPlano}>
+        <div className={css.dataPlanejamento}>
+          <CampoTexto tipo="date" rotulo="Pedidos até" disabled={ocupado || atualizando} value={ate} onChange={(e) => consultar(e.target.value)} />
+        </div>
+        {/* #2235 (banca A2): a sugestão diz de onde vem, para o zero não parecer erro. */}
+        <details className={css.saibaMais}>
+          <summary>Como a sugestão é calculada</summary>
+          A sugestão soma os pedidos agendados até a data, o estoque mínimo e o que foi vendido sem saldo, e tira o que já está no estoque.
+          Zero quer dizer que nada pede produção: o estoque cobre os pedidos e o mínimo, ou o prato não tem pedido nem mínimo cadastrado.
+        </details>
       </div>
       {atualizando && <output className={css.descricao}>Atualizando a sugestão para a data escolhida…</output>}
       {carga.estado === 'erro' && <p className={css.aviso} role="alert">
@@ -140,28 +157,42 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
       {linhas.length === 0 ? (
         <p className={css.descricao}>Registre a primeira produção em <a className={css.link} href={hashDoModulo('producao', 'producao')}>Produção do dia</a> para planejar os pratos.</p>
       ) : (
-        <ul className={css.lista}>
-          {linhas.map((l) => (
-            <li key={l.sku} className={css.linha}>
-              <div className={css.resumo}>
-                <span className={css.nome}>{l.nome}</span>
-                <span className={css.detalhe}>{porQue(l)}</span>
-              </div>
-              <div className={css.estados}>
-                {l.sugestao > 0 && <Pilula tom="ok" fina>sugestão {qtd(l.sugestao)}</Pilula>}
-              </div>
-              <div className={css.campoQuantidade}>
-                <CampoTexto disabled={bloqueado} rotulo="Porções" inputMode="numeric" aria-label={`Porções de ${l.nome}`} value={l.porcoes} onChange={mudar(l.sku)} />
-              </div>
-            </li>
-          ))}
-        </ul>
+        // #2439: a quantidade fica na linha do prato, ao lado do saldo, com − e + para o ajuste de uma porção.
+        <div className={tabela.moldura}>
+          <table className={tabela.tabela} aria-label="Porções por prato">
+            <thead><tr><th scope="col">Prato</th><th scope="col" className={tabela.numero}>Saldo atual</th><th scope="col" className={tabela.colunaAcoes}>Porções a produzir</th></tr></thead>
+            <tbody>
+              {linhas.map((l) => (
+                <tr key={l.sku}>
+                  <td>
+                    <span className={tabela.nome}>{l.nome}</span>
+                    {porQue(l) && <span className={tabela.apoio}>{porQue(l)}</span>}
+                  </td>
+                  <td data-rotulo="Saldo atual" className={`${tabela.numero} ${tabela.valor}`}>{qtd(l.saldo)}</td>
+                  <td data-rotulo="Porções a produzir" className={tabela.colunaAcoes}>
+                    <div className={tabela.contador}>
+                      <BotaoIcone tom="secundario" icone="menos" rotulo={`Tirar 1 porção de ${l.nome}`} disabled={bloqueado || porcoesDe(l) <= 0} onClick={somar(l.sku, -1)} />
+                      <CampoTexto disabled={bloqueado} rotulo="Porções" rotuloOculto inputMode="numeric" aria-label={`Porções de ${l.nome}`} value={l.porcoes} onChange={mudar(l.sku)} />
+                      <BotaoIcone tom="secundario" icone="mais" rotulo={`Somar 1 porção de ${l.nome}`} disabled={bloqueado} onClick={somar(l.sku, 1)} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {/* #2235 (banca A3): as duas ações do mesmo fluxo juntas à direita, a principal por último. */}
-      <div className={css.acoesDireita}>
-        <Botao icone="nota" onClick={calcular} disabled={bloqueado || linhas.length === 0}>Calcular insumos</Botao>
-        <Botao variante="primario" icone="cooking-pot" onClick={lancar} disabled={bloqueado || linhas.length === 0}>Revisar na produção</Botao>
+      {/* #2235 (banca A3) + #2439: as duas ações do mesmo fluxo juntas à direita, a principal por último; o que calcular faz fica dito embaixo. */}
+      <div className={tabela.rodapeDoPlano}>
+        <p className={tabela.notaDoPlano}><Icone nome="dica" />Uma sugestão zero também pode indicar ausência de pedidos ou de estoque mínimo definido.</p>
+        <div className={tabela.acoesDoPlano}>
+          <div className={css.acoesDireita}>
+            <Botao variante="secundario" icone="nota" onClick={calcular} disabled={bloqueado || linhas.length === 0}>Calcular insumos</Botao>
+            <Botao variante="primario" icone="cooking-pot" onClick={lancar} disabled={bloqueado || linhas.length === 0}>Revisar na produção</Botao>
+          </div>
+          <span className={tabela.apoio}>Calcular insumos não altera o estoque.</span>
+        </div>
       </div>
 
       {plano && (
