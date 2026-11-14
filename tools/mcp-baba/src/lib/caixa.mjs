@@ -7,11 +7,11 @@ export const qs = obj => {
   return p.length ? '?' + p.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&') : '';
 };
 
-function data(v, nome) { if (v !== undefined && !DATA.test(v)) throw new Error(`${nome} deve ser AAAA-MM-DD.`); return v; }
-const reais = (v, nome) => { if (!Number.isFinite(v) || Math.round(v * 100) / 100 !== v) throw new Error(`${nome} deve ter no maximo 2 casas decimais.`); return v.toFixed(2); };
+export function data(v, nome) { if (v !== undefined && !DATA.test(v)) throw new Error(`${nome} deve ser AAAA-MM-DD.`); return v; }
+export const reais = (v, nome) => { if (!Number.isFinite(v) || Math.round(v * 100) / 100 !== v) throw new Error(`${nome} deve ter no maximo 2 casas decimais.`); return v.toFixed(2); };
 const limpo = t => String(t).replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ');
-const campos = o => Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => `${k}=${JSON.stringify(limpo(v))}`).join(' ');
-function uuid(v, nome) { if (v !== undefined && !UUID.test(v)) throw new Error(`${nome} deve ser um UUID.`); return v; }
+export const campos = o => Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => `${k}=${JSON.stringify(limpo(v))}`).join(' ');
+export function uuid(v, nome) { if (v !== undefined && !UUID.test(v)) throw new Error(`${nome} deve ser um UUID.`); return v; }
 
 export const consultas = {
   dia: ({ data: d, loja_id }) => '/api/caixa/dia' + qs({ data: data(d, 'data'), lojaId: uuid(loja_id, 'loja_id') }),
@@ -53,8 +53,8 @@ export function criarPedir(srv) {
 }
 
 /** Escrita so com BABA_CAIXA_ESCRITA=1 e confirmacao da pessoa pelo cliente (fora do canal do modelo). */
-export async function escrever({ env = process.env, cliente, pedir, plano }) {
-  if (env.BABA_CAIXA_ESCRITA !== '1') throw new Error('escrita desligada: defina BABA_CAIXA_ESCRITA=1 na sua maquina.');
+export async function escrever({ env = process.env, cliente, pedir, plano, flag = 'BABA_CAIXA_ESCRITA' }) {
+  if (env[flag] !== '1') throw new Error(`escrita desligada: defina ${flag}=1 na sua maquina.`);
   const ok = await pedir(`Confirma na Casa da Baba?\n${plano.resumo}`);
   if (!ok) return { feito: false, motivo: 'nao confirmado pela pessoa' };
   const corpo = Object.fromEntries(Object.entries(plano.corpo).filter(([, v]) => v !== undefined));

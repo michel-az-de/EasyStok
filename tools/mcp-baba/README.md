@@ -97,4 +97,7 @@ Leitura: `caixa_dia`, `caixa_movimentos`, `caixa_linhas`, `caixa_fechamentos`. E
 
 Atencao: o login da API sem dispositivo revoga as outras sessoes web da mesma conta (AuthController). Use para o MCP uma conta propria (ou aceite que o navegador deslogue ao expirar o token). Um timeout numa escrita pode ter gravado no servidor: confira o caixa antes de repetir. As leituras devolvem `data` e `meta` (total, paginas): ao somar um periodo, confira `meta.pages`.
 
+## baba-producao (#2525)
+
+Mesma conta e variaveis do baba-caixa (`BABA_API_*`), pela API de producao do atendimento. Leitura: `producao_estoque_do_dia`, `producao_sugestao`, `producao_receitas`, `producao_receita`, `producao_insumos`, `producao_perdas`, `producao_perdas_vencidos`. Escrita: so `producao_lancar_perda` (baixa o estoque), com `BABA_PRODUCAO_ESCRITA=1` **e** confirmacao da pessoa no cliente; acima de R$ 50 a API exige Gerente. Registrar producao do dia e editar receita ficam de fora: tem fluxo proprio no app. Cliente HTTP liberado para `/api/atendimento/producao/*`. Script `npm run producao`. Timeout numa escrita pode ter gravado: confira `producao_perdas` antes de repetir.
 No PowerShell 5.1 `~` nao expande em argumentos: gere a chave com `ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\baba-mcp_ed25519"`. Instale na VPS as copias de `scripts/mcp/` em LF (o `.gitattributes` garante no checkout; se vier CRLF, `tr -d '\r'`). O `baba_ro.sql` pula (com NOTICE) tabela sem RLS, como `empresas`.
