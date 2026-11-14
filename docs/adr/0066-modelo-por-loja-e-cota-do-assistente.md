@@ -1,6 +1,6 @@
 # ADR-0066 · Modelo por loja dentro da lista aprovada e cota mensal do Assistente
 
-- Status: Proposto (aguarda a label `aprovado` do Felipe na PR da #2518)
+- Status: Aceito (2026-11-14; Felipe aprovou no chat da sessão da #2518: "Aprovo, pode mergear")
 - Data: 2026-11-13
 - Decisor: Felipe
 - Relacionados: issue #2518, plano `docs/plan/atendimento-whatsapp/19-engrenagem-do-assistente.md`
