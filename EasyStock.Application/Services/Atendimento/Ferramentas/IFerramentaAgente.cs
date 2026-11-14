@@ -76,6 +76,17 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     public void RegistrarEnvioVerificado() => EnvioVerificado = HouveEnvio = true;
 
     /// <summary>
+    /// #2544: a ferramenta mandou algo ao cliente que não é a resposta (a foto do produto). O turno já respondeu, mas o
+    /// texto do agente ainda sai depois, pela guarda.
+    /// </summary>
+    public void RegistrarEnvio() => HouveEnvio = true;
+
+    /// <summary>#2544: fotos de produto mandadas neste turno, para o limite por turno.</summary>
+    public int FotosEnviadas { get; private set; }
+
+    public void RegistrarFotoEnviada() { FotosEnviadas++; RegistrarEnvio(); }
+
+    /// <summary>
     /// Grava já a <see cref="Mensagem"/> que a ferramenta acabou de enviar e adicionar (#1791). O status e o eco da
     /// Meta chegam enquanto o LLM ainda responde e procuram a mensagem pelo wamid: sem ela no banco, o status se
     /// perde (sem reenvio S57 nem SMS S60) e o eco vira mensagem da dona, que assume a conversa.

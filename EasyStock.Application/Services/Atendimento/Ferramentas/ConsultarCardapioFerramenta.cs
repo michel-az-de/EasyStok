@@ -51,7 +51,9 @@ public sealed class ConsultarCardapioFerramenta(
                     porcao = i.PesoExibicao,
                     linha = i.Categoria,
                     alergenos = Preenchido(ficha?.Alergenos),
-                    ingredientes = Preenchido(ficha?.Ingredientes)
+                    ingredientes = Preenchido(ficha?.Ingredientes),
+                    // #2544: só diz se há foto; a URL fica com enviar_foto_produto.
+                    temFoto = !string.IsNullOrWhiteSpace(i.ImagemUrl)
                 };
             })
             .ToList();
