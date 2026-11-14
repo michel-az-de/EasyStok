@@ -21,7 +21,7 @@ namespace EasyStock.Domain.ValueObjects
 
         /// <summary>
         /// Rateia <paramref name="precoUnitario"/> × quantidade entre os lotes sem perder centavo (#2373): cada lote
-        /// leva o próprio valor arredondado e o último leva o resíduo, para a soma bater com o total arredondado.
+        /// leva o próprio valor arredondado, limitado ao saldo, e o último leva o resíduo.
         /// </summary>
         public static IReadOnlyList<Dinheiro> Ratear(decimal precoUnitario, IReadOnlyList<decimal> quantidades)
         {
@@ -32,7 +32,8 @@ namespace EasyStock.Domain.ValueObjects
             var acumulado = 0m;
             for (var i = 0; i < quantidades.Count - 1; i++)
             {
-                partes[i] = FromDecimal(precoUnitario * quantidades[i]);
+                var valor = FromDecimal(precoUnitario * quantidades[i]);
+                partes[i] = FromDecimal(Math.Min(valor.Valor, total - acumulado));
                 acumulado += partes[i].Valor;
             }
             partes[^1] = FromDecimal(Math.Max(0m, total - acumulado));
