@@ -155,7 +155,7 @@ os registros.
 - a leitura sem a ação de editar.
 
 **Aceite.**
-- Print, no console real, das 5 abas com os dados da Casa da Babá.
+- Print, no console real, das 5 abas com os dados da Casa da Baba.
 - A dona troca o tom e vê o efeito na próxima resposta.
 
 **Rollback.** Reverter. A API continua igual.
