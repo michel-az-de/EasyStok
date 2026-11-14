@@ -168,6 +168,26 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task FerramentaComProvedorExternoRodaForaDaTransacaoDaConversa()
+    {
+        // #2544: enviar_link_pagamento chama o Mercado Pago; a conversa não pode ficar travada durante a rede.
+        var transacao = false;
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<string>>>(), Arg.Any<CancellationToken>())
+            .Returns(async c => { transacao = true; try { return await c.Arg<Func<CancellationToken, Task<string>>>()(c.Arg<CancellationToken>()); } finally { transacao = false; } });
+        var link = Substitute.For<IFerramentaAgente, IFerramentaForaDaTransacao>();
+        link.Nome.Returns("enviar_link_pagamento");
+        var dentro = (bool?)null;
+        link.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { dentro = transacao; return "{}"; });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(UsoFerramenta("enviar_link_pagamento"), Texto("Pronto"));
+
+        await CriarServico(link).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        dentro.Should().BeFalse("a chamada ao provedor sai depois de conferir o vínculo, fora da transação");
+        await _conversaRepository.Received().ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task NovaRevisaoEntreFerramentasInterrompeRestanteDoTurno()
     {
         var travas = 0;

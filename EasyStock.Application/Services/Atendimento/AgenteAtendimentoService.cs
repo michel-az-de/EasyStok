@@ -288,7 +288,7 @@ public sealed class AgenteAtendimentoService(
         public string Descricao => ferramenta.Descricao;
         public string SchemaJson => ferramenta.SchemaJson;
         public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, System.Text.Json.JsonElement entrada, CancellationToken ct = default) =>
-            (ferramenta is CriarPedidoFerramenta
+            (ferramenta is CriarPedidoFerramenta or IFerramentaForaDaTransacao
                 ? await protecao.ExecutarPedidoAsync(token => ferramenta.ExecutarAsync(contexto, entrada, token), ct)
                 : await protecao.ExecutarAsync(token => ferramenta.ExecutarAsync(contexto, entrada, token), ct))
             ?? "O contexto da conversa mudou. Nenhuma ação foi executada.";

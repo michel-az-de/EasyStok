@@ -17,7 +17,7 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 public sealed class EnviarLinkPagamentoFerramenta(
     IPedidoRepository pedidoRepository,
     GerarCobrancaPedidoUseCase gerarCobranca,
-    IConversaRepository conversaRepository) : IFerramentaAgente
+    IConversaRepository conversaRepository) : IFerramentaAgente, IFerramentaForaDaTransacao
 {
     public string Nome => "enviar_link_pagamento";
 

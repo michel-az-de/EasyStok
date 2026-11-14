@@ -107,6 +107,21 @@ public class EnviarResumoPedidoFerramentaTests
     }
 
     [Fact]
+    public async Task ArquivoDoResumoTemNomeQueOFilesServe()
+    {
+        // #2544 (revisão): /files só serve atendimento/* com nome Guid no formato D; com outro nome a Meta recebe 404.
+        var c = new Cenario();
+        FileUploadRequest? enviado = null;
+        c.Armazenamento.UploadAsync(Arg.Do<FileUploadRequest>(r => enviado = r), Arg.Any<CancellationToken>())
+            .Returns(new StoredFileResult("k", "https://loja.exemplo/files/resumo.png", "image/png", 3));
+
+        await c.ExecutarAsync();
+
+        enviado!.BucketPath.Should().StartWith("atendimento/");
+        Guid.TryParseExact(Path.GetFileNameWithoutExtension(enviado.FileName), "D", out _).Should().BeTrue(enviado.FileName);
+    }
+
+    [Fact]
     public async Task PedidoDeOutroCliente_Recusa()
     {
         var c = new Cenario();

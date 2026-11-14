@@ -4,6 +4,12 @@ using EasyStock.Domain.Entities.Atendimento;
 namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 
 /// <summary>
+/// #2544: ferramenta que chama provedor externo lento (Mercado Pago) e grava pelo próprio use case. Confere o vínculo
+/// da conversa sob lock, mas executa fora da transação, para não travar a conversa durante a rede.
+/// </summary>
+public interface IFerramentaForaDaTransacao;
+
+/// <summary>
 /// Ferramenta que o agente de atendimento (S06) pode chamar. Executa contra a Application, nunca
 /// contra o banco direto, e devolve o texto do <c>tool_result</c> (JSON curto ou frase).
 /// </summary>

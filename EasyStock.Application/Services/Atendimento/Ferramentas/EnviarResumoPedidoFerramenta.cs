@@ -70,9 +70,10 @@ public sealed class EnviarResumoPedidoFerramenta(
         try
         {
             var imagem = await renderizador.RenderizarAsync(resumo, ct);
-            // Nome aleatório: a URL é pública porque o WhatsApp baixa a mídia por ela.
+            // Nome aleatório: a URL é pública porque o WhatsApp baixa a mídia por ela. Guid no formato D é o
+            // que o /files serve em atendimento/* (PublicUploadFileProvider).
             var salvo = await armazenamento.UploadAsync(new FileUploadRequest(
-                $"atendimento/resumos/{contexto.EmpresaId:N}", $"{Guid.NewGuid():N}.{imagem.Extensao}",
+                $"atendimento/resumos/{contexto.EmpresaId:N}", $"{Guid.NewGuid():D}.{imagem.Extensao}",
                 imagem.ContentType, imagem.Conteudo), ct);
             var url = MidiaPublica.Url(salvo.Url, configuration)
                 ?? throw new InvalidOperationException("O resumo não ficou em URL HTTPS pública.");
