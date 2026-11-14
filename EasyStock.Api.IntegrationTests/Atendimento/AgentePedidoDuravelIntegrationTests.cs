@@ -49,7 +49,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
             pedidoDuravel = pedido.Id;
             vagaDuravel = vaga.Id;
             provedorConfirmou = true;
-            falha.Armar(bancoDoTurno);
+            falha.Armar(bancoDoTurno!);
             return new PreferenceCriadaResult("pref-w5-controlada", "https://mp.test/w5-controlada");
         });
         await using var factory = CriarFactory(mp).WithWebHostBuilder(b => b.ConfigureTestServices(s =>
