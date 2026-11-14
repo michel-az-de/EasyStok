@@ -13,7 +13,8 @@ export const filtrarSemCadastro = (conversas, busca) => {
 }
 // #2446 (M4): o `requestId` nasce ao abrir o editor e vale para a abertura inteira. Trocá-lo a cada tecla fazia a
 // conta bancária duplicar quando a dona editava e salvava de novo depois de um timeout que tinha gravado.
-export const mudarDadosCadastro = (tela, dados, campo, valor) => ({ ...dados, [campo]: valor,
+// #2495 (S3): "Sem subcategoria" chega como '' do seletor e grava null.
+export const mudarDadosCadastro = (tela, dados, campo, valor) => ({ ...dados, [campo]: campo === 'subcategoriaId' && valor === '' ? null : valor,
   ...(tela === 'produtos' && campo === 'categoriaId' && valor !== dados.categoriaId ? { subcategoriaId: null } : {}) })
 export const abrirEdicaoCadastro = (tela, item, novaOperacao = () => crypto.randomUUID()) =>
   tela === 'bancos' ? { ...item, requestId: novaOperacao() } : item
@@ -179,6 +180,13 @@ const LIMITES_CADASTRO = {
   fornecedores: { nome: 150, contato: 150, telefone: 20, email: 150, documento: 30, categoria: 120, tipo: 60, siteUrl: 255, pedidoMinimo: 120, fretePadrao: 120 },
   produtos: { nome: 180 },
   bancos: { nome: 150 },
+}
+// #2495 (S3, I2): GET /api/categorias devolve as raízes com as filhas de um nível. O produto oferece só as filhas
+// da categoria escolhida; sem filhas, o seletor some.
+export const categoriasRaiz = (categorias) => (categorias ?? []).filter(c => !c.categoriaPaiId).map(c => ({ valor: c.id, rotulo: c.nome }))
+export function subcategoriasDe(categorias, categoriaId) {
+  const filhas = (categorias ?? []).find(c => c.id === categoriaId)?.subCategorias ?? []
+  return filhas.length ? [{ valor: '', rotulo: 'Sem subcategoria' }, ...filhas.map(s => ({ valor: s.id, rotulo: s.nome }))] : []
 }
 export const OBRIGATORIOS_CADASTRO = { clientes: ['nome'], fornecedores: ['nome'], produtos: ['nome', 'categoriaId'], bancos: ['nome'] }
 export function errosDoFormularioCadastro(tela, dados) {
