@@ -10,7 +10,7 @@
 // Puro. A hora sai de `passagem.em`, gravada quando o agente devolveu.
 
 import { horaCurta } from './formato'
-import { AUTOMATICO_DESLIGADO } from './motivoDeEscalada'
+import { AUTOMATICO_DESLIGADO, rotuloCurtoDoMotivo } from './motivoDeEscalada'
 import { pedidoEncerrado } from './pedido'
 import { ultimaFala } from './mensagem'
 
@@ -35,6 +35,8 @@ const minuscula = (texto) => texto.charAt(0).toLowerCase() + texto.slice(1)
 // ponto e, se ainda passar de 28 letras, na última palavra que cabe.
 const LIMITE_DO_CHIP = 28
 export function chipDoMotivo(motivo) {
+  const conhecido = rotuloCurtoDoMotivo(motivo)
+  if (conhecido) return conhecido
   const assunto = String(motivo ?? '').split(/[,.;:(]/)[0].trim()
   if (!assunto) return null
   const inicial = assunto.charAt(0).toUpperCase() + assunto.slice(1)
