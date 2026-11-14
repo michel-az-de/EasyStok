@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -6,6 +6,7 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
+using EasyStock.Application.UseCases.RemoverPagamentoPedido;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Notifications;
@@ -254,6 +255,49 @@ public class EncomendaSinalManualTests
         await receber.Should().ThrowAsync<UseCaseValidationException>();
         f.Pedido.TotalPago.Should().Be(0);
     }
+
+    // #2578: remover o pagamento que completou o sinal manual deixava a encomenda na fila sem sinal.
+    // Decisão do Felipe (14/11): abaixo do sinal e sem preparo, volta a aguardar pagamento.
+    [Fact]
+    public async Task RemoverPagamentoDoSinal_VoltaAAguardarPagamentoEAvisaAOperacao()
+    {
+        var f = Futuro();
+        f.AdicionarNaEntrega();
+        var sinal = PlanoPagamentoEncomenda.Sinal(f.Pedido.Total.Valor);
+        await Manual(f).ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", sinal));
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+
+        await Remover(f).ExecuteAsync(new RemoverPagamentoPedidoCommand(f.EmpresaId, f.Pedido.Id, f.Pedido.Pagamentos.Single().Id));
+
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+        await f.OperacaoEventos.Received(1).PublicarAsync(EventosOperacao.PedidoMudouStatus, f.EmpresaId,
+            Arg.Is<PedidoMudouStatusOperacao>(e => e.PedidoId == f.Pedido.Id
+                && e.StatusAntigo == StatusPedidoMapper.Aguardando
+                && e.StatusNovo == StatusPedidoMapper.AguardandoPagamento), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RemoverPagamentoDoRestante_ComSinalPago_MantemNaFila()
+    {
+        var f = Futuro();
+        f.AdicionarNaEntrega();
+        var total = f.Pedido.Total.Valor;
+        var sinal = PlanoPagamentoEncomenda.Sinal(total);
+        var uc = Manual(f);
+        await uc.ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", sinal));
+        await uc.ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "dinheiro", total - sinal));
+        var restante = f.Pedido.Pagamentos.Single(p => p.Metodo == "dinheiro");
+
+        await Remover(f).ExecuteAsync(new RemoverPagamentoPedidoCommand(f.EmpresaId, f.Pedido.Id, restante.Id));
+
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Pedido.TotalPago.Should().Be(sinal);
+    }
+
+    private static RemoverPagamentoPedidoUseCase Remover(CobrancaPedidoFixture f) =>
+        new(f.PedidoRepo, f.CobrancaRepo, f.Uow, NullLogger<RemoverPagamentoPedidoUseCase>.Instance,
+            QuitacaoPedidoTeste.Criar(f.PedidoRepo, f.CobrancaRepo, f.ConversaRepo, f.ImpressaoRepo, f.Publicador, f.OperacaoEventos, f.PrazoQueries),
+            f.CaixaRepo);
 
     private static CobrancaPedidoFixture Futuro()
     {

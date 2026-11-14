@@ -1,4 +1,4 @@
-using EasyStock.Application.Events.Pedidos;
+﻿using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Notifications;
@@ -128,6 +128,29 @@ public sealed class QuitacaoPedido(
                 "credito_cliente", "cupom", "cupom", 0m, pedido.Status, agora), correlationId: pedido.Id.ToString(), ct: ct);
         return new(new PedidoPagoOperacao(pedido.Id, CodigoCurto.De(pedido.Id),
             pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await PrepararCanhotoAsync(pedido, agora, ct));
+    }
+
+    /// <summary>
+    /// #2578: desfaz o <see cref="ConfirmarSinalManualAsync"/> quando um pagamento sai da encomenda. Sem preparo
+    /// iniciado, com cobrança manual e o alocado abaixo do sinal, o pedido sai da fila e volta a aguardar pagamento
+    /// (decisão do Felipe, 14/11). Pedido de balcão, sem cobrança manual, nunca entrou por aqui e fica como está.
+    /// </summary>
+    public async Task<PedidoMudouStatusOperacao?> ReverterSinalManualAsync(Pedido pedido, string? origem, Guid? usuarioId,
+        string? usuarioNome, DateTime agora, CancellationToken ct)
+    {
+        if (!PedidoStateMachine.PodeDesfazerPagamento(pedido.StatusEnum)
+            || !PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)) return null;
+        var lista = await cobrancas.ListarDoPedidoAsync(pedido.EmpresaId, pedido.Id, ct);
+        if (!lista.Any(c => c.EmpresaId == pedido.EmpresaId && c.PedidoId == pedido.Id && !c.EhOnline)) return null;
+        var alocado = saldos is not null ? (await saldos.ConsultarAsync(pedido, ct)).Alocado : pedido.TotalPago;
+        if (alocado >= PlanoPagamentoEncomenda.Sinal(pedido.Total.Valor)) return null;
+        var anterior = pedido.Status;
+        pedido.VoltarParaAguardandoPagamento();
+        await publicador.PublicarAsync(pedido.EmpresaId, "pedido.mudou_status", "pedido", pedido.Id,
+            new PedidoMudouStatusEvent(pedido.Id, pedido.EmpresaId, pedido.LojaId, anterior, pedido.Status,
+                origem ?? "web", usuarioId, usuarioNome, agora),
+            correlationId: pedido.Id.ToString(), ct: ct);
+        return new(pedido.Id, anterior, pedido.Status);
     }
 
     public async Task ReabrirManualAsync(Pedido pedido, DateTime agora, CancellationToken ct)
