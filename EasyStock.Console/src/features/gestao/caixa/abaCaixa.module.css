@@ -18,6 +18,9 @@
 
 .dicaItem { display: block; font-size: var(--t-micro); color: var(--tinta-2); }
 
+/* #2507 (N4): observação do fechamento junta nota do operador e aviso com quebra de linha; sem isto as frases se fundem. */
+.quebraLinha { white-space: pre-line; }
+
 .avisoFechado {
   margin: 0; padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta);
   background: var(--erro-pastel); border-radius: var(--r-1);

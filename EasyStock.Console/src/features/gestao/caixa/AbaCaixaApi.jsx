@@ -305,7 +305,7 @@ function UltimosFechamentos({ fechamentos }) {
             <span className={css.linhaInfo}>
               <strong>{diaMes(f.data)}</strong>
               <span className={css.dicaItem}>{f.fechadoPorNome ? `${f.fechadoPorNome} · ` : ''}{horaCurta(f.fechadoEm)}</span>
-              {f.observacoes && <span className={css.dicaItem}>{f.observacoes}</span>}
+              {f.observacoes && <span className={`${css.dicaItem} ${css.quebraLinha}`}>{f.observacoes}</span>}
             </span>
             {/* #1920: o valor da linha é o dinheiro que ficou na gaveta, o mesmo que a abertura sugere;
                 `saldoFinal` soma Pix e cartão e desmentia o "Contado na gaveta" da observação. */}
@@ -570,7 +570,8 @@ export function AbaCaixaApi() {
           {dia.fechado && dia.fechamento && (
             <p className={css.corpoBloco}>
               Fechado às {horaCurta(dia.fechamento.fechadoEm)}{dia.fechamento.fechadoPorNome ? ` por ${dia.fechamento.fechadoPorNome}` : ''}.
-              {dia.fechamento.observacoes ? ` ${dia.fechamento.observacoes}` : ''}
+              {/* #2507 (N4): a nota do operador e o aviso do fechamento vêm separados por quebra de linha. */}
+              {dia.fechamento.observacoes && <span className={css.quebraLinha}> {dia.fechamento.observacoes}</span>}
               {dia.posFechamento !== 0 && ` ${dia.posFechamento > 0 ? 'Entrou' : 'Saiu'} ${moeda(Math.abs(dia.posFechamento))} depois de fechar, fora do total do dia.`}
               {/* #2113 (B4 da #2084): o dinheiro vivo dessa conta vai para a gaveta sugerida na abertura seguinte. */}
               {dia.dinheiroPosFechamento > 0 && ` ${moeda(dia.dinheiroPosFechamento)} em dinheiro entrou na gaveta depois de fechar e vai para a abertura de amanhã.`}
