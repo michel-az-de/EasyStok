@@ -173,7 +173,7 @@ Habilidades em `agents/<id>/skills/<nome>/SKILL.md`, com nome e descrição no c
 do `consultar_caderno` (S54). Cada habilidade pode restringir as ferramentas do turno. Roteamento por
 intenção com modelo menor só se o eval mostrar ganho. Decidir aqui como ler o cabeçalho sem pacote novo.
 
-### S66 · Ajuste por loja no console (a especificar)
+### S66 · Ajuste por loja no console (substituída pela Onda 14, [19-engrenagem-do-assistente.md](19-engrenagem-do-assistente.md), ADR-0066)
 
 A loja ajusta, dentro dos limites que o perfil define: tom, saudação, instruções curtas extras, liga e
 desliga de habilidade. Nunca modelo, ferramenta, guarda nem gatilho de escalada. Guardado em
