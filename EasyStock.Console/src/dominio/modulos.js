@@ -45,6 +45,8 @@ export const MODULOS = [
       // #2478: todos os pedidos, de qualquer canal e dia; a API libera pela policy de `GET api/pedidos`.
       { id: 'pedidos', rotulo: 'Pedidos', tipo: TELA_AJUSTE, aba: 'cadastros-pedidos', soApi: true, acao: 'verPedidos' },
       { id: 'produtos', rotulo: 'Produtos', tipo: TELA_AJUSTE, aba: 'cadastros-produtos', soApi: true, acao: 'verCadastrosProdutos' },
+      // #2495 (S4): a API de categorias não tem policy própria; a tela segue o acesso de produtos.
+      { id: 'categorias', rotulo: 'Categorias de produto', tipo: TELA_AJUSTE, aba: 'cadastros-categorias', soApi: true, acao: 'verCadastrosProdutos' },
       { id: 'fornecedores', rotulo: 'Fornecedores', tipo: TELA_AJUSTE, aba: 'cadastros-fornecedores', soApi: true, acao: 'verCadastrosFornecedores' },
       { id: 'bancos', rotulo: 'Contas bancárias', tipo: TELA_AJUSTE, aba: 'cadastros-bancos', soApi: true, acao: 'verCadastrosFinanceiros' },
       { id: 'pagamentos', rotulo: 'Formas de pagamento', tipo: TELA_AJUSTE, aba: 'cadastros-pagamentos', soApi: true, acao: 'verCadastrosFinanceiros' },

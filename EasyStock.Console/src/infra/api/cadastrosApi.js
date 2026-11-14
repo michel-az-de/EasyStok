@@ -32,6 +32,10 @@ export const alternarAtividadeCadastro = (tela, id, ativar, contexto) => chamarA
   `${rotas[tela]}/${encodeURIComponent(id)}${ativar ? '/reativar' : ''}?empresaId=${contexto.empresaId}`,
   { ...opcoes(contexto), metodo: ativar ? 'POST' : 'DELETE' })
 export const listarCategoriasCadastro = (contexto, sinal) => chamarApi(`/api/categorias?empresaId=${contexto.empresaId}`, opcoes(contexto, sinal))
+// #2495 (S4): o POST e o PUT levam `empresaId` no corpo; o DELETE leva na query.
+export const criarCategoriaCadastro = (corpo, contexto) => chamarApi('/api/categorias', { ...opcoes(contexto), metodo: 'POST', corpo })
+export const atualizarCategoriaCadastro = (corpo, contexto) => chamarApi(`/api/categorias/${encodeURIComponent(corpo.id)}`, { ...opcoes(contexto), metodo: 'PUT', corpo })
+export const excluirCategoriaCadastro = (id, contexto) => chamarApi(`/api/categorias/${encodeURIComponent(id)}?empresaId=${contexto.empresaId}`, { ...opcoes(contexto), metodo: 'DELETE' })
 export async function salvarCadastro(tela, dados, contexto) {
   const id = dados.id ?? dados.produtoId
   let corpo, metodo = id ? 'PATCH' : 'POST'

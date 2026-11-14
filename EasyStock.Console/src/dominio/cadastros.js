@@ -209,7 +209,7 @@ export const TEXTOS_CADASTRO = {
   bancos: { busca: 'Nome ou instituição', novo: 'Nova conta', vazio: 'Cadastre a conta que recebe os pagamentos da loja.' },
 }
 
-export const TITULOS_CADASTROS = { clientes: 'Leads e clientes', produtos: 'Produtos', fornecedores: 'Fornecedores', bancos: 'Contas bancárias', pagamentos: 'Formas de pagamento', modelos: 'Modelos' }
+export const TITULOS_CADASTROS = { clientes: 'Leads e clientes', produtos: 'Produtos', categorias: 'Categorias de produto', fornecedores: 'Fornecedores', bancos: 'Contas bancárias', pagamentos: 'Formas de pagamento', modelos: 'Modelos' }
 export const NOMES_CANAIS_MODELO = { Email: 'E-mail', Sms: 'SMS', WhatsApp: 'WhatsApp', 1: 'E-mail', 2: 'SMS', 3: 'WhatsApp' }
 export const EVENTOS_MODELO = [
   ['PedidoPagoConfirmado', 'Pagamento do pedido confirmado'], ['PedidoEmPreparo', 'Pedido em preparo'], ['PedidoSaiuParaEntrega', 'Pedido saiu para entrega'],
