@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../infra/api/cadastrosApi'
-export { alternarAtividadeCadastro, contextoCadastro, obterCadastro, listarCategoriasCadastro, salvarCadastro, ativarMetodoCadastro, previaModeloCadastro, aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro } from '../infra/api/cadastrosApi'
+export { alternarAtividadeCadastro, atualizarCategoriaCadastro, contextoCadastro, criarCategoriaCadastro, excluirCategoriaCadastro, obterCadastro, listarCategoriasCadastro, salvarCadastro, ativarMetodoCadastro, previaModeloCadastro, aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro } from '../infra/api/cadastrosApi'
 
 // Preferências visuais da visita, sem entidades nem dados para persistir. Não contam como formulário sujo.
 const contextosVisuais = new Map()
@@ -12,6 +12,22 @@ export function useContextoVisualCadastro(chave, identidade, inicial) {
     if (contextosVisuais.size > 100) contextosVisuais.delete(contextosVisuais.keys().next().value)
     definir(proximo)
   }]
+}
+
+// #2495 (S4): a árvore de categorias de produto. Ao recarregar, a lista atual fica na tela até a nova chegar.
+export function useCategoriasCadastro(contexto) {
+  const [resultado, definir] = useState({ itens: [], carregando: true, erro: null, revisao: 0 })
+  const { empresaId, identidade } = contexto
+  const { revisao } = resultado
+  useEffect(() => {
+    const abortar = new AbortController()
+    api.listarCategoriasCadastro({ empresaId, identidade }, abortar.signal).then(
+      itens => { if (!abortar.signal.aborted) definir(r => ({ ...r, itens: itens ?? [], carregando: false, erro: null })) },
+      e => { if (!abortar.signal.aborted) definir(r => ({ ...r, carregando: false, erro: e.message })) },
+    )
+    return () => abortar.abort()
+  }, [empresaId, identidade, revisao])
+  return { ...resultado, recarregar: () => definir(r => ({ ...r, carregando: true, erro: null, revisao: r.revisao + 1 })) }
 }
 
 export function useListaCadastros(tela, filtros, contexto, habilitada = true) {

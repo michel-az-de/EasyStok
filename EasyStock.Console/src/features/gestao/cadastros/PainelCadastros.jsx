@@ -15,13 +15,14 @@ import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
 import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
+import { CategoriasCadastro } from './CategoriasCadastro'
 import { ModelosCadastro } from './ModelosCadastro'
 import { MetodosCadastro } from './MetodosCadastro'
 import css from './cadastros.module.css'
 
 const FILTROS = [{ valor: '', rotulo: 'Todos os cadastros' }, { valor: 'ativos', rotulo: 'Ativos' }, { valor: 'inativos', rotulo: 'Inativos' }]
 const ICONE = { clientes: 'usuarios', produtos: 'package', fornecedores: 'house', bancos: 'dollar-sign' }
-const CHAVE_LEITURA = { produtos: 'verCadastrosProdutos', fornecedores: 'verCadastrosFornecedores', bancos: 'verCadastrosFinanceiros', pagamentos: 'verCadastrosFinanceiros' }
+const CHAVE_LEITURA = { produtos: 'verCadastrosProdutos', categorias: 'verCadastrosProdutos', fornecedores: 'verCadastrosFornecedores', bancos: 'verCadastrosFinanceiros', pagamentos: 'verCadastrosFinanceiros' }
 const CHAVE_EDICAO = { produtos: 'editarCadastrosProdutos', fornecedores: 'editarCadastrosFornecedores', bancos: 'gerenciarCadastrosFinanceiros' }
 const nome = (c) => c.nome || c.contatoInformado?.nome || 'Contato sem nome'
 // #2457 (U2): telefone na máscara da tela, não no E.164 que a API grava.
@@ -37,6 +38,7 @@ export function PainelCadastros({ tela, respostas, impressao, aoAbrirConversa })
   if (!permitida) return <Vazio titulo="Esta área precisa de outro acesso">Peça à pessoa responsável pelos cadastros para conferir estes dados.</Vazio>
   if (tela === 'modelos') return <ModelosCadastro contexto={contexto} respostas={respostas} impressao={impressao} />
   if (tela === 'pagamentos') return <MetodosCadastro contexto={contexto} />
+  if (tela === 'categorias') return <CategoriasCadastro contexto={contexto} />
   const contextoAtivo = contextoFixado === undefined ? contextoDaConsulta : contextoFixado
   const conversa = contextoAtivo === undefined || contextoAtivo?.id === selecionada?.id ? selecionada : contextoAtivo
   return <ListaCadastro key={`${tela}:${contexto.identidade}:${conversa?.id ?? 'geral'}`} tela={tela} contexto={contexto} conversa={conversa} conversas={conversas} acoes={acoes}
