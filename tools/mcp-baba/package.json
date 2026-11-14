@@ -9,6 +9,7 @@
     "diag": "node src/diag/server.mjs",
     "db": "node src/db/server.mjs",
     "caixa": "node src/caixa/server.mjs",
+    "producao": "node src/producao/server.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {

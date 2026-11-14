@@ -1,7 +1,7 @@
 // Cliente da API EasyStok para os MCPs operacionais. Login nominal (JWT do usuario); a senha so vem do ambiente local.
 const BASE = (process.env.BABA_API_BASE || 'https://api.easystok.online').replace(/\/+$/, '');
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-const PERMITIDO = /^\/api\/(auth\/login|caixa\/[a-z/]+)(\?[A-Za-z0-9=&_.:%-]*)?$/;
+const PERMITIDO = /^\/api\/(auth\/login|caixa\/[a-z/]+|atendimento\/producao\/[a-z0-9/-]+)(\?[A-Za-z0-9=&_.:%-]*)?$/;
 
 export function validarBase(base) {
   if (!/^https:\/\/[A-Za-z0-9.-]+(:\d+)?$/.test(base) && !LOCAL.test(base)) throw new Error('BABA_API_BASE deve ser https (ou http local).');
