@@ -66,7 +66,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.LayoutSnapshotJson).HasColumnType("text");
             b.Property(x => x.LayoutSnapshotMeta).HasColumnType("text");
 
-            b.HasIndex(x => x.Codigo).IsUnique();
+            // #2506: o código repete entre empresas (LOT-aammdd-001-0001); único só dentro do lote.
+            b.HasIndex(x => new { x.LoteId, x.Codigo }).IsUnique();
             b.HasIndex(x => new { x.LoteId, x.Status });
 
             b.HasOne(x => x.LoteItem).WithMany().HasForeignKey(x => x.LoteItemId).OnDelete(DeleteBehavior.Cascade);
