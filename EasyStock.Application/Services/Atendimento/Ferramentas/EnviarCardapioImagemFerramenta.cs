@@ -22,7 +22,7 @@ public sealed class EnviarCardapioImagemFerramenta(
     public string Nome => "enviar_cardapio_imagem";
 
     public string Descricao =>
-        "Compartilha a comanda pessoal: imagem com legenda, ou texto quando não houver imagem; pelo link cliente e atendimento acompanham seleção, envio e pagamento. " +
+        "Recurso para quem quer escolher sozinho ou pede o cardápio: compartilha a comanda pessoal, imagem com legenda, ou texto quando não houver imagem; pelo link cliente e atendimento acompanham seleção, envio e pagamento. " +
         "A comanda vale a conversa toda: com uma aberta, não envia de novo. Use reenviar=true só quando o cliente pedir o link outra vez ou disser que não abre.";
 
     public string SchemaJson =>

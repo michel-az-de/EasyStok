@@ -571,7 +571,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
 
         ordem.Should().Equal("saudacao", "agente");
         saudacaoEm.Should().NotBeNull().And.BeLessThan(TimeSpan.FromSeconds(5));
-        textoSaudacao.Should().Contain("Maria").And.Contain("/cardapio");
+        textoSaudacao.Should().Contain("Maria").And.NotContain("/cardapio"); // #2544 (D1): o link não vai na saudação
         conversaAberta!.ClienteId.Should().Be(existente.Id);
         await _conversaRepository.Received(1).AddMensagemAsync(
             Arg.Is<Mensagem>(m => m.Direcao == DirecaoMensagem.Saida && m.Autor == AutorMensagem.Sistema
@@ -717,8 +717,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _useCase.ExecuteAsync(PayloadTexto("wamid.meio-dia", "Oi"));
 
         var padrao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
-        enviado.Should().StartWith(padrao.SaudacaoPrimeiroContato.Split('{')[0])
-            .And.Contain("/cardapio")
+        enviado.Should().StartWith(padrao.SaudacaoPrimeiroContato)
+            .And.NotContain("/cardapio")
             .And.EndWith(padrao.FraseEspera);
     }
 

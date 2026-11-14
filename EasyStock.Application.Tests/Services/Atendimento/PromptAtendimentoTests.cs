@@ -35,9 +35,9 @@ public class PromptAtendimentoTests
         for (var i = 1; i <= 8; i++)
             prompt.Should().Contain($"RN-0{i}");
         prompt.Should().Contain("D3").And.Contain(configuracao.Tom).And.Contain("[interno]");
-        prompt.Should().Contain("Para montar um pedido compartilhe a comanda pessoal")
+        prompt.Should().Contain("A comanda pessoal é um recurso")
             .And.Contain("nunca use criar_pedido para repetir esse envio")
-            .And.Contain("Use criar_pedido somente quando o cliente pedir explicitamente");
+            .And.Contain("Para fechar pela conversa");
 
         // Snapshot: mudança no system prompt é deliberada e revisada no diff deste arquivo.
         var snapshot = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Services", "Atendimento", "PromptAtendimento.snapshot.txt"));
@@ -52,7 +52,7 @@ public class PromptAtendimentoTests
         var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
 
         descricao.Should().NotContain("Baba").And.Contain("a responsável");
-        prompt.Replace("Casa da Baba", "", StringComparison.Ordinal).Should().NotContain("Baba");
+        prompt.Should().NotContain("Baba");
     }
 
     /// <summary>
@@ -97,10 +97,63 @@ public class PromptAtendimentoTests
         var etapas = string.Join("\n", RoteiroAtendimento.Padrao.Select(e => $"{e.Nome}: {e.Instrucao}"));
         var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
 
-        etapas.Should().NotContain("Anotar").And.Contain("nunca diga que anotou")
+        etapas.Should().NotContain("Anotar").And.Contain("Nunca diga que anotou")
             .And.Contain("validar_endereco").And.Contain("salve o endereço do mesmo jeito");
         prompt.Should().Contain("sem usar escalar_para_dona ou encaminhar_para_responsavel")
             .And.Contain("consultar_pedido não mostrar pedido em andamento");
+    }
+
+    /// <summary>
+    /// #2544 (S71): o Assistente abria pelo link e parava de conduzir. O prompt abre pela identidade, depois o script e
+    /// só então as regras; o script segue Acolher, Entender, Mostrar, Montar, Entrega, Confirmar, Pagar e Acompanhar.
+    /// </summary>
+    [Fact]
+    public void Prompt_AbrePeloScript()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        RoteiroAtendimento.Padrao.Select(e => e.Nome).Should().Equal(
+            "Acolher", "Entender", "Mostrar", "Montar", "Entrega", "Confirmar", "Pagar", "Acompanhar");
+        prompt.Should().StartWith("Você é o assistente virtual da loja no WhatsApp");
+        prompt.IndexOf("Roteiro do atendimento", StringComparison.Ordinal).Should()
+            .BePositive().And.BeLessThan(prompt.IndexOf("Regras (obrigatórias)", StringComparison.Ordinal));
+        prompt.Should().Contain("RN-01: a saudação já foi enviada automaticamente no primeiro contato")
+            .And.NotContain("o link do cardápio já foram enviados");
+        var confirmar = RoteiroAtendimento.Padrao.Single(e => e.Nome == "Confirmar").Instrucao;
+        confirmar.Should().Contain("criar_pedido").And.Contain("enviar_resumo_pedido").And.Contain("ok");
+        RoteiroAtendimento.Padrao.Single(e => e.Nome == "Pagar").Instrucao.Should().Contain("enviar_link_pagamento");
+        RoteiroAtendimento.Padrao.Single(e => e.Nome == "Mostrar").Instrucao.Should().Contain("enviar_foto_produto");
+    }
+
+    /// <summary>
+    /// #2544 (S71, D3 a): a comanda é recurso, oferecido só a quem quer escolher sozinho ou pede o cardápio. O primeiro
+    /// passo não manda link.
+    /// </summary>
+    [Fact]
+    public void Roteiro_ComandaEhRecurso()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+        var acolher = RoteiroAtendimento.Padrao[0].Instrucao;
+
+        acolher.Should().Contain("Não mande link");
+        RoteiroAtendimento.Padrao.Where(e => e.Instrucao.Contains("enviar_cardapio_imagem", StringComparison.Ordinal))
+            .Select(e => e.Nome).Should().Equal("Mostrar");
+        RoteiroAtendimento.Padrao.Single(e => e.Nome == "Mostrar").Instrucao.Should()
+            .Contain("se ele quiser escolher sozinho ou pedir o cardápio");
+        prompt.Should().NotContain("Para montar um pedido compartilhe a comanda")
+            .And.Contain("A comanda pessoal é um recurso")
+            .And.Contain("ofereça como pergunta");
+    }
+
+    /// <summary>#2544 (S71): "não existe baba, é a dona". O prompt não cita o nome da loja e fala da dona como "a dona".</summary>
+    [Fact]
+    public void Prompt_DonaPeloNomeOuADona()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        prompt.Should().NotContain("Baba")
+            .And.Contain("O nome da loja não é uma pessoa")
+            .And.Contain("fale dela como \"a dona\"");
     }
 
     [Fact]
