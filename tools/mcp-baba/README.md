@@ -81,3 +81,16 @@ Cobrem redacao (token, JWT, senha, connection string, e-mail, CPF, telefone), re
 
 - A redacao local e segunda camada. Antes de confiar nos logs do console da API, rode `logs_api` e confira que nada sensivel aparece (a redacao provada no servidor e a do sink de arquivo).
 - `docker logs` usa o driver do Docker; se o container for recriado, o historico anterior some.
+
+## baba-caixa (#2524)
+
+Consulta e opera o caixa pela API (regras de negocio ficam la; o nivel do usuario limita o que cada pessoa faz). Nao usa SSH nem SQL.
+
+| Variavel | Valor |
+|---|---|
+| `BABA_API_BASE` | `https://api.easystok.online` (so https, ou http em localhost) |
+| `BABA_API_EMAIL`, `BABA_API_PASSWORD` | login nominal da pessoa, **so no ambiente local** |
+| `BABA_EMPRESA_ID` | opcional, se o login tiver mais de uma empresa |
+| `BABA_CAIXA_ESCRITA` | `1` habilita escrita; padrao desligada |
+
+Leitura: `caixa_dia`, `caixa_movimentos`, `caixa_linhas`, `caixa_fechamentos`. Escrita (`caixa_abrir`, `caixa_fechar`, `caixa_lancar_movimento`): so com `BABA_CAIXA_ESCRITA=1` **e** confirmacao da pessoa no cliente (elicitation do MCP, fora do canal do modelo); cliente sem suporte a confirmacao recusa. O cliente HTTP so fala com `/api/auth/login` e `/api/caixa/*`. Registro: `node tools/mcp-baba/src/caixa/server.mjs` (script `npm run caixa`).
