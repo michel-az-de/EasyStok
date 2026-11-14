@@ -33,7 +33,9 @@ public sealed class WebhookWppConnectController(ProcessarWebhookWppConnectUseCas
         }
         catch (Exception ex) when (ex is JsonException or FormatException or ArgumentOutOfRangeException)
         {
-            logger.LogWarning("Callback WPPConnect inválido: {Motivo}", ex.Message);
+            // #2591: o corpo recusado não fica gravado; o formato (campos e tipos, sem valores) torna a causa observável.
+            logger.LogWarning("Callback WPPConnect inválido: {Motivo} Formato: {Formato}", ex.Message,
+                WppConnectWebhookFormato.Descrever(rawBody));
             return BadRequest(new { error = new { message = "Evento WPPConnect inválido." } });
         }
         catch (Exception ex) when (ex is WhatsAppCloudException or HttpRequestException or TaskCanceledException)
