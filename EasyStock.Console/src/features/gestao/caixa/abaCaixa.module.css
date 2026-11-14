@@ -134,16 +134,16 @@
 .caixaApi { gap: var(--e-4); }
 .identificacao { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; min-width: 0; }
 .caixaApi .cabecalho { align-items: center; }
-.caixaApi > .resumoLista { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-4); }
+.resumoDoDia .resumoLista { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--e-4); }
 /* #2078 (E6): rótulo colado ao valor. O item desce para o pé da célula (os valores da linha seguem
    alinhados pela base quando um rótulo quebra em duas linhas), em vez de reservar duas linhas para
    todo rótulo e deixar o número a meio caminho entre o seu rótulo e o da linha de baixo. */
-.caixaApi > .resumoLista div { justify-content: flex-end; }
-.caixaApi > .resumoLista dt { line-height: var(--lh-corpo); }
-.caixaApi > .resumoLista dd { font-size: var(--t-forte); line-height: var(--lh-compacto); white-space: nowrap; }
+.resumoDoDia .resumoLista div { justify-content: flex-end; }
+.resumoDoDia .resumoLista dt { line-height: var(--lh-corpo); }
+.resumoDoDia .resumoLista dd { font-size: var(--t-forte); line-height: var(--lh-compacto); white-space: nowrap; }
 /* #2078 (E6): o número herói (a gaveta) com o tamanho de valor do Hall, não o de título. */
-.caixaApi > .resumoLista .resumoForte dd { font-size: var(--t-valor); letter-spacing: var(--ls-display); }
-.caixaApi > .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; padding: 0; }
+.resumoDoDia .resumoLista .resumoForte dd { font-size: var(--t-valor); letter-spacing: var(--ls-display); }
+.resumoDoDia .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; padding: 0; }
 .notaGaveta { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-corpo); }
 .caixaApi .extrato { gap: var(--e-6); }
 .caixaApi .lista { gap: 0; }
@@ -187,20 +187,23 @@
   .fluxo tfoot th, .fluxo tfoot td { border-top: 0; }
 }
 
-/* Resumo com número de itens diferente de sete: quatro colunas, para o total não ficar sozinho. */
-@container (min-width: 1040px) {
-  .caixaApi > .resumoLista.resumoEmQuatro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* #2512 (Q08, N3): o resumo em duas contas, "Onde está" e "De onde veio", cada uma com a sua grade. A grade
+   se ajusta ao número de linhas (auto-fit); antes o layout trocava quando a conta não dava seis itens. */
+.resumoDoDia { display: grid; gap: var(--e-4); }
+.contasDoResumo { display: grid; gap: var(--e-4) var(--e-6); grid-template-columns: minmax(0, 1fr); }
+.contaDoResumo { display: grid; gap: var(--e-2); min-width: 0; align-content: start; }
+.tituloConta { margin: 0; font-size: var(--t-apoio); font-weight: 700; color: var(--tinta-2); }
+@container (min-width: 900px) {
+  .contasDoResumo { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
 }
-
-@container (min-width: 1040px) {
-  .caixaApi > .resumoLista { grid-template-columns: minmax(150px, 1.2fr) repeat(6, minmax(0, 1fr)); }
-}
+/* #2512 (N4): a observação do fechamento junta a nota e o aviso com quebra de linha. */
+.observacao { white-space: pre-line; }
 
 @container (max-width: 600px) {
-  .caixaApi > .resumoLista { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
-  .caixaApi > .resumoLista dt { white-space: normal; }
-  .caixaApi > .resumoLista .resumoForte { grid-column: auto; }
-  .caixaApi > .resumoLista .resumoTotal { grid-column: 1 / -1; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: var(--e-2); }
+  .resumoDoDia .resumoLista { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
+  .resumoDoDia .resumoLista dt { white-space: normal; }
+  .resumoDoDia .resumoLista .resumoForte { grid-column: auto; }
+  .resumoDoDia .resumoLista .resumoTotal { grid-column: 1 / -1; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: var(--e-2); }
   .caixaApi .linha { gap: var(--e-2); padding-inline: var(--e-2); }
   .caixaApi .linhaInfo strong, .caixaApi .linhaValor { font-size: var(--t-apoio); }
 }
@@ -208,8 +211,8 @@
 @container (max-width: 360px) {
   .caixaApi .acoesTopo { gap: var(--e-1); }
   .caixaApi .acoesTopo > button { padding-inline: var(--e-2); }
-  .caixaApi > .resumoLista .resumoForte { grid-column: 1 / -1; }
-  .caixaApi > .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; gap: var(--e-1); }
+  .resumoDoDia .resumoLista .resumoForte { grid-column: 1 / -1; }
+  .resumoDoDia .resumoLista .resumoTotal { grid-column: auto; flex-direction: column; align-items: flex-start; gap: var(--e-1); }
 }
 
 /* #2258 (F3): esqueleto do valor do resumo enquanto o dado não chegou (mesmos tokens do T2 do Atendimento). */

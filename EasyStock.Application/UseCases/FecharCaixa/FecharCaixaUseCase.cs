@@ -88,6 +88,7 @@ public class FecharCaixaUseCase(
         // início de hoje) não entram neste fechamento e não pertencem ao caixa de hoje → ficariam
         // órfãos. Não descartar em silêncio: detecta e anexa aviso persistido + log (ADR-0033).
         var observacoes = cmd.Observacoes;
+        var lancamentosForaDoFechamento = false;
         if (dia < hoje)
         {
             var iniInter = HorarioBrasil.JanelaDiaUtc(dia).FimUtc;   // = 00:00 do dia seguinte à abertura
@@ -104,6 +105,7 @@ public class FecharCaixaUseCase(
                                 $"{hoje.AddDays(-1):dd/MM/yyyy} nesta sessão que não entraram neste fechamento. " +
                                 "Revise e reconcilie manualmente.";
                     observacoes = string.IsNullOrWhiteSpace(observacoes) ? aviso : $"{observacoes}\n{aviso}";
+                    lancamentosForaDoFechamento = true;
                     logger.LogWarning(
                         "Fechamento {Dia} (empresa {Empresa}, loja {Loja}): lancamentos em dias intermediarios nao cobertos.",
                         dia, cmd.EmpresaId, cmd.LojaId);
@@ -154,7 +156,7 @@ public class FecharCaixaUseCase(
         logger.LogInformation("Caixa {Data} fechado (saldo final={Saldo}, vendas={Vendas}).",
             dia, fechamento.SaldoFinal, totalVendas);
         await ResolverAvisosDoSinoAsync(cmd.EmpresaId);
-        return Map(fechamento);
+        return Map(fechamento) with { LancamentosForaDoFechamento = lancamentosForaDoFechamento };
     }
 
     // #2258 (F1): o aviso "caixa aberto desde ..." do sino sai de circulação quando o caixa fecha. O fechamento já está

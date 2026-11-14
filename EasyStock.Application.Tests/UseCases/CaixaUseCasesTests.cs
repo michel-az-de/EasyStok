@@ -355,6 +355,35 @@ public class CaixaUseCasesTests
         await _repo.Received(1).AddFechamentoAsync(Arg.Is<FechamentoCaixa>(f => f.Observacoes == esperado));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FecharCaixa_ExpoeSinalTipadoDeLancamentosForaDoFechamento(bool haLancamentoOrfao)
+    {
+        // #2507 (N1): o Web decide o toast por este campo, não pela frase das observações. O teste trava o nome
+        // que vai no JSON da API (camelCase, JsonSerializerDefaults.Web), o mesmo que CaixaFechamentoAvisoTests lê.
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var dia = hoje.AddDays(-3);
+        var abertura = MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-3));
+        var esquecido = MovimentoCaixa.Criar(empresaId, "entrada", 20m, DateTime.UtcNow.AddDays(-2));
+
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(abertura);
+        _repo.GetFechamentoDoDiaAsync(empresaId, dia, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, dia, null).Returns(new[] { abertura });
+        _repo.GetMovimentosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(haLancamentoOrfao ? new[] { esquecido } : Array.Empty<MovimentoCaixa>());
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<FecharCaixaUseCase>>());
+
+        var result = await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, Observacoes: "Nota do operador"));
+
+        var json = System.Text.Json.JsonSerializer.Serialize(result,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        json.Should().Contain($"\"lancamentosForaDoFechamento\":{(haLancamentoOrfao ? "true" : "false")}");
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // RegistrarMovimentoCaixa
     // ════════════════════════════════════════════════════════════════════

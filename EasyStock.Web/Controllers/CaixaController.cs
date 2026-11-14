@@ -54,7 +54,8 @@ public class CaixaController(CaixaService svc, SessionService session) : BaseCon
         var fech = result.Data;
         // Toast usa a data efetivamente fechada pelo servidor (não um palpite do cliente).
         // Toast() grava uma única chave em TempData → emitir um só toast (aviso engloba sucesso).
-        var temAviso = fech?.Observacoes?.Contains("nao foram incluidos", StringComparison.OrdinalIgnoreCase) == true;
+        // #2507: decide pelo sinal tipado da API, não pelo texto das observações.
+        var temAviso = fech?.LancamentosForaDoFechamento == true;
         if (temAviso)
             Toast("warning", $"Caixa de {fech?.Data:dd/MM/yyyy} fechado (saldo {fech?.SaldoFinal:C}). " +
                 "Atenção: há lançamentos em dias anteriores não incluídos — revise no histórico.");

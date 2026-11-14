@@ -23,8 +23,8 @@ import {
   observacaoDaConfirmacao, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, ROTULO_FORA_DA_GAVETA, ROTULO_FORA_DO_DINHEIRO, TIPOS_MOVIMENTO, avisoDeDevolucoesNasTelas, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
-  nomeDoMetodoCaixa, temMovimentoNoDia, tituloDaLinhaExtra, tomDoCaixa, totaisDoFluxo,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, avisoDeDevolucoesNasTelas, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
+  nomeDoMetodoCaixa, quandoNoCaixa, resumoEmDuasContas, temMovimentoNoDia, tituloDaLinhaExtra, tomDoCaixa, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
   horaCurta, lerMoeda, moeda, moedaAltaDemais, plural,
@@ -249,7 +249,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
             <li key={`${m.origem}-${m.tipo}-${m.em}-${m.valor}-${indice}`} className={css.linha}>
               <span className={css.linhaInfo}>
                 <strong>{tituloDaLinhaExtra(m)}</strong>
-                <span className={css.dicaItem}>{horaCurta(m.em)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.clienteNome && ` · ${m.clienteNome}`}{m.tipo !== 'estorno' && m.descricao && ` · ${m.descricao}`}{m.autorNome && ` · ${m.autorNome}`}</span>
+                <span className={css.dicaItem}>{quandoNoCaixa(m.em, dia.data)}{m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}{m.clienteNome && ` · ${m.clienteNome}`}{m.tipo !== 'estorno' && m.descricao && ` · ${m.descricao}`}{m.autorNome && ` · ${m.autorNome}`}</span>
               </span>
               <span className={m.valor < 0 ? `${css.linhaValor} ${css.valorSaida}` : css.linhaValor}>{m.valor < 0 ? '−' : '+'} {moeda(Math.abs(m.valor))}</span>
             </li>
@@ -272,7 +272,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
               <span className={css.linhaInfo}>
                 <strong>{m.categoria}</strong>
                 <span className={css.dicaItem}>
-                  {horaCurta(m.em)}
+                  {quandoNoCaixa(m.em, dia.data)}
                   {m.meio && ` · ${nomeDoMetodoCaixa(m.meio)}`}
                   {m.descricao && ` · ${m.descricao}`}
                   {m.autorNome && ` · ${m.autorNome}`}
@@ -304,8 +304,10 @@ function UltimosFechamentos({ fechamentos }) {
           <li key={f.id} className={css.linha}>
             <span className={css.linhaInfo}>
               <strong>{diaMes(f.data)}</strong>
-              <span className={css.dicaItem}>{f.fechadoPorNome ? `${f.fechadoPorNome} · ` : ''}{horaCurta(f.fechadoEm)}</span>
-              {f.observacoes && <span className={css.dicaItem}>{f.observacoes}</span>}
+              {/* #2512 (Q06, Q04): fechamento antigo pode não ter quem fechou; e quem fecha o caixa esquecido fecha outro dia. */}
+              <span className={css.dicaItem}>{f.fechadoPorNome ?? 'Sem registro de quem fechou'} · {quandoNoCaixa(f.fechadoEm, f.data)}</span>
+              {/* #2512 (N4): a observação junta nota e aviso com quebra de linha. */}
+              {f.observacoes && <span className={`${css.dicaItem} ${css.observacao}`}>{f.observacoes}</span>}
             </span>
             {/* #1920: o valor da linha é o dinheiro que ficou na gaveta, o mesmo que a abertura sugere;
                 `saldoFinal` soma Pix e cartão e desmentia o "Contado na gaveta" da observação. */}
@@ -327,25 +329,30 @@ const ROTULO_TOTAL_DO_CAIXA = 'Total do caixa (com Pix e cartão)'
 // #1627: sem abertura ninguém disse quanto havia na gaveta, então a tela não afirma "na gaveta" nem
 // "saldo inicial": mostra o que entrou e saiu, por onde. O que veio sem forma de pagamento (venda
 // do pedido entregue pelo PWA, #1630) tem linha própria em vez de engordar "Pix e cartão".
-function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
-  const linhas = [
-    !semAbertura && { forte: true, rotulo: 'Na gaveta (dinheiro)', valor: gaveta.naGaveta },
-    !semAbertura && { rotulo: 'Saldo inicial', valor: dia.saldoInicial },
-    dia.totalVendas !== 0 && { rotulo: 'Vendas', valor: dia.totalVendas },
-    { rotulo: 'Outras entradas', valor: dia.totalEntradasExtras },
-    { rotulo: 'Outras saídas', valor: dia.totalSaidasExtras },
-    { rotulo: 'Pagamentos de pedidos', valor: dia.totalPagamentosPedidos },
-    semAbertura && { rotulo: 'Em dinheiro', valor: gaveta.naGaveta },
-    { rotulo: semAbertura ? ROTULO_FORA_DO_DINHEIRO : ROTULO_FORA_DA_GAVETA, valor: gaveta.pixECartao },
-    gaveta.semForma !== 0 && { rotulo: 'Sem forma de pagamento', valor: gaveta.semForma },
-  ].filter(Boolean)
+// #2512 (Q08, N3): duas contas, cada uma com a sua grade, que fecham no mesmo total. A grade se ajusta ao
+// número de linhas sozinha; antes o layout trocava quando a conta não dava seis.
+function ContaDoResumo({ titulo, linhas }) {
   return (
-    <>
-      {/* Sete itens cabem numa linha só; com outro número, quatro colunas não deixam o total sozinho. */}
-      <dl className={`${css.resumoLista} ${linhas.length === 6 ? '' : css.resumoEmQuatro}`}>
+    <section className={css.contaDoResumo} aria-label={titulo}>
+      <h4 className={css.tituloConta}>{titulo}</h4>
+      <dl className={css.resumoLista}>
         {linhas.map((l) => (
           <div key={l.rotulo} className={l.forte ? css.resumoForte : undefined}><dt title={l.rotulo}>{l.rotulo}</dt><dd>{valorDoResumo(l.valor)}</dd></div>
         ))}
+      </dl>
+    </section>
+  )
+}
+
+function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
+  const { lugar, origem } = resumoEmDuasContas(dia, gaveta, semAbertura)
+  return (
+    <div className={css.resumoDoDia}>
+      <div className={css.contasDoResumo}>
+        <ContaDoResumo titulo="Onde está" linhas={lugar} />
+        <ContaDoResumo titulo="De onde veio" linhas={origem} />
+      </div>
+      <dl className={css.resumoLista}>
         <div className={css.resumoTotal}><dt>{ROTULO_TOTAL_DO_CAIXA}</dt><dd>{valorDoResumo(dia.saldoEsperado)}</dd></div>
       </dl>
       <p className={css.notaGaveta}>
@@ -357,7 +364,7 @@ function ResumoDoDia({ dia, gaveta, semAbertura = false }) {
           ? ' O que veio sem forma de pagamento pode ter sido dinheiro.'
           : ' O que veio sem forma de pagamento pode ser dinheiro: confira antes de fechar o caixa.')}
       </p>
-    </>
+    </div>
   )
 }
 
@@ -441,12 +448,19 @@ export function AbaCaixaApi() {
   // #2275: o aviso soma o mesmo período dos totais: o dia, ou desde a abertura no caixa esquecido aberto.
   const inicioDevolucoes = caixa.dia?.esquecidoAberto && caixa.dia?.abertoDesde ? caixa.dia.abertoDesde : caixa.dia?.data
   // #2267: o pagamento do pedido cancelado está nos totais; o aviso diz que ele não é da loja.
-  const avisoDevolucoes = avisoDeDevolucoesNasTelas(useDevolucoesPendentes(Boolean(caixa.dia?.data), inicioDevolucoes, caixa.dia?.data))
+  // #2512 (Q03): o aviso diz o recorte que conta; o Extrato soma 90 dias e dava outro número sem explicar.
+  const avisoDevolucoes = avisoDeDevolucoesNasTelas(
+    useDevolucoesPendentes(Boolean(caixa.dia?.data), inicioDevolucoes, caixa.dia?.data),
+    { desde: caixa.dia?.esquecidoAberto ? caixa.dia?.abertoDesde ?? null : null },
+  )
   // #2275: alerta com ícone e título curto; o corpo é o aviso de sempre.
   const devolucoesPendentes = avisoDevolucoes && (
     <p className={`${css.alerta} ${css.alertaAtencao}`} role="status">
       <Icone nome="alerta" tamanho={20} className={css.alertaIcone} />
-      <span className={css.alertaCorpo}><strong className={css.alertaTitulo}>Devolução a fazer.</strong> {avisoDevolucoes}</span>
+      <span className={css.alertaCorpo}>
+        <strong className={css.alertaTitulo}>Devolução a fazer.</strong> {avisoDevolucoes}
+        {' '}<a href="#/m/financeiro/extrato">Ver no Extrato</a>
+      </span>
     </p>
   )
   const [acao, executar, limparErro] = useAcaoComRecarga(caixa.recarregar)
@@ -539,9 +553,10 @@ export function AbaCaixaApi() {
               </Pilula>
             </div>
             <div className={css.acoesTopo}>
-              {podeGerenciar && dia.aberto && !dia.fechado && (
+              {/* #2512 (Q07): no caixa esquecido aberto o botão de fechar é o do alerta, um só na vista. */}
+              {podeGerenciar && dia.aberto && !dia.fechado && !dia.esquecidoAberto && (
                 <Botao variante="texto" icone="lock" disabled={acao.enviando || conferindo} onClick={abrirFechamento}>
-                  {dia.esquecidoAberto ? `Fechar o caixa de ${diaMes(dia.abertoDesde)}` : 'Fechar o caixa'}
+                  Fechar o caixa
                 </Botao>
               )}
               {podeLancar && (
@@ -570,7 +585,7 @@ export function AbaCaixaApi() {
           {dia.fechado && dia.fechamento && (
             <p className={css.corpoBloco}>
               Fechado às {horaCurta(dia.fechamento.fechadoEm)}{dia.fechamento.fechadoPorNome ? ` por ${dia.fechamento.fechadoPorNome}` : ''}.
-              {dia.fechamento.observacoes ? ` ${dia.fechamento.observacoes}` : ''}
+              {dia.fechamento.observacoes && <>{' '}<span className={css.observacao}>{dia.fechamento.observacoes}</span></>}
               {dia.posFechamento !== 0 && ` ${dia.posFechamento > 0 ? 'Entrou' : 'Saiu'} ${moeda(Math.abs(dia.posFechamento))} depois de fechar, fora do total do dia.`}
               {/* #2113 (B4 da #2084): o dinheiro vivo dessa conta vai para a gaveta sugerida na abertura seguinte. */}
               {dia.dinheiroPosFechamento > 0 && ` ${moeda(dia.dinheiroPosFechamento)} em dinheiro entrou na gaveta depois de fechar e vai para a abertura de amanhã.`}
