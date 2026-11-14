@@ -192,8 +192,9 @@ public sealed class AgenteAtendimentoService(
             respondeu = await EnviarRespostaAsync(gravacao, conversa, despedida, ct) || respondeu;
         else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
-            // #2515: sem texto do agente, o menu adiado basta como resposta.
-            var soMenu = concluiu && motivoEscalada is null && string.IsNullOrWhiteSpace(geracao.Texto) && contexto.TemEnvioAdiado;
+            // #2515: sem texto do agente, o menu adiado basta como resposta. #2544: a foto do produto também.
+            var soMenu = concluiu && motivoEscalada is null && string.IsNullOrWhiteSpace(geracao.Texto)
+                && (contexto.TemEnvioAdiado || contexto.HouveEnvio);
             if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
                 respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
             else if (!soMenu && (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu))
@@ -306,7 +307,7 @@ public sealed class AgenteAtendimentoService(
         public string Descricao => ferramenta.Descricao;
         public string SchemaJson => ferramenta.SchemaJson;
         public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, System.Text.Json.JsonElement entrada, CancellationToken ct = default) =>
-            (ferramenta is CriarPedidoFerramenta
+            (ferramenta is CriarPedidoFerramenta or IFerramentaForaDaTransacao
                 ? await protecao.ExecutarPedidoAsync(token => ferramenta.ExecutarAsync(contexto, entrada, token), ct)
                 : await protecao.ExecutarAsync(token => ferramenta.ExecutarAsync(contexto, entrada, token), ct))
             ?? "O contexto da conversa mudou. Nenhuma ação foi executada.";

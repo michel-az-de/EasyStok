@@ -37,7 +37,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         mp.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>()).Returns(async chamada =>
         {
             var command = chamada.Arg<CriarPreferenceCommand>();
-            bancoDoTurno!.Database.CurrentTransaction.Should().BeNull("a ferramenta do agente não mantém transação durante o provedor");
+            // #2544: enviar_link_pagamento roda fora da transação da conversa; a única trava viva é a do pedido (#1724).
             // Outra unidade de trabalho só vê pedido e vaga se o commit anterior realmente ocorreu no PostgreSQL.
             using var consulta = servicos!.CreateScope();
             var banco = consulta.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -49,7 +49,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
             pedidoDuravel = pedido.Id;
             vagaDuravel = vaga.Id;
             provedorConfirmou = true;
-            falha.Armar(bancoDoTurno);
+            falha.Armar(bancoDoTurno!);
             return new PreferenceCriadaResult("pref-w5-controlada", "https://mp.test/w5-controlada");
         });
         await using var factory = CriarFactory(mp).WithWebHostBuilder(b => b.ConfigureTestServices(s =>
@@ -78,14 +78,45 @@ public sealed partial class PedidoConversaConcorrenciaTests
             itens = new[] { new { cardapio_item_id = cenario.CardapioItemId, quantidade = 1 } },
             data_entrega = cenario.DataEntrega.ToString("yyyy-MM-dd"), janela_id = cenario.JanelaId,
         });
+        // #2544: criar_pedido não cobra mais. O pedido nasce no primeiro turno, sem tocar o provedor.
         llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
             new RespostaLlm(RespostaLlm.StopToolUse, [new BlocoUsoFerramentaLlm("w5-pedido", "criar_pedido", entrada)], 1, 1));
+        using (var turno = servicos.CreateScope())
+        {
+            var banco = turno.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            banco.SetMobileTenantContext(EmpresaId);
+            await turno.ServiceProvider.GetRequiredService<AgenteAtendimentoService>()
+                .ProcessarTurnoAsync(EmpresaId, cenario.ConversaId, DateTime.UtcNow);
+        }
+        await mp.DidNotReceiveWithAnyArgs().CriarPreferenceAsync(default!, default);
+        Guid pedidoCriado;
+        using (var resumo = servicos.CreateScope())
+        {
+            // O resumo saiu e o cliente respondeu: só então enviar_link_pagamento chama o provedor.
+            var banco = resumo.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            banco.SetMobileTenantContext(EmpresaId);
+            var conversa = await banco.AtendimentoConversas.SingleAsync(c => c.Id == cenario.ConversaId);
+            pedidoCriado = conversa.PedidoEmAndamentoId!.Value;
+            var agora = DateTime.UtcNow;
+            banco.AtendimentoMensagens.Add(Mensagem.Saida(EmpresaId, conversa.Id, AutorMensagem.Agente, agora,
+                TipoConteudoMensagem.Imagem, ResumoPedidoAtendimento.Legenda(pedidoCriado), "wamid.w5.resumo"));
+            conversa.LiberarAutomatico();
+            conversa.RegistrarEntrada(agora.AddSeconds(1));
+            banco.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conversa.Id, agora.AddSeconds(1),
+                TipoConteudoMensagem.Texto, "Tudo certo, pode mandar.", "wamid.w5.ok"));
+            await banco.SaveChangesAsync();
+        }
+        llm.ClearReceivedCalls();
+        cloud.ClearReceivedCalls();
+        llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            new RespostaLlm(RespostaLlm.StopToolUse, [new BlocoUsoFerramentaLlm("w5-link", "enviar_link_pagamento",
+                JsonSerializer.SerializeToElement(new { pedidoId = pedidoCriado }))], 1, 1));
         using (var turno = servicos.CreateScope())
         {
             bancoDoTurno = turno.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             bancoDoTurno.SetMobileTenantContext(EmpresaId);
             var agente = turno.ServiceProvider.GetRequiredService<AgenteAtendimentoService>();
-            var resultado = await agente.ProcessarTurnoAsync(EmpresaId, cenario.ConversaId, DateTime.UtcNow);
+            var resultado = await agente.ProcessarTurnoAsync(EmpresaId, cenario.ConversaId, DateTime.UtcNow.AddSeconds(2));
             resultado.ChamouLlm.Should().BeTrue();
             resultado.Respondeu.Should().BeFalse();
         }

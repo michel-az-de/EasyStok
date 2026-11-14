@@ -169,6 +169,26 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task FerramentaComProvedorExternoRodaForaDaTransacaoDaConversa()
+    {
+        // #2544: enviar_link_pagamento chama o Mercado Pago; a conversa não pode ficar travada durante a rede.
+        var transacao = false;
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<string>>>(), Arg.Any<CancellationToken>())
+            .Returns(async c => { transacao = true; try { return await c.Arg<Func<CancellationToken, Task<string>>>()(c.Arg<CancellationToken>()); } finally { transacao = false; } });
+        var link = Substitute.For<IFerramentaAgente, IFerramentaForaDaTransacao>();
+        link.Nome.Returns("enviar_link_pagamento");
+        var dentro = (bool?)null;
+        link.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { dentro = transacao; return "{}"; });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(UsoFerramenta("enviar_link_pagamento"), Texto("Pronto"));
+
+        await CriarServico(link).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        dentro.Should().BeFalse("a chamada ao provedor sai depois de conferir o vínculo, fora da transação");
+        await _conversaRepository.Received().ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task NovaRevisaoEntreFerramentasInterrompeRestanteDoTurno()
     {
         var travas = 0;
@@ -647,6 +667,39 @@ public partial class AgenteAtendimentoServiceTests
         ordem.Should().Equal(esperado);
         resultado.Respondeu.Should().BeTrue();
         resultado.Escalou.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// #2544 (S72): a foto do produto já chegou ao cliente. Sem texto do agente, a foto basta e nada vai para a equipe;
+    /// com texto, ele sai depois da foto.
+    /// </summary>
+    [Theory]
+    [InlineData("", new[] { "foto" })]
+    [InlineData("Essa é a lasanha. Quer pedir?", new[] { "foto", "texto" })]
+    public async Task FotoDoProdutoNaoEhRespostaVaziaNemEscala(string fala, string[] esperado)
+    {
+        var ordem = new List<string>();
+        var foto = Substitute.For<IFerramentaAgente>();
+        foto.Nome.Returns("enviar_foto_produto");
+        foto.Descricao.Returns("Manda a foto");
+        foto.SchemaJson.Returns("""{"type":"object","properties":{}}""");
+        foto.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(c =>
+            {
+                ordem.Add("foto");
+                c.Arg<ContextoTurnoAgente>().RegistrarFotoEnviada();
+                return """{"enviado":true}""";
+            });
+        _cloudClient.When(c => c.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("texto"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("enviar_foto_produto"), Texto(fala));
+
+        var resultado = await CriarServico(foto).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        ordem.Should().Equal(esperado);
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeFalse();
     }
 
     [Fact]

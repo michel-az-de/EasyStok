@@ -4,27 +4,37 @@ namespace EasyStock.Application.Services.Atendimento;
 public sealed record EtapaRoteiroAtendimento(string Nome, string Instrucao, bool Ativo = true);
 
 /// <summary>
-/// Roteiro padrão do atendimento (#2516), na ordem em que entra no prompt. A frente de conduta é dona do conteúdo; a
-/// configuração por loja (S68, <c>RoteiroJson</c>) só guarda e edita.
+/// Script padrão do atendimento (#2544, S71), na ordem em que entra no prompt: o Assistente conduz do acolhimento ao
+/// pagamento, e a comanda é um recurso. A frente de conduta é dona do conteúdo; a configuração por loja (S68,
+/// <c>RoteiroJson</c>) só guarda e edita.
 /// </summary>
 public static class RoteiroAtendimento
 {
     public static IReadOnlyList<EtapaRoteiroAtendimento> Padrao { get; } =
     [
-        new("Entender o pedido",
-            "Descubra o que o cliente quer. A comanda pessoal enviada no primeiro contato vale a conversa toda."),
-        new("Itens",
-            "Item dito na conversa: confirme sabor, tamanho e quantidade em uma frase e siga para o que falta; nunca diga que anotou ou registrou, " +
-            "pois quem marca é o cliente no link ou criar_pedido. Não reenvie a comanda."),
-        new("Endereço",
-            "Peça o endereço com CEP e número, valide com validar_endereco, repita ao cliente e, com a confirmação dele, salve com confirmar_endereco. " +
-            "Fora da área, salve o endereço do mesmo jeito e use escalar_para_dona para combinar entrega e frete."),
-        new("Data e janela",
-            "Pergunte a data e use listar_janelas; o cliente escolhe uma das opções enviadas."),
-        new("Fechar o pedido",
-            "Pela comanda, o cliente confirma no link. Se ele pedir para fechar por aqui e consultar_pedido não mostrar pedido em andamento, " +
-            "siga até criar_pedido neste atendimento: nunca diga que faz por aqui e pare."),
+        new("Acolher",
+            "Cumprimente pelo primeiro nome quando o dossiê trouxer, apresente-se como o assistente da loja e pergunte como pode ajudar. " +
+            "Não mande link nem cardápio sem o cliente pedir."),
+        new("Entender",
+            "Descubra a ocasião, a data, quantas pessoas e se há restrição alimentar. Uma pergunta por mensagem e nada que já foi dito. " +
+            "Se o cliente citar um pedido, use consultar_pedido."),
+        new("Mostrar",
+            "Com consultar_cardapio, sugira 2 ou 3 opções que combinem com o que ele contou e, no item com foto, pergunte se quer ver como fica; " +
+            "com o sim, use enviar_foto_produto. Ofereça a comanda pessoal só se ele quiser escolher sozinho ou pedir o cardápio, " +
+            "e então use enviar_cardapio_imagem."),
+        new("Montar",
+            "Confirme item, sabor, tamanho e quantidade em uma frase, com o preço que consultar_cardapio devolver. Nunca diga que anotou ou " +
+            "registrou: o pedido só existe depois de criar_pedido ou da confirmação na comanda."),
+        new("Entrega",
+            "Peça o endereço com CEP e número, valide com validar_endereco, repita ao cliente e, com a confirmação dele, salve com " +
+            "confirmar_endereco. Fora da área, salve o endereço do mesmo jeito e use escalar_para_dona para combinar entrega e frete. " +
+            "Depois pergunte a data e use listar_janelas; o cliente escolhe uma das opções enviadas."),
+        new("Confirmar",
+            "Se consultar_pedido não mostrar pedido em andamento, siga até criar_pedido neste atendimento, use enviar_resumo_pedido e peça o ok " +
+            "do cliente. Nunca diga que faz por aqui e pare."),
+        new("Pagar",
+            "Com o ok do resumo, use enviar_link_pagamento (Pix ou cartão). Se o link vencer, use de novo."),
         new("Acompanhar",
-            "Status, entrega e pagamento vêm de consultar_pedido; responda só com o que ela devolver."),
+            "Status, entrega e pagamento vêm de consultar_pedido e consultar_entrega; responda só com o que elas devolverem."),
     ];
 }

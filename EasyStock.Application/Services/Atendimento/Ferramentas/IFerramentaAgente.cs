@@ -4,6 +4,12 @@ using EasyStock.Domain.Entities.Atendimento;
 namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 
 /// <summary>
+/// #2544: ferramenta que chama provedor externo lento (Mercado Pago) e grava pelo próprio use case. Confere o vínculo
+/// da conversa sob lock, mas executa fora da transação, para não travar a conversa durante a rede.
+/// </summary>
+public interface IFerramentaForaDaTransacao;
+
+/// <summary>
 /// Ferramenta que o agente de atendimento (S06) pode chamar. Executa contra a Application, nunca
 /// contra o banco direto, e devolve o texto do <c>tool_result</c> (JSON curto ou frase).
 /// </summary>
@@ -74,6 +80,17 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     public void RegistrarRespostaVerificada(string texto) => RespostaVerificada = texto;
 
     public void RegistrarEnvioVerificado() => EnvioVerificado = HouveEnvio = true;
+
+    /// <summary>
+    /// #2544: a ferramenta mandou algo ao cliente que não é a resposta (a foto do produto). O turno já respondeu, mas o
+    /// texto do agente ainda sai depois, pela guarda.
+    /// </summary>
+    public void RegistrarEnvio() => HouveEnvio = true;
+
+    /// <summary>#2544: fotos de produto mandadas neste turno, para o limite por turno.</summary>
+    public int FotosEnviadas { get; private set; }
+
+    public void RegistrarFotoEnviada() { FotosEnviadas++; RegistrarEnvio(); }
 
     /// <summary>
     /// Grava já a <see cref="Mensagem"/> que a ferramenta acabou de enviar e adicionar (#1791). O status e o eco da

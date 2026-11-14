@@ -17,13 +17,17 @@ public class ConfiguracaoAtendimento
 
     public NivelSugestaoAtendimento NivelSugestao { get; set; } = NivelSugestaoAtendimento.Discreto;
 
-    /// <summary>Enviada antes do agente, na primeira mensagem de uma conversa nova (S05).</summary>
-    public string SaudacaoPrimeiroContato { get; set; } =
-        "Oi! Seja bem-vindo(a) à Casa da Baba 🍝 Dá uma olhada no nosso cardápio: {link}";
+    /// <summary>
+    /// Enviada antes do agente, na primeira mensagem de uma conversa nova (S05). Sem link (#2544, D1): o Assistente
+    /// conduz e oferece a comanda só a quem quer escolher sozinho. <c>{link}</c> no texto da loja ainda vira o cardápio.
+    /// </summary>
+    public string SaudacaoPrimeiroContato { get; set; } = SaudacaoPrimeiroContatoPadrao;
 
-    /// <summary>Com <c>{nome}</c> — cliente já conhecido, identificado pelo telefone (S05).</summary>
-    public string SaudacaoRetorno { get; set; } =
-        "Oi, {nome}! Que bom te ver de novo por aqui. Segue nosso cardápio: {link}";
+    /// <summary>Com <c>{nome}</c> — cliente já conhecido, identificado pelo telefone (S05). Sem link (#2544).</summary>
+    public string SaudacaoRetorno { get; set; } = SaudacaoRetornoPadrao;
+
+    public const string SaudacaoPrimeiroContatoPadrao = "Oi! Seja bem-vindo(a) à Casa da Baba 🍝";
+    public const string SaudacaoRetornoPadrao = "Oi, {nome}! Que bom te ver de novo por aqui.";
 
     /// <summary>Frase de espera enviada junto da saudação, antes do agente responder (RN-01).</summary>
     public string FraseEspera { get; set; } = "Só um instante que já te ajudo!";

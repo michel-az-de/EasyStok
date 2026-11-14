@@ -7,8 +7,8 @@ namespace EasyStock.Application.Services.Atendimento;
 
 /// <summary>
 /// Monta a saudação que o webhook envia antes do agente na primeira mensagem de uma conversa nova
-/// (S05, RN-01): texto de <see cref="ConfiguracaoAtendimento"/>, link do cardápio e frase de espera,
-/// numa única mensagem. Sem LLM, para caber nos 5 s.
+/// (S05, RN-01): texto de <see cref="ConfiguracaoAtendimento"/> e frase de espera, numa única mensagem. Sem LLM,
+/// para caber nos 5 s. O link do cardápio só entra se o texto da loja tiver <c>{link}</c> (#2544, D1).
 /// </summary>
 public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontRepository, IConfiguration configuration)
 {
@@ -30,8 +30,8 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
 
     /// <summary>
     /// Cliente conhecido e com nome → <see cref="ConfiguracaoAtendimento.SaudacaoRetorno"/> com <c>{nome}</c>;
-    /// senão <see cref="ConfiguracaoAtendimento.SaudacaoPrimeiroContato"/>. Texto configurado sem
-    /// <c>{link}</c> recebe o link numa linha própria: o cardápio sempre vai.
+    /// senão <see cref="ConfiguracaoAtendimento.SaudacaoPrimeiroContato"/>. <c>{link}</c> vira o link do cardápio; sem
+    /// ele, nada é anexado: a comanda é recurso que o Assistente oferece (#2544).
     /// </summary>
     public static string Montar(ConfiguracaoAtendimento configuracao, string? primeiroNome, string linkCardapio)
     {
@@ -40,9 +40,7 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
             : configuracao.SaudacaoRetorno;
 
         var saudacao = modelo.Replace("{nome}", primeiroNome ?? string.Empty, StringComparison.Ordinal);
-        saudacao = saudacao.Contains("{link}", StringComparison.Ordinal)
-            ? saudacao.Replace("{link}", linkCardapio, StringComparison.Ordinal)
-            : $"{saudacao}\n{linkCardapio}";
+        saudacao = saudacao.Replace("{link}", linkCardapio, StringComparison.Ordinal);
 
         return string.IsNullOrWhiteSpace(configuracao.FraseEspera)
             ? saudacao
