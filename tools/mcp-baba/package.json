@@ -10,6 +10,7 @@
     "db": "node src/db/server.mjs",
     "caixa": "node src/caixa/server.mjs",
     "producao": "node src/producao/server.mjs",
+    "atendimento": "node src/atendimento/server.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
