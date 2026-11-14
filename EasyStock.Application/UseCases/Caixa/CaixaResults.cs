@@ -50,7 +50,13 @@ public sealed record FechamentoCaixaResult(
     /// <summary>#2084 (D1): caixa esquecido; o dinheiro de hoje que já estava na gaveta contada e fica no caixa de hoje.</summary>
     decimal? DinheiroEntrouDepois = null,
     /// <summary>#2084 (B4): dinheiro recebido no mesmo dia depois de fechar. Já somado em <see cref="DinheiroNaGaveta"/>.</summary>
-    decimal DinheiroPosFechamento = 0m
+    decimal DinheiroPosFechamento = 0m,
+    /// <summary>
+    /// #2507: a sessão fechada tinha lançamentos em dias intermediários que não entraram neste fechamento (o mesmo
+    /// caso do aviso gravado em <see cref="Observacoes"/>). É o sinal que a tela usa para avisar; o texto é só para
+    /// leitura. Só vem verdadeiro no fechamento que acabou de ser gravado; a releitura idempotente devolve falso.
+    /// </summary>
+    bool LancamentosForaDoFechamento = false
 );
 
 /// <summary>
