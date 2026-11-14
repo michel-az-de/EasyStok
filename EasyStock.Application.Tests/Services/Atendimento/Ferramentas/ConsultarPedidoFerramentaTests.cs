@@ -84,4 +84,57 @@ public sealed class ConsultarPedidoFerramentaTests
             .Should().Contain("pedido_nao_encontrado");
         outroCliente.RespostaVerificada.Should().BeNull();
     }
+
+    /// <summary>
+    /// #2515, conversa 96ca9f9e: o cliente respondeu "2" à lista de janelas e o agente consultou o pedido sem id.
+    /// Sem pedido em andamento, a ferramenta caiu no último pedido do cliente, cancelado havia 10 dias, e o texto
+    /// verificado saiu literal: "Situação registrada: Cancelado... Falta pagar: R$ 19,00".
+    /// </summary>
+    [Fact]
+    public async Task SemPedidoEmAndamento_UltimoPedidoCanceladoNaoViraRespostaVerificada()
+    {
+        var empresa = Guid.NewGuid();
+        var cliente = Cliente.Criar(empresa, "Felipe");
+        var pedido = Pedido.Criar(empresa, cliente);
+        pedido.Total = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(19m);
+        pedido.Cancelar();
+        var conversa = Conversa.Abrir(empresa, "5511999998888", DateTime.UtcNow, "Felipe", cliente.Id);
+        var pedidos = Substitute.For<IPedidoRepository>();
+        pedidos.GetByIdWithDetailsAsync(empresa, pedido.Id).Returns(pedido);
+        pedidos.ListByClienteAsync(empresa, cliente.Id, 1).Returns([pedido]);
+        var creditos = Substitute.For<ICreditoClienteComandaRepository>();
+        var ferramenta = new ConsultarPedidoFerramenta(pedidos, new(pedidos), Substitute.For<IConfiguracaoAtendimentoRepository>(),
+            new SaldoFinanceiroPedido(pedidos, Substitute.For<IEstornoOnlineRepository>(), creditos), creditos);
+        var contexto = new ContextoTurnoAgente(empresa, conversa, DateTime.UtcNow);
+
+        using var json = JsonDocument.Parse(await ferramenta.ExecutarAsync(contexto, JsonSerializer.SerializeToElement(new { })));
+
+        json.RootElement.GetProperty("erro").GetString().Should().Be("sem_pedido_em_andamento");
+        json.RootElement.GetProperty("ultimoPedido").GetProperty("pedidoId").GetGuid().Should().Be(pedido.Id);
+        contexto.RespostaVerificada.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PedidoCanceladoInformadoNaoCobraFaltaPagarNemPrevisao()
+    {
+        var empresa = Guid.NewGuid();
+        var cliente = Cliente.Criar(empresa, "Felipe");
+        var pedido = Pedido.Criar(empresa, cliente);
+        pedido.Total = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(19m);
+        pedido.Cancelar();
+        var conversa = Conversa.Abrir(empresa, "5511999998888", DateTime.UtcNow, "Felipe", cliente.Id);
+        var pedidos = Substitute.For<IPedidoRepository>();
+        pedidos.GetByIdWithDetailsAsync(empresa, pedido.Id).Returns(pedido);
+        var creditos = Substitute.For<ICreditoClienteComandaRepository>();
+        var ferramenta = new ConsultarPedidoFerramenta(pedidos, new(pedidos), Substitute.For<IConfiguracaoAtendimentoRepository>(),
+            new SaldoFinanceiroPedido(pedidos, Substitute.For<IEstornoOnlineRepository>(), creditos), creditos);
+        var contexto = new ContextoTurnoAgente(empresa, conversa, DateTime.UtcNow);
+
+        using var json = JsonDocument.Parse(await ferramenta.ExecutarAsync(contexto,
+            JsonSerializer.SerializeToElement(new { pedido_id = pedido.Id })));
+
+        json.RootElement.GetProperty("faltaPagar").GetString().Should().Be("R$ 0,00");
+        contexto.RespostaVerificada.Should().Contain("Cancelado").And.Contain("Total: R$ 19,00")
+            .And.NotContain("Falta pagar").And.NotContain("Cobertura atual").And.NotContain("previsão de entrega");
+    }
 }

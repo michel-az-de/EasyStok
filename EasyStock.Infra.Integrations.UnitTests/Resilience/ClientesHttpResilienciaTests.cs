@@ -69,7 +69,7 @@ public class ClientesHttpResilienciaTests
     {
         var falso = FalsoQueFalhaDuasVezes(PreferenciaJson);
         var comando = new CriarPreferenceCommand(
-            Guid.NewGuid(), Guid.NewGuid(), "Casa da Babá", 10m, [new PreferenceItemCommand("Brigadeiro", 1, 10m)]);
+            Guid.NewGuid(), Guid.NewGuid(), "Casa da Baba", 10m, [new PreferenceItemCommand("Brigadeiro", 1, 10m)]);
 
         var act = () => MercadoPago(falso).CriarPreferenceAsync(comando);
 

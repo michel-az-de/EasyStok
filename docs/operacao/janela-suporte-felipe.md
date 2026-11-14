@@ -1,8 +1,8 @@
 # Janela de suporte do Felipe — módulo Caixa Conciliado
 
 > Este documento é parte do contrato operacional entre Felipe (dev EasyStock)
-> e a Casa da Babá (cliente piloto do módulo Caixa Conciliado). **Precisa de
-> assinatura escrita da Casa da Babá antes do go-live de produção (F8).**
+> e a Casa da Baba (cliente piloto do módulo Caixa Conciliado). **Precisa de
+> assinatura escrita da Casa da Baba antes do go-live de produção (F8).**
 >
 > Versão: 1 — 2026-05-16. Origem: `docs/plan/07-faseamento.md` H.5 + Premissa N.11.
 
@@ -10,7 +10,7 @@
 
 Felipe é o único desenvolvedor do EasyStock e trabalha na Avanade durante
 o dia útil. O módulo de Caixa Conciliado é crítico para o fechamento diário
-da Casa da Babá — se falhar fora da janela de suporte do Felipe, a
+da Casa da Baba — se falhar fora da janela de suporte do Felipe, a
 operadora precisa ter um caminho de fallback automático que **não dependa
 de telefonar para ele**.
 
@@ -18,7 +18,7 @@ Este documento declara honestamente:
 
 1. Quando Felipe está disponível para suporte humano.
 2. Quando não está, e o que acontece nesse intervalo.
-3. Como a Casa da Babá aciona o fallback sem depender de Felipe.
+3. Como a Casa da Baba aciona o fallback sem depender de Felipe.
 
 ## Janela real de suporte
 
@@ -33,18 +33,18 @@ Este documento declara honestamente:
 
 ## Fallback automático — flag de emergência
 
-Para todos os horários **fora da janela do Felipe**, a Casa da Babá usa o
+Para todos os horários **fora da janela do Felipe**, a Casa da Baba usa o
 botão **"Desligar Caixa Novo (emergência)"** disponível no admin do
 EasyStock.
 
 **O que o botão faz** (em ≤ 1 minuto):
 
-1. Desliga a feature flag `CaixaConciliadoV2` para a empresa Casa da Babá.
+1. Desliga a feature flag `CaixaConciliadoV2` para a empresa Casa da Baba.
 2. A UI do PWA volta automaticamente para o fluxo de Caixa antigo (versão
    anterior ao deploy de meados de julho de 2026).
 3. Backend para de gravar em `sessoes_caixa` e `movimentos_caixa` linkados —
    pagamentos continuam funcionando via `PedidoPagamento` (fluxo legacy).
-4. Casa da Babá não perde funcionalidade básica — perde apenas os ganhos
+4. Casa da Baba não perde funcionalidade básica — perde apenas os ganhos
    novos (conferência, PDF, hash) até Felipe investigar.
 5. Felipe recebe notificação por WhatsApp + email assim que possível.
 
@@ -60,12 +60,12 @@ Authorization: Bearer <jwt admin>
 Idempotente (chamar 2x não causa efeito adicional). Registrado em
 `AuditLog`.
 
-## SLA combinado com a Casa da Babá
+## SLA combinado com a Casa da Baba
 
 - **Suporte humano em janela**: resposta de Felipe em até 30 min via
   WhatsApp; resolução depende da gravidade.
 - **Fora da janela — falha não-crítica** (bug cosmético, UI estranha mas
-  caixa fecha): Casa da Babá registra ocorrência; Felipe trata na próxima
+  caixa fecha): Casa da Baba registra ocorrência; Felipe trata na próxima
   janela.
 - **Fora da janela — falha crítica** (operadora não consegue registrar
   pagamento OU caixa fecha com valor errado): Thatiane (ou admin) aperta
@@ -115,8 +115,8 @@ Total: ~30h de janela ativa nas primeiras 60h pós-deploy.
 | Parte | Nome | Data | Assinatura |
 |---|---|---|---|
 | EasyStock (dev) | Felipe Michel de Azevedo | _____ | _____ |
-| Casa da Babá (gestão) | _________________ | _____ | _____ |
-| Casa da Babá (operadora) | Thatiane _______ | _____ | _____ |
+| Casa da Baba (gestão) | _________________ | _____ | _____ |
+| Casa da Baba (operadora) | Thatiane _______ | _____ | _____ |
 
 > Após assinatura, anexar foto/scan deste documento em
 > `docs/operacao/janela-suporte-felipe-assinada-YYYY-MM-DD.pdf` e referenciar

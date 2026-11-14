@@ -11,7 +11,7 @@ export async function entrar(email, senha) {
     metodo: 'POST', corpo: { email, senha, empresaId: null }, autenticado: false,
   })
   const empresaId = empresaDoToken(dados.token)
-  if (!empresaId) throw new Error('Este usuário precisa de uma empresa ativa única para entrar na Casa da Babá. Peça à responsável para conferir o acesso.')
+  if (!empresaId) throw new Error('Este usuário precisa de uma empresa ativa única para entrar na Casa da Baba. Peça à responsável para conferir o acesso.')
   return abrirSessao(dados, { id: empresaId, nome: null })
 }
 

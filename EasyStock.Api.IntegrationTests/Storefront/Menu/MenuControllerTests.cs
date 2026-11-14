@@ -113,7 +113,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
         var empresa = new Empresa
         {
             Id = Guid.NewGuid(),
-            Nome = "Casa da Babá (test)",
+            Nome = "Casa da Baba (test)",
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow,
         };
@@ -159,7 +159,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
         var storefront = StorefrontEntity.Criar(
             empresaId: empresa.Id,
             slug: slug,
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 0m);
         if (storefrontAtivo) storefront.Ativar();
         db.Storefronts.Add(storefront);
@@ -207,7 +207,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
 
         var json = await resp.Content.ReadAsStringAsync();
         var envelope = JsonSerializer.Deserialize<MenuEnvelope>(json, JsonOpts)!;
-        envelope.TituloPublico.Should().Be("Casa da Babá", "o envelope carrega o título público do storefront");
+        envelope.TituloPublico.Should().Be("Casa da Baba", "o envelope carrega o título público do storefront");
         envelope.Slug.Should().Be(seed.Storefront.Slug);
         var itens = envelope.Itens;
         itens.Should().HaveCount(1, "apenas o item Visivel=true deve aparecer");
@@ -239,7 +239,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
         doc.RootElement.TryGetProperty("itens", out var itens).Should().BeTrue("envelope tem 'itens'");
         itens.ValueKind.Should().Be(JsonValueKind.Array);
         doc.RootElement.TryGetProperty("tituloPublico", out var titulo).Should().BeTrue("envelope tem 'tituloPublico'");
-        titulo.GetString().Should().Be("Casa da Babá");
+        titulo.GetString().Should().Be("Casa da Baba");
         doc.RootElement.TryGetProperty("slug", out _).Should().BeTrue("envelope tem 'slug'");
     }
 
@@ -450,7 +450,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
 
         // O título sai com entidades HTML (Bab&#225;): o guard de XSS (#658) codifica texto do tenant.
         var html = System.Net.WebUtility.HtmlDecode(await resp.Content.ReadAsStringAsync());
-        html.Should().Contain("Casa da Babá", "cabeçalho usa o título público do storefront");
+        html.Should().Contain("Casa da Baba", "cabeçalho usa o título público do storefront");
         html.Should().Contain("Lasanha de berinjela", "item visível deve aparecer");
         html.Should().NotContain("Em rascunho", "item oculto (Visivel=false) não vai para impressão");
         html.Should().Contain("window.print()", "botão de imprimir presente (escondido no @media print)");
@@ -487,7 +487,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
         var empresa = new Empresa
         {
             Id = Guid.NewGuid(),
-            Nome = "Casa da Babá (avulso test)",
+            Nome = "Casa da Baba (avulso test)",
             CriadoEm = DateTime.UtcNow,
             AlteradoEm = DateTime.UtcNow,
         };
@@ -517,7 +517,7 @@ public sealed class MenuControllerTests : IAsyncLifetime
         };
         db.Produtos.Add(produto);
 
-        var storefront = StorefrontEntity.Criar(empresa.Id, slug, "Casa da Babá", 0m);
+        var storefront = StorefrontEntity.Criar(empresa.Id, slug, "Casa da Baba", 0m);
         storefront.Ativar();
         db.Storefronts.Add(storefront);
 

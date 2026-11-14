@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
@@ -7,7 +8,10 @@ namespace EasyStock.Application.UseCases.Atendimento;
 
 /// <param name="WaId">Dígitos E.164 sem <c>+</c>, como a Meta entrega em <c>contacts[].wa_id</c>.</param>
 /// <param name="NomePerfil">Nome do perfil do WhatsApp; vira o nome do cadastro quando o contato é novo.</param>
-public sealed record IdentificarClientePorTelefoneInput(Guid EmpresaId, string WaId, string? NomePerfil, bool ReutilizarCadastro = true);
+/// <param name="HonrarDecisaoDaEquipe">#2492: só o webhook do WhatsApp liga. Aplica a correção que a equipe fez
+/// numa conversa anterior deste telefone. Quem prova identidade (OTP, cadastro pela equipe) não passa por ela.</param>
+public sealed record IdentificarClientePorTelefoneInput(Guid EmpresaId, string WaId, string? NomePerfil,
+    bool ReutilizarCadastro = true, bool HonrarDecisaoDaEquipe = false);
 
 /// <param name="EhLead">Ainda não comprou (<c>OrderCount == 0</c>), RN-03.</param>
 /// <param name="EhNovo">O cadastro foi criado agora, nesta identificação.</param>
@@ -32,6 +36,7 @@ public sealed class TelefoneExigeVerificacaoException() : Exception(
 public sealed class IdentificarClientePorTelefoneUseCase(
     IClienteRepository clienteRepository,
     IClienteStorefrontRepository clienteStorefrontRepository,
+    IVinculoClienteConversaRepository vinculos,
     ILogger<IdentificarClientePorTelefoneUseCase> logger)
 {
     /// <summary>Nome do lead quando o perfil do WhatsApp não traz nome.</summary>
@@ -46,14 +51,30 @@ public sealed class IdentificarClientePorTelefoneUseCase(
         var candidatos = NormalizadorTelefone.CandidatosDeWaId(input.WaId);
         var telefones = candidatos.SelectMany(GrafiasDoCadastro).Distinct().ToArray();
         var hashes = candidatos.Select(ClienteOtp.CalcularTelefoneHash).ToArray();
+        var decisao = input.HonrarDecisaoDaEquipe
+            ? await vinculos.ObterDecisaoAtivaAsync(input.EmpresaId, hashes, ct)
+            : null;
+
+        // #2492 D4: a pessoa que a equipe apontou resolve até o telefone compartilhado.
+        if (decisao?.ClienteEscolhidoId is { } escolhidoId
+            && await clienteRepository.GetByIdAsync(input.EmpresaId, escolhidoId) is { Ativo: true } escolhido
+            && escolhido.EmpresaId == input.EmpresaId)
+            return new IdentificacaoCliente(escolhido, EhLead: escolhido.OrderCount == 0, EhNovo: false);
+
         if (await clienteRepository.TemTelefoneCompartilhadoAsync(input.EmpresaId, telefones, hashes, ct))
             return new IdentificacaoCliente(null, EhLead: false, EhNovo: false);
 
-        var existente = await ProcurarAsync(input.EmpresaId, candidatos, input.ReutilizarCadastro, ct);
+        var recusado = decisao?.ClienteRecusadoId;
+        var existente = await ProcurarAsync(input.EmpresaId, candidatos, input.ReutilizarCadastro, recusado, ct);
         if (existente is not null && !input.ReutilizarCadastro)
             throw new TelefoneExigeVerificacaoException();
         if (existente is not null)
             return new IdentificacaoCliente(existente, EhLead: existente.OrderCount == 0, EhNovo: false);
+
+        // #2492 D1: só sobrou quem a equipe recusou. Um lead novo repetiria o telefone dele e deixaria o
+        // número compartilhado; a conversa fica sem cliente, com a identidade a conferir.
+        if (recusado is not null)
+            return new IdentificacaoCliente(null, EhLead: false, EhNovo: false);
 
         var novo = CriarLead(input.EmpresaId, candidatos[0], input.NomePerfil);
         await clienteRepository.AddAsync(novo);
@@ -65,13 +86,14 @@ public sealed class IdentificarClientePorTelefoneUseCase(
         return new IdentificacaoCliente(novo, EhLead: true, EhNovo: true);
     }
 
-    private async Task<ClienteEntity?> ProcurarAsync(Guid empresaId, IReadOnlyList<string> candidatos, bool preencherHash, CancellationToken ct)
+    private async Task<ClienteEntity?> ProcurarAsync(Guid empresaId, IReadOnlyList<string> candidatos, bool preencherHash,
+        Guid? recusado, CancellationToken ct)
     {
         foreach (var e164 in candidatos)
         {
             var porHash = await clienteStorefrontRepository.GetByTelefoneHashAsync(
                 empresaId, ClienteOtp.CalcularTelefoneHash(e164), ct);
-            if (porHash is not null)
+            if (porHash is not null && porHash.Id != recusado)
                 return porHash;
         }
 
@@ -80,7 +102,7 @@ public sealed class IdentificarClientePorTelefoneUseCase(
             foreach (var grafia in GrafiasDoCadastro(e164))
             {
                 var porTelefone = await clienteRepository.FindByTelefoneAsync(empresaId, grafia);
-                if (porTelefone is null) continue;
+                if (porTelefone is null || porTelefone.Id == recusado) continue;
 
                 // #1290: cadastro do ERP não tem TelefoneHash; sem ele o OTP e o checkout guest do site
                 // (que procuram por hash) criam outro cliente. O hash do canônico está livre: nenhum

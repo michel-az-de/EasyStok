@@ -35,7 +35,7 @@ public class CadastrarClienteDaConversaUseCaseTests
     {
         _uow.SetupExecuteInTransactionSemRetry<ClienteDaConversaResult>();
         _conversas.EspelharLeituraComLock();
-        _storefront = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Babá", pedidoMinimoEntrega: 0m);
+        _storefront = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Baba", pedidoMinimoEntrega: 0m);
         _storefront.Ativar();
         _storefronts.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(_storefront);
         _storefronts.GetBySlugAsync("casa-da-baba", Arg.Any<CancellationToken>()).Returns(_storefront);
@@ -58,7 +58,7 @@ public class CadastrarClienteDaConversaUseCaseTests
         var frete = new CalcularFreteUseCase(_storefronts, _zonas, _cep, geocoding, Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
         return new CadastrarClienteDaConversaUseCase(
             _conversas, _clientes, _uow,
-            new IdentificarClientePorTelefoneUseCase(_clientes, _clientesStorefront, NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+            new IdentificarClientePorTelefoneUseCase(_clientes, _clientesStorefront, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new ValidarEnderecoUseCase(_storefronts, frete, _cep, _configuracao, NullLogger<ValidarEnderecoUseCase>.Instance),
             new ConfirmarEnderecoClienteUseCase(_clientes, _uow,
                 new AdicionarClienteEnderecoUseCase(_clientes, _uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance)),

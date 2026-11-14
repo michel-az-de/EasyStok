@@ -13,7 +13,7 @@ Ambos os módulos têm:
 
 - **Plano consolidado pronto.** Caixa V2 em [`docs/plan/00..08-*.md`](../plan/) (9 documentos); Rotulagem P-02 em [`docs/plan/p-02-rotulagem-nutricional.md`](../plan/p-02-rotulagem-nutricional.md) (1 documento gigante).
 - **ADRs preparatórios.** Caixa V2: [0014](0014-pagamento-aditivo-em-pedido-pagamento.md), [0015](0015-sessao-caixa-como-entidade-explicita.md), [0016](0016-fechamento-hash-retencao-cinco-anos.md). Rotulagem P-02: [0011](0011-nomenclatura-pt-br-rotulagem.md), [0012](0012-backup-rotulos-storage.md), [0017](0017-comprovante-aprovacao-interna-rt.md).
-- **Mesmo cliente piloto:** Casa da Babá (massas frescas artesanais; operadora Thatiane).
+- **Mesmo cliente piloto:** Casa da Baba (massas frescas artesanais; operadora Thatiane).
 - **Tasks ETK materializadas no bootstrap** ([ADR-0020](0020-tdd-tasks-numeradas-multitarefa.md)): 7 tasks de Caixa (ETK-0006 a ETK-0012, todas P1) + 1 architecture test (ETK-0023); 2 tasks de Rotulagem (ETK-0016, ETK-0017, ambas P2).
 
 A pendência era a escolha estratégica entre dois perfis distintos de módulo, não a falta de plano técnico.
@@ -28,7 +28,7 @@ Validados em sessão Felipe ↔ Claude em 2026-05-24:
 
 | Dimensão | Caixa Conciliado V2 | **Rotulagem P-02 (vencedora)** |
 |---|---|---|
-| Dor real hoje na Casa da Babá | Thatiane fecha caixa manualmente; trilha fiscal frágil para extrato de 2022. Operacional, diária. | **Rótulos irregulares circulando = risco multa Anvisa R$6k-1,5M por unidade comercializada.** Regulatória, latente, alta severidade. |
+| Dor real hoje na Casa da Baba | Thatiane fecha caixa manualmente; trilha fiscal frágil para extrato de 2022. Operacional, diária. | **Rótulos irregulares circulando = risco multa Anvisa R$6k-1,5M por unidade comercializada.** Regulatória, latente, alta severidade. |
 | Objetivo estratégico EasyStok | Retention do cliente atual ("feijão-com-arroz" ERP). | **Diferencial competitivo defensável (IA extrai ficha + Anvisa compliance) vendável a qualquer cliente Alimentos.** |
 | Esforço part-time | 5-8 semanas | 10-12 semanas |
 | Bloqueadores externos | Contador (1 reunião) + treino Thatiane | Contador (F0 + F6) + política privacidade do QR público |
@@ -41,7 +41,7 @@ Critérios decisivos: **dor regulatória ativa** + **diferencial competitivo def
 
 **Positivas:**
 
-- Casa da Babá protegida do risco fiscal mais crítico (multa Anvisa por unidade comercializada, não por SKU)
+- Casa da Baba protegida do risco fiscal mais crítico (multa Anvisa por unidade comercializada, não por SKU)
 - EasyStok ganha narrativa de venda concreta para o segmento Alimentos (gatilho regulatório vendável)
 - Reuso de infra já feita: `ClaudeHttpBase` (extractor IA), `QuestPDF` (renderer rótulo), `TenantFeatureFlag` (gate do módulo), Resend (e-mails contador/RT), RLS Postgres (defesa por tenant)
 - Aproveita o refactor IA já feito em worktree `feat/claude-extractor-refactor` (commit `5e0aa622`)
@@ -49,7 +49,7 @@ Critérios decisivos: **dor regulatória ativa** + **diferencial competitivo def
 
 **Negativas:**
 
-- Caixa V2 fica em backlog. Casa da Babá continua fechando caixa manualmente. Mitigação: planilha funciona; risco fiscal de extrato de 2022 fica em standby — não piora.
+- Caixa V2 fica em backlog. Casa da Baba continua fechando caixa manualmente. Mitigação: planilha funciona; risco fiscal de extrato de 2022 fica em standby — não piora.
 - Maior complexidade técnica (LLM extraction, validador RDC com regras Anvisa, hash de aprovação RT)
 - Bloqueadores externos exigem coordenação humana (contador + política privacidade) antes de F6
 - 10-12 semanas part-time = ~1 trimestre comprometido com 1 módulo
@@ -71,7 +71,7 @@ Critérios decisivos: **dor regulatória ativa** + **diferencial competitivo def
 
 Felipe destrava enquanto F0 começa:
 
-1. **Contador da Casa da Babá** — 1 reunião em F0 (validar layout PDF) + 1 revisão em F6 (PDF real). Bloqueia F6 se não resolvido. Não bloqueia F0.
+1. **Contador da Casa da Baba** — 1 reunião em F0 (validar layout PDF) + 1 revisão em F6 (PDF real). Bloqueia F6 se não resolvido. Não bloqueia F0.
 2. **Política de privacidade / QR público** — slug opaco reservado no MVP; página renderizada em F+1. Conteúdo da página (empresa + data + hash + nome operador) precisa OK legal antes de F+1, não antes de F0.
 
 ## Consequências
@@ -85,14 +85,14 @@ Felipe destrava enquanto F0 começa:
 **Becomes harder:**
 
 - Estabilização operacional do Caixa fica em standby
-- Risco fiscal de extrato 2022 da Casa da Babá não resolve nesta etapa
+- Risco fiscal de extrato 2022 da Casa da Baba não resolve nesta etapa
 - Mais ~1 trimestre antes da próxima reavaliação Caixa V2
 
 **To revisit:**
 
 - Após F2 da Rotulagem (modelo de dados + migrations aplicadas), reavaliar se Caixa V2 pode entrar em paralelo
 - Se Felipe receber cliente Alimentos novo antes de F5, reavaliar cronograma Rotulagem para entregar valor parcial mais cedo
-- Se Casa da Babá tiver incidente fiscal de caixa antes de F4, reavaliar urgência relativa
+- Se Casa da Baba tiver incidente fiscal de caixa antes de F4, reavaliar urgência relativa
 
 ## Reversão
 

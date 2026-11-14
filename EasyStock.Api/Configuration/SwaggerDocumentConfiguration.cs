@@ -47,7 +47,7 @@ public static class SwaggerConfiguration
             - 🔔 **Notificações** de estoque baixo e validade próxima
             - 🗄️ **Banco de dados agnóstico** (PostgreSQL ou MongoDB)
             - 🛒 **Storefront público** (OTP via WhatsApp, checkout MercadoPago, frete)
-            - 📱 **Módulo Mobile** (Casa da Babá PWA — sync delta offline-first)
+            - 📱 **Módulo Mobile** (Casa da Baba PWA — sync delta offline-first)
 
             ### Autenticação
             1. A empresa e o primeiro usuário são criados pelo suporte (`POST /api/admin/tenants`)
@@ -512,18 +512,18 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["AdminUsuariosTenant"] = "Gestão dos usuários de um tenant específico (admin global).",
         ["AdminFaturas"]        = "Gestão de faturas SaaS por tenant (admin global).",
 
-        // ── Mobile (Casa da Babá PWA — sync delta offline-first) ─────────────
+        // ── Mobile (Casa da Baba PWA — sync delta offline-first) ─────────────
         ["DeviceBackup"]        = "Backup e restore do estado local do device (PWA).",
         ["DevicePairing"]       = "Pareamento de tablets via código (provisioning + emissão de API key).",
         ["Kds"]                 = "Kitchen Display System — fila de pedidos em produção.",
         ["MobileBatches"]       = "Lotes de produção sincronizados do mobile (vinculo opcional com Lote ERP).",
-        ["MobileCalculadora"]   = "Calculadora de compras Casa da Babá (precificação + receita).",
+        ["MobileCalculadora"]   = "Calculadora de compras Casa da Baba (precificação + receita).",
         ["MobileCash"]          = "Caixa do tablet: entradas, saídas, fechamento diário.",
         ["MobileClients"]       = "Clientes cadastrados no PWA (vinculo opcional com Cliente ERP).",
         ["MobileDiagTrace"]     = "Traces de diagnóstico do PWA (request lifecycle, falhas de sync).",
         ["MobileDiagnostics"]   = "Erros e telemetria do PWA reportados ao servidor.",
         ["MobileEstoque"]       = "Visão de estoque do tablet (read-mostly, sync com ERP).",
-        ["MobileOrders"]        = "Pedidos do tablet (Casa da Babá): rascunho, pago, entregue.",
+        ["MobileOrders"]        = "Pedidos do tablet (Casa da Baba): rascunho, pago, entregue.",
         ["MobileProducts"]      = "Catálogo de produtos do tablet (cardápio + variações).",
         ["MobileQuickReports"]  = "Relatórios resumo offline para o tablet (vendas, fechamento).",
         ["Operation"]           = "Operações cross-device do módulo mobile (comandos remotos, broadcast).",
@@ -535,7 +535,7 @@ public sealed class TagDescriptionsDocumentFilter : IDocumentFilter
         ["Reports"]             = "Relatórios gerenciais (estoque, vendas, financeiro).",
         ["Consentimentos"]      = "Registro de consentimentos LGPD por usuário/cliente.",
         ["EntityAudit"]         = "Consulta da trilha de auditoria de entidades específicas (quem alterou o quê).",
-        ["PwaPush"]             = "Subscription Web Push para o PWA (storefront e Casa da Babá).",
+        ["PwaPush"]             = "Subscription Web Push para o PWA (storefront e Casa da Baba).",
         ["WebhookGateway"]      = "Webhook do gateway de pagamento (MercadoPago).",
         ["WebhookPix"]          = "Webhook da Efi (PIX): retorno de cobrança recebida.",
     };

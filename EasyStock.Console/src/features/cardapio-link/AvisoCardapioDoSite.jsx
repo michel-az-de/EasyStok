@@ -10,7 +10,7 @@ export function AvisoCardapioDoSite() {
   return (
     <PaginaAviso titulo="O cardápio do cliente agora é o do site"
       acoes={<Botao onClick={() => { window.location.hash = '#/m/atendimento/balcao' }}>Abrir Atendimento</Botao>}>
-      O link que o cliente recebe pelo WhatsApp abre a página da Casa da Babá. O pedido feito lá
+      O link que o cliente recebe pelo WhatsApp abre a página da Casa da Baba. O pedido feito lá
       aparece sozinho na conversa, com o resumo. Gere o link pela conversa, no botão do cardápio.
     </PaginaAviso>
   )

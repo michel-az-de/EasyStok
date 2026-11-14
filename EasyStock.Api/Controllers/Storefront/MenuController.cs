@@ -271,7 +271,7 @@ public sealed class MenuController(
         var result = await listarCardapioUseCase.ExecuteAsync(new ListarCardapioPublicoInput(slug), ct);
 
         // Envelope { itens, tituloPublico, slug } — contrato canônico (menu-publico.contract.md)
-        // que a vitrine Casa da Babá consome (menu.js exige Array.isArray(data.itens)).
+        // que a vitrine Casa da Baba consome (menu.js exige Array.isArray(data.itens)).
         // Serialização MANUAL com PublicJsonOptions é load-bearing: o ETag tem que ser o hash
         // dos BYTES EXATOS servidos. NÃO trocar por Ok(response) — Ok() delega a serialização ao
         // framework (opções globais do MVC, não PublicJsonOptions) e o hash deixaria de bater.

@@ -158,7 +158,7 @@ try {
   await page.getByRole('textbox', { name: 'Instituição financeira', exact: true }).fill('Instituição fictícia')
   await page.getByRole('textbox', { name: 'Agência', exact: true }).fill('0001')
   await page.getByRole('textbox', { name: 'Número da conta', exact: true }).fill('123-4')
-  await page.getByRole('textbox', { name: 'Titular', exact: true }).fill('Casa da Babá Fixture')
+  await page.getByRole('textbox', { name: 'Titular', exact: true }).fill('Casa da Baba Fixture')
   await page.getByRole('button', { name: 'Salvar cadastro', exact: true }).click()
   await page.getByRole('button', { name: `Editar ${nomeConta}`, exact: true }).waitFor()
   await page.reload()

@@ -1,4 +1,4 @@
-// Prova da #2258: auditoria de UX/UI (Casa da Babá, 05/11), tela Início (Home) do Console.
+// Prova da #2258: auditoria de UX/UI (Casa da Baba, 05/11), tela Início (Home) do Console.
 //
 // Cobre as regras puras (resumo = soma dos cartões, plural de "precisa(m) de você", ordem padrão dos
 // módulos, "Tudo em dia" só com leitura, link do cartão com pendência) e as regras de composição

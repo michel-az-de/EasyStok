@@ -23,7 +23,7 @@ controller resolve empresaId do claim (SuperAdmin = null). 404 (não 403) em sto
 **Aceite:** Admin de outra empresa recebe 404; SuperAdmin segue cross-tenant. (Fase 1)
 
 ### 2. feat(web): gestão de cardápio do tenant no EasyStock.Web `enhancement` `web-api`/`storefront`
-**Contexto:** a gestão de cardápio existe no EasyStock.Admin (SuperAdmin). O tenant (ex: Casa da Babá)
+**Contexto:** a gestão de cardápio existe no EasyStock.Admin (SuperAdmin). O tenant (ex: Casa da Baba)
 precisa gerenciar o próprio cardápio no produto (EasyStock.Web), não no painel interno.
 **Entrega:** `TenantVitrineCardapioController` (`/api/minha-vitrine/cardapio`) + `CardapioController`/
 `CardapioService` + Views no Web (espelha LojasController). Item no menu lateral.

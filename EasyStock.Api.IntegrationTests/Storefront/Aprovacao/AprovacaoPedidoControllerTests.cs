@@ -29,7 +29,7 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 ///
 /// <para>
 /// Sobe Postgres real via Testcontainers, registra um <c>ICurrentUserAccessor</c>
-/// stubado + <c>TestAuth</c> scheme para autenticar o caller como Babá ativa
+/// stubado + <c>TestAuth</c> scheme para autenticar o caller como Baba ativa
 /// (sem precisar passar pelo middleware JWT). Faz request HTTP completa e valida:
 /// </para>
 /// <list type="bullet">
@@ -49,7 +49,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 
     private static readonly Guid EmpresaId = Guid.NewGuid();
     private static readonly Guid UsuarioBabaId = Guid.NewGuid();
-    private const string UsuarioBabaNome = "Babá Maria";
+    private const string UsuarioBabaNome = "Baba Maria";
 
     public async Task InitializeAsync()
     {
@@ -106,7 +106,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 
                 b.ConfigureTestServices(services =>
                 {
-                    // Substitui ICurrentUserAccessor: caller é Babá ativa do tenant.
+                    // Substitui ICurrentUserAccessor: caller é Baba ativa do tenant.
                     var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ICurrentUserAccessor));
                     if (descriptor is not null) services.Remove(descriptor);
                     services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor(

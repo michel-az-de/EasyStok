@@ -31,7 +31,7 @@ public class AprovarPedidoStorefrontUseCaseTests
     private static readonly Guid EmpresaId = Guid.NewGuid();
     private static readonly Guid PedidoId = Guid.NewGuid();
     private static readonly Guid UsuarioId = Guid.NewGuid();
-    private const string UsuarioNome = "Babá Maria";
+    private const string UsuarioNome = "Baba Maria";
 
     // ── Fixture ────────────────────────────────────────────────────────────
 

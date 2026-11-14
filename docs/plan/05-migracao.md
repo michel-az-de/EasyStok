@@ -10,12 +10,12 @@
 |---|---|---|---|---|
 | M01 | `*_AddIdempotencyBodyHash` | `ALTER TABLE idempotency_keys ADD body_hash varchar(64) NULL` | <1s | aditivo |
 | M02 | `*_CreateSessaoCaixa` | `CREATE TABLE sessoes_caixa` + índices iniciais | <1s | aditivo |
-| M03 | `*_AddCaixaColumnsAditivos` | `ALTER` em movimentos_caixa, fechamentos_caixa, pedido_pagamentos (ADD COLUMN com defaults) | <5s mesmo com Casa da Babá em prod (~22k pedido_pagamentos) | aditivo |
+| M03 | `*_AddCaixaColumnsAditivos` | `ALTER` em movimentos_caixa, fechamentos_caixa, pedido_pagamentos (ADD COLUMN com defaults) | <5s mesmo com Casa da Baba em prod (~22k pedido_pagamentos) | aditivo |
 | M04 | `*_AddCaixaIndexesConcurrent` | `CREATE INDEX CONCURRENTLY` para todos os índices novos | depende do tamanho; ~30s para 22k linhas | concorrente, sem lock |
 | M05 | `*_BackfillPagamentos` | UPDATE em massa para preencher `empresa_id` denorm + `conciliacao_tipo` derivado do método | ~30s para 22k linhas | sem lock pesado |
 | M06 | `*_TightenPagamentosConstraints` | `ALTER` para `empresa_id NOT NULL` (depois do backfill) | <2s | dependente do M05 |
 
-**Total estimado em produção (Casa da Babá ~22k pedido_pagamentos)**: <2 min.
+**Total estimado em produção (Casa da Baba ~22k pedido_pagamentos)**: <2 min.
 
 ### F.2 Conteúdo das migrations
 
@@ -104,7 +104,7 @@ WHERE conciliacao_tipo = 'fisico'; -- só toca defaults, preserva quem já foi a
 
 Idempotente: rodar 2x não duplica (condições `WHERE empresa_id IS NULL` etc).
 
-**Para Casa da Babá (~22k linhas)**: <30s. Bloqueia tabela em UPDATE
+**Para Casa da Baba (~22k linhas)**: <30s. Bloqueia tabela em UPDATE
 (Postgres MVCC, sem lock total, mas escritas concorrentes esperam). Janela
 de deploy: noite de domingo após 22h (memory: cliente ativo segunda-sexta).
 
@@ -222,7 +222,7 @@ background.
   `TenantFeatureFlags` da migration `20260430205554_AddGovernancaFeatures`).
   Sem migration nova. Reusar `ITenantFeatureFlagService` (se existir; caso
   contrário, criar no F1 — leitura simples).
-- **Default**: nenhum registro → flag OFF. Casa da Babá recebe registro
+- **Default**: nenhum registro → flag OFF. Casa da Baba recebe registro
   manual via admin UI / SQL após Felipe acompanhar staging.
 - **Cliente vê**:
   - Flag OFF: aba "Caixa" antiga (atual). `RegistrarPagamentoPedidoUseCase`

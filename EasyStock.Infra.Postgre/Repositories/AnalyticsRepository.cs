@@ -124,7 +124,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null)
             => _receita.GetReceitaPorPeriodoAsync(empresaId, meses, lojaId);
 
-        public Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
+        public Task<(IReadOnlyList<MargemPorProduto> Items, int TotalCount)> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
             => _receita.GetMargemPorProdutoAsync(empresaId, dias, page, pageSize, lojaId);
 
         public Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)

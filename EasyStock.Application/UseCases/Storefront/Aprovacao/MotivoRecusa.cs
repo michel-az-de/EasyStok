@@ -1,7 +1,7 @@
 namespace EasyStock.Application.UseCases.Storefront.Aprovacao;
 
 /// <summary>
-/// Motivo canônico de recusa de pedido Storefront pela Babá (TASK-EZ-APROVAR-001).
+/// Motivo canônico de recusa de pedido Storefront pela Baba (TASK-EZ-APROVAR-001).
 ///
 /// <para>
 /// Valor enviado no body do POST <c>/api/storefront/pedidos/{id}/recusar</c>.

@@ -2,7 +2,7 @@ namespace EasyStock.Application.UseCases.Storefront.Aprovacao;
 
 /// <summary>Input do <see cref="RecusarPedidoStorefrontUseCase"/>.</summary>
 /// <param name="PedidoId">PK do agregado.</param>
-/// <param name="EmpresaId">Tenant da Babá.</param>
+/// <param name="EmpresaId">Tenant da Baba.</param>
 /// <param name="UsuarioId">Operador — audit trail.</param>
 /// <param name="Motivo">Categoria canônica (parse no controller).</param>
 /// <param name="MensagemCliente">Texto livre (max 280) que vai no WhatsApp ao cliente.</param>

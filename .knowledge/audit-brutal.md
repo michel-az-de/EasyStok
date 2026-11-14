@@ -15,7 +15,7 @@
 | Subscription / Billing / Pix | 47% | 50% | 45% | ⚠️ Vuln R$0,01 |
 | Analytics / IA / Notifs | 47% | 55% | 50% | Parcial |
 | Admin / Diagnostics | 57% | 65% | n/a | 🚨 Diagnóstico |
-| Mobile PWA | 48% | 70% (Casa da Babá) | 30% | Parcial |
+| Mobile PWA | 48% | 70% (Casa da Baba) | 30% | Parcial |
 | Infra / Jobs / Email | 60% | n/a | n/a | Parcial |
 
 ## Top bloqueadores P0
@@ -43,7 +43,7 @@
 - ✅ Multi-tenant funcionando de verdade (filtros manuais funcionam, testado)
 - ✅ Idempotência de movimentação de estoque (raro até em concorrentes)
 - ✅ State machine de pedido bem definida
-- ✅ PWA white-label em produção real (Casa da Babá usa diariamente)
+- ✅ PWA white-label em produção real (Casa da Baba usa diariamente)
 - ✅ 457 testes verdes (nem todo concorrente tem isso)
 - ✅ Clean Architecture estrita (manutenção barata long-term)
 - ✅ Subscription/billing infra pronta (Trial 14d, Pix Efí, gate middleware)

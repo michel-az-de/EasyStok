@@ -1,6 +1,6 @@
-// Prova da #2258: navegação, cabeçalho, Ajuda, Avisos e nomes (auditoria de UX/UI da Casa da Babá, 05/11).
+// Prova da #2258: navegação, cabeçalho, Ajuda, Avisos e nomes (auditoria de UX/UI da Casa da Baba, 05/11).
 //
-// Cobre: o nome "Casa da Babá" na aba e na marca (H9); "Respostas automáticas" no lugar de "Automáticas"
+// Cobre: o nome "Casa da Baba" na aba e na marca (H9); "Respostas automáticas" no lugar de "Automáticas"
 // solto (A4, H7, T9); Início no lugar de "Módulos"/"Ver módulos" (A3, T9); Ajuda conforme a tela aberta, sem
 // o link para a própria home (A3); ícones distintos entre módulos e entre as telas de Configurações e do
 // Financeiro (A1, G2, F7); ordem única dos módulos no Menu (A2); Tema e Sair só atrás do avatar (A9, G4);
@@ -43,12 +43,13 @@ const caso = async (nome, fn) => {
   try { await fn(); ok++; console.log(`ok    ${nome}`) } catch (erro) { falhas.push(nome); console.log(`FALHA ${nome}\n      ${erro.message.split('\n')[0]}`) }
 }
 
-await caso('H9: a aba, a marca, o login e o convite dizem "Casa da Babá"', async () => {
+await caso('H9: a aba, a marca, o login e o convite dizem "Casa da Baba"', async () => {
   const { tituloDaAba } = await importar('dominio/tituloDaAba.js')
-  assert.match(tituloDaAba({ tipo: 'hall' }), /Casa da Babá$/)
-  assert.match(readFileSync(new URL('../index.html', base), 'utf8'), /<title>Casa da Babá<\/title>/)
+  assert.match(tituloDaAba({ tipo: 'hall' }), /Casa da Baba$/)
+  assert.match(readFileSync(new URL('../index.html', base), 'utf8'), /<title>Casa da Baba<\/title>/)
   for (const arquivo of ['componentes/Marca.jsx', 'features/login/TelaLogin.jsx', 'features/login/TelaConvite.jsx', 'app/Moldura.jsx']) {
-    assert.doesNotMatch(ler(arquivo), /Casa da Baba/, `${arquivo} ainda escreve "Baba"`)
+    // #2517: a grafia canônica é sem acento; a letra acentuada entra por código para não repetir o erro aqui.
+    assert.doesNotMatch(ler(arquivo), new RegExp(`bab${String.fromCharCode(0xe1)}`, 'i'), `${arquivo} escreve a marca com acento`)
   }
 })
 

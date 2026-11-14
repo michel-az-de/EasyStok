@@ -62,7 +62,7 @@ public class ValidarOtpUseCaseTests
         var storefront = StorefrontEntity.Criar(
             empresaId: empresaId,
             slug: SlugValido,
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 0m);
         if (storefrontAtivo)
             storefront.Ativar();
@@ -112,7 +112,7 @@ public class ValidarOtpUseCaseTests
         f.ClienteRepository,
         f.ClienteSessionRepository,
         new IdentificarClientePorTelefoneUseCase(f.CadastroRepository, f.ClienteRepository,
-            Substitute.For<ILogger<IdentificarClientePorTelefoneUseCase>>()),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), Substitute.For<ILogger<IdentificarClientePorTelefoneUseCase>>()),
         f.PasswordHasher,
         f.UnitOfWork,
         f.Time,

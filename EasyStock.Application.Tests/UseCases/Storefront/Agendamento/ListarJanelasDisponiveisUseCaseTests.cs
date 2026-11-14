@@ -42,7 +42,7 @@ public class ListarJanelasDisponiveisUseCaseTests
         var storefront = StorefrontEntity.Criar(
             empresaId: Guid.NewGuid(),
             slug: SlugValido,
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 0m);
         if (storefrontAtivo) storefront.Ativar();
 

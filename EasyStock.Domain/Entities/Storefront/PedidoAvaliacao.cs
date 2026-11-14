@@ -6,10 +6,10 @@ namespace EasyStock.Domain.Entities.Storefront;
 /// Avaliação do cliente sobre um pedido entregue.
 ///
 /// <para>
-/// <strong>Fluxo:</strong> a Babá solicita a avaliação +24h após a entrega
+/// <strong>Fluxo:</strong> a Baba solicita a avaliação +24h após a entrega
 /// (<see cref="SolicitadoEm"/>). O cliente preenche estrelas + comentário,
 /// e a entity é criada nesse momento — <see cref="RespondidoEm"/> reflete
-/// quando o cliente respondeu. A Babá pode opcionalmente responder o
+/// quando o cliente respondeu. A Baba pode opcionalmente responder o
 /// comentário público (<see cref="Responder"/>) ou ocultar a avaliação
 /// por moderação (<see cref="Ocultar"/>).
 /// </para>
@@ -44,19 +44,19 @@ public class PedidoAvaliacao
     /// <summary>URL da foto do prato enviada pelo cliente (opcional).</summary>
     public string? FotoUrl { get; private set; }
 
-    /// <summary>Quando a Babá solicitou a avaliação (gerado por evento +24h após entrega).</summary>
+    /// <summary>Quando a Baba solicitou a avaliação (gerado por evento +24h após entrega).</summary>
     public DateTime SolicitadoEm { get; private set; }
 
     /// <summary>Quando o cliente respondeu. Setado no factory (UTC).</summary>
     public DateTime? RespondidoEm { get; private set; }
 
-    /// <summary>Quando a Babá ocultou a avaliação por moderação. Null = visível.</summary>
+    /// <summary>Quando a Baba ocultou a avaliação por moderação. Null = visível.</summary>
     public DateTime? OcultadoEm { get; private set; }
 
-    /// <summary>Resposta pública da Babá ao comentário do cliente. Null = sem resposta.</summary>
+    /// <summary>Resposta pública da Baba ao comentário do cliente. Null = sem resposta.</summary>
     public string? RespostaDaBaba { get; private set; }
 
-    /// <summary>Quando a Babá respondeu. Atualizado a cada chamada de <see cref="Responder"/>.</summary>
+    /// <summary>Quando a Baba respondeu. Atualizado a cada chamada de <see cref="Responder"/>.</summary>
     public DateTime? RespondidaEmPorBaba { get; private set; }
 
     // EF Core ctor sem parâmetros
@@ -150,18 +150,18 @@ public class PedidoAvaliacao
     }
 
     /// <summary>
-    /// Resposta pública da Babá ao comentário. Permite edição — cada chamada
+    /// Resposta pública da Baba ao comentário. Permite edição — cada chamada
     /// substitui o texto e atualiza <see cref="RespondidaEmPorBaba"/>.
     /// </summary>
     public void Responder(string textoResposta)
     {
         if (string.IsNullOrWhiteSpace(textoResposta))
-            throw new RegraDeDominioVioladaException("Resposta da Babá é obrigatória.");
+            throw new RegraDeDominioVioladaException("Resposta da Baba é obrigatória.");
 
         var textoTrim = textoResposta.Trim();
         if (textoTrim.Length > LimiteResposta)
             throw new RegraDeDominioVioladaException(
-                $"Resposta da Babá não pode exceder {LimiteResposta} caracteres (recebido: {textoTrim.Length}).");
+                $"Resposta da Baba não pode exceder {LimiteResposta} caracteres (recebido: {textoTrim.Length}).");
 
         RespostaDaBaba = textoTrim;
         RespondidaEmPorBaba = DateTime.UtcNow;

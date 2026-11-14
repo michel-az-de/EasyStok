@@ -82,7 +82,7 @@ public class ListarPedidosClienteUseCaseTests
         var s = Domain.Entities.Storefront.Storefront.Criar(
             empresaId: EmpresaId,
             slug: Slug,
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 0m);
         s.Ativar();
         return s;
@@ -417,14 +417,14 @@ public class ListarPedidosClienteUseCaseTests
     {
         var pedido = PedidoStub(
             status: StatusPedidoMapper.Cancelado,
-            mensagemRecusaCliente: "Babá sem disponibilidade no dia",
+            mensagemRecusaCliente: "Baba sem disponibilidade no dia",
             motivoRecusa: "operacional");
 
         var sut = BuildSut(storefront: StorefrontAtivo(), pedidos: new[] { pedido });
 
         var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
 
-        result.Pedidos.Single().MotivoCancelamento.Should().Be("Babá sem disponibilidade no dia");
+        result.Pedidos.Single().MotivoCancelamento.Should().Be("Baba sem disponibilidade no dia");
     }
 
     [Fact]

@@ -63,7 +63,7 @@ public sealed class RelatorioMensalJob(
             var mes = mesAnterior.Month;
 
             var receita = await analyticsRepo.GetReceitaPorPeriodoAsync(empresa.Id, 1);
-            var margem = await analyticsRepo.GetMargemPorProdutoAsync(empresa.Id, 30, 1, 50);
+            var (margem, _) = await analyticsRepo.GetMargemPorProdutoAsync(empresa.Id, 30, 1, 50);
             var dashboard = await analyticsRepo.GetDashboardResumoAsync(empresa.Id, 30);
 
             var htmlReport = GerarHtmlRelatorio(empresa, dashboard, receita.FirstOrDefault(), margem, ano, mes);

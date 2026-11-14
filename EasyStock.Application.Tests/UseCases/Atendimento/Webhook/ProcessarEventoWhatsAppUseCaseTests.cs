@@ -64,6 +64,27 @@ public class ProcessarEventoWhatsAppUseCaseTests
         ConfigurarCenario();
     }
 
+    private readonly EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository _vinculos =
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>();
+
+    [Fact]
+    public async Task ConversaNovaSegueAPessoaQueAEquipeEscolheuParaOTelefone()
+    {
+        var escolhida = Cliente.Criar(_empresaId, "Pessoa certa");
+        var hashes = NormalizadorTelefone.CandidatosDeWaId(ContatoWaId).Select(ClienteOtp.CalcularTelefoneHash).ToArray();
+        _vinculos.ObterDecisaoAtivaAsync(_empresaId, Arg.Is<IReadOnlyList<string>>(h => h.SequenceEqual(hashes)), Arg.Any<CancellationToken>())
+            .Returns(EasyStock.Domain.Entities.Atendimento.DecisaoVinculoTelefone.Escolher(_empresaId, hashes[0], escolhida.Id, Guid.NewGuid(),
+                Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow));
+        _clienteRepository.GetByIdAsync(_empresaId, escolhida.Id).Returns(escolhida);
+        Conversa? aberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => aberta = c), Arg.Any<CancellationToken>());
+
+        (await _useCase.ExecuteAsync(PayloadTexto("wamid.decisao1", "Oi"))).Should().BeTrue();
+
+        aberta!.ClienteId.Should().Be(escolhida.Id);
+        await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
     [Fact]
     public async Task TelefoneCompartilhadoPreservaMensagensSemVincularOuDispararAgente()
     {
@@ -100,7 +121,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
             _unitOfWork,
             new IdentificarClientePorTelefoneUseCase(
                 _clienteRepository, _clienteStorefrontRepository,
-                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                _vinculos, NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new SaudacaoAtendimento(_storefrontRepository, new ConfigurationBuilder().Build()),
             new RoteadorAcoesBotao(
                 [new ConfirmarEnderecoAcaoBotao(new EscalarConversaUseCase(_conversaRepository, Substitute.For<INotificadorService>(), Substitute.For<IOperacaoEventPublisher>()), ConfirmacaoEnderecoFake.Nova(), _conversaRepository)],
@@ -770,7 +791,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
             _empresaRepository, _featureFlagRepository, _configuracaoRepository, _conversaRepository,
             _webhookRecebidoRepository, _cloudClient, _queueService, _eventPublisher, _tenantContext, _unitOfWork,
             new IdentificarClientePorTelefoneUseCase(_clienteRepository, _clienteStorefrontRepository,
-                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                _vinculos, NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new SaudacaoAtendimento(_storefrontRepository, new ConfigurationBuilder().Build()),
             new RoteadorAcoesBotao([], NullLogger<RoteadorAcoesBotao>.Instance),
             new OptOutPorPalavra(_consentimentoRepository, _conversaRepository, new ResolvedorCanal([_canalWhatsApp]),

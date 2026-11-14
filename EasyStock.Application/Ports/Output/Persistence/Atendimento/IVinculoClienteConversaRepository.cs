@@ -15,4 +15,8 @@ public interface IVinculoClienteConversaRepository
     Task AddAsync(AlteracaoVinculoConversa alteracao, CancellationToken ct);
     Task ExpirarLinksAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct);
     Task EncerrarSessoesChatAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct);
+
+    /// <summary>#2492: decisão ativa da equipe para qualquer grafia do telefone (hashes dos candidatos do wa_id).</summary>
+    Task<DecisaoVinculoTelefone?> ObterDecisaoAtivaAsync(Guid empresaId, IReadOnlyList<string> telefoneHashes, CancellationToken ct);
+    Task AddDecisaoAsync(DecisaoVinculoTelefone decisao, CancellationToken ct);
 }

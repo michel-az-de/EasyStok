@@ -17,7 +17,7 @@ public class EnviarCardapioImagemFerramentaTests
 
     private sealed class Cenario
     {
-        public StorefrontEntity Storefront { get; } = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);
+        public StorefrontEntity Storefront { get; } = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Baba", 0m);
         public IStorefrontRepository StorefrontRepo { get; } = Substitute.For<IStorefrontRepository>();
         public IWhatsAppCloudClient Cloud { get; } = Substitute.For<IWhatsAppCloudClient>();
         public LinkCardapioConversaServiceTests.RepositorioEmMemoria Links { get; } = new();
