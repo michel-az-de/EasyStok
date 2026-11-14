@@ -104,7 +104,7 @@ public class StorefrontTests
     [InlineData("Casa Da Baba")]     // espaços
     [InlineData("casa.da.baba")]     // dots
     [InlineData("casa_da_baba")]     // underscore (não permitido — só hifen)
-    [InlineData("casadababa")]       // acento
+    [InlineData("cozinhadaavó")]     // acento
     [InlineData("CASADABABA")]       // uppercase (não vamos normalizar uppercase? sim, mas testa rejeição se não usar normalizador)
     [InlineData("-casadababa")]      // hífen no início
     [InlineData("casadababa-")]      // hífen no fim
