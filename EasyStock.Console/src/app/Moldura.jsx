@@ -266,14 +266,15 @@ function Trilho({
         <IconeDoModulo modulo={MODULO_ATENDIMENTO} />
         <span>{MODULO_ATENDIMENTO.nome}</span>
       </span>
-      {permite('entregas') && <ResumoEntregas
-        aoAbrir={aoAbrirEntregas}
-        noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
-      />}
+      {/* #2559 (Q11): Cozinha antes de Entregas, como ORDEM_DOS_MODULOS no trilho da gestão. */}
       {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
         <IconeDoModulo modulo={MODULO_COZINHA} tamanho={24} />
         <span>Cozinha</span>
       </Botao>}
+      {permite('entregas') && <ResumoEntregas
+        aoAbrir={aoAbrirEntregas}
+        noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
+      />}
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)} title={NOME_RESPOSTAS_AUTOMATICAS}>
         <IconeDoModulo modulo={MODULO_ATENDIMENTO} telaId="respostas" tamanho={24} />
         <span>{NOME_RESPOSTAS_AUTOMATICAS}</span>
