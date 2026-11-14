@@ -7,7 +7,7 @@ namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
 public sealed class ProcessarWebhookWppConnectUseCase(
     IIntegrationCredentialResolver credenciais, ITenantContextAccessor tenant,
-    IWppConnectSessaoClient cliente, ProcessarEventoWhatsAppUseCase processar)
+    IWppConnectSessaoClient cliente, ProcessarEventoWhatsAppUseCase processar, IMenusNumeradosWppConnect? menus = null)
 {
     public async Task<bool?> ExecuteAsync(string rawBody, CancellationToken ct = default)
     {
@@ -26,6 +26,9 @@ public sealed class ProcessarWebhookWppConnectUseCase(
         if (contato?.EndsWith("@lid", StringComparison.Ordinal) == true)
             telefone = await cliente.ResolverTelefoneAsync(sessao, contato, ct);
         var normalizado = WppConnectWebhookParser.Parse(rawBody, telefone, sessao.InicioDaCaptura);
+        // #2515: o "2" que responde ao menu numerado volta como o toque no botão.
+        if (menus is not null)
+            normalizado = await EscolhaMenuWppConnect.TraduzirAsync(normalizado, sessao.Sessao, menus, ct);
         return await processar.ExecuteNormalizadoAsync(normalizado, empresaId, ct);
     }
 }

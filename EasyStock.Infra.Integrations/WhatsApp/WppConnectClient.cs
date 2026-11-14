@@ -14,7 +14,7 @@ public sealed class WppConnectOptions
 }
 
 public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions> options, IRemetenteWhatsApp remetente,
-    BaixadorFotoPerfilWhatsApp? fotos = null)
+    BaixadorFotoPerfilWhatsApp? fotos = null, IMenusNumeradosWppConnect? menus = null)
     : IWhatsAppCloudClient, IWppConnectSessaoClient
 {
     private readonly WppConnectOptions _options = options.Value;
@@ -132,8 +132,14 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
         return new(sessao.IdExterno(id));
     }
 
-    public Task<EnvioWhatsAppResult> EnviarBotoesAsync(string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default) =>
-        EnviarTextoAsync(waId, corpo + "\n" + string.Join("\n", botoes.Select((b, i) => $"{i + 1}. {b.Titulo}")), ct: ct);
+    /// <summary>Conta comum não tem botão: as opções saem numeradas e o menu fica guardado para a resposta (#2515).</summary>
+    public async Task<EnvioWhatsAppResult> EnviarBotoesAsync(string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default)
+    {
+        var envio = await EnviarTextoAsync(waId, MenuNumeradoWhatsApp.Texto(corpo, botoes.Select(b => b.Titulo)), ct: ct);
+        if (menus is not null)
+            await menus.GuardarAsync((await SessaoAsync(ct)).Sessao, waId, botoes, ct);
+        return envio;
+    }
 
     public Task<EnvioWhatsAppResult> EnviarTemplateAsync(string waId, string nomeTemplate, string idioma, IReadOnlyList<string> parametrosCorpo,
         IReadOnlyList<(string Id, string Titulo)>? botoesQuickReply = null, string? imagemCabecalho = null, CancellationToken ct = default) =>

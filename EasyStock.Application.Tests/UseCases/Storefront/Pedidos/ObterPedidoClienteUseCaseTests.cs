@@ -69,7 +69,7 @@ public class ObterPedidoClienteUseCaseTests
         var s = Domain.Entities.Storefront.Storefront.Criar(
             empresaId: EmpresaId,
             slug: Slug,
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 0m);
         s.Ativar();
         return s;

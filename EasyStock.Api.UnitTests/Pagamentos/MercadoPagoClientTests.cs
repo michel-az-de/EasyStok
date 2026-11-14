@@ -64,7 +64,7 @@ public class MercadoPagoClientTests
         var expira = new DateTime(2026, 9, 29, 15, 30, 0, DateTimeKind.Utc);
 
         var r = await client.CriarPreferenceAsync(new CriarPreferenceCommand(
-            pedidoId, Guid.NewGuid(), "Casa da Babá", 25m,
+            pedidoId, Guid.NewGuid(), "Casa da Baba", 25m,
             [new PreferenceItemCommand("Brigadeiro", 2, 10m), new PreferenceItemCommand("Frete", 1, 5m)],
             ExpiraEm: expira, IdempotencyKey: $"{pedidoId:N}-1"));
 
@@ -140,7 +140,7 @@ public class MercadoPagoClientTests
         var expira = new DateTime(2026, 9, 29, 15, 30, 0, DateTimeKind.Utc);
 
         await client.CriarPreferenceAsync(new CriarPreferenceCommand(
-            Guid.NewGuid(), Guid.NewGuid(), "Casa da Babá", 10m, [new PreferenceItemCommand("Item", 1, 10m)],
+            Guid.NewGuid(), Guid.NewGuid(), "Casa da Baba", 10m, [new PreferenceItemCommand("Item", 1, 10m)],
             ExpiraEm: expira));
 
         using var json = JsonDocument.Parse(handler.UltimaChamada!.Corpo!);
@@ -157,7 +157,7 @@ public class MercadoPagoClientTests
         var (client, handler) = Criar();
 
         await client.CriarPreferenceAsync(new CriarPreferenceCommand(
-            Guid.NewGuid(), Guid.NewGuid(), "Casa da Babá", 10m, [new PreferenceItemCommand("Entrega — Butantã", 1, 10m)],
+            Guid.NewGuid(), Guid.NewGuid(), "Casa da Baba", 10m, [new PreferenceItemCommand("Entrega — Butantã", 1, 10m)],
             ExpiraEm: new DateTime(2026, 9, 29, 15, 30, 0, DateTimeKind.Utc)));
 
         handler.UltimaChamada!.Corpo.Should().Contain("\"expiration_date_to\":\"2026-09-29T15:30:00.000+00:00\"")

@@ -70,7 +70,7 @@ HashSha256 = SHA256(canonical_json_snapshot || pdf_bytes)
 - Certificado ICP-Brasil A1 custa ~R$150-300/ano por empresa, exige cadeia
   de confiança AC raiz, e implementação consome ~2 semanas só para gerenciar
   certificados.
-- Casa da Babá não pediu (validado em premissa N.10 — contador aceita SHA-256
+- Casa da Baba não pediu (validado em premissa N.10 — contador aceita SHA-256
   com hash visível).
 - Fora de escopo F0; revisitar quando primeiro fiscal cobrar.
 
@@ -87,7 +87,7 @@ HashSha256 = SHA256(canonical_json_snapshot || pdf_bytes)
 
 ## Análise de trade-off
 
-Para o caso de uso real (Casa da Babá + fiscais brasileiros padrão), SHA-256
+Para o caso de uso real (Casa da Baba + fiscais brasileiros padrão), SHA-256
 + hash visível + retenção 5 anos é o **mínimo viável regulatório** sem
 custo de certificados. Contador validou em F0 (premissa N.10).
 

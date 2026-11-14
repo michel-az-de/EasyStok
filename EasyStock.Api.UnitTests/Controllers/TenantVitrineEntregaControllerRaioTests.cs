@@ -26,7 +26,7 @@ public class TenantVitrineEntregaControllerRaioTests
 
     public TenantVitrineEntregaControllerRaioTests()
     {
-        _loja = StorefrontEntity.Criar(_empresaId, "casa-da-baba", "Casa da Babá", 0m);
+        _loja = StorefrontEntity.Criar(_empresaId, "casa-da-baba", "Casa da Baba", 0m);
         _lojas.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(_loja);
         _geocoding.Disponivel.Returns(true);
 

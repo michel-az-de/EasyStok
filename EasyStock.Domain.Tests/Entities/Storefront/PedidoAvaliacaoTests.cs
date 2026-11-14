@@ -7,9 +7,9 @@ namespace EasyStock.Domain.Tests.Entities.Storefront;
 /// <summary>
 /// Testes da entity <see cref="PedidoAvaliacao"/>.
 ///
-/// Modelo: avaliação é SOLICITADA pela Babá +24h após entrega (SolicitadoEm),
+/// Modelo: avaliação é SOLICITADA pela Baba +24h após entrega (SolicitadoEm),
 /// RESPONDIDA pelo cliente (RespondidoEm + Estrelas + Comentario),
-/// opcionalmente RESPONDIDA PELA BABÁ (RespostaDaBaba + RespondidaEmPorBaba),
+/// opcionalmente RESPONDIDA PELA BABA (RespostaDaBaba + RespondidaEmPorBaba),
 /// e pode ser OCULTADA por moderação (OcultadoEm).
 ///
 /// Unique constraint a nível de DB: 1 avaliação por pedido (UNIQUE PedidoId).
@@ -73,7 +73,7 @@ public class PedidoAvaliacaoTests
         aval.RespondidoEm!.Value.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
         aval.RespondidoEm.Value.Kind.Should().Be(DateTimeKind.Utc, "timestamps em UTC para auditoria");
         aval.OcultadoEm.Should().BeNull("nasce visível");
-        aval.RespostaDaBaba.Should().BeNull("Babá ainda não respondeu");
+        aval.RespostaDaBaba.Should().BeNull("Baba ainda não respondeu");
         aval.RespondidaEmPorBaba.Should().BeNull();
     }
 
@@ -201,7 +201,7 @@ public class PedidoAvaliacaoTests
         aval.Comentario.Should().BeNull("strings em branco são tratadas como ausência de comentário");
     }
 
-    // ── Responder (resposta da Babá ao comentário do cliente) ─────────
+    // ── Responder (resposta da Baba ao comentário do cliente) ─────────
 
     [Fact]
     public void Responder_preenche_RespostaDaBaba_e_timestamp()
@@ -256,7 +256,7 @@ public class PedidoAvaliacaoTests
             .WithMessage("*Resposta*");
     }
 
-    // ── Ocultar (moderação Babá) ──────────────────────────────────────
+    // ── Ocultar (moderação Baba) ──────────────────────────────────────
 
     [Fact]
     public void Ocultar_define_OcultadoEm_com_timestamp_UTC()

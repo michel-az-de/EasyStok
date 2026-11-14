@@ -65,7 +65,7 @@ export function TelaConvite({ token, aoConcluir }) {
       <section className={css.cartao} aria-labelledby={`${id}-titulo`}>
         <Marca />
         <div>
-          <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>Boas-vindas à Casa da Babá</h1>
+          <h1 id={`${id}-titulo`} ref={titulo} tabIndex={-1} className={css.titulo}>Boas-vindas à Casa da Baba</h1>
           <p className={css.apoio}>Escolha a senha que você vai usar para entrar.</p>
         </div>
         {estado.erro && <p className={css.erro} role="alert">{estado.erro}</p>}

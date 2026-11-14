@@ -1,6 +1,6 @@
 # QA do console web em produção (13/11/2026, #2491)
 
-Alvo: `app.easystok.online`, build `68b583816`, tenant Casa da Babá, sessão real do Felipe. Somente leitura:
+Alvo: `app.easystok.online`, build `68b583816`, tenant Casa da Baba, sessão real do Felipe. Somente leitura:
 nenhum formulário enviado, nenhuma configuração alterada. Desktop 1568×711 no Chrome.
 Skill de QA: `design:accessibility-review` (WCAG 2.1 AA) mais QA funcional, rede, console e borda HTTP.
 Complementa a revisão geral de 12/11, a do console desktop de 12/11 e a de Cadastros de 13/11
@@ -78,7 +78,7 @@ no código pelo revisor principal. Lista final: 2 P1, 7 P2, 8 P3.
 | Q12 | Confirmado por desenho | Refutado | P3 | **Refutado** | N/A | `hyphens: auto` com `lang="pt-BR"` é decisão da #2326, homologada a 200% de zoom |
 | Q13 | Confirmado, P2 | Inconclusivo | P3 | **Confirmado** | P2 | `motivoDeEscalada.js:10-23` só conhece 2 padrões; os motivos novos da #2249 entram crus no chip. Todo motivo novo da API repete o defeito. Absorve o N5 do R1 |
 | Q14 | Confirmado, P3 | Mantido, P3 | P2/P3 | **Confirmado** | P3 | Marcação manual em `EditorItemCardapio.jsx:256`; o `Campo.jsx` comum já põe a dica em `aria-describedby`. Nome acessível verboso, não falha WCAG |
-| Q15 | Confirmado por desenho | Refutado | Não é defeito | **Refutado** | N/A | `sessaoPersistente` vale só para perfis da Casa da Babá (`AutenticarUsuarioUseCase.cs:186`). Fica como decisão de produto, se o Felipe quiser |
+| Q15 | Confirmado por desenho | Refutado | Não é defeito | **Refutado** | N/A | `sessaoPersistente` vale só para perfis da Casa da Baba (`AutenticarUsuarioUseCase.cs:186`). Fica como decisão de produto, se o Felipe quiser |
 | Q16 | Confirmado com ressalva, P2 | Mantido, P2 | P2 | **Confirmado** | P2 | CSP sem `report-uri`/`report-to`. O `nginx.conf` diz que o HSTS fica com o Caddy, mas o `Caddyfile` não tem diretiva `header`; a #2407 fechou sem o HSTS chegar ao `app.` |
 | Q17 | Refutado, P3 | Inconclusivo | P3 | **Reformulado** | P3 | Pagina de 60 em 60 (`AbaAcervo.jsx:24-46`). O custo real: miniaturas sem `loading="lazy"` (`AbaAcervo.jsx:17`, `SugestoesDoAcervo.jsx:11`) |
 | Q18 | Explicado diferente | Refutado | P3 | **Refutado** | N/A | `.verLista::after { inset: 0 }` torna o bloco inteiro clicável; a medida pegou só o texto |

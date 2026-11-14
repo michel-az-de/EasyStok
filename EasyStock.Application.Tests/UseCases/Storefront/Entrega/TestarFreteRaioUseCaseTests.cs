@@ -26,7 +26,7 @@ public class TestarFreteRaioUseCaseTests
 
     public TestarFreteRaioUseCaseTests()
     {
-        _loja = StorefrontEntity.Criar(_empresaId, Slug, "Casa da Babá", 0m);
+        _loja = StorefrontEntity.Criar(_empresaId, Slug, "Casa da Baba", 0m);
         _loja.Ativar();
         _loja.ConfigurarFreteRaio(0, 0, 1.4, 500, 5000,
             """[{"id":"ate-2km","ateMetros":2000,"valorCentavos":1500},{"id":"ate-5km","ateMetros":5000,"valorCentavos":2500}]""");

@@ -19,7 +19,7 @@ public class CalcularFreteUseCaseLalamoveTests
 
     private static StorefrontEntity Loja(int faixaGratisMetros = 500)
     {
-        var s = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Babá", 0m);
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Baba", 0m);
         s.Ativar();
         s.ConfigurarFreteRaio(0, 0, 1.4, faixaGratisMetros, 5000,
             """[{"id":"ate-2km","ateMetros":2000,"valorCentavos":1500},{"id":"ate-5km","ateMetros":5000,"valorCentavos":2500}]""");

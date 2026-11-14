@@ -36,7 +36,7 @@ public class MontarCanhotoUseCaseTests
 
         public Cenario()
         {
-            Storefront = StorefrontEntity.Criar(EmpresaId, "casa-da-baba", "Casa da Babá", 0m);
+            Storefront = StorefrontEntity.Criar(EmpresaId, "casa-da-baba", "Casa da Baba", 0m);
             Cliente = new Cliente
             {
                 Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Ana",
@@ -104,7 +104,7 @@ public class MontarCanhotoUseCaseTests
         canhoto.Observacoes.Should().Be("Portão azul");
         canhoto.Rodape.Should().Be("imprima este canhoto: ele basta para produzir");
         var cab = canhoto.Cabecalho;
-        cab.NomeCasa.Should().Be("Casa da Babá");
+        cab.NomeCasa.Should().Be("Casa da Baba");
         cab.Numero.Should().Be(c.Pedido.Id.ToString("N")[..8].ToUpperInvariant());
         cab.Cliente.Should().Be("Ana");
         cab.Telefone.Should().Be("+5511999990000");

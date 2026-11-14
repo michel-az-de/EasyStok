@@ -34,7 +34,7 @@ public class CriarStorefrontAdminUseCaseTests
             .Returns((StorefrontEntity?)null);
 
         var result = await Sut().ExecuteAsync(new CriarStorefrontAdminCommand(
-            empresaId, "casa-da-baba", "Casa da Babá", 50m));
+            empresaId, "casa-da-baba", "Casa da Baba", 50m));
 
         result.Should().NotBeNull();
         result.Slug.Should().Be("casa-da-baba");
@@ -84,7 +84,7 @@ public class CriarStorefrontAdminUseCaseTests
             .Returns(slugAlheio);
 
         var act = async () => await Sut().ExecuteAsync(new CriarStorefrontAdminCommand(
-            empresaId, "casa-da-baba", "Casa da Babá", 0m));
+            empresaId, "casa-da-baba", "Casa da Baba", 0m));
 
         await act.Should().ThrowAsync<StorefrontSlugDuplicadoException>()
             .Where(e => e.Slug == "casa-da-baba");
@@ -105,7 +105,7 @@ public class CriarStorefrontAdminUseCaseTests
             Arg.Do<StorefrontEntity>(s => capturado = s), Arg.Any<CancellationToken>());
 
         await Sut().ExecuteAsync(new CriarStorefrontAdminCommand(
-            empresaId, "casa-da-baba", "Casa da Babá", 50m));
+            empresaId, "casa-da-baba", "Casa da Baba", 50m));
 
         capturado.Should().NotBeNull();
         capturado!.Ativo.Should().BeFalse();

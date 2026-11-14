@@ -55,7 +55,7 @@ CREATE UNIQUE INDEX ux_sessoes_caixa_aberta_por_dia
 - Mais uma tabela. Mais um índice. Mais um migration.
 - Para histórico (pré-feature), precisa backfill criando `SessaoCaixa`
   retroativa para cada par `abertura/fechamento` em `MovimentoCaixa` —
-  ~30s para Casa da Babá, ver `docs/plan/05-migracao.md` F.3.
+  ~30s para Casa da Baba, ver `docs/plan/05-migracao.md` F.3.
 
 ### Opção B — Manter agregação de `MovimentoCaixa` + adicionar `tipo='conferencia'`
 

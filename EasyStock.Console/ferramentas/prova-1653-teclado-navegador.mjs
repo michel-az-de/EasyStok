@@ -74,7 +74,7 @@ try {
   await context.route(url => url.pathname.startsWith('/api/'), route => route.fulfill({ json: { data: [] } }))
   await page.goto(origem + '/#/m/atendimento', { waitUntil: 'networkidle', timeout: 90000 }) // #2437: o Vite frio otimiza dependências na primeira carga
   // #2135: a tela abre sem conversa escolhida; a atendente abre a do Renan Okamoto, que está no automático.
-  // #2437: a demonstração da Casa da Babá não traz mais o José Moretti, e o botão virou "Assumir conversa" (#2232).
+  // #2437: a demonstração da Casa da Baba não traz mais o José Moretti, e o botão virou "Assumir conversa" (#2232).
   await page.locator('button[aria-current]', { hasText: 'Renan Okamoto' }).click()
   await page.getByRole('button', { name: 'Assumir conversa', exact: true }).click()
   const campo = page.getByRole('textbox', { name: 'Mensagem para o cliente', exact: true })

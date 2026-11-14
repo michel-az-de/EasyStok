@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-// Prova da issue #2276 (auditoria UX da Casa da Babá, itens 08·5 e 06·1):
+// Prova da issue #2276 (auditoria UX da Casa da Baba, itens 08·5 e 06·1):
 //   1. a lista de viagens do dia não mostra viagem "Montando" vazia criada em outro dia (ao virar o dia
 //      ela some; com pedido, continua aparecendo até ser resolvida);
 //   2. o dia de hoje, de madrugada no fuso da loja, conta como o dia da viagem criada à noite;

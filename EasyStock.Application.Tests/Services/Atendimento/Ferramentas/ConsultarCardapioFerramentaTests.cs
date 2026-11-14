@@ -18,7 +18,7 @@ public class ConsultarCardapioFerramentaTests
     private sealed class Cenario
     {
         private readonly List<CardapioItem> _itens = [];
-        private readonly StorefrontEntity _storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);
+        private readonly StorefrontEntity _storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Baba", 0m);
         private readonly ConsultarCardapioFerramenta _ferramenta;
         private readonly Conversa _conversa;
 

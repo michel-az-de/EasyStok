@@ -13,7 +13,7 @@ public sealed class ListarAgendaEntregasUseCaseTests
     {
         var empresaId = Guid.NewGuid();
         var data = new DateOnly(2026, 10, 20);
-        var loja = StorefrontEntity.Criar(empresaId, "casa-da-baba", "Casa da Babá", 0);
+        var loja = StorefrontEntity.Criar(empresaId, "casa-da-baba", "Casa da Baba", 0);
         loja.Ativar();
         var janela = JanelaEntrega.Criar(loja.Id, (int)data.DayOfWeek, new(9, 0), new(12, 0), 3, "Manhã");
         var bloqueio = BloqueioEntrega.Criar(loja.Id, data, "Feriado");
@@ -52,7 +52,7 @@ public sealed class ListarAgendaEntregasUseCaseTests
         // conversa dona dele; sem conversa o campo é nulo e só a referência curta fica.
         var empresaId = Guid.NewGuid();
         var data = new DateOnly(2026, 10, 20);
-        var loja = StorefrontEntity.Criar(empresaId, "casa-da-baba", "Casa da Babá", 0);
+        var loja = StorefrontEntity.Criar(empresaId, "casa-da-baba", "Casa da Baba", 0);
         loja.Ativar();
         var janela = JanelaEntrega.Criar(loja.Id, (int)data.DayOfWeek, new(9, 0), new(12, 0), 3, "Manhã");
         var comComanda = Guid.NewGuid();

@@ -18,7 +18,7 @@ public class StorefrontTests
     private static EasyStock.Domain.Entities.Storefront.Storefront NovoStorefrontValido(
         Guid? empresaId = null,
         string slug = "casadababa",
-        string titulo = "Casa da Babá")
+        string titulo = "Casa da Baba")
     {
         return EasyStock.Domain.Entities.Storefront.Storefront.Criar(
             empresaId: empresaId ?? Guid.NewGuid(),
@@ -36,13 +36,13 @@ public class StorefrontTests
         var s = EasyStock.Domain.Entities.Storefront.Storefront.Criar(
             empresaId: empresaId,
             slug: "casadababa",
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 40m);
 
         s.Id.Should().NotBeEmpty();
         s.EmpresaId.Should().Be(empresaId);
         s.Slug.Should().Be("casadababa");
-        s.TituloPublico.Should().Be("Casa da Babá");
+        s.TituloPublico.Should().Be("Casa da Baba");
         s.PedidoMinimoEntrega.Should().Be(40m);
 
         // Defaults importantes — feature flags SEMPRE safe-by-default
@@ -104,7 +104,7 @@ public class StorefrontTests
     [InlineData("Casa Da Baba")]     // espaços
     [InlineData("casa.da.baba")]     // dots
     [InlineData("casa_da_baba")]     // underscore (não permitido — só hifen)
-    [InlineData("casadababá")]       // acento
+    [InlineData("cozinhadaavó")]     // acento
     [InlineData("CASADABABA")]       // uppercase (não vamos normalizar uppercase? sim, mas testa rejeição se não usar normalizador)
     [InlineData("-casadababa")]      // hífen no início
     [InlineData("casadababa-")]      // hífen no fim

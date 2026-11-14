@@ -25,7 +25,7 @@ public class AssinaturaMetaTests
     [Fact]
     public void CorpoComAcento_EAssinadoEmUtf8()
     {
-        const string corpoComAcento = """{"text":{"body":"Olá, Casa da Babá"}}""";
+        const string corpoComAcento = """{"text":{"body":"Olá, Casa da Baba"}}""";
 
         var cabecalho = AssinaturaMeta.Gerar(corpoComAcento, AppSecret);
 

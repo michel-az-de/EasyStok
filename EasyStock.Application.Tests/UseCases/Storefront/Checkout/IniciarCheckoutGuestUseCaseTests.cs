@@ -66,7 +66,7 @@ public class IniciarCheckoutGuestUseCaseTests
 
         public Fixture()
         {
-            Storefront = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Babá", 0m);
+            Storefront = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Baba", 0m);
             Storefront.Ativar();
             StorefrontRepo.GetBySlugAsync(Slug, Arg.Any<CancellationToken>()).Returns(Storefront);
 

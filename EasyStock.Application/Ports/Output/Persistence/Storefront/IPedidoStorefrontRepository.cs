@@ -25,7 +25,7 @@ public interface IPedidoStorefrontRepository
     /// fora de transação explícita o lock é descartado e a corrida fica aberta.
     ///
     /// <para>
-    /// Garante que dois agentes Babá não aprovem/recusem o mesmo pedido
+    /// Garante que dois agentes Baba não aprovem/recusem o mesmo pedido
     /// simultaneamente. O segundo aguarda commit/rollback do primeiro antes
     /// de ler o registro — o use case então detecta o status novo e devolve 409.
     /// </para>

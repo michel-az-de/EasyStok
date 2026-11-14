@@ -546,7 +546,7 @@ window.etqModeloPreview = function(id) {
   if (!t) return;
   try {
     const layout = JSON.parse(t.LayoutJson);
-    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Babá', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Babá', LogoUrl: null } };
+    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Baba', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Baba', LogoUrl: null } };
     const el = renderEtiqueta(layout, dados);
     const wrap = document.getElementById('etq-tpl-preview-wrap');
     wrap.innerHTML = '';
@@ -571,7 +571,7 @@ async function _renderThumbnail(t) {
     const scale = Math.min((containerW - 16) / wPx, (containerH - 8) / hPx);
     const scaledW = wPx * scale;
 
-    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Babá', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Babá', LogoUrl: null } };
+    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Baba', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Baba', LogoUrl: null } };
 
     const el = renderEtiqueta(layout, dados);
     el.style.transform = `scale(${scale})`;

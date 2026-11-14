@@ -328,7 +328,7 @@ public class DevicePairingController(
     /// <summary>
     /// Auto-provisionamento de device a partir de token compartilhado.
     ///
-    /// Casa da Babá (e qualquer cliente cujo APK é gerado pré-configurado)
+    /// Casa da Baba (e qualquer cliente cujo APK é gerado pré-configurado)
     /// embute um secret de longa vida no APK + config das envs no server
     /// apontando a empresa/loja default. O app pareia sozinho no primeiro
     /// boot, sem operador digitar codigo de 6 digitos.
