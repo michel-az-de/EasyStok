@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { listarCategoriasCadastro, obterCadastro, salvarCadastro } from '../../../aplicacao/cadastros'
+import { alternarAtividadeCadastro, listarCategoriasCadastro, obterCadastro, salvarCadastro } from '../../../aplicacao/cadastros'
 import { useSugestaoCadastro } from '../../../aplicacao/useSugestaoCadastro'
 import { useGravacaoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
@@ -8,7 +8,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { lerMoeda } from '../../../dominio/formato'
-import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
+import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
 const pessoa = [{ valor: 'fisica', rotulo: 'Pessoa física' }, { valor: 'juridica', rotulo: 'Pessoa jurídica' }]
@@ -16,7 +16,7 @@ const tiposProduto = [{ valor: 'Alimento', rotulo: 'Alimento' }, { valor: 'Fisic
 const tiposConta = [{ valor: 'corrente', rotulo: 'Conta corrente' }, { valor: 'poupanca', rotulo: 'Poupança' }, { valor: 'pagamento', rotulo: 'Conta de pagamento' }]
 const opcoesStatus = [{ valor: 'Inativo', rotulo: 'Inativo' }, { valor: 'Ativo', rotulo: 'Ativo' }]
 
-export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo }) {
+export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade }) {
   const idForm = useId()
   const { dados, inicial } = editor
   const id = dados.id ?? dados.produtoId
@@ -32,6 +32,11 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const [salvando, iniciar] = useGravacaoDoAjuste(`cadastros:${tela}:${id ?? dados.requestId}`)
   const alterado = JSON.stringify(dados) !== JSON.stringify(inicial)
   const montado = useRef(true)
+  // #2495 (S2, I1): confirmação de inativar ou reativar; o erro fica no Modal e nada fecha.
+  const [atividade, confirmarAtividade] = useState(null)
+  const [alternando, alternar] = useState(false)
+  const [erroAtividade, falharAtividade] = useState(null)
+  const atividadeEmVoo = useRef(false)
   useEffect(() => { montado.current = true; return () => { montado.current = false; leituraAtual.current?.abort() } }, [])
   const mudar = (campo, valor, manual = true) => {
     aoMudar({ ...editor, dados: mudarDadosCadastro(tela, dados, campo, valor) })
@@ -103,8 +108,21 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
       if (semConfirmacao) aoMudar({ ...editor, semConfirmacao: true })
     } finally { concluir() }
   }
+  async function concluirAtividade() {
+    if (atividadeEmVoo.current || !atividade) return
+    atividadeEmVoo.current = true; alternar(true); falharAtividade(null)
+    try {
+      await alternarAtividadeCadastro(tela, id, atividade.ativar, contexto)
+      if (montado.current) aoAlternarAtividade?.(atividade.sucesso)
+    } catch (e) { if (montado.current) falharAtividade(mensagemDeAtividade(tela, atividade.ativar, e)) }
+    finally { atividadeEmVoo.current = false; if (montado.current) alternar(false) }
+  }
+  const mostraAtividade = podeEditar && temAtividadeNoEditor(tela, dados)
   const titulo = `${podeEditar ? id ? 'Editar' : 'Novo' : 'Consultar'} ${({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro bancário' })[tela]}`
   return <Modal titulo={titulo} largura="md" focarCampo aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
+    {/* O vermelho fica só na confirmação: aqui o botão é discreto e afastado de Salvar. Com `motivo` sempre
+        presente o invólucro não troca e o botão não remonta (#2258). */}
+    {mostraAtividade && <span className={css.acaoAtividade}><Botao disabled={salvando || alterado || Boolean(editor.conflito || editor.semConfirmacao)} motivo={`Salve ou descarte as alterações antes de ${emAtividadeCadastro(dados) ? 'inativar' : 'reativar'}.`} onClick={() => { falharAtividade(null); confirmarAtividade(confirmacaoDeAtividade(tela, dados)) }}>{emAtividadeCadastro(dados) ? 'Inativar' : 'Reativar'}</Botao></span>}
     <Botao onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))} disabled={salvando}>{podeEditar ? 'Cancelar' : 'Fechar'}</Botao>
     {podeEditar && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : !alterado ? id ? 'Nada mudou para salvar.' : 'Preencha o cadastro para salvar.' : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
   </>}>
@@ -164,6 +182,11 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
         </>}
       </fieldset>
     </form>
+    {atividade && <Modal titulo={atividade.titulo} aoFechar={alternando ? undefined : () => confirmarAtividade(null)} segurarFechamento={alternando}
+      rodape={<><Botao disabled={alternando} onClick={() => confirmarAtividade(null)}>Cancelar</Botao><Botao variante={atividade.ativar ? 'primario' : 'perigo'} disabled={alternando} onClick={concluirAtividade}>{alternando ? atividade.ativar ? 'Reativando…' : 'Inativando…' : atividade.botao}</Botao></>}>
+      <p>{atividade.texto}</p>
+      {erroAtividade && <p className={css.erro} role="alert">{erroAtividade}</p>}
+    </Modal>}
     {tela === 'clientes' && dados.detalhe?.alteracoes?.length > 0 && <details className={css.historico}><summary>Histórico do cadastro</summary><ul>{dados.detalhe.alteracoes.slice(0, 10).map(a => <li key={a.id}><strong>{a.campo}</strong> · {a.alteradoPorNome || 'Usuário da loja'}<small>{a.valorAntigo || 'Vazio'} → {a.valorNovo || 'Vazio'}</small></li>)}</ul></details>}
   </Modal>
 }

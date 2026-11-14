@@ -100,6 +100,11 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
     definir({ editor: null }); aoFixarContexto(false); avisar(editor?.origemConversa ? 'Cadastro salvo. Volte à conversa e confira o vínculo com a pessoa.' : 'Cadastro salvo.'); consulta.recarregar()
     if (tela === 'clientes' && conversa?.clienteId === editor?.dados.id) carregarClienteDaConversa?.(conversa.id)
   }
+  // #2495 (S2): inativar ou reativar fecha o editor, avisa e relê a lista (e o cliente da conversa, se for o mesmo).
+  const atividadeAlternada = (mensagem) => {
+    definir({ editor: null }); aoFixarContexto(false); avisar(mensagem); consulta.recarregar()
+    if (tela === 'clientes' && conversa?.clienteId === editor?.dados.id) carregarClienteDaConversa?.(conversa.id)
+  }
   async function desfazer() {
     if (!reversao || !podeEditar) return
     const concluir = iniciarDesfazer(); if (!concluir) return
@@ -154,6 +159,6 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       <footer className={css.rodape}><span>{soLeads ? `${leads.length} contatos sem cadastro nas conversas carregadas` : consulta.pesquisaLimitada ? `${lista.length} resultados, até 100 por busca` : `${consulta.total} cadastros`}</span>{!soLeads && !consulta.pesquisaLimitada && tela !== 'bancos' && <div className={css.acoes}><Botao disabled={pagina <= 1 || consulta.carregando} onClick={() => definir({ pagina: pagina - 1, posicao: 0 })}>Anterior</Botao><span>Página {pagina}</span><Botao disabled={!temProximaPagina(pagina, consulta.total) || consulta.carregando} onClick={() => definir({ pagina: pagina + 1, posicao: 0 })}>Próxima</Botao></div>}</footer>
     </div>
     {tela === 'produtos' && <div className={css.links}><a href={hashDoModulo('cardapio', 'itens')}>Abrir itens do cardápio</a><a href={hashDoModulo('producao', 'estoque')}>Conferir estoque do dia</a></div>}
-    {editor && <EditorCadastro tela={tela} editor={editor} aoMudar={valor => definir({ editor: valor })} contexto={contexto} conversa={tela === 'clientes' && ((editor.dados.id && conversa?.clienteId === editor.dados.id) || (!editor.dados.id && !conversa?.clienteId && editor.origemConversa?.id === conversa?.id && editor.origemConversa?.vinculoRevisao === (conversa?.vinculoRevisao ?? 0))) ? conversa : null} podeEditar={podeEditar} aoFechar={() => { definir({ editor: null }); aoFixarContexto(false) }} aoSalvo={salvo} />}
+    {editor && <EditorCadastro tela={tela} editor={editor} aoMudar={valor => definir({ editor: valor })} contexto={contexto} conversa={tela === 'clientes' && ((editor.dados.id && conversa?.clienteId === editor.dados.id) || (!editor.dados.id && !conversa?.clienteId && editor.origemConversa?.id === conversa?.id && editor.origemConversa?.vinculoRevisao === (conversa?.vinculoRevisao ?? 0))) ? conversa : null} podeEditar={podeEditar} aoFechar={() => { definir({ editor: null }); aoFixarContexto(false) }} aoSalvo={salvo} aoAlternarAtividade={atividadeAlternada} />}
   </section>
 }

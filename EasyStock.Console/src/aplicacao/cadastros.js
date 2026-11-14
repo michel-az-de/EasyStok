@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../infra/api/cadastrosApi'
-export { contextoCadastro, obterCadastro, listarCategoriasCadastro, salvarCadastro, ativarMetodoCadastro, previaModeloCadastro, aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro } from '../infra/api/cadastrosApi'
+export { alternarAtividadeCadastro, contextoCadastro, obterCadastro, listarCategoriasCadastro, salvarCadastro, ativarMetodoCadastro, previaModeloCadastro, aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro } from '../infra/api/cadastrosApi'
 
 // Preferências visuais da visita, sem entidades nem dados para persistir. Não contam como formulário sujo.
 const contextosVisuais = new Map()

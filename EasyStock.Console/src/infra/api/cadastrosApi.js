@@ -27,6 +27,10 @@ export async function obterCadastro(tela, id, contexto, sinal) {
   const r = await chamarApi(`${rotas[tela]}/${encodeURIComponent(id)}?empresaId=${contexto.empresaId}`, opcoes(contexto, sinal))
   return tela === 'clientes' ? { ...r.cliente, detalhe: r } : r
 }
+// #2495 (S2): DELETE inativa (204) e POST /reativar volta; as duas são idempotentes na API.
+export const alternarAtividadeCadastro = (tela, id, ativar, contexto) => chamarApi(
+  `${rotas[tela]}/${encodeURIComponent(id)}${ativar ? '/reativar' : ''}?empresaId=${contexto.empresaId}`,
+  { ...opcoes(contexto), metodo: ativar ? 'POST' : 'DELETE' })
 export const listarCategoriasCadastro = (contexto, sinal) => chamarApi(`/api/categorias?empresaId=${contexto.empresaId}`, opcoes(contexto, sinal))
 export async function salvarCadastro(tela, dados, contexto) {
   const id = dados.id ?? dados.produtoId
