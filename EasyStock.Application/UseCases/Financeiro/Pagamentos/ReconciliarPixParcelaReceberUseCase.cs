@@ -55,14 +55,15 @@ public class ReconciliarPixParcelaReceberUseCase(
         if (conta is null)
             return new ReconciliarPixResult(null, parcela.Id, null, null, null, false, "parcela orfa");
 
-        // Idempotencia: ja confirmado
-        var jaConfirmado = parcela.Pagamentos.Any(p =>
+        // Idempotencia: o txid ja gerou pagamento. #2501: o estornado tambem conta; o estorno mantem o txid na
+        // parcela e o indice unico do txid barraria um segundo pagamento a cada rodada do job.
+        var jaProcessado = parcela.Pagamentos.FirstOrDefault(p =>
             p.GatewayProvedor == "EfiPix" &&
-            p.GatewayTransactionId == cmd.Txid &&
-            p.Status == StatusPagamentoParcela.Confirmado);
-        if (jaConfirmado)
+            p.GatewayTransactionId == cmd.Txid);
+        if (jaProcessado is not null)
             return new ReconciliarPixResult(null, parcela.Id, conta.Id,
-                parcela.Status.ToString(), conta.Status.ToString(), false, "ja reconciliado");
+                parcela.Status.ToString(), conta.Status.ToString(), false,
+                jaProcessado.Status == StatusPagamentoParcela.Estornado ? "pix estornado" : "ja reconciliado");
 
         // Se nao recebemos valor, consultar Efi
         decimal valorPago;
