@@ -18,6 +18,7 @@ public class CriarUsuarioUseCaseTests
     private readonly IUsuarioEmpresaRepository _vinculos = Substitute.For<IUsuarioEmpresaRepository>();
     private readonly IUsuarioPerfilRepository _perfisDoUsuario = Substitute.For<IUsuarioPerfilRepository>();
     private readonly IPerfilRepository _perfis = Substitute.For<IPerfilRepository>();
+    private readonly ILojaRepository _lojas = Substitute.For<ILojaRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly ICurrentUserAccessor _atual = Substitute.For<ICurrentUserAccessor>();
     private readonly List<Usuario> _adicionados = [];
@@ -32,12 +33,25 @@ public class CriarUsuarioUseCaseTests
     }
 
     private CriarUsuarioUseCase UseCase() => new(
-        _c.Usuarios, _assinaturas, _vinculos, _perfisDoUsuario, _perfis, _c.Consentimentos, _c.Convites(), _atual,
+        _c.Usuarios, _assinaturas, _vinculos, _perfisDoUsuario, _perfis, _lojas, _c.Consentimentos, _c.Convites(), _atual,
         _c.Auditoria, _c.UnitOfWork, _hasher, Substitute.For<ILogger<CriarUsuarioUseCase>>());
 
     private CriarUsuarioCommand Convite(
         string? telefone = null, bool atesta = false, Guid? perfilId = null, string? senha = null) =>
         new(_empresaId, "Ana Souza", "ana@casadababa.com", senha, perfilId, null, telefone, atesta);
+
+    [Fact]
+    public async Task LojaDeOutraEmpresaRecusaENaoGrava()
+    {
+        // #2569: o token leva a loja do perfil; GetByIdAsync(empresa, loja) nulo = loja de outra empresa (ou inexistente).
+        var lojaAlheia = Guid.NewGuid();
+        var comando = new CriarUsuarioCommand(_empresaId, "Ana Souza", "ana@casadababa.com", null, null, lojaAlheia, null, false);
+
+        var acao = () => UseCase().ExecuteAsync(comando);
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("Loja invalida.");
+        _adicionados.Should().BeEmpty();
+    }
 
     [Fact]
     public async Task SemSenhaCriaConvidadoEEmiteConviteDeEmail()

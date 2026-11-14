@@ -118,7 +118,7 @@ public class AuthControllerTests
             Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), currentUser, passwordHasher,
             unitOfWork2, config, TimeProvider.System, Substitute.For<ILogger<TrocaDeContatoService>>());
         var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, trocaDeContato, atualizarUsuarioAtualLogger);
-        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, revogadorSessoes, unitOfWork2, passwordHasher, alterarSenhaLogger);
+        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, revogadorSessoes, Substitute.For<IResetTokenRepository>(), unitOfWork2, passwordHasher, alterarSenhaLogger);
         var confirmEmailLogger = Substitute.For<ILogger<ConfirmEmailUseCase>>();
         var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, revogadorSessoes, unitOfWork2, confirmEmailLogger);
 
