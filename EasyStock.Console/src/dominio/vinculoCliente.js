@@ -1,7 +1,12 @@
 // #2461: quem é a pessoa para a loja. 'lead' é quem tem cadastro e nenhum pedido; a regra do que conta como
-// pedido é da API (`temPedido`, cancelado conta). Sem `temPedido` (API anterior ao campo, cadastro rápido), vale
+// pedido é da API (`temPedido`, cancelado conta). Sem `temPedido` (API anterior ao campo), vale
 // o de antes: cadastro é cliente. Não é o `conta === 'lead'`, que segue querendo dizer sem cadastro.
 export const relacionamentoDaApi = (clienteId, temPedido) => !clienteId ? 'sem-cadastro' : temPedido === false ? 'lead' : 'cliente'
+
+// #2461: o cadastro criado agora ainda não tem pedido, então já nasce Lead. O telefone que era de outro cadastro
+// (`novo === false`) pode ter pedido: sem `temPedido`, quem responde é a próxima leitura da lista.
+export const vinculoDoCadastro = (salvo) => ({ clienteId: salvo.clienteId, clienteNome: salvo.nome, vinculoRevisao: salvo.vinculoRevisao,
+  ...(salvo.novo === true ? { temPedido: false } : {}) })
 
 export function aplicarVinculoConfirmado(conversa, vinculo) {
   if (!Number.isInteger(vinculo?.vinculoRevisao) || vinculo.vinculoRevisao < (conversa.vinculoRevisao ?? 0)) return conversa

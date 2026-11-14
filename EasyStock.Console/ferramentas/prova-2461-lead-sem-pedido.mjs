@@ -33,7 +33,7 @@ registerHooks({
 })
 
 const { conversaDaApi } = await import('../src/infra/api/traducaoConversas.js')
-const { aplicarVinculoConfirmado, preservarVinculoConfirmado } = await import('../src/dominio/vinculoCliente.js')
+const { aplicarVinculoConfirmado, preservarVinculoConfirmado, vinculoDoCadastro } = await import('../src/dominio/vinculoCliente.js')
 const { mesclarDoServidor } = await import('../src/aplicacao/reducer/mesclaDoServidor.js')
 const { ehLead } = await import('../src/dominio/conversa.js')
 const { marcaDoPedido } = await import('../src/features/caixa-de-entrada/apresentacaoDoCartao.js')
@@ -91,8 +91,20 @@ provar('correção do vínculo já traz o relacionamento do cadastro novo, sem e
   assert.equal(marcaDoPedido(vinculada, [], { fonteApi: true })?.texto, 'Lead')
   assert.equal(aplicarVinculoConfirmado(semCadastro, { clienteId: 'cad-2', temPedido: true, vinculoRevisao: 1 }).relacionamento, 'cliente')
   assert.equal(aplicarVinculoConfirmado(lead, { clienteId: null, temPedido: null, vinculoRevisao: 2 }).relacionamento, 'sem-cadastro')
-  // Cadastro rápido e API antiga não informam temPedido: vale o fallback até a próxima leitura.
+  // API antiga não informa temPedido: vale o fallback até a próxima leitura.
   assert.equal(aplicarVinculoConfirmado(semCadastro, { clienteId: 'cad-9', vinculoRevisao: 1 }).relacionamento, 'cliente')
+})
+
+provar('cadastro rápido novo já aparece como Lead; telefone de cadastro existente espera a leitura', () => {
+  const novo = vinculoDoCadastro({ clienteId: 'cad-9', nome: 'Pessoa de Teste', vinculoRevisao: 1, novo: true })
+  assert.deepEqual(novo, { clienteId: 'cad-9', clienteNome: 'Pessoa de Teste', vinculoRevisao: 1, temPedido: false })
+  const conversa = aplicarVinculoConfirmado(semCadastro, novo)
+  assert.equal(conversa.relacionamento, 'lead')
+  assert.equal(marcaDoPedido(conversa, [], { fonteApi: true })?.texto, 'Lead')
+  // O cadastro que já existia pode ter pedido: sem temPedido, quem decide é a próxima leitura da lista.
+  const existente = vinculoDoCadastro({ clienteId: 'cad-3', nome: 'Pessoa de Teste', vinculoRevisao: 1, novo: false })
+  assert.equal('temPedido' in existente, false)
+  assert.equal(aplicarVinculoConfirmado(semCadastro, existente).relacionamento, 'cliente')
 })
 
 provar('polling atrasada não desfaz o relacionamento confirmado; a leitura da mesma revisão atualiza', () => {
