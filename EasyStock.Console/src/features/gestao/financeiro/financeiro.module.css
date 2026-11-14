@@ -7,6 +7,7 @@
 .grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
 /* #2258 (F8): quatro números em 2x2, sempre; auto-fit deixava 3+1 conforme a largura. */
 .indicadores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
+.indicadoresTres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .indicador { display: grid; gap: var(--e-2); padding: var(--e-4); border: 0; border-radius: var(--r-2); background: var(--preenchimento); }
 .indicador > span { color: var(--tinta-2); font-size: var(--t-apoio); }
 .indicador > strong { font-family: var(--f-dado); font-size: var(--t-titulo); }
@@ -15,6 +16,7 @@
 .atalho { display: flex; align-items: center; gap: var(--e-3); padding: var(--e-4); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); font-weight: 600; text-decoration: none; }
 .atalho:hover { background: var(--preenchimento-forte); }
 .filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); align-items: end; gap: var(--e-3); }
+.filtros > button[type='submit'] { justify-self: start; }
 .comContexto { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--e-4); }
 .contexto { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: 0; border-radius: var(--r-2); background: var(--preenchimento); }
 .contexto h2 { font-size: var(--t-forte); margin: 0; }
@@ -44,12 +46,14 @@
 .maisFiltros[open] { flex-basis: 100%; order: 3; }
 .maisFiltros > summary { cursor: pointer; min-height: var(--toque); display: flex; align-items: center; color: var(--tinta-2); font-weight: 600; }
 .maisFiltros[open] > summary { margin-bottom: var(--e-3); }
+.maisFiltros > summary::after { content: '▾'; content: '▾' / ''; margin-left: var(--e-2); }
+.maisFiltros[open] > summary::after { transform: rotate(180deg); }
 /* #2258 (F12): categoria nova criada ali mesmo, ao lado da escolha. */
 .categoria { display: grid; align-content: start; justify-items: start; gap: var(--e-1); min-width: 0; }
 .novaCategoria { border: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: end; gap: var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); }
 .novaCategoria > :nth-child(2) { flex: 1 1 220px; }
 .dia { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--e-4); }
-.ladoDia { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: 0; border-radius: var(--r-2); }
+.ladoDia { display: grid; align-content: start; gap: var(--e-3); padding: 0; border: 0; border-radius: var(--r-2); }
 .ladoDia h2 { margin: 0; font-size: var(--t-forte); }
 .ladoDia h3 { margin: 0; font-size: var(--t-corpo); }
 .cartaoVencidas { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); text-decoration: none; }
@@ -92,10 +96,12 @@
 .tabela { width: 100%; border-collapse: collapse; font-size: var(--t-apoio); }
 .tabela th, .tabela td { padding: var(--e-3); text-align: left; border-bottom: var(--b-1) solid var(--linha); }
 .tabela th { color: var(--tinta-2); }
-.tabela td { white-space: nowrap; }
-.tabela td:first-child { white-space: normal; }
+.tabela td { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.tabela thead th:not(:first-child) { text-align: right; }
+.tabela td:first-child { white-space: normal; text-align: left; }
 @media (max-width: 1199px) { .comContexto { grid-template-columns: minmax(0, 1fr); } .contexto { grid-template-columns: repeat(2, minmax(0, 1fr)); } .contexto .acoes { justify-content: start; } }
 @media (max-width: 759px) {
+  .indicadoresTres { grid-template-columns: minmax(0, 1fr); }
   .grade, .detalhes, .contexto { grid-template-columns: minmax(0, 1fr); } .linha { gap: var(--e-2); } .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* No celular o toque na conta abre o detalhe; o resumo ao lado iria para depois da lista. */
   .comContexto > .contexto { display: none; }
