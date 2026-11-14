@@ -157,7 +157,12 @@ builder.Services.AddEasyStockDataProtection();
 // consome e o HealthchecksPingService, que pinga o Healthchecks.io enquanto estao saudaveis e chama /fail quando nao.
 builder.Services.AddHealthChecks()
     .AddNotificationsHosting()
-    .AddNotificacoesBacklog();
+    .AddNotificacoesBacklog()
+    // #2536: os outros loops do Worker (outbox, agendamento, relatorios...) tambem alimentam o arquivo de vida.
+    .AddCheck<EasyStock.Infra.Notifications.Hosting.LoopsDoWorkerHealthCheck>(
+        EasyStock.Infra.Notifications.Hosting.LoopsDoWorkerHealthCheck.Nome,
+        tags: EasyStock.Infra.Notifications.Hosting.LoopsDoWorkerHealthCheck.Tags);
+builder.Services.AddSingleton<EasyStock.Infra.Notifications.Hosting.LoopsDoWorker>();
 builder.Services.AddHttpClient(HealthchecksPingService.NomeDoCliente);
 builder.Services.AddHostedService<HealthchecksPingService>();
 // #2107: sinal de vida para o healthcheck do Docker (Notifications:Monitoring:ArquivoDeVida; vazio desliga).
