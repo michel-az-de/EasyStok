@@ -212,14 +212,61 @@ public sealed class AnalyticsRepositoryIntegrationTests(PostgreSqlDatabaseFixtur
         await dbContext.SaveChangesAsync();
 
         // Act
-        var items = await repo.GetMargemPorProdutoAsync(empresaId, 30);
+        var (items, total) = await repo.GetMargemPorProdutoAsync(empresaId, 30);
 
         // Assert
+        total.Should().Be(1);
         items.Should().NotBeNull();
         items.Should().HaveCount(1);
         var margem = items.First();
         margem.ProdutoId.Should().Be(produto.Id);
         margem.NomeProduto.Should().Be("Produto Teste");
+    }
+
+    [SkippableFact] // #2510: o total é o de produtos com margem, não o tamanho da página.
+    public async Task GetMargemPorProdutoAsync_Paginado_TotalContaTodosOsProdutos()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await using var dbContext = fixture.CreateDbContext();
+        var repo = new Infra.Postgre.Repositories.AnalyticsRepository(dbContext, new CaixaSaldoCalculator(new CaixaRepository(dbContext)));
+
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        dbContext.SetMobileTenantContext(empresaId);
+        dbContext.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Teste", Documento = empresaId.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        dbContext.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria Teste", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+
+        for (var i = 1; i <= 3; i++)
+        {
+            var produto = new Produto
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, CategoriaId = categoriaId, Nome = $"Produto {i}",
+                Tipo = TipoProduto.Fisico, SkuBase = CodigoSku.From($"SKU-PG-{i}"), Status = StatusProduto.Ativo,
+                CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            };
+            var item = new ItemEstoque
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produto.Id,
+                QuantidadeAtual = Quantidade.From(10), QuantidadeInicial = Quantidade.From(10),
+                CustoUnitario = Dinheiro.FromDecimal(50m), PrecoVendaSugerido = Dinheiro.FromDecimal(75m),
+                EntradaEm = DateTime.UtcNow, Status = StatusItemEstoque.Ok, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+            };
+            dbContext.Produtos.Add(produto);
+            dbContext.ItensEstoque.Add(item);
+            dbContext.MovimentacoesEstoque.Add(new MovimentacaoEstoque
+            {
+                Id = Guid.NewGuid(), EmpresaId = empresaId, ItemEstoqueId = item.Id, ProdutoId = produto.Id,
+                Tipo = TipoMovimentacaoEstoque.Saida, Natureza = NaturezaMovimentacaoEstoque.Venda,
+                Quantidade = Quantidade.From(1), ValorUnitario = Dinheiro.FromDecimal(70m + i), ValorTotal = Dinheiro.FromDecimal(70m + i),
+                DataMovimentacao = DateTime.UtcNow, CriadoEm = DateTime.UtcNow
+            });
+        }
+        await dbContext.SaveChangesAsync();
+
+        var (items, total) = await repo.GetMargemPorProdutoAsync(empresaId, 30, page: 1, pageSize: 2);
+
+        items.Should().HaveCount(2);
+        total.Should().Be(3);
     }
 
     [SkippableFact]

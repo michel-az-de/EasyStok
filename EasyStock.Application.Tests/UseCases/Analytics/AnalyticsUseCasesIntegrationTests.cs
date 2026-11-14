@@ -72,7 +72,7 @@ public class AnalyticsUseCasesIntegrationTests
             new(Guid.NewGuid(), "Produto A", 100m, 150m, 50m, 33.33m, 100)
         };
 
-        _repository.GetMargemPorProdutoAsync(empresaId, 30, 1, 20, null).Returns(margens);
+        _repository.GetMargemPorProdutoAsync(empresaId, 30, 1, 20, null).Returns((margens, 1));
 
         var logger = Substitute.For<ILogger<CalcularMargemUseCase>>();
         var useCase = new CalcularMargemUseCase(_repository, logger);
@@ -84,6 +84,25 @@ public class AnalyticsUseCasesIntegrationTests
         // Assert
         items.Should().HaveCount(1);
         items.First().MargemPercentual.Should().BeApproximately(33.33m, 0.01m);
+        total.Should().Be(1);
+    }
+
+    [Fact] // #2510: o total vem do repositório, não do tamanho da página.
+    public async Task CalcularMargemUseCase_Paginado_RepassaTotalDoRepositorio()
+    {
+        var empresaId = Guid.NewGuid();
+        var pagina = new List<MargemPorProduto>
+        {
+            new(Guid.NewGuid(), "Produto A", 100m, 150m, 50m, 50m, 10),
+            new(Guid.NewGuid(), "Produto B", 100m, 140m, 40m, 40m, 10)
+        };
+        _repository.GetMargemPorProdutoAsync(empresaId, 30, 1, 2, null).Returns((pagina, 3));
+        var useCase = new CalcularMargemUseCase(_repository, Substitute.For<ILogger<CalcularMargemUseCase>>());
+
+        var (items, total) = await useCase.ExecuteAsync(new CalcularMargemCommand(empresaId, PageSize: 2));
+
+        items.Should().HaveCount(2);
+        total.Should().Be(3);
     }
 
     [Fact]
