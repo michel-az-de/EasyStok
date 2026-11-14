@@ -51,9 +51,13 @@ psql_ro() {
   sql="$(head -c 20001)"
   [ "${#sql}" -ge 1 ] && [ "${#sql}" -le 20000 ] || nega "sql vazio ou maior que 20000 bytes"
   case "$sql" in *\\*) nega "barra invertida no sql" ;; esac
-  shopt -s nocasematch
-  case "$sql" in *set_config*|*app.empresa_id*|*app.bypass_rls*|*pg_sleep*|*dblink*|*lo_export*|*lo_import*) nega "funcao ou parametro nao permitido" ;; esac
-  shopt -u nocasematch
+  # uma unica instrucao: ';' so no fim (um ';' no meio permitiria COMMIT/SET e sairia do READ ONLY e do escopo de empresa)
+  sql="${sql%"${sql##*[![:space:];]}"}"
+  case "$sql" in *\;*) nega "apenas uma instrucao" ;; esac
+  # nomes que trocam escopo ou executam SQL montado em texto; compara sem espacos, aspas e comentarios
+  local norm
+  norm="$(printf '%s' "$sql" | sed -e 's#/\*[^*]*\*/##g' | tr -d '[:space:]"' | tr '[:upper:]' '[:lower:]')"
+  case "$norm" in *set_config*|*app.empresa_id*|*app.bypass_rls*|*pg_sleep*|*dblink*|*lo_export*|*lo_import*|*lo_create*|*query_to_xml*|*cursor_to_xml*|*table_to_xml*|*schema_to_xml*|*database_to_xml*|*ts_stat*|*pg_read_*|*pg_ls_*) nega "funcao ou parametro nao permitido" ;; esac
   if [ -n "$GATE_DRY" ]; then echo "psql_ro ok (${#sql} bytes)"; exit 0; fi
   [ -r "$envf" ] || nega "sem configuracao do banco"
   # shellcheck disable=SC1090
@@ -67,7 +71,7 @@ SET LOCAL app.empresa_id = %s;
 %s
 ;
 COMMIT;
-' "'$EMPRESA_ID'" "$sql"     | "$DOCKER" exec -i -e PGPASSWORD "$PG_CONTAINER" psql -X -q -v ON_ERROR_STOP=1 --csv -U "$PG_USER" -d "$PG_DB" 2>&1
+' "'$EMPRESA_ID'" "$sql"     | timeout 25 "$DOCKER" exec -i -e PGPASSWORD "$PG_CONTAINER" psql -X -q -v ON_ERROR_STOP=1 --csv -U "$PG_USER" -d "$PG_DB" 2>&1
 }
 
 executa() {

@@ -12,6 +12,8 @@ ALTER ROLE baba_ro SET default_transaction_read_only = on;
 ALTER ROLE baba_ro SET statement_timeout = '15s';
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM baba_ro;
 GRANT USAGE ON SCHEMA public TO baba_ro;
+REVOKE TEMP ON DATABASE easystock FROM baba_ro;  -- efetivo so se PUBLIC tambem perder TEMP: REVOKE TEMP ON DATABASE easystock FROM PUBLIC (confirmar que a API nao usa tabela temporaria)
+-- Fora da allowlist por risco de payload/PII/dado global: audit_logs, system_error_logs, notif_eventos, notif_logs_envio, nfe_documentos, nfe_eventos, planos, endpoint_health_state.
 DO $$
 DECLARE t text;
 BEGIN
@@ -26,8 +28,8 @@ BEGIN
     'atendimento_conversas','atendimento_mensagens','configuracoes_atendimento','respostas_prontas','mensagens_programadas','lembretes',
     'campanhas','campanha_destinatarios','cardapio_item','cardapio_item_variacao','cardapio_secao','storefront','frete_zona','janela_entrega',
     'entregadores','viagens','viagem_paradas','corridas_externas','chamados_entregador','ocorrencias',
-    'nfe_documentos','nfe_eventos','nfe_itens','faturas','fatura_itens','fatura_pagamentos','assinaturas_empresa','planos',
-    'notificacoes','notif_logs_envio','notif_eventos','system_error_logs','audit_logs','report_runs','endpoint_health_state'
+    'nfe_itens','faturas','fatura_itens','fatura_pagamentos','assinaturas_empresa',
+    'notificacoes','report_runs'
   ] LOOP
     IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
       EXECUTE format('GRANT SELECT ON public.%I TO baba_ro', t);

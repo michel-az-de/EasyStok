@@ -98,3 +98,7 @@ A lista exata de endpoints sai do `swagger` na PR de cada um, não aqui.
 - Criar `baba_ro` e a senha na VPS (antes da prova real do #2522).
 - Confirmar que "SHA privado daqui" é a leitura da decisão 2.
 - Papéis nominais e acesso SSH da Thatiane (antes do #2523).
+
+## Follow-up de seguranca do baba-db (revisao opus da PR #2549)
+
+O guard de SQL (cliente e gate) e higiene, nao barreira: GUC `app.bypass_rls` e `app.empresa_id` sao setaveis por qualquer papel. A defesa real e policy que ignore o bypass para `baba_ro` (`AND current_user <> 'baba_ro'`), migracao de tier alto, e `REVOKE TEMP ... FROM PUBLIC`. Ate la: gate recusa `;` no meio, nomes de GUC normalizados e funcoes de SQL dinamico; tabelas com payload, log ou dado global ficam fora do GRANT.

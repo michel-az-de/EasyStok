@@ -4,7 +4,9 @@ import { validarSql, comLimite } from '../src/lib/sql.mjs';
 
 const ok = ['select 1', 'SELECT * FROM pedidos;', 'with a as (select 1) select * from a', 'explain select 1', "select 'a;b' as x", 'select 1 -- ; drop table x',
   'select * from pedidos where nome = \'insert\'', '(select 1) union (select 2)'];
-const ruim = ['select 1; select 2', 'delete from pedidos', 'update pedidos set x=1', 'drop table x', 'select 1; drop table x', 'select * into t from pedidos',
+const ruim = [
+  "SELECT '--' ) x; COMMIT; SET app . bypass_rls = 'true'; SELECT * FROM (SELECT * FROM clientes", "select 1 /* x */ ; set app . empresa_id = 'x'", "select $$'$$; delete from t",
+  "select query_to_xml('select 1', true, true, '')", "select set_config('app'||'.x','1',false)", 'select app/**/.bypass_rls', 'select 1 /* nao fecha', "select 'nao fecha",'select 1; select 2', 'delete from pedidos', 'update pedidos set x=1', 'drop table x', 'select 1; drop table x', 'select * into t from pedidos',
   'explain analyze select 1', 'select * from pedidos for update', 'with x as (delete from pedidos returning *) select * from x', 'select pg_sleep(100)',
   'select set_config(\'app.bypass_rls\',\'on\',false)', 'select 1 \\! id', 'copy pedidos to program \'id\'', 'select $a$;$a$; drop table x', 'do $$ begin end $$', '', '   ',
   'select 1 /* x */; delete from t', 'select dblink(\'x\',\'y\')', 'select lo_export(1,\'/x\')', 'x'.repeat(20_001)];

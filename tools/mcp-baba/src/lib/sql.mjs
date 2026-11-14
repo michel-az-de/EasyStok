@@ -3,14 +3,39 @@ export const MAX_SQL = 20_000;
 
 const PROIBIDAS = /\b(insert|update|delete|truncate|drop|alter|create|grant|revoke|copy|call|do|vacuum|reindex|cluster|lock|listen|notify|set|reset|begin|commit|rollback|savepoint|prepare|execute|refresh|comment|security|pg_sleep|pg_read_file|pg_ls_dir|lo_import|lo_export|dblink|set_config|pg_terminate_backend|pg_cancel_backend)\b/i;
 
-/** Remove comentarios e literais para inspecionar so o esqueleto do SQL. */
+/** Varredura sequencial (string, identificador, dollar-quote e comentario na ordem em que aparecem): devolve so o esqueleto. */
 function esqueleto(sql) {
-  return sql
-    .replace(/--[^\n]*/g, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/'(?:[^']|'')*'/g, "''")
-    .replace(/"(?:[^"]|"")*"/g, '""')
-    .replace(/\$([A-Za-z_]*)\$[\s\S]*?\$\1\$/g, "''");
+  let o = '', i = 0;
+  const n = sql.length;
+  while (i < n) {
+    const c = sql[i], d = sql[i + 1];
+    if (c === '-' && d === '-') { while (i < n && sql[i] !== '\n') i++; o += ' '; continue; }
+    if (c === '/' && d === '*') {
+      let nivel = 1; i += 2;
+      while (i < n && nivel > 0) { if (sql[i] === '/' && sql[i + 1] === '*') { nivel++; i += 2; } else if (sql[i] === '*' && sql[i + 1] === '/') { nivel--; i += 2; } else i++; }
+      if (nivel > 0) throw new Error('comentario de bloco nao fechado.');
+      o += ' '; continue;
+    }
+    if (c === "'" || c === '"') {
+      i++;
+      for (;;) {
+        if (i >= n) throw new Error('aspas nao fechadas.');
+        if (sql[i] === c) { if (sql[i + 1] === c) { i += 2; continue; } i++; break; }
+        i++;
+      }
+      o += c + c; continue;
+    }
+    if (c === '$') {
+      const m = /^\$([A-Za-z_][A-Za-z_0-9]*)?\$/.exec(sql.slice(i));
+      if (m) {
+        const fim = sql.indexOf(m[0], i + m[0].length);
+        if (fim < 0) throw new Error('dollar-quote nao fechado.');
+        i = fim + m[0].length; o += "''"; continue;
+      }
+    }
+    o += c; i++;
+  }
+  return o;
 }
 
 /** Devolve o SQL pronto ou lanca erro. Uma unica instrucao SELECT/WITH/EXPLAIN (sem ANALYZE). */
@@ -27,6 +52,8 @@ export function validarSql(entrada) {
   if (/^\s*explain\b[^]*\banalyze\b/i.test(e)) throw new Error('EXPLAIN ANALYZE executa a consulta: nao permitido.');
   if (/\binto\b/i.test(e)) throw new Error('SELECT INTO nao permitido.');
   if (/\bfor\s+(update|share|no\s+key\s+update|key\s+share)\b/i.test(e)) throw new Error('bloqueio de linha nao permitido.');
+  const norm = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/[\s"]/g, '').toLowerCase();
+  if (/app\.(bypass_rls|empresa_id)|set_config|query_to_xml|cursor_to_xml|table_to_xml|schema_to_xml|database_to_xml|ts_stat|lo_create|pg_read_|pg_ls_/.test(norm)) throw new Error('funcao ou parametro nao permitido.');
   const m = e.match(PROIBIDAS);
   if (m) throw new Error(`palavra nao permitida: ${m[1].toLowerCase()}.`);
   return sql;
