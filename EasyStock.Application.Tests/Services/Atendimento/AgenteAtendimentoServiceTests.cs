@@ -17,7 +17,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EasyStock.Application.Tests.Services.Atendimento;
 
 /// <summary>O LLM é um fake (<see cref="IAgenteLlmClient"/> substituído): nenhuma chamada de rede.</summary>
-public class AgenteAtendimentoServiceTests
+public partial class AgenteAtendimentoServiceTests
 {
     private const string WaId = "5511999998888";
     private static readonly DateTime Agora = new(2026, 9, 26, 15, 0, 0, DateTimeKind.Utc);
@@ -83,7 +83,8 @@ public class AgenteAtendimentoServiceTests
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
         [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos);
+        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
+        turnos: _turnos, precos: Microsoft.Extensions.Options.Options.Create(_precos));
 
     private AgenteAtendimentoService CriarServicoComLimite(int maximoPorHora) => new(
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,

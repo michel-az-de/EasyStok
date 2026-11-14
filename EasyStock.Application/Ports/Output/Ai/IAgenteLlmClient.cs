@@ -47,11 +47,17 @@ public sealed record BlocoResultadoFerramentaLlm(string UsoFerramentaId, string 
 /// </summary>
 public sealed record BlocoOpacoLlm(JsonElement Bruto) : BlocoLlm;
 
+/// <summary>
+/// S67 (#2534): <paramref name="TokensCacheLido"/> é o prompt lido do cache do provedor (preço próprio, fora de
+/// <paramref name="TokensEntrada"/>); <paramref name="Modelo"/> é o modelo que respondeu, nulo quando o cliente não sabe.
+/// </summary>
 public sealed record RespostaLlm(
     string? StopReason,
     IReadOnlyList<BlocoLlm> Conteudo,
     int TokensEntrada,
-    int TokensSaida)
+    int TokensSaida,
+    int TokensCacheLido = 0,
+    string? Modelo = null)
 {
     public const string StopToolUse = "tool_use";
 }
