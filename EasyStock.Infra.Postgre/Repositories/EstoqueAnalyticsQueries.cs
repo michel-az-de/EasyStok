@@ -9,7 +9,7 @@ using EasyStock.Domain.Reposicao;
 namespace EasyStock.Infra.Postgre.Repositories;
 
 /// <summary>Consultas de analytics para estoque: validade, parados, sazonalidade, reposição e projeção de ruptura.</summary>
-internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDistributedCache? cache = null)
+internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDistributedCache? cache = null, TimeProvider? relogio = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -284,9 +284,12 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
         int? configMinima, int? configCritica, CancellationToken ct = default)
     {
         var diasHist = Math.Max(1, diasHistorico);
-        var agora = DateTime.UtcNow;
+        var agora = (relogio ?? TimeProvider.System).GetUtcNow().UtcDateTime;
         var deVenda = agora.AddDays(-diasHist);
-        var hoje = agora.Date; // "vigente" = lote cuja validade é hoje ou futura.
+        // "vigente" = lote cuja validade é hoje ou futura, com "hoje" pela data de Brasília (#2561):
+        // agora.Date (UTC) já era amanhã das 21h às 24h BRT e tratava o lote de hoje como vencido.
+        var hojeCivil = HorarioBrasil.DataOperacional(agora);
+        var hoje = HorarioBrasil.CivilComoInstanteUtc(hojeCivil);
 
         // ── Passo 1a: saldo vigente por produto (lotes não vencidos, não bloqueados/descartados) ──
         var saldoQuery = dbContext.ItensEstoque
@@ -333,7 +336,7 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
             x => x.ProdutoId,
             x => (
                 Velocidade: x.TotalQtd / diasHist,
-                Dias: Math.Max(1, (int)(agora.Date - x.PrimeiraVenda.Date).TotalDays + 1)));
+                Dias: Math.Max(1, hojeCivil.DayNumber - HorarioBrasil.DataOperacional(x.PrimeiraVenda).DayNumber + 1)));
 
         // ── Passo 1c: lead time / validade média / fornecedor do lote vigente mais recente ──
         var lotesQuery = dbContext.ItensEstoque

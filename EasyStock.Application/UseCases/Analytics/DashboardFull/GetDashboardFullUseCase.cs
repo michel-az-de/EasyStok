@@ -12,7 +12,7 @@ public class GetDashboardFullUseCase(
 
         var stopwatch = Stopwatch.StartNew();
 
-        var now = DateTime.UtcNow.AddMinutes(-cmd.TimezoneOffsetMinutes);
+        var now = DateTime.UtcNow; // janela em instantes UTC; o fuso (tz) só agrupa no repositório (#2561)
         var ate = now;
         var de = ate.AddDays(-cmd.PeriodoDias);
         var dePrev = de.AddDays(-cmd.PeriodoDias);
