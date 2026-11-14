@@ -109,8 +109,12 @@ export const deveCarregarDossie = (conversa) => Boolean(conversa?.clienteId && !
 
 // Aviso da faixa quando o cardápio da vitrine não vem (#1474): a vitrine desligada é um 404
 // com texto técnico; a dona precisa saber o que ligar.
+// #2596: o mesmo 404 aparece em Cardápio, Banco de imagens e Produção num inquilino sem loja
+// online. Quem precisa trocar o erro cru por um vazio com o próximo passo testa por aqui.
+export const lojaDesligada = (erro) => erro?.status === 404 && /vitrine ativa/i.test(erro?.message ?? '')
+
 export function avisoDoCardapio(erro) {
-  if (erro?.status === 404 && /vitrine ativa/i.test(erro.message ?? '')) {
+  if (lojaDesligada(erro)) {
     return 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.'
   }
   return `Cardápio: ${erro?.message ?? 'não carregou.'}`

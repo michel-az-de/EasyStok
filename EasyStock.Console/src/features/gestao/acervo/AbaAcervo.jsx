@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAcervo, useMiniaturaAcervo } from '../../../aplicacao/useAcervo'
 import { Botao } from '../../../componentes/Botao'
+import { Vazio } from '../../../componentes/Vazio'
 import { Modal } from '../../../componentes/Modal'
 import css from './acervo.module.css'
 import { ProducaoAcervo, canaisAcervo } from './ProducaoAcervo'
@@ -61,6 +62,7 @@ export function AbaAcervo() {
   const a = useAcervo()
   const [busca, setBusca] = useState('')
   const [filtros, setFiltros] = useState({})
+  const semFiltro = !busca && !Object.values(filtros).some(Boolean)
   useEffect(() => {
     const tempo = setTimeout(() => a.setFiltros({ ...filtros, busca }), 300)
     return () => clearTimeout(tempo)
@@ -146,7 +148,9 @@ export function AbaAcervo() {
         <button type="button" disabled={a.ocupado} key={i.id} className={`${css.cartao} ${selecionada === i.id ? css.ativo : ''}`} onClick={() => { selecionar(i.id); setDialogo(null) }}>
           <Foto imagem={i} /><strong>{i.titulo}</strong><span>{i.origem} · {i.formato} · {i.aprovadoEm ? 'Aprovada' : 'Em revisão'}</span>
         </button>)}
-      {!a.imagens.length && <p>Nenhuma imagem nos filtros selecionados.</p>}
+      {!a.imagens.length && (semFiltro
+        ? <Vazio titulo="Nenhuma imagem no banco ainda" acao={<Botao variante="primario" onClick={() => setDialogo('upload')}>Adicionar imagem</Botao>}>Envie a primeira foto de um prato.</Vazio>
+        : <p>Nenhuma imagem nos filtros selecionados.</p>)}
     </div>}
     <div className={css.acoes}><Botao disabled={!a.pagina || a.carregando || a.ocupado} onClick={() => a.setPagina(a.pagina - 1)}>Anterior</Botao><span>Página {a.pagina + 1}</span><Botao disabled={a.imagens.length < 60 || a.carregando || a.ocupado} onClick={() => a.setPagina(a.pagina + 1)}>Próxima</Botao></div>
     {imagem && <section ref={detalhe} tabIndex={-1} className={css.detalhe} aria-label="Ficha da imagem">

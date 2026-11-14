@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/acervoApi'
 import { listarGestao, obterItem } from '../infra/api/cardapioApi'
+import { lojaDesligada } from './planoDeSincronizacao'
 import { urlDeExibicaoDaFoto } from '../dominio/vitrineCardapio'
 import { API_BASE } from '../infra/fonteDados'
 
@@ -24,7 +25,7 @@ export function useAcervo() {
     const atual = ++requisicao.current
     setCarregando(true)
     try {
-      const [lista, cardapio, pedidos, briefs, mapa, usosConfirmados] = await Promise.all([api.listarImagens(pagina, filtros), listarGestao(), api.listarSolicitacoes(), api.listarBriefings(), api.listarCobertura(), api.listarUsos()])
+      const [lista, cardapio, pedidos, briefs, mapa, usosConfirmados] = await Promise.all([api.listarImagens(pagina, filtros), listarGestao().catch((e) => (lojaDesligada(e) ? [] : Promise.reject(e))), api.listarSolicitacoes(), api.listarBriefings(), api.listarCobertura(), api.listarUsos()])
       if (atual === requisicao.current) { setImagens(lista); setItens(cardapio); setSolicitacoes(pedidos); setBriefings(briefs); setCobertura(mapa); setUsos(usosConfirmados); setAviso(''); setErro('') }
     } catch (e) { if (atual === requisicao.current) setErro(e.message); throw e }
     finally { if (atual === requisicao.current) setCarregando(false) }

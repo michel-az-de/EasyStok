@@ -3,6 +3,7 @@
 .cabecalho h2, .detalhe h3 { margin: 0; }
 .cabecalho p, .detalhe p { color: var(--tinta-2); }
 .acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.grade > :is(div, p):only-child { grid-column: 1 / -1; }
 .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 16px; }
 .fotosCardapio { display: grid; gap: var(--e-24); container-type: inline-size; }
 .fotosCardapio h3, .fotosCardapio p { margin: 0; }

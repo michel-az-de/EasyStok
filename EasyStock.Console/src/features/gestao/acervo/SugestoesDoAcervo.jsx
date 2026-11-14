@@ -38,7 +38,7 @@ export function SugestoesDoAcervo({ acervo: a }) {
   return <section className={css.fotosCardapio} aria-label="Sugestões de imagem para os pratos">
     <div className={css.cabecalho}>
       <div><h3>Sugestões de imagem para os pratos</h3><p>Confira as imagens sugeridas antes de publicar.</p></div>
-      <Botao disabled={pedindo || a.ocupado} title="Sugere imagens aprovadas do acervo. Você confere antes de publicar." onClick={sugerir}>{pedindo ? 'Buscando sugestões…' : 'Sugerir imagens'}</Botao>
+      <Botao disabled={pedindo || a.ocupado} onClick={sugerir}>{pedindo ? 'Buscando sugestões…' : 'Sugerir imagens'}</Botao>
     </div>
     {erro && <p role="alert" className={css.erro}>{erro}</p>}
     {aviso && <output>{aviso}</output>}

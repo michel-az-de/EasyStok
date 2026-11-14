@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Botao } from '../../../componentes/Botao'
 import { Icone } from '../../../componentes/Icone'
 import { filtrarCardapio } from '../../../dominio/vitrineCardapio'
 import { agruparApresentacoes } from '../../../dominio/apresentacoesDoCardapio'
@@ -11,7 +12,7 @@ function FotoDoProduto({ item, url, nome }) {
   return <div className={css.moldura}>
     {falhou ? <span className={css.foto}>Foto indisponível.</span> : <img className={css.foto} src={url} alt={item.nome} loading="lazy" onError={() => setFalhou(true)} />}
     {(item.arquivado || !item.visivel) && <span className={css.selo}><Icone nome={item.arquivado ? 'archive' : 'ocultoNoSite'} tamanho={16} />{item.arquivado ? 'Produto arquivado' : 'Oculto no cardápio'}</span>}
-    <a className={css.ampliar} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir foto de ${nome}`} title="Abrir foto"><Icone nome="ampliar" tamanho={16} /></a>
+    <a className={css.ampliar} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir foto de ${nome}`}><Icone nome="ampliar" tamanho={16} /></a>
   </div>
 }
 
@@ -37,12 +38,13 @@ export function FotosCardapio({ acervo: a, aoEscolherPrato }) {
   const encontradas = filtrarCardapio(fotos, busca)
   const grupos = agruparApresentacoes(encontradas.map(i => ({ ...i, sku: i.cardapioItemId, porcoes: i.porcoes > 0 ? [i.cardapioItemId] : [] })))
   return <section className={css.fotosCardapio} aria-label="Fotos do cardápio">
+    <h3>Fotos do cardápio</h3>
     <label className={css.buscaFotos}>
       <span className="sr">Buscar foto por nome, categoria ou porção</span>
       <Icone nome="busca" tamanho={20} />
       <input type="search" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, categoria ou porção" />
     </label>
-    {a.carregando ? <p role="status">Carregando fotos…</p> : a.erro ? <p>Atualize o acervo para conferir as fotos.</p> : <>
+    {a.carregando ? <p role="status">Carregando fotos…</p> : a.erro ? <div className={css.acoes}><p>Não foi possível carregar as fotos agora.</p><Botao onClick={() => a.carregar().catch((e) => a.setErro(e.message))}>Tentar de novo</Botao></div> : <>
       <div className={css.gradeFotos}>{grupos.map(grupo => <FotosDoGrupo key={grupo.nome + grupo.itens[0].cardapioItemId} grupo={grupo} fotoUrl={a.fotoUrl} aoEscolherPrato={aoEscolherPrato} ocupado={a.ocupado} />)}</div>
       {!encontradas.length && <p>{fotos.length ? 'Nenhuma foto encontrada para esta busca.' : 'Os produtos ainda não têm foto de capa.'}</p>}
     </>}

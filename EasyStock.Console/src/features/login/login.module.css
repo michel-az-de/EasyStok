@@ -9,7 +9,7 @@
   width: min(100%, 440px); flex: none; margin-block: auto;
   display: grid;
   gap: var(--e-4);
-  padding: var(--e-5) var(--e-24);
+  padding: var(--e-5);
   background: var(--papel);
   border: 0;
   border-radius: var(--r-3);
@@ -27,12 +27,12 @@
 
 .formulario {
   display: grid;
-  gap: 16px;
+  gap: var(--e-4);
 }
 
 .erro {
   margin: 0;
-  padding: 12px;
+  padding: var(--e-3);
   border-radius: var(--r-1);
   background: var(--erro-pastel);
   color: var(--erro);
@@ -54,8 +54,10 @@
 .google {
   display: flex;
   justify-content: center;
-  margin-top: 1rem;
+  margin-top: var(--e-4);
 }
+
+.google:empty { display: none; }
 
 @media (max-width: 480px) {
   .tela { padding: var(--e-3); }
