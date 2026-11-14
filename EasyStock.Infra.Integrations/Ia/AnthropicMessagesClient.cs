@@ -152,7 +152,7 @@ public sealed class AnthropicMessagesClient(
         }
     }
 
-    private static RespostaLlm LerResposta(string corpo)
+    private RespostaLlm LerResposta(string corpo)
     {
         using var doc = JsonDocument.Parse(corpo);
         var raiz = doc.RootElement;
@@ -176,13 +176,19 @@ public sealed class AnthropicMessagesClient(
         }
 
         var stopReason = raiz.TryGetProperty("stop_reason", out var sr) && sr.ValueKind == JsonValueKind.String ? sr.GetString() : null;
-        int entrada = 0, saida = 0;
+        int entrada = 0, saida = 0, cacheLido = 0;
         if (raiz.TryGetProperty("usage", out var usage))
         {
             if (usage.TryGetProperty("input_tokens", out var i) && i.ValueKind == JsonValueKind.Number) entrada = i.GetInt32();
             if (usage.TryGetProperty("output_tokens", out var o) && o.ValueKind == JsonValueKind.Number) saida = o.GetInt32();
+            if (usage.TryGetProperty("cache_read_input_tokens", out var c) && c.ValueKind == JsonValueKind.Number) cacheLido = c.GetInt32();
         }
 
-        return new RespostaLlm(stopReason, blocos, entrada, saida);
+        // S67 (#2534): o modelo que respondeu (versão datada); sem ele, o configurado.
+        var modelo = raiz.TryGetProperty("model", out var m) && m.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(m.GetString())
+            ? m.GetString()
+            : _opcoes.ModeloAgente;
+
+        return new RespostaLlm(stopReason, blocos, entrada, saida, cacheLido, modelo);
     }
 }
