@@ -574,6 +574,44 @@ public class AgenteAtendimentoServiceTests
             await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
     }
 
+    /// <summary>
+    /// #2515, conversa 96ca9f9e: listar_janelas mandava as janelas no meio do laço e o texto do agente, que pedia para
+    /// confirmar o endereço, chegava depois do menu. O menu fica para o fim do turno e sai depois do texto; sem texto
+    /// do agente, sai só o menu; com o texto barrado ou a conversa escalada, o menu não sai.
+    /// </summary>
+    [Theory]
+    [InlineData("Confirma o endereço de entrega? Depois é só escolher a janela.", new[] { "texto", "menu" }, false)]
+    [InlineData("", new[] { "menu" }, false)]
+    [InlineData("Seu pedido foi registrado.", new[] { "texto" }, true)]
+    public async Task MenuAdiadoPorFerramentaSaiDepoisDoTextoDoAgente(string fala, string[] esperado, bool escala)
+    {
+        var ordem = new List<string>();
+        var janelas = Substitute.For<IFerramentaAgente>();
+        janelas.Nome.Returns("listar_janelas");
+        janelas.Descricao.Returns("Lista as janelas");
+        janelas.SchemaJson.Returns("""{"type":"object","properties":{}}""");
+        janelas.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(c =>
+            {
+                c.Arg<ContextoTurnoAgente>().AdiarEnvio(_ =>
+                {
+                    ordem.Add("menu");
+                    return Task.FromResult(true);
+                });
+                return """{"opcoesNoMenu":2}""";
+            });
+        _cloudClient.When(c => c.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("texto"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("listar_janelas"), Texto(fala));
+
+        var resultado = await CriarServico(janelas).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        ordem.Should().Equal(esperado);
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().Be(escala);
+    }
+
     [Fact]
     public async Task CadernoEntraNoPromptAntesDoDossie()
     {

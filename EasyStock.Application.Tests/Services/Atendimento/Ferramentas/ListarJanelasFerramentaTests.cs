@@ -91,6 +91,8 @@ public class ListarJanelasFerramentaTests
             return item;
         }
 
+        public ContextoTurnoAgente? Contexto { get; private set; }
+
         public Task<string> ExecutarAsync(object entrada)
         {
             var listar = new ListarJanelasDisponiveisUseCase(
@@ -99,13 +101,12 @@ public class ListarJanelasFerramentaTests
             var ferramenta = new ListarJanelasFerramenta(
                 new ListarJanelasAtendimentoUseCase(StorefrontRepo, CardapioRepo, ConfiguracaoRepo, listar),
                 Cloud, ConversaRepo, NullLogger<ListarJanelasFerramenta>.Instance);
-            return ferramenta.ExecutarAsync(
-                new ContextoTurnoAgente(Storefront.EmpresaId, Conversa, Agora, _ =>
-                {
-                    GravadasNaHora.AddRange(Mensagens.Select(m => m.ExternoId));
-                    return Task.CompletedTask;
-                }),
-                JsonSerializer.SerializeToElement(entrada));
+            Contexto = new ContextoTurnoAgente(Storefront.EmpresaId, Conversa, Agora, _ =>
+            {
+                GravadasNaHora.AddRange(Mensagens.Select(m => m.ExternoId));
+                return Task.CompletedTask;
+            });
+            return ferramenta.ExecutarAsync(Contexto, JsonSerializer.SerializeToElement(entrada));
         }
     }
 
@@ -122,9 +123,14 @@ public class ListarJanelasFerramentaTests
 
         var json = JsonDocument.Parse(resultado).RootElement;
         json.GetProperty("prazoMinimoMinutos").GetInt32().Should().Be(100);
-        json.GetProperty("botoesEnviados").GetInt32().Should().Be(2);
+        json.GetProperty("opcoesNoMenu").GetInt32().Should().Be(2);
         json.GetProperty("janelas").EnumerateArray().Select(j => j.GetProperty("janelaId").GetGuid())
             .Should().Equal(hoje13.Id, hoje14.Id);
+
+        // #2515: o menu sai depois do texto do agente, no fim do turno; a ferramenta só o deixa pronto.
+        c.BotoesEnviados.Should().BeEmpty();
+        c.Contexto!.TemEnvioAdiado.Should().BeTrue();
+        (await c.Contexto.EnviarAdiadoAsync()).Should().BeTrue();
 
         var botoes = c.BotoesEnviados.Should().ContainSingle().Subject;
         botoes.Should().Equal(
@@ -134,6 +140,9 @@ public class ListarJanelasFerramentaTests
         var saida = c.Mensagens.Should().ContainSingle().Subject;
         saida.Autor.Should().Be(AutorMensagem.Agente);
         saida.ExternoId.Should().Be("wamid.botoes");
+        // #2515: o histórico guarda o menu numerado como o cliente o viu; "2" no turno seguinte tem a que se referir.
+        saida.Texto.Should().Be("Escolha a janela de entrega:\n1. 02/06 13:00-14:00\n2. 02/06 14:00-15:00");
+        saida.EnviadaEm.Should().BeAfter(Agora, "o texto do agente gravado no mesmo turno vem antes do menu");
         // #1791: gravada logo depois do envio, antes de o LLM continuar; o status e o eco a encontram.
         c.GravadasNaHora.Should().Equal("wamid.botoes");
     }
@@ -174,7 +183,8 @@ public class ListarJanelasFerramentaTests
 
         var json = JsonDocument.Parse(resultado).RootElement;
         json.GetProperty("janelas").GetArrayLength().Should().Be(4);
-        json.GetProperty("botoesEnviados").GetInt32().Should().Be(ListarJanelasFerramenta.MaximoBotoes);
+        json.GetProperty("opcoesNoMenu").GetInt32().Should().Be(ListarJanelasFerramenta.MaximoBotoes);
+        (await c.Contexto!.EnviarAdiadoAsync()).Should().BeTrue();
         c.BotoesEnviados.Should().ContainSingle().Which.Should().HaveCount(3);
     }
 
@@ -189,11 +199,12 @@ public class ListarJanelasFerramentaTests
         var json = JsonDocument.Parse(resultado).RootElement;
         json.GetProperty("janelas").GetArrayLength().Should().Be(0);
         json.TryGetProperty("orientacao", out _).Should().BeTrue();
+        c.Contexto!.TemEnvioAdiado.Should().BeFalse();
         await c.Cloud.DidNotReceiveWithAnyArgs().EnviarBotoesAsync(default!, default!, default!, default);
     }
 
     [Fact]
-    public async Task FalhaNoEnvioDosBotoes_DevolveListaParaOAgente()
+    public async Task FalhaNoEnvioDoMenu_FicaRegistradaComoFalhaParaAEquipe()
     {
         var c = new Cenario();
         var hoje13 = c.Janela(Hoje, 13);
@@ -203,9 +214,11 @@ public class ListarJanelasFerramentaTests
         var resultado = await c.ExecutarAsync(new { data = "2026-06-02" });
 
         var json = JsonDocument.Parse(resultado).RootElement;
-        json.GetProperty("botoesEnviados").GetInt32().Should().Be(0);
         json.GetProperty("janelas")[0].GetProperty("janelaId").GetGuid().Should().Be(hoje13.Id);
-        c.Mensagens.Should().BeEmpty();
+        (await c.Contexto!.EnviarAdiadoAsync()).Should().BeFalse();
+        var saida = c.Mensagens.Should().ContainSingle().Subject;
+        saida.Status.Should().Be(StatusMensagem.Falhou);
+        saida.Texto.Should().Be("Escolha a janela de entrega:\n1. 02/06 13:00-14:00");
     }
 
     [Fact]

@@ -94,7 +94,7 @@ public static class GeracaoAgenteAtendimento
                 var texto = string.Join("\n", resposta.Conteudo.OfType<BlocoTextoLlm>().Select(b => b.Texto)).Trim();
                 return new GeracaoAgente(texto, tokens, true,
                     texto.Length == 0 && !(situacaoInicial == SituacaoConversa.Automatica
-                        && (contexto.EnvioVerificado || contexto.RespostaVerificada is { Length: > 0 }))
+                        && (contexto.EnvioVerificado || contexto.TemEnvioAdiado || contexto.RespostaVerificada is { Length: > 0 }))
                         ? $"o agente não produziu resposta (stop_reason={resposta.StopReason})" : null);
             }
 

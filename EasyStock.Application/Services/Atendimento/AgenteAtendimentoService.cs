@@ -176,9 +176,11 @@ public sealed class AgenteAtendimentoService(
             respondeu = await EnviarRespostaAsync(gravacao, conversa, despedida, ct) || respondeu;
         else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
+            // #2515: sem texto do agente, o menu adiado basta como resposta.
+            var soMenu = concluiu && motivoEscalada is null && string.IsNullOrWhiteSpace(geracao.Texto) && contexto.TemEnvioAdiado;
             if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
                 respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
-            else if (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu)
+            else if (!soMenu && (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu))
             {
                 // #1704: a conversa vai ao cliente; afirmação que nenhuma fonte do turno sustenta fica para a equipe.
                 var barrada = !concluiu || motivoEscalada is not null ? null
@@ -196,6 +198,10 @@ public sealed class AgenteAtendimentoService(
                 }
             }
         }
+
+        // #2515: o menu da ferramenta sai depois do texto; conversa escalada ou texto barrado não o recebe.
+        if (motivoEscalada is null && conversa.Situacao == SituacaoConversa.Automatica)
+            respondeu = await contexto.EnviarAdiadoAsync(ct) || respondeu;
 
         if (motivoEscalada is not null && conversa.Situacao == SituacaoConversa.Automatica)
             await escalador.EscalarAsync(empresaId, conversa, motivoEscalada, agora, ct);

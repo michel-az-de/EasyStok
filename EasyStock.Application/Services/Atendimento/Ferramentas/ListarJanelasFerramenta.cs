@@ -14,7 +14,8 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 /// <c>listar_janelas</c> (S16, RN-21): janelas com vaga cujo início não é antes de agora + prazo mínimo
 /// do pedido (<see cref="EasyStock.Application.Services.Pedidos.CalculadoraPrazoPedido"/>: maior preparo dos itens + respiro da configuração).
 /// As primeiras vão ao cliente como botões <c>acao:escolher_janela:&lt;id&gt;:&lt;data&gt;</c> (até
-/// <see cref="MaximoBotoes"/>, limite do WhatsApp); a lista inteira volta para o agente.
+/// <see cref="MaximoBotoes"/>, limite do WhatsApp); a lista inteira volta para o agente. #2515: o menu sai no fim do
+/// turno, depois do texto do agente, e o histórico o guarda numerado.
 ///
 /// <para>
 /// Os itens chegam na entrada da ferramenta, como em <c>criar_pedido</c>: nada grava carrinho em
@@ -36,7 +37,8 @@ public sealed class ListarJanelasFerramenta(
     public string Descricao =>
         "Lista as janelas de entrega com vaga que respeitam o prazo mínimo do pedido (maior tempo de preparo dos itens " +
         "mais o respiro). Informe os itens (ids de consultar_cardapio) para o prazo sair certo e, se o cliente pediu, a data. " +
-        "As primeiras vão ao cliente como botões: não as repita, só convide a escolher. Use o janelaId e a data escolhidos em criar_pedido.";
+        "As primeiras vão ao cliente como opções numeradas logo depois da sua mensagem: não as repita, só convide a escolher. " +
+        "Use o janelaId e a data escolhidos em criar_pedido.";
 
     public string SchemaJson => """
         {"type":"object","properties":{
@@ -76,12 +78,13 @@ public sealed class ListarJanelasFerramenta(
             });
         }
 
-        var botoesEnviados = await EnviarBotoesAsync(contexto, janelas.Take(MaximoBotoes).ToList(), ct);
+        var opcoes = janelas.Take(MaximoBotoes).Select(j => (Id: IdBotao(j.JanelaId, j.Data), Titulo: Titulo(j))).ToList();
+        contexto.AdiarEnvio(token => EnviarMenuAsync(contexto, opcoes, token));
 
         return FerramentaJson.Serializar(new
         {
             prazoMinimoMinutos = prazo,
-            botoesEnviados,
+            opcoesNoMenu = opcoes.Count,
             janelas = janelas.Select(j => new
             {
                 janelaId = j.JanelaId,
@@ -92,31 +95,33 @@ public sealed class ListarJanelasFerramenta(
         });
     }
 
-    private async Task<int> EnviarBotoesAsync(ContextoTurnoAgente contexto, IReadOnlyList<JanelaDisponivelDto> janelas, CancellationToken ct)
+    private async Task<bool> EnviarMenuAsync(ContextoTurnoAgente contexto, IReadOnlyList<(string Id, string Titulo)> opcoes, CancellationToken ct)
     {
         var conversa = contexto.Conversa;
-        var botoes = janelas.Select(j => (Id: IdBotao(j.JanelaId, j.Data), Titulo: Titulo(j))).ToList();
+        var texto = MenuNumeradoWhatsApp.Texto(CorpoBotoes, opcoes.Select(o => o.Titulo));
+        // O texto do agente sai no mesmo instante do turno; 1 ms a mais mantém o menu depois dele no histórico.
+        var enviadaEm = contexto.Agora.AddMilliseconds(1);
+        Mensagem saida;
+        var enviou = false;
         try
         {
-            var envio = await cloudClient.EnviarBotoesAsync(
-                conversa.ContatoIdExterno, CorpoBotoes, botoes.Select(b => (b.Id, b.Titulo)).ToList(), ct);
-            contexto.RegistrarEnvioVerificado();
-
-            if (conversa.EstaAberta) conversa.RegistrarSaida(contexto.Agora);
-            var texto = $"{CorpoBotoes} {string.Join(" | ", botoes.Select(b => b.Titulo))}";
-            await conversaRepository.AddMensagemAsync(
-                Mensagem.Saida(contexto.EmpresaId, conversa.Id, AutorMensagem.Agente, contexto.Agora,
-                    TipoConteudoMensagem.Texto, texto, envio.Wamid),
-                ct);
-            await contexto.GravarSaidaAsync(ct);
-            return botoes.Count;
+            var envio = await cloudClient.EnviarBotoesAsync(conversa.ContatoIdExterno, CorpoBotoes, opcoes, ct);
+            saida = Mensagem.Saida(contexto.EmpresaId, conversa.Id, AutorMensagem.Agente, enviadaEm,
+                TipoConteudoMensagem.Texto, texto, envio.Wamid);
+            enviou = true;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            // Sem envio verificado, o atendimento automático encaminha para a equipe.
-            logger.LogWarning(ex, "listar_janelas: falha ao enviar os botões da conversa {ConversaId}.", conversa.Id);
-            return 0;
+            // O texto do agente já convidou a escolher: a falha fica no histórico para a equipe ver e reenviar.
+            logger.LogWarning(ex, "listar_janelas: falha ao enviar o menu de janelas da conversa {ConversaId}.", conversa.Id);
+            saida = Mensagem.Saida(contexto.EmpresaId, conversa.Id, AutorMensagem.Agente, enviadaEm, TipoConteudoMensagem.Texto, texto);
+            saida.RegistrarFalhaEnvio(ClassificadorFalhaEnvio.Motivo(ex), ClassificadorFalhaEnvio.Classificar(ex), enviadaEm);
         }
+
+        if (conversa.EstaAberta) conversa.RegistrarSaida(enviadaEm);
+        await conversaRepository.AddMensagemAsync(saida, ct);
+        await contexto.GravarSaidaAsync(ct);
+        return enviou;
     }
 
     /// <summary>"02/06 13:00-14:00": cabe nos 20 caracteres do título de botão.</summary>
