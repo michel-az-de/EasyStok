@@ -44,6 +44,65 @@ public class PromptAtendimentoTests
         Normalizar(prompt).Should().Be(Normalizar(snapshot));
     }
 
+    /// <summary>#2516: "não existe Baba, é a dona". Sem o nome da dona configurado (S68), a escalada fala da responsável.</summary>
+    [Fact]
+    public void Escalada_FalaDaResponsavel_NuncaDaBaba()
+    {
+        var descricao = new EasyStock.Application.Services.Atendimento.Ferramentas.EscalarParaDonaFerramenta(null!).Descricao;
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        descricao.Should().NotContain("Baba").And.Contain("a responsável");
+        prompt.Replace("Casa da Baba", "", StringComparison.Ordinal).Should().NotContain("Baba");
+    }
+
+    /// <summary>
+    /// #2516: o roteiro é uma lista de etapas (nome, instrução curta, ativo) que a S68 guarda por loja; o padrão vem daqui.
+    /// Só as etapas ativas entram no prompt, na ordem.
+    /// </summary>
+    [Fact]
+    public void Roteiro_SoEtapasAtivasEntram_NaOrdem()
+    {
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(Guid.Empty);
+        EtapaRoteiroAtendimento[] roteiro = [new("Saudar", "Cumprimente.", true), new("Upsell", "Ofereça sobremesa.", false), new("Fechar", "Feche o pedido.", true)];
+
+        var prompt = PromptAtendimento.Montar(configuracao, roteiro);
+
+        prompt.Should().Contain("1. Saudar: Cumprimente.").And.Contain("2. Fechar: Feche o pedido.").And.NotContain("sobremesa");
+        RoteiroAtendimento.Padrao.Should().NotBeEmpty().And.OnlyContain(e => e.Ativo && e.Nome.Length > 0 && e.Instrucao.Length > 0);
+        PromptAtendimento.Montar(configuracao).Should().Contain(RoteiroAtendimento.Padrao[0].Instrucao);
+    }
+
+    /// <summary>
+    /// #2516: o agente reenviou a comanda a cada item, disse "faço por aqui" sem criar_pedido e prometeu que a responsável
+    /// combinaria o frete sem escalar.
+    /// </summary>
+    [Fact]
+    public void Conduta_AnotaSemReenviar_FechaAteCriarPedido_NaoPrometePelaEquipe()
+    {
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        prompt.Should().Contain("Não reenvie a comanda")
+            .And.Contain("siga até criar_pedido")
+            .And.Contain("sem usar escalar_para_dona")
+            .And.Contain("reenviar=true");
+    }
+
+    /// <summary>
+    /// #2516 (revisão): nenhuma ferramenta anota item na comanda, então o roteiro não convida a dizer "anotei"; o endereço
+    /// passa por validar_endereco e, fora da área, é salvo antes de escalar, como manda a regra do CEP.
+    /// </summary>
+    [Fact]
+    public void Roteiro_NaoConvidaAPromessaEAlinhaOEndereco()
+    {
+        var etapas = string.Join("\n", RoteiroAtendimento.Padrao.Select(e => $"{e.Nome}: {e.Instrucao}"));
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        etapas.Should().NotContain("Anotar").And.Contain("nunca diga que anotou")
+            .And.Contain("validar_endereco").And.Contain("salve o endereço do mesmo jeito");
+        prompt.Should().Contain("sem usar escalar_para_dona ou encaminhar_para_responsavel")
+            .And.Contain("consultar_pedido não mostrar pedido em andamento");
+    }
+
     [Fact]
     public void TextoDoCliente_EDadoEMarcaCitadaPorEleNaoVale()
     {

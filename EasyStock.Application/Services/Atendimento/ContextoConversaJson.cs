@@ -23,6 +23,18 @@ public static class ContextoConversaJson
         return no is null ? default : no.Deserialize<T>(Opcoes);
     }
 
+    /// <summary>
+    /// Contexto que o agente vê no dossiê (#2516): sem as chaves <c>comanda*</c>, que valem para um link e uma revisão
+    /// que só a comanda sabe julgar. Vazio quando não sobra nada.
+    /// </summary>
+    public static string ParaDossie(Conversa conversa)
+    {
+        if (JsonNode.Parse(conversa.ContextoJson) is not JsonObject raiz) return string.Empty;
+        foreach (var chave in raiz.Select(p => p.Key).Where(k => k.StartsWith("comanda", StringComparison.Ordinal)).ToList())
+            raiz.Remove(chave);
+        return raiz.Count == 0 ? string.Empty : raiz.ToJsonString();
+    }
+
     /// <summary>Grava a chave; valor nulo remove.</summary>
     public static void Gravar<T>(Conversa conversa, string chave, T? valor)
     {

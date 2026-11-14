@@ -23,8 +23,8 @@ import {
   observacaoDaConfirmacao, retificacaoDoSaldo, situacaoDoCaixaParaAbrirLoja,
 } from '../../../dominio/aberturaDaLoja'
 import {
-  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, avisoDeDevolucoesNasTelas, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
-  nomeDoMetodoCaixa, quandoNoCaixa, resumoEmDuasContas, temMovimentoNoDia, tituloDaLinhaExtra, tomDoCaixa, totaisDoFluxo,
+  CATEGORIAS_ENTRADA_SUGERIDAS, CATEGORIAS_SAIDA_SUGERIDAS, METODOS_CAIXA, TIPOS_MOVIMENTO, avisoDeDevolucoesNasTelas, avisoForaDoFechamento, categoriaAoTrocarTipo, conferenciaDaGaveta, gavetaDoDia, lancamentosEmOrdem, linhasDoFluxo,
+  nomeDoMetodoCaixa, observacaoDoFechamento, quandoNoCaixa, resumoEmDuasContas, temMovimentoNoDia, tituloDaLinhaExtra, tomDoCaixa, totaisDoFluxo,
 } from '../../../dominio/caixa'
 import {
   horaCurta, lerMoeda, moeda, moedaAltaDemais, plural,
@@ -294,6 +294,22 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
   )
 }
 
+// #2535 (Q05): a nota de quem fechou fica como está; o aviso de lançamentos fora do fechamento vira frase do produto
+// com o período e o caminho para conferir. O Extrato mostra 90 dias de movimento.
+function ObservacaoDoFechamento({ texto, className }) {
+  const { nota, foraDoFechamento } = observacaoDoFechamento(texto)
+  return (
+    <>
+      {nota && <span className={className}>{nota}</span>}
+      {foraDoFechamento && (
+        <span className={className}>
+          {avisoForaDoFechamento(foraDoFechamento)}{' '}<a href="#/m/financeiro/extrato">Conferir no Extrato</a>
+        </span>
+      )}
+    </>
+  )
+}
+
 function UltimosFechamentos({ fechamentos }) {
   if (fechamentos.length === 0) return <p className={css.corpoBloco}>Nenhum fechamento anterior registrado.</p>
   return (
@@ -307,7 +323,7 @@ function UltimosFechamentos({ fechamentos }) {
               {/* #2512 (Q06, Q04): fechamento antigo pode não ter quem fechou; e quem fecha o caixa esquecido fecha outro dia. */}
               <span className={css.dicaItem}>{f.fechadoPorNome ?? 'Sem registro de quem fechou'} · {quandoNoCaixa(f.fechadoEm, f.data)}</span>
               {/* #2512 (N4): a observação junta nota e aviso com quebra de linha. */}
-              {f.observacoes && <span className={`${css.dicaItem} ${css.observacao}`}>{f.observacoes}</span>}
+              {f.observacoes && <ObservacaoDoFechamento texto={f.observacoes} className={`${css.dicaItem} ${css.observacao}`} />}
             </span>
             {/* #1920: o valor da linha é o dinheiro que ficou na gaveta, o mesmo que a abertura sugere;
                 `saldoFinal` soma Pix e cartão e desmentia o "Contado na gaveta" da observação. */}
@@ -585,7 +601,7 @@ export function AbaCaixaApi() {
           {dia.fechado && dia.fechamento && (
             <p className={css.corpoBloco}>
               Fechado às {horaCurta(dia.fechamento.fechadoEm)}{dia.fechamento.fechadoPorNome ? ` por ${dia.fechamento.fechadoPorNome}` : ''}.
-              {dia.fechamento.observacoes && <>{' '}<span className={css.observacao}>{dia.fechamento.observacoes}</span></>}
+              {dia.fechamento.observacoes && <>{' '}<ObservacaoDoFechamento texto={dia.fechamento.observacoes} className={css.observacao} /></>}
               {dia.posFechamento !== 0 && ` ${dia.posFechamento > 0 ? 'Entrou' : 'Saiu'} ${moeda(Math.abs(dia.posFechamento))} depois de fechar, fora do total do dia.`}
               {/* #2113 (B4 da #2084): o dinheiro vivo dessa conta vai para a gaveta sugerida na abertura seguinte. */}
               {dia.dinheiroPosFechamento > 0 && ` ${moeda(dia.dinheiroPosFechamento)} em dinheiro entrou na gaveta depois de fechar e vai para a abertura de amanhã.`}
