@@ -114,6 +114,41 @@ export function situacaoDaLinha(tela, item, soLeads) {
 export const TAMANHO_PAGINA_CADASTRO = 20
 export const temProximaPagina = (pagina, total) => pagina * TAMANHO_PAGINA_CADASTRO < total
 
+// #2495 (S1, I6): ordens que a API aceita em cada lista (Cliente/Fornecedor/ProdutoRepository). A primeira, de
+// valor vazio, é a padrão da rota e não manda `sort`: a lista abre como sempre abriu. "Último pedido" só no
+// crescente, porque o Postgres põe NULL primeiro no DESC e a lista abriria com quem nunca comprou.
+const NOME_AZ = { valor: 'nome-az', rotulo: 'Nome (A a Z)', sort: 'nome', order: 'asc' }
+const NOME_ZA = { valor: 'nome-za', rotulo: 'Nome (Z a A)', sort: 'nome', order: 'desc' }
+const MAIS_ANTIGOS = { valor: 'antigos', rotulo: 'Cadastrados primeiro', sort: 'criadoem', order: 'asc' }
+export const ORDENS_CADASTRO = {
+  clientes: [
+    { valor: '', rotulo: 'Nome (A a Z)', sort: 'nome', order: 'asc' }, NOME_ZA,
+    { valor: 'recentes', rotulo: 'Cadastrados por último', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS,
+    { valor: 'mais-pedidos', rotulo: 'Mais pedidos', sort: 'ordercount', order: 'desc' },
+    { valor: 'sem-comprar', rotulo: 'Sem comprar há mais tempo', sort: 'lastorderat', order: 'asc' },
+  ],
+  fornecedores: [{ valor: '', rotulo: 'Cadastrados por último', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS, NOME_AZ, NOME_ZA],
+  produtos: [
+    { valor: '', rotulo: 'Cadastrados por último', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS,
+    { valor: 'alterados', rotulo: 'Alterados por último', sort: 'alteradoem', order: 'desc' }, NOME_AZ, NOME_ZA,
+  ],
+}
+const ordemEscolhida = (tela, valor) => ORDENS_CADASTRO[tela]?.find((o) => o.valor === valor) ?? ORDENS_CADASTRO[tela]?.[0] ?? null
+export function parametrosDaOrdem(tela, valor) {
+  const ordem = ordemEscolhida(tela, valor)
+  return ordem?.valor ? { sort: ordem.sort, order: ordem.order } : {}
+}
+// Cabeçalho Nome: o estado para `aria-sort` e a ordem do próximo clique (A a Z, depois Z a A).
+export function sortDoNome(tela, valor) {
+  const ordem = ordemEscolhida(tela, valor)
+  return ordem?.sort !== 'nome' ? 'none' : ordem.order === 'desc' ? 'descending' : 'ascending'
+}
+export function ordemDoCabecalhoNome(tela, valor) {
+  const az = ORDENS_CADASTRO[tela]?.find((o) => o.sort === 'nome' && o.order === 'asc')?.valor
+  const za = ORDENS_CADASTRO[tela]?.find((o) => o.sort === 'nome' && o.order === 'desc')?.valor
+  return sortDoNome(tela, valor) === 'ascending' ? za : az
+}
+
 // #2457 (U3): o limite de cada coluna vira erro no próprio campo, com o tamanho atual. `maxLength` cortava o
 // texto colado sem avisar (direção visual, seção 2). Fornecedor: e-mail com 150, o tamanho da coluna (B2).
 const LIMITES_CADASTRO = {
