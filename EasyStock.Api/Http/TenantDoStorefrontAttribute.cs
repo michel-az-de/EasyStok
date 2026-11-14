@@ -34,7 +34,7 @@ internal sealed class TenantDoStorefrontFilter(
             && valor is string slug
             && !string.IsNullOrWhiteSpace(slug))
         {
-            var storefront = await storefrontRepository.GetBySlugAsync(slug, context.HttpContext.RequestAborted);
+            var storefront = await storefrontRepository.GetBySlugAsync(slug.Trim().ToLowerInvariant(), context.HttpContext.RequestAborted);
             if (storefront is not null)
                 tenantContext.SetCurrentTenant(storefront.EmpresaId);
         }
