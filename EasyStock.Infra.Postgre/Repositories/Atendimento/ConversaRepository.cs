@@ -213,13 +213,16 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                 PedidoStatus = db.Pedidos
                     .Where(p => p.EmpresaId == empresaId && p.Id == c.PedidoEmAndamentoId)
                     .Select(p => p.Status).FirstOrDefault(),
+                // #2461: mesma regra de lead do ClienteRepository (cancelado conta); nulo para contato sem cadastro.
+                TemPedido = c.ClienteId == null ? (bool?)null
+                    : db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.ClienteId),
             })
             .ToListAsync(ct);
 
         return linhas.Select(l => new ConversaInboxItem(
             l.Id, l.EmpresaId, l.Canal, l.ContatoIdExterno, l.ContatoNome, l.ClienteId, l.Situacao, l.NaoLidas,
             l.UltimaMensagemEm, l.UltimaMensagemEntradaEm, l.PedidoEmAndamentoId, l.AssumidaPorUsuarioId, l.MotivoEscalada,
-            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto, l.FotoClienteChave, l.VinculoRevisao, l.VinculoEmRevisao)).ToList();
+            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto, l.FotoClienteChave, l.VinculoRevisao, l.VinculoEmRevisao, l.TemPedido)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(

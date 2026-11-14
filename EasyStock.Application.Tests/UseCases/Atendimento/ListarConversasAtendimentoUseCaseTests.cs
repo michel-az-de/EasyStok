@@ -44,6 +44,25 @@ public class ListarConversasAtendimentoUseCaseTests
         resumo.VinculoRevisao.Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InboxLevaTemPedidoAoResumo(bool? temPedido)
+    {
+        // #2461: nulo é contato sem cadastro; falso é cadastro sem pedido (lead); verdadeiro é cliente.
+        var empresa = Guid.NewGuid();
+        var repo = Substitute.For<IConversaRepository>();
+        repo.ListarInboxAsync(default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs([ConversaInboxItem.De(Conversa.Abrir(empresa, "5511999990001", DateTime.UtcNow), null) with { TemPedido = temPedido }]);
+        var caso = new ListarConversasAtendimentoUseCase(repo, Substitute.For<IConfiguracaoAtendimentoRepository>(),
+            Options.Create(new PrazosOptions { ClienteSemRespostaMin = 7 }));
+
+        var resultado = await caso.ExecuteAsync(new ListarConversasAtendimentoQuery(empresa, null, null, 1, 10));
+
+        resultado.Should().ContainSingle().Which.TemPedido.Should().Be(temPedido);
+    }
+
     [Fact]
     public async Task InboxLevaOAssuntoDoEmailAoResumo()
     {

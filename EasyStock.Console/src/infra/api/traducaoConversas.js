@@ -6,6 +6,7 @@
 import { pausaDaSituacao, respostaAtrasada } from '../../dominio/automatico'
 import { ACOES } from '../../dominio/agente'
 import { motivoDeEscalada, notaDeReabertura, notaDeSistema } from '../../dominio/motivoDeEscalada'
+import { relacionamentoDaApi } from '../../dominio/vinculoCliente'
 
 // #2005 (console-09): a leitura da conversa traz até 100 mensagens (as mais recentes); página cheia sugere que há mais.
 export const MENSAGENS_POR_LEITURA = 100
@@ -140,6 +141,7 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     id: resumo.id,
     numeroComanda: resumo.numeroComanda || null,
     conta: resumo.clienteId ? 'cliente' : 'lead',
+    relacionamento: relacionamentoDaApi(resumo.clienteId, resumo.temPedido), // #2461
     // Chave do cadastro na API: consentimento (S38) e o que mais for por cliente.
     clienteId: resumo.clienteId ?? null,
     vinculoRevisao: resumo.vinculoRevisao ?? 0,

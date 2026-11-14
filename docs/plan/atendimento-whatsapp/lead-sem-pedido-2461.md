@@ -1,6 +1,6 @@
 # Na conversa, quem tem cadastro mas nunca fez pedido aparece como lead (#2461)
 
-Status: proposta, aguardando a aprovação do Felipe para D1 a D4. A2 da revisão R4 de Cadastros (#2395).
+Status: aprovada pelo Felipe em 14/11/2026, D1 a D4 como propostas (decisão registrada na PR #2584 e na issue #2461). A2 da revisão R4 de Cadastros (#2395).
 
 ## Problema
 

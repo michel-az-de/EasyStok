@@ -63,6 +63,16 @@ public sealed class VinculoClienteConversaUseCaseTests
     }
 
     [Fact]
+    public async Task EstadoInformaTemPedidoDoClienteVinculadoENuloSemVinculo()
+    {
+        // #2461: cadastro sem pedido é lead; o console lê `temPedido` no estado e na resposta da correção.
+        (await Sut.ObterAsync(_empresa, _conversa.Id)).TemPedido.Should().BeFalse();
+        _clientes.ObterMetricasPedidosAsync(_empresa, _conversa.ClienteId!.Value).Returns((1, DateTime.UtcNow));
+        (await Sut.ObterAsync(_empresa, _conversa.Id)).TemPedido.Should().BeTrue();
+        (await Sut.ExecuteAsync(Retirar())).TemPedido.Should().BeNull();
+    }
+
+    [Fact]
     public async Task TrocaRequestIdNaoReaproveitaTentativaComOutroMotivo()
     {
         var command = Retirar();

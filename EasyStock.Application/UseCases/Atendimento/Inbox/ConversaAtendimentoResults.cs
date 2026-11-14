@@ -37,6 +37,8 @@ public sealed record ConversaResumoResult(
     public string? Assunto { get; init; }
     public long VinculoRevisao { get; init; }
     public bool VinculoEmRevisao { get; init; }
+    /// <summary>#2461: o cliente vinculado já fez pedido na empresa (cancelado conta); nulo sem cadastro.</summary>
+    public bool? TemPedido { get; init; }
 
     internal static ConversaResumoResult De(ConversaInboxItem i, DateTime agora, int slaRespostaMinutos) => new(
         i.Id, i.Canal, i.ContatoIdExterno, i.ContatoNome, i.ClienteId, i.Situacao, i.NaoLidas,
@@ -44,7 +46,7 @@ public sealed record ConversaResumoResult(
         Conversa.DentroDaJanela(i.Canal, i.UltimaMensagemEntradaEm, agora),
         i.MotivoEscalada, i.UltimaMensagemEntradaEm, i.AguardaResposta, slaRespostaMinutos, i.AssumidaPorNome, i.PedidoStatus, i.NumeroComanda,
         i.ClienteId is { } clienteId ? EasyStock.Application.UseCases.Cliente.Foto.ClienteFotoUseCase.Url(i.EmpresaId, clienteId, i.FotoClienteChave) : null)
-    { Assunto = i.Assunto, VinculoRevisao = i.VinculoRevisao, VinculoEmRevisao = i.VinculoEmRevisao };
+    { Assunto = i.Assunto, VinculoRevisao = i.VinculoRevisao, VinculoEmRevisao = i.VinculoEmRevisao, TemPedido = i.TemPedido };
 }
 
 /// <summary>Mensagem como o console mostra. <c>MidiaChave</c> é interna: o arquivo é servido por endpoint autenticado.</summary>

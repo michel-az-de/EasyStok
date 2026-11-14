@@ -11,7 +11,11 @@ public sealed record CorrigirVinculoClienteCommand(Guid EmpresaId, Guid Conversa
     long VinculoRevisao, Guid? ClienteId, string Acao, Guid? DestinoClienteId, string Motivo);
 public sealed record EstadoVinculoCliente(Guid? ClienteId, string? ClienteNome, Guid? ClienteAnteriorId, string? ClienteAnteriorNome,
     long VinculoRevisao, bool PodeCorrigir, string? MotivoBloqueio, IReadOnlyList<PedidoDoVinculo> Pedidos,
-    IReadOnlyList<AlteracaoVinculoConversa> Historico);
+    IReadOnlyList<AlteracaoVinculoConversa> Historico)
+{
+    /// <summary>#2461: o cliente vinculado já fez pedido na empresa (cancelado conta); nulo sem vínculo.</summary>
+    public bool? TemPedido { get; init; }
+}
 public sealed class VinculoClienteConflitoException(string message) : Exception(message);
 
 public sealed class VinculoClienteConversaUseCase(IConversaRepository conversas, IClienteRepository clientes,
@@ -153,7 +157,12 @@ public sealed class VinculoClienteConversaUseCase(IConversaRepository conversas,
         return new(conversa.ClienteId, cliente?.EmpresaId == conversa.EmpresaId ? cliente.Nome : null,
             conversa.ClienteAnteriorId, anterior?.EmpresaId == conversa.EmpresaId ? anterior.Nome : null,
             conversa.VinculoRevisao, PodeCorrigir(usuario) && bloqueio is null, bloqueio,
-            pedidos, await vinculos.ListarHistoricoAsync(conversa.EmpresaId, conversa.Id, ct));
+            pedidos, await vinculos.ListarHistoricoAsync(conversa.EmpresaId, conversa.Id, ct))
+        {
+            // #2461: a contagem do cadastro é a mesma do filtro de lead; cancelado conta.
+            TemPedido = conversa.ClienteId is { } vinculado
+                ? (await clientes.ObterMetricasPedidosAsync(conversa.EmpresaId, vinculado)).OrderCount > 0 : null
+        };
     }
 
     private static string? Bloqueio(Conversa conversa, IReadOnlyList<PedidoDoVinculo> pedidos) =>
