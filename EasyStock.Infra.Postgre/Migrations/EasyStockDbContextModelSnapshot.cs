@@ -5240,10 +5240,10 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Codigo")
-                        .IsUnique();
-
                     b.HasIndex("LoteItemId");
+
+                    b.HasIndex("LoteId", "Codigo")
+                        .IsUnique();
 
                     b.HasIndex("LoteId", "Status");
 
