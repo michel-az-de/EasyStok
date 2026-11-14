@@ -51,6 +51,7 @@ psql_ro() {
   sql="$(head -c 20001)"
   [ "${#sql}" -ge 1 ] && [ "${#sql}" -le 20000 ] || nega "sql vazio ou maior que 20000 bytes"
   case "$sql" in *\\*) nega "barra invertida no sql" ;; esac
+  case "$sql" in *'/*'*|*'--'*) nega "comentarios nao sao permitidos" ;; esac
   # uma unica instrucao: ';' so no fim (um ';' no meio permitiria COMMIT/SET e sairia do READ ONLY e do escopo de empresa)
   sql="${sql%"${sql##*[![:space:];]}"}"
   case "$sql" in *\;*) nega "apenas uma instrucao" ;; esac
@@ -58,6 +59,15 @@ psql_ro() {
   local norm
   norm="$(printf '%s' "$sql" | sed -e 's#/\*[^*]*\*/##g' | tr -d '[:space:]"' | tr '[:upper:]' '[:lower:]')"
   case "$norm" in *set_config*|*app.empresa_id*|*app.bypass_rls*|*pg_sleep*|*dblink*|*lo_export*|*lo_import*|*lo_create*|*query_to_xml*|*cursor_to_xml*|*table_to_xml*|*schema_to_xml*|*database_to_xml*|*ts_stat*|*pg_read_*|*pg_ls_*) nega "funcao ou parametro nao permitido" ;; esac
+  # so SELECT/WITH/VALUES/TABLE/EXPLAIN, sem escape unicode nem DO, e so funcoes da lista (mesma lista do cliente)
+  [[ "$norm" =~ ^\(*(select|with|values|table|explain) ]] || nega "so consultas"
+  [[ "$norm" =~ u\& ]] || [[ "$norm" =~ uescape ]] && nega "escape unicode"
+  local nome lista=" $(tr '\n' ' ' < "${BABA_FUNCOES:-/opt/baba-mcp/psql_ro_funcoes.txt}") "
+  while read -r nome; do
+    [ -n "$nome" ] || continue
+    [[ "$lista" == *" $nome "* ]] || nega "funcao nao permitida: $nome"
+  done < <(printf '%s' "$sql" | tr '
+' ' ' | tr -d '"' | tr '[:upper:]' '[:lower:]' | grep -oE '[a-z_][a-z0-9_]*[[:space:]]*\(' | sed -E 's/[[:space:]]*\($//')
   if [ -n "$GATE_DRY" ]; then echo "psql_ro ok (${#sql} bytes)"; exit 0; fi
   [ -r "$envf" ] || nega "sem configuracao do banco"
   # shellcheck disable=SC1090
@@ -101,7 +111,7 @@ inspeciona() {
 
 if [ "${1:-}" = "--root" ]; then
   # como root nada vem do ambiente: caminhos fixos, sem modo de teste
-  DOCKER=/usr/bin/docker; HIST=/home/felipe/build/deploy-history.log; GATE_DRY=; BABA_RO_ENV=/opt/baba-mcp/baba_ro.env
+  DOCKER=/usr/bin/docker; HIST=/home/felipe/build/deploy-history.log; GATE_DRY=; BABA_RO_ENV=/opt/baba-mcp/baba_ro.env; BABA_FUNCOES=/opt/baba-mcp/psql_ro_funcoes.txt
   shift; valida "$@"
   if [ "$1" = "containers" ] && [ -z "$GATE_DRY" ]; then
     "$DOCKER" ps -a --filter name=ez- --format '{{.Names}}|{{.Status}}|{{.Image}}'; inspeciona; exit 0

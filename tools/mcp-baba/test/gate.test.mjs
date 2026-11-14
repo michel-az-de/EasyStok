@@ -24,10 +24,12 @@ test('gate.sh: recusa injecao e fora da lista', { skip: !temBash }, () => {
   }
 });
 
-const psql = sql => spawnSync('bash', [GATE], { input: sql, env: { ...process.env, GATE_DRY: '1', SSH_ORIGINAL_COMMAND: 'psql_ro' }, encoding: 'utf8' });
+const FUNCOES = fileURLToPath(new URL('../../../scripts/mcp/psql_ro_funcoes.txt', import.meta.url));
+const psql = sql => spawnSync("bash", [GATE], { input: sql, env: { ...process.env, BABA_FUNCOES: FUNCOES, GATE_DRY: '1', SSH_ORIGINAL_COMMAND: 'psql_ro' }, encoding: 'utf8' });
 test('gate.sh psql_ro: aceita select e recusa barra invertida, set_config e vazio', { skip: !temBash }, () => {
   assert.equal(psql('select 1').status, 0);
-  for (const s of ["select 1; set app.bypass_rls='true'", 'select 1 from t where a=APP /**/ . "bypass_rls"', 'select query_to_xml(1)', 'select 1; \\! id', "select set_config('app.empresa_id','x',false)", 'select 1 from x where a = APP.BYPASS_RLS', '', 'x'.repeat(20_001)])
+  assert.equal(psql("select date_trunc('day', d), count(*), sum(x)::numeric(12,2) from t where y in (1,2) group by 1").status, 0);
+  for (const s of ["select (select ts_rewrite('a'::tsquery, 'select 1')) x", "select 1 where 'a' = u&'a' uescape '!'", 'select 1 -- c', 'do $$ begin end $$', "select 1; set app.bypass_rls='true'", 'select 1 from t where a=APP /**/ . "bypass_rls"', 'select query_to_xml(1)', 'select 1; \\! id', "select set_config('app.empresa_id','x',false)", 'select 1 from x where a = APP.BYPASS_RLS', '', 'x'.repeat(20_001)])
     assert.equal(psql(s).status, 64, `deveria recusar: ${s.slice(0, 30)}`);
 });
 test('gate.sh psql_ro: recusa argumentos', { skip: !temBash }, () => assert.equal(spawnSync('bash', [GATE], { input: 'select 1', env: { ...process.env, GATE_DRY: '1', SSH_ORIGINAL_COMMAND: 'psql_ro x' }, encoding: 'utf8' }).status, 64));

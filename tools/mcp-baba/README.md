@@ -65,6 +65,8 @@ docker exec -i shared-postgres psql -U <superusuario> -d easystock -v baba_ro_pw
 install -m 600 -o root -g root /dev/null /opt/baba-mcp/baba_ro.env   # preencher: PG_CONTAINER=shared-postgres PG_DB=easystock PG_USER=baba_ro PGPASSWORD=... EMPRESA_ID=<uuid da Casa da Baba>
 ```
 
+Instale tambem a lista de funcoes permitidas: `install -m 644 -o root -g root scripts/mcp/psql_ro_funcoes.txt /opt/baba-mcp/` (o gate recusa qualquer funcao fora dela, e comentarios SQL).
+
 Reexecute `baba_ro.sql` apos migracao que crie tabela de negocio. Entrada de MCP: `command: node`, `args: [.../src/db/server.mjs]`.
 
 ## Testes
