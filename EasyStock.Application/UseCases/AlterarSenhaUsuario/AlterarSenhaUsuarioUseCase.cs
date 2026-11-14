@@ -12,6 +12,7 @@ namespace EasyStock.Application.UseCases.AlterarSenhaUsuario
         IUsuarioRepository usuarioRepository,
         IValidator<AlterarSenhaCommand> validator,
         RevogadorSessoes revogadorSessoes,
+        IResetTokenRepository resetTokens,
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         ILogger<AlterarSenhaUsuarioUseCase> logger)
@@ -40,6 +41,9 @@ namespace EasyStock.Application.UseCases.AlterarSenhaUsuario
 
             // #1352: a senha mudou, então toda sessão anterior do usuário cai.
             await revogadorSessoes.RevogarAsync(usuario);
+            // #2569: link de reset e chave de acesso abertos caem junto, como no reset (#2201).
+            await resetTokens.InvalidarAbertosAsync(usuario.Id, usuario.AlteradoEm);
+            await resetTokens.InvalidarChavesDeAcessoAbertasAsync(usuario.Id);
             await unitOfWork.CommitAsync();
         }
     }

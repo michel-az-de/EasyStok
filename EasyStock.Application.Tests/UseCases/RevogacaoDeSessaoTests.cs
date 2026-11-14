@@ -33,6 +33,7 @@ public class RevogacaoDeSessaoTests
     private readonly IUsuarioRepository _usuarios = Substitute.For<IUsuarioRepository>();
     private readonly IRefreshTokenRepository _refreshTokens = Substitute.For<IRefreshTokenRepository>();
     private readonly ICacheService _cache = Substitute.For<ICacheService>();
+    private readonly IResetTokenRepository _resetTokens = Substitute.For<IResetTokenRepository>();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly RevogadorSessoes _revogador;
     private readonly Usuario _usuario;
@@ -124,6 +125,9 @@ public class RevogacaoDeSessaoTests
 
         await DeveTerRevogadoOUsuarioTodo();
         _usuario.SenhaHash.Should().Be(FakePasswordHasher.MakeHash("NovaSenha@456"));
+        // #2569: como no reset, o link de redefinição e a chave de acesso abertos caem junto.
+        await _resetTokens.Received(1).InvalidarAbertosAsync(_usuario.Id, Arg.Any<DateTime>());
+        await _resetTokens.Received(1).InvalidarChavesDeAcessoAbertasAsync(_usuario.Id);
     }
 
     [Theory]
@@ -134,6 +138,8 @@ public class RevogacaoDeSessaoTests
         await Assert.ThrowsAnyAsync<Exception>(() => TrocarSenhaAsync(fluxo, senhaAtual: "SenhaErrada@999"));
 
         await NaoDeveTerRevogadoNada();
+        await _resetTokens.DidNotReceiveWithAnyArgs().InvalidarAbertosAsync(default, default);
+        await _resetTokens.DidNotReceiveWithAnyArgs().InvalidarChavesDeAcessoAbertasAsync(default);
         _unitOfWork.CommitCount.Should().Be(0);
     }
 
@@ -145,12 +151,12 @@ public class RevogacaoDeSessaoTests
             var logado = Substitute.For<ICurrentUserAccessor>();
             logado.UsuarioId.Returns(_usuario.Id);
             return new AlterarSenhaUseCase(
-                    _usuarios, logado, _revogador, _unitOfWork, hasher, Substitute.For<ILogger<AlterarSenhaUseCase>>())
+                    _usuarios, logado, _revogador, _resetTokens, _unitOfWork, hasher, Substitute.For<ILogger<AlterarSenhaUseCase>>())
                 .ExecuteAsync(new AlterarSenhaCommand(senhaAtual, "NovaSenha@456"));
         }
 
         return new AlterarSenhaUsuarioUseCase(
-                _usuarios, new AlterarSenhaUsuarioCommandValidator(), _revogador, _unitOfWork, hasher,
+                _usuarios, new AlterarSenhaUsuarioCommandValidator(), _revogador, _resetTokens, _unitOfWork, hasher,
                 Substitute.For<ILogger<AlterarSenhaUsuarioUseCase>>())
             .ExecuteAsync(new AlterarSenhaUsuarioCommand(_usuario.Id, senhaAtual, "NovaSenha@456"));
     }
