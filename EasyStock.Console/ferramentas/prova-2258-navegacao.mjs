@@ -48,7 +48,8 @@ await caso('H9: a aba, a marca, o login e o convite dizem "Casa da Baba"', async
   assert.match(tituloDaAba({ tipo: 'hall' }), /Casa da Baba$/)
   assert.match(readFileSync(new URL('../index.html', base), 'utf8'), /<title>Casa da Baba<\/title>/)
   for (const arquivo of ['componentes/Marca.jsx', 'features/login/TelaLogin.jsx', 'features/login/TelaConvite.jsx', 'app/Moldura.jsx']) {
-    assert.doesNotMatch(ler(arquivo), /Casa da Baba/, `${arquivo} ainda escreve "Baba"`)
+    // #2517: a grafia canônica é sem acento; a letra acentuada entra por código para não repetir o erro aqui.
+    assert.doesNotMatch(ler(arquivo), new RegExp(`bab${String.fromCharCode(0xe1)}`, 'i'), `${arquivo} escreve a marca com acento`)
   }
 })
 
