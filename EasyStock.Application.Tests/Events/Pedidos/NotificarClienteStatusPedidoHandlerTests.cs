@@ -93,7 +93,7 @@ public class NotificarClienteStatusPedidoHandlerTests
         _clientes.GetByIdAsync(_empresaId, _cliente.Id).Returns(_cliente);
         _consentimentos.ListarDoClienteAsync(_empresaId, _cliente.Id, Arg.Any<CancellationToken>()).Returns([]);
 
-        var storefront = StorefrontEntity.Criar(_empresaId, "casadababa", "Casa da Babá", 40m);
+        var storefront = StorefrontEntity.Criar(_empresaId, "casadababa", "Casa da Baba", 40m);
         storefront.DefinirInstagramUrl("https://instagram.com/casadababa");
         _storefronts.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(storefront);
 

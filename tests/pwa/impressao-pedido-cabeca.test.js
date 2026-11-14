@@ -67,7 +67,7 @@ module.exports = function ({ test, runInSandbox, assert }) {
     } }) };
     const PT_MM = 25.4 / 72;
     const medirSemCache = (t, pt) => largura(t) / 100 * pt * PT_MM;
-    const campos = { empresa: 'Casa da Babá', nome: 'Bolo de cenoura com cobertura de chocolate meio amargo', validade: '20/11/2026', fabricacao: '12/11/2026', lote: 'L-000123', peso: 'PESO 1,2 kg', nota: 'Manter refrigerado entre 0 e 5 graus', qr: 'https://x.y/l/0123456789abcdef', barras: '0123456789' };
+    const campos = { empresa: 'Casa da Baba', nome: 'Bolo de cenoura com cobertura de chocolate meio amargo', validade: '20/11/2026', fabricacao: '12/11/2026', lote: 'L-000123', peso: 'PESO 1,2 kg', nota: 'Manter refrigerado entre 0 e 5 graus', qr: 'https://x.y/l/0123456789abcdef', barras: '0123456789' };
     for (const [papel, ori, codigos] of [['continuo-80', 'vertical', ['qr']], ['continuo-52', 'vertical', ['qr', 'barras']], ['etiqueta-50x30', 'horizontal', ['qr', 'barras']]]) {
       chamadas = 0; chaves.clear();
       const area = ctx.cdbEtiquetaCanvas.areaDoPapel(ctx.cdbPapeis.porId(papel), ori);

@@ -1,4 +1,4 @@
-// Prova da #2258: padrões de sistema da auditoria de UX/UI (Casa da Babá, 05/11) nos componentes.
+// Prova da #2258: padrões de sistema da auditoria de UX/UI (Casa da Baba, 05/11) nos componentes.
 //
 // Cobre as regras que valem para todas as telas: "Descartar o que foi digitado?" ao fechar um
 // formulário com dados (F4, T17), botão desabilitado com cara de desabilitado e com o motivo

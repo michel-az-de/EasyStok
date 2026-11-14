@@ -25,7 +25,7 @@
 ## Value Mapping
 
 ### Primary Value Action
-**Ring up a sale at the cash register (Caixa/POS)** — record a confirmed payment and the corresponding stock movement within a cash session. This is the real production workload of the Casa da Babá tenant and the transactional heart of the product. If this drops to zero, the product has failed and the customer "goes back to the spreadsheet."
+**Ring up a sale at the cash register (Caixa/POS)** — record a confirmed payment and the corresponding stock movement within a cash session. This is the real production workload of the Casa da Baba tenant and the transactional heart of the product. If this drops to zero, the product has failed and the customer "goes back to the spreadsheet."
 
 ### Core Features (directly deliver value)
 1. **Caixa / POS** — cash session (`SessaoCaixa`: aberta → em_conferencia → fechada), `MovimentoCaixa`, multiple/partial payments per order, audited reversals, conciliated closing with hash + receipt PDF. Directly captures revenue.

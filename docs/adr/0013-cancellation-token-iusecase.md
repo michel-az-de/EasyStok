@@ -42,7 +42,7 @@ Qualquer um destes gera issue + PR no sprint corrente:
 ## Trade-off explícito (o que perdemos enquanto não temos)
 
 - **Recursos desperdiçados em request cancelado:** se cliente fecha aba durante `EmitirNfceUseCase`, o use case completa todas as 2 transações + chamada HTTP ao Focus NFe (8-30s de CPU/network). Resultado fica órfão no DB (NFC-e Autorizada que ninguém viu).
-- **Pior caso DoS soft:** ator malicioso pode iniciar requests pesados e fechar aba — servidor continua processando. Mitigação atual: rate limiting + auth. Suficiente para o piloto Casa da Babá.
+- **Pior caso DoS soft:** ator malicioso pode iniciar requests pesados e fechar aba — servidor continua processando. Mitigação atual: rate limiting + auth. Suficiente para o piloto Casa da Baba.
 - **Graceful shutdown ruim:** Worker que recebe SIGTERM aguarda use cases em andamento até timeout (default 30s do Kestrel/Worker host) — mas use case não sabe disso, então não tenta encerrar cedo. Casos de borda: deploy demora mais; em pior cenário, processo é kill -9.
 - **Testes de stress complicados:** sem CT, testes de carga não conseguem cancelar requests para medir comportamento sob abandono — métrica de "abandoned request rate" não existe.
 

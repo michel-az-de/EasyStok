@@ -118,7 +118,7 @@ public sealed class AgendamentoControllerTests : IAsyncLifetime
         var storefront = StorefrontEntity.Criar(
             empresaId: empresaId,
             slug: slug,
-            tituloPublico: "Casa da Babá (it-agend)",
+            tituloPublico: "Casa da Baba (it-agend)",
             pedidoMinimoEntrega: 0m);
         storefront.Ativar();
         await storefrontRepo.AddAsync(storefront);

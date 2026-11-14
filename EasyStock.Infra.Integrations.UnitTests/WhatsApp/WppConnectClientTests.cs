@@ -40,6 +40,29 @@ public class WppConnectClientTests
         _http.Chamadas.Should().HaveCount(1);
     }
 
+    /// <summary>
+    /// #2515: a conta comum não tem botão. As opções saem numeradas e o menu fica guardado para o "2" do cliente voltar
+    /// como o toque no segundo botão.
+    /// </summary>
+    [Fact]
+    public async Task Botoes_saem_numerados_e_o_menu_fica_guardado_para_a_resposta()
+    {
+        var menus = Substitute.For<IMenusNumeradosWppConnect>();
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/send-message")
+            .Responde(HttpStatusCode.Created, """{"status":"success","response":[{"id":{"_serialized":"true_contato_MENU"}}]}""");
+        var client = new WppConnectClient(_http.CriarClient("http://wpp.test/"),
+            Options.Create(new WppConnectOptions { Habilitado = true, SecretKey = "segredo-teste", WebhookToken = "token-webhook-teste" }),
+            _remetente, menus: menus);
+        (string Id, string Titulo)[] opcoes = [("acao:escolher_janela:a:2026-11-14", "14/11 09:00-12:00"), ("acao:escolher_janela:b:2026-11-14", "14/11 12:00-15:00")];
+
+        await client.EnviarBotoesAsync("5511999999999", "Escolha a janela de entrega:", opcoes);
+
+        System.Text.Json.JsonDocument.Parse(_http.UltimaChamada!.Corpo!).RootElement.GetProperty("message").GetString()
+            .Should().Be("Escolha a janela de entrega:\n1. 14/11 09:00-12:00\n2. 14/11 12:00-15:00");
+        await menus.Received(1).GuardarAsync(_sessao.Sessao, "5511999999999",
+            Arg.Is<IReadOnlyList<(string Id, string Titulo)>>(o => o.SequenceEqual(opcoes)), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Falha_do_servidor_nao_repete_envio()
     {

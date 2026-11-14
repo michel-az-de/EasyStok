@@ -29,6 +29,7 @@ operador é o console React em `EasyStock.Console/` (ADR-0054), ligado à API m�
 | 11 | [15-reenvio-mensagens.md](15-reenvio-mensagens.md) | S57 | Reenvio de mensagens que falharam: automático em 1/5/15/60 min para falha temporária, nunca para permanente ou incerta; botão "Reenviar" no console |
 | 12 | [16-retomada-nao-entregues-sms.md](16-retomada-nao-entregues-sms.md) | S58–S60 | Janela vencida: modelo de retomada e reenvio quando o cliente responde; painel "Não entregues"; reserva por SMS pronta e desligada |
 | 13 | [18-harness-do-agente.md](18-harness-do-agente.md) | S61–S66 | ADR-0065: harness do agente configurável por arquivo. Eval com linha de base primeiro, perfil e prompt em `agents/`, `IChatClient` atrás da porta, custo por turno; depois habilidades e ajuste por loja |
+| 14 | [19-engrenagem-do-assistente.md](19-engrenagem-do-assistente.md) | S67–S70 | ADR-0066: engrenagem do Assistente no topo do Atendimento. Registro do turno (antecipa a S64), configuração guiada com nome da dona e modelo da lista aprovada (substitui a S66), cota mensal com alerta e painel com Geral, Roteiro, Respostas prontas, Histórico e Uso |
 
 Ordem: 1 → 2 → 3 → 4 → 5 → 6. S32 (Mercado Pago, doc 08) entra logo após S11. A onda 7 pode correr em paralelo a partir da onda 4 (P05 depende de S18/S19).
 **Onda 8 (ADR-0051, go-live com tudo):** S34 entra **entre S03 e S05**, porque muda a chave da identidade do cliente. As demais fatias da onda 8 correm em paralelo às ondas 2 e 3, conforme o diagrama de ordem em [09-sistema-completo.md](09-sistema-completo.md).

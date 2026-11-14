@@ -1,3 +1,4 @@
+using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Ports.Output.Storage;
@@ -23,6 +24,7 @@ public sealed class ReportRunnerBackgroundService(
     IServiceProvider               serviceProvider,
     ReportingMetricsService        metrics,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
+    LoopsDoWorker loops,
     ILogger<ReportRunnerBackgroundService> logger)
     : BackgroundService
 {
@@ -64,8 +66,11 @@ public sealed class ReportRunnerBackgroundService(
         try { await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken); }
         catch (OperationCanceledException) { return; }
 
+        loops.Iniciar("report-runner", pollingInterval); // #2536: arquivo de vida do Worker
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            loops.Bater("report-runner");
             try
             {
                 int dispatched = await DispatchBatchAsync(batchSize, leaseDuration, stoppingToken);

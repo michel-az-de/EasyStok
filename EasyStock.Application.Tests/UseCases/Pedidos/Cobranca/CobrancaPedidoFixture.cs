@@ -116,7 +116,7 @@ internal sealed class CobrancaPedidoFixture
             .Do(ci => Cobrancas.Add(ci.Arg<CobrancaPedido>()));
         CobrancaRepo.ObterEmpresaIdDoPedidoAsync(Pedido.Id, Arg.Any<CancellationToken>()).Returns(EmpresaId);
 
-        var storefront = StorefrontEntity.Criar(EmpresaId, "casa-da-baba", "Casa da Babá", 0m);
+        var storefront = StorefrontEntity.Criar(EmpresaId, "casa-da-baba", "Casa da Baba", 0m);
         StorefrontRepo.GetByEmpresaAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(storefront);
 
         var sequencia = 0;

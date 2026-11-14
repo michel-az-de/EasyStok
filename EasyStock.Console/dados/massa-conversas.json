@@ -374,7 +374,7 @@
       "pedido": null,
       "mensagens": [
         { "id": "c7m1", "dir": "in", "texto": "Bom dia! Vocês entregam em Itaquera?", "minutosAtras": 34 },
-        { "id": "c7m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Babá, massa artesanal com entrega agendada. Me passa rua, número e CEP que eu confirmo a área na hora.", "minutosAtras": 33, "status": "lida", "automatica": true },
+        { "id": "c7m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Me passa rua, número e CEP que eu confirmo a área na hora.", "minutosAtras": 33, "status": "lida", "automatica": true },
         { "id": "c7m3", "dir": "in", "texto": "Rua Américo Salvador Novelli, 320, Itaquera, CEP 08275-000", "minutosAtras": 30 },
         { "id": "c7m4", "dir": "out", "texto": "Oi Diego! Essa região ainda não é atendida por aqui. Quer que eu veja com a Thatiane se dá uma exceção mesmo assim?", "minutosAtras": 29, "status": "lida", "automatica": true },
         { "id": "c7m5", "dir": "in", "texto": "Ah, que pena. Obrigado!", "minutosAtras": 25 }
@@ -467,7 +467,7 @@
       "pedido": null,
       "mensagens": [
         { "id": "c9m1", "dir": "in", "texto": "Oi, tudo bem? Queria ver o cardápio de vocês", "minutosAtras": 2880 },
-        { "id": "c9m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Babá, massa artesanal com entrega agendada. Segue nosso cardápio de hoje. Me chama quando escolher que eu já anoto.", "minutosAtras": 2878, "status": "lida", "automatica": true },
+        { "id": "c9m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Segue nosso cardápio de hoje. Me chama quando escolher que eu já anoto.", "minutosAtras": 2878, "status": "lida", "automatica": true },
         { "id": "c9m3", "dir": "out", "texto": "Oi! Qualquer dúvida do cardápio é só chamar. Produzo de novo nesta semana.", "minutosAtras": 1440, "status": "lida", "automatica": true }
       ],
       "esperado": {
@@ -555,7 +555,7 @@
       },
       "pedido": null,
       "mensagens": [
-        { "id": "c11m1", "dir": "out", "texto": "Olá! Aqui é a Casa da Babá, massa artesanal com entrega agendada. Me conta o que você procura que eu te ajudo.", "minutosAtras": 205, "status": "lida", "automatica": true },
+        { "id": "c11m1", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Me conta o que você procura que eu te ajudo.", "minutosAtras": 205, "status": "lida", "automatica": true },
         { "id": "c11m2", "dir": "in", "texto": "Oi! Vocês têm alguma opção vegana? Parei com laticínio e ovo", "minutosAtras": 200 },
         { "id": "c11m3", "dir": "in", "texto": "O ravióli de abóbora leva ovo na massa?", "minutosAtras": 196 }
       ],
@@ -1268,7 +1268,7 @@
       },
       "pedido": null,
       "mensagens": [
-        { "id": "c23m1", "dir": "out", "texto": "Olá! Aqui é a Casa da Babá, massa artesanal com entrega agendada. Segue nosso cardápio de hoje.", "minutosAtras": 82, "status": "lida", "automatica": true },
+        { "id": "c23m1", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Segue nosso cardápio de hoje.", "minutosAtras": 82, "status": "lida", "automatica": true },
         { "id": "c23m2", "dir": "in", "texto": "Bom dia! Vocês fazem brodo? Aquele caldo com capeletti dentro", "minutosAtras": 80 },
         { "id": "c23m3", "dir": "in", "texto": "Ou alguma sopa, sei lá. Tá frio e eu queria algo quentinho", "minutosAtras": 78 }
       ],
@@ -1406,7 +1406,7 @@
         }
       },
       "mensagens": [
-        { "id": "c25m1", "dir": "out", "texto": "Oi Sandra, entrou lasanha clássica no cardápio da Casa da Babá. Quer provar?", "minutosAtras": 800, "status": "lida", "automatica": true },
+        { "id": "c25m1", "dir": "out", "texto": "Oi Sandra, entrou lasanha clássica no cardápio da Casa da Baba. Quer provar?", "minutosAtras": 800, "status": "lida", "automatica": true },
         { "id": "c25m2", "dir": "in", "texto": "Thati! Vi que vai ter lasanha, quero duas", "minutosAtras": 60 },
         { "id": "c25m3", "dir": "out", "texto": "Oi Sandra! Duas lasanhas clássicas, 170 reais. Tenho a janela das 19h30 às 20h30 livre hoje.", "minutosAtras": 58, "status": "lida" },
         { "id": "c25m4", "dir": "in", "texto": "Perfeito, pode ser essa", "minutosAtras": 55 },
@@ -1475,7 +1475,7 @@
       },
       "mensagens": [
         { "id": "c26m1", "dir": "in", "texto": "Oi! Uma amiga minha compra com vocês, a Bianca. Queria pedir também", "minutosAtras": 90 },
-        { "id": "c26m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Babá, massa artesanal com entrega agendada. Segue nosso cardápio de hoje. Me chama quando escolher que eu já anoto.", "minutosAtras": 88, "status": "lida", "automatica": true },
+        { "id": "c26m2", "dir": "out", "texto": "Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. Segue nosso cardápio de hoje. Me chama quando escolher que eu já anoto.", "minutosAtras": 88, "status": "lida", "automatica": true },
         { "id": "c26m3", "dir": "in", "texto": "Amei o tortéi de costela. Quero um pra hoje à noite", "minutosAtras": 80 },
         { "id": "c26m4", "dir": "out", "texto": "Que bom! Tortéi de costela, 500 g, 68 reais. Me passa rua, número e CEP que eu confirmo a área.", "minutosAtras": 78, "status": "lida" },
         { "id": "c26m5", "dir": "in", "texto": "Av. Pompeia, 1540, Perdizes, CEP 05022-001", "minutosAtras": 72 },

@@ -143,7 +143,7 @@ O agente automático nasce desligado. Testes de integração da API voltaram ao 
   conversa, com bypass de RLS na leitura e escrita no tenant do pedido, e a vaga deixa de ficar presa. (#1291)
 - **Cliente bloqueado** não fecha pedido pelo site (guest e logado), como já acontecia na conversa. (#1291)
 - **Troca para pagar na entrega** respeita `RequerAprovacao`: lead liberado fora de área vai para a aprovação
-  da Babá, não direto para a cozinha. (#1291)
+  da Baba, não direto para a cozinha. (#1291)
 - **Envio ao cliente** (#1292): o `POST /messages` da Meta não é mais repetido pelo retry (mensagem
   duplicada após timeout); empresa sem número de WhatsApp vinculado não envia pelo número global; aviso de
   preparo e de saída respeita os avisos desligados pelo cliente; aviso de reembolso ganha telefone no payload

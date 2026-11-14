@@ -8,7 +8,7 @@
 ## Contexto
 
 O EasyStok nasceu com pretensão de SaaS de mercado, mas essa pretensão acabou. Hoje ele é
-**ferramenta interna da Casa da Babá** (food service). O mesmo dono tem uma segunda empresa,
+**ferramenta interna da Casa da Baba** (food service). O mesmo dono tem uma segunda empresa,
 a **FMA Informática** (prestação de serviços de TI), e quer os sistemas dela — financeiro,
 CRM, cadastros, contratos, propostas — numa plataforma que ele mesmo gerencie.
 
@@ -78,7 +78,7 @@ princípio. `Web` e `Admin` já têm zero `ProjectReference` — a fronteira é 
 porta continua aberta para fazer isso depois sem tocar o backend. Hoje seria um segundo front
 para manter sozinho, com um design system para replicar, sem ganho.
 
-**Modelar a FMA como uma "loja" da Casa da Babá.** Descartada, e vale registrar porque é o
+**Modelar a FMA como uma "loja" da Casa da Baba.** Descartada, e vale registrar porque é o
 atalho tentador. Loja é subdivisão operacional **dentro** de uma empresa: compartilha
 clientes, plano de contas, usuários e assinatura. Duas empresas distintas com CNPJs
 diferentes não podem compartilhar isso — seria misturar o financeiro das duas.
@@ -100,7 +100,7 @@ diferentes não podem compartilhar isso — seria misturar o financeiro das duas
   um monólito modular de dono único; se um dia incomodar, o corte natural é por contexto, não
   por empresa.
 - **Todo módulo novo precisa de gate por tenant.** Um módulo sem flag aparece para a Casa da
-  Babá, e "Propostas" no menu de uma cozinha é ruído. O aceite do épico exige verificar isso
+  Baba, e "Propostas" no menu de uma cozinha é ruído. O aceite do épico exige verificar isso
   **em tela**, não só na configuração.
 - **O `TenantFeatureFlag` precisa deixar de ser decorativo.** Hoje a tabela existe e ninguém
   a lê — é o pré-requisito de tudo, e por isso é o item 0 do épico. Enquanto não for lido em

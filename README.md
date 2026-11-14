@@ -1,6 +1,6 @@
 # EasyStok
 
-SaaS multi-tenant de gestão de estoque/foodservice em **.NET 9 + PostgreSQL**, com PWA mobile (Casa da Babá em produção real) e MAUI Android (produto SaaS em maturação).
+SaaS multi-tenant de gestão de estoque/foodservice em **.NET 9 + PostgreSQL**, com PWA mobile (Casa da Baba em produção real) e MAUI Android (produto SaaS em maturação).
 
 ## Para agentes / desenvolvedores entrando agora
 

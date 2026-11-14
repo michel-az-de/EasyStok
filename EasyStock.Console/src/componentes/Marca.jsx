@@ -7,7 +7,7 @@ const logo = new URL('../assets/casa-da-baba.png', import.meta.url).href
 export function Marca({ compacta = false }) {
   return (
     <span className={`${css.marca} ${compacta ? css.compacta : ''}`}>
-      <img src={logo} width="120" height="80" alt="Casa da Babá" />
+      <img src={logo} width="120" height="80" alt="Casa da Baba" />
       {!compacta && <span className={css.produto}>EasyStok</span>}
     </span>
   )

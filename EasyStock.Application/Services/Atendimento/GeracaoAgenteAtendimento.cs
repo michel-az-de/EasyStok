@@ -94,7 +94,7 @@ public static class GeracaoAgenteAtendimento
                 var texto = string.Join("\n", resposta.Conteudo.OfType<BlocoTextoLlm>().Select(b => b.Texto)).Trim();
                 return new GeracaoAgente(texto, tokens, true,
                     texto.Length == 0 && !(situacaoInicial == SituacaoConversa.Automatica
-                        && (contexto.EnvioVerificado || contexto.RespostaVerificada is { Length: > 0 }))
+                        && (contexto.EnvioVerificado || contexto.TemEnvioAdiado || contexto.RespostaVerificada is { Length: > 0 }))
                         ? $"o agente não produziu resposta (stop_reason={resposta.StopReason})" : null);
             }
 
@@ -263,8 +263,8 @@ public static class GeracaoAgenteAtendimento
         sb.AppendLine(conversa.PedidoEmAndamentoId is { } pedidoId
             ? $"- Pedido vinculado à conversa: {pedidoId}. Consulte consultar_pedido para saber a situação atual; o vínculo não comprova pedido em andamento."
             : "- Pedido em andamento: nenhum registrado nesta conversa.");
-        if (conversa.ContextoJson != "{}")
-            sb.AppendLine($"- Contexto salvo: {TextoExternoPrompt.Linha(conversa.ContextoJson)}");
+        if (ContextoConversaJson.ParaDossie(conversa) is { Length: > 0 } contextoSalvo)
+            sb.AppendLine($"- Contexto salvo: {TextoExternoPrompt.Linha(contextoSalvo)}");
         if (!string.IsNullOrWhiteSpace(cliente?.Observacoes))
             sb.AppendLine($"- {interno} Observações do cadastro: {cliente.Observacoes}");
 

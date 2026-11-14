@@ -37,7 +37,7 @@ existentes.
 
 **Contras**: tabela ganha colunas nullable que só fazem sentido para
 estornos (~5% das linhas em prod). Espaço de armazenamento +~50 bytes/linha.
-Para Casa da Babá (~22k linhas/ano): +1MB/ano. Negligível.
+Para Casa da Baba (~22k linhas/ano): +1MB/ano. Negligível.
 
 ### Opção B — Criar tabela `pagamentos` nova
 
@@ -53,7 +53,7 @@ Para Casa da Babá (~22k linhas/ano): +1MB/ano. Negligível.
 ótimo, sem colunas legacy desnecessárias para estornos. Permite renomear
 `Metodo` → `FormaPagamento`, etc.
 
-**Contras**: bloquear mobile não é aceitável (Casa da Babá depende do APK
+**Contras**: bloquear mobile não é aceitável (Casa da Baba depende do APK
 em produção). Coexistência dupla é fonte de bug. Princípio aditivo do escopo
 proíbe destrutivo, e "deprecar tabela em uso" é destrutivo na prática.
 

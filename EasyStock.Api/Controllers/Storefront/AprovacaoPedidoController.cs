@@ -45,7 +45,7 @@ public sealed class AprovacaoPedidoController(
         Summary = "Aprovar pedido storefront",
         Description = "Lock pessimista no pedido + transição AguardandoAprovacaoBaba → AprovadoBaba. " +
                       "Enfileira NotificarClientePedidoAprovadoEvent no Outbox (WhatsApp). " +
-                      "Concorrência: 2 babás simultâneas → 1 sucesso (200), 1 falha (409).")]
+                      "Concorrência: 2 babas simultâneas → 1 sucesso (200), 1 falha (409).")]
     [ProducesResponseType(typeof(ApiResponse<AprovarPedidoStorefrontResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -174,7 +174,7 @@ public sealed class AprovacaoPedidoController(
     private UnprocessableEntityObjectResult DataUnprocessable(string mensagem, string? detalhe = null) =>
         UnprocessableEntity(new ApiErrorResponse(new ApiError("VALIDATION_ERROR", mensagem, detalhe, null)));
 
-    /// <summary>409 com o estado atual em <c>details</c> (contrato da corrida entre duas babás).</summary>
+    /// <summary>409 com o estado atual em <c>details</c> (contrato da corrida entre duas babas).</summary>
     private ConflictObjectResult PedidoJaResolvido(PedidoJaResolvidoException ex) =>
         Conflict(new ApiErrorResponse(new ApiError("PEDIDO_JA_RESOLVIDO", ex.Message, null, null)
         {

@@ -176,9 +176,11 @@ public sealed class AgenteAtendimentoService(
             respondeu = await EnviarRespostaAsync(gravacao, conversa, despedida, ct) || respondeu;
         else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
+            // #2515: sem texto do agente, o menu adiado basta como resposta.
+            var soMenu = concluiu && motivoEscalada is null && string.IsNullOrWhiteSpace(geracao.Texto) && contexto.TemEnvioAdiado;
             if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
                 respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
-            else if (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu)
+            else if (!soMenu && (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu))
             {
                 // #1704: a conversa vai ao cliente; afirmação que nenhuma fonte do turno sustenta fica para a equipe.
                 var barrada = !concluiu || motivoEscalada is not null ? null
@@ -194,6 +196,21 @@ public sealed class AgenteAtendimentoService(
                     motivoEscalada ??= concluiu ? $"resposta do agente barrada ({barrada}); precisa de conferência humana"
                         : $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
                 }
+            }
+        }
+
+        // #2515: o menu da ferramenta sai depois do texto; conversa escalada ou texto barrado não o recebe.
+        // Menu que não sai deixa o cliente convidado a escolher sem opções: a equipe confere, e quem não recebeu nada
+        // recebe o encaminhamento.
+        if (motivoEscalada is null && conversa.Situacao == SituacaoConversa.Automatica && contexto.TemEnvioAdiado)
+        {
+            if (await contexto.EnviarAdiadoAsync(ct))
+                respondeu = true;
+            else
+            {
+                if (!respondeu)
+                    respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct);
+                motivoEscalada = "o menu de janelas não saiu ao cliente; precisa de conferência humana";
             }
         }
 

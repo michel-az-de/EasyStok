@@ -39,7 +39,7 @@ public class ChatSiteControllerTests
 
     public ChatSiteControllerTests()
     {
-        _loja = StorefrontEntity.Criar(empresaId: Guid.NewGuid(), slug: Slug, tituloPublico: "Casa da Babá", pedidoMinimoEntrega: 0m);
+        _loja = StorefrontEntity.Criar(empresaId: Guid.NewGuid(), slug: Slug, tituloPublico: "Casa da Baba", pedidoMinimoEntrega: 0m);
         _loja.Ativar();
         _lojas.GetBySlugAsync(Slug, Arg.Any<CancellationToken>()).Returns(_loja);
         _flags.ListarAtivasAsync(_loja.EmpresaId, Arg.Any<CancellationToken>())

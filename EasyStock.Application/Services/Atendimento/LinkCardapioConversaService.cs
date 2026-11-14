@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Domain.Entities.Atendimento;
@@ -16,7 +17,7 @@ public sealed class LinkCardapioConversaIndisponivelException() : Exception(Orie
 /// Gera e valida o link do cardápio ligado à conversa (S48). O token é aleatório (256 bits,
 /// base64url) e vai na URL como <c>?c=</c>; o banco guarda só o hash. Vale 24 h e um pedido só.
 /// </summary>
-public sealed class LinkCardapioConversaService(ILinkCardapioConversaRepository repository, SaudacaoAtendimento saudacao,
+public sealed partial class LinkCardapioConversaService(ILinkCardapioConversaRepository repository, SaudacaoAtendimento saudacao,
     IUnitOfWork? uow = null, IConversaRepository? conversas = null)
 {
     public const string ParametroToken = "c";
@@ -48,6 +49,22 @@ public sealed class LinkCardapioConversaService(ILinkCardapioConversaRepository 
         }
         return uow is null ? await Gerar(ct) : await uow.ExecuteInTransactionSemRetryAsync(Gerar, ct);
     }
+
+    /// <summary>Comanda aberta mais recente da conversa (não usada e não vencida), ou <c>null</c> (#2516).</summary>
+    public async Task<LinkCardapioConversa?> VigenteAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default) =>
+        (await repository.ListarDaConversaAsync(empresaId, conversaId, agora - LinkCardapioConversa.Validade, ct))
+            .Where(l => l.EstaValido(agora)).MaxBy(l => l.CriadoEm);
+
+    /// <summary>
+    /// O texto leva a URL da comanda deste link (#2516). O banco guarda só o hash, então só a mensagem que saiu com o
+    /// token prova que o cliente recebeu aquele link.
+    /// </summary>
+    public static bool LevaOLink(string? texto, LinkCardapioConversa link) =>
+        !string.IsNullOrEmpty(texto) && TokenDaComanda().Matches(texto)
+            .Any(m => string.Equals(AcessoChatSite.HashDoToken(m.Groups["token"].Value), link.TokenHash, StringComparison.Ordinal));
+
+    [GeneratedRegex(@"comanda\.html\?c=(?<token>[A-Za-z0-9_-]+)")]
+    private static partial Regex TokenDaComanda();
 
     /// <summary>Link válido pelo token. Inexistente, vencido ou já usado: <see cref="LinkCardapioConversaIndisponivelException"/>.</summary>
     public async Task<LinkCardapioConversa> ValidarAsync(string? token, DateTime agora, CancellationToken ct = default)

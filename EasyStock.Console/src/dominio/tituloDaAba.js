@@ -1,14 +1,14 @@
 // Título da aba do navegador (#1582). Puro: recebe a rota já decidida por `rotaDaHash`.
 //
 // Balcão, Cozinha e Entregas ficam abertos em janelas separadas e todas se chamavam
-// "Casa da Babá"; na barra de tarefas não dava para saber qual era qual. O nome da tela
+// "Casa da Baba"; na barra de tarefas não dava para saber qual era qual. O nome da tela
 // vem do catálogo de módulos, o mesmo do hall e do menu. A contagem de "Precisa de você"
 // só existe no Balcão e vai na frente, para caber em aba estreita.
 
 import { moduloPorId } from './modulos'
 import { ROTA_CARDAPIO_LINK, ROTA_COZINHA, ROTA_ENTREGAS } from './rota'
 
-export const TITULO_BASE = 'Casa da Babá'
+export const TITULO_BASE = 'Casa da Baba'
 
 // Janela avulsa aberta pelo apelido (`#/cozinha`, `#/entregas`): não tem módulo na rota.
 const NOME_DO_APELIDO = {

@@ -426,6 +426,22 @@ export function quandoNoCaixa(iso, dataDoCaixa) {
   return dia === dataDoCaixa ? hora : `${dia.slice(8, 10)}/${dia.slice(5, 7)} ${hora}`
 }
 
+// #2535 (Q05): o fechamento de uma sessão de vários dias grava em `observacoes`, depois da nota do operador,
+// o aviso de lançamentos que ficaram fora dele. Antes da #2256 a frase era "Atencao: ha lancamentos entre ...
+// NAO foram incluidos ..."; hoje é "Atenção: há lançamentos entre ... não entraram ...". As duas trazem o
+// período no mesmo formato, e é só ele que a tela precisa para dizer o que houve e para onde ir.
+const AVISO_FORA_DO_FECHAMENTO = /^\s*Aten[cç][aã]o: h[aá] lan[cç]amentos entre (\d{2})\/(\d{2})\/\d{4} e (\d{2})\/(\d{2})\/\d{4}.*$/imu
+
+export function observacaoDoFechamento(texto) {
+  const bruto = String(texto ?? '')
+  const achado = bruto.match(AVISO_FORA_DO_FECHAMENTO)
+  if (!achado) return { nota: bruto.trim(), foraDoFechamento: null }
+  const [linha, diaDe, mesDe, diaAte, mesAte] = achado
+  return { nota: bruto.replace(linha, '').trim(), foraDoFechamento: { de: `${diaDe}/${mesDe}`, ate: `${diaAte}/${mesAte}` } }
+}
+
+export const avisoForaDoFechamento = ({ de, ate }) => `Os lançamentos de ${de} a ${ate} ficaram fora deste fechamento.`
+
 // --- Fluxo de caixa de vários dias (#1624) ----------------------------------
 // Uma linha por dia, com as palavras da dona: entrou (vendas, pagamentos de pedido e outras
 // entradas), saiu (saídas) e o saldo do dia. O saldo inicial fica de fora: é dinheiro que já

@@ -427,7 +427,7 @@ check('Push: evento novo vira push clicável no topo', () => {
 });
 
 /* ── v12: temas ── */
-check('Temas: Casa da Babá aplica as cores do PWA', () => {
+check('Temas: Casa da Baba aplica as cores do PWA', () => {
   window.setTheme('casa');
   return document.documentElement.dataset.theme === 'casa';
 });

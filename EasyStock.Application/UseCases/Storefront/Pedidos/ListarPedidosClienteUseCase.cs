@@ -238,7 +238,7 @@ public sealed class ListarPedidosClienteUseCase(
     internal static string? StepKeyDoStatus(string? statusInterno) => statusInterno switch
     {
         StatusPedidoMapper.AguardandoAprovacaoBaba => "pagamento",  // pagamento confirmado
-        StatusPedidoMapper.AprovadoBaba => "aprovacao",             // a Babá confirmou
+        StatusPedidoMapper.AprovadoBaba => "aprovacao",             // a Baba confirmou
         StatusPedidoMapper.Aguardando => "preparo",
         StatusPedidoMapper.Preparando => "preparo",
         StatusPedidoMapper.Pronto => "finalizando",                 // o "Finalizando" do site (#1927)

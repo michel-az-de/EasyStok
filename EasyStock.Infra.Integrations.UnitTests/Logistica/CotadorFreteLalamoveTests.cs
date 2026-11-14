@@ -18,7 +18,7 @@ public class CotadorFreteLalamoveTests
 {
     private static readonly DateTimeOffset Agora = DateTimeOffset.FromUnixTimeMilliseconds(1545880607433);
     private static readonly Guid Empresa = Guid.NewGuid();
-    private static readonly PontoCotacaoFrete Cozinha = new(-23.5613, -46.6565, "Casa da Babá");
+    private static readonly PontoCotacaoFrete Cozinha = new(-23.5613, -46.6565, "Casa da Baba");
     private static readonly PontoCotacaoFrete Cliente = new(-23.5874, -46.6576, "Rua X, 100, Vila Y, São Paulo - SP, 04000000");
 
     private const string Cidades = """
@@ -29,7 +29,7 @@ public class CotadorFreteLalamoveTests
     private const string Cotacao = """
         {"data":{"quotationId":"1514140994227007571","scheduleAt":"2026-10-17T15:00:00.00Z","expiresAt":"2026-10-17T15:05:00.00Z",
           "serviceType":"LALAGO","language":"pt_BR","isRouteOptimized":false,
-          "stops":[{"stopId":"1","coordinates":{"lat":"-23.5613","lng":"-46.6565"},"address":"Casa da Babá"},
+          "stops":[{"stopId":"1","coordinates":{"lat":"-23.5613","lng":"-46.6565"},"address":"Casa da Baba"},
                    {"stopId":"2","coordinates":{"lat":"-23.5874","lng":"-46.6576"},"address":"Rua X"}],
           "priceBreakdown":{"base":"12.40","totalExcludePriorityFee":"17.40","total":"17.40","currency":"BRL"},
           "distance":{"value":"4120","unit":"m"}}}

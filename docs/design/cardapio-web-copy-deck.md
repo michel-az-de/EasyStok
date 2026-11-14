@@ -1,8 +1,8 @@
 # Copy-deck — Gestão de Cardápio do Tenant (EasyStock.Web)
 
 > **Fase 3 (UX) do plano ADR-0031.** Microcopy PT-BR pronta para as Views Razor da Fase 4.
-> **Persona:** Thatiane (Casa da Babá) — dona de negócio de comida artesanal, não-técnica, gerencia
-> o próprio cardápio. **Tom:** prático e honesto (EasyStok) + acolhedor (Casa da Babá). Sem jargão,
+> **Persona:** Thatiane (Casa da Baba) — dona de negócio de comida artesanal, não-técnica, gerencia
+> o próprio cardápio. **Tom:** prático e honesto (EasyStok) + acolhedor (Casa da Baba). Sem jargão,
 > sem "sistema", sem "registro/entidade". Fala com o cliente como uma pessoa que ajuda.
 >
 > **Princípios aplicados:** verbo no CTA · erro = o que aconteceu + por quê + como resolver ·

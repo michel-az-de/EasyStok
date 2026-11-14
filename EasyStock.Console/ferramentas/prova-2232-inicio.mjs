@@ -74,7 +74,7 @@ const confere = (descricao, fn) => {
 }
 
 confere('H1  uma marca só no canto: o logo da loja, sem o "EasyStok" ao lado', () => {
-  assert.match(topo(html), /alt="Casa da Babá"/)
+  assert.match(topo(html), /alt="Casa da Baba"/)
   assert.doesNotMatch(topo(html).replace(/<[^>]*>/g, ' '), /EasyStok/)
   assert.match(jsxHall, /<Marca compacta \/>/)
 })
