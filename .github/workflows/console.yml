@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   qualidade:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, easystok]
     defaults:
       run:
         working-directory: EasyStock.Console
@@ -35,7 +35,7 @@ jobs:
       - run: bash ../scripts/deploy/console-deploy.test.sh
       - run: npm ci
       # #2410: as provas de navegador do `npm run provas` abrem o console no Chromium.
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - run: npm run qualidade
       - run: node ferramentas/prova-2146-componentes-gramatica.mjs
       - run: node --test ferramentas/prova-2021-frete.mjs ferramentas/prova-2021-midias.mjs ferramentas/prova-2021-galeria.mjs

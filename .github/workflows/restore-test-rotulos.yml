@@ -28,7 +28,7 @@ concurrency:
 jobs:
   restore-and-validate:
     name: Restore + validar
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, easystok]
     timeout-minutes: 30
     if: ${{ vars.BACKUP_ENABLED == 'true' }}
 
