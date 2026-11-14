@@ -60,7 +60,7 @@ desserializa em `EtapaRoteiroAtendimento(Nome, Instrucao, Ativo)`. A S71 troca s
 
 ### S71 · Script padrão como base do prompt
 **Abordagem:** reescrever `RoteiroAtendimento.Padrao` com as 8 etapas. O `PromptAtendimento` passa a abrir pela identidade, depois o script e
-por último as regras. A comanda deixa de ser o caminho de "Para montar um pedido" e vira um recurso. A RN-01 muda conforme D1.
+por último as regras. A comanda deixa de ser o caminho de "Para montar um pedido" e vira um recurso. A RN-01 passa a dizer só que a saudação já foi enviada, porque o primeiro contato sai sem link (D1).
 **Aceite:** prompt sem "Baba"; etapa 1 sem link; `enviar_cardapio_imagem` só aparece como recurso; snapshot revisado.
 **Testes (Red):** `Prompt_AbrePeloScript`, `Roteiro_ComandaEhRecurso`, `Prompt_DonaPeloNomeOuADona`.
 **Depende de:** S68 para `NomeDona`. Sem ela, usa "a dona". **Tamanho:** P.
@@ -76,7 +76,7 @@ URL relativa vira absoluta e HTTPS; envio grava a mensagem. **Risco:** a URL pre
 `enviar_resumo_pedido(pedidoId)` renderiza o resumo (itens, total, entrega e janela) com QuestPDF, sobe com URL
 pública e manda no formato escolhido em D2.
 **Testes (Red):** o resumo traz os itens e o total do pedido; pedido de outra conversa → recusa; falha no envio
-não grava a mensagem como enviada. **Tamanho:** M (com D2 = b, M+, por causa da porta nova nos 5 clientes).
+não grava a mensagem como enviada. **Tamanho:** M. O resumo sai como imagem, gerada pelo QuestPDF e enviada por `EnviarImagemAsync` (D2).
 
 ### S74 · `enviar_link_pagamento`
 **Abordagem:** a ferramenta chama `GerarCobrancaPedidoUseCase` para o pedido da conversa e manda o link (Pix ou cartão).
@@ -84,9 +84,9 @@ Serve também para "o link venceu". A guarda já barra link que não veio de fer
 **Testes (Red):** sem "ok" do resumo no turno → a orientação pede confirmação; pedido pago → não gera; link
 vencido → gera novo. **Tamanho:** P.
 
-Ordem: S71 primeiro. S72 e S74 podem correr em paralelo. S73 depois de D2. Cada fatia vira uma PR de tier alto.
+Ordem: S71, S72, S74, S73. As quatro formam um pacote: uma PR de tier alto, com um commit por fatia, porque o script só funciona com as ferramentas novas.
 
-## Decisões do Felipe
+## Decisões do Felipe (14/11/2026 00:57 BRT: D1 a, D2 a, D3 a; spec aprovada)
 
 | # | Pergunta | Opções (a = recomendada) |
 |---|---|---|
