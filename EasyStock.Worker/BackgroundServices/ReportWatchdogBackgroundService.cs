@@ -1,3 +1,4 @@
+using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Reporting;
@@ -20,6 +21,7 @@ public sealed class ReportWatchdogBackgroundService(
     IServiceProvider serviceProvider,
     ReportingMetricsService metrics,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
+    LoopsDoWorker loops,
     ILogger<ReportWatchdogBackgroundService> logger)
     : BackgroundService
 {
@@ -49,8 +51,11 @@ public sealed class ReportWatchdogBackgroundService(
 
         var lastArtifactGc = DateTimeOffset.MinValue;
 
+        loops.Iniciar("report-watchdog", leaseReclaimInterval); // #2536: arquivo de vida do Worker
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            loops.Bater("report-watchdog");
             try
             {
                 await RunLeaseReclaimAsync(stoppingToken);
