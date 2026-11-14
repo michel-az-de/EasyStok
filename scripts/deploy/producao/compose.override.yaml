@@ -1,0 +1,19 @@
+services:
+  api:
+    environment:
+      Notifications__WhatsApp__Provider: meta
+      Auth__TrustedLinkOrigins__0: __NA_VPS__
+      Auth__LinkRedefinirSenha: __NA_VPS__
+      Auth__TrustedLinkOrigins__1: __NA_VPS__
+      Auth__LinkConvite: __NA_VPS__
+      Logistica__EmpresaDemonstracaoId: 923f8e8d-406b-4897-8c45-f8fe6f049773
+  worker:
+    environment:
+      Notifications__WhatsApp__Provider: meta
+      Notifications__WhatsApp__Meta__AccessToken: ${EZ_META_ACCESS_TOKEN:-}
+      Notifications__WhatsApp__Meta__AppSecret: ${EZ_META_APP_SECRET:-}
+      Notifications__WhatsApp__Meta__VerifyToken: ${EZ_META_VERIFY_TOKEN:-}
+      Crypto__CurrentKekId: ${EZ_CRYPTO_KEK_ID:-}
+      Crypto__Keks__kek-2026-10: ${EZ_CRYPTO_KEK:-}
+      Auth__Google__EmpresaPadrao: __NA_VPS__
+      Logistica__EmpresaDemonstracaoId: 923f8e8d-406b-4897-8c45-f8fe6f049773
