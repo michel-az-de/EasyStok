@@ -1,4 +1,4 @@
-using EasyStock.Domain.Defaults;
+﻿using EasyStock.Domain.Defaults;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities
@@ -141,7 +141,9 @@ namespace EasyStock.Domain.Entities
             Tamanho = NormalizarTexto(tamanho) ?? Tamanho;
             Observacoes = NormalizarTexto(observacoes) ?? Observacoes;
             DimensoesReais = dimensoesReais ?? DimensoesReais;
-            ValidadeEm = validade ?? ValidadeEm;
+            // #2575: as unidades que ja estavam no lote vencem antes; vale a validade mais curta.
+            if (validade is not null && (ValidadeEm is null || validade.DataValidade < ValidadeEm.DataValidade))
+                ValidadeEm = validade;
             UltimaMovimentacaoEm = dataReposicao;
             AlteradoEm = alteradoEm;
 
