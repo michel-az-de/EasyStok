@@ -1,7 +1,7 @@
 // Guarda de forma do SQL do baba-db. A barreira real e o papel baba_ro (so SELECT); isto evita erro e abuso barato.
 export const MAX_SQL = 20_000;
 
-export const FUNCOES = new Set(["count", "sum", "avg", "min", "max", "coalesce", "nullif", "greatest", "least", "abs", "round", "ceil", "ceiling", "floor", "trunc", "mod", "power", "sqrt", "length", "char_length", "lower", "upper", "trim", "ltrim", "rtrim", "btrim", "substr", "substring", "replace", "concat", "concat_ws", "left", "right", "split_part", "position", "strpos", "to_char", "to_date", "to_number", "to_timestamp", "date_trunc", "date_part", "extract", "now", "current_date", "current_timestamp", "age", "make_date", "string_agg", "array_agg", "jsonb_agg", "json_agg", "row_number", "rank", "dense_rank", "lag", "lead", "first_value", "last_value", "ntile", "percentile_cont", "percentile_disc", "generate_series", "unnest", "array_length", "cardinality", "lpad", "rpad", "initcap", "cast", "exists", "in", "any", "all", "some", "over", "filter", "values", "select", "from", "where", "join", "on", "using", "and", "or", "not", "as", "by", "order", "group", "having", "limit", "offset", "with", "union", "intersect", "except", "distinct", "case", "when", "then", "else", "end", "between", "like", "ilike", "similar", "is", "lateral", "partition", "rows", "range", "explain", "table", "numeric", "varchar", "char", "timestamp", "timestamptz", "time", "decimal", "date", "text", "int", "integer", "bigint", "interval", "within"]);
+export const FUNCOES = new Set(["count", "sum", "avg", "min", "max", "coalesce", "nullif", "greatest", "least", "abs", "round", "ceil", "ceiling", "floor", "trunc", "mod", "power", "sqrt", "length", "char_length", "lower", "upper", "trim", "ltrim", "rtrim", "btrim", "substr", "substring", "replace", "concat", "concat_ws", "left", "right", "split_part", "position", "strpos", "to_char", "to_date", "to_number", "to_timestamp", "date_trunc", "date_part", "extract", "now", "current_date", "current_timestamp", "age", "make_date", "string_agg", "array_agg", "jsonb_agg", "json_agg", "row_number", "rank", "dense_rank", "lag", "lead", "first_value", "last_value", "ntile", "percentile_cont", "percentile_disc", "generate_series", "unnest", "array_length", "cardinality", "initcap", "cast", "exists", "in", "any", "all", "some", "over", "filter", "values", "select", "from", "where", "join", "on", "using", "and", "or", "not", "as", "by", "order", "group", "having", "limit", "offset", "with", "union", "intersect", "except", "distinct", "case", "when", "then", "else", "end", "between", "like", "ilike", "similar", "is", "lateral", "partition", "rows", "range", "explain", "table", "numeric", "varchar", "char", "timestamp", "timestamptz", "time", "decimal", "date", "text", "int", "integer", "bigint", "interval", "within"]);
 
 const PROIBIDAS = /\b(insert|update|delete|truncate|drop|alter|create|grant|revoke|copy|call|do|vacuum|reindex|cluster|lock|listen|notify|set|reset|begin|commit|rollback|savepoint|prepare|execute|refresh|comment|security|pg_sleep|pg_read_file|pg_ls_dir|lo_import|lo_export|dblink|set_config|pg_terminate_backend|pg_cancel_backend)\b/i;
 
@@ -27,7 +27,7 @@ function esqueleto(sql) {
       }
       o += c + c; continue;
     }
-    if (c === '$') {
+    if (c === '$' && !/[A-Za-z0-9_$]/.test(sql[i - 1] ?? '')) {
       const m = /^\$([A-Za-z_][A-Za-z_0-9]*)?\$/.exec(sql.slice(i));
       if (m) {
         const fim = sql.indexOf(m[0], i + m[0].length);
@@ -52,7 +52,7 @@ export function validarSql(entrada) {
   const e = esqueleto(sql);
   if (e.includes(';')) throw new Error('apenas uma instrucao por chamada.');
   if (!/^\s*\(*\s*(select|with|values|table|explain)\b/i.test(e)) throw new Error('so SELECT, WITH, VALUES, TABLE ou EXPLAIN.');
-  if (/^\s*explain\b[^]*\banalyze\b/i.test(e)) throw new Error('EXPLAIN ANALYZE executa a consulta: nao permitido.');
+  if (/^\s*explain\b[^]*\banaly[sz]e\b/i.test(e)) throw new Error('EXPLAIN ANALYZE executa a consulta: nao permitido.');
   if (/\binto\b/i.test(e)) throw new Error('SELECT INTO nao permitido.');
   if (/\bfor\s+(update|share|no\s+key\s+update|key\s+share)\b/i.test(e)) throw new Error('bloqueio de linha nao permitido.');
   const norm = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/[\s"]/g, '').toLowerCase();

@@ -67,7 +67,7 @@ psql_ro() {
     [ -n "$nome" ] || continue
     [[ "$lista" == *" $nome "* ]] || nega "funcao nao permitida: $nome"
   done < <(printf '%s' "$sql" | tr '
-' ' ' | tr -d '"' | tr '[:upper:]' '[:lower:]' | grep -oE '[a-z_][a-z0-9_]*[[:space:]]*\(' | sed -E 's/[[:space:]]*\($//')
+' ' ' | tr -d '"' | tr '[:upper:]' '[:lower:]' | LC_ALL=C grep -a -oE '[a-z_][a-z0-9_]*[[:space:]]*\(' | sed -E 's/[[:space:]]*\($//')
   if [ -n "$GATE_DRY" ]; then echo "psql_ro ok (${#sql} bytes)"; exit 0; fi
   [ -r "$envf" ] || nega "sem configuracao do banco"
   # shellcheck disable=SC1090
@@ -81,7 +81,7 @@ SET LOCAL app.empresa_id = %s;
 %s
 ;
 COMMIT;
-' "'$EMPRESA_ID'" "$sql"     | timeout 25 "$DOCKER" exec -i -e PGPASSWORD "$PG_CONTAINER" psql -X -q -v ON_ERROR_STOP=1 --csv -U "$PG_USER" -d "$PG_DB" 2>&1
+' "'$EMPRESA_ID'" "$sql"     | timeout 25 "$DOCKER" exec -i -e PGPASSWORD "$PG_CONTAINER" psql -X -q -v ON_ERROR_STOP=1 -v FETCH_COUNT=500 --csv -U "$PG_USER" -d "$PG_DB" 2>&1 | head -c 1000000
 }
 
 executa() {
