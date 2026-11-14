@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   qualidade:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, easystok]
     defaults:
       run:
         working-directory: EasyStock.Console
