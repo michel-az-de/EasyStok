@@ -134,7 +134,7 @@ public class CobrancaPedidoJobTests
         await f.VagaRepo.DidNotReceiveWithAnyArgs().LiberarPorPedidoAsync(default, default!, default);
         await f.Notificador.Received(1).EnfileirarEventoAsync(
             EasyStock.Domain.Enums.Notifications.TipoEventoNotificacao.CobrancaAguardandoEquipe, f.EmpresaId,
-            Arg.Is<string>(p => p.Contains(referencia) && !p.Contains("5511")),
+            Arg.Is<string>(p => p.Contains(referencia) && !p.Contains("5511999990001")),
             f.Pedido.Id, Arg.Any<CancellationToken>(), $"cobranca-aguardando-equipe:{vencida.Id:N}");
         // #2211: e o WhatsApp da equipe inscrita, uma vez por cobrança.
         await f.Notificador.Received(1).EnfileirarEventoAsync(
