@@ -1,4 +1,4 @@
-using EasyStock.Domain.Specifications;
+﻿using EasyStock.Domain.Specifications;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Defaults;
@@ -302,7 +302,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return saldos.ToDictionary(s => s.ProdutoId, s => s.Saldo);
         }
 
-        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false)
+        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false, Guid? lojaId = null)
         {
             // FOR UPDATE serializa concorrentes — lock adquirido no raw SQL DENTRO da
             // transacao do caller (DbContext.Database.CurrentTransaction). Evita estoque
@@ -354,6 +354,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 parametros.Add(HorarioBrasil.HojeInstanteUtc());
             }
 
+            // #2575: com loja, so o lote dela ou sem loja (a mesma regra de EstoqueDaLoja.Pertence).
+            var filtroLoja = string.Empty;
+            if (lojaId is { } loja && loja != Guid.Empty)
+            {
+                filtroLoja = $"AND (\"LojaId\" = {{{parametros.Count}}} OR \"LojaId\" IS NULL)";
+                parametros.Add(loja);
+            }
+
             var orderBy = fefo
                 ? "\"ValidadeEm\" NULLS LAST, \"EntradaEm\", \"CriadoEm\""
                 : "\"EntradaEm\", \"CriadoEm\"";
@@ -365,6 +373,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                       AND ""QuantidadeAtual"" > 0
                       {variacaoFilter}
                       {filtroVencido}
+                      {filtroLoja}
                     ORDER BY {orderBy}
                     FOR UPDATE";
 

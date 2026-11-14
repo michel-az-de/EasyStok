@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Events;
+﻿using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Domain.Events;
 using EasyStock.Domain.Services;
 using EasyStock.Domain.Specifications;
@@ -200,7 +200,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 var valorUnitario = Dinheiro.FromDecimal(comandoItem.ValorVendaUnitario);
                 var lotes = comandoItem.ItemEstoqueId.HasValue
                     ? [await ObterItemDiretoAsync(command.EmpresaId, comandoItem.ItemEstoqueId.Value)]
-                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo, permitirVencido)).ToArray();
+                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo, permitirVencido, command.LojaId)).ToArray();
 
                 if (lotes.Length == 0 && comandoItem.ItemEstoqueId.HasValue)
                     throw new UseCaseValidationException("Item de estoque nao encontrado ou nao esta disponivel.");

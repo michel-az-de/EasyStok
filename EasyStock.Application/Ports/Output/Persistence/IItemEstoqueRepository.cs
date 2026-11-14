@@ -81,7 +81,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// true = inclui vencidos; usar apenas quando o caller vai dar baixa neles (natureza que
         /// satisfaz <see cref="Domain.Enums.NaturezaMovimentacaoEstoqueExtensions.PermiteBaixaDeLoteVencido"/>).
         /// </param>
-        Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false);
+        Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false, Guid? lojaId = null);
         /// <summary>
         /// Lotes do produto (opcionalmente da loja) para o ajuste rápido de saldo (S22): RASTREADOS,
         /// inclui saldo 0 e descoberto, exclui Descartado. Ordenados do mais antigo para o mais novo.

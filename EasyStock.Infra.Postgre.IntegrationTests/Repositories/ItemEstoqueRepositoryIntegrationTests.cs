@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Repositories;
@@ -550,6 +550,52 @@ public class ItemEstoqueRepositoryIntegrationTests(PostgreSqlDatabaseFixture fix
         var comVencido = await repository.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, incluirVencidos: true);
         comVencido.Should().HaveCount(2, "incluirVencidos=true e usado pelas naturezas de baixa/descarte (#983)");
     }
+    [SkippableFact]
+    public async Task GetLotesDisponiveisParaSaidaAsync_com_loja_nao_enxerga_lote_de_outra_loja()
+    {
+        // #2575: a saida da loja A consumia o lote da loja B. Mesma regra de EstoqueDaLoja: lote da loja ou sem loja.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        context.SetMobileTenantContext(empresaId);
+
+        context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Lojas", Documento = "222", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        var lojaA = Loja.Criar(empresaId, "Loja A");
+        var lojaB = Loja.Criar(empresaId, "Loja B");
+        context.AddRange(lojaA, lojaB);
+        context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Doces", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Produtos.Add(new Produto
+        {
+            Id = produtoId, EmpresaId = empresaId, CategoriaId = categoriaId, Nome = "Brigadeiro",
+            Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+        });
+
+        ItemEstoque Lote(Guid? lojaId, int diasValidade) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, ProdutoId = produtoId, LojaId = lojaId,
+            QuantidadeInicial = Quantidade.From(5), QuantidadeAtual = Quantidade.From(5),
+            CustoUnitario = Dinheiro.FromDecimal(2m), ValidadeEm = Validade.From(DateTime.UtcNow.AddDays(diasValidade)),
+            Status = StatusItemEstoque.Ok, EntradaEm = DateTime.UtcNow.AddDays(-1), CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow
+        };
+        var daLojaB = Lote(lojaB.Id, 2); // vence antes: seria o primeiro do FEFO se a loja fosse ignorada
+        var daLojaA = Lote(lojaA.Id, 5);
+        var semLoja = Lote(null, 8);
+        context.ItensEstoque.AddRange(daLojaB, daLojaA, semLoja);
+        await context.SaveChangesAsync();
+
+        var repository = new ItemEstoqueRepository(context);
+
+        var daLoja = await repository.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null, lojaId: lojaA.Id);
+        daLoja.Select(l => l.Id).Should().Equal(daLojaA.Id, semLoja.Id);
+
+        var daEmpresa = await repository.GetLotesDisponiveisParaSaidaAsync(empresaId, produtoId, null);
+        daEmpresa.Should().HaveCount(3, "sem loja na consulta vale a empresa toda");
+    }
+
     [SkippableFact]
     public async Task GetSaldoDisponivelPorProdutosAsync_soma_lotes_validos_do_tenant_numa_consulta()
     {
