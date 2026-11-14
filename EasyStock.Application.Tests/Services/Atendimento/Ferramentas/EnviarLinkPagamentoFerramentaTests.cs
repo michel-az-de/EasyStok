@@ -97,6 +97,20 @@ public class EnviarLinkPagamentoFerramentaTests
     }
 
     [Fact]
+    public async Task EncomendaComSinal_NaoChamaOSinalDeTotal()
+    {
+        // #2544: com 2 dias ou mais de antecedência o link cobra 50%; chamar R$ 12,50 de "Total" engana o cliente.
+        var c = new Cenario();
+        c.Cobranca.Pedido.AgendadoParaEm = Agora.AddDays(5);
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        await c.ExecutarAsync();
+
+        c.Contexto.RespostaVerificada.Should().Contain("Total do pedido: R$ 25,00").And.Contain("sinal de R$ 12,50")
+            .And.NotContain("Total: R$ 12,50");
+    }
+
+    [Fact]
     public async Task LinkVencido_GeraOutro()
     {
         var c = new Cenario();

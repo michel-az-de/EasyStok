@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -88,7 +89,7 @@ public sealed class EnviarLinkPagamentoFerramenta(
             ? HorarioBrasil.ConverterParaBrasilia(expira).ToString("HH:mm", CultureInfo.InvariantCulture)
             : null;
         contexto.RegistrarRespostaVerificada(
-            $"Total: {valor}. Pague por Pix ou cartão neste link{(validoAte is null ? "" : $", válido até {validoAte}")}: {cobranca.LinkPagamento}");
+            $"{QuantoCobra(pedido.Total.Valor, cobranca.Valor)} Pague por Pix ou cartão neste link{(validoAte is null ? "" : $", válido até {validoAte}")}: {cobranca.LinkPagamento}");
         return FerramentaJson.Serializar(new
         {
             linkGerado = true,
@@ -96,6 +97,17 @@ public sealed class EnviarLinkPagamentoFerramenta(
             validoAte,
             orientacao = "O link sai ao cliente como sua resposta deste turno.",
         });
+    }
+
+    // #2544: na encomenda com sinal o link cobra só uma parte; chamar a parte de "Total" engana o cliente.
+    private static string QuantoCobra(decimal totalPedido, decimal cobrado)
+    {
+        var valor = FerramentaJson.FormatarReais(cobrado);
+        if (cobrado >= totalPedido) return $"Total: {valor}.";
+        var total = FerramentaJson.FormatarReais(totalPedido);
+        return cobrado == PlanoPagamentoEncomenda.Sinal(totalPedido)
+            ? $"Total do pedido: {total}. Agora é o sinal de {valor}; o restante é pago depois."
+            : $"Total do pedido: {total}. Este link é de {valor}, o que falta pagar.";
     }
 
     private static string Recusa(string motivo, string orientacao) =>
