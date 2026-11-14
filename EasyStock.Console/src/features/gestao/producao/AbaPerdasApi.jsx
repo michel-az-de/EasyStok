@@ -134,7 +134,7 @@ export function AbaPerdasApi() {
       </form></Modal>}
 
       <section className={css.aba} aria-label="Resumo do período">
-        <div className={css.campos}>
+        <div className={`${css.campos} ${producao.periodoDasPerdas}`}>
           <CampoTexto disabled={enviando} tipo="date" rotulo="Data inicial" value={gestao.periodo.de ?? resumo?.de ?? ''}
             onChange={(e) => gestao.setPeriodo((p) => ({ ...p, de: e.target.value || null }))} />
           <CampoTexto disabled={enviando} tipo="date" rotulo="Data final" value={gestao.periodo.ate ?? resumo?.ate ?? ''}
@@ -155,7 +155,8 @@ export function AbaPerdasApi() {
           <p className={css.descricao}>{resumo.porMotivo.map((m) => `${m.rotulo}: ${m.valor > 0 || !(m.quantidade > 0) ? moeda(m.valor) : 'sem custo'}`).join(' · ')}</p>
         )}
         {(resumo?.lancamentos ?? []).length === 0 ? (
-          <p className={css.descricao}>Nenhuma perda no período.</p>
+          <Vazio variante="linha" titulo="Nenhuma perda no período."
+            acao={<Botao variante="texto" onClick={() => { gestao.fecharAviso(); setLancamentoAberto(true) }}>Lançar perda</Botao>} />
         ) : (
           <ul className={css.lista}>
             {resumo.lancamentos.map((l) => (

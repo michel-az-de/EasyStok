@@ -177,7 +177,7 @@ export function AbaInsumosApi() {
       {/* #2235 (banca B1-B3): sem insumo, a tela é um estado vazio com exemplo e o botão junto da frase;
           "Comprar" só aparece quando há insumo para comparar com o mínimo. */}
       <div className={css.topo}>
-        <p className={css.descricao}>Saldo, estoque mínimo e uso nas receitas.</p>
+        {!semInsumo && <p className={css.descricao}>Saldo, estoque mínimo e uso nas receitas.</p>}
         {podeEditar && semInsumo === false && abrirCadastro}
       </div>
 
@@ -190,8 +190,8 @@ export function AbaInsumosApi() {
       </section>
       )}
 
-      <section className={css.secao} aria-labelledby="insumos-lista">
-        <h3 id="insumos-lista" className={css.tituloSecao}>Insumos cadastrados</h3>
+      <section className={css.secao} aria-labelledby={semInsumo ? undefined : 'insumos-lista'} aria-label={semInsumo ? 'Insumos cadastrados' : undefined}>
+        {!semInsumo && <h3 id="insumos-lista" className={css.tituloSecao}>Insumos cadastrados</h3>}
         {semInsumo ? (
           <Vazio icone="nota" titulo="Nenhum insumo cadastrado" acao={podeEditar ? abrirCadastro : null}>
             Insumo é o que entra na receita: molho de tomate em gramas, massa fresca em quilos, embalagem em unidades.

@@ -41,8 +41,13 @@ export function AbaCalculadoraApi() {
     catch (e) { setErro(e.message) }
     finally { enviando.current = false; setOcupado(false) }
   }
-  if (catalogo.estado === 'carregando') return <output>Carregando as receitas…</output>
-  if (catalogo.estado === 'erro') return <div role="alert">{catalogo.erro}<Botao onClick={catalogo.recarregar}>Tentar de novo</Botao></div>
+  if (catalogo.estado === 'carregando') return <output className={css.descricao}>Carregando as receitas…</output>
+  if (catalogo.estado === 'erro') return <div className={css.aba}>
+    {catalogo.semLoja
+      ? <Vazio icone="cardapio" role="alert" titulo="A calculadora espera a loja online">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
+      : <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as receitas"
+        acao={<Botao icone="refresh-cw" onClick={catalogo.recarregar}>Tentar de novo</Botao>}>{catalogo.erro}</Vazio>}
+  </div>
   const montadas = catalogo.receitas.filter((r) => r.linhas > 0)
   // #2235 (banca C2): sem receita montada não há o que escolher; a tela diz o que falta e leva lá.
   if (montadas.length === 0) return <div className={css.aba}>

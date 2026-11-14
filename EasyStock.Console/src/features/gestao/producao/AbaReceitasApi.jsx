@@ -174,6 +174,9 @@ export function AbaReceitasApi() {
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as receitas…</output>
   if (gestao.estado === 'erro' && gestao.receitas.length === 0) {
+    if (gestao.semLoja) {
+      return <Vazio icone="cardapio" role="alert" titulo="As receitas esperam a loja online">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
+    }
     return (
       <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as receitas"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
