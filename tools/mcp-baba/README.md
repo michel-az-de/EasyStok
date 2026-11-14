@@ -31,7 +31,7 @@ Variaveis (todas opcionais):
 Host baba-mcp
   HostName <mesmo host da VPS>
   User baba-mcp
-  IdentityFile ~/.ssh/baba-mcp_ed25519
+  IdentityFile C:/Users/<voce>/.ssh/baba-mcp_ed25519
   IdentitiesOnly yes
 ```
 
@@ -96,3 +96,5 @@ Consulta e opera o caixa pela API (regras de negocio ficam la; o nivel do usuari
 Leitura: `caixa_dia`, `caixa_movimentos`, `caixa_linhas`, `caixa_fechamentos`. Escrita (`caixa_abrir`, `caixa_fechar`, `caixa_lancar_movimento`): so com `BABA_CAIXA_ESCRITA=1` **e** confirmacao da pessoa no cliente (elicitation do MCP, fora do canal do modelo); cliente sem suporte a confirmacao recusa. O cliente HTTP so fala com `/api/auth/login` e `/api/caixa/*`. Registro: `node tools/mcp-baba/src/caixa/server.mjs` (script `npm run caixa`).
 
 Atencao: o login da API sem dispositivo revoga as outras sessoes web da mesma conta (AuthController). Use para o MCP uma conta propria (ou aceite que o navegador deslogue ao expirar o token). Um timeout numa escrita pode ter gravado no servidor: confira o caixa antes de repetir. As leituras devolvem `data` e `meta` (total, paginas): ao somar um periodo, confira `meta.pages`.
+
+No PowerShell 5.1 `~` nao expande em argumentos: gere a chave com `ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\baba-mcp_ed25519"`. Instale na VPS as copias de `scripts/mcp/` em LF (o `.gitattributes` garante no checkout; se vier CRLF, `tr -d '\r'`). O `baba_ro.sql` pula (com NOTICE) tabela sem RLS, como `empresas`.

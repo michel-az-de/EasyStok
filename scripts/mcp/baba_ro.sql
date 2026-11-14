@@ -12,6 +12,7 @@ ALTER ROLE baba_ro SET default_transaction_read_only = on;
 ALTER ROLE baba_ro SET statement_timeout = '15s';
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM baba_ro;
 GRANT USAGE ON SCHEMA public TO baba_ro;
+GRANT CONNECT ON DATABASE easystock TO baba_ro;  -- em producao PUBLIC nao tem CONNECT
 REVOKE TEMP ON DATABASE easystock FROM baba_ro;  -- efetivo so se PUBLIC tambem perder TEMP: REVOKE TEMP ON DATABASE easystock FROM PUBLIC (confirmar que a API nao usa tabela temporaria)
 -- Fora da allowlist por risco de payload/PII/dado global: audit_logs, system_error_logs, notif_eventos, notif_logs_envio, nfe_documentos, nfe_eventos, planos, endpoint_health_state.
 DO $$
@@ -31,8 +32,11 @@ BEGIN
     'nfe_itens','faturas','fatura_itens','fatura_pagamentos','assinaturas_empresa',
     'notificacoes','report_runs'
   ] LOOP
-    IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
-      EXECUTE format('GRANT SELECT ON public.%I TO baba_ro', t);
+    IF to_regclass(format('public.%I', t)) IS NULL THEN CONTINUE; END IF;
+    -- sem RLS ligado a tabela mostraria outros tenants (ex.: empresas): so concede onde o RLS protege
+    IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass(format('public.%I', t))) THEN
+      RAISE NOTICE 'baba_ro: % sem RLS, GRANT pulado', t; CONTINUE;
     END IF;
+    EXECUTE format('GRANT SELECT ON public.%I TO baba_ro', t);
   END LOOP;
 END $$;
