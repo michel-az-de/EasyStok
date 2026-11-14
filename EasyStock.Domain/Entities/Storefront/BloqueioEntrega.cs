@@ -1,7 +1,7 @@
 ﻿namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
-/// Bloqueio pontual de entrega — feriados, férias da Babá, dias específicos (ADR-0011).
+/// Bloqueio pontual de entrega — feriados, férias da Baba, dias específicos (ADR-0011).
 ///
 /// <para>
 /// Aplicado em cima das <see cref="JanelaEntrega"/> recorrentes:

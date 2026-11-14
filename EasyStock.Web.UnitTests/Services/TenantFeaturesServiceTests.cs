@@ -48,7 +48,7 @@ public class TenantFeaturesServiceTests
     [Fact]
     public async Task Isola_por_empresa()
     {
-        // A chave inclui a empresa: sem isso a Casa da Babá herdaria as flags da FMA.
+        // A chave inclui a empresa: sem isso a Casa da Baba herdaria as flags da FMA.
         var fonte = Fonte(["modulo.crm"]);
         var svc = new TenantFeaturesService(fonte, NewCache());
 

@@ -50,7 +50,7 @@ const data = (ms) => new Date(ms).toLocaleDateString('pt-BR', { day: '2-digit', 
 export function textoDoResumoDoDia(resumo, agora) {
   const meios = resumo.porMeio.map((m) => `${m.nome} ${moeda(m.valor)}`).join('; ')
   const linhas = [
-    `Casa da Babá · resumo do dia ${data(agora)}`,
+    `Casa da Baba · resumo do dia ${data(agora)}`,
     `Entregues: ${resumo.quantidade} ${resumo.quantidade === 1 ? 'pedido' : 'pedidos'} · ${moeda(resumo.totalPedidos)}`,
     `Recebido registrado no sistema: ${moeda(resumo.recebido)}${meios ? ` (${meios})` : ''}`,
   ]

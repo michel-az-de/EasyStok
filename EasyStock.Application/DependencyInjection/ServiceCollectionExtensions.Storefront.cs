@@ -94,7 +94,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AcompanhamentoTokenService>();
         services.AddScoped<IniciarCheckoutGuestUseCase>();
 
-        // TASK-EZ-APROVAR-001 — use cases Babá aprovar/recusar pedido.
+        // TASK-EZ-APROVAR-001 — use cases Baba aprovar/recusar pedido.
         services.AddScoped<AprovarPedidoStorefrontUseCase>();
         services.AddScoped<RecusarPedidoStorefrontUseCase>();
 

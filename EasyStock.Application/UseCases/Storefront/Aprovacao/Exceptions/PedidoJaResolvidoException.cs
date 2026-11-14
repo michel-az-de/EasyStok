@@ -3,7 +3,7 @@ using EasyStock.Domain.Sales;
 namespace EasyStock.Application.UseCases.Storefront.Aprovacao.Exceptions;
 
 /// <summary>
-/// Lançada quando um pedido já foi aprovado/recusado/cancelado por outro agente Babá
+/// Lançada quando um pedido já foi aprovado/recusado/cancelado por outro agente Baba
 /// (ou pelo background service de timeout) entre o lookup e o lock pessimista.
 /// Mapeada para HTTP 409 pelo <c>AprovacaoPedidoController</c>.
 ///

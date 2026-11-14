@@ -47,7 +47,7 @@ public class CalcularFreteUseCaseTests
         var storefront = StorefrontEntity.Criar(
             empresaId: empresaId,
             slug: SlugValido,
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 0m);
         if (storefrontAtivo)
             storefront.Ativar();

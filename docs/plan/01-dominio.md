@@ -80,7 +80,7 @@ CREATE INDEX ix_sessoes_caixa_empresa_data
 - `empresa_id → empresas(id) ON DELETE RESTRICT` (empresa não pode ser deletada se tem sessão)
 - `loja_id → lojas(id) ON DELETE SET NULL` (loja apagada vira sessão "matriz")
 
-**Cardinalidade 1 ano (Casa da Babá ~50 ped/dia, 1 sessão/dia)**:
+**Cardinalidade 1 ano (Casa da Baba ~50 ped/dia, 1 sessão/dia)**:
 - 365 sessões/ano/loja → 4MB/ano. Negligível.
 
 **RLS policy** (quando RLS subir em master):
@@ -170,7 +170,7 @@ CREATE INDEX CONCURRENTLY ix_pedido_pagamentos_pago_em_empresa
   ON pedido_pagamentos (empresa_id, pago_em DESC) WHERE status = 'confirmado';
 ```
 
-**Cardinalidade 1 ano (Casa da Babá)**:
+**Cardinalidade 1 ano (Casa da Baba)**:
 - 50 pedidos/dia × ~1.2 pagamentos médio × 365 = ~22k linhas/ano. Negligível.
 
 #### B.1.c Expansão de `MovimentoCaixa` (tabela `movimentos_caixa` — **ADD COLUMN aditivo**)
@@ -278,7 +278,7 @@ viram **MovimentoCaixa de ajuste na próxima sessão** (B.2.3).
 
 #### B.2.2 Decisão D1.3 (pedido pago em caixa fechado)
 
-**Recomendação: HÍBRIDA** — manter abertura automática atual (Casa da Babá
+**Recomendação: HÍBRIDA** — manter abertura automática atual (Casa da Baba
 já usa) MAS bloquear quando sessão está `em_conferencia`.
 
 | Cenário | Comportamento |
@@ -290,7 +290,7 @@ já usa) MAS bloquear quando sessão está `em_conferencia`.
 | Sessão `fechada` em data passada | Mesma regra: PedidoPagamento sem movimento, retroativo |
 
 **Trade-off honesto**:
-- Bloqueio total (opção (a) pura) cria fricção para Casa da Babá que opera
+- Bloqueio total (opção (a) pura) cria fricção para Casa da Baba que opera
   sem ritual de "abrir caixa" no início do dia.
 - Enfileiramento puro (opção (b)) cria fantasma de movimento aparecer só
   depois — confusão de auditoria.

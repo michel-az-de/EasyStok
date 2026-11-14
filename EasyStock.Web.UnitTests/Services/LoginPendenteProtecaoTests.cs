@@ -30,7 +30,7 @@ public class LoginPendenteProtecaoTests
 
     private static LoginPendente Pendente(TimeSpan? validade = null) =>
         new("felipe@easystok.com", SenhaSecreta, ManterLogado: false, ReturnUrl: null,
-            [new EmpresaLoginItem("e1", "Casa da Babá")],
+            [new EmpresaLoginItem("e1", "Casa da Baba")],
             DateTime.UtcNow.Add(validade ?? SessionService.LoginPendenteTtl));
 
     [Fact]
@@ -56,7 +56,7 @@ public class LoginPendenteProtecaoTests
 
         lido.Should().NotBeNull();
         lido!.Senha.Should().Be(SenhaSecreta);
-        lido.Empresas.Should().ContainSingle().Which.Nome.Should().Be("Casa da Babá");
+        lido.Empresas.Should().ContainSingle().Which.Nome.Should().Be("Casa da Baba");
     }
 
     [Fact]

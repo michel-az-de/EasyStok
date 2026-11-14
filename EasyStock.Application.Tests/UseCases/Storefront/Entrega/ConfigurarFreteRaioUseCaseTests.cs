@@ -21,7 +21,7 @@ public class ConfigurarFreteRaioUseCaseTests
 
     public ConfigurarFreteRaioUseCaseTests()
     {
-        _loja = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Babá", pedidoMinimoEntrega: 0m);
+        _loja = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Baba", pedidoMinimoEntrega: 0m);
         _lojas.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(_loja);
         _ceps.LookupAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new CepLookupResult("05500000", "Rua X", "Bairro Y", "São Paulo", "SP"));

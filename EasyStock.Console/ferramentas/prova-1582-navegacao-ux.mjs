@@ -85,7 +85,7 @@ confere('o topo do Balcão tem link para os módulos (tablet de 1024 a 1179 px, 
   const moldura = fonte('app/Moldura.jsx')
   const cabecalho = moldura.slice(moldura.indexOf('function Cabecalho('), moldura.indexOf('function Trilho('))
   assert.match(cabecalho, /<a className=\{css\.marca\} href=\{HASH_HALL\} aria-label=\{`Ir para o \$\{NOME_INICIO\}`\}/) // #2258 (auditoria T9): Início no lugar de Módulos
-  assert.match(cabecalho, /<h1 className="sr">Casa da Babá<\/h1>/)
+  assert.match(cabecalho, /<h1 className="sr">Casa da Baba<\/h1>/)
 })
 
 // ---------------------------------------------------------------- Ajuda e Sair no celular

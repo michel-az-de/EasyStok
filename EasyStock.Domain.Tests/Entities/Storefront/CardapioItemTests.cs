@@ -197,7 +197,7 @@ public class CardapioItemTests
         item.ProdutoId.Should().Be(produto.Id);
 
         item.Visivel.Should().BeFalse(
-            "Babá aprova manualmente cada item depois de importar — default oculto");
+            "Baba aprova manualmente cada item depois de importar — default oculto");
         item.Disponivel.Should().BeTrue("disponível por default — fica esgotado só via MarcarEsgotado()");
 
         item.PrecoStorefront.Should().BeNull("sem override inicial — usa PrecoReferencia do Produto");

@@ -44,7 +44,7 @@ Quatro grupos isentos:
 | `admin_impersonation_logs` | Auditoria cross-tenant do SuperAdmin — leitura legítima sem tenant. |
 | `TenantFeatureFlags` | Toggles globais avaliados sem JWT contextual. |
 | `fatura_contador` | PK composta `(EmpresaId, Ano)` acessada via INSERT...ON CONFLICT em background — RLS zerá leituras de fallback. |
-| `mobile_*` | Módulo Casa da Babá tem isolamento por loja, não por empresa. |
+| `mobile_*` | Módulo Casa da Baba tem isolamento por loja, não por empresa. |
 
 ## Pontos cross-tenant que recebem bypass
 

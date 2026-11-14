@@ -299,7 +299,7 @@ O `_Topbar.cshtml` ja tem breadcrumb. Basta adicionar o nome do modulo:
 
 ---
 
-## 6. Multi-tenant: Casa da Babá ↔ FMA
+## 6. Multi-tenant: Casa da Baba ↔ FMA
 
 Isso e **separado** do shell modular. A arquitetura do shell ja suporta:
 

@@ -32,7 +32,7 @@
 O EasyStock hoje suporta múltiplos pagamentos por pedido via tabela
 `pedido_pagamentos`, e tem entidades `MovimentoCaixa` + `FechamentoCaixa`
 funcionais. Porém faltam três coisas críticas para o caso de uso real da
-Casa da Babá e qualquer cliente regulado:
+Casa da Baba e qualquer cliente regulado:
 
 1. **Estorno auditado de pagamento** — hoje `RemoverPagamentoPedidoUseCase`
    faz `DELETE` físico, sem motivo, sem rastro, sem movimento de caixa
@@ -112,7 +112,7 @@ part-time** (2h/dia + fins de semana, com buffer 25%).
    linkado". Outbox é reservado para eventos externos (email contador,
    webhook). **PDF + hash do FechamentoCaixa também são pré-commit** (ver
    [03-api.md](03-api.md) D.2.6 sequência de 15 passos).
-4. **D1.3 híbrida**: mantém abertura automática (UX atual da Casa da Babá)
+4. **D1.3 híbrida**: mantém abertura automática (UX atual da Casa da Baba)
    + bloqueia quando sessão `em_conferencia`. Justificativa: opção pura (a)
    gera fricção desnecessária; opção pura (b) cria fantasma confuso. Híbrido
    protege o ponto crítico real (snapshot durante conferência).
@@ -143,8 +143,8 @@ part-time** (2h/dia + fins de semana, com buffer 25%).
 - **Semana 8** (07-13 → 07-19): F8 polimento + go-live segunda metade
 
 **Marcos cliente**:
-- **M1**: 2026-06-12 (Casa da Babá testa pagamento+estorno em staging)
-- **M2**: 2026-07-06 (Casa da Babá testa fechamento completo em staging)
+- **M1**: 2026-06-12 (Casa da Baba testa pagamento+estorno em staging)
+- **M2**: 2026-07-06 (Casa da Baba testa fechamento completo em staging)
 - **M3**: 2026-07-15 (go-live em produção com flag, suporte ao vivo)
 
 Total: **~5 semanas trabalhadas part-time em janela de 8 semanas calendar**.
@@ -219,14 +219,14 @@ Antes de codificar qualquer linha de F1, Felipe deve confirmar:
 
 1. **A tabela `TenantFeatureFlags` está em uso** (entidade
    `EasyStock.Domain/Entities/TenantFeatureFlag.cs`) e Felipe pode criar
-   registros para Casa da Babá via SQL/admin.
+   registros para Casa da Baba via SQL/admin.
 2. **`Permissao` enum em Domain pode receber novas entradas** sem migration
    complexa de roles existentes (`caixa.abrir`, `caixa.fechar`,
    `caixa.movimentos.registrar`, `caixa.historico.ver`,
    `pedidos.pagamentos.estornar`).
-3. **Casa da Babá aceita janela de manutenção de 30 minutos** num domingo à
+3. **Casa da Baba aceita janela de manutenção de 30 minutos** num domingo à
    noite para deploy + backfill F3.
-4. **Contador da Casa da Babá está disponível** para 1 reunião em F0
+4. **Contador da Casa da Baba está disponível** para 1 reunião em F0
    (validar layout do PDF) + 1 revisão em F6 (PDF real). Sem isso, F6
    trava.
 5. **Política de privacidade não impede QR code público** apontando para
@@ -244,11 +244,11 @@ Antes de codificar qualquer linha de F1, Felipe deve confirmar:
 8. **`QRCoder` 1.6+ pacote NuGet é aceito** pelo padrão de licença do
    projeto (MIT). Confirmar.
 9. **Backfill em produção pode rodar em janela noturna** — Felipe agenda com
-   Casa da Babá.
+   Casa da Baba.
 10. **`SHA256.HashData` do PDF + canonical JSON é suficiente** como prova
     fiscal (não precisa eIDAS/ICP-Brasil) — confirmado com contador.
 11. **Endpoint de emergência `desligar-emergencia` + treinamento da
-    Thatiane** são bloqueadores de F8. Casa da Babá precisa concordar em
+    Thatiane** são bloqueadores de F8. Casa da Baba precisa concordar em
     treinar a operadora (15min de demo). Doc:
     [`../operacao/janela-suporte-felipe.md`](../operacao/janela-suporte-felipe.md).
 
@@ -266,8 +266,8 @@ Antes de codificar qualquer linha de F1, Felipe deve confirmar:
 ## Próximos passos
 
 1. Felipe valida premissas 1–11 acima (1 sessão de perguntas + 1 reunião
-   com contador da Casa da Babá).
+   com contador da Casa da Baba).
 2. Felipe envia [`../operacao/janela-suporte-felipe.md`](../operacao/janela-suporte-felipe.md)
-   para a Casa da Babá assinar.
+   para a Casa da Baba assinar.
 3. Criar branch `feat/caixa-conciliado-v2` localmente.
 4. Iniciar F0 (ver [07-faseamento.md](07-faseamento.md)).

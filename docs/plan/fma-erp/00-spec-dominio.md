@@ -35,7 +35,7 @@ Uso **interno**. Não é produto à venda (alinhamento comercial).
 | E-mail, WhatsApp, LLM | `SmtpEmailCanal`, `CanalWhatsApp` (Cloud API e WppConnect), `AnthropicMessagesClient` | **Reaproveitar** (seção 6) |
 
 Governança vigente: o ADR-0048 (FMA como 2º tenant) foi **substituído** pelo ADR-0056 (ERP da Casa
-da Babá, tenant único, front único). Qualquer opção abaixo que reabra a FMA dentro do EasyStok
+da Baba, tenant único, front único). Qualquer opção abaixo que reabra a FMA dentro do EasyStok
 reverte ou emenda o ADR-0056. Ressalva: ADR-0056 e ADR-0042 ainda estão com status **Proposto**.
 
 ### 2.2 Opções
@@ -45,7 +45,7 @@ reverte ou emenda o ADR-0056. Ressalva: ADR-0056 e ADR-0042 ainda estão com sta
 | Custo até o MVP | Baixo | Médio (2º deploy, 2º Postgres, flags) | Alto (refazer auth, financeiro, RLS) | Médio (fork, poda, 2º deploy) |
 | Reuso | Total | Total do código | Só padrões | Total no dia do fork; depois manual |
 | Acoplamento | Alto | Médio: mesmo código e release | Nenhum | Baixo: só a origem comum |
-| Risco para a Casa da Babá | **Alto**: migração e enum no banco vivo | **Médio**: migrações e enum entram no release da CdB; seeds e jobs da CdB rodariam na instância FMA sem desligar | Nenhum | Nenhum |
+| Risco para a Casa da Baba | **Alto**: migração e enum no banco vivo | **Médio**: migrações e enum entram no release da CdB; seeds e jobs da CdB rodariam na instância FMA sem desligar | Nenhum | Nenhum |
 | Isolamento de dados | Lógico (EF + RLS) | Físico | Físico | Físico |
 | Governança | Reverte o ADR-0056 | Emenda o ADR-0056 e reverte a poda B2B | Não toca o EasyStok | Não toca o EasyStok |
 | Correção do EasyStok chega à FMA | Automática | Automática | Não | Cherry-pick manual |
@@ -54,7 +54,7 @@ A banca de arquitetura refutou o risco "Baixo" que a primeira versão dava à B 
 
 ### 2.3 Recomendação
 
-**D, com B como alternativa.** A D tira o ERP da FMA do ciclo de release da Casa da Babá, que hoje
+**D, com B como alternativa.** A D tira o ERP da FMA do ciclo de release da Casa da Baba, que hoje
 recebe merge e deploy de várias sessões por dia, e não depende de reverter o ADR-0056. O custo é
 manter correções por cherry-pick. A **B** vale se o Felipe preferir uma base só, desde que antes
 exista:
@@ -107,7 +107,7 @@ Invariantes:
 
 ## 4. Extensão do fluxo de pedido
 
-O pedido da Casa da Babá é `Aguardando → Preparando → Pronto → Entregue`, com baixa de estoque e
+O pedido da Casa da Baba é `Aguardando → Preparando → Pronto → Entregue`, com baixa de estoque e
 cobrança. O fluxo comercial é a mesma ideia em escala de projeto: o **pedido** é o contrato, cada
 **item** é uma etapa, **entregar** é a etapa aprovada, e a **cobrança** nasce na aprovação, não na
 venda. Reaproveita-se o padrão de `PedidoStateMachine` (transições explícitas, evento por mudança),

@@ -12,7 +12,7 @@ durante a fase de maturação do MAUI:
 
 | Frontend | Stack | Caso de uso primário | Status |
 |---|---|---|---|
-| **PWA** | HTML/CSS/JS vanilla + Service Worker | Casa da Babá (uso real, white-label, Felipe + Thati) | Estável, em produção |
+| **PWA** | HTML/CSS/JS vanilla + Service Worker | Casa da Baba (uso real, white-label, Felipe + Thati) | Estável, em produção |
 | **MAUI Android** | .NET 9 MAUI híbrido (shell nativo + WebView com PWA empacotado) | Produto SaaS multi-tenant E2E que será apresentado a clientes externos | Em maturação (v1.3.1) |
 
 A decisão estratégica é: **manter o PWA estável** enquanto o MAUI ganha
@@ -58,7 +58,7 @@ Servido pela API ASP.NET em `/pwa/` (configurado no `MobileModule.UseMobileModul
 Também é a base do projeto **`casa-da-baba-mobile/`** — esse projeto **não tem
 mais cópia própria do PWA** (foi removida no commit `39a0e39 chore(repo): remove
 copia orfa do PWA + atualiza docs apontando pra fonte real`). Quando precisar
-replicar o PWA pra outro contexto Casa da Babá, copie de
+replicar o PWA pra outro contexto Casa da Baba, copie de
 `EasyStock.Api/wwwroot/pwa/`.
 
 ### MAUI (shell nativo + PWA empacotado)
@@ -148,14 +148,14 @@ Mudanças nas camadas abaixo ficam exclusivas do MAUI e jamais voltam pro PWA:
 Qualquer feature que precise existir nos dois lugares **começa no PWA** e segue
 o procedimento da seção anterior.
 
-## Casa da Babá
+## Casa da Baba
 
 O projeto `casa-da-baba-mobile/` (PWA + backend drop-in) usa o PWA da raiz como
-fonte. Não cria cópia local. Quando o PWA muda, o Casa da Babá ganha de graça
+fonte. Não cria cópia local. Quando o PWA muda, o Casa da Baba ganha de graça
 ao deployar a API. Ver `casa-da-baba-mobile/CLAUDE.md` Passo 6 e
 `casa-da-baba-mobile/README.md`.
 
-Casa da Babá é o ambiente de validação contínua do PWA: se quebrar lá, o Felipe
+Casa da Baba é o ambiente de validação contínua do PWA: se quebrar lá, o Felipe
 descobre direto. Por isso o PWA tem que ficar estável enquanto o MAUI matura.
 
 ## Checklist de PR que toca PWA
@@ -196,7 +196,7 @@ este doc apontando pro workflow.
 
 **Não faz parte (são decisões separadas):**
 - Quando deprecar o PWA. Isso é decisão de produto futura, depende do MAUI estar
-  provado em campo e da Casa da Babá ter sido migrada (ou não).
+  provado em campo e da Casa da Baba ter sido migrada (ou não).
 - Estratégia de bridge JS↔Native dentro do WebView do MAUI (ver
   `WebOpsPage.xaml.cs` linha 8: "Bridge JS->Native fica para v1.3.1").
 - Estratégia de OTA do APK. Já existe (`AndroidPackageFormat=apk` permite
@@ -206,7 +206,7 @@ este doc apontando pro workflow.
 
 Quando uma destas três coisas acontecer, este doc precisa ser revisitado:
 
-1. MAUI for considerado pronto pra substituir o PWA na Casa da Babá → PWA pode
+1. MAUI for considerado pronto pra substituir o PWA na Casa da Baba → PWA pode
    virar legado e a regra de propagação cai.
 2. PWA for descontinuado por decisão de produto → MAUI passa a ter UI nativa
    própria sem WebView.

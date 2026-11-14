@@ -1,4 +1,4 @@
-# Sala de guerra do APK Casa da Babá (#2305)
+# Sala de guerra do APK Casa da Baba (#2305)
 
 Laboratório isolado (`scripts/homologacao/laboratorio.ps1`): API e Postgres só em loopback, Mercado Pago falso, APK de laboratório no emulador `CasaDaBabaReview` apontando para a API do laboratório. Nada foi testado contra produção. Registro de 2026-11-12.
 
