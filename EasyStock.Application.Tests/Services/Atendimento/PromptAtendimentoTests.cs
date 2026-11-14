@@ -87,6 +87,22 @@ public class PromptAtendimentoTests
             .And.Contain("reenviar=true");
     }
 
+    /// <summary>
+    /// #2516 (revisão): nenhuma ferramenta anota item na comanda, então o roteiro não convida a dizer "anotei"; o endereço
+    /// passa por validar_endereco e, fora da área, é salvo antes de escalar, como manda a regra do CEP.
+    /// </summary>
+    [Fact]
+    public void Roteiro_NaoConvidaAPromessaEAlinhaOEndereco()
+    {
+        var etapas = string.Join("\n", RoteiroAtendimento.Padrao.Select(e => $"{e.Nome}: {e.Instrucao}"));
+        var prompt = PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(Guid.Empty));
+
+        etapas.Should().NotContain("Anotar").And.Contain("nunca diga que anotou")
+            .And.Contain("validar_endereco").And.Contain("salve o endereço do mesmo jeito");
+        prompt.Should().Contain("sem usar escalar_para_dona ou encaminhar_para_responsavel")
+            .And.Contain("consultar_pedido não mostrar pedido em andamento");
+    }
+
     [Fact]
     public void TextoDoCliente_EDadoEMarcaCitadaPorEleNaoVale()
     {

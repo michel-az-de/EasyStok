@@ -29,7 +29,7 @@ public static partial class GuardaRespostaAgente
 
         foreach (var frase in Frases().Split(plano))
         {
-            if (Encaminhamento().IsMatch(frase) || AcaoDaEquipe().IsMatch(frase))
+            if (Encaminhamento().IsMatch(frase) || AfirmaSemNegacao(frase, AcaoDaEquipe()))
                 return "promete encaminhamento sem acionar a equipe";
             if (AfirmaSemCondicao(frase, PedidoFeito()) || AfirmaSemCondicao(frase, FizPedido()))
                 return "afirma situação do pedido sem a ferramenta confirmar";
@@ -37,7 +37,7 @@ public static partial class GuardaRespostaAgente
                 return "afirma pagamento ou devolução sem a ferramenta confirmar";
             if (Cortesia().Match(frase) is { Success: true } c && !Negacao().IsMatch(frase[..c.Index]))
                 return "promete frete grátis ou desconto, que é decisão da equipe";
-            if (!freteCombinadoNaFonte && AfirmaSemCondicao(frase, FreteCombinado()))
+            if (!freteCombinadoNaFonte && AfirmaSemNegacao(frase, FreteCombinado()))
                 return "afirma frete combinado sem a ferramenta confirmar";
         }
 
@@ -64,6 +64,10 @@ public static partial class GuardaRespostaAgente
     /// <summary>"quando o pedido for confirmado" é condição, não afirmação.</summary>
     private static bool AfirmaSemCondicao(string frase, Regex afirmacao) =>
         afirmacao.Match(frase) is { Success: true } m && !(Condicao().IsMatch(frase[..m.Index]) && Futuro().IsMatch(m.Value));
+
+    /// <summary>#2516: "o frete ainda não foi combinado" e "a equipe não vai ligar" negam, não afirmam.</summary>
+    private static bool AfirmaSemNegacao(string frase, Regex afirmacao) =>
+        AfirmaSemCondicao(frase, afirmacao) && afirmacao.Match(frase) is var m && !Nao().IsMatch(frase[..(m.Index + m.Length)]);
 
     private static decimal Reais(Match m)
     {
@@ -102,11 +106,15 @@ public static partial class GuardaRespostaAgente
     private static partial Regex Encaminhamento();
 
     // #2516: "a Baba vai combinar com você a entrega e o frete" sem escalar_para_dona.
-    [GeneratedRegex(@"\b(dona|equipe|responsavel|atendente|baba|loja)\b.{0,20}\b(vai|vao|ira|irao)\s+(te\s+|lhe\s+)?(combinar|chamar|ligar|retornar|responder|confirmar|verificar|resolver|acertar|avaliar|analisar|entrar em contato|falar)\b")]
+    [GeneratedRegex(@"\b(dona|equipe|responsavel|atendente|baba|ela)\b.{0,20}\b(vai|vao|ira|irao)\s+(te\s+|lhe\s+)?(combinar|chamar|ligar|retornar|responder|confirmar|verificar|resolver|acertar|avaliar|analisar|entrar em contato|falar)\b")]
     private static partial Regex AcaoDaEquipe();
 
-    [GeneratedRegex(@"\b(frete|entrega|taxa)\b.{0,25}\b(combinad[oa]|acertad[oa]|definid[oa]|fechad[oa])\b")]
+    // Só frete ou taxa acordados: "a entrega está definida para amanhã" e "a taxa é definida pelo CEP" são conversa.
+    [GeneratedRegex(@"\b(frete|taxa)\b.{0,25}\b(combinad[oa]|acertad[oa])\b")]
     private static partial Regex FreteCombinado();
+
+    [GeneratedRegex(@"\b(nao|nunca)\b")]
+    private static partial Regex Nao();
 
     [GeneratedRegex(@"\b(frete|entrega|taxa)\b.{0,25}\b(gratis|gratuit[oa]|cortesia|por nossa conta)\b|\bdesconto\b")]
     private static partial Regex Cortesia();

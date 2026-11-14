@@ -17,7 +17,13 @@ public class GuardaRespostaAgenteTests
     [InlineData("Não temos frete grátis, a taxa depende do CEP.")]
     [InlineData("Qual o tamanho da lasanha: 600 g, 800 g ou 1 kg?")]
     [InlineData("Me passa o CEP para eu ver a entrega e o frete.")]
-    [InlineData("A equipe vai adorar preparar sua lasanha.")]
+    // #2516 (revisão): frase comum de entrega, negação e sujeito que não é a equipe não são promessa nem acordo.
+    [InlineData("A taxa de entrega é definida pelo CEP.")]
+    [InlineData("A entrega está definida para amanhã, das 14h às 16h.")]
+    [InlineData("A entrega ainda não foi definida.")]
+    [InlineData("O frete ainda não foi combinado.")]
+    [InlineData("A equipe não vai ligar, é tudo por aqui.")]
+    [InlineData("Na loja o motoboy vai falar com você.")]
     public void ConversaSemAfirmacaoPassa(string texto) => Avaliar(texto).Should().BeNull();
 
     [Theory]
@@ -45,6 +51,8 @@ public class GuardaRespostaAgenteTests
     [InlineData("Faço por aqui sim, a Baba vai combinar com você a entrega e o frete.")]
     [InlineData("A responsável vai entrar em contato para confirmar o horário.")]
     [InlineData("A dona vai te chamar para acertar a entrega.")]
+    [InlineData("Ela vai combinar o frete com você.")]
+    [InlineData("A taxa de entrega já está acertada.")]
     public void AfirmacaoSemFonteEBarrada(string texto) => Avaliar(texto).Should().NotBeNull();
 
     [Theory]
@@ -61,7 +69,7 @@ public class GuardaRespostaAgenteTests
     public void FreteCombinadoSoPassaQuandoAFerramentaMostra()
     {
         Avaliar("O frete combinado ficou R$ 15,00.", """{"freteCombinado":"R$ 15,00"}""").Should().BeNull();
-        Avaliar("O frete combinado ficou R$ 15,00.", """{"frete":"R$ 15,00"}""").Should().Contain("frete");
+        Avaliar("O frete combinado ficou R$ 15,00.", """{"frete":"R$ 15,00"}""").Should().Be("afirma frete combinado sem a ferramenta confirmar");
     }
 
     [Fact]
