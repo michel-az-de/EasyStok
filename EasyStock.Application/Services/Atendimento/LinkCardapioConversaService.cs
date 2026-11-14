@@ -49,6 +49,11 @@ public sealed class LinkCardapioConversaService(ILinkCardapioConversaRepository 
         return uow is null ? await Gerar(ct) : await uow.ExecuteInTransactionSemRetryAsync(Gerar, ct);
     }
 
+    /// <summary>Comanda aberta mais recente da conversa (não usada e não vencida), ou <c>null</c> (#2516).</summary>
+    public async Task<LinkCardapioConversa?> VigenteAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default) =>
+        (await repository.ListarDaConversaAsync(empresaId, conversaId, agora - LinkCardapioConversa.Validade, ct))
+            .Where(l => l.EstaValido(agora)).MaxBy(l => l.CriadoEm);
+
     /// <summary>Link válido pelo token. Inexistente, vencido ou já usado: <see cref="LinkCardapioConversaIndisponivelException"/>.</summary>
     public async Task<LinkCardapioConversa> ValidarAsync(string? token, DateTime agora, CancellationToken ct = default)
     {

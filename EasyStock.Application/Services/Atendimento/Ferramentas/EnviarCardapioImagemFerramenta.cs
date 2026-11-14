@@ -23,12 +23,24 @@ public sealed class EnviarCardapioImagemFerramenta(
 
     public string Descricao =>
         "Compartilha a comanda pessoal: imagem com legenda, ou texto quando não houver imagem; pelo link cliente e atendimento acompanham seleção, envio e pagamento. " +
-        "Não precisa repetir o link depois.";
+        "A comanda vale a conversa toda: com uma aberta, não envia de novo. Use reenviar=true só quando o cliente pedir o link outra vez ou disser que não abre.";
 
-    public string SchemaJson => """{"type":"object","properties":{},"additionalProperties":false}""";
+    public string SchemaJson =>
+        """{"type":"object","properties":{"reenviar":{"type":"boolean","description":"true só quando o cliente pede o link de novo"}},"additionalProperties":false}""";
 
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
+        // #2516: cada envio gera link novo e vence o anterior; item dito na conversa não é motivo para reenviar.
+        var reenviar = entrada.ValueKind == JsonValueKind.Object
+            && entrada.TryGetProperty("reenviar", out var r) && r.ValueKind == JsonValueKind.True;
+        if (!reenviar && await linkCardapio.VigenteAsync(contexto.EmpresaId, contexto.Conversa.Id, contexto.Agora, ct) is not null)
+            return FerramentaJson.Serializar(new
+            {
+                enviado = false,
+                motivo = "comanda_ja_enviada",
+                orientacao = "O cliente já tem a comanda aberta. Responda na conversa ao que ele disse; ele marca os itens no mesmo link.",
+            });
+
         var link = (await linkCardapio.GerarAsync(contexto.EmpresaId, contexto.Conversa.Id, contexto.Agora, ct)).Url;
         var storefront = await storefrontRepository.GetByEmpresaAsync(contexto.EmpresaId, ct);
         var conversa = contexto.Conversa;

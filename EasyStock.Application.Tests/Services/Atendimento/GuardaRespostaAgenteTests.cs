@@ -16,6 +16,8 @@ public class GuardaRespostaAgenteTests
     [InlineData("Assim que o pagamento for aprovado a cozinha começa a preparar.")]
     [InlineData("Não temos frete grátis, a taxa depende do CEP.")]
     [InlineData("Qual o tamanho da lasanha: 600 g, 800 g ou 1 kg?")]
+    [InlineData("Me passa o CEP para eu ver a entrega e o frete.")]
+    [InlineData("A equipe vai adorar preparar sua lasanha.")]
     public void ConversaSemAfirmacaoPassa(string texto) => Avaliar(texto).Should().BeNull();
 
     [Theory]
@@ -38,6 +40,11 @@ public class GuardaRespostaAgenteTests
     [InlineData("Vou chamar criar_pedido agora.")]
     [InlineData("```json\n{}\n```")]
     [InlineData("   ")]
+    // #2516: frases de produção, sem pedido, sem frete na ferramenta e sem escalar.
+    [InlineData("A comanda já está com o frete combinado pela equipe.")]
+    [InlineData("Faço por aqui sim, a Baba vai combinar com você a entrega e o frete.")]
+    [InlineData("A responsável vai entrar em contato para confirmar o horário.")]
+    [InlineData("A dona vai te chamar para acertar a entrega.")]
     public void AfirmacaoSemFonteEBarrada(string texto) => Avaliar(texto).Should().NotBeNull();
 
     [Theory]
@@ -49,6 +56,13 @@ public class GuardaRespostaAgenteTests
     [InlineData("Fica R$ 57,00.", """{"preco":"R$ 38,00"}""", false)]
     public void ValorSoPassaQuandoVemExatamenteDaFonte(string texto, string fonte, bool passa) =>
         (Avaliar(texto, fonte) is null).Should().Be(passa);
+
+    [Fact]
+    public void FreteCombinadoSoPassaQuandoAFerramentaMostra()
+    {
+        Avaliar("O frete combinado ficou R$ 15,00.", """{"freteCombinado":"R$ 15,00"}""").Should().BeNull();
+        Avaliar("O frete combinado ficou R$ 15,00.", """{"frete":"R$ 15,00"}""").Should().Contain("frete");
+    }
 
     [Fact]
     public void LinkSoPassaQuandoEstaNumaFonte()

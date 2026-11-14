@@ -22,9 +22,14 @@ public static partial class GuardaRespostaAgente
             || nomesDeFerramentas.Any(n => plano.Contains(n, StringComparison.OrdinalIgnoreCase)))
             return "texto com chamada de ferramenta no lugar da resposta";
 
+        var originais = fontes.ToList();
+        var conhecidas = originais.Select(SemAcento).ToList();
+        // #2516: "frete combinado" só passa quando a ferramenta mostra o frete combinado.
+        var freteCombinadoNaFonte = conhecidas.Any(f => f.Contains("fretecombinado", StringComparison.Ordinal) || FreteCombinado().IsMatch(f));
+
         foreach (var frase in Frases().Split(plano))
         {
-            if (Encaminhamento().IsMatch(frase))
+            if (Encaminhamento().IsMatch(frase) || AcaoDaEquipe().IsMatch(frase))
                 return "promete encaminhamento sem acionar a equipe";
             if (AfirmaSemCondicao(frase, PedidoFeito()) || AfirmaSemCondicao(frase, FizPedido()))
                 return "afirma situação do pedido sem a ferramenta confirmar";
@@ -32,10 +37,10 @@ public static partial class GuardaRespostaAgente
                 return "afirma pagamento ou devolução sem a ferramenta confirmar";
             if (Cortesia().Match(frase) is { Success: true } c && !Negacao().IsMatch(frase[..c.Index]))
                 return "promete frete grátis ou desconto, que é decisão da equipe";
+            if (!freteCombinadoNaFonte && AfirmaSemCondicao(frase, FreteCombinado()))
+                return "afirma frete combinado sem a ferramenta confirmar";
         }
 
-        var originais = fontes.ToList();
-        var conhecidas = originais.Select(SemAcento).ToList();
         var valores = conhecidas.SelectMany(f => Valor().Matches(f)).Select(Reais).ToHashSet();
         foreach (Match m in Valor().Matches(plano))
         {
@@ -95,6 +100,13 @@ public static partial class GuardaRespostaAgente
 
     [GeneratedRegex(@"\b(vou|irei|ja)\s+(pedir|chamar|avisar|encaminhar|passar|transferir|verificar|conferir)\b.{0,60}\b(dona|equipe|atendente|humano)\b")]
     private static partial Regex Encaminhamento();
+
+    // #2516: "a Baba vai combinar com você a entrega e o frete" sem escalar_para_dona.
+    [GeneratedRegex(@"\b(dona|equipe|responsavel|atendente|baba|loja)\b.{0,20}\b(vai|vao|ira|irao)\s+(te\s+|lhe\s+)?(combinar|chamar|ligar|retornar|responder|confirmar|verificar|resolver|acertar|avaliar|analisar|entrar em contato|falar)\b")]
+    private static partial Regex AcaoDaEquipe();
+
+    [GeneratedRegex(@"\b(frete|entrega|taxa)\b.{0,25}\b(combinad[oa]|acertad[oa]|definid[oa]|fechad[oa])\b")]
+    private static partial Regex FreteCombinado();
 
     [GeneratedRegex(@"\b(frete|entrega|taxa)\b.{0,25}\b(gratis|gratuit[oa]|cortesia|por nossa conta)\b|\bdesconto\b")]
     private static partial Regex Cortesia();
