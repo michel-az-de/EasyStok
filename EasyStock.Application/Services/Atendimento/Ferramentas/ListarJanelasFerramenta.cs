@@ -53,6 +53,8 @@ public sealed class ListarJanelasFerramenta(
 
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
+        // A consulta mais nova manda: o menu de uma consulta anterior do mesmo turno não sai depois dela.
+        contexto.DescartarEnvioAdiado();
         DateOnly? data = null;
         if (FerramentaJson.LerTexto(entrada, "data") is { } textoData)
         {

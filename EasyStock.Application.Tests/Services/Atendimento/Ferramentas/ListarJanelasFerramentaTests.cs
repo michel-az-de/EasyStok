@@ -101,7 +101,7 @@ public class ListarJanelasFerramentaTests
             var ferramenta = new ListarJanelasFerramenta(
                 new ListarJanelasAtendimentoUseCase(StorefrontRepo, CardapioRepo, ConfiguracaoRepo, listar),
                 Cloud, ConversaRepo, NullLogger<ListarJanelasFerramenta>.Instance);
-            Contexto = new ContextoTurnoAgente(Storefront.EmpresaId, Conversa, Agora, _ =>
+            Contexto ??= new ContextoTurnoAgente(Storefront.EmpresaId, Conversa, Agora, _ =>
             {
                 GravadasNaHora.AddRange(Mensagens.Select(m => m.ExternoId));
                 return Task.CompletedTask;
@@ -201,6 +201,20 @@ public class ListarJanelasFerramentaTests
         json.TryGetProperty("orientacao", out _).Should().BeTrue();
         c.Contexto!.TemEnvioAdiado.Should().BeFalse();
         await c.Cloud.DidNotReceiveWithAnyArgs().EnviarBotoesAsync(default!, default!, default!, default);
+    }
+
+    /// <summary>#2515 (revisão): a consulta seguinte manda; o menu da anterior não sai depois de "sem vaga nessa data".</summary>
+    [Fact]
+    public async Task NovaConsultaSemMenu_DescartaOMenuDaConsultaAnterior()
+    {
+        var c = new Cenario();
+        c.Janela(Hoje, 13);
+        await c.ExecutarAsync(new { data = "2026-06-02" });
+        c.Contexto!.TemEnvioAdiado.Should().BeTrue();
+
+        await c.ExecutarAsync(new { data = "03/06/2026" });
+
+        c.Contexto.TemEnvioAdiado.Should().BeFalse();
     }
 
     [Fact]

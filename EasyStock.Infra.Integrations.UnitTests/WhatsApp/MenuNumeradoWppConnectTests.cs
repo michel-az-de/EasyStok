@@ -32,7 +32,20 @@ public class MenuNumeradoWppConnectTests
 
         (await menus.EscolhaAsync(Sessao, "5511888888888", "1")).Should().BeNull();
         (await menus.EscolhaAsync("ez-00000000000000000000000000000001", Contato, "1")).Should().BeNull();
-        (await menus.EscolhaAsync(Sessao, Contato, "quero 2 lasanhas")).Should().BeNull();
         (await menus.EscolhaAsync(Sessao, Contato, "1")).Should().Be(("a", "Sim"));
+    }
+
+    /// <summary>
+    /// #2515 (revisão): o menu vale para a resposta seguinte. Se o cliente fala outra coisa, o agente segue a conversa,
+    /// e um "2" de outra pergunta ("quantas?") não vira a escolha de uma janela antiga.
+    /// </summary>
+    [Fact]
+    public async Task TextoQueNaoEscolheEncerraOMenu()
+    {
+        var menus = Menus();
+        await menus.GuardarAsync(Sessao, Contato, [("a", "Sim"), ("b", "Não")]);
+
+        (await menus.EscolhaAsync(Sessao, Contato, "quero 2 lasanhas")).Should().BeNull();
+        (await menus.EscolhaAsync(Sessao, Contato, "2")).Should().BeNull();
     }
 }

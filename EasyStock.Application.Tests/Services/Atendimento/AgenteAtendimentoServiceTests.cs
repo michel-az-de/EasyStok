@@ -612,6 +612,42 @@ public class AgenteAtendimentoServiceTests
         resultado.Escalou.Should().Be(escala);
     }
 
+    /// <summary>
+    /// #2515 (revisão): o cliente foi convidado a escolher e o menu não saiu (sessão caída). Sem resposta nenhuma, sai o
+    /// encaminhamento; em todo caso a conversa vai para a equipe.
+    /// </summary>
+    [Theory]
+    [InlineData("", new[] { "menu", "texto" })]
+    [InlineData("Escolha uma das janelas abaixo.", new[] { "texto", "menu" })]
+    public async Task MenuAdiadoQueNaoSaiEscalaParaAEquipe(string fala, string[] esperado)
+    {
+        var ordem = new List<string>();
+        var janelas = Substitute.For<IFerramentaAgente>();
+        janelas.Nome.Returns("listar_janelas");
+        janelas.Descricao.Returns("Lista as janelas");
+        janelas.SchemaJson.Returns("""{"type":"object","properties":{}}""");
+        janelas.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(c =>
+            {
+                c.Arg<ContextoTurnoAgente>().AdiarEnvio(_ =>
+                {
+                    ordem.Add("menu");
+                    return Task.FromResult(false);
+                });
+                return """{"opcoesNoMenu":2}""";
+            });
+        _cloudClient.When(c => c.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("texto"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("listar_janelas"), Texto(fala));
+
+        var resultado = await CriarServico(janelas).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        ordem.Should().Equal(esperado);
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeTrue();
+    }
+
     [Fact]
     public async Task CadernoEntraNoPromptAntesDoDossie()
     {

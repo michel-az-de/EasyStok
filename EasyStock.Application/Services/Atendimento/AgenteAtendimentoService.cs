@@ -200,8 +200,19 @@ public sealed class AgenteAtendimentoService(
         }
 
         // #2515: o menu da ferramenta sai depois do texto; conversa escalada ou texto barrado não o recebe.
-        if (motivoEscalada is null && conversa.Situacao == SituacaoConversa.Automatica)
-            respondeu = await contexto.EnviarAdiadoAsync(ct) || respondeu;
+        // Menu que não sai deixa o cliente convidado a escolher sem opções: a equipe confere, e quem não recebeu nada
+        // recebe o encaminhamento.
+        if (motivoEscalada is null && conversa.Situacao == SituacaoConversa.Automatica && contexto.TemEnvioAdiado)
+        {
+            if (await contexto.EnviarAdiadoAsync(ct))
+                respondeu = true;
+            else
+            {
+                if (!respondeu)
+                    respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct);
+                motivoEscalada = "o menu de janelas não saiu ao cliente; precisa de conferência humana";
+            }
+        }
 
         if (motivoEscalada is not null && conversa.Situacao == SituacaoConversa.Automatica)
             await escalador.EscalarAsync(empresaId, conversa, motivoEscalada, agora, ct);

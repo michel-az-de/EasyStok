@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace EasyStock.Infra.Integrations.WhatsApp;
 
 /// <summary>
-/// #2515: menu numerado pendente da conexão provisória, por sessão e contato, no cache da aplicação (24 h, uma escolha).
+/// #2515: menu numerado pendente da conexão provisória, por sessão e contato, no cache da aplicação (24 h, só a resposta seguinte).
 /// A interpretação do "2" é a mesma da ponte WAHA (#2072). O webhook e o turno do agente rodam na API, então o cache em
 /// memória também serve.
 /// </summary>
@@ -46,7 +46,7 @@ public sealed class MenuNumeradoWppConnect(IDistributedCache cache, ILogger<Menu
             return null;
         }
 
-        if (MenuNumeradoWaha.Interpretar(texto, opcoes) is not { } escolha) return null;
+        // O menu vale só para a resposta seguinte: escolhendo ou não, ela o encerra.
         try
         {
             await cache.RemoveAsync(chave, ct);
@@ -55,7 +55,7 @@ public sealed class MenuNumeradoWppConnect(IDistributedCache cache, ILogger<Menu
         {
             logger.LogWarning(ex, "WPPConnect: menu numerado não removido do cache.");
         }
-        return (escolha.Id, escolha.Titulo);
+        return MenuNumeradoWaha.Interpretar(texto, opcoes) is { } escolha ? (escolha.Id, escolha.Titulo) : null;
     }
 
     private static string Chave(string sessao, string contato) =>

@@ -12,7 +12,7 @@ public static class MenuNumeradoWhatsApp
 
 /// <summary>
 /// #2515: menu numerado pendente por contato na conexão provisória. A resposta "2" (ou o título da opção) volta ao
-/// atendimento como o toque no segundo botão, como na Meta e na ponte WAHA (#2072). Vale 24 h e uma escolha.
+/// atendimento como o toque no segundo botão, como na Meta e na ponte WAHA (#2072). Vale 24 h e só para a resposta seguinte.
 /// </summary>
 public interface IMenusNumeradosWppConnect
 {

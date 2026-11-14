@@ -48,6 +48,7 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     /// Ferramenta seguinte não o apaga; conversa interrompida, escalada ou com texto barrado não o envia.
     /// </summary>
     public void AdiarEnvio(Func<CancellationToken, Task<bool>> envio) => _envioAdiado = envio;
+    public void DescartarEnvioAdiado() => _envioAdiado = null;
 
     /// <summary>Executa o envio adiado uma vez; devolve se algo saiu ao cliente.</summary>
     public async Task<bool> EnviarAdiadoAsync(CancellationToken ct = default)
