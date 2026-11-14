@@ -8,6 +8,9 @@ export const qs = obj => {
 };
 
 function data(v, nome) { if (v !== undefined && !DATA.test(v)) throw new Error(`${nome} deve ser AAAA-MM-DD.`); return v; }
+const reais = (v, nome) => { if (!Number.isFinite(v) || Math.round(v * 100) / 100 !== v) throw new Error(`${nome} deve ter no maximo 2 casas decimais.`); return v.toFixed(2); };
+const limpo = t => String(t).replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ');
+const campos = o => Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => `${k}=${JSON.stringify(limpo(v))}`).join(' ');
 function uuid(v, nome) { if (v !== undefined && !UUID.test(v)) throw new Error(`${nome} deve ser um UUID.`); return v; }
 
 export const consultas = {
@@ -19,25 +22,35 @@ export const consultas = {
     '/api/caixa/fechamentos' + qs({ desde: data(desde, 'desde'), ate: data(ate, 'ate'), page: pagina, pageSize: Math.min(por_pagina, 100) }),
 };
 
-/** Corpos de escrita. Identidade, origem e empresa vem do token no servidor da API, nunca daqui. */
+/** Corpos de escrita. Identidade, origem e empresa vem do token no servidor da API, nunca daqui. O resumo mostra TODOS os campos enviados. */
 export const escritas = {
-  abrir: ({ saldo_inicial = 0, loja_id, observacoes }) => ({
-    resumo: `ABRIR caixa com saldo inicial R$ ${Number(saldo_inicial).toFixed(2)}`,
-    caminho: '/api/caixa/abrir', corpo: { saldoInicial: saldo_inicial, lojaId: uuid(loja_id, 'loja_id'), observacoes },
-  }),
-  fechar: ({ data: d, valor_contado, loja_id, observacoes }) => ({
-    resumo: `FECHAR caixa${d ? ' de ' + d : ' de hoje'}${valor_contado !== undefined ? ` contado R$ ${Number(valor_contado).toFixed(2)}` : ''}`,
-    caminho: '/api/caixa/fechar', corpo: { data: data(d, 'data'), valorContado: valor_contado, lojaId: uuid(loja_id, 'loja_id'), observacoes },
-  }),
-  movimento: ({ tipo, valor, descricao, metodo, categoria, loja_id }) => {
+  abrir: a => {
+    const { saldo_inicial = 0, loja_id, observacoes } = a;
+    return { resumo: `ABRIR caixa: ${campos({ saldo_inicial: reais(saldo_inicial, 'saldo_inicial'), loja_id, observacoes })}`,
+      caminho: '/api/caixa/abrir', corpo: { saldoInicial: saldo_inicial, lojaId: uuid(loja_id, 'loja_id'), observacoes } };
+  },
+  fechar: a => {
+    const { data: d, valor_contado, loja_id, observacoes } = a;
+    return { resumo: `FECHAR caixa: ${campos({ data: data(d, 'data') ?? '(sem data: a API fecha a sessao pendente mais recente, que pode ser de dia anterior)', valor_contado: valor_contado === undefined ? undefined : reais(valor_contado, 'valor_contado'), loja_id, observacoes })}`,
+      caminho: '/api/caixa/fechar', corpo: { data: d, valorContado: valor_contado, lojaId: uuid(loja_id, 'loja_id'), observacoes } };
+  },
+  movimento: a => {
+    const { tipo, valor, descricao, metodo, categoria, loja_id } = a;
     if (!['entrada', 'saida'].includes(tipo)) throw new Error('tipo deve ser entrada ou saida.');
     if (!(valor > 0)) throw new Error('valor deve ser maior que zero.');
-    return {
-      resumo: `LANCAR ${tipo.toUpperCase()} de R$ ${Number(valor).toFixed(2)}${descricao ? ` (${descricao})` : ''}`,
-      caminho: '/api/caixa/movimentos', corpo: { tipo, valor, descricao, metodo, categoria, lojaId: uuid(loja_id, 'loja_id') },
-    };
+    return { resumo: `LANCAR ${tipo.toUpperCase()}: ${campos({ valor: reais(valor, 'valor'), descricao, metodo, categoria, loja_id })}`,
+      caminho: '/api/caixa/movimentos', corpo: { tipo, valor, descricao, metodo, categoria, lojaId: uuid(loja_id, 'loja_id') } };
   },
 };
+
+/** Confirmacao pela pessoa via elicitation do cliente. Sem suporte ou sem "confirmo: true", recusa: nunca confirma sozinho. */
+export function criarPedir(srv) {
+  return async mensagem => {
+    if (!srv.getClientCapabilities()?.elicitation) throw new Error('este cliente nao suporta confirmacao (elicitation); escrita recusada.');
+    const r = await srv.elicitInput({ message: mensagem, requestedSchema: { type: 'object', properties: { confirmo: { type: 'boolean', title: 'Confirmo esta operacao' } }, required: ['confirmo'] } });
+    return r.action === 'accept' && r.content?.confirmo === true;
+  };
+}
 
 /** Escrita so com BABA_CAIXA_ESCRITA=1 e confirmacao da pessoa pelo cliente (fora do canal do modelo). */
 export async function escrever({ env = process.env, cliente, pedir, plano }) {

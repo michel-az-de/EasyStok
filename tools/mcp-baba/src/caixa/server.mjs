@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { criarCliente } from '../lib/api.mjs';
-import { consultas, escritas, escrever } from '../lib/caixa.mjs';
+import { consultas, escritas, escrever, criarPedir } from '../lib/caixa.mjs';
 import { redigir } from '../lib/redacao.mjs';
 import { limitar } from '../lib/limites.mjs';
 
@@ -20,15 +20,10 @@ const E = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 const dia = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const uuid = z.string().uuid();
 
-/** Confirmacao pela pessoa via elicitation do cliente. Sem suporte, recusa: nunca confirma sozinho. */
-async function pedir(mensagem) {
-  if (!server.server.getClientCapabilities()?.elicitation) throw new Error('este cliente nao suporta confirmacao (elicitation); escrita recusada.');
-  const r = await server.server.elicitInput({ message: mensagem, requestedSchema: { type: 'object', properties: { confirmo: { type: 'boolean', title: 'Confirmo esta operacao' } }, required: ['confirmo'] } });
-  return r.action === 'accept' && r.content?.confirmo === true;
-}
+const pedir = criarPedir(server.server);
 
 const ler = (nome, descricao, shape, fn) => server.registerTool(nome, { description: descricao, annotations: L, inputSchema: shape },
-  async args => { try { return json((await cliente.get(fn(args)))?.data ?? null); } catch (e) { return falha(e); } });
+  async args => { try { return json(await cliente.get(fn(args))); } catch (e) { return falha(e); } });
 
 server.registerTool('sobre', { description: 'Modo e usuario do servidor.', annotations: L, inputSchema: {} }, async () => {
   try { const u = await cliente.entrar(); return texto(`baba-caixa 0.1.0\nusuario=${u?.nome ?? '?'} nivel=${u?.nivel ?? '?'}\nescrita=${process.env.BABA_CAIXA_ESCRITA === '1' ? 'habilitada (com confirmacao)' : 'desligada'}`); } catch (e) { return falha(e); }
