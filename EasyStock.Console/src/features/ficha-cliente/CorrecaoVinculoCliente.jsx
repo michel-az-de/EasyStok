@@ -104,7 +104,7 @@ function ConferenciaVinculo({ conversa, aoFechar }) {
           </section>}
           {escolha && <section className={css.revisao}>
             <strong>{escolha.acao === 'retirar' ? `Retirar somente o vínculo com ${estado.clienteNome}` : escolha.acao === 'restaurar' ? `Restaurar o vínculo com ${estado.clienteAnteriorNome}` : `Vincular a conversa a ${escolha.cliente.nome}`}</strong>
-            <p>Cadastros, mensagens e rascunhos serão preservados. {escolha.acao === 'retirar' ? 'Links e sessões de acesso desta conversa serão invalidados.' : 'Nenhum pedido será transferido.'}</p>
+            <p>Cadastros, mensagens e rascunhos serão preservados. {escolha.acao === 'retirar' ? 'Links e sessões de acesso desta conversa serão invalidados.' : 'Nenhum pedido será transferido.'}{conversa.canal === 'WhatsApp' && (escolha.acao === 'restaurar' ? ' As próximas conversas deste telefone voltam a ser identificadas pelo cadastro.' : ' Vale também para as próximas conversas deste telefone.')}</p>
             <CampoArea rotulo="Motivo da alteração" value={motivo} minLength={3} maxLength={500} disabled={impedido} onChange={e => guardarRascunho({ motivo: e.target.value })} />
             <label className={css.confirmacao}><input type="checkbox" checked={confirmado} disabled={impedido} onChange={e => confirmar(e.target.checked)} />Conferi a identidade com a pessoa e revisei esta alteração.</label>
           </section>}

@@ -150,7 +150,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             {
                 // A loja puxou a conversa pelo celular: identifica (ou cria o lead) como na 1ª mensagem do cliente.
                 var identificacao = await identificarCliente.ExecuteAsync(
-                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, conversa.ContatoNome), ct);
+                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, conversa.ContatoNome,
+                        HonrarDecisaoDaEquipe: true), ct);
                 if (identificacao.Cliente is { } cliente) conversa.VincularCliente(cliente.Id);
                 else conversa.ExigirConferenciaCliente();
                 await conversaRepository.AddAsync(conversa, ct);
@@ -289,7 +290,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         {
             // S05: identifica (ou cria o lead) na mesma transação que abre a conversa.
             identificacao = await identificarCliente.ExecuteAsync(
-                new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil), ct);
+                new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil, HonrarDecisaoDaEquipe: true), ct);
             if (identificacao.Cliente is { } cliente) conversa.VincularCliente(cliente.Id);
             else conversa.ExigirConferenciaCliente();
         }

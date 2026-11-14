@@ -3,6 +3,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Enums.Atendimento;
 
 namespace EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 
@@ -81,19 +82,50 @@ public sealed class VinculoClienteConversaUseCase(IConversaRepository conversas,
                 if (cliente.Bloqueado || !cliente.Ativo) throw new VinculoClienteConflitoException("O cadastro está bloqueado ou inativo.");
             }
             var agora = relogio.GetUtcNow().UtcDateTime;
+            var clienteRetiradoAntes = conversa.ClienteAnteriorId;
             conversa.CorrigirVinculoCliente(destino, command.VinculoRevisao);
             await vinculos.ExpirarLinksAsync(command.EmpresaId, command.ConversaId, agora, t);
             await vinculos.EncerrarSessoesChatAsync(command.EmpresaId, command.ConversaId, agora, t);
-            await vinculos.AddAsync(new AlteracaoVinculoConversa
+            var alteracao = new AlteracaoVinculoConversa
             {
                 EmpresaId = command.EmpresaId, ConversaId = command.ConversaId, RequestId = command.RequestId,
                 UsuarioId = usuario.UsuarioId, ClienteAnteriorId = command.ClienteId, ClienteNovoId = destino,
                 RevisaoAnterior = command.VinculoRevisao, Revisao = conversa.VinculoRevisao,
                 Acao = command.Acao, Motivo = motivo, CriadaEm = agora
-            }, t);
+            };
+            await vinculos.AddAsync(alteracao, t);
+            await RegistrarDecisaoDoTelefoneAsync(conversa, command, alteracao, clienteRetiradoAntes, agora, t);
             await uow.CommitAsync();
             return await EstadoAsync(conversa, t);
         }, ct);
+    }
+
+    /// <summary>
+    /// #2492: a correção vale para as próximas conversas do telefone. Só no WhatsApp, onde o contato é o wa_id.
+    /// Há uma decisão ativa por telefone: a nova revoga a anterior; <c>restaurar</c> só revoga.
+    /// </summary>
+    private async Task RegistrarDecisaoDoTelefoneAsync(Conversa conversa, CorrigirVinculoClienteCommand command,
+        AlteracaoVinculoConversa alteracao, Guid? clienteRetiradoAntes, DateTime agora, CancellationToken ct)
+    {
+        if (conversa.Canal != CanalConversa.WhatsApp) return;
+        var candidatos = NormalizadorTelefone.CandidatosDeWaId(conversa.ContatoIdExterno);
+        var hashes = candidatos.Select(ClienteOtp.CalcularTelefoneHash).ToArray();
+        var ativa = await vinculos.ObterDecisaoAtivaAsync(command.EmpresaId, hashes, ct);
+        ativa?.Revogar(usuario.UsuarioId, agora);
+        if (ativa is not null) await uow.CommitAsync(); // dentro da transação: o índice único parcial exige a revogação antes da nova
+
+        var hash = hashes[0];
+        DecisaoVinculoTelefone? nova = command.Acao switch
+        {
+            "retirar" => DecisaoVinculoTelefone.Recusar(command.EmpresaId, hash, command.ClienteId!.Value,
+                conversa.Id, alteracao.Id, usuario.UsuarioId, agora),
+            // Retirar e depois vincular é o caminho de Y para Z: a recusa de Y vem da retirada anterior.
+            "vincular" => DecisaoVinculoTelefone.Escolher(command.EmpresaId, hash, command.DestinoClienteId!.Value,
+                command.ClienteId ?? ativa?.ClienteRecusadoId ?? clienteRetiradoAntes,
+                conversa.Id, alteracao.Id, usuario.UsuarioId, agora),
+            _ => null
+        };
+        if (nova is not null) await vinculos.AddDecisaoAsync(nova, ct);
     }
 
     private void ValidarEmpresa(Guid empresaId)

@@ -112,7 +112,7 @@ public class ValidarOtpUseCaseTests
         f.ClienteRepository,
         f.ClienteSessionRepository,
         new IdentificarClientePorTelefoneUseCase(f.CadastroRepository, f.ClienteRepository,
-            Substitute.For<ILogger<IdentificarClientePorTelefoneUseCase>>()),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), Substitute.For<ILogger<IdentificarClientePorTelefoneUseCase>>()),
         f.PasswordHasher,
         f.UnitOfWork,
         f.Time,

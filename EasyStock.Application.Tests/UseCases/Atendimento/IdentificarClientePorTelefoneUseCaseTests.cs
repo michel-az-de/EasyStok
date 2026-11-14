@@ -1,5 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -14,6 +16,7 @@ public class IdentificarClientePorTelefoneUseCaseTests
 
     private readonly IClienteRepository _clienteRepository = Substitute.For<IClienteRepository>();
     private readonly IClienteStorefrontRepository _clienteStorefrontRepository = Substitute.For<IClienteStorefrontRepository>();
+    private readonly IVinculoClienteConversaRepository _vinculos = Substitute.For<IVinculoClienteConversaRepository>();
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly IdentificarClientePorTelefoneUseCase _useCase;
 
@@ -21,7 +24,7 @@ public class IdentificarClientePorTelefoneUseCaseTests
     {
         _useCase = new IdentificarClientePorTelefoneUseCase(
             _clienteRepository, _clienteStorefrontRepository,
-            NullLogger<IdentificarClientePorTelefoneUseCase>.Instance);
+            _vinculos, NullLogger<IdentificarClientePorTelefoneUseCase>.Instance);
     }
 
     [Fact]
@@ -192,5 +195,79 @@ public class IdentificarClientePorTelefoneUseCaseTests
         resultado.EhNovo.Should().BeTrue();
         resultado.Cliente.Should().NotBeNull();
         await _clienteRepository.Received(1).AddAsync(resultado.Cliente!);
+    }
+
+    // #2492 -------------------------------------------------------------------------------------
+
+    private DecisaoVinculoTelefone Decidir(Guid? recusado, Guid? escolhido)
+    {
+        var hash = ClienteOtp.CalcularTelefoneHash(TelefoneE164);
+        var decisao = escolhido is { } z
+            ? DecisaoVinculoTelefone.Escolher(_empresaId, hash, z, recusado, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow)
+            : DecisaoVinculoTelefone.Recusar(_empresaId, hash, recusado!.Value, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow);
+        _vinculos.ObterDecisaoAtivaAsync(_empresaId, Arg.Is<IReadOnlyList<string>>(h => h.Contains(hash)), Arg.Any<CancellationToken>())
+            .Returns(decisao);
+        return decisao;
+    }
+
+    [Fact]
+    public async Task Escolha_da_equipe_vence_o_telefone_compartilhado()
+    {
+        var z = ClienteEntity.Criar(_empresaId, "Pessoa certa");
+        Decidir(recusado: Guid.NewGuid(), escolhido: z.Id);
+        _clienteRepository.GetByIdAsync(_empresaId, z.Id).Returns(z);
+        _clienteRepository.TemTelefoneCompartilhadoAsync(default, default!, default!, default).ReturnsForAnyArgs(true);
+
+        var resultado = await _useCase.ExecuteAsync(new(_empresaId, WaId, "Contato", HonrarDecisaoDaEquipe: true));
+
+        resultado.Cliente!.Id.Should().Be(z.Id);
+        await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
+    [Fact]
+    public async Task Escolha_de_cliente_desativado_e_ignorada_e_a_recusa_continua()
+    {
+        var y = ClienteEntity.Criar(_empresaId, "Pessoa errada");
+        var z = ClienteEntity.Criar(_empresaId, "Pessoa certa");
+        z.Ativo = false;
+        Decidir(recusado: y.Id, escolhido: z.Id);
+        _clienteRepository.GetByIdAsync(_empresaId, z.Id).Returns(z);
+        _clienteStorefrontRepository.GetByTelefoneHashAsync(_empresaId, ClienteOtp.CalcularTelefoneHash(TelefoneE164), Arg.Any<CancellationToken>())
+            .Returns(y);
+
+        var resultado = await _useCase.ExecuteAsync(new(_empresaId, WaId, "Contato", HonrarDecisaoDaEquipe: true));
+
+        resultado.IdentidadePendente.Should().BeTrue();
+        await _clienteRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        y.TelefoneHash.Should().BeNull("o recusado não ganha o hash do telefone");
+    }
+
+    [Fact]
+    public async Task Recusa_pula_o_recusado_e_acha_outro_cadastro_do_telefone()
+    {
+        var y = ClienteEntity.Criar(_empresaId, "Pessoa errada");
+        var outro = ClienteEntity.Criar(_empresaId, "Outra pessoa");
+        Decidir(recusado: y.Id, escolhido: null);
+        _clienteStorefrontRepository.GetByTelefoneHashAsync(_empresaId, ClienteOtp.CalcularTelefoneHash(TelefoneE164), Arg.Any<CancellationToken>())
+            .Returns(y);
+        _clienteRepository.FindByTelefoneAsync(_empresaId, "11997573992").Returns(outro);
+
+        var resultado = await _useCase.ExecuteAsync(new(_empresaId, WaId, "Contato", HonrarDecisaoDaEquipe: true));
+
+        resultado.Cliente!.Id.Should().Be(outro.Id);
+    }
+
+    [Fact]
+    public async Task Sem_a_flag_do_webhook_a_decisao_nao_e_lida()
+    {
+        var existente = ClienteEntity.Criar(_empresaId, "Dona do OTP");
+        Decidir(recusado: existente.Id, escolhido: null);
+        _clienteStorefrontRepository.GetByTelefoneHashAsync(_empresaId, ClienteOtp.CalcularTelefoneHash(TelefoneE164), Arg.Any<CancellationToken>())
+            .Returns(existente);
+
+        var resultado = await _useCase.ExecuteAsync(new(_empresaId, WaId, null));
+
+        resultado.Cliente!.Id.Should().Be(existente.Id);
+        await _vinculos.DidNotReceiveWithAnyArgs().ObterDecisaoAtivaAsync(default, default!, default);
     }
 }

@@ -55,4 +55,12 @@ public sealed class VinculoClienteConversaRepository(EasyStockDbContext db) : IV
         var sessoes = await db.SessoesChatSite.Where(s => s.EmpresaId == empresaId && s.ConversaId == conversaId).ToListAsync(ct);
         foreach (var sessao in sessoes) sessao.Encerrar(agora);
     }
+
+    public Task<DecisaoVinculoTelefone?> ObterDecisaoAtivaAsync(Guid empresaId, IReadOnlyList<string> telefoneHashes, CancellationToken ct) =>
+        db.Set<DecisaoVinculoTelefone>().Where(d => d.EmpresaId == empresaId && d.RevogadaEm == null
+                && telefoneHashes.Contains(d.TelefoneHash))
+            .OrderByDescending(d => d.CriadaEm).FirstOrDefaultAsync(ct);
+
+    public Task AddDecisaoAsync(DecisaoVinculoTelefone decisao, CancellationToken ct) =>
+        db.Set<DecisaoVinculoTelefone>().AddAsync(decisao, ct).AsTask();
 }
