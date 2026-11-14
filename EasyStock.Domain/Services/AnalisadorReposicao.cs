@@ -75,7 +75,7 @@ public sealed class AnalisadorReposicao
             limiares.QuantidadeMinima, limiares.QuantidadeCritica,
             estado.Value, sugerida, confianca, motivo, diasAteRuptura, produto.FornecedorId,
             produto.VelocidadeMediaDia,
-            Math.Round(sugerida * produto.CustoUnitario, 2));
+            Math.Round(sugerida * produto.CustoUnitario, 2, MidpointRounding.AwayFromZero));
     }
 
     // R3: quantidade sugerida = cobre lead time + cobertura, descontando vigente; com fallback e

@@ -84,9 +84,16 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
         return result;
     }
 
-    public async Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
+    public async Task<(IReadOnlyList<MargemPorProduto> Items, int TotalCount)> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:margem:{empresaId}:{dias}:{page}:{pageSize}:{lojaId}";
+        // #2510: guarda a lista inteira ordenada; o total é dela, não da página.
+        var todos = await GetMargemOrdenadaAsync(empresaId, dias, lojaId);
+        return (todos.Skip((page - 1) * pageSize).Take(pageSize).ToList(), todos.Count);
+    }
+
+    private async Task<List<MargemPorProduto>> GetMargemOrdenadaAsync(Guid empresaId, int dias, Guid? lojaId)
+    {
+        var cacheKey = $"analytics:margem-ordenada:{empresaId}:{dias}:{lojaId}";
         var cached = await GetCachedAsync<List<MargemPorProduto>>(cacheKey);
         if (cached is not null) return cached;
 
@@ -141,8 +148,6 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
                     QuantidadeVendida: qtdVendida);
             })
             .OrderByDescending(x => x.MargemPercentual)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .ToList();
 
         await SetCachedAsync(cacheKey, result, MargemTtl);

@@ -336,7 +336,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null);
 
         /// <summary>Margem por produto nos últimos N dias.</summary>
-        Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null);
+        Task<(IReadOnlyList<MargemPorProduto> Items, int TotalCount)> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null);
 
         /// <summary>Resumo de movimentações agrupado por dia/mês.</summary>
         Task<IReadOnlyList<MovimentacaoResumo>> GetMovimentacoesResumoAsync(
