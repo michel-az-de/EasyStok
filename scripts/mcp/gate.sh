@@ -36,13 +36,58 @@ valida() {
       [ "$#" -eq 1 ] || nega "deploy_historico exige 1 argumento"
       [[ "$1" =~ ^[0-9]{1,3}$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 200 ] || nega "linhas"
       ;;
+    psql_ro) [ "$#" -eq 0 ] || nega "psql_ro recebe o SQL por stdin, sem argumentos" ;;
     *) nega "verbo desconhecido" ;;
   esac
+}
+
+# psql_ro: SQL via stdin, so leitura. A barreira real e o papel baba_ro no banco (apenas GRANT SELECT em
+# tabelas de negocio, sem BYPASSRLS, sem escrita); aqui ficam so os limites de forma.
+#   - sem barra invertida (meta-comandos do psql, como \!, executam shell dentro do container)
+#   - ate 20 KB; transacao READ ONLY, timeout de 15 s e escopo de empresa fixo vindos do arquivo de config
+# Config (root:root 600): PG_CONTAINER, PG_DB, PG_USER, PGPASSWORD, EMPRESA_ID.
+psql_ro() {
+  local envf="${BABA_RO_ENV:-/opt/baba-mcp/baba_ro.env}" sql
+  sql="$(head -c 20001)"
+  [ "${#sql}" -ge 1 ] && [ "${#sql}" -le 20000 ] || nega "sql vazio ou maior que 20000 bytes"
+  case "$sql" in *\\*) nega "barra invertida no sql" ;; esac
+  case "$sql" in *'/*'*|*'--'*) nega "comentarios nao sao permitidos" ;; esac
+  # uma unica instrucao: ';' so no fim (um ';' no meio permitiria COMMIT/SET e sairia do READ ONLY e do escopo de empresa)
+  sql="${sql%"${sql##*[![:space:];]}"}"
+  case "$sql" in *\;*) nega "apenas uma instrucao" ;; esac
+  # nomes que trocam escopo ou executam SQL montado em texto; compara sem espacos, aspas e comentarios
+  local norm
+  norm="$(printf '%s' "$sql" | sed -e 's#/\*[^*]*\*/##g' | tr -d '[:space:]"' | tr '[:upper:]' '[:lower:]')"
+  case "$norm" in *set_config*|*app.empresa_id*|*app.bypass_rls*|*pg_sleep*|*dblink*|*lo_export*|*lo_import*|*lo_create*|*query_to_xml*|*cursor_to_xml*|*table_to_xml*|*schema_to_xml*|*database_to_xml*|*ts_stat*|*pg_read_*|*pg_ls_*) nega "funcao ou parametro nao permitido" ;; esac
+  # so SELECT/WITH/VALUES/TABLE/EXPLAIN, sem escape unicode nem DO, e so funcoes da lista (mesma lista do cliente)
+  [[ "$norm" =~ ^\(*(select|with|values|table|explain) ]] || nega "so consultas"
+  [[ "$norm" =~ u\& ]] || [[ "$norm" =~ uescape ]] && nega "escape unicode"
+  local nome lista=" $(tr '\n' ' ' < "${BABA_FUNCOES:-/opt/baba-mcp/psql_ro_funcoes.txt}") "
+  while read -r nome; do
+    [ -n "$nome" ] || continue
+    [[ "$lista" == *" $nome "* ]] || nega "funcao nao permitida: $nome"
+  done < <(printf '%s' "$sql" | tr '
+' ' ' | tr -d '"' | tr '[:upper:]' '[:lower:]' | LC_ALL=C grep -a -oE '[a-z_][a-z0-9_]*[[:space:]]*\(' | sed -E 's/[[:space:]]*\($//')
+  if [ -n "$GATE_DRY" ]; then echo "psql_ro ok (${#sql} bytes)"; exit 0; fi
+  [ -r "$envf" ] || nega "sem configuracao do banco"
+  # shellcheck disable=SC1090
+  . "$envf"
+  [[ "${EMPRESA_ID:-}" =~ ^[0-9a-fA-F-]{36}$ ]] || nega "EMPRESA_ID invalido"
+  [[ "${PG_CONTAINER:-}" =~ ^[A-Za-z0-9_.-]+$ && "${PG_DB:-}" =~ ^[A-Za-z0-9_]+$ && "${PG_USER:-}" =~ ^[A-Za-z0-9_]+$ ]] || nega "configuracao invalida"
+  export PGPASSWORD
+  printf 'BEGIN READ ONLY;
+SET LOCAL statement_timeout = 15000;
+SET LOCAL app.empresa_id = %s;
+%s
+;
+COMMIT;
+' "'$EMPRESA_ID'" "$sql"     | timeout 25 "$DOCKER" exec -i -e PGPASSWORD "$PG_CONTAINER" psql -X -q -v ON_ERROR_STOP=1 -v FETCH_COUNT=500 --csv -U "$PG_USER" -d "$PG_DB" 2>&1 | head -c 1000000
 }
 
 executa() {
   local verbo="$1"; shift
   case "$verbo" in
+    psql_ro) psql_ro; exit 0 ;;
     logs)
       set -- "$DOCKER" logs --timestamps --since "$2" --tail "$3" "$1" ;;
     containers)
@@ -66,7 +111,7 @@ inspeciona() {
 
 if [ "${1:-}" = "--root" ]; then
   # como root nada vem do ambiente: caminhos fixos, sem modo de teste
-  DOCKER=/usr/bin/docker; HIST=/home/felipe/build/deploy-history.log; GATE_DRY=
+  DOCKER=/usr/bin/docker; HIST=/home/felipe/build/deploy-history.log; GATE_DRY=; BABA_RO_ENV=/opt/baba-mcp/baba_ro.env; BABA_FUNCOES=/opt/baba-mcp/psql_ro_funcoes.txt
   shift; valida "$@"
   if [ "$1" = "containers" ] && [ -z "$GATE_DRY" ]; then
     "$DOCKER" ps -a --filter name=ez- --format '{{.Names}}|{{.Status}}|{{.Image}}'; inspeciona; exit 0
@@ -79,5 +124,5 @@ cmd="${SSH_ORIGINAL_COMMAND:-${GATE_CMD:-}}"
 [[ "$cmd" =~ ^[a-z_]+(\ [A-Za-z0-9-]+)*$ ]] || nega "caracteres invalidos"
 read -r -a partes <<<"$cmd"
 valida "${partes[@]}"
-if [ -n "$GATE_DRY" ] || [ "${partes[0]}" = "deploy_historico" ]; then executa "${partes[@]}"; exit 0; fi
+if [ -n "$GATE_DRY" ] || [ -n "${GATE_LOCAL:-}" ] || [ "${partes[0]}" = "deploy_historico" ]; then executa "${partes[@]}"; exit 0; fi
 exec sudo -n "$0" --root "${partes[@]}"

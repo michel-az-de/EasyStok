@@ -56,6 +56,19 @@ chown root:root /home/baba-mcp/.ssh /home/baba-mcp/.ssh/authorized_keys && chmod
 
 Comandos aceitos pelo gate: `logs <ez-api|ez-worker|ez-web> <5m|2h> <1..5000>`, `containers`, `deploy_historico <1..200>`. O restante e recusado (exit 64).
 
+## baba-db (leitura do banco)
+
+Servidor `node src/db/server.mjs`; tools `sobre`, `tabelas`, `consultar` (um SELECT/WITH/EXPLAIN, ate 1000 linhas, CSV redigido). Na VPS, como root:
+
+```bash
+docker exec -i shared-postgres psql -U <superusuario> -d easystock -v baba_ro_pw="$SENHA" -f - < /opt/baba-mcp/baba_ro.sql
+install -m 600 -o root -g root /dev/null /opt/baba-mcp/baba_ro.env   # preencher: PG_CONTAINER=shared-postgres PG_DB=easystock PG_USER=baba_ro PGPASSWORD=... EMPRESA_ID=<uuid da Casa da Baba>
+```
+
+Instale tambem a lista de funcoes permitidas: `install -m 644 -o root -g root scripts/mcp/psql_ro_funcoes.txt /opt/baba-mcp/` (o gate recusa qualquer funcao fora dela, e comentarios SQL).
+
+Reexecute `baba_ro.sql` apos migracao que crie tabela de negocio. Entrada de MCP: `command: node`, `args: [.../src/db/server.mjs]`.
+
 ## Testes
 
 ```bash

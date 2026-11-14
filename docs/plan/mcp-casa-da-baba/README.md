@@ -50,7 +50,7 @@ Segurança: lista fixa de comandos remotos (allowlist), alvos fixos, nenhuma str
 | `consultar` | L | só `SELECT`, `WITH`, `EXPLAIN`; um comando; `BEGIN READ ONLY`, `statement_timeout` 15 s, limite 500 linhas, `SET LOCAL app.bypass_rls` (tenant único) |
 | `amostra` | L | `SELECT *` limitado de uma tabela |
 
-Papel de banco `baba_ro`: `LOGIN`, `default_transaction_read_only = on`, `GRANT SELECT` no schema, sem `BYPASSRLS` (usa o `SET LOCAL` do precedente). **Felipe cria o papel e a senha na VPS**; o script vem na PR do #2522. Senha só em `BABA_DB_PASSWORD` local. A leitura é imposta pelo servidor (papel + transação), o filtro de SQL no cliente é só a segunda camada.
+Papel de banco `baba_ro`: `LOGIN`, `NOBYPASSRLS`, `default_transaction_read_only = on`, **somente `GRANT SELECT` em tabelas de negocio listadas** (sem views: view de dono superusuario ignora RLS). Segredos e sessoes ficam fora (usuarios, tokens, credenciais, OTP, push). O gate roda cada consulta em `BEGIN READ ONLY` com `statement_timeout` de 15 s e `app.empresa_id` fixo vindo de arquivo root-only na VPS (`app.bypass_rls` nao e barreira, entao nao se confia em GUC). Script: `scripts/mcp/baba_ro.sql` (senha por `-v`). **Felipe roda o script e cria `/opt/baba-mcp/baba_ro.env`**. O filtro de SQL no cliente e a segunda camada.
 
 ### baba-db-admin (#2523) · desligado por padrão, tier alto
 
@@ -98,3 +98,7 @@ A lista exata de endpoints sai do `swagger` na PR de cada um, não aqui.
 - Criar `baba_ro` e a senha na VPS (antes da prova real do #2522).
 - Confirmar que "SHA privado daqui" é a leitura da decisão 2.
 - Papéis nominais e acesso SSH da Thatiane (antes do #2523).
+
+## Follow-up de seguranca do baba-db (revisao opus da PR #2549)
+
+O guard de SQL (cliente e gate) e higiene, nao barreira: GUC `app.bypass_rls` e `app.empresa_id` sao setaveis por qualquer papel. A defesa real e policy que ignore o bypass para `baba_ro` (`AND current_user <> 'baba_ro'`), migracao de tier alto, e `REVOKE TEMP ... FROM PUBLIC`. Ate la: o gate e o cliente so aceitam funcoes de uma lista fixa (`scripts/mcp/psql_ro_funcoes.txt`; lista de bloqueio foi contornada por `ts_rewrite` e `DO` na revisao), recusam comentarios, `;` no meio, escape unicode e nomes de GUC. Alem disso `;` no meio, nomes de GUC normalizados e funcoes de SQL dinamico; tabelas com payload, log ou dado global ficam fora do GRANT.

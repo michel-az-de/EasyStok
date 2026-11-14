@@ -14,9 +14,10 @@ export function argvSsh(comando, alvo = ALVO) {
   return ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-T', alvo, comando];
 }
 
-export function executarRemoto(comando, { timeoutMs = 30_000, ssh = 'ssh' } = {}) {
+export function executarRemoto(comando, { timeoutMs = 30_000, ssh = 'ssh', stdin = null } = {}) {
   return new Promise((resolve, reject) => {
-    const p = spawn(ssh, argvSsh(comando), { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const p = spawn(ssh, argvSsh(comando), { stdio: [stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'], windowsHide: true });
+    if (stdin != null) p.stdin.end(stdin);
     let out = '', err = '';
     const t = setTimeout(() => { p.kill(); reject(new Error(`timeout de ${timeoutMs} ms`)); }, timeoutMs);
     p.stdout.on('data', d => { out += d; if (out.length > 4_000_000) p.kill(); });
