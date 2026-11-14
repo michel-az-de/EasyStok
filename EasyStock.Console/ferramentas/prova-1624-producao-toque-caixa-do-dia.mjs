@@ -168,6 +168,8 @@ const andar = (no, fn, achados = []) => {
 const texto = (no) => (no == null ? '' : typeof no !== 'object' ? String(no) : Array.isArray(no) ? no.map(texto).join('') : texto(no.props?.children))
 const limpo = (no) => texto(no).replace(/\u00a0/g, ' ')
 const doTipo = (no, tipo) => andar(no, (n) => n.type === tipo)
+// #2512 (Q08): o resumo tem duas contas (onde está, de onde veio) e o total; as linhas vêm das três listas, na ordem da tela.
+const itensDoResumo = (arvore) => andar(arvore, (n) => n.type === 'dl' && String(n.props.className).includes('resumoLista')).flatMap((dl) => doTipo(dl, 'div'))
 const comRotulo = (no, rotulo) => andar(no, (n) => n.props?.['aria-label'] === rotulo)
 const campos = (no, rotulo) => andar(no, (n) => n.type === 'CampoTexto' && n.props.rotulo === rotulo)
 const evento = { preventDefault() {} }
@@ -742,8 +744,7 @@ await confere('Caixa do dia: o resumo tem a linha de vendas e as linhas somam o 
   g.caixa = caixaCom(dia({ aberto: true, saldoInicial: 100, totalVendas: 80, totalPagamentosPedidos: 310.5, totalEntradasExtras: 20, totalSaidasExtras: 45, saldoEsperado: 465.5 }))
   const t = montar(AbaCaixaApi)
   await t.assentar()
-  const resumo = andar(t.arvore, (n) => n.type === 'dl' && String(n.props.className).includes('resumoLista'))[0]
-  const linhas = Object.fromEntries(doTipo(resumo, 'div').map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
+  const linhas = Object.fromEntries(itensDoResumo(t.arvore).map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
   assert.equal(linhas.Vendas, moedaDe(80))
   const valor = (rotulo) => Number(linhas[rotulo].replace(/[^\d,]/g, '').replace(',', '.'))
   assert.equal(valor('Saldo inicial') + valor('Vendas') + valor('Pagamentos de pedidos') + valor('Outras entradas') - valor('Outras saídas'), valor('Total do caixa (com Pix e cartão)'))
@@ -859,8 +860,7 @@ await confere('Caixa do dia: sem abertura o resumo não inventa gaveta nem saldo
   }))
   const t = montar(AbaCaixaApi)
   await t.assentar()
-  const resumo = andar(t.arvore, (n) => n.type === 'dl' && String(n.props.className).includes('resumoLista'))[0]
-  const linhas = Object.fromEntries(doTipo(resumo, 'div').map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
+  const linhas = Object.fromEntries(itensDoResumo(t.arvore).map((d) => [texto(doTipo(d, 'dt')[0]), limpo(doTipo(d, 'dd')[0])]))
   assert.equal(linhas['Na gaveta (dinheiro)'], undefined, 'sem abrir o caixa ninguém disse quanto há na gaveta')
   assert.equal(linhas['Saldo inicial'], undefined)
   assert.deepEqual([linhas['Em dinheiro'], linhas['Pix, cartão e outros'], linhas['Sem forma de pagamento'], linhas['Total do caixa (com Pix e cartão)']],
@@ -999,14 +999,13 @@ await confere('#2078 E6: o número herói é a gaveta, à frente, com o total da
   g.caixa = caixaCom(DIA_ABERTO_2078())
   const t = montar(AbaCaixaApi)
   await t.assentar()
-  const resumo = andar(t.arvore, (n) => n.type === 'dl' && String(n.props.className).includes('resumoLista'))[0]
-  const itens = doTipo(resumo, 'div')
+  const itens = itensDoResumo(t.arvore)
   assert.equal(itens[0].props.className, 'resumoForte')
   assert.deepEqual([texto(doTipo(itens[0], 'dt')[0]), limpo(doTipo(itens[0], 'dd')[0])], ['Na gaveta (dinheiro)', moedaDe(262.1)])
   assert.equal(texto(doTipo(itens.at(-1), 'dt')[0]), 'Total do caixa (com Pix e cartão)')
   const css = readFileSync(new URL('../src/features/gestao/caixa/abaCaixa.module.css', import.meta.url), 'utf8')
-  assert.match(css, /\.caixaApi > \.resumoLista \.resumoForte dd \{ font-size: var\(--t-valor\);/, 'o herói no tamanho de valor (28 px), não no de título')
-  assert.doesNotMatch(css, /\.caixaApi > \.resumoLista dt \{ min-height/, 'sem duas linhas reservadas entre o rótulo e o número')
+  assert.match(css, /\.resumoDoDia \.resumoLista \.resumoForte dd \{ font-size: var\(--t-valor\);/, 'o herói no tamanho de valor (28 px), não no de título')
+  assert.doesNotMatch(css, /\.resumoDoDia \.resumoLista dt \{ min-height/, 'sem duas linhas reservadas entre o rótulo e o número')
 })
 
 await confere('#2078 D6: sem abertura, com dinheiro já no dia, o saldo inicial pede só o troco', async () => {

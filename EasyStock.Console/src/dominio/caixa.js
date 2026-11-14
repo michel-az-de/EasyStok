@@ -11,7 +11,7 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
-import { dataIsoNoFuso, inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { dataIsoNoFuso, horaCurta, inicioDoDiaNoFuso, moeda, plural } from './formato.js'
 import { aDevolverDe } from './cobranca.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
@@ -36,18 +36,27 @@ export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechar, o caixa de hoje não rea
 // J2 (#1990), item 5: devolução pendente não trava o fechamento (o dinheiro pode sair amanhã), mas o
 // modal diz quanto e onde se resolve. Sem nada a devolver, nada.
 // Pedido que não deu para conferir (`falhas`) é dito, para "nada a devolver" não ser presumido.
-function avisoDeDevolucoes({ total = 0, pedidos = 0, falhas = 0 } = {}, orientacao) {
+function avisoDeDevolucoes({ total = 0, pedidos = 0, falhas = 0 } = {}, orientacao, recorte = '') {
   const semConferir = falhas > 0 ? ` ${plural(falhas, 'pedido cancelado não foi conferido', 'pedidos cancelados não foram conferidos')}.` : ''
   if (!(total > 0)) return semConferir ? `Não deu para conferir tudo:${semConferir}` : null
-  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}. ${orientacao}${semConferir}`
+  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}${recorte}. ${orientacao}${semConferir}`
 }
 
 export const avisoDeDevolucoesPendentes = (leitura) =>
   avisoDeDevolucoes(leitura, 'O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
 
 // #2267: no Caixa do dia e no Extrato o pagamento do pedido cancelado parecia receita comum.
-export const avisoDeDevolucoesNasTelas = (leitura) =>
-  avisoDeDevolucoes(leitura, 'Esse dinheiro entrou e está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido.')
+// #2512 (Q03): com `recorte`, o Caixa diz de quando é o pagamento que ele conta (hoje, ou desde a
+// abertura no caixa esquecido aberto) e manda ao Extrato, que soma os cancelados de 90 dias.
+export const avisoDeDevolucoesNasTelas = (leitura, recorte = null) => {
+  if (!recorte) return avisoDeDevolucoes(leitura, 'Esse dinheiro entrou e está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido.')
+  const quando = recorte.desde ? `desde ${recorte.desde.slice(8, 10)}/${recorte.desde.slice(5, 7)}` : 'hoje'
+  return avisoDeDevolucoes(
+    leitura,
+    'Esse dinheiro está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido. Cancelados de outros dias ficam no Extrato.',
+    ` com pagamento recebido ${quando}`,
+  )
+}
 
 // #2275: o Extrato lê os cancelados dos últimos 90 dias, não o período da tela: o aviso diz isso e não
 // afirma que o valor está nos totais.
@@ -385,6 +394,36 @@ export function gavetaDoDia(dia) {
     else fora += centavos(l.valor)
   }
   return { naGaveta: gaveta / 100, pixECartao: fora / 100, semForma: semForma / 100 }
+}
+
+// #2512 (Q08, N3): o resumo em duas contas que fecham no mesmo total. "Onde está" separa a gaveta do que
+// não está nela; "De onde veio" diz a origem. Numa fileira só, o Pix do pedido aparecia ao lado do saldo
+// inicial (como se estivesse na gaveta) e de novo em "Fora da gaveta". `saida` marca a linha que subtrai.
+// Sem abertura ninguém disse quanto havia na gaveta (#1627): nada de "gaveta" nem de "saldo inicial".
+export function resumoEmDuasContas(dia, gaveta, semAbertura = false) {
+  const lugar = [
+    { forte: !semAbertura, rotulo: semAbertura ? 'Em dinheiro' : 'Na gaveta (dinheiro)', valor: gaveta.naGaveta },
+    { rotulo: semAbertura ? ROTULO_FORA_DO_DINHEIRO : ROTULO_FORA_DA_GAVETA, valor: gaveta.pixECartao },
+    gaveta.semForma !== 0 && { rotulo: 'Sem forma de pagamento', valor: gaveta.semForma },
+  ].filter(Boolean)
+  const origem = [
+    !semAbertura && { rotulo: 'Saldo inicial', valor: dia.saldoInicial },
+    dia.totalVendas !== 0 && { rotulo: 'Vendas', valor: dia.totalVendas },
+    { rotulo: 'Pagamentos de pedidos', valor: dia.totalPagamentosPedidos },
+    { rotulo: 'Outras entradas', valor: dia.totalEntradasExtras },
+    { rotulo: 'Outras saídas', valor: dia.totalSaidasExtras, saida: true },
+  ].filter(Boolean)
+  return { lugar, origem }
+}
+
+// #2512 (Q04): no caixa aberto há dias, "21:39" sozinho não diz de que dia é o lançamento. A data entra
+// quando o dia do lançamento (no fuso da loja) não é o dia do caixa.
+export function quandoNoCaixa(iso, dataDoCaixa) {
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) return ''
+  const hora = horaCurta(iso)
+  const dia = dataIsoNoFuso(ms)
+  return dia === dataDoCaixa ? hora : `${dia.slice(8, 10)}/${dia.slice(5, 7)} ${hora}`
 }
 
 // --- Fluxo de caixa de vários dias (#1624) ----------------------------------
