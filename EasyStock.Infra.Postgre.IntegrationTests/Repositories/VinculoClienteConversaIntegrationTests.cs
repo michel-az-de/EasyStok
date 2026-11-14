@@ -212,7 +212,7 @@ public sealed class VinculoClienteConversaIntegrationTests(PostgreSqlDatabaseFix
         await using var db = Contexto(c.Empresa);
         var clientes = new ClienteRepository(db);
         var identificar = new IdentificarClientePorTelefoneUseCase(clientes, new ClienteStorefrontRepository(db),
-            NullLogger<IdentificarClientePorTelefoneUseCase>.Instance);
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance);
         var unico = await identificar.ExecuteAsync(new(c.Empresa, "5511999990001", null));
         unico.IdentidadePendente.Should().BeFalse();
         var clienteUnico = unico.Cliente!;
@@ -239,7 +239,7 @@ public sealed class VinculoClienteConversaIntegrationTests(PostgreSqlDatabaseFix
 
         await using var outraDb = Contexto(outra.Empresa);
         var outroResultado = await new IdentificarClientePorTelefoneUseCase(new ClienteRepository(outraDb),
-            new ClienteStorefrontRepository(outraDb), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance)
+            new ClienteStorefrontRepository(outraDb), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance)
             .ExecuteAsync(new(outra.Empresa, "5511999990001", null));
         outroResultado.IdentidadePendente.Should().BeFalse();
         outroResultado.Cliente!.Id.Should().Be(outra.Conversa.ClienteId!.Value);

@@ -125,7 +125,7 @@ public sealed class LoginTentativasConcorrenciaTests(PostgreSqlDatabaseFixture f
                 clientes,
                 Substitute.For<IClienteSessionRepository>(),
                 new IdentificarClientePorTelefoneUseCase(Substitute.For<IClienteRepository>(), clientes,
-                    NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                    Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
                 hasher,
                 db,
                 TimeProvider.System,
@@ -183,7 +183,7 @@ public sealed class LoginTentativasConcorrenciaTests(PostgreSqlDatabaseFixture f
                 clientes,
                 sessoes,
                 new IdentificarClientePorTelefoneUseCase(Substitute.For<IClienteRepository>(), clientes,
-                    NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                    Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
                 Bcrypt,
                 db,
                 TimeProvider.System,
@@ -231,7 +231,7 @@ public sealed class LoginTentativasConcorrenciaTests(PostgreSqlDatabaseFixture f
         ValidarOtpUseCase Criar(EasyStockDbContext db, IClienteSessionRepository sessoes) => new(
             storefronts, new ClienteOtpRepository(db), clientes, sessoes,
             new IdentificarClientePorTelefoneUseCase(Substitute.For<IClienteRepository>(), clientes,
-                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             Bcrypt, db, TimeProvider.System, NullLogger<ValidarOtpUseCase>.Instance);
 
         await using (var db = ContextoDoTenant(empresaId))

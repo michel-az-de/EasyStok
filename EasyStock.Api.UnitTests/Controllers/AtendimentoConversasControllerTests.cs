@@ -666,7 +666,7 @@ public partial class AtendimentoConversasControllerTests
         var useCase = new CadastrarClienteDaConversaUseCase(
             _repositorio, clientes, _unitOfWork,
             new IdentificarClientePorTelefoneUseCase(clientes, Substitute.For<IClienteStorefrontRepository>(),
-                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new ValidarEnderecoUseCase(storefronts, frete, cep, Substitute.For<IConfiguracaoAtendimentoRepository>(),
                 NullLogger<ValidarEnderecoUseCase>.Instance),
             new ConfirmarEnderecoClienteUseCase(clientes, _unitOfWork,

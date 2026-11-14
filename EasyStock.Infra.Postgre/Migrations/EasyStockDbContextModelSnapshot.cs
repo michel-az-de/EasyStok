@@ -1024,6 +1024,57 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("creditos_cliente_comanda", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.DecisaoVinculoTelefone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AlteracaoVinculoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ClienteEscolhidoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ClienteRecusadoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConversaOrigemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevogadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RevogadaPorUsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TelefoneHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlteracaoVinculoId");
+
+                    b.HasIndex("ConversaOrigemId");
+
+                    b.HasIndex("EmpresaId", "TelefoneHash")
+                        .IsUnique()
+                        .HasFilter("\"RevogadaEm\" IS NULL");
+
+                    b.ToTable("decisoes_vinculo_telefone", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.DespachoLogistica", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11479,6 +11530,21 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.HasOne("EasyStock.Domain.Entities.Pedido", null)
                         .WithMany()
                         .HasForeignKey("PedidoOrigemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.DecisaoVinculoTelefone", b =>
+                {
+                    b.HasOne("EasyStock.Domain.Entities.Atendimento.AlteracaoVinculoConversa", null)
+                        .WithMany()
+                        .HasForeignKey("AlteracaoVinculoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EasyStock.Domain.Entities.Atendimento.Conversa", null)
+                        .WithMany()
+                        .HasForeignKey("ConversaOrigemId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

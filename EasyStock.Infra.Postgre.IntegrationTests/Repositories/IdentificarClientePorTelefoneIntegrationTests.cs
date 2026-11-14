@@ -1,6 +1,7 @@
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Repositories;
+using EasyStock.Infra.Postgre.Repositories.Atendimento;
 using EasyStock.Infra.Postgre.Repositories.Storefront;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,7 @@ public class IdentificarClientePorTelefoneIntegrationTests(PostgreSqlDatabaseFix
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
     private static IdentificarClientePorTelefoneUseCase CriarUseCase(Data.EasyStockDbContext db) =>
-        new(new ClienteRepository(db), new ClienteStorefrontRepository(db),
+        new(new ClienteRepository(db), new ClienteStorefrontRepository(db), new VinculoClienteConversaRepository(db),
             NullLogger<IdentificarClientePorTelefoneUseCase>.Instance);
 
     private async Task<Guid> SemearEmpresaAsync()
