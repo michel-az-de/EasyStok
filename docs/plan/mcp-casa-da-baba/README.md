@@ -50,7 +50,7 @@ Segurança: lista fixa de comandos remotos (allowlist), alvos fixos, nenhuma str
 | `consultar` | L | só `SELECT`, `WITH`, `EXPLAIN`; um comando; `BEGIN READ ONLY`, `statement_timeout` 15 s, limite 500 linhas, `SET LOCAL app.bypass_rls` (tenant único) |
 | `amostra` | L | `SELECT *` limitado de uma tabela |
 
-Papel de banco `baba_ro`: `LOGIN`, `default_transaction_read_only = on`, `GRANT SELECT` no schema, sem `BYPASSRLS` (usa o `SET LOCAL` do precedente). **Felipe cria o papel e a senha na VPS**; o script vem na PR do #2522. Senha só em `BABA_DB_PASSWORD` local. A leitura é imposta pelo servidor (papel + transação), o filtro de SQL no cliente é só a segunda camada.
+Papel de banco `baba_ro`: `LOGIN`, `NOBYPASSRLS`, `default_transaction_read_only = on`, **somente `GRANT SELECT` em tabelas de negocio listadas** (sem views: view de dono superusuario ignora RLS). Segredos e sessoes ficam fora (usuarios, tokens, credenciais, OTP, push). O gate roda cada consulta em `BEGIN READ ONLY` com `statement_timeout` de 15 s e `app.empresa_id` fixo vindo de arquivo root-only na VPS (`app.bypass_rls` nao e barreira, entao nao se confia em GUC). Script: `scripts/mcp/baba_ro.sql` (senha por `-v`). **Felipe roda o script e cria `/opt/baba-mcp/baba_ro.env`**. O filtro de SQL no cliente e a segunda camada.
 
 ### baba-db-admin (#2523) · desligado por padrão, tier alto
 
