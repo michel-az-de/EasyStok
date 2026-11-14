@@ -1885,6 +1885,66 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.ToTable("caderno_trechos", (string)null);
                 });
 
+            modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.TurnoAgente", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConversaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("CustoEstimado")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<int>("Desfecho")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DuracaoMs")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FerramentasJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("Ferramentas");
+
+                    b.Property<Guid?>("MensagemClienteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MensagemRespostaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Modelo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Passos")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TokensCacheLido")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TokensEntrada")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TokensSaida")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "CriadoEm")
+                        .HasDatabaseName("ix_atendimento_turnos_agente_empresa_criado");
+
+                    b.ToTable("atendimento_turnos_agente", (string)null);
+                });
+
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.UsoCreditoClienteComanda", b =>
                 {
                     b.Property<Guid>("Id")
