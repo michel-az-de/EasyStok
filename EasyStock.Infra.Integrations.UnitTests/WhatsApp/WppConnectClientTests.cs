@@ -151,6 +151,21 @@ public class WppConnectClientTests
     }
 
     [Fact]
+    public async Task Lista_mensagens_recentes_com_id_em_texto_ou_objeto_e_descarta_as_sem_id()
+    {
+        // #2590: a mensagem lida depois do evento já traz o id que o webhook perdeu.
+        _http.Quando(HttpMethod.Get, $"/api/{_sessao.Sessao}/get-messages/5511999999999%40c.us")
+            .Responde(HttpStatusCode.OK, """{"status":"success","response":[{"id":"false_5511999999999@c.us_ABC","t":1793000000,"fromMe":false,"type":"chat","body":"Oi"},{"id":{"_serialized":"true_5511999999999@c.us_DEF"},"t":1793000001,"fromMe":true,"type":"image"},{"t":1793000002,"fromMe":false}]}""");
+
+        var recentes = await Client.ListarMensagensRecentesAsync(_sessao, "5511999999999@c.us");
+
+        recentes.Should().Equal(
+            new MensagemRecenteWppConnect("false_5511999999999@c.us_ABC", 1793000000, false, "chat", "Oi"),
+            new MensagemRecenteWppConnect("true_5511999999999@c.us_DEF", 1793000001, true, "image", null));
+        _http.UltimaChamada!.Uri.Query.Should().Be("?count=30");
+    }
+
+    [Fact]
     public async Task Piloto_sem_sessao_nao_cai_em_envio_simulado()
     {
         _remetente.ObterSessaoWebAsync(Arg.Any<CancellationToken>()).Returns((CredencialWppConnect?)null);
