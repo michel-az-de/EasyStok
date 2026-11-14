@@ -15,14 +15,15 @@ namespace EasyStock.Infra.Postgre.Repositories
     public sealed partial class AnalyticsRepository(
         EasyStockDbContext dbContext,
         ICaixaSaldoCalculator caixaSaldo,
-        IDistributedCache? cache = null)
+        IDistributedCache? cache = null,
+        TimeProvider? relogio = null)
         : IAnalyticsRepository
     {
         // â”€â”€ Specialised query objects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private readonly DashboardAnalyticsQueries _dashboard = new(dbContext, cache);
         private readonly ReceitaAnalyticsQueries   _receita   = new(dbContext, cache);
-        private readonly EstoqueAnalyticsQueries   _estoque   = new(dbContext, cache);
+        private readonly EstoqueAnalyticsQueries   _estoque   = new(dbContext, cache, relogio);
 
         // â”€â”€ Cache helpers (used only by store-intelligence methods below) â”€â”€â”€â”€
 
