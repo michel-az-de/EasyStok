@@ -42,6 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/ci/puxar-imagem.sh postgres:16
+          docker rm -f postgres >/dev/null 2>&1 || true
           docker run -d --name postgres -p 5432:5432 \
             -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=easystock_ci postgres:16
           for i in $(seq 1 30); do
