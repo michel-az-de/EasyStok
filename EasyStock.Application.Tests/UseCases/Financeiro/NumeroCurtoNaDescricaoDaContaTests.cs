@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
@@ -74,5 +75,34 @@ public class NumeroCurtoNaDescricaoDaContaTests
 
         gravada.Should().NotBeNull();
         gravada!.Descricao.Should().Be($"Compra {compra.Id.ToString("N")[..8].ToUpperInvariant()}");
+    }
+
+    /// <summary>
+    /// #2546: o vencimento da conta da compra é data civil (meia-noite UTC do dia), como o da conta do pedido.
+    /// Antes era UtcNow + 30 com hora, e à noite em Brasília caía no dia civil seguinte.
+    /// </summary>
+    [Fact]
+    public async Task ContaPagarDoPedidoFornecedor_VenceEmDataCivilDaquiATrintaDias()
+    {
+        var contas = Substitute.For<IContaPagarRepository>();
+        var categorias = Substitute.For<ICategoriaFinanceiraRepository>();
+        var config = Substitute.For<IConfiguracaoLojaRepository>();
+        var categoria = CategoriaFinanceira.Criar(Empresa, "Compras", TipoCategoriaFinanceira.Despesa);
+        categorias.ListarAsync(Empresa, true, TipoCategoriaFinanceira.Despesa, Arg.Any<CancellationToken>()).Returns([categoria]);
+        categorias.GetByIdAsync(Empresa, categoria.Id, Arg.Any<CancellationToken>()).Returns(categoria);
+        config.GetByLojaIdAsync(Loja).Returns(ConfigLigada());
+        ContaPagar? gravada = null;
+        contas.When(r => r.AddAsync(Arg.Any<ContaPagar>(), Arg.Any<CancellationToken>())).Do(ci => gravada = ci.Arg<ContaPagar>());
+        var criar = new CriarContaPagarUseCase(contas, categorias, Substitute.For<ICentroCustoRepository>(),
+            Substitute.For<IUnitOfWork>(), Substitute.For<ILogger<CriarContaPagarUseCase>>());
+        var sut = new GerarContaPagarDePedidoFornecedorUseCase(contas, categorias, config, criar,
+            Substitute.For<ILogger<GerarContaPagarDePedidoFornecedorUseCase>>());
+        var compra = new PedidoFornecedor { Id = Guid.NewGuid(), EmpresaId = Empresa, FornecedorId = Guid.NewGuid(), LojaId = Loja, ValorEstimado = 80m };
+        var esperado = HorarioBrasil.CivilComoInstanteUtc(HorarioBrasil.Hoje().AddDays(30));
+
+        await sut.ExecuteAsync(new GerarContaPagarDePedidoFornecedorCommand(Empresa, compra));
+
+        gravada.Should().NotBeNull();
+        gravada!.Parcelas.Single().DataVencimento.Should().Be(esperado);
     }
 }
