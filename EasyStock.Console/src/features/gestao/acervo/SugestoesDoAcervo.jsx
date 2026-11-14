@@ -8,7 +8,7 @@ import css from './acervo.module.css'
 // pela conferência e a publicação é o mesmo POST imagens/{id}/publicar da ficha da imagem.
 function Miniatura({ id, titulo }) {
   const { url, erro } = useMiniaturaAcervo(id)
-  return url ? <img className={css.foto} src={url} alt={titulo} /> : <div className={css.foto}>{erro ? 'Prévia indisponível.' : 'Carregando imagem…'}</div>
+  return url ? <img className={css.foto} src={url} alt={titulo} loading="lazy" /> : <div className={css.foto}>{erro ? 'Prévia indisponível.' : 'Carregando imagem…'}</div>
 }
 
 export function SugestoesDoAcervo({ acervo: a }) {
@@ -62,7 +62,7 @@ export function SugestoesDoAcervo({ acervo: a }) {
         {a.erro && <p role="alert" className={css.erro}>{a.erro}</p>}
         <Miniatura id={conferindo.sugestao.imagemId} titulo={conferindo.sugestao.titulo} />
         <p>{conferindo.sugestao.motivo}</p>
-        {conferindo.capaEsperada ? <details><summary>Ver capa atual</summary><img className={css.foto} src={a.fotoUrl(conferindo.capaEsperada)} alt="Capa atual do prato" /></details> : <p>O prato ainda não tem foto.</p>}
+        {conferindo.capaEsperada ? <details><summary>Ver capa atual</summary><img className={css.foto} src={a.fotoUrl(conferindo.capaEsperada)} alt="Capa atual do prato" loading="lazy" /></details> : <p>O prato ainda não tem foto.</p>}
         <fieldset><label><input type="checkbox" checked={conferindo.galeria} disabled={a.ocupado} onChange={(e) => setConferindo({ ...conferindo, galeria: e.target.checked })} /> Adicionar à galeria em vez de trocar a capa</label></fieldset>
         <Botao variante="primario" disabled={a.ocupado} onClick={publicar}>Confirmar publicação</Botao>
       </div>

@@ -2,6 +2,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import { Pilula } from '../../componentes/Pilula'
 import { nomeDoPedido } from '../../dominio/pedido'
+import { janelaEncerrada, nomeDaJanela, ocupacaoDaJanela } from '../../dominio/agendaDeEntrega'
 import { rotuloDaData } from '../../dominio/roteiroDoDia'
 import { useAgendaEncomendasApi } from '../../aplicacao/useAgendaEncomendasApi'
 import css from './entregasApi.module.css'
@@ -12,6 +13,7 @@ const diaDoMes = (data) => new Date(`${data}T12:00:00Z`).toLocaleDateString('pt-
 
 export function AgendaEncomendasApi() {
   const { hoje, inicio, fim, agenda, erro, voltar, avancar, mudarInicio, atualizar } = useAgendaEncomendasApi()
+  const agora = Date.now()
 
   return (
     <div className={`${css.conteudo} ${css.agenda}`}>
@@ -41,13 +43,16 @@ export function AgendaEncomendasApi() {
             <div className={css.janelasAgenda}>
             {dia.bloqueio && <p className={css.estadoAgenda}><Pilula tom="aviso">Dia fechado</Pilula><span>{dia.bloqueio}</span></p>}
             {dia.janelas.length === 0 && <p className={css.vazioAgenda}>Sem janela cadastrada.</p>}
-            {dia.janelas.map((janela) => (
+            {dia.janelas.map((janela) => {
+              const nome = nomeDaJanela(janela.label, janela.inicio, janela.fim)
+              return (
               <div key={janela.janelaId} className={css.janelaAgenda}>
                 <div className={css.tituloJanelaAgenda}>
                   <h3>{hora(janela.inicio)}–{hora(janela.fim)}</h3>
-                  <span className={css.rotuloJanelaAgenda}>{janela.label}</span>
-                  <span className={css.ocupacaoAgenda}>{janela.ocupadas} de {janela.capacidade} vagas</span>
+                  {nome && <span className={css.rotuloJanelaAgenda}>{nome}</span>}
+                  <span className={css.ocupacaoAgenda}>{ocupacaoDaJanela(janela)}</span>
                 </div>
+                {janelaEncerrada({ data: dia.data, fim: janela.fim }, agora) && <p className={css.estadoAgenda}><Pilula tom="neutro">Encerrada</Pilula></p>}
                 {!janela.ativa && <p className={css.estadoAgenda}><Pilula tom="aviso">Janela inativa</Pilula></p>}
                 {janela.bloqueio && !dia.bloqueio && <p className={css.estadoAgenda}><Pilula tom="aviso">Bloqueada</Pilula><span>{janela.bloqueio}</span></p>}
                 {janela.pedidos.length === 0 && <p className={css.vazioAgenda}>Sem reservas nesta janela.</p>}
@@ -59,7 +64,8 @@ export function AgendaEncomendasApi() {
                   </li>)}
                 </ul>}
               </div>
-            ))}
+              )
+            })}
             </div>
           </section>
         )

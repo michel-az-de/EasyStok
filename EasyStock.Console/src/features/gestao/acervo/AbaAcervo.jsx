@@ -14,7 +14,7 @@ function Foto({ imagem }) {
 }
 function VisualFoto({ imagem, previa }) {
   const { url, erro } = previa
-  return url ? <img className={css.foto} src={url} alt={imagem.titulo} /> : <div className={css.foto}>{erro ? 'Prévia indisponível. Atualize o acervo.' : 'Carregando imagem…'}</div>
+  return url ? <img className={css.foto} src={url} alt={imagem.titulo} loading="lazy" /> : <div className={css.foto}>{erro ? 'Prévia indisponível. Atualize o acervo.' : 'Carregando imagem…'}</div>
 }
 const ids = (imagem) => JSON.parse(imagem.itensJson || '[]')
 const formatos = ['1:1', '4:5', '16:9', '9:16', '3:2', 'livre']
@@ -206,7 +206,7 @@ export function AbaAcervo() {
         <p>Impressão exige pelo menos 300 dpi no tamanho informado. Arte final e prova física devem ser conferidas separadamente.</p><Botao tipo="submit" disabled={!previa.url || a.ocupado}>Confirmar este uso</Botao>
       </form>}
       {dialogo === 'aprovar' && <div className={css.formulario}><VisualFoto imagem={imagem} previa={previa} /><p>Confira a apresentação do prato, os ingredientes visíveis e a adequação da imagem aos itens vinculados. A aprovação vale para esta versão.</p><Botao variante="primario" disabled={!previa.url || a.ocupado} onClick={() => executar(() => a.api.aprovarImagem(imagem.id), 'Versão aprovada para uso.')}>Aprovar esta versão</Botao></div>}
-      {dialogo === 'publicar' && <div className={css.formulario}><h3>{publicacao.nome}</h3><VisualFoto imagem={imagem} previa={previa} /><p>{publicacao.galeria ? 'Acrescentar esta imagem à galeria.' : 'Usar esta versão como capa do prato no site.'}</p>{!ids(imagem).includes(publicacao.itemId) && <p>A imagem passa a ficar vinculada a este prato no acervo.</p>}{publicacao.capaEsperada && <details><summary>Ver capa atual</summary><img className={css.foto} src={a.fotoUrl(publicacao.capaEsperada)} alt="Capa atual do prato" /></details>}<Botao variante="primario" disabled={!previa.url || a.ocupado} onClick={() => executar(() => a.api.publicarImagem(publicacao.imagemId, publicacao), 'Publicação registrada. A nova imagem já está no cardápio.')}>Confirmar publicação</Botao></div>}
+      {dialogo === 'publicar' && <div className={css.formulario}><h3>{publicacao.nome}</h3><VisualFoto imagem={imagem} previa={previa} /><p>{publicacao.galeria ? 'Acrescentar esta imagem à galeria.' : 'Usar esta versão como capa do prato no site.'}</p>{!ids(imagem).includes(publicacao.itemId) && <p>A imagem passa a ficar vinculada a este prato no acervo.</p>}{publicacao.capaEsperada && <details><summary>Ver capa atual</summary><img className={css.foto} src={a.fotoUrl(publicacao.capaEsperada)} alt="Capa atual do prato" loading="lazy" /></details>}<Botao variante="primario" disabled={!previa.url || a.ocupado} onClick={() => executar(() => a.api.publicarImagem(publicacao.imagemId, publicacao), 'Publicação registrada. A nova imagem já está no cardápio.')}>Confirmar publicação</Botao></div>}
       {dialogo === 'escolherImagem' && pratoAlvo && <div className={css.formulario}>
         <p>Escolha uma imagem aprovada do acervo. Você confere a prévia antes de publicar.</p>
         <fieldset><label><input type="checkbox" checked={paraGaleria} disabled={a.ocupado} onChange={(e) => setParaGaleria(e.target.checked)} /> Adicionar à galeria em vez de trocar a capa</label></fieldset>

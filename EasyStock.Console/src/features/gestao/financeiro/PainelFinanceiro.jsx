@@ -9,7 +9,7 @@ import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import { useConsultaFinanceira, listarContasFinanceiras, listarContasEmAberto, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
 import { STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, palavrasDoLado, statusDaConta, parcelasDoDia, somaSaldos, diaFinanceiro, periodoFinanceiro, mesFinanceiro, CHIPS_CONTAS, CHIP_PADRAO, planoDoChip, filtrosDaApi, ordenarPorVencimento, paginaDaLista, paginaValida, TAMANHO_PAGINA, proximaParcela, parcelaEmAberto, valorDaLinha, valorLancado, podeEditarConta, podeRegistrarNaConta, cancelamentoExigeEstorno, hashDoChip, chipDaHash } from '../../../dominio/financeiro'
-import { moeda } from '../../../dominio/formato'
+import { dataPorExtenso, moeda } from '../../../dominio/formato'
 import { avisoDeDevolucoesNoExtrato, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { ModalContaFinanceira, ModalPagamentoFinanceiro, ModalConfirmacaoFinanceira, ModalCadastroFinanceiro, ModalParcelaFinanceira, ErroFinanceiro } from './ModaisFinanceiras'
@@ -299,7 +299,7 @@ function RelatoriosFinanceiros() {
   const [exportando, setExportando] = useState(false)
   const [erroExportacao, setErroExportacao] = useState(null)
   const campo = (nome, valor) => setRascunho((atual) => ({ ...atual, [nome]: valor }))
-  const tabela = <div className={css.tabelaRolavel}><table className={css.tabela}><caption className="sr">Fluxo de caixa previsto e realizado de {filtros.inicio} a {filtros.fim}</caption><thead><tr>{['Período', 'A pagar', 'A receber', 'Pago', 'Recebido', 'Saldo realizado'].map((nome) => <th scope="col" key={nome}>{nome}</th>)}</tr></thead><tbody>{consulta.dados?.map((item) => <tr key={item.inicioBucket}><th scope="row">{item.rotulo}</th>{[item.previstoPagar, item.previstoReceber, item.realizadoPagar, item.realizadoReceber, item.realizadoReceber - item.realizadoPagar].map((valor, indice) => <td key={indice}>{moeda(valor)}</td>)}</tr>)}</tbody></table></div>
+  const tabela = <div className={css.tabelaRolavel}><table className={css.tabela}><caption className="sr">Fluxo de caixa previsto e realizado de {dataPorExtenso(filtros.inicio)} a {dataPorExtenso(filtros.fim)}</caption><thead><tr>{['Período', 'A pagar', 'A receber', 'Pago', 'Recebido', 'Saldo realizado'].map((nome) => <th scope="col" key={nome}>{nome}</th>)}</tr></thead><tbody>{consulta.dados?.map((item) => <tr key={item.inicioBucket}><th scope="row">{item.rotulo}</th>{[item.previstoPagar, item.previstoReceber, item.realizadoPagar, item.realizadoReceber, item.realizadoReceber - item.realizadoPagar].map((valor, indice) => <td key={indice}>{moeda(valor)}</td>)}</tr>)}</tbody></table></div>
   const exportar = async () => {
     setExportando(true); setErroExportacao(null)
     try {
