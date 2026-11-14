@@ -118,6 +118,10 @@ export const dataHora = (ms) =>
 export const mesPorExtenso = (ms) =>
   new Date(ms).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: FUSO })
 
+// "2026-11-01" -> "1 de novembro de 2026" (#2553, Q09): o leitor de tela lia a data ISO na legenda.
+export const dataPorExtenso = (iso) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+
 export function haQuantoTempo(iso, agora) {
   const minutos = Math.floor((agora - new Date(iso).getTime()) / 60000)
   if (minutos < 1) return 'agora'

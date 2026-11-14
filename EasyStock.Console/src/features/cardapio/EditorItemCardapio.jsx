@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { cloneElement, useEffect, useId, useRef, useState } from 'react'
 import { Modal } from '../../componentes/Modal'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
@@ -20,6 +20,20 @@ const VAZIA = { descricao: '', ingredientes: '', alergenos: '', preparo: '', ins
 const dataDoIso = (iso) => iso?.slice(0, 10) ?? ''
 const camposDe = (d) => ({ descricao: d.descricao, ingredientes: d.ingredientes, alergenos: d.alergenos,
   preparo: d.tempoPreparoMinutos == null ? '' : String(d.tempoPreparoMinutos), instrucao: d.instrucaoFinalizacao })
+
+// Rótulo fora do controle e dica ligada por aria-describedby (#2553, Q14): dentro do <label> a dica
+// entrava no nome acessível do campo.
+function CampoDaFicha({ rotulo, dica, children }) {
+  const id = useId()
+  const idDaDica = `${id}-dica`
+  return (
+    <div className={css.campo}>
+      <label htmlFor={id}>{rotulo}</label>
+      {cloneElement(children, { id, 'aria-describedby': dica ? idDaDica : undefined })}
+      {dica && <small id={idDaDica}>{dica}</small>}
+    </div>
+  )
+}
 
 // Mesmo editor no Balcão e na Gestão, composto pelo App. O rascunho só fecha após a confirmação.
 export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicial }) {
@@ -252,17 +266,17 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
           <fieldset disabled={salvando || precisaReler || carga !== 'ok' || !podeEditar} className={css.campos}>
             <section className={css.secao}>
               <h3>Apresentação do prato</h3>
-              <label className={css.campo}>Nome do prato<input required maxLength={200} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Lasanha à bolonhesa" /></label>
-              <label className={css.campo}>Descrição para o cliente<textarea rows={3} maxLength={240} value={ficha.descricao} onChange={mudarFicha('descricao')} placeholder="O que faz este prato especial?" /><small>Até 240 caracteres. Conte o que o cliente vai receber.</small></label>
+              <CampoDaFicha rotulo="Nome do prato"><input required maxLength={200} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Lasanha à bolonhesa" /></CampoDaFicha>
+              <CampoDaFicha rotulo="Descrição para o cliente" dica="Até 240 caracteres. Conte o que o cliente vai receber."><textarea rows={3} maxLength={240} value={ficha.descricao} onChange={mudarFicha('descricao')} placeholder="O que faz este prato especial?" /></CampoDaFicha>
               <div className={css.dupla}>
-                <label className={css.campo}>Linha de produto<select value={linha} onChange={(e) => setLinha(e.target.value)}>{Object.entries(linhas).map(([chave, l]) => <option key={chave} value={chave}>{l.rotulo}</option>)}</select></label>
-                {fonteApi && <label className={css.campo}>Categoria no cardápio<select value={secao} onChange={(e) => setSecao(e.target.value)}><option value="">Sem categoria</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>}
+                <CampoDaFicha rotulo="Linha de produto"><select value={linha} onChange={(e) => setLinha(e.target.value)}>{Object.entries(linhas).map(([chave, l]) => <option key={chave} value={chave}>{l.rotulo}</option>)}</select></CampoDaFicha>
+                {fonteApi && <CampoDaFicha rotulo="Categoria no cardápio"><select value={secao} onChange={(e) => setSecao(e.target.value)}><option value="">Sem categoria</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></CampoDaFicha>}
               </div>
             </section>
             <section className={css.secao}>
               <h3>Porções e valores</h3>
               {porcoes.length === 0 && <div className={css.dupla}>
-                <label className={css.campo}>Porção<input required value={porcao} onChange={(e) => setPorcao(e.target.value)} placeholder="Ex.: 800 g · serve 2 pessoas" /></label>
+                <CampoDaFicha rotulo="Porção"><input required value={porcao} onChange={(e) => setPorcao(e.target.value)} placeholder="Ex.: 800 g · serve 2 pessoas" /></CampoDaFicha>
                 {/* #2080: reais como em todo campo ("100" é R$ 100,00, igual à porção e ao caixa), não máscara de centavos. */}
                 <CampoReais rotulo="Preço" centavos={centavos} ler={lerMoeda} erro={moedaAltaDemais(centavos) ? 'Valor alto demais' : null} aoMudar={(c) => { setCentavos(c ?? 0); setAlterado(true) }} />
               </div>}
@@ -271,15 +285,15 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
             <section className={css.secao}>
               <h3>Informações para atender bem</h3>
               <p className={css.ajuda}>Use estes detalhes para responder às dúvidas do cliente.</p>
-              <label className={css.campo}>Ingredientes<textarea rows={2} maxLength={500} value={ficha.ingredientes} onChange={mudarFicha('ingredientes')} /></label>
-              <label className={css.campo}>Alérgenos<input maxLength={200} value={ficha.alergenos} onChange={mudarFicha('alergenos')} placeholder="Ex.: trigo, leite e ovos" /><small>Informe os ingredientes e riscos de contato cruzado confirmados pela cozinha.</small></label>
-              <label className={css.campo}>Tempo de preparo, em minutos<input type="number" min={1} max={1440} step={1} required={detalhe?.tempoPreparoMinutos != null} value={ficha.preparo} onChange={mudarFicha('preparo')} placeholder="Usa o tempo padrão da loja" /></label>
-              {linha === 'casa' && <label className={css.campo}>Como finalizar em casa<textarea rows={3} maxLength={500} value={ficha.instrucao} onChange={mudarFicha('instrucao')} placeholder="Tempo, temperatura e modo de preparo." /></label>}
+              <CampoDaFicha rotulo="Ingredientes"><textarea rows={2} maxLength={500} value={ficha.ingredientes} onChange={mudarFicha('ingredientes')} /></CampoDaFicha>
+              <CampoDaFicha rotulo="Alérgenos" dica="Informe os ingredientes e riscos de contato cruzado confirmados pela cozinha."><input maxLength={200} value={ficha.alergenos} onChange={mudarFicha('alergenos')} placeholder="Ex.: trigo, leite e ovos" /></CampoDaFicha>
+              <CampoDaFicha rotulo="Tempo de preparo, em minutos"><input type="number" min={1} max={1440} step={1} required={detalhe?.tempoPreparoMinutos != null} value={ficha.preparo} onChange={mudarFicha('preparo')} placeholder="Usa o tempo padrão da loja" /></CampoDaFicha>
+              {linha === 'casa' && <CampoDaFicha rotulo="Como finalizar em casa"><textarea rows={3} maxLength={500} value={ficha.instrucao} onChange={mudarFicha('instrucao')} placeholder="Tempo, temperatura e modo de preparo." /></CampoDaFicha>}
             </section>
             <section className={css.secao}>
               <h3>Organização e vínculos</h3>
               <label className={css.opcao}><input type="checkbox" checked={comNovidade} onChange={(e) => setComNovidade(e.target.checked)} />Destacar como novidade</label>
-              {comNovidade && <label className={css.campo}>Novidade até<input type="date" required value={novidade} onChange={(e) => setNovidade(e.target.value)} /></label>}
+              {comNovidade && <CampoDaFicha rotulo="Novidade até"><input type="date" required value={novidade} onChange={(e) => setNovidade(e.target.value)} /></CampoDaFicha>}
               {fonteApi && <p className={css.vinculo}><MarcaIcone nome="produto" tamanho={24} /><span><strong>{detalhe?.produtoId ? 'Vinculado ao estoque' : 'Item sem vínculo com estoque'}</strong>{detalhe?.produtoId ? 'As porções mantêm seus vínculos de saldo. A receita e os insumos ficam em Produção.' : 'A disponibilidade é controlada manualmente. Este cadastro não cria saldo ou receita.'}</span></p>}
               {!fonteApi && extras.length > 0 && <fieldset className={css.secao}><legend>Adicionais do prato</legend>{extras.map((a) => <label key={a.sku} className={css.opcao}><input type="checkbox" checked={selecionados.includes(a.sku)} onChange={() => setSelecionados((s) => s.includes(a.sku) ? s.filter((v) => v !== a.sku) : [...s, a.sku])} />{a.nome} · {moeda(a.preco)}</label>)}</fieldset>}
               {!item && <p className={css.ajuda}>O prato entra em validação. Depois de salvar, confirme no cardápio para o assistente poder oferecê-lo.</p>}
