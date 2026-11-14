@@ -100,7 +100,8 @@ public sealed class ContaReceberPixReconciliacaoJob(
         foreach (var parcela in parcelas)
         {
             if (string.IsNullOrWhiteSpace(parcela.EfiTxid)) continue;
-            if (parcela.Status != StatusParcela.Pendente && parcela.Status != StatusParcela.ParcialmentePaga)
+            if (parcela.Status != StatusParcela.Pendente && parcela.Status != StatusParcela.ParcialmentePaga
+                && parcela.Status != StatusParcela.Vencida)
                 continue;
 
             try
