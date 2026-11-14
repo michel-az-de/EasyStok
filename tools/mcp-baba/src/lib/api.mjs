@@ -1,7 +1,13 @@
 // Cliente da API EasyStok para os MCPs operacionais. Login nominal (JWT do usuario); a senha so vem do ambiente local.
 const BASE = (process.env.BABA_API_BASE || 'https://api.easystok.online').replace(/\/+$/, '');
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-const PERMITIDO = /^\/api\/(auth\/login|caixa\/[a-z/]+|atendimento\/producao\/[a-z0-9/-]+)(\?[A-Za-z0-9=&_.:%-]*)?$/;
+const QUERY = '(\\?[A-Za-z0-9=&_.:%-]*)?$';
+const SEG = '[a-z0-9-]+';
+// Por metodo: leitura em varias areas, escrita so nas rotas que um MCP expoe (nunca por prefixo).
+const PERMITIDO = {
+  GET: new RegExp(`^/api/(caixa/[a-z/]+|atendimento/(producao/${SEG}(/${SEG})*|conversas(/${SEG})?(/(mensagens|assistente))?|assistente/(historico|uso)|expediente|viagens(/${SEG})?|agenda))` + QUERY),
+  POST: /^\/api\/(auth\/login|caixa\/(abrir|fechar|movimentos)|atendimento\/producao\/perdas)$/,
+};
 
 export function validarBase(base) {
   if (!/^https:\/\/[A-Za-z0-9.-]+(:\d+)?$/.test(base) && !LOCAL.test(base)) throw new Error('BABA_API_BASE deve ser https (ou http local).');
@@ -13,7 +19,7 @@ export function criarCliente({ base = BASE, env = process.env, fetchFn = fetch }
   validarBase(base);
   let token = null, entrando = null;
   const req = async (metodo, caminho, corpo, tentouLogin = false) => {
-    if (!PERMITIDO.test(caminho)) throw new Error('caminho da API nao permitido.');
+    if (!PERMITIDO[metodo]?.test(caminho)) throw new Error('caminho da API nao permitido.');
     if (!token && caminho !== '/api/auth/login') await entrar();
     let r;
     try { r = await fetchFn(base + caminho, {
