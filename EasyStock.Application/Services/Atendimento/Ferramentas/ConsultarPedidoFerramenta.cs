@@ -9,7 +9,7 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 
 /// <summary>
 /// <c>consultar_pedido(pedido_id?)</c>: status e previsão do pedido. Sem id, usa o pedido em andamento
-/// da conversa ou o último do cliente. Só devolve pedido do cliente da conversa: o id vem do LLM e
+/// da conversa ou o último do cliente ainda não finalizado. Só devolve pedido do cliente da conversa: o id vem do LLM e
 /// não pode abrir pedido de outra pessoa.
 /// </summary>
 public sealed class ConsultarPedidoFerramenta(
@@ -23,7 +23,8 @@ public sealed class ConsultarPedidoFerramenta(
 
     public string Descricao =>
         "Consulta status, itens e previsão de um pedido do cliente desta conversa. Sem pedido_id, usa o pedido " +
-        "em andamento ou o último pedido do cliente. Horários em horário de Brasília.";
+        "em andamento; sem pedido em andamento, devolve só o resumo do último pedido, que é passado e não deve ser " +
+        "confundido com o pedido que o cliente está fazendo agora. Horários em horário de Brasília.";
 
     public string SchemaJson =>
         """{"type":"object","properties":{"pedido_id":{"type":"string","description":"Id do pedido, se o cliente informou"}},"additionalProperties":false}""";
@@ -41,12 +42,28 @@ public sealed class ConsultarPedidoFerramenta(
             return FerramentaJson.Serializar(new { erro = "pedido_nao_encontrado" });
         if (pedidoId is null)
         {
-            var ultimos = await pedidoRepository.ListByClienteAsync(contexto.EmpresaId, clienteId, max: 1);
-            pedidoId = ultimos.FirstOrDefault()?.Id;
+            var ultimo = (await pedidoRepository.ListByClienteAsync(contexto.EmpresaId, clienteId, max: 1)).FirstOrDefault();
+            if (ultimo is null)
+                return FerramentaJson.Serializar(new { erro = "cliente_sem_pedidos" });
+            // #2515: pedido finalizado não é o atendimento em andamento (#2126). Virar resposta verificada fazia o "2"
+            // da lista de janelas receber "Situação registrada: Cancelado... Falta pagar" de um pedido de dias atrás.
+            if (ultimo.EstaFinalizado)
+                return FerramentaJson.Serializar(new
+                {
+                    erro = "sem_pedido_em_andamento",
+                    ultimoPedido = new
+                    {
+                        pedidoId = ultimo.Id,
+                        situacao = StatusPedidoVocabulario.RotuloLojista(ultimo.StatusEnum),
+                        criadoEm = Brasilia(ultimo.CriadoEm),
+                        canceladoEm = ultimo.CanceladoEm is { } canceladoUltimo ? Brasilia(canceladoUltimo) : null,
+                        entregueEm = ultimo.EntreguEm is { } entregue ? Brasilia(entregue) : null
+                    },
+                    orientacao = "Não há pedido em andamento. Só fale do último pedido se o cliente perguntar dele; " +
+                        "para os detalhes, chame de novo com o pedido_id."
+                });
+            pedidoId = ultimo.Id;
         }
-
-        if (pedidoId is null)
-            return FerramentaJson.Serializar(new { erro = "cliente_sem_pedidos" });
 
         var detalhe = await obterPedidoDetalhes.ExecuteAsync(new ObterPedidoDetalhesQuery(contexto.EmpresaId, pedidoId.Value, MaxEventos: 20));
         if (detalhe is null || detalhe.Pedido.ClienteId != clienteId)
@@ -71,22 +88,29 @@ public sealed class ConsultarPedidoFerramenta(
             ? $"Comanda #{conversa.NumeroComanda}" : $"Pedido registrado em {Brasilia(p.CriadoEm)}";
         // #2126: devolução e cupom zerados fora de um acerto de devolução são ruído para o cliente.
         var temDevolucao = financeiro.Devolvido > 0 || financeiro.Reservado > 0 || estado?.Acerto?.Tipo == "estorno";
+        // #2515: pedido cancelado não cobra nada nem tem entrega a prever.
+        var cancelado = pedido.StatusEnum == StatusPedido.Cancelado;
+        var faltaPagar = cancelado ? 0 : Math.Max(0, p.Total - financeiro.Alocado);
         var resposta = new List<string>
         {
-            $"{titulo}. Situação registrada: {StatusPedidoVocabulario.RotuloLojista(StatusPedidoMapper.Parse(pedido.Status))}.",
-            $"Total: {FerramentaJson.FormatarReais(p.Total)}. Cobertura atual: {FerramentaJson.FormatarReais(financeiro.Alocado)}. Falta pagar: {FerramentaJson.FormatarReais(Math.Max(0, p.Total - financeiro.Alocado))}.",
+            $"{titulo}. Situação registrada: {StatusPedidoVocabulario.RotuloLojista(pedido.StatusEnum)}" +
+                (cancelado && p.CanceladoEm is { } canceladoEm ? $" em {Brasilia(canceladoEm)}." : "."),
+            cancelado
+                ? $"Total: {FerramentaJson.FormatarReais(p.Total)}."
+                : $"Total: {FerramentaJson.FormatarReais(p.Total)}. Cobertura atual: {FerramentaJson.FormatarReais(financeiro.Alocado)}. Falta pagar: {FerramentaJson.FormatarReais(faltaPagar)}.",
             temDevolucao
                 ? $"Dinheiro recebido registrado: {FerramentaJson.FormatarReais(financeiro.Recebido)}. Devoluções registradas: {FerramentaJson.FormatarReais(financeiro.Devolvido)}. Reservado para devolução: {FerramentaJson.FormatarReais(financeiro.Reservado)}."
                 : $"Dinheiro recebido registrado: {FerramentaJson.FormatarReais(financeiro.Recebido)}.",
         };
         if (financeiro.ConvertidoEmCupom > 0 || financeiro.CupomAplicado > 0)
             resposta.Add($"Crédito emitido em cupom: {FerramentaJson.FormatarReais(financeiro.ConvertidoEmCupom)}. Crédito aplicado ao pedido: {FerramentaJson.FormatarReais(financeiro.CupomAplicado)}.");
-        resposta.Add(
-            estado?.Pedido?.Janela is { } janela
-                ? $"Entrega agendada para {janela.Data:dd/MM/yyyy}, das {janela.HoraInicio:HH:mm} às {janela.HoraFim:HH:mm}."
-                : p.AgendadoParaEm is { } agendado
-                    ? $"Data de entrega registrada: {HorarioBrasil.ConverterParaBrasilia(agendado):dd/MM/yyyy}. A equipe pode conferir a janela com você."
-                    : "Sem previsão de entrega registrada.");
+        if (!cancelado)
+            resposta.Add(
+                estado?.Pedido?.Janela is { } janela
+                    ? $"Entrega agendada para {janela.Data:dd/MM/yyyy}, das {janela.HoraInicio:HH:mm} às {janela.HoraFim:HH:mm}."
+                    : p.AgendadoParaEm is { } agendado
+                        ? $"Data de entrega registrada: {HorarioBrasil.ConverterParaBrasilia(agendado):dd/MM/yyyy}. A equipe pode conferir a janela com você."
+                        : "Sem previsão de entrega registrada.");
         if (estado?.Acerto is { Tipo: "estorno" } acerto)
             foreach (var devolucao in acerto.Devolucoes)
                 resposta.Add($"Solicitação de devolução desta alteração: {FerramentaJson.FormatarReais(devolucao.Valor)}, " +
@@ -109,7 +133,7 @@ public sealed class ConsultarPedidoFerramenta(
             total = FerramentaJson.FormatarReais(p.Total),
             pago = FerramentaJson.FormatarReais(financeiro.Alocado),
             recebido = FerramentaJson.FormatarReais(financeiro.Recebido),
-            faltaPagar = FerramentaJson.FormatarReais(Math.Max(0, p.Total - financeiro.Alocado)),
+            faltaPagar = FerramentaJson.FormatarReais(faltaPagar),
             financeiro,
             acerto = estado?.Acerto,
             cupomAplicado = estado?.Envio?.CupomAplicado,

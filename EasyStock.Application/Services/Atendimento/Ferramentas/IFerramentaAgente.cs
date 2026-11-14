@@ -36,7 +36,27 @@ public sealed class ContextoTurnoAgente(Guid empresaId, Conversa conversa, DateT
     public bool EnvioVerificado { get; private set; }
     public bool HouveEnvio { get; private set; }
     public bool Interrompido { get; private set; }
-    public void Interromper() { Interrompido = true; LimparRespostaVerificada(); }
+    public void Interromper() { Interrompido = true; LimparRespostaVerificada(); _envioAdiado = null; }
+
+    private Func<CancellationToken, Task<bool>>? _envioAdiado;
+
+    /// <summary>#2515: há um envio que só sai no fim do turno, depois do texto do agente (menu de opções).</summary>
+    public bool TemEnvioAdiado => _envioAdiado is not null;
+
+    /// <summary>
+    /// #2515: o menu de opções sai depois do texto do agente, não no meio do laço. Uma vaga só: o último adiamento vale.
+    /// Ferramenta seguinte não o apaga; conversa interrompida, escalada ou com texto barrado não o envia.
+    /// </summary>
+    public void AdiarEnvio(Func<CancellationToken, Task<bool>> envio) => _envioAdiado = envio;
+    public void DescartarEnvioAdiado() => _envioAdiado = null;
+
+    /// <summary>Executa o envio adiado uma vez; devolve se algo saiu ao cliente.</summary>
+    public async Task<bool> EnviarAdiadoAsync(CancellationToken ct = default)
+    {
+        var envio = _envioAdiado;
+        _envioAdiado = null;
+        return envio is not null && await envio(ct);
+    }
 
     /// <summary>Ferramenta desconhecida ou que lançou no turno: o texto livre que vier depois não sai (#1704).</summary>
     public bool FerramentaFalhou { get; private set; }
