@@ -89,6 +89,8 @@ export const cadastrarClienteDaConversa = (id, corpo) => chamarApi(`${BASE}/${id
 export const obterDossie = (id) => chamarApi(`${BASE}/${id}/dossie`)
 // #1839: uma ou duas frases sobre o cliente, pela IA; texto nulo com a IA desligada.
 export const obterResumoDoCliente = (id, sinal) => chamarApi(`${BASE}/${id}/resumo-cliente`, { sinal, prazoComCancelamento: true })
+// #2496: etapas do turno do robô nesta conversa, chave da loja, prompt exato e ferramentas. Só lê.
+export const checarAssistente = (id, sinal) => chamarApi(`${BASE}/${id}/assistente`, { sinal, prazoComCancelamento: true })
 // #1436: nota interna no cadastro do cliente (o cliente nunca vê).
 export const adicionarNotaCliente = (clienteId, texto) =>
   chamarApi(`/api/clientes/${clienteId}/notas`, { metodo: 'POST', corpo: { texto } })

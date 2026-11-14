@@ -19,6 +19,7 @@ import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
 import { ModalCompartilharComanda } from './CompartilharComanda'
+import { ModalAssistente } from './ModalAssistente'
 import { ModalDevolverAssistente } from './ModalDevolverAssistente'
 import { ModalPassarConversa } from './PassarConversa'
 import { Thread } from './Thread'
@@ -194,6 +195,9 @@ export function PainelAtendimento({
               acoesTela.enviarCardapio && { chave: 'cardapio', rotulo: 'Enviar cardápio', icone: 'cardapio', abreJanela: true, aoEscolher: () => abrirModal('cardapio') },
               acoesTela.passar && { chave: 'passar', rotulo: 'Passar conversa', icone: 'user-plus', abreJanela: true, aoEscolher: () => abrirModal('passar') },
               acoesTela.devolver && { chave: 'devolver', rotulo: 'Devolver ao Assistente', icone: 'sparkles', abreJanela: true, aoEscolher: () => abrirModal('devolver') },
+              // #2496: só a API sabe as etapas do robô; na demonstração não há o que checar. Conversa concluída
+              // fica sem menu (#2185): a próxima mensagem abre outra, que começa com o robô.
+              fonteApi && !encerrada && { chave: 'assistente', rotulo: 'Checar o Assistente', icone: 'settings', abreJanela: true, aoEscolher: () => abrirModal('assistente') },
               acoesTela.concluir && { chave: 'concluir', rotulo: 'Concluir conversa', icone: 'circle-check', abreJanela: true, aoEscolher: () => abrirEncerramento(selecionada.id) },
             ]}
           />
@@ -275,6 +279,7 @@ export function PainelAtendimento({
       {modalAberto === 'cardapio' && <ModalCompartilharComanda conversa={selecionada} aoFechar={fecharModal} />}
       {modalAberto === 'passar' && <ModalPassarConversa conversa={selecionada} aoFechar={fecharModal} />}
       {modalAberto === 'devolver' && <ModalDevolverAssistente conversa={selecionada} aoFechar={fecharModal} aoConfirmar={() => devolverAutomatico(selecionada.id)} />}
+      {modalAberto === 'assistente' && <ModalAssistente key={selecionada.id} conversa={selecionada} aoFechar={fecharModal} />}
     </>
   )
 }
