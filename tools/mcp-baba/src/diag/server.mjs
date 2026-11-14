@@ -7,7 +7,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { executarRemoto, ALVO } from '../lib/ssh.mjs';
 import { consultar, ENDPOINTS } from '../lib/saude.mjs';
-import { filtrar, formatar, agruparErros } from '../lib/logs.mjs';
+import { filtrar, formatar, agruparErros, AVISO } from '../lib/logs.mjs';
 import { redigir } from '../lib/redacao.mjs';
 import { limitar } from '../lib/limites.mjs';
 
@@ -77,6 +77,6 @@ server.registerTool('erros_recentes', {
 server.registerTool('deploy_historico', {
   description: 'Ultimas linhas do deploy-history.log (data, modo, sha, rc, quem, motivo).', annotations: L,
   inputSchema: { linhas: z.number().int().min(1).max(200).default(20) },
-}, async ({ linhas }) => { try { return texto(limitar(redigir(await executarRemoto(`deploy_historico ${linhas}`)))); } catch (e) { return falha(e); } });
+}, async ({ linhas }) => { try { return texto(AVISO + limitar(redigir(await executarRemoto(`deploy_historico ${linhas}`)))); } catch (e) { return falha(e); } });
 
 await server.connect(new StdioServerTransport());

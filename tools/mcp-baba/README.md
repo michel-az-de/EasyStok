@@ -44,13 +44,14 @@ useradd -m -s /bin/bash baba-mcp            # sem grupo docker
 install -d -o root -g root -m 755 /opt/baba-mcp
 install -o root -g root -m 755 scripts/mcp/gate.sh /opt/baba-mcp/gate.sh
 echo 'baba-mcp ALL=(root) NOPASSWD: /opt/baba-mcp/gate.sh --root *' > /etc/sudoers.d/baba-mcp
+echo "Defaults!/opt/baba-mcp/gate.sh env_reset,!setenv" >> /etc/sudoers.d/baba-mcp
 chmod 440 /etc/sudoers.d/baba-mcp && visudo -c
 # leitura do historico de deploy (ajuste se o caminho for outro)
-setfacl -m u:baba-mcp:rx /home/felipe /home/felipe/build && setfacl -m u:baba-mcp:r /home/felipe/build/deploy-history.log
+setfacl -m u:baba-mcp:x /home/felipe /home/felipe/build && setfacl -m u:baba-mcp:r /home/felipe/build/deploy-history.log
 # chave publica da pessoa (uma linha por pessoa), restrita ao gate:
-install -d -m 700 -o baba-mcp -g baba-mcp /home/baba-mcp/.ssh
+install -d -m 755 -o root -g root /home/baba-mcp/.ssh
 echo 'command="/opt/baba-mcp/gate.sh",restrict ssh-ed25519 AAAA... pessoa' >> /home/baba-mcp/.ssh/authorized_keys
-chown baba-mcp: /home/baba-mcp/.ssh/authorized_keys && chmod 600 /home/baba-mcp/.ssh/authorized_keys
+chown root:root /home/baba-mcp/.ssh /home/baba-mcp/.ssh/authorized_keys && chmod 755 /home/baba-mcp/.ssh && chmod 644 /home/baba-mcp/.ssh/authorized_keys   # root e dono: baba-mcp nao reescreve a propria chave
 ```
 
 Comandos aceitos pelo gate: `logs <ez-api|ez-worker|ez-web> <5m|2h> <1..5000>`, `containers`, `deploy_historico <1..200>`. O restante e recusado (exit 64).

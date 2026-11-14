@@ -9,7 +9,7 @@ const NEGADOS = new Set(['hostinger']);
 /** Monta o argv do ssh. Exportado para teste. */
 export function argvSsh(comando, alvo = ALVO) {
   if (NEGADOS.has(alvo)) throw new Error('BABA_SSH_TARGET nao pode ser a chave de deploy (hostinger).');
-  if (!/^[A-Za-z0-9._@-]+$/.test(alvo)) throw new Error('BABA_SSH_TARGET invalido.');
+  if (!/^[A-Za-z0-9._@][A-Za-z0-9._@-]*$/.test(alvo)) throw new Error('BABA_SSH_TARGET invalido.');
   if (!/^[a-z_]+(?: [A-Za-z0-9-]+)*$/.test(comando)) throw new Error('comando remoto invalido.');
   return ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-T', alvo, comando];
 }

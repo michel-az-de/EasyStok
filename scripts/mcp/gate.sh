@@ -65,6 +65,8 @@ inspeciona() {
 }
 
 if [ "${1:-}" = "--root" ]; then
+  # como root nada vem do ambiente: caminhos fixos, sem modo de teste
+  DOCKER=/usr/bin/docker; HIST=/home/felipe/build/deploy-history.log; GATE_DRY=
   shift; valida "$@"
   if [ "$1" = "containers" ] && [ -z "$GATE_DRY" ]; then
     "$DOCKER" ps -a --filter name=ez- --format '{{.Names}}|{{.Status}}|{{.Image}}'; inspeciona; exit 0
