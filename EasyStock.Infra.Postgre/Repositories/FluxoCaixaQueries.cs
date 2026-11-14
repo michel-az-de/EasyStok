@@ -17,7 +17,8 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
         if (empresaId == Guid.Empty) throw new ArgumentException("EmpresaId obrigatorio.", nameof(empresaId));
 
         var hoje = referenceDateUtc.Date;
-        var mais30 = hoje.AddDays(30);
+        // #2546: janela [hoje, hoje+31) inclui o 30º dia inteiro (vencimento gravado 00:00Z ou 03:00Z).
+        var fimJanela30 = hoje.AddDays(31);
         // #2268: pagamento e instante real; o mes e o civil de Brasilia, como no Extrato.
         var (inicioMes, fimMes) = HorarioBrasil.JanelaMesUtc(DateOnly.FromDateTime(hoje));
 
@@ -36,10 +37,10 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
 
         // A vencer nos proximos 30d
         var aVencerPagar = await parcelasPagarVivas
-            .Where(p => p.DataVencimento >= hoje && p.DataVencimento <= mais30)
+            .Where(p => p.DataVencimento >= hoje && p.DataVencimento < fimJanela30)
             .SumAsync(p => (decimal?)(p.Valor - p.ValorPago), ct) ?? 0m;
         var aVencerReceber = await parcelasReceberVivas
-            .Where(p => p.DataVencimento >= hoje && p.DataVencimento <= mais30)
+            .Where(p => p.DataVencimento >= hoje && p.DataVencimento < fimJanela30)
             .SumAsync(p => (decimal?)(p.Valor - p.ValorPago), ct) ?? 0m;
 
         // Vencido = derivado por data (independe do status armazenado da parcela/conta)
@@ -84,10 +85,10 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
 
         // BUG-08 (QA v1.10 #674): contas DISTINTAS com parcela viva a vencer na janela 30d do VALOR.
         var qtdCpAVencer30 = await parcelasPagarVivas
-            .Where(p => p.DataVencimento >= hoje && p.DataVencimento <= mais30)
+            .Where(p => p.DataVencimento >= hoje && p.DataVencimento < fimJanela30)
             .Select(p => p.ContaPagarId).Distinct().CountAsync(ct);
         var qtdCrAVencer30 = await parcelasReceberVivas
-            .Where(p => p.DataVencimento >= hoje && p.DataVencimento <= mais30)
+            .Where(p => p.DataVencimento >= hoje && p.DataVencimento < fimJanela30)
             .Select(p => p.ContaReceberId).Distinct().CountAsync(ct);
 
         return new DashboardFinanceiroDto(
@@ -241,7 +242,8 @@ public sealed class FluxoCaixaQueries(EasyStockDbContext db) : IFluxoCaixaQuerie
             {
                 PeriodicidadeFluxo.Diario => cursor.AddDays(1),
                 PeriodicidadeFluxo.Semanal => cursor.AddDays(7),
-                _ => cursor.AddMonths(1)
+                // #2546: mês do calendário; a primeira linha vai do início até o dia 1 do mês seguinte.
+                _ => new DateOnly(cursor.Year, cursor.Month, 1).AddMonths(1)
             };
             var rotulo = p == PeriodicidadeFluxo.Mensal ? cursor.ToString("MM/yyyy") : cursor.ToString("dd/MM");
             ret.Add((cursor, proximo > fim ? fim.AddDays(1) : proximo, rotulo));

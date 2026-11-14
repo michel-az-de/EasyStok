@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
@@ -42,7 +43,9 @@ public sealed class AgenteAtendimentoService(
     ILogger<AgenteAtendimentoService> logger,
     IPedidoRepository? pedidos = null,
     Notifications.IContatoDaEquipeAvisada? equipe = null,
-    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null)
+    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null,
+    ITurnoAgenteRepository? turnos = null,
+    IOptions<PrecosModelosAgenteOptions>? precos = null)
 {
     public const int MaximoIteracoes = 6;
     public const int UltimasMensagens = 20;
@@ -59,6 +62,7 @@ public sealed class AgenteAtendimentoService(
 
     public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
+        var cronometro = Stopwatch.StartNew();
         var dados = await conversaRepository.ObterComMensagensAsync(empresaId, conversaId, UltimasMensagens, ct);
         if (dados is null) return ResultadoTurnoAgente.Ignorado;
 
@@ -150,8 +154,20 @@ public sealed class AgenteAtendimentoService(
         var final = await protecao.ExecutarAsync(Finalizar, ct, gravar: false);
         if (final is not null) return final;
         if (tokens > 0) await RegistrarUsoAsync(empresaId, tokens, agora);
+        await RegistrarTurnoAsync(geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro : DesfechoTurnoAgente.Interrompido, ct);
         await unitOfWork.CommitAsync();
         return new ResultadoTurnoAgente(true, contexto.HouveEnvio, false);
+
+        // S67 (#2534): um registro por turno que chamou o modelo, só com números e ids; vai no mesmo commit do consumo.
+        async Task RegistrarTurnoAsync(DesfechoTurnoAgente desfecho, CancellationToken token)
+        {
+            if (turnos is null) return;
+            var consumo = geracao.Consumo ?? new ConsumoGeracaoAgente();
+            await turnos.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, gravacao.UltimaSaidaId,
+                consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido,
+                precos?.Value.Estimar(consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido),
+                consumo.Ferramentas, consumo.Passos, desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora), token);
+        }
 
         async Task<ResultadoTurnoAgente> Finalizar(CancellationToken token)
         {
@@ -221,9 +237,12 @@ public sealed class AgenteAtendimentoService(
         if (tokens > 0)
             await RegistrarUsoAsync(empresaId, tokens, agora);
 
+        var escalou = motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida;
+        await RegistrarTurnoAsync(geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro
+            : escalou ? DesfechoTurnoAgente.Escalou : DesfechoTurnoAgente.Respondeu, ct);
+
         await unitOfWork.CommitAsync();
-        return new ResultadoTurnoAgente(true, respondeu,
-            motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida);
+        return new ResultadoTurnoAgente(true, respondeu, escalou);
         }
     }
 
@@ -319,6 +338,7 @@ public sealed class AgenteAtendimentoService(
         // encerrar_conversa pode ter fechado a conversa neste turno: a despedida ainda vai para o histórico.
         if (conversa.EstaAberta) conversa.RegistrarSaida(agora);
         await conversaRepository.AddMensagemAsync(saida, ct);
+        gravacao.UltimaSaidaId = saida.Id;
         await gravacao.GravarAsync(ct);
         return enviou;
     }
@@ -386,6 +406,9 @@ public sealed class AgenteAtendimentoService(
 
         public Guid EmpresaId => empresaId;
         public DateTime Agora => agora;
+
+        /// <summary>S67: a última resposta que o turno gravou, para o registro do turno.</summary>
+        public Guid? UltimaSaidaId { get; set; }
 
         public async Task GravarAsync(CancellationToken ct)
         {

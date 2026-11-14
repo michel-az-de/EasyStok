@@ -13,6 +13,10 @@
 #   6. compose up -d, espera healthy e confere GIT_SHA no ez-api
 #   7. se falhar: volta as imagens para vps-prev-<ts> e sobe de novo.
 #      O banco NAO e revertido: o dump do passo 4 fica para restauracao manual.
+#   8. se ficou no ar: faxina (issue #2545). Guarda so as RETEM_PREV imagens
+#      vps-prev-<ts> mais novas por servico, remove as tags vps-<sha> de deploys
+#      anteriores e poda o cache de build acima de CACHE_TETO. Falha na faxina
+#      nao derruba o deploy. Dumps, volumes e banco ficam fora.
 #
 # Guarda (issue #1336, incidente 2026-10-01): antes do git archive faz git fetch
 # e RECUSA o SHA que nao for o origin/master atual nem descendente dele, porque
@@ -36,7 +40,8 @@
 #
 # Variaveis: VPS_HOST (hostinger), STACK_DIR (/opt/stacks/easystok),
 # BUILD_ROOT (/home/felipe/build), BACKUP_DIR (/home/felipe/backups; /opt/backups e do root), DB_CONTAINER
-# (shared-postgres), DB_NAME (easystock), HEALTH_TIMEOUT (180 s).
+# (shared-postgres), DB_NAME (easystock), HEALTH_TIMEOUT (180 s), RETEM_PREV (3
+# imagens de rollback por servico), CACHE_TETO (10GB de cache de build).
 # =============================================================================
 set -euo pipefail
 
@@ -47,6 +52,8 @@ BACKUP_DIR="${BACKUP_DIR:-/home/felipe/backups}"
 DB_CONTAINER="${DB_CONTAINER:-shared-postgres}"
 DB_NAME="${DB_NAME:-easystock}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
+RETEM_PREV="${RETEM_PREV:-3}"
+CACHE_TETO="${CACHE_TETO:-10GB}"
 SERVICES="api worker web"
 
 uso() { echo "ERRO: $*" >&2; sed -n '/^# Uso:/,/^# Saidas:/p' "$0" | sed '$d; s/^# \{0,1\}//' >&2; exit 2; }
@@ -146,11 +153,24 @@ sha_no_ar() {
   docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' ez-api | sed -n 's/^GIT_SHA=//p' | head -1
 }
 
+# #2545: sem isto o disco enche (80 GB de cache e 30 imagens de rollback por
+# servico em 14/11/2026). So roda depois do deploy saudavel: o caminho de falha
+# precisa das imagens antigas. Remover a tag nao apaga camada ainda em uso.
+faxina() {
+  local s t
+  for s in $SERVICES; do
+    docker images "easystok-$s" --format '{{.Tag}}' | grep '^vps-prev-' | sort -r       | tail -n +"$(( ${RETEM_PREV:-3} + 1 ))"       | while read -r t; do docker rmi "easystok-$s:$t" >/dev/null || true; done
+    docker images "easystok-$s" --format '{{.Tag}}' | grep -E '^vps-[0-9a-f]{7,40}$' | grep -vx "vps-$SHA"       | while read -r t; do docker rmi "easystok-$s:$t" >/dev/null || true; done
+  done
+  docker builder prune -af --reserved-space "${CACHE_TETO:-10GB}" >/dev/null
+}
+
 echo "==> [5/6] compose up"
 up
 if healthy && [ "$(sha_no_ar)" = "$SHA_FULL" ]; then
   echo "$SHA" >"$BUILD_ROOT/easystok-current"
   echo "==> [6/6] OK: $SHA no ar. Dump pre-deploy: $DUMP"
+  faxina || echo "AVISO: faxina de imagens e cache falhou; o deploy esta no ar" >&2
   exit 0
 fi
 
@@ -239,6 +259,7 @@ fi
 ENVS="SHA=$SHA SHA_FULL=$SHA_FULL TS=$TS STACK_DIR=$STACK_DIR BUILD_ROOT=$BUILD_ROOT"
 ENVS="$ENVS BACKUP_DIR=$BACKUP_DIR DB_CONTAINER=$DB_CONTAINER DB_NAME=$DB_NAME"
 ENVS="$ENVS HEALTH_TIMEOUT=$HEALTH_TIMEOUT SERVICES='$SERVICES'"
+ENVS="$ENVS RETEM_PREV=$RETEM_PREV CACHE_TETO=$CACHE_TETO"
 ENVS="$ENVS MODO=$MODO QUEM=$(printf '%q' "$QUEM") MOTIVO=$(printf '%q' "$MOTIVO")"
 
 # stdin do ssh = fonte (tar); o script remoto vai como argumento de bash -c.

@@ -11,9 +11,42 @@ namespace EasyStock.Application.Services.Atendimento;
 
 /// <summary>
 /// Resultado do laço do LLM. <see cref="Concluiu"/> falso sem <see cref="MotivoFalha"/> = atingiu o
-/// limite de iterações sem resposta final.
+/// limite de iterações sem resposta final. <see cref="Consumo"/> (S67) traz o detalhe para o registro do turno.
 /// </summary>
-public sealed record GeracaoAgente(string? Texto, int Tokens, bool Concluiu, string? MotivoFalha);
+public sealed record GeracaoAgente(string? Texto, int Tokens, bool Concluiu, string? MotivoFalha, ConsumoGeracaoAgente? Consumo = null);
+
+/// <summary>
+/// S67 (#2534): o que o laço gastou e pediu, para o registro do turno. Cada resposta do modelo é um passo; o modelo é
+/// o da última resposta. Ferramenta fica sem ok quando falhou, não existe ou não rodou porque a conversa mudou.
+/// </summary>
+public sealed class ConsumoGeracaoAgente
+{
+    private readonly List<FerramentaDoTurno> _ferramentas = [];
+
+    public int TokensEntrada { get; private set; }
+    public int TokensSaida { get; private set; }
+    public int TokensCacheLido { get; private set; }
+    public string? Modelo { get; private set; }
+    public int Passos { get; private set; }
+
+    /// <summary>A chamada ao modelo falhou (depois da nova tentativa).</summary>
+    public bool FalhaLlm { get; private set; }
+
+    public IReadOnlyList<FerramentaDoTurno> Ferramentas => _ferramentas;
+
+    internal void Somar(RespostaLlm resposta)
+    {
+        TokensEntrada += resposta.TokensEntrada;
+        TokensSaida += resposta.TokensSaida;
+        TokensCacheLido += resposta.TokensCacheLido;
+        Modelo = resposta.Modelo ?? Modelo;
+        Passos++;
+    }
+
+    internal void RegistrarFerramenta(string nome, bool ok) => _ferramentas.Add(new FerramentaDoTurno(nome, ok));
+
+    internal void RegistrarFalhaLlm() => FalhaLlm = true;
+}
 
 /// <summary>
 /// Geração do agente de atendimento, sem efeito colateral próprio: monta o contexto (prompt fixo, caderno,
@@ -70,6 +103,7 @@ public static class GeracaoAgenteAtendimento
             .Select(f => new FerramentaLlm(f.Nome, f.Descricao, f.SchemaJson))
             .ToList();
         var tokens = 0;
+        var consumo = new ConsumoGeracaoAgente();
         var situacaoInicial = contexto.Conversa.Situacao;
 
         for (var iteracao = 0; iteracao < maximoIteracoes; iteracao++)
@@ -83,11 +117,13 @@ public static class GeracaoAgenteAtendimento
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 contexto.LimparRespostaVerificada();
+                consumo.RegistrarFalhaLlm();
                 logger.LogError(ex, "Agente de atendimento: falha chamando o LLM na conversa {ConversaId}.", contexto.Conversa.Id);
-                return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)");
+                return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)", consumo);
             }
 
             tokens += resposta.TokensEntrada + resposta.TokensSaida;
+            consumo.Somar(resposta);
 
             if (resposta.StopReason != RespostaLlm.StopToolUse)
             {
@@ -95,25 +131,27 @@ public static class GeracaoAgenteAtendimento
                 return new GeracaoAgente(texto, tokens, true,
                     texto.Length == 0 && !(situacaoInicial == SituacaoConversa.Automatica
                         && (contexto.HouveEnvio || contexto.TemEnvioAdiado || contexto.RespostaVerificada is { Length: > 0 }))
-                        ? $"o agente não produziu resposta (stop_reason={resposta.StopReason})" : null);
+                        ? $"o agente não produziu resposta (stop_reason={resposta.StopReason})" : null, consumo);
             }
 
             mensagens.Add(new MensagemLlm(MensagemLlm.Assistente, resposta.Conteudo));
             var resultados = new List<BlocoLlm>();
             foreach (var uso in resposta.Conteudo.OfType<BlocoUsoFerramentaLlm>())
             {
-                resultados.Add(await ExecutarFerramentaAsync(ferramentas, contexto, uso, logger, ct));
-                if (contexto.Interrompido) return new GeracaoAgente(null, tokens, false, "o contexto da conversa mudou");
+                var resultado = await ExecutarFerramentaAsync(ferramentas, contexto, uso, logger, ct);
+                resultados.Add(resultado);
+                consumo.RegistrarFerramenta(uso.Nome, !resultado.EhErro && !contexto.Interrompido);
+                if (contexto.Interrompido) return new GeracaoAgente(null, tokens, false, "o contexto da conversa mudou", consumo);
                 if (situacaoInicial == SituacaoConversa.Automatica && contexto.Conversa.Situacao != SituacaoConversa.Automatica)
                 {
                     if (contexto.Conversa.Situacao != SituacaoConversa.Encerrada) contexto.LimparRespostaVerificada();
-                    return new GeracaoAgente(null, tokens, true, null);
+                    return new GeracaoAgente(null, tokens, true, null, consumo);
                 }
             }
             mensagens.Add(new MensagemLlm(MensagemLlm.Usuario, resultados));
         }
 
-        return new GeracaoAgente(null, tokens, false, null);
+        return new GeracaoAgente(null, tokens, false, null, consumo);
     }
 
     /// <summary>

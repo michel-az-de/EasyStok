@@ -165,6 +165,37 @@ public class AnthropicMessagesClientTests
         ex.Which.Message.Should().Contain("429").And.NotContain("chave-de-teste");
     }
 
+    private static RequisicaoLlm RequisicaoSimples() =>
+        new("Você é o atendente.", [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], []);
+
+    [Fact]
+    public async Task DevolveOModeloQueRespondeuEOCacheLido()
+    {
+        // S67 (#2534): o registro do turno guarda o modelo que respondeu e o cache lido, que tem preço próprio.
+        const string corpo = """
+            {"id":"msg_2","type":"message","role":"assistant","model":"claude-sonnet-5-20261101",
+             "content":[{"type":"text","text":"Oi"}],"stop_reason":"end_turn",
+             "usage":{"input_tokens":40,"output_tokens":8,"cache_read_input_tokens":900}}
+            """;
+
+        var resposta = await Criar(new CapturaHandler(HttpStatusCode.OK, corpo)).EnviarAsync(RequisicaoSimples());
+
+        resposta.Modelo.Should().Be("claude-sonnet-5-20261101");
+        resposta.TokensEntrada.Should().Be(40);
+        resposta.TokensSaida.Should().Be(8);
+        resposta.TokensCacheLido.Should().Be(900);
+    }
+
+    [Fact]
+    public async Task SemModeloNaRespostaFicaOConfiguradoESemCacheZero()
+    {
+        var resposta = await Criar(new CapturaHandler(HttpStatusCode.OK, """{"content":[],"stop_reason":"end_turn"}"""))
+            .EnviarAsync(RequisicaoSimples());
+
+        resposta.Modelo.Should().Be("claude-sonnet-5");
+        resposta.TokensCacheLido.Should().Be(0);
+    }
+
     private sealed class CapturaHandler(HttpStatusCode status, string resposta) : HttpMessageHandler
     {
         public HttpRequestMessage? Requisicao { get; private set; }

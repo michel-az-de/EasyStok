@@ -91,6 +91,10 @@ case "$1" in
   tag) src=$(grep "^$2 " "$STATE/tags" | cut -d' ' -f2); sed -i "\#^$3 #d" "$STATE/tags"; echo "$3 ${src:-$2}" >> "$STATE/tags" ;;
   compose) : ;;
   logs) : ;;
+  # #2545: faxina pos-deploy. FAKE_FAXINA_FAIL=1 simula docker recusando remover/podar.
+  images) grep "^$2:" "$STATE/tags" | cut -d' ' -f1 | cut -d: -f2 ;;
+  rmi) [ "${FAKE_FAXINA_FAIL:-0}" = 1 ] && exit 1; sed -i "\#^$2 #d" "$STATE/tags" ;;
+  builder) exit "${FAKE_FAXINA_FAIL:-0}" ;;
   inspect)
     atual=$(grep "^easystok-api:vps " "$STATE/tags" | cut -d' ' -f2)
     case "$3" in
@@ -113,7 +117,12 @@ export SHA=novo0001 SHA_FULL=novo0001novo TS=T0 DB_CONTAINER=pg DB_NAME=db HEALT
 export MODO=deploy QUEM="Teste <t@t> em t@maquina" MOTIVO=
 mkdir -p /tmp/bin && cp /t/.fake-docker /tmp/bin/docker && chmod +x /tmp/bin/docker
 export PATH=/tmp/bin:$PATH
-for s in api worker web; do echo "easystok-$s:vps easystok-$s:vps-antiga" >> "$STATE/tags"; done
+for s in api worker web; do
+  echo "easystok-$s:vps easystok-$s:vps-antiga" >> "$STATE/tags"
+  # #2545: sobras de deploys anteriores (5 imagens de rollback e 2 tags de sha)
+  for d in 01 02 03 04 05; do echo "easystok-$s:vps-prev-202611${d}T000000Z img-$s-$d" >> "$STATE/tags"; done
+  for h in abc12345 def67890; do echo "easystok-$s:vps-$h img-$s-$h" >> "$STATE/tags"; done
+done
 tar -cf /tmp/src.tar -C /t .remote.sh
 if [ "${SEGURA_TRAVA:-0}" = 1 ]; then exec 8>/tmp/easystok-deploy.lock; flock 8; fi
 bash /t/.remote.sh < /tmp/src.tar > /tmp/out 2>&1; rc=$?
@@ -124,6 +133,11 @@ echo "dump=$(ls $BACKUP_DIR | wc -l)"
 echo "up=$(grep -c 'compose up' $STATE/calls 2>/dev/null)"
 echo "hist=$(cat $BUILD_ROOT/deploy-history.log 2>/dev/null)"
 echo "log_worker=$(grep -c 'logs --tail 40 ez-worker' $STATE/calls 2>/dev/null)"
+echo "prev=$(grep -c '^easystok-web:vps-prev-' $STATE/tags)"
+echo "prev_velha=$(grep -c '^easystok-web:vps-prev-2026110[123]T' $STATE/tags)"
+echo "prev_nova=$(grep -c '^easystok-web:vps-prev-\(T0\|2026110[45]T\)' $STATE/tags)"
+echo "shas=$(grep -c '^easystok-web:vps-[0-9a-f]\{8\} ' $STATE/tags)"
+echo "poda=$(grep -c 'builder prune' $STATE/calls)"
 EOF
 
 run() { docker run --rm -e "$1" -v "$(pwd -W):/t" bash:5 sh -c 'apk add -q util-linux >/dev/null 2>&1; bash /t/.caso.sh'; }
@@ -133,6 +147,14 @@ r=$(run X=0);                confere "sucesso: exit 0"                  "rc=0" "
                               confere "sucesso: grava easystok-current"  "current=novo0001" "$r"
                               confere "sucesso: faz o dump"              "dump=1" "$r"
                               confere "sucesso: historico com quem e rc" "hist=.*deploy	novo0001	rc=0	Teste <t@t>" "$r"
+                              confere "sucesso: guarda so 3 imagens de rollback" "prev=3" "$r"
+                              confere "sucesso: as 3 guardadas sao as mais novas" "prev_nova=3" "$r"
+                              confere "sucesso: remove as de rollback antigas" "prev_velha=0" "$r"
+                              confere "sucesso: remove as tags de sha antigas" "shas=0" "$r"
+                              confere "sucesso: poda o cache de build"   "poda=1" "$r"
+r=$(run RETEM_PREV=5);       confere "RETEM_PREV=5: guarda 5"           "prev=5" "$r"
+r=$(run FAKE_FAXINA_FAIL=1); confere "faxina falha: deploy segue exit 0" "rc=0" "$r"
+                              confere "faxina falha: marca current"      "current=novo0001" "$r"
 r=$(run FAKE_WORKER_RESTARTS=3); confere "worker em laco de restart: exit 6"     "rc=6" "$r"
                               confere "worker em laco: volta a imagem"   "imagem=easystok-api:vps-antiga" "$r"
                               confere "worker em laco: nao marca current" "current=$" "$r"
@@ -147,6 +169,9 @@ r=$(run FAKE_BAD=1);         confere "falha de health: exit 6"          "rc=6" "
                               confere "falha de health: sobe 2 vezes"    "up=2" "$r"
                               confere "falha de health: nao marca current" "current=$" "$r"
                               confere "falha de health: historico rc=6"  "hist=.*novo0001	rc=6" "$r"
+                              confere "falha de health: nao remove imagem de rollback" "prev=6" "$r"
+                              confere "falha de health: nao remove tag de sha" "shas=2" "$r"
+                              confere "falha de health: nao poda o cache" "poda=0" "$r"
 r=$(run SEGURA_TRAVA=1);     confere "trava ocupada: exit 3"            "rc=3" "$r"
                               confere "trava ocupada: nao sobe nada"     "up=0" "$r"
                               confere "trava ocupada: historico rc=3"    "hist=.*rc=3" "$r"

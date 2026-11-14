@@ -1,0 +1,17 @@
+{
+  "name": "mcp-baba",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidores MCP da Casa da Baba (diagnostico primeiro). Roda na maquina da pessoa; ver docs/plan/mcp-casa-da-baba.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "diag": "node src/diag/server.mjs",
+    "db": "node src/db/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7"
+  }
+}

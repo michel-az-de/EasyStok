@@ -1,5 +1,7 @@
 using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Assistente;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Application.UseCases.Common;
 using Swashbuckle.AspNetCore.Annotations;
 using Microsoft.AspNetCore.RateLimiting;
@@ -56,6 +58,36 @@ public class AtendimentoAssistenteController(
                 new ApiErrorResponse(new ApiError("FICHA_IA_INDISPONIVEL", ex.Message, null, null)));
         }
         catch (ConversaNaoEncontradaException) { return DataNotFound("Conversa não encontrada."); }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
+    }
+
+    /// <summary>S67 (#2534): o que o Assistente fez, turno a turno, do mais novo ao mais velho.</summary>
+    [HttpGet("historico")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Historico([FromQuery] Guid? conversaId, [FromQuery] DesfechoTurnoAgente? resultado,
+        [FromServices] ListarHistoricoAssistenteUseCase historico,
+        [FromQuery] int pagina = 1, [FromQuery] int tamanhoPagina = 20, CancellationToken ct = default)
+    {
+        try
+        {
+            return DataOk(await historico.ExecuteAsync(
+                new ListarHistoricoAssistenteQuery(currentUser.EmpresaId, conversaId, resultado, pagina, tamanhoPagina), ct));
+        }
+        catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
+    }
+
+    /// <summary>S67 (#2534): consumo do Assistente no mês de Brasília (sem ano e mês, o corrente).</summary>
+    [HttpGet("uso")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Uso([FromQuery] int? ano, [FromQuery] int? mes,
+        [FromServices] ObterUsoAssistenteUseCase uso, CancellationToken ct = default)
+    {
+        try
+        {
+            return DataOk(await uso.ExecuteAsync(new ObterUsoAssistenteQuery(currentUser.EmpresaId, ano, mes), ct));
+        }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 

@@ -65,6 +65,8 @@ public class GerarContaPagarDePedidoFornecedorUseCase(
 
         var descricao = $"Compra {CodigoCurto.De(pedido.Id)}";
         var hoje = DateTime.UtcNow;
+        // #2546: vencimento é data civil de Brasília (meia-noite UTC do dia), como na conta do pedido.
+        var vencimento = HorarioBrasil.CivilComoInstanteUtc(HorarioBrasil.Hoje().AddDays(30));
 
         try
         {
@@ -76,7 +78,7 @@ public class GerarContaPagarDePedidoFornecedorUseCase(
                 DataEmissao: hoje,
                 Parcelas: new[]
                 {
-                    new ParcelaSpec(1, valor, hoje.AddDays(30), MetodoPlanejado: null)
+                    new ParcelaSpec(1, valor, vencimento, MetodoPlanejado: null)
                 },
                 CentroCustoId: null,
                 LojaId: lojaId,

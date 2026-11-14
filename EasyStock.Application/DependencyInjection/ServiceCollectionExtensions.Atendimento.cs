@@ -59,6 +59,9 @@ public static partial class ServiceCollectionExtensions
                 if (int.TryParse(configuracao[LimiteRespostasAgenteOptions.ChaveMaximoPorHora], out var maximo))
                     opcoes.MaximoPorHora = maximo;
             });
+        // S67: custo estimado do turno pela tabela Anthropic:Precos; sem a tabela, custo nulo.
+        services.AddOptions<PrecosModelosAgenteOptions>()
+            .Configure<IConfiguration>((opcoes, configuracao) => opcoes.Ler(configuracao));
         services.AddScoped<IEscaladorConversa, EscalarConversaUseCase>(); // S07: Assumir + nota + Push + SSE
 
         services.AddScoped<RoteadorAcoesBotao>();
