@@ -71,6 +71,8 @@ public class WppConnectWebhookParserTests
     {
         var grupo = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","id":"g1","from":"123@g.us","type":"chat","body":"grupo","t":1793000000}""";
         WppConnectWebhookParser.Parse(grupo).Entradas.Should().BeEmpty();
+        var grupoSemId = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","from":"123@g.us","type":"chat","t":1793000000}""";
+        WppConnectWebhookParser.Parse(grupoSemId).Entradas.Should().BeEmpty();
         var lid = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","id":"l1","from":"123@lid","type":"chat","body":"cliente","t":1793000000}""";
         var act = () => WppConnectWebhookParser.Parse(lid);
         act.Should().Throw<FormatException>();
@@ -90,6 +92,17 @@ public class WppConnectWebhookParserTests
 
         var comSender = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","id":"e2","fromMe":true,"from":"5511888888888@c.us","to":"123@lid","type":"chat","body":"loja","t":1793000000,"sender":{"id":"5511888888888@c.us"}}""";
         WppConnectWebhookParser.Parse(comSender).Entradas.Single().Ecos.Single().Para.Should().Be("5511888888888");
+    }
+
+    [Fact]
+    public void Sem_identificador_registra_so_os_nomes_das_chaves()
+    {
+        // #2590: a forma do evento que falha fica no log sem telefone nem texto do cliente.
+        var raw = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","from":"5511999999999@c.us","type":"chat","body":"Segredo","t":1793000000}""";
+        var act = () => WppConnectWebhookParser.Parse(raw);
+        var erro = act.Should().Throw<FormatException>().Which.Message;
+        erro.Should().Contain("evento onmessage").And.Contain("chaves: event,session,from,type,body,t");
+        erro.Should().NotContain("5511999999999").And.NotContain("Segredo");
     }
 
     [Fact]

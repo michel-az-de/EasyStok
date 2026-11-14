@@ -15,8 +15,11 @@ public static class WppConnectWebhookParser
             throw new FormatException("Sessão WPPConnect inválida.");
         var evento = Texto(root, "event");
         if (evento is not ("onmessage" or "unreadmessages" or "onselfmessage" or "onack")) return new([]);
+        if (evento != "onack" && Grupo(root)) return new([]);
         var id = Id(root);
-        if (string.IsNullOrWhiteSpace(id)) throw new FormatException("Mensagem WPPConnect sem identificador.");
+        // #2590: só os nomes das chaves vão para o log, nunca os valores (telefone e texto do cliente).
+        if (string.IsNullOrWhiteSpace(id))
+            throw new FormatException($"Mensagem WPPConnect sem identificador (evento {evento}; chaves: {Chaves(root)}).");
         var externo = $"wpp:{sessao}:{id}";
 
         if (evento == "onack")
@@ -29,8 +32,6 @@ public static class WppConnectWebhookParser
 
         var eco = evento == "onselfmessage" || (root.TryGetProperty("fromMe", out var deMim) && deMim.ValueKind == JsonValueKind.True);
         var contato = Texto(root, eco ? "to" : "from") ?? "";
-        if (contato.EndsWith("@g.us", StringComparison.Ordinal) || contato.EndsWith("@broadcast", StringComparison.Ordinal)
-            || (root.TryGetProperty("isGroupMsg", out var grupo) && grupo.ValueKind == JsonValueKind.True)) return new([]);
         var telefone = telefoneResolvido;
         if (string.IsNullOrWhiteSpace(telefone))
         {
@@ -82,9 +83,21 @@ public static class WppConnectWebhookParser
             && double.TryParse(valor.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var lido) ? lido
         : null;
 
-    public static string? Id(JsonElement root)
+    public static string? Id(JsonElement root) => Serializado(root, "id");
+
+    /// <summary>Identificador do WhatsApp em texto ou no objeto com <c>_serialized</c>.</summary>
+    public static string? Serializado(JsonElement root, string nome)
     {
-        if (!root.TryGetProperty("id", out var id)) return null;
-        return id.ValueKind == JsonValueKind.String ? id.GetString() : Texto(id, "_serialized");
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty(nome, out var valor)) return null;
+        return valor.ValueKind == JsonValueKind.String ? valor.GetString() : Texto(valor, "_serialized");
     }
+
+    /// <summary>Grupo e transmissão são ignorados antes de exigir id (#2590).</summary>
+    public static bool Grupo(JsonElement root) =>
+        new[] { Texto(root, "from"), Texto(root, "to"), Serializado(root, "chatId") }.Any(c =>
+            c is not null && (c.EndsWith("@g.us", StringComparison.Ordinal) || c.EndsWith("@broadcast", StringComparison.Ordinal)))
+        || (root.TryGetProperty("isGroupMsg", out var grupo) && grupo.ValueKind == JsonValueKind.True);
+
+    private static string Chaves(JsonElement root) =>
+        string.Join(",", root.EnumerateObject().Select(p => p.Name).Take(40));
 }

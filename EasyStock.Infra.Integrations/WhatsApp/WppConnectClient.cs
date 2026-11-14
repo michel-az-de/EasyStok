@@ -98,6 +98,28 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
         return pn[..^5];
     }
 
+    /// <summary>#2590: as últimas mensagens da conversa, para recuperar o id que o evento perdeu.</summary>
+    public async Task<IReadOnlyList<MensagemRecenteWppConnect>> ListarMensagensRecentesAsync(CredencialWppConnect sessao, string chat,
+        CancellationToken ct = default)
+    {
+        using var doc = await ChamarAsync(HttpMethod.Get, Path(sessao, $"get-messages/{Uri.EscapeDataString(chat)}?count=30"), sessao, null, ct);
+        var lista = doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("response", out var r) ? r : default;
+        var itens = lista.ValueKind switch
+        {
+            JsonValueKind.Array => lista.EnumerateArray().ToList(),
+            JsonValueKind.Object => lista.EnumerateObject().Select(p => p.Value).ToList(),
+            _ => []
+        };
+        return [.. itens.Select(Recente).OfType<MensagemRecenteWppConnect>()];
+    }
+
+    private static MensagemRecenteWppConnect? Recente(JsonElement m) =>
+        m.ValueKind == JsonValueKind.Object && m.TryGetProperty("id", out var id) && Identificador(id) is { Length: > 0 } valor
+            && m.TryGetProperty("t", out var t) && t.TryGetInt64(out var quando)
+            ? new(valor, quando, m.TryGetProperty("fromMe", out var f) && f.ValueKind == JsonValueKind.True,
+                LerTexto(m, "type"), LerTexto(m, "body"))
+            : null;
+
     public async Task<EnvioWhatsAppResult> EnviarTextoAsync(string waId, string texto, string? responderAWamid = null, CancellationToken ct = default) =>
         await EnviarAsync("send-message", new { phone = waId, isGroup = false, message = texto }, ct);
 
