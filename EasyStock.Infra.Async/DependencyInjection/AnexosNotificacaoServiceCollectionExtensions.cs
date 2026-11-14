@@ -15,6 +15,8 @@ public static class AnexosNotificacaoServiceCollectionExtensions
     public static IServiceCollection AddAnexosDeNotificacao(this IServiceCollection services)
     {
         services.TryAddSingleton<IRenderizadorCanhoto, CanhotoDocumentoRenderer>();
+        // #2544: o resumo do pedido do Assistente sobe pelo mesmo armazenamento público dos anexos.
+        services.TryAddSingleton<IRenderizadorResumoPedido, ResumoPedidoRenderer>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IModeloAnexoNotificacao, ModeloAnexoCanhoto>());
         services.TryAddScoped<IAnexadorMensagem, AnexadorMensagem>();
         return services;

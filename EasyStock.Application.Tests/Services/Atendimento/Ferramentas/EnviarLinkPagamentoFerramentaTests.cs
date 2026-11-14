@@ -1,10 +1,12 @@
 using System.Text.Json;
+using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
+using NSubstitute.ExceptionExtensions;
 
 namespace EasyStock.Application.Tests.Services.Atendimento.Ferramentas;
 
@@ -118,6 +120,22 @@ public class EnviarLinkPagamentoFerramentaTests
 
         resultado.GetProperty("motivo").GetString().Should().Be("pedido_ja_pago");
         c.Cobranca.Preferencias.Should().BeEmpty();
+        c.Contexto.RespostaVerificada.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task MercadoPagoFora_NaoInventaLinkEOrientaTentarDeNovo()
+    {
+        // #1301, agora no link (#2544): o provedor caído não vira link nem resposta pronta.
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+        c.Cobranca.MpClient.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("500"));
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("motivo").GetString().Should().Be("pagamento_indisponivel");
+        c.Cobranca.Cobrancas.Should().BeEmpty();
         c.Contexto.RespostaVerificada.Should().BeNull();
     }
 

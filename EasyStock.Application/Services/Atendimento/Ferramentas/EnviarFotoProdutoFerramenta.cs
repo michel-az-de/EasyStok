@@ -47,7 +47,7 @@ public sealed class EnviarFotoProdutoFerramenta(
         var item = cardapio.Itens.FirstOrDefault(i => i.Id == itemId && i.Disponivel && !i.EmValidacao);
         if (item is null) return Recusa("item_nao_encontrado", "Use o id de um item que consultar_cardapio devolveu.");
 
-        var url = UrlPublica(item.ImagemUrl);
+        var url = MidiaPublica.Url(item.ImagemUrl, configuration);
         if (url is null) return Recusa("sem_foto", "Este item não tem foto; descreva-o com o que consultar_cardapio devolveu.");
 
         var preco = FerramentaJson.FormatarReais(item.PrecoCentavos / 100m);
@@ -63,15 +63,6 @@ public sealed class EnviarFotoProdutoFerramenta(
         await contexto.GravarSaidaAsync(ct);
 
         return FerramentaJson.Serializar(new { enviado = true, item = item.Nome, preco });
-    }
-
-    /// <summary>O WhatsApp só baixa mídia por HTTPS. Caminho gravado relativo ganha o endereço público da loja.</summary>
-    private string? UrlPublica(string? foto)
-    {
-        if (string.IsNullOrWhiteSpace(foto)) return null;
-        if (foto.StartsWith('/'))
-            foto = (configuration["App:BaseUrl"]?.TrimEnd('/') ?? SaudacaoAtendimento.BaseUrlPadrao) + foto;
-        return Uri.TryCreate(foto, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps ? uri.ToString() : null;
     }
 
     private static string Recusa(string motivo, string orientacao) =>
