@@ -1,5 +1,4 @@
-using EasyStock.Application.UseCases.Financeiro.Pagamentos;
-using EasyStock.Domain.Enums.Financeiro;
+﻿using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.BackgroundServices;
@@ -93,42 +92,13 @@ public sealed class ContaReceberPixReconciliacaoJob(
         var hoje = DateTime.UtcNow;
         var parcelas = await contaRepo.ListarParcelasComPixAtivoAsync(hoje, ct);
 
-        var reconciliadas = 0;
-        var consultadas = 0;
-        var falhas = 0;
-
-        foreach (var parcela in parcelas)
-        {
-            if (string.IsNullOrWhiteSpace(parcela.EfiTxid)) continue;
-            if (parcela.Status != StatusParcela.Pendente && parcela.Status != StatusParcela.ParcialmentePaga
-                && parcela.Status != StatusParcela.Vencida)
-                continue;
-
-            try
-            {
-                var r = await reconciliarUseCase.ExecuteAsync(
-                    new ReconciliarPixParcelaReceberCommand(parcela.EfiTxid, ValorPagoEfi: null, PagoEm: null), ct);
-                consultadas++;
-                if (r.Reconciliado) reconciliadas++;
-            }
-            catch (Exception ex)
-            {
-                falhas++;
-                // #1598: o resto da parcela que falhou não pode sair no commit da seguinte (mesmo escopo).
-                unitOfWork.DescartarAlteracoesPendentes();
-                logger.LogWarning(ex, "Falha ao reconciliar parcela {ParcelaId} txid={Txid}",
-                    parcela.Id, parcela.EfiTxid);
-                // Circuit breaker simples: 3 falhas seguidas para a rodada
-                if (falhas >= 3)
-                {
-                    logger.LogWarning("ContaReceberPixReconciliacaoJob: 3 falhas seguidas — interrompendo rodada.");
-                    break;
-                }
-            }
-        }
+        var resumo = await RodadaPixContaReceber.ProcessarAsync(parcelas,
+            async (txid, token) => (await reconciliarUseCase.ExecuteAsync(
+                new ReconciliarPixParcelaReceberCommand(txid, ValorPagoEfi: null, PagoEm: null), token)).Reconciliado,
+            unitOfWork.DescartarAlteracoesPendentes, logger, ct);
 
         logger.LogInformation(
             "ContaReceberPixReconciliacaoJob: parcelas={Total} consultadas={Consultadas} reconciliadas={Reconciliadas} falhas={Falhas}",
-            parcelas.Count, consultadas, reconciliadas, falhas);
+            parcelas.Count, resumo.Consultadas, resumo.Reconciliadas, resumo.Falhas);
     }
 }
