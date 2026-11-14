@@ -28,10 +28,11 @@ export const escritas = {
     const { produto_id, item_estoque_id, quantidade: q, motivo, texto, produto_variacao_id } = a;
     if (!produto_id) throw new Error('produto_id e obrigatorio.');
     if (!MOTIVOS.includes(motivo)) throw new Error(`motivo deve ser um de: ${MOTIVOS.join(', ')}.`);
+    if (motivo === 'Outro' && !String(texto ?? '').trim()) throw new Error('motivo Outro exige texto.');
     return {
       resumo: `LANCAR PERDA: ${campos({ produto_id: uuid(produto_id, 'produto_id'), quantidade: quantidade(q), motivo, item_estoque_id: uuid(item_estoque_id, 'item_estoque_id'), produto_variacao_id: uuid(produto_variacao_id, 'produto_variacao_id'), texto })}. Baixa o estoque; desfazer so pelo estorno na API.`,
       caminho: `${BASE}/perdas`,
-      corpo: { produtoId: produto_id, itemEstoqueId: item_estoque_id, quantidade: q, motivo, texto, produtoVariacaoId: produto_variacao_id },
+      corpo: { produtoId: produto_id, itemEstoqueId: item_estoque_id, quantidade: q, motivo, texto: texto || undefined, produtoVariacaoId: produto_variacao_id },
     };
   },
 };

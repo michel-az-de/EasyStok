@@ -37,7 +37,7 @@ ler('producao_perdas', 'Perdas do periodo por motivo e produto, em quantidade e 
 ler('producao_perdas_vencidos', 'Lotes vencidos com saldo, sugeridos como perda (nunca lancados sozinhos).', {}, consultas.vencidos);
 
 server.registerTool('producao_lancar_perda', {
-  description: `Lanca uma perda com motivo e baixa o estoque (lote escolhido ou FEFO). Acima de R$ 50 so Gerente na API. Exige ${FLAG}=1 e confirmacao da pessoa.`,
+  description: `Lanca uma perda com motivo e baixa o estoque (lote escolhido ou FEFO). Acima de R$ 50 so Gerente na API. Os ids aparecem na confirmacao: confira antes o prato e o lote em producao_estoque_do_dia. Exige ${FLAG}=1 e confirmacao da pessoa.`,
   annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   inputSchema: { produto_id: uuid, quantidade: z.number().gt(0).max(100000), motivo: z.enum(MOTIVOS), item_estoque_id: uuid.optional(), produto_variacao_id: uuid.optional(), texto: z.string().max(200).optional() },
 }, async args => { try { return json(await escrever({ cliente, pedir, flag: FLAG, plano: escritas.perda(args) })); } catch (e) { return falha(e); } });

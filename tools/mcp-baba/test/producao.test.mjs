@@ -41,6 +41,7 @@ test('perda: valida e mostra todos os campos no resumo', () => {
   assert.throws(() => escritas.perda({ produto_id: P, quantidade: 1.0001, motivo: 'Vencido' }), /quantidade/);
   assert.throws(() => escritas.perda({ produto_id: P, quantidade: 1, motivo: 'Roubo' }), /motivo/);
   assert.throws(() => escritas.perda({ quantidade: 1, motivo: 'Outro' }), /produto_id/);
+  assert.throws(() => escritas.perda({ produto_id: P, quantidade: 1, motivo: 'Outro' }), /exige texto/);
 });
 
 test('escrever com outra flag: desligada, nao confirmada e confirmada', async () => {
