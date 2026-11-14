@@ -94,10 +94,15 @@ public static class WppConnectWebhookParser
 
     /// <summary>Grupo e transmissão são ignorados antes de exigir id (#2590).</summary>
     public static bool Grupo(JsonElement root) =>
-        new[] { Texto(root, "from"), Texto(root, "to"), Serializado(root, "chatId") }.Any(c =>
+        new[] { Serializado(root, "from"), Serializado(root, "to"), Serializado(root, "chatId") }.Any(c =>
             c is not null && (c.EndsWith("@g.us", StringComparison.Ordinal) || c.EndsWith("@broadcast", StringComparison.Ordinal)))
         || (root.TryGetProperty("isGroupMsg", out var grupo) && grupo.ValueKind == JsonValueKind.True);
 
+    // Só nomes com cara de campo: chave numérica ou com telefone, que seria dado, fica de fora.
     private static string Chaves(JsonElement root) =>
-        string.Join(",", root.EnumerateObject().Select(p => p.Name).Take(40));
+        string.Join(",", root.EnumerateObject().Select(p => p.Name).Where(NomeDeCampo).Take(60));
+
+    private static bool NomeDeCampo(string nome) =>
+        nome.Length is > 0 and <= 40 && (char.IsAsciiLetter(nome[0]) || nome[0] == '_')
+        && nome.All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
 }

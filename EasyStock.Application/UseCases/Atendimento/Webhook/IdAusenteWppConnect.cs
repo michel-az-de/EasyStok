@@ -27,7 +27,7 @@ public static class IdAusenteWppConnect
                 return rawBody;
             deMim = root.TryGetProperty("fromMe", out var f) && f.ValueKind == JsonValueKind.True;
             var conversa = WppConnectWebhookParser.Serializado(root, "chatId")
-                ?? WppConnectWebhookParser.Texto(root, deMim ? "to" : "from");
+                ?? WppConnectWebhookParser.Serializado(root, deMim ? "to" : "from");
             // Sem conversa ou sem data não há como procurar: o parser responde 400 com as chaves do evento.
             if (string.IsNullOrWhiteSpace(conversa) || !root.TryGetProperty("t", out var t) || !t.TryGetInt64(out quando))
                 return rawBody;

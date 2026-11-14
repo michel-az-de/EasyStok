@@ -44,6 +44,18 @@ public class IdAusenteWppConnectTests
     }
 
     [Fact]
+    public async Task Remetente_em_objeto_do_lote_da_subida_tambem_acha_a_conversa()
+    {
+        // unreadmessages sai do modelo cru do chat; "from" pode vir como objeto com _serialized.
+        Recentes("5511999999999@c.us", new MensagemRecenteWppConnect("false_5511999999999@c.us_ABC", 1793000000, false, "chat", "Oi"));
+        var raw = $$$"""{"event":"unreadmessages","session":"{{{Sessao.Sessao}}}","from":{"_serialized":"5511999999999@c.us"},"type":"chat","body":"Oi","t":1793000000}""";
+
+        var completo = await IdAusenteWppConnect.CompletarAsync(raw, Sessao, _cliente);
+
+        WppConnectWebhookParser.Id(System.Text.Json.JsonDocument.Parse(completo).RootElement).Should().Be("false_5511999999999@c.us_ABC");
+    }
+
+    [Fact]
     public async Task Mesmo_horario_desempata_por_tipo_e_texto()
     {
         Recentes("5511999999999@c.us",

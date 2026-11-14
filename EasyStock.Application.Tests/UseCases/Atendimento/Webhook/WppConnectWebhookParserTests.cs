@@ -98,11 +98,11 @@ public class WppConnectWebhookParserTests
     public void Sem_identificador_registra_so_os_nomes_das_chaves()
     {
         // #2590: a forma do evento que falha fica no log sem telefone nem texto do cliente.
-        var raw = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","from":"5511999999999@c.us","type":"chat","body":"Segredo","t":1793000000}""";
+        var raw = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","from":"5511999999999@c.us","type":"chat","body":"Segredo","t":1793000000,"5511888888888":1,"0":"x","a@b":2}""";
         var act = () => WppConnectWebhookParser.Parse(raw);
         var erro = act.Should().Throw<FormatException>().Which.Message;
         erro.Should().Contain("evento onmessage").And.Contain("chaves: event,session,from,type,body,t");
-        erro.Should().NotContain("5511999999999").And.NotContain("Segredo");
+        erro.Should().NotContain("5511999999999").And.NotContain("Segredo").And.NotContain("5511888888888").And.NotContain("a@b");
     }
 
     [Fact]
