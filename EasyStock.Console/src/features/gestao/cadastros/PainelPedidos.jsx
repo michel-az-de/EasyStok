@@ -89,7 +89,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
       </div>
       {primeiraCarga ? <Vazio titulo="Carregando pedidos">Aguarde um instante.</Vazio>
         : lista.length === 0 && !consulta.erro ? <Vazio titulo={comFiltro ? 'Nenhum pedido com estes filtros' : 'Nenhum pedido ainda'}
-          acao={comFiltro ? <Botao onClick={() => filtrar({ busca: '', situacao: '', periodo: 'tudo', ordem: 'mais-recentes' })}>Limpar filtros</Botao> : undefined}>
+          acao={comFiltro ? <Botao onClick={() => filtrar({ busca: '', situacao: '', periodo: 'tudo', ordem: 'mais-recentes' })}>Limpar filtros</Botao> : <Botao onClick={() => { window.location.hash = hashDoModulo('atendimento', 'balcao') }}>Abrir Conversas</Botao>}>
           {comFiltro ? 'Tente outro número, nome ou período.' : 'Os pedidos do site, do WhatsApp e do balcão aparecem aqui.'}</Vazio>
         : lista.length > 0 && <div ref={tabela} className={`${base.lista} ${css.tabela}`} aria-busy={consulta.carregando} onScroll={(e) => definir({ posicao: e.currentTarget.scrollTop })}>
           <table>
@@ -114,7 +114,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
           </table>
         </div>}
       <footer className={base.rodape}>
-        <span role="status">{consulta.carregando ? 'Atualizando…' : consulta.carregado ? `${consulta.total} ${consulta.total === 1 ? 'pedido' : 'pedidos'}` : ''}</span>
+        <span role="status">{consulta.carregando ? 'Atualizando…' : consulta.carregado && consulta.total > 0 ? `${consulta.total} ${consulta.total === 1 ? 'pedido' : 'pedidos'}` : ''}</span>
         {paginas > 1 && <div className={base.acoes}>
           <Botao disabled={pagina <= 1 || consulta.carregando} onClick={() => definir({ pagina: pagina - 1, posicao: 0 })}>Anterior</Botao>
           <span>Página {pagina} de {paginas}</span>

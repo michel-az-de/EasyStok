@@ -7,6 +7,7 @@
 
 .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .descricao { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 60ch; }
+.descricao a { color: var(--marca-forte); text-underline-offset: 3px; }
 
 .filtros { display: flex; align-items: flex-start; gap: var(--e-3); flex-wrap: wrap; }
 .filtroBusca { flex: 1 1 320px; min-width: 0; display: grid; gap: var(--e-1); }

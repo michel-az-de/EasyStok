@@ -19,7 +19,7 @@ export function MetodosCadastro({ contexto }) {
     emVoo.current = true; ocupar(true); falhar(null)
     try {
       await ativarMetodoCadastro(intencao.metodo, intencao.ativo, intencao.requestId, contexto)
-      avisar(`${intencao.metodo.nome}: ${intencao.ativo ? 'ativado' : 'inativado'}.`)
+      avisar(`${intencao.metodo.nome}: ${intencao.ativo ? 'ativada' : 'inativada'}.`)
       escolher(null); consulta.recarregar()
     } catch (e) { falhar(e.status === 409 ? 'Esta forma de pagamento mudou. Feche e atualize a lista antes de tentar novamente.' : e.message) }
     finally { emVoo.current = false; ocupar(false) }
@@ -27,13 +27,13 @@ export function MetodosCadastro({ contexto }) {
   return <section className={css.painel} aria-label="Formas de pagamento">
     <header className={css.cabecalho}><div><h2>Formas de pagamento</h2><p>Escolha os meios aceitos pela loja.</p></div><Botao icone="refresh-cw" onClick={consulta.recarregar} disabled={consulta.carregando}>Atualizar</Botao></header>
     {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
-    {consulta.erro && <div className={css.erro} role="alert">{consulta.erro}<Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>}
-    {consulta.carregando ? <Vazio titulo="Carregando formas de pagamento" /> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.codigo}>
+    {consulta.erro && <div className={css.erro} role="alert"><p>{consulta.erro}</p><Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>}
+    {consulta.carregando ? <Vazio titulo="Carregando formas de pagamento">Aguarde um instante.</Vazio> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.codigo}>
       <div><h3>{m.nome}</h3><span className={css.situacao}>{m.ativo ? 'Ativa' : 'Inativa'}</span></div>
-      {acoes.gerenciarCadastrosFinanceiros && <Botao onClick={() => { falhar(null); escolher({ metodo: m, ativo: !m.ativo, requestId: crypto.randomUUID() }) }}>{m.ativo ? 'Inativar' : 'Ativar'}</Botao>}
+      {acoes.gerenciarCadastrosFinanceiros && <Botao aria-label={`${m.ativo ? 'Inativar' : 'Ativar'} ${m.nome}`} onClick={() => { falhar(null); escolher({ metodo: m, ativo: !m.ativo, requestId: crypto.randomUUID() }) }}>{m.ativo ? 'Inativar' : 'Ativar'}</Botao>}
     </li>)}</ul>}
     {intencao && <Modal titulo={`${intencao.ativo ? 'Ativar' : 'Inativar'} ${intencao.metodo.nome}?`} aoFechar={ocupado ? undefined : () => escolher(null)} segurarFechamento={ocupado}
-      rodape={<><Botao disabled={ocupado} onClick={() => escolher(null)}>Cancelar</Botao><Botao variante="primario" disabled={ocupado} onClick={salvar}>{ocupado ? 'Salvando…' : 'Confirmar alteração'}</Botao></>}>
+      rodape={<><Botao disabled={ocupado} onClick={() => escolher(null)}>Cancelar</Botao><Botao variante="primario" disabled={ocupado} onClick={salvar}>{ocupado ? 'Salvando…' : `${intencao.ativo ? 'Ativar' : 'Inativar'} ${intencao.metodo.nome}`}</Botao></>}>
       <p>{intencao.ativo ? 'Esta forma ficará disponível para novos recebimentos.' : 'Esta forma deixará de ser oferecida para novos recebimentos.'} O histórico já registrado permanece.</p>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
     </Modal>}

@@ -7,8 +7,11 @@
 .contexto > svg { color: var(--marca-forte); flex: none; }
 .superficie { border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); min-width: 0; }
 .abas { display: flex; gap: var(--e-2); flex-wrap: wrap; padding: var(--e-3); border-bottom: 1px solid var(--linha); }
+.painel > .abas { padding-inline: 0; }
 .abas [aria-pressed='true'] { background: var(--marca-claro); color: var(--marca-forte); border-color: var(--marca); }
 .filtros { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 240px) auto; gap: var(--e-3); align-items: end; padding: var(--e-4); }
+/* Contas bancárias: só busca e Atualizar. */
+.filtros.soBusca { grid-template-columns: minmax(180px, 1fr) auto; }
 /* #2495 (S1): Situação e Ordem lado a lado, Atualizar na mesma linha. */
 .filtros.comOrdem { grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(160px, 220px)) auto; }
 .lista { overflow: auto; max-height: 62vh; min-width: 0; }

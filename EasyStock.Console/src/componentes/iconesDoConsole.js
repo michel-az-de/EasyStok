@@ -36,6 +36,7 @@ const ICONE_DO_CONSOLE = {
   'cadastros/clientes': 'usuarios',
   'cadastros/pedidos': 'shopping-cart',
   'cadastros/produtos': 'package',
+  'cadastros/categorias': 'etiqueta',
   'cadastros/fornecedores': 'house',
   'cadastros/bancos': 'dollar-sign',
   'cadastros/pagamentos': 'credit-card',
