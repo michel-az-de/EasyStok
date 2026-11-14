@@ -8,6 +8,7 @@ import { deveCarregarDossie } from '../planoDeSincronizacao'
 import { textoNaoLigado } from './naoLigadas'
 import { nomeConhecidoDoLead, nomeGenerico, recusaDoEndereco } from '../../dominio/cliente'
 import { ERRO_IDENTIDADE_DA_EDICAO, mesmaIdentidadeDaEdicao } from '../../dominio/identidadeDaEdicao'
+import { vinculoDoCadastro } from '../../dominio/vinculoCliente'
 
 // Cadastro do cliente da conversa no modo API (#1276). Sem cliente vinculado o EasyStok não
 // gera pedido; aqui a dona cadastra nome, telefone e endereço pela Ficha. Nada muda na tela
@@ -76,7 +77,7 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
         const mesmoResultado = Boolean(salvo?.clienteId && salvo.clienteId === atual?.clienteId
           && Number.isInteger(salvo.vinculoRevisao) && salvo.vinculoRevisao === atual.vinculoRevisao)
         if (!mesmaIdentidadeDaEdicao(identidade, atual) && !mesmoResultado) return { erro: 'O cadastro foi salvo, mas o vínculo mudou depois. Confira a ficha atual antes de continuar.' }
-        if (Number.isInteger(salvo?.vinculoRevisao)) despachar({ tipo: acao.VINCULO_CLIENTE_DA_API, id, vinculo: { clienteId: salvo.clienteId, clienteNome: salvo.nome, vinculoRevisao: salvo.vinculoRevisao } })
+        if (Number.isInteger(salvo?.vinculoRevisao)) despachar({ tipo: acao.VINCULO_CLIENTE_DA_API, id, vinculo: vinculoDoCadastro(salvo) })
         // O telefone já era de outro cadastro: a conversa foi ligada a ele, com o nome dele.
         // Quando foi a dona que mandou ligar, ela já sabe.
         if (!confirmarVinculoExistente && salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {

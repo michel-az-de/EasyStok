@@ -103,7 +103,8 @@ const ICONE_DO_PASSO = {
 export const MARCA_EM_MONTAGEM = { texto: 'Em montagem', icone: 'shopping-cart', tom: 'neutro' }
 
 // Passo do pedido no contexto da linha (com o sinal verde do pagamento, RN-25,
-// dez minutos só) ou "Lead" quando ainda não há pedido nem cadastro.
+// dez minutos só); sem pedido na conversa, "Contato" para quem não tem cadastro e "Lead" para quem tem
+// cadastro e nunca pediu (#2461). Cliente que já pediu fica sem selo.
 // #1940 (item 2): no modo API a comanda em montagem ainda não tem frete (só o servidor calcula, ao
 // gerar a cobrança): "Falta R$ 38,00" no cartão contra R$ 50,00 na Ficha. Sem pedido criado, o
 // cartão diz que está em montagem, sem valor.
@@ -123,5 +124,6 @@ export function marcaDoPedido(conversa, cardapio, { fonteApi = false } = {}) {
     return { texto: passo.rotulo, icone: ICONE_DO_PASSO[passo.id], tom: 'neutro' }
   }
   if (ehLead(conversa)) return { texto: 'Contato', icone: 'user-plus', tom: 'marca' }
+  if (conversa.relacionamento === 'lead') return { texto: 'Lead', icone: 'ficha', tom: 'marca' }
   return null
 }

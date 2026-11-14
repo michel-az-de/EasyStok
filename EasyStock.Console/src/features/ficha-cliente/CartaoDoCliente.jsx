@@ -48,7 +48,8 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
   const { cliente } = conversa
   const fotoCadastro = useFotoCliente(cliente.fotoUrl)
   const [freteAberto, setFreteAberto] = useState(false)
-  const lead = conversa.conta === 'lead' || !conversa.clienteId
+  const semCadastro = conversa.conta === 'lead' || !conversa.clienteId
+  const semPedido = !semCadastro && conversa.relacionamento === 'lead' // #2461
   // #2258 (T4): o mesmo nome do cartão da lista, do cabeçalho e dos botões "Abrir".
   const nome = apresentacaoDoNome(conversa.nome, { comanda: conversa.numeroComanda })
   const { restricoes } = useCatalogo()
@@ -64,7 +65,8 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
             </strong>
           </span>
         </span>
-        {lead && <span className={css.numerosCliente}>Contato sem cadastro</span>}
+        {semCadastro && <span className={css.numerosCliente}>Contato sem cadastro</span>}
+        {semPedido && <span className={css.numerosCliente}>Cadastrado, ainda sem pedido</span>}
       </button>
       {cliente.endereco && <EnderecoDoCliente endereco={cliente.endereco} />}
       {fonteApi && <CorrecaoVinculoCliente key={conversa.id} conversa={conversa} />}

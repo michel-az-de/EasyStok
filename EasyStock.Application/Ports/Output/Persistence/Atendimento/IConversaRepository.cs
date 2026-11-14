@@ -33,7 +33,8 @@ public sealed record ConversaInboxItem(
     string? Assunto = null,
     string? FotoClienteChave = null,
     long VinculoRevisao = 0,
-    bool VinculoEmRevisao = false)
+    bool VinculoEmRevisao = false,
+    bool? TemPedido = null)
 {
     /// <summary>Linha a partir da entidade carregada. Sem <paramref name="aguardaResposta"/> vale a regra do dominio.</summary>
     public static ConversaInboxItem De(Conversa c, string? ultimaMensagemTexto, bool? aguardaResposta = null, string? assumidaPorNome = null, string? pedidoStatus = null) => new(
