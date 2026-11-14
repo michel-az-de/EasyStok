@@ -7,6 +7,7 @@ import { CampoReais } from '../../../componentes/CampoReais'
 import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
+import { FichaCliente } from './FichaCliente'
 import { lerMoeda } from '../../../dominio/formato'
 import { avisoDeDuplicado, duplicadosDoCliente, termoDeDuplicado } from '../../../dominio/clienteDuplicado'
 import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, categoriasRaiz, subcategoriasDe, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
@@ -212,6 +213,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
         </>}
       </fieldset>
     </form>
+    {tela === 'clientes' && id && dados.detalhe && <FichaCliente key={`${id}:${dados.revisao ?? ''}`} cliente={dados} detalhe={dados.detalhe} contexto={contexto} podeEditar={podeEditar} />}
     {atividade && <Modal titulo={atividade.titulo} aoFechar={alternando ? undefined : () => confirmarAtividade(null)} segurarFechamento={alternando}
       rodape={<><Botao disabled={alternando} onClick={() => confirmarAtividade(null)}>Cancelar</Botao><Botao variante={atividade.ativar ? 'primario' : 'perigo'} disabled={alternando} onClick={concluirAtividade}>{alternando ? atividade.ativar ? 'Reativando…' : 'Inativando…' : atividade.botao}</Botao></>}>
       <p>{atividade.texto}</p>
