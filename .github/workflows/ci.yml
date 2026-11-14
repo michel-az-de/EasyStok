@@ -10,8 +10,10 @@ on:
 permissions:
   contents: read
 
+# PR: push novo cancela o run anterior do mesmo PR. Push no master: group por SHA, cada commit
+# conclui o proprio run; o CI leva ~35 min e merges chegam a cada 5-15 min (#2554).
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: true
 
 env:
