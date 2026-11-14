@@ -11,7 +11,7 @@ public sealed class CanhotoDocumentoRendererTests
     private static readonly byte[] AssinaturaPng = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     private static CanhotoDto Canhoto(int itens = 2) => new(
-        new CanhotoCabecalhoDto("Casa da Babá", "A1B2C3D4", "Maria", "11999990000", "Rua das Flores, 10",
+        new CanhotoCabecalhoDto("Casa da Baba", "A1B2C3D4", "Maria", "11999990000", "Rua das Flores, 10",
             new DateTime(2026, 11, 4, 12, 0, 0), new DateTime(2026, 11, 4, 9, 30, 0)),
         [new CanhotoGrupoDto("paraServir", "Para servir",
             Enumerable.Range(1, itens).Select(i => new CanhotoItemDto($"Nhoque {i}", "800g", i, "sugo", i == 1 ? "sem sal" : null))

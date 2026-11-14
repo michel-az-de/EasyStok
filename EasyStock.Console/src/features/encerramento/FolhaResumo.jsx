@@ -83,7 +83,7 @@ export function FolhaResumo({
     <div className={css.folha}>
       <header className={css.cabecalho}>
         <div>
-          <p className={css.marca}>Casa da Babá</p>
+          <p className={css.marca}>Casa da Baba</p>
           <p className={css.submarca}>massa artesanal</p>
         </div>
         <div>

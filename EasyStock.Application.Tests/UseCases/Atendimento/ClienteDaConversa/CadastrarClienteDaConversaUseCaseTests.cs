@@ -35,7 +35,7 @@ public class CadastrarClienteDaConversaUseCaseTests
     {
         _uow.SetupExecuteInTransactionSemRetry<ClienteDaConversaResult>();
         _conversas.EspelharLeituraComLock();
-        _storefront = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Babá", pedidoMinimoEntrega: 0m);
+        _storefront = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Baba", pedidoMinimoEntrega: 0m);
         _storefront.Ativar();
         _storefronts.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(_storefront);
         _storefronts.GetBySlugAsync("casa-da-baba", Arg.Any<CancellationToken>()).Returns(_storefront);

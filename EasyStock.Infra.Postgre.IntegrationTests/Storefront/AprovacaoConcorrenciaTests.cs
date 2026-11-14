@@ -170,7 +170,7 @@ public sealed class AprovacaoConcorrenciaTests(PostgreSqlDatabaseFixture fixture
                 PedidoId: pedidoId,
                 EmpresaId: empresaId,
                 UsuarioId: Guid.NewGuid(),
-                UsuarioNome: "Babá Concorrência"));
+                UsuarioNome: "Baba Concorrência"));
         });
 
     private Task RecusarAsync(Guid empresaId, Guid pedidoId) =>

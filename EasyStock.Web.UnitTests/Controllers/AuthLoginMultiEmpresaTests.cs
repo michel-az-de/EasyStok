@@ -142,7 +142,7 @@ public class AuthLoginMultiEmpresaTests
         var vm = ctrl.SelecionarEmpresa().Should().BeOfType<ViewResult>()
             .Which.Model.Should().BeOfType<SelecionarEmpresaViewModel>().Subject;
 
-        vm.Empresas.Select(e => e.Nome).Should().Equal("Casa da Babá", "FMA Informática");
+        vm.Empresas.Select(e => e.Nome).Should().Equal("Casa da Baba", "FMA Informática");
         vm.Email.Should().Be("felipe@easystok.com");
     }
 
@@ -257,7 +257,7 @@ public class AuthLoginMultiEmpresaTests
 
     private const string DuasEmpresas = """
         {"isSuperAdmin":false,"empresas":[
-            {"id":"11111111-1111-1111-1111-111111111111","nome":"Casa da Babá"},
+            {"id":"11111111-1111-1111-1111-111111111111","nome":"Casa da Baba"},
             {"id":"22222222-2222-2222-2222-222222222222","nome":"FMA Informática"}]}
         """;
 

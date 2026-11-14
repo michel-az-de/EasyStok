@@ -75,7 +75,7 @@ public class CheckoutCoreServiceTests
         public Cenario(DateTimeOffset? agora = null)
         {
             Relogio = new(agora ?? new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero));
-            Storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);
+            Storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Baba", 0m);
             Storefront.Ativar();
             ConfiguracaoAtendimentoRepo.GetOrDefaultAsync(Storefront.EmpresaId)
                 .Returns(EasyStock.Domain.Entities.Atendimento.ConfiguracaoAtendimento.CriarPadrao(Storefront.EmpresaId));

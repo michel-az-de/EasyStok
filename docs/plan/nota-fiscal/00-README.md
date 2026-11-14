@@ -1,6 +1,6 @@
 # Plano — Nota Fiscal Eletrônica (NFC-e modelo 65)
 
-> Avanço da feature **Nota Fiscal Eletrônica** no EasyStok, com foco em entregar **UI Web ERP + UI Admin** sobre a fundação backend `Nfe*` já existente em master. Cliente piloto: **Casa da Babá**. Escopo: apenas **NFC-e modelo 65** (varejo direto consumidor). NF-e modelo 55 (B2B) e PWA NFC-e ficam fora desta rodada.
+> Avanço da feature **Nota Fiscal Eletrônica** no EasyStok, com foco em entregar **UI Web ERP + UI Admin** sobre a fundação backend `Nfe*` já existente em master. Cliente piloto: **Casa da Baba**. Escopo: apenas **NFC-e modelo 65** (varejo direto consumidor). NF-e modelo 55 (B2B) e PWA NFC-e ficam fora desta rodada.
 
 ## Índice
 
@@ -13,7 +13,7 @@
 | 04 | [04-ux-copy.md](04-ux-copy.md) | Glossário PT-BR, microcopy (labels, erros, empty states), status badges, wizard Admin |
 | 05 | [05-migracao.md](05-migracao.md) | Migration aditiva CSC + validação SQL pós-migração |
 | 06 | [06-testes.md](06-testes.md) | TDD-first: unit, integration, snapshot (Verify), concorrência, E2E sandbox |
-| 07 | [07-faseamento.md](07-faseamento.md) | F0-F5, critérios de pronto, cronograma realista, marcos com Casa da Babá |
+| 07 | [07-faseamento.md](07-faseamento.md) | F0-F5, critérios de pronto, cronograma realista, marcos com Casa da Baba |
 | 08 | [08-riscos.md](08-riscos.md) | 10 riscos com prob/impacto/mitigação/gatilho, decisões abertas |
 
 > O plano operacional vivo (em iteração nesta sessão) está em `~/.claude/plans/debug-ux-copy-analise-composed-pond.md` e é absorvido para os arquivos acima conforme cada fase fecha.
@@ -32,7 +32,7 @@ A fundação backend de NF foi construída em master (commit `a1c27e28` em 2026-
 
 **Lacuna crítica**: nenhuma das três superfícies de UI (Web ERP, Admin, PWA mobile) tem fluxo funcional para o operador interagir com NF. Web ERP tem só placeholder textual (`SaidaFormViewModel.NotaFiscal`); Admin tem zero pages de configuração fiscal; PWA tem só CSS de DANFE.
 
-Resultado prático: **Casa da Babá não consegue configurar a empresa nem emitir NFC-e via UI** — só por curl direto na API. Sem isso, o sistema perde contra "voltar pra planilha" no primeiro fiscal sério.
+Resultado prático: **Casa da Baba não consegue configurar a empresa nem emitir NFC-e via UI** — só por curl direto na API. Sem isso, o sistema perde contra "voltar pra planilha" no primeiro fiscal sério.
 
 ## Sumário Executivo
 
@@ -41,7 +41,7 @@ Esta rodada entrega:
 - **Listagem + detalhe + cancelamento + DANFE no Web ERP** — operador gerencia notas emitidas
 - **Backend gaps menores** (listagem com filtros, proxy DANFE, CSC handling em `EmpresaConfiguracaoFiscal`, métricas, health check, ArchitectureTests)
 - **Hardening** (testes E2E sandbox FocusNFe, snapshot PayloadMapper, concorrência numeração)
-- **Soak + go-live piloto** em produção real na Casa da Babá
+- **Soak + go-live piloto** em produção real na Casa da Baba
 
 **Não inclui** (vão para F+1/F+2):
 - PWA mobile (emissão NFC-e no PDV)
@@ -70,11 +70,11 @@ Esforço: 56-78h (Felipe solo, 2-3h/dia útil + 4-6h fins). Calendar: ~3-4 seman
 | F2 | 16-22h | Wizard Admin funcional |
 | F3 | 18-24h | Web ERP NFs gerenciáveis |
 | F4 | 10-14h | Testes E2E + snapshots |
-| F5 | 5-7 dias | Soak staging + go-live Casa da Babá |
+| F5 | 5-7 dias | Soak staging + go-live Casa da Baba |
 
 ## Premissas que precisam validação
 
-1. **CSC** da Casa da Babá: **pendente — Felipe vai providenciar em paralelo**
+1. **CSC** da Casa da Baba: **pendente — Felipe vai providenciar em paralelo**
 2. **Certificado A1** (.pfx + senha): **pendente — Felipe vai providenciar**
 3. **Token FocusNFe sandbox**: **pendente — Felipe vai providenciar**
 4. Working tree master dirty (2026-05-17): **confirmado pelo Felipe — é trabalho dele, ignorar nesta sessão**

@@ -72,7 +72,7 @@ public class Storefront
 
     /// <summary>
     /// Mensagem exibida quando cliente está fora da área de cobertura.
-    /// Default: "Por enquanto a Babá entrega só em determinadas regiões."
+    /// Default: "Por enquanto a Baba entrega só em determinadas regiões."
     /// </summary>
     public string? MensagemForaArea { get; private set; }
 

@@ -153,7 +153,7 @@ function Cabecalho({
       <a className={css.marca} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
         <Marca compacta />
       </a>
-      <h1 className="sr">Casa da Babá</h1>
+      <h1 className="sr">Casa da Baba</h1>
       <ControleLoja aberta={aberta} aoAlternar={aoAlternarLoja} />
       <div className={css.controles}>
         {/* Sininho é o primeiro do grupo, à esquerda de Automáticas (seção 8
@@ -247,7 +247,7 @@ function Trilho({
       <a className={css.inicioTrilho} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
         <Marca compacta /><span>{NOME_INICIO}</span>
       </a>
-      <h1 className="sr">Casa da Babá</h1>
+      <h1 className="sr">Casa da Baba</h1>
       {/* Estado da loja logo abaixo da marca: é o que vale para tudo embaixo.
           Mesmo texto e mesmo nome do controle do topo da main ("Loja aberta"
           ou "Loja fechada"), que as provas procuram pelo nome exato. */}

@@ -13,7 +13,7 @@ Antes desta decisão:
 - TDD era recomendado mas não formalizado. R8 exigia "build + test antes de cada commit" mas não exigia red/green/refactor explícito.
 - Trabalhar em equipe (ou com múltiplos agentes Claude) não tinha protocolo seguro.
 
-Casa da Babá implementou um sistema multi-agente baseado em tasks YAML numeradas, locks atômicos por filesystem, worktree por task, TDD obrigatório. Funcionou na prática: 18 tasks materializadas, 12 done, zero race condition de coordenação após adoção de worktree (ADR casa-da-baba 0015).
+Casa da Baba implementou um sistema multi-agente baseado em tasks YAML numeradas, locks atômicos por filesystem, worktree por task, TDD obrigatório. Funcionou na prática: 18 tasks materializadas, 12 done, zero race condition de coordenação após adoção de worktree (ADR casa-da-baba 0015).
 
 ## Decisão
 
@@ -114,7 +114,7 @@ Esta decisão é executada pela primeira task formal do novo sistema (sem ID —
 
 ## Referências
 
-- Casa da Babá ADR-0015 (worktree por task) — inspiração
+- Casa da Baba ADR-0015 (worktree por task) — inspiração
 - Sessões anteriores: `docs/dev/sessoes/2026-05-16-agentes-paralelos-trabalho-paralelo.md`
 - Schema das tasks: `docs/tasks/_schema.md`
 - Schema das issues: `docs/issues/_schema.md`

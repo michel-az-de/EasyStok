@@ -34,7 +34,7 @@ public class GerarCobrancaPedidoUseCaseTests
         var preferencia = f.Preferencias.Should().ContainSingle().Subject;
         preferencia.ValorTotal.Should().Be(12.51m);
         preferencia.Items.Should().ContainSingle().Which.Should().BeEquivalentTo(
-            new PreferenceItemCommand($"Pedido {CodigoCurto.De(f.Pedido.Id)} · Casa da Babá", 1, 12.51m));
+            new PreferenceItemCommand($"Pedido {CodigoCurto.De(f.Pedido.Id)} · Casa da Baba", 1, 12.51m));
 
         f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
         var reemitida = await uc.ExecuteAsync(input);
@@ -83,7 +83,7 @@ public class GerarCobrancaPedidoUseCaseTests
     public async Task RetornoDoCheckout_WhatsAppDaLojaSoNaConversa(string? whatsApp, bool daConversa, string? esperado)
     {
         var f = new CobrancaPedidoFixture();
-        var storefront = EasyStock.Domain.Entities.Storefront.Storefront.Criar(f.EmpresaId, "casa-da-baba", "Casa da Babá", 0m);
+        var storefront = EasyStock.Domain.Entities.Storefront.Storefront.Criar(f.EmpresaId, "casa-da-baba", "Casa da Baba", 0m);
         storefront.AtualizarBranding(whatsappPedidos: whatsApp);
         f.StorefrontRepo.GetByEmpresaAsync(f.EmpresaId, Arg.Any<CancellationToken>()).Returns(storefront);
 
@@ -92,7 +92,7 @@ public class GerarCobrancaPedidoUseCaseTests
         f.Preferencias.Should().ContainSingle().Which.RetornoUrl.Should().Be(esperado);
     }
 
-    /// <summary>#2228: na conversa, o sinal leva o número da comanda que o cliente lê ("Pague por Pedido 5 · Casa da Babá").</summary>
+    /// <summary>#2228: na conversa, o sinal leva o número da comanda que o cliente lê ("Pague por Pedido 5 · Casa da Baba").</summary>
     [Fact]
     public async Task SinalDaConversa_TituloComNumeroDaComandaELoja()
     {
@@ -107,7 +107,7 @@ public class GerarCobrancaPedidoUseCaseTests
         await f.Gerar().ExecuteAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id, conversa.Id));
 
         f.Preferencias.Should().ContainSingle().Which.Items.Should().ContainSingle()
-            .Which.Titulo.Should().Be("Pedido 5 · Casa da Babá");
+            .Which.Titulo.Should().Be("Pedido 5 · Casa da Baba");
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class GerarCobrancaPedidoUseCaseTests
 
         r.Valor.Should().Be(12.5m);
         f.Preferencias.Should().ContainSingle().Which.Items.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new PreferenceItemCommand($"Pedido {CodigoCurto.De(f.Pedido.Id)} · Casa da Babá", 1, 12.5m));
+            .Which.Should().BeEquivalentTo(new PreferenceItemCommand($"Pedido {CodigoCurto.De(f.Pedido.Id)} · Casa da Baba", 1, 12.5m));
     }
 
     // #1540: depois do estorno total a cobrança fica Estornada e o pagamento permanece. A confirmação

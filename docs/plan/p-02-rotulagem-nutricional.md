@@ -8,7 +8,7 @@
 
 **O que é:** módulo aditivo no EasyStok que permite a lojas do segmento Alimentos cadastrar fichas nutricionais por insumo (manual ou via TACO), publicar rótulos full RDC-compliant em PDF/etiqueta térmica, e manter versionamento auditável de cada rótulo impresso para fiscalização da Anvisa.
 
-**Para quem:** clientes EasyStok do segmento Alimentos. Cliente piloto: **Casa da Babá** (massas frescas artesanais). Usuária operadora: **Thatiane** (esposa do Felipe). Admin/dono: **Felipe** (sênior .NET 15a, Avanade durante o dia).
+**Para quem:** clientes EasyStok do segmento Alimentos. Cliente piloto: **Casa da Baba** (massas frescas artesanais). Usuária operadora: **Thatiane** (esposa do Felipe). Admin/dono: **Felipe** (sênior .NET 15a, Avanade durante o dia).
 
 **Em quanto tempo:** 10–12 semanas part-time, considerando 2–3h/dia úteis + 4–8h sábados/domingos. Buffer de 20% incluído. Início efetivo: **2026-05-17**. Marco MVP em produção: **2026-08-09** (data realista com buffer).
 
@@ -53,7 +53,7 @@ Normas Anvisa que o módulo precisa atender (todas seedeadas como `NormaRegulato
 | **RDC 275/2002** | BPF — fundamenta rastreabilidade e recall (retenção mínima 5 anos) |
 | **Art. 22 RDC 429/2020** | Alimentos isentos (frutas in natura, especiarias, vinagre, água, café puro) |
 
-**Penalidade financeira por rótulo irregular**: R$ 6.000 mínimo até R$ 1.500.000 (Lei 6.437/77 atualizada). Multa por unidade comercializada, não por SKU. Casa da Babá produz 50 lotes/mês × ~20 unidades = 1000 oportunidades/mês de multa por SKU mal-rotulado.
+**Penalidade financeira por rótulo irregular**: R$ 6.000 mínimo até R$ 1.500.000 (Lei 6.437/77 atualizada). Multa por unidade comercializada, não por SKU. Casa da Baba produz 50 lotes/mês × ~20 unidades = 1000 oportunidades/mês de multa por SKU mal-rotulado.
 
 ---
 
@@ -65,7 +65,7 @@ Normas Anvisa que o módulo precisa atender (todas seedeadas como `NormaRegulato
 | Gate do módulo | `TenantFeatureFlag` por empresa, `Feature="Rotulagem"`. `SegmentoEmpresa==Alimentos` apenas sugere ativar via modal. | Q1 |
 | Padrões de rótulo | BR no MVP (apenas `BrRdc429Tabular`). Arquitetura preparada para FDA/EU via interface `IRenderizadorRotulo` + stubs registrados no factory. | Q3 |
 | QR público | Slug `PublicSlug` (UUIDv4 opaco) reservado no MVP. Página pública renderizada **em F+1**. | Q4 + corte Q32 |
-| Calculadora Preview | 4 superfícies no MVP: aba Nutricional do Produto, Etapa 2 da Calculadora (quando mergear), PWA Pedidos (leitura cache), App mobile Casa da Babá (leitura cache). Modal "Simular ajuste" no Lote **removido** (link "Reformular este produto" → produto-pai). Simulador standalone + Comparador → F+1. | Q17, Q18 |
+| Calculadora Preview | 4 superfícies no MVP: aba Nutricional do Produto, Etapa 2 da Calculadora (quando mergear), PWA Pedidos (leitura cache), App mobile Casa da Baba (leitura cache). Modal "Simular ajuste" no Lote **removido** (link "Reformular este produto" → produto-pai). Simulador standalone + Comparador → F+1. | Q17, Q18 |
 | Multi-device drafts | `RascunhoNutricional` no servidor é fonte de verdade. `localStorage` apenas cache de sessão ativa. Sem edição offline-first no MVP. | Q19 |
 | Microcopy | Banner Preview: "Você está simulando. Mudanças aqui não afetam rótulos publicados." Banner Live: "Oficial · publicado por {user} em {data}." Botão primário: "Confirmar essa receita". | Q25 |
 | RT no MVP | Cadastro permitido para Suplementos/Infantis + bloqueio de publicação até RT aprovar (4º modo `AguardandoAprovacaoRt`). Hash de aprovação inclui secret de servidor — **NÃO é assinatura digital legal**, é "Comprovante de Aprovação Interna" (ADR-0017). | Q28, Q30 |
@@ -136,7 +136,7 @@ EasyStock.Web
 
 ### 4.3 Modelo de Dados Completo
 
-Cardinalidade estimada para Casa da Babá em 1 ano de uso (50 lotes/mês, 30 produtos finais, 50 insumos, 5 fornecedores).
+Cardinalidade estimada para Casa da Baba em 1 ano de uso (50 lotes/mês, 30 produtos finais, 50 insumos, 5 fornecedores).
 
 #### 4.3.1 PerfilNutricional (N:1 com Produto, FK Fornecedor opcional)
 
@@ -179,7 +179,7 @@ CREATE POLICY perfil_nutricional_tenant ON rotulagem.perfil_nutricional
     USING (empresa_id = current_setting('app.current_empresa')::uuid);
 ```
 
-**Cardinalidade Casa da Babá em 1 ano:** ~50 insumos × média 1,5 fornecedores/insumo = **75 perfis**. Atualização da ficha bumpa `versao_id` (cria nova linha histórica? Não — UPDATE in-place; histórico vai em log de auditoria separado se precisar).
+**Cardinalidade Casa da Baba em 1 ano:** ~50 insumos × média 1,5 fornecedores/insumo = **75 perfis**. Atualização da ficha bumpa `versao_id` (cria nova linha histórica? Não — UPDATE in-place; histórico vai em log de auditoria separado se precisar).
 
 #### 4.3.2 PerfilNutricionalAlergeno (N:N com enum Alergeno)
 
@@ -382,7 +382,7 @@ CREATE POLICY config_rotulo_tenant ON rotulagem.configuracao_rotulo_empresa
     USING (empresa_id = current_setting('app.current_empresa')::uuid);
 ```
 
-**Cardinalidade**: 1 por empresa do segmento Alimentos. Casa da Babá = **1 linha**.
+**Cardinalidade**: 1 por empresa do segmento Alimentos. Casa da Baba = **1 linha**.
 
 #### 4.3.11 Rotulo (snapshot imutável — auditoria 5 anos)
 
@@ -477,7 +477,7 @@ CREATE POLICY aprovacao_rt_tenant ON rotulagem.aprovacao_rt_rotulo
     USING (empresa_id = current_setting('app.current_empresa')::uuid);
 ```
 
-**Cardinalidade**: RT 1–2 por empresa = **1–2 linhas**. AprovacaoRtRotulo só para Suplementos/Infantis = ~30 linhas/ano (Casa da Babá produz só massas/molhos; valor real próximo de 0 — feature útil para outros clientes futuros).
+**Cardinalidade**: RT 1–2 por empresa = **1–2 linhas**. AprovacaoRtRotulo só para Suplementos/Infantis = ~30 linhas/ano (Casa da Baba produz só massas/molhos; valor real próximo de 0 — feature útil para outros clientes futuros).
 
 #### 4.3.13 AuditoriaRotacaoSecretRt (decisão P4)
 
@@ -567,7 +567,7 @@ CREATE POLICY privacidade_fornecedor_tenant ON rotulagem.privacidade_fornecedor
     USING (empresa_id = current_setting('app.current_empresa')::uuid);
 ```
 
-**Cardinalidade**: 5 fornecedores Casa da Babá = **5 linhas**.
+**Cardinalidade**: 5 fornecedores Casa da Baba = **5 linhas**.
 
 #### 4.3.17 RastreabilidadeEvento (backend popula desde F2, UI F+1)
 
@@ -1730,7 +1730,7 @@ Cada fase tem: dias úteis estimados, critério "pronto" objetivo, bloqueadores,
 - Enum `SubTipoAlimento` em Produto + wizard de cadastro.
 - Enum `OrigemCalculoNutricional` em Produto (Manual | Auto).
 
-**Critério pronto**: `dotnet test --filter Category=FeatureFlag` passa + E2E manual ativa flag para Casa da Babá em <10s.
+**Critério pronto**: `dotnet test --filter Category=FeatureFlag` passa + E2E manual ativa flag para Casa da Baba em <10s.
 
 **Bloqueador**: nenhum (independente).
 
@@ -1806,7 +1806,7 @@ Cada fase tem: dias úteis estimados, critério "pronto" objetivo, bloqueadores,
 
 **Critério pronto**: imprimir 20 etiquetas em Zebra USB em <30s + PDF arquivado em `/data/rotulos/{empresa}/{rotulo}.pdf` + trigger SQL impede UPDATE em `Rotulo` publicado + teste E2E "publicar + reimprimir" passa.
 
-**Bloqueador**: impressora Zebra física para teste. Mitigação: Felipe tem Zebra ZD230 em casa para Casa da Babá.
+**Bloqueador**: impressora Zebra física para teste. Mitigação: Felipe tem Zebra ZD230 em casa para Casa da Baba.
 
 ### F8 — Lupa + Bebidas Alcoólicas + Validação de 8 Claims (A6 fase 1 + A12 + A13 + C4 determinístico + RT) — 8 dias
 
@@ -1923,7 +1923,7 @@ Premissa: início F0.5 pendente em **2026-05-17 (segunda-feira)**. 17–19h/sema
 | F12 | 3 | 2026-08-14 | 2026-08-18 | Resend ativo, backups rodando |
 | F13 | 5 | 2026-08-19 | 2026-08-25 | FAQ, Troubleshooting, doc produção |
 | **Buffer 20%** | **13** | 2026-08-26 | 2026-09-11 | Imprevistos absorvidos |
-| **MVP go-live** | — | — | **2026-09-12** | Produção para Casa da Babá |
+| **MVP go-live** | — | — | **2026-09-12** | Produção para Casa da Baba |
 
 **Total: 16 semanas calendário (17 mai 2026 → 12 set 2026) com buffer.** Equivalente a ~11 semanas líquidas de execução. **Honestidade cronográfica**: o anterior "8-10 semanas" era otimista — agora ajustado para **10-12 semanas líquidas / ~16 calendário com buffer**.
 
@@ -2122,9 +2122,9 @@ Salvar em `docs/operacao/como-rodar-mvp-producao.md`. Será escrito em F13 mas e
   imprime senha temporária forçando reset no primeiro login.
 - **MFA**: Habilitado obrigatório para qualquer usuário com role `Admin` (TOTP via Google Authenticator).
 
-## Ativar flag Rotulagem para Casa da Babá (passo a passo)
+## Ativar flag Rotulagem para Casa da Baba (passo a passo)
 1. Login como admin em `https://app.easystok.com.br/admin`.
-2. Vá em **Empresas** → busque "Casa da Babá" → clique.
+2. Vá em **Empresas** → busque "Casa da Baba" → clique.
 3. Aba **Feature Flags** → encontre `Rotulagem` → toggle ON.
 4. Modal pergunta: "Importar base TACO de ingredientes?" → **Sim**.
 5. Aguarde job de seed (~30s, badge "Importando…").
@@ -2592,11 +2592,11 @@ Resolução:
 | R07 | OCR de PDF de fornecedor (C2) tem qualidade ruim | Média (OCR sempre tem imprecisão) | Ficha errada = cálculo errado = rótulo errado | (1) Modal obrigatório "Confirmar/Editar" antes de salvar; (2) Origem `Fornecedor` + referência ao PDF original; (3) Validador inline (nutriente >0 e plausível); (4) Choice Azure Document Intelligence vs Tesseract no spike F9 | Taxa de erro >20% em batch real de 10 PDFs → mudar OCR provider ou desabilitar feature |
 | R08 | Resend free tier insuficiente (3k emails/mês) | Baixa | Notificações começam a falhar silenciosamente | (1) Métrica de uso mensal de email; (2) Alerta quando passar 80%; (3) Upgrade Pro Resend ($20/mês) trivial | Passar 2.500 emails/mês → upgrade antes de chegar a 3k |
 | R09 | Fly volume corrompe ou é deletado por erro humano | Baixa | Catastrófico: perda PDFs arquivados | (1) Backup diário Fly volume → R2; (2) Snapshot JSON espelhado em `Rotulo.dados_snapshot_json` no DB; (3) `fly.toml` com `auto_extend_size_threshold`; (4) Restore-test mensal valida R2 | Volume <20% espaço livre → expansão automática + alerta; corrupção por hash divergente → restore do R2 |
-| R10 | LGPD pedido de esquecimento causa lentidão no app | Baixa (Casa da Babá tem 5 fornecedores) | App lento durante regeneração de snapshots | (1) Job background não bloqueia UI; (2) Lock por `fornecedor_id`; (3) Retry com backoff; (4) Pequeno número de rótulos afetados | Job demora >10min → split em batches; impacto sustained → janela noturna |
+| R10 | LGPD pedido de esquecimento causa lentidão no app | Baixa (Casa da Baba tem 5 fornecedores) | App lento durante regeneração de snapshots | (1) Job background não bloqueia UI; (2) Lock por `fornecedor_id`; (3) Retry com backoff; (4) Pequeno número de rótulos afetados | Job demora >10min → split em batches; impacto sustained → janela noturna |
 | R11 | Anthropic API fora do ar durante demo importante | Baixa | Feature C2 indisponível temporariamente | (1) Fallback "preencher manualmente" sempre disponível; (2) Cache `idempotency_keys` 24h; (3) Status monitor: status.anthropic.com | API down >5min → banner UI "Importação automática indisponível" |
 | R12 | Felipe descobre bug em produção sem dashboard de métricas | Alta no MVP | Detecção atrasa horas em vez de minutos | (1) Logs estruturados JSON via ILogger; (2) Sentry opcional avaliado em F+1; (3) Email crítico Resend para SEV-1; (4) Cobertura ≥90% motor reduz bugs | MTTD SEV-1 > 1h durante 1ª semana → instalar Sentry imediatamente |
 | R13 | Conflito de versão pacote Microsoft.Extensions.* | Média (recorrente em .NET 9) | Pre-commit lento ou builds quebram | (1) Pre-commit escopado a 1 projeto; (2) MongoDb projetos removidos em sprint dedicada (ADR-0001 follow-up); (3) Renovate em PR isolado | Build quebra após bump → reverter no PR, investigar conflito |
-| R14 | Casa da Babá rejeita módulo por confusão UX | Média | Reset de F3-F8 com retrabalho UX | (1) Validação semanal Thatiane a partir de F5; (2) Microcopy filtro Thatiane (Seção 8.2); (3) Critério Go/No-Go inclui 5 dias staging; (4) Empty states ensinam | Thatiane "não entendi" 2× mesma tela → sprint UX antes de prosseguir |
+| R14 | Casa da Baba rejeita módulo por confusão UX | Média | Reset de F3-F8 com retrabalho UX | (1) Validação semanal Thatiane a partir de F5; (2) Microcopy filtro Thatiane (Seção 8.2); (3) Critério Go/No-Go inclui 5 dias staging; (4) Empty states ensinam | Thatiane "não entendi" 2× mesma tela → sprint UX antes de prosseguir |
 
 ---
 

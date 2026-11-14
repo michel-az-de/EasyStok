@@ -256,7 +256,7 @@
 1. **Menos ruído**: de 25 itens de menu → 5-8 módulos no launcher → 4-6 itens por módulo
 2. **Contexto preservado**: dentro do Financeiro, só vê coisas de financeiro
 3. **Launcher como cockpit**: resumo do dia antes de entrar em qualquer módulo
-4. **Identidade forte**: Casa da Babá e FMA Informática com seus próprios módulos
+4. **Identidade forte**: Casa da Baba e FMA Informática com seus próprios módulos
 5. **Gameficação**: missões do dia guiam o operador
 6. **Zero quebra**: nenhuma rota muda, nenhuma tela quebra
 

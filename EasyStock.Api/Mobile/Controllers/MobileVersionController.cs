@@ -99,7 +99,7 @@ public class MobileVersionController(
         // alterando essa config quando confiar na versão.
         // PwaCacheVersion (campo legado) resolve pra Canary ou Stable conforme o
         // device tem flag IsCanary. Devices anônimos (sem X-Device-Id) sempre
-        // recebem Stable, pra Casa da Babá inteira ficar em stable por default.
+        // recebem Stable, pra Casa da Baba inteira ficar em stable por default.
         //
         // Kill switch: Ota:Enabled=false congela TUDO — devices recebem
         // PwaCacheVersion="" e nao atualizam. Util quando estamos testando.

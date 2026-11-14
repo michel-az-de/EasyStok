@@ -252,7 +252,7 @@ UseCases que mexem em `PedidoPagamento`:
 ### A.9 Riscos descobertos (não previstos no escopo original)
 
 - **R-D1: Mobile MAUI usa `PedidoPagamento` via sync** (memory: APK Casa da
-  Babá, polling 30s). Mudar contrato pode quebrar sync → preservar
+  Baba, polling 30s). Mudar contrato pode quebrar sync → preservar
   `PedidoPagamento` físico, só adicionar colunas com defaults.
 - **R-D2: PWA já lê `pedido.Pagamentos[]` direto** em telas existentes
   (memory: P-01 refatoração tela produtos não tocou pedidos). Filtrar
@@ -273,7 +273,7 @@ UseCases que mexem em `PedidoPagamento`:
 - **R-D6: `EntityAlteracaoRetentionService` precisa registrar `SessaoCaixa`
   e `FechamentoCaixa` com retention 1825 dias** explicitamente — não basta
   default, configurar.
-- **R-D7: Casa da Babá hoje "fecha caixa" via UseCase atual** (memory
+- **R-D7: Casa da Baba hoje "fecha caixa" via UseCase atual** (memory
   resumo_horario_conventions). Deploy precisa ser feature-flagged por
   empresa para coexistência durante validação.
 

@@ -39,6 +39,8 @@ issue -> branch `tipo/slug-N` -> commits -> push -> PR `closes #N` -> CI + revie
 
 PT-BR direto, sem floreio, sem travessão. Resposta = ação + resultado. Código, identificadores e commits seguem o padrão do repo.
 
+**Grafia da marca:** escreva sempre "Casa da Baba" e "Baba", sem acento, em código, tela, teste, doc, commit, issue e PR. A grafia com acento é erro; o teste `GrafiaDaMarcaTests` barra a volta (#2517). Regra definitiva do Felipe, 13/11/2026.
+
 <!-- BEGIN CASA-BABA-HUB -->
 ## Hub da Casa da Baba
 
