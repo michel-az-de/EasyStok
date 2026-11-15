@@ -34,6 +34,16 @@ public sealed class LojaPixController(ChavePixLojaUseCases useCases, ICurrentUse
         return r is null ? DataNotFound("Loja não encontrada.") : DataOk(r);
     }
 
+    [SwaggerOperation(Summary = "Pix direto disponível", Description = "true só com a flag pagamento.pix_direto ligada e alguma loja com chave. Não traz chave.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [Authorize(Policy = "Operador")]
+    [HttpGet("/api/pix-direto")]
+    public async Task<IActionResult> Disponivel(CancellationToken ct)
+    {
+        if (!TryResolveEmpresaId(currentUser, null, out var empresaId, out var error)) return error!;
+        return DataOk(new { disponivel = await useCases.DisponivelAsync(empresaId, ct) });
+    }
+
     [SwaggerOperation(Summary = "Grava a chave Pix da loja", Description = "Valida a chave pelo tipo; nome até 25 e cidade até 15 caracteres, sem acento.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

@@ -67,6 +67,17 @@ public sealed class ChavePixLojaUseCases(ILojaRepository lojas, ITenantFeatureFl
         return await ResultadoAsync(loja, ct);
     }
 
+    /// <summary>
+    /// O console mostra o chip do Pix direto só com a flag do tenant ligada e alguma loja com chave. Flag desligada nem
+    /// lê as lojas. Quem decide a loja do pedido é a troca de forma, que recusa a loja sem chave.
+    /// </summary>
+    public async Task<bool> DisponivelAsync(Guid empresaId, CancellationToken ct = default)
+    {
+        UseCaseGuards.EnsureEmpresaId(empresaId);
+        if (!(await flags.ListarAtivasAsync(empresaId, ct)).Contains(FeatureCatalogo.PagamentoPixDireto)) return false;
+        return (await lojas.GetByEmpresaAsync(empresaId)).Any(l => l.ObterRecebedorPix() is not null);
+    }
+
     /// <summary>E-mail mostra o começo e o domínio; os outros tipos, só os 4 últimos caracteres.</summary>
     public static string Mascarar(ChavePix chave)
     {

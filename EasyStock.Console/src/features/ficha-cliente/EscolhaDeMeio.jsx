@@ -1,6 +1,8 @@
 import { Chip } from '../../componentes/Chip'
 import { CampoReais } from '../../componentes/CampoReais'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { usePixDireto } from '../../aplicacao/usePixDireto'
+import { meiosDaEscolha } from '../../dominio/cobranca'
 import { lerMoeda, moeda } from '../../dominio/formato'
 import { avisoDeSinalAntesDeGerar } from '../../dominio/resumoPedido'
 import css from './ficha.module.css'
@@ -24,14 +26,17 @@ export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir 
   const { meiosDePagamento } = useCatalogo()
   const { fonteApi, agora, selecionada } = useAtendimento()
   const { definirTroco } = useAcoes()
-  const meios = meiosDePagamento.filter((meio) => meio.id !== excluir)
+  const pixDireto = usePixDireto()
+  const pedidoAtual = pedido ?? selecionada?.pedido ?? null
+  // #2233: Pix na chave da loja só com a API dizendo que está disponível e o pedido já criado.
+  const meios = meiosDaEscolha(meiosDePagamento, { pixDireto, pedidoCriado: Boolean(pedidoAtual?.pedidoId) })
+    .filter((meio) => meio.id !== excluir)
   const principais = meios.filter((meio) => meio.destaque)
   const naEntrega = meios.filter((meio) => !meio.destaque)
   const escolhidoNaEntrega = naEntrega.find((meio) => meio.id === escolhido)
   const sinalNaEntrega = escolhidoNaEntrega && escolhidoNaEntrega.id !== 'vale-refeicao'
   const aviso = (sinalNaEntrega || (geraAoEscolher && !escolhido)) && naEntrega.some(meio => meio.id === 'maquininha')
     ? avisoDeSinalAntesDeGerar(pedido, { fonteApi, agora, meio: escolhido }) : null
-  const pedidoAtual = pedido ?? selecionada?.pedido ?? null
   const pedeTroco = Boolean(escolhidoNaEntrega?.pedeTroco) && Boolean(pedidoAtual)
   const trocoGravavel = pedeTroco && !pedidoAtual.pedidoId && Boolean(selecionada)
   const chip = (meio, className) => (

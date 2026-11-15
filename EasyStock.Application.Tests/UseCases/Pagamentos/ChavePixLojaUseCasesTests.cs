@@ -117,6 +117,27 @@ public class ChavePixLojaUseCasesTests
         loja.ObterRecebedorPix().Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, true)]
+    public async Task Disponivel_SoComFlagEChave(bool flagLigada, bool comChave, bool esperado)
+    {
+        if (flagLigada) flags.ListarAtivasAsync(Empresa, Arg.Any<CancellationToken>()).Returns([FeatureCatalogo.PagamentoPixDireto]);
+        if (comChave) loja.DefinirRecebedorPix(RecebedorPix.Criar(ChavePix.Criar(TipoChavePix.Email, Email), "Casa de Doces", "Sao Paulo"));
+        lojas.GetByEmpresaAsync(Empresa).Returns([loja]);
+
+        (await Sut().DisponivelAsync(Empresa)).Should().Be(esperado);
+    }
+
+    [Fact]
+    public async Task Disponivel_ComFlagDesligada_NemLeAsLojas()
+    {
+        (await Sut().DisponivelAsync(Empresa)).Should().BeFalse();
+
+        await lojas.DidNotReceive().GetByEmpresaAsync(Arg.Any<Guid>());
+    }
+
     [Fact]
     public void Comando_NaoMostraAChaveNoToString()
     {

@@ -51,7 +51,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         if (chave == "LojaImpressao" && acao == "Obter")
             return [Modulo.Configuracoes, Modulo.Producao, Modulo.Atendimento, Modulo.Caixa, Modulo.Cozinha, Modulo.Entregas];
         // #2233: quem escolhe a forma de pagamento lê se a loja tem Pix direto (mascarado); só Configurações grava.
-        if (chave == "LojaPix" && acao == "Obter")
+        if (chave == "LojaPix" && acao is "Obter" or "Disponivel")
             return [Modulo.Configuracoes, Modulo.Atendimento, Modulo.Caixa, Modulo.Entregas];
         if (EscritaGestaoMobile.TryGetValue((chave, acao), out var mobile)) return mobile;
         return Mapa.GetValueOrDefault(chave);
