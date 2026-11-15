@@ -61,8 +61,13 @@ caso('contadores de Avisos e Lembretes ancorados no canto do ícone do trilho', 
 })
 
 caso('fechar o caixa de outro dia é a ação primária do Financeiro', () => {
+  // #2512 (PR #2519, Q07) deixou um botão de fechar por vista: com o caixa de outro dia aberto, o primário
+  // fica no alerta; o de texto no topo só aparece fora desse caso (#2699).
   const aba = ler('features/gestao/caixa/AbaCaixaApi.jsx')
-  assert.match(aba, /<Botao variante=\{dia\.esquecidoAberto \? 'primario' : 'texto'\} icone="lock"/)
+  assert.match(aba, /\{podeGerenciar && dia\.aberto && !dia\.fechado && !dia\.esquecidoAberto && \(\s*<Botao variante="texto" icone="lock"/)
+  const alerta = aba.slice(aba.indexOf('{dia.esquecidoAberto && ('))
+  assert.match(alerta, /^\{dia\.esquecidoAberto && \([\s\S]*?role="alert"[\s\S]*?<Botao variante="primario" icone="lock"[^>]*>\s*Fechar o caixa de \{diaMes\(dia\.abertoDesde\)\}/)
+  assert.equal(aba.match(/icone="lock" disabled=\{acao\.enviando \|\| conferindo\} onClick=\{abrirFechamento\}/g)?.length, 2, 'um botão no topo e um no alerta, nunca os dois na mesma vista')
 })
 
 console.log(`\n${ok} casos ok`)
