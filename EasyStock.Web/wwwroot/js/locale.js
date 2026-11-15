@@ -77,8 +77,12 @@
     // Mesma regra do keydown: o value final só pode ter 1 ponto decimal —
     // remove pontos vestigiais do que já estava no campo fora da seleção,
     // mantém só o do texto colado.
-    const esq = t.value.slice(0, s).replace(/\./g, '');
-    const dir = t.value.slice(end).replace(/\./g, '');
+    // #993: só quando o colado TRAZ um decimal. Colar "0" em "10.50" não define
+    // separador novo; apagar o ponto ali virava 10500 (1000x) em silêncio.
+    const trazDecimal = colado.indexOf('.') > -1;
+    const tirarPontos = function (x) { return trazDecimal ? x.replace(/\./g, '') : x; };
+    const esq = tirarPontos(t.value.slice(0, s));
+    const dir = tirarPontos(t.value.slice(end));
     t.value = esq + colado + dir;
     const cur = (esq + colado).length;
     t.setSelectionRange(cur, cur);
