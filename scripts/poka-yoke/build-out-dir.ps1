@@ -16,3 +16,24 @@ function Get-BuildOutDir([string]$RepoRoot) {
     $hash  = -join ($bytes[0..3] | ForEach-Object { $_.ToString('x2') })
     Join-Path $env:TEMP "easystok-build-check-$hash"
 }
+
+<#
+Get-BuildOutDirOrfas -- pastas de build que nenhum worktree vivo usa mais (issue 2653).
+
+O #1117 deu uma pasta por worktree, mas nada a apaga quando o worktree sai: em 15/11 eram
+364 pastas e 54,8 GB no %TEMP%. Orfa = hash que nao bate com nenhum `git worktree list` do
+repo E sem escrita ha mais de $Horas horas (folga para um gate de outro clone em andamento).
+So lista; quem apaga e o limpar-build-orfao.ps1 com -Apagar.
+#>
+function Get-BuildOutDirOrfas([string]$RepoRoot, [int]$Horas = 24) {
+    $vivas = @{}
+    foreach ($ln in (git -C $RepoRoot worktree list --porcelain)) {
+        if ($ln -like 'worktree *') { $vivas[(Get-BuildOutDir $ln.Substring(9)).ToLowerInvariant()] = $true }
+    }
+    $vivas[(Get-BuildOutDir $RepoRoot).ToLowerInvariant()] = $true
+    $limite = (Get-Date).AddHours(-$Horas)
+    Get-ChildItem -LiteralPath $env:TEMP -Directory -Filter 'easystok-build-check-*' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^easystok-build-check-[0-9a-f]{8}$' } |
+        Where-Object { -not $vivas.ContainsKey($_.FullName.ToLowerInvariant()) } |
+        Where-Object { $_.LastWriteTime -lt $limite }
+}
