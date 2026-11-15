@@ -633,6 +633,42 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
             .Which.Reason.Should().Contain(Produto);
     }
 
+    // ---------- #2083: pedido do console com quantidade fracionada ----------
+
+    [Theory]
+    [InlineData("preparando")]
+    [InlineData("entregue")]
+    public async Task PedidoDoConsoleCom1_5Kg_VoltaDoAparelho_ServidorAceitaENaoMexeNoPedido(string status)
+    {
+        var pedido = EasyStock.Domain.Entities.Pedido.Criar(_empresaId, cliente: null, lojaId: null, "console");
+        pedido.Itens.Add(new PedidoItem
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = _produtoErpId, Nome = "Queijo", Quantidade = 1.5m,
+            PrecoUnitario = 30m, Subtotal = 45m, CriadoEm = DateTime.UtcNow
+        });
+        pedido.RecalcularTotal();
+        _db.Add(pedido);
+        _db.SaveChanges();
+        _db.ChangeTracker.Clear();
+        var agora = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        // O aparelho devolve o que recebeu do pull: qty 1,5 no JSON.
+        var eco = Mutation("order.upsert", new
+        {
+            id = pedido.Id.ToString(), clientId = (string?)null, clientSnapshot = new { name = "Ana" },
+            items = new[] { new { productId = _produtoErpId.ToString(), name = "Queijo", emoji = (string?)null, unit = "kg", qty = 1.5m, unitPrice = 30m } },
+            total = 45m, status, metodo = "pix", createdAt = agora, updatedAt = agora
+        });
+
+        var resposta = await Push("dev-a", eco);
+
+        resposta.Rejected.Should().BeNullOrEmpty("1,5 no JSON não pode travar o sync do pedido");
+        resposta.AcceptedIds.Should().Contain(eco.Id);
+        _db.Set<Order>().AsNoTracking().Any(o => o.Id == pedido.Id.ToString()).Should().BeTrue("o espelho do pedido foi gravado");
+        var doErp = _db.Set<EasyStock.Domain.Entities.Pedido>().AsNoTracking().Include(p => p.Itens).Single(p => p.Id == pedido.Id);
+        doErp.Itens.Single().Quantidade.Should().Be(1.5m, "o eco do aparelho não reescreve o item do pedido do console");
+        doErp.Total.Valor.Should().Be(45m);
+    }
+
     // ---------- apoio ----------
 
     private async Task<SyncPushResponse> Push(string deviceId, params MutationDto[] mutations)

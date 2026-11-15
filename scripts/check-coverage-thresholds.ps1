@@ -10,11 +10,15 @@ param(
 )
 
 $thresholds = @{
-    "EasyStock.Domain"      = 70
-    "EasyStock.Application" = 45
+    "EasyStock.Domain"      = 80
+    "EasyStock.Application" = 75
     "EasyStock.Api"         = 9
     "EasyStock.Infra.Async" = 55
 }
+# #2371 (2026-11-15): Domain 70->80 e Application 45->75. Medido nos dois ultimos runs do
+# coverage.yml no master: Domain 84,7/85,3 e Application 79,7/79,6, margem de ~5 pontos.
+# Infra.Async fica em 55: o real e 55,6 e um run de branch caiu a 49,5 (ruido).
+#
 # Api gate intencionalmente baixo (9%) nesta onda. O modulo tem ~5500 linhas
 # em controllers, services, background jobs — subir significativamente exige
 # E2E tests via WebApplicationFactory + Testcontainers, escopo da Onda 2

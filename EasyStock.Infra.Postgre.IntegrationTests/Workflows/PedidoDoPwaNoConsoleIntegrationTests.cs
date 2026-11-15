@@ -385,6 +385,13 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
         var vendidos = await leitura.Set<ItemVenda>().IgnoreQueryFilters().CountAsync(i => i.ProdutoId == produtoId);
         vendidos.Should().Be(produtoVinculado ? 1 : 0);
         (await Saldo(s)).Should().Be(produtoVinculado ? 8m : 10m);
+        if (produtoVinculado)
+        {
+            // #2083: a Venda do pedido nascido no aparelho continua saindo dos itens do aparelho.
+            var vendido = await leitura.Set<ItemVenda>().IgnoreQueryFilters().SingleAsync(i => i.ProdutoId == produtoId);
+            vendido.Quantidade.Value.Should().Be(2m);
+            vendido.PrecoTotal.Valor.Should().Be(60m);
+        }
     }
 
     [SkippableTheory]

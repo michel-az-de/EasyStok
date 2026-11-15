@@ -120,7 +120,7 @@ public class SyncMutationDispatcher(
     private static void AssertHistoricalOrderUpdate(Order existing, OrderDto dto)
     {
         var sameItems = dto.Items is not null && existing.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).Order()
-            .SequenceEqual(dto.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).Order());
+            .SequenceEqual(dto.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, QtyDoEspelho(i.Qty), i.UnitPrice)).Order());
         var sameBase = sameItems && existing.Total == dto.Total && existing.ClientId == dto.ClientId
             && existing.ClientSnapshotName == dto.ClientSnapshot?.Name && existing.ClientSnapshotRef == dto.ClientSnapshot?.Ref
             && CarimboMs(existing.CreatedAt) == dto.CreatedAt;
@@ -405,7 +405,7 @@ public class SyncMutationDispatcher(
                 order.Items.Add(new OrderItem
                 {
                     OrderId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                    Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
+                    Emoji = i.Emoji, Unit = i.Unit, Qty = QtyDoEspelho(i.Qty), UnitPrice = i.UnitPrice
                 });
             _db.Add(order);
             // #1543: pedido que ja chega "pronto" (ou adiante) baixa aqui; antes so a troca de status baixava.
@@ -446,7 +446,7 @@ public class SyncMutationDispatcher(
                 existing.Items.Add(new OrderItem
                 {
                     OrderId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                    Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
+                    Emoji = i.Emoji, Unit = i.Unit, Qty = QtyDoEspelho(i.Qty), UnitPrice = i.UnitPrice
                 });
 
             // Onda 3 — vendas mobile -> ERP. #1543: a Venda do pedido que nasceu no ERP so nasce, ou e
@@ -513,7 +513,7 @@ public class SyncMutationDispatcher(
         {
             // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
             var p = await _db.Set<Product>().FindAsync(doProduto.Key);
-            if (p != null && p.EmpresaId == empresaId) linhas.Add((p, doProduto.Sum(i => i.Qty)));
+            if (p != null && p.EmpresaId == empresaId) linhas.Add((p, doProduto.Sum(i => QtyDoEspelho(i.Qty))));
         }
         foreach (var (produto, quantidade) in MobileStockReconciler.PorProdutoDoErp(linhas))
             await _stockReconciler.BaixarVendaAsync(produto, quantidade, orderId, lojaDoPedido,
@@ -540,6 +540,14 @@ public class SyncMutationDispatcher(
     public static Task<bool> PedidoNasceuNoErpAsync(EasyStockDbContext db, Guid? empresaId, Guid pedidoId) =>
         db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
             .AnyAsync(p => p.Id == pedidoId && p.EmpresaId == empresaId && p.Origem != OrigemDoPwa);
+
+    /// <summary>
+    /// #2083: a quantidade do item no espelho (<c>mobile_order_items.qty</c>, inteiro). Só o pedido que nasceu no
+    /// console traz fração, e dele o espelho não decide nada: estoque é da esteira do ERP e a Venda sai dos itens do
+    /// Pedido (<see cref="MobileSaleSyncService.ItensDaVendaAsync"/>). Trunca em vez de recusar, para o eco do
+    /// aparelho não travar o sync do pedido. A coluna decimal fica para a #2707.
+    /// </summary>
+    public static int QtyDoEspelho(decimal qty) => (int)qty;
 
     /// <summary>Origem gravada no pedido do ERP que o <see cref="Linkers.OrderLinker"/> cria a partir do aparelho.</summary>
     public const string OrigemDoPwa = "mobile";

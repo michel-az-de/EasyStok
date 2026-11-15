@@ -26,7 +26,6 @@ const EXCECOES = new Map([
   ['prova-1846-seletor-acervo.mjs', 'manual (#2437): chama a API de homologação (HOMOLOGACAO_API_URL)'],
   ['prova-1693-dez-cenarios-api-real.mjs', 'lê .build/logistica-browser.json gerado por outra prova de navegador (Playwright e API real)'],
   ['prova-1712-comanda-operador.mjs', 'SSR em camadas (#2701): useComplementoDeTexto (#2181) lê document no estado inicial e, com um document mínimo, o harness ainda monta componente undefined; sem jsdom no projeto'],
-  ['prova-1868-visual.mjs', 'decisão de produto pendente (#2701): #2143 tirou do composer o aviso visível "Só texto neste canal" (o motivo ficou só no leitor de tela); os outros casos já acompanham #2187 e #2156'],
   ['prova-2395-api-real.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
   ['prova-2395-cadastros-concorrencia.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
   ['prova-2395-operacao-complementos.mjs', 'opt-in: Playwright e fixture R4 real final; requer R4_EXECUTAR_COMPLEMENTOS=1 e grava operações'],

@@ -5,40 +5,46 @@ namespace EasyStock.ArchitectureTests;
 /// <summary>
 /// Trava regressão F3 (god Program.cs da Api).
 ///
-/// Medido em 2026-11-15 (#825): <c>EasyStock.Api/Program.cs</c> tem 245 linhas físicas (eram 1037) — concentra DI,
-/// observabilidade, pipeline, swagger, mobile. F3 quebra em extensions e move
-/// pipeline pra <c>UseEasyStockPipeline(env)</c>, deixando o Program.cs &le; 200
-/// linhas.
+/// O alvo de F3 é <c>EasyStock.Api/Program.cs</c> com até <see cref="Alvo"/> linhas (eram 1037). #2371: era
+/// <c>ArchitectureDebt</c>, que o CI filtra, então nada barrava o arquivo de crescer. Agora é ratchet: o teto é o
+/// tamanho medido (245 em 2026-11-15) e só desce. Passar do teto falha; ficar abaixo dele também falha, pedindo
+/// para baixar o <see cref="Teto"/> ao número novo. Quando o teto chegar ao alvo, o ratchet acaba.
 ///
-/// Enquanto F3 não fecha, este teste fica em <c>ArchitectureDebt</c> (não bloqueia
-/// Husky). Quando &le; 200, troca pra <c>Architecture</c> e vira gate permanente.
-///
-/// Limite consistente com gate manual:
-/// <c>(Get-Content EasyStock.Api/Program.cs | Measure-Object -Line).Lines</c>
-/// = <c>File.ReadAllLines(path).Length</c> (linhas físicas, inclui brancos e comentários).
+/// Linhas físicas, inclui brancos e comentários: <c>File.ReadAllLines(path).Length</c>.
 /// </summary>
+[Trait("Category", "Architecture")]
 public class ProgramSize_Api_Discipline
 {
-    private const string TargetRelativePath = @"EasyStock.Api\Program.cs";
-    private const int MaxLines = 200;
+    // Barra normal: o CI roda em Linux, onde a barra invertida não é separador.
+    private const string TargetRelativePath = "EasyStock.Api/Program.cs";
+    private const int Alvo = 200;
+    private const int Teto = 245;
+
+    private static int LinhasDoProgram()
+    {
+        var targetPath = Path.Combine(RepoPaths.FindRepoRoot(), TargetRelativePath);
+        File.Exists(targetPath).Should().BeTrue(
+            $"alvo {targetPath} sumiu. Program.cs foi movido? Atualize este teste.");
+        return File.ReadAllLines(targetPath).Length;
+    }
 
     [Fact]
-    [Trait("Category", "ArchitectureDebt")]
-    public void Api_ProgramCs_DeveTerAteCemLinhas()
+    public void Api_ProgramCs_NaoPassaDoTeto()
     {
-        // Arrange
-        var repoRoot = RepoPaths.FindRepoRoot();
-        var targetPath = Path.Combine(repoRoot, TargetRelativePath);
+        var linhas = LinhasDoProgram();
 
-        File.Exists(targetPath).Should().BeTrue(
-            $"alvo {targetPath} sumiu — Program.cs foi movido? Atualizar este teste.");
+        linhas.Should().BeLessThanOrEqualTo(Teto,
+            $"EasyStock.Api/Program.cs concentra responsabilidades demais ({linhas} linhas, teto {Teto}). " +
+            $"Registre o serviço numa extension Add*() em vez de crescer o Program (F3, alvo {Alvo}).");
+    }
 
-        // Act
-        var lineCount = File.ReadAllLines(targetPath).Length;
+    [Fact]
+    public void Teto_AcompanhaOProgramQuandoEleEncolhe()
+    {
+        var linhas = LinhasDoProgram();
 
-        // Assert
-        lineCount.Should().BeLessThanOrEqualTo(MaxLines,
-            $"EasyStock.Api/Program.cs concentra responsabilidades demais hoje ({lineCount} linhas). " +
-            $"F3 quebra em Add*() extensions + UseEasyStockPipeline(env), alvo <= {MaxLines}.");
+        (linhas < Teto && Teto > Alvo).Should().BeFalse(
+            $"o Program.cs encolheu para {linhas} linhas. Baixe o Teto para {Math.Max(linhas, Alvo)} " +
+            "para o ratchet não devolver a folga.");
     }
 }
