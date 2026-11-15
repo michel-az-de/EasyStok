@@ -257,14 +257,19 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         recebidoD.Should().Be(30m, "o sinal conta no dia em que entrou");
         recebidoD1.Should().Be(70m, "na entrega entra só o restante");
         (recebidoD + recebidoD1).Should().Be(100m);
-        noDiaDoSinal.SaldoEsperado.Should().Be(80m, "gaveta de D: abertura 50 + sinal 30");
-        naEntrega.SaldoEsperado.Should().Be(120m, "gaveta de D+1: abertura 50 + restante 70");
+        noDiaDoSinal.SaldoEsperado.Should().Be(80m, "saldo de D: abertura 50 + sinal 30");
+        naEntrega.SaldoEsperado.Should().Be(120m, "saldo de D+1: abertura 50 + restante 70");
+        var dinheiroNaGaveta = new List<decimal>();
         foreach (var dia in new[] { noDiaDoSinal, naEntrega })
         {
             var linhas = await caixa.GetLinhasExtrasAsync(s.EmpresaId, dia.JanelaInicioUtc, dia.JanelaFimUtc);
             linhas.Sum(l => l.Valor).Should().Be(dia.TotalVendas + dia.TotalPagamentosPedidos,
                 $"as linhas de {dia.Data} somam o que o saldo conta");
+            dinheiroNaGaveta.Add(linhas
+                .Where(l => string.Equals(l.Metodo?.Trim(), "dinheiro", StringComparison.OrdinalIgnoreCase))
+                .Sum(l => l.Valor));
         }
+        dinheiroNaGaveta.Should().Equal([0m, 70m], "o sinal entrou em pix; na gaveta só os 70 em dinheiro da entrega");
     }
 
     private static MovimentoCaixa Movimento(Guid empresaId, string tipo, decimal valor, DateTime em) => new()
