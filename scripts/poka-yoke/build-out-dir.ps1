@@ -26,6 +26,16 @@ repo E sem escrita ha mais de $Horas horas (folga para um gate de outro clone em
 Juncao ou link no topo do TEMP nunca e orfa: apagar seguiria para o alvo.
 So lista; quem apaga e o limpar-build-orfao.ps1 com -Apagar.
 #>
+# Build incremental reescreve as DLLs sem mudar a data da pasta: vale a escrita mais nova
+# entre a pasta e os arquivos direto nela (o -o do dotnet build grava no topo).
+function Get-UltimaEscritaDoTopo([IO.DirectoryInfo]$Pasta) {
+    $maisNova = $Pasta.LastWriteTime
+    foreach ($f in (Get-ChildItem -LiteralPath $Pasta.FullName -File -Force -ErrorAction SilentlyContinue)) {
+        if ($f.LastWriteTime -gt $maisNova) { $maisNova = $f.LastWriteTime }
+    }
+    $maisNova
+}
+
 function Get-BuildOutDirOrfas([string]$RepoRoot, [int]$Horas = 24) {
     $vivas = @{}
     foreach ($ln in (git -C $RepoRoot worktree list --porcelain)) {
@@ -37,5 +47,5 @@ function Get-BuildOutDirOrfas([string]$RepoRoot, [int]$Horas = 24) {
         Where-Object { $_.Name -match '^easystok-build-check-[0-9a-f]{8}$' } |
         Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
         Where-Object { -not $vivas.ContainsKey($_.FullName.ToLowerInvariant()) } |
-        Where-Object { $_.LastWriteTime -lt $limite }
+        Where-Object { (Get-UltimaEscritaDoTopo $_) -lt $limite }
 }

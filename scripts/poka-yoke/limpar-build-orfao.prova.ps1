@@ -3,7 +3,7 @@ Prova da #2653: a poda das pastas de build orfas do gate.
 
 Cria, num TEMP isolado, pastas easystok-build-check-<hash> falsas e confere:
   - a pasta de um worktree vivo nunca e listada, mesmo antiga;
-  - a orfa recente (menos de 24 h) nao e listada;
+  - a orfa recente (menos de 24 h) nao e listada, nem a que so teve arquivo reescrito;
   - a orfa antiga e listada; sem -Apagar nada some; com -Apagar ela some;
   - pasta de outro nome no TEMP nao e tocada.
 
@@ -28,7 +28,9 @@ function Confere([string]$descricao, [scriptblock]$teste) {
 }
 function NovaPasta([string]$caminho, [int]$horasAtras) {
     New-Item -ItemType Directory -Path $caminho -Force | Out-Null
-    Set-Content -Path (Join-Path $caminho 'EasyStock.Domain.dll') -Value 'x'
+    $dll = Join-Path $caminho 'EasyStock.Domain.dll'
+    Set-Content -Path $dll -Value 'x'
+    (Get-Item $dll).LastWriteTime = (Get-Date).AddHours(-$horasAtras)
     (Get-Item $caminho).LastWriteTime = (Get-Date).AddHours(-$horasAtras)
     $caminho
 }
@@ -38,6 +40,10 @@ try {
     $antiga  = NovaPasta (Join-Path $isolado 'easystok-build-check-deadbeef') 48
     $recente = NovaPasta (Join-Path $isolado 'easystok-build-check-cafebabe') 1
     $outra   = NovaPasta (Join-Path $isolado 'outra-ferramenta') 999
+    # Build incremental reescreve a DLL sem mudar a data da pasta: conta a escrita do arquivo.
+    $emUso   = NovaPasta (Join-Path $isolado 'easystok-build-check-0ddba11a') 48
+    (Get-Item (Join-Path $emUso 'EasyStock.Domain.dll')).LastWriteTime = (Get-Date).AddMinutes(-5)
+    (Get-Item $emUso).LastWriteTime = (Get-Date).AddHours(-48)
 
     Confere 'o script de poda existe' { Test-Path $script }
 
@@ -45,6 +51,7 @@ try {
     Confere 'a orfa antiga e listada' { $listadas -contains $antiga }
     Confere 'a pasta do worktree vivo nao e listada, mesmo antiga' { $listadas -notcontains $viva }
     Confere 'a orfa recente nao e listada' { $listadas -notcontains $recente }
+    Confere 'orfa com pasta antiga mas DLL reescrita ha 5 min nao e listada' { $listadas -notcontains $emUso }
     Confere 'pasta de outro nome nao e listada' { $listadas -notcontains $outra }
     Confere 'sem -Apagar nada e apagado' { (Test-Path $antiga) -and (Test-Path $viva) -and (Test-Path $recente) }
 
