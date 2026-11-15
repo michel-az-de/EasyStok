@@ -432,10 +432,11 @@ export function Composer({
           </div>
 
           {/* #1870: em coluna estreita a frase inteira quebrava em 2 linhas. Canal só de texto mostra
-              o curto; o motivo inteiro segue no title, no leitor de tela e no aria-describedby. */}
+              o curto; o motivo inteiro segue no title, no leitor de tela e no aria-describedby. A #2143 tinha
+              deixado só o texto de leitor de tela e os botões sumiam sem explicação (#2706). */}
           {restricao && (podeAnexar || podeAudio
             ? <p id={idRestricao} className={css.restricao}>{restricao}</p>
-            : <p id={idRestricao} className="sr">{restricao}</p>)}
+            : <p id={idRestricao} className={css.restricao} title={restricao}><span aria-hidden="true">Só texto neste canal</span><span className="sr">{restricao}</span></p>)}
         </>
       )}
 
