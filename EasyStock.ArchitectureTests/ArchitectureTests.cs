@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace EasyStock.ArchitectureTests;
 
+[Trait("Category", "Architecture")]
 public class ArchitectureTests
 {
     private const string DomainNamespace = "EasyStock.Domain";

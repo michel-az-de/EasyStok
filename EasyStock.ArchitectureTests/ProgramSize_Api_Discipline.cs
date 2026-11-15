@@ -5,7 +5,7 @@ namespace EasyStock.ArchitectureTests;
 /// <summary>
 /// Trava regressão F3 (god Program.cs da Api).
 ///
-/// Hoje <c>EasyStock.Api/Program.cs</c> tem 1037 linhas físicas — concentra DI,
+/// Medido em 2026-11-15 (#825): <c>EasyStock.Api/Program.cs</c> tem 245 linhas físicas (eram 1037) — concentra DI,
 /// observabilidade, pipeline, swagger, mobile. F3 quebra em extensions e move
 /// pipeline pra <c>UseEasyStockPipeline(env)</c>, deixando o Program.cs &le; 200
 /// linhas.

@@ -14,6 +14,7 @@ namespace EasyStock.ArchitectureTests;
 ///   sem decisão consciente (não regredir para "emite sempre")
 /// - ADR-0012: ClienteOtp / ClienteSession devem usar TimeProvider, não DateTime.UtcNow
 /// </summary>
+[Trait("Category", "Architecture")]
 public class StorefrontArchitectureTests
 {
     private const string StorefrontNamespace = "EasyStock.Domain.Entities.Storefront";
