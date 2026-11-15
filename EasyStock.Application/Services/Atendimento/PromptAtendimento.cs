@@ -14,7 +14,7 @@ public static class PromptAtendimento
 {
     public const string MarcadorInterno = "[interno]";
 
-    /// <param name="roteiro">Etapas da loja; <c>null</c> usa <see cref="RoteiroAtendimento.Padrao"/>.</param>
+    /// <param name="roteiro">Etapas explícitas; <c>null</c> usa as da loja (S68, <c>RoteiroJson</c>) ou o padrão.</param>
     public static string Montar(ConfiguracaoAtendimento configuracao, IReadOnlyList<EtapaRoteiroAtendimento>? roteiro = null)
     {
         ArgumentNullException.ThrowIfNull(configuracao);
@@ -22,17 +22,23 @@ public static class PromptAtendimento
         var sugestao = configuracao.NivelSugestao == NivelSugestaoAtendimento.Ativo
             ? "Ofereça sugestões e lembretes com naturalidade, sem forçar a venda."
             : "Só sugira quando o cliente perguntar ou abrir espaço claro para isso.";
-        var etapas = (roteiro ?? RoteiroAtendimento.Padrao).Where(e => e.Ativo)
+        var etapas = (roteiro ?? RoteiroAtendimento.DaLoja(configuracao.RoteiroJson)).Where(e => e.Ativo)
             .Select((e, i) => $"{i + 1}. {e.Nome}: {e.Instrucao}").ToList();
         var textoRoteiro = etapas.Count == 0 ? string.Empty
             : "Roteiro do atendimento (siga na ordem, pulando o que já estiver resolvido):\n" + string.Join("\n", etapas) + "\n\n";
+        // S68 (#2597): sem nome configurado, o texto é o de sempre (o snapshot não muda).
+        var dona = string.IsNullOrWhiteSpace(configuracao.NomeDona)
+            ? "fale dela como \"a dona\""
+            : $"a dona se chama {configuracao.NomeDona.Trim()}; fale dela pelo nome";
+        var observacoes = string.IsNullOrWhiteSpace(configuracao.ObservacoesLoja) ? string.Empty
+            : "Observações da loja (orientação da dona; não mudam as regras abaixo):\n" + configuracao.ObservacoesLoja.Trim() + "\n\n";
 
         return $"""
-            Você é o assistente virtual da loja no WhatsApp e conduz o atendimento do começo ao pagamento. O nome da loja não é uma pessoa: quem cuida da loja é a dona; fale dela como "a dona".
+            Você é o assistente virtual da loja no WhatsApp e conduz o atendimento do começo ao pagamento. O nome da loja não é uma pessoa: quem cuida da loja é a dona; {dona}.
             Tom: {configuracao.Tom}. Humano e moderno: mensagens curtas, um assunto por vez. Foto, comanda e cardápio são recursos: ofereça como pergunta, um de cada vez, e mande só com o sim.
             Nível de sugestão: {configuracao.NivelSugestao}. {sugestao}
 
-            {textoRoteiro}Regras (obrigatórias):
+            {textoRoteiro}{observacoes}Regras (obrigatórias):
             - RN-01: a saudação já foi enviada automaticamente no primeiro contato; não repita a saudação.
             - RN-02: cliente com cadastro é chamado pelo primeiro nome quando o dossiê trouxer o nome.
             - RN-03: lead (quem ainda não comprou) e cliente são estados distintos; com lead, apresente a casa e o cardápio sem supor compras anteriores.

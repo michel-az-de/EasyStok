@@ -56,6 +56,52 @@ public class PromptAtendimentoTests
     }
 
     /// <summary>
+    /// S68 (#2597): o nome da dona vem da configuração. Sem ele, o prompt fica igual ao padrão (o snapshot não muda) e
+    /// nunca fala em "Baba"; com ele, o agente fala dela pelo nome.
+    /// </summary>
+    [Fact]
+    public void NomeDaDona_VemDaConfiguracao_ESemEleNaoHaBaba()
+    {
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(Guid.Empty);
+        PromptAtendimento.Montar(configuracao).Should().NotContain("Baba").And.Contain("fale dela como \"a dona\"");
+
+        configuracao.DefinirAssistente("Michele", null, null, null, null);
+        var prompt = PromptAtendimento.Montar(configuracao);
+
+        prompt.Should().Contain("a dona se chama Michele").And.NotContain("Baba").And.NotContain("fale dela como \"a dona\"");
+    }
+
+    /// <summary>S68 (#2597): o roteiro guardado pela loja substitui o padrão; vazio ou ilegível volta ao padrão.</summary>
+    [Fact]
+    public void RoteiroDaLoja_SubstituiOPadrao_EIlegivelVoltaAoPadrao()
+    {
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(Guid.Empty);
+        configuracao.DefinirAssistente(null, null, null,
+            RoteiroAtendimento.Serializar([new("Saudar", "Cumprimente pelo nome."), new("Upsell", "Ofereça sobremesa.", false)]), null);
+
+        PromptAtendimento.Montar(configuracao).Should().Contain("1. Saudar: Cumprimente pelo nome.")
+            .And.NotContain("sobremesa").And.NotContain(RoteiroAtendimento.Padrao[0].Instrucao);
+        RoteiroAtendimento.DaLoja(null).Should().BeSameAs(RoteiroAtendimento.Padrao);
+        RoteiroAtendimento.DaLoja("[]").Should().BeSameAs(RoteiroAtendimento.Padrao);
+        RoteiroAtendimento.DaLoja("{quebrado").Should().BeSameAs(RoteiroAtendimento.Padrao);
+        RoteiroAtendimento.DaLoja(RoteiroAtendimento.Serializar(RoteiroAtendimento.Padrao)).Should().Equal(RoteiroAtendimento.Padrao);
+    }
+
+    /// <summary>S68 (#2597): as observações da loja entram depois do roteiro e antes das regras, que continuam valendo.</summary>
+    [Fact]
+    public void ObservacoesDaLoja_EntramAntesDasRegras()
+    {
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(Guid.Empty);
+        configuracao.DefinirAssistente(null, null, null, null, "Encomenda de bolo só com 2 dias de antecedência.");
+
+        var prompt = PromptAtendimento.Montar(configuracao);
+
+        var indice = prompt.IndexOf("Encomenda de bolo só com 2 dias de antecedência.", StringComparison.Ordinal);
+        indice.Should().BeGreaterThan(prompt.IndexOf("Roteiro do atendimento", StringComparison.Ordinal))
+            .And.BeLessThan(prompt.IndexOf("Regras (obrigatórias)", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// #2516: o roteiro é uma lista de etapas (nome, instrução curta, ativo) que a S68 guarda por loja; o padrão vem daqui.
     /// Só as etapas ativas entram no prompt, na ordem.
     /// </summary>

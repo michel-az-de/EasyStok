@@ -1,6 +1,7 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -32,11 +33,95 @@ public class AtendimentoConfiguracaoControllerTests
     public AtendimentoConfiguracaoControllerTests()
     {
         var obterUseCase = new ObterConfiguracaoAtendimentoUseCase(_repository);
-        var atualizarUseCase = new AtualizarConfiguracaoAtendimentoUseCase(_repository, _unitOfWork);
+        var aprovados = new ModelosAprovadosAgenteOptions();
+        aprovados.Modelos.Add(new ModeloAprovadoAgente("claude-sonnet-5", "Padrão", "padrão"));
+        aprovados.Modelos.Add(new ModeloAprovadoAgente("claude-haiku-5", "Econômico", "econômico"));
+        var atualizarUseCase = new AtualizarConfiguracaoAtendimentoUseCase(_repository, _unitOfWork,
+            modelos: Microsoft.Extensions.Options.Options.Create(aprovados));
         _currentUser.EmpresaId.Returns(_empresaId);
         _controller = new AtendimentoConfiguracaoController(obterUseCase, atualizarUseCase,
             new DefinirModeloRetomadaUseCase(_repository, _unitOfWork), _currentUser);
     }
+
+    // S68 (#2597, ADR-0066): o modelo da loja só vale dentro da lista aprovada.
+    [Fact]
+    public async Task PutComModeloForaDaListaAprovada400ENaoGrava()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+
+        var resultado = await _controller.Put(Corpo(ModeloAgente: "claude-opus-5"));
+
+        resultado.Should().BeOfType<BadRequestObjectResult>();
+        config.ModeloAgente.Should().BeNull();
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task PutGravaAConfiguracaoDoAssistenteEOGetDevolve()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+        _repository.GetOrDefaultAsync(_empresaId).Returns(config);
+
+        var put = await _controller.Put(Corpo(NomeDona: "Michele", ModeloAgente: "claude-haiku-5", CotaTokensMes: 2_000_000,
+            Roteiro: [new EtapaRoteiroAtendimento("Saudar", "Cumprimente pelo nome.")], ObservacoesLoja: "Sem glúten só por encomenda."));
+
+        put.Should().BeOfType<OkObjectResult>();
+        await _unitOfWork.Received(1).CommitAsync();
+        var dados = DadosDe(await _controller.Get());
+        dados.NomeDona.Should().Be("Michele");
+        dados.ModeloAgente.Should().Be("claude-haiku-5");
+        dados.CotaTokensMes.Should().Be(2_000_000);
+        dados.RoteiroPersonalizado.Should().BeTrue();
+        dados.Roteiro.Should().Equal(new EtapaRoteiroAtendimento("Saudar", "Cumprimente pelo nome."));
+        dados.ObservacoesLoja.Should().Be("Sem glúten só por encomenda.");
+    }
+
+    [Fact]
+    public async Task GetSemRoteiroDaLojaDevolveOPadrao()
+    {
+        _repository.GetOrDefaultAsync(_empresaId).Returns(ConfiguracaoAtendimento.CriarPadrao(_empresaId));
+
+        var dados = DadosDe(await _controller.Get());
+
+        dados.RoteiroPersonalizado.Should().BeFalse();
+        dados.Roteiro.Should().Equal(RoteiroAtendimento.Padrao);
+        dados.NomeDona.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PutComRoteiroVazioVoltaAoPadrao()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        config.DefinirAssistente(null, null, null, RoteiroAtendimento.Serializar([new("Saudar", "Oi.")]), null);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+
+        (await _controller.Put(Corpo(Roteiro: []))).Should().BeOfType<OkObjectResult>();
+
+        config.RoteiroJson.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("", "Cumprimente.")]
+    [InlineData("Saudar", "")]
+    public async Task PutComEtapaSemNomeOuInstrucao400(string nome, string instrucao)
+    {
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(ConfiguracaoAtendimento.CriarPadrao(_empresaId));
+
+        (await _controller.Put(Corpo(Roteiro: [new EtapaRoteiroAtendimento(nome, instrucao)])))
+            .Should().BeOfType<BadRequestObjectResult>();
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
+    private static AtualizarConfiguracaoAtendimentoBody Corpo(string? NomeDona = null, string? ModeloAgente = null,
+        long? CotaTokensMes = null, IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null, string? ObservacoesLoja = null) =>
+        new(null, null, null, null, null, null, null, null, null, NomeDona: NomeDona, ModeloAgente: ModeloAgente,
+            CotaTokensMes: CotaTokensMes, Roteiro: Roteiro, ObservacoesLoja: ObservacoesLoja);
+
+    private static ConfiguracaoAtendimentoResult DadosDe(IActionResult resultado) =>
+        resultado.Should().BeOfType<OkObjectResult>().Subject.Value.Should()
+            .BeOfType<EasyStock.Api.Http.ApiResponse<ConfiguracaoAtendimentoResult>>().Subject.Data!;
 
     [Fact]
     public async Task DefineOModeloDeRetomada()

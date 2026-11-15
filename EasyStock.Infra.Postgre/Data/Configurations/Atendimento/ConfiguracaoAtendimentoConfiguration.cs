@@ -43,6 +43,12 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
                 v => JsonSerializer.Serialize(v, AvisosJson),
                 v => JsonSerializer.Deserialize<AvisosOperacao>(v, AvisosJson) ?? AvisosOperacao.Padrao,
                 new ValueComparer<AvisosOperacao>((a, b) => a == b, v => v.GetHashCode(), v => v));
+        // S68 (#2597): Assistente por loja; tudo anulável, nulo = padrão (linha antiga segue igual).
+        builder.Property(x => x.NomeDona).HasMaxLength(ConfiguracaoAtendimento.NomeDonaTamanhoMaximo);
+        builder.Property(x => x.ModeloAgente).HasMaxLength(ConfiguracaoAtendimento.ModeloAgenteTamanhoMaximo);
+        builder.Property(x => x.CotaTokensMes);
+        builder.Property(x => x.RoteiroJson).HasColumnType("jsonb");
+        builder.Property(x => x.ObservacoesLoja).HasMaxLength(ConfiguracaoAtendimento.ObservacoesLojaTamanhoMaximo);
         builder.Property(x => x.CriadoEm).IsRequired();
         builder.Property(x => x.AlteradoEm).IsRequired();
 

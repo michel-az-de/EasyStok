@@ -588,6 +588,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnName("avisos_operacao")
                         .HasDefaultValueSql("'{}'::jsonb");
 
+                    b.Property<long?>("CotaTokensMes")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -608,12 +611,16 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasDefaultValue("Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.");
+                        .HasDefaultValue("Vou encaminhar sua mensagem para {dona} conferir e responder por aqui.");
 
                     b.Property<string>("MensagemForaArea")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ModeloAgente")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("ModeloRetomadaIdioma")
                         .IsRequired()
@@ -629,10 +636,21 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("NivelSugestao")
                         .HasColumnType("integer");
 
+                    b.Property<string>("NomeDona")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("ObservacoesLoja")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<int>("RespiroMinutos")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(40);
+
+                    b.Property<string>("RoteiroJson")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("SaudacaoPrimeiroContato")
                         .IsRequired()

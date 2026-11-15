@@ -69,7 +69,7 @@ public sealed class AnthropicMessagesClient(
             throw new HttpRequestException($"Anthropic respondeu {(int)response.StatusCode}.", null, response.StatusCode);
         }
 
-        return LerResposta(corpo);
+        return LerResposta(corpo, requisicao.Modelo);
     }
 
     internal byte[] MontarCorpo(RequisicaoLlm requisicao)
@@ -78,7 +78,7 @@ public sealed class AnthropicMessagesClient(
         using (var w = new Utf8JsonWriter(buffer))
         {
             w.WriteStartObject();
-            w.WriteString("model", _opcoes.ModeloAgente);
+            w.WriteString("model", ModeloDe(requisicao.Modelo));
             w.WriteNumber("max_tokens", _opcoes.MaxTokensAgente);
             w.WriteString("system", requisicao.System);
 
@@ -152,7 +152,10 @@ public sealed class AnthropicMessagesClient(
         }
     }
 
-    private RespostaLlm LerResposta(string corpo)
+    /// <summary>S68 (#2597): o modelo pedido pelo turno (já na lista aprovada) ou o configurado.</summary>
+    private string ModeloDe(string? pedido) => string.IsNullOrWhiteSpace(pedido) ? _opcoes.ModeloAgente : pedido;
+
+    private RespostaLlm LerResposta(string corpo, string? modeloPedido)
     {
         using var doc = JsonDocument.Parse(corpo);
         var raiz = doc.RootElement;
@@ -187,7 +190,7 @@ public sealed class AnthropicMessagesClient(
         // S67 (#2534): o modelo que respondeu (versão datada); sem ele, o configurado.
         var modelo = raiz.TryGetProperty("model", out var m) && m.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(m.GetString())
             ? m.GetString()
-            : _opcoes.ModeloAgente;
+            : ModeloDe(modeloPedido);
 
         return new RespostaLlm(stopReason, blocos, entrada, saida, cacheLido, modelo);
     }

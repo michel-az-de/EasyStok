@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace EasyStock.Application.Services.Atendimento;
 
 /// <summary>Etapa do roteiro do Assistente: nome, instrução curta e liga e desliga (#2516). A S68 guarda a lista por loja.</summary>
@@ -10,6 +12,43 @@ public sealed record EtapaRoteiroAtendimento(string Nome, string Instrucao, bool
 /// </summary>
 public static class RoteiroAtendimento
 {
+    public const int EtapasMaximo = 20;
+    public const int NomeTamanhoMaximo = 40;
+    public const int InstrucaoTamanhoMaximo = 600;
+
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    /// <summary>S68 (#2597): o roteiro guardado pela loja; nulo, vazio ou ilegível devolve o <see cref="Padrao"/>.</summary>
+    public static IReadOnlyList<EtapaRoteiroAtendimento> DaLoja(string? roteiroJson)
+    {
+        if (string.IsNullOrWhiteSpace(roteiroJson)) return Padrao;
+        try
+        {
+            var etapas = JsonSerializer.Deserialize<List<EtapaRoteiroAtendimento>>(roteiroJson, Json);
+            return etapas is { Count: > 0 } && Erro(etapas) is null ? etapas : Padrao;
+        }
+        catch (JsonException)
+        {
+            return Padrao;
+        }
+    }
+
+    public static string Serializar(IEnumerable<EtapaRoteiroAtendimento> etapas) => JsonSerializer.Serialize(etapas, Json);
+
+    /// <summary>S68: o que impede guardar o roteiro, ou nulo quando ele serve.</summary>
+    public static string? Erro(IReadOnlyCollection<EtapaRoteiroAtendimento> etapas)
+    {
+        if (etapas.Count > EtapasMaximo) return $"O roteiro aceita até {EtapasMaximo} etapas.";
+        foreach (var etapa in etapas)
+        {
+            if (etapa is null || string.IsNullOrWhiteSpace(etapa.Nome) || string.IsNullOrWhiteSpace(etapa.Instrucao))
+                return "Cada etapa do roteiro precisa de nome e instrução.";
+            if (etapa.Nome.Trim().Length > NomeTamanhoMaximo || etapa.Instrucao.Trim().Length > InstrucaoTamanhoMaximo)
+                return $"Cada etapa tem nome de até {NomeTamanhoMaximo} e instrução de até {InstrucaoTamanhoMaximo} caracteres.";
+        }
+        return null;
+    }
+
     public static IReadOnlyList<EtapaRoteiroAtendimento> Padrao { get; } =
     [
         new("Acolher",

@@ -35,7 +35,8 @@ public class ConfiguracaoAtendimento
     public string MensagemForaArea { get; set; } = "Por enquanto a gente só entrega em algumas regiões.";
 
     public const int MoldeTamanhoMaximo = 500;
-    public const string MensagemEscaladaPadrao = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+    /// <summary>S68 (#2597): <c>{dona}</c> vira <see cref="NomeDona"/>; sem nome, "a equipe" (o texto de antes).</summary>
+    public const string MensagemEscaladaPadrao = "Vou encaminhar sua mensagem para {dona} conferir e responder por aqui.";
     public const string MensagemEncaminhamentoPadrao =
         "Oi, {nome}! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.";
 
@@ -153,6 +154,57 @@ public class ConfiguracaoAtendimento
         ModeloRetomadaIdioma = string.IsNullOrWhiteSpace(idioma) ? IdiomaModeloPadrao : idioma.Trim();
         AlteradoEm = DateTime.UtcNow;
     }
+
+    public const int NomeDonaTamanhoMaximo = 60;
+    public const int ModeloAgenteTamanhoMaximo = 200;
+    public const int ObservacoesLojaTamanhoMaximo = 500;
+    public const int RoteiroTamanhoMaximo = 20_000;
+
+    /// <summary>S68 (#2597): como o robô chama a dona na escalada e no prompt. Nulo: "a dona" e "a equipe".</summary>
+    public string? NomeDona { get; private set; }
+
+    /// <summary>S68 (ADR-0066): modelo do Assistente da loja, conferido na lista aprovada pelo caso de uso. Nulo: o padrão.</summary>
+    public string? ModeloAgente { get; private set; }
+
+    /// <summary>S68: limite mensal de tokens do Assistente (a regra entra na S69). Nulo: sem cota.</summary>
+    public long? CotaTokensMes { get; private set; }
+
+    /// <summary>S68: etapas do roteiro em JSON, no formato da aplicação. Nulo: o roteiro padrão.</summary>
+    public string? RoteiroJson { get; private set; }
+
+    /// <summary>S68: orientação livre da loja para o Assistente, abaixo das regras. Nulo: nenhuma.</summary>
+    public string? ObservacoesLoja { get; private set; }
+
+    /// <summary>
+    /// S68 (#2597): nulo mantém o valor; vazio (ou cota 0) volta ao padrão. Valida tudo antes de mudar qualquer campo.
+    /// </summary>
+    public void DefinirAssistente(string? nomeDona, string? modeloAgente, long? cotaTokensMes, string? roteiroJson,
+        string? observacoesLoja)
+    {
+        var nome = nomeDona?.Trim();
+        var modelo = modeloAgente?.Trim();
+        var roteiro = roteiroJson?.Trim();
+        var observacoes = observacoesLoja?.Trim();
+        if (nome?.Length > NomeDonaTamanhoMaximo || nome?.Any(char.IsControl) == true)
+            throw new RegraDeDominioVioladaException($"O nome da dona tem de caber em uma linha de até {NomeDonaTamanhoMaximo} caracteres.");
+        if (modelo?.Length > ModeloAgenteTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"O modelo passa de {ModeloAgenteTamanhoMaximo} caracteres.");
+        if (cotaTokensMes is < 0)
+            throw new RegraDeDominioVioladaException("A cota mensal de tokens não pode ser negativa.");
+        if (roteiro?.Length > RoteiroTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"O roteiro passa de {RoteiroTamanhoMaximo} caracteres.");
+        if (observacoes?.Length > ObservacoesLojaTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"As observações passam de {ObservacoesLojaTamanhoMaximo} caracteres.");
+
+        if (nome is not null) NomeDona = Vazio(nome);
+        if (modelo is not null) ModeloAgente = Vazio(modelo);
+        if (cotaTokensMes.HasValue) CotaTokensMes = cotaTokensMes == 0 ? null : cotaTokensMes;
+        if (roteiro is not null) RoteiroJson = Vazio(roteiro);
+        if (observacoes is not null) ObservacoesLoja = Vazio(observacoes);
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    private static string? Vazio(string texto) => texto.Length == 0 ? null : texto;
 
     /// <summary>Avisos da operação para a dona e o gerente (#2096). Linha antiga sem o documento lê o padrão.</summary>
     public AvisosOperacao Avisos { get; private set; } = AvisosOperacao.Padrao;

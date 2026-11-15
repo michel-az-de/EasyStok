@@ -1,5 +1,7 @@
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.UseCases.Atendimento;
 
@@ -20,7 +22,13 @@ public sealed record ConfiguracaoAtendimentoResult(
     string ModeloRetomadaIdioma = ConfiguracaoAtendimento.IdiomaModeloPadrao,
     int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos,
     string MensagemEscalada = ConfiguracaoAtendimento.MensagemEscaladaPadrao,
-    string MensagemEncaminhamento = ConfiguracaoAtendimento.MensagemEncaminhamentoPadrao);
+    string MensagemEncaminhamento = ConfiguracaoAtendimento.MensagemEncaminhamentoPadrao,
+    string? NomeDona = null,
+    string? ModeloAgente = null,
+    long? CotaTokensMes = null,
+    IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
+    bool RoteiroPersonalizado = false,
+    string? ObservacoesLoja = null);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -43,7 +51,10 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
         c.EmpresaId, c.Tom, c.NivelSugestao, c.SaudacaoPrimeiroContato, c.SaudacaoRetorno,
         c.FraseEspera, c.MensagemForaArea, c.RespiroMinutos, c.TempoPreparoPadraoMinutos,
         c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo, c.ModeloRetomadaNome, c.ModeloRetomadaIdioma,
-        c.SlaRespostaMinutos, c.MensagemEscalada, c.MensagemEncaminhamento);
+        c.SlaRespostaMinutos, c.MensagemEscalada, c.MensagemEncaminhamento,
+        // S68 (#2597): o roteiro sai sempre efetivo (o da loja ou o padrão), com a marca de qual dos dois.
+        c.NomeDona, c.ModeloAgente, c.CotaTokensMes, RoteiroAtendimento.DaLoja(c.RoteiroJson),
+        !ReferenceEquals(RoteiroAtendimento.DaLoja(c.RoteiroJson), RoteiroAtendimento.Padrao), c.ObservacoesLoja);
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -59,11 +70,21 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     bool? Ativo,
     int? SlaRespostaMinutos = null,
     string? MensagemEscalada = null,
-    string? MensagemEncaminhamento = null);
+    string? MensagemEncaminhamento = null,
+    string? NomeDona = null,
+    string? ModeloAgente = null,
+    long? CotaTokensMes = null,
+    IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
+    string? ObservacoesLoja = null);
 
+/// <remarks>
+/// S68 (#2597): nulo mantém cada campo do Assistente; vazio volta ao padrão (roteiro vazio, modelo vazio, cota 0). O
+/// modelo só entra se estiver na lista aprovada (ADR-0066); sem a lista, nenhum entra.
+/// </remarks>
 public sealed class AtualizarConfiguracaoAtendimentoUseCase(
     IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork, ICacheService? cacheService = null,
-    ILogger<AtualizarConfiguracaoAtendimentoUseCase>? logger = null)
+    ILogger<AtualizarConfiguracaoAtendimentoUseCase>? logger = null,
+    IOptions<ModelosAprovadosAgenteOptions>? modelos = null)
 {
     public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(AtualizarConfiguracaoAtendimentoCommand command)
     {
@@ -86,6 +107,8 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
                 command.Ativo,
                 command.SlaRespostaMinutos);
             configuracao.DefinirMoldes(command.MensagemEscalada, command.MensagemEncaminhamento);
+            configuracao.DefinirAssistente(command.NomeDona, ModeloValidado(command.ModeloAgente), command.CotaTokensMes,
+                RoteiroValidado(command.Roteiro), command.ObservacoesLoja);
         }
         catch (Exception ex) when (ex is ArgumentOutOfRangeException or RegraDeDominioVioladaException)
         {
@@ -109,6 +132,22 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         }
 
         return ObterConfiguracaoAtendimentoUseCase.ToResult(configuracao);
+    }
+
+    private string? ModeloValidado(string? modelo)
+    {
+        if (string.IsNullOrWhiteSpace(modelo)) return modelo;
+        if (modelos?.Value.Aprovado(modelo) != true)
+            throw new UseCaseValidationException("Modelo fora da lista aprovada do Assistente.");
+        return modelo.Trim();
+    }
+
+    private static string? RoteiroValidado(IReadOnlyList<EtapaRoteiroAtendimento>? roteiro)
+    {
+        if (roteiro is null) return null;
+        if (roteiro.Count == 0) return string.Empty;
+        if (RoteiroAtendimento.Erro(roteiro) is { } erro) throw new UseCaseValidationException(erro);
+        return RoteiroAtendimento.Serializar(roteiro.Select(e => e with { Nome = e.Nome.Trim(), Instrucao = e.Instrucao.Trim() }));
     }
 }
 
