@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
@@ -521,6 +522,65 @@ public class AuthControllerTests
 
         var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
         DadosDaResposta(ok).GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Login_ComCredencialValida_Devolve200ComTokenERefreshGravadoPeloHash()
+    {
+        // #827: o caminho feliz do login nunca era asserido no controller, só a falha.
+        var usuario = UsuarioComSenhaDaProva();
+        _mockJwtService.GerarToken(Arg.Any<AutenticarUsuarioResult>()).Returns("jwt-da-prova");
+        _mockJwtService.GerarRefreshToken().Returns("refresh-da-prova");
+
+        var resposta = await _controller.Login(new LoginRequest(usuario.Email, "Senha@12345", null));
+
+        var dados = DadosDaResposta(resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject);
+        dados.GetProperty("token").GetString().Should().Be("jwt-da-prova");
+        dados.GetProperty("refreshToken").GetString().Should().Be("refresh-da-prova");
+        await _refreshTokenRepository.Received(1).AddAsync(Arg.Is<RefreshToken>(t =>
+            t.UsuarioId == usuario.Id && t.TokenHash == TokenHashHelper.ComputeSha256Hash("refresh-da-prova")));
+        await _unitOfWork.Received().CommitAsync(); // a sessão nova é gravada, não fica só na resposta
+    }
+
+    [Fact]
+    public async Task Login_ComEmpresaIdVazio_RecusaSemEmitirSessao()
+    {
+        // #827: Guid.Empty não é "sem empresa" (null); é uma empresa que não existe, e o login recusa (401 no handler).
+        var usuario = UsuarioComSenhaDaProva();
+
+        var tentar = () => _controller.Login(new LoginRequest(usuario.Email, "Senha@12345", Guid.Empty));
+
+        await tentar.Should().ThrowAsync<CredenciaisInvalidasException>();
+        await _refreshTokenRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        _mockJwtService.DidNotReceiveWithAnyArgs().GerarToken(default!);
+    }
+
+    [Fact]
+    public void RotasQueConferemCredencialUsamOBaldeAuth_EORefreshTemBaldeProprio()
+    {
+        // #827 / #747: o refresh no balde do login fazia os BFFs esfomearem o login (429 no login-admin).
+        static string? Politica(string acao) => typeof(AuthController).GetMethod(acao)!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), false)
+            .Cast<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>().SingleOrDefault()?.PolicyName;
+
+        string[] conferemCredencial =
+        [
+            nameof(AuthController.Login), nameof(AuthController.LoginGoogle), nameof(AuthController.LoginChaveAcesso),
+            nameof(AuthController.ListarEmpresasParaLogin), nameof(AuthController.ForgotPassword),
+            nameof(AuthController.ResetPassword), nameof(AuthController.ResetPasswordCode), nameof(AuthController.AceitarConvite),
+        ];
+        conferemCredencial.Select(a => (a, Politica(a))).Should().AllSatisfy(p => p.Item2.Should().Be("auth", p.a));
+        Politica(nameof(AuthController.Refresh)).Should().Be("auth-refresh");
+    }
+
+    private Usuario UsuarioComSenhaDaProva()
+    {
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+        _passwordHasher.Verify("Senha@12345", "hash").Returns(true);
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() };
+        return usuario;
     }
 
     private static IConfiguration ConfiguracaoComSessaoNativa(string? valor) =>
