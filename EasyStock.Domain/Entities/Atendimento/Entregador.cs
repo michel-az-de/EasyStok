@@ -52,10 +52,15 @@ public class Entregador
         if (!Enum.IsDefined(tipo)) throw new RegraDeDominioVioladaException($"Tipo de entregador inválido: {tipo}.");
         if (!Enum.IsDefined(empresa)) throw new RegraDeDominioVioladaException($"Empresa do entregador inválida: {empresa}.");
 
+        var telefoneLimpo = Limitar(telefone, TelefoneTamanhoMaximo, "Telefone");
+        // #2658: mesma régua do Telefone (7 a 15 dígitos); grava como digitado, que é como a tela mostra.
+        if (telefoneLimpo is not null && ValueObjects.Telefone.TryFrom(telefoneLimpo) is null)
+            throw new RegraDeDominioVioladaException("Telefone do entregador inválido. Informe entre 7 e 15 dígitos, com DDD.");
+
         Nome = Limitar(nome, NomeTamanhoMaximo, "Nome")!;
         Tipo = tipo;
         Empresa = empresa;
-        Telefone = Limitar(telefone, TelefoneTamanhoMaximo, "Telefone");
+        Telefone = telefoneLimpo;
         Veiculo = Limitar(veiculo, VeiculoTamanhoMaximo, "Veículo");
         Placa = Limitar(placa, PlacaTamanhoMaximo, "Placa")?.ToUpperInvariant();
         AlteradoEm = Datas.Utc(agora);
