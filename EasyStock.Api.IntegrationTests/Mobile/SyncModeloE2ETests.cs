@@ -400,7 +400,7 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
         return await consulta(db);
     }
 
-    private Task<int> SaldoAsync(string produto) => LerAsync(db =>
+    private Task<decimal> SaldoAsync(string produto) => LerAsync(db =>
         db.Set<Product>().AsNoTracking().Where(p => p.Id == produto).Select(p => p.Stock).SingleAsync());
 
     private Task<CashEntry> LancamentoAsync(string id) => LerAsync(db =>

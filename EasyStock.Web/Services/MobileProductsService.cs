@@ -45,9 +45,9 @@ public class StockDivergenceApi
     public string? Emoji { get; set; }
     public Guid ErpProductId { get; set; }
     public Guid? LojaId { get; set; }
-    public int MobileStock { get; set; }
-    public int ErpStock { get; set; }
-    public int Delta { get; set; }
+    public decimal MobileStock { get; set; }
+    public decimal ErpStock { get; set; }
+    public decimal Delta { get; set; }
     public bool ItemEstoqueExists { get; set; }
     public string? LastDeviceId { get; set; }
     public string? LastOperatorName { get; set; }
@@ -63,7 +63,7 @@ public class MobileProductApi
     public string Category { get; set; } = "";
     public string? Unit { get; set; }
     public decimal? Price { get; set; }
-    public int Stock { get; set; }
+    public decimal Stock { get; set; }
     public bool IsCustom { get; set; }
     public bool IsApproved { get; set; }
     public Guid? ErpProductId { get; set; }

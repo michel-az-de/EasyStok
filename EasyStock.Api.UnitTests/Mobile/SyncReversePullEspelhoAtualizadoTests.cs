@@ -310,5 +310,41 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
             && m.Payload.GetProperty("id").GetString() == cliente.Id.ToString());
     }
 
+    // #2718 (resto da #2083): saldo fracionado do ERP descia ao aparelho truncado (1,5 kg virava 1).
+    [Fact]
+    public async Task ProdutoErpSemEspelho_SaldoFracionado_DesceSemTruncar()
+    {
+        var loja = Guid.NewGuid();
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Ragu", Tipo = TipoProduto.Alimento,
+            Status = StatusProduto.Ativo, CategoriaId = CriarCategoria(),
+            CriadoEm = DateTime.UtcNow.AddDays(-10), AlteradoEm = DateTime.UtcNow,
+        };
+        _db.Add(produto);
+        ItemEstoqueDoErp(produto.Id, loja, 1.5m);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, loja);
+
+        mutations.Single(m => m.Type == "product.upsert").Payload.GetProperty("stock").GetDecimal()
+            .Should().Be(1.5m, "o aparelho recebe o saldo da loja como está no ERP");
+    }
+
+    [Fact]
+    public async Task ProdutoErpComEspelho_SaldoFracionadoDoErp_DesceSemTruncar()
+    {
+        var produto = ProdutoErpComEspelho("Ragu", DateTime.UtcNow);
+        ItemEstoqueDoErp(produto.Id, null, 1.5m);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, null);
+
+        mutations.Single(m => m.Type == "product.upsert").Payload.GetProperty("stock").GetDecimal()
+            .Should().Be(1.5m, "o estoque do ERP mudou depois do cursor e vale como está");
+    }
+
     public void Dispose() => _db.Dispose();
 }

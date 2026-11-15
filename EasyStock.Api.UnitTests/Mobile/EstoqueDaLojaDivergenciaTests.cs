@@ -42,7 +42,7 @@ public sealed class EstoqueDaLojaDivergenciaTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
-    private Product Mobile(Guid? lojaId, int stock)
+    private Product Mobile(Guid? lojaId, decimal stock)
     {
         var p = new Product
         {
@@ -53,7 +53,7 @@ public sealed class EstoqueDaLojaDivergenciaTests : IDisposable
         return p;
     }
 
-    private void Item(Guid? lojaId, int qtd) => _db.Add(new ItemEstoque
+    private void Item(Guid? lojaId, decimal qtd) => _db.Add(new ItemEstoque
     {
         Id = Guid.NewGuid(), EmpresaId = _empresaId, ProdutoId = _erpProdutoId, LojaId = lojaId,
         QuantidadeInicial = Quantidade.From(qtd), QuantidadeAtual = Quantidade.From(qtd), CustoUnitario = Dinheiro.Zero,
@@ -196,5 +196,31 @@ public sealed class EstoqueDaLojaDivergenciaTests : IDisposable
 
         r.Should().BeOfType<ForbidResult>();
         (await _db.Set<Product>().AsNoTracking().SingleAsync(x => x.Id == p.Id)).Stock.Should().Be(3);
+    }
+    [Fact]
+    public async Task Reconciliar_com_saldo_fracionado_grava_sem_truncar()
+    {
+        // #2718: o espelho era inteiro e a soma 1,5 do ERP virava 1.
+        var p = Mobile(_lojaA, stock: 3);
+        Item(_lojaA, 1.5m);
+        await _db.SaveChangesAsync();
+
+        var r = await Produtos().ReconcileStock(p.Id, _empresaId, default);
+
+        r.Should().BeOfType<OkObjectResult>();
+        (await _db.Set<Product>().AsNoTracking().SingleAsync(x => x.Id == p.Id)).Stock.Should().Be(1.5m);
+        (await Divergencias()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Divergencia_fracionada_mostra_o_meio_quilo()
+    {
+        Mobile(_lojaA, stock: 1);
+        Item(_lojaA, 1.5m);
+        await _db.SaveChangesAsync();
+
+        var d = (await Divergencias()).Should().ContainSingle().Subject;
+        d.ErpStock.Should().Be(1.5m);
+        d.Delta.Should().Be(0.5m);
     }
 }

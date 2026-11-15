@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Specifications;
@@ -52,7 +53,7 @@ public class MobileProductsController(
             Category: p.Category,
             Unit: p.Unit,
             Price: p.Price,
-            Stock: p.Stock,
+            Stock: SaldoSemZerosFinaisJsonConverter.SemZerosFinais(p.Stock),
             IsCustom: p.IsCustom,
             IsApproved: p.IsApproved,
             ErpProductId: p.ErpProductId,
@@ -173,9 +174,9 @@ public class MobileProductsController(
                 Emoji: mp.Emoji,
                 ErpProductId: mp.ErpProductId!.Value,
                 LojaId: mp.LojaId,
-                MobileStock: mp.Stock,
-                ErpStock: (int)erpStock,
-                Delta: (int)erpStock - mp.Stock,
+                MobileStock: SaldoSemZerosFinaisJsonConverter.SemZerosFinais(mp.Stock),
+                ErpStock: SaldoSemZerosFinaisJsonConverter.SemZerosFinais(erpStock),
+                Delta: SaldoSemZerosFinaisJsonConverter.SemZerosFinais(erpStock - mp.Stock),
                 ItemEstoqueExists: item != null,
                 LastDeviceId: mp.LastDeviceId,
                 LastOperatorName: mp.LastOperatorName,
@@ -210,7 +211,7 @@ public class MobileProductsController(
             return BadRequest(new { error = "ItemEstoque não existe no ERP. Crie o estoque inicial primeiro." });
 
         var oldStock = product.Stock;
-        product.Stock = (int)EstoqueDaLojaMobile.Soma(itensDaLoja, product.ErpProductId.Value, product.LojaId);
+        product.Stock = EstoqueDaLojaMobile.Soma(itensDaLoja, product.ErpProductId.Value, product.LojaId);
         product.UpdatedAt = DateTime.UtcNow;
         // Alteração do servidor deve chegar também ao aparelho que gravou o saldo anterior.
         product.LastDeviceId = null;
@@ -222,7 +223,11 @@ public class MobileProductsController(
             "Reconcile stock: mobile_product {Id} {Old}→{New} (ERP itens={Itens})",
             idLog, oldStock, product.Stock, itensDaLoja.Count);
 
-        return Ok(new { mobileStock = product.Stock, previousStock = oldStock });
+        return Ok(new
+        {
+            mobileStock = SaldoSemZerosFinaisJsonConverter.SemZerosFinais(product.Stock),
+            previousStock = SaldoSemZerosFinaisJsonConverter.SemZerosFinais(oldStock)
+        });
     }
 
     /// <summary>
@@ -264,7 +269,7 @@ public record MobileProductSummary(
     string Category,
     string? Unit,
     decimal? Price,
-    int Stock,
+    decimal Stock,
     bool IsCustom,
     bool IsApproved,
     Guid? ErpProductId,
@@ -288,9 +293,9 @@ public record StockDivergence(
     string? Emoji,
     Guid ErpProductId,
     Guid? LojaId,
-    int MobileStock,
-    int ErpStock,
-    int Delta,
+    decimal MobileStock,
+    decimal ErpStock,
+    decimal Delta,
     bool ItemEstoqueExists,
     string? LastDeviceId,
     string? LastOperatorName,

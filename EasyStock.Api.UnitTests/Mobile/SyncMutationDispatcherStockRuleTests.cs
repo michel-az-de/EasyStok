@@ -669,6 +669,47 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
         doErp.Total.Valor.Should().Be(45m);
     }
 
+    // ---------- #2718: saldo fracionado ----------
+
+    [Fact]
+    public async Task ProdutoNovoComSaldoFracionado_GravaSemTruncar()
+    {
+        await Push("dev-a", Mutation("product.upsert",
+            new { id = Produto, name = "Queijo", category = "extra", unit = "kg", stock = 1.5m }));
+
+        Estoque().Should().Be(1.5m);
+    }
+
+    [Fact]
+    public async Task ProdutoNovoComSaldoInteiro_AparelhoAntigoContinuaAceito()
+    {
+        await Push("dev-a", Mutation("product.upsert",
+            new { id = Produto, name = "Lasanha", category = "massa", stock = 3 }));
+
+        Estoque().Should().Be(3m);
+    }
+
+    [Fact]
+    public async Task CadastroComSaldoAbsolutoFracionado_GravaSemTruncar()
+    {
+        SemearProduto(estoque: 10);
+
+        await Push("dev-a", Mutation("product.upsert",
+            new { id = Produto, name = "Lasanha", category = "massa", price = 30m, stock = 2.25m }));
+
+        Estoque().Should().Be(2.25m);
+    }
+
+    [Fact]
+    public async Task MovimentoInteiroSobreSaldoFracionado_NaoTrunca()
+    {
+        SemearProduto(estoque: 1.5m);
+
+        await Push("dev-a", Movimento(-1));
+
+        Estoque().Should().Be(0.5m, "1,5 - 1 = 0,5; o delta inteiro e a #2707, o saldo nao pode truncar");
+    }
+
     // ---------- apoio ----------
 
     private async Task<SyncPushResponse> Push(string deviceId, params MutationDto[] mutations)
@@ -714,7 +755,7 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
         Discarded: descartado ? true : null,
         DiscardedAt: descartado ? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() : null));
 
-    private void SemearProduto(int estoque, bool comVinculo = false, Guid? lojaId = null)
+    private void SemearProduto(decimal estoque, bool comVinculo = false, Guid? lojaId = null)
     {
         if (comVinculo)
             _db.Add(new Produto
@@ -771,7 +812,7 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
         _db.ChangeTracker.Clear();
     }
 
-    private int Estoque() => _db.Set<Product>().AsNoTracking().Single(p => p.Id == Produto).Stock;
+    private decimal Estoque() => _db.Set<Product>().AsNoTracking().Single(p => p.Id == Produto).Stock;
 
     private decimal SaldoErp() => _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
         .Where(i => i.EmpresaId == _empresaId && i.ProdutoId == _produtoErpId)

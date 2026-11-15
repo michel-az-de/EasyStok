@@ -6240,8 +6240,8 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("sku");
 
-                    b.Property<int>("Stock")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("Stock")
+                        .HasColumnType("numeric(18,3)");
 
                     b.Property<string>("Unit")
                         .HasMaxLength(32)

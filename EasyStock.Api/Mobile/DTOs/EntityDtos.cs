@@ -10,7 +10,9 @@ public record ProductDto(
     string Category,
     string? Unit,
     decimal? Price,
-    int Stock,
+    // #2718: saldo fracionado (1,5 kg). Inteiro continua saindo como inteiro no JSON (1, não 1.000).
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(SaldoSemZerosFinaisJsonConverter))]
+    decimal Stock,
     bool? Custom,
     // Etiquetas de produção (opcionais — APKs antigos não enviam).
     string? Sku = null,
