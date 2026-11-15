@@ -44,7 +44,7 @@ jobs:
           set -euo pipefail
           bash scripts/ci/puxar-imagem.sh postgres:16
           docker rm -f postgres >/dev/null 2>&1 || true
-          docker run -d --name postgres -p 5432:5432 \
+          docker run -d --name postgres -p 55432:5432 \
             -e POSTGRES_PASSWORD=restoretest -e POSTGRES_DB=easystok_restore_test postgres:16
           for i in $(seq 1 30); do
             docker exec postgres pg_isready -U postgres -d easystok_restore_test && exit 0
@@ -87,7 +87,7 @@ jobs:
         env:
           PGPASSWORD: restoretest
         run: |
-          pg_restore --host=localhost --port=5432 --username=postgres \
+          pg_restore --host=localhost --port=55432 --username=postgres \
                      --dbname=easystok_restore_test \
                      --no-owner --no-privileges \
                      "$BACKUP_FILE"

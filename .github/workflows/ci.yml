@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           bash scripts/ci/puxar-imagem.sh postgres:16
           docker rm -f postgres >/dev/null 2>&1 || true
-          docker run -d --name postgres -p 5432:5432 \
+          docker run -d --name postgres -p 55432:5432 \
             -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=easystock_ci postgres:16
           for i in $(seq 1 30); do
             docker exec postgres pg_isready -U postgres -d easystock_ci && exit 0
@@ -86,7 +86,7 @@ jobs:
           # Conn string do service postgres (superuser). SSL Mode=Disable: o container
           # oficial nao tem TLS e o Npgsql 9.x tentaria handshake. O fixture deriva dela
           # o login NOSUPERUSER rls_test_client para exercer a RLS de verdade.
-          EASYSTOCK_IT_PG: "Host=localhost;Port=5432;Database=easystock_ci;Username=postgres;Password=postgres;SSL Mode=Disable"
+          EASYSTOCK_IT_PG: "Host=localhost;Port=55432;Database=easystock_ci;Username=postgres;Password=postgres;SSL Mode=Disable"
           # Timeout do ScribanRenderer: 2s no CI (500ms em prod/local). O runner sob JIT frio/GC
           # estoura 500ms na primeira renderizacao de template -- flaky de timing (issue #910,
           # flaky-tests.md). NAO relaxa a guarda de producao, so o piso do runner lento.
