@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using EasyStock.Api.Controllers;
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -20,7 +22,7 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class CaixaControllerFechamentoTests
 {
     private readonly ICaixaRepository _repo = Substitute.For<ICaixaRepository>();
-    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<FechamentoCaixaResult>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly Guid _usuarioId = Guid.NewGuid();

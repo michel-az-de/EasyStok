@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.AbrirCaixa;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
@@ -11,7 +12,7 @@ namespace EasyStock.Application.Tests.UseCases;
 public class CaixaValidacaoEntradaTests
 {
     private readonly ICaixaRepository _repo = Substitute.For<ICaixaRepository>();
-    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>();
 
     private RegistrarMovimentoCaixaUseCase Registrar() => new(_repo, _uow,
         new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
