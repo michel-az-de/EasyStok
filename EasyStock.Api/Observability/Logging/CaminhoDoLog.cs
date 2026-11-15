@@ -17,14 +17,20 @@ public static class CaminhoDoLog
     /// <summary>Prefixo das rotas públicas da comanda: o segmento seguinte é o token de acesso (#1725-3).</summary>
     public const string PrefixoDaComanda = "/api/storefront/cardapio-conversa";
 
-    /// <summary>O caminho cru carrega segredo: webhook (montado pelo provedor) ou token da comanda.</summary>
+    /// <summary>Prefixo do download do artefato de relatório: o segmento seguinte é o token assinado (#2668).</summary>
+    public const string PrefixoDoArtefatoDeRelatorio = "/api/reports/artefatos";
+
+    private static readonly string[] PrefixosComToken = [PrefixoDaComanda, PrefixoDoArtefatoDeRelatorio];
+
+    /// <summary>O caminho cru carrega segredo: webhook (montado pelo provedor) ou token (comanda, artefato de relatório).</summary>
     public static bool TemSegredo(HttpContext contexto) =>
-        EhWebhook(contexto) || contexto.Request.Path.StartsWithSegments(PrefixoDaComanda, StringComparison.OrdinalIgnoreCase);
+        EhWebhook(contexto) || PrefixosComToken.Any(p => contexto.Request.Path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase));
 
     public static string De(HttpContext contexto)
     {
-        if (contexto.Request.Path.StartsWithSegments(PrefixoDaComanda, StringComparison.OrdinalIgnoreCase, out var resto))
-            return PrefixoDaComanda + MascararPrimeiroSegmento(resto.Value);
+        foreach (var prefixo in PrefixosComToken)
+            if (contexto.Request.Path.StartsWithSegments(prefixo, StringComparison.OrdinalIgnoreCase, out var resto))
+                return prefixo + MascararPrimeiroSegmento(resto.Value);
         if (!EhWebhook(contexto)) return contexto.Request.Path.Value ?? string.Empty;
         var molde = (contexto.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText;
         return string.IsNullOrEmpty(molde) ? WebhookSemRota : "/" + molde.TrimStart('/');

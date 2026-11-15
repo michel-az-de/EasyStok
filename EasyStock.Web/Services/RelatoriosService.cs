@@ -2,7 +2,7 @@ using EasyStock.Web.Models.Api;
 
 namespace EasyStock.Web.Services;
 
-public class RelatoriosService(ApiClient api)
+public class RelatoriosService(ApiClient api, IConfiguration config)
 {
     public Task<ApiResult<List<ReportCatalogItemApi>>> CatalogAsync(string? categoria = null)
     {
@@ -18,8 +18,13 @@ public class RelatoriosService(ApiClient api)
             format
         });
 
-    public Task<ApiResult<ReportRunApi>> GetRunAsync(Guid id)
-        => api.GetAsync<ReportRunApi>($"reports/runs/{id}");
+    public async Task<ApiResult<ReportRunApi>> GetRunAsync(Guid id)
+    {
+        var resultado = await api.GetAsync<ReportRunApi>($"reports/runs/{id}");
+        if (resultado.Data is not { DownloadUrl: not null } run) return resultado;
+        // #2668: o link do artefato vem relativo; o navegador abre a partir do host do Web.
+        return resultado with { Data = run with { DownloadUrl = LinkDaApi.Absoluto(config["PublicApiUrl"], run.DownloadUrl) } };
+    }
 
     public Task<ApiResult<ReportRunListApi>> ListRunsAsync(
         string? categoria = null, string? status = null, int skip = 0, int take = 25)
