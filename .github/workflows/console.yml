@@ -36,7 +36,10 @@ jobs:
       - run: npm ci
       # #2410: as provas de navegador do `npm run provas` abrem o console no Chromium.
       - run: npx playwright install chromium
+      # #2537: runner próprio tem 6 núcleos; 4 Chromium em paralelo estouram os timeouts das provas de navegador.
       - run: npm run qualidade
+        env:
+          PROVAS_PARALELO: "2"
       - run: node ferramentas/prova-2146-componentes-gramatica.mjs
       - run: node --test ferramentas/prova-2021-frete.mjs ferramentas/prova-2021-midias.mjs ferramentas/prova-2021-galeria.mjs
       - run: node ferramentas/prova-comanda-compartilhada.mjs
