@@ -88,3 +88,12 @@
   .contexto { gap: var(--e-2); padding: var(--e-3); }
   .rodape { padding: var(--e-3); }
 }
+/* #2495 (S6): ficha do cliente no editor. */
+.ficha { display: grid; gap: var(--e-5); padding-block-start: var(--e-4); border-block-start: 1px solid var(--linha); }
+.ficha section { display: grid; gap: var(--e-2); min-width: 0; }
+.ficha h3 { margin: 0; font-size: var(--t-corpo); }
+.ficha section > p { margin: 0; }
+.itensFicha { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.itensFicha li { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding: var(--e-2) var(--e-3); background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--r-1); }
+.itensFicha li > span:first-child { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.itensFicha small { color: var(--tinta-2); font-size: var(--t-micro); }

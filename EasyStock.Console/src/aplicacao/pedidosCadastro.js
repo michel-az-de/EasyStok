@@ -2,7 +2,7 @@
 // consulta velha), mas a lista anterior fica na tela enquanto a nova chega: trocar de página não pisca.
 import { useEffect, useState } from 'react'
 import * as api from '../infra/api/pedidosCadastroApi'
-export { obterPedido } from '../infra/api/pedidosCadastroApi'
+export { listarPedidosDoCliente, obterPedido } from '../infra/api/pedidosCadastroApi'
 
 export function useListaPedidos(filtros, contexto) {
   const [resultado, definir] = useState({ itens: [], total: 0, carregando: true, erro: null, carregado: false })

@@ -28,6 +28,12 @@ export async function buscarClientesParecidos(termo, contexto, sinal) {
   const r = await chamarApi(`${rotas.clientes}?${query({ empresaId: contexto.empresaId, search: termo, pageSize: 10 })}`, { ...opcoes(contexto, sinal), envelope: true })
   return Array.isArray(r?.data) ? r.data : []
 }
+// #2495 (S6): a ficha do cliente só adiciona e remove endereço e telefone extra; a API devolve só o id.
+const subrecurso = (clienteId, sub, id) => `${rotas.clientes}/${encodeURIComponent(clienteId)}/${sub}${id ? `/${encodeURIComponent(id)}` : ''}`
+export const adicionarEnderecoCliente = (clienteId, corpo, contexto) => chamarApi(subrecurso(clienteId, 'enderecos'), { ...opcoes(contexto), metodo: 'POST', corpo })
+export const removerEnderecoCliente = (clienteId, id, contexto) => chamarApi(`${subrecurso(clienteId, 'enderecos', id)}?empresaId=${contexto.empresaId}`, { ...opcoes(contexto), metodo: 'DELETE' })
+export const adicionarTelefoneCliente = (clienteId, corpo, contexto) => chamarApi(subrecurso(clienteId, 'telefones'), { ...opcoes(contexto), metodo: 'POST', corpo })
+export const removerTelefoneCliente = (clienteId, id, contexto) => chamarApi(`${subrecurso(clienteId, 'telefones', id)}?empresaId=${contexto.empresaId}`, { ...opcoes(contexto), metodo: 'DELETE' })
 export async function obterCadastro(tela, id, contexto, sinal) {
   const r = await chamarApi(`${rotas[tela]}/${encodeURIComponent(id)}?empresaId=${contexto.empresaId}`, opcoes(contexto, sinal))
   return tela === 'clientes' ? { ...r.cliente, detalhe: r } : r
