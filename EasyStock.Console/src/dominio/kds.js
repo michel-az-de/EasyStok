@@ -96,7 +96,7 @@ export const gruposDoKds = (pedido, linhas) => agruparPorLinha(itensDoKds(pedido
 
 export const nomeNaComanda = (pedido) => [pedido.clienteNome ?? 'Cliente', pedido.clienteApt].filter(Boolean).join(' · ')
 
-// D2 da homologação #1769 (decisão do Felipe): o checkout grava o endereço nas observações com
+// Achado D2 da homologação #1769: o checkout grava o endereço nas observações com
 // rótulos de máquina ("[Entrega] ...", "[Guest] CEP ..., numero ..."; `EnderecoCheckout.Snapshot`
 // e `IniciarCheckoutGuestUseCase`). A Cozinha lê só o endereço formatado e o que o cliente
 // escreveu; o dado gravado não muda.
