@@ -23,6 +23,11 @@ export async function listarCadastro(tela, { busca = '', pagina = 1, filtro = ''
   if (simples && busca) itens = itens.filter(x => `${x.nome} ${x.instituicao ?? ''}`.toLocaleLowerCase('pt-BR').includes(busca.toLocaleLowerCase('pt-BR')))
   return { itens, total: r?.meta?.totalCount ?? r?.meta?.total ?? itens.length, pagina, busca, pesquisaLimitada: Boolean(pesquisaProduto) }
 }
+// #2495 (S5): a API acha por "contém" em nome, telefone e documento; quem compara os dígitos é o domínio.
+export async function buscarClientesParecidos(termo, contexto, sinal) {
+  const r = await chamarApi(`${rotas.clientes}?${query({ empresaId: contexto.empresaId, search: termo, pageSize: 10 })}`, { ...opcoes(contexto, sinal), envelope: true })
+  return Array.isArray(r?.data) ? r.data : []
+}
 export async function obterCadastro(tela, id, contexto, sinal) {
   const r = await chamarApi(`${rotas[tela]}/${encodeURIComponent(id)}?empresaId=${contexto.empresaId}`, opcoes(contexto, sinal))
   return tela === 'clientes' ? { ...r.cliente, detalhe: r } : r
