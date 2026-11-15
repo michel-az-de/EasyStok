@@ -155,8 +155,7 @@ export function AbaPerdasApi() {
           <p className={css.descricao}>{resumo.porMotivo.map((m) => `${m.rotulo}: ${m.valor > 0 || !(m.quantidade > 0) ? moeda(m.valor) : 'sem custo'}`).join(' · ')}</p>
         )}
         {(resumo?.lancamentos ?? []).length === 0 ? (
-          <Vazio variante="linha" titulo="Nenhuma perda no período."
-            acao={<Botao variante="texto" onClick={() => { gestao.fecharAviso(); setLancamentoAberto(true) }}>Lançar perda</Botao>} />
+          <Vazio variante="linha" titulo="Nenhuma perda no período. Use Lançar perda, no topo, para registrar a primeira." />
         ) : (
           <ul className={css.lista}>
             {resumo.lancamentos.map((l) => (
