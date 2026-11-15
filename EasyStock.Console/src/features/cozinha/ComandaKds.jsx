@@ -8,7 +8,7 @@ import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { RegistrarAtraso } from './RegistrarAtraso'
 import {
-  ETAPAS_KDS, avisoDeInicio, colunaDoStatusKds, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds,
+  ETAPAS_KDS, avisoDeInicio, colunaDoStatusKds, gruposDoKds, leituraDasObservacoes, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds,
 } from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
@@ -25,6 +25,8 @@ export function ComandaKds({
   const { acoes } = useAcessoModulos()
   const proximo = proximoStatusKds(pedido.status)
   const aviso = avisoDeInicio(pedido, agora)
+  const leitura = leituraDasObservacoes(pedido.observacoes)
+  const endereco = pedido.endereco ?? leitura.endereco
   const atual = ETAPAS_KDS.findIndex((e) => e.status === colunaDoStatusKds(pedido.status))
   // #1584: "Reimprimir na fila" não dava retorno. A ação guarda a própria falha no erro da
   // tela, então o erro antigo sai antes e a confirmação só vale se nenhum erro voltar.
@@ -71,7 +73,7 @@ export function ComandaKds({
           </output>
         )}
         <p className={css.comandaCliente}>{nomeNaComanda(pedido)}</p>
-        {pedido.endereco && <p className={css.comandaApoio}>{pedido.endereco}</p>}
+        {endereco && <p className={css.comandaApoio}>{endereco}</p>}
         <p className={css.comandaApoio}>
           <Icone nome="relogio" tamanho={16} /> {pedido.janela ? `Janela ${pedido.janela.label}` : 'Para já, sem janela'}
           {aviso && <span className={aviso.atrasado ? css.comandaAtraso : undefined}> · {aviso.texto}</span>}
@@ -105,7 +107,7 @@ export function ComandaKds({
           </section>
         ))}
 
-        {pedido.observacoes && <p className={css.obsPedido}>{pedido.observacoes}</p>}
+        {leitura.observacoes && <p className={css.obsPedido}>{leitura.observacoes}</p>}
         {acoes.gerenciarOcorrencias && <RegistrarAtraso key={pedido.id} pedidoId={pedido.id} />}
         {pedido.requerAprovacao && (
           <p className={css.motivoRecusa}>

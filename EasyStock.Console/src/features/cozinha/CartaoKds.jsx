@@ -6,8 +6,8 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import {
-  avisoDeInicio, colunaDoStatusKds, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds, rotuloDoStatusKds, tempoAteInicio,
-  urgenciaDoPedido,
+  avisoDeInicio, colunaDoStatusKds, gruposDoKds, leituraDasObservacoes, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds, rotuloDoStatusKds,
+  tempoAteInicio, urgenciaDoPedido,
 } from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
@@ -30,6 +30,9 @@ export function CartaoKds({
   const proximo = saindo ? null : proximoStatusKds(pedido.status)
   const urgencia = urgenciaDoPedido(pedido, agora)
   const nome = nomeDoPedido(pedido)
+  // #2663: cada botão diz de qual pedido é; o texto visível vem primeiro (como a alça).
+  const doPedido = (acao) => `${acao}: ${nome.frase} de ${nomeNaComanda(pedido)}`
+  const textoAvancar = movendo ? 'Enviando…' : proximo?.toque
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
     id: pedido.id,
     disabled: !proximo || movendo || Boolean(adiado),
@@ -78,16 +81,17 @@ export function CartaoKds({
       {proximo && !adiado && (
         <Botao
           largo variante="primario" className={css.botaoAvancar} disabled={movendo}
-          onClick={() => aoAvancar(pedido.id, proximo.status)}
+          onClick={() => aoAvancar(pedido.id, proximo.status)} aria-label={doPedido(textoAvancar)}
         >
-          {movendo ? 'Enviando…' : proximo.toque}
+          {textoAvancar}
         </Botao>
       )}
       {!saindo && (
         <div className={css.acoesCartao}>
-          <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)}>Ver comanda</Botao>
+          <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)} aria-label={doPedido('Ver comanda')}>Ver comanda</Botao>
           {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}
-          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" rotulo="Imprimir pedido" />
+          <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" rotulo="Imprimir pedido"
+            aria-label={doPedido('Imprimir pedido')} />
         </div>
       )}
     </li>
@@ -111,6 +115,7 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
   const aviso = avisoDeInicio(pedido, agora)
   const todos = gruposDoKds(pedido, linhas)
   const nome = nomeDoPedido(pedido)
+  const leitura = leituraDasObservacoes(pedido.observacoes)
   const grupos = linhaFiltro ? todos.filter((g) => g.chave === linhaFiltro) : todos
   const fracao = tempoAteInicio(pedido, agora)
 
@@ -149,7 +154,9 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
           </ul>
         </div>
       ))}
-      {pedido.observacoes && <p className={css.obsPedido}>{pedido.observacoes}</p>}
+      {/* D2 (#1769): o endereço do checkout sai formatado, sem os rótulos de máquina. */}
+      {leitura.endereco && <p className={css.comandaApoio}>{leitura.endereco}</p>}
+      {leitura.observacoes && <p className={css.obsPedido}>{leitura.observacoes}</p>}
     </>
   )
 }
