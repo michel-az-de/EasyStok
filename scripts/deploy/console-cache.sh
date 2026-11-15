@@ -3,7 +3,7 @@
 #   /assets/* (nome com hash): cache imutável de um ano no navegador (#2254).
 #   HTML, versao.json e o resto: no-store, para a aba ver a versão nova na hora.
 #   Arquivo com extensão que não existe (favicon.ico...): 404, não o app inteiro (#2254).
-#   Cabeçalhos de segurança do estático (CSP Report-Only, nosniff, Referrer, X-Frame), #2407.
+#   Cabeçalhos de segurança do estático (CSP Report-Only, nosniff, Referrer, X-Frame), #2407; HSTS, #2603.
 # Idempotente: se o bloco já está na forma nova, só valida e recarrega.
 set -euo pipefail
 ssh -o BatchMode=yes "${VPS_HOST:-hostinger}" 'bash -s' <<'REMOTE'
@@ -46,9 +46,13 @@ seguranca = (
     '\t\t\tX-Content-Type-Options "nosniff"\n'
     '\t\t\tReferrer-Policy "strict-origin-when-cross-origin"\n'
     '\t\t\tX-Frame-Options "DENY"\n'
-    '\t\t}\n'
 )
+fim_seguranca = '\t\t}\n'
+# HSTS de 1 ano só do app., sem includeSubDomains (#2603): o nginx do console não está no caminho do Caddy.
+hsts = '\t\t\tStrict-Transport-Security "max-age=31536000"\n'
 antigos.append('\thandle {\n' + root + cache_e_spa)
+antigos.append('\thandle {\n' + root + seguranca + fim_seguranca + cache_e_spa)
+seguranca += hsts + fim_seguranca
 novo = '\thandle {\n' + root + seguranca + cache_e_spa
 if block.count(novo) == 1:
     raise SystemExit(0)
