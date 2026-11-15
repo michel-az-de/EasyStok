@@ -49,12 +49,16 @@ public record ClientDto(
     string? Document = null
 );
 
+/// <summary>
+/// #2083: <c>Qty</c> é decimal porque o item do pedido do console pode ser fracionado (1,5 kg). O espelho
+/// <c>mobile_order_items.qty</c> ainda é inteiro (#2707): ver <see cref="Services.SyncMutationDispatcher.QtyDoEspelho"/>.
+/// </summary>
 public record OrderItemDto(
     string ProductId,
     string Name,
     string? Emoji,
     string? Unit,
-    int Qty,
+    decimal Qty,
     decimal UnitPrice
 );
 

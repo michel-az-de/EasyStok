@@ -254,7 +254,9 @@ public class SyncReversePullService(
                 Name: NomeCardapio.Exibicao(i.Nome) ?? "",
                 Emoji: i.Emoji,
                 Unit: i.Unidade,
-                Qty: (int)i.Quantidade,
+                // #2083: 1,5 kg desce 1,5. A escala do numeric(14,3) sai fora para o inteiro
+                // continuar saindo como inteiro no JSON (2.000 vira 2).
+                Qty: i.Quantidade / 1.000000000000000000000000000000000m,
                 UnitPrice: i.PrecoUnitario
             )).ToList();
             var dto = new OrderDto(
