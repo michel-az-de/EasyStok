@@ -163,7 +163,8 @@ confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no 
 })
 confere('4  restrição de formato permanece acessível e problemas de envio continuam visíveis junto do campo', () => {
   const composer = fonte('features/atendimento/Composer.jsx')
-  assert.match(composer, /\{restricao && \(podeAnexar \|\| podeAudio\s*\? <p id=\{idRestricao\} className=\{css\.restricao\}>\{restricao\}<\/p>\s*: <p id=\{idRestricao\} className="sr">\{restricao\}<\/p>\)\}/)
+  // #2706: canal só de texto volta a mostrar o curto "Só texto neste canal"; a frase inteira segue no leitor de tela.
+  assert.match(composer, /\{restricao && \(podeAnexar \|\| podeAudio\s*\? <p id=\{idRestricao\} className=\{css\.restricao\}>\{restricao\}<\/p>\s*: <p id=\{idRestricao\} className=\{css\.restricao\} title=\{restricao\}><span aria-hidden="true">Só texto neste canal<\/span><span className="sr">\{restricao\}<\/span><\/p>\)\}/)
   // #2420: o aviso virou <div> para levar o botão Escolher modelo ao lado da explicação.
   // #2185: Anexar e Fotos são itens do MenuDeAcoes; o motivo vai escrito no item (aria-describedby no componente).
   assert.match(composer, /motivo: motivoDeFormato\(canal, 'foto'\)/)

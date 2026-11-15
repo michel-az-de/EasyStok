@@ -77,7 +77,11 @@ await confere('1. o Composer não tem `title` nativo em controle nem <button> cr
   const composer = fonte('features/atendimento/Composer.jsx')
   const anexos = fonte('features/atendimento/ComposerAnexos.jsx')
   // A restrição continua em texto acessível; controles usam Tooltip e não title nativo.
-  const titulos = [...composer.matchAll(/<(\w+)[^<>]*?\stitle=/g)].map((m) => m[1])
+  // #2706: a única exceção é o parágrafo "Só texto neste canal" (texto, não controle), que leva a
+  // frase inteira no title como antes da #2143 (prova 1868).
+  const titulos = [...composer.matchAll(/<(\w+)([^<>]*?)\stitle=/g)]
+    .filter((m) => !(m[1] === 'p' && /^ id=\{idRestricao\} className=\{css\.restricao\}$/.test(m[2])))
+    .map((m) => m[1])
   assert.deepEqual(titulos, [], `title em: ${titulos.join(', ')}`)
   assert.equal((composer.match(/<button\b/g) ?? []).length, 0, '<button> cru no Composer')
   assert.doesNotMatch(anexos, /<label[^>]*\stitle=/, 'o Anexar ainda usa title nativo')
