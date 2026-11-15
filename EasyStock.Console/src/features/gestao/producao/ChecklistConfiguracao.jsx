@@ -3,21 +3,25 @@ import { Icone } from '../../../componentes/Icone'
 import { configuracaoDaProducao } from '../../../aplicacao/configuracaoProducao'
 import { lerInsumos } from '../../../aplicacao/insumos'
 import { lerReceitas } from '../../../aplicacao/receitas'
+import { assinarMudancaNaProducao } from '../../../aplicacao/mudancasDaProducao'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from './checklistConfiguracao.module.css'
 
 // #2362: no topo do módulo Produção, a ordem em que a loja configura (Insumos → Receitas), enquanto
-// faltar algo. Lê de novo a cada troca de tela, então o passo concluído aparece ao voltar.
+// faltar algo. Lê de novo a cada troca de tela e a cada gravação de insumo ou receita (#2647).
 // Falha de leitura não bloqueia a tela de baixo: o checklist só não aparece.
 export function ChecklistConfiguracao() {
   const [config, setConfig] = useState(null)
 
   useEffect(() => {
     let vivo = true
-    Promise.all([lerInsumos(), lerReceitas()])
+    const ler = () => Promise.all([lerInsumos(), lerReceitas()])
       .then(([insumos, receitas]) => { if (vivo) setConfig(configuracaoDaProducao({ insumos, receitas })) })
       .catch(() => { if (vivo) setConfig(null) })
-    return () => { vivo = false }
+    ler()
+    // #2647 (A1): gravar insumo ou receita relê na hora, sem esperar a troca de aba.
+    const sair = assinarMudancaNaProducao(ler)
+    return () => { vivo = false; sair() }
   }, [])
 
   if (!config?.visivel) return null
