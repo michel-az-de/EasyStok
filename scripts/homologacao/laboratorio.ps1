@@ -92,6 +92,8 @@ $env:MercadoPago__BaseUrl = "http://127.0.0.1:$PortaMp/"; $env:MercadoPago__Webh
 # #1901 exige as duas URLs com credencial que nao e TEST-: o webhook volta para a propria API e o retorno vai ao site local.
 $env:MercadoPago__NotificationUrl = "$api/api/webhooks/mercadopago"; $env:MercadoPago__BackUrlSuccess = 'http://localhost:5732/pedido-status.html?resultado=sucesso'
 $env:ENABLE_VIACEP_LOOKUP = 'false'; $env:ENABLE_NOMINATIM_GEOCODING = 'false'
+# #2667: o vigia testa a chave da FMA no TestadorMercadoPago, que tem URL fixa do provedor real (ignora o MP falso).
+$env:BackgroundJobs__EnableVigiaIntegracoes = 'false'
 $env:ASPNETCORE_ENVIRONMENT = 'Development'; $env:ASPNETCORE_URLS = $api
 $iniciados += (Start-Process dotnet -PassThru -WindowStyle Hidden -WorkingDirectory (Join-Path $raiz 'EasyStock.Api') `
     -ArgumentList 'bin/Release/net10.0/EasyStock.Api.dll' -RedirectStandardOutput (Join-Path $Pasta 'api.out') -RedirectStandardError (Join-Path $Pasta 'api.err')).Id
