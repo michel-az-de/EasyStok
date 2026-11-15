@@ -46,6 +46,51 @@ public class FecharCaixaUseCase(
 
         var hoje = HorarioBrasil.Hoje();   // dia operacional em Brasilia (alinha com o card; BUG-09)
 
+        // #2613: o retrato do dia sai atrás da trava do caixa da loja, a mesma dos lançamentos manuais (#1547). Sem
+        // ela, uma entrada que passou pela guarda de dia fechado antes do retrato era gravada depois dele: o dinheiro
+        // ficava num dia fechado e fora do fechamento.
+        var gravacao = new Gravacao();
+        FechamentoCaixaResult resultado;
+        try
+        {
+            resultado = await uow.ExecuteInTransactionSemRetryAsync(async ct =>
+            {
+                await repo.TravarSaidasAsync(cmd.EmpresaId, cmd.LojaId, ct);
+                return await FecharSobTravaAsync(cmd, hoje, gravacao);
+            });
+        }
+        catch (Exception ex) when (gravacao.Dia is { } dia)
+        {
+            // Race: 2 fechamentos concorrentes do mesmo dia/loja. O índice único coalescido
+            // (migration AddUniqueFechamentoCaixaPorDia) rejeita o perdedor; re-query confirma o
+            // vencedor. Se não houver vencedor, é erro real -> propaga. (Espelha EmitirNfceUseCase.)
+            var vencedor = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, dia, cmd.LojaId);
+            if (vencedor == null) throw;
+            logger.LogInformation(ex,
+                "Fechamento {Dia} race-resolved: outra TX venceu o indice unico (empresa {Empresa}).",
+                dia, cmd.EmpresaId);
+            return Map(vencedor);
+        }
+
+        if (gravacao.Novo is { } novo)
+        {
+            logger.LogInformation("Caixa {Data} fechado (saldo final={Saldo}, vendas={Vendas}).",
+                novo.Data, novo.SaldoFinal, novo.TotalVendas);
+            await ResolverAvisosDoSinoAsync(cmd.EmpresaId);
+        }
+        return resultado;
+    }
+
+    /// <summary>Dia do retrato em gravação e o fechamento gravado; o tratamento da corrida e os avisos pós-commit
+    /// leem daqui.</summary>
+    private sealed class Gravacao
+    {
+        public DateOnly? Dia { get; set; }
+        public FechamentoCaixa? Novo { get; set; }
+    }
+
+    private async Task<FechamentoCaixaResult> FecharSobTravaAsync(FecharCaixaCommand cmd, DateOnly hoje, Gravacao gravacao)
+    {
         // Fonte de verdade: a sessão aberta (última abertura sem fechamento posterior), que
         // pode ser de um dia anterior. É o mesmo sinal que a tela usa (ObterCaixaDia, #596).
         var pendente = await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId);
@@ -134,28 +179,11 @@ public class FecharCaixaUseCase(
         mov.RegistradoPorNome = cmd.FechadoPorNome;
         mov.Origem = "web";
 
-        try
-        {
-            await repo.AddFechamentoAsync(fechamento);
-            await repo.AddMovimentoAsync(mov);
-            await uow.CommitAsync();
-        }
-        catch (Exception ex)
-        {
-            // Race: 2 fechamentos concorrentes do mesmo dia/loja. O índice único coalescido
-            // (migration AddUniqueFechamentoCaixaPorDia) rejeita o perdedor; re-query confirma o
-            // vencedor. Se não houver vencedor, é erro real -> propaga. (Espelha EmitirNfceUseCase.)
-            var vencedor = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, dia, cmd.LojaId);
-            if (vencedor == null) throw;
-            logger.LogInformation(ex,
-                "Fechamento {Dia} race-resolved: outra TX venceu o indice unico (empresa {Empresa}).",
-                dia, cmd.EmpresaId);
-            return Map(vencedor);
-        }
-
-        logger.LogInformation("Caixa {Data} fechado (saldo final={Saldo}, vendas={Vendas}).",
-            dia, fechamento.SaldoFinal, totalVendas);
-        await ResolverAvisosDoSinoAsync(cmd.EmpresaId);
+        gravacao.Dia = dia;
+        await repo.AddFechamentoAsync(fechamento);
+        await repo.AddMovimentoAsync(mov);
+        await uow.CommitAsync();
+        gravacao.Novo = fechamento;
         return Map(fechamento) with { LancamentosForaDoFechamento = lancamentosForaDoFechamento };
     }
 

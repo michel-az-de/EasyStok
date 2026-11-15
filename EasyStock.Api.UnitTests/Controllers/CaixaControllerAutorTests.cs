@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using EasyStock.Api.Controllers;
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Caixa;
@@ -29,7 +30,7 @@ public class CaixaControllerAutorTests
         // #2319: o lançamento manual exige caixa aberto.
         repo.GetAberturaPendenteAsync(Arg.Any<Guid>(), Arg.Any<Guid?>())
             .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 0m, DateTime.UtcNow, null));
-        var registrar = new RegistrarMovimentoCaixaUseCase(repo, Substitute.For<IUnitOfWork>(),
+        var registrar = new RegistrarMovimentoCaixaUseCase(repo, Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>(),
             new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(repo)),
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
         var controller = new CaixaController(null!, null!, registrar, null!, null!, null!, null!, null!, currentUser)

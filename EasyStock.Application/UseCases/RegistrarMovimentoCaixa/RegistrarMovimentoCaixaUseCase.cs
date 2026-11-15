@@ -83,32 +83,32 @@ public class RegistrarMovimentoCaixaUseCase(
                     $"O lançamento manual deve usar o dia da abertura ({diaDaAbertura:dd/MM/yyyy}) ou hoje. Revise a data informada.");
         }
 
-        // Bloquear lançamento em dia já fechado (preserva integridade do snapshot).
-        await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId,
-            "Caixa do dia já foi fechado. Lance em outra data ou faça estorno.");
+        const string diaFechado = "Caixa do dia já foi fechado. Lance em outra data ou faça estorno.";
 
-        // FIN-003: saída interativa (não-mobile) exige rastro de auditoria e não pode estourar o
-        // saldo do dia — caixa físico não fica negativo. O mobile promove fatos já registrados no
-        // device (sync); não passa por estas guardas pra não bloquear lançamento legítimo.
-        if (tipo == "saida" && origem != "mobile")
+        // O mobile promove fatos já registrados no device (sync): só a guarda de dia fechado, sem as de saída.
+        if (origem == "mobile")
         {
-            if (string.IsNullOrWhiteSpace(cmd.Metodo))
-                throw new UseCaseValidationException("Saída exige método (dinheiro, pix, cartão, etc.).");
-            if (string.IsNullOrWhiteSpace(cmd.Descricao))
-                throw new UseCaseValidationException("Saída exige descrição (justificativa para auditoria).");
-
-            // #1547: duas saídas simultâneas liam o mesmo saldo e as duas passavam do teto. A conferência
-            // e a gravação ficam na mesma transação, atrás da trava do caixa da loja: a segunda só lê o
-            // saldo depois que a primeira gravou.
-            return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
-            {
-                await repo.TravarSaidasAsync(cmd.EmpresaId, cmd.LojaId, ct);
-                await ConferirSaldoParaSaidaAsync(cmd, data);
-                return await GravarAsync(cmd, tipo, origem, dataMov);
-            });
+            await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId, diaFechado);
+            return await GravarAsync(cmd, tipo, origem, dataMov);
         }
 
-        return await GravarAsync(cmd, tipo, origem, dataMov);
+        // FIN-003: saída interativa exige rastro de auditoria e não pode estourar o saldo do dia — caixa físico não
+        // fica negativo.
+        var saida = tipo == "saida";
+        if (saida && string.IsNullOrWhiteSpace(cmd.Metodo))
+            throw new UseCaseValidationException("Saída exige método (dinheiro, pix, cartão, etc.).");
+        if (saida && string.IsNullOrWhiteSpace(cmd.Descricao))
+            throw new UseCaseValidationException("Saída exige descrição (justificativa para auditoria).");
+
+        // #1547: duas saídas simultâneas liam o mesmo saldo e as duas passavam do teto. #2613: o fechamento toma a
+        // mesma trava; a guarda de dia fechado só vale lida atrás dela, senão o lançamento cai depois do retrato.
+        return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
+        {
+            await repo.TravarSaidasAsync(cmd.EmpresaId, cmd.LojaId, ct);
+            await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId, diaFechado);
+            if (saida) await ConferirSaldoParaSaidaAsync(cmd, data);
+            return await GravarAsync(cmd, tipo, origem, dataMov);
+        });
     }
 
     private async Task ConferirSaldoParaSaidaAsync(RegistrarMovimentoCaixaCommand cmd, DateOnly data)

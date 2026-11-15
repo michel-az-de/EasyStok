@@ -23,7 +23,8 @@ public class CaixaUseCasesTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     // #1547: a saída interativa roda dentro de ExecuteInTransactionSemRetryAsync.
-    public CaixaUseCasesTests() => _uow.SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>();
+    public CaixaUseCasesTests() => _uow.SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>()
+        .SetupExecuteInTransactionSemRetry<FechamentoCaixaResult>();
 
     // ════════════════════════════════════════════════════════════════════
     // AbrirCaixa
