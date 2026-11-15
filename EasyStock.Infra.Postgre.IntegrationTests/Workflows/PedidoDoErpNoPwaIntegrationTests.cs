@@ -272,6 +272,62 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         dinheiroNaGaveta.Should().Equal([0m, 70m], "o sinal entrou em pix; na gaveta só os 70 em dinheiro da entrega");
     }
 
+    [SkippableFact]
+    public async Task SinalPixEEntregaEmDinheiroNoMesmoDia_CaixaSeparaCadaFormaPeloQueEntrou()
+    {
+        // #2711 + #2714: sinal de R$ 30 em Pix e entrega pelo PWA no mesmo dia, restante de R$ 70 em dinheiro.
+        // O dia fecha com 100, e a gaveta só recebe os 70 em dinheiro: o Pix do sinal não entra nela.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var hoje = HorarioBrasil.Hoje();
+        var inicioDoDia = HorarioBrasil.JanelaDiaUtc(hoje).IniUtc;
+        var agora = DateTime.UtcNow;
+        var pagoEm = agora.AddMinutes(-1) < inicioDoDia ? inicioDoDia : agora.AddMinutes(-1);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            var pedido = await db.Set<Pedido>().Include(p => p.Itens).SingleAsync(p => p.Id == s.PedidoId);
+            pedido.Itens.Single().PrecoUnitario = 50m;
+            pedido.Itens.Single().Subtotal = 100m;
+            pedido.RecalcularTotal();
+            db.Add(new PedidoPagamento
+            {
+                Id = Guid.NewGuid(), PedidoId = s.PedidoId, Metodo = "pix", Valor = 30m, Observacao = "Sinal",
+                PagoEm = pagoEm, RegistradoPorNome = "Felipe"
+            });
+            db.Add(Movimento(s.EmpresaId, "abertura", 50m, inicioDoDia));
+            var doAparelho = new Order
+            {
+                Id = s.PedidoId.ToString(), ClientSnapshotName = "Ana", Total = 100m, Metodo = "dinheiro", LastDeviceId = "dev-a",
+                LastOperatorName = "Thati", EmpresaId = s.EmpresaId
+            };
+            doAparelho.Items.Add(new OrderItem { OrderId = doAparelho.Id, ProductId = s.ProdutoId.ToString(), Name = "Lasanha", Qty = 2, UnitPrice = 50m });
+            db.Add(doAparelho);
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue");
+        await EcoarDoAparelho(provider, s, "entregue");
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var caixa = new CaixaSaldoCalculator(new CaixaRepository(leitura));
+        var dia = await caixa.CalcularAsync(s.EmpresaId, hoje);
+        var total = dia.TotalVendas + dia.TotalPagamentosPedidos;
+        total.Should().Be(100m, "sinal e restante no mesmo dia somam o pedido, uma vez");
+
+        var linhas = await caixa.GetLinhasExtrasAsync(s.EmpresaId, dia.JanelaInicioUtc, dia.JanelaFimUtc);
+        linhas.Sum(l => l.Valor).Should().Be(total, "as linhas somam o que o saldo conta");
+        decimal Forma(string metodo) => linhas
+            .Where(l => string.Equals(l.Metodo?.Trim(), metodo, StringComparison.OrdinalIgnoreCase))
+            .Sum(l => l.Valor);
+        Forma("dinheiro").Should().Be(70m, "na gaveta só o restante pago em dinheiro na entrega");
+        Forma("pix").Should().Be(30m, "o sinal fica na forma em que entrou");
+    }
+
     private static MovimentoCaixa Movimento(Guid empresaId, string tipo, decimal valor, DateTime em) => new()
     {
         Id = Guid.NewGuid(), EmpresaId = empresaId, Tipo = tipo, Valor = valor, Metodo = "dinheiro",
