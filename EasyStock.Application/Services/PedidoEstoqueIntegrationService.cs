@@ -1,5 +1,6 @@
 using EasyStock.Application.Events.Estoque;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Domain.Services;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
@@ -52,7 +53,9 @@ public sealed class PedidoEstoqueIntegrationService(
     IPublicadorEventoIntegracao publicadorEventos,
     Microsoft.Extensions.Options.IOptions<PedidoEstoqueOptions> options,
     ILogger<PedidoEstoqueIntegrationService> logger,
-    IConfiguracaoLojaRepository? configuracaoLoja = null)
+    IConfiguracaoLojaRepository? configuracaoLoja = null,
+    IStorefrontRepository? storefronts = null,
+    ICardapioItemRepository? cardapio = null)
 {
     private bool PermiteEstoqueNegativo => options.Value.PermiteEstoqueNegativo;
     private bool RequerEstoqueExistente => options.Value.RequerEstoqueExistente;
@@ -70,6 +73,39 @@ public sealed class PedidoEstoqueIntegrationService(
     public Task DescontarAsync(PedidoEntity pedido, CancellationToken ct = default) =>
         DescontarAsync(pedido, itemNovo: null, ct);
 
+    /// <summary>
+    /// #1619: o item grava o prato como ele estava na hora do pedido. Prato incluído pelo console nasce
+    /// avulso e a produção liga ao estoque depois; sem isto, o item seguia sem produto e a baixa pulava
+    /// calada. Aqui o item herda o produto do prato e a porção do estoque da porção pedida, e fica com
+    /// eles (o pedido é salvo depois da baixa), então a devolução acha a mesma saída.
+    /// </summary>
+    private async Task ReligarAoEstoqueAsync(PedidoEntity pedido, CancellationToken ct)
+    {
+        if (storefronts is null || cardapio is null) return;
+        var soltos = pedido.Itens
+            .Where(i => i.CardapioItemId.HasValue
+                        && (!i.ProdutoId.HasValue || (i.CardapioItemVariacaoId.HasValue && !i.ProdutoVariacaoId.HasValue)))
+            .ToList();
+        if (soltos.Count == 0) return;
+
+        var vitrine = await storefronts.GetByEmpresaAsync(pedido.EmpresaId, ct);
+        if (vitrine is null) return;
+        var pratos = (await cardapio.ListarPorIdsAsync(vitrine.Id, soltos.Select(i => i.CardapioItemId!.Value).Distinct().ToList(), ct))
+            .ToDictionary(c => c.Id);
+
+        foreach (var item in soltos)
+        {
+            if (!pratos.TryGetValue(item.CardapioItemId!.Value, out var prato) || prato.ProdutoId is not { } produtoId) continue;
+            // Item que já aponta outro produto foi decisão de alguém (troca, ajuste); não se mexe.
+            if (item.ProdutoId.HasValue && item.ProdutoId != produtoId) continue;
+            item.ProdutoId = produtoId;
+            if (item.ProdutoVariacaoId is null && item.CardapioItemVariacaoId is { } porcaoId)
+                item.ProdutoVariacaoId = prato.Variacoes.FirstOrDefault(v => v.Id == porcaoId)?.ProdutoVariacaoId;
+            logger.LogInformation("Pedido {Id} item {ItemId}: prato {PratoId} ligado ao produto {ProdutoId} depois do pedido (#1619).",
+                pedido.Id, item.Id, prato.Id, produtoId);
+        }
+    }
+
     /// <param name="itemNovo">
     /// O item que acabou de entrar num pedido que já tinha baixado (#939). O aparelho não sabe dele,
     /// então a baixa do aparelho não o cobre (#1571): ele sai inteiro.
@@ -79,6 +115,7 @@ public sealed class PedidoEstoqueIntegrationService(
         // #1534: o pedido do site e da comanda nasce sem loja (tenant único, uma cozinha) e baixa do
         // estoque da empresa; antes saía daqui sem descontar nada. Pedido com loja segue na loja dele.
         var lojaId = pedido.LojaId;
+        await ReligarAoEstoqueAsync(pedido, ct);
         var baixadoPeloAparelho = await BaixadoPeloAparelhoAsync(pedido, ct);
         var regra = await RegraDeConsumoAsync(pedido, ct);
 
@@ -242,6 +279,8 @@ public sealed class PedidoEstoqueIntegrationService(
 
     public async Task DevolverAsync(PedidoEntity pedido, CancellationToken ct = default)
     {
+        // Mesmo vínculo da baixa: se o item não foi salvo com o produto, a devolução ainda acha a saída.
+        await ReligarAoEstoqueAsync(pedido, ct);
         foreach (var item in pedido.Itens)
             await DevolverItemAsync(pedido, item, ct);
         await DevolverBaixaDoAparelhoAsync(pedido, ct);
