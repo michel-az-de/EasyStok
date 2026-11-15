@@ -168,7 +168,8 @@ const { mock } = await import('node:test')
 const { ligarRecargaAoVivo } = await import('../src/aplicacao/recargaAoVivo.js')
 
 function montarAoVivo({ aleatorio } = {}) {
-  mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+  // `Date` junto: a espera de reconexão mede quanto a conexão durou (#2401, C3.8).
+  mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] })
   let recargas = 0
   const conexoes = []
   const desligar = ligarRecargaAoVivo({
@@ -259,10 +260,12 @@ await confere('5. a espera varia de 75% a 100%, para as abas não baterem juntas
   assert.equal(ultima, 45000, 'no teto a variação também vale')
 })
 
-await confere('5. o ready zera: a queda depois de uma conexão boa volta à base', () => {
-  const espera = criarEsperaDeReconexao({ base: 5000, aleatorio: () => 0 })
+await confere('5. o ready zera: a queda depois de uma conexão boa (30 s estável, #2401) volta à base', () => {
+  let agora = 0
+  const espera = criarEsperaDeReconexao({ base: 5000, aleatorio: () => 0, agora: () => agora })
   espera.proxima(); espera.proxima(); espera.proxima()
   espera.zerar()
+  agora += 30000
   assert.equal(espera.proxima(), 5000)
 })
 
@@ -283,9 +286,10 @@ await confere('5. recarga ao vivo: quedas seguidas espaçam a reconexão; o read
     t.andar(1)
     assert.equal(t.conexoes.length, 4, 'a terceira, em 40 s')
     t.conexao().aoEvento({ evento: 'ready' })
+    t.andar(30000)
     t.conexao().aoCair()
     t.andar(10000)
-    assert.equal(t.conexoes.length, 5, 'depois do ready a queda volta a reconectar em 10 s')
+    assert.equal(t.conexoes.length, 5, 'depois de 30 s conectado a queda volta a reconectar em 10 s')
   } finally { t.desligar() }
 })
 

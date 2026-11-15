@@ -78,6 +78,8 @@ export function useEntregasApi({ comVitrine = true } = {}) {
   }, [envio])
   // J2 (#1990): repetir o "Recebi" logo depois de uma queda não lança o pagamento duas vezes.
   const [envioDoPagamento] = useState(() => criarChaveDeEnvio())
+  // #2401 (C3.5): repetir "Nova viagem" logo depois de uma queda não cria outra viagem.
+  const [envioDaViagem] = useState(() => criarChaveDeEnvio())
   const [recebidosNaPorta] = useState(() => new Set())
 
   const recarregar = useCallback((alcance) => {
@@ -199,7 +201,10 @@ export function useEntregasApi({ comVitrine = true } = {}) {
   const acoes = {
     // Pedido de quem está na tela (botão, reagendamento): a leitura inteira.
     recarregar: () => recarregar(),
-    criarViagem: (entregadorId) => executar(() => api.criarViagem(entregadorId), 'A viagem não foi criada'),
+    criarViagem: (entregadorId) => {
+      const chave = envioDaViagem.para({ entregadorId: entregadorId ?? null })
+      return executar(() => api.criarViagem(entregadorId, chave).then(() => envioDaViagem.confirmar(chave)), 'A viagem não foi criada')
+    },
     definirEntregador: (id, entregadorId) => executar(() => api.definirEntregadorViagem(id, entregadorId), 'O entregador não mudou'),
     incluirParada: (id, pedidoId) => executar(() => api.incluirParada(id, pedidoId), 'O pedido não entrou na viagem'),
     retirarParada: (id, pedidoId) => executar(() => api.retirarParada(id, pedidoId), 'O pedido não saiu da viagem'),

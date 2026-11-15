@@ -12,18 +12,26 @@ export const RECONECTAR_MS = 10000
 export const RECONECTAR_TETO_MS = 60000
 const VARIACAO_DA_ESPERA = 0.25
 
+// #2401 (C3.8): só a conexão que durou isto conta como boa e volta a espera à base.
+export const CONEXAO_ESTAVEL_MS = 30000
+
 // #2287: espera para reconectar o SSE caído. Começa em `base`, dobra a cada queda seguida até o teto e varia
 // de 75% a 100% do valor, para as abas abertas não baterem juntas no endpoint depois de um deploy. `zerar` vai
-// no `ready`: a queda depois de uma conexão boa volta a tentar na base. É a regra de todo ponto que abre o SSE.
-export function criarEsperaDeReconexao({ base, teto = RECONECTAR_TETO_MS, aleatorio = Math.random }) {
+// no `ready` e marca a hora da conexão. A queda depois de uma conexão estável volta a tentar na base. A queda
+// logo depois do `ready` (#2401, C3.8: servidor que aceita e cai em seguida) segue a espera crescente. É a
+// regra de todo ponto que abre o SSE.
+export function criarEsperaDeReconexao({ base, teto = RECONECTAR_TETO_MS, aleatorio = Math.random, agora = Date.now }) {
   let cheia = base
+  let conectouEm = null
   return {
     proxima() {
+      if (conectouEm != null && agora() - conectouEm >= CONEXAO_ESTAVEL_MS) cheia = base
+      conectouEm = null
       const espera = Math.round(cheia * (1 - VARIACAO_DA_ESPERA * aleatorio()))
       cheia = Math.min(teto, cheia * 2)
       return espera
     },
-    zerar() { cheia = base },
+    zerar() { conectouEm = agora() },
   }
 }
 
