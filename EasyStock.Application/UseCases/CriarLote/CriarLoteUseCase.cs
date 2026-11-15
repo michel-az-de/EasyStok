@@ -85,6 +85,8 @@ public class CriarLoteUseCase(
             foreach (var input in cmd.Itens)
             {
                 LoteItemValidacao.Validar(input.Nome, input.Quantidade, input.ProdutoId, input.PesoG, tipoEmbalagemMap);
+                // #2605: validade negativa gravava ExpiraEm no passado; enorme estourava o AddDays (500).
+                LoteItemValidacao.ValidarFaixas(input.PesoG, input.ValidadeDias);
 
                 var expira = input.ValidadeDias.HasValue ? lote.DataProducao.AddDays(input.ValidadeDias.Value) : (DateTime?)null;
                 lote.Itens.Add(new LoteItem

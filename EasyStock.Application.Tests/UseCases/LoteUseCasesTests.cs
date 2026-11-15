@@ -123,6 +123,26 @@ public class LoteUseCasesTests
         capturado.TotalUnidades.Should().Be(13);
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(int.MaxValue)]
+    public async Task CriarLote_DeveLancarValidation_QuandoValidadeDiasForaDaFaixa(int validadeDias)
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _repo.GetNextSequencialDoDiaAsync(empresaId, Arg.Any<DateOnly>()).Returns(1);
+        _produtoRepo.GetTipoEmbalagemMapAsync(empresaId, Arg.Any<IEnumerable<Guid>>())
+            .Returns((IReadOnlyDictionary<Guid, TipoEmbalagem>)new Dictionary<Guid, TipoEmbalagem>());
+        var useCase = new CriarLoteUseCase(_repo, _produtoRepo, _uow,
+            Substitute.For<ILogger<CriarLoteUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new CriarLoteCommand(empresaId,
+            Itens: new[] { new CriarLoteItemInput("Pão", 2, ProdutoId: produtoId, ValidadeDias: validadeDias) }));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Validade*");
+        await _repo.DidNotReceive().AddAsync(Arg.Any<Lote>());
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // AdicionarItemLote (#2605): mesmas regras do CriarLote
     // ════════════════════════════════════════════════════════════════════
