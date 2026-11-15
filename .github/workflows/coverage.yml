@@ -32,12 +32,14 @@ jobs:
       - name: Build
         run: dotnet build EasyStok.sln --configuration Release --no-restore
 
+      # As suítes de integração (namespace *.IntegrationTests.*) ficam fora: rodam com Postgres real
+      # no ci.yml e, instrumentadas aqui, estouravam o teto de 25 min em todo run (#468).
       - name: Test with coverage
         run: |
           dotnet test EasyStok.sln \
             --configuration Release \
             --no-build \
-            --filter "Category!=ArchitectureDebt" \
+            --filter "Category!=ArchitectureDebt&FullyQualifiedName!~.IntegrationTests." \
             --collect:"XPlat Code Coverage" \
             --settings coverlet.runsettings \
             --logger "trx;LogFileName=test.trx" \
