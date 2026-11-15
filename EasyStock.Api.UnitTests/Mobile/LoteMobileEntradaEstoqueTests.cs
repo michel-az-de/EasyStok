@@ -214,14 +214,46 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
 
         await SincronizarAsync(Lote("b-1", 5) with
         {
-            Discarded = true, DiscardedAt = Agora(), DiscardedBy = "Thati", DiscardReason = "vencido"
+            Discarded = true, DiscardedAt = Agora(), DiscardedBy = "Thati", DiscardReason = "acidente"
         });
 
         SaldoDoProdutoNaLoja().Should().Be(0);
         Saidas(NaturezaMovimentacaoEstoque.Perda).Should().ContainSingle()
             .Which.Quantidade.Value.Should().Be(5);
         StatusDoLoteErp("b-1").Should().Be("descartado");
-        _db.Set<Batch>().Single(b => b.Id == "b-1").DiscardReason.Should().Be("vencido");
+        _db.Set<Batch>().Single(b => b.Id == "b-1").DiscardReason.Should().Be("acidente");
+    }
+
+    [Theory]
+    [InlineData("vencido")]
+    [InlineData("vencido · passou do dia")]
+    public async Task DescartarLoteVencido_EntraComoVencimentoENaoComoPerdaNoPreparo(string motivo)
+    {
+        // #2083 (A9): o aparelho manda o motivo "vencido" (com a nota depois de " · ") e o console mostrava "Perda no preparo".
+        await SincronizarLoteAsync("b-1", 5);
+
+        await SincronizarAsync(Lote("b-1", 5) with { Discarded = true, DiscardedAt = Agora(), DiscardReason = motivo });
+
+        Saidas(NaturezaMovimentacaoEstoque.Vencimento).Should().ContainSingle()
+            .Which.Quantidade.Value.Should().Be(5);
+        Saidas(NaturezaMovimentacaoEstoque.Perda).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(22, 30)]
+    [InlineData(23, 59)]
+    public async Task LoteFeitoDepoisDas21h_GuardaAValidadeDoDiaDaEtiqueta(int hora, int minuto)
+    {
+        // #2083 (A3): a etiqueta vence em 30/10 à noite em Brasília, que já é 31/10 em UTC. O console mostrava 31/10.
+        var venceEm = new DateTimeOffset(2026, 10, 30, hora, minuto, 0, TimeSpan.FromHours(-3));
+        var dto = new BatchDto("b-1", "LOT-261030",
+            [new BatchItemDto(ProdutoMobileId, "Massa de lasanha", null, "un", 5, null,
+                ValidityDays: 1, ExpiresAt: venceEm.ToUnixTimeMilliseconds())],
+            null, venceEm.AddDays(-1).ToUnixTimeMilliseconds());
+
+        await SincronizarAsync(dto);
+
+        EntradaDoLote().ValidadeEm!.DataValidade.Should().Be(new DateTime(2026, 10, 30));
     }
 
     [Fact]

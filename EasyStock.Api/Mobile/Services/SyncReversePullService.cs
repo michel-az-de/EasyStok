@@ -76,6 +76,16 @@ public class SyncReversePullService(
         }
     }
 
+    private async Task<Dictionary<Guid, decimal>> SaldoNaLojaAsync(List<Guid> produtoIds, Guid empresaId, Guid? lojaId)
+    {
+        if (produtoIds.Count == 0) return [];
+        var q = _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
+            .Where(i => i.EmpresaId == empresaId && produtoIds.Contains(i.ProdutoId));
+        if (lojaId.HasValue) q = q.Where(i => i.LojaId == lojaId || i.LojaId == null);
+        var itens = await q.ToListAsync();
+        return itens.GroupBy(i => i.ProdutoId).ToDictionary(g => g.Key, g => g.Sum(i => i.QuantidadeAtual?.Value ?? 0m));
+    }
+
     public async Task AppendAsync(List<MutationDto> mutations, DateTime sinceDate, Guid empresaId, Guid? lojaId)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -90,6 +100,8 @@ public class SyncReversePullService(
                 && p.Status == StatusProduto.Ativo
                 && !mobileLinkedProdutos.Contains(p.Id));
         var produtos = await produtosQ.ToListAsync();
+        // #2083 (A7): o produto novo desce com o saldo do ERP na loja do aparelho (e o sem loja), não com 0.
+        var saldoNovos = await SaldoNaLojaAsync(produtos.Select(p => p.Id).ToList(), empresaId, lojaId);
         foreach (var p in produtos)
         {
             var dto = new ProductDto(
@@ -99,7 +111,7 @@ public class SyncReversePullService(
                 Category: CategoriaDoPwa(p.Categoria?.Nome),
                 Unit: null,
                 Price: p.PrecoReferencia?.Valor ?? 0m,
-                Stock: 0,
+                Stock: (int)saldoNovos.GetValueOrDefault(p.Id),
                 Custom: false,
                 Sku: p.CodigoBarras,
                 DefaultWeightG: null,

@@ -32,6 +32,18 @@ public class LoteMobileEstadoReconciler(
     private static string DocumentoDe(Guid loteId, string status) =>
         $"lote:{loteId}:{(status == StatusDescartado ? "descarte" : "exclusao")}";
 
+    /// <summary>
+    /// #2083 (A9): o aparelho manda o motivo como "vencido" ou "vencido · nota". Vencido entra como
+    /// vencimento, igual à perda lançada no console; os outros motivos seguem como perda.
+    /// </summary>
+    internal static NaturezaMovimentacaoEstoque NaturezaDoDescarte(string? motivo)
+    {
+        var chave = (motivo ?? "").Split('·', 2)[0].Trim();
+        return string.Equals(chave, "vencido", StringComparison.OrdinalIgnoreCase)
+            ? NaturezaMovimentacaoEstoque.Vencimento
+            : NaturezaMovimentacaoEstoque.Perda;
+    }
+
     /// <summary>Aplica o estado do batch ao Lote ERP vinculado. Não chama SaveChanges.</summary>
     public async Task AplicarAsync(Batch batch, CancellationToken ct = default)
     {
@@ -57,7 +69,7 @@ public class LoteMobileEstadoReconciler(
         if (desejado != StatusFinalizado)
         {
             var natureza = desejado == StatusDescartado
-                ? NaturezaMovimentacaoEstoque.Perda
+                ? NaturezaDoDescarte(batch.DiscardReason)
                 : NaturezaMovimentacaoEstoque.Ajuste;
             var motivo = desejado == StatusDescartado
                 ? $"Descarte do lote {lote.Codigo}{(string.IsNullOrWhiteSpace(batch.DiscardReason) ? "" : " · " + batch.DiscardReason)}"

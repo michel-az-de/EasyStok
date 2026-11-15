@@ -265,7 +265,11 @@ public sealed class BatchLinker(
 
                 var custoUnit = produto.CustoReferencia ?? Dinheiro.Zero;
                 var precoVenda = produto.PrecoReferencia;
-                Validade? validade = item.ExpiraEm.HasValue ? Validade.From(item.ExpiraEm.Value) : null;
+                // #2083 (A3): ExpiraEm é um instante UTC. A validade é o dia da etiqueta em Brasília; a data UTC
+                // somava um dia ao lote feito depois das 21h.
+                Validade? validade = item.ExpiraEm.HasValue
+                    ? Validade.From(OperacionalFuso.DataOperacional(item.ExpiraEm.Value).ToDateTime(TimeOnly.MinValue))
+                    : null;
                 var qtd = Quantidade.From(item.Quantidade);
                 // #2003 (estoque-20): o item de estoque leva o codigo do lote, como na entrada do console
                 // (RegistrarEntradaEstoque). Sem ele aparecia como "sem lote" em "Vencidos com saldo" e no Estoque do dia.
