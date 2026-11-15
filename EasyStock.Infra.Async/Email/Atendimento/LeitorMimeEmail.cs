@@ -17,7 +17,12 @@ internal static class LeitorMimeEmail
     /// <summary>E-mail inteiro maior que isto não é baixado: entra só o envelope (<see cref="SoEnvelope"/>).</summary>
     public const long TetoEmailBytes = 40 * 1024 * 1024;
 
-    private static readonly string[] PrecedenciaAutomatica = ["bulk", "junk", "auto_reply"];
+    // #1642 (item 4): "list" entra junto. Lista de distribuição não é cliente esperando resposta.
+    private static readonly string[] PrecedenciaAutomatica = ["bulk", "junk", "auto_reply", "list"];
+
+    /// <summary>Caixas que não leem resposta: devolução de entrega e "não responda".</summary>
+    private static readonly string[] RemetenteAutomatico =
+        ["mailer-daemon", "postmaster", "noreply", "no-reply", "donotreply", "do-not-reply", "naoresponda", "nao-responda"];
 
     public static EmailRecebido Ler(string idNaCaixa, MimeMessage mime, DateTime agora)
     {
@@ -70,7 +75,19 @@ internal static class LeitorMimeEmail
         if (mime.Headers.Contains("X-Autoreply") || mime.Headers.Contains("X-Autorespond"))
             return true;
         var precedencia = mime.Headers[HeaderId.Precedence]?.Trim();
-        return precedencia is not null && PrecedenciaAutomatica.Contains(precedencia, StringComparer.OrdinalIgnoreCase);
+        if (precedencia is not null && PrecedenciaAutomatica.Contains(precedencia, StringComparer.OrdinalIgnoreCase))
+            return true;
+        // #1642 (item 4): lista (List-Id, RFC 2919; List-Unsubscribe não: e-mail transacional também traz), relatório de entrega (RFC 3462) e envelope sem remetente (NDR).
+        if (mime.Headers.Contains(HeaderId.ListId))
+            return true;
+        if (mime.Body is MultipartReport)
+            return true;
+        if (mime.Headers[HeaderId.ReturnPath]?.Trim() == "<>")
+            return true;
+        // "Não responda" só sem Reply-To: o formulário do site manda do noreply com o cliente no Reply-To.
+        var local = mime.From.Mailboxes.FirstOrDefault()?.LocalPart;
+        return mime.ReplyTo.Count == 0 && local is not null
+            && RemetenteAutomatico.Contains(local, StringComparer.OrdinalIgnoreCase);
     }
 
     private static List<AnexoEmailRecebido> Anexos(MimeMessage mime)

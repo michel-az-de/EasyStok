@@ -112,6 +112,30 @@ public class LerCaixaEmailAtendimentoUseCaseTests
         _sessao.Lidos.Should().Equal("1", "2", "3");
     }
 
+    [Fact]
+    public async Task EmailEmQuarentena_EPulado_ENaoOcupaOLote()
+    {
+        // #1642 (item 3): os mesmos e-mails que falham ao gravar voltavam no lote toda rodada e travavam a fila.
+        for (var i = 1; i <= 3; i++) _sessao.Emails.Add(Email(i.ToString()));
+
+        await Sut().ExecuteAsync(_empresaId, 2, quarentena: new HashSet<string> { "1", "2" });
+
+        _sessao.Lidos.Should().Equal("3");
+    }
+
+    [Fact]
+    public async Task FalhaAoGravar_EntraNaQuarentena()
+    {
+        _sessao.Emails.Add(Email("1"));
+        _sessao.Emails.Add(Email("2"));
+        _uow.CommitAsync().Returns(Task.FromException<int>(new InvalidOperationException("banco fora")), Task.FromResult(1));
+        var quarentena = new HashSet<string>();
+
+        await Sut().ExecuteAsync(_empresaId, 20, quarentena: quarentena);
+
+        quarentena.Should().Equal("1");
+    }
+
     /// <summary>INBOX em memória: o que foi marcado como lido, e em que ordem.</summary>
     private sealed class SessaoDeTeste : ISessaoCaixaEmail
     {

@@ -14,7 +14,7 @@ public sealed record LeituraCaixaEmailResultado(int Gravados, int Duplicados, in
 /// <summary>
 /// Uma rodada na caixa de suporte de uma empresa (#1432): abre a INBOX, lê até <c>maximo</c> não lidos, grava
 /// cada um (<see cref="ReceberEmailAtendimentoUseCase"/>) e só então marca como lido. O que falhou continua não
-/// lido para a próxima rodada; gravado, repetido e ignorado são marcados. Sem módulo de atendimento ou sem
+/// lido para a próxima rodada (e entra na <c>quarentena</c> de quem chama, #1642); gravado, repetido e ignorado são marcados. Sem módulo de atendimento ou sem
 /// caixa configurada, não faz nada. O escopo é de uma empresa só: o tenant é fixado aqui (RLS, ADR-0010).
 /// </summary>
 public sealed class LerCaixaEmailAtendimentoUseCase(
@@ -25,7 +25,8 @@ public sealed class LerCaixaEmailAtendimentoUseCase(
     ITenantContextAccessor tenantContext,
     ILogger<LerCaixaEmailAtendimentoUseCase> logger)
 {
-    public async Task<LeituraCaixaEmailResultado> ExecuteAsync(Guid empresaId, int maximo, CancellationToken ct = default)
+    public async Task<LeituraCaixaEmailResultado> ExecuteAsync(
+        Guid empresaId, int maximo, CancellationToken ct = default, ISet<string>? quarentena = null)
     {
         tenantContext.SetCurrentTenant(empresaId);
 
@@ -40,7 +41,9 @@ public sealed class LerCaixaEmailAtendimentoUseCase(
 
         int gravados = 0, duplicados = 0, ignorados = 0, falhas = 0;
         await using var sessao = await cliente.AbrirAsync(caixa, ct);
-        foreach (var id in await sessao.ListarNaoLidosAsync(maximo, ct))
+        // #1642 (item 3): o que está em quarentena (falhou em rodada recente) não ocupa o lote.
+        var naoLidos = await sessao.ListarNaoLidosAsync(maximo + (quarentena?.Count ?? 0), ct);
+        foreach (var id in naoLidos.Where(id => quarentena?.Contains(id) != true).Take(maximo))
         {
             try
             {
@@ -58,6 +61,7 @@ public sealed class LerCaixaEmailAtendimentoUseCase(
             {
                 // Sem endereço no log (LGPD): o id do IMAP basta para achar o e-mail na caixa.
                 falhas++;
+                quarentena?.Add(id);
                 logger.LogWarning(ex, "Caixa de e-mail da empresa {EmpresaId}: e-mail {IdNaCaixa} não entrou; fica não lido.", empresaId, id);
             }
         }
