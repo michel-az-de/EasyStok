@@ -76,7 +76,7 @@ public sealed class CaixaFechamentoTravaIntegrationTests(PostgreSqlDatabaseFixtu
 
     // Determinístico, sem cronômetro: a tarefa terminou sem esperar (sem trava) ou outra conexão ficou na fila
     // da trava do caixa desta loja. pg_locks guarda a chave de 64 bits partida em classid (alta) e objid (baixa).
-    private async Task<bool> AlguemEsperaATravaAsync(Task tarefa, Guid empresaId, Guid lojaId)
+    private async Task<bool> AlguemEsperaATravaAsync(Task tarefa, Guid empresaId, Guid? lojaId)
     {
         var chave = $"caixa-saida:{empresaId:N}:{lojaId:N}";
         await using var db = fixture.CreateDbContext();
@@ -92,7 +92,35 @@ public sealed class CaixaFechamentoTravaIntegrationTests(PostgreSqlDatabaseFixtu
         return false;
     }
 
-    private static Task TravarAsync(EasyStockDbContext db, Guid empresaId, Guid lojaId)
+    [SkippableFact]
+    public async Task Entrada_da_loja_espera_o_fechamento_da_empresa_e_e_recusada()
+    {
+        // #2629: o fechamento da empresa inteira (loja nula) soma os lançamentos de todas as lojas, então a entrada de
+        // uma loja tem de esperar por ele também, não só pelo fechamento da própria loja.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (empresaId, lojaId) = await SemearCaixaAbertoAsync();
+        await using var provider = BuildProductionProvider();
+
+        await using var segura = fixture.CreateDbContext();
+        segura.SetMobileTenantContext(empresaId);
+        await using var tx = await segura.Database.BeginTransactionAsync();
+        await TravarAsync(segura, empresaId, null);
+
+        var entrada = Task.Run(() => Executar<RegistrarMovimentoCaixaUseCase>(provider, empresaId,
+            uc => uc.ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 10m,
+                Descricao: "Troco", LojaId: lojaId, Metodo: "dinheiro"))));
+        var esperouATrava = await AlguemEsperaATravaAsync(entrada, empresaId, null);
+
+        segura.FechamentosCaixa.Add(FechamentoCaixa.Criar(empresaId, HorarioBrasil.Hoje(), 100m, 0m, 0m, 0m, 0m));
+        await segura.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        await entrada.Awaiting(t => t).Should().ThrowAsync<UseCaseValidationException>()
+            .WithMessage("*já foi fechado*");
+        esperouATrava.Should().BeTrue("a entrada da loja cai no retrato da empresa");
+    }
+
+    private static Task TravarAsync(EasyStockDbContext db, Guid empresaId, Guid? lojaId)
     {
         var chave = $"caixa-saida:{empresaId:N}:{lojaId:N}";
         return db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({chave}))");
