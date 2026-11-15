@@ -586,4 +586,61 @@ public class ProcessarRecebimentoPedidoFornecedorUseCaseTests
                 e.TotalItensRecebidos == 1 &&
                 e.DataRecebimento == dataRecebimento));
     }
+
+    private (PedidoFornecedor Pedido, PedidoFornecedorItem Item) PedidoAbertoComUmItem(decimal quantidade)
+    {
+        var agora = new DateTime(2026, 11, 14, 12, 0, 0, DateTimeKind.Utc);
+        var pedidoId = Guid.NewGuid();
+        var item = new PedidoFornecedorItem
+        {
+            Id = Guid.NewGuid(), PedidoFornecedorId = pedidoId, ProdutoId = _produtoId, Nome = "Farinha",
+            Quantidade = quantidade, QuantidadeRecebida = 0, CustoUnitario = 5m, CriadoEm = agora
+        };
+        var pedido = new PedidoFornecedor
+        {
+            Id = pedidoId, EmpresaId = _empresaId, FornecedorId = _fornecedorId, DataPedido = agora,
+            Status = StatusPedidoFornecedor.Aberto, CriadoEm = agora, AlteradoEm = agora,
+            Fornecedor = new Fornecedor { Id = _fornecedorId, Nome = "Fornecedor", EmpresaId = _empresaId },
+            Itens = { item }
+        };
+        _pedidoRepository.GetByIdWithItensAsync(pedidoId, Arg.Any<CancellationToken>()).Returns(pedido);
+        return (pedido, item);
+    }
+
+    [Theory]
+    [InlineData(false)] // Itens vazio
+    [InlineData(true)]  // item informado com o mesmo total ja recebido
+    public async Task ExecuteAsync_SemNenhumDelta_NaoMudaStatusNemDataRecebimento(bool informaItem)
+    {
+        var (pedido, item) = PedidoAbertoComUmItem(10m);
+        var itens = informaItem
+            ? new Dictionary<Guid, decimal> { { item.Id, 0m } }
+            : new Dictionary<Guid, decimal>();
+
+        var resultado = await _useCase.ExecuteAsync(new ProcessarRecebimentoPedidoFornecedorCommand(
+            pedido.Id, _empresaId, null, itens));
+
+        resultado.ItensProcessados.Should().Be(0);
+        pedido.Status.Should().Be(StatusPedidoFornecedor.Aberto);
+        pedido.DataRecebimento.Should().BeNull();
+        await _pedidoRepository.DidNotReceive().UpdateAsync(Arg.Any<PedidoFornecedor>());
+        await _publicador.DidNotReceive().PublicarAsync(Arg.Any<PedidoFornecedorRecebido>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_QuantidadeFracionada_EntraNoEstoqueComoDecimal()
+    {
+        var (pedido, item) = PedidoAbertoComUmItem(3m);
+        _entradaUseCase.ExecuteAsync(Arg.Any<RegistrarEntradaEstoqueCommand>())
+            .Returns(new RegistrarEntradaEstoqueResult(Guid.NewGuid(), Guid.NewGuid(), "Descricao", "CHAVE"));
+
+        var resultado = await _useCase.ExecuteAsync(new ProcessarRecebimentoPedidoFornecedorCommand(
+            pedido.Id, _empresaId, null, new Dictionary<Guid, decimal> { { item.Id, 2.5m } }));
+
+        resultado.ItensProcessados.Should().Be(1);
+        await _entradaUseCase.Received(1).ExecuteAsync(
+            Arg.Is<RegistrarEntradaEstoqueCommand>(c => c.Quantidade == 2.5m));
+        item.QuantidadeRecebida.Should().Be(2.5m);
+        pedido.Status.Should().Be(StatusPedidoFornecedor.RecebidoParcial);
+    }
 }
