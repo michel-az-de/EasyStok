@@ -1,3 +1,4 @@
+using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -77,6 +78,10 @@ public class MobileSaleSyncService(
                 return false;
             }
 
+            // #1621: a venda entra no caixa no lugar do pagamento do pedido; sincronizada depois do fechamento do
+            // dia do aparelho, vale o instante do registro, como o pagamento e o lançamento (#2030).
+            var dataVenda = await InstanteNoCaixa.DoRegistroAsync(_db, order.EmpresaId.Value, order.UpdatedAt, order.LojaId);
+
             // Cria a Venda
             var vendaId = Guid.NewGuid();
             var venda = Venda.Criar(
@@ -84,7 +89,7 @@ public class MobileSaleSyncService(
                 empresaId: order.EmpresaId.Value,
                 canal: CanalVenda.Outro,
                 natureza: NaturezaMovimentacaoEstoque.Venda,
-                dataVenda: order.UpdatedAt,
+                dataVenda: dataVenda,
                 dataEnvio: null,
                 numeroNotaFiscal: null,
                 observacoes: $"Mobile · pedido #{order.Id.Substring(Math.Max(0, order.Id.Length - 8))} · {order.ClientSnapshotName}",

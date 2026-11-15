@@ -86,15 +86,9 @@ public class RegistrarMovimentoCaixaUseCase(
         const string diaFechado = "Caixa do dia já foi fechado. Lance em outra data ou faça estorno.";
 
         // O mobile promove fatos já registrados no device (sync): só a guarda de dia fechado, sem as de saída.
-        if (origem == "mobile")
-        {
-            await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, cmd.EmpresaId, dataMov, cmd.LojaId, diaFechado);
-            return await GravarAsync(cmd, tipo, origem, dataMov);
-        }
-
         // FIN-003: saída interativa exige rastro de auditoria e não pode estourar o saldo do dia — caixa físico não
         // fica negativo.
-        var saida = tipo == "saida";
+        var saida = origem != "mobile" && tipo == "saida";
         if (saida && string.IsNullOrWhiteSpace(cmd.Metodo))
             throw new UseCaseValidationException("Saída exige método (dinheiro, pix, cartão, etc.).");
         if (saida && string.IsNullOrWhiteSpace(cmd.Descricao))
@@ -102,6 +96,7 @@ public class RegistrarMovimentoCaixaUseCase(
 
         // #1547: duas saídas simultâneas liam o mesmo saldo e as duas passavam do teto. #2613: o fechamento toma a
         // mesma trava; a guarda de dia fechado só vale lida atrás dela, senão o lançamento cai depois do retrato.
+        // #2629: vale também para o sync do mobile.
         return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
         {
             await repo.TravarSaidasAsync(cmd.EmpresaId, cmd.LojaId, ct);

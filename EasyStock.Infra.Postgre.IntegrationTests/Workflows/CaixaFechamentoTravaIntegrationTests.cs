@@ -43,8 +43,10 @@ public sealed class CaixaFechamentoTravaIntegrationTests(PostgreSqlDatabaseFixtu
         esperouATrava.Should().BeTrue("o retrato do dia só sai depois de quem segura o caixa da loja");
     }
 
-    [SkippableFact]
-    public async Task Entrada_que_esperou_um_fechamento_e_recusada()
+    [SkippableTheory]
+    [InlineData("web")]
+    [InlineData("mobile")] // #2629: o sync do PWA também espera o fechamento em curso, não grava atrás do retrato.
+    public async Task Entrada_que_esperou_um_fechamento_e_recusada(string origem)
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var (empresaId, lojaId) = await SemearCaixaAbertoAsync();
@@ -58,7 +60,7 @@ public sealed class CaixaFechamentoTravaIntegrationTests(PostgreSqlDatabaseFixtu
 
         var entrada = Task.Run(() => Executar<RegistrarMovimentoCaixaUseCase>(provider, empresaId,
             uc => uc.ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 10m,
-                Descricao: "Troco", LojaId: lojaId, Metodo: "dinheiro"))));
+                Descricao: "Troco", LojaId: lojaId, Metodo: "dinheiro", Origem: origem))));
         var esperouATrava = await AlguemEsperaATravaAsync(entrada, empresaId, lojaId);
 
         segura.FechamentosCaixa.Add(FechamentoCaixa.Criar(empresaId, HorarioBrasil.Hoje(), 100m, 0m, 0m, 0m, 0m, lojaId));
