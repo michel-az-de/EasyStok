@@ -485,10 +485,10 @@ export function totaisDoFluxo(linhas) {
   return { entrou: soma('entrou'), saiu: soma('saiu'), saldo: soma('saldo') }
 }
 
-// O dia tem dinheiro para mostrar mesmo sem abertura? A rota do dia não devolve lançamento estornado:
-// dia cujo único lançamento foi estornado não tem movimento.
+// O dia tem dinheiro para mostrar mesmo sem abertura? A rota do dia devolve o lançamento estornado marcado
+// (A3, #1769): dia cujo único lançamento foi estornado não tem movimento.
 export const temMovimentoNoDia = (dia) =>
-  (dia?.movimentos ?? []).some((m) => m.tipo !== TIPOS_MOVIMENTO.ABERTURA && m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
+  (dia?.movimentos ?? []).some((m) => !m.estornadoEm && m.tipo !== TIPOS_MOVIMENTO.ABERTURA && m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
   || (dia?.linhasExtras ?? []).length > 0
   || [dia?.totalVendas, dia?.totalPagamentosPedidos, dia?.totalEntradasExtras, dia?.totalSaidasExtras].some((v) => centavos(v) !== 0)
 

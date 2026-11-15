@@ -6,7 +6,9 @@ import { normalizarMetodoCaixa } from '../../dominio/caixa'
 const BASE = '/api/caixa'
 
 // Sem data, a API devolve o dia de hoje da loja. Com data (#1624), o resumo daquele dia.
-export const obterCaixaDoDia = (data = null) => chamarApi(`${BASE}/dia${data ? `?data=${data}` : ''}`).then(caixaDiaDaApi)
+// A3 (#1769): pede também o lançamento estornado, que vem marcado e fora de todo total da API.
+export const obterCaixaDoDia = (data = null) =>
+  chamarApi(`${BASE}/dia?${data ? `data=${data}&` : ''}incluirEstornados=true`).then(caixaDiaDaApi)
 
 export const listarFechamentos = (quantos = 7) =>
   chamarApi(`${BASE}/fechamentos?page=1&pageSize=${quantos}`).then((itens) => (itens ?? []).map(fechamentoDaApi))

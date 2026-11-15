@@ -3,7 +3,7 @@ using EasyStock.Application.UseCases.Caixa;
 
 namespace EasyStock.Application.UseCases.ObterCaixaDia;
 
-public sealed record ObterCaixaDiaQuery(Guid EmpresaId, DateOnly Data, Guid? LojaId = null);
+public sealed record ObterCaixaDiaQuery(Guid EmpresaId, DateOnly Data, Guid? LojaId = null, bool IncluirEstornados = false);
 
 /// <summary>
 /// Resumo consolidado do caixa de um dia, mesmo que ainda não fechado.
@@ -42,7 +42,23 @@ public class ObterCaixaDiaUseCase(ICaixaSaldoCalculator calc, ICaixaRepository? 
             b.AberturaPendenteCrossDay, b.AbertoDesde, linhasExtras, b.PosFechamento,
             AberturaAConfirmar: b.Movimentos.Any(m => m.Tipo == "abertura" && m.EstornadoEm == null && m.ConfirmacaoPendente));
 
-        return await ComGavetaEntreDiasAsync(dia, b, q);
+        var comGaveta = await ComGavetaEntreDiasAsync(dia, b, q);
+        return q.IncluirEstornados ? await ComEstornadosAsync(comGaveta, b, q) : comGaveta;
+    }
+
+    /// <summary>
+    /// A3 (#1769): o lançamento estornado volta à lista marcado ("Estornado por X · motivo"), DEPOIS de todo número
+    /// do dia estar calculado: nenhum total, gaveta ou saldo o vê. Só sob pedido, porque quem confere a lista
+    /// (estorno duplo, tela do Web) conta com ela sem estornados. Mesma janela e mesmo corte do dia fechado (#2082 D9).
+    /// </summary>
+    private async Task<CaixaDiaResult> ComEstornadosAsync(CaixaDiaResult dia, CaixaSaldoBreakdown b, ObterCaixaDiaQuery q)
+    {
+        if (repo is null) return dia;
+        var fimDoDia = HorarioBrasil.JanelaDiaUtc(b.Data).FimUtc;
+        var estornados = (await repo.GetMovimentosEstornadosNoIntervaloAsync(q.EmpresaId, b.JanelaInicioUtc, fimDoDia, q.LojaId))
+            .Where(m => b.Fechamento is not { } f || m.Tipo is not ("entrada" or "saida") || m.DataMovimento <= f.FechadoEm)
+            .Select(AbrirCaixaUseCase.Map);
+        return dia with { Movimentos = [.. dia.Movimentos.Concat(estornados).OrderBy(m => m.DataMovimento)] };
     }
 
     /// <summary>

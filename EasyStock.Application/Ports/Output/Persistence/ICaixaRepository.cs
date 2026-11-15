@@ -23,6 +23,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// Base cross-day: agrega a sessão de caixa que pode atravessar a meia-noite BRT.</summary>
         Task<IEnumerable<MovimentoCaixa>> GetMovimentosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
 
+        /// <summary>A3 (#1769): só os movimentos ESTORNADOS lançados em [iniUtc, fimUtc), para a lista do dia mostrar
+        /// "Estornado por X". Nunca entram em total; os totais seguem em <see cref="GetMovimentosNoIntervaloAsync"/>.</summary>
+        Task<IReadOnlyList<MovimentoCaixa>> GetMovimentosEstornadosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
+
         /// <summary>Última abertura sem fechamento posterior (sessão em aberto, possivelmente de um
         /// dia anterior). Null se o último evento abertura/fechamento foi um fechamento. Espelha a
         /// lógica de "último evento" do dashboard (AnalyticsRepository.ResumoDia) — issue #596.</summary>
