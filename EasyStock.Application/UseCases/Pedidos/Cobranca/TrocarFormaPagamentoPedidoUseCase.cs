@@ -132,16 +132,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         flags is not null && lojas is not null
         && (await flags.ListarAtivasAsync(empresaId, ct)).Contains(FeatureCatalogo.PagamentoPixDireto);
 
-    /// <summary>Recebedor da loja do pedido; sem loja no pedido, o da única loja da empresa com chave.</summary>
-    private async Task<RecebedorPix?> RecebedorAsync(PedidoEntity pedido)
-    {
-        if (lojas is null) return null;
-        if (pedido.LojaId is { } lojaId)
-            return (await lojas.GetByIdAsync(pedido.EmpresaId, lojaId))?.ObterRecebedorPix();
-        var comChave = (await lojas.GetByEmpresaAsync(pedido.EmpresaId))
-            .Select(l => l.ObterRecebedorPix()).OfType<RecebedorPix>().ToList();
-        return comChave.Count == 1 ? comChave[0] : null;
-    }
+    private Task<RecebedorPix?> RecebedorAsync(PedidoEntity pedido) =>
+        PixDiretoDoPedido.RecebedorAsync(lojas, pedido.EmpresaId, pedido.LojaId);
 
     public const string MensagemLinkPendente = "Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.";
 

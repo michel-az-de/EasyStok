@@ -22,6 +22,17 @@ public static class PixDiretoDoPedido
     public static string CopiaECola(RecebedorPix recebedor, Guid pedidoId, decimal valorDoPix) =>
         BrCodePix.Estatico(recebedor, valorDoPix, BrCodePix.TxidDoPedido(pedidoId));
 
+    /// <summary>Recebedor da loja do pedido; sem loja no pedido, o da única loja da empresa com chave.</summary>
+    public static async Task<RecebedorPix?> RecebedorAsync(ILojaRepository? lojas, Guid empresaId, Guid? lojaId)
+    {
+        if (lojas is null) return null;
+        if (lojaId is { } id)
+            return (await lojas.GetByIdAsync(empresaId, id))?.ObterRecebedorPix();
+        var comChave = (await lojas.GetByEmpresaAsync(empresaId))
+            .Select(l => l.ObterRecebedorPix()).OfType<RecebedorPix>().ToList();
+        return comChave.Count == 1 ? comChave[0] : null;
+    }
+
     /// <summary>Mensagem ao cliente com o valor, o recebedor e o copia e cola da cobrança.</summary>
     public static string Texto(CobrancaPedido cobranca, RecebedorPix recebedor, decimal valorDoPix) =>
         AvisoCobrancaConversa.TextoPixDireto(valorDoPix, cobranca.Valor - valorDoPix, cobranca.PixCopiaCola!, recebedor.Nome);

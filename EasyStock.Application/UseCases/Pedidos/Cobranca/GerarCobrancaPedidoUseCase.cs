@@ -48,6 +48,10 @@ public sealed record CobrancaPedidoResult(
     [System.Text.Json.Serialization.JsonIgnore]
     public string? TextoPix { get; init; }
 
+    /// <summary>#2684: o Pix direto pendente caiu porque a loja ficou sem chave; a cobrança voltou para a entrega.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool PixDiretoSemChave { get; init; }
+
     public static CobrancaPedidoResult De(CobrancaPedido c, bool reutilizada = false) =>
         new(c.Id, c.PedidoId, c.Provedor, c.Status.ToString(), c.LinkPagamento, c.Valor, c.ExpiraEm, c.Tentativa, reutilizada)
         {
@@ -203,6 +207,16 @@ public sealed class GerarCobrancaPedidoUseCase(
             var temSinal = PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm);
             if (recebedor is not null && (dados.NaEntregaSemProvedor || temSinal))
                 return await PixDiretoAsync(pendente, dados, recebedor, conversaId, agora, ct);
+            // A alteração da comanda sem chave na loja: o código velho cobra o valor antigo; a diferença fica na entrega.
+            if (recebedor is null && dados.NaEntregaSemProvedor)
+            {
+                pendente.Cancelar(MotivoValorAlterado, agora);
+                var naEntrega = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId, dados.Total - dados.Alocado,
+                    agora, conversaId ?? pendente.ConversaId);
+                await cobrancaRepository.AddAsync(naEntrega, ct);
+                await unitOfWork.CommitAsync();
+                return CobrancaPedidoResult.De(naEntrega) with { PixDiretoSemChave = true };
+            }
             // Sem chave na loja, a encomenda segue a cobrança manual de sempre (abaixo); o resto é pedido de link.
             if (recebedor is not null || !temSinal)
                 throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.FormaPixDireto,
@@ -357,10 +371,8 @@ public sealed class GerarCobrancaPedidoUseCase(
         return CobrancaPedidoResult.De(nova) with { TextoPix = PixDiretoDoPedido.Texto(nova, recebedor, valorDoPix) };
     }
 
-    private async Task<RecebedorPix?> RecebedorPixAsync(DadosCobranca dados) =>
-        lojas is not null && dados.LojaId is { } lojaId
-            ? (await lojas.GetByIdAsync(dados.EmpresaId, lojaId))?.ObterRecebedorPix()
-            : null;
+    private Task<RecebedorPix?> RecebedorPixAsync(DadosCobranca dados) =>
+        PixDiretoDoPedido.RecebedorAsync(lojas, dados.EmpresaId, dados.LojaId);
 
     private sealed record DadosCobranca(
         Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,

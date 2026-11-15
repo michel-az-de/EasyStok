@@ -145,8 +145,12 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
                 UsuarioId = input.UsuarioId == Guid.Empty ? null : input.UsuarioId, UsuarioNome = input.UsuarioNome,
                 Origem = "comanda_cliente", OcorridoEm = agora, Detalhes = $"Antes: {historico}. Total: {novoTotal}. Link: {link.Id}. {statusAnterior} -> {pedido.Status}" });
             var naEntrega = false;
+            CobrancaPedido? pixDireto = null;
             foreach (var c in (await cobrancas.ListarDoPedidoAsync(input.EmpresaId, pedido.Id, t)).Where(c => c.EstaPendente))
             {
+                // #2684: combinado para Pix na chave da loja, o pedido segue no Pix; a cobrança depois do commit
+                // reaproveita o código ou gera outro com o saldo novo.
+                if (c.EhPixDireto) { pixDireto = c; continue; }
                 c.Cancelar(GerarCobrancaPedidoUseCase.MotivoValorAlterado, agora);
                 // #1717-8: o link cancelado para de aceitar pagamento no provedor depois do commit.
                 if (c.EhOnline && c.ReferenciaExterna is { } preferencia) substituidas.Add(preferencia);
@@ -183,6 +187,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
             }
             var cupomAplicado = await comanda.AplicarCupomAsync(pedido, dados.CodigoCupom, t);
             var saldo = pedido.Total.Valor - (await saldos.ConsultarAsync(pedido, t)).Alocado;
+            // Sem saldo, ou com a diferença na entrega, nenhum Pix com o valor velho fica vivo.
+            if (saldo <= 0 || naEntrega) pixDireto?.Cancelar(GerarCobrancaPedidoUseCase.MotivoValorAlterado, agora);
             if (saldo > 0 && !naEntrega)
             {
                 // #1725-6: a cobrança sai depois do commit, sem o link travado durante a chamada ao provedor. Até lá, outro
@@ -275,11 +281,17 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
                 var saldo = pedido is null ? 0 : pedido.Total.Valor - (await saldos.ConsultarAsync(pedido, t)).Alocado;
                 avisarCliente = pedido is not null && !PedidoStateMachine.EstaFinalizado(pedido.StatusEnum);
                 resposta = saldo > 0 ? resposta with { Saldo = saldo } : resposta with { Situacao = "alteracao_confirmada", Saldo = 0 };
+                // #2684: o Pix direto mantido na alteração cobra o valor antigo; sem cobrança nova, ele cai.
+                foreach (var pix in (await cobrancas.ListarDoPedidoAsync(input.EmpresaId, provisorio.PedidoId, t)).Where(c => c.EstaPendente && c.EhPixDireto))
+                    pix.Cancelar(GerarCobrancaPedidoUseCase.MotivoValorAlterado, agora);
                 if (saldo > 0 || !avisarCliente)
                     await AvisarEquipeAsync(input, avisarCliente
                         ? $"A cobrança da alteração da comanda não saiu: faltam {saldo.ToString("C", Cultura.PtBr)}. Use Link de pagamento na Ficha."
                         : "A alteração da comanda foi aplicada, mas o pedido foi encerrado antes da cobrança. Confira o pedido na Ficha.", agora, t);
             }
+            else if (cobranca is { PixDiretoSemChave: true })
+                await AvisarEquipeAsync(input, $"A loja está sem chave Pix cadastrada: o Pix direto da alteração da comanda foi cancelado e " +
+                    $"{cobranca.Valor.ToString("C", Cultura.PtBr)} ficam para receber na entrega. Cadastre a chave em Integrações ou use Link de pagamento na Ficha.", agora, t);
             else if (cobranca?.Provedor == CobrancaPedido.ProvedorNaEntrega)
                 await AvisarEquipeAsync(input, $"Link do Mercado Pago indisponível na alteração da comanda: {cobranca.Valor.ToString("C", Cultura.PtBr)} " +
                     "ficam para receber na entrega. Para mandar um link, use Link de pagamento na Ficha.", agora, t);
