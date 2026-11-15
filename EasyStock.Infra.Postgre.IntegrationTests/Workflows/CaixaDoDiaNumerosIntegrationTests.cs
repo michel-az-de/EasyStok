@@ -233,6 +233,137 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         caixa.TotalPagamentosPedidos.Should().Be(linhas.Sum(l => l.Valor), "as linhas continuam somando o total do dia");
     }
 
+    [SkippableFact]
+    public async Task Sinal_fica_no_dia_em_que_entrou_e_a_entrega_pelo_PWA_traz_so_o_restante()
+    {
+        // #2708 (2b da #1630): sinal de 30 no dia D; o PWA entrega em D+3 e cria a Venda de 100 ligada ao pedido. Como o
+        // pedido já tinha pagamento, a entrega não grava recebimento do restante. Antes, o filtro VendaId == null tirava o
+        // sinal de D e a venda inteira caía em D+3. Regra: o sinal fica em D, D+3 mostra só os 70, e a soma é 100.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var sinalEm = entregaEm.AddDays(-3);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, "pix");
+        var pedido = NovoPedidoComPagamento(empresaId, 7, "Ana", 30m, "pix", "Joana", sinalEm);
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var diaDoSinal = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(sinalEm))));
+        var diaDaEntrega = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
+
+        var recebidoNoSinal = diaDoSinal.TotalVendas + diaDoSinal.TotalPagamentosPedidos;
+        var recebidoNaEntrega = diaDaEntrega.TotalVendas + diaDaEntrega.TotalPagamentosPedidos;
+        recebidoNoSinal.Should().Be(30m, "o sinal conta no dia em que o dinheiro entrou e não sai mais de lá");
+        recebidoNaEntrega.Should().Be(70m, "no dia da entrega entra só o restante");
+        (recebidoNoSinal + recebidoNaEntrega).Should().Be(100m, "a venda não dobra nem some na soma do período");
+        diaDoSinal.LinhasExtras!.Sum(l => l.Valor).Should().Be(recebidoNoSinal, "as linhas do dia do sinal somam o total");
+        diaDaEntrega.LinhasExtras!.Sum(l => l.Valor).Should().Be(recebidoNaEntrega, "as linhas do dia da entrega somam o total");
+    }
+
+    [SkippableFact]
+    public async Task Restante_pago_em_dinheiro_na_entrega_entra_na_gaveta_so_pelo_que_falta()
+    {
+        // #2708 (b): sinal de 30 em Pix no dia D; o restante é pago em dinheiro na entrega em D+3, e o PWA grava a Venda
+        // com a forma da entrega. A gaveta de D não ganha nada; a de D+3 ganha os 70, não os 100. O Pix fica no dia D.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var sinalEm = entregaEm.AddDays(-3);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
+        var pedido = NovoPedidoComPagamento(empresaId, 9, "Cida", 30m, "pix", "Joana", sinalEm);
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var diaDoSinal = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(sinalEm))));
+        var diaDaEntrega = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
+
+        (GavetaCaixa.DinheiroNaGaveta(diaDoSinal) - diaDoSinal.SaldoInicial).Should().Be(0m, "o sinal foi em Pix");
+        diaDoSinal.LinhasExtras!.Where(l => l.Metodo == "pix").Sum(l => l.Valor).Should().Be(30m);
+        (GavetaCaixa.DinheiroNaGaveta(diaDaEntrega) - diaDaEntrega.SaldoInicial).Should().Be(70m,
+            "na entrega entrou em dinheiro só o que faltava");
+        diaDaEntrega.LinhasExtras!.Where(l => l.Metodo == "pix").Sum(l => l.Valor).Should().Be(0m);
+    }
+
+    [SkippableFact]
+    public async Task Restante_ja_gravado_na_entrega_nao_soma_com_a_venda_abatida()
+    {
+        // #2708 + #2711: quando a entrega passar a gravar o recebimento do restante (70, em D+1, mesmo dia da Venda),
+        // ele é representado pela venda abatida e não soma por cima dela. Nunca 130 nem 170.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var sinalEm = entregaEm.AddDays(-1);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
+        var pedido = NovoPedidoComPagamento(empresaId, 11, "Eva", 30m, "pix", "Joana", sinalEm);
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Valor = 70m, Metodo = "dinheiro",
+            PagoEm = entregaEm, RegistradoPorNome = "Joana" });
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var diaDoSinal = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(sinalEm))));
+        var diaDaEntrega = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
+
+        var recebidoNoSinal = diaDoSinal.TotalVendas + diaDoSinal.TotalPagamentosPedidos;
+        var recebidoNaEntrega = diaDaEntrega.TotalVendas + diaDaEntrega.TotalPagamentosPedidos;
+        recebidoNoSinal.Should().Be(30m);
+        recebidoNaEntrega.Should().Be(70m, "a venda abatida já representa o restante recebido no dia");
+        (recebidoNoSinal + recebidoNaEntrega).Should().Be(100m);
+        diaDaEntrega.LinhasExtras!.Sum(l => l.Valor).Should().Be(recebidoNaEntrega);
+        (GavetaCaixa.DinheiroNaGaveta(diaDaEntrega) - diaDaEntrega.SaldoInicial).Should().Be(70m);
+    }
+
+    [SkippableFact]
+    public async Task Sinal_e_entrega_no_mesmo_dia_contam_o_total_uma_vez()
+    {
+        // #926, guarda da #2708: sinal de 30 e entrega pelo PWA no mesmo dia operacional. A venda de 100 representa o
+        // dia inteiro; o sinal não soma por cima dela nem é abatido dela.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var sinalEm = entregaEm.AddSeconds(-20);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, "pix");
+        var pedido = NovoPedidoComPagamento(empresaId, 10, "Duda", 30m, "pix", "Joana", sinalEm);
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
+
+        (caixa.TotalVendas + caixa.TotalPagamentosPedidos).Should().Be(100m, "o total da venda conta uma vez");
+        caixa.LinhasExtras!.Sum(l => l.Valor).Should().Be(100m);
+    }
+
+    [SkippableFact]
+    public async Task Pedido_sem_sinal_entregue_pelo_PWA_conta_uma_vez_no_dia_da_entrega()
+    {
+        // #926, guarda da #2708: sem sinal, a entrega grava o recebimento de 100 e a Venda de 100 ligada ao pedido.
+        // O dinheiro conta uma vez só.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, "pix");
+        var pedido = NovoPedidoComPagamento(empresaId, 8, "Bia", 100m, "pix", "Joana", entregaEm);
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
+
+        (caixa.TotalVendas + caixa.TotalPagamentosPedidos).Should().Be(100m);
+        caixa.LinhasExtras!.Sum(l => l.Valor).Should().Be(100m);
+    }
+
     private static Pedido NovoPedidoComPagamento(Guid empresaId, int? numeroDoDia, string? cliente, decimal valor, string metodo,
         string? registradoPor, DateTime pagoEm)
     {

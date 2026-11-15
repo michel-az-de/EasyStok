@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Infra.Postgre.Repositories
 {
@@ -212,11 +213,12 @@ namespace EasyStock.Infra.Postgre.Repositories
                             && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
 
-            // Projeta so a coluna ValorTotal (VO Dinheiro via HasConversion — o EF nao
+            // Projeta so Id, DataVenda e ValorTotal (VO Dinheiro via HasConversion — o EF nao
             // traduz Sum() sobre VO-com-converter, entao a soma fica em memoria, mas o
             // SELECT deixa de trazer a entidade Venda inteira). Antes: SELECT * + materializa Venda.
-            var valores = await q.Select(v => v.ValorTotal).ToListAsync();
-            var bruto = valores.Sum(v => v == null ? 0m : v.Valor);
+            var vendas = await q.Select(v => new { v.Id, v.DataVenda, v.ValorTotal }).ToListAsync();
+            var recebidoAntes = await RecebidoEmOutroDiaPorVendaAsync(empresaId, vendas.Select(v => (v.Id, v.DataVenda)).ToList());
+            var bruto = vendas.Sum(v => ValorNoCaixa(v.ValorTotal == null ? 0m : v.ValorTotal.Valor, recebidoAntes.GetValueOrDefault(v.Id)));
 
             var estornados = await SaidasDeVendaEstornadasNoIntervalo(empresaId, iniUtc, fimUtc, lojaId)
                 .Select(m => m.ValorTotal).ToListAsync();
@@ -247,28 +249,61 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalPagamentosPedidosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
-            // pg.Valor e decimal simples -> SumAsync agrega no proprio Postgres (antes:
-            // materializava a lista de pagamentos do intervalo e somava em memoria).
-            return await db.Set<PedidoPagamento>().AsNoTracking()
-                .Where(pg => pg.PagoEm >= iniUtc && pg.PagoEm < fimUtc)
+            // #2708: o filtro do dia da Venda (RecebidoNoDiaDaVenda) e por dia operacional de Brasilia, entao a
+            // soma fica em memoria sobre Valor, PagoEm e DataVenda do intervalo (poucas linhas por dia).
+            var recebimentos = await PagamentosQueContam(empresaId, lojaId)
+                .Where(x => x.Pagamento.PagoEm >= iniUtc && x.Pagamento.PagoEm < fimUtc)
+                .Select(x => new { x.Pagamento.Valor, x.Pagamento.PagoEm, DataVenda = db.Vendas.Where(v => v.Id == x.Pedido.VendaId).Select(v => (DateTime?)v.DataVenda).FirstOrDefault() })
+                .ToListAsync();
+            return recebimentos.Where(r => !RecebidoNoDiaDaVenda(r.PagoEm, r.DataVenda)).Sum(r => r.Valor);
+        }
+
+        // Recebimentos de pedido que movem o caixa. Cancelar a operação não devolve dinheiro. Só sai do saldo
+        // quando o legado já retirou o recebimento. Estorno com ledger mantém receita e saída.
+        private IQueryable<PagamentoDoPedido> PagamentosQueContam(Guid empresaId, Guid? lojaId) =>
+            db.Set<PedidoPagamento>().AsNoTracking()
                 .Join(db.Pedidos.AsNoTracking(),
                       pg => pg.PedidoId,
                       p => p.Id,
-                      (pg, p) => new { pg, p })
-                .Where(x => x.p.EmpresaId == empresaId
-                         // Cancelar a operação não devolve dinheiro. Só sai do saldo quando
-                         // o legado já retirou o recebimento. Estorno com ledger mantém receita e saída.
+                      (pg, p) => new PagamentoDoPedido { Pagamento = pg, Pedido = p })
+                .Where(x => x.Pedido.EmpresaId == empresaId
                          && !db.Set<CobrancaPedido>().Any(c => c.EmpresaId == empresaId
-                             && c.PedidoId == x.p.Id && c.Status == StatusCobrancaPedido.Estornada
-                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia
+                             && c.PedidoId == x.Pedido.Id && c.Status == StatusCobrancaPedido.Estornada
+                             && x.Pagamento.Referencia != null && c.PagamentoExternoId == x.Pagamento.Referencia
                              && !db.Set<PedidoEstornoOnline>().Any(e => e.EmpresaId == empresaId
-                                 && e.PagamentoId == x.pg.Id && e.Situacao == PedidoEstornoOnline.Confirmado))
-                         // So pedidos SEM Venda consolidada (balcao/web tem so PedidoPagamento).
-                         // Pedido mobile entregue gera Venda (VendaId setado) e ja e contado por
-                         // GetTotalVendas — sem este filtro o mesmo dinheiro somava 2x no caixa (#926).
-                         && x.p.VendaId == null
-                         && (lojaId == null || x.p.LojaId == lojaId))
-                .SumAsync(x => (decimal?)x.pg.Valor) ?? 0m;
+                                 && e.PagamentoId == x.Pagamento.Id && e.Situacao == PedidoEstornoOnline.Confirmado))
+                         && (lojaId == null || x.Pedido.LojaId == lojaId));
+
+        private sealed class PagamentoDoPedido
+        {
+            public PedidoPagamento Pagamento { get; init; } = null!;
+            public Pedido Pedido { get; init; } = null!;
+        }
+
+        // #926 e #2708: pedido entregue pelo PWA vira Venda (Pedido.VendaId) com o total do pedido. Recebimento do
+        // mesmo dia operacional fica representado pela Venda (senão o dinheiro contava 2x). Recebimento de outro dia,
+        // como o sinal pago antes da entrega, conta no dia em que entrou e a Venda entra abatida dele, então a soma
+        // do período é o total da venda, sem dobrar nem sumir.
+        private static bool RecebidoNoDiaDaVenda(DateTime pagoEm, DateTime? dataVenda) =>
+            dataVenda is { } dv && HorarioBrasil.DataOperacional(pagoEm) == HorarioBrasil.DataOperacional(dv);
+
+        private static decimal ValorNoCaixa(decimal valorDaVenda, decimal recebidoEmOutroDia) =>
+            Math.Max(0m, valorDaVenda - recebidoEmOutroDia);
+
+        private async Task<Dictionary<Guid, decimal>> RecebidoEmOutroDiaPorVendaAsync(
+            Guid empresaId, IReadOnlyList<(Guid Id, DateTime DataVenda)> vendas)
+        {
+            if (vendas.Count == 0) return [];
+            var ids = vendas.Select(v => v.Id).ToList();
+            var recebimentos = await PagamentosQueContam(empresaId, null)
+                .Where(x => x.Pedido.VendaId != null && ids.Contains(x.Pedido.VendaId.Value))
+                .Select(x => new { VendaId = x.Pedido.VendaId!.Value, x.Pagamento.PagoEm, x.Pagamento.Valor })
+                .ToListAsync();
+            var dataDaVenda = vendas.ToDictionary(v => v.Id, v => v.DataVenda);
+            return recebimentos
+                .Where(r => !RecebidoNoDiaDaVenda(r.PagoEm, dataDaVenda[r.VendaId]))
+                .GroupBy(r => r.VendaId)
+                .ToDictionary(g => g.Key, g => g.Sum(r => r.Valor));
         }
 
         // ── Linhas para a lista "Movimentos do dia" (BUG-5) ───────────
@@ -281,34 +316,35 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(v => v.EmpresaId == empresaId && v.Natureza == NaturezaMovimentacaoEstoque.Venda
                             && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
-            return await q.OrderBy(v => v.DataVenda).ToListAsync();
+            var vendas = await q.OrderBy(v => v.DataVenda).ToListAsync();
+            // #2708: a linha leva o que a venda pôs no caixa naquele dia, igual ao total. A venda já paga
+            // inteira antes (sinal do valor todo) não vira linha de zero. Entidades sem rastreio: nada é gravado.
+            var recebidoAntes = await RecebidoEmOutroDiaPorVendaAsync(empresaId, vendas.Select(v => (v.Id, v.DataVenda)).ToList());
+            if (recebidoAntes.Count == 0) return vendas;
+            var linhas = new List<Venda>(vendas.Count);
+            foreach (var venda in vendas)
+            {
+                if (!recebidoAntes.TryGetValue(venda.Id, out var antes)) { linhas.Add(venda); continue; }
+                var noCaixa = ValorNoCaixa(venda.ValorTotal?.Valor ?? 0m, antes);
+                if (noCaixa == 0m) continue;
+                venda.ValorTotal = Dinheiro.FromDecimal(noCaixa);
+                linhas.Add(venda);
+            }
+            return linhas;
         }
 
         public async Task<IReadOnlyList<PedidoPagamento>> GetPagamentosPedidosListaNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
             // #2082 B16: o mesmo SELECT traz o pedido de cada pagamento (a linha do caixa mostra o número do dia e o
             // cliente), em vez de um GetById por linha.
-            var linhas = await db.Set<PedidoPagamento>().AsNoTracking()
-                .Where(pg => pg.PagoEm >= iniUtc && pg.PagoEm < fimUtc)
-                .Join(db.Pedidos.AsNoTracking(),
-                      pg => pg.PedidoId,
-                      p => p.Id,
-                      (pg, p) => new { pg, p })
-                .Where(x => x.p.EmpresaId == empresaId
-                         && !db.Set<CobrancaPedido>().Any(c => c.EmpresaId == empresaId
-                             && c.PedidoId == x.p.Id && c.Status == StatusCobrancaPedido.Estornada
-                             && x.pg.Referencia != null && c.PagamentoExternoId == x.pg.Referencia
-                             && !db.Set<PedidoEstornoOnline>().Any(e => e.EmpresaId == empresaId
-                                 && e.PagamentoId == x.pg.Id && e.Situacao == PedidoEstornoOnline.Confirmado))
-                         // Mesmo filtro do total (#926): exclui pagamentos de pedidos com Venda
-                         // consolidada, para a soma das linhas exibidas casar com o SaldoEsperado.
-                         && x.p.VendaId == null
-                         && (lojaId == null || x.p.LojaId == lojaId))
-                .OrderBy(x => x.pg.PagoEm)
-                .Select(x => new { x.pg, x.p })
+            // Mesma seleção do total (#926/#2708), para a soma das linhas exibidas casar com o SaldoEsperado.
+            var linhas = await PagamentosQueContam(empresaId, lojaId)
+                .Where(x => x.Pagamento.PagoEm >= iniUtc && x.Pagamento.PagoEm < fimUtc)
+                .OrderBy(x => x.Pagamento.PagoEm)
+                .Select(x => new { x.Pagamento, x.Pedido, DataVenda = db.Vendas.Where(v => v.Id == x.Pedido.VendaId).Select(v => (DateTime?)v.DataVenda).FirstOrDefault() })
                 .ToListAsync();
-            foreach (var linha in linhas) linha.pg.Pedido = linha.p;
-            return linhas.Select(l => l.pg).ToList();
+            foreach (var linha in linhas) linha.Pagamento.Pedido = linha.Pedido;
+            return linhas.Where(l => !RecebidoNoDiaDaVenda(l.Pagamento.PagoEm, l.DataVenda)).Select(l => l.Pagamento).ToList();
         }
 
         // #1630-4: uma linha por venda estornada, na forma da venda, para a soma das linhas por forma

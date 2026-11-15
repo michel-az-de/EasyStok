@@ -112,7 +112,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         // ── Linhas para a lista "Movimentos do dia" (BUG-5) ───────────
         /// <summary>Vendas (não-canceladas) de um intervalo [iniUtc, fimUtc) — para listar como
         /// linhas no caixa. Mesma seleção de <see cref="GetTotalVendasNoIntervaloAsync"/>, então a
-        /// soma das linhas == total que entra no saldo.</summary>
+        /// soma das linhas == total que entra no saldo. #2708: venda de pedido com recebimento de outro dia
+        /// (sinal) vem com <c>ValorTotal</c> abatido desse recebimento, e a já paga inteira antes não vem.</summary>
         Task<IReadOnlyList<Venda>> GetVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
 
         /// <summary>Pagamentos de pedidos não-cancelados de um intervalo [iniUtc, fimUtc) — para
