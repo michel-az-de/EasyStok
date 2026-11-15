@@ -23,6 +23,7 @@ Get-BuildOutDirOrfas -- pastas de build que nenhum worktree vivo usa mais (issue
 O #1117 deu uma pasta por worktree, mas nada a apaga quando o worktree sai: em 15/11 eram
 364 pastas e 54,8 GB no %TEMP%. Orfa = hash que nao bate com nenhum `git worktree list` do
 repo E sem escrita ha mais de $Horas horas (folga para um gate de outro clone em andamento).
+Juncao ou link no topo do TEMP nunca e orfa: apagar seguiria para o alvo.
 So lista; quem apaga e o limpar-build-orfao.ps1 com -Apagar.
 #>
 function Get-BuildOutDirOrfas([string]$RepoRoot, [int]$Horas = 24) {
@@ -34,6 +35,7 @@ function Get-BuildOutDirOrfas([string]$RepoRoot, [int]$Horas = 24) {
     $limite = (Get-Date).AddHours(-$Horas)
     Get-ChildItem -LiteralPath $env:TEMP -Directory -Filter 'easystok-build-check-*' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match '^easystok-build-check-[0-9a-f]{8}$' } |
+        Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
         Where-Object { -not $vivas.ContainsKey($_.FullName.ToLowerInvariant()) } |
         Where-Object { $_.LastWriteTime -lt $limite }
 }

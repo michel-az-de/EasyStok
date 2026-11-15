@@ -51,7 +51,27 @@ try {
     & $script -RepoRoot $repoRoot -Apagar 6>$null | Out-Null
     Confere 'com -Apagar a orfa antiga some' { -not (Test-Path $antiga) }
     Confere 'com -Apagar a viva, a recente e a de outro nome ficam' { (Test-Path $viva) -and (Test-Path $recente) -and (Test-Path $outra) }
+
+    # Juncao: nunca seguir. Alvos ficam FORA do TEMP isolado da poda, mas dentro da pasta da prova.
+    $fora = Join-Path $isolado 'fora'
+    $alvoTopo   = NovaPasta (Join-Path $fora 'alvo-topo') 72
+    $alvoDentro = NovaPasta (Join-Path $fora 'alvo-dentro') 72
+    $env:TEMP = Join-Path $isolado 'temp-juncao'
+    New-Item -ItemType Directory -Path $env:TEMP | Out-Null
+    $juncaoTopo = Join-Path $env:TEMP 'easystok-build-check-0badf00d'
+    New-Item -ItemType Junction -Path $juncaoTopo -Target $alvoTopo | Out-Null
+    $orfaComJuncao = NovaPasta (Join-Path $env:TEMP 'easystok-build-check-feedface') 0
+    New-Item -ItemType Junction -Path (Join-Path $orfaComJuncao 'link') -Target $alvoDentro | Out-Null
+
+    $listadas = @(& $script -RepoRoot $repoRoot -Horas 0 6>$null | ForEach-Object { $_.Path })
+    Confere 'juncao no topo do TEMP nao e listada' { $listadas -notcontains $juncaoTopo }
+    & $script -RepoRoot $repoRoot -Horas 0 -Apagar 6>$null | Out-Null
+    Confere 'juncao no topo fica e o alvo dela fica intacto' { (Test-Path $juncaoTopo) -and (Test-Path (Join-Path $alvoTopo 'EasyStock.Domain.dll')) }
+    Confere 'orfa com juncao dentro some sem apagar o alvo da juncao' { (-not (Test-Path $orfaComJuncao)) -and (Test-Path (Join-Path $alvoDentro 'EasyStock.Domain.dll')) }
 } finally {
+    Get-ChildItem -LiteralPath $isolado -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint } |
+        ForEach-Object { [IO.Directory]::Delete($_.FullName) }
     $env:TEMP = $tempOriginal
     Remove-Item -LiteralPath $isolado -Recurse -Force -ErrorAction SilentlyContinue
 }

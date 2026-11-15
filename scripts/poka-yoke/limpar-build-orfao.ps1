@@ -3,7 +3,8 @@ limpar-build-orfao -- poda as pastas de build do gate que ficaram sem worktree (
 
 Cada worktree compila em %TEMP%\easystok-build-check-<hash> (issue 1117) e a pasta fica para
 tras quando o worktree e removido. Por padrao SO LISTA (quantidade e GB). Apaga so com -Apagar.
-Nunca toca a pasta de um worktree vivo nem orfa com escrita nas ultimas -Horas horas.
+Nunca toca a pasta de um worktree vivo, orfa com escrita nas ultimas -Horas horas nem juncao/link
+no topo do TEMP; juncao dentro de uma orfa e removida sem apagar o alvo.
 
 Uso: powershell -File scripts/poka-yoke/limpar-build-orfao.ps1 [-Horas 24] [-Apagar]
 #>
@@ -15,10 +16,20 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'build-out-dir.ps1')
 
+# Soma o tamanho sem entrar em juncao ou link (o alvo nao e da pasta).
+function Get-TamanhoSemSeguir([string]$Pasta) {
+    $total = [int64]0
+    foreach ($item in (Get-ChildItem -LiteralPath $Pasta -Force -ErrorAction SilentlyContinue)) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+        if ($item.PSIsContainer) { $total += Get-TamanhoSemSeguir $item.FullName } else { $total += $item.Length }
+    }
+    $total
+}
+
 $orfas = @(Get-BuildOutDirOrfas $RepoRoot $Horas)
 $bytes = 0
 foreach ($p in $orfas) {
-    $tam = (Get-ChildItem -LiteralPath $p.FullName -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+    $tam = Get-TamanhoSemSeguir $p.FullName
     $bytes += [int64]$tam
     [PSCustomObject]@{ Path = $p.FullName; MB = [math]::Round($tam / 1MB); UltimaEscrita = $p.LastWriteTime }
 }
