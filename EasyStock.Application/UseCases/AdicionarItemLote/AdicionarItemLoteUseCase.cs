@@ -17,6 +17,7 @@ public sealed record AdicionarItemLoteCommand(
 
 public class AdicionarItemLoteUseCase(
     ILoteRepository repo,
+    IProdutoRepository produtoRepo,
     IUnitOfWork uow,
     ILogger<AdicionarItemLoteUseCase> logger)
 {
@@ -31,6 +32,13 @@ public class AdicionarItemLoteUseCase(
         if (lote == null) return null;
         if (lote.EstaFinalizado)
             throw new UseCaseValidationException("Não é permitido alterar itens de lote finalizado.");
+
+        // #2605: mesmas regras do CriarLote (R1, R5/RDC 727) mais faixas de peso e validade.
+        var tipoEmbalagemMap = cmd.ProdutoId.HasValue
+            ? await produtoRepo.GetTipoEmbalagemMapAsync(cmd.EmpresaId, new[] { cmd.ProdutoId.Value })
+            : new Dictionary<Guid, TipoEmbalagem>();
+        LoteItemValidacao.Validar(cmd.Nome, cmd.Quantidade, cmd.ProdutoId, cmd.PesoG, tipoEmbalagemMap);
+        LoteItemValidacao.ValidarFaixas(cmd.PesoG, cmd.ValidadeDias);
 
         var item = new LoteItem
         {
