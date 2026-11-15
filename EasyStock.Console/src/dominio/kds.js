@@ -1,4 +1,4 @@
-import { dataIsoNoFuso, horaCurta } from './formato'
+import { dataIsoNoFuso, horaCurta, mascaraCep } from './formato'
 import { agruparPorLinha } from './pedido'
 
 // KDS sobre Pedido (S19), usado pela cozinha no modo API (F05). Os status são os
@@ -96,17 +96,40 @@ export const gruposDoKds = (pedido, linhas) => agruparPorLinha(itensDoKds(pedido
 
 export const nomeNaComanda = (pedido) => [pedido.clienteNome ?? 'Cliente', pedido.clienteApt].filter(Boolean).join(' · ')
 
+// D2 da homologação #1769 (decisão do Felipe): o checkout grava o endereço nas observações com
+// rótulos de máquina ("[Entrega] ...", "[Guest] CEP ..., numero ..."; `EnderecoCheckout.Snapshot`
+// e `IniciarCheckoutGuestUseCase`). A Cozinha lê só o endereço formatado e o que o cliente
+// escreveu; o dado gravado não muda.
+const SEPARADOR = ' | '
+const MARCA_ENTREGA = '[Entrega] '
+const MARCA_CONVIDADO = '[Guest] '
+
+export function leituraDasObservacoes(observacoes) {
+  const partes = String(observacoes ?? '').split(SEPARADOR).map((p) => p.trim()).filter(Boolean)
+  const comMarca = (marca) => partes.find((p) => p.startsWith(marca))?.slice(marca.length) ?? null
+  const retrato = comMarca(MARCA_ENTREGA)
+  const convidado = comMarca(MARCA_CONVIDADO)
+  const doCliente = partes.filter((p) => !p.startsWith(MARCA_ENTREGA) && !p.startsWith(MARCA_CONVIDADO))
+  const endereco = retrato?.replace(/CEP (\d{8})\b/, (_, cep) => `CEP ${mascaraCep(cep)}`)
+    ?? convidado?.replace(/, numero /, ', nº ')
+    ?? null
+  return { endereco, observacoes: doCliente.length ? doCliente.join(SEPARADOR) : null }
+}
+
 // Dados de `documentoDoCanhoto` (dominio/impressao.js): o MESMO PDF de 80 mm da cozinha do
 // protótipo, sem preço (não é cupom fiscal) e com a observação do pedido.
-export const canhotoDoKds = (pedido, linhas) => ({
-  pedido: { numero: pedido.numeroCurto, cobranca: null },
-  itens: itensDoKds(pedido),
-  linhas,
-  nomeCliente: nomeNaComanda(pedido),
-  endereco: pedido.endereco ?? null,
-  faixa: pedido.janela?.label ?? null,
-  observacoes: pedido.observacoes ?? null,
-})
+export const canhotoDoKds = (pedido, linhas) => {
+  const leitura = leituraDasObservacoes(pedido.observacoes)
+  return {
+    pedido: { numero: pedido.numeroCurto, cobranca: null },
+    itens: itensDoKds(pedido),
+    linhas,
+    nomeCliente: nomeNaComanda(pedido),
+    endereco: pedido.endereco ?? leitura.endereco,
+    faixa: pedido.janela?.label ?? null,
+    observacoes: leitura.observacoes,
+  }
+}
 
 export const filtrarPorLinha = (pedidos, linha) => (linha
   ? pedidos.filter((p) => (p.itens ?? []).some((i) => chaveDaLinha(i.linha) === linha))
