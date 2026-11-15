@@ -38,7 +38,7 @@ export function SecaoWppConnect({ wpp, aoConectar }) {
 
   return (
     <div className={css.resultado}>
-      <h4 className={css.titulo}>Conexão provisória por QR</h4>
+      <h4 className={css.subtitulo}>Conexão provisória por QR</h4>
       {sessao && <Pilula tom={sessao.conectado ? 'ok' : 'aviso'}>{textoDoStatus(sessao, ocupado)}</Pilula>}
       <p className={css.texto}>Use um número de teste enquanto a conexão pela Meta está pendente.
         Esta conexão não oficial pode sofrer interrupções ou bloqueio do número.</p>
@@ -47,7 +47,7 @@ export function SecaoWppConnect({ wpp, aoConectar }) {
         <img className={css.qr} src={sessao.qrCode} alt="QR para conectar o número de teste ao chat" />
       </>}
       {!confirmando && <div className={css.acoes}>
-        {!sessao?.vinculado && <Botao variante="primario" onClick={conectar} disabled={ocupado}>Conectar por QR</Botao>}
+        {sessao && !sessao.vinculado && <Botao variante="primario" onClick={conectar} disabled={ocupado}>Conectar por QR</Botao>}
         {sessao?.vinculado && !conectado && <Botao onClick={sessao.qrCode ? atualizar : reconectar} disabled={ocupado || sessao.estado === 'INITIALIZING'}>{sessao.qrCode ? 'Atualizar QR' : 'Reconectar'}</Botao>}
         <Botao variante="texto" onClick={atualizar} disabled={ocupado}>Atualizar conexão</Botao>
         {sessao?.vinculado && <Botao ref={desconectarRef} variante="perigo" onClick={pedirDesconexao} disabled={ocupado}>Desconectar número</Botao>}
@@ -63,8 +63,8 @@ export function SecaoWppConnect({ wpp, aoConectar }) {
       )}
       {ocupado && !confirmando && <p className={css.texto} role="status">Atualizando a conexão…</p>}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
-      <p className={css.explicacao}>A conexão provisória recebe texto, imagem e áudio e permite responder pelo chat.
-        Responda pelo chat: respostas feitas no celular não são sincronizadas por esta conexão. Modelos aprovados pela Meta não estão disponíveis.</p>
+      <p className={css.explicacao}>A conexão provisória recebe texto, imagem e áudio e permite responder pelas Conversas.
+        Respostas feitas no celular não são sincronizadas por esta conexão. Modelos aprovados pela Meta não estão disponíveis.</p>
     </div>
   )
 }

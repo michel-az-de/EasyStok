@@ -9,9 +9,10 @@
 .embutida { display: flex; flex-direction: column; gap: var(--e-3); align-items: flex-start; }
 
 .titulo { margin: 0; font-size: var(--t-titulo); color: var(--tinta); }
-.texto { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
+.subtitulo { margin: 0; font-size: var(--t-forte); color: var(--tinta); }
+.texto { margin: 0; font-size: var(--t-corpo); color: var(--tinta); max-width: 72ch; }
 .botao { font-size: var(--t-forte); }
-.explicacao { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
+.explicacao { margin: 0; font-size: var(--t-corpo); color: var(--tinta); max-width: 72ch; }
 .erro { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--erro); }
 
 .resultado { display: flex; flex-direction: column; gap: var(--e-2); }
