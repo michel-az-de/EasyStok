@@ -216,9 +216,10 @@ namespace EasyStock.Infra.Postgre.Repositories
             // Projeta so Id, DataVenda e ValorTotal (VO Dinheiro via HasConversion — o EF nao
             // traduz Sum() sobre VO-com-converter, entao a soma fica em memoria, mas o
             // SELECT deixa de trazer a entidade Venda inteira). Antes: SELECT * + materializa Venda.
-            var vendas = await q.Select(v => new { v.Id, v.DataVenda, v.ValorTotal }).ToListAsync();
-            var recebidoAntes = await RecebidoEmOutroDiaPorVendaAsync(empresaId, vendas.Select(v => (v.Id, v.DataVenda)).ToList());
-            var bruto = vendas.Sum(v => ValorNoCaixa(v.ValorTotal == null ? 0m : v.ValorTotal.Valor, recebidoAntes.GetValueOrDefault(v.Id)));
+            var vendas = await q.Select(v => new { v.Id, v.DataVenda, v.FormaPagamentoPrincipal, v.ValorTotal }).ToListAsync();
+            var recebidoFora = await RecebidoForaDaVendaPorVendaAsync(empresaId,
+                vendas.Select(v => new VendaDoPedido(v.Id, v.DataVenda, v.FormaPagamentoPrincipal)).ToList());
+            var bruto = vendas.Sum(v => ValorNoCaixa(v.ValorTotal == null ? 0m : v.ValorTotal.Valor, recebidoFora.GetValueOrDefault(v.Id)));
 
             var estornados = await SaidasDeVendaEstornadasNoIntervalo(empresaId, iniUtc, fimUtc, lojaId)
                 .Select(m => m.ValorTotal).ToListAsync();
@@ -249,13 +250,18 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<decimal> GetTotalPagamentosPedidosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
         {
-            // #2708: o filtro do dia da Venda (RecebidoNoDiaDaVenda) e por dia operacional de Brasilia, entao a
-            // soma fica em memoria sobre Valor, PagoEm e DataVenda do intervalo (poucas linhas por dia).
+            // #2708/#2714: o filtro (RepresentadoPelaVenda) usa dia operacional de Brasilia e forma normalizada, entao
+            // a soma fica em memoria sobre o intervalo (poucas linhas por dia).
             var recebimentos = await PagamentosQueContam(empresaId, lojaId)
                 .Where(x => x.Pagamento.PagoEm >= iniUtc && x.Pagamento.PagoEm < fimUtc)
-                .Select(x => new { x.Pagamento.Valor, x.Pagamento.PagoEm, DataVenda = db.Vendas.Where(v => v.Id == x.Pedido.VendaId).Select(v => (DateTime?)v.DataVenda).FirstOrDefault() })
+                .Select(x => new
+                {
+                    x.Pagamento.Valor, x.Pagamento.PagoEm, x.Pagamento.Metodo,
+                    DataVenda = db.Vendas.Where(v => v.Id == x.Pedido.VendaId).Select(v => (DateTime?)v.DataVenda).FirstOrDefault(),
+                    FormaVenda = db.Vendas.Where(v => v.Id == x.Pedido.VendaId).Select(v => v.FormaPagamentoPrincipal).FirstOrDefault()
+                })
                 .ToListAsync();
-            return recebimentos.Where(r => !RecebidoNoDiaDaVenda(r.PagoEm, r.DataVenda)).Sum(r => r.Valor);
+            return recebimentos.Where(r => !RepresentadoPelaVenda(r.PagoEm, r.Metodo, r.DataVenda, r.FormaVenda)).Sum(r => r.Valor);
         }
 
         // Recebimentos de pedido que movem o caixa. Cancelar a operação não devolve dinheiro. Só sai do saldo
@@ -280,28 +286,38 @@ namespace EasyStock.Infra.Postgre.Repositories
             public Pedido Pedido { get; init; } = null!;
         }
 
-        // #926 e #2708: pedido entregue pelo PWA vira Venda (Pedido.VendaId) com o total do pedido. Recebimento do
-        // mesmo dia operacional fica representado pela Venda (senão o dinheiro contava 2x). Recebimento de outro dia,
-        // como o sinal pago antes da entrega, conta no dia em que entrou e a Venda entra abatida dele, então a soma
-        // do período é o total da venda, sem dobrar nem sumir.
-        private static bool RecebidoNoDiaDaVenda(DateTime pagoEm, DateTime? dataVenda) =>
-            dataVenda is { } dv && HorarioBrasil.DataOperacional(pagoEm) == HorarioBrasil.DataOperacional(dv);
+        // #926, #2708 e #2714: pedido entregue pelo PWA vira Venda (Pedido.VendaId) com o total do pedido, na forma da
+        // entrega. Recebimento do mesmo dia operacional e da mesma forma fica representado pela Venda (senão o dinheiro
+        // contava 2x). Recebimento de outro dia (o sinal pago antes) ou de outra forma (sinal em Pix, restante em
+        // dinheiro) conta em separado, no dia e na forma dele, e a Venda entra abatida exatamente desse valor: o total
+        // do período não muda e a gaveta só recebe o que entrou em dinheiro. Venda ou recebimento sem forma segue
+        // representado pela Venda, como antes (PWA antigo).
+        private static bool RepresentadoPelaVenda(DateTime pagoEm, string? metodo, DateTime? dataVenda, string? formaVenda) =>
+            dataVenda is { } dv
+            && HorarioBrasil.DataOperacional(pagoEm) == HorarioBrasil.DataOperacional(dv)
+            && !FormasDiferentes(metodo, formaVenda);
 
-        private static decimal ValorNoCaixa(decimal valorDaVenda, decimal recebidoEmOutroDia) =>
-            Math.Max(0m, valorDaVenda - recebidoEmOutroDia);
+        private static bool FormasDiferentes(string? metodo, string? formaVenda) =>
+            !string.IsNullOrWhiteSpace(metodo) && !string.IsNullOrWhiteSpace(formaVenda)
+            && !string.Equals(metodo.Trim(), formaVenda.Trim(), StringComparison.OrdinalIgnoreCase);
 
-        private async Task<Dictionary<Guid, decimal>> RecebidoEmOutroDiaPorVendaAsync(
-            Guid empresaId, IReadOnlyList<(Guid Id, DateTime DataVenda)> vendas)
+        private static decimal ValorNoCaixa(decimal valorDaVenda, decimal recebidoForaDaVenda) =>
+            Math.Max(0m, valorDaVenda - recebidoForaDaVenda);
+
+        private sealed record VendaDoPedido(Guid Id, DateTime DataVenda, string? Forma);
+
+        private async Task<Dictionary<Guid, decimal>> RecebidoForaDaVendaPorVendaAsync(
+            Guid empresaId, IReadOnlyList<VendaDoPedido> vendas)
         {
             if (vendas.Count == 0) return [];
             var ids = vendas.Select(v => v.Id).ToList();
             var recebimentos = await PagamentosQueContam(empresaId, null)
                 .Where(x => x.Pedido.VendaId != null && ids.Contains(x.Pedido.VendaId.Value))
-                .Select(x => new { VendaId = x.Pedido.VendaId!.Value, x.Pagamento.PagoEm, x.Pagamento.Valor })
+                .Select(x => new { VendaId = x.Pedido.VendaId!.Value, x.Pagamento.PagoEm, x.Pagamento.Metodo, x.Pagamento.Valor })
                 .ToListAsync();
-            var dataDaVenda = vendas.ToDictionary(v => v.Id, v => v.DataVenda);
+            var venda = vendas.ToDictionary(v => v.Id);
             return recebimentos
-                .Where(r => !RecebidoNoDiaDaVenda(r.PagoEm, dataDaVenda[r.VendaId]))
+                .Where(r => !RepresentadoPelaVenda(r.PagoEm, r.Metodo, venda[r.VendaId].DataVenda, venda[r.VendaId].Forma))
                 .GroupBy(r => r.VendaId)
                 .ToDictionary(g => g.Key, g => g.Sum(r => r.Valor));
         }
@@ -317,9 +333,10 @@ namespace EasyStock.Infra.Postgre.Repositories
                             && v.DataVenda >= iniUtc && v.DataVenda < fimUtc);
             if (lojaId.HasValue) q = q.Where(v => v.LojaId == lojaId);
             var vendas = await q.OrderBy(v => v.DataVenda).ToListAsync();
-            // #2708: a linha leva o que a venda pôs no caixa naquele dia, igual ao total. A venda já paga
-            // inteira antes (sinal do valor todo) não vira linha de zero. Entidades sem rastreio: nada é gravado.
-            var recebidoAntes = await RecebidoEmOutroDiaPorVendaAsync(empresaId, vendas.Select(v => (v.Id, v.DataVenda)).ToList());
+            // #2708/#2714: a linha leva o que a venda pôs no caixa naquele dia, igual ao total. A venda já paga
+            // inteira fora dela (sinal do valor todo) não vira linha de zero. Entidades sem rastreio: nada é gravado.
+            var recebidoAntes = await RecebidoForaDaVendaPorVendaAsync(empresaId,
+                vendas.Select(v => new VendaDoPedido(v.Id, v.DataVenda, v.FormaPagamentoPrincipal)).ToList());
             if (recebidoAntes.Count == 0) return vendas;
             var linhas = new List<Venda>(vendas.Count);
             foreach (var venda in vendas)
@@ -337,14 +354,20 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             // #2082 B16: o mesmo SELECT traz o pedido de cada pagamento (a linha do caixa mostra o número do dia e o
             // cliente), em vez de um GetById por linha.
-            // Mesma seleção do total (#926/#2708), para a soma das linhas exibidas casar com o SaldoEsperado.
+            // Mesma seleção do total (#926/#2708/#2714), para a soma das linhas exibidas casar com o SaldoEsperado.
             var linhas = await PagamentosQueContam(empresaId, lojaId)
                 .Where(x => x.Pagamento.PagoEm >= iniUtc && x.Pagamento.PagoEm < fimUtc)
                 .OrderBy(x => x.Pagamento.PagoEm)
-                .Select(x => new { x.Pagamento, x.Pedido, DataVenda = db.Vendas.Where(v => v.Id == x.Pedido.VendaId).Select(v => (DateTime?)v.DataVenda).FirstOrDefault() })
+                .Select(x => new
+                {
+                    x.Pagamento, x.Pedido,
+                    DataVenda = db.Vendas.Where(v => v.Id == x.Pedido.VendaId).Select(v => (DateTime?)v.DataVenda).FirstOrDefault(),
+                    FormaVenda = db.Vendas.Where(v => v.Id == x.Pedido.VendaId).Select(v => v.FormaPagamentoPrincipal).FirstOrDefault()
+                })
                 .ToListAsync();
             foreach (var linha in linhas) linha.Pagamento.Pedido = linha.Pedido;
-            return linhas.Where(l => !RecebidoNoDiaDaVenda(l.Pagamento.PagoEm, l.DataVenda)).Select(l => l.Pagamento).ToList();
+            return linhas.Where(l => !RepresentadoPelaVenda(l.Pagamento.PagoEm, l.Pagamento.Metodo, l.DataVenda, l.FormaVenda))
+                .Select(l => l.Pagamento).ToList();
         }
 
         // #1630-4: uma linha por venda estornada, na forma da venda, para a soma das linhas por forma

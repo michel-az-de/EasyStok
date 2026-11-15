@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
+using EasyStock.Application.UseCases.ListarLinhasCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
 using EasyStock.Domain.Entities;
@@ -344,6 +345,107 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
     }
 
     [SkippableFact]
+    public async Task Sinal_em_Pix_e_restante_em_dinheiro_no_mesmo_dia_poem_na_gaveta_so_o_dinheiro()
+    {
+        // Sinal de 30 em Pix e entrega pelo PWA no mesmo dia com o restante em dinheiro. A Venda de 100 vem com a forma
+        // da entrega e representa o dia (#926). A gaveta só pode ganhar os 70 em dinheiro; os 30 ficam no Pix.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var sinalEm = entregaEm.AddSeconds(-20);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
+        var pedido = NovoPedidoComPagamento(empresaId, 12, "Fê", 30m, "pix", "Joana", sinalEm);
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
+
+        (caixa.TotalVendas + caixa.TotalPagamentosPedidos).Should().Be(100m, "o total do dia segue 100");
+        (GavetaCaixa.DinheiroNaGaveta(caixa) - caixa.SaldoInicial).Should().Be(70m, "só 70 entraram em dinheiro");
+        caixa.LinhasExtras!.Where(l => l.Metodo == "pix").Sum(l => l.Valor).Should().Be(30m, "o sinal foi em Pix");
+    }
+
+    [SkippableTheory]
+    [InlineData(0, "dinheiro", 100)]
+    [InlineData(0, "pix", 70)]
+    [InlineData(1, "dinheiro", 100)]
+    [InlineData(1, "pix", 70)]
+    [InlineData(0, " Dinheiro ", 100)]
+    public async Task Sinal_de_30_e_entrega_em_dinheiro_somam_100_e_a_gaveta_so_o_dinheiro(int diasAntes, string formaDoSinal,
+        decimal dinheiroNoPeriodo)
+    {
+        // #2714, matriz mesmo dia/outro dia x mesma forma/forma diferente: o total do período é 100 e a gaveta recebe só
+        // o que entrou em dinheiro. A forma é comparada sem espaço nem caixa (" Dinheiro " = "dinheiro").
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var sinalEm = diasAntes == 0 ? entregaEm.AddSeconds(-20) : entregaEm.AddDays(-diasAntes);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
+        var pedido = NovoPedidoComPagamento(empresaId, 13, "Gal", 30m, formaDoSinal, "Joana", sinalEm);
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var dias = new[] { HorarioBrasil.DataOperacional(sinalEm), HorarioBrasil.DataOperacional(entregaEm) }.Distinct().ToList();
+        var caixas = new List<CaixaDiaResult>();
+        foreach (var dia in dias)
+            caixas.Add(await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+                .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, dia))));
+
+        caixas.Sum(c => c.TotalVendas + c.TotalPagamentosPedidos).Should().Be(100m, "o total do período nunca dobra nem some");
+        caixas.Sum(c => GavetaCaixa.DinheiroNaGaveta(c) - c.SaldoInicial).Should().Be(dinheiroNoPeriodo,
+            "a gaveta só recebe o que entrou em dinheiro");
+        foreach (var c in caixas)
+            c.LinhasExtras!.Sum(l => l.Valor).Should().Be(c.TotalVendas + c.TotalPagamentosPedidos, "as linhas somam o total do dia");
+    }
+
+    [SkippableFact]
+    public async Task Sinal_e_entrega_no_mesmo_dia_e_mesma_forma_seguem_uma_linha_de_venda_no_dia_e_no_extrato()
+    {
+        // #926, guarda da #2714: mesmo dia e mesma forma, a lista do dia e o Extrato mostram uma linha "venda" de 100,
+        // sem linha de pagamento de pedido.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
+        var pedido = NovoPedidoComPagamento(empresaId, 14, "Hel", 30m, "dinheiro", "Joana", entregaEm.AddSeconds(-20));
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
+        var extrato = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ListarLinhasCaixaUseCase>()
+            .ExecuteAsync(new ListarLinhasCaixaQuery(empresaId, entregaEm.AddHours(-1), DateTime.UtcNow)));
+
+        caixa.LinhasExtras!.Select(l => (l.Tipo, l.Valor)).Should().Equal(("venda", 100m));
+        extrato.Select(l => (l.Tipo, l.Valor)).Should().Equal(("venda", 100m));
+    }
+
+    [SkippableFact]
+    public async Task Venda_sem_forma_segue_representando_o_sinal_do_mesmo_dia()
+    {
+        // #2714: Venda sem forma (PWA antigo) fica como antes. O sinal do mesmo dia não vira linha separada e a linha
+        // "venda" não muda para "pagamento".
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var venda = NovaVenda(empresaId, 100m, entregaEm, null);
+        var pedido = NovoPedidoComPagamento(empresaId, 15, "Iara", 30m, "pix", "Joana", entregaEm.AddSeconds(-20));
+        pedido.VendaId = venda.Id;
+        await SemearAsync(empresaId, db => { db.Vendas.Add(venda); db.Pedidos.Add(pedido); });
+        await using var provider = BuildProductionProvider();
+
+        var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
+
+        (caixa.TotalVendas + caixa.TotalPagamentosPedidos).Should().Be(100m);
+        caixa.LinhasExtras!.Select(l => (l.Tipo, l.Valor)).Should().Equal(("venda", 100m));
+    }
+
+    [SkippableFact]
     public async Task Pedido_sem_sinal_entregue_pelo_PWA_conta_uma_vez_no_dia_da_entrega()
     {
         // #926, guarda da #2708: sem sinal, a entrega grava o recebimento de 100 e a Venda de 100 ligada ao pedido.
@@ -401,7 +503,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         return await acao(scope.ServiceProvider);
     }
 
-    private static Venda NovaVenda(Guid empresaId, decimal valor, DateTime em, string forma) => new()
+    private static Venda NovaVenda(Guid empresaId, decimal valor, DateTime em, string? forma) => new()
     {
         Id = Guid.NewGuid(), EmpresaId = empresaId, Canal = CanalVenda.LojaPropria,
         Natureza = NaturezaMovimentacaoEstoque.Venda, DataVenda = em, CriadoEm = em,
