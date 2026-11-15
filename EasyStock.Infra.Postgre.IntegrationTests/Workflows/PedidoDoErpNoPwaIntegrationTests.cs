@@ -1,6 +1,8 @@
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Application.DependencyInjection;
+using EasyStock.Application.Common;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -11,6 +13,7 @@ using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -148,6 +151,211 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         (await leitura.Set<Venda>().SingleAsync(v => v.Id == vendido.VendaId)).ValorTotal.Valor.Should().Be(45m);
         // Medição da condição 5 (#2083): a esteira do ERP baixa pelo item do Pedido, uma vez só.
         (await Saldo(s)).Should().Be(8.5m, "a baixa sai do item do Pedido (1,5), uma vez, pela esteira");
+    }
+
+    [SkippableTheory]
+    [InlineData(2)]
+    [InlineData(0)]
+    public async Task PedidoComSinalEntregueNoAparelho_GravaSoORestanteComAFormaDaEntrega(int diasDesdeOSinal)
+    {
+        // #2711: o vínculo saía cedo quando o pedido já tinha qualquer recebimento, e o restante pago
+        // na entrega não virava PedidoPagamento. Pedido de R$ 100 com sinal de R$ 30.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            var pedido = await db.Set<Pedido>().Include(p => p.Itens).SingleAsync(p => p.Id == s.PedidoId);
+            pedido.Itens.Single().PrecoUnitario = 50m;
+            pedido.Itens.Single().Subtotal = 100m;
+            pedido.RecalcularTotal();
+            db.Add(new PedidoPagamento
+            {
+                Id = Guid.NewGuid(), PedidoId = s.PedidoId, Metodo = "pix", Valor = 30m, Observacao = "Sinal",
+                PagoEm = DateTime.UtcNow.AddDays(-diasDesdeOSinal), RegistradoPorNome = "Felipe"
+            });
+            // O aparelho entrega com a forma escolhida na entrega.
+            var doAparelho = new Order
+            {
+                Id = s.PedidoId.ToString(), ClientSnapshotName = "Ana", Total = 100m, Metodo = "credito", LastDeviceId = "dev-a",
+                LastOperatorName = "Thati", EmpresaId = s.EmpresaId
+            };
+            doAparelho.Items.Add(new OrderItem { OrderId = doAparelho.Id, ProductId = s.ProdutoId.ToString(), Name = "Lasanha", Qty = 2, UnitPrice = 50m });
+            db.Add(doAparelho);
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue");
+        await EcoarDoAparelho(provider, s, "entregue");
+
+        (await StatusDoPedido(s)).Should().Be("entregue");
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var recebimentos = await leitura.Set<PedidoPagamento>().Where(p => p.PedidoId == s.PedidoId)
+            .OrderBy(p => p.Valor).Select(p => new { p.Valor, p.Metodo }).ToListAsync();
+        recebimentos.Should().BeEquivalentTo(
+            [new { Valor = 30m, Metodo = "pix" }, new { Valor = 70m, Metodo = "credito" }],
+            o => o.WithStrictOrdering(),
+            "o sinal fica como entrou e a entrega grava só o restante, uma vez, mesmo com o reenvio do eco");
+        (await leitura.Set<Venda>().Where(v => v.EmpresaId == s.EmpresaId).Select(v => v.ValorTotal.Valor).ToListAsync())
+            .Should().ContainSingle().Which.Should().Be(100m);
+    }
+
+    [SkippableFact]
+    public async Task SinalNoDiaDEEntregaNoDiaSeguinte_CaixaContaCadaValorUmaVezNoSeuDia()
+    {
+        // #2711 + #2708: sinal de R$ 30 no dia D, entrega pelo PWA em D+1 (hoje) com o restante. O Caixa de D
+        // fecha com 30, o de D+1 com 70, soma 100: nunca 130 (sinal na venda e no recebimento) nem 170 (70 em dobro).
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var hoje = HorarioBrasil.Hoje();
+        var diaDoSinal = hoje.AddDays(-1);
+        var meioDiaDoSinal = HorarioBrasil.JanelaDiaUtc(diaDoSinal).IniUtc.AddHours(12);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            var pedido = await db.Set<Pedido>().Include(p => p.Itens).SingleAsync(p => p.Id == s.PedidoId);
+            pedido.Itens.Single().PrecoUnitario = 50m;
+            pedido.Itens.Single().Subtotal = 100m;
+            pedido.RecalcularTotal();
+            db.Add(new PedidoPagamento
+            {
+                Id = Guid.NewGuid(), PedidoId = s.PedidoId, Metodo = "pix", Valor = 30m, Observacao = "Sinal",
+                PagoEm = meioDiaDoSinal, RegistradoPorNome = "Felipe"
+            });
+            // Gaveta: abre com R$ 50 em D (e fecha) e em D+1.
+            db.Add(Movimento(s.EmpresaId, "abertura", 50m, meioDiaDoSinal.AddHours(-3)));
+            db.Add(Movimento(s.EmpresaId, "fechamento", 0m, meioDiaDoSinal.AddHours(8)));
+            db.Add(Movimento(s.EmpresaId, "abertura", 50m, HorarioBrasil.JanelaDiaUtc(hoje).IniUtc.AddHours(9)));
+            var doAparelho = new Order
+            {
+                Id = s.PedidoId.ToString(), ClientSnapshotName = "Ana", Total = 100m, Metodo = "dinheiro", LastDeviceId = "dev-a",
+                LastOperatorName = "Thati", EmpresaId = s.EmpresaId
+            };
+            doAparelho.Items.Add(new OrderItem { OrderId = doAparelho.Id, ProductId = s.ProdutoId.ToString(), Name = "Lasanha", Qty = 2, UnitPrice = 50m });
+            db.Add(doAparelho);
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue");
+        await EcoarDoAparelho(provider, s, "entregue");
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var caixa = new CaixaSaldoCalculator(new CaixaRepository(leitura));
+        var noDiaDoSinal = await caixa.CalcularAsync(s.EmpresaId, diaDoSinal);
+        var naEntrega = await caixa.CalcularAsync(s.EmpresaId, hoje);
+
+        var recebidoD = noDiaDoSinal.TotalVendas + noDiaDoSinal.TotalPagamentosPedidos;
+        var recebidoD1 = naEntrega.TotalVendas + naEntrega.TotalPagamentosPedidos;
+        recebidoD.Should().Be(30m, "o sinal conta no dia em que entrou");
+        recebidoD1.Should().Be(70m, "na entrega entra só o restante");
+        (recebidoD + recebidoD1).Should().Be(100m);
+        noDiaDoSinal.SaldoEsperado.Should().Be(80m, "saldo de D: abertura 50 + sinal 30");
+        naEntrega.SaldoEsperado.Should().Be(120m, "saldo de D+1: abertura 50 + restante 70");
+        var dinheiroNaGaveta = new List<decimal>();
+        foreach (var dia in new[] { noDiaDoSinal, naEntrega })
+        {
+            var linhas = await caixa.GetLinhasExtrasAsync(s.EmpresaId, dia.JanelaInicioUtc, dia.JanelaFimUtc);
+            linhas.Sum(l => l.Valor).Should().Be(dia.TotalVendas + dia.TotalPagamentosPedidos,
+                $"as linhas de {dia.Data} somam o que o saldo conta");
+            dinheiroNaGaveta.Add(linhas
+                .Where(l => string.Equals(l.Metodo?.Trim(), "dinheiro", StringComparison.OrdinalIgnoreCase))
+                .Sum(l => l.Valor));
+        }
+        dinheiroNaGaveta.Should().Equal([0m, 70m], "o sinal entrou em pix; na gaveta só os 70 em dinheiro da entrega");
+    }
+
+    [SkippableFact]
+    public async Task SinalPixEEntregaEmDinheiroNoMesmoDia_CaixaSeparaCadaFormaPeloQueEntrou()
+    {
+        // #2711 + #2714: sinal de R$ 30 em Pix e entrega pelo PWA no mesmo dia, restante de R$ 70 em dinheiro.
+        // O dia fecha com 100, e a gaveta só recebe os 70 em dinheiro: o Pix do sinal não entra nela.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var hoje = HorarioBrasil.Hoje();
+        var inicioDoDia = HorarioBrasil.JanelaDiaUtc(hoje).IniUtc;
+        var agora = DateTime.UtcNow;
+        var pagoEm = agora.AddMinutes(-1) < inicioDoDia ? inicioDoDia : agora.AddMinutes(-1);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            var pedido = await db.Set<Pedido>().Include(p => p.Itens).SingleAsync(p => p.Id == s.PedidoId);
+            pedido.Itens.Single().PrecoUnitario = 50m;
+            pedido.Itens.Single().Subtotal = 100m;
+            pedido.RecalcularTotal();
+            db.Add(new PedidoPagamento
+            {
+                Id = Guid.NewGuid(), PedidoId = s.PedidoId, Metodo = "pix", Valor = 30m, Observacao = "Sinal",
+                PagoEm = pagoEm, RegistradoPorNome = "Felipe"
+            });
+            db.Add(Movimento(s.EmpresaId, "abertura", 50m, inicioDoDia));
+            var doAparelho = new Order
+            {
+                Id = s.PedidoId.ToString(), ClientSnapshotName = "Ana", Total = 100m, Metodo = "dinheiro", LastDeviceId = "dev-a",
+                LastOperatorName = "Thati", EmpresaId = s.EmpresaId
+            };
+            doAparelho.Items.Add(new OrderItem { OrderId = doAparelho.Id, ProductId = s.ProdutoId.ToString(), Name = "Lasanha", Qty = 2, UnitPrice = 50m });
+            db.Add(doAparelho);
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue");
+        await EcoarDoAparelho(provider, s, "entregue");
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var caixa = new CaixaSaldoCalculator(new CaixaRepository(leitura));
+        var dia = await caixa.CalcularAsync(s.EmpresaId, hoje);
+        var total = dia.TotalVendas + dia.TotalPagamentosPedidos;
+        total.Should().Be(100m, "sinal e restante no mesmo dia somam o pedido, uma vez");
+
+        var linhas = await caixa.GetLinhasExtrasAsync(s.EmpresaId, dia.JanelaInicioUtc, dia.JanelaFimUtc);
+        linhas.Sum(l => l.Valor).Should().Be(total, "as linhas somam o que o saldo conta");
+        decimal Forma(string metodo) => linhas
+            .Where(l => string.Equals(l.Metodo?.Trim(), metodo, StringComparison.OrdinalIgnoreCase))
+            .Sum(l => l.Valor);
+        Forma("dinheiro").Should().Be(70m, "na gaveta só o restante pago em dinheiro na entrega");
+        Forma("pix").Should().Be(30m, "o sinal fica na forma em que entrou");
+    }
+
+    private static MovimentoCaixa Movimento(Guid empresaId, string tipo, decimal valor, DateTime em) => new()
+    {
+        Id = Guid.NewGuid(), EmpresaId = empresaId, Tipo = tipo, Valor = valor, Metodo = "dinheiro",
+        DataMovimento = em, CriadoEm = em, RegistradoPorNome = "Felipe", Origem = "web"
+    };
+
+    [SkippableFact]
+    public async Task PedidoJaQuitadoAntesDaEntrega_NaoGravaRecebimentoNaEntrega()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            db.Add(new PedidoPagamento
+            {
+                Id = Guid.NewGuid(), PedidoId = s.PedidoId, Metodo = "pix", Valor = 60m, Observacao = "Pago adiantado",
+                PagoEm = DateTime.UtcNow.AddDays(-1), RegistradoPorNome = "Felipe"
+            });
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue");
+
+        (await Recebimentos(s)).Should().ContainSingle().Which.Should().Be(60m, "o recebido já cobre o total");
     }
 
     [SkippableTheory]
