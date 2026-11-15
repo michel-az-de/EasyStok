@@ -83,9 +83,10 @@ public class OperationController(
         if (lojaId.HasValue) batchesQ = batchesQ.Where(b => b.LojaId == lojaId);
         var batches = await batchesQ.CountAsync(ct);
 
-        // Saldo de caixa do dia (vendas entregues + entradas extras − saídas)
+        // Saldo de caixa do dia (vendas entregues + entradas extras − saídas). #2722: lançamento excluído no PWA
+        // (exclusão lógica, CashEntry sem query filter) não conta.
         var cashEntriesQ = _db.Set<CashEntry>().AsNoTracking()
-            .Where(c => c.EmpresaId == empresaId && c.CreatedAt >= todayStart);
+            .Where(c => c.EmpresaId == empresaId && c.CreatedAt >= todayStart && c.DeletedAt == null);
         if (lojaId.HasValue) cashEntriesQ = cashEntriesQ.Where(c => c.LojaId == lojaId);
         var cashEntries = await cashEntriesQ.ToListAsync(ct);
 
