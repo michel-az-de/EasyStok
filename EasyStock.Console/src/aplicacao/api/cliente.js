@@ -78,6 +78,8 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
           && Number.isInteger(salvo.vinculoRevisao) && salvo.vinculoRevisao === atual.vinculoRevisao)
         if (!mesmaIdentidadeDaEdicao(identidade, atual) && !mesmoResultado) return { erro: 'O cadastro foi salvo, mas o vínculo mudou depois. Confira a ficha atual antes de continuar.' }
         if (Number.isInteger(salvo?.vinculoRevisao)) despachar({ tipo: acao.VINCULO_CLIENTE_DA_API, id, vinculo: vinculoDoCadastro(salvo) })
+        // #2691: salvo, o aviso de uma tentativa anterior ("Escreva o nome…") sai; o fixo fica (casos/api.js).
+        despachar({ tipo: acao.FECHAR_AVISO_API })
         // O telefone já era de outro cadastro: a conversa foi ligada a ele, com o nome dele.
         // Quando foi a dona que mandou ligar, ela já sabe.
         if (!confirmarVinculoExistente && salvo && salvo.novo === false && corpo.nome && salvo.nome !== corpo.nome) {
