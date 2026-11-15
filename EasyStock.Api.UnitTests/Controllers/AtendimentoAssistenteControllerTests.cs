@@ -65,6 +65,20 @@ public class AtendimentoAssistenteControllerTests
         await _conversas.DidNotReceive().AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>S68 (#2597): a lista aprovada, com o modelo atual em primeiro, para a aba Geral escolher.</summary>
+    [Fact]
+    public void ModelosDevolveAListaAprovada()
+    {
+        var lista = new EasyStock.Application.Services.Atendimento.ModelosAprovadosAgenteOptions();
+        lista.Modelos.Add(new("claude-sonnet-5", "Padrão", "padrão"));
+
+        var result = Criar().Modelos(Microsoft.Extensions.Options.Options.Create(lista));
+
+        result.Should().BeOfType<OkObjectResult>().Subject.Value.Should()
+            .BeOfType<ApiResponse<IReadOnlyList<EasyStock.Application.Services.Atendimento.ModeloAprovadoAgente>>>()
+            .Subject.Data.Should().Equal(new EasyStock.Application.Services.Atendimento.ModeloAprovadoAgente("claude-sonnet-5", "Padrão", "padrão"));
+    }
+
     [Fact]
     public async Task SemChave_Devolve503ComMensagemClara()
     {

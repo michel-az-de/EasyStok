@@ -97,7 +97,8 @@ public static class GeracaoAgenteAtendimento
         ContextoTurnoAgente contexto,
         int maximoIteracoes,
         ILogger logger,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? modelo = null)
     {
         var definicoes = ferramentas.Values
             .Select(f => new FerramentaLlm(f.Nome, f.Descricao, f.SchemaJson))
@@ -112,7 +113,7 @@ public static class GeracaoAgenteAtendimento
             try
             {
                 resposta = await EnviarComUmaNovaTentativaAsync(
-                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes), contexto.Conversa.Id, logger, ct);
+                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes, modelo), contexto.Conversa.Id, logger, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {

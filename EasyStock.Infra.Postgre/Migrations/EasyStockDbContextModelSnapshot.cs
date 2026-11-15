@@ -588,6 +588,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnName("avisos_operacao")
                         .HasDefaultValueSql("'{}'::jsonb");
 
+                    b.Property<long?>("CotaTokensMes")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
@@ -615,6 +618,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ModeloAgente")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("ModeloRetomadaIdioma")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -629,10 +636,21 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<int>("NivelSugestao")
                         .HasColumnType("integer");
 
+                    b.Property<string>("NomeDona")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("ObservacoesLoja")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<int>("RespiroMinutos")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(40);
+
+                    b.Property<string>("RoteiroJson")
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("SaudacaoPrimeiroContato")
                         .IsRequired()

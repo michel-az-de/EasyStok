@@ -1,3 +1,5 @@
+using EasyStock.Application.Ports.Output.Ai;
+
 namespace EasyStock.Infra.Integrations.Ia;
 
 /// <summary>
@@ -22,7 +24,7 @@ public sealed class AnthropicAgenteOptions
     /// <summary>Envia <c>Authorization: Bearer</c> no lugar de <c>x-api-key</c> (Fireworks).</summary>
     public bool AutenticacaoBearer { get; set; }
 
-    public string ModeloAgente { get; set; } = "claude-sonnet-5";
+    public string ModeloAgente { get; set; } = RequisicaoLlm.ModeloPadrao;
     public int MaxTokensAgente { get; set; } = 4096;
     public string BaseUrl { get; set; } = "https://api.anthropic.com/";
     public int TimeoutSegundos { get; set; } = 60;

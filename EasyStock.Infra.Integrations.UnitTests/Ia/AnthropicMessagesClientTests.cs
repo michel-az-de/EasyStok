@@ -187,6 +187,19 @@ public class AnthropicMessagesClientTests
     }
 
     [Fact]
+    public async Task ModeloDaRequisicaoSubstituiOConfigurado()
+    {
+        // S68 (#2597): o turno pede o modelo da loja, já conferido na lista aprovada; sem ele, vale o configurado.
+        var handler = new CapturaHandler(HttpStatusCode.OK, """{"content":[],"stop_reason":"end_turn"}""");
+
+        var resposta = await Criar(handler).EnviarAsync(RequisicaoSimples() with { Modelo = "claude-haiku-5" });
+
+        using var corpo = JsonDocument.Parse(handler.Corpo!);
+        corpo.RootElement.GetProperty("model").GetString().Should().Be("claude-haiku-5");
+        resposta.Modelo.Should().Be("claude-haiku-5");
+    }
+
+    [Fact]
     public async Task SemModeloNaRespostaFicaOConfiguradoESemCacheZero()
     {
         var resposta = await Criar(new CapturaHandler(HttpStatusCode.OK, """{"content":[],"stop_reason":"end_turn"}"""))

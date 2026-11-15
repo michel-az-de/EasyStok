@@ -61,7 +61,12 @@ public class AtendimentoConfiguracaoController(
                 body.Ativo,
                 body.SlaRespostaMinutos,
                 body.MensagemEscalada,
-                body.MensagemEncaminhamento));
+                body.MensagemEncaminhamento,
+                body.NomeDona,
+                body.ModeloAgente,
+                body.CotaTokensMes,
+                body.Roteiro,
+                body.ObservacoesLoja));
 
             return DataOk(resultado);
         }
@@ -84,6 +89,11 @@ public sealed record AtualizarConfiguracaoAtendimentoBody(
     bool? Ativo,
     int? SlaRespostaMinutos = null,
     string? MensagemEscalada = null,
-    string? MensagemEncaminhamento = null);
+    string? MensagemEncaminhamento = null,
+    string? NomeDona = null,
+    string? ModeloAgente = null,
+    long? CotaTokensMes = null,
+    IReadOnlyList<EasyStock.Application.Services.Atendimento.EtapaRoteiroAtendimento>? Roteiro = null,
+    string? ObservacoesLoja = null);
 
 public sealed record ModeloRetomadaBody(string? Nome, string? Idioma);
