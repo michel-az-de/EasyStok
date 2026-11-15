@@ -1,6 +1,8 @@
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Application.DependencyInjection;
+using EasyStock.Application.Common;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence;
@@ -11,6 +13,7 @@ using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.DependencyInjection;
+using EasyStock.Infra.Postgre.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -200,6 +203,75 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         (await leitura.Set<Venda>().Where(v => v.EmpresaId == s.EmpresaId).Select(v => v.ValorTotal.Valor).ToListAsync())
             .Should().ContainSingle().Which.Should().Be(100m);
     }
+
+    [SkippableFact]
+    public async Task SinalNoDiaDEEntregaNoDiaSeguinte_CaixaContaCadaValorUmaVezNoSeuDia()
+    {
+        // #2711 + #2708: sinal de R$ 30 no dia D, entrega pelo PWA em D+1 (hoje) com o restante. O Caixa de D
+        // fecha com 30, o de D+1 com 70, soma 100: nunca 130 (sinal na venda e no recebimento) nem 170 (70 em dobro).
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var hoje = HorarioBrasil.Hoje();
+        var diaDoSinal = hoje.AddDays(-1);
+        var meioDiaDoSinal = HorarioBrasil.JanelaDiaUtc(diaDoSinal).IniUtc.AddHours(12);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            var pedido = await db.Set<Pedido>().Include(p => p.Itens).SingleAsync(p => p.Id == s.PedidoId);
+            pedido.Itens.Single().PrecoUnitario = 50m;
+            pedido.Itens.Single().Subtotal = 100m;
+            pedido.RecalcularTotal();
+            db.Add(new PedidoPagamento
+            {
+                Id = Guid.NewGuid(), PedidoId = s.PedidoId, Metodo = "pix", Valor = 30m, Observacao = "Sinal",
+                PagoEm = meioDiaDoSinal, RegistradoPorNome = "Felipe"
+            });
+            // Gaveta: abre com R$ 50 em D (e fecha) e em D+1.
+            db.Add(Movimento(s.EmpresaId, "abertura", 50m, meioDiaDoSinal.AddHours(-3)));
+            db.Add(Movimento(s.EmpresaId, "fechamento", 0m, meioDiaDoSinal.AddHours(8)));
+            db.Add(Movimento(s.EmpresaId, "abertura", 50m, HorarioBrasil.JanelaDiaUtc(hoje).IniUtc.AddHours(9)));
+            var doAparelho = new Order
+            {
+                Id = s.PedidoId.ToString(), ClientSnapshotName = "Ana", Total = 100m, Metodo = "dinheiro", LastDeviceId = "dev-a",
+                LastOperatorName = "Thati", EmpresaId = s.EmpresaId
+            };
+            doAparelho.Items.Add(new OrderItem { OrderId = doAparelho.Id, ProductId = s.ProdutoId.ToString(), Name = "Lasanha", Qty = 2, UnitPrice = 50m });
+            db.Add(doAparelho);
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue");
+        await EcoarDoAparelho(provider, s, "entregue");
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var caixa = new CaixaSaldoCalculator(new CaixaRepository(leitura));
+        var noDiaDoSinal = await caixa.CalcularAsync(s.EmpresaId, diaDoSinal);
+        var naEntrega = await caixa.CalcularAsync(s.EmpresaId, hoje);
+
+        var recebidoD = noDiaDoSinal.TotalVendas + noDiaDoSinal.TotalPagamentosPedidos;
+        var recebidoD1 = naEntrega.TotalVendas + naEntrega.TotalPagamentosPedidos;
+        recebidoD.Should().Be(30m, "o sinal conta no dia em que entrou");
+        recebidoD1.Should().Be(70m, "na entrega entra só o restante");
+        (recebidoD + recebidoD1).Should().Be(100m);
+        noDiaDoSinal.SaldoEsperado.Should().Be(80m, "gaveta de D: abertura 50 + sinal 30");
+        naEntrega.SaldoEsperado.Should().Be(120m, "gaveta de D+1: abertura 50 + restante 70");
+        foreach (var dia in new[] { noDiaDoSinal, naEntrega })
+        {
+            var linhas = await caixa.GetLinhasExtrasAsync(s.EmpresaId, dia.JanelaInicioUtc, dia.JanelaFimUtc);
+            linhas.Sum(l => l.Valor).Should().Be(dia.TotalVendas + dia.TotalPagamentosPedidos,
+                $"as linhas de {dia.Data} somam o que o saldo conta");
+        }
+    }
+
+    private static MovimentoCaixa Movimento(Guid empresaId, string tipo, decimal valor, DateTime em) => new()
+    {
+        Id = Guid.NewGuid(), EmpresaId = empresaId, Tipo = tipo, Valor = valor, Metodo = "dinheiro",
+        DataMovimento = em, CriadoEm = em, RegistradoPorNome = "Felipe", Origem = "web"
+    };
 
     [SkippableFact]
     public async Task PedidoJaQuitadoAntesDaEntrega_NaoGravaRecebimentoNaEntrega()
