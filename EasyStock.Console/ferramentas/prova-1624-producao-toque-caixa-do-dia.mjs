@@ -1270,6 +1270,18 @@ await confere('#2113 B1: abrir a loja com o caixa a confirmar pede a gaveta cont
   assert.match(chamadas[0].observacoes.replace(/\u00a0/g, ' '), /^Abertura automática conferida: contado R\$ 230,00 na gaveta\. Faltam R\$ 6,00\.$/)
 })
 
+// #2073 (resto da #2113): a operadora via o aviso da abertura a confirmar no Caixa do dia, mas não no gesto
+// de abrir a loja. Ela segue sem a ação; o aviso diz quem confirma.
+await confere('#2113 B1: quem não controla a loja vê no gesto o aviso da abertura a confirmar, sem a ação', async () => {
+  g.acesso = { acoes: { gerenciarCaixa: false, controlarLoja: false }, permite: () => true }
+  g.caixa = { ...caixaCom(DIA_A_CONFIRMAR()), fechamentos: [FECHAMENTO_DE_ONTEM] }
+  const t = montar(ModalAbrirLoja, { aoFechar() {} })
+  t.renderizar()
+  assert.match(limpo(t.arvore), /O caixa de hoje abriu sozinho no primeiro pagamento em dinheiro, com R\$ 130,00 que o fechamento de 10\/10 deixou na gaveta\. Peça à gerência para contar a gaveta e confirmar a abertura\./)
+  assert.deepEqual(doTipo(t.arvore.props.rodape, 'Botao').map(texto), ['Entendi'])
+  assert.equal(andar(t.arvore, (n) => n.type === 'CampoReais').length, 0, 'sem campo de gaveta')
+})
+
 await confere('#2113 D1: fechar o caixa esquecido confere o esperado do dia da abertura e mostra à parte o que entrou depois', async () => {
   const conferidos = []
   const d = DIA_ESQUECIDO()
