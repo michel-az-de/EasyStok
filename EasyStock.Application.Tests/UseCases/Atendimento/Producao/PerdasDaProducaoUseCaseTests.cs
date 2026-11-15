@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.Atendimento.Producao;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
@@ -21,6 +22,7 @@ public class PerdasDaProducaoUseCaseTests
     private readonly IItemVendaRepository _itensVenda = Substitute.For<IItemVendaRepository>();
     private readonly IMovimentacaoEstoqueRepository _movs = Substitute.For<IMovimentacaoEstoqueRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IProdutoComposicaoRepository _receitas = Substitute.For<IProdutoComposicaoRepository>();
     private readonly List<MovimentacaoEstoque> _gravadas = [];
     private readonly Produto _lasanha;
 
@@ -37,7 +39,8 @@ public class PerdasDaProducaoUseCaseTests
 
     private PerdasDaProducaoUseCase Sut() => new(_itens, _movs, new RegistrarSaidaEstoqueUseCase(
         _produtos, _itens, _vendas, _itensVenda, _movs, _uow,
-        Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(), publicadorEventos: Substitute.For<IPublicadorEventos>()), _relogio, _produtos);
+        Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(), publicadorEventos: Substitute.For<IPublicadorEventos>()), _relogio, _produtos,
+        _receitas, Substitute.For<ICardapioItemRepository>());
 
     private ItemEstoque Lote(decimal saldo, decimal custo, DateTime validade, string codigo)
     {
@@ -75,12 +78,25 @@ public class PerdasDaProducaoUseCaseTests
     [Fact]
     public async Task PerdaDePrato_EmFracaoDePorcao_eRecusadaSemGravar()
     {
+        _receitas.GetByProdutoFinalAsync(_empresaId, _lasanha.Id, null, Arg.Any<CancellationToken>()).Returns(
+            [new ProdutoComposicao { Id = Guid.NewGuid(), EmpresaId = _empresaId, ProdutoFinalId = _lasanha.Id, InsumoId = Guid.NewGuid(), Quantidade = 1m, Unidade = UnidadeMedida.Kg }]);
         Fefo(true, Lote(10, 4m, new DateTime(2026, 10, 15), "LOT-A"));
 
         var act = () => Sut().LancarAsync(_empresaId, true, new LancarPerdaInput(_lasanha.Id, null, 0.5m, MotivoPerda.PerdaNoPreparo));
 
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*inteiro*");
         _gravadas.Should().BeEmpty();
+    }
+
+    // Revisão da #2638: produto em Un sem receita e fora do cardápio é revenda; a perda fracionada segue aceita.
+    [Fact]
+    public async Task PerdaDeRevendaEmUn_SemReceitaEForaDoCardapio_AceitaFracao()
+    {
+        Fefo(true, Lote(10, 4m, new DateTime(2026, 10, 15), "LOT-A"));
+
+        var r = await Sut().LancarAsync(_empresaId, true, new LancarPerdaInput(_lasanha.Id, null, 0.5m, MotivoPerda.PerdaNoPreparo));
+
+        r.Valor.Should().Be(2m);
     }
 
     [Fact]

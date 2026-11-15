@@ -147,4 +147,11 @@ public sealed class CardapioItemRepository(EasyStockDbContext db) : ICardapioIte
             .Where(c => c.StorefrontId == storefrontId && c.ProdutoId.HasValue)
             .Select(c => c.ProdutoId!.Value)   // Guid? → Guid: safe após filtro HasValue
             .ToListAsync(ct);
+
+    public Task<bool> ProdutoEstaNoCardapioAsync(Guid empresaId, Guid produtoId, CancellationToken ct = default) =>
+        db.CardapioItens
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .AnyAsync(c => c.ProdutoId == produtoId
+                && db.Storefronts.Any(s => s.Id == c.StorefrontId && s.EmpresaId == empresaId), ct);
 }

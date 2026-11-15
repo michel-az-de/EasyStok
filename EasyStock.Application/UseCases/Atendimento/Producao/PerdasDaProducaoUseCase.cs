@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Producao;
 using EasyStock.Application.UseCases.RegistrarSaidaEstoque;
 
@@ -48,7 +49,9 @@ public sealed class PerdasDaProducaoUseCase(
     IMovimentacaoEstoqueRepository movimentacaoRepository,
     RegistrarSaidaEstoqueUseCase registrarSaida,
     TimeProvider relogio,
-    IProdutoRepository? produtos = null)
+    IProdutoRepository? produtos = null,
+    IProdutoComposicaoRepository? receitas = null,
+    ICardapioItemRepository? cardapio = null)
 {
     public const decimal LimiteSemGerente = 50m;
     public const string CodigoExigeGerente = "PERDA_EXIGE_GERENTE";
@@ -62,7 +65,8 @@ public sealed class PerdasDaProducaoUseCase(
         UseCaseGuards.EnsureEmpresaId(empresaId);
         Validar(input);
         if (produtos is not null)
-            QuantidadeEmPorcoes.Validar(await produtos.GetByIdAsync(empresaId, input.ProdutoId), input.Quantidade, "A perda");
+            await QuantidadeEmPorcoes.ValidarAsync(empresaId, await produtos.GetByIdAsync(empresaId, input.ProdutoId),
+                input.Quantidade, "A perda", receitas, cardapio, ct);
 
         var natureza = input.Motivo.Natureza();
         var permitirVencido = natureza.PermiteBaixaDeLoteVencido();

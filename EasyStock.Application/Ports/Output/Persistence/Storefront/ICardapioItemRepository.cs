@@ -42,4 +42,7 @@ public interface ICardapioItemRepository
 
     /// <summary>ProdutoIds já em uso pelo storefront — filtra dropdown ao adicionar.</summary>
     Task<IReadOnlyCollection<Guid>> GetProdutoIdsDoStorefrontAsync(Guid storefrontId, CancellationToken ct = default);
+
+    /// <summary>#1776: o produto está ligado a algum item do cardápio de uma vitrine da empresa (inclusive arquivado).</summary>
+    Task<bool> ProdutoEstaNoCardapioAsync(Guid empresaId, Guid produtoId, CancellationToken ct = default);
 }

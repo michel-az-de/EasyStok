@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Producao;
 using EasyStock.Domain.ValueObjects;
 
@@ -42,7 +43,9 @@ public sealed class AjustarSaldoRapidoUseCase(
     IUnitOfWork unitOfWork,
     IOperacaoEventPublisher operacaoEventos,
     TimeProvider relogio,
-    IProdutoRepository? produtos = null)
+    IProdutoRepository? produtos = null,
+    IProdutoComposicaoRepository? receitas = null,
+    ICardapioItemRepository? cardapio = null)
 {
     public const int MotivoMaximo = 500;
 
@@ -61,7 +64,8 @@ public sealed class AjustarSaldoRapidoUseCase(
             throw new UseCaseValidationException($"O motivo aceita até {MotivoMaximo} caracteres.");
         UseCaseGuards.EnsureSemTagsHtml(motivo, "Motivo");
         if (produtos is not null)
-            QuantidadeEmPorcoes.Validar(await produtos.GetByIdAsync(input.EmpresaId, input.ProdutoId), input.QuantidadeContada, "A contagem");
+            await QuantidadeEmPorcoes.ValidarAsync(input.EmpresaId, await produtos.GetByIdAsync(input.EmpresaId, input.ProdutoId),
+                input.QuantidadeContada, "A contagem", receitas, cardapio, ct);
 
         var doProduto = (await itens.GetLotesParaAjusteAsync(input.EmpresaId, input.ProdutoId, input.LojaId, ct))
             .OrderBy(l => l.EntradaEm).ThenBy(l => l.CriadoEm).ToList();

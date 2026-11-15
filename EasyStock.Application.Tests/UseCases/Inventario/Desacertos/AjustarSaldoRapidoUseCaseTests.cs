@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Inventario.Desacertos;
 using EasyStock.Domain.ValueObjects;
 
@@ -18,7 +19,9 @@ public class AjustarSaldoRapidoUseCaseTests
     private readonly IOperacaoEventPublisher _eventos = Substitute.For<IOperacaoEventPublisher>();
     private readonly IProdutoRepository _produtos = Substitute.For<IProdutoRepository>();
 
-    private AjustarSaldoRapidoUseCase Criar() => new(_itens, _contagens, _movs, _uow, _eventos, TimeProvider.System, _produtos);
+    private readonly IProdutoComposicaoRepository _receitas = Substitute.For<IProdutoComposicaoRepository>();
+    private readonly ICardapioItemRepository _cardapio = Substitute.For<ICardapioItemRepository>();
+    private AjustarSaldoRapidoUseCase Criar() => new(_itens, _contagens, _movs, _uow, _eventos, TimeProvider.System, _produtos, _receitas, _cardapio);
 
     private ItemEstoque Lote(decimal atual, decimal descoberto = 0m, int diasAtras = 1) => new()
     {
@@ -39,12 +42,23 @@ public class AjustarSaldoRapidoUseCaseTests
     public async Task ContagemDePrato_ForaDePorcaoInteiraOuAcimaDoTeto_eRecusadaSemGravar(decimal contada, string mensagem)
     {
         _produtos.GetByIdAsync(_empresaId, _produtoId).Returns(new Produto { Id = _produtoId, EmpresaId = _empresaId, Nome = "Lasanha", UnidadeMedidaBase = UnidadeMedida.Un });
+        _cardapio.ProdutoEstaNoCardapioAsync(_empresaId, _produtoId, Arg.Any<CancellationToken>()).Returns(true);
         _itens.GetLotesParaAjusteAsync(_empresaId, _produtoId, null, Arg.Any<CancellationToken>()).Returns(new[] { Lote(atual: 8m) });
 
         var act = () => Criar().ExecuteAsync(Input(contada));
 
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage(mensagem);
         await _contagens.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
+    // Revisão da #2638: o teto é de prato. Item de revenda contado em unidade segue sem teto nem porção inteira.
+    [Fact]
+    public async Task ContagemDeRevendaEmUn_ForaDoCardapioESemReceita_AceitaAcimaDe9999()
+    {
+        _produtos.GetByIdAsync(_empresaId, _produtoId).Returns(new Produto { Id = _produtoId, EmpresaId = _empresaId, Nome = "Refrigerante lata", UnidadeMedidaBase = UnidadeMedida.Un });
+        _itens.GetLotesParaAjusteAsync(_empresaId, _produtoId, null, Arg.Any<CancellationToken>()).Returns(new[] { Lote(atual: 8m) });
+
+        (await Criar().ExecuteAsync(Input(15_000m))).QuantidadeAtual.Should().Be(15_000m);
     }
 
     [Fact]
