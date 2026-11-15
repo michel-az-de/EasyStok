@@ -3,6 +3,7 @@ import { rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sort
 import { CSS } from '@dnd-kit/utilities'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { indicadoresDoHall, ROTULO_PRECISA_DE_VOCE } from '../../dominio/pulsoDoHall'
+import { moeda } from '../../dominio/formato'
 import { hashDoModulo } from '../../dominio/modulos'
 import { acaoDoIndicador, severidadeDoIndicador } from '../../dominio/estadoDoHall'
 import { alcaDoLink, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
@@ -20,14 +21,13 @@ const frentes = {
   financeiro: { nome: 'Na gaveta (dinheiro)', acao: 'Conferir caixa', tela: 'caixa' },
 }
 const hora = (em) => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(em)
-const dinheiro = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 function Indicador({ item, movimentos }) {
   const frente = frentes[item.id]
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id, transition: movimentos ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' } : null,
   })
-  const valor = item.valor === null ? '—' : item.id === 'financeiro' ? dinheiro(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
+  const valor = item.valor === null ? '—' : item.id === 'financeiro' ? moeda(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
   // Só o que pede ação aparece por escrito: leitura que falhou e caixa de outro dia aberto.
   const aviso = item.estado === 'erro'
     ? `${item.em ? `Desatualizado · dados das ${hora(item.em)}` : 'Não foi possível atualizar'}${item.erro ? `: ${item.erro}` : ''}`

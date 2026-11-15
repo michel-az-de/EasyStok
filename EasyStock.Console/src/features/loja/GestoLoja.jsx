@@ -135,19 +135,30 @@ function UltimoFechamento({ ultimo }) {
 // que o caixa já abriu (a política do caixa deixa a operadora abrir): nada sai e a tela diz quem abre.
 export function ModalAbrirLoja({ aoFechar }) {
   const { acoes } = useAcessoModulos()
-  if (acoes?.controlarLoja !== true) {
-    return (
-      <Modal
-        titulo="Abrir a loja"
-        descricao="Peça a um gerente ou proprietário para abrir a loja."
-        aoFechar={aoFechar}
-        rodape={<Botao variante="primario" onClick={aoFechar}>Entendi</Botao>}
-      >
-        <p className={css.apoio}>Abrir a loja também abre o caixa do dia, com a conferência da gaveta.</p>
-      </Modal>
-    )
-  }
+  if (acoes?.controlarLoja !== true) return <AbrirLojaSemPermissao aoFechar={aoFechar} />
   return <AbrirLojaComCaixa aoFechar={aoFechar} />
+}
+
+// #2073 (resto da #2113): a operadora também vê aqui o aviso da abertura a confirmar, sem a ação, como no Caixa do dia.
+function AbrirLojaSemPermissao({ aoFechar }) {
+  const caixa = useCaixaDoDiaApi({ fechamentos: 1 })
+  const situacao = caixa.estado === 'ok' ? situacaoDoCaixaParaAbrirLoja(caixa.dia, caixa.fechamentos[0] ?? null) : null
+  const aConfirmar = situacao?.tipo === 'aberto' && situacao.aConfirmar
+  return (
+    <Modal
+      titulo="Abrir a loja"
+      descricao="Peça a um gerente ou proprietário para abrir a loja."
+      aoFechar={aoFechar}
+      rodape={<Botao variante="primario" onClick={aoFechar}>Entendi</Botao>}
+    >
+      {aConfirmar && (
+        <p className={css.alerta}>
+          {avisoDaAberturaAConfirmar(situacao.saldoInicial, situacao.ultimo)} Peça à gerência para contar a gaveta e confirmar a abertura.
+        </p>
+      )}
+      <p className={css.apoio}>Abrir a loja também abre o caixa do dia, com a conferência da gaveta.</p>
+    </Modal>
+  )
 }
 
 function AbrirLojaComCaixa({ aoFechar }) {
