@@ -1,4 +1,4 @@
-import { chamarApi } from './cliente'
+import { chamarApi, lerDaLoja } from './cliente'
 import { API_BASE } from '../fonteDados'
 import { urlDeExibicaoDaFoto } from '../../dominio/vitrineCardapio'
 
@@ -73,7 +73,7 @@ export const detalheDaApi = (d) => ({
   })),
 })
 
-export const listarFora = () => chamarApi(`${CARDAPIO}/fora`)
+export const listarFora = () => lerDaLoja(`${CARDAPIO}/fora`)
 
 // Item escondido → produto do console já marcado como fora do cardápio, para o "Repor".
 export const itemForaDaApi = (item) => ({
@@ -97,7 +97,7 @@ export const alertaDaApi = (d) => ({ id: `desacerto-${d.produtoId}`, texto: d.te
 // M1.1 (#1481): gestão do cardápio (Gerente). Todos os itens, inclusive ocultos e desligados.
 const LINHA_DA_GESTAO = { ParaServir: 'servir', PrepararEmCasa: 'casa' }
 
-export const listarGestao = () => chamarApi(`${CARDAPIO}/gestao`)
+export const listarGestao = () => lerDaLoja(`${CARDAPIO}/gestao`)
 // O servidor troca de lugar e renumera de 1 a n (#1486).
 const DIRECAO_DA_API = { subir: 'Subir', descer: 'Descer' }
 export const moverItem = (id, direcao) =>

@@ -32,7 +32,8 @@ public class AtendimentoComandaController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpGet("comanda/cardapio")]
     public Task<IActionResult> Cardapio(CancellationToken ct = default)
-        => Tratar(async () => DataOk(await cardapioUseCase.ExecuteAsync(currentUser.EmpresaId, ct)));
+        => Tratar(() => LerDaLoja(() => cardapioUseCase.ExecuteAsync(currentUser.EmpresaId, ct),
+            new CardapioDaComandaResult([], "", "", new Dictionary<Guid, IReadOnlyList<PorcaoDaComanda>>())));
 
     [SwaggerOperation(Summary = "Delivery windows with vacancies that respect the order lead time (S16)",
         Description = "itens: cardapio_item_id da comanda (o prazo sai do maior preparo). Sem datas, os próximos 14 dias.")]
@@ -112,7 +113,7 @@ public class AtendimentoComandaController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return VitrineDesligada();
         }
         catch (Exception ex) when (ex is UseCaseValidationException or CepInvalidoException)
         {

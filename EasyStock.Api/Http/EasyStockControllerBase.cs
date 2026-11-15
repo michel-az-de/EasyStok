@@ -16,6 +16,26 @@ public abstract class EasyStockControllerBase : ControllerBase
         return base.Ok(new ApiResponse<IEnumerable<T>>(items, new PagedMeta(total, pages, page, limit)));
     }
 
+    /// <summary>
+    /// #2598: 200 com o vazio da leitura e <c>meta.lojaDisponivel = false</c> quando a empresa não tem vitrine ativa,
+    /// o mesmo sinal da agenda de entregas. A tela mostra o vazio sem 404 no navegador.
+    /// </summary>
+    protected IActionResult DataSemLoja<T>(T vazio) =>
+        base.Ok(new ApiResponse<T>(vazio, new { lojaDisponivel = false }));
+
+    /// <summary>#2598: lê o que depende da vitrine e devolve <see cref="DataSemLoja{T}"/> quando ela não está ativa.</summary>
+    protected async Task<IActionResult> LerDaLoja<T>(Func<Task<T>> ler, T vazio)
+    {
+        try
+        {
+            return DataOk(await ler());
+        }
+        catch (EasyStock.Domain.Exceptions.Storefront.StorefrontNaoEncontradoException)
+        {
+            return DataSemLoja(vazio);
+        }
+    }
+
     /// <summary>201 with { data, meta: {} }</summary>
     protected IActionResult DataCreated<T>(string uri, T data) =>
         base.Created(uri, new ApiResponse<T>(data, new { }));
@@ -36,6 +56,10 @@ public abstract class EasyStockControllerBase : ControllerBase
     /// <summary>404 with { error: { code: NOT_FOUND, ... } }</summary>
     protected IActionResult DataNotFound(string message = "Recurso não encontrado.", string? detail = null) =>
         base.NotFound(new ApiErrorResponse(new ApiError("NOT_FOUND", message, detail, null)));
+
+    /// <summary>#2598: 404 com o código estável VITRINE_DESLIGADA, que o console lê no lugar da mensagem.</summary>
+    protected IActionResult VitrineDesligada() =>
+        base.NotFound(new ApiErrorResponse(new ApiError("VITRINE_DESLIGADA", "A empresa não tem vitrine ativa.", null, null)));
 
     /// <summary>409 with { error: { code: CONFLICT, ... } }</summary>
     protected IActionResult DataConflict(string message, string? detail = null) =>

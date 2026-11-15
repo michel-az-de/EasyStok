@@ -30,7 +30,7 @@ public sealed class ClientesFreteController(ConsultarFreteClienteUseCase frete, 
                 Detail = ex.Message
             });
         }
-        catch (StorefrontNaoEncontradoException) { return DataNotFound("A empresa não tem vitrine ativa."); }
+        catch (StorefrontNaoEncontradoException) { return VitrineDesligada(); }
         catch (CepInvalidoException ex) { return DataBadRequest(ex.Message); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }

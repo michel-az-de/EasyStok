@@ -289,7 +289,9 @@ await confere('C12 sugestão já presente (sem acento/caixa) some; "_" vira espa
 
 // ── C13 ────────────────────────────────────────────────────────────────────
 await confere('C13 vitrine desligada vira aviso acionável', () => {
-  const texto = plano.avisoDoCardapio({ status: 404, message: 'A empresa não tem vitrine ativa.' })
+  // #2598: o código decide, não a mensagem (a leitura chega como 200 e vira VITRINE_DESLIGADA em lerDaLoja).
+  const texto = plano.avisoDoCardapio({ status: 200, codigo: 'VITRINE_DESLIGADA', message: 'A empresa não tem vitrine ativa.' })
+  assert.equal(plano.lojaDesligada({ status: 404, codigo: 'NOT_FOUND', message: 'A empresa não tem vitrine ativa.' }), false)
   assert.equal(texto, 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.')
   assert.equal(plano.avisoDoCardapio({ status: 500, message: 'Fora' }), 'Cardápio: Fora')
 })

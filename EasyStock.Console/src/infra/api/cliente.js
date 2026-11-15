@@ -115,6 +115,14 @@ const comoJson = (texto) => {
 const semResposta = (metodo) => new ErroApi(0, 'SEM_RESPOSTA',
   metodo === 'GET' ? MENSAGEM_LEITURA_SEM_RESPOSTA : MENSAGEM_ESCRITA_SEM_RESPOSTA)
 
+// #2598: leitura que depende da loja online. Sem vitrine ativa a API responde 200 com o vazio e meta.lojaDisponivel=false;
+// aqui vira o erro VITRINE_DESLIGADA da escrita, que as telas já mostram como "a loja online ainda não está ligada".
+export async function lerDaLoja(caminho, opcoes = {}) {
+  const json = await chamarApi(caminho, { ...opcoes, envelope: true })
+  if (json?.meta?.lojaDisponivel === false) throw new ErroApi(200, 'VITRINE_DESLIGADA', 'A empresa não tem vitrine ativa.')
+  return json?.data ?? null
+}
+
 export async function chamarApi(caminho, {
   metodo = 'GET', corpo, formulario, autenticado = true, texto = false, arquivo = false, chave = null, sinal, envelope = false, prazoComCancelamento = false, identidadeEsperada = null, keepalive = false, repetida = false, prazoMs = null,
 } = {}) {
