@@ -118,6 +118,31 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         upsert.Payload.GetProperty("stock").GetInt32().Should().Be(7);
     }
 
+    // #2083 (A7): produto do console ainda sem espelho descia ao app com saldo 0 (app 0, console 11).
+    [Fact]
+    public async Task ProdutoErpSemEspelho_DesceComOSaldoDoErpNaLoja()
+    {
+        var loja = Guid.NewGuid();
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Lasanha", Tipo = TipoProduto.Alimento,
+            Status = StatusProduto.Ativo, CategoriaId = CriarCategoria(),
+            CriadoEm = DateTime.UtcNow.AddDays(-10), AlteradoEm = DateTime.UtcNow,
+        };
+        _db.Add(produto);
+        ItemEstoqueDoErp(produto.Id, loja, 8m);
+        ItemEstoqueDoErp(produto.Id, null, 3m);
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 50m);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, DateTime.UtcNow.AddDays(-1), _empresaId, loja);
+
+        var upsert = mutations.Should().ContainSingle(m => m.Type == "product.upsert").Subject;
+        upsert.Payload.GetProperty("id").GetString().Should().Be(produto.Id.ToString());
+        upsert.Payload.GetProperty("stock").GetInt32().Should().Be(11, "8 da loja + 3 sem loja; a outra loja fica de fora");
+    }
+
     [Fact]
     public async Task ProdutoErpNaoAlterado_ComEspelho_NaoEmiteUpsert()
     {
