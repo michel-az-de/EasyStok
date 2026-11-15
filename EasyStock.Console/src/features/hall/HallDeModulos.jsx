@@ -210,7 +210,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             {buscando && destinos.length > 0 && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
           </div>
         </div>
-        {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos} aoMover={moverPainel} />}
+        {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos}
+          podeFecharCaixa={acoes?.gerenciarCaixa === true} aoMover={moverPainel} />}
         {/* #1810: no modo API o destaque repetia um cartão de área; ficam só os números e as áreas. */}
         {!buscando && destaque && !fonteApi && <section className={css.destaque} aria-labelledby="destaque-hall">
           <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={40} /></div>

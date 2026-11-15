@@ -124,7 +124,7 @@ caso('H2/H3: os cartões de número usam o rótulo do domínio e o ícone do map
 
 caso('H4: com "Fechar caixa" à vista, o texto lido é o mesmo (sem "Conferir caixa" oculto)', () => {
   const caixa = { financeiro: lido({ aberto: true, saldoEsperado: 40, saldoInicial: 0, movimentos: [], esquecidoAberto: true }) }
-  const html = renderToStaticMarkup(h(PulsoDoHall, { ids: ['financeiro'], foco: 'x', fontes: caixa, aoMover: () => {} }))
+  const html = renderToStaticMarkup(h(PulsoDoHall, { ids: ['financeiro'], foco: 'x', fontes: caixa, podeFecharCaixa: true, aoMover: () => {} }))
   assert.match(html, /Fechar caixa/)
   assert.doesNotMatch(html, /Conferir caixa/)
   const normal = { financeiro: lido({ aberto: true, saldoEsperado: 40, saldoInicial: 0, movimentos: [] }) }
@@ -182,7 +182,7 @@ caso('C1/P1: o cartão com pendência leva ao ponto exato; sem ela, ao módulo',
 
 caso('P1: Produção é medida pelos lotes vencidos e nunca diz "Tudo em dia" sem ler', () => {
   const lotes = pulso.pendenciaDoModulo('producao', { producao: lido({ vencidos: [{}, {}] }) })
-  assert.deepEqual([lotes.texto, lotes.atencao, lotes.href], ['2 lotes vencidos', true, '#/m/producao/estoque'])
+  assert.deepEqual([lotes.texto, lotes.atencao, lotes.href], ['2 lotes vencidos', true, '#/m/producao/perdas'])
   assert.equal(pulso.pendenciaDoModulo('producao', { producao: lido({ vencidos: [] }) }).texto, 'Nenhum lote vencido')
   for (const id of ['atendimento', 'cozinha', 'entregas', 'financeiro', 'cardapio', 'producao', 'configuracoes', 'campanhas']) {
     assert.equal(estado.estadoDoCartao(id, {}), null, `${id} sem leitura não afirma nada`)

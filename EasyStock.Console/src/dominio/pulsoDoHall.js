@@ -15,7 +15,9 @@ export const precisaDeVoce = (n, mais = '') => `${n}${mais} ${n === 1 ? 'precisa
 export { plural }
 
 // #2258 (P1): `href` leva o alerta ao ponto exato do módulo; sem ele o cartão abre o módulo.
-export const HASH_LOTES_VENCIDOS = '#/m/producao/estoque'
+// #2677 (H1): os lotes vencidos com saldo estão em Perdas, que lê a mesma fonte (`/perdas/vencidos`); Estoque do
+// dia conta outra coisa e mostrava 0 para quem chegava pelo cartão.
+export const HASH_LOTES_VENCIDOS = '#/m/producao/perdas'
 export const HASH_PRATOS_COM_PENDENCIA = '#/m/cardapio/itens/pendencia'
 
 // #1839 D: a linha viva do cartão de cada módulo. Só módulo com fonte lida tem linha; leitura que
