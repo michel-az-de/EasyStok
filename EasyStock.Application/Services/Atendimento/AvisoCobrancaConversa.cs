@@ -25,6 +25,16 @@ public sealed class AvisoCobrancaConversa(
     public static string TextoNovoLink(string link) =>
         $"O link de pagamento anterior expirou. Aqui está um novo, válido por 30 minutos (Pix ou cartão, como preferir): {link}";
 
+    /// <summary>
+    /// #2233: Pix direto para a chave da loja. <paramref name="restanteNaEntrega"/> maior que zero é a encomenda que paga
+    /// o sinal agora. O texto leva a chave dentro do copia e cola: nunca vai para log.
+    /// </summary>
+    public static string TextoPixDireto(decimal valorDoPix, decimal restanteNaEntrega, string copiaCola, string nomeRecebedor) =>
+        (restanteNaEntrega > 0m
+            ? $"Sinal de {valorDoPix.ToString("C", Cultura.PtBr)} pelo Pix para {nomeRecebedor}. Restante na entrega: {restanteNaEntrega.ToString("C", Cultura.PtBr)}."
+            : $"Pagamento de {valorDoPix.ToString("C", Cultura.PtBr)} pelo Pix para {nomeRecebedor}.")
+        + $" Copie o código abaixo no app do seu banco (Pix copia e cola). Assim que a equipe conferir, confirmamos por aqui.\n\n{copiaCola}";
+
     public static string TextoLinkTrocado(string link) =>
         $"Aqui está o link para pagar seu pedido, válido por 30 minutos (Pix ou cartão, como preferir): {link}";
 

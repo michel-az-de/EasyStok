@@ -91,7 +91,7 @@ public sealed class PedidosCobrancaController(
     public Task<IActionResult> Conferir(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
         ExecutarAsync(empresaId, async emp => DataOk(await conferencia.ExecuteAsync(emp, id, ct)));
 
-    [SwaggerOperation(Summary = "Trocar a forma de pagamento do pedido (online | na_entrega)")]
+    [SwaggerOperation(Summary = "Trocar a forma de pagamento do pedido (online | na_entrega | pix_direto)", Description = "pix_direto (#2233) exige a flag pagamento.pix_direto e a chave Pix da loja do pedido; a resposta traz pixCopiaCola.")]
     [HttpPost("{id}/cobranca/forma")]
     [Authorize(Policy = "Operador")]
     public Task<IActionResult> TrocarForma(

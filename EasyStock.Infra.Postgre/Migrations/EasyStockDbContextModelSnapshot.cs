@@ -5234,6 +5234,21 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<string>("PixChave")
+                        .HasMaxLength(77)
+                        .HasColumnType("character varying(77)");
+
+                    b.Property<string>("PixCidade")
+                        .HasMaxLength(15)
+                        .HasColumnType("character varying(15)");
+
+                    b.Property<string>("PixNomeRecebedor")
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)");
+
+                    b.Property<int?>("PixTipo")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Telefone")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
@@ -7660,6 +7675,10 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<Guid>("PedidoId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("PixCopiaCola")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("Provedor")
                         .IsRequired()
