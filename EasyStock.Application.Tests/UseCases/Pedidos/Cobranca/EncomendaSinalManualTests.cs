@@ -294,6 +294,44 @@ public class EncomendaSinalManualTests
         f.Pedido.TotalPago.Should().Be(sinal);
     }
 
+    // #2724: mesma regra da #2578 pelo "Desfazer pagamento manual": desfazer o sinal deixava a encomenda na fila com pago 0.
+    [Fact]
+    public async Task DesfazerPagamentoDoSinal_VoltaAAguardarPagamentoEAvisaAOperacao()
+    {
+        var f = Futuro();
+        f.AdicionarNaEntrega();
+        var sinal = PlanoPagamentoEncomenda.Sinal(f.Pedido.Total.Valor);
+        await Manual(f).ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", sinal));
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+
+        await f.Desfazer().ExecuteAsync(new DesfazerPagamentoManualInput(f.EmpresaId, f.Pedido.Id, "marquei por engano"));
+
+        f.Pedido.TotalPago.Should().Be(0);
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
+        await f.OperacaoEventos.Received(1).PublicarAsync(EventosOperacao.PedidoMudouStatus, f.EmpresaId,
+            Arg.Is<PedidoMudouStatusOperacao>(e => e.PedidoId == f.Pedido.Id
+                && e.StatusAntigo == StatusPedidoMapper.Aguardando
+                && e.StatusNovo == StatusPedidoMapper.AguardandoPagamento), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DesfazerPagamentoDoRestante_ComSinalPago_MantemNaFila()
+    {
+        var f = Futuro();
+        f.AdicionarNaEntrega();
+        var total = f.Pedido.Total.Valor;
+        var sinal = PlanoPagamentoEncomenda.Sinal(total);
+        var uc = Manual(f);
+        await uc.ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "pix", sinal));
+        await uc.ExecuteAsync(new(f.EmpresaId, f.Pedido.Id, "dinheiro", total - sinal));
+        var restante = f.Pedido.Pagamentos.Single(p => p.Metodo == "dinheiro");
+
+        await f.Desfazer().ExecuteAsync(new DesfazerPagamentoManualInput(f.EmpresaId, f.Pedido.Id, "engano", PagamentoId: restante.Id));
+
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.Aguardando);
+        f.Pedido.TotalPago.Should().Be(sinal);
+    }
+
     private static RemoverPagamentoPedidoUseCase Remover(CobrancaPedidoFixture f) =>
         new(f.PedidoRepo, f.CobrancaRepo, f.Uow, NullLogger<RemoverPagamentoPedidoUseCase>.Instance,
             QuitacaoPedidoTeste.Criar(f.PedidoRepo, f.CobrancaRepo, f.ConversaRepo, f.ImpressaoRepo, f.Publicador, f.OperacaoEventos, f.PrazoQueries),
