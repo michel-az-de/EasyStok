@@ -65,7 +65,8 @@ confere('1  "Chat do site" sai da origem (o selo do avatar já diz); as outras o
   const reabertura = cartao.origemNoCartao({ origem: 'reabertura', motivo: 'Cliente voltou a escrever' })
   assert.equal(reabertura.curto, 'Cliente voltou a escrever')
   const naoSoube = cartao.origemNoCartao({ motivo: 'pediu desconto', em: '2026-10-16T14:00:00Z' })
-  assert.match(naoSoube.curto, /^Automático não soube responder/)
+  // #2187 (harmonia do Atendimento) chamou o robô de Assistente em toda a tela (#2701).
+  assert.match(naoSoube.curto, /^Assistente não soube responder/)
 })
 // #1899: a função recebe o estado da linha (que herda a chave do motivo quando há motivo).
 confere('1  etiqueta do estado some na passagem, no Automático e no Com você; motivos, Bloqueado, Encerrada e Outro ficam', () => {
@@ -181,12 +182,16 @@ confere('5  a janela continua no acesso "Pedido e entrega" do Resumo e o aviso d
   assert.match(painel, /resumo=\{editavel \? faixa \|\| 'Itens, horário e acompanhamento'/)
   assert.match(fonte('features/atendimento/Composer.jsx'), /fixo acima do campo só perto do fim da janela de 24 h/)
 })
-confere('5  Balcão e Resumo sem cabeçalho só no desktop de três colunas; o nome segue no aria-label', () => {
+// #2156 tirou também do tablet o título repetido de Conversas: nenhuma coluna da Moldura tem cabeçalho
+// visível e o nome segue no aria-label (#2701).
+confere('5  Balcão e Resumo sem cabeçalho repetido no desktop e no tablet; o nome segue no aria-label', () => {
   const moldura = fonte('app/Moldura.jsx')
   assert.match(moldura, /<Coluna variante="entrada" titulo="Conversas" semTitulo>/)
   assert.match(moldura, /<Coluna variante="ficha" titulo="Ficha" semTitulo>/)
   assert.match(moldura, /<section className=\{`\$\{css\.coluna\} \$\{css\[variante\]\}`\} aria-label=\{titulo\}>/)
-  assert.equal((moldura.match(/titulo="Conversas" semTitulo/g) ?? []).length, 1, 'tablet e celular mantêm o título')
+  const colunas = moldura.match(/<Coluna variante=[^>]*>/g) ?? []
+  assert.equal(colunas.length, 3, 'Conversas no desktop e no tablet, Ficha no desktop')
+  assert.ok(colunas.every((c) => / semTitulo>$/.test(c)), 'toda coluna sem o cabeçalho repetido')
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

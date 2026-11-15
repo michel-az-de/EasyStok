@@ -19,8 +19,10 @@ const dona = { usuarioId: 'dona', ativo: true, convite: { estado: 'nenhum' } }
 const convidada = { usuarioId: 'ana', ativo: true, convite: { estado: 'pendente' } }
 const desativada = { usuarioId: 'bia', ativo: false, convite: { estado: 'pendente' } }
 
+// #2201 (PR #2204) acrescentou gerarCodigo (código de acesso de uso único): nunca para si mesma nem para quem
+// está desativada, por isso os dois objetos abaixo o trazem falso (#2701).
 conferir('a dona não recebe botão para mexer no próprio acesso', () => {
-  assert.deepEqual(acoesDoUsuario(dona, 'dona'), { trocarPerfil: false, reenviarConvite: false, desativar: false, reativar: false })
+  assert.deepEqual(acoesDoUsuario(dona, 'dona'), { trocarPerfil: false, reenviarConvite: false, desativar: false, reativar: false, gerarCodigo: false })
 })
 
 conferir('quem ainda não aceitou pode receber o convite de novo; quem aceitou, não', () => {
@@ -29,7 +31,7 @@ conferir('quem ainda não aceitou pode receber o convite de novo; quem aceitou, 
 })
 
 conferir('desativada só tem o caminho de volta, e aparece como desativada mesmo com convite aberto', () => {
-  assert.deepEqual(acoesDoUsuario(desativada, 'dona'), { trocarPerfil: false, reenviarConvite: false, desativar: false, reativar: true })
+  assert.deepEqual(acoesDoUsuario(desativada, 'dona'), { trocarPerfil: false, reenviarConvite: false, desativar: false, reativar: true, gerarCodigo: false })
   assert.equal(situacaoDoUsuario(desativada).rotulo, 'Desativado')
   assert.equal(situacaoDoUsuario(convidada).rotulo, 'Convite enviado')
   assert.equal(situacaoDoUsuario(dona).rotulo, 'Ativo')
