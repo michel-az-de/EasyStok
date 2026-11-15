@@ -31,9 +31,14 @@ public sealed class UsuarioContaDeSistemaIntegrationTests(PostgreSqlDatabaseFixt
 
         var ana = Usuario.Criar("Ana", $"ana+{empresaId:N}@casadababa.com", "hash");
         // Igual ao MobileSystemUserResolver: Ativo = false (trava de login) e vínculo ativo.
-        var sync = Usuario.Criar("Sistema Mobile Sync", $"mobile-sync+{empresaId:N}@system.local", "DISABLED_NO_LOGIN");
-        sync.Ativo = false;
-        foreach (var u in new[] { ana, sync })
+        var sync = Usuario.CriarContaDeSistema(empresaId);
+        // Pessoa gravada com o domínio antes da guarda: o domínio sozinho não a esconde.
+        var leo = new Usuario
+        {
+            Id = Guid.NewGuid(), Nome = "Leo", Email = $"leo+{empresaId:N}@system.local", SenhaHash = "$2a$11$hash",
+            Ativo = true, CriadoEm = Instante, AlteradoEm = Instante
+        };
+        foreach (var u in new[] { ana, sync, leo })
         {
             db.Usuarios.Add(u);
             db.UsuariosEmpresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = u.Id, EmpresaId = empresaId, Ativo = true });
@@ -52,8 +57,8 @@ public sealed class UsuarioContaDeSistemaIntegrationTests(PostgreSqlDatabaseFixt
 
         var (usuarios, total) = await new UsuarioRepository(db).GetByEmpresaAsync(empresaId, 1, 20);
 
-        usuarios.Select(u => u.Nome).Should().Equal("Ana");
-        total.Should().Be(1, "a paginação conta só quem aparece");
+        usuarios.Select(u => u.Nome).Should().BeEquivalentTo("Ana", "Leo");
+        total.Should().Be(2, "a paginação conta só quem aparece");
     }
 
     [SkippableFact]
@@ -63,6 +68,6 @@ public sealed class UsuarioContaDeSistemaIntegrationTests(PostgreSqlDatabaseFixt
         var (db, empresaId) = await CenarioAsync();
         await using var _ = db;
 
-        (await new UsuarioRepository(db).CountByEmpresaAsync(empresaId)).Should().Be(1);
+        (await new UsuarioRepository(db).CountByEmpresaAsync(empresaId)).Should().Be(2);
     }
 }

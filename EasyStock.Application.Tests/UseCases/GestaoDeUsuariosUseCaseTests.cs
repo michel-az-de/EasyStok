@@ -154,8 +154,7 @@ public class GestaoDeUsuariosUseCaseTests
     // #2695: a conta interna do sync móvel nasce com Ativo = false e o vínculo ativo (MobileSystemUserResolver).
     private Usuario ContaDoSyncMovel()
     {
-        var conta = Usuario.Criar("Sistema Mobile Sync", $"mobile-sync+{_empresaId:N}@system.local", "DISABLED_NO_LOGIN");
-        conta.Ativo = false;
+        var conta = Usuario.CriarContaDeSistema(_empresaId);
         var vinculo = new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = conta.Id, EmpresaId = _empresaId, Ativo = true };
         conta.Empresas.Add(vinculo);
         _c.Usuarios.GetByIdAsync(conta.Id).Returns(conta);
@@ -185,6 +184,19 @@ public class GestaoDeUsuariosUseCaseTests
         (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("CONTA_DE_SISTEMA");
         conta.Empresas.Single().Ativo.Should().BeTrue("o sync móvel grava com este vínculo");
         _c.Auditorias.Should().BeEmpty();
+    }
+
+    // #2695 (devolução da #2696): pessoa gravada com o domínio antes da guarda segue desativável.
+    [Fact]
+    public async Task PessoaComODominioReservadoSegueDesativavel()
+    {
+        var fulano = Atendente();
+        fulano.Email = "fulano@system.local";
+
+        await Desativar().ExecuteAsync(new DesativarUsuarioCommand(fulano.Id, _empresaId));
+
+        fulano.Empresas.Single().Ativo.Should().BeFalse();
+        _c.Auditorias.Should().ContainSingle(a => a.Acao == "usuario-desativado");
     }
 
     [Fact]

@@ -49,7 +49,7 @@ namespace EasyStock.Application.UseCases.CriarUsuario
         {
             logger.LogInformation("Criando usuario para empresa {EmpresaId}", command.EmpresaId);
 
-            EmailValidator.EnsureValid(command.Email);
+            EmailValidator.EnsureValidDeUsuario(command.Email);
 
             var convidar = string.IsNullOrEmpty(command.Senha);
             TelefoneE164? telefone = null;

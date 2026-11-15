@@ -262,6 +262,24 @@ public class AtualizarUsuarioUseCaseTests
         _f.Eventos.Should().BeEmpty();
     }
 
+    // #2695: o domínio das contas internas é reservado, na troca imediata do convidado e na de dois passos.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TrocarEmailParaODominioReservadoRecusa(bool convidado)
+    {
+        var empresaA = _f.EmpresaId;
+        var alvo = convidado ? ConvidadoDaEmpresa(empresaA) : AlvoDaEmpresa(empresaA);
+        ComoAdmin(empresaA);
+
+        var acao = () => CriarUseCase().ExecuteAsync(new AtualizarUsuarioCommand(alvo.Id, "Alvo", "alvo@system.local"));
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("EMAIL_RESERVADO");
+        alvo.Email.Should().Be("alvo@empresa.com");
+        alvo.EmailPendente.Should().BeNull();
+        _f.Eventos.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task EditarSoONomeDeConvidadoNaoMexeNoConvite()
     {

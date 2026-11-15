@@ -24,7 +24,7 @@ public class MobileSystemUserResolver(EasyStockDbContext db)
     {
         // Email escopado por empresa pra evitar conflito entre tenants.
         // Formato: mobile-sync+<empresaId-N>@system.local
-        var email = $"mobile-sync+{empresaId:N}{Usuario.DominioDeSistema}";
+        var email = Usuario.EmailDaContaDeSistema(empresaId);
 
         // IgnoreQueryFilters: Usuario nao tem EmpresaId direto (m:n via UsuarioEmpresa),
         // mas defensive — outros filters podem mexer.
@@ -36,9 +36,8 @@ public class MobileSystemUserResolver(EasyStockDbContext db)
 
         // Cria Usuario sistema. SenhaHash placeholder invalido pra login.
         // Ativo=false: hard-block de login mesmo se alguem descobrir.
-        var novo = Usuario.Criar("Sistema Mobile Sync", email, "DISABLED_NO_LOGIN");
-        novo.Ativo = false;
-        novo.EmailConfirmado = false;
+        // #2695: Usuario.Criar recusa o domínio reservado; a conta interna tem fábrica própria.
+        var novo = Usuario.CriarContaDeSistema(empresaId);
         _db.Add(novo);
 
         _db.Add(new UsuarioEmpresa

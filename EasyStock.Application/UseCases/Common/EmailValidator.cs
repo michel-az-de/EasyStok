@@ -19,4 +19,19 @@ public static class EmailValidator
         if (!IsValid(email))
             throw new UseCaseValidationException($"{campoAmigavel} inválido.");
     }
+
+    /// <summary>#2695: e-mail de pessoa da equipe. Formato válido e fora do domínio das contas internas.</summary>
+    public static void EnsureValidDeUsuario(string? email)
+    {
+        EnsureValid(email);
+        RecusarReservado(email);
+    }
+
+    /// <summary>#2695: o domínio das contas internas não serve para pessoa (o domínio também barra, ver <c>Usuario</c>).</summary>
+    public static void RecusarReservado(string? email)
+    {
+        if (email is not null && Usuario.EmailReservado(email))
+            throw new UseCaseValidationException(
+                "EMAIL_RESERVADO", "Este domínio de e-mail é reservado ao sistema. Use o e-mail da pessoa.");
+    }
 }

@@ -1,4 +1,5 @@
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
 using FluentAssertions;
 
@@ -194,10 +195,74 @@ public class UsuarioConviteTests
         Usuario.NormalizarEmail(informado).Should().Be(esperado);
 
     // #2695: a conta interna do sync móvel não é pessoa da equipe.
+    [Fact]
+    public void ContaDeSistemaNasceComLoginTravadoEReconhecida()
+    {
+        var empresaId = Guid.Parse("f2cf3584-4815-4883-a084-9aa56deebcbd");
+
+        var conta = Usuario.CriarContaDeSistema(empresaId);
+
+        conta.Email.Should().Be("mobile-sync+f2cf358448154883a0849aa56deebcbd@system.local");
+        conta.Ativo.Should().BeFalse();
+        conta.EhContaDeSistema.Should().BeTrue();
+    }
+
+    // #2695 (devolução da #2696): o domínio sozinho não identifica a conta; precisa do prefixo E da senha inutilizável.
+    // Uma pessoa gravada com o domínio antes da guarda continua visível e desativável.
     [Theory]
-    [InlineData("mobile-sync+f2cf358448154883a0849aa56deebcbd@system.local", true)]
-    [InlineData("ana@casadababa.com", false)]
-    [InlineData("system.local@casadababa.com", false)]
-    public void ContaDeSistemaSeReconhecePeloDominioInterno(string email, bool esperado) =>
-        Usuario.Criar("Qualquer", email, "hash").EhContaDeSistema.Should().Be(esperado);
+    [InlineData("fulano@system.local", "$2a$11$hash-real")]
+    [InlineData("mobile-sync+f2cf358448154883a0849aa56deebcbd@system.local", "$2a$11$hash-real")]
+    [InlineData("fulano@system.local", "DISABLED_NO_LOGIN")]
+    [InlineData("system.local@casadababa.com", "DISABLED_NO_LOGIN")]
+    public void SoODominioNaoFazContaDeSistema(string email, string senhaHash)
+    {
+        var pessoa = new Usuario { Email = email, SenhaHash = senhaHash };
+
+        pessoa.EhContaDeSistema.Should().BeFalse();
+        Usuario.NaoEhContaDeSistema.Compile()(pessoa).Should().BeTrue("o filtro do repositório segue a mesma regra");
+    }
+
+    [Fact]
+    public void FiltroDoRepositorioReconheceAContaDeSistema() =>
+        Usuario.NaoEhContaDeSistema.Compile()(Usuario.CriarContaDeSistema(Guid.NewGuid())).Should().BeFalse();
+
+    [Theory]
+    [InlineData("fulano@system.local")]
+    [InlineData(" Fulano@System.LOCAL ")]
+    public void PessoaNaoNasceComODominioReservado(string email)
+    {
+        var criar = () => Usuario.Criar("Fulano", email, "hash");
+        var convidar = () => Usuario.CriarConvidado("Fulano", email);
+
+        criar.Should().Throw<EmailReservadoException>();
+        convidar.Should().Throw<EmailReservadoException>();
+    }
+
+    [Fact]
+    public void TrocaDeEmailNaoAceitaODominioReservado()
+    {
+        var ana = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+
+        var pedir = () => ana.SolicitarTrocaDeEmail("ana@system.local");
+        var trocarConvidado = () => ana.TrocarEmailDoConvidado("ana@system.local");
+
+        pedir.Should().Throw<EmailReservadoException>();
+        trocarConvidado.Should().Throw<EmailReservadoException>();
+        ana.Email.Should().Be("ana@casadababa.com");
+        ana.EmailPendente.Should().BeNull();
+    }
+
+    [Fact]
+    public void TrocarEmailDoConvidadoGravaNormalizadoESemPendencia()
+    {
+        var ana = Usuario.CriarConvidado("Ana", "ana@casadababa.com");
+        ana.EmailPendente = "outro@casadababa.com";
+        ana.EmailConfirmado = true;
+
+        ana.TrocarEmailDoConvidado(" Nova@CasaDaBaba.com ");
+
+        ana.Email.Should().Be("nova@casadababa.com");
+        ana.EmailPendente.Should().BeNull();
+        ana.EmailConfirmado.Should().BeFalse();
+    }
 }

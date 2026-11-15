@@ -239,4 +239,19 @@ public class CriarUsuarioUseCaseTests
         await act.Should().ThrowAsync<UseCaseValidationException>();
         _adicionados.Should().BeEmpty();
     }
+
+    // #2695: o domínio das contas internas é reservado, com senha e por convite.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Senha@12345")]
+    public async Task EmailDoDominioReservadoRecusaAntesDeCriar(string? senha)
+    {
+        var comando = new CriarUsuarioCommand(_empresaId, "Fulano", "Fulano@System.Local", senha, null, null, null, false);
+
+        var act = () => UseCase().ExecuteAsync(comando);
+
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("EMAIL_RESERVADO");
+        _adicionados.Should().BeEmpty();
+        _c.Eventos.Should().BeEmpty();
+    }
 }
