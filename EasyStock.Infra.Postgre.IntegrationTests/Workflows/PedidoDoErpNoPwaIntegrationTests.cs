@@ -123,6 +123,81 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     }
 
     [SkippableTheory]
+    [InlineData(2)]
+    [InlineData(0)]
+    public async Task PedidoComSinalEntregueNoAparelho_GravaSoORestanteComAFormaDaEntrega(int diasDesdeOSinal)
+    {
+        // #2711: o vínculo saía cedo quando o pedido já tinha qualquer recebimento, e o restante pago
+        // na entrega não virava PedidoPagamento. Pedido de R$ 100 com sinal de R$ 30.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            var pedido = await db.Set<Pedido>().Include(p => p.Itens).SingleAsync(p => p.Id == s.PedidoId);
+            pedido.Itens.Single().PrecoUnitario = 50m;
+            pedido.Itens.Single().Subtotal = 100m;
+            pedido.RecalcularTotal();
+            db.Add(new PedidoPagamento
+            {
+                Id = Guid.NewGuid(), PedidoId = s.PedidoId, Metodo = "pix", Valor = 30m, Observacao = "Sinal",
+                PagoEm = DateTime.UtcNow.AddDays(-diasDesdeOSinal), RegistradoPorNome = "Felipe"
+            });
+            // O aparelho entrega com a forma escolhida na entrega.
+            var doAparelho = new Order
+            {
+                Id = s.PedidoId.ToString(), ClientSnapshotName = "Ana", Total = 100m, Metodo = "credito", LastDeviceId = "dev-a",
+                LastOperatorName = "Thati", EmpresaId = s.EmpresaId
+            };
+            doAparelho.Items.Add(new OrderItem { OrderId = doAparelho.Id, ProductId = s.ProdutoId.ToString(), Name = "Lasanha", Qty = 2, UnitPrice = 50m });
+            db.Add(doAparelho);
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue");
+        await EcoarDoAparelho(provider, s, "entregue");
+
+        (await StatusDoPedido(s)).Should().Be("entregue");
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var recebimentos = await leitura.Set<PedidoPagamento>().Where(p => p.PedidoId == s.PedidoId)
+            .OrderBy(p => p.Valor).Select(p => new { p.Valor, p.Metodo }).ToListAsync();
+        recebimentos.Should().BeEquivalentTo(
+            [new { Valor = 30m, Metodo = "pix" }, new { Valor = 70m, Metodo = "credito" }],
+            o => o.WithStrictOrdering(),
+            "o sinal fica como entrou e a entrega grava só o restante, uma vez, mesmo com o reenvio do eco");
+        (await leitura.Set<Venda>().Where(v => v.EmpresaId == s.EmpresaId).Select(v => v.ValorTotal.Valor).ToListAsync())
+            .Should().ContainSingle().Which.Should().Be(100m);
+    }
+
+    [SkippableFact]
+    public async Task PedidoJaQuitadoAntesDaEntrega_NaoGravaRecebimentoNaEntrega()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(s.EmpresaId);
+            db.Add(new PedidoPagamento
+            {
+                Id = Guid.NewGuid(), PedidoId = s.PedidoId, Metodo = "pix", Valor = 60m, Observacao = "Pago adiantado",
+                PagoEm = DateTime.UtcNow.AddDays(-1), RegistradoPorNome = "Felipe"
+            });
+            await db.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue");
+
+        (await Recebimentos(s)).Should().ContainSingle().Which.Should().Be(60m, "o recebido já cobre o total");
+    }
+
+    [SkippableTheory]
     [InlineData("Sinal recebido no balcão", false)]
     [InlineData(OrderLinker.MarcaDoRecebimentoAutomatico + " (texto digitado no console)", true)]
     public async Task CancelarNoAparelhoPedidoComRecebimentoLancadoNoErp_SegueARegraDoErp(string observacao, bool lancadoPorUsuario)
