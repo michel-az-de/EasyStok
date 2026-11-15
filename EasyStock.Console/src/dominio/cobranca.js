@@ -59,6 +59,7 @@ export const NOME_DO_MEIO = {
   maquininha: 'maquininha',
   'vale-refeicao': 'vale',
   'dinheiro-entrega': 'dinheiro na entrega',
+  'pix-direto': 'Pix na chave da loja',
 }
 // Cobrança sem `meio` é da massa anterior à F4, quando só existia Pix.
 export const nomeDoMeio = (meio) => NOME_DO_MEIO[meio ?? 'pix'] ?? 'cobrança'
@@ -70,6 +71,26 @@ export const nomeDoMeio = (meio) => NOME_DO_MEIO[meio ?? 'pix'] ?? 'cobrança'
 // transforma o pedido em maquininha.
 export const DINHEIRO_NA_ENTREGA = 'dinheiro-entrega'
 export const MEIOS_NA_ENTREGA = new Set([DINHEIRO_NA_ENTREGA, 'maquininha', 'vale-refeicao'])
+
+// --- Pix direto pela chave da loja (#2233) -------------------------------------
+// Sem Mercado Pago: o EasyStok manda o copia e cola da chave da loja e a equipe confere e dá baixa
+// ("Marcar pago"). Fica fora de `infra/catalogo.js` porque depende do tenant: o chip só aparece com a
+// API dizendo que está disponível (flag `pagamento.pix_direto` e loja com chave) e com o pedido já
+// criado, que é quando a troca de forma existe. Demonstração e cardápio público não o veem.
+export const MEIO_PIX_DIRETO = 'pix-direto'
+const CHIP_PIX_DIRETO = {
+  id: MEIO_PIX_DIRETO, rotulo: 'Pix na chave da loja', situacao: 'ativo', provedor: 'pix_direto',
+  liberaEsteiraSemPagar: true, destaque: true,
+}
+export const meiosDaEscolha = (meios, { pixDireto = false, pedidoCriado = false } = {}) =>
+  pixDireto && pedidoCriado ? [...meios, CHIP_PIX_DIRETO] : meios
+
+// O cartão da aba Integrações só existe com a flag `pagamento.pix_direto` ligada: com ela desligada
+// (ou ainda carregando) não aparece, nem com chave salva. Ligada, diz se falta cadastrar a chave.
+export const situacaoDoPixDireto = (pix) => {
+  if (!pix?.pixDiretoLigado) return null
+  return pix.configurada ? { tom: 'ok', texto: 'Ligado' } : { tom: 'neutro', texto: 'Sem chave' }
+}
 const PREFIXO_DINHEIRO = 'Pagamento na entrega: dinheiro'
 
 // `trocoPara` em reais; vazio ou zero é "sem troco".

@@ -123,8 +123,13 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
 
   // #2185 (F12): trocar para o link online faz o EasyStok mandar o link na conversa (`TextoLinkTrocado`). É fala
   // humana como a cobrança: com o Assistente atendendo, assume antes. Pagar na entrega não fala com o cliente.
-  const trocarFormaFalando = (id, meio) => (formaDoMeio(meio) === FORMA_ONLINE
-    ? antesDeEnviar(id, () => trocarForma(id, meio), { erro: 'Não consegui assumir a conversa, então o link não saiu.' })
+  // #2233: o Pix direto também fala (manda o copia e cola), então também assume antes.
+  const trocarFormaFalando = (id, meio) => (formaDoMeio(meio) !== FORMA_NA_ENTREGA
+    ? antesDeEnviar(id, () => trocarForma(id, meio), {
+      erro: formaDoMeio(meio) === FORMA_ONLINE
+        ? 'Não consegui assumir a conversa, então o link não saiu.'
+        : 'Não consegui assumir a conversa, então o Pix não saiu.',
+    })
     : trocarForma(id, meio))
 
   // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e

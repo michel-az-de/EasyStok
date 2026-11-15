@@ -228,10 +228,23 @@ internal sealed class CobrancaPedidoFixture
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,
             NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
+    /// <summary>Lojas da empresa; a chave Pix direto (#2233) mora na loja do pedido.</summary>
+    public ILojaRepository LojaRepo { get; } = Substitute.For<ILojaRepository>();
+
+    /// <summary>Flags ativas do tenant; sem configuração, nenhuma (o Pix direto nasce desligado).</summary>
+    public ITenantFeatureFlagRepository Flags { get; } = SemFlags();
+
+    private static ITenantFeatureFlagRepository SemFlags()
+    {
+        var flags = Substitute.For<ITenantFeatureFlagRepository>();
+        flags.ListarAtivasAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(Array.Empty<string>());
+        return flags;
+    }
+
     public TrocarFormaPagamentoPedidoUseCase Trocar(IConferenciaPagamentoPedido? conferencia = null, SaldoFinanceiroPedido? saldos = null) =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
             NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries), OperacaoEventos, Quitacao(),
-            conferencia ?? Conferir(), saldos);
+            conferencia ?? Conferir(), saldos, LojaRepo, Flags);
 
     public ConferirPagamentoPedidoUseCase Conferir() => new(PedidoRepo, CobrancaRepo, MpClient, Confirmar());
 

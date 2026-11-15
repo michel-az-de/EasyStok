@@ -50,6 +50,9 @@ public sealed class ModulosConvention : IApplicationModelConvention
         // #2199: quem imprime lê a regra da loja; só Configurações grava.
         if (chave == "LojaImpressao" && acao == "Obter")
             return [Modulo.Configuracoes, Modulo.Producao, Modulo.Atendimento, Modulo.Caixa, Modulo.Cozinha, Modulo.Entregas];
+        // #2233: quem escolhe a forma de pagamento lê se a loja tem Pix direto (mascarado); só Configurações grava.
+        if (chave == "LojaPix" && acao is "Obter" or "Disponivel")
+            return [Modulo.Configuracoes, Modulo.Atendimento, Modulo.Caixa, Modulo.Entregas];
         if (EscritaGestaoMobile.TryGetValue((chave, acao), out var mobile)) return mobile;
         return Mapa.GetValueOrDefault(chave);
     }
@@ -116,7 +119,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Cozinha, "Kds");
         Associar(Modulo.Caixa, "Caixa", "Venda");
         Associar(Modulo.Campanhas, "Campanhas", "CampanhasSugestoes");
-        Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "LojaImpressao", "NotificacoesConfiguracao",
+        Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "LojaImpressao", "LojaPix", "NotificacoesConfiguracao",
             "Integracoes", "IntegracoesWhatsApp", "IntegracoesWppConnect", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
         Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega", "AtendimentoCorridas", "AtendimentoRelatorioCustoDeEntrega",
             "Storefront.TenantVitrineEntrega");

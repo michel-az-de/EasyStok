@@ -5,6 +5,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { ORIGEM, rotuloDoCampo, situacaoDoCartao, textoDoUltimoTeste } from '../../../dominio/chavesIntegracao'
+import { CartaoPixDireto } from './CartaoPixDireto'
 import css from './AbaIntegracoes.module.css'
 
 // Aba Integrações no modo API (F16, #1246): uma por integração do EasyStok. O segredo só se
@@ -122,6 +123,7 @@ export function AbaIntegracoesApi() {
       </p>
       <ul className={css.lista}>
         {lista.map((item) => <CartaoIntegracao key={item.provider} item={item} ocupado={ocupado} acoes={acoes} statusWhatsApp={statusWhatsApp} />)}
+        <CartaoPixDireto />
         <li className={css.cartao}>
           <div className={css.cabecalho}>
             <strong className={css.nomeProvedor}>Entregador próprio</strong>

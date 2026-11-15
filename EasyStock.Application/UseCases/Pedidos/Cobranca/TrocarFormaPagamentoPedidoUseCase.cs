@@ -6,13 +6,18 @@ using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects.Pix;
 using PedidoEntity = EasyStock.Domain.Entities.Pedido;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
-/// <param name="Forma"><c>online</c> (link do Mercado Pago) ou <c>na_entrega</c> (maquininha ou dinheiro).</param>
+/// <param name="Forma">
+/// <c>online</c> (link do Mercado Pago), <c>na_entrega</c> (maquininha ou dinheiro) ou <c>pix_direto</c> (chave Pix da
+/// loja, #2233, só com a flag <see cref="FeatureCatalogo.PagamentoPixDireto"/>).
+/// </param>
 public sealed record TrocarFormaPagamentoPedidoInput(
     Guid EmpresaId, Guid PedidoId, string Forma, Guid? UsuarioId = null, string? UsuarioNome = null);
 
@@ -29,6 +34,9 @@ public sealed record TrocarFormaPagamentoPedidoResult(CobrancaPedidoResult Cobra
 ///   <item><c>na_entrega</c>: cobrança online pendente é conferida e impede nova cobrança manual; sem link,
 ///     pedido em <c>AguardandoPagamento</c> vai para <c>Aguardando</c>
 ///     (entra na fila e paga na entrega), senão o job o cancelaria por falta de pagamento.</item>
+///   <item><c>pix_direto</c> (#2233): como <c>na_entrega</c> (decisão do Felipe em 05/11: entra na fila com o saldo a
+///     receber), com o copia e cola da chave da loja do pedido, mandado na conversa. Sem a flag ou sem chave, recusa e
+///     nada muda. Nenhum provedor confirma: a baixa é de quem registra o pagamento.</item>
 /// </list>
 ///
 /// <para>
@@ -51,10 +59,16 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     IOperacaoEventPublisher operacaoEventos,
     QuitacaoPedido quitacao,
     IConferenciaPagamentoPedido conferencia,
-    SaldoFinanceiroPedido? saldos = null)
+    SaldoFinanceiroPedido? saldos = null,
+    ILojaRepository? lojas = null,
+    ITenantFeatureFlagRepository? flags = null)
 {
     public const string FormaOnline = "online";
     public const string FormaNaEntrega = "na_entrega";
+    public const string FormaPixDireto = "pix_direto";
+
+    public const string MensagemPixDiretoDesligado = "Pix direto não está habilitado para esta empresa.";
+    public const string MensagemSemChavePix = "A loja do pedido não tem chave Pix cadastrada.";
 
     public async Task<TrocarFormaPagamentoPedidoResult> ExecuteAsync(TrocarFormaPagamentoPedidoInput input, CancellationToken ct = default)
     {
@@ -62,11 +76,13 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(input.PedidoId, "PedidoId");
         var forma = (input.Forma ?? string.Empty).Trim().ToLowerInvariant();
-        if (forma is not (FormaOnline or FormaNaEntrega))
-            throw new UseCaseValidationException("Forma de pagamento deve ser 'online' ou 'na_entrega'.");
+        if (forma is not (FormaOnline or FormaNaEntrega or FormaPixDireto))
+            throw new UseCaseValidationException("Forma de pagamento deve ser 'online', 'na_entrega' ou 'pix_direto'.");
+        if (forma == FormaPixDireto && !await PixDiretoLigadoAsync(input.EmpresaId, ct))
+            throw new UseCaseValidationException(MensagemPixDiretoDesligado);
 
         Guid? linkConferido = null;
-        if (forma == FormaNaEntrega)
+        if (forma != FormaOnline)
         {
             var anteriores = await cobrancaRepository.ListarDoPedidoAsync(input.EmpresaId, input.PedidoId, ct);
             var linkPendente = anteriores.FirstOrDefault(c => c.EmpresaId == input.EmpresaId && c.PedidoId == input.PedidoId && c.EhOnline && c.EstaPendente);
@@ -86,8 +102,9 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
             }
         }
 
+        string? textoPix = null;
         var (cobranca, conversaId, preferenciaSubstituida, mudanca, impressao) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
-            async token => await TrocarNoLockAsync(input, forma, linkConferido, token), ct);
+            async token => await TrocarNoLockAsync(input, forma, linkConferido, texto => textoPix = texto, token), ct);
 
         // A cozinha só relê depois que a transação terminou; na entrega ainda não é pagamento.
         if (mudanca is not null)
@@ -104,8 +121,26 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
             // #1991-7: o link trocado pela atendente sai em nome dela, não como automática.
             enviada = await aviso.EnviarAsync(input.EmpresaId, conversa, AvisoCobrancaConversa.TextoLinkTrocado(link),
                 relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
+        else if (conversaId is { } conversaPix && textoPix is not null)
+            // #2233: o copia e cola sai em nome de quem trocou; o texto tem a chave e não vai para log.
+            enviada = await aviso.EnviarAsync(input.EmpresaId, conversaPix, textoPix, relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
 
         return new TrocarFormaPagamentoPedidoResult(cobranca, enviada);
+    }
+
+    private async Task<bool> PixDiretoLigadoAsync(Guid empresaId, CancellationToken ct) =>
+        flags is not null && lojas is not null
+        && (await flags.ListarAtivasAsync(empresaId, ct)).Contains(FeatureCatalogo.PagamentoPixDireto);
+
+    /// <summary>Recebedor da loja do pedido; sem loja no pedido, o da única loja da empresa com chave.</summary>
+    private async Task<RecebedorPix?> RecebedorAsync(PedidoEntity pedido)
+    {
+        if (lojas is null) return null;
+        if (pedido.LojaId is { } lojaId)
+            return (await lojas.GetByIdAsync(pedido.EmpresaId, lojaId))?.ObterRecebedorPix();
+        var comChave = (await lojas.GetByEmpresaAsync(pedido.EmpresaId))
+            .Select(l => l.ObterRecebedorPix()).OfType<RecebedorPix>().ToList();
+        return comChave.Count == 1 ? comChave[0] : null;
     }
 
     public const string MensagemLinkPendente = "Há uma cobrança online pendente. Confira o pagamento antes de receber manualmente.";
@@ -129,7 +164,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     /// pela troca para a entrega; outro link pendente nascido no meio não foi consultado e continua recusando.
     /// </param>
     private async Task<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?, ImpressaoPendenteOperacao?)> TrocarNoLockAsync(
-        TrocarFormaPagamentoPedidoInput input, string forma, Guid? linkConferido, CancellationToken ct)
+        TrocarFormaPagamentoPedidoInput input, string forma, Guid? linkConferido, Action<string> textoPix, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
         var pedido = await pedidoRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, ct);
@@ -152,12 +187,23 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
         // #1717-2 (decisão do Felipe em 13/10): o sinal da encomenda pode ser baixado à mão, como o pedido comum. O
         // link conferido sem pagamento é cancelado e a baixa manual segue; link pendente que não foi conferido recusa.
-        if (forma == FormaNaEntrega && cobrancas.Any(c => c.EstaPendente && c.EhOnline && c.Id != linkConferido))
+        if (forma != FormaOnline && cobrancas.Any(c => c.EstaPendente && c.EhOnline && c.Id != linkConferido))
             throw new UseCaseValidationException(MensagemLinkPendente);
+        var recebedor = forma == FormaPixDireto
+            ? await RecebedorAsync(pedido) ?? throw new UseCaseValidationException(MensagemSemChavePix)
+            : null;
 
         var pendente = cobrancas.FirstOrDefault(c => c.EstaPendente);
-        var provedorPedido = forma == FormaOnline ? CobrancaPedido.ProvedorMercadoPago : CobrancaPedido.ProvedorNaEntrega;
-        if (pendente is not null && pendente.Provedor == provedorPedido && !pendente.Venceu(agora))
+        var provedorPedido = forma switch
+        {
+            FormaOnline => CobrancaPedido.ProvedorMercadoPago,
+            FormaPixDireto => CobrancaPedido.ProvedorPixDireto,
+            _ => CobrancaPedido.ProvedorNaEntrega,
+        };
+        // Com algo já recebido (sinal, cupom), a cobrança manual é só do restante.
+        var valor = alocado > 0m ? restante : pedido.Total.Valor;
+        if (pendente is not null && pendente.Provedor == provedorPedido && !pendente.Venceu(agora)
+            && !PixDiretoDesatualizado(pendente, pedido, valor, recebedor))
             return (CobrancaPedidoResult.De(pendente, reutilizada: true), pendente.ConversaId, null, null, null);
 
         var conversaId = cobrancas.Where(c => c.ConversaId is not null).Select(c => c.ConversaId).LastOrDefault();
@@ -177,13 +223,13 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         }
         else
         {
-            // Com algo já recebido (sinal, cupom), a cobrança na entrega é só do restante.
-            var naEntrega = CobrancaPedido.CriarNaEntrega(input.EmpresaId, pedido.Id,
-                alocado > 0m ? restante : pedido.Total.Valor, agora, conversaId);
-            await cobrancaRepository.AddAsync(naEntrega, ct);
+            var manual = recebedor is null
+                ? CobrancaPedido.CriarNaEntrega(input.EmpresaId, pedido.Id, valor, agora, conversaId)
+                : PixDireto(input, pedido, valor, recebedor, agora, conversaId, textoPix);
+            await cobrancaRepository.AddAsync(manual, ct);
             mudanca = await ColocarNaFilaAsync(pedido, input, agora, ct);
             if (mudanca is not null) impressao = await quitacao.PrepararCanhotoAsync(pedido, agora, ct);
-            nova = CobrancaPedidoResult.De(naEntrega);
+            nova = CobrancaPedidoResult.De(manual);
         }
 
         await pedidoRepository.AddEventoAsync(new PedidoEvento
@@ -201,6 +247,35 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
 
         return (nova, conversaId, preferenciaSubstituida, mudanca, impressao);
     }
+
+    /// <summary>
+    /// #2233: cobrança Pix direto do saldo. A encomenda com sinal guarda o saldo (só se quita quando o pedido fecha, como a
+    /// da entrega) e o copia e cola pede só o que falta do sinal.
+    /// </summary>
+    private static CobrancaPedido PixDireto(TrocarFormaPagamentoPedidoInput input, PedidoEntity pedido, decimal valor,
+        RecebedorPix recebedor, DateTime agora, Guid? conversaId, Action<string> textoPix)
+    {
+        var valorDoPix = ValorDoPix(pedido, valor);
+        var cobranca = CobrancaPedido.CriarPixDireto(input.EmpresaId, pedido.Id, valor, recebedor, agora, conversaId, valorDoPix);
+        textoPix(AvisoCobrancaConversa.TextoPixDireto(valorDoPix, valor - valorDoPix, cobranca.PixCopiaCola!, recebedor.Nome));
+        return cobranca;
+    }
+
+    private static decimal ValorDoPix(PedidoEntity pedido, decimal valor)
+    {
+        var sinal = PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
+            ? PlanoPagamentoEncomenda.SinalRestante(pedido.Total.Valor, valor)
+            : 0m;
+        return sinal > 0m ? sinal : valor;
+    }
+
+    /// <summary>
+    /// #2233: o Pix direto pendente só é reaproveitado se o copia e cola continua o mesmo. Chave, nome, cidade ou valor
+    /// mudaram: a cobrança velha é cancelada e sai outra, para o cliente nunca pagar a chave antiga.
+    /// </summary>
+    private static bool PixDiretoDesatualizado(CobrancaPedido pendente, PedidoEntity pedido, decimal valor, RecebedorPix? recebedor) =>
+        recebedor is not null
+        && pendente.PixCopiaCola != BrCodePix.Estatico(recebedor, ValorDoPix(pedido, valor), BrCodePix.TxidDoPedido(pedido.Id));
 
     private async Task<PedidoMudouStatusOperacao?> ColocarNaFilaAsync(PedidoEntity pedido, TrocarFormaPagamentoPedidoInput input, DateTime agora, CancellationToken ct)
     {

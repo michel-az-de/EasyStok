@@ -34,8 +34,17 @@ public sealed record CobrancaPedidoResult(
     [System.Text.Json.Serialization.JsonIgnore]
     public string? PreferenciaSubstituida { get; init; }
 
+    /// <summary>
+    /// #2233: copia e cola do Pix direto. Carrega a chave da loja, por isso só sai para quem cuida do pedido (console)
+    /// ou para o próprio cliente; nunca para o cardápio público.
+    /// </summary>
+    public string? PixCopiaCola { get; init; }
+
     public static CobrancaPedidoResult De(CobrancaPedido c, bool reutilizada = false) =>
-        new(c.Id, c.PedidoId, c.Provedor, c.Status.ToString(), c.LinkPagamento, c.Valor, c.ExpiraEm, c.Tentativa, reutilizada);
+        new(c.Id, c.PedidoId, c.Provedor, c.Status.ToString(), c.LinkPagamento, c.Valor, c.ExpiraEm, c.Tentativa, reutilizada)
+        {
+            PixCopiaCola = c.PixCopiaCola,
+        };
 }
 
 /// <summary>
