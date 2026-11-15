@@ -62,7 +62,7 @@ const armazenamentoNegado = {
 // --- A. Preferências --------------------------------------------------------------------------
 confere('catálogo: quatro documentos e cinco papéis, com os rótulos da tela', () => {
   assert.deepEqual(DOCUMENTOS.map((d) => d.valor), ['pedido', 'agendamento', 'entrega', 'cozinha'])
-  assert.deepEqual(DOCUMENTOS.map((d) => d.rotulo), ['Pedido', 'Agendamento', 'Etiqueta de entrega', 'Canhoto de cozinha'])
+  assert.deepEqual(DOCUMENTOS.map((d) => d.rotulo), ['Pedido', 'Agendamento', 'Etiqueta de entrega', 'Via da cozinha'])
   assert.deepEqual(PAPEIS.map((p) => p.valor), ['a4', 'a5', 'etiqueta-10x15', 'cupom-80', 'cupom-58'])
   assert.deepEqual(PAPEIS.map((p) => p.rotulo), ['A4', 'A5', 'Etiqueta 10×15', 'Bobina 80 mm', 'Bobina 58 mm'])
 })

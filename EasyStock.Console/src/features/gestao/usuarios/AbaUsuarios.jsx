@@ -57,7 +57,7 @@ function Convite({ perfis, aoConvidar, aoCancelar }) {
   return (
     <form ref={formulario} className={css.convite} onSubmit={enviar} aria-label="Convidar pessoa" aria-busy={enviando} noValidate>
       <CampoTexto rotulo="Nome" autoComplete="off" value={campos.nome} onChange={trocar('nome')} readOnly={enviando} />
-      <CampoTexto rotulo="E-mail" tipo="email" autoComplete="off" value={campos.email} onChange={trocar('email')} readOnly={enviando} dica="O convite vai para este e-mail" />
+      <CampoTexto rotulo="E-mail" tipo="email" autoComplete="off" value={campos.email} onChange={trocar('email')} readOnly={enviando} dica="O convite vai para este e-mail." />
       <CampoSelecao rotulo="Perfil" opcoes={opcoes} value={campos.perfilId} onChange={trocar('perfilId')} disabled={enviando} dica={resumo} />
       <div className={css.botoesDoConvite}>
         <Botao variante="primario" tipo="submit" disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar convite'}</Botao>

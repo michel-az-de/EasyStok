@@ -166,7 +166,7 @@ try {
     await page.keyboard.press('Escape')
     assert.equal(await abrir.evaluate(el => el === document.activeElement), true)
   })
-  const config = page.getByRole('form', { name: 'Como o automático atende' })
+  const config = page.getByRole('form', { name: 'Como o Assistente atende' })
   const tom = page.getByLabel('Tom', { exact: true })
   await conferir('horários preservam edição, exigem preenchimento e só confirmam após salvar', async () => {
     const antes = estado.escritas.length

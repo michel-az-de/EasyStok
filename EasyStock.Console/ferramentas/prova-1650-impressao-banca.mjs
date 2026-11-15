@@ -60,7 +60,7 @@ const campo = (t, rotulo) => nos(t.arvore).find(n => n.type?.name === 'CampoSele
 const papelNaTela = t => nos(t.arvore).find(n => n.type?.name === 'PreviaImpresso')?.props
 const original = { id: 'original-58', documento: 'cozinha', modelo: 'cupom-58', codigo: 'barras', perfil: 'Escolher no diálogo do sistema', criadaEm: '2026-10-12T12:00:00Z', versao: 'anterior', status: 'impressa' }
 const props = extra => ({
-  documentos: [{ valor: 'pedido', rotulo: 'Pedido' }, { valor: 'cozinha', rotulo: 'Canhoto de cozinha' }],
+  documentos: [{ valor: 'pedido', rotulo: 'Pedido' }, { valor: 'cozinha', rotulo: 'Via da cozinha' }],
   papeis: [{ valor: 'a4', rotulo: 'A4' }, { valor: 'cupom-58', rotulo: 'Bobina 58 mm' }], papelPadrao: () => 'a4',
   obterPrevia: async o => `<p>${o.documento}-${o.modelo}-${o.codigo}</p>`,
   preparar: async o => ({ ...o, id: 'nova', html: o.originalId ? '<h1>Original guardado</h1>' : '<h1>x</h1>' }),
@@ -115,10 +115,10 @@ await provar('original histórico não avança a fila; cada via confirmada tem r
   const preparadas = [], impressas = [], confirmadas = [], callbacks = []
   const t = new Tela(props({ historico: async () => [original], preparar: async o => { preparadas.push(o); return { ...o, id: 'r' + preparadas.length, html: '<h1>Original guardado</h1>' } }, abrirImpressao: async html => { impressas.push(html); return 'dialogo' }, confirmar: async r => { confirmadas.push(r.id) }, aoImprimir: () => callbacks.push('confirmou'), aoAbrirImpressao: () => callbacks.push('abriu') }))
   await clicar(t, 'Imprimir'); await clicar(t, 'Reimprimir original')
-  assert.ok(botao(t, 'Reimprimir original').props['aria-label'].startsWith('Reimprimir original: Canhoto de cozinha'))
+  assert.ok(botao(t, 'Reimprimir original').props['aria-label'].startsWith('Reimprimir original: Via da cozinha'))
   assert.equal(preparadas[0].originalId, original.id)
   assert.equal(papelNaTela(t).html, '<h1>Original guardado</h1>'); assert.equal(papelNaTela(t).modelo, 'cupom-58')
-  assert.ok(texto(t.arvore).includes('Canhoto de cozinha · Bobina 58 mm'))
+  assert.ok(texto(t.arvore).includes('Via da cozinha · Bobina 58 mm'))
   await clicar(t, 'Imprimir')
   assert.equal(preparadas.length, 1, 'a primeira via usa a tentativa preparada na seleção')
   await clicar(t, 'Sim, saiu'); await clicar(t, 'Imprimir de novo'); await clicar(t, 'Sim, saiu')

@@ -6,6 +6,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao } from '../../../componentes/Campo'
 import { Vazio } from '../../../componentes/Vazio'
 import { FUSO } from '../../../dominio/formato'
+import { hashDoModulo } from '../../../dominio/modulos'
 import {
   agruparPorDia, condensarAuditoria, instanteDaApi, juntarPaginas, linhaDeAuditoria, opcoesDePessoas,
 } from '../../../dominio/usuarios'
@@ -97,7 +98,7 @@ export function AbaAuditoria() {
         </p>
       )}
       {!estado.erro && !estado.carregando && estado.linhas.length === 0 && (
-        <Vazio titulo="Nada registrado ainda">Entradas, convites e mudanças de acesso aparecem aqui.</Vazio>
+        <Vazio titulo="Nada registrado ainda" acao={<a className={css.link} href={hashDoModulo('configuracoes', 'usuarios')}>Ir para Usuários</a>}>Entradas, convites e mudanças de acesso aparecem aqui. Convide alguém para começar.</Vazio>
       )}
       {grupos.map((grupo) => (
         <section key={grupo.dia} className={css.dia} aria-label={grupo.dia}>
