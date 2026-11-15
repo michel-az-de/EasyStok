@@ -8,6 +8,7 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects.Pix;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
@@ -39,6 +40,17 @@ public sealed record CobrancaPedidoResult(
     /// ou para o próprio cliente; nunca para o cardápio público.
     /// </summary>
     public string? PixCopiaCola { get; init; }
+
+    /// <summary>
+    /// #2684: mensagem pronta ao cliente quando a cobrança é Pix direto (valor, recebedor e copia e cola), para quem
+    /// avisa na conversa. Leva a chave da loja: nunca sai na resposta da API.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? TextoPix { get; init; }
+
+    /// <summary>#2684: o Pix direto pendente caiu porque a loja ficou sem chave; a cobrança voltou para a entrega.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool PixDiretoSemChave { get; init; }
 
     public static CobrancaPedidoResult De(CobrancaPedido c, bool reutilizada = false) =>
         new(c.Id, c.PedidoId, c.Provedor, c.Status.ToString(), c.LinkPagamento, c.Valor, c.ExpiraEm, c.Tentativa, reutilizada)
@@ -76,7 +88,8 @@ public sealed class GerarCobrancaPedidoUseCase(
     TimeProvider relogio,
     ILogger<GerarCobrancaPedidoUseCase> logger,
     SaldoFinanceiroPedido? saldoFinanceiro = null,
-    IConversaRepository? conversaRepository = null)
+    IConversaRepository? conversaRepository = null,
+    ILojaRepository? lojas = null)
 {
     public static readonly TimeSpan Validade = TimeSpan.FromMinutes(30);
 
@@ -169,7 +182,7 @@ public sealed class GerarCobrancaPedidoUseCase(
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
             pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, cobrarSaldo,
-            input.NaEntregaSemProvedor, storefront?.LinkWhatsAppPedidos());
+            input.NaEntregaSemProvedor, storefront?.LinkWhatsAppPedidos(), pedido.LojaId);
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
 
@@ -188,6 +201,27 @@ public sealed class GerarCobrancaPedidoUseCase(
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
 
         var pendente = existentes.FirstOrDefault(c => c.EstaPendente);
+        if (pendente is { EhPixDireto: true })
+        {
+            var recebedor = await RecebedorPixAsync(dados);
+            var temSinal = PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm);
+            if (recebedor is not null && (dados.NaEntregaSemProvedor || temSinal))
+                return await PixDiretoAsync(pendente, dados, recebedor, conversaId, agora, ct);
+            // A alteração da comanda sem chave na loja: o código velho cobra o valor antigo; a diferença fica na entrega.
+            if (recebedor is null && dados.NaEntregaSemProvedor)
+            {
+                pendente.Cancelar(MotivoValorAlterado, agora);
+                var naEntrega = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId, dados.Total - dados.Alocado,
+                    agora, conversaId ?? pendente.ConversaId);
+                await cobrancaRepository.AddAsync(naEntrega, ct);
+                await unitOfWork.CommitAsync();
+                return CobrancaPedidoResult.De(naEntrega) with { PixDiretoSemChave = true };
+            }
+            // Sem chave na loja, a encomenda segue a cobrança manual de sempre (abaixo); o resto é pedido de link.
+            if (recebedor is not null || !temSinal)
+                throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.FormaPixDireto,
+                    "O pedido está combinado para Pix na chave da loja; troque a forma para gerar link.");
+        }
         if (pendente is not null && !pendente.EhOnline)
         {
             if (PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm))
@@ -318,8 +352,30 @@ public sealed class GerarCobrancaPedidoUseCase(
         return string.IsNullOrWhiteSpace(dados.StorefrontNome) ? pedido : $"{pedido} · {dados.StorefrontNome}";
     }
 
+    /// <summary>
+    /// #2684: a alteração da comanda (ou a encomenda) com Pix direto pendente continua no Pix direto. Mesmo saldo e mesmo
+    /// copia e cola: reaproveita. Mudou: cancela e sai outro, porque o código velho cobra o valor antigo.
+    /// </summary>
+    private async Task<CobrancaPedidoResult> PixDiretoAsync(CobrancaPedido pendente, DadosCobranca dados, RecebedorPix recebedor,
+        Guid? conversaId, DateTime agora, CancellationToken ct)
+    {
+        var valor = dados.Total - dados.Alocado;
+        var valorDoPix = PixDiretoDoPedido.ValorDoPix(dados.AgendadoParaEm, dados.CriadoEm, dados.Total, valor);
+        if (pendente.Valor == valor && pendente.PixCopiaCola == PixDiretoDoPedido.CopiaECola(recebedor, dados.PedidoId, valorDoPix))
+            return CobrancaPedidoResult.De(pendente, reutilizada: true) with { TextoPix = PixDiretoDoPedido.Texto(pendente, recebedor, valorDoPix) };
+        pendente.Cancelar(MotivoValorAlterado, agora);
+        var nova = CobrancaPedido.CriarPixDireto(dados.EmpresaId, dados.PedidoId, valor, recebedor, agora,
+            conversaId ?? pendente.ConversaId, valorDoPix);
+        await cobrancaRepository.AddAsync(nova, ct);
+        await unitOfWork.CommitAsync();
+        return CobrancaPedidoResult.De(nova) with { TextoPix = PixDiretoDoPedido.Texto(nova, recebedor, valorDoPix) };
+    }
+
+    private Task<RecebedorPix?> RecebedorPixAsync(DadosCobranca dados) =>
+        PixDiretoDoPedido.RecebedorAsync(lojas, dados.EmpresaId, dados.LojaId);
+
     private sealed record DadosCobranca(
         Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,
         IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, DateTime CriadoEm, decimal Alocado = 0m, bool CobrarSaldo = false,
-        bool NaEntregaSemProvedor = false, string? RetornoWhatsApp = null);
+        bool NaEntregaSemProvedor = false, string? RetornoWhatsApp = null, Guid? LojaId = null);
 }

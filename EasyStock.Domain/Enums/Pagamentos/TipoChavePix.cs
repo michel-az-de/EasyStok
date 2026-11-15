@@ -1,6 +1,6 @@
 namespace EasyStock.Domain.Enums.Pagamentos;
 
-/// <summary>Tipos de chave Pix do DICT (#2233). Gravado como inteiro em <c>lojas.pix_tipo</c>.</summary>
+/// <summary>Tipos de chave Pix do DICT (#2233). Gravado como inteiro em <c>lojas."PixTipo"</c>.</summary>
 public enum TipoChavePix
 {
     Cpf = 1,
