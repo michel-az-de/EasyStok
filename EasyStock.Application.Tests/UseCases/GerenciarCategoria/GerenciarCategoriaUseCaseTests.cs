@@ -97,4 +97,55 @@ public class GerenciarCategoriaUseCaseTests
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*nao pode ser negativa*");
         await _repo.DidNotReceive().AddAsync(Arg.Any<Categoria>());
     }
+
+    [Fact]
+    public async Task AtualizarAsync_rejeita_pai_que_e_descendente_da_propria_categoria()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        _repo.GetByIdAsync(EmpId, a).Returns(new Categoria { Id = a, EmpresaId = EmpId, Nome = "Bebidas" });
+        _repo.GetByIdAsync(EmpId, b).Returns(new Categoria { Id = b, EmpresaId = EmpId, Nome = "Sucos", CategoriaPaiId = a });
+        _repo.ExisteNomeAsync(EmpId, Arg.Any<string>(), a).Returns(false);
+
+        var act = () => Sut().AtualizarAsync(new AtualizarCategoriaCommand(a, EmpId, "Bebidas", null, b));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*ciclo*");
+        await _repo.DidNotReceive().UpdateAsync(Arg.Any<Categoria>());
+    }
+
+    [Fact]
+    public async Task AtualizarAsync_aceita_pai_que_nao_forma_ciclo()
+    {
+        var id = Guid.NewGuid();
+        var pai = Guid.NewGuid();
+        var avo = Guid.NewGuid();
+        _repo.GetByIdAsync(EmpId, id).Returns(new Categoria { Id = id, EmpresaId = EmpId, Nome = "Antigo" });
+        _repo.GetByIdAsync(EmpId, pai).Returns(new Categoria { Id = pai, EmpresaId = EmpId, Nome = "Bebidas", CategoriaPaiId = avo });
+        _repo.GetByIdAsync(EmpId, avo).Returns(new Categoria { Id = avo, EmpresaId = EmpId, Nome = "Raiz" });
+        _repo.ExisteNomeAsync(EmpId, Arg.Any<string>(), id).Returns(false);
+
+        await Sut().AtualizarAsync(new AtualizarCategoriaCommand(id, EmpId, "Novo", null, pai));
+
+        await _repo.Received(1).UpdateAsync(Arg.Is<Categoria>(c => c.CategoriaPaiId == pai));
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task AtualizarAsync_rejeita_cadeia_de_pais_acima_do_teto_de_profundidade()
+    {
+        var id = Guid.NewGuid();
+        var cadeia = Enumerable.Range(0, 60).Select(_ => Guid.NewGuid()).ToArray();
+        _repo.GetByIdAsync(EmpId, id).Returns(new Categoria { Id = id, EmpresaId = EmpId, Nome = "Antigo" });
+        for (var i = 0; i < cadeia.Length; i++)
+        {
+            Guid? paiDoNivel = i + 1 < cadeia.Length ? cadeia[i + 1] : null;
+            _repo.GetByIdAsync(EmpId, cadeia[i]).Returns(new Categoria { Id = cadeia[i], EmpresaId = EmpId, Nome = $"Nivel {i}", CategoriaPaiId = paiDoNivel });
+        }
+        _repo.ExisteNomeAsync(EmpId, Arg.Any<string>(), id).Returns(false);
+
+        var act = () => Sut().AtualizarAsync(new AtualizarCategoriaCommand(id, EmpId, "Novo", null, cadeia[0]));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*limite permitido*");
+        await _repo.DidNotReceive().UpdateAsync(Arg.Any<Categoria>());
+    }
 }

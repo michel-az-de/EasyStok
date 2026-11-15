@@ -27,3 +27,27 @@ export function textoDoUltimoTeste(item) {
 }
 
 export const ORIGEM = { loja: 'Chave da loja', global: 'Chave da FMA' }
+
+// #2600 (Q02): o "Ligado" da lista diz só que há credencial. Quem envia é o `provider` do
+// `GET api/integracoes/whatsapp/status` (o mesmo da tela Canais). Sem o status (ainda carregando,
+// 403 ou 404), o cartão fica como a API diz.
+const NUMERO_DE_TESTE_DA_META = /\(Test Number\)/i
+
+export function situacaoDoCartao(item, statusWhatsApp) {
+  const padrao = { pilula: { tom: item?.ativo ? 'ok' : 'neutro', texto: item?.ativo ? 'Ligado' : 'Desligado' }, avisos: [] }
+  if (item?.provider !== 'whatsapp' || !item.ativo) return padrao
+
+  if (statusWhatsApp?.provider === 'wppconnect') {
+    return {
+      pilula: { tom: 'neutro', texto: 'Não é o canal que envia' },
+      avisos: [{ tom: 'neutro', texto: 'As mensagens saem hoje pela conexão por QR. Veja o estado dela em Canais.' }],
+    }
+  }
+  if (NUMERO_DE_TESTE_DA_META.test(item.ultimoTesteMensagem ?? '')) {
+    return {
+      pilula: { tom: 'aviso', texto: 'Número de teste' },
+      avisos: [{ tom: 'perigo', texto: 'Número de teste da Meta: não conversa com clientes.' }],
+    }
+  }
+  return padrao
+}

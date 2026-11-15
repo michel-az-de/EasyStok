@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { alternarAtividadeCadastro, listarCategoriasCadastro, obterCadastro, salvarCadastro } from '../../../aplicacao/cadastros'
+import { alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro } from '../../../aplicacao/cadastros'
 import { useSugestaoCadastro } from '../../../aplicacao/useSugestaoCadastro'
 import { useGravacaoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
@@ -7,7 +7,9 @@ import { CampoReais } from '../../../componentes/CampoReais'
 import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
+import { FichaCliente } from './FichaCliente'
 import { lerMoeda } from '../../../dominio/formato'
+import { avisoDeDuplicado, duplicadosDoCliente, termoDeDuplicado } from '../../../dominio/clienteDuplicado'
 import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, categoriasRaiz, subcategoriasDe, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
@@ -16,7 +18,7 @@ const tiposProduto = [{ valor: 'Alimento', rotulo: 'Alimento' }, { valor: 'Fisic
 const tiposConta = [{ valor: 'corrente', rotulo: 'Conta corrente' }, { valor: 'poupanca', rotulo: 'Poupança' }, { valor: 'pagamento', rotulo: 'Conta de pagamento' }]
 const opcoesStatus = [{ valor: 'Inativo', rotulo: 'Inativo' }, { valor: 'Ativo', rotulo: 'Ativo' }]
 
-export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade }) {
+export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade, aoAbrirCadastro }) {
   const idForm = useId()
   const { dados, inicial } = editor
   const id = dados.id ?? dados.produtoId
@@ -37,10 +39,17 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const [alternando, alternar] = useState(false)
   const [erroAtividade, falharAtividade] = useState(null)
   const atividadeEmVoo = useRef(false)
-  useEffect(() => { montado.current = true; return () => { montado.current = false; leituraAtual.current?.abort() } }, [])
+  // #2495 (S5, B6): ao sair de Telefone ou Documento, avisa quem já tem os mesmos dígitos. Salvar segue liberado.
+  const [duplicado, definirDuplicado] = useState(null)
+  const [abrirOutro, confirmarAbrirOutro] = useState(null)
+  const buscaDuplicado = useRef(null)
+  useEffect(() => { montado.current = true; return () => { montado.current = false; leituraAtual.current?.abort(); buscaDuplicado.current?.abort() } }, [])
   const mudar = (campo, valor, manual = true) => {
     aoMudar({ ...editor, dados: mudarDadosCadastro(tela, dados, campo, valor) })
     definirErros(anteriores => ({ ...anteriores, [campo]: null }))
+    // Mudar o campo tira o aviso e cancela a busca em voo: resposta velha não avisa.
+    definirDuplicado(atual => atual?.campo === campo ? null : atual)
+    if (campo === 'telefone' || campo === 'documento') buscaDuplicado.current?.abort()
     if (manual) revisarFormulario(r => r + 1)
   }
   const sugestao = useSugestaoCadastro({ conversa, revisaoFormulario: `${id ?? 'novo'}:${revisaoManual}`, conversaId: conversa?.id, clienteId: conversa?.clienteId, vinculoRevisao: conversa?.vinculoRevisao, aoAplicar: (campo, valor) => mudar(campo, valor, false) })
@@ -64,12 +73,28 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   // #2476 (U2): CPF e CNPJ na máscara; digitar o mesmo número de volta não conta como mudança.
   const mesmoDocumento = (valor) => documentoNaTela(valor) === documentoNaTela(inicial.documento)
   const naTela = (campo, valor) => (campo === 'telefone' ? telefoneNaTela(valor) : campo === 'documento' ? documentoNaTela(valor) : String(valor ?? '')) || 'Vazio'
-  const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => mudar('telefone', mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value)} erro={erroDo('telefone')} />
-  const documento = (rotulo) => campo('documento', rotulo, { value: documentoNaTela(dados.documento), onChange: e => mudar('documento', mesmoDocumento(e.target.value) ? inicial.documento : e.target.value) })
+  const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => mudar('telefone', mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value)} onBlur={() => conferirDuplicado('telefone')} erro={erroDo('telefone')} />
+  const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => mudar('documento', mesmoDocumento(e.target.value) ? inicial.documento : e.target.value)} onBlur={() => conferirDuplicado('documento')} erro={erroDo('documento')} />
   const area = (chave, rotulo) => <div className={css.larguraTotal}><CampoArea rotulo={rotulo} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} erro={erroDo(chave)} /></div>
   const selecao = (chave, rotulo, opcoes) => <Combobox rotulo={rotulo} obrigatorio={obrigatorio(chave)} valor={dados[chave]} aoMudar={valor => mudar(chave, valor)} opcoes={opcoes} erro={erros[chave]} disabled={salvando || !podeEditar} />
   const subcategorias = tela === 'produtos' ? subcategoriasDe(categorias, dados.categoriaId) : []
   const dinheiro = (chave, rotulo) => <CampoReais rotulo={rotulo} centavos={dados[chave] == null ? null : Math.round(dados[chave] * 100)} aoMudar={valor => mudar(chave, valor == null ? null : valor / 100)} ler={lerMoeda} erro={erros[chave]} />
+
+  async function conferirDuplicado(chave) {
+    if (tela !== 'clientes' || !podeEditar) return
+    buscaDuplicado.current?.abort()
+    const valor = dados[chave]
+    const termo = termoDeDuplicado(chave, valor)
+    if (!termo) return
+    const controlador = new AbortController(); buscaDuplicado.current = controlador
+    try {
+      const itens = await buscarClientesParecidos(termo, contexto, controlador.signal)
+      if (controlador.signal.aborted || !montado.current) return
+      const [cliente] = duplicadosDoCliente(chave, valor, itens, id)
+      definirDuplicado(cliente ? { campo: chave, cliente } : null)
+    } catch { /* O aviso é ajuda: se a busca falhar, o cadastro segue normal. */ }
+  }
+  const pedirAbrirOutro = (cliente) => alterado ? confirmarAbrirOutro(cliente) : aoAbrirCadastro(cliente)
 
   async function carregarVersaoAtual() {
     leituraAtual.current?.abort()
@@ -154,6 +179,10 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
           {selecao('tipoPessoa', 'Tipo de pessoa', pessoa)}
           {telefone()}{campo('email', 'E-mail', { tipo: 'email' })}
           {documento(dados.tipoPessoa === 'juridica' ? 'CNPJ' : 'CPF ou documento')}
+          {duplicado && <div className={`${css.larguraTotal} ${css.avisoDuplicado}`} role="status">
+            <p>{avisoDeDuplicado(duplicado.campo, duplicado.cliente)}</p>
+            {aoAbrirCadastro && <Botao onClick={() => pedirAbrirOutro(duplicado.cliente)}>Abrir cadastro de {duplicado.cliente.nome?.trim() || 'cliente sem nome'}</Botao>}
+          </div>}
           {dados.tipoPessoa === 'juridica' && <>{campo('nomeFantasia', 'Nome fantasia')}{campo('inscricaoEstadual', 'Inscrição estadual')}</>}
           {campo('endereco', 'Endereço')}{campo('apt', 'Apartamento ou referência')}
           {area('observacoes', 'Observações')}
@@ -184,10 +213,15 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
         </>}
       </fieldset>
     </form>
+    {tela === 'clientes' && id && dados.detalhe && <FichaCliente key={`${id}:${dados.revisao ?? ''}`} cliente={dados} detalhe={dados.detalhe} contexto={contexto} podeEditar={podeEditar} />}
     {atividade && <Modal titulo={atividade.titulo} aoFechar={alternando ? undefined : () => confirmarAtividade(null)} segurarFechamento={alternando}
       rodape={<><Botao disabled={alternando} onClick={() => confirmarAtividade(null)}>Cancelar</Botao><Botao variante={atividade.ativar ? 'primario' : 'perigo'} disabled={alternando} onClick={concluirAtividade}>{alternando ? atividade.ativar ? 'Reativando…' : 'Inativando…' : atividade.botao}</Botao></>}>
       <p>{atividade.texto}</p>
       {erroAtividade && <p className={css.erro} role="alert">{erroAtividade}</p>}
+    </Modal>}
+    {abrirOutro && <Modal titulo={`Abrir o cadastro de ${abrirOutro.nome?.trim() || 'cliente sem nome'}?`} aoFechar={() => confirmarAbrirOutro(null)}
+      rodape={<><Botao onClick={() => confirmarAbrirOutro(null)}>Continuar aqui</Botao><Botao variante="primario" onClick={() => aoAbrirCadastro(abrirOutro)}>Abrir cadastro</Botao></>}>
+      <p>O que você digitou aqui não será salvo.</p>
     </Modal>}
     {tela === 'clientes' && dados.detalhe?.alteracoes?.length > 0 && <details className={css.historico}><summary>Histórico do cadastro</summary><ul>{dados.detalhe.alteracoes.slice(0, 10).map(a => <li key={a.id}><strong>{a.campo}</strong> · {a.alteradoPorNome || 'Usuário da loja'}<small>{a.valorAntigo || 'Vazio'} → {a.valorNovo || 'Vazio'}</small></li>)}</ul></details>}
   </Modal>

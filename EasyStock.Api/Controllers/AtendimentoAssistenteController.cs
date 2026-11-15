@@ -1,4 +1,6 @@
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
+using Microsoft.Extensions.Options;
 using EasyStock.Application.UseCases.Atendimento.Assistente;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Enums.Atendimento;
@@ -90,6 +92,12 @@ public class AtendimentoAssistenteController(
         }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
+
+    /// <summary>S68 (#2597, ADR-0066): modelos que a loja pode escolher, com o modelo atual em primeiro.</summary>
+    [HttpGet("modelos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult Modelos([FromServices] IOptions<ModelosAprovadosAgenteOptions> modelos) =>
+        DataOk<IReadOnlyList<ModeloAprovadoAgente>>(modelos.Value.Modelos);
 
     [SwaggerOperation(Summary = "Ask the owner assistant (never sent to the customer)",
         Description = "Sem Anthropic:Enabled/Anthropic:ApiKey devolve 503.")]

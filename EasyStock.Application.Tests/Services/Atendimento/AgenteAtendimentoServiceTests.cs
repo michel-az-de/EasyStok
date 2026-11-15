@@ -84,7 +84,8 @@ public partial class AgenteAtendimentoServiceTests
         [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
         _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
-        turnos: _turnos, precos: Microsoft.Extensions.Options.Options.Create(_precos));
+        turnos: _turnos, precos: Microsoft.Extensions.Options.Options.Create(_precos),
+        modelos: Microsoft.Extensions.Options.Options.Create(_modelos));
 
     private AgenteAtendimentoService CriarServicoComLimite(int maximoPorHora) => new(
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,

@@ -20,7 +20,7 @@ const NIVEIS_DE_SUGESTAO = [
 const OCIOSO = { estado: 'ocioso' }
 const CAMPOS_CONFIGURACAO = [
   'ativo', 'tom', 'nivelSugestao', 'saudacaoPrimeiroContato', 'saudacaoRetorno',
-  'fraseEspera', 'mensagemForaArea', 'mensagemEscalada', 'mensagemEncaminhamento', 'modeloRetomadaNome', 'respiroMinutos',
+  'fraseEspera', 'mensagemForaArea', 'mensagemEscalada', 'mensagemEncaminhamento', 'nomeDona', 'modeloRetomadaNome', 'respiroMinutos',
   'tempoPreparoPadraoMinutos', 'slaRespostaMinutos',
 ]
 const valorComparavel = (valor) => String(valor ?? '')
@@ -281,6 +281,13 @@ function ConfiguracaoDoAtendimento() {
           required
           onChange={mudar('tom')}
         />
+        <CampoTexto
+          rotulo="Nome da dona"
+          dica="Como o robô chama você ao passar a conversa, por exemplo Michele. Na mensagem padrão, seu nome entra no lugar de a equipe."
+          value={form.nomeDona ?? ''}
+          maxLength={60}
+          onChange={mudar('nomeDona')}
+        />
         <CampoSelecao
           rotulo="Sugestões"
           opcoes={NIVEIS_DE_SUGESTAO}
@@ -304,7 +311,7 @@ function ConfiguracaoDoAtendimento() {
         <CampoArea rotulo="Mensagem para endereço fora da área" value={form.mensagemForaArea} required onChange={mudar('mensagemForaArea')} />
         <CampoArea
           rotulo="Ao passar o cliente para a equipe"
-          dica="Enviada quando o cliente pede uma pessoa ou o Assistente não sabe responder. {nome} vira o primeiro nome."
+          dica="Enviada quando o cliente pede uma pessoa ou o Assistente não sabe responder. {nome} vira o primeiro nome e {dona}, o nome da dona."
           value={form.mensagemEscalada ?? ''}
           required
           maxLength={500}

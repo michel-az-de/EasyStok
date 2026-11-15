@@ -14,3 +14,9 @@ export async function listarPedidos(filtros, contexto, sinal, agoraMs = Date.now
 
 export const obterPedido = (id, contexto, sinal) =>
   chamarApi(`/api/pedidos/${encodeURIComponent(id)}?empresaId=${encodeURIComponent(contexto.empresaId)}`, opcoes(contexto, sinal))
+// #2495 (S6): os 5 pedidos mais recentes do cliente, para a ficha no editor de Cadastros.
+export async function listarPedidosDoCliente(clienteId, contexto, sinal) {
+  const parametros = new URLSearchParams({ empresaId: contexto.empresaId, clienteId, page: 1, pageSize: 5, sort: 'criadoem', order: 'desc' })
+  const r = await chamarApi(`/api/pedidos?${parametros}`, { ...opcoes(contexto, sinal), envelope: true })
+  return Array.isArray(r?.data) ? r.data : []
+}

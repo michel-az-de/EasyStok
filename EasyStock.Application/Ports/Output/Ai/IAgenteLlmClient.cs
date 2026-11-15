@@ -5,7 +5,8 @@ namespace EasyStock.Application.Ports.Output.Ai;
 /// <summary>
 /// Chamada ao LLM com ferramentas usada pelo agente de atendimento (S06). A implementação real
 /// fala com a API Messages da Anthropic (<c>AnthropicMessagesClient</c>); o modelo, a chave e o
-/// liga/desliga vêm de configuração (<c>Anthropic:*</c>), nunca do chamador.
+/// liga/desliga vêm de configuração (<c>Anthropic:*</c>). Exceção (S68, ADR-0066): o turno pode pedir
+/// <see cref="RequisicaoLlm.Modelo"/>, sempre um da lista aprovada; nulo usa o configurado.
 /// </summary>
 public interface IAgenteLlmClient
 {
@@ -21,7 +22,12 @@ public interface IAgenteLlmClient
 public sealed record RequisicaoLlm(
     string System,
     IReadOnlyList<MensagemLlm> Mensagens,
-    IReadOnlyList<FerramentaLlm> Ferramentas);
+    IReadOnlyList<FerramentaLlm> Ferramentas,
+    string? Modelo = null)
+{
+    /// <summary>Modelo do agente quando a configuração não diz outro (<c>Anthropic:ModeloAgente</c> ausente).</summary>
+    public const string ModeloPadrao = "claude-sonnet-5";
+}
 
 /// <summary><paramref name="Papel"/> é <c>user</c> ou <c>assistant</c>.</summary>
 public sealed record MensagemLlm(string Papel, IReadOnlyList<BlocoLlm> Conteudo)

@@ -57,7 +57,11 @@ await confere('CSP libera os SDKs do Google e do Facebook e a mesma origem', () 
   assert.match(conf, /connect-src 'self'/)
   assert.match(conf, /img-src 'self' data: blob:/)
 })
-await confere('HSTS fica com o Caddy, não no nginx', () => assert.doesNotMatch(conf, /Strict-Transport-Security/))
+// #2603 (Q16): o Caddy compartilhado não manda HSTS para o app.; o nginx do console manda, só para ele.
+await confere('HSTS de 1 ano no nginx, sem includeSubDomains', () => {
+  assert.match(conf, /Strict-Transport-Security "max-age=31536000" always/)
+  assert.doesNotMatch(conf, /Strict-Transport-Security[^\n]*includeSubDomains/i)
+})
 await confere('client_max_body_size cobre o acervo de 6 MB', () => {
   const m = conf.match(/client_max_body_size\s+(\d+)m;/)
   assert.ok(m, 'client_max_body_size ausente')

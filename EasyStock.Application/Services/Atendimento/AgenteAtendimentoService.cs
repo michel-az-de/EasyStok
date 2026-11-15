@@ -45,7 +45,8 @@ public sealed class AgenteAtendimentoService(
     Notifications.IContatoDaEquipeAvisada? equipe = null,
     IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null,
     ITurnoAgenteRepository? turnos = null,
-    IOptions<PrecosModelosAgenteOptions>? precos = null)
+    IOptions<PrecosModelosAgenteOptions>? precos = null,
+    IOptions<ModelosAprovadosAgenteOptions>? modelos = null)
 {
     public const int MaximoIteracoes = 6;
     public const int UltimasMensagens = 20;
@@ -146,7 +147,8 @@ public sealed class AgenteAtendimentoService(
             par => (IFerramentaAgente)new FerramentaProtegida(par.Value, protecao));
 
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
-            llm, system, mensagens, ferramentasProtegidas, contexto, MaximoIteracoes, logger, ct);
+            llm, system, mensagens, ferramentasProtegidas, contexto, MaximoIteracoes, logger, ct,
+            modelos?.Value.DoTurno(configuracao.ModeloAgente)); // S68: modelo da loja só se aprovado
         var tokens = geracao.Tokens;
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
@@ -180,11 +182,11 @@ public sealed class AgenteAtendimentoService(
         var respondeu = contexto.HouveEnvio;
         // #2249: o texto de cada ação é molde da loja; quem não é cliente recebe o de encaminhamento.
         var primeiroNome = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome);
-        var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MensagemEscalada, primeiroNome);
+        var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MoldeEscalada(), primeiroNome, configuracao.NomeDona);
         if (conversa.Situacao == SituacaoConversa.Assumida)
         {
             var aoContato = contexto.Encaminhou
-                ? MoldeMensagemContato.Preencher(configuracao.MensagemEncaminhamento, primeiroNome)
+                ? MoldeMensagemContato.Preencher(configuracao.MensagemEncaminhamento, primeiroNome, configuracao.NomeDona)
                 : encaminhamento;
             respondeu = await EnviarRespostaAsync(gravacao, conversa, aoContato, ct) || respondeu;
         }

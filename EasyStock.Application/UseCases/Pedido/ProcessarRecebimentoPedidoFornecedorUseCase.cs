@@ -102,6 +102,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
         // 2. PROCESSAR ITENS
         var dataRecebimento = command.DataRecebimento ?? DateTime.UtcNow;
         var itensFinal = 0;
+        var houveMudanca = false;
 
         foreach (var item in itens)
         {
@@ -137,17 +138,9 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
             {
                 logger.LogWarning("Item {ItemId} sem ProdutoId, pula entrada estoque", item.Id);
                 item.QuantidadeRecebida = novoTotalRecebido;
+                houveMudanca = true;
                 continue;
             }
-
-            // Estoque atual exige int. Quantidade fracionaria (1.5kg) nao
-            // entra ate refactor que troque RegistrarEntradaEstoqueCommand
-            // pra decimal. Falhar explicito evita o cast (int) silencioso
-            // que truncava 1.5 -> 1 e gerava saldo errado em compra.
-            if (delta % 1m != 0m)
-                throw new UseCaseValidationException(
-                    $"Quantidade fracionaria ({delta}) ainda nao suportada no recebimento. " +
-                    "Cadastre delta inteiro ou aguarde suporte a decimal no estoque.");
 
             // IDEMPOTENCIA (#790): refDoc inclui novoTotalRecebido, entao cada delta e
             // uma chave unica. Se uma execucao anterior falhou DEPOIS de commitar esta
@@ -163,6 +156,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                     "Item {ItemId} (ref {Ref}) ja aplicado — idempotencia, pulando entrada e persistindo total.",
                     item.Id, refDoc);
                 item.QuantidadeRecebida = novoTotalRecebido;
+                houveMudanca = true;
                 continue;
             }
 
@@ -171,7 +165,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
                 EmpresaId: command.EmpresaId,
                 ProdutoId: item.ProdutoId.Value,
                 ProdutoVariacaoId: null,
-                Quantidade: (int)delta,
+                Quantidade: delta,
                 CustoUnitario: item.CustoUnitario,
                 PrecoVendaSugerido: null,
                 DataEntrada: dataRecebimento,
@@ -196,6 +190,7 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
 
             // Atualiza quantidade recebida no item — total absoluto agora.
             item.QuantidadeRecebida = novoTotalRecebido;
+            houveMudanca = true;
 
             // Publica evento item recebido — QuantidadeRecebida no evento
             // e o DELTA aplicado nesta chamada (compativel com listeners
@@ -213,6 +208,15 @@ public class ProcessarRecebimentoPedidoFornecedorUseCase(
             await PublicadorObrigatorio().PublicarAsync(eventoItem);
 
             itensFinal++;
+        }
+
+        // Nenhum item mudou: nao ha o que gravar. Sem isto o pedido Aberto virava RecebidoParcial
+        // (com DataRecebimento) sem entrar nada no estoque, e o receber simples passava a recusa-lo.
+        if (!houveMudanca)
+        {
+            logger.LogInformation("Pedido {PedidoId} sem nenhum item novo a receber; status mantido ({Status}).",
+                command.PedidoId, pedido.Status);
+            return new ProcessarRecebimentoPedidoFornecedorResult("Nenhum item novo a receber", 0);
         }
 
         // 3. ATUALIZAR PEDIDO — total absoluto vs pedido determina parcial/total.
