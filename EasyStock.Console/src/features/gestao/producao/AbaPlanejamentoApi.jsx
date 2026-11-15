@@ -7,7 +7,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { assinaturaDoPlano, comprasGuardadas, erroDasPorcoes, gerarCompras, guardarCompras, itensDeCompra, lerSugestao, levarParaProducao, motivosDosPendentes, planejar } from '../../../aplicacao/planejamento'
-import { lerInsumos } from '../../../aplicacao/insumos'
+import { lerInsumos, rotuloDaUnidade } from '../../../aplicacao/insumos'
 import { lojaDesligada } from '../../../aplicacao/planoDeSincronizacao'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
@@ -209,11 +209,11 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
                 <li key={i.insumoId} className={css.linha}>
                   <div className={css.resumo}>
                     <span className={css.nome}>{i.nome}</span>
-                    <span className={css.detalhe}>precisa {qtd(i.precisa)} {i.unidade} · tem {qtd(i.saldo)} {i.unidadeSaldo}{i.aviso ? ` · ${i.aviso}` : ''}</span>
+                    <span className={css.detalhe}>precisa {qtd(i.precisa)} {rotuloDaUnidade(i.unidade)} · tem {qtd(i.saldo)} {rotuloDaUnidade(i.unidadeSaldo)}{i.aviso ? ` · ${i.aviso}` : ''}</span>
                   </div>
                   <div className={css.estados}>
                     {i.falta > 0
-                      ? <Pilula tom="aviso" fina>falta {qtd(i.falta)} {i.unidade}</Pilula>
+                      ? <Pilula tom="aviso" fina>falta {qtd(i.falta)} {rotuloDaUnidade(i.unidade)}</Pilula>
                       : <Pilula tom="ok" fina>tem</Pilula>}
                     {i.custo != null && <span className={css.detalhe}>{moeda(i.custo)}</span>}
                   </div>
@@ -236,7 +236,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
                       <span className={css.nome}>{i.texto}</span>
                       <span className={css.detalhe}>{i.categoria === 'Mínimo' ? 'repõe o mínimo' : 'falta para a produção'}</span>
                     </div>
-                    <span className={css.preco}>{qtd(i.quantidade)} {i.unidade}</span>
+                    <span className={css.preco}>{qtd(i.quantidade)} {rotuloDaUnidade(i.unidade)}</span>
                   </li>
                 ))}
               </ul>

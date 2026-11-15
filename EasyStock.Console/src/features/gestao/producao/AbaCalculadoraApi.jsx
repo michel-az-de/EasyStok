@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
 import { calcularReceita, numeroDaReceita, quantidadeDaReceita as qtd } from '../../../aplicacao/calculosReceita'
+import { rotuloDaUnidade } from '../../../aplicacao/insumos'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
@@ -84,13 +85,13 @@ export function AbaCalculadoraApi() {
       </section>
     )}
     {resultado && <Modal titulo={`Cálculo de ${resultado.produtoFinalNome}`} aoFechar={() => setResultado(null)} largura="min(1000px, calc(100vw - 24px))" rodape={<Botao onClick={() => setResultado(null)}>Fechar cálculo</Botao>}>
-      <p>{qtd(resultado.quantidadeDesejada)} {resultado.unidadeDesejada} · multiplicador {qtd(resultado.fatorMultiplicador)}</p>
+      <p>{qtd(resultado.quantidadeDesejada)} {rotuloDaUnidade(resultado.unidadeDesejada)} · multiplicador {qtd(resultado.fatorMultiplicador)}</p>
       <p><strong>{resultado.custoEstimadoTotal == null ? 'Custo incompleto: confira os custos dos insumos.' : `Custo estimado: ${moeda(resultado.custoEstimadoTotal)}`}</strong></p>
       <p>{resultado.tudoDisponivel ? 'Insumos disponíveis para esta simulação.' : 'Há faltas ou unidades que precisam ser conferidas.'}</p>
       <ul className={css.lista}>{resultado.insumos.map((insumo) => <li key={insumo.insumoId} className={css.linha}>
-        <div className={css.resumo}><strong className={css.nome}>{insumo.insumoNome}</strong><span className={css.detalhe}>Precisa {qtd(insumo.quantidadeNecessaria)} {insumo.unidadeReceita} · saldo {qtd(insumo.saldoAtual)} {insumo.unidadeSaldo}</span>
+        <div className={css.resumo}><strong className={css.nome}>{insumo.insumoNome}</strong><span className={css.detalhe}>Precisa {qtd(insumo.quantidadeNecessaria)} {rotuloDaUnidade(insumo.unidadeReceita)} · saldo {qtd(insumo.saldoAtual)} {rotuloDaUnidade(insumo.unidadeSaldo)}</span>
           {insumo.aviso && <span role="status">{insumo.aviso}</span>}</div>
-        <span>{insumo.conversaoFalhou ? 'Conferir unidade' : insumo.falta > 0 ? `Falta ${qtd(insumo.falta)} ${insumo.unidadeReceita}` : 'Saldo suficiente'}</span>
+        <span>{insumo.conversaoFalhou ? 'Conferir unidade' : insumo.falta > 0 ? `Falta ${qtd(insumo.falta)} ${rotuloDaUnidade(insumo.unidadeReceita)}` : 'Saldo suficiente'}</span>
         <span>{insumo.custoEstimadoLinha == null ? 'Sem custo conhecido' : moeda(insumo.custoEstimadoLinha)}</span>
       </li>)}</ul>
     </Modal>}

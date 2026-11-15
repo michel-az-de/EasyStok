@@ -7,6 +7,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { usePerdasApi } from '../../../aplicacao/usePerdasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { detalheDoVencido, MOTIVOS_PERDA, perdasSemCusto, semCusto, textoDaPerda } from '../../../aplicacao/perdas'
+import { rotuloDaUnidade } from '../../../aplicacao/insumos'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
 import producao from './producao.module.css'
@@ -113,7 +114,7 @@ export function AbaPerdasApi() {
           <CampoSelecao disabled={enviando} rotulo="Prato ou insumo" value={rascunho.produtoId}
             onChange={(e) => setRascunho((atual) => ({ ...atual, produtoId: e.target.value, porcao: '' }))}
             opcoes={[{ valor: '', rotulo: 'Escolha o prato ou insumo' }, ...gestao.opcoes.map((o) => ({
-              valor: o.produtoId, rotulo: `${o.nome} (${o.tipo}, tem ${qtd(o.saldo)}${o.unidade ? ` ${o.unidade}` : ''})`,
+              valor: o.produtoId, rotulo: `${o.nome} (${o.tipo}, tem ${qtd(o.saldo)}${o.unidade ? ` ${rotuloDaUnidade(o.unidade)}` : ''})`,
             }))]} />
           {porcoes.length > 0 && (
             <div className={css.linhaCompleta}>
@@ -121,7 +122,7 @@ export function AbaPerdasApi() {
                 opcoes={[{ valor: '', rotulo: 'Escolha a porção perdida' }, ...porcoes.map((s) => ({ valor: s.chave, rotulo: `${s.rotulo} (tem ${qtd(s.saldo)})` }))]} />
             </div>
           )}
-          <CampoTexto disabled={enviando} inputMode="decimal" rotulo={escolhido?.unidade ? `Quantidade (${escolhido.unidade})` : 'Quantidade'} value={rascunho.quantidade} onChange={mudar('quantidade')} />
+          <CampoTexto disabled={enviando} inputMode="decimal" rotulo={escolhido?.unidade ? `Quantidade (${rotuloDaUnidade(escolhido.unidade)})` : 'Quantidade'} value={rascunho.quantidade} onChange={mudar('quantidade')} />
           <CampoSelecao disabled={enviando} rotulo="Motivo" value={rascunho.motivo} onChange={mudar('motivo')}
             opcoes={MOTIVOS_PERDA.map((m) => ({ valor: m.id, rotulo: m.rotulo }))} />
           {rascunho.motivo === 'Outro' && (
