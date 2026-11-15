@@ -29,8 +29,12 @@ public class Product
     [Column(TypeName = "numeric(10,2)")]
     public decimal? Price { get; set; }
 
-    /// <summary>Quantidade atual disponível em estoque (unidades).</summary>
-    public int Stock { get; set; }
+    /// <summary>
+    /// Quantidade atual disponível em estoque, na unidade do produto. #2718: fracionada (1,5 kg), com a
+    /// mesma precisão do saldo do ERP (<c>itens_estoque.QuantidadeAtual</c>).
+    /// </summary>
+    [Column(TypeName = "numeric(18,3)")]
+    public decimal Stock { get; set; }
 
     /// <summary>Custo unitário informado no PWA (#1467). Espelha <c>Produto.CustoReferencia</c>.</summary>
     [Column("cost", TypeName = "numeric(10,2)")]
