@@ -149,6 +149,22 @@
             el._masking = false;
         };
         el.addEventListener('input', handler);
+        if (type === 'money') {
+            // #993: caixa registradora so acrescenta digito pela direita, entao digitar sobre o
+            // valor pre-preenchido concatenava (R$ 14,29 + 777 = R$ 14.297,77). Selecionar no
+            // foco faz a primeira tecla substituir. Sem timer: o mouseup do mesmo clique
+            // desfaria a selecao (Chromium), entao ele e cancelado so naquela vez.
+            let acabouDeFocar = false;
+            el.addEventListener('focus', () => {
+                if (!el.value) return;
+                try { el.select(); acabouDeFocar = true; } catch (_) { /* input sem selecao */ }
+            });
+            el.addEventListener('mouseup', (e) => {
+                if (!acabouDeFocar) return;
+                acabouDeFocar = false;
+                e.preventDefault();
+            });
+        }
         el.dataset.maskApplied = '1';
         // initial format
         if (el.value) handler();
