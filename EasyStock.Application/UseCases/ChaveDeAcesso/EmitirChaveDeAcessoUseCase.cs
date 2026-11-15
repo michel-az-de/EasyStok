@@ -1,3 +1,4 @@
+using System.Globalization;
 using EasyStock.Application.Services.Auth;
 
 namespace EasyStock.Application.UseCases.ChaveDeAcesso;
@@ -39,7 +40,9 @@ public sealed class EmitirChaveDeAcessoUseCase(
         var prefixo = ChavesDeAcesso.PrefixoDoHash(hash);
         var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
         await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(usuario.Id, ChavesDeAcesso.AcaoEmitida,
-            $"Chave de acesso {prefixo} emitida por {autor}, vale até {expiraEm:yyyy-MM-dd}", currentUser, empresaId));
+            // #2672: o Histórico de acesso mostra este texto; a tela diz "código de acesso" e data de Brasília.
+            $"Código de acesso {prefixo} gerado por {autor}, vale até {HorarioBrasil.DataOperacional(expiraEm).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}",
+            currentUser, empresaId));
         await unitOfWork.CommitAsync();
 
         logger.LogInformation("Chave de acesso {Prefixo} emitida para o usuario {UsuarioId} por {Executor}",
@@ -54,7 +57,7 @@ public sealed class EmitirChaveDeAcessoUseCase(
         var revogadas = await tokens.InvalidarChavesDeAcessoAbertasAsync(usuario.Id);
         var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
         await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(usuario.Id, ChavesDeAcesso.AcaoRevogada,
-            $"Chave de acesso revogada por {autor} ({revogadas} aberta(s))", currentUser, empresaId));
+            $"Código de acesso revogado por {autor} ({revogadas} aberto(s))", currentUser, empresaId));
         await unitOfWork.CommitAsync();
         return revogadas;
     }

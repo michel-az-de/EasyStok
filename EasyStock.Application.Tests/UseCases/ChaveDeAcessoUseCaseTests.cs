@@ -72,6 +72,23 @@ public class ChaveDeAcessoUseCaseTests
     }
 
     [Fact]
+    public async Task HistoricoFalaCodigoDeAcessoEDataDeBrasilia()
+    {
+        // #2672 (C4): o Histórico de acesso mostra este texto; a tela chama de "código de acesso" e data em dd/mm/aaaa.
+        // 22h30 de Brasília (01h30 UTC do dia seguinte): a validade é contada no dia de Brasília.
+        _c.Relogio.SetUtcNow(new DateTimeOffset(2026, 10, 3, 1, 30, 0, TimeSpan.Zero));
+        var usuario = CriarDaEmpresa();
+
+        var emitida = await Emitir(usuario);
+        await Emissor().RevogarAsync(usuario.Id);
+
+        var prefixo = emitida.PrefixoDoHash;
+        _c.Auditorias.Single(a => a.Acao == ChavesDeAcesso.AcaoEmitida).Detalhes
+            .Should().StartWith($"Código de acesso {prefixo} gerado por ").And.EndWith(", vale até 01/11/2026");
+        _c.Auditorias.Single(a => a.Acao == ChavesDeAcesso.AcaoRevogada).Detalhes.Should().StartWith("Código de acesso revogado por ");
+    }
+
+    [Fact]
     public async Task EmitirOutraRevogaAAnterior()
     {
         var usuario = CriarDaEmpresa();
