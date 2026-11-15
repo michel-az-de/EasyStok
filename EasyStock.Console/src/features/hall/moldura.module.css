@@ -15,6 +15,8 @@
 .preparacao { display: block; font-size: var(--t-micro); font-weight: 400; color: var(--tinta-2); margin-top: var(--e-1); }
 .itemAtivo, .itemAtivo:hover { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
 .item > svg, .modulo > svg, .titulo > svg { flex: none; }
+/* Ícone de marca de 32 px ocupa o mesmo espaço de 24 px dos vizinhos: a linha e o texto alinham. */
+.item > svg[width="32"] { margin: calc(-1 * var(--e-1)); }
 .item:focus-visible, .voltar:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .barra { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); padding: var(--e-2) var(--e-3); flex: none; }
 .contexto, .acoes { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); min-width: 0; }

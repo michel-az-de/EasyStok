@@ -225,6 +225,9 @@
 .lojaTrilho { margin-bottom: var(--e-2); }
 .lojaAberta { color: var(--sucesso); background: var(--sucesso-pastel); }
 .lojaFechada { color: var(--erro); background: var(--erro-pastel); }
+/* O trilho marca o item atual com aria-pressed (0,2,0); o estado da loja precisa vencer essa regra. */
+.lojaTrilho.lojaAberta { color: var(--sucesso); background: var(--sucesso-pastel); }
+.lojaTrilho.lojaFechada { color: var(--erro); background: var(--erro-pastel); }
 .lojaAberta:hover:not(:disabled) { color: var(--sucesso); background: var(--sucesso-pastel); filter: brightness(.97); }
 .lojaFechada:hover:not(:disabled) { color: var(--erro); background: var(--erro-pastel); filter: brightness(.97); }
 

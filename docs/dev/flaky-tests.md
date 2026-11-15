@@ -10,6 +10,25 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ⚠️ TOLERADO: prova do hub não vê a troca de ordem depois do arrasto por toque
+
+Visto em `EasyStock.Console/ferramentas/prova-hub-navegador.mjs:161`, no job `qualidade` da PR #2616
+(run 43667676409, head `276a3b392`). A tentativa 1 falhou com `page.waitForFunction: Timeout 30000ms
+exceeded`, logo depois do log "Produção movido para a posição 2 de 6". O rerun do mesmo job no mesmo SHA
+passou, e localmente a prova passou 4 de 4 vezes nesse head. A PR não toca `features/hall`.
+
+- **Por que é flaky:** causa não confirmada. A prova usa `page.clock` falso, e o arrasto por toque
+  depende de timers e quadros. A suspeita é que, com o runner carregado, a reordenação só aplique depois
+  de um `runFor` que vem depois da espera da linha 161.
+- **Como confirmar:** rerun do job no mesmo SHA. Para reproduzir, rodar a prova com CPU limitada
+  (`cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })`) e ver se a espera expira.
+- **Por que não foi corrigido:** apareceu uma vez, numa PR fora do hall. Corrigir sem reproduzir
+  seria chute.
+- **Quando promover a "corrigir":** na segunda falha em qualquer branch, ou se reproduzir com CPU
+  limitada.
+
+---
+
 ## ✅ CORRIGIDO (#2433): prova do Financeiro contava o Sair da tela de carregamento
 
 Visto em `EasyStock.Console/ferramentas/prova-financeiro-navegador.mjs:69`, no job `console` do master em

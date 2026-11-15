@@ -11,16 +11,18 @@ export function MenuDosModulos({ moduloId, telaId, fonteApi, aoNavegar, semMenu 
   const { permite, aoSair, sessaoPersistente, conta, acoes } = useAcessoModulos()
   const modulo = MODULOS.find((item) => item.id === moduloId)
   // #2258 (auditoria A2): a ordem dos módulos é a mesma do Início, da Ajuda e da Busca.
+  // Em Respostas automáticas o atual é o próprio atalho, não o módulo Atendimento.
+  const naRespostas = moduloId === 'atendimento' && telaId === 'respostas'
   const areas = emOrdemDosModulos(MODULOS).filter((item) => permite(item.id) && telasDoMenu(item, { fonteApi, acoes }).length)
   return <>
     <nav className={css.trilho} aria-label="Módulos da loja">
       <a className={css.inicioTrilho} href={HASH_HALL} onClick={aoNavegar} aria-label={`Ir para o ${NOME_INICIO}`}><Marca compacta /><span>{NOME_INICIO}</span></a>
-      {areas.map((item) => <a key={item.id} href={hashDoModulo(item.id)} onClick={aoNavegar} className={`${css.itemTrilho} ${item.id === moduloId ? css.moduloAtivo : ''}`} aria-current={item.id === moduloId ? 'true' : undefined} title={item.nome}>
+      {areas.map((item) => <a key={item.id} href={hashDoModulo(item.id)} onClick={aoNavegar} className={`${css.itemTrilho} ${item.id === moduloId && !naRespostas ? css.moduloAtivo : ''}`} aria-current={item.id === moduloId && !naRespostas ? 'true' : undefined} title={item.nome}>
         <IconeDoModulo modulo={item} /><span>{item.nome}</span>
       </a>)}
       {/* #1839 (F1): as automáticas só abriam pelo trilho do Balcão. O atalho leva à tela que as liga e escreve. */}
       {permite('atendimento') && <a href={hashDoModulo('atendimento', 'respostas')} onClick={aoNavegar}
-        className={css.itemTrilho} title={NOME_RESPOSTAS_AUTOMATICAS}>
+        className={`${css.itemTrilho} ${naRespostas ? css.moduloAtivo : ''}`} aria-current={naRespostas ? 'true' : undefined} title={NOME_RESPOSTAS_AUTOMATICAS}>
         <IconeDoModulo modulo={moduloPorId('atendimento')} telaId="respostas" /><span>{NOME_RESPOSTAS_AUTOMATICAS}</span>
       </a>}
       {/* #1870: o Sair mora atrás do avatar, no pé do trilho, como no Balcão. */}

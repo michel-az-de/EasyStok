@@ -13,7 +13,6 @@ import { janelaDosPaineis, observarAreaDosPaineis } from '../hooks/areaDosPainei
 import { Pilula } from '../componentes/Pilula'
 import { Icone } from '../componentes/Icone'
 import { Modal } from '../componentes/Modal'
-import { MarcaIcone } from '../componentes/MarcaIcone'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useAcessoModulos } from '../aplicacao/acessoModulos'
 import { contarAtivas } from '../dominio/automacao'
@@ -290,7 +289,7 @@ function Trilho({
       <div className={css.avisosTrilho}>{busca}{notificacoes}</div>
       <div className={css.sinoTrilho}><Sininho comRotulo /></div>
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda">
-        <MarcaIcone nome="informacao" tamanho={24} /><span>Ajuda</span>
+        <Icone nome="ajuda" tamanho={24} /><span>Ajuda</span>
       </Botao>
       {disposicao}
       <span className={css.espacoTrilho} />
