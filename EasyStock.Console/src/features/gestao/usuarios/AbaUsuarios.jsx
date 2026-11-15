@@ -69,16 +69,23 @@ function Convite({ perfis, aoConvidar, aoCancelar }) {
 }
 
 // #2201: mostrado uma vez. A dona copia e manda pelo WhatsApp; a pessoa cola em "Entrar com código de acesso".
+// #2672: o painel abre no topo da lista; quem gerou numa linha de baixo não o via e o foco ficava na linha.
+// O foco vai para o código e o painel entra na tela (o `key` da chave refaz isso a cada código novo).
 function CodigoGerado({ codigo, aoCopiar, aoFechar }) {
+  const painel = useRef(null)
   const campo = useRef(null)
   const validade = new Date(codigo.expiraEm).toLocaleDateString('pt-BR')
-  useEffect(() => { campo.current?.select() }, [])
+  useEffect(() => {
+    painel.current?.scrollIntoView?.({ block: 'nearest' })
+    campo.current?.focus({ preventScroll: true })
+    campo.current?.select()
+  }, [])
   async function copiar() {
     try { await navigator.clipboard.writeText(codigo.chave); aoCopiar() }
     catch { campo.current?.select() }
   }
   return (
-    <section className={css.convite} aria-label={`Código de acesso de ${codigo.nome}`}>
+    <section ref={painel} className={css.convite} aria-label={`Código de acesso de ${codigo.nome}`}>
       <CampoTexto
         ref={campo} rotulo={`Código de acesso de ${codigo.nome}`} readOnly value={codigo.chave}
         autoComplete="off" spellCheck={false} onFocus={(e) => e.target.select()}
@@ -146,13 +153,19 @@ function Pessoa({ usuario, perfis, meuId, souSuporte, agora, ocupado, aoAgir, ao
       </div>
       <div className={css.acoes}>
         {pode.reenviarConvite && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reenviar', usuario)}>Reenviar convite</Botao>
+          <Botao variante="texto" disabled={ocupado} aria-label={`Reenviar convite para ${usuario.nome}`} onClick={() => aoAgir('reenviar', usuario)}>
+            Reenviar convite
+          </Botao>
         )}
         {pode.gerarCodigo && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('codigo', usuario)}>Gerar código de acesso</Botao>
+          <Botao variante="texto" disabled={ocupado} aria-label={`Gerar código de acesso de ${usuario.nome}`} onClick={() => aoAgir('codigo', usuario)}>
+            Gerar código de acesso
+          </Botao>
         )}
         {pode.desativar && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>Desativar</Botao>
+          <Botao variante="texto" disabled={ocupado} aria-label={`Desativar ${usuario.nome}`} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>
+            Desativar
+          </Botao>
         )}
         {confirmando && (
           <>
@@ -170,7 +183,9 @@ function Pessoa({ usuario, perfis, meuId, souSuporte, agora, ocupado, aoAgir, ao
             <Botao ref={cancelar} variante="texto" disabled={ocupado} onClick={() => setPerfilEscolhido(null)}>Cancelar</Botao>
           </>
         )}
-        {pode.reativar && <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reativar', usuario)}>Reativar</Botao>}
+        {pode.reativar && (
+          <Botao variante="texto" disabled={ocupado} aria-label={`Reativar ${usuario.nome}`} onClick={() => aoAgir('reativar', usuario)}>Reativar</Botao>
+        )}
       </div>
     </li>
   )
@@ -232,12 +247,15 @@ export function AbaUsuarios() {
   const agir = useCallback(async (acao, usuario, valor) => {
     setOcupado(true)
     setRetorno(null)
+    // #2672: código gerado fica com o foco no painel do código; só a falha devolve o foco à linha.
+    let focoNoCodigo = false
     try {
       if (acao === 'perfil') await trocarPerfil(usuario.usuarioId, valor)
       else if (acao === 'reenviar') await reenviarConvite(usuario.usuarioId)
       else if (acao === 'codigo') {
         const gerado = await gerarCodigoDeAcesso(usuario.usuarioId)
         setCodigo({ nome: usuario.nome, chave: gerado.chave, expiraEm: gerado.expiraEm, copiado: false })
+        focoNoCodigo = true
       }
       else if (acao === 'desativar') await desativarUsuario(usuario.usuarioId)
       else await reativarUsuario(usuario.usuarioId)
@@ -251,7 +269,7 @@ export function AbaUsuarios() {
     } finally {
       setOcupado(false)
       // Desativar e reativar mudam a linha de lugar: o foco vai para o título da lista.
-      setFoco({ usuarioId: acao === 'desativar' || acao === 'reativar' ? null : usuario.usuarioId })
+      if (!focoNoCodigo) setFoco({ usuarioId: acao === 'desativar' || acao === 'reativar' ? null : usuario.usuarioId })
     }
   }, [carregar, estado.perfis])
 
@@ -283,7 +301,7 @@ export function AbaUsuarios() {
           )}
         </div>
         {convidando && <Convite perfis={estado.perfis} aoConvidar={convidar} aoCancelar={() => setConvidando(false)} />}
-        {codigo && <CodigoGerado codigo={codigo} aoCopiar={() => setCodigo((c) => c && { ...c, copiado: true })} aoFechar={() => setCodigo(null)} />}
+        {codigo && <CodigoGerado key={codigo.chave} codigo={codigo} aoCopiar={() => setCodigo((c) => c && { ...c, copiado: true })} aoFechar={() => setCodigo(null)} />}
         {/* Sempre montado e com a altura reservada: a lista não pula quando o aviso chega. */}
         <div className={css.aviso}>
           <output className={css.retorno} data-tom={retorno?.tom} role={retorno?.tom === 'erro' ? 'alert' : undefined}>{retorno?.texto}</output>
