@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useChavePixLoja } from '../../../aplicacao/useChavePixLoja'
+import { situacaoDoPixDireto } from '../../../dominio/cobranca'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
@@ -7,17 +8,12 @@ import css from './AbaIntegracoes.module.css'
 
 // #2233: Pix direto pela chave da loja, sem Mercado Pago. O cliente paga pelo copia e cola e a
 // equipe confere no banco antes do "Marcar pago": nada confirma sozinho. A chave só se escreve; o
-// que volta é o tipo e o final. Cobrar assim ainda depende da flag `pagamento.pix_direto` do tenant.
+// que volta é o tipo e o final. O cartão só aparece com a flag `pagamento.pix_direto` do tenant ligada.
 const TIPOS = [
   { valor: 'cpf', rotulo: 'CPF' }, { valor: 'cnpj', rotulo: 'CNPJ' }, { valor: 'email', rotulo: 'E-mail' },
   { valor: 'telefone', rotulo: 'Telefone' }, { valor: 'aleatoria', rotulo: 'Chave aleatória' },
 ]
 const VAZIO = { tipo: 'cnpj', chave: '', nomeRecebedor: '', cidade: '' }
-
-function pilula(pix) {
-  if (!pix?.configurada) return { tom: 'neutro', texto: 'Sem chave' }
-  return pix.pixDiretoLigado ? { tom: 'ok', texto: 'Ligado' } : { tom: 'aviso', texto: 'Chave salva, Pix direto desligado' }
-}
 
 export function CartaoPixDireto() {
   const { pix, erro, ocupado, salvar, remover } = useChavePixLoja()
@@ -26,7 +22,8 @@ export function CartaoPixDireto() {
   const preenchido = valores.chave.trim() && valores.nomeRecebedor.trim() && valores.cidade.trim()
   const fechar = () => { setValores(VAZIO); setEditando(false) }
   const campo = (nome) => (e) => setValores((v) => ({ ...v, [nome]: e.target.value }))
-  const situacao = pilula(pix)
+  const situacao = situacaoDoPixDireto(pix)
+  if (!situacao) return null
 
   return (
     <li className={css.cartao}>

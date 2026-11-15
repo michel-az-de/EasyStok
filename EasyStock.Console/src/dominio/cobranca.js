@@ -84,6 +84,13 @@ const CHIP_PIX_DIRETO = {
 }
 export const meiosDaEscolha = (meios, { pixDireto = false, pedidoCriado = false } = {}) =>
   pixDireto && pedidoCriado ? [...meios, CHIP_PIX_DIRETO] : meios
+
+// O cartão da aba Integrações só existe com a flag `pagamento.pix_direto` ligada: com ela desligada
+// (ou ainda carregando) não aparece, nem com chave salva. Ligada, diz se falta cadastrar a chave.
+export const situacaoDoPixDireto = (pix) => {
+  if (!pix?.pixDiretoLigado) return null
+  return pix.configurada ? { tom: 'ok', texto: 'Ligado' } : { tom: 'neutro', texto: 'Sem chave' }
+}
 const PREFIXO_DINHEIRO = 'Pagamento na entrega: dinheiro'
 
 // `trocoPara` em reais; vazio ou zero é "sem troco".

@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.FeatureFlags;
 using LojaEntity = EasyStock.Domain.Entities.Loja;
 using EasyStock.Domain.Enums.Pagamentos;
@@ -22,9 +23,18 @@ public sealed record DefinirChavePixLojaCommand(
         $"DefinirChavePixLojaCommand {{ EmpresaId = {EmpresaId}, LojaId = {LojaId}, Tipo = {Tipo}, Chave = ***, NomeRecebedor = {NomeRecebedor}, Cidade = {Cidade} }}";
 }
 
-/// <summary>Lê, grava e remove a chave Pix da loja (#2233). Loja de outra empresa responde nulo (404).</summary>
-public sealed class ChavePixLojaUseCases(ILojaRepository lojas, ITenantFeatureFlagRepository flags, IUnitOfWork unitOfWork)
+/// <summary>
+/// Lê, grava e remove a chave Pix da loja (#2233). Loja de outra empresa responde nulo (404). Gravar e remover trocam o
+/// destino do dinheiro, então deixam linha na auditoria com quem, quando, a loja e a chave mascarada; sem usuário
+/// identificado, nada muda.
+/// </summary>
+public sealed class ChavePixLojaUseCases(
+    ILojaRepository lojas, ITenantFeatureFlagRepository flags, IUnitOfWork unitOfWork,
+    IAuditLogRepository auditoria, IUsuarioRepository usuarios, ICurrentUserAccessor atual)
 {
+    public const string AcaoDefinida = "chave-pix-loja-definida";
+    public const string AcaoRemovida = "chave-pix-loja-removida";
+
     public async Task<ChavePixLojaResult?> ObterAsync(Guid empresaId, Guid lojaId, CancellationToken ct = default)
     {
         var loja = await CarregarAsync(empresaId, lojaId);
@@ -36,6 +46,7 @@ public sealed class ChavePixLojaUseCases(ILojaRepository lojas, ITenantFeatureFl
         ArgumentNullException.ThrowIfNull(command);
         var loja = await CarregarAsync(command.EmpresaId, command.LojaId);
         if (loja is null) return null;
+        ExigirUsuario();
 
         RecebedorPix recebedor;
         try
@@ -48,8 +59,11 @@ public sealed class ChavePixLojaUseCases(ILojaRepository lojas, ITenantFeatureFl
             throw new UseCaseValidationException(ex.Message);
         }
 
+        var anterior = loja.ObterRecebedorPix()?.Chave;
         loja.DefinirRecebedorPix(recebedor);
         await lojas.UpdateAsync(loja);
+        var troca = anterior is null ? "definida como" : $"trocada de {Mascarar(anterior)} para";
+        await RegistrarAsync(loja, AcaoDefinida, $"{troca} {Mascarar(recebedor.Chave)}");
         await unitOfWork.CommitAsync();
         return await ResultadoAsync(loja, ct);
     }
@@ -58,10 +72,13 @@ public sealed class ChavePixLojaUseCases(ILojaRepository lojas, ITenantFeatureFl
     {
         var loja = await CarregarAsync(empresaId, lojaId);
         if (loja is null) return null;
-        if (loja.PixChave is not null)
+        var anterior = loja.ObterRecebedorPix()?.Chave;
+        if (anterior is not null)
         {
+            ExigirUsuario();
             loja.DefinirRecebedorPix(null);
             await lojas.UpdateAsync(loja);
+            await RegistrarAsync(loja, AcaoRemovida, $"removida (era {Mascarar(anterior)})");
             await unitOfWork.CommitAsync();
         }
         return await ResultadoAsync(loja, ct);
@@ -88,6 +105,20 @@ public sealed class ChavePixLojaUseCases(ILojaRepository lojas, ITenantFeatureFl
             return chave.Valor[..Math.Min(2, arroba)] + "***" + chave.Valor[arroba..];
         }
         return "***" + chave.Valor[^4..];
+    }
+
+    // A linha da auditoria pertence a quem fez (FK para usuarios): sem usuário, não há trilha, então não há troca.
+    private void ExigirUsuario()
+    {
+        if (atual.UsuarioId == Guid.Empty)
+            throw new UseCaseValidationException("Só um usuário identificado pode alterar a chave Pix da loja.");
+    }
+
+    private async Task RegistrarAsync(LojaEntity loja, string acao, string oQue)
+    {
+        var autor = await RastroDeUsuarios.AutorAsync(usuarios, atual);
+        await auditoria.AddAsync(RastroDeUsuarios.Linha(
+            atual.UsuarioId, acao, $"Chave Pix da loja {loja.Nome} ({loja.Id}) {oQue} por {autor}", atual, loja.EmpresaId));
     }
 
     private async Task<LojaEntity?> CarregarAsync(Guid empresaId, Guid lojaId)

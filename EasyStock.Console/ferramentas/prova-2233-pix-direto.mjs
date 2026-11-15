@@ -79,4 +79,11 @@ confere('voltar do Pix direto: cobrança na entrega e online seguem como antes',
   assert.equal(online.cobranca.meio, 'cartao-link')
 })
 
+confere('cartão da aba Integrações só com a flag ligada', () => {
+  assert.equal(cob.situacaoDoPixDireto(null), null, 'ainda carregando')
+  assert.equal(cob.situacaoDoPixDireto({ configurada: true, pixDiretoLigado: false }), null, 'flag desligada com chave salva')
+  assert.equal(cob.situacaoDoPixDireto({ configurada: false, pixDiretoLigado: false }), null, 'flag desligada sem chave')
+  assert.deepEqual(cob.situacaoDoPixDireto({ configurada: false, pixDiretoLigado: true }), { tom: 'neutro', texto: 'Sem chave' })
+  assert.deepEqual(cob.situacaoDoPixDireto({ configurada: true, pixDiretoLigado: true }), { tom: 'ok', texto: 'Ligado' })
+})
 console.log(`\n${passou} verificações ok`)

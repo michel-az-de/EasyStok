@@ -200,7 +200,10 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
             FormaPixDireto => CobrancaPedido.ProvedorPixDireto,
             _ => CobrancaPedido.ProvedorNaEntrega,
         };
-        if (pendente is not null && pendente.Provedor == provedorPedido && !pendente.Venceu(agora))
+        // Com algo já recebido (sinal, cupom), a cobrança manual é só do restante.
+        var valor = alocado > 0m ? restante : pedido.Total.Valor;
+        if (pendente is not null && pendente.Provedor == provedorPedido && !pendente.Venceu(agora)
+            && !PixDiretoDesatualizado(pendente, pedido, valor, recebedor))
             return (CobrancaPedidoResult.De(pendente, reutilizada: true), pendente.ConversaId, null, null, null);
 
         var conversaId = cobrancas.Where(c => c.ConversaId is not null).Select(c => c.ConversaId).LastOrDefault();
@@ -220,8 +223,6 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         }
         else
         {
-            // Com algo já recebido (sinal, cupom), a cobrança manual é só do restante.
-            var valor = alocado > 0m ? restante : pedido.Total.Valor;
             var manual = recebedor is null
                 ? CobrancaPedido.CriarNaEntrega(input.EmpresaId, pedido.Id, valor, agora, conversaId)
                 : PixDireto(input, pedido, valor, recebedor, agora, conversaId, textoPix);
@@ -254,14 +255,27 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     private static CobrancaPedido PixDireto(TrocarFormaPagamentoPedidoInput input, PedidoEntity pedido, decimal valor,
         RecebedorPix recebedor, DateTime agora, Guid? conversaId, Action<string> textoPix)
     {
-        var sinal = PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
-            ? PlanoPagamentoEncomenda.SinalRestante(pedido.Total.Valor, valor)
-            : 0m;
-        var valorDoPix = sinal > 0m ? sinal : valor;
+        var valorDoPix = ValorDoPix(pedido, valor);
         var cobranca = CobrancaPedido.CriarPixDireto(input.EmpresaId, pedido.Id, valor, recebedor, agora, conversaId, valorDoPix);
         textoPix(AvisoCobrancaConversa.TextoPixDireto(valorDoPix, valor - valorDoPix, cobranca.PixCopiaCola!, recebedor.Nome));
         return cobranca;
     }
+
+    private static decimal ValorDoPix(PedidoEntity pedido, decimal valor)
+    {
+        var sinal = PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
+            ? PlanoPagamentoEncomenda.SinalRestante(pedido.Total.Valor, valor)
+            : 0m;
+        return sinal > 0m ? sinal : valor;
+    }
+
+    /// <summary>
+    /// #2233: o Pix direto pendente só é reaproveitado se o copia e cola continua o mesmo. Chave, nome, cidade ou valor
+    /// mudaram: a cobrança velha é cancelada e sai outra, para o cliente nunca pagar a chave antiga.
+    /// </summary>
+    private static bool PixDiretoDesatualizado(CobrancaPedido pendente, PedidoEntity pedido, decimal valor, RecebedorPix? recebedor) =>
+        recebedor is not null
+        && pendente.PixCopiaCola != BrCodePix.Estatico(recebedor, ValorDoPix(pedido, valor), BrCodePix.TxidDoPedido(pedido.Id));
 
     private async Task<PedidoMudouStatusOperacao?> ColocarNaFilaAsync(PedidoEntity pedido, TrocarFormaPagamentoPedidoInput input, DateTime agora, CancellationToken ct)
     {

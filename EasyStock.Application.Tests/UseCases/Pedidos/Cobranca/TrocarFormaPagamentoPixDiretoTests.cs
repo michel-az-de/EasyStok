@@ -100,6 +100,25 @@ public class TrocarFormaPagamentoPixDiretoTests
     }
 
     [Fact]
+    public async Task ChaveDaLojaMudou_NaoReutilizaOCopiaEColaVelho()
+    {
+        var f = Cenario();
+        await f.Trocar().ExecuteAsync(PixDireto(f));
+        var velha = f.Cobrancas.Single();
+        var loja = await f.LojaRepo.GetByIdAsync(f.EmpresaId, f.Pedido.LojaId!.Value);
+        loja!.DefinirRecebedorPix(RecebedorPix.Criar(ChavePix.Criar(TipoChavePix.Email, "caixa@exemplo.test"), "Casa de Doces", "Sao Paulo"));
+
+        var r = await f.Trocar().ExecuteAsync(PixDireto(f));
+
+        r.Cobranca.Reutilizada.Should().BeFalse("o copia e cola da chave antiga não vale mais");
+        velha.Status.Should().Be(StatusCobrancaPedido.Cancelada);
+        var nova = f.Cobrancas.Should().ContainSingle(c => c.Status == StatusCobrancaPedido.Pendente).Subject;
+        nova.Provedor.Should().Be(CobrancaPedido.ProvedorPixDireto);
+        nova.PixCopiaCola.Should().Contain("caixa@exemplo.test").And.NotContain(ChaveFicticia);
+        r.Cobranca.PixCopiaCola.Should().Be(nova.PixCopiaCola);
+    }
+
+    [Fact]
     public async Task EncomendaComSinal_CopiaEColaCobraOSinal_ESaldoFicaInteiro()
     {
         var f = new CobrancaPedidoFixture();

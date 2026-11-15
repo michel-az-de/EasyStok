@@ -102,8 +102,8 @@ public static class FeatureCatalogo
     public const string CanalChatSite = "atendimento.canal.chatsite";
 
     /// <summary>
-    /// Pix direto para a chave da loja, sem Mercado Pago (#2233). Desligado por padrão: a pergunta se o pedido vai
-    /// para a fila antes da confirmação do pagamento é do Felipe.
+    /// Pix direto para a chave da loja, sem Mercado Pago (#2233). Desligado por padrão para liberar loja por loja:
+    /// o pedido entra na fila antes de o pagamento ser conferido (decidido em 05/11) e a baixa é sempre de uma pessoa.
     /// </summary>
     public const string PagamentoPixDireto = "pagamento.pix_direto";
 

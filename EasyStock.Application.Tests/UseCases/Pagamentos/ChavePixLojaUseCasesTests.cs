@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Application.UseCases.Pagamentos.PixLoja;
@@ -18,15 +19,23 @@ public class ChavePixLojaUseCasesTests
     private readonly ILojaRepository lojas = Substitute.For<ILojaRepository>();
     private readonly ITenantFeatureFlagRepository flags = Substitute.For<ITenantFeatureFlagRepository>();
     private readonly IUnitOfWork uow = Substitute.For<IUnitOfWork>();
+    private readonly IAuditLogRepository auditoria = Substitute.For<IAuditLogRepository>();
+    private readonly IUsuarioRepository usuarios = Substitute.For<IUsuarioRepository>();
+    private readonly ICurrentUserAccessor atual = Substitute.For<ICurrentUserAccessor>();
+    private readonly Usuario gerente = Usuario.Criar("Marina", "marina@exemplo.test", "hash");
+    private readonly List<AuditLog> trilha = [];
     private readonly Loja loja = Loja.Criar(Empresa, "Loja Centro");
 
     public ChavePixLojaUseCasesTests()
     {
         lojas.GetByIdAsync(Empresa, loja.Id).Returns(loja);
         flags.ListarAtivasAsync(Empresa, Arg.Any<CancellationToken>()).Returns(Array.Empty<string>());
+        atual.UsuarioId.Returns(gerente.Id);
+        usuarios.GetByIdAsync(gerente.Id).Returns(gerente);
+        auditoria.AddAsync(Arg.Do<AuditLog>(trilha.Add)).Returns(Task.CompletedTask);
     }
 
-    private ChavePixLojaUseCases Sut() => new(lojas, flags, uow);
+    private ChavePixLojaUseCases Sut() => new(lojas, flags, uow, auditoria, usuarios, atual);
 
     private DefinirChavePixLojaCommand Comando(string tipo = "email", string chave = Email) =>
         new(Empresa, loja.Id, tipo, chave, "Casa de Doces", "São Paulo");
@@ -142,5 +151,71 @@ public class ChavePixLojaUseCasesTests
     public void Comando_NaoMostraAChaveNoToString()
     {
         Comando().ToString().Should().NotContain(Email);
+    }
+
+    [Fact]
+    public async Task Definir_DeixaTrilhaComQuemQuandoLojaEChaveMascarada()
+    {
+        await Sut().DefinirAsync(Comando());
+
+        var linha = trilha.Should().ContainSingle().Subject;
+        linha.Acao.Should().Be(ChavePixLojaUseCases.AcaoDefinida);
+        linha.UsuarioId.Should().Be(gerente.Id);
+        linha.EmpresaId.Should().Be(Empresa);
+        linha.DataHora.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        linha.Detalhes.Should().Contain("Marina").And.Contain("Loja Centro").And.Contain(loja.Id.ToString())
+            .And.Contain("fi***@exemplo.test").And.NotContain(Email);
+        Received.InOrder(() =>
+        {
+            auditoria.AddAsync(Arg.Any<AuditLog>());
+            uow.CommitAsync();
+        });
+    }
+
+    [Fact]
+    public async Task Trocar_DizAChaveAnteriorMascarada()
+    {
+        await Sut().DefinirAsync(Comando());
+        trilha.Clear();
+
+        await Sut().DefinirAsync(Comando("aleatoria", "123e4567-e89b-12d3-a456-426614174000"));
+
+        trilha.Should().ContainSingle().Which.Detalhes.Should().Contain("fi***@exemplo.test").And.Contain("***4000")
+            .And.NotContain(Email).And.NotContain("123e4567");
+    }
+
+    [Fact]
+    public async Task Remover_DeixaTrilhaComAChaveQueSaiu()
+    {
+        await Sut().DefinirAsync(Comando());
+        trilha.Clear();
+
+        await Sut().RemoverAsync(Empresa, loja.Id);
+
+        var linha = trilha.Should().ContainSingle().Subject;
+        linha.Acao.Should().Be(ChavePixLojaUseCases.AcaoRemovida);
+        linha.UsuarioId.Should().Be(gerente.Id);
+        linha.Detalhes.Should().Contain("Marina").And.Contain("Loja Centro").And.Contain("fi***@exemplo.test").And.NotContain(Email);
+    }
+
+    [Fact]
+    public async Task RemoverSemChave_NaoDeixaTrilha()
+    {
+        await Sut().RemoverAsync(Empresa, loja.Id);
+
+        trilha.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SemUsuarioIdentificado_RecusaETrocaNada()
+    {
+        atual.UsuarioId.Returns(Guid.Empty);
+
+        var act = () => Sut().DefinirAsync(Comando());
+
+        await act.Should().ThrowAsync<UseCaseValidationException>();
+        loja.PixChave.Should().BeNull();
+        await uow.DidNotReceive().CommitAsync();
+        trilha.Should().BeEmpty();
     }
 }
