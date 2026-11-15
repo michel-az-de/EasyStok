@@ -75,11 +75,14 @@ public sealed class AtualizarProdutoUseCase(
                 throw new UseCaseValidationException("A subcategoria nao pertence a categoria informada.");
         }
 
+        // #2606: variacoes enviadas substituem as do produto (delete-and-recreate); as atuais nao contam como colisao.
+        Guid? produtoIgnorado = command.Variacoes is not null ? command.ProdutoId : null;
+
         if (!string.IsNullOrWhiteSpace(command.SkuBase))
         {
             var skuBase = command.SkuBase.Trim();
             if (await produtoRepository.ExistsSkuBaseAsync(command.EmpresaId, skuBase, command.ProdutoId) ||
-                await produtoVariacaoRepository.ExistsSkuAsync(command.EmpresaId, skuBase))
+                await produtoVariacaoRepository.ExistsSkuAsync(command.EmpresaId, skuBase, null, produtoIgnorado))
             {
                 throw new UseCaseValidationException("SKU duplicado para esta empresa.");
             }
@@ -138,8 +141,9 @@ public sealed class AtualizarProdutoUseCase(
         // Gating: nao deixa Ativo sem preco de venda. Antes o usuario podia salvar
         // produto Ativo sem preco e ele aparecia na vitrine como "Definir preco →"
         // mas vendavel — gerava pedido com R$0 (auditoria QA 2026-05-16).
+        // Insumo e isento: nao se vende, e o status Inativo faz a producao pular a baixa dele (#2606).
         var precoValido = command.PrecoReferencia.HasValue && command.PrecoReferencia.Value > 0;
-        produto.Status = (command.Status == StatusProduto.Ativo && !precoValido)
+        produto.Status = (command.Status == StatusProduto.Ativo && !precoValido && !produto.EhInsumo)
             ? StatusProduto.Inativo
             : command.Status;
         produto.ObservacaoInterna = command.ObservacaoInterna;
@@ -157,6 +161,30 @@ public sealed class AtualizarProdutoUseCase(
             foreach (var variacao in command.Variacoes)
                 if (!string.IsNullOrWhiteSpace(variacao.Sku))
                     _ = CodigoSku.From(variacao.Sku); // valida formato do SKU antes de deletar
+
+            // #2606: mesma checagem do cadastro (duplicado no comando, igual ao SKU base, ja usado por outro produto).
+            var skus = command.Variacoes
+                .Select(v => v.Sku?.Trim())
+                .Where(sku => !string.IsNullOrWhiteSpace(sku))
+                .Select(sku => sku!.ToUpperInvariant())
+                .ToArray();
+
+            if (skus.Length != skus.Distinct().Count())
+                throw new UseCaseValidationException("Nao e permitido cadastrar variacoes com o mesmo SKU.");
+
+            if (!string.IsNullOrWhiteSpace(command.SkuBase) &&
+                skus.Contains(command.SkuBase.Trim().ToUpperInvariant()))
+                throw new UseCaseValidationException("SKU base do produto nao pode ser igual ao SKU de uma variacao.");
+
+            foreach (var skuVariacao in command.Variacoes
+                         .Select(v => v.Sku?.Trim())
+                         .Where(sku => !string.IsNullOrWhiteSpace(sku))
+                         .Cast<string>())
+            {
+                if (await produtoRepository.ExistsSkuBaseAsync(command.EmpresaId, skuVariacao, command.ProdutoId) ||
+                    await produtoVariacaoRepository.ExistsSkuAsync(command.EmpresaId, skuVariacao, null, command.ProdutoId))
+                    throw new UseCaseValidationException("SKU duplicado para esta empresa.");
+            }
         }
 
         try
