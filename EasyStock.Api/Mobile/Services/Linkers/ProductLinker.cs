@@ -1,5 +1,7 @@
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Entities.Storefront;
+using Storefront = EasyStock.Domain.Entities.Storefront.Storefront;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
@@ -90,6 +92,28 @@ public sealed class ProductLinker(
                     continue;
                 }
 
+                var produtoDoPrato = await ProdutoDoPratoAsync(nomeLimpo, empresaId.Value, pid);
+                if (produtoDoPrato.HasValue)
+                {
+                    mobileP.ErpProductId = produtoDoPrato.Value;
+                    matched++;
+                    log.LogInformation("AutoLink Produto matched: mobile={MobileId} → erp={ErpId} via prato do cardapio", pid, produtoDoPrato.Value);
+                    cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
+                    db.Add(new ProdutoAlteracao
+                    {
+                        Id = Guid.NewGuid(),
+                        EmpresaId = empresaId.Value,
+                        ProdutoId = produtoDoPrato.Value,
+                        UsuarioId = cachedSysUserId.Value,
+                        Acao = "atualizado",
+                        AlteracoesJson = $"[{{\"campo\":\"vinculacao_mobile\",\"de\":null,\"para\":\"mobile_product={pid}\"}}]",
+                        Motivo = "Sync mobile",
+                        Observacao = $"Vinculado ao mobile_product {pid} pelo nome do prato do cardápio",
+                        AlteradoEm = DateTime.UtcNow
+                    });
+                    continue;
+                }
+
                 cachedCategoriaId ??= await CategoriaDefaultHelper.GetOrCreateAsync(db, log, empresaId.Value);
 
                 var novoProd = new Produto
@@ -141,6 +165,43 @@ public sealed class ProductLinker(
         log.LogInformation(
             "AutoLink Produto summary empresaId={EmpresaId} total={Total} matched={Matched} created={Created} idempotent={Idempotent} errors={Errors}",
             empresaId, idsList.Count, matched, created, idempotentSkip, errorSkip);
+    }
+
+    /// <summary>
+    /// #2083 A2: o console lê a produção pelo produto do prato (<c>CardapioItem.ProdutoId</c>). Sem Produto de mesmo
+    /// nome, o produto do app com o nome de um prato ativo liga ao produto desse prato, em vez de virar um Produto
+    /// órfão. Nome comparado sem espaços nas pontas, sem diferenciar maiúsculas e com "%"/"_" literais (#2477).
+    /// Dois pratos de mesmo nome em produtos diferentes: não adivinha, devolve null e o fluxo cria como antes.
+    /// O cardápio é um por empresa (sem escopo de loja) e o lote do app não diz porção: liga ao produto, nunca a uma
+    /// variação.
+    /// </summary>
+    private async Task<Guid?> ProdutoDoPratoAsync(string nome, Guid empresaId, string mobileId)
+    {
+        var nomeAparado = nome.Trim();
+        if (nomeAparado.Length == 0) return null;
+        var padrao = PadraoILike.Literal(nomeAparado);
+
+        var produtos = await (
+                from prato in db.Set<CardapioItem>().IgnoreQueryFilters()
+                join loja in db.Set<Storefront>().IgnoreQueryFilters() on prato.StorefrontId equals loja.Id
+                join produto in db.Set<Produto>().IgnoreQueryFilters() on prato.ProdutoId equals produto.Id
+                where loja.EmpresaId == empresaId
+                      && produto.EmpresaId == empresaId
+                      && produto.Status == StatusProduto.Ativo
+                      && prato.ArquivadoEm == null
+                      && prato.NomePublico != null
+                      && EF.Functions.ILike(prato.NomePublico.Trim(), padrao, PadraoILike.Escape)
+                select produto.Id)
+            .Distinct()
+            .Take(2)
+            .ToListAsync();
+
+        if (produtos.Count == 1) return produtos[0];
+        if (produtos.Count > 1)
+            log.LogWarning(
+                "AutoLink Produto: nome do mobile casa pratos de produtos diferentes; nao vincula a nenhum. mobile={MobileId} empresaId={EmpresaId}",
+                mobileId, empresaId);
+        return null;
     }
 
     /// <summary>
