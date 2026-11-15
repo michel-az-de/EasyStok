@@ -144,6 +144,42 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         (await estornarSuprimento())!.EstornadoEm.Should().NotBeNull();
     }
 
+    // A3 da homologação (#1769): a sangria estornada sumia do Caixa do dia; o console já sabe mostrar "Estornado por X".
+    [SkippableFact]
+    public async Task Sangria_estornada_volta_marcada_na_lista_sem_mudar_nenhum_total()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await NovaEmpresaAsync();
+        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddMinutes(-5))));
+        await using var provider = BuildProductionProvider();
+        await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<RegistrarMovimentoCaixaUseCase>()
+            .ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 20m, Descricao: "Suprimento", Metodo: "dinheiro")));
+        var sangria = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<RegistrarMovimentoCaixaUseCase>()
+            .ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "saida", 30m, Descricao: "Sangria", Metodo: "dinheiro")));
+        await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<EstornarMovimentoCaixaUseCase>()
+            .ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, sangria.Id, "lançada em dobro", UsuarioNome: "Gerente")));
+
+        var hoje = HorarioBrasil.Hoje();
+        var semEstornados = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje)));
+        var comEstornados = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
+            .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, hoje, IncluirEstornados: true)));
+
+        var estornada = comEstornados.Movimentos.Should().ContainSingle(m => m.Id == sangria.Id).Subject;
+        estornada.EstornadoEm.Should().NotBeNull();
+        estornada.EstornadoPorNome.Should().Be("Gerente");
+        estornada.MotivoEstorno.Should().Be("lançada em dobro");
+        // Sem pedir, a lista segue como antes (Web, guarda do estorno duplo).
+        semEstornados.Movimentos.Should().NotContain(m => m.Id == sangria.Id);
+
+        // Nenhum total muda: o estornado aparece, mas não entra em gaveta, saídas, entradas nem saldo.
+        comEstornados.TotalSaidasExtras.Should().Be(0m).And.Be(semEstornados.TotalSaidasExtras);
+        comEstornados.TotalEntradasExtras.Should().Be(20m).And.Be(semEstornados.TotalEntradasExtras);
+        comEstornados.SaldoEsperado.Should().Be(120m).And.Be(semEstornados.SaldoEsperado);
+        GavetaCaixa.DinheiroNaGaveta(comEstornados).Should().Be(120m).And.Be(GavetaCaixa.DinheiroNaGaveta(semEstornados));
+        GavetaCaixa.TetoSaidaEmDinheiro(comEstornados).Should().Be(GavetaCaixa.TetoSaidaEmDinheiro(semEstornados));
+    }
+
     [SkippableFact]
     public async Task Lancamento_gravado_depois_do_fechamento_some_do_retrato_e_o_estorno_diz_o_motivo_certo()
     {

@@ -33,14 +33,16 @@ public class CaixaController(
     [HttpGet("dia")]
     [Authorize(Policy = "Operador")]
     public async Task<IActionResult> ObterDia(
-        [FromQuery] Guid? empresaId, [FromQuery] DateOnly? data, [FromQuery] Guid? lojaId)
+        [FromQuery] Guid? empresaId, [FromQuery] DateOnly? data, [FromQuery] Guid? lojaId,
+        // A3 (#1769): o console pede o estornado de volta, marcado e fora dos totais.
+        [FromQuery] bool incluirEstornados = false)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
         // Dia operacional em Brasilia (não UtcNow): na janela 21h-23h59 BRT o dia UTC já
         // virou o seguinte e o fallback abriria o caixa do dia errado. Alinha com o Web
         // (BrazilTime.Today()) e com Fechar/AbrirCaixa (HorarioBrasil.Hoje()). Issue #596.
         var d = data ?? HorarioBrasil.Hoje();
-        var result = await obterDiaUseCase.ExecuteAsync(new ObterCaixaDiaQuery(emp, d, lojaId));
+        var result = await obterDiaUseCase.ExecuteAsync(new ObterCaixaDiaQuery(emp, d, lojaId, incluirEstornados));
         return DataOk(result);
     }
 

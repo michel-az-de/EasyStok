@@ -467,7 +467,8 @@ function servidorDoCaixa(estado) {
   const leituras = { dia: 0 }
   globalThis.sessionStorage = { getItem: () => JSON.stringify({ token: 't', expiraEm: Date.now() + 600000, empresa: { id: 'e' }, usuario: { id: 'u' } }), setItem() {}, removeItem() {} }
   globalThis.fetch = async (url) => {
-    if (/\/api\/caixa\/dia$/.test(url)) {
+    // A3 (#1769): o dia de hoje é pedido com o estornado marcado; sem a flag a aba perde o "Estornado por X".
+    if (/\/api\/caixa\/dia\?incluirEstornados=true$/.test(url)) {
       leituras.dia += 1
       return estado.semRede ? new Response(JSON.stringify({ error: { message: 'Fora do ar' } }), { status: 503 }) : corpo(estado.dia)
     }

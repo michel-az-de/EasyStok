@@ -62,6 +62,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             return await q.OrderBy(m => m.DataMovimento).ToListAsync();
         }
 
+        public async Task<IReadOnlyList<MovimentoCaixa>> GetMovimentosEstornadosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null)
+        {
+            var q = db.MovimentosCaixa.AsNoTracking()
+                .Where(m => m.EmpresaId == empresaId && m.EstornadoEm != null
+                         && m.DataMovimento >= iniUtc && m.DataMovimento < fimUtc);
+            if (lojaId.HasValue) q = q.Where(m => m.LojaId == lojaId);
+            return await q.OrderBy(m => m.DataMovimento).ToListAsync();
+        }
+
         // Ultima abertura sem fechamento posterior (sessao em aberto, possivelmente cross-day).
         // Espelha o "ultimo evento abertura/fechamento" do AnalyticsRepository.ResumoDia (issue 596):
         // o estado da sessao e dado pelo evento mais recente; se for abertura, ha caixa em aberto.
