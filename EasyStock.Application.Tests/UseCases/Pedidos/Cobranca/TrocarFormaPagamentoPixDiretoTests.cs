@@ -1,4 +1,6 @@
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Pedidos;
+using EasyStock.Application.UseCases.Atendimento.Comanda;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Pagamentos;
@@ -205,5 +207,84 @@ public class TrocarFormaPagamentoPixDiretoTests
         var texto = AvisoCobrancaConversa.TextoPixDireto(12.5m, 12.5m, "000201COPIA", "CASA DE DOCES");
 
         texto.Should().Contain("Sinal de R$ 12,50").And.Contain("Restante na entrega: R$ 12,50");
+    }
+
+    // #2684: a cobrança da alteração da comanda tratava o Pix direto pendente como "na entrega".
+    private static RecebedorPix Recebedor() =>
+        RecebedorPix.Criar(ChavePix.Criar(TipoChavePix.Email, ChaveFicticia), "Casa de Doces", "São Paulo");
+
+    private static void MudarTotal(CobrancaPedidoFixture f, decimal acrescimo)
+    {
+        var item = f.Pedido.Itens.Last();
+        item.PrecoUnitario += acrescimo; item.RecalcularSubtotal(); f.Pedido.RecalcularTotal();
+    }
+
+    private static GerarCobrancaPedidoInput DaComanda(CobrancaPedidoFixture f) =>
+        new(f.EmpresaId, f.Pedido.Id, CobrarSaldo: true, NaEntregaSemProvedor: true);
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AlteracaoDaComanda_ComPixDiretoPendente_SaiOutroPixComOValorNovo(bool encomenda)
+    {
+        var f = new CobrancaPedidoFixture();
+        if (encomenda)
+        {
+            f.Pedido.CriadoEm = CobrancaPedidoFixture.Agora;
+            f.Pedido.AgendadoParaEm = CobrancaPedidoFixture.Agora.AddDays(3);
+        }
+        Cenario(fixture: f);
+        await f.Trocar().ExecuteAsync(PixDireto(f));
+        var velha = f.Cobrancas.Single();
+        MudarTotal(f, 10m);
+        var total = f.Pedido.Total.Valor;
+
+        var r = await f.Gerar().ExecuteComTravaAsync(DaComanda(f));
+
+        velha.Status.Should().Be(StatusCobrancaPedido.Cancelada, "o copia e cola velho cobra o valor antigo");
+        var nova = f.Cobrancas.Should().ContainSingle(c => c.Status == StatusCobrancaPedido.Pendente).Subject;
+        nova.Provedor.Should().Be(CobrancaPedido.ProvedorPixDireto, "a forma combinada era o Pix direto, não a entrega");
+        nova.Valor.Should().Be(total);
+        var valorDoPix = encomenda ? PlanoPagamentoEncomenda.Sinal(total) : total;
+        nova.PixCopiaCola.Should().Be(BrCodePix.Estatico(Recebedor(), valorDoPix, BrCodePix.TxidDoPedido(f.Pedido.Id)));
+        r.Provedor.Should().Be(CobrancaPedido.ProvedorPixDireto);
+        r.TextoPix.Should().Contain(nova.PixCopiaCola).And.Contain("Casa de Doces");
+    }
+
+    [Fact]
+    public async Task AlteracaoDaComanda_SemMudarOValor_ReaproveitaOPix()
+    {
+        var f = Cenario();
+        await f.Trocar().ExecuteAsync(PixDireto(f));
+
+        var r = await f.Gerar().ExecuteComTravaAsync(DaComanda(f));
+
+        r.Reutilizada.Should().BeTrue();
+        f.Cobrancas.Should().ContainSingle();
+        r.TextoPix.Should().Contain(f.Cobrancas.Single().PixCopiaCola);
+    }
+
+    [Fact]
+    public async Task LinkPeloConsole_ComPixDiretoPendente_RecusaSemFalarEmEntrega()
+    {
+        var f = Cenario();
+        await f.Trocar().ExecuteAsync(PixDireto(f));
+
+        var act = () => f.Gerar().ExecuteComTravaAsync(new GerarCobrancaPedidoInput(f.EmpresaId, f.Pedido.Id));
+
+        var erro = await act.Should().ThrowAsync<CobrancaPedidoConflitoException>();
+        erro.Which.Codigo.Should().Be(CobrancaPedidoConflitoException.FormaPixDireto);
+        erro.Which.Message.Should().Contain("Pix na chave da loja").And.NotContain("na entrega").And.NotContain(ChaveFicticia);
+        f.Cobrancas.Should().ContainSingle(c => c.Status == StatusCobrancaPedido.Pendente);
+    }
+
+    [Fact]
+    public void TextoDaAlteracao_ComPixDireto_MandaOCopiaECola()
+    {
+        var resposta = new EnvioComandaCliente(Guid.NewGuid(), "aguardando_pagamento", 35m, 35m);
+
+        var texto = ConfirmarAlteracaoComandaUseCase.Texto(resposta, textoPix: "Pagamento de R$ 35,00 pelo Pix. 000201NOVO");
+
+        texto.Should().Contain("000201NOVO").And.Contain("anterior não vale mais").And.NotContain("Combine o pagamento");
     }
 }

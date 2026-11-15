@@ -257,17 +257,12 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     {
         var valorDoPix = ValorDoPix(pedido, valor);
         var cobranca = CobrancaPedido.CriarPixDireto(input.EmpresaId, pedido.Id, valor, recebedor, agora, conversaId, valorDoPix);
-        textoPix(AvisoCobrancaConversa.TextoPixDireto(valorDoPix, valor - valorDoPix, cobranca.PixCopiaCola!, recebedor.Nome));
+        textoPix(PixDiretoDoPedido.Texto(cobranca, recebedor, valorDoPix));
         return cobranca;
     }
 
-    private static decimal ValorDoPix(PedidoEntity pedido, decimal valor)
-    {
-        var sinal = PlanoPagamentoEncomenda.TemSinal(pedido.AgendadoParaEm, pedido.CriadoEm)
-            ? PlanoPagamentoEncomenda.SinalRestante(pedido.Total.Valor, valor)
-            : 0m;
-        return sinal > 0m ? sinal : valor;
-    }
+    private static decimal ValorDoPix(PedidoEntity pedido, decimal valor) =>
+        PixDiretoDoPedido.ValorDoPix(pedido.AgendadoParaEm, pedido.CriadoEm, pedido.Total.Valor, valor);
 
     /// <summary>
     /// #2233: o Pix direto pendente só é reaproveitado se o copia e cola continua o mesmo. Chave, nome, cidade ou valor
@@ -275,7 +270,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     /// </summary>
     private static bool PixDiretoDesatualizado(CobrancaPedido pendente, PedidoEntity pedido, decimal valor, RecebedorPix? recebedor) =>
         recebedor is not null
-        && pendente.PixCopiaCola != BrCodePix.Estatico(recebedor, ValorDoPix(pedido, valor), BrCodePix.TxidDoPedido(pedido.Id));
+        && pendente.PixCopiaCola != PixDiretoDoPedido.CopiaECola(recebedor, pedido.Id, ValorDoPix(pedido, valor));
 
     private async Task<PedidoMudouStatusOperacao?> ColocarNaFilaAsync(PedidoEntity pedido, TrocarFormaPagamentoPedidoInput input, DateTime agora, CancellationToken ct)
     {

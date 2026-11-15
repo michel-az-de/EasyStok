@@ -21,7 +21,7 @@ public sealed record RegistrarEstornoManualRequest(Guid OperacaoId, Guid Pagamen
 /// <para>
 /// Erros: 404 pedido de outro tenant ou inexistente; 409 com <c>error.code</c> =
 /// <c>pedido_ja_pago</c>, <c>use_estorno</c>, <c>preparo_iniciado</c>, <c>pedido_finalizado</c>,
-/// <c>sem_pagamento</c> ou <c>forma_na_entrega</c>; 503 Mercado Pago indisponível.
+/// <c>sem_pagamento</c>, <c>forma_na_entrega</c> ou <c>forma_pix_direto</c>; 503 Mercado Pago indisponível.
 /// </para>
 /// </summary>
 [SwaggerTag("Pedidos (encomendas)")]

@@ -340,7 +340,8 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
         await aviso.EnfileirarAsync(Domain.Enums.Notifications.TipoEventoNotificacao.ComandaAtualizada,
             input.EmpresaId, resposta.PedidoId, $"comanda:{linkId:N}:{resposta.Situacao}", ct,
             mensagem: Texto(resposta, devolucao, cobranca?.LinkPagamento is null ? null : cobranca.Valor,
-                naEntrega || cobranca?.Provedor == CobrancaPedido.ProvedorNaEntrega));
+                naEntrega || cobranca?.Provedor == CobrancaPedido.ProvedorNaEntrega,
+                cobranca?.TextoPix, cobranca is not { Reutilizada: true }));
     }
 
     public static bool SomenteAcrescimos(IEnumerable<PedidoItem> antigos, IReadOnlyList<ItemSelecionadoComanda> selecao) =>
@@ -350,11 +351,14 @@ public sealed class ConfirmarAlteracaoComandaUseCase(ILinkCardapioConversaReposi
     public static Guid IdEstorno(Guid linkId, Guid pagamentoId) => new(SHA256.HashData(Encoding.UTF8.GetBytes($"comanda:{linkId:N}:{pagamentoId:N}"))[..16]);
     /// <param name="valorDoLink">Quanto o link cobra; menor que o saldo na encomenda que cobra o sinal (#1717-7).</param>
     /// <param name="naEntrega">Diferença combinada para receber na entrega (pedido na entrega ou link indisponível).</param>
-    private static string Texto(EnvioComandaCliente r, decimal devolucao = 0, decimal? valorDoLink = null, bool naEntrega = false) => r.Situacao == "alteracao_recusada"
+    public static string Texto(EnvioComandaCliente r, decimal devolucao = 0, decimal? valorDoLink = null, bool naEntrega = false,
+        string? textoPix = null, bool pixNovo = true) => r.Situacao == "alteracao_recusada"
         ? "A alteração precisa de outro ajuste. Seu pedido original foi mantido; fale com o atendimento."
         : $"Seu pedido foi atualizado. Total: {r.Total.ToString("C", Cultura.PtBr)}.\n" + (r.CodigoCupom is { } cupom
             ? $"Você tem {devolucao.ToString("C", Cultura.PtBr)} de crédito para uma próxima compra.\nCódigo do cupom: {cupom}\nEsse crédito não é uma devolução em dinheiro."
             : r.Situacao == "estorno_pendente" ? $"Solicitamos a devolução de {devolucao.ToString("C", Cultura.PtBr)} pelo Mercado Pago. Aguarde a confirmação."
+            // #2684: o Pix direto manda o copia e cola do valor novo; o código anterior cobrava o valor antigo.
+            : r.Saldo > 0 && textoPix is { } pix ? (pixNovo ? "O código Pix anterior não vale mais. " : "") + pix
             : r.LinkPagamento is { } link && valorDoLink is { } sinal && sinal < r.Saldo
                 ? $"Falta pagar {r.Saldo.ToString("C", Cultura.PtBr)}. Sinal de {sinal.ToString("C", Cultura.PtBr)} pelo link: {link}\nRestante na entrega: {(r.Saldo - sinal).ToString("C", Cultura.PtBr)}."
             : r.LinkPagamento is { } diferenca ? $"Falta pagar {Math.Max(0, r.Saldo).ToString("C", Cultura.PtBr)}. Pague apenas essa diferença: {diferenca}"

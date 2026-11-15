@@ -3,7 +3,7 @@ namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 /// <summary>
 /// Operação de cobrança recusada pelo estado do pedido (409). <see cref="Codigo"/> é o contrato de fio:
 /// <c>pedido_ja_pago</c>, <c>use_estorno</c>, <c>preparo_iniciado</c>, <c>pedido_finalizado</c>,
-/// <c>sem_pagamento</c>, <c>forma_na_entrega</c>.
+/// <c>sem_pagamento</c>, <c>forma_na_entrega</c>, <c>forma_pix_direto</c>.
 /// </summary>
 public sealed class CobrancaPedidoConflitoException(string codigo, string mensagem) : Exception(mensagem)
 {
@@ -13,6 +13,8 @@ public sealed class CobrancaPedidoConflitoException(string codigo, string mensag
     public const string PedidoFinalizado = "pedido_finalizado";
     public const string SemPagamento = "sem_pagamento";
     public const string FormaNaEntrega = "forma_na_entrega";
+    /// <summary>#2684: o pedido está combinado para o Pix na chave da loja; link do Mercado Pago só trocando a forma.</summary>
+    public const string FormaPixDireto = "forma_pix_direto";
     /// <summary>#1724-5: o pedido já tem valor recebido; itens mudam pela comanda (que confere a devolução), não pelo DELETE.</summary>
     public const string ValorRecebido = "valor_recebido";
 
