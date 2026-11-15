@@ -258,6 +258,25 @@ public class RegistrarPagamentoPedidoUseCaseTests
         await _caixaRepo.DidNotReceiveWithAnyArgs().TryAddMovimentoAsync(default!, default);
     }
 
+    // #1709-2: o caixa da empresa (sem loja) ficou aberto desde ontem; o pix de hoje de um pedido da loja não pode abrir
+    // uma sessão nova da loja por cima, senão o /caixa/dia sem loja começa nela e perde o saldo e os pagamentos de ontem.
+    [Fact]
+    public async Task Caixa_da_empresa_aberto_desde_ontem_impede_abertura_automatica_para_pedido_com_loja()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId, Guid.NewGuid());
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), Arg.Any<Guid?>())
+            .Returns(Array.Empty<MovimentoCaixa>());
+        _caixaRepo.GetAberturaPendenteAsync(empresaId, null)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-1)));
+        _caixaRepo.TryAddMovimentoAsync(Arg.Any<MovimentoCaixa>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await UC().ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 29.80m));
+
+        await _caixaRepo.DidNotReceive().TryAddMovimentoAsync(
+            Arg.Is<MovimentoCaixa>(m => m.Tipo == "abertura"), Arg.Any<CancellationToken>());
+    }
+
     // #2341 (R2-API-1): o console abriu o Caixa da empresa sem loja (R$20) e o pix de um pedido da loja criou uma
     // segunda abertura "auto-pagamento" da loja com a gaveta herdada; o saldo inicial do dia somou as duas.
     [Fact]

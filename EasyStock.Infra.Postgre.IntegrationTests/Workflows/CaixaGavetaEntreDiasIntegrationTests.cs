@@ -275,6 +275,39 @@ public sealed class CaixaGavetaEntreDiasIntegrationTests(PostgreSqlDatabaseFixtu
         dia.SaldoInicial.Should().Be(40m, "o Mercadão herda a própria gaveta, não a do Centro");
     }
 
+    // #1709-2: o caixa da empresa (sem loja) ficou aberto desde ontem com 100. O pix de hoje de um pedido da loja não
+    // abre outro caixa da loja por cima; o caixa do dia sem loja segue na sessão de ontem, com o troco e o pagamento.
+    [SkippableFact]
+    public async Task Caixa_da_empresa_aberto_desde_ontem_segura_o_pix_da_loja_na_mesma_sessao()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var (empresaId, lojaId) = await SemearEmpresaAsync();
+        var pedido = NovoPedidoOperacional(empresaId, lojaId, 29.80m);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-1)));
+            seed.Pedidos.Add(pedido);
+            await seed.SaveChangesAsync();
+        }
+        await using var provider = BuildProductionProvider();
+
+        await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<RegistrarPagamentoPedidoUseCase>().ExecuteAsync(
+            new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 29.80m)));
+
+        await using (var conferir = fixture.CreateDbContext())
+        {
+            conferir.SetMobileTenantContext(empresaId);
+            (await conferir.MovimentosCaixa.CountAsync(m => m.EmpresaId == empresaId && m.Tipo == "abertura"))
+                .Should().Be(1, "a sessão da empresa de ontem vale para o pedido da loja");
+        }
+        var dia = await NoEscopoAsync(provider, empresaId, sp =>
+            sp.GetRequiredService<ObterCaixaDiaUseCase>().ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.Hoje())));
+        dia.AberturaPendenteCrossDay.Should().BeTrue();
+        dia.SaldoInicial.Should().Be(100m, "o troco inicial é o da abertura da empresa");
+        dia.TotalPagamentosPedidos.Should().Be(29.80m);
+    }
+
     private async Task<(Guid EmpresaId, Guid LojaId)> SemearEmpresaAsync()
     {
         var empresaId = Guid.NewGuid();
