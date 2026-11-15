@@ -7,7 +7,7 @@ import { Icone } from '../../../componentes/Icone'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { lerReceita, orientacoesDaReceita, progressoDasReceitas, receitaEmBranco, rotuloDoRendimento, temReceita, textoDoProgresso, UNIDADES_RECEITA, UNIDADES_RENDIMENTO } from '../../../aplicacao/receitas'
-import { lerInsumos } from '../../../aplicacao/insumos'
+import { lerInsumos, rotuloDaUnidade } from '../../../aplicacao/insumos'
 import { custoDoRascunho, rascunhoDaSugestao } from '../../../aplicacao/calculosReceita'
 import { PesquisaReceitaIa } from './PesquisaProducao'
 import { moeda } from '../../../dominio/formato'
@@ -71,7 +71,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
         <ul className={css.lista}>
           {detalhe.linhas.map((l) => <li key={l.insumoId} className={css.linha}>
             <span className={css.nome}>{l.insumo}</span>
-            <span>{l.quantidade} {l.unidade}</span>
+            <span>{l.quantidade} {rotuloDaUnidade(l.unidade)}</span>
           </li>)}
         </ul>
       )}
@@ -127,7 +127,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
                 ...(l.insumoId && !insumos.some((s) => s.id === l.insumoId) ? [{ valor: l.insumoId, rotulo: l.insumo }] : [])]} />
             <CampoTexto disabled={salvando} rotulo="Quantidade" inputMode="decimal" value={l.quantidade} onChange={mudar(i, 'quantidade')} />
             <CampoSelecao disabled={salvando} rotulo="Unidade" value={l.unidade} onChange={mudar(i, 'unidade')}
-              opcoes={[{ valor: '', rotulo: 'Conferir unidade' }, ...UNIDADES_RECEITA.map((u) => ({ valor: u, rotulo: u }))]} />
+              opcoes={[{ valor: '', rotulo: 'Conferir unidade' }, ...UNIDADES_RECEITA.map((u) => ({ valor: u, rotulo: rotuloDaUnidade(u) }))]} />
             <div className={css.rodapeForm}>
               <span className={css.detalhe}>{custos.custos[i] == null ? 'Custo não conhecido' : `Custo estimado: ${moeda(custos.custos[i])}`}</span>
               <Botao variante="texto" icone="lixeira" disabled={salvando} aria-label={`Remover insumo ${i + 1} da receita`} onClick={() => setLinhas((atual) => atual.filter((_, j) => j !== i))}>Remover insumo</Botao>

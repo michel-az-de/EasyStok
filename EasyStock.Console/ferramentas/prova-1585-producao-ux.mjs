@@ -534,7 +534,7 @@ await confere('Planejamento: a lista gerada aparece na tela e o botão só destr
   t.renderizar()
   assert.equal(listasCriadas(), 1)
   assert.equal(gerar().props.disabled, true)
-  assert.equal(texto(lista()[0]), 'Compras da produção de 12/10Molhofalta para a produção1,4 KgBandejarepõe o mínimo30 UnPara gerar outra lista, mude as porções ou a data.')
+  assert.equal(texto(lista()[0]), 'Compras da produção de 12/10Molhofalta para a produção1,4 kgBandejarepõe o mínimo30 unPara gerar outra lista, mude as porções ou a data.')
   // Sair, voltar e calcular de novo sem mudar nada: a lista segue na tela e o botão travado.
   t = montar(AbaPlanejamentoApi)
   await t.assentar()
