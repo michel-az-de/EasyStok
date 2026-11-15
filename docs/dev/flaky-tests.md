@@ -10,6 +10,25 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ⚠️ TOLERADO (#2697): impresso entrega/a5 falhou uma vez na suíte local carregada
+
+Visto em `EasyStock.Api.UnitTests/Services/Impressao/PedidoImpressoHtmlTests.cs:107`,
+`TodoDocumentoSaiEmTodoPapelComONumeroEOQr(documento: "entrega", modelo: "a5")`, em 15/11/2026. A suíte
+local deu 2177/1 com os testes de integração Postgres rodando em paralelo na mesma máquina. A mensagem da
+falha não foi guardada. Isolado, o teste passou 3 de 3.
+
+- **Por que é flaky:** causa não confirmada. O teste usa dados fixos. A suspeita é o `RenderTimeout` do
+  `ScribanRenderer`, que vale 500 ms fora do CI (o CI usa 2 s, ver #910 abaixo). Com
+  `EASYSTOK_SCRIBAN_TIMEOUT_MS=1`, o teste falha com `TimeoutException`, então o mecanismo existe. Duas
+  rodadas de carga não reproduziram: 3 e depois 8 suítes completas em paralelo, 0 falhas em 11.
+- **Como confirmar:** rodar de novo. Se voltar, guardar a mensagem. `TimeoutException: Renderizacao de
+  template excedeu 500ms` confirma a suspeita.
+- **Por que não foi corrigido:** apareceu uma vez, só localmente e sob carga externa. Subir o timeout de
+  produção ou mexer no teste sem reproduzir seria chute.
+- **Quando promover a "corrigir":** na segunda falha, ou se aparecer no CI (lá o timeout já é 2 s).
+
+---
+
 ## ⚠️ TOLERADO: prova do hub não vê a troca de ordem depois do arrasto por toque
 
 Visto em `EasyStock.Console/ferramentas/prova-hub-navegador.mjs:161`, no job `qualidade` da PR #2616
