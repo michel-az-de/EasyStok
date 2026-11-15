@@ -148,4 +148,31 @@ public class GerenciarCategoriaUseCaseTests
         await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*limite permitido*");
         await _repo.DidNotReceive().UpdateAsync(Arg.Any<Categoria>());
     }
+
+    [Fact]
+    public async Task RemoverAsync_recusa_categoria_com_subcategorias()
+    {
+        // #2504: o DELETE estourava 23503 em categorias_CategoriaPaiId_fkey e virava 500.
+        var raiz = new Categoria { Id = Guid.NewGuid(), EmpresaId = EmpId, Nome = "Bebidas" };
+        raiz.SubCategorias.Add(new Categoria { Id = Guid.NewGuid(), EmpresaId = EmpId, CategoriaPaiId = raiz.Id, Nome = "Sucos" });
+        _repo.GetByIdAsync(EmpId, raiz.Id).Returns(raiz);
+
+        var act = () => Sut().RemoverAsync(raiz.Id, EmpId);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*subcategorias*");
+        await _repo.DidNotReceive().DeleteAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task RemoverAsync_subcategoria_em_uso_diz_que_ha_produtos_nela()
+    {
+        var sub = new Categoria { Id = Guid.NewGuid(), EmpresaId = EmpId, CategoriaPaiId = Guid.NewGuid(), Nome = "Sucos" };
+        _repo.GetByIdAsync(EmpId, sub.Id).Returns(sub);
+        _repo.ExisteProdutosNaCategoriaAsync(sub.Id).Returns(true);
+
+        var act = () => Sut().RemoverAsync(sub.Id, EmpId);
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("Há produtos nesta subcategoria*");
+        await _repo.DidNotReceive().DeleteAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
 }

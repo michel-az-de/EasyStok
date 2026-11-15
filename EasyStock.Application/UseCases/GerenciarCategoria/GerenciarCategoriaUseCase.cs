@@ -130,8 +130,14 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             if (categoria == null)
                 throw new UseCaseValidationException("Categoria nao encontrada.");
 
+            // #2504: o banco recusa com 23503 (categoria pai ou produto apontando para ela), que vira 500.
+            if (categoria.SubCategorias.Count > 0)
+                throw new UseCaseValidationException("Esta categoria tem subcategorias. Exclua ou mova as subcategorias antes.");
+
             if (await categoriaRepository.ExisteProdutosNaCategoriaAsync(id))
-                throw new UseCaseValidationException("Nao e possivel remover uma categoria que possui produtos vinculados.");
+                throw new UseCaseValidationException(categoria.CategoriaPaiId is null
+                    ? "Nao e possivel remover uma categoria que possui produtos vinculados."
+                    : "Há produtos nesta subcategoria. Mova os produtos antes de excluir.");
 
             await categoriaRepository.DeleteAsync(empresaId, id);
             await unitOfWork.CommitAsync();
