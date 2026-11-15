@@ -302,7 +302,9 @@ escritos e desliga as animações, inclusive a volta do overlay. */
   .horaTopo { grid-row: 2; grid-column: 2; justify-self: end; }
   .filtros { padding: var(--e-2) var(--e-3); }
   .feedbackArrasto { padding-inline: var(--e-3); }
-  .filtros > .chipsFiltro { flex-wrap: nowrap; overflow-x: auto; min-width: 0; padding-bottom: var(--e-1); }
+  /* #2663: a faixa de chips ocupa a linha inteira e a gaveta de canhotos desce; sem isso a gaveta
+     espremia os chips em 70 px e só "Toda" aparecia. */
+  .filtros > .chipsFiltro { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; min-width: 0; padding-bottom: var(--e-1); }
   .filtros > .chipsFiltro > button { flex: none; }
   .colunas { padding-inline: var(--e-3); gap: var(--e-2); }
   .coluna { flex: 0 0 calc(100vw - 56px); min-width: 0; }
