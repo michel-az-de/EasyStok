@@ -80,7 +80,10 @@ public class MobileSaleSyncService(
 
             // #1621: a venda entra no caixa no lugar do pagamento do pedido; sincronizada depois do fechamento do
             // dia do aparelho, vale o instante do registro, como o pagamento e o lançamento (#2030).
-            var dataVenda = await InstanteNoCaixa.DoRegistroAsync(_db, order.EmpresaId.Value, order.UpdatedAt, order.LojaId);
+            // #950: pedido já recebido por inteiro (ex.: entregue com item sem vínculo e consolidado depois) leva o
+            // instante do recebimento, senão o dinheiro sairia do dia em que entrou e apareceria no da consolidação.
+            var dataVenda = await InstanteDoRecebimentoIntegralAsync(order, ct)
+                ?? await InstanteNoCaixa.DoRegistroAsync(_db, order.EmpresaId.Value, order.UpdatedAt, order.LojaId);
 
             // Cria a Venda
             var vendaId = Guid.NewGuid();
@@ -203,6 +206,27 @@ public class MobileSaleSyncService(
                 order.Id);
             return false;
         }
+    }
+
+    /// <summary>
+    /// #950: a Venda entra no caixa no lugar dos recebimentos do pedido (<c>Pedido.VendaId</c>). Quando eles já
+    /// cobrem o total, ela carrega o instante do último, e o dinheiro fica no dia em que entrou. Recebimento
+    /// parcial devolve null: a Venda segue no instante da entrega.
+    /// </summary>
+    private async Task<DateTime?> InstanteDoRecebimentoIntegralAsync(Order order, CancellationToken ct)
+    {
+        if (order.ErpPedidoId is not { } pedidoId) return null;
+        var total = await _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.Id == pedidoId && p.EmpresaId == order.EmpresaId)
+            .Select(p => p.Total)
+            .FirstOrDefaultAsync(ct);
+        if (total is null || total.Valor <= 0) return null;
+        var recebimentos = await _db.Set<PedidoPagamento>().IgnoreQueryFilters().AsNoTracking()
+            .Where(pg => pg.PedidoId == pedidoId)
+            .Select(pg => new { pg.Valor, pg.PagoEm })
+            .ToListAsync(ct);
+        if (recebimentos.Count == 0 || recebimentos.Sum(r => r.Valor) < total.Valor) return null;
+        return recebimentos.Max(r => r.PagoEm);
     }
 
     /// <summary>
