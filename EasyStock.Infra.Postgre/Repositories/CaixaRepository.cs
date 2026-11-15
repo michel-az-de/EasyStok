@@ -150,14 +150,19 @@ namespace EasyStock.Infra.Postgre.Repositories
             return false;
         }
 
-        public Task TravarSaidasAsync(Guid empresaId, Guid? lojaId, CancellationToken ct = default)
+        public async Task TravarSaidasAsync(Guid empresaId, Guid? lojaId, CancellationToken ct = default)
         {
             // O lock é da transação: fora dela soltaria na hora, em silêncio.
             if (db.Database.CurrentTransaction is null)
                 throw new InvalidOperationException("TravarSaidasAsync exige transação aberta.");
-            var chave = $"caixa-saida:{empresaId:N}:{lojaId:N}";
-            return db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({chave}))", ct);
+            // #2629: o caixa da empresa inteira (loja nula) retrata os lançamentos de todas as lojas, então quem mexe
+            // numa loja toma primeiro a trava da empresa e depois a da loja. A ordem é sempre essa: sem deadlock.
+            await TravarAsync($"caixa-saida:{empresaId:N}:", ct);
+            if (lojaId is { } loja) await TravarAsync($"caixa-saida:{empresaId:N}:{loja:N}", ct);
         }
+
+        private Task TravarAsync(string chave, CancellationToken ct) =>
+            db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({chave}))", ct);
 
         public Task<FechamentoCaixa?> GetFechamentoDoDiaAsync(Guid empresaId, DateOnly data, Guid? lojaId = null) =>
             db.FechamentosCaixa.FirstOrDefaultAsync(f =>

@@ -74,7 +74,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>
         /// Serializa as saídas interativas do caixa de uma empresa/loja até o fim da transação
         /// (<c>pg_advisory_xact_lock</c>): conferência de saldo é checagem de limite, e o índice não
-        /// serializa isso sozinho (#1547). Precisa de transação explícita em andamento.
+        /// serializa isso sozinho (#1547). Com loja, toma antes a trava do caixa da empresa, que o fechamento sem
+        /// loja usa (#2629). Precisa de transação explícita em andamento.
         /// </summary>
         Task TravarSaidasAsync(Guid empresaId, Guid? lojaId, CancellationToken ct = default);
 
