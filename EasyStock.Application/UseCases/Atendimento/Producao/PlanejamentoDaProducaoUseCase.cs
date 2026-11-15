@@ -38,6 +38,10 @@ public sealed class PlanejamentoDaProducaoUseCase(
     CalcularCestaProducaoUseCase cesta,
     TimeProvider relogio)
 {
+    /// <summary>#2598: a sugestão vazia da empresa sem vitrine ativa, com a mesma data padrão (amanhã).</summary>
+    public SugestaoDeProducaoResult SugestaoVazia(DateOnly? ate) =>
+        new(ate ?? HorarioBrasil.DataOperacional(relogio.GetUtcNow().UtcDateTime).AddDays(1), []);
+
     public async Task<SugestaoDeProducaoResult> SugestaoAsync(Guid empresaId, DateOnly? ate = null, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(empresaId);

@@ -56,7 +56,7 @@ public class AtendimentoCardapioDoDiaController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return VitrineDesligada();
         }
         catch (CardapioItemNaoEncontradoException)
         {

@@ -1,9 +1,9 @@
-import { chamarApi } from './cliente'
+import { chamarApi, lerDaLoja } from './cliente'
 
 // Produção pelo console (M2, #1490). Estoque do dia em porções, por prato do cardápio.
 const PRODUCAO = '/api/atendimento/producao'
 
-export const obterEstoqueDoDia = () => chamarApi(`${PRODUCAO}/estoque-do-dia`)
+export const obterEstoqueDoDia = () => lerDaLoja(`${PRODUCAO}/estoque-do-dia`)
 
 const loteDaApi = (l) => ({
   codigo: l.codigo ?? null,
@@ -123,7 +123,7 @@ export const insumoDaApi = (i) => ({
 
 // M2.4a (#1498): receitas dos pratos. Ler é do Operador com estoque; gravar é o PUT da composição
 // que já existe (Gerente desde a #1462), que guarda o diff na auditoria.
-export const listarReceitas = () => chamarApi(`${PRODUCAO}/receitas`)
+export const listarReceitas = () => lerDaLoja(`${PRODUCAO}/receitas`)
 export const obterReceita = (produtoId) => chamarApi(`${PRODUCAO}/receitas/${produtoId}`)
 export const salvarReceita = (produtoId, { rendimentoBase, rendimentoUnidade, unidadeMedidaBase, linhas }) =>
   chamarApi(`/api/produtos/${produtoId}/composicao`, {
@@ -176,7 +176,7 @@ export const detalheDaReceitaDaApi = (d) => ({
 
 // M2.5 (#1502): sugestão de produção (mínimo + agendados + descoberto − saldo) e planejamento dos
 // insumos pela mesma cesta da calculadora mobile. Ler exige a permissão de estoque.
-export const obterSugestao = (ate) => chamarApi(`${PRODUCAO}/sugestao${ate ? `?ate=${ate}` : ''}`)
+export const obterSugestao = (ate) => lerDaLoja(`${PRODUCAO}/sugestao${ate ? `?ate=${ate}` : ''}`)
 export const planejarProducao = async (pratos) => {
   const prazo = AbortSignal.timeout(20000)
   try {

@@ -111,7 +111,9 @@ export const deveCarregarDossie = (conversa) => Boolean(conversa?.clienteId && !
 // com texto técnico; a dona precisa saber o que ligar.
 // #2596: o mesmo 404 aparece em Cardápio, Banco de imagens e Produção num inquilino sem loja
 // online. Quem precisa trocar o erro cru por um vazio com o próximo passo testa por aqui.
-export const lojaDesligada = (erro) => erro?.status === 404 && /vitrine ativa/i.test(erro?.message ?? '')
+// #2598: a API diz pelo código, nunca pela mensagem. A escrita responde 404 VITRINE_DESLIGADA e a leitura 200 vazio com
+// meta.lojaDisponivel=false, que `lerDaLoja` (infra/api/cliente) transforma no mesmo erro.
+export const lojaDesligada = (erro) => erro?.codigo === 'VITRINE_DESLIGADA'
 
 export function avisoDoCardapio(erro) {
   if (lojaDesligada(erro)) {

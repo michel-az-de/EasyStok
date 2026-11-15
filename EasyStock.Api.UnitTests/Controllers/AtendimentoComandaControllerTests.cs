@@ -260,10 +260,14 @@ public class AtendimentoComandaControllerTests
     }
 
     [Fact]
-    public async Task EmpresaSemVitrineDevolve404NoCardapio()
+    public async Task EmpresaSemVitrineDevolveCardapioVazioComLojaIndisponivel()
     {
+        // #2598: leitura sem vitrine é 200 com o vazio de sempre e meta.lojaDisponivel=false, não 404.
         var resultado = await _controller.Cardapio();
 
-        resultado.Should().BeOfType<NotFoundObjectResult>();
+        var corpo = resultado.Should().BeOfType<OkObjectResult>().Which.Value
+            .Should().BeOfType<ApiResponse<CardapioDaComandaResult>>().Subject;
+        corpo.Data.Itens.Should().BeEmpty();
+        corpo.Meta.GetType().GetProperty("lojaDisponivel")!.GetValue(corpo.Meta).Should().Be(false);
     }
 }

@@ -2,7 +2,7 @@ import { API_BASE } from '../fonteDados'
 import { urlDeExibicaoDaFoto } from '../../dominio/vitrineCardapio'
 import { partesDoSku, skuDaPorcao } from '../../dominio/cardapio'
 import { MEIOS_NA_ENTREGA, observacaoDoPagamentoNaEntrega, pagamentoNaEntregaDasObservacoes } from '../../dominio/cobranca'
-import { chamarApi } from './cliente'
+import { chamarApi, lerDaLoja } from './cliente'
 import { instante } from './traducaoConversas'
 import { lerSessao } from './sessao'
 
@@ -177,7 +177,7 @@ export function pedidoDaApi(p, anterior = null) {
 }
 
 export const listarCardapio = async () => {
-  const r = await chamarApi(`${BASE}/comanda/cardapio`)
+  const r = await lerDaLoja(`${BASE}/comanda/cardapio`)
   return (r?.itens ?? []).map((item) => produtoDaApi(item, r?.porcoes?.[item.id]))
 }
 

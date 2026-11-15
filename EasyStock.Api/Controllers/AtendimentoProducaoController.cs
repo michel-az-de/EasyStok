@@ -122,7 +122,7 @@ public class AtendimentoProducaoController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return DataSemLoja(planejamento.SugestaoVazia(ate));
         }
         catch (UseCaseValidationException ex)
         {
@@ -163,7 +163,7 @@ public class AtendimentoProducaoController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return DataSemLoja(Array.Empty<ReceitaDoPrato>());
         }
     }
 
@@ -200,7 +200,7 @@ public class AtendimentoProducaoController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return VitrineDesligada();
         }
         catch (CardapioItemNaoEncontradoException)
         {
@@ -294,7 +294,7 @@ public class AtendimentoProducaoController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return VitrineDesligada();
         }
         catch (CardapioItemNaoEncontradoException)
         {
@@ -319,7 +319,7 @@ public class AtendimentoProducaoController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return DataSemLoja(new EstoqueDoDiaResult([], []));
         }
     }
 }
