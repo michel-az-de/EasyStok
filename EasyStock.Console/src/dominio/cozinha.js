@@ -65,7 +65,7 @@ export const ICONE_DO_PASSO = {
 // Rótulo do botão de avançar (RN-31, um toque só). Mesmo texto de
 // `ACAO_DO_PASSO` em BarraProximoPasso.jsx, duplicado pelo mesmo motivo acima.
 export const ROTULO_DO_TOQUE = {
-  pago: 'Iniciar preparo', preparo: 'Marcar embalado', embalado: 'Despachar pedido', entrega: 'Marcar entregue',
+  pago: 'Começar preparo', preparo: 'Marcar pronto', embalado: 'Saiu para entrega', entrega: 'Marcar entregue',
 }
 
 // Arrastar e soltar entre colunas (issue #7, rodada 11: "cozinha deveria ter

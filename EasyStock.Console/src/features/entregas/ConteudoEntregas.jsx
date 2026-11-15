@@ -4,6 +4,7 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { Chip } from '../../componentes/Chip'
+import { Vazio } from '../../componentes/Vazio'
 import { horaCurta, plural } from '../../dominio/formato'
 import { ocupacaoDeHoje, rotuloDaOcupacao } from '../../dominio/entrega'
 import { EXPLICACAO_JANELA, opcoesDoDespacho } from '../../dominio/despacho'
@@ -23,7 +24,7 @@ import css from './dashboard.module.css'
 const CHIPS_ESTADO = [
   { chave: 'preparar', rotulo: 'A preparar' },
   { chave: 'pronta', rotulo: 'Prontas' },
-  { chave: 'com-entregador', rotulo: 'Com entregador' },
+  { chave: 'com-entregador', rotulo: 'Com o entregador' },
   { chave: 'entregue', rotulo: 'Entregues' },
   { chave: 'cancelada', rotulo: 'Canceladas' },
 ]
@@ -158,7 +159,8 @@ export function ConteudoEntregas({
     <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={aoTerminarArrasto}>
       <div className={css.dashboard}>
         <div className={css.faixaControles}>
-          <div className={css.linhaChips}>
+          <div className={css.linhaChips} role="group" aria-label="Filtrar por situação">
+            <strong>Mostrar:</strong>
             {CHIPS_ESTADO.map(({ chave, rotulo }) => (
               <Chip key={chave} papel="filtro" ativo={filtroEstados.has(chave)} onClick={() => alternarFiltro(chave)}>
                 {rotulo} <span className={css.contadorChip}>{contagemPorEstado[chave]}</span>
@@ -232,7 +234,7 @@ export function ConteudoEntregas({
                   integracoesLogistica={integracoesLogistica}
                 />
               ))}
-              {viagens.length === 0 && <p className={css.proximaConferencia}>Nenhuma viagem montada. Arraste uma entrega para o quadro ao lado.</p>}
+              {viagens.length === 0 && <li><Vazio variante="linha" titulo='Nenhuma viagem montada. Arraste uma entrega até "Solte aqui: nova viagem" ou escolha Nova viagem em Mais opções do cartão.' /></li>}
             </ul>
           </section>
         </div>

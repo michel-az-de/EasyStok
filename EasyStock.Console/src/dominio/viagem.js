@@ -161,13 +161,13 @@ export function proximoPassoDeEntrega(conversa, grupoDaViagem, janelas, agora, c
     return { chave: 'aguardando-viagem', quandoMs: marcos.sair, semAcao: true }
   }
   if (pedido.estado === 'embalado') {
-    return { chave: 'sair', quandoMs: marcos.sair, rotuloBotao: 'Saiu', proximoEstado: 'entrega' }
+    return { chave: 'sair', quandoMs: marcos.sair, rotuloBotao: 'Saiu para entrega', proximoEstado: 'entrega' }
   }
   if (pedido.estado === 'entrega') {
-    return { chave: 'entregar', quandoMs: minhaParada?.entregarAte, rotuloBotao: 'Entregue', proximoEstado: 'entregue' }
+    return { chave: 'entregar', quandoMs: minhaParada?.entregarAte, rotuloBotao: 'Marcar entregue', proximoEstado: 'entregue' }
   }
   // aguardando, pago ou preparo: ainda falta conferir.
-  return { chave: 'conferir', quandoMs: marcos.conferir, rotuloBotao: 'Conferi', proximoEstado: 'embalado' }
+  return { chave: 'conferir', quandoMs: marcos.conferir, rotuloBotao: 'Marcar pronto', proximoEstado: 'embalado' }
 }
 
 // Ordenação por clique (seção 6): nunca escrita, só clique. `viagensPorId`

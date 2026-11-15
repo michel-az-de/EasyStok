@@ -91,6 +91,7 @@
   display: flex; align-items: center; gap: var(--e-2); flex-wrap: nowrap;
   overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px;
 }
+@media (min-width: 900px) { .linhaChips { flex-wrap: wrap; overflow-x: visible; } }
 .linhaChips > button { flex-shrink: 0; white-space: nowrap; }
 .linhaChips strong { font-size: var(--t-apoio); color: var(--tinta-2); font-weight: 600; }
 .contadorChip { font-family: var(--f-dado); }

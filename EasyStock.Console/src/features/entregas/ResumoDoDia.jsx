@@ -28,7 +28,7 @@ export function ResumoDoDia({ conversas, cardapio, agora }) {
           Entregues hoje: {plural(resumo.quantidade, 'pedido', 'pedidos')} · {moeda(resumo.totalPedidos)}
         </strong>
         <span>
-          Total para conferir no caixa. Este resumo não lança nada no caixa.
+          Confira este total no Caixa. O resumo não lança nada.
           {resumo.aReceber > 0 && ` ${moeda(resumo.aReceber)} sem pagamento registrado.`}
         </span>
       </p>
