@@ -182,7 +182,7 @@ public sealed class AgenteAtendimentoService(
         var respondeu = contexto.HouveEnvio;
         // #2249: o texto de cada ação é molde da loja; quem não é cliente recebe o de encaminhamento.
         var primeiroNome = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome);
-        var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MensagemEscalada, primeiroNome, configuracao.NomeDona);
+        var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MoldeEscalada(), primeiroNome, configuracao.NomeDona);
         if (conversa.Situacao == SituacaoConversa.Assumida)
         {
             var aoContato = contexto.Encaminhou

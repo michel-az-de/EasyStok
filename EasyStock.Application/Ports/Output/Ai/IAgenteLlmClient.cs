@@ -23,7 +23,11 @@ public sealed record RequisicaoLlm(
     string System,
     IReadOnlyList<MensagemLlm> Mensagens,
     IReadOnlyList<FerramentaLlm> Ferramentas,
-    string? Modelo = null);
+    string? Modelo = null)
+{
+    /// <summary>Modelo do agente quando a configuração não diz outro (<c>Anthropic:ModeloAgente</c> ausente).</summary>
+    public const string ModeloPadrao = "claude-sonnet-5";
+}
 
 /// <summary><paramref name="Papel"/> é <c>user</c> ou <c>assistant</c>.</summary>
 public sealed record MensagemLlm(string Papel, IReadOnlyList<BlocoLlm> Conteudo)

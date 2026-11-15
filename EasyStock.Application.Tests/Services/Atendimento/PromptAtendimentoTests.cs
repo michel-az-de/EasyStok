@@ -88,6 +88,16 @@ public class PromptAtendimentoTests
     }
 
     /// <summary>S68 (#2597): as observações da loja entram depois do roteiro e antes das regras, que continuam valendo.</summary>
+    /// <summary>Revisão da #2618: acento não vira escape (que contaria 6 caracteres no limite do roteiro).</summary>
+    [Fact]
+    public void RoteiroSerializado_GuardaOAcentoComoEle()
+    {
+        var json = RoteiroAtendimento.Serializar([new EtapaRoteiroAtendimento("Saudação", "Cumprimente com atenção.", true)]);
+
+        json.Should().Contain("Saudação").And.Contain("atenção").And.NotContain("\\u00");
+        RoteiroAtendimento.DaLoja(json).Single().Nome.Should().Be("Saudação");
+    }
+
     [Fact]
     public void ObservacoesDaLoja_EntramAntesDasRegras()
     {

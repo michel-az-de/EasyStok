@@ -614,7 +614,7 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasDefaultValue("Vou encaminhar sua mensagem para {dona} conferir e responder por aqui.");
+                        .HasDefaultValue("Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.");
 
                     b.Property<string>("MensagemForaArea")
                         .IsRequired()

@@ -283,7 +283,7 @@ function ConfiguracaoDoAtendimento() {
         />
         <CampoTexto
           rotulo="Nome da dona"
-          dica="Como o robô chama você ao passar a conversa, por exemplo Michele. Vazio: ele diz a equipe."
+          dica="Como o robô chama você ao passar a conversa, por exemplo Michele. Na mensagem padrão, seu nome entra no lugar de a equipe."
           value={form.nomeDona ?? ''}
           maxLength={60}
           onChange={mudar('nomeDona')}

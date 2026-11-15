@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Services.Atendimento;
 using Microsoft.Extensions.Configuration;
 
@@ -63,7 +64,8 @@ public class ModelosAprovadosAgenteOptionsTests
         lista.DoTurno(null).Should().BeNull();
     }
 
+    /// <summary>Revisão da #2618: sem <c>Anthropic:ModeloAgente</c>, o cliente usa o padrão, e a lista também.</summary>
     [Fact]
-    public void SemConfiguracaoAListaFicaVazia() =>
-        Ler([]).Modelos.Should().BeEmpty();
+    public void SemAChaveDoModeloAtualAListaNasceComOPadrao() =>
+        Ler([]).Modelos.Select(m => m.Id).Should().Equal(RequisicaoLlm.ModeloPadrao);
 }

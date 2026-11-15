@@ -35,13 +35,21 @@ public class ConfiguracaoAtendimento
     public string MensagemForaArea { get; set; } = "Por enquanto a gente só entrega em algumas regiões.";
 
     public const int MoldeTamanhoMaximo = 500;
-    /// <summary>S68 (#2597): <c>{dona}</c> vira <see cref="NomeDona"/>; sem nome, "a equipe" (o texto de antes).</summary>
-    public const string MensagemEscaladaPadrao = "Vou encaminhar sua mensagem para {dona} conferir e responder por aqui.";
+    /// <summary>
+    /// Texto padrão gravado da escalada. Fica sem marcador para um rollback só de código (<c>vps-deploy.sh --rollback</c>)
+    /// nunca mandar "{dona}" ao cliente; a escalada com ele sai como <see cref="MensagemEscaladaComDona"/> (S68, #2597).
+    /// </summary>
+    public const string MensagemEscaladaPadrao = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+    /// <summary>S68 (#2597): <c>{dona}</c> vira <see cref="NomeDona"/>; sem nome, "a equipe" (o mesmo texto do padrão).</summary>
+    public const string MensagemEscaladaComDona = "Vou encaminhar sua mensagem para {dona} conferir e responder por aqui.";
     public const string MensagemEncaminhamentoPadrao =
         "Oi, {nome}! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.";
 
     /// <summary>#2249: o que o robô diz ao passar a conversa de cliente para a equipe. Com <c>{nome}</c>.</summary>
     public string MensagemEscalada { get; private set; } = MensagemEscaladaPadrao;
+
+    /// <summary>S68 (#2597): o molde que a escalada usa; o texto padrão gravado passa a citar a dona.</summary>
+    public string MoldeEscalada() => MensagemEscalada == MensagemEscaladaPadrao ? MensagemEscaladaComDona : MensagemEscalada;
 
     /// <summary>#2249: o que o robô diz a quem não é cliente (fornecedor, pessoal) ao encaminhar à responsável. Com <c>{nome}</c>.</summary>
     public string MensagemEncaminhamento { get; private set; } = MensagemEncaminhamentoPadrao;
@@ -185,8 +193,10 @@ public class ConfiguracaoAtendimento
         var modelo = modeloAgente?.Trim();
         var roteiro = roteiroJson?.Trim();
         var observacoes = observacoesLoja?.Trim();
-        if (nome?.Length > NomeDonaTamanhoMaximo || nome?.Any(char.IsControl) == true)
-            throw new RegraDeDominioVioladaException($"O nome da dona tem de caber em uma linha de até {NomeDonaTamanhoMaximo} caracteres.");
+        // Sem chaves: um "{nome}" no nome da dona seria trocado pelo nome do cliente no molde.
+        if (nome?.Length > NomeDonaTamanhoMaximo || nome?.Any(c => char.IsControl(c) || c is '{' or '}') == true)
+            throw new RegraDeDominioVioladaException(
+                $"O nome da dona tem de caber em uma linha de até {NomeDonaTamanhoMaximo} caracteres, sem chaves.");
         if (modelo?.Length > ModeloAgenteTamanhoMaximo)
             throw new RegraDeDominioVioladaException($"O modelo passa de {ModeloAgenteTamanhoMaximo} caracteres.");
         if (cotaTokensMes is < 0)

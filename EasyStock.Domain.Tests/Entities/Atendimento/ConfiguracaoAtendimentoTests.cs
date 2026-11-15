@@ -154,4 +154,30 @@ public class ConfiguracaoAtendimentoTests
 
         acao.Should().Throw<RegraDeDominioVioladaException>();
     }
+
+    // Revisão da #2618: um nome com marcador seria trocado pelo nome do cliente no molde.
+    [Theory]
+    [InlineData("{nome}")]
+    [InlineData("Michele {dona}")]
+    public void DefinirAssistente_nome_com_marcador_lanca(string nome)
+    {
+        var acao = () => Padrao().DefinirAssistente(nome, null, null, null, null);
+
+        acao.Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    // Revisão da #2618: o texto padrão gravado continua sem marcador, para um rollback só de código
+    // (vps-deploy.sh --rollback) nunca mandar "{dona}" ao cliente; a escalada padrão cita a dona em código.
+    [Fact]
+    public void MoldeEscalada_padrao_cita_a_dona_e_texto_da_loja_fica()
+    {
+        var config = Padrao();
+        ConfiguracaoAtendimento.MensagemEscaladaPadrao.Should().NotContain("{");
+        config.MensagemEscalada.Should().Be(ConfiguracaoAtendimento.MensagemEscaladaPadrao);
+        config.MoldeEscalada().Should().Be(ConfiguracaoAtendimento.MensagemEscaladaComDona);
+
+        config.DefinirMoldes("Já chamo a {dona}, {nome}.", null);
+
+        config.MoldeEscalada().Should().Be("Já chamo a {dona}, {nome}.");
+    }
 }

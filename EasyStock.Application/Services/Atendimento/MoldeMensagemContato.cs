@@ -17,10 +17,13 @@ public static partial class MoldeMensagemContato
     {
         var dona = string.IsNullOrWhiteSpace(nomeDona) ? DonaSemNome : nomeDona.Trim();
         var comDona = MarcadorDona().Replace(molde, dona.Replace("$", "$$", StringComparison.Ordinal));
-        var preenchido = string.IsNullOrWhiteSpace(primeiroNome)
+        var semNome = string.IsNullOrWhiteSpace(primeiroNome);
+        var preenchido = semNome
             ? InicioSolto().Replace(SemNome().Replace(comDona, string.Empty), string.Empty)
-            : Marcador().Replace(comDona, primeiroNome.Trim().Replace("$", "$$", StringComparison.Ordinal));
-        return preenchido.Length == 0 ? preenchido : char.ToUpperInvariant(preenchido[0]) + preenchido[1..];
+            : Marcador().Replace(comDona, primeiroNome!.Trim().Replace("$", "$$", StringComparison.Ordinal));
+        // Maiúscula só onde um marcador pode ter aberto a frase; o resto sai como a loja escreveu.
+        var abreComMarcador = semNome || molde.TrimStart().StartsWith(Dona, StringComparison.OrdinalIgnoreCase);
+        return preenchido.Length == 0 || !abreComMarcador ? preenchido : char.ToUpperInvariant(preenchido[0]) + preenchido[1..];
     }
 
     [GeneratedRegex(@"\{dona\}", RegexOptions.IgnoreCase)]

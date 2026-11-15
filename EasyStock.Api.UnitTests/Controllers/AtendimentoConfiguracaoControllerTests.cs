@@ -57,6 +57,36 @@ public class AtendimentoConfiguracaoControllerTests
         await _unitOfWork.DidNotReceive().CommitAsync();
     }
 
+    // Revisão da #2618: a recusa do modelo vem antes de qualquer mudança na entidade rastreada.
+    [Fact]
+    public async Task PutComModeloForaDaListaNaoMudaNadaNaEntidade()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        var tomAntes = config.Tom;
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+
+        var resultado = await _controller.Put(new AtualizarConfiguracaoAtendimentoBody(
+            "Tom novo", null, null, null, null, null, null, null, null, ModeloAgente: "claude-opus-5"));
+
+        resultado.Should().BeOfType<BadRequestObjectResult>();
+        config.Tom.Should().Be(tomAntes);
+    }
+
+    // Revisão da #2618: o modelo já gravado que saiu da lista volta igual no PUT sem travar os outros campos.
+    [Fact]
+    public async Task PutComOModeloJaGravadoQueSaiuDaListaGravaOResto()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        config.DefinirAssistente(null, "modelo-retirado", null, null, null);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+
+        var resultado = await _controller.Put(Corpo(NomeDona: "Michele", ModeloAgente: "modelo-retirado"));
+
+        resultado.Should().BeOfType<OkObjectResult>();
+        config.NomeDona.Should().Be("Michele");
+        config.ModeloAgente.Should().Be("modelo-retirado");
+    }
+
     [Fact]
     public async Task PutGravaAConfiguracaoDoAssistenteEOGetDevolve()
     {

@@ -92,6 +92,9 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         ObterConfiguracaoAtendimentoUseCase.ValidarEmpresa(configuracao, command.EmpresaId);
         var nova = configuracao is null;
         configuracao ??= ConfiguracaoAtendimento.CriarPadrao(command.EmpresaId);
+        // A recusa do modelo ou do roteiro vem antes de qualquer mudança na entidade rastreada.
+        var modeloAgente = ModeloValidado(command.ModeloAgente, configuracao.ModeloAgente);
+        var roteiroJson = RoteiroValidado(command.Roteiro);
 
         try
         {
@@ -107,8 +110,8 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
                 command.Ativo,
                 command.SlaRespostaMinutos);
             configuracao.DefinirMoldes(command.MensagemEscalada, command.MensagemEncaminhamento);
-            configuracao.DefinirAssistente(command.NomeDona, ModeloValidado(command.ModeloAgente), command.CotaTokensMes,
-                RoteiroValidado(command.Roteiro), command.ObservacoesLoja);
+            configuracao.DefinirAssistente(command.NomeDona, modeloAgente, command.CotaTokensMes, roteiroJson,
+                command.ObservacoesLoja);
         }
         catch (Exception ex) when (ex is ArgumentOutOfRangeException or RegraDeDominioVioladaException)
         {
@@ -134,12 +137,15 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         return ObterConfiguracaoAtendimentoUseCase.ToResult(configuracao);
     }
 
-    private string? ModeloValidado(string? modelo)
+    private string? ModeloValidado(string? modelo, string? gravado)
     {
         if (string.IsNullOrWhiteSpace(modelo)) return modelo;
-        if (modelos?.Value.Aprovado(modelo) != true)
+        var id = modelo.Trim();
+        // O já gravado que saiu da lista volta igual sem travar o resto; o turno já usa o padrão no lugar dele.
+        if (string.Equals(id, gravado, StringComparison.Ordinal)) return id;
+        if (modelos?.Value.Aprovado(id) != true)
             throw new UseCaseValidationException("Modelo fora da lista aprovada do Assistente.");
-        return modelo.Trim();
+        return id;
     }
 
     private static string? RoteiroValidado(IReadOnlyList<EtapaRoteiroAtendimento>? roteiro)

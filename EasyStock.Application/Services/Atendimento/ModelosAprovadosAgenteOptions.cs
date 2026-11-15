@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Ai;
 using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.Services.Atendimento;
@@ -7,8 +8,8 @@ public sealed record ModeloAprovadoAgente(string Id, string Rotulo, string Custo
 
 /// <summary>
 /// S68 (#2597, ADR-0066): lista aprovada do Assistente em <c>Anthropic:ModelosAprovados</c> (<c>Id</c>, <c>Rotulo</c>,
-/// <c>CustoRelativo</c>). Um modelo só entra com eval verde. A lista nasce com o modelo atual (<c>Anthropic:ModeloAgente</c>),
-/// sempre em primeiro. O turno só pede o modelo da loja quando ele está aqui; fora da lista vale o padrão.
+/// <c>CustoRelativo</c>). Um modelo só entra com eval verde. A lista nasce com o modelo atual (<c>Anthropic:ModeloAgente</c>,
+/// ou <see cref="RequisicaoLlm.ModeloPadrao"/> sem a chave, como no cliente), sempre em primeiro. O turno só pede o modelo da loja quando ele está aqui; fora da lista vale o padrão.
 /// </summary>
 public sealed class ModelosAprovadosAgenteOptions
 {
@@ -34,7 +35,7 @@ public sealed class ModelosAprovadosAgenteOptions
         }
 
         var atual = configuracao[ChaveModeloAtual]?.Trim();
-        if (string.IsNullOrEmpty(atual)) return;
+        if (string.IsNullOrEmpty(atual)) atual = RequisicaoLlm.ModeloPadrao;
         var listado = Modelos.Find(m => string.Equals(m.Id, atual, StringComparison.Ordinal));
         if (listado is not null) Modelos.Remove(listado);
         Modelos.Insert(0, listado ?? new ModeloAprovadoAgente(atual, "Modelo atual", "padrão"));

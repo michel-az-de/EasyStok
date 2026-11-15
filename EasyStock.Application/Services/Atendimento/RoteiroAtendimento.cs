@@ -1,4 +1,6 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -16,7 +18,11 @@ public static class RoteiroAtendimento
     public const int NomeTamanhoMaximo = 40;
     public const int InstrucaoTamanhoMaximo = 600;
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    // Acento fica como é: o limite do roteiro conta o texto da loja, não o escape "\u00e7".
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+    };
 
     /// <summary>S68 (#2597): o roteiro guardado pela loja; nulo, vazio ou ilegível devolve o <see cref="Padrao"/>.</summary>
     public static IReadOnlyList<EtapaRoteiroAtendimento> DaLoja(string? roteiroJson)
