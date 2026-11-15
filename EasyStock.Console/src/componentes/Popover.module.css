@@ -24,7 +24,9 @@
   display: block; width: 100%; text-align: left; background: none; border: 0;
   border-radius: var(--r-1); padding: var(--e-2) var(--e-3); min-height: var(--toque);
 }
-.item:hover:not(.informativo) { background: var(--preenchimento-forte); }
+/* #2621: mesmo degrau do MenuDeAcoes: hover no preenchimento, pressionado no forte. */
+.item:hover:not(.informativo) { background: var(--preenchimento); }
+.item:active:not(.informativo) { background: var(--preenchimento-forte); }
 /* #2232 (M1): opção ativa de um grupo de escolha única (tema): fundo de seleção e marca visível,
    além do `aria-checked`. A marca, que é de seleção, é a única cor de marca do menu. */
 .item { position: relative; }

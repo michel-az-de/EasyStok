@@ -48,8 +48,11 @@ button {
     border-color var(--dur-curta) var(--ease-padrao),
     color var(--dur-curta) var(--ease-padrao),
     box-shadow var(--dur-curta) var(--ease-padrao),
-    opacity var(--dur-curta) var(--ease-padrao);
+    opacity var(--dur-curta) var(--ease-padrao),
+    filter var(--dur-curta) var(--ease-padrao);
 }
+/* #2621: controle desabilitado nunca mostra a mãozinha, mesmo o botão cru de uma tela. */
+:where(button, input, select, textarea):disabled { cursor: not-allowed; }
 
 /* Foco: anel de 3 px com folga de 2. */
 :focus-visible {

@@ -4,7 +4,8 @@
   background: transparent; cursor: pointer;
 }
 .gatilho:hover { background: var(--preenchimento); }
-.gatilho:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.gatilho:active { background: var(--preenchimento-forte); }
+.gatilho:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .camada {
   position: fixed; z-index: 60; display: grid; gap: var(--e-3);
   /* #1872: como popover o navegador põe `inset: 0`, `margin: auto` e `overflow: auto`; a posição vem do JS. */
