@@ -14,7 +14,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { cpus } from 'node:os'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const EXCECOES = new Map([
   ['prova-1693-frete-api-real.mjs', 'manual (#2437): lê .build/logistica-browser.json gerado por outra prova'],
@@ -25,9 +25,8 @@ const EXCECOES = new Map([
   ['prova-1841-cardapio-acervo.mjs', 'manual (#2437): chama a API de homologação (HOMOLOGACAO_API_URL)'],
   ['prova-1846-seletor-acervo.mjs', 'manual (#2437): chama a API de homologação (HOMOLOGACAO_API_URL)'],
   ['prova-1693-dez-cenarios-api-real.mjs', 'lê .build/logistica-browser.json gerado por outra prova de navegador (Playwright e API real)'],
-  ['prova-1712-comanda-operador.mjs', 'precisa de DOM (document) que o Node puro não tem (já falha no master)'],
-  ['prova-1753-usuarios.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
-  ['prova-1868-visual.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
+  ['prova-1712-comanda-operador.mjs', 'SSR em camadas (#2701): useComplementoDeTexto (#2181) lê document no estado inicial e, com um document mínimo, o harness ainda monta componente undefined; sem jsdom no projeto'],
+  ['prova-1868-visual.mjs', 'decisão de produto pendente (#2701): #2143 tirou do composer o aviso visível "Só texto neste canal" (o motivo ficou só no leitor de tela); os outros casos já acompanham #2187 e #2156'],
   ['prova-2395-api-real.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
   ['prova-2395-cadastros-concorrencia.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
   ['prova-2395-operacao-complementos.mjs', 'opt-in: Playwright e fixture R4 real final; requer R4_EXECUTAR_COMPLEMENTOS=1 e grava operações'],
@@ -38,24 +37,13 @@ const EXCECOES = new Map([
   ['prova-2395-jornada-api.mjs', 'opt-in: fixture R4 com API/PostgreSQL reais; cria pedidos e altera pagamentos e estoque'],
   ['prova-2395-jornada-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera a jornada de teste'],
   ['prova-2395-mensagem-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; envia mensagens ao transporte de teste'],
-  ['prova-bloqueio-preparo.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-contadores-canal.mjs', 'asserção velha, já falha no master (a tela mudou e a prova não acompanhou)'],
-  ['prova-producao-ia-navegador.mjs', 'precisa de servidor Vite no ar na porta 5187 e navegador (já falha no master)'],
-  ['prova-r11-atendimento.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r11-cozinha.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r12-cardapio-cliente.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r12-entregas.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r12-enviar-comanda.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r12-trocar-pagamento.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r13-caixa.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r13-fidelidade.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r13-integracoes.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r13-janelas.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
-  ['prova-r13-producao.mjs', 'importa src/ sem o hook do Vite e quebra em import.meta.env (já falha no master)'],
+  ['prova-r12-cardapio-cliente.mjs', 'prova velha em camadas (#2701): Dinheiro na entrega (#1998), frase depois do link (#1679) e o chip Pix que virou o link do MP (#1943); reescrever o cenário 2'],
+  ['prova-producao-ia-navegador.mjs', 'prova velha em camadas (#2701): pelo Vite do script cai no nome "Editar receita de …" (#2242) e depois no Cadastrar insumo; chama a API em 5245 e grava evidência em builds/ do checkout'],
 ])
 
 const pasta = fileURLToPath(new URL('./', import.meta.url))
 const TETO_MS = 180_000
+const PRELOAD = pathToFileURL(`${pasta}ambienteDoVite.mjs`).href
 const paralelo = Number(process.env.PROVAS_PARALELO) || Math.min(4, cpus().length)
 const termos = process.argv.slice(2)
 
@@ -106,7 +94,8 @@ async function subirVite() {
 
 const rodar = (nome) => new Promise((resolver) => {
   const inicio = Date.now()
-  const filho = spawn(process.execPath, [`${pasta}${nome}`], { cwd: `${pasta}..`, env: ambiente, stdio: ['ignore', 'pipe', 'pipe'] })
+  // #2701: todo filho nasce com o `import.meta.env` e o import de JSON que o Vite dá ao `src/`.
+  const filho = spawn(process.execPath, ['--import', PRELOAD, `${pasta}${nome}`], { cwd: `${pasta}..`, env: ambiente, stdio: ['ignore', 'pipe', 'pipe'] })
   let saida = ''
   filho.stdout.on('data', (parte) => { saida += parte })
   filho.stderr.on('data', (parte) => { saida += parte })

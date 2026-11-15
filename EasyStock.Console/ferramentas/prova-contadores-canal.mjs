@@ -61,8 +61,9 @@ const base = [
   conversa('Chat do site', { bloqueada: true, precisa: true }),
 ]
 
+// #1432 (PR #1433) pôs o E-mail no catálogo, depois do Chat do site: o canal sem conversa aparece com zero (#2701).
 caso('um contador por canal do catálogo, na ordem do catálogo', () => {
-  assert.deepEqual(contarPorCanal(base, CANAIS, AGORA).map((c) => c.nome), ['WhatsApp', 'Instagram', 'Chat do site'])
+  assert.deepEqual(contarPorCanal(base, CANAIS, AGORA).map((c) => c.nome), ['WhatsApp', 'Instagram', 'Chat do site', 'E-mail'])
 })
 
 caso('conta abertas e, dentro delas, quantas precisam de você', () => {
@@ -70,6 +71,7 @@ caso('conta abertas e, dentro delas, quantas precisam de você', () => {
     WhatsApp: { abertas: 2, precisam: 1 },
     Instagram: { abertas: 1, precisam: 0 },
     'Chat do site': { abertas: 0, precisam: 0 },
+    'E-mail': { abertas: 0, precisam: 0 },
   })
 })
 
