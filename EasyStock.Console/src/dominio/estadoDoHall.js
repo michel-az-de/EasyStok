@@ -53,7 +53,10 @@ export function severidadeDoIndicador(item) {
 }
 
 // H6: o alerta do caixa de outro dia traz a ação que resolve, no próprio cartão.
-export const acaoDoIndicador = (item) => (item.id === 'financeiro' && item.alerta ? 'Fechar caixa' : null)
+// #2677 (H3): só para quem pode fechar o caixa (`acoes.gerenciarCaixa`, a regra da tela do caixa). O operador via
+// "Fechar caixa" e chegava a uma tela sem o botão; sem a permissão o alerta fica e a ação some.
+export const acaoDoIndicador = (item, { podeFecharCaixa = false } = {}) =>
+  (item.id === 'financeiro' && item.alerta && podeFecharCaixa ? 'Fechar caixa' : null)
 
 // #2258 (H1): o resumo é a SOMA dos números que o hall mostra nos cartões que pedem a dona (conversas
 // que precisam dela, pedidos na fila, pedidos prontos para sair), e separa o que pede ação (conversas, "precisam de você") do que só está em andamento.
@@ -71,6 +74,12 @@ export function resumoDoDia(fontes, ids = MODULOS_QUE_PEDEM_A_DONA) {
   // sair está em andamento. O texto separa as duas contas em vez de chamar tudo de "precisam de você".
   const precisam = itens.filter((item) => item.id === 'atendimento').reduce((soma, item) => soma + item.valor, 0)
   const andamento = total - precisam
+  // #2677 (H2): sem o Atendimento contado, as conversas não foram medidas; o resumo fala só do andamento em vez
+  // de afirmar "nada precisa de você" ao lado do cartão que mostra conversas esperando.
+  if (!contados.includes('atendimento')) {
+    const texto = andamento ? `Hoje · ${andamento}${parcial ? '+' : ''} em andamento` : 'Hoje · nada em andamento'
+    return { total, precisam, andamento, parcial, texto }
+  }
   const parteAcao = precisam || parcial ? precisaDeVoce(precisam, parcial ? '+' : '') : 'nada precisa de você'
   const parteAndamento = andamento ? ` · ${andamento} em andamento` : ''
   return { total, precisam, andamento, parcial, texto: `Hoje · ${parteAcao}${parteAndamento}` }

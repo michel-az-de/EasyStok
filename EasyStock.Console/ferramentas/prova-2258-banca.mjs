@@ -76,7 +76,8 @@ await caso('H1: "precisam de você" é só conversa; fila e prontos são "em and
   }
   assert.equal(estado.resumoDoDia(fontes).texto, 'Hoje · 3 precisam de você · 3 em andamento')
   assert.equal(estado.resumoDoDia(fontes, ['atendimento']).texto, 'Hoje · 3 precisam de você')
-  assert.equal(estado.resumoDoDia(fontes, ['cozinha', 'entregas']).texto, 'Hoje · nada precisa de você · 3 em andamento')
+  // #2677 (H2): sem o Atendimento contado, o resumo não afirma nada sobre as conversas.
+  assert.equal(estado.resumoDoDia(fontes, ['cozinha', 'entregas']).texto, 'Hoje · 3 em andamento')
   assert.equal(estado.resumoDoDia({ atendimento: lido({ itens: [] }), pedidos: lido({ itens: [] }) }).texto, 'Hoje · nada precisa de você')
 })
 

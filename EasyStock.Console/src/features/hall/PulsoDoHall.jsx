@@ -22,7 +22,7 @@ const frentes = {
 }
 const hora = (em) => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(em)
 
-function Indicador({ item, movimentos }) {
+function Indicador({ item, movimentos, podeFecharCaixa }) {
   const frente = frentes[item.id]
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id, transition: movimentos ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' } : null,
@@ -34,7 +34,7 @@ function Indicador({ item, movimentos }) {
     : item.alerta
   // #2232 (H6/H9): o que pede atenção vira estado do cartão, na cor de severidade, com a ação que resolve.
   const severidade = severidadeDoIndicador(item)
-  const acao = acaoDoIndicador(item)
+  const acao = acaoDoIndicador(item, { podeFecharCaixa })
   return <li ref={setNodeRef} className={isDragging ? css.arrastando : undefined}
     style={{ transform: CSS.Transform.toString(transform), transition }}>
     <a ref={setActivatorNodeRef} data-indicador={item.id} data-estado={item.estado} data-severidade={severidade ?? undefined} className={css.indicador}
@@ -53,7 +53,8 @@ function Indicador({ item, movimentos }) {
 // #1810: o hall mostra só o número e o caminho. A explicação de cada número fica no título do
 // cartão (passar o mouse) e o frescor só aparece quando a leitura falhou ou está velha.
 // #1839 D: os números arrastam direto para a ordem que a dona quiser; quem lê as fontes é o Hall.
-export function PulsoDoHall({ ids, foco, fontes, movimentos = true, aoMover }) {
+// #2677 (H3): `podeFecharCaixa` vem da permissão de gerenciar o caixa; sem ela o cartão não oferece "Fechar caixa".
+export function PulsoDoHall({ ids, foco, fontes, movimentos = true, podeFecharCaixa = false, aoMover }) {
   const sensores = useSensoresDoHall()
   const clique = useCliqueAposArrasto()
   const indicadores = indicadoresDoHall(fontes, ids)
@@ -76,7 +77,7 @@ export function PulsoDoHall({ ids, foco, fontes, movimentos = true, aoMover }) {
       }}>
       <SortableContext items={ids} strategy={rectSortingStrategy}>
         <ul className={css.indicadores} data-total={indicadores.length} onClickCapture={clique.onClickCapture}>
-          {indicadores.map((item) => <Indicador key={item.id} item={item} movimentos={movimentos} />)}
+          {indicadores.map((item) => <Indicador key={item.id} item={item} movimentos={movimentos} podeFecharCaixa={podeFecharCaixa} />)}
         </ul>
       </SortableContext>
     </DndContext>
