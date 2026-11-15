@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace EasyStock.Infra.Postgre.Data.Interceptors;
 
@@ -97,14 +98,21 @@ public sealed class AuditTimestampsInterceptor : SaveChangesInterceptor
                       || (underlying == typeof(DateTimeOffset) && current is DateTimeOffset dto && dto == default);
 
         if (isDefault)
-            entry.Property(name).CurrentValue = value;
+            entry.Property(name).CurrentValue = NoTipoDa(prop, value);
+    }
+
+    // #2671: a ReportRun mapeia a auditoria em DateTimeOffset; gravar DateTime ali derrubava o SaveChanges.
+    private static object NoTipoDa(IProperty prop, object value)
+    {
+        var tipo = Nullable.GetUnderlyingType(prop.ClrType) ?? prop.ClrType;
+        return tipo == typeof(DateTimeOffset) && value is DateTime utc ? new DateTimeOffset(utc, TimeSpan.Zero) : value;
     }
 
     private static void SetAlways(EntityEntry entry, string name, object value)
     {
         var prop = entry.Metadata.FindProperty(name);
         if (prop is null) return;
-        entry.Property(name).CurrentValue = value;
+        entry.Property(name).CurrentValue = NoTipoDa(prop, value);
         entry.Property(name).IsModified = true;
     }
 
