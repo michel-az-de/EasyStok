@@ -89,5 +89,41 @@ await confere('K2: no celular a faixa de chips ocupa a linha inteira da barra de
   assert.match(regra, /flex:\s*1 1 100%/)
 })
 
+// D2 (decisão do Felipe): o checkout grava o endereço nas observações com rótulos de máquina; a
+// Cozinha mostra só o endereço formatado e o que o cliente escreveu. O dado gravado não muda.
+const RETRATO = '[Entrega] Rua Teodoro Sampaio, 104, Pinheiros, São Paulo/SP, CEP 05411000'
+const GUEST = '[Guest] CEP 05411-000, numero 104'
+const ENDERECO = 'Rua Teodoro Sampaio, 104, Pinheiros, São Paulo/SP, CEP 05411-000'
+const kds = await import('../src/dominio/kds.js')
+
+await confere('D2: o retrato do checkout vira endereço formatado, sem rótulos', () => {
+  assert.deepEqual(kds.leituraDasObservacoes(`${RETRATO} | ${GUEST}`), { endereco: ENDERECO, observacoes: null })
+})
+
+await confere('D2: o que o cliente escreveu continua como observação', () => {
+  assert.deepEqual(kds.leituraDasObservacoes(`Ligar antes | ${RETRATO} | ${GUEST}`), { endereco: ENDERECO, observacoes: 'Ligar antes' })
+})
+
+await confere('D2: só o rótulo de convidado vira "CEP ..., nº ..."', () => {
+  assert.deepEqual(kds.leituraDasObservacoes(GUEST), { endereco: 'CEP 05411-000, nº 104', observacoes: null })
+})
+
+await confere('D2: observação sem rótulo fica como está', () => {
+  assert.deepEqual(kds.leituraDasObservacoes('Sem cebola'), { endereco: null, observacoes: 'Sem cebola' })
+})
+
+await confere('D2: o cartão mostra o endereço formatado, sem [Entrega] nem [Guest]', () => {
+  const html = cartao(pedido({ observacoes: `Ligar antes | ${RETRATO} | ${GUEST}` }))
+  assert.ok(!/\[Entrega\]|\[Guest\]|numero 104/.test(html), 'rótulo cru no cartão')
+  assert.ok(html.includes(ENDERECO), 'endereço formatado ausente')
+  assert.ok(html.includes('Ligar antes'), 'observação do cliente ausente')
+})
+
+await confere('D2: o canhoto impresso também sai sem rótulos', () => {
+  const dados = kds.canhotoDoKds(pedido({ observacoes: `Ligar antes | ${RETRATO} | ${GUEST}` }), {})
+  assert.equal(dados.endereco, ENDERECO)
+  assert.equal(dados.observacoes, 'Ligar antes')
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) process.exit(1)

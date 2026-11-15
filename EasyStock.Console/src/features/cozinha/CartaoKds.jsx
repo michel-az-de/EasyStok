@@ -6,8 +6,8 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import {
-  avisoDeInicio, colunaDoStatusKds, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds, rotuloDoStatusKds, tempoAteInicio,
-  urgenciaDoPedido,
+  avisoDeInicio, colunaDoStatusKds, gruposDoKds, leituraDasObservacoes, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds, rotuloDoStatusKds,
+  tempoAteInicio, urgenciaDoPedido,
 } from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
@@ -115,6 +115,7 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
   const aviso = avisoDeInicio(pedido, agora)
   const todos = gruposDoKds(pedido, linhas)
   const nome = nomeDoPedido(pedido)
+  const leitura = leituraDasObservacoes(pedido.observacoes)
   const grupos = linhaFiltro ? todos.filter((g) => g.chave === linhaFiltro) : todos
   const fracao = tempoAteInicio(pedido, agora)
 
@@ -153,7 +154,9 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
           </ul>
         </div>
       ))}
-      {pedido.observacoes && <p className={css.obsPedido}>{pedido.observacoes}</p>}
+      {/* D2 (#1769): o endereço do checkout sai formatado, sem os rótulos de máquina. */}
+      {leitura.endereco && <p className={css.comandaApoio}>{leitura.endereco}</p>}
+      {leitura.observacoes && <p className={css.obsPedido}>{leitura.observacoes}</p>}
     </>
   )
 }
