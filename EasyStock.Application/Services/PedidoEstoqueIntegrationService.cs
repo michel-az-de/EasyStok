@@ -73,10 +73,6 @@ public sealed class PedidoEstoqueIntegrationService(
     public Task DescontarAsync(PedidoEntity pedido, CancellationToken ct = default) =>
         DescontarAsync(pedido, itemNovo: null, ct);
 
-    /// <param name="itemNovo">
-    /// O item que acabou de entrar num pedido que já tinha baixado (#939). O aparelho não sabe dele,
-    /// então a baixa do aparelho não o cobre (#1571): ele sai inteiro.
-    /// </param>
     /// <summary>
     /// #1619: o item grava o prato como ele estava na hora do pedido. Prato incluído pelo console nasce
     /// avulso e a produção liga ao estoque depois; sem isto, o item seguia sem produto e a baixa pulava
@@ -110,6 +106,10 @@ public sealed class PedidoEstoqueIntegrationService(
         }
     }
 
+    /// <param name="itemNovo">
+    /// O item que acabou de entrar num pedido que já tinha baixado (#939). O aparelho não sabe dele,
+    /// então a baixa do aparelho não o cobre (#1571): ele sai inteiro.
+    /// </param>
     public async Task DescontarAsync(PedidoEntity pedido, PedidoItem? itemNovo, CancellationToken ct = default)
     {
         // #1534: o pedido do site e da comanda nasce sem loja (tenant único, uma cozinha) e baixa do
