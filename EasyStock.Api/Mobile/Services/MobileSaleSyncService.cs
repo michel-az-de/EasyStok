@@ -34,6 +34,38 @@ public class MobileSaleSyncService(
     private readonly ILogger<MobileSaleSyncService> _log = log;
 
     /// <summary>
+    /// #2083: os itens que a Venda do pedido entregue leva. O pedido que nasceu no console vende os itens do
+    /// próprio Pedido (1,5 kg a R$ 30 dá R$ 45), porque o espelho do aparelho guarda a quantidade inteira (#2707).
+    /// O pedido que nasceu no aparelho vende o espelho, como sempre.
+    /// </summary>
+    public async Task<List<DTOs.OrderItemDto>> ItensDaVendaAsync(Order order, CancellationToken ct = default)
+    {
+        if (order.ErpPedidoId is not { } pedidoId
+            || !await SyncMutationDispatcher.PedidoNasceuNoErpAsync(_db, order.EmpresaId, pedidoId))
+            return order.Items.Select(i => new DTOs.OrderItemDto(
+                i.ProductId ?? "", i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).ToList();
+
+        var itens = (await _db.Set<EasyStock.Domain.Entities.PedidoItem>().IgnoreQueryFilters().AsNoTracking()
+                .Where(i => i.PedidoId == pedidoId)
+                .ToListAsync(ct))
+            .Where(i => !i.EhLinhaDeFrete)
+            .ToList();
+        var produtoIds = itens.Where(i => i.ProdutoId.HasValue).Select(i => i.ProdutoId).Distinct().ToList();
+        var espelhos = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == order.EmpresaId && produtoIds.Contains(p.ErpProductId))
+            .Select(p => new { p.Id, ErpProductId = p.ErpProductId!.Value })
+            .ToListAsync(ct);
+        // O pull leva o item com o id do produto do ERP; o espelho com esse id ganha, senão o primeiro vinculado.
+        var espelhoDoProduto = espelhos.GroupBy(p => p.ErpProductId).ToDictionary(g => g.Key, g => g
+            .OrderBy(p => p.Id == g.Key.ToString() ? 0 : 1).ThenBy(p => p.Id, StringComparer.Ordinal).First().Id);
+
+        // Item sem espelho vai com produto vazio: a Venda não nasce pela metade (#2049).
+        return itens.Select(i => new DTOs.OrderItemDto(
+            i.ProdutoId is { } produtoId && espelhoDoProduto.TryGetValue(produtoId, out var espelhoId) ? espelhoId : "",
+            i.Nome, i.Emoji, i.Unidade, i.Quantidade, i.PrecoUnitario)).ToList();
+    }
+
+    /// <summary>
     /// Cria Venda + ItemVenda no ERP a partir de um Order mobile entregue.
     /// Idempotente: se já tem ErpVendaId, retorna sem fazer nada.
     /// </summary>

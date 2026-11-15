@@ -122,6 +122,34 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         (await ObservacoesDasVendas(s)).Single().Should().NotContain("] [CANCELADO", "reenviar o cancelamento não marca a Venda de novo");
     }
 
+    [SkippableFact]
+    public async Task PedidoDoConsoleCom1_5Kg_EntregueNoAparelho_VendaERecebimentoSaemDoPedido()
+    {
+        // #2083: o aparelho guarda 1,5; o espelho do servidor fica com 1 (coluna inteira, #2707).
+        // A Venda, o recebimento e a baixa saem do Pedido do console, não do espelho.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync(quantidade: 1.5m);
+        await using var provider = BuildProductionProvider();
+        await AbastecerAsync(provider, s, 10m);
+
+        await EcoarDoAparelho(provider, s, "entregue", qtyNoEspelho: 1, totalNoEspelho: 45m);
+
+        (await StatusDoPedido(s)).Should().Be("entregue");
+        (await Recebimentos(s)).Should().ContainSingle().Which.Should().Be(45m);
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var pedido = await leitura.Set<Pedido>().Include(p => p.Itens).SingleAsync(p => p.Id == s.PedidoId);
+        pedido.Itens.Single().Quantidade.Should().Be(1.5m, "o eco do aparelho não reescreve o item do console");
+        pedido.Total.Valor.Should().Be(45m);
+        var vendido = await leitura.Set<ItemVenda>().IgnoreQueryFilters().SingleAsync(i => i.ProdutoId == s.ProdutoId);
+        vendido.Quantidade.Value.Should().Be(1.5m, "a Venda do pedido do console sai dos itens dele, não do espelho truncado");
+        vendido.PrecoTotal.Valor.Should().Be(45m, "1,5 kg a R$ 30");
+        (await leitura.Set<Venda>().SingleAsync(v => v.Id == vendido.VendaId)).ValorTotal.Valor.Should().Be(45m);
+        // Medição da condição 5 (#2083): a esteira do ERP baixa pelo item do Pedido, uma vez só.
+        (await Saldo(s)).Should().Be(8.5m, "a baixa sai do item do Pedido (1,5), uma vez, pela esteira");
+    }
+
     [SkippableTheory]
     [InlineData(2)]
     [InlineData(0)]
@@ -334,7 +362,7 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     private sealed record Semente(Guid EmpresaId, Guid ProdutoId, Guid PedidoId, Guid ItemId);
 
     /// <summary>O pedido do ERP volta do aparelho com o mesmo id e o status novo; depois roda o vínculo, como no sync.</summary>
-    private async Task EcoarDoAparelho(ServiceProvider provider, Semente s, string status)
+    private async Task EcoarDoAparelho(ServiceProvider provider, Semente s, string status, int qtyNoEspelho = 2, decimal totalNoEspelho = 60m)
     {
         var id = s.PedidoId.ToString();
         await using (var db = fixture.CreateDbContext())
@@ -345,9 +373,9 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
             {
                 order = new Order
                 {
-                    Id = id, ClientSnapshotName = "Ana", Total = 60m, LastDeviceId = "dev-a", LastOperatorName = "Thati", EmpresaId = s.EmpresaId
+                    Id = id, ClientSnapshotName = "Ana", Total = totalNoEspelho, LastDeviceId = "dev-a", LastOperatorName = "Thati", EmpresaId = s.EmpresaId
                 };
-                order.Items.Add(new OrderItem { OrderId = id, ProductId = s.ProdutoId.ToString(), Name = "Lasanha", Qty = 2, UnitPrice = 30m });
+                order.Items.Add(new OrderItem { OrderId = id, ProductId = s.ProdutoId.ToString(), Name = "Lasanha", Qty = qtyNoEspelho, UnitPrice = 30m });
                 db.Add(order);
             }
             order.Status = status;
@@ -378,7 +406,7 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         await acao(scope.ServiceProvider);
     }
 
-    private async Task<Semente> SeedAsync()
+    private async Task<Semente> SeedAsync(decimal quantidade = 2m)
     {
         var (empresaId, categoriaId, produtoId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
         var agora = DateTime.UtcNow;
@@ -396,8 +424,8 @@ public class PedidoDoErpNoPwaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var pedido = Pedido.Criar(empresaId, cliente: null, lojaId: null, "console");
         var item = new PedidoItem
         {
-            Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId, Nome = "Lasanha", Quantidade = 2,
-            PrecoUnitario = 30m, Subtotal = 60m, CriadoEm = agora
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = produtoId, Nome = "Lasanha", Quantidade = quantidade,
+            PrecoUnitario = 30m, Subtotal = 30m * quantidade, CriadoEm = agora
         };
         pedido.Itens.Add(item);
         pedido.RecalcularTotal();

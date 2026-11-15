@@ -1,4 +1,3 @@
-using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CriarPedido;
@@ -407,14 +406,8 @@ public sealed class OrderLinker(
 
             if (!trackedOrder.ErpVendaId.HasValue)
             {
-                var created = await saleSync.CreateVendaForDeliveredOrderAsync(trackedOrder, trackedOrder.Items.Select(i => new OrderItemDto(
-                    ProductId: i.ProductId ?? "",
-                    Name: i.Name,
-                    Emoji: i.Emoji,
-                    Unit: i.Unit,
-                    Qty: i.Qty,
-                    UnitPrice: i.UnitPrice
-                )).ToList());
+                var created = await saleSync.CreateVendaForDeliveredOrderAsync(trackedOrder,
+                    await saleSync.ItensDaVendaAsync(trackedOrder));
                 if (created && db.ChangeTracker.HasChanges())
                     await db.SaveChangesAsync();
             }
