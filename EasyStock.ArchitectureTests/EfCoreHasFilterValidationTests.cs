@@ -17,6 +17,7 @@ namespace EasyStock.ArchitectureTests;
 /// referencia identificadores entre aspas que efetivamente existem como
 /// propriedades ou ColumnNames da entidade.
 /// </summary>
+[Trait("Category", "Architecture")]
 public class EfCoreHasFilterValidationTests
 {
     [Fact]

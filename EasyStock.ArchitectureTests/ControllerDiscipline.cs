@@ -6,10 +6,10 @@ namespace EasyStock.ArchitectureTests;
 /// <summary>
 /// Trava regressão F7 (DbContext direto em controllers Admin).
 ///
-/// Hoje 22 controllers da Api injetam EasyStockDbContext diretamente, anti-pattern
-/// que esta fase do refactor pretende eliminar. Enquanto F7 não fecha, este teste
-/// fica em <c>ArchitectureDebt</c> (não bloqueia Husky pre-commit). Quando todos os
-/// 22 controllers migrarem pra UseCases, troca o Trait pra <c>Architecture</c> e
+/// Medido em 2026-11-15 (#825): 13 controllers da Api (11 do Mobile) injetam EasyStockDbContext diretamente,
+/// anti-pattern que esta fase do refactor pretende eliminar. Enquanto F7 não fecha, este teste
+/// fica em <c>ArchitectureDebt</c> (não bloqueia Husky pre-commit). Quando os
+/// 13 controllers migrarem pra UseCases, troca o Trait pra <c>Architecture</c> e
 /// vira gate permanente.
 /// </summary>
 public class ControllerDiscipline

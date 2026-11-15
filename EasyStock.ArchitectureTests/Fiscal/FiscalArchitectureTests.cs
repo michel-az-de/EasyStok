@@ -3,6 +3,7 @@ using FluentAssertions;
 
 namespace EasyStock.ArchitectureTests.Fiscal;
 
+[Trait("Category", "Architecture")]
 public class FiscalArchitectureTests
 {
     [Fact]

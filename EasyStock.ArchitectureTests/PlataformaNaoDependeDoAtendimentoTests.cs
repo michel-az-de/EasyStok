@@ -10,6 +10,7 @@ namespace EasyStock.ArchitectureTests;
 /// provider (<c>Infra.Notifications.WhatsApp.Plataforma</c>) e para os casos de uso do webhook
 /// (<c>Application.UseCases.Notifications.Plataforma</c>).
 /// </summary>
+[Trait("Category", "Architecture")]
 public class PlataformaNaoDependeDoAtendimentoTests
 {
     private const string InfraPlataforma = "EasyStock.Infra.Notifications.WhatsApp.Plataforma";
