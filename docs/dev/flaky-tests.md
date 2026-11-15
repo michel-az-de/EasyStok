@@ -29,6 +29,23 @@ passou, e localmente a prova passou 4 de 4 vezes nesse head. A PR não toca `fea
 
 ---
 
+## ✅ CORRIGIDO (#2357, #2010): stream do chat do site media relógio de parede abaixo de 2 s
+
+Visto em `ChatSiteControllerTests.RespostaDaLojaChegaPeloStreamEmMenosDeDoisSegundos`: 2,43 s, 2,74 s e 3,25 s
+em PRs de 23/10 (#1929, #1931), 2,05 s na #2310 e 2,275 s no master `d3c31ea72` (run 43175092348). Todas
+passaram no rerun do mesmo SHA, em PRs que não tocam o chat.
+
+- **Por que era flaky:** o stream lê a cada `IntervaloStream` (1 s) e o teste exigia a resposta em menos de 2 s
+  de parede. Com o runner carregado, uma leitura lenta somada ao ciclo passava do limite.
+- **Como foi confirmado:** com a leitura que acha a resposta atrasada em 1,5 s, o teste antigo falhava em 1 de 1.
+- **Fix:** `RespostaDaLojaSaiNoStreamNaLeituraQueAEncontra` afirma a ordem, não o tempo: a resposta sai no
+  stream antes da leitura seguinte, e `IntervaloStream` fica em até 1 s. O atraso de 1,5 s ficou no teste, então
+  quem voltar a medir parede vê a falha sempre. 20 de 20 verdes localmente.
+- **Se voltar a falhar:** não é mais carga do runner. Ver se o controller passou a escrever a mensagem depois
+  da leitura seguinte ou se o intervalo subiu.
+
+---
+
 ## ✅ CORRIGIDO (#2433): prova do Financeiro contava o Sair da tela de carregamento
 
 Visto em `EasyStock.Console/ferramentas/prova-financeiro-navegador.mjs:69`, no job `console` do master em
