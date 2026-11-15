@@ -453,6 +453,36 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
             });
         }
     }
+    // #1630 (item 1): a Venda que o sync do PWA cria leva a forma do pedido, e o caixa do dia põe na gaveta só o
+    // dinheiro. Antes a Venda nascia sem forma e a gaveta esperada ficava sem os pedidos pagos em dinheiro.
+    [SkippableTheory]
+    [InlineData("dinheiro", 60)]
+    [InlineData("pix", 0)]
+    public async Task PedidoDoPwaEntreguePagoNaForma_VendaLevaAForma_EAGavetaDoDiaSoContaDinheiro(string metodo, int naGaveta)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        await AparelhoManda(provider, s, "pronto", metodo: metodo);
+        await AparelhoManda(provider, s, "entregue", metodo: metodo);
+
+        var pedidoId = await PedidoDoErp(s);
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var pedido = await leitura.Set<Pedido>().Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId);
+        var venda = await leitura.Set<Venda>().SingleAsync();
+        pedido.VendaId.Should().Be(venda.Id);
+        venda.FormaPagamentoPrincipal.Should().Be(metodo);
+        var dia = HorarioBrasil.DataOperacional(pedido.Pagamentos.Single().PagoEm);
+
+        await Escopo(provider, s.EmpresaId, async sp =>
+        {
+            var caixa = await sp.GetRequiredService<ObterCaixaDiaUseCase>().ExecuteAsync(new ObterCaixaDiaQuery(s.EmpresaId, dia));
+            caixa.TotalVendas.Should().Be(60m);
+            caixa.TotalPagamentosPedidos.Should().Be(0m, "com a Venda o recebimento do pedido não conta de novo");
+            GavetaCaixa.DinheiroNaGaveta(caixa).Should().Be(naGaveta);
+        });
+    }
+
     private sealed record Semente(Guid EmpresaId, Guid CategoriaId, Dictionary<string, Guid> Produtos);
 
     private static string NoAparelho(string prato) => $"p-{prato.ToLowerInvariant()}";
@@ -501,14 +531,15 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
     /// O envio do aparelho como no <c>SyncController</c>: a mutation num SaveChanges só, e depois o
     /// vínculo. Sem <paramref name="itens"/>, o pedido tem 2 lasanhas.
     /// </summary>
-    private Task AparelhoManda(ServiceProvider provider, Semente s, string status, List<OrderItemDto>? itens = null, bool comVinculo = true) =>
+    private Task AparelhoManda(ServiceProvider provider, Semente s, string status, List<OrderItemDto>? itens = null, bool comVinculo = true,
+        string? metodo = null) =>
         Escopo(provider, s.EmpresaId, async sp =>
         {
             var ts = ++_relogioDoAparelho;
             itens ??= [new OrderItemDto(NoAparelho(Lasanha), Lasanha, null, "un", 2, 30m)];
             var pedido = new OrderDto(
                 PedidoNoAparelho, null, new ClientSnapshotDto("Ana", null), itens,
-                null, itens.Sum(i => i.Qty * i.UnitPrice), status, ts, ts);
+                null, itens.Sum(i => i.Qty * i.UnitPrice), status, ts, ts, Metodo: metodo);
             var mutation = new MutationDto($"m-{ts}-{Guid.NewGuid():N}", "dev-a", "order.upsert", JsonSerializer.SerializeToElement(pedido, Json), ts);
 
             await sp.GetRequiredService<SyncMutationDispatcher>().ApplyMutationAsync(mutation, "dev-a", "Thati", s.EmpresaId, null);
