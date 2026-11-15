@@ -41,7 +41,7 @@ export function avisoDeResponder(leitura) {
   const carga = cargaDaLista(leitura)
   if (!carga) return null
   return carga === 'erro'
-    ? 'Não consegui carregar as conversas. Abra o Balcão para tentar de novo.'
+    ? 'Não consegui carregar as conversas. Abra Conversas para tentar de novo.'
     : 'Carregando as conversas…'
 }
 

@@ -47,12 +47,13 @@ function Fila({ titulo, apoio, itens, emDia, href, rotuloDoLink, renderizar, avi
   )
 }
 
-const Pedido = (item) => (
-  <div className={css.item} data-tom={item.atrasado ? 'perigo' : undefined}>
+// Cada pedido leva à fila do módulo, como o item de Responder leva à conversa: nada com cara de botão fica inerte.
+const Pedido = (href) => (item) => (
+  <a className={css.item} href={href} data-tom={item.atrasado ? 'perigo' : undefined}>
     <span className={css.quem}>{item.nome}</span>
     <span className={css.selo}>{item.situacao}</span>
     <span className={css.detalhe}>Pedido {item.numero}{item.faixa ? ` · ${item.faixa}` : ''}</span>
-  </div>
+  </a>
 )
 
 export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = null }) {
@@ -73,10 +74,10 @@ export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = 
           )} />}
         {podeVer.cozinha && <Fila titulo="Preparar" apoio="Pedidos pagos, por horário de entrega"
           itens={filas.cozinhar} emDia="Nada na fila de preparo."
-          href={hashDoModulo('cozinha', 'fila')} rotuloDoLink="Cozinha" renderizar={Pedido} />}
+          href={hashDoModulo('cozinha', 'fila')} rotuloDoLink="Cozinha" renderizar={Pedido(hashDoModulo('cozinha', 'fila'))} />}
         {podeVer.entregas && <Fila titulo="Despachar" apoio="Pronto e a caminho"
           itens={filas.despachar} emDia="Nada esperando sair."
-          href={hashDoModulo('entregas', 'painel')} rotuloDoLink="Entregas" renderizar={Pedido} />}
+          href={hashDoModulo('entregas', 'painel')} rotuloDoLink="Entregas" renderizar={Pedido(hashDoModulo('entregas', 'painel'))} />}
       </div>
     </section>
   )

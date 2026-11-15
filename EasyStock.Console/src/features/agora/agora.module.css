@@ -11,10 +11,10 @@
 .emDia { display: flex; align-items: center; gap: var(--e-2); margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 .itens { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
-.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-1) var(--e-2); align-items: baseline; width: 100%; min-height: var(--toque); padding: var(--e-2) var(--e-3); background: var(--marca-claro); color: var(--tinta); border: var(--b-1) solid transparent; border-radius: var(--r-1); font: inherit; text-align: left; }
-button.item { cursor: pointer; }
-button.item:hover { border-color: var(--marca); }
-button.item:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--e-1) var(--e-2); align-items: baseline; width: 100%; min-height: var(--toque); padding: var(--e-2) var(--e-3); background: var(--marca-claro); color: var(--tinta); border: var(--b-1) solid transparent; border-radius: var(--r-1); font: inherit; text-align: left; text-decoration: none; }
+.item:is(a, button) { cursor: pointer; }
+.item:is(a, button):hover { border-color: var(--marca); }
+.item:is(a, button):focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .item[data-tom="perigo"] { background: var(--erro-pastel); }
 .item[data-tom="perigo"] .selo { color: var(--erro); }
 .quem { min-width: 0; font-size: var(--t-corpo); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
