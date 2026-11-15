@@ -177,7 +177,7 @@ export function ModalCadastroFinanceiro({ tipo, item, aoFechar, aoGravar }) {
   const [tipoCategoria, setTipoCategoria] = useState(item?.tipo ?? 'Despesa')
   const [descricao, setDescricao] = useState(item?.descricao ?? '')
   const operacao = useOperacaoFinanceira(aoGravar)
-  return <FormularioFinanceiro titulo={`${item ? 'Editar' : 'Novo cadastro de'} ${categoria ? 'categoria financeira' : 'centro de custo'}`} aoFechar={aoFechar} operacao={operacao} valido={nome.trim() && (categoria || codigo.trim())} aoEnviar={async () => {
+  return <FormularioFinanceiro titulo={`${item ? 'Editar' : 'Novo cadastro de'} ${categoria ? 'categoria financeira' : 'centro de custo'}`} aoFechar={aoFechar} operacao={operacao} valido={nome.trim() && (categoria || codigo.trim())} motivo={!nome.trim() ? 'Informe o nome.' : 'Informe o código do centro de custo.'} aoEnviar={async () => {
     const corpo = categoria ? { nome: nome.trim(), ...(item ? { cor: item.cor, icone: item.icone } : { tipo: tipoCategoria }) } : { nome: nome.trim(), descricao, ...(item ? {} : { codigo: codigo.trim() }) }
     if (await operacao.executar(() => salvarCadastroFinanceiro(tipo === 'centros' ? 'centros-custo' : tipo, corpo, item?.id))) aoFechar()
   }}>

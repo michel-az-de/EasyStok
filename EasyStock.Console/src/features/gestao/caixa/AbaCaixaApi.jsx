@@ -237,7 +237,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
   const [estornando, setEstornando] = useState(null)
   // #1474: movimentos e pagamentos numa lista só, na ordem da hora.
   const lancamentos = lancamentosEmOrdem(dia)
-  const podeEstornar = (m) => podeGerenciar && !dia.fechado && !m.estornadoEm && !m.devolucaoPedido && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
+  const podeEstornar = (m) => podeGerenciar && !dia.fechado && !m.estornadoEm && !m.devolucaoPedido && !m.pagamentoDeConta && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
 
   if (lancamentos.length === 0) return <p className={css.corpoBloco}>Nenhum lançamento neste caixa.</p>
   return (
@@ -607,7 +607,7 @@ export function AbaCaixaApi() {
               {dia.dinheiroPosFechamento > 0 && ` ${moeda(dia.dinheiroPosFechamento)} em dinheiro entrou na gaveta depois de fechar e vai para a abertura de amanhã.`}
             </p>
           )}
-          {dia.aberturaAConfirmar && !dia.fechado && (
+          {dia.aberturaAConfirmar && !dia.fechado && !dia.esquecidoAberto && (
             <ConfirmarAbertura
               dia={dia} gaveta={gaveta} ultimo={fechamentos[0] ?? null} podeGerenciar={podeGerenciar}
               executar={executar} enviando={acao.enviando} confirmando={acao.enviando && acao.origem === 'abertura'}
