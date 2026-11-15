@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Mobile;
@@ -192,14 +191,8 @@ public class MobileOrdersController(
 
         foreach (var order in pendentes)
         {
-            var itens = order.Items.Select(i => new OrderItemDto(
-                ProductId: i.ProductId,
-                Name: i.Name,
-                Emoji: i.Emoji,
-                Unit: i.Unit,
-                Qty: i.Qty,
-                UnitPrice: i.UnitPrice
-            )).ToList();
+            // #2083: o pedido do console vende os itens do Pedido; o do aparelho, o espelho.
+            var itens = await saleSync.ItensDaVendaAsync(order, ct);
 
             // CreateVendaForDeliveredOrderAsync tem try/catch interno (fail-safe).
             // Retorna true se Venda foi criada, false em qualquer outro caso
