@@ -96,7 +96,12 @@ public class LeitorMimeEmailTests
     [InlineData("Auto-Submitted: no", false)]
     [InlineData("X-Autoreply: yes", true)]
     [InlineData("Precedence: bulk", true)]
-    [InlineData("Precedence: list", false)]
+    // #1642 (item 4): lista de distribuição entrava na fila humana. A #1433 tinha fixado "list" como gente.
+    [InlineData("Precedence: list", true)]
+    [InlineData("List-Id: <novidades.fornecedor.com>", true)]
+    [InlineData("List-Unsubscribe: <mailto:sair@fornecedor.com>", false)] // transacional legítimo também traz
+    [InlineData("Return-Path: <>", true)]
+    [InlineData("Return-Path: <maria@exemplo.com>", false)]
     public void RespostaAutomatica_PelosCabecalhos(string cabecalho, bool automatica)
     {
         using var mime = Ler($"""
@@ -109,6 +114,45 @@ public class LeitorMimeEmailTests
             """);
 
         LeitorMimeEmail.Ler("1", mime, Agora).AutoGerado.Should().Be(automatica);
+    }
+
+    [Theory]
+    // #1642 (item 4): aviso de não entrega e remetente que não lê resposta não viram conversa.
+    [InlineData("MAILER-DAEMON@mx.exemplo.com", null, true)]
+    [InlineData("postmaster@exemplo.com", null, true)]
+    [InlineData("noreply@loja.com", null, true)]
+    [InlineData("no-reply@loja.com", null, true)]
+    [InlineData("nao-responda@banco.com.br", null, true)]
+    [InlineData("noreply@casadababa.com", "joana@exemplo.com", false)]
+    [InlineData("maria@exemplo.com", null, false)]
+    public void RemetenteAutomatico_PeloEndereco(string de, string? responderPara, bool automatica)
+    {
+        var replyTo = responderPara is null ? string.Empty : $"Reply-To: {responderPara}\n";
+        using var mime = Ler($"From: {de}\n{replyTo}Subject: Aviso\nContent-Type: text/plain\n\nTexto.\n");
+
+        LeitorMimeEmail.Ler("1", mime, Agora).AutoGerado.Should().Be(automatica);
+    }
+
+    [Fact]
+    public void RelatorioDeEntrega_SemAutoSubmitted_EAutomatico()
+    {
+        using var mime = Ler("""
+            From: Mail Delivery System <entregas@mx.exemplo.com>
+            Subject: Undelivered Mail Returned to Sender
+            Content-Type: multipart/report; report-type=delivery-status; boundary="b"
+
+            --b
+            Content-Type: text/plain
+
+            Não foi possível entregar.
+            --b
+            Content-Type: message/delivery-status
+
+            Status: 5.1.1
+            --b--
+            """);
+
+        LeitorMimeEmail.Ler("1", mime, Agora).AutoGerado.Should().BeTrue();
     }
 
     [Fact]

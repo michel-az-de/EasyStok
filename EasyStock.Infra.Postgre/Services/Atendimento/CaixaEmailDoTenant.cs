@@ -33,10 +33,12 @@ public sealed class CaixaEmailDoTenant(EasyStockDbContext dbContext, IIntegratio
             return null;
 
         var contato = contatoEmail.Trim().ToLowerInvariant();
+        // #1642 (item 6): a automática de encerramento sai com a conversa JÁ encerrada; sem a encerrada no filtro
+        // ela perdia o fio. A aberta continua vencendo; sem aberta, vale a mais recente.
         var conversa = await dbContext.Set<Conversa>().AsNoTracking()
-            .Where(c => c.EmpresaId == tenant && c.Canal == CanalConversa.Email
-                        && c.ContatoIdExterno == contato && c.Situacao != SituacaoConversa.Encerrada)
-            .OrderByDescending(c => c.UltimaMensagemEm)
+            .Where(c => c.EmpresaId == tenant && c.Canal == CanalConversa.Email && c.ContatoIdExterno == contato)
+            .OrderBy(c => c.Situacao == SituacaoConversa.Encerrada)
+            .ThenByDescending(c => c.UltimaMensagemEm)
             .Select(c => new { c.Id, c.Assunto })
             .FirstOrDefaultAsync(ct);
         if (conversa is null)
