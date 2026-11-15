@@ -21,7 +21,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         var relativePath = request.BucketPath.Replace('\\', '/').Trim('/');
         var rootPath = Path.GetFullPath(GetRootPath());
         var targetDirectory = Path.GetFullPath(Path.Combine(rootPath, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-        if (!targetDirectory.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        if (!DentroDaRaiz(rootPath, targetDirectory))
             throw new ArgumentException("Caminho de upload invalido.");
         Directory.CreateDirectory(targetDirectory);
 
@@ -40,7 +40,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         var safeKey = storageKey.Replace('/', Path.DirectorySeparatorChar);
         var rootPath = Path.GetFullPath(GetRootPath());
         var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
-        if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        if (!DentroDaRaiz(rootPath, filePath))
             throw new ArgumentException("Caminho de exclusao invalido.");
         if (File.Exists(filePath))
             File.Delete(filePath);
@@ -52,7 +52,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
     {
         var rootPath = Path.GetFullPath(GetRootPath());
         var dirPath = Path.GetFullPath(Path.Combine(rootPath, bucketPath.Replace('/', Path.DirectorySeparatorChar).Trim(Path.DirectorySeparatorChar)));
-        if (!dirPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(dirPath))
+        if (!DentroDaRaiz(rootPath, dirPath) || !Directory.Exists(dirPath))
             return Task.FromResult<IReadOnlyList<StoredFileInfo>>(Array.Empty<StoredFileInfo>());
 
         var files = new DirectoryInfo(dirPath)
@@ -73,7 +73,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         var safeKey = storageKey.Replace('/', Path.DirectorySeparatorChar);
         var rootPath = Path.GetFullPath(GetRootPath());
         var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
-        if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        if (!DentroDaRaiz(rootPath, filePath))
             throw new ArgumentException("Caminho invalido.");
         return File.ReadAllBytesAsync(filePath, cancellationToken);
     }
@@ -90,7 +90,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         var safeKey  = storageKey.Replace('/', Path.DirectorySeparatorChar);
         var rootPath = Path.GetFullPath(GetRootPath());
         var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
-        if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        if (!DentroDaRaiz(rootPath, filePath))
             throw new ArgumentException("Caminho de upload inválido.", nameof(storageKey));
 
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
@@ -106,7 +106,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         var safeKey  = storageKey.Replace('/', Path.DirectorySeparatorChar);
         var rootPath = Path.GetFullPath(GetRootPath());
         var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
-        if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        if (!DentroDaRaiz(rootPath, filePath))
             throw new ArgumentException("Caminho inválido.", nameof(storageKey));
         if (!File.Exists(filePath))
             throw new FileNotFoundException("Artefato não encontrado.", filePath);
@@ -141,9 +141,18 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         var safeKey  = storageKey.Replace('/', Path.DirectorySeparatorChar);
         var rootPath = Path.GetFullPath(GetRootPath());
         var filePath = Path.GetFullPath(Path.Combine(rootPath, safeKey));
-        if (!filePath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        if (!DentroDaRaiz(rootPath, filePath))
             return Task.FromResult(false);
         return Task.FromResult(File.Exists(filePath));
+    }
+
+    // A raiz ou algo abaixo dela. Só StartsWith deixava passar a pasta irmã de mesmo prefixo ("uploads-x") (#2664).
+    private static bool DentroDaRaiz(string rootPath, string caminho)
+    {
+        var raiz = Path.TrimEndingDirectorySeparator(rootPath);
+        var prefixo = Path.EndsInDirectorySeparator(raiz) ? raiz : raiz + Path.DirectorySeparatorChar;
+        return caminho.Equals(raiz, StringComparison.OrdinalIgnoreCase)
+            || caminho.StartsWith(prefixo, StringComparison.OrdinalIgnoreCase);
     }
 
     public string GetRootPath()
