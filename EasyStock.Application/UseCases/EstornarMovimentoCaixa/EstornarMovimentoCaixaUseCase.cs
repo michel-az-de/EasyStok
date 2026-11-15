@@ -29,6 +29,9 @@ public class EstornarMovimentoCaixaUseCase(
 
         if (mov.Origem == PedidoEstornoManual.OrigemCaixa)
             throw new UseCaseValidationException("Esta saída confirma uma devolução ao cliente e não pode ser desfeita pelo Caixa.");
+        // #2687: estornado aqui, a conta seguia paga e Extrato e Visão geral divergiam.
+        if (ReferenciaDeParcela.EhDeParcela(mov.Referencia))
+            throw new UseCaseValidationException("Este lançamento é o pagamento de uma conta. Estorne pela conta, em Contas a pagar ou a receber: o Caixa sai junto.");
 
         // Abertura/fechamento definem a sessao do caixa; estornar quebraria saldo e reabertura.
         if (mov.Tipo is not ("entrada" or "saida"))

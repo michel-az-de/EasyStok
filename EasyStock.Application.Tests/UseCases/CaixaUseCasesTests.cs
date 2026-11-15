@@ -803,6 +803,36 @@ public class CaixaUseCasesTests
         await _uow.DidNotReceive().CommitAsync();
     }
 
+    // #2687 (F2, homologação #1769): o lançamento que nasce do pagamento de uma parcela só sai junto com o
+    // pagamento. Estornado pelo Caixa, a conta seguia paga e Extrato e Visão geral divergiam; estornar pela
+    // conta já desfaz o Caixa (EstornarPagamentoParcelaUseCase).
+    [Theory]
+    [InlineData("cp", "saida")]
+    [InlineData("cr", "entrada")]
+    public async Task EstornarMovimento_recusa_lancamento_de_pagamento_de_parcela(string lado, string tipo)
+    {
+        var empresaId = Guid.NewGuid();
+        var mov = MovimentoCaixa.Criar(empresaId, tipo, 100m);
+        mov.Referencia = ReferenciaDeParcela.DoPagamento(lado, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
+        var useCase = NovoEstornar();
+
+        var act = () => useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id, Motivo: "teste"));
+
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Message.Should().Contain("pela conta");
+        mov.EstornadoEm.Should().BeNull();
+        await _repo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public void Referencia_de_parcela_e_reconhecida_e_a_comum_nao()
+    {
+        ReferenciaDeParcela.EhDeParcela(ReferenciaDeParcela.DoPix("cr", Guid.NewGuid(), Guid.NewGuid(), "txid123")).Should().BeTrue();
+        ReferenciaDeParcela.EhDeParcela("pedido:123").Should().BeFalse();
+        ReferenciaDeParcela.EhDeParcela(null).Should().BeFalse();
+    }
+
     [Fact]
     public async Task EstornarMovimento_DeveSerIdempotente_QuandoJaEstornado()
     {

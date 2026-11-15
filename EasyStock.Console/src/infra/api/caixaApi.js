@@ -46,11 +46,16 @@ export const fechamentoDaApi = (f) => (f ? {
   fechadoEm: f.fechadoEm,
 } : null)
 
+// #2687 (F3): o pagamento de uma conta lança no Caixa com a categoria técnica; a tela mostra como se lê.
+const CATEGORIA_LEGIVEL = { 'contas-a-pagar': 'Conta a pagar', 'contas-a-receber': 'Conta a receber' }
+// Referência montada por `ReferenciaDeParcela` (EasyStock.Domain): cp|cr:{conta}:parcela:{parcela}:...
+const REFERENCIA_DE_PARCELA = /^(cp|cr):[0-9a-f]{32}:parcela:/
+
 const movimentoDaApi = (m) => ({
   id: m.id,
   tipo: m.tipo,
   valor: m.valor,
-  categoria: m.categoria || (m.tipo === 'abertura' ? 'Abertura de caixa' : m.tipo === 'fechamento' ? 'Fechamento' : m.tipo),
+  categoria: CATEGORIA_LEGIVEL[m.categoria] || m.categoria || (m.tipo === 'abertura' ? 'Abertura de caixa' : m.tipo === 'fechamento' ? 'Fechamento' : m.tipo),
   meio: normalizarMetodoCaixa(m.metodo) ?? null,
   descricao: m.descricao ?? '',
   em: m.dataMovimento,
@@ -59,6 +64,8 @@ const movimentoDaApi = (m) => ({
   estornadoPorNome: m.estornadoPorNome ?? null,
   motivoEstorno: m.motivoEstorno ?? null,
   devolucaoPedido: m.origem === 'devolucao_pedido',
+  // #2687 (F2): sai junto com o pagamento, pela conta; estornado no Caixa, a conta seguiria paga.
+  pagamentoDeConta: REFERENCIA_DE_PARCELA.test(m.referencia ?? ''),
 })
 
 // `aberturaPendenteCrossDay`: o caixa de um dia anterior ficou aberto e ainda não fechou (#596).
