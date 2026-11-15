@@ -158,6 +158,14 @@ public class ClientesHttpResilienciaTests
     }
 
     [Fact]
+    public void Categoria_logistics_sem_uso_nao_tem_pipeline_com_retry()
+    {
+        // #2660: "logistics" nascia com retry de 3 tentativas e nenhum cliente a usava. Um adapter de POST não
+        // idempotente (Lalamove /v3/orders) que a pegasse repetiria o pedido.
+        PipelinesDeTeste.Reais().TryGetPipeline("logistics", out _).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Anthropic_com_503_nao_repete_e_com_disjuntor_aberto_nao_chama()
     {
         var fora = FalsoFora();

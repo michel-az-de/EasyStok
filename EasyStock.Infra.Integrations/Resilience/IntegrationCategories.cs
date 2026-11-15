@@ -37,7 +37,6 @@ public static class IntegrationCategories
     /// </summary>
     public const string Anthropic = "anthropic";
 
-    public const string Logistics = "logistics";
     public const string WhatsApp = "whatsapp";
 
     /// <summary>
@@ -60,6 +59,6 @@ public static class IntegrationCategories
 
     public static readonly IReadOnlyCollection<string> All = new[]
     {
-        Logistics, WhatsApp,
+        WhatsApp,
     };
 }
