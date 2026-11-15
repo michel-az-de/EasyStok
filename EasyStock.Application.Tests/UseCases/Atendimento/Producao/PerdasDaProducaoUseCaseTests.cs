@@ -32,11 +32,12 @@ public class PerdasDaProducaoUseCaseTests
             .Do(c => _gravadas.AddRange(c.Arg<IEnumerable<MovimentacaoEstoque>>()));
         _lasanha = new Produto { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Lasanha", Status = StatusProduto.Ativo };
         _produtos.GetByIdAsync(_lasanha.Id).Returns(_lasanha);
+        _produtos.GetByIdAsync(_empresaId, _lasanha.Id).Returns(_lasanha);
     }
 
     private PerdasDaProducaoUseCase Sut() => new(_itens, _movs, new RegistrarSaidaEstoqueUseCase(
         _produtos, _itens, _vendas, _itensVenda, _movs, _uow,
-        Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(), publicadorEventos: Substitute.For<IPublicadorEventos>()), _relogio);
+        Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(), publicadorEventos: Substitute.For<IPublicadorEventos>()), _relogio, _produtos);
 
     private ItemEstoque Lote(decimal saldo, decimal custo, DateTime validade, string codigo)
     {
@@ -68,6 +69,18 @@ public class PerdasDaProducaoUseCaseTests
         _gravadas.Select(m => (m.ItemEstoqueId, m.Quantidade.Value, m.ValorUnitario!.Valor)).Should().Equal((antigo.Id, 1m, 4m), (novo.Id, 1m, 6m));
         _gravadas.Should().OnlyContain(m => m.Natureza == NaturezaMovimentacaoEstoque.Perda && m.Descricao == "Perda · Perda no preparo");
         (antigo.QuantidadeAtual.Value, novo.QuantidadeAtual.Value).Should().Be((0m, 4m));
+    }
+
+    // #1776 (item 5): 0,5 porção de prato era aceita na perda.
+    [Fact]
+    public async Task PerdaDePrato_EmFracaoDePorcao_eRecusadaSemGravar()
+    {
+        Fefo(true, Lote(10, 4m, new DateTime(2026, 10, 15), "LOT-A"));
+
+        var act = () => Sut().LancarAsync(_empresaId, true, new LancarPerdaInput(_lasanha.Id, null, 0.5m, MotivoPerda.PerdaNoPreparo));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*inteiro*");
+        _gravadas.Should().BeEmpty();
     }
 
     [Fact]

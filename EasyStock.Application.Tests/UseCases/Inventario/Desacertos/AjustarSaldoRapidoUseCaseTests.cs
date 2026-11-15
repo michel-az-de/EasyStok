@@ -16,8 +16,9 @@ public class AjustarSaldoRapidoUseCaseTests
     private readonly IMovimentacaoEstoqueRepository _movs = Substitute.For<IMovimentacaoEstoqueRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly IOperacaoEventPublisher _eventos = Substitute.For<IOperacaoEventPublisher>();
+    private readonly IProdutoRepository _produtos = Substitute.For<IProdutoRepository>();
 
-    private AjustarSaldoRapidoUseCase Criar() => new(_itens, _contagens, _movs, _uow, _eventos, TimeProvider.System);
+    private AjustarSaldoRapidoUseCase Criar() => new(_itens, _contagens, _movs, _uow, _eventos, TimeProvider.System, _produtos);
 
     private ItemEstoque Lote(decimal atual, decimal descoberto = 0m, int diasAtras = 1) => new()
     {
@@ -30,6 +31,30 @@ public class AjustarSaldoRapidoUseCaseTests
 
     private AjustarSaldoRapidoInput Input(decimal contada, string motivo = "contei na geladeira") =>
         new(_empresaId, _usuarioId, _produtoId, null, contada, motivo);
+
+    // #1776 (itens 1 e 5): a contagem do prato aceitou 999.999.999 porções e "5.5 porções".
+    [Theory]
+    [InlineData(5.5, "*inteiro*")]
+    [InlineData(10000, "*9.999*")]
+    public async Task ContagemDePrato_ForaDePorcaoInteiraOuAcimaDoTeto_eRecusadaSemGravar(decimal contada, string mensagem)
+    {
+        _produtos.GetByIdAsync(_empresaId, _produtoId).Returns(new Produto { Id = _produtoId, EmpresaId = _empresaId, Nome = "Lasanha", UnidadeMedidaBase = UnidadeMedida.Un });
+        _itens.GetLotesParaAjusteAsync(_empresaId, _produtoId, null, Arg.Any<CancellationToken>()).Returns(new[] { Lote(atual: 8m) });
+
+        var act = () => Criar().ExecuteAsync(Input(contada));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage(mensagem);
+        await _contagens.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
+    [Fact]
+    public async Task ContagemDeInsumoEmKg_AceitaFracao()
+    {
+        _produtos.GetByIdAsync(_empresaId, _produtoId).Returns(new Produto { Id = _produtoId, EmpresaId = _empresaId, Nome = "Queijo", UnidadeMedidaBase = UnidadeMedida.Kg, EhInsumo = true });
+        _itens.GetLotesParaAjusteAsync(_empresaId, _produtoId, null, Arg.Any<CancellationToken>()).Returns(new[] { Lote(atual: 8m) });
+
+        (await Criar().ExecuteAsync(Input(2.5m))).QuantidadeAtual.Should().Be(2.5m);
+    }
 
     [Fact]
     public async Task ZeraDescobertoEGravaAjuste()

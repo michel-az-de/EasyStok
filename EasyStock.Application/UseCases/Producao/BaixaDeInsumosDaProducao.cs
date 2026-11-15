@@ -170,7 +170,7 @@ public sealed class BaixaDeInsumosDaProducao(
     }
 
     // Receita em Un rende porções; em massa/volume, a produção é medida pelo peso produzido.
-    private static (decimal? Fator, string? Erro) FatorDaReceita(PratoParaBaixa p)
+    internal static (decimal? Fator, string? Erro) FatorDaReceita(PratoParaBaixa p)
     {
         var receita = p.Prato;
         if (receita.RendimentoBase <= 0) return (null, "rendimento da receita é zero");

@@ -10,7 +10,10 @@ registerHooks({
     return proximo(url, contexto)
   },
 })
-const { parcelasFinanceiras, diaFinanceiro, extratoFinanceiro, janelasDoPeriodo } = await import('../src/dominio/financeiro.js')
+const { parcelasFinanceiras, diaFinanceiro, extratoFinanceiro, janelasDoPeriodo, mensagemFinanceira } = await import('../src/dominio/financeiro.js')
+// #1776 (item 18): o servidor passou a acentuar a mensagem; a tradução vale para as duas grafias.
+for (const servidor of ['So e possivel atualizar conta em Rascunho.', 'Só é possível atualizar conta em Rascunho.'])
+  assert.equal(mensagemFinanceira(servidor), 'Só dá para editar uma conta em rascunho.', servidor)
 const parcelas = parcelasFinanceiras(10001, 3, '2026-01-31')
 assert.equal(parcelas.reduce((total, item) => total + Math.round(item.valor * 100), 0), 10001)
 assert.deepEqual(parcelas.map((item) => diaFinanceiro(item.dataVencimento)), ['2026-01-31', '2026-02-28', '2026-03-31'])

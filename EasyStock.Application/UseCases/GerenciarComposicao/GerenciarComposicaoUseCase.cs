@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.GerenciarComposicao;
 
@@ -90,6 +91,13 @@ public class GerenciarComposicaoUseCase(
             if (insumo == null || insumo.EmpresaId != command.EmpresaId)
                 throw new UseCaseValidationException("CROSS_TENANT_INSUMO",
                     $"Insumo {linha.InsumoId} nao pertence a esta empresa.");
+
+            // #1776 (item 7): a linha precisa converter para a unidade do insumo. Un com G gravava 204 e a baixa e o
+            // custo da receita não fechavam nunca (grupos diferentes não convertem).
+            var (_, erroDeUnidade) = UnidadeMedidaConverter.Converter(linha.Quantidade, linha.Unidade, insumo.UnidadeMedidaBase);
+            if (erroDeUnidade is not null)
+                throw new UseCaseValidationException("INCOMPATIBLE_UNIT",
+                    $"{insumo.Nome} é medido em {insumo.UnidadeMedidaBase}: na receita, use {insumo.UnidadeMedidaBase} ou uma unidade que converta para ela, não {linha.Unidade}.");
         }
 
         // Carrega estado anterior pra diff

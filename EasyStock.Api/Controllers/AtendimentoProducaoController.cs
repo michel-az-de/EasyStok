@@ -1,3 +1,4 @@
+using EasyStock.Api.Authentication;
 using EasyStock.Application.UseCases.Atendimento.Producao;
 using EasyStock.Application.UseCases.CalcularProducao;
 using EasyStock.Application.UseCases.Common;
@@ -288,8 +289,10 @@ public class AtendimentoProducaoController(
         if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
         try
         {
+            // #1776 (item 9): o lote guarda quem produziu; o null deixava OperadorNome vazio no console.
+            var operador = User.NomeExibicao() is { } nome ? nome[..Math.Min(nome.Length, 120)] : null;
             var r = await produzirPratos.ExecuteAsync(new ProduzirPratosCommand(
-                currentUser.EmpresaId, currentUser.UsuarioId, null, req.Pratos, req.Observacao), ct);
+                currentUser.EmpresaId, currentUser.UsuarioId, operador, req.Pratos, req.Observacao), ct);
             return DataCreated($"/api/lotes/{r.LoteId}", r);
         }
         catch (StorefrontNaoEncontradoException)

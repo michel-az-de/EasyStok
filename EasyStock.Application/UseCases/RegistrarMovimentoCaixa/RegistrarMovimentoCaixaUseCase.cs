@@ -33,6 +33,17 @@ public class RegistrarMovimentoCaixaUseCase(
 
     private static readonly TimeSpan ToleranciaDeRelogio = TimeSpan.FromMinutes(5);
 
+    private const int TamanhoCategoria = 60;
+    private const int TamanhoReferencia = 120;
+
+    private static string? Cortar(string? texto, int max) => texto is { } t && t.Length > max ? t[..max] : texto;
+
+    private static void ExigirTamanho(string? texto, int max, string campo)
+    {
+        if (texto is { } t && t.Length > max)
+            throw new UseCaseValidationException($"{campo} deve ter no máximo {max} caracteres (veio com {t.Length}).");
+    }
+
     public async Task<MovimentoCaixaResult> ExecuteAsync(RegistrarMovimentoCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
@@ -50,6 +61,13 @@ public class RegistrarMovimentoCaixaUseCase(
         var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
         // O mobile envia fato já gravado no aparelho: arredonda em vez de recusar, para a mutação não virar rejeição permanente.
         if (origem == "mobile") cmd = cmd with { Valor = decimal.Round(cmd.Valor, 2, MidpointRounding.AwayFromZero) };
+        // #1776 (item 12): texto maior que a coluna estourava no banco (500). Quem digita recebe 400 claro; o app corta,
+        // como arredonda o valor, para o fato já gravado no aparelho não virar rejeição permanente.
+        cmd = origem == "mobile"
+            ? cmd with { Categoria = Cortar(cmd.Categoria, TamanhoCategoria), Referencia = Cortar(cmd.Referencia, TamanhoReferencia) }
+            : cmd;
+        ExigirTamanho(cmd.Categoria, TamanhoCategoria, "Categoria");
+        ExigirTamanho(cmd.Referencia, TamanhoReferencia, "Referência");
         ValidacaoCaixa.ExigirValorMonetario(cmd.Valor, "Valor");
 
         var dataMov = DataUtc.ParaUtc(cmd.DataMovimento ?? DateTime.UtcNow);

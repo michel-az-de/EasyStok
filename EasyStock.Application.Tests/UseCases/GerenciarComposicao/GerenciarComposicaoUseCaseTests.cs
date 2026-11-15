@@ -62,6 +62,55 @@ public class GerenciarComposicaoUseCaseTests
         ex.Code.Should().Be("INVALID_QUANTITY");
     }
 
+    // #1776 (item 7): a receita aceitava insumo medido em Un com quantidade em G (PUT 204). A baixa e o custo
+    // não convertem grupos diferentes, então a linha virava aviso eterno e custo desconhecido.
+    [Theory]
+    [InlineData(UnidadeMedida.Un, UnidadeMedida.G)]
+    [InlineData(UnidadeMedida.Kg, UnidadeMedida.Ml)]
+    [InlineData(UnidadeMedida.L, UnidadeMedida.Un)]
+    public async Task SubstituirAsync_com_unidade_que_nao_converte_para_a_do_insumo_lanca_INCOMPATIBLE_UNIT(
+        UnidadeMedida unidadeDoInsumo, UnidadeMedida unidadeDaReceita)
+    {
+        var empresaId = Guid.NewGuid();
+        var produto = BuildProduto(empresaId);
+        _produtoRepo.GetByIdParaAtualizarAsync(empresaId, produto.Id).Returns(produto);
+        var insumo = BuildProduto(empresaId, "Ovo");
+        insumo.UnidadeMedidaBase = unidadeDoInsumo;
+        _produtoRepo.GetByIdAsync(empresaId, insumo.Id).Returns(insumo);
+
+        var command = new SubstituirComposicaoCommand(
+            empresaId, produto.Id, null, Guid.NewGuid(),
+            1m, UnidadeMedida.Un, UnidadeMedida.Un,
+            [new ComposicaoLinhaInput(insumo.Id, 50m, unidadeDaReceita, null, 0)],
+            null);
+
+        var ex = await Assert.ThrowsAsync<UseCaseValidationException>(() => Build().SubstituirAsync(command));
+        ex.Code.Should().Be("INCOMPATIBLE_UNIT");
+        ex.Message.Should().Contain("Ovo");
+        await _composicaoRepo.DidNotReceiveWithAnyArgs().InsertAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task SubstituirAsync_com_unidade_do_mesmo_grupo_converte_e_grava()
+    {
+        var empresaId = Guid.NewGuid();
+        var produto = BuildProduto(empresaId);
+        _produtoRepo.GetByIdParaAtualizarAsync(empresaId, produto.Id).Returns(produto);
+        var insumo = BuildProduto(empresaId, "Farinha");
+        insumo.UnidadeMedidaBase = UnidadeMedida.Kg;
+        _produtoRepo.GetByIdAsync(empresaId, insumo.Id).Returns(insumo);
+        _composicaoRepo.GetByProdutoFinalAsync(empresaId, produto.Id, null, Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<ProdutoComposicao>());
+
+        await Build().SubstituirAsync(new SubstituirComposicaoCommand(
+            empresaId, produto.Id, null, Guid.NewGuid(),
+            1m, UnidadeMedida.Un, UnidadeMedida.Un,
+            [new ComposicaoLinhaInput(insumo.Id, 300m, UnidadeMedida.G, null, 0)],
+            null));
+
+        await _composicaoRepo.Received(1).InsertAsync(Arg.Is<ProdutoComposicao>(c => c.Unidade == UnidadeMedida.G), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task SubstituirAsync_com_produto_como_proprio_insumo_lanca_CYCLE_DETECTED()
     {
@@ -90,6 +139,7 @@ public class GerenciarComposicaoUseCaseTests
         var insumoId = Guid.NewGuid();
         var insumo = BuildProduto(empresaId, "Farinha");
         insumo.Id = insumoId;
+        insumo.UnidadeMedidaBase = UnidadeMedida.Kg; // #1776 (item 7): a linha em Kg precisa de insumo de massa.
         _produtoRepo.GetByIdAsync(empresaId, insumoId).Returns(insumo);
 
         var uc = Build();

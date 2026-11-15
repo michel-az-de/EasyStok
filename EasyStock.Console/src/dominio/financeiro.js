@@ -160,7 +160,7 @@ export const motivoDaNovaCategoria = (nome) => (String(nome ?? '').trim() ? null
 // Mensagem técnica do servidor (Npgsql, exceção, stack) nunca vai crua para a tela (F4).
 const TECNICA = /Cannot write|Kind=|Npgsql|Exception|System\.|PostgreSQL|SQLSTATE|stack trace|\bat [A-Z][\w.]+\(|Object reference/i
 const TRADUCOES = [
-  [/^So e possivel atualizar conta em Rascunho\.?$/i, 'Só dá para editar uma conta em rascunho.'],
+  [/^S[oó] [eé] poss[ií]vel atualizar conta em Rascunho\.?$/i, 'Só dá para editar uma conta em rascunho.'],
   [/^Conta a (pagar|receber) nao encontrada\.?$/i, 'Esta conta não foi encontrada. Atualize a lista.'],
 ]
 export function mensagemFinanceira(texto) {

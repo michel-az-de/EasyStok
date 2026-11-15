@@ -30,7 +30,7 @@ public class AtualizarCategoriaFinanceiraUseCase(
 
         if (!string.Equals(categoria.Nome, cmd.Nome.Trim(), StringComparison.OrdinalIgnoreCase) &&
             await repo.ExisteNomeAsync(cmd.EmpresaId, cmd.Nome, categoria.ParentId, excludeId: cmd.Id, ct))
-            throw new UseCaseValidationException("Ja existe categoria ativa com este nome no mesmo nivel.");
+            throw new UseCaseValidationException("Já existe categoria ativa com este nome no mesmo nível.");
 
         try
         {

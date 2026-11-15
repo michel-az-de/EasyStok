@@ -32,7 +32,7 @@ public class AtualizarContaPagarUseCase(
         if (conta is null) return null;
 
         if (conta.Status != StatusContaFinanceira.Rascunho)
-            throw new UseCaseValidationException("So e possivel atualizar conta em Rascunho.");
+            throw new UseCaseValidationException("Só é possível atualizar conta em Rascunho.");
 
         if (!string.IsNullOrWhiteSpace(cmd.Descricao)) conta.Descricao = cmd.Descricao.Trim();
         if (cmd.Observacoes is not null) conta.Observacoes = string.IsNullOrWhiteSpace(cmd.Observacoes) ? null : cmd.Observacoes.Trim();
