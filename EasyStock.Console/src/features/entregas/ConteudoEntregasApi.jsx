@@ -328,8 +328,17 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
   )
 }
 
+// #2658: cada chamado se nomeia pelo pedido (o começo do texto basta para distinguir os cartões).
+const resumoDoChamado = (c) => { const t = c.texto ?? ''; return t.length > 60 ? t.slice(0, 59).trimEnd() + '…' : t }
+
+// #2658: o aviso aponta para a lista abaixo; sem chamado aberto não há lista, e o aviso sai.
+export function AvisoDoChamado({ texto, abertos }) {
+  if (!texto || abertos === 0) return null
+  return <output className={`${css.apoio} ${css.bloco}`}>{texto}</output>
+}
+
 // #2418: "Chamar entregador" é um cartão próprio; os chamados abertos vêm abaixo, um cartão por chamado.
-function Chamados({ chamados, ocupado, acoes }) {
+export function Chamados({ chamados, ocupado, acoes }) {
   const [texto, setTexto] = useState('')
   const [confirmacao, setConfirmacao] = useState(null)
   const abrir = (e) => {
@@ -348,7 +357,7 @@ function Chamados({ chamados, ocupado, acoes }) {
             rows={2} disabled={ocupado} placeholder="Ex.: buscar um pedido ou realizar uma entrega" />
           <Botao tipo="submit" variante="primario" icone="enviar" disabled={ocupado || !texto.trim()}>Chamar entregador</Botao>
         </form>
-        {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
+        <AvisoDoChamado texto={confirmacao} abertos={chamados.length} />
       </section>
       {chamados.length > 0 && (
         <section className={css.secao} aria-label="Chamados de entregador">
@@ -364,8 +373,10 @@ function Chamados({ chamados, ocupado, acoes }) {
                   <Pilula tom="aviso" className={css.selo}>Em aberto</Pilula>
                 </div>
                 <div className={css.acoesCartao}>
-                  <Botao variante="texto" className={css.acaoPerigo} disabled={ocupado} onClick={() => acoes.cancelarChamado(c.id)}>Cancelar chamado</Botao>
-                  <Botao variante="secundario" icone="check" disabled={ocupado} onClick={() => acoes.atenderChamado(c.id)}>Concluir chamado</Botao>
+                  <Botao variante="texto" className={css.acaoPerigo} disabled={ocupado} aria-label={`Cancelar chamado: ${resumoDoChamado(c)}`}
+                    onClick={() => acoes.cancelarChamado(c.id)}>Cancelar chamado</Botao>
+                  <Botao variante="secundario" icone="check" disabled={ocupado} aria-label={`Concluir chamado: ${resumoDoChamado(c)}`}
+                    onClick={() => acoes.atenderChamado(c.id)}>Concluir chamado</Botao>
                 </div>
               </li>
             ))}

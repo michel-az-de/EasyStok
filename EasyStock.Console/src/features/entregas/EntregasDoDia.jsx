@@ -53,22 +53,28 @@ function EscolhaDoDia({ dia, mudarDia }) {
   )
 }
 
+// #2658: com dois pedidos na mesma janela, os botões de cada cartão dizem de quem é a entrega.
+const quemRecebe = (pedido) => pedido.cliente || pedido.identificacao?.principal || pedido.numero
+
 // #2096: o cliente confirmou a encomenda? Selo quando sim; botão enquanto ela ainda vai acontecer.
 function ConfirmacaoDoCliente({ pedido, agora, ocupado, acoes }) {
   const situacao = confirmacaoDoCliente(pedido, agora)
+  const quem = quemRecebe(pedido)
   if (situacao === 'confirmada') return (
     <div className={css.linha}>
       <Pilula tom="ok">Cliente confirmou</Pilula>
-      <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desfazerConfirmacaoDoCliente(pedido.id)}>Desfazer confirmação</Botao>
+      <Botao variante="texto" disabled={ocupado} aria-label={`Desfazer confirmação da entrega de ${quem}`}
+        onClick={() => acoes.desfazerConfirmacaoDoCliente(pedido.id)}>Desfazer confirmação</Botao>
     </div>
   )
   if (situacao === 'pendente') return (
-    <Botao variante="secundario" icone="check" disabled={ocupado} onClick={() => acoes.confirmarPeloCliente(pedido.id)}>Cliente confirmou</Botao>
+    <Botao variante="secundario" icone="check" disabled={ocupado} aria-label={`Cliente confirmou a entrega de ${quem}`}
+      onClick={() => acoes.confirmarPeloCliente(pedido.id)}>Cliente confirmou</Botao>
   )
   return null
 }
 
-function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
+export function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
   const detalhes = [
     situacaoDoPagamento(pedido),
     pedido.entregador ? `Leva ${textoDeQuemLeva(pedido.entregador)}` : null,
@@ -85,7 +91,8 @@ function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, ao
       <p className={css.apoio}>{detalhes}</p>
       <ConfirmacaoDoCliente pedido={pedido} agora={agora} ocupado={ocupado} acoes={acoes} />
       {!['entregue', 'cancelado'].includes(pedido.status) && (
-        <Botao variante="texto" disabled={ocupado} onClick={() => aoReagendar(pedido)}>Alterar agendamento</Botao>
+        <Botao variante="texto" disabled={ocupado} aria-label={`Alterar agendamento da entrega de ${quemRecebe(pedido)}`}
+          onClick={() => aoReagendar(pedido)}>Alterar agendamento</Botao>
       )}
       {pedido.podePorNaViagem && (
         <div className={css.linha}>
@@ -94,7 +101,8 @@ function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, ao
             <Botao variante="texto" onClick={aoVerViagens}>Ver viagens</Botao>
           </>}
           {montando.map((v, i) => (
-            <Botao key={v.id} variante="texto" disabled={ocupado} onClick={() => acoes.incluirParada(v.id, pedido.id)}>
+            <Botao key={v.id} variante="texto" disabled={ocupado} aria-label={`Pôr na viagem ${i + 1} a entrega de ${quemRecebe(pedido)}`}
+              onClick={() => acoes.incluirParada(v.id, pedido.id)}>
               Pôr na viagem {i + 1}
             </Botao>
           ))}
