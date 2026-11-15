@@ -22,7 +22,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .OrderByDescending(v => v.CriadoEm)
                 .ToListAsync();
 
-        public Task<bool> ExistsSkuAsync(Guid empresaId, string sku, Guid? ignoreVariacaoId = null)
+        public Task<bool> ExistsSkuAsync(Guid empresaId, string sku, Guid? ignoreVariacaoId = null, Guid? ignoreProdutoId = null)
         {
             var skuObj = CodigoSku.From(sku.Trim());
 
@@ -30,6 +30,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .AsNoTracking()
                 .Where(v => v.EmpresaId == empresaId && v.Sku == skuObj)
                 .Where(v => !ignoreVariacaoId.HasValue || v.Id != ignoreVariacaoId.Value)
+                .Where(v => !ignoreProdutoId.HasValue || v.ProdutoId != ignoreProdutoId.Value)
                 .AnyAsync();
         }
 

@@ -33,7 +33,8 @@ await contexto.route('**/api/**', async route => {
   assert.ok(path.startsWith('/api/clientes'), path)
   const id = path.split('/')[3]
   if (req.method() === 'GET') {
-    if (!id) assert.equal(url.searchParams.get('pageSize'), '20', 'A lista pede a página da constante do domínio')
+    // A busca de duplicado (#2495, S5) não pagina: a checagem vale para a lista, que leva page.
+    if (!id && url.searchParams.has('page')) assert.equal(url.searchParams.get('pageSize'), '20', 'A lista pede a página da constante do domínio')
     return route.fulfill({ json: { data: id ? { cliente: pessoas.get(id), alteracoes: [] } : [...pessoas.values()], meta: { total: pessoas.size } } })
   }
   assert.equal(req.method(), 'PATCH')

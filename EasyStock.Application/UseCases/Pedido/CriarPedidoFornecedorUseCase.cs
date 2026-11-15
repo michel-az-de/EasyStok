@@ -25,6 +25,12 @@ public class CriarPedidoFornecedorUseCase(
         var fornecedor = await fornecedorRepository.GetByIdAsync(command.EmpresaId, command.FornecedorId)
             ?? throw new UseCaseValidationException("Fornecedor não pertence a esta empresa.");
 
+        if (!fornecedor.Ativo)
+            throw new UseCaseValidationException(
+                "SUPPLIER_INACTIVE",
+                $"Fornecedor {fornecedor.Nome} esta inativo.",
+                new { fornecedorId = fornecedor.Id, fornecedorNome = fornecedor.Nome });
+
         var pedido = new PedidoFornecedor
         {
             Id = Guid.NewGuid(),

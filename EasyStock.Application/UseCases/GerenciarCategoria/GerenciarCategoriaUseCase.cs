@@ -31,6 +31,8 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
         ICategoriaRepository categoriaRepository,
         IUnitOfWork unitOfWork)
     {
+        private const int ProfundidadeMaximaHierarquia = 50;
+
         public async Task<CategoriaResult> CriarAsync(CriarCategoriaCommand command)
         {
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
@@ -92,6 +94,7 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
                 var pai = await categoriaRepository.GetByIdAsync(command.EmpresaId, command.CategoriaPaiId.Value);
                 if (pai == null)
                     throw new UseCaseValidationException("Categoria pai nao encontrada ou nao pertence a esta empresa.");
+                await EnsureSemCicloAsync(command.EmpresaId, command.Id, pai);
             }
 
             categoria.Nome = nomeTrim;
@@ -148,6 +151,27 @@ namespace EasyStock.Application.UseCases.GerenciarCategoria
             if (categoria == null)
                 return null;
             return ToResult(categoria);
+        }
+
+        /// <summary>
+        /// Sobe a cadeia de pais a partir de <paramref name="pai"/>. Se encontrar <paramref name="id"/>,
+        /// a troca de pai fecharia um ciclo e a categoria sumiria da listagem de raizes.
+        /// </summary>
+        private async Task EnsureSemCicloAsync(Guid empresaId, Guid id, Categoria pai)
+        {
+            var ancestral = pai;
+            for (var nivel = 0; nivel < ProfundidadeMaximaHierarquia; nivel++)
+            {
+                if (ancestral.Id == id)
+                    throw new UseCaseValidationException("Essa categoria pai criaria um ciclo na hierarquia.");
+                if (ancestral.CategoriaPaiId is not Guid paiId)
+                    return;
+                var proximo = await categoriaRepository.GetByIdAsync(empresaId, paiId);
+                if (proximo == null)
+                    return;
+                ancestral = proximo;
+            }
+            throw new UseCaseValidationException("Hierarquia de categorias excede o limite permitido.");
         }
 
         /// <summary>

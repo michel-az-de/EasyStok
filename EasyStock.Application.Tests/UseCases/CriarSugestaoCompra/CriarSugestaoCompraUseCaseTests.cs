@@ -9,9 +9,17 @@ public class CriarSugestaoCompraUseCaseTests
 {
     private readonly IPedidoFornecedorRepository _pedidoRepo = Substitute.For<IPedidoFornecedorRepository>();
     private readonly IFornecedorRepository _fornecedorRepo = Substitute.For<IFornecedorRepository>();
+    private readonly IProdutoRepository _produtoRepo = Substitute.For<IProdutoRepository>();
     private readonly IPublicadorEventoIntegracao _publicador = Substitute.For<IPublicadorEventoIntegracao>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ILogger<CriarSugestaoCompraUseCase> _logger = Substitute.For<ILogger<CriarSugestaoCompraUseCase>>();
+
+    public CriarSugestaoCompraUseCaseTests()
+    {
+        // Por padrao o insumo existe na empresa do request; o teste cross-tenant sobrescreve com null.
+        _produtoRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>())
+            .Returns(ci => new Produto { Id = ci.ArgAt<Guid>(1), EmpresaId = ci.ArgAt<Guid>(0), Nome = "Insumo" });
+    }
 
     private CriarSugestaoCompraUseCase Build()
     {
@@ -21,7 +29,7 @@ public class CriarSugestaoCompraUseCaseTests
                 var action = callInfo.Arg<Func<CancellationToken, Task>>();
                 return action(CancellationToken.None);
             });
-        return new CriarSugestaoCompraUseCase(_pedidoRepo, _fornecedorRepo, _publicador, _uow, _logger);
+        return new CriarSugestaoCompraUseCase(_pedidoRepo, _fornecedorRepo, _produtoRepo, _publicador, _uow, _logger);
     }
 
     private CriarSugestaoCompraCommand BuildCommand(Guid empresaId, Guid fornecedorId, string idempotencyKey = "test-key")
@@ -129,5 +137,21 @@ public class CriarSugestaoCompraUseCaseTests
             "lista-compras", null, "chave-arredonda"));
 
         result.PedidosCriados.Single().ValorEstimado.Should().Be(3.66m);
+    }
+
+    [Fact]
+    public async Task Insumo_de_outra_empresa_ou_inexistente_lanca_CROSS_TENANT_INSUMO_e_nada_e_criado()
+    {
+        var empresaId = Guid.NewGuid();
+        var fornecedor = Fornecedor.Criar(empresaId, "Moinho");
+        _fornecedorRepo.GetByIdAsync(empresaId, fornecedor.Id).Returns(fornecedor);
+        _produtoRepo.GetByIdAsync(empresaId, Arg.Any<Guid>()).Returns((Produto?)null);
+
+        var ex = await Assert.ThrowsAsync<UseCaseValidationException>(
+            () => Build().ExecuteAsync(BuildCommand(empresaId, fornecedor.Id)));
+
+        ex.Code.Should().Be("CROSS_TENANT_INSUMO");
+        await _pedidoRepo.DidNotReceive().AddAsync(Arg.Any<PedidoFornecedor>());
+        await _pedidoRepo.DidNotReceive().AddItemAsync(Arg.Any<PedidoFornecedorItem>());
     }
 }
