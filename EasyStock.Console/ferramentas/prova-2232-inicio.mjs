@@ -64,7 +64,8 @@ const topo = (pagina) => pagina.slice(pagina.indexOf('<header'), pagina.indexOf(
 const rodape = (pagina) => pagina.slice(pagina.indexOf('class="rodapeHall"'))
 
 const caixa = (dados) => ({ estado: 'ok', em: 1, dados })
-const pulso = (fontes) => renderToStaticMarkup(h(PulsoDoHall, { ids: ['atendimento', 'cozinha', 'entregas', 'financeiro'], foco: 'Cliente primeiro', fontes, aoMover: () => {} }))
+// #2677 (H3): a ação "Fechar caixa" só vem para quem pode fechar; aqui é a gerência.
+const pulso = (fontes) => renderToStaticMarkup(h(PulsoDoHall, { ids: ['atendimento', 'cozinha', 'entregas', 'financeiro'], foco: 'Cliente primeiro', fontes, podeFecharCaixa: true, aoMover: () => {} }))
 
 let passou = 0
 const falhas = []
@@ -146,7 +147,7 @@ confere('H6  KPIs em grade 2×2 e o alerta do caixa vira estado do cartão com a
   assert.doesNotMatch(normal, /Fechar caixa|data-severidade/)
   const item = (extra) => ({ id: 'financeiro', estado: 'ok', alerta: null, ...extra })
   assert.equal(estado.severidadeDoIndicador(item({ alerta: 'Caixa de outro dia' })), 'alerta')
-  assert.equal(estado.acaoDoIndicador(item({ alerta: 'Caixa de outro dia' })), 'Fechar caixa')
+  assert.equal(estado.acaoDoIndicador(item({ alerta: 'Caixa de outro dia' }), { podeFecharCaixa: true }), 'Fechar caixa')
   assert.equal(estado.acaoDoIndicador(item({})), null)
   assert.equal(estado.acaoDoIndicador({ id: 'cozinha', estado: 'ok', alerta: 'x' }), null)
   assert.equal(estado.severidadeDoIndicador(item({})), null)
