@@ -63,6 +63,15 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public static string NormalizarEmail(string email) => email.Trim().ToLowerInvariant();
 
+        /// <summary>
+        /// #2695: domínio das contas internas (o sync móvel grava com <c>mobile-sync+&lt;empresa&gt;@system.local</c>).
+        /// Não são pessoas da equipe: ficam fora da lista de usuários e da vaga do plano, e não se reativam nem desativam.
+        /// </summary>
+        public const string DominioDeSistema = "@system.local";
+
+        /// <summary>#2695: o e-mail gravado já é normalizado (<see cref="NormalizarEmail"/>), então o sufixo basta.</summary>
+        public bool EhContaDeSistema => Email.EndsWith(DominioDeSistema, StringComparison.Ordinal);
+
         public static Usuario Criar(string nome, string email, string senhaHash)
         {
             var agora = DateTime.UtcNow;

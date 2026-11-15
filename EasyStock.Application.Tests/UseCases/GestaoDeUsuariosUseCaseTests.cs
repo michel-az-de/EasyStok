@@ -151,6 +151,42 @@ public class GestaoDeUsuariosUseCaseTests
         _c.UnitOfWork.CommitCount.Should().Be(0);
     }
 
+    // #2695: a conta interna do sync móvel nasce com Ativo = false e o vínculo ativo (MobileSystemUserResolver).
+    private Usuario ContaDoSyncMovel()
+    {
+        var conta = Usuario.Criar("Sistema Mobile Sync", $"mobile-sync+{_empresaId:N}@system.local", "DISABLED_NO_LOGIN");
+        conta.Ativo = false;
+        var vinculo = new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = conta.Id, EmpresaId = _empresaId, Ativo = true };
+        conta.Empresas.Add(vinculo);
+        _c.Usuarios.GetByIdAsync(conta.Id).Returns(conta);
+        _vinculos.GetByUsuarioEEmpresaAsync(conta.Id, _empresaId).Returns(vinculo);
+        return conta;
+    }
+
+    [Fact]
+    public async Task ReativarContaDeSistemaRecusaEmVezDeFingirQueReativou()
+    {
+        var conta = ContaDoSyncMovel();
+
+        var acao = () => Reativar().ExecuteAsync(new ReativarUsuarioCommand(conta.Id, _empresaId));
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("CONTA_DE_SISTEMA");
+        _c.Auditorias.Should().BeEmpty();
+        _c.UnitOfWork.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DesativarContaDeSistemaRecusaENaoDesligaOSyncMovel()
+    {
+        var conta = ContaDoSyncMovel();
+
+        var acao = () => Desativar().ExecuteAsync(new DesativarUsuarioCommand(conta.Id, _empresaId));
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("CONTA_DE_SISTEMA");
+        conta.Empresas.Single().Ativo.Should().BeTrue("o sync móvel grava com este vínculo");
+        _c.Auditorias.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task ReativarUsuarioDeOutraEmpresaNaoAchaNada()
     {

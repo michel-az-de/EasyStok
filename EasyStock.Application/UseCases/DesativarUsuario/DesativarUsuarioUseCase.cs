@@ -26,6 +26,8 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
 
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
+            // #2695: desligar o vínculo da conta interna pararia o sync móvel.
+            ContaDeSistema.Recusar(usuario);
 
             // #1753: só administrador chega aqui, então barrar a própria desativação garante que sempre sobra
             // um administrador ativo na empresa. O suporte (SuperAdmin) não tem vínculo a perder.

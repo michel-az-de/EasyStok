@@ -192,4 +192,12 @@ public class UsuarioConviteTests
     [InlineData("admin@casadababa.demo", "admin@casadababa.demo")]
     public void NormalizarEmailAplicaTrimEMinusculas(string informado, string esperado) =>
         Usuario.NormalizarEmail(informado).Should().Be(esperado);
+
+    // #2695: a conta interna do sync móvel não é pessoa da equipe.
+    [Theory]
+    [InlineData("mobile-sync+f2cf358448154883a0849aa56deebcbd@system.local", true)]
+    [InlineData("ana@casadababa.com", false)]
+    [InlineData("system.local@casadababa.com", false)]
+    public void ContaDeSistemaSeReconhecePeloDominioInterno(string email, bool esperado) =>
+        Usuario.Criar("Qualquer", email, "hash").EhContaDeSistema.Should().Be(esperado);
 }

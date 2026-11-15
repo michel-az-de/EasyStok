@@ -24,7 +24,7 @@ public class MobileSystemUserResolver(EasyStockDbContext db)
     {
         // Email escopado por empresa pra evitar conflito entre tenants.
         // Formato: mobile-sync+<empresaId-N>@system.local
-        var email = $"mobile-sync+{empresaId:N}@system.local";
+        var email = $"mobile-sync+{empresaId:N}{Usuario.DominioDeSistema}";
 
         // IgnoreQueryFilters: Usuario nao tem EmpresaId direto (m:n via UsuarioEmpresa),
         // mas defensive — outros filters podem mexer.
