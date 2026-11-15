@@ -26,7 +26,7 @@ jobs:
   pg-dump:
     name: pg_dump + sync R2
     runs-on: [self-hosted, easystok]
-    timeout-minutes: 30
+    timeout-minutes: 60
     if: ${{ vars.BACKUP_ENABLED == 'true' }}
     steps:
       - name: Checkout

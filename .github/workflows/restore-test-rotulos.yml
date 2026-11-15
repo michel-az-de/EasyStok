@@ -29,7 +29,7 @@ jobs:
   restore-and-validate:
     name: Restore + validar
     runs-on: [self-hosted, easystok]
-    timeout-minutes: 30
+    timeout-minutes: 60
     if: ${{ vars.BACKUP_ENABLED == 'true' }}
 
     steps:
