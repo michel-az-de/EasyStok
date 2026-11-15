@@ -91,7 +91,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(u => u.Empresas!.Where(e => e.EmpresaId == empresaId))
                 .Include(u => u.Perfis!.Where(p => p.EmpresaId == empresaId))
                     .ThenInclude(up => up.Perfil)
-                .Where(u => u.Empresas!.Any(ue => ue.EmpresaId == empresaId));
+                .Where(u => u.Empresas!.Any(ue => ue.EmpresaId == empresaId))
+                // #2695: a conta interna do sync móvel não é pessoa da equipe.
+                .Where(Usuario.NaoEhContaDeSistema);
 
             var total = await query.CountAsync();
             var usuarios = await query
@@ -104,7 +106,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         public async Task<int> CountByEmpresaAsync(Guid empresaId) =>
-            await dbContext.UsuariosEmpresas.CountAsync(ue => ue.EmpresaId == empresaId && ue.Ativo);
+            // #2695: a conta interna do sync móvel não ocupa vaga do plano.
+            await dbContext.UsuariosEmpresas
+                .Where(ue => ue.EmpresaId == empresaId && ue.Ativo)
+                .Select(ue => ue.Usuario!)
+                .Where(Usuario.NaoEhContaDeSistema)
+                .CountAsync();
 
         public Task AddAsync(Usuario usuario) =>
             dbContext.Usuarios.AddAsync(usuario).AsTask();

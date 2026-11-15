@@ -85,4 +85,17 @@ public class CriarTenantPorAdminUseCaseTests
         resultado.EmailEnviado.Should().BeFalse();
         await _emailService.DidNotReceive().EnviarAsync(Arg.Any<MensagemEmail>(), Arg.Any<CancellationToken>());
     }
+
+    // #2695: o domínio das contas internas é reservado também para o responsável de uma empresa nova.
+    [Fact]
+    public async Task EmailDoDominioReservadoRecusaAntesDeCriarAEmpresa()
+    {
+        var comando = new CriarTenantPorAdminCommand("Padaria da Maria", null, "Maria Souza", "maria@system.local", true);
+
+        var act = () => CriarUseCase().ExecuteAsync(comando);
+
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("EMAIL_RESERVADO");
+        await _empresaRepository.DidNotReceive().AddAsync(Arg.Any<Empresa>());
+        await _usuarioRepository.DidNotReceive().AddAsync(Arg.Any<Usuario>());
+    }
 }

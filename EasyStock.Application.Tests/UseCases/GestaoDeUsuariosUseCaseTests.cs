@@ -151,6 +151,54 @@ public class GestaoDeUsuariosUseCaseTests
         _c.UnitOfWork.CommitCount.Should().Be(0);
     }
 
+    // #2695: a conta interna do sync móvel nasce com Ativo = false e o vínculo ativo (MobileSystemUserResolver).
+    private Usuario ContaDoSyncMovel()
+    {
+        var conta = Usuario.CriarContaDeSistema(_empresaId);
+        var vinculo = new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = conta.Id, EmpresaId = _empresaId, Ativo = true };
+        conta.Empresas.Add(vinculo);
+        _c.Usuarios.GetByIdAsync(conta.Id).Returns(conta);
+        _vinculos.GetByUsuarioEEmpresaAsync(conta.Id, _empresaId).Returns(vinculo);
+        return conta;
+    }
+
+    [Fact]
+    public async Task ReativarContaDeSistemaRecusaEmVezDeFingirQueReativou()
+    {
+        var conta = ContaDoSyncMovel();
+
+        var acao = () => Reativar().ExecuteAsync(new ReativarUsuarioCommand(conta.Id, _empresaId));
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("CONTA_DE_SISTEMA");
+        _c.Auditorias.Should().BeEmpty();
+        _c.UnitOfWork.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DesativarContaDeSistemaRecusaENaoDesligaOSyncMovel()
+    {
+        var conta = ContaDoSyncMovel();
+
+        var acao = () => Desativar().ExecuteAsync(new DesativarUsuarioCommand(conta.Id, _empresaId));
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("CONTA_DE_SISTEMA");
+        conta.Empresas.Single().Ativo.Should().BeTrue("o sync móvel grava com este vínculo");
+        _c.Auditorias.Should().BeEmpty();
+    }
+
+    // #2695 (devolução da #2696): pessoa gravada com o domínio antes da guarda segue desativável.
+    [Fact]
+    public async Task PessoaComODominioReservadoSegueDesativavel()
+    {
+        var fulano = Atendente();
+        fulano.Email = "fulano@system.local";
+
+        await Desativar().ExecuteAsync(new DesativarUsuarioCommand(fulano.Id, _empresaId));
+
+        fulano.Empresas.Single().Ativo.Should().BeFalse();
+        _c.Auditorias.Should().ContainSingle(a => a.Acao == "usuario-desativado");
+    }
+
     [Fact]
     public async Task ReativarUsuarioDeOutraEmpresaNaoAchaNada()
     {

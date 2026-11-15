@@ -137,6 +137,17 @@ public class AtualizarUsuarioAtualUseCaseTests
         _ana.EmailPendente.Should().BeNull();
     }
 
+    // #2695: o domínio das contas internas é reservado; a própria pessoa também não troca para ele.
+    [Fact]
+    public async Task EmailDoDominioReservadoRecusa()
+    {
+        var acao = () => Criar().ExecuteAsync(Troca("ana@System.Local"));
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("EMAIL_RESERVADO");
+        _ana.EmailPendente.Should().BeNull();
+        _f.Eventos.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task NovoPedidoInvalidaOsTokensAnteriores()
     {

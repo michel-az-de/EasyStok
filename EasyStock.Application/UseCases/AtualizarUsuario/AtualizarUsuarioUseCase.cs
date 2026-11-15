@@ -81,7 +81,7 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
         /// </summary>
         private async Task TrocarEmailDeConvidadoAsync(Usuario usuario, string novoEmail)
         {
-            EmailValidator.EnsureValid(novoEmail);
+            EmailValidator.EnsureValidDeUsuario(novoEmail);
             var existente = await usuarioRepository.GetByEmailAsync(novoEmail);
             if (existente is not null && existente.Id != usuario.Id)
                 throw new UseCaseValidationException("Email ja cadastrado.");
@@ -90,10 +90,7 @@ namespace EasyStock.Application.UseCases.AtualizarUsuario
             var empresaId = await trocaDeContato.ResolverEmpresaDoEventoAsync();
             convites.ExigirBaseDeLink();
 
-            usuario.Email = Usuario.NormalizarEmail(novoEmail);
-            usuario.EmailConfirmado = false;
-            usuario.EmailPendente = null;
-            usuario.AlteradoEm = DateTime.UtcNow;
+            usuario.TrocarEmailDoConvidado(novoEmail);
 
             var comWhatsApp = await convites.ElegivelAoWhatsAppAsync(usuario);
             await convites.EmitirAsync(usuario, empresaId, comWhatsApp, currentUser.Ip, currentUser.UserAgent);

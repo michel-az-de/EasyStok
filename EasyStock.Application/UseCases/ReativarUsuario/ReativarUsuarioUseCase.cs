@@ -20,6 +20,8 @@ namespace EasyStock.Application.UseCases.ReativarUsuario
 
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
+            // #2695: antes respondia 204 sem efeito (o bloqueio da conta interna é do cadastro, não do vínculo).
+            ContaDeSistema.Recusar(usuario);
             // Mesma mensagem do não encontrado: não confirma a existência de usuário de outra empresa.
             var linkEmpresa = await usuarioEmpresaRepository.GetByUsuarioEEmpresaAsync(command.UsuarioId, command.EmpresaId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
