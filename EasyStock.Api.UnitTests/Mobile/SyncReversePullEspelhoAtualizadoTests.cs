@@ -220,12 +220,13 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         await _servico.AppendAsync(primeiroPull, criadoEm.AddSeconds(-1), _empresaId, loja);
         primeiroPull.Should().ContainSingle().Which.Payload.GetProperty("stock").GetInt32().Should().Be(7);
 
-        // Depois do cursor, o cadastro ERP mudou e ha saldo real da loja e global.
+        // Depois do cursor, o cadastro ERP mudou e ha saldo real da loja e global, movido no mesmo
+        // instante (#2721: movimento posterior ao cursorFinal reenviaria o produto, com razao).
         produto.Nome = "Produto atualizado no ERP";
         produto.AlteradoEm = alteradoEm;
-        ItemEstoqueDoErp(produto.Id, loja, 4m);
-        ItemEstoqueDoErp(produto.Id, null, 2m);
-        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m);
+        ItemEstoqueDoErp(produto.Id, loja, 4m, alteradoEm);
+        ItemEstoqueDoErp(produto.Id, null, 2m, alteradoEm);
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m, alteradoEm);
         await _db.SaveChangesAsync();
         var incremental = new List<MutationDto>();
         await _servico.AppendAsync(incremental, cursorInicial, _empresaId, loja);
