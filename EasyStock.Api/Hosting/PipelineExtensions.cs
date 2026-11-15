@@ -454,6 +454,8 @@ public static class PipelineExtensions
         .Add("/api/atendimento/producao")
         .Add("/api/atendimento/mensagens-programadas")
         .Add("/api/atendimento/lembretes")
+        // #2401 (C3.5): "Nova viagem" repetida depois de uma resposta perdida criava outra viagem.
+        .Add("/api/atendimento/viagens")
         // #1786: envio de texto, foto e áudio pelo console. Resposta perdida e o mesmo envio de novo mandavam duas
         // mensagens ao cliente. O id da conversa fica no meio do path; as outras ações da conversa sem header seguem como sempre.
         .Add("/api/atendimento/conversas")
