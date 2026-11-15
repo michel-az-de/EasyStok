@@ -4,4 +4,11 @@
   width: var(--toque); height: var(--toque); padding: 0; gap: 0;
   border-radius: var(--r-pilula); flex-shrink: 0;
 }
-.botaoIcone[aria-pressed='true'] { background: var(--preenchimento-forte); color: var(--tinta); }
+/* #2621: o ligado segue ligado sob o ponteiro. Sem o `:hover` aqui, o hover da variante `texto`
+   (mais específico) trocava o preenchimento forte pelo fraco e o botão parecia desligar. Desabilitado
+   fica de fora: quem manda é o tracejado do Botao. */
+.botaoIcone[aria-pressed='true']:not(:disabled),
+.botaoIcone[aria-pressed='true']:hover:not(:disabled) { background: var(--preenchimento-forte); color: var(--tinta); }
+.botaoIcone[aria-pressed='true']:active:not(:disabled) {
+  background: color-mix(in srgb, var(--preenchimento-forte) 90%, var(--tinta)); color: var(--tinta);
+}
