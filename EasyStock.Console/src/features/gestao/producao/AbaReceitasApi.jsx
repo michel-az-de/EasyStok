@@ -108,7 +108,8 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
     <form className={`${css.aba} ${css.editorReceita}`} onSubmit={salvar} aria-label={`Receita de ${prato.nome}`}>
       <div className={`${css.campos} ${css.rendimentoDaReceita}`}>
         <CampoTexto rotulo="Rendimento" dica={`Quanto a receita rende, em ${rotuloDoRendimento(unidade)}`}
-          disabled={salvando} inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
+          disabled={salvando} inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)}
+                onFocus={(e) => e.target.select()} />
         <CampoSelecao rotulo="Rende em" dica="Em peso, a baixa acompanha o tamanho da porção"
           disabled={salvando} value={unidade} onChange={(e) => setUnidade(e.target.value)}
           opcoes={unidadesDoRendimento} />

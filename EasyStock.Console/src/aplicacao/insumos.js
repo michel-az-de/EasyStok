@@ -1,4 +1,5 @@
 import { atualizarInsumo, criarInsumo, insumoDaApi, listarInsumos } from '../infra/api/producaoApi'
+import { avisarMudancaNaProducao } from './mudancasDaProducao'
 
 // Insumos no modo API (M2.3, #1496). Grava, relê sempre e devolve `true` quando gravou; o erro vai
 // para `aoErro`. Separado do hook para a prova rodar sem React.
@@ -89,6 +90,7 @@ export function criarGestaoInsumos({ recarregar, aoErro }) {
   const gravar = async (chamada) => {
     try {
       await chamada()
+      avisarMudancaNaProducao()
       return true
     } catch (erro) {
       aoErro(erro.message)

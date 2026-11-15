@@ -1,5 +1,6 @@
 import { detalheDaReceitaDaApi, ligarPratoAoEstoque, marcarBaixaAutomatica, obterReceita, receitaDaApi, listarReceitas, salvarReceita } from '../infra/api/producaoApi'
 import { numeroDaReceita } from './calculosReceita'
+import { avisarMudancaNaProducao } from './mudancasDaProducao'
 
 // Receitas no modo API (M2.4a, #1498). A receita é gravada inteira (o EasyStok substitui as linhas
 // numa transação e guarda o diff). Valida antes o que a API recusaria, para avisar em português.
@@ -92,6 +93,7 @@ export function criarGestaoReceitas({ recarregar, aoErro }) {
           unidadeMedidaBase: rascunho.unidadeMedidaBase ?? 'Un',
           linhas: rascunho.linhas.map((l) => ({ insumoId: l.insumoId, quantidade: numero(l.quantidade), unidade: l.unidade })),
         })
+        avisarMudancaNaProducao()
         return true
       } catch (e) {
         aoErro(e.message)
