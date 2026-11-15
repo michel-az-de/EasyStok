@@ -27,7 +27,7 @@
 }
 button.texto { cursor: pointer; border-radius: var(--r-1); }
 button.texto:hover strong { text-decoration: underline; }
-button.texto:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+button.texto:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .texto strong { font-size: var(--t-apoio); font-weight: 700; line-height: var(--lh-compacto); }
 .texto span { font-size: var(--t-micro); color: var(--tinta-2); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
 @keyframes entrarAviso {

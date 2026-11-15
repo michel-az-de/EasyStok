@@ -5,7 +5,7 @@
   background: var(--papel); color: var(--tinta);
   width: min(560px, calc(100vw - var(--e-6))); max-height: 86dvh; overflow: hidden;
   max-width: calc(100vw - var(--e-4));
-  box-shadow: var(--sombra-media);
+  box-shadow: var(--sombra-alta);
   /* `.caixa` em coluna e `.conteudo` como item flexível de `min-height: 0`
      (em vez de duas `max-height` iguais soltas, ancestral e filho): garante
      que o filho é sempre quem rola, nunca depende do conteúdo "adivinhar"

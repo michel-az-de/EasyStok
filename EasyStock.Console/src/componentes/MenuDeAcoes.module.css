@@ -7,6 +7,7 @@
   font: inherit; font-size: var(--t-apoio); text-align: left; cursor: pointer;
 }
 .item:hover:not(:disabled) { background: var(--preenchimento); }
+.item:active:not(:disabled) { background: var(--preenchimento-forte); }
 .item:focus-visible { background: var(--preenchimento); outline: 2px solid var(--halo); outline-offset: -2px; }
 .item:disabled { color: var(--tinta-3); cursor: not-allowed; }
 .perigo { color: var(--erro); }
