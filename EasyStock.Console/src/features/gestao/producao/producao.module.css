@@ -110,7 +110,5 @@
 .estadoDoAparelho { color: var(--tinta-2); font-size: var(--t-apoio); overflow-wrap: anywhere; }
 
 /* #2596: as duas datas do período ficam lado a lado em largura de data, não esticadas. */
-.periodoDasPerdas { grid-template-columns: repeat(2, minmax(0, 220px)); }
-
-/* #2596: as duas datas do período ficam lado a lado em largura de data, não esticadas. */
-.periodoDasPerdas { grid-template-columns: repeat(2, minmax(0, 220px)); }
+/* A classe dobrada vence o .campos de abaCardapio.module.css (mesma especificidade) em qualquer ordem do pacote. */
+.periodoDasPerdas.periodoDasPerdas { grid-template-columns: repeat(2, minmax(0, 220px)); }

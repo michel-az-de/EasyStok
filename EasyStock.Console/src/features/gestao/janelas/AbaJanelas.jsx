@@ -5,7 +5,7 @@
 // mexer em código. Mudar aqui reflete na hora no seletor da ficha, no
 // Balcão/Entregas e no que o agente oferece, porque todos leem
 // `estado.catalogo.janelas` e `ocupacaoDeHoje` (mesmas funções de sempre).
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Chip } from '../../../componentes/Chip'
@@ -161,7 +161,18 @@ function FormularioJanela({ valorInicial, rotuloSalvar, aoSalvar, aoCancelar }) 
 function CartaoJanela({ janela, ocupacao, temPedidos, aoSalvar, aoPausar, aoReativar, aoExcluir }) {
   const [editando, setEditando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
+  const excluirRef = useRef(null)
+  const cancelarRef = useRef(null)
   const pausada = janela.ativa === false
+
+  // #2596: a confirmação leva o foco a Cancelar ao abrir e o devolve a Excluir ao cancelar. Pedido que chega
+  // com ela aberta fecha a confirmação: janela com pedido hoje se pausa, não se exclui.
+  useEffect(() => { if (confirmando) cancelarRef.current?.focus() }, [confirmando])
+  const confirmacaoAberta = confirmando && !temPedidos
+  function cancelarExclusao() {
+    setConfirmando(false)
+    excluirRef.current?.focus()
+  }
 
   function salvar(campos) {
     aoSalvar(campos)
@@ -189,7 +200,8 @@ function CartaoJanela({ janela, ocupacao, temPedidos, aoSalvar, aoPausar, aoReat
             icone="lixeira"
             disabled={temPedidos}
             motivo={temPedidos ? 'Tem pedido hoje. Pause em vez de excluir.' : undefined}
-            aria-expanded={confirmando}
+            ref={excluirRef}
+            aria-expanded={confirmacaoAberta}
             onClick={() => setConfirmando(true)}
           >
             Excluir
@@ -197,12 +209,12 @@ function CartaoJanela({ janela, ocupacao, temPedidos, aoSalvar, aoPausar, aoReat
         </div>
       </div>
 
-      {confirmando && (
+      {confirmacaoAberta && (
         <div className={css.confirmacaoInline}>
           <p>Excluir a janela {janela.faixa}?</p>
           <div className={css.acoesEdicao}>
-            <Botao onClick={() => setConfirmando(false)}>Cancelar</Botao>
-            <Botao variante="perigo" onClick={aoExcluir}>Excluir janela</Botao>
+            <Botao ref={cancelarRef} onClick={cancelarExclusao}>Cancelar</Botao>
+            <Botao variante="perigo" disabled={temPedidos} onClick={aoExcluir}>Excluir janela</Botao>
           </div>
         </div>
       )}

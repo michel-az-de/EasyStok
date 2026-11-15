@@ -54,7 +54,7 @@ export const GRUPOS_DE_AVISOS = [
     // #2211: saem pelo WhatsApp da loja só para quem está inscrito em "Quem recebe no WhatsApp".
     id: 'equipe', titulo: 'WhatsApp da equipe',
     avisos: [
-      ligado('equipeAtencao', 'Atendimento precisa de atenção', 'Quando o robô tem dúvida ou chama uma pessoa.'),
+      ligado('equipeAtencao', 'Atendimento precisa de atenção', 'Quando o Assistente tem dúvida ou chama uma pessoa.'),
       ligado('equipePedido', 'Pedido pago com a via da cozinha', 'Manda a imagem da via da cozinha de cada pedido pago.'),
       ligado('equipePagamento', 'Problema no pagamento', 'Pagamento recusado, estornado, em disputa ou vencido.'),
     ],
