@@ -62,7 +62,8 @@ public class RegistrarProducaoUseCase(
     IUnitOfWork uow,
     ILogger<RegistrarProducaoUseCase> logger,
     BaixaDeInsumosDaProducao? baixaDeInsumos = null,
-    ILojaRepository? lojas = null)
+    ILojaRepository? lojas = null,
+    IProdutoComposicaoRepository? composicao = null)
 {
     /// <summary>#2343 (R2-API-7): o FinalizarLote gera uma etiqueta por porcao com sequencial GLOBAL no lote, entao o
     /// teto vale para a soma das porcoes de todos os itens. Limite operacional de etiquetas por lote, nao de formato:
@@ -71,6 +72,9 @@ public class RegistrarProducaoUseCase(
 
     /// <summary>#2343 (R2-API-7): 10 anos e teto de sanidade para validade de producao propria (dias).</summary>
     public const int TetoValidadeDias = 3650;
+
+    /// <summary>#1776 (item 5): 50 kg por porção é teto de sanidade (99.999.999 g passava).</summary>
+    public const int TetoPesoPorPorcaoG = 50_000;
 
     public async Task<RegistrarProducaoResult> ExecuteAsync(RegistrarProducaoCommand cmd, CancellationToken ct = default)
     {
@@ -94,6 +98,8 @@ public class RegistrarProducaoUseCase(
                     $"Limite de validade em dias: {TetoValidadeDias} (10 anos).");
             if (it.PesoPorPorcaoG is <= 0)
                 throw new UseCaseValidationException("Peso por porcao deve ser maior que zero.");
+            if (it.PesoPorPorcaoG > TetoPesoPorPorcaoG)
+                throw new UseCaseValidationException("O peso por porção passa do limite de 50.000 g: confira o número.");
             if (it.CustoUnitario is < 0)
                 throw new UseCaseValidationException("Custo unitario nao pode ser negativo.");
             if (it.PesoRealG is <= 0)
@@ -162,7 +168,9 @@ public class RegistrarProducaoUseCase(
             // meia-noite UTC). Somar dias ao instante UTC dava +1 dia nas producoes apos as 21h.
             var validadeEm = HorarioBrasil.CivilComoInstanteUtc(
                 HorarioBrasil.DataOperacional(dataProducao).AddDays(it.ValidadeDias));
-            var custo = it.CustoUnitario ?? (decimal?)produto.CustoReferencia ?? 0m;
+            var custo = it.CustoUnitario
+                ?? await CustoDaReceitaAsync(cmd.EmpresaId, produto, it, ct)
+                ?? (decimal?)produto.CustoReferencia ?? 0m;
 
             var entrada = await registrarEntradaUC.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
                 EmpresaId: cmd.EmpresaId,
@@ -203,6 +211,17 @@ public class RegistrarProducaoUseCase(
             finalizado.Codigo, resultados.Count, finalizado.TotalUnidades, avisos.Count);
 
         return new RegistrarProducaoResult(finalizado.Id, finalizado.Codigo, finalizado.TotalUnidades, resultados, avisos);
+    }
+
+    // #1776 (item 4): sem custo informado, a porção leva o custo da receita. O lote nascia com R$ 0 e a
+    // perda valia R$ 0,00, então a regra de perda acima de R$ 50 nunca pedia Gerente.
+    private async Task<decimal?> CustoDaReceitaAsync(Guid empresaId, Produto prato, RegistrarProducaoItemInput it, CancellationToken ct)
+    {
+        if (composicao is null) return null;
+        var receita = await composicao.GetByProdutoFinalAsync(empresaId, prato.Id, null, ct);
+        if (receita.Count == 0) return null;
+        var embalagemDaPorcao = it.EmbalagemDaPorcaoId is { } id ? await produtoRepository.GetByIdAsync(empresaId, id) : null;
+        return CustoDaProducao.PorPorcao(PratoParaBaixa.Da(prato, it), receita, embalagemDaPorcao);
     }
 
     private static string Truncar(string s, int max) => s.Length > max ? s[..max] : s;

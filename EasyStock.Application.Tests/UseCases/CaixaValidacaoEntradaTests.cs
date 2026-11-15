@@ -33,6 +33,28 @@ public class CaixaValidacaoEntradaTests
         await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
+    // #1776 (item 12): categoria acima da coluna (60) e referência acima de 120 estouravam no banco (500).
+    [Theory]
+    [InlineData(61, 10)]
+    [InlineData(10, 121)]
+    public async Task RegistrarMovimento_RecusaTextoMaiorQueAColuna_ComMensagemClara(int categoria, int referencia)
+    {
+        var act = () => Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(Guid.NewGuid(), "entrada", 10m,
+            Metodo: "pix", Categoria: new string('c', categoria), Referencia: new string('r', referencia)));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*no máximo*caracteres*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task RegistrarMovimentoDoApp_CortaOTextoNaColuna_EmVezDeRecusarOFatoJaGravadoNoAparelho()
+    {
+        await Registrar().ExecuteAsync(new RegistrarMovimentoCaixaCommand(Guid.NewGuid(), "entrada", 10m,
+            Metodo: "pix", Categoria: new string('c', 300), Referencia: new string('r', 400), Origem: "mobile"));
+
+        await _repo.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Categoria!.Length == 60 && m.Referencia!.Length == 120));
+    }
+
     [Theory]
     [InlineData("Dinheiro ", "dinheiro")]
     [InlineData(" PIX", "pix")]

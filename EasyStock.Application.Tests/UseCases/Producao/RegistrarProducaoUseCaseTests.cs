@@ -58,7 +58,107 @@ public class RegistrarProducaoUseCaseTests
         _uow,
         Substitute.For<ILogger<RegistrarProducaoUseCase>>(),
         null,
-        lojas);
+        lojas,
+        _composicao);
+
+    private readonly IProdutoComposicaoRepository _composicao = Substitute.For<IProdutoComposicaoRepository>();
+
+    private Produto Insumo(string nome, UnidadeMedida unidade, decimal? custoPorUnidade)
+    {
+        var insumo = new Produto { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = nome, Status = StatusProduto.Ativo, UnidadeMedidaBase = unidade };
+        insumo.DefinirCustoDoInsumo(custoPorUnidade);
+        return insumo;
+    }
+
+    private void Receita(Produto prato, decimal rendimento, UnidadeMedida unidadeDoRendimento,
+        params (Produto Insumo, decimal Quantidade, UnidadeMedida Unidade)[] linhas)
+    {
+        prato.RendimentoBase = rendimento;
+        prato.RendimentoUnidade = unidadeDoRendimento;
+        IReadOnlyCollection<ProdutoComposicao> receita = linhas.Select(l => new ProdutoComposicao
+        {
+            Id = Guid.NewGuid(), EmpresaId = _empresaId, ProdutoFinalId = prato.Id, InsumoId = l.Insumo.Id,
+            Insumo = l.Insumo, Quantidade = l.Quantidade, Unidade = l.Unidade
+        }).ToList();
+        _composicao.GetByProdutoFinalAsync(_empresaId, prato.Id, null, Arg.Any<CancellationToken>()).Returns(receita);
+    }
+
+    private async Task<decimal> CustoDoLoteAsync(Produto prato, int porcoes, int? pesoPorPorcaoG, decimal? custoInformado = null)
+    {
+        _loteRepo.FindByCodigoAsync(_empresaId, Arg.Any<string>()).Returns(_ => _loteGravado);
+        ItemEstoque? entrada = null;
+        _itemRepo.When(r => r.InsertAsync(Arg.Any<ItemEstoque>())).Do(c => entrada = c.Arg<ItemEstoque>());
+        await Sut().ExecuteAsync(new RegistrarProducaoCommand(_empresaId, null, _dataProducao,
+            [new RegistrarProducaoItemInput(prato.Id, porcoes, pesoPorPorcaoG, ValidadeDias: 3, CustoUnitario: custoInformado)]));
+        return entrada!.CustoUnitario.Valor;
+    }
+
+    // #1776 (item 4): o lote da produção própria nascia com custo 0, então toda perda valia R$ 0,00 e a regra de
+    // perda acima de R$ 50 nunca pedia Gerente. Sem custo informado, a porção leva o custo da receita.
+    [Fact]
+    public async Task ProducaoSemCustoInformado_LevaOCustoDaPorcaoPelaReceitaEmPorcoes()
+    {
+        var lasanha = NovoProduto(TipoEmbalagem.Avulso);
+        Receita(lasanha, 10m, UnidadeMedida.Un,
+            (Insumo("Farinha", UnidadeMedida.G, 0.02m), 1000m, UnidadeMedida.G),
+            (Insumo("Queijo", UnidadeMedida.Kg, 30m), 0.5m, UnidadeMedida.Kg));
+
+        (await CustoDoLoteAsync(lasanha, porcoes: 4, pesoPorPorcaoG: null)).Should().Be(3.50m, "R$ 35 da receita ÷ 10 porções");
+    }
+
+    [Fact]
+    public async Task ProducaoSemCustoInformado_LevaOCustoDaPorcaoPelaReceitaEmPeso()
+    {
+        var molho = NovoProduto(TipoEmbalagem.Avulso);
+        Receita(molho, 2m, UnidadeMedida.Kg, (Insumo("Tomate", UnidadeMedida.Kg, 8m), 5m, UnidadeMedida.Kg));
+
+        (await CustoDoLoteAsync(molho, porcoes: 3, pesoPorPorcaoG: 500)).Should().Be(10m, "R$ 40 rendem 2 kg; a porção de 500 g custa R$ 10");
+    }
+
+    [Fact]
+    public async Task ReceitaComInsumoSemCusto_NaoInventaCusto_EUsaOCustoDeReferenciaDoPrato()
+    {
+        // Custo parcial pareceria barato demais (mesma regra da tela de receitas): fica o custo de referência.
+        var lasanha = NovoProduto(TipoEmbalagem.Avulso);
+        lasanha.CustoReferencia = EasyStock.Domain.ValueObjects.Dinheiro.FromDecimal(6m);
+        Receita(lasanha, 10m, UnidadeMedida.Un,
+            (Insumo("Farinha", UnidadeMedida.G, 0.02m), 1000m, UnidadeMedida.G),
+            (Insumo("Queijo", UnidadeMedida.Kg, null), 0.5m, UnidadeMedida.Kg));
+
+        (await CustoDoLoteAsync(lasanha, porcoes: 4, pesoPorPorcaoG: null)).Should().Be(6m);
+    }
+
+    [Fact]
+    public async Task ReceitaIncompleta_SemCustoDeReferencia_LoteFicaComCustoZero_ESemBloquearAProducao()
+    {
+        // #1776 (item 4): sem custo conhecido o lote segue em R$ 0 (a perda dele não exige o Gerente), como antes.
+        var lasanha = NovoProduto(TipoEmbalagem.Avulso);
+        Receita(lasanha, 10m, UnidadeMedida.Un, (Insumo("Queijo", UnidadeMedida.Kg, null), 0.5m, UnidadeMedida.Kg));
+
+        (await CustoDoLoteAsync(lasanha, porcoes: 4, pesoPorPorcaoG: null)).Should().Be(0m);
+    }
+
+    // #1776 (item 5): 99.999.999 g por porção era aceito.
+    [Fact]
+    public async Task PesoPorPorcaoAcimaDoTeto_eRecusado()
+    {
+        var produto = NovoProduto(TipoEmbalagem.Embalado);
+
+        var act = () => Sut().ExecuteAsync(new RegistrarProducaoCommand(
+            _empresaId, null, _dataProducao,
+            [new RegistrarProducaoItemInput(produto.Id, Porcoes: 2, PesoPorPorcaoG: 50_001, ValidadeDias: 3, CustoUnitario: 12m)]));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*50.000 g*");
+    }
+
+    [Fact]
+    public async Task CustoInformadoNaProducao_PrevaleceSobreAReceita()
+    {
+        var lasanha = NovoProduto(TipoEmbalagem.Avulso);
+        Receita(lasanha, 10m, UnidadeMedida.Un, (Insumo("Farinha", UnidadeMedida.G, 0.02m), 1000m, UnidadeMedida.G));
+
+        (await CustoDoLoteAsync(lasanha, porcoes: 4, pesoPorPorcaoG: null, custoInformado: 12m)).Should().Be(12m);
+    }
 
     // #2343 (R2-API-7): sem teto, 1.000.000 porcoes geravam 1 etiqueta por unidade e travavam a API.
     [Fact]

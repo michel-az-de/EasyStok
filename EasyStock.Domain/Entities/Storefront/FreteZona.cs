@@ -274,7 +274,7 @@ public class FreteZona
         // Comparação lexicográfica funciona para CEPs sempre com 8 dígitos.
         if (string.CompareOrdinal(inicioNorm, fimNorm) > 0)
             throw new RegraDeDominioVioladaException(
-                $"intervalo de CEP invertido: início '{inicioNorm}' > fim '{fimNorm}'.");
+                $"Intervalo de CEP invertido: o início '{inicioNorm}' vem depois do fim '{fimNorm}'.");
         return (inicioNorm, fimNorm);
     }
 
