@@ -576,7 +576,7 @@ public class CaixaUseCasesTests
     // #1547: a saída interativa confere o saldo e grava atrás da trava do caixa, na mesma transação.
     // A corrida em si é provada contra Postgres em SangriaSimultaneaIntegrationTests.
     [Fact]
-    public async Task RegistrarMovimento_SaidaInterativa_TravaOCaixaAntesDeLerOSaldo_EMobileNaoTrava()
+    public async Task RegistrarMovimento_SaidaInterativa_TravaOCaixaAntesDeLerOSaldo_EMobileTravaSemConferirSaldo()
     {
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
@@ -600,7 +600,9 @@ public class CaixaUseCasesTests
 
         _repo.ClearReceivedCalls();
         await useCase.ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m, LojaId: lojaId, Origem: "mobile"));
-        await _repo.DidNotReceive().TravarSaidasAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        // #2629: o sync do mobile também espera o fechamento em curso, mas não confere saldo (fato já ocorrido).
+        await _repo.Received(1).TravarSaidasAsync(empresaId, lojaId, Arg.Any<CancellationToken>());
+        await _repo.DidNotReceive().GetMovimentosDoDiaAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid?>());
         await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
