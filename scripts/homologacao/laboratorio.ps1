@@ -92,6 +92,17 @@ $env:MercadoPago__BaseUrl = "http://127.0.0.1:$PortaMp/"; $env:MercadoPago__Webh
 # #1901 exige as duas URLs com credencial que nao e TEST-: o webhook volta para a propria API e o retorno vai ao site local.
 $env:MercadoPago__NotificationUrl = "$api/api/webhooks/mercadopago"; $env:MercadoPago__BackUrlSuccess = 'http://localhost:5732/pedido-status.html?resultado=sucesso'
 $env:ENABLE_VIACEP_LOOKUP = 'false'; $env:ENABLE_NOMINATIM_GEOCODING = 'false'
+# #2667: o vigia testa a chave da FMA no TestadorMercadoPago, que tem URL fixa do provedor real (ignora o MP falso).
+$env:BackgroundJobs__EnableVigiaIntegracoes = 'false'
+# #2667: nenhum job ou cliente sai para provedor real, nem com chave herdada do shell ou banco copiado.
+# Sem KEK a credencial por loja (Lalamove, caixa de e-mail, WhatsApp) nao decifra; vazio = nao definida.
+$env:EZ_CRYPTO_KEK = ''; $env:EZ_CRYPTO_KEK_ID = ''; $env:EZ_CRYPTO_KEK_ANTERIOR = ''; $env:EZ_CRYPTO_KEK_ANTERIOR_ID = ''
+$env:BackgroundJobs__EnableAtendimentoCaixaEmail = 'false'; $env:BackgroundJobs__EnableCorridasLalamove = 'false'
+$env:Atendimento__WhatsApp__Cliente = 'stub'; $env:Notifications__WhatsApp__Provider = 'stub'; $env:Notifications__Sms__Provider = 'stub'
+$env:Atendimento__WppConnect__Habilitado = 'false'; $env:Atendimento__MetaMensageria__Provider = 'stub'; $env:Email__Provider = 'console'
+$env:Transcricao__Enabled = 'false'; $env:OpenTelemetry__OtlpEndpoint = ''; $env:Notifications__Monitoring__PingUrl = ''; $env:EndpointHealth__BaseUrl = ''
+$env:Storefront__Frete__GeocodingProvider = ''; $env:GOOGLE_MAPS_API_KEY = ''; $env:TOMTOM_API_KEY = ''; $env:Anthropic__ApiKey = ''; $env:OpenAI__ApiKey = ''
+$env:Efi__ClientId = ''; $env:Efi__ClientSecret = ''; $env:WebPush__PrivateKey = ''
 $env:ASPNETCORE_ENVIRONMENT = 'Development'; $env:ASPNETCORE_URLS = $api
 $iniciados += (Start-Process dotnet -PassThru -WindowStyle Hidden -WorkingDirectory (Join-Path $raiz 'EasyStock.Api') `
     -ArgumentList 'bin/Release/net10.0/EasyStock.Api.dll' -RedirectStandardOutput (Join-Path $Pasta 'api.out') -RedirectStandardError (Join-Path $Pasta 'api.err')).Id
