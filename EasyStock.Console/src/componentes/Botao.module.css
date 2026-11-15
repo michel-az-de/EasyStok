@@ -14,6 +14,10 @@
   background: transparent; border: var(--b-1) dashed var(--linha-forte); color: var(--tinta-3);
   box-shadow: none; cursor: not-allowed;
 }
+/* #2621: carregando (`aria-busy`) não é indisponível. O contorno fica contínuo e o ponteiro avisa que
+   está trabalhando; o tracejado segue só para o que não pode ser usado. */
+.botao[aria-busy='true'] { cursor: progress; }
+.botao[aria-busy='true']:disabled { border-style: solid; cursor: progress; }
 .primario {
   background: var(--acao); border: var(--b-1) solid transparent; color: var(--sobre-acao);
 }
