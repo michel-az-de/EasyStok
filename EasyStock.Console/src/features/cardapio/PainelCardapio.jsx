@@ -695,6 +695,9 @@ export function PainelCardapio({
             </button>
           </div>
         </header>
+        {/* #1587 e #2634: pedido já criado não soma nem tira por aqui. O motivo vem antes dos pratos,
+            à vista de quem abriu "Ver cardápio"; o `title` de cada prato não aparece no toque. */}
+        {papel === 'escolher' && travada && <output className={css.comandaTravada}>{LINHA_COMANDA_TRAVADA}</output>}
 
         {/* Botão de alternância em vez do padrão ARIA de aba: aba promete
             navegação por seta, e prometer teclado que não existe é pior que
@@ -784,8 +787,6 @@ export function PainelCardapio({
         {/* `cardapio` cheio (não só `ativos`) de propósito: um item já anotado
             na comanda continua precificando certo mesmo depois de tirado do
             cardápio (RN de não apagar histórico). */}
-        {/* #1587: pedido já criado não soma nem tira por aqui; o motivo fica escrito acima do total. */}
-        {papel === 'escolher' && travada && <output className={css.comandaTravada}>{LINHA_COMANDA_TRAVADA}</output>}
         {papel === 'escolher' && pedido && <RodapeComanda pedido={pedido} cardapio={cardapio} linhas={linhas} nomeCliente={nomeCliente} />}
       </div>
 
