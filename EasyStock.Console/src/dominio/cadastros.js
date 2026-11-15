@@ -201,6 +201,11 @@ export function errosDoFormularioCadastro(tela, dados) {
   return erros
 }
 
+// #2679 (K1): leitura falha é estado próprio. Sem ler a lista, a tela não afirma vazio nem conta zero.
+// A aba "Sem cadastro" lista conversas já carregadas, não a API de cadastros.
+export const leituraDaLista = ({ carregando, erro } = {}, soLeads = false) =>
+  soLeads ? 'pronta' : carregando ? 'carregando' : erro ? 'falhou' : 'pronta'
+
 // #2457 (U5): textos de cada lista. Conta bancária não tem telefone nem documento para buscar.
 export const TEXTOS_CADASTRO = {
   clientes: { busca: 'Nome, telefone ou documento', novo: 'Novo cliente', itens: 'cadastros', semItens: 'Nenhuma pessoa cadastrada', vazio: 'Cadastre a primeira pessoa ou traga um contato do Atendimento.' },

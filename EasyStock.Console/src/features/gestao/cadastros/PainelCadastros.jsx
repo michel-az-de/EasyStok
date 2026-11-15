@@ -13,7 +13,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
-import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
+import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
 import { CategoriasCadastro } from './CategoriasCadastro'
 import { ModelosCadastro } from './ModelosCadastro'
@@ -69,6 +69,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const podeEditar = !CHAVE_EDICAO[tela] || acoes[CHAVE_EDICAO[tela]] === true
   const leads = filtrarSemCadastro(conversas ?? [], busca)
   const lista = soLeads ? leads : consulta.itens
+  const leitura = leituraDaLista(consulta, soLeads)
   // #2495 (S1, I6): a busca de produto usa outra rota, sem ordem; ali a escolha fica parada.
   const ordenavel = !soLeads && Boolean(ORDENS_CADASTRO[tela]) && !(tela === 'produtos' && busca.trim())
   const comFiltro = Boolean(filtro) || tipo !== 'todos'
@@ -142,7 +143,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
         {!soLeads && ORDENS_CADASTRO[tela] && <Combobox rotulo="Ordem" valor={ordem} opcoes={ORDENS_CADASTRO[tela]} disabled={!ordenavel} aoMudar={ordenar} />}
         <Botao icone="refresh-cw" disabled={consulta.carregando || soLeads} onClick={consulta.recarregar}>Atualizar</Botao>
       </div>
-      {consulta.carregando && !soLeads ? <Vazio titulo="Carregando cadastros">Aguarde um instante.</Vazio> : lista.length === 0 ? <Vazio titulo={busca ? 'Nenhum resultado para esta busca' : soLeads ? 'Nenhum contato sem cadastro nesta lista de conversas' : comFiltro ? 'Nenhum cadastro com estes filtros' : TEXTOS_CADASTRO[tela].semItens}
+      {leitura === 'carregando' ? <Vazio titulo="Carregando cadastros">Aguarde um instante.</Vazio> : leitura === 'falhou' ? null : lista.length === 0 ? <Vazio titulo={busca ? 'Nenhum resultado para esta busca' : soLeads ? 'Nenhum contato sem cadastro nesta lista de conversas' : comFiltro ? 'Nenhum cadastro com estes filtros' : TEXTOS_CADASTRO[tela].semItens}
         acao={busca ? <Botao onClick={() => definir({ busca: '', pagina: 1, posicao: 0 })}>Limpar busca</Botao> : comFiltro && !soLeads ? <Botao onClick={() => definir({ busca: '', filtro: '', tipo: 'todos', pagina: 1, posicao: 0 })}>Limpar filtros</Botao> : !soLeads && podeEditar ? <Botao variante="primario" icone="mais" onClick={novo}>{TEXTOS_CADASTRO[tela].novo}</Botao> : undefined}>
         {busca ? 'Tente outro nome ou contato.' : soLeads ? 'As pessoas que ainda não têm cadastro aparecem aqui ao chegar no Atendimento.' : comFiltro ? (tela === 'clientes' ? 'Tente outra aba ou situação.' : 'Tente outra situação.') : TEXTOS_CADASTRO[tela].vazio}</Vazio> : <div ref={tabela} className={css.lista} onScroll={e => definir({ posicao: e.currentTarget.scrollTop })}>
         <table><thead><tr>{ordenavel ? <th aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={16} /></button></th>
@@ -159,7 +160,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
           </tr>
         })}</tbody></table>
       </div>}
-      <footer className={css.rodape}><span>{soLeads ? `${leads.length} contatos sem cadastro nas conversas carregadas` : consulta.pesquisaLimitada ? `${lista.length} resultados, até 100 por busca` : `${consulta.total} ${consulta.total === 1 ? TEXTOS_CADASTRO[tela].itens.replace(/s$/, '') : TEXTOS_CADASTRO[tela].itens}`}</span>{!soLeads && !consulta.pesquisaLimitada && tela !== 'bancos' && (pagina > 1 || temProximaPagina(pagina, consulta.total)) && <div className={css.acoes}><Botao disabled={pagina <= 1 || consulta.carregando} onClick={() => definir({ pagina: pagina - 1, posicao: 0 })}>Anterior</Botao><span>Página {pagina}</span><Botao disabled={!temProximaPagina(pagina, consulta.total) || consulta.carregando} onClick={() => definir({ pagina: pagina + 1, posicao: 0 })}>Próxima</Botao></div>}</footer>
+      <footer className={css.rodape}><span>{leitura === 'falhou' ? 'Lista não carregada' : soLeads ? `${leads.length} contatos sem cadastro nas conversas carregadas` : consulta.pesquisaLimitada ? `${lista.length} resultados, até 100 por busca` : `${consulta.total} ${consulta.total === 1 ? TEXTOS_CADASTRO[tela].itens.replace(/s$/, '') : TEXTOS_CADASTRO[tela].itens}`}</span>{leitura !== 'falhou' && !soLeads && !consulta.pesquisaLimitada && tela !== 'bancos' && (pagina > 1 || temProximaPagina(pagina, consulta.total)) && <div className={css.acoes}><Botao disabled={pagina <= 1 || consulta.carregando} onClick={() => definir({ pagina: pagina - 1, posicao: 0 })}>Anterior</Botao><span>Página {pagina}</span><Botao disabled={!temProximaPagina(pagina, consulta.total) || consulta.carregando} onClick={() => definir({ pagina: pagina + 1, posicao: 0 })}>Próxima</Botao></div>}</footer>
     </div>
     {tela === 'produtos' && <div className={css.links}><a href={hashDoModulo('cardapio', 'itens')}>Abrir itens do cardápio</a><a href={hashDoModulo('producao', 'estoque')}>Conferir estoque do dia</a></div>}
     {editor && <EditorCadastro tela={tela} editor={editor} aoMudar={valor => definir({ editor: valor })} contexto={contexto} conversa={tela === 'clientes' && ((editor.dados.id && conversa?.clienteId === editor.dados.id) || (!editor.dados.id && !conversa?.clienteId && editor.origemConversa?.id === conversa?.id && editor.origemConversa?.vinculoRevisao === (conversa?.vinculoRevisao ?? 0))) ? conversa : null} podeEditar={podeEditar} aoFechar={() => { definir({ editor: null }); aoFixarContexto(false) }} aoSalvo={salvo} aoAlternarAtividade={atividadeAlternada} aoAbrirCadastro={item => { definir({ editor: null }); editar(item) }} />}

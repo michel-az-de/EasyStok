@@ -69,27 +69,27 @@ internal static partial class CasaDaBabaSeed
         var subPesto = await SeedData.UpsertCategoriaAsync(context, empresa.Id, "Pesto", "Molhos verdes frescos", catMolhos.Id, agora);
 
         var fornFarinha = await SeedData.UpsertFornecedorAsync(context, empresa.Id, "Moinho Santa Italia",
-            "22.418.901/0001-06", "vendas@moinhosantaitalia.com.br", "(11) 3504-8801", "Marcos Silveira",
+            "22.418.901/0001-30", "vendas@moinhosantaitalia.com.br", "(11) 3504-8801", "Marcos Silveira",
             "Farinha de trigo especial e semola", "Nacional", 5, "https://moinhosantaitalia.com.br",
             "R$ 800,00", "CIF", "Fornecedor principal de farinha tipo 00 para massas frescas");
         var fornOvos = await SeedData.UpsertFornecedorAsync(context, empresa.Id, "Granja Ouro Caipira",
-            "31.209.665/0001-51", "comercial@ourocaipira.com.br", "(11) 4962-2210", "Elisa Pacheco",
+            "31.209.665/0001-33", "comercial@ourocaipira.com.br", "(11) 4962-2210", "Elisa Pacheco",
             "Ovos frescos", "Nacional", 2, "https://ourocaipira.com.br",
             "R$ 300,00", "CIF", "Entrega diária para manter qualidade da massa fresca");
         var fornLaticinios = await SeedData.UpsertFornecedorAsync(context, empresa.Id, "Laticinios Serra Alta",
-            "07.843.117/0001-90", "pedidos@serraalta.com.br", "(11) 3891-6120", "Ricardo Moreira",
+            "07.843.117/0001-86", "pedidos@serraalta.com.br", "(11) 3891-6120", "Ricardo Moreira",
             "Queijos e derivados", "Nacional", 3, "https://serraalta.com.br",
             "R$ 400,00", "FOB", "Ricota, creme de leite fresco e parmesão ralado");
         var fornCarnes = await SeedData.UpsertFornecedorAsync(context, empresa.Id, "Frigorifico Bela Arte",
-            "12.776.100/0001-32", "atendimento@belaartefrigorifico.com.br", "(11) 4227-9000", "Fernanda Lopes",
+            "12.776.100/0001-93", "atendimento@belaartefrigorifico.com.br", "(11) 4227-9000", "Fernanda Lopes",
             "Carnes e recheios", "Nacional", 4, "https://belaartefrigorifico.com.br",
             "R$ 700,00", "CIF", "Cortes bovinos e suínos para recheios e molho bolonhesa");
         await SeedData.UpsertFornecedorAsync(context, empresa.Id, "PackFresh Embalagens",
-            "58.190.334/0001-18", "vendas@packfresh.com.br", "(11) 4125-4477", "Guilherme Neri",
+            "58.190.334/0001-55", "vendas@packfresh.com.br", "(11) 4125-4477", "Guilherme Neri",
             "Embalagens alimentícias", "Nacional", 6, "https://packfresh.com.br",
             "R$ 500,00", "CIF", "Bandejas PET, selos térmicos e potes para molhos");
         var fornHortifruti = await SeedData.UpsertFornecedorAsync(context, empresa.Id, "HortiVerde Premium",
-            "44.920.701/0001-73", "pedidos@hortiverde.com.br", "(11) 3822-9191", "Patricia Campos",
+            "44.920.701/0001-14", "pedidos@hortiverde.com.br", "(11) 3822-9191", "Patricia Campos",
             "Hortifruti", "Nacional", 1, "https://hortiverde.com.br",
             "R$ 250,00", "FOB", "Espinafre, manjericão, tomate italiano e ervas frescas");
 
