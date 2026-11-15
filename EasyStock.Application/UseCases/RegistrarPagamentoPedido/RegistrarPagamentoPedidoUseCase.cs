@@ -280,6 +280,18 @@ public class RegistrarPagamentoPedidoUseCase(
                 return;
             }
 
+            // #1709-2: a sessão da empresa (sem loja) aberta num dia anterior vale para o pedido da loja, como no mesmo dia
+            // (#2341). Sem isso o pix da loja abria uma sessão nova por cima e o caixa do dia sem loja começava nela,
+            // perdendo o troco inicial e os pagamentos desde a abertura da empresa.
+            if (pedido.LojaId.HasValue
+                && await caixaRepo.GetAberturaPendenteAsync(cmd.EmpresaId) is { LojaId: null } daEmpresaPendente
+                && HorarioBrasil.DataOperacional(daEmpresaPendente.DataMovimento) < data)
+            {
+                logger.LogInformation("Caixa da empresa de {Pendente} ainda aberto; pagamento {PedidoId} não abre o caixa da loja.",
+                    HorarioBrasil.DataOperacional(daEmpresaPendente.DataMovimento), pedido.Id);
+                return;
+            }
+
             // #2084 (B1): a gaveta não começa vazia. Herda o dinheiro deixado no último fechamento, a mesma sugestão da
             // abertura manual, e fica marcada para a gerente conferir depois (ConfirmacaoPendente). Não bloqueia o
             // pagamento: sem fechamento anterior, abre com zero, também a confirmar.
