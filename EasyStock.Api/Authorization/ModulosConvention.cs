@@ -11,7 +11,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
     private static readonly HashSet<string> Transversais =
     [
         "Auth", "Notificacao", "Uploads", "PreferenciaMenu", "PwaPush", "FeatureFlags", "EntregasDemonstracao",
-        "Consentimentos", "ContatoUsuario",
+        "Consentimentos", "ContatoUsuario", "ReportArtefatos",
         "AdminTenants", "AdminNotificacoes", "WebhookGateway", "WebhookPix",
         "Internal.NotificacoesJobs", "Webhooks.WebhookMensageriaMeta", "Webhooks.WebhookWhatsApp",
         "Webhooks.WebhookWhatsAppPlataforma", "Webhooks.WebhookWppConnect", "Webhooks.WebhookWaha", "Webhooks.WebhookLalamove",

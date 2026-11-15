@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Reporting;
-using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Application.Reporting;
 using EasyStock.Application.Reporting.Dtos;
 using EasyStock.Domain.Reporting;
@@ -15,18 +14,18 @@ public sealed class GetReportRunUseCase
 
     private readonly IReportRunRepository _repo;
     private readonly ReportRegistry       _registry;
-    private readonly IFileStorage         _storage;
+    private readonly IRelatorioDownloadLink _link;
     private readonly ICurrentUserAccessor _user;
 
     public GetReportRunUseCase(
         IReportRunRepository repo,
         ReportRegistry       registry,
-        IFileStorage         storage,
+        IRelatorioDownloadLink link,
         ICurrentUserAccessor user)
     {
         _repo     = repo;
         _registry = registry;
-        _storage  = storage;
+        _link     = link;
         _user     = user;
     }
 
@@ -46,19 +45,8 @@ public sealed class GetReportRunUseCase
 
         if (run.Status == ReportStatus.Succeeded && run.ArtifactStorageKey is not null)
         {
-            var label     = definition?.Label ?? run.ReportKey;
-            var ext       = run.Format switch
-            {
-                ReportFormat.Csv  => ".csv",
-                ReportFormat.Xlsx => ".xlsx",
-                ReportFormat.Pdf  => ".pdf",
-                ReportFormat.Zip  => ".zip",
-                _                 => ".bin"
-            };
-            var fileName  = $"{run.ReportKey.Replace('.', '-')}_{run.Id:N}{ext}";
             var expira    = DateTimeOffset.UtcNow.Add(DownloadUrlTtl);
-            downloadUrl       = (await _storage.CreatePreSignedDownloadUrlAsync(
-                run.ArtifactStorageKey, DownloadUrlTtl, fileName, ct)).ToString();
+            downloadUrl       = (await _link.CriarAsync(run, ReportArtefato.NomeArquivo(run), DownloadUrlTtl, ct)).ToString();
             downloadExpiresAt = expira;
         }
 

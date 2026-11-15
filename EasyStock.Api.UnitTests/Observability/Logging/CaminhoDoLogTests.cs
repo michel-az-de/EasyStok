@@ -60,6 +60,18 @@ public class CaminhoDoLogTests
         CaminhoDoLog.De(contexto).Should().Be(esperado).And.NotContain(Canario);
     }
 
+    // #2668: o token do download do relatório vai no caminho; quem lesse o log baixaria o artefato por 15 min.
+    [Theory]
+    [InlineData("/api/reports/artefatos/" + Canario, "/api/reports/artefatos/{token}")]
+    [InlineData("/API/Reports/Artefatos/" + Canario, "/api/reports/artefatos/{token}")]
+    public void Token_do_artefato_de_relatorio_sai_mascarado(string caminho, string esperado)
+    {
+        var contexto = Contexto(caminho, molde: null);
+
+        CaminhoDoLog.TemSegredo(contexto).Should().BeTrue();
+        CaminhoDoLog.De(contexto).Should().Be(esperado).And.NotContain(Canario);
+    }
+
     [Theory]
     [InlineData("/oauth/token")]
     [InlineData("/v1/OAuth/access_token")]
