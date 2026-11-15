@@ -12,7 +12,7 @@
 
 .cartao {
   display: flex; flex-direction: column; gap: var(--e-3);
-  padding: var(--e-4); border: 0; border-radius: var(--r-1); background: var(--papel);
+  padding: var(--e-4); border: 0; border-radius: var(--r-1); background: var(--fundo);
 }
 
 .cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
@@ -20,6 +20,7 @@
 .chipLigar { flex-shrink: 0; }
 
 .credencial { display: flex; flex-direction: column; gap: var(--e-2); }
+.credencial > button { align-self: flex-start; }
 .formularioCredencial { display: flex; flex-direction: column; gap: var(--e-2); }
 .formularioCredencial :global(input) { width: 100%; }
 .botoesCredencial { display: flex; gap: var(--e-2); }
@@ -27,5 +28,3 @@
 .rodapeCartao { display: flex; flex-direction: column; gap: var(--e-1); align-items: flex-start; }
 .motivo { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 
-.rodape { margin: 0; color: var(--tinta-3); font-size: var(--t-apoio); }
-.rodape code { font-size: inherit; }

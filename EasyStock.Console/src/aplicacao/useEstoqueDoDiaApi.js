@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { criarEstoqueDoDia, lerEstoqueDoDia } from './estoqueDoDia'
+import { lojaDesligada } from './planoDeSincronizacao'
 
 // Estoque do dia lido da API (M2.1, #1490). estado: carregando | ok | erro
 export function useEstoqueDoDiaApi() {
   const [carga, setCarga] = useState({ estado: 'carregando', pratos: [], alertas: [], erro: null, aviso: null, feito: null })
 
   const recarregar = useCallback(() => lerEstoqueDoDia()
-    .then((r) => setCarga((atual) => ({ ...atual, ...r, estado: 'ok', erro: null })))
-    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message }))), [])
+    .then((r) => setCarga((atual) => ({ ...atual, ...r, estado: 'ok', erro: null, semLoja: false })))
+    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message, semLoja: lojaDesligada(erro) }))), [])
 
   useEffect(() => {
     let vivo = true
     lerEstoqueDoDia()
-      .then((r) => { if (vivo) setCarga((atual) => ({ ...atual, ...r, estado: 'ok', erro: null })) })
-      .catch((erro) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message })) })
+      .then((r) => { if (vivo) setCarga((atual) => ({ ...atual, ...r, estado: 'ok', erro: null, semLoja: false })) })
+      .catch((erro) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message, semLoja: lojaDesligada(erro) })) })
     return () => { vivo = false }
   }, [])
 

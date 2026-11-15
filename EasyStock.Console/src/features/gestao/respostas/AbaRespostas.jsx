@@ -85,7 +85,7 @@ function SecaoRespostas() {
       <header className={css.topo}>
         <div>
           <h3 id="gestao-respostas">Respostas prontas</h3>
-          <p className={css.descricao}>{plural(ativas, 'ativa', 'ativas')}. No atendimento, digite / no campo ou toque em Respostas.</p>
+          <p className={css.descricao}>{plural(ativas, 'resposta ativa', 'respostas ativas')}. Em Conversas, digite / no campo da mensagem ou toque em Respostas.</p>
           {!editavel && <p className={css.descricao}>Somente a gerência pode criar, editar e arquivar respostas prontas.</p>}
         </div>
         {editavel && <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando !== null}>Nova resposta</Botao>}
@@ -114,7 +114,7 @@ function SecaoRespostas() {
       )}
 
       {lista.length === 0 ? (
-        <Vazio icone={busca ? 'search' : 'respostas'} titulo={busca ? 'Nada com essa busca.' : 'Nenhuma resposta pronta ainda.'}>
+        <Vazio icone={busca ? 'search' : 'respostas'} titulo={busca ? 'Nada com essa busca' : 'Nenhuma resposta pronta ainda'}>
           {busca ? 'Busque outro título, atalho ou trecho.' : editavel ? 'Use Nova resposta para salvar mensagens frequentes.' : 'Peça à gerência para cadastrar respostas prontas.'}
         </Vazio>
       ) : (
@@ -240,10 +240,10 @@ function SecaoAutomaticas({ focoInicial }) {
   const editavel = automacoesEditaveis({ fonteApi, acoes })
   // #1474: lista vazia não é "carregando": separa a espera, o erro e o vazio de verdade.
   const vazio = cargaDasRegras?.estado === 'carregando'
-    ? 'Carregando as automáticas do EasyStok…'
+    ? 'Carregando as respostas automáticas…'
     : cargaDasRegras?.estado === 'erro'
-      ? `As automáticas não carregaram: ${cargaDasRegras.mensagem ?? 'tente de novo.'}`
-      : 'Nenhuma automática.'
+      ? `Não foi possível carregar as respostas automáticas. ${cargaDasRegras.mensagem ?? ''} Recarregue a página para tentar de novo.`.replace('  ', ' ')
+      : 'Nenhuma resposta automática configurada para esta loja.'
   return (
     <section className={css.secao} aria-labelledby="gestao-automaticas">
       <header className={css.topo}>
@@ -273,8 +273,9 @@ function SecaoAutomaticas({ focoInicial }) {
 export function AbaRespostas({ focoInicial = null, comAutomaticas = true }) {
   return (
     <div className={css.aba}>
+      {comAutomaticas && <SecaoAutomaticas focoInicial={focoInicial} />}
       <SecaoRespostas />
-      {comAutomaticas ? <SecaoAutomaticas focoInicial={focoInicial} /> : (
+      {!comAutomaticas && (
         <p className={css.descricao}>
           As mensagens que saem sozinhas ficam em <a href={hashDoModulo('atendimento', 'respostas')}>{NOME_RESPOSTAS_AUTOMATICAS}</a>.
         </p>

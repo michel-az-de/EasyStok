@@ -93,7 +93,7 @@ function LojaAgora({ horariosAtendimento }) {
         {acoes.controlarLoja === true && <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
           {aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
         </Botao>}
-        {acoes.editarAtendimento === true && <Botao className={css.toque} disabled={lojaAberta == null} onClick={voltarAoHorario}>
+        {acoes.editarAtendimento === true && <Botao className={css.toque} disabled={lojaAberta == null} motivo="A loja já segue os horários da semana." onClick={voltarAoHorario}>
           Voltar a seguir o horário
         </Botao>}
       </div>
@@ -140,15 +140,15 @@ function MensagensDoExpediente() {
       {!expediente.carregado && <output className={css.descricao}>Carregando o expediente…</output>}
       <CampoArea
         rotulo="Fora do horário"
-        dica="Substitui a saudação na primeira mensagem fora do horário."
+        dica="Substitui a saudação na primeira mensagem fora do horário. {abre} vira a próxima abertura, por exemplo: amanhã às 08:00."
         maxLength={TAMANHO_MENSAGEM}
         value={valor.mensagemForaDoHorario}
         disabled={!expediente.carregado || situacao.estado === 'salvando'}
         onChange={mudar('mensagemForaDoHorario')}
       />
       <CampoArea
-        rotulo="Loja fechada"
-        dica="Substitui a saudação na primeira mensagem com a loja fechada manualmente."
+        rotulo="Loja fechada manualmente"
+        dica="Substitui a saudação na primeira mensagem enquanto a loja estiver fechada à mão."
         maxLength={TAMANHO_MENSAGEM}
         value={valor.mensagemLojaFechada}
         disabled={!expediente.carregado || situacao.estado === 'salvando'}
@@ -256,7 +256,7 @@ function ConfiguracaoDoAtendimento() {
     <form className={css.secao} aria-labelledby="gestao-atend-config" onSubmit={aoSalvar}>
       <fieldset disabled={situacao.estado === 'salvando'} className={css.campos}>
         <div className={css.topo}>
-          <h3 id="gestao-atend-config">Como o automático atende</h3>
+          <h3 id="gestao-atend-config">Como o Assistente atende</h3>
           <label className={css.chave}>
             <input
               type="checkbox"
@@ -264,7 +264,7 @@ function ConfiguracaoDoAtendimento() {
               aria-describedby="gestao-atend-config-efeito"
               onChange={mudar('ativo', (e) => e.target.checked)}
             />
-            Atendimento automático
+            Assistente ligado
           </label>
         </div>
         <Pendencia visivel={pendente && situacao.estado !== 'salvando'} />
@@ -311,7 +311,7 @@ function ConfiguracaoDoAtendimento() {
         <CampoArea rotulo="Mensagem para endereço fora da área" value={form.mensagemForaArea} required onChange={mudar('mensagemForaArea')} />
         <CampoArea
           rotulo="Ao passar o cliente para a equipe"
-          dica="Enviada quando o cliente pede uma pessoa ou o robô não sabe responder. {nome} vira o primeiro nome e {dona}, o nome da dona."
+          dica="Enviada quando o cliente pede uma pessoa ou o Assistente não sabe responder. {nome} vira o primeiro nome e {dona}, o nome da dona."
           value={form.mensagemEscalada ?? ''}
           required
           maxLength={500}
@@ -319,7 +319,7 @@ function ConfiguracaoDoAtendimento() {
         />
         <CampoArea
           rotulo="Ao encaminhar quem não é cliente"
-          dica="Fornecedor, orçamento ou assunto pessoal. O robô para de responder a pessoa até alguém devolver a conversa a ele. {nome} vira o primeiro nome."
+          dica="Fornecedor, orçamento ou assunto pessoal. O Assistente para de responder a pessoa até alguém devolver a conversa a ele. {nome} vira o primeiro nome."
           value={form.mensagemEncaminhamento ?? ''}
           required
           maxLength={500}

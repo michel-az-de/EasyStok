@@ -1,7 +1,9 @@
 import { Botao } from '../../componentes/Botao'
 import { CampoTexto } from '../../componentes/Campo'
 import { Pilula } from '../../componentes/Pilula'
+import { Vazio } from '../../componentes/Vazio'
 import { nomeDoPedido } from '../../dominio/pedido'
+import { rotuloDaSituacao } from '../../dominio/pedidosCadastro'
 import { janelaEncerrada, nomeDaJanela, ocupacaoDaJanela } from '../../dominio/agendaDeEntrega'
 import { rotuloDaData } from '../../dominio/roteiroDoDia'
 import { useAgendaEncomendasApi } from '../../aplicacao/useAgendaEncomendasApi'
@@ -14,10 +16,11 @@ const diaDoMes = (data) => new Date(`${data}T12:00:00Z`).toLocaleDateString('pt-
 export function AgendaEncomendasApi() {
   const { hoje, inicio, fim, agenda, erro, voltar, avancar, mudarInicio, atualizar } = useAgendaEncomendasApi()
   const agora = Date.now()
+  const semLoja = Boolean(agenda) && !agenda.lojaDisponivel
 
   return (
     <div className={`${css.conteudo} ${css.agenda}`}>
-      <section className={css.periodoAgenda} aria-label="Período da agenda">
+      {!semLoja && <section className={css.periodoAgenda} aria-label="Período da agenda">
         <div className={css.controlesAgenda}>
           <Botao variante="texto" className={css.passoSemana} icone="chevron-right" aria-label="Semana anterior" title="Semana anterior" disabled={inicio <= hoje} onClick={voltar} />
           <CampoTexto rotulo="Primeiro dia" rotuloOculto tipo="date" value={inicio} min={hoje} onChange={(e) => { if (e.target.value) mudarInicio(e.target.value) }} />
@@ -25,12 +28,12 @@ export function AgendaEncomendasApi() {
         </div>
         <p className={css.intervaloAgenda}>De <time dateTime={inicio}>{diaDoMes(inicio)}</time> a <time dateTime={fim}>{diaDoMes(fim)}/{fim.slice(0, 4)}</time></p>
         <Botao variante="texto" onClick={atualizar}>Atualizar agenda</Botao>
-      </section>
-      <p className={`${css.apoio} ${css.notaAgenda}`}>Vagas ocupadas vêm das reservas ativas.</p>
+      </section>}
+      {!semLoja && <p className={`${css.apoio} ${css.notaAgenda}`}>Vagas ocupadas vêm das reservas ativas.</p>}
 
       {erro && <p role="alert" className={css.faixa}>{erro}</p>}
-      {!agenda && !erro && <p className={css.vazio}>Carregando a agenda…</p>}
-      {agenda && !agenda.lojaDisponivel && <p className={css.vazio}>Sem vitrine de entrega ativa.</p>}
+      {!agenda && !erro && <output className={css.vazio}>Carregando a agenda…</output>}
+      {semLoja && <Vazio icone="globo" titulo="A loja online ainda não está ligada">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>}
       <div className={css.semanaAgenda}>
       {agenda?.dias.map((dia) => {
         const ocupadas = dia.janelas.reduce((total, janela) => total + janela.ocupadas, 0)
@@ -60,7 +63,7 @@ export function AgendaEncomendasApi() {
                   {janela.pedidos.map((pedido) => <li key={pedido.pedidoId}>
                     <strong title={nomeDoPedido(pedido).titulo || undefined}>{nomeDoPedido(pedido).principal}{nomeDoPedido(pedido).referencia && <small className={css.referencia}>{nomeDoPedido(pedido).referencia}</small>}</strong>
                     <span>{pedido.clienteNome || 'Cliente sem nome'}</span>
-                    <span className={css.apoio}>{pedido.status.replaceAll('_', ' ')}</span>
+                    <span className={css.apoio}>{rotuloDaSituacao(pedido.status)}</span>
                   </li>)}
                 </ul>}
               </div>

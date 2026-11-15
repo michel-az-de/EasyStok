@@ -5,7 +5,7 @@
 // mexer em código. Mudar aqui reflete na hora no seletor da ficha, no
 // Balcão/Entregas e no que o agente oferece, porque todos leem
 // `estado.catalogo.janelas` e `ocupacaoDeHoje` (mesmas funções de sempre).
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Chip } from '../../../componentes/Chip'
@@ -160,7 +160,19 @@ function FormularioJanela({ valorInicial, rotuloSalvar, aoSalvar, aoCancelar }) 
 
 function CartaoJanela({ janela, ocupacao, temPedidos, aoSalvar, aoPausar, aoReativar, aoExcluir }) {
   const [editando, setEditando] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
+  const excluirRef = useRef(null)
+  const cancelarRef = useRef(null)
   const pausada = janela.ativa === false
+
+  // #2596: a confirmação leva o foco a Cancelar ao abrir e o devolve a Excluir ao cancelar. Pedido que chega
+  // com ela aberta fecha a confirmação: janela com pedido hoje se pausa, não se exclui.
+  useEffect(() => { if (confirmando) cancelarRef.current?.focus() }, [confirmando])
+  const confirmacaoAberta = confirmando && !temPedidos
+  function cancelarExclusao() {
+    setConfirmando(false)
+    excluirRef.current?.focus()
+  }
 
   function salvar(campos) {
     aoSalvar(campos)
@@ -185,20 +197,30 @@ function CartaoJanela({ janela, ocupacao, temPedidos, aoSalvar, aoPausar, aoReat
           )}
           <Botao
             variante="texto"
-            icone="x"
+            icone="lixeira"
             disabled={temPedidos}
-            title={temPedidos ? 'Tem pedido marcado nesta janela hoje. Pause em vez de excluir.' : undefined}
-            onClick={aoExcluir}
+            motivo={temPedidos ? 'Tem pedido hoje. Pause em vez de excluir.' : undefined}
+            ref={excluirRef}
+            aria-expanded={confirmacaoAberta}
+            onClick={() => setConfirmando(true)}
           >
             Excluir
           </Botao>
         </div>
       </div>
 
+      {confirmacaoAberta && (
+        <div className={css.confirmacaoInline}>
+          <p>Excluir a janela {janela.faixa}?</p>
+          <div className={css.acoesEdicao}>
+            <Botao ref={cancelarRef} onClick={cancelarExclusao}>Cancelar</Botao>
+            <Botao variante="perigo" disabled={temPedidos} onClick={aoExcluir}>Excluir janela</Botao>
+          </div>
+        </div>
+      )}
+
       <p className={css.metaLinha}>
-        <span>{janela.capacidade} pedidos de capacidade</span>
-        <span>corte {janela.corteMinutos ?? MINUTOS_DE_CORTE} min antes</span>
-        <span>{rotuloDosDias(janela.diasSemana)}</span>
+        <span>{`Até ${janela.capacidade} pedidos · corte ${janela.corteMinutos ?? MINUTOS_DE_CORTE} min antes · ${rotuloDosDias(janela.diasSemana)}`}</span>
         {janela.capacidadePorLinha && (
           <span className={css.proposta}>
             por linha: servir {janela.capacidadePorLinha.servir} · casa {janela.capacidadePorLinha.casa}
@@ -249,8 +271,8 @@ function RespiroMinimo({ valor, aoAjustar }) {
       />
       <span>min</span>
       <p className={css.respiroDica}>
-        O cliente nunca recebe prazo com menos de {RESPIRO_MINIMO_RN22} min entre o pedido e a faixa prometida.
-        {abaixoDoPiso && ' O valor digitado fica travado em ' + RESPIRO_MINIMO_RN22 + ' ao salvar.'}
+        O cliente nunca recebe prazo com menos de {Math.max(Number(rascunho) || 0, RESPIRO_MINIMO_RN22)} min entre o pedido e a faixa prometida.
+        {abaixoDoPiso && ` O mínimo é ${RESPIRO_MINIMO_RN22} min; ao sair do campo o valor volta para ${RESPIRO_MINIMO_RN22}.`}
       </p>
     </div>
   )

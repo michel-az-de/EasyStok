@@ -4,9 +4,11 @@ import { BotaoIcone } from '../../../componentes/BotaoIcone'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
 import { Pilula } from '../../../componentes/Pilula'
+import { Vazio } from '../../../componentes/Vazio'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { assinaturaDoPlano, comprasGuardadas, erroDasPorcoes, gerarCompras, guardarCompras, itensDeCompra, lerSugestao, levarParaProducao, motivosDosPendentes, planejar } from '../../../aplicacao/planejamento'
 import { lerInsumos } from '../../../aplicacao/insumos'
+import { lojaDesligada } from '../../../aplicacao/planoDeSincronizacao'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
@@ -68,7 +70,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
         setPlano(null)
         setCarga({ estado: 'ok', erro: null })
       })
-      .catch((e) => { if (vivo) setCarga({ estado: 'erro', erro: e.message }) })
+      .catch((e) => { if (vivo) setCarga({ estado: 'erro', erro: e.message, semLoja: lojaDesligada(e) }) })
     return () => { vivo = false }
   }, [consulta, tentativa])
 
@@ -122,9 +124,11 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
 
   if (carga.estado === 'carregando') return <output className={css.descricao}>Calculando a sugestão…</output>
   if (carga.estado === 'erro' && linhas.length === 0) return (
-    <div className={css.aba} role="alert">
-      <p className={css.aviso}>Não foi possível carregar a sugestão. {carga.erro}</p>
-      <Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar de novo</Botao>
+    <div className={css.aba}>
+      {carga.semLoja
+        ? <Vazio icone="cardapio" role="alert" titulo="O planejamento espera a loja online">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
+        : <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar a sugestão"
+          acao={<Botao icone="refresh-cw" onClick={tentarNovamente}>Tentar de novo</Botao>}>{carga.erro}</Vazio>}
     </div>
   )
 

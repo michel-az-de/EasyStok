@@ -20,14 +20,14 @@ export function resumoDoWhatsApp(status) {
     return {
       tom: 'neutro',
       titulo: 'Só o administrador vê o estado do canal',
-      linhas: ['Peça para a dona abrir esta tela com o usuário dela.'],
+      linhas: ['Peça a um administrador da loja para abrir esta tela.'],
     }
   }
   if (!status) {
     return {
       tom: 'aviso',
       titulo: 'O atendimento por WhatsApp não está ligado para a loja',
-      linhas: ['Sem o módulo de atendimento ligado, nenhuma mensagem chega ao Balcão.'],
+      linhas: ['Sem o módulo de atendimento ligado, nenhuma conversa do WhatsApp chega a Conversas.'],
     }
   }
 
@@ -47,7 +47,7 @@ export function resumoDoWhatsApp(status) {
   const linhas = [
     status.webhookVerificadoEm
       ? `Webhook verificado em ${dataHora(Date.parse(status.webhookVerificadoEm))}`
-      : recebendo ? 'Webhook funcionando: as mensagens chegam ao Balcão' : 'Webhook ainda não verificado pela Meta',
+      : recebendo ? 'Webhook funcionando: as mensagens chegam a Conversas' : 'Webhook ainda não verificado pela Meta',
     recebendo
       ? `Recebendo mensagens (última às ${horaEDia(status.ultimaMensagemRecebidaEm)})`
       : 'Nenhuma mensagem recebida ainda',

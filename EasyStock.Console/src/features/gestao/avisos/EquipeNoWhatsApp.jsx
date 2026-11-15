@@ -7,7 +7,7 @@ import css from './abaAvisos.module.css'
 
 const AVISOS_DA_EQUIPE = [
   { campo: 'atencao', rotulo: 'Atenção no atendimento' },
-  { campo: 'pedido', rotulo: 'Pedido com canhoto' },
+  { campo: 'pedido', rotulo: 'Pedido com via da cozinha' },
   { campo: 'pagamento', rotulo: 'Problema no pagamento' },
 ]
 

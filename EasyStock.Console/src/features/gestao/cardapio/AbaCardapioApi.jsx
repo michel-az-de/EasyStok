@@ -104,6 +104,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando o cardápio…</output>
   if (gestao.estado === 'erro' && gestao.itens.length === 0 && !editor) {
+    if (gestao.semLoja) return <Vazio icone="globo" titulo="A loja online ainda não está ligada">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
     return (
       <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar o cardápio"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>

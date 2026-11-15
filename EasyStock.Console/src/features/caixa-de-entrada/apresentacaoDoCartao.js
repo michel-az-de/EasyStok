@@ -41,6 +41,9 @@ const MOTIVO_NO_CARTAO = {
   passagem: { texto: 'Passou para você', icone: 'hand' },
   esperando: { texto: 'Esperando você', icone: 'relogio' },
   cobranca: { texto: 'Cobrança venceu', icone: 'dollar-sign' },
+  restricao: { texto: 'Restrição alimentar', icone: 'alerta' },
+  'diz-que-pagou': { texto: 'Diz que pagou', icone: 'dollar-sign' },
+  devolucao: { texto: 'Problema no pedido', icone: 'message-square-warning' },
   // #1474 (R12): o cliente escreveu fora do horário; "Loja abriu" parecia aviso da loja.
   'aguardando-abertura': { texto: 'Loja fechada', icone: 'relogio', titulo: 'Escreveu com a loja fechada' },
   // Rodada 10, itens 3 e 4: pedido atrasado (ainda na cozinha) e entrega atrasada (já em rota).

@@ -113,7 +113,7 @@ try {
   await botao('Nova subcategoria em Bolos').click()
   d = dialogo('Nova subcategoria em Bolos'); await d.waitFor()
   await d.getByRole('textbox', { name: 'Nome' }).fill('Mini')
-  await d.getByRole('button', { name: 'Criar categoria', exact: true }).click()
+  await d.getByRole('button', { name: 'Criar subcategoria', exact: true }).click()
   await d.waitFor({ state: 'detached' })
   await aviso('Subcategoria Mini criada em Bolos.')
   assert.deepEqual(escritas.at(-1).corpo, { empresaId: 'empresa', nome: 'Mini', descricao: null, categoriaPaiId: 'R1' })

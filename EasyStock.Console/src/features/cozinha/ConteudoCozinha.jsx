@@ -32,7 +32,8 @@ const MS_SEM_ESPELHO = 5000
 // visual (arrasto do cardápio), para não brigar com a rolagem da coluna no
 // tablet. Mouse e toque em sensores separados: com PointerSensor o dedo que
 // só quer rolar a coluna viraria arrasto no sexto pixel.
-const rotuloDaColuna = (id) => passoPorId(id)?.rotulo ?? id
+const ROTULO_DA_COLUNA = { pago: 'Na fila' }
+const rotuloDaColuna = (id) => ROTULO_DA_COLUNA[id] ?? passoPorId(id)?.rotulo ?? id
 
 // Anúncios para leitor de tela em PT-BR (o padrão do dnd-kit fala inglês).
 const respostaDoArrasto = (dados, destino) => respostaAoSoltar(dados.estado, destino, { bloqueado: dados.bloqueado })
@@ -266,11 +267,11 @@ export function ConteudoCozinha({
                     onClick={() => setEntregueAberto((v) => !v)}
                   >
                     <Icone nome="chevron-right" tamanho={16} className={entregueAberto ? css.chevronAberto : ''} />
-                    {passo.rotulo} <span className={css.contagem}>{cartoes.length}</span>
+                    {rotuloDaColuna(passo.id)} <span className={css.contagem}>{cartoes.length}</span>
                   </button>
                 ) : (
                   <h2>
-                    {passo.rotulo} <span className={css.contagem}>{cartoes.length}</span>
+                    {rotuloDaColuna(passo.id)} <span className={css.contagem}>{cartoes.length}</span>
                   </h2>
                 )}
                 {(!recolhivel || entregueAberto) && (

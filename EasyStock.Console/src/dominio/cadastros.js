@@ -147,14 +147,14 @@ const MAIS_ANTIGOS = { valor: 'antigos', rotulo: 'Cadastrados primeiro', sort: '
 export const ORDENS_CADASTRO = {
   clientes: [
     { valor: '', rotulo: 'Nome (A a Z)', sort: 'nome', order: 'asc' }, NOME_ZA,
-    { valor: 'recentes', rotulo: 'Cadastrados por último', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS,
+    { valor: 'recentes', rotulo: 'Mais recentes', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS,
     { valor: 'mais-pedidos', rotulo: 'Mais pedidos', sort: 'ordercount', order: 'desc' },
     { valor: 'sem-comprar', rotulo: 'Sem comprar há mais tempo', sort: 'lastorderat', order: 'asc' },
   ],
-  fornecedores: [{ valor: '', rotulo: 'Cadastrados por último', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS, NOME_AZ, NOME_ZA],
+  fornecedores: [{ valor: '', rotulo: 'Mais recentes', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS, NOME_AZ, NOME_ZA],
   produtos: [
-    { valor: '', rotulo: 'Cadastrados por último', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS,
-    { valor: 'alterados', rotulo: 'Alterados por último', sort: 'alteradoem', order: 'desc' }, NOME_AZ, NOME_ZA,
+    { valor: '', rotulo: 'Mais recentes', sort: 'criadoem', order: 'desc' }, MAIS_ANTIGOS,
+    { valor: 'alterados', rotulo: 'Alterados há pouco', sort: 'alteradoem', order: 'desc' }, NOME_AZ, NOME_ZA,
   ],
 }
 const ordemEscolhida = (tela, valor) => ORDENS_CADASTRO[tela]?.find((o) => o.valor === valor) ?? ORDENS_CADASTRO[tela]?.[0] ?? null
@@ -203,10 +203,10 @@ export function errosDoFormularioCadastro(tela, dados) {
 
 // #2457 (U5): textos de cada lista. Conta bancária não tem telefone nem documento para buscar.
 export const TEXTOS_CADASTRO = {
-  clientes: { busca: 'Nome, telefone ou documento', novo: 'Novo cliente', vazio: 'Cadastre a primeira pessoa ou traga um contato do Atendimento.' },
-  produtos: { busca: 'Nome, marca, código ou SKU', novo: 'Novo produto', vazio: 'Cadastre o primeiro produto para usar no cardápio e no estoque.' },
-  fornecedores: { busca: 'Nome, telefone ou documento', novo: 'Novo fornecedor', vazio: 'Cadastre o primeiro fornecedor para registrar compras.' },
-  bancos: { busca: 'Nome ou instituição', novo: 'Nova conta', vazio: 'Cadastre a conta que recebe os pagamentos da loja.' },
+  clientes: { busca: 'Nome, telefone ou documento', novo: 'Novo cliente', itens: 'cadastros', semItens: 'Nenhuma pessoa cadastrada', vazio: 'Cadastre a primeira pessoa ou traga um contato do Atendimento.' },
+  produtos: { busca: 'Nome, marca, código ou SKU', novo: 'Novo produto', itens: 'produtos', semItens: 'Nenhum produto cadastrado', vazio: 'Cadastre o primeiro produto para usar no cardápio e no estoque.' },
+  fornecedores: { busca: 'Nome, telefone ou documento', novo: 'Novo fornecedor', itens: 'fornecedores', semItens: 'Nenhum fornecedor cadastrado', vazio: 'Cadastre o primeiro fornecedor para registrar compras.' },
+  bancos: { busca: 'Nome ou instituição', novo: 'Nova conta', itens: 'contas', semItens: 'Nenhuma conta cadastrada', vazio: 'Cadastre a conta que recebe os pagamentos da loja.' },
 }
 
 export const TITULOS_CADASTROS = { clientes: 'Leads e clientes', produtos: 'Produtos', categorias: 'Categorias de produto', fornecedores: 'Fornecedores', bancos: 'Contas bancárias', pagamentos: 'Formas de pagamento', modelos: 'Modelos' }

@@ -94,7 +94,7 @@ export function CartaoEntrega({
             </span>
           </Anel>
         )}
-        <button type="button" className={css.nomeCartao} onClick={() => setAberto((v) => !v)}>
+        <button type="button" className={css.nomeCartao} aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
           {conversa.nome}
         </button>
         <span className={css.pilulaEstado}>

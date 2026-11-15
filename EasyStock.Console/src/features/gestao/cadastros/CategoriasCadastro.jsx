@@ -17,7 +17,7 @@ const TITULO = {
   mover: ({ categoria }) => `Mover ${categoria.nome}`,
   excluir: ({ categoria }) => `Excluir ${categoria.nome}?`,
 }
-const CONFIRMAR = { criar: 'Criar categoria', renomear: 'Salvar nome', mover: 'Mover', excluir: 'Excluir' }
+const CONFIRMAR = { criar: ({ pai }) => pai ? 'Criar subcategoria' : 'Criar categoria', renomear: 'Salvar nome', mover: 'Mover', excluir: 'Excluir' }
 
 export function CategoriasCadastro({ contexto }) {
   const { acoes } = useAcessoModulos()
@@ -76,7 +76,7 @@ export function CategoriasCadastro({ contexto }) {
     {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
     {consulta.erro && <div className={css.erro} role="alert"><p>{consulta.erro}</p><Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>}
     {consulta.carregando && arvore.length === 0 ? <Vazio titulo="Carregando categorias">Aguarde um instante.</Vazio>
-      : !consulta.erro && arvore.length === 0 ? <Vazio titulo="Nenhuma categoria cadastrada">Crie a primeira para organizar os produtos.</Vazio>
+      : !consulta.erro && arvore.length === 0 ? <Vazio titulo="Nenhuma categoria cadastrada" acao={podeEditar ? <Botao variante="primario" icone="mais" onClick={() => abrir('criar')}>Nova categoria</Botao> : undefined}>{podeEditar ? 'Crie a primeira para organizar os produtos.' : 'Peça à gerência para cadastrar categorias.'}</Vazio>
       : <ul className={css.cartoes}>{arvore.map(raiz => <li key={raiz.id}>
         <div>
           <h3>{raiz.nome}</h3>
@@ -89,7 +89,7 @@ export function CategoriasCadastro({ contexto }) {
         {podeEditar && acoesDa(raiz, null)}
       </li>)}</ul>}
     {intencao && <Modal titulo={TITULO[intencao.acao](intencao)} aoFechar={ocupado ? undefined : fechar} segurarFechamento={ocupado}
-      rodape={<><Botao disabled={ocupado} onClick={fechar}>Cancelar</Botao><Botao variante={intencao.acao === 'excluir' ? 'perigo' : 'primario'} disabled={ocupado} onClick={confirmar}>{ocupado ? 'Salvando…' : CONFIRMAR[intencao.acao]}</Botao></>}>
+      rodape={<><Botao disabled={ocupado} onClick={fechar}>Cancelar</Botao><Botao variante={intencao.acao === 'excluir' ? 'perigo' : 'primario'} disabled={ocupado} onClick={confirmar}>{ocupado ? 'Salvando…' : typeof CONFIRMAR[intencao.acao] === 'function' ? CONFIRMAR[intencao.acao](intencao) : CONFIRMAR[intencao.acao]}</Botao></>}>
       {(intencao.acao === 'criar' || intencao.acao === 'renomear') && <form onSubmit={confirmar}>
         <CampoTexto rotulo="Nome" obrigatorio value={valor} erro={erroNome} disabled={ocupado} onChange={e => { definirValor(e.target.value); definirErroNome(null) }} />
       </form>}
@@ -97,7 +97,7 @@ export function CategoriasCadastro({ contexto }) {
         <p>{intencao.categoria.categoriaPaiId ? 'Os produtos desta subcategoria continuam com ela.' : 'Esta categoria passa a ser subcategoria da escolhida.'}</p>
         <Combobox rotulo="Mover para" valor={valor} aoMudar={definirValor} opcoes={destinosParaMover(arvore, intencao.categoria)} disabled={ocupado} />
       </>}
-      {intencao.acao === 'excluir' && <p>{intencao.categoria.categoriaPaiId ? 'A subcategoria sai da lista.' : 'A categoria sai da lista.'} Se algum produto ainda usa {intencao.categoria.nome}, a loja não deixa excluir.</p>}
+      {intencao.acao === 'excluir' && <p>{intencao.categoria.categoriaPaiId ? 'A subcategoria sai da lista.' : 'A categoria sai da lista.'} Se algum produto ainda usa {intencao.categoria.nome}, não é possível excluir. Mude esses produtos de categoria antes.</p>}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
     </Modal>}
   </section>

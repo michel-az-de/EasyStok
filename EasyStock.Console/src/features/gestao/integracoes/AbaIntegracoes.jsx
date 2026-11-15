@@ -37,13 +37,13 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
         <strong className={css.nomeProvedor}>{provedor.rotulo}</strong>
         <Chip
           papel="filtro" ativo={ativo} className={css.chipLigar}
+          disabled={!ativo && Boolean(motivo)}
           aria-label={`${provedor.rotulo}: ${ativo ? 'ligado' : 'desligado'}`}
           onClick={() => acoes.alternarProvedorLogistica(provedor.chave)}
         >
           {ativo ? 'Ligado' : 'Desligado'}
         </Chip>
       </div>
-      {ehPadrao && <Pilula tom="ok" fina>Padrão do despacho</Pilula>}
 
       {provedor.exigeCredencial && (
         <div className={css.credencial}>
@@ -107,9 +107,10 @@ export function AbaIntegracoes() {
   return (
     <div className={css.aba}>
       <p className={css.intro}>
-        Provedores de entrega ligados ao despacho (cozinha e Entregas). {AVISO_SIMULADO}
+        Quem leva os pedidos que saem da Cozinha e de Entregas. {AVISO_SIMULADO}
       </p>
-      <ul className={css.lista} role="radiogroup" aria-label="Provedor padrão do despacho">
+      <div role="radiogroup" aria-label="Provedor padrão do despacho">
+      <ul className={css.lista}>
         {PROVEDORES_LOGISTICA.map((provedor) => (
           <CartaoProvedor
             key={provedor.chave}
@@ -120,9 +121,7 @@ export function AbaIntegracoes() {
           />
         ))}
       </ul>
-      <p className={css.rodape}>
-        Só provedores ligados podem ser usados como padrão do despacho.
-      </p>
+      </div>
     </div>
   )
 }

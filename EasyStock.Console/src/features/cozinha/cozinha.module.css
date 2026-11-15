@@ -218,6 +218,7 @@ escritos e desliga as animações, inclusive a volta do overlay. */
   background: var(--preenchimento); font-size: var(--t-apoio);
 }
 .numeroEntrega { font-family: var(--f-dado); font-weight: 700; }
+.notaDoNumero { font-family: var(--f-corpo); font-weight: 400; color: var(--tinta-2); }
 .quemLeva { display: flex; align-items: flex-start; gap: var(--e-1); color: var(--tinta-2); }
 .quemLeva > :first-child { flex-shrink: 0; margin-top: 2px; }
 .quemLeva b { color: var(--tinta); }

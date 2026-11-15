@@ -64,7 +64,7 @@ assert.doesNotMatch(painel, /tomDaSituacao/, 'Regra de tom não fica no componen
 // U8: Cadastros › Modelos mostra só as respostas prontas; as automáticas ficam no trilho.
 assert.match(ler('features/gestao/ModalGestao.jsx'), /respostas=\{<AbaRespostas comAutomaticas=\{false\} \/>\}/)
 const aba = ler('features/gestao/respostas/AbaRespostas.jsx')
-assert.match(aba, /comAutomaticas \? <SecaoAutomaticas/, 'Seção de automáticas só quando pedida')
+assert.match(aba, /comAutomaticas && <SecaoAutomaticas/, 'Seção de automáticas só quando pedida')
 
 // U8: variável que o EasyStok não preenche não sai para o cliente: a automática não liga nem salva com ela.
 assert.equal(bloqueioDaAutomatica('Oi {nome}, pedido {pedido} sai {faixa}.'), null)

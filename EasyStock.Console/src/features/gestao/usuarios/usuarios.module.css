@@ -84,3 +84,6 @@
   .convite, .pessoas { grid-template-columns: 1fr; }
   .acoes { flex-wrap: wrap; }
 }
+
+.link { font-weight: 700; color: var(--marca); }
+.link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }

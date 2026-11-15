@@ -108,3 +108,7 @@
 /* #2235 (banca P2-2): o estado do aparelho fica ao lado do botão que o conecta. */
 .aparelho { display: inline-flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; justify-content: flex-end; }
 .estadoDoAparelho { color: var(--tinta-2); font-size: var(--t-apoio); overflow-wrap: anywhere; }
+
+/* #2596: as duas datas do período ficam lado a lado em largura de data, não esticadas. */
+/* A classe dobrada vence o .campos de abaCardapio.module.css (mesma especificidade) em qualquer ordem do pacote. */
+.periodoDasPerdas.periodoDasPerdas { grid-template-columns: repeat(2, minmax(0, 220px)); }

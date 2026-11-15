@@ -104,6 +104,7 @@ export function AbaCategoriasApi() {
 
   if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as categorias…</output>
   if (gestao.estado === 'erro' && gestao.secoes.length === 0) {
+    if (gestao.semLoja) return <Vazio icone="globo" titulo="A loja online ainda não está ligada">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
     return (
       <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as categorias"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>

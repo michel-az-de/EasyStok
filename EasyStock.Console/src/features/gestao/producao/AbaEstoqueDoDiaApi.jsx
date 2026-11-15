@@ -162,6 +162,9 @@ export function AbaEstoqueDoDiaApi() {
 
   if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
   if (estoque.estado === 'erro' && estoque.pratos.length === 0) {
+    if (estoque.semLoja) {
+      return <Vazio icone="cardapio" role="alert" titulo="O estoque do dia espera a loja online">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
+    }
     return (
       <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar o estoque"
         acao={<Botao icone="refresh-cw" onClick={estoque.recarregar}>Tentar de novo</Botao>}>

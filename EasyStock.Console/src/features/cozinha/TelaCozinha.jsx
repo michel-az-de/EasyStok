@@ -51,7 +51,7 @@ function TelaCozinhaPronta({ estado, acoes }) {
   return (
     <div className={css.pagina}>
       <header className={css.topoPagina}>
-        <h1>Cozinha</h1>
+        <h1>Fila da cozinha</h1>
         <span className={css.horaTopo}>{horaCurta(new Date(agora).toISOString())}</span>
       </header>
       <ConteudoCozinha

@@ -94,7 +94,7 @@ function AbrirCaixa({ dia, ultimo, executar, enviando, abrindo }) {
   }
 
   return (
-    <div className={css.painel}>
+    <div className={`${css.painel} ${css.abertura}`}>
       <p className={css.corpoBloco}>
         O caixa de hoje ainda não foi aberto.
         {ultimo ? ` O fechamento de ${diaMes(ultimo.data)} deixou ${moeda(gavetaDoFechamento(ultimo))} na gaveta.` : ''}

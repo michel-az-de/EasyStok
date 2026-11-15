@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lojaDesligada } from './planoDeSincronizacao'
 import { criarGestaoSecoes, lerPreviaMigracao, lerSecoes } from './gestaoSecoes'
 
 // Categorias do cardápio lidas da API (M1.3, #1483). Lista da tela; nada no reducer.
 // #1803: quem edita também lê a prévia da conversão; se ela falhar, a tela segue sem o resumo.
 export function useSecoesCardapioApi({ comPrevia = false } = {}) {
-  const [carga, setCarga] = useState({ estado: 'carregando', secoes: [], previa: null, erro: null, aviso: null })
+  const [carga, setCarga] = useState({ estado: 'carregando', secoes: [], previa: null, erro: null, semLoja: false, aviso: null })
 
   const ler = useCallback(() => Promise.all([
     lerSecoes(),
@@ -12,14 +13,14 @@ export function useSecoesCardapioApi({ comPrevia = false } = {}) {
   ]), [comPrevia])
 
   const recarregar = useCallback(() => ler()
-    .then(([secoes, previa]) => setCarga((atual) => ({ ...atual, estado: 'ok', secoes, previa, erro: null })))
-    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message }))), [ler])
+    .then(([secoes, previa]) => setCarga((atual) => ({ ...atual, estado: 'ok', secoes, previa, erro: null, semLoja: false })))
+    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message, semLoja: lojaDesligada(erro) }))), [ler])
 
   useEffect(() => {
     let vivo = true
     ler()
-      .then(([secoes, previa]) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'ok', secoes, previa, erro: null })) })
-      .catch((erro) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message })) })
+      .then(([secoes, previa]) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'ok', secoes, previa, erro: null, semLoja: false })) })
+      .catch((erro) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message, semLoja: lojaDesligada(erro) })) })
     return () => { vivo = false }
   }, [ler])
 

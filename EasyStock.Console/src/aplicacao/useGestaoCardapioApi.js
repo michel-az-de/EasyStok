@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lojaDesligada } from './planoDeSincronizacao'
 import { criarGestaoCardapio, lerGestao, pedirDicaDoPrato } from './gestaoCardapio'
 
 // Lista de gestão do cardápio lida da API (M1.1, #1481). Nada fica no reducer: a lista é da tela
@@ -6,17 +7,17 @@ import { criarGestaoCardapio, lerGestao, pedirDicaDoPrato } from './gestaoCardap
 //
 // estado: carregando | ok | erro
 export function useGestaoCardapioApi() {
-  const [carga, setCarga] = useState({ estado: 'carregando', itens: [], erro: null, aviso: null })
+  const [carga, setCarga] = useState({ estado: 'carregando', itens: [], erro: null, semLoja: false, aviso: null })
 
   const recarregar = useCallback(() => lerGestao()
-    .then((itens) => setCarga((atual) => ({ ...atual, estado: 'ok', itens, erro: null })))
-    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message }))), [])
+    .then((itens) => setCarga((atual) => ({ ...atual, estado: 'ok', itens, erro: null, semLoja: false })))
+    .catch((erro) => setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message, semLoja: lojaDesligada(erro) }))), [])
 
   useEffect(() => {
     let vivo = true
     lerGestao()
-      .then((itens) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'ok', itens, erro: null })) })
-      .catch((erro) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message })) })
+      .then((itens) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'ok', itens, erro: null, semLoja: false })) })
+      .catch((erro) => { if (vivo) setCarga((atual) => ({ ...atual, estado: 'erro', erro: erro.message, semLoja: lojaDesligada(erro) })) })
     return () => { vivo = false }
   }, [])
 

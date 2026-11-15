@@ -128,7 +128,7 @@ export function PainelAtendimento({
         )}
       >
         {primeira
-          ? 'Escolha um cliente na lista para ver as mensagens.'
+          ? 'A conversa que você escolher na lista abre aqui.'
           : 'Altere a busca ou os filtros para encontrar uma conversa.'}
       </Vazio>
     )

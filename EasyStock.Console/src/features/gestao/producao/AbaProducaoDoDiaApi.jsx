@@ -336,7 +336,7 @@ export function AbaProducaoDoDiaApi() {
         <div className={grade.bancada}>
           <section className={grade.cardapio} aria-label="Pratos para produzir">
             {/* #2235 (banca T3-4): buscar é o atalho mais rápido e vem antes dos filtros. */}
-            <div className={grade.filtros}>
+            {cartoes.length > 0 && <div className={grade.filtros}>
               <div className={grade.busca}>
                 <CampoTexto rotulo="Buscar prato" rotuloOculto tipo="search" placeholder="Buscar prato" value={busca} onChange={(e) => setBusca(e.target.value)} />
               </div>
@@ -347,8 +347,8 @@ export function AbaProducaoDoDiaApi() {
                     opcoes={[{ valor: '', rotulo: 'Todas as categorias' }, ...categorias.map((c) => ({ valor: c, rotulo: c }))]} />
                 </div>
               )}
-            </div>
-            {estoque.estado === 'erro' && (
+            </div>}
+            {estoque.estado === 'erro' && cartoes.length > 0 && (
               <p className={css.aviso}>
                 Não foi possível carregar o saldo dos pratos. Você pode registrar a produção mesmo assim.
                 {' '}<Botao variante="texto" icone="refresh-cw" onClick={recarregarEstoque}>Tentar de novo</Botao>
@@ -357,7 +357,9 @@ export function AbaProducaoDoDiaApi() {
             {cartoes.length === 0 ? (
               <Vazio icone="cardapio" titulo="Nenhum prato para produzir"
                 acao={<a className={css.link} href={hashDoModulo('cardapio', 'itens')}>Abrir Itens do cardápio</a>}>
-                Cadastre um prato no cardápio para começar.
+                {estoque.semLoja
+                  ? 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.'
+                  : 'Cadastre um prato no cardápio para começar.'}
               </Vazio>
             ) : visiveis.length === 0 ? (
               <p className={css.descricao}>
@@ -515,7 +517,7 @@ export function AbaProducaoDoDiaApi() {
         <aside className={grade.barraDoLote} aria-labelledby="titulo-do-lote">
           <h3 id="titulo-do-lote" className={grade.tituloDoLote}>
             <Icone nome="package" tamanho={20} />
-            <span>Lote a registrar <span className={grade.itensDoLote}>· {plural(resumo.pratos, 'item', 'itens')}</span></span>
+            <span>Lote a registrar{!semLote && <span className={grade.itensDoLote}> · {plural(resumo.pratos, 'item', 'itens')}</span>}</span>
           </h3>
           {confirmandoLimpar ? (
             <>

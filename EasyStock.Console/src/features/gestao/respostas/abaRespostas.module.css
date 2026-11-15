@@ -3,10 +3,11 @@
 .aba { display: grid; gap: var(--e-5); }
 
 .secao { display: grid; gap: var(--e-3); }
-.secao h3 { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
+.secao h3 { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
 
 .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .descricao { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 60ch; }
+.descricao a { color: var(--marca-forte); text-underline-offset: 3px; }
 
 .filtros { display: flex; align-items: flex-start; gap: var(--e-3); flex-wrap: wrap; }
 .filtroBusca { flex: 1 1 320px; min-width: 0; display: grid; gap: var(--e-1); }
@@ -31,7 +32,7 @@
   flex: 1 1 320px; min-width: 0;
   display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; column-gap: var(--e-2); row-gap: var(--e-1);
 }
-.titulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); }
+.titulo { font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
 .atalho { font-family: var(--f-corpo); font-size: var(--t-micro); color: var(--tinta-3); }
 .marca { font-size: var(--t-micro); color: var(--tinta-3); justify-self: start; }
 .texto {

@@ -113,7 +113,7 @@ export const CartaoConversa = memo(function CartaoConversa({
             />
           </strong>
           {/* #2258 (T7): a cor da borda não é o único sinal; o prazo estourado e a vez da equipe têm ícone e texto. */}
-          {slaEstourado && (
+          {slaEstourado && motivo?.chave !== 'esperando' && (
             <span className={css.sinalPrazo} title="Prazo de resposta estourado" role="img" aria-label="Prazo de resposta estourado">
               <Icone nome="relogio" tamanho={16} />
             </span>
