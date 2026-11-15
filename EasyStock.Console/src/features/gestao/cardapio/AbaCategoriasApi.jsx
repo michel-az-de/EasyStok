@@ -11,10 +11,10 @@ import css from './abaCardapio.module.css'
 
 // M1 › Categorias (M1.3, #1483). As categorias que o cliente vê no site e que agrupam a comanda,
 // na ordem que ela define. Renomear, esconder (sem apagar os pratos), subir/descer e excluir só a
-// vazia. "Converter as categorias antigas" cria uma categoria por texto livre que os pratos já
+// vazia (#2656: o Excluir parado diz o motivo e o Ocultar nomeia a categoria). "Converter as categorias antigas" cria uma categoria por texto livre que os pratos já
 // tinham e liga cada prato a ela; pode rodar de novo sem duplicar. #1803: enquanto houver prato só
 // com o texto antigo, a tela diz quais categorias são e o que a conversão faz (prévia do servidor).
-function LinhaCategoria({ secao, primeira, ultima, gestao }) {
+export function LinhaCategoria({ secao, primeira, ultima, gestao }) {
   const [editando, setEditando] = useState(false)
   const [nome, setNome] = useState(secao.nome)
   const [ocupado, setOcupado] = useState(false)
@@ -56,7 +56,8 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
       <div className={css.acoes}>
           <>
             <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Renomear ${secao.nome}`} aria-haspopup="dialog" onClick={() => { setNome(secao.nome); gestao.fecharAviso(); setEditando(true) }}>Renomear</Botao>
-            <Botao variante="texto" disabled={ocupado} onClick={() => fazer(() => gestao.alternarVisivel(secao.id))}>
+            <Botao variante="texto" disabled={ocupado} aria-label={`${secao.visivel ? 'Ocultar' : 'Mostrar'} ${secao.nome} no site`}
+              onClick={() => fazer(() => gestao.alternarVisivel(secao.id))}>
               {secao.visivel ? 'Ocultar no site' : 'Mostrar no site'}
             </Botao>
             <Botao
@@ -64,7 +65,7 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
               icone="lixeira"
               disabled={ocupado || secao.itens > 0}
               aria-label={`Excluir ${secao.nome}`}
-              title={secao.itens > 0 ? 'Mude os pratos de categoria antes de excluir' : undefined}
+              motivo={secao.itens > 0 ? 'Mude os pratos de categoria antes de excluir' : undefined}
               onClick={() => fazer(() => gestao.excluir(secao.id))}
             >
               Excluir
