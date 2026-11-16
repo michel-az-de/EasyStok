@@ -85,6 +85,8 @@ public sealed class ContaReceberPixReconciliacaoJob(
     private async Task ProcessarAsync(CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
+        // #2743: job sem usuario: a policy RLS zera parcelas_receber sem o bypass (ligado antes da 1a conexao).
+        using var _ = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().UseRowLevelSecurityBypass();
         var contaRepo = scope.ServiceProvider.GetRequiredService<IContaReceberRepository>();
         var reconciliarUseCase = scope.ServiceProvider.GetRequiredService<ReconciliarPixParcelaReceberUseCase>();
         var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();

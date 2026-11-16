@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using Microsoft.Extensions.Logging;
 
@@ -26,6 +27,7 @@ namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
 public sealed class EfiPixWebhookProcessor(
     ReconciliarPixParcelaReceberUseCase reconciliarPixParcelaReceberUseCase,
     IUnitOfWork unitOfWork,
+    IRowLevelSecurityBypass rlsBypass,
     ILogger<EfiPixWebhookProcessor> logger) : IGatewayWebhookProcessor
 {
     public const string ErroTxidDesconhecido = "txid_desconhecido";
@@ -52,6 +54,8 @@ public sealed class EfiPixWebhookProcessor(
         if (!payload.TryGetProperty("pix", out var pixArray) || pixArray.ValueKind != JsonValueKind.Array)
             return ResultadoWebhookGateway.Ok;
 
+        // #2743: webhook anonimo, sem tenant: IgnoreQueryFilters nao basta, a policy RLS zera parcelas_receber.
+        using var _ = rlsBypass.Begin();
         var algumDesconhecido = false;
         Exception? falha = null;
         foreach (var item in pixArray.EnumerateArray())
