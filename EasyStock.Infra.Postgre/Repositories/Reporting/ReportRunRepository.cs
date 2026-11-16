@@ -210,6 +210,7 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
 
     /// <summary>
     /// Recicla runs com lease expirado. Incrementa tentativas; se esgotadas → Failed terminal.
+    /// Run em Canceling com lease vencido (worker morto) é fechada como Canceled (#2773).
     /// Executa dentro de advisory lock global para watchdog (G-15).
     /// </summary>
     public async Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct)
@@ -254,7 +255,22 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             """,
             ct);
 
-        return pendingReclaim + terminalReclaim;
+        // #2773: Canceling com lease vencido = worker morreu antes de fechar o cancelamento.
+        // Espelha ReportRun.MarkCanceled (Canceled, finished_at, lease nulo). Worker vivo fecha
+        // sozinho dentro do prazo; o lease não é renovado em Canceling (heartbeat só em Running).
+        var canceledReclaim = await db.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE public.report_runs
+               SET status          = 3,
+                   finished_at      = now(),
+                   lease_expires_at = NULL,
+                   alterado_em      = now()
+             WHERE status           = 5
+               AND lease_expires_at < now()
+            """,
+            ct);
+
+        return pendingReclaim + terminalReclaim + canceledReclaim;
     }
 
     // ── GC de artefatos ───────────────────────────────────────────────────────
@@ -286,4 +302,54 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         return storageKeys;
     }
 
+    // ── Worker: fechamento atômico (#2764) ───────────────────────────────────
+
+    public async Task<ReportRunDesfecho> FecharAsync(
+        ReportRun run, Action<ReportRun> desfechoNormal, CancellationToken ct)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        // Trava a linha desta tentativa. SqlQueryRaw não compõe com FOR UPDATE: lista e pega o primeiro em memória.
+        var status = await db.Database
+            .SqlQueryRaw<int>(
+                """
+                SELECT status AS "Value"
+                  FROM public.report_runs
+                 WHERE id         = {0}
+                   AND tentativas = {1}
+                   FOR UPDATE
+                """,
+                run.Id, run.Tentativas)
+            .ToListAsync(ct);
+
+        if (status.Count == 0 || (status[0] != 1 && status[0] != 5))
+            return ReportRunDesfecho.TentativaPerdida;
+
+        // Cancelamento pedido durante a geração: vence qualquer desfecho normal (sucesso, retry ou falha).
+        var desfecho = status[0] == 5 ? ReportRunDesfecho.CanceladoPeloUsuario : ReportRunDesfecho.Gravado;
+        if (desfecho == ReportRunDesfecho.CanceladoPeloUsuario)
+            run.MarkCanceled();
+        else
+            desfechoNormal(run);
+
+        // Alinha o xmin DEPOIS da trava: o heartbeat avança o xmin com UPDATE direto.
+        var versoes = await db.Database
+            .SqlQueryRaw<long>(
+                """
+                SELECT xmin::text::bigint AS "Value"
+                  FROM public.report_runs
+                 WHERE id = {0}
+                """,
+                run.Id)
+            .ToListAsync(ct);
+
+        var entry = db.Entry(run);
+        entry.State = EntityState.Modified;
+        if (versoes.Count == 1)
+            entry.Property(r => r.Xmin).OriginalValue = (uint)versoes[0];
+
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return desfecho;
+    }
 }

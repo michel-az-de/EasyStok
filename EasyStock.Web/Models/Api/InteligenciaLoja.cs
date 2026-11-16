@@ -46,7 +46,7 @@ public record ProdutoTurnoverApi
 {
     public Guid ProdutoId { get; init; }
     public string NomeProduto { get; init; } = "";
-    public int QuantidadeVendida { get; init; }
+    public decimal QuantidadeVendida { get; init; }
     public decimal ReceitaGerada { get; init; }
     public decimal TaxaSaidaDiaria { get; init; }
 }

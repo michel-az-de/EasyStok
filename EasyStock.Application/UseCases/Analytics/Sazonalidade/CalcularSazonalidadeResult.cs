@@ -3,7 +3,7 @@ namespace EasyStock.Application.UseCases.Analytics.Sazonalidade;
 public sealed record CalcularSazonalidadeResult(
     int Ano,
     int Mes,
-    int TotalSaidas,
+    decimal TotalSaidas,
     decimal ValorTotal,
     decimal MediaMovelTresMeses)
 {
