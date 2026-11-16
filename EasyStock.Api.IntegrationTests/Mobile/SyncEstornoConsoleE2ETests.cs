@@ -56,19 +56,7 @@ public class SyncEstornoConsoleE2ETests(MobileE2EFixture fixture)
     {
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         var (empresaId, _, a, b) = await DoisAparelhosAsync();
-
-        // A lança a saída; o vínculo cria o MovimentoCaixa "mobile:<id>" dentro do push.
-        var lancamento = "ce-" + Guid.NewGuid().ToString("N")[..20];
-        var envio = new
-        {
-            id = "mut_" + Guid.NewGuid(), deviceId = a.DeviceId, type = "cashEntry.upsert",
-            payload = new { id = lancamento, type = "expense", amount = 15m, description = "Gás", metodo = "pix", createdAt = Ms(DateTime.UtcNow) },
-            ts = Ms(DateTime.UtcNow),
-        };
-        (await a.Http.PostAsJsonAsync("/api/mobile/sync", new { deviceId = a.DeviceId, operatorName = "Thati", mutations = new[] { envio } }, Json))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
-        var movimentoId = await LerAsync(db => db.Set<MovimentoCaixa>().IgnoreQueryFilters().AsNoTracking()
-            .Where(m => m.Referencia == "mobile:" + lancamento).Select(m => m.Id).SingleAsync());
+        var (lancamento, movimentoId) = await LancarNoAparelhoAsync(a);
         await LancadoOntemAsync(movimentoId, lancamento);
         await PullAsync(a);
         await PullAsync(b);
@@ -81,7 +69,58 @@ public class SyncEstornoConsoleE2ETests(MobileE2EFixture fixture)
                 .Which.Payload.GetProperty("estornado").GetBoolean().Should().BeTrue();
     }
 
+    [SkippableFact]
+    public async Task LancamentoEditadoPorOutroAparelho_EstornadoNoConsole_DesceUmaVezSo()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresaId, _, a, b) = await DoisAparelhosAsync();
+        var (lancamento, movimentoId) = await LancarNoAparelhoAsync(a);
+        await LancadoOntemAsync(movimentoId, lancamento);
+        await PullAsync(a);
+        await PullAsync(b);
+
+        // B edita o lançamento depois do cursor: o pull de mobile_cash_entries leva o mesmo id para A.
+        using (var scope = fixture.Factory!.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().Set<CashEntry>().IgnoreQueryFilters()
+                .Where(c => c.Id == lancamento)
+                .ExecuteUpdateAsync(u => u.SetProperty(c => c.Description, "Gás de cozinha")
+                    .SetProperty(c => c.LastDeviceId, b.DeviceId)
+                    .SetProperty(c => c.ServerUpdatedAt, DateTime.UtcNow));
+
+        await EstornarNoConsoleAsync(empresaId, movimentoId);
+
+        // A recebe a edição de B e o estorno numa mutation só, a do pull de mobile_cash_entries.
+        var paraA = (await PullAsync(a)).Should().ContainSingle(m => m.Tipo == "cashEntry.upsert" && m.Id == lancamento,
+            "o mesmo id não pode descer duas vezes").Which.Payload;
+        paraA.GetProperty("description").GetString().Should().Be("Gás de cozinha");
+        Estornado(paraA).Should().BeTrue("o estorno do console entra na mutation que já ia descer");
+
+        // B não recebe o eco da própria edição: o estorno desce como upsert novo.
+        Estornado((await PullAsync(b)).Should().ContainSingle(m => m.Tipo == "cashEntry.upsert" && m.Id == lancamento)
+            .Which.Payload).Should().BeTrue();
+    }
+
     // ---------- apoio ----------
+
+    /// <summary>O aparelho lança a saída; o vínculo cria o MovimentoCaixa "mobile:&lt;id&gt;" dentro do push.</summary>
+    private async Task<(string Lancamento, Guid MovimentoId)> LancarNoAparelhoAsync(Aparelho aparelho)
+    {
+        var lancamento = "ce-" + Guid.NewGuid().ToString("N")[..20];
+        var envio = new
+        {
+            id = "mut_" + Guid.NewGuid(), deviceId = aparelho.DeviceId, type = "cashEntry.upsert",
+            payload = new { id = lancamento, type = "expense", amount = 15m, description = "Gás", metodo = "pix", createdAt = Ms(DateTime.UtcNow) },
+            ts = Ms(DateTime.UtcNow),
+        };
+        (await aparelho.Http.PostAsJsonAsync("/api/mobile/sync", new { deviceId = aparelho.DeviceId, operatorName = "Thati", mutations = new[] { envio } }, Json))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        var movimentoId = await LerAsync(db => db.Set<MovimentoCaixa>().IgnoreQueryFilters().AsNoTracking()
+            .Where(m => m.Referencia == "mobile:" + lancamento).Select(m => m.Id).SingleAsync());
+        return (lancamento, movimentoId);
+    }
+
+    private static bool Estornado(JsonElement payload) =>
+        payload.TryGetProperty("estornado", out var e) && e.ValueKind == JsonValueKind.True;
 
     private sealed record Aparelho(string DeviceId, HttpClient Http)
     {
