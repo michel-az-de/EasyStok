@@ -175,8 +175,10 @@
   width: var(--toque); height: var(--toque); margin: calc(var(--toque) * -0.25);
   background: none; border: 0; color: var(--tinta-3); cursor: grab; touch-action: none;
 }
+/* Bloco, não flex: em contêiner flex a reticência não vale e o nome comprido era cortado seco. O botão
+   já centra o texto na altura de toque. */
 .nomeCartao {
-  display: flex; align-items: center; max-width: 100%; min-height: var(--toque);
+  display: block; max-width: 100%; min-height: var(--toque);
   font-family: var(--f-display); font-size: var(--t-forte); font-weight: 600;
   background: none; border: 0; padding: 0; margin: 0; text-align: left; color: inherit; cursor: pointer;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em;
@@ -275,8 +277,10 @@
   box-shadow: none; min-height: var(--toque);
 }
 .linha3 > button:hover:not(:disabled) { background: color-mix(in srgb, var(--marca) 18%, var(--marca-claro)); }
-/* #2762 (VD14): no escuro o pastel quase some no papel; o texto em --marca-forte sustenta o contraste. */
-.linha3 > button:not(:disabled) { color: var(--marca-forte); }
+/* #2762 (VD14): no escuro o pastel quase some no papel; o texto em --marca-forte sustenta o contraste.
+   O hover entra na lista porque a regra dele, acima, é mais específica e devolvia --marca. */
+.linha3 > button:not(:disabled),
+.linha3 > button:hover:not(:disabled) { color: var(--marca-forte); }
 
 /* #2762 (VD12): o gatilho do menu aberto fica marcado, para mostrar de qual cartão é a camada. */
 .linha1 button[aria-haspopup='menu'][aria-expanded='true'] { background: var(--preenchimento); }

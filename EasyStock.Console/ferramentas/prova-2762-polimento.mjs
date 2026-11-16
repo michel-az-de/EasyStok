@@ -7,7 +7,9 @@
 //   node ferramentas/prova-2762-polimento.mjs
 
 import { readFileSync, readdirSync } from 'node:fs'
+import { registerHooks } from 'node:module'
 import assert from 'node:assert/strict'
+import { transformWithOxc } from 'vite'
 
 const SRC = new URL('../src/', import.meta.url)
 const fonte = (caminho) => readFileSync(new URL(caminho, SRC), 'utf8')
@@ -188,7 +190,7 @@ confere('login: a altura do botão do Google fica reservada, e sai junto quando 
   assert.match(fonte('features/login/BotaoGoogle.jsx'), /return null/, 'é o `null` do botão que deixa a caixa vazia')
 })
 
-confere('busca: o X nativo só aparece com texto digitado, e o placeholder cabe inteiro', () => {
+confere('busca: o X nativo só aparece com texto digitado (no campo vazio ele tirava lugar do placeholder)', () => {
   assert.match(regra(fonte('componentes/Campo.module.css'), '.controle:placeholder-shown::-webkit-search-cancel-button'), /display:\s*none/)
 })
 
@@ -260,6 +262,193 @@ confere('alcance por bairro: a variação é um trecho próprio, sem ponto médi
   assert.match(regra(css, '.alcanceNumeros .alcanceVariacao, .alcanceNumeros .alcanceCaiu'), /white-space:\s*nowrap/)
   assert.match(fonte('features/entregas/PainelAlcance.jsx'), /'clientes'\)\}<\/span>\s*\{' '\}<Variacao/, 'os números fecham o trecho antes da variação')
 })
+
+// ---------- achados da revisão do diff ----------
+
+// Valor que vence entre as regras de mesmo seletor (mesma especificidade: vale a última).
+const ultimaDeclaracao = (css, seletor, propriedade) => {
+  let valor
+  for (const [, seletores, corpo] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!seletores.split(',').map((s) => s.trim()).includes(seletor)) continue
+    const achado = corpo.match(new RegExp(`(?:^|[;\\s])${propriedade}:\\s*([^;]+)`))
+    if (achado) valor = achado[1].trim()
+  }
+  return valor
+}
+
+confere('reticência: nenhuma regra pede `text-overflow: ellipsis` num contêiner flex ou grid, onde ela não vale', () => {
+  const cortadas = []
+  for (const arquivo of listar('.')) {
+    for (const [, seletores, corpo] of semComentario(fonte(arquivo)).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (/text-overflow:\s*ellipsis/.test(corpo) && /display:\s*(?:inline-)?(?:flex|grid)/.test(corpo)) cortadas.push(`${arquivo}: ${seletores.trim()}`)
+    }
+  }
+  assert.deepEqual(cortadas, [], `o texto vira item anônimo e é cortado sem "…":\n${cortadas.join('\n')}`)
+})
+
+confere('cartão de entrega: o botão do passo mantém a tinta forte em repouso e sob o ponteiro', () => {
+  const css = semComentario(fonte('features/entregas/dashboard.module.css'))
+  assert.equal(ultimaDeclaracao(css, '.linha3 > button:not(:disabled)', 'color'), 'var(--marca-forte)')
+  assert.equal(ultimaDeclaracao(css, '.linha3 > button:hover:not(:disabled)', 'color'), 'var(--marca-forte)', 'a regra de hover é mais específica: sem a cor nela, o ponteiro devolve --marca')
+})
+
+confere('produção do dia: o cartão no lote também mostra o pressionado', () => {
+  const css = semComentario(fonte('features/gestao/producao/producaoDoDia.module.css'))
+  const hover = css.indexOf('.noLote .tocar:hover:not(:disabled)')
+  const pressionado = css.indexOf('.noLote .tocar:active:not(:disabled)')
+  assert.ok(hover >= 0 && pressionado > hover, 'o hover do lote é mais específico que o :active comum: o lote precisa do seu pressionado, depois do hover')
+  assert.doesNotMatch(regra(css, '.noLote .tocar:active:not(:disabled)'), /background:\s*transparent/)
+})
+
+// O provedor real do Aviso (JSX compilado) com um React mínimo e relógio falso. A atualização de estado
+// fica na fila e só roda no desenho seguinte, como no React quando já há outra pendente: função de
+// atualização que mexe em relógio erra aqui. Não prova pixels, foco nem leitor de tela.
+const urlAviso = new URL('componentes/Aviso.jsx', SRC)
+const avisoCompilado = (await transformWithOxc(fonte('componentes/Aviso.jsx'), urlAviso.pathname, { jsx: { runtime: 'automatic' } })).code
+let host
+const mesmasDeps = (a, b) => a?.length === b?.length && a?.every((v, i) => Object.is(v, b[i]))
+const memorizar = (fn, deps) => {
+  const i = host.indice++
+  if (!host.valores[i] || !mesmasDeps(host.valores[i].deps, deps)) host.valores[i] = { deps, valor: fn() }
+  return host.valores[i].valor
+}
+globalThis.__prova2762 = {
+  useState(inicial) {
+    const h = host
+    const i = h.indice++
+    if (!(i in h.valores)) h.valores[i] = inicial
+    return [h.valores[i], (valor) => { h.fila.push([i, valor]) }]
+  },
+  useRef(inicial) { const i = host.indice++; return host.valores[i] ??= { current: inicial } },
+  useMemo: memorizar,
+  useCallback: (fn, deps) => memorizar(() => fn, deps),
+  useEffect(fn, deps) {
+    const h = host
+    const i = h.indice++
+    const anterior = h.efeitos.get(i)
+    if (!mesmasDeps(anterior?.deps, deps)) h.pendentes.push(() => { anterior?.limpar?.(); h.efeitos.set(i, { deps, limpar: fn() }) })
+  },
+  createContext: (padrao) => ({ padrao, Provider: 'Provider' }),
+  useContext: (contexto) => contexto.padrao,
+}
+const modulo = (texto) => 'data:text/javascript,' + encodeURIComponent(texto)
+registerHooks({
+  resolve(spec, contexto, proximo) {
+    if (contexto.parentURL !== urlAviso.href) return proximo(spec, contexto)
+    if (spec === 'react') return { url: modulo('const h=globalThis.__prova2762; export const createContext=h.createContext,useCallback=h.useCallback,useContext=h.useContext,useEffect=h.useEffect,useMemo=h.useMemo,useRef=h.useRef,useState=h.useState'), shortCircuit: true }
+    if (spec === 'react/jsx-runtime') return { url: modulo('export const Fragment="fragment"; export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx'), shortCircuit: true }
+    if (spec.endsWith('.css')) return { url: modulo('export default new Proxy({},{get:(_,chave)=>String(chave)})'), shortCircuit: true }
+    return { url: modulo('const casca=()=>null; export const Botao=casca,BotaoIcone=casca,Icone=casca'), shortCircuit: true }
+  },
+  load(url, contexto, proximo) {
+    return url === urlAviso.href ? { format: 'module', shortCircuit: true, source: avisoCompilado } : proximo(url, contexto)
+  },
+})
+const { ProvedorDeAviso, DURACAO_DO_AVISO_MS, DURACAO_COM_ACAO_MS } = await import(urlAviso.href)
+const SAIDA_DO_AVISO_MS = 150 // --dur-curta
+
+const relogioFalso = () => {
+  const real = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout }
+  const armados = new Map()
+  let agora = 0
+  let serie = 0
+  globalThis.setTimeout = (fn, ms = 0) => { serie += 1; armados.set(serie, { fn, em: agora + ms }); return serie }
+  globalThis.clearTimeout = (id) => { armados.delete(id) }
+  return {
+    armados: () => armados.size,
+    avancar(ms, aposCada) {
+      const fim = agora + ms
+      for (;;) {
+        const [id, vencido] = [...armados].filter(([, t]) => t.em <= fim).sort((a, b) => a[1].em - b[1].em || a[0] - b[0])[0] ?? []
+        if (!vencido) break
+        agora = vencido.em
+        armados.delete(id)
+        vencido.fn()
+        aposCada()
+      }
+      agora = fim
+    },
+    devolver() { Object.assign(globalThis, real) },
+  }
+}
+const acharNo = (no, teste) => {
+  if (!no || typeof no !== 'object') return null
+  if (Array.isArray(no)) { for (const filho of no) { const achado = acharNo(filho, teste); if (achado) return achado } return null }
+  return teste(no) ? no : acharNo(no.props?.children, teste)
+}
+const montarAviso = () => {
+  const h = { valores: [], efeitos: new Map(), pendentes: [], fila: [], indice: 0, arvore: null }
+  const desenhar = () => {
+    do {
+      for (const [i, valor] of h.fila.splice(0)) h.valores[i] = typeof valor === 'function' ? valor(h.valores[i]) : valor
+      h.indice = 0
+      host = h
+      h.arvore = ProvedorDeAviso({ children: null })
+      for (const efeito of h.pendentes.splice(0)) efeito()
+    } while (h.fila.length)
+  }
+  desenhar()
+  return {
+    desenhar,
+    get api() { return h.arvore.props.value },
+    estado() {
+      const no = acharNo(h.arvore, (n) => n.props?.['data-aviso'] !== undefined || n.props?.['data-aviso-saindo'] !== undefined)
+      if (!no) return 'sem aviso'
+      return no.props['data-aviso-saindo'] ? 'saindo' : 'na tela'
+    },
+    texto: () => acharNo(h.arvore, (n) => n.type === 'p')?.props.children,
+  }
+}
+const comRelogioFalso = (fn) => { const relogio = relogioFalso(); try { fn(relogio) } finally { relogio.devolver() } }
+
+confere('Aviso: dispensar o aviso de outro não apaga o aviso da tela nem cancela o prazo dele', () => comRelogioFalso((relogio) => {
+  const tela = montarAviso()
+  tela.api.mostrar({ texto: 'Anexo removido', acao: { rotulo: 'Desfazer', aoAgir() {} } })
+  tela.desenhar()
+  assert.equal(tela.estado(), 'na tela')
+  // O Composer que sai da conversa sem aviso próprio chama dispensar(-1).
+  tela.api.dispensar(-1)
+  tela.desenhar()
+  assert.equal(tela.estado(), 'na tela', 'quem saiu não apaga o aviso de outro')
+  relogio.avancar(DURACAO_COM_ACAO_MS - 1, tela.desenhar)
+  assert.equal(tela.estado(), 'na tela', 'o aviso com ação dura o prazo inteiro')
+  relogio.avancar(1, tela.desenhar)
+  assert.equal(tela.estado(), 'saindo', 'vencido o prazo ele sai sozinho: o dispensar de outro não pode ter parado o relógio')
+  relogio.avancar(SAIDA_DO_AVISO_MS, tela.desenhar)
+  assert.equal(tela.estado(), 'sem aviso')
+  assert.equal(relogio.armados(), 0, 'nenhum relógio sobra armado')
+}))
+
+confere('Aviso: dispensar um aviso e mostrar outro em seguida deixa o novo com o prazo dele', () => comRelogioFalso((relogio) => {
+  const tela = montarAviso()
+  const anexo = tela.api.mostrar({ texto: 'Anexo removido', acao: { rotulo: 'Desfazer', aoAgir() {} } })
+  tela.desenhar()
+  // O Composer que desmonta gravando: dispensa o aviso do anexo e avisa da gravação, no mesmo turno.
+  tela.api.dispensar(anexo)
+  tela.api.mostrar({ texto: 'Gravação descartada' })
+  tela.desenhar()
+  assert.equal(tela.estado(), 'na tela')
+  assert.equal(tela.texto(), 'Gravação descartada')
+  relogio.avancar(DURACAO_DO_AVISO_MS - 1, tela.desenhar)
+  assert.equal(tela.estado(), 'na tela', 'o prazo do aviso antigo não vale para o novo')
+  relogio.avancar(1, tela.desenhar)
+  assert.equal(tela.estado(), 'saindo', 'o aviso novo sai no prazo dele')
+  relogio.avancar(SAIDA_DO_AVISO_MS, tela.desenhar)
+  assert.equal(tela.estado(), 'sem aviso')
+  assert.equal(relogio.armados(), 0, 'nenhum relógio sobra armado')
+}))
+
+confere('Aviso: dispensar com o id certo começa a saída na hora e desarma o prazo', () => comRelogioFalso((relogio) => {
+  const tela = montarAviso()
+  const salvo = tela.api.mostrar({ texto: 'Salvo' })
+  tela.desenhar()
+  tela.api.dispensar(salvo)
+  tela.desenhar()
+  assert.equal(tela.estado(), 'saindo')
+  relogio.avancar(SAIDA_DO_AVISO_MS, tela.desenhar)
+  assert.equal(tela.estado(), 'sem aviso')
+  assert.equal(relogio.armados(), 0, 'o prazo de 4 s não fica armado depois de dispensar')
+}))
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) process.exit(1)

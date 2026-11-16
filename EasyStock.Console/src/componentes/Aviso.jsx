@@ -42,14 +42,18 @@ export function ProvedorDeAviso({ children }) {
   const contador = useRef(0)
   const relogio = useRef(null)
   const restante = useRef(0)
+  const contandoPrazo = useRef(null) // id do aviso que ainda conta prazo; null sem aviso ou com ele já saindo
 
-  // Com `id`, só dispensa se aquele aviso ainda é o da tela (quem saiu não apaga o aviso de outro).
+  // Com `id`, só dispensa se aquele aviso ainda é o da tela: quem saiu não apaga o aviso de outro nem para
+  // o relógio dele. Por isso o id é conferido aqui, antes do clearTimeout, e não na função de atualização.
   // #2762 (A5): dispensar não desmonta na hora: marca `saindo` e o aviso fica --dur-curta mais, só para
   // sumir suavemente (inert e aria-hidden, sem clique nem foco). Sem movimento reduzido sai direto.
   const dispensar = useCallback((id) => {
+    if (contandoPrazo.current === null || (id !== undefined && contandoPrazo.current !== id)) return
+    contandoPrazo.current = null
     clearTimeout(relogio.current)
     setAviso((atual) => {
-      if (!atual || atual.saindo || (id !== undefined && atual.id !== id)) return atual
+      if (!atual || atual.saindo) return atual
       return semMovimento() ? null : { ...atual, saindo: true }
     })
   }, [])
@@ -69,6 +73,7 @@ export function ProvedorDeAviso({ children }) {
   const mostrar = useCallback(({ texto, tom = 'info', acao = null, duracao }) => {
     contador.current += 1
     const id = contador.current
+    contandoPrazo.current = id
     setAviso({ id, texto, tom: tom in TONS ? tom : 'info', acao })
     armar(id, duracao ?? (acao ? DURACAO_COM_ACAO_MS : DURACAO_DO_AVISO_MS))
     return id

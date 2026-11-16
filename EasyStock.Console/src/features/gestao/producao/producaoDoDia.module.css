@@ -73,8 +73,10 @@
 }
 .tocar:hover:not(:disabled) { background: var(--preenchimento); }
 .tocar:active:not(:disabled) { background: var(--preenchimento-forte); }
-/* O cartão no lote mantém o fundo de marca ao passar o mouse; o pressionado ainda responde. */
+/* O cartão no lote mantém o fundo de marca ao passar o mouse. O pressionado dele vem depois e com o mesmo
+   peso: o :active comum perde para este hover. */
 .noLote .tocar:hover:not(:disabled) { background: transparent; }
+.noLote .tocar:active:not(:disabled) { background: color-mix(in srgb, var(--marca) 18%, var(--marca-claro)); }
 /* #1809: a foto ocupa a largura do cartão numa proporção fixa. O lugar existe antes de a imagem
    chegar e continua igual sem foto: nada abaixo dela se mexe. */
 .fotoDoPrato {
