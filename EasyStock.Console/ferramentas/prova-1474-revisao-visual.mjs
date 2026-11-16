@@ -6,7 +6,7 @@
 //   C4  erro da API mostra o `detail` útil no lugar de "Requisição inválida";
 //   C5  baixa manual com cobrança online pendente cancela o link (na_entrega) antes do pagamento;
 //   C6  legenda da foto sem peso duplicado e sem "Foto N";
-//   C9  saldo sem valor vira "—", não "null porções";
+//   C9  saldo sem valor vira "Sem saldo" (#2792), não "null porções";
 //   C11 automáticas de entrada dizem a verdade sobre a saudação; carregando/erro/vazio separados;
 //   C12 sugestão de tag já presente some; "cliente_vip" aparece "cliente vip";
 //   C13 aviso velho some quando a ação seguinte dá certo; vitrine desligada vira texto acionável;
@@ -248,9 +248,9 @@ await confere('C6 peça da galeria do cardápio leva legenda sem "Foto N"', () =
 })
 
 // ── C9 ─────────────────────────────────────────────────────────────────────
-await confere('C9 saldo sem valor vira "—"', () => {
-  assert.equal(producao.rotuloDoSaldo(null), '—')
-  assert.equal(producao.rotuloDoSaldo(undefined), '—')
+await confere('C9 saldo sem valor vira "Sem saldo" (#2792: sem travessão)', () => {
+  assert.equal(producao.rotuloDoSaldo(null), 'Sem saldo')
+  assert.equal(producao.rotuloDoSaldo(undefined), 'Sem saldo')
   assert.equal(producao.rotuloDoSaldo(1), '1 porção')
   assert.equal(producao.rotuloDoSaldo(0), '0 porções')
 })

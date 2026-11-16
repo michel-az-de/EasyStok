@@ -32,7 +32,7 @@ export const PADRAO_DIAS_AVISO_VENCIMENTO = 1 // RN-51: proposta de prazo para a
 
 // Saldo da tabela "Saldo por item" (#1474): item sem controle de saldo (API devolve nulo)
 // mostra "—", não "null porções".
-export const rotuloDoSaldo = (estoque) => (estoque == null ? '—' : plural(estoque, 'porção', 'porções'))
+export const rotuloDoSaldo = (estoque) => (estoque == null ? 'Sem saldo' : plural(estoque, 'porção', 'porções'))
 
 // ---------------------------------------------------------------------------
 // Lote de produção (UC-08). `porcoes` já chega em porção de venda (RN-46),

@@ -8,7 +8,11 @@ import { podeVerIntegracoes } from '../../dominio/acessoModulos'
 import { erroDoModelo } from '../../dominio/falhaDeEnvio'
 import { hashDoModulo } from '../../dominio/modulos'
 import { nomeDaConversa } from '../../dominio/nomeDoContato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './atendimento.module.css'
+
+// #2792: o limite de cada campo do modelo espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o envio trava.
+const LIMITE_PARAMETRO = 1024
 
 // #1408: com `cliente` no lugar de `conversa`, é o "Chamar no WhatsApp" de quem nunca escreveu: a API abre (ou
 // reaproveita) a conversa e `aoIniciar` recebe o id dela para o Balcão abrir.
@@ -48,6 +52,7 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
     ? !String(cliente.telefone ?? '').trim()
     : Boolean(conversa.bloqueio) || conversa.estado === 'Encerrado' || !conversa.clienteId
   const falta = escolha === '' || !modelo || modelo.indisponivel || parametros.some(p => !p.trim() || p.includes('{{'))
+    || algumPassaDoLimite(...parametros.map(p => [p, LIMITE_PARAMETRO]))
   const previa = modelo ? [modelo.cabecalho, modelo.corpo.replace(/\{\{([1-9][0-9]?)\}\}/g,
     (original, n) => parametros[Number(n) - 1]?.trim() || original), modelo.rodape].filter(Boolean).join('\n') : ''
   // #1408: a conversa aberta pelo "Chamar" só é levada ao Balcão ao fechar: no celular, abrir a conversa troca a aba e
@@ -107,7 +112,7 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
             <p>{modelo.categoria === 'MARKETING' ? 'Novidades e promoções: exige autorização de marketing na Ficha.' : 'Aviso transacional: respeita os consentimentos da Ficha.'}</p>
             {modelo.indisponivel && <p role="alert" className={css.programarErro}>{modelo.indisponivel}</p>}
             {!modelo.indisponivel && parametros.length > 0 && <p>Preencha os campos numerados e confira cada substituição na prévia abaixo.</p>}
-            {!modelo.indisponivel && parametros.map((p, i) => <CampoTexto key={i} rotulo={`Campo ${i + 1} ({{${i + 1}}})`} value={p} maxLength={1024}
+            {!modelo.indisponivel && parametros.map((p, i) => <CampoTexto key={i} rotulo={`Campo ${i + 1} ({{${i + 1}}})`} value={p} limite={LIMITE_PARAMETRO}
               onChange={e => setParametros(atuais => atuais.map((v, n) => n === i ? e.target.value : v))} />)}
             <p className={css.cardapioRotulo}>Prévia da mensagem</p>
             <p className={css.programadaTexto}>{previa}</p>

@@ -50,8 +50,9 @@ function usePedidosDoCliente(clienteId, { empresaId, identidade }, habilitado) {
 // `aoAbrirConversa` (cadastro com mudança por salvar) as conversas ficam listadas, mas não abrem.
 // `conversasNoAtendimento` são as que o Atendimento já carregou. Vem por prop: este editor também abre pela
 // Buscar na Casa, fora do AtendimentoProvider, e lá as conversas ficam só como registro.
+// #2792: `carregandoRelacionamento` vale só até o primeiro dossiê chegar; em releitura o valor anterior fica na tela.
 // `aoGravar` avisa quem mostra a mesma pessoa (a Ficha do Atendimento) de que endereço ou telefone mudou.
-export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relacionamento, conversasNoAtendimento, aoAbrirConversa, aoGravar }) {
+export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relacionamento, carregandoRelacionamento = false, conversasNoAtendimento, aoAbrirConversa, aoGravar }) {
   const ids = { pedidos: useId(), enderecos: useId(), telefones: useId(), conversas: useId(), form: useId() }
   const { acoes } = useAcessoModulos()
   const vePedidos = acoes.verPedidos === true
@@ -149,7 +150,9 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
     <section aria-labelledby={ids.pedidos}>
       <div className={css.barra}><h3 id={ids.pedidos}>Pedidos</h3></div>
       <p><strong>{resumo.contagem}</strong>{resumo.ultimo && <> · {resumo.ultimo}</>}</p>
-      {numeros.length > 0 && <p>{numeros.join(' · ')}</p>}
+      {/* #2792: sem o dossiê, "Valor total" e "Costuma pedir" não aparecem e a ficha parece sem histórico: diz que está lendo. */}
+      {carregandoRelacionamento ? <p className={css.legenda}>Carregando valor total e o que costuma pedir…</p>
+        : numeros.length > 0 && <p>{numeros.join(' · ')}</p>}
       {vePedidos && (pedidos.erro ? <div className={css.erro} role="alert"><p>{pedidos.erro}</p><Botao onClick={pedidos.recarregar}>Tentar de novo</Botao></div>
         : pedidos.carregando ? <p className={css.legenda}>Carregando pedidos…</p>
         : pedidos.itens.length > 0 && <ul className={css.itensFicha} aria-label="Últimos pedidos">{pedidos.itens.map(p => <li key={p.id}>

@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import css from './Campo.module.css'
+import { erroDoLimite } from '../componentes/limiteDoCampo'
 
 const descricao = (id, dica, adicional, erro, aviso) => [erro ? `${id}-erro` : aviso ? `${id}-aviso` : dica && `${id}-dica`, adicional].filter(Boolean).join(' ') || undefined
 
@@ -8,7 +9,12 @@ const descricao = (id, dica, adicional, erro, aviso) => [erro ? `${id}-erro` : a
 // #2457 (U4): `obrigatorio` mostra o * fora do nome acessível e liga aria-required no campo.
 // #2734 (A27): `aviso` é o aviso de limite (ex.: caracteres a mais): `role="status"`, para não reanunciar a cada tecla;
 // só `erro` de validação é `alert`. O aviso não marca o campo como inválido.
-function Envelope({ id, rotulo, rotuloOculto, dica, erro, aviso, obrigatorio, children }) {
+// #2792: `limite` substitui o `maxLength` (que cortava o texto colado em silêncio): o texto fica inteiro, a frase
+// "Use até N caracteres. Agora tem M." sai como aviso (`role="status"`, sem reanunciar a cada tecla) e o campo
+// fica `aria-invalid`. Quem envia trava o botão com `algumPassaDoLimite` (componentes/limiteDoCampo.js).
+// A contagem muda a cada tecla, então ela não é região viva: o leitor de tela ouve uma vez "Passou do limite de N
+// caracteres." (região própria, texto estável) e lê a contagem pelo aria-describedby do campo.
+function Envelope({ id, rotulo, rotuloOculto, dica, erro, aviso, limite, passou, obrigatorio, children }) {
   return (
     <div className={css.campo}>
       <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}{obrigatorio && <span aria-hidden="true"> *</span>}</label>
@@ -16,38 +22,47 @@ function Envelope({ id, rotulo, rotuloOculto, dica, erro, aviso, obrigatorio, ch
       {erro
         ? <p id={`${id}-erro`} className={css.erro} role="alert">{erro}</p>
         : aviso
-          ? <p id={`${id}-aviso`} className={css.erro} role="status">{aviso}</p>
+          ? <p id={`${id}-aviso`} className={css.erro} role={passou ? undefined : 'status'}>{aviso}</p>
           : dica && <p id={`${id}-dica`} className={css.dica}>{dica}</p>}
+      {limite != null && <AnuncioDoLimite limite={limite} passou={passou} />}
     </div>
   )
 }
 
-export function CampoTexto({ rotulo, rotuloOculto, dica, erro, aviso, obrigatorio, tipo = 'text', id: idInformado, className, ...resto }) {
+export function AnuncioDoLimite({ limite, passou }) {
+  return <span className="sr" role="status">{passou ? `Passou do limite de ${limite} caracteres.` : ''}</span>
+}
+
+export function CampoTexto({ rotulo, rotuloOculto, dica, erro, aviso, limite, obrigatorio, tipo = 'text', id: idInformado, className, ...resto }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
+  const passou = erro ? null : erroDoLimite(resto.value, limite)
+  const avisoFinal = passou ?? aviso
   return (
-    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica} erro={erro} aviso={aviso} obrigatorio={obrigatorio}>
+    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica} erro={erro} aviso={avisoFinal} limite={limite} passou={Boolean(passou)} obrigatorio={obrigatorio}>
       <input
         id={id} type={tipo} className={[css.controle, className].filter(Boolean).join(' ')}
-        aria-invalid={erro ? true : undefined} aria-required={obrigatorio || undefined} {...resto}
-        aria-describedby={descricao(id, dica, resto['aria-describedby'], erro, aviso)}
+        aria-invalid={erro || passou ? true : undefined} aria-required={obrigatorio || undefined} {...resto}
+        aria-describedby={descricao(id, dica, resto['aria-describedby'], erro, avisoFinal)}
       />
     </Envelope>
   )
 }
 
 export function CampoArea({
-  rotulo, rotuloOculto, dica, erro, aviso, obrigatorio, className, id: idInformado, ...resto
+  rotulo, rotuloOculto, dica, erro, aviso, limite, obrigatorio, className, id: idInformado, ...resto
 }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
+  const passou = erro ? null : erroDoLimite(resto.value, limite)
+  const avisoFinal = passou ?? aviso
   return (
-    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica} erro={erro} aviso={aviso} obrigatorio={obrigatorio}>
+    <Envelope id={id} rotulo={rotulo} rotuloOculto={rotuloOculto} dica={dica} erro={erro} aviso={avisoFinal} limite={limite} passou={Boolean(passou)} obrigatorio={obrigatorio}>
       <textarea
         id={id}
         className={[css.controle, css.area, className].filter(Boolean).join(' ')}
-        aria-invalid={erro ? true : undefined} aria-required={obrigatorio || undefined} {...resto}
-        aria-describedby={descricao(id, dica, resto['aria-describedby'], erro, aviso)}
+        aria-invalid={erro || passou ? true : undefined} aria-required={obrigatorio || undefined} {...resto}
+        aria-describedby={descricao(id, dica, resto['aria-describedby'], erro, avisoFinal)}
       />
     </Envelope>
   )

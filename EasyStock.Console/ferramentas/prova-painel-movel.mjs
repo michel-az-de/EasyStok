@@ -421,12 +421,13 @@ function conferirFonteDaNota(conversaId, solta, destacar = false, mesaHost = mes
   const listaHost = montar(NotasDoCliente, { conversaId, clienteId, clienteNome: 'Nome atual do cadastro', notas: [notaCompartilhada] })
   let cabecalho, lista
   visitar(listaHost.tree, n => {
-    if (n.type === 'button' && n.props?.['data-voltar-notas'] === conversaId) cabecalho = n
+    if (n.props?.['data-voltar-notas'] === conversaId) cabecalho = n
     if (n.props?.id === `notas-${conversaId}`) lista = n
   })
-  // #2734: a nota única já aparece inteira na prévia. O cabeçalho não se oferece para abrir o que está na tela:
-  // fica como título e destino do foco, sem `aria-expanded` e sem clique.
-  assert.equal(cabecalho.props['aria-disabled'], true, 'sem nota escondida, o cabeçalho não alterna')
+  // #2734: a nota única já aparece inteira na prévia. O cabeçalho não se oferece para abrir o que está na tela.
+  // #2792: em vez de botão desativado, é título (h3) e destino do foco, sem `aria-expanded` e sem clique.
+  assert.equal(cabecalho.type, 'h3', 'sem nota escondida, o cabeçalho é título, não botão')
+  assert.equal(cabecalho.props['aria-disabled'], undefined)
   assert.equal(cabecalho.props['aria-expanded'], undefined)
   assert.equal(cabecalho.props.onClick, undefined)
   assert.equal(lista.props['data-aberta'], undefined, 'a nota está na prévia, sem abrir a lista')

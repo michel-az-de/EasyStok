@@ -9,6 +9,7 @@ import { useInsumosApi } from '../../../aplicacao/useInsumosApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { compraDoCusto, ondeOInsumoEUsado, rotuloDaEmbalagem, rotuloDaUnidade, UNIDADES_INSUMO, unidadesDeCompra } from '../../../aplicacao/insumos'
 import { moeda, textoDosCentavos } from '../../../dominio/formato'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import css from '../cardapio/abaCardapio.module.css'
 import producao from './producao.module.css'
 
@@ -152,7 +153,8 @@ export function AbaInsumosApi() {
   const fecharCadastro = () => { avisarEm(null); setErroDoNome(null); setCadastroAberto(false) }
   const cadastrar = (evento) => {
     evento.preventDefault()
-    if (criando) return
+    // #2792: o nome passa do limite de 180 (espelha o servidor): o aviso fica no campo e o envio trava.
+    if (criando || algumPassaDoLimite([novo.nome, 180])) return
     if (!novo.nome.trim()) { setErroDoNome('Informe o nome do insumo.'); nomeRef.current?.focus(); return }
     avisarEm(CADASTRO)
     setCriando(true)
@@ -209,7 +211,7 @@ export function AbaInsumosApi() {
 
       {podeEditar ? <>
       {cadastroAberto && <Modal titulo="Cadastrar insumo" aoFechar={criando ? undefined : fecharCadastro} largura="min(720px, calc(100vw - 24px))"><form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
-        <CampoTexto ref={nomeRef} erro={erroDoNome} disabled={criando} rotulo="Nome do insumo" placeholder="Ex.: farinha de trigo" maxLength={180} value={novo.nome} onChange={mudarNovo('nome')} />
+        <CampoTexto ref={nomeRef} erro={erroDoNome} disabled={criando} rotulo="Nome do insumo" placeholder="Ex.: farinha de trigo" limite={180} value={novo.nome} onChange={mudarNovo('nome')} />
         <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: rotuloDaUnidade(u) }))} />
         <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo (opcional)" value={novo.minimo} onChange={mudarNovo('minimo')} />
         <CampoTexto disabled={criando} inputMode="decimal" rotulo={`Quanto tem hoje (${rotuloDaUnidade(unidadeDoNovo)}, opcional)`} dica="Vira o saldo inicial no Estoque" value={novo.saldo} onChange={mudarNovo('saldo')} />
@@ -225,7 +227,7 @@ export function AbaInsumosApi() {
         {/* Mesmo rodapé da edição: Cancelar à esquerda, o primário à direita. */}
         <div className={css.rodapeForm}>
           <Botao variante="texto" disabled={criando} onClick={fecharCadastro}>Cancelar</Botao>
-          <Botao tipo="submit" variante="primario" icone="check" disabled={criando}>{criando ? 'Cadastrando…' : 'Salvar insumo'}</Botao>
+          <Botao tipo="submit" variante="primario" icone="check" disabled={criando || algumPassaDoLimite([novo.nome, 180])}>{criando ? 'Cadastrando…' : 'Salvar insumo'}</Botao>
         </div>
       </form></Modal>}</> : <p className={css.descricao}>Seu perfil permite apenas consultar os insumos.</p>}
     </div>

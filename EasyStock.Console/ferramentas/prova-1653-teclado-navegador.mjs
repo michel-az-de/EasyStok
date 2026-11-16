@@ -165,9 +165,10 @@ try {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('tab', { name: 'Cliente', exact: true }).click() // #2437: a aba Ficha virou Cliente
   // #2437: a Ficha (agora aba Cliente) trocou os blocos sanfonados por gatilhos que abrem/fecham (Ações, Assistente, Notas).
-  // #2734: sem nota escondida, o cabeçalho "Notas" é só título (aria-disabled, sem aria-expanded); a altura de toque segue medida.
-  const blocos = await page.locator('button[aria-expanded], button[data-voltar-notas]').evaluateAll(ns => ns.filter(n => n.getClientRects().length)
-    .map(n => ({ nome: n.textContent, altura: n.getBoundingClientRect().height, alterna: n.hasAttribute('aria-expanded'), inerte: n.getAttribute('aria-disabled') === 'true' })))
+  // #2734: sem nota escondida, o cabeçalho "Notas" é só título, sem aria-expanded; a altura de toque segue medida.
+  // #2792: esse título é h3 (antes, botão com aria-disabled).
+  const blocos = await page.locator('button[aria-expanded], [data-voltar-notas]').evaluateAll(ns => ns.filter(n => n.getClientRects().length)
+    .map(n => ({ nome: n.textContent, altura: n.getBoundingClientRect().height, alterna: n.hasAttribute('aria-expanded'), inerte: n.tagName === 'H3' })))
   assert.ok(blocos.length >= 3, JSON.stringify(blocos))
   assert.ok(blocos.some(bloco => bloco.nome.startsWith('Notas')), JSON.stringify(blocos))
   assert.ok(blocos.every(bloco => bloco.alterna !== bloco.inerte), JSON.stringify(blocos))

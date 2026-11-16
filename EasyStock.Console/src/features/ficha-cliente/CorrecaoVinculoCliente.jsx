@@ -8,8 +8,10 @@ import { CampoArea, CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { moeda } from '../../dominio/formato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './CorrecaoVinculoCliente.module.css'
 
+const LIMITE_MOTIVO = 500
 const nomeAcao = { retirar: 'Retirada do vínculo', restaurar: 'Restauração do vínculo', vincular: 'Vínculo conferido' }
 export function CorrecaoVinculoCliente({ conversa }) {
   const { acoes } = useAcessoModulos()
@@ -40,6 +42,8 @@ function ConferenciaVinculo({ conversa, aoFechar }) {
   const [pendente, guardarPendente] = useState(null)
   const [rascunho, guardarRascunho] = useRascunhoDoAjuste(`vinculo:${conversa.id}`)
   const motivo = rascunho?.motivo ?? ''
+  // #2792: sem `maxLength` (cortava o texto colado em silêncio): o campo avisa e a confirmação trava acima do limite.
+  const passaDoLimite = algumPassaDoLimite([motivo, LIMITE_MOTIVO])
   const emVoo = useRef(false)
   const consultaCandidatos = useRef(null)
   const montado = useRef(true)
@@ -68,7 +72,7 @@ function ConferenciaVinculo({ conversa, aoFechar }) {
     finally { if (!controle.signal.aborted) buscar(false) }
   }
   async function executar() {
-    if (emVoo.current || !estado || (!pendente && (impedido || !escolha || !confirmado || motivo.trim().length < 3))) return
+    if (emVoo.current || !estado || (!pendente && (impedido || !escolha || !confirmado || passaDoLimite || motivo.trim().length < 3))) return
     const corpo = pendente ?? { requestId: crypto.randomUUID(), vinculoRevisao: estado.vinculoRevisao, clienteId: estado.clienteId,
       acao: escolha.acao, destinoClienteId: escolha.acao === 'vincular' ? escolha.cliente.id : null, motivo: motivo.trim() }
     emVoo.current = true; salvarEstado(true); falhar(null)
@@ -84,7 +88,7 @@ function ConferenciaVinculo({ conversa, aoFechar }) {
     } finally { emVoo.current = false; if (montado.current) salvarEstado(false) }
   }
   return <Modal titulo="Conferir identidade da conversa" largura="md" focarCampo aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={Boolean(motivo.trim()) && !salvando}
-    rodape={<><Botao disabled={salvando} onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))}>Fechar</Botao>{pendente ? <Botao variante="primario" disabled={salvando} onClick={executar}>{salvando ? 'Conferindo…' : 'Conferir resultado'}</Botao> : escolha && <Botao variante="primario" disabled={impedido || !confirmado || motivo.trim().length < 3} onClick={executar}>{salvando ? 'Salvando…' : 'Confirmar alteração'}</Botao>}</>}>
+    rodape={<><Botao disabled={salvando} onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))}>Fechar</Botao>{pendente ? <Botao variante="primario" disabled={salvando} onClick={executar}>{salvando ? 'Conferindo…' : 'Conferir resultado'}</Botao> : escolha && <Botao variante="primario" disabled={impedido || !confirmado || passaDoLimite || motivo.trim().length < 3} onClick={executar}>{salvando ? 'Salvando…' : 'Confirmar alteração'}</Botao>}</>}>
     <div className={css.conteudo}>
       {carregando && <p role="status">Conferindo vínculo e pedidos…</p>}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
@@ -105,7 +109,7 @@ function ConferenciaVinculo({ conversa, aoFechar }) {
           {escolha && <section className={css.revisao}>
             <strong>{escolha.acao === 'retirar' ? `Retirar somente o vínculo com ${estado.clienteNome}` : escolha.acao === 'restaurar' ? `Restaurar o vínculo com ${estado.clienteAnteriorNome}` : `Vincular a conversa a ${escolha.cliente.nome}`}</strong>
             <p>Cadastros, mensagens e rascunhos serão preservados. {escolha.acao === 'retirar' ? 'Links e sessões de acesso desta conversa serão invalidados.' : 'Nenhum pedido será transferido.'}{conversa.canal === 'WhatsApp' && (escolha.acao === 'restaurar' ? ' As próximas conversas deste telefone voltam a ser identificadas pelo cadastro.' : ' Vale também para as próximas conversas deste telefone.')}</p>
-            <CampoArea rotulo="Motivo da alteração" value={motivo} minLength={3} maxLength={500} disabled={impedido} onChange={e => guardarRascunho({ motivo: e.target.value })} />
+            <CampoArea rotulo="Motivo da alteração" value={motivo} minLength={3} limite={LIMITE_MOTIVO} disabled={impedido} onChange={e => guardarRascunho({ motivo: e.target.value })} />
             <label className={css.confirmacao}><input type="checkbox" checked={confirmado} disabled={impedido} onChange={e => confirmar(e.target.checked)} />Conferi a identidade com a pessoa e revisei esta alteração.</label>
           </section>}
         </>}

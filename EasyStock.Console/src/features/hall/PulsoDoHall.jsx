@@ -38,7 +38,9 @@ function Indicador({ item, movimentos, podeFecharCaixa }) {
     if (visto.current !== null && item.valor !== null && visto.current !== item.valor) setMudancas((n) => n + 1)
     visto.current = item.valor
   }, [item.valor])
-  const valor = item.valor === null ? '—' : item.id === 'financeiro' ? moeda(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
+  // #2792: sem leitura, nada de travessão; o texto fica só para o leitor de tela.
+  const valor = item.valor === null ? <span className={css.oculto}>Sem leitura</span>
+    : item.id === 'financeiro' ? moeda(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
   // Só o que pede ação aparece por escrito: leitura que falhou e caixa de outro dia aberto.
   const aviso = item.estado === 'erro'
     ? `${item.em ? `Desatualizado · dados das ${hora(item.em)}` : 'Não foi possível atualizar'}${item.erro ? `: ${item.erro}` : ''}`

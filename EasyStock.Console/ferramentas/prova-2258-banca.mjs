@@ -40,8 +40,8 @@ await caso('F3: o resumo do fechamento e o do dia usam valorDoResumo, sem moeda(
   const modal = ler('features/gestao/caixa/ModalFecharCaixa.jsx')
   const aba = ler('features/gestao/caixa/AbaCaixaApi.jsx')
   assert.match(modal, /valorDoResumo\(gaveta\.pixECartao\)/, 'Fora da gaveta sem esqueleto')
-  assert.doesNotMatch(modal, /<dd>\{moeda\(/, 'campo do modal ainda mostra moeda(null) como "—"')
-  assert.doesNotMatch(aba, /<dd>\{moeda\(/, 'resumo do dia ainda mostra moeda(null) como "—"')
+  assert.doesNotMatch(modal, /<dd>\{moeda\(/, 'campo do modal ainda mostra moeda(null) como texto solto')
+  assert.doesNotMatch(aba, /<dd>\{moeda\(/, 'resumo do dia ainda mostra moeda(null) como texto solto')
 })
 
 await caso('F3: o esqueleto aparece só sem valor e respeita movimento reduzido', () => {

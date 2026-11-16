@@ -15,6 +15,7 @@ import {
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { canalDaConversa } from '../../dominio/canal'
 import { conversaEncerrada } from '../../dominio/conversa'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import { MOTIVO_BLOQUEIO, permissaoDeEscrita } from '../../dominio/janela'
 import {
   analisarFotoSuspeita, dicaCDC, padraoDeCompra, resumoCliente, revisarOrtografia, sentimentoDaConversa,
@@ -27,6 +28,9 @@ import {
 import { AcoesPropostas } from './AcoesPropostas'
 import { useConversaAssistente } from './useConversaAssistente'
 import css from './assistente.module.css'
+
+// #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o Perguntar trava.
+const LIMITE_PERGUNTA = 2000
 
 // Balão flutuante do canto inferior direito (fala do dono, 24/09/2026 04h12):
 // o que hoje fazia papel de assistente dentro do fio (`PainelAgente`, seção
@@ -157,6 +161,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
 
   function enviarPergunta(evento) {
     evento.preventDefault()
+    if (algumPassaDoLimite([pergunta, LIMITE_PERGUNTA])) return
     aoPerguntar()
   }
 
@@ -408,7 +413,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
                 onChange={(e) => setPergunta(e.target.value)}
                 placeholder="Ex.: sugira uma resposta ou prepare uma nota"
                 rows={2}
-                maxLength={2000}
+                limite={LIMITE_PERGUNTA}
                 dica="Ctrl+Enter para perguntar. Enter cria uma nova linha."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent?.isComposing) enviarPergunta(e)
@@ -416,7 +421,7 @@ export function BalaoAssistente({ sugestaoAgente, aoAbrirTela, areaDoBalcao }) {
               />
               <BotaoIcone
                 tipo="submit" tom="primario" className={css.botaoEnviar} rotulo="Perguntar" icone="enviar"
-                disabled={perguntando || !pergunta.trim()}
+                disabled={perguntando || !pergunta.trim() || algumPassaDoLimite([pergunta, LIMITE_PERGUNTA])}
               />
             </form>
           )}

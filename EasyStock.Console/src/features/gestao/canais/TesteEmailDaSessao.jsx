@@ -1,7 +1,10 @@
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { useTesteEmailDaSessao } from '../../../aplicacao/useTesteEmailDaSessao'
 import css from './TesteEmailDaSessao.module.css'
+
+const MOTIVO_MAXIMO = 500
 
 const TEXTOS = {
   Pendente: 'Aguardando envio.',
@@ -24,9 +27,10 @@ export function TesteEmailDaSessao({ email }) {
       <div className={css.conteudo}>
         <p>O teste vai para o e-mail confirmado da sua própria conta{email ? `: ${email}` : '.'}</p>
         <form onSubmit={enviar} className={css.formulario}>
-          <CampoTexto rotulo="Motivo do teste" minLength={10} maxLength={500} required value={motivo}
+          {/* #2792: sem maxLength, que cortava o motivo colado; acima de 500 avisa no campo e trava o envio. */}
+          <CampoTexto rotulo="Motivo do teste" minLength={10} limite={MOTIVO_MAXIMO} required value={motivo}
             onChange={e => setMotivo(e.target.value)} disabled={enviando || consultando} />
-          <Botao tipo="submit" variante="texto" disabled={enviando || consultando || aguardando || motivo.trim().length < 10}>
+          <Botao tipo="submit" variante="texto" disabled={enviando || consultando || aguardando || motivo.trim().length < 10 || algumPassaDoLimite([motivo, MOTIVO_MAXIMO])}>
             {enviando ? 'Solicitando teste…' : 'Enviar teste para meu e-mail'}
           </Botao>
         </form>

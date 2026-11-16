@@ -4,6 +4,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoTexto, CampoSelecao, CampoArea } from '../../../componentes/Campo'
 import { CampoReais } from '../../../componentes/CampoReais'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { erroDoLimite, algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { moeda, lerMoeda, moedaAltaDemais } from '../../../dominio/formato'
 import { METODOS_CAIXA, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { diaFinanceiro, instanteFinanceiro, parcelasFinanceiras, motivoContaInvalida, palavrasDoLado, mensagemFinanceira, lerParcelas, corpoDaNovaCategoria, motivoDaNovaCategoria } from '../../../dominio/financeiro'
@@ -64,7 +65,7 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
   const todasCategorias = [...cadastros.categorias, ...criadas.filter((nova) => !cadastros.categorias.some((item) => item.id === nova.id))]
   const categorias = todasCategorias.filter((item) => (item.ativa && [tipo, 'Ambas'].includes(item.tipo)) || item.id === categoria)
   const criarCategoria = async () => {
-    if (motivoDaNovaCategoria(nomeNovaCategoria) || criacao.ocupado) return
+    if (motivoDaNovaCategoria(nomeNovaCategoria) || algumPassaDoLimite([nomeNovaCategoria, 100]) || criacao.ocupado) return
     const corpo = corpoDaNovaCategoria(nomeNovaCategoria, lado)
     let nova = null
     const ok = await criacao.executar(async () => {
@@ -82,7 +83,8 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
   // Só some a caixa "Já foi paga" com mais de uma parcela; valor inválido no campo não a esconde.
   const parcelaUnica = !(quantidade > 1)
   const digitado = !conta && !travada && Boolean(descricao.trim() || centavos > 0 || observacoes.trim() || categoria || centro)
-  const motivo = travada ? (!dataFeito ? `Informe a ${palavras.data.toLowerCase()}.` : null) : conta
+  // #2792: sem `maxLength`; a descrição acima de 200 trava o Salvar com a frase do limite.
+  const motivo = !travada && erroDoLimite(descricao, 200) ? 'Encurte a descrição para salvar.' : travada ? (!dataFeito ? `Informe a ${palavras.data.toLowerCase()}.` : null) : conta
     ? (!descricao.trim() ? 'Escreva a descrição da conta.' : !categoria ? 'Escolha a categoria financeira.' : null)
     : motivoContaInvalida({ descricao, categoria, centavos, quantidade, emissao, vencimento })
       ?? (moedaAltaDemais(centavos) ? 'Valor alto demais.' : registrarJunto && !dataFeito ? `Informe a ${palavras.data.toLowerCase()}.` : null)
@@ -111,7 +113,7 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
   return <FormularioFinanceiro titulo={conta ? 'Editar conta' : `Nova conta a ${lado}`} aoFechar={fechar} operacao={operacao} aoEnviar={salvar} valido={valido} motivo={motivo} digitado={digitado} salvar={travada ? `Registrar ${palavras.registro}` : 'Salvar'}>
     {travada && <output className={css.aviso}>A conta já foi criada e aparece na lista. Falta só registrar o {palavras.registro}; para mudar a conta, feche e abra o detalhe.</output>}
     <fieldset disabled={travada} className={css.campos}>
-    <CampoTexto rotulo="Descrição" required maxLength={200} dica="Até 200 caracteres." erro={descricao && !descricao.trim() ? 'Escreva a descrição da conta.' : null} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+    <CampoTexto rotulo="Descrição" required limite={200} dica="Até 200 caracteres." erro={descricao && !descricao.trim() ? 'Escreva a descrição da conta.' : null} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
     <div className={css.grade}>
       <div className={css.categoria}>
         <CampoSelecao rotulo="Categoria financeira" required value={categoria} onChange={(e) => setCategoria(e.target.value)} opcoes={[{ valor: '', rotulo: 'Escolha a categoria' }, ...categorias.map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
@@ -120,8 +122,8 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
       <CampoSelecao rotulo="Centro de custo (opcional)" value={centro} onChange={(e) => setCentro(e.target.value)} opcoes={[...(!conta?.centroCustoId ? [{ valor: '', rotulo: 'Sem centro de custo' }] : []), ...cadastros.centros.filter((item) => item.ativo || item.id === centro).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
     </div>
     {podeCriarCategoria && criandoCategoria && <fieldset className={css.novaCategoria}><legend className="sr">Nova categoria</legend>
-      <CampoTexto ref={campoNovaCategoria} rotulo={`Nome da nova categoria de ${tipo.toLowerCase()}`} maxLength={100} erro={criacao.erro ? mensagemFinanceira(criacao.erro) : null} value={nomeNovaCategoria} onChange={(e) => setNomeNovaCategoria(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criarCategoria() } }} />
-      <Botao variante="primario" disabled={Boolean(motivoDaNovaCategoria(nomeNovaCategoria)) || criacao.ocupado} onClick={criarCategoria}>{criacao.ocupado ? 'Criando…' : 'Criar categoria'}</Botao>
+      <CampoTexto ref={campoNovaCategoria} rotulo={`Nome da nova categoria de ${tipo.toLowerCase()}`} limite={100} erro={criacao.erro ? mensagemFinanceira(criacao.erro) : null} value={nomeNovaCategoria} onChange={(e) => setNomeNovaCategoria(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criarCategoria() } }} />
+      <Botao variante="primario" disabled={Boolean(motivoDaNovaCategoria(nomeNovaCategoria)) || algumPassaDoLimite([nomeNovaCategoria, 100]) || criacao.ocupado} onClick={criarCategoria}>{criacao.ocupado ? 'Criando…' : 'Criar categoria'}</Botao>
       <Botao variante="texto" disabled={criacao.ocupado} onClick={() => { setCriandoCategoria(false); setNomeNovaCategoria('') }}>Cancelar</Botao>
     </fieldset>}
     {!categorias.length && !criandoCategoria && <p className={css.aviso}>{podeCriarCategoria ? `Ainda não há categoria de ${tipo.toLowerCase()}. Use "+ Nova categoria" para criar a primeira.` : `Ainda não há categoria de ${tipo.toLowerCase()}. Peça a quem administra a loja para cadastrar uma.`}</p>}

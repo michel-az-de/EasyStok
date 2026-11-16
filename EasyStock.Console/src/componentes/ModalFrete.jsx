@@ -4,6 +4,11 @@ import { CampoSelecao, CampoTexto } from './Campo'
 import { Modal } from './Modal'
 import css from './ModalFrete.module.css'
 
+// #2792: tetos do servidor, sem `maxLength` (cortava o texto colado em silêncio). O campo mostra a frase (`limite`)
+// e o Confirmar fica parado. Componente não importa `dominio`, então a conta é só o tamanho do texto.
+const LIMITE_REFERENCIA = 120
+const LIMITE_MOTIVO = 500
+
 // Dinheiro em centavos: quem formata é `dominio/formato.js` (#2080), que chega pelo controlador porque
 // `componentes` não importa `dominio`.
 const horario = (valor) => valor ? new Date(valor).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : ''
@@ -142,8 +147,10 @@ function Despacho({ despacho: d, controlador: c }) {
   const podeEvento = d.simulado || manual
   const rastreioSeguro = d.rastreioUrl && (/^https:\/\//i.test(d.rastreioUrl)
     || /^\/api\/entregas-demonstracao\/[a-z\d.]+$/i.test(d.rastreioUrl))
+  const passou = acao === 'pagamento' ? referencia.length > LIMITE_REFERENCIA : motivo.length > LIMITE_MOTIVO
   const confirmar = async (e) => {
     e.preventDefault()
+    if (passou) return
     if (acao === 'pagamento') await c.pagar(d.id, meio, referencia.trim())
     else await c.evento(d.id, acao, motivo.trim() || null)
   }
@@ -169,10 +176,10 @@ function Despacho({ despacho: d, controlador: c }) {
       <h3>{acao === 'pagamento' ? 'Registrar valor já pago ao transportador' : SITUACOES[acao]}</h3>
       {acao === 'pagamento' ? <><p>Será registrada uma saída de {c.moeda(d.valorCentavos)} no caixa. Confirme apenas depois de pagar.</p>
         <div className={css.formulario}><CampoSelecao rotulo="Meio usado" value={meio} disabled={c.ocupado} onChange={(e) => setMeio(e.target.value)} opcoes={[{ valor: 'pix', rotulo: 'Pix' }, { valor: 'dinheiro', rotulo: 'Dinheiro' }, { valor: 'credito', rotulo: 'Cartão de crédito' }, { valor: 'debito', rotulo: 'Cartão de débito' }, { valor: 'transferencia', rotulo: 'Transferência' }, { valor: 'outro', rotulo: 'Outro' }]} />
-          <CampoTexto rotulo="Referência do pagamento" value={referencia} maxLength={120} required disabled={c.ocupado} onChange={(e) => setReferencia(e.target.value)} /></div></>
-        : <><CampoTexto rotulo="Motivo ou observação" value={motivo} maxLength={500} required={['falha', 'devolvendo', 'cancelado'].includes(acao)} disabled={c.ocupado} onChange={(e) => setMotivo(e.target.value)} />
+          <CampoTexto rotulo="Referência do pagamento" value={referencia} limite={LIMITE_REFERENCIA} required disabled={c.ocupado} onChange={(e) => setReferencia(e.target.value)} /></div></>
+        : <><CampoTexto rotulo="Motivo ou observação" value={motivo} limite={LIMITE_MOTIVO} required={['falha', 'devolvendo', 'cancelado'].includes(acao)} disabled={c.ocupado} onChange={(e) => setMotivo(e.target.value)} />
           {['devolvendo', 'devolvido'].includes(acao) && <p className={css.apoio}>O retorno físico não devolve o pagamento do cliente. Confira a devolução financeira na ficha do pedido.</p>}</>}
-      <div className={css.linha}><Botao tipo="submit" variante="primario" disabled={c.ocupado}>Confirmar registro</Botao><Botao variante="texto" disabled={c.ocupado} onClick={() => setAcao(null)}>Voltar</Botao></div>
+      <div className={css.linha}><Botao tipo="submit" variante="primario" disabled={c.ocupado || passou} motivo={passou ? 'Encurte o texto para confirmar.' : undefined}>Confirmar registro</Botao><Botao variante="texto" disabled={c.ocupado} onClick={() => setAcao(null)}>Voltar</Botao></div>
     </form>}
     {d.eventos?.length > 0 && <details><summary>Histórico da entrega</summary><ol className={css.historico}>{d.eventos.map((e, i) => <li key={`${e.em}:${i}`}>{horario(e.em)} · {SITUACOES[e.tipo] ?? e.tipo}{e.motivo ? ` · ${e.motivo}` : ''}</li>)}</ol></details>}
   </article>

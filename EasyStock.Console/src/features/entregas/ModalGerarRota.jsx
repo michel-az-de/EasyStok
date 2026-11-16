@@ -55,7 +55,7 @@ export function ModalGerarRota({ viagem, janelas, agora, constantes, enderecoDaC
               <strong>{indice + 1}. {conversa.nome}</strong>
               <span>{conversa.cliente?.endereco}</span>
               <span>
-                Chegada prevista {parada?.chegadaReal != null ? horaCurta(new Date(parada.chegadaReal).toISOString()) : '—'}
+                Chegada prevista {parada?.chegadaReal != null ? horaCurta(new Date(parada.chegadaReal).toISOString()) : 'a definir'}
               </span>
               {conversa.cliente?.endereco && (
                 <a

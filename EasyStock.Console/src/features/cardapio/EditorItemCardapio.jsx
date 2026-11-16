@@ -11,8 +11,10 @@ import { useMiniaturaAcervo } from '../../aplicacao/useAcervo'
 import { catalogoDeAdicionais } from '../../dominio/cardapio'
 import { fotoDoItem } from '../../dominio/vitrineCardapio'
 import { lerMoeda, moeda, moedaAltaDemais } from '../../dominio/formato'
+import { algumPassaDoLimite, erroDoLimite } from '../../componentes/limiteDoCampo'
 import { corpoDasPorcoes, erroDasPorcoes, porcoesMudaram, rascunhoDasPorcoes, resumoDoItem } from '../../dominio/porcoes'
 import { EditorPorcoes } from './EditorPorcoes'
+import { porcoesPassamDoLimite } from './limitesDaPorcao'
 import { EscolherFotoDoAcervo } from './EscolherFotoDoAcervo'
 import css from './editorItem.module.css'
 
@@ -23,14 +25,20 @@ const camposDe = (d) => ({ descricao: d.descricao, ingredientes: d.ingredientes,
 
 // Rótulo fora do controle e dica ligada por aria-describedby (#2553, Q14): dentro do <label> a dica
 // entrava no nome acessível do campo.
-function CampoDaFicha({ rotulo, dica, children }) {
+// #2792: `limite` (espelha o servidor) substitui o `maxLength`, que cortava o texto colado em silêncio: a frase
+// "Use até N caracteres. Agora tem M." fica logo abaixo, ligada ao campo, e o campo fica aria-invalid.
+function CampoDaFicha({ rotulo, dica, limite, children }) {
   const id = useId()
   const idDaDica = `${id}-dica`
+  const idDoLimite = `${id}-limite`
+  const passou = erroDoLimite(children.props.value, limite)
+  const descricao = [dica && idDaDica, passou && idDoLimite].filter(Boolean).join(' ') || undefined
   return (
     <div className={css.campo}>
       <label htmlFor={id}>{rotulo}</label>
-      {cloneElement(children, { id, 'aria-describedby': dica ? idDaDica : undefined })}
+      {cloneElement(children, { id, 'aria-describedby': descricao, 'aria-invalid': passou ? true : undefined })}
       {dica && <small id={idDaDica}>{dica}</small>}
+      {passou && <small id={idDoLimite} className={css.limite} role="status">{passou}</small>}
     </div>
   )
 }
@@ -177,9 +185,12 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
     finally { setSalvando(false) }
   }
 
+  // #2792: algum campo de texto passa do limite: o aviso fica no campo e o Salvar trava.
+  const textoPassaDoLimite = algumPassaDoLimite([nome, 200], [ficha.descricao, 240], [ficha.ingredientes, 500], [ficha.alergenos, 200],
+    ...(linha === 'casa' ? [[ficha.instrucao, 500]] : [])) || porcoesPassamDoLimite(porcoes)
   async function salvar(evento) {
     evento.preventDefault()
-    if (salvando || precisaReler || carga !== 'ok' || !podeEditar) return
+    if (salvando || precisaReler || carga !== 'ok' || !podeEditar || textoPassaDoLimite) return
     setErro(null)
     const erroPorcoes = erroDasPorcoes(porcoes)
     if (erroPorcoes) { setErro(erroPorcoes); return }
@@ -228,7 +239,7 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
       rodape={<>
         <span className={css.statusRodape}>{salvando ? 'Salvando alterações…' : alterado || fotoPendente ? 'Alterações ainda não salvas' : 'Ficha do cardápio'}</span>
         <Botao disabled={salvando} onClick={fechar}>Cancelar</Botao>
-        <Botao variante="primario" disabled={salvando || carga !== 'ok' || !podeEditar} onClick={() => precisaReler ? tentarReler() : formulario.current?.requestSubmit()}>{salvando ? 'Salvando…' : precisaReler ? 'Atualizar ficha salva' : 'Salvar prato'}</Botao>
+        <Botao variante="primario" disabled={salvando || carga !== 'ok' || !podeEditar || (textoPassaDoLimite && !precisaReler)} motivo={textoPassaDoLimite && !precisaReler ? 'Encurte o texto que passou do limite.' : undefined} onClick={() => precisaReler ? tentarReler() : formulario.current?.requestSubmit()}>{salvando ? 'Salvando…' : precisaReler ? 'Atualizar ficha salva' : 'Salvar prato'}</Botao>
       </>}>
       {confirmaSaida && <div className={css.confirmacao} role="alert" ref={confirmacaoRef} tabIndex={-1}>
         <strong>Descartar as alterações deste prato?</strong><p>O que ainda não foi salvo será perdido.</p>
@@ -266,8 +277,8 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
           <fieldset disabled={salvando || precisaReler || carga !== 'ok' || !podeEditar} className={css.campos}>
             <section className={css.secao}>
               <h3>Apresentação do prato</h3>
-              <CampoDaFicha rotulo="Nome do prato"><input required maxLength={200} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Lasanha à bolonhesa" /></CampoDaFicha>
-              <CampoDaFicha rotulo="Descrição para o cliente" dica="Até 240 caracteres. Conte o que o cliente vai receber."><textarea rows={3} maxLength={240} value={ficha.descricao} onChange={mudarFicha('descricao')} placeholder="O que faz este prato especial?" /></CampoDaFicha>
+              <CampoDaFicha rotulo="Nome do prato" limite={200}><input required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Lasanha à bolonhesa" /></CampoDaFicha>
+              <CampoDaFicha rotulo="Descrição para o cliente" dica="Até 240 caracteres. Conte o que o cliente vai receber." limite={240}><textarea rows={3} value={ficha.descricao} onChange={mudarFicha('descricao')} placeholder="O que faz este prato especial?" /></CampoDaFicha>
               <div className={css.dupla}>
                 <CampoDaFicha rotulo="Linha de produto"><select value={linha} onChange={(e) => setLinha(e.target.value)}>{Object.entries(linhas).map(([chave, l]) => <option key={chave} value={chave}>{l.rotulo}</option>)}</select></CampoDaFicha>
                 {fonteApi && <CampoDaFicha rotulo="Categoria no cardápio"><select value={secao} onChange={(e) => setSecao(e.target.value)}><option value="">Sem categoria</option>{categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></CampoDaFicha>}
@@ -285,10 +296,10 @@ export function EditorItemCardapio({ item = null, aoFechar, aoSalvar, focoInicia
             <section className={css.secao}>
               <h3>Informações para atender bem</h3>
               <p className={css.ajuda}>Use estes detalhes para responder às dúvidas do cliente.</p>
-              <CampoDaFicha rotulo="Ingredientes"><textarea rows={2} maxLength={500} value={ficha.ingredientes} onChange={mudarFicha('ingredientes')} /></CampoDaFicha>
-              <CampoDaFicha rotulo="Alérgenos" dica="Informe os ingredientes e riscos de contato cruzado confirmados pela cozinha."><input maxLength={200} value={ficha.alergenos} onChange={mudarFicha('alergenos')} placeholder="Ex.: trigo, leite e ovos" /></CampoDaFicha>
+              <CampoDaFicha rotulo="Ingredientes" limite={500}><textarea rows={2} value={ficha.ingredientes} onChange={mudarFicha('ingredientes')} /></CampoDaFicha>
+              <CampoDaFicha rotulo="Alérgenos" dica="Informe os ingredientes e riscos de contato cruzado confirmados pela cozinha." limite={200}><input value={ficha.alergenos} onChange={mudarFicha('alergenos')} placeholder="Ex.: trigo, leite e ovos" /></CampoDaFicha>
               <CampoDaFicha rotulo="Tempo de preparo, em minutos"><input type="number" min={1} max={1440} step={1} required={detalhe?.tempoPreparoMinutos != null} value={ficha.preparo} onChange={mudarFicha('preparo')} placeholder="Usa o tempo padrão da loja" /></CampoDaFicha>
-              {linha === 'casa' && <CampoDaFicha rotulo="Como finalizar em casa"><textarea rows={3} maxLength={500} value={ficha.instrucao} onChange={mudarFicha('instrucao')} placeholder="Tempo, temperatura e modo de preparo." /></CampoDaFicha>}
+              {linha === 'casa' && <CampoDaFicha rotulo="Como finalizar em casa" limite={500}><textarea rows={3} value={ficha.instrucao} onChange={mudarFicha('instrucao')} placeholder="Tempo, temperatura e modo de preparo." /></CampoDaFicha>}
             </section>
             <section className={css.secao}>
               <h3>Organização e vínculos</h3>

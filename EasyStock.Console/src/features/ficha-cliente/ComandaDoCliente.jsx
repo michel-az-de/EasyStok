@@ -4,6 +4,8 @@ import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
 import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
 import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
+import { algumPassaDoLimite, erroDoLimite } from '../../componentes/limiteDoCampo'
+import campo from '../../componentes/Campo.module.css'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
 import {
@@ -17,6 +19,10 @@ import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { SeletorJanelaApi } from './SeletorJanelaApi'
 import { Cabecalho } from './Cabecalho'
 import css from './comanda.module.css'
+
+// #2792: limites que espelham o servidor; sem `maxLength`, o texto colado fica inteiro, o aviso aparece e o Salvar trava.
+const LIMITE_OBSERVACAO_ITEM = 500
+const LIMITE_OBSERVACAO_PEDIDO = 2000
 
 // #2007 (item 4): a data e a janela que o cliente pediu pelo link aparecem ao lado dos itens, para aprovar sabendo.
 function MudancaDeData({ comanda: c }) {
@@ -147,6 +153,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
     setPrato('')
   }
   const pendente = !c.pedidoEncerrado && c.envio?.situacao === 'alteracao_aguardando_confirmacao'
+  const passaDoLimite = algumPassaDoLimite([rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO], ...rascunho.itens.map(i => [i.observacao, LIMITE_OBSERVACAO_ITEM]))
   // J2 (#1990): a diferença acompanha a edição antes de salvar (antes dizia "Sem diferença" com +R$ 38 na tela).
   const saldo = saldoDaAlteracao(c, edicao?.rascunho ?? null, catalogo)
   const naoSalvo = Boolean(edicao) && c.podeEditar && !c.pedidoEncerrado
@@ -205,8 +212,11 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
         {c.podeEditar ? <details className={css.anotacaoCompartilhada}>
           <summary>Observação do prato{i.observacao && <small className={css.apontamento}>{i.observacao}</small>}</summary>
           <label className={css.observacaoCompartilhada}>Observação de {nome}
-            <input value={i.observacao ?? ''} maxLength={500} disabled={ocupado} onChange={e => mudarItem(n, { observacao: e.target.value })} />
+            <input value={i.observacao ?? ''} disabled={ocupado} onChange={e => mudarItem(n, { observacao: e.target.value })}
+              aria-invalid={erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM) ? true : undefined}
+              aria-describedby={erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM) ? `${c.linkId}-obs-${n}-limite` : undefined} />
           </label>
+          {erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM) && <p id={`${c.linkId}-obs-${n}-limite`} className={campo.erro}>{erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM)}</p>}
         </details> : i.observacao && <small className={css.apontamento}>{i.observacao}</small>}
       </li>
     })}</ul>
@@ -223,10 +233,13 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       <details className={css.anotacaoCompartilhada}>
       <summary>Observação do pedido{rascunho.observacoes && <small>{rascunho.observacoes}</small>}</summary>
       <label className={css.observacaoCompartilhada}>Observação para a cozinha
-        <textarea value={rascunho.observacoes ?? ''} maxLength={2000} disabled={ocupado}
+        <textarea value={rascunho.observacoes ?? ''} disabled={ocupado}
+          aria-invalid={erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO) ? true : undefined}
+          aria-describedby={erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO) ? `${c.linkId}-obs-pedido-limite` : undefined}
           onChange={e => editar({ ...rascunho, observacoes: e.target.value })}
           onFocus={sugestao.aoFocar} onBlur={sugestao.aoSair} onKeyDown={sugestao.aoTeclar} />
       </label>
+      {erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO) && <p id={`${c.linkId}-obs-pedido-limite`} className={campo.erro}>{erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO)}</p>}
       <SugestaoDeTexto sugestao={sugestao} />
       </details>
       {!c.pedido && <details className={css.entregaDaSelecao} open={!janela || c.entregaACombinar || c.freteCombinado == null}>
@@ -258,7 +271,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
         <Botao disabled={ocupado} onClick={limparEdicao}>{conflito ? 'Usar itens atuais' : 'Descartar minha edição'}</Botao>
         {conflito ? <Botao disabled={ocupado || rascunho.pedidoId !== c.rascunho.pedidoId} onClick={() => setEdicao({ revisao: c.revisao, base: c.rascunho,
           rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho, edicao.base) })}>Manter minha edição para conferir</Botao>
-          : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar itens</Botao>}
+          : <Botao variante="primario" disabled={ocupado || passaDoLimite} motivo={passaDoLimite ? 'Encurte as observações que passam do limite.' : undefined} onClick={persistir}>Salvar itens</Botao>}
       </div>}
       {edicao && <output className={css.avisoCompartilhado}>Alterações ainda não salvas. Salvar itens atualiza o link{c.pedido ? ', sem alterar o pedido atual.' : ', sem criar um pedido.'}</output>}
       {!c.pedido && !edicao && <div className={css.confirmarCompartilhado}>

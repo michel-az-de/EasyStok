@@ -4,7 +4,9 @@ import { CampoTexto } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
 import { pesquisarReceitaIa } from '../../../aplicacao/calculosReceita'
 import { combinarSinais } from '../../../aplicacao/sinais'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import css from './pesquisaProducao.module.css'
+// #2792: o limite de 100 (espelha o servidor) vira aviso no campo e trava o Buscar, em vez de cortar o texto colado.
 
 function Fontes({ fontes }) {
   return <ul className={css.fontes}>{fontes.map((fonte) => <li key={fonte.url}><a href={fonte.url} target="_blank" rel="noopener noreferrer">{fonte.titulo}</a> · consultada em {new Date(fonte.consultadaEm).toLocaleDateString('pt-BR')}</li>)}</ul>
@@ -40,10 +42,10 @@ function ModalPesquisaReceita({ nome, aoAplicar, aoFechar }) {
   }
   return <Modal titulo="Pesquisar receita" aoFechar={aoFechar} largura="min(900px, calc(100vw - 24px))" rodape={<>
     <Botao onClick={aoFechar}>Cancelar</Botao>
-    <Botao tipo="submit" form={formId} disabled={ocupado || termo.trim().length < 3 || termo.trim().length > 100}>{ocupado ? 'Pesquisando…' : 'Buscar receita'}</Botao>
+    <Botao tipo="submit" form={formId} disabled={ocupado || termo.trim().length < 3 || algumPassaDoLimite([termo, 100])}>{ocupado ? 'Pesquisando…' : 'Buscar receita'}</Botao>
     {resultado && <Botao variante="primario" onClick={() => aoAplicar(resultado)}>Aplicar ao rascunho</Botao>}
   </>}>
-    <form id={formId} onSubmit={pesquisar}><CampoTexto rotulo="Nome para pesquisar" value={termo} maxLength={100} disabled={ocupado} onChange={(e) => { setTermo(e.target.value); setResultado(null) }} /></form>
+    <form id={formId} onSubmit={pesquisar}><CampoTexto rotulo="Nome para pesquisar" value={termo} limite={100} disabled={ocupado} onChange={(e) => { setTermo(e.target.value); setResultado(null) }} /></form>
     <p>O Assistente pesquisa no Livro de receitas do Wikilivros. Aplicar substitui os insumos do rascunho; a receita só é gravada em Salvar receita.</p>
     {erro && <p role="alert">{erro}</p>}
     {resultado && <section aria-label="Receita sugerida">

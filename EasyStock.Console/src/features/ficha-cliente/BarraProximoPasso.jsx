@@ -10,6 +10,7 @@ import {
 import { saldoApi, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR, itensDoResumo, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
 import { totalDoPedido } from '../../dominio/pedido'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import {
   PASSOS, motivoParaNaoAvancar, passoAnterior, passoPorId, proximoPasso, situacaoDoPasso,
   SEGUNDOS_PARA_DESFAZER,
@@ -55,6 +56,8 @@ const PROXIMO_DE_AGUARDANDO = proximoPasso('aguardando')?.rotulo ?? 'Pago'
 // O passo "aguardando pagamento" não tem um botão único: o próximo passo muda com a situação da
 // cobrança (`acaoDoPix.js`, secao 2, "Alerta do Pix").
 const GERANDO_COBRANCA = 'Gerando cobrança…'
+// #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o cancelamento trava.
+const LIMITE_MOTIVO_CANCELAR = 500
 
 // O bloco Pedido: trilha, onde está e ação (secao 5 da direção visual). Um
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
@@ -572,20 +575,20 @@ export function BarraProximoPasso({
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape em qualquer campo fecha a confirmação; o form é o único ancestral comum.
         <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
           evento.preventDefault()
-          if (!emVoo && !(fonteApi && motivoCancelar.trim().length < 3)) confirmarCancelamento()
+          if (!emVoo && !(fonteApi && (motivoCancelar.trim().length < 3 || algumPassaDoLimite([motivoCancelar, LIMITE_MOTIVO_CANCELAR])))) confirmarCancelamento()
         }}>
           <p className={css.corpoBloco}>
             Cancelar o pedido {pedido.numero}? {fonteApi ? 'Avise o cliente pela conversa após confirmar.' : `${nomeCliente} recebe aviso de cancelamento.`}
           </p>
           {fonteApi && <CampoArea rotulo="Motivo do cancelamento" value={motivoCancelar}
-            onChange={(e) => setMotivoCancelar(e.target.value)} maxLength={500} disabled={emVoo} autoFocus />}
+            onChange={(e) => setMotivoCancelar(e.target.value)} limite={LIMITE_MOTIVO_CANCELAR} disabled={emVoo} autoFocus />}
           {fonteApi && temPagamento && <p className={css.corpoBloco}>
             O cancelamento não devolve o pagamento automaticamente. A devolução deve ser tratada separadamente.
           </p>}
           {erroCancelar && <p className={css.motivoDesabilitado} role="alert">{erroCancelar}</p>}
           <p className={css.confirmarAcoes}>
             <Botao variante="texto" disabled={emVoo} autoFocus={!fonteApi} onClick={() => setConfirmando(null)}>Manter</Botao>
-            <Botao variante="perigo" tipo="submit" disabled={emVoo || (fonteApi && motivoCancelar.trim().length < 3)}>
+            <Botao variante="perigo" tipo="submit" disabled={emVoo || (fonteApi && (motivoCancelar.trim().length < 3 || algumPassaDoLimite([motivoCancelar, LIMITE_MOTIVO_CANCELAR])))}>
               {emVoo ? 'Cancelando…' : 'Cancelar pedido'}
             </Botao>
           </p>

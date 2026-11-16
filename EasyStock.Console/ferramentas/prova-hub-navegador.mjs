@@ -79,7 +79,7 @@ try {
   const { page, context, controle, erros } = await preparar({ demora: 900 })
   const atendimento = page.locator('[data-indicador="atendimento"]')
   await atendimento.locator('xpath=self::*[@data-estado="carregando"]').waitFor()
-  // #2762 (B10): a espera é um esqueleto do tamanho do número, com "Carregando…" para o leitor de tela; o traço fica para a falha.
+  // #2762 (B10): a espera é um esqueleto do tamanho do número, com "Carregando…" para o leitor de tela; na falha, "Sem leitura" (#2792, sem traço).
   assert.equal(await atendimento.locator('strong').innerText(), 'Carregando…')
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
@@ -202,7 +202,7 @@ try {
   assert.equal(await atendimento.locator('strong').innerText(), '2')
   controle.modo = 'revogado'; await page.clock.runFor(61000)
   await atendimento.getByText(/Não foi possível atualizar/).waitFor()
-  assert.equal(await atendimento.locator('strong').innerText(), '—')
+  assert.equal(await atendimento.locator('strong').innerText(), 'Sem leitura')
   controle.modo = 'vazio'; await page.clock.runFor(61000)
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '0')
@@ -242,7 +242,7 @@ try {
   await restrito.context.close()
   const falha = await preparar({ permitidos: ['atendimento'], modo: 'revogado', bloqueiaStorage: true })
   await falha.page.locator('[data-indicador="atendimento"]').getByText(/Não foi possível atualizar/).waitFor()
-  assert.equal(await falha.page.locator('[data-indicador="atendimento"] strong').innerText(), '—')
+  assert.equal(await falha.page.locator('[data-indicador="atendimento"] strong').innerText(), 'Sem leitura')
   await falha.page.getByRole('button', { name: 'Ajustar tela inicial' }).click()
   await falha.page.getByRole('button', { name: 'Organizar áreas e favoritos' }).click()
   await falha.page.getByRole('button', { name: 'Adicionar Atendimento aos favoritos' }).click()
@@ -262,6 +262,11 @@ try {
   await ampliado.page.locator('[data-indicador="financeiro"]').scrollIntoViewIfNeeded()
   await foto(ampliado.page, 'hub-financeiro-texto-200')
   await ampliado.context.close()
+  // #2792 (revisão): caixa sem saldo esperado não fica "Carregando…": a leitura vira erro e diz "Sem leitura".
+  const semSaldo = await preparar({ permitidos: ['financeiro'], saldoEsperado: NaN })
+  await semSaldo.page.locator('[data-indicador="financeiro"]').locator('xpath=self::*[@data-estado="erro"]').waitFor()
+  assert.equal(await semSaldo.page.locator('[data-indicador="financeiro"] strong').innerText(), 'Sem leitura')
+  await semSaldo.context.close()
   console.log('Hub UI: números, erro/zero/parcial, modelos, persistência por pessoa/empresa, drag com mouse/toque, teclado/Esc, polling visível, celular/escuro, modal/foco e permissões aprovados. Nenhuma escrita operacional.')
 } catch (erro) {
   if (ultimaPagina && !ultimaPagina.isClosed()) console.error('Diagnóstico:', await ultimaPagina.evaluate(() => ({ foco: document.activeElement?.outerHTML.slice(0, 350), anuncios: [...document.querySelectorAll('[aria-live], [role="status"]')].map((el) => el.textContent.slice(0, 180)), ordem: [...document.querySelectorAll('[data-modulo]')].map((el) => el.dataset.modulo) })))

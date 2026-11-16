@@ -1,7 +1,11 @@
 import { useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Modal } from '../../../componentes/Modal'
+import { CampoComLimite } from './CampoComLimite'
+import { algumCampoPassaDoLimite } from './limitesDoAcervo'
 import css from './acervo.module.css'
+// #2792: limites do briefing (espelham o servidor).
+const LIMITES_BRIEFING = { finalidade: 500, restricoes: 4000, prompt: 7000 }
 
 export const canaisAcervo = { site: 'Site/cardápio', instagram: 'Instagram', whatsapp: 'WhatsApp', impressao: 'Materiais impressos' }
 const formatos = ['1:1', '4:5', '16:9', '9:16', '3:2', 'livre']
@@ -13,14 +17,16 @@ export function ProducaoAcervo({ acervo: a }) {
   const [somenteLacunas, setSomenteLacunas] = useState(true)
   const [formulario, setFormulario] = useState(null)
   const [aviso, setAviso] = useState('')
+  const [passou, setPassou] = useState(false)
   const operacoesFila = useRef({})
   const atuais = a.briefings.filter((b) => !a.briefings.some((v) => v.anteriorId === b.id))
-  function abrir(dados = {}) { setFormulario({ operacaoId: crypto.randomUUID(), ...dados, referenciasSelecionadas: JSON.parse(dados.referenciasJson || '[]') }) }
+  function abrir(dados = {}) { setPassou(false); setFormulario({ operacaoId: crypto.randomUUID(), ...dados, referenciasSelecionadas: JSON.parse(dados.referenciasJson || '[]') }) }
   function selecionarReferencia(id, selecionada) {
     setFormulario((f) => ({ ...f, referenciasSelecionadas: selecionada ? [...new Set([...f.referenciasSelecionadas, id])] : f.referenciasSelecionadas.filter((r) => r !== id) }))
   }
   async function salvar(e) {
     e.preventDefault()
+    if (algumCampoPassaDoLimite(e.currentTarget, LIMITES_BRIEFING)) return
     const f = new FormData(e.currentTarget)
     const atual = formulario
     const resultado = await a.fazer(() => a.api.salvarBriefing({ operacaoId: atual.operacaoId, anteriorId: atual.anteriorId || null,
@@ -65,22 +71,22 @@ export function ProducaoAcervo({ acervo: a }) {
     </details>)}
     {!atuais.length && <p>Nenhum briefing preparado.</p>}
     {formulario && <Modal titulo={formulario.anteriorId ? 'Nova versão do briefing' : 'Preparar briefing'} aoFechar={a.ocupado ? undefined : () => setFormulario(null)}>
-      <form className={css.formulario} onSubmit={salvar}>
+      <form className={css.formulario} onSubmit={salvar} onInput={(e) => setPassou(algumCampoPassaDoLimite(e.currentTarget, LIMITES_BRIEFING))}>
         <fieldset className={css.campos} disabled={a.ocupado}>
         {a.erro && <p role="alert" className={css.erro}>{a.erro}</p>}
         <label>Produto<select name="itemId" required defaultValue={formulario.itemId}>{a.itens.filter((i) => !formulario.anteriorId || i.cardapioItemId === formulario.itemId).map((i) => <option key={i.cardapioItemId} value={i.cardapioItemId}>{i.nome}</option>)}</select></label>
         <label>Canal<select name="canal" required defaultValue={formulario.canal || 'site'}>{Object.entries(canaisAcervo).map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}</select></label>
         <label>Formato<select name="formato" defaultValue={formulario.formato || '1:1'}>{formatos.map((f) => <option key={f}>{f}</option>)}</select></label>
         <p>Site: 1:1, 3:2 ou banner 16:9. Instagram: 1:1, 4:5 ou 9:16. WhatsApp: 1:1 ou 4:5. Impressão: medida física da peça.</p>
-        <label>Finalidade<textarea name="finalidade" required maxLength={500} defaultValue={formulario.finalidade || ''} /></label>
+        <CampoComLimite rotulo="Finalidade" limite={500} name="finalidade" required defaultValue={formulario.finalidade || ''} />
         <fieldset><legend>Referências aprovadas nesta página do acervo</legend>{referencias.map((i) => <label key={i.id}><input type="checkbox" name="referencia" value={i.id} checked={referenciasSelecionadas.includes(i.id)} onChange={(e) => selecionarReferencia(i.id, e.target.checked)} /> {i.titulo} · {i.origem}</label>)}
           {referenciasSelecionadas.filter((id) => !referencias.some((i) => i.id === id)).map((id) => <label key={id}><input type="checkbox" name="referencia" value={id} checked onChange={(e) => selecionarReferencia(id, e.target.checked)} /> Referência preservada: {id}</label>)}
           {!referencias.length && !referenciasSelecionadas.length && <p>Busque e aprove referências no acervo antes de preparar a produção.</p>}
         </fieldset>
-        <label>Restrições<textarea name="restricoes" required maxLength={4000} defaultValue={formulario.restricoes || restricoesBase} /></label>
-        <label>Prompt desta versão<textarea name="prompt" required maxLength={7000} defaultValue={formulario.prompt || ''} /></label>
+        <CampoComLimite rotulo="Restrições" limite={4000} name="restricoes" required defaultValue={formulario.restricoes || restricoesBase} />
+        <CampoComLimite rotulo="Prompt desta versão" limite={7000} name="prompt" required defaultValue={formulario.prompt || ''} />
         <p>Geração assistida. O resultado exigirá revisão e aprovação explícita antes de publicar.</p>
-        <Botao tipo="submit" variante="primario" disabled={a.ocupado || !referenciasSelecionadas.length}>Salvar briefing</Botao>
+        <Botao tipo="submit" variante="primario" disabled={a.ocupado || !referenciasSelecionadas.length || passou} motivo={passou ? 'Encurte o texto que passou do limite.' : undefined}>Salvar briefing</Botao>
         </fieldset>
       </form>
     </Modal>}

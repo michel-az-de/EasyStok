@@ -9,6 +9,7 @@ import {
   VEICULOS_CORRIDA, cotacaoVencida, distanciaDaCotacao, relogioDaCotacao, validadeDaCotacao,
 } from '../../dominio/entregasApi'
 import { moedaDosCentavos } from '../../dominio/formato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './corridas.module.css'
 
 const ICONE_DO_VEICULO = { Moto: 'moto', Carro: 'carro' }
@@ -16,6 +17,7 @@ const ICONE_DO_VEICULO = { Moto: 'moto', Carro: 'carro' }
 // Cotar e chamar (#2162, redesenho #2168): a cotação mostra o preço grande, a distância e quanto tempo ela
 // ainda vale. Vencida, o preço fica riscado e o botão vira "Cotar de novo". A chamada usa a cotação relida no
 // servidor: o preço nunca sai daqui.
+// #2792: o recado não usa `maxLength` (cortava em silêncio); acima de 120 o Chamar fica parado, com a frase no campo.
 export function ChamadaLalamove({ travado, cotar, chamar, destino }) {
   const [veiculo, setVeiculo] = useState('Moto')
   const [cotacao, setCotacao] = useState(null)
@@ -37,7 +39,7 @@ export function ChamadaLalamove({ travado, cotar, chamar, destino }) {
       </div>
       {cotacao
         // Cotação nova (inclusive a de "Cotar de novo") monta de novo: o foco volta para "Chamar".
-        ? <Cotacao key={`${cotacao.cotacaoId}:${cotacao.expiraEm}`} cotacao={cotacao} veiculo={veiculo} observacao={observacao} travado={travado}
+        ? <Cotacao key={`${cotacao.cotacaoId}:${cotacao.expiraEm}`} cotacao={cotacao} veiculo={veiculo} observacao={observacao} travado={travado} longo={algumPassaDoLimite([observacao, 120])}
             aoMudarObservacao={setObservacao} aoChamar={chamarAgora} aoCotarDeNovo={cotarAgora} aoDesistir={() => setCotacao(null)} />
         : (
           <div className={css.linha}>
@@ -54,7 +56,7 @@ export function ChamadaLalamove({ travado, cotar, chamar, destino }) {
   )
 }
 
-function Cotacao({ cotacao, veiculo, observacao, travado, aoMudarObservacao, aoChamar, aoCotarDeNovo, aoDesistir }) {
+function Cotacao({ cotacao, veiculo, observacao, travado, longo, aoMudarObservacao, aoChamar, aoCotarDeNovo, aoDesistir }) {
   const agora = useRelogio(0, 1000, { real: true })
   const chamarRef = useRef(null)
   // A cotação acabou de aparecer no lugar do "Ver preço": o foco vai para o próximo passo.
@@ -80,13 +82,13 @@ function Cotacao({ cotacao, veiculo, observacao, travado, aoMudarObservacao, aoC
           )}
       </div>
       {!vencida && (
-        <CampoTexto rotulo="Recado para o motorista (opcional)" maxLength={120} value={observacao} disabled={travado}
+        <CampoTexto rotulo="Recado para o motorista (opcional)" limite={120} value={observacao} disabled={travado}
           placeholder="Ex.: portão azul, interfone 42" onChange={(e) => aoMudarObservacao(e.target.value)} />
       )}
       <div className={css.linha}>
         {vencida
           ? <Botao variante="primario" icone="refresh-cw" disabled={travado} onClick={aoCotarDeNovo}>Cotar de novo</Botao>
-          : <Botao ref={chamarRef} variante="primario" icone={ICONE_DO_VEICULO[veiculo]} disabled={travado} onClick={aoChamar}>
+          : <Botao ref={chamarRef} variante="primario" icone={ICONE_DO_VEICULO[veiculo]} disabled={travado || longo} motivo={longo ? 'Encurte o recado para chamar.' : undefined} onClick={aoChamar}>
               {travado ? 'Chamando…' : `Chamar por ${preco}`}
             </Botao>}
         <Botao variante="texto" disabled={travado} onClick={aoDesistir}>Cancelar</Botao>

@@ -90,7 +90,7 @@ export function ModalLoteDePapel() {
           <Icone nome="alerta" tamanho={20} />
           <span>
             Sem conexão desde {horaCurta(conexao.offlineDesde)}. Nenhuma mensagem está saindo pro
-            cliente agora — continue pelos canhotos no quadro.
+            cliente agora. Continue pelos canhotos no quadro.
           </span>
           <Botao variante="primario" onClick={() => conexaoVoltou(agora)}>Conexão voltou</Botao>
         </output>

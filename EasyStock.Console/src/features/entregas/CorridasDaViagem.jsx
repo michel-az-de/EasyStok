@@ -8,6 +8,7 @@ import {
   formularioDaCorrida, motivoSemChamada, resumoDaCorrida,
 } from '../../dominio/entregasApi'
 import { centavosDoTexto, lerMoeda, moeda, textoDosCentavos } from '../../dominio/formato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import { ChamadaLalamove } from './ChamadaLalamove'
 import { CorridaLalamove } from './CorridaLalamove'
 import css from './entregasApi.module.css'
@@ -27,10 +28,14 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado, pedido = null 
   const travado = ocupado || enviando
   const campo = (k) => ({ value: form[k], disabled: travado, onChange: (e) => { setForm({ ...form, [k]: e.target.value }); setAviso(null) } })
 
+  // #2792: sem `maxLength`; o motorista passa de 120 e o Salvar fica parado, com a frase no campo.
+  const motoristaLongo = form ? algumPassaDoLimite([form.motorista, 120]) : false
+
   const abrirNova = () => { setAviso(null); setForm({ id: null, empresa: empresaPadraoDaCorrida(viagem, entregadores), custo: '', motorista: '' }) }
   const abrirCorrecao = (corrida) => { setAviso(null); setForm({ id: corrida.id, ...formularioDaCorrida(corrida) }) }
   const salvar = (e) => {
     e.preventDefault()
+    if (motoristaLongo) return
     const motivo = erroDoFormularioCorrida(form)
     if (motivo) { setAviso(motivo); return }
     const corpo = corpoCorrida(form)
@@ -76,9 +81,9 @@ export function CorridasDaViagem({ viagem, entregadores, ocupado, pedido = null 
           <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_DE_CORRIDA} {...campo('empresa')} disabled={travado || Boolean(form.id)} />
           <CampoReais rotulo="Custo (R$)" autoFocus centavos={centavosDoTexto(form.custo)} ler={lerMoeda} mostrarZero disabled={travado}
             aoMudar={(centavos) => { setForm({ ...form, custo: textoDosCentavos(centavos) }); setAviso(null) }} />
-          <CampoTexto rotulo="Motorista (opcional)" maxLength={120} {...campo('motorista')} />
+          <CampoTexto rotulo="Motorista (opcional)" limite={120} {...campo('motorista')} />
           <div className={css.linha}>
-            <Botao tipo="submit" variante="primario" disabled={travado}>{form.id ? 'Salvar correção' : 'Salvar corrida'}</Botao>
+            <Botao tipo="submit" variante="primario" disabled={travado || motoristaLongo} motivo={motoristaLongo ? 'Encurte o nome do motorista para salvar.' : undefined}>{form.id ? 'Salvar correção' : 'Salvar corrida'}</Botao>
             <Botao variante="texto" disabled={travado} onClick={() => { setForm(null); setAviso(null) }}>Cancelar</Botao>
           </div>
           {aviso && <p className={css.erroCampo} role="alert">{aviso}</p>}
