@@ -1,3 +1,4 @@
+using System.Globalization;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 
@@ -90,9 +91,10 @@ public class ReconciliarPixParcelaReceberUseCase(
         // Tolerancia: se valor pago for menor que saldo da parcela (cliente pagou parcial), aceitar
         // Se valor pago > saldo, cap no saldo (preserva invariante)
         var aplicado = Math.Min(valorPago, parcela.Saldo);
-        if (valorPago > parcela.Saldo)
+        var excedente = valorPago - aplicado;
+        if (excedente > 0m)
             // Sem o txid: na baixa manual ele vem do corpo da requisição (CodeQL, log de entrada do usuário).
-            logger.LogWarning("Pix acima do saldo: parcela={ParcId} pago={Pago} saldo={Saldo}; excedente sem registro na conta",
+            logger.LogWarning("Pix acima do saldo: parcela={ParcId} pago={Pago} saldo={Saldo}; excedente registrado na linha do tempo da conta",
                 parcela.Id, valorPago, parcela.Saldo);
         if (aplicado <= 0m)
             return new ReconciliarPixResult(null, parcela.Id, conta.Id,
@@ -125,6 +127,16 @@ public class ReconciliarPixParcelaReceberUseCase(
                 conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PixReconciliado,
                 descricao: $"Pix reconciliado: R$ {aplicado:F2} (txid={cmd.Txid})",
                 origem: "webhook"), ct);
+
+            // #2736: o que passou do saldo entrou na conta bancária e não vira crédito no Extrato: fica na linha do
+            // tempo da conta, para quem concilia o banco devolver ou lançar o valor.
+            if (excedente > 0m)
+                await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
+                    conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PixReconciliado,
+                    descricao: $"Pix excedente de {excedente.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} " +
+                               $"a devolver ou conciliar: o Pix foi de {valorPago.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} " +
+                               $"e a parcela aceitou {aplicado.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} (txid={cmd.Txid})",
+                    origem: "webhook"), ct);
 
             await contaRepo.UpdateAsync(conta, ct);
             await uow.CommitAsync();
