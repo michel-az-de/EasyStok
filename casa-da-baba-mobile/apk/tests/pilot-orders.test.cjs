@@ -39,7 +39,7 @@ function fixture(orders = [], pilot = true) {
   };
   vm.createContext(ctx);
   const start = html.indexOf('const KANBAN_COLS = ['), end = html.indexOf('function renderProgressDots(', start);
-  vm.runInContext(html.slice(start, end) + '\n' + fn('advanceOrder') + '\n' + fn('updateFab') + '\n' + fn('goPedidosTab'), ctx);
+  vm.runInContext(html.slice(start, end) + '\n' + fn('advanceOrder') + '\n' + fn('updateFab') + '\n' + fn('goPedidosTab') + '\n' + fn('contaItens'), ctx);
   return { ctx, list, header, title, fab, sections, active: value => { active = value; }, defer: () => { deferred = true; }, focus: () => focus, confer: () => confer,
     highlight: id => vm.runInContext('highlightOrderId = ' + JSON.stringify(id), ctx) };
 }
@@ -101,6 +101,7 @@ test('card APK preserva avisos, ações, segurança dos textos e filtro de quant
   assert.doesNotMatch(card, /Conferência|openConfer|openCestaCalc/); assert.match(card, /pilot-order-meta/); assert.match(card, /10:30/);
   assert.match(card, /&lt;img>/); assert.match(card, /&lt;script>/); assert.match(card, /&lt;faltou>/); assert.match(card, /&lt;canal>/);
   assert.doesNotMatch(card, /invisivel|class="apt"|class="k-time"/);
+  assert.match(card, /<span>1 item<\/span>/, '#2735: contagem em português, no singular');
   for (const handler of ['advanceOrder', 'openCobranca', 'printEtiqueta', 'openHistorico', 'cancelOrder']) assert.ok(card.includes(handler + "(&quot;a&quot;)"));
 });
 test('card de total zero não oferece cobrança e metadados ausentes não criam slots vazios', () => {
