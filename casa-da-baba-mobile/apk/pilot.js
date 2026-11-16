@@ -319,7 +319,7 @@
   let latest = null;
   let lastFocus = null;
   let health = 'checking';
-  let checkingUpdate = false;
+  let checkingUpdate = false, manualRequested = false;
   let nativeVersion = null;
   let lastAutomaticCheck = 0;
   let pendingContent = '';
@@ -860,6 +860,7 @@
       if (!automatic) {
         const status = doc.getElementById('pilotUpdateStatus');
         status.hidden = false; status.textContent = 'Conferindo a versão disponível…';
+        manualRequested = true;
       }
       return;
     }
@@ -877,6 +878,7 @@
     download.hidden = true; showVersion();
     message.textContent = 'Conferindo a versão disponível…';
     if (!automatic) { message.focus(); message.scrollIntoView({ block: 'nearest' }); }
+    let received = false;
     try {
       if (updater()) {
         try { showOtaStatus(await (automatic ? updater().status() : updater().check()), !automatic); }
@@ -894,6 +896,7 @@
         data = await response.json();
       }
       if (root.Capacitor?.isNativePlatform?.() && !nativeVersion) throw new Error('Versão nativa não confirmada.');
+      received = true;
       latest = validateManifest(data, installedConfig());
       message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Atualize sem desinstalar.' : 'Nada novo para instalar. Versão publicada: ' + latest.version + ' (' + latest.versionCode + ').';
       message.hidden = automatic && !latest.available;
@@ -901,12 +904,16 @@
       showVersion();
     } catch {
       message.textContent = 'Não foi possível conferir a atualização. Tente novamente com conexão.';
+      // Sem resposta, a oferta anterior continua valendo; manifesto recebido e inválido a cancela.
+      if (received) latest = null;
       download.hidden = !latest?.available;
     } finally {
       checkingUpdate = false;
       button.disabled = false;
       showVersion();
     }
+    // Quem pediu durante a automática recebe a própria conferência, com a checagem de conteúdo.
+    if (manualRequested) { manualRequested = false; return checkUpdate(); }
     // O resultado (e o botão de baixar, quando existe) entra na tela de quem pediu a conferência.
     if (!automatic) (download.hidden ? message : download).scrollIntoView({ block: 'nearest' });
   }

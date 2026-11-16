@@ -224,3 +224,15 @@ test('instalação recusa sequência menor que release já publicada em outro ca
   run(root, higher, 'install'); run(root, higher, 'activate');
   assert.equal(current(root).sequence, 10);
 });
+
+// #2804 (revisão da PR): repetir o deploy da mesma release depois de falha entre install e activate continua possível.
+test('reinstalar a mesma release já instalada é idempotente e ativa em seguida', () => {
+  const root = fs.mkdtempSync(path.join(temporary, 'retry-'));
+  const release = build('0.4.5', 11);
+  run(root, staging(root, release), 'install');
+  const retry = staging(root, release);
+  run(root, retry, 'install'); run(root, retry, 'activate');
+  assert.equal(current(root).sequence, 11);
+  const other = staging(root, build('0.4.6', 11, 'outro conteudo'));
+  run(root, other, 'install', false);
+});

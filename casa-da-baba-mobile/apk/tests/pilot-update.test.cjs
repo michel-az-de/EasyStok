@@ -897,7 +897,24 @@ test('conferência manual durante a automática mostra que está conferindo', as
   await root.forceCheckUpdate();
   assert.equal(nodes.get('pilotUpdateStatus').hidden, false);
   assert.match(nodes.get('pilotUpdateStatus').textContent, /Conferindo a versão disponível/);
+  root.CDB_CONFIG.versionCode = manifest.versionCode;
   release();
+  for (let i = 0; i < 5; i++) await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateStatus').hidden, false, 'quem pediu recebe a resposta');
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Nada novo para instalar/);
+});
+
+// #2804 (revisão da PR): manifesto recebido mas inválido cancela a oferta anterior; só falha de rede a mantém.
+test('manifesto inválido na conferência seguinte retira a oferta anterior', async () => {
+  const gate = {};
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
+  const original = manifest.url;
+  manifest.url = 'https://outro.exemplo/app.apk';
+  try { await root.forceCheckUpdate(); } finally { manifest.url = original; }
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, true);
+  assert.equal(nodes.get('pilotDownload').hidden, true);
 });
 
 // #2804: envio bem-sucedido prova a conexão; o rodapé não fica preso em "Sem conexão confirmada".
