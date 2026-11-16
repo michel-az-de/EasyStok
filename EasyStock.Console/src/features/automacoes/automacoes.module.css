@@ -100,6 +100,7 @@
 }
 
 .editando { display: block; margin: var(--e-2) 0 0; }
+.previaErro { background: var(--erro-pastel); color: var(--erro); border-radius: var(--r-1); padding: 0 var(--e-1); font-weight: 600; }
 .alerta { margin: var(--e-1) 0; font-size: var(--t-apoio); color: var(--alerta); }
 .acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-3); }
 .toque { min-height: var(--toque); }

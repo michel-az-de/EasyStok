@@ -206,7 +206,7 @@
 .topoNaoEntregue h3 { margin: 0; font-size: var(--t-forte); line-height: var(--lh-compacto); }
 .metaNaoEntregue { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .metaNaoEntregue time { margin-left: auto; color: var(--tinta-2); font-size: var(--t-micro); }
-.textoNaoEntregue { margin: 0; padding-left: var(--e-3); border-left: 3px solid var(--linha); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta-2); }
+.textoNaoEntregue { margin: 0; padding: var(--e-3); background: var(--elevado); border-radius: var(--r-1); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tinta-2); }
 .erroNaoEntregue { margin: 0; color: var(--erro); background: var(--erro-pastel); border-radius: var(--r-1); padding: var(--e-3); font-size: var(--t-micro); overflow-wrap: anywhere; }
 .acoesNaoEntregue { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .resumoNaoEntregues { margin-block: var(--e-3); color: var(--tinta-2); overflow-wrap: anywhere; }

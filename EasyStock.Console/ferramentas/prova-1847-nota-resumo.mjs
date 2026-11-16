@@ -38,9 +38,11 @@ try {
   await pagina.getByRole('button', { name: /Renan Okamoto/ }).click()
   const abrirNotas = pagina.locator('[data-destino-nota]').getByRole('button', { name: /^Notas\b/ })
   assert.equal(await abrirNotas.getAttribute('aria-expanded'), 'false', 'notas começam recolhidas')
+  // #2734: recolhida, a coluna mostra a prévia. A nota recém-fixada aparece sem clique; antes a lista nascia escondida.
+  const notaVisivel = pagina.locator('p:visible').filter({ hasText: texto })
+  assert.equal(await notaVisivel.count(), 1, 'a nota fixada aparece na Ficha sem precisar abrir a lista')
   await abrirNotas.click()
   assert.equal(await abrirNotas.getAttribute('aria-expanded'), 'true', 'o botão abre as notas da ficha')
-  const notaVisivel = pagina.locator('p:visible').filter({ hasText: texto })
   assert.equal(await notaVisivel.count(), 1, 'uma única nota visível no cliente original; evento recolhido não duplica pixels')
   assert.equal(await notaVisivel.innerText(), texto, 'texto completo preservado')
   fatos.etapas.push('Nota preserva texto e destinatário ao trocar de conversa; nenhuma nota em Bianca e uma única nota visível em Renan')

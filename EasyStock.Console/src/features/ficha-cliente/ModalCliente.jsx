@@ -3,12 +3,14 @@ import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
 import { baixarPdf } from '../../componentes/pdfNoNavegador'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useResumoDoCliente } from '../../aplicacao/useResumoDoCliente'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { enviarFotoCliente, removerFotoCliente } from '../../aplicacao/fotoCliente'
 import { gerarFichaClientePdf } from '../../aplicacao/fichaClientePdf'
 import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
+import { hashDoCadastroDoCliente } from '../../dominio/fichaCliente'
 import { BlocoCliente } from './BlocoCliente'
 import { ModalHistorico } from './ModalHistorico'
 import css from './ModalCliente.module.css'
@@ -16,6 +18,7 @@ import css from './ModalCliente.module.css'
 export function ModalCliente({ conversa, aoFechar, children }) {
   const { fonteApi, historico = [], agora } = useAtendimento()
   const { carregarClienteDaConversa } = useAcoes()
+  const { permite } = useAcessoModulos()
   const [salvandoNota, setSalvandoNota] = useState(false)
   const [baixandoPdf, setBaixandoPdf] = useState(false)
   const [alterandoFoto, setAlterandoFoto] = useState(false)
@@ -70,14 +73,21 @@ export function ModalCliente({ conversa, aoFechar, children }) {
   // O Fechar do rodapé passa pela mesma pergunta do Esc e do X (Modal.confirmarDescarte).
   const pedirFechamento = (evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
   const fechar = () => { definirNota(null); definirNome(null); definirTelefone(null); definirEndereco(null); definirRapido(null); aoFechar() }
+  // #2734: a mesma pessoa tem um cadastro completo em Cadastros (documentos, endereços, telefones, pedidos). A Ficha
+  // leva até ele; com texto por salvar o atalho espera, para a troca de tela não descartar nada em silêncio.
+  const sujo = cadastroSujo || notaSuja
+  const podeAbrirCadastro = fonteApi && Boolean(conversa.clienteId) && permite('cadastros')
+  const abrirCadastroCompleto = () => { const destino = hashDoCadastroDoCliente(conversa.clienteId); fechar(); window.location.hash = destino }
 
   // Um só caminho para "texto não salvo": confirmarDescarte (a pergunta do Modal), o mesmo do resto do sistema.
   // O segurarFechamento da PR (que travava Esc e fundo sem perguntar) saiu: a pergunta já protege o digitado.
   return <Modal titulo="Cadastro do cliente" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : fechar}
-    confirmarDescarte={cadastroSujo || notaSuja}
+    confirmarDescarte={sujo}
     rodape={<div className={css.acoes}>
       {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
       <Botao variante="texto" disabled={ocupado} onClick={pedirFechamento}>Fechar</Botao>
+      {podeAbrirCadastro && <Botao variante="secundario" icone="usuarios" disabled={ocupado || sujo}
+        motivo={sujo ? 'Salve ou descarte o que foi digitado para abrir o cadastro completo.' : undefined} onClick={abrirCadastroCompleto}>Abrir cadastro completo</Botao>}
       <Botao variante="secundario" icone="download" disabled={ocupado || !podeBaixarPdf} onClick={baixarFicha}>{baixandoPdf ? 'Preparando PDF…' : 'Baixar PDF'}</Botao>
       <span ref={setRodapeDoCadastro} className={css.lugarDoSalvar} />
     </div>}>

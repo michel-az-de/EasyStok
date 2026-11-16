@@ -33,6 +33,10 @@ export function CategoriasCadastro({ contexto }) {
   const emVoo = useRef(false)
   const abrir = (acao, categoria = null, pai = null) => { falhar(null); definirErroNome(null); definirValor(acao === 'renomear' ? categoria.nome : ''); escolher({ acao, categoria, pai }) }
   const fechar = () => { if (!emVoo.current) escolher(null) }
+  // #2734 (A22): Esc, Cancelar e o fundo perguntam antes de perder o que foi digitado ou escolhido.
+  const alterado = intencao?.acao === 'criar' ? valor.trim() !== '' : intencao?.acao === 'renomear' ? valor.trim() !== intencao.categoria.nome : intencao?.acao === 'mover' && valor !== ''
+  // O erro aparece no próprio campo; só excluir, que não tem campo, mostra no corpo.
+  const erroDoCampo = intencao?.acao === 'excluir' ? null : erroNome ?? erro
 
   async function confirmar(evento) {
     evento?.preventDefault()
@@ -40,7 +44,7 @@ export function CategoriasCadastro({ contexto }) {
     const { acao, categoria, pai } = intencao
     const problema = acao === 'criar' || acao === 'renomear' ? erroDoNomeDaCategoria(valor) : null
     if (problema) { definirErroNome(problema); return }
-    if (acao === 'mover' && !valor) { falhar('Escolha para onde mover.'); return }
+    if (acao === 'mover' && !valor) { definirErroNome('Escolha para onde mover.'); return }
     emVoo.current = true; ocupar(true); falhar(null)
     try {
       if (acao === 'criar') await criarCategoriaCadastro(corpoDaNovaCategoria(valor, pai?.id, contexto.empresaId), contexto)
@@ -88,17 +92,17 @@ export function CategoriasCadastro({ contexto }) {
         </li>)}</ul>}
         {podeEditar && acoesDa(raiz, null)}
       </li>)}</ul>}
-    {intencao && <Modal titulo={TITULO[intencao.acao](intencao)} aoFechar={ocupado ? undefined : fechar} segurarFechamento={ocupado}
-      rodape={<><Botao disabled={ocupado} onClick={fechar}>Cancelar</Botao><Botao variante={intencao.acao === 'excluir' ? 'perigo' : 'primario'} disabled={ocupado} onClick={confirmar}>{ocupado ? 'Salvando…' : typeof CONFIRMAR[intencao.acao] === 'function' ? CONFIRMAR[intencao.acao](intencao) : CONFIRMAR[intencao.acao]}</Botao></>}>
+    {intencao && <Modal titulo={TITULO[intencao.acao](intencao)} aoFechar={ocupado ? undefined : fechar} segurarFechamento={ocupado} confirmarDescarte={alterado && !ocupado}
+      rodape={<><Botao disabled={ocupado} onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))}>Cancelar</Botao><Botao variante={intencao.acao === 'excluir' ? 'perigo' : 'primario'} disabled={ocupado} onClick={confirmar}>{ocupado ? 'Salvando…' : typeof CONFIRMAR[intencao.acao] === 'function' ? CONFIRMAR[intencao.acao](intencao) : CONFIRMAR[intencao.acao]}</Botao></>}>
       {(intencao.acao === 'criar' || intencao.acao === 'renomear') && <form onSubmit={confirmar}>
-        <CampoTexto rotulo="Nome" obrigatorio value={valor} erro={erroNome} disabled={ocupado} onChange={e => { definirValor(e.target.value); definirErroNome(null) }} />
+        <CampoTexto rotulo="Nome" obrigatorio value={valor} erro={erroDoCampo} disabled={ocupado} onChange={e => { definirValor(e.target.value); definirErroNome(null); falhar(null) }} />
       </form>}
       {intencao.acao === 'mover' && <>
         <p>{intencao.categoria.categoriaPaiId ? 'Os produtos desta subcategoria continuam com ela.' : 'Esta categoria passa a ser subcategoria da escolhida.'}</p>
-        <Combobox rotulo="Mover para" valor={valor} aoMudar={definirValor} opcoes={destinosParaMover(arvore, intencao.categoria)} disabled={ocupado} />
+        <Combobox rotulo="Mover para" valor={valor} aoMudar={v => { definirValor(v); definirErroNome(null); falhar(null) }} erro={erroDoCampo} opcoes={destinosParaMover(arvore, intencao.categoria)} disabled={ocupado} />
       </>}
       {intencao.acao === 'excluir' && <p>{intencao.categoria.categoriaPaiId ? 'A subcategoria sai da lista.' : 'A categoria sai da lista.'} Se algum produto ainda usa {intencao.categoria.nome}, não é possível excluir. Mude esses produtos de categoria antes.</p>}
-      {erro && <p className={css.erro} role="alert">{erro}</p>}
+      {intencao.acao === 'excluir' && erro && <p className={css.erro} role="alert">{erro}</p>}
     </Modal>}
   </section>
 }

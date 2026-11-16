@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../infra/api/cadastrosApi'
-export { adicionarEnderecoCliente, adicionarTelefoneCliente, alternarAtividadeCadastro, removerEnderecoCliente, removerTelefoneCliente, atualizarCategoriaCadastro, buscarClientesParecidos, contextoCadastro, criarCategoriaCadastro, excluirCategoriaCadastro, obterCadastro, listarCategoriasCadastro, salvarCadastro, ativarMetodoCadastro, previaModeloCadastro, aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro } from '../infra/api/cadastrosApi'
+export { adicionarEnderecoCliente, adicionarNotaCadastro, adicionarTagCadastro, adicionarTelefoneCliente, alternarAtividadeCadastro, obterRelacionamentoCliente, removerTagCadastro, removerEnderecoCliente, removerTelefoneCliente, atualizarCategoriaCadastro, buscarClientesParecidos, contextoCadastro, criarCategoriaCadastro, excluirCategoriaCadastro, obterCadastro, listarCategoriasCadastro, salvarCadastro, ativarMetodoCadastro, previaModeloCadastro, aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro } from '../infra/api/cadastrosApi'
 
 // Preferências visuais da visita, sem entidades nem dados para persistir. Não contam como formulário sujo.
 const contextosVisuais = new Map()
@@ -30,6 +30,32 @@ export function useCategoriasCadastro(contexto) {
   return { ...resultado, recarregar: () => definir(r => ({ ...r, carregando: true, erro: null, revisao: r.revisao + 1 })) }
 }
 
+// #2734: relacionamento do cliente no editor (notas, tags, bloqueio e conversas do dossiê). Sem cliente, não lê.
+// Reler mantém o que está na tela; a releitura que falha depois de uma gravação não apaga a lista local nem vira alerta.
+export function useRelacionamentoCliente(clienteId, contexto) {
+  const { empresaId, identidade } = contexto
+  const chave = `${clienteId}:${empresaId}:${identidade}`
+  const [estado, definir] = useState({ chave: null, dados: null, erro: null, lida: -1 })
+  const [revisao, reler] = useState(0)
+  useEffect(() => {
+    if (!clienteId) return undefined
+    const abortar = new AbortController()
+    api.obterRelacionamentoCliente(clienteId, { empresaId, identidade }, abortar.signal).then(
+      dados => { if (!abortar.signal.aborted) definir({ chave, dados, erro: null, lida: revisao }) },
+      e => { if (!abortar.signal.aborted) definir(atual => ({ chave, dados: atual.chave === chave ? atual.dados : null, erro: e, lida: revisao })) },
+    )
+    return () => abortar.abort()
+  }, [chave, clienteId, empresaId, identidade, revisao])
+  const atual = estado.chave === chave
+  const dados = atual ? estado.dados : null
+  const lida = atual && estado.lida === revisao
+  return {
+    dados, carregando: Boolean(clienteId) && !lida, erro: lida && !dados ? estado.erro : null,
+    recarregar: () => reler(r => r + 1),
+    aplicar: mudanca => definir(a => (a.chave === chave && a.dados ? { ...a, dados: mudanca(a.dados) } : a)),
+  }
+}
+
 export function useListaCadastros(tela, filtros, contexto, habilitada = true) {
   const [resultado, definir] = useState({ itens: [], total: 0, carregando: true, erro: null })
   const [revisao, recarregar] = useState(0)
@@ -37,7 +63,8 @@ export function useListaCadastros(tela, filtros, contexto, habilitada = true) {
   useEffect(() => {
     if (!habilitada) { definir({ itens: [], total: 0, carregando: false, erro: null }); return undefined }
     const abortar = new AbortController()
-    definir({ itens: [], total: 0, carregando: true, erro: null })
+    // #2734 (A12): a lista que está na tela fica até a nova chegar; zerar a cada busca fazia a tabela piscar.
+    definir(r => ({ ...r, carregando: true, erro: null }))
     const timer = setTimeout(() => api.listarCadastro(tela, { busca, pagina, filtro, relacionamento, ordem }, contexto, abortar.signal).then(
       r => { if (!abortar.signal.aborted) definir({ ...r, carregando: false, erro: null }) },
       e => { if (!abortar.signal.aborted) definir({ itens: [], total: 0, carregando: false, erro: e.message }) },

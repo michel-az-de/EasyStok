@@ -258,18 +258,13 @@
 .transcricao { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); font-style: italic; }
 
 /* Quem responde esta conversa. Fica entre o cabeçalho e a thread, que é onde
-   a dona olha antes de escrever. Estado por trilho esquerdo mais texto, não
+   a dona olha antes de escrever. Estado por texto, não
    por fundo pastel, para não competir com os balões. */
 .modo {
   flex-shrink: 0; background: var(--papel);
   border: 0;
   padding: 0 var(--e-4); min-height: var(--toque);
 }
-.modo_ligado { border-left-color: var(--sucesso); }
-.modo_pausado { border-left-color: var(--linha-forte); }
-.modo_com-voce { border-left-color: var(--alerta); }
-.modo_encerrado { border-left-color: var(--linha-forte); }
-.modo_bloqueado { border-left-color: var(--erro); }
 
 /* Estado e Assumir permanecem à vista; as ações secundárias moram no ⋮ do cabeçalho (#2232, A4). */
 .modoLinha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); min-height: var(--toque); }
@@ -592,7 +587,8 @@
   background: var(--alerta-pastel);
 }
 .modoLinha:has(.faixaTransferencia) > .modoAssumir { margin: var(--e-2) var(--e-3) var(--e-2) auto; }
-/* Sem traço lateral (#2420, pedido do Felipe): a direção vem do ícone e do divisor curto antes do texto. */
+/* Sem traço lateral (#2420, pedido do Felipe): a direção vem do ícone e do divisor curto antes do texto.
+   #2734: o divisor é da cor da grade; a cor do aviso fica só no ícone. */
 .faixaTransferencia {
   flex: 1 1 auto; min-width: 0; margin: 0; padding: var(--e-2) var(--e-3) var(--e-2) var(--e-4);
   display: flex; align-items: center; gap: var(--e-3);
@@ -603,7 +599,7 @@
 .faixaIcone { flex: none; color: var(--alerta); }
 .faixaTexto {
   display: grid; gap: 2px; min-width: 0; padding-left: var(--e-3);
-  border-left: var(--b-1) solid color-mix(in srgb, var(--alerta) 30%, transparent);
+  border-left: var(--b-1) solid var(--linha-forte);
 }
 .faixaTexto strong { font-weight: 600; }
 .faixaMotivo { color: var(--tinta-2); }

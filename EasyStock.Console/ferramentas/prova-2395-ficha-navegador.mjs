@@ -36,7 +36,8 @@ await context.route('**/api/clientes?*', route => route.fulfill({ json: { data: 
 await context.route('**/api/atendimento/assistente/cadastro', route => route.fulfill({ json: { data: { conversaId: 'conversa', clienteId: null, vinculoRevisao: 0, campos: [{ campo: 'nome', valor: 'Júlia', evidencia: 'Meu nome é Júlia', mensagemId: 'msg' }, { campo: 'telefone', valor: '11999999999', evidencia: 'telefone11999999999', mensagemId: 'msg' }, { campo: 'email', valor: 'julia@exemplo.com', evidencia: 'email julia@exemplo.com', mensagemId: 'msg' }] } } }))
 try {
   await page.goto(`${process.env.CONSOLE_TEST_URL ?? 'http://127.0.0.1:5209'}/.build/2395/ficha-identidade/index.html`)
-  await page.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).click()
+  // #2734 (A16): o botão em linha se chama "<valor>, editar <rótulo>".
+  await page.getByRole('button', { name: 'Pessoa A, editar Nome do cliente', exact: true }).click()
   const nome = page.getByRole('textbox', { name: 'Nome do cliente', exact: true })
   await nome.fill('Texto preservado')
   await page.evaluate(() => window.trocarPessoa())

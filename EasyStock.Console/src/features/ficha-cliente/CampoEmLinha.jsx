@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
-import { mascaraTelefone, telefoneDoE164 } from '../../dominio/formato'
+import { telefoneDoE164 } from '../../dominio/formato'
+import { telefoneNaTela } from '../../dominio/cadastros'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { ERRO_IDENTIDADE_DA_EDICAO, identidadeDaEdicao, mesmaIdentidadeDaEdicao } from '../../dominio/identidadeDaEdicao'
 import { ConferirDestinoDaEdicao } from './ConferirDestinoDaEdicao'
@@ -23,7 +24,7 @@ const FALHA_AO_SALVAR = 'Não foi possível salvar. Tente de novo.'
 //
 // #2258 (auditoria T12, T13): com erro o campo continua visível (contorno vermelho),
 // recebe o foco de volta e a mensagem fica ligada a ele por aria-describedby.
-// `dica` vira o placeholder e `limite` o maxLength (nome: "Nome e sobrenome", 80).
+// `dica` vira o placeholder e `limite` a mensagem que trava o confirmar (nome: "Nome e sobrenome", 150).
 export function CampoEmLinha({
   rotulo, valor, vazio = 'Sem valor', tipo = 'texto', validar, aoSalvar, dica, limite, aoMudarSujo, chaveRascunho, conversa,
 }) {
@@ -36,7 +37,13 @@ export function CampoEmLinha({
   const erro = edicao?.erro ?? null
   const erroDoVinculo = erro === ERRO_IDENTIDADE_DA_EDICAO && conversa && !mesmaIdentidadeDaEdicao(edicao?.identidade, conversa)
   const setRascunho = (valor) => setEdicao(valor === null ? null : { ...edicao, valor, erro: null })
-  const setErro = (mensagem) => setEdicao({ ...edicao, valor: rascunho, erro: mensagem })
+  // #2734 (A06): `foco` falso (blur) mostra o erro sem tirar o foco de onde a pessoa foi.
+  const semFoco = useRef(false)
+  const setErro = (mensagem, foco = true) => {
+    semFoco.current = !foco
+    setEdicao({ ...edicao, valor: rascunho, erro: mensagem })
+    if (mensagem && foco) inputRef.current?.focus()
+  }
   const [salvou, setSalvou] = useState(false)
   // #2365: texto e trava pertencem ao cliente/campo, inclusive após remontar no celular.
   const [salvando, iniciarGravacao, estaGravando] = useGravacaoDoAjuste(chave)
@@ -61,7 +68,7 @@ export function CampoEmLinha({
 
   // O erro devolve o foco ao campo: quem digitou corrige sem caçar onde está.
   useEffect(() => {
-    if (erro && editando) inputRef.current?.focus()
+    if (erro && editando && !semFoco.current) inputRef.current?.focus()
   }, [erro, editando])
 
   useEffect(() => {
@@ -85,11 +92,14 @@ export function CampoEmLinha({
     setSalvou(true)
   }
 
-  function confirmar() {
+  // #2734 (A09): sem maxLength, que corta o texto colado em silêncio; o limite vira mensagem e trava o confirmar.
+  const avisoDoLimite = (texto) => (limite && texto.trim().length > limite ? `Use até ${limite} caracteres. Agora tem ${texto.trim().length}.` : null)
+
+  function confirmar(deBlur = false) {
     if (estaGravando()) return
-    if (conversa && !mesmaIdentidadeDaEdicao(edicao?.identidade, conversa)) { setErro(ERRO_IDENTIDADE_DA_EDICAO); return }
-    const mensagem = validar?.(rascunho) ?? null
-    if (mensagem) { setErro(mensagem); return }
+    if (conversa && !mesmaIdentidadeDaEdicao(edicao?.identidade, conversa)) { setErro(ERRO_IDENTIDADE_DA_EDICAO, !deBlur); return }
+    const mensagem = avisoDoLimite(rascunho) ?? validar?.(rascunho) ?? null
+    if (mensagem) { setErro(mensagem, !deBlur); return }
     if (rascunho === exibido) { setRascunho(null); return }
     const ida = aoSalvar(rascunho, edicao?.identidade)
     if (!ida?.then) { concluir(ida); return }
@@ -100,7 +110,9 @@ export function CampoEmLinha({
 
   function aoDigitar(evento) {
     const bruto = evento.target.value
-    setRascunho(tipo === 'telefone' ? mascaraTelefone(bruto) : bruto)
+    // #2734 (A01): colar "+55 11 98225-4398" tira o DDI (telefoneNaTela) em vez de cortar em 11 dígitos.
+    const novo = tipo === 'telefone' ? telefoneNaTela(bruto) : bruto
+    setEdicao({ ...edicao, valor: novo, erro: avisoDoLimite(novo) })
   }
 
   function aoTeclar(evento) {
@@ -111,7 +123,7 @@ export function CampoEmLinha({
   if (!editando) {
     return (
       <div className={css.campoEmLinha}>
-        <button type="button" className={css.valorBotao} onClick={abrir} aria-label={`Editar ${rotulo}`}>
+        <button type="button" className={css.valorBotao} onClick={abrir} aria-label={`${exibido || vazio}, editar ${rotulo}`}>
           <span className={valor ? undefined : css.valorVazio}>{exibido || vazio}</span>
           <Icone nome="lapis" tamanho={20} />
         </button>
@@ -135,16 +147,15 @@ export function CampoEmLinha({
           value={rascunho}
           onChange={aoDigitar}
           onKeyDown={aoTeclar}
-          onBlur={confirmar}
+          onBlur={() => confirmar(true)}
           readOnly={salvando}
           aria-busy={salvando || undefined}
           aria-invalid={Boolean(erro) || undefined}
           aria-describedby={erro ? idErro : undefined}
           placeholder={dica}
-          maxLength={limite}
         />
-        <BotaoIcone rotulo="Salvar" icone="check" disabled={salvando} onClick={confirmar} />
-        <BotaoIcone rotulo="Desfazer" icone="x" disabled={salvando} onMouseDown={(e) => e.preventDefault()} onClick={cancelar} />
+        <BotaoIcone rotulo="Salvar" icone="check" disabled={salvando} onClick={() => confirmar()} />
+        <BotaoIcone rotulo="Cancelar edição"icone="x" disabled={salvando} onMouseDown={(e) => e.preventDefault()} onClick={cancelar} />
       </div>
       {salvando && <output className={css.salvandoEmLinha}>Salvando…</output>}
       {erro && !erroDoVinculo && <p id={idErro} className={css.erroEmLinha} role="alert">{erro}</p>}

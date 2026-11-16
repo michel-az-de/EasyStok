@@ -60,3 +60,10 @@
   .filtros > .chave { margin-top: 0; }
   .acoesLinha { margin-left: 0; }
 }
+
+/* Pergunta de descarte do formulário em linha: mesma cara da do Modal (confirmarDescarte). */
+.descarte {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-3); border-radius: var(--r-2); background: var(--erro-pastel); color: var(--tinta);
+}
+.descarte p { margin: 0; font-weight: 600; }

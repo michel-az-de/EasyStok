@@ -2,6 +2,7 @@ import { precisaDeVoce, respostaAtrasada } from './automatico'
 import { inicioDoPedidoAtivo } from './entrega'
 import { pedidoEncerrado } from './pedido'
 import { normalizarBuscaCadastro, termoBuscaCadastro, telefoneCadastro } from './cadastros'
+import { rotuloDaTag } from './tag'
 
 export const ehLead = (conversa) => conversa.conta === 'lead'
 
@@ -83,6 +84,9 @@ const contemTextoOuTelefone = (valor, termo, telefone) => {
   return texto.includes(telefone) || [...numeros].some(([numero]) => telefoneDaBusca(numero) === telefone)
 }
 
+// #2734: a tag gravada vem com "_" ("cliente_antiga"). A busca compara com o rótulo, do jeito que a tela mostra.
+const tagContem = (tag, termo, telefone) => contemTextoOuTelefone(rotuloDaTag(tag), termo.replace(/_/g, ' '), telefone)
+
 export const combinaBusca = (conversa, busca) => {
   const termo = normalizarBuscaCadastro(busca).trim()
   if (!termo) return true
@@ -93,7 +97,7 @@ export const combinaBusca = (conversa, busca) => {
     || conversa.numeroComanda != null && ('comanda ' + conversa.numeroComanda).includes(termo)
     || [conversa.cliente?.telefone, telefoneCadastro(conversa)].some(valor => contem(valor)
       || telefone && telefoneDaBusca(valor).includes(telefone))
-    || (conversa.cliente?.tags ?? []).some(contem)
+    || (conversa.cliente?.tags ?? []).some(tag => tagContem(tag, termo, telefone))
     || conversa.mensagens.some(m => contem(m.texto))
     || (conversa.historico ?? []).some(pedido => pedido.itens.some(contem))
 }
@@ -105,7 +109,7 @@ export const combinaBusca = (conversa, busca) => {
 export function tagCorrespondida(conversa, busca) {
   const termo = normalizarBuscaCadastro(busca).trim()
   if (!termo) return null
-  return (conversa.cliente?.tags ?? []).find(tag => contemTextoOuTelefone(tag, termo, telefoneDoTermo(busca))) ?? null
+  return (conversa.cliente?.tags ?? []).find(tag => tagContem(tag, termo, telefoneDoTermo(busca))) ?? null
 }
 
 // Chip de canal liga e desliga (zero ou mais). Nenhum ligado é "todos", por
@@ -323,3 +327,8 @@ export function bloqueioDeSemente(conversa) {
     por: nota?.autor ?? 'Thatiane',
   })
 }
+
+// #2734: as conversas carregadas que mostram essa pessoa (mesmo cadastro). Quem grava o cadastro relê só elas.
+export const conversasDoCliente = (conversas, clienteId) => (
+  clienteId ? (conversas ?? []).filter((c) => c.clienteId === clienteId).map((c) => c.id) : []
+)

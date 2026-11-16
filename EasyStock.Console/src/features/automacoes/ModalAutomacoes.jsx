@@ -7,8 +7,10 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { automacoesEditaveis } from '../../dominio/acessoModulos'
 import {
-  VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica, contextoDePrevia, textoDaRegra,
+  VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, avisoDeValorFaltando, bloqueioDaAutomatica, contextoDePrevia,
+  previaDoServidor, textoDaRegra,
 } from '../../dominio/automacao'
+import { NOME_RESPOSTAS_AUTOMATICAS } from '../../dominio/modulos'
 import { ROTULO_DO_SOM, listaDeEventosDeSom } from '../../dominio/automatico'
 import { canalDaConversa } from '../../dominio/canal'
 import { DIAS_DA_SEMANA, chaveDoDiaNaLoja, descreverProximaAbertura } from '../../dominio/funcionamento'
@@ -20,11 +22,16 @@ const AVISOS_DE_SOM = listaDeEventosDeSom().map((e) => ROTULO_DO_SOM[e]).join(',
 
 // #1474, modo API: o EasyStok só preenche {nome}, {pedido} e {faixa}; a prévia não inventa o
 // resto ({abre}, {linkCardapio} saem escritos assim para o cliente) e a tela avisa.
-const CHAVES_DA_API = new Set(VARIAVEIS_DA_API.map((v) => v.chave))
-const soDaApi = (contexto) => Object.fromEntries(Object.entries(contexto).filter(([chave]) => CHAVES_DA_API.has(chave)))
+// #2734 (T7): a prévia usa a troca do servidor (`previaDoServidor`): o que ele deixaria escrito aparece marcado.
+const EXEMPLOS_DA_API = { nome: 'Maria', pedido: '12', faixa: 'amanhã às 14:00' }
+const valoresDaPreviaApi = (conversa, faixa) => ({
+  nome: conversa?.nome ? conversa.nome.split(' ')[0] : EXEMPLOS_DA_API.nome,
+  pedido: conversa?.pedido?.numero ? String(conversa.pedido.numero) : EXEMPLOS_DA_API.pedido,
+  faixa: faixa ?? EXEMPLOS_DA_API.faixa,
+})
 
 function Regra({
-  regra, contexto, aoAlternar, aoEditar, nomeConversa, podeEnviar, aoEnviar, fonteApi, avisoApi, editavel,
+  regra, contexto, valoresApi, aoAlternar, aoEditar, nomeConversa, podeEnviar, aoEnviar, fonteApi, avisoApi, editavel,
 }) {
   const [rascunho, setRascunho] = useState(null)
   // ocioso | salvando | salvo | erro: o resultado aparece aqui dentro, não atrás do modal.
@@ -32,7 +39,9 @@ function Regra({
 
   const valor = rascunho ?? { texto: regra.texto }
   const editando = valor.texto !== regra.texto
-  const previa = textoDaRegra({ ...regra, texto: valor.texto }, fonteApi ? soDaApi(contexto) : contexto)
+  const partesApi = fonteApi ? previaDoServidor(valor.texto, valoresApi) : null
+  const previa = partesApi ? partesApi.map((p) => p.texto).join('') : textoDaRegra({ ...regra, texto: valor.texto }, contexto)
+  const semValor = fonteApi ? avisoDeValorFaltando(regra.gatilho, valor.texto) : null
   const variaveis = fonteApi ? VARIAVEIS_DA_API : VARIAVEIS
   // #2476 (U8): variável que o EasyStok não preenche sairia escrita para o cliente: não salva nem liga.
   const bloqueio = fonteApi ? bloqueioDaAutomatica(valor.texto, editavel) : null
@@ -95,10 +104,17 @@ function Regra({
       </p>
       {bloqueio && <p id={idBloqueio} className={css.alerta} role="alert">{bloqueio}</p>}
       {avisoEntrada && <p className={css.alerta}>{avisoEntrada}</p>}
+      {semValor && <p className={css.alerta}>{semValor}</p>}
 
       {/* Prévia em bolha: é o que o cliente lê agora, com os dados desta conversa. */}
-      <p className={css.rotuloPrevia}>Prévia para o cliente</p>
-      <p className={css.bolha}>{previa}</p>
+      <p className={css.rotuloPrevia}>{fonteApi ? 'Prévia para o cliente (com valores de exemplo)' : 'Prévia para o cliente'}</p>
+      <p className={css.bolha}>
+        {partesApi
+          ? partesApi.map((parte, i) => (parte.tipo === 'erro'
+            ? <mark key={i} className={css.previaErro}>{parte.texto}</mark>
+            : <span key={i}>{parte.texto}</span>))
+          : previa}
+      </p>
 
       {editando && gravacao !== 'erro' && (
         <p className={css.editando}>
@@ -219,6 +235,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
   // `abre` só a regra "Fora do horário" usa (VARIAVEIS, dominio/automacao.js);
   // as outras ignoram a chave que não citam no texto.
   const contexto = { ...contextoDePrevia(selecionada, faixa), abre: descreverProximaAbertura(agora, funcionamento) }
+  const valoresApi = valoresDaPreviaApi(selecionada, selecionada?.pedido ? faixa : null)
   // Achado 8: mesmo relógio de `agora` que já decide Aberta/Fechada aqui do
   // lado, lido como dia civil da loja e não do navegador (#2742).
   const chaveDeHoje = chaveDoDiaNaLoja(agora)
@@ -238,7 +255,7 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
 
   return (
     <Modal
-      titulo="Mensagens automáticas"
+      titulo={NOME_RESPOSTAS_AUTOMATICAS}
       descricao="Mensagens, horários e avisos da loja."
       aoFechar={aoFechar}
       rodape={<Botao className={css.toque} onClick={aoFechar}>Fechar</Botao>}
@@ -344,13 +361,14 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
         )}
       </div>
 
-      {!editavel && <p className={css.descricao}>Somente proprietário ou gerente pode alterar as mensagens automáticas.</p>}
+      {!editavel && <p className={css.descricao}>Somente proprietário ou gerente pode alterar as respostas automáticas.</p>}
       <ul className={css.lista}>
         {regras.map((regra) => (
           <Regra
             key={regra.id}
             regra={regra}
             contexto={contexto}
+            valoresApi={valoresApi}
             aoAlternar={aoAlternar}
             aoEditar={editarRegra}
             nomeConversa={selecionada?.nome}

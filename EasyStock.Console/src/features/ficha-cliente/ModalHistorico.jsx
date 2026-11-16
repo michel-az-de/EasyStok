@@ -47,7 +47,7 @@ function AbaPedidos({ historico, pedidosAnteriores, aberta }) {
     return (
       <Vazio titulo={aberta ? textoDaComandaAberta(aberta) : 'Nenhum pedido ainda'}>
         {aberta ? 'Ela entra no histórico quando o pedido for concluído.' : pedidosAnteriores > 0
-          ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe salvo neste protótipo.`
+          ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe para mostrar aqui.`
           : 'Primeira vez na casa.'}
       </Vazio>
     )
@@ -80,11 +80,11 @@ function AbaPedidos({ historico, pedidosAnteriores, aberta }) {
 }
 
 // Desfecho e avisos (decisão 46, "Encerrar" v2): quem encerrou, quando, com
-// que desfecho, e se mandou mensagem, e-mail e SMS — o log de auditoria do
+// que desfecho, e se mandou mensagem, e-mail e SMS: o log de auditoria do
 // atendimento que a direção pede visível aqui. `desfecho` só existe a partir
 // desta decisão: atendimento antigo (nenhum nesta massa) cairia no rótulo
 // padrão "manual" em vez de quebrar.
-const ROTULO_DESFECHO = { manual: 'concluído por', tempo: 'concluído por tempo, sem mensagem —' }
+const ROTULO_DESFECHO = { manual: 'concluído por', tempo: 'concluído por tempo, sem mensagem ·' }
 
 function LogDeEncerramento({ atendimento }) {
   const desfecho = atendimento.desfecho ?? 'manual'
@@ -120,7 +120,7 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
               {new Date(a.encerradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', timeZone: FUSO })}
             </time>
             <span>{a.numero} · {a.faixaHorario} · {a.duracaoTexto}</span>
-            <b className={css.totalPedido}>{a.receita ? moeda(a.receita.liquido) : '—'}</b>
+            <b className={css.totalPedido}>{a.receita ? moeda(a.receita.liquido) : 'Sem venda'}</b>
             <AvaliacaoCliente avaliacao={a.avaliacaoCliente} />
           </header>
           <LogDeEncerramento atendimento={a} />

@@ -299,7 +299,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
         </nav>
         <div className={css.notasDaFicha}>
           <NotasDoCliente key={selecionada.id} conversaId={selecionada.id} clienteId={selecionada.clienteId ?? selecionada.id}
-            clienteNome={selecionada.nome} fonteApi={fonteApi && Boolean(selecionada.clienteId)} notas={cliente.notas ?? []}
+            clienteNome={selecionada.nome} fonteApi={fonteApi && Boolean(selecionada.clienteId)} notas={cliente.notas ?? []} observacao={cliente.observacoes ?? null}
             aoCriarNota={editavel ? aoAbrirNota : undefined} podeCriarNota={!fonteApi || Boolean(selecionada.clienteId)} />
         </div>
         <nav className={css.acessosFicha} aria-label="Histórico e pós-venda">

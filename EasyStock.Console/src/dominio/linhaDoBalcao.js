@@ -9,6 +9,7 @@
 
 import { PAUSA_POR_OUTRO } from './automatico'
 import { mensagensSemRespostaReal } from './mensagem'
+import { rotuloDaTag } from './tag'
 
 const ESTADOS = {
   bloqueado: { chave: 'bloqueado', texto: 'Bloqueado', tom: 'perigo', icone: 'lock' },
@@ -57,6 +58,6 @@ export function contextoDaLinha({
   if (pedido) itens.push({ chave: 'pedido', ...pedido })
   if (janelaFechada) itens.push({ chave: 'janela', texto: 'Só modelo', icone: 'lock', tom: 'neutro' })
   else if (entregaAte) itens.push({ chave: 'entrega', texto: `entrega até ${entregaAte}`, icone: 'moto', tom: 'neutro' })
-  if (tagAchada) itens.push({ chave: 'tag', texto: `Tag: ${tagAchada}`, icone: null, tom: 'neutro' })
+  if (tagAchada) itens.push({ chave: 'tag', texto: `Tag: ${rotuloDaTag(tagAchada)}`, icone: null, tom: 'neutro' })
   return itens
 }

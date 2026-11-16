@@ -39,7 +39,7 @@ export function corpoCliente(dados, empresaId) {
   return { ...campos(dados, ['nome', 'apt', 'endereco', 'telefone', 'email', 'documento', 'observacoes', 'nomeFantasia', 'inscricaoEstadual']), telefone: telefoneParaApi(dados.telefone), documento: documentoParaApi(dados.documento), empresaId,
     ...(dados.id ? { id: dados.id, revisao: dados.revisao } : {}), pessoaJuridica: dados.tipoPessoa === 'juridica', origem: 'console' }
 }
-export const CAMPOS_CLIENTE = { nome: 'Nome', tipoPessoa: 'Tipo de pessoa', telefone: 'Telefone', email: 'E-mail', documento: 'Documento', nomeFantasia: 'Nome fantasia', inscricaoEstadual: 'Inscrição estadual', endereco: 'Endereço', apt: 'Apartamento ou referência', observacoes: 'Observações' }
+export const CAMPOS_CLIENTE = { nome: 'Nome', tipoPessoa: 'Tipo de pessoa', telefone: 'Telefone', email: 'E-mail', documento: 'Documento', nomeFantasia: 'Nome fantasia', inscricaoEstadual: 'Inscrição estadual', endereco: 'Endereço', apt: 'Complemento', observacoes: 'Observações' }
 export function reconferirCadastroCliente(editor, atual) {
   if (!editor.dados.id || atual?.id !== editor.dados.id || !Number.isInteger(atual.revisao) || atual.revisao < 0)
     throw new Error('Não foi possível conferir a versão deste cadastro. Tente carregar novamente.')
@@ -64,13 +64,21 @@ export function corpoProduto(dados, empresaId) {
 // nunca é inventado: um telefone gravado sem "+" volta sem "+" (revisão da #2460). Com "+", segue E.164.
 // Número de outro país (DDI que não é 55) fica como foi digitado; o que não parece telefone vai cru e a API diz o motivo.
 const BRASIL_COM_DDI = /^55\d{10,11}$/
-export function telefoneNaTela(valor) {
+// #2734: a máscara e a validação leem o telefone do mesmo jeito, para a tela não recusar o que ela mesma deixou
+// digitar. `deFora`: começa com "+" e o DDI não é 55. `nacional`: os dígitos do Brasil, já sem o DDI.
+export function partesDoTelefone(valor) {
   const bruto = String(valor ?? '').trim()
   const digitos = bruto.replace(/\D/g, '')
+  const deFora = bruto.startsWith('+') && !digitos.startsWith('55')
+  // O texto que já está na máscara "(DD)" não tem DDI. Sem isto, um dígito a mais num telefone de DDD 55
+  // parecia "55 + número" e a tela trocava o DDD de quem estava digitando.
+  const comDdi = !deFora && (bruto.startsWith('+') || (!bruto.startsWith('(') && BRASIL_COM_DDI.test(digitos)))
+  return { bruto, digitos, deFora, nacional: comDdi ? digitos.slice(2) : digitos }
+}
+export function telefoneNaTela(valor) {
+  const { bruto, digitos, deFora, nacional } = partesDoTelefone(valor)
   if (!digitos) return bruto.startsWith('+') ? bruto : ''
-  if (bruto.startsWith('+') && !digitos.startsWith('55')) return bruto
-  const nacional = bruto.startsWith('+') || BRASIL_COM_DDI.test(digitos) ? digitos.slice(2) : digitos
-  if (!nacional) return bruto
+  if (deFora || !nacional) return bruto
   return nacional.length > 11 ? bruto : mascaraTelefone(nacional)
 }
 export function telefoneParaApi(valor) {
@@ -175,8 +183,10 @@ export function ordemDoCabecalhoNome(tela, valor) {
 
 // #2457 (U3): o limite de cada coluna vira erro no próprio campo, com o tamanho atual. `maxLength` cortava o
 // texto colado sem avisar (direção visual, seção 2). Fornecedor: e-mail com 150, o tamanho da coluna (B2).
+// #2734 (A11, C-13): a coluna Cliente.Nome tem 150 no servidor (ClienteConfiguration); Ficha e Cadastros usam o mesmo número.
+export const LIMITE_DO_NOME_DO_CLIENTE = 150
 const LIMITES_CADASTRO = {
-  clientes: { nome: 150, telefone: 32, email: 255, documento: 30, nomeFantasia: 150, inscricaoEstadual: 20, endereco: 255, apt: 32 },
+  clientes: { nome: LIMITE_DO_NOME_DO_CLIENTE, telefone: 32, email: 255, documento: 30, nomeFantasia: 150, inscricaoEstadual: 20, endereco: 255, apt: 32 },
   fornecedores: { nome: 150, contato: 150, telefone: 20, email: 150, documento: 30, categoria: 120, tipo: 60, siteUrl: 255, pedidoMinimo: 120, fretePadrao: 120 },
   produtos: { nome: 180 },
   bancos: { nome: 150 },

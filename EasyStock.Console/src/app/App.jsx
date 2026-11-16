@@ -13,7 +13,7 @@ import { useHash } from '../hooks/useHash'
 import { useLarguras } from '../hooks/useLarguras'
 import { useRelogio } from '../hooks/useRelogio'
 import { CELULAR, DESKTOP, useTamanhoTela } from '../hooks/useTamanhoTela'
-import { INSTANTE_INICIAL, LINHAS_PRODUTO } from '../infra/catalogo'
+import { INSTANTE_INICIAL, LINHAS_PRODUTO, RESTRICOES } from '../infra/catalogo'
 import { FONTE_API } from '../infra/fonteDados'
 import { demonstracao } from '../infra/demonstracao'
 import { telasDaDemonstracao } from './demonstracao'
@@ -711,7 +711,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
       {tela}{confirmacaoSaida}
-      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={props => <EditorCadastro {...props} />} renderizarPedido={props => <DetalhePedido {...props} />} aoAbrirConversa={resumo => {
+      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={props => <EditorCadastro {...props} restricoes={RESTRICOES} />} renderizarPedido={props => <DetalhePedido {...props} />} aoAbrirConversa={resumo => {
         memoriaDoLaco.dono = sessao.usuario?.id ?? null
         memoriaDoLaco.resumos.set(resumo.id, resumo)
         guardarConversaEncontrada(resumo)

@@ -43,6 +43,8 @@ await contexto.route('**/api/**', async route => {
   if (req.method() === 'GET') {
     if (!id) return route.fulfill({ json: { data: [cliente], meta: { total: 1 } } })
     if (falharDetalhe) return route.fulfill({ status: 503, json: { error: { message: 'Fora do ar.' } } })
+    // #2734: o editor do cliente lê também o dossiê (notas, tags, bloqueio e conversas).
+    if (sub === 'dossie') return route.fulfill({ json: { data: { cliente, enderecos, tags: [], notas: [], ultimosPedidos: [], totalPedidos: 7, bloqueado: false, conversasRecentes: [], totalGasto: 0 } } })
     return route.fulfill({ json: { data: { cliente, enderecos, telefones, documentos: [], alteracoes: [] } } })
   }
   escritas.push({ metodo: req.method(), path, empresaId: url.searchParams.get('empresaId'), corpo: req.postDataJSON?.() ?? null })
@@ -117,7 +119,8 @@ try {
   await editor.getByRole('status').filter({ hasText: 'Endereço adicionado.' }).waitFor()
 
   // Telefone extra: com DDD; WhatsApp sim ou não.
-  const secaoTelefones = editor.getByRole('region', { name: 'Telefones extras' })
+  // #2734: a seção passou a listar também o telefone principal, então o nome é só "Telefones".
+  const secaoTelefones = editor.getByRole('region', { name: 'Telefones', exact: true })
   await secaoTelefones.getByText('(11) 95555-4444').waitFor()
   await secaoTelefones.getByRole('button', { name: 'Adicionar telefone', exact: true }).click()
   modal = pagina.getByRole('dialog', { name: 'Novo telefone', exact: true }); await modal.waitFor()

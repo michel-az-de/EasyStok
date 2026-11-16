@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
+import { useContext, useEffect, useId, useRef, useState } from 'react'
+import { ContextoCatalogo, useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { anunciarAberturaDeConversa } from '../../../aplicacao/aberturaDeConversa'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
@@ -12,6 +12,8 @@ import { Icone } from '../../../componentes/Icone'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { hashDoModulo } from '../../../dominio/modulos'
+import { clienteDaHash } from '../../../dominio/fichaCliente'
+import { conversasDoCliente } from '../../../dominio/conversa'
 import { moeda } from '../../../dominio/formato'
 import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
@@ -27,6 +29,7 @@ const CHAVE_EDICAO = { produtos: 'editarCadastrosProdutos', fornecedores: 'edita
 const nome = (c) => c.nome || c.contatoInformado?.nome || 'Contato sem nome'
 // #2457 (U2): telefone na máscara da tela, não no E.164 que a API grava.
 const telefone = (item) => telefoneNaTela(telefoneCadastro(item))
+const SEM_RESTRICOES = []
 
 export function PainelCadastros({ tela, respostas, impressao, aoAbrirConversa }) {
   const { selecionada, conversas } = useAtendimento()
@@ -46,7 +49,11 @@ export function PainelCadastros({ tela, respostas, impressao, aoAbrirConversa })
 }
 
 function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarContexto, aoFixarConsulta, aoAbrirConversa }) {
-  const { selecionar, carregarClienteDaConversa } = useAcoes()
+  const { selecionar, relerClienteDaConversa } = useAcoes()
+  // #2734: as restrições do catálogo destacam a tag de restrição no editor, como na Ficha. A lista de cadastros
+  // funciona sem o catálogo; só o destaque depende dele, por isso a leitura não exige o provider.
+  const restricoes = useContext(ContextoCatalogo)?.restricoes ?? SEM_RESTRICOES
+  const idTitulo = useId()
   const chave = chaveContextoCadastro(tela, conversa?.id)
   const [editor, guardarEditor] = useRascunhoDoAjuste(chave)
   const [memoria, guardarVisual] = useContextoVisualCadastro(chave, contexto.identidade, { busca: '', pagina: 1, filtro: '', tipo: 'todos', ordem: '', posicao: 0 })
@@ -98,17 +105,46 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
     const dados = { nome: '', tipoPessoa: 'fisica', tipo: tela === 'bancos' ? 'corrente' : 'Alimento', status: 'Inativo', ativo: true, requestId: crypto.randomUUID() }
     definir({ editor: { dados, inicial: dados, ...(tela === 'clientes' && conversa && !conversa.clienteId ? { origemConversa: { id: conversa.id, vinculoRevisao: conversa.vinculoRevisao ?? 0 } } : {}) } })
   }
+  // #2734 (C-11): a Ficha do Atendimento não relê a pessoa sozinha. Toda conversa carregada desse cliente relê o
+  // cadastro, não só a que está selecionada; a do contexto entra também quando o cadastro nasceu dela (sem vínculo).
+  // A leitura pedida é nova: a que já estava em voo pode ter saído do servidor antes da gravação.
+  const relerConversasDoCliente = (clienteId) => {
+    if (tela !== 'clientes') return
+    const alvos = new Set(conversasDoCliente(conversas, clienteId))
+    if (conversa && conversa.clienteId === clienteId) alvos.add(conversa.id)
+    alvos.forEach(id => relerClienteDaConversa?.(id))
+  }
   const salvo = ({ anterior, atual } = {}) => {
     prepararReversao(tela === 'bancos' && anterior?.id && atual?.id === anterior.id && Number.isInteger(atual.revisao)
       ? { ...anterior, revisao: atual.revisao, requestId: crypto.randomUUID() } : null)
     definir({ editor: null }); aoFixarContexto(false); avisar(editor?.origemConversa ? 'Cadastro salvo. Volte à conversa e confira o vínculo com a pessoa.' : 'Cadastro salvo.'); consulta.recarregar()
-    if (tela === 'clientes' && conversa?.clienteId === editor?.dados.id) carregarClienteDaConversa?.(conversa.id)
+    relerConversasDoCliente(editor?.dados.id)
   }
-  // #2495 (S2): inativar ou reativar fecha o editor, avisa e relê a lista (e o cliente da conversa, se for o mesmo).
+  // #2495 (S2): inativar ou reativar fecha o editor, avisa e relê a lista (e as conversas desse cliente).
   const atividadeAlternada = (mensagem) => {
     definir({ editor: null }); aoFixarContexto(false); avisar(mensagem); consulta.recarregar()
-    if (tela === 'clientes' && conversa?.clienteId === editor?.dados.id) carregarClienteDaConversa?.(conversa.id)
+    relerConversasDoCliente(editor?.dados.id)
   }
+  // #2734: a Ficha do Atendimento abre o cadastro completo por `#/m/cadastros/clientes/<id>`. O id sai do endereço
+  // depois de lido. Outro cadastro aberto com mudança por salvar, ou com nota ou tag sendo escrita, não é trocado:
+  // o pedido espera a pessoa salvar ou descartar.
+  const [daRota, pedirDaRota] = useState(() => (tela === 'clientes' ? clienteDaHash(window.location.hash) : null))
+  const [rascunhoNoRelacionamento, marcarRascunho] = useState(false)
+  const editorAlterado = Boolean(editor) && (rascunhoNoRelacionamento || JSON.stringify(editor.dados) !== JSON.stringify(editor.inicial))
+  useEffect(() => {
+    if (tela !== 'clientes') return undefined
+    const ler = () => pedirDaRota(clienteDaHash(window.location.hash))
+    window.addEventListener('hashchange', ler)
+    return () => window.removeEventListener('hashchange', ler)
+  }, [tela])
+  useEffect(() => {
+    if (!daRota || abrindo || desfazendo) return
+    const aberto = editor?.dados.id
+    if (editor && aberto !== daRota && editorAlterado) return
+    pedirDaRota(null)
+    window.history.replaceState(null, '', hashDoModulo('cadastros', 'clientes'))
+    if (aberto !== daRota) editar({ id: daRota })
+  }, [daRota, editor, abrindo, desfazendo, rascunhoNoRelacionamento])
   async function desfazer() {
     if (!reversao || !podeEditar) return
     const concluir = iniciarDesfazer(); if (!concluir) return
@@ -121,9 +157,9 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       falhar(e.status === 409 ? 'A conta mudou depois desta edição. Nada foi desfeito. Abra o cadastro para conferir a versão atual.' : e.message)
     } finally { concluir() }
   }
-  return <section className={css.painel} aria-label={TITULOS_CADASTROS[tela]}>
+  return <section className={css.painel} aria-labelledby={idTitulo}>
     <header className={css.cabecalho}>
-      <div><h2>{TITULOS_CADASTROS[tela]}</h2><p>{({ clientes: 'Pessoas, contatos e histórico de relacionamento.', produtos: 'Dados dos produtos usados no cardápio e na operação.', fornecedores: 'Contatos e condições de compra.', bancos: 'Contas usadas pela loja.' })[tela]}</p></div>
+      <div><h2 id={idTitulo}>{TITULOS_CADASTROS[tela]}</h2><p>{({ clientes: 'Pessoas, contatos e histórico de relacionamento.', produtos: 'Dados dos produtos usados no cardápio e na operação.', fornecedores: 'Contatos e condições de compra.', bancos: 'Contas usadas pela loja.' })[tela]}</p></div>
       {podeEditar && !soLeads && <Botao variante="primario" icone="mais" onClick={novo}>{tela === 'clientes' && conversa && !conversa.clienteId ? 'Cadastrar pessoa da conversa' : TEXTOS_CADASTRO[tela].novo}</Botao>}
     </header>
     {conversa && <div className={css.contexto}><Icone nome="conversa" tamanho={20} /><span>Atendimento de <strong>{nome(conversa)}</strong></span>
@@ -143,11 +179,11 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
         {!soLeads && ORDENS_CADASTRO[tela] && <Combobox rotulo="Ordem" valor={ordem} opcoes={ORDENS_CADASTRO[tela]} disabled={!ordenavel} aoMudar={ordenar} />}
         <Botao icone="refresh-cw" disabled={consulta.carregando || soLeads} onClick={consulta.recarregar}>Atualizar</Botao>
       </div>
-      {leitura === 'carregando' ? <Vazio titulo="Carregando cadastros">Aguarde um instante.</Vazio> : leitura === 'falhou' ? null : lista.length === 0 ? <Vazio titulo={busca ? 'Nenhum resultado para esta busca' : soLeads ? 'Nenhum contato sem cadastro nesta lista de conversas' : comFiltro ? 'Nenhum cadastro com estes filtros' : TEXTOS_CADASTRO[tela].semItens}
+      {leitura === 'carregando' && lista.length === 0 ? <Vazio titulo="Carregando cadastros">Aguarde um instante.</Vazio> : leitura === 'falhou' ? null : lista.length === 0 ? <Vazio titulo={busca ? 'Nenhum resultado para esta busca' : soLeads ? 'Nenhum contato sem cadastro nesta lista de conversas' : comFiltro ? 'Nenhum cadastro com estes filtros' : TEXTOS_CADASTRO[tela].semItens}
         acao={busca ? <Botao onClick={() => definir({ busca: '', pagina: 1, posicao: 0 })}>Limpar busca</Botao> : comFiltro && !soLeads ? <Botao onClick={() => definir({ busca: '', filtro: '', tipo: 'todos', pagina: 1, posicao: 0 })}>Limpar filtros</Botao> : !soLeads && podeEditar ? <Botao variante="primario" icone="mais" onClick={novo}>{TEXTOS_CADASTRO[tela].novo}</Botao> : undefined}>
-        {busca ? 'Tente outro nome ou contato.' : soLeads ? 'As pessoas que ainda não têm cadastro aparecem aqui ao chegar no Atendimento.' : comFiltro ? (tela === 'clientes' ? 'Tente outra aba ou situação.' : 'Tente outra situação.') : TEXTOS_CADASTRO[tela].vazio}</Vazio> : <div ref={tabela} className={css.lista} onScroll={e => definir({ posicao: e.currentTarget.scrollTop })}>
-        <table><thead><tr>{ordenavel ? <th aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={16} /></button></th>
-          : <th>{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th>}<th>{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th>Situação</th><th><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
+        {busca ? 'Tente outro nome ou contato.' : soLeads ? 'As pessoas que ainda não têm cadastro aparecem aqui ao chegar no Atendimento.' : comFiltro ? (tela === 'clientes' ? 'Tente outra aba ou situação.' : 'Tente outra situação.') : TEXTOS_CADASTRO[tela].vazio}</Vazio> : <div ref={tabela} className={css.lista} aria-busy={leitura === 'carregando'} onScroll={e => definir({ posicao: e.currentTarget.scrollTop })}>
+        <table><caption className="sr">{TITULOS_CADASTROS[tela]}</caption><thead><tr>{ordenavel ? <th scope="col" aria-sort={sortDoNome(tela, ordem)}><button type="button" className={css.ordenar} onClick={() => ordenar(ordemDoCabecalhoNome(tela, ordem))}>{tela === 'produtos' ? 'Produto' : 'Nome'}<Icone nome={({ ascending: 'arrow-up', descending: 'arrow-down' })[sortDoNome(tela, ordem)] ?? 'arrow-up-down'} tamanho={16} /></button></th>
+          : <th scope="col">{tela === 'produtos' ? 'Produto' : tela === 'bancos' ? 'Conta' : 'Nome'}</th>}<th scope="col">{tela === 'produtos' ? 'Preço' : tela === 'bancos' ? 'Instituição' : 'Contato'}</th><th scope="col">Situação</th><th scope="col"><span className="sr">Ações</span></th></tr></thead><tbody>{lista.map(item => {
           const id = item.id ?? item.produtoId
           const c = soLeads ? item : (conversas ?? []).find(c => c.clienteId === id)
           const situacao = situacaoDaLinha(tela, item, soLeads)
@@ -163,6 +199,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       <footer className={css.rodape}><span>{leitura === 'falhou' ? 'Lista não carregada' : soLeads ? `${leads.length} contatos sem cadastro nas conversas carregadas` : consulta.pesquisaLimitada ? `${lista.length} resultados, até 100 por busca` : `${consulta.total} ${consulta.total === 1 ? TEXTOS_CADASTRO[tela].itens.replace(/s$/, '') : TEXTOS_CADASTRO[tela].itens}`}</span>{leitura !== 'falhou' && !soLeads && !consulta.pesquisaLimitada && tela !== 'bancos' && (pagina > 1 || temProximaPagina(pagina, consulta.total)) && <div className={css.acoes}><Botao disabled={pagina <= 1 || consulta.carregando} onClick={() => definir({ pagina: pagina - 1, posicao: 0 })}>Anterior</Botao><span>Página {pagina}</span><Botao disabled={!temProximaPagina(pagina, consulta.total) || consulta.carregando} onClick={() => definir({ pagina: pagina + 1, posicao: 0 })}>Próxima</Botao></div>}</footer>
     </div>
     {tela === 'produtos' && <div className={css.links}><a href={hashDoModulo('cardapio', 'itens')}>Abrir itens do cardápio</a><a href={hashDoModulo('producao', 'estoque')}>Conferir estoque do dia</a></div>}
-    {editor && <EditorCadastro tela={tela} editor={editor} aoMudar={valor => definir({ editor: valor })} contexto={contexto} conversa={tela === 'clientes' && ((editor.dados.id && conversa?.clienteId === editor.dados.id) || (!editor.dados.id && !conversa?.clienteId && editor.origemConversa?.id === conversa?.id && editor.origemConversa?.vinculoRevisao === (conversa?.vinculoRevisao ?? 0))) ? conversa : null} podeEditar={podeEditar} aoFechar={() => { definir({ editor: null }); aoFixarContexto(false) }} aoSalvo={salvo} aoAlternarAtividade={atividadeAlternada} aoAbrirCadastro={item => { definir({ editor: null }); editar(item) }} />}
+    {editor && <EditorCadastro tela={tela} editor={editor} aoMudar={valor => definir({ editor: valor })} contexto={contexto} conversa={tela === 'clientes' && ((editor.dados.id && conversa?.clienteId === editor.dados.id) || (!editor.dados.id && !conversa?.clienteId && editor.origemConversa?.id === conversa?.id && editor.origemConversa?.vinculoRevisao === (conversa?.vinculoRevisao ?? 0))) ? conversa : null} podeEditar={podeEditar} aoFechar={() => { definir({ editor: null }); aoFixarContexto(false) }} aoSalvo={salvo} aoAlternarAtividade={atividadeAlternada} aoAbrirCadastro={item => { definir({ editor: null }); editar(item) }}
+      conversasNoAtendimento={(conversas ?? []).map(c => c.id)} aoAbrirConversa={id => { definir({ editor: null }); aoFixarContexto(false); abrirConversa(id) }} aoGravarRelacionamento={() => relerConversasDoCliente(editor.dados.id)} aoRascunharRelacionamento={marcarRascunho} restricoes={restricoes} />}
   </section>
 }

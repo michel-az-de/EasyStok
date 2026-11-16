@@ -15,6 +15,8 @@
 /* #2495 (S1): Situação e Ordem lado a lado, Atualizar na mesma linha. */
 .filtros.comOrdem { grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(160px, 220px)) auto; }
 .lista { overflow: auto; max-height: 62vh; min-width: 0; }
+/* #2734 (A12): a lista que está na tela espera a nova chegar, mais apagada, em vez de sumir a cada busca. */
+.lista[aria-busy='true'] { opacity: 0.6; }
 .lista table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--t-apoio); }
 .lista th { padding: var(--e-3) var(--e-4); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; background: var(--elevado); }
 .lista td { border-top: 1px solid var(--linha); padding: var(--e-4); vertical-align: middle; overflow-wrap: anywhere; }
@@ -22,7 +24,7 @@
 /* #2495 (S1): o cabeçalho Nome ordena; alvo de 44px e foco visível. */
 .ordenar { display: inline-flex; align-items: center; gap: var(--e-2); min-height: 44px; margin: calc(var(--e-3) * -1) 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 .ordenar:hover { color: var(--tinta); }
-.ordenar:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.ordenar:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .lista td small { display: block; margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-micro); }
 .clicavel { cursor: pointer; }
 .clicavel:hover td { background: var(--elevado); }
@@ -44,10 +46,13 @@
 .subcategorias > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); padding-block: var(--e-2); border-top: 1px solid var(--linha); }
 .subcategorias > li > span { overflow-wrap: anywhere; min-width: 0; }
 .sucesso { margin: 0; padding: var(--e-3); color: var(--sucesso); background: var(--sucesso-pastel); border-radius: var(--r-1); }
+/* #2734: a região de aviso (role="status") fica sempre na tela, para o leitor de tela anunciar o que entra nela.
+   Vazia, sai do fluxo e não ocupa uma linha da grade; nunca `display: none`, que a tiraria da árvore de acessibilidade. */
+.vivo:empty { position: absolute; }
 .formulario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-4); padding: var(--e-3) 0; margin: 0; border: 0; min-width: 0; }
 .larguraTotal { grid-column: 1 / -1; }
 /* #2495 (S5): aviso de cliente com o mesmo telefone ou documento; não bloqueia salvar. */
-.avisoDuplicado { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding: var(--e-3); color: var(--tinta); background: var(--alerta-pastel); border-inline-start: 4px solid var(--alerta); border-radius: var(--r-1); }
+.avisoDuplicado { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding: var(--e-3); color: var(--tinta); background: var(--alerta-pastel); border: var(--b-1) solid var(--alerta); border-radius: var(--r-1); }
 .avisoDuplicado p { margin: 0; }
 .legenda { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); }
 .check { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
@@ -91,6 +96,24 @@
   .contexto { gap: var(--e-2); padding: var(--e-3); }
   .rodape { padding: var(--e-3); }
 }
+/* #2734: relacionamento do cliente no editor (bloqueio, notas internas e tags), com as palavras da Ficha do
+   Atendimento. Destaque por contorno uniforme e fundo, sem barra lateral. */
+.relacionamento { display: grid; gap: var(--e-4); margin-block-end: var(--e-4); }
+.relacionamento section { display: grid; gap: var(--e-2); min-width: 0; align-content: start; }
+.relacionamento h3 { margin: 0; font-size: var(--t-corpo); }
+.avisoBloqueio { display: grid; gap: var(--e-1); padding: var(--e-3); background: var(--elevado); border: var(--b-1) solid color-mix(in srgb, var(--erro) 30%, transparent); border-radius: var(--r-1); }
+.avisoBloqueio p { margin: 0; overflow-wrap: anywhere; }
+.tituloBloqueio { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); color: var(--erro); }
+.tituloBloqueio span { color: var(--tinta-2); font-size: var(--t-micro); }
+.notasETags { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--e-5); align-items: start; }
+.notas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.notas li { display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3); background: var(--fundo); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); }
+.notas p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notas small { color: var(--tinta-2); font-size: var(--t-micro); }
+.tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-2); }
+/* #2734: a restrição tem o mesmo destaque da Ficha do Atendimento (cliente.module.css, .chipRestricao). */
+.tags .tagRestricao { border-color: var(--alerta); background: var(--alerta-pastel); color: var(--tinta); }
+@media (max-width: 700px) { .notasETags { grid-template-columns: minmax(0, 1fr); } }
 /* #2495 (S6): ficha do cliente no editor. */
 .ficha { display: grid; gap: var(--e-5); padding-block-start: var(--e-4); border-block-start: 1px solid var(--linha); }
 .ficha section { display: grid; gap: var(--e-2); min-width: 0; }

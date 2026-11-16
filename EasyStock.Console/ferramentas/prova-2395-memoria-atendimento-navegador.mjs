@@ -44,11 +44,14 @@ try {
   const lista = page.locator('[class*="rolagem"]').filter({ has: page.getByText('Pessoa 00', { exact: true }) }).first()
   await lista.hover(); await page.mouse.wheel(0, 700); await page.waitForTimeout(200)
   const antes = await lista.evaluate(el => el.scrollTop); assert.ok(antes >= 400)
+  // #2734: a posição só volta quando as conversas chegam. Com tempo fixo, a leitura caía em "Carregando as conversas…"
+  // e dava 0 com a máquina carregada; espere a lista. Sem lista, a leitura segue 0 e a asserção decide.
+  const listaCarregada = () => lista.waitFor({ timeout: 8000 }).catch(() => {})
   await hash('#/'); await page.getByPlaceholder(/insumos, caixa/).waitFor(); await hash('#/m/atendimento/balcao')
-  await busca.waitFor(); await page.waitForTimeout(300)
+  await busca.waitFor(); await listaCarregada(); await page.waitForTimeout(300)
   resultado.buscaAposVoltar = await busca.inputValue()
   resultado.posicaoAposVoltar = await lista.count() ? await lista.evaluate(el => el.scrollTop) : 0
-  await page.reload(); await busca.waitFor(); await page.waitForTimeout(300)
+  await page.reload(); await busca.waitFor(); await listaCarregada(); await page.waitForTimeout(300)
   resultado.buscaAposReload = await busca.inputValue()
   resultado.posicaoAposReload = await lista.count() ? await lista.evaluate(el => el.scrollTop) : 0
   await page.screenshot({ path: resolve(pasta, 'filtros-posicao.png'), fullPage: true })

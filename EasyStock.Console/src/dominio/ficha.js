@@ -32,6 +32,13 @@ export const PEDIDOS_PARA_COSTUMA_PEDIR = 2
 export const favoritoDoCliente = (itemFavorito) =>
   (Number(itemFavorito?.pedidos) >= PEDIDOS_PARA_COSTUMA_PEDIR ? itemFavorito.nome ?? null : null)
 
+// #2734: a nota interna aparece sem clique. Recolhida, a lista mostra as mais recentes; o botão abre o resto.
+export const NOTAS_NA_PREVIA = 2
+export function previaDasNotas(notas = [], abertas = false) {
+  const visiveis = abertas ? notas : notas.slice(0, NOTAS_NA_PREVIA)
+  return { visiveis, escondidas: notas.length - visiveis.length }
+}
+
 // #1761 (L22): linha zerada da Ficha. "Tags · 0 tags" vira o convite da ação que mora ali; o
 // Histórico sem pedido e sem pontos para resgatar não tem o que abrir e sai da coluna.
 export const resumoDasTags = (quantas) => (quantas === 0 ? 'Adicionar tag' : quantas === 1 ? '1 tag' : `${quantas} tags`)

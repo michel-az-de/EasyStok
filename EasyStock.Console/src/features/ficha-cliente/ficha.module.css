@@ -73,12 +73,11 @@
 .trilhaItem.feito .circuloPasso {
   border-color: transparent; color: var(--branco);
   background: var(--acao-sucesso);
-  box-shadow: 0 3px 8px -3px rgba(43, 106, 69, .55);
+  box-shadow: 0 3px 8px -3px color-mix(in srgb, var(--acao-sucesso) 55%, transparent);
 }
 .trilhaItem.atual .circuloPasso {
-  --halo: light-dark(rgba(29, 29, 31, .16), rgba(244, 239, 233, .18));
   transform: scale(1.11); border: 2px solid var(--tinta); background: var(--papel); color: var(--tinta);
-  box-shadow: 0 0 0 3px var(--halo);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tinta) 16%, transparent);
 }
 .trilhaItem.futuro .circuloPasso { color: var(--tinta-3); border-color: var(--linha-media); background: var(--papel); }
 
@@ -97,13 +96,13 @@
   color: var(--tinta); font-family: var(--f-corpo); font-size: var(--t-apoio); font-weight: 600;
   text-align: left; cursor: pointer; border-radius: var(--r-1);
 }
-.resumoAndamento:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.resumoAndamento:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .abrirEtapas { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--marca); white-space: nowrap; }
 .retornoEtapa { display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-apoio); color: var(--tinta-2); }
 .barraPasso[data-etapa-confirmada] { animation: confirmarEtapa 650ms var(--ease-saida) 1; }
 @keyframes confirmarEtapa {
-  from { box-shadow: inset 3px 0 var(--sucesso); background: var(--sucesso-pastel); }
-  to { box-shadow: inset 0 0 transparent; background: var(--papel); }
+  from { background: var(--sucesso-pastel); }
+  to { background: var(--papel); }
 }
 @media (prefers-reduced-motion: reduce) {
   .barraPasso[data-etapa-confirmada] { animation: none; }
@@ -126,7 +125,7 @@
 .notas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
 .nota {
   background: var(--elevado); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--alerta);
+  border: var(--b-1) solid color-mix(in srgb, var(--alerta) 30%, transparent);
   padding: var(--e-2) var(--e-3); font-size: var(--t-apoio);
 }
 /* Autoria da nota é rótulo, não carimbo de hora: 15 px. */
@@ -199,14 +198,13 @@
 .acessoFicha small { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); }
 .acessoFicha svg { flex-shrink: 0; color: var(--tinta-3); }
 .acessoFicha:hover { background: var(--fundo); }
-.acessoFicha:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.acessoFicha:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 /* #2185: Cadastrar cliente, Itens e Nova comanda são da mesma família: uma coluna, a largura toda. */
 .acaoMontar { margin: 0; padding: 0 var(--e-4); display: grid; gap: var(--e-2); }
 
 .alerta {
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
-  padding: var(--e-3) var(--e-4); background: var(--papel); color: var(--alerta);
-  border-left: var(--trilho) solid var(--alerta);
+  padding: var(--e-3) var(--e-4); background: var(--alerta-pastel); color: var(--alerta);
   border-bottom: var(--b-1) solid var(--linha); font-size: var(--t-apoio);
 }
 .alerta p { margin: 0; flex: 1; min-width: 160px; color: var(--tinta); }
@@ -221,7 +219,7 @@
 }
 .barraDesfazer {
   grid-auto-flow: column; align-items: center; justify-content: start;
-  border-left: var(--trilho) solid var(--sucesso); color: var(--sucesso);
+  background: var(--sucesso-pastel); color: var(--sucesso);
 }
 .barraTexto { font-size: var(--t-apoio); font-weight: 600; }
 
@@ -334,14 +332,14 @@
 /* #1868: em grade, Manhã e Tarde do mesmo dia lado a lado; as vagas na mesma linha da faixa.
    Eram 10 linhas de 61 px numa coluna só (2,4 telas de rolagem do modal em 1280). */
 .janelas { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
-/* Mesmo trilho de 3 px da esteira e das notas, no lugar da caixa colorida. */
+/* Contorno uniforme de 1 px, sem barra de um lado só (#2734). */
 .janela {
-  border: 0; border-left: var(--trilho) solid var(--linha);
+  border: var(--b-1) solid var(--linha);
   border-radius: var(--r-1);
   background: var(--fundo); overflow: hidden;
 }
-.janela.confirmada { border-left-color: var(--marca); background: var(--marca-claro); }
-.janela.estourada { border-left-color: var(--erro); }
+.janela.confirmada { border-color: var(--marca); background: var(--marca-claro); }
+.janela.estourada { border-color: var(--erro); background: var(--erro-pastel); }
 
 .escolhaJanela {
   display: grid; gap: var(--e-1); width: 100%; text-align: left;
@@ -373,7 +371,7 @@
 .motivoJanela {
   display: flex; gap: var(--e-2); align-items: center; flex-wrap: wrap;
   margin: 0; padding: var(--e-2) var(--e-3);
-  background: var(--elevado); border-left: var(--trilho) solid var(--alerta);
+  background: var(--elevado); border: var(--b-1) solid color-mix(in srgb, var(--alerta) 30%, transparent);
   font-size: var(--t-apoio); color: var(--tinta);
 }
 .motivoJanela b { font-weight: 700; }
@@ -382,7 +380,7 @@
 .avisoBloqueio {
   margin: var(--e-3) 0; padding: var(--e-3);
   background: var(--elevado); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--erro);
+  border: var(--b-1) solid color-mix(in srgb, var(--erro) 30%, transparent);
 }
 .tituloBloqueio {
   display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap;
@@ -398,7 +396,7 @@
 .avisoDiferenca {
   margin: 0 0 var(--e-3); padding: var(--e-3); display: grid; gap: var(--e-2);
   background: var(--alerta-pastel); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--alerta);
+  border: var(--b-1) solid color-mix(in srgb, var(--alerta) 30%, transparent);
 }
 .avisoDiferenca .corpoBloco { margin: 0; color: var(--alerta); display: flex; gap: var(--e-2); align-items: baseline; }
 .avisoDiferenca .corpoBloco b { color: var(--alerta); }
@@ -438,8 +436,8 @@
    pulsa de leve; movimento reduzido (base.css) corta o pulso e o contorno
    continua marcando. */
 .capturaAuto {
-  margin: 0 var(--e-4); padding: var(--e-3) var(--e-3) var(--e-3) calc(var(--e-3) - var(--trilho));
-  border-left: 0; border-radius: var(--r-2);
+  margin: 0 var(--e-4); padding: var(--e-3);
+  border-radius: var(--r-2);
   background: var(--elevado); display: grid; gap: var(--e-2);
 }
 .capturaTitulo {
@@ -505,19 +503,20 @@
   display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding-inline: var(--e-2);
   color: var(--marca); font-size: var(--t-apoio); font-weight: 600; text-decoration: underline; text-underline-offset: 2px;
 }
-.abrirNoMapa:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+.abrirNoMapa:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 2px; }
 .retornoEndereco { flex-basis: 100%; min-height: 0; color: var(--sucesso); font-size: var(--t-apoio); font-weight: 600; }
 .retornoEndereco:empty { display: none; }
 .notaCliente { margin: 0; padding: var(--e-3); background: var(--alerta-pastel); color: var(--tinta); border-radius: var(--r-1); font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6; overflow-wrap: anywhere; }
 .notaCliente small { display: block; font-family: var(--f-corpo); color: var(--tinta-2); font-size: var(--t-micro); }
 .cartaoClienteAbrir { all: unset; display: grid; text-align: left; gap: var(--e-1); cursor: pointer; border-radius: var(--r-1); }
-.cartaoClienteAbrir:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
+.cartaoClienteAbrir:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 3px; }
 .resumoIa { display: block; margin: 0; color: var(--tinta); line-height: 1.45; }
 .numerosCliente { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 .tagsCliente { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1); }
 .tagsCliente li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 2px var(--e-2); border-radius: var(--r-pilula); background: var(--preenchimento); font-size: var(--t-apoio); }
-.tagsCliente li.tagRestricao { display: flex; align-items: center; gap: var(--e-1); background: var(--alerta-pastel); color: var(--alerta); }
-.tagRestricao svg { flex: none; }
+/* #2734: a restrição tem o mesmo tom em Cadastros e na Ficha: texto na tinta, só o ícone no alerta. */
+.tagsCliente li.tagRestricao { display: flex; align-items: center; gap: var(--e-1); background: var(--alerta-pastel); color: var(--tinta); }
+.tagRestricao svg { flex: none; color: var(--alerta); }
 .postitResumo {
   margin: 0; padding: var(--e-2) var(--e-3); background: var(--alerta-pastel); color: var(--tinta);
   font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6;

@@ -19,6 +19,9 @@ import css from './abaRespostas.module.css'
 // a da demonstração não devolve nada. Nos dois casos sem `false`, o formulário fecha.
 const depois = (resultado, fechar) => Promise.resolve(resultado).then((ok) => { if (ok !== false) fechar() })
 
+// Limite do servidor (RespostaPronta.TituloTamanhoMaximo): o campo não corta, avisa e trava o salvar.
+const TITULO_MAXIMO = 120
+
 const VARIAVEIS_TEXTO = VARIAVEIS_DA_API.map((v) => `{${v.chave}} ${v.descricao}`).join(' · ')
 
 function FormResposta({ inicial, aoSalvar, aoCancelar }) {
@@ -26,7 +29,11 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
   const [atalho, setAtalho] = useState(inicial?.atalho ?? '')
   const [texto, setTexto] = useState(inicial?.texto ?? '')
   const [salvando, setSalvando] = useState(false)
-  const pronto = titulo.trim() && texto.trim()
+  const [descartando, setDescartando] = useState(false)
+  const tituloLongo = titulo.length > TITULO_MAXIMO
+  const pronto = titulo.trim() && texto.trim() && !tituloLongo
+  // Mesma pergunta do Modal (`confirmarDescarte`): com algo digitado, Cancelar não descarta calado.
+  const alterado = titulo !== (inicial?.titulo ?? '') || atalho !== (inicial?.atalho ?? '') || texto !== (inicial?.texto ?? '')
 
   function salvar(evento) {
     evento.preventDefault()
@@ -39,7 +46,11 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
   return (
     <form className={css.form} onSubmit={salvar}>
       <div className={css.duas}>
-        <CampoTexto disabled={salvando} rotulo="Título" value={titulo} maxLength={80} onChange={(e) => setTitulo(e.target.value)} autoFocus />
+        <CampoTexto
+          disabled={salvando} rotulo="Título" value={titulo}
+          erro={tituloLongo ? `Use até ${TITULO_MAXIMO} caracteres. Agora tem ${titulo.length}.` : undefined}
+          onChange={(e) => setTitulo(e.target.value)} autoFocus
+        />
         <CampoTexto
           rotulo="Atalho"
           value={atalho}
@@ -50,9 +61,19 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
         />
       </div>
       <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
+      {descartando && (
+        <div className={css.descarte} role="alert">
+          <p>Descartar o que foi digitado?</p>
+          <div className={css.acoes}>
+            {/* eslint-disable-next-line jsx-a11y/no-autofocus -- o foco vai para a opção que não perde nada */}
+            <Botao autoFocus onClick={() => setDescartando(false)}>Continuar editando</Botao>
+            <Botao variante="perigo" onClick={aoCancelar}>Descartar</Botao>
+          </div>
+        </div>
+      )}
       <div className={css.acoes}>
         <Botao variante="primario" tipo="submit" icone="check" disabled={!pronto || salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
-        <Botao variante="texto" disabled={salvando} onClick={aoCancelar}>Cancelar</Botao>
+        <Botao variante="texto" disabled={salvando || descartando} onClick={() => (alterado ? setDescartando(true) : aoCancelar())}>Cancelar</Botao>
       </div>
     </form>
   )
@@ -70,6 +91,43 @@ function SecaoRespostas() {
   const [verArquivadas, setVerArquivadas] = useState(false)
   // 'nova', o id da resposta em edição, ou null.
   const [editando, setEditando] = useState(null)
+  const listaRef = useRef(null)
+  const novaRef = useRef(null)
+  // Quem fechou o formulário ('nova' ou o id): ao fechar, o foco volta ao botão dele, não ao início da página.
+  const voltarFoco = useRef(null)
+  const fechar = (id) => { voltarFoco.current = id; setEditando(null) }
+  // Arquivar e restaurar gravam pela API: um por vez, com retorno para quem lê só a tela.
+  const [gravando, setGravando] = useState(null)
+  const [aviso, setAviso] = useState('')
+
+  useEffect(() => {
+    if (editando !== null || voltarFoco.current === null) return
+    const id = voltarFoco.current
+    voltarFoco.current = null
+    const alvo = id === 'nova' ? novaRef.current : listaRef.current?.querySelector(`[data-editar="${id}"]`)
+    alvo?.focus()
+  }, [editando])
+
+  // #2734: enquanto grava, o botão fica desabilitado e perde o foco; arquivada, a linha ainda sai da lista. Ao fim,
+  // o foco volta ao botão da linha, ou a "Nova resposta" quando a linha saiu. Quem já foi a outro controle fica lá.
+  const focoAlternado = useRef(null)
+  useEffect(() => {
+    const id = focoAlternado.current
+    if (id === null || gravando !== null) return
+    focoAlternado.current = null
+    const ativo = document.activeElement
+    if (ativo && ativo !== document.body && !ativo.disabled) return
+    const alvo = listaRef.current?.querySelector(`[data-alternar="${id}"]`) ?? novaRef.current
+    alvo?.focus()
+  })
+
+  function alternarArquivo(r) {
+    if (gravando) return
+    setGravando(r.id); setAviso(''); focoAlternado.current = r.id
+    Promise.resolve(alternarArquivamentoRespostaPronta(r.id))
+      .then((ok) => { if (ok !== false) setAviso(`Resposta ${r.titulo} ${r.arquivada ? 'restaurada' : 'arquivada'}.`) })
+      .finally(() => setGravando(null))
+  }
 
   const lista = useMemo(() => {
     const alvo = normalizarBusca(busca)
@@ -88,7 +146,7 @@ function SecaoRespostas() {
           <p className={css.descricao}>{plural(ativas, 'resposta ativa', 'respostas ativas')}. Em Conversas, digite / no campo da mensagem ou toque em Respostas.</p>
           {!editavel && <p className={css.descricao}>Somente a gerência pode criar, editar e arquivar respostas prontas.</p>}
         </div>
-        {editavel && <Botao variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando !== null}>Nova resposta</Botao>}
+        {editavel && <Botao ref={novaRef} variante="primario" icone="plus" onClick={() => setEditando('nova')} disabled={editando !== null}>Nova resposta</Botao>}
       </header>
 
       <div className={css.filtros}>
@@ -105,11 +163,12 @@ function SecaoRespostas() {
           Mostrar arquivadas
         </label>
       </div>
+      <p className={css.descricao} role="status">{aviso}</p>
 
       {editando === 'nova' && (
         <FormResposta
-          aoSalvar={(dados) => depois(incluirRespostaPronta(dados), () => setEditando(null))}
-          aoCancelar={() => setEditando(null)}
+          aoSalvar={(dados) => depois(incluirRespostaPronta(dados), () => fechar('nova'))}
+          aoCancelar={() => fechar('nova')}
         />
       )}
 
@@ -118,14 +177,14 @@ function SecaoRespostas() {
           {busca ? 'Busque outro título, atalho ou trecho.' : editavel ? 'Use Nova resposta para salvar mensagens frequentes.' : 'Peça à gerência para cadastrar respostas prontas.'}
         </Vazio>
       ) : (
-        <ul className={css.lista}>
+        <ul className={css.lista} ref={listaRef}>
           {lista.map((r) => (
             <li key={r.id} className={`${css.linha} ${r.arquivada ? css.arquivada : ''}`}>
               {editando === r.id ? (
                 <FormResposta
                   inicial={r}
-                  aoSalvar={(dados) => depois(editarRespostaPronta(r.id, dados), () => setEditando(null))}
-                  aoCancelar={() => setEditando(null)}
+                  aoSalvar={(dados) => depois(editarRespostaPronta(r.id, dados), () => fechar(r.id))}
+                  aoCancelar={() => fechar(r.id)}
                 />
               ) : (
                 <>
@@ -136,8 +195,8 @@ function SecaoRespostas() {
                     <span className={css.texto}>{r.texto}</span>
                   </div>
                   {editavel && <div className={css.acoesLinha}>
-                    {!r.arquivada && <Botao variante="texto" disabled={editando !== null} icone="lapis" aria-label={`Editar resposta ${r.titulo}`} onClick={() => setEditando(r.id)}>Editar</Botao>}
-                    <Botao variante="texto" disabled={editando !== null} aria-label={`${r.arquivada ? 'Restaurar' : 'Arquivar'} resposta ${r.titulo}`} icone={r.arquivada ? 'undo-2' : 'archive'} onClick={() => alternarArquivamentoRespostaPronta(r.id)}>
+                    {!r.arquivada && <Botao variante="texto" disabled={editando !== null || gravando !== null} icone="lapis" data-editar={r.id} aria-label={`Editar resposta ${r.titulo}`} onClick={() => setEditando(r.id)}>Editar</Botao>}
+                    <Botao variante="texto" disabled={editando !== null || gravando !== null} data-alternar={r.id} aria-label={`${r.arquivada ? 'Restaurar' : 'Arquivar'} resposta ${r.titulo}`} icone={r.arquivada ? 'undo-2' : 'archive'} onClick={() => alternarArquivo(r)}>
                       {r.arquivada ? 'Restaurar' : 'Arquivar'}
                     </Botao>
                   </div>}

@@ -286,8 +286,9 @@ try {
     const id = prova.pedidos.excecoes
     const numeroComanda = (await ler('/api/atendimento/conversas?limite=100&pagina=1')).find(c => c.id === conversaId).numeroComanda
     await navegar('#/m/cozinha'); await page.getByRole('radio', { name: 'Amanhã', exact: true }).click()
-    const card = page.getByRole('listitem').filter({ hasText: new RegExp(`Comanda ${numeroComanda}(?=\\D|$)`) }).filter({ has: page.getByRole('button', { name: 'Ver comanda', exact: true }) })
-    await card.getByRole('button', { name: 'Ver comanda', exact: true }).click()
+    // #2663: o botão do cartão da Cozinha se chama "<ação>: <pedido> de <cliente>"; a ação visível vem primeiro.
+    const card = page.getByRole('listitem').filter({ hasText: new RegExp(`Comanda ${numeroComanda}(?=\\D|$)`) }).filter({ has: page.getByRole('button', { name: /^Ver comanda: / }) })
+    await card.getByRole('button', { name: /^Ver comanda: / }).click()
     const modal = page.getByRole('dialog')
     await modal.getByRole('button', { name: 'Registrar atraso', exact: true }).click()
     const motivo = `R4 E02 origem Cozinha, comanda ${numeroComanda}, pedido ${id}: preparo atrasado; Atendimento deve conferir novo horário antes de prometer.`
@@ -390,7 +391,8 @@ try {
     const recusa = `R4 E03 pedido ${id}: recuso cancelamento imediato; confirmar com cliente o novo horário. Próximo passo: Atendimento consultar disponibilidade e retornar antes de alterar pedido.`
     const notaRecusa = await nota(recusa); assert.deepEqual(await detalhe(id), antes)
     await login('Atendimento', fixture.conversaExcecoesId)
-    await page.getByRole('button', { name: /^Notas\b/ }).first().click()
+    // #2734: a nota recém-gravada já aparece na prévia; o cabeçalho "Notas" só abre quando há nota escondida.
+    const abrirNotas = page.getByRole('button', { name: /^Notas\b/ }).first(); if (await abrirNotas.getAttribute('aria-expanded') === 'false') await abrirNotas.click()
     await page.getByRole('article').filter({ hasText: recusa }).getByRole('button', { name: 'Destacar nota', exact: true }).click()
     await page.getByRole('complementary', { name: /^Nota ·/ }).filter({ hasText: recusa }).waitFor()
     await foto('E03-recusa-proximo-passo')
@@ -413,12 +415,12 @@ try {
     assert.ok(prova.estoqueAntesPronto >= 1)
     if (antes.pedido.status !== 'cancelado') {
     await navegar('#/m/cozinha'); await page.getByRole('radio', { name: 'Amanhã', exact: true }).click()
-    const card = page.getByRole('listitem').filter({ hasText: new RegExp(`Comanda ${numeroComanda}(?=nº|\\s|$)`) }).filter({ has: page.getByRole('button', { name: 'Ver comanda', exact: true }) })
+    const card = page.getByRole('listitem').filter({ hasText: new RegExp(`Comanda ${numeroComanda}(?=nº|\\s|$)`) }).filter({ has: page.getByRole('button', { name: /^Ver comanda: / }) })
     if (['aguardando', 'pago'].includes(antes.pedido.status)) {
-      await agir(`/api/kds/pedidos/${id}/status`, 'PATCH', () => card.getByRole('button', { name: 'Começar preparo', exact: true }).click())
+      await agir(`/api/kds/pedidos/${id}/status`, 'PATCH', () => card.getByRole('button', { name: /^Começar preparo: / }).click())
       assert.equal((await estoque(produto)).qty, prova.estoqueAntesPronto, 'Preparando não baixa')
     }
-    if (antes.pedido.status !== 'pronto') await agir(`/api/kds/pedidos/${id}/status`, 'PATCH', () => card.getByRole('button', { name: 'Marcar pronto', exact: true }).click())
+    if (antes.pedido.status !== 'pronto') await agir(`/api/kds/pedidos/${id}/status`, 'PATCH', () => card.getByRole('button', { name: /^Marcar pronto: / }).click())
     prova.estoqueAposPronto = (await estoque(produto)).qty
     assert.equal(prova.estoqueAposPronto, prova.estoqueAntesPronto - 1, 'Exceções tem só 1 unidade, distinta das 2 operacionais')
     await foto('E04-pronto-saida-real'); await atendimento(fixture.conversaExcecoesId)

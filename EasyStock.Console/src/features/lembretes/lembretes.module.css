@@ -100,7 +100,7 @@ button.botaoVistos {
 .sugestoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
 .erro {
   margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1);
-  border-left: var(--trilho) solid var(--erro); background: var(--elevado);
+  background: var(--erro-pastel);
   color: var(--erro); font-size: var(--t-apoio);
 }
 

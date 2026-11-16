@@ -15,7 +15,7 @@ import {
 import { montarPromptLivre } from '../dominio/assistente'
 import { historicoComPedidoVivo } from '../dominio/cliente'
 import {
-  conversasBloqueadasDoBalcao, conversasDoBalcao, conversasEncerradasDoBalcao, ordenarBalcao,
+  conversasBloqueadasDoBalcao, conversasDoBalcao, conversasDoCliente, conversasEncerradasDoBalcao, ordenarBalcao,
 } from '../dominio/conversa'
 import { conversasParaEncerrarPorJanela } from '../dominio/janela'
 import { ocupacaoDeHoje } from '../dominio/entrega'
@@ -34,6 +34,7 @@ import { FONTE_API } from '../infra/fonteDados'
 import { useAcessoModulos } from './acessoModulos'
 import { podeVerDesacertos, podeVerItensFora } from '../dominio/acessoModulos'
 import { comApi } from './acoesApi'
+import { assinarMudancaNoCliente } from './mudancasDoCliente'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
 import { precisaLerFicha } from './api/cliente'
@@ -363,6 +364,12 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     [acoes],
   )
   useEffect(() => { acoesAtivasRef.current = acoesAtivas }, [acoesAtivas])
+
+  // #2734: o cadastro gravado fora daqui (Buscar na Casa) avisa; a Ficha relê as conversas dessa pessoa.
+  useEffect(() => assinarMudancaNoCliente((clienteId) => {
+    conversasDoCliente(estadoRef.current.conversas, clienteId)
+      .forEach((id) => acoesAtivasRef.current?.relerClienteDaConversa?.(id))
+  }), [])
 
   // Modo API (F02): o expediente vem da API uma vez ao entrar; depois, a cada gravação.
   useEffect(() => {

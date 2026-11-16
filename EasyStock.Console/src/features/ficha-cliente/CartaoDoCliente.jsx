@@ -6,7 +6,7 @@ import { Avatar } from '../../componentes/Avatar'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
-import { ehRestricao, ordenarTags } from '../../dominio/cliente'
+import { ehRestricao, ordenarTags, ROTULO_RESTRICAO, rotuloDaTag } from '../../dominio/cliente'
 import { hashDoModulo } from '../../dominio/modulos'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
 import { CorrecaoVinculoCliente } from './CorrecaoVinculoCliente'
@@ -78,9 +78,10 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
             : fonteApi && conversa.clienteId && <Botao variante="texto" icone="map-pin" onClick={aoAbrir}>Adicionar endereço</Botao>}
       </div>}
       {tags.length > 0 && (
-        <ul className={css.tagsCliente} aria-label="Tags do cliente">
+        // #2734: o cartão mostra só o resumo; a lista completa ("Tags do cliente") fica na Ficha, logo abaixo.
+        <ul className={css.tagsCliente} aria-label="Resumo das tags do cliente">
           {tags.map((t) => <li key={t} className={ehRestricao(t, restricoes) ? css.tagRestricao : undefined}>
-            {ehRestricao(t, restricoes) && <Icone nome="alerta" tamanho={16} />}{t}</li>)}
+            {ehRestricao(t, restricoes) && <Icone nome="alerta" tamanho={16} rotulo={ROTULO_RESTRICAO} />}{rotuloDaTag(t)}</li>)}
         </ul>
       )}
       {freteAberto && <ConsultaFreteCliente conversa={conversa} aoFechar={() => setFreteAberto(false)}

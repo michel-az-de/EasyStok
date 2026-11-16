@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { buscarNaCasa, contextoDaBusca, obterCadastro, obterPedidoDaBusca } from '../../aplicacao/buscaNaCasa'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { avisarMudancaNoCliente } from '../../aplicacao/mudancasDoCliente'
 import { BuscaComSugestoes } from '../../componentes/BuscaComSugestoes'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
@@ -69,8 +70,11 @@ export function BuscaNaCasa({ aoFechar, aoAbrirConversa, renderizarCadastro, ren
         {termo.trim() && !consulta.carregando && resultados.length === 0 && <p role="status">Nenhum resultado nas categorias consultadas.</p>}
       </div>
     </Modal>
+    {/* #2734: este editor abre por cima de qualquer tela, fora do Atendimento. O que ele grava na pessoa (nota, tag,
+        endereço, telefone ou o cadastro) avisa, e a Ficha da conversa dela relê o dossiê. */}
     {editor && renderizarCadastro({ tela: editor.tela, editor, aoMudar: editar, contexto, podeEditar: editor.tela === 'clientes' || acoes.editarCadastrosProdutos === true,
-      aoFechar: () => editar(null), aoSalvo: () => { editar(null); tentar(t => t + 1) } })}
+      aoGravarRelacionamento: () => avisarMudancaNoCliente(editor.dados?.id),
+      aoFechar: () => editar(null), aoSalvo: () => { if (editor.tela === 'clientes') avisarMudancaNoCliente(editor.dados?.id); editar(null); tentar(t => t + 1) } })}
     {/* #2478: o mesmo detalhe da tela Pedidos de Cadastros, injetado pelo App. */}
     {pedido && renderizarPedido({ dados: pedido, aoFechar: () => mostrarPedido(null) })}
   </>

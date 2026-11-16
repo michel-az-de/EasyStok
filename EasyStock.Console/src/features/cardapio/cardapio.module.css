@@ -230,7 +230,7 @@
 }
 .rodapeObs {
   flex-basis: 100%; color: var(--tinta-2);
-  border-left: var(--trilho) solid var(--alerta); padding-left: var(--e-2);
+  background: var(--alerta-pastel); border-radius: var(--r-1); padding: var(--e-1) var(--e-2);
 }
 
 /* Cartãozinho de 64 px que segue o dedo no arrasto do prato até a comanda
