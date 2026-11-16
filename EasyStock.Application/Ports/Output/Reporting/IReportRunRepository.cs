@@ -31,6 +31,12 @@ public interface IReportRunRepository
 
     Task AddAsync(ReportRun run, CancellationToken ct);
 
+    /// <summary>
+    /// Grava a mudança de estado de uma run lida por <see cref="GetByIdAsync"/>. Usa o xmin como
+    /// concorrência: devolve false se o Worker (ou outro pedido) alterou a run no meio, e o chamador relê.
+    /// </summary>
+    Task<bool> UpdateAsync(ReportRun run, CancellationToken ct);
+
     Task<IReadOnlyList<ReportRun>> ListMineAsync(
         Guid?           empresaId,
         Guid            usuarioId,

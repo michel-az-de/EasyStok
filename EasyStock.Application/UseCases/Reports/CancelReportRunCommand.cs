@@ -18,18 +18,28 @@ public sealed class CancelReportRunUseCase
         _user = user;
     }
 
+    private const int MaxTentativasDeGravacao = 3;
+
     public async Task<bool> ExecuteAsync(CancelReportRunCommand command)
     {
-        var ct  = CancellationToken.None;
-        var run = await _repo.GetByIdAsync(command.RunId, ct);
-        if (run is null) return false;
+        var ct = CancellationToken.None;
 
-        // Isolamento: só o próprio usuário ou SuperAdmin pode cancelar
-        if (_user.Nivel != EasyStock.Domain.Enums.NivelAcesso.SuperAdmin &&
-            run.UsuarioSolicitanteId != _user.UsuarioId)
-            return false;
+        // O Worker pode reclamar a run entre a leitura e a gravação (xmin). Nesse caso relê e reaplica:
+        // a run que virou Running passa a Canceling, e a que já terminou lança InvalidReportStateException.
+        for (var tentativa = 0; tentativa < MaxTentativasDeGravacao; tentativa++)
+        {
+            var run = await _repo.GetByIdAsync(command.RunId, ct);
+            if (run is null) return false;
 
-        run.RequestCancellation();
-        return true;
+            // Isolamento: só o próprio usuário ou SuperAdmin pode cancelar
+            if (_user.Nivel != EasyStock.Domain.Enums.NivelAcesso.SuperAdmin &&
+                run.UsuarioSolicitanteId != _user.UsuarioId)
+                return false;
+
+            run.RequestCancellation();
+            if (await _repo.UpdateAsync(run, ct)) return true;
+        }
+
+        throw new InvalidOperationException("Não foi possível gravar o cancelamento: a execução mudou várias vezes. Tente de novo.");
     }
 }

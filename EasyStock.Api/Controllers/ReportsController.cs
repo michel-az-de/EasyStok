@@ -120,15 +120,23 @@ public sealed class ReportsController(
     /// <summary>
     /// Cancela uma execução pendente ou em andamento.
     /// Retorna 204 independente de o cancelamento ser imediato ou assíncrono (Canceling).
+    /// Execução já concluída, falha ou cancelada devolve 409.
     /// </summary>
     [HttpDelete("runs/{id:guid}")]
     public async Task<IActionResult> CancelRun([FromRoute] Guid id)
     {
-        var found = await cancel.ExecuteAsync(new CancelReportRunCommand(id));
-        if (!found)
-            return DataNotFound("Execução de relatório não encontrada.");
+        try
+        {
+            var found = await cancel.ExecuteAsync(new CancelReportRunCommand(id));
+            if (!found)
+                return DataNotFound("Execução de relatório não encontrada.");
 
-        return NoContent();
+            return NoContent();
+        }
+        catch (InvalidReportStateException)
+        {
+            return DataConflict("A execução já terminou e não pode mais ser cancelada.");
+        }
     }
 
     // ── POST /api/reports/runs/{id}/repeat ──────────────────────────────────
