@@ -17,7 +17,7 @@
 .pilot-home { width: min(100%, 600px); max-width: 100vw; max-height: 100dvh; margin: auto; padding: 0; border: 0; border-radius: var(--pilot-r-lg); background: var(--bg); color: var(--ink); box-shadow: 0 18px 80px #241b1744; font: 15px/1.5 'Manrope', sans-serif; }
 .pilot-home::backdrop { background: #291f1bbf; backdrop-filter: blur(3px); }
 .pilot-sheet { padding: 24px 26px 22px; }
-.pilot-topline { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--ink-mute); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.pilot-topline { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--ink-mute); font-size: 12px; font-weight: 800; letter-spacing: .12em; }
 .pilot-topline button { width: 48px; height: 48px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--bg-elev); color: var(--ink-mute); font-size: 25px; cursor: pointer; }
 .pilot-home h1 { margin: 18px 0 9px; font: 400 clamp(28px, 6vw, 38px)/1.12 Georgia, serif; letter-spacing: -.04em; }
 .pilot-intro { color: var(--ink-mute); margin: 0 0 18px; }
@@ -32,7 +32,7 @@
 .pilot-card b { position: absolute; right: 22px; top: 47%; font-size: 23px; font-weight: 400; }
 .pilot-production { color: #fff9ee; background: var(--fill-basil); }
 .pilot-orders { color: #fff9ee; background: var(--fill-accent); }
-.pilot-card:hover { box-shadow: 0 0 0 3px #352d2526; }
+.pilot-card:hover { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 15%, transparent); }
 .pilot-hint, .pilot-help p { color: var(--ink-mute); font-size: 12px; }
 .pilot-local { display: grid; gap: 5px; width: 100%; min-height: 48px; margin-top: 18px; padding: 15px 17px; border: 1px solid var(--border); border-radius: var(--pilot-r-md); background: var(--bg-elev); color: var(--ink-dim); font: 13px/1.5 'Manrope', sans-serif; text-align: left; cursor: pointer; }
 .pilot-local strong { font-size: 14px; }
@@ -86,7 +86,7 @@
 .pilot-rail #pilotRailStatus { max-width: 35%; font-size: 11px; }
 .pilot-rail .pilot-bell, .pilot-topline .pilot-bell { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; width: auto; min-width: 48px; min-height: 48px; height: auto; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: var(--pilot-r-md); background: var(--bg-elev); color: var(--ink-dim); font: 650 12px/1.3 'Manrope', sans-serif; letter-spacing: 0; cursor: pointer; }
 .pilot-rail .pilot-bell .pilot-bell-label { color: inherit; font: inherit; margin: 0; }
-.pilot-rail .pilot-bell-count, .pilot-topline .pilot-bell-count { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 20px; height: 20px; margin: 0; padding: 0 4px; border: 2px solid var(--bg-elev); border-radius: var(--pilot-r-md); background: var(--fill-accent); color: #fffaf2; font: 700 11px/1 'Manrope', sans-serif; box-sizing: border-box; }
+.pilot-rail .pilot-bell-count, .pilot-topline .pilot-bell-count { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 20px; height: 20px; margin: 0; padding: 0 4px; border: 2px solid var(--bg-elev); border-radius: var(--pilot-r-md); background: var(--fill-accent); color: #fffaf2; font: 700 12px/1 'Manrope', sans-serif; box-sizing: border-box; }
 .pilot-bell-count[hidden], .pilot-notices [hidden] { display: none !important; }
 .pilot-notices .pilot-sheet { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 .pilot-notices h2 { font: 400 25px/1.2 Georgia, serif; letter-spacing: -.025em; color: var(--ink); }
@@ -117,7 +117,7 @@
 .pilot-notice-device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 5px 12px; padding-top: 14px; color: var(--ink-mute); font-size: 12px; }
 .pilot-notice-device button { border: 0; padding: 7px 0; background: transparent; color: var(--gold); text-decoration: underline; }
 #pilotNoticeError { overflow-wrap: anywhere; }
-@media (max-width: 380px) { .pilot-rail .pilot-bell-label { display: none; } .pilot-topline > span { font-size: 10px; letter-spacing: .08em; } .pilot-top-actions { gap: 7px; } }
+@media (max-width: 380px) { .pilot-rail .pilot-bell-label { display: none; } .pilot-topline > span { font-size: 12px; letter-spacing: .06em; } .pilot-top-actions { gap: 7px; } }
 .pilot-notice-health[data-permission=granted] #pilotNoticePermission { background: transparent; border-color: var(--border-strong); color: var(--basil); }
 .pilot-notice-health[data-permission=granted] #pilotNoticeRefresh { background: var(--fill-basil); color: #fff9ee; }
 /* Cabeçalho de trabalho estável; o sino é sempre a entrada dos avisos. */
@@ -132,7 +132,7 @@
 .pilot-notice-list { gap: 0; border-top: 1px solid var(--border); }
 .pilot-notice-item { position: relative; padding: 18px 14px 18px 20px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
 .pilot-notice-item[data-unread=true] { border-left: 0; padding-left: 20px; background: var(--bg-elev); }
-.pilot-notice-item[data-unread=true]::before { content: ''; position: absolute; left: 5px; top: 25px; width: 6px; height: 6px; border-radius: 50%; background: var(--fill-accent); }
+.pilot-notice-item[data-unread=true]::before { content: ''; position: absolute; left: 5px; top: 25px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-ink); }
 .pilot-notice-item:hover { background: var(--bg-elev-2); }
 .pilot-notice-preview { margin: 0; color: var(--ink-dim); font: 400 13px/1.5 'Manrope', sans-serif; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .pilot-notice-empty { display: grid; justify-items: center; gap: 10px; border: 0; padding: 34px 18px; text-align: center; }
@@ -167,7 +167,7 @@
 .pilot-topline > span:not(.pilot-notice-brand) { letter-spacing: .1em; }
 .pilot-topline button svg { flex-shrink: 0; }
 .pilot-actions { margin: 0 0 18px; gap: 12px; }
-.pilot-card { display: grid; grid-template-columns: 28px minmax(0, 1fr) 18px; align-items: center; column-gap: 12px; padding: 20px 18px; border-radius: var(--pilot-r-lg); box-shadow: 0 2px 4px #352d2508; }
+.pilot-card { display: grid; grid-template-columns: 28px minmax(0, 1fr) 18px; align-items: center; column-gap: 12px; padding: 20px 18px; border-radius: var(--pilot-r-lg); box-shadow: 0 2px 4px color-mix(in srgb, var(--ink) 3%, transparent); }
 .pilot-action-icon { display: flex; align-items: center; justify-content: center; align-self: start; padding-top: 2px; color: #fff9ee; }
 .pilot-card-copy { display: grid; gap: 7px; min-width: 0; }
 .pilot-card .pilot-step { font-size: 10px; line-height: 1.4; letter-spacing: .06em; }
@@ -190,7 +190,7 @@
 .pilot-notices .pilot-intro { font-size: 14px; line-height: 1.5; max-width: 32ch; margin: 0 0 16px; color: var(--pilot-muted); }
 .pilot-notice-list-heading { align-items: center; margin: 0 0 10px; min-height: 32px; }
 .pilot-notice-list-heading h2 { font: 650 11px/1.4 'Manrope', sans-serif; text-transform: uppercase; letter-spacing: .07em; margin: 0; color: var(--pilot-muted); }
-.pilot-notice-list-heading span:not(:empty) { padding: 4px 9px; border-radius: var(--pilot-r-lg); background: var(--bg-elev-2); color: var(--gold); font-size: 11px; font-weight: 600; }
+.pilot-notice-list-heading span:not(:empty) { padding: 4px 9px; border-radius: var(--pilot-r-lg); background: var(--bg-elev-2); color: var(--gold); font-size: 12px; font-weight: 600; }
 .pilot-notice-list { margin-bottom: 8px; }
 .pilot-notice-item { padding: 17px 30px 17px 18px; gap: 6px; }
 .pilot-notice-item[data-unread=true] { padding-left: 18px; background: var(--bg-elev); }
@@ -203,7 +203,7 @@
 .pilot-notice-diagnostics { margin-top: 8px; }
 .pilot-notice-back { text-underline-offset: 4px; }
 .pilot-home button { transition: background-color .14s ease, box-shadow .14s ease; -webkit-tap-highlight-color: transparent; }
-.pilot-home button:active, .pilot-rail .pilot-bell:active { box-shadow: inset 0 0 0 2px #352d2533; }
+.pilot-home button:active, .pilot-rail .pilot-bell:active { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ink) 20%, transparent); }
 .pilot-home button:focus-visible, .pilot-home summary:focus-visible, .pilot-rail button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 @media (max-width: 480px) {
   .pilot-home h1 { font-size: 30px; margin-top: 22px; }
@@ -219,7 +219,7 @@
 .pilot-notices[data-tone=ready] .pilot-notice-health { border-top: 0; padding: 10px 0; }
 /* Conteúdo operacional do PWA dentro do APK: sem alterar o desenho das etiquetas. */
 body.pilot-app { align-items: flex-start; background: var(--bg-page); --bg-page: #24221d; --fill-basil: #496b56; --fill-accent: #a34e35; --bg: #24221d; --bg-elev: #302d26; --bg-elev-2: #3a352c; --bg-card: #302d26; --ink: #faf3e7; --ink-dim: #d9cbb7; --ink-mute: #b8aa95; --accent: #e7a58b; --accent-soft: #51392e; --basil: #a5c3ad; --basil-soft: #344538; --gold: #dfc28d; --gold-soft: #514633; --border: #544b3c; --border-strong: #78694f; --shadow: 0 2px 8px #00000018; --glow: none; --surface: var(--bg-elev); --line: var(--border-strong); }
-[data-theme=light] body.pilot-app { --bg-page: #eee6d9; --bg: #fbf6ec; --bg-elev: #fffaf2; --bg-elev-2: #f2eadc; --bg-card: #fffaf2; --ink: #352d25; --ink-dim: #62533f; --ink-mute: #77644c; --accent: #a34e35; --accent-soft: #f1dfd5; --basil: #496b56; --basil-soft: #e8eee4; --gold: #7a5a28; --gold-soft: #eee2ca; --border: #e4d7c3; --border-strong: #cebc9f; --shadow: 0 2px 8px #352d2508; }
+[data-theme=light] body.pilot-app { --bg-page: #eee6d9; --bg: #fbf6ec; --bg-elev: #fffaf2; --bg-elev-2: #f2eadc; --bg-card: #fffaf2; --ink: #352d25; --ink-dim: #62533f; --ink-mute: #77644c; --accent: #a34e35; --accent-soft: #f1dfd5; --basil: #496b56; --basil-soft: #e8eee4; --gold: #7a5a28; --gold-soft: #eee2ca; --border: #e4d7c3; --border-strong: #cebc9f; --shadow: 0 2px 8px color-mix(in srgb, var(--ink) 3%, transparent); }
 body.pilot-app :is(.section-label .count, .cat-pill.active, .loc-tab.active, .cash-type-pill.active.expense, .btn-confer-ok, .cf-prob, .scan-status.error, .welcome button, .tour-card .btn-next, .mov-filter button.active, .action-toast .at-primary) { background: var(--fill-accent); }
 body.pilot-app :is(.product-tile .pcount, .product-tile .camera-btn.has-photo, .cash-type-pill.active.income, .forma-pill.active) { background: var(--fill-basil); }
 body.pilot-app .screen-tab:not(.active) .screen-tab-badge { background: var(--fill-accent); }
@@ -265,7 +265,7 @@ body.pilot-app .phone .screen-tabs .screen-tab { min-height: 48px; color: var(--
 body.pilot-app .phone .screen-tabs .screen-tab.active { background: var(--fill-basil); color: #fffaf2; }
 body.pilot-app .phone > .nav > .nav-btn.active { background: var(--accent-soft); background-image: none; box-shadow: none; }
 body.pilot-app .phone > .nav > .nav-btn.active::before { background: var(--accent); box-shadow: none; }
-body.pilot-app .phone .fab, body.pilot-app .phone [data-screen=pedidos] .export-btn { background: var(--fill-accent); color: #fffaf2; box-shadow: 0 2px 6px #352d2515; min-height: 48px; }
+body.pilot-app .phone .fab, body.pilot-app .phone [data-screen=pedidos] .export-btn { background: var(--fill-accent); color: #fffaf2; box-shadow: 0 2px 6px color-mix(in srgb, var(--ink) 8%, transparent); min-height: 48px; }
 body.pilot-app .phone .product-tile.add-tile { background: var(--bg-elev-2); border-color: var(--border-strong); box-shadow: none; }
 body.pilot-app .phone .product-tile.add-tile .add-icon { background: var(--basil-soft); color: var(--basil); box-shadow: none; }
 body.pilot-app .phone .empty { background: var(--bg-elev); border-color: var(--border); }
@@ -727,7 +727,7 @@ body.pilot-app .pilot-home .pilot-card { padding: 14px; border-radius: var(--pil
 body.pilot-app .pilot-home .pilot-card strong { font-family: 'Manrope', sans-serif; font-size: 19px; }
 body.pilot-app .pilot-home .pilot-card-copy { gap: 4px; }
 body.pilot-app .pilot-home .pilot-card-description { font-family: 'Manrope', sans-serif; }
-body.pilot-app .pilot-home .pilot-connection { padding: 12px 0; border: 0; border-bottom: 1px solid #352d2524; border-radius: 0; background: transparent; }
+body.pilot-app .pilot-home .pilot-connection { padding: 12px 0; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); border-radius: 0; background: transparent; }
 body.pilot-app .pilot-home .pilot-local { padding: 12px 0; border: 0; border-radius: 0; background: transparent; }
 body.pilot-app .pilot-home .pilot-shortcuts button { min-height: 48px; padding: 10px 12px; border: 0; border-radius: var(--pilot-r-sm); background: var(--bg-elev-2); }
 body.pilot-app .pilot-home .pilot-topline button { border: 0; border-radius: var(--pilot-r-sm); background: transparent; }
@@ -866,7 +866,7 @@ body.pilot-app .pilot-menu-button:active { background: var(--basil-soft); }
 body.pilot-app .pilot-menu-button:focus-visible { outline: 2px solid var(--basil); outline-offset: 2px; }
 body.pilot-app .pilot-menu-button[hidden], body.pilot-app .pilot-home-support[hidden] { display: none !important; }
 body.pilot-app .pilot-home .pilot-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 20px; }
-body.pilot-app #pilotHome .pilot-tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; min-width: 0; min-height: 88px; aspect-ratio: 1; padding: 10px 3px; border: 0; border-radius: var(--pilot-r-lg); background: var(--bg-elev-2); color: var(--ink); font: 600 14px/1.35 'Manrope', sans-serif; letter-spacing: -.015em; text-align: center; text-decoration: none; box-shadow: 0 3px 12px #352d2507; cursor: pointer; overflow: hidden; isolation: isolate; transition: scale var(--pilot-fast) var(--pilot-ease), translate var(--pilot-fast) var(--pilot-ease), box-shadow var(--pilot-fast) ease; animation: pilot-tile-enter var(--pilot-enter) var(--pilot-ease) both; }
+body.pilot-app #pilotHome .pilot-tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; min-width: 0; min-height: 88px; aspect-ratio: 1; padding: 10px 3px; border: 0; border-radius: var(--pilot-r-lg); background: var(--bg-elev-2); color: var(--ink); font: 600 14px/1.35 'Manrope', sans-serif; letter-spacing: -.015em; text-align: center; text-decoration: none; box-shadow: 0 3px 12px color-mix(in srgb, var(--ink) 3%, transparent); cursor: pointer; overflow: hidden; isolation: isolate; transition: scale var(--pilot-fast) var(--pilot-ease), translate var(--pilot-fast) var(--pilot-ease), box-shadow var(--pilot-fast) ease; animation: pilot-tile-enter var(--pilot-enter) var(--pilot-ease) both; }
 body.pilot-app #pilotHome .pilot-tile::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: currentColor; opacity: 0; transition: opacity var(--pilot-fast) ease; pointer-events: none; }
 body.pilot-app #pilotHome .pilot-tile > svg { width: 30px; height: 30px; flex: 0 0 auto; margin: 0; stroke-width: 1.75; }
 body.pilot-app #pilotHome .pilot-tile > span { flex: 0 0 auto; min-width: 0; max-width: 100%; }
@@ -885,7 +885,7 @@ body.pilot-app #pilotHome .pilot-tile:nth-child(4) { animation-delay: var(--pilo
 body.pilot-app #pilotHome .pilot-tile:nth-child(5) { animation-delay: var(--pilot-fast); }
 body.pilot-app #pilotHome .pilot-tile:nth-child(6) { animation-delay: var(--pilot-fast); }
 @keyframes pilot-tile-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-@media (hover: hover) and (pointer: fine) { body.pilot-app #pilotHome .pilot-tile:hover { translate: 0 -2px; box-shadow: 0 6px 18px #352d2510; } }
+@media (hover: hover) and (pointer: fine) { body.pilot-app #pilotHome .pilot-tile:hover { translate: 0 -2px; box-shadow: 0 6px 18px color-mix(in srgb, var(--ink) 6%, transparent); } }
 @media (min-width: 768px) { body.pilot-app .pilot-home .pilot-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 359px) { body.pilot-app #pilotHome .pilot-home-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { body.pilot-app #pilotHome .pilot-tile:active { scale: 1; } body.pilot-app #pilotHome .pilot-tile:hover { translate: 0; } }
@@ -1004,7 +1004,7 @@ body.pilot-app .phone .client-card-foot { gap: 8px; }
 body.pilot-app .phone .client-card-foot button { min-width: 0; min-height: 48px; padding: 8px 6px; border: 0; border-radius: var(--pilot-r-md); background: var(--bg-elev-2); color: var(--ink); font-size: 14px; font-weight: 600; }
 body.pilot-app .phone .client-card-foot button.primary:not(:disabled) { background: var(--fill-basil); color: #fffaf2; }
 body.pilot-app .phone [data-screen=clientes] .empty { padding: 32px 16px; border: 0; background: transparent; color: var(--ink-dim); font-size: 14px; line-height: 1.5; }
-body.pilot-app .phone .fab { padding: 12px 20px; border-radius: var(--pilot-r-lg); font-size: 15px; font-weight: 700; letter-spacing: 0; box-shadow: 0 4px 14px #352d2526; }
+body.pilot-app .phone .fab { padding: 12px 20px; border-radius: var(--pilot-r-lg); font-size: 15px; font-weight: 700; letter-spacing: 0; box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 15%, transparent); }
 body.pilot-app .phone .fin-code { font-size: 12px; line-height: 1.5; }
 body.pilot-app .phone .fin-name { font-size: 16px; line-height: 1.4; }
 body.pilot-app .phone .fin-meta { font-size: 13px; line-height: 1.5; }
@@ -1014,7 +1014,7 @@ body.pilot-app .phone .fin-actions { gap: 8px; margin-top: 12px; }
 body.pilot-app .phone .fin-action { min-height: 48px; padding: 8px 10px; border: 0; border-radius: var(--pilot-r-md); background: var(--bg-elev-2); color: var(--ink); font-size: 14px; font-weight: 600; white-space: normal; }
 body.pilot-app .phone .fin-action.danger { background: var(--accent-soft); color: var(--accent-ink); }
 body.pilot-app .phone #finList .confer-empty { padding: 32px 16px; border: 0; background: transparent; color: var(--ink-dim); font-size: 14px; font-style: normal; line-height: 1.5; }
-body.pilot-app .toast { padding: 12px 16px; border: 1px solid var(--border-strong); border-radius: var(--pilot-r-md); background: var(--bg-elev); color: var(--ink); box-shadow: 0 6px 20px #352d2524; }
+body.pilot-app .toast { padding: 12px 16px; border: 1px solid var(--border-strong); border-radius: var(--pilot-r-md); background: var(--bg-elev); color: var(--ink); box-shadow: 0 6px 20px color-mix(in srgb, var(--ink) 14%, transparent); }
 body.pilot-app .toast .msg { font-size: 14px; line-height: 1.5; }
 body.pilot-app .toast .undo { min-height: 48px; padding: 8px 4px 8px 12px; color: var(--accent-ink); font-size: 14px; letter-spacing: 0; text-transform: none; }
 body.pilot-app .action-toast { border-radius: var(--pilot-r-md); }
@@ -1034,7 +1034,7 @@ body.pilot-app .phone #finList .confer-empty { padding: 24px 0; text-align: left
 /* Nome da casa no topo do Início: 16 px também em tela estreita (herdava 10 px de uma regra antiga). */
 @media (max-width: 380px) { body.pilot-app .pilot-home .pilot-topline > .pilot-home-brand { font-size: 16px; letter-spacing: 0; } }
 /* Faixa de aviso do aparelho: cores do piloto com contraste, ação preenchida e ponto de estado no lugar do emoji. */
-body.pilot-app .health-banner { gap: 12px; background: var(--bg-elev-2); color: var(--ink); font-size: 14px; line-height: 1.4; box-shadow: 0 4px 12px #352d251f; }
+body.pilot-app .health-banner { gap: 12px; background: var(--bg-elev-2); color: var(--ink); font-size: 14px; line-height: 1.4; box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 12%, transparent); }
 body.pilot-app .health-banner.warn { background: var(--gold-soft); color: var(--ink); }
 body.pilot-app .health-banner.error { background: var(--accent-soft); color: var(--ink); }
 body.pilot-app .health-banner.info { background: var(--bg-elev-2); color: var(--ink); }
@@ -1075,3 +1075,9 @@ body.pilot-app .demo-mode-banner { border-radius: var(--pilot-r-sm); font-size: 
   body.pilot-app .phone :is(.client-map-btn, .k-quick-map) > span[aria-hidden] { --pilot-contact-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%2010c0%204.993-5.539%2010.193-7.399%2011.799a1%201%200%200%201-1.202%200C9.539%2020.193%204%2014.993%204%2010a8%208%200%200%201%2016%200%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2210%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E"); }
   body.pilot-app .phone :is(.client-wa-btn, .client-map-btn, .k-quick-wa, .k-quick-map) > span[aria-hidden] { display: block; flex: 0 0 20px; width: 20px; height: 20px; font-size: 0; line-height: 0; background: currentColor; mask: var(--pilot-contact-mask) center / contain no-repeat; -webkit-mask: var(--pilot-contact-mask) center / contain no-repeat; }
 }
+
+/* #2804: acabamento da revisão 0.8.15 sobre regras do PWA (o inline do Tentar de novo exige !important). */
+body.pilot-app #etqRetryBtn { background: var(--fill-accent) !important; color: #fffaf2 !important; }
+body.pilot-app .catalog-list .cat-btn { width: 48px; height: 48px; }
+body.pilot-app .ajustes-section label { font-size: 12px; }
+body.pilot-app :is(.ajustes-section .hint, .catalog-list .cat-meta, .logo-picker-actions .hint) { font-size: 12px; }

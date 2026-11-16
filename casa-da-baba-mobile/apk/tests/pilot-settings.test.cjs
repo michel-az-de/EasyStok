@@ -60,7 +60,7 @@ function settings({ native = false } = {}) {
     vm.runInNewContext(source.slice(source.indexOf('(function setupBackButton() {'), source.indexOf('// Forca checagem manual de update')), environment);
     const pilot = fs.readFileSync(path.resolve(__dirname, '../pilot.js'), 'utf8');
     vm.runInNewContext(pilot.slice(pilot.indexOf('  root.cdbHandleNativeBack = function () {'), pilot.indexOf('  function showError(message)')),
-      { root: environment, doc: environment.document, notices: { open: false }, home: { open: false }, openHome: () => calls.push('home') });
+      { root: environment, doc: environment.document, notices: { open: false }, home: { open: false }, openHome: () => calls.push('home'), welcomeVisible: () => false });
   }
   installSettings(environment);
   return { environment, modal, title, calls, nodes, handlers, fields, saved, opener, update, printerDiagnostics,

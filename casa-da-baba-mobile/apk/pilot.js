@@ -319,7 +319,7 @@
   let latest = null;
   let lastFocus = null;
   let health = 'checking';
-  let checkingUpdate = false;
+  let checkingUpdate = false, manualRequested = false;
   let nativeVersion = null;
   let lastAutomaticCheck = 0;
   let pendingContent = '';
@@ -606,8 +606,13 @@
   }
   showVersion();
 
+  // #2804: enquanto "Quem vai usar o app?" está na tela, nada abre o Início por cima dela.
+  function welcomeVisible() {
+    const welcome = doc.getElementById('welcomeScreen');
+    return !!welcome && !welcome.classList.contains('hidden');
+  }
   function openHome() {
-    if (home.open) return;
+    if (home.open || welcomeVisible()) return;
     lastFocus = doc.activeElement;
     home.showModal();
     doc.getElementById('pilotTitle').focus();
@@ -626,6 +631,10 @@
       if (selectedNotice) backToNotices(); else notices.close();
       return true;
     }
+    const account = doc.getElementById('pilotAccountDialog');
+    if (account?.open) { account.close(); return true; }
+    // Primeiro uso: a raiz é a tela do nome; o Voltar minimiza sem passar pelo Início.
+    if (welcomeVisible()) return false;
     // Início é a raiz da navegação: o Android pode minimizar sem fechar o dialog.
     if (home.open) return false;
     const handled = root.cdbHandleBack?.() === true;
@@ -847,7 +856,14 @@
   async function checkUpdate(options = {}) {
     const automatic = options.automatic === true;
     if (!automatic) openHome();
-    if (checkingUpdate) return;
+    if (checkingUpdate) {
+      if (!automatic) {
+        const status = doc.getElementById('pilotUpdateStatus');
+        status.hidden = false; status.textContent = 'Conferindo a versão disponível…';
+        manualRequested = true;
+      }
+      return;
+    }
     if (automatic) {
       if (root.navigator?.onLine === false || doc.hidden || (lastAutomaticCheck && Date.now() - lastAutomaticCheck < 60000)) return;
       lastAutomaticCheck = Date.now();
@@ -858,9 +874,11 @@
     const button = doc.getElementById('pilotUpdateButton');
     message.hidden = automatic;
     button.disabled = true;
-    download.hidden = true; latest = null; showVersion();
+    // #2804: a oferta anterior só muda com uma resposta nova; falha de rede não a apaga.
+    download.hidden = true; showVersion();
     message.textContent = 'Conferindo a versão disponível…';
     if (!automatic) { message.focus(); message.scrollIntoView({ block: 'nearest' }); }
+    let received = false;
     try {
       if (updater()) {
         try { showOtaStatus(await (automatic ? updater().status() : updater().check()), !automatic); }
@@ -878,6 +896,7 @@
         data = await response.json();
       }
       if (root.Capacitor?.isNativePlatform?.() && !nativeVersion) throw new Error('Versão nativa não confirmada.');
+      received = true;
       latest = validateManifest(data, installedConfig());
       message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Atualize sem desinstalar.' : 'Nada novo para instalar. Versão publicada: ' + latest.version + ' (' + latest.versionCode + ').';
       message.hidden = automatic && !latest.available;
@@ -885,11 +904,16 @@
       showVersion();
     } catch {
       message.textContent = 'Não foi possível conferir a atualização. Tente novamente com conexão.';
+      // Sem resposta, a oferta anterior continua valendo; manifesto recebido e inválido a cancela.
+      if (received) latest = null;
+      download.hidden = !latest?.available;
     } finally {
       checkingUpdate = false;
       button.disabled = false;
       showVersion();
     }
+    // Quem pediu durante a automática recebe a própria conferência, com a checagem de conteúdo.
+    if (manualRequested) { manualRequested = false; return checkUpdate(); }
     // O resultado (e o botão de baixar, quando existe) entra na tela de quem pediu a conferência.
     if (!automatic) (download.hidden ? message : download).scrollIntoView({ block: 'nearest' });
   }
@@ -956,7 +980,11 @@
   root.addEventListener('focus', () => checkUpdate({ automatic: true }));
   doc.addEventListener?.('visibilitychange', () => { if (!doc.hidden) checkUpdate({ automatic: true }); });
   root.addEventListener('offline', () => { health = 'offline'; showConnection(); });
-  root.addEventListener('cdb-sync-success', showConnection);
+  // #2804: um envio aceito pelo servidor prova a conexão, mesmo que a checagem anterior tenha estourado.
+  root.addEventListener('cdb-sync-success', () => {
+    if (root.navigator?.onLine !== false) health = 'online';
+    showConnection();
+  });
   root.addEventListener('cdb-sync-state-change', showConnection);
   root.addEventListener('cdb-initial-pull-done', showConnection);
   root.addEventListener('cdb-mutations-applied', showConnection);
