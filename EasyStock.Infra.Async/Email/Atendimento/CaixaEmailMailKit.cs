@@ -27,9 +27,17 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
     private readonly RemoteCertificateValidationCallback? _validadorDeCertificado;
     private readonly TimeProvider _relogio;
     private readonly bool _permiteHostInterno;
+    private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolverNome;
 
     public CaixaEmailMailKit(ILogger<CaixaEmailMailKit> logger, TimeProvider relogio)
-        : this(logger, relogio, null, permiteHostInterno: false)
+        : this(logger, relogio, null, permiteHostInterno: false, null)
+    {
+    }
+
+    /// <summary>Seam de teste: troca a resolução de nome, para provar a recusa de endereço interno depois do DNS.</summary>
+    internal CaixaEmailMailKit(
+        ILogger<CaixaEmailMailKit> logger, TimeProvider relogio, Func<string, CancellationToken, Task<IPAddress[]>> resolverNome)
+        : this(logger, relogio, null, permiteHostInterno: false, resolverNome)
     {
     }
 
@@ -39,18 +47,19 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
     /// </summary>
     internal CaixaEmailMailKit(
         ILogger<CaixaEmailMailKit> logger, TimeProvider relogio, RemoteCertificateValidationCallback? validadorDeCertificado)
-        : this(logger, relogio, validadorDeCertificado, permiteHostInterno: true)
+        : this(logger, relogio, validadorDeCertificado, permiteHostInterno: true, null)
     {
     }
 
     private CaixaEmailMailKit(
         ILogger<CaixaEmailMailKit> logger, TimeProvider relogio, RemoteCertificateValidationCallback? validadorDeCertificado,
-        bool permiteHostInterno)
+        bool permiteHostInterno, Func<string, CancellationToken, Task<IPAddress[]>>? resolverNome)
     {
         _logger = logger;
         _relogio = relogio;
         _validadorDeCertificado = validadorDeCertificado;
         _permiteHostInterno = permiteHostInterno;
+        _resolverNome = resolverNome ?? ((nome, ct) => Dns.GetHostAddressesAsync(nome, ct));
     }
 
     internal static SecureSocketOptions SegurancaDaPorta(int porta) =>
@@ -174,7 +183,7 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
 
         if (HostDeCaixaEmail.NomeInterno(host))
             throw new HostNaoPermitidoException();
-        var enderecos = IPAddress.TryParse(host, out var literal) ? [literal] : await Dns.GetHostAddressesAsync(host, ct);
+        var enderecos = IPAddress.TryParse(host, out var literal) ? [literal] : await _resolverNome(host, ct);
         if (enderecos.Length == 0 || enderecos.Any(HostDeCaixaEmail.IpInterno))
             throw new HostNaoPermitidoException();
 
