@@ -22,6 +22,7 @@ internal static class DispatcherDeTeste
 
     // #2736: o estorno toma a trava do Caixa, que exige transação real (advisory lock do Postgres). O contexto
     // InMemory ignora a transação, então a trava é a única chamada que o teste dispensa; o resto vai ao repositório.
+    // A trava no caminho do aparelho é provada no Postgres real em SyncEstornoTravaE2ETests (#2765).
     private static ICaixaRepository SemTravaDeTransacao(ICaixaRepository repo)
     {
         var proxy = DispatchProxy.Create<ICaixaRepository, DispensaTrava>();
