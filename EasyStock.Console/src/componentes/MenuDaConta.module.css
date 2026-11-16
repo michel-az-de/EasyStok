@@ -12,7 +12,8 @@
   inset: auto; margin: 0; overflow: visible; color: inherit;
   min-width: 220px; max-width: min(320px, calc(100vw - 24px)); padding: var(--e-3);
   border: 0; border-radius: var(--r-2);
-  background: var(--papel); box-shadow: var(--sombra-media);
+  /* #2762 (VB16): fundo elevado e sombra alta separam a camada da lista de conversas e do avatar atrás. */
+  background: var(--elevado); box-shadow: var(--sombra-alta);
   animation: contaEntra var(--dur-media) var(--ease-saida);
 }
 /* Pé do trilho: abre à direita, alinhada pelo fundo, para não sair da tela. */

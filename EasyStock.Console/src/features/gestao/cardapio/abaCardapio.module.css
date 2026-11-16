@@ -3,7 +3,7 @@
 .aba { display: grid; gap: var(--e-24); min-width: 0; container-type: inline-size; }
 .secao { display: grid; gap: var(--e-3); min-width: 0; }
 .tituloSecao { margin: 0; color: var(--tinta); font-size: var(--t-forte); line-height: var(--lh-compacto); font-weight: 750; letter-spacing: var(--ls-titulo); }
-.resumoOperacao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding-block: var(--e-3) var(--e-4); border-bottom: 0; gap: var(--e-4); }
+.resumoOperacao { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding-block: var(--e-3) var(--e-4); gap: var(--e-4); }
 /* #2258 (auditoria P3): os três números têm o mesmo fundo de cartão; o tom do estado troca só a cor. */
 .resumoOperacao > div { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); }
 .resumoOperacao dt { color: var(--tinta-2); font-size: var(--t-micro); line-height: var(--lh-compacto); }
@@ -23,53 +23,56 @@
 .acoesDireita { display: flex; justify-content: flex-end; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 
 /* #2424: categorias antigas sem caixa: título, estado em âmbar, nomes com divisórias e a ação no fim. */
-.antigas { display: grid; gap: var(--e-2); min-width: 0; }
+/* #2762: a conversão pendente é um aviso de ação: moldura e fundo de alerta, texto em tinta cheia (par conferido). */
+.antigas { display: grid; gap: var(--e-2); min-width: 0; padding: var(--e-4); border: var(--b-1) solid var(--alerta); border-radius: var(--r-2); background: var(--alerta-pastel); }
+.antigas .descricao { color: var(--tinta); }
+.antigas .nomesAntigos { border-top-color: var(--alerta); }
+.antigas .nomesAntigos li { border-bottom-color: var(--linha-forte); }
 .cabecalhoAntigas { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-2) var(--e-3); flex-wrap: wrap; }
-.pendenteConversao { color: var(--marca-forte); font-size: var(--t-apoio); font-weight: 650; }
 .nomesAntigos { list-style: none; margin: var(--e-2) 0 0; padding: 0; border-top: var(--b-1) solid var(--linha); }
 .nomesAntigos li { padding: var(--e-3) 0; border-bottom: var(--b-1) solid var(--linha); color: var(--tinta); font-size: var(--t-corpo); overflow-wrap: anywhere; }
 .converter { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding-top: var(--e-2); }
 .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
-.acoesFormulario { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding-top: var(--e-4); border-top: var(--b-1) solid var(--linha); }
 .acoesReceita { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .acoesReceita > :last-child { margin-left: auto; }
 .editorReceita { width: 100%; padding-top: var(--e-4); border-top: var(--b-1) solid var(--linha); }
 .descricao { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 70ch; line-height: var(--lh-corpo); }
-.orientacoes { flex: 1 1 320px; min-width: 0; }
-.ajudaControles { margin-top: var(--e-1); font-size: var(--t-apoio); }
-.ajudaControles summary { width: fit-content; color: var(--marca); cursor: pointer; padding-block: var(--e-2); }
-.ajudaControles[open] summary { margin-bottom: var(--e-1); }
-.busca {
-  flex: 0 1 280px; min-width: 0; max-width: 100%; min-height: var(--toque); padding: 0 var(--e-3);
-  border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1);
-  background: var(--papel); color: var(--tinta); font: inherit; font-size: var(--t-apoio);
-}
 .aviso {
   margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-2);
   background: var(--alerta-pastel); color: var(--alerta); font-size: var(--t-apoio);
 }
 
-.lista { list-style: none; margin: 0; padding: 0; border: 0; border-radius: var(--r-2); background: var(--papel); overflow: clip; }
+.lista { list-style: none; margin: 0; padding: 0; border-radius: var(--r-2); background: var(--papel); overflow: clip; }
 .linha {
   display: flex; align-items: center; gap: var(--e-3) var(--e-4); flex-wrap: wrap;
   padding: var(--e-4); min-width: 0;
 }
+.linha { transition: background var(--dur-curta) var(--ease-padrao), opacity var(--dur-curta) var(--ease-padrao); }
 .linha + .linha { border-top: var(--b-1) solid var(--linha); }
+/* #2762: a linha não é clicável inteira, então só o foco a destaca. Lista em tom elevado ou hover em tom de
+   preenchimento apagavam o botão secundário no escuro, onde os dois tons quase se igualam. */
 .linha:focus-within { background: var(--elevado); }
 .linha[aria-busy='true'] { opacity: .6; }
 
-.foto, .semFoto { width: 48px; height: 48px; border-radius: var(--r-1); flex: none; object-fit: cover; }
-.semFoto { background: var(--linha); }
-
 .resumo { flex: 1 1 220px; min-width: 0; display: grid; gap: 6px; }
 .nome { margin: 0; font-size: var(--t-corpo); font-weight: 750; color: var(--tinta); line-height: var(--lh-compacto); overflow-wrap: anywhere; }
-.detalhe { margin: 0; font-size: var(--t-micro); color: var(--tinta-3); overflow-wrap: anywhere; line-height: var(--lh-corpo); }
+.detalhe { margin: 0; font-size: var(--t-micro); color: var(--tinta-3); overflow-wrap: anywhere; text-wrap: pretty; line-height: var(--lh-corpo); }
 .preco { font-size: var(--t-forte); font-weight: 750; color: var(--tinta); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* #2258 (auditoria P4): base curta e crescimento livre; com a base do conteúdo inteiro, as pílulas empurravam o botão da linha para baixo. */
 .estados { display: flex; gap: var(--e-2); flex: 1 1 8rem; flex-wrap: wrap; min-width: 0; }
 
 .acoes { display: flex; align-items: center; gap: var(--e-1); margin-left: auto; flex-wrap: wrap; max-width: 100%; }
 .acoes > button { font-size: var(--t-micro); }
+/* #2762: o último botão tem largura mínima, então a coluna de ações mede o mesmo em toda linha: o rótulo
+   "Não é embalagem" não empurra o "Ajustar" para o lado. Sem base fixa, a sobra fica com o nome do insumo. */
+.acoesFixas { flex: none; justify-content: flex-end; }
+.acoesFixas > button:last-child { min-width: 9.5rem; }
+/* #2762: categoria em grade de duas colunas (nome e estado à esquerda, ações à direita), sem quebrar em dois andares. */
+.linhaCategoria { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'resumo acoes' 'estados acoes'; column-gap: var(--e-4); row-gap: var(--e-1); align-items: center; }
+.linhaCategoria > .resumo { grid-area: resumo; }
+.linhaCategoria > .estados { grid-area: estados; }
+.linhaCategoria > .estados:empty { display: none; }
+.linhaCategoria > .acoes { grid-area: acoes; }
 .chave {
   display: inline-flex; align-items: center; gap: var(--e-2);
   min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
@@ -77,15 +80,10 @@
 .chave input { width: 20px; height: 20px; accent-color: var(--marca); }
 .ordem { display: inline-flex; }
 
-.filtro { display: grid; gap: var(--e-2); flex: 1 1 280px; min-width: 0; }
-.resumoBusca { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; }
 .campos { display: grid; gap: var(--e-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); align-items: end; width: 100%; }
 .campos > * { min-width: 0; }
 .formulario { padding: var(--e-24); margin: 0; border: 0; border-radius: var(--r-2); background: var(--papel); }
-.cabecalhoFormulario { display: flex; align-items: center; gap: var(--e-3); grid-column: 1 / -1; padding-bottom: var(--e-4); margin-bottom: var(--e-2); border-bottom: 0; }
 .numeroPrato { align-self: flex-start; color: var(--marca); font-family: var(--f-corpo); font-size: var(--t-titulo); line-height: var(--lh-compacto); }
-.tituloFormulario { margin: 0; color: var(--tinta); font-size: var(--t-forte); font-weight: 750; line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo); }
-.cabecalhoFormulario .detalhe { margin-top: var(--e-1); }
 .listaFormularios { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
 .listaFormularios > .formulario { margin: 0; }
 .linhaReceita { grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); }
@@ -104,17 +102,25 @@
 .ajudaEmbalagem { display: block; max-width: 44ch; color: var(--tinta-2); font-size: var(--t-micro); }
 .dataPlanejamento { display: grid; gap: var(--e-2); width: min(100%, 280px); }
 .rodapeForm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-2); padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha); }
-.campoQuantidade { width: 180px; max-width: 100%; }
 .rendimentoDaReceita { grid-template-columns: repeat(2, minmax(0, 220px)); align-items: start; }
 .link { color: var(--marca); text-underline-offset: 3px; }
+/* #2762: listas de pílulas (insumos a comprar, perdas por motivo) em vez de uma frase corrida com ponto-médio. */
+.chips { display: flex; flex-wrap: wrap; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+.chips > li { display: inline-flex; max-width: 100%; padding: var(--e-1) var(--e-3); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-pilula); }
+/* #2762: perda em três colunas (descrição, valor à direita em dígitos tabulares, ação), em vez do valor solto no meio da linha. */
+.linhaPerda { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
+.linhaPerda > .estados { flex: none; justify-content: flex-end; text-align: right; font-variant-numeric: tabular-nums; }
+.linhaPerda > .acoes { margin-left: 0; }
 
 @container (max-width: 640px) {
-  .acoesFormulario { display: grid; grid-template-columns: minmax(0, 1fr); }
   .acoesReceita { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
   .acoesReceita > :last-child { grid-column: 1 / -1; margin-left: 0; }
   .acoes { width: 100%; margin-left: 0; padding-top: var(--e-2); }
+  .acoesFixas { flex-basis: 100%; justify-content: flex-start; }
+  .linhaCategoria { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'resumo' 'estados' 'acoes'; }
   .linha > .resumo { flex-basis: 100%; }
-  .campoQuantidade { width: 100%; }
+  .linhaPerda { grid-template-columns: minmax(0, 1fr) auto; }
+  .linhaPerda > .acoes { grid-column: 1 / -1; }
   .formulario, .linha { padding: var(--e-16); }
   .linhaReceita { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .linhaReceita > :first-child { grid-column: 1 / -1; }

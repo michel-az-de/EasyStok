@@ -5,7 +5,7 @@
 // mexer em código. Mudar aqui reflete na hora no seletor da ficha, no
 // Balcão/Entregas e no que o agente oferece, porque todos leem
 // `estado.catalogo.janelas` e `ocupacaoDeHoje` (mesmas funções de sempre).
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Chip } from '../../../componentes/Chip'
@@ -18,6 +18,8 @@ import {
   ajustarRespiroMinimo, erroDaJanela, janelaTemPedidos, ocupacaoDaJanela, rotuloDaOcupacao,
 } from '../../../dominio/entrega'
 import css from './janelas.module.css'
+
+const MOTIVO_SEM_EXCLUIR = 'Tem pedido hoje. Pause em vez de excluir.'
 
 const rotuloDosDias = (diasSemana) => {
   if (!diasSemana || diasSemana.length === 7) return 'todo dia'
@@ -164,6 +166,7 @@ function CartaoJanela({ janela, ocupacao, temPedidos, aoSalvar, aoPausar, aoReat
   const excluirRef = useRef(null)
   const cancelarRef = useRef(null)
   const pausada = janela.ativa === false
+  const idBase = `janela-${useId().replace(/:/g, '')}`
 
   // #2596: a confirmação leva o foco a Cancelar ao abrir e o devolve a Excluir ao cancelar. Pedido que chega
   // com ela aberta fecha a confirmação: janela com pedido hoje se pausa, não se exclui.
@@ -199,7 +202,8 @@ function CartaoJanela({ janela, ocupacao, temPedidos, aoSalvar, aoPausar, aoReat
             variante="texto"
             icone="lixeira"
             disabled={temPedidos}
-            motivo={temPedidos ? 'Tem pedido hoje. Pause em vez de excluir.' : undefined}
+            title={temPedidos ? MOTIVO_SEM_EXCLUIR : undefined}
+            aria-describedby={temPedidos ? `${idBase}-sem-excluir` : undefined}
             ref={excluirRef}
             aria-expanded={confirmacaoAberta}
             onClick={() => setConfirmando(true)}
@@ -208,6 +212,8 @@ function CartaoJanela({ janela, ocupacao, temPedidos, aoSalvar, aoPausar, aoReat
           </Botao>
         </div>
       </div>
+
+      {temPedidos && <p id={`${idBase}-sem-excluir`} className={css.metaLinha}>{MOTIVO_SEM_EXCLUIR}</p>}
 
       {confirmacaoAberta && (
         <div className={css.confirmacaoInline}>
@@ -305,6 +311,7 @@ export function AbaJanelas() {
       <ul className={css.lista}>
         {criando && (
           <li className={`${css.item} ${css.itemNovo}`}>
+            <h3 className={css.tituloNovo}>Nova janela</h3>
             <FormularioJanela
               valorInicial={camposIniciais(null)}
               rotuloSalvar="Cadastrar"

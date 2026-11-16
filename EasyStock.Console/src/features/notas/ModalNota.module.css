@@ -18,8 +18,12 @@
 .requisito { margin: 0; font-size: var(--t-apoio); line-height: 1.4; color: var(--tinta-2); }
 .acoes { display: flex; justify-content: flex-end; gap: var(--e-2); }
 .postit textarea { font-family: var(--f-manuscrita); font-size: var(--t-corpo); line-height: 1.6; border: 0; box-shadow: none; background: transparent; }
+.postit textarea::placeholder { color: var(--tinta-2); font-size: var(--t-corpo); opacity: 1; }
 .postit textarea:focus { outline: none; }
 .postit textarea:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
+
+/* #2762: entra só por opacidade; o post-it já usa transform para centralizar. */
+.postit[open]:not(.embutida) { animation: global(esmaecer) var(--dur-curta) var(--ease-saida) both; }
 
 /* O display:grid do post-it não pode revelar o diálogo fechado. */
 .postit:not([open]) { display: none; }

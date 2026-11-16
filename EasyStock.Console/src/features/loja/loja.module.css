@@ -26,6 +26,6 @@
   margin: 0; display: grid; gap: var(--e-3);
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
-.numeros div { display: flex; flex-direction: column; gap: 2px; }
+.numeros div { display: flex; flex-direction: column; gap: var(--e-1); }
 .numeros dt { font-size: var(--t-apoio); color: var(--tinta-2); }
 .numeros dd { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }

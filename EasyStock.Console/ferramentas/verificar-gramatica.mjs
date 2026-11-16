@@ -99,7 +99,6 @@ const PASTAS_DA_ESCALA_DE_FONTE = ['app/', 'componentes/', 'estilos/', ...PASTAS
 const FONTE_EXCECOES = {
   'componentes/Trilho.module.css': 'o trilho tem 12 px aprovado na prancha (plano balcao-ux, secao 15)',
   'componentes/Campo.module.css': '16 px no celular: abaixo disso o iOS amplia a tela ao focar o campo',
-  'componentes/CampoMascarado.module.css': '16 px no celular: abaixo disso o iOS amplia a tela ao focar o campo',
 }
 const LARGURA_DE_MODAL_EXCECOES = {
   'componentes/ImprimirPedido.jsx': 'a previa do impresso tem a largura do papel',

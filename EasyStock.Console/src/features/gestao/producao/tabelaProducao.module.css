@@ -15,6 +15,9 @@
 .apoio { display: block; margin-top: var(--e-1); color: var(--tinta-3); font-size: var(--t-micro); line-height: var(--lh-corpo); overflow-wrap: anywhere; }
 .acoes { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--e-2); flex-wrap: wrap; }
 .acoes > button { font-size: var(--t-micro); }
+/* #2762: com dois botões na linha (Editar + baixa de insumos), o segundo tem largura fixa: o Editar não muda de coluna
+   conforme o rótulo ("Parar de baixar insumos" x "Baixar insumos ao produzir"). */
+.acoesFixas > button:last-child:not(:first-child) { min-width: 14rem; }
 /* Cada prato é um tbody: a linha dele e, quando abre, a de baixo (formulário de ajuste, confirmação de perda e aviso). */
 .tabela .extra { border-top: 0; padding-top: 0; }
 
@@ -57,6 +60,8 @@
   .tabela td[data-rotulo]::before { content: attr(data-rotulo); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 500; }
   .tabela .numero, .tabela .colunaAcoes { text-align: left; }
   .acoes { justify-content: flex-start; padding-top: var(--e-1); }
+  .acoesFixas > button { justify-content: flex-start; }
+  .acoesFixas > button:last-child:not(:first-child) { min-width: 0; }
   .acoesDoPlano { align-items: stretch; width: 100%; }
   .numeros > div { padding-inline: var(--e-2); }
   .numeros dd { font-size: var(--t-titulo); }

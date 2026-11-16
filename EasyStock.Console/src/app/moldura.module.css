@@ -34,7 +34,11 @@
   border: 0; background: none; cursor: pointer; color: var(--tinta); font: inherit;
   font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto);
 }
-.lojaPonto { flex-shrink: 0; width: var(--ponto); height: var(--ponto); background: var(--tinta-3); }
+/* #2762: fechar a loja tem consequência, então o botão responde ao mouse e ao toque (cor, sem transform). */
+.controleLoja { border-radius: var(--r-1); transition: background-color var(--dur-micro) var(--ease-padrao); }
+.controleLoja:hover { background: var(--preenchimento); }
+.controleLoja:active { background: var(--preenchimento-forte); }
+.lojaPonto { flex-shrink: 0; width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula); background: var(--tinta-3); }
 .topoAberta .lojaPonto { background: var(--sucesso); }
 .topoFechada .lojaPonto { background: var(--erro); }
 .lojaTexto { white-space: nowrap; }
@@ -77,7 +81,7 @@
 .rolavel { overflow-y: auto; flex: 1; min-height: 0; overscroll-behavior: contain; }
 .painelFicha { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .disposicao { position: relative; }
-.ajusteDisposicao { display: grid; gap: var(--e-3); width: min(300px, 80vw); padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta); }
+.ajusteDisposicao { display: grid; gap: var(--e-3); padding: var(--e-3); font-size: var(--t-apoio); color: var(--tinta); }
 .ajusteDisposicao label { display: grid; grid-template-columns: 1fr auto; gap: var(--e-2); }
 .ajusteDisposicao input { grid-column: 1 / -1; width: 100%; min-height: var(--toque); accent-color: var(--marca); }
 .ajusteDisposicao output, .ajusteDisposicao small { font-size: var(--t-micro); color: var(--tinta-2); }
@@ -156,11 +160,11 @@
 .inicioTrilho { composes: inicio from '../componentes/Trilho.module.css'; }
 .itemTrilho { composes: item from '../componentes/Trilho.module.css'; }
 .avisosTrilho { composes: filhos from '../componentes/Trilho.module.css'; }
-.itemTrilho svg, .sinoTrilho > div > button svg { transition: transform var(--dur-media) var(--ease-mola); }
-.itemTrilho:hover svg, .sinoTrilho > div > button:hover svg { transform: translateY(-2px) scale(1.06); }
+/* #2762: o hover do trilho responde por cor (fundo e tinta, em `Trilho.module.css`); o ícone não sobe nem
+   cresce, porque transformação é do arraste e da camada, e no toque o hover grudava. */
 .itemAtual { composes: ativo from '../componentes/Trilho.module.css'; cursor: default; }
-.itemAtual::before { left: 0; }
 .itemTrilho[aria-pressed='true'] { color: var(--tinta); background: var(--preenchimento-forte); }
+/* #2762: o pulso do selo roda 3 vezes ao surgir a pendência e para; laço infinito distraía o atendimento. */
 @keyframes seloPulso {
   0% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 2px color-mix(in srgb, var(--erro) 50%, transparent); }
   70% { box-shadow: 0 0 0 2px var(--fundo), 0 0 0 9px transparent; }
@@ -179,8 +183,11 @@
 @media (max-width: 759px) {
   .controles > button { font-size: 0; gap: 6px; padding: 0 10px; }
   /* O aviso do aparelho fica no sino sem alargar o cabeçalho e empurrar Mais para fora. */
-  .controles > button:has([data-aparelho-desligado]) { position: relative; }
+  .controles > button:has([data-aparelho-desligado], [data-aviso-erro]) { position: relative; }
   .controles > button > [data-aparelho-desligado] { position: absolute; top: 6px; right: 6px; margin-left: 0; }
+  /* #2762: o ponto de "sem atualizar" fica no canto do sino; com os dois, o do aparelho passa para o outro lado. */
+  .controles > button > [data-aviso-erro] { position: absolute; top: 6px; right: 6px; margin-left: 0; }
+  .controles > button:has([data-aviso-erro]) > [data-aparelho-desligado] { right: auto; left: 6px; }
 }
 /* #1940 (item 3): a 375 px o "Mais" passava 16 px da borda (marca 66 + loja 32 + controles 277 +
    recuos = 399 px). Abaixo de 400 px os vãos e o recuo lateral dos botões de ícone apertam
@@ -215,9 +222,10 @@
 .espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
 .espacoTrilho::after { content: none; }
 .atendente { composes: avatar from '../componentes/Trilho.module.css'; }
-/* 12: no celular, o painel que entra desliza brevemente da direita. */
-@keyframes painelDesliza { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
-.palco > [role='tabpanel'] > * { animation: painelDesliza var(--dur-media) var(--ease-saida) backwards; }
+/* 12: no celular, o painel que entra aparece com esmaecimento. #2762: o alvo é o filho real do painel
+   (o invólucro ativo é `display: contents` e não gera caixa, então a animação nele era morta); só a
+   opacidade anima, para não criar contexto de empilhamento que prenda o Enviar fixo. */
+.palco > [role='tabpanel'] > [data-painel-mobile] > * { animation: global(esmaecer) var(--dur-media) var(--ease-saida) backwards; }
 
 /* Integração com a rodada 7: o estado da loja mora no trilho do desktop,
    abaixo da marca. Aberta em verde, fechada em carmim, com o fundo tingido do
@@ -236,13 +244,17 @@
    dentro da tela. O alvo de toque segue com --toque de altura. */
 @media (max-width: 759px) {
   .controleLoja { gap: var(--e-1); padding: 0 var(--e-1); font-size: var(--t-micro); }
+  /* Duas linhas ("Loja" sobre "fechada"): numa só o menu ⋮ sai da tela a 390 px, e o texto curto sem "Loja"
+     foi recusado na #2232 (L1). */
   .lojaTexto { width: min-content; white-space: normal; }
   .automaticas > svg { display: none; }
   .autoTexto { display: grid; justify-items: start; gap: 0; line-height: var(--lh-compacto); }
   .autoEstado::before { content: none; }
-  .autoEstado { font-size: var(--t-micro); }
+  .autoEstado { font-size: var(--t-micro); white-space: nowrap; }
 }
 
 /* #2185 (R04): o número é a `Pilula contagem`; aqui só o lugar dele sobre o ícone do trilho. */
-.contaTrilho, .seloTrilho { position: absolute; top: 4px; left: calc(50% + 6px); box-shadow: 0 0 0 2px var(--fundo); }
-.seloTrilho { white-space: nowrap; animation: seloPulso 2.4s var(--ease-padrao) infinite; }
+/* #2762: o selo sai do desenho do ícone (de 24 px, centrado): começa na borda direita dele. Tamanho e
+   fonte são da `Pilula contagem`, iguais em todos. */
+.contaTrilho, .seloTrilho { position: absolute; top: 2px; left: calc(50% + 12px); box-shadow: 0 0 0 2px var(--fundo); white-space: nowrap; }
+.seloTrilho { left: auto; right: 0; animation: seloPulso calc(var(--dur-longa) * 7) var(--ease-padrao) 3; }

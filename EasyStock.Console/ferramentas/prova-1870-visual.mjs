@@ -159,7 +159,8 @@ confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no 
   assert.doesNotMatch(css, /\.modoTexto\s*\{[^}]*text-overflow:\s*ellipsis/)
   assert.doesNotMatch(css, /maisAcoesModo|listaAcoesModo/)
   // #2232 (A4): o foco visível do item do menu ⋮ da conversa vale no MenuDeAcoes, o único menu de ações.
-  assert.match(fonte('componentes/MenuDeAcoes.module.css'), /\.item:focus-visible\s*\{[^}]*outline: 2px solid var\(--halo\)/)
+  // #2762 (A1): o anel do item é o da casa (borda de foco na cor da marca), no lugar do halo de 2 px, que sumia no escuro.
+  assert.match(fonte('componentes/MenuDeAcoes.module.css'), /\.item:focus-visible\s*\{[^}]*outline: var\(--b-3\) solid var\(--marca\)/)
 })
 confere('4  restrição de formato permanece acessível e problemas de envio continuam visíveis junto do campo', () => {
   const composer = fonte('features/atendimento/Composer.jsx')

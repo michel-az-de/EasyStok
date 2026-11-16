@@ -214,13 +214,15 @@ function Cabecalho({
 // Trilho lateral do desktop (rodada 6c): a navegação de app com ícone e
 // rótulo curto, no lugar da barra de botões de texto do topo. Os mesmos
 // controles, os mesmos handlers; Balcão é a tela atual, não um botão.
+// #2762: ícone próprio (Gestão já usa `painel`) e camada de 300 px medida pelo Popover (`abaixo`): presa
+// ao gatilho de 76 px ela abria como faixa de 45 px, com os controles cortados.
 function DisposicaoConversas({ larguras, padrao, aoRedimensionar }) {
   const [aberto, setAberto] = useState(false)
   return <span className={css.disposicao}>
     <Botao variante="texto" className={css.itemTrilho} aria-expanded={aberto} aria-haspopup="dialog" onClick={() => setAberto(!aberto)}>
-      <Icone nome="painel" tamanho={24} /><span>Disposição</span>
+      <Icone nome="modelo" tamanho={24} /><span>Disposição</span>
     </Botao>
-    {aberto && <Popover rotulo="Disposição das conversas" papel="dialog" portal posicao="acima" aoFechar={() => setAberto(false)}>
+    {aberto && <Popover rotulo="Disposição das conversas" papel="dialog" portal posicao="abaixo" alinhamento="esquerda" largura={300} aoFechar={() => setAberto(false)}>
       <div className={css.ajusteDisposicao}>
         <strong>Seu espaço de trabalho</strong>
         <label>Conversas <output>{larguras.balcao} px</output>

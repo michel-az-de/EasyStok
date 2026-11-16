@@ -15,7 +15,7 @@
 .previaRemover {
   flex-shrink: 0; display: grid; place-items: center;
   width: var(--toque); height: var(--toque); border-radius: var(--r-pilula); border: 0; background: none;
-  color: var(--tinta-2); cursor: pointer; transition: background 180ms ease;
+  color: var(--tinta-2); cursor: pointer; transition: background var(--dur-curta) var(--ease-padrao);
 }
 .previaRemover:hover { background: var(--linha); }
 

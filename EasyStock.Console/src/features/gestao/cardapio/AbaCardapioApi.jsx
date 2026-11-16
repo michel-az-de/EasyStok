@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { BotaoIcone } from '../../../componentes/BotaoIcone'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
@@ -102,7 +103,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
   const limpar = () => { setBusca(''); escolherFiltro('todos'); setCategoria(null); buscaRef.current?.focus() }
   const ordenando = podeReordenar(recorte)
 
-  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando o cardápio…</output>
+  if (gestao.estado === 'carregando') return <EsqueletoDeLista linhas={5} altura="calc(var(--toque) * 2)">Carregando o cardápio…</EsqueletoDeLista>
   if (gestao.estado === 'erro' && gestao.itens.length === 0 && !editor) {
     if (gestao.semLoja) return <Vazio icone="globo" titulo="A loja online ainda não está ligada">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
     return (
@@ -186,7 +187,7 @@ export function AbaCardapioApi({ renderizarEditor }) {
                     </button>
                   ) : <div className={css.abrirFoto}><FotoDoPrato item={item} /></div>}
                   <div className={css.resumo}>
-                    <h3 className={css.nome}>{item.nome}</h3>
+                    <h3 className={css.nome} title={temEditor ? 'Dê dois cliques na linha para editar o prato' : undefined}>{item.nome}</h3>
                     <p className={css.detalhe}>
                       {item.categoria && <><span className={css.categoria}>{rotuloDaCategoria(item.categoria)}</span>{' · '}</>}
                       {[LINHA[item.linha], porcaoDoDetalhe(item)].filter(Boolean).join(' · ')}

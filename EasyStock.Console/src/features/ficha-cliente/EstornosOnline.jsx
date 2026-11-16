@@ -90,7 +90,7 @@ export function EstornosOnline({ pedidoId, aoAlterado = null }) {
       <CampoTexto rotulo="Motivo do estorno online" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} required disabled={ocupado} />
       <label className={css.corpoBloco}><input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} disabled={ocupado} /> Confirmo a solicitação de devolução de {moeda(valor)} pelo Mercado Pago.</label>
       <p className={css.corpoBloco}>O Mercado Pago devolverá pelo meio original. A saída no Caixa será registrada quando o provedor confirmar. Não faça uma devolução manual para o mesmo valor.</p>
-      <Botao type="submit" variante="primario" disabled={!valido || ocupado}>{ocupado ? 'Conferindo estorno…' : 'Confirmar solicitação de estorno'}</Botao>
+      <Botao type="submit" variante="primario" disabled={!valido || ocupado} aria-busy={ocupado || undefined}>{ocupado ? 'Conferindo estorno…' : 'Confirmar solicitação de estorno'}</Botao>
       <Botao type="button" disabled={ocupado} onClick={() => setAberto(false)}>Voltar</Botao>
     </form>}
     <Botao disabled={ocupado} onClick={atualizar}>Atualizar estornos online</Botao>

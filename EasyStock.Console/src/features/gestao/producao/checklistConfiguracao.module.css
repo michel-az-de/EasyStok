@@ -3,32 +3,34 @@
 
 .checklist {
   display: flex; align-items: center; gap: var(--e-3) var(--e-4); flex-wrap: wrap; padding: var(--e-2) var(--e-4);
-  border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
+  border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
   margin-bottom: var(--e-4);
 }
 
 .titulo {
-  margin: 0; padding-right: var(--e-4); border-right: 1px solid var(--linha);
+  margin: 0; padding-right: var(--e-4); border-right: var(--b-1) solid var(--linha);
   font-size: var(--t-apoio); font-weight: 700; color: var(--tinta);
 }
 
 .passos { display: flex; flex-wrap: wrap; gap: var(--e-2) var(--e-4); flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; list-style: none; }
 
 .passo { display: flex; gap: var(--e-2); align-items: center; min-width: 0; }
-.passo + .passo { padding-left: var(--e-4); border-left: 1px solid var(--linha); }
+.passo + .passo { padding-left: var(--e-4); border-left: var(--b-1) solid var(--linha); }
 
 .marca {
   flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px;
-  border-radius: 50%; border: 1px solid var(--linha-forte); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 700;
+  border-radius: var(--r-pilula); border: var(--b-1) solid var(--linha-forte); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 700;
 }
 .ativo .marca { border-color: var(--marca); background: var(--marca); color: var(--marca-contraste); }
 .feito .marca { border-color: var(--sucesso); color: var(--sucesso); }
+/* #2762: o passo concluído estala uma vez ao entrar. */
+.feito .marca { animation: global(estalar) var(--dur-media) var(--ease-pulo) both; }
 
 .texto { display: grid; gap: 0; min-width: 0; }
 
 .link {
   color: var(--tinta); font-size: var(--t-apoio); font-weight: 600; text-decoration: underline;
-  text-underline-offset: 3px; display: inline-flex; align-items: center; min-height: 24px;
+  text-underline-offset: 3px; display: inline-flex; align-items: center; min-height: var(--toque);
 }
 .ativo .link { color: var(--marca-forte); }
 .feito .link { color: var(--tinta-2); font-weight: 400; }

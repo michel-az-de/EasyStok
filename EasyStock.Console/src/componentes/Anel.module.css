@@ -14,7 +14,7 @@
 .trilhoParado { stroke: var(--erro); }
 .arco {
   fill: none; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
-  transition: stroke-dashoffset 1s linear, stroke .3s ease;
+  transition: stroke-dashoffset 1s linear, stroke var(--dur-longa) var(--ease-padrao);
 }
 .arco.ok { stroke: var(--sucesso); }
 .arco.atencao { stroke: var(--alerta); }

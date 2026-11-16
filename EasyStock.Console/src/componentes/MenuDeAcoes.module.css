@@ -8,7 +8,9 @@
 }
 .item:hover:not(:disabled) { background: var(--preenchimento); }
 .item:active:not(:disabled) { background: var(--preenchimento-forte); }
-.item:focus-visible { background: var(--preenchimento); outline: 2px solid var(--halo); outline-offset: -2px; }
+/* #2762 (A1): o anel é o global (3 px da marca); o --halo, com 20% de alfa, ficava abaixo de 3:1. O recuo
+   para dentro evita o corte pela rolagem da camada. */
+.item:focus-visible { background: var(--preenchimento); outline: var(--b-3) solid var(--marca); outline-offset: calc(var(--b-3) * -1); }
 .item:disabled { color: var(--tinta-3); cursor: not-allowed; }
 .perigo { color: var(--erro); }
 .rotulo { flex: 1; min-width: 0; }

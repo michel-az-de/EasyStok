@@ -1,0 +1,5 @@
+/* #2762: caixas E-mail e SMS com alvo de toque e marca visível nos dois temas (a base `.avisoCanal` mora
+   em cliente.module.css). */
+.caixa { min-height: var(--toque); gap: var(--e-2); cursor: pointer; }
+.caixa input { width: 20px; height: 20px; margin: 0; flex-shrink: 0; accent-color: var(--marca); cursor: inherit; }
+.caixa input:disabled { cursor: default; }

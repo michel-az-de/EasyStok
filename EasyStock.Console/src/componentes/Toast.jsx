@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BotaoIcone } from './BotaoIcone'
 import { Icone } from './Icone'
 import css from './Toast.module.css'
@@ -12,8 +12,40 @@ import css from './Toast.module.css'
 // #2185 (F28): `aoPausar` e `aoRetomar` seguram o relógio dos avisos enquanto o ponteiro ou o foco estão na
 // pilha (o teclado não alcança um aviso de 6 s a tempo). Foco de clique não conta: o mouse já pausa pelo
 // ponteiro, e um clique deixaria o foco na pilha, segurando os avisos depois de o ponteiro sair.
+const SAIDA_MS = 150 // --dur-curta
+const semMovimento = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+
 export function Toast({ itens, aoFechar, aoAbrir, aoPausar, aoRetomar, rotulo = 'Avisos', rodape = null }) {
   const pilha = useRef(null)
+  // #2762 (A5): o aviso que saiu da fila fica mais --dur-curta, no mesmo lugar, só para sumir suavemente. É
+  // cópia visual: `inert` e `aria-hidden`, sem clique nem foco. A fila do dono (`itens`) já está atualizada.
+  const [saindo, setSaindo] = useState([])
+  const anteriores = useRef(itens)
+  const prazos = useRef(new Set())
+  useLayoutEffect(() => {
+    const antes = anteriores.current
+    anteriores.current = itens
+    if (semMovimento()) return
+    const ficam = new Set(itens.map((item) => item.id))
+    const idas = antes.map((item, indice) => ({ item, indice })).filter(({ item }) => !ficam.has(item.id))
+    if (!idas.length) return
+    setSaindo((atual) => [...atual, ...idas])
+    const prazo = setTimeout(() => {
+      prazos.current.delete(prazo)
+      setSaindo((atual) => atual.filter((s) => !idas.includes(s)))
+    }, SAIDA_MS)
+    prazos.current.add(prazo)
+  }, [itens])
+  useEffect(() => { const todos = prazos.current; return () => todos.forEach(clearTimeout) }, [])
+  const desenhados = itens.map((item) => ({ item, saindo: false }))
+  for (const { item, indice } of [...saindo].sort((a, b) => a.indice - b.indice)) {
+    if (!desenhados.some((d) => d.item.id === item.id)) desenhados.splice(Math.min(indice, desenhados.length), 0, { item, saindo: true })
+  }
+  // #2762 (A14): fechar pelo X desmonta o botão focado; o foco vai para a reserva da tela em vez de cair no body.
+  const fechar = (evento, id) => {
+    if (evento.currentTarget.closest('[data-toast]')?.contains(document.activeElement)) document.querySelector('[data-foco-reserva]')?.focus()
+    aoFechar(id)
+  }
   const dentro = useRef({ ponteiro: false, foco: false })
   const mudou = useCallback((parte, valor) => {
     const antes = dentro.current.ponteiro || dentro.current.foco
@@ -54,8 +86,9 @@ export function Toast({ itens, aoFechar, aoAbrir, aoPausar, aoRetomar, rotulo = 
   }, [vazia, aoRetomar])
   return (
     <section ref={pilha} className={css.pilha} role="status" aria-live="polite" aria-label={rotulo}>
-      {itens.map((item) => (
-        <div key={item.id} className={`${css.aviso} ${css[item.tom ?? 'marca'] ?? ''}`}>
+      {desenhados.map(({ item, saindo: indo }) => (
+        <div key={item.id} data-toast className={`${css.aviso} ${css[item.tom ?? 'marca'] ?? ''} ${indo ? css.saindo : ''}`}
+          inert={indo || undefined} aria-hidden={indo || undefined}>
           {item.icone && <span className={css.icone} aria-hidden="true"><Icone nome={item.icone} tamanho={20} /></span>}
           {item.abrivel && aoAbrir ? (
             <button type="button" className={css.texto} onClick={() => aoAbrir(item)}>
@@ -68,7 +101,7 @@ export function Toast({ itens, aoFechar, aoAbrir, aoPausar, aoRetomar, rotulo = 
               <span>{item.corpo}</span>
             </p>
           )}
-          <BotaoIcone rotulo={`Fechar aviso: ${item.titulo}`} dica="Fechar" icone="x" onClick={() => aoFechar(item.id)} />
+          <BotaoIcone rotulo={`Fechar aviso: ${item.titulo}`} dica="Fechar" icone="x" onClick={(evento) => fechar(evento, item.id)} />
         </div>
       ))}
       {itens.length > 0 && rodape}

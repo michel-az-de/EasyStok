@@ -7,7 +7,11 @@
   background: transparent; border-color: transparent; box-shadow: none; color: var(--tinta-2);
 }
 .tema > button:hover { background: var(--elevado); color: var(--tinta); }
-.tema > button[aria-checked='true'] {
+/* #2762 (A2): o ligado segue ligado sob o ponteiro (o hover do secundário é mais específico). */
+.tema > button:hover:not(:disabled):not([aria-checked='true']) { background: var(--elevado); }
+.tema > button[aria-checked='true'],
+.tema > button[aria-checked='true']:hover:not(:disabled),
+.tema > button[aria-checked='true']:active:not(:disabled) {
   background: var(--papel); color: var(--marca-forte); border-color: transparent; box-shadow: none;
 }
 .vertical { display: flex; flex-direction: column; margin-top: var(--e-2); }

@@ -8,6 +8,7 @@ import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { CampoReais } from '../../componentes/CampoReais'
 import { DiferencaDaGaveta } from '../../componentes/DiferencaDaGaveta'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
 import { Modal } from '../../componentes/Modal'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
@@ -212,6 +213,7 @@ function AbrirLojaComCaixa({ aoFechar }) {
               variante="primario"
               icone="dollar-sign"
               disabled={envio.enviando || moedaAltaDemais(saldoCentavos) || motivoFalta || (aConfirmar && centavos == null)}
+              aria-busy={envio.enviando}
               onClick={abrir}
             >
               {envio.enviando ? 'Abrindo…' : confirmacao.rotulo(rotuloAbrir)}
@@ -221,7 +223,7 @@ function AbrirLojaComCaixa({ aoFechar }) {
       )}
     >
       <div className={css.corpo}>
-        {caixa.estado === 'carregando' && <p className={css.apoio}>Conferindo o caixa…</p>}
+        {caixa.estado === 'carregando' && <EsqueletoDeLista linhas={2} altura="var(--toque)">Conferindo o caixa…</EsqueletoDeLista>}
         {caixa.estado === 'erro' && (
           <div className={css.bloco}>
             <Erro texto={`O caixa não carregou: ${caixa.erro}`} />
@@ -328,6 +330,7 @@ export function ModalFecharLoja({ aoFechar }) {
             variante="primario"
             icone="lock"
             disabled={envio.enviando || !justificativaValida(justificativa)}
+            aria-busy={envio.enviando}
             onClick={() => enviar(() => fecharLojaComJustificativa(justificativa))}
           >
             {envio.enviando ? 'Fechando…' : 'Fechar a loja'}

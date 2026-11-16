@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
 import { Icone } from '../../componentes/Icone'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
@@ -155,10 +156,12 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
         onFocusCapture={travar}
         onBlurCapture={destravarComAtraso}
       >
-        {carga && (
-          <VazioEmLinha texto={carga === 'erro'
-            ? 'Não consegui carregar as conversas. Tento de novo em instantes.'
-            : 'Carregando as conversas…'} />
+        {/* #2762: esqueleto com a altura do cartão no lugar do texto solto; o texto segue no DOM (.sr). */}
+        {carga === 'carregando' && (
+          <EsqueletoDeLista linhas={6} altura="calc(var(--toque) * 1.8)">Carregando as conversas…</EsqueletoDeLista>
+        )}
+        {carga === 'erro' && (
+          <VazioEmLinha texto="Não consegui carregar as conversas. Tento de novo em instantes." />
         )}
         {/* #1442: vazio em uma linha, com o atalho certo. O bloco grande
             "Ninguém esperando você" ocupava a coluna e escondia o resto. */}

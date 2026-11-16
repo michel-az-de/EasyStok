@@ -4,6 +4,7 @@ import { calcularReceita, numeroDaReceita, quantidadeDaReceita as qtd } from '..
 import { rotuloDaUnidade } from '../../../aplicacao/insumos'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Modal } from '../../../componentes/Modal'
 import { Vazio } from '../../../componentes/Vazio'
 import { hashDoModulo } from '../../../dominio/modulos'
@@ -42,7 +43,7 @@ export function AbaCalculadoraApi() {
     catch (e) { setErro(e.message) }
     finally { enviando.current = false; setOcupado(false) }
   }
-  if (catalogo.estado === 'carregando') return <output className={css.descricao}>Carregando as receitas…</output>
+  if (catalogo.estado === 'carregando') return <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 2)">Carregando as receitas…</EsqueletoDeLista>
   if (catalogo.estado === 'erro') return <div className={css.aba}>
     {catalogo.semLoja
       ? <Vazio icone="cardapio" role="alert" titulo="A calculadora espera a loja online">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
@@ -68,9 +69,7 @@ export function AbaCalculadoraApi() {
       <CampoTexto rotulo="Quantidade desejada" aria-required="true" inputMode="decimal" placeholder="Ex.: 12" disabled={ocupado} value={quantidade} onChange={(e) => setQuantidade(e.target.value)}
         aria-invalid={faltaQuantidade || undefined} dica={faltaQuantidade ? 'Diga quanto quer produzir, maior que zero.' : undefined} />
       <CampoSelecao rotulo="Unidade desejada" disabled={ocupado} value={unidade} onChange={(e) => setUnidade(e.target.value)} opcoes={UNIDADES} />
-      <div className={`${css.rodapeForm} ${css.acoesDireita}`}>
-        <Botao tipo="submit" variante="primario" icone="nota" className={css.semQuebra} disabled={ocupado}>{ocupado ? 'Calculando…' : 'Calcular insumos e custo'}</Botao>
-      </div>
+      <Botao tipo="submit" variante="primario" icone="nota" className={css.semQuebra} disabled={ocupado}>{ocupado ? 'Calculando…' : 'Calcular insumos e custo'}</Botao>
     </form>
     {erro && <p className={css.aviso} role="alert">{erro}</p>}
     {/* #2235 (banca C5): antes de calcular, a tela mostra o que o cálculo vai trazer. */}

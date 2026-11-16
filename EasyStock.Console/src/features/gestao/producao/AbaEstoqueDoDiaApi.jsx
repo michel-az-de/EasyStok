@@ -3,6 +3,7 @@ import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
 import { contagemInicial, detalheDoLote, podeRegistrarPerda, podeReimprimir, motivoDaContagem, porcaoQueNaoRepete, porcaoSugerida, porcoesParaAjuste, resumoDoEstoque, situacaoDoPrato, validadeDoLote, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
 import { producaoDoDia } from '../../../aplicacao/producaoDoDia'
@@ -10,6 +11,7 @@ import { hashDoModulo } from '../../../dominio/modulos'
 import css from '../cardapio/abaCardapio.module.css'
 import { PreviaDasEtiquetas } from './etiqueta/PreviaDasEtiquetas'
 import tabela from './tabelaProducao.module.css'
+import producao from './producao.module.css'
 
 // M2 › Estoque do dia (M2.1, #1490). O que a Thati usa todo dia, lido do EasyStok: os alertas de
 // venda sem saldo (avisa, não trava; RN-48), o saldo em porções por prato e os lotes com o
@@ -160,7 +162,7 @@ export function AbaEstoqueDoDiaApi() {
     return estoque.ajustar(sku, contagem, motivo, porcao)
   }
 
-  if (estoque.estado === 'carregando') return <output className={css.descricao}>Carregando o estoque…</output>
+  if (estoque.estado === 'carregando') return <EsqueletoDeLista linhas={5} altura="calc(var(--toque) * 2)">Carregando o estoque…</EsqueletoDeLista>
   if (estoque.estado === 'erro' && estoque.pratos.length === 0) {
     if (estoque.semLoja) {
       return <Vazio icone="cardapio" role="alert" titulo="O estoque do dia espera a loja online">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
@@ -219,7 +221,7 @@ export function AbaEstoqueDoDiaApi() {
                     aoFecharAviso={estoque.fecharAviso}
                   />
                 ) : (
-                  <div className={css.acoes}>
+                  <div className={`${css.acoes} ${producao.alertaAjustar}`}>
                     <Botao variante="primario" icone="lapis" aria-label={`Ajustar contagem de ${a.nome}`} disabled={!a.sku} onClick={() => trocarAjuste(a.produtoId)}>Ajustar</Botao>
                   </div>
                 )}
