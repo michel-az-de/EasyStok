@@ -131,6 +131,11 @@ public class RlsBypassAllowlistTests
         // I4.2, #1708: na subida, em Production, o host confere se a chave-mestra decifra as credenciais ativas de
         // todas as lojas. Verificacao de plataforma, sem tenant por natureza, num escopo de DI proprio e curto; so le.
         "EasyStock.Infra.Postgre/Integration/ChaveMestraNaSubida.cs",
+
+        // #2743: o webhook Pix da Efi e anonimo e o processor generico roda sem usuario; a parcela e achada pelo txid
+        // do payload (o tenant e descoberto por ela), e a policy RLS de parcelas_receber zera a busca sem o bypass.
+        "EasyStock.Api/Controllers/WebhookPixController.cs",
+        "EasyStock.Infra.Async/Pagamentos/Webhooks/EfiPixWebhookProcessor.cs",
     };
 
     [Fact]
