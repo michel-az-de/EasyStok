@@ -92,6 +92,11 @@ export function AbaAcervo() {
   const detalhe = useRef(null)
   const imagem = dialogo === 'publicar' && imagemEscolhida ? imagemEscolhida : a.imagens.find((i) => i.id === selecionada)
   const previa = useMiniaturaAcervo(imagem?.id)
+  // #2792 (revisão): a versão do Canva abre com o título preenchido; se ele já passa do limite, o Guardar abre travado.
+  const formArquivo = useRef(null)
+  useEffect(() => {
+    if (formArquivo.current) setPassou(algumCampoPassaDoLimite(formArquivo.current, LIMITES_ARQUIVO))
+  }, [dialogo])
   useEffect(() => {
     if (selecionada && detalhe.current) {
       detalhe.current.focus({ preventScroll: true })
@@ -200,7 +205,7 @@ export function AbaAcervo() {
     </section>
     {dialogo && <Modal titulo={({ upload: 'Adicionar original', retorno: 'Adicionar exportação do Canva', canva: 'Vincular design', aprovar: 'Aprovar esta versão', publicar: 'Conferir publicação', escolherImagem: pratoAlvo ? `Imagem para ${pratoAlvo.nome}` : 'Imagem para o prato', solicitar: 'Solicitar nova imagem', uso: 'Confirmar adequação ao canal', classificar: 'Classificar imagem ou peça' })[dialogo]} aoFechar={a.ocupado ? undefined : () => setDialogo(null)}>
       {a.erro && <p role="alert" className={css.erro}>{a.erro}</p>}
-      {(dialogo === 'upload' || dialogo === 'retorno') && <form className={css.formulario} onSubmit={enviarArquivo} onInput={(e) => setPassou(algumCampoPassaDoLimite(e.currentTarget, LIMITES_ARQUIVO))}>
+      {(dialogo === 'upload' || dialogo === 'retorno') && <form ref={formArquivo} className={css.formulario} onSubmit={enviarArquivo} onInput={(e) => setPassou(algumCampoPassaDoLimite(e.currentTarget, LIMITES_ARQUIVO))}>
         <CampoComLimite rotulo="Título" como="input" limite={160} name="titulo" required defaultValue={dialogo === 'retorno' ? `${imagem.titulo} · Canva` : ''} />
         <label>Arquivo PNG, JPEG ou WebP, até 6 MB<input name="file" type="file" accept="image/png,image/jpeg,image/webp" required /></label>
         {dialogo === 'upload' && <><label>Origem<select name="origem"><option value="Fotografia">Fotografia</option><option value="IA">Geração por IA</option></select></label><label>Item do cardápio<select name="itemId"><option value="">Uso geral</option>{a.itens.map((i) => <option key={i.cardapioItemId} value={i.cardapioItemId}>{i.nome}</option>)}</select></label></>}

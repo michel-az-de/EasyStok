@@ -27,7 +27,9 @@ function Componentes(){const [v,d]=useState('b');return <div>
 <CampoSelecao rotulo="Tamanho" erro="Escolha o tamanho." opcoes={[{valor:'p',rotulo:'Pequeno'}]}/>
 <CampoTexto rotulo="Apelido" aviso="Use até 5 caracteres." value="abcdef" onChange={()=>{}}/>
 <CampoTexto rotulo="Nome" erro="Informe o nome." value="" onChange={()=>{}}/>
+<ComLimite/>
 </div>}
+function ComLimite(){const [s,d]=useState('abcd');return <CampoTexto rotulo="Sigla" limite={3} value={s} onChange={e=>d(e.target.value)}/>}
 function Cena(){const [rascunhos,definir]=useState({});const gravacoes=useGravacoesDosAjustes();
 if(tela==='componentes')return <Componentes/>
 return <ContextoAcessoModulos.Provider value={{acoes:{verCadastrosProdutos:true,editarCadastrosProdutos:true,verCadastrosFinanceiros:true,gerenciarCadastrosFinanceiros:true},permite:()=>true}}><ContextoEstado.Provider value={{fonteApi:true,conversas:[],selecionada:null}}><ContextoAcoes.Provider value={{}}><ContextoRascunhosDosAjustes.Provider value={{rascunhos,definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes}}><PainelCadastros tela={tela}/></ContextoRascunhosDosAjustes.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>}
@@ -86,6 +88,27 @@ try {
   assert.equal(await pagina.getByText('Use até 5 caracteres.').getAttribute('role'), 'status', 'aviso de limite não reanuncia como alert')
   assert.equal(await pagina.getByText('Informe o nome.').getAttribute('role'), 'alert', 'erro de validação continua alert')
   assert.equal(await pagina.getByRole('textbox', { name: 'Apelido' }).getAttribute('aria-invalid'), null, 'aviso não marca o campo como inválido')
+  // #2792 (revisão): a contagem muda a cada tecla, então a frase visível não é região viva; o anúncio estável
+  // "Passou do limite" fica numa região própria e só muda ao cruzar o limite.
+  const sigla = pagina.getByRole('textbox', { name: 'Sigla' })
+  const contagem = pagina.getByText('Use até 3 caracteres. Agora tem 4.', { exact: true })
+  assert.equal(await contagem.getAttribute('role'), null, 'a contagem visível não reanuncia a cada tecla')
+  assert.equal(await sigla.getAttribute('aria-invalid'), 'true')
+  assert.equal(await sigla.getAttribute('aria-describedby'), await contagem.getAttribute('id'))
+  const anuncio = pagina.getByRole('status').filter({ hasText: 'Passou do limite de 3 caracteres.' })
+  assert.equal(await anuncio.count(), 1, 'um anúncio estável ao passar do limite')
+  await anuncio.evaluate(e => { e.dataset.prova = 'anuncio-sigla' })
+  await sigla.press('End'); await sigla.press('e')
+  await pagina.getByText('Use até 3 caracteres. Agora tem 5.', { exact: true }).waitFor()
+  assert.equal(await anuncio.count(), 1, 'o anúncio não muda com a contagem')
+  await sigla.fill('abc')
+  assert.equal(await pagina.getByText(/Use até 3 caracteres/).count(), 0)
+  assert.equal(await anuncio.count(), 0, 'dentro do limite, nada a anunciar')
+  // A região viva continua no DOM, vazia: só assim o próximo estouro é anunciado.
+  const regiao = pagina.locator('[data-prova="anuncio-sigla"]')
+  assert.deepEqual(await regiao.evaluate(e => [e.getAttribute('role'), e.textContent]), ['status', ''], 'a mesma região fica vazia dentro do limite')
+  await sigla.fill('abcd')
+  assert.equal(await regiao.textContent(), 'Passou do limite de 3 caracteres.', 'o mesmo nó anuncia de novo')
 
   // Formas de pagamento: vazio e concordância.
   metodos = []

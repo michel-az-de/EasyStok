@@ -27,6 +27,14 @@ const TEXTO_MAXIMO = 4096
 
 const VARIAVEIS_TEXTO = VARIAVEIS_DA_API.map((v) => `{${v.chave}} ${v.descricao}`).join(' · ')
 
+// #2792: o motivo do Salvar pede só o que falta.
+function faltando(titulo, texto) {
+  const semTitulo = !titulo.trim()
+  const semTexto = !texto.trim()
+  if (semTitulo && semTexto) return 'Preencha o título e o texto.'
+  return semTitulo ? 'Preencha o título.' : semTexto ? 'Preencha o texto.' : undefined
+}
+
 function FormResposta({ inicial, aoSalvar, aoCancelar }) {
   const [titulo, setTitulo] = useState(inicial?.titulo ?? '')
   const [atalho, setAtalho] = useState(inicial?.atalho ?? '')
@@ -79,7 +87,7 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
       )}
       <div className={css.acoes}>
         <Botao variante="primario" tipo="submit" icone="check" disabled={!pronto || salvando}
-          motivo={passaDoLimite ? 'Algum campo passa do limite de caracteres.' : 'Preencha o título e o texto.'}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+          motivo={passaDoLimite ? 'Algum campo passa do limite de caracteres.' : faltando(titulo, texto)}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
         <Botao variante="texto" disabled={salvando || descartando} onClick={() => (alterado ? setDescartando(true) : aoCancelar())}>Cancelar</Botao>
       </div>
     </form>

@@ -262,6 +262,11 @@ try {
   await ampliado.page.locator('[data-indicador="financeiro"]').scrollIntoViewIfNeeded()
   await foto(ampliado.page, 'hub-financeiro-texto-200')
   await ampliado.context.close()
+  // #2792 (revisão): caixa sem saldo esperado não fica "Carregando…": a leitura vira erro e diz "Sem leitura".
+  const semSaldo = await preparar({ permitidos: ['financeiro'], saldoEsperado: NaN })
+  await semSaldo.page.locator('[data-indicador="financeiro"]').locator('xpath=self::*[@data-estado="erro"]').waitFor()
+  assert.equal(await semSaldo.page.locator('[data-indicador="financeiro"] strong').innerText(), 'Sem leitura')
+  await semSaldo.context.close()
   console.log('Hub UI: números, erro/zero/parcial, modelos, persistência por pessoa/empresa, drag com mouse/toque, teclado/Esc, polling visível, celular/escuro, modal/foco e permissões aprovados. Nenhuma escrita operacional.')
 } catch (erro) {
   if (ultimaPagina && !ultimaPagina.isClosed()) console.error('Diagnóstico:', await ultimaPagina.evaluate(() => ({ foco: document.activeElement?.outerHTML.slice(0, 350), anuncios: [...document.querySelectorAll('[aria-live], [role="status"]')].map((el) => el.textContent.slice(0, 180)), ordem: [...document.querySelectorAll('[data-modulo]')].map((el) => el.dataset.modulo) })))

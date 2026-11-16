@@ -61,7 +61,13 @@ try {
   await pagina.getByRole('button', { name: 'Nova resposta', exact: true }).click()
   const titulo = pagina.getByRole('textbox', { name: /^Título/ })
   assert.equal(await titulo.getAttribute('maxlength'), null, 'Sem maxLength no campo')
+  // #2792: o motivo do Salvar diz só o que falta, não pede o que já está preenchido.
+  await pagina.getByText('Preencha o título e o texto.', { exact: true }).waitFor()
+  await titulo.fill('Horário')
+  await pagina.getByText('Preencha o texto.', { exact: true }).waitFor()
+  await titulo.fill('')
   await pagina.getByRole('textbox', { name: /^Texto/ }).fill('Corpo')
+  await pagina.getByText('Preencha o título.', { exact: true }).waitFor()
   await titulo.fill('a'.repeat(121))
   await pagina.getByText('Use até 120 caracteres. Agora tem 121.', { exact: true }).waitFor()
   assert.equal(await pagina.getByRole('button', { name: 'Salvar', exact: true }).isDisabled(), true)
