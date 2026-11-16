@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.Services;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Sales;
@@ -18,7 +19,8 @@ public class RemoverItemPedidoUseCase(
     IPedidoRepository repo,
     PedidoEstoqueIntegrationService estoqueIntegration,
     IUnitOfWork uow,
-    ILogger<RemoverItemPedidoUseCase> logger)
+    ILogger<RemoverItemPedidoUseCase> logger,
+    SaldoFinanceiroPedido? saldos = null)
 {
     public async Task<PedidoResult?> ExecuteAsync(RemoverItemPedidoCommand cmd)
     {
