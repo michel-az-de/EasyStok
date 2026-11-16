@@ -3,7 +3,7 @@ namespace EasyStock.Application.UseCases.Analytics.VendasPorCanal;
 public sealed record ObterVendasPorCanalResult(
     CanalVenda Canal,
     int TotalVendas,
-    int TotalItensVendidos,
+    decimal TotalItensVendidos,
     decimal ReceitaTotal,
     decimal TicketMedio,
     decimal PercentualReceita)

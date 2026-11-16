@@ -55,4 +55,35 @@ public class MovimentacaoControllerTests
             new DateTime(2026, 11, 14, 3, 0, 0, DateTimeKind.Utc).AddTicks(-10),
             null, null, 1, 20);
     }
+
+    // #2738: os cards de KPI usam o mesmo periodo da lista (dia civil de Brasilia, ultimo dia inclusivo).
+    [Fact]
+    public async Task GetKpis_data_pura_usa_o_mesmo_periodo_da_lista()
+    {
+        var empresaId = Guid.NewGuid();
+        _currentUser.EmpresaId.Returns(empresaId);
+        _movRepo.GetKpisAsync(default, default, default, default, default)
+            .ReturnsForAnyArgs(new KpisMovimentacao(0m, 0m, 0, 0));
+
+        await _controller.GetKpis(empresaId, de: new DateTime(2026, 11, 1), ate: new DateTime(2026, 11, 15),
+            tipo: null, natureza: null);
+
+        await _movRepo.Received(1).GetKpisAsync(empresaId,
+            new DateTime(2026, 11, 1, 3, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 16, 3, 0, 0, DateTimeKind.Utc).AddTicks(-10),
+            null, null);
+    }
+
+    [Fact]
+    public async Task GetKpis_intervalo_invertido_retorna_BadRequest_sem_consultar_repo()
+    {
+        var empresaId = Guid.NewGuid();
+        _currentUser.EmpresaId.Returns(empresaId);
+
+        var result = await _controller.GetKpis(empresaId, de: new DateTime(2026, 12, 31),
+            ate: new DateTime(2026, 1, 1), tipo: null, natureza: null);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await _movRepo.DidNotReceiveWithAnyArgs().GetKpisAsync(Guid.Empty);
+    }
 }

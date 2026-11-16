@@ -26,7 +26,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         int Mes,
         decimal ReceitaBruta,
         int TotalVendas,
-        int TotalItensVendidos,
+        decimal TotalItensVendidos,
         decimal TicketMedio);
 
     public sealed record MargemPorProduto(
@@ -36,7 +36,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         decimal PrecoMedioVenda,
         decimal MargemAbsoluta,
         decimal MargemPercentual,
-        int QuantidadeVendida);
+        decimal QuantidadeVendida);
 
     public sealed record MovimentacaoResumo(
         int Ano,
@@ -99,7 +99,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public sealed record VendaPorCanal(
         CanalVenda Canal,
         int TotalVendas,
-        int TotalItensVendidos,
+        decimal TotalItensVendidos,
         decimal ReceitaTotal,
         decimal TicketMedio,
         decimal PercentualReceita);

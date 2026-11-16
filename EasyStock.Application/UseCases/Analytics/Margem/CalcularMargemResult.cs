@@ -7,7 +7,7 @@ public sealed record CalcularMargemResult(
     decimal PrecoMedioVenda,
     decimal MargemAbsoluta,
     decimal MargemPercentual,
-    int QuantidadeVendida)
+    decimal QuantidadeVendida)
 {
     public static CalcularMargemResult FromDto(MargemPorProduto dto) =>
         new(

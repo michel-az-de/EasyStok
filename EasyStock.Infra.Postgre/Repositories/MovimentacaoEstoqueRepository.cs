@@ -78,7 +78,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var aggregated = await query
                 .Select(m => new
                 {
-                    Quantidade = (int)m.Quantidade,
+                    Quantidade = (decimal)m.Quantidade,
                     ValorTotal = (decimal?)m.ValorTotal,
                     m.Natureza
                 })

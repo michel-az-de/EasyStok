@@ -6,6 +6,6 @@ public record ReceitaPorPeriodoApi
     public int Mes { get; init; }
     public decimal ReceitaBruta { get; init; }
     public int TotalVendas { get; init; }
-    public int TotalItensVendidos { get; init; }
+    public decimal TotalItensVendidos { get; init; }
     public decimal TicketMedio { get; init; }
 }
