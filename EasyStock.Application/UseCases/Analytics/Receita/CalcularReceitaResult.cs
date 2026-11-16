@@ -5,7 +5,7 @@ public sealed record CalcularReceitaResult(
     int Mes,
     decimal ReceitaBruta,
     int TotalVendas,
-    int TotalItensVendidos,
+    decimal TotalItensVendidos,
     decimal TicketMedio)
 {
     public static CalcularReceitaResult FromDto(ReceitaPorPeriodo dto) =>
