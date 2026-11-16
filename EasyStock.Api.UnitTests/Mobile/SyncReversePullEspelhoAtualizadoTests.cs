@@ -220,12 +220,13 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
         await _servico.AppendAsync(primeiroPull, criadoEm.AddSeconds(-1), _empresaId, loja);
         primeiroPull.Should().ContainSingle().Which.Payload.GetProperty("stock").GetInt32().Should().Be(7);
 
-        // Depois do cursor, o cadastro ERP mudou e ha saldo real da loja e global.
+        // Depois do cursor, o cadastro ERP mudou e ha saldo real da loja e global, movido no mesmo
+        // instante (#2721: movimento posterior ao cursorFinal reenviaria o produto, com razao).
         produto.Nome = "Produto atualizado no ERP";
         produto.AlteradoEm = alteradoEm;
-        ItemEstoqueDoErp(produto.Id, loja, 4m);
-        ItemEstoqueDoErp(produto.Id, null, 2m);
-        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m);
+        ItemEstoqueDoErp(produto.Id, loja, 4m, alteradoEm);
+        ItemEstoqueDoErp(produto.Id, null, 2m, alteradoEm);
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m, alteradoEm);
         await _db.SaveChangesAsync();
         var incremental = new List<MutationDto>();
         await _servico.AppendAsync(incremental, cursorInicial, _empresaId, loja);
@@ -344,6 +345,71 @@ public sealed class SyncReversePullEspelhoAtualizadoTests : IDisposable
 
         mutations.Single(m => m.Type == "product.upsert").Payload.GetProperty("stock").GetDecimal()
             .Should().Be(1.5m, "o estoque do ERP mudou depois do cursor e vale como está");
+    }
+
+    // #2721: entrada ou venda no console muda so o ItemEstoque. O cadastro ficou antes do cursor
+    // e o saldo novo nao descia ao aparelho.
+    [Fact]
+    public async Task SoOEstoqueDoErpMudouDepoisDoCursor_DesceOSaldoNovoAoAparelho()
+    {
+        var cursor = DateTime.UtcNow.AddMinutes(-5);
+        var loja = Guid.NewGuid();
+        var produto = ProdutoErpComEspelho("Lasanha", cursor.AddDays(-1));
+        ItemEstoqueDoErp(produto.Id, loja, 4m, cursor.AddDays(-1));
+        var movidoEm = cursor.AddMinutes(2);
+        ItemEstoqueDoErp(produto.Id, loja, 6m, movidoEm);
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, cursor, _empresaId, loja);
+
+        var upsert = mutations.Should().ContainSingle(m => m.Type == "product.upsert").Subject;
+        upsert.Payload.GetProperty("id").GetString().Should().Be("mob-" + produto.Id);
+        upsert.Payload.GetProperty("stock").GetDecimal().Should().Be(10m, "4 de antes + 6 da entrada no console");
+        upsert.Ts.Should().Be(new DateTimeOffset(movidoEm).ToUnixTimeMilliseconds(), "o instante e o do movimento, nao o do cadastro");
+
+        var depois = new List<MutationDto>();
+        await _servico.AppendAsync(depois, movidoEm.AddSeconds(1), _empresaId, loja);
+        depois.Should().BeEmpty("o mesmo saldo nao desce de novo");
+    }
+
+    [Fact]
+    public async Task SoOEstoqueDeOutraLojaMudou_NaoReenviaOProduto()
+    {
+        var cursor = DateTime.UtcNow.AddMinutes(-5);
+        var loja = Guid.NewGuid();
+        var produto = ProdutoErpComEspelho("Lasanha", cursor.AddDays(-1));
+        ItemEstoqueDoErp(produto.Id, loja, 4m, cursor.AddDays(-1));
+        ItemEstoqueDoErp(produto.Id, Guid.NewGuid(), 9m, cursor.AddMinutes(2));
+        await _db.SaveChangesAsync();
+
+        var mutations = new List<MutationDto>();
+        await _servico.AppendAsync(mutations, cursor, _empresaId, loja);
+
+        mutations.Should().BeEmpty();
+    }
+
+    // ADR-0060: a mutacao do aparelho que ja veio no pull de mobile_products continua vencendo.
+    [Fact]
+    public async Task SoOEstoqueDoErpMudou_ComMutacaoDoAparelhoNoPull_EstoqueDoAppVence()
+    {
+        var cursor = DateTime.UtcNow.AddMinutes(-5);
+        var produto = ProdutoErpComEspelho("Lasanha", cursor.AddDays(-1));
+        ItemEstoqueDoErp(produto.Id, null, 10m, cursor.AddMinutes(2));
+        await _db.SaveChangesAsync();
+
+        var idEspelho = "mob-" + produto.Id;
+        var doApp = new ProductDto(idEspelho, "Lasanha", null, "extra", null, 30m, 3, false);
+        var mutations = new List<MutationDto>
+        {
+            new("m1", "aparelho-a", "product.upsert", System.Text.Json.JsonSerializer.SerializeToElement(doApp, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)), 123),
+        };
+
+        await _servico.AppendAsync(mutations, cursor, _empresaId, null);
+
+        var upsert = mutations.Should().ContainSingle(m => m.Type == "product.upsert").Subject;
+        upsert.Id.Should().Be("m1");
+        upsert.Payload.GetProperty("stock").GetDecimal().Should().Be(3m);
     }
 
     public void Dispose() => _db.Dispose();
