@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { executarRemoto, ALVO } from '../lib/ssh.mjs';
-import { validarSql, comLimite } from '../lib/sql.mjs';
+import { validarSql, comLimite, sqlTabelas } from '../lib/sql.mjs';
 import { redigir } from '../lib/redacao.mjs';
 import { limitar } from '../lib/limites.mjs';
 
@@ -29,11 +29,7 @@ server.registerTool('tabelas', {
   inputSchema: { filtro: z.string().regex(/^[a-z_0-9]{1,40}$/).optional().describe('trecho do nome da tabela') },
 }, async ({ filtro }) => {
   try {
-    const f = filtro ? `AND c.table_name LIKE '%${filtro}%'` : '';
-    return texto(await rodar(`SELECT c.table_name, string_agg(c.column_name || ' ' || c.data_type, ', ' ORDER BY c.ordinal_position) AS colunas
-FROM information_schema.columns c
-WHERE c.table_schema = 'public' AND has_table_privilege('baba_ro', format('public.%I', c.table_name), 'SELECT') ${f}
-GROUP BY c.table_name ORDER BY c.table_name`, 500));
+    return texto(await rodar(sqlTabelas(filtro), 500));
   } catch (e) { return falha(e); }
 });
 
