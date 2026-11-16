@@ -286,4 +286,54 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         return storageKeys;
     }
 
+    // ── Worker: fechamento atômico (#2764) ───────────────────────────────────
+
+    public async Task<ReportRunDesfecho> FecharAsync(
+        ReportRun run, Action<ReportRun> desfechoNormal, CancellationToken ct)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        // Trava a linha desta tentativa. SqlQueryRaw não compõe com FOR UPDATE: lista e pega o primeiro em memória.
+        var status = await db.Database
+            .SqlQueryRaw<int>(
+                """
+                SELECT status AS "Value"
+                  FROM public.report_runs
+                 WHERE id         = {0}
+                   AND tentativas = {1}
+                   FOR UPDATE
+                """,
+                run.Id, run.Tentativas)
+            .ToListAsync(ct);
+
+        if (status.Count == 0 || (status[0] != 1 && status[0] != 5))
+            return ReportRunDesfecho.TentativaPerdida;
+
+        // Cancelamento pedido durante a geração: vence qualquer desfecho normal (sucesso, retry ou falha).
+        var desfecho = status[0] == 5 ? ReportRunDesfecho.CanceladoPeloUsuario : ReportRunDesfecho.Gravado;
+        if (desfecho == ReportRunDesfecho.CanceladoPeloUsuario)
+            run.MarkCanceled();
+        else
+            desfechoNormal(run);
+
+        // Alinha o xmin DEPOIS da trava: o heartbeat avança o xmin com UPDATE direto.
+        var versoes = await db.Database
+            .SqlQueryRaw<long>(
+                """
+                SELECT xmin::text::bigint AS "Value"
+                  FROM public.report_runs
+                 WHERE id = {0}
+                """,
+                run.Id)
+            .ToListAsync(ct);
+
+        var entry = db.Entry(run);
+        entry.State = EntityState.Modified;
+        if (versoes.Count == 1)
+            entry.Property(r => r.Xmin).OriginalValue = (uint)versoes[0];
+
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return desfecho;
+    }
 }

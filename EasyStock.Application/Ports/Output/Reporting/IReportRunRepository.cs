@@ -72,4 +72,25 @@ public interface IReportRunRepository
     /// deletar exatamente esses arquivos do storage (#929 — evita divergência DB vs storage).
     /// </summary>
     Task<IReadOnlyList<string>> PurgeExpiredArtifactsAsync(int batchSize, CancellationToken ct);
+
+    /// <summary>
+    /// Fecha a execução do Worker de forma atômica (#2764): trava a linha, lê o status gravado e decide o desfecho.
+    /// Se a pessoa pediu o cancelamento durante a geração (Canceling), grava Canceled e ignora o desfecho normal
+    /// (sucesso ou falha), para o relatório cancelado nunca ser entregue nem reenfileirado. Se a tentativa foi
+    /// perdida (a linha não está mais Running/Canceling com o mesmo número de tentativas), não grava nada.
+    /// </summary>
+    Task<ReportRunDesfecho> FecharAsync(ReportRun run, Action<ReportRun> desfechoNormal, CancellationToken ct);
+}
+
+/// <summary>Resultado de <see cref="IReportRunRepository.FecharAsync"/>.</summary>
+public enum ReportRunDesfecho
+{
+    /// <summary>O desfecho normal (sucesso ou falha) foi gravado.</summary>
+    Gravado,
+
+    /// <summary>A pessoa cancelou durante a geração: a run foi gravada como Canceled.</summary>
+    CanceladoPeloUsuario,
+
+    /// <summary>A linha não pertence mais a esta tentativa: nada foi gravado.</summary>
+    TentativaPerdida,
 }
