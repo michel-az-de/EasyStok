@@ -28,7 +28,8 @@ public class MobileCashController(
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
 
-        var q = db.Set<CashEntry>().AsNoTracking().Where(c => c.EmpresaId == emp);
+        // #2730: excluído no PWA não entra na revisão; o tombstone do sync sai pelo SyncController.
+        var q = db.Set<CashEntry>().AsNoTracking().Where(c => c.EmpresaId == emp && c.DeletedAt == null);
         if (pendingOnly == true) q = q.Where(c => c.ErpMovimentoCaixaId == null);
 
         var items = await q.OrderByDescending(c => c.CreatedAt).Take(500).ToListAsync(ct);
