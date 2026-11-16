@@ -8,6 +8,7 @@ using EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal;
 using EasyStock.Application.Reporting.Definitions.Fiscal.TotalizadoresFiscais;
 using EasyStock.Application.Reporting.Definitions.Fiscal.XmlBulkDownload;
 using EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
+using EasyStock.Application.UseCases.Reports;
 using EasyStock.Infra.Async.Reporting;
 using EasyStock.Infra.Async.Reporting.Exporters;
 using EasyStock.Infra.Async.Reporting.Handlers;
@@ -42,6 +43,9 @@ public static class ReportingWorkerExtensions
 
         // ── Repositório ──────────────────────────────────────────────────────────
         services.AddScoped<IReportRunRepository, ReportRunRepository>();
+
+        // ── Watchdog: recicla runs vencidas e apaga o envio das que fecham sem sucesso (#2788) ──
+        services.AddScoped<ReciclarExecucoesVencidasUseCase>();
 
         // ── Catálogo de definições (singleton — imutável em runtime) ─────────────
         services.AddSingleton<ReportRegistry>();

@@ -63,9 +63,9 @@ public interface IReportRunRepository
     /// <summary>
     /// Watchdog: move runs com lease expirado de volta para Pending (ou Failed se tentativas esgotadas).
     /// Run em Canceling com lease vencido (worker morto) é fechada como Canceled (#2773).
-    /// Retorna IDs das runs afetadas.
+    /// Devolve o total reciclado e as runs que esta chamada fechou sem sucesso (#2788).
     /// </summary>
-    Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct);
+    Task<ReportRunReciclagem> ReclaimExpiredLeasesAsync(CancellationToken ct);
 
     /// <summary>
     /// GC de artefatos: remove artifact_storage_key de runs expiradas (uma única seleção,
@@ -82,6 +82,13 @@ public interface IReportRunRepository
     /// </summary>
     Task<ReportRunDesfecho> FecharAsync(ReportRun run, Action<ReportRun> desfechoNormal, CancellationToken ct);
 }
+
+/// <summary>Resultado de <see cref="IReportRunRepository.ReclaimExpiredLeasesAsync"/>.</summary>
+/// <param name="Total">Runs recicladas: devolvidas à fila, falhadas por tentativas esgotadas ou canceladas.</param>
+/// <param name="FechadasSemSucesso">
+/// Runs que esta chamada fechou como Failed ou Canceled. Nenhuma tentativa vai concluir o envio delas (#2788).
+/// </param>
+public sealed record ReportRunReciclagem(int Total, IReadOnlyList<ReportRun> FechadasSemSucesso);
 
 /// <summary>Resultado de <see cref="IReportRunRepository.FecharAsync"/>.</summary>
 public enum ReportRunDesfecho

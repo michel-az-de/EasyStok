@@ -211,9 +211,10 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
     /// <summary>
     /// Recicla runs com lease expirado. Incrementa tentativas; se esgotadas → Failed terminal.
     /// Run em Canceling com lease vencido (worker morto) é fechada como Canceled (#2773).
+    /// Devolve as runs fechadas sem sucesso, para o watchdog apagar o envio interrompido delas (#2788).
     /// Executa dentro de advisory lock global para watchdog (G-15).
     /// </summary>
-    public async Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct)
+    public async Task<ReportRunReciclagem> ReclaimExpiredLeasesAsync(CancellationToken ct)
     {
         // G-15: apenas 1 worker executa o watchdog por vez.
         var gotLock = await db.Database
@@ -221,7 +222,7 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
                 "SELECT pg_try_advisory_xact_lock(hashtextextended('reporting:watchdog', 0)) AS \"Value\"")
             .FirstOrDefaultAsync(ct);
 
-        if (!gotLock) return 0;
+        if (!gotLock) return new ReportRunReciclagem(0, []);
 
         // Runs que podem ser recicladas (tentativas < max)
         var pendingReclaim = await db.Database.ExecuteSqlRawAsync(
@@ -239,8 +240,9 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             """,
             ct);
 
-        // Runs terminais (tentativas >= max)
-        var terminalReclaim = await db.Database.ExecuteSqlRawAsync(
+        // Runs terminais (tentativas >= max). RETURNING (#2788): quem fechou sai da mesma instrução que fechou.
+        // SqlQueryRaw não compõe UPDATE ... RETURNING (embrulharia em subselect): lista sem compor.
+        var terminalReclaim = await db.Database.SqlQueryRaw<Guid>(
             """
             UPDATE public.report_runs
                SET status          = 4,
@@ -252,13 +254,14 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
              WHERE status           = 1
                AND lease_expires_at < now()
                AND tentativas       >= max_tentativas
-            """,
-            ct);
+            RETURNING id AS "Value"
+            """)
+            .ToListAsync(ct);
 
         // #2773: Canceling com lease vencido = worker morreu antes de fechar o cancelamento.
         // Espelha ReportRun.MarkCanceled (Canceled, finished_at, lease nulo). Worker vivo fecha
         // sozinho dentro do prazo; o lease não é renovado em Canceling (heartbeat só em Running).
-        var canceledReclaim = await db.Database.ExecuteSqlRawAsync(
+        var canceledReclaim = await db.Database.SqlQueryRaw<Guid>(
             """
             UPDATE public.report_runs
                SET status          = 3,
@@ -267,10 +270,16 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
                    alterado_em      = now()
              WHERE status           = 5
                AND lease_expires_at < now()
-            """,
-            ct);
+            RETURNING id AS "Value"
+            """)
+            .ToListAsync(ct);
 
-        return pendingReclaim + terminalReclaim + canceledReclaim;
+        List<Guid> fechadas = [.. terminalReclaim, .. canceledReclaim];
+        IReadOnlyList<ReportRun> semSucesso = fechadas.Count == 0
+            ? []
+            : await db.ReportRuns.AsNoTracking().Where(r => fechadas.Contains(r.Id)).ToListAsync(ct);
+
+        return new ReportRunReciclagem(pendingReclaim + fechadas.Count, semSucesso);
     }
 
     // ── GC de artefatos ───────────────────────────────────────────────────────

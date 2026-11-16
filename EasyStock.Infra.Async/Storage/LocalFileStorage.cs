@@ -45,6 +45,12 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         if (File.Exists(filePath))
             File.Delete(filePath);
 
+        // #2788: o envio que o processo não chegou a fechar fica com o nome do envio, nunca com o da chave.
+        // Apagar a chave leva junto o que sobrou dele.
+        var envio = CaminhoDoEnvio(filePath);
+        if (File.Exists(envio))
+            File.Delete(envio);
+
         return Task.CompletedTask;
     }
 
@@ -96,7 +102,7 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
         // Escreve em arquivo .tmp; renomeia atomicamente ao fechar (LocalReportUploadStream).
-        var tmpPath = filePath + ".tmp";
+        var tmpPath = CaminhoDoEnvio(filePath);
         Stream stream = new LocalReportUploadStream(tmpPath, filePath);
         return Task.FromResult(stream);
     }
@@ -154,6 +160,9 @@ public sealed class LocalFileStorage(IOptions<FileStorageOptions> options, IHost
         return caminho.Equals(raiz, StringComparison.OrdinalIgnoreCase)
             || caminho.StartsWith(prefixo, StringComparison.OrdinalIgnoreCase);
     }
+
+    // Onde o stream de upload escreve até fechar: o upload e a exclusão leem daqui (#2788).
+    private static string CaminhoDoEnvio(string filePath) => filePath + ".tmp";
 
     public string GetRootPath()
     {
