@@ -38,6 +38,14 @@ public class HostDeCaixaEmailTests
     [InlineData("2002:a00:1::1")]
     [InlineData("2002:7f00:1::")]
     [InlineData("2002:c0a8:101::1")]
+    [InlineData("::10.0.0.1")]
+    [InlineData("::7f00:1")]
+    [InlineData("::a9fe:a9fe")]
+    [InlineData("::c0a8:101")]
+    [InlineData("::ffff:0:a00:1")]
+    [InlineData("::ffff:0:7f00:1")]
+    [InlineData("2001:0:a00:1::f7f7:f7f7")]
+    [InlineData("2001:0:808:808::f5ff:fffe")]
     public void IpInterno_FaixaReservada_Recusa(string endereco) =>
         HostDeCaixaEmail.IpInterno(IPAddress.Parse(endereco)).Should().BeTrue();
 
@@ -51,6 +59,9 @@ public class HostDeCaixaEmailTests
     [InlineData("::ffff:8.8.8.8")]
     [InlineData("64:ff9b::808:808")]
     [InlineData("2002:808:808::1")]
+    [InlineData("::808:808")]
+    [InlineData("2001:0:808:808::f7f7:f7f7")]
+    [InlineData("::ffff:0:808:808")]
     public void IpInterno_Publico_Aceita(string endereco) =>
         HostDeCaixaEmail.IpInterno(IPAddress.Parse(endereco)).Should().BeFalse();
 }
