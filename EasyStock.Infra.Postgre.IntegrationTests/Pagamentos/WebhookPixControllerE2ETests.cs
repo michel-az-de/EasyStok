@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
+using EasyStock.Infra.Postgre.Security;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -197,7 +198,8 @@ public class WebhookPixControllerE2ETests(PostgreSqlDatabaseFixture fixture)
             config,
             reconciliarPixUc,
             NullLogger<WebhookPixController>.Instance,
-            env);
+            env,
+            new RowLevelSecurityBypass(ctx));
     }
 
     private static void ConfigurarRequest(WebhookPixController controller, string body, string timestamp, string signature)

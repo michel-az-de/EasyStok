@@ -4,7 +4,7 @@
 // resgate, aplicar cupom) mora na ficha/Cobrança, não aqui — ver
 // `features/ficha-cliente/BlocoCliente.jsx`, `BlocoCobranca.jsx` e
 // `ModalFidelidade.jsx`.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
@@ -14,6 +14,13 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contex
 import { TIPOS_RECOMPENSA } from '../../../dominio/fidelidade'
 import { moeda } from '../../../dominio/formato'
 import css from './AbaFidelidade.module.css'
+
+// #2762 (F12): o formulário que abre no lugar do botão leva o foco ao primeiro campo.
+function useFocoNoPrimeiroCampo() {
+  const ref = useRef(null)
+  useEffect(() => { ref.current?.querySelector('input, select')?.focus() }, [])
+  return ref
+}
 
 function Secao({ titulo, descricao, children, acao }) {
   return (
@@ -39,11 +46,12 @@ const CUPOM_VAZIO = {
 }
 
 function FormCupom({ aoSalvar, aoCancelar }) {
+  const formRef = useFocoNoPrimeiroCampo()
   const [form, setForm] = useState(CUPOM_VAZIO)
   const valido = form.codigo.trim().length >= 3 && Number(form.valor) > 0
 
   return (
-    <form className={css.formLinha} noValidate onSubmit={(e) => {
+    <form className={css.formLinha} ref={formRef} noValidate onSubmit={(e) => {
       e.preventDefault()
       if (valido) aoSalvar({ ...form, validade: form.validade || null, limiteUsos: form.limiteUsos === '' ? null : form.limiteUsos })
     }}>
@@ -69,6 +77,7 @@ function FormCupom({ aoSalvar, aoCancelar }) {
           variante="primario"
           tipo="submit"
           disabled={!valido}
+          motivo={!valido ? 'Informe o código (3+ letras) e o desconto.' : undefined}
         >
           Salvar cupom
         </Botao>
@@ -106,10 +115,15 @@ function ListaCupons({ cupons, aoAlternarAtivo }) {
 
 function RegraFidelidade({ config, aoSalvar }) {
   const [rascunho, setRascunho] = useState(config)
-  const mudou = JSON.stringify(rascunho) !== JSON.stringify(config)
+  // #2762 (F11): o campo guarda o texto digitado (apagar deixa vazio, sem virar "0" nem "05"); o número sai ao comparar e ao salvar.
+  const numerico = (r) => ({
+    ...r,
+    ...Object.fromEntries(['valorPorPonto', 'pontosPorFaixa', 'pedidosPorPonto', 'pontosPorPedidos'].map((c) => [c, Number(r[c]) || 0])),
+  })
+  const mudou = JSON.stringify(numerico(rascunho)) !== JSON.stringify(config)
 
   return (
-    <form className={css.formLinha} noValidate onSubmit={(e) => { e.preventDefault(); if (mudou) aoSalvar(rascunho) }}>
+    <form className={css.formLinha} noValidate onSubmit={(e) => { e.preventDefault(); if (mudou) aoSalvar(numerico(rascunho)) }}>
       <CampoSelecao
         rotulo="Como pontua"
         opcoes={[
@@ -121,17 +135,17 @@ function RegraFidelidade({ config, aoSalvar }) {
       />
       {rascunho.tipo === 'valor' ? (
         <>
-          <CampoTexto rotulo="A cada R$" tipo="number" value={rascunho.valorPorPonto}
-            onChange={(e) => setRascunho((r) => ({ ...r, valorPorPonto: Number(e.target.value) || 0 }))} />
-          <CampoTexto rotulo="Ganha (pontos)" tipo="number" value={rascunho.pontosPorFaixa}
-            onChange={(e) => setRascunho((r) => ({ ...r, pontosPorFaixa: Number(e.target.value) || 0 }))} />
+          <CampoTexto rotulo="A cada R$" tipo="number" value={rascunho.valorPorPonto ?? ''}
+            onChange={(e) => setRascunho((r) => ({ ...r, valorPorPonto: e.target.value }))} />
+          <CampoTexto rotulo="Ganha (pontos)" tipo="number" value={rascunho.pontosPorFaixa ?? ''}
+            onChange={(e) => setRascunho((r) => ({ ...r, pontosPorFaixa: e.target.value }))} />
         </>
       ) : (
         <>
-          <CampoTexto rotulo="A cada X pedidos" tipo="number" value={rascunho.pedidosPorPonto}
-            onChange={(e) => setRascunho((r) => ({ ...r, pedidosPorPonto: Number(e.target.value) || 0 }))} />
-          <CampoTexto rotulo="Ganha (pontos)" tipo="number" value={rascunho.pontosPorPedidos}
-            onChange={(e) => setRascunho((r) => ({ ...r, pontosPorPedidos: Number(e.target.value) || 0 }))} />
+          <CampoTexto rotulo="A cada X pedidos" tipo="number" value={rascunho.pedidosPorPonto ?? ''}
+            onChange={(e) => setRascunho((r) => ({ ...r, pedidosPorPonto: e.target.value }))} />
+          <CampoTexto rotulo="Ganha (pontos)" tipo="number" value={rascunho.pontosPorPedidos ?? ''}
+            onChange={(e) => setRascunho((r) => ({ ...r, pontosPorPedidos: e.target.value }))} />
         </>
       )}
       <div className={css.acoesForm}>
@@ -152,13 +166,14 @@ function RegraFidelidade({ config, aoSalvar }) {
 const RECOMPENSA_VAZIA = { tipo: 'produto', rotulo: '', custoPontos: '', skuProduto: '', sorteioId: '' }
 
 function FormRecompensa({ cardapio, sorteios, aoSalvar, aoCancelar }) {
+  const formRef = useFocoNoPrimeiroCampo()
   const [form, setForm] = useState(RECOMPENSA_VAZIA)
   const precisaSorteio = form.tipo === 'sorteio'
   const valido = form.rotulo.trim() && Number(form.custoPontos) > 0
     && (!precisaSorteio || form.sorteioId)
 
   return (
-    <form className={css.formLinha} noValidate onSubmit={(e) => { e.preventDefault(); if (valido) aoSalvar(form) }}>
+    <form className={css.formLinha} ref={formRef} noValidate onSubmit={(e) => { e.preventDefault(); if (valido) aoSalvar(form) }}>
       <CampoSelecao rotulo="Tipo" opcoes={TIPOS_RECOMPENSA.map((t) => ({ valor: t.valor, rotulo: t.rotulo }))}
         value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))} />
       <CampoTexto rotulo="Nome da recompensa" value={form.rotulo}
@@ -183,7 +198,7 @@ function FormRecompensa({ cardapio, sorteios, aoSalvar, aoCancelar }) {
       )}
       <div className={css.acoesForm}>
         <Botao onClick={aoCancelar}>Cancelar</Botao>
-        <Botao variante="primario" tipo="submit" disabled={!valido}>Salvar recompensa</Botao>
+        <Botao variante="primario" tipo="submit" disabled={!valido} motivo={!valido ? (precisaSorteio ? 'Informe o nome, o custo em pontos e o sorteio.' : 'Informe o nome e o custo em pontos.') : undefined}>Salvar recompensa</Botao>
       </div>
     </form>
   )
@@ -214,9 +229,10 @@ function ListaRecompensas({ recompensas, aoAlternarAtivo }) {
 // ---------------------------------------------------------------------------
 
 function FormSorteio({ aoSalvar, aoCancelar }) {
+  const formRef = useFocoNoPrimeiroCampo()
   const [form, setForm] = useState({ nome: '', dataSorteio: '' })
   return (
-    <form className={css.formLinha} noValidate onSubmit={(e) => {
+    <form className={css.formLinha} ref={formRef} noValidate onSubmit={(e) => {
       e.preventDefault()
       if (form.nome.trim()) aoSalvar({ ...form, dataSorteio: form.dataSorteio || null })
     }}>
@@ -226,7 +242,7 @@ function FormSorteio({ aoSalvar, aoCancelar }) {
         onChange={(e) => setForm((f) => ({ ...f, dataSorteio: e.target.value }))} />
       <div className={css.acoesForm}>
         <Botao onClick={aoCancelar}>Cancelar</Botao>
-        <Botao variante="primario" tipo="submit" disabled={!form.nome.trim()}>
+        <Botao variante="primario" tipo="submit" disabled={!form.nome.trim()} motivo={!form.nome.trim() ? 'Informe o nome do sorteio.' : undefined}>
           Salvar sorteio
         </Botao>
       </div>
@@ -284,8 +300,8 @@ export function AbaFidelidade() {
       <Secao
         titulo="Cupons"
         descricao="Código, percentual ou valor, validade, limite de usos e pedido mínimo."
-        acao={formAberto !== 'cupom' && (
-          <Botao icone="plus" onClick={() => setFormAberto('cupom')}>Novo cupom</Botao>
+        acao={(
+          <Botao icone="plus" disabled={formAberto === 'cupom'} onClick={() => setFormAberto('cupom')}>Novo cupom</Botao>
         )}
       >
         {formAberto === 'cupom' && (
@@ -307,8 +323,8 @@ export function AbaFidelidade() {
       <Secao
         titulo="Catálogo de recompensas"
         descricao="Produto do cardápio, frete grátis ou número da sorte num sorteio, cada um com custo em pontos."
-        acao={formAberto !== 'recompensa' && (
-          <Botao icone="plus" onClick={() => setFormAberto('recompensa')}>Nova recompensa</Botao>
+        acao={(
+          <Botao icone="plus" disabled={formAberto === 'recompensa'} onClick={() => setFormAberto('recompensa')}>Nova recompensa</Botao>
         )}
       >
         {formAberto === 'recompensa' && (
@@ -325,8 +341,8 @@ export function AbaFidelidade() {
       <Secao
         titulo="Sorteios"
         descricao="Quem resgatou número da sorte entra na lista de participantes."
-        acao={formAberto !== 'sorteio' && (
-          <Botao icone="plus" onClick={() => setFormAberto('sorteio')}>Novo sorteio</Botao>
+        acao={(
+          <Botao icone="plus" disabled={formAberto === 'sorteio'} onClick={() => setFormAberto('sorteio')}>Novo sorteio</Botao>
         )}
       >
         {formAberto === 'sorteio' && (

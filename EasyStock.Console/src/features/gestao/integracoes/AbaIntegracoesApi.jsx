@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useIntegracoesApi } from '../../../aplicacao/useIntegracoesApi'
 import { useStatusWhatsAppApi } from '../../../aplicacao/useStatusWhatsAppApi'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
@@ -114,7 +115,7 @@ export function AbaIntegracoesApi() {
   const { status: statusWhatsApp } = useStatusWhatsAppApi()
 
   if (erro && !lista) return <div className={css.aba}><p role="alert">Não foi possível carregar as integrações. {erro}</p></div>
-  if (!lista) return <div className={css.aba}><p>Carregando integrações…</p></div>
+  if (!lista) return <div className={css.aba}><EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 3)">Carregando integrações…</EsqueletoDeLista></div>
 
   return (
     <div className={css.aba}>

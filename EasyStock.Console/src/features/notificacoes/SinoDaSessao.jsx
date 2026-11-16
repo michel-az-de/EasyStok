@@ -48,7 +48,9 @@ export function SinoDaSessao({ avisos, aparelho }) {
       title={semAvisoNoAparelho ? 'Avisos desligados neste aparelho: abra e toque em Ativar' : undefined}
       aria-haspopup="dialog" onClick={() => { setAberto(true); carregar() }}>
       {/* #2232 (H3, L2): o número sai do texto e vai para o contador único do app. */}
-      <span>Avisos{erro ? ' !' : ''}</span>
+      <span>Avisos</span>
+      {/* #2762 (VF14): o erro vira ponto sobre o sino; o aria-label já diz "sem atualizar". */}
+      {erro && <span className={css.pontoErro} data-aviso-erro aria-hidden="true" title="Avisos sem atualizar" />}
       {!erro && total > 0 && <Pilula contagem={total > 99 ? '99+' : total} tom="perigo" aria-hidden="true" data-contador-sino />}
       {semAvisoNoAparelho && <span className={css.pontoAparelho} data-aparelho-desligado aria-hidden="true" title="Avisos desligados neste aparelho" />}
     </Botao>

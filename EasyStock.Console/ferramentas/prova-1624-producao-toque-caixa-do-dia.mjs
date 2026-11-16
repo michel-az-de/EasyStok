@@ -735,7 +735,8 @@ await confere('Caixa do dia: dia sem abertura e sem movimento diz que nada entro
   g.caixa = caixaCom(dia())
   const t = montar(AbaCaixaApi)
   await t.assentar()
-  assert.match(limpo(t.arvore), /Nada entrou nem saiu hoje ainda\./)
+  // #2762: a mesma frase virou o título de um <Vazio variante="linha">, a peça de vazio da casa.
+  assert.ok(doTipo(t.arvore, 'Vazio').some((v) => v.props.titulo === 'Nada entrou nem saiu hoje ainda.'), 'o dia sem movimento diz que nada entrou nem saiu')
   assert.equal(andar(t.arvore, (n) => n.type === 'dl' && String(n.props.className).includes('resumoLista')).length, 0)
 })
 

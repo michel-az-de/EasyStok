@@ -99,7 +99,7 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false, aoAlterado = null
           <CampoTexto rotulo={referenciaObrigatoria ? 'Comprovante ou referência da devolução' : 'Comprovante ou referência (opcional em dinheiro)'} value={referencia} onChange={(e) => setReferencia(e.target.value)} limite={LIMITE_REFERENCIA} required={referenciaObrigatoria} disabled={ocupado} />
           <label className={css.corpoBloco}><input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} disabled={ocupado} /> Confirmo que já devolvi este valor ao cliente.</label>
           <p className={css.corpoBloco}>O registro gera uma saída no Caixa de hoje e preserva o recebimento original. O Caixa do dia precisa estar sem fechamento.</p>
-          <Botao type="submit" variante="primario" disabled={!valido || ocupado} motivo={passaDoLimite ? 'Encurte os campos que passam do limite.' : undefined}>{ocupado ? 'Registrando…' : 'Confirmar devolução já realizada'}</Botao>
+          <Botao type="submit" variante="primario" disabled={!valido || ocupado} aria-busy={ocupado || undefined} motivo={passaDoLimite ? 'Encurte os campos que passam do limite.' : undefined}>{ocupado ? 'Registrando…' : 'Confirmar devolução já realizada'}</Botao>
           <Botao type="button" disabled={ocupado} onClick={() => setAberto(false)}>Voltar</Botao>
         </form>}
         <Botao disabled={ocupado} onClick={atualizar}>Atualizar devoluções</Botao>

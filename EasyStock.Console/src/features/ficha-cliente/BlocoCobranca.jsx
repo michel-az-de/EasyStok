@@ -145,7 +145,7 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
         <div className={css.acoesCobranca}>
           <Botao largo onClick={aoCancelar}>Voltar</Botao>
           {aoAprovar && aguardaAprovacao(pedido) && (
-            <Botao largo variante="primario" icone="circle-check" disabled={enviando} onClick={async () => {
+            <Botao largo variante="primario" icone="circle-check" disabled={enviando} aria-busy={enviando || undefined} onClick={async () => {
               setEnviando(true)
               try { await aoAprovar() } finally { setEnviando(false) }
             }}>
@@ -200,7 +200,7 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
       {recusa && <p className={css.motivoDesabilitado} role="alert">{recusa}</p>}
       <div className={css.acoesCobranca}>
         <Botao largo disabled={enviando} onClick={aoCancelar}>Voltar</Botao>
-        <Botao largo tipo="submit" variante="primario" disabled={!valido || enviando}>
+        <Botao largo tipo="submit" variante="primario" disabled={!valido || enviando} aria-busy={enviando || undefined}>
           {enviando ? 'Registrando…' : aguardaSinalManual(pedido) ? 'Registrar sinal' : 'Marcar pago'}
         </Botao>
       </div>

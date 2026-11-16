@@ -24,7 +24,7 @@
 .audioOnda { display: flex; align-items: center; gap: 2px; height: 22px; flex: 1 1 auto; }
 .audioOnda span {
   width: 3px; border-radius: var(--r-ponta); background: var(--linha-forte);
-  transition: background 180ms ease, height 180ms ease;
+  transition: background-color var(--dur-curta) var(--ease-padrao);
 }
 .ondaFutura { height: 40%; }
 .ondaPassada { height: 100%; background: var(--tinta); }

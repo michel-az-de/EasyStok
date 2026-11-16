@@ -23,7 +23,7 @@ import {
 import { usePulsoDoHall } from '../../aplicacao/usePulsoDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
 import { IlustracaoDoModulo } from './IlustracaoDoModulo'
-import { alcaDoLink, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
+import { alcaDoLink, transicaoDoArrasto, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
 import { PulsoDoHall } from './PulsoDoHall'
 import { ResumoDoDia } from './ResumoDoDia'
@@ -33,7 +33,7 @@ import css from './hall.module.css'
 function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, indice, total, pendencia, aoFavoritar, aoMover }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: modulo.id, disabled: !arrastavel,
-    transition: movimentos ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' } : null,
+    transition: movimentos ? transicaoDoArrasto() : null,
   })
   // #1839 D: fora do modo Organizar o próprio link é a alça; dentro dele, o botão Mover.
   const alcaNoLink = arrastavel && !organizar ? { ref: setActivatorNodeRef, ...alcaDoLink(attributes, listeners) } : { draggable: false }

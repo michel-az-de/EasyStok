@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAcervo, useMiniaturaAcervo } from '../../../aplicacao/useAcervo'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Modal } from '../../../componentes/Modal'
 import { CampoComLimite } from './CampoComLimite'
 import { algumCampoPassaDoLimite } from './limitesDoAcervo'
@@ -53,7 +54,7 @@ function EscolhaDeImagem({ listar, ocupado, pratoId, aoEscolher }) {
       <Botao disabled={imagens.length < 60 || carregando || ocupado} onClick={() => setPagina(pagina + 1)}>Próxima</Botao>
       {busca && <Botao disabled={ocupado} onClick={() => { setBusca(''); setPagina(0) }}>Limpar busca</Botao>}
     </div>
-    {carregando ? <output>Carregando imagens…</output> : erro ? <div><p role="alert" className={css.erro}>{erro}</p><Botao disabled={ocupado} onClick={() => setTentativa(tentativa + 1)}>Tentar de novo</Botao></div> : <>
+    {carregando ? <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 3)">Carregando imagens…</EsqueletoDeLista> : erro ? <div><p role="alert" className={css.erro}>{erro}</p><Botao disabled={ocupado} onClick={() => setTentativa(tentativa + 1)}>Tentar de novo</Botao></div> : <>
       <div className={css.grade}>{imagens.filter(i => i.aprovadoEm).map(i =>
         <button type="button" key={i.id} className={css.cartao} disabled={ocupado} onClick={() => aoEscolher(i)}>
           <Foto imagem={i} /><strong>{i.titulo}</strong><span>{ids(i).includes(pratoId) ? 'Já vinculada a este prato' : i.origem + ' · ' + i.formato}</span>
@@ -151,9 +152,9 @@ export function AbaAcervo() {
       ['itemId', 'Produto vinculado', a.itens.map((i) => [i.cardapioItemId, i.nome])],
       ['canal', 'Uso confirmado', Object.entries(canaisAcervo)],
     ].map(([campo, titulo, opcoes]) => <label className={css.campo} key={campo}>{titulo}<select value={filtros[campo] || ''} disabled={a.ocupado} onChange={(e) => setFiltros({ ...filtros, [campo]: e.target.value })}><option value="">Todos</option>{opcoes.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}</select></label>)}</div>
-    {a.carregando ? <p role="status">Carregando acervo…</p> : <div className={css.grade}>
+    {a.carregando ? <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 5)">Carregando acervo…</EsqueletoDeLista> : <div className={css.grade}>
       {a.imagens.map((i) =>
-        <button type="button" disabled={a.ocupado} key={i.id} className={`${css.cartao} ${selecionada === i.id ? css.ativo : ''}`} onClick={() => { selecionar(i.id); setDialogo(null) }}>
+        <button type="button" disabled={a.ocupado} key={i.id} aria-pressed={selecionada === i.id} className={`${css.cartao} ${selecionada === i.id ? css.ativo : ''}`} onClick={() => { selecionar(i.id); setDialogo(null) }}>
           <Foto imagem={i} /><strong>{i.titulo}</strong><span>{i.origem} · {i.formato} · {i.aprovadoEm ? 'Aprovada' : 'Em revisão'}</span>
         </button>)}
       {!a.imagens.length && (semFiltro

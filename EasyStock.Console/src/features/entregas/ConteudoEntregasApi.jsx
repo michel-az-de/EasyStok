@@ -1,7 +1,8 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../componentes/Campo'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
 import { Pilula } from '../../componentes/Pilula'
 import { useEntregasApi } from '../../aplicacao/useEntregasApi'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
@@ -89,7 +90,7 @@ export function ConteudoEntregasApi({ topo } = {}) {
         </p>
       )}
       <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} tabIndex={0} className={css.painel}>
-        {aba === 'hoje' && situacao === 'carregando' && <p className={css.vazio}>Carregando as entregas…</p>}
+        {aba === 'hoje' && situacao === 'carregando' && <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 2)">Carregando as entregas…</EsqueletoDeLista>}
         {aba === 'hoje' && situacao === 'falhou' && <p className={css.vazio}>Não foi possível carregar as entregas.</p>}
         {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }} aoAbrirCadastro={comVitrine ? () => trocarAba('cadastro') : null} />}
         {aba === 'entregadores' && <Entregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
@@ -110,6 +111,10 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   const pedidoPorId = new Map([...(doDia?.pedidos ?? []), ...pedidos].map((x) => [x.id, x]))
   // #1474 (R7): recusar cancela, estorna e avisa o cliente; confirma em linha antes.
   const [recusando, setRecusando] = useState(null)
+  // #2762: a confirmação inline leva o foco (teclado e leitor de tela percebem que ela abriu); em ação
+  // destrutiva o foco cai no lado seguro, "Manter pedido".
+  const manterRef = useRef(null)
+  useEffect(() => { if (recusando) manterRef.current?.focus() }, [recusando])
   const concluidas = viagensConcluidasNoDia(viagens, dia)
 
   return (
@@ -130,8 +135,8 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
                   <div role="alertdialog" aria-label={`Recusar ${nomeDoPedido(x).frase}`}>
                     <p>{confirmacaoDaRecusa(nomeDoPedido(x).frase, x.clienteNome)}</p>
                     <div className={css.linha}>
-                      <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter pedido</Botao>
-                      <Botao variante="primario" disabled={ocupado} onClick={() => { setRecusando(null); acoes.recusar(x.id) }}>
+                      <Botao ref={manterRef} variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter pedido</Botao>
+                      <Botao variante="perigo" disabled={ocupado} aria-busy={ocupado} onClick={() => { setRecusando(null); acoes.recusar(x.id) }}>
                         Recusar e devolver
                       </Botao>
                     </div>
@@ -228,6 +233,8 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
   // conhece; se ele mudou desde a leitura, a API recusa com o valor certo e a pergunta aparece igual.
   // J2 (#1990): ali mesmo ela lança o que recebeu ("Recebi R$ X") e a entrega sai marcada.
   const [confirmando, setConfirmando] = useState(null) // { pedidoId, valor }
+  const receberRef = useRef(null)
+  useEffect(() => { if (confirmando) receberRef.current?.focus() }, [confirmando])
   const [metodoNaPorta, setMetodoNaPorta] = useState('')
   const perguntar = (parada, valor) => {
     setMetodoNaPorta(metodoSugeridoNaPorta(paradaDaViagem(parada, pedidoPorId?.get(parada.pedidoId)).observacoes))
@@ -282,7 +289,7 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
                 </span>
                 <CampoSelecao rotulo="Como recebeu" rotuloOculto opcoes={METODOS_NA_PORTA} value={metodoNaPorta}
                   disabled={ocupado} onChange={(e) => setMetodoNaPorta(e.target.value)} />
-                <Botao variante="primario" disabled={ocupado || !metodoNaPorta} onClick={() => receberEEntregar(parada)}>
+                <Botao ref={receberRef} variante="primario" disabled={ocupado || !metodoNaPorta} aria-busy={ocupado} onClick={() => receberEEntregar(parada)}>
                   Recebi {moeda(confirmando.valor)}
                 </Botao>
                 <Botao variante="secundario" disabled={ocupado} onClick={() => marcarEntregue(parada, true)}>Entregue sem receber</Botao>
@@ -358,7 +365,7 @@ export function Chamados({ chamados, ocupado, acoes }) {
         <form className={css.formChamado} onSubmit={abrir}>
           <CampoArea rotulo="O que você precisa?" value={texto} onChange={(e) => setTexto(e.target.value)} limite={500}
             rows={2} disabled={ocupado} placeholder="Ex.: buscar um pedido ou realizar uma entrega" />
-          <Botao tipo="submit" variante="primario" icone="enviar" disabled={ocupado || !texto.trim() || textoLongo} motivo={textoLongo ? 'Encurte o texto para chamar.' : undefined}>Chamar entregador</Botao>
+          <Botao tipo="submit" variante="primario" icone="enviar" disabled={ocupado || !texto.trim() || textoLongo} motivo={textoLongo ? 'Encurte o texto para chamar.' : ocupado ? 'Aguarde o envio terminar' : 'Escreva o que precisa para enviar'}>Chamar entregador</Botao>
         </form>
         <AvisoDoChamado texto={confirmacao} abertos={chamados.length} />
       </section>

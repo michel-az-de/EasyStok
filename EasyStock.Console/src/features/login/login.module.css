@@ -11,9 +11,12 @@
   gap: var(--e-4);
   padding: var(--e-5);
   background: var(--papel);
-  border: 0;
+  /* #2762 (VJ10): no escuro o papel e o fundo quase se igualam; borda e sombra recortam o cartão nos dois temas. */
+  border: var(--b-1) solid var(--linha);
   border-radius: var(--r-3);
-  box-shadow: none;
+  box-shadow: var(--sombra);
+  /* #2762 (B18): o cartão entra com um surgir curto, só na chegada à tela. */
+  animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
 
 .titulo {
@@ -39,13 +42,17 @@
   font-size: var(--t-apoio);
   overflow-wrap: anywhere;
 }
+/* #2762 (B18): erro e aviso entram com esmaecer, sem empurrar o formulário num corte seco. */
+.erro, .aviso { animation: global(esmaecer) var(--dur-curta) var(--ease-saida) both; }
+/* #2762 (VJ10): a troca de modo é um link: cor de ação e sublinhado. */
+.cartao .alternar { color: var(--marca-forte); text-decoration: underline; text-underline-offset: 3px; }
 /* Primeiro acesso (#1753): o que a senha ainda precisa ter, marcado enquanto a pessoa digita. */
 .mostrar { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta); }
 .mostrar input { width: 20px; height: 20px; accent-color: var(--marca); }
 .regras { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-1); font-size: var(--t-apoio); color: var(--tinta-2); }
-.regras li { display: flex; align-items: center; gap: var(--e-2); }
+.regras li { display: flex; align-items: center; gap: var(--e-2); transition: color var(--dur-curta) var(--ease-padrao); }
 .regras li[data-ok] { color: var(--tinta); }
-.regras li[data-ok] svg { color: var(--sucesso); }
+.regras li[data-ok] svg { color: var(--sucesso); animation: global(estalar) var(--dur-media) var(--ease-pulo); }
 .pendente { width: 16px; height: 16px; flex: none; display: grid; place-items: center; }
 .pendente::before { content: ''; width: 6px; height: 6px; border-radius: var(--r-1); background: var(--tinta-3); }
 
@@ -54,9 +61,11 @@
 .google {
   display: flex;
   justify-content: center;
+  /* #2762 (B4): o botão do Google chega depois do script; a altura dele fica reservada e o cartão não salta. */
+  min-height: 44px;
   margin-top: var(--e-4);
 }
-
+/* Sem Google configurado o `BotaoGoogle` não desenha nada: a reserva de altura sai junto, sem vão no cartão. */
 .google:empty { display: none; }
 
 @media (max-width: 480px) {

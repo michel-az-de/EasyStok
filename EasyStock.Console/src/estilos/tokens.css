@@ -182,6 +182,11 @@
   --dur-curta: 150ms;
   --dur-media: 220ms;
   --dur-longa: 320ms;
+  /* #2762: três tempos que não são de transição. `realce` é o esmaecimento único de item novo ou de
+     valor que mudou; `giro` é uma volta do indicador de espera; `respiro` é meio ciclo do esqueleto. */
+  --dur-realce: 2000ms;
+  --dur-giro: 800ms;
+  --dur-respiro: 1280ms;
   --ease-padrao: cubic-bezier(.2, 0, 0, 1);
   --ease-saida: cubic-bezier(.16, 1, .3, 1);     /* desacelera: quem ENTRA */
   --ease-entrada: cubic-bezier(.4, 0, 1, 1);     /* acelera: quem SAI */

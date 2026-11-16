@@ -5,6 +5,7 @@ import { CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { useCatalogo } from '../../../aplicacao/contextos'
 import { assinaturaDoPlano, comprasGuardadas, erroDasPorcoes, gerarCompras, guardarCompras, itensDeCompra, lerSugestao, levarParaProducao, motivosDosPendentes, planejar } from '../../../aplicacao/planejamento'
 import { lerInsumos, rotuloDaUnidade } from '../../../aplicacao/insumos'
@@ -122,7 +123,7 @@ export function AbaPlanejamentoApi({ aoAbrirAba } = {}) {
     else window.location.hash = hashDoModulo('producao', 'producao')
   }
 
-  if (carga.estado === 'carregando') return <output className={css.descricao}>Calculando a sugestão…</output>
+  if (carga.estado === 'carregando') return <EsqueletoDeLista linhas={4} altura="calc(var(--toque) * 2)">Calculando a sugestão…</EsqueletoDeLista>
   if (carga.estado === 'erro' && linhas.length === 0) return (
     <div className={css.aba}>
       {carga.semLoja

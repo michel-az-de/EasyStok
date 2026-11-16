@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.RateLimiting;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,7 +13,8 @@ public class WebhookPixController(
     IConfiguration configuration,
     ReconciliarPixParcelaReceberUseCase reconciliarPixParcelaReceberUseCase,
     ILogger<WebhookPixController> logger,
-    IWebHostEnvironment env) : ControllerBase
+    IWebHostEnvironment env,
+    IRowLevelSecurityBypass rlsBypass) : ControllerBase
 {
     [HttpPost("pix")]
     [RequestSizeLimit(2_000_000)] // #2401: anônimo; sem teto o Kestrel aceita 30 MB antes da assinatura.
@@ -42,6 +44,8 @@ public class WebhookPixController(
 
         try
         {
+            // #2743: webhook anonimo, sem tenant: IgnoreQueryFilters nao basta, a policy RLS zera parcelas_receber.
+            using var _ = rlsBypass.Begin();
             if (!payload.TryGetProperty("pix", out var pixArray) || pixArray.ValueKind != JsonValueKind.Array)
                 return Ok();
 

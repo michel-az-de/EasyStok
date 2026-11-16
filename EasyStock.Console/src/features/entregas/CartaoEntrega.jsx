@@ -94,14 +94,17 @@ export function CartaoEntrega({
             </span>
           </Anel>
         )}
-        <button type="button" className={css.nomeCartao} aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
-          {conversa.nome}
-        </button>
-        <span className={css.pilulaEstado}>
-          <Pilula tom={estado.tom} fina>
-            <Icone nome={estado.icone} tamanho={16} /> {estado.rotulo}
-          </Pilula>
-        </span>
+        {/* #2762: nome e estado no mesmo bloco, o estado embaixo do nome sem recuo calculado. */}
+        <div className={css.nomeEEstado}>
+          <button type="button" className={css.nomeCartao} aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
+            {conversa.nome}
+          </button>
+          <span className={css.pilulaEstado}>
+            <Pilula tom={estado.tom} fina>
+              <Icone nome={estado.icone} tamanho={16} /> {estado.rotulo}
+            </Pilula>
+          </span>
+        </div>
         <MenuDeAcoes
           rotulo={'Mais opções da entrega de ' + conversa.nome}
           itens={[
@@ -185,7 +188,7 @@ export function CartaoEntrega({
               <p>Cancelar a entrega de {conversa.nome}? Ela recebe aviso.</p>
               <div className={css.confirmacaoBotoes}>
                 <Botao
-                  variante="primario"
+                  variante="perigo"
                   onClick={() => {
                     acoes.cancelarPedido(conversa.id, `Cancelei o pedido ${pedido.numero}. Qualquer coisa, é só chamar.`)
                     setConfirmando(null)
@@ -201,7 +204,7 @@ export function CartaoEntrega({
               <p>Pedido pago. Marcar estorno também?</p>
               <div className={css.confirmacaoBotoes}>
                 <Botao
-                  variante="primario"
+                  variante="perigo"
                   onClick={() => {
                     acoes.cancelarPedido(conversa.id, `Cancelei o pedido ${pedido.numero}. Qualquer coisa, é só chamar.`)
                     acoes.marcarEstorno(conversa.id)

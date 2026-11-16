@@ -5,6 +5,7 @@ import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
 import { IconeDoModulo } from '../../../componentes/IconeDoModulo'
 import { Vazio } from '../../../componentes/Vazio'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useDevolucoesPendentes } from '../../../aplicacao/useDevolucoesPendentes'
 import { useConsultaFinanceira, listarContasFinanceiras, listarContasEmAberto, obterContaFinanceira, obterResumoFinanceiro, obterExtratoFinanceiro, obterRelatorioFinanceiro, listarCategoriasFinanceiras, listarCentrosFinanceiros, emitirContaFinanceira, cancelarContaFinanceira, estornarParcelaFinanceira, removerParcelaFinanceira, inativarCadastroFinanceiro, reativarCadastroFinanceiro } from '../../../aplicacao/useFinanceiroApi'
@@ -34,9 +35,9 @@ function quandoVence(parcela) {
 }
 
 function EstadoFinanceiro({ consulta, children }) {
-  if (consulta.erro) return <div className={css.painel}><ErroFinanceiro erro={consulta.erro} /><Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>
-  if (consulta.carregando && !consulta.dados) return <Vazio titulo="Carregando financeiro">Aguarde um instante.</Vazio>
-  return <div aria-busy={consulta.carregando}>{children}</div>
+  if (consulta.erro) return <div className={css.painel}><ErroFinanceiro erro={consulta.erro} /><Botao icone="refresh-cw" onClick={consulta.recarregar}>Tentar de novo</Botao></div>
+  if (consulta.carregando && !consulta.dados) return <EsqueletoDeLista linhas={4} altura="var(--toque)">Carregando financeiro…</EsqueletoDeLista>
+  return <div className={css.estado} aria-busy={consulta.carregando}>{children}</div>
 }
 function Indicador({ nome, valor, detalhe }) { return <div className={css.indicador}><span>{nome}</span><strong>{moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}</div> }
 function SituacaoConta({ status, lado }) { return <Pilula tom={tomDoStatusConta(status)}>{nomeStatusConta(status, lado)}</Pilula> }
@@ -69,7 +70,7 @@ function ResumoFinanceiro() {
   const [pagamento, setPagamento] = useState(null)
   const resumo = consulta.dados?.resumo
   return <EstadoFinanceiro consulta={consulta}>{resumo && <div className={css.painel}>
-    <div className={css.barra}><p className={css.aviso}>O que vence hoje e nos próximos 7 dias.</p><Botao icone="refresh-cw" onClick={consulta.recarregar}>Atualizar</Botao></div>
+    <div className={css.barra}><p className={css.aviso}>O que vence hoje e nos próximos 7 dias.</p><Botao icone="refresh-cw" disabled={consulta.carregando} onClick={consulta.recarregar}>Atualizar</Botao></div>
     <div className={css.dia}>{Object.entries(consulta.dados.porLado).map(([lado, listas]) => {
       const vencido = somaSaldos(listas.vencida)
       return <section key={lado} className={css.ladoDia} aria-label={`Contas a ${lado}`}>
@@ -163,7 +164,7 @@ function ContasFinanceiras({ lado }) {
   return <div className={css.painel}>
     <div className={css.barra}>
       <fieldset className={css.chips}><legend className="sr">Mostrar contas</legend>{CHIPS_CONTAS.map((item) => <button key={item.id} type="button" className={`${css.chip} ${chip === item.id && !comAvancado ? css.chipAtivo : ''}`} aria-pressed={chip === item.id && !comAvancado} onClick={() => escolherChip(item.id)}>{item.rotulo}</button>)}</fieldset>
-      <div className={css.acoes}><Botao onClick={consulta.recarregar} icone="refresh-cw">Atualizar</Botao>{podeGerenciar && <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => setNova(true)}>Nova conta a {lado}</Botao>}</div>
+      <div className={css.acoes}><Botao onClick={consulta.recarregar} icone="refresh-cw" disabled={consulta.carregando}>Atualizar</Botao>{podeGerenciar && <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => setNova(true)}>Nova conta a {lado}</Botao>}</div>
     </div>
     <div className={css.ferramentas}>
       <form className={css.busca} onSubmit={(evento) => { evento.preventDefault(); clearTimeout(espera.current); aplicarBusca(busca) }}>
@@ -184,13 +185,13 @@ function ContasFinanceiras({ lado }) {
     <EstadoFinanceiro consulta={consulta}>
       <div className={selecionada ? css.comContexto : css.painel}>
         <div className={css.painel}>
-          {consulta.dados?.itens.length === 0 && <Vazio titulo={buscaAplicada || comAvancado ? 'Nenhuma conta encontrada' : chip === 'todas' ? `Nenhuma conta a ${lado} ainda` : 'Nenhuma conta nesta lista'}>{buscaAplicada || comAvancado ? 'Limpe a busca ou os filtros para ver mais contas.' : chip === 'todas' ? `Use Nova conta a ${lado}, no topo, para acompanhar vencimentos e pagamentos.` : 'Escolha Todas para ver as demais ou cadastre uma conta nova.'}</Vazio>}
+          {consulta.dados?.itens.length === 0 && <Vazio icone="recibo" acao={buscaAplicada || comAvancado ? undefined : chip !== 'todas' ? <Botao onClick={() => escolherChip('todas')}>Ver todas</Botao> : podeGerenciar ? <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => setNova(true)}>Cadastrar a primeira conta</Botao> : undefined} titulo={buscaAplicada || comAvancado ? 'Nenhuma conta encontrada' : chip === 'todas' ? `Nenhuma conta a ${lado} ainda` : 'Nenhuma conta nesta lista'}>{buscaAplicada || comAvancado ? 'Limpe a busca ou os filtros para ver mais contas.' : chip === 'todas' ? `Use Nova conta a ${lado}, no topo, para acompanhar vencimentos e pagamentos.` : 'Escolha Todas para ver as demais ou cadastre uma conta nova.'}</Vazio>}
           <ul className={css.lista}>{consulta.dados?.itens.map((conta) => {
             const parcela = proximaParcela(conta)
             const linha = valorDaLinha(conta, lado)
             const parcelas = conta.parcelas.length
             return <li key={conta.id} className={`${css.linha} ${conta.id === selecionadaId ? css.linhaSelecionada : ''}`}>
-              <button type="button" className={css.selecionar} aria-pressed={conta.id === selecionadaId} onClick={() => selecionar(conta)}><strong>{conta.descricao}</strong><small><SituacaoConta status={statusDaConta(conta)} lado={lado} />{conta.status !== 'Cancelada' && parcela ? ` · ${quandoVence(parcela)}` : ''}{parcelas > 1 ? ` · ${parcelas} parcelas` : ''}</small></button>
+              <button type="button" className={css.selecionar} aria-current={conta.id === selecionadaId ? 'true' : undefined} onClick={() => selecionar(conta)}><strong>{conta.descricao}</strong><small><SituacaoConta status={statusDaConta(conta)} lado={lado} />{conta.status !== 'Cancelada' && parcela ? ` · ${quandoVence(parcela)}` : ''}{parcelas > 1 ? ` · ${parcelas} parcelas` : ''}</small></button>
               <span className={css.valorLinha}><small>{linha.rotulo}</small><span className={css.valor}>{moeda(linha.valor)}</span></span>
               <div className={css.acoesLinha}>
                 {podeRegistrarNaConta(conta, podeGerenciar) && <Botao variante="primario" aria-haspopup="dialog" aria-label={`${palavras.verbo} ${conta.descricao}`} onClick={() => { setSelecionadaId(conta.id); setPagamento({ conta, parcela }) }}>{palavras.verbo}</Botao>}
@@ -283,7 +284,7 @@ function ExtratoFinanceiro() {
       <div className={`${css.indicadores} ${css.indicadoresTres}`}><Indicador nome="Entradas do período" valor={total('receber')} /><Indicador nome="Saídas do período" valor={total('pagar')} /><Indicador nome="Resultado dos movimentos" valor={total('receber') - total('pagar')} /></div>
       {avisoDevolucoes && <output className={css.avisoAtencao}>{avisoDevolucoes}</output>}
       {!linhas.length && <Vazio titulo="Sem movimentos no período">Escolha outro período e toque em Consultar extrato.</Vazio>}
-      <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={css.linha}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={css.valor}>{moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
+      <ul className={css.lista}>{linhas.map((item) => <li key={item.id} className={`${css.linha} ${css.linhaExtrato}`}><div><strong>{item.descricao}</strong><p className={css.apoio}>{dataCurta(item.em)} · {nomeDoMetodoCaixa(item.metodo)} · {item.lado === 'pagar' ? 'Saída' : 'Entrada'}{item.estornado ? ' · Estornado' : ''}</p></div><span className={`${css.valor} ${item.lado === 'pagar' ? css.valorSaida : ''}`}>{moeda(item.valor)}</span><Botao aria-haspopup="dialog" aria-label={`Detalhes de ${item.descricao}`} onClick={() => setLinha(item)}>Detalhes</Botao></li>)}</ul>
     </div></EstadoFinanceiro>
     {linha && <Modal titulo="Movimento financeiro" aoFechar={() => setLinha(null)}><dl className={css.detalhes}><div><dt>Descrição</dt><dd>{linha.descricao}</dd></div><div><dt>Data</dt><dd>{dataCurta(linha.em)}</dd></div><div><dt>Valor</dt><dd>{moeda(linha.valor)}</dd></div><div><dt>Situação</dt><dd>{linha.estornado ? 'Estornado' : 'Registrado'}</dd></div></dl>{linha.contaId && <a className={css.atalho} href={hashDoModulo('financeiro', linha.lado)} onClick={() => setLinha(null)}>Consultar conta a {linha.lado}</a>}</Modal>}
   </div>
@@ -299,7 +300,7 @@ function RelatoriosFinanceiros() {
   const [exportando, setExportando] = useState(false)
   const [erroExportacao, setErroExportacao] = useState(null)
   const campo = (nome, valor) => setRascunho((atual) => ({ ...atual, [nome]: valor }))
-  const tabela = <div className={css.tabelaRolavel}><table className={css.tabela}><caption className="sr">Fluxo de caixa previsto e realizado de {dataPorExtenso(filtros.inicio)} a {dataPorExtenso(filtros.fim)}</caption><thead><tr>{['Período', 'A pagar', 'A receber', 'Pago', 'Recebido', 'Saldo realizado'].map((nome) => <th scope="col" key={nome}>{nome}</th>)}</tr></thead><tbody>{consulta.dados?.map((item) => <tr key={item.inicioBucket}><th scope="row">{item.rotulo}</th>{[item.previstoPagar, item.previstoReceber, item.realizadoPagar, item.realizadoReceber, item.realizadoReceber - item.realizadoPagar].map((valor, indice) => <td key={indice}>{moeda(valor)}</td>)}</tr>)}</tbody></table></div>
+  const tabela = <div className={css.tabelaRolavel}><table className={css.tabela}><caption className="sr">Fluxo de caixa previsto e realizado de {dataPorExtenso(filtros.inicio)} a {dataPorExtenso(filtros.fim)}</caption><thead><tr>{['Período', 'A pagar', 'A receber', 'Pago', 'Recebido', 'Saldo realizado'].map((nome) => <th scope="col" key={nome}>{nome}</th>)}</tr></thead><tbody>{consulta.dados?.map((item) => <tr key={item.inicioBucket ?? item.rotulo}><th scope="row">{item.rotulo}</th>{[item.previstoPagar, item.previstoReceber, item.realizadoPagar, item.realizadoReceber, item.realizadoReceber - item.realizadoPagar].map((valor, indice) => <td key={indice}>{moeda(valor)}</td>)}</tr>)}</tbody></table></div>
   const exportar = async () => {
     setExportando(true); setErroExportacao(null)
     try {
@@ -312,7 +313,7 @@ function RelatoriosFinanceiros() {
       <CampoSelecao rotulo="Agrupar por" value={rascunho.periodicidade} onChange={(e) => campo('periodicidade', e.target.value)} opcoes={['Diario', 'Semanal', 'Mensal'].map((valor) => ({ valor, rotulo: { Diario: 'Dia', Semanal: 'Semana', Mensal: 'Mês' }[valor] }))} />
       <CampoSelecao rotulo="Categoria" value={rascunho.categoriaId} onChange={(e) => campo('categoriaId', e.target.value)} opcoes={[{ valor: '', rotulo: 'Todas' }, ...(cadastros.dados?.categorias ?? []).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
       <CampoSelecao rotulo="Centro de custo" value={rascunho.centroCustoId} onChange={(e) => campo('centroCustoId', e.target.value)} opcoes={[{ valor: '', rotulo: 'Todos' }, ...(cadastros.dados?.centros ?? []).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
-      <Botao tipo="submit">Gerar relatório</Botao>
+      <Botao tipo="submit" variante="primario">Gerar relatório</Botao>
     </form><ErroFinanceiro erro={cadastros.erro} />
     <EstadoFinanceiro consulta={consulta}><div className={css.painel}><div className={css.barra}><p className={css.aviso}>{filtros.categoriaId || filtros.centroCustoId ? 'Previsto por vencimento; Pago e Recebido só das contas, porque pedidos e vendas não têm categoria nem centro de custo.' : 'Previsto por vencimento. Pago e Recebido somam contas, pedidos, vendas e movimentos do Caixa, como o Extrato.'}</p><div className={css.acoes}><Botao disabled={!consulta.dados?.length} aria-haspopup="dialog" onClick={() => setAberto(true)}>Ampliar relatório</Botao><Botao disabled={!consulta.dados?.length || exportando} onClick={exportar}>Exportar CSV</Botao></div></div>{consulta.dados?.every((i) => !i.previstoPagar && !i.previstoReceber && !i.realizadoPagar && !i.realizadoReceber) && <p className={css.aviso}>Sem movimentos neste período. Cadastre contas ou registre vendas para ver o fluxo.</p>}{tabela}<ErroFinanceiro erro={erroExportacao} /></div></EstadoFinanceiro>
     {aberto && <Modal titulo="Relatório de fluxo de caixa" aoFechar={() => setAberto(false)} largura="min(1100px, calc(100vw - 24px))">{tabela}</Modal>}

@@ -3,6 +3,7 @@ import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoTexto } from '../../../componentes/Campo'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Pilula } from '../../../componentes/Pilula'
 import { useSecoesCardapioApi } from '../../../aplicacao/useSecoesCardapioApi'
 import { resumoCategoriasAntigas } from '../../../aplicacao/gestaoSecoes'
@@ -33,7 +34,7 @@ export function LinhaCategoria({ secao, primeira, ultima, gestao }) {
   }
 
   return (
-    <li className={css.linha} aria-busy={ocupado}>
+    <li className={`${css.linha} ${css.linhaCategoria}`} aria-busy={ocupado}>
       {editando && <Modal titulo={`Renomear ${secao.nome}`} aoFechar={ocupado ? undefined : () => setEditando(false)}>
         <form className={css.resumo} onSubmit={salvar}>
           <CampoTexto
@@ -58,7 +59,7 @@ export function LinhaCategoria({ secao, primeira, ultima, gestao }) {
       <div className={css.acoes}>
           <>
             <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Renomear ${secao.nome}`} aria-haspopup="dialog" onClick={() => { setNome(secao.nome); gestao.fecharAviso(); setEditando(true) }}>Renomear</Botao>
-            <Botao variante="texto" disabled={ocupado} aria-label={`${secao.visivel ? 'Ocultar' : 'Mostrar'} ${secao.nome} no site`}
+            <Botao variante="texto" icone={secao.visivel ? 'ocultoNoSite' : 'globo'} disabled={ocupado} aria-label={`${secao.visivel ? 'Ocultar' : 'Mostrar'} ${secao.nome} no site`}
               onClick={() => fazer(() => gestao.alternarVisivel(secao.id))}>
               {secao.visivel ? 'Ocultar no site' : 'Mostrar no site'}
             </Botao>
@@ -105,7 +106,7 @@ export function AbaCategoriasApi() {
     Promise.resolve(gestao.criar(nova)).then((ok) => { if (ok !== false) { setNova(''); setCadastroAberto(false) } }).finally(() => setCriando(false))
   }
 
-  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as categorias…</output>
+  if (gestao.estado === 'carregando') return <EsqueletoDeLista linhas={4} altura="calc(var(--toque) * 2)">Carregando as categorias…</EsqueletoDeLista>
   if (gestao.estado === 'erro' && gestao.secoes.length === 0) {
     if (gestao.semLoja) return <Vazio icone="globo" titulo="A loja online ainda não está ligada">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
     return (
@@ -151,7 +152,7 @@ export function AbaCategoriasApi() {
         <section className={css.antigas} aria-labelledby="categorias-antigas" aria-describedby="resumo-antigas">
           <div className={css.cabecalhoAntigas}>
             <h3 id="categorias-antigas" className={css.tituloSecao}>{antigas.titulo}</h3>
-            <span className={css.pendenteConversao}>Conversão pendente</span>
+            <Pilula tom="aviso">Conversão pendente</Pilula>
           </div>
           <p id="resumo-antigas" className={css.descricao}>{antigas.subtitulo}<span className="sr"> {antigas.texto}</span></p>
           <ul className={css.nomesAntigos}>{antigas.nomes.map((nome) => <li key={nome}>{nome}</li>)}</ul>

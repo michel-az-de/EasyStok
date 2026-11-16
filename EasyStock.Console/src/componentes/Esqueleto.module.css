@@ -1,0 +1,18 @@
+/* #2762: reserva o espaço do que ainda não chegou. O atraso da entrada é de propósito: resposta que
+   volta em menos de --dur-media nunca chega a piscar um esqueleto na tela. */
+.esqueleto {
+  display: block; width: var(--largura, 100%); height: var(--altura, 1em);
+  border-radius: var(--r-2); background: var(--preenchimento-forte);
+  animation: global(respirar) calc(var(--dur-respiro) * 2) var(--ease-padrao) infinite;
+}
+.linha { display: inline-block; vertical-align: middle; }
+.bloco { height: var(--altura, var(--toque)); }
+.circulo { width: var(--altura, var(--toque)); height: var(--altura, var(--toque)); border-radius: var(--r-pilula); }
+
+.lista {
+  display: grid; gap: var(--e-2); padding: var(--e-3) 0; margin: 0;
+  animation: global(esmaecer) var(--dur-curta) var(--ease-padrao) var(--dur-media) both;
+}
+.lista > .esqueleto:nth-child(3n + 1) { --largura: 100%; }
+.lista > .esqueleto:nth-child(3n + 2) { --largura: 86%; }
+.lista > .esqueleto:nth-child(3n) { --largura: 94%; }

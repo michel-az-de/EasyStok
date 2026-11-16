@@ -1,12 +1,14 @@
+import { useEffect, useRef, useState } from 'react'
 import { DndContext } from '@dnd-kit/core'
 import { rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
+import { Esqueleto } from '../../componentes/Esqueleto'
 import { indicadoresDoHall, ROTULO_PRECISA_DE_VOCE } from '../../dominio/pulsoDoHall'
 import { moeda } from '../../dominio/formato'
 import { hashDoModulo } from '../../dominio/modulos'
 import { acaoDoIndicador, severidadeDoIndicador } from '../../dominio/estadoDoHall'
-import { alcaDoLink, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
+import { alcaDoLink, transicaoDoArrasto, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
 import css from './hall.module.css'
@@ -25,9 +27,19 @@ const hora = (em) => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute:
 function Indicador({ item, movimentos, podeFecharCaixa }) {
   const frente = frentes[item.id]
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id, transition: movimentos ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' } : null,
+    id: item.id, transition: movimentos ? transicaoDoArrasto() : null,
   })
-  const valor = item.valor === null ? <span className={css.oculto}>{item.estado === 'erro' ? 'Sem leitura' : 'Carregando'}</span> // #2792: sem travessão; texto só para o leitor de tela
+  // #2762 (B10): enquanto a leitura não chegou o número é um esqueleto de linha; quando o valor MUDA por sync
+  // (nunca na primeira chegada) o número recebe um realce único, que a troca da chave reinicia.
+  const carregando = item.valor === null && item.estado === 'carregando'
+  const visto = useRef(item.valor)
+  const [mudancas, setMudancas] = useState(0)
+  useEffect(() => {
+    if (visto.current !== null && item.valor !== null && visto.current !== item.valor) setMudancas((n) => n + 1)
+    visto.current = item.valor
+  }, [item.valor])
+  // #2792: sem leitura, nada de travessão; o texto fica só para o leitor de tela.
+  const valor = item.valor === null ? <span className={css.oculto}>{item.estado === 'erro' ? 'Sem leitura' : 'Carregando…'}</span>
     : item.id === 'financeiro' ? moeda(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
   // Só o que pede ação aparece por escrito: leitura que falhou e caixa de outro dia aberto.
   const aviso = item.estado === 'erro'
@@ -41,7 +53,9 @@ function Indicador({ item, movimentos, podeFecharCaixa }) {
     <a ref={setActivatorNodeRef} data-indicador={item.id} data-estado={item.estado} data-severidade={severidade ?? undefined} className={css.indicador}
       href={hashDoModulo(item.id, frente.tela)} title={item.detalhe || undefined} {...alcaDoLink(attributes, listeners)}>
       {/* #2232 (H5): o número vem primeiro e o rótulo embaixo; todos os cartões partem da mesma linha. */}
-      <strong className={css.valor}>{valor}</strong>
+      <strong key={mudancas} className={mudancas ? `${css.valor} ${css.valorMudou}` : css.valor}>
+        {carregando ? <><Esqueleto forma="linha" largura="3ch" altura="var(--t-valor)" /><span className="sr">Carregando…</span></> : valor}
+      </strong>
       <span className={css.cabecaIndicador}><IconeDoModulo modulo={{ id: item.id }} tamanho={20} />{item.rotulo ?? frente.nome}</span>
       {aviso && <span className={css.frescor}><MarcaIcone nome="atencao" tamanho={16} />{aviso}</span>}
       {acao && <span className={css.acaoIndicador}>{acao}</span>}

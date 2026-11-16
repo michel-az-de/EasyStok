@@ -12,6 +12,8 @@
 }
 button.chip { cursor: pointer; }
 button.chip:hover:not(.ativo):not(.emBreve):not(:disabled) { background: var(--preenchimento-forte); }
+/* #2762 (A8): pressionado um degrau além do hover, como o Botao. */
+button.chip:active:not(.emBreve):not(:disabled) { background: color-mix(in srgb, var(--preenchimento-forte) 90%, var(--tinta)); }
 button.chip:disabled {
   color: var(--tinta-3); border: var(--b-1) dashed var(--linha-forte); background: transparent; cursor: not-allowed;
 }
@@ -20,6 +22,8 @@ button.chip:disabled {
   background: var(--marca-claro); color: var(--marca);
   border-color: transparent;
 }
+/* #2762 (A8): o ✓ aparece em esmaecimento curto, no lugar da mola prometida acima (mola é só de selo de confirmação). */
+.ativo > svg:first-child { animation: global(esmaecer) var(--dur-curta) var(--ease-saida) both; }
 /* "Em breve" (seção 4): não é clicável, rótulo inteiro escreve o motivo. */
 .emBreve {
   background: transparent; color: var(--tinta-3); border-color: transparent; cursor: default;

@@ -39,7 +39,12 @@ function achadosDe(texto) {
     if (grosso(v)) achados.push(`${linhaDe(m.index)}  borda lateral grossa: ${m[0].trim()}`)
     else if (!corDaGrade.test(corDe(v))) achados.push(`${linhaDe(m.index)}  borda lateral colorida: ${m[0].trim()}`)
   }
-  for (const m of texto.matchAll(ladoCor)) achados.push(`${linhaDe(m.index)}  cor de borda lateral avulsa: ${m[0].trim()}`)
+  // Cor lateral avulsa na cor da grade ou transparente não pinta barra: apaga um lado (ex.: o anel do giro de espera,
+  // que é um círculo com um quarto vazio). Qualquer outra cor reprova, como em (b).
+  for (const m of texto.matchAll(ladoCor)) {
+    const cor = texto.slice(m.index + m[0].length).match(/^\s*([^;}]*)/)[1].replace(/!important/g, '').trim()
+    if (!corDaGrade.test(cor)) achados.push(`${linhaDe(m.index)}  cor de borda lateral avulsa: ${m[0].trim()} ${cor}`)
+  }
   for (const m of texto.matchAll(sombra)) {
     if (horizontal(m[1])) achados.push(`${linhaDe(m.index)}  sombra inset horizontal: ${m[0].trim()}`)
   }
@@ -56,6 +61,10 @@ const AMOSTRAS = [
   ['.a { border-left: 1px solid; }', 1],
   ['.a { border-left: 1px solid currentColor; }', 1],
   ['.a { border-left-color: var(--marca); }', 1],
+  ['.a { border-right-color: currentColor; }', 1],
+  ['.a { border-inline-start-color: var(--alerta) !important; }', 1],
+  ['.a { border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; }', 0],
+  ['.a { border-left-color: var(--linha); }', 0],
   ['.a { box-shadow: inset 3px 0 0 var(--marca); }', 1],
   ['.a { box-shadow: inset 3px 0 var(--marca); }', 1],
   ['.a { border-left: var(--b-1) solid var(--linha); }', 0],

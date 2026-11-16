@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
@@ -10,6 +11,7 @@ import { compraDoCusto, ondeOInsumoEUsado, rotuloDaEmbalagem, rotuloDaUnidade, U
 import { moeda, textoDosCentavos } from '../../../dominio/formato'
 import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import css from '../cardapio/abaCardapio.module.css'
+import producao from './producao.module.css'
 
 // M2 › Insumos (M2.3, #1496). O intermediário (molho, recheio, massa laminada) e a embalagem, com o
 // saldo, o mínimo e em quantas receitas entra. Abaixo do mínimo aparece em "Comprar". Farinha e ovo
@@ -99,7 +101,7 @@ function LinhaInsumo({ insumo, gestao, podeEditar, aviso, avisarEm }) {
         </Modal>
       )}
       {podeEditar && (
-        <div className={css.acoes}>
+        <div className={`${css.acoes} ${css.acoesFixas}`}>
           <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Ajustar ${insumo.nome}`} aria-haspopup="dialog" onClick={() => {
             setMinimo(insumo.minimo ?? ''); setCompra(compraNoCampo(insumo.custo, insumo.unidade)); setEditando(true)
           }}>Ajustar</Botao>
@@ -125,7 +127,7 @@ export function AbaInsumosApi() {
   const [erroDoNome, setErroDoNome] = useState(null)
   const nomeRef = useRef(null)
 
-  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando os insumos…</output>
+  if (gestao.estado === 'carregando') return <EsqueletoDeLista linhas={5} altura="calc(var(--toque) * 2)">Carregando os insumos…</EsqueletoDeLista>
   if (gestao.estado === 'erro' && gestao.insumos.length === 0) {
     return (
       <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar os insumos"
@@ -188,7 +190,7 @@ export function AbaInsumosApi() {
         <h3 id="insumos-comprar" className={css.tituloSecao}>Comprar</h3>
         {comprar.length === 0
           ? <p className={css.descricao}>Nenhum insumo abaixo do mínimo.</p>
-          : <p className={css.descricao}>{comprar.map((i) => `${i.nome} (tem ${formatar(i.saldo)} ${rotuloDaUnidade(i.unidade)}, mínimo ${i.minimo})`).join(' · ')}</p>}
+          : <ul className={producao.listaComprar} aria-label="Insumos para comprar">{comprar.map((i) => <li key={i.id}><Pilula tom="aviso">{`${i.nome} (tem ${formatar(i.saldo)} ${rotuloDaUnidade(i.unidade)}, mínimo ${i.minimo})`}</Pilula></li>)}</ul>}
       </section>
       )}
 

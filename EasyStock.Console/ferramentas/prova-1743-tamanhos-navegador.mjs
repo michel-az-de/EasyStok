@@ -205,7 +205,9 @@ try {
     assert.equal(await page.getByText('Soltar aqui', { exact: true }).count(), 0, 'Comanda bloqueada não aceita arrasto')
     await page.mouse.up()
     assert.equal(await pedido.innerText(), pedidoAntes, 'Clique e arrasto bloqueados preservam os itens do pedido')
-    assert.equal(chamadas.filter(c => c.metodo !== 'GET').length, escritasAntes, 'Tentativa bloqueada não escreve na API')
+    const escritasDepois = chamadas.filter(c => c.metodo !== 'GET')
+    assert.equal(escritasDepois.length, escritasAntes, 'Tentativa bloqueada não escreve na API: '
+      + JSON.stringify(escritasDepois.slice(escritasAntes)))
     await foto(page, '07-clique-arrasto-bloqueados-1280')
   }
   assert.deepEqual(erros, [])
