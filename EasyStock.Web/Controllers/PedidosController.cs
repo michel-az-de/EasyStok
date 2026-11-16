@@ -241,11 +241,13 @@ public class PedidosController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Agendar(string id, DateTime? agendadoParaEm)
     {
-        var result = await svc.AlterarAgendamentoAsync(id, agendadoParaEm);
+        // #2727: o datetime-local da tela é horário de Brasília; a API recebe o instante em UTC.
+        var agendadoUtc = agendadoParaEm.HasValue ? BrazilTime.DeBrasiliaParaUtc(agendadoParaEm.Value) : (DateTime?)null;
+        var result = await svc.AlterarAgendamentoAsync(id, agendadoUtc);
         if (HasError(result)) return RedirectToAction(nameof(Detail), new { id });
 
-        var msg = agendadoParaEm.HasValue
-            ? $"Pedido agendado para {agendadoParaEm.Value.ParaBrasilia():dd/MM/yyyy HH:mm}."
+        var msg = agendadoUtc.HasValue
+            ? $"Pedido agendado para {agendadoUtc.Value.ParaBrasilia():dd/MM/yyyy HH:mm}."
             : "Agendamento removido.";
         Toast("success", msg);
         return RedirectToAction(nameof(Detail), new { id });
