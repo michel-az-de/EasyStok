@@ -64,6 +64,9 @@
   /* #2762 (B4): o botão do Google chega depois do script; a altura dele fica reservada e o cartão não salta. */
   min-height: 44px;
   margin-top: var(--e-4);
+  /* #2803: o botão é um iframe de outra origem, sempre claro. Com o esquema da página diferente do dele, o
+     navegador pinta um fundo branco opaco em volta do botão no tema escuro. O iframe herda este valor. */
+  color-scheme: light;
 }
 /* Sem Google configurado o `BotaoGoogle` não desenha nada: a reserva de altura sai junto, sem vão no cartão. */
 .google:empty { display: none; }
