@@ -58,6 +58,7 @@ public class CampanhaJobTests
         lembrete.Categoria.Should().Be(CategoriaConteudoNotificacao.Marketing);
         lembrete.ProximaTentativaEm.Should().Be(encerramento);
         lembrete.LerMetadados().Should().Contain("template", EnfileiradorMensagensCampanha.TemplateMetaLembrete);
+        lembrete.LerMetadados().Should().Contain("clienteId", naoPediu.ClienteId.ToString());
         _c.EventosCriados.Last().Tipo.Should().Be(TipoEventoNotificacao.CampanhaLembreteEncerramento);
 
         // Encerrada não repete o lembrete.

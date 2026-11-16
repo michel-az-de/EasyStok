@@ -153,8 +153,21 @@ public class DispararOndaCampanhaUseCaseTests
             ["template"] = "novidade_semana",
             ["idioma"] = "pt_BR",
             ["param1"] = "Ana",
+            ["clienteId"] = ana.ClienteId.ToString(),
         });
         _c.Destinatario(ana).Status.Should().Be(StatusCampanhaDestinatario.Enfileirado);
+    }
+
+    [Fact]
+    public async Task ClienteVaiNosMetadadosParaOEnvioReconferirBloqueioEConsentimento()
+    {
+        // #2746: sem o clienteId o provider não reconfere bloqueio nem consentimento no momento do envio.
+        var campanha = _c.Campanha();
+        var ana = _c.Pendente(campanha, "Ana");
+
+        await _c.Disparar().ExecuteAsync(_c.EmpresaId, campanha.Id, OrigemOndaCampanha.Agendamento);
+
+        _c.Mensagens.Single().LerMetadados().Should().Contain("clienteId", ana.ClienteId.ToString());
     }
 
     [Fact]
