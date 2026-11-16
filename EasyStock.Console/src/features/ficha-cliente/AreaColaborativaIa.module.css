@@ -7,7 +7,7 @@
 .orientar summary { color: var(--tinta-2); min-height: var(--toque); display: flex; align-items: center; cursor: pointer; font-size: var(--t-micro); }
 /* #2232 (F5): os blocos do assistente crescem com o conteúdo; quem rola é a Ficha (.conteudo). */
 .blocos { display: grid; gap: var(--e-3); min-width: 0; }
-.bloco { min-width: 0; padding: var(--e-3); background: var(--preenchimento); animation: inserir 150ms var(--ease-padrao); }
+.bloco { min-width: 0; padding: var(--e-3); background: var(--preenchimento); animation: global(esmaecer) var(--dur-curta) var(--ease-saida) both; }
 .cabecalhoBloco { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
 .cabecalhoBloco h4 { font-size: var(--t-apoio); }
 .texto, .nota { margin: var(--e-2) 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -18,5 +18,3 @@
 .total { display: flex; justify-content: space-between; gap: var(--e-2); }
 .endereco { overflow-wrap: anywhere; }
 .erro { color: var(--erro); margin: 0; }
-@keyframes inserir { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .bloco { animation: none; } }

@@ -83,7 +83,7 @@ function ItemComanda({
                 <button type="button" aria-label="Menos um" onClick={() => aoAjustar(linha.sku, -1)}>
                   <Icone nome="menos" rotulo={`Tirar uma unidade de ${linha.produto?.nome}`} />
                 </button>
-                <b>{linha.qtd}</b>
+                <b aria-live="polite">{linha.qtd}</b>
                 <button type="button" aria-label="Mais um" onClick={() => aoAjustar(linha.sku, 1)}>
                   <Icone nome="mais" rotulo={`Mais uma unidade de ${linha.produto?.nome}`} />
                 </button>

@@ -147,7 +147,7 @@ export const CartaoConversa = memo(function CartaoConversa({
           </span>
           {pendentes > 0 && (
             <Pilula
-              contagem={pendentes} tom="marca" className={css.naoLidas}
+              contagem={pendentes} key={pendentes} tom="marca" className={css.naoLidas}
               aria-label={pendentes === 1 ? '1 mensagem sem resposta' : `${pendentes} mensagens sem resposta`}
               titulo={pendentes === 1 ? '1 mensagem sem resposta' : `${pendentes} mensagens sem resposta`}
             />

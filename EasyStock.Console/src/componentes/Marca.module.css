@@ -1,4 +1,6 @@
 .marca { display: inline-flex; align-items: center; gap: var(--e-2); flex: none; }
-.marca img { display: block; width: 120px; height: 80px; object-fit: contain; background: var(--branco); }
+/* #2762 (VE1): o logo tem fundo branco próprio. Cantos do token nos dois temas; o fio de contorno entra só no
+   escuro, onde o branco vira um retângulo vivo. No claro o fio desenharia uma caixa em volta do logo. */
+.marca img { display: block; width: 120px; height: 80px; object-fit: contain; background: var(--branco); border-radius: var(--r-1); box-shadow: 0 0 0 var(--b-1) light-dark(transparent, var(--linha)); }
 .produto { font-family: var(--f-corpo); font-size: var(--t-micro); font-weight: 700; color: var(--tinta-2); }
 .compacta img { width: 66px; height: 44px; }

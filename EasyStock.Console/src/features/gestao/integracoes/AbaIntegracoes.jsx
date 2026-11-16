@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAcoes, useCatalogo } from '../../../aplicacao/contextos'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
 import {
@@ -32,7 +33,7 @@ function CartaoProvedor({ provedor, config, padrao, acoes }) {
   }
 
   return (
-    <li className={css.cartao}>
+    <li className={`${css.cartao} ${ativo ? '' : css.desligado}`}>
       <div className={css.cabecalho}>
         <strong className={css.nomeProvedor}>{provedor.rotulo}</strong>
         <Chip
@@ -99,7 +100,7 @@ export function AbaIntegracoes() {
   if (!integracoesLogistica) {
     return (
       <div className={css.aba}>
-        <output>Carregando integrações…</output>
+        <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 3)">Carregando integrações…</EsqueletoDeLista>
       </div>
     )
   }

@@ -16,15 +16,38 @@
     box-shadow var(--dur-curta) var(--ease-padrao);
 }
 .controle:is(input, select) { height: var(--toque); padding-block: var(--e-1); }
-.controle:hover:not(:disabled) { background: var(--preenchimento-forte); }
-.controle:focus { outline: none; background: var(--preenchimento-forte); border-color: var(--marca); }
+/* #2762 (VC11, VH6, VG7): a seta do select é a da casa. A nativa muda de desenho e de cor por navegador e
+   tema (clara demais no Chrome escuro, em dupla no Safari). Dois gradientes desenham o triângulo na tinta 2,
+   a 12 px da borda como o texto. Hover, foco e desabilitado trocam só a cor de fundo para não apagar a seta. */
+select.controle {
+  -webkit-appearance: none; appearance: none; padding-right: var(--e-6);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--tinta-2) 50%),
+    linear-gradient(135deg, var(--tinta-2) 50%, transparent 50%);
+  background-position: calc(100% - var(--e-4)) 50%, calc(100% - var(--e-3)) 50%;
+  background-size: var(--e-1) var(--e-1);
+  background-repeat: no-repeat;
+}
+.controle:hover:not(:disabled) { background-color: var(--preenchimento-forte); }
+.controle:focus { outline: none; background-color: var(--preenchimento-forte); border-color: var(--marca); }
 .controle:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 /* #2621: o desabilitado segue o do Botao (#2258): sem preenchimento e com a linha tracejada, em vez de
    só clarear o texto sobre o mesmo fundo do campo ativo. */
 .controle:disabled {
-  background: transparent; border-style: dashed; color: var(--tinta-3); cursor: not-allowed;
+  background-color: transparent; border-style: dashed; color: var(--tinta-3); cursor: not-allowed;
 }
 .controle::placeholder { color: var(--tinta-3); }
+/* #2762 (VE2): o X nativo da busca era azul no claro e branco grosso no escuro. Mesmo botão, desenhado como
+   máscara na tinta do tema: tinta 2 parado, tinta cheia sob o ponteiro (só WebKit/Blink; o Firefox não tem X). */
+.controle::-webkit-search-cancel-button {
+  -webkit-appearance: none; appearance: none; width: var(--e-4); height: var(--e-4); margin-left: var(--e-2); cursor: pointer;
+  background-color: var(--tinta-2);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 5.4 5.4 4 12 10.6 18.6 4 20 5.4 13.4 12 20 18.6 18.6 20 12 13.4 5.4 20 4 18.6 10.6 12z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 5.4 5.4 4 12 10.6 18.6 4 20 5.4 13.4 12 20 18.6 18.6 20 12 13.4 5.4 20 4 18.6 10.6 12z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.controle::-webkit-search-cancel-button:hover { background-color: var(--tinta); }
+/* Vazio, o X sai do desenho: escondido ele ainda ocupava 24 px e cortava o fim do texto de exemplo. */
+.controle:placeholder-shown::-webkit-search-cancel-button { display: none; }
 .area { min-height: 96px; resize: vertical; }
 .dica { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
 .controle[aria-invalid='true'] { box-shadow: inset 0 0 0 var(--b-2) var(--erro); }

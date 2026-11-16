@@ -2,7 +2,9 @@
    abaixo de qualquer <dialog> (camada de cima do navegador). Papel com tinta: par já conferido
    pelo `npm run contraste`; a cor do tom fica só na borda e no ícone, nunca no texto. */
 .pilha {
-  position: fixed; top: var(--e-4); right: var(--e-4); z-index: 90;
+  /* #2762 (VD4): no desktop a pilha parte abaixo do topo (a mesma medida do celular) e não cobre mais o
+     relógio nem as abas. */
+  position: fixed; top: calc(var(--altura-regiao) + var(--e-2)); right: var(--e-4); z-index: 90;
   display: grid; gap: var(--e-2); justify-items: end;
   width: min(24rem, calc(100vw - 2 * var(--e-16)));
   pointer-events: none;
@@ -10,12 +12,15 @@
 .aviso {
   pointer-events: auto; width: 100%;
   display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: var(--e-2);
-  padding: var(--e-3) var(--e-2) var(--e-3) var(--e-3);
+  padding: var(--e-3) var(--e-2) var(--e-3) calc(var(--e-3) + var(--trilho));
   border: 0;
   border-radius: var(--r-2); background: var(--papel); color: var(--tinta);
-  box-shadow: var(--sombra-media);
+  /* #2762 (A3): o tom é o filete da esquerda (o mesmo trilho do Bloco destacado), valendo também sem ícone. */
+  box-shadow: inset var(--trilho) 0 0 var(--tom, var(--marca)), var(--sombra-media);
   animation: entrarAviso var(--dur-media) var(--ease-saida) both;
 }
+/* #2762 (A5): o aviso dispensado fica mais um instante só para sair; não aceita ponteiro nem foco (inert). */
+.saindo { pointer-events: none; animation: sairAviso var(--dur-curta) var(--ease-entrada) both; }
 .marca { --tom: var(--marca); }
 .sucesso { --tom: var(--sucesso); }
 .alerta { --tom: var(--alerta); }
@@ -34,6 +39,7 @@ button.texto:focus-visible { outline: var(--b-3) solid var(--marca); outline-off
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
 }
+@keyframes sairAviso { to { opacity: 0; transform: translateY(-4px); } }
 /* #1989: no rodapé a pilha cobria a barra de abas (Balcão, Atendimento, Resumo) e a faixa Imprimir,
    que mudam de altura. No celular ela fica em cima, logo abaixo do topo (64 px em moldura.module.css,
    mais o recorte da tela): não cobre o menu nem o sino, só o começo do conteúdo, por 6 s. */

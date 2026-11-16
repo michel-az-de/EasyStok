@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useDroppable, useSensor, useSensors,
 } from '@dnd-kit/core'
@@ -18,6 +18,7 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { Botao } from '../../componentes/Botao'
 import { Chip } from '../../componentes/Chip'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
 import { Icone } from '../../componentes/Icone'
 import { Vazio } from '../../componentes/Vazio'
 import { CartaoKds, CartaoKdsErguido } from './CartaoKds'
@@ -183,7 +184,7 @@ export function TelaCozinhaApi({ linhas }) {
         </p>
       )}
       {pedidos === null
-        ? !erro && <output className={css.aviso}>Carregando a fila da cozinha…</output>
+        ? !erro && <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 2)">Carregando a fila da cozinha…</EsqueletoDeLista>
         : (
           <DndContext
             sensors={sensores} collisionDetection={colisaoPorColuna}
@@ -290,17 +291,21 @@ export function TelaCozinhaApi({ linhas }) {
 function PerguntaDoSaldo({ saldo, pedido, ocupado, aoReceber, aoEntregarSemReceber, aoVoltar }) {
   const [metodo, setMetodo] = useState(() => metodoSugeridoNaPorta(pedido.observacoes))
   const troco = trocoDaPorta(pedido.observacoes, saldo.valor)
+  // #2762: o foco vai para o botão que confirma, como a confirmação da corrida (CorridaLalamove).
+  const receberRef = useRef(null)
+  useEffect(() => { receberRef.current?.focus() }, [])
   return (
-    <div className={css.motivoRecusa} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
+    // Pergunta neutra (não é erro): tom de apoio no lugar do vermelho do `.motivoRecusa`.
+    <div className={css.motivoRecusa} style={{ background: 'var(--preenchimento)', color: 'var(--tinta)' }} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
       <Icone nome="alerta" tamanho={16} />
       <span>
         {nomeDoPedido(pedido).frase}: falta receber {moeda(saldo.valor)}. Recebeu na porta? Diga como e o pagamento
         entra no Caixa junto com a entrega.{troco && <> {troco}.</>}
       </span>
-      <span>
+      <span className={css.acoesCartao}>
         <CampoSelecao rotulo="Como recebeu" rotuloOculto opcoes={METODOS_NA_PORTA} value={metodo}
           disabled={ocupado} onChange={(e) => setMetodo(e.target.value)} />
-        <Botao variante="primario" disabled={ocupado || !metodo} onClick={() => aoReceber(metodo)}>
+        <Botao ref={receberRef} variante="primario" disabled={ocupado || !metodo} aria-busy={ocupado} onClick={() => aoReceber(metodo)}>
           Recebi {moeda(saldo.valor)}
         </Botao>
         <Botao variante="secundario" disabled={ocupado} onClick={aoEntregarSemReceber}>Entregue sem receber</Botao>

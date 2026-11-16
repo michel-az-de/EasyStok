@@ -4,6 +4,7 @@
 import { useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { CampoReais } from '../../../componentes/CampoReais'
 import { Chip } from '../../../componentes/Chip'
@@ -239,7 +240,7 @@ function Lancamentos({ dia, executar, podeGerenciar, enviando }) {
   const lancamentos = lancamentosEmOrdem(dia)
   const podeEstornar = (m) => podeGerenciar && !dia.fechado && !m.estornadoEm && !m.devolucaoPedido && !m.pagamentoDeConta && (m.tipo === TIPOS_MOVIMENTO.ENTRADA || m.tipo === TIPOS_MOVIMENTO.SAIDA)
 
-  if (lancamentos.length === 0) return <p className={css.corpoBloco}>Nenhum lançamento neste caixa.</p>
+  if (lancamentos.length === 0) return <Vazio variante="linha" titulo="Nenhum lançamento neste caixa." />
   return (
     <>
       <h3 className={css.tituloSecao}>Lançamentos</h3>
@@ -486,7 +487,7 @@ export function AbaCaixaApi() {
   const [conferindo, setConferindo] = useState(false)
   const [avisoDoFechamento, setAvisoDoFechamento] = useState(null)
 
-  if (caixa.estado === 'carregando') return <output className={css.corpoBloco}>Carregando o caixa…</output>
+  if (caixa.estado === 'carregando') return <EsqueletoDeLista linhas={5} altura="var(--toque)">Carregando o caixa…</EsqueletoDeLista>
   if (caixa.estado === 'erro' && !caixa.dia) {
     return (
       <Vazio icone="alerta" role="alert" titulo="O caixa não carregou"
@@ -555,7 +556,7 @@ export function AbaCaixaApi() {
           <h3 className={css.tituloSecao}>Movimento de hoje</h3>
           {comMovimento
             ? <p className={css.corpoBloco}>Já tem dinheiro no dia, mesmo sem abrir o caixa. Ao abrir, informe só o troco: o que entrou hoje já está na conta.</p>
-            : <p className={css.corpoBloco}>Nada entrou nem saiu hoje ainda.</p>}
+            : <Vazio variante="linha" titulo="Nada entrou nem saiu hoje ainda." />}
           {comMovimento && <ResumoDoDia dia={dia} gaveta={gaveta} semAbertura />}
           {devolucoesPendentes}
         </>

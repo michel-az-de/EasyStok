@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
@@ -37,7 +38,7 @@ export function AbaPerdasApi() {
   }
   const confirmar = (acao) => executar(acao).then((ok) => { if (ok) setConfirmando(null) })
 
-  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as perdas…</output>
+  if (gestao.estado === 'carregando') return <EsqueletoDeLista linhas={4} altura="calc(var(--toque) * 2)">Carregando as perdas…</EsqueletoDeLista>
   if (gestao.estado === 'erro' && !gestao.resumo) {
     return (
       <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as perdas"
@@ -153,14 +154,14 @@ export function AbaPerdasApi() {
           )}
         </dl>
         {(resumo?.porMotivo ?? []).length > 0 && (
-          <p className={css.descricao}>{resumo.porMotivo.map((m) => `${m.rotulo}: ${m.valor > 0 || !(m.quantidade > 0) ? moeda(m.valor) : 'sem custo'}`).join(' · ')}</p>
+          <ul className={css.chips} aria-label="Perdas por motivo">{resumo.porMotivo.map((m) => <li key={m.motivo ?? m.rotulo}><Pilula fina>{`${m.rotulo}: ${m.valor > 0 || !(m.quantidade > 0) ? moeda(m.valor) : 'sem custo'}`}</Pilula></li>)}</ul>
         )}
         {(resumo?.lancamentos ?? []).length === 0 ? (
           <Vazio variante="linha" titulo="Nenhuma perda no período. Use Lançar perda, no topo, para registrar a primeira." />
         ) : (
           <ul className={css.lista}>
             {resumo.lancamentos.map((l) => (
-              <li key={l.id} className={css.linha}>
+              <li key={l.id} className={`${css.linha} ${css.linhaPerda}`}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{l.nome}</span>
                   <span className={css.detalhe}>{quando(l.data)} · {qtd(l.quantidade)} · {textoDaPerda(l)}{l.lote ? ` · ${l.lote}` : ''}</span>

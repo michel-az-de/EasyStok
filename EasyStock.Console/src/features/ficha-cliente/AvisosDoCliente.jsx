@@ -9,6 +9,7 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { podeVerAvisosDoCliente } from '../../dominio/acessoModulos'
 import css from './cliente.module.css'
+import local from './AvisosDoCliente.module.css'
 
 const CANAIS = [
   { aviso: 'email', rotulo: 'E-mail' },
@@ -17,7 +18,7 @@ const CANAIS = [
 
 function Caixas({ avisos, aoMudar, desabilitado }) {
   return CANAIS.map(({ aviso, rotulo }) => (
-    <label key={aviso} className={css.avisoCanal}>
+    <label key={aviso} className={`${css.avisoCanal} ${local.caixa}`}>
       <input
         type="checkbox"
         checked={Boolean(avisos?.[aviso])}

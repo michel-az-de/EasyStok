@@ -79,7 +79,8 @@ try {
   const { page, context, controle, erros } = await preparar({ demora: 900 })
   const atendimento = page.locator('[data-indicador="atendimento"]')
   await atendimento.locator('xpath=self::*[@data-estado="carregando"]').waitFor()
-  assert.equal(await atendimento.locator('strong').innerText(), '—')
+  // #2762 (B10): a espera é um esqueleto do tamanho do número, com "Carregando…" para o leitor de tela; o traço fica para a falha.
+  assert.equal(await atendimento.locator('strong').innerText(), 'Carregando…')
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
   assert.equal(await page.locator('[data-indicador="cozinha"] strong').innerText(), '2')
@@ -227,7 +228,7 @@ try {
   }, { empresa, usuario })
   await page.getByRole('heading', { name: /Outra/ }).waitFor()
   assert.equal((await ordem(page))[0], 'atendimento') // #2258 A2: ordem padrão começa pelo Atendimento
-  assert.equal(await atendimento.locator('strong').innerText(), '—')
+  assert.equal(await atendimento.locator('strong').innerText(), 'Carregando…') // #2762 (B10): esqueleto na espera
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
   assert.equal(await page.evaluate((chave) => JSON.parse(localStorage.getItem(chave)).ordem[0], chave), 'producao')

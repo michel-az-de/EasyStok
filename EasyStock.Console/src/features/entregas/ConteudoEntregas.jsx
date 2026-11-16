@@ -208,7 +208,7 @@ export function ConteudoEntregas({
         <div className={css.colunas}>
           <section className={css.coluna}>
             <h2>Entregas sem viagem</h2>
-            {soltas.length === 0 && <p className={css.proximaConferencia}>Nenhuma entrega solta agora.</p>}
+            {soltas.length === 0 && <Vazio variante="linha" titulo="Nenhuma entrega solta agora." />}
             {grupos
               ? (
                 <div className={css.listaColuna}>

@@ -7,23 +7,32 @@
 .respiro {
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
   padding: var(--e-3); margin-bottom: var(--e-4);
-  border: 0; border-radius: var(--r-1); background: var(--fundo);
+  border-radius: var(--r-2); background: var(--elevado);
 }
 .respiro label { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
-.respiroCampo { width: 88px; }
+/* #2762: o campo de respiro tem o desenho dos campos da casa (raio, preenchimento, altura de toque); a largura é só dele. */
+.respiroCampo { width: 88px; box-sizing: border-box; min-height: var(--toque); padding: var(--e-1) var(--e-3); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta); font: inherit; font-size: var(--t-corpo); transition: background-color var(--dur-curta) var(--ease-padrao), border-color var(--dur-curta) var(--ease-padrao); }
+.respiroCampo:hover { background: var(--preenchimento-forte); }
+.respiroCampo:focus { border-color: var(--marca); }
 .respiroDica { margin: 0; font-size: var(--t-apoio); color: var(--tinta-3); flex: 1 1 220px; }
 
 .barra { display: flex; justify-content: flex-end; margin-bottom: var(--e-3); }
 .toqueAcao { min-height: var(--toque); }
+/* #2762: com o formulário aberto o botão fica um degrau mais escuro (aria-expanded), sem mudar de lugar. */
+.toqueAcao[aria-expanded='true'] { background: var(--acao-forte); }
 
 .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
 
 .item {
-  border: 0; border-radius: var(--r-1);
-  padding: var(--e-3); background: var(--fundo);
+  border: 0; border-radius: var(--r-2);
+  padding: var(--e-3); background: var(--elevado);
 }
-.pausada { opacity: .68; }
-.itemNovo { border-style: dashed; border-color: var(--linha-forte); background: var(--papel); }
+/* #2762: só a identidade e a meta esmaecem; os botões de ação seguem opacos (contraste inteiro). */
+.identidade, .metaLinha { transition: opacity var(--dur-curta) var(--ease-padrao); }
+.pausada .identidade, .pausada .metaLinha { opacity: .68; }
+/* #2762: a borda precisa de largura para existir (o .item zera a dele). */
+.itemNovo { border: var(--b-1) dashed var(--linha-forte); background: var(--papel); }
+.tituloNovo { margin: 0 0 var(--e-2); font-size: var(--t-forte); color: var(--tinta); }
 
 .linhaItem { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .identidade { display: flex; align-items: baseline; gap: var(--e-2); flex-wrap: wrap; min-width: 0; }
@@ -32,9 +41,12 @@
 .confirmacaoInline {
   display: grid; gap: var(--e-2); margin-top: var(--e-2); padding: var(--e-2) var(--e-3);
   background: var(--elevado); border-radius: var(--r-1); font-size: var(--t-apoio);
+  animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
 .confirmacaoInline p { margin: 0; }
 .acoesTopo { display: flex; gap: var(--e-2); margin-left: auto; flex-wrap: wrap; }
+/* #2762: no celular os três botões (Editar, Pausar, Excluir) cabem numa linha: folga lateral menor e vão curto. */
+@media (max-width: 620px) { .acoesTopo { gap: var(--e-1); } .acoesTopo > button { padding-inline: var(--e-2); } }
 
 .metaLinha {
   display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
@@ -44,10 +56,10 @@
 .rotuloCampo { margin: 0; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
 .dias { display: flex; gap: var(--e-1); flex-wrap: wrap; margin-top: var(--e-2); }
 
-.campos { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--e-2); }
-@media (max-width: 620px) { .campos { grid-template-columns: repeat(2, 1fr); } }
+.campos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-2); }
+@media (max-width: 620px) { .campos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-.campoLinha { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-2); }
+.campoLinha { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--e-2); }
 
 .porLinha {
   display: grid; gap: var(--e-2); margin-top: var(--e-2); padding: var(--e-2) var(--e-3);
@@ -66,9 +78,8 @@
 .edicao {
   margin-top: var(--e-3); padding-top: var(--e-3); border-top: var(--b-1) solid var(--linha);
   display: grid; gap: var(--e-2);
-  animation: abrirEdicao var(--dur-media) var(--ease-saida);
+  animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
-@keyframes abrirEdicao { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 .aviso {
   display: flex; align-items: center; gap: var(--e-1); margin: var(--e-2) 0 0;

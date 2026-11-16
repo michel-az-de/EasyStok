@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Icone } from '../../../componentes/Icone'
 import { filtrarCardapio } from '../../../dominio/vitrineCardapio'
 import { agruparApresentacoes } from '../../../dominio/apresentacoesDoCardapio'
@@ -44,7 +45,7 @@ export function FotosCardapio({ acervo: a, aoEscolherPrato }) {
       <Icone nome="busca" tamanho={20} />
       <input type="search" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, categoria ou porção" />
     </label>
-    {a.carregando ? <p role="status">Carregando fotos…</p> : a.erro ? <div className={css.acoes}><p>Não foi possível carregar as fotos agora.</p><Botao onClick={() => a.carregar().catch((e) => a.setErro(e.message))}>Tentar de novo</Botao></div> : <>
+    {a.carregando ? <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 5)">Carregando fotos…</EsqueletoDeLista> : a.erro ? <div className={css.acoes}><p>Não foi possível carregar as fotos agora.</p><Botao onClick={() => a.carregar().catch((e) => a.setErro(e.message))}>Tentar de novo</Botao></div> : <>
       <div className={css.gradeFotos}>{grupos.map(grupo => <FotosDoGrupo key={grupo.nome + grupo.itens[0].cardapioItemId} grupo={grupo} fotoUrl={a.fotoUrl} aoEscolherPrato={aoEscolherPrato} ocupado={a.ocupado} />)}</div>
       {!encontradas.length && <p>{fotos.length ? 'Nenhuma foto encontrada para esta busca.' : 'Os produtos ainda não têm foto de capa.'}</p>}
     </>}

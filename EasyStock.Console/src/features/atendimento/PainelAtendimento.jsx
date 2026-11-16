@@ -116,10 +116,11 @@ export function PainelAtendimento({
       )
     }
     if (carga === 'erro') {
-      return <Vazio titulo="Não consegui carregar as conversas">Tento de novo em instantes.</Vazio>
+      return <Vazio centro icone="conversa" titulo="Não consegui carregar as conversas">Tento de novo em instantes.</Vazio>
     }
     return (
       <Vazio
+        centro icone="conversa"
         titulo={primeira ? 'Escolha uma conversa' : 'Nenhuma conversa para exibir'}
         acao={primeira && (
           <Botao variante="primario" onClick={() => selecionar(primeira.id)}>

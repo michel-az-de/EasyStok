@@ -1,18 +1,24 @@
 .faixa {
   position: fixed;
   left: 50%;
-  bottom: 12px;
+  /* #2762: acima da barra de abas do celular e sem encolher a 50vw (o texto quebrava em 4 linhas). */
+  bottom: calc(var(--e-4) + var(--toque) + var(--e-3) + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   z-index: 60;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 12px;
+  gap: var(--e-3);
+  width: max-content;
+  max-width: min(720px, calc(100vw - 2 * var(--e-4)));
+  padding: var(--e-1) var(--e-3);
   font-size: var(--t-micro);
-  color: var(--tinta-2);
-  background: var(--elevado);
-  border: 1px solid var(--linha);
+  color: var(--erro);
+  background: var(--erro-pastel);
+  border: var(--b-1) solid var(--erro);
   border-radius: var(--r-2);
+  box-shadow: var(--sombra-media);
+  /* `esmaecer` só mexe na opacidade: `surgir` sobrescreveria o translateX de centralizar. */
+  animation: global(esmaecer) var(--dur-media) var(--ease-saida) both;
 }
 
 .empilhada {
@@ -20,11 +26,11 @@
   transform: none;
   flex-shrink: 0;
   align-self: center;
-  width: min(720px, calc(100vw - 24px));
-  margin: 6px 12px;
+  width: min(720px, calc(100vw - 2 * var(--e-3)));
+  margin: var(--e-1) var(--e-3);
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: var(--e-1);
 }
 
 .quadro { display: flex; flex-direction: column; height: 100%; min-height: 0; }

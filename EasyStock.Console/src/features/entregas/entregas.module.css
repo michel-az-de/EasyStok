@@ -14,12 +14,12 @@
 
 /* Ocupação em texto. Só a janela estourada ganha peso e cor. */
 .chipCheio {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 var(--e-3);
+  display: inline-flex; align-items: center; gap: var(--e-1); min-height: 32px; padding: 0 var(--e-3);
   border-radius: var(--r-pilula); background: var(--erro-pastel); color: var(--erro);
   font-size: var(--t-apoio); font-weight: 700; font-family: var(--f-dado); white-space: nowrap;
 }
 .chipCheio::before {
   content: ''; width: var(--ponto); height: var(--ponto); border-radius: var(--r-pilula);
-  background: currentColor; animation: piscaCheio 2.4s var(--ease-padrao) infinite;
+  background: currentColor;
 }
-@keyframes piscaCheio { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+/* #2762: sem pisca infinito (distraía na tela de cozinha): o aviso é a cor, o ponto e o texto. */

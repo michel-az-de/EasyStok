@@ -35,6 +35,8 @@ const minuscula = (texto) => texto.charAt(0).toLowerCase() + texto.slice(1)
 // ponto e, se ainda passar de 28 letras, na última palavra que cabe.
 const LIMITE_DO_CHIP = 28
 export function chipDoMotivo(motivo) {
+  // #2762: o motivo padrão virava "O Assistente preferiu não…" e escondia o chip Lead/Contato; o texto inteiro segue no title e na conversa.
+  if (motivo === MOTIVO_PADRAO) return 'Assistente passou'
   const conhecido = rotuloCurtoDoMotivo(motivo)
   if (conhecido) return conhecido
   const assunto = String(motivo ?? '').split(/[,.;:(]/)[0].trim()

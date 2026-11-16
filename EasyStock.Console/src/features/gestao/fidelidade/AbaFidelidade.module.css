@@ -23,11 +23,18 @@
 .detalheLinha { flex: 1 1 160px; min-width: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
 .linhaSorteio { display: grid; gap: var(--e-2); }
+/* #2762 (F10): a linha do sorteio é botão: responde ao ponteiro e marca a aberta. */
+button.linha { cursor: pointer; transition: background-color var(--dur-curta) var(--ease-padrao), border-color var(--dur-curta) var(--ease-padrao); }
+button.linha:hover { background: var(--preenchimento-forte); }
+button.linha[aria-expanded='true'] { border-color: var(--marca); }
+.semParticipantes, .listaParticipantes { animation: global(surgir) var(--dur-media) var(--ease-saida) both; }
 .semParticipantes { margin: 0 0 0 var(--e-5); font-size: var(--t-apoio); color: var(--tinta-3); }
 .listaParticipantes {
   margin: 0 0 0 var(--e-5); padding: 0 0 0 var(--e-4); font-size: var(--t-apoio); color: var(--tinta-2);
 }
 
+/* #2762 (F12): o formulário que abre no lugar entra com a animação de camada. */
+.formLinha { animation: global(surgir) var(--dur-media) var(--ease-saida) both; }
 .formLinha {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--e-3);
   padding: var(--e-3); border: 0; border-radius: var(--r-2);

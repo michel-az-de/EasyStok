@@ -44,7 +44,7 @@ export function ComandaKds({
       aoFechar={aoFechar}
       rodape={(
         <>
-          <Botao variante="texto" disabled={reimpressao === 'enviando'} onClick={reimprimir}>
+          <Botao variante="texto" disabled={reimpressao === 'enviando'} aria-busy={reimpressao === 'enviando'} onClick={reimprimir}>
             {reimpressao === 'enviando' ? 'Reenviando…' : 'Reimprimir na fila'}
           </Botao>
           {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}

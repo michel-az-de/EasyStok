@@ -14,10 +14,16 @@
 .item > span { min-width: 0; overflow-wrap: anywhere; }
 .preparacao { display: block; font-size: var(--t-micro); font-weight: 400; color: var(--tinta-2); margin-top: var(--e-1); }
 .itemAtivo, .itemAtivo:hover { background: var(--preenchimento-forte); color: var(--tinta); box-shadow: none; }
+/* #2762 (VJ16): o item atual leva também uma barra de 3 px; no escuro o fundo sozinho quase some no painel. */
+.itemAtivo { position: relative; }
+.itemAtivo::before { content: ''; position: absolute; left: 0; top: var(--e-2); bottom: var(--e-2); width: var(--b-3); border-radius: var(--r-pilula); background: var(--acao); }
 .item > svg, .modulo > svg, .titulo > svg { flex: none; }
-/* Ícone de marca de 32 px ocupa o mesmo espaço de 24 px dos vizinhos: a linha e o texto alinham. */
-.item > svg[width="32"] { margin: calc(-1 * var(--e-1)); }
-.item:focus-visible, .voltar:focus-visible, .link:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+/* Ícone de marca de 32 px ocupa o mesmo espaço de 24 px dos vizinhos: a linha e o texto alinham.
+   #2762 (VJ4): o MarcaIcone escreve `width="32px"` e a regra só pegava `"32"`. No menu a compensação é dos quatro
+   lados (o eixo dos ícones e a coluna do texto alinham); no título e na barra é só na altura, porque ali não há
+   coluna de ícones e a de lado punha o ícone para fora da margem do conteúdo. */
+:is(.item, .nomeMenu) > svg:is([width="32"], [width="32px"]) { margin: calc(-1 * var(--e-1)); }
+:is(.modulo, .titulo) > svg:is([width="32"], [width="32px"]) { margin-block: calc(-1 * var(--e-1)); }
 .barra { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); padding: var(--e-2) var(--e-3); flex: none; }
 .contexto, .acoes { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); min-width: 0; }
 .acoes { margin-left: auto; }
@@ -31,6 +37,8 @@
 .folha { min-height: 100%; padding: var(--e-4); border: 0; border-radius: var(--r-2); box-shadow: none; background: var(--papel); }
 .titulo { display: flex; align-items: center; gap: var(--e-2); margin: 0 0 var(--e-4); font-size: var(--t-titulo); font-weight: 700; line-height: var(--lh-compacto); }
 .conteudo { min-width: 0; }
+/* #2762 (B11): a troca de tela e de módulo entra com um esmaecer curto, sem deslocamento (a chave da tela remonta o bloco). */
+.conteudo, .operacao { animation: global(esmaecer) var(--dur-media) var(--ease-saida) backwards; }
 .link { font-weight: 700; color: var(--marca); }
 .espacoTrilho { composes: espaco from '../../componentes/Trilho.module.css'; }
 .avatarTrilho { composes: avatar from '../../componentes/Trilho.module.css'; }
@@ -42,7 +50,8 @@
   text-decoration: none; white-space: nowrap;
 }
 .telaNaBarra:hover { background: var(--preenchimento); color: var(--tinta); }
-.telaNaBarra:focus-visible { outline: 2px solid var(--marca); outline-offset: -2px; }
+/* A faixa rola (overflow) e cortaria o anel de fora: o de dentro tem a mesma espessura do global. */
+.telaNaBarra:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: -2px; }
 .telaAtiva, .telaAtiva:hover { background: var(--preenchimento-forte); color: var(--tinta); }
 .abrirMenu { display: none; }
 .nomeNoMenu { display: none; }
@@ -71,13 +80,31 @@
   .acoes > :global([data-ajuda-console]) { font-size: 0; gap: 0; width: var(--toque); padding: 0; }
   .ajuste { padding: 0 var(--e-2) var(--e-2); }
   .folha { padding: var(--e-3); }
+
+  /* #2762 (VI15): no celular, só no escuro, a folha tem borda: ali o papel e o fundo quase se igualam e o cartão
+     perdia o limite. No claro o contraste do papel basta e a borda viraria uma linha a mais. */
+  .folha { border: var(--b-1) solid light-dark(transparent, var(--linha)); }
 }
 @media (max-width: 640px) {
-  .barra { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--e-2); }
-  .telaNaBarra { flex: 0 0 auto; max-width: 100%; white-space: normal; }
-  .contexto { grid-row: 1; grid-column: 1; }
-  .acoes { display: contents; }
-  .acoes > :global([data-ajuda-console]) { grid-row: 1; grid-column: 2; }
-  .avisos { grid-row: 2; grid-column: 1 / -1; justify-self: end; }
-  .contaNaBarra { grid-row: 1; grid-column: 3; }
+  /* #2762 (VF1, VH2, VH3, VI1, VJ1): uma linha só para Menu, Buscar, Ajuda, Avisos e conta; as abas do módulo
+     ganham a linha de baixo, inteira, e rolam. O contexto some como caixa para as abas poderem descer sem grade;
+     sem grade, a ordem do Tab é a da tela. */
+  .barra { flex-wrap: wrap; gap: var(--e-1) var(--e-2); }
+  .contexto { display: contents; }
+  .abrirMenu { order: 0; margin-right: auto; }
+  .acoes { order: 1; flex-wrap: nowrap; margin-left: auto; }
+  .acoes > :global([aria-label="Buscar na Casa"]), .avisos > button { font-size: 0; gap: 0; min-width: var(--toque); padding-inline: var(--e-2); }
+  /* Os pontos do sino ficam nos cantos do ícone, como no trilho (#2256): o do aparelho à esquerda, o de "sem
+     atualizar" à direita. Soltos ao lado do sino eles alargavam o botão e liam como reticências. */
+  .avisos > button { position: relative; }
+  .avisos > button > :global([data-aparelho-desligado]) { position: absolute; top: 6px; left: 6px; margin: 0; }
+  .avisos > button > :global([data-aviso-erro]) { position: absolute; top: 6px; right: 6px; margin: 0; }
+  .telasNaBarra {
+    order: 2; flex: 0 0 auto; width: calc(100% + 2 * var(--e-2)); margin: 0 calc(-1 * var(--e-2)); padding-inline: var(--e-3);
+    scroll-snap-type: x proximity; scroll-padding-inline: var(--e-3);
+    /* Esmaece as duas bordas: avisa que há mais abas; o respiro lateral mantém a primeira e a última nítidas em repouso. */
+    -webkit-mask-image: linear-gradient(to right, transparent, var(--tinta) var(--e-3), var(--tinta) calc(100% - var(--e-3)), transparent);
+    mask-image: linear-gradient(to right, transparent, var(--tinta) var(--e-3), var(--tinta) calc(100% - var(--e-3)), transparent);
+  }
+  .telaNaBarra { flex: 0 0 auto; scroll-snap-align: center; }
 }

@@ -51,6 +51,8 @@ registerHooks({
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))
     // #2079 (C1): a pergunta do saldo usa o CampoSelecao, que mora em `Campo.jsx` com os outros campos.
     if (url.endsWith('/componentes/Campo.jsx')) return inline("export const CampoSelecao='CampoSelecao',CampoTexto='CampoTexto'")
+    // #2762: a espera da cozinha usa o EsqueletoDeLista, que mora em `Esqueleto.jsx` com o Esqueleto.
+    if (url.endsWith('/componentes/Esqueleto.jsx')) return inline("export const Esqueleto='Esqueleto',EsqueletoDeLista='EsqueletoDeLista'")
     if (url.endsWith('.jsx')) {
       const nome = url.split('/').at(-1).slice(0, -4)
       return inline(`export const ${nome}='${nome}'`)

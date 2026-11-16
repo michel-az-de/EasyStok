@@ -27,10 +27,12 @@
   display: inline-flex; align-items: center; gap: 4px;
   min-height: var(--toque); min-width: var(--toque); justify-content: center;
   border: 0; background: none; border-radius: var(--r-1); color: var(--tinta-2); cursor: pointer;
-  transition: background 180ms ease, color 180ms ease;
+  transition: background var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao);
 }
 .cartaoIcone:hover { background: var(--elevado); }
-.confirmarTirar { width: auto; padding: 0 var(--e-2); color: var(--erro); background: var(--erro-pastel); }
+/* #2762: mesma especificidade do :hover do .cartaoIcone, senão o hover cinza apaga o estado destrutivo. */
+.cartaoIcone.confirmarTirar { width: auto; padding: 0 var(--e-2); color: var(--erro); background: var(--erro-pastel); }
+.cartaoIcone.confirmarTirar:hover { background: color-mix(in srgb, var(--erro-pastel) 80%, var(--erro)); }
 .cartaoEnviar { margin-left: auto; }
 /* #1587: foto que não saiu, escrita logo abaixo do botão do próprio cartão. */
 .cartaoFalha { margin: 0; padding: 0 var(--e-3) var(--e-2); color: var(--erro); font-size: var(--t-apoio); text-align: right; }

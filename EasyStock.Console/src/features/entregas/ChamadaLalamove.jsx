@@ -47,7 +47,7 @@ export function ChamadaLalamove({ travado, cotar, chamar, destino }) {
                   onClick={() => setVeiculo(v.valor)}>{v.rotulo}</Chip>
               ))}
             </div>
-            <Botao variante="primario" disabled={travado} onClick={cotarAgora}>{travado ? 'Cotando…' : 'Ver preço'}</Botao>
+            <Botao variante="primario" disabled={travado} aria-busy={travado} onClick={cotarAgora}>{travado ? 'Cotando…' : 'Ver preço'}</Botao>
           </div>
         )}
     </section>

@@ -3,6 +3,7 @@ import { Botao } from '../../componentes/Botao'
 import { Chip } from '../../componentes/Chip'
 import { CampoTexto } from '../../componentes/Campo'
 import { Pilula } from '../../componentes/Pilula'
+import { Vazio } from '../../componentes/Vazio'
 import { DIAS_DA_SEMANA as DIAS_CURTOS, faixaDeHorarios } from '../../dominio/entrega'
 import {
   CAPACIDADE_TETO, DIAS_DA_SEMANA, camposDaJanela, corpoJanela, corposJanela, erroDoFormularioJanela,
@@ -153,7 +154,14 @@ export function JanelasDaLoja({ janelas, acoes, ocupado }) {
           })} />
         </div>
       )}
-      {lista.length === 0 && !criando && <p className={css.vazio}>Nenhuma janela cadastrada. Sem janela, o cliente não tem horário para escolher.</p>}
+      {lista.length === 0 && !criando && (
+        <Vazio
+          icone="relogio" titulo="Nenhuma janela cadastrada"
+          acao={<Botao variante="primario" disabled={ocupado} icone="plus" onClick={() => setCriando(true)}>Nova janela</Botao>}
+        >
+          Sem janela, o cliente não tem horário para escolher.
+        </Vazio>
+      )}
       {dias.map((d) => (
         <div key={d} className={css.diaDaSemana}>
           <h3 className={layout.dia}>{DIAS_DA_SEMANA[d]}</h3>

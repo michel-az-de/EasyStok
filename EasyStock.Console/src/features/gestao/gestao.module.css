@@ -4,10 +4,10 @@
   display: inline-flex; align-items: center; min-height: var(--toque); padding-inline: var(--e-3);
   color: var(--marca); font-weight: 600; text-decoration: underline; border-radius: var(--r-1);
 }
-.saidaPreparacao:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
 
 .inicioGestao { display: grid; gap: var(--e-6); padding-block: var(--e-3); }
-.tarefasGestao { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--e-6); align-items: start; }
+/* #2762 (VB13): coluna mínima menor, para os grupos caberem 4 a 4 em vez de 3 + 1 no modal largo. */
+.tarefasGestao { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--e-6); align-items: start; }
 .listaTarefas { display: grid; gap: var(--e-1); }
 .tarefaGestao {
   display: flex; align-items: center; gap: var(--e-3); width: 100%; min-height: var(--toque);
@@ -17,7 +17,6 @@
 .tarefaGestao span { flex: 1; }
 .tarefaGestao svg { flex: none; color: var(--tinta-2); }
 .tarefaGestao:hover { background: var(--preenchimento-forte); }
-.tarefaGestao:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .janelaGestao {
   composes: densidade-compacta from global;
   display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start;
@@ -65,9 +64,8 @@
   background: var(--preenchimento-forte); color: var(--tinta); font-weight: 700;
 }
 .painelGestao { min-width: 0; }
-.areaGestao:focus-visible, .subtelaGestao:focus-visible, .verModulos:focus-visible, .painelGestao:focus-visible {
-  outline: 2px solid var(--marca); outline-offset: 2px;
-}
+/* #2762 (F15): a subtela nova entra com um esmaecer curto, como o tablist anima a cor. */
+.painelGestao > * { animation: global(esmaecer) var(--dur-curta) var(--ease-saida) backwards; }
 .rodapeGestao { width: 100%; min-width: 0; }
 .avisosGestao { margin-bottom: var(--e-3); }
 .avisosGestao:empty { display: none; }

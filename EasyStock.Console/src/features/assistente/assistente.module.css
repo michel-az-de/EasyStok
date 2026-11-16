@@ -8,9 +8,7 @@
   width: auto; min-width: 56px; height: 56px; padding: 0 var(--e-4); gap: var(--e-2); border-radius: var(--r-pilula);
   display: flex; align-items: center; justify-content: center;
   box-shadow: var(--sombra-alta);
-  transition: transform 180ms ease;
 }
-.gatilho:hover { transform: scale(1.05); }
 /* #1868: na linha de Link de compra e Encerrar, a mesma régua deles (altura do toque, raio 1,
    ícone de 20), em vez da pílula de 48 com ícone de 26. */
 .gatilhoNoCabecalho {
@@ -43,7 +41,7 @@
   background: var(--papel); border-radius: var(--r-2);
   box-shadow: var(--sombra-alta);
   display: flex; flex-direction: row; overflow: hidden;
-  animation: assistenteSubir 180ms ease;
+  animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
 /* #1806: a alça de largura fica na borda de dentro; o conteúdo segue em coluna ao lado dela. */
 .colunaPainel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -61,10 +59,6 @@
 }
 .botaoPosicao:hover { background: var(--elevado); color: var(--tinta); }
 .pega { cursor: move; touch-action: none; }
-@keyframes assistenteSubir {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
 .cabecalho {
   display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
