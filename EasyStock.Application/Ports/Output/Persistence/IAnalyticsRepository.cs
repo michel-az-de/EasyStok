@@ -147,7 +147,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public sealed record ProdutoTurnover(
         Guid ProdutoId,
         string NomeProduto,
-        int QuantidadeVendida,
+        decimal QuantidadeVendida,
         decimal ReceitaGerada,
         decimal TaxaSaidaDiaria);
 

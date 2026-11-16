@@ -228,7 +228,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 {
                     m.ProdutoId,
                     NomeProduto = p.Nome,
-                    Quantidade = (int)m.Quantidade,
+                    Quantidade = (decimal)m.Quantidade,
                     Valor = (decimal?)m.ValorTotal ?? 0m
                 })
                 .GroupBy(x => new { x.ProdutoId, x.NomeProduto })
@@ -252,7 +252,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     NomeProduto: l.NomeProduto,
                     QuantidadeVendida: l.QuantidadeVendida,
                     ReceitaGerada: Math.Round(l.ReceitaGerada, 2),
-                    TaxaSaidaDiaria: Math.Round((decimal)l.QuantidadeVendida / dias, 2)))
+                    TaxaSaidaDiaria: Math.Round(l.QuantidadeVendida / dias, 2)))
                 .ToList();
 
             await SetCachedAsync(cacheKey, result, ComparacaoTtl);

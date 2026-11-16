@@ -163,7 +163,7 @@
                     {
                         <tr>
                             <td class="truncate max-w-[180px]">@p.NomeProduto</td>
-                            <td class="text-right">@p.QuantidadeVendida</td>
+                            <td class="text-right">@p.QuantidadeVendida.ToString("0.###", ptBR)</td>
                             <td class="text-right">@p.ReceitaGerada.ToString("C", ptBR)</td>
                             <td class="text-right">@p.TaxaSaidaDiaria.ToString("F1")</td>
                         </tr>
@@ -193,7 +193,7 @@
                     {
                         <tr>
                             <td class="truncate max-w-[180px]">@p.NomeProduto</td>
-                            <td class="text-right">@p.QuantidadeVendida</td>
+                            <td class="text-right">@p.QuantidadeVendida.ToString("0.###", ptBR)</td>
                             <td class="text-right">@p.ReceitaGerada.ToString("C", ptBR)</td>
                             <td class="text-right">@p.TaxaSaidaDiaria.ToString("F1")</td>
                         </tr>
