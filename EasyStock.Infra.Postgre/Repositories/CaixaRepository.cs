@@ -125,7 +125,15 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task AddMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Add(m); return Task.CompletedTask; }
         public Task UpdateMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Update(m); return Task.CompletedTask; }
-        public Task RecarregarMovimentoAsync(MovimentoCaixa m, CancellationToken ct = default) => db.Entry(m).ReloadAsync(ct);
+        public async Task RecarregarMovimentoAsync(MovimentoCaixa m, CancellationToken ct = default)
+        {
+            // Só relê quando o banco já tem o estorno: assim a edição ainda não salva do mesmo envio do aparelho
+            // não se perde, e o movimento estornado volta inteiro como ficou, que é a trilha do estorno.
+            var entry = db.Entry(m);
+            if (entry.State == EntityState.Added || m.EstornadoEm != null) return;
+            var banco = await entry.GetDatabaseValuesAsync(ct);
+            if (banco?[nameof(MovimentoCaixa.EstornadoEm)] != null) await entry.ReloadAsync(ct);
+        }
 
         // issue 951: flush isolado da abertura automatica, dentro da tx explicita aberta pelo
         // caller (RegistrarPagamentoPedidoUseCase). Se colidir com a unique parcial por dia/loja

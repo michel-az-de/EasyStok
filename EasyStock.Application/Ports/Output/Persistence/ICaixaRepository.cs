@@ -61,8 +61,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task UpdateMovimentoAsync(MovimentoCaixa movimento);
 
         /// <summary>
-        /// #2763: relê do banco o movimento já carregado, descartando o que estava em memória. Quem leu antes da trava do
-        /// Caixa chama atrás dela para ver o estorno que outra tela gravou enquanto esperava.
+        /// #2763: quem leu o movimento antes da trava do Caixa chama atrás dela para ver o estorno que outra tela gravou
+        /// enquanto esperava. Só relê do banco quando o banco já tem o estorno; senão preserva a edição ainda não salva.
         /// </summary>
         Task RecarregarMovimentoAsync(MovimentoCaixa movimento, CancellationToken ct = default);
 
