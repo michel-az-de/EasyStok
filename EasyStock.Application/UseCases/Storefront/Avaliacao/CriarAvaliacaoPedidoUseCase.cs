@@ -13,6 +13,7 @@ public sealed class CriarAvaliacaoPedidoUseCase(
     IPedidoAvaliacaoRepository avaliacaoRepo,
     AvaliacaoCookieStore cookieStore,
     ComentarioSanitizer sanitizer,
+    IUnitOfWork uow,
     TimeProvider timeProvider,
     ILogger<CriarAvaliacaoPedidoUseCase> logger)
 {
@@ -75,6 +76,19 @@ public sealed class CriarAvaliacaoPedidoUseCase(
             solicitadoEm: solicitadoEm);
 
         await avaliacaoRepo.AddAsync(avaliacao, ct);
+
+        try
+        {
+            await uow.CommitAsync();
+        }
+        catch (Exception ex) when (uow.EhViolacaoDeUnicidade(ex))
+        {
+            // Dois envios simultâneos passam da checagem do passo 4; o índice único (PedidoId) deixa só um.
+            uow.DescartarAlteracoesPendentes();
+            var vencedora = await avaliacaoRepo.GetByPedidoAsync(input.PedidoId, ct);
+            if (vencedora is null) throw;
+            throw new AvaliacaoDuplicadaException(vencedora.Id);
+        }
 
         logger.LogInformation(
             "PedidoAvaliacao criada. avaliacaoId={AvaliacaoId} pedidoId={PedidoId} nota={Nota}",
