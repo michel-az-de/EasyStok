@@ -43,7 +43,7 @@ test('diferencia servidor acessível de aparelho pareado e envio pendente', () =
   assert.doesNotMatch(revoked.queue, /sincronizad|confirmad/);
 });
 
-function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch, updater } = {}) {
+function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch, updater, manifestGate } = {}) {
   const nodes = new Map();
   const events = new Map();
   const doc = { activeElement: null, hidden: false, addEventListener: (name, callback) => events.set(name, callback), getElementById: id => nodes.get(id) };
@@ -79,6 +79,7 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
   const fetch = async url => {
     requests.push(url);
     if (url.endsWith('/api/mobile/version')) return healthFetch ? healthFetch() : { ok: true, json: async () => ({ databaseOk: true }) };
+    if (manifestGate?.wait) await manifestGate.wait;
     if (manifestError) throw new Error('Network failure');
     return { ok: true, json: async () => manifest };
   };
@@ -837,4 +838,20 @@ test('faixa do topo aparece só quando há APK novo e some quando a conferência
   const failed = pilotHarness({ operator: '', manifestError: true });
   await new Promise(setImmediate);
   assert.equal(failed.nodes.get('pilotUpdateOffer').hidden, true);
+});
+
+// #2785 (revisão): a faixa não pisca nem empurra os atalhos enquanto uma nova conferência está em curso.
+test('faixa do topo continua no lugar durante a conferência seguinte', async () => {
+  const gate = {};
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
+  let release;
+  gate.wait = new Promise(resolve => { release = resolve; });
+  const pending = root.forceCheckUpdate();
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false, 'a faixa fica visível enquanto confere');
+  release();
+  await pending;
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
 });

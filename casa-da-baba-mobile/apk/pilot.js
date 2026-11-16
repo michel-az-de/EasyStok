@@ -599,6 +599,8 @@
     doc.getElementById('pilotRailVersion').textContent = (nativeVersion ? 'APK ' + nativeVersion.version : 'Piloto')
       + (latest?.available ? ' · atualização disponível' : pendingContent ? ' · conteúdo pronto' : '');
     // #2785: a oferta sobe para o topo do Início, sem depender do aviso do push nem de rolar a tela.
+    // Durante a conferência ela fica como estava, para não piscar nem empurrar os atalhos sob o dedo.
+    if (checkingUpdate) return;
     doc.getElementById('pilotUpdateOffer').hidden = !latest?.available;
     doc.getElementById('pilotUpdateOfferText').textContent = latest?.available ? 'Versão ' + latest.version + ' disponível. Instale sem desinstalar.' : '';
   }
@@ -886,6 +888,7 @@
     } finally {
       checkingUpdate = false;
       button.disabled = false;
+      showVersion();
     }
     // O resultado (e o botão de baixar, quando existe) entra na tela de quem pediu a conferência.
     if (!automatic) (download.hidden ? message : download).scrollIntoView({ block: 'nearest' });
