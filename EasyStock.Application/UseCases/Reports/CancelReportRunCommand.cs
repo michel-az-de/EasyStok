@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Reporting;
+using EasyStock.Domain.Reporting;
 
 namespace EasyStock.Application.UseCases.Reports;
 
@@ -36,10 +37,13 @@ public sealed class CancelReportRunUseCase
                 run.UsuarioSolicitanteId != _user.UsuarioId)
                 return false;
 
+            // Duplo clique em Cancelar: o pedido já está valendo, não há o que regravar.
+            if (run.Status == ReportStatus.Canceling) return true;
+
             run.RequestCancellation();
             if (await _repo.UpdateAsync(run, ct)) return true;
         }
 
-        throw new InvalidOperationException("Não foi possível gravar o cancelamento: a execução mudou várias vezes. Tente de novo.");
+        throw new UseCaseConcurrencyException("Não foi possível gravar o cancelamento: a execução mudou várias vezes. Tente de novo.");
     }
 }

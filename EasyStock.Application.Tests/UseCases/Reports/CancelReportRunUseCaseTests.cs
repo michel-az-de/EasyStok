@@ -99,4 +99,30 @@ public sealed class CancelReportRunUseCaseTests
         await _repo.Received(2).GetByIdAsync(run.Id, Arg.Any<CancellationToken>());
         await _repo.Received(2).UpdateAsync(Arg.Any<ReportRun>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Tres_conflitos_seguidos_lancam_excecao_de_concorrencia()
+    {
+        var run = Run();
+        _repo.GetByIdAsync(run.Id, Arg.Any<CancellationToken>()).Returns(
+            _ => ReportRun.Enqueue(Guid.NewGuid(), _usuario, "vendas.por-periodo", ReportCategoria.Vendas,
+                ReportContexto.Tenant, "{}", "hash", ReportFormat.Csv, "1.0.0", TimeSpan.FromDays(7)));
+        _repo.UpdateAsync(Arg.Any<ReportRun>(), Arg.Any<CancellationToken>()).Returns(false);
+
+        var acao = () => UseCase().ExecuteAsync(new CancelReportRunCommand(run.Id));
+
+        await acao.Should().ThrowAsync<UseCaseConcurrencyException>();
+        await _repo.Received(3).UpdateAsync(Arg.Any<ReportRun>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Run_ja_em_cancelando_e_idempotente_e_nao_regrava()
+    {
+        var run = Run(emExecucao: true);
+        run.RequestCancellation();
+
+        (await UseCase().ExecuteAsync(new CancelReportRunCommand(run.Id))).Should().BeTrue();
+
+        await _repo.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default);
+    }
 }

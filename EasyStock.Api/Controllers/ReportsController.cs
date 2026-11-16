@@ -1,4 +1,5 @@
 using EasyStock.Application.Reporting;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.Reports;
 using EasyStock.Domain.Reporting;
 using EasyStock.Infra.Async.Reporting;
@@ -136,6 +137,10 @@ public sealed class ReportsController(
         catch (InvalidReportStateException)
         {
             return DataConflict("A execução já terminou e não pode mais ser cancelada.");
+        }
+        catch (UseCaseConcurrencyException)
+        {
+            return DataConflict("Não deu para cancelar agora. Tente de novo.");
         }
     }
 
