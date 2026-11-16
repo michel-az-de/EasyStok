@@ -85,6 +85,8 @@ export const ativarMetodoCadastro = (metodo, ativo, requestId, contexto) => cham
 export const previaModeloCadastro = (dados, contexto, sinal) => chamarApi('/api/notificacoes/templates/preview-draft', {
   ...opcoes(contexto, sinal), metodo: 'POST', corpo: { assuntoTemplate: dados.assuntoTemplate ?? '', corpoTemplate: dados.corpoTemplate, variaveis: {} },
 })
+// #2792: variáveis {{ x }} do tipo de evento. A rota é a do controller (api/notificacoes), não a do openapi antigo; só o admin lê.
+export const variaveisDoModeloCadastro = (tipoEvento, contexto, sinal) => chamarApi(`/api/notificacoes/variaveis-catalogo?${query({ tipoEvento })}`, opcoes(contexto, sinal))
 export const aprovarModeloCadastro = (id, contexto) => chamarApi(`${rotas.modelos}/${encodeURIComponent(id)}/aprovar`, { ...opcoes(contexto), metodo: 'POST' })
 export const definirEtiquetaPadrao = (item, contexto) => chamarApi(`${rotas.etiquetas}/${item.origem}/${item.id}/set-default`, { ...opcoes(contexto), metodo: 'POST', corpo: { empresaId: contexto.empresaId } })
 export const duplicarEtiquetaCadastro = (item, nome, contexto) => chamarApi(rotas.etiquetas, { ...opcoes(contexto), metodo: 'POST', corpo: { empresaId: contexto.empresaId, nome, layoutJson: item.layoutJson, baseSistemaId: item.origem === 'Sistema' ? item.id : item.baseSistemaId, definirComoPadrao: false } })

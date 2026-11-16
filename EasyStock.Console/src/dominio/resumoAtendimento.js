@@ -134,7 +134,7 @@ export function vendaDoTrecho(pedido, cardapio, desde) {
   const nome = recebidos.length > 0
     ? recebidos.join(' e ')
     : pedido.cobranca ? nomeDoMeio(pedido.cobranca.meio) : null
-  const meio = nome ? nome[0].toUpperCase() + nome.slice(1) : '—'
+  const meio = nome ? nome[0].toUpperCase() + nome.slice(1) : 'Forma não informada' // #2792: sem travessão
   // Número completo (achado 3, pendência 22 da banca 64: "mesmo número do
   // pedido em toda a folha"): o aviso do Encerrar já mostra "2026-0184"; a
   // tabela usava numeroCurto ("0184"), um formato diferente para o mesmo dado.

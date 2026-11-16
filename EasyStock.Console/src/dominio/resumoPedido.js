@@ -8,7 +8,7 @@ import { nomeDoMeio, sinalDeEncomenda } from './cobranca'
 export function resumoParaCliente(pedido, cardapio, janela) {
   const linhas = itensDetalhados(pedido, cardapio)
     .map((l) => `• ${l.qtd}× ${l.produto?.nome} (${l.produto?.porcao})`
-      + (l.obs ? ` — ${l.obs}` : ''))
+      + (l.obs ? `: ${l.obs}` : ''))
   return [
     `Pedido ${pedido.numero}`,
     ...linhas,

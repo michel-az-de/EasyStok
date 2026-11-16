@@ -219,7 +219,7 @@ export function AbaReceitasApi() {
                     {temReceita(r) && <span className={tabela.apoio}>{`${r.linhas} ${r.linhas === 1 ? 'insumo' : 'insumos'}`}</span>}
                   </td>
                   <td data-rotulo="Rendimento" className={tabela.valor}>
-                    {temReceita(r) ? `${r.rendimento} ${rotuloDoRendimento(r.unidadeRendimento)}` : <span className={tabela.tomNeutro}>—</span>}
+                    {temReceita(r) ? `${r.rendimento} ${rotuloDoRendimento(r.unidadeRendimento)}` : null /* #2792: a coluna Situação já diz "Sem receita" */}
                   </td>
                   <td data-rotulo="Situação">
                     <span>

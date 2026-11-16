@@ -9,7 +9,8 @@ import {
   VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica,
 } from '../../../dominio/automacao'
 import { plural } from '../../../dominio/formato'
-import { gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
+import { ATALHO_MAXIMO, gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
 import { hashDoModulo, NOME_RESPOSTAS_AUTOMATICAS } from '../../../dominio/modulos'
 import css from './abaRespostas.module.css'
 
@@ -19,8 +20,10 @@ import css from './abaRespostas.module.css'
 // a da demonstração não devolve nada. Nos dois casos sem `false`, o formulário fecha.
 const depois = (resultado, fechar) => Promise.resolve(resultado).then((ok) => { if (ok !== false) fechar() })
 
-// Limite do servidor (RespostaPronta.TituloTamanhoMaximo): o campo não corta, avisa e trava o salvar.
+// Limites do servidor (RespostaPronta.*TamanhoMaximo): o campo não corta, avisa (`limite`) e trava o salvar.
+// #2792: Atalho e Texto também avisam; antes só o Título, e os outros dois só falhavam no servidor.
 const TITULO_MAXIMO = 120
+const TEXTO_MAXIMO = 4096
 
 const VARIAVEIS_TEXTO = VARIAVEIS_DA_API.map((v) => `{${v.chave}} ${v.descricao}`).join(' · ')
 
@@ -30,8 +33,11 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
   const [texto, setTexto] = useState(inicial?.texto ?? '')
   const [salvando, setSalvando] = useState(false)
   const [descartando, setDescartando] = useState(false)
-  const tituloLongo = titulo.length > TITULO_MAXIMO
-  const pronto = titulo.trim() && texto.trim() && !tituloLongo
+  // #2792: sem atalho digitado, o servidor recebe o gerado do título, que já nasce dentro de 40 (gerarAtalho) e
+  // aparece no placeholder: a pessoa vê o atalho exato antes de salvar.
+  const atalhoGerado = gerarAtalho(titulo)
+  const passaDoLimite = algumPassaDoLimite([titulo, TITULO_MAXIMO], [atalho, ATALHO_MAXIMO], [texto, TEXTO_MAXIMO])
+  const pronto = titulo.trim() && texto.trim() && !passaDoLimite
   // Mesma pergunta do Modal (`confirmarDescarte`): com algo digitado, Cancelar não descarta calado.
   const alterado = titulo !== (inicial?.titulo ?? '') || atalho !== (inicial?.atalho ?? '') || texto !== (inicial?.texto ?? '')
 
@@ -39,7 +45,7 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
     evento.preventDefault()
     if (salvando || !pronto) return
     setSalvando(true)
-    const dados = { titulo: titulo.trim(), atalho: atalho.trim() || gerarAtalho(titulo), texto: texto.trim() }
+    const dados = { titulo: titulo.trim(), atalho: atalho.trim() || atalhoGerado, texto: texto.trim() }
     Promise.resolve(aoSalvar(dados)).finally(() => setSalvando(false))
   }
 
@@ -47,20 +53,20 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
     <form className={css.form} onSubmit={salvar}>
       <div className={css.duas}>
         <CampoTexto
-          disabled={salvando} rotulo="Título" value={titulo}
-          erro={tituloLongo ? `Use até ${TITULO_MAXIMO} caracteres. Agora tem ${titulo.length}.` : undefined}
+          disabled={salvando} rotulo="Título" value={titulo} limite={TITULO_MAXIMO}
           onChange={(e) => setTitulo(e.target.value)} autoFocus
         />
         <CampoTexto
           rotulo="Atalho"
           value={atalho}
           disabled={salvando}
+          limite={ATALHO_MAXIMO}
           dica="Sem preencher, o atalho é criado a partir do título."
-          placeholder={titulo ? gerarAtalho(titulo) : '/pix'}
+          placeholder={titulo ? atalhoGerado : '/pix'}
           onChange={(e) => setAtalho(e.target.value.replace(/\s/g, '-'))}
         />
       </div>
-      <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
+      <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} limite={TEXTO_MAXIMO} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
       {descartando && (
         <div className={css.descarte} role="alert">
           <p>Descartar o que foi digitado?</p>
@@ -72,7 +78,8 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
         </div>
       )}
       <div className={css.acoes}>
-        <Botao variante="primario" tipo="submit" icone="check" disabled={!pronto || salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+        <Botao variante="primario" tipo="submit" icone="check" disabled={!pronto || salvando}
+          motivo={passaDoLimite ? 'Algum campo passa do limite de caracteres.' : 'Preencha o título e o texto.'}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
         <Botao variante="texto" disabled={salvando || descartando} onClick={() => (alterado ? setDescartando(true) : aoCancelar())}>Cancelar</Botao>
       </div>
     </form>

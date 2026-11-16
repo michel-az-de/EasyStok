@@ -6,11 +6,15 @@ import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { Botao } from '../../../componentes/Botao'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import css from './abaAtendimento.module.css'
 
 const TAMANHO_MENSAGEM = 500
+// #2792: limites que espelham o servidor; passar deles avisa no campo e trava o Salvar (sem `maxLength`).
+const TAMANHO_NOME_DONA = 60
+const TAMANHO_MODELO_RETOMADA = 512
 
 const NIVEIS_DE_SUGESTAO = [
   { valor: 'Discreto', rotulo: 'Discreto: só responde o que perguntam' },
@@ -113,6 +117,7 @@ function MensagensDoExpediente() {
     mensagemLojaFechada: expediente.mensagemLojaFechada,
   }
   const pendente = camposMudaram(valor, expediente, ['mensagemForaDoHorario', 'mensagemLojaFechada'])
+  const passaDoLimite = algumPassaDoLimite([valor.mensagemForaDoHorario, TAMANHO_MENSAGEM], [valor.mensagemLojaFechada, TAMANHO_MENSAGEM])
   useAtualizarAposLimparRascunho(rascunho, situacao, recarregarExpediente, gravando)
   useEffect(() => {
     if (gravando) { expedienteDuranteGravacao.current = expediente; return }
@@ -128,7 +133,7 @@ function MensagensDoExpediente() {
 
   async function aoSalvar(evento) {
     evento.preventDefault()
-    if (!expediente.carregado || !pendente || gravando || situacao.estado === 'salvando') return
+    if (!expediente.carregado || !pendente || passaDoLimite || gravando || situacao.estado === 'salvando') return
     const { ok } = await salvar(() => salvarMensagensExpediente(valor))
     if (ok) setRascunho((atual) => atual === rascunho ? null : atual)
   }
@@ -141,7 +146,7 @@ function MensagensDoExpediente() {
       <CampoArea
         rotulo="Fora do horário"
         dica="Substitui a saudação na primeira mensagem fora do horário. {abre} vira a próxima abertura, por exemplo: amanhã às 08:00."
-        maxLength={TAMANHO_MENSAGEM}
+        limite={TAMANHO_MENSAGEM}
         value={valor.mensagemForaDoHorario}
         disabled={!expediente.carregado || situacao.estado === 'salvando'}
         onChange={mudar('mensagemForaDoHorario')}
@@ -149,7 +154,7 @@ function MensagensDoExpediente() {
       <CampoArea
         rotulo="Loja fechada manualmente"
         dica="Substitui a saudação na primeira mensagem enquanto a loja estiver fechada à mão."
-        maxLength={TAMANHO_MENSAGEM}
+        limite={TAMANHO_MENSAGEM}
         value={valor.mensagemLojaFechada}
         disabled={!expediente.carregado || situacao.estado === 'salvando'}
         onChange={mudar('mensagemLojaFechada')}
@@ -159,7 +164,8 @@ function MensagensDoExpediente() {
           variante="primario"
           tipo="submit"
           className={css.toque}
-          disabled={!expediente.carregado || !pendente || gravando || situacao.estado === 'salvando'}
+          disabled={!expediente.carregado || !pendente || passaDoLimite || gravando || situacao.estado === 'salvando'}
+          motivo={passaDoLimite ? 'Encurte as mensagens que passam do limite.' : undefined}
         >
           Salvar mensagens
         </Botao>
@@ -228,10 +234,14 @@ function ConfiguracaoDoAtendimento() {
     setRascunho(gravando || camposMudaram(proximo, gravado, CAMPOS_CONFIGURACAO) ? proximo : null)
   }
   const pendente = camposMudaram(form, gravado, CAMPOS_CONFIGURACAO)
+  const passaDoLimite = algumPassaDoLimite(
+    [form.nomeDona, TAMANHO_NOME_DONA], [form.mensagemEscalada, TAMANHO_MENSAGEM],
+    [form.mensagemEncaminhamento, TAMANHO_MENSAGEM], [form.modeloRetomadaNome, TAMANHO_MODELO_RETOMADA],
+  )
 
   async function aoSalvar(evento) {
     evento.preventDefault()
-    if (!pendente || gravando || situacao.estado === 'salvando') return
+    if (!pendente || passaDoLimite || gravando || situacao.estado === 'salvando') return
     // Texto em branco é ignorado pela API. Impedir aqui evita confirmar uma alteração que não aconteceu.
     for (const campo of evento.currentTarget.querySelectorAll('[required]')) {
       campo.setCustomValidity(campo.value.trim() ? '' : 'Preencha este campo antes de salvar.')
@@ -285,7 +295,7 @@ function ConfiguracaoDoAtendimento() {
           rotulo="Nome da dona"
           dica="Como o robô chama você ao passar a conversa, por exemplo Michele. Na mensagem padrão, seu nome entra no lugar de a equipe."
           value={form.nomeDona ?? ''}
-          maxLength={60}
+          limite={TAMANHO_NOME_DONA}
           onChange={mudar('nomeDona')}
         />
         <CampoSelecao
@@ -314,7 +324,7 @@ function ConfiguracaoDoAtendimento() {
           dica="Enviada quando o cliente pede uma pessoa ou o Assistente não sabe responder. {nome} vira o primeiro nome e {dona}, o nome da dona."
           value={form.mensagemEscalada ?? ''}
           required
-          maxLength={500}
+          limite={TAMANHO_MENSAGEM}
           onChange={mudar('mensagemEscalada')}
         />
         <CampoArea
@@ -322,14 +332,14 @@ function ConfiguracaoDoAtendimento() {
           dica="Fornecedor, orçamento ou assunto pessoal. O Assistente para de responder a pessoa até alguém devolver a conversa a ele. {nome} vira o primeiro nome."
           value={form.mensagemEncaminhamento ?? ''}
           required
-          maxLength={500}
+          limite={TAMANHO_MENSAGEM}
           onChange={mudar('mensagemEncaminhamento')}
         />
         <CampoTexto
           rotulo="Modelo de retomada (WhatsApp)"
           dica="Nome do modelo aprovado pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa."
           value={form.modeloRetomadaNome ?? ''}
-          maxLength={512}
+          limite={TAMANHO_MODELO_RETOMADA}
           pattern="[a-z0-9_]+"
           title="Use somente letras minúsculas, números e sublinhado (_). Deixe vazio para desativar a retomada."
           onChange={mudar('modeloRetomadaNome')}
@@ -368,7 +378,7 @@ function ConfiguracaoDoAtendimento() {
           />
         </div>
         <div className={css.acoes}>
-          <Botao variante="primario" tipo="submit" className={css.toque} disabled={!pendente || gravando || situacao.estado === 'salvando'}>
+          <Botao variante="primario" tipo="submit" className={css.toque} disabled={!pendente || passaDoLimite || gravando || situacao.estado === 'salvando'} motivo={passaDoLimite ? 'Encurte os campos que passam do limite.' : undefined}>
             Salvar configuração
           </Botao>
           <Botao variante="texto" disabled={!pendente || situacao.estado === 'salvando'} onClick={() => { setRascunho(null); limpar() }}>

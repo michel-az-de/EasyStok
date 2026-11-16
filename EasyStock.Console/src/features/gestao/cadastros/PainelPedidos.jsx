@@ -17,6 +17,7 @@ import {
   situacaoDoPagamento, situacaoPedeAcao, tituloDoPedido,
 } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
+import { useRolagemDaLista } from './rolagemDaLista'
 import base from './cadastros.module.css'
 import css from './pedidos.module.css'
 
@@ -49,7 +50,8 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
   const comFiltro = FILTROS.some((campo) => memoria[campo] !== INICIAL[campo])
   const paginas = Math.max(1, Math.ceil(consulta.total / PAGINA_PEDIDOS))
   useEffect(() => () => leitura.current?.abort(), [])
-  useEffect(() => { if (tabela.current && consulta.carregado && !consulta.carregando) tabela.current.scrollTop = memoria.posicao ?? 0 }, [consulta.carregando])
+  // #2792: a lista de Pedidos usa a mesma classe e também deixou de rolar sozinha.
+  useRolagemDaLista(tabela, { posicao: memoria.posicao, aoRolar: posicao => definir({ posicao }), pronto: consulta.carregado && !consulta.carregando, comLista: consulta.itens.length > 0 })
   // Filtro que encolhe a lista (outra pessoa cancelou, o período virou o dia) não deixa a página vazia além do fim.
   useEffect(() => { if (consulta.carregado && !consulta.carregando && !consulta.erro && pagina > paginas) definir({ pagina: paginas, posicao: 0 }) }, [consulta.carregando])
 
@@ -91,7 +93,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
         : lista.length === 0 && !consulta.erro ? <Vazio titulo={comFiltro ? 'Nenhum pedido com estes filtros' : 'Nenhum pedido ainda'}
           acao={comFiltro ? <Botao onClick={() => filtrar({ busca: '', situacao: '', periodo: 'tudo', ordem: 'mais-recentes' })}>Limpar filtros</Botao> : <Botao onClick={() => { window.location.hash = hashDoModulo('atendimento', 'balcao') }}>Abrir Conversas</Botao>}>
           {comFiltro ? 'Tente outro número, nome ou período.' : 'Os pedidos do site, do WhatsApp e do balcão aparecem aqui.'}</Vazio>
-        : lista.length > 0 && <div ref={tabela} className={`${base.lista} ${css.tabela}`} aria-busy={consulta.carregando} onScroll={(e) => definir({ posicao: e.currentTarget.scrollTop })}>
+        : lista.length > 0 && <div ref={tabela} className={`${base.lista} ${css.tabela}`} aria-busy={consulta.carregando}>
           <table>
             <caption className="sr">Pedidos, página {pagina} de {paginas}</caption>
             <thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Situação</th><th scope="col" className={css.valor}>Total</th><th scope="col"><span className="sr">Ações</span></th></tr></thead>

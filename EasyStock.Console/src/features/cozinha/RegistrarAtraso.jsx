@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { abrirOcorrencia } from '../../aplicacao/api/ocorrencias'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './cozinha.module.css'
 
 export function RegistrarAtraso({ pedidoId }) {
@@ -11,10 +12,12 @@ export function RegistrarAtraso({ pedidoId }) {
   const [erro, setErro] = useState(null)
   const [registrado, setRegistrado] = useState(null)
   const emVoo = useRef(false)
+  // #2792: sem `maxLength` (cortava o relato colado); acima de 1000 o Salvar fica parado, com a frase no campo.
+  const longo = algumPassaDoLimite([relato, 1000])
   const chave = useRef(null)
   async function registrar(e) {
     e.preventDefault()
-    if (emVoo.current || !relato.trim()) return
+    if (emVoo.current || !relato.trim() || longo) return
     emVoo.current = true; setOcupado(true); setErro(null)
     chave.current ??= crypto.randomUUID()
     try {
@@ -29,11 +32,11 @@ export function RegistrarAtraso({ pedidoId }) {
   if (!aberto) return <Botao onClick={() => setAberto(true)}>Registrar atraso</Botao>
   return <form className={css.comanda} onSubmit={registrar}>
     <CampoArea rotulo="O que atrasou?" value={relato} onChange={e => { setRelato(e.target.value); chave.current = null }}
-      maxLength={1000} rows={3} required disabled={ocupado} />
+      limite={1000} rows={3} required disabled={ocupado} />
     <p className={css.comandaApoio}>O relato fica no pedido. Se houver conversa vinculada, o Atendimento recebe o aviso.</p>
     {erro && <p className={css.motivoRecusa} role="alert">{erro}</p>}
     <div className={css.acoesCartao}>
-      <Botao tipo="submit" variante="primario" disabled={ocupado || !relato.trim()}>{ocupado ? 'Registrando…' : 'Salvar ocorrência'}</Botao>
+      <Botao tipo="submit" variante="primario" disabled={ocupado || !relato.trim() || longo} motivo={longo ? 'Encurte o relato para salvar.' : undefined}>{ocupado ? 'Registrando…' : 'Salvar ocorrência'}</Botao>
       <Botao disabled={ocupado} onClick={() => setAberto(false)}>Voltar</Botao>
     </div>
   </form>

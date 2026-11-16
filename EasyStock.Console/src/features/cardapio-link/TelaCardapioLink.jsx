@@ -38,6 +38,7 @@ import { itensDetalhados } from '../../dominio/pedido'
 import { nomeDoMeio } from '../../dominio/cobranca'
 import { janelaDisponivel, ocupacaoDeHoje, rotuloDaOcupacao } from '../../dominio/entrega'
 import { moeda } from '../../dominio/formato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import { primeiroNome } from '../../dominio/mensagem'
 import css from './cardapioLink.module.css'
 import { PaginaAviso } from './AvisoCardapioDoSite'
@@ -309,7 +310,7 @@ function CartaoItem({ item, qtd, obs, adicionais, aoAdicionar, aoAjustar, aoAnot
             rotulo={`Observação para ${item.nome}`}
             rotuloOculto
             placeholder="Alguma observação? Ex.: sem cebola"
-            maxLength={80}
+            limite={80}
             value={obs}
             onChange={(e) => aoAnotar(item.sku, e.target.value)}
           />
@@ -333,12 +334,13 @@ function CartaoItem({ item, qtd, obs, adicionais, aoAdicionar, aoAjustar, aoAnot
 
 // O que ainda falta para "Enviar pedido", escrito, para o botão nunca ficar
 // desabilitado sem motivo.
-function faltasDoEnvio({ carrinho, janelaEscolhida, avisoEndereco, meioEscolhido }) {
+function faltasDoEnvio({ carrinho, janelaEscolhida, avisoEndereco, meioEscolhido, obsLonga }) {
   return [
     carrinhoVazioDeItens(carrinho) && 'marque um prato',
     !janelaEscolhida && 'escolha o horário',
     avisoEndereco && 'confira o endereço',
     !meioEscolhido && 'escolha o pagamento',
+    obsLonga && 'encurte a observação de um prato',
   ].filter(Boolean)
 }
 
@@ -358,11 +360,13 @@ function Sacola({
     })),
   ]
   const avisoEndereco = avisoDeEndereco(endereco, catalogo.prefixosCepAtendidos)
-  const podeEnviar = pedidoLinkPodeSerConfirmado({
+  // #2792: a observação passa do limite de 80 (espelha o servidor): o aviso fica no campo do prato e o envio trava.
+  const obsLonga = carrinho.itens.some((l) => algumPassaDoLimite([l.obs, 80]))
+  const podeEnviar = !obsLonga && pedidoLinkPodeSerConfirmado({
     carrinho, janelaId: janelaEscolhida, endereco, meio: meioEscolhido,
     prefixosCepAtendidos: catalogo.prefixosCepAtendidos,
   })
-  const faltas = faltasDoEnvio({ carrinho, janelaEscolhida, avisoEndereco, meioEscolhido })
+  const faltas = faltasDoEnvio({ carrinho, janelaEscolhida, avisoEndereco, meioEscolhido, obsLonga })
   const { principais, naEntrega } = meiosDaPagina(catalogo.meiosDePagamento)
 
   return (

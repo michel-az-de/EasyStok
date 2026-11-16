@@ -116,10 +116,16 @@ export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = 
   const podeAlternar = abertas || haMaisNotas || cortado
   return <section className={css.coluna} data-destino-nota={conversaId} aria-label="Notas internas do cliente">
     <header className={css.cabecalho}>
-      <button type="button" data-voltar-notas={conversaId} className={css.abrirNotas}
-        {...(podeAlternar ? { 'aria-expanded': abertas, 'aria-controls': `notas-${conversaId}`, onClick: () => setAbertas(v => !v) } : { 'aria-disabled': true, tabIndex: -1 })}>
-        Notas {lista.length > 0 && <span>{lista.length}{fonteApi && pagina.temMais ? '+' : ''}</span>}{podeAlternar && <Icone nome="chevron-down" tamanho={16} />}
-      </button>
+      {/* #2792: sem o que abrir, "Notas" é título (heading), não botão inerte; com o que abrir, segue botão com aria-expanded.
+          Os dois levam `data-voltar-notas`: é o destino do foco da conversa (focarNotasDaConversa). */}
+      {podeAlternar
+        ? <button type="button" data-voltar-notas={conversaId} className={css.abrirNotas}
+          aria-expanded={abertas} aria-controls={`notas-${conversaId}`} onClick={() => setAbertas(v => !v)}>
+          Notas {lista.length > 0 && <span>{lista.length}{fonteApi && pagina.temMais ? '+' : ''}</span>}<Icone nome="chevron-down" tamanho={16} />
+        </button>
+        : <h3 data-voltar-notas={conversaId} tabIndex={-1} className={css.tituloNotas}>
+          Notas {lista.length > 0 && <span>{lista.length}{fonteApi && pagina.temMais ? '+' : ''}</span>}
+        </h3>}
       {aoCriarNota && <Botao variante="texto" icone="plus" aria-label="Adicionar nota" onClick={aoCriarNota} disabled={!podeCriarNota}
         title={!podeCriarNota ? 'Cadastre o cliente para adicionar uma nota.' : undefined}>Nota</Botao>}
     </header>

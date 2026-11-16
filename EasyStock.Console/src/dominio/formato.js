@@ -14,9 +14,9 @@ const REAIS = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL
 const SINAL_NEGATIVO = '−'
 
 // "R$ 1.234,56". Negativo leva um sinal só, o menos de verdade colado ao "R$" ("−R$ 3,00"), e o que
-// arredonda para zero não leva sinal ("-R$ 0,00" não existe). Sem valor (nulo) mostra traço.
+// arredonda para zero não leva sinal ("-R$ 0,00" não existe). Sem valor (nulo) mostra "Sem valor".
 export const moeda = (v) => {
-  if (v == null) return '—'
+  if (v == null) return 'Sem valor' // #2792: sem travessão em texto de tela
   const texto = REAIS.format(Math.abs(v))
   return v < 0 && /[1-9]/.test(texto) ? SINAL_NEGATIVO + texto : texto
 }

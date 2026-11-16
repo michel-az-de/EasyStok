@@ -54,9 +54,9 @@ confere('E10: o que arredonda para zero não leva sinal (nem -0)', () => {
   assert.equal(moeda(0.004), duro('R$ 0,00'))
   assert.equal(moeda(-0.01), duro('−R$ 0,01'))
 })
-confere('E10: sem valor mostra traço, não derruba a tela', () => {
-  assert.equal(moeda(null), '—')
-  assert.equal(moeda(undefined), '—')
+confere('E10: sem valor mostra "Sem valor" (#2792: sem travessão), não derruba a tela', () => {
+  assert.equal(moeda(null), 'Sem valor')
+  assert.equal(moeda(undefined), 'Sem valor')
 })
 confere('E10: o texto do campo (componentes) e o moeda (domínio) escrevem igual', () => {
   for (const centavos of [0, 1, 7, 99, 100, 1850, 123456, 150000, 9999999, 100000000]) {

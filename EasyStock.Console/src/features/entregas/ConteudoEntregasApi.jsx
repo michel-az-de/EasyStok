@@ -14,6 +14,7 @@ import {
   opcoesDeEntregador, paineisDeEntregas, rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
 } from '../../dominio/entregasApi'
 import { horaCurta, moeda } from '../../dominio/formato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import { nomeDoPedido } from '../../dominio/pedido'
 import { paradaDaViagem, roteiroDoDia, trocoDaPorta } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
@@ -341,9 +342,11 @@ export function AvisoDoChamado({ texto, abertos }) {
 export function Chamados({ chamados, ocupado, acoes }) {
   const [texto, setTexto] = useState('')
   const [confirmacao, setConfirmacao] = useState(null)
+  // #2792: sem `maxLength` (cortava o texto colado); acima de 500 o Chamar fica parado.
+  const textoLongo = algumPassaDoLimite([texto, 500])
   const abrir = (e) => {
     e.preventDefault()
-    if (!texto.trim()) return
+    if (!texto.trim() || textoLongo) return
     setConfirmacao(null)
     acoes.abrirChamado(texto.trim(), null).then((ok) => { if (ok) { setTexto(''); setConfirmacao('Chamado aberto. Acompanhe o atendimento na lista abaixo.') } })
   }
@@ -353,9 +356,9 @@ export function Chamados({ chamados, ocupado, acoes }) {
         <h3>Chamar entregador</h3>
         <p className={css.apoio}>Descreva o que precisa e envie um chamado.</p>
         <form className={css.formChamado} onSubmit={abrir}>
-          <CampoArea rotulo="O que você precisa?" value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={500}
+          <CampoArea rotulo="O que você precisa?" value={texto} onChange={(e) => setTexto(e.target.value)} limite={500}
             rows={2} disabled={ocupado} placeholder="Ex.: buscar um pedido ou realizar uma entrega" />
-          <Botao tipo="submit" variante="primario" icone="enviar" disabled={ocupado || !texto.trim()}>Chamar entregador</Botao>
+          <Botao tipo="submit" variante="primario" icone="enviar" disabled={ocupado || !texto.trim() || textoLongo} motivo={textoLongo ? 'Encurte o texto para chamar.' : undefined}>Chamar entregador</Botao>
         </form>
         <AvisoDoChamado texto={confirmacao} abertos={chamados.length} />
       </section>

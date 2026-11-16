@@ -3,7 +3,13 @@ import { useAcervo, useMiniaturaAcervo } from '../../../aplicacao/useAcervo'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { Modal } from '../../../componentes/Modal'
+import { CampoComLimite } from './CampoComLimite'
+import { algumCampoPassaDoLimite } from './limitesDoAcervo'
 import css from './acervo.module.css'
+// #2792: limites dos formulários do acervo (espelham o servidor).
+const LIMITES_ARQUIVO = { titulo: 160, prompt: 12000, referencias: 6000 }
+const LIMITES_SOLICITACAO = { brief: 12000 }
+const MOTIVO_LIMITE = 'Encurte o texto que passou do limite.'
 import { ProducaoAcervo, canaisAcervo } from './ProducaoAcervo'
 import { FotosCardapio } from './FotosCardapio'
 import { SugestoesDoAcervo } from './SugestoesDoAcervo'
@@ -68,10 +74,11 @@ export function AbaAcervo() {
     return () => clearTimeout(tempo)
   }, [busca, filtros])
   const [selecionada, setSelecionada] = useState(null)
+  const [passou, setPassou] = useState(false)
   const selecionadaAtual = useRef(null)
   const [dialogo, definirDialogo] = useState(null)
   const fluxoAtual = useRef(0)
-  const setDialogo = (novo) => { fluxoAtual.current++; definirDialogo(novo) }
+  const setDialogo = (novo) => { fluxoAtual.current++; setPassou(false); definirDialogo(novo) }
   const [historico, setHistorico] = useState([])
   const [publicacao, setPublicacao] = useState(null)
   const [imagemEscolhida, setImagemEscolhida] = useState(null)
@@ -117,6 +124,7 @@ export function AbaAcervo() {
   }
   async function enviarArquivo(e) {
     e.preventDefault()
+    if (algumCampoPassaDoLimite(e.currentTarget, LIMITES_ARQUIVO)) return
     const f = new FormData(e.currentTarget)
     const pai = dialogo === 'retorno' ? imagem : null
     const origem = pai ? 'Canva' : f.get('origem')
@@ -191,15 +199,15 @@ export function AbaAcervo() {
     </section>
     {dialogo && <Modal titulo={({ upload: 'Adicionar original', retorno: 'Adicionar exportação do Canva', canva: 'Vincular design', aprovar: 'Aprovar esta versão', publicar: 'Conferir publicação', escolherImagem: pratoAlvo ? `Imagem para ${pratoAlvo.nome}` : 'Imagem para o prato', solicitar: 'Solicitar nova imagem', uso: 'Confirmar adequação ao canal', classificar: 'Classificar imagem ou peça' })[dialogo]} aoFechar={a.ocupado ? undefined : () => setDialogo(null)}>
       {a.erro && <p role="alert" className={css.erro}>{a.erro}</p>}
-      {(dialogo === 'upload' || dialogo === 'retorno') && <form className={css.formulario} onSubmit={enviarArquivo}>
-        <label>Título<input name="titulo" required maxLength={160} defaultValue={dialogo === 'retorno' ? `${imagem.titulo} · Canva` : ''} /></label>
+      {(dialogo === 'upload' || dialogo === 'retorno') && <form className={css.formulario} onSubmit={enviarArquivo} onInput={(e) => setPassou(algumCampoPassaDoLimite(e.currentTarget, LIMITES_ARQUIVO))}>
+        <CampoComLimite rotulo="Título" como="input" limite={160} name="titulo" required defaultValue={dialogo === 'retorno' ? `${imagem.titulo} · Canva` : ''} />
         <label>Arquivo PNG, JPEG ou WebP, até 6 MB<input name="file" type="file" accept="image/png,image/jpeg,image/webp" required /></label>
         {dialogo === 'upload' && <><label>Origem<select name="origem"><option value="Fotografia">Fotografia</option><option value="IA">Geração por IA</option></select></label><label>Item do cardápio<select name="itemId"><option value="">Uso geral</option>{a.itens.map((i) => <option key={i.cardapioItemId} value={i.cardapioItemId}>{i.nome}</option>)}</select></label></>}
         <label>Formato<select name="formato" defaultValue={imagem?.formato || '4:5'}>{formatos.map((f) => <option key={f}>{f}</option>)}</select></label>
         <label>Natureza<select name="natureza" defaultValue={dialogo === 'retorno' ? 'Comunicacao' : 'Produto'}><option value="Produto">Imagem de produto</option><option value="Comunicacao">Peça de comunicação</option></select></label>
-        <label>Prompt da geração<textarea name="prompt" maxLength={12000} /></label><label>Referências<textarea name="referencias" maxLength={6000} /></label>
-        {dialogo === 'upload' && <label>Atende uma solicitação<select name="solicitacaoId" onChange={(e) => { const pedido = a.solicitacoes.find((s) => s.id === e.target.value); if (pedido) { const f = e.target.form; f.elements.itemId.value = pedido.itemId; f.elements.formato.value = pedido.formato; f.elements.prompt.value = pedido.brief; f.elements.referencias.value = pedido.referenciasJson; if (pedido.briefingId) f.elements.origem.value = 'IA' } }}><option value="">Nenhuma</option>{a.solicitacoes.filter((s) => !s.concluidoEm).map((s) => <option value={s.id} key={s.id}>{a.itens.find((i) => i.cardapioItemId === s.itemId)?.nome} · {s.formato}</option>)}</select></label>}
-        <Botao tipo="submit" variante="primario" disabled={a.ocupado}>Guardar versão</Botao>
+        <CampoComLimite rotulo="Prompt da geração" limite={12000} name="prompt" /><CampoComLimite rotulo="Referências" limite={6000} name="referencias" />
+        {dialogo === 'upload' && <label>Atende uma solicitação<select name="solicitacaoId" onChange={(e) => { const pedido = a.solicitacoes.find((s) => s.id === e.target.value); if (pedido) { const f = e.target.form; f.elements.itemId.value = pedido.itemId; f.elements.formato.value = pedido.formato; f.elements.prompt.value = pedido.brief; f.elements.referencias.value = pedido.referenciasJson; if (pedido.briefingId) f.elements.origem.value = 'IA'; f.dispatchEvent(new Event('input', { bubbles: true })) } }}><option value="">Nenhuma</option>{a.solicitacoes.filter((s) => !s.concluidoEm).map((s) => <option value={s.id} key={s.id}>{a.itens.find((i) => i.cardapioItemId === s.itemId)?.nome} · {s.formato}</option>)}</select></label>}
+        <Botao tipo="submit" variante="primario" disabled={a.ocupado || passou} motivo={passou ? MOTIVO_LIMITE : undefined}>Guardar versão</Botao>
       </form>}
       {dialogo === 'canva' && <form className={css.formulario} onSubmit={(e) => { e.preventDefault(); const url = new FormData(e.currentTarget).get('url'); executar(() => a.api.vincularCanva(imagem.id, url), 'Design vinculado.') }}><label>Link do design Canva<input name="url" type="url" required defaultValue={imagem.canvaUrl || ''} /></label><Botao tipo="submit" disabled={a.ocupado}>Salvar vínculo</Botao></form>}
       {dialogo === 'classificar' && <form className={css.formulario} onSubmit={(e) => { e.preventDefault(); const natureza = new FormData(e.currentTarget).get('natureza'); executar(() => a.api.classificarImagem(imagem.id, natureza, imagem.natureza), 'Classificação registrada. Origem e original preservados.') }}><label>Natureza da imagem<select name="natureza" disabled={a.ocupado} defaultValue={imagem.natureza === 'Comunicacao' ? 'Comunicacao' : 'Produto'}><option value="Produto">Imagem de produto</option><option value="Comunicacao">Peça de comunicação</option></select></label><p>Uma fotografia e uma imagem IA conservam sua origem mesmo quando usadas em uma peça.</p><Botao tipo="submit" disabled={a.ocupado}>Confirmar classificação</Botao></form>}
@@ -216,10 +224,10 @@ export function AbaAcervo() {
         <fieldset><label><input type="checkbox" checked={paraGaleria} disabled={a.ocupado} onChange={(e) => setParaGaleria(e.target.checked)} /> Adicionar à galeria em vez de trocar a capa</label></fieldset>
         <EscolhaDeImagem listar={a.api.listarImagens} ocupado={a.ocupado} pratoId={pratoAlvo.id} aoEscolher={usarImagemNoPrato} />
       </div>}
-      {dialogo === 'solicitar' && <form className={css.formulario} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); executar(() => a.api.solicitarImagem({ operacaoId: solicitacaoId, itemId: f.get('itemId'), formato: f.get('formato'), brief: f.get('brief'), referencias: imagem ? [imagem.id] : [] }), 'Solicitação registrada na fila.') }}>
+      {dialogo === 'solicitar' && <form className={css.formulario} onInput={(e) => setPassou(algumCampoPassaDoLimite(e.currentTarget, LIMITES_SOLICITACAO))} onSubmit={(e) => { e.preventDefault(); if (algumCampoPassaDoLimite(e.currentTarget, LIMITES_SOLICITACAO)) return; const f = new FormData(e.currentTarget); executar(() => a.api.solicitarImagem({ operacaoId: solicitacaoId, itemId: f.get('itemId'), formato: f.get('formato'), brief: f.get('brief'), referencias: imagem ? [imagem.id] : [] }), 'Solicitação registrada na fila.') }}>
         <label>Item<select name="itemId" required>{a.itens.map((i) => <option key={i.cardapioItemId} value={i.cardapioItemId}>{i.nome}</option>)}</select></label>
-        <label>Formato<select name="formato">{formatos.map((f) => <option key={f}>{f}</option>)}</select></label><label>Descreva o que precisa<textarea name="brief" required maxLength={12000} /></label>
-        <p>{imagem ? `Referência: ${imagem.titulo}` : 'Selecione uma imagem no acervo antes de solicitar se quiser usá-la como referência.'}</p><Botao tipo="submit" variante="primario" disabled={a.ocupado}>Registrar solicitação</Botao>
+        <label>Formato<select name="formato">{formatos.map((f) => <option key={f}>{f}</option>)}</select></label><CampoComLimite rotulo="Descreva o que precisa" limite={12000} name="brief" required />
+        <p>{imagem ? `Referência: ${imagem.titulo}` : 'Selecione uma imagem no acervo antes de solicitar se quiser usá-la como referência.'}</p><Botao tipo="submit" variante="primario" disabled={a.ocupado || passou} motivo={passou ? MOTIVO_LIMITE : undefined}>Registrar solicitação</Botao>
       </form>}
     </Modal>}
   </section>

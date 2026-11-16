@@ -163,7 +163,7 @@ await provar('formulário inválido não envia e os limites reais estão nos cam
   assert.equal(escritas.length, 0)
   for (const nome of ['Tom', 'Saudação no primeiro contato', 'Saudação para quem volta', 'Frase de espera', 'Mensagem para endereço fora da área', 'Tempo extra de preparo (min)', 'Preparo padrão (min)']) assert.equal(campo(tela, nome).props.required, true)
   assert.equal(campo(tela, 'Modelo de retomada (WhatsApp)').props.pattern, '[a-z0-9_]+')
-  assert.equal(campo(tela, 'Modelo de retomada (WhatsApp)').props.maxLength, 512)
+  assert.equal(campo(tela, 'Modelo de retomada (WhatsApp)').props.limite, 512) // #2792: o teto virou aviso no campo (limite), sem cortar o texto
 })
 await provar('falha de gravação preserva a edição e permite tentar novamente', async () => {
   const tela = montar('ConfiguracaoDoAtendimento'); await tela.atualizar(); mudar(tela, 'Tom', 'direto')

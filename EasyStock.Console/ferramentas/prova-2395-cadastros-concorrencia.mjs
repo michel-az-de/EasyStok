@@ -180,7 +180,7 @@ try {
 
   etapa = 'M01-modelos'
   await pagina.goto(`${origem}/#/m/cadastros/modelos`)
-  await pagina.getByRole('button', { name: 'E-mail e SMS', exact: true }).click()
+  await pagina.getByRole('tab', { name: 'E-mail e SMS', exact: true }).click()
   await pagina.getByRole('button', { name: 'Novo modelo', exact: true }).click()
   let modeloDialogo = pagina.getByRole('dialog', { name: 'Novo modelo', exact: true })
   const nomeModelo = `${prefixo} modelo`
@@ -215,7 +215,7 @@ try {
   await item.getByText('Aguardando revisão', { exact: true }).waitFor()
   await aprovar()
   await pagina.reload()
-  await pagina.getByRole('button', { name: 'E-mail e SMS', exact: true }).click()
+  await pagina.getByRole('tab', { name: 'E-mail e SMS', exact: true }).click()
   await pagina.getByRole('listitem').filter({ has: pagina.getByRole('heading', { name: nomeModelo, exact: true }) })
     .getByText('Aprovado na loja', { exact: true }).waitFor()
   const antigo = (await api(pagina, `/api/notificacoes/templates/${rascunho.id}`)).json.data

@@ -7,6 +7,8 @@ import { Pilula } from '../../../componentes/Pilula'
 import { useSecoesCardapioApi } from '../../../aplicacao/useSecoesCardapioApi'
 import { resumoCategoriasAntigas } from '../../../aplicacao/gestaoSecoes'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
+// #2792: o limite de 100 (espelha o servidor) avisa no campo e trava o envio, em vez de cortar o texto colado.
 import css from './abaCardapio.module.css'
 
 // M1 › Categorias (M1.3, #1483). As categorias que o cliente vê no site e que agrupam a comanda,
@@ -39,11 +41,11 @@ export function LinhaCategoria({ secao, primeira, ultima, gestao }) {
             aria-label={`Novo nome de ${secao.nome}`}
             value={nome}
             disabled={ocupado}
-            maxLength={100}
+            limite={100}
             onChange={(e) => setNome(e.target.value)}
           />
           {gestao.aviso && <p role="alert" className={css.aviso}>{gestao.aviso}</p>}
-          <div className={css.acoes}><Botao disabled={ocupado} onClick={() => setEditando(false)}>Cancelar</Botao><Botao tipo="submit" variante="primario" disabled={ocupado || !nome.trim()}>Salvar nome</Botao></div>
+          <div className={css.acoes}><Botao disabled={ocupado} onClick={() => setEditando(false)}>Cancelar</Botao><Botao tipo="submit" variante="primario" disabled={ocupado || !nome.trim() || algumPassaDoLimite([nome, 100])}>Salvar nome</Botao></div>
         </form>
       </Modal>}
         <div className={css.resumo}>
@@ -173,13 +175,13 @@ export function AbaCategoriasApi() {
         <CampoTexto
           rotulo="Nome da nova categoria"
           placeholder="Nova categoria (ex.: Massas)"
-          maxLength={100}
+          limite={100}
           value={nova}
           disabled={criando}
           onChange={(e) => setNova(e.target.value)}
         />
         {gestao.aviso && <p className={css.aviso} role="alert">{gestao.aviso}</p>}
-        <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim()}>{criando ? 'Criando…' : 'Criar categoria'}</Botao>
+        <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim() || algumPassaDoLimite([nova, 100])}>{criando ? 'Criando…' : 'Criar categoria'}</Botao>
       </form></Modal>}
 
       {gestao.secoes.length === 0 ? (!antigas && (

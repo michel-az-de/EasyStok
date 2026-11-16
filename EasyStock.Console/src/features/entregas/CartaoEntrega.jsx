@@ -26,7 +26,7 @@ const corPeloMinuto = (minutos) => {
 }
 
 const rotuloMinutos = (minutos) => {
-  if (minutos == null) return '—'
+  if (minutos == null) return '' // #2792: sem travessão; o aria-label do anel diz "Sem janela escolhida"
   if (minutos < 0) return '+' + Math.min(Math.abs(Math.round(minutos)), 99)
   // #2237: acima de 99 min, as horas inteiras que faltam, para baixo (nunca promete tempo a mais).
   if (minutos > 99) return Math.floor(minutos / 60) + ' h'

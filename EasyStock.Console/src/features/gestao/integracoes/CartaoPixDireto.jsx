@@ -4,6 +4,7 @@ import { situacaoDoPixDireto } from '../../../dominio/cobranca'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import css from './AbaIntegracoes.module.css'
 
 // #2233: Pix direto pela chave da loja, sem Mercado Pago. O cliente paga pelo copia e cola e a
@@ -20,6 +21,8 @@ export function CartaoPixDireto() {
   const [editando, setEditando] = useState(false)
   const [valores, setValores] = useState(VAZIO)
   const preenchido = valores.chave.trim() && valores.nomeRecebedor.trim() && valores.cidade.trim()
+  // #2792: sem `maxLength` (cortava em silêncio); passou do limite do servidor, o Salvar fica parado.
+  const passou = algumPassaDoLimite([valores.nomeRecebedor, 25], [valores.cidade, 15])
   const fechar = () => { setValores(VAZIO); setEditando(false) }
   const campo = (nome) => (e) => setValores((v) => ({ ...v, [nome]: e.target.value }))
   const situacao = situacaoDoPixDireto(pix)
@@ -49,11 +52,11 @@ export function CartaoPixDireto() {
           <div className={css.formularioCredencial}>
             <CampoSelecao rotulo="Tipo da chave" opcoes={TIPOS} value={valores.tipo} onChange={campo('tipo')} />
             <CampoTexto rotulo="Chave Pix" autoComplete="off" value={valores.chave} onChange={campo('chave')} />
-            <CampoTexto rotulo="Nome de quem recebe" dica="Até 25 letras, sai sem acento no Pix." maxLength={25}
+            <CampoTexto rotulo="Nome de quem recebe" dica="Até 25 letras, sai sem acento no Pix." limite={25}
               value={valores.nomeRecebedor} onChange={campo('nomeRecebedor')} />
-            <CampoTexto rotulo="Cidade" dica="Até 15 letras." maxLength={15} value={valores.cidade} onChange={campo('cidade')} />
+            <CampoTexto rotulo="Cidade" dica="Até 15 letras." limite={15} value={valores.cidade} onChange={campo('cidade')} />
             <div className={css.botoesCredencial}>
-              <Botao variante="primario" disabled={!preenchido || ocupado}
+              <Botao variante="primario" disabled={!preenchido || passou || ocupado}
                 onClick={async () => { if (await salvar(valores)) fechar() }}>Salvar</Botao>
               <Botao variante="texto" onClick={fechar}>Cancelar</Botao>
             </div>

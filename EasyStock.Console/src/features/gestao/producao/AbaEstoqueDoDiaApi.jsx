@@ -7,6 +7,7 @@ import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
 import { contagemInicial, detalheDoLote, podeRegistrarPerda, podeReimprimir, motivoDaContagem, porcaoQueNaoRepete, porcaoSugerida, porcoesParaAjuste, resumoDoEstoque, situacaoDoPrato, validadeDoLote, vencidasNaContagem } from '../../../aplicacao/estoqueDoDia'
 import { producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { hashDoModulo } from '../../../dominio/modulos'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import css from '../cardapio/abaCardapio.module.css'
 import { PreviaDasEtiquetas } from './etiqueta/PreviaDasEtiquetas'
 import tabela from './tabelaProducao.module.css'
@@ -44,7 +45,9 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
   const [salvando, setSalvando] = useState(false)
   const vencidas = vencidasNaContagem(contado)
   // #2258 (auditoria P6): parado, o botão diz o que falta em vez de ficar apagado sem explicação.
+  // #2792: o motivo passa do limite de 500 (espelha o servidor): o aviso fica no campo e o botão trava.
   const parado = motivoDaContagem({ salvando, contagem, motivo, porPorcao, contado: Boolean(contado) })
+    ?? (algumPassaDoLimite([motivo, 500]) ? 'Encurte o motivo do ajuste.' : null)
 
   const trocarPorcao = (evento) => {
     const chave = evento.target.value
@@ -54,7 +57,7 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
 
   const salvar = (evento) => {
     evento.preventDefault()
-    if (salvando) return
+    if (salvando || algumPassaDoLimite([motivo, 500])) return
     setSalvando(true)
     Promise.resolve(aoSalvar(contagem, motivo, { porcoes: opcoes, porcao }))
       .then((ok) => { if (ok !== false) aoCancelar() }).finally(() => setSalvando(false))
@@ -82,7 +85,7 @@ function FormularioAjuste({ alvo, aoSalvar, aoCancelar, aviso, aoFecharAviso }) 
       <CampoTexto
         rotulo="Motivo do ajuste"
         placeholder="Ex.: contei o congelador"
-        maxLength={500}
+        limite={500}
         value={motivo}
         disabled={salvando}
         onChange={(e) => setMotivo(e.target.value)}

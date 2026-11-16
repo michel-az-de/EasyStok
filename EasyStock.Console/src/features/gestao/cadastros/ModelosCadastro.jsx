@@ -1,5 +1,5 @@
-import { useId, useRef, useState } from 'react'
-import { aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro, obterCadastro, previaModeloCadastro, salvarCadastro, useContextoVisualCadastro, useListaCadastros } from '../../../aplicacao/cadastros'
+import { useEffect, useId, useRef, useState } from 'react'
+import { aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro, obterCadastro, previaModeloCadastro, salvarCadastro, useContextoVisualCadastro, useListaCadastros, variaveisDoModeloCadastro } from '../../../aplicacao/cadastros'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
@@ -9,6 +9,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
+import { dicaDasVariaveis } from '../../../dominio/variaveisDoModelo'
 import { EVENTOS_MODELO, MENSAGEM_CADASTRO_REPETIDO, NOMES_CANAIS_MODELO, novoModeloCadastro, temProximaPagina } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
@@ -90,9 +91,18 @@ function EditorModelo({ contexto, editor, aoMudar, aoFechar, aoSalvo }) {
   const [erro, falhar] = useState(null)
   const [previa, mostrarPrevia] = useState(null)
   const [tentou, tentar] = useState(false)
+  const [catalogo, catalogar] = useState([])
   const formulario = useRef(null)
   const emVoo = useRef(false)
   const problemas = problemasDoModelo(dados)
+  // #2792: as variáveis {{ x }} do evento viram dica da Mensagem; erro ou 403 só deixam o campo sem dica.
+  const { empresaId, identidade } = contexto
+  useEffect(() => {
+    if (!dados.tipoEvento) return undefined
+    const controle = new AbortController()
+    variaveisDoModeloCadastro(dados.tipoEvento, { empresaId, identidade }, controle.signal).then(catalogar, () => catalogar([]))
+    return () => controle.abort()
+  }, [dados.tipoEvento, empresaId, identidade])
   const nomeLongo = dados.nome?.length > LIMITE_NOME
   const mudar = (campo, valor) => { aoMudar({ ...editor, dados: { ...dados, [campo]: valor } }); mostrarPrevia(null) }
   async function executar(salvar) {
@@ -116,7 +126,7 @@ function EditorModelo({ contexto, editor, aoMudar, aoFechar, aoSalvo }) {
       <CampoTexto rotulo="Nome do modelo" obrigatorio erro={tentou && !nomeLongo ? problemas.nome : undefined} aviso={nomeLongo ? problemas.nome : undefined} dica={`${dados.nome?.length ?? 0} de ${LIMITE_NOME} caracteres`} value={dados.nome} disabled={Boolean(dados.id)} onChange={e => mudar('nome', e.target.value)} />
       {!dados.id && <><CampoTexto rotulo="Identificação do modelo" dica="Um nome curto, sem espaços, para identificar este modelo." obrigatorio erro={tentou ? problemas.codigo : undefined} value={dados.codigo} onChange={e => mudar('codigo', e.target.value)} /><Combobox rotulo="Canal" valor={dados.canal} aoMudar={v => mudar('canal', v)} opcoes={CANAIS.slice(1)} /><Combobox rotulo="Quando usar" valor={dados.tipoEvento} aoMudar={v => mudar('tipoEvento', v)} opcoes={EVENTOS_MODELO} /></>}
       <div className={css.larguraTotal}><CampoTexto rotulo="Assunto" value={dados.assuntoTemplate ?? ''} onChange={e => mudar('assuntoTemplate', e.target.value)} /></div>
-      <div className={css.larguraTotal}><CampoArea rotulo="Mensagem" obrigatorio erro={tentou ? problemas.corpo : undefined} rows={9} value={dados.corpoTemplate ?? ''} onChange={e => mudar('corpoTemplate', e.target.value)} /></div>
+      <div className={css.larguraTotal}><CampoArea rotulo="Mensagem" dica={dados.tipoEvento ? dicaDasVariaveis(catalogo) : undefined} obrigatorio erro={tentou ? problemas.corpo : undefined} rows={9} value={dados.corpoTemplate ?? ''} onChange={e => mudar('corpoTemplate', e.target.value)} /></div>
     </fieldset></form>
     {previa && <section className={css.previa}><h3>Prévia sem envio</h3><p>{previa.assuntoRenderizado}</p>{dados.canal === 'Email' || dados.canal === 1 ? <iframe title="Prévia do modelo" sandbox="" srcDoc={`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>body{font-family:system-ui;overflow-wrap:anywhere;padding:12px}</style>${previa.corpoRenderizado}`} /> : <p className={css.previaTexto}>{previa.corpoRenderizado}</p>}<p className={css.apoio}>Dados do cliente e do pedido serão preenchidos no uso do modelo.</p></section>}
   </Modal>

@@ -27,7 +27,8 @@ function Indicador({ item, movimentos, podeFecharCaixa }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id, transition: movimentos ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' } : null,
   })
-  const valor = item.valor === null ? '—' : item.id === 'financeiro' ? moeda(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
+  const valor = item.valor === null ? <span className={css.oculto}>{item.estado === 'erro' ? 'Sem leitura' : 'Carregando'}</span> // #2792: sem travessão; texto só para o leitor de tela
+    : item.id === 'financeiro' ? moeda(item.valor) : `${item.valor}${item.parcial ? '+' : ''}`
   // Só o que pede ação aparece por escrito: leitura que falhou e caixa de outro dia aberto.
   const aviso = item.estado === 'erro'
     ? `${item.em ? `Desatualizado · dados das ${hora(item.em)}` : 'Não foi possível atualizar'}${item.erro ? `: ${item.erro}` : ''}`

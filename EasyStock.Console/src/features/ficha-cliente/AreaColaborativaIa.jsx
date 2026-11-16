@@ -11,7 +11,11 @@ import { useContextoAssistencia } from '../../aplicacao/contextoAssistencia'
 import { comandaDaFichaIa, tituloDoBlocoIa } from '../../dominio/montagemFicha'
 import { horaCurta, moeda } from '../../dominio/formato'
 import { conversaEncerrada } from '../../dominio/conversa'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './AreaColaborativaIa.module.css'
+
+// #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o Organizar trava.
+const LIMITE_ORIENTACAO = 2000
 
 export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAbrirComanda, aoProporNota, aoCalcularFrete, aoAbrirCardapio, aoRascunho, aoSoltar }) {
   const { selecionada, fonteApi, agora } = useAtendimento()
@@ -86,7 +90,7 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
     && contexto.current?.aberta && contexto.current?.chave === chave && identidadeDaMontagem() === identidade
   async function organizar(evento) {
     evento.preventDefault()
-    if (!fonteApi || selecionada?.id !== conversaId || pedido.current || !mesmaConversa()) return
+    if (!fonteApi || selecionada?.id !== conversaId || pedido.current || !mesmaConversa() || algumPassaDoLimite([orientacao, LIMITE_ORIENTACAO])) return
     const controle = new AbortController(), numero = ++sequencia.current
     pedido.current = controle; setCarregando(true); setErro(null)
     try {
@@ -104,10 +108,10 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
   return <section className={css.area} aria-label="Organizar a ficha com o Assistente">
     <form onSubmit={organizar}>
       <header className={css.cabecalho}><AvatarAssistente tamanho={32} decorativo /><h3>Assistente</h3>
-        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com o Assistente'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
+        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com o Assistente'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando || algumPassaDoLimite([orientacao, LIMITE_ORIENTACAO])}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
       </header>
       <details className={css.orientar}><summary>Orientar</summary>
-        <CampoTexto rotulo="Orientação (opcional)" placeholder="Ex.: preparar a retirada de sábado" maxLength={2000}
+        <CampoTexto rotulo="Orientação (opcional)" placeholder="Ex.: preparar a retirada de sábado" limite={LIMITE_ORIENTACAO}
           value={orientacao} disabled={carregando} onChange={(e) => setOrientacao(e.target.value)} />
       </details>
     </form>

@@ -16,11 +16,20 @@ const semAcento = (texto) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
 
 export const normalizarBusca = (texto) => semAcento(String(texto ?? '').toLowerCase()).trim()
 
+// Teto do servidor para o atalho (RespostaPronta.AtalhoTamanhoMaximo).
+export const ATALHO_MAXIMO = 40
+
 // Atalho de barra a partir do título: "Enviar cardápio" -> "/enviar-cardapio".
+// #2792: o atalho gerado é sugestão do sistema, não texto da pessoa, então já nasce dentro do teto: um título
+// longo vira o atalho das primeiras palavras inteiras que cabem em 40 (sem palavra partida quando dá).
 export function gerarAtalho(titulo) {
   const slug = semAcento(String(titulo ?? '').toLowerCase())
     .replace(/[^a-z0-9 ]/g, '').trim().replace(/\s+/g, '-')
-  return `/${slug || 'resposta'}`
+  const atalho = `/${slug || 'resposta'}`
+  if (atalho.length <= ATALHO_MAXIMO) return atalho
+  const cabe = atalho.slice(0, ATALHO_MAXIMO)
+  const ultimaPalavra = atalho[ATALHO_MAXIMO] === '-' ? ATALHO_MAXIMO : cabe.lastIndexOf('-')
+  return ultimaPalavra > 1 ? cabe.slice(0, ultimaPalavra) : cabe
 }
 
 function idLivre(lista, base) {

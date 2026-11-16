@@ -108,8 +108,12 @@ try {
   await p.waitForTimeout(300)
   assert.equal(await p.getByRole('button', { name: 'Ver texto inteiro', exact: true }).count(), 0, 'texto que cabe não ganha botão')
   // Sem nota escondida e sem texto cortado, o cabeçalho não se oferece para abrir o que já está inteiro na tela.
-  const inerte = p.getByRole('region', { name: 'Notas internas do cliente', exact: true }).locator('[data-voltar-notas]')
-  assert.equal(await inerte.getAttribute('aria-disabled'), 'true', 'cabeçalho sem o que abrir fica inerte')
+  // #2792: o cabeçalho inerte é título (h3), não botão desativado.
+  const regiaoNotas = p.getByRole('region', { name: 'Notas internas do cliente', exact: true })
+  const inerte = regiaoNotas.locator('[data-voltar-notas]')
+  assert.equal(await inerte.evaluate(n => n.tagName), 'H3', 'cabeçalho sem o que abrir é título')
+  assert.equal(await regiaoNotas.getByRole('heading', { name: /^Notas/ }).isVisible(), true)
+  assert.equal(await regiaoNotas.getByRole('button', { name: /^Notas/ }).count(), 0, 'sem botão que não faz nada')
   assert.equal(await inerte.getAttribute('aria-expanded'), null)
   assert.equal(await inerte.locator('svg').count(), 0, 'sem seta quando não há o que abrir')
   await p.close()
