@@ -1,3 +1,4 @@
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Security;
@@ -42,7 +43,7 @@ public class EfiPixWebhookProcessorTests
 
         var bypass = Substitute.For<IRowLevelSecurityBypass>();
         var passos = new List<string>();
-        var uow = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<ReconciliarPixResult>();
         uow.When(u => u.DescartarAlteracoesPendentes()).Do(_ => passos.Add("descartar"));
         uow.CommitAsync().Returns(_ => { passos.Add("gravar"); return Task.FromResult(1); });
 
@@ -65,7 +66,7 @@ public class EfiPixWebhookProcessorTests
         var boa = NovaParcela();
         var contas = Substitute.For<IContaReceberRepository>();
         contas.GetParcelaByEfiTxidAsync("cr-boa", Arg.Any<CancellationToken>()).Returns(boa);
-        var uow = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<ReconciliarPixResult>();
         var bypass = Substitute.For<IRowLevelSecurityBypass>();
         var reconciliar = new ReconciliarPixParcelaReceberUseCase(contas, Substitute.For<ICaixaRepository>(),
             Substitute.For<IEfiPixService>(), uow, NullLogger<ReconciliarPixParcelaReceberUseCase>.Instance);

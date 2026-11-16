@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
@@ -30,7 +31,8 @@ public class ReconciliarPixParcelaReceberExcedenteTests
         repo.GetParcelaByEfiTxidAsync(Txid, Arg.Any<CancellationToken>()).Returns(parcela);
         repo.AddEventoAsync(Arg.Do<ContaFinanceiraEvento>(eventos.Add), Arg.Any<CancellationToken>());
         var uc = new ReconciliarPixParcelaReceberUseCase(repo, Substitute.For<ICaixaRepository>(),
-            Substitute.For<IEfiPixService>(), Substitute.For<IUnitOfWork>(),
+            Substitute.For<IEfiPixService>(),
+            Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<ReconciliarPixResult>(),
             Substitute.For<ILogger<ReconciliarPixParcelaReceberUseCase>>());
         return (uc, eventos);
     }

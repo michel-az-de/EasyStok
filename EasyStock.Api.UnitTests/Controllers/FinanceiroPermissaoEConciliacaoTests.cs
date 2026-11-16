@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Caixa;
@@ -161,7 +162,7 @@ public class FinanceiroPermissaoEConciliacaoTests
 
     private static ContasAReceberController ControllerReceber(IContaReceberRepository repo, ICaixaRepository caixa, IEfiPixService efi, ICurrentUserAccessor user)
     {
-        var uow = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<ReconciliarPixResult>();
         return new ContasAReceberController(null!, null!, null!, null!, null!, null!, null!, null!,
             new RegistrarPagamentoParcelaReceberUseCase(repo, caixa, uow, NullLogger<RegistrarPagamentoParcelaReceberUseCase>.Instance),
             null!, null!, null!,

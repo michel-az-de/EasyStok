@@ -161,6 +161,23 @@ public sealed class LancamentoCaixaMobileEdicaoExclusaoTests : IDisposable
     }
 
     [Fact]
+    public async Task Editar_e_excluir_no_mesmo_envio_estorna_o_movimento_com_a_edicao()
+    {
+        // #2763: o estorno relê o movimento atrás da trava do Caixa. A releitura não pode desfazer a edição que o
+        // mesmo envio acabou de espelhar no movimento, ainda não salva.
+        await SincronizarAsync(Dto("expense", 30m, "Gas", "dinheiro"));
+
+        await AplicarAsync("cashEntry.upsert", Dto("income", 45.5m, "Troco do fornecedor", "pix"), salvar: false);
+        await AplicarAsync("cashEntry.delete", new { id = Lancamento });
+        _db.ChangeTracker.Clear();
+
+        var movimento = Movimentos().Should().ContainSingle().Subject;
+        movimento.EstornadoEm.Should().NotBeNull();
+        (movimento.Tipo, movimento.Valor, movimento.Descricao, movimento.Metodo)
+            .Should().Be(("entrada", 45.5m, "Troco do fornecedor", "pix"));
+    }
+
+    [Fact]
     public async Task Excluir_Reenvio_NaoEstornaDeNovoNemRecusa()
     {
         await SincronizarAsync(Dto("expense", 30m, "Gas", "dinheiro"));

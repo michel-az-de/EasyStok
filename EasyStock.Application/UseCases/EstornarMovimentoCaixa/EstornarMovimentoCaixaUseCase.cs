@@ -50,6 +50,10 @@ public class EstornarMovimentoCaixaUseCase(
         return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
         {
             await repo.TravarSaidasAsync(mov.EmpresaId, mov.LojaId, ct);
+            // #2763: o movimento foi lido antes da trava; outra tela pode tê-lo estornado enquanto esta esperava.
+            // Quem chega depois responde com o estorno que venceu, sem regravar autoria e motivo.
+            await repo.RecarregarMovimentoAsync(mov, ct);
+            if (mov.EstornadoEm != null) return AbrirCaixaUseCase.Map(mov);
             await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, mov.EmpresaId, mov.DataMovimento, mov.LojaId,
                 "Não é possível estornar movimento de dia já fechado.");
             if (conferirGaveta) await ConferirCaixaParaEstornoAsync(mov);

@@ -82,4 +82,25 @@ public class EstornarMovimentoCaixaTravaTests
             _repo.UpdateMovimentoAsync(mov);
         });
     }
+
+    [Fact]
+    public async Task Estorno_que_outra_tela_fez_enquanto_esperava_a_trava_responde_com_ele()
+    {
+        // #2763: o movimento foi lido antes da trava; atrás dela, a releitura mostra o estorno de quem chegou antes.
+        var mov = MovimentoCaixa.Criar(Empresa, "saida", 30m);
+        _repo.GetMovimentoAsync(Empresa, mov.Id).Returns(mov);
+        _repo.When(r => r.RecarregarMovimentoAsync(mov, Arg.Any<CancellationToken>()))
+            .Do(_ => mov.Estornar(Guid.NewGuid(), "Ana", "primeiro"));
+
+        var r = await Novo().ExecuteAsync(new EstornarMovimentoCaixaCommand(Empresa, mov.Id, "segundo", Guid.NewGuid(), "Bia"));
+
+        (r!.EstornadoPorNome, r.MotivoEstorno).Should().Be(("Ana", "primeiro"));
+        await _repo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+        await _uow.DidNotReceive().CommitAsync();
+        Received.InOrder(() =>
+        {
+            _repo.TravarSaidasAsync(Empresa, mov.LojaId, Arg.Any<CancellationToken>());
+            _repo.RecarregarMovimentoAsync(mov, Arg.Any<CancellationToken>());
+        });
+    }
 }
