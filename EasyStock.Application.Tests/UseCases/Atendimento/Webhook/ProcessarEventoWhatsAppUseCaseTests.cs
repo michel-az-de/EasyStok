@@ -457,6 +457,24 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _queueService.DidNotReceiveWithAnyArgs().EnqueueAsync(default!, default(ProcessarTurnoAgenteJob)!);
     }
 
+    [Theory]
+    [InlineData("read")]
+    [InlineData("failed")]
+    public async Task StatusParaMensagemRecebidaDoClienteEIgnoradoSemDerrubarOWebhook(string status)
+    {
+        // #2746: o provedor pode mandar status para o id de uma mensagem de ENTRADA; o domínio só aceita Saida.
+        const string wamid = "wamid.entrada-com-status";
+        var mensagem = Mensagem.Entrada(_empresaId, Guid.NewGuid(), DateTime.UtcNow, TipoConteudoMensagem.Texto, "Oi", wamid);
+        var statusAntes = mensagem.Status;
+        _conversaRepository.ObterMensagemPorExternoIdAsync(_empresaId, wamid, Arg.Any<CancellationToken>()).Returns(mensagem);
+
+        var acao = () => _useCase.ExecuteAsync(PayloadStatus(wamid, status));
+
+        await acao.Should().NotThrowAsync();
+        mensagem.Status.Should().Be(statusAntes);
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
     [Fact]
     public async Task StatusAtualizaMensagem()
     {

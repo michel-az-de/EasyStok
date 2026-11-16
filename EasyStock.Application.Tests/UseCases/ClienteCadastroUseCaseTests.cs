@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarCliente;
 using EasyStock.Application.UseCases.CriarCliente;
+using EasyStock.Domain.Entities.Storefront;
 using Microsoft.Extensions.Logging;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 
@@ -331,5 +332,92 @@ public class ClienteCadastroUseCaseTests
         TipoPessoaCliente.EhValido("juridica").Should().BeTrue();
         TipoPessoaCliente.EhValido("PJ").Should().BeFalse();
         TipoPessoaCliente.EhValido(null).Should().BeFalse();
+    }
+
+    // ── TelefoneHash acompanha o telefone (#2740) ────────────────────
+
+    private static string HashDe(string e164) => ClienteOtp.CalcularTelefoneHash(e164);
+
+    private ClienteEntity ClienteComTelefone(string telefone, string e164)
+    {
+        var cliente = ClienteEntity.Criar(Empresa, "Ana");
+        cliente.Telefone = telefone;
+        cliente.TelefoneHash = HashDe(e164);
+        _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
+        return cliente;
+    }
+
+    [Fact]
+    public async Task Atualizar_telefone_novo_recalcula_o_hash_do_otp()
+    {
+        var cliente = ClienteComTelefone("11999998888", "+5511999998888");
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana", Telefone: "(11) 97777-6666", Revisao: cliente.Revisao));
+
+        cliente.TelefoneHash.Should().Be(HashDe("+5511977776666"));
+    }
+
+    [Fact]
+    public async Task Atualizar_telefone_removido_zera_o_hash()
+    {
+        var cliente = ClienteComTelefone("11999998888", "+5511999998888");
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana", Telefone: null, Revisao: cliente.Revisao));
+
+        cliente.TelefoneHash.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Atualizar_telefone_invalido_zera_o_hash_em_vez_de_manter_o_antigo()
+    {
+        var cliente = ClienteComTelefone("11999998888", "+5511999998888");
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana", Telefone: "123", Revisao: cliente.Revisao));
+
+        cliente.TelefoneHash.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Atualizar_sem_mudar_o_telefone_nao_mexe_no_hash()
+    {
+        var cliente = ClienteComTelefone("5511999998888", "+5511999998888");
+        cliente.TelefoneHash = "hash-do-otp-intocado";
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana Beatriz", Telefone: "5511999998888", Revisao: cliente.Revisao));
+
+        cliente.TelefoneHash.Should().Be("hash-do-otp-intocado");
+    }
+
+    [Fact]
+    public async Task Atualizar_telefone_de_outro_cliente_vira_erro_de_negocio_e_nao_500()
+    {
+        var cliente = ClienteComTelefone("11999998888", "+5511999998888");
+        var colisao = new InvalidOperationException("23505 ix_clientes_empresa_telefonehash");
+        _uow.CommitAsync().Returns<Task<int>>(_ => throw colisao);
+        _uow.EhViolacaoDeUnicidade(colisao).Returns(true);
+
+        var act = () => Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana", Telefone: "11977776666", Revisao: cliente.Revisao));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*telefone*");
+        _uow.Received(1).DescartarAlteracoesPendentes();
+    }
+
+    [Fact]
+    public async Task Atualizar_violacao_de_unicidade_sem_mudar_o_telefone_nao_e_reinterpretada()
+    {
+        var cliente = ClienteComTelefone("5511999998888", "+5511999998888");
+        var outra = new InvalidOperationException("23505 outro indice");
+        _uow.CommitAsync().Returns<Task<int>>(_ => throw outra);
+        _uow.EhViolacaoDeUnicidade(outra).Returns(true);
+
+        var act = () => Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana Beatriz", Telefone: "5511999998888", Revisao: cliente.Revisao));
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("23505 outro indice");
     }
 }

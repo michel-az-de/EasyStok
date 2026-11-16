@@ -206,7 +206,7 @@ public sealed class BatchLinker(
             }
             if (pratos.Count == 0) return;
 
-            var avisos = await baixaDeInsumos.BaixarAsync(lote.EmpresaId, pratos, lote.Codigo, lote.DataProducao);
+            var avisos = await baixaDeInsumos.BaixarAsync(lote.EmpresaId, pratos, lote.Codigo, lote.DataProducao, lojaId: lote.LojaId);
             if (avisos.Count == 0) return;
             foreach (var aviso in avisos)
                 log.LogWarning("Baixa de insumo do lote {Codigo} (PWA): {Aviso}", lote.Codigo, aviso);

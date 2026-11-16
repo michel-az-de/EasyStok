@@ -73,6 +73,10 @@ public sealed class MetaCloudWhatsAppProvider(
                 if (politica is not null && mensagem.Categoria == Domain.Enums.Notifications.CategoriaConteudoNotificacao.Transacional
                     && !await politica.PodeEnviarAsync(mensagem.EmpresaId, clienteId, CanalConversa.WhatsApp, FinalidadeContato.Transacional, ct))
                     return Falha("contato_transacional_revogado", permanente: true, sw);
+                // #2746: a onda foi enfileirada com consentimento; SAIR depois do enfileiramento barra a saída.
+                if (politica is not null && mensagem.Categoria == Domain.Enums.Notifications.CategoriaConteudoNotificacao.Marketing
+                    && await politica.RevogouAsync(mensagem.EmpresaId, clienteId, CanalConversa.WhatsApp, FinalidadeContato.Marketing, ct))
+                    return Falha("contato_marketing_revogado", permanente: true, sw);
             }
             var dentroDaJanela = conversa?.DentroDaJanela(agora) == true;
 

@@ -134,6 +134,8 @@ internal static class CaixaEmailGravada
         var host = Obrigatorio(valor, campo).ToLowerInvariant();
         if (host.Any(c => char.IsWhiteSpace(c) || c is '/' or ':' or '@'))
             throw new UseCaseValidationException($"{campo} inválido: só o nome do servidor, como imap.hostinger.com.");
+        if (HostDeCaixaEmail.NomeInterno(host))
+            throw new UseCaseValidationException($"{campo} inválido: use o servidor público do provedor de e-mail.");
         return host;
     }
 

@@ -11,7 +11,7 @@ import {
 } from '../../dominio/automacao'
 import { ROTULO_DO_SOM, listaDeEventosDeSom } from '../../dominio/automatico'
 import { canalDaConversa } from '../../dominio/canal'
-import { DIAS_DA_SEMANA, descreverProximaAbertura } from '../../dominio/funcionamento'
+import { DIAS_DA_SEMANA, chaveDoDiaNaLoja, descreverProximaAbertura } from '../../dominio/funcionamento'
 import { faixaDaJanela } from '../../dominio/entrega'
 import { permissaoDeEscrita } from '../../dominio/janela'
 import css from './automacoes.module.css'
@@ -220,9 +220,8 @@ export function ModalAutomacoes({ regras, aoAlternar, aoFechar, horariosApi }) {
   // as outras ignoram a chave que não citam no texto.
   const contexto = { ...contextoDePrevia(selecionada, faixa), abre: descreverProximaAbertura(agora, funcionamento) }
   // Achado 8: mesmo relógio de `agora` que já decide Aberta/Fechada aqui do
-  // lado, só lido como dia da semana (0-6, igual Date#getDay) para achar a
-  // chave em DIAS_DA_SEMANA.
-  const chaveDeHoje = DIAS_DA_SEMANA[new Date(agora).getDay()].chave
+  // lado, lido como dia civil da loja e não do navegador (#2742).
+  const chaveDeHoje = chaveDoDiaNaLoja(agora)
 
   // Mesma conta de canal/janela do composer e da biblioteca (Respostas):
   // enviar daqui respeita a mesma regra de janela fechada, nunca um atalho

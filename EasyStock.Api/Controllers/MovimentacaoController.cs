@@ -93,7 +93,12 @@ public class MovimentacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var kpis = await movimentacaoRepository.GetKpisAsync(resolvedEmpresaId, de, ate, tipo, natureza);
+        // #2738: mesmo periodo da lista (dia civil de Brasilia, ultimo dia inclusivo) e mesma barreira de intervalo invertido.
+        if (de.HasValue && ate.HasValue && de.Value.Date > ate.Value.Date)
+            return DataBadRequest("Período inválido: a data inicial não pode ser posterior à data final.");
+
+        var kpis = await movimentacaoRepository.GetKpisAsync(
+            resolvedEmpresaId, DataUtc.InicioDoPeriodoUtc(de), DataUtc.FimDoPeriodoUtc(ate), tipo, natureza);
         return DataOk(kpis);
     }
 

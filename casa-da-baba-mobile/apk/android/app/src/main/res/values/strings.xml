@@ -4,4 +4,6 @@
     <string name="title_activity_main">Casa da Baba Piloto</string>
     <string name="package_name">com.casadababa.piloto</string>
     <string name="custom_url_scheme">cdb-piloto</string>
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_cancel">Cancelar</string>
 </resources>

@@ -49,6 +49,18 @@ public static class BrazilTime
     public static DateTime? ParaBrasilia(this DateTime? utc)
         => utc.HasValue ? utc.Value.ParaBrasilia() : null;
 
+    /// <summary>
+    /// #2727: inverso de <see cref="ParaBrasilia(DateTime)"/> para o que a pessoa digita num campo sem fuso
+    /// (datetime-local chega com Kind Unspecified): é horário de Brasília e vira o instante UTC. A API trata
+    /// data sem fuso como UTC, então a conversão é aqui, na borda da tela. Utc fica igual; Local só normaliza.
+    /// </summary>
+    public static DateTime DeBrasiliaParaUtc(DateTime brasilia) => brasilia.Kind switch
+    {
+        DateTimeKind.Utc => brasilia,
+        DateTimeKind.Local => brasilia.ToUniversalTime(),
+        _ => TimeZoneInfo.ConvertTimeToUtc(brasilia, TimeZone),
+    };
+
     /// <summary>Overload p/ DateTimeOffset (alguns models vindos da API): converte o
     /// instante para Brasilia e devolve DateTime (sem offset) pronto p/ formatar.</summary>
     public static DateTime ParaBrasilia(this DateTimeOffset utc)

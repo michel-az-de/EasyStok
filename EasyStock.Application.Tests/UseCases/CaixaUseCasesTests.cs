@@ -1300,6 +1300,7 @@ public class CaixaUseCasesTests
             new EstornarMovimentoCaixaCommand(empresaId, suprimento.Id, Origem: "mobile"));
 
         result!.EstornadoEm.Should().NotBeNull();
-        await _repo.DidNotReceive().TravarSaidasAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        // #2736: a trava vale para qualquer origem (o fechamento a toma); só a conferência da gaveta fica de fora.
+        await _repo.Received(1).TravarSaidasAsync(empresaId, null, Arg.Any<CancellationToken>());
     }
 }

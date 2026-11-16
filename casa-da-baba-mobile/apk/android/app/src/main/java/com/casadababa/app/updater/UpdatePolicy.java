@@ -11,6 +11,10 @@ import java.util.zip.ZipInputStream;
 
 /** Validation shared by the Android updater and its dependency-free host tests. */
 public final class UpdatePolicy {
+    /** O manifesto do canal responde 404: nenhum pacote de conteúdo foi publicado para este APK. Não é falha. */
+    public static final class NotPublished extends IOException {
+        NotPublished(String message) { super(message); }
+    }
     public static final long MAX_ZIP = 64L * 1024 * 1024;
     public static final long MAX_EXPANDED = 128L * 1024 * 1024;
     public static final long MAX_FILE = 32L * 1024 * 1024;
@@ -131,6 +135,15 @@ public final class UpdatePolicy {
     /** Avisa uma vez por conteúdo preparado em segundo plano; o mesmo pacote nunca gera duas notificações. */
     public static boolean shouldAnnounceContent(String pendingVersion, String alreadyAnnounced) {
         return pendingVersion != null && !pendingVersion.isEmpty() && !pendingVersion.equals(alreadyAnnounced);
+    }
+
+    /**
+     * O job do push repete enquanto a conferência não terminou ou falhou. Canal sem pacote (manifesto 404) conta como
+     * conferência concluída: o tópico do push é um só para todos os APKs, e o aviso de um pacote de outro canal não
+     * pode deixar este aparelho tentando em segundo plano sem fim (#2735).
+     */
+    public static boolean shouldRetryCheck(boolean checking, boolean trial, boolean checkSucceeded) {
+        return checking || trial || !checkSucceeded;
     }
 
     public static boolean isUpdateAnnouncement(String sender, String kind, String sequence) {

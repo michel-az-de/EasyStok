@@ -54,48 +54,55 @@ public class RegistrarPagamentoParcelaReceberUseCase(
         try
         {
             conta.GarantirAceitaPagamento();
-            var pagamento = PagamentoParcela.CriarConfirmado(
-                cmd.EmpresaId, TipoLadoFinanceiro.Receber,
-                valor, metodo, dataPagamento,
-                cmd.GatewayProvedor, cmd.GatewayTransactionId,
-                cmd.Observacao, cmd.RegistradoPorUserId, cmd.RegistradoPorNome);
 
-            parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
+            return await uow.ExecuteInTransactionSemRetryAsync(async tx =>
+            {
+                // #2736: o recebimento toma a trava do Caixa, que o fechamento também toma (dia fechado não recusa).
+                await caixaRepo.TravarSaidasAsync(cmd.EmpresaId, conta.LojaId, tx);
 
-            var mov = MovimentoCaixa.Criar(
-                cmd.EmpresaId, "entrada", valor,
-                dataMovimento: DateTime.UtcNow,
-                lojaId: conta.LojaId);
-            mov.Descricao = $"Recb. parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
-            mov.Metodo = metodo;
-            mov.Categoria = "contas-a-receber";
-            mov.Referencia = ReferenciaDeParcela.DoPagamento("cr", conta.Id, parcela.Id, pagamento.Id);
-            mov.RegistradoPorUserId = cmd.RegistradoPorUserId;
-            mov.RegistradoPorNome = cmd.RegistradoPorNome;
-            mov.Origem = "api";
+                var pagamento = PagamentoParcela.CriarConfirmado(
+                    cmd.EmpresaId, TipoLadoFinanceiro.Receber,
+                    valor, metodo, dataPagamento,
+                    cmd.GatewayProvedor, cmd.GatewayTransactionId,
+                    cmd.Observacao, cmd.RegistradoPorUserId, cmd.RegistradoPorNome);
 
-            await caixaRepo.AddMovimentoAsync(mov);
-            pagamento.AssociarMovimentoCaixa(mov.Id);
+                parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
 
-            conta.AtualizarStatusPorParcelas();
+                var mov = MovimentoCaixa.Criar(
+                    cmd.EmpresaId, "entrada", valor,
+                    dataMovimento: DateTime.UtcNow,
+                    lojaId: conta.LojaId);
+                mov.Descricao = $"Recb. parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
+                mov.Metodo = metodo;
+                mov.Categoria = "contas-a-receber";
+                mov.Referencia = ReferenciaDeParcela.DoPagamento("cr", conta.Id, parcela.Id, pagamento.Id);
+                mov.RegistradoPorUserId = cmd.RegistradoPorUserId;
+                mov.RegistradoPorNome = cmd.RegistradoPorNome;
+                mov.Origem = "api";
 
-            await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
-                conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PagamentoConfirmado,
-                descricao: $"Recebimento de R$ {valor:F2} via {metodo} na parcela {parcela.Numero}.",
-                valorDepois: $"+R$ {valor:F2}",
-                usuarioId: cmd.RegistradoPorUserId, usuarioNome: cmd.RegistradoPorNome,
-                origem: "api"), ct);
+                await caixaRepo.AddMovimentoAsync(mov);
+                pagamento.AssociarMovimentoCaixa(mov.Id);
 
-            await contaRepo.UpdateAsync(conta, ct);
-            await uow.CommitAsync();
+                conta.AtualizarStatusPorParcelas();
 
-            logger.LogInformation("Recebimento {PagId} registrado em parcela {ParcId} (CR={ContaId}). Caixa={MovId}",
-                pagamento.Id, parcela.Id, conta.Id, mov.Id);
+                await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
+                    conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PagamentoConfirmado,
+                    descricao: $"Recebimento de R$ {valor:F2} via {metodo} na parcela {parcela.Numero}.",
+                    valorDepois: $"+R$ {valor:F2}",
+                    usuarioId: cmd.RegistradoPorUserId, usuarioNome: cmd.RegistradoPorNome,
+                    origem: "api"), ct);
 
-            return new RegistrarPagamentoResult(
-                pagamento.Id, parcela.Id, conta.Id,
-                parcela.Status.ToString(), conta.Status.ToString(),
-                parcela.ValorPago, parcela.Saldo, mov.Id);
+                await contaRepo.UpdateAsync(conta, ct);
+                await uow.CommitAsync();
+
+                logger.LogInformation("Recebimento {PagId} registrado em parcela {ParcId} (CR={ContaId}). Caixa={MovId}",
+                    pagamento.Id, parcela.Id, conta.Id, mov.Id);
+
+                return new RegistrarPagamentoResult(
+                    pagamento.Id, parcela.Id, conta.Id,
+                    parcela.Status.ToString(), conta.Status.ToString(),
+                    parcela.ValorPago, parcela.Saldo, mov.Id);
+            }, ct);
         }
         catch (RegraDeDominioVioladaException ex)
         {

@@ -36,7 +36,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var aberturaEm = DateTime.UtcNow.AddMinutes(-5);
+        var aberturaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromMinutes(5)).AddMinutes(-5);
         var dia = HorarioBrasil.DataOperacional(aberturaEm);
         await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, aberturaEm)));
         await using var provider = BuildProductionProvider();
@@ -44,7 +44,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<FecharCaixaUseCase>()
             .ExecuteAsync(new FecharCaixaCommand(empresaId)));
         // Venda que o PWA sincroniza depois de fechar: o caixa fechado não a recusa.
-        await SemearAsync(empresaId, db => db.Vendas.Add(NovaVenda(empresaId, 80m, DateTime.UtcNow, "pix")));
+        await SemearAsync(empresaId, db => db.Vendas.Add(NovaVenda(empresaId, 80m, InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.Zero), "pix")));
 
         var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
             .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, dia)));
@@ -89,9 +89,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
         // #2324: o estorno vai em agora+1min; no último minuto do dia ele cairia no dia seguinte.
-        var agora = DateTime.UtcNow;
-        if (HorarioBrasil.DataOperacional(agora.AddMinutes(1)) != HorarioBrasil.DataOperacional(agora))
-            agora = agora.AddMinutes(-2);
+        var agora = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.Zero, TimeSpan.FromMinutes(1));
         var dia = HorarioBrasil.DataOperacional(agora);
         var vendaQueFica = NovaVenda(empresaId, 100m, agora, "dinheiro");
         var vendaEstornada = NovaVenda(empresaId, 50m, agora, "dinheiro");
@@ -121,7 +119,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 0m, DateTime.UtcNow.AddMinutes(-5))));
+        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 0m, InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromMinutes(5)).AddMinutes(-5))));
         await using var provider = BuildProductionProvider();
 
         var suprimento = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<RegistrarMovimentoCaixaUseCase>()
@@ -151,7 +149,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddMinutes(-5))));
+        await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromMinutes(5)).AddMinutes(-5))));
         await using var provider = BuildProductionProvider();
         await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<RegistrarMovimentoCaixaUseCase>()
             .ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "entrada", 20m, Descricao: "Suprimento", Metodo: "dinheiro")));
@@ -188,12 +186,12 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // concluir que ele "já foi estornado" por não achá-lo ali: o movimento é conferido pelo id, no banco.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var aberturaEm = DateTime.UtcNow.AddMinutes(-5);
+        var aberturaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromMinutes(5)).AddMinutes(-5);
         var dia = HorarioBrasil.DataOperacional(aberturaEm);
         await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(MovimentoCaixa.Criar(empresaId, "abertura", 100m, aberturaEm)));
         await using var provider = BuildProductionProvider();
         await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<FecharCaixaUseCase>().ExecuteAsync(new FecharCaixaCommand(empresaId)));
-        var tardio = MovimentoCaixa.Criar(empresaId, "entrada", 30m, DateTime.UtcNow.AddSeconds(5));
+        var tardio = MovimentoCaixa.Criar(empresaId, "entrada", 30m, InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.Zero, TimeSpan.FromSeconds(5)).AddSeconds(5));
         tardio.Metodo = "dinheiro";
         await SemearAsync(empresaId, db => db.MovimentosCaixa.Add(tardio));
 
@@ -214,7 +212,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // passa a levar o número do pedido no dia, o cliente e o registrador, todos no mesmo SELECT do dia.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var agora = DateTime.UtcNow;
+        var agora = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromMinutes(3));
         var dia = HorarioBrasil.DataOperacional(agora);
         var doProvedor = NovoPedidoComPagamento(empresaId, 12, "Maria", 59m, "pix", "Mercado Pago", agora.AddMinutes(-3));
         var baixaManual = NovoPedidoComPagamento(empresaId, 13, "João", 30m, "dinheiro", "Joana", agora.AddMinutes(-2));
@@ -242,7 +240,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // sinal de D e a venda inteira caía em D+3. Regra: o sinal fica em D, D+3 mostra só os 70, e a soma é 100.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var sinalEm = entregaEm.AddDays(-3);
         var venda = NovaVenda(empresaId, 100m, entregaEm, "pix");
         var pedido = NovoPedidoComPagamento(empresaId, 7, "Ana", 30m, "pix", "Joana", sinalEm);
@@ -271,7 +269,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // com a forma da entrega. A gaveta de D não ganha nada; a de D+3 ganha os 70, não os 100. O Pix fica no dia D.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var sinalEm = entregaEm.AddDays(-3);
         var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
         var pedido = NovoPedidoComPagamento(empresaId, 9, "Cida", 30m, "pix", "Joana", sinalEm);
@@ -298,7 +296,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // ele é representado pela venda abatida e não soma por cima dela. Nunca 130 nem 170.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var sinalEm = entregaEm.AddDays(-1);
         var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
         var pedido = NovoPedidoComPagamento(empresaId, 11, "Eva", 30m, "pix", "Joana", sinalEm);
@@ -329,7 +327,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // dia inteiro; o sinal não soma por cima dela nem é abatido dela.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var sinalEm = entregaEm.AddSeconds(-20);
         var venda = NovaVenda(empresaId, 100m, entregaEm, "pix");
         var pedido = NovoPedidoComPagamento(empresaId, 10, "Duda", 30m, "pix", "Joana", sinalEm);
@@ -351,7 +349,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // da entrega e representa o dia (#926). A gaveta só pode ganhar os 70 em dinheiro; os 30 ficam no Pix.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var sinalEm = entregaEm.AddSeconds(-20);
         var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
         var pedido = NovoPedidoComPagamento(empresaId, 12, "Fê", 30m, "pix", "Joana", sinalEm);
@@ -380,7 +378,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // o que entrou em dinheiro. A forma é comparada sem espaço nem caixa (" Dinheiro " = "dinheiro").
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var sinalEm = diasAntes == 0 ? entregaEm.AddSeconds(-20) : entregaEm.AddDays(-diasAntes);
         var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
         var pedido = NovoPedidoComPagamento(empresaId, 13, "Gal", 30m, formaDoSinal, "Joana", sinalEm);
@@ -408,7 +406,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // sem linha de pagamento de pedido.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var venda = NovaVenda(empresaId, 100m, entregaEm, "dinheiro");
         var pedido = NovoPedidoComPagamento(empresaId, 14, "Hel", 30m, "dinheiro", "Joana", entregaEm.AddSeconds(-20));
         pedido.VendaId = venda.Id;
@@ -418,7 +416,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         var caixa = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ObterCaixaDiaUseCase>()
             .ExecuteAsync(new ObterCaixaDiaQuery(empresaId, HorarioBrasil.DataOperacional(entregaEm))));
         var extrato = await NoEscopoAsync(provider, empresaId, sp => sp.GetRequiredService<ListarLinhasCaixaUseCase>()
-            .ExecuteAsync(new ListarLinhasCaixaQuery(empresaId, entregaEm.AddHours(-1), DateTime.UtcNow)));
+            .ExecuteAsync(new ListarLinhasCaixaQuery(empresaId, entregaEm.AddHours(-1), entregaEm.AddMinutes(1))));
 
         caixa.LinhasExtras!.Select(l => (l.Tipo, l.Valor)).Should().Equal(("venda", 100m));
         extrato.Select(l => (l.Tipo, l.Valor)).Should().Equal(("venda", 100m));
@@ -431,7 +429,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // "venda" não muda para "pagamento".
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var venda = NovaVenda(empresaId, 100m, entregaEm, null);
         var pedido = NovoPedidoComPagamento(empresaId, 15, "Iara", 30m, "pix", "Joana", entregaEm.AddSeconds(-20));
         pedido.VendaId = venda.Id;
@@ -452,7 +450,7 @@ public sealed class CaixaDoDiaNumerosIntegrationTests(PostgreSqlDatabaseFixture 
         // O dinheiro conta uma vez só.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         var empresaId = await NovaEmpresaAsync();
-        var entregaEm = DateTime.UtcNow.AddMinutes(-1);
+        var entregaEm = InstantesDoDiaOperacional.Ancora(DateTime.UtcNow, TimeSpan.FromSeconds(80)).AddMinutes(-1);
         var venda = NovaVenda(empresaId, 100m, entregaEm, "pix");
         var pedido = NovoPedidoComPagamento(empresaId, 8, "Bia", 100m, "pix", "Joana", entregaEm);
         pedido.VendaId = venda.Id;

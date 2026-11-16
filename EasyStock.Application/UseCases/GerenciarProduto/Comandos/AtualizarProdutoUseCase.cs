@@ -28,7 +28,9 @@ public sealed class AtualizarProdutoUseCase(
     IProdutoEmbalagemRepository embalagemRepository,
     IUnitOfWork unitOfWork,
     ICacheService? cacheService = null,
-    IProdutoAlteracaoRepository? alteracaoRepository = null)
+    IProdutoAlteracaoRepository? alteracaoRepository = null,
+    IItemEstoqueRepository? itemEstoqueRepository = null,
+    IPedidoRepository? pedidoRepository = null)
 {
     public async Task ExecuteAsync(AtualizarProdutoCommand command)
     {
@@ -113,6 +115,11 @@ public sealed class AtualizarProdutoUseCase(
                 throw new UseCaseValidationException("Nome de produto duplicado para esta empresa.");
             }
         }
+
+        // #2737: inativar por escolha da pessoa passa pela guarda do Remover. O gate de preco abaixo nao passa por ela.
+        if (statusAntes == StatusProduto.Ativo && command.Status == StatusProduto.Inativo && itemEstoqueRepository is not null)
+            await RemoverProdutoUseCase.EnsurePodeInativarAsync(
+                command.EmpresaId, command.ProdutoId, itemEstoqueRepository, pedidoRepository);
 
         produto.CategoriaId = command.CategoriaId;
         produto.SubcategoriaId = command.SubcategoriaId;

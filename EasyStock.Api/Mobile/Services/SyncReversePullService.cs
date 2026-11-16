@@ -76,6 +76,38 @@ public class SyncReversePullService(
         }
     }
 
+    private static long UltimaMudanca(MovimentoCaixa m) => new DateTimeOffset(
+        m.EstornadoEm is { } estornadoEm && estornadoEm > m.CriadoEm ? estornadoEm : m.CriadoEm).ToUnixTimeMilliseconds();
+
+    /// <summary>
+    /// #2731: lancamento do aparelho estornado no console. O pull de mobile_cash_entries ja pode ter
+    /// trazido o mesmo id (outro aparelho editou, ou o proprio aparelho excluiu): marca estornado
+    /// nele em vez de mandar um segundo upsert.
+    /// </summary>
+    private static void EstornoDoLancamentoDoAparelho(List<MutationDto> mutations, MovimentoCaixa m)
+    {
+        var idDoAparelho = m.Referencia!["mobile:".Length..];
+        var idx = mutations.FindIndex(x => x.Type == "cashEntry.upsert"
+            && x.Payload.TryGetProperty("id", out var id) && id.GetString() == idDoAparelho);
+        if (idx >= 0)
+        {
+            var doApp = mutations[idx].Payload.Deserialize<CashEntryDto>(SyncDtoConverters.JsonOpts);
+            if (doApp is not null)
+                mutations[idx] = mutations[idx] with { Payload = SyncDtoConverters.Serialize(doApp with { Estornado = true }) };
+            return;
+        }
+        var dto = new CashEntryDto(
+            Id: idDoAparelho,
+            Type: m.Tipo is "entrada" or "abertura" ? "income" : "expense",
+            Amount: m.Valor,
+            Description: m.Descricao ?? "",
+            CreatedAt: new DateTimeOffset(m.DataMovimento).ToUnixTimeMilliseconds(),
+            Estornado: true,
+            Metodo: m.Metodo);
+        mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
+            "cashEntry.upsert", SyncDtoConverters.Serialize(dto), UltimaMudanca(m)));
+    }
+
     private async Task<Dictionary<Guid, decimal>> SaldoNaLojaAsync(List<Guid> produtoIds, Guid empresaId, Guid? lojaId)
     {
         if (produtoIds.Count == 0) return [];
@@ -124,11 +156,17 @@ public class SyncReversePullService(
 
         // SYNC-2/SYNC-1 (#2306): Produto ERP ja espelhado e alterado depois do cursor.
         // Reenvia o cadastro com o Id do espelho e o saldo de itens_estoque da loja do device.
+        // #2721: entrada ou venda no console muda so o ItemEstoque, nao o Produto; o estoque da loja
+        // do device movido depois do cursor tambem reenvia. EXISTS na mesma consulta, sem N+1.
+        var estoqueMovido = _db.Set<ItemEstoque>()
+            .Where(i => i.EmpresaId == empresaId && i.AlteradoEm > sinceDate);
+        if (lojaId.HasValue) estoqueMovido = estoqueMovido.Where(i => i.LojaId == lojaId || i.LojaId == null);
         var produtosEspelhados = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
             .Include(p => p.Categoria)
-            .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
+            .Where(p => p.EmpresaId == empresaId
                 && p.Status == StatusProduto.Ativo
-                && mobileLinkedProdutos.Contains(p.Id))
+                && mobileLinkedProdutos.Contains(p.Id)
+                && (p.AlteradoEm > sinceDate || estoqueMovido.Any(i => i.ProdutoId == p.Id)))
             .ToListAsync();
         if (produtosEspelhados.Count > 0)
         {
@@ -178,8 +216,10 @@ public class SyncReversePullService(
                     mutations[idx] = mutations[idx] with { Payload = SyncDtoConverters.Serialize(dto) };
                     continue;
                 }
+                // #2721: o instante e o da ultima mudanca, do cadastro ou do estoque da loja.
+                var alteradoEm = itensDoProduto.Select(i => i.AlteradoEm).Append(p.AlteradoEm).Max();
                 mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
-                    "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
+                    "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(alteradoEm).ToUnixTimeMilliseconds()));
             }
         }
 
@@ -314,12 +354,18 @@ public class SyncReversePullService(
 
         // MovimentoCaixa web sem Referencia="mobile:..." (criados direto no admin).
         // F7-B: incluir tambem estornados.
+        // #2731: o estorno feito no console depois do cursor tambem desce, do lancamento do console
+        // (criado antes do cursor) e do lancamento do aparelho ("mobile:<id>"), que desce com o id
+        // do aparelho para o PWA remove-lo (sync.js, F7-B). Uma consulta, sem N+1.
         var movimentosQ = _db.Set<MovimentoCaixa>().IgnoreQueryFilters().AsNoTracking()
-            .Where(m => m.EmpresaId == empresaId && m.CriadoEm > sinceDate
-                && (m.Referencia == null || !m.Referencia.StartsWith("mobile:")));
+            .Where(m => m.EmpresaId == empresaId
+                && (((m.Referencia == null || !m.Referencia.StartsWith("mobile:")) && m.CriadoEm > sinceDate)
+                    || m.EstornadoEm > sinceDate));
         if (lojaId.HasValue) movimentosQ = movimentosQ.Where(m => m.LojaId == lojaId || m.LojaId == null);
         var movimentos = await movimentosQ.ToListAsync();
-        foreach (var m in movimentos)
+        foreach (var m in movimentos.Where(m => m.Referencia != null && m.Referencia.StartsWith("mobile:")))
+            EstornoDoLancamentoDoAparelho(mutations, m);
+        foreach (var m in movimentos.Where(m => m.Referencia == null || !m.Referencia.StartsWith("mobile:")))
         {
             string type = m.Tipo switch
             {
@@ -337,7 +383,7 @@ public class SyncReversePullService(
                 Estornado: m.EstornadoEm.HasValue,
                 Metodo: m.Metodo);
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
-                "cashEntry.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(m.CriadoEm).ToUnixTimeMilliseconds()));
+                "cashEntry.upsert", SyncDtoConverters.Serialize(dto), UltimaMudanca(m)));
         }
 
         // F7-C — Fechamentos de caixa do web (alterados depois do `since`).

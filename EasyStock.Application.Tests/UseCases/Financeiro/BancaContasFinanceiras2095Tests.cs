@@ -1,10 +1,13 @@
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.Financeiro.Categorias;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
 using EasyStock.Application.UseCases.Financeiro.ContasReceber;
 using EasyStock.Application.UseCases.Financeiro.Common;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 using Microsoft.Extensions.Logging;
@@ -49,7 +52,8 @@ public class BancaContasFinanceiras2095Tests
         repo.GetParcelaWithContaAsync(Empresa, parcela.Id, Arg.Any<CancellationToken>()).Returns(parcela);
         repo.GetByIdAsync(Empresa, parcela.ContaPagarId, Arg.Any<CancellationToken>()).Returns(parcela.ContaPagar);
         var caixa = Substitute.For<ICaixaRepository>();
-        return (new RegistrarPagamentoParcelaPagarUseCase(repo, caixa, Substitute.For<IUnitOfWork>(),
+        return (new RegistrarPagamentoParcelaPagarUseCase(repo, caixa, new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(caixa)),
+            Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<RegistrarPagamentoResult?>(),
             Substitute.For<ILogger<RegistrarPagamentoParcelaPagarUseCase>>()), caixa);
     }
 
@@ -58,7 +62,8 @@ public class BancaContasFinanceiras2095Tests
         var repo = Substitute.For<IContaReceberRepository>();
         repo.GetParcelaWithContaAsync(Empresa, parcela.Id, Arg.Any<CancellationToken>()).Returns(parcela);
         var caixa = Substitute.For<ICaixaRepository>();
-        return (new RegistrarPagamentoParcelaReceberUseCase(repo, caixa, Substitute.For<IUnitOfWork>(),
+        return (new RegistrarPagamentoParcelaReceberUseCase(repo, caixa,
+            Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<RegistrarPagamentoResult?>(),
             Substitute.For<ILogger<RegistrarPagamentoParcelaReceberUseCase>>()), caixa);
     }
 
