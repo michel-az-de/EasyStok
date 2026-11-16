@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { AlcaLargura } from '../../componentes/AlcaLargura'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
@@ -53,7 +54,7 @@ const PAPEIS = [
 
 // Foto real do item (#1448), a mesma da vitrine. Sem foto, ou se ela não carregar, a carta
 // desenhada: honesta, parece arte de cardápio e não finge ser fotografia.
-function FotoDoItem({ item, className, alt = '' }) {
+function FotoDoItem({ item, className, alt = '', tamanho }) {
   const foto = fotoDoItem(item)
   const [falhou, setFalhou] = useState(null)
   const usarFoto = foto && falhou !== foto
@@ -62,6 +63,7 @@ function FotoDoItem({ item, className, alt = '' }) {
       className={className}
       src={usarFoto ? foto : cartaDoItem(item)}
       alt={alt}
+      width={tamanho} height={tamanho}
       onError={usarFoto ? () => setFalhou(foto) : undefined}
     />
   )
@@ -82,7 +84,7 @@ function FichaDoItem({ item, adicionais, linhas, aoEditar }) {
   return (
     <div className={css.ficha}>
       {(detalhe?.descricao || item.descricao) && <p className={css.descricaoPrato}>{detalhe?.descricao || item.descricao}</p>}
-      {fonteApi && !detalhe && !erro && <output>Consultando informações do prato…</output>}
+      {fonteApi && !detalhe && !erro && <EsqueletoDeLista linhas={3} altura="var(--e-5)">Consultando informações do prato…</EsqueletoDeLista>}
       {erro && <p role="alert">{erro} <Botao variante="texto" onClick={() => setTentativa((v) => v + 1)}>Tentar de novo</Botao></p>}
       <dl className={css.dados}>
         <div><dt>Como sai</dt><dd>{linhas[item.linha]?.dica}</dd></div>
@@ -154,7 +156,7 @@ function ItemEscolher({
           {...listeners}
           {...attributes}
         >
-          {!compacto && <FotoDoItem item={item} className={css.foto} />}
+          {!compacto && <FotoDoItem item={item} className={css.foto} tamanho={72} />}
           {/* Sete itens viravam sete manchas de cor. O estado do item é
               texto na segunda linha, e só aparece quando muda a venda. */}
           <span className={css.nome}>

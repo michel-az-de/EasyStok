@@ -9,15 +9,11 @@
   font-size: var(--t-micro); font-weight: 600; line-height: var(--lh-compacto);
   overflow-wrap: anywhere; pointer-events: none;
   /* Fade de entrada (seção 3.4): duração curta, curva de quem entra. */
-  animation: aparecerDica var(--dur-curta) var(--ease-saida) both;
+  animation: global(esmaecer) var(--dur-curta) var(--ease-saida) both;
 }
 .dica[hidden] { display: none; }
 .atalho {
   margin-left: var(--e-2); padding: 0 var(--e-1);
   border: var(--b-1) solid currentColor; border-radius: var(--r-ponta);
   font: inherit; font-weight: 400; white-space: nowrap;
-}
-@keyframes aparecerDica {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }

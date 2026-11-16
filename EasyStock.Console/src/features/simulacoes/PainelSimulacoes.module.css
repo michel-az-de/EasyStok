@@ -14,6 +14,7 @@
   z-index: 40;
   display: flex;
   flex-direction: column;
+  animation: global(surgirDeLado) var(--dur-media) var(--ease-saida) both;
 }
 /* Rodada 10 (registro 79, notificações achado 8): a decisão 19 pede "sobre o
    Balcão", com o balcão (e o trilho ao lado dele) clicável. No desktop
@@ -41,7 +42,7 @@
 .rolavel {
   flex: 1;
   overflow-y: auto;
-  padding: var(--e-4);
+  padding: var(--e-4) var(--e-4) var(--e-5);
   display: flex;
   flex-direction: column;
   gap: var(--e-5);
@@ -134,6 +135,8 @@
   gap: var(--e-2);
   padding: var(--e-3) var(--e-4);
   border-top: var(--b-1) solid var(--linha);
+  /* #2762: sombra para cima avisa que o corpo rola por baixo do rodapé fixo. */
+  position: relative; box-shadow: 0 -8px 12px -8px var(--fundo);
 }
 
 .confirmar {

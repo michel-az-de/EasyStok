@@ -91,7 +91,7 @@ export function TelaLogin({ entrarNaEmpresa, entrarPorCodigo, google, avisoSaida
           </form>
         )}
         {entrarPorCodigo && !google?.nativo && (
-          <Botao variante="texto" largo onClick={trocarModo} disabled={ocupado}>
+          <Botao variante="texto" largo className={css.alternar} onClick={trocarModo} disabled={ocupado}>
             {comCodigo ? 'Entrar com e-mail e senha' : 'Entrar com código de acesso'}
           </Botao>
         )}

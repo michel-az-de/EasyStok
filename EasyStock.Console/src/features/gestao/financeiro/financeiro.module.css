@@ -1,5 +1,10 @@
 .painel, .formulario, .campos { display: grid; align-content: start; gap: var(--e-4); min-width: 0; }
 .painel { grid-template-columns: minmax(0, 1fr); }
+/* #2762 (VI7): o botão de "Tentar de novo" não estica a linha toda do grid. */
+.painel > button { justify-self: start; }
+/* #2762 (F5): recarregando, o conteúdo anterior esmaece em vez de ficar parado sem sinal. */
+.estado > * { transition: opacity var(--dur-curta) var(--ease-padrao); }
+.estado[aria-busy='true'] > * { opacity: .6; }
 .campos { border: 0; padding: 0; margin: 0; }
 .barra, .acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .barra { justify-content: space-between; }
@@ -13,10 +18,10 @@
 .indicador > strong { font-family: var(--f-dado); font-size: var(--t-titulo); }
 .indicador > small { color: var(--tinta-2); }
 .atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--e-3); }
-.atalho { display: flex; align-items: center; gap: var(--e-3); padding: var(--e-4); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); font-weight: 600; text-decoration: none; }
+.atalho { transition: background-color var(--dur-curta) var(--ease-padrao); display: flex; align-items: center; gap: var(--e-3); padding: var(--e-4); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); font-weight: 600; text-decoration: none; }
 .atalho:hover { background: var(--preenchimento-forte); }
 .filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); align-items: end; gap: var(--e-3); }
-.filtros > button[type='submit'] { justify-self: start; }
+.filtros > button[type='submit'] { justify-self: start; align-self: end; }
 .comContexto { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--e-4); }
 .contexto { display: grid; align-content: start; gap: var(--e-3); padding: var(--e-4); border: 0; border-radius: var(--r-2); background: var(--preenchimento); }
 .contexto h2 { font-size: var(--t-forte); margin: 0; }
@@ -24,20 +29,33 @@
 .lista { display: grid; align-content: start; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
 .linha { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--e-3); padding: var(--e-3); border: 0; border-radius: var(--r-2); min-width: 0; }
 /* #2095: a linha da conta é grade (descrição | valor com rótulo | ações); no celular as ações descem para baixo do valor. */
-.lista > .linha:has(> .valorLinha) { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; padding: var(--e-2) var(--e-3); }
+.lista > .linha:has(> .valorLinha) { display: grid; grid-template-columns: minmax(0, 1fr) 9rem auto; padding: var(--e-2) var(--e-3); transition: background-color var(--dur-curta) var(--ease-padrao); }
+/* #2762 (F4): a linha que abre a conta responde ao ponteiro; a escolhida leva a marca na borda. */
+.lista > .linha:has(> .selecionar):hover:not(.linhaSelecionada) { background: var(--preenchimento); }
+/* #2762 (VI10, VI2): linha de cadastro e de extrato: densa, sem o respiro do parágrafo, com filete entre elas. */
+.lista > .linha:not(:has(> .valorLinha)) { padding: var(--e-2) var(--e-3); border-radius: 0; border-bottom: var(--b-1) solid var(--linha); }
+.linha > div > .apoio { margin: 0; }
+/* Nome longo quebra dentro da própria coluna; as ações ficam à direita em todas as linhas, sem cair para baixo. */
+.lista > .linha:not(:has(> .valorLinha)):has(> .acoes) { flex-wrap: nowrap; }
+.lista > .linha:has(> .acoes) > div:first-child { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+.lista > .linha > .acoes { flex: none; flex-wrap: nowrap; }
+.lista > .linhaExtrato { display: grid; grid-template-columns: minmax(0, 1fr) minmax(9ch, auto) auto; }
+.linhaExtrato > .valor { text-align: right; }
+.valorSaida { color: var(--erro); }
 .valorLinha { display: grid; justify-items: end; gap: 2px; }
 .valorLinha > small { color: var(--tinta-2); font-size: var(--t-apoio); }
-.acoesLinha { display: flex; gap: var(--e-2); justify-content: flex-end; }
+/* #2762 (VI12): colunas fixas, para o valor e o "Abrir" não mudarem de x entre Pagar e Receber nem entre linhas. */
+.acoesLinha { display: grid; grid-template-columns: 7rem 5rem; gap: var(--e-2); justify-content: end; }
+.acoesLinha > button:only-child { grid-column: 2; }
 .selecionar small { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--e-1); }
 /* #2258 (F10): os chips quebram linha, sem barra de rolagem escondendo o "Em aberto". */
 .chips { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--e-2); }
-.chip { flex: none; min-height: var(--toque); padding: 0 var(--e-4); border-radius: var(--r-pilula); border: var(--b-1) solid transparent; background: var(--preenchimento); color: var(--tinta); font: inherit; font-weight: 600; cursor: pointer; }
-.chip:hover { background: var(--preenchimento); }
+.chip { flex: none; transition: background-color var(--dur-curta) var(--ease-padrao), border-color var(--dur-curta) var(--ease-padrao), color var(--dur-curta) var(--ease-padrao); min-height: var(--toque); padding: 0 var(--e-4); border-radius: var(--r-pilula); border: var(--b-1) solid transparent; background: var(--preenchimento); color: var(--tinta); font: inherit; font-weight: 600; cursor: pointer; }
+.chip:hover { background: var(--preenchimento-forte); }
 .chipAtivo, .chipAtivo:hover { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
 .chip[aria-pressed='true'] { background: var(--marca); border-color: var(--marca); color: var(--marca-contraste); }
 .chip[aria-pressed='true']:hover { background: var(--marca); color: var(--marca-contraste); }
 .chip[aria-pressed='true']::before { content: '✓'; content: '✓' / ''; margin-right: var(--e-1); font-weight: 700; }
-.chip:focus-visible, .cartaoVencidas:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .verLista:focus-visible { outline: none; }
 .barra > .chips { flex: 1 1 360px; }
 .ferramentas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); }
@@ -49,17 +67,21 @@
 .maisFiltros > summary::after { content: '▾'; content: '▾' / ''; margin-left: var(--e-2); }
 .maisFiltros[open] > summary::after { transform: rotate(180deg); }
 /* #2258 (F12): categoria nova criada ali mesmo, ao lado da escolha. */
-.categoria { display: grid; align-content: start; justify-items: start; gap: var(--e-1); min-width: 0; }
+.categoria { display: grid; align-content: start; justify-items: stretch; gap: var(--e-1); min-width: 0; }
+/* #2762 (VI6): o campo ocupa a largura toda e o "+ Nova categoria" alinha o texto à borda dele. */
+.categoria > button { justify-self: start; margin-inline-start: calc(var(--e-2) * -1); }
 .novaCategoria { border: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: end; gap: var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); }
 .novaCategoria > :nth-child(2) { flex: 1 1 220px; }
 .dia { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--e-4); }
 .ladoDia { display: grid; align-content: start; gap: var(--e-3); padding: 0; border: 0; border-radius: var(--r-2); }
 .ladoDia h2 { margin: 0; font-size: var(--t-forte); }
 .ladoDia h3 { margin: 0; font-size: var(--t-corpo); }
-.cartaoVencidas { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); text-decoration: none; }
+.cartaoVencidas { transition: background-color var(--dur-curta) var(--ease-padrao); display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 var(--e-3); padding: var(--e-3); border-radius: var(--r-2); background: var(--preenchimento); color: var(--tinta); text-decoration: none; }
 .cartaoVencidas > strong { font-family: var(--f-dado); font-size: var(--t-forte); }
 .cartaoVencidas > small { grid-column: 1 / -1; color: var(--tinta-2); }
+.cartaoVencidas:hover { background: var(--preenchimento-forte); }
 .temVencida { background: var(--erro-pastel); }
+.temVencida:hover { background: var(--erro-pastel); }
 .temVencida > strong, .temVencida > span { color: var(--erro); }
 /* #2258 (F9): o bloco todo leva à lista por este link (cobre o bloco; "Pagar" fica acima dele). */
 .blocoDia { position: relative; display: grid; gap: var(--e-2); }
@@ -67,16 +89,15 @@
 .blocoDia .itemDia button { position: relative; z-index: 1; }
 .verLista { color: var(--marca); font-weight: 600; font-size: var(--t-apoio); }
 .verLista::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-2); }
-.verLista:focus-visible::after { outline: 2px solid var(--marca); outline-offset: 2px; }
+.verLista:focus-visible::after { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .itensDia { display: grid; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
 .itemDia { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--e-3); padding: var(--e-2) 0; border-top: var(--b-1) solid var(--linha); }
 .itemDia > div { display: grid; min-width: 0; }
 .itemDia strong { overflow-wrap: anywhere; }
 .itemDia small, .valor > small { color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 400; }
-.linhaSelecionada { border-color: var(--marca); background: var(--preenchimento); }
+.linhaSelecionada { box-shadow: inset 3px 0 0 var(--marca); background: var(--preenchimento-forte); }
 .selecionar { display: grid; gap: var(--e-1); flex: 1; min-width: 130px; text-align: left; background: none; border: 0; padding: var(--e-2); color: var(--tinta); }
 .selecionar small, .apoio { color: var(--tinta-2); font-size: var(--t-apoio); }
-.selecionar:focus-visible, .atalho:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
 .valor { font-family: var(--f-dado); font-weight: 700; white-space: nowrap; }
 .detalhes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); margin: 0; }
 .detalhes > div { min-width: 0; }
@@ -93,6 +114,9 @@
 .escolha { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
 .parcelas { margin: 0; padding-left: var(--e-5); max-height: 180px; overflow-y: auto; }
 .tabelaRolavel { min-width: 0; overflow-x: auto; }
+/* #2762 (VI5): primeira coluna fixa e uma sombra na borda dizem que a tabela rola para o lado. */
+.tabela tbody th, .tabela thead th:first-child { position: sticky; left: 0; background: var(--papel); text-align: left; }
+@media (max-width: 759px) { .tabela tbody th, .tabela thead th:first-child { box-shadow: inset calc(var(--b-1) * -1) 0 0 var(--linha); } }
 .tabela { width: 100%; border-collapse: collapse; font-size: var(--t-apoio); }
 .tabela th, .tabela td { padding: var(--e-3); text-align: left; border-bottom: var(--b-1) solid var(--linha); }
 .tabela th { color: var(--tinta-2); }
@@ -102,6 +126,8 @@
 @media (max-width: 1199px) { .comContexto { grid-template-columns: minmax(0, 1fr); } .contexto { grid-template-columns: repeat(2, minmax(0, 1fr)); } .contexto .acoes { justify-content: start; } }
 @media (max-width: 759px) {
   .indicadoresTres { grid-template-columns: minmax(0, 1fr); }
+  .chip { padding-inline: var(--e-3); }
+  .filtros > button[type='submit'] { grid-column: 1 / -1; justify-self: stretch; }
   .grade, .detalhes, .contexto { grid-template-columns: minmax(0, 1fr); } .linha { gap: var(--e-2); } .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* No celular o toque na conta abre o detalhe; o resumo ao lado iria para depois da lista. */
   .comContexto > .contexto { display: none; }
@@ -109,6 +135,8 @@
   .lista > .linha > .valorLinha { display: flex; align-items: baseline; gap: var(--e-2); padding-left: var(--e-2); }
   .ferramentas > .aviso { display: none; }
   .lista > .linha > .selecionar { grid-area: sel; } .lista > .linha > .valorLinha { grid-area: valor; } .lista > .linha > .acoesLinha { grid-area: acoes; }
+  /* #2762: as colunas fixas das ações valem só na tela larga; aqui elas cobririam o fim do valor. */
+  .lista > .linha > .acoesLinha { display: flex; justify-content: flex-end; }
   .busca { flex-basis: 160px; max-width: none; }
   .dia { grid-template-columns: minmax(0, 1fr); }
 }

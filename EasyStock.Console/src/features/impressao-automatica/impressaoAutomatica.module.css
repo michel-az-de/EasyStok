@@ -7,8 +7,13 @@
   border: 0; border-radius: var(--r-1);
   background: var(--elevado); color: var(--tinta);
   font-size: var(--t-apoio); pointer-events: none;
+  animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
-.ponto { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--sucesso); }
+/* No celular a barra de abas ocupa o rodapé: o indicador sobe acima dela (mesma conta do aviso). */
+@media (max-width: 759px) {
+  .indicador { bottom: calc(var(--toque) + var(--e-5) + env(safe-area-inset-bottom, 0px)); }
+}
+.ponto { flex: none; width: var(--ponto); height: var(--ponto); border-radius: 50%; background: var(--sucesso); }
 .espera { background: var(--tinta-2); }
 .falhou { color: var(--erro); font-weight: 600; }
 .conferir { display: flex; flex-direction: column; gap: var(--e-1); pointer-events: auto; }

@@ -35,8 +35,8 @@ export function gruposDoMenuMais({
   return [
     { titulo: 'Ir para', itens: ir },
     {
+      // #2762: duas linhas de lista, como o grupo de cima; o par lado a lado deixava a opção marcada solta.
       titulo: 'Tema',
-      disposicao: 'linha',
       // #2258 (A9/G4): as mesmas opções, na mesma ordem, do menu do avatar (`componentes/contaDoMenu`).
       itens: OPCOES_DE_TEMA.map((opcao) => ({
         chave: opcao.valor === 'dark' ? CHAVES_DO_MENU.escuro : CHAVES_DO_MENU.claro,

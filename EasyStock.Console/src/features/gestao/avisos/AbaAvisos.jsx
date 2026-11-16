@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { carregarAvisos, gravarAvisos } from '../../../aplicacao/avisosDaOperacao'
 import { Botao } from '../../../componentes/Botao'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import {
   GRUPOS_DE_AVISOS, avisoLigado, avisosMudaram, ligarAviso, mudarPrazo, textoDaFaixa, textoDoSla, validarAvisos,
 } from '../../../dominio/avisosDaOperacao'
@@ -93,7 +94,7 @@ function FormularioDeAvisos() {
     return () => { leituras.current++ }
   }, [buscar])
 
-  if (carga.estado === 'carregando') return <p className={css.descricao}>Carregando os avisos…</p>
+  if (carga.estado === 'carregando') return <EsqueletoDeLista linhas={4} altura="calc(var(--toque) + var(--e-4))">Carregando os avisos…</EsqueletoDeLista>
   if (carga.estado === 'erro') {
     return (
       <div className={css.secao} role="alert">

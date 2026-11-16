@@ -10,12 +10,12 @@
   z-index: 50;
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 6px 16px;
+  gap: var(--e-3);
+  padding: var(--e-1) var(--e-4);
   font-size: var(--t-micro);
   color: var(--tinta-2);
   background: var(--elevado);
-  border-top: 1px solid var(--linha);
+  border-top: var(--b-1) solid var(--linha);
 }
 
 .aviso {
@@ -38,7 +38,7 @@
 
 .quem {
   display: flex;
-  gap: 12px;
+  gap: var(--e-3);
   align-items: center;
   white-space: nowrap;
 }
@@ -50,12 +50,18 @@
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
+  position: relative;
+  transition: color var(--dur-micro) var(--ease-padrao);
 }
+/* #2762: a área de toque cresce sem engordar a faixa (o link tem altura de texto, abaixo de --toque). */
+.sair::after { content: ''; position: absolute; inset: calc(-1 * var(--e-3)) calc(-1 * var(--e-2)); }
+.sair:hover { color: var(--marca); text-decoration-thickness: var(--b-2); }
+.sair:active { color: var(--marca-forte); }
 
 .texto {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--e-3);
   align-items: center;
 }
 
@@ -64,7 +70,7 @@
 }
 
 @media (max-width: 767px) {
-  .faixa, .quem { flex-wrap: wrap; gap: 4px 12px; }
+  .faixa, .quem { flex-wrap: wrap; gap: var(--e-1) var(--e-3); }
   .quem { white-space: normal; overflow-wrap: anywhere; }
 }
 

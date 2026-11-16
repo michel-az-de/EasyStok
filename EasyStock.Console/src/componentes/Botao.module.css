@@ -44,7 +44,32 @@
 .padrao { composes: secundario; }
 .discreto { composes: texto; }
 .largo { width: 100%; }
+/* #2762 (A4): indicador de espera. O giro entra em fluxo, antes do texto e no lugar do ícone quando há um
+   (16 px + 2 px de cada lado = os 20 px do ícone, então nada anda). O texto segue à vista ("Salvando…")
+   e a tinta do giro é a do próprio botão, em qualquer variante e também no desabilitado. */
+.botao[aria-busy='true'] > svg { display: none; }
+.botao[aria-busy='true']::before {
+  content: ''; flex: none; box-sizing: border-box;
+  width: var(--e-4); height: var(--e-4); margin-inline: var(--b-2);
+  border: var(--b-2) solid currentColor; border-right-color: transparent; border-radius: var(--r-pilula);
+  animation-name: global(girar); animation-duration: var(--dur-giro);
+  animation-timing-function: linear; animation-iteration-count: infinite;
+}
+/* Movimento reduzido: o giro vira respiração (a regra global derrubaria a animação inteira e a espera ficaria muda). */
+@media (prefers-reduced-motion: reduce) {
+  .botao[aria-busy='true']::before {
+    animation-name: global(respirar) !important; animation-duration: var(--dur-respiro) !important;
+    animation-iteration-count: infinite !important;
+  }
+}
 /* Motivo do desabilitado: ao lado do botão, na mesma linha do rodapé; quebra para cima se faltar espaço. */
 .comMotivo { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--e-2); max-width: 100%; }
 .motivo { font-size: var(--t-apoio); color: var(--tinta-2); line-height: var(--lh-compacto); text-align: right; }
 .comMotivo:has(.largo) { width: 100%; }
+/* #2762 (VD3): em tela estreita o motivo vira legenda sob o botão, na mesma borda esquerda, em vez de um bloco de
+   três linhas à esquerda que empurra o botão para uma fileira sozinho. */
+@media (max-width: 639px) {
+  .comMotivo { flex-direction: column-reverse; align-items: flex-start; gap: var(--e-1); }
+  .comMotivo:has(.largo) { align-items: stretch; }
+  .motivo { text-align: left; }
+}

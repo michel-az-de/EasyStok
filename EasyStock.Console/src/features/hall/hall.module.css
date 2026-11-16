@@ -3,6 +3,8 @@
 .hall {
   display: flex; flex-direction: column; height: 100%; min-height: 0; overflow-y: auto;
   background: var(--fundo); color: var(--tinta); font-family: var(--f-corpo);
+  /* #2762 (B11): o Início entra com um esmaecer curto ao chegar de um módulo; só opacidade. */
+  animation: global(esmaecer) var(--dur-media) var(--ease-saida) backwards;
 }
 
 /* #2258 (H10): o topo (marca, ajuda, sino, conta) fica à vista ao rolar a tela inicial. */
@@ -17,7 +19,7 @@
 .topo img { width: 84px; height: 56px; }
 /* #2232 (H3): o sino fica numa faixa da altura de toque, alinhado ao avatar e ao Ajuda. */
 .avisos { display: flex; align-items: center; min-height: var(--toque); }
-.abertura { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); align-items: center; gap: var(--e-4); margin-bottom: var(--e-4); padding-bottom: var(--e-3); border-bottom: 0; }
+.abertura { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); align-items: end; gap: var(--e-4); margin-bottom: var(--e-4); padding-bottom: var(--e-3); border-bottom: 0; }
 .busca { display: flex; align-items: end; flex-wrap: wrap; gap: var(--e-2); }
 .busca > div { width: 100%; }
 /* #2232 (H4): lupa decorativa sobre o campo, à altura da caixa de texto (o rótulo fica acima dela). */
@@ -29,12 +31,13 @@
 .destinos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--e-2); list-style: none; padding: 0; margin: 0; }
 .destino { display: flex; align-items: center; gap: var(--e-3); min-height: 72px; height: 100%; padding: var(--e-3); border: var(--b-1) solid transparent; border-radius: var(--r-2); color: var(--tinta); background: var(--papel); text-decoration: none; }
 .destino:hover { border-color: var(--marca); background: var(--preenchimento); }
+/* #2762 (B6): pressionado por cor, um passo acima do hover. */
+.destino:active { background: var(--preenchimento-forte); }
 .destino:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .destino > svg { flex: none; color: var(--marca-forte); }
 .textoDestino { display: flex; flex-direction: column; flex: 1; gap: var(--e-1); min-width: 0; overflow-wrap: anywhere; }
 .textoDestino strong { font-size: var(--t-forte); }
-.textoDestino > span, .estadoTela { font-size: var(--t-micro); color: var(--tinta-2); }
-.estadoTela { display: inline-flex; align-items: center; padding: var(--e-1) var(--e-2); border: 0; border-radius: var(--r-1); background: var(--fundo); line-height: var(--lh-compacto); font-weight: 500; }
+.textoDestino > span { font-size: var(--t-micro); color: var(--tinta-2); }
 
 .conteudo { width: min(1384px, 100%); margin: 0 auto; padding: var(--e-4) var(--e-5); }
 
@@ -63,11 +66,13 @@
   transition: background var(--dur-curta) var(--ease-padrao), border-color var(--dur-curta) var(--ease-padrao);
 }
 .cartao:not(.emBreve):hover { border-color: var(--marca); background: var(--preenchimento); }
+.cartao:not(.emBreve):active { background: var(--preenchimento-forte); }
 .cartao:has(.abrir:focus-visible) { outline: 3px solid var(--marca); outline-offset: 2px; }
 
-.icone { display: grid; place-items: center; flex: none; width: 44px; height: 44px; color: var(--tinta); }
-.icone > svg { width: 32px; height: 32px; }
-.ilustracaoCartao { grid-column: 1; grid-row: span 2; align-self: center; display: block; width: 88px; height: auto; }
+.ilustracaoCartao { grid-column: 1; grid-row: auto; align-self: center; display: block; width: 88px; height: auto; }
+/* #2762 (VE5): ilustração e nome ocupam a mesma linha em todos os cartões (com ou sem descrição e selo): os títulos alinham na fileira. */
+.cartao > .nome { display: flex; align-items: center; min-height: var(--toque); }
+.abrir { align-self: center; }
 .nome { grid-column: 2; font-family: var(--f-corpo); font-size: var(--t-titulo); line-height: var(--lh-compacto); font-weight: 700; color: var(--tinta); }
 .resumo { grid-column: 2; font-size: var(--t-apoio); color: var(--tinta-2); }
 .pendencia { grid-column: 2; align-self: start; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); overflow-wrap: anywhere; }
@@ -82,7 +87,7 @@
 
 /* Indisponibilidade usa texto e cadeado sem reduzir o contraste. */
 .emBreve { background: var(--papel); }
-.emBreve .icone, .emBreve .nome { color: var(--tinta-2); }
+.emBreve .nome { color: var(--tinta-2); }
 .selo {
   grid-column: 2; display: inline-flex; align-items: center; gap: var(--e-1);
   font-size: var(--t-micro); font-weight: 600; color: var(--tinta-2);
@@ -103,19 +108,17 @@
 .alca { touch-action: none; cursor: grab; color: var(--marca); background: var(--marca-claro); }
 .alca:active { cursor: grabbing; }
 .mover { width: var(--toque); flex: none; }
-.mover:disabled { cursor: default; color: var(--tinta-2); opacity: .45; }
+.mover:disabled { color: var(--tinta-2); opacity: .45; }
 .posicao { margin-left: auto; font-size: var(--t-micro); color: var(--tinta-2); white-space: nowrap; }
-.cartao.organizando:hover { transform: none; }
 .cartao.arrastando { border-color: var(--marca); border-style: dashed; box-shadow: none; background: var(--marca-claro); }
 /* #2258 (H5): na mesma linha os cartões têm a mesma altura; cada linha pesa só o próprio conteúdo. */
 .indicadores > li { min-width: 0; display: flex; }
 .indicadores > li.arrastando { position: relative; z-index: 1; }
 .indicadores > li.arrastando .indicador { border-color: var(--marca); border-style: dashed; background: var(--marca-claro); box-shadow: var(--sombra-media); cursor: grabbing; }
-.dicaArrasto { flex-basis: 100%; text-align: center; font-size: var(--t-micro); color: var(--tinta-2); }
 .previaArrasto { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); padding: var(--e-4); border: 1px solid var(--marca); border-radius: var(--r-3); background: var(--papel); color: var(--marca); box-shadow: var(--sombra-media); pointer-events: none; }
 .previaArrasto strong { color: var(--tinta); font-size: var(--t-titulo); }
 .previaArrasto span { flex-basis: 100%; font-size: var(--t-apoio); color: var(--tinta-2); }
-.rotina { padding: 0 0 var(--e-5); margin-bottom: var(--e-5); border-bottom: 1px solid var(--linha); animation: aparecerRotina var(--dur-curta) var(--ease-saida); }
+.rotina { padding: 0 0 var(--e-5); margin-bottom: var(--e-5); border-bottom: 1px solid var(--linha); animation: global(esmaecer) var(--dur-curta) var(--ease-saida); }
 .cabecaRotina { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--e-1) var(--e-2); margin-bottom: var(--e-2); }
 .rotinaTitulo { font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
 .linksRotina { display: flex; flex-wrap: wrap; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
@@ -131,32 +134,28 @@
 .ferramentas { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); }
 .opcoesOrdem { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); padding: var(--e-2) var(--e-3); margin-bottom: var(--e-3); border-radius: var(--r-2); background: var(--marca-claro); }
 .opcoesOrdem span { flex: 1 1 280px; font-size: var(--t-apoio); color: var(--tinta-2); }
-@keyframes aparecerRotina { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
+/* #2762 (VE16): no rodapé do "Ajustar tela" a ação de organizar é um grupo à parte; no celular ela ganha a linha de cima
+   e Cancelar e Aplicar dividem a de baixo. No desktop o invólucro some e o rodapé segue como antes. */
+.organizarRodape { display: contents; }
 @media (max-width: 640px) {
+  .organizarRodape { display: flex; flex: 1 0 100%; }
+  .organizarRodape > button { flex: 1 1 auto; }
   .ferramentas { width: 100%; }
   .rotina { padding-bottom: var(--e-4); }
   .linksRotina { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
   .linkRotina > svg:last-child { margin-left: auto; }
   .topo, .conteudo { padding-inline: var(--e-3); }
-  /* #1582: Ajuda e Sair em colunas próprias. Antes dividiam a mesma coluna, com `margin-left` fixo
-     no Sair, e o Ajuda ficava 20 px por baixo dele: tocar ali encerrava a sessão. */
-  /* #2232 (H2/H3): sem o tema na linha 2, o sino sobe para a linha 1, entre Ajuda e conta. O fluxo em
-     coluna cria a coluna da conta só quando ela existe; sem sino nem conta não sobra vão à direita. */
-  .topo { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-auto-flow: column; gap: var(--e-2); }
-  .acoes { display: contents; }
-  .acoes > :global([data-ajuda-console]) { grid-row: 1; grid-column: 2; }
-  .avisos { grid-row: 1; grid-column: 3; }
-  .sair { grid-row: 1; grid-column: 3; max-width: 140px; }
+  /* #1582, #2232 (H2/H3): Buscar, Ajuda, sino e conta numa linha só, cada um no seu lugar (sem vão à direita se
+     faltar o sino ou a conta). #2762 (B17): sem grade nem `display: contents`, a ordem do Tab é a da tela; os três
+     botões de texto viram só ícone (o nome acessível continua no aria-label) e a linha cabe a 390 px. */
+  .topo { flex-wrap: nowrap; gap: var(--e-2); }
+  .acoes { flex-wrap: nowrap; gap: var(--e-1); margin-left: auto; }
+  .acoes > :global([data-ajuda-console]), .acoes > :global([aria-label="Buscar na Casa"]), .avisos > button { font-size: 0; gap: 0; min-width: var(--toque); padding-inline: var(--e-2); }
   .conteudo { padding-top: var(--e-4); }
   .abertura { gap: var(--e-4); padding-bottom: var(--e-4); margin-bottom: var(--e-4); }
   .titulo { font-size: var(--t-valor); }
   .cartao { padding: var(--e-3); }
-}
-
-/* Até 460 px o Ajuda fica só com o ícone: com "Sair deste aparelho" (140 px) as três colunas não cabem. */
-@media (max-width: 460px) {
-  .acoes > :global([data-ajuda-console]) { width: 44px; padding-inline: 0; font-size: 0; gap: 0; }
 }
 
 @media (max-width: 900px) {
@@ -167,7 +166,6 @@
   .rotina { animation: none; }
   .cartao.organizando { transition: none !important; }
   .cartao { transition: none; }
-  .cartao:not(.emBreve):hover { transform: none; }
 }
 
 /* O painel usa a mesma tipografia, papel e ilustrações da casa. */
@@ -182,10 +180,13 @@
 .indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); align-items: stretch; gap: var(--e-3); margin: 0; padding: 0; list-style: none; }
 .indicador { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-start; gap: var(--e-1); padding: var(--e-3) var(--e-4); border: 1px solid transparent; border-radius: var(--r-2); background: var(--papel); color: var(--tinta); text-decoration: none; min-width: 0; }
 .indicador:hover { border-color: var(--marca); background: var(--preenchimento); }
+.indicador:active { background: var(--preenchimento-forte); }
 .indicador:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
 .cabecaIndicador { display: flex; align-items: center; gap: var(--e-2); min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
 .cabecaIndicador > svg { flex: none; color: var(--tinta-2); }
 .valor { font: 700 var(--t-valor)/1.2 var(--f-corpo); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* #2762 (B10): valor que mudou por sync acende uma vez e assenta; o fundo cobre só o número. */
+.valorMudou { align-self: flex-start; border-radius: var(--r-1); animation: global(realcar) var(--dur-realce) var(--ease-padrao); }
 .frescor { display: flex; align-items: center; gap: var(--e-1); font-size: var(--t-micro); color: var(--tinta); overflow-wrap: anywhere; }
 /* #2232 (H6/H9): alerta e falha viram estado do cartão (pastel e borda de severidade). */
 .indicador[data-severidade='alerta'] { background: var(--alerta-pastel); border-color: var(--alerta); }

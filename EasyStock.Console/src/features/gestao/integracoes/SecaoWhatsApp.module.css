@@ -22,4 +22,4 @@
 .acoes { display: flex; flex-wrap: wrap; gap: var(--e-2); }
 
 /* #2258 (auditoria G1): confirmação inline de "Desconectar número". */
-.confirmacao { display: flex; flex-direction: column; gap: var(--e-2); padding: var(--e-3); border-radius: var(--r-2); background: var(--erro-pastel); }
+.confirmacao { display: flex; flex-direction: column; gap: var(--e-2); padding: var(--e-3); border-radius: var(--r-2); background: var(--erro-pastel); animation: global(surgir) var(--dur-media) var(--ease-saida) both; }

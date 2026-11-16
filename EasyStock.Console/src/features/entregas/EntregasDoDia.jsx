@@ -5,6 +5,8 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { Chip } from '../../componentes/Chip'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
+import { Vazio } from '../../componentes/Vazio'
 import { dataIsoNoFuso, listaEmPortugues, plural } from '../../dominio/formato'
 import { pdfDoRoteiro } from '../../dominio/impressao'
 import { SEM_JANELA, confirmacaoDoCliente, resumoDoRoteiro, rotuloDoDiaPorExtenso, situacaoDoPagamento, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
@@ -177,19 +179,27 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
           </div>
         )}
       </section>
-      {!roteiro && <p className={css.vazio}>Carregando o dia…</p>}
+      {!roteiro && <EsqueletoDeLista linhas={2} altura="calc(var(--toque) * 2)">Carregando o dia…</EsqueletoDeLista>}
       {roteiro?.grupos.length === 0 && (
-        <div className={css.secao}>
-          <p className={css.vazio}>Nenhuma janela neste dia e nenhum pedido marcado.</p>
-          {aoAbrirCadastro && <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>}
-        </div>
+        <Vazio
+          icone="moto" titulo="Nenhuma janela neste dia e nenhum pedido marcado."
+          acao={aoAbrirCadastro && <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>}
+        >
+          {aoAbrirCadastro ? 'Cadastre as janelas e o frete para organizar as entregas do dia.' : null}
+        </Vazio>
       )}
       {roteiro?.grupos.length > 0 && (
         <section className={css.secao} aria-label="Janelas do dia">
           <div className={css.linha}>
             <h3 className={css.cresce}>Janelas do dia</h3>
             {/* #2418: "Roteiro e impressão" é um botão no título; o papel e o PDF abrem logo abaixo dele. */}
-            <details className={css.impressaoDoDia}>
+            {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape em qualquer campo do painel o fecha; o details é o único ancestral comum. */}
+            <details className={css.impressaoDoDia} onKeyDown={(e) => {
+              if (e.key !== 'Escape' || !e.currentTarget.open) return
+              e.stopPropagation()
+              e.currentTarget.open = false
+              e.currentTarget.querySelector('summary')?.focus()
+            }}>
               <summary><Icone nome="printer" tamanho={20} /> Roteiro e impressão</summary>
               <div className={css.linha}>
                 <div className={css.campoData}>

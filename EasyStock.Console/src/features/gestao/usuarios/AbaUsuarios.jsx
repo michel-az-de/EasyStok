@@ -11,6 +11,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { haQuantoTempo } from '../../../dominio/formato'
 import {
   SITUACAO, acoesDoUsuario, erroDoConvite, fraseDeFalha, fraseDeRetorno, instanteDaApi, ordenarPerfis, resumoDoPerfil,
@@ -163,7 +164,7 @@ function Pessoa({ usuario, perfis, meuId, souSuporte, agora, ocupado, aoAgir, ao
           </Botao>
         )}
         {pode.desativar && !aberta && (
-          <Botao variante="texto" disabled={ocupado} aria-label={`Desativar ${usuario.nome}`} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>
+          <Botao variante="texto" className={css.desativar} disabled={ocupado} aria-label={`Desativar ${usuario.nome}`} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>
             Desativar
           </Botao>
         )}
@@ -282,7 +283,7 @@ export function AbaUsuarios() {
     [estado.usuarios],
   )
 
-  if (estado.carregando) return <output className={css.descricao}>Carregando as pessoas…</output>
+  if (estado.carregando) return <EsqueletoDeLista linhas={4} altura="calc(var(--e-6) * 2 + var(--e-2))">Carregando as pessoas…</EsqueletoDeLista>
   if (estado.erro && !estado.carregada) {
     return (
       <Vazio titulo="A lista não carregou" role="alert" acao={<Botao onClick={recarregar}>Tentar de novo</Botao>}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
 import { useReceitasApi } from '../../../aplicacao/useReceitasApi'
@@ -62,7 +63,7 @@ function EditorReceita({ prato, aoSalvar, aoFechar, podeEditar, aviso, aoFecharA
     </div>
   </div>
 
-  if (!detalhe) return <output className={css.descricao}>Carregando a receita…</output>
+  if (!detalhe) return <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 2)">Carregando a receita…</EsqueletoDeLista>
 
   if (!podeEditar) return (
     <section className={css.aba} aria-label={`Receita de ${prato.nome}`}>
@@ -173,7 +174,7 @@ export function AbaReceitasApi() {
     try { return await gestao.salvar(...args) } finally { setSalvando(false) }
   }
 
-  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as receitas…</output>
+  if (gestao.estado === 'carregando') return <EsqueletoDeLista linhas={5} altura="calc(var(--toque) * 2)">Carregando as receitas…</EsqueletoDeLista>
   if (gestao.estado === 'erro' && gestao.receitas.length === 0) {
     if (gestao.semLoja) {
       return <Vazio icone="cardapio" role="alert" titulo="As receitas esperam a loja online">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
@@ -232,7 +233,7 @@ export function AbaReceitasApi() {
                     </span>
                   </td>
                   <td className={tabela.colunaAcoes}>
-                    <div className={tabela.acoes}>
+                    <div className={`${tabela.acoes} ${tabela.acoesFixas}`}>
                       {(podeEditar || temReceita(r)) && (
                         <Botao variante={podeEditar && r.sku === progresso.proximo ? 'primario' : 'secundario'} disabled={salvando}
                           icone={!podeEditar ? 'nota' : temReceita(r) ? 'lapis' : 'mais'} aria-expanded={editando === r.sku}

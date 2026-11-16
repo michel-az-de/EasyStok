@@ -34,7 +34,7 @@
 .vazio { color: var(--tinta-2); margin: 0; }
 
 /* #1440: janelas da loja e entregas do dia por janela. */
-.secao h4 { margin: var(--e-2) 0 var(--e-1, 4px); font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
+.secao h4 { margin: var(--e-2) 0 var(--e-1); font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); }
 .diaDaSemana { display: flex; flex-direction: column; }
 .edicaoJanela { display: flex; flex-direction: column; gap: var(--e-2); }
 .erroCampo { margin: 0; color: var(--erro); font-size: var(--t-apoio); }
@@ -48,7 +48,7 @@
 .dataDoDia::first-letter { text-transform: uppercase; }
 .janelaDoDia { display: flex; flex-direction: column; gap: var(--e-3); }
 .janelaDoDia .lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: var(--e-3); }
-.janelaDoDia h3 { margin: 0; font-size: var(--t-corpo, 1rem); font-weight: 700; color: var(--tinta); }
+.janelaDoDia h3 { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
 .janelaDoDia p { margin: 0; }
 .dias { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; border: 0; margin: 0; padding: 0; min-width: 0; }
 .cadastro { display: flex; flex-direction: column; gap: var(--e-4); }
@@ -76,6 +76,7 @@
 .impressaoDoDia summary:hover { background: var(--preenchimento); }
 .impressaoDoDia summary:focus-visible { outline: var(--b-2) solid var(--marca); outline-offset: 2px; }
 .impressaoDoDia > .linha {
+  animation: global(surgir) var(--dur-media) var(--ease-saida) both;
   position: absolute; right: 0; top: calc(100% + var(--e-1)); z-index: 3; flex-wrap: nowrap;
   padding: var(--e-3); background: var(--papel); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); box-shadow: var(--sombra-media);
 }
@@ -112,7 +113,10 @@
 .tituloCartao { font-weight: 700; color: var(--tinta); overflow-wrap: anywhere; }
 .cartaoChamar { padding: var(--e-4); gap: var(--e-1); }
 .formChamado { display: flex; flex-direction: column; gap: var(--e-3); margin-top: var(--e-2); }
-.formChamado > button { align-self: flex-end; }
+.formChamado > button, .formChamado > span { align-self: flex-end; }
+/* #2762: a borda do campo em repouso tinha contraste fraco (linha clara sobre o cartão) e o puxador nativo
+   deixava redimensionar para os lados; só a altura muda. */
+.formChamado textarea { border-color: var(--linha-forte); resize: vertical; }
 .listaCartoes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--e-3); }
 .cartaoChamado { display: flex; flex-direction: column; gap: var(--e-3); padding: var(--e-3) var(--e-4); }
 .acoesCartao { display: flex; align-items: center; justify-content: flex-end; gap: var(--e-3); flex-wrap: wrap; }
@@ -173,14 +177,14 @@
 @media (max-width: 640px) {
   .navegacao { gap: var(--e-1); }
   .abas { flex-basis: 100%; }
-  .abas .abaInterna { flex: 1 1 auto; padding-inline: var(--e-1); font-size: .875rem; line-height: 1.25; }
-  .navegacao > .apoio { font-size: .8125rem; }
+  .abas .abaInterna { flex: 1 1 auto; padding-inline: var(--e-1); font-size: var(--t-apoio); line-height: var(--lh-compacto); }
+  .navegacao > .apoio { font-size: var(--t-micro); }
   .painelDia { gap: var(--e-3); }
   .painelDia .cartao > .linha:first-child .cresce { flex-basis: 8rem; }
   .painelDia .cabecalhoDoDia > .cresce { flex-basis: 100%; }
   .periodoAgenda { column-gap: var(--e-1); }
   .controlesAgenda { flex-basis: 100%; grid-template-columns: var(--toque) minmax(0, 1fr) var(--toque); }
-  .periodoAgenda > button { padding-inline: var(--e-1); font-size: .875rem; }
+  .periodoAgenda > button { padding-inline: var(--e-1); font-size: var(--t-apoio); }
   .faixa { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
   .faixa > button { grid-column: 2; justify-self: start; }
   /* #2418: no celular o papel e o PDF abrem na linha de baixo, sem cartão flutuante cortado na borda. */

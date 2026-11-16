@@ -18,6 +18,8 @@ import css from './Aviso.module.css'
 // <output> (papel `status`, educado) para info e sucesso, `alert` para erro.
 export const DURACAO_DO_AVISO_MS = 4000
 export const DURACAO_COM_ACAO_MS = 8000
+const SAIDA_MS = 150 // --dur-curta
+const semMovimento = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 // Info é o neutro do snackbar e vai sem ícone; sucesso e erro levam o ícone além da cor.
 const TONS = { info: null, sucesso: 'circle-check', erro: 'alerta' }
 
@@ -42,19 +44,27 @@ export function ProvedorDeAviso({ children }) {
   const restante = useRef(0)
 
   // Com `id`, só dispensa se aquele aviso ainda é o da tela (quem saiu não apaga o aviso de outro).
+  // #2762 (A5): dispensar não desmonta na hora: marca `saindo` e o aviso fica --dur-curta mais, só para
+  // sumir suavemente (inert e aria-hidden, sem clique nem foco). Sem movimento reduzido sai direto.
   const dispensar = useCallback((id) => {
+    clearTimeout(relogio.current)
     setAviso((atual) => {
-      if (id !== undefined && atual?.id !== id) return atual
-      clearTimeout(relogio.current)
-      return null
+      if (!atual || atual.saindo || (id !== undefined && atual.id !== id)) return atual
+      return semMovimento() ? null : { ...atual, saindo: true }
     })
   }, [])
+  const saindoId = aviso?.saindo ? aviso.id : null
+  useEffect(() => {
+    if (saindoId === null) return undefined
+    const prazo = setTimeout(() => setAviso((atual) => (atual?.id === saindoId ? null : atual)), SAIDA_MS)
+    return () => clearTimeout(prazo)
+  }, [saindoId])
 
   const armar = useCallback((id, duracao) => {
     clearTimeout(relogio.current)
     restante.current = duracao
-    relogio.current = setTimeout(() => setAviso((atual) => (atual?.id === id ? null : atual)), duracao)
-  }, [])
+    relogio.current = setTimeout(() => dispensar(id), duracao)
+  }, [dispensar])
 
   const mostrar = useCallback(({ texto, tom = 'info', acao = null, duracao }) => {
     contador.current += 1
@@ -68,14 +78,22 @@ export function ProvedorDeAviso({ children }) {
 
   const valor = useMemo(() => ({ mostrar, dispensar }), [mostrar, dispensar])
   const pausar = () => clearTimeout(relogio.current)
-  const retomar = () => { if (aviso) armar(aviso.id, restante.current) }
+  const retomar = () => { if (aviso && !aviso.saindo) armar(aviso.id, restante.current) }
+  // #2762 (A14): Desfazer e Fechar desmontam o botão focado; o foco vai para a reserva da tela em vez de cair
+  // no body. Antes do `aoAgir`, que pode escolher outro destino.
+  const devolverFoco = (evento) => {
+    if (evento.currentTarget.closest('[data-aviso]')?.contains(document.activeElement)) document.querySelector('[data-foco-reserva]')?.focus()
+  }
 
   const corpo = aviso && (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Hover e foco só pausam o prazo; a ação é o botão.
     <div
       key={aviso.id}
-      className={`${css.aviso} ${css[aviso.tom] ?? ''}`}
-      data-aviso={aviso.tom}
+      className={`${css.aviso} ${css[aviso.tom] ?? ''} ${aviso.saindo ? css.saindo : ''}`}
+      data-aviso={aviso.saindo ? undefined : aviso.tom}
+      data-aviso-saindo={aviso.saindo || undefined}
+      inert={aviso.saindo || undefined}
+      aria-hidden={aviso.saindo || undefined}
       onPointerEnter={pausar}
       onPointerLeave={retomar}
       onFocus={pausar}
@@ -84,11 +102,11 @@ export function ProvedorDeAviso({ children }) {
       {TONS[aviso.tom] && <Icone nome={TONS[aviso.tom]} tamanho={20} className={css.icone} />}
       <p className={css.texto}>{aviso.texto}</p>
       {aviso.acao && (
-        <Botao variante="texto" className={css.acao} onClick={() => { dispensar(aviso.id); aviso.acao.aoAgir() }}>
+        <Botao variante="texto" className={css.acao} onClick={(evento) => { devolverFoco(evento); dispensar(aviso.id); aviso.acao.aoAgir() }}>
           {aviso.acao.rotulo}
         </Botao>
       )}
-      <BotaoIcone rotulo="Fechar aviso" icone="fechar" className={css.fechar} onClick={() => dispensar(aviso.id)} />
+      <BotaoIcone rotulo="Fechar aviso" icone="fechar" className={css.fechar} onClick={(evento) => { devolverFoco(evento); dispensar(aviso.id) }} />
     </div>
   )
 

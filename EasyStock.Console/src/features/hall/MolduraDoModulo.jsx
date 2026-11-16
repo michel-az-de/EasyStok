@@ -55,7 +55,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
   useEffect(() => {
     const faixa = abasRef.current
     if (!faixa) return
-    const revelar = () => faixa.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    const revelar = () => faixa.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'center' })
     revelar()
     const observador = new ResizeObserver(revelar)
     observador.observe(faixa)
@@ -136,7 +136,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
                     <IconeDoModulo modulo={modulo} telaId={tela.id} />
                     {tela.rotulo}
                   </h1>
-                  <div className={css.conteudo}><LimiteDeErro parte={tela.rotulo}>{children}</LimiteDeErro></div>
+                  <div className={css.conteudo} key={tela.id}><LimiteDeErro parte={tela.rotulo}>{children}</LimiteDeErro></div>
                 </>
               ) : (
                 <div className={css.conteudo}>

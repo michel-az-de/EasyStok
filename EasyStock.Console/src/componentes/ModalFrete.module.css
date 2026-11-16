@@ -23,7 +23,7 @@
 .viagem a { color: var(--marca); text-underline-offset: .2em; }
 .historico { padding-left: var(--e-4); display: grid; gap: var(--e-2); color: var(--tinta-2); }
 .trilha { height: 4px; border-radius: var(--r-1); background: var(--preenchimento-forte); overflow: hidden; }
-.trilha span { display: block; height: 100%; background: var(--marca); transition: width .3s ease-out; }
+.trilha span { display: block; height: 100%; background: var(--marca); transition: width var(--dur-longa) var(--ease-saida); }
 .politica { display: grid; gap: var(--e-3); }
 .politica summary { cursor: pointer; font-weight: 700; min-height: var(--toque); display: flex; align-items: center; }
 .politica form { display: grid; gap: var(--e-3); }

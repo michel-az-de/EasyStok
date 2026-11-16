@@ -94,11 +94,13 @@ confere('H3  o hall encaixa o sino numa faixa de altura de toque, alinhada ao ce
   const regra = corpo('.avisos')
   assert.match(regra, /align-items: center/)
   assert.match(regra, /min-height: var\(--toque\)/)
-  // Revisão 4: sem o tema na linha 2, o sino sobe para a linha 1, numa coluna própria entre Ajuda e conta.
-  const ate640 = css.slice(css.indexOf('@media (max-width: 640px)'))
-  assert.match(corpo('.avisos', ate640), /grid-row: 1; grid-column: 3/)
-  assert.doesNotMatch(corpo('.avisos', ate640), /grid-row: 2/)
-  assert.match(corpo('.topo', ate640), /grid-auto-flow: column/)
+  // Revisão 4: sem o tema na linha 2, o sino fica na linha 1, entre Ajuda e conta.
+  // #2762 (B17): a linha única agora é flex sem quebra, sem grade nem `display: contents`; o sino é um item dela.
+  const inicio640 = css.indexOf('@media (max-width: 640px)')
+  const ate640 = css.slice(inicio640, css.indexOf('\n}', inicio640))
+  assert.match(corpo('.topo', ate640), /flex-wrap: nowrap/)
+  assert.match(corpo('.acoes', ate640), /flex-wrap: nowrap/)
+  assert.doesNotMatch(ate640, /grid-row/)
 })
 
 // Revisão 4: Configurações mora no rodapé; favorito e posição anunciada contam só as áreas da grade.
