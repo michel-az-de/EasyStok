@@ -10,6 +10,31 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#2770): provas do Caixa do dia falhavam nos primeiros minutos depois da meia-noite de São Paulo
+
+Visto em `EasyStock.Infra.Postgre.IntegrationTests/Workflows/CaixaDoDiaNumerosIntegrationTests.cs`, em 16/11/2026
+às 03:02:20Z (00:02 em São Paulo), em duas PRs sem relação com o caixa. Três provas falharam:
+`Dia_fechado_mostra_o_fechamento_e_o_que_entrou_depois_fica_em_pos_fechamento` ("Expected caixa.PosFechamento to
+be 80M ... but found 0.00M"), `Lancamento_gravado_depois_do_fechamento_some_do_retrato_e_o_estorno_diz_o_motivo_certo`
+("Expected caixa.PosFechamento to be 30M, but found 0.00M") e
+`Linha_de_pagamento_de_pedido_traz_numero_do_dia_cliente_e_quem_registrou` (lista sem a primeira linha).
+
+- **Por que era flaky:** as provas derivavam os instantes de `DateTime.UtcNow` menos 5, 3, 2 ou 1 min e calculavam
+  o dia operacional a partir de um deles. Nos primeiros minutos depois das 03:00Z parte dos lançamentos caía no
+  dia anterior, e o dia consultado não continha o que o teste semeou. Os use cases usam o relógio real
+  (`HorarioBrasil.Hoje()`, `DateTime.UtcNow`), então deslocar tudo para outro horário não resolvia.
+- **Como foi confirmado:** `InstantesDoDiaOperacionalTests` com a derivação antiga (o próprio `agora`, sem
+  empurrar para dentro do dia) falhou em 3 de 3 para `03:02:20Z`, `02:59:58Z` e `03:00:00Z`, com os lançamentos
+  espalhados por 15/11 e 16/11.
+- **Fix (#2770):** `InstantesDoDiaOperacional.Ancora` empurra `agora` para dentro do dia operacional dele, com
+  folga para o maior recuo e o maior avanço da prova. Todas as provas do arquivo derivam daí, e a ordem e o
+  espaçamento entre os instantes não mudam. A prova do helper roda sem banco e sem relógio, com `agora` fixo.
+- **Se voltar a falhar:** ver se algum use case novo carimba ou filtra por um relógio que não seja o dia
+  operacional de agora, ou se a prova voltou a semear com `DateTime.UtcNow.AddMinutes(-N)` solto. Instante
+  semeado depois de `FecharCaixa` precisa ser derivado depois dele, como `Ancora(DateTime.UtcNow, ...)` de novo.
+
+---
+
 ## ⚠️ TOLERADO (#2697): impresso entrega/a5 falhou uma vez na suíte local carregada
 
 Visto em `EasyStock.Api.UnitTests/Services/Impressao/PedidoImpressoHtmlTests.cs:107`,
