@@ -205,11 +205,8 @@ public sealed class ReportRunnerBackgroundService(
         // Contexto do tenant (ADR-R06).
         using var execContext = scope.Begin(run.EmpresaId, run.UsuarioSolicitanteId, run.Contexto);
 
-        // Storage key conforme convenção B-15.
-        var ext         = exporterFactory.Resolve(run.Format).FileExtension;
-        var storageKey  = run.Contexto == ReportContexto.AdminSaaS
-            ? $"admin/reports/{run.EnqueuedAt:yyyy}/{run.EnqueuedAt:MM}/{run.Id}{ext}"
-            : $"tenants/{run.EmpresaId}/reports/{run.EnqueuedAt:yyyy}/{run.EnqueuedAt:MM}/{run.Id}{ext}";
+        // Storage key conforme convenção B-15, na mesma fonte que o watchdog usa para apagar o envio interrompido (#2788).
+        var storageKey  = ReportArtefato.Chave(run);
 
         var contentType = exporterFactory.Resolve(run.Format).ContentType;
 

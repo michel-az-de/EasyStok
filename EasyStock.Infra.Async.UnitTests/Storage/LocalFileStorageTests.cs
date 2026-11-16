@@ -122,6 +122,22 @@ public sealed class LocalFileStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task Exclusao_remove_tambem_o_envio_interrompido_da_chave()
+    {
+        // #2788: o Worker morre no meio do envio. O SO fecha o arquivo e nada renomeia o envio para a chave.
+        const string chave = "relatorios/run-3/vendas.csv";
+        var envio = (FileStream)await _storage.OpenUploadStreamAsync(chave, "text/csv", default);
+        await envio.WriteAsync(Encoding.UTF8.GetBytes("a;b\n1;2\n"));
+        await envio.FlushAsync();
+        envio.SafeFileHandle.Dispose();
+        GC.SuppressFinalize(envio);
+
+        await _storage.DeleteAsync(chave);
+
+        Directory.GetFiles(_base, "*", SearchOption.AllDirectories).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Stream_de_upload_fechado_sincrono_tambem_renomeia()
     {
         const string chave = "relatorios/run-2/estoque.csv";

@@ -1,6 +1,7 @@
 using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.UseCases.Reports;
 using EasyStock.Infra.Async.Reporting;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ namespace EasyStock.Worker.BackgroundServices;
 /// Responsabilidades:
 ///   1. Reclamar leases expirados — runs presas em Running voltam para Pending
 ///      (ou marcadas Failed definitivo se tentativas esgotadas). (ADR-R03, §6.3)
+///      A run fechada sem sucesso tem o envio interrompido apagado do storage (#2788).
 ///   2. Garbage-collect de artefatos expirados — NULLifica artifact_storage_key
 ///      e emite deleção física do arquivo no storage. (§B-15)
 /// Advisory lock global (§G-15): <see cref="IReportRunRepository.ReclaimExpiredLeasesAsync"/>
@@ -85,10 +87,10 @@ public sealed class ReportWatchdogBackgroundService(
     private async Task RunLeaseReclaimAsync(CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
-        var repo = scope.ServiceProvider.GetRequiredService<IReportRunRepository>();
+        var reciclar = scope.ServiceProvider.GetRequiredService<ReciclarExecucoesVencidasUseCase>();
 
         // ReclaimExpiredLeasesAsync adquire advisory lock de watchdog internamente (G-15).
-        int reclaimed = await repo.ReclaimExpiredLeasesAsync(ct);
+        int reclaimed = await reciclar.ExecuteAsync(ct);
 
         if (reclaimed > 0)
         {
