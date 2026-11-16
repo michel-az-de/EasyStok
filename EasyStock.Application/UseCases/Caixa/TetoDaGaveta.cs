@@ -1,5 +1,3 @@
-using EasyStock.Application.UseCases.ObterCaixaDia;
-
 namespace EasyStock.Application.UseCases.Caixa;
 
 /// <summary>
@@ -20,9 +18,4 @@ public static class TetoDaGaveta
                 $"({teto.ToString("C", ptBr)}). Pix e cartão não estão na gaveta.");
         }
     }
-
-    /// <summary>Lê o caixa do dia pela fonte única do saldo e confere a saída em dinheiro contra a gaveta.</summary>
-    public static async Task ExigirSaidaEmDinheiroCabeAsync(ObterCaixaDiaUseCase obterCaixaDia, Guid empresaId,
-        DateOnly data, Guid? lojaId, decimal valor) =>
-        ExigirSaidaEmDinheiroCabe(await obterCaixaDia.ExecuteAsync(new ObterCaixaDiaQuery(empresaId, data, lojaId)), valor);
 }
