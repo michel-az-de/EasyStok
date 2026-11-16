@@ -55,13 +55,13 @@ public static class HostDeCaixaEmail
         return true;
     }
 
-    /// <summary>::/96 (IPv4 compatível) e ::ffff:0:0:0/96 (SIIT): o IPv4 vai nos 4 últimos bytes.</summary>
+    /// <summary>::/96 (IPv4 compatÃ­vel) e ::ffff:0:0:0/96 (SIIT): o IPv4 vai nos 4 Ãºltimos bytes.</summary>
     private static bool EhCompativelOuSiit(byte[] b) =>
         b[0..8].All(x => x == 0)
         && ((b[8] == 0 && b[9] == 0 && b[10] == 0 && b[11] == 0)
             || (b[8] == 0xFF && b[9] == 0xFF && b[10] == 0 && b[11] == 0));
 
-    /// <summary>Teredo 2001:0::/32: o IPv4 do cliente vem invertido (XOR) nos 4 últimos bytes.</summary>
+    /// <summary>Teredo 2001:0::/32: o IPv4 do cliente vem invertido (XOR) nos 4 Ãºltimos bytes.</summary>
     private static byte[] ClienteTeredo(byte[] b) => b[12..16].Select(x => (byte)~x).ToArray();
 
     /// <summary>64:ff9b::/96: o IPv4 de destino vai nos 4 Ãºltimos bytes e vale a mesma conferÃªncia do IPv4.</summary>
