@@ -331,17 +331,27 @@ public class UpdaterTest {
         check(quiet.getBoolean("checkSucceeded"), "Manifest 404 is a successful check (nothing published for this APK)");
         check(quiet.getString("lastError").isEmpty(), "Manifest 404 leaves no error");
         check(quiet.getString("pendingVersion").isEmpty(), "Manifest 404 prepares nothing");
+        check(!jobRetries(quiet), "Manifest 404 ends the push job: the topic is shared, another channel's package must not keep this APK retrying");
         for (int code : new int[] { 403, 500, 503 }) {
             NetworkFixture.statusByUrl.put(UpdatePolicy.MANIFEST_URL, code);
             JSONObject failed = checkUpdate(unpublished);
             check(!failed.getBoolean("checkSucceeded") && !failed.getString("lastError").isEmpty(), "Manifest HTTP " + code + " stays an error");
+            check(jobRetries(failed), "Manifest HTTP " + code + " keeps the push job retrying");
         }
         NetworkFixture.statusByUrl.remove(UpdatePolicy.MANIFEST_URL);
         NetworkFixture.statusByUrl.put(URL, 404);
         JSONObject zip404 = checkUpdate(networkManager(directory("zip-404"), key));
         check(!zip404.getBoolean("checkSucceeded") && !zip404.getString("lastError").isEmpty(), "Package ZIP 404 stays an error");
         check(zip404.getString("pendingVersion").isEmpty(), "Package ZIP 404 prepares nothing");
+        check(jobRetries(zip404), "Package ZIP 404 keeps the push job retrying");
+        check(UpdatePolicy.shouldRetryCheck(true, false, true) && UpdatePolicy.shouldRetryCheck(false, true, true),
+            "A check still running or a bundle on trial keeps the push job retrying");
         NetworkFixture.statusByUrl.clear();
+    }
+
+    /** A mesma decisao do UpdateCheckJob, que so roda no Android: repetir ou encerrar o job do push. */
+    private static boolean jobRetries(JSONObject status) {
+        return UpdatePolicy.shouldRetryCheck(status.optBoolean("checking"), status.optBoolean("trial"), status.optBoolean("checkSucceeded"));
     }
 
     private static File zip(String name, String[] entries, int largeBytes) throws Exception {

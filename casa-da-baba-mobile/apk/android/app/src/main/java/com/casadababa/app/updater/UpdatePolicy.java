@@ -137,6 +137,15 @@ public final class UpdatePolicy {
         return pendingVersion != null && !pendingVersion.isEmpty() && !pendingVersion.equals(alreadyAnnounced);
     }
 
+    /**
+     * O job do push repete enquanto a conferência não terminou ou falhou. Canal sem pacote (manifesto 404) conta como
+     * conferência concluída: o tópico do push é um só para todos os APKs, e o aviso de um pacote de outro canal não
+     * pode deixar este aparelho tentando em segundo plano sem fim (#2735).
+     */
+    public static boolean shouldRetryCheck(boolean checking, boolean trial, boolean checkSucceeded) {
+        return checking || trial || !checkSucceeded;
+    }
+
     public static boolean isUpdateAnnouncement(String sender, String kind, String sequence) {
         if (!"/topics/casa-da-baba-piloto-updates".equals(sender) || !"ota-update".equals(kind)
                 || sequence == null || !sequence.matches("[1-9][0-9]{0,18}")) return false;
