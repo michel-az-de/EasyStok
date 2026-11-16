@@ -33,3 +33,12 @@ test('gate.sh psql_ro: aceita select e recusa barra invertida, set_config e vazi
     assert.equal(psql(s).status, 64, `deveria recusar: ${s.slice(0, 30)}`);
 });
 test('gate.sh psql_ro: recusa argumentos', { skip: !temBash }, () => assert.equal(spawnSync('bash', [GATE], { input: 'select 1', env: { ...process.env, GATE_DRY: '1', SSH_ORIGINAL_COMMAND: 'psql_ro x' }, encoding: 'utf8' }).status, 64));
+
+// #2801: e pela guarda do gate.sh (mesma lista de funcoes, na VPS).
+test('gate.sh psql_ro: aceita a consulta da ferramenta tabelas', { skip: !temBash }, async () => {
+  const { sqlTabelas } = await import('../src/lib/sql.mjs');
+  for (const filtro of [undefined, 'pedido']) {
+    const r = psql(sqlTabelas(filtro));
+    assert.equal(r.status, 0, `gate recusou (filtro=${filtro}): ${r.stderr}`);
+  }
+});

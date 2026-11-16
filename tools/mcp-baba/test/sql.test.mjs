@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validarSql, comLimite } from '../src/lib/sql.mjs';
+import { validarSql, comLimite, sqlTabelas } from '../src/lib/sql.mjs';
 
 const ok = [
   "select date_trunc('day', \"CriadoEm\") d, count(*), sum(total)::numeric(12,2) from pedidos group by 1 order by 1", 'select coalesce(a,0) from t where x in (1,2) and exists (select 1 from u)','select 1', 'SELECT * FROM pedidos;', 'with a as (select 1) select * from a', 'explain select 1', "select 'a;b' as x",
@@ -18,3 +18,7 @@ for (const s of ok) test(`aceita: ${s.slice(0, 40)}`, () => assert.ok(validarSql
 for (const s of ruim) test(`recusa: ${s.slice(0, 40)}`, () => assert.throws(() => validarSql(s)));
 test('limite embrulha em subselect', () => assert.match(comLimite('select 1', 50), /LIMIT 50$/));
 test('explain nao embrulha', () => assert.equal(comLimite('explain select 1', 50), 'explain select 1'));
+
+// #2801: a consulta da propria ferramenta `tabelas` tem de passar pela guarda do cliente.
+for (const filtro of [undefined, 'pedido'])
+  test(`tabelas passa na guarda do cliente (filtro=${filtro})`, () => assert.ok(validarSql(sqlTabelas(filtro))));

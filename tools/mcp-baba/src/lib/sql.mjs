@@ -72,3 +72,16 @@ export function comLimite(sql, max) {
   if (/^\s*explain\b/i.test(sql)) return sql;
   return `SELECT * FROM (\n${sql}\n) AS _q LIMIT ${Number(max)}`;
 }
+
+/**
+ * Consulta da ferramenta `tabelas`: tabelas e colunas visiveis ao papel de leitura. Filtro ja validado por /^[a-z_0-9]{1,40}$/.
+ * Sem has_table_privilege/format (fora da lista de funcoes, #2801): information_schema.columns ja mostra so as colunas
+ * a que o papel tem algum privilegio, e baba_ro so tem SELECT.
+ */
+export function sqlTabelas(filtro) {
+  const f = filtro ? `AND c.table_name LIKE '%${filtro}%'` : '';
+  return `SELECT c.table_name, string_agg(c.column_name || ' ' || c.data_type, ', ' ORDER BY c.ordinal_position) AS colunas
+FROM information_schema.columns c
+WHERE c.table_schema = 'public' ${f}
+GROUP BY c.table_name ORDER BY c.table_name`;
+}
