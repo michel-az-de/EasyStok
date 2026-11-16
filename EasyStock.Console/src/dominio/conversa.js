@@ -327,3 +327,8 @@ export function bloqueioDeSemente(conversa) {
     por: nota?.autor ?? 'Thatiane',
   })
 }
+
+// #2734: as conversas carregadas que mostram essa pessoa (mesmo cadastro). Quem grava o cadastro relê só elas.
+export const conversasDoCliente = (conversas, clienteId) => (
+  clienteId ? (conversas ?? []).filter((c) => c.clienteId === clienteId).map((c) => c.id) : []
+)

@@ -165,8 +165,12 @@ try {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('tab', { name: 'Cliente', exact: true }).click() // #2437: a aba Ficha virou Cliente
   // #2437: a Ficha (agora aba Cliente) trocou os blocos sanfonados por gatilhos que abrem/fecham (Ações, Assistente, Notas).
-  const blocos = await page.locator('button[aria-expanded]').evaluateAll(ns => ns.filter(n => n.getClientRects().length).map(n => ({ nome: n.textContent, altura: n.getBoundingClientRect().height })))
+  // #2734: sem nota escondida, o cabeçalho "Notas" é só título (aria-disabled, sem aria-expanded); a altura de toque segue medida.
+  const blocos = await page.locator('button[aria-expanded], button[data-voltar-notas]').evaluateAll(ns => ns.filter(n => n.getClientRects().length)
+    .map(n => ({ nome: n.textContent, altura: n.getBoundingClientRect().height, alterna: n.hasAttribute('aria-expanded'), inerte: n.getAttribute('aria-disabled') === 'true' })))
   assert.ok(blocos.length >= 3, JSON.stringify(blocos))
+  assert.ok(blocos.some(bloco => bloco.nome.startsWith('Notas')), JSON.stringify(blocos))
+  assert.ok(blocos.every(bloco => bloco.alterna !== bloco.inerte), JSON.stringify(blocos))
   assert.equal(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), true)
   assert.ok(blocos.every(bloco => bloco.altura >= 44), JSON.stringify(blocos))
   await foto(page, '04-ficha-toque')

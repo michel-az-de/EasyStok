@@ -18,9 +18,9 @@ import {NotasDoCliente} from '../../../src/features/ficha-cliente/NotasDoCliente
 import {ModalCliente} from '../../../src/features/ficha-cliente/ModalCliente';
 import {CANAIS} from '../../../src/infra/catalogo';import '../../../src/estilos/base.css';
 const busca=new URLSearchParams(location.search);const cena=busca.get('cena');
-const NOTAS=[{id:'n1',texto:'Prefere entrega à tarde',autor:'Ana',criadoEm:'2026-11-01T10:00:00Z'},
-{id:'n2',texto:'Alérgica a amendoim',autor:'Ana',criadoEm:'2026-11-05T10:00:00Z'},
-{id:'n3',texto:'Portão azul, tocar duas vezes',autor:'Bia',criadoEm:'2026-11-09T10:00:00Z'}];
+const NOTAS=[{id:'n1',texto:'Prefere entrega à tarde',autor:'Ana',em:'01/11, 07:00',criadoEm:'2026-11-01T10:00:00Z'},
+{id:'n2',texto:'Alérgica a amendoim',autor:'Ana',em:'05/11, 07:00',criadoEm:'2026-11-05T10:00:00Z'},
+{id:'n3',texto:'Portão azul, tocar duas vezes',autor:'Bia',em:'09/11, 07:00',criadoEm:'2026-11-09T10:00:00Z'}];
 const LONGA='Cliente desde 2019, não ligar antes das 10h. '.repeat(8).trim();
 function Notas(){const vazia=cena==='vazia';const estreita=cena==='longa'||cena==='curta';
 const observacao=vazia?null:cena==='longa'?LONGA:cena==='curta'?'Portão azul.':'Cliente desde 2019. Não ligar antes das 10h.';
@@ -61,7 +61,13 @@ try {
   await coluna.getByText('Portão azul, tocar duas vezes', { exact: true }).waitFor()
   assert.equal(await cabecalho.getAttribute('aria-expanded'), 'false')
   assert.deepEqual(await textos(), ['Cliente desde 2019. Não ligar antes das 10h.', 'Portão azul, tocar duas vezes', 'Alérgica a amendoim'])
-  assert.equal(await coluna.locator('[data-observacao-do-cadastro] small').textContent(), 'Observação do cadastro')
+  // O mesmo nome do campo em Cadastros ("Observações"), e a nota diz quem escreveu e quando, como lá.
+  assert.equal(await coluna.locator('[data-observacao-do-cadastro] small').textContent(), 'Observações do cadastro')
+  assert.deepEqual(await coluna.locator('article:not([data-observacao-do-cadastro]) small').allTextContents(), ['Nota · Bia · 09/11, 07:00', 'Nota · Ana · 05/11, 07:00'])
+  // "Destacar nota" se repete a cada nota: a descrição diz de qual nota é o botão.
+  const descrito = await coluna.getByRole('button', { name: 'Destacar nota', exact: true }).first().getAttribute('aria-describedby')
+  assert.ok(descrito, 'o botão Destacar nota aponta para o texto da nota')
+  assert.equal(await p.locator(`[id="${descrito}"]`).textContent(), 'Portão azul, tocar duas vezes')
   assert.equal(await coluna.getByText('Portão azul, tocar duas vezes', { exact: true }).isVisible(), true, 'a nota está na tela sem abrir a lista')
   assert.equal(await coluna.locator('article p').first().evaluate(el => getComputedStyle(el).webkitLineClamp), '2', 'recolhida, cada nota mostra 2 linhas')
   // O que ficou de fora tem número e leva ao resto.
@@ -101,6 +107,11 @@ try {
   await p.getByText('Portão azul.', { exact: true }).waitFor()
   await p.waitForTimeout(300)
   assert.equal(await p.getByRole('button', { name: 'Ver texto inteiro', exact: true }).count(), 0, 'texto que cabe não ganha botão')
+  // Sem nota escondida e sem texto cortado, o cabeçalho não se oferece para abrir o que já está inteiro na tela.
+  const inerte = p.getByRole('region', { name: 'Notas internas do cliente', exact: true }).locator('[data-voltar-notas]')
+  assert.equal(await inerte.getAttribute('aria-disabled'), 'true', 'cabeçalho sem o que abrir fica inerte')
+  assert.equal(await inerte.getAttribute('aria-expanded'), null)
+  assert.equal(await inerte.locator('svg').count(), 0, 'sem seta quando não há o que abrir')
   await p.close()
 
   // 3. A Ficha leva ao cadastro completo: o endereço muda para o da pessoa em Cadastros e a janela fecha.

@@ -98,4 +98,47 @@ for (const arquivo of ['EditorCadastro.jsx', 'FichaCliente.jsx', 'Relacionamento
 const app = readFileSync(new URL('../src/app/App.jsx', import.meta.url), 'utf8')
 assert.match(app, /renderizarCadastro=\{props => <EditorCadastro \{\.\.\.props\} restricoes=\{RESTRICOES\} \/>\}/, 'a Buscar na Casa entrega as restrições ao editor')
 
-console.log('prova-2734-coerencia-cliente ok: nota, tag, telefone principal, atalho, números, prévia, tradução do dossiê e editor fora do Atendimento')
+// Telefone de DDD 55 (Rio Grande do Sul): o texto que já está na máscara "(55) …" não tem DDI. Um dígito a mais
+// é erro que a pessoa vê, não outro número gravado em silêncio.
+const { telefoneNaTela } = await import('../src/dominio/cadastros.js')
+const { erroDoTelefone } = await import('../src/dominio/validacaoDoCadastro.js')
+assert.equal(telefoneNaTela('(55) 99999-8888'), '(55) 99999-8888')
+assert.equal(telefoneNaTela('(55) 99999-88887'), '(55) 99999-88887', 'o dígito a mais não troca o DDD')
+assert.equal(erroDoTelefone(telefoneNaTela('(55) 99999-88887')), 'Telefone com mais de 11 dígitos. Use só o DDD e o número.')
+assert.equal(telefoneNaTela('5511999998888'), '(11) 99999-8888', 'colado com DDI segue virando o número nacional')
+assert.equal(telefoneNaTela('+55 11 99999-8888'), '(11) 99999-8888')
+assert.equal(telefoneNaTela('+55 (55) 99999-8888'), '(55) 99999-8888')
+
+// Texto de tela sem travessão no histórico do cliente.
+const historico = readFileSync(new URL('../src/features/ficha-cliente/ModalHistorico.jsx', import.meta.url), 'utf8')
+assert.equal(historico.includes('—'), false, 'ModalHistorico sem travessão')
+assert.match(historico, /'Sem venda'/)
+
+// Quem mostra a pessoa: as conversas carregadas com o mesmo cadastro.
+const { conversasDoCliente } = await import('../src/dominio/conversa.js')
+assert.deepEqual(conversasDoCliente([{ id: 'C1', clienteId: ID }, { id: 'C2', clienteId: 'outra' }, { id: 'C3', clienteId: ID }], ID), ['C1', 'C3'])
+assert.deepEqual(conversasDoCliente([{ id: 'C1', clienteId: null }], null), [], 'contato sem cadastro não casa com ninguém')
+assert.deepEqual(conversasDoCliente(undefined, ID), [])
+
+// O cadastro gravado fora do Atendimento avisa; quem assinou recebe, e um ouvinte com defeito não cala os outros.
+const { avisarMudancaNoCliente, assinarMudancaNoCliente } = await import('../src/aplicacao/mudancasDoCliente.js')
+const avisos = []
+const largarDefeito = assinarMudancaNoCliente(() => { throw new Error('ouvinte com defeito') })
+const largar = assinarMudancaNoCliente(id => avisos.push(id))
+avisarMudancaNoCliente(ID); avisarMudancaNoCliente(null); avisarMudancaNoCliente('')
+assert.deepEqual(avisos, [ID], 'o aviso chega a quem assinou; sem id não avisa')
+largar(); largarDefeito()
+avisarMudancaNoCliente(ID)
+assert.deepEqual(avisos, [ID], 'quem cancelou a assinatura não ouve mais')
+
+// A Ficha do Atendimento assina o aviso e relê; a Buscar na Casa avisa ao gravar; endereço e telefone também avisam.
+const provedor = readFileSync(new URL('../src/aplicacao/AtendimentoProvider.jsx', import.meta.url), 'utf8')
+assert.match(provedor, /assinarMudancaNoCliente\(/, 'o Atendimento ouve a mudança do cadastro')
+assert.match(provedor, /relerClienteDaConversa/, 'e relê a conversa da pessoa')
+const busca = readFileSync(new URL('../src/features/busca/BuscaNaCasa.jsx', import.meta.url), 'utf8')
+assert.match(busca, /aoGravarRelacionamento: \(\) => avisarMudancaNoCliente\(/, 'nota e tag gravadas pela Buscar na Casa avisam')
+assert.match(busca, /aoSalvo: \(\) => \{[^}]*avisarMudancaNoCliente\(/, 'o cadastro salvo pela Buscar na Casa avisa')
+const editor = readFileSync(new URL('../src/features/gestao/cadastros/EditorCadastro.jsx', import.meta.url), 'utf8')
+assert.match(editor, /<FichaCliente[\s\S]*?aoGravar=\{aoGravarRelacionamento\}/, 'endereço e telefone gravados avisam como nota e tag')
+
+console.log('prova-2734-coerencia-cliente ok: nota, tag, telefone principal e de DDD 55, atalho, números, prévia, tradução do dossiê, editor fora do Atendimento e aviso de mudança')

@@ -390,7 +390,8 @@ try {
     const recusa = `R4 E03 pedido ${id}: recuso cancelamento imediato; confirmar com cliente o novo horário. Próximo passo: Atendimento consultar disponibilidade e retornar antes de alterar pedido.`
     const notaRecusa = await nota(recusa); assert.deepEqual(await detalhe(id), antes)
     await login('Atendimento', fixture.conversaExcecoesId)
-    await page.getByRole('button', { name: /^Notas\b/ }).first().click()
+    // #2734: a nota recém-gravada já aparece na prévia; o cabeçalho "Notas" só abre quando há nota escondida.
+    const abrirNotas = page.getByRole('button', { name: /^Notas\b/ }).first(); if (await abrirNotas.getAttribute('aria-expanded') === 'false') await abrirNotas.click()
     await page.getByRole('article').filter({ hasText: recusa }).getByRole('button', { name: 'Destacar nota', exact: true }).click()
     await page.getByRole('complementary', { name: /^Nota ·/ }).filter({ hasText: recusa }).waitFor()
     await foto('E03-recusa-proximo-passo')

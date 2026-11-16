@@ -14,7 +14,7 @@ registerHooks({
   },
 })
 
-const { ehRestricao, ordenarTags, rotuloDaTag } = await import('../src/dominio/cliente.js')
+const { ehRestricao, ordenarTags, rotuloDaTag, ROTULO_RESTRICAO } = await import('../src/dominio/cliente.js')
 const { combinaBusca, tagCorrespondida } = await import('../src/dominio/conversa.js')
 const { contextoDaLinha } = await import('../src/dominio/linhaDoBalcao.js')
 const { RESTRICOES } = await import('../src/infra/catalogo.js')
@@ -59,5 +59,8 @@ assert.deepEqual(contextoDaLinha({ tagAchada: 'cliente_antiga' }),
 assert.deepEqual(contextoDaLinha({ tagAchada: 'Gosta de lasanha' }),
   [{ chave: 'tag', texto: 'Tag: Gosta de lasanha', icone: null, tom: 'neutro' }])
 assert.deepEqual(contextoDaLinha({}), [])
+
+// 4. O alerta da restrição tem um nome só, lido por leitor de tela na Ficha, no cartão e em Cadastros.
+assert.equal(ROTULO_RESTRICAO, 'Restrição alimentar')
 
 console.log(`prova-2734 ok: ${RESTRICOES.length} restrições reconhecidas depois de gravadas, busca e rótulo da tag coerentes`)

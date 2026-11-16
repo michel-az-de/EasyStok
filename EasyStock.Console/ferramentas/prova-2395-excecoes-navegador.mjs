@@ -171,7 +171,9 @@ try {
   await login('Dona')
   if (!prova.cancelado) {
     prova.vagasAntesCancelar = await vagas()
-    await page.getByRole('button', { name: /^Notas\b/ }).first().click(); await page.locator('p:visible').filter({ hasText: new RegExp(`Ensaio R4 pedido ${prova.pedidoId}`) }).first().waitFor()
+    // #2734: a nota já aparece na prévia; o cabeçalho "Notas" só abre quando há nota escondida ou texto cortado.
+    const abrirNotas = page.getByRole('button', { name: /^Notas\b/ }).first(); if (await abrirNotas.getAttribute('aria-expanded') === 'false') await abrirNotas.click()
+    await page.locator('p:visible').filter({ hasText: new RegExp(`Ensaio R4 pedido ${prova.pedidoId}`) }).first().waitFor()
     await page.getByRole('button', { name: 'Ações da ficha', exact: true }).click(); await page.getByRole('menuitem', { name: 'Cancelar pedido', exact: true }).click()
     await page.getByLabel('Motivo do cancelamento', { exact: true }).fill('Ensaio R4: gerente conferiu falta de produto e atraso; cancelamento acordado com cliente, devolução separada.')
     await agir(`/api/pedidos/${prova.pedidoId}/cancelar`, 'POST', () => page.getByRole('button', { name: 'Cancelar pedido', exact: true }).click())

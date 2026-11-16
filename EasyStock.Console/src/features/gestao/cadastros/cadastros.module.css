@@ -46,6 +46,9 @@
 .subcategorias > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); padding-block: var(--e-2); border-top: 1px solid var(--linha); }
 .subcategorias > li > span { overflow-wrap: anywhere; min-width: 0; }
 .sucesso { margin: 0; padding: var(--e-3); color: var(--sucesso); background: var(--sucesso-pastel); border-radius: var(--r-1); }
+/* #2734: a região de aviso (role="status") fica sempre na tela, para o leitor de tela anunciar o que entra nela.
+   Vazia, sai do fluxo e não ocupa uma linha da grade; nunca `display: none`, que a tiraria da árvore de acessibilidade. */
+.vivo:empty { position: absolute; }
 .formulario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-4); padding: var(--e-3) 0; margin: 0; border: 0; min-width: 0; }
 .larguraTotal { grid-column: 1 / -1; }
 /* #2495 (S5): aviso de cliente com o mesmo telefone ou documento; não bloqueia salvar. */

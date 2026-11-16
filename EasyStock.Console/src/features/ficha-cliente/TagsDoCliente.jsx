@@ -3,7 +3,7 @@ import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import {
-  chaveDaTag, ehRestricao, ordenarTags, rotuloDaTag, sugestoesDeTag,
+  chaveDaTag, ehRestricao, ordenarTags, ROTULO_RESTRICAO, rotuloDaTag, sugestoesDeTag,
 } from '../../dominio/cliente'
 import { SEGUNDOS_PARA_DESFAZER } from '../../dominio/esteira'
 import css from './cliente.module.css'
@@ -121,7 +121,7 @@ export function TagsDoCliente({ conversa }) {
               />
             ) : (
               <span className={[css.chip, ehRestricao(tag, restricoes) ? css.chipRestricao : ''].filter(Boolean).join(' ')}>
-                {ehRestricao(tag, restricoes) && <Icone nome="alerta" tamanho={20} />}
+                {ehRestricao(tag, restricoes) && <Icone nome="alerta" tamanho={20} rotulo={ROTULO_RESTRICAO} />}
                 <button type="button" className={css.chipTexto} onClick={() => abrirEdicao(tag)}>
                   {rotuloDaTag(tag)}
                 </button>

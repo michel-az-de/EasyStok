@@ -90,7 +90,7 @@ try {
   assert.deepEqual((await chamadas(p)).filter(c => c[2] === 'nome'), [['editarDadoCliente', 'conversa', 'nome', 'B'.repeat(100)]], '100 caracteres cabem (servidor aceita 150)')
 
   // A29: Esc cancela de verdade; tag duplicada é recusada com mensagem.
-  const tags = () => p.getByRole('list', { name: 'Tags do cliente' })
+  const tags = () => p.getByRole('list', { name: 'Tags do cliente', exact: true })
   await tags().getByRole('button', { name: 'Sem glúten', exact: true }).click()
   const edicaoTag = tags().getByRole('textbox')
   await edicaoTag.fill('Vegana')
@@ -125,10 +125,13 @@ try {
   // Tag gravada pelo EasyStok ("sem_gluten", "cliente_antiga"): rótulo com espaço em todo lugar, e a restrição
   // segue restrição (alerta e primeiro lugar) no cartão do Resumo, na Ficha e no cartão do Assistente.
   p = await abrir('gravadas')
-  const noCartao = p.locator('section[aria-label^="Cliente "] ul[aria-label="Tags do cliente"] li')
+  // O cartão é o resumo e a Ficha é a lista que se edita: cada uma tem o seu nome, e o alerta tem nome nas duas.
+  const noCartao = p.locator('section[aria-label^="Cliente "] ul[aria-label="Resumo das tags do cliente"] li')
   await noCartao.first().waitFor()
   assert.deepEqual(await noCartao.allInnerTexts(), ['sem gluten', 'cliente antiga'])
   assert.deepEqual(await noCartao.evaluateAll(lis => lis.map(li => li.querySelectorAll('svg').length)), [1, 0], 'no cartão, só a restrição leva o alerta')
+  assert.equal(await p.locator('ul[aria-label="Resumo das tags do cliente"]').getByRole('img', { name: 'Restrição alimentar', exact: true }).count(), 1, 'no cartão, o alerta tem nome')
+  assert.equal(await p.locator('[data-tags-cliente] ul[aria-label="Tags do cliente"]').getByRole('img', { name: 'Restrição alimentar', exact: true }).count(), 1, 'na Ficha, o alerta tem nome')
   const naFicha = p.locator('[data-tags-cliente] ul[aria-label="Tags do cliente"] li')
   assert.deepEqual(await naFicha.evaluateAll(lis => lis.slice(0, 2).map(li => ({ texto: li.querySelector('button')?.textContent.trim(), alerta: li.querySelectorAll(':scope > span > svg').length }))),
     [{ texto: 'sem gluten', alerta: 1 }, { texto: 'cliente antiga', alerta: 0 }])
@@ -142,6 +145,11 @@ try {
   const rapido = p.getByRole('textbox', { name: 'Telefone', exact: true })
   await rapido.fill('+55 11 98225-4398')
   assert.equal(await rapido.inputValue(), '(11) 98225-4398')
+  // DDD 55: um dígito a mais não vira outro número. O campo mostra o que foi digitado e o salvar recusa.
+  await rapido.fill('(55) 99999-8888')
+  assert.equal(await rapido.inputValue(), '(55) 99999-8888')
+  await rapido.press('End'); await rapido.pressSequentially('7')
+  assert.equal(await rapido.inputValue(), '(55) 99999-88887', 'o dígito a mais não troca o DDD')
   await rapido.fill('119822543981')
   await p.getByRole('button', { name: 'Salvar cadastro', exact: true }).click()
   await p.getByRole('alert').filter({ hasText: 'Telefone com mais de 11 dígitos. Use só o DDD e o número.' }).waitFor()

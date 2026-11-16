@@ -341,7 +341,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
               <CampoMascarado
                 tipo="telefone" rotulo="Telefone"
                 valor={form.telefone}
-                aoMudarDigitos={(d) => setForm((f) => ({ ...f, telefone: telefoneNaTela(d) }))}
+                aoMudarDigitos={(d, texto) => setForm((f) => ({ ...f, telefone: telefoneNaTela(texto ?? d) }))}
                 id={idDoCampo('telefone')}
                 placeholder="(00) 00000-0000"
                 dica="Com DDD"

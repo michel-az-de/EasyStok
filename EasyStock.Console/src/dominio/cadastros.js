@@ -69,7 +69,10 @@ export function telefoneNaTela(valor) {
   const digitos = bruto.replace(/\D/g, '')
   if (!digitos) return bruto.startsWith('+') ? bruto : ''
   if (bruto.startsWith('+') && !digitos.startsWith('55')) return bruto
-  const nacional = bruto.startsWith('+') || BRASIL_COM_DDI.test(digitos) ? digitos.slice(2) : digitos
+  // #2734: o texto que já está na máscara "(DD)" não tem DDI. Sem isto, um dígito a mais num telefone de DDD 55
+  // parecia "55 + número" e a tela trocava o DDD de quem estava digitando.
+  const comDdi = bruto.startsWith('+') || (!bruto.startsWith('(') && BRASIL_COM_DDI.test(digitos))
+  const nacional = comDdi ? digitos.slice(2) : digitos
   if (!nacional) return bruto
   return nacional.length > 11 ? bruto : mascaraTelefone(nacional)
 }

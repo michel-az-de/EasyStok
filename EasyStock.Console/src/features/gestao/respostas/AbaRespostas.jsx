@@ -108,9 +108,22 @@ function SecaoRespostas() {
     alvo?.focus()
   }, [editando])
 
+  // #2734: enquanto grava, o botão fica desabilitado e perde o foco; arquivada, a linha ainda sai da lista. Ao fim,
+  // o foco volta ao botão da linha, ou a "Nova resposta" quando a linha saiu. Quem já foi a outro controle fica lá.
+  const focoAlternado = useRef(null)
+  useEffect(() => {
+    const id = focoAlternado.current
+    if (id === null || gravando !== null) return
+    focoAlternado.current = null
+    const ativo = document.activeElement
+    if (ativo && ativo !== document.body && !ativo.disabled) return
+    const alvo = listaRef.current?.querySelector(`[data-alternar="${id}"]`) ?? novaRef.current
+    alvo?.focus()
+  })
+
   function alternarArquivo(r) {
     if (gravando) return
-    setGravando(r.id); setAviso('')
+    setGravando(r.id); setAviso(''); focoAlternado.current = r.id
     Promise.resolve(alternarArquivamentoRespostaPronta(r.id))
       .then((ok) => { if (ok !== false) setAviso(`Resposta ${r.titulo} ${r.arquivada ? 'restaurada' : 'arquivada'}.`) })
       .finally(() => setGravando(null))
@@ -183,7 +196,7 @@ function SecaoRespostas() {
                   </div>
                   {editavel && <div className={css.acoesLinha}>
                     {!r.arquivada && <Botao variante="texto" disabled={editando !== null || gravando !== null} icone="lapis" data-editar={r.id} aria-label={`Editar resposta ${r.titulo}`} onClick={() => setEditando(r.id)}>Editar</Botao>}
-                    <Botao variante="texto" disabled={editando !== null || gravando !== null} aria-label={`${r.arquivada ? 'Restaurar' : 'Arquivar'} resposta ${r.titulo}`} icone={r.arquivada ? 'undo-2' : 'archive'} onClick={() => alternarArquivo(r)}>
+                    <Botao variante="texto" disabled={editando !== null || gravando !== null} data-alternar={r.id} aria-label={`${r.arquivada ? 'Restaurar' : 'Arquivar'} resposta ${r.titulo}`} icone={r.arquivada ? 'undo-2' : 'archive'} onClick={() => alternarArquivo(r)}>
                       {r.arquivada ? 'Restaurar' : 'Arquivar'}
                     </Botao>
                   </div>}

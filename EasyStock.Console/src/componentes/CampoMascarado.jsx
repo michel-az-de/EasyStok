@@ -34,7 +34,9 @@ export function CampoMascarado({
 
   function aoDigitar(evento) {
     const texto = evento.target.value
-    aoMudarDigitos(tipo === 'moeda' ? digitosDeMoeda(String(valor ?? ''), texto) : texto.replace(/\D/g, ''))
+    // #2734: o texto do campo vai junto. Só com os dígitos, um telefone de DDD 55 com um dígito a mais parecia
+    // "55 + número" e a máscara trocava o DDD; com o texto, quem monta a tela vê que já havia "(55)".
+    aoMudarDigitos(tipo === 'moeda' ? digitosDeMoeda(String(valor ?? ''), texto) : texto.replace(/\D/g, ''), texto)
   }
 
   function aoColar(evento) {

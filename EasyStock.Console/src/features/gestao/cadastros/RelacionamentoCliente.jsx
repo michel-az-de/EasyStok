@@ -6,7 +6,7 @@ import { Chip } from '../../../componentes/Chip'
 import { Icone } from '../../../componentes/Icone'
 import { Modal } from '../../../componentes/Modal'
 import { Vazio } from '../../../componentes/Vazio'
-import { ehRestricao, ordenarTags, rotuloDaTag } from '../../../dominio/cliente'
+import { ehRestricao, ordenarTags, ROTULO_RESTRICAO, rotuloDaTag } from '../../../dominio/cliente'
 import { previaDasNotas } from '../../../dominio/ficha'
 import { avisoDasNotas, erroDaNota, erroDaTag, LIMITE_DA_NOTA, LIMITE_DA_TAG, mensagemDaFicha } from '../../../dominio/fichaCliente'
 import { plural } from '../../../dominio/formato'
@@ -39,6 +39,15 @@ export function RelacionamentoCliente({ clienteId, relacionamento, contexto, pod
   useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
   const comRascunho = Boolean(intencao && intencao.acao !== 'tirarTag' && valor.trim())
   useEffect(() => { aoRascunhar?.(comRascunho); return () => aoRascunhar?.(false) }, [comRascunho, aoRascunhar])
+  // #2734: tirada a tag, o chip que tinha o foco sai da tela. O foco vai para "Adicionar tag", na mesma seção; sem
+  // isto ele caía no X do cadastro. Roda depois da limpeza do Modal, que devolve o foco antes.
+  const botaoTag = useRef(null)
+  const focoPendente = useRef(false)
+  useEffect(() => {
+    if (!focoPendente.current) return
+    focoPendente.current = false
+    botaoTag.current?.focus()
+  })
 
   if (!dados) {
     return <div className={css.relacionamento}>
@@ -76,7 +85,7 @@ export function RelacionamentoCliente({ clienteId, relacionamento, contexto, pod
       // O que o servidor devolveu entra na lista na hora; a releitura do dossiê só confirma.
       if (acao === 'nota' && gravado) aplicar(atual => ({ ...atual, notas: [gravado, ...atual.notas] }))
       if (acao === 'tag' && gravado) aplicar(atual => ({ ...atual, tags: atual.tags.includes(gravado) ? atual.tags : [...atual.tags, gravado] }))
-      if (acao === 'tirarTag') aplicar(atual => ({ ...atual, tags: atual.tags.filter(t => t !== alvo) }))
+      if (acao === 'tirarTag') { aplicar(atual => ({ ...atual, tags: atual.tags.filter(t => t !== alvo) })); focoPendente.current = true }
       escolher(null); avisar(SUCESSO[acao]); recarregar()
     } catch (e) {
       if (!montado.current) return
@@ -87,7 +96,8 @@ export function RelacionamentoCliente({ clienteId, relacionamento, contexto, pod
 
   const digitando = intencao && intencao.acao !== 'tirarTag'
   return <div className={css.relacionamento}>
-    {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
+    {/* #2734: a região de aviso fica sempre na tela; o leitor de tela só anuncia o que muda dentro dela. */}
+    <div role="status" className={css.vivo}>{sucesso && <p className={css.sucesso}>{sucesso}</p>}</div>
     {bloqueio && <div className={css.avisoBloqueio}>
       <p className={css.tituloBloqueio}><Icone nome="bloqueio" tamanho={20} /><strong>Cadastro bloqueado</strong><span>vale em todos os canais</span></p>
       <p>{bloqueio.motivo}</p>
@@ -106,10 +116,10 @@ export function RelacionamentoCliente({ clienteId, relacionamento, contexto, pod
         {abertas && avisoDasNotas(notas.length) && <p className={css.legenda}>{avisoDasNotas(notas.length)}</p>}
       </section>
       <section aria-labelledby={ids.tags}>
-        <div className={css.barra}><h3 id={ids.tags}>Tags</h3>{podeEditar && <Botao icone="mais" onClick={() => abrir('tag')}>Adicionar tag</Botao>}</div>
+        <div className={css.barra}><h3 id={ids.tags}>Tags</h3>{podeEditar && <Botao ref={botaoTag} icone="mais" onClick={() => abrir('tag')}>Adicionar tag</Botao>}</div>
         {tags.length === 0 ? <Vazio variante="linha" titulo="Nenhuma tag." />
           : <ul className={css.tags}>{ordenarTags(tags, restricoes).map(t => { const restricao = ehRestricao(t, restricoes); return <li key={t}>
-            <Chip papel="tag" icone={restricao ? 'alerta' : undefined} className={restricao ? css.tagRestricao : undefined}
+            <Chip papel="tag" icone={restricao ? 'alerta' : undefined} rotuloIcone={restricao ? ROTULO_RESTRICAO : undefined} className={restricao ? css.tagRestricao : undefined}
               onRemover={podeEditar ? () => abrir('tirarTag', t) : undefined} rotuloRemover={`Tirar tag ${rotuloDaTag(t)}`}>{rotuloDaTag(t)}</Chip>
           </li> })}</ul>}
       </section>

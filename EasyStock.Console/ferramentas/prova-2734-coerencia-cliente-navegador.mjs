@@ -20,7 +20,7 @@ import {PainelCadastros} from '../../../src/features/gestao/cadastros/PainelCada
 import '../../../src/estilos/base.css';
 document.body.style.cssText='margin:0;padding:16px;box-sizing:border-box;background:var(--fundo);font-family:var(--f-corpo);color:var(--tinta)';
 const conversas=[{id:'C1',clienteId:'${ID}',nome:'Marina Teste',canal:'Chat do site',cliente:{}}];
-const acoes={selecionar:id=>{window.__selecionada=id},carregarClienteDaConversa:id=>{(window.__relidas??=[]).push(id)}};
+const acoes={selecionar:id=>{window.__selecionada=id},carregarClienteDaConversa:id=>{(window.__lidas??=[]).push(id)},relerClienteDaConversa:id=>{(window.__relidas??=[]).push(id)}};
 function Cena(){const [rascunhos,definir]=useState({});const gravacoes=useGravacoesDosAjustes();return <ContextoAcessoModulos.Provider value={{acoes:{editarCadastrosClientes:true,verCadastrosClientes:true,verPedidos:true},permite:()=>true}}><ContextoEstado.Provider value={{fonteApi:true,conversas,selecionada:null}}><ContextoAcoes.Provider value={acoes}><ContextoCatalogo.Provider value={{restricoes:['Lactose','Glúten']}}><ContextoRascunhosDosAjustes.Provider value={{rascunhos,definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes}}><PainelCadastros tela="clientes"/></ContextoRascunhosDosAjustes.Provider></ContextoCatalogo.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>}
 createRoot(document.getElementById('root')).render(<Cena/>);
 `)
@@ -28,7 +28,7 @@ const browser = await chromium.launch({ headless: true })
 const contexto = await browser.newContext({ viewport: { width: 1280, height: 1400 }, locale: 'pt-BR', reducedMotion: 'reduce' })
 await contexto.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture-controlada', empresa: { id: 'empresa' }, usuario: { id: 'operador' }, expiraEm: Date.now() + 600000 })))
 const cliente = { id: ID, revisao: 1, nome: 'Marina Teste', telefone: '+5511999998888', email: '', documento: '', tipoPessoa: 'fisica', ativo: true, observacoes: 'Portão azul.', orderCount: 7, lastOrderAt: '2026-11-10T15:30:00Z' }
-const telefones = [
+let telefones = [
   { id: 'T2', clienteId: ID, numero: '+5511955554444', whatsapp: false, principal: false },
   { id: 'T1', clienteId: ID, numero: '+5511999998888', whatsapp: true, principal: true },
 ]
@@ -85,6 +85,7 @@ await contexto.route('**/api/**', async route => {
     return route.fulfill({ status: 201, json: { data: { tag, origem: 'manual', criadoEm: '2026-11-14T15:00:00' } } })
   }
   if (req.method() === 'DELETE' && sub === 'tags') { tags = tags.filter(t => t !== decodeURIComponent(subId)); return route.fulfill({ status: 204, body: '' }) }
+  if (req.method() === 'DELETE' && sub === 'telefones') { telefones = telefones.filter(t => t.id !== subId); return route.fulfill({ status: 204, body: '' }) }
   if (req.method() === 'PATCH' && !sub) { Object.assign(cliente, { observacoes: req.postDataJSON().observacoes, revisao: cliente.revisao + 1 }); return route.fulfill({ json: { data: cliente } }) }
   return route.fulfill({ status: 500, json: { error: { message: `Inesperado: ${req.method()} ${path}` } } })
 })
@@ -121,6 +122,8 @@ try {
   assert.deepEqual(await secaoTags.getByRole('listitem').evaluateAll(itens => itens.map(li => ({
     texto: li.querySelector(':scope > span > span')?.textContent, alerta: li.querySelectorAll(':scope > span > svg').length,
   }))), [{ texto: 'sem lactose', alerta: 1 }, { texto: 'mora perto', alerta: 0 }])
+  // O alerta não fica só no ícone: quem usa leitor de tela ouve que a tag é restrição.
+  assert.equal(await secaoTags.getByRole('img', { name: 'Restrição alimentar', exact: true }).count(), 1, 'o alerta da restrição tem nome')
   const secaoPedidos = editor.getByRole('region', { name: 'Pedidos', exact: true })
   await secaoPedidos.getByText('Valor total R$ 412,50 · Costuma pedir Feijoada').waitFor()
 
@@ -137,6 +140,8 @@ try {
   await secaoConversas.getByText('Chat do site · Aberto · 12/11, 18:05').waitFor()
   await secaoConversas.getByText('WhatsApp · Encerrado · 01/11, 10:00').waitFor()
   assert.equal(await secaoConversas.getByRole('button', { name: /^Abrir conversa/ }).count(), 1)
+  // A conversa sem botão tem explicação: a pessoa não fica procurando como abrir.
+  await secaoConversas.getByText('Só a conversa que está na lista do Atendimento abre daqui. As outras ficam como registro.', { exact: true }).waitFor()
   await pagina.screenshot({ path: resolve(pasta, 'relacionamento-1280.png'), fullPage: true })
 
   // A14: no Novo telefone o número ganha a máscara enquanto a pessoa digita; sair com texto pergunta antes.
@@ -164,6 +169,10 @@ try {
   await modal.waitFor({ state: 'detached' })
   assert.equal(escritas.length, 0, 'telefone e endereço descartados não enviam nada')
 
+  // O aviso de gravação entra numa região que já estava na tela: o leitor de tela só anuncia o que muda dentro dela.
+  assert.ok(await editor.locator('[role="status"]').evaluateAll(nos => nos.filter(no => no.textContent === '').length) >= 2, 'as regiões de aviso existem vazias antes da gravação')
+  await editor.locator('[role="status"]').evaluateAll(nos => nos.forEach(no => { if (!no.textContent) no.dataset.vivaAntes = '1' }))
+
   // Nota nova: limite em mensagem (o texto colado não é cortado), descarte perguntado e gravação com empresaId.
   await secaoNotas.getByRole('button', { name: 'Adicionar nota', exact: true }).click()
   modal = pagina.getByRole('dialog', { name: 'Nota interna', exact: true }); await modal.waitFor()
@@ -184,6 +193,7 @@ try {
   assert.deepEqual(escritas.at(-1), { metodo: 'POST', path: `/api/clientes/${ID}/notas`, empresaId: 'empresa', corpo: { texto: 'Não gosta de coentro.' } })
   await secaoNotas.getByText('Não gosta de coentro.').waitFor()
   await editor.getByRole('status').filter({ hasText: 'Nota adicionada.' }).waitFor()
+  assert.equal(await editor.locator('[role="status"][data-viva-antes]').filter({ hasText: 'Nota adicionada.' }).count(), 1, 'o aviso entra na região que já existia')
   assert.deepEqual(await pagina.evaluate(() => window.__relidas), ['C1'], 'a nota gravada no cadastro chega à Ficha da conversa carregada')
 
   // Tag: repetida não envia; a que o servidor recusa mostra o motivo no campo; a nova entra na lista.
@@ -216,8 +226,21 @@ try {
   await editor.getByRole('status').filter({ hasText: 'Tag tirada.' }).waitFor()
   assert.equal(await secaoTags.getByText('sem lactose', { exact: true }).count(), 0)
   assert.deepEqual(await pagina.evaluate(() => window.__relidas), ['C1', 'C1', 'C1'], 'a tag tirada no cadastro sai da Ficha')
+  // O chip que tinha o foco saiu da tela: o foco vai para o controle da mesma seção, não para o X do cadastro.
+  await pagina.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Adicionar tag', undefined, { timeout: 4000 })
 
-  // Nota e tag gravam sozinhas: o formulário segue sem alteração para salvar.
+  // Telefone removido: a Ficha do Atendimento relê a pessoa e o foco fica na seção de telefones.
+  await secaoTelefones.getByRole('button', { name: 'Remover telefone (11) 95555-4444', exact: true }).click()
+  modal = pagina.getByRole('dialog', { name: 'Remover telefone?', exact: true }); await modal.waitFor()
+  await modal.getByRole('button', { name: 'Remover', exact: true }).click()
+  await modal.waitFor({ state: 'detached' })
+  assert.deepEqual(escritas.at(-1), { metodo: 'DELETE', path: `/api/clientes/${ID}/telefones/T2`, empresaId: 'empresa', corpo: null })
+  await editor.getByRole('status').filter({ hasText: 'Telefone removido.' }).waitFor()
+  assert.equal(await linhasTelefone.count(), 1, 'o telefone removido sai da lista')
+  assert.deepEqual(await pagina.evaluate(() => window.__relidas), ['C1', 'C1', 'C1', 'C1'], 'o telefone removido no cadastro chega à Ficha da conversa carregada')
+  await pagina.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Adicionar telefone', undefined, { timeout: 4000 })
+
+  // Nota, tag e telefone gravam sozinhos: o formulário segue sem alteração para salvar.
   assert.equal(await editor.getByRole('button', { name: 'Salvar cadastro', exact: true }).isDisabled(), true, 'o relacionamento não marca o formulário como alterado')
 
   // Abrir a conversa carregada fecha o cadastro e seleciona a conversa.
@@ -232,7 +255,8 @@ try {
   await editor.getByRole('button', { name: 'Salvar cadastro', exact: true }).click()
   await editor.waitFor({ state: 'detached' })
   assert.equal(escritas.at(-1).metodo, 'PATCH')
-  assert.deepEqual(await pagina.evaluate(() => window.__relidas), ['C1', 'C1', 'C1', 'C1'], 'a Ficha da conversa carregada recebe o cadastro salvo')
+  assert.deepEqual(await pagina.evaluate(() => window.__relidas), ['C1', 'C1', 'C1', 'C1', 'C1'], 'a Ficha da conversa carregada recebe o cadastro salvo')
+  assert.equal(await pagina.evaluate(() => window.__lidas), undefined, 'quem gravou pede uma leitura nova, não a que já estava em voo')
 
   // A primeira leitura que falha diz o que houve e deixa tentar de novo; o resto do cadastro continua na tela.
   falharDossie = true

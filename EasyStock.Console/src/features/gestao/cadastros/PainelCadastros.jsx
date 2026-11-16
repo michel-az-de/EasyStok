@@ -13,6 +13,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { hashDoModulo } from '../../../dominio/modulos'
 import { clienteDaHash } from '../../../dominio/fichaCliente'
+import { conversasDoCliente } from '../../../dominio/conversa'
 import { moeda } from '../../../dominio/formato'
 import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
@@ -48,7 +49,7 @@ export function PainelCadastros({ tela, respostas, impressao, aoAbrirConversa })
 }
 
 function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarContexto, aoFixarConsulta, aoAbrirConversa }) {
-  const { selecionar, carregarClienteDaConversa } = useAcoes()
+  const { selecionar, relerClienteDaConversa } = useAcoes()
   // #2734: as restrições do catálogo destacam a tag de restrição no editor, como na Ficha. A lista de cadastros
   // funciona sem o catálogo; só o destaque depende dele, por isso a leitura não exige o provider.
   const restricoes = useContext(ContextoCatalogo)?.restricoes ?? SEM_RESTRICOES
@@ -106,11 +107,12 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   }
   // #2734 (C-11): a Ficha do Atendimento não relê a pessoa sozinha. Toda conversa carregada desse cliente relê o
   // cadastro, não só a que está selecionada; a do contexto entra também quando o cadastro nasceu dela (sem vínculo).
+  // A leitura pedida é nova: a que já estava em voo pode ter saído do servidor antes da gravação.
   const relerConversasDoCliente = (clienteId) => {
     if (tela !== 'clientes') return
-    const alvos = new Set((conversas ?? []).filter(c => clienteId && c.clienteId === clienteId).map(c => c.id))
+    const alvos = new Set(conversasDoCliente(conversas, clienteId))
     if (conversa && conversa.clienteId === clienteId) alvos.add(conversa.id)
-    alvos.forEach(id => carregarClienteDaConversa?.(id))
+    alvos.forEach(id => relerClienteDaConversa?.(id))
   }
   const salvo = ({ anterior, atual } = {}) => {
     prepararReversao(tela === 'bancos' && anterior?.id && atual?.id === anterior.id && Number.isInteger(atual.revisao)

@@ -50,7 +50,8 @@ function usePedidosDoCliente(clienteId, { empresaId, identidade }, habilitado) {
 // `aoAbrirConversa` (cadastro com mudança por salvar) as conversas ficam listadas, mas não abrem.
 // `conversasNoAtendimento` são as que o Atendimento já carregou. Vem por prop: este editor também abre pela
 // Buscar na Casa, fora do AtendimentoProvider, e lá as conversas ficam só como registro.
-export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relacionamento, conversasNoAtendimento, aoAbrirConversa }) {
+// `aoGravar` avisa quem mostra a mesma pessoa (a Ficha do Atendimento) de que endereço ou telefone mudou.
+export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relacionamento, conversasNoAtendimento, aoAbrirConversa, aoGravar }) {
   const ids = { pedidos: useId(), enderecos: useId(), telefones: useId(), conversas: useId(), form: useId() }
   const { acoes } = useAcessoModulos()
   const vePedidos = acoes.verPedidos === true
@@ -70,6 +71,17 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
   const leitura = useRef(0)
   const montado = useRef(true)
   useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
+  // #2734: removido o endereço ou o telefone, o botão que tinha o foco sai da tela. O foco vai para o controle da
+  // mesma seção; sem isto ele caía no X do cadastro. Roda depois da limpeza do Modal, que devolve o foco antes.
+  const botaoEndereco = useRef(null)
+  const botaoTelefone = useRef(null)
+  const focoPendente = useRef(null)
+  useEffect(() => {
+    const alvo = focoPendente.current
+    if (!alvo) return
+    focoPendente.current = null
+    alvo.current?.focus()
+  })
   const resumo = resumoDePedidos(cliente)
   const numeros = numerosDoRelacionamento(relacionamento)
   const telefones = telefonesDaFicha(listas.telefones)
@@ -101,7 +113,11 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
         : acao === 'telefone' ? await adicionarTelefoneCliente(cliente.id, corpo, contexto)
         : acao === 'removerEndereco' ? await removerEnderecoCliente(cliente.id, alvo.id, contexto)
         : await removerTelefoneCliente(cliente.id, alvo.id, contexto)
+      // A Ficha do Atendimento relê a pessoa mesmo que este editor já tenha fechado.
+      aoGravar?.()
       if (!montado.current) return
+      if (acao === 'removerEndereco') focoPendente.current = botaoEndereco
+      if (acao === 'removerTelefone') focoPendente.current = botaoTelefone
       escolher(null); avisar(SUCESSO[acao])
       definirListas(atual => aplicarNaFicha(atual, acao, alvo, corpo, resposta?.id))
       sincronizar()
@@ -127,7 +143,8 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
   }
 
   return <div className={css.ficha}>
-    {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
+    {/* #2734: a região de aviso fica sempre na tela; o leitor de tela só anuncia o que muda dentro dela. */}
+    <div role="status" className={css.vivo}>{sucesso && <p className={css.sucesso}>{sucesso}</p>}</div>
     {!intencao && erro && <p className={css.erro} role="alert">{erro}</p>}
     <section aria-labelledby={ids.pedidos}>
       <div className={css.barra}><h3 id={ids.pedidos}>Pedidos</h3></div>
@@ -141,7 +158,7 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
         </li>)}</ul>)}
     </section>
     <section aria-labelledby={ids.enderecos}>
-      <div className={css.barra}><h3 id={ids.enderecos}>Endereços</h3>{podeEditar && <Botao icone="mais" onClick={() => abrir('endereco')}>Adicionar endereço</Botao>}</div>
+      <div className={css.barra}><h3 id={ids.enderecos}>Endereços</h3>{podeEditar && <Botao ref={botaoEndereco} icone="mais" onClick={() => abrir('endereco')}>Adicionar endereço</Botao>}</div>
       {listas.enderecos.length === 0 ? <Vazio variante="linha" titulo="Nenhum endereço cadastrado." />
         : <ul className={css.itensFicha}>{listas.enderecos.map(e => { const linha = linhaDoEndereco(e); return <li key={e.id}>
           <span><strong>{linha.principal}</strong>{linha.detalhe && <small>{linha.detalhe}</small>}</span>
@@ -149,7 +166,7 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
         </li> })}</ul>}
     </section>
     <section aria-labelledby={ids.telefones}>
-      <div className={css.barra}><h3 id={ids.telefones}>Telefones</h3>{podeEditar && <Botao icone="mais" onClick={() => abrir('telefone')}>Adicionar telefone</Botao>}</div>
+      <div className={css.barra}><h3 id={ids.telefones}>Telefones</h3>{podeEditar && <Botao ref={botaoTelefone} icone="mais" onClick={() => abrir('telefone')}>Adicionar telefone</Botao>}</div>
       {telefones.length === 0 ? <Vazio variante="linha" titulo="Nenhum telefone extra." />
         : <ul className={css.itensFicha}>{telefones.map(t => { const numero = telefoneNaTela(t.numero) || t.numero; return <li key={t.id}>
           <span><strong>{numero}</strong></span>
@@ -164,6 +181,10 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
           <span>{[c.canal, c.estado, c.em].filter(Boolean).join(' · ')}</span>
           {noAtendimento.has(c.id) && <Botao disabled={!aoAbrirConversa} onClick={() => aoAbrirConversa?.(c.id)} aria-label={`Abrir conversa de ${[c.canal, c.em].filter(Boolean).join(', ')}`}>Abrir conversa</Botao>}
         </li>)}</ul>}
+      {/* #2734: conversa sem botão tem explicação; pela Buscar na Casa nenhuma abre daqui. */}
+      {recentes.some(c => !noAtendimento.has(c.id)) && <p className={css.legenda}>{conversasNoAtendimento
+        ? 'Só a conversa que está na lista do Atendimento abre daqui. As outras ficam como registro.'
+        : 'Aqui as conversas ficam como registro. Para abrir uma, use o Atendimento.'}</p>}
       {!aoAbrirConversa && recentes.some(c => noAtendimento.has(c.id)) && <p className={css.legenda}>Salve ou descarte as mudanças do cadastro para abrir uma conversa.</p>}
     </section>}
     {intencao && <Modal titulo={TITULO[intencao.acao]} largura={intencao.acao === 'endereco' ? 'md' : 'sm'} focarCampo={digitando} aoFechar={ocupado ? undefined : fechar} segurarFechamento={ocupado} confirmarDescarte={comTexto && !ocupado}

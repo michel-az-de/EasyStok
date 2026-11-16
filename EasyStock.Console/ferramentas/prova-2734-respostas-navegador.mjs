@@ -83,12 +83,16 @@ try {
   await arquivar.dblclick()
   await pagina.getByRole('status').filter({ hasText: 'Resposta Pix arquivada.' }).waitFor()
   assert.equal((await pagina.evaluate(() => window.__chamadas)).filter(c => c[0] === 'alternar').length, 1, 'Duplo clique grava uma vez')
+  // A linha arquivada sai da lista: o foco vai para um controle que continua na tela, não se perde.
+  await pagina.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Nova resposta', undefined, { timeout: 4000 })
   await pagina.getByLabel('Mostrar arquivadas').check()
   const restaurar = pagina.getByRole('button', { name: 'Restaurar resposta Pix', exact: true })
   await restaurar.click()
   assert.equal(await restaurar.isDisabled(), true, 'Desabilitado durante a gravação')
   await pagina.getByRole('status').filter({ hasText: 'Resposta Pix restaurada.' }).waitFor()
   assert.equal(await pagina.getByRole('button', { name: 'Arquivar resposta Pix', exact: true }).isDisabled(), false)
+  // A linha restaurada continua na tela: o foco volta ao botão dela.
+  await pagina.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Arquivar resposta Pix', undefined, { timeout: 4000 })
   assert.deepEqual(erros, [])
   console.log('#2734 B2 respostas: descarte confirmado, limite de 120 sem maxLength, arquivar anunciado e sem duplo envio, foco devolvido.')
 } catch (erro) { await pagina.screenshot({ path: resolve(pasta, 'falha.png'), fullPage: true }); console.error(erros.join('\n')); throw erro }

@@ -131,6 +131,14 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
     return lendoDossie.get(id)
   }
 
+  // #2734: quem acabou de gravar o cadastro precisa de uma leitura que comece depois da gravação. A que está em voo
+  // pode ter saído do servidor antes: espera ela terminar e lê de novo, em vez de receber a mesma promessa.
+  // Duas releituras pedidas juntas esperam a mesma leitura e viram uma chamada só.
+  async function relerClienteDaConversa(id) {
+    await lendoDossie.get(id)
+    return carregarClienteDaConversa(id)
+  }
+
   return {
     corrigirVinculoClienteConversa: async (id, corpo) => {
       const vinculo = await alterarVinculoCliente(id, corpo)
@@ -222,5 +230,6 @@ export function criarAcoesClienteApi({ despachar, estadoRef }) {
     },
 
     carregarClienteDaConversa,
+    relerClienteDaConversa,
   }
 }

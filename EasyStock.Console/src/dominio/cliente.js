@@ -25,6 +25,9 @@ export function ehRestricao(tag, restricoes = []) {
   const alvo = chaveDaTag(tag)
   return restricoes.some((r) => { const chave = chaveDaTag(r); return chave !== '' && alvo.includes(chave) })
 }
+// #2734: o alerta da restrição é só um ícone. O nome dele é um só, lido por leitor de tela na Ficha, no cartão
+// do cliente e em Cadastros.
+export const ROTULO_RESTRICAO = 'Restrição alimentar'
 
 // Restrição primeiro, o resto na ordem em que foi criado. `sort` só troca
 // posição quando o critério de restrição muda: mantém estável o resto.

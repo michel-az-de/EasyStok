@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { PainelMovel, usePainelMovel } from '../../componentes/PainelMovel'
 import { Icone } from '../../componentes/Icone'
 import { Botao } from '../../componentes/Botao'
@@ -10,11 +10,15 @@ import { useMesaDeNotas } from './MesaDeNotas'
 import { focarNotasDaConversa } from './focarCampoDaFicha'
 import css from './NotasDoCliente.module.css'
 const SEM_NOTAS = []
+// #2734: a nota diz quem escreveu e quando, como em Cadastros.
+const rotuloDaNota = (nota) => ['Nota', nota.autor, nota.em].filter(Boolean).join(' · ')
 
 function NotaDoCliente({ conversaId, nota, indice }) {
   const controle = usePainelMovel(conversaId, `nota:${nota.id}`, { posicaoInicial: () => lerPosicaoPostit(conversaId, nota.id) })
   const [focar, setFocar] = useState(false)
   const botao = useRef(null)
+  // "Destacar nota" se repete a cada nota: a descrição diz de qual nota é o botão.
+  const idTexto = useId()
   function soltar(e) {
     const r = e.currentTarget.closest('article').getBoundingClientRect()
     setFocar(true)
@@ -23,9 +27,10 @@ function NotaDoCliente({ conversaId, nota, indice }) {
   return <>
     <article className={controle.solto ? css.referencia : css.nota}>
       {controle.solto ? <><Icone nome="nota" tamanho={20} /><span>Nota solta{nota.autor ? ` · ${nota.autor.trim().split(/\s+/)[0]}` : ''}</span></>
-        : <><small>Nota{nota.autor ? ` · ${nota.autor}` : ''}</small><p className={css.texto}>{nota.texto}</p></>}
+        : <><small>{rotuloDaNota(nota)}</small><p id={idTexto} className={css.texto}>{nota.texto}</p></>}
       {nota.id && <button type="button" ref={botao} className={controle.solto ? css.recolher : css.soltar}
         aria-label={controle.solto ? 'Recolher nota à ficha' : undefined} title={controle.solto ? 'Recolher à ficha' : undefined}
+        aria-describedby={controle.solto ? undefined : idTexto}
         onClick={(e) => controle.solto ? controle.recolher() : soltar(e)}>
         {controle.solto ? <Icone nome="arrow-left" tamanho={20} /> : 'Destacar nota'}
       </button>}
@@ -41,11 +46,13 @@ function NotaDoCliente({ conversaId, nota, indice }) {
 
 function NotaRegistrada({ mesa, conversaId, clienteId, clienteNome, nota }) {
   const solta = mesa.estaSolta(clienteId, nota.id)
+  const idTexto = useId()
   return <article className={solta ? css.referencia : css.nota}>
     {solta ? <><Icone nome="nota" tamanho={20} /><span>Nota solta{nota.autor ? ` · ${nota.autor.trim().split(/\s+/)[0]}` : ''}</span></>
-      : <><small>Nota{nota.autor ? ` · ${nota.autor}` : ''}</small><p className={css.texto}>{nota.texto}</p></>}
+      : <><small>{rotuloDaNota(nota)}</small><p id={idTexto} className={css.texto}>{nota.texto}</p></>}
     {nota.id && <button type="button" className={solta ? css.recolher : css.soltar} data-foco-reserva={mesa.chaveDeFoco(clienteId, nota.id)}
       aria-label={solta ? 'Recolher nota à ficha' : undefined} title={solta ? 'Recolher à ficha' : undefined}
+      aria-describedby={solta ? undefined : idTexto}
       onClick={(e) => solta ? mesa.recolher(clienteId, nota.id) : mesa.soltar({ conversaId, clienteId, clienteNome, nota }, e)}>
       {solta ? <Icone nome="arrow-left" tamanho={20} /> : 'Destacar nota'}</button>}
   </article>
@@ -53,17 +60,18 @@ function NotaRegistrada({ mesa, conversaId, clienteId, clienteNome, nota }) {
 
 // #2734: recolhida, cada nota mostra 2 linhas. Diz se alguma ficou cortada, para a Ficha oferecer o texto inteiro
 // quando não há nota escondida (só a observação longa, por exemplo). Mede pelo observador, que avisa na montagem
-// e a cada mudança de tamanho; `chave` refaz a medida quando o texto muda sem mudar a altura.
-function useTextoCortado(lista, chave) {
+// e a cada mudança de tamanho; `chave` refaz a medida quando o texto muda sem mudar a altura. `parado` guarda a
+// última medida enquanto a lista está aberta: aberta, nada fica cortado, e o cabeçalho ainda precisa recolher.
+function useTextoCortado(lista, chave, parado) {
   const [cortado, definir] = useState(false)
   useEffect(() => {
     const alvo = lista.current
-    if (!alvo || typeof ResizeObserver === 'undefined') return undefined
+    if (parado || !alvo || typeof ResizeObserver === 'undefined') return undefined
     const medir = () => definir([...alvo.querySelectorAll(`.${css.nota} .${css.texto}`)].some(p => p.scrollHeight > p.clientHeight + 1))
     const observador = new ResizeObserver(medir)
     observador.observe(alvo)
     return () => observador.disconnect()
-  }, [lista, chave])
+  }, [lista, chave, parado])
   return cortado
 }
 
@@ -102,18 +110,22 @@ export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = 
   const haNoServidor = fonteApi && pagina.temMais && lista.length > 0
   const haMaisNotas = previa.escondidas > 0 || haNoServidor
   const caixa = useRef(null)
-  const cortado = useTextoCortado(caixa, `${abertas}|${observacao ?? ''}|${previa.visiveis.map(n => n.texto).join('|')}`)
+  const cortado = useTextoCortado(caixa, `${observacao ?? ''}|${previa.visiveis.map(n => n.texto).join('|')}`, abertas)
+  // #2734: o cabeçalho só abre e recolhe quando há o que mostrar a mais (nota escondida ou texto cortado). Sem isso
+  // ele segue como título e como destino do foco, mas não se oferece para alternar o que já está inteiro na tela.
+  const podeAlternar = abertas || haMaisNotas || cortado
   return <section className={css.coluna} data-destino-nota={conversaId} aria-label="Notas internas do cliente">
     <header className={css.cabecalho}>
-      <button type="button" data-voltar-notas={conversaId} className={css.abrirNotas} aria-expanded={abertas} aria-controls={`notas-${conversaId}`} onClick={() => setAbertas(v => !v)}>
-        Notas {lista.length > 0 && <span>{lista.length}{fonteApi && pagina.temMais ? '+' : ''}</span>}<Icone nome="chevron-down" tamanho={16} />
+      <button type="button" data-voltar-notas={conversaId} className={css.abrirNotas}
+        {...(podeAlternar ? { 'aria-expanded': abertas, 'aria-controls': `notas-${conversaId}`, onClick: () => setAbertas(v => !v) } : { 'aria-disabled': true, tabIndex: -1 })}>
+        Notas {lista.length > 0 && <span>{lista.length}{fonteApi && pagina.temMais ? '+' : ''}</span>}{podeAlternar && <Icone nome="chevron-down" tamanho={16} />}
       </button>
       {aoCriarNota && <Botao variante="texto" icone="plus" aria-label="Adicionar nota" onClick={aoCriarNota} disabled={!podeCriarNota}
         title={!podeCriarNota ? 'Cadastre o cliente para adicionar uma nota.' : undefined}>Nota</Botao>}
     </header>
     {fonteApi && pagina.erro && <output className={css.erro}>{pagina.erro}</output>}
     <div ref={caixa} className={css.lista} id={`notas-${conversaId}`} data-aberta={abertas || undefined}>
-    {observacao && <article className={css.nota} data-observacao-do-cadastro><small>Observação do cadastro</small><p className={css.texto}>{observacao}</p></article>}
+    {observacao && <article className={css.nota} data-observacao-do-cadastro><small>Observações do cadastro</small><p className={css.texto}>{observacao}</p></article>}
     {previa.visiveis.map((nota, indice) => mesa
       ? <NotaRegistrada key={nota.id ?? indice} mesa={mesa} conversaId={conversaId} clienteId={clienteId} clienteNome={clienteNome} nota={nota} />
       : <NotaDoCliente key={nota.id ?? indice} conversaId={conversaId} nota={nota} indice={indice} />)}

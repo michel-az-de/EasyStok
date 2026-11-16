@@ -419,11 +419,17 @@ function conferirFonteDaNota(conversaId, solta, destacar = false, mesaHost = mes
   // Mesma nota confirmada e mesmo cliente em duas conversas. A lista real usa
   // o contexto da Mesa; só a paginação HTTP, já coberta abaixo, fica desligada.
   const listaHost = montar(NotasDoCliente, { conversaId, clienteId, clienteNome: 'Nome atual do cadastro', notas: [notaCompartilhada] })
-  let abrir, lista
-  visitar(listaHost.tree, n => { if (n.type === 'button' && n.props?.['aria-controls'] === `notas-${conversaId}`) abrir = n })
-  abrir.props.onClick(); listaHost.render()
-  visitar(listaHost.tree, n => { if (n.props?.id === `notas-${conversaId}`) lista = n })
-  assert.equal(lista.props['data-aberta'], true) // #2734: aberta por atributo; a lista não usa mais `hidden`
+  let cabecalho, lista
+  visitar(listaHost.tree, n => {
+    if (n.type === 'button' && n.props?.['data-voltar-notas'] === conversaId) cabecalho = n
+    if (n.props?.id === `notas-${conversaId}`) lista = n
+  })
+  // #2734: a nota única já aparece inteira na prévia. O cabeçalho não se oferece para abrir o que está na tela:
+  // fica como título e destino do foco, sem `aria-expanded` e sem clique.
+  assert.equal(cabecalho.props['aria-disabled'], true, 'sem nota escondida, o cabeçalho não alterna')
+  assert.equal(cabecalho.props['aria-expanded'], undefined)
+  assert.equal(cabecalho.props.onClick, undefined)
+  assert.equal(lista.props['data-aberta'], undefined, 'a nota está na prévia, sem abrir a lista')
   const elemento = lista.props.children.find(Array.isArray).find(n => n.props.nota.id === notaId)
   const fonteHost = montar(elemento.type, elemento.props)
   let botao, texto
