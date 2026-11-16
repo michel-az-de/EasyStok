@@ -42,6 +42,28 @@ be 80M ... but found 0.00M"), `Lancamento_gravado_depois_do_fechamento_some_do_r
 
 ---
 
+## ⚠️ TOLERADO (#2809): provas de navegador do Console estouram o tempo no gate local carregado
+
+Visto em 16/11/2026, no head `777ffef10` da PR #2806, em duas rodadas completas de `npm run qualidade` com outras
+sessões usando a máquina. Cada rodada falhou em uma prova diferente, sempre por timeout do Playwright:
+
+| Rodada | Prova | Falha |
+|---|---|---|
+| 1 | `prova-1847-nota-resumo.mjs` | `click` em "Abrir Atendimento" passou de 5 s |
+| 1 | `prova-2478-pedidos-navegador.mjs` | `waitFor` da navegação "Telas de Cadastros" passou de 12 s |
+| 2 | `prova-1685-sinal-navegador.mjs` | `page.goto` passou de 8 s |
+
+- **Por que é flaky:** causa provável, não medida. O runner roda as provas em paralelo, e cada prova de navegador
+  abre seu Chromium (a 1847 sobe também seu próprio Vite). Com a CPU disputada, o `goto` e o primeiro render
+  passam dos timeouts fixos de 5 a 12 s. Isolada, a 1847 levou 68 s.
+- **Como confirmar:** `node ferramentas/rodar-provas.mjs <nome>` no mesmo commit. As 3 passaram isoladas, e cada
+  uma passou na outra rodada completa. O CI do mesmo head ficou verde (job `qualidade`).
+- **Por que não foi corrigido:** só aparece com a máquina carregada por fora. Subir timeout sem medir esconderia
+  lentidão real da tela.
+- **Quando promover a "corrigir":** se a mesma prova falhar em duas rodadas completas seguidas, ou se aparecer no CI.
+
+---
+
 ## ⚠️ TOLERADO (#2697): impresso entrega/a5 falhou uma vez na suíte local carregada
 
 Visto em `EasyStock.Api.UnitTests/Services/Impressao/PedidoImpressoHtmlTests.cs:107`,
