@@ -429,4 +429,29 @@ public class BaixaDeInsumosDaProducaoTests
         _movimentos.Should().ContainSingle().Which.DocumentoReferencia.Should().Be("producao:LOT-261009-AB");
         BaixaDeInsumosDaProducao.DocumentoDaProducao("LOT-261009-AB").Should().Be("producao:LOT-261009-AB");
     }
+
+    [Fact]
+    public async Task ProducaoDeUmaLoja_BuscaOsLotesDaLojaESaiDaLojaNaoDaOutra()
+    {
+        // #2737 (EST-02): tenant multi-loja. Produzir na loja A baixava o lote do insumo da loja B.
+        var lojaA = Guid.NewGuid();
+        var lojaB = Guid.NewGuid();
+        var lasanha = Prato(marcado: true);
+        var molho = Insumo("Molho", UnidadeMedida.G, 5000);
+        Receita(lasanha, (molho, 1.2m, UnidadeMedida.Kg));
+        var loteDaB = new ItemEstoque
+        {
+            Id = Guid.NewGuid(), EmpresaId = _empresaId, ProdutoId = molho.Id, LojaId = lojaB,
+            QuantidadeAtual = Quantidade.From(5000), QuantidadeInicial = Quantidade.From(5000),
+            CustoUnitario = Dinheiro.FromDecimal(0m), Status = StatusItemEstoque.Ok, EntradaEm = _data.AddDays(-5),
+        };
+        _itens.GetLotesDisponiveisParaSaidaAsync(_empresaId, molho.Id, Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<Guid?>())
+            .Returns(c => c.ArgAt<Guid?>(5) == lojaB ? new[] { loteDaB } : Array.Empty<ItemEstoque>());
+
+        var avisos = await Sut().BaixarAsync(_empresaId, [new PratoParaBaixa(lasanha, 12, null)], "LOT-1", _data, lojaId: lojaA);
+
+        await _itens.Received().GetLotesDisponiveisParaSaidaAsync(_empresaId, molho.Id, Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Is<Guid?>(g => g == lojaA));
+        avisos.Should().ContainSingle().Which.Should().Contain("Sem estoque de Molho");
+        Baixado(molho).Should().Be(0m);
+    }
 }
