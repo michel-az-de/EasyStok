@@ -476,6 +476,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             return;
         }
 
+        // #2746: o provedor pode mandar status para o id de uma mensagem RECEBIDA; o domínio só aceita status de
+        // entrega na saída, e a exceção derrubaria o webhook (500, reenvio e perda do resto do lote).
+        if (mensagem.Direcao != DirecaoMensagem.Saida)
+        {
+            logger.LogInformation("Webhook WhatsApp: status para mensagem que não é de saída ({Wamid}), ignorado.", status.Wamid);
+            return;
+        }
+
         var novoStatus = MapearStatus(status.Status);
         if (novoStatus is null) return;
 

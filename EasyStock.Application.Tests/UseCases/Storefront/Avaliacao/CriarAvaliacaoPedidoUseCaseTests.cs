@@ -1,4 +1,5 @@
 ﻿using EasyStock.Application.Ports.Output;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Storefront.Avaliacao;
 using EasyStock.Domain.Entities.Storefront;
@@ -36,7 +37,8 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
         IPedidoStorefrontRepository PedidoRepo,
         IPedidoAvaliacaoRepository AvaliacaoRepo,
         ICacheService Cache,
-        ComentarioSanitizer Sanitizer);
+        ComentarioSanitizer Sanitizer,
+        IUnitOfWork Uow);
 
     private static Fakes BuildFakes(
         Pedido? pedido = null,
@@ -63,13 +65,14 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
         var avaliacaoRepo = Substitute.For<IPedidoAvaliacaoRepository>();
         avaliacaoRepo.GetByPedidoAsync(PedidoId, Arg.Any<CancellationToken>()).Returns(avaliacaoExistente);
 
-        return new Fakes(pedidoRepo, avaliacaoRepo, cache, new ComentarioSanitizer());
+        return new Fakes(pedidoRepo, avaliacaoRepo, cache, new ComentarioSanitizer(), Substitute.For<IUnitOfWork>());
     }
 
     private static CriarAvaliacaoPedidoUseCase BuildUseCase(Fakes fakes) =>
         new(fakes.PedidoRepo, fakes.AvaliacaoRepo,
             new AvaliacaoCookieStore(fakes.Cache),
             fakes.Sanitizer,
+            fakes.Uow,
             TimeProvider.System,
             NullLogger<CriarAvaliacaoPedidoUseCase>.Instance);
 
@@ -188,5 +191,59 @@ public sealed class CriarAvaliacaoPedidoUseCaseTests
         await fakes.AvaliacaoRepo.Received(1).AddAsync(
             Arg.Is<PedidoAvaliacao>(a => a.Estrelas == 5 && a.PedidoId == PedidoId),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HappyPath_GravaAvaliacaoNoBanco()
+    {
+        var pedido = BuildPedidoEntregue();
+        var fakes = BuildFakes(pedido: pedido);
+        var useCase = BuildUseCase(fakes);
+        var input = new CriarAvaliacaoPedidoInput(
+            Slug, PedidoId, 4, "Chegou bem.", true, null, CookieValido);
+
+        await useCase.ExecuteAsync(input);
+
+        await fakes.Uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task EnvioSimultaneo_ViolacaoDeUnicidadeNoCommit_LancaAvaliacaoDuplicadaComIdDaExistente()
+    {
+        var pedido = BuildPedidoEntregue();
+        var vencedora = PedidoAvaliacao.Criar(
+            PedidoId, ClienteId, EmpresaId, 5, null, true, null,
+            DateTime.UtcNow.AddHours(-24));
+        var fakes = BuildFakes(pedido: pedido);
+        var violacao = new InvalidOperationException("23505");
+        fakes.Uow.CommitAsync().Returns<Task<int>>(_ => throw violacao);
+        fakes.Uow.EhViolacaoDeUnicidade(violacao).Returns(true);
+        // A segunda leitura (depois do commit que falhou) já enxerga a avaliação da outra requisição.
+        fakes.AvaliacaoRepo.GetByPedidoAsync(PedidoId, Arg.Any<CancellationToken>())
+            .Returns(null, vencedora);
+        var useCase = BuildUseCase(fakes);
+        var input = new CriarAvaliacaoPedidoInput(Slug, PedidoId, 5, null, false, null, CookieValido);
+
+        var act = () => useCase.ExecuteAsync(input);
+
+        var ex = await act.Should().ThrowAsync<AvaliacaoDuplicadaException>();
+        ex.Which.AvaliacaoId.Should().Be(vencedora.Id);
+        fakes.Uow.Received(1).DescartarAlteracoesPendentes();
+    }
+
+    [Fact]
+    public async Task FalhaDeCommitQueNaoEUnicidade_Propaga()
+    {
+        var pedido = BuildPedidoEntregue();
+        var fakes = BuildFakes(pedido: pedido);
+        var falha = new InvalidOperationException("banco fora do ar");
+        fakes.Uow.CommitAsync().Returns<Task<int>>(_ => throw falha);
+        fakes.Uow.EhViolacaoDeUnicidade(falha).Returns(false);
+        var useCase = BuildUseCase(fakes);
+        var input = new CriarAvaliacaoPedidoInput(Slug, PedidoId, 5, null, false, null, CookieValido);
+
+        var act = () => useCase.ExecuteAsync(input);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("banco fora do ar");
     }
 }

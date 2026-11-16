@@ -16,4 +16,16 @@ public sealed class PoliticaEnvioCliente(IConsentimentoContatoRepository reposit
         var consentimentos = await repository.ListarDoClienteAsync(empresaId, clienteId, ct);
         return PoliticaConsentimento.PodeEnviar(consentimentos, canal, finalidade);
     }
+
+    /// <summary>
+    /// Só a revogação explícita (a palavra SAIR, o console). Quem não tem linha de consentimento, o legado,
+    /// não conta como revogado: a campanha já checou a concessão ao enfileirar.
+    /// </summary>
+    public async Task<bool> RevogouAsync(
+        Guid empresaId, Guid clienteId, CanalConversa canal, FinalidadeContato finalidade, CancellationToken ct = default)
+    {
+        var consentimentos = await repository.ListarDoClienteAsync(empresaId, clienteId, ct);
+        return consentimentos.Any(c => c.Canal == canal && c.Finalidade == finalidade
+            && c.Situacao == SituacaoConsentimento.Revogado);
+    }
 }

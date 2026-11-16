@@ -16,6 +16,9 @@ export const DIAS_DA_SEMANA = [
 
 const diaPorIndice = (indice) => DIAS_DA_SEMANA[indice]
 
+// Chave do dia civil da loja (America/Sao_Paulo) em `agora`, nunca o do navegador (#2742).
+export const chaveDoDiaNaLoja = (agora) => diaPorIndice(partesNoFuso(agora).diaDaSemana).chave
+
 // Mesmo par que `HORARIO` tinha em `dominio/automacao.js` (8h-22h), agora
 // repetido por dia porque cada um pode mudar sozinho. Nenhum dia fechado por
 // padrão: quem quiser folga marca "fechado" na tela.

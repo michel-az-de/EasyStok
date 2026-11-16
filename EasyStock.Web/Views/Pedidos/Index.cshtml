@@ -882,7 +882,7 @@
                     </label>
                     <div x-show="form.agendarAtivo" x-cloak class="mt-2">
                         <input type="datetime-local" x-model="form.agendadoParaEm"
-                               :min="new Date(Date.now() + 60000).toISOString().slice(0, 16)"
+                               :min="agendamentoMin"
                                class="ui-field w-full text-sm" />
                         <p class="text-xs text-slate-500 mt-1">
                             O pedido ficará marcado com badge 📅 e lembretes automáticos serão enviados.
@@ -995,6 +995,12 @@ function novoPedidoModal() {
             nomeAdHoc: '', aptAdHoc: '', telefoneAdHoc: '',
             observacoes: '', itens: [],
             agendarAtivo: false, agendadoParaEm: ''
+        },
+
+        // yyyy-MM-ddTHH:mm na hora da loja: datetime-local le o min como hora local, nao UTC.
+        get agendamentoMin() {
+            return new Date(Date.now() + 60000)
+                .toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).slice(0, 16).replace(' ', 'T');
         },
 
         get reciboPedidoCurto() {

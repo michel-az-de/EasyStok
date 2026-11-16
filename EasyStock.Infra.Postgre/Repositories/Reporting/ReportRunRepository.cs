@@ -89,6 +89,21 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task<bool> UpdateAsync(ReportRun run, CancellationToken ct)
+    {
+        db.ReportRuns.Update(run);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            db.Entry(run).State = EntityState.Detached;
+            return false;
+        }
+    }
+
     // ── Worker: picking e locking ─────────────────────────────────────────────
 
     /// <summary>

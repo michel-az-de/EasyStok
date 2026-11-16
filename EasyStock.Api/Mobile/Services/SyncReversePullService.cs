@@ -124,11 +124,17 @@ public class SyncReversePullService(
 
         // SYNC-2/SYNC-1 (#2306): Produto ERP ja espelhado e alterado depois do cursor.
         // Reenvia o cadastro com o Id do espelho e o saldo de itens_estoque da loja do device.
+        // #2721: entrada ou venda no console muda so o ItemEstoque, nao o Produto; o estoque da loja
+        // do device movido depois do cursor tambem reenvia. EXISTS na mesma consulta, sem N+1.
+        var estoqueMovido = _db.Set<ItemEstoque>()
+            .Where(i => i.EmpresaId == empresaId && i.AlteradoEm > sinceDate);
+        if (lojaId.HasValue) estoqueMovido = estoqueMovido.Where(i => i.LojaId == lojaId || i.LojaId == null);
         var produtosEspelhados = await _db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
             .Include(p => p.Categoria)
-            .Where(p => p.EmpresaId == empresaId && p.AlteradoEm > sinceDate
+            .Where(p => p.EmpresaId == empresaId
                 && p.Status == StatusProduto.Ativo
-                && mobileLinkedProdutos.Contains(p.Id))
+                && mobileLinkedProdutos.Contains(p.Id)
+                && (p.AlteradoEm > sinceDate || estoqueMovido.Any(i => i.ProdutoId == p.Id)))
             .ToListAsync();
         if (produtosEspelhados.Count > 0)
         {
@@ -178,8 +184,10 @@ public class SyncReversePullService(
                     mutations[idx] = mutations[idx] with { Payload = SyncDtoConverters.Serialize(dto) };
                     continue;
                 }
+                // #2721: o instante e o da ultima mudanca, do cadastro ou do estoque da loja.
+                var alteradoEm = itensDoProduto.Select(i => i.AlteradoEm).Append(p.AlteradoEm).Max();
                 mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
-                    "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
+                    "product.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(alteradoEm).ToUnixTimeMilliseconds()));
             }
         }
 
