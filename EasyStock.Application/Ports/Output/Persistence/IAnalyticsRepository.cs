@@ -70,7 +70,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public sealed record SazonalidadeMensal(
         int Ano,
         int Mes,
-        int TotalSaidas,
+        decimal TotalSaidas,
         decimal ValorTotal,
         decimal MediaMovelTresMeses);
 

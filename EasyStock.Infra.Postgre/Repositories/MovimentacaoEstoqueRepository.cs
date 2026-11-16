@@ -227,7 +227,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return totais.ToDictionary(x => x.ProdutoId, x => x.TotalSaidas / dias);
         }
 
-        public async Task<IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)>> GetAgregacaoMensalAsync(
+        public async Task<IEnumerable<(int Ano, int Mes, decimal TotalSaidas, decimal ValorTotal)>> GetAgregacaoMensalAsync(
             Guid empresaId, Guid produtoId, int meses = 12)
         {
             var de = DateTime.UtcNow.AddMonths(-meses);
@@ -241,7 +241,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(m => new
                 {
                     m.DataMovimentacao,
-                    Quantidade = (int)m.Quantidade,
+                    Quantidade = (decimal)m.Quantidade,
                     ValorTotal = (decimal?)m.ValorTotal ?? 0m
                 })
                 .GroupBy(m => new { m.DataMovimentacao.Year, m.DataMovimentacao.Month })
