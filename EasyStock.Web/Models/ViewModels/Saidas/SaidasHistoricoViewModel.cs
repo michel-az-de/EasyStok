@@ -10,7 +10,7 @@ public class SaidasHistoricoViewModel
 
     // KPI chips
     public int TotalRegistros { get; set; }
-    public int TotalUnidades { get; set; }
+    public decimal TotalUnidades { get; set; }
     public decimal ReceitaTotal { get; set; }
     public int TotalVendas { get; set; }
     public int TotalPerdas { get; set; }

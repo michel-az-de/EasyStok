@@ -722,3 +722,91 @@ test('resumo compacto mantém rede, vínculo, fila pendente e bloqueio de import
   const importing = connectionStatus({ health: 'online', paired: true, invalid: false, pending: 2, importPending: true });
   assert.match(importing.summary, /Envio pausado.*2 alterações aguardando envio/);
 });
+
+// #2735: o bloco de apoio do Início fica oculto; o que a operadora precisa ver mora fora dele.
+test('Início explica o próximo passo quando o aparelho não envia ao EasyStok', () => {
+  const base = { invalid: false, pending: 0 };
+  assert.match(connectionStatus({ ...base, health: 'online', paired: false }).hint, /código da equipe/);
+  assert.match(connectionStatus({ ...base, health: 'online', paired: false, googleSession: true }).hint, /conta Google/);
+  assert.match(connectionStatus({ ...base, health: 'online', paired: true, invalid: true }).hint, /Conecte novamente/);
+  assert.match(connectionStatus({ ...base, health: 'offline', paired: true, pending: 2 }).hint, /fica salvo/);
+  assert.match(connectionStatus({ ...base, health: 'checking', paired: true, retrying: true }).hint, /fica salvo/);
+  for (const quiet of [{ health: 'online', paired: true }, { health: 'checking', paired: true }, { health: 'offline', paired: true, importPending: true }]) {
+    assert.equal(connectionStatus({ ...base, ...quiet }).hint, '');
+  }
+});
+
+test('Início mantém Verificar conexão, a dica e o estado do conteúdo fora do bloco oculto', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'pilot.js'), 'utf8');
+  const hidden = source.slice(source.indexOf('<div class="pilot-home-support" hidden>'), source.indexOf('<div class="pilot-update">'));
+  const visible = source.slice(source.indexOf('<div class="pilot-connection">'), source.indexOf('<div class="pilot-home-controls">'));
+  assert.ok(hidden.length > 0 && visible.length > 0);
+  for (const id of ['pilotReconnect', 'pilotConnectionHint', 'pilotOtaStatus']) assert.ok(!hidden.includes('id="' + id + '"'), id + ' não pode ficar no bloco oculto');
+  assert.ok(visible.includes('id="pilotReconnect"'));
+  assert.ok(visible.includes('id="pilotConnectionHint"'));
+});
+
+test('sem conexão, o Início oferece Verificar conexão e avisa que o registro fica salvo', async () => {
+  const { root, nodes } = pilotHarness({ connected: false });
+  root.cdbSync.getPairing = () => ({ empresaId: 'empresa', lojaId: 'loja' });
+  await nodes.get('pilotHome').click('reconnect');
+  assert.equal(nodes.get('pilotReconnect').hidden, false);
+  assert.equal(nodes.get('pilotConnectionHint').hidden, false);
+  assert.match(nodes.get('pilotConnectionHint').textContent, /fica salvo/);
+  assert.equal(nodes.get('pilotHome').dataset.sync, 'offline');
+});
+
+test('aparelho vinculado e com conexão não mostra dica nem Verificar conexão', async () => {
+  const { root, nodes } = pilotHarness();
+  root.cdbSync.getPairing = () => ({ empresaId: 'empresa', lojaId: 'loja' });
+  await new Promise(setImmediate); // a conferência da abertura termina antes da nova
+  await nodes.get('pilotHome').click('reconnect');
+  assert.equal(nodes.get('pilotConnectionHint').textContent, '');
+  assert.equal(nodes.get('pilotConnectionHint').hidden, true);
+  assert.equal(nodes.get('pilotReconnect').hidden, true);
+  assert.equal(nodes.get('pilotHome').dataset.sync, 'online');
+});
+
+test('nova tentativa a partir de sem conexão mantém o botão e a dica na tela até a resposta', async () => {
+  let complete;
+  const { root, nodes } = pilotHarness({ connected: false, healthFetch: () => new Promise(resolve => { complete = resolve; }) });
+  root.cdbSync.getPairing = () => ({ empresaId: 'empresa', lojaId: 'loja' });
+  root.navigator.onLine = true;
+  const pending = nodes.get('pilotHome').click('reconnect');
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotReconnect').hidden, false);
+  assert.equal(nodes.get('pilotReconnect').disabled, true);
+  assert.equal(nodes.get('pilotConnectionHint').hidden, false);
+  complete({ ok: true, json: async () => ({ databaseOk: true }) });
+  await pending;
+  assert.equal(nodes.get('pilotReconnect').hidden, true);
+  assert.equal(nodes.get('pilotConnectionHint').hidden, true);
+});
+
+test('sem versão nova, a conferência diz que não há o que instalar', async () => {
+  const { root, nodes } = pilotHarness();
+  root.CDB_CONFIG.versionCode = manifest.versionCode;
+  await root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotUpdateStatus').textContent, 'Nada novo para instalar. Versão publicada: ' + manifest.version + ' (' + manifest.versionCode + ').');
+});
+
+test('rodapé do Início só mostra o estado do conteúdo quando há o que dizer', async () => {
+  const base = { builtinVersion: '0.7.0', nativeVersionCode: 7, activeVersion: '0.7.0' };
+  const open = async state => {
+    const harness = pilotHarness({ updater: { status: async () => state, check: async () => state } });
+    await new Promise(setImmediate);
+    return harness;
+  };
+  const prepared = await open({ ...base, pendingVersion: '0.7.1' });
+  assert.equal(prepared.nodes.get('pilotOtaStatus').hidden, false);
+  assert.match(prepared.nodes.get('pilotOtaStatus').textContent, /0\.7\.1 preparada/);
+  const recovered = await open({ ...base, rolledBack: true });
+  assert.equal(recovered.nodes.get('pilotOtaStatus').hidden, false);
+  const usual = await open(base);
+  assert.equal(usual.nodes.get('pilotOtaStatus').hidden, true);
+  const failed = await open({ ...base, lastError: 'timeout' });
+  assert.equal(failed.nodes.get('pilotOtaStatus').hidden, true, 'falha passageira não ocupa o Início sozinha');
+  await failed.root.forceCheckUpdate();
+  assert.equal(failed.nodes.get('pilotOtaStatus').hidden, false, 'quem pediu a conferência vê a falha');
+  assert.match(failed.nodes.get('pilotOtaStatus').textContent, /não foi concluída/);
+});

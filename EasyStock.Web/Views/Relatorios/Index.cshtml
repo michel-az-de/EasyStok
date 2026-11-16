@@ -301,8 +301,10 @@
 @section Scripts {
 <script>
 function reportForm() {
-    var today = new Date().toISOString().slice(0, 10);
-    var thirtyAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    // Dia civil da loja (America/Sao_Paulo): a data UTC vira "amanha" apos as 21h.
+    var diaDaLoja = function (ms) { return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); };
+    var today = diaDaLoja(Date.now());
+    var thirtyAgo = diaDaLoja(Date.now() - 30 * 86400000);
     return {
         de: thirtyAgo,
         ate: today,

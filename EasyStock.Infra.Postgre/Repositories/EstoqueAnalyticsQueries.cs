@@ -168,7 +168,7 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
             {
                 m.DataMovimentacao.Year,
                 m.DataMovimentacao.Month,
-                Quantidade = (int)m.Quantidade,
+                Quantidade = (decimal)m.Quantidade,
                 Valor = (decimal?)m.ValorTotal ?? 0m
             })
             .ToListAsync();
@@ -189,13 +189,13 @@ internal sealed class EstoqueAnalyticsQueries(EasyStockDbContext dbContext, IDis
         var result = agregados.Select((item, idx) =>
         {
             var janela = agregados.Skip(Math.Max(0, idx - 2)).Take(Math.Min(3, idx + 1));
-            var media = janela.Any() ? janela.Average(x => (double)x.TotalSaidas) : 0d;
+            var media = janela.Any() ? janela.Average(x => x.TotalSaidas) : 0m;
             return new SazonalidadeMensal(
                 Ano: item.Ano,
                 Mes: item.Mes,
                 TotalSaidas: item.TotalSaidas,
                 ValorTotal: Math.Round(item.ValorTotal, 2),
-                MediaMovelTresMeses: Math.Round((decimal)media, 2));
+                MediaMovelTresMeses: Math.Round(media, 2));
         }).ToList();
 
         await SetCachedAsync(cacheKey, result, SazonalidadeTtl);

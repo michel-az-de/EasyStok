@@ -58,7 +58,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
             {
                 v.DataVenda,
                 ValorTotal = (decimal)v.ValorTotal,
-                TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
+                TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (decimal)i.Quantidade) : 0
             })
             .ToListAsync();
 
@@ -125,7 +125,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
                     NomeProduto = x.p.Nome,
                     CustoUnitario = ie != null ? (decimal)ie.CustoUnitario : (x.p.CustoReferencia != null ? (decimal)x.p.CustoReferencia : 0m),
                     PrecoVenda = (decimal)x.m.ValorUnitario!,
-                    Quantidade = (int)x.m.Quantidade
+                    Quantidade = (decimal)x.m.Quantidade
                 })
             .ToListAsync();
 
@@ -173,7 +173,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
             {
                 v.Canal,
                 ValorTotal = (decimal)v.ValorTotal,
-                TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
+                TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (decimal)i.Quantidade) : 0
             })
             .ToListAsync();
 

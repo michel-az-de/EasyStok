@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Easy Stock Mobile">
+<link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
 /* === A1 (WCAG 1.4.4 / Resize Text) ===
@@ -7616,7 +7617,7 @@ body.ux-calm [data-screen="producao"] .section-label {
             <span class="ods-title" id="odsTitle">Escolha o cliente</span>
             <span class="ods-sub" id="odsSub">0 itens</span>
           </div>
-          <div class="ods-total" id="odsTotal">R$ 0</div>
+          <div class="ods-total" id="odsTotal">R$ 0,00</div>
         </div>
         <div id="odsActions" style="display:none;margin-top:8px;">
           <button class="cta-btn" onclick="openCestaCalcFromDraft()">Conferir insumos</button>
@@ -7644,7 +7645,7 @@ body.ux-calm [data-screen="producao"] .section-label {
         </button>
         <div class="total-line" id="totalLine" style="display:none">
           <div class="l">Total</div>
-          <div class="v" id="orderTotal">R$ 0</div>
+          <div class="v" id="orderTotal">R$ 0,00</div>
         </div>
 
         <div class="section-label">Observação (opcional)</div>
@@ -7768,7 +7769,7 @@ body.ux-calm [data-screen="producao"] .section-label {
         </button>
         <div class="screen-title-wrap">
           <h2 class="screen-title">Clientes</h2>
-          <span class="screen-subtitle">Recorrencia, ticket e retorno</span>
+          <span class="screen-subtitle">Recorrência, ticket e retorno</span>
         </div>
       </div>
       <div class="client-value-grid" id="clientValueGrid"></div>
@@ -10794,6 +10795,17 @@ function money(v) {
   var intSep = abs.slice(0, dot).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return 'R$ ' + (n < 0 ? '-' : '') + intSep + ',' + abs.slice(dot + 1);
 }
+// #2735: contagem de itens em português. O sufixo montado à mão dava "2 items" e "2 itemns".
+function contaItens(n) {
+  const qtd = Number(n) || 0;
+  return qtd + (qtd === 1 ? ' item' : ' itens');
+}
+// #2735: total do pedido em construção, arredondado ao centavo. A soma crua gravava
+// 3 x 19,90 como 59,699999999999996 e esse valor seguia para a sincronização.
+function orderItemsTotal(items) {
+  const soma = (items || []).reduce((s, i) => s + (Number(i && i.qty) || 0) * (Number(i && i.unitPrice) || 0), 0);
+  return Math.round(soma * 100) / 100;
+}
 function haptic() { if (navigator.vibrate) navigator.vibrate(8); }
 // #409: rotulos do canal/origem do pedido.
 const CHANNEL_LABELS = { balcao: 'Balcão', whatsapp: 'WhatsApp', ifood: 'iFood', telefone: 'Telefone' };
@@ -11046,7 +11058,7 @@ function renderHomeFocusCard() {
     primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)";
   } else if (shopping.length) {
     title = 'Compras pendentes';
-    sub = `${shopping.length} item${shopping.length === 1 ? '' : 's'} para destravar producao`;
+    sub = `${contaItens(shopping.length)} para destravar a produção`;
     primaryLabel = 'Abrir compras';
     primaryAction = "go('compras')";
   }
@@ -11994,7 +12006,7 @@ function renderHomeShopping() {
   const listHtml = empty
     ? `<div class="home-shopping-empty"><span class="home-shopping-check">✓</span> Sem compras pendentes</div>`
     : shown.map(item => `<div class="home-shopping-item">${escapeHtml(item.name)}</div>`).join('')
-      + (extra > 0 ? `<div class="home-shopping-item home-shopping-more">+${extra} item${extra === 1 ? '' : 's'}</div>` : '');
+      + (extra > 0 ? `<div class="home-shopping-item home-shopping-more">+${contaItens(extra)}</div>` : '');
   card.innerHTML = `
     <div class="home-shopping-head">
       <div class="home-shopping-title">${empty ? 'Lista de compras' : 'Itens para comprar'}</div>
@@ -12938,7 +12950,7 @@ function renderBatchPhotoPreview() {
     wrap.innerHTML = `
       <div class="photo-preview">
         <img src="${currentPhotoDataUrl}" alt="Foto do lote">
-        <button class="remove-photo" onclick="removeBatchPhoto()">&times;</button>
+        <button class="remove-photo" onclick="removeBatchPhoto()" aria-label="Remover foto">&times;</button>
       </div>
     `;
   } else {
@@ -13473,6 +13485,11 @@ function dateKeyOf(ms) {
   const d = new Date(ms || Date.now());
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
+// Meia-noite local do dia de ms, em ms.
+function startOfLocalDay(ms) {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
 function getActiveCashClosing(dateKey) {
   const k = dateKey || dateKeyOf();
   return (cashClosings || []).find(c => c.dateKey === k && !c.reopenedAt) || null;
@@ -13567,7 +13584,7 @@ function openCashCloseModal(dateKey) {
     ? (() => {
         const approx = sum.semCusto > 0;
         const cor = sum.margem >= 0 ? 'var(--basil)' : 'var(--accent)';
-        const suf = approx ? ` <span style="font-size:10px;color:var(--ink-mute)">(${sum.semCusto} item${sum.semCusto > 1 ? 'ns' : ''} sem custo)</span>` : '';
+        const suf = approx ? ` <span style="font-size:10px;color:var(--ink-mute)">(${contaItens(sum.semCusto)} sem custo)</span>` : '';
         return `<div style="display:flex;justify-content:space-between;margin-top:4px"><span>Margem${approx ? ' ~' : ''}</span><span style="font-weight:800;color:${cor}">${money(sum.margem)}${suf}</span></div>`;
       })()
     : '';
@@ -13753,14 +13770,19 @@ function setFinStatus(s) {
   });
   renderFinalizadosScreen();
 }
+// #2735: "Hoje" começa à meia-noite local. Com as últimas 24 h, o que foi entregue
+// ontem à tarde aparecia como de hoje. Os outros períodos seguem como janelas corridas.
+function finCutoffMs(period, now) {
+  if (period === 'hoje') return startOfLocalDay(now);
+  if (period === '7d') return now - 7 * 24 * 60 * 60 * 1000;
+  if (period === '30d') return now - 30 * 24 * 60 * 60 * 1000;
+  return 0;
+}
 function renderFinalizadosScreen() {
   const host = document.getElementById('finList');
   if (!host) return;
   const now = Date.now();
-  const cutoffMs = finPeriod === 'hoje' ? (now - 24*60*60*1000)
-                  : finPeriod === '7d'  ? (now - 7*24*60*60*1000)
-                  : finPeriod === '30d' ? (now - 30*24*60*60*1000)
-                  : 0;
+  const cutoffMs = finCutoffMs(finPeriod, now);
   const list = (orders || []).filter(o => {
     if (o.status !== STATUS.ENTREGUE && o.status !== STATUS.CANCELADO) return false;
     if (finStatusFilter !== 'todos' && o.status !== finStatusFilter) return false;
@@ -13876,7 +13898,8 @@ function buildClientInsights() {
     // configuram cliente recorrente — recorrencia exige retorno.
     const orderTime = Number(o.factAt || o.createdAt) || 0;
     if (orderTime) {
-      const dayKey = new Date(orderTime).toISOString().slice(0, 10); // YYYY-MM-DD
+      // #2735: dia do fuso local. Em UTC, dois pedidos na mesma noite viravam dois dias.
+      const dayKey = dateKeyOf(orderTime); // YYYY-MM-DD
       row.distinctDays.add(dayKey);
     }
     row.lastAt = Math.max(row.lastAt || 0, Number(o.factAt || o.updatedAt || o.createdAt) || 0);
@@ -14543,8 +14566,8 @@ function renderKanbanCard(o, col) {
         <span class="k-total">${money(o.total)}</span>
       </div>
       ${quickActions}
-      ${pilot ? `<div class="k-meta pilot-order-meta"><span>${itemCount} item${itemCount === 1 ? '' : 's'}</span>${o.id ? `<span>Pedido ${escapeHtml(o.id.slice(-8))}</span>` : ''}${o.createdAt ? `<span>${timeOf(o.createdAt)}</span>` : ''}${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}</div>` : `<div class="k-meta">
-        <span class="k-chip">${itemCount} item${itemCount === 1 ? '' : 's'}</span>
+      ${pilot ? `<div class="k-meta pilot-order-meta"><span>${contaItens(itemCount)}</span>${o.id ? `<span>Pedido ${escapeHtml(o.id.slice(-8))}</span>` : ''}${o.createdAt ? `<span>${timeOf(o.createdAt)}</span>` : ''}${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}</div>` : `<div class="k-meta">
+        <span class="k-chip">${contaItens(itemCount)}</span>
         <span class="k-chip">Pedido ${(o.id || '').slice(-8)}</span>
         ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
       </div>`}
@@ -18151,6 +18174,21 @@ function renderConferProPanel() {
     '<div class="confer-pro-stat"><span class="v">' + problemUnits + '</span><span class="k">Divergências</span></div>';
 }
 
+// #2735: rótulo de validade pelo dia do calendário local. Antes "vence hoje" valia para
+// qualquer vencimento nas 24 h seguintes (amanhã cedo saía como hoje) e 30 h virava "2d".
+// A janela de 7 dias e o destaque de urgência (vencido ou a menos de 24 h) não mudaram.
+function validadeRotulo(expiresAt, agora) {
+  const fim = Number(expiresAt) || 0;
+  if (!fim) return null;
+  const now = agora == null ? Date.now() : Number(agora);
+  const diff = fim - now;
+  if (diff <= 0) return { texto: 'vencido', urgente: true, vencido: true };
+  if (diff >= 7 * 24 * 3600 * 1000) return null;
+  const dias = Math.round((startOfLocalDay(fim) - startOfLocalDay(now)) / (24 * 3600 * 1000));
+  const texto = dias === 0 ? 'vence hoje' : (dias === 1 ? 'vence amanhã' : 'vence em ' + dias + ' dias');
+  return { texto: texto, urgente: diff < 24 * 3600 * 1000, vencido: false };
+}
+
 function batchCardHtml(batch) {
   const pilot = window.CDB_CONFIG?.isPilot === true;
   const isClosed = getBatchStatus(batch) === 'closed';
@@ -18160,13 +18198,13 @@ function batchCardHtml(batch) {
   const divergencias = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.DIVERGENCIA).length;
   const items = (batch.items || []).map(i => `${i.qty}× ${i.name}`).join(' · ');
   // #440 — validade: badge de urgência por item
-  const now440 = Date.now(); const H24_440 = 24*3600*1000; const H7D_440 = 7*24*3600*1000;
-  const validadeHtml = (batch.items || []).filter(function(i){ return i.expiresAt; }).map(function(i) {
-    const diff = i.expiresAt - now440;
-    const label = diff <= 0 ? '⛔ vencido' : (diff < H24_440 ? '🔴 vence hoje' : (diff < H7D_440 ? '🟡 vence em ' + Math.ceil(diff/H24_440) + 'd' : null));
-    if (!label) return '';
-    const cor = diff <= 0 ? 'var(--accent)' : (diff < H24_440 ? 'var(--accent)' : 'var(--gold)');
-    return '<span style="font-size:11px;color:'+cor+';font-weight:700">'+label+' · '+escapeHtml(i.name)+'</span>';
+  const validadeHtml = (batch.items || []).map(function(i) {
+    const v = validadeRotulo(i.expiresAt);
+    if (!v) return '';
+    // No piloto a cor já diz a urgência: sem emoji, como no resto do app.
+    const marca = pilot ? '' : (v.vencido ? '⛔ ' : (v.urgente ? '🔴 ' : '🟡 '));
+    const cor = v.urgente ? 'var(--accent)' : 'var(--gold)';
+    return '<span style="font-size:12px;color:'+cor+';font-weight:700">'+marca+v.texto+' · '+escapeHtml(i.name)+'</span>';
   }).filter(Boolean).join(' · ');
   const dateStr = new Date(batch.createdAt).toLocaleDateString('pt-BR') + ' ' +
     new Date(batch.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
@@ -19216,11 +19254,15 @@ function cestaCalcFechar() {
   cestaCalcResultadoAtual = null;
 }
 
+// #2735: o piloto esconde a calculadora de cesta (pilot-ui.js). Sem ela, a carga das receitas era um
+// pedido a mais em toda abertura do APK, e um 401 no aparelho ainda sem sessão.
+function cestaCalcIniciar() {
+  cestaCalcInstalarObservadorDraft();
+  if (window.CDB_CONFIG?.isPilot !== true) cestaCalcCarregarCacheReceitas();
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => {
-    cestaCalcInstalarObservadorDraft();
-    cestaCalcCarregarCacheReceitas();
-  });
+  window.addEventListener('load', cestaCalcIniciar);
 }
 
 function setBatchFilter(next) {
@@ -19244,7 +19286,7 @@ function renderProducaoBatches() {
 function mergeBatchesFlow() {
   const opens = (batches || []).filter(b => !b.deleted && getBatchStatus(b) === 'open');
   if (opens.length < 2) { showToast('Precisa de 2 lotes abertos para mesclar'); return; }
-  const list = opens.map((b, i) => `${i + 1} - ${b.lote || b.code} (${(b.items||[]).length} item(ns))`).join('\n');
+  const list = opens.map((b, i) => `${i + 1} - ${b.lote || b.code} (${contaItens((b.items || []).length)})`).join('\n');
   const aRaw = prompt('Lote origem (número):\n' + list, '1');
   if (aRaw == null) return;
   const bRaw = prompt('Lote destino (número):\n' + list, '2');
@@ -19397,7 +19439,7 @@ function conferRowHtml(o) {
   const cls = status === CONFER_STATUS.CONFERIDO ? 'done'
             : status === CONFER_STATUS.DIVERGENCIA ? 'problem' : '';
   const meta = status === CONFER_STATUS.PENDENTE
-    ? `${qty} item${qty===1?'':'s'} · ${money(o.total)}`
+    ? `${contaItens(qty)} · ${money(o.total)}`
     : `${conferStatusLabel(status)} · ${o.confirmation?.by || '—'}`;
   return `<div class="confer-row ${cls}">
     <div class="cr-main">
@@ -22205,7 +22247,7 @@ function renderSelectedClient() {
           <div class="cp-name">Avulso <span class="muted">sem cadastro</span></div>
           <div class="cp-ref">só o pedido vai ser salvo</div>
         </div>
-        <button class="cp-clear" onclick="clearClient()">&times;</button>
+        <button class="cp-clear" onclick="clearClient()" aria-label="Remover cliente">&times;</button>
       </div>
     `;
   } else {
@@ -22227,7 +22269,7 @@ function renderSelectedClient() {
         <button class="cp-edit" onclick="openClientModal({editId: ${jsString(c.id)}})" title="Editar cliente" aria-label="Editar">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
         </button>
-        <button class="cp-clear" onclick="clearClient()">&times;</button>
+        <button class="cp-clear" onclick="clearClient()" aria-label="Remover cliente">&times;</button>
       </div>
     `;
   }
@@ -22421,13 +22463,14 @@ function closeItemPicker() {
   document.getElementById('itemPickerModal').classList.remove('show');
 }
 function searchItem() {
-  const q = document.getElementById('itemSearch').value.trim().toLowerCase();
+  // #2735: busca sem acento nem caixa, para "pao" achar "Pão".
+  const q = normalizeSearch(document.getElementById('itemSearch').value.trim());
   renderItemPickerList(q);
 }
 function renderItemPickerList(q) {
   const list = document.getElementById('itemPickerList');
   const matches = products
-    .filter(p => !p.archived && (!q || p.name.toLowerCase().includes(q)))
+    .filter(p => !p.archived && (!q || normalizeSearch(p.name).includes(q)))
     .sort((a, b) => {
       const pa = Number(a.price) > 0 ? 0 : 1;
       const pb = Number(b.price) > 0 ? 0 : 1;
@@ -22440,11 +22483,15 @@ function renderItemPickerList(q) {
     const hasPrice = Number(p.price) > 0;
     item.className = 'sug-item' + (hasPrice ? '' : ' needs-price');
     const priceLabel = p.price ? money(p.price).replace(',00','') : '';
-    const stockLabel = p.stock > 0
-      ? `${p.stock} disp.`
-      : (p.stock === 0 ? 'em falta' : `faltam ${Math.abs(p.stock)}`);
-    const stockClass = p.stock <= 0 ? 'sr-warn' : '';
-    item.innerHTML = `<div class="sn">${escapeHtml(p.emoji || '📦')} ${escapeHtml(p.name)}</div><div class="sr">${escapeHtml(p.unit || '')}${priceLabel ? ' · ' + priceLabel : ' · sem preço'} · <span class="${stockClass}">${stockLabel}</span></div>`;
+    // #2735: produto sem o campo de estoque caía em "faltam NaN".
+    const stock = Number(p.stock) || 0;
+    const stockLabel = stock > 0
+      ? `${stock} disp.`
+      : (stock === 0 ? 'em falta' : `faltam ${Math.abs(stock)}`);
+    const stockClass = stock <= 0 ? 'sr-warn' : '';
+    // #2735: produto sem unidade começava a linha com o separador solto (" · R$ 28").
+    const meta = [escapeHtml(p.unit || ''), priceLabel || 'sem preço'].filter(Boolean).join(' · ');
+    item.innerHTML = `<div class="sn">${escapeHtml(p.emoji || '📦')} ${escapeHtml(p.name)}</div><div class="sr">${meta} · <span class="${stockClass}">${stockLabel}</span></div>`;
     item.onclick = () => {
       if (!hasPrice) { closeItemPicker(); openProductModalForEdit(p.id); return; }
       addItemToOrder(p);
@@ -22455,7 +22502,7 @@ function renderItemPickerList(q) {
     list.innerHTML = '<div class="gs-empty"><strong>Nenhum produto ativo</strong>Cadastre produtos no catálogo para montar pedidos.</div>';
   }
   if (q) {
-    const exact = products.some(p => !p.archived && p.name.toLowerCase() === q);
+    const exact = products.some(p => !p.archived && normalizeSearch(p.name) === q);
     if (!exact) {
       const create = document.createElement('button');
       create.className = 'sug-item create';
@@ -22509,9 +22556,8 @@ function renderOrderItems() {
     renderOrderDraftSummary();
     return;
   }
-  let total = 0;
+  const total = orderItemsTotal(currentOrderItems);
   currentOrderItems.forEach((it, idx) => {
-    total += it.qty * it.unitPrice;
     const row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = `
@@ -22581,7 +22627,7 @@ function renderOrderDraftSummary() {
   const sub = document.getElementById('odsSub');
   const totalEl = document.getElementById('odsTotal');
   const qty = currentOrderItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
-  const total = currentOrderItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0);
+  const total = orderItemsTotal(currentOrderItems);
   const hasClient = !!selectedClient;
   const hasItems = qty > 0;
   wrap.classList.toggle('ready', hasClient && hasItems);
@@ -22591,7 +22637,8 @@ function renderOrderDraftSummary() {
   sub.textContent = hasItems
     ? qty + ' un. em ' + currentOrderItems.length + ' produto' + (currentOrderItems.length === 1 ? '' : 's')
     : (hasClient ? 'Adicione itens ao pedido' : '0 itens');
-  totalEl.textContent = money(total).replace(',00','');
+  // #2735: com centavos, igual ao total da folha logo abaixo.
+  totalEl.textContent = money(total);
 }
 
 function saveOrder() {
@@ -22600,7 +22647,7 @@ function saveOrder() {
   const notes = document.getElementById('orderNotes').value.trim();
   if (currentOrderItems.length === 0 && !notes) { showToast('Adicione pelo menos 1 item ao pedido'); return; }
 
-  const total = currentOrderItems.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+  const total = orderItemsTotal(currentOrderItems);
 
   const previousClientLastOrder = selectedClient === 'avulso' ? null : selectedClient.lastOrder;
   let snapshot;
@@ -22711,7 +22758,7 @@ function saveOrder() {
     action: 'order.create',
     entityType: 'order',
     entityId: order.id,
-    summary: `Pedido para ${snapshot.name} · ${order.items.length} item(ns) · R$ ${total.toFixed(2).replace('.', ',')}` + (retroAtMs ? ' (retroativo)' : '')
+    summary: `Pedido para ${snapshot.name} · ${contaItens(order.items.length)} · R$ ${total.toFixed(2).replace('.', ',')}` + (retroAtMs ? ' (retroativo)' : '')
   });
 
   if (isRetro) resetRetroToggle();
@@ -23469,7 +23516,7 @@ function clearBoughtShoppingItems() {
   persistAll();
   renderShoppingList();
   renderHomeShopping();
-  showToast(count + ' item(ns) removido(s)');
+  showToast(count === 1 ? '1 item removido' : count + ' itens removidos');
 }
 document.addEventListener('DOMContentLoaded', function () {
   ensureShoppingState();
@@ -23832,6 +23879,12 @@ try {
 })();
 
 // Exposição pro sync.js
+// #2735: no piloto não existe Ajustes > Diagnóstico; quem reconecta o aparelho é o Início.
+function pairingInvalidMessage() {
+  return window.CDB_CONFIG?.isPilot === true
+    ? 'Conexão do aparelho inválida. Abra o Início para conectar de novo.'
+    : 'Pareamento invalidado. Abra Ajustes > Diagnóstico para parear de novo.';
+}
 window.cdbApp = {
   getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
   setPendingSync: (n) => { pendingSync = n; updateSync(); },
@@ -23841,7 +23894,7 @@ window.cdbApp = {
   showToast: function (msg) { if (typeof showToast === 'function') showToast(msg); },
   // Onda 1: pairing revogado pelo servidor — operador precisa re-parear.
   onPairingInvalid: function () {
-    try { showToast('Pareamento invalidado — abra Ajustes > Diagnostico pra re-parear'); } catch (e) {}
+    try { showToast(pairingInvalidMessage()); } catch (e) {}
     try { logError(new Error('pairing invalidated by server'), 'sync.pairing'); } catch (_) {}
   },
   // Onda 5/6: edits conflitaram com versão mais nova no servidor.
@@ -24028,6 +24081,8 @@ window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.carregarFonte({ base: '
     // Ordem = prioridade: overlays abertos por cima de outros vêm primeiro.
     'updateModal','autoBackupModal','noPrinterModal','printerPickerModal','productActionsModal',
     'ajustarModal','problemaModal','conferProdModal','prodProblemaModal',
+    // #2735: folhas que o voltar ignorava; o app saía da tela com elas abertas.
+    'pagamentoEntregaModal','batchDiscardModal','cestaCalcModal','conferModal','historicoModal','batchDetailsModal',
     'cashCloseModal','etiquetasPreview','ajustesModal','cashEntryModal',
     'newProductModal','productionConfirmModal','cobrancaModal','newClientModal','itemPickerModal',
     'productModal','clientModal','batchModal','novoProdutoModal',
@@ -24075,7 +24130,13 @@ window.cdbResolverEtiqueta && window.cdbResolverEtiqueta.carregarFonte({ base: '
       clientModal: 'closeClientModal',
       diagnosticsModal: 'closeDiagnostics',
       globalSearchModal: 'closeGlobalSearch',
-      supportModal: 'closeSupport'
+      supportModal: 'closeSupport',
+      pagamentoEntregaModal: 'closePagamentoEntrega',
+      batchDiscardModal: 'closeBatchDiscardModal',
+      cestaCalcModal: 'cestaCalcFechar',
+      conferModal: 'closeConfer',
+      historicoModal: 'closeHistorico',
+      batchDetailsModal: 'closeBatchDetails'
     };
     var closer = closers[id];
     try {
@@ -24340,7 +24401,9 @@ window.addEventListener('cdb-deadletter-full', function () {
   } catch (_) {}
 });
 
-if ('serviceWorker' in navigator) {
+// #2735: o pacote do APK não leva sw.js (copy-web.cjs remove); registrar ali só gerava
+// um erro 404 a cada abertura do app.
+if ('serviceWorker' in navigator && window.CDB_CONFIG?.isPilot !== true) {
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;

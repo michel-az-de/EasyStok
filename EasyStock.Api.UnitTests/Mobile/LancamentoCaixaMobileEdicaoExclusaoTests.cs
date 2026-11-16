@@ -15,6 +15,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -47,6 +48,8 @@ public sealed class LancamentoCaixaMobileEdicaoExclusaoTests : IDisposable
         _db = new EasyStockDbContext(
             new DbContextOptionsBuilder<EasyStockDbContext>()
                 .UseInMemoryDatabase($"caixa-edicao-exclusao-{Guid.NewGuid()}")
+                // #2736: o estorno agora roda em transação (trava do fechamento); o InMemory a ignora.
+                .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
                 .Options,
             currentUser);
 

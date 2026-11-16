@@ -42,7 +42,7 @@ public sealed class MovimentacaoEstoqueRepositoryKpisTests : IDisposable
     }
 
     private MovimentacaoEstoque Saida(
-        NaturezaMovimentacaoEstoque natureza, int qtd, decimal valorTotal, bool estornada = false) =>
+        NaturezaMovimentacaoEstoque natureza, decimal qtd, decimal valorTotal, bool estornada = false) =>
         new()
         {
             Id = Guid.NewGuid(),
@@ -91,6 +91,21 @@ public sealed class MovimentacaoEstoqueRepositoryKpisTests : IDisposable
         kpis.ReceitaTotal.Should().Be(500m); // estornada nao conta
         kpis.TotalVendas.Should().Be(1);
         kpis.TotalUnidades.Should().Be(5);
+    }
+
+    // #2738: produto vendido por peso (0,5 kg) nao pode virar 0 unidades no card.
+    [Fact]
+    public async Task GetKpis_SomaQuantidadeFracionada_SemTruncar()
+    {
+        _db.MovimentacoesEstoque.AddRange(
+            Saida(NaturezaMovimentacaoEstoque.Venda, 0.5m, 20m),
+            Saida(NaturezaMovimentacaoEstoque.Venda, 2.75m, 55m));
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        var kpis = await _repo.GetKpisAsync(_empresaId, tipo: TipoMovimentacaoEstoque.Saida);
+
+        kpis.TotalUnidades.Should().Be(3.25m);
     }
 
     [Fact]

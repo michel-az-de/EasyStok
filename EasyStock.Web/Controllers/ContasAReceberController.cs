@@ -1,3 +1,4 @@
+using EasyStock.Web.Helpers;
 using EasyStock.Web.Models.ViewModels.Financeiro;
 using EasyStock.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -102,7 +103,7 @@ public class ContasAReceberController(FinanceiroService svc, SessionService sess
         if (primeiraVencimento.Date < dataEmissao.Date)
             return await ReexibirComErro("A 1a vencimento nao pode ser anterior a data de emissao.");
 
-        var parcelas = MontarParcelas(valorTotal, numeroParcelas, primeiraVencimento, intervaloTipo);
+        var parcelas = ParcelasHelper.Montar(valorTotal, numeroParcelas, primeiraVencimento, intervaloTipo);
 
         var result = await svc.CriarContaReceberAsync(
             descricao, categoriaFinanceiraId, dataEmissao, parcelas,
@@ -183,31 +184,5 @@ public class ContasAReceberController(FinanceiroService svc, SessionService sess
         if (HasError(result)) return RedirectToAction(nameof(Detalhe), new { id });
         Toast("success", "Conta cancelada.");
         return RedirectToAction(nameof(Detalhe), new { id });
-    }
-
-    private static List<object> MontarParcelas(decimal valorTotal, int n, DateTime primeira, string intervalo)
-    {
-        var lista = new List<object>(n);
-        var valorParcela = Math.Round(valorTotal / n, 2, MidpointRounding.AwayFromZero);
-        var residuo = valorTotal - valorParcela * n;
-        var dataAtual = primeira;
-        for (var i = 1; i <= n; i++)
-        {
-            var v = i == n ? valorParcela + residuo : valorParcela;
-            lista.Add(new
-            {
-                numero = i,
-                valor = v,
-                dataVencimento = dataAtual,
-                metodoPlanejado = (string?)null
-            });
-            dataAtual = intervalo switch
-            {
-                "quinzenal" => dataAtual.AddDays(15),
-                "semanal" => dataAtual.AddDays(7),
-                _ => dataAtual.AddMonths(1)
-            };
-        }
-        return lista;
     }
 }

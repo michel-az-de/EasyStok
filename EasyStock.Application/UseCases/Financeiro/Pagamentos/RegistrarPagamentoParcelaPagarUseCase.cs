@@ -1,4 +1,6 @@
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Financeiro.Common;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 
@@ -29,6 +31,7 @@ public sealed record RegistrarPagamentoResult(
 public class RegistrarPagamentoParcelaPagarUseCase(
     IContaPagarRepository contaRepo,
     ICaixaRepository caixaRepo,
+    ObterCaixaDiaUseCase obterCaixaDia,
     IUnitOfWork uow,
     ILogger<RegistrarPagamentoParcelaPagarUseCase> logger)
 {
@@ -65,49 +68,65 @@ public class RegistrarPagamentoParcelaPagarUseCase(
         try
         {
             conta.GarantirAceitaPagamento();
-            var pagamento = PagamentoParcela.CriarConfirmado(
-                cmd.EmpresaId, TipoLadoFinanceiro.Pagar,
-                valor, metodo, dataPagamento,
-                cmd.GatewayProvedor, cmd.GatewayTransactionId,
-                cmd.Observacao, cmd.RegistradoPorUserId, cmd.RegistradoPorNome);
 
-            parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
+            return await uow.ExecuteInTransactionSemRetryAsync(async tx =>
+            {
+                // #2736: a saída toma a trava que o lançamento manual e o fechamento tomam; em dinheiro, não passa
+                // do dinheiro da gaveta, mas só com o dia aberto. Dia fechado ou nunca aberto não recusa: o pagamento
+                // segue aceito e cai em PosFechamento (#2319), sem conferir teto.
+                await caixaRepo.TravarSaidasAsync(cmd.EmpresaId, conta.LojaId, tx);
+                if (GavetaCaixa.EhDinheiro(metodo))
+                {
+                    var dia = await obterCaixaDia.ExecuteAsync(
+                        new ObterCaixaDiaQuery(cmd.EmpresaId, HorarioBrasil.Hoje(), conta.LojaId));
+                    if (dia.Aberto && !dia.Fechado)
+                        TetoDaGaveta.ExigirSaidaEmDinheiroCabe(dia, valor);
+                }
 
-            // MovimentoCaixa na MESMA transacao — sai pelo caixa do dia atual
-            var mov = MovimentoCaixa.Criar(
-                cmd.EmpresaId, "saida", valor,
-                dataMovimento: DateTime.UtcNow,
-                lojaId: conta.LojaId);
-            mov.Descricao = $"Pag. parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
-            mov.Metodo = metodo;
-            mov.Categoria = "contas-a-pagar";
-            mov.Referencia = ReferenciaDeParcela.DoPagamento("cp", conta.Id, parcela.Id, pagamento.Id);
-            mov.RegistradoPorUserId = cmd.RegistradoPorUserId;
-            mov.RegistradoPorNome = cmd.RegistradoPorNome;
-            mov.Origem = "api";
+                var pagamento = PagamentoParcela.CriarConfirmado(
+                    cmd.EmpresaId, TipoLadoFinanceiro.Pagar,
+                    valor, metodo, dataPagamento,
+                    cmd.GatewayProvedor, cmd.GatewayTransactionId,
+                    cmd.Observacao, cmd.RegistradoPorUserId, cmd.RegistradoPorNome);
 
-            await caixaRepo.AddMovimentoAsync(mov);
-            pagamento.AssociarMovimentoCaixa(mov.Id);
+                parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
 
-            conta.AtualizarStatusPorParcelas();
+                // MovimentoCaixa na MESMA transacao — sai pelo caixa do dia atual
+                var mov = MovimentoCaixa.Criar(
+                    cmd.EmpresaId, "saida", valor,
+                    dataMovimento: DateTime.UtcNow,
+                    lojaId: conta.LojaId);
+                mov.Descricao = $"Pag. parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
+                mov.Metodo = metodo;
+                mov.Categoria = "contas-a-pagar";
+                mov.Referencia = ReferenciaDeParcela.DoPagamento("cp", conta.Id, parcela.Id, pagamento.Id);
+                mov.RegistradoPorUserId = cmd.RegistradoPorUserId;
+                mov.RegistradoPorNome = cmd.RegistradoPorNome;
+                mov.Origem = "api";
 
-            await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaPagar(
-                conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PagamentoConfirmado,
-                descricao: $"Pagamento de R$ {valor:F2} via {metodo} na parcela {parcela.Numero}.",
-                valorDepois: $"+R$ {valor:F2}",
-                usuarioId: cmd.RegistradoPorUserId, usuarioNome: cmd.RegistradoPorNome,
-                origem: "api"), ct);
+                await caixaRepo.AddMovimentoAsync(mov);
+                pagamento.AssociarMovimentoCaixa(mov.Id);
 
-            await contaRepo.UpdateAsync(conta, ct);
-            await uow.CommitAsync();
+                conta.AtualizarStatusPorParcelas();
 
-            logger.LogInformation("Pagamento {PagId} registrado em parcela {ParcId} (CP={ContaId}). Caixa={MovId}",
-                pagamento.Id, parcela.Id, conta.Id, mov.Id);
+                await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaPagar(
+                    conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PagamentoConfirmado,
+                    descricao: $"Pagamento de R$ {valor:F2} via {metodo} na parcela {parcela.Numero}.",
+                    valorDepois: $"+R$ {valor:F2}",
+                    usuarioId: cmd.RegistradoPorUserId, usuarioNome: cmd.RegistradoPorNome,
+                    origem: "api"), ct);
 
-            return new RegistrarPagamentoResult(
-                pagamento.Id, parcela.Id, conta.Id,
-                parcela.Status.ToString(), conta.Status.ToString(),
-                parcela.ValorPago, parcela.Saldo, mov.Id);
+                await contaRepo.UpdateAsync(conta, ct);
+                await uow.CommitAsync();
+
+                logger.LogInformation("Pagamento {PagId} registrado em parcela {ParcId} (CP={ContaId}). Caixa={MovId}",
+                    pagamento.Id, parcela.Id, conta.Id, mov.Id);
+
+                return new RegistrarPagamentoResult(
+                    pagamento.Id, parcela.Id, conta.Id,
+                    parcela.Status.ToString(), conta.Status.ToString(),
+                    parcela.ValorPago, parcela.Saldo, mov.Id);
+            }, ct);
         }
         catch (RegraDeDominioVioladaException ex)
         {

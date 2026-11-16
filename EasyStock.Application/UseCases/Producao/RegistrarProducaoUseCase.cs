@@ -205,7 +205,7 @@ public class RegistrarProducaoUseCase(
             ? []
             : await baixaDeInsumos.BaixarAsync(cmd.EmpresaId,
                 itens.Select(i => PratoParaBaixa.Da(produtos[i.ProdutoId], i)).ToList(),
-                finalizado.Codigo, dataProducao, ct);
+                finalizado.Codigo, dataProducao, ct, cmd.LojaId);
 
         logger.LogInformation("Producao registrada: lote {Codigo} com {Itens} item(ns), {Etiquetas} etiqueta(s) e {Avisos} aviso(s) de insumo.",
             finalizado.Codigo, resultados.Count, finalizado.TotalUnidades, avisos.Count);

@@ -37,26 +37,24 @@ public class EstornarMovimentoCaixaUseCase(
         if (mov.Tipo is not ("entrada" or "saida"))
             throw new UseCaseValidationException("Somente movimentos de entrada ou saída podem ser estornados.");
 
-        // Bloquear estorno se o dia já foi fechado.
-        await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, mov.EmpresaId, mov.DataMovimento, mov.LojaId,
-            "Não é possível estornar movimento de dia já fechado.");
-
         // #1623: estornar uma entrada tira dinheiro do caixa, como uma sangria. Suprimento estornado
         // depois de uma sangria deixava a gaveta negativa. Mesma guarda e mesma trava da saída
         // (RegistrarMovimentoCaixaUseCase, #1521/#1547); o PWA promove o que já fez no aparelho e
         // segue sem a guarda, como a saída mobile.
         var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
-        if (mov.Tipo == "entrada" && origem != "mobile")
-        {
-            return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
-            {
-                await repo.TravarSaidasAsync(mov.EmpresaId, mov.LojaId, ct);
-                await ConferirCaixaParaEstornoAsync(mov);
-                return await EstornarAsync(mov, cmd);
-            });
-        }
+        var conferirGaveta = mov.Tipo == "entrada" && origem != "mobile";
 
-        return await EstornarAsync(mov, cmd);
+        // #2736: o fechamento toma a mesma trava (#2613). A guarda de dia fechado só vale lida atrás dela, senão o
+        // fechamento entre a guarda e a gravação deixa o estorno entrar num dia já retratado. Vale para entrada e
+        // saída, de qualquer origem: sem a trava a corrida da saída não era serializada.
+        return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
+        {
+            await repo.TravarSaidasAsync(mov.EmpresaId, mov.LojaId, ct);
+            await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, mov.EmpresaId, mov.DataMovimento, mov.LojaId,
+                "Não é possível estornar movimento de dia já fechado.");
+            if (conferirGaveta) await ConferirCaixaParaEstornoAsync(mov);
+            return await EstornarAsync(mov, cmd);
+        });
     }
 
     private async Task<MovimentoCaixaResult> EstornarAsync(MovimentoCaixa mov, EstornarMovimentoCaixaCommand cmd)

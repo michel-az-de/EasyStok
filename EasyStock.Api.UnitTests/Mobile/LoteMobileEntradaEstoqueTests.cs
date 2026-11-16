@@ -350,6 +350,43 @@ public sealed class LoteMobileEntradaEstoqueTests : IDisposable
     }
 
     [Fact]
+    public async Task BaixaDeInsumoDoLoteSincronizado_BuscaOsLotesDaLojaDaProducao()
+    {
+        // #2737 (R-2737-1): a produção sincronizada pelo aparelho baixava o insumo sem filtro de loja,
+        // e o saldo podia sair do lote de outra loja da mesma empresa.
+        var molho = new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Molho", Tipo = TipoProduto.Fisico,
+            Status = StatusProduto.Ativo, CategoriaId = Guid.NewGuid(), UnidadeMedidaBase = UnidadeMedida.G, EhInsumo = true
+        };
+        _db.Add(molho);
+        _db.Set<Produto>().Single(p => p.Id == _produtoErpId).BaixaInsumoAutomatica = true;
+        _db.SaveChanges();
+
+        var receita = Substitute.For<IProdutoComposicaoRepository>();
+        receita.GetByProdutoFinalAsync(_empresaId, _produtoErpId, null, Arg.Any<CancellationToken>())
+            .Returns(new List<ProdutoComposicao>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(), EmpresaId = _empresaId, ProdutoFinalId = _produtoErpId, InsumoId = molho.Id,
+                    Insumo = molho, Quantidade = 100, Unidade = UnidadeMedida.G
+                }
+            });
+        var itens = Substitute.For<IItemEstoqueRepository>();
+        var baixa = new BaixaDeInsumosDaProducao(receita, itens, null!, Substitute.For<IProdutoRepository>());
+        var linker = new BatchLinker(_db, new LoteRepository(_db),
+            new LoteMobileEstadoReconciler(_db, NullLogger<LoteMobileEstadoReconciler>.Instance),
+            NullLogger<BatchLinker>.Instance, baixa);
+
+        await AplicarAsync(Lote("b-1", 5));
+        await linker.ExecuteAsync(["b-1"], _empresaId);
+
+        await itens.Received().GetLotesDisponiveisParaSaidaAsync(
+            _empresaId, molho.Id, Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Is<Guid?>(g => g == _lojaId));
+    }
+
+    [Fact]
     public async Task PullDevolveAsMarcasDoLote()
     {
         await SincronizarLoteAsync("b-1", 5);
