@@ -214,11 +214,19 @@ window.imprimir = async function() {
 window.marcarImpressas = async function() {
     const t = getSelectedTemplate(); if (!t) return;
     const ids = getSelectedIds();
-    await fetch(`/api/lotes/${LOTE_ID}/etiquetas/marcar-impressas?empresaId=${EMPRESA_ID}`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-Overwrite-Snapshot': 'true' },
-        body: JSON.stringify({ ids, layoutJson: t.layoutJson, layoutMeta: { origem: t.origem, id: t.id, nome: t.nome }, status: 'impressa' }),
-    });
+    let res = null;
+    try {
+        res = await fetch(`/api/lotes/${LOTE_ID}/etiquetas/marcar-impressas?empresaId=${EMPRESA_ID}`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-Overwrite-Snapshot': 'true' },
+            body: JSON.stringify({ ids, layoutJson: t.layoutJson, layoutMeta: { origem: t.origem, id: t.id, nome: t.nome }, status: 'impressa' }),
+        });
+    } catch (_) { res = null; }
+    // fetch nao lanca em 4xx/5xx: so afirma sucesso com resposta ok.
+    if (!res || !res.ok) {
+        setStatus('Não foi possível registrar as etiquetas como impressas. Tente novamente.');
+        return;
+    }
     setStatus(`${ids.length} etiquetas marcadas como impressas.`);
 };
 
