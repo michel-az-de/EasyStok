@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.Services;
+using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos;
 using EasyStock.Domain.Sales;
@@ -18,7 +19,8 @@ public class RemoverItemPedidoUseCase(
     IPedidoRepository repo,
     PedidoEstoqueIntegrationService estoqueIntegration,
     IUnitOfWork uow,
-    ILogger<RemoverItemPedidoUseCase> logger)
+    ILogger<RemoverItemPedidoUseCase> logger,
+    SaldoFinanceiroPedido? saldos = null)
 {
     public async Task<PedidoResult?> ExecuteAsync(RemoverItemPedidoCommand cmd)
     {
@@ -36,7 +38,9 @@ public class RemoverItemPedidoUseCase(
 
         // #1724-5: com valor recebido, tirar item deixaria o total abaixo do pago sem devolução. A comanda do
         // cliente (ConfirmarAlteracaoComandaUseCase) confere o saldo e devolve; o DELETE direto não.
-        if (pedido.TotalPago > 0m)
+        // #2733: a quitação com crédito do cliente não grava PedidoPagamento (TotalPago = 0), então o
+        // crédito aplicado também conta como valor recebido.
+        if (pedido.TotalPago > 0m || await CreditoAplicadoAsync(pedido) > 0m)
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.ValorRecebido,
                 "O pedido já tem valor recebido. Altere os itens pela comanda ou desfaça o pagamento antes de remover.");
 
@@ -74,4 +78,7 @@ public class RemoverItemPedidoUseCase(
             pedido.Id, item.Nome, pedido.Total);
         return CriarPedidoUseCase.Map(pedido);
     }
+
+    private async Task<decimal> CreditoAplicadoAsync(Domain.Entities.Pedido pedido) =>
+        saldos is null ? 0m : (await saldos.ConsultarAsync(pedido, CancellationToken.None)).CupomAplicado;
 }
