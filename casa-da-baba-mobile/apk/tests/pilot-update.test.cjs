@@ -43,7 +43,7 @@ test('diferencia servidor acessível de aparelho pareado e envio pendente', () =
   assert.doesNotMatch(revoked.queue, /sincronizad|confirmad/);
 });
 
-function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch, updater } = {}) {
+function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch, updater, manifestGate } = {}) {
   const nodes = new Map();
   const events = new Map();
   const doc = { activeElement: null, hidden: false, addEventListener: (name, callback) => events.set(name, callback), getElementById: id => nodes.get(id) };
@@ -79,6 +79,7 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
   const fetch = async url => {
     requests.push(url);
     if (url.endsWith('/api/mobile/version')) return healthFetch ? healthFetch() : { ok: true, json: async () => ({ databaseOk: true }) };
+    if (manifestGate?.wait) await manifestGate.wait;
     if (manifestError) throw new Error('Network failure');
     return { ok: true, json: async () => manifest };
   };
@@ -809,4 +810,48 @@ test('rodapé do Início só mostra o estado do conteúdo quando há o que dizer
   await failed.root.forceCheckUpdate();
   assert.equal(failed.nodes.get('pilotOtaStatus').hidden, false, 'quem pediu a conferência vê a falha');
   assert.match(failed.nodes.get('pilotOtaStatus').textContent, /não foi concluída/);
+});
+
+// #2785: sem o aviso do push, a oferta precisa aparecer na primeira dobra do Início, antes dos atalhos.
+test('oferta de APK novo fica no topo do Início, antes de Produção e fora do bloco oculto', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'pilot.js'), 'utf8');
+  const offer = source.indexOf('id="pilotUpdateOffer"');
+  assert.ok(offer > 0, 'Início precisa da faixa pilotUpdateOffer');
+  assert.ok(offer > source.indexOf('id="pilotTitle"') && offer < source.indexOf('<div class="pilot-actions">'), 'a faixa fica entre o título e os atalhos');
+  const block = source.slice(offer, source.indexOf('</section>', offer));
+  assert.match(block, /data-action="download"/, 'a faixa tem o próprio botão de instalar');
+});
+
+test('faixa do topo aparece só quando há APK novo e some quando a conferência falha', async () => {
+  const available = pilotHarness({ operator: '' });
+  await new Promise(setImmediate);
+  assert.equal(available.nodes.get('pilotUpdateOffer').hidden, false);
+  assert.match(available.nodes.get('pilotUpdateOfferText').textContent, /Versão 0\.1\.1 disponível/);
+  await available.nodes.get('pilotHome').click('download');
+  assert.deepEqual(available.calls.filter(url => String(url).endsWith('.apk')), [manifest.url]);
+
+  const current = pilotHarness({ operator: '' });
+  current.root.CDB_CONFIG.versionCode = manifest.versionCode;
+  await new Promise(setImmediate);
+  assert.equal(current.nodes.get('pilotUpdateOffer').hidden, true);
+
+  const failed = pilotHarness({ operator: '', manifestError: true });
+  await new Promise(setImmediate);
+  assert.equal(failed.nodes.get('pilotUpdateOffer').hidden, true);
+});
+
+// #2785 (revisão): a faixa não pisca nem empurra os atalhos enquanto uma nova conferência está em curso.
+test('faixa do topo continua no lugar durante a conferência seguinte', async () => {
+  const gate = {};
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
+  let release;
+  gate.wait = new Promise(resolve => { release = resolve; });
+  const pending = root.forceCheckUpdate();
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false, 'a faixa fica visível enquanto confere');
+  release();
+  await pending;
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
 });
