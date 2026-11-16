@@ -102,51 +102,58 @@ public class ReconciliarPixParcelaReceberUseCase(
 
         try
         {
-            var pagamento = PagamentoParcela.CriarConfirmado(
-                conta.EmpresaId, TipoLadoFinanceiro.Receber,
-                aplicado, "pix", DataUtc.ParaUtc(pagoEm),
-                "EfiPix", cmd.Txid, "Reconciliado via Pix Efi");
-            parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
+            return await uow.ExecuteInTransactionSemRetryAsync(async tx =>
+            {
+                // #2763: o Pix de parcela entra no Caixa como o recebimento manual (#2736): toma a trava que o
+                // fechamento também toma, e o instante do movimento é lido depois dela, nunca antes.
+                await caixaRepo.TravarSaidasAsync(conta.EmpresaId, conta.LojaId, tx);
 
-            var mov = MovimentoCaixa.Criar(
-                conta.EmpresaId, "entrada", aplicado,
-                dataMovimento: DateTime.UtcNow,
-                lojaId: conta.LojaId);
-            mov.Descricao = $"Pix recebido — parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
-            mov.Metodo = "pix";
-            mov.Categoria = "contas-a-receber";
-            mov.Referencia = ReferenciaDeParcela.DoPix("cr", conta.Id, parcela.Id, cmd.Txid);
-            mov.Origem = "webhook";
+                var pagamento = PagamentoParcela.CriarConfirmado(
+                    conta.EmpresaId, TipoLadoFinanceiro.Receber,
+                    aplicado, "pix", DataUtc.ParaUtc(pagoEm),
+                    "EfiPix", cmd.Txid, "Reconciliado via Pix Efi");
+                parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
 
-            await caixaRepo.AddMovimentoAsync(mov);
-            pagamento.AssociarMovimentoCaixa(mov.Id);
+                var mov = MovimentoCaixa.Criar(
+                    conta.EmpresaId, "entrada", aplicado,
+                    dataMovimento: DateTime.UtcNow,
+                    lojaId: conta.LojaId);
+                mov.Descricao = $"Pix recebido — parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
+                mov.Metodo = "pix";
+                mov.Categoria = "contas-a-receber";
+                mov.Referencia = ReferenciaDeParcela.DoPix("cr", conta.Id, parcela.Id, cmd.Txid);
+                mov.Origem = "webhook";
 
-            conta.AtualizarStatusPorParcelas();
+                await caixaRepo.AddMovimentoAsync(mov);
+                pagamento.AssociarMovimentoCaixa(mov.Id);
 
-            await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
-                conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PixReconciliado,
-                descricao: $"Pix reconciliado: R$ {aplicado:F2} (txid={cmd.Txid})",
-                origem: "webhook"), ct);
+                conta.AtualizarStatusPorParcelas();
 
-            // #2736: o que passou do saldo entrou na conta bancária e não vira crédito no Extrato: fica na linha do
-            // tempo da conta, para quem concilia o banco devolver ou lançar o valor.
-            if (excedente > 0m)
                 await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
                     conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PixReconciliado,
-                    descricao: $"Pix excedente de {excedente.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} " +
-                               $"a devolver ou conciliar: o Pix foi de {valorPago.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} " +
-                               $"e a parcela aceitou {aplicado.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} (txid={cmd.Txid})",
+                    descricao: $"Pix reconciliado: R$ {aplicado:F2} (txid={cmd.Txid})",
                     origem: "webhook"), ct);
 
-            await contaRepo.UpdateAsync(conta, ct);
-            await uow.CommitAsync();
+                // #2736: o que passou do saldo entrou na conta bancária e não vira crédito no Extrato: fica na linha do
+                // tempo da conta, para quem concilia o banco devolver ou lançar o valor.
+                if (excedente > 0m)
+                    await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
+                        conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PixReconciliado,
+                        descricao: $"Pix excedente de {excedente.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} " +
+                                   $"a devolver ou conciliar: o Pix foi de {valorPago.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} " +
+                                   $"e a parcela aceitou {aplicado.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} (txid={cmd.Txid})",
+                        origem: "webhook"), ct);
 
-            logger.LogInformation("Pix reconciliado: parcela={ParcId} txid={Txid} valor={Valor}",
-                parcela.Id, cmd.Txid, aplicado);
+                await contaRepo.UpdateAsync(conta, ct);
+                await uow.CommitAsync();
 
-            return new ReconciliarPixResult(
-                pagamento.Id, parcela.Id, conta.Id,
-                parcela.Status.ToString(), conta.Status.ToString(), true, null);
+                logger.LogInformation("Pix reconciliado: parcela={ParcId} txid={Txid} valor={Valor}",
+                    parcela.Id, cmd.Txid, aplicado);
+
+                return new ReconciliarPixResult(
+                    pagamento.Id, parcela.Id, conta.Id,
+                    parcela.Status.ToString(), conta.Status.ToString(), true, null);
+            }, ct);
         }
         catch (RegraDeDominioVioladaException ex)
         {

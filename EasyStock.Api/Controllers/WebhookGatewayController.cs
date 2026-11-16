@@ -104,8 +104,8 @@ public class WebhookGatewayController(
             }
 
             // Tentativa anterior sem sucesso — reprocessa. Os processors tem idempotencia
-            // interna (ex.: EfiPixWebhookProcessor usa SELECT FOR UPDATE + checagem de
-            // status), entao reprocessar e seguro mesmo sob retries concorrentes.
+            // interna (ex.: EfiPixWebhookProcessor serializa pela trava do caixa e o indice unico
+            // do txid barra o pagamento repetido), entao reprocessar e seguro mesmo sob retries concorrentes.
             logger.LogWarning(
                 "Webhook {Provedor} (eventId={EventId}) com tentativa anterior sem sucesso (ProcessadoEm={ProcessadoEm}) — reprocessando.",
                 validator.Provedor, eventIdExterno, existente.ProcessadoEm);

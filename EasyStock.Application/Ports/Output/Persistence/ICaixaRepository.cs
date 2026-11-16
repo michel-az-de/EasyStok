@@ -61,6 +61,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task UpdateMovimentoAsync(MovimentoCaixa movimento);
 
         /// <summary>
+        /// #2763: relê do banco o movimento já carregado, descartando o que estava em memória. Quem leu antes da trava do
+        /// Caixa chama atrás dela para ver o estorno que outra tela gravou enquanto esperava.
+        /// </summary>
+        Task RecarregarMovimentoAsync(MovimentoCaixa movimento, CancellationToken ct = default);
+
+        /// <summary>
         /// Tenta inserir o movimento; se colidir com <c>ix_movimentos_caixa_abertura_unica</c>
         /// (corrida perdida — outra transação já abriu o caixa do dia/loja), retorna
         /// <see langword="false"/> sem lançar, e a entidade é destrackeada. Qualquer OUTRA

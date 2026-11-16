@@ -125,6 +125,7 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public Task AddMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Add(m); return Task.CompletedTask; }
         public Task UpdateMovimentoAsync(MovimentoCaixa m) { db.MovimentosCaixa.Update(m); return Task.CompletedTask; }
+        public Task RecarregarMovimentoAsync(MovimentoCaixa m, CancellationToken ct = default) => db.Entry(m).ReloadAsync(ct);
 
         // issue 951: flush isolado da abertura automatica, dentro da tx explicita aberta pelo
         // caller (RegistrarPagamentoPedidoUseCase). Se colidir com a unique parcial por dia/loja

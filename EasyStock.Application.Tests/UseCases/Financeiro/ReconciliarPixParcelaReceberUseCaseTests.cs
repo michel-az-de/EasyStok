@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
@@ -41,7 +42,7 @@ public class ReconciliarPixParcelaReceberUseCaseTests
         var caixaRepo = Substitute.For<ICaixaRepository>();
         caixaRepo.AddMovimentoAsync(Arg.Do<MovimentoCaixa>(movimentos.Add));
         var pix = Substitute.For<IEfiPixService>();
-        var uow = Substitute.For<IUnitOfWork>();
+        var uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<ReconciliarPixResult>();
         var uc = new ReconciliarPixParcelaReceberUseCase(contaRepo, caixaRepo, pix, uow,
             Substitute.For<ILogger<ReconciliarPixParcelaReceberUseCase>>());
         return new Cenario(uc, conta, parcela, contaRepo, caixaRepo, pix, uow, movimentos);
@@ -67,6 +68,25 @@ public class ReconciliarPixParcelaReceberUseCaseTests
         mov.Metodo.Should().Be("pix");
         c.Parcela.Pagamentos.Single().MovimentoCaixaId.Should().Be(mov.Id);
         await c.Uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task Pix_toma_a_trava_do_caixa_antes_de_lancar_a_entrada()
+    {
+        // #2763: o fechamento toma a mesma trava; a entrada só pode ser gravada (e datada) depois dela.
+        var c = Montar();
+        var ordem = new List<string>();
+        c.CaixaRepo.When(r => r.TravarSaidasAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("trava"));
+        c.CaixaRepo.When(r => r.AddMovimentoAsync(Arg.Any<MovimentoCaixa>()))
+            .Do(_ => ordem.Add("movimento"));
+        c.Uow.When(u => u.CommitAsync()).Do(_ => ordem.Add("commit"));
+
+        var r = await c.Uc.ExecuteAsync(Webhook());
+
+        r.Reconciliado.Should().BeTrue();
+        ordem.Should().Equal("trava", "movimento", "commit");
+        await c.CaixaRepo.Received(1).TravarSaidasAsync(Empresa, c.Conta.LojaId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
