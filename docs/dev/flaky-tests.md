@@ -32,6 +32,13 @@ be 80M ... but found 0.00M"), `Lancamento_gravado_depois_do_fechamento_some_do_r
 - **Se voltar a falhar:** ver se algum use case novo carimba ou filtra por um relógio que não seja o dia
   operacional de agora, ou se a prova voltou a semear com `DateTime.UtcNow.AddMinutes(-N)` solto. Instante
   semeado depois de `FecharCaixa` precisa ser derivado depois dele, como `Ancora(DateTime.UtcNow, ...)` de novo.
+- **Limite conhecido:** as provas com banco só rodaram em horário comum; a virada é provada pelo helper, com
+  `agora` fixo. Se a meia-noite real cair entre o semeio e o `FecharCaixa` da mesma prova (milissegundos a poucos
+  segundos por dia), o fechamento vale para o dia novo e a prova ainda pode falhar. Isso só some com relógio
+  injetável no use case, que é mudança de produção e ficou fora da #2770.
+- **Classes vizinhas conferidas (#2769):** `CaixaFechamentoTravaIntegrationTests`,
+  `SangriaSimultaneaIntegrationTests` e `MobileCashPromoverIntegrationTests` também semeiam com "agora menos N",
+  mas nenhuma prova delas depende de a abertura cair no dia de hoje; não falham na virada.
 
 ---
 
