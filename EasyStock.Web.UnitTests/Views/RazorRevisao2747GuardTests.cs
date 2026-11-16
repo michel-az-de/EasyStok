@@ -39,6 +39,17 @@ public class RazorRevisao2747GuardTests
         posSucesso.Should().BeGreaterThan(posOk, "o texto de sucesso so pode vir depois da checagem de res.ok");
     }
 
+    // R2747-01: o aviso de falha substitui o status, entao ele mesmo precisa trazer o caminho de nova tentativa.
+    [Fact]
+    public void Imprimir_marcarImpressas_na_falha_mantem_o_link_de_nova_tentativa()
+    {
+        var fn = Trecho(LerView("Lotes/Imprimir.cshtml"), "window.marcarImpressas", "window.baixarPdf");
+        var falha = Trecho(fn, "!res.ok", "return;");
+
+        falha.Should().Contain("setStatusHtml", "setStatus so escreve texto e apagaria o link que estava na tela");
+        falha.Should().Contain("marcarImpressas()", "o link do aviso precisa chamar a mesma acao de novo");
+    }
+
     // WR2-02
     [Fact]
     public void Modelos_nao_injeta_dado_no_onclick()

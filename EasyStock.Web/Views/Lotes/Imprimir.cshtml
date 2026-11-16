@@ -224,7 +224,7 @@ window.marcarImpressas = async function() {
     } catch (_) { res = null; }
     // fetch nao lanca em 4xx/5xx: so afirma sucesso com resposta ok.
     if (!res || !res.ok) {
-        setStatus('Não foi possível registrar as etiquetas como impressas. Tente novamente.');
+        setStatusHtml('Não foi possível registrar as etiquetas como impressas. <a href="#" onclick="marcarImpressas();return false">Tentar de novo →</a>');
         return;
     }
     setStatus(`${ids.length} etiquetas marcadas como impressas.`);
