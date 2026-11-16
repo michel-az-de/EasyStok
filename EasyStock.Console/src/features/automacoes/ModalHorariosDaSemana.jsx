@@ -3,8 +3,7 @@ import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { Botao } from '../../componentes/Botao'
 import { Modal } from '../../componentes/Modal'
-import { DIAS_DA_SEMANA } from '../../dominio/funcionamento'
-import { partesNoFuso } from '../../dominio/formato'
+import { DIAS_DA_SEMANA, chaveDoDiaNaLoja } from '../../dominio/funcionamento'
 import { DiaDeFuncionamento } from './ModalAutomacoes'
 import css from './automacoes.module.css'
 
@@ -91,7 +90,7 @@ export function ModalHorariosDaSemana({ aoFechar }) {
   }
 
   const fechar = () => { if (!ocupado.current && !gravando) aoFechar() }
-  const hoje = DIAS_DA_SEMANA[partesNoFuso(agora).diaDaSemana].chave
+  const hoje = chaveDoDiaNaLoja(agora)
   return <Modal titulo="Horários da semana" largura="min(760px, calc(100vw - 24px))"
     descricao="As mudanças valem após salvar. Fechar mantém o rascunho nesta sessão."
     aoFechar={salvando || gravando ? undefined : fechar}
