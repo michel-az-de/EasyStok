@@ -14,7 +14,7 @@
     return { ...data, available: data.versionCode > config.versionCode };
   }
 
-  function connectionStatus({ health, paired, invalid, pending, importPending, googleSession = false }) {
+  function connectionStatus({ health, paired, invalid, pending, importPending, googleSession = false, retrying = false }) {
     const status = health === 'online' ? 'EasyStok acessível' : health === 'checking' ? 'Conferindo conexão' : 'Sem conexão confirmada';
     const pairing = invalid ? 'Conexão do aparelho inválida. Conecte novamente.'
       : paired ? 'Aparelho vinculado ao EasyStok.' : googleSession ? 'Produção só neste aparelho. Entre com Google para sincronizar.' : 'Produção só neste aparelho. Conecte com o código de pareamento para sincronizar.';
@@ -24,7 +24,11 @@
     const railStatus = invalid ? 'Reconectar aparelho' : importPending ? 'Conferir dados importados' : !paired ? 'Só neste aparelho' : status;
     const visibleQueue = importPending ? 'Envio pausado até conferir os dados importados. ' + queue : queue;
     const summary = status + '. ' + (invalid ? 'Conexão do aparelho inválida.' : paired ? 'Aparelho vinculado ao EasyStok.' : 'Produção só neste aparelho.') + (pending > 0 || importPending ? ' ' + visibleQueue : '');
-    return { status, pairing, summary, queue: visibleQueue, syncState, rail: railStatus + (pending > 0 ? ' · ' + pending + ' pendente' + (pending === 1 ? '' : 's') : '') };
+    // Próximo passo à vista no Início: só aparece quando o aparelho não está enviando ao EasyStok.
+    const hint = invalid ? pairing : importPending ? ''
+      : !paired ? 'O que você registrar fica só neste aparelho até ' + (googleSession ? 'entrar com sua conta Google.' : 'conectar com o código da equipe.')
+      : health === 'offline' || retrying ? 'Sem conexão com o EasyStok agora. O que você registrar fica salvo e é enviado quando a conexão voltar.' : '';
+    return { status, pairing, summary, hint, queue: visibleQueue, syncState, rail: railStatus + (pending > 0 ? ' · ' + pending + ' pendente' + (pending === 1 ? '' : 's') : '') };
   }
 
   function otaStatusText(state) {
@@ -320,6 +324,7 @@
   let lastAutomaticCheck = 0;
   let pendingContent = '';
   let checkingConnection = false;
+  let retryingConnection = false;
   let openingWorkspace = false;
   let confirmingImport = false;
   let undoingImport = false;
@@ -359,7 +364,8 @@
         ${tileButton('local-orders', 'Pedidos', 'pedido-em-preparo', 'orders')}
         ${tileButton('clients', 'Clientes', 'ficha', 'orders')}
       </div>
-      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p></div>
+      <div class="pilot-connection"><p id="pilotConnection" role="status" tabindex="-1">Conferindo a conexão com o EasyStok…</p><button type="button" id="pilotReconnect" data-action="reconnect" hidden>Reconectar</button></div>
+      <p id="pilotConnectionHint" class="pilot-connection-hint" hidden></p>
       <div class="pilot-home-controls">
         ${tileButton('workspace', 'Atendimento', 'mensagem', 'support', 'pilotWorkspaceButton')}
         ${tileButton('pair', 'Conectar', 'link', 'support', 'pilotPairButton')}
@@ -368,14 +374,14 @@
         ${tileButton('update', 'Atualizar', 'refresh-cw', 'support', 'pilotUpdateButton')}
       </div>
       <div class="pilot-home-support" hidden>
-      <button type="button" id="pilotReconnect" data-action="reconnect" hidden>Reconectar</button>
       <details class="pilot-connection-details"><summary>Conexão</summary><p id="pilotConnectionDetail"></p><p id="pilotPairHint">Solicite o código de conexão à equipe da Casa da Baba.</p><div id="pilotSyncDetails"></div></details>
       <div class="pilot-operator-row"><span>Registrando como</span><div id="pilotOperator"></div></div>
       <details class="pilot-help pilot-migration"><summary>Sistema Antigo</summary><p>Guarde o backup original até conferir a importação.</p><button type="button" data-action="import-pwa">Importar</button><button type="button" data-action="migration-guide">Guia</button></details>
       <details class="pilot-help"><summary>Offline</summary><p>Produtos, pedidos e lotes ficam salvos neste aparelho. Após conectar, o envio ao EasyStok é retomado com internet.</p></details>
-      <details class="pilot-help"><summary>Atualizações</summary><p id="pilotOtaStatus" role="status">O conteúdo é atualizado ao reabrir.</p><p id="pilotPushStatus" role="status"></p><p>A versão anterior preserva seus dados e envios pendentes.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Recuperar</button></details>
+      <details class="pilot-help"><summary>Atualizações</summary><p id="pilotPushStatus" role="status"></p><p>A versão anterior preserva seus dados e envios pendentes.</p><button type="button" id="pilotRollback" data-action="rollback" hidden>Recuperar</button></details>
       </div>
       <div class="pilot-update"><span id="pilotVersion" role="status"></span></div>
+      <p id="pilotOtaStatus" class="pilot-feedback pilot-ota-status" role="status" hidden></p>
       <p id="pilotUpdateStatus" class="pilot-feedback" role="status" tabindex="-1"></p>
       <button type="button" id="pilotDownload" data-action="download" hidden>Atualizar APK</button>
     </div>`;
@@ -421,7 +427,7 @@
   let noticeLoading = false;
   let pendingOpenHandled = '';
   const noticeTime = value => Number.isFinite(value) && value > 0 ? new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Ainda não confirmado';
-  function noticeSource(item) { return item.source === 'push' ? 'Recebido por push' : item.source === 'sync' ? 'Recuperado pelo histórico' : 'Origem não identificada'; }
+  function noticeSource(item) { return item.source === 'push' ? 'Recebido por notificação' : item.source === 'sync' ? 'Recuperado pelo histórico' : 'Origem não identificada'; }
   function renderNotices() {
     const presentation = noticePresentation({ ...noticeState, checking: noticeLoading || noticeState.checking }, root.navigator?.onLine !== false);
     const contentFirst = noticeState.registered === true && noticeState.permission === 'granted' && !noticeState.lastError && root.navigator?.onLine !== false;
@@ -490,7 +496,7 @@
       button.append(title, description, preview, arrow); list.append(button);
       if (focusedId === item.id && !selectedNotice) button.focus();
     }
-    doc.getElementById('pilotNoticePush').textContent = 'Último push recebido: ' + noticeTime(noticeState.lastPushAt);
+    doc.getElementById('pilotNoticePush').textContent = 'Última notificação recebida: ' + noticeTime(noticeState.lastPushAt);
     doc.getElementById('pilotNoticeSync').textContent = 'Última consulta ao histórico: ' + noticeTime(noticeState.lastSyncAt);
     const pending = Number.isSafeInteger(noticeState.pendingReceipts) ? Math.max(0, noticeState.pendingReceipts) : 0;
     doc.getElementById('pilotNoticeReceipts').textContent = pending ? pending + (pending > 1 ? ' confirmações aguardam' : ' confirmação aguarda') + ' envio ao servidor. O app tentará novamente com conexão.' : 'Nenhuma confirmação aguardando envio neste aparelho.';
@@ -631,13 +637,18 @@
     const review = root.cdbSync?.importReview?.();
     const invalid = !!root.cdbSync?.isPairingInvalid?.();
     const googleSession = root.cdbAuth?.available?.() === true;
-    const state = connectionStatus({ health, paired: !!pairing, invalid, pending: root.cdbSync?.queueSize?.() || 0, importPending: !!review, googleSession });
+    const state = connectionStatus({ health, paired: !!pairing, invalid, pending: root.cdbSync?.queueSize?.() || 0, importPending: !!review, googleSession, retrying: retryingConnection });
+    const hint = doc.getElementById('pilotConnectionHint');
+    hint.textContent = state.hint;
+    hint.hidden = !state.hint;
+    home.dataset.sync = state.syncState;
     doc.getElementById('pilotPairHint').textContent = googleSession ? 'Sua conta Google conecta este aparelho à sua empresa e loja.' : 'Solicite o código de conexão à equipe da Casa da Baba.';
     doc.getElementById('pilotRailStatus').textContent = state.rail;
     doc.getElementById('pilotConnection').textContent = review ? 'Envio pausado · revise a importação' : state.rail;
     doc.getElementById('pilotConnectionDetail').textContent = state.status + '. ' + state.pairing + ' ' + state.queue;
     const reconnect = doc.getElementById('pilotReconnect');
-    reconnect.hidden = health !== 'offline' && !checkingConnection;
+    // Só aparece sem conexão (e durante a nova tentativa): na abertura normal não pisca.
+    reconnect.hidden = health !== 'offline' && !retryingConnection;
     reconnect.disabled = checkingConnection;
     reconnect.innerHTML = pilotIcon('refresh-cw');
     reconnect.setAttribute('aria-label', checkingConnection ? 'Conferindo conexão' : 'Verificar conexão');
@@ -763,7 +774,10 @@
   }
   async function refreshHealth() {
     if (checkingConnection) return;
-    health = root.navigator?.onLine === false ? 'offline' : 'checking'; showConnection();
+    const wasOffline = health === 'offline';
+    health = root.navigator?.onLine === false ? 'offline' : 'checking';
+    retryingConnection = wasOffline && health === 'checking';
+    showConnection();
     if (health === 'offline') return;
     checkingConnection = true; showConnection();
     try {
@@ -772,7 +786,7 @@
       const body = await response.json();
       health = body.databaseOk === true && root.navigator?.onLine !== false ? 'online' : 'offline';
     } catch { health = 'offline'; }
-    finally { checkingConnection = false; }
+    finally { checkingConnection = false; retryingConnection = false; }
     showConnection();
   }
   async function connectProduction() {
@@ -785,14 +799,20 @@
     const target = result?.paired ? doc.getElementById('pilotConnection') : button;
     target.focus(); target.scrollIntoView({ block: 'nearest' });
   }
-  function showOtaStatus(state) {
+  function showOtaMessage(text, visible) {
+    const status = doc.getElementById('pilotOtaStatus');
+    status.textContent = text;
+    status.hidden = !visible;
+  }
+  function showOtaStatus(state, manual = false) {
     if (Number.isSafeInteger(state.nativeVersionCode) && state.nativeVersionCode > 0
         && typeof state.builtinVersion === 'string' && state.builtinVersion) {
       nativeVersion = { code: state.nativeVersionCode, version: state.builtinVersion };
     }
     pendingContent = state.pendingVersion || '';
     showVersion();
-    doc.getElementById('pilotOtaStatus').textContent = otaStatusText(state);
+    // Falha passageira só ocupa o Início para quem pediu a conferência; o rodapé já traz a versão.
+    showOtaMessage(otaStatusText(state), !!(state.pendingVersion || state.rolledBack || (manual && state.lastError)));
     doc.getElementById('pilotRollback').hidden = !state.canRollback || !!state.pendingVersion;
     doc.getElementById('pilotPushStatus').textContent = state.pushSubscribed
       ? 'Aparelho inscrito para receber atualizações. A inscrição não confirma o recebimento de uma atualização. A verificação ao abrir continua disponível.'
@@ -815,7 +835,7 @@
       await confirmOtaHealth(root, config, updater());
       showOtaStatus(await updater().check());
     } catch {
-      doc.getElementById('pilotOtaStatus').textContent = 'Não foi possível confirmar a atualização. Se esta for uma versão nova, a anterior será recuperada na próxima abertura.';
+      showOtaMessage('Não foi possível confirmar a atualização. Se esta for uma versão nova, a anterior será recuperada na próxima abertura.', true);
     }
   }
   async function checkUpdate(options = {}) {
@@ -837,8 +857,8 @@
     if (!automatic) { message.focus(); message.scrollIntoView({ block: 'nearest' }); }
     try {
       if (updater()) {
-        try { showOtaStatus(await (automatic ? updater().status() : updater().check())); }
-        catch { doc.getElementById('pilotOtaStatus').textContent = 'Não foi possível preparar a atualização de conteúdo. A versão atual foi mantida.'; }
+        try { showOtaStatus(await (automatic ? updater().status() : updater().check()), !automatic); }
+        catch { showOtaMessage('Não foi possível preparar a atualização de conteúdo. A versão atual foi mantida.', !automatic); }
       }
       let data;
       const http = root.Capacitor?.Plugins?.CapacitorHttp;
@@ -853,7 +873,7 @@
       }
       if (root.Capacitor?.isNativePlatform?.() && !nativeVersion) throw new Error('Versão nativa não confirmada.');
       latest = validateManifest(data, installedConfig());
-      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Atualize sem desinstalar.' : 'Versão publicada: ' + latest.version + ' (' + latest.versionCode + ').';
+      message.textContent = latest.available ? 'Versão ' + latest.version + ' disponível. Atualize sem desinstalar.' : 'Nada novo para instalar. Versão publicada: ' + latest.version + ' (' + latest.versionCode + ').';
       message.hidden = automatic && !latest.available;
       download.hidden = !latest.available;
       showVersion();
@@ -863,6 +883,8 @@
       checkingUpdate = false;
       button.disabled = false;
     }
+    // O resultado (e o botão de baixar, quando existe) entra na tela de quem pediu a conferência.
+    if (!automatic) (download.hidden ? message : download).scrollIntoView({ block: 'nearest' });
   }
   async function downloadUpdate() {
     if (!latest?.available) return;

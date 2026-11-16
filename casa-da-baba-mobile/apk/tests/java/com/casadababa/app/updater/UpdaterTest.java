@@ -318,6 +318,30 @@ public class UpdaterTest {
         check(!checkUpdate(tamperApp).getBoolean("checkSucceeded"), "Different native APK manifest rejected");
         signedManifest(new JSONObject(next.toString()).put("bundleVersion", "0.3.2"), key);
         check(!checkUpdate(tamperApp).getBoolean("checkSucceeded"), "Internal bundle version mismatch rejected");
+        notPublishedTests(key, next, data.toByteArray());
+    }
+
+    /** Canal sem pacote publicado para este APK (manifesto 404) nao e falha; qualquer outro erro continua sendo. */
+    private static void notPublishedTests(KeyPair key, JSONObject next, byte[] zipBytes) throws Exception {
+        NetworkFixture.responses.put(URL, zipBytes);
+        signedManifest(next, key);
+        NetworkFixture.statusByUrl.put(UpdatePolicy.MANIFEST_URL, 404);
+        OtaManager unpublished = networkManager(directory("not-published"), key);
+        JSONObject quiet = checkUpdate(unpublished);
+        check(quiet.getBoolean("checkSucceeded"), "Manifest 404 is a successful check (nothing published for this APK)");
+        check(quiet.getString("lastError").isEmpty(), "Manifest 404 leaves no error");
+        check(quiet.getString("pendingVersion").isEmpty(), "Manifest 404 prepares nothing");
+        for (int code : new int[] { 403, 500, 503 }) {
+            NetworkFixture.statusByUrl.put(UpdatePolicy.MANIFEST_URL, code);
+            JSONObject failed = checkUpdate(unpublished);
+            check(!failed.getBoolean("checkSucceeded") && !failed.getString("lastError").isEmpty(), "Manifest HTTP " + code + " stays an error");
+        }
+        NetworkFixture.statusByUrl.remove(UpdatePolicy.MANIFEST_URL);
+        NetworkFixture.statusByUrl.put(URL, 404);
+        JSONObject zip404 = checkUpdate(networkManager(directory("zip-404"), key));
+        check(!zip404.getBoolean("checkSucceeded") && !zip404.getString("lastError").isEmpty(), "Package ZIP 404 stays an error");
+        check(zip404.getString("pendingVersion").isEmpty(), "Package ZIP 404 prepares nothing");
+        NetworkFixture.statusByUrl.clear();
     }
 
     private static File zip(String name, String[] entries, int largeBytes) throws Exception {

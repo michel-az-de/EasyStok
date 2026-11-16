@@ -11,6 +11,10 @@ import java.util.zip.ZipInputStream;
 
 /** Validation shared by the Android updater and its dependency-free host tests. */
 public final class UpdatePolicy {
+    /** O manifesto do canal responde 404: nenhum pacote de conteúdo foi publicado para este APK. Não é falha. */
+    public static final class NotPublished extends IOException {
+        NotPublished(String message) { super(message); }
+    }
     public static final long MAX_ZIP = 64L * 1024 * 1024;
     public static final long MAX_EXPANDED = 128L * 1024 * 1024;
     public static final long MAX_FILE = 32L * 1024 * 1024;
