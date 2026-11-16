@@ -63,6 +63,9 @@ try {
     })
     const page = await context.newPage()
     page.setDefaultTimeout(10000)
+    // #2814: abrir a página depende do Vite e da máquina, não do que a prova confere. Com a suíte em paralelo e
+    // a máquina carregada, o goto passava de 10 s. Só a navegação ganha folga; as esperas da tela seguem em 10 s.
+    page.setDefaultNavigationTimeout(60000)
     const erros = []
     page.on('pageerror', erro => erros.push(erro.message))
     try {

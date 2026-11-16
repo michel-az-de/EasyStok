@@ -68,6 +68,12 @@ await context.route('**/api/**', async route => {
 })
 const page = await context.newPage()
 page.setDefaultTimeout(10000)
+// #2814: abrir e recarregar a página dependem do Vite e da máquina, não do que a prova confere. Com a máquina
+// carregada, o goto passava de 10 s. Só a navegação ganha folga; as esperas da tela seguem em 10 s.
+page.setDefaultNavigationTimeout(60000)
+// #2437: abrir a conversa marca como lida e pede a sugestão da Assistente; nenhuma das duas mexe no pedido.
+// #2814: essas duas saem quando o aplicativo quer, então a prova conta só as escritas que mudam o pedido.
+const escritaNoPedido = c => c.metodo !== 'GET' && !c.path.endsWith('/marcar-lida') && !c.path.endsWith('/sugestao')
 // #2437: no celular a aba "Pedido" virou "Cliente", e a comanda é um resumo que se abre em "Revisar comanda".
 const recolherPedido = async () => { // a comanda aberta fica sobre o cardápio e é lembrada entre recargas
   const recolher = page.getByRole('button', { name: /^Recolher Comanda/ })
@@ -164,7 +170,7 @@ try {
       assert.equal(await page.getByRole('button', { name: 'Anotação para ' + item.nome, exact: true }).count(), 1,
         'Cada tamanho fica no pedido com seu nome original: ' + item.id)
     }
-    assert.equal(chamadas.filter(c => c.metodo !== 'GET').every(c => c.path.endsWith('/marcar-lida') || c.path.endsWith('/sugestao')), true) // #2437: abrir a conversa também pede a sugestão da Assistente (só leitura)
+    assert.deepEqual(chamadas.filter(escritaNoPedido), [], 'Montar a comanda não escreve no pedido')
     await foto(page, '04-pedido-390')
     await recolherPedido()
     nativa = true
@@ -193,7 +199,7 @@ try {
     await page.setViewportSize({ width: 1280, height: 720 })
     const pedido = page.locator('#comanda-pedido')
     const pedidoAntes = await pedido.innerText()
-    const escritasAntes = chamadas.filter(c => c.metodo !== 'GET').length
+    const escritasAntes = chamadas.filter(escritaNoPedido).length
     const bloqueado = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g na comanda', exact: true })
     await bloqueado.scrollIntoViewIfNeeded()
     const r = await bloqueado.boundingBox(), alvo = await pedido.boundingBox()
@@ -205,7 +211,7 @@ try {
     assert.equal(await page.getByText('Soltar aqui', { exact: true }).count(), 0, 'Comanda bloqueada não aceita arrasto')
     await page.mouse.up()
     assert.equal(await pedido.innerText(), pedidoAntes, 'Clique e arrasto bloqueados preservam os itens do pedido')
-    const escritasDepois = chamadas.filter(c => c.metodo !== 'GET')
+    const escritasDepois = chamadas.filter(escritaNoPedido)
     assert.equal(escritasDepois.length, escritasAntes, 'Tentativa bloqueada não escreve na API: '
       + JSON.stringify(escritasDepois.slice(escritasAntes)))
     await foto(page, '07-clique-arrasto-bloqueados-1280')
