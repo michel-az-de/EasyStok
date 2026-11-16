@@ -855,3 +855,72 @@ test('faixa do topo continua no lugar durante a conferência seguinte', async ()
   await pending;
   assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
 });
+
+// #2804: na tela "Quem vai usar o app?" o Voltar não pode abrir o Início por cima e liberar a operação sem nome.
+test('boas-vindas visível bloqueia o Início e o Voltar minimiza sem navegar', () => {
+  const { root, doc, nodes } = pilotHarness({ operator: '' });
+  let welcomeVisible = true, backs = 0;
+  nodes.set('welcomeScreen', { classList: { contains: name => name === 'hidden' ? !welcomeVisible : false } });
+  root.cdbHandleBack = () => { backs++; return true; };
+  doc.querySelector = () => ({ dataset: { screen: 'home' } });
+  assert.equal(root.cdbHandleNativeBack(), false);
+  assert.equal(backs, 0, 'não chama o voltar do PWA, que levaria ao Início');
+  nodes.get('pilotHomeButton').click?.();
+  root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotHome').open, false, 'o Início não cobre as boas-vindas');
+  welcomeVisible = false;
+  root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotHome').open, true);
+});
+
+// #2804: falha de rede numa conferência posterior não apaga a oferta que já estava na tela.
+test('falha na conferência seguinte mantém a oferta de APK novo, o botão e o aviso do rodapé', async () => {
+  const gate = {};
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
+  gate.wait = Promise.reject(new Error('rede'));
+  gate.wait.catch(() => {});
+  await root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false, 'a faixa continua');
+  assert.equal(nodes.get('pilotDownload').hidden, false, 'o botão de baixar continua');
+  assert.match(nodes.get('pilotRailVersion').textContent, /atualização disponível/);
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Não foi possível conferir/);
+});
+
+// #2804: pedir a conferência enquanto a automática roda mostra o andamento em vez de ficar mudo.
+test('conferência manual durante a automática mostra que está conferindo', async () => {
+  let release;
+  const gate = { wait: new Promise(resolve => { release = resolve; }) };
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  await root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotUpdateStatus').hidden, false);
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Conferindo a versão disponível/);
+  release();
+});
+
+// #2804: envio bem-sucedido prova a conexão; o rodapé não fica preso em "Sem conexão confirmada".
+test('sincronização bem-sucedida confirma a conexão depois de uma checagem que estourou', async () => {
+  const { root, nodes, events } = pilotHarness({ healthFetch: () => { throw new Error('timeout'); } });
+  root.cdbSync.getPairing = () => ({ empresaId: 'empresa', lojaId: 'loja' });
+  await new Promise(setImmediate);
+  events.get('cdb-sync-success')();
+  assert.equal(nodes.get('pilotHome').dataset.sync, 'online');
+  root.navigator.onLine = false;
+  events.get('offline')();
+  events.get('cdb-sync-success')();
+  assert.equal(nodes.get('pilotHome').dataset.sync, 'offline', 'sem rede o envio não promove a conexão');
+});
+
+// #2804: o Voltar do Android fecha o diálogo de conta antes de minimizar ou navegar.
+test('Voltar fecha o diálogo de conta aberto', () => {
+  const { root, doc, nodes } = pilotHarness();
+  const account = doc.createElement('dialog');
+  account.open = true;
+  nodes.set('pilotAccountDialog', account);
+  assert.equal(nodes.get('pilotHome').open, true);
+  assert.equal(root.cdbHandleNativeBack(), true);
+  assert.equal(account.open, false);
+  assert.equal(nodes.get('pilotHome').open, true);
+});

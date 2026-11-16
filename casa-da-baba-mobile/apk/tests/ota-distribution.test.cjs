@@ -210,3 +210,17 @@ test('APK novo mantém manifesto e recuperação legados intactos', () => {
   assert.equal(current(root).sequence,7);
   assert.equal(ota.verify(read(path.join(channelRoot(root),'previous.json')),key).sequence,6);
 });
+
+// #2804 (#2123 item 1): o aparelho guarda a maior sequência mesmo ao trocar de APK, então
+// o servidor não pode aceitar sequência menor que alguma já publicada, em qualquer canal.
+test('instalação recusa sequência menor que release já publicada em outro canal', () => {
+  const root = fs.mkdtempSync(path.join(temporary, 'cross-channel-'));
+  const other = build('0.4.0', 9);
+  fs.copyFileSync(other.release, path.join(root, 'release-9.json'));
+  const lower = staging(root, build('0.4.1', 5));
+  run(root, lower, 'install', false);
+  assert.equal(fs.existsSync(path.join(root, 'release-5.json')), false);
+  const higher = staging(root, build('0.4.2', 10));
+  run(root, higher, 'install'); run(root, higher, 'activate');
+  assert.equal(current(root).sequence, 10);
+});
