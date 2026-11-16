@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Cliente;
 using EasyStock.Application.UseCases.CriarCliente;
+using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.ValueObjects;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 using ClienteAlteracao = EasyStock.Domain.Entities.ClienteAlteracao;
@@ -69,6 +70,17 @@ public class AtualizarClienteUseCase(
             telNormalizado, cmd.Email, docNormalizado, cmd.Observacoes);
         cliente.AtualizarPessoaJuridica(cmd.PessoaJuridica, cmd.NomeFantasia, cmd.InscricaoEstadual);
 
+        // O login por OTP do storefront acha o cliente pelo TelefoneHash: se o telefone muda e o hash fica,
+        // o número antigo continua abrindo a conta e o novo não encontra ninguém. Número removido ou
+        // inválido zera o hash.
+        var telefoneMudou = diffs.Any(d => d.Campo == "Telefone");
+        if (telefoneMudou)
+        {
+            cliente.TelefoneHash = TelefoneE164.TryFrom(telNormalizado) is { } e164
+                ? ClienteOtp.CalcularTelefoneHash(e164.Value)
+                : null;
+        }
+
         foreach (var (campo, antigo, novo) in diffs)
         {
             await repo.AddAlteracaoAsync(new ClienteAlteracao
@@ -87,7 +99,16 @@ public class AtualizarClienteUseCase(
         }
 
         await repo.UpdateAsync(cliente);
-        await uow.CommitAsync();
+        try
+        {
+            await uow.CommitAsync();
+        }
+        catch (Exception ex) when (telefoneMudou && uow.EhViolacaoDeUnicidade(ex))
+        {
+            // Índice único (EmpresaId, TelefoneHash): o número novo já é de outro cadastro desta empresa.
+            uow.DescartarAlteracoesPendentes();
+            throw new UseCaseValidationException("Já existe outro cliente com este telefone. Confira o cadastro dele antes de salvar.");
+        }
 
         logger.LogInformation("Cliente {Id} atualizado ({Diffs} campos).", cliente.Id, diffs.Count);
         return CriarClienteUseCase.Map(cliente);
