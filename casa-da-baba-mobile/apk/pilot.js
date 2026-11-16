@@ -357,6 +357,7 @@
       <div class="pilot-topline"><span class="pilot-home-brand"><img class="pilot-brand-mark" src="casa-da-baba.png" alt="" width="60" height="44"><span>Casa da Baba<small id="pilotHomeVersion">PILOTO</small></span></span><div class="pilot-top-actions">${bell('pilotHomeNoticeBell', 'pilotHomeNoticeCount')}<button type="button" data-action="close" aria-label="Fechar início">${closeIcon}</button></div></div>
       <h1 id="pilotTitle" tabindex="-1">Início</h1>
       <p id="pilotError" class="pilot-feedback pilot-error" role="alert" tabindex="-1"></p>
+      <section id="pilotUpdateOffer" class="pilot-update-offer" hidden aria-label="Atualização do aplicativo"><p id="pilotUpdateOfferText" role="status"></p><button type="button" data-action="download">${pilotIcon('refresh-cw')}<span>Atualizar agora</span></button></section>
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
       <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
       <div class="pilot-actions">
@@ -597,6 +598,9 @@
       + (pendingContent ? ' · Próximo conteúdo: ' + pendingContent + ' ao reabrir' : '');
     doc.getElementById('pilotRailVersion').textContent = (nativeVersion ? 'APK ' + nativeVersion.version : 'Piloto')
       + (latest?.available ? ' · atualização disponível' : pendingContent ? ' · conteúdo pronto' : '');
+    // #2785: a oferta sobe para o topo do Início, sem depender do aviso do push nem de rolar a tela.
+    doc.getElementById('pilotUpdateOffer').hidden = !latest?.available;
+    doc.getElementById('pilotUpdateOfferText').textContent = latest?.available ? 'Versão ' + latest.version + ' disponível. Instale sem desinstalar.' : '';
   }
   showVersion();
 

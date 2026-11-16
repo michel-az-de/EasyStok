@@ -177,6 +177,11 @@
 .pilot-card-arrow svg { width: 18px; height: 18px; }
 .pilot-connection { padding: 14px 16px 7px; margin: 0 0 16px; border: 1px solid var(--border); border-radius: var(--pilot-r-md); background: var(--bg-elev-2); }
 .pilot-connection p { color: var(--ink-dim); line-height: 1.55; }
+/* #2785: oferta de APK novo no topo do Início, visível sem rolar. */
+.pilot-update-offer:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: -6px 0 18px; padding: 14px 16px; border: 1px solid var(--fill-basil); border-radius: var(--pilot-r-md); background: var(--bg-elev); }
+.pilot-update-offer p { flex: 1 1 180px; margin: 0; color: var(--ink); font: 600 14px/1.45 'Manrope', sans-serif; }
+.pilot-update-offer button { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 12px 16px; border: 0; border-radius: var(--pilot-r-sm); background: var(--fill-basil); color: #fff; font: 700 14px/1.2 'Manrope', sans-serif; cursor: pointer; }
+.pilot-update-offer button svg { width: 20px; height: 20px; flex-shrink: 0; }
 .pilot-connection button { font-weight: 650; padding: 8px 0; margin: 2px 16px 0 0; text-underline-offset: 3px; }
 .pilot-hint { line-height: 1.55; }
 .pilot-local { padding: 16px; border-radius: var(--pilot-r-md); margin-top: 14px; }
