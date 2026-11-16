@@ -23,7 +23,8 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class CaixaControllerFechamentoTests
 {
     private readonly ICaixaRepository _repo = Substitute.For<ICaixaRepository>();
-    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<FechamentoCaixaResult>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<FechamentoCaixaResult>()
+        .SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly Guid _usuarioId = Guid.NewGuid();

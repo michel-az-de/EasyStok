@@ -1,7 +1,9 @@
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums;
@@ -40,7 +42,7 @@ public class FinanceiroPermissaoEConciliacaoTests
         parcela.ContaPagar = conta;
         repo.GetParcelaWithContaAsync(Empresa, parcela.Id, Arg.Any<CancellationToken>()).Returns(parcela);
         var controller = new ContasAPagarController(null!, null!, null!, null!, null!, null!, null!, null!,
-            new RegistrarPagamentoParcelaPagarUseCase(repo, caixa, Substitute.For<IUnitOfWork>(), NullLogger<RegistrarPagamentoParcelaPagarUseCase>.Instance),
+            new RegistrarPagamentoParcelaPagarUseCase(repo, caixa, new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(caixa)), Substitute.For<IUnitOfWork>(), NullLogger<RegistrarPagamentoParcelaPagarUseCase>.Instance),
             null!, SoConsulta(Permissao.VisualizarContasAPagar, Permissao.GerenciarContasAPagar));
 
         var r = await controller.RegistrarPagamento(conta.Id, parcela.Id,

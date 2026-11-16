@@ -3,7 +3,9 @@ using EasyStock.Api.Http;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Financeiro.ContasPagar;
+using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
+using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
@@ -40,7 +42,7 @@ public class ContasAPagarControllerTests
             new RemoverParcelaContaPagarUseCase(_contaRepo, _uow),
             new ListarContasPagarUseCase(_contaRepo),
             new ObterContaPagarDetalheUseCase(_contaRepo),
-            new RegistrarPagamentoParcelaPagarUseCase(_contaRepo, _caixaRepo, _uow, NullLogger<RegistrarPagamentoParcelaPagarUseCase>.Instance),
+            new RegistrarPagamentoParcelaPagarUseCase(_contaRepo, _caixaRepo, new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_caixaRepo)), _uow, NullLogger<RegistrarPagamentoParcelaPagarUseCase>.Instance),
             new EstornarPagamentoParcelaPagarUseCase(_contaRepo, _caixaRepo, _uow, NullLogger<EstornarPagamentoParcelaPagarUseCase>.Instance),
             _currentUser);
     }
