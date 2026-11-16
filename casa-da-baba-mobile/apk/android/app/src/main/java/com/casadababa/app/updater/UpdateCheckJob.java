@@ -35,9 +35,8 @@ public class UpdateCheckJob extends JobService {
             if (running != params) return;
             running = null;
             announce(status.optString("pendingVersion", ""));
-            boolean retry = status.optBoolean("checking") || status.optBoolean("trial")
-                || !status.optBoolean("checkSucceeded");
-            jobFinished(params, retry);
+            jobFinished(params, UpdatePolicy.shouldRetryCheck(status.optBoolean("checking"), status.optBoolean("trial"),
+                status.optBoolean("checkSucceeded")));
         }));
         return true;
     }

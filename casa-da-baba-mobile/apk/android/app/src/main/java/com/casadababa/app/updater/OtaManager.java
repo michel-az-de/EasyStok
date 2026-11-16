@@ -303,6 +303,9 @@ public final class OtaManager {
                 download();
                 synchronized (this) { checkSucceeded = true; lastError = ""; }
             }
+            catch (UpdatePolicy.NotPublished unpublished) {
+                synchronized (this) { checkSucceeded = true; lastError = ""; }
+            }
             catch (Exception error) {
                 synchronized (this) { lastError = safeError(error); }
             } finally {
@@ -357,7 +360,7 @@ public final class OtaManager {
         File stage = new File(root, "stage-" + UUID.randomUUID());
         try {
             long expected = integer(release, "sizeBytes");
-            HttpsURLConnection connection = connect(string(release, "url"));
+            HttpsURLConnection connection = connect(string(release, "url"), false);
             try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(archive)) {
                 copyLimited(input, output, expected);
                 output.getFD().sync();
@@ -398,7 +401,7 @@ public final class OtaManager {
         }
     }
 
-    private static HttpsURLConnection connect(String url) throws IOException {
+    private static HttpsURLConnection connect(String url, boolean manifest) throws IOException {
         UpdatePolicy.validateUrl(url);
         HttpsURLConnection connection = (HttpsURLConnection) new URL(url).openConnection();
         connection.setInstanceFollowRedirects(false);
@@ -408,13 +411,14 @@ public final class OtaManager {
         connection.setRequestProperty("Accept-Encoding", "identity");
         connection.setRequestProperty("Cache-Control", "no-cache");
         try {
+            if (manifest && connection.getResponseCode() == 404) throw new UpdatePolicy.NotPublished("Nenhum pacote de conteúdo publicado para este APK.");
             UpdatePolicy.require(connection.getResponseCode() == 200, "Servidor de atualização indisponível (HTTP " + connection.getResponseCode() + ").");
             return connection;
         } catch (IOException error) { connection.disconnect(); throw error; }
     }
 
     private static byte[] fetch(String url, long limit) throws IOException {
-        HttpsURLConnection connection = connect(url);
+        HttpsURLConnection connection = connect(url, true);
         try (InputStream input = connection.getInputStream()) { return readLimited(input, limit); }
         finally { connection.disconnect(); }
     }

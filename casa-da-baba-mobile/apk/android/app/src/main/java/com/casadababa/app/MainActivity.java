@@ -111,6 +111,8 @@ public class MainActivity extends BridgeActivity {
             ? new ServerPath(ServerPath.PathType.ASSET_PATH, Bridge.DEFAULT_WEB_ASSET_DIR)
             : new ServerPath(ServerPath.PathType.BASE_PATH, path));
         super.load();
+        // Troca o cliente padrão já em onCreate: os launchers de ActivityResult só podem ser registrados antes de STARTED.
+        if (bridge != null && bridge.getWebView() != null) bridge.getWebView().setWebChromeClient(new PilotChromeClient(bridge));
     }
 
     private void showStartupOverlay() {

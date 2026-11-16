@@ -938,3 +938,135 @@ body.pilot-app .pilot-home-controls #pilotRollback { margin: 0; }
 /* #2212 Coerência: uma fonte em todo o piloto (códigos seguem monoespaçados) e movimento reduzido de verdade. */
 body.pilot-app :is(*):not(code, pre, kbd, samp, .pix-value, .cr-code, [class*=mono]) { font-family: 'Manrope', sans-serif !important; }
 @media (prefers-reduced-motion: reduce) { body.pilot-app *, body.pilot-app *::before, body.pilot-app *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }
+
+/* #2735 Início: terceiro atalho em faixa, conexão como estado (não título), apoio sem buraco na grade. */
+@media (max-width: 767px) {
+  body.pilot-app #pilotHome .pilot-actions .pilot-tile:nth-child(3):last-child { grid-column: 1 / -1; aspect-ratio: auto; flex-direction: row; gap: 14px; min-height: 76px; padding: 14px 20px; }
+  body.pilot-app #pilotHome .pilot-actions .pilot-tile:nth-child(3):last-child > svg { width: 32px; height: 32px; }
+}
+body.pilot-app .pilot-home .pilot-connection { display: flex; align-items: center; gap: 8px; min-height: 48px; margin: 0 0 8px; }
+body.pilot-app .pilot-home #pilotConnection { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; margin: 0; padding: 5px 12px; border-radius: var(--pilot-r-lg); background: var(--bg-elev-2); color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+body.pilot-app .pilot-home #pilotConnection::before { content: ''; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-mute); }
+body.pilot-app .pilot-home[data-sync=online] #pilotConnection::before { background: var(--basil); }
+body.pilot-app .pilot-home[data-sync=pending] #pilotConnection::before { background: var(--gold); }
+body.pilot-app .pilot-home:is([data-sync=invalid], [data-sync=offline]) #pilotConnection::before { background: var(--accent); }
+body.pilot-app .pilot-home .pilot-connection #pilotReconnect { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 48px; min-height: 48px; margin: 0 0 0 auto; padding: 8px 12px; border: 0; border-radius: var(--pilot-r-md); background: var(--bg-elev-2); color: var(--ink); font-size: 14px; font-weight: 600; text-decoration: none; }
+body.pilot-app .pilot-home .pilot-connection #pilotReconnect[hidden] { display: none; }
+body.pilot-app .pilot-home .pilot-connection #pilotReconnect svg { width: 22px; height: 22px; }
+body.pilot-app .pilot-home .pilot-connection #pilotReconnect:disabled { opacity: .5; }
+body.pilot-app .pilot-home .pilot-connection-hint { margin: 0 0 12px; color: var(--ink-dim); font-size: 14px; line-height: 1.5; }
+body.pilot-app .pilot-home .pilot-connection-hint[hidden] { display: none; }
+body.pilot-app #pilotHome .pilot-home-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+body.pilot-app #pilotHome .pilot-home-controls .pilot-tile { flex: 1 1 calc((100% - 16px) / 3); width: auto; aspect-ratio: auto; min-height: 104px; }
+@media (max-width: 359px) { body.pilot-app #pilotHome .pilot-home-controls .pilot-tile { flex-basis: calc((100% - 8px) / 2); } }
+body.pilot-app .pilot-home .pilot-ota-status { margin-top: 8px; font-size: 13px; line-height: 1.5; }
+body.pilot-app .pilot-home .pilot-ota-status[hidden] { display: none; }
+html:not([data-theme=light]) body.pilot-app .pilot-brand-mark { border-radius: var(--pilot-r-sm); }
+
+/* #2735 Clientes, Finalizados e avisos no padrão do piloto: cantos, alvos de 48 px, texto a partir de 12 px, contraste 4,5:1. */
+body.pilot-app { --accent-ink: var(--accent); }
+[data-theme=light] body.pilot-app { --accent-ink: #984830; }
+body.pilot-app .phone :is([data-screen=clientes], [data-screen=finalizados]) { --pilot-divider: color-mix(in srgb, var(--ink) 14%, transparent); }
+body.pilot-app .phone .nav-btn.active { color: var(--accent-ink); }
+body.pilot-app [data-screen=clientes] .screen-title { font: 750 24px/1.3 'Manrope', sans-serif; }
+body.pilot-app .phone .client-value-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+body.pilot-app .phone .client-value-card { min-width: 0; padding: 12px; border: 0; border-radius: var(--pilot-r-md); background: var(--bg-elev-2); box-shadow: none; }
+body.pilot-app .phone .client-value-card:nth-child(3) { grid-column: 1 / -1; }
+body.pilot-app .phone .client-value-card .k { color: var(--ink-dim); font-size: 12px; font-weight: 600; line-height: 1.4; letter-spacing: 0; text-transform: none; }
+body.pilot-app .phone .client-value-card .v { margin-top: 2px; font-size: 20px; font-weight: 700; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.pilot-app .phone [data-screen=clientes] .client-card { margin: 0; padding: 16px 0 20px; border: 0; border-bottom: 1px solid var(--pilot-divider); border-radius: 0; background: transparent; box-shadow: none; }
+body.pilot-app .phone [data-screen=clientes] .client-card:last-child { border-bottom: 0; }
+body.pilot-app .phone #clientRecurrenceList { padding-bottom: 64px; }
+body.pilot-app .phone .client-name { font-size: 17px; font-weight: 700; line-height: 1.35; letter-spacing: -.01em; }
+body.pilot-app .phone .client-recency { margin-top: 2px; color: var(--ink-dim); font-size: 14px; font-weight: 500; line-height: 1.5; }
+body.pilot-app .phone .client-badge { margin-left: 8px; padding: 2px 8px; border-radius: var(--pilot-r-sm); background: var(--bg-elev-2); color: var(--ink-dim); font-size: 12px; font-weight: 600; line-height: 1.5; letter-spacing: 0; text-transform: none; }
+body.pilot-app .phone .client-badge-top { background: var(--basil-soft); color: var(--basil); }
+body.pilot-app .phone .client-badge-recorrente { background: var(--gold-soft); color: var(--gold); }
+body.pilot-app .phone .client-badge-risco { background: var(--accent-soft); color: var(--accent-ink); }
+body.pilot-app .phone .client-rank { padding: 4px 8px; border: 0; border-radius: var(--pilot-r-sm); background: var(--bg-elev-2); color: var(--ink-dim); font-size: 12px; font-weight: 600; line-height: 1.5; }
+body.pilot-app .phone .client-meta { display: flex; flex-wrap: wrap; align-items: center; row-gap: 8px; margin-top: 10px; font-size: 0; line-height: 0; }
+body.pilot-app .phone .client-meta > * { margin: 0 8px 0 0; font-size: 14px; line-height: 1.4; }
+body.pilot-app .phone :is(.client-wa-btn, .client-map-btn) { gap: 8px; min-height: 48px; max-width: 100%; padding: 8px 14px; border: 0; border-radius: var(--pilot-r-md); font-size: 14px; font-weight: 600; }
+body.pilot-app .phone .client-wa-btn { background: var(--basil-soft); color: var(--basil); }
+body.pilot-app .phone .client-map-btn { background: var(--bg-elev-2); color: var(--ink-dim); }
+body.pilot-app .phone .client-wa-btn:focus-visible, body.pilot-app .phone .client-map-btn:focus-visible { outline: 2px solid var(--basil); outline-offset: 2px; }
+body.pilot-app .phone .client-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+body.pilot-app .phone .client-stat { padding: 10px 12px; border: 0; border-radius: var(--pilot-r-sm); background: var(--bg-elev-2); }
+body.pilot-app .phone .client-stat:nth-child(3) { grid-column: 1 / -1; }
+body.pilot-app .phone .client-stat span { color: var(--ink-dim); font-size: 12px; font-weight: 600; line-height: 1.4; letter-spacing: 0; text-transform: none; }
+body.pilot-app .phone .client-stat strong { margin-top: 2px; font-size: 15px; font-weight: 700; line-height: 1.4; }
+body.pilot-app .phone .client-card-foot { gap: 8px; }
+body.pilot-app .phone .client-card-foot button { min-width: 0; min-height: 48px; padding: 8px 6px; border: 0; border-radius: var(--pilot-r-md); background: var(--bg-elev-2); color: var(--ink); font-size: 14px; font-weight: 600; }
+body.pilot-app .phone .client-card-foot button.primary:not(:disabled) { background: var(--fill-basil); color: #fffaf2; }
+body.pilot-app .phone [data-screen=clientes] .empty { padding: 32px 16px; border: 0; background: transparent; color: var(--ink-dim); font-size: 14px; line-height: 1.5; }
+body.pilot-app .phone .fab { padding: 12px 20px; border-radius: var(--pilot-r-lg); font-size: 15px; font-weight: 700; letter-spacing: 0; box-shadow: 0 4px 14px #352d2526; }
+body.pilot-app .phone .fin-code { font-size: 12px; line-height: 1.5; }
+body.pilot-app .phone .fin-name { font-size: 16px; line-height: 1.4; }
+body.pilot-app .phone .fin-meta { font-size: 13px; line-height: 1.5; }
+body.pilot-app .phone .fin-badge { padding: 4px 10px; border-radius: var(--pilot-r-sm); font-size: 12px; font-weight: 600; line-height: 1.5; letter-spacing: 0; }
+body.pilot-app .phone .fin-badge.cancelado { color: var(--accent-ink); }
+body.pilot-app .phone .fin-actions { gap: 8px; margin-top: 12px; }
+body.pilot-app .phone .fin-action { min-height: 48px; padding: 8px 10px; border: 0; border-radius: var(--pilot-r-md); background: var(--bg-elev-2); color: var(--ink); font-size: 14px; font-weight: 600; white-space: normal; }
+body.pilot-app .phone .fin-action.danger { background: var(--accent-soft); color: var(--accent-ink); }
+body.pilot-app .phone #finList .confer-empty { padding: 32px 16px; border: 0; background: transparent; color: var(--ink-dim); font-size: 14px; font-style: normal; line-height: 1.5; }
+body.pilot-app .toast { padding: 12px 16px; border: 1px solid var(--border-strong); border-radius: var(--pilot-r-md); background: var(--bg-elev); color: var(--ink); box-shadow: 0 6px 20px #352d2524; }
+body.pilot-app .toast .msg { font-size: 14px; line-height: 1.5; }
+body.pilot-app .toast .undo { min-height: 48px; padding: 8px 4px 8px 12px; color: var(--accent-ink); font-size: 14px; letter-spacing: 0; text-transform: none; }
+body.pilot-app .action-toast { border-radius: var(--pilot-r-md); }
+body.pilot-app .action-toast .at-actions button { min-height: 48px; border-radius: var(--pilot-r-sm); }
+body.pilot-app .phone #kanban .k-card .k-quick-actions { gap: 8px; margin: 8px 0 10px; }
+body.pilot-app .phone #kanban .k-card :is(.k-quick-wa, .k-quick-map) { min-width: 48px; min-height: 48px; padding: 8px; border: 0; border-radius: var(--pilot-r-md); }
+body.pilot-app .phone #kanban .k-card .k-quick-wa { background: var(--basil-soft); color: var(--basil); }
+body.pilot-app .phone #kanban .k-card .k-quick-map { background: var(--bg-elev-2); color: var(--ink-dim); }
+body.pilot-app .phone [data-screen=producao] .stock-badge { background: var(--basil-soft); color: var(--basil); font-size: 12px; }
+body.pilot-app .phone [data-screen=producao] .stock-badge.empty { background: var(--accent-soft); color: var(--accent-ink); }
+body.pilot-app .phone [data-screen=producao] .grid-section { font-size: 12px; letter-spacing: .04em; }
+body.pilot-app .phone .order-draft-summary :is(.ods-k, .ods-sub) { font-size: 12px; line-height: 1.5; }
+/* Estados vazios como os de Pedidos: texto simples à esquerda, sem figura. */
+body.pilot-app .phone [data-screen=clientes] .empty { padding: 24px 0; text-align: left; font-size: 16px; font-style: normal; }
+body.pilot-app .phone [data-screen=clientes] .empty .big { display: none; }
+body.pilot-app .phone #finList .confer-empty { padding: 24px 0; text-align: left; font-size: 16px; }
+/* Nome da casa no topo do Início: 16 px também em tela estreita (herdava 10 px de uma regra antiga). */
+@media (max-width: 380px) { body.pilot-app .pilot-home .pilot-topline > .pilot-home-brand { font-size: 16px; letter-spacing: 0; } }
+/* Faixa de aviso do aparelho: cores do piloto com contraste, ação preenchida e ponto de estado no lugar do emoji. */
+body.pilot-app .health-banner { gap: 12px; background: var(--bg-elev-2); color: var(--ink); font-size: 14px; line-height: 1.4; box-shadow: 0 4px 12px #352d251f; }
+body.pilot-app .health-banner.warn { background: var(--gold-soft); color: var(--ink); }
+body.pilot-app .health-banner.error { background: var(--accent-soft); color: var(--ink); }
+body.pilot-app .health-banner.info { background: var(--bg-elev-2); color: var(--ink); }
+body.pilot-app .health-banner .hb-icon { flex: 0 0 8px; width: 8px; height: 8px; overflow: hidden; font-size: 0; line-height: 0; }
+body.pilot-app .health-banner .hb-icon::before { content: ''; display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-mute); }
+body.pilot-app .health-banner.warn .hb-icon::before { background: var(--gold); }
+body.pilot-app .health-banner.error .hb-icon::before { background: var(--accent); }
+body.pilot-app .health-banner .hb-msg { line-height: 1.4; }
+body.pilot-app .health-banner .hb-action { padding: 8px 12px; border: 0; border-radius: var(--pilot-r-md); background: var(--fill-basil); color: #fffaf2; font-size: 14px; font-weight: 600; }
+body.pilot-app .health-banner .hb-close { border-radius: var(--pilot-r-md); color: var(--ink-dim); opacity: 1; }
+/* Novo pedido: atalho de cliente avulso e alternadores sem tracejado, com canto e leitura do piloto. */
+body.pilot-app .phone .chip { border-radius: var(--pilot-r-md); }
+body.pilot-app .phone .chip.avulso { border: 0; background: var(--bg-elev-2); color: var(--ink); font-size: 14px; }
+body.pilot-app .phone :is(.retroactive-toggle, .schedule-toggle) { gap: 8px; padding: 8px 12px; border: 0; border-radius: var(--pilot-r-md); background: var(--bg-elev-2); color: var(--ink-dim); font-size: 14px; line-height: 1.4; text-align: left; }
+body.pilot-app .phone :is(.retroactive-toggle, .schedule-toggle).active { border: 0; background: var(--basil-soft); color: var(--basil); }
+/* Seletor de itens, categorias do produto e histórico do pedido. */
+body.pilot-app .sug-item { border: 0; border-radius: var(--pilot-r-md); background: var(--bg-elev-2); }
+body.pilot-app .sug-item .sn { font-size: 15px; line-height: 1.4; }
+body.pilot-app .sug-item .sr { color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
+body.pilot-app .sug-item.create { background: var(--accent-soft); color: var(--accent-ink); }
+body.pilot-app :is(.cat-pills, .loc-tabs) { border-radius: var(--pilot-r-md); }
+body.pilot-app :is(.cat-pill, .loc-tab) { border-radius: var(--pilot-r-sm); }
+body.pilot-app .he-meta { color: var(--ink-dim); font-size: 12px; line-height: 1.5; }
+/* Folhas de histórico, detalhes do lote e busca: cabeçalho da cor da folha (no tema claro vinha branco puro) e cantos do piloto. */
+body.pilot-app .historico-sheet { border-radius: var(--pilot-r-lg) var(--pilot-r-lg) 0 0; }
+body.pilot-app .historico-sheet .cobranca-head { background: var(--bg-elev); }
+body.pilot-app .historico-event { border-bottom: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); }
+body.pilot-app .historico-event:last-child { border-bottom: 0; }
+body.pilot-app .he-icon { border: 0; border-radius: var(--pilot-r-sm); background: var(--bg-elev-2); }
+body.pilot-app .he-action { font-size: 15px; line-height: 1.4; }
+body.pilot-app .he-action::first-letter { text-transform: uppercase; }
+body.pilot-app .he-change { font-size: 13px; font-style: normal; line-height: 1.5; }
+body.pilot-app .phone .prod-tile-action.pilot-command { border-radius: var(--pilot-r-sm); }
+body.pilot-app .demo-mode-banner { border-radius: var(--pilot-r-sm); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+/* Ícones no lugar dos emojis de mensagem e endereço: mesma cor do texto, sem depender da fonte do aparelho. */
+@supports (mask-image: url("")) or (-webkit-mask-image: url("")) {
+  body.pilot-app .phone :is(.client-wa-btn, .k-quick-wa) > span[aria-hidden] { --pilot-contact-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%205H28V22H14L6%2029V22H4Z%20M9%2011H23%20M9%2016H19%22%2F%3E%3C%2Fsvg%3E"); }
+  body.pilot-app .phone :is(.client-map-btn, .k-quick-map) > span[aria-hidden] { --pilot-contact-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%2010c0%204.993-5.539%2010.193-7.399%2011.799a1%201%200%200%201-1.202%200C9.539%2020.193%204%2014.993%204%2010a8%208%200%200%201%2016%200%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2210%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E"); }
+  body.pilot-app .phone :is(.client-wa-btn, .client-map-btn, .k-quick-wa, .k-quick-map) > span[aria-hidden] { display: block; flex: 0 0 20px; width: 20px; height: 20px; font-size: 0; line-height: 0; background: currentColor; mask: var(--pilot-contact-mask) center / contain no-repeat; -webkit-mask: var(--pilot-contact-mask) center / contain no-repeat; }
+}

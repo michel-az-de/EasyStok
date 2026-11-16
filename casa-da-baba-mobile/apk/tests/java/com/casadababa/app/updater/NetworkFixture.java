@@ -9,6 +9,8 @@ import javax.net.ssl.HttpsURLConnection;
 final class NetworkFixture {
     static final ConcurrentHashMap<String, byte[]> responses = new ConcurrentHashMap<>();
     static volatile int status = 200;
+    /** Status por URL; vence o status global. */
+    static final ConcurrentHashMap<String, Integer> statusByUrl = new ConcurrentHashMap<>();
     static volatile int packageRequests;
     static void install() {
         URL.setURLStreamHandlerFactory(protocol -> new URLStreamHandler() {
@@ -23,7 +25,7 @@ final class NetworkFixture {
                     public Certificate[] getServerCertificates() { return null; }
                     @Override public int getResponseCode() {
                         if (getInstanceFollowRedirects()) throw new AssertionError("Redirects must be disabled");
-                        return status;
+                        return statusByUrl.getOrDefault(url.toString(), status);
                     }
                     @Override public InputStream getInputStream() throws IOException {
                         byte[] bytes = responses.get(url.toString());

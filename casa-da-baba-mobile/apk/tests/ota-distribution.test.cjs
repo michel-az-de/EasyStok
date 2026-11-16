@@ -152,6 +152,11 @@ test('#2066 esquema de dados do empacotador é o mesmo do APK', () => {
   const java = fs.readFileSync(path.resolve(__dirname, '../android/app/src/main/java/com/casadababa/app/updater/UpdatePolicy.java'), 'utf8');
   assert.equal(Number(/DATA_SCHEMA\s*=\s*(\d+)/.exec(java)[1]), require('../scripts/ota-contract.cjs').DATA_SCHEMA);
 });
+test('#2735 o job do push decide a nova tentativa pela política coberta no harness nativo', () => {
+  const job = fs.readFileSync(path.resolve(__dirname, '../android/app/src/main/java/com/casadababa/app/updater/UpdateCheckJob.java'), 'utf8');
+  assert.match(job, /jobFinished\(params, UpdatePolicy\.shouldRetryCheck\(status\.optBoolean\("checking"\), status\.optBoolean\("trial"\),\s*status\.optBoolean\("checkSucceeded"\)\)\);/);
+  assert.doesNotMatch(job, /!status\.optBoolean\("checkSucceeded"\)/, 'a decisão não pode voltar a ficar solta no job, onde nenhum teste a alcança');
+});
 
 test('versão e código do APK vêm do manifesto, com lockfile consistente', () => {
   const manifest = require('../package.json');
