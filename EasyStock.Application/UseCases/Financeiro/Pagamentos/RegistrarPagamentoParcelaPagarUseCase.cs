@@ -72,11 +72,16 @@ public class RegistrarPagamentoParcelaPagarUseCase(
             return await uow.ExecuteInTransactionSemRetryAsync(async tx =>
             {
                 // #2736: a saída toma a trava que o lançamento manual e o fechamento tomam; em dinheiro, não passa
-                // do dinheiro da gaveta. Dia fechado não recusa: o pagamento cai em PosFechamento (#2319).
+                // do dinheiro da gaveta, mas só com o dia aberto. Dia fechado ou nunca aberto não recusa: o pagamento
+                // segue aceito e cai em PosFechamento (#2319), sem conferir teto.
                 await caixaRepo.TravarSaidasAsync(cmd.EmpresaId, conta.LojaId, tx);
                 if (GavetaCaixa.EhDinheiro(metodo))
-                    await TetoDaGaveta.ExigirSaidaEmDinheiroCabeAsync(
-                        obterCaixaDia, cmd.EmpresaId, HorarioBrasil.Hoje(), conta.LojaId, valor);
+                {
+                    var dia = await obterCaixaDia.ExecuteAsync(
+                        new ObterCaixaDiaQuery(cmd.EmpresaId, HorarioBrasil.Hoje(), conta.LojaId));
+                    if (dia.Aberto && !dia.Fechado)
+                        TetoDaGaveta.ExigirSaidaEmDinheiroCabe(dia, valor);
+                }
 
                 var pagamento = PagamentoParcela.CriarConfirmado(
                     cmd.EmpresaId, TipoLadoFinanceiro.Pagar,

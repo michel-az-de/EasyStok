@@ -28,13 +28,13 @@ public class RegistrarPagamentoParcelaPagarTetoGavetaTests
         return parcela;
     }
 
-    private static (RegistrarPagamentoParcelaPagarUseCase Uc, ICaixaRepository Caixa) Montar(ParcelaPagar parcela, decimal dinheiroNaGaveta)
+    private static (RegistrarPagamentoParcelaPagarUseCase Uc, ICaixaRepository Caixa) Montar(ParcelaPagar parcela, decimal dinheiroNaGaveta, bool comAbertura = true)
     {
         var repo = Substitute.For<IContaPagarRepository>();
         repo.GetParcelaWithContaAsync(Empresa, parcela.Id, Arg.Any<CancellationToken>()).Returns(parcela);
         var caixa = Substitute.For<ICaixaRepository>();
         caixa.GetMovimentosDoDiaAsync(Empresa, Arg.Any<DateOnly>(), Arg.Any<Guid?>())
-            .Returns(new[] { MovimentoCaixa.Criar(Empresa, "abertura", dinheiroNaGaveta) });
+            .Returns(comAbertura ? new[] { MovimentoCaixa.Criar(Empresa, "abertura", dinheiroNaGaveta) } : Array.Empty<MovimentoCaixa>());
         var uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<RegistrarPagamentoResult?>();
         var uc = new RegistrarPagamentoParcelaPagarUseCase(repo, caixa,
             new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(caixa)), uow,
@@ -108,6 +108,32 @@ public class RegistrarPagamentoParcelaPagarTetoGavetaTests
 
         r.Should().NotBeNull();
         await caixa.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
+    }
+
+    [Fact]
+    public async Task Conta_a_pagar_em_dinheiro_com_o_dia_fechado_segue_paga_sem_conferir_o_teto()
+    {
+        var parcela = Parcela(500m);
+        var (uc, caixa) = Montar(parcela, dinheiroNaGaveta: 100m);
+        caixa.GetFechamentoDoDiaAsync(Empresa, Arg.Any<DateOnly>(), Arg.Any<Guid?>())
+            .Returns(FechamentoCaixa.Criar(Empresa, HorarioBrasil.Hoje(), 100, 0, 0, 0, 0));
+
+        var r = await uc.ExecuteAsync(Pagar(parcela, 500m, "dinheiro"));
+
+        r.Should().NotBeNull();
+        await caixa.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Tipo == "saida" && m.Valor == 500m));
+    }
+
+    [Fact]
+    public async Task Conta_a_pagar_em_dinheiro_com_o_caixa_nunca_aberto_segue_paga_sem_conferir_o_teto()
+    {
+        var parcela = Parcela(50m);
+        var (uc, caixa) = Montar(parcela, dinheiroNaGaveta: 0m, comAbertura: false);
+
+        var r = await uc.ExecuteAsync(Pagar(parcela, 50m, "dinheiro"));
+
+        r.Should().NotBeNull();
+        await caixa.Received(1).AddMovimentoAsync(Arg.Is<MovimentoCaixa>(m => m.Tipo == "saida" && m.Valor == 50m));
     }
 }
 
