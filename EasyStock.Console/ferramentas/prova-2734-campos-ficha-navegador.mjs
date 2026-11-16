@@ -22,7 +22,7 @@ const cena = new URLSearchParams(location.search).get('cena'); const lead = cena
 const conversa={id:'conversa',clienteId:lead?null:'a',vinculoRevisao:1,nome:'Pessoa A',canal:'WhatsApp',estado:'Aberto',conta:lead?'lead':'cliente',cliente:{tags:gravadas?['cliente_antiga','sem_gluten']:['Lactose','Sem glúten'],notas:[],pedidos:0,pontos:0,telefone:lead?null:'(11) 99999-9999',endereco:lead?null:'Rua A, 10, Centro, 01001-000'},pedido:null,mensagens:[]};
 window.__chamadas=[];
 const registra=(nome,n)=>(...a)=>{window.__chamadas.push([nome,...a.slice(0,n)])};
-const acoes={selecionar:()=>{},editarDadoCliente:registra('editarDadoCliente',3),adicionarTag:registra('adicionarTag',2),removerTag:registra('removerTag',2),editarTag:registra('editarTag',3),salvarCadastroRapido:registra('salvarCadastroRapido',1)};
+const acoes={selecionar:()=>{},editarDadoCliente:registra('editarDadoCliente',3),adicionarTag:registra('adicionarTag',2),removerTag:registra('removerTag',2),editarTag:registra('editarTag',3),salvarCadastroRapido:registra('salvarCadastroRapido',2)};
 function Cena(){const [rascunhos,guardar]=useState({});const gravacoes=useGravacoesDosAjustes();
 const estado={fonteApi:false,selecionada:conversa,conversas:[conversa],historico:[],agora:Date.now(),automaticoPausado:{},fidelidade:{recompensas:[],sorteios:[],resgatesPorCadastro:{},config:{}}};
 return <ContextoAcessoModulos.Provider value={{acoes:{},permite:()=>true}}><ContextoRascunhosDosAjustes.Provider value={{rascunhos,definir:(c,v)=>guardar(e=>({...e,[c]:v})),...gravacoes}}><ContextoEstado.Provider value={estado}><ContextoAcoes.Provider value={acoes}><ContextoCatalogo.Provider value={{canais:CANAIS,motivosBloqueio:[],prefixosCepAtendidos:[],restricoes:gravadas?['Lactose','Glúten']:[]}}>
@@ -58,9 +58,16 @@ try {
   await p.getByRole('button', { name: 'Salvar', exact: true }).click()
   assert.deepEqual((await chamadas(p)).filter(c => c[0] === 'editarDadoCliente'), [['editarDadoCliente', 'conversa', 'telefone', '(11) 98225-4398']])
 
-  // A01: mais de 11 dígitos sem DDI 55 é recusado com mensagem; não grava.
-  // A ação é falsa e não atualiza a conversa: o botão continua com o valor de partida.
+  // Número de outro país: a conversa grava pelo E.164 do Brasil e o servidor devolve 400 (visto na tela real).
+  // A tela não corta o número nem o troca por um do Brasil: mostra como foi digitado, recusa e diz onde ele entra.
   await p.getByRole('button', { name: '(11) 99999-9999, editar Telefone', exact: true }).click()
+  await tel.fill('+44 7911 123456')
+  assert.equal(await tel.inputValue(), '+44 7911 123456')
+  await tel.press('Enter')
+  await p.getByRole('alert').filter({ hasText: 'Aqui só entra telefone do Brasil, com DDD. O de outro país entra em Cadastros.' }).waitFor()
+  assert.equal((await chamadas(p)).filter(c => c[0] === 'editarDadoCliente').length, 1, 'número de outro país não vai ao servidor')
+
+  // A01: mais de 11 dígitos é recusado com mensagem que diz a saída; não grava.
   await tel.fill('119822543981')
   await tel.press('Enter')
   await p.getByRole('alert').filter({ hasText: 'Telefone com mais de 11 dígitos. Use só o DDD e o número.' }).waitFor()
@@ -154,6 +161,17 @@ try {
   await p.getByRole('button', { name: 'Salvar cadastro', exact: true }).click()
   await p.getByRole('alert').filter({ hasText: 'Telefone com mais de 11 dígitos. Use só o DDD e o número.' }).waitFor()
   assert.deepEqual((await chamadas(p)).filter(c => c[0] === 'salvarCadastroRapido'), [], 'recusado não grava')
+  // Número de outro país: o cadastro rápido também grava pela conversa (só Brasil); recusa e diz onde ele entra.
+  await rapido.fill('+351 912 345 678')
+  assert.equal(await rapido.inputValue(), '+351 912 345 678')
+  await p.getByRole('button', { name: 'Salvar cadastro', exact: true }).click()
+  await p.getByRole('alert').filter({ hasText: 'Aqui só entra telefone do Brasil, com DDD. O de outro país entra em Cadastros.' }).waitFor()
+  assert.deepEqual((await chamadas(p)).filter(c => c[0] === 'salvarCadastroRapido'), [], 'número de outro país não vai ao servidor')
+  // O do Brasil, colado com o DDI, grava.
+  await rapido.fill('+55 11 98225-4398')
+  await p.getByRole('button', { name: 'Salvar cadastro', exact: true }).click()
+  await p.waitForFunction(() => window.__chamadas.some(c => c[0] === 'salvarCadastroRapido'))
+  assert.deepEqual((await chamadas(p)).filter(c => c[0] === 'salvarCadastroRapido').map(c => String(c[2].telefone).replace(/\D/g, '')), ['11982254398'])
   await p.close()
   assert.deepEqual(erros, [])
   console.log('ok #2734 D1: telefone com DDI, foco no blur, limite 150 sem maxLength, nome acessível, Cancelar edição e tags')

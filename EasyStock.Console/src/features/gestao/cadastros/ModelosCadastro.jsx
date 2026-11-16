@@ -34,7 +34,7 @@ export function ModelosCadastro({ contexto, respostas, impressao }) {
   const abasNomeadas = abas.map(a => ({ ...a, nome: a.rotulo }))
   return <section className={css.painel} aria-label="Modelos">
     <header className={css.cabecalho}><div><h2>Modelos</h2><p>Textos, etiquetas e impressos da loja.</p></div></header>
-    <BarraDeAbas abas={abasNomeadas} ativa={atual} aoTrocar={id => guardar({ ...memoria, aba: id })} idPainel="modelos-painel" prefixoId="modelos-aba" />
+    <BarraDeAbas rotulo="Tipos de modelo" abas={abasNomeadas} ativa={atual} aoTrocar={id => guardar({ ...memoria, aba: id })} idPainel="modelos-painel" prefixoId="modelos-aba" />
     <div id="modelos-painel" role="tabpanel" aria-labelledby={`modelos-aba-${atual}`}>
       {atual === 'respostas' && respostas}
       {atual === 'impressao' && impressao}

@@ -49,8 +49,9 @@ export function linhaDoEndereco(e) {
   return { principal: principal || 'Endereço sem rua', detalhe }
 }
 
-// Mesma regra do cadastro rápido (#2258): telefone com DDD.
-export const erroDoTelefoneExtra = (numero) => erroDoTelefone(numero)
+// Telefone com DDD, como no cadastro rápido (#2258). #2734: a rota do telefone extra aceita número de outro país
+// (Telefone.cs, 7 a 15 dígitos); a da conversa, não.
+export const erroDoTelefoneExtra = (numero) => erroDoTelefone(numero, { aceitaDeFora: true })
 export const corpoDoTelefone = (numero, whatsapp, empresaId) => ({ empresaId, numero: String(numero ?? '').trim(), whatsapp: Boolean(whatsapp) })
 
 export function resumoDePedidos(cliente) {

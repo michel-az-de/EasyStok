@@ -104,10 +104,49 @@ const { telefoneNaTela } = await import('../src/dominio/cadastros.js')
 const { erroDoTelefone } = await import('../src/dominio/validacaoDoCadastro.js')
 assert.equal(telefoneNaTela('(55) 99999-8888'), '(55) 99999-8888')
 assert.equal(telefoneNaTela('(55) 99999-88887'), '(55) 99999-88887', 'o dígito a mais não troca o DDD')
-assert.equal(erroDoTelefone(telefoneNaTela('(55) 99999-88887')), 'Telefone com mais de 11 dígitos. Use só o DDD e o número.')
+const TELEFONE_LONGO = 'Telefone com mais de 11 dígitos. Use só o DDD e o número.'
+assert.equal(erroDoTelefone(telefoneNaTela('(55) 99999-88887')), TELEFONE_LONGO)
 assert.equal(telefoneNaTela('5511999998888'), '(11) 99999-8888', 'colado com DDI segue virando o número nacional')
 assert.equal(telefoneNaTela('+55 11 99999-8888'), '(11) 99999-8888')
 assert.equal(telefoneNaTela('+55 (55) 99999-8888'), '(55) 99999-8888')
+assert.equal(telefoneNaTela('+44 7911 123456'), '+44 7911 123456', 'número de outro país fica como foi digitado, sem virar número do Brasil')
+
+// A validação lê o telefone como a máscara e segue a regra da rota que grava.
+// 1. Ficha do Atendimento (edição em linha e cadastro rápido): grava pela conversa, e essa rota só aceita telefone
+//    do Brasil. A prova lê o servidor para a regra da tela não se separar da dele: na tela real, o número de outro
+//    país que a tela aceitava voltava com 400.
+const servidor = (caminho) => readFileSync(new URL(`../../${caminho}`, import.meta.url), 'utf8')
+assert.match(servidor('EasyStock.Domain/ValueObjects/TelefoneE164.cs'), /\^\\\+55\[1-9\]\[0-9\]\\d\{8,9\}\$/, 'TelefoneE164: +55, DDD que não começa com zero, 8 ou 9 dígitos')
+assert.match(servidor('EasyStock.Application/Services/Atendimento/NormalizadorTelefone.cs'), /NormalizarE164Br\(string telefone\) => TelefoneE164\.From\(telefone\)\.Value/)
+assert.match(servidor('EasyStock.Application/UseCases/Atendimento/ClienteDaConversa/CadastrarClienteDaConversaUseCase.cs'), /NormalizadorTelefone\.NormalizarE164Br\(telefone\)/, 'a rota da conversa normaliza pelo E.164 do Brasil')
+for (const doBrasil of ['+55 11 99999-8888', '5511999998888', '+55 (31) 3333-4444', '(55) 99999-8888', '(31) 3333-4444']) {
+  assert.equal(erroDoTelefone(doBrasil), null, doBrasil)
+  assert.equal(erroDoTelefone(telefoneNaTela(doBrasil)), null, `${doBrasil} depois da máscara`)
+}
+const SO_DO_BRASIL = 'Aqui só entra telefone do Brasil, com DDD. O de outro país entra em Cadastros.'
+for (const deFora of ['+44 7911 123456', '+351 912 345 678', '+1 415 555 0100', '+44 79']) {
+  assert.equal(erroDoTelefone(deFora), SO_DO_BRASIL, `${deFora} na Ficha: recusado com a saída, sem ir ao servidor`)
+}
+assert.equal(erroDoTelefone('+5'), 'Telefone incompleto', 'um dígito depois do + ainda pode ser o 55')
+assert.equal(erroDoTelefone('+55 11 99999-88887'), TELEFONE_LONGO, 'DDI 55 com um dígito a mais segue recusado')
+assert.equal(erroDoTelefone('447911123456'), TELEFONE_LONGO, 'na Ficha a mensagem não ensina o +, que ela não aceita')
+assert.equal(erroDoTelefone('+55 (31) 99999-999'), 'Telefone incompleto', 'celular sem o último número, com DDI')
+assert.equal(erroDoTelefone('+'), 'Informe o telefone com DDD')
+for (const dddZero of ['(01) 99999-8888', '0800 123 4567', '+55 01 99999-8888']) {
+  assert.equal(erroDoTelefone(dddZero), 'O DDD não começa com zero. Confira o número.', dddZero)
+}
+
+// 2. Telefone extra de Cadastros: `/api/clientes/{id}/telefones` aceita número de outro país com 7 a 15 dígitos.
+assert.match(servidor('EasyStock.Domain/ValueObjects/Telefone.cs'), /\^\\\+\?\\d\{7,15\}\$/, 'Telefone: 7 a 15 dígitos, com ou sem +')
+assert.match(servidor('EasyStock.Application/UseCases/AdicionarClienteTelefone/AdicionarClienteTelefoneUseCase.cs'), /Telefone\.TryFrom\(cmd\.Numero\)/, 'o telefone extra usa a regra frouxa')
+const TELEFONE_LONGO_COM_SAIDA = `${TELEFONE_LONGO} Para outro país, comece com + e o código do país.`
+for (const aceito of ['+44 7911 123456', '+351 912 345 678', '+1 415 555 0100', '+55 11 99999-8888', '5511999998888', '(31) 3333-4444', '0800 123 4567']) {
+  assert.equal(cadastro.erroDoTelefoneExtra(aceito), null, `${aceito} como telefone extra`)
+}
+assert.equal(cadastro.erroDoTelefoneExtra('+44 79'), 'Telefone incompleto')
+assert.equal(cadastro.erroDoTelefoneExtra('+44 7911 123456 7890 12'), 'Telefone com mais de 15 dígitos. Confira o número.')
+assert.equal(cadastro.erroDoTelefoneExtra('447911123456'), TELEFONE_LONGO_COM_SAIDA, 'sem o + não dá para saber que é de outro país: a mensagem diz como escrever')
+assert.equal(cadastro.erroDoTelefoneExtra('+55 11 99999-88887'), TELEFONE_LONGO_COM_SAIDA)
 
 // Texto de tela sem travessão no histórico do cliente.
 const historico = readFileSync(new URL('../src/features/ficha-cliente/ModalHistorico.jsx', import.meta.url), 'utf8')

@@ -39,9 +39,11 @@ pagina.on('pageerror', e => erros.push(e.message))
 const base = `${process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'}/.build/2734/modelos/index.html`
 try {
   await pagina.goto(base)
-  // A34 e T9: tablist, com o nome da tela de respostas prontas.
-  const lista = pagina.getByRole('tablist')
+  // A34 e T9: tablist, com o nome da tela de respostas prontas. As abas se chamam pelo que escolhem ("Tipos de
+  // modelo"), como antes de virarem tablist; "Painéis" é o nome da barra do Atendimento.
+  const lista = pagina.getByRole('tablist', { name: 'Tipos de modelo', exact: true })
   await lista.waitFor()
+  await pagina.getByRole('navigation', { name: 'Tipos de modelo', exact: true }).waitFor()
   assert.deepEqual(await lista.getByRole('tab').allInnerTexts(), ['Respostas prontas', 'E-mail e SMS', 'Etiquetas', 'Impressão'])
   assert.equal(await pagina.getByRole('tab', { name: 'Respostas prontas', exact: true }).getAttribute('aria-selected'), 'true')
   await pagina.getByText('Conteúdo das respostas', { exact: true }).waitFor()

@@ -64,16 +64,21 @@ export function corpoProduto(dados, empresaId) {
 // nunca é inventado: um telefone gravado sem "+" volta sem "+" (revisão da #2460). Com "+", segue E.164.
 // Número de outro país (DDI que não é 55) fica como foi digitado; o que não parece telefone vai cru e a API diz o motivo.
 const BRASIL_COM_DDI = /^55\d{10,11}$/
-export function telefoneNaTela(valor) {
+// #2734: a máscara e a validação leem o telefone do mesmo jeito, para a tela não recusar o que ela mesma deixou
+// digitar. `deFora`: começa com "+" e o DDI não é 55. `nacional`: os dígitos do Brasil, já sem o DDI.
+export function partesDoTelefone(valor) {
   const bruto = String(valor ?? '').trim()
   const digitos = bruto.replace(/\D/g, '')
-  if (!digitos) return bruto.startsWith('+') ? bruto : ''
-  if (bruto.startsWith('+') && !digitos.startsWith('55')) return bruto
-  // #2734: o texto que já está na máscara "(DD)" não tem DDI. Sem isto, um dígito a mais num telefone de DDD 55
+  const deFora = bruto.startsWith('+') && !digitos.startsWith('55')
+  // O texto que já está na máscara "(DD)" não tem DDI. Sem isto, um dígito a mais num telefone de DDD 55
   // parecia "55 + número" e a tela trocava o DDD de quem estava digitando.
-  const comDdi = bruto.startsWith('+') || (!bruto.startsWith('(') && BRASIL_COM_DDI.test(digitos))
-  const nacional = comDdi ? digitos.slice(2) : digitos
-  if (!nacional) return bruto
+  const comDdi = !deFora && (bruto.startsWith('+') || (!bruto.startsWith('(') && BRASIL_COM_DDI.test(digitos)))
+  return { bruto, digitos, deFora, nacional: comDdi ? digitos.slice(2) : digitos }
+}
+export function telefoneNaTela(valor) {
+  const { bruto, digitos, deFora, nacional } = partesDoTelefone(valor)
+  if (!digitos) return bruto.startsWith('+') ? bruto : ''
+  if (deFora || !nacional) return bruto
   return nacional.length > 11 ? bruto : mascaraTelefone(nacional)
 }
 export function telefoneParaApi(valor) {

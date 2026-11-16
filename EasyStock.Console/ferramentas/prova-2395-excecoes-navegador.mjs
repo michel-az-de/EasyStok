@@ -67,11 +67,13 @@ async function fecharPaineis() { for (const nome of [/^Fechar cardápio$/, /^Rec
 async function posVenda() { await page.getByRole('button', { name: /^Pós-venda\b/ }).first().click(); return page.getByRole('dialog').last() }
 async function secao(modal, nome) { const b = modal.getByRole('button', { name: new RegExp(`^${nome}`) }).first(); if (await b.getAttribute('aria-expanded') === 'false') await b.click() }
 async function cozinha() { await navegar('#/m/cozinha'); await page.getByRole('radio', { name: 'Amanhã', exact: true }).click() }
+// #2663: o botão do cartão da Cozinha se chama "<ação>: <pedido> de <cliente>"; a ação visível vem primeiro.
+const doCartao = (acao) => new RegExp(`^${acao}: `)
 async function etapaPedido(nome, status) {
-  const card = page.getByRole('listitem').filter({ hasText: nomeProduto }).filter({ has: page.getByRole('button', { name: 'Ver comanda', exact: true }) })
+  const card = page.getByRole('listitem').filter({ hasText: nomeProduto }).filter({ has: page.getByRole('button', { name: doCartao('Ver comanda') }) })
   await card.waitFor()
   assert.equal(await card.count(), 1)
-  await agir(`/api/kds/pedidos/${prova.pedidoId}/status`, 'PATCH', () => card.getByRole('button', { name: nome, exact: true }).click())
+  await agir(`/api/kds/pedidos/${prova.pedidoId}/status`, 'PATCH', () => card.getByRole('button', { name: doCartao(nome) }).click())
   prova.status = status; salvar()
 }
 async function mensagem(texto) { await page.getByRole('textbox', { name: 'Mensagem para o cliente' }).fill(texto); await agir(`/api/atendimento/conversas/${conversaId}/mensagens`, 'POST', () => page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click()) }
@@ -132,7 +134,7 @@ try {
     assert.equal(vaga(prova.janelasDepois.janelas, prova.janelasDepois.atual).vagasRestantes, vaga(prova.janelasAntes.janelas, prova.janelasDepois.atual).vagasRestantes - 1)
     prova.reagendado = true; salvar()
     await fecharPaineis(); await mensagem('Ensaio R4: reagendamento confirmado para a tarde, conforme combinado.'); await cozinha()
-    await page.getByRole('listitem').filter({ hasText: nomeProduto }).filter({ has: page.getByRole('button', { name: 'Ver comanda', exact: true }) }).getByText(/13:00|13h|Tarde/).first().waitFor()
+    await page.getByRole('listitem').filter({ hasText: nomeProduto }).filter({ has: page.getByRole('button', { name: doCartao('Ver comanda') }) }).getByText(/13:00|13h|Tarde/).first().waitFor()
     registrar('E02 atraso registrado; falha preserva vaga anterior; troca confirmada e comunicada, Cozinha atualizada', { antes: prova.janelasAntes.atual, depois: prova.janelasDepois.atual })
   }
   etapa = 'falta-estoque'
