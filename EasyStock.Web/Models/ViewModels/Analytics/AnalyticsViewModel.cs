@@ -11,7 +11,7 @@ public class AnalyticsViewModel
     public decimal MediaVendasDiaria { get; set; }
 
     // Dados reais do último mês (vindos do endpoint receita)
-    public int UnidadesVendidasMes { get; set; }
+    public decimal UnidadesVendidasMes { get; set; }
     public decimal ReceitaMes { get; set; }
 
     // Projeções derivadas da velocidade média diária

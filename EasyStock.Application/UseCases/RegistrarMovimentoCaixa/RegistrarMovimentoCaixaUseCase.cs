@@ -133,11 +133,7 @@ public class RegistrarMovimentoCaixaUseCase(
         // uma sangria de R$450 passava e a gaveta "ficava negativa".
         if (GavetaCaixa.EhDinheiro(cmd.Metodo))
         {
-            var teto = GavetaCaixa.TetoSaidaEmDinheiro(dia);
-            if (cmd.Valor > teto)
-                throw new UseCaseValidationException(
-                    $"Saída de {cmd.Valor.ToString("C", ptBr)} em dinheiro é maior que o dinheiro na gaveta " +
-                    $"({teto.ToString("C", ptBr)}). Pix e cartão não estão na gaveta.");
+            TetoDaGaveta.ExigirSaidaEmDinheiroCabe(dia, cmd.Valor);
         }
         else if (cmd.Valor > dia.SaldoEsperado)
         {

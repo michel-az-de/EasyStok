@@ -1,5 +1,6 @@
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
@@ -24,7 +25,8 @@ public sealed record DesfazerPagamentoManualResult(Guid PedidoId, string Status,
 /// O pedido volta a <c>AguardandoPagamento</c> quando fica sem pagamento e tem link online pendente: é o
 /// estado em que o job e o webhook voltam a cuidar dele. Pedido combinado para pagar na entrega (ou do
 /// balcão, sem cobrança online) continua na fila, porque em <c>AguardandoPagamento</c> ninguém o
-/// tiraria de lá.
+/// tiraria de lá. Exceção (#2724, regra da #2578): encomenda com sinal manual que fica abaixo do sinal volta a
+/// aguardar pagamento.
 /// </para>
 /// </summary>
 public sealed class DesfazerPagamentoManualUseCase(
@@ -37,7 +39,7 @@ public sealed class DesfazerPagamentoManualUseCase(
     QuitacaoPedido quitacao,
     ICaixaRepository caixa)
 {
-    public Task<DesfazerPagamentoManualResult> ExecuteAsync(DesfazerPagamentoManualInput input, CancellationToken ct = default)
+    public async Task<DesfazerPagamentoManualResult> ExecuteAsync(DesfazerPagamentoManualInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
@@ -45,10 +47,19 @@ public sealed class DesfazerPagamentoManualUseCase(
         if (string.IsNullOrWhiteSpace(input.Motivo))
             throw new UseCaseValidationException("Motivo é obrigatório para desfazer o pagamento.");
 
-        return unitOfWork.ExecuteInTransactionSemRetryAsync(token => DesfazerNoLockAsync(input, token), ct);
+        PedidoMudouStatusOperacao? mudanca = null;
+        var resultado = await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
+        {
+            (var r, mudanca) = await DesfazerNoLockAsync(input, token);
+            return r;
+        }, ct);
+        // #2724: depois do commit, como no RemoverPagamento (#2578): a fila da operação só ouve o que gravou.
+        await quitacao.PublicarAsync(input.EmpresaId, null, CancellationToken.None, mudanca);
+        return resultado;
     }
 
-    private async Task<DesfazerPagamentoManualResult> DesfazerNoLockAsync(DesfazerPagamentoManualInput input, CancellationToken ct)
+    private async Task<(DesfazerPagamentoManualResult, PedidoMudouStatusOperacao?)> DesfazerNoLockAsync(
+        DesfazerPagamentoManualInput input, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
         var travado = await pedidoStorefrontRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, ct);
@@ -88,6 +99,9 @@ public sealed class DesfazerPagamentoManualUseCase(
         var voltaAoLink = pedido.Pagamentos.Count == 0 && cobrancas.Any(c => c.EstaPendente && c.EhOnline);
         if (voltaAoLink)
             pedido.VoltarParaAguardandoPagamento();
+        // #2724: sem link para voltar, a encomenda que ficou abaixo do sinal manual sai da fila (regra da #2578).
+        var mudanca = voltaAoLink ? null
+            : await quitacao.ReverterSinalManualAsync(pedido, "web", input.UsuarioId, input.UsuarioNome, agora, ct);
 
         await pedidoRepository.AddEventoAsync(new PedidoEvento
         {
@@ -114,6 +128,6 @@ public sealed class DesfazerPagamentoManualUseCase(
 
         await quitacao.ReabrirManualAsync(pedido, agora, ct);
         await unitOfWork.CommitAsync();
-        return new DesfazerPagamentoManualResult(pedido.Id, pedido.Status, pagamento.Id);
+        return (new DesfazerPagamentoManualResult(pedido.Id, pedido.Status, pagamento.Id), mudanca);
     }
 }

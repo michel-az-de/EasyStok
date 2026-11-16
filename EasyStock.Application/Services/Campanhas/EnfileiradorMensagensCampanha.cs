@@ -152,7 +152,13 @@ public sealed class EnfileiradorMensagensCampanha(
     private static Dictionary<string, string> Metadados(
         Campanha campanha, MensagemCampanha tipo, ContatoCampanha contato, string texto)
     {
-        var metadados = new Dictionary<string, string> { ["idioma"] = IdiomaMeta, ["param1"] = contato.Nome };
+        var metadados = new Dictionary<string, string>
+        {
+            ["idioma"] = IdiomaMeta,
+            ["param1"] = contato.Nome,
+            // #2746: o provider reconfere bloqueio e consentimento do cliente na hora do envio.
+            ["clienteId"] = contato.ClienteId.ToString(),
+        };
         if (tipo == MensagemCampanha.LembreteEncerramento)
         {
             metadados["template"] = TemplateMetaLembrete;
