@@ -62,6 +62,7 @@ public interface IReportRunRepository
 
     /// <summary>
     /// Watchdog: move runs com lease expirado de volta para Pending (ou Failed se tentativas esgotadas).
+    /// Run em Canceling com lease vencido (worker morto) é fechada como Canceled (#2773).
     /// Retorna IDs das runs afetadas.
     /// </summary>
     Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct);

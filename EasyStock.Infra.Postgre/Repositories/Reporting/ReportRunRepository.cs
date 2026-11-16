@@ -210,6 +210,7 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
 
     /// <summary>
     /// Recicla runs com lease expirado. Incrementa tentativas; se esgotadas → Failed terminal.
+    /// Run em Canceling com lease vencido (worker morto) é fechada como Canceled (#2773).
     /// Executa dentro de advisory lock global para watchdog (G-15).
     /// </summary>
     public async Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct)
@@ -254,7 +255,22 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             """,
             ct);
 
-        return pendingReclaim + terminalReclaim;
+        // #2773: Canceling com lease vencido = worker morreu antes de fechar o cancelamento.
+        // Espelha ReportRun.MarkCanceled (Canceled, finished_at, lease nulo). Worker vivo fecha
+        // sozinho dentro do prazo; o lease não é renovado em Canceling (heartbeat só em Running).
+        var canceledReclaim = await db.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE public.report_runs
+               SET status          = 3,
+                   finished_at      = now(),
+                   lease_expires_at = NULL,
+                   alterado_em      = now()
+             WHERE status           = 5
+               AND lease_expires_at < now()
+            """,
+            ct);
+
+        return pendingReclaim + terminalReclaim + canceledReclaim;
     }
 
     // ── GC de artefatos ───────────────────────────────────────────────────────
