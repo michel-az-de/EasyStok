@@ -2,6 +2,7 @@ using System.Text;
 using EasyStock.Api.Controllers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Security;
 using EasyStock.Application.UseCases.Financeiro.Pagamentos;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
@@ -23,6 +24,7 @@ public class WebhookPixControllerTests
         var reconciliar = new ReconciliarPixParcelaReceberUseCase(contas, Substitute.For<ICaixaRepository>(),
             Substitute.For<IEfiPixService>(), Substitute.For<IUnitOfWork>(),
             NullLogger<ReconciliarPixParcelaReceberUseCase>.Instance);
+        var bypass = Substitute.For<IRowLevelSecurityBypass>();
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Efi:WebhookAllowUnsigned"] = "true",
@@ -31,7 +33,7 @@ public class WebhookPixControllerTests
         ambiente.EnvironmentName.Returns("Development");
         var http = new DefaultHttpContext();
         http.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("{\"pix\":[{\"txid\":\"cr-123\"}]}"));
-        var controller = new WebhookPixController(config, reconciliar, NullLogger<WebhookPixController>.Instance, ambiente)
+        var controller = new WebhookPixController(config, reconciliar, NullLogger<WebhookPixController>.Instance, ambiente, bypass)
         {
             ControllerContext = new ControllerContext { HttpContext = http },
         };
@@ -41,5 +43,7 @@ public class WebhookPixControllerTests
 
         result.Should().BeOfType<OkResult>();
         await contas.Received(1).GetParcelaByEfiTxidAsync("cr-123", cts.Token);
+        // #2743: o webhook e anonimo; sem o bypass a policy RLS zera a busca da parcela.
+        bypass.Received(1).Begin();
     }
 }
