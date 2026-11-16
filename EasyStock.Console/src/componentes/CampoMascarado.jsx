@@ -27,7 +27,7 @@ function manterCursorNoFim(evento) {
 }
 
 export function CampoMascarado({
-  tipo, rotulo, rotuloOculto, dica, erro, valor, aoMudarDigitos, aoColarTexto, id: idInformado, className, ...resto
+  tipo, rotulo, rotuloOculto, dica, erro, obrigatorio, valor, aoMudarDigitos, aoColarTexto, id: idInformado, className, ...resto
 }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
@@ -45,7 +45,7 @@ export function CampoMascarado({
 
   return (
     <div className={css.campo}>
-      <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}</label>
+      <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}{obrigatorio && <span aria-hidden="true"> *</span>}</label>
       <input
         id={id}
         inputMode="numeric"
@@ -56,6 +56,7 @@ export function CampoMascarado({
         onPaste={aoColar}
         onSelect={tipo === 'moeda' ? manterCursorNoFim : undefined}
         aria-invalid={Boolean(erro) || undefined}
+        aria-required={obrigatorio || undefined}
         {...resto}
         aria-describedby={[resto['aria-describedby'], erro ? `${id}-erro` : dica ? `${id}-dica` : null].filter(Boolean).join(' ') || undefined}
       />

@@ -6,9 +6,10 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
+import { Vazio } from '../../../componentes/Vazio'
 import { telefoneNaTela } from '../../../dominio/cadastros'
-import { aplicarNaFicha, corpoDoEndereco, corpoDoTelefone, ENDERECO_VAZIO, enderecoVaiComoPadrao, erroDoTelefoneExtra, errosDoEndereco, linhaDoEndereco, mensagemDaFicha, resumoDePedidos } from '../../../dominio/fichaCliente'
-import { dataHora, moeda } from '../../../dominio/formato'
+import { aplicarNaFicha, corpoDoEndereco, corpoDoTelefone, ENDERECO_VAZIO, enderecoVaiComoPadrao, erroDoTelefoneExtra, errosDoEndereco, linhaDoEndereco, mensagemDaFicha, numerosDoRelacionamento, resumoDePedidos, telefonesDaFicha } from '../../../dominio/fichaCliente'
+import { dataHora, mascaraCep, moeda } from '../../../dominio/formato'
 import { rotuloDaSituacao, tituloDoPedido } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
 import css from './cadastros.module.css'
@@ -22,6 +23,10 @@ const CAMPOS_ENDERECO = [
 const TITULO = { endereco: 'Novo endereço', telefone: 'Novo telefone', removerEndereco: 'Remover endereço?', removerTelefone: 'Remover telefone?' }
 const CONFIRMAR = { endereco: 'Adicionar endereço', telefone: 'Adicionar telefone', removerEndereco: 'Remover', removerTelefone: 'Remover' }
 const SUCESSO = { endereco: 'Endereço adicionado.', telefone: 'Telefone adicionado.', removerEndereco: 'Endereço removido.', removerTelefone: 'Telefone removido.' }
+// #2734 (A14): CEP e telefone ganham a máscara enquanto a pessoa digita, a mesma do campo Telefone do cadastro.
+// O endereço também tem um campo `numero` (o da casa): a máscara de telefone só vale no formulário de telefone.
+const comMascara = (acao, chave, valor) => (chave === 'cep' ? mascaraCep(valor) : acao === 'telefone' && chave === 'numero' ? telefoneNaTela(valor) : valor)
+const pedirFechamento = (evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
 
 // Carregando é derivado (a resposta guardada é de outra chave), sem setState síncrono no efeito.
 function usePedidosDoCliente(clienteId, { empresaId, identidade }, habilitado) {
@@ -41,8 +46,12 @@ function usePedidosDoCliente(clienteId, { empresaId, identidade }, habilitado) {
   return { itens: atual ? estado.itens : [], erro: atual ? estado.erro : null, carregando: habilitado && !atual, recarregar: () => recarregar(r => r + 1) }
 }
 
-export function FichaCliente({ cliente, detalhe, contexto, podeEditar }) {
-  const ids = { pedidos: useId(), enderecos: useId(), telefones: useId(), form: useId() }
+// #2734: `relacionamento` é o dossiê já lido pelo editor (valor total, favorito e conversas recentes); sem
+// `aoAbrirConversa` (cadastro com mudança por salvar) as conversas ficam listadas, mas não abrem.
+// `conversasNoAtendimento` são as que o Atendimento já carregou. Vem por prop: este editor também abre pela
+// Buscar na Casa, fora do AtendimentoProvider, e lá as conversas ficam só como registro.
+export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relacionamento, conversasNoAtendimento, aoAbrirConversa }) {
+  const ids = { pedidos: useId(), enderecos: useId(), telefones: useId(), conversas: useId(), form: useId() }
   const { acoes } = useAcessoModulos()
   const vePedidos = acoes.verPedidos === true
   const pedidos = usePedidosDoCliente(cliente.id, contexto, vePedidos)
@@ -62,10 +71,17 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar }) {
   const montado = useRef(true)
   useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
   const resumo = resumoDePedidos(cliente)
+  const numeros = numerosDoRelacionamento(relacionamento)
+  const telefones = telefonesDaFicha(listas.telefones)
+  const recentes = relacionamento?.conversas ?? []
+  // Só abre daqui a conversa que o Atendimento já carregou; as outras ficam como registro.
+  const noAtendimento = new Set(conversasNoAtendimento ?? [])
+  const digitando = Boolean(intencao) && !intencao.acao.startsWith('remover')
+  const comTexto = digitando && Object.values(form).some(valor => String(valor ?? '').trim())
 
   const abrir = (acao, alvo = null) => { falhar(null); avisar(null); definirErros({}); definirForm(acao === 'telefone' ? { numero: '' } : ENDERECO_VAZIO); marcarWhatsapp(false); escolher({ acao, alvo }) }
   const fechar = () => { if (!emVoo.current) escolher(null) }
-  const mudar = (chave, valor) => { definirForm(atual => ({ ...atual, [chave]: valor })); definirErros(atual => ({ ...atual, [chave]: null })) }
+  const mudar = (chave, valor) => { definirForm(atual => ({ ...atual, [chave]: comMascara(intencao?.acao, chave, valor) })); definirErros(atual => ({ ...atual, [chave]: null })) }
 
   async function confirmar(evento) {
     evento?.preventDefault()
@@ -116,6 +132,7 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar }) {
     <section aria-labelledby={ids.pedidos}>
       <div className={css.barra}><h3 id={ids.pedidos}>Pedidos</h3></div>
       <p><strong>{resumo.contagem}</strong>{resumo.ultimo && <> · {resumo.ultimo}</>}</p>
+      {numeros.length > 0 && <p>{numeros.join(' · ')}</p>}
       {vePedidos && (pedidos.erro ? <div className={css.erro} role="alert"><p>{pedidos.erro}</p><Botao onClick={pedidos.recarregar}>Tentar de novo</Botao></div>
         : pedidos.carregando ? <p className={css.legenda}>Carregando pedidos…</p>
         : pedidos.itens.length > 0 && <ul className={css.itensFicha} aria-label="Últimos pedidos">{pedidos.itens.map(p => <li key={p.id}>
@@ -125,22 +142,32 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar }) {
     </section>
     <section aria-labelledby={ids.enderecos}>
       <div className={css.barra}><h3 id={ids.enderecos}>Endereços</h3>{podeEditar && <Botao icone="mais" onClick={() => abrir('endereco')}>Adicionar endereço</Botao>}</div>
-      {listas.enderecos.length === 0 ? <p className={css.legenda}>Nenhum endereço cadastrado.</p>
+      {listas.enderecos.length === 0 ? <Vazio variante="linha" titulo="Nenhum endereço cadastrado." />
         : <ul className={css.itensFicha}>{listas.enderecos.map(e => { const linha = linhaDoEndereco(e); return <li key={e.id}>
           <span><strong>{linha.principal}</strong>{linha.detalhe && <small>{linha.detalhe}</small>}</span>
           <span className={css.acoes}>{e.padrao && <Pilula fina>Padrão</Pilula>}{podeEditar && <Botao variante="texto" aria-label={`Remover endereço ${linha.principal}`} onClick={() => abrir('removerEndereco', e)}>Remover</Botao>}</span>
         </li> })}</ul>}
     </section>
     <section aria-labelledby={ids.telefones}>
-      <div className={css.barra}><h3 id={ids.telefones}>Telefones extras</h3>{podeEditar && <Botao icone="mais" onClick={() => abrir('telefone')}>Adicionar telefone</Botao>}</div>
-      {listas.telefones.length === 0 ? <p className={css.legenda}>Nenhum telefone extra.</p>
-        : <ul className={css.itensFicha}>{listas.telefones.map(t => <li key={t.id}>
-          <span><strong>{telefoneNaTela(t.numero) || t.numero}</strong></span>
-          <span className={css.acoes}>{t.whatsapp && <Pilula fina>WhatsApp</Pilula>}{podeEditar && <Botao variante="texto" aria-label={`Remover telefone ${telefoneNaTela(t.numero) || t.numero}`} onClick={() => abrir('removerTelefone', t)}>Remover</Botao>}</span>
-        </li>)}</ul>}
+      <div className={css.barra}><h3 id={ids.telefones}>Telefones</h3>{podeEditar && <Botao icone="mais" onClick={() => abrir('telefone')}>Adicionar telefone</Botao>}</div>
+      {telefones.length === 0 ? <Vazio variante="linha" titulo="Nenhum telefone extra." />
+        : <ul className={css.itensFicha}>{telefones.map(t => { const numero = telefoneNaTela(t.numero) || t.numero; return <li key={t.id}>
+          <span><strong>{numero}</strong></span>
+          <span className={css.acoes}>{t.principal && <Pilula fina>Principal</Pilula>}{t.whatsapp && <Pilula fina>WhatsApp</Pilula>}{podeEditar && t.removivel && <Botao variante="texto" aria-label={`Remover telefone ${numero}`} onClick={() => abrir('removerTelefone', t)}>Remover</Botao>}</span>
+        </li> })}</ul>}
+      {telefones.some(t => t.principal) && <p className={css.legenda}>O telefone principal identifica a pessoa no Atendimento e não sai por esta lista.</p>}
     </section>
-    {intencao && <Modal titulo={TITULO[intencao.acao]} largura={intencao.acao === 'endereco' ? 'md' : 'sm'} aoFechar={ocupado ? undefined : fechar} segurarFechamento={ocupado}
-      rodape={<><Botao disabled={ocupado} onClick={fechar}>Cancelar</Botao><Botao variante={intencao.acao.startsWith('remover') ? 'perigo' : 'primario'} disabled={ocupado} {...(intencao.acao.startsWith('remover') ? { onClick: confirmar } : { tipo: 'submit', form: ids.form })}>{ocupado ? 'Salvando…' : CONFIRMAR[intencao.acao]}</Botao></>}>
+    {relacionamento && <section aria-labelledby={ids.conversas}>
+      <div className={css.barra}><h3 id={ids.conversas}>Conversas recentes</h3></div>
+      {recentes.length === 0 ? <Vazio variante="linha" titulo="Nenhuma conversa ainda." />
+        : <ul className={css.itensFicha}>{recentes.map(c => <li key={c.id}>
+          <span>{[c.canal, c.estado, c.em].filter(Boolean).join(' · ')}</span>
+          {noAtendimento.has(c.id) && <Botao disabled={!aoAbrirConversa} onClick={() => aoAbrirConversa?.(c.id)} aria-label={`Abrir conversa de ${[c.canal, c.em].filter(Boolean).join(', ')}`}>Abrir conversa</Botao>}
+        </li>)}</ul>}
+      {!aoAbrirConversa && recentes.some(c => noAtendimento.has(c.id)) && <p className={css.legenda}>Salve ou descarte as mudanças do cadastro para abrir uma conversa.</p>}
+    </section>}
+    {intencao && <Modal titulo={TITULO[intencao.acao]} largura={intencao.acao === 'endereco' ? 'md' : 'sm'} focarCampo={digitando} aoFechar={ocupado ? undefined : fechar} segurarFechamento={ocupado} confirmarDescarte={comTexto && !ocupado}
+      rodape={<><Botao disabled={ocupado} onClick={digitando ? pedirFechamento : fechar}>Cancelar</Botao><Botao variante={intencao.acao.startsWith('remover') ? 'perigo' : 'primario'} disabled={ocupado} {...(intencao.acao.startsWith('remover') ? { onClick: confirmar } : { tipo: 'submit', form: ids.form })}>{ocupado ? 'Salvando…' : CONFIRMAR[intencao.acao]}</Botao></>}>
       {intencao.acao === 'endereco' && <form id={ids.form} ref={formRef} onSubmit={confirmar} className={css.formulario} noValidate>
         {CAMPOS_ENDERECO.map(([chave, rotulo, obrigatorio]) => <CampoTexto key={chave} rotulo={rotulo} obrigatorio={obrigatorio} value={form[chave] ?? ''} erro={erros[chave]} disabled={ocupado}
           inputMode={chave === 'cep' ? 'numeric' : undefined} autoComplete={chave === 'cep' ? 'postal-code' : undefined} onChange={e => mudar(chave, e.target.value)} />)}
@@ -149,8 +176,8 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar }) {
         <CampoTexto rotulo="Telefone" obrigatorio tipo="tel" inputMode="tel" value={form.numero ?? ''} erro={erros.numero} disabled={ocupado} onChange={e => mudar('numero', e.target.value)} />
         <label className={css.check}><input type="checkbox" checked={whatsapp} disabled={ocupado} onChange={e => marcarWhatsapp(e.target.checked)} />Tem WhatsApp</label>
       </form>}
-      {intencao.acao === 'removerEndereco' && <p>{linhaDoEndereco(intencao.alvo).principal} sai da ficha. Para mudar um endereço, remova e adicione de novo.</p>}
-      {intencao.acao === 'removerTelefone' && <p>{telefoneNaTela(intencao.alvo.numero) || intencao.alvo.numero} sai da ficha.</p>}
+      {intencao.acao === 'removerEndereco' && <p>{linhaDoEndereco(intencao.alvo).principal} sai do cadastro. Para mudar um endereço, remova e adicione de novo.</p>}
+      {intencao.acao === 'removerTelefone' && <p>{telefoneNaTela(intencao.alvo.numero) || intencao.alvo.numero} sai do cadastro.</p>}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
     </Modal>}
     {pedidoAberto && <DetalhePedido dados={pedidoAberto} aoFechar={() => abrirPedido(null)} />}

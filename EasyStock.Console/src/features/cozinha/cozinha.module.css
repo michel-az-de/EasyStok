@@ -77,12 +77,7 @@
 .cartao {
   display: grid; gap: var(--e-2); padding: var(--e-3);
   background: var(--papel); border: var(--b-1) solid transparent; border-radius: var(--r-2);
-  border-left-width: 0;
 }
-.cor-esperando { border-left-color: var(--info); }
-.cor-atraso { border-left-color: var(--erro); }
-.cor-preparo { border-left-color: var(--sucesso); }
-.cor-entregue { border-left-color: var(--entregue); }
 
 /* Achado 1 (rodada 10): cartão que muda sozinho (pagamento, novo pedido)
    pisca por ~1,5 s, mesmo tempo do destaque sonoro (aplicacao/useAvisoSonoro.js). */
@@ -229,7 +224,6 @@ escritos e desliga as animações, inclusive a volta do overlay. */
    mudou de coluna (`.cartaoAssenta`, acima); sai = deixou a fila; pulsa =
    atrasado. Com movimento reduzido, `estilos/base.css` zera as durações e
    sobram a cor e o texto escrito (RN-30). */
-.cor-agora { border-left-color: var(--alerta); }
 .cor-agora .rotuloSituacao { color: var(--alerta); }
 
 .cartaoEntra { animation: cartaoEntrar 240ms var(--ease-saida); }

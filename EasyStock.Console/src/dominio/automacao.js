@@ -73,7 +73,9 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.PAGAMENTO_CONFIRMADO,
     descricao: 'Confirma o recebimento e avisa a janela de entrega.',
     ativa: true,
-    texto: 'Pagamento confirmado, obrigada! Entrego entre {faixa}.',
+    // #2734 (T8): o mesmo texto que o EasyStok usa enquanto a dona não grava o dela
+    // (RegraAutomatica.TextoPadraoPagamentoConfirmado). Copiar, não reescrever.
+    texto: 'Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!',
   },
   {
     id: 'agradecimento',
@@ -108,7 +110,7 @@ export const contarAtivas = (regras) => regras.filter((r) => r.ativa).length
 export const VARIAVEIS = [
   { chave: 'nome', descricao: 'primeiro nome de quem está na conversa' },
   { chave: 'faixa', descricao: 'janela de entrega do pedido' },
-  { chave: 'pedido', descricao: 'número do pedido em andamento' },
+  { chave: 'pedido', descricao: 'número do pedido em andamento, o mesmo que o cliente lê' },
   { chave: 'abre', descricao: 'quando a loja abre de novo (só na regra Fora do horário)' },
   { chave: 'linkCardapio', descricao: 'link do cardápio (só na regra Primeira resposta)' },
 ]
@@ -210,13 +212,26 @@ export function avisoDaAutomaticaDeEntrada(regra) {
 // chave entre chaves sai para o cliente do jeito que está escrita.
 export const VARIAVEIS_DA_API = [
   { chave: 'nome', descricao: 'primeiro nome do cliente' },
-  { chave: 'pedido', descricao: 'código do pedido em andamento' },
+  { chave: 'pedido', descricao: 'número do pedido em andamento, o mesmo que o cliente lê' },
   { chave: 'faixa', descricao: 'dia e hora agendados da entrega' },
 ]
 
+// #2734 (T2): o EasyStok só troca {nome}, {pedido} e {faixa}, em minúsculas e sem espaço
+// (ModeloTextoAtendimento.cs, regex `\{([a-z]+)\}`). {Nome}, {nome_cliente}, { nome } e {endereço} saem
+// escritos assim para o cliente. A busca é larga de propósito: acha tudo o que parece variável.
+const MARCADOR_LIVRE = /\{(\s*[\p{L}\p{N}_]+\s*)\}/gu
+const semAcentoNemCaixa = (texto) => String(texto).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+
+// A variável que o EasyStok preenche e que a grafia escrita quis dizer ({Nome} e {nome_cliente} querem {nome}), ou null.
+export function sugestaoDeVariavel(chave) {
+  const chaves = VARIAVEIS_DA_API.map((v) => v.chave)
+  const limpa = semAcentoNemCaixa(String(chave).trim())
+  return chaves.includes(limpa) ? limpa : limpa.split('_').find((parte) => chaves.includes(parte)) ?? null
+}
+
 export function variaveisForaDaApi(texto) {
   const conhecidas = new Set(VARIAVEIS_DA_API.map((v) => v.chave))
-  const chaves = [...String(texto ?? '').matchAll(/\{(\w+)\}/g)].map((m) => m[1])
+  const chaves = [...String(texto ?? '').matchAll(MARCADOR_LIVRE)].map((m) => m[1])
   return [...new Set(chaves.filter((c) => !conhecidas.has(c)))]
 }
 
@@ -224,11 +239,56 @@ export function variaveisForaDaApi(texto) {
 // leria "{linkCardapio}"; por isso ela não liga nem salva assim. Devolve o motivo, ou null quando pode. Quem não
 // edita (Operador) não recebe a ordem de trocar o texto, só o porquê.
 export function bloqueioDaAutomatica(texto, editavel = true) {
-  const soltas = variaveisForaDaApi(texto).map((v) => `{${v}}`).join(', ')
+  const fora = variaveisForaDaApi(texto)
+  const soltas = fora.map((v) => `{${v}}`).join(', ')
   if (!soltas) return null
-  return editavel
-    ? `Troque ou apague ${soltas}: o EasyStok não preenche e o cliente leria assim.`
-    : `Tem ${soltas}, que o EasyStok não preenche: assim ela não liga.`
+  if (!editavel) return `Tem ${soltas}, que o EasyStok não preenche: assim ela não liga.`
+  const trocas = fora.map((v) => [v, sugestaoDeVariavel(v)])
+  if (trocas.every(([, certa]) => certa)) {
+    return `Escreva ${trocas.map(([v, certa]) => `{${certa}} no lugar de {${v}}`).join(', ')}: o EasyStok só preenche {nome}, {pedido} e {faixa}.`
+  }
+  return `Troque ou apague ${soltas}: o EasyStok não preenche e o cliente leria assim.`
+}
+
+// #2734 (T7): a prévia do modo API faz a mesma troca do servidor. Variável conhecida com valor vira o valor;
+// o resto (desconhecida, ou conhecida sem valor, que no servidor nem sai) fica escrito e marcado como erro.
+// Devolve pedaços `{ texto, tipo }`, tipo `texto`, `valor` ou `erro`, para a tela marcar o que o cliente não leria bem.
+export function previaDoServidor(texto, valores = {}) {
+  const partes = []
+  let cursor = 0
+  const origem = String(texto ?? '')
+  for (const m of origem.matchAll(MARCADOR_LIVRE)) {
+    if (m.index > cursor) partes.push({ texto: origem.slice(cursor, m.index), tipo: 'texto' })
+    const chave = m[1]
+    const valor = VARIAVEIS_DA_API.some((v) => v.chave === chave) ? String(valores[chave] ?? '').trim() : ''
+    partes.push(valor ? { texto: valor, tipo: 'valor' } : { texto: m[0], tipo: 'erro' })
+    cursor = m.index + m[0].length
+  }
+  if (cursor < origem.length) partes.push({ texto: origem.slice(cursor), tipo: 'texto' })
+  return partes
+}
+
+// #2734 (T5): o EasyStok não manda a automática quando falta valor (DispararAutomacaoUseCase: VariavelSemValor),
+// mesmo ligada. O que falta depende do gatilho: a primeira mensagem nasce antes de existir pedido.
+const GATILHOS_SEM_PEDIDO = new Set([GATILHOS.PRIMEIRO_CONTATO, GATILHOS.FORA_DO_HORARIO, GATILHOS.LOJA_FECHADA])
+const GATILHOS_DE_PEDIDO = new Set([GATILHOS.PAGAMENTO_CONFIRMADO, GATILHOS.POS_ENTREGA, GATILHOS.COBRANCA_VENCENDO])
+
+export function avisoDeValorFaltando(gatilho, texto) {
+  const usadas = new Set([...String(texto ?? '').matchAll(/\{([a-z]+)\}/g)].map((m) => m[1]))
+  const frases = []
+  if (usadas.has('nome')) frases.push('Com {nome} esta mensagem não sai se o contato não tiver nome, mesmo ligada.')
+  const semPedido = GATILHOS_SEM_PEDIDO.has(gatilho)
+  const faltaPedido = ['pedido', 'faixa'].filter((c) => usadas.has(c) && (semPedido || !GATILHOS_DE_PEDIDO.has(gatilho)))
+  if (faltaPedido.length > 0) {
+    const lista = faltaPedido.map((c) => `{${c}}`).join(' e ')
+    frases.push(semPedido
+      ? `Com ${lista} esta mensagem não sai: a primeira mensagem de uma conversa nova ainda não tem pedido.`
+      : `Com ${lista} esta mensagem não sai se a conversa não tiver pedido em andamento.`)
+  }
+  if (GATILHOS_DE_PEDIDO.has(gatilho) && usadas.has('faixa')) {
+    frases.push('Com {faixa} esta mensagem não sai se o pedido não tiver horário agendado, mesmo ligada.')
+  }
+  return frases.length === 0 ? null : frases.join(' ')
 }
 
 // O que a casa mandou sozinha nesta conversa, do mais novo ao mais antigo:

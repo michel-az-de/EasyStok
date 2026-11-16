@@ -19,7 +19,7 @@ export function MetodosCadastro({ contexto }) {
     emVoo.current = true; ocupar(true); falhar(null)
     try {
       await ativarMetodoCadastro(intencao.metodo, intencao.ativo, intencao.requestId, contexto)
-      avisar(`${intencao.metodo.nome}: ${intencao.ativo ? 'ativada' : 'inativada'}.`)
+      avisar(`${intencao.metodo.nome}: ${intencao.ativo ? 'ativo' : 'inativo'}.`)
       escolher(null); consulta.recarregar()
     } catch (e) { falhar(e.status === 409 ? 'Esta forma de pagamento mudou. Feche e atualize a lista antes de tentar novamente.' : e.message) }
     finally { emVoo.current = false; ocupar(false) }
@@ -28,7 +28,7 @@ export function MetodosCadastro({ contexto }) {
     <header className={css.cabecalho}><div><h2>Formas de pagamento</h2><p>Escolha os meios aceitos pela loja.</p></div><Botao icone="refresh-cw" onClick={consulta.recarregar} disabled={consulta.carregando}>Atualizar</Botao></header>
     {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
     {consulta.erro && <div className={css.erro} role="alert"><p>{consulta.erro}</p><Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>}
-    {consulta.carregando ? <Vazio titulo="Carregando formas de pagamento">Aguarde um instante.</Vazio> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.codigo}>
+    {consulta.carregando ? <Vazio titulo="Carregando formas de pagamento">Aguarde um instante.</Vazio> : !consulta.erro && consulta.itens.length === 0 ? <Vazio titulo="Nenhuma forma de pagamento cadastrada">A Casa ainda não tem formas de pagamento para ativar.</Vazio> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.codigo}>
       <div><h3>{m.nome}</h3><span className={css.situacao}>{m.ativo ? 'Ativa' : 'Inativa'}</span></div>
       {acoes.gerenciarCadastrosFinanceiros && <Botao aria-label={`${m.ativo ? 'Inativar' : 'Ativar'} ${m.nome}`} onClick={() => { falhar(null); escolher({ metodo: m, ativo: !m.ativo, requestId: crypto.randomUUID() }) }}>{m.ativo ? 'Inativar' : 'Ativar'}</Botao>}
     </li>)}</ul>}

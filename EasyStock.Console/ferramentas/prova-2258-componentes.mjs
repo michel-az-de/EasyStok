@@ -69,9 +69,12 @@ caso('T12: erro sob o campo, ligado por aria-describedby, com aria-invalid e con
 caso('T12/T13: o nome em edição não some no erro, recebe o foco e tem dica e limite', () => {
   const emLinha = ler('features/ficha-cliente/CampoEmLinha.jsx')
   assert.match(emLinha, /aria-describedby=\{erro \? idErro : undefined\}/)
-  assert.match(emLinha, /if \(erro && editando\) inputRef\.current\?\.focus\(\)/)
+  // #2734 (A06): o foco volta só quando o erro não vem do blur (semFoco).
+  assert.match(emLinha, /if \(erro && editando && !semFoco\.current\) inputRef\.current\?\.focus\(\)/)
   assert.match(emLinha, /placeholder=\{dica\}/)
-  assert.match(emLinha, /maxLength=\{limite\}/)
+  // #2734 (A09): sem maxLength; o limite vira mensagem que trava o confirmar.
+  assert.doesNotMatch(emLinha, /maxLength=/)
+  assert.match(emLinha, /Use até \$\{limite\} caracteres/)
   const comErro = regra(ler('features/ficha-cliente/cliente.module.css'), '.controleComErro')
   // #2185 (R17): os 2 px da borda vêm do token --b-2.
   assert.match(comErro, /box-shadow: inset 0 0 0 var\(--b-2\) var\(--erro\)/)

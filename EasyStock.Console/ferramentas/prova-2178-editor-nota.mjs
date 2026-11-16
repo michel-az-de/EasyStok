@@ -214,14 +214,15 @@ try {
     await pagina.evaluate(() => window.montarCadastro(false)); await cadastroCliente.waitFor({ state: 'detached' })
     await pagina.evaluate(() => window.montarCadastro(true)); await cadastroCliente.waitFor({ state: 'visible' })
   }
-  await cadastroCliente.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).click()
+  // #2734 (A16): o botão em linha se chama "<valor>, editar <rótulo>".
+  await cadastroCliente.getByRole('button', { name: 'Marina, editar Nome do cliente', exact: true }).click()
   await nomeCadastro.fill('Marina revisada')
   await remontarCadastro()
   assert.equal(await nomeCadastro.count(), 1, 'remonte mantém o editor de nome aberto')
   assert.equal(await nomeCadastro.inputValue(), 'Marina revisada')
   assert.equal(await pagina.evaluate(() => window.gravacoesCampos.length), 0, 'reabrir o rascunho não salva por mudança automática de foco')
   await pagina.evaluate(() => window.trocarClienteCadastro('Carlos'))
-  await cadastroCliente.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).waitFor()
+  await cadastroCliente.getByRole('button', { name: 'Carlos, editar Nome do cliente', exact: true }).waitFor()
   assert.equal(await nomeCadastro.count(), 0, 'outro cliente não herda a edição')
   await pagina.evaluate(() => window.trocarClienteCadastro('Marina'))
   await nomeCadastro.waitFor(); assert.equal(await nomeCadastro.inputValue(), 'Marina revisada')
@@ -238,11 +239,12 @@ try {
   await nomeCadastro.press('Enter')
   await pagina.waitForFunction(() => window.gravacoesCampos.length === 2)
   await pagina.evaluate(() => window.responderCampo(true))
-  await cadastroCliente.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).waitFor()
+  await cadastroCliente.getByRole('button', { name: 'Marina, editar Nome do cliente', exact: true }).waitFor()
   await remontarCadastro(); assert.equal(await nomeCadastro.count(), 0, 'sucesso limpa o rascunho')
-  await cadastroCliente.getByRole('button', { name: 'Editar Nome do cliente', exact: true }).click()
+  await cadastroCliente.getByRole('button', { name: 'Marina, editar Nome do cliente', exact: true }).click()
   await nomeCadastro.fill('Marina descartada')
-  await cadastroCliente.getByRole('button', { name: 'Desfazer', exact: true }).click()
+  // #2734 (A31): o X da edição em linha passou de "Desfazer" para "Cancelar edição".
+  await cadastroCliente.getByRole('button', { name: 'Cancelar edição', exact: true }).click()
   await remontarCadastro(); assert.equal(await nomeCadastro.count(), 0, 'Desfazer limpa o rascunho')
   assert.deepEqual(await pagina.evaluate(() => window.gravacoesCampos), [
     { id: 'Marina', campo: 'nome', texto: 'Marina revisada' }, { id: 'Marina', campo: 'nome', texto: 'Marina revisada' },

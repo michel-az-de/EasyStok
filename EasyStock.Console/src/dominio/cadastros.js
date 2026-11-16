@@ -39,7 +39,7 @@ export function corpoCliente(dados, empresaId) {
   return { ...campos(dados, ['nome', 'apt', 'endereco', 'telefone', 'email', 'documento', 'observacoes', 'nomeFantasia', 'inscricaoEstadual']), telefone: telefoneParaApi(dados.telefone), documento: documentoParaApi(dados.documento), empresaId,
     ...(dados.id ? { id: dados.id, revisao: dados.revisao } : {}), pessoaJuridica: dados.tipoPessoa === 'juridica', origem: 'console' }
 }
-export const CAMPOS_CLIENTE = { nome: 'Nome', tipoPessoa: 'Tipo de pessoa', telefone: 'Telefone', email: 'E-mail', documento: 'Documento', nomeFantasia: 'Nome fantasia', inscricaoEstadual: 'Inscrição estadual', endereco: 'Endereço', apt: 'Apartamento ou referência', observacoes: 'Observações' }
+export const CAMPOS_CLIENTE = { nome: 'Nome', tipoPessoa: 'Tipo de pessoa', telefone: 'Telefone', email: 'E-mail', documento: 'Documento', nomeFantasia: 'Nome fantasia', inscricaoEstadual: 'Inscrição estadual', endereco: 'Endereço', apt: 'Complemento', observacoes: 'Observações' }
 export function reconferirCadastroCliente(editor, atual) {
   if (!editor.dados.id || atual?.id !== editor.dados.id || !Number.isInteger(atual.revisao) || atual.revisao < 0)
     throw new Error('Não foi possível conferir a versão deste cadastro. Tente carregar novamente.')
@@ -175,8 +175,10 @@ export function ordemDoCabecalhoNome(tela, valor) {
 
 // #2457 (U3): o limite de cada coluna vira erro no próprio campo, com o tamanho atual. `maxLength` cortava o
 // texto colado sem avisar (direção visual, seção 2). Fornecedor: e-mail com 150, o tamanho da coluna (B2).
+// #2734 (A11, C-13): a coluna Cliente.Nome tem 150 no servidor (ClienteConfiguration); Ficha e Cadastros usam o mesmo número.
+export const LIMITE_DO_NOME_DO_CLIENTE = 150
 const LIMITES_CADASTRO = {
-  clientes: { nome: 150, telefone: 32, email: 255, documento: 30, nomeFantasia: 150, inscricaoEstadual: 20, endereco: 255, apt: 32 },
+  clientes: { nome: LIMITE_DO_NOME_DO_CLIENTE, telefone: 32, email: 255, documento: 30, nomeFantasia: 150, inscricaoEstadual: 20, endereco: 255, apt: 32 },
   fornecedores: { nome: 150, contato: 150, telefone: 20, email: 150, documento: 30, categoria: 120, tipo: 60, siteUrl: 255, pedidoMinimo: 120, fretePadrao: 120 },
   produtos: { nome: 180 },
   bancos: { nome: 150 },

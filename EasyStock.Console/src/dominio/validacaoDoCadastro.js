@@ -1,14 +1,17 @@
 // #2258 (auditoria de UX, T12, T14 e T16): regras do cadastro rápido do cliente, uma mensagem por
 // campo, para a tela mostrar o erro no próprio campo em vez de deixar o botão mudo.
 
-export const LIMITE_DO_NOME = 80
+import { LIMITE_DO_NOME_DO_CLIENTE } from './cadastros.js'
+
+// #2734 (A11): o mesmo limite (e a mesma frase) de Cadastros: a coluna do servidor tem 150.
+export const LIMITE_DO_NOME = LIMITE_DO_NOME_DO_CLIENTE
 
 const digitos = (valor) => String(valor ?? '').replace(/\D/g, '')
 
 export function erroDoNome(nome) {
   const texto = String(nome ?? '').trim()
   if (!texto) return 'Escreva o nome'
-  return texto.length > LIMITE_DO_NOME ? `Use até ${LIMITE_DO_NOME} caracteres` : null
+  return texto.length > LIMITE_DO_NOME ? `Use até ${LIMITE_DO_NOME} caracteres. Agora tem ${texto.length}.` : null
 }
 
 // Telefone com DDD: 10 (fixo) ou 11 (celular) dígitos.
@@ -19,6 +22,8 @@ const CELULAR_SEM_O_ULTIMO = /\D\d{5}-\d{1,3}\s*$/
 export function erroDoTelefone(telefone) {
   const quantos = digitos(telefone).length
   if (quantos === 0) return 'Informe o telefone com DDD'
+  // #2734 (A01, A02): o DDI 55 já saiu na máscara (telefoneNaTela); o que passa de 11 dígitos aqui não é número do Brasil.
+  if (quantos > 11) return 'Telefone com mais de 11 dígitos. Use só o DDD e o número.'
   if (quantos < 10) return 'Telefone incompleto'
   return quantos === 10 && CELULAR_SEM_O_ULTIMO.test(String(telefone)) ? 'Telefone incompleto' : null
 }

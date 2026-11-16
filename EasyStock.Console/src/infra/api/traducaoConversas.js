@@ -22,6 +22,10 @@ export const canalParaApi = (nome) => CANAL_DO_NOME[nome] ?? nome
 
 const ESTADO_DA_SITUACAO = { Automatica: 'Aberto', Assumida: 'Em atendimento', Encerrada: 'Encerrado' }
 
+// #2734: as conversas recentes do dossiê usam os mesmos nomes de canal e de estado da lista do Atendimento.
+export const nomeDoCanal = (canal) => NOME_DO_CANAL[canal] ?? canal ?? null
+export const estadoDaSituacao = (situacao) => ESTADO_DA_SITUACAO[situacao] ?? situacao ?? null
+
 const STATUS_DA_MENSAGEM = {
   Pendente: 'enviando', Enviada: 'enviada', Entregue: 'entregue', Lida: 'lida', Falhou: 'falhou',
 }

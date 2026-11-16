@@ -4,6 +4,7 @@ import { Chip } from '../../componentes/Chip'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { moeda } from '../../dominio/formato'
+import { rotuloDaTag } from '../../dominio/tag'
 import css from './assistente.module.css'
 
 // Casca comum aos seis cartões: ícone, título, "ok, entendi" (seção D da
@@ -27,7 +28,7 @@ export function CartaoCliente({ dado, aoDispensar }) {
     <Cartao icone="ficha" titulo="Perfil do cliente" aoDispensar={aoDispensar}>
       {dado.tags.length > 0 && (
         <div className={css.tagsCliente}>
-          {dado.tags.map((tag) => <Chip key={tag} papel="tag">{tag}</Chip>)}
+          {dado.tags.map((tag) => <Chip key={tag} papel="tag">{rotuloDaTag(tag)}</Chip>)}
         </div>
       )}
       <p>{dado.chegou ?? 'Sem data de chegada registrada'}</p>

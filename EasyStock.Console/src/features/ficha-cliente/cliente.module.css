@@ -63,6 +63,8 @@
   background: none; border: 0; padding: 0; color: var(--marca); font-weight: 600;
   font-size: inherit; text-decoration: underline; min-height: var(--toque);
 }
+.linkDomicilio:hover { color: var(--acao-forte); }
+.linkDomicilio:active { color: var(--tinta); }
 
 /* #1441: post-it. Papel de recado com a borda do aviso e leve inclinação alternada. */
 .postIts { list-style: none; margin: 0 0 var(--e-3); padding: 0; display: grid; gap: var(--e-2); }
@@ -88,6 +90,8 @@
   font-size: var(--t-corpo); color: var(--tinta); font-family: inherit;
 }
 .valorBotao svg { color: var(--tinta-2); flex-shrink: 0; }
+.valorBotao:hover svg { color: var(--tinta); }
+.valorBotao:active { background: var(--preenchimento); border-radius: var(--r-1); }
 .valorVazio { color: var(--tinta-3); font-style: italic; }
 .salvo { display: flex; align-items: center; gap: var(--e-1); margin: 0; color: var(--sucesso); font-size: var(--t-apoio); }
 
@@ -143,6 +147,8 @@
   border-radius: var(--r-pilula); border: 0;
   background: transparent; color: var(--tinta-3); font-size: var(--t-apoio); font-weight: 600; white-space: nowrap;
 }
+.chipTracejado:hover { background: var(--preenchimento); color: var(--tinta); }
+.chipTracejado:active { background: var(--preenchimento-forte); color: var(--tinta); }
 .sugestoesTag { margin-top: var(--e-2); display: grid; gap: var(--e-2); }
 .grupoSugestao { margin: 0 0 var(--e-1); font-size: var(--t-apoio); color: var(--tinta-3); }
 .chipSugestao {
@@ -151,6 +157,8 @@
   border: 0; background: var(--papel); color: var(--tinta-2);
   font-size: var(--t-apoio);
 }
+.chipSugestao:hover { background: var(--preenchimento); color: var(--tinta); }
+.chipSugestao:active { background: var(--preenchimento-forte); color: var(--tinta); }
 .avisoDesfazer {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-1); margin: var(--e-2) 0 0;
   font-size: var(--t-apoio); color: var(--tinta-2);
@@ -202,7 +210,7 @@
 .azulejo {
   grid-row: 1 / span 2; align-self: center;
   width: 30px; height: 30px; border-radius: var(--r-2); display: grid; place-items: center;
-  color: var(--branco); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 2px rgba(0, 0, 0, .12);
+  color: var(--branco); box-shadow: var(--brilho), var(--sombra);
 }
 .azVerde, .az_conversa { background: var(--canal-whatsapp-fundo); }
 .azAzul, .az_globo { background: var(--canal-site-fundo); }
@@ -211,7 +219,6 @@
    mesma pendência, não como um segundo dado desencontrado. */
 .linhaDadoPendente {
   border-left: 0; background: var(--alerta-pastel);
-  padding-left: calc(var(--e-3) - var(--trilho));
 }
 .linhaDadoPendente .valorVazio { color: var(--alerta); font-style: normal; }
 .az_camera { background: var(--canal-instagram-fundo); }
@@ -235,8 +242,8 @@
 }
 .captadoAgora { animation: realceCaptado 1.6s var(--ease-saida, ease-out); }
 @keyframes realceCaptado {
-  0% { background-color: var(--sucesso-pastel); box-shadow: inset 3px 0 0 var(--sucesso); }
-  100% { background-color: transparent; box-shadow: inset 3px 0 0 transparent; }
+  0% { background-color: var(--sucesso-pastel); }
+  100% { background-color: transparent; }
 }
 
 /* Rodada 13 · Fidelidade e cupons (issue #45, registro 107): selo discreto de
@@ -269,15 +276,15 @@
 .subRecompensa { font-size: var(--t-micro); color: var(--tinta-3); }
 
 /* #1430: contato que o visitante do chat do site informou antes de conversar.
-   Selo em azul de informação (não é o verde de "feito": ninguém confirmou ainda). */
+   Mesmo tom do dado pendente (.linhaDadoPendente, Bloco .destaque): ninguém confirmou ainda. */
 .contatoInformado {
   display: grid; gap: var(--e-2); margin-bottom: var(--e-3); padding: var(--e-3);
-  background: var(--info-pastel); border-radius: var(--r-2);
+  background: var(--alerta-pastel); border-radius: var(--r-2);
 }
 .seloInformado {
   justify-self: start; padding: 1px 8px; border-radius: var(--r-pilula);
   font-size: var(--t-micro); font-weight: 600; line-height: 1.5;
-  color: var(--info); background: var(--elevado);
+  color: var(--alerta); background: var(--elevado);
 }
 .listaInformado {
   display: grid; grid-template-columns: auto 1fr; gap: var(--e-1) var(--e-3); margin: 0;

@@ -43,7 +43,7 @@ export function BarraModo({ conversa, pausado, bloqueada = false, podeReabrir = 
   }
 
   return (
-    <section className={`${css.modo} ${css['modo_' + resumo.chave]}`} data-controle-conversa aria-label="Quem responde esta conversa">
+    <section className={css.modo} data-controle-conversa aria-label="Quem responde esta conversa">
       <div className={css.modoLinha}>
         {/* #2420: título em negrito e motivo embaixo; o " · " fica para o leitor de tela ler a frase inteira. */}
         {faixa ? (

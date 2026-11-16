@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
@@ -7,6 +7,8 @@ import {
 } from '../../dominio/cliente'
 import { SEGUNDOS_PARA_DESFAZER } from '../../dominio/esteira'
 import css from './cliente.module.css'
+
+const TAG_REPETIDA = 'Esta tag já existe.'
 
 // Tags como chips (seção 2 da direção visual, US-016). Restrição sempre
 // primeiro (RN-39/RN-52): ícone de alerta e borda `--alerta`. Remover usa o
@@ -23,9 +25,15 @@ export function TagsDoCliente({ conversa }) {
   const [adicionando, setAdicionando] = useState(false)
   const [novaTag, setNovaTag] = useState('')
   const [desfazer, setDesfazer] = useState(null)
+  // #2734: o erro guarda em qual campo nasceu (`edicao` ou `nova`), para ficar ligado a ele por aria-describedby.
+  const [erroTag, setErroTag] = useState(null)
+  const idErro = useId()
+  const recusaEm = (campo) => (erroTag?.em === campo ? { 'aria-invalid': true, 'aria-describedby': idErro } : {})
+  const cancelou = useRef(false)
 
   useEffect(() => {
     setEditando(null)
+    setErroTag(null)
     setAdicionando(false)
     setDesfazer(null)
   }, [conversa.id])
@@ -49,13 +57,29 @@ export function TagsDoCliente({ conversa }) {
   }
 
   function abrirEdicao(tag) {
+    cancelou.current = false
+    setErroTag(null)
     setEditando(tag)
     setRascunho(rotuloDaTag(tag))
   }
 
+  // #2734 (A29): tag repetida (mesma chave, sem caixa nem acento) é recusada com mensagem.
+  const jaExiste = (texto, exceto) => tags.some((t) => t !== exceto && chaveDaTag(t) === chaveDaTag(texto))
+
   function confirmarEdicao() {
     const novo = rascunho.trim()
-    if (novo && chaveDaTag(novo) !== chaveDaTag(editando)) editarTag(conversa.id, editando, novo)
+    if (novo && chaveDaTag(novo) !== chaveDaTag(editando)) {
+      if (jaExiste(novo, editando)) { setErroTag({ texto: TAG_REPETIDA, em: 'edicao' }); return }
+      editarTag(conversa.id, editando, novo)
+    }
+    setErroTag(null)
+    setEditando(null)
+  }
+
+  // O Esc cancela: o blur que vem depois (a janela perde o foco, o input some) não pode salvar.
+  function cancelarEdicao() {
+    cancelou.current = true
+    setErroTag(null)
     setEditando(null)
   }
 
@@ -66,7 +90,9 @@ export function TagsDoCliente({ conversa }) {
 
   function confirmarNovaTag() {
     const tag = novaTag.trim()
+    if (tag && jaExiste(tag)) { setErroTag({ texto: TAG_REPETIDA, em: 'nova' }); return }
     if (tag) adicionarTag(conversa.id, tag)
+    setErroTag(null)
     setNovaTag('')
   }
 
@@ -83,12 +109,14 @@ export function TagsDoCliente({ conversa }) {
               <input
                 autoFocus
                 className={css.chipEdicao}
+                aria-label={`Editar tag ${rotuloDaTag(tag)}`}
+                {...recusaEm('edicao')}
                 value={rascunho}
-                onChange={(e) => setRascunho(e.target.value)}
-                onBlur={confirmarEdicao}
+                onChange={(e) => { setRascunho(e.target.value); setErroTag(null) }}
+                onBlur={() => { if (cancelou.current) { cancelou.current = false; return } confirmarEdicao() }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') confirmarEdicao()
-                  if (e.key === 'Escape') setEditando(null)
+                  if (e.key === 'Escape') cancelarEdicao()
                 }}
               />
             ) : (
@@ -108,12 +136,14 @@ export function TagsDoCliente({ conversa }) {
               autoFocus
               className={css.chipEdicao}
               placeholder="Nova tag"
+              aria-label="Nova tag"
+              {...recusaEm('nova')}
               value={novaTag}
-              onChange={(e) => setNovaTag(e.target.value)}
+              onChange={(e) => { setNovaTag(e.target.value); setErroTag(null) }}
               onBlur={() => { if (!novaTag.trim()) setAdicionando(false) }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') confirmarNovaTag()
-                if (e.key === 'Escape') setAdicionando(false)
+                if (e.key === 'Escape') { setAdicionando(false); setErroTag(null) }
               }}
             />
           ) : (
@@ -123,6 +153,7 @@ export function TagsDoCliente({ conversa }) {
           )}
         </li>
       </ul>
+      {erroTag && <p id={idErro} className={css.erroEmLinha} role="alert">{erroTag.texto}</p>}
 
       {adicionando && (sugestoes.restricao.length > 0 || sugestoes.gosto.length > 0) && (
         <div className={css.sugestoesTag}>

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro } from '../../../aplicacao/cadastros'
+import { alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro, useRelacionamentoCliente } from '../../../aplicacao/cadastros'
 import { useSugestaoCadastro } from '../../../aplicacao/useSugestaoCadastro'
 import { useGravacaoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
@@ -8,6 +8,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { FichaCliente } from './FichaCliente'
+import { RelacionamentoCliente } from './RelacionamentoCliente'
 import { lerMoeda } from '../../../dominio/formato'
 import { avisoDeDuplicado, duplicadosDoCliente, termoDeDuplicado } from '../../../dominio/clienteDuplicado'
 import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, categoriasRaiz, subcategoriasDe, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
@@ -18,10 +19,16 @@ const tiposProduto = [{ valor: 'Alimento', rotulo: 'Alimento' }, { valor: 'Fisic
 const tiposConta = [{ valor: 'corrente', rotulo: 'Conta corrente' }, { valor: 'poupanca', rotulo: 'Poupança' }, { valor: 'pagamento', rotulo: 'Conta de pagamento' }]
 const opcoesStatus = [{ valor: 'Inativo', rotulo: 'Inativo' }, { valor: 'Ativo', rotulo: 'Ativo' }]
 
-export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade, aoAbrirCadastro }) {
+export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade, aoAbrirCadastro, conversasNoAtendimento, aoAbrirConversa, aoGravarRelacionamento, aoRascunharRelacionamento, restricoes }) {
   const idForm = useId()
+  const formRef = useRef(null)
   const { dados, inicial } = editor
   const id = dados.id ?? dados.produtoId
+  // #2734: cliente já cadastrado mostra o mesmo relacionamento da Ficha do Atendimento (notas, tags, bloqueio).
+  const comRelacionamento = tela === 'clientes' && Boolean(id && dados.detalhe)
+  const relacionamento = useRelacionamentoCliente(comRelacionamento ? id : null, contexto)
+  // #2734 (A21): o primeiro campo recusado recebe o foco; o erro embaixo dele não fica fora da tela.
+  const focarPrimeiroErro = () => requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus())
   const [erro, falhar] = useState(null)
   const [erros, definirErros] = useState({})
   const [categorias, definirCategorias] = useState([])
@@ -116,7 +123,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     evento.preventDefault()
     if (salvando || !podeEditar || editor.semConfirmacao || editor.conflito) return
     const faltas = errosDoFormularioCadastro(tela, dados)
-    if (Object.keys(faltas).length) { definirErros(faltas); return }
+    if (Object.keys(faltas).length) { definirErros(faltas); focarPrimeiroErro(); return }
     const concluir = iniciar(); if (!concluir) return
     falhar(null)
     try {
@@ -128,7 +135,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
       const conflitoCliente = e.status === 409 && tela === 'clientes' && id
       // #2457 (B5): erro de validação da API vai para baixo do campo; o aviso geral só diz para conferir.
       const camposComErro = e.campos ?? {}
-      if (Object.keys(camposComErro).length) definirErros(camposComErro)
+      if (Object.keys(camposComErro).length) { definirErros(camposComErro); focarPrimeiroErro() }
       falhar(e.codigo === 'IDEMPOTENCY_PAYLOAD_MISMATCH' ? MENSAGEM_CADASTRO_REPETIDO : e.status === 409 ? conflitoCliente ? 'Este cadastro mudou. O que você digitou continua aqui. Confira a versão atual antes de salvar novamente.' : 'Este cadastro mudou. Feche e abra novamente para conferir a versão atual. O que você digitou continua aqui.' : Object.keys(camposComErro).length ? `Confira os campos destacados: ${Object.values(camposComErro).join(' ')}` : e.message)
       if (conflitoCliente) { aoMudar({ ...editor, conflito: true, reconferido: false }); definirVersaoAtual(null) }
       if (semConfirmacao) aoMudar({ ...editor, semConfirmacao: true })
@@ -165,13 +172,15 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     </section>}
     {editor.reconferido && !editor.conflito && <p role="status">Versão atual conferida. Revise os campos e use Salvar cadastro para confirmar sua edição.</p>}
     {editor.semConfirmacao && <div className={css.erro} role="alert"><p>A resposta não chegou. O cadastro pode ter sido salvo. Feche e confira a lista antes de criar outro.</p></div>}
+    {/* `key`: o atalho por endereço troca a pessoa sem desmontar o editor; modal, aviso e notas abertas não passam adiante. */}
+    {comRelacionamento && <RelacionamentoCliente key={id} clienteId={id} relacionamento={relacionamento} contexto={contexto} podeEditar={podeEditar} aoGravar={aoGravarRelacionamento} aoRascunhar={aoRascunharRelacionamento} restricoes={restricoes} />}
     {conversa && podeEditar && <section className={css.assistente} aria-label="Assistência ao cadastro">
       <div className={css.barra}><strong>Conferir dados da conversa</strong><Botao icone="sparkles" disabled={salvando || sugestao.carregando} onClick={sugestao.consultar}>{sugestao.carregando ? 'Consultando…' : 'Consultar com IA'}</Botao></div>
       <p>Usa até 20 mensagens recentes recebidas com texto nesta conversa para sugerir nome, telefone e e-mail.</p>
       {sugestao.erro && <p className={css.erro} role="alert">{sugestao.erro}</p>}
       {sugestao.campos.map(c => <div className={css.sugestao} key={c.campo}><span><strong>{({ nome: 'Nome', telefone: 'Telefone', email: 'E-mail' })[c.campo]}: {c.valor}</strong><q>{c.evidencia}</q></span><Botao disabled={salvando} onClick={() => sugestao.aplicar(c.campo)}>Usar este dado</Botao></div>)}
     </section>}
-    <form id={idForm} onSubmit={salvar}>
+    <form id={idForm} ref={formRef} onSubmit={salvar}>
       {podeEditar && <p className={css.legenda}>Campos com * são obrigatórios.</p>}
       <fieldset disabled={salvando || !podeEditar} className={css.formulario}>
         {campo('nome', tela === 'bancos' ? 'Nome da conta' : 'Nome', { required: true, 'data-foco-inicial': true })}
@@ -184,7 +193,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
             {aoAbrirCadastro && <Botao onClick={() => pedirAbrirOutro(duplicado.cliente)}>Abrir cadastro de {duplicado.cliente.nome?.trim() || 'cliente sem nome'}</Botao>}
           </div>}
           {dados.tipoPessoa === 'juridica' && <>{campo('nomeFantasia', 'Nome fantasia')}{campo('inscricaoEstadual', 'Inscrição estadual')}</>}
-          {campo('endereco', 'Endereço')}{campo('apt', 'Apartamento ou referência')}
+          {campo('endereco', 'Endereço')}{campo('apt', 'Complemento')}
           {area('observacoes', 'Observações')}
         </>}
         {tela === 'fornecedores' && <>
@@ -213,7 +222,8 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
         </>}
       </fieldset>
     </form>
-    {tela === 'clientes' && id && dados.detalhe && <FichaCliente key={`${id}:${dados.revisao ?? ''}`} cliente={dados} detalhe={dados.detalhe} contexto={contexto} podeEditar={podeEditar} />}
+    {comRelacionamento && <FichaCliente key={`${id}:${dados.revisao ?? ''}`} cliente={dados} detalhe={dados.detalhe} contexto={contexto} podeEditar={podeEditar}
+      relacionamento={relacionamento.dados} conversasNoAtendimento={conversasNoAtendimento} aoAbrirConversa={alterado || salvando ? undefined : aoAbrirConversa} />}
     {atividade && <Modal titulo={atividade.titulo} aoFechar={alternando ? undefined : () => confirmarAtividade(null)} segurarFechamento={alternando}
       rodape={<><Botao disabled={alternando} onClick={() => confirmarAtividade(null)}>Cancelar</Botao><Botao variante={atividade.ativar ? 'primario' : 'perigo'} disabled={alternando} onClick={concluirAtividade}>{alternando ? atividade.ativar ? 'Reativando…' : 'Inativando…' : atividade.botao}</Botao></>}>
       <p>{atividade.texto}</p>

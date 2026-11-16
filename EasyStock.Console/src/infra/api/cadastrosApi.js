@@ -1,5 +1,6 @@
 import { chamarApi } from './cliente'
 import { identidadeDaSessao, lerSessao } from './sessao'
+import { notaDaApi, relacionamentoDoDossie } from './traducaoCliente'
 import { chaveDeCriacaoCadastro, corpoCliente, corpoFornecedor, corpoProduto, parametrosDaOrdem, TAMANHO_PAGINA_CADASTRO, termoBuscaCadastro } from '../../dominio/cadastros'
 
 const rotas = { clientes: '/api/clientes', produtos: '/api/produtos', fornecedores: '/api/fornecedores', bancos: '/api/cadastros/contas-bancarias', pagamentos: '/api/cadastros/metodos-pagamento', modelos: '/api/notificacoes/templates', etiquetas: '/api/etiquetas/templates' }
@@ -34,6 +35,22 @@ export const adicionarEnderecoCliente = (clienteId, corpo, contexto) => chamarAp
 export const removerEnderecoCliente = (clienteId, id, contexto) => chamarApi(`${subrecurso(clienteId, 'enderecos', id)}?empresaId=${contexto.empresaId}`, { ...opcoes(contexto), metodo: 'DELETE' })
 export const adicionarTelefoneCliente = (clienteId, corpo, contexto) => chamarApi(subrecurso(clienteId, 'telefones'), { ...opcoes(contexto), metodo: 'POST', corpo })
 export const removerTelefoneCliente = (clienteId, id, contexto) => chamarApi(`${subrecurso(clienteId, 'telefones', id)}?empresaId=${contexto.empresaId}`, { ...opcoes(contexto), metodo: 'DELETE' })
+// #2734: relacionamento do cliente no editor (dossiê S25, notas e tags), na mesma tradução da Ficha do Atendimento.
+export async function obterRelacionamentoCliente(clienteId, contexto, sinal) {
+  const lido = relacionamentoDoDossie(await chamarApi(`${subrecurso(clienteId, 'dossie')}?empresaId=${contexto.empresaId}`, opcoes(contexto, sinal)))
+  if (!lido) throw new Error('O relacionamento deste cliente não foi recebido. Tente carregar novamente.')
+  return lido
+}
+// A nota volta na tradução da Ficha e a tag como o servidor normalizou. Resposta sem corpo devolve nulo (a tela relê o dossiê).
+export async function adicionarNotaCadastro(clienteId, texto, contexto) {
+  const nota = await chamarApi(`${subrecurso(clienteId, 'notas')}?empresaId=${contexto.empresaId}`, { ...opcoes(contexto), metodo: 'POST', corpo: { texto } })
+  return nota?.id ? notaDaApi(nota) : null
+}
+export async function adicionarTagCadastro(clienteId, tag, contexto) {
+  const resposta = await chamarApi(`${subrecurso(clienteId, 'tags')}?empresaId=${contexto.empresaId}`, { ...opcoes(contexto), metodo: 'POST', corpo: { tag } })
+  return resposta?.tag ?? null
+}
+export const removerTagCadastro = (clienteId, tag, contexto) => chamarApi(`${subrecurso(clienteId, 'tags', tag)}?empresaId=${contexto.empresaId}`, { ...opcoes(contexto), metodo: 'DELETE' })
 export async function obterCadastro(tela, id, contexto, sinal) {
   const r = await chamarApi(`${rotas[tela]}/${encodeURIComponent(id)}?empresaId=${contexto.empresaId}`, opcoes(contexto, sinal))
   return tela === 'clientes' ? { ...r.cliente, detalhe: r } : r

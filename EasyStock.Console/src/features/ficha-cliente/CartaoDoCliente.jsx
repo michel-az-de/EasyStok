@@ -6,7 +6,7 @@ import { Avatar } from '../../componentes/Avatar'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
-import { ehRestricao, ordenarTags } from '../../dominio/cliente'
+import { ehRestricao, ordenarTags, rotuloDaTag } from '../../dominio/cliente'
 import { hashDoModulo } from '../../dominio/modulos'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
 import { CorrecaoVinculoCliente } from './CorrecaoVinculoCliente'
@@ -80,7 +80,7 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
       {tags.length > 0 && (
         <ul className={css.tagsCliente} aria-label="Tags do cliente">
           {tags.map((t) => <li key={t} className={ehRestricao(t, restricoes) ? css.tagRestricao : undefined}>
-            {ehRestricao(t, restricoes) && <Icone nome="alerta" tamanho={16} />}{t}</li>)}
+            {ehRestricao(t, restricoes) && <Icone nome="alerta" tamanho={16} />}{rotuloDaTag(t)}</li>)}
         </ul>
       )}
       {freteAberto && <ConsultaFreteCliente conversa={conversa} aoFechar={() => setFreteAberto(false)}

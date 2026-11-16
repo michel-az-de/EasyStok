@@ -1,6 +1,6 @@
 import { diaMesHora, enderecoDasPartes, mascaraCep, partesDoEndereco } from '../../dominio/formato'
 import { favoritoDoCliente } from '../../dominio/ficha'
-import { instante } from './traducaoConversas'
+import { estadoDaSituacao, instante, nomeDoCanal } from './traducaoConversas'
 
 // Cliente da conversa entre o console e o EasyStok (#1276). A Ficha guarda o endereço numa
 // string só ("Rua X, 120, apto 12, Bairro, 05500-000"); a API recebe e devolve em partes.
@@ -37,6 +37,8 @@ export function clienteDoDossie(dossie) {
       telefone: dados.telefone || null,
       email: dados.email || null,
       fotoUrl: dados.fotoUrl ?? null,
+      // #2734 (C-03): a observação escrita em Cadastros aparece na Ficha, junto das notas.
+      observacoes: String(dados.observacoes ?? '').trim() || null,
       endereco: endereco || null,
       pedidos: dossie.totalPedidos ?? 0,
       // #1839: soma e favorito do servidor sobre todas as compras, não só as 10 da lista.
@@ -50,6 +52,21 @@ export function clienteDoDossie(dossie) {
       // Fica em `cliente` porque a sincronização de 5 s preserva o cliente lido da API.
       historico: (dossie.ultimosPedidos ?? []).map(pedidoDaApi),
     },
+  }
+}
+
+// #2734: o editor de Cadastros mostra o relacionamento com a mesma leitura da Ficha (`clienteDoDossie`):
+// uma tradução só, para a nota, a tag e o bloqueio não divergirem entre as duas telas.
+export function relacionamentoDoDossie(dossie) {
+  const lido = clienteDoDossie(dossie)
+  if (!lido) return null
+  const { notas, tags, totalGasto, favorito, pedidos } = lido.cliente
+  return {
+    bloqueio: lido.bloqueio, notas, tags, totalGasto, favorito, pedidos,
+    conversas: (dossie.conversasRecentes ?? []).map((c) => ({
+      id: c.id, canal: nomeDoCanal(c.canal), estado: estadoDaSituacao(c.situacao),
+      em: quando(instante(c.ultimaMensagemEm ?? c.iniciadaEm)),
+    })),
   }
 }
 
@@ -67,7 +84,7 @@ const quando = diaMesHora
 
 // `criadoEm` (ISO, UTC) põe a nota no lugar certo do fio como post-it (#1441). Sem o Z o
 // navegador leria como hora local e a nota cairia três horas depois.
-const notaDaApi = (n) => ({ id: n.id, texto: n.texto, autor: n.autor, em: quando(instante(n.criadoEm)), criadoEm: instante(n.criadoEm) })
+export const notaDaApi = (n) => ({ id: n.id, texto: n.texto, autor: n.autor, em: quando(instante(n.criadoEm)), criadoEm: instante(n.criadoEm) })
 
 const pedidoDaApi = (p) => ({
   numero: `#${p.id.slice(0, 8)}`,

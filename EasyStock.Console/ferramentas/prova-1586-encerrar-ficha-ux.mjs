@@ -520,7 +520,8 @@ await confere('A  modal na demonstração: ações síncronas seguem valendo, se
 })
 
 const editar = (tela, valor) => {
-  botao(tela, 'Editar Telefone').props.onClick()
+  // #2734 (A16): o nome acessível do botão em linha passou a ser "<valor>, editar <rótulo>".
+  botao(tela, '(11) 90000-0000, editar Telefone').props.onClick()
   tela.renderizar()
   doTipo(tela, 'input')[0].props.onChange({ target: { value: valor } })
   tela.renderizar()

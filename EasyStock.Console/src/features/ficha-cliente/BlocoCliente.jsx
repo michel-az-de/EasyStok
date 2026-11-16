@@ -19,8 +19,9 @@ import {
 import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
 import { canalDaConversa, fotoDoCliente } from '../../dominio/canal'
 import {
-  listaEmPortugues, mascaraCep, mascaraTelefone, partesDoEndereco, moeda,
+  listaEmPortugues, mascaraCep, partesDoEndereco, moeda,
 } from '../../dominio/formato'
+import { telefoneNaTela } from '../../dominio/cadastros'
 import { indiceDoPasso } from '../../dominio/esteira'
 import { numeroCurto, pedidoEncerrado } from '../../dominio/pedido'
 import { SITUACOES, situacaoDoCep } from '../../dominio/areaEntrega'
@@ -340,7 +341,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
               <CampoMascarado
                 tipo="telefone" rotulo="Telefone"
                 valor={form.telefone}
-                aoMudarDigitos={(d) => setForm((f) => ({ ...f, telefone: mascaraTelefone(d) }))}
+                aoMudarDigitos={(d) => setForm((f) => ({ ...f, telefone: telefoneNaTela(d) }))}
                 id={idDoCampo('telefone')}
                 placeholder="(00) 00000-0000"
                 dica="Com DDD"

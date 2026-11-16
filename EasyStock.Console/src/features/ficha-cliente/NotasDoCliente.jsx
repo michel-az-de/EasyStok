@@ -4,6 +4,8 @@ import { Icone } from '../../componentes/Icone'
 import { Botao } from '../../componentes/Botao'
 import { lerPosicaoPostit } from '../../aplicacao/posicoesDosPostits'
 import { paginaNotasDaMesa } from '../../aplicacao/mesaDeNotas'
+import { previaDasNotas } from '../../dominio/ficha'
+import { plural } from '../../dominio/formato'
 import { useMesaDeNotas } from './MesaDeNotas'
 import { focarNotasDaConversa } from './focarCampoDaFicha'
 import css from './NotasDoCliente.module.css'
@@ -49,7 +51,26 @@ function NotaRegistrada({ mesa, conversaId, clienteId, clienteNome, nota }) {
   </article>
 }
 
-export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = false, notas = SEM_NOTAS, aoCriarNota, podeCriarNota = true }) {
+// #2734: recolhida, cada nota mostra 2 linhas. Diz se alguma ficou cortada, para a Ficha oferecer o texto inteiro
+// quando não há nota escondida (só a observação longa, por exemplo). Mede pelo observador, que avisa na montagem
+// e a cada mudança de tamanho; `chave` refaz a medida quando o texto muda sem mudar a altura.
+function useTextoCortado(lista, chave) {
+  const [cortado, definir] = useState(false)
+  useEffect(() => {
+    const alvo = lista.current
+    if (!alvo || typeof ResizeObserver === 'undefined') return undefined
+    const medir = () => definir([...alvo.querySelectorAll(`.${css.nota} .${css.texto}`)].some(p => p.scrollHeight > p.clientHeight + 1))
+    const observador = new ResizeObserver(medir)
+    observador.observe(alvo)
+    return () => observador.disconnect()
+  }, [lista, chave])
+  return cortado
+}
+
+// #2734: a nota nasce à vista. Recolhida, a coluna mostra a prévia (as 2 notas mais recentes, 2 linhas cada); aberta,
+// todas, com o texto inteiro. Antes a lista nascia escondida e o cliente com nota parecia não ter nenhuma.
+// `observacao` é o campo Observações do cadastro: fica fixo no topo e não entra na contagem.
+export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = false, notas = SEM_NOTAS, observacao = null, aoCriarNota, podeCriarNota = true }) {
   const mesa = useMesaDeNotas()
   const [abertas, setAbertas] = useState(false)
   const [pagina, setPagina] = useState({ clienteId, itens: [], proximaPagina: 1, temMais: true, carregando: false, erro: null })
@@ -77,6 +98,11 @@ export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = 
     .sort((a, b) => (Date.parse(b.criadoEm) || 0) - (Date.parse(a.criadoEm) || 0) || String(b.id).localeCompare(String(a.id))), [notas, carregadas])
   const atualizar = mesa?.atualizar
   useEffect(() => { atualizar?.(clienteId, clienteNome, lista, conversaId) }, [atualizar, clienteId, clienteNome, conversaId, lista])
+  const previa = previaDasNotas(lista, abertas)
+  const haNoServidor = fonteApi && pagina.temMais && lista.length > 0
+  const haMaisNotas = previa.escondidas > 0 || haNoServidor
+  const caixa = useRef(null)
+  const cortado = useTextoCortado(caixa, `${abertas}|${observacao ?? ''}|${previa.visiveis.map(n => n.texto).join('|')}`)
   return <section className={css.coluna} data-destino-nota={conversaId} aria-label="Notas internas do cliente">
     <header className={css.cabecalho}>
       <button type="button" data-voltar-notas={conversaId} className={css.abrirNotas} aria-expanded={abertas} aria-controls={`notas-${conversaId}`} onClick={() => setAbertas(v => !v)}>
@@ -86,11 +112,15 @@ export function NotasDoCliente({ conversaId, clienteId, clienteNome, fonteApi = 
         title={!podeCriarNota ? 'Cadastre o cliente para adicionar uma nota.' : undefined}>Nota</Botao>}
     </header>
     {fonteApi && pagina.erro && <output className={css.erro}>{pagina.erro}</output>}
-    <div className={css.lista} id={`notas-${conversaId}`} hidden={!abertas}>
-    {lista.map((nota, indice) => mesa
+    <div ref={caixa} className={css.lista} id={`notas-${conversaId}`} data-aberta={abertas || undefined}>
+    {observacao && <article className={css.nota} data-observacao-do-cadastro><small>Observação do cadastro</small><p className={css.texto}>{observacao}</p></article>}
+    {previa.visiveis.map((nota, indice) => mesa
       ? <NotaRegistrada key={nota.id ?? indice} mesa={mesa} conversaId={conversaId} clienteId={clienteId} clienteNome={clienteNome} nota={nota} />
       : <NotaDoCliente key={nota.id ?? indice} conversaId={conversaId} nota={nota} indice={indice} />)}
-    {fonteApi && pagina.temMais && <button type="button" className={css.soltar} disabled={pagina.carregando}
+    {!abertas && haMaisNotas && <button type="button" className={css.soltar} onClick={() => setAbertas(true)}>
+      {previa.escondidas > 0 && !haNoServidor ? `Ver mais ${plural(previa.escondidas, 'nota', 'notas')}` : 'Ver todas as notas'}</button>}
+    {!abertas && !haMaisNotas && cortado && <button type="button" className={css.soltar} onClick={() => setAbertas(true)}>Ver texto inteiro</button>}
+    {abertas && fonteApi && pagina.temMais && <button type="button" className={css.soltar} disabled={pagina.carregando}
       onClick={() => carregar(pagina.proximaPagina ?? 1)}>{pagina.carregando ? 'Carregando notas…' : pagina.erro ? 'Tentar novamente' : 'Carregar mais notas'}</button>}
     </div>
   </section>

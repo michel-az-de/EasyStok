@@ -5,14 +5,22 @@
 .abrirNotas[aria-expanded='true'] svg { transform: rotate(180deg); }
 /* #2232 (F5): a lista de notas cresce com o conteúdo; quem rola é a Ficha (.conteudo), não uma caixa dentro dela. */
 .lista { display: grid; gap: var(--e-2); }
-.lista[hidden] { display: none; }
+/* #2734: a lista não nasce escondida. Vazia, não ocupa a Ficha. */
+.lista:empty { display: none; }
 .acoesCliente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
 .nota, .solto { border: 0; border-radius: 0; color: var(--tinta); }
 .solto { background: var(--alerta-pastel); }
 .nota { padding: var(--e-2); background: var(--preenchimento); animation: aparecer var(--dur-curta) var(--ease-padrao); }
 .nota small, .corpo small { color: var(--tinta-2); font-size: var(--t-micro); }
 .texto { margin: var(--e-2) 0; font-family: var(--f-corpo); font-size: var(--t-apoio); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.nota .texto { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* #2734: recolhida, cada nota mostra 2 linhas; aberta, o texto inteiro. */
+.lista:not([data-aberta]) .nota .texto { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* #2734: a ação divide a linha com o rótulo da nota; com a nota sempre à vista, a prévia não alonga a Ficha. */
+.nota { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--e-2); }
+.nota small { grid-area: 1 / 1; min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
+.nota .soltar { grid-area: 1 / 2; }
+.nota .texto { grid-column: 1 / -1; margin: var(--e-1) 0; }
+.nota .erro { grid-column: 1 / -1; }
 .soltar { padding: 0; min-height: var(--toque); border: 0; background: transparent; color: var(--tinta-2); font: inherit; font-size: var(--t-micro); cursor: pointer; }
 .referencia { display: flex; align-items: center; gap: var(--e-2); min-width: 0; min-height: var(--toque); color: var(--tinta-2); font-size: var(--t-micro); }
 .referencia span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

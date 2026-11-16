@@ -10,7 +10,7 @@
 // ALTERNAR_REGRA), então editar uma automática na biblioteca É editar a
 // mesma que a outra tela mostra.
 import { primeiroNome } from './mensagem.js'
-import { VARIAVEIS } from './automacao.js'
+import { VARIAVEIS, sugestaoDeVariavel } from './automacao.js'
 
 const semAcento = (texto) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '')
 
@@ -97,14 +97,19 @@ const ROTULO_VARIAVEL = { nome: 'nome do cliente', pedido: 'número do pedido', 
 // no mesmo balaio de nome/pedido, sem sujeito próprio de "faltando" para não
 // duplicar aviso que a automática já trata do jeito dela.
 export function resolverVariaveis(texto, conversa, extras = {}) {
+  // `faixa` sempre entra (vazia quando a conversa não tem janela): assim a falta é apontada, nunca calada.
   const valores = {
     nome: conversa?.nome ? primeiroNome(conversa.nome) : '',
     pedido: conversa?.pedido?.numero ? String(conversa.pedido.numero) : '',
+    faixa: '',
     ...extras,
   }
-  const chavesNoTexto = [...texto.matchAll(/\{(\w+)\}/g)].map((m) => m[1])
-  const faltando = [...new Set(chavesNoTexto.filter((chave) => chave in valores && !valores[chave]))]
-  const textoResolvido = texto.replace(/\{(\w+)\}/g, (todo, chave) => (valores[chave] ? valores[chave] : todo))
+  // #2734 (T2): mesma regra do servidor (ModeloTextoAtendimento.cs): só `{minúsculas}`, e só chave própria.
+  const marcador = /\{([a-z]+)\}/g
+  const chavesNoTexto = [...texto.matchAll(marcador)].map((m) => m[1])
+  const temValor = (chave) => Object.hasOwn(valores, chave)
+  const faltando = [...new Set(chavesNoTexto.filter((chave) => temValor(chave) && !valores[chave]))]
+  const textoResolvido = texto.replace(marcador, (todo, chave) => (temValor(chave) && valores[chave] ? valores[chave] : todo))
   return { texto: textoResolvido, faltando }
 }
 
@@ -124,14 +129,20 @@ const chaveNormalizada = (chave) => semAcento(chave).toLowerCase()
 const ROTULO_POR_CHAVE = new Map(Object.entries(ROTULOS_DO_SISTEMA).map(([chave, rotulo]) => [chaveNormalizada(chave), rotulo]))
 const MARCADOR = /\{\s*([\p{L}\p{N}_]+)\s*\}/gu
 
+// #2734 (T2): também a grafia que o servidor não preenche mas quis dizer uma variável dele ({nome_cliente}).
 const marcadoresDoSistema = (texto) =>
-  [...String(texto ?? '').matchAll(MARCADOR)].filter((m) => ROTULO_POR_CHAVE.has(chaveNormalizada(m[1])))
+  [...String(texto ?? '').matchAll(MARCADOR)]
+    .filter((m) => ROTULO_POR_CHAVE.has(chaveNormalizada(m[1])) || sugestaoDeVariavel(m[1]))
 
 export const variaveisNaoResolvidas = (texto) => [...new Set(marcadoresDoSistema(texto).map((m) => m[0]))]
 
 export function avisoDeVariaveisNaoResolvidas(texto) {
   const frases = variaveisNaoResolvidas(texto).map((marcador) => {
-    const chave = chaveNormalizada(marcador.slice(1, -1).trim())
+    const escrita = marcador.slice(1, -1)
+    const certa = sugestaoDeVariavel(escrita)
+    // Grafia que o servidor não preenche: o problema é a escrita, não a falta de dado.
+    if (certa && escrita !== certa) return `${marcador} não é preenchido pelo EasyStok: escreva {${certa}}.`
+    const chave = chaveNormalizada(escrita.trim())
     return `Esta conversa não tem ${ROTULO_POR_CHAVE.get(chave)}: apague ${marcador} ou escreva no lugar.`
   })
   return frases.length === 0 ? null : frases.join(' ')

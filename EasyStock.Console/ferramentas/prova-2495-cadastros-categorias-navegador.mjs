@@ -107,6 +107,7 @@ try {
   await d.getByRole('button', { name: 'Criar categoria', exact: true }).click()
   await d.getByRole('alert').filter({ hasText: 'Já existe uma categoria chamada "Doces".' }).waitFor()
   await d.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await pagina.getByRole('button', { name: 'Descartar', exact: true }).click() // #2734: Cancelar com texto digitado pergunta antes
   await d.waitFor({ state: 'detached' })
 
   // Criar subcategoria dentro de uma raiz.

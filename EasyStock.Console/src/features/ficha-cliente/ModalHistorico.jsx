@@ -47,7 +47,7 @@ function AbaPedidos({ historico, pedidosAnteriores, aberta }) {
     return (
       <Vazio titulo={aberta ? textoDaComandaAberta(aberta) : 'Nenhum pedido ainda'}>
         {aberta ? 'Ela entra no histórico quando o pedido for concluído.' : pedidosAnteriores > 0
-          ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe salvo neste protótipo.`
+          ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe para mostrar aqui.`
           : 'Primeira vez na casa.'}
       </Vazio>
     )

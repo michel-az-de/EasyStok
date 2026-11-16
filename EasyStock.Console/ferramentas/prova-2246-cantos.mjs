@@ -85,13 +85,12 @@ confere('cartão da comanda e gaveta da ficha arredondados', () => {
   assert.match(regra(fonte('app/moldura.module.css'), '.gaveta.gaveta'), /border-radius:\s*var\(--r-3\)/, 'gaveta')
 })
 
-// A ponta (2 px) fica no balão, no canto da barra lateral das faixas e na tecla de atalho da dica;
-// miniatura e anel de foco eram o "canto reto" antigo e seguem o raio de controle.
-confere('--r-ponta só no balão, nas faixas com barra lateral e na tecla de atalho', () => {
+// A ponta (2 px) fica no balão e na tecla de atalho da dica; faixas já não têm barra lateral (#2734, regra do dono
+// de 12/11/2026), então não há canto de ponta nelas. Miniatura e anel de foco seguem o raio de controle.
+confere('--r-ponta só no balão e na tecla de atalho', () => {
   for (const caminho of ['features/atendimento/composerAnexos.module.css', 'componentes/Bloco.module.css']) {
     assert.doesNotMatch(fonte(caminho), /border-radius:\s*var\(--r-ponta\)\s*;/, caminho)
   }
-  assert.match(regra(fonte('features/encerramento/encerramento.module.css'), '.erroAoEncerrar'), /border-radius:\s*var\(--r-ponta\) var\(--r-1\) var\(--r-1\) var\(--r-ponta\)/, 'erro ao encerrar: barra lateral com canto quase reto')
 })
 
 confere('nenhum comentário do Console promete cantos retos', () => {

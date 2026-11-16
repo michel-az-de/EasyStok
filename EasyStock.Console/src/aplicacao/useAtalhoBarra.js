@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useCatalogo } from './contextos'
+import { faixaDoPedido, faixaParaCliente } from '../dominio/entrega'
 import { moverDestaque, resolverVariaveis, respostasDoSeletor, termoDaBarra } from '../dominio/respostas'
 
 // Seletor rápido de respostas do compositor (#1441, homologação de 07/10, comparando
@@ -12,7 +13,7 @@ import { moverDestaque, resolverVariaveis, respostasDoSeletor, termoDaBarra } fr
 // Mora em aplicacao/ porque precisa dos contextos e feature nenhuma importa outra
 // feature (ferramentas/verificar-camadas.mjs).
 export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
-  const { respostasProntas } = useCatalogo()
+  const { respostasProntas, janelas } = useCatalogo()
   const termoBarra = termoDaBarra(rascunho)
   const pelaBarra = termoBarra !== null
   // A busca aberta pelo botão vale só para a conversa em que abriu; o destaque, só
@@ -42,7 +43,11 @@ export function useAtalhoBarra({ rascunho, conversa, aoInserir }) {
   // #1587: `aoInserido` é de quem desenha a lista. Pelo botão o foco estava na busca, que some
   // com a lista; sem devolver o foco ao campo de texto, o Enter seguinte não envia.
   function inserir(item, aoInserido) {
-    const texto = resolverVariaveis(item.texto, conversa).texto
+    // #2734 (T3): {faixa} sai da janela do pedido da conversa, com o mesmo respiro das automáticas. Sem janela
+    // ela fica escrita, e o aviso do campo (avisoDeVariaveisNaoResolvidas) trava o envio.
+    const faixa = faixaDoPedido(janelas ?? [], conversa?.pedido)
+    const extras = faixa ? { faixa: faixaParaCliente(faixa, Date.now()) } : {}
+    const texto = resolverVariaveis(item.texto, conversa, extras).texto
     const antes = pelaBarra ? '' : (rascunho ?? '').trimEnd()
     aoInserir(antes ? `${antes} ${texto}` : texto)
     setBusca(null)

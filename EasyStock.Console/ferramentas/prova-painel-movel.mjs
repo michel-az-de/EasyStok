@@ -301,11 +301,13 @@ visitar(notasMontadas.tree, n => {
   if (n.props?.id === 'notas-muitas-notas') areaNotas = n
   if (n.type === 'button' && n.props?.['aria-controls'] === 'notas-muitas-notas') abrirNotas = n
 })
-assert.equal(areaNotas.props.hidden, true, 'notas recolhidas não ocupam a ficha')
+// #2734: a lista não nasce mais escondida (a nota "sumia"); recolhida, mostra só a prévia das 2 mais recentes.
+assert.notEqual(areaNotas.props.hidden, true, 'a nota não nasce escondida')
+assert.equal(areaNotas.props.children.find(Array.isArray).length, 2, 'notas recolhidas ocupam só a prévia na ficha')
 abrirNotas.props.onClick(); notasMontadas.render()
 visitar(notasMontadas.tree, n => { if (n.props?.id === 'notas-muitas-notas') areaNotas = n })
-assert.equal(areaNotas.props.hidden, false, 'o controle revela todas as notas')
-const lista = areaNotas.props.children[0]
+assert.equal(areaNotas.props['data-aberta'], true, 'o controle revela todas as notas')
+const lista = areaNotas.props.children.find(Array.isArray)
 assert.equal(lista.length, 120)
 for (const item of lista) {
   const nota = montar(item.type, item.props)
@@ -421,8 +423,8 @@ function conferirFonteDaNota(conversaId, solta, destacar = false, mesaHost = mes
   visitar(listaHost.tree, n => { if (n.type === 'button' && n.props?.['aria-controls'] === `notas-${conversaId}`) abrir = n })
   abrir.props.onClick(); listaHost.render()
   visitar(listaHost.tree, n => { if (n.props?.id === `notas-${conversaId}`) lista = n })
-  assert.equal(lista.props.hidden, false)
-  const elemento = lista.props.children[0].find(n => n.props.nota.id === notaId)
+  assert.equal(lista.props['data-aberta'], true) // #2734: aberta por atributo; a lista não usa mais `hidden`
+  const elemento = lista.props.children.find(Array.isArray).find(n => n.props.nota.id === notaId)
   const fonteHost = montar(elemento.type, elemento.props)
   let botao, texto
   visitar(fonteHost.tree, n => {

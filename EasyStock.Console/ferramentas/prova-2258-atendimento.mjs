@@ -204,13 +204,14 @@ caso('T14  CEP é opcional; de 1 a 7 dígitos diz que precisa de 8', () => {
   assert.equal(validacao.erroDoCep('12345-678'), null)
 })
 
-caso('T12  nome: obrigatório e até 80 caracteres', () => {
-  assert.equal(validacao.LIMITE_DO_NOME, 80)
+// #2734 (A11): o limite do nome do cliente passou de 80 para 150, o da coluna do servidor.
+caso('T12  nome: obrigatório e até 150 caracteres', () => {
+  assert.equal(validacao.LIMITE_DO_NOME, 150)
   assert.equal(validacao.erroDoNome(''), 'Escreva o nome')
   assert.equal(validacao.erroDoNome('   '), 'Escreva o nome')
-  assert.equal(validacao.erroDoNome('A'.repeat(80)), null)
-  assert.equal(validacao.erroDoNome('A'.repeat(81)), 'Use até 80 caracteres')
-  assert.equal(validacao.erroDoNome(`  ${'A'.repeat(80)}  `), null, 'espaço nas pontas não conta')
+  assert.equal(validacao.erroDoNome('A'.repeat(150)), null)
+  assert.equal(validacao.erroDoNome('A'.repeat(151)), 'Use até 150 caracteres. Agora tem 151.')
+  assert.equal(validacao.erroDoNome(`  ${'A'.repeat(150)}  `), null, 'espaço nas pontas não conta')
 })
 
 caso('T14  validarCadastro junta os erros e aponta o primeiro campo, na ordem da tela', () => {

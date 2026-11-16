@@ -20,9 +20,11 @@ export function Combobox({ rotulo, obrigatorio, valor, opcoes, aoMudar, erro, di
   const navegar = (evento) => {
     if (evento.key === 'Escape' && aberto) { evento.preventDefault(); evento.stopPropagation(); abrir(false); buscar(''); return }
     if (evento.key === 'Tab') { abrir(false); buscar(''); return }
+    // #2734 (A23): digitar com a lista fechada abre e começa a busca do zero, em vez de colar no valor escolhido.
+    if (!aberto && evento.key.length === 1 && !evento.ctrlKey && !evento.metaKey && !evento.altKey) { iniciar(); return }
     if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(evento.key)) {
       evento.preventDefault()
-      if (!aberto) { iniciar(); return }
+      if (!aberto) { iniciar(); if (evento.key === 'Home') ativar(0); else if (evento.key === 'End') ativar(Math.max(0, opcoes.length - 1)); return }
       ativar(evento.key === 'Home' ? 0 : evento.key === 'End' ? lista.length - 1 : Math.max(0, Math.min(lista.length - 1, indice + (evento.key === 'ArrowDown' ? 1 : -1))))
     } else if (evento.key === 'Enter' && aberto) { evento.preventDefault(); escolher(lista[indice]) }
   }
@@ -33,7 +35,7 @@ export function Combobox({ rotulo, obrigatorio, valor, opcoes, aoMudar, erro, di
         aria-controls={`${id}-opcoes`} aria-activedescendant={aberto && lista.length ? `${id}-opcao-${indice}` : undefined}
         aria-invalid={erro ? true : undefined} aria-required={obrigatorio || undefined} aria-describedby={erro ? `${id}-erro` : undefined} disabled={disabled}
         value={aberto ? busca : selecionado?.rotulo ?? ''} placeholder={aberto ? 'Buscar opção' : placeholder}
-        onFocus={iniciar} onClick={() => { if (!aberto) iniciar() }} onKeyDown={navegar}
+        onClick={() => { if (!aberto) iniciar() }} onKeyDown={navegar}
         onChange={e => { buscar(e.target.value); ativar(0); abrir(true) }} />
       <Icone nome="chevron-down" tamanho={20} />
     </div>
