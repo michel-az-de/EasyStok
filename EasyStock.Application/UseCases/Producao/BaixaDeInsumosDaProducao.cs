@@ -50,7 +50,8 @@ public sealed class BaixaDeInsumosDaProducao(
     public static string DocumentoDaProducao(string codigoLote) => $"{PrefixoDoDocumento}{codigoLote}";
 
     public async Task<IReadOnlyList<string>> BaixarAsync(
-        Guid empresaId, IReadOnlyList<PratoParaBaixa> pratos, string codigoLote, DateTime data, CancellationToken ct = default)
+        Guid empresaId, IReadOnlyList<PratoParaBaixa> pratos, string codigoLote, DateTime data, CancellationToken ct = default,
+        Guid? lojaId = null)
     {
         var avisos = new List<string>();
         var consumo = new Dictionary<Guid, (Produto Insumo, decimal Quantidade)>();
@@ -108,7 +109,7 @@ public sealed class BaixaDeInsumosDaProducao(
                 continue;
             }
 
-            var lotes = await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, insumoId, null, true, false);
+            var lotes = await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(empresaId, insumoId, null, true, false, lojaId);
             var disponivel = lotes.Sum(l => l.QuantidadeAtual.Value);
             var unidade = insumo.UnidadeMedidaBase;
             if (!lotes.Any())
@@ -127,7 +128,7 @@ public sealed class BaixaDeInsumosDaProducao(
                 empresaId, itens, data, data, null, null,
                 NaturezaMovimentacaoEstoque.UsoInterno, CanalVenda.Outro,
                 $"Insumos da produção {codigoLote}", PermitirDescoberto: true,
-                DocumentoReferencia: DocumentoDaProducao(codigoLote)));
+                DocumentoReferencia: DocumentoDaProducao(codigoLote), LojaId: lojaId));
 
         return avisos;
     }

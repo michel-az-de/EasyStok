@@ -24,17 +24,7 @@ public sealed class RemoverProdutoUseCase(
         var produto = await produtoRepository.GetByIdAsync(empresaId, produtoId)
             ?? throw new UseCaseValidationException("Produto nao encontrado.");
 
-        if (await itemEstoqueRepository.ExisteEstoqueDoProdutoAsync(empresaId, produtoId))
-            throw new UseCaseValidationException("Nao e permitido inativar produto com estoque disponivel.");
-
-        // Bloqueia inativação enquanto há pedido aberto (aguardando/preparando/pronto)
-        // referenciando este produto — evita orfanar itens em produção.
-        if (pedidoRepository is not null &&
-            await pedidoRepository.ExistemPedidosAbertosComProdutoAsync(empresaId, produtoId))
-        {
-            throw new UseCaseValidationException(
-                "Nao e permitido inativar produto com pedidos abertos. Finalize ou cancele os pedidos primeiro.");
-        }
+        await EnsurePodeInativarAsync(empresaId, produtoId, itemEstoqueRepository, pedidoRepository);
 
         produto.Status = StatusProduto.Inativo;
         produto.AlteradoPor = usuarioId != Guid.Empty ? usuarioId : null;
@@ -59,5 +49,24 @@ public sealed class RemoverProdutoUseCase(
 
         if (cacheService is not null)
             await cacheService.RemoveAsync(CacheKeys.ProdutoRelacionadas(empresaId, produtoId));
+    }
+
+    /// <summary>
+    /// #2737 (EST-01): a guarda de inativação, num ponto só para o Remover e para a edição (status Ativo para
+    /// Inativo). Estoque disponível e pedido aberto (aguardando/preparando/pronto) travam: o saldo ficaria preso
+    /// em produto inativo e os itens do pedido ficariam órfãos.
+    /// </summary>
+    internal static async Task EnsurePodeInativarAsync(
+        Guid empresaId, Guid produtoId, IItemEstoqueRepository itemEstoqueRepository, IPedidoRepository? pedidoRepository)
+    {
+        if (await itemEstoqueRepository.ExisteEstoqueDoProdutoAsync(empresaId, produtoId))
+            throw new UseCaseValidationException("Nao e permitido inativar produto com estoque disponivel.");
+
+        if (pedidoRepository is not null &&
+            await pedidoRepository.ExistemPedidosAbertosComProdutoAsync(empresaId, produtoId))
+        {
+            throw new UseCaseValidationException(
+                "Nao e permitido inativar produto com pedidos abertos. Finalize ou cancele os pedidos primeiro.");
+        }
     }
 }
