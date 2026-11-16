@@ -80,6 +80,45 @@ public class CaixaEmailMailKitTests
     }
 
     [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("localhost")]
+    [InlineData("169.254.169.254")]
+    [InlineData("10.1.2.3")]
+    [InlineData("postgres")]
+    public async Task Producao_RecusaHostInternoSemConectar_ComMensagemGenerica(string host)
+    {
+        await using var smtp = new ServidorSmtpDeTeste
+        {
+            Tls = ServidorSmtpDeTeste.ModoTls.StartTls, AnunciaAuth = true, ExigeAuth = true,
+        }.Iniciar();
+        var caixa = new CaixaEmailAtendimento("contato@casadababa.com", "Casa da Baba", host, smtp.Porta, host, smtp.Porta,
+            "contato@casadababa.com", Senha, DateTime.UtcNow);
+        var producao = new CaixaEmailMailKit(NullLogger<CaixaEmailMailKit>.Instance, TimeProvider.System);
+
+        var r = await producao.TestarAsync(caixa);
+
+        r.ImapOk.Should().BeFalse();
+        r.SmtpOk.Should().BeFalse();
+        r.ImapErro.Should().Be("IMAP: servidor não permitido");
+        r.SmtpErro.Should().Be("SMTP: servidor não permitido");
+        smtp.Mensagens.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Producao_HostInternoNoEnvio_FalhaPermanenteSemExporOHost()
+    {
+        var caixa = new CaixaEmailAtendimento("contato@casadababa.com", null, "127.0.0.1", 993, "127.0.0.1", 5432,
+            "contato@casadababa.com", Senha, DateTime.UtcNow);
+        var producao = new CaixaEmailMailKit(NullLogger<CaixaEmailMailKit>.Instance, TimeProvider.System);
+
+        var act = () => producao.EnviarAsync(caixa, new EmailSaida("maria@exemplo.com", "Re: x", "oi", false, null));
+
+        var falha = (await act.Should().ThrowAsync<FalhaCaixaEmailException>()).Which;
+        falha.Permanente.Should().BeTrue();
+        falha.Message.Should().Be("SMTP: servidor não permitido");
+    }
+
+    [Theory]
     [InlineData(993, SecureSocketOptions.SslOnConnect)]
     [InlineData(465, SecureSocketOptions.SslOnConnect)]
     [InlineData(587, SecureSocketOptions.StartTls)]

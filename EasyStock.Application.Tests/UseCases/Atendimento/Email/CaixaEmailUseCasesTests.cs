@@ -69,6 +69,50 @@ public class CaixaEmailUseCasesTests
         (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Message.Should().Contain(campo);
     }
 
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("127.1")]
+    [InlineData("localhost")]
+    [InlineData("caixa.localhost")]
+    [InlineData("169.254.169.254")]
+    [InlineData("10.0.0.5")]
+    [InlineData("172.16.0.1")]
+    [InlineData("172.31.255.255")]
+    [InlineData("192.168.0.10")]
+    [InlineData("100.64.0.1")]
+    [InlineData("0.0.0.0")]
+    [InlineData("postgres")]
+    public async Task Salvar_RecusaHostInternoNoImapENoSmtp(string host)
+    {
+        foreach (var (entrada, campo) in new[]
+                 {
+                     (Entrada() with { ImapHost = host, ImapPorta = 5432 }, "Servidor IMAP"),
+                     (Entrada() with { SmtpHost = host, SmtpPorta = 5432 }, "Servidor SMTP"),
+                 })
+        {
+            var act = () => new SalvarCaixaEmailUseCase(_credenciais, new FakeTimeProvider(Agora))
+                .ExecuteAsync(_empresaId, _usuarioId, entrada);
+
+            (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Message.Should().Contain(campo);
+        }
+        await _credenciais.DidNotReceiveWithAnyArgs().SalvarAsync<CaixaEmailAtendimento>(default, default, default!, default, default!, default, default, default);
+    }
+
+    [Theory]
+    [InlineData("imap.hostinger.com", 2525)]
+    [InlineData("8.8.8.8", 143)]
+    [InlineData("100.63.255.255", 993)]
+    [InlineData("172.32.0.1", 993)]
+    public async Task Salvar_AceitaHostPublicoEPortaNaoPadrao(string host, int porta)
+    {
+        var entrada = Entrada() with { ImapHost = host, ImapPorta = porta };
+
+        var resumo = await new SalvarCaixaEmailUseCase(_credenciais, new FakeTimeProvider(Agora))
+            .ExecuteAsync(_empresaId, _usuarioId, entrada);
+
+        resumo.SenhaDefinida.Should().BeTrue();
+    }
+
     [Fact]
     public async Task Salvar_PrimeiraVezSemSenha_Recusa()
     {

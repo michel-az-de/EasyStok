@@ -1,4 +1,5 @@
 using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.RateLimiting;
 using EasyStock.Application.UseCases.Atendimento.Entregas;
 using EasyStock.Infra.Postgre.Data;
 
@@ -11,6 +12,7 @@ public sealed class EntregasDemonstracaoController(RastreioLogisticaLink links, 
     ObterRastreioLogisticaUseCase rastreio, EasyStockDbContext db) : ControllerBase
 {
     [HttpGet("{token}")]
+    [EnableRateLimiting("public-post")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> Obter(string token, CancellationToken ct)
     {
