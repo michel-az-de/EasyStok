@@ -16,7 +16,7 @@ assert.deepEqual(destinos(api, 'caixa'), ['#/m/financeiro/caixa'])
 assert.deepEqual(destinos(api, 'produção receitas'), ['#/m/producao/receitas'])
 assert.deepEqual(destinos(api, 'janelas entrega'), ['#/m/entregas/janelas'])
 // #2095: o financeiro gerencial foi descongelado; a área oferece todas as suas telas vivas.
-assert.deepEqual(destinos(api, 'financeiro'), ['caixa', 'visao-geral', 'pagar', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo'].map((tela) => `#/m/financeiro/${tela}`), 'o nome da área oferece suas telas vivas')
+assert.deepEqual(destinos(api, 'financeiro'), ['caixa', 'visao-geral', 'pagar', 'receber', 'extrato', 'relatorios', 'categorias', 'centros-custo', 'fechamentos-legados'].map((tela) => `#/m/financeiro/${tela}`), 'o nome da área oferece suas telas vivas')
 assert.deepEqual(destinos(api, 'extrato'), ['#/m/financeiro/extrato'], 'extrato descongelado aparece na busca (#2095)')
 assert.deepEqual(destinos(modulosDoHall({ fonteApi: true, acoes: { gerenciarCaixa: true } }), 'extrato'), ['#/m/financeiro/caixa'], 'perfil sem contas não acha o extrato, só a área viva (#2095, F17)')
 assert.deepEqual(destinos(api, 'pratos preços'), [
