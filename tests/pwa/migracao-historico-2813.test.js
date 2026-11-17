@@ -14,10 +14,19 @@ module.exports = function ({ test, sandbox, reset, assert, runInSandbox }) {
   async function isolated(fn) {
     const oldFetch = sandbox.fetch, oldOnline = sandbox.navigator.onLine, oldConfig = sandbox.window.CDB_CONFIG, oldPhotos = sandbox.window.cdbPhotoStore, oldQueueStore = sandbox.window.cdbQueueStore, oldCrypto = sandbox.window.crypto, oldAbort = sandbox.AbortController, oldParams = sandbox.URLSearchParams, oldSet = sandbox.localStorage.setItem;
     const oldAlert = sandbox.alert, oldConfirm = sandbox.confirm, oldReader = sandbox.FileReader, oldCreate = sandbox.document.createElement, oldGetById = sandbox.document.getElementById;
+    // O import aceito agenda location.reload() 800 ms depois (index.html). O timer não pode sobreviver ao teste: ele cairia no
+    // contador de reloads do pull-carimbo, que começa ~0,5 s depois, e o #1520 veria 2 reloads onde espera 1.
+    const oldSetTimeout = sandbox.setTimeout, timersDeReload = [];
+    sandbox.setTimeout = (fn, ms, ...args) => {
+      const id = oldSetTimeout.call(sandbox, fn, ms, ...args);
+      if (typeof fn === 'function' && /location\.reload/.test(String(fn))) timersDeReload.push(id);
+      return id;
+    };
     reset(); sandbox.localStorage.clear(); sync().clearPairing(); sync().clearQueue(); sandbox.navigator.onLine = false;
     sandbox.window.CDB_CONFIG = { isPilot: true }; sandbox.window.crypto = require('node:crypto').webcrypto; sandbox.AbortController = AbortController; sandbox.URLSearchParams = URLSearchParams;
     try { await fn(); }
     finally {
+      sandbox.setTimeout = oldSetTimeout; timersDeReload.forEach(id => sandbox.clearTimeout(id));
       sandbox.localStorage.setItem = oldSet; sandbox.fetch = oldFetch; sandbox.navigator.onLine = oldOnline; sandbox.window.CDB_CONFIG = oldConfig; sandbox.window.crypto = oldCrypto; sandbox.AbortController = oldAbort; sandbox.URLSearchParams = oldParams; sandbox.window.cdbPhotoStore = oldPhotos; sandbox.window.cdbQueueStore = oldQueueStore;
       sandbox.alert = oldAlert; sandbox.confirm = oldConfirm; sandbox.FileReader = oldReader; sandbox.document.createElement = oldCreate; sandbox.document.getElementById = oldGetById;
       sandbox.localStorage.clear(); sync().clearPairing(); sync().clearQueue(); reset();
