@@ -134,8 +134,10 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             var linkedClients = clientMap.Values.Count(x => x.ErpClienteId is { } id && existingErpClients.Contains(id));
             if (productMap.Values.Any(x => x.ErpProductId is null) || clientMap.Values.Any(x => x.ErpClienteId is null))
                 throw Conflict("Um cadastro nao pode ser vinculado ao ERP. A importacao inteira foi revertida.");
-            // So o vencedor abre saldo: o alias nao soma, e saldo negativo abre com 0.
-            await CreateOpeningStockAsync(productMap.Where(x => !aliases.ContainsKey(x.Key)).ToDictionary(x => x.Key, x => x.Value), device, request.ImportId, ct);
+            // So o vencedor abre saldo, num item so: o alias nao abre o proprio. No grupo repetido o vencedor abre com a soma dos saldos
+            // positivos distintos dos ativos (OpeningStockOfGroup); registro unico abre o proprio. Sem saldo positivo a abrir, abre com 0.
+            var winners = productMap.Where(x => !aliases.ContainsKey(x.Key)).ToDictionary(x => x.Key, x => x.Value);
+            await CreateOpeningStockAsync(winners, union, device, request.ImportId, ct);
             await CreateHistoryAsync(rows, productMap, clientMap, device, request, ct);
             var archive = counts["cashClosings"] > 0 ? new List<string> { "cashClosings" } : [];
             var warnings = new List<string> { "Pedidos historicos nao geram pagamentos presumidos. Lotes e pedidos encerrados exigem revisao para alterar estoque. Pedidos prontos podem ser entregues com forma de pagamento informada." };
@@ -147,7 +149,7 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
                 ? "1 produto vinculado ao cadastro existente do ERP (sem saldo nem lote); o saldo aberto vem so do backup."
                 : $"{linkedProducts.Count} produtos vinculados aos cadastros existentes do ERP (sem saldo nem lote); o saldo aberto vem so do backup.");
             warnings.AddRange(UnionWarnings(union));
-            if (NegativeStockWarning(productMap.Where(x => !aliases.ContainsKey(x.Key)).Select(x => x.Value.Stock)) is { } negative) warnings.Add(negative);
+            if (NegativeStockWarning(winners.Values.Where(x => union.StockToOpen(x) <= 0).Select(x => x.Stock)) is { } negative) warnings.Add(negative);
             var response = new LegacySnapshotResponse(request.ImportId, hash, device.EmpresaId, device.LojaId, originIds, counts,
                 false, archive, warnings, request.ImportId);
             db.Add(new DeviceBackup { Id = request.ImportId, DeviceId = device.Id, EmpresaId = device.EmpresaId,
@@ -169,32 +171,50 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
     /// #2813: o produto do ERP e nome + embalagem (LegacyProductName). Registros do arquivo com o mesmo nome composto (sem
     /// diferenciar maiusculas) viram um cadastro so no ERP. Vence o ativo (archived != true) mais recente: data de 13 digitos
     /// no fim do id (0 se nao houver); empate ou sem data, o que aparece depois no arquivo. Sem nenhum ativo, vence o arquivado
-    /// mais recente. Os demais viram alias: nao passam pelo linker, herdam o cadastro do ERP do vencedor e nao abrem saldo
-    /// (o saldo de um alias ativo de mesmo nome e embalagem nao soma). O espelho de cada alias continua existindo.
-    /// Mesmo nome com embalagens diferentes sao produtos diferentes: cada um abre o proprio saldo.
+    /// mais recente. Os demais viram alias: nao passam pelo linker, herdam o cadastro do ERP do vencedor e nao abrem o proprio
+    /// saldo: o vencedor abre com a soma dos saldos positivos distintos dos ativos do grupo (OpeningStockOfGroup). O espelho de
+    /// cada alias continua existindo. Mesmo nome com embalagens diferentes sao produtos diferentes: cada um abre o proprio saldo.
     /// </summary>
     private static ProductUnion UnifyRepeatedProducts(List<LegacyProduct> products)
     {
         var aliases = new Dictionary<string, string>(StringComparer.Ordinal);
+        var openingStock = new Dictionary<string, decimal>(StringComparer.Ordinal);
         var groups = 0;
         foreach (var group in products.GroupBy(x => x.ErpName, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
         {
             var winner = group.OrderBy(x => x.Archived).ThenByDescending(x => DateInId(x.Id)).ThenByDescending(x => x.Index).First();
             foreach (var other in group.Where(x => x.Index != winner.Index)) aliases[other.Id] = winner.Id;
+            openingStock[winner.Id] = OpeningStockOfGroup(winner, group);
             groups++;
         }
-        return new ProductUnion(aliases, groups);
+        return new ProductUnion(aliases, groups, openingStock);
     }
 
-    private sealed record ProductUnion(Dictionary<string, string> Aliases, int Groups);
+    /// <summary>
+    /// #2813, decisao do Felipe (17/11, "Somar, menos copias"): o vencedor abre com a SOMA dos saldos positivos DISTINTOS dos
+    /// registros ATIVOS do grupo. Saldos iguais sao copias e contam uma vez; arquivado, zero e negativo ficam fora. Sem nenhum
+    /// ativo positivo vale o saldo do proprio vencedor, como antes (so abre se for positivo). Registro unico nao passa por aqui.
+    /// Risco aceito: dois registros com o mesmo saldo que NAO sejam copias perdem um saldo (a dona confere os grupos reais na Fase 5).
+    /// </summary>
+    private static decimal OpeningStockOfGroup(LegacyProduct winner, IEnumerable<LegacyProduct> group)
+    {
+        var distinct = group.Where(x => !x.Archived && x.Stock > 0).Select(x => x.Stock).Distinct().ToList();
+        return distinct.Count == 0 ? winner.Stock : distinct.Sum();
+    }
+
+    /// <summary>Uniao dos repetidos: alias -> vencedor, quantos grupos e o saldo que o vencedor de cada grupo abre (quem nao esta em OpeningStock, registro unico, abre o proprio).</summary>
+    private sealed record ProductUnion(Dictionary<string, string> Aliases, int Groups, Dictionary<string, decimal> OpeningStock)
+    {
+        public decimal StockToOpen(Product product) => OpeningStock.GetValueOrDefault(product.Id, product.Stock);
+    }
 
     /// <summary>Produto do arquivo com o nome que ele tera no ERP (nome + embalagem).</summary>
-    private sealed record LegacyProduct(string Id, string ErpName, bool Archived, int Index);
+    private sealed record LegacyProduct(string Id, string ErpName, bool Archived, int Index, decimal Stock);
 
     private static List<LegacyProduct> ReadProducts(List<JsonElement> products) => products.Select((row, index) =>
     {
         var p = row.Deserialize<ProductDto>(Json)!;
-        return new LegacyProduct(p.Id, LegacyProductName.Compose(p.Name, p.Unit), IsArchived(row), index);
+        return new LegacyProduct(p.Id, LegacyProductName.Compose(p.Name, p.Unit), IsArchived(row), index, p.Stock);
     }).ToList();
 
     private static bool IsArchived(JsonElement row) => row.TryGetProperty("archived", out var archived) && archived.ValueKind == JsonValueKind.True;
@@ -208,7 +228,7 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
         if (union.Groups == 0) yield break;
         var groups = union.Groups == 1 ? "1 produto aparecia repetido no arquivo" : $"{union.Groups} produtos apareciam repetidos no arquivo";
         var extra = union.Aliases.Count == 1 ? "1 registro a mais" : $"{union.Aliases.Count} registros a mais";
-        yield return $"{groups} (mesmo nome e embalagem; {extra}). Cada um virou um cadastro so, com preco e saldo do registro ativo mais recente; pedidos e lotes dos registros a mais ficam ligados a esse cadastro.";
+        yield return $"{groups} (mesmo nome e embalagem; {extra}). Cada um virou um cadastro so, com o preco do registro ativo mais recente e o saldo somado dos registros ativos (saldos iguais contam uma vez); pedidos e lotes dos registros a mais ficam ligados a esse cadastro.";
     }
 
     /// <summary>Saldo negativo nao recusa o arquivo: abre com 0 no ERP (conta so quem abre saldo). O numero original fica no espelho e no backup.</summary>
@@ -382,22 +402,23 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
         }
     }
 
-    private async Task CreateOpeningStockAsync(Dictionary<string, Product> map, MobileDevice device, Guid importId, CancellationToken ct)
+    private async Task CreateOpeningStockAsync(Dictionary<string, Product> map, ProductUnion union, MobileDevice device, Guid importId, CancellationToken ct)
     {
         foreach (var mobile in map.Values)
         {
             var product = await db.Set<Produto>().SingleAsync(x => x.Id == mobile.ErpProductId && x.EmpresaId == device.EmpresaId, ct);
             if (await db.Set<ItemEstoque>().AnyAsync(x => x.ProdutoId == product.Id && x.EmpresaId == device.EmpresaId, ct))
                 throw Conflict("Produto vinculado ja tem estoque ERP. A abertura absoluta exige reconciliacao.");
-            if (mobile.Stock <= 0) continue; // saldo negativo abre com 0: sem item de estoque nem movimento
+            var stock = union.StockToOpen(mobile);
+            if (stock <= 0) continue; // sem saldo positivo a abrir (negativo abre com 0): sem item de estoque nem movimento
             var now = DateTime.UtcNow;
-            var item = ItemEstoque.CriarParaEntrada(Guid.NewGuid(), device.EmpresaId, product, null, Quantidade.From(mobile.Stock),
+            var item = ItemEstoque.CriarParaEntrada(Guid.NewGuid(), device.EmpresaId, product, null, Quantidade.From(stock),
                 product.CustoReferencia ?? Dinheiro.Zero, product.PrecoReferencia, now, "legacy:" + importId.ToString("N") + ":" + product.Id.ToString("N"),
                 null, null, null, null, null, null, null, null, null, "Saldo inicial da primeira migracao; nao representa nova producao.", now);
             item.LojaId = device.LojaId;
             db.Add(item);
             db.Add(MovimentacaoEstoque.CriarEntrada(Guid.NewGuid(), device.EmpresaId, item, NaturezaMovimentacaoEstoque.Ajuste,
-                Quantidade.From(mobile.Stock), product.CustoReferencia ?? Dinheiro.Zero, now, "Saldo inicial do PWA", "legacy-import:" + importId, now));
+                Quantidade.From(stock), product.CustoReferencia ?? Dinheiro.Zero, now, "Saldo inicial do PWA", "legacy-import:" + importId, now));
         }
     }
 

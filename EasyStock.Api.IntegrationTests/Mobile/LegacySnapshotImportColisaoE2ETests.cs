@@ -259,7 +259,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
             var lote = await db.Set<Lote>().IgnoreQueryFilters().Include(x => x.Itens).SingleAsync(x => x.EmpresaId == empresa && x.MobileBatchId == bid);
             lote.Itens.Should().ContainSingle().Which.ProdutoId.Should().Be(lasanha.Id);
             var estoque = await db.Set<ItemEstoque>().Where(x => x.ProdutoId == lasanha.Id).ToListAsync();
-            estoque.Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(5, "so o saldo do vencedor; o arquivado nao soma");
+            estoque.Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(5, "o arquivado (9) fica fora da soma; so o ativo conta");
             (await db.Set<ItemEstoque>().CountAsync(x => x.EmpresaId == empresa)).Should().Be(2, "Lasanha e Pudim; nenhum item de estoque do arquivado");
             return 0;
         });
@@ -293,8 +293,8 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
             espelhos.Single(x => x.Id == recente).Unit.Should().Be("300 G", "embalagem do vencedor, como veio");
             espelhos.Single(x => x.Id == velho).Unit.Should().Be("300g", "o perdedor mantem a propria linha do espelho");
             var estoque = await db.Set<ItemEstoque>().Where(x => x.ProdutoId == nhoque.Id).ToListAsync();
-            estoque.Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(8, "saldo so do vencedor, sem somar os outros");
-            (await db.Set<MovimentacaoEstoque>().CountAsync()).Should().Be(1, "perdedor nao abre saldo");
+            estoque.Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(16, "#2813 C: o vencedor abre com a soma dos tres saldos ativos distintos (3 + 5 + 8)");
+            (await db.Set<MovimentacaoEstoque>().CountAsync()).Should().Be(1, "so o vencedor abre saldo, num movimento so; o perdedor nao abre o proprio");
             var pedidos = await db.Set<Pedido>().Include(x => x.Itens).Where(x => x.MobileOrderId == oVelho || x.MobileOrderId == oRecente).ToListAsync();
             var doVelho = pedidos.Single(x => x.MobileOrderId == oVelho).Itens.Single();
             doVelho.ProdutoId.Should().Be(nhoque.Id, "pedido do id antigo cai no mesmo produto");
@@ -354,7 +354,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
             var unico = erp.Should().ContainSingle("\"Lasanha \" e \"lasanha\" sao o mesmo nome").Subject;
             (unico.PrecoReferencia?.Valor).Should().Be(13m, "vale o mais recente");
             (await db.Set<Product>().Where(x => x.Id == velho || x.Id == novo).ToListAsync()).Should().HaveCount(2).And.OnlyContain(x => x.ErpProductId == unico.Id);
-            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == unico.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(6);
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == unico.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(10, "#2813 C: soma dos dois ativos distintos (4 + 6)");
             return 0;
         });
     }
@@ -431,8 +431,9 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         });
     }
 
+    // #2813 C: o vencedor negativo abre com o saldo dos outros ativos positivos (Ravioli); so abre 0 e avisa quando o grupo nao tem nenhum ativo positivo (Capelete).
     [SkippableFact]
-    public async Task SaldoNegativo_NoVencedorDoGrupo_AbreComZeroEOPerdedorNaoSoma()
+    public async Task SaldoNegativo_NoVencedorDoGrupo_SoAbreComZeroSeNaoHaOutroAtivoPositivo()
     {
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         var c = await NovoContextoAsync();
@@ -442,15 +443,86 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         var capeleteVelho = IdDatado(origem.AddDays(1)); var capeleteNovo = IdDatado(origem.AddDays(31));
         var request = Pedir(c.Device,
             [ProdutoDe(raviolVelho, "Ravioli", 6, 10m, "un"), ProdutoDe(raviolNovo, "Ravioli", -4, 12m, "un"),
-             ProdutoDe(capeleteVelho, "Capelete", 3, 10m, "un"), ProdutoDe(capeleteNovo, "Capelete", -13, 12m, "un")], [], []);
+             ProdutoDe(capeleteVelho, "Capelete", -2, 10m, "un"), ProdutoDe(capeleteNovo, "Capelete", -13, 12m, "un")], [], []);
 
         var recibo = await ImportarAsync(c, request);
 
-        recibo.Warnings.Should().Contain(w => w.Contains("2 produtos com saldo negativo entraram com saldo 0"), string.Join(" | ", recibo.Warnings));
+        recibo.Warnings.Should().Contain(w => w.Contains("1 produto com saldo negativo entrou com saldo 0") && w.Contains("soma zerada: -13"), string.Join(" | ", recibo.Warnings));
+        recibo.Warnings.Should().NotContain(w => w.Contains("2 produtos com saldo negativo"), "o Ravioli abre com o saldo do outro ativo: nao entrou com 0");
         await LerAsync(empresa, async db =>
         {
-            (await db.Set<Produto>().IgnoreQueryFilters().CountAsync(x => x.EmpresaId == empresa)).Should().Be(2);
-            (await db.Set<ItemEstoque>().CountAsync(x => x.EmpresaId == empresa)).Should().Be(0, "o vencedor tem saldo negativo (0) e o perdedor nao soma");
+            var erp = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
+            erp.Should().HaveCount(2);
+            var ravioli = erp.Single(x => x.Nome == "Ravioli");
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == ravioli.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(6, "o vencedor negativo abre com o saldo do outro ativo");
+            (await db.Set<ItemEstoque>().CountAsync(x => x.EmpresaId == empresa)).Should().Be(1, "o Capelete nao tem ativo positivo: abre com 0, sem item de estoque");
+            return 0;
+        });
+    }
+
+    // ---------- #2813 C ("Somar, menos copias"): o vencedor abre com a soma dos saldos positivos DISTINTOS dos registros ativos do grupo ----------
+
+    // Cada linha e um grupo de registros do mesmo nome composto, do mais antigo ao mais novo (o ultimo ativo vence). "*" marca o arquivado.
+    [SkippableTheory]
+    [InlineData("dois ativos com saldos diferentes somam", "3, 5", "8")]
+    [InlineData("dois ativos com saldo igual contam uma vez (copia)", "4, 4", "4")]
+    [InlineData("tres ativos 5, 5 e 3 somam 8", "5, 5, 3", "8")]
+    [InlineData("a copia no meio nao muda a soma", "5, 3, 5", "8")]
+    [InlineData("arquivado com saldo positivo fica fora", "6, 9*", "6")]
+    [InlineData("saldo negativo fica fora", "5, -3", "5")]
+    [InlineData("vencedor zerado abre com o saldo do outro ativo", "7, 0", "7")]
+    [InlineData("vencedor negativo abre com o saldo do outro ativo", "7, -2", "7")]
+    [InlineData("fracoes somam sem arredondar", "2.5, 1.25", "3.75")]
+    [InlineData("mesmo saldo com escala diferente e a mesma copia", "2.5, 2.50", "2.5")]
+    [InlineData("ativos, copias, arquivados e negativo juntos", "5, 5*, 3, 4*, -2, 5", "8")]
+    [InlineData("sem ativo positivo: nada abre", "0, -2", "0")]
+    [InlineData("arquivado positivo nao abre quando o ativo esta zerado", "5*, 0", "0")]
+    [InlineData("so arquivados: abre o saldo do mais recente, como antes", "2*, 4*", "4")]
+    [InlineData("registro unico abre o proprio saldo", "7", "7")]
+    [InlineData("registro unico negativo nao abre nada", "-3", "0")]
+    [InlineData("registro unico arquivado abre o proprio saldo, como antes", "4*", "4")]
+    public async Task GrupoRepetido_AbreComASomaDosSaldosPositivosDistintosDosAtivos(string caso, string registros, string esperado)
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var c = await NovoContextoAsync();
+        var empresa = c.Device.EmpresaId;
+        var origem = DateTimeOffset.UtcNow.AddDays(-90);
+        var produtos = registros.Split(',').Select(x => x.Trim()).Select((x, i) =>
+            ProdutoDe(IdDatado(origem.AddDays(i)), "Produto A", decimal.Parse(x.TrimEnd('*'), System.Globalization.CultureInfo.InvariantCulture), 10m, "un", archived: x.EndsWith('*'))).ToArray<object>();
+
+        await ImportarAsync(c, Pedir(c.Device, produtos, [], []));
+
+        var saldo = decimal.Parse(esperado, System.Globalization.CultureInfo.InvariantCulture);
+        await LerAsync(empresa, async db =>
+        {
+            var erp = (await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync()).Should().ContainSingle(caso).Subject;
+            var itens = await db.Set<ItemEstoque>().Where(x => x.ProdutoId == erp.Id).ToListAsync();
+            if (saldo == 0) itens.Should().BeEmpty(caso);
+            else itens.Should().ContainSingle(caso).Which.QuantidadeAtual.Value.Should().Be(saldo, caso);
+            (await db.Set<MovimentacaoEstoque>().CountAsync()).Should().Be(saldo == 0 ? 0 : 1, "so o vencedor abre saldo, num movimento so: " + caso);
+            return 0;
+        });
+    }
+
+    [SkippableFact]
+    public async Task Reenvio_ComMesmoImportId_ComSaldosSomados_NaoSomaDeNovo()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var c = await NovoContextoAsync();
+        var empresa = c.Device.EmpresaId;
+        var origem = DateTimeOffset.UtcNow.AddDays(-90);
+        var request = Pedir(c.Device, [ProdutoDe(IdDatado(origem), "Produto A", 3, 10m, "un"), ProdutoDe(IdDatado(origem.AddDays(30)), "Produto A", 5, 12m, "un")], [], []);
+
+        var primeiro = await ImportarAsync(c, request);
+        var segundo = await ImportarAsync(c, request);
+
+        primeiro.Replayed.Should().BeFalse();
+        segundo.Replayed.Should().BeTrue();
+        await LerAsync(empresa, async db =>
+        {
+            var erp = (await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync()).Should().ContainSingle().Subject;
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == erp.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(8, "o reenvio e reconhecido pelo ImportId e nao abre saldo outra vez");
+            (await db.Set<MovimentacaoEstoque>().CountAsync()).Should().Be(1, "um movimento de abertura so");
             return 0;
         });
     }
@@ -477,7 +549,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
             unico.Id.Should().Be(erp.Id);
             (unico.PrecoReferencia?.Valor).Should().Be(55m, "preco do ERP nao e sobrescrito pelo backup");
             (await db.Set<Product>().Where(x => x.Id == velho || x.Id == novo).ToListAsync()).Should().HaveCount(2).And.OnlyContain(x => x.ErpProductId == erp.Id);
-            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == erp.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(6, "o saldo aberto vem so do vencedor");
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == erp.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(8, "#2813 C: o saldo aberto e a soma dos dois ativos distintos (2 + 6)");
             return 0;
         });
     }
@@ -519,7 +591,9 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
             produtos.Select(x => x.Nome).Should().BeEquivalentTo(new[] { "queijo coalho 300 g", "Pao Frances" }, "um Produto do ERP por nome e embalagem; o nome vem do vencedor e o un nao entra");
             var coalho = produtos.Single(x => x.Id == vencedor.ErpProductId);
             (coalho.PrecoReferencia?.Valor).Should().Be(20m, "o cadastro do ERP vem do vencedor");
-            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == coalho.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(7, "saldo so do vencedor; o 3 do alias nao soma");
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == coalho.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(10, "#2813 C: soma dos dois ativos distintos (3 do alias + 7 do vencedor)");
+            var pao = produtos.Single(x => x.Nome == "Pao Frances");
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == pao.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(7, "#2813 C: o outro grupo tambem soma (2 + 5)");
             var linha = (await db.Set<Pedido>().Include(x => x.Itens).SingleAsync(x => x.MobileOrderId == pedido)).Itens.Single();
             linha.ProdutoId.Should().Be(coalho.Id, "o pedido do alias aponta para o cadastro unico");
             linha.Unidade.Should().Be("300g", "a linha do pedido guarda a unidade que tinha, nao a do vencedor");
@@ -709,7 +783,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
 
     // #2813 B2: o id do app e "<prefixo>-<data em ms>"; o prefixo e unico por teste porque mobile_products.Id e global.
     private static string IdDatado(DateTimeOffset quando) => "p" + Guid.NewGuid().ToString("N")[..10] + "-" + quando.ToUnixTimeMilliseconds();
-    private static object ProdutoDe(string id, string name, int stock, decimal price, string unit, bool archived = false) =>
+    private static object ProdutoDe(string id, string name, decimal stock, decimal price, string unit, bool archived = false) =>
         new { id, name, category = "massa", stock, price, cost = 3m, unit, archived };
     private static object LoteDe(string id, string productId, string productName, long createdAt) =>
         new { id, code = "LEG-" + id[^8..], createdAt, items = new[] { new { productId, name = productName, qty = 5, weightG = 100, validityDays = 30 } } };
