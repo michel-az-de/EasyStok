@@ -431,6 +431,12 @@ namespace EasyStock.Domain.Entities
         public bool QuitadoHistorico => QuitadoHistoricoEm is not null;
 
         /// <summary>
+        /// #2813: o que falta receber pelos pagamentos do pedido (total menos o pago, nunca negativo). Zero para o quitado
+        /// do histórico: a marca é a quitação. Para quem não consulta o saldo financeiro (estornos e cupons).
+        /// </summary>
+        public decimal AReceberPelosPagamentos => QuitadoHistorico ? 0m : Math.Max(0m, Total.Valor - TotalPago);
+
+        /// <summary>
         /// #2813: o import do histórico quita o pedido entregue pela marca, sem criar pagamento. Só o
         /// <c>LegacySnapshotImportService</c> chama (teste de arquitetura). Recusa pedido que não esteja entregue ou que
         /// já tenha pagamento: a marca não esconde dinheiro recebido.

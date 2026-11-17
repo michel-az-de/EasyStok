@@ -286,10 +286,12 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         Guid empresaId, int periodoDias = 30, Guid? lojaId = null, int pageSize = 50)
     {
         var de = DateTime.UtcNow.AddDays(-periodoDias);
+        // #2813: o entregue quitado pelo histórico não deve nada (marca, sem pagamento). O filtro vai no SQL, antes do
+        // Take(200): Pedido.QuitadoHistorico (calculada) não traduz e o importado não pode ocupar as vagas dos pendentes.
         var query = dbContext.Pedidos.AsNoTracking()
             .Include(p => p.Itens)
             .Include(p => p.Pagamentos)
-            .Where(p => p.EmpresaId == empresaId && p.CriadoEm >= de && p.Status != "cancelado");
+            .Where(p => p.EmpresaId == empresaId && p.CriadoEm >= de && p.Status != "cancelado" && p.QuitadoHistoricoEm == null);
         if (lojaId.HasValue)
             query = query.Where(p => p.LojaId == lojaId.Value);
 
