@@ -91,7 +91,12 @@ contaReceber.id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 contaReceber.descricao = 'Venda de encomenda'
 contaReceber.parcelas[0].id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 // #2395: a Dona da navegação recebe as leituras de Cadastros expostas por /auth/me/modulos.
-const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasReceber', 'gerenciarContasPagar', 'gerenciarContasReceber', 'gerenciarCategoriasFinanceiras', 'gerenciarCentrosCusto', 'gerenciarCaixa', 'editarProducao', 'editarCardapio', 'editarAtendimento', 'verCadastrosProdutos', 'verCadastrosFornecedores', 'verCadastrosFinanceiros', 'verPedidos'].map((nome) => [nome, true]))
+// #2813: e `verFechamentosLegados`, que o servidor manda a quem é Gerente ou acima (AuthController.GetModulos). Sem ela o
+// menu do Financeiro perde "Fechamentos do aparelho" e o DOM fica com uma tela a menos que o catálogo.
+const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasReceber', 'gerenciarContasPagar', 'gerenciarContasReceber', 'gerenciarCategoriasFinanceiras', 'gerenciarCentrosCusto', 'gerenciarCaixa', 'editarProducao', 'editarCardapio', 'editarAtendimento', 'verCadastrosProdutos', 'verCadastrosFornecedores', 'verCadastrosFinanceiros', 'verPedidos', 'verFechamentosLegados'].map((nome) => [nome, true]))
+// #2813: fechamento do aparelho antigo como a API manda (chaves reais de `totals`), com valores inventados.
+const fechamentoDoAparelho = { id: 'fch-prova-1', importId: '00000000-0000-0000-0000-000000000001', dateKey: '2026-03-02', closedAt: '2026-03-02T21:30:00Z', closedBy: 'Operadora de teste', notes: null, origem: 'aparelho-legado', totals: { sold: 1234.5, in: 200, out: 50.25, balance: 1384.25, conferredBalance: null, entriesCount: 12, ordersCount: 9 } }
+let leiturasDosFechamentos = 0
 let modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
 const escritas = []
 const erros = []
@@ -160,6 +165,8 @@ try {
     // #2262: o Pix do pedido pago pelo Mercado Pago chega pelas linhas do Caixa, fora dos movimentos.
     if (caminho === '/api/caixa/linhas') return ok([{ hora: instante, tipo: 'pagamento', valor: 19, metodo: 'pix', origem: 'Pedido', pedidoNumeroDoDia: 5 }])
     if (caminho === '/api/caixa/dia') return ok({ data: url.searchParams.get('data') ?? hoje, aberto: true, fechado: false, saldoInicial: 100, saldoEsperado: 100, movimentos: [], linhasExtras: [] })
+    // #2813: a API do aparelho antigo responde `{ itens, ignorados }` cru, fora do envelope `{ data }`.
+    if (caminho === '/api/mobile/legacy-import/fechamentos') { leiturasDosFechamentos++; return route.fulfill({ json: { itens: [fechamentoDoAparelho], ignorados: 1 } }) }
     if (caminho === '/api/atendimento/configuracao') return ok({})
     if (caminho === '/api/atendimento/agenda') return ok({ lojaDisponivel: false, dias: [] })
     if (caminho === '/api/atendimento/producao/insumos') return ok([{ produtoId: 'insumo', nome: 'Molho sugo', unidade: 'G', saldo: 1000, minimo: 500, custo: 0.02, receitas: 1 }])
@@ -245,6 +252,32 @@ try {
     await browser.close()
     process.exit(0)
   }
+  // #2813: Fechamentos do aparelho. A Dona tem `verFechamentosLegados` e a aba lê a API falsa, só para consulta. Sem a ação
+  // a aba some do menu, a rota direta cai na primeira tela viva e a leitura de gerência nem sai do navegador.
+  const moduloFinanceiro = MODULOS.find(({ id }) => id === 'financeiro')
+  const rotaDosFechamentos = hashDoModulo('financeiro', 'fechamentos-legados')
+  await page.goto(origem + '/' + rotaDosFechamentos)
+  const principalDosFechamentos = page.getByRole('main', { name: 'Fechamentos do aparelho', exact: true })
+  await principalDosFechamentos.getByRole('heading', { name: '2 de março de 2026', exact: true }).waitFor()
+  await principalDosFechamentos.getByText(/Fechado em 02\/03\/2026.*18:30 por Operadora de teste/).waitFor()
+  await principalDosFechamentos.getByText('Não conferida', { exact: true }).waitFor()
+  await principalDosFechamentos.getByText('1 fechamento do aparelho não pôde ser lido e ficou fora desta lista.', { exact: true }).waitFor()
+  assert.equal(await principalDosFechamentos.locator('input, select, textarea, button').count(), 0, 'Fechamentos do aparelho: só consulta, sem controle que grave')
+  assert.ok(leiturasDosFechamentos > 0, 'a aba leu a API do aparelho antigo')
+  assert.deepEqual(escritas.filter((item) => item.caminho.includes('/legacy-import/')), [], 'nenhuma escrita na API do aparelho antigo')
+  await page.screenshot({ path: join(evidencias, 'financeiro-fechamentos-do-aparelho.png') })
+  acoes.verFechamentosLegados = false
+  const semAcao = telasDoMenu(moduloFinanceiro, { fonteApi: true, acoes })
+  assert.equal(semAcao.length, 8, 'sem a ação, o Financeiro volta às oito telas de antes da #2813')
+  const leiturasAntes = leiturasDosFechamentos
+  await page.reload()
+  await page.waitForFunction((destino) => location.hash === destino, hashDoModulo('financeiro', semAcao[0].id))
+  const menuSemAcao = page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true })
+  await menuSemAcao.waitFor()
+  assert.equal(await menuSemAcao.getByRole('link').count(), semAcao.length, 'o menu mostra o que o catálogo filtra pela mesma ação')
+  assert.equal(await menuSemAcao.locator(`a[href="${rotaDosFechamentos}"]`).count(), 0)
+  assert.equal(leiturasDosFechamentos, leiturasAntes, 'sem a ação, a rota direta não chama a API de gerência')
+  acoes.verFechamentosLegados = true
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
   await page.getByRole('main', { name: 'Contas a pagar', exact: true }).waitFor()
@@ -256,7 +289,7 @@ try {
   await page.goto(origem + '/#/m/financeiro/pagar')
   await page.reload()
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).waitFor()
-  assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link').count(), 8)
+  assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link').count(), 9, 'a Dona vê as nove telas do Financeiro (a nona é Fechamentos do aparelho, #2813)')
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   let modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
   await modal.getByLabel('Descrição', { exact: true }).fill('Conta criada pela prova')
