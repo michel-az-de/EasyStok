@@ -28,11 +28,11 @@ public sealed record DossieClienteDto(
 
 /// <summary>
 /// Dados primários. Sem cliente vinculado (conversa de lead), <c>Id</c> é nulo e nome e telefone vêm do
-/// perfil do canal.
+/// perfil do canal. <c>Ativo</c> (#2780): a Ficha avisa quando a conversa está ligada a um cadastro desativado.
 /// </summary>
 public sealed record DossieClienteDados(
     Guid? Id, string? Nome, string? Telefone, string? Email, string? Observacoes, string? MotivoBloqueio,
-    string? FotoUrl = null);
+    string? FotoUrl = null, bool Ativo = true);
 
 /// <summary>Item que aparece em mais pedidos (desempate: maior quantidade somada).</summary>
 public sealed record ItemFavoritoDossie(string Nome, int Pedidos, decimal Quantidade);

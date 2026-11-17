@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
@@ -30,9 +31,10 @@ public sealed class VinculoClienteConversaRepository(EasyStockDbContext db) : IV
                 || (c.Telefone != null && telefones.Contains(c.Telefone)) || c.Telefones.Any(t => telefones.Contains(t.Numero))))
             .OrderBy(c => c.Nome).ThenBy(c => c.Id)
             .Select(c => new CandidatoClienteConversa(c.Id, c.Nome, c.Telefone,
-                !db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id), c.Bloqueado,
-                db.Pedidos.Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id),
-                db.Pedidos.Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm),
+                // #2777: lead, contagem e última compra pela mesma regra de Cadastros e do dossiê.
+                !db.Pedidos.Where(RegraDeCompra.Pedido).Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id), c.Bloqueado,
+                db.Pedidos.Where(RegraDeCompra.Pedido).Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id),
+                db.Pedidos.Where(RegraDeCompra.Pedido).Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm),
                 c.Ativo))
             .ToListAsync(ct);
 

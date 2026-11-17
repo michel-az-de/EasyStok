@@ -1,3 +1,4 @@
+using EasyStock.Domain.Sales;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
 
@@ -25,6 +26,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var metricas = await db.Pedidos.AsNoTracking()
                 .Where(p => p.EmpresaId == empresaId && p.ClienteId == clienteId)
+                .Where(RegraDeCompra.Pedido)
                 .GroupBy(p => p.ClienteId)
                 .Select(g => new { Quantidade = g.Count(), UltimoEm = (DateTime?)g.Max(p => p.CriadoEm) })
                 .SingleOrDefaultAsync();
@@ -38,10 +40,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         {
             var query = db.Clientes.AsNoTracking()
                 .Where(c => c.EmpresaId == empresaId);
+            // #2777: a mesma regra de compra do dossiê na contagem, no filtro e na ordenação.
+            var compras = db.Pedidos.Where(p => p.EmpresaId == empresaId).Where(RegraDeCompra.Pedido);
 
             if (ativo.HasValue) query = query.Where(c => c.Ativo == ativo.Value);
-            if (relacionamento == "lead") query = query.Where(c => !db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id));
-            if (relacionamento == "cliente") query = query.Where(c => db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.Id));
+            if (relacionamento == "lead") query = query.Where(c => !compras.Any(p => p.ClienteId == c.Id));
+            if (relacionamento == "cliente") query = query.Where(c => compras.Any(p => p.ClienteId == c.Id));
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -71,11 +75,11 @@ namespace EasyStock.Infra.Postgre.Repositories
             {
                 "criadoem"    => desc ? query.OrderByDescending(c => c.CriadoEm)    : query.OrderBy(c => c.CriadoEm),
                 "lastorderat" => desc
-                    ? query.OrderByDescending(c => db.Pedidos.Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm))
-                    : query.OrderBy(c => db.Pedidos.Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm)),
+                    ? query.OrderByDescending(c => compras.Where(p => p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm))
+                    : query.OrderBy(c => compras.Where(p => p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm)),
                 "ordercount" => desc
-                    ? query.OrderByDescending(c => db.Pedidos.Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id))
-                    : query.OrderBy(c => db.Pedidos.Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id)),
+                    ? query.OrderByDescending(c => compras.Count(p => p.ClienteId == c.Id))
+                    : query.OrderBy(c => compras.Count(p => p.ClienteId == c.Id)),
                 _             => desc ? query.OrderByDescending(c => c.Nome)        : query.OrderBy(c => c.Nome),
             };
 
@@ -84,8 +88,8 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(c => new
                 {
                     Cliente = c,
-                    Quantidade = db.Pedidos.Count(p => p.EmpresaId == empresaId && p.ClienteId == c.Id),
-                    UltimoEm = db.Pedidos.Where(p => p.EmpresaId == empresaId && p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm)
+                    Quantidade = compras.Count(p => p.ClienteId == c.Id),
+                    UltimoEm = compras.Where(p => p.ClienteId == c.Id).Max(p => (DateTime?)p.CriadoEm)
                 }).ToListAsync();
             // Apenas o retrato sem tracking recebe as métricas; o contador legado não inclui todos os canais.
             foreach (var item in clientes)
@@ -93,7 +97,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (clientes.Select(item => item.Cliente), total);
         }
 
-        public async Task<IEnumerable<Cliente>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
+        public async Task<IEnumerable<Cliente>> SearchAsync(Guid empresaId, string termo, int maxResults = 20, bool incluirInativos = false)
         {
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
@@ -102,14 +106,16 @@ namespace EasyStock.Infra.Postgre.Repositories
             var digitos = BuscaTextual.DigitosTelefone(termo);
             var buscaId = Guid.TryParse(termo, out var id);
             return await db.Clientes.AsNoTracking()
-                .Where(c => c.EmpresaId == empresaId && c.Ativo &&
+                .Where(c => c.EmpresaId == empresaId && (incluirInativos || c.Ativo) &&
                     ((buscaId && c.Id == id) || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Nome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern, PadraoILike.Escape) ||
                      (c.NomeFantasia != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.NomeFantasia.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern, PadraoILike.Escape)) ||
                      (c.Telefone != null && EF.Functions.ILike(c.Telefone, pattern, PadraoILike.Escape)) ||
                      (digitos.Length >= 3 && c.Telefone != null && EasyStockDbContext.TraduzirTexto(c.Telefone, BuscaTextual.MascaraTelefone, "").Contains(digitos)) ||
                      (digitos.Length >= 3 && c.Telefones.Any(t => EasyStockDbContext.TraduzirTexto(t.Numero, BuscaTextual.MascaraTelefone, "").Contains(digitos))) ||
-                     (c.Documento != null && EF.Functions.ILike(c.Documento, pattern, PadraoILike.Escape))))
-                .OrderBy(c => c.Nome)
+                     (c.Documento != null && EF.Functions.ILike(c.Documento, pattern, PadraoILike.Escape)) ||
+                     (c.Email != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(c.Email.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), pattern, PadraoILike.Escape))))
+                .OrderByDescending(c => c.Ativo)
+                .ThenBy(c => c.Nome)
                 .Take(maxResults)
                 .ToListAsync();
         }
@@ -153,7 +159,7 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task AddTelefoneAsync(ClienteTelefone t) { db.Set<ClienteTelefone>().Add(t); return Task.CompletedTask; }
         public async Task<bool> RemoveTelefoneAsync(Guid empresaId, Guid clienteId, Guid telefoneId)
         {
-            var telefone = await db.Set<ClienteTelefone>().Include(t => t.Cliente)
+            var telefone = await db.Set<ClienteTelefone>().Include(t => t.Cliente).ThenInclude(c => c!.Telefones)
                 .Where(t => t.Id == telefoneId
                             && t.ClienteId == clienteId
                             && db.Clientes.Any(c => c.Id == clienteId && c.EmpresaId == empresaId))
@@ -161,6 +167,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (telefone is null) return false;
             telefone.Cliente!.AlteradoEm = DateTime.UtcNow;
             db.Entry(telefone.Cliente!).Property(c => c.AlteradoEm).IsModified = true;
+            telefone.Cliente!.PromoverPrincipalSemOTelefone(telefone.Id);
             db.Remove(telefone);
             return true;
         }

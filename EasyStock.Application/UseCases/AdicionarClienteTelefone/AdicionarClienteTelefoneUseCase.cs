@@ -21,7 +21,8 @@ public class AdicionarClienteTelefoneUseCase(
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(cmd.ClienteId, "ClienteId");
 
-        var cliente = await repo.GetByIdAsync(cmd.EmpresaId, cmd.ClienteId);
+        // #2778: com a lista carregada, para o principal novo rebaixar os outros.
+        var cliente = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.ClienteId);
         if (cliente == null) return null;
 
         var numeroNormalizado = Telefone.TryFrom(cmd.Numero)?.Value ?? cmd.Numero.Trim();
@@ -40,6 +41,7 @@ public class AdicionarClienteTelefoneUseCase(
             AlteradoEm = agora
         };
 
+        cliente.RebaixarPrincipaisPara(tel);
         await repo.AddTelefoneAsync(tel);
         cliente.AlteradoEm = agora;
         await repo.UpdateAsync(cliente);

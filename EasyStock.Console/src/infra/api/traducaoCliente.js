@@ -37,6 +37,8 @@ export function clienteDoDossie(dossie) {
       telefone: dados.telefone || null,
       email: dados.email || null,
       fotoUrl: dados.fotoUrl ?? null,
+      // #2780: conversa ligada a cadastro desativado; a Ficha avisa e leva ao cadastro para reativar.
+      inativo: dados.ativo === false,
       // #2734 (C-03): a observação escrita em Cadastros aparece na Ficha, junto das notas.
       observacoes: String(dados.observacoes ?? '').trim() || null,
       endereco: endereco || null,

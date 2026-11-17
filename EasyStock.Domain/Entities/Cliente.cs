@@ -250,6 +250,30 @@ using EasyStock.Domain.ValueObjects;
         }
 
         public void Desativar() { Ativo = false; AlteradoEm = DateTime.UtcNow; }
+
+        /// <summary>
+        /// #2778: a lista de telefones tem um principal só. Chamar com <see cref="Telefones"/> carregado,
+        /// antes de gravar o telefone novo: quando ele chega como principal, os outros deixam de ser.
+        /// </summary>
+        public void RebaixarPrincipaisPara(ClienteTelefone novo)
+        {
+            if (!novo.Principal) return;
+            foreach (var t in Telefones.Where(t => t.Id != novo.Id && t.Principal)) { t.Principal = false; t.AlteradoEm = DateTime.UtcNow; }
+        }
+
+        /// <summary>
+        /// #2778: ao remover o principal, o telefone mais antigo que sobra passa a ser o principal, para a
+        /// lista não ficar sem nenhum. Chamar com <see cref="Telefones"/> carregado. Devolve o promovido.
+        /// </summary>
+        public ClienteTelefone? PromoverPrincipalSemOTelefone(Guid removidoId)
+        {
+            var removido = Telefones.FirstOrDefault(t => t.Id == removidoId);
+            if (removido is null || !removido.Principal) return null;
+            var proximo = Telefones.Where(t => t.Id != removidoId)
+                .OrderBy(t => t.CriadoEm).ThenBy(t => t.Id).FirstOrDefault();
+            if (proximo is not null) { proximo.Principal = true; proximo.AlteradoEm = DateTime.UtcNow; }
+            return proximo;
+        }
         public void Reativar() { Ativo = true; AlteradoEm = DateTime.UtcNow; }
 
         // ── CRM leve (S24). Métodos separados de AtualizarCadastro (R8). ──

@@ -12,7 +12,8 @@ export function requisicoesDaBusca(termo, acesso, empresaId) {
   const busca = termo.trim()
   if (!busca) return []
   const urls = {
-    clientes: ['/api/clientes/buscar', { termo: busca, max: LIMITE_BUSCA_CASA, empresaId }],
+    // #2780: quem procura um cadastro também acha o inativo (marcado), para não criar outro igual.
+    clientes: ['/api/clientes/buscar', { termo: busca, max: LIMITE_BUSCA_CASA, empresaId, incluirInativos: true }],
     conversas: ['/api/atendimento/conversas', { q: busca, limite: LIMITE_BUSCA_CASA, pagina: 1 }],
     pedidos: ['/api/pedidos', { search: busca, pageSize: LIMITE_BUSCA_CASA, page: 1, empresaId }],
     produtos: ['/api/produtos/search', { termo: busca, limite: LIMITE_BUSCA_CASA, empresaId }],
@@ -25,5 +26,6 @@ export function resultadoDaBusca(tipo, item) {
   const rotulo = tipo === 'conversas' ? item.contatoNome || item.contatoIdExterno
     : tipo === 'pedidos' ? `${tituloDoPedido(item)} · ${item.clienteNome || 'Sem nome'}` : item.nome
   const detalhe = tipo === 'conversas' ? item.contatoIdExterno : tipo === 'pedidos' ? rotuloDaSituacao(item.status) : tipo === 'clientes' ? item.telefone : item.skuBase
-  return { id: `${tipo}:${item.id}`, tipo, rotulo: rotulo || 'Sem nome', descricao: [nomesDaBusca[tipo], detalhe, `ID ${item.id}`].filter(Boolean).join(' · '), item }
+  const inativo = tipo === 'clientes' && item.ativo === false ? 'Inativo' : null
+  return { id: `${tipo}:${item.id}`, tipo, rotulo: rotulo || 'Sem nome', descricao: [nomesDaBusca[tipo], inativo, detalhe, `ID ${item.id}`].filter(Boolean).join(' · '), item }
 }

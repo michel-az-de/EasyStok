@@ -8,6 +8,7 @@ import { Icone } from '../../componentes/Icone'
 import { useCatalogo } from '../../aplicacao/contextos'
 import { ehRestricao, ordenarTags, ROTULO_RESTRICAO, rotuloDaTag } from '../../dominio/cliente'
 import { hashDoModulo } from '../../dominio/modulos'
+import { hashDoCadastroDoCliente } from '../../dominio/fichaCliente'
 import { ConsultaFreteCliente } from './ConsultaFreteCliente'
 import { CorrecaoVinculoCliente } from './CorrecaoVinculoCliente'
 import { copiarTexto, linkDoMapa } from './apresentacaoDaFicha'
@@ -68,6 +69,13 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
         {semCadastro && <span className={css.numerosCliente}>Contato sem cadastro</span>}
         {semPedido && <span className={css.numerosCliente}>Cadastrado, ainda sem pedido</span>}
       </button>
+      {/* #2780: cadastro desativado não some da conversa; o cartão diz e leva ao cadastro para reativar. */}
+      {!semCadastro && cliente.inativo && (
+        <p className={css.avisoInativo} role="status" data-aviso-inativo>
+          <Icone nome="alerta" tamanho={16} />
+          <span><strong>Cadastro desativado.</strong> Não aparece nas listas de clientes ativos. <a href={hashDoCadastroDoCliente(conversa.clienteId)}>Abrir o cadastro para reativar</a></span>
+        </p>
+      )}
       {cliente.endereco && <EnderecoDoCliente endereco={cliente.endereco} />}
       {fonteApi && <CorrecaoVinculoCliente key={conversa.id} conversa={conversa} />}
       {fonteApi && !conversa.clienteId && <Botao variante="texto" onClick={() => { window.location.hash = hashDoModulo('cadastros', 'clientes') }}>Conferir cadastros</Botao>}

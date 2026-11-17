@@ -92,6 +92,15 @@ public class ObterDossieClienteUseCaseTests
     }
 
     [Fact]
+    public async Task ClienteInativoVemMarcadoParaAFichaOferecerAReativacao()
+    {
+        // #2780: a Ficha mostra "Cadastro desativado" a partir deste campo.
+        (await CriarUseCase().ExecuteAsync(new ObterDossieClienteQuery(_empresaId, _cliente.Id)))!.Cliente.Ativo.Should().BeTrue();
+        _cliente.Desativar();
+        (await CriarUseCase().ExecuteAsync(new ObterDossieClienteQuery(_empresaId, _cliente.Id)))!.Cliente.Ativo.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ClienteDeOutraEmpresaDevolveNulo()
     {
         var dossie = await CriarUseCase().ExecuteAsync(new ObterDossieClienteQuery(_empresaId, Guid.NewGuid()));

@@ -37,7 +37,7 @@ public sealed record ConversaResumoResult(
     public string? Assunto { get; init; }
     public long VinculoRevisao { get; init; }
     public bool VinculoEmRevisao { get; init; }
-    /// <summary>#2461: o cliente vinculado já fez pedido na empresa (cancelado conta); nulo sem cadastro.</summary>
+    /// <summary>#2461: o cliente vinculado já fez pedido na empresa (#2777: só compra, cancelado não); nulo sem cadastro.</summary>
     public bool? TemPedido { get; init; }
 
     internal static ConversaResumoResult De(ConversaInboxItem i, DateTime agora, int slaRespostaMinutos) => new(
