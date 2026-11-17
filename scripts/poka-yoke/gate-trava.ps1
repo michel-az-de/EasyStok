@@ -11,6 +11,8 @@ Mecanica:
   abortado, janela fechada), o Windows marca a trava como abandonada e o proximo da fila
   a recebe: nao existe arquivo de trava para limpar a mao.
 
+Cobre o gate.ps1 e o build-check.ps1. Um `dotnet build` ou `dotnet test` avulso NAO entra na fila.
+
 Desligar (rollback):  $env:EASYSTOK_GATE_TRAVA = '0'
 Teto da espera:       $env:EASYSTOK_GATE_TRAVA_MIN (minutos, padrao 60); estourou = gate falha.
 Teste:                powershell -File scripts/poka-yoke/gate-trava.test.ps1
@@ -20,9 +22,17 @@ Uso (dot-source):
   $trava = Enter-GateTrava -Info $repoRoot
   try { ... } finally { Exit-GateTrava $trava }
 #>
+function Get-GateTravaTeto {
+    # Valor invalido ou vazio cai no padrao; aceita "0,5" e "0.5" (cultura pt-BR leria 0,5 como 5).
+    $v = 0.0
+    $txt = "$env:EASYSTOK_GATE_TRAVA_MIN".Replace(',', '.')
+    if ([double]::TryParse($txt, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$v) -and $v -gt 0) { return $v }
+    60
+}
+
 function Enter-GateTrava {
     param([string]$Nome = 'Global\EasyStokGate',
-          [double]$EsperaMin = $(if ($env:EASYSTOK_GATE_TRAVA_MIN) { [double]$env:EASYSTOK_GATE_TRAVA_MIN } else { 60 }),
+          [double]$EsperaMin = (Get-GateTravaTeto),
           [string]$Info = '')
     if ($env:EASYSTOK_GATE_TRAVA -eq '0') {
         Write-Host '[gate] trava global DESLIGADA (EASYSTOK_GATE_TRAVA=0).' -ForegroundColor Yellow
@@ -32,12 +42,13 @@ function Enter-GateTrava {
     $dono   = Join-Path $env:TEMP (($Nome -replace '[\\/:]', '_') + '.dono.txt')
     $relogio = [Diagnostics.Stopwatch]::StartNew()
     $limite = [TimeSpan]::FromMinutes($EsperaMin)
-    $obtida = $false; $proximoAviso = 0
+    $obtida = $false; $abandonada = $false; $proximoAviso = 0
     while (-not $obtida) {
-        try { $obtida = $mutex.WaitOne(1000) } catch [System.Threading.AbandonedMutexException] { $obtida = $true }
+        try { $obtida = $mutex.WaitOne(1000) } catch [System.Threading.AbandonedMutexException] { $obtida = $true; $abandonada = $true }
         if ($obtida) { break }
         if ($relogio.Elapsed.TotalSeconds -ge $proximoAviso) {   # na primeira volta e depois a cada minuto
-            $quem = if (Test-Path $dono) { (Get-Content $dono -Raw).Trim() } else { 'outro processo' }
+            $quem = 'outro processo'   # o dono pode gravar ou apagar o arquivo agora: leitura nunca derruba o gate
+            try { $txt = Get-Content $dono -Raw -ErrorAction Stop; if ($txt) { $quem = $txt.Trim() } } catch { }
             Write-Host ("[gate] aguardando a trava global ha {0:N0} s; em uso por {1}" -f $relogio.Elapsed.TotalSeconds, $quem) -ForegroundColor Yellow
             $proximoAviso += 60
         }
@@ -45,6 +56,9 @@ function Enter-GateTrava {
             $mutex.Dispose()
             throw "[gate] trava global ocupada ha mais de $EsperaMin min. Rode de novo, ou EASYSTOK_GATE_TRAVA=0 para pular a fila."
         }
+    }
+    if ($abandonada) {
+        Write-Host '[gate] o dono anterior da trava morreu sem solta-la; processos filhos dele podem seguir rodando.' -ForegroundColor Yellow
     }
     Set-Content -Path $dono -Value ("PID {0}, {1}, desde {2:HH:mm:ss}" -f $PID, $Info, (Get-Date)) -ErrorAction SilentlyContinue
     Write-Host ("[gate] trava global obtida apos {0:N1} s de espera." -f $relogio.Elapsed.TotalSeconds)

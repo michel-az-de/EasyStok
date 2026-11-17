@@ -18,6 +18,7 @@ if ($Papel) {
     $r = @{ papel = $Papel }
     try {
         . (Join-Path $PSScriptRoot 'gate-trava.ps1')
+        $r.inicio = (Get-Date).ToString('o')   # prova que o ator ja disputava a trava antes da liberacao
         $t = Enter-GateTrava -Nome $Nome -EsperaMin $EsperaMin -Info "teste $Papel"
         $r.obtida = (Get-Date).ToString('o')
         Set-Content "$Saida.obtida" $r.obtida
@@ -62,20 +63,22 @@ function Confere([string]$caso, [bool]$ok, [string]$detalhe) {
 function NovoNome { "Global\EasyStokGateTeste-" + [guid]::NewGuid().ToString('N') }
 
 try {
-    # 1. O segundo espera o primeiro soltar.
+    # 1. O segundo espera o primeiro soltar. Exige que o segundo tenha comecado a disputar
+    #    antes da liberacao: com a maquina lenta ele poderia subir depois e passar sem esperar.
     $nome = NovoNome
-    $a = Ator 'espera-a' $nome 4
+    $a = Ator 'espera-a' $nome 8
     if (AguardaObtida $a) {
         $b = Ator 'espera-b' $nome 0
         $ra = Resultado $a; $rb = Resultado $b
         Confere 'segundo gate espera o primeiro soltar a trava' `
-            ($rb.obtida -and $ra.liberada -and [datetime]$rb.obtida -ge [datetime]$ra.liberada) `
+            ($rb.inicio -and $rb.obtida -and $ra.liberada -and [datetime]$rb.inicio -lt [datetime]$ra.liberada -and
+             [datetime]$rb.obtida -ge [datetime]$ra.liberada) `
             "a: $($ra | ConvertTo-Json -Compress) b: $($rb | ConvertTo-Json -Compress)"
     } else { Confere 'segundo gate espera o primeiro soltar a trava' $false "o primeiro ator nao pegou a trava: $((Resultado $a) | ConvertTo-Json -Compress)" }
 
     # 2. Com EASYSTOK_GATE_TRAVA=0 ninguem espera (rollback da issue).
     $nome = NovoNome
-    $a = Ator 'desligada-a' $nome 4
+    $a = Ator 'desligada-a' $nome 8
     if (AguardaObtida $a) {
         $env:EASYSTOK_GATE_TRAVA = '0'
         try { $b = Ator 'desligada-b' $nome 0 } finally { Remove-Item Env:EASYSTOK_GATE_TRAVA }
@@ -103,6 +106,13 @@ try {
         Confere 'espera acima do teto falha com mensagem' ([bool]($rb.erro -match 'ocupada' -and -not $rb.obtida)) `
             "b: $($rb | ConvertTo-Json -Compress)"
     } else { Confere 'espera acima do teto falha com mensagem' $false "o primeiro ator nao pegou a trava: $((Resultado $a) | ConvertTo-Json -Compress)" }
+
+    # 5. O gate e o build-check usam a trava: pegam antes do build e soltam no finally.
+    foreach ($s in 'gate.ps1', 'build-check.ps1') {
+        $c = Get-Content (Join-Path $PSScriptRoot $s) -Raw
+        $iE = $c.IndexOf('Enter-GateTrava'); $iB = $c.IndexOf('dotnet build $slnf'); $iX = $c.LastIndexOf('finally { Exit-GateTrava $trava }')
+        Confere "$s pega a trava antes do build e solta no finally" ($iE -ge 0 -and $iB -gt $iE -and $iX -gt $iB) "Enter=$iE build=$iB finally=$iX"
+    }
 } finally {
     Get-ChildItem $pasta -File | Remove-Item -Force
     Remove-Item $pasta -Force
