@@ -63,8 +63,10 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
         var counts = rows.ToDictionary(x => x.Key, x => x.Value.Count);
         if (counts.Values.Sum() == 0) throw Invalid("LEGACY_EMPTY_SNAPSHOT", "O arquivo nao contem registros para importar.");
         Validate(rows);
-        var union = UnifyRepeatedProducts(rows["products"]);
+        var legacyProducts = ReadProducts(rows["products"]);
+        var union = UnifyRepeatedProducts(legacyProducts);
         var aliases = union.Aliases;
+        var erpNames = legacyProducts.ToDictionary(x => x.Id, x => x.ErpName, StringComparer.Ordinal);
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -96,10 +98,10 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             await RequireAbsentAsync<MobileOrder>(rows["orders"], ct);
             await RequireAbsentAsync<Batch>(rows["batches"], ct);
             await RequireAbsentAsync<CashEntry>(rows["cashEntries"], ct);
-            // Colisao com o ERP nao trava a carga: cliente de mesmo telefone e produto de mesmo nome sem saldo nem lote vinculam.
-            // O que nao tem vinculo seguro (ambiguo, com saldo ou lote) recusa, listando tudo de uma vez.
-            // Nome repetido so dentro do arquivo nao recusa: UnifyRepeatedProducts une no registro vencedor.
-            var collisions = await FindCollisionsAsync(rows, device.EmpresaId, ct);
+            // Colisao com o ERP nao trava a carga: cliente de mesmo telefone e produto de mesmo nome composto (nome + embalagem)
+            // sem saldo nem lote vinculam. O que nao tem vinculo seguro (ambiguo, com saldo ou lote) recusa, listando tudo de uma vez.
+            // Nome composto repetido so dentro do arquivo nao recusa: UnifyRepeatedProducts une no registro vencedor.
+            var collisions = await FindCollisionsAsync(rows, erpNames.Values, device.EmpresaId, ct);
             if (collisions.Count > 0) throw Conflict(CollisionMessage(collisions));
             var types = new[] { ("products", "product"), ("clients", "client"), ("orders", "order"), ("batches", "batch"), ("cashEntries", "cashEntry") };
             foreach (var (collection, type) in types)
@@ -110,8 +112,9 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             var productIds = rows["products"].Select(Id).ToList();
             var clientIds = rows["clients"].Select(Id).ToList();
             var existingErpProducts = await db.Set<Produto>().Where(x => x.EmpresaId == device.EmpresaId).Select(x => x.Id).ToListAsync(ct);
-            // Nome repetido no arquivo: so o vencedor passa pelo linker; o alias herda o cadastro dele mais abaixo.
-            await products.ExecuteAsync(productIds.Where(x => !aliases.ContainsKey(x)).ToList(), device.EmpresaId);
+            // Nome composto repetido no arquivo: so o vencedor passa pelo linker; o alias herda o cadastro dele mais abaixo.
+            // O linker vincula e cria pelo nome composto (nome + embalagem), nao pelo nome do app.
+            await products.ExecuteAsync(productIds.Where(x => !aliases.ContainsKey(x)).ToList(), device.EmpresaId, erpNames);
             var existingErpClients = await db.Set<Cliente>().Where(x => x.EmpresaId == device.EmpresaId).Select(x => x.Id).ToListAsync(ct);
             // Sem telefone nao ha prova de identidade: cria sempre, sem vincular por nome. Com telefone, o linker do sync normal
             // vincula ao unico cliente do ERP de mesmo telefone (a ambiguidade ja foi recusada acima) ou cria.
@@ -163,31 +166,36 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
     }
 
     /// <summary>
-    /// #2813: nome repetido no arquivo (sem espacos nas pontas, sem diferenciar maiusculas) vira um cadastro so no ERP.
-    /// Vence o ativo (archived != true) mais recente: data de 13 digitos no fim do id (0 se nao houver); empate ou sem data,
-    /// o que aparece depois no arquivo. Sem nenhum ativo, vence o arquivado mais recente. Os demais viram alias: nao passam
-    /// pelo linker, herdam o cadastro do ERP do vencedor e nao abrem saldo. O espelho de cada alias continua existindo.
+    /// #2813: o produto do ERP e nome + embalagem (LegacyProductName). Registros do arquivo com o mesmo nome composto (sem
+    /// diferenciar maiusculas) viram um cadastro so no ERP. Vence o ativo (archived != true) mais recente: data de 13 digitos
+    /// no fim do id (0 se nao houver); empate ou sem data, o que aparece depois no arquivo. Sem nenhum ativo, vence o arquivado
+    /// mais recente. Os demais viram alias: nao passam pelo linker, herdam o cadastro do ERP do vencedor e nao abrem saldo
+    /// (o saldo de um alias ativo de mesmo nome e embalagem nao soma). O espelho de cada alias continua existindo.
+    /// Mesmo nome com embalagens diferentes sao produtos diferentes: cada um abre o proprio saldo.
     /// </summary>
-    private static ProductUnion UnifyRepeatedProducts(List<JsonElement> products)
+    private static ProductUnion UnifyRepeatedProducts(List<LegacyProduct> products)
     {
         var aliases = new Dictionary<string, string>(StringComparer.Ordinal);
-        var entries = products.Select((row, index) =>
-        {
-            var p = row.Deserialize<ProductDto>(Json)!;
-            return (p.Id, Name: p.Name.Trim(), Unit: (p.Unit ?? "").Trim(), Archived: IsArchived(row), Index: index);
-        }).ToList();
-        int names = 0, mixedUnitNames = 0;
-        foreach (var group in entries.GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+        var groups = 0;
+        foreach (var group in products.GroupBy(x => x.ErpName, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
         {
             var winner = group.OrderBy(x => x.Archived).ThenByDescending(x => DateInId(x.Id)).ThenByDescending(x => x.Index).First();
             foreach (var other in group.Where(x => x.Index != winner.Index)) aliases[other.Id] = winner.Id;
-            names++;
-            if (group.Select(x => x.Unit).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1) mixedUnitNames++;
+            groups++;
         }
-        return new ProductUnion(aliases, names, mixedUnitNames);
+        return new ProductUnion(aliases, groups);
     }
 
-    private sealed record ProductUnion(Dictionary<string, string> Aliases, int Names, int MixedUnitNames);
+    private sealed record ProductUnion(Dictionary<string, string> Aliases, int Groups);
+
+    /// <summary>Produto do arquivo com o nome que ele tera no ERP (nome + embalagem).</summary>
+    private sealed record LegacyProduct(string Id, string ErpName, bool Archived, int Index);
+
+    private static List<LegacyProduct> ReadProducts(List<JsonElement> products) => products.Select((row, index) =>
+    {
+        var p = row.Deserialize<ProductDto>(Json)!;
+        return new LegacyProduct(p.Id, LegacyProductName.Compose(p.Name, p.Unit), IsArchived(row), index);
+    }).ToList();
 
     private static bool IsArchived(JsonElement row) => row.TryGetProperty("archived", out var archived) && archived.ValueKind == JsonValueKind.True;
 
@@ -197,13 +205,10 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
     /// <summary>Avisos da uniao: so numeros, nunca nomes. A unidade de cada pedido e lote continua a do proprio registro.</summary>
     private static IEnumerable<string> UnionWarnings(ProductUnion union)
     {
-        if (union.Names == 0) yield break;
-        var names = union.Names == 1 ? "1 nome de produto aparecia repetido no arquivo" : $"{union.Names} nomes de produtos apareciam repetidos no arquivo";
+        if (union.Groups == 0) yield break;
+        var groups = union.Groups == 1 ? "1 produto aparecia repetido no arquivo" : $"{union.Groups} produtos apareciam repetidos no arquivo";
         var extra = union.Aliases.Count == 1 ? "1 registro a mais" : $"{union.Aliases.Count} registros a mais";
-        yield return $"{names} ({extra}). Cada nome virou um cadastro so, com preco e saldo do registro ativo mais recente; pedidos e lotes dos registros a mais ficam ligados a esse cadastro.";
-        if (union.MixedUnitNames > 0) yield return union.MixedUnitNames == 1
-            ? "1 nome repetido tinha unidades diferentes entre os registros; o cadastro usa a unidade do registro mais recente e cada pedido ou lote guarda a unidade que ja tinha."
-            : $"{union.MixedUnitNames} nomes repetidos tinham unidades diferentes entre os registros; o cadastro usa a unidade do registro mais recente e cada pedido ou lote guarda a unidade que ja tinha.";
+        yield return $"{groups} (mesmo nome e embalagem; {extra}). Cada um virou um cadastro so, com preco e saldo do registro ativo mais recente; pedidos e lotes dos registros a mais ficam ligados a esse cadastro.";
     }
 
     /// <summary>Saldo negativo nao recusa o arquivo: abre com 0 no ERP (conta so quem abre saldo). O numero original fica no espelho e no backup.</summary>
@@ -228,16 +233,16 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
     }
 
     /// <summary>Colisoes de cadastro, todas de uma vez. Mesmo universo e mesma comparacao dos linkers do sync normal.</summary>
-    private async Task<List<string>> FindCollisionsAsync(Dictionary<string, List<JsonElement>> rows, Guid empresaId, CancellationToken ct)
+    private async Task<List<string>> FindCollisionsAsync(Dictionary<string, List<JsonElement>> rows, IEnumerable<string> erpProductNames, Guid empresaId, CancellationToken ct)
     {
         var lines = new List<string>();
-        var backupProducts = rows["products"].Select(r => r.Deserialize<ProductDto>(Json)!).Select(p => (p.Id, Name: p.Name.Trim())).ToList();
-        // Nome repetido so dentro do arquivo nao e colisao (UnifyRepeatedProducts une no vencedor); aqui entra so o que bate com o ERP.
+        // #2813: o produto do arquivo e o nome composto (nome + embalagem), o mesmo que vira o nome no ERP. Repetido so dentro do
+        // arquivo nao e colisao (UnifyRepeatedProducts une no vencedor); aqui entra so o que bate com o ERP.
         var erpProducts = await db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
             .Where(x => x.EmpresaId == empresaId && x.Status == StatusProduto.Ativo).Select(x => new { x.Id, x.Nome }).ToListAsync(ct);
         var erpByName = erpProducts.GroupBy(x => x.Nome.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Id).Order().ToList(), StringComparer.OrdinalIgnoreCase);
-        var matches = backupProducts.Select(x => x.Name).Distinct(StringComparer.OrdinalIgnoreCase).Where(erpByName.ContainsKey)
+        var matches = erpProductNames.Distinct(StringComparer.OrdinalIgnoreCase).Where(erpByName.ContainsKey)
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase).Select(x => (Name: x, Erp: erpByName[x])).ToList();
         var (withStock, withLot) = await StockAndLotAsync(matches.SelectMany(x => x.Erp).Distinct().ToList(), empresaId, ct);
         foreach (var (name, erp) in matches)

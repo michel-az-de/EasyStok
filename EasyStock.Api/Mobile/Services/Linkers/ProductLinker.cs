@@ -21,7 +21,9 @@ public sealed class ProductLinker(
     ILogger<ProductLinker> log,
     IProdutoRepository produtoRepository)
 {
-    public async Task ExecuteAsync(IEnumerable<string> mobileProductIds, Guid? empresaId)
+    // #2813: erpNames traz o nome que o produto tera no ERP, por id do app, quando difere do nome do app (primeira carga: nome +
+    // embalagem). Ausente, vale o nome do app, como no sync normal.
+    public async Task ExecuteAsync(IEnumerable<string> mobileProductIds, Guid? empresaId, IReadOnlyDictionary<string, string>? erpNames = null)
     {
         var idsList = mobileProductIds as ICollection<string> ?? mobileProductIds.ToList();
         if (!empresaId.HasValue)
@@ -60,8 +62,9 @@ public sealed class ProductLinker(
                 // antes de matchear/criar o Produto ERP para nao persistir markup (XSS armazenado
                 // que vazaria em PDF/etiqueta/exportacao). Em background nao da pra rejeitar:
                 // sanitiza-e-loga.
-                var nomeLimpo = UseCaseGuards.RemoverTagsHtml(mobileP.Name) ?? string.Empty;
-                if (!string.Equals(nomeLimpo, mobileP.Name, StringComparison.Ordinal))
+                var nomeDoApp = erpNames is not null && erpNames.TryGetValue(pid, out var nomeNoErp) ? nomeNoErp : mobileP.Name;
+                var nomeLimpo = UseCaseGuards.RemoverTagsHtml(nomeDoApp) ?? string.Empty;
+                if (!string.Equals(nomeLimpo, nomeDoApp, StringComparison.Ordinal))
                     log.LogWarning("AutoLink Produto: nome do mobile continha tags HTML e foi sanitizado. mobile={MobileId} empresaId={EmpresaId}", pid, empresaId);
 
                 var webP = await db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()

@@ -235,7 +235,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         var pudim = Id("p"); var oArquivado = Id("o"); var oAtivo = Id("o"); var bid = Id("b");
         var quando = DateTimeOffset.UtcNow.AddDays(-20).ToUnixTimeMilliseconds();
         var request = Pedir(c.Device,
-            [ProdutoDe(ativo, "Lasanha de frango", 5, 20m, "un"), ProdutoDe(arquivado, "Lasanha de frango", 9, 30m, "kg", archived: true), Produto(pudim, "Pudim")], [],
+            [ProdutoDe(ativo, "Lasanha de frango", 5, 20m, "un"), ProdutoDe(arquivado, "Lasanha de frango", 9, 30m, "un", archived: true), Produto(pudim, "Pudim")], [],
             [Pedido(oArquivado, null, "Cliente A", arquivado, "Lasanha de frango", "entregue", quando, quando, 30m),
              Pedido(oAtivo, null, "Cliente B", ativo, "Lasanha de frango", "entregue", quando, quando, 20m)],
             [LoteDe(bid, arquivado, "Lasanha de frango", quando)]);
@@ -243,7 +243,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         var recibo = await ImportarAsync(c, request);
 
         recibo.Counts["products"].Should().Be(3, "a resposta continua contando as linhas do arquivo");
-        recibo.Warnings.Should().Contain(w => w.Contains("1 nome de produto aparecia repetido") && w.Contains("1 registro a mais"), string.Join(" | ", recibo.Warnings));
+        recibo.Warnings.Should().Contain(w => w.Contains("1 produto aparecia repetido") && w.Contains("1 registro a mais"), string.Join(" | ", recibo.Warnings));
         await LerAsync(empresa, async db =>
         {
             var erp = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
@@ -277,7 +277,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         var quando = DateTimeOffset.UtcNow.AddDays(-20).ToUnixTimeMilliseconds();
         // O mais recente pela data do id vem no meio do arquivo: vale a data, nao a posicao.
         var request = Pedir(c.Device,
-            [ProdutoDe(velho, "Nhoque", 3, 12m, "un"), ProdutoDe(recente, "Nhoque", 8, 15m, "kg"), ProdutoDe(meio, "Nhoque", 5, 14m, "cx")], [],
+            [ProdutoDe(velho, "Nhoque", 3, 12m, "300g"), ProdutoDe(recente, "Nhoque", 8, 15m, "300 G"), ProdutoDe(meio, "Nhoque", 5, 14m, "300 g")], [],
             [Pedido(oVelho, null, "Cliente A", velho, "Nhoque", "entregue", quando, quando, 12m),
              Pedido(oRecente, null, "Cliente B", recente, "Nhoque", "entregue", quando, quando, 15m)]);
 
@@ -286,11 +286,12 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         await LerAsync(empresa, async db =>
         {
             var nhoque = (await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync()).Should().ContainSingle().Subject;
+            nhoque.Nome.Should().Be("Nhoque 300 g", "mesmo nome e mesma embalagem, escrita de tres jeitos, e um produto so");
             (nhoque.PrecoReferencia?.Valor).Should().Be(15m, "preco do mais recente");
             var espelhos = await db.Set<Product>().Where(x => x.Id == velho || x.Id == meio || x.Id == recente).ToListAsync();
             espelhos.Should().HaveCount(3).And.OnlyContain(x => x.ErpProductId == nhoque.Id);
-            espelhos.Single(x => x.Id == recente).Unit.Should().Be("kg", "unidade do vencedor");
-            espelhos.Single(x => x.Id == velho).Unit.Should().Be("un", "o perdedor mantem a propria linha do espelho");
+            espelhos.Single(x => x.Id == recente).Unit.Should().Be("300 G", "embalagem do vencedor, como veio");
+            espelhos.Single(x => x.Id == velho).Unit.Should().Be("300g", "o perdedor mantem a propria linha do espelho");
             var estoque = await db.Set<ItemEstoque>().Where(x => x.ProdutoId == nhoque.Id).ToListAsync();
             estoque.Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(8, "saldo so do vencedor, sem somar os outros");
             (await db.Set<MovimentacaoEstoque>().CountAsync()).Should().Be(1, "perdedor nao abre saldo");
@@ -346,7 +347,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
 
         var recibo = await ImportarAsync(c, request);
 
-        recibo.Warnings.Should().Contain(w => w.Contains("1 nome de produto aparecia repetido"), string.Join(" | ", recibo.Warnings));
+        recibo.Warnings.Should().Contain(w => w.Contains("1 produto aparecia repetido"), string.Join(" | ", recibo.Warnings));
         await LerAsync(empresa, async db =>
         {
             var erp = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
@@ -373,7 +374,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         var recibo = await ImportarAsync(c, request);
 
         recibo.Counts["products"].Should().Be(8, "a resposta continua contando as linhas do arquivo");
-        recibo.Warnings.Should().ContainSingle(w => w.Contains("3 nomes de produtos apareciam repetidos") && w.Contains("4 registros a mais"), string.Join(" | ", recibo.Warnings));
+        recibo.Warnings.Should().ContainSingle(w => w.Contains("3 produtos apareciam repetidos") && w.Contains("4 registros a mais"), string.Join(" | ", recibo.Warnings));
         (await LerAsync(empresa, db => db.Set<Produto>().IgnoreQueryFilters().CountAsync(x => x.EmpresaId == empresa))).Should().Be(4, "Torta, Quiche, Empada e Sorvete");
     }
 
@@ -468,7 +469,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         var recibo = await ImportarAsync(c, request);
 
         recibo.Warnings.Should().Contain(w => w.Contains("1 produto vinculado ao cadastro existente"), string.Join(" | ", recibo.Warnings));
-        recibo.Warnings.Should().Contain(w => w.Contains("1 nome de produto aparecia repetido"), string.Join(" | ", recibo.Warnings));
+        recibo.Warnings.Should().Contain(w => w.Contains("1 produto aparecia repetido"), string.Join(" | ", recibo.Warnings));
         await LerAsync(empresa, async db =>
         {
             var produtos = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
@@ -481,10 +482,10 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         });
     }
 
-    // #2813 B2: no arquivo real 18 dos 24 grupos ativos repetidos misturam unidades. Cadastro e saldo vem do vencedor,
-    // mas a linha de pedido e a de lote do alias guardam a unidade que tinham no arquivo.
+    // #2813: a embalagem faz parte da chave do produto. "300g" e "300 G" sao a mesma embalagem; "un" e " UN " sao a unidade padrao
+    // do app, nao embalagem. Cadastro e saldo vem do vencedor, mas a linha de pedido e a de lote do alias guardam a unidade que tinham.
     [SkippableFact]
-    public async Task NomeRepetidoComUnidadesDiferentes_LinhasDoAliasGuardamAPropriaUnidade_SaldoSoDoVencedor()
+    public async Task NomeEEmbalagemRepetidos_EscritosDeOutroJeito_UnemEAsLinhasDoAliasGuardamAPropriaUnidade()
     {
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         var c = await NovoContextoAsync();
@@ -495,36 +496,168 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         var cliente = Id("c"); var pedido = Id("o"); var lote = Id("l");
         var quando = origem.AddDays(40).ToUnixTimeMilliseconds();
         var request = Pedir(c.Device,
-            [ProdutoDe(coalhoVelho, "Queijo coalho", 3, 9m, "un"), ProdutoDe(coalhoNovo, "queijo coalho ", 7, 20m, "kg"),
+            [ProdutoDe(coalhoVelho, "Queijo coalho", 3, 9m, "300g"), ProdutoDe(coalhoNovo, "queijo coalho ", 7, 20m, "300 G"),
              ProdutoDe(paoVelho, "Pao frances", 2, 1m, "un"), ProdutoDe(paoNovo, "Pao Frances", 5, 1m, " UN ")],
             [Cliente(cliente, "Cliente do queijo", "11955554444", quando)],
-            [PedidoComUnidade(pedido, cliente, "Cliente do queijo", coalhoVelho, "Queijo coalho", "un", quando)],
-            [LoteComUnidade(lote, coalhoVelho, "Queijo coalho", quando, "un")]);
+            [PedidoComUnidade(pedido, cliente, "Cliente do queijo", coalhoVelho, "Queijo coalho", "300g", quando)],
+            [LoteComUnidade(lote, coalhoVelho, "Queijo coalho", quando, "300g")]);
 
         var recibo = await ImportarAsync(c, request);
 
         recibo.Counts["products"].Should().Be(4, "o recibo conta as linhas do arquivo, nao os cadastros");
-        recibo.Warnings.Should().Contain(w => w.Contains("2 nomes de produtos apareciam repetidos") && w.Contains("2 registros a mais"), string.Join(" | ", recibo.Warnings));
-        recibo.Warnings.Should().Contain(w => w.Contains("1 nome repetido tinha unidades diferentes"), string.Join(" | ", recibo.Warnings));
+        recibo.Warnings.Should().Contain(w => w.Contains("2 produtos apareciam repetidos") && w.Contains("2 registros a mais"), string.Join(" | ", recibo.Warnings));
+        recibo.Warnings.Should().NotContain(w => w.Contains("unidades diferentes"), "embalagem diferente nao une mais; nao ha o que avisar");
         recibo.Warnings.Should().NotContain(w => w.Contains("coalho", StringComparison.OrdinalIgnoreCase) || w.Contains("frances", StringComparison.OrdinalIgnoreCase), "o aviso conta, nunca cita nomes");
         await LerAsync(empresa, async db =>
         {
             var vencedor = await db.Set<Product>().SingleAsync(x => x.Id == coalhoNovo);
             var alias = await db.Set<Product>().SingleAsync(x => x.Id == coalhoVelho);
-            vencedor.Unit.Should().Be("kg", "o espelho do vencedor guarda a unidade dele");
-            alias.Unit.Should().Be("un", "o espelho do alias guarda a unidade dele");
+            vencedor.Unit.Should().Be("300 G", "o espelho do vencedor guarda a embalagem como veio");
+            alias.Unit.Should().Be("300g", "o espelho do alias guarda a embalagem como veio");
             alias.ErpProductId.Should().Be(vencedor.ErpProductId);
             var produtos = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
-            produtos.Should().HaveCount(2, "um Produto do ERP por nome");
+            produtos.Select(x => x.Nome).Should().BeEquivalentTo(new[] { "queijo coalho 300 g", "Pao Frances" }, "um Produto do ERP por nome e embalagem; o nome vem do vencedor e o un nao entra");
             var coalho = produtos.Single(x => x.Id == vencedor.ErpProductId);
             (coalho.PrecoReferencia?.Valor).Should().Be(20m, "o cadastro do ERP vem do vencedor");
             (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == coalho.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(7, "saldo so do vencedor; o 3 do alias nao soma");
             var linha = (await db.Set<Pedido>().Include(x => x.Itens).SingleAsync(x => x.MobileOrderId == pedido)).Itens.Single();
             linha.ProdutoId.Should().Be(coalho.Id, "o pedido do alias aponta para o cadastro unico");
-            linha.Unidade.Should().Be("un", "a linha do pedido guarda a unidade que tinha, nao a do vencedor");
+            linha.Unidade.Should().Be("300g", "a linha do pedido guarda a unidade que tinha, nao a do vencedor");
             var itemDoLote = (await db.Set<Lote>().IgnoreQueryFilters().Include(x => x.Itens).SingleAsync(x => x.EmpresaId == empresa && x.MobileBatchId == lote)).Itens.Single();
             itemDoLote.ProdutoId.Should().Be(coalho.Id, "o lote do alias aponta para o cadastro unico");
-            itemDoLote.Unidade.Should().Be("un", "a linha do lote guarda a unidade que tinha, nao a do vencedor");
+            itemDoLote.Unidade.Should().Be("300g", "a linha do lote guarda a unidade que tinha, nao a do vencedor");
+            return 0;
+        });
+    }
+
+    // #2813 (a): o produto do ERP e nome + embalagem. Mesmo nome com duas embalagens sao dois produtos, cada um com o proprio
+    // saldo de abertura: nenhum saldo de variante ativa se perde.
+    [SkippableFact]
+    public async Task MesmoNomeComDuasEmbalagens_ViraDoisProdutos_CadaUmComSeuSaldo()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var c = await NovoContextoAsync();
+        var empresa = c.Device.EmpresaId;
+        var origem = DateTimeOffset.UtcNow.AddDays(-90);
+        var pequena = IdDatado(origem); var grande = IdDatado(origem.AddDays(30)); var oPequena = Id("o"); var oGrande = Id("o");
+        var quando = origem.AddDays(40).ToUnixTimeMilliseconds();
+        var request = Pedir(c.Device,
+            [ProdutoDe(pequena, "Lasanha de frango", 5, 20m, "300g"), ProdutoDe(grande, "Lasanha de frango", 9, 30m, "500g")], [],
+            [Pedido(oPequena, null, "Cliente A", pequena, "Lasanha de frango", "entregue", quando, quando, 20m),
+             Pedido(oGrande, null, "Cliente B", grande, "Lasanha de frango", "entregue", quando, quando, 30m)]);
+
+        var recibo = await ImportarAsync(c, request);
+
+        recibo.Counts["products"].Should().Be(2);
+        recibo.Warnings.Should().NotContain(w => w.Contains("repetido"), "embalagens diferentes nao sao repeticao: " + string.Join(" | ", recibo.Warnings));
+        await LerAsync(empresa, async db =>
+        {
+            var erp = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
+            erp.Select(x => x.Nome).Should().BeEquivalentTo(new[] { "Lasanha de frango 300 g", "Lasanha de frango 500 g" });
+            var p300 = erp.Single(x => x.Nome == "Lasanha de frango 300 g"); var p500 = erp.Single(x => x.Nome == "Lasanha de frango 500 g");
+            (p300.PrecoReferencia?.Valor).Should().Be(20m); (p500.PrecoReferencia?.Valor).Should().Be(30m);
+            (await db.Set<Product>().SingleAsync(x => x.Id == pequena)).ErpProductId.Should().Be(p300.Id);
+            (await db.Set<Product>().SingleAsync(x => x.Id == grande)).ErpProductId.Should().Be(p500.Id);
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == p300.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(5);
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == p500.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(9);
+            var pedidos = await db.Set<Pedido>().Include(x => x.Itens).Where(x => x.MobileOrderId == oPequena || x.MobileOrderId == oGrande).ToListAsync();
+            pedidos.Single(x => x.MobileOrderId == oPequena).Itens.Single().ProdutoId.Should().Be(p300.Id, "cada pedido aponta para a embalagem que vendeu");
+            pedidos.Single(x => x.MobileOrderId == oGrande).Itens.Single().ProdutoId.Should().Be(p500.Id);
+            return 0;
+        });
+    }
+
+    // #2813 (c): sem embalagem (vazia, em branco ou a unidade padrao un) o produto do ERP fica so com o nome e convive com a variante embalada.
+    [SkippableFact]
+    public async Task SemEmbalagem_FicaSoComONome_EConviveComAVarianteEmbalada()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var c = await NovoContextoAsync();
+        var empresa = c.Device.EmpresaId;
+        var request = Pedir(c.Device,
+            [ProdutoDe(Id("p"), "Pudim", 4, 9m, "un"), ProdutoDe(Id("p"), "Torta", 6, 15m, ""), ProdutoDe(Id("p"), "Quiche", 2, 12m, "  "),
+             ProdutoDe(Id("p"), "Torta", 3, 18m, "400g")], [], []);
+
+        await ImportarAsync(c, request);
+
+        await LerAsync(empresa, async db =>
+        {
+            var erp = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
+            erp.Select(x => x.Nome).Should().BeEquivalentTo(new[] { "Pudim", "Torta", "Quiche", "Torta 400 g" }, "sem embalagem fica so o nome; a variante embalada e outro produto");
+            (await db.Set<ItemEstoque>().CountAsync(x => x.EmpresaId == empresa)).Should().Be(4, "a variante embalada nao absorve o saldo da simples");
+            return 0;
+        });
+    }
+
+    // #2813 (d): a colisao com o ERP compara pelo nome composto. O mesmo nome composto sem saldo nem lote vincula; o nome simples nao colide.
+    [SkippableFact]
+    public async Task Produto_ComEmbalagem_VinculaAoProdutoDoErpComOMesmoNomeComposto()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var c = await NovoContextoAsync();
+        var empresa = c.Device.EmpresaId;
+        var composto = await SeedProdutoAsync(empresa, c.Device.LojaId, "Lasanha de frango 300 g"); // sem saldo e sem lote
+        var simples = await SeedProdutoAsync(empresa, c.Device.LojaId, "Lasanha de frango", saldo: 8); // outro nome no ERP: nao colide com a variante
+        var origem = DateTimeOffset.UtcNow.AddDays(-90);
+        var pequena = IdDatado(origem); var grande = IdDatado(origem.AddDays(30));
+        var request = Pedir(c.Device, [ProdutoDe(pequena, "Lasanha de frango", 5, 20m, "300g"), ProdutoDe(grande, "Lasanha de frango", 9, 30m, "500g")], [], []);
+
+        var recibo = await ImportarAsync(c, request);
+
+        recibo.Warnings.Should().Contain(w => w.Contains("1 produto vinculado ao cadastro existente"), string.Join(" | ", recibo.Warnings));
+        await LerAsync(empresa, async db =>
+        {
+            var erp = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
+            erp.Should().HaveCount(3, "o 300 g vincula, o 500 g nasce e o de nome simples fica como estava");
+            var nova = erp.Single(x => x.Nome == "Lasanha de frango 500 g");
+            (await db.Set<Product>().SingleAsync(x => x.Id == pequena)).ErpProductId.Should().Be(composto.Id);
+            (await db.Set<Product>().SingleAsync(x => x.Id == grande)).ErpProductId.Should().Be(nova.Id);
+            (erp.Single(x => x.Id == composto.Id).PrecoReferencia?.Valor).Should().Be(55m, "preco do ERP nao e sobrescrito pelo backup");
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == composto.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(5);
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == nova.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(9);
+            (await db.Set<ItemEstoque>().Where(x => x.ProdutoId == simples.Id).ToListAsync()).Should().ContainSingle().Which.QuantidadeAtual.Value.Should().Be(8, "o produto de nome simples do ERP nao foi tocado");
+            return 0;
+        });
+    }
+
+    [SkippableFact]
+    public async Task Produto_ComEmbalagem_RecusaSeOProdutoDoErpComOMesmoNomeCompostoTemSaldo()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var c = await NovoContextoAsync();
+        var empresa = c.Device.EmpresaId;
+        var comSaldo = await SeedProdutoAsync(empresa, c.Device.LojaId, "Lasanha de frango 300 g", saldo: 4);
+        var request = Pedir(c.Device, [ProdutoDe(Id("p"), "Lasanha de frango", 5, 20m, "300g"), ProdutoDe(Id("p"), "Lasanha de frango", 9, 30m, "500g")], [], []);
+
+        var erro = await RecusadaAsync(c, request);
+
+        erro.Should().Contain(comSaldo.Id.ToString()).And.Contain("Lasanha de frango 300 g").And.Contain("Ha 1 colisao");
+        erro.Should().NotContain("500 g", "a outra embalagem nao colide");
+        await AssertNadaGravadoAsync(empresa, clientesDoErp: 0, produtosDoErp: 1);
+    }
+
+    // #2813 (e): o nome composto e estavel: nao repete a embalagem que o nome ja traz, usa sempre o mesmo formato e o reenvio nao duplica.
+    [SkippableFact]
+    public async Task NomeComposto_EEstavel_NaoRepeteAEmbalagemDoNome_EReenvioNaoDuplica()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var c = await NovoContextoAsync();
+        var empresa = c.Device.EmpresaId;
+        var request = Pedir(c.Device,
+            [ProdutoDe(Id("p"), "Lasanha de frango 300 g", 5, 20m, "300g"), ProdutoDe(Id("p"), "  PUDIM  ", 2, 9m, " 250ML "), ProdutoDe(Id("p"), "Torta", 1, 5m, "un")], [], []);
+
+        var primeiro = await ImportarAsync(c, request);
+        var segundo = await ImportarAsync(c, request);
+
+        primeiro.Replayed.Should().BeFalse();
+        segundo.Replayed.Should().BeTrue();
+        segundo.Warnings.Should().Equal(primeiro.Warnings);
+        await LerAsync(empresa, async db =>
+        {
+            var erp = await db.Set<Produto>().IgnoreQueryFilters().Where(x => x.EmpresaId == empresa).ToListAsync();
+            erp.Select(x => x.Nome).Should().BeEquivalentTo(new[] { "Lasanha de frango 300 g", "PUDIM 250 ml", "Torta" }, "a embalagem do nome nao se repete e o formato e sempre o mesmo");
+            (await db.Set<Product>().CountAsync(x => x.EmpresaId == empresa)).Should().Be(3);
+            (await db.Set<ItemEstoque>().CountAsync(x => x.EmpresaId == empresa)).Should().Be(3);
             return 0;
         });
     }
