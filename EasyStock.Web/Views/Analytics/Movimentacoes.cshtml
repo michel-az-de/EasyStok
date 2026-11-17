@@ -49,7 +49,15 @@
 
 <!-- Tabela -->
 <div class="ws">
-    @if (!Model.Itens.Any())
+    @if (Model.ErroCarga is not null)
+    {
+        @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
+            { "EmptyIconName", "lock" },
+            { "EmptyTitle", "Movimentações indisponíveis" },
+            { "EmptyDescription", Model.ErroCarga }
+        })
+    }
+    else if (!Model.Itens.Any())
     {
         @await Html.PartialAsync("_EmptyState", null, new ViewDataDictionary(ViewData) {
             { "EmptyIconName", "list-checks" },

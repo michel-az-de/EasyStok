@@ -124,6 +124,11 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
                 });
             }
         }
+        else if (!result.Success)
+        {
+            // #2744: sem a permissão de relatórios a Api responde 403; lista vazia diria "nada se moveu".
+            vm.ErroCarga = result.ErrorMessage ?? "Não foi possível carregar as movimentações.";
+        }
 
         return View(vm);
     }

@@ -28,7 +28,7 @@ public class MenuResumoServiceTests
         source.FetchAsync().Returns(Raw(criticos: 2, vencidos: 5, pedidos: 3));
         var svc = new MenuResumoService(source, NewCache());
 
-        var (badges, ok) = await svc.ObterAsync("e1", "l1");
+        var (badges, ok) = await svc.ObterAsync("e1", "l1", "u1");
 
         ok.Should().BeTrue();
         badges.ProdutosCriticos.Should().Be(2);
@@ -44,8 +44,8 @@ public class MenuResumoServiceTests
         source.FetchAsync().Returns(Raw(1, 1, 1));
         var svc = new MenuResumoService(source, NewCache());
 
-        await svc.ObterAsync("e1", "l1");
-        await svc.ObterAsync("e1", "l1");
+        await svc.ObterAsync("e1", "l1", "u1");
+        await svc.ObterAsync("e1", "l1", "u1");
 
         await source.Received(1).FetchAsync();
     }
@@ -57,10 +57,25 @@ public class MenuResumoServiceTests
         source.FetchAsync().Returns(Raw(1, 1, 1));
         var svc = new MenuResumoService(source, NewCache());
 
-        await svc.ObterAsync("e1", "lojaA");
-        await svc.ObterAsync("e1", "lojaB");
+        await svc.ObterAsync("e1", "lojaA", "u1");
+        await svc.ObterAsync("e1", "lojaB", "u1");
 
         await source.Received(2).FetchAsync(); // chaves de cache distintas por loja
+    }
+
+    // #2744: o resumo do dia depende da permissão de quem pede (403 para quem não lê relatórios).
+    // Cache só por loja servia o faturamento da dona ao atendente, ou o vazio do atendente à dona.
+    [Fact]
+    public async Task Isola_por_usuario()
+    {
+        var source = Substitute.For<IMenuResumoSource>();
+        source.FetchAsync().Returns(Raw(1, 1, 1));
+        var svc = new MenuResumoService(source, NewCache());
+
+        await svc.ObterAsync("e1", "l1", "dona");
+        await svc.ObterAsync("e1", "l1", "atendente");
+
+        await source.Received(2).FetchAsync();
     }
 
     [Fact]
@@ -70,8 +85,8 @@ public class MenuResumoServiceTests
         source.FetchAsync().Returns(Raw(0, 0, 0, ok: false));
         var svc = new MenuResumoService(source, NewCache());
 
-        var (badges, ok) = await svc.ObterAsync("e1", "l1");
-        await svc.ObterAsync("e1", "l1");
+        var (badges, ok) = await svc.ObterAsync("e1", "l1", "u1");
+        await svc.ObterAsync("e1", "l1", "u1");
 
         ok.Should().BeFalse();
         badges.Should().Be(MenuBadges.Zero);
@@ -87,7 +102,7 @@ public class MenuResumoServiceTests
             Dia: null, Ok: true));
         var svc = new MenuResumoService(source, NewCache());
 
-        var (badges, ok) = await svc.ObterAsync("e1", "l1");
+        var (badges, ok) = await svc.ObterAsync("e1", "l1", "u1");
 
         ok.Should().BeTrue();
         badges.PedidosAbertos.Should().Be(0);
