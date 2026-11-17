@@ -242,9 +242,14 @@
     result.batchIds = Array.from(batches);
     return result;
   }
+  // #2813: o aviso depende de QUAIS anexos o backup guardou. 'cdb-sync-*' são as recusadas e os conflitos do envio antigo; as demais chaves são compras e auditoria.
   function legacyArchiveWarning(source) {
-    return source && Array.isArray(source.archivedStorageKeys) && source.archivedStorageKeys.length
-      ? ['Compras e auditoria antigas preservadas como anexos no backup; não alteram as listas atuais do app nem do EasyStok.'] : [];
+    const keys = source && Array.isArray(source.archivedStorageKeys) ? source.archivedStorageKeys : [];
+    const isSyncKey = key => /^cdb-sync-/.test(String(key));
+    const sentences = [];
+    if (keys.some(key => !isSyncKey(key))) sentences.push('Compras e auditoria antigas preservadas como anexos no backup; não alteram as listas atuais do app nem do EasyStok.');
+    if (keys.some(isSyncKey)) sentences.push('As alterações recusadas e os conflitos do envio antigo ficam guardados como anexo no arquivo do backup; não entram no EasyStok.');
+    return sentences.length ? [sentences.join(' ')] : [];
   }
   function getImportedMigrationState() {
     const review = importReview(), source = importedLegacySource(), pairing = loadPairing();
