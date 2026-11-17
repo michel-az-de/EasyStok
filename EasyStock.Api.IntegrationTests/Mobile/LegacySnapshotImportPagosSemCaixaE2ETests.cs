@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using EasyStock.Api.Http;
 using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Application.Services.Pedidos;
@@ -113,6 +114,64 @@ public class LegacySnapshotImportPagosSemCaixaE2ETests(MobileE2EFixture fixture)
     public async Task CancelarEntregueDoHistorico_NaoMovimentaCaixaNemEstoque_EEstornoManualRecusaSemPagamento()
     {
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresa, pedidoId) = await ImportarEntregueDoHistoricoAsync();
+        var antes = await ContarAsync(empresa);
+
+        var gerente = await ClienteGerenteAsync(empresa);
+        var cancelar = await gerente.PostAsJsonAsync($"/api/pedidos/{pedidoId}/cancelar",
+            new { empresaId = empresa, motivo = "Cancelado depois da importação" });
+        cancelar.StatusCode.Should().Be(HttpStatusCode.OK, await cancelar.Content.ReadAsStringAsync());
+
+        var estorno = await gerente.PostAsJsonAsync($"/api/pedidos/{pedidoId}/estornos-manuais?empresaId={empresa}",
+            new { operacaoId = Guid.NewGuid(), pagamentoId = Guid.NewGuid(), valor = 10m, metodo = "dinheiro",
+                motivo = "Cliente pediu", referencia = (string?)null, valorJaDevolvido = true });
+        estorno.StatusCode.Should().Be(HttpStatusCode.Conflict, await estorno.Content.ReadAsStringAsync());
+        (await estorno.Content.ReadAsStringAsync()).Should().Contain("sem_pagamento");
+
+        await ReadAsync(empresa, async (db, _) =>
+        {
+            using var escopo = new AssertionScope();
+            var pedido = await db.Set<Pedido>().Include(p => p.Eventos).SingleAsync(p => p.Id == pedidoId);
+            pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
+            pedido.Pagamentos.Should().BeEmpty("cancelar não cria pagamento nem estorno");
+            pedido.Eventos.Should().NotContain(e => e.Tipo == CancelarPedidoUseCase.EventoDevolucaoAFazer,
+                "o entregue do histórico não tem o que devolver");
+            return 0;
+        });
+        (await ContarAsync(empresa)).Should().Be(antes, "cancelar e recusar o estorno não movimentam caixa, estoque nem contas a receber");
+    }
+
+    /// <summary>
+    /// A regra principal da marca: o ERP recusa pagamento novo no entregue do histórico, que já entrou quitado. A recusa
+    /// sai pelo caminho HTTP real do recebimento, como 400 com o texto da guarda, e nada é gravado.
+    /// </summary>
+    [SkippableFact]
+    public async Task RegistrarPagamentoNoEntregueDoHistorico_RecusaComBadRequestENaoGravaPagamentoNemCaixa()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresa, pedidoId) = await ImportarEntregueDoHistoricoAsync();
+        var antes = await ContarAsync(empresa);
+
+        var gerente = await ClienteGerenteAsync(empresa);
+        var resposta = await gerente.PostAsJsonAsync($"/api/pedidos/{pedidoId}/pagamentos",
+            new { empresaId = empresa, pedidoId, valor = 10m, metodo = "dinheiro" });
+
+        var corpo = await resposta.Content.ReadAsStringAsync();
+        resposta.StatusCode.Should().Be(HttpStatusCode.BadRequest, corpo);
+        JsonSerializer.Deserialize<ApiErrorResponse>(corpo, Json)!.Error.Message
+            .Should().Be("Não é possível registrar pagamento: o pedido do histórico já está quitado.");
+        await ReadAsync(empresa, async (db, _) =>
+        {
+            (await db.Set<PedidoPagamento>().CountAsync(pg => pg.PedidoId == pedidoId))
+                .Should().Be(0, "a recusa não grava pagamento no entregue do histórico");
+            return 0;
+        });
+        (await ContarAsync(empresa)).Should().Be(antes, "a recusa não movimenta caixa, estoque nem contas a receber");
+    }
+
+    /// <summary>Importa, pelo caminho real, um entregue sintético do histórico: ele sai quitado pela marca, sem pagamento nem caixa.</summary>
+    private async Task<(Guid Empresa, Guid PedidoId)> ImportarEntregueDoHistoricoAsync()
+    {
         var (empresa, loja) = await fixture.SeedEmpresaELojaAsync();
         var device = await fixture.SeedMobileDeviceAsync(empresa, loja);
         var produto = "p-" + Guid.NewGuid().ToString("N");
@@ -139,30 +198,7 @@ public class LegacySnapshotImportPagosSemCaixaE2ETests(MobileE2EFixture fixture)
             pedido.QuitadoHistoricoEm.Should().NotBeNull("pré-condição: o entregue do histórico entra quitado, pela marca");
             return pedido.Id;
         });
-        var antes = await ContarAsync(empresa);
-
-        var gerente = await ClienteGerenteAsync(empresa);
-        var cancelar = await gerente.PostAsJsonAsync($"/api/pedidos/{pedidoId}/cancelar",
-            new { empresaId = empresa, motivo = "Cancelado depois da importação" });
-        cancelar.StatusCode.Should().Be(HttpStatusCode.OK, await cancelar.Content.ReadAsStringAsync());
-
-        var estorno = await gerente.PostAsJsonAsync($"/api/pedidos/{pedidoId}/estornos-manuais?empresaId={empresa}",
-            new { operacaoId = Guid.NewGuid(), pagamentoId = Guid.NewGuid(), valor = 10m, metodo = "dinheiro",
-                motivo = "Cliente pediu", referencia = (string?)null, valorJaDevolvido = true });
-        estorno.StatusCode.Should().Be(HttpStatusCode.Conflict, await estorno.Content.ReadAsStringAsync());
-        (await estorno.Content.ReadAsStringAsync()).Should().Contain("sem_pagamento");
-
-        await ReadAsync(empresa, async (db, _) =>
-        {
-            using var escopo = new AssertionScope();
-            var pedido = await db.Set<Pedido>().Include(p => p.Eventos).SingleAsync(p => p.Id == pedidoId);
-            pedido.Status.Should().Be(StatusPedidoMapper.Cancelado);
-            pedido.Pagamentos.Should().BeEmpty("cancelar não cria pagamento nem estorno");
-            pedido.Eventos.Should().NotContain(e => e.Tipo == CancelarPedidoUseCase.EventoDevolucaoAFazer,
-                "o entregue do histórico não tem o que devolver");
-            return 0;
-        });
-        (await ContarAsync(empresa)).Should().Be(antes, "cancelar e recusar o estorno não movimentam caixa, estoque nem contas a receber");
+        return (empresa, pedidoId);
     }
 
     private async Task<(int Caixa, int Estoque, int Contas)> ContarAsync(Guid empresa) =>
