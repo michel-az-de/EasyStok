@@ -215,6 +215,7 @@
 
   const IMPORT_SOURCE_KEY = 'cdb-import-source';
   const IMPORT_RECEIPT_KEY = 'cdb-last-legacy-import';
+  const IMPORT_TIMEOUT_MS = 300000; // #2813: 5 min. O servidor leva ~4 s com a máquina quieta e passou de 60 s sob carga pesada; abortar antes desfaz a transação no servidor
   function importedLegacySource() {
     try { const raw = localStorage.getItem(IMPORT_SOURCE_KEY); return raw ? JSON.parse(raw) : null; }
     catch (_) { return null; }
@@ -298,7 +299,7 @@
       const stillSameDestination = () => { const current = loadPairing(); return current && sameId(String(current.empresaId), String(request.expectedEmpresaId)) && sameId(String(current.lojaId), String(request.expectedLojaId)); };
       if (!stillSameDestination()) throw new Error('A conexão mudou durante a preparação. Retome na mesma empresa e loja.');
       const send = async (url, init) => {
-        const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60000);
+        const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), IMPORT_TIMEOUT_MS);
         try {
           const response = await fetch(url, Object.assign({}, init, { signal: ctrl.signal }));
           let data = null; try { data = await response.json(); } catch (_) {}

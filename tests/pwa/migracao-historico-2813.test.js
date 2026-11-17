@@ -2,6 +2,7 @@
 // #2813 - migracao do historico, defeitos do PWA.
 //  B3: backup com recusadas ou conflitos era rejeitado sem caminho na tela.
 //  B6: lista de clientes cortada em 20, sem busca por texto.
+//  Espera: o envio e a conferência do histórico abortavam aos 60 s, antes de o servidor terminar de gravar o backup real.
 module.exports = function ({ test, sandbox, reset, assert, runInSandbox }) {
   const sync = () => sandbox.window.cdbSync;
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -200,6 +201,73 @@ module.exports = function ({ test, sandbox, reset, assert, runInSandbox }) {
     assert.deepStrictEqual(clone(recibo.archivedStorageKeys).sort(), ['cdb-audit-log', 'cdb-sync-conflicts', 'cdb-sync-deadletter']);
     juntas(recibo.warnings);
   }));
+
+  // ---------- Espera: o servidor leva mais de 60 s para gravar o backup real ----------
+  // O import de um backup de ~7,5 MB levou 61,7 s no servidor. Abortar antes desfaz a transação lá e "Retomar a mesma migração" repete o mesmo envio sem nunca terminar.
+  const ESPERA_DO_IMPORT_MS = 300000;
+  // Relógio falso só para os timers de aborto (`() => ctrl.abort()`); os outros timers seguem reais.
+  function relogioDeAborto() {
+    const setReal = sandbox.setTimeout, clearReal = sandbox.clearTimeout, armados = new Map();
+    let agora = 0, serie = 0, ultimoAtraso = null;
+    sandbox.setTimeout = (fn, ms, ...args) => {
+      if (typeof fn !== 'function' || !/\.abort\(\)/.test(String(fn))) return setReal.call(sandbox, fn, ms, ...args);
+      const id = 'aborto-' + (++serie);
+      armados.set(id, { fn, vence: agora + ms }); ultimoAtraso = ms;
+      return id;
+    };
+    sandbox.clearTimeout = id => (armados.delete(id) ? undefined : clearReal.call(sandbox, id));
+    return {
+      ultimoAtraso: () => ultimoAtraso,
+      avancar(ms) {
+        agora += ms;
+        Array.from(armados).filter(([, t]) => t.vence <= agora).sort((a, b) => a[1].vence - b[1].vence).forEach(([id, t]) => { armados.delete(id); t.fn(); });
+      },
+      // Quem ficou pendurado por falha do teste é abortado, para o envio não deixar a importação travada nos testes seguintes.
+      restaurar() { armados.forEach(t => t.fn()); armados.clear(); sandbox.setTimeout = setReal; sandbox.clearTimeout = clearReal; }
+    };
+  }
+  async function comRelogioDeAborto(corpo) {
+    const relogio = relogioDeAborto();
+    try { await corpo(relogio); } finally { relogio.restaurar(); }
+  }
+  // Servidor lento: cada chamada à rede fica pendurada até o teste responder ou o sinal abortar, como o fetch de verdade.
+  async function migrarComServidorLento(relogio) {
+    await sandbox.applyBackupPayload(backupComAnexos(), false, OPT_IN);
+    sandbox.localStorage.setItem('cdb-pairing', JSON.stringify({ empresaId: 'e1', lojaId: 'l1', apiKey: 'key' })); sandbox.navigator.onLine = true;
+    const pedidos = [];
+    sandbox.fetch = (url, init) => new Promise((responder, falhar) => {
+      pedidos.push({ url: String(url), corpo: init.body, sinal: init.signal, atraso: relogio.ultimoAtraso(), responder });
+      init.signal.addEventListener('abort', () => falhar(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })));
+    });
+    const desfecho = sync().migrateImportedLegacyData(MIGRACAO).then(() => null, erro => erro);
+    return { pedidos, desfecho };
+  }
+  async function confereEsperaDeCincoMinutos(relogio, pedido, nome, desfecho) {
+    relogio.avancar(ESPERA_DO_IMPORT_MS - 1);
+    assert.strictEqual(pedido.sinal.aborted, false, nome + ' abortou antes de ' + ESPERA_DO_IMPORT_MS + ' ms (o timer era de ' + pedido.atraso + ' ms)');
+    relogio.avancar(1);
+    assert.strictEqual(pedido.sinal.aborted, true, nome + ' precisa desistir quando os ' + ESPERA_DO_IMPORT_MS + ' ms passam');
+    const erro = await desfecho;
+    assert.ok(erro && /Não foi possível confirmar a comunicação com o EasyStok\. Retome a mesma migração/.test(erro.message), 'a mensagem de erro segue a mesma: ' + (erro && erro.message));
+  }
+
+  test('#2813 import lento: o envio do histórico só desiste após 5 minutos, nem um instante antes', () => isolated(() => comRelogioDeAborto(async relogio => {
+    const { pedidos, desfecho } = await migrarComServidorLento(relogio);
+    await ate(() => pedidos.length === 1, 'o envio do histórico à rede');
+    assert.ok(/\/legacy-import$/.test(pedidos[0].url), 'a primeira chamada é o POST do import: ' + pedidos[0].url);
+    await confereEsperaDeCincoMinutos(relogio, pedidos[0], 'o envio do histórico', desfecho);
+  })));
+
+  test('#2813 import lento: a conferência da cópia no servidor também só desiste após 5 minutos, nem um instante antes', () => isolated(() => comRelogioDeAborto(async relogio => {
+    const { pedidos, desfecho } = await migrarComServidorLento(relogio);
+    await ate(() => pedidos.length === 1, 'o envio do histórico à rede');
+    const envio = JSON.parse(pedidos[0].corpo), estado = JSON.parse(envio.snapshotJson);
+    pedidos[0].responder(resposta({ importId: envio.importId, snapshotSha256: envio.snapshotSha256, empresaId: 'e1', lojaId: 'l1', coveredMutationIds: envio.originMutationIds,
+      counts: Object.fromEntries(Object.keys(estado).map(k => [k, estado[k].length])), replayed: false }));
+    await ate(() => pedidos.length === 2, 'a conferência da cópia no servidor');
+    assert.ok(/\/legacy-import\/[^/]+\/snapshot$/.test(pedidos[1].url), 'a segunda chamada é a releitura do snapshot: ' + pedidos[1].url);
+    await confereEsperaDeCincoMinutos(relogio, pedidos[1], 'a conferência da cópia', desfecho);
+  })));
 
   // ---------- B6: lista de clientes cortada em 20 ----------
   const fs = require('fs'), path = require('path');
