@@ -77,7 +77,7 @@ public class SessaoCozinhaTests
             token.Revogar(); return true;
         });
         var audit = Substitute.For<IAuditLogRepository>();
-        var renovar = new RefreshTokenUseCase(repositorio, usuarios, audit, jwt, uow, NullLogger<RefreshTokenUseCase>.Instance);
+        var renovar = new RefreshTokenUseCase(repositorio, usuarios, audit, jwt, new EasyStock.TestHelpers.FakeUnitOfWork(), NullLogger<RefreshTokenUseCase>.Instance);
         var renovada = await renovar.ExecuteAsync(new RefreshTokenCommand("inicial"));
         Persistente(renovada.AccessToken).Should().Be(esperado);
         tokens[TokenHashHelper.ComputeSha256Hash("inicial")].Revogado.Should().BeTrue();

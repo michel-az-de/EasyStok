@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Services;
@@ -14,6 +15,14 @@ namespace EasyStock.Web.Middleware;
 public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionRestoreMiddleware> log, IWebHostEnvironment env)
 {
     private const string RememberCookie = "_rt";
+
+    /// <summary>
+    /// #2745: a Api consome o refresh uma vez só. Restaurações paralelas do mesmo _rt (abas e fragmentos depois
+    /// de um deploy) compartilham uma renovação, como no TokenRefreshHandler; a entrada vive 30 s para quem
+    /// chegar logo depois ainda com o cookie antigo.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, Lazy<Task<ApiResult<JsonElement>>>> Renovacoes = new();
+    private static readonly TimeSpan Retencao = TimeSpan.FromSeconds(30);
 
     public async Task InvokeAsync(HttpContext context, SessionService session, ApiClient api, IJwtClaimsReader jwt)
     {
@@ -49,7 +58,7 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
     {
         try
         {
-            var result = await api.PostAsync<JsonElement>("auth/refresh", new { refreshToken });
+            var result = await RenovarUmaVezAsync(api, refreshToken);
             if (!result.Success || result.Data.ValueKind == JsonValueKind.Undefined)
             {
                 log.LogWarning("Restauração de sessão falhou: refresh token inválido ou expirado");
@@ -109,6 +118,23 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
             log.LogError(ex, "Erro ao restaurar sessão via remember-me");
             return false;
         }
+    }
+
+    private static Task<ApiResult<JsonElement>> RenovarUmaVezAsync(ApiClient api, string refreshToken)
+    {
+        var voo = new Lazy<Task<ApiResult<JsonElement>>>(
+            () => api.PostAsync<JsonElement>("auth/refresh", new { refreshToken }));
+        var atual = Renovacoes.GetOrAdd(refreshToken, voo);
+        if (ReferenceEquals(atual, voo))
+            _ = LiberarAsync(refreshToken, voo);
+        return atual.Value;
+    }
+
+    private static async Task LiberarAsync(string refreshToken, Lazy<Task<ApiResult<JsonElement>>> voo)
+    {
+        try { await voo.Value; } catch { /* a falha é tratada por quem espera o voo */ }
+        await Task.Delay(Retencao);
+        Renovacoes.TryRemove(new KeyValuePair<string, Lazy<Task<ApiResult<JsonElement>>>>(refreshToken, voo));
     }
 
     private static string? GetString(JsonElement el, string prop) =>

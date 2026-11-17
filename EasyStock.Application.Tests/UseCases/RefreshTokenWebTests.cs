@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.RefreshToken;
+using EasyStock.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Application.Tests.UseCases;
@@ -16,6 +17,8 @@ public class RefreshTokenWebTests
     private readonly IRefreshTokenRepository _repo = Substitute.For<IRefreshTokenRepository>();
     private readonly IUsuarioRepository _usuarios = Substitute.For<IUsuarioRepository>();
     private readonly Usuario _usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+    private readonly FakeUnitOfWork _uow = new();
+    private readonly List<bool> _consumosEmTransacao = [];
     private readonly RefreshTokenUseCase _renovar;
 
     public RefreshTokenWebTests()
@@ -32,13 +35,14 @@ public class RefreshTokenWebTests
         // Espelha o UPDATE condicional do repositório: só o primeiro consumo de um token válido afeta a linha.
         _repo.ConsumirAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(c =>
         {
+            _consumosEmTransacao.Add(_uow.EmTransacao);
             var token = _tokens.Values.SingleOrDefault(t => t.Id == c.Arg<Guid>());
             if (token is null || !token.EstaValido()) return false;
             token.Revogar();
             return true;
         });
-        _renovar =new RefreshTokenUseCase(_repo, _usuarios, Substitute.For<IAuditLogRepository>(),
-            Substitute.For<IJwtTokenService>(), Substitute.For<IUnitOfWork>(), NullLogger<RefreshTokenUseCase>.Instance);
+        _renovar = new RefreshTokenUseCase(_repo, _usuarios, Substitute.For<IAuditLogRepository>(),
+            Substitute.For<IJwtTokenService>(), _uow, NullLogger<RefreshTokenUseCase>.Instance);
     }
 
     [Fact]
@@ -80,6 +84,17 @@ public class RefreshTokenWebTests
 
         await perdedora.Should().ThrowAsync<CredenciaisInvalidasException>();
         await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
+    [Fact]
+    public async Task Consumo_do_refresh_web_roda_na_mesma_transacao_que_emite_o_sucessor()
+    {
+        // #2745: se o consumo comitasse sozinho, uma falha depois dele queimaria o token sem sucessor.
+        Gravar("refresh-em-transacao", DateTime.UtcNow.AddDays(1));
+
+        await _renovar.ExecuteAsync(new RefreshTokenCommand("refresh-em-transacao"));
+
+        _consumosEmTransacao.Should().Equal(true);
     }
 
     private RefreshToken Gravar(string valor, DateTime expiraEm) =>
