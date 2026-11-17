@@ -18,7 +18,7 @@ Mecanica:
 
 Uso:   powershell -File scripts/poka-yoke/gate.ps1
 Saida: exit 0 = verde (build + arquitetura); exit != 0 = etapa que falhou
-       (4 = nenhum arch-test executou).
+       (4 = nenhum arch-test executou; 5 = trava global ocupada alem do teto, issue 2817).
 
 Definido em ADR-0040. Registrado em .poka-yoke/registry.yaml (canonical_commands.gate).
 #>
@@ -34,6 +34,13 @@ if (-not (Test-Path $slnf)) {
     Write-Host "[gate] NAO achei $slnf -- rode a partir do repo." -ForegroundColor Red
     exit 2
 }
+
+# -- 0. Trava global: um gate por vez builda e testa na maquina (issue 2817) --
+# Rollback: EASYSTOK_GATE_TRAVA=0. Detalhes e teste em gate-trava.ps1.
+. (Join-Path $PSScriptRoot 'gate-trava.ps1')
+$env:MSBUILDDISABLENODEREUSE = '1'   # nos do MSBuild saem junto com o build, sem ficar residentes
+try { $trava = Enter-GateTrava -Info $repoRoot } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 5 }
+try {   # corpo sem reindentar, para preservar o blame; o finally solta a trava em todo exit
 
 # -- 1. Build (mesma receita do build-check.ps1) -----------------------------
 Write-Host "[gate] 1/3 build incremental: $slnf -> $buildOut"
@@ -81,3 +88,5 @@ if ($executed -eq 0) {
 
 Write-Host "[gate] VERDE -- build + arquitetura OK ($executed arch-tests executados)." -ForegroundColor Green
 exit 0
+
+} finally { Exit-GateTrava $trava }
