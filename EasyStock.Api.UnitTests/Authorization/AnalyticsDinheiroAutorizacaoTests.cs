@@ -1,6 +1,7 @@
 using System.Reflection;
 using EasyStock.Api.Authorization;
 using EasyStock.Api.Controllers;
+using EasyStock.Api.Mobile.Controllers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -42,6 +43,30 @@ public class AnalyticsDinheiroAutorizacaoTests
         controller.GetMethod(acao)!.GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy)
             .Should().Contain(PoliticasPermissao.VisualizarRelatorios);
     }
+
+    // #2823: os relatórios rápidos do app seguem a mesma regra do site para valores de venda.
+    [Theory]
+    [InlineData(nameof(MobileQuickReportsController.VendasHoje))]
+    [InlineData(nameof(MobileQuickReportsController.CaixaTurno))]
+    [InlineData(nameof(MobileQuickReportsController.VendasVendedorTurno))]
+    public void Relatorio_rapido_com_valor_de_venda_exige_a_permissao_de_relatorios(string acao)
+    {
+        PoliticasDaAcao(typeof(MobileQuickReportsController), acao)
+            .Should().Contain(PoliticasPermissao.VisualizarRelatorios);
+    }
+
+    // Busca de estoque traz custo, e NFC-e do dia só contagens: seguem abertas à equipe.
+    [Theory]
+    [InlineData(nameof(MobileQuickReportsController.EstoqueBusca))]
+    [InlineData(nameof(MobileQuickReportsController.NfceHoje))]
+    public void Relatorio_rapido_sem_valor_de_venda_segue_aberto_a_equipe(string acao)
+    {
+        PoliticasDaAcao(typeof(MobileQuickReportsController), acao)
+            .Should().NotContain(PoliticasPermissao.VisualizarRelatorios);
+    }
+
+    private static IEnumerable<string?> PoliticasDaAcao(Type controller, string acao) =>
+        controller.GetMethod(acao)!.GetCustomAttributes<AuthorizeAttribute>().Select(a => a.Policy);
 
     [Fact]
     public void Projecao_de_estoque_segue_aberta_a_equipe()
