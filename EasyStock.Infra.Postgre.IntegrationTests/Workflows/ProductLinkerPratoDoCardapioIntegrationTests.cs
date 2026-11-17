@@ -140,6 +140,88 @@ public class ProductLinkerPratoDoCardapioIntegrationTests(PostgreSqlDatabaseFixt
         (await VincularAsync(s.EmpresaId, "Feijoada", erpJaVinculado: antigo)).Should().Be(antigo);
     }
 
+    /// <summary>
+    /// #2813 B8: a produção feita no aparelho não aparecia no console, que lê o estoque pelo produto do prato
+    /// (<c>CardapioItem.ProdutoId</c>). Prato avulso (sem produto) com o nome do produto do app: o Produto novo do app
+    /// nasce ligado ao prato, em vez de órfão.
+    /// </summary>
+    [SkippableTheory]
+    [InlineData("Lasanha")]
+    [InlineData("  LASANHA ")]
+    public async Task PratoAvulsoSemProduto_ProdutoNovoDoAppLigaOPrato(string nomeNoApp)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var prato = await PratoAsync(s, "lasanha", produtoId: null);
+
+        var vinculado = await VincularAsync(s.EmpresaId, nomeNoApp);
+
+        vinculado.Should().NotBeNull();
+        (await ContarProdutosAsync(s.EmpresaId)).Should().Be(1, "o produto do app é criado como hoje, um só");
+        (await ProdutoLigadoAoPratoAsync(prato)).Should().Be(vinculado.Value, "o console lê a produção pelo produto do prato");
+    }
+
+    [SkippableFact]
+    public async Task PratoQueJaTemProduto_NaoETrocadoPeloProdutoNovoDoApp()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var inativo = await ProdutoAsync(s, "Risoto antigo", StatusProduto.Inativo);
+        var prato = await PratoAsync(s, "risoto", inativo);
+
+        var vinculado = await VincularAsync(s.EmpresaId, "Risoto");
+
+        vinculado.Should().NotBeNull().And.NotBe(inativo, "o produto inativo do prato não casa: o produto do app é criado como hoje");
+        (await ProdutoLigadoAoPratoAsync(prato)).Should().Be(inativo, "prato que já tem produto não é trocado");
+    }
+
+    /// <summary>
+    /// Dois pratos com o mesmo nome (um avulso, outro já ligado a um produto inativo): não adivinha e não liga o avulso.
+    /// Dois avulsos de mesmo nome na mesma loja o banco já barra (<c>uq_cardapio_item_storefront_nome_avulso</c>).
+    /// </summary>
+    [SkippableFact]
+    public async Task DoisPratosComOMesmoNome_NaoLigaOAvulso()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var inativo = await ProdutoAsync(s, "Torta de frango", StatusProduto.Inativo);
+        await PratoAsync(s, "torta", inativo);
+        var avulso = await PratoAsync(s, "torta", produtoId: null);
+
+        var vinculado = await VincularAsync(s.EmpresaId, "Torta");
+
+        vinculado.Should().NotBeNull().And.NotBe(inativo);
+        (await ProdutoLigadoAoPratoAsync(avulso)).Should().BeNull("com dois pratos de mesmo nome não adivinha");
+    }
+
+    [SkippableFact]
+    public async Task PratoAvulsoDeOutraEmpresa_NaoLiga()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var outra = await SeedAsync();
+        var pratoAlheio = await PratoAsync(outra, "panqueca", produtoId: null);
+        var s = await SeedAsync();
+
+        (await VincularAsync(s.EmpresaId, "Panqueca")).Should().NotBeNull();
+        (await ProdutoLigadoAoPratoAsync(pratoAlheio)).Should().BeNull("prato de outra empresa não é tocado");
+    }
+
+    [SkippableFact]
+    public async Task PratoAvulsoArquivado_NaoLiga()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        var s = await SeedAsync();
+        var arquivado = await PratoAsync(s, "nhoque", produtoId: null, arquivado: true);
+
+        (await VincularAsync(s.EmpresaId, "Nhoque")).Should().NotBeNull();
+        (await ProdutoLigadoAoPratoAsync(arquivado)).Should().BeNull("prato arquivado não é ligado");
+    }
+
     private sealed record Semente(Guid EmpresaId, Guid CategoriaId, Guid StorefrontId);
 
     private async Task<Guid?> VincularAsync(Guid empresaId, string nomeNoApp, Guid? erpJaVinculado = null)
@@ -168,6 +250,13 @@ public class ProductLinkerPratoDoCardapioIntegrationTests(PostgreSqlDatabaseFixt
         return (await leitura.Set<Product>().SingleAsync(p => p.Id == "p-app")).ErpProductId;
     }
 
+    private async Task<Guid?> ProdutoLigadoAoPratoAsync(Guid pratoId)
+    {
+        await using var leitura = fixture.CreateDbContext();
+        var prato = await leitura.Set<CardapioItem>().IgnoreQueryFilters().AsNoTracking().SingleAsync(p => p.Id == pratoId);
+        return prato.ProdutoId;
+    }
+
     private async Task<int> ContarProdutosAsync(Guid empresaId)
     {
         await using var db = fixture.CreateDbContext();
@@ -187,19 +276,19 @@ public class ProductLinkerPratoDoCardapioIntegrationTests(PostgreSqlDatabaseFixt
         return new Semente(empresaId, categoriaId, loja.Id);
     }
 
-    private async Task<Guid> ProdutoAsync(Semente s, string nome)
+    private async Task<Guid> ProdutoAsync(Semente s, string nome, StatusProduto status = StatusProduto.Ativo)
     {
         var id = Guid.NewGuid();
         await using var seed = fixture.CreateDbContext();
-        seed.Add(new Produto { Id = id, EmpresaId = s.EmpresaId, CategoriaId = s.CategoriaId, Nome = nome, Status = StatusProduto.Ativo });
+        seed.Add(new Produto { Id = id, EmpresaId = s.EmpresaId, CategoriaId = s.CategoriaId, Nome = nome, Status = status });
         await seed.SaveChangesAsync();
         return id;
     }
 
-    private async Task<Guid> PratoAsync(Semente s, string nome, Guid produtoId, bool arquivado = false)
+    private async Task<Guid> PratoAsync(Semente s, string nome, Guid? produtoId, bool arquivado = false)
     {
         var prato = CardapioItem.CriarAvulso(s.StorefrontId, nome, 30m);
-        prato.VincularProduto(produtoId);
+        if (produtoId.HasValue) prato.VincularProduto(produtoId.Value);
         if (arquivado) prato.Arquivar(DateTime.UtcNow);
         await using var seed = fixture.CreateDbContext();
         seed.Add(prato);
