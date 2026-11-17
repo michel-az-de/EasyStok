@@ -298,3 +298,9 @@
 
 /* #1686 (item 9): marca de destino do motivo da barra sem mexer no layout. */
 .contents { display: contents; }
+
+/* #2780: mesmo tom âmbar da restrição: texto na tinta, só o ícone no alerta. */
+.avisoInativo { display: flex; align-items: flex-start; gap: var(--e-2); margin: var(--e-3) 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--alerta-pastel); color: var(--tinta); font-size: var(--t-apoio); }
+.avisoInativo svg { flex: none; margin-top: 2px; color: var(--alerta); }
+.avisoInativo a { color: var(--marca); font-weight: 600; text-underline-offset: 2px; }
+.avisoInativo a:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 2px; }
