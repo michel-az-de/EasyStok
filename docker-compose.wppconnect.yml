@@ -8,7 +8,7 @@ services:
       Atendimento__WppConnect__WebhookToken: '${WPP_WEBHOOK_TOKEN:?Informe WPP_WEBHOOK_TOKEN}'
       FileStorage__PublicBaseUrl: '${WPP_PUBLIC_FILES_URL:?Informe a URL HTTP(S) dos arquivos terminada em /files}'
   wppconnect:
-    image: wppconnect/wppconnect-server:2.10.68@sha256:efeb3bbb73cc1443942e309d01cca9d70d0a4a13002d9d4f60d86e525eab610f
+    image: wppconnect/wppconnect-server:2.10.81@sha256:7c882ee934a5663a107b5f5a0382bfd8b1fb95150cd21ab35cd8ff9cea70d1f8
     restart: unless-stopped
     init: true
     shm_size: 512mb
