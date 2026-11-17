@@ -42,12 +42,58 @@ public class SessionRestoreMiddlewareTests
         requisicoes.Should().OnlyContain(r => r.Sessao.GetToken() == "token-novo");
     }
 
+    [Fact]
+    public async Task Falha_transitoria_da_api_nao_desloga_nem_fica_em_cache()
+    {
+        var refresh = $"rt-{Guid.NewGuid():N}";
+        var api = new ApiQueVolta();
+        var auth = Substitute.For<IAuthenticationService>();
+        var env = Substitute.For<IWebHostEnvironment>();
+        env.EnvironmentName.Returns("Development");
+        var middleware = new SessionRestoreMiddleware(_ => Task.CompletedTask,
+            NullLogger<SessionRestoreMiddleware>.Instance, env);
+        var durante = Requisicao(refresh, auth);
+        var depois = Requisicao(refresh, auth);
+
+        await middleware.InvokeAsync(durante.Contexto, durante.Sessao, Cliente(api), new JwtClaimsReader());
+        await middleware.InvokeAsync(depois.Contexto, depois.Sessao, Cliente(api), new JwtClaimsReader());
+
+        await auth.DidNotReceiveWithAnyArgs().SignOutAsync(default!, default, default);
+        durante.Contexto.Response.Headers.SetCookie.ToString().Should().NotContain("_rt=", "o cookie sobrevive à queda da Api");
+        api.Renovacoes.Should().Be(2, "a falha transitória não fica em cache");
+        depois.Sessao.GetToken().Should().Be("token-novo");
+    }
+
+    private static ApiClient Cliente(HttpMessageHandler api) =>
+        new(new HttpClient(api, disposeHandler: false) { BaseAddress = new Uri("http://api.test/") },
+            NullLogger<ApiClient>.Instance);
+
+    /// <summary>Api que cai na primeira renovação (503, como num deploy) e responde na seguinte.</summary>
+    private sealed class ApiQueVolta : HttpMessageHandler
+    {
+        private int _renovacoes;
+        public int Renovacoes => _renovacoes;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            if (!request.RequestUri!.AbsolutePath.EndsWith("auth/refresh"))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            if (Interlocked.Increment(ref _renovacoes) == 1)
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"token\":\"token-novo\",\"refreshToken\":\"rt-sucessor\"}",
+                    Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
     private static (HttpContext Contexto, SessionService Sessao) Requisicao(string refresh, IAuthenticationService auth)
     {
         var contexto = new DefaultHttpContext { Session = new FakeSession() };
         contexto.Request.Path = "/dashboard";
         contexto.Request.Headers.Cookie = $"_rt={refresh}";
-        contexto.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "u")], "Cookies"));
+        contexto.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Email, "ana@teste.local")], "Cookies"));
         var services = new ServiceCollection();
         services.AddSingleton(auth);
         contexto.RequestServices = services.BuildServiceProvider();

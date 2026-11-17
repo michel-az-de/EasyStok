@@ -1,4 +1,7 @@
 using System.Collections.Concurrent;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using EasyStock.Web.Models.Api;
 using EasyStock.Web.Services;
@@ -19,7 +22,8 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
     /// <summary>
     /// #2745: a Api consome o refresh uma vez só. Restaurações paralelas do mesmo _rt (abas e fragmentos depois
     /// de um deploy) compartilham uma renovação, como no TokenRefreshHandler; a entrada vive 30 s para quem
-    /// chegar logo depois ainda com o cookie antigo.
+    /// chegar logo depois ainda com o cookie antigo. A chave é o usuário mais o hash do _rt, nunca o segredo; a
+    /// falha transitória (queda, timeout, 429, 5xx) sai na hora, para a próxima requisição tentar de novo.
     /// </summary>
     private static readonly ConcurrentDictionary<string, Lazy<Task<ApiResult<JsonElement>>>> Renovacoes = new();
     private static readonly TimeSpan Retencao = TimeSpan.FromSeconds(30);
@@ -39,8 +43,8 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
                 var rt = context.Request.Cookies[RememberCookie];
                 if (!string.IsNullOrEmpty(rt))
                 {
-                    var restored = await TryRestoreAsync(context, session, api, jwt, rt);
-                    if (!restored)
+                    var restauracao = await TryRestoreAsync(context, session, api, jwt, rt);
+                    if (restauracao == Restauracao.Recusada)
                     {
                         // Refresh token inválido/expirado — limpa tudo e força login
                         context.Response.Cookies.Delete(RememberCookie);
@@ -54,15 +58,23 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
         await next(context);
     }
 
-    private async Task<bool> TryRestoreAsync(HttpContext context, SessionService session, ApiClient api, IJwtClaimsReader jwt, string refreshToken)
+    private enum Restauracao { Restaurada, Recusada, Indisponivel }
+
+    private async Task<Restauracao> TryRestoreAsync(HttpContext context, SessionService session, ApiClient api, IJwtClaimsReader jwt, string refreshToken)
     {
         try
         {
-            var result = await RenovarUmaVezAsync(api, refreshToken);
+            var result = await RenovarUmaVezAsync(api, ChaveDoVoo(context.User, refreshToken), refreshToken);
+            if (!result.Success && EhTransitoria(result))
+            {
+                // A Api caiu ou demorou: o _rt pode seguir válido; não desloga, a próxima requisição tenta de novo.
+                log.LogWarning("Restauração de sessão adiada: Api indisponível (HTTP {Status})", result.HttpStatus);
+                return Restauracao.Indisponivel;
+            }
             if (!result.Success || result.Data.ValueKind == JsonValueKind.Undefined)
             {
                 log.LogWarning("Restauração de sessão falhou: refresh token inválido ou expirado");
-                return false;
+                return Restauracao.Recusada;
             }
 
             var newToken = GetString(result.Data, "token");
@@ -70,7 +82,7 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
             if (string.IsNullOrEmpty(newToken))
             {
                 log.LogWarning("Restauração de sessão falhou: resposta sem token");
-                return false;
+                return Restauracao.Recusada;
             }
 
             // Restaura tokens na sessão
@@ -111,30 +123,39 @@ public class SessionRestoreMiddleware(RequestDelegate next, ILogger<SessionResto
             }
 
             log.LogInformation("Sessão restaurada via remember-me para usuário {UserId}", userId);
-            return true;
+            return Restauracao.Restaurada;
         }
         catch (Exception ex)
         {
             log.LogError(ex, "Erro ao restaurar sessão via remember-me");
-            return false;
+            return Restauracao.Recusada;
         }
     }
 
-    private static Task<ApiResult<JsonElement>> RenovarUmaVezAsync(ApiClient api, string refreshToken)
+    private static bool EhTransitoria(ApiResult<JsonElement> result) =>
+        result.HttpStatus is 0 or 408 or 429 or >= 500;
+
+    private static string ChaveDoVoo(ClaimsPrincipal usuario, string refreshToken) =>
+        $"{usuario.FindFirstValue(ClaimTypes.Email)}:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)))}";
+
+    private static Task<ApiResult<JsonElement>> RenovarUmaVezAsync(ApiClient api, string chave, string refreshToken)
     {
         var voo = new Lazy<Task<ApiResult<JsonElement>>>(
             () => api.PostAsync<JsonElement>("auth/refresh", new { refreshToken }));
-        var atual = Renovacoes.GetOrAdd(refreshToken, voo);
+        var atual = Renovacoes.GetOrAdd(chave, voo);
         if (ReferenceEquals(atual, voo))
-            _ = LiberarAsync(refreshToken, voo);
+            _ = LiberarAsync(chave, voo);
         return atual.Value;
     }
 
-    private static async Task LiberarAsync(string refreshToken, Lazy<Task<ApiResult<JsonElement>>> voo)
+    private static async Task LiberarAsync(string chave, Lazy<Task<ApiResult<JsonElement>>> voo)
     {
-        try { await voo.Value; } catch { /* a falha é tratada por quem espera o voo */ }
-        await Task.Delay(Retencao);
-        Renovacoes.TryRemove(new KeyValuePair<string, Lazy<Task<ApiResult<JsonElement>>>>(refreshToken, voo));
+        var reter = false;
+        try { var result = await voo.Value; reter = result.Success || !EhTransitoria(result); }
+        catch { /* a falha é tratada por quem espera o voo; sem retenção, a próxima tenta de novo */ }
+        if (reter)
+            await Task.Delay(Retencao);
+        Renovacoes.TryRemove(new KeyValuePair<string, Lazy<Task<ApiResult<JsonElement>>>>(chave, voo));
     }
 
     private static string? GetString(JsonElement el, string prop) =>
