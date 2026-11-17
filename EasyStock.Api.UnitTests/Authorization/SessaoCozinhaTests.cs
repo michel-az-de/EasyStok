@@ -71,6 +71,11 @@ public class SessaoCozinhaTests
         repositorio.AddAsync(Arg.Any<RefreshToken>()).Returns(c => {
             var token = c.Arg<RefreshToken>(); tokens[token.TokenHash] = token; return Task.CompletedTask;
         });
+        repositorio.ConsumirAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(c => {
+            var token = tokens.Values.SingleOrDefault(t => t.Id == c.Arg<Guid>());
+            if (token is null || !token.EstaValido()) return false;
+            token.Revogar(); return true;
+        });
         var audit = Substitute.For<IAuditLogRepository>();
         var renovar = new RefreshTokenUseCase(repositorio, usuarios, audit, jwt, uow, NullLogger<RefreshTokenUseCase>.Instance);
         var renovada = await renovar.ExecuteAsync(new RefreshTokenCommand("inicial"));

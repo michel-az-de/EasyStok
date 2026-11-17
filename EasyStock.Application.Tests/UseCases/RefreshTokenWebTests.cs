@@ -29,7 +29,15 @@ public class RefreshTokenWebTests
             _tokens[token.TokenHash] = token;
             return Task.CompletedTask;
         });
-        _renovar = new RefreshTokenUseCase(_repo, _usuarios, Substitute.For<IAuditLogRepository>(),
+        // Espelha o UPDATE condicional do repositório: só o primeiro consumo de um token válido afeta a linha.
+        _repo.ConsumirAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(c =>
+        {
+            var token = _tokens.Values.SingleOrDefault(t => t.Id == c.Arg<Guid>());
+            if (token is null || !token.EstaValido()) return false;
+            token.Revogar();
+            return true;
+        });
+        _renovar =new RefreshTokenUseCase(_repo, _usuarios, Substitute.For<IAuditLogRepository>(),
             Substitute.For<IJwtTokenService>(), Substitute.For<IUnitOfWork>(), NullLogger<RefreshTokenUseCase>.Instance);
     }
 
@@ -61,7 +69,20 @@ public class RefreshTokenWebTests
         await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!);
     }
 
-    private void Gravar(string valor, DateTime expiraEm) =>
+    [Fact]
+    public async Task Renovacao_que_perde_o_consumo_atomico_e_recusada_sem_emitir_outro()
+    {
+        // #2745: outra renovação com o mesmo token consumiu a linha primeiro; esta não pode ganhar um par novo.
+        var token = Gravar("refresh-disputado", DateTime.UtcNow.AddDays(1));
+        _repo.ConsumirAsync(token.Id, Arg.Any<DateTime>()).Returns(false);
+
+        var perdedora = () => _renovar.ExecuteAsync(new RefreshTokenCommand("refresh-disputado"));
+
+        await perdedora.Should().ThrowAsync<CredenciaisInvalidasException>();
+        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!);
+    }
+
+    private RefreshToken Gravar(string valor, DateTime expiraEm) =>
         _tokens[Hash(valor)] = RefreshToken.Criar(_usuario.Id, Hash(valor), expiraEm, null, null);
 
     private static string Hash(string valor) => TokenHashHelper.ComputeSha256Hash(valor);
