@@ -298,20 +298,15 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
           />
         </div>
 
-        {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não
-            informa nada, então o texto diz tudo o que o vermelho sugeriria. */}
         {/* #2780: cadastro desativado não some da conversa; a Ficha diz e leva ao cadastro para reativar. */}
         {conversa.cliente?.inativo && conversa.clienteId && (
-          <div className={css.avisoBloqueio} data-aviso-inativo>
-            <p className={css.tituloBloqueio}>
-              <Icone nome="alerta" />
-              <strong>Cadastro desativado</strong>
-            </p>
-            <p className={css.rodapeBloco}>
-              Ele não aparece nas listas de clientes ativos. <a href={hashDoCadastroDoCliente(conversa.clienteId)}>Abrir o cadastro para reativar</a>
-            </p>
-          </div>
+          <p className={css.avisoInativo} role="status" data-aviso-inativo>
+            <Icone nome="alerta" tamanho={16} />
+            <span><strong>Cadastro desativado.</strong> Não aparece nas listas de clientes ativos. <a href={hashDoCadastroDoCliente(conversa.clienteId)}>Abrir o cadastro para reativar</a></span>
+          </p>
         )}
+        {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não
+            informa nada, então o texto diz tudo o que o vermelho sugeriria. */}
         {bloqueada && (
           <div className={css.avisoBloqueio}>
             <p className={css.tituloBloqueio}>

@@ -71,7 +71,7 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
       </button>
       {/* #2780: cadastro desativado não some da conversa; o cartão diz e leva ao cadastro para reativar. */}
       {!semCadastro && cliente.inativo && (
-        <p className={css.avisoInativo} data-aviso-inativo>
+        <p className={css.avisoInativo} role="status" data-aviso-inativo>
           <Icone nome="alerta" tamanho={16} />
           <span><strong>Cadastro desativado.</strong> Não aparece nas listas de clientes ativos. <a href={hashDoCadastroDoCliente(conversa.clienteId)}>Abrir o cadastro para reativar</a></span>
         </p>

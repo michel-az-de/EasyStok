@@ -2,6 +2,7 @@ using EasyStock.Application.UseCases.AdicionarClienteTelefone;
 using EasyStock.Application.UseCases.RemoverClienteTelefone;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Repositories;
+using EasyStock.Infra.Postgre.Repositories.Atendimento;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -49,6 +50,7 @@ public sealed class CoerenciaClienteIntegrationTests(PostgreSqlDatabaseFixture f
         var outra = Empresa.Criar("Coerência 2777 alheia", "88888888000191");
         var compradora = Cliente.Criar(empresa.Id, "Contagem 2777 Compradora");
         var soCancelou = Cliente.Criar(empresa.Id, "Contagem 2777 Cancelou");
+        soCancelou.Telefone = "+5511987652777";
         var cancelado = Pedido.Criar(empresa.Id, compradora);
         cancelado.Cancelar();
         var concluido = Pedido.Criar(empresa.Id, compradora);
@@ -74,6 +76,11 @@ public sealed class CoerenciaClienteIntegrationTests(PostgreSqlDatabaseFixture f
 
         var porContagem = await clientes.GetByEmpresaAsync(empresa.Id, 1, 20, search: "contagem 2777", sort: "ordercount", order: "desc");
         porContagem.items.First().Id.Should().Be(compradora.Id);
+
+        var candidato = (await new VinculoClienteConversaRepository(db).ListarCandidatosAsync(empresa.Id, ["+5511987652777"], [], default)).Should().ContainSingle().Subject;
+        candidato.EhLead.Should().BeTrue("a correção de vínculo usa a mesma regra de compra");
+        candidato.QuantidadePedidos.Should().Be(0);
+        candidato.UltimoPedidoEm.Should().BeNull();
     }
 
     [SkippableFact]

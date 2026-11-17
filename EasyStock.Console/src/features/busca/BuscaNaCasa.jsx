@@ -63,7 +63,7 @@ export function BuscaNaCasa({ aoFechar, aoAbrirConversa, renderizarCadastro, ren
       <div className={css.busca}>
         <p>Até {LIMITE_BUSCA_CASA} resultados por categoria. Pessoas: por nome, telefone, e-mail ou documento, com os inativos marcados. Refine a busca para encontrar outro registro.</p>
         <BuscaComSugestoes valor={termo} aoMudar={valor => { buscando.current?.abort(); leitura.current?.abort(); abrir(null); falhar(null); definir({ resultados: [], indisponiveis: [], carregando: Boolean(valor.trim()) }); mudar(valor) }} opcoes={resultados.map(r => ({ ...r, item: r }))} aoEscolher={escolher}
-          carregando={consulta.carregando} minimo={1} rotulo="Buscar na Casa" rotuloLista="Resultados da busca na Casa" textoCarregando="Consultando a loja…" placeholder="Nome, telefone, ID ou tela" />
+          carregando={consulta.carregando} minimo={1} rotulo="Buscar na Casa" rotuloLista="Resultados da busca na Casa" textoCarregando="Consultando a loja…" placeholder="Nome, telefone, e-mail, ID ou tela" />
         {abrindo && <p role="status">Abrindo o registro…</p>}
         {erro && <p role="alert">{erro}</p>}
         {consulta.indisponiveis.length > 0 && <div role="alert"><p>Parte da busca não está disponível:</p><ul>{consulta.indisponiveis.map(e => <li key={e.tipo}>{nomesDaBusca[e.tipo]}: {e.mensagem}</li>)}</ul><Botao onClick={() => tentar(t => t + 1)}>Tentar novamente</Botao></div>}

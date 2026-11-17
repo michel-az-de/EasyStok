@@ -258,7 +258,7 @@ using EasyStock.Domain.ValueObjects;
         public void RebaixarPrincipaisPara(ClienteTelefone novo)
         {
             if (!novo.Principal) return;
-            foreach (var t in Telefones.Where(t => t.Id != novo.Id && t.Principal)) t.Principal = false;
+            foreach (var t in Telefones.Where(t => t.Id != novo.Id && t.Principal)) { t.Principal = false; t.AlteradoEm = DateTime.UtcNow; }
         }
 
         /// <summary>
@@ -271,7 +271,7 @@ using EasyStock.Domain.ValueObjects;
             if (removido is null || !removido.Principal) return null;
             var proximo = Telefones.Where(t => t.Id != removidoId)
                 .OrderBy(t => t.CriadoEm).ThenBy(t => t.Id).FirstOrDefault();
-            if (proximo is not null) proximo.Principal = true;
+            if (proximo is not null) { proximo.Principal = true; proximo.AlteradoEm = DateTime.UtcNow; }
             return proximo;
         }
         public void Reativar() { Ativo = true; AlteradoEm = DateTime.UtcNow; }

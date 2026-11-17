@@ -130,9 +130,9 @@ public sealed class VinculoClienteConversaIntegrationTests(PostgreSqlDatabaseFix
             pedido.Itens.Add(new PedidoItem { Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "Histórico sintético",
                 Quantidade = 1, PrecoUnitario = 10m, Subtotal = 10m, CriadoEm = em });
             pedido.RecalcularTotal();
-            pedido.Cancelar();
+            // #2777: o histórico do candidato conta só compra; cancelado fica de fora (CoerenciaClienteIntegrationTests).
             pedido.CriadoEm = em;
-            pedido.CanceladoEm = pedido.AlteradoEm = em.AddHours(1);
+            pedido.AlteradoEm = em.AddHours(1);
             return pedido;
         }
     }
