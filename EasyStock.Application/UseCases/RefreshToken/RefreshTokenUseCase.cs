@@ -50,7 +50,8 @@ public sealed class RefreshTokenUseCase(
                 return await RenovarAsync(refreshToken, sessao, command.RequisicaoId, usuario);
             });
         }
-        return await RenovarAsync(refreshToken, null);
+        // #2745: consumo e sucessor na mesma transação; uma falha depois do consumo não queima o token sem sucessor.
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => RenovarAsync(refreshToken, null));
     }
 
     private async Task<RefreshTokenResult> RenovarAsync(RefreshTokenEntity? refreshToken, SessaoNativa? sessao,
@@ -64,10 +65,12 @@ public sealed class RefreshTokenUseCase(
 
         var usuario = usuarioConferido ?? await ObterUsuarioValidoAsync(refreshToken.UsuarioId, sessao);
 
-        if (sessao is null)
+        // #2745: UPDATE condicional, como no ramo nativo; de duas renovações simultâneas só uma consome o token.
+        // Em READ COMMITTED a perdedora espera a trava da linha e, ao reavaliar !Revogado, afeta 0 linhas.
+        if (sessao is null && !await refreshTokenRepository.ConsumirAsync(refreshToken.Id, DateTime.UtcNow))
         {
-            refreshToken.Revogar();
-            await refreshTokenRepository.UpdateAsync(refreshToken);
+            logger.LogWarning("Refresh token já consumido por outra renovação");
+            throw new CredenciaisInvalidasException("Refresh token invalido.");
         }
 
         var novoRefreshTokenValue = sessao is null ? Guid.NewGuid().ToString()
