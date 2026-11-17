@@ -490,6 +490,14 @@ else if (Model.ResumoApiFalhou)
 <div class="ds-kpi-stack mb-6">
     <div class="ws ds-kpi" title="Receita gerada com saídas nos últimos 30 dias">
         <div class="ds-kpi-lbl">Vendas</div>
+        @if (!Model.ReceitaDisponivel)
+        {
+            @* #2821: sem a permissão de relatórios a API não manda a receita; R$ 0,00 seria mentira. *@
+            <div class="ds-kpi-val text-slate-400">Sem acesso</div>
+            <div class="ds-kpi-sub text-slate-400">visível a quem vê relatórios</div>
+        }
+        else
+        {
         <div class="ds-kpi-val text-slate-900">@Model.ReceitaMes.ToString("C", ptBR)</div>
         @if (Model.TemComparativoReceita)
         {
@@ -509,6 +517,7 @@ else if (Model.ResumoApiFalhou)
                title="Saídas registradas com produtos sem preço resultam em receita zero">
                 ⚠ Verifique produtos sem preço
             </a>
+        }
         }
     </div>
 

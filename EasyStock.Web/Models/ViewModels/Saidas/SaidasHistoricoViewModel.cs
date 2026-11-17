@@ -11,7 +11,8 @@ public class SaidasHistoricoViewModel
     // KPI chips
     public int TotalRegistros { get; set; }
     public decimal TotalUnidades { get; set; }
-    public decimal ReceitaTotal { get; set; }
+    /// <summary>#2821: nula quando a API omite a receita a quem não tem a permissão de relatórios.</summary>
+    public decimal? ReceitaTotal { get; set; } = 0m;
     public int TotalVendas { get; set; }
     public int TotalPerdas { get; set; }
 

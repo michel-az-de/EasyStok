@@ -6,6 +6,8 @@ public class DashboardViewModel
     public int QuantidadeTotalEmEstoque { get; set; }
     public decimal ValorEstoque { get; set; }
     public decimal ReceitaMes { get; set; }
+    /// <summary>#2821: falso quando a API omite a receita a quem não tem a permissão de relatórios.</summary>
+    public bool ReceitaDisponivel { get; set; } = true;
     public decimal MediaVendasDiaria { get; set; }
 
     public int EstoqueCritico { get; set; }
