@@ -6,6 +6,8 @@ public class AnalyticsViewModel
 {
     // KPIs do período (vindos do dashboard summary)
     public decimal ReceitaEstimadaPeriodo { get; set; }
+    /// <summary>#2821: falso quando a API omite a receita a quem não tem a permissão de relatórios.</summary>
+    public bool ReceitaDisponivel { get; set; } = true;
     public int TotalEstoque { get; set; }
     public decimal ValorEstoque { get; set; }
     public decimal MediaVendasDiaria { get; set; }

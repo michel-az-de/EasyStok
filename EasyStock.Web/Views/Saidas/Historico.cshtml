@@ -35,7 +35,14 @@
         <div class="text-xs text-slate-500 mt-1">Unidades saídas</div>
     </div>
     <div class="ws text-center">
-        <div class="text-2xl font-bold text-green-600">R$ @Model.ReceitaTotal.ToString("N2")</div>
+        @if (Model.ReceitaTotal is { } receitaTotal)
+        {
+            <div class="text-2xl font-bold text-green-600">R$ @receitaTotal.ToString("N2")</div>
+        }
+        else
+        {
+            <div class="text-2xl font-bold text-slate-400" title="Visível a quem vê relatórios">Sem acesso</div>
+        }
         <div class="text-xs text-slate-500 mt-1">Receita total</div>
     </div>
     <div class="ws text-center">
@@ -176,7 +183,7 @@
                             }
                             else
                             {
-                                <span class="text-slate-400" title="Saída registrada sem valor monetário (perda, doação, uso interno ou venda sem preço informado)">—</span>
+                                <span class="text-slate-400" title="@(Model.ReceitaTotal is null ? "Valores de venda visíveis a quem vê relatórios" : "Saída registrada sem valor monetário (perda, doação, uso interno ou venda sem preço informado)")">—</span>
                             }
                         </td>
                         <td class="text-slate-600">@s.DataMovimentacao.ToString("dd/MM/yyyy")</td>

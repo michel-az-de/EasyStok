@@ -56,7 +56,8 @@ public class AnalyticsController(
             return error!;
 
         var result = await getDashboardUseCase.ExecuteAsync(new GetDashboardCommand(resolvedEmpresaId, periodo, lojaId));
-        return DataOk(result);
+        return DataOk(DashboardResumoResponse.De(result,
+            currentUser.TemPermissao(EasyStock.Domain.Enums.Permissao.VisualizarRelatorios)));
     }
 
     [SwaggerOperation(Summary = "Get full dashboard data", Description = "Consolidated endpoint: 8 KPI cards with delta %, stock status, pending orders, alerts, and insights. Single request replaces 12+ individual calls.")]

@@ -55,7 +55,8 @@ public record DinheiroDto
 public record KpisResponse
 {
     public decimal TotalUnidades { get; init; }
-    public decimal ReceitaTotal { get; init; }
+    /// <summary>Nula para quem não tem a permissão de relatórios (#2821).</summary>
+    public decimal? ReceitaTotal { get; init; }
     public int TotalVendas { get; init; }
     public int TotalPerdas { get; init; }
 }

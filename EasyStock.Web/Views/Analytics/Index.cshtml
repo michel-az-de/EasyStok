@@ -20,7 +20,14 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="ws">
         <div class="kpi-lbl">Receita no período</div>
-        <div class="kpi-val text-green-600">@Model.ReceitaEstimadaPeriodo.ToString("C", ptBR)</div>
+        @if (Model.ReceitaDisponivel)
+        {
+            <div class="kpi-val text-green-600">@Model.ReceitaEstimadaPeriodo.ToString("C", ptBR)</div>
+        }
+        else
+        {
+            <div class="kpi-val text-slate-400" title="Visível a quem vê relatórios">Sem acesso</div>
+        }
     </div>
     <div class="ws">
         <div class="kpi-lbl">Unid. vendidas (último mês)</div>

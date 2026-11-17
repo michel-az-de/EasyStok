@@ -38,6 +38,8 @@ public class MovimentacaoController(
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
             resolvedEmpresaId, DataUtc.InicioDoPeriodoUtc(de), DataUtc.FimDoPeriodoUtc(ate), tipo, natureza, p, ps);
 
+        // #2821: o valor de cada saída é venda, e venda é relatório. Entrada e ajuste mantêm o custo.
+        var podeVerValoresDeSaida = currentUser.TemPermissao(Permissao.VisualizarRelatorios);
         var dtos = items.Select(m => new
         {
             id = m.Id.ToString(),
@@ -47,8 +49,10 @@ public class MovimentacaoController(
             tipo = m.Tipo.ToString(),
             natureza = m.Natureza.ToString(),
             quantidade = m.Quantidade.Value,
-            valorUnitario = m.ValorUnitario != null ? (decimal?)m.ValorUnitario.Valor : null,
-            valorTotal = m.ValorTotal != null ? (decimal?)m.ValorTotal.Valor : null,
+            valorUnitario = m.ValorUnitario != null && (podeVerValoresDeSaida || m.Tipo != TipoMovimentacaoEstoque.Saida)
+                ? (decimal?)m.ValorUnitario.Valor : null,
+            valorTotal = m.ValorTotal != null && (podeVerValoresDeSaida || m.Tipo != TipoMovimentacaoEstoque.Saida)
+                ? (decimal?)m.ValorTotal.Valor : null,
             dataMovimentacao = m.DataMovimentacao,
             descricao = m.Descricao,
             documentoReferencia = m.DocumentoReferencia,
@@ -99,13 +103,15 @@ public class MovimentacaoController(
 
         var kpis = await movimentacaoRepository.GetKpisAsync(
             resolvedEmpresaId, DataUtc.InicioDoPeriodoUtc(de), DataUtc.FimDoPeriodoUtc(ate), tipo, natureza);
-        return DataOk(kpis);
+        return DataOk(KpisMovimentacaoResponse.De(kpis, currentUser.TemPermissao(Permissao.VisualizarRelatorios)));
     }
 
     [SwaggerOperation(Summary = "List movements for a specific stock item")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    // #2821: o histórico do item traz o valor de cada saída; nenhum cliente o usa hoje.
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("item/{itemEstoqueId}")]
     public async Task<IActionResult> GetByItem(Guid itemEstoqueId, [FromQuery] Guid empresaId)
     {

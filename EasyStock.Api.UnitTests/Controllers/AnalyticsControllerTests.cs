@@ -98,13 +98,45 @@ public class AnalyticsControllerTests
     {
         var resumo = MakeDashboardResumo(totalSkus: 10, receita: 2500m);
         _analyticsRepo.GetDashboardResumoAsync(_empresaId, 30, null).Returns(resumo);
+        _currentUser.TemPermissao(EasyStock.Domain.Enums.Permissao.VisualizarRelatorios).Returns(true);
 
         var result = await _controller.Dashboard(_empresaId, 30);
 
-        var data = OkData<GetDashboardResult>(result);
+        var data = OkData<DashboardResumoResponse>(result);
         data.TotalSkus.Should().Be(10);
         data.ReceitaEstimadaPeriodo.Should().Be(2500m);
         data.EmpresaId.Should().Be(_empresaId);
+    }
+
+    // #2744: o resumo de estoque é de toda a equipe, mas a receita do período é relatório.
+    [Fact]
+    public async Task Dashboard_sem_permissao_de_relatorios_omite_a_receita_e_mantem_o_estoque()
+    {
+        _analyticsRepo.GetDashboardResumoAsync(_empresaId, 30, null).Returns(MakeDashboardResumo(totalSkus: 10, receita: 2500m));
+
+        var data = DataJson(await _controller.Dashboard(_empresaId, 30));
+
+        data.GetProperty("receitaEstimadaPeriodo").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+        data.GetProperty("totalSkus").GetInt32().Should().Be(10);
+    }
+
+    [Fact]
+    public async Task Dashboard_com_permissao_de_relatorios_traz_a_receita()
+    {
+        _currentUser.TemPermissao(EasyStock.Domain.Enums.Permissao.VisualizarRelatorios).Returns(true);
+        _analyticsRepo.GetDashboardResumoAsync(_empresaId, 30, null).Returns(MakeDashboardResumo(totalSkus: 10, receita: 2500m));
+
+        var data = DataJson(await _controller.Dashboard(_empresaId, 30));
+
+        data.GetProperty("receitaEstimadaPeriodo").GetDecimal().Should().Be(2500m);
+    }
+
+    private static System.Text.Json.JsonElement DataJson(IActionResult result)
+    {
+        var value = result.Should().BeOfType<OkObjectResult>().Subject.Value;
+        var json = System.Text.Json.JsonSerializer.Serialize(value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        return System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("data").Clone();
     }
 
     [Fact]

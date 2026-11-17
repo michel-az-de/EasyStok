@@ -39,7 +39,8 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             // FIN-004: capital imobilizado e valorado a CUSTO, nao a preco de venda (que inflava ~17%).
             // ValorCustoEstoque ja vem somado de CustoUnitario * Quantidade no DashboardAnalyticsQueries.
             vm.ValorEstoque = d.ValorCustoEstoque;
-            vm.ReceitaMes = d.ReceitaEstimadaPeriodo;
+            vm.ReceitaMes = d.ReceitaEstimadaPeriodo ?? 0m;
+            vm.ReceitaDisponivel = d.ReceitaEstimadaPeriodo.HasValue;
             vm.MediaVendasDiaria = d.MediaVendasDiaria;
             vm.EstoqueCritico = d.AlertasEstoqueBaixo;
             vm.ProximosVencimento = d.AlertasVencimento;
