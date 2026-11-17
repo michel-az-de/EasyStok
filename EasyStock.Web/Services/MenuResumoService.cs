@@ -35,8 +35,9 @@ public sealed class MenuResumoSource(ApiClient api) : IMenuResumoSource
 }
 
 /// <summary>
-/// Agrega os badges do menu (ADR-0032, fatia 2) com cache curto por empresa+loja.
-/// Cache key SEMPRE inclui a loja (sem isso vaza contagem entre lojas do mesmo tenant).
+/// Agrega os badges do menu (ADR-0032, fatia 2) com cache curto por empresa+loja+usuário.
+/// Cache key SEMPRE inclui a loja (sem isso vaza contagem entre lojas do mesmo tenant) e o usuário
+/// (o resumo do dia exige a permissão de relatórios, #2744; sem isso vaza faturamento entre perfis).
 /// Falha NUNCA é cacheada — devolve zero+ok:false e tenta de novo na próxima chamada.
 /// </summary>
 public sealed class MenuResumoService(IMenuResumoSource source, IMemoryCache cache)
@@ -48,9 +49,10 @@ public sealed class MenuResumoService(IMenuResumoSource source, IMemoryCache cac
     /// que as 3 contagens (faturamento, caixa, pedidos), e chamava a Api por fora — o que
     /// refazia, em toda renderizacao, os 2 requests que o menu da mesma pagina ja fizera.
     /// </summary>
-    public async Task<MenuResumoRaw> ObterRawAsync(string? empresaId, string? lojaId)
+    public async Task<MenuResumoRaw> ObterRawAsync(string? empresaId, string? lojaId, string? usuarioId)
     {
-        var key = $"menu-resumo:{empresaId}:{lojaId}";
+        // #2744: o resumo do dia depende da permissão de quem pede, então a chave leva o usuário.
+        var key = $"menu-resumo:{empresaId}:{lojaId}:{usuarioId}";
         if (cache.TryGetValue(key, out MenuResumoRaw? cached) && cached is not null)
             return cached;
 
@@ -62,9 +64,9 @@ public sealed class MenuResumoService(IMenuResumoSource source, IMemoryCache cac
         return raw;
     }
 
-    public async Task<(MenuBadges Badges, bool Ok)> ObterAsync(string? empresaId, string? lojaId)
+    public async Task<(MenuBadges Badges, bool Ok)> ObterAsync(string? empresaId, string? lojaId, string? usuarioId)
     {
-        var raw = await ObterRawAsync(empresaId, lojaId);
+        var raw = await ObterRawAsync(empresaId, lojaId, usuarioId);
         if (!raw.Ok || raw.Dash is null)
             return (MenuBadges.Zero, false);
 

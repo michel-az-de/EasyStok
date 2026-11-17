@@ -133,7 +133,8 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             new("Abrir o caixa", vm.CaixaAbertaHoje || vm.CaixaFechadaHoje, "/caixa", "Abrir o caixa"),
         ];
         // #2744: sem o resumo do dia (403 para quem não lê relatórios) não dá para saber o que a loja já fez.
-        vm.MostrarChecklist = diaResult.Success && vm.OnboardingPassos.Exists(p => !p.Concluido) && !checklistDispensado;
+        vm.ResumoDiaDisponivel = diaResult.Success;
+        vm.MostrarChecklist = vm.ResumoDiaDisponivel && vm.OnboardingPassos.Exists(p => !p.Concluido) && !checklistDispensado;
 
         return View(vm);
     }

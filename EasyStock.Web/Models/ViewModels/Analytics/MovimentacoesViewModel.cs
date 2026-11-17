@@ -9,6 +9,9 @@ public class MovimentacoesViewModel
     public string? FiltroTipo { get; set; }
     public string? PeriodoInicio { get; set; }
     public string? PeriodoFim { get; set; }
+
+    /// <summary>Motivo de a lista não ter vindo (ex.: sem permissão de relatórios, #2744). Nulo quando carregou.</summary>
+    public string? ErroCarga { get; set; }
 }
 
 public class MovimentacaoItem

@@ -48,5 +48,6 @@ public class DashboardSemPermissaoDeRelatoriosTests
         var vm = resultado.Should().BeOfType<ViewResult>().Subject.Model.Should().BeOfType<DashboardViewModel>().Subject;
         vm.TotalProdutos.Should().Be(12, "o resumo de estoque continua aberto a quem não lê relatórios");
         vm.MostrarChecklist.Should().BeFalse("sem o resumo do dia não dá para saber o que a loja já fez");
+        vm.ResumoDiaDisponivel.Should().BeFalse("o atalho do caixa não pode convidar a abrir um caixa que talvez já esteja aberto");
     }
 }

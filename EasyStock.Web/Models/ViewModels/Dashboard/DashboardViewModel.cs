@@ -36,6 +36,9 @@ public class DashboardViewModel
     // a exclusao dos Ids de demonstracao entra junto com a loja-demo.
     public List<PassoOnboarding> OnboardingPassos { get; set; } = [];
     public bool MostrarChecklist { get; set; }
+
+    /// <summary>#2744: o resumo do dia veio (403 para quem não lê relatórios). Sem ele, caixa e pedidos são desconhecidos, não zero.</summary>
+    public bool ResumoDiaDisponivel { get; set; }
     public int OnboardingConcluidos => OnboardingPassos.FindAll(p => p.Concluido).Count;
     public int OnboardingTotal => OnboardingPassos.Count;
 
