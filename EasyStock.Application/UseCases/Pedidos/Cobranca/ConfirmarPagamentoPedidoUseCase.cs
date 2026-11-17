@@ -241,7 +241,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
                 SituacaoConfirmacaoPagamento.PedidoCancelado, ct);
 
         // #1289: pedido já pago por outro pagamento devolve este, a menor inclusive.
-        if (await JaPagoPorOutroPagamentoAsync(pedido, cobrancas, input, empresaId, ct))
+        // #2813: o entregue do histórico já entrou quitado pelo import; o que chega do provedor é cobrança em duplicidade.
+        if (pedido.QuitadoHistorico || await JaPagoPorOutroPagamentoAsync(pedido, cobrancas, input, empresaId, ct))
             return await EstornarPagamentoAutomaticoAsync(pedido, alvo, cobrancas, input, agora,
                 $"estorno-duplicado-{input.PagamentoExternoId}", "recebido com o pedido já pago (pagamento_duplicado)",
                 SituacaoConfirmacaoPagamento.PagamentoDuplicado, ct);

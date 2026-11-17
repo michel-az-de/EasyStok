@@ -425,7 +425,12 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             { pedido.ClienteId = client.ErpClienteId; pedido.ClienteApt = client.Apt; pedido.ClienteTelefone = client.Phone; }
             pedido.Observacoes = o.Notes; pedido.CriadoEm = o.CreatedAt; pedido.AlteradoEm = o.UpdatedAt;
             // Mesmo criterio do sync normal (OrderLinker): a data do ultimo evento do PWA e a data da entrega ou do cancelamento.
-            if (o.Status == "entregue") pedido.EntreguEm = o.UpdatedAt;
+            if (o.Status == "entregue")
+            {
+                pedido.EntreguEm = o.UpdatedAt;
+                // #2813: o entregue do histórico entra quitado, sem pagamento nem caixa; só o import grava a marca.
+                pedido.MarcarQuitadoHistorico(o.UpdatedAt);
+            }
             else if (o.Status == "cancelado") pedido.CanceladoEm = o.UpdatedAt;
             pedido.AgendadoParaEm = o.ScheduledDeliveryAt;
             foreach (var i in o.Items)

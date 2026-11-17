@@ -113,7 +113,7 @@ namespace EasyStock.Domain.Entities
         public DateTime? AvaliacaoSolicitadaEm { get; set; }
 
         /// <summary>
-        /// #2813: instante em que o import do histórico do aparelho antigo quitou o pedido entregue, sem pagamento nem
+        /// #2813: data original da entrega no aparelho antigo (nunca a de hoje) em que o import quitou o pedido entregue, sem pagamento nem
         /// movimento de caixa. Só o import grava (setter privado, sem DTO, request ou mutação de sync). Null = pedido
         /// comum, que segue a conta normal de recebimento.
         /// </summary>
@@ -425,6 +425,23 @@ namespace EasyStock.Domain.Entities
                 foreach (var p in Pagamentos) s += p.Valor;
                 return s;
             }
+        }
+
+        /// <summary>#2813: o import do histórico quitou o pedido. Não há pagamento: a marca é a quitação.</summary>
+        public bool QuitadoHistorico => QuitadoHistoricoEm is not null;
+
+        /// <summary>
+        /// #2813: o import do histórico quita o pedido entregue pela marca, sem criar pagamento. Só o
+        /// <c>LegacySnapshotImportService</c> chama (teste de arquitetura). Recusa pedido que não esteja entregue ou que
+        /// já tenha pagamento: a marca não esconde dinheiro recebido.
+        /// </summary>
+        public void MarcarQuitadoHistorico(DateTime em)
+        {
+            if (StatusEnum != StatusPedido.Entregue)
+                throw new InvalidOperationException("Só o pedido entregue pode ser quitado pelo histórico.");
+            if (Pagamentos.Count > 0)
+                throw new InvalidOperationException("Pedido com pagamento não é quitado pelo histórico.");
+            QuitadoHistoricoEm = em;
         }
     }
 
