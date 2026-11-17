@@ -79,6 +79,55 @@ public class CriarPedidoUseCaseTests
         await _uow.Received(2).CommitAsync();
     }
 
+    // #2813 (B7): pedido feito sem internet no aparelho e sincronizado dias depois ganhava a data da sincronizacao,
+    // e o dia do relatorio, o "ultimo pedido" do cliente e a fila andavam para hoje.
+    [Fact]
+    public async Task PedidoDoAparelho_PreservaADataEmQueFoiFeito()
+    {
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+        var feitoEm = DateTime.UtcNow.AddDays(-3);
+
+        await Sut().ExecuteAsync(new CriarPedidoCommand(Guid.NewGuid(), Origem: "mobile", CriadoEmOriginal: feitoEm));
+
+        salvo!.CriadoEm.Should().Be(feitoEm);
+    }
+
+    [Fact]
+    public async Task PedidoDoAparelho_ComDataSemFusoVaiComoUtc()
+    {
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+        var feitoEm = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-40), DateTimeKind.Unspecified);
+
+        await Sut().ExecuteAsync(new CriarPedidoCommand(Guid.NewGuid(), Origem: "mobile", CriadoEmOriginal: feitoEm));
+
+        salvo!.CriadoEm.Kind.Should().Be(DateTimeKind.Utc);
+        salvo.CriadoEm.Should().Be(DateTime.SpecifyKind(feitoEm, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public async Task PedidoDoAparelho_ComRelogioAdiantadoNascePeloRelogioDoServidor()
+    {
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+
+        await Sut().ExecuteAsync(new CriarPedidoCommand(Guid.NewGuid(), Origem: "mobile", CriadoEmOriginal: DateTime.UtcNow.AddDays(2)));
+
+        salvo!.CriadoEm.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task PedidoDoConsole_SemDataOriginalNasceAgora()
+    {
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+
+        await Sut().ExecuteAsync(new CriarPedidoCommand(Guid.NewGuid()));
+
+        salvo!.CriadoEm.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
     [Fact]
     public async Task PedidoParaJa_NaoConsultaInicioPrevisto()
     {

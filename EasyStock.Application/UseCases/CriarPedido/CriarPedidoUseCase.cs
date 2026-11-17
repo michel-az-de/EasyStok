@@ -28,7 +28,9 @@ public sealed record CriarPedidoCommand(
     Guid? CriadoPorUserId = null,
     [property: MaxLength(120)] string? CriadoPorNome = null,
     // F5 — agendamento (MVP). NULL = pedido pra agora.
-    DateTime? AgendadoParaEm = null);
+    DateTime? AgendadoParaEm = null,
+    // #2813 (B7): data em que o aparelho fez o pedido. NULL = a do servidor (pedido criado no console).
+    DateTime? CriadoEmOriginal = null);
 
 /// <summary>
 /// Cria um novo pedido (encomenda) — Onda P2. Se <see cref="ClienteId"/>
@@ -97,6 +99,11 @@ public class CriarPedidoUseCase(
             throw new UseCaseValidationException("Loja não encontrada nesta empresa.");
 
         var pedido = PedidoEntity.Criar(cmd.EmpresaId, cliente, lojaId, cmd.Origem ?? "web");
+        // #2813 (B7): pedido feito sem internet no aparelho e sincronizado depois mantem a data em que foi feito
+        // (dia do relatorio, "ultimo pedido" do cliente). Data no futuro = relogio errado do aparelho: vale a do
+        // servidor. AlteradoEm segue sendo o da gravacao, que e o que o pull incremental dos outros aparelhos le.
+        if (DataUtc.ParaUtcOpcional(cmd.CriadoEmOriginal) is { } feitoEm && feitoEm <= DateTime.UtcNow)
+            pedido.CriadoEm = feitoEm;
         // Snapshot ad-hoc (sobrescreve quando cliente é null)
         if (cliente == null)
         {

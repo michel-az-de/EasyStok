@@ -129,7 +129,8 @@ public sealed class OrderLinker(
                             Itens: itens,
                             CriadoPorUserId: null,
                             CriadoPorNome: mobileO.LastOperatorName,
-                            AgendadoParaEm: mobileO.ScheduledDeliveryAt
+                            AgendadoParaEm: mobileO.ScheduledDeliveryAt,
+                            CriadoEmOriginal: mobileO.CreatedAt
                         ));
 
                         try
