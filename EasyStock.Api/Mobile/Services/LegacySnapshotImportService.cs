@@ -138,9 +138,9 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             // positivos distintos dos ativos (OpeningStockOfGroup); registro unico abre o proprio. Sem saldo positivo a abrir, abre com 0.
             var winners = productMap.Where(x => !aliases.ContainsKey(x.Key)).ToDictionary(x => x.Key, x => x.Value);
             await CreateOpeningStockAsync(winners, union, device, request.ImportId, ct);
-            await CreateHistoryAsync(rows, productMap, clientMap, device, request, ct);
+            var quitados = await CreateHistoryAsync(rows, productMap, clientMap, device, request, ct);
             var archive = counts["cashClosings"] > 0 ? new List<string> { "cashClosings" } : [];
-            var warnings = new List<string> { "Pedidos historicos nao geram pagamentos presumidos. Lotes e pedidos encerrados exigem revisao para alterar estoque. Pedidos prontos podem ser entregues com forma de pagamento informada." };
+            var warnings = new List<string> { DeliveredWarning(quitados) + " Lotes e pedidos encerrados exigem revisao para alterar estoque. Pedidos prontos podem ser entregues com forma de pagamento informada." };
             if (archive.Count > 0) warnings.Add("Fechamentos antigos preservados no backup; nao reabrem nem recalculam caixa do EasyStok.");
             if (linkedClients > 0) warnings.Add(linkedClients == 1
                 ? "1 cliente ja existia no ERP (mesmo telefone) e foi vinculado; o cadastro do ERP nao foi alterado."
@@ -191,7 +191,7 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
     }
 
     /// <summary>
-    /// #2813, decisao do Felipe (17/11, "Somar, menos copias"): o vencedor abre com a SOMA dos saldos positivos DISTINTOS dos
+    /// decisão do dono do produto (#2813), opção "Somar, menos copias": o vencedor abre com a SOMA dos saldos positivos DISTINTOS dos
     /// registros ATIVOS do grupo. Saldos iguais sao copias e contam uma vez; arquivado, zero e negativo ficam fora. Sem nenhum
     /// ativo positivo vale o saldo do proprio vencedor, como antes (so abre se for positivo). Registro unico nao passa por aqui.
     /// Risco aceito: dois registros com o mesmo saldo que NAO sejam copias perdem um saldo (a dona confere os grupos reais na Fase 5).
@@ -422,7 +422,19 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
         }
     }
 
-    private async Task CreateHistoryAsync(Dictionary<string, List<JsonElement>> rows, Dictionary<string, Product> productMap,
+    /// <summary>
+    /// #2813: o entregue do histórico entra quitado na origem (marca no pedido), sem pagamento nem caixa no ERP. O aviso do
+    /// recibo diz quantos entraram assim, no próprio texto: o DTO do recibo não muda.
+    /// </summary>
+    private static string DeliveredWarning(int quitados) => quitados switch
+    {
+        0 => "Pedidos historicos nao geram pagamentos nem caixa no ERP.",
+        1 => "1 pedido entregue entrou quitado na origem, sem pagamento nem caixa no ERP.",
+        _ => $"{quitados} pedidos entregues entraram quitados na origem, sem pagamento nem caixa no ERP."
+    };
+
+    /// <summary>Grava o histórico no ERP e devolve quantos pedidos entregues entraram quitados (pela marca).</summary>
+    private async Task<int> CreateHistoryAsync(Dictionary<string, List<JsonElement>> rows, Dictionary<string, Product> productMap,
         Dictionary<string, Client> clientMap, MobileDevice device, LegacySnapshotRequest request, CancellationToken ct)
     {
         foreach (var row in rows["batches"])
@@ -436,6 +448,7 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             lote.Finalizar(); lote.Status = LoteMobileEstadoReconciler.StatusDesejado(b); lote.CriadoEm = b.CreatedAt; lote.FinalizadoEm = b.CreatedAt;
             db.Add(lote); b.ErpLoteId = lote.Id;
         }
+        var quitados = 0;
         foreach (var row in rows["orders"])
         {
             var o = await db.Set<MobileOrder>().Include(x => x.Items).SingleAsync(x => x.Id == Id(row), ct);
@@ -451,6 +464,7 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
                 pedido.EntreguEm = o.UpdatedAt;
                 // #2813: o entregue do histórico entra quitado, sem pagamento nem caixa; só o import grava a marca.
                 pedido.MarcarQuitadoHistorico(o.UpdatedAt);
+                quitados++;
             }
             else if (o.Status == "cancelado") pedido.CanceladoEm = o.UpdatedAt;
             pedido.AgendadoParaEm = o.ScheduledDeliveryAt;
@@ -464,7 +478,9 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             pedido.RecalcularTotal(); pedido.AlteradoEm = o.UpdatedAt; // RecalcularTotal grava "agora"; o histórico guarda a data original do aparelho.
             pedido.Eventos.Add(new PedidoEvento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = "importado", StatusNovo = o.Status,
                 Origem = HistoryOrigin, UsuarioNome = request.OperatorName, OcorridoEm = DateTime.UtcNow,
-                Detalhes = "Snapshot legado preservado. Pagamentos antigos nao foram presumidos." });
+                Detalhes = o.Status == "entregue"
+                    ? "Snapshot legado preservado. O entregue entrou quitado na origem, sem pagamento nem caixa no ERP."
+                    : "Snapshot legado preservado. Pagamentos antigos nao foram presumidos." });
             db.Add(pedido); o.ErpPedidoId = pedido.Id;
         }
         foreach (var row in rows["cashEntries"])
@@ -474,6 +490,7 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             var c = await db.Set<CashEntry>().SingleAsync(x => x.Id == Id(row), ct);
             c.MarcarNaoPromover(c.CreatedAt);
         }
+        return quitados;
     }
 
     private async Task<string> AssertBackupAsync(LegacySnapshotResponse receipt, CancellationToken ct)

@@ -58,6 +58,10 @@ public class LegacySnapshotImportPagosSemCaixaE2ETests(MobileE2EFixture fixture)
 
         var response = await fixture.CreateMobileClient(device.ApiKey).PostAsJsonAsync("/api/mobile/legacy-import", request);
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var recibo = (await response.Content.ReadFromJsonAsync<LegacySnapshotResponse>())!;
+        recibo.Warnings.Should().Contain(w => w.StartsWith("3 pedidos entregues entraram quitados na origem, sem pagamento nem caixa no ERP."),
+            "o aviso diz quantos entregues entraram quitados, em vez de dizer que os pagamentos nao foram presumidos");
+        recibo.Warnings.Should().NotContain(w => w.Contains("presumidos"));
 
         await ReadAsync(empresa, async (db, saldos) =>
         {
@@ -72,6 +76,14 @@ public class LegacySnapshotImportPagosSemCaixaE2ETests(MobileE2EFixture fixture)
                 p.QuitadoHistoricoEm.Should().Be(p.EntreguEm, "a marca guarda a data original da entrega, nunca a de hoje");
                 (await AReceberDoPedidoMobile.CalcularAsync(p, saldos, CancellationToken.None))
                     .Should().Be(0m, $"o entregue {id} do histórico não pode ficar a receber");
+            }
+            var idsDosPedidos = pedidos.Select(p => p.Id).ToList();
+            var eventos = await db.Set<PedidoEvento>().Where(e => e.Tipo == "importado" && idsDosPedidos.Contains(e.PedidoId)).ToListAsync();
+            foreach (var id in entregues)
+            {
+                var evento = eventos.Single(e => e.PedidoId == pedidos.Single(x => x.MobileOrderId == id).Id);
+                evento.Detalhes.Should().Contain("quitado na origem", $"o evento do entregue {id} diz que entrou quitado");
+                evento.Detalhes.Should().NotContain("presumidos");
             }
             var ativo = pedidos.Single(x => x.MobileOrderId == aguardando);
             ativo.Origem.Should().Be("mobile");
