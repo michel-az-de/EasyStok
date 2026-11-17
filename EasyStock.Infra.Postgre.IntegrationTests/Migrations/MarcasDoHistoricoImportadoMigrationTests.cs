@@ -70,7 +70,7 @@ public class MarcasDoHistoricoImportadoMigrationTests(PostgreSqlDatabaseFixture 
         db.Database.SqlQuery<string>($"""
             SELECT data_type || '/' || is_nullable AS "Value"
             FROM information_schema.columns
-            WHERE table_name = {tabela} AND column_name = {coluna}
+            WHERE table_schema = current_schema() AND table_name = {tabela} AND column_name = {coluna}
             """).FirstOrDefaultAsync();
 
     private static Task<int> ContarAsync(DbContext db, FormattableString sql) =>
