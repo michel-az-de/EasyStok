@@ -14,9 +14,17 @@ const usuario = '22222222-2222-4222-8222-222222222222'
 const chave = `easystok.hall.v1:${empresa}:${usuario}`
 const browser = await chromium.launch({ headless: true })
 let ultimaPagina
-async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bloqueiaStorage = false, saldoEsperado = 300.03 } = {}) {
+// #2814: a leitura fica presa num portão que a prova solta, em vez de demorar 900 ms de relógio real. Com a
+// máquina carregada, os 900 ms acabavam antes de a prova olhar e o "carregando" nunca era visto.
+function segurar(controle) {
+  let soltar
+  controle.portao = new Promise((resolve) => { soltar = resolve })
+  return () => { controle.portao = null; soltar() }
+}
+async function preparar({ permitidos = catalogo, modo = 'normal', segura = false, bloqueiaStorage = false, saldoEsperado = 300.03 } = {}) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', hasTouch: true })
-  const controle = { modo, demora, chamadas: [] }
+  const controle = { modo, portao: null, chamadas: [] }
+  const soltar = segura ? segurar(controle) : () => {}
   await context.addInitScript(({ empresa, usuario, bloqueiaStorage }) => {
     sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'prova-controlada', expiraEm: Date.now() + 3600000, empresa: { id: empresa }, usuario: { id: usuario, nome: 'Felipe' } }))
     if (bloqueiaStorage) {
@@ -34,7 +42,7 @@ async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bl
     assert.equal(request.method(), 'GET', 'Hub não pode alterar operações')
     const ok = (data) => route.fulfill({ json: { data } })
     if (path === '/api/auth/me/modulos') return ok({ modulos: catalogo.map((id) => ({ id, liberado: permitidos.includes(id) })), acoes: {} })
-    if (['/api/atendimento/conversas', '/api/kds/pedidos', '/api/caixa/dia'].includes(path) && controle.demora) await new Promise((resolve) => setTimeout(resolve, controle.demora))
+    if (['/api/atendimento/conversas', '/api/kds/pedidos', '/api/caixa/dia'].includes(path) && controle.portao) await controle.portao
     if (path === '/api/atendimento/conversas') {
       if (controle.modo === 'erro' || controle.modo === 'revogado') return route.fulfill({ status: controle.modo === 'revogado' ? 403 : 503, json: { error: { message: 'Leitura indisponível na prova' } } })
       if (controle.modo === 'parcial') return ok(Array.from({ length: 100 }, (_, i) => ({ id: `${url.searchParams.get('pagina')}-${i}`, situacao: 'Assumida', aguardaResposta: true })))
@@ -59,7 +67,7 @@ async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bl
   page.on('pageerror', (erro) => { erros.push(erro.message); console.error('Erro de página:', erro.message) })
   await page.goto(origem + '/#/')
   await page.getByRole('heading', { name: /Felipe/ }).waitFor()
-  return { context, page, controle, erros }
+  return { context, page, controle, erros, soltar }
 }
 const ordem = (page) => page.locator('[data-modulo]').evaluateAll((itens) => itens.map((item) => item.dataset.modulo))
 const ordemIndicadores = (page) => page.locator('[data-indicador]').evaluateAll((itens) => itens.map((item) => item.dataset.indicador))
@@ -76,11 +84,12 @@ async function foto(page, nome) {
   await page.screenshot({ path: join(evidencias, nome + '.png'), fullPage: true })
 }
 try {
-  const { page, context, controle, erros } = await preparar({ demora: 900 })
+  const { page, context, controle, erros, soltar } = await preparar({ segura: true })
   const atendimento = page.locator('[data-indicador="atendimento"]')
   await atendimento.locator('xpath=self::*[@data-estado="carregando"]').waitFor()
   // #2762 (B10): a espera é um esqueleto do tamanho do número, com "Carregando…" para o leitor de tela; na falha, "Sem leitura" (#2792, sem traço).
   assert.equal(await atendimento.locator('strong').innerText(), 'Carregando…')
+  soltar()
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
   assert.equal(await page.locator('[data-indicador="cozinha"] strong').innerText(), '2')
@@ -195,8 +204,7 @@ try {
   await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); document.dispatchEvent(new Event('visibilitychange')) })
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.ok(controle.chamadas.filter((item) => item.path === '/api/atendimento/conversas').length > antesOculto)
-  controle.demora = 0
-  controle.demora = 0; controle.modo = 'erro'
+  controle.modo = 'erro'
   await page.clock.runFor(61000)
   await atendimento.getByText(/Desatualizado/).waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
@@ -207,20 +215,20 @@ try {
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '0')
   assert.equal(await page.getByRole('progressbar').count(), 0)
-  controle.demora = 900
+  const soltarReleitura = segurar(controle)
   await page.clock.runFor(61000)
   await atendimento.locator('xpath=self::*[@data-estado="carregando"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '0')
   assert.equal(await page.getByRole('progressbar').count(), 0)
+  soltarReleitura()
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
-  controle.demora = 0
   controle.modo = 'parcial'; await page.clock.runFor(61000)
   await atendimento.locator('strong', { hasText: '1000+' }).waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '1000+')
   assert.equal(await page.locator('[data-indicador="entregas"] strong').innerText(), '200+')
   assert.equal(await page.getByRole('progressbar').count(), 0)
   // Troca de pessoa e de empresa remonta a leitura e não herda a personalização.
-  controle.demora = 900; controle.modo = 'normal'
+  const soltarTroca = segurar(controle); controle.modo = 'normal'
   await page.evaluate(({ empresa, usuario }) => {
     const sessao = JSON.parse(sessionStorage.getItem('easystok.sessao'))
     sessao.empresa.id = empresa + '-outra'; sessao.usuario.id = usuario + '-outro'; sessao.usuario.nome = 'Outra pessoa'
@@ -229,6 +237,7 @@ try {
   await page.getByRole('heading', { name: /Outra/ }).waitFor()
   assert.equal((await ordem(page))[0], 'atendimento') // #2258 A2: ordem padrão começa pelo Atendimento
   assert.equal(await atendimento.locator('strong').innerText(), 'Carregando…') // #2762 (B10): esqueleto na espera
+  soltarTroca()
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
   assert.equal(await page.evaluate((chave) => JSON.parse(localStorage.getItem(chave)).ordem[0], chave), 'producao')

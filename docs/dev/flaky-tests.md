@@ -42,6 +42,33 @@ be 80M ... but found 0.00M"), `Lancamento_gravado_depois_do_fechamento_some_do_r
 
 ---
 
+## ✅ CORRIGIDO (#2814): três provas de navegador do Console dependiam de tempo e falhavam com a máquina carregada
+
+Visto em 16/11/2026, em `npm run qualidade` na #2803, com outra medição de navegador na mesma máquina. Sozinhas,
+as 3 passaram no mesmo commit.
+
+| Prova | Falha | Causa |
+|---|---|---|
+| `prova-1728-teste-email-navegador.mjs` | `page.goto` passou de 10 s | o teto de 10 s da prova valia também para abrir a página |
+| `prova-1743-tamanhos-navegador.mjs` | `5 !== 4` em "Tentativa bloqueada não escreve na API" | o POST `/sugestao`, que o aplicativo manda sozinho ao abrir a conversa, chegou depois da contagem |
+| `prova-hub-navegador.mjs` | `waitFor` do `data-estado="carregando"` passou de 30 s | a leitura demorava 900 ms de relógio real; com a máquina lenta, acabava antes de a prova olhar |
+
+- **Como foi confirmado:** com 8 processos ocupando CPU numa máquina de 12, a 1728 falhou de novo no `goto` de
+  10 s e a 1743 falhou no próprio `goto`. As outras duas causas saem da mensagem da falha e do código: a da 1743
+  nomeia o POST `/sugestao` a mais, e a do hub espera um estado que dura 900 ms.
+- **Fix (#2814):** o hub segura a leitura num portão que a prova solta depois de conferir o "Carregando…" (três
+  pontos da prova usavam os 900 ms). A 1743 conta só as escritas que mexem no pedido; `/marcar-lida` e `/sugestao`
+  já eram aceitas pela asserção do fim da prova, mas a contagem de escritas não as ignorava. A 1728 e a 1743 dão
+  60 s só à navegação; as esperas da tela seguem em 10 s. O hub não mexeu na navegação.
+- **Se voltar a falhar:** `goto` acima de 60 s é máquina sem CPU, não a prova. No hub, ver se alguma leitura
+  nova ficou fora do portão. Na 1743, ver se o aplicativo passou a mandar outra escrita ao abrir a conversa.
+- **Limite conhecido:** com o portão fechado, a leitura presa conta os 25 s de `AbortSignal.timeout` do
+  `usePulsoDoHall.js`, que o relógio falso da prova não controla. Se a prova levar mais de 25 s entre fechar e
+  soltar o portão, o cartão vira "erro" em vez de "carregando". A entrada do hub mais abaixo (arrasto por toque) é
+  outro ponto e segue tolerada. As provas da entrada #2809 não foram mexidas.
+
+---
+
 ## ⚠️ TOLERADO (#2809): provas de navegador do Console estouram o tempo no gate local carregado
 
 Visto em 16/11/2026, no head `777ffef10` da PR #2806, em duas rodadas completas de `npm run qualidade` com outras
