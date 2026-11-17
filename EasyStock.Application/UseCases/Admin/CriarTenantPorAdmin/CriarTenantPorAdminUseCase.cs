@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Notifications;
+using LojaEntity = EasyStock.Domain.Entities.Loja;
 
 namespace EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
 
@@ -37,6 +38,7 @@ public class CriarTenantPorAdminUseCase(
     IPerfilRepository perfilRepository,
     IAssinaturaEmpresaRepository assinaturaRepository,
     IEmpresaRepository empresaRepository,
+    ILojaRepository lojaRepository,
     IUsuarioEmpresaRepository usuarioEmpresaRepository,
     IUsuarioPerfilRepository usuarioPerfilRepository,
     IPasswordHasher passwordHasher,
@@ -77,6 +79,10 @@ public class CriarTenantPorAdminUseCase(
         var agora = DateTime.UtcNow;
         var empresa = Empresa.Criar(command.NomeEmpresa.Trim(), command.Documento?.Trim());
         await empresaRepository.AddAsync(empresa);
+
+        // #2813 (B0): empresa sem loja nao pareia aparelho nem recebe o historico do PWA. A primeira loja nasce
+        // com a empresa e com o nome dela; o limite do plano so vale a partir da segunda.
+        await lojaRepository.AddAsync(LojaEntity.Criar(empresa.Id, empresa.Nome));
 
         var assinatura = new AssinaturaEmpresa
         {

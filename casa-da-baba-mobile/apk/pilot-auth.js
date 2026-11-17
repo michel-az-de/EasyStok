@@ -8,6 +8,11 @@
   let generation = 0, nativeVersion = -1, restoringGeneration = -1, linkingGeneration = -1, operation = null;
   let syncReady = false;
   let dialog, title, description, notice, loginButton, logoutButton, confirmButton, shopSelect, shopButton, shopLabel;
+  // #2813 B0: código do servidor que a dona não consegue interpretar vira instrução em português claro.
+  const CONNECT_MESSAGES = {
+    __proto__: null,
+    LOJA_INVALIDA: 'Não encontramos uma loja ativa para conectar este aparelho. Seus dados continuam aqui e nada foi enviado. Peça ao suporte para conferir a loja da empresa e tente de novo.',
+  };
 
   function sync() { return root.cdbSync; }
   function context() {
@@ -113,7 +118,7 @@
           shopSelect.hidden = false; shopButton.hidden = false; shopLabel.hidden = false; shopButton.disabled = true;
           message('Escolha uma vez a loja deste aparelho.');
         } else {
-          message(error.message || 'A conta entrou, mas não foi possível conectar a produção. Seus dados foram mantidos.');
+          message(CONNECT_MESSAGES[error.code] || error.message || 'A conta entrou, mas não foi possível conectar a produção. Seus dados foram mantidos.');
           signal();
         }
       }
