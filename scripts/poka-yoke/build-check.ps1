@@ -46,8 +46,14 @@ try {
 Write-Host "[build-check] solution filter: $slnf"
 Write-Host "[build-check] saida temporaria: $outDir (fora dos bins do ambiente local)"
 
-dotnet build $slnf --nologo -p:UseAppHost=false -o $outDir
-$code = $LASTEXITCODE
+# Mesma trava global do gate (issue 2817): um build por vez na maquina toda.
+. (Join-Path $PSScriptRoot 'gate-trava.ps1')
+$env:MSBUILDDISABLENODEREUSE = '1'
+try { $trava = Enter-GateTrava -Info "build-check $repoRoot" } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 5 }
+try {
+    dotnet build $slnf --nologo -p:UseAppHost=false -o $outDir
+    $code = $LASTEXITCODE
+} finally { Exit-GateTrava $trava }
 
 if ($code -eq 0) {
     Write-Host "[build-check] VERDE -- compilou o que deploya, sem tocar os bins do ambiente local." -ForegroundColor Green
