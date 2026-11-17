@@ -469,13 +469,10 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
         }
         foreach (var row in rows["cashEntries"])
         {
+            // #2813 (opção B do dono do produto): o lançamento manual do histórico fica só como arquivo em mobile_cash_entries, com a
+            // data ORIGINAL na marca, e não vira movimento do caixa do ERP (nem o estornado: o estado segue no backup original).
             var c = await db.Set<CashEntry>().SingleAsync(x => x.Id == Id(row), ct);
-            var movimento = MovimentoCaixa.Criar(device.EmpresaId, c.Type == "income" ? "entrada" : "saida", c.Amount, c.CreatedAt, device.LojaId);
-            movimento.Origem = HistoryOrigin; movimento.Descricao = c.Description; movimento.Metodo = c.Metodo;
-            movimento.Referencia = "mobile:" + c.Id; movimento.RegistradoPorNome = request.OperatorName; movimento.CriadoEm = c.CreatedAt;
-            if (row.TryGetProperty("estornado", out var reversed) && reversed.ValueKind == JsonValueKind.True)
-            { movimento.EstornadoEm = c.CreatedAt; movimento.MotivoEstorno = "Estado estornado preservado do snapshot legado."; }
-            db.Add(movimento); c.ErpMovimentoCaixaId = movimento.Id;
+            c.MarcarNaoPromover(c.CreatedAt);
         }
     }
 

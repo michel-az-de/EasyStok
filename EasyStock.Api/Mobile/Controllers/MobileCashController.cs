@@ -30,7 +30,8 @@ public class MobileCashController(
 
         // #2730: excluído no PWA não entra na revisão; o tombstone do sync sai pelo SyncController.
         var q = db.Set<CashEntry>().AsNoTracking().Where(c => c.EmpresaId == emp && c.DeletedAt == null);
-        if (pendingOnly == true) q = q.Where(c => c.ErpMovimentoCaixaId == null);
+        // #2813: o arquivo do histórico importado (marca NaoPromoverEm) não é pendência de promoção.
+        if (pendingOnly == true) q = q.Where(c => c.ErpMovimentoCaixaId == null && c.NaoPromoverEm == null);
 
         var items = await q.OrderByDescending(c => c.CreatedAt).Take(500).ToListAsync(ct);
 
@@ -59,6 +60,8 @@ public class MobileCashController(
             return BadRequest(new { error = "Já está linkado a um movimento ERP." });
         if (entry.DeletedAt != null)
             return BadRequest(new { error = "Lançamento excluído no aparelho não entra no caixa." });
+        if (entry.NaoPromoverEm != null)
+            return BadRequest(new { error = "Lançamento do histórico importado fica só como arquivo e não entra no caixa." });
 
         // #1615: mesma referência do vínculo automático. Desvincular não estorna o movimento;
         // promover de novo criava um segundo e o valor entrava duas vezes no caixa.

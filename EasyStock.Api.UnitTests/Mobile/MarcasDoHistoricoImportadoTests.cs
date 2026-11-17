@@ -46,19 +46,38 @@ public sealed class MarcasDoHistoricoImportadoTests
     }
 
     [Fact]
-    public void So_o_import_do_historico_chama_MarcarQuitadoHistorico()
+    public void So_o_import_do_historico_chama_MarcarQuitadoHistorico() =>
+        ArquivosQueChamam(".MarcarQuitadoHistorico(").Should().Equal("LegacySnapshotImportService.cs");
+
+    [Fact]
+    public void So_o_import_do_historico_chama_MarcarNaoPromover() =>
+        ArquivosQueChamam(".MarcarNaoPromover(").Should().Equal("LegacySnapshotImportService.cs");
+
+    [Fact]
+    public void MarcarNaoPromover_guarda_a_data_original_e_recusa_o_lancamento_ja_promovido()
     {
-        var chamadores = Directory.EnumerateDirectories(RaizDoRepositorio(), "EasyStock.*")
+        var original = new DateTime(2026, 4, 12, 15, 30, 0, DateTimeKind.Utc);
+        var arquivo = new CashEntry { Id = "cash-arquivo", Type = "income", Amount = 10m, Description = "Entrada sintetica", CreatedAt = original };
+        var promovido = new CashEntry { Id = "cash-promovido", Type = "income", Amount = 10m, Description = "Entrada sintetica",
+            CreatedAt = original, ErpMovimentoCaixaId = Guid.NewGuid() };
+
+        arquivo.MarcarNaoPromover(original);
+        var marcarPromovido = () => promovido.MarcarNaoPromover(original);
+
+        arquivo.NaoPromoverEm.Should().Be(original, "a marca guarda a data original, não a de hoje");
+        marcarPromovido.Should().Throw<InvalidOperationException>("a marca não esconde um movimento que já existe no caixa");
+        promovido.NaoPromoverEm.Should().BeNull();
+    }
+
+    private static List<string> ArquivosQueChamam(string chamada) =>
+        Directory.EnumerateDirectories(RaizDoRepositorio(), "EasyStock.*")
             .Where(d => !Path.GetFileName(d).Contains("Tests", StringComparison.Ordinal))
             .SelectMany(d => Directory.EnumerateFiles(d, "*.cs", SearchOption.AllDirectories))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                 && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(f => File.ReadAllText(f).Contains(".MarcarQuitadoHistorico(", StringComparison.Ordinal))
+            .Where(f => File.ReadAllText(f).Contains(chamada, StringComparison.Ordinal))
             .Select(f => Path.GetFileName(f)!)
             .ToList();
-
-        chamadores.Should().Equal("LegacySnapshotImportService.cs");
-    }
 
     private static bool EhMarca(string nome) =>
         nome.StartsWith("QuitadoHistorico", StringComparison.OrdinalIgnoreCase)
