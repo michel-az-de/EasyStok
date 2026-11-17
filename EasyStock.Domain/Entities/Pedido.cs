@@ -113,6 +113,13 @@ namespace EasyStock.Domain.Entities
         public DateTime? AvaliacaoSolicitadaEm { get; set; }
 
         /// <summary>
+        /// #2813: instante em que o import do histórico do aparelho antigo quitou o pedido entregue, sem pagamento nem
+        /// movimento de caixa. Só o import grava (setter privado, sem DTO, request ou mutação de sync). Null = pedido
+        /// comum, que segue a conta normal de recebimento.
+        /// </summary>
+        public DateTime? QuitadoHistoricoEm { get; private set; }
+
+        /// <summary>
         /// Data/hora agendada para entrega. NULL = pedido pra agora (caso padrão).
         /// Espelha <see cref="Mobile.Order.ScheduledDeliveryAt"/> para sync com app.
         /// MVP: sem alertas/recorrência — só ordenação visual no PWA/KDS/grid web.

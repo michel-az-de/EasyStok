@@ -73,4 +73,11 @@ public class CashEntry
 
     [Column("deleted_by"), MaxLength(64)]
     public string? DeletedBy { get; set; }
+
+    /// <summary>
+    /// #2813: marca do import do histórico. O lançamento fica só como arquivo e não vira movimento do ERP. Só o import
+    /// grava (setter privado); quem promove lançamentos ao ERP deve ignorar a linha marcada. NULL = lançamento comum.
+    /// </summary>
+    [Column("nao_promover_em")]
+    public DateTime? NaoPromoverEm { get; private set; }
 }
