@@ -62,6 +62,7 @@ public class AnalyticsController(
     [SwaggerOperation(Summary = "Get full dashboard data", Description = "Consolidated endpoint: 8 KPI cards with delta %, stock status, pending orders, alerts, and insights. Single request replaces 12+ individual calls.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("dashboard-full")]
     public async Task<IActionResult> DashboardFull(
         [FromQuery] Guid empresaId,
@@ -80,6 +81,7 @@ public class AnalyticsController(
     [SwaggerOperation(Summary = "Resumo do dia em curso", Description = "Vendas, pedidos pendentes, status do caixa e Pix recebidos no dia. Usado pelo dashboard primario.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("dia")]
     public async Task<IActionResult> Dia([FromQuery] Guid empresaId, [FromQuery] Guid? lojaId = null)
     {
@@ -203,6 +205,7 @@ public class AnalyticsController(
     [SwaggerOperation(Summary = "Get movement analytics")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("movimentacoes")]
     public async Task<IActionResult> Movimentacoes(
         [FromQuery] Guid empresaId,
@@ -293,6 +296,7 @@ public class AnalyticsController(
     [SwaggerOperation(Summary = "Get dashboard extras", Description = "Carrega dados secundários: fluxo de caixa, validade timeline, top produtos, top clientes, produção por operador, entradas/saídas semanal, fornecedores, novos clientes.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("dashboard-extras")]
     public async Task<IActionResult> DashboardExtras(
         [FromQuery] Guid empresaId,
@@ -311,6 +315,7 @@ public class AnalyticsController(
     [SwaggerOperation(Summary = "Get sales by channel")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("vendas-por-canal")]
     public async Task<IActionResult> VendasPorCanal(
         [FromQuery] Guid empresaId,

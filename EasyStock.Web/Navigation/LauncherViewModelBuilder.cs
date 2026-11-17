@@ -96,7 +96,9 @@ public static class LauncherViewModelBuilder
         // "3 de 3 missoes concluidas" na tela de quem tem 12 lotes vencidos.
         if (badges is not null)
         {
-            missoes.Add(Missao("pedidos", "Zerar os pedidos em aberto", "/pedidos", badges.PedidosAbertos));
+            // #2744: a contagem de pedidos vem do resumo do dia, que quem não lê relatórios não recebe.
+            if (dia is not null)
+                missoes.Add(Missao("pedidos", "Zerar os pedidos em aberto", "/pedidos", badges.PedidosAbertos));
             missoes.Add(Missao("validade", "Resolver os lotes vencidos", "/estoque?status=vencido", badges.LotesVencidos));
             missoes.Add(Missao("estoque-critico", "Repor o estoque crítico", "/estoque", badges.ProdutosCriticos));
         }
