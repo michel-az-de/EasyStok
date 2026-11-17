@@ -64,10 +64,11 @@ public class ClientesController(
     public async Task<IActionResult> Buscar(
         [FromQuery] string termo,
         [FromQuery] Guid? empresaId,
-        [FromQuery] int max = 20)
+        [FromQuery] int max = 20,
+        [FromQuery] bool incluirInativos = false)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
-        return DataOk(await buscarUseCase.ExecuteAsync(new BuscarClienteQuery(emp, termo ?? "", max)));
+        return DataOk(await buscarUseCase.ExecuteAsync(new BuscarClienteQuery(emp, termo ?? "", max, incluirInativos)));
     }
 
     [SwaggerOperation(Summary = "Get client details (with sub-collections)")]

@@ -73,7 +73,7 @@ public sealed class ObterDossieClienteUseCase(
 
         return new DossieClienteDto(
             new DossieClienteDados(cliente.Id, cliente.Nome, cliente.Telefone, cliente.Email, cliente.Observacoes, cliente.MotivoBloqueio,
-                EasyStock.Application.UseCases.Cliente.Foto.ClienteFotoUseCase.Url(cliente)),
+                EasyStock.Application.UseCases.Cliente.Foto.ClienteFotoUseCase.Url(cliente), cliente.Ativo),
             cliente.Enderecos
                 .OrderByDescending(e => e.Padrao).ThenByDescending(e => e.CriadoEm)
                 .Select(e => new ClienteEnderecoResult(
@@ -111,7 +111,7 @@ public sealed class ObterDossieClienteUseCase(
     /// da última compra e do total gasto. #2007 (item 12): a mesma regra para todos os números do cartão.
     /// </summary>
     private static bool EhCompra(PedidoResumoCliente pedido) =>
-        pedido.Status is not (StatusPedidoMapper.Cancelado or StatusPedidoMapper.Rascunho or StatusPedidoMapper.AguardandoPagamento);
+        RegraDeCompra.EhCompra(pedido.Status);
 
     /// <summary>O item presente em mais pedidos; empate vai para a maior quantidade somada.</summary>
     private static ItemFavoritoDossie? ItemFavorito(IEnumerable<PedidoResumoCliente> compras) =>

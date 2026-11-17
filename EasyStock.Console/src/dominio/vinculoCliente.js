@@ -1,5 +1,5 @@
 // #2461: quem é a pessoa para a loja. 'lead' é quem tem cadastro e nenhum pedido; a regra do que conta como
-// pedido é da API (`temPedido`, cancelado conta). Sem `temPedido` (API anterior ao campo), vale
+// pedido é da API (`temPedido`, só compra conta; #2777). Sem `temPedido` (API anterior ao campo), vale
 // o de antes: cadastro é cliente. Não é o `conta === 'lead'`, que segue querendo dizer sem cadastro.
 export const relacionamentoDaApi = (clienteId, temPedido) => !clienteId ? 'sem-cadastro' : temPedido === false ? 'lead' : 'cliente'
 

@@ -85,6 +85,9 @@ assert.deepEqual(relacionamentoDoDossie({ ...dossie, conversasRecentes: undefine
 // C-03: a observação do cadastro chega à Ficha do Atendimento (antes o campo era lido e descartado).
 assert.equal(clienteDoDossie(dossie).cliente.observacoes, 'Portão azul')
 assert.equal(clienteDoDossie({ ...dossie, cliente: { ...dossie.cliente, observacoes: '   ' } }).cliente.observacoes, null)
+// #2780: cadastro desativado chega à Ficha marcado; sem o campo (API anterior), segue ativo.
+assert.equal(clienteDoDossie({ ...dossie, cliente: { ...dossie.cliente, ativo: false } }).cliente.inativo, true)
+assert.equal(clienteDoDossie(dossie).cliente.inativo, false)
 
 // O editor de cliente também abre pela Buscar na Casa, fora do AtendimentoProvider: nada nele pode ler o contexto
 // do Atendimento (useAtendimento, useAcoes e useCatalogo lançam sem o provider e derrubam o console).

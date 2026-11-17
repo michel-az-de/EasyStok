@@ -22,6 +22,7 @@ import {
   listaEmPortugues, mascaraCep, partesDoEndereco, moeda,
 } from '../../dominio/formato'
 import { telefoneNaTela } from '../../dominio/cadastros'
+import { hashDoCadastroDoCliente } from '../../dominio/fichaCliente'
 import { indiceDoPasso } from '../../dominio/esteira'
 import { numeroCurto, pedidoEncerrado } from '../../dominio/pedido'
 import { SITUACOES, situacaoDoCep } from '../../dominio/areaEntrega'
@@ -299,6 +300,18 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
 
         {/* Sinal forte de bloqueio: ícone, palavra e motivo. A cor sozinha não
             informa nada, então o texto diz tudo o que o vermelho sugeriria. */}
+        {/* #2780: cadastro desativado não some da conversa; a Ficha diz e leva ao cadastro para reativar. */}
+        {conversa.cliente?.inativo && conversa.clienteId && (
+          <div className={css.avisoBloqueio} data-aviso-inativo>
+            <p className={css.tituloBloqueio}>
+              <Icone nome="alerta" />
+              <strong>Cadastro desativado</strong>
+            </p>
+            <p className={css.rodapeBloco}>
+              Ele não aparece nas listas de clientes ativos. <a href={hashDoCadastroDoCliente(conversa.clienteId)}>Abrir o cadastro para reativar</a>
+            </p>
+          </div>
+        )}
         {bloqueada && (
           <div className={css.avisoBloqueio}>
             <p className={css.tituloBloqueio}>

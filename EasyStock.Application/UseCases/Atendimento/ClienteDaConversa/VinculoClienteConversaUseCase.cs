@@ -13,7 +13,7 @@ public sealed record EstadoVinculoCliente(Guid? ClienteId, string? ClienteNome, 
     long VinculoRevisao, bool PodeCorrigir, string? MotivoBloqueio, IReadOnlyList<PedidoDoVinculo> Pedidos,
     IReadOnlyList<AlteracaoVinculoConversa> Historico)
 {
-    /// <summary>#2461: o cliente vinculado já fez pedido na empresa (cancelado conta); nulo sem vínculo.</summary>
+    /// <summary>#2461: o cliente vinculado já fez pedido na empresa (#2777: só compra, cancelado não); nulo sem vínculo.</summary>
     public bool? TemPedido { get; init; }
 }
 public sealed class VinculoClienteConflitoException(string message) : Exception(message);
@@ -159,7 +159,7 @@ public sealed class VinculoClienteConversaUseCase(IConversaRepository conversas,
             conversa.VinculoRevisao, PodeCorrigir(usuario) && bloqueio is null, bloqueio,
             pedidos, await vinculos.ListarHistoricoAsync(conversa.EmpresaId, conversa.Id, ct))
         {
-            // #2461: a contagem do cadastro é a mesma do filtro de lead; cancelado conta.
+            // #2461 e #2777: a contagem do cadastro é a mesma do filtro de lead; só compra conta.
             TemPedido = conversa.ClienteId is { } vinculado
                 ? (await clientes.ObterMetricasPedidosAsync(conversa.EmpresaId, vinculado)).OrderCount > 0 : null
         };

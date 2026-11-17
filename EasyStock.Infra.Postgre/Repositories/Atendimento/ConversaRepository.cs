@@ -1,3 +1,4 @@
+using EasyStock.Domain.Sales;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
@@ -213,9 +214,9 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                 PedidoStatus = db.Pedidos
                     .Where(p => p.EmpresaId == empresaId && p.Id == c.PedidoEmAndamentoId)
                     .Select(p => p.Status).FirstOrDefault(),
-                // #2461: mesma regra de lead do ClienteRepository (cancelado conta); nulo para contato sem cadastro.
+                // #2461 e #2777: mesma regra de lead do ClienteRepository (só compra conta); nulo para contato sem cadastro.
                 TemPedido = c.ClienteId == null ? (bool?)null
-                    : db.Pedidos.Any(p => p.EmpresaId == empresaId && p.ClienteId == c.ClienteId),
+                    : db.Pedidos.Where(RegraDeCompra.Pedido).Any(p => p.EmpresaId == empresaId && p.ClienteId == c.ClienteId),
             })
             .ToListAsync(ct);
 

@@ -512,6 +512,11 @@
 .cartaoClienteAbrir:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 3px; }
 .resumoIa { display: block; margin: 0; color: var(--tinta); line-height: 1.45; }
 .numerosCliente { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+/* #2780: mesmo tom âmbar da restrição: texto na tinta, só o ícone no alerta. */
+.avisoInativo { display: flex; align-items: flex-start; gap: var(--e-2); margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--alerta-pastel); color: var(--tinta); font-size: var(--t-apoio); }
+.avisoInativo svg { flex: none; margin-top: 2px; color: var(--alerta); }
+.avisoInativo a { color: var(--marca); font-weight: 600; text-underline-offset: 2px; }
+.avisoInativo a:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 2px; }
 .tagsCliente { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-1); }
 .tagsCliente li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: 2px var(--e-2); border-radius: var(--r-pilula); background: var(--preenchimento); font-size: var(--t-apoio); }
 /* #2734: a restrição tem o mesmo tom em Cadastros e na Ficha: texto na tinta, só o ícone no alerta. */

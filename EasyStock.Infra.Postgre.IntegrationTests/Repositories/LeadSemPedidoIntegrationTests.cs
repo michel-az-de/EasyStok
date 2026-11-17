@@ -21,7 +21,7 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 /// <summary>
 /// #2461: a conversa informa se a pessoa do cadastro já fez pedido (<c>temPedido</c>), na lista e no estado do
 /// vínculo. A regra é a das abas de Cadastros (<c>ClienteRepository.GetByEmpresaAsync</c>): qualquer pedido do
-/// cliente na empresa conta, inclusive cancelado; pedido de outra empresa não conta.
+/// cliente na empresa que seja compra conta (#2777: cancelado não); pedido de outra empresa não conta.
 /// </summary>
 [Collection("PostgreSqlTestCollection")]
 public sealed class LeadSemPedidoIntegrationTests(PostgreSqlDatabaseFixture fixture)
@@ -46,13 +46,13 @@ public sealed class LeadSemPedidoIntegrationTests(PostgreSqlDatabaseFixture fixt
         TemPedido(c.SemCadastro).Should().BeNull("sem cadastro não há de quem contar pedido");
         TemPedido(c.DoLead).Should().BeFalse("cadastro sem pedido é lead");
         TemPedido(c.DoCliente).Should().BeTrue();
-        TemPedido(c.DoSoCancelado).Should().BeTrue("pedido cancelado conta, como na aba Clientes de Cadastros");
+        TemPedido(c.DoSoCancelado).Should().BeFalse("pedido cancelado não é compra, como na aba Clientes de Cadastros (#2777)");
 
         // O console lê `temPedido` em camelCase (traducaoConversas.js); nulo sai como null, não some.
         JsonDe(c.SemCadastro)["temPedido"].Should().BeNull();
         JsonDe(c.SemCadastro).ContainsKey("temPedido").Should().BeTrue();
         JsonDe(c.DoLead)["temPedido"]!.GetValue<bool>().Should().BeFalse();
-        JsonDe(c.DoSoCancelado)["temPedido"]!.GetValue<bool>().Should().BeTrue();
+        JsonDe(c.DoSoCancelado)["temPedido"]!.GetValue<bool>().Should().BeFalse();
 
         bool? TemPedido(Conversa conversa) => resumos.Single(r => r.Id == conversa.Id).TemPedido;
         System.Text.Json.Nodes.JsonObject JsonDe(Conversa conversa) =>
@@ -84,7 +84,7 @@ public sealed class LeadSemPedidoIntegrationTests(PostgreSqlDatabaseFixture fixt
 
         (await caso.ObterAsync(c.EmpresaId, c.SemCadastro.Id)).TemPedido.Should().BeNull();
         (await caso.ObterAsync(c.EmpresaId, c.DoCliente.Id)).TemPedido.Should().BeTrue();
-        (await caso.ObterAsync(c.EmpresaId, c.DoSoCancelado.Id)).TemPedido.Should().BeTrue();
+        (await caso.ObterAsync(c.EmpresaId, c.DoSoCancelado.Id)).TemPedido.Should().BeFalse("só cancelou: é lead (#2777)");
         var doLead = await caso.ObterAsync(c.EmpresaId, c.DoLead.Id);
         doLead.TemPedido.Should().BeFalse("o pedido de outra empresa não conta");
 
@@ -95,8 +95,8 @@ public sealed class LeadSemPedidoIntegrationTests(PostgreSqlDatabaseFixture fixt
         var vinculada = await caso.ExecuteAsync(new(c.EmpresaId, c.DoLead.Id, Guid.NewGuid(), retirada.VinculoRevisao,
             null, "vincular", c.SoCanceladoId, "Outra pessoa confirmada"));
         vinculada.ClienteId.Should().Be(c.SoCanceladoId);
-        vinculada.TemPedido.Should().BeTrue("a resposta da correção já traz o do cliente novo");
-        JsonSerializer.SerializeToNode(vinculada, Json)!["temPedido"]!.GetValue<bool>().Should().BeTrue();
+        vinculada.TemPedido.Should().BeFalse("a resposta da correção já traz o do cliente novo, que só cancelou");
+        JsonSerializer.SerializeToNode(vinculada, Json)!["temPedido"]!.GetValue<bool>().Should().BeFalse();
 
         var deVoltaAoLead = await caso.ExecuteAsync(new(c.EmpresaId, c.SemCadastro.Id, Guid.NewGuid(), 0,
             null, "vincular", c.LeadId, "Pessoa confirmada no atendimento"));

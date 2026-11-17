@@ -61,7 +61,7 @@ export function BuscaNaCasa({ aoFechar, aoAbrirConversa, renderizarCadastro, ren
   return <>
     <Modal titulo="Buscar na Casa" descricao="Pessoas, conversas, pedidos, produtos e telas que seu perfil pode abrir." aoFechar={aoFechar} largura="md" focarCampo>
       <div className={css.busca}>
-        <p>Até {LIMITE_BUSCA_CASA} resultados por categoria. Pessoas: cadastros ativos. Refine a busca para encontrar outro registro.</p>
+        <p>Até {LIMITE_BUSCA_CASA} resultados por categoria. Pessoas: por nome, telefone, e-mail ou documento, com os inativos marcados. Refine a busca para encontrar outro registro.</p>
         <BuscaComSugestoes valor={termo} aoMudar={valor => { buscando.current?.abort(); leitura.current?.abort(); abrir(null); falhar(null); definir({ resultados: [], indisponiveis: [], carregando: Boolean(valor.trim()) }); mudar(valor) }} opcoes={resultados.map(r => ({ ...r, item: r }))} aoEscolher={escolher}
           carregando={consulta.carregando} minimo={1} rotulo="Buscar na Casa" rotuloLista="Resultados da busca na Casa" textoCarregando="Consultando a loja…" placeholder="Nome, telefone, ID ou tela" />
         {abrindo && <p role="status">Abrindo o registro…</p>}
