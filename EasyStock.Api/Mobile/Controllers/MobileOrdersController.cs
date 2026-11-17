@@ -21,7 +21,9 @@ public class MobileOrdersController(
     ICurrentUserAccessor currentUser,
     ILogger<MobileOrdersController> log) : MobileManagementControllerBase(currentUser)
 {
+    // #2828: traz total; mesma regra da leitura dos pedidos do ERP.
     [HttpGet]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> List(
         [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
