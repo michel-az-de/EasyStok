@@ -38,8 +38,11 @@ public class MovimentacaoController(
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
             resolvedEmpresaId, DataUtc.InicioDoPeriodoUtc(de), DataUtc.FimDoPeriodoUtc(ate), tipo, natureza, p, ps);
 
-        // #2821: o valor de cada saída é venda, e venda é relatório. Entrada e ajuste mantêm o custo.
-        var podeVerValoresDeSaida = currentUser.TemPermissao(Permissao.VisualizarRelatorios);
+        // #2821: o valor de cada saída é venda, e venda é relatório. O estorno copia o preço da venda,
+        // então segue a mesma regra. Entrada e ajuste mantêm o custo.
+        var podeVerValoresDeVenda = currentUser.TemPermissao(Permissao.VisualizarRelatorios);
+        bool MostraValor(MovimentacaoEstoque m) => podeVerValoresDeVenda
+            || (m.Tipo != TipoMovimentacaoEstoque.Saida && m.Natureza != NaturezaMovimentacaoEstoque.Estorno);
         var dtos = items.Select(m => new
         {
             id = m.Id.ToString(),
@@ -49,10 +52,8 @@ public class MovimentacaoController(
             tipo = m.Tipo.ToString(),
             natureza = m.Natureza.ToString(),
             quantidade = m.Quantidade.Value,
-            valorUnitario = m.ValorUnitario != null && (podeVerValoresDeSaida || m.Tipo != TipoMovimentacaoEstoque.Saida)
-                ? (decimal?)m.ValorUnitario.Valor : null,
-            valorTotal = m.ValorTotal != null && (podeVerValoresDeSaida || m.Tipo != TipoMovimentacaoEstoque.Saida)
-                ? (decimal?)m.ValorTotal.Valor : null,
+            valorUnitario = m.ValorUnitario != null && MostraValor(m) ? (decimal?)m.ValorUnitario.Valor : null,
+            valorTotal = m.ValorTotal != null && MostraValor(m) ? (decimal?)m.ValorTotal.Valor : null,
             dataMovimentacao = m.DataMovimentacao,
             descricao = m.Descricao,
             documentoReferencia = m.DocumentoReferencia,

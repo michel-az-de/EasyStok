@@ -143,6 +143,24 @@ public class MovimentacaoControllerTests
         }
     }
 
+    // #2821 (revisão): o estorno de uma venda entra no estoque como Entrada, mas carrega o preço da venda.
+    [Fact]
+    public async Task GetAll_sem_permissao_de_relatorios_omite_o_valor_do_estorno_de_venda()
+    {
+        var empresaId = Guid.NewGuid();
+        _currentUser.EmpresaId.Returns(empresaId);
+        var estorno = EasyStock.Domain.Entities.MovimentacaoEstoque.CriarEstorno(
+            Guid.NewGuid(), SaidaDeVenda(empresaId), DateTime.UtcNow, null, DateTime.UtcNow);
+        _movRepo.GetByEmpresaAsync(default, default, default, default, default, default, default)
+            .ReturnsForAnyArgs((new[] { estorno }.AsEnumerable(), 1));
+
+        var linha = DataJson(await _controller.GetAll(empresaId, null, null, null, null))[0];
+
+        linha.GetProperty("tipo").GetString().Should().Be("Entrada");
+        linha.GetProperty("valorUnitario").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+        linha.GetProperty("valorTotal").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+    }
+
     private static EasyStock.Domain.Entities.MovimentacaoEstoque SaidaDeVenda(Guid empresaId)
     {
         var item = new EasyStock.Domain.Entities.ItemEstoque
