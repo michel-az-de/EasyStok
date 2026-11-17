@@ -1,5 +1,6 @@
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.Tests.Helpers;
+using EasyStock.Application.UseCases.ObterPedidoDetalhes;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Application.UseCases.RegistrarPagamentoPedido;
 using EasyStock.Domain.Sales;
@@ -80,5 +81,39 @@ public class PedidoQuitadoHistoricoTests
         (await quitado.Saldos().AReceberAsync(quitado.Pedido, CancellationToken.None)).Should().Be(0m);
         (await comum.Saldos().AReceberAsync(comum.Pedido, CancellationToken.None))
             .Should().Be(25m, "sem a marca o entregue sem pagamento segue a receber");
+    }
+
+    // O que a tela lê: o detalhe do pedido (GET pedidos/{id}) já traz o que falta receber decidido pelo servidor.
+    private static async Task<decimal?> AReceberDoDetalheAsync(CobrancaPedidoFixture f)
+    {
+        f.PedidoRepo.GetByIdWithDetailsAsync(f.EmpresaId, f.Pedido.Id).Returns(f.Pedido);
+        var detalhe = await new ObterPedidoDetalhesUseCase(f.PedidoRepo)
+            .ExecuteAsync(new ObterPedidoDetalhesQuery(f.EmpresaId, f.Pedido.Id));
+        return detalhe!.Pedido.AReceber;
+    }
+
+    [Fact]
+    public async Task Detalhe_do_pedido_quitado_no_historico_informa_que_nada_falta_receber()
+    {
+        var f = EntregueQuitadoNoHistorico();
+
+        (await AReceberDoDetalheAsync(f)).Should().Be(0m, "o servidor decide: a tela não refaz total menos pago");
+    }
+
+    [Fact]
+    public async Task Detalhe_do_pedido_comum_sem_pagamento_informa_o_total_a_receber()
+    {
+        var f = new CobrancaPedidoFixture("entregue");
+
+        (await AReceberDoDetalheAsync(f)).Should().Be(25m, "sem a marca o entregue sem pagamento segue a receber");
+    }
+
+    [Fact]
+    public async Task Detalhe_do_pedido_comum_com_pagamento_parcial_informa_o_que_falta()
+    {
+        var f = new CobrancaPedidoFixture("entregue");
+        f.AdicionarPagamento("pix-direto", 10m);
+
+        (await AReceberDoDetalheAsync(f)).Should().Be(15m);
     }
 }

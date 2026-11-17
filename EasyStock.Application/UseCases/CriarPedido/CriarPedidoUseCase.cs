@@ -222,5 +222,6 @@ public class CriarPedidoUseCase(
         p.Observacoes, p.Origem, p.MobileOrderId, p.VendaId,
         p.Itens.Count,
         p.CriadoEm, p.AlteradoEm, p.EntreguEm, p.CanceladoEm,
-        p.AgendadoParaEm, p.NumeroDoDia, p.DataNumero);
+        p.AgendadoParaEm, p.NumeroDoDia, p.DataNumero,
+        p.AReceberPelosPagamentos);
 }
