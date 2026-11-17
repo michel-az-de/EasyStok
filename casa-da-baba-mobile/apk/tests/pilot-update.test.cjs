@@ -941,3 +941,61 @@ test('Voltar fecha o diálogo de conta aberto', () => {
   assert.equal(account.open, false);
   assert.equal(nodes.get('pilotHome').open, true);
 });
+
+// #2813 (B1): o APK recém-instalado nasce vazio. O Início precisa oferecer, no primeiro acesso,
+// trazer o histórico do Sistema Antigo, sem depender de abrir o bloco de suporte escondido.
+const estadoLocalVazio = () => ({ products: [], clients: [], orders: [], batches: [], cashEntries: [], cashClosings: [] });
+const ofertaPrimeiroAcesso = nodes => {
+  const offer = nodes.get('pilotFirstImport');
+  assert.ok(offer, 'o Início precisa ter a oferta de importação do primeiro acesso');
+  return offer;
+};
+
+test('primeiro acesso sem dados oferece trazer o histórico do Sistema Antigo', () => {
+  const { root, nodes, events } = pilotHarness();
+  root.cdbApp.getState = estadoLocalVazio;
+  events.get('cdb-sync-state-change')();
+  assert.equal(ofertaPrimeiroAcesso(nodes).hidden, false);
+  assert.match(nodes.get('pilotHome').innerHTML, /id="pilotFirstImport"[\s\S]*?data-action="import-pwa"/);
+});
+
+for (const colecao of ['products', 'clients', 'orders', 'batches']) {
+  test('com ' + colecao + ' no aparelho a oferta do primeiro acesso não aparece', () => {
+    const { root, nodes, events } = pilotHarness();
+    root.cdbApp.getState = () => ({ ...estadoLocalVazio(), [colecao]: [{ id: 'x' }] });
+    events.get('cdb-sync-state-change')();
+    assert.equal(ofertaPrimeiroAcesso(nodes).hidden, true);
+  });
+}
+
+test('a oferta some quando o primeiro dado chega ao aparelho', () => {
+  const { root, nodes, events } = pilotHarness();
+  let state = estadoLocalVazio();
+  root.cdbApp.getState = () => state;
+  events.get('cdb-sync-state-change')();
+  assert.equal(ofertaPrimeiroAcesso(nodes).hidden, false);
+  state = { ...state, products: [{ id: 'p1' }] };
+  events.get('cdb-mutations-applied')();
+  assert.equal(ofertaPrimeiroAcesso(nodes).hidden, true);
+});
+
+test('a oferta não aparece enquanto o backup importado espera conferência nem depois da migração', () => {
+  const { root, nodes, events } = pilotHarness();
+  root.cdbApp.getState = estadoLocalVazio;
+  root.cdbSync.importReview = () => ({ missingPhotos: 0 });
+  events.get('cdb-sync-state-change')();
+  assert.equal(ofertaPrimeiroAcesso(nodes).hidden, true);
+  root.cdbSync.importReview = () => null;
+  root.cdbSync.getLastLegacyMigration = () => ({ counts: { orders: 79 } });
+  events.get('cdb-sync-state-change')();
+  assert.equal(ofertaPrimeiroAcesso(nodes).hidden, true);
+});
+
+test('sem estado local legível a oferta não aparece (não adivinha aparelho vazio)', () => {
+  const { root, nodes, events } = pilotHarness();
+  events.get('cdb-sync-state-change')();
+  assert.equal(ofertaPrimeiroAcesso(nodes).hidden, true);
+  root.cdbApp.getState = () => ({ products: [] });
+  events.get('cdb-sync-state-change')();
+  assert.equal(ofertaPrimeiroAcesso(nodes).hidden, true);
+});
