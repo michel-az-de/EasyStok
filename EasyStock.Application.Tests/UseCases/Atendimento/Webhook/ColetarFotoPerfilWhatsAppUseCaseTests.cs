@@ -172,4 +172,44 @@ public sealed class ColetarFotoPerfilWhatsAppUseCaseTests
 
         await _whatsApp.Received(2).ObterFotoPerfilAsync(Contato, Arg.Any<CancellationToken>());
     }
+
+    // Revisão da #2838: com a busca em toda mensagem, a foto removida pela loja voltaria na mensagem seguinte.
+    [Fact]
+    public async Task FotoRemovidaPelaLojaNaoVolta()
+    {
+        var cliente = Cliente();
+        FotoGravadaPor(cliente, "console", TimeSpan.FromDays(1));
+
+        await Criar().ExecuteAsync(new ColetarFotoPerfilWhatsAppJob(_empresaId, cliente.Id, Contato));
+
+        await _whatsApp.DidNotReceiveWithAnyArgs().ObterFotoPerfilAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task DentroDaJanelaNemConsultaOBanco()
+    {
+        var cliente = Cliente();
+        _whatsApp.ObterFotoPerfilAsync(Contato, Arg.Any<CancellationToken>()).Returns((FotoPerfilWhatsApp?)null);
+        var job = new ColetarFotoPerfilWhatsAppJob(_empresaId, cliente.Id, Contato);
+        await Criar().ExecuteAsync(job);
+        _clientes.ClearReceivedCalls();
+
+        await Criar().ExecuteAsync(job);
+
+        await _clientes.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+    }
+
+    [Fact]
+    public async Task FalhaDaPonteNaoGastaAJanela()
+    {
+        var cliente = Cliente();
+        _whatsApp.ObterFotoPerfilAsync(Contato, Arg.Any<CancellationToken>())
+            .Returns<FotoPerfilWhatsApp?>(_ => throw new WhatsAppCloudException(0, "fora do ar", ehPermanente: false), _ => null);
+        var job = new ColetarFotoPerfilWhatsAppJob(_empresaId, cliente.Id, Contato);
+
+        await Criar().ExecuteAsync(job);
+        await Criar().ExecuteAsync(job);
+
+        await _whatsApp.Received(2).ObterFotoPerfilAsync(Contato, Arg.Any<CancellationToken>());
+    }
 }

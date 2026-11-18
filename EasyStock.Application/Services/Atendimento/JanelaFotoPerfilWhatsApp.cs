@@ -16,16 +16,20 @@ public sealed class JanelaFotoPerfilWhatsApp(TimeProvider relogio)
     /// <summary>Reserva a consulta do cliente; <c>false</c> quando outra já saiu dentro da janela.</summary>
     public bool Reservar(Guid empresaId, Guid clienteId)
     {
+        var chave = (empresaId, clienteId);
         var agora = relogio.GetUtcNow();
-        var reservou = false;
-        _ultimaConsulta.AddOrUpdate((empresaId, clienteId),
-            _ => { reservou = true; return agora; },
-            (_, ultima) =>
+        while (true)
+        {
+            if (!_ultimaConsulta.TryGetValue(chave, out var ultima))
             {
-                if (agora - ultima < Intervalo) return ultima;
-                reservou = true;
-                return agora;
-            });
-        return reservou;
+                if (_ultimaConsulta.TryAdd(chave, agora)) return true;
+                continue;
+            }
+            if (agora - ultima < Intervalo) return false;
+            if (_ultimaConsulta.TryUpdate(chave, agora, ultima)) return true;
+        }
     }
+
+    /// <summary>Devolve a reserva quando a consulta falhou e não disse nada sobre a foto.</summary>
+    public void Liberar(Guid empresaId, Guid clienteId) => _ultimaConsulta.TryRemove((empresaId, clienteId), out _);
 }

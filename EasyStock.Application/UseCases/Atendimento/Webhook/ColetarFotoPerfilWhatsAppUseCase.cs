@@ -25,9 +25,10 @@ public sealed class ColetarFotoPerfilWhatsAppUseCase(
         // Escopo do job não tem JWT: sem isto o filtro global e a RLS (ADR-0010) zeram a consulta.
         tenantContext.SetCurrentTenant(job.EmpresaId);
 
+        // A janela vem antes do banco: o webhook enfileira a cada mensagem do cliente.
+        if (!janela.Reservar(job.EmpresaId, job.ClienteId)) return;
         var cliente = await clientes.GetByIdAsync(job.EmpresaId, job.ClienteId);
         if (cliente is null || !await PodeTrocarAsync(cliente)) return;
-        if (!janela.Reservar(job.EmpresaId, job.ClienteId)) return;
 
         FotoPerfilWhatsApp? foto;
         try
@@ -36,6 +37,7 @@ public sealed class ColetarFotoPerfilWhatsAppUseCase(
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
+            janela.Liberar(job.EmpresaId, job.ClienteId); // ponte fora do ar: a próxima mensagem tenta de novo
             logger.LogWarning(ex, "Foto do perfil do WhatsApp: a ponte não devolveu a foto do cliente {ClienteId}.", job.ClienteId);
             return;
         }
@@ -60,13 +62,17 @@ public sealed class ColetarFotoPerfilWhatsAppUseCase(
 
     public static readonly TimeSpan Validade = TimeSpan.FromDays(7);
 
-    /// <summary>Sem foto, ou com a foto que o próprio WhatsApp deu há mais de <see cref="Validade"/>.</summary>
+    /// <summary>
+    /// Sem foto que a loja tenha removido, ou com a foto que o próprio WhatsApp deu há mais de <see cref="Validade"/>.
+    /// A última gravação da foto no histórico diz quem a pôs (ou a tirou).
+    /// </summary>
     private async Task<bool> PodeTrocarAsync(EasyStock.Domain.Entities.Cliente cliente)
     {
-        if (cliente.FotoChave is null) return true;
         var gravacao = (await clientes.GetAlteracoesAsync(cliente.Id) ?? [])
-            .FirstOrDefault(a => a.Campo == "Foto" && a.ValorNovo == cliente.FotoChave);
-        return gravacao is { Origem: PerfilClienteWhatsApp.Origem }
+            .Where(a => a.Campo == "Foto").MaxBy(a => a.AlteradoEm);
+        if (cliente.FotoChave is null)
+            return gravacao is null || gravacao.ValorNovo is not null || gravacao.Origem == PerfilClienteWhatsApp.Origem;
+        return gravacao is { Origem: PerfilClienteWhatsApp.Origem } && gravacao.ValorNovo == cliente.FotoChave
             && relogio.GetUtcNow().UtcDateTime - gravacao.AlteradoEm >= Validade;
     }
 }
