@@ -141,3 +141,4 @@
   .quadroCliente { grid-template-columns: minmax(0, 1fr); }
   .contatoCliente { grid-template-columns: minmax(0, 1fr); }
 }
+.acoesDoResumo { display: flex; flex-wrap: wrap; gap: var(--e-2, 8px); }

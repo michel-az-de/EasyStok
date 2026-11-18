@@ -99,7 +99,10 @@ for (const arquivo of ['EditorCadastro.jsx', 'FichaCliente.jsx', 'Relacionamento
 
 // Por isso as restrições do catálogo chegam ao editor por propriedade, também pela Buscar na Casa.
 const app = readFileSync(new URL('../src/app/App.jsx', import.meta.url), 'utf8')
-assert.match(app, /renderizarCadastro=\{props => <EditorCadastro \{\.\.\.props\} restricoes=\{RESTRICOES\} \/>\}/, 'a Buscar na Casa entrega as restrições ao editor')
+// #2849: a mesma função desenha a ficha na Busca e no Atendimento.
+assert.match(app, /const renderizarFichaUnica = props => <EditorCadastro \{\.\.\.props\} restricoes=\{RESTRICOES\} \/>/, 'a ficha única recebe as restrições')
+assert.match(app, /renderizarCadastro=\{renderizarFichaUnica\}/, 'a Buscar na Casa entrega as restrições ao editor')
+assert.match(app, /<ContextoFichaUnicaDoCliente\.Provider value=\{renderizarFichaUnica\}>/, 'o Atendimento recebe a mesma ficha')
 
 // Telefone de DDD 55 (Rio Grande do Sul): o texto que já está na máscara "(55) …" não tem DDI. Um dígito a mais
 // é erro que a pessoa vê, não outro número gravado em silêncio.

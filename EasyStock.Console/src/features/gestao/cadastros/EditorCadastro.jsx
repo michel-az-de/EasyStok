@@ -21,7 +21,7 @@ const tiposProduto = [{ valor: 'Alimento', rotulo: 'Alimento' }, { valor: 'Fisic
 const tiposConta = [{ valor: 'corrente', rotulo: 'Conta corrente' }, { valor: 'poupanca', rotulo: 'Poupança' }, { valor: 'pagamento', rotulo: 'Conta de pagamento' }]
 const opcoesStatus = [{ valor: 'Inativo', rotulo: 'Inativo' }, { valor: 'Ativo', rotulo: 'Ativo' }]
 
-export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade, aoAbrirCadastro, conversasNoAtendimento, aoAbrirConversa, aoGravarRelacionamento, aoRascunharRelacionamento, restricoes }) {
+export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade, aoAbrirCadastro, conversasNoAtendimento, aoAbrirConversa, aoGravarRelacionamento, aoRascunharRelacionamento, restricoes, editarAoAbrir = false, complemento }) {
   const idForm = useId()
   const formRef = useRef(null)
   const { dados, inicial } = editor
@@ -46,7 +46,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   // #2849: cliente já cadastrado abre como ficha, em leitura; o formulário só aparece em "Editar dados".
   // Rascunho restaurado ou conflito pendente abre direto no formulário: nada digitado fica escondido.
   const ehFicha = tela === 'clientes' && Boolean(id)
-  const [editando, editar] = useState(false)
+  const [editando, editar] = useState(editarAoAbrir)
   const formularioAberto = !ehFicha || editando || alterado || Boolean(editor.conflito || editor.semConfirmacao)
   // O foco vai ao primeiro campo no mesmo clique: quem digita em seguida não perde tecla para um foco atrasado.
   const abrirFormulario = () => { flushSync(() => editar(true)); formRef.current?.querySelector('[data-foco-inicial]')?.focus() }
@@ -182,7 +182,10 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     {editor.reconferido && !editor.conflito && <p role="status">Versão atual conferida. Revise os campos e use Salvar cadastro para confirmar sua edição.</p>}
     {editor.semConfirmacao && <div className={css.erro} role="alert"><p>A resposta não chegou. O cadastro pode ter sido salvo. Feche e confira a lista antes de criar outro.</p></div>}
     {ehFicha && <ResumoDoCliente key={`resumo:${id}`} dados={dados} relacionamento={relacionamento.dados} carregando={relacionamento.carregando && !relacionamento.dados}
-      editando={formularioAberto} aoEditar={podeEditar ? abrirFormulario : undefined} />}
+      editando={formularioAberto} aoEditar={podeEditar ? abrirFormulario : undefined}
+      aoMudarFoto={podeEditar ? () => { relacionamento.recarregar(); aoGravarRelacionamento?.() } : undefined} />}
+    {/* #2849: o que só a tela que abriu sabe (no Atendimento: apontamentos, avisos, endereço da conversa). */}
+    {ehFicha && complemento}
     {/* `key`: o atalho por endereço troca a pessoa sem desmontar o editor; modal, aviso e notas abertas não passam adiante. */}
     {comRelacionamento && <RelacionamentoCliente key={id} clienteId={id} relacionamento={relacionamento} contexto={contexto} podeEditar={podeEditar} aoGravar={aoGravarRelacionamento} aoRascunhar={aoRascunharRelacionamento} restricoes={restricoes} />}
     {conversa && podeEditar && formularioAberto && <section className={css.assistente} aria-label="Assistência ao cadastro">

@@ -26,6 +26,7 @@ import { identidadeDaAssistencia, useContextoAssistencia } from '../aplicacao/co
 import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
+import { ContextoFichaUnicaDoCliente } from '../aplicacao/fichaUnicaDoCliente'
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
@@ -84,6 +85,8 @@ import css from './moldura.module.css'
 // Modo demonstração (laboratório local, issue #2017): as telas e os ganchos dele só existem fora do build de
 // produção (`VITE_FONTE_DADOS=api`). Com `demonstracao` nulo viram vazio, e os ramos `!FONTE_API` abaixo nem rodam.
 const semEfeito = () => {}
+// #2849: a ficha única do cliente. A Busca e o Atendimento desenham o cliente por esta mesma função.
+const renderizarFichaUnica = props => <EditorCadastro {...props} restricoes={RESTRICOES} />
 const { useReacaoClienteSimulado = semEfeito, useDigitacaoAutomatica = semEfeito } = demonstracao ?? {}
 const {
   TelaCardapioLink = null, TelaCozinha = null, GavetaEntregas = null, TelaEntregas = null,
@@ -712,8 +715,8 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else tela = <AppPrincipal rota={rota} sessao={sessao} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} lerFiltrosDaVisita={lerFiltrosDaVisita} aoGuardarFiltros={guardarFiltrosDaVisita} lerRascunhosDaVisita={lerRascunhosDaVisita} aoGuardarRascunhos={guardarRascunhosDaVisita} memoriaDoLaco={memoriaDoLaco} visitaSoNaMemoria={visitaSoNaMemoria} conversaEncontrada={conversaEncontrada} aoConsumirConversa={consumirConversaEncontrada} />
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
-      {tela}{confirmacaoSaida}
-      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={props => <EditorCadastro {...props} restricoes={RESTRICOES} />} renderizarPedido={props => <DetalhePedido {...props} />} aoAbrirConversa={resumo => {
+      <ContextoFichaUnicaDoCliente.Provider value={renderizarFichaUnica}>{tela}</ContextoFichaUnicaDoCliente.Provider>{confirmacaoSaida}
+      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={renderizarFichaUnica} renderizarPedido={props => <DetalhePedido {...props} />} aoAbrirConversa={resumo => {
         memoriaDoLaco.dono = sessao.usuario?.id ?? null
         memoriaDoLaco.resumos.set(resumo.id, resumo)
         guardarConversaEncontrada(resumo)
