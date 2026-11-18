@@ -1017,7 +1017,9 @@ public class ProcessarEventoWhatsAppUseCaseTests
         lead.Nome.Should().Be("Fulano");
         lead.Email.Should().Be("fulano@exemplo.com");
         await _unitOfWork.Received().CommitAsync();
-        await _queueService.DidNotReceiveWithAnyArgs().EnqueueAsync(FilaAtendimentoNomes.FotoPerfilWhatsApp, default(ColetarFotoPerfilWhatsAppJob)!);
+        // #2838: conversa aberta também busca a foto; antes só a conversa nova buscava, e quem já conversava ficava sem.
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.FotoPerfilWhatsApp,
+            Arg.Is<ColetarFotoPerfilWhatsAppJob>(j => j.EmpresaId == _empresaId && j.ClienteId == lead.Id && j.Contato == ContatoWaId));
     }
 
     [Fact]

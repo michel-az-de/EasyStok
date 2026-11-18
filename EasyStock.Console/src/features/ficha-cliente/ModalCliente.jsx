@@ -17,7 +17,7 @@ import css from './ModalCliente.module.css'
 
 export function ModalCliente({ conversa, aoFechar, children }) {
   const { fonteApi, historico = [], agora } = useAtendimento()
-  const { carregarClienteDaConversa } = useAcoes()
+  const { relerClienteDaConversa } = useAcoes()
   const { permite } = useAcessoModulos()
   const [salvandoNota, setSalvandoNota] = useState(false)
   const [baixandoPdf, setBaixandoPdf] = useState(false)
@@ -62,7 +62,8 @@ export function ModalCliente({ conversa, aoFechar, children }) {
     try {
       if (arquivo) await enviarFotoCliente(conversa.clienteId, arquivo)
       else await removerFotoCliente(conversa.clienteId)
-      if (await carregarClienteDaConversa(conversa.id) === false) {
+      // #2838: a leitura em voo pode ter saído antes da gravação e traria a foto anterior.
+      if (await relerClienteDaConversa(conversa.id) === false) {
         setErro('A alteração da foto foi salva. Reabra a ficha para atualizar a imagem.')
       }
     } catch (falha) {
