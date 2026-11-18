@@ -20,3 +20,13 @@ export async function listarPedidosDoCliente(clienteId, contexto, sinal) {
   const r = await chamarApi(`/api/pedidos?${parametros}`, { ...opcoes(contexto, sinal), envelope: true })
   return Array.isArray(r?.data) ? r.data : []
 }
+
+// #2832: quantos pedidos de hoje há numa situação (`status`, lista por vírgula; nulo = todos). Pede uma linha só e
+// lê o total da página: a contagem é da API, nunca da página que veio.
+export async function contarPedidos({ status = null, desde }, contexto, sinal) {
+  const parametros = new URLSearchParams({ empresaId: contexto.empresaId, page: 1, pageSize: 1, desde, ...(status ? { status } : {}) })
+  const r = await chamarApi(`/api/pedidos?${parametros}`, { ...opcoes(contexto, sinal), envelope: true })
+  const total = r?.meta?.totalCount ?? r?.meta?.total
+  if (!Number.isInteger(total)) throw new Error('A contagem dos pedidos não foi recebida.')
+  return total
+}

@@ -31,6 +31,8 @@ import { AbaCalculadoraApi } from './producao/AbaCalculadoraApi'
 import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
 import { AbaPerdasApi } from './producao/AbaPerdasApi'
 import { ChecklistConfiguracao } from './producao/ChecklistConfiguracao'
+import { PainelTurnoDeHoje } from './turno/PainelTurnoDeHoje'
+import { contarUsoDaGestao, identidadeDaGestao, lerUsoDaGestao } from '../../aplicacao/useTurnoDeHoje'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -52,7 +54,9 @@ function navegarAbas(evento, itens, indice, escolher, botoes, vertical = false) 
 
 // A janela e as rotas usam o mesmo catálogo, as mesmas permissões e o mesmo
 // PainelDeAjuste. Trocar uma aba aqui mantém a conversa e o pedido montados.
-export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
+// #2832: no modo API o início abre no painel "Agora" (Turno de hoje); "Todas as telas" é o índice de antes.
+// `renderizarEnviarCardapio` vem do App: o modal de enviar o cardápio é da feature do atendimento.
+export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null, renderizarEnviarCardapio = null }) {
   const { fonteApi } = useAtendimento()
   const { permite, acoes } = useAcessoModulos()
   const areas = useMemo(() => MODULOS
@@ -62,6 +66,10 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
   const [abaAtiva, setAbaAtiva] = useState(abaInicial)
   const [inicio, setInicio] = useState(!abaInicial)
   const [busca, setBusca] = useState('')
+  const [vista, setVista] = useState(fonteApi ? 'agora' : 'telas')
+  const [identidade] = useState(identidadeDaGestao)
+  const [uso, setUso] = useState(() => lerUsoDaGestao(identidade))
+  const telasDisponiveis = useMemo(() => areas.flatMap((modulo) => modulo.telas).filter((t) => !(fonteApi && t.indisponivelNaApi)), [areas, fonteApi])
   const termo = busca.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
   const encontradas = areas.map((modulo) => ({
     ...modulo,
@@ -82,6 +90,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
     else painelRef.current?.focus({ preventScroll: true })
   }, [inicio, abaAtiva])
   function escolherTela(item) {
+    setUso(contarUsoDaGestao(identidade, item.aba))
     mudarFoco.current = inicio
     setInicio(false)
     setAbaAtiva(item.aba)
@@ -133,6 +142,15 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
     >
       {area && inicio ? (
         <div className={css.inicioGestao}>
+          {fonteApi && (
+            <div className={css.vistasGestao}>
+              <Botao variante={vista === 'agora' ? 'primario' : 'secundario'} aria-pressed={vista === 'agora'} onClick={() => setVista('agora')}>Agora</Botao>
+              <Botao variante={vista === 'telas' ? 'primario' : 'secundario'} aria-pressed={vista === 'telas'} onClick={() => setVista('telas')}>Todas as telas</Botao>
+            </div>
+          )}
+          {vista === 'agora' ? (
+            <PainelTurnoDeHoje telas={telasDisponiveis} uso={uso} aoAbrirAba={(aba) => escolherTela({ aba })} renderizarEnviarCardapio={renderizarEnviarCardapio} />
+          ) : <>
           <div ref={buscaRef}><CampoTexto rotulo="O que você quer fazer?" placeholder="Buscar por respostas, estoque, caixa…" value={busca} onChange={(evento) => setBusca(evento.target.value)} /></div>
           <div className={css.tarefasGestao}>
             {encontradas.map((modulo) => (
@@ -151,6 +169,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
             ))}
           </div>
           {encontradas.length === 0 && <Vazio titulo="Nenhuma tela encontrada">Tente outro nome.</Vazio>}
+          </>}
         </div>
       ) : area ? (
         <>

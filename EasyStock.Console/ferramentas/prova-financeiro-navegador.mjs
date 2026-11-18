@@ -432,6 +432,8 @@ try {
   await page.goto(origem + '/#/m/atendimento/balcao')
   await page.getByRole('button', { name: 'Gestão', exact: true }).click()
   const gestao = page.getByRole('dialog', { name: 'Gestão da loja', exact: true })
+  // #2832: no modo API a Gestão abre no painel Agora; a busca das telas fica em Todas as telas.
+  await gestao.getByRole('button', { name: 'Todas as telas', exact: true }).click()
   // #2143: a Gestão abre na busca de tarefas; a escolha da tela leva às abas.
   await gestao.getByRole('region', { name: 'Financeiro', exact: true }).getByRole('button', { name: 'Contas a pagar', exact: true }).click()
   await gestao.getByRole('tab', { name: 'Financeiro', exact: true, selected: true }).waitFor()

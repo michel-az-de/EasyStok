@@ -51,6 +51,7 @@ import { CartaoArrasto, PainelCardapio } from '../features/cardapio/PainelCardap
 import { ModalNota } from '../features/notas/ModalNota'
 import { PainelGaleria } from '../features/anexos/PainelGaleria'
 import { ModalAutomacoes } from '../features/automacoes/ModalAutomacoes'
+import { ModalCompartilharComanda } from '../features/atendimento/CompartilharComanda'
 import { ModalHorariosDaSemana } from '../features/automacoes/ModalHorariosDaSemana'
 import { ModalGestao, PainelDeAjuste } from '../features/gestao/ModalGestao'
 import { HallDeModulos } from '../features/hall/HallDeModulos'
@@ -358,6 +359,7 @@ function Composicao({ rota }) {
       {modal === 'gestao' && (
         <ModalGestao
           renderizarEditorCardapio={(props) => <EditorItemCardapio {...props} />}
+          renderizarEnviarCardapio={(props) => <ModalCompartilharComanda {...props} />}
           horariosAtendimento={<AjustarHorariosAtendimento />}
           abaInicial={abaGestao}
           aoTrocarAba={setAbaGestao}
