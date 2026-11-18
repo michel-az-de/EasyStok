@@ -65,10 +65,10 @@ public class CancelarPedidoUseCase(
 
             statusAntigo = pedido.Status;
             // #1571: no pedido que veio do aparelho o status do ERP espelha o do aparelho, e um
-            // aparelho atrasado pode tê-lo levado de volta a "aguardando" com a baixa já feita. Aí
-            // devolve-se pelo que está baixado, não pelo status (a devolução só mexe em saída aberta).
-            if (PedidoStateMachine.DescontaEstoque(pedido.StatusEnum) || !string.IsNullOrWhiteSpace(pedido.MobileOrderId))
-                await estoqueIntegration.DevolverAsync(pedido);
+            // aparelho atrasado pode tê-lo levado de volta a "aguardando" com a baixa já feita.
+            // #2843: a alteração da comanda leva o Pronto de volta a Preparando com a linha avulsa ainda baixada.
+            // Por isso devolve-se pelo que está baixado, não pelo status (a devolução só mexe em saída aberta).
+            await estoqueIntegration.DevolverAsync(pedido);
             pedido.Cancelar();
             var agora = DateTime.UtcNow;
             // Cobrança paga conserva a evidência do recebimento. Cancelar a operação não
