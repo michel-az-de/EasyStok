@@ -1360,6 +1360,12 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime?>("AguardaClienteDesde")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("ApagadaEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApagadaPorUsuarioId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Assunto")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
@@ -1430,6 +1436,10 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime?>("ProximoReenvioEm")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reacao")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("ReservaSmsEm")
                         .HasColumnType("timestamp with time zone");

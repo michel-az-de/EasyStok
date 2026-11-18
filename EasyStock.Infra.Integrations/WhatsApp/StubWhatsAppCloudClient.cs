@@ -52,6 +52,12 @@ public sealed class StubWhatsAppCloudClient : IWhatsAppCloudClient
         return Task.FromResult<(Stream, string)>((new MemoryStream(), "application/octet-stream"));
     }
 
+    public Task ReagirAsync(string waId, string wamid, string? emoji, CancellationToken ct = default)
+        => Registrar("reacao", waId, $"{wamid}:{emoji}");
+
+    public Task ApagarParaTodosAsync(string waId, string wamid, CancellationToken ct = default)
+        => Registrar("apagar", waId, wamid);
+
     private Task<EnvioWhatsAppResult> Registrar(string tipo, string waId, string conteudo)
     {
         var wamid = $"wamid-stub-{Guid.NewGuid():N}";

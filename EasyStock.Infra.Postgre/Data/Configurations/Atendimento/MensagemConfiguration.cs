@@ -34,6 +34,7 @@ public class MensagemConfiguration : IEntityTypeConfiguration<Mensagem>
         builder.Property(m => m.ErroMidia).HasMaxLength(Mensagem.ErroMidiaTamanhoMaximo);
         builder.Property(m => m.TentativasMidia).HasDefaultValue(0);
         builder.Ignore(m => m.MidiaFalhou);
+        builder.Property(m => m.Reacao).HasMaxLength(Mensagem.ReacaoTamanhoMaximo); // #2833
 
         // #1397: a varredura de anexos só procura mensagens com tentativa agendada.
         builder.HasIndex(m => m.ProximaTentativaMidiaEm)

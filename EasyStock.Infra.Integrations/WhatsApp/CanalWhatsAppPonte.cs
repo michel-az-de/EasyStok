@@ -7,9 +7,16 @@ namespace EasyStock.Infra.Integrations.WhatsApp;
 /// Adaptador do WhatsApp quando a ponte não oficial está ligada (#2072, ADR-0062): o mesmo <see cref="CanalWhatsApp"/>,
 /// marcado como <see cref="ICanalSemModeloAprovado"/> para o outbox mandar o texto onde a Meta mandaria o modelo.
 /// </summary>
-public sealed class CanalWhatsAppPonte(IWhatsAppCloudClient cloud) : ICanalMensageria, ICanalComAudio, ICanalSemModeloAprovado
+public sealed class CanalWhatsAppPonte(IWhatsAppCloudClient cloud)
+    : ICanalMensageria, ICanalComAudio, ICanalSemModeloAprovado, ICanalComAcoesNaMensagem
 {
     private readonly CanalWhatsApp _canal = new(cloud);
+
+    public Task ReagirAsync(string contatoIdExterno, string idMensagemExterna, string? emoji, CancellationToken ct = default) =>
+        _canal.ReagirAsync(contatoIdExterno, idMensagemExterna, emoji, ct);
+
+    public Task ApagarParaTodosAsync(string contatoIdExterno, string idMensagemExterna, CancellationToken ct = default) =>
+        _canal.ApagarParaTodosAsync(contatoIdExterno, idMensagemExterna, ct);
 
     public CanalConversa Canal => _canal.Canal;
 

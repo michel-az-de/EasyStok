@@ -165,6 +165,81 @@ public class WppConnectClientTests
         _http.UltimaChamada!.Uri.Query.Should().Be("?count=30");
     }
 
+    /// <summary>#2833: a reação vai pelo id serializado da mensagem; reação vazia sai como <c>false</c>, que retira.</summary>
+    [Fact]
+    public async Task Reacao_vai_pelo_id_da_mensagem_e_vazia_retira()
+    {
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/react-message")
+            .Responde(HttpStatusCode.OK, """{"status":"success","response":{"message":"Reaction sended"}}""");
+        var wamid = $"wpp:{_sessao.Sessao}:false_5511999999999@c.us_ABC";
+
+        await Client.ReagirAsync("5511999999999", wamid, "👍");
+        var corpo = System.Text.Json.JsonDocument.Parse(_http.UltimaChamada!.Corpo!).RootElement;
+        corpo.GetProperty("msgId").GetString().Should().Be("false_5511999999999@c.us_ABC");
+        corpo.GetProperty("reaction").GetString().Should().Be("👍");
+
+        await Client.ReagirAsync("5511999999999", wamid, null);
+        System.Text.Json.JsonDocument.Parse(_http.UltimaChamada!.Corpo!).RootElement
+            .GetProperty("reaction").ValueKind.Should().Be(System.Text.Json.JsonValueKind.False);
+    }
+
+    /// <summary>#2833: a rota de apagar do WPPConnect não completa o telefone; vai a conversa inteira, inclusive LID.</summary>
+    [Theory]
+    [InlineData("true_5511999999999@c.us_ABC", "5511999999999@c.us")]
+    [InlineData("true_123456789012345@lid_DEF", "123456789012345@lid")]
+    public async Task Apagar_para_todos_manda_a_conversa_completa_e_o_id(string serializado, string conversa)
+    {
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/delete-message")
+            .Responde(HttpStatusCode.OK, """{"status":"success","response":{"message":"Message deleted"}}""");
+
+        await Client.ApagarParaTodosAsync("5511999999999", $"wpp:{_sessao.Sessao}:{serializado}");
+
+        var corpo = System.Text.Json.JsonDocument.Parse(_http.UltimaChamada!.Corpo!).RootElement;
+        corpo.GetProperty("phone").GetString().Should().Be(conversa);
+        corpo.GetProperty("messageId").GetString().Should().Be(serializado);
+        corpo.GetProperty("isGroup").GetBoolean().Should().BeFalse();
+        corpo.TryGetProperty("onlyLocal", out var soLocal).Should().BeTrue();
+        soLocal.GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Apagar_sem_confirmacao_da_ponte_falha()
+    {
+        _http.QuandoQualquer().Responde(HttpStatusCode.Unauthorized,
+            """{"status":"error","response":{"message":"Error unknown on delete message"}}""");
+
+        var act = () => Client.ApagarParaTodosAsync("5511999999999", $"wpp:{_sessao.Sessao}:true_5511999999999@c.us_ABC");
+
+        await act.Should().ThrowAsync<WhatsAppCloudException>();
+    }
+
+    [Fact]
+    public async Task Mensagem_de_outra_sessao_nao_e_apagada_nem_reagida()
+    {
+        var alheia = "wpp:ez-00000000000000000000000000000000:true_5511999999999@c.us_ABC";
+
+        await ((Func<Task>)(() => Client.ApagarParaTodosAsync("5511999999999", alheia))).Should().ThrowAsync<WhatsAppCloudException>();
+        await ((Func<Task>)(() => Client.ReagirAsync("5511999999999", alheia, "👍"))).Should().ThrowAsync<WhatsAppCloudException>();
+        _http.Chamadas.Should().BeEmpty();
+    }
+
+    /// <summary>#2833: o roteador repassa reagir e apagar ao cliente da sessão, sem cair no padrão "não suporta".</summary>
+    [Fact]
+    public async Task Roteador_repassa_reagir_e_apagar_a_ponte()
+    {
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/react-message")
+            .Responde(HttpStatusCode.OK, """{"status":"success","response":{}}""");
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/delete-message")
+            .Responde(HttpStatusCode.OK, """{"status":"success","response":{}}""");
+        var roteador = new RoteadorWhatsAppClient(_remetente, Client, null!, new ConfigurationBuilder().Build());
+        var wamid = $"wpp:{_sessao.Sessao}:true_5511999999999@c.us_ABC";
+
+        await roteador.ReagirAsync("5511999999999", wamid, "❤️");
+        await roteador.ApagarParaTodosAsync("5511999999999", wamid);
+
+        _http.Chamadas.Should().HaveCount(2);
+    }
+
     [Fact]
     public async Task Piloto_sem_sessao_nao_cai_em_envio_simulado()
     {

@@ -27,6 +27,9 @@ import { EscolhaDeArquivo, GravadorAudio, PreviaAnexo } from './ComposerAnexos'
 import { avisoDeVariaveisNaoResolvidas } from '../../dominio/respostas'
 import { avisoDeLimiteDoTexto } from '../../dominio/limiteDoTexto'
 import { SeletorRespostas } from './SeletorRespostas'
+import { SeletorDeEmoji } from './SeletorDeEmoji'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
+import { inserirNoCursor } from '../../dominio/acoesNaMensagem'
 import { ModalProgramarMensagem } from './ModalProgramarMensagem'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
 import { acoesDoComposer } from './apresentacaoDaConversa'
@@ -82,6 +85,20 @@ export function Composer({
   // O Composer remonta por conversa (#1510): o "Desfazer" do anexo não vale na conversa seguinte.
   const avisoDoAnexo = useRef(null)
   useEffect(() => () => aviso.dispensar(avisoDoAnexo.current ?? -1), [aviso])
+  // #2833: seletor de emoji. O emoji entra no cursor do campo (a seleção do textarea sobrevive ao foco na busca),
+  // e o cursor fica logo depois dele para o próximo.
+  const [emojiAberto, setEmojiAberto] = useState(false)
+  const textareaDoCampo = () => campoRef.current?.querySelector('textarea')
+  function inserirEmoji(emoji) {
+    const campo = textareaDoCampo()
+    const { texto, cursor } = inserirNoCursor(lerTexto(), campo?.selectionStart, campo?.selectionEnd, emoji)
+    aoMudarRascunho(texto)
+    requestAnimationFrame(() => textareaDoCampo()?.setSelectionRange(cursor, cursor))
+  }
+  function fecharEmoji() {
+    setEmojiAberto(false)
+    requestAnimationFrame(() => textareaDoCampo()?.focus())
+  }
   // #1424: modal de programar mensagem, guardada pelo id da conversa (trocar de conversa fecha).
   const [programarEm, setProgramarEm] = useState(null)
   const { ler } = useArquivoComoDataUrl()
@@ -362,6 +379,16 @@ export function Composer({
                   <Icone nome="nota" /><span>{notaEmRascunho ? 'Retomar nota' : 'Nota'}</span>
                 </Botao>
               </Tooltip>
+              {/* #2833: emoji no cursor, com busca por :nome. */}
+              <span className={css.ancoraEmoji}>
+                {/* Só o ícone, como no WhatsApp: com nome visível, a fileira não cabia em 320 px (prova-2134). */}
+                <BotaoIcone
+                  rotulo="Emoji" dica="Emoji no texto (busca por :nome)" icone="smile"
+                  aria-haspopup="dialog" aria-expanded={emojiAberto}
+                  disabled={!podeEscrever} onClick={() => (emojiAberto ? fecharEmoji() : setEmojiAberto(true))}
+                />
+                {emojiAberto && <SeletorDeEmoji aoEscolher={inserirEmoji} aoFechar={fecharEmoji} />}
+              </span>
               {/* Rodada 12 (issue #16, dúvida da Thatiane "esse botão é pra
                   quê?"): os quatro vizinhos ganham nome visível, como o
                   Respostas. Em coluna estreita o nome some por container

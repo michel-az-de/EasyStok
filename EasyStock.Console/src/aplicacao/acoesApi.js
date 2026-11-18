@@ -1,7 +1,7 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
-  transferir,
+  apagarMensagem, assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir,
+  reagirMensagem, reenviarMensagem, transferir,
 } from '../infra/api/conversasApi'
 import { conversaDaApi, mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
 import { lerSessao } from '../infra/api/sessao'
@@ -32,6 +32,7 @@ import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/nao
 import { criarAssumirAntesDeEnviar } from './api/assumirAntesDeEnviar'
 import { criarChavesDeMensagem } from './chavesDeMensagem'
 import { proximoInstante } from './relogioDeLeitura'
+import { guardarMensagemNaMemoria } from './cicloDeSincronizacao'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
@@ -67,8 +68,18 @@ const falhaDoEnvio = (id, mensagemId, erro) => ({
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
 // traz o estado do servidor. As ações ainda não ligadas (lista única em
 // `api/naoLigadas.js`) não mexem na memória do navegador: só avisam na faixa.
-export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef = null }) {
+export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef = null, memoria = null }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
+  // #2833: a resposta é a mensagem inteira; devolve a traduzida, ou null quando a API recusou. Ela entra também
+  // na lista do laço, senão a volta seguinte desfaz a mudança na tela (`guardarMensagemNaMemoria`).
+  const atualizarMensagem = (id, chamada) => chamada
+    .then((m) => {
+      const mensagem = mensagemDaApi(m, id)
+      guardarMensagemNaMemoria(memoria, id, m)
+      despachar({ tipo: acao.ATUALIZAR_MENSAGEM_API, id, mensagem })
+      return mensagem
+    })
+    .catch((erro) => { avisar(erro); return null })
   // #1787: o reducer recusa o envio sem criar balão; sem esta guarda o texto saía pela API e a falha ficava muda.
   // A mesma regra do reducer (envioBloqueado); conversa que o estado não conhece segue para o EasyStok decidir.
   const envioRecusado = (id) => {
@@ -171,6 +182,10 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
           despachar({ tipo: acao.FALHAR_ENVIO_API, id, mensagemId, erro: motivoDaRecusa(erro) })
           return null
         }),
+    // #2833: reação (emoji nulo retira) e apagar para todos, só no modo API. A mensagem que a API devolve troca a
+    // da conversa; a recusa (prazo, canal sem a ação) vira aviso, e a bolha fica como estava.
+    reagir: (id, mensagemId, emoji) => atualizarMensagem(id, reagirMensagem(id, mensagemId, emoji)),
+    apagar: (id, mensagemId) => atualizarMensagem(id, apagarMensagem(id, mensagemId)),
     // #1353: a tela do link no console não tem dado no modo API; o link é o da loja.
     obterLinkCardapio: (id) => gerarLinkCardapio(id)
       .then((link) => ({ url: link.url, numeroComanda: link.numeroComanda, daLoja: true }))

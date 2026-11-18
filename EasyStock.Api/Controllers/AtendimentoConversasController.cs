@@ -191,6 +191,31 @@ public class AtendimentoConversasController(
     public Task<IActionResult> ReenviarMensagem(Guid id, Guid mensagemId, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await reenviarUseCase.ExecuteAsync(currentUser.EmpresaId, id, mensagemId, ct)));
 
+    [SwaggerOperation(Summary = "React to a message (#2833)",
+        Description = "Emoji nulo ou vazio retira a reação. Sai pelo canal antes de gravar. Canal sem reação: 409 ACAO_NAO_SUPORTADA_NO_CANAL.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [HttpPost("{id:guid}/mensagens/{mensagemId:guid}/reacao")]
+    public Task<IActionResult> Reagir(Guid id, Guid mensagemId, [FromBody] ReagirMensagemBody body,
+        [FromServices] AcoesNaMensagemUseCase acoes, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await acoes.ReagirAsync(
+            new ReagirMensagemCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, mensagemId, body?.Emoji), ct)));
+
+    [SwaggerOperation(Summary = "Delete a store message for everyone (#2833)",
+        Description = "Só mensagem enviada pela loja, até 48 h. O registro fica guardado como apagado, com quem e quando. " +
+                      "A Cloud API da Meta não apaga: 409 ACAO_NAO_SUPORTADA_NO_CANAL.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    [HttpDelete("{id:guid}/mensagens/{mensagemId:guid}")]
+    public Task<IActionResult> ApagarMensagem(Guid id, Guid mensagemId,
+        [FromServices] AcoesNaMensagemUseCase acoes, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await acoes.ApagarParaTodosAsync(
+            new ApagarMensagemCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, mensagemId), ct)));
+
     [SwaggerOperation(Summary = "Send an image as the owner (multipart; takes over the conversation)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -398,6 +423,10 @@ public class AtendimentoConversasController(
         {
             return UnprocessableEntity(new ApiErrorResponse(new ApiError("DESTINO_NAO_ATENDE", ex.Message, null, null)));
         }
+        catch (AcaoNaoSuportadaWhatsAppException ex)
+        {
+            return Conflict(new ApiErrorResponse(new ApiError(AcaoNaoSuportadaWhatsAppException.Codigo, ex.Message, null, null)));
+        }
         catch (ForaDaJanelaAtendimentoException)
         {
             return Conflict(new { erro = ForaDaJanelaAtendimentoException.Codigo, sugestao = ForaDaJanelaAtendimentoException.Sugestao });
@@ -445,6 +474,8 @@ public class AtendimentoConversasController(
 }
 
 public sealed record EnviarMensagemConsoleBody(string Texto, bool Confirmar = false);
+
+public sealed record ReagirMensagemBody(string? Emoji);
 
 public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null, bool Confirmar = false);
 

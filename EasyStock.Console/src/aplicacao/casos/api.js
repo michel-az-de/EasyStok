@@ -100,6 +100,17 @@ export const casosApi = {
       }
     }),
 
+  // #2833: a mensagem já enviada volta com a reação ou apagada. A tradução omite o que é nulo, então a reação
+  // retirada só some se a mensagem velha não emprestar a dela.
+  [acao.ATUALIZAR_MENSAGEM_API]: (estado, { id, mensagem }) => mapear(estado, id, c => ({
+    ...c,
+    mensagens: c.mensagens.map((m) => {
+      if (m.id !== mensagem.id) return m
+      const { reacao: _reacao, apagadaEm: _apagadaEm, ...resto } = m
+      return { ...resto, ...mensagem }
+    }),
+  })),
+
   [acao.RECEBER_MODELO_API]: (estado, { id, mensagem }) => mapear(estado, id, c => ({
     ...c, mensagens: [...c.mensagens.filter(m => m.id !== mensagem.id), { ...mensagem, aguardandoSync: true }],
   })),

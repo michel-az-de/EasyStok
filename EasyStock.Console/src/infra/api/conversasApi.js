@@ -62,6 +62,13 @@ export const enviarTexto = (id, texto, { chave = null } = {}) =>
 export const reenviarMensagem = (conversaId, mensagemId) =>
   chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/reenviar`, { metodo: 'POST' })
 
+// #2833: reação da loja (emoji nulo retira) e apagar para todos. As duas devolvem a mensagem atualizada.
+export const reagirMensagem = (conversaId, mensagemId, emoji) =>
+  chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/reacao`, { metodo: 'POST', corpo: { emoji } })
+
+export const apagarMensagem = (conversaId, mensagemId) =>
+  chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}`, { metodo: 'DELETE' })
+
 // Mensagens que não chegaram ao cliente, de todas as conversas (S59).
 export const listarNaoEntregues = ({ limite = 50 } = {}) => chamarApi(`${BASE}/nao-entregues?limite=${limite}`)
 
