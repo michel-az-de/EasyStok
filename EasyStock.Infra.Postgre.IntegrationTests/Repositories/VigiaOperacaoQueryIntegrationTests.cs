@@ -259,4 +259,42 @@ public class VigiaOperacaoQueryIntegrationTests(PostgreSqlDatabaseFixture fixtur
         if (finalizar) lote.Finalizar();
         return lote;
     }
+
+    // #2836: pedido aberto com o retrato do cadastro; finalizado, antigo e de outra empresa ficam de fora.
+    [SkippableFact]
+    public async Task PedidosAbertosTrazemOCadastroLigado()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var casa = Empresa.Criar("Vigia cadastro", null);
+        var outra = Empresa.Criar("Vigia cadastro outra", null);
+        var cliente = Cliente.Criar(casa.Id, "Maria Souza");
+        // Telefone só na lista de telefones, como nos cadastros feitos pela tela Cadastros.
+        cliente.Telefones.Add(new ClienteTelefone { Id = Guid.NewGuid(), ClienteId = cliente.Id, Numero = "+5511999998888" });
+        var comCliente = NovoPedido(casa.Id, StatusPedidoMapper.Aguardando, "Rua A, 1");
+        comCliente.ClienteId = cliente.Id;
+        var semCliente = NovoPedido(casa.Id, StatusPedidoMapper.Preparando, null);
+        semCliente.CriadoEm = Agora.AddHours(-1);
+        var entregue = NovoPedido(casa.Id, StatusPedidoMapper.Entregue, "Rua B, 2");
+        var antigo = NovoPedido(casa.Id, StatusPedidoMapper.Aguardando, "Rua C, 3");
+        antigo.CriadoEm = Agora.AddDays(-5);
+        var deFora = NovoPedido(outra.Id, StatusPedidoMapper.Aguardando, "Rua D, 4");
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.Empresas.AddRange(casa, outra);
+            db.Clientes.Add(cliente);
+            db.Pedidos.AddRange(comCliente, semCliente, entregue, antigo, deFora);
+            await db.SaveChangesAsync();
+        }
+
+        await using var leitura = await ComTenantAsync(casa.Id);
+        var lista = await new VigiaOperacaoQuery(leitura).ListarPedidosAbertosComClienteAsync(casa.Id, Agora.AddDays(-3), 50);
+
+        lista.Select(p => p.PedidoId).Should().Equal(semCliente.Id, comCliente.Id);
+        lista[0].ClienteId.Should().BeNull();
+        lista[1].NomeCadastro.Should().Be("Maria Souza");
+        lista[1].TelefoneCadastro.Should().Be("+5511999998888");
+        lista[1].FotoChave.Should().BeNull();
+        lista[1].EnderecoEntrega.Should().Be("Rua A, 1");
+        lista[1].EnderecoConfirmadoEm.Should().BeNull();
+    }
 }

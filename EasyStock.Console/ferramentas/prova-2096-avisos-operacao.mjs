@@ -45,9 +45,9 @@ const DA_API = {
   slaRespostaMinutos: 7,
 }
 
-confere('aba Avisos: seis grupos na ordem pedida, quatorze avisos, só no modo API', () => {
+confere('aba Avisos: seis grupos na ordem pedida, quinze avisos, só no modo API', () => {
   assert.deepEqual(GRUPOS_DE_AVISOS.map((g) => g.titulo), ['Atendimento', 'Pedidos e cozinha', 'Encomendas', 'Estoque', 'Assistente', 'WhatsApp da equipe'])
-  assert.equal(AVISOS.length, 14)
+  assert.equal(AVISOS.length, 15)
   const atendimento = moduloPorId('atendimento')
   assert.ok(telasDoMenu(atendimento, { fonteApi: true }).some((t) => t.id === 'avisos' && t.aba === 'avisos'))
   assert.ok(!telasDoMenu(atendimento, { fonteApi: false }).some((t) => t.id === 'avisos'))

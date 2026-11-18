@@ -10,6 +10,14 @@ public sealed record EncomendaEmAberto(
 /// <summary>Item de lote ainda no freezer (etiquetas sem baixa), perto de vencer ou parado há muito tempo (#2096).</summary>
 public sealed record ItemFreezerParaConferir(string Nome, string CodigoLote, DateTime ProduzidoEm, DateTime? ExpiraEm, int Unidades);
 
+/// <summary>
+/// #2836: pedido em aberto com o retrato do cadastro ligado (nulo quando o pedido não tem cliente). Entrega é o pedido com
+/// endereço; retirada não pede endereço confirmado.
+/// </summary>
+public sealed record PedidoAbertoComCliente(
+    Guid PedidoId, string? ClienteNomePedido, Guid? ClienteId, string? NomeCadastro, string? TelefoneCadastro,
+    string? FotoChave, string? EnderecoEntrega, DateTime? EnderecoConfirmadoEm);
+
 /// <summary>Leituras da vigia da operação, sempre de uma empresa só (o job liga o tenant antes).</summary>
 public interface IVigiaOperacaoQuery
 {
@@ -30,4 +38,8 @@ public interface IVigiaOperacaoQuery
     /// <param name="produzidoAteUtc">Entra o lote produzido até aqui (parado). Nulo: não olha idade.</param>
     Task<IReadOnlyList<ItemFreezerParaConferir>> ListarFreezerParaConferirAsync(
         Guid empresaId, DateTime? venceAteUtc, DateTime? produzidoAteUtc, int limite, CancellationToken ct = default);
+
+    /// <summary>#2836: pedidos abertos e já aceitos, feitos a partir de <paramref name="criadoDesdeUtc"/>, mais novos primeiro.</summary>
+    Task<IReadOnlyList<PedidoAbertoComCliente>> ListarPedidosAbertosComClienteAsync(
+        Guid empresaId, DateTime criadoDesdeUtc, int limite, CancellationToken ct = default);
 }
