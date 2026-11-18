@@ -278,6 +278,35 @@ public class AuthControllerTests
             comEmpresa && modulo is Modulo.Atendimento or Modulo.Cadastros && nivel is not NivelAcesso.Visualizador);
     }
 
+    // #2813: `GET api/mobile/legacy-import/fechamentos` é da policy Gerente, exige empresa e não tem módulo. A tela do Console
+    // deve aparecer para quem a rota aceita, mesmo com permissões explícitas que deixam o Atendimento de fora.
+    [Theory]
+    [InlineData(NivelAcesso.SuperAdmin, true, true)]
+    [InlineData(NivelAcesso.Admin, true, true)]
+    [InlineData(NivelAcesso.Gerente, true, true)]
+    [InlineData(NivelAcesso.Operador, true, false)]
+    [InlineData(NivelAcesso.Visualizador, true, false)]
+    [InlineData(NivelAcesso.Gerente, false, false)]
+    public void VerFechamentosLegadosSegueARotaGerenteComEmpresaSemDependerDeModulo(NivelAcesso nivel, bool comEmpresa, bool esperado)
+    {
+        UsarContextoHttp();
+        _controller.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+        [
+            new("nivel", nivel.ToString()),
+            new("empresaId", (comEmpresa ? Guid.NewGuid() : Guid.Empty).ToString()),
+            new("permissao", EasyStock.Domain.Services.AcessoModulos.PermissaoDe(Modulo.Caixa).ToString()),
+            new("permissoesExplicitas", "true")
+        ], "test"));
+        var usuario = new EasyStock.Api.Services.CurrentUserAccessor(
+            new Microsoft.AspNetCore.Http.HttpContextAccessor { HttpContext = _controller.HttpContext });
+
+        var resposta = (Microsoft.AspNetCore.Mvc.OkObjectResult)_controller.GetModulos(usuario);
+        var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
+
+        acoes.GetProperty("verFechamentosLegados").GetBoolean().Should().Be(esperado);
+    }
+
     [Theory]
     [InlineData(true, true, true)]
     [InlineData(false, true, false)]

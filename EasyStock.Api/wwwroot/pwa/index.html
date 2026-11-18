@@ -7778,6 +7778,10 @@ body.ux-calm [data-screen="producao"] .section-label {
         <button data-f="recorrentes" onclick="setClientFilter('recorrentes')">Recorrentes</button>
         <button data-f="sumidos" onclick="setClientFilter('sumidos')">Sumidos</button>
       </div>
+      <div class="search-box" style="margin:8px 0 12px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="clientListSearch" type="search" inputmode="search" placeholder="Buscar por nome ou telefone" aria-label="Buscar cliente por nome ou telefone" oninput="setClientListQuery(this.value)" autocomplete="off">
+      </div>
       <div id="clientRecurrenceList"></div>
     </div>
 
@@ -10087,7 +10091,9 @@ function preferenciaAusente(key) {
     return !v || !v.impressoras || !Object.keys(v.impressoras).length;
   } catch (e) { return true; }
 }
-const BACKUP_ARCHIVE_KEYS = ['cdb-shopping', 'cdb-audit-log', 'cdb-audit-log-archive'];
+// #2813: 'cdb-sync-deadletter' e 'cdb-sync-conflicts' não existem no localStorage; guardam, uma entrada por item, as recusadas e os
+// conflitos de um backup importado com aceite explícito (nada se perde e nada disso vai ao importador).
+const BACKUP_ARCHIVE_KEYS = ['cdb-shopping', 'cdb-audit-log', 'cdb-audit-log-archive', 'cdb-sync-deadletter', 'cdb-sync-conflicts'];
 function backupArchiveEntries(entries, legacyStorage = {}) {
   if (!Array.isArray(entries)) throw new Error('Anexos do backup inválidos.');
   const result = [], seen = new Set();
@@ -10143,7 +10149,23 @@ function backupComparable(value) {
   return JSON.stringify(value);
 }
 
-function prepareBackupImport(input) {
+// #2813: backup com recusadas ou conflitos de sincronização só entra com aceite explícito (options.aceitarRecusadosEConflitos).
+function backupRecusadosError(recusadas, conflitos) {
+  const erro = new Error('Este backup tem alterações recusadas ou conflitos de sincronização. A equipe precisa revisá-los no PWA antigo antes da migração.');
+  erro.code = 'BACKUP_RECUSADOS_CONFLITOS'; erro.recusadas = recusadas; erro.conflitos = conflitos;
+  return erro;
+}
+function backupContagemRecusadas(recusadas, conflitos) {
+  return recusadas + (recusadas === 1 ? ' alteração recusada' : ' alterações recusadas') + ' e ' + conflitos + (conflitos === 1 ? ' conflito' : ' conflitos');
+}
+// Uma entrada de anexo por item, em ordem canônica: reimportar o mesmo backup não duplica nada.
+function backupArquivoRecusados(recusadas, conflitos) {
+  if (!Array.isArray(recusadas) || !Array.isArray(conflitos)) throw new Error('Alterações recusadas ou conflitos do backup inválidos.');
+  const anexo = key => item => ({ key, value: canonicalImportJson(item) });
+  return backupArchiveEntries(recusadas.map(anexo('cdb-sync-deadletter')).concat(conflitos.map(anexo('cdb-sync-conflicts'))));
+}
+
+function prepareBackupImport(input, options = {}) {
   let payload = input;
   if (input && input.schema === 'cdb-backup-v1' && input.data && typeof input.data === 'object') {
     const state = {};
@@ -10180,12 +10202,15 @@ function prepareBackupImport(input) {
   });
   const ls = payload.localStorage || {};
   if (typeof ls !== 'object' || Array.isArray(ls)) throw new Error('Preferências do backup inválidas.');
-  const sourceArchive = backupArchiveEntries(payload.localArchive || [], ls);
+  const exportedSync = payload.sync || {};
+  const recusadas = exportedSync.deadletter || [], conflitosDeSync = exportedSync.conflicts || [];
+  const comRecusadas = !!(recusadas.length || conflitosDeSync.length);
+  if (comRecusadas && !(options && options.aceitarRecusadosEConflitos)) throw backupRecusadosError(recusadas.length, conflitosDeSync.length);
+  // #2813: com aceite explícito, recusadas e conflitos de sincronização saem do que vai ao importador e ficam guardados como anexos (localArchive).
+  const sourceArchive = backupArchiveEntries(backupArchiveEntries(payload.localArchive || [], ls).concat(comRecusadas ? backupArquivoRecusados(recusadas, conflitosDeSync) : []));
   const existingArchive = backupArchiveEntries(JSON.parse(localStorage.getItem('cdb-import-archives') || '[]'));
   const localArchive = backupArchiveEntries(existingArchive.concat(sourceArchive));
   const archiveChanged = JSON.stringify(localArchive) !== JSON.stringify(existingArchive);
-  const exportedSync = payload.sync || {};
-  if ((exportedSync.deadletter || []).length || (exportedSync.conflicts || []).length) throw new Error('Este backup tem alterações recusadas ou conflitos de sincronização. A equipe precisa revisá-los no PWA antigo antes da migração.');
   const preparedOrigin = exportedSync.legacyImportSource && exportedSync.legacyImportSource.preparedRequest;
   let sourceContext = exportedSync.context || (preparedOrigin && preparedOrigin.expectedEmpresaId && preparedOrigin.expectedLojaId ? { empresaId: preparedOrigin.expectedEmpresaId, lojaId: preparedOrigin.expectedLojaId } : null);
   if (!sourceContext && ls['cdb-pairing']) {
@@ -10227,7 +10252,7 @@ function prepareBackupImport(input) {
   incomingKeys.forEach(key => { if (!complete) unresolved.add(key); });
   const requiresReconciliation = !complete || !!preparedOrigin || unresolved.size > 0 || !!(previousReview && previousReview.requiresReconciliation);
   const reviewUpdated = !!previousReview && (previousReview.requiresReconciliation !== requiresReconciliation || backupComparable(previousReview.unreconciledRecords || []) !== backupComparable(Array.from(unresolved)));
-  return { merged, queue, preferences, photos, sourceArchive, localArchive, archiveChanged, sourceContext: sourceContext || (previousReview && previousReview.sourceContext) || null, conflicts, added, repeated, queueAdded, counts,
+  return { merged, queue, preferences, photos, sourceArchive, localArchive, archiveChanged, recusadasGuardadas: comRecusadas ? { recusadas: recusadas.length, conflitos: conflitosDeSync.length } : null, sourceContext: sourceContext || (previousReview && previousReview.sourceContext) || null, conflicts, added, repeated, queueAdded, counts,
     missingPhotos: missingPhotos.size, exportedAt: payload.exportedAt || null, legacy: payload.version < 3,
     requiresReconciliation, unreconciledRecords: Array.from(unresolved), reviewUpdated, sourceState: payload.state, sourceQueue, sourceCapsule: exportedSync.legacyImportSource || null, historyRules: exportedSync.legacyHistoryRules || null };
 }
@@ -10338,12 +10363,12 @@ async function undoBackupImport() {
   } finally { sync.endBackupImport(); }
 }
 
-async function applyBackupPayload(payload, askConfirmation = false) {
+async function applyBackupPayload(payload, askConfirmation = false, options = {}) {
   const sync = window.cdbSync;
   if (!sync || !sync.beginBackupImport || !sync.finishBackupImport) throw new Error('Sincronização ainda está iniciando. Aguarde e tente novamente.');
   await sync.beginBackupImport();
   try {
-    const plan = prepareBackupImport(payload);
+    const plan = prepareBackupImport(payload, options);
     if (plan.conflicts.length) throw new Error('Importação bloqueada: ' + plan.conflicts.length + ' registros têm o mesmo código e dados diferentes. A equipe precisa revisar. Exemplos: ' + plan.conflicts.slice(0, 3).join(', ') + '. Nenhum registro foi substituído.');
     const captured = await prepareLegacyImportSource(plan);
     const newPhotos = [];
@@ -10372,7 +10397,7 @@ async function applyBackupPayload(payload, askConfirmation = false) {
     Object.assign(expected.localStorage, plan.preferences);
     const undoCheckpoint = undoAllowed ? await backupCheckpoint(expected, plan.merged) : null;
     const undoBackupHash = undoAllowed ? await backupDigest(JSON.parse(localStorage.getItem('cdb-before-import-backup'))) : null;
-    const warning = (plan.requiresReconciliation ? '\nEste arquivo não comprova a fila completa. Os registros serão preservados offline, mas o envio ficará bloqueado até a equipe conferir a origem e concluir a migração inicial segura para o EasyStok.' : '') + (plan.missingPhotos ? '\n' + plan.missingPhotos + ' fotos não estão neste arquivo. Preserve o PWA antigo.' : '') + (plan.sourceArchive.length ? '\nCompras e auditoria antigas serão preservadas como anexos no backup; não alteram as listas atuais deste app.' : '');
+    const warning = (plan.requiresReconciliation ? '\nEste arquivo não comprova a fila completa. Os registros serão preservados offline, mas o envio ficará bloqueado até a equipe conferir a origem e concluir a migração inicial segura para o EasyStok.' : '') + (plan.missingPhotos ? '\n' + plan.missingPhotos + ' fotos não estão neste arquivo. Preserve o PWA antigo.' : '') + (plan.sourceArchive.some(entry => !entry.key.startsWith('cdb-sync-')) ? '\nCompras e auditoria antigas serão preservadas como anexos no backup; não alteram as listas atuais deste app.' : '') + (plan.recusadasGuardadas ? '\n' + backupContagemRecusadas(plan.recusadasGuardadas.recusadas, plan.recusadasGuardadas.conflitos) + ' de sincronização ficam guardados neste aparelho e não serão enviados.' : '');
     if (askConfirmation && !confirm('Importar ' + plan.added + ' registros e ' + plan.queueAdded + ' alterações pendentes?\n' + plan.repeated + ' registros repetidos serão ignorados.\nOs dados atuais serão mantidos. Uma cópia de segurança local já foi guardada.' + warning + '\n\nA sincronização ficará pausada para revisar esta importação.')) return null;
     for (const photo of newPhotos) await window.cdbPhotoStore.save(photo.hash, photo.dataUrl, photo.batchId || '', photo.field || '');
     const entries = Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [key, JSON.stringify(plan.merged[name])]);
@@ -10508,6 +10533,38 @@ function showBackupTextForCopy(json, filename) {
   overlay.querySelector('#closeBackupTxt').onclick = () => overlay.remove();
 }
 
+// #2813: backup com recusadas ou conflitos não fica mais sem saída. A tela diz quantas são e a pessoa escolhe: importar mesmo assim
+// (elas ficam guardadas no aparelho, fora do que vai ao importador) ou cancelar sem alterar nada.
+function pedirAceiteRecusadosEConflitos(erro) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+    overlay.innerHTML = `
+      <div style="background:#fff;color:#222;border-radius:14px;padding:18px;max-width:420px;width:100%;font-size:15px;line-height:1.45">
+        <div style="font-size:17px;font-weight:700;margin-bottom:8px">Este backup tem pendências recusadas</div>
+        <p style="margin:0 0 10px">O backup tem <b>${backupContagemRecusadas(erro.recusadas, erro.conflitos)}</b> de sincronização.</p>
+        <p style="margin:0 0 14px">Se você continuar, o resto do backup é importado. Essas pendências ficam guardadas neste aparelho e não são enviadas.</p>
+        <button id="bkRecusadasAceitar" style="width:100%;padding:13px;background:#d4af37;color:#000;border:0;border-radius:10px;font-weight:700;font-size:15px;margin-bottom:8px">Importar mesmo assim (as recusadas ficam guardadas no aparelho e não são enviadas)</button>
+        <button id="bkRecusadasCancelar" style="width:100%;padding:13px;background:#eee;color:#222;border:0;border-radius:10px;font-weight:600;font-size:15px">Cancelar</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    const fechar = aceitou => { overlay.remove(); resolve(aceitou); };
+    overlay.querySelector('#bkRecusadasAceitar').onclick = () => fechar(true);
+    overlay.querySelector('#bkRecusadasCancelar').onclick = () => fechar(false);
+  });
+}
+
+async function importarBackupDoArquivo(texto) {
+  const backup = JSON.parse(texto);
+  try { return await applyBackupPayload(backup, true); }
+  catch (erro) {
+    if (!erro || erro.code !== 'BACKUP_RECUSADOS_CONFLITOS') throw erro;
+    if (!(await pedirAceiteRecusadosEConflitos(erro))) return null;
+    return applyBackupPayload(backup, true, { aceitarRecusadosEConflitos: true });
+  }
+}
+
 function importBackup(event) {
   const file = event.target.files && event.target.files[0];
   event.target.value = '';
@@ -10516,7 +10573,7 @@ function importBackup(event) {
   const reader = new FileReader();
   reader.onload = async e => {
     try {
-      const result = await applyBackupPayload(JSON.parse(String(e.target.result || '')), true);
+      const result = await importarBackupDoArquivo(String(e.target.result || ''));
       if (!result) return;
       showToast(result.updated ? (result.requiresReconciliation ? 'Dados preservados. A fila precisa ser conferida no PWA de origem.' : 'Dados importados. Confira a loja antes de sincronizar.') : 'Este backup já está no aparelho. Nenhum registro foi duplicado.');
       if (result.updated) setTimeout(() => location.reload(), 800);
@@ -13848,9 +13905,35 @@ function purgeOrderRecord(id) {
 
 // ===== CLIENTES E RECORRENCIA =====
 let clientFilter = 'todos';
+// #2813: a lista mostra CLIENT_LIST_PAGE_SIZE clientes por vez (a carteira migrada, de 25, cabe inteira) e cada "Mostrar mais" acrescenta o mesmo tanto; a busca filtra por nome ou telefone.
+const CLIENT_LIST_PAGE_SIZE = 100;
+let clientListVisible = CLIENT_LIST_PAGE_SIZE;
+let clientListQuery = '';
+
+function setClientListQuery(text) {
+  clientListQuery = String(text == null ? '' : text);
+  clientListVisible = CLIENT_LIST_PAGE_SIZE;
+  renderClientesScreen();
+}
+
+function showMoreClients() {
+  clientListVisible += CLIENT_LIST_PAGE_SIZE;
+  renderClientesScreen();
+}
+
+// Nome ou telefone, sem diferenciar maiúscula e acento. Busca que parece telefone ("(11) 99988-7766") compara só os dígitos.
+function clientMatchesQuery(client, query) {
+  const q = _normalizeSearch(query).trim();
+  if (!q) return true;
+  const c = client || {};
+  if (_normalizeSearch(c.name).indexOf(q) >= 0 || _normalizeSearch(c.phone).indexOf(q) >= 0) return true;
+  const digits = q.replace(/\D/g, '');
+  return !!digits && /^[\d\s().+-]+$/.test(q) && String(c.phone || '').replace(/\D/g, '').indexOf(digits) >= 0;
+}
 
 function setClientFilter(filter) {
   clientFilter = filter || 'todos';
+  clientListVisible = CLIENT_LIST_PAGE_SIZE;
   document.querySelectorAll('#clientFilter button').forEach(b => b.classList.toggle('active', b.dataset.f === clientFilter));
   renderClientesScreen();
 }
@@ -13995,11 +14078,13 @@ function renderClientesScreen() {
   let filtered = rows;
   if (clientFilter === 'recorrentes') filtered = rows.filter(r => r.orders >= 2);
   if (clientFilter === 'sumidos') filtered = rows.filter(r => r.orders > 0 && r.days >= 21);
+  if (clientListQuery.trim()) filtered = filtered.filter(r => clientMatchesQuery(r.client, clientListQuery));
   if (!filtered.length) {
-    host.innerHTML = '<div class="empty"><span class="big">👤</span>Nenhum cliente nesse filtro</div>';
+    host.innerHTML = '<div class="empty"><span class="big">👤</span>' + (clientListQuery.trim() ? 'Nenhum cliente encontrado para essa busca' : 'Nenhum cliente nesse filtro') + '</div>';
     return;
   }
-  host.innerHTML = filtered.slice(0, 20).map((row, idx) => {
+  const shown = filtered.slice(0, clientListVisible), remaining = filtered.length - shown.length;
+  host.innerHTML = shown.map((row, idx) => {
     const c = row.client || {};
     const name = c.name || 'Cliente sem nome';
     const idArg = jsString(c.id || '');
@@ -14053,7 +14138,9 @@ function renderClientesScreen() {
         <button onclick="openGlobalSearch(); setTimeout(function(){ try { document.getElementById('globalSearchInput').value=${nameArg}; onGlobalSearchInput(); } catch(e){} }, 80)">Histórico</button>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (remaining > 0
+    ? `<button type="button" class="client-more-btn" onclick="showMoreClients()" style="width:100%;margin:12px 0 4px;padding:13px;border-radius:12px;border:1px solid var(--line, #d9d4c7);background:var(--surface, transparent);color:inherit;font-weight:700;font-size:15px;cursor:pointer">Mostrar mais (${remaining} ${remaining === 1 ? 'restante' : 'restantes'})</button>`
+    : '');
 }
 
 // #1466: o lote conta no saldo local enquanto nao esta excluido nem descartado.

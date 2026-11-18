@@ -152,7 +152,7 @@ confere('tela de ajuste abre dentro do módulo, com o módulo vindo da rota', ()
   // #2095: o financeiro gerencial foi descongelado (revoga a #1891 nessas telas); a visão geral abre a própria aba.
   assert.equal(rotaDaHash('#/m/financeiro/visao-geral', { fonteApi: true }).aba, 'financeiro-resumo', 'Visão geral descongelada abre a própria tela')
   assert.deepEqual(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true, acoes: { gerenciarCaixa: true } }).map((t) => t.id), ['caixa'], 'Operador: Financeiro só com Caixa do dia (#2095, F17)')
-  assert.equal(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).length, 8, 'sem a matriz (catálogo), as oito telas do Financeiro')
+  assert.equal(telasDoMenu(moduloPorId('financeiro'), { fonteApi: true }).length, 9, 'sem a matriz (catálogo), as nove telas do Financeiro (a nona é Fechamentos do aparelho, #2813)')
   assert.equal(rotaDaHash('#/m/financeiro').aba, 'caixa', 'A demonstração conserva o Caixa')
   assert.equal(rotaDaHash('#/m/configuracoes/canais', { fonteApi: true }).aba, 'canais')
 })

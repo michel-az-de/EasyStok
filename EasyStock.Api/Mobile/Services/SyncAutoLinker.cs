@@ -76,8 +76,9 @@ public class SyncAutoLinker(
         var batchIds = await _db.Set<Batch>().IgnoreQueryFilters()
             .Where(b => b.EmpresaId == empresaId && b.ErpLoteId == null)
             .Select(b => b.Id).ToListAsync(ct);
+        // #2813: o arquivo do histórico importado (NaoPromoverEm) não é pendência de promoção ao caixa.
         var cashIds = await _db.Set<CashEntry>().IgnoreQueryFilters()
-            .Where(c => c.EmpresaId == empresaId && c.ErpMovimentoCaixaId == null)
+            .Where(c => c.EmpresaId == empresaId && c.ErpMovimentoCaixaId == null && c.NaoPromoverEm == null)
             .Select(c => c.Id).ToListAsync(ct);
 
         _log.LogInformation("Backfill empresa={EmpresaId}: products={P} clients={C} orders={O} batches={B} cash={CE}",

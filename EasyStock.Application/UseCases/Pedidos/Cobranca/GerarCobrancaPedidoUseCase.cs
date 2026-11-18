@@ -166,6 +166,9 @@ public sealed class GerarCobrancaPedidoUseCase(
 
         var pedido = await pedidoRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.PedidoId)
             ?? throw new CobrancaPedidoNaoEncontradoException(input.PedidoId);
+        // #2813: o entregue do histórico já foi pago na origem; link ou cobrança nova seria cobrar de novo.
+        if (pedido.QuitadoHistorico)
+            throw new UseCaseValidationException("Não é possível gerar cobrança: o pedido do histórico já está quitado.");
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoFinalizado,
                 "Pedido cancelado ou entregue não recebe cobrança.");

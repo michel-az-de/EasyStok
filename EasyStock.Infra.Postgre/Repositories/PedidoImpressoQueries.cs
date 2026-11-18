@@ -122,7 +122,8 @@ public sealed class PedidoImpressoQueries(EasyStockDbContext db) : IPedidoImpres
                     Molho: i.CardapioItemId is { } c ? molhos.GetValueOrDefault(c) : null,
                     Conservacao: i.ConservacaoSnapshot))
                 .ToList(),
-            NumeroDoDia: p.NumeroDoDia);
+            NumeroDoDia: p.NumeroDoDia,
+            AReceber: p.AReceberPelosPagamentos);
     }
 
     public async Task<PedidoImpressoCasaLeitura> ObterCasaAsync(Guid empresaId, Guid? lojaId = null, CancellationToken ct = default)
