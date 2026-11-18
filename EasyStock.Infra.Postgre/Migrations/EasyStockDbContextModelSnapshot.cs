@@ -594,6 +594,9 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("FerramentasDesligadasJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("FraseEspera")
                         .IsRequired()
                         .HasMaxLength(200)
