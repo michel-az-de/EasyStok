@@ -70,8 +70,19 @@ try {
   await editor.waitFor({ state: 'detached' })
 
   // Resumo e os 5 pedidos mais recentes do cliente.
-  await pagina.getByRole('button', { name: 'Editar Ana Souza', exact: true }).click()
-  editor = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  await pagina.getByRole('button', { name: 'Abrir ficha de Ana Souza', exact: true }).click()
+  editor = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor()
+  // #2849: a ficha abre em leitura. O resumo mostra os números com as palavras do Atendimento e o contato;
+  // o formulário e o Salvar só aparecem depois de "Editar dados", com o foco no primeiro campo.
+  const resumo = editor.getByRole('region', { name: 'Resumo de Ana Souza', exact: true })
+  await resumo.getByLabel('Números do cliente').getByText('compras válidas', { exact: true }).waitFor()
+  await resumo.getByLabel('Dados de contato').getByText('Telefone', { exact: true }).waitFor()
+  assert.equal(await editor.getByRole('textbox', { name: 'Nome', exact: true }).count(), 0, 'formulário fechado na leitura')
+  assert.equal(await editor.getByRole('button', { name: 'Salvar cadastro', exact: true }).count(), 0, 'sem Salvar na leitura')
+  await pagina.screenshot({ path: resolve(pasta, 'ficha-leitura-1280.png'), fullPage: true })
+  await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
+  assert.equal(await editor.getByRole('textbox', { name: 'Nome', exact: true }).evaluate(el => el === document.activeElement), true, 'foco no primeiro campo')
+  assert.equal(await editor.getByLabel('Dados de contato').count(), 0, 'o contato em leitura sai quando o formulário abre')
   const secaoPedidos = editor.getByRole('region', { name: 'Pedidos' })
   await secaoPedidos.getByText('7 pedidos').waitFor()
   await secaoPedidos.getByText('Último pedido em 10/11/2026, 12:30').waitFor()

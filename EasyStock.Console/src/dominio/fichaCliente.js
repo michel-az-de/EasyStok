@@ -112,5 +112,16 @@ export function numerosDoRelacionamento(relacionamento) {
   ].filter(Boolean)
 }
 
-export const avisoDasNotas = (quantas) => (quantas >= NOTAS_DO_DOSSIE
+// #2849: o quadro que abre a ficha em qualquer tela, com as palavras do Atendimento ("compras válidas",
+// "total comprado", "Ticket médio"). Sem o dossiê lido não há número; sem compra não há soma nem média.
+export function quadroDoCliente(relacionamento) {
+  if (!relacionamento) return []
+  const compras = Number(relacionamento.pedidos ?? 0)
+  const total = Number(relacionamento.totalGasto ?? 0)
+  const quadro = [{ rotulo: compras === 1 ? 'compra válida' : 'compras válidas', valor: String(compras) }]
+  if (compras > 0 && total > 0) quadro.push({ rotulo: 'total comprado', valor: moeda(total) }, { rotulo: 'Ticket médio', valor: moeda(total / compras) })
+  return quadro
+}
+
+export const avisoDasNotas =(quantas) => (quantas >= NOTAS_DO_DOSSIE
   ? `Aqui aparecem as ${NOTAS_DO_DOSSIE} notas mais recentes. As anteriores estão na Ficha do Atendimento.` : null)

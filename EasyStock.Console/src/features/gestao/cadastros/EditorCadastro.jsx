@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro, useRelacionamentoCliente } from '../../../aplicacao/cadastros'
 import { useSugestaoCadastro } from '../../../aplicacao/useSugestaoCadastro'
 import { useGravacaoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
@@ -8,6 +9,7 @@ import { Combobox } from '../../../componentes/Combobox'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { FichaCliente } from './FichaCliente'
+import { ResumoDoCliente } from './ResumoDoCliente'
 import { RelacionamentoCliente } from './RelacionamentoCliente'
 import { lerMoeda } from '../../../dominio/formato'
 import { avisoDeDuplicado, duplicadosDoCliente, termoDeDuplicado } from '../../../dominio/clienteDuplicado'
@@ -41,6 +43,13 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const [salvando, iniciar] = useGravacaoDoAjuste(`cadastros:${tela}:${id ?? dados.requestId}`)
   const alterado = JSON.stringify(dados) !== JSON.stringify(inicial)
   const montado = useRef(true)
+  // #2849: cliente já cadastrado abre como ficha, em leitura; o formulário só aparece em "Editar dados".
+  // Rascunho restaurado ou conflito pendente abre direto no formulário: nada digitado fica escondido.
+  const ehFicha = tela === 'clientes' && Boolean(id)
+  const [editando, editar] = useState(false)
+  const formularioAberto = !ehFicha || editando || alterado || Boolean(editor.conflito || editor.semConfirmacao)
+  // O foco vai ao primeiro campo no mesmo clique: quem digita em seguida não perde tecla para um foco atrasado.
+  const abrirFormulario = () => { flushSync(() => editar(true)); formRef.current?.querySelector('[data-foco-inicial]')?.focus() }
   // #2495 (S2, I1): confirmação de inativar ou reativar; o erro fica no Modal e nada fecha.
   const [atividade, confirmarAtividade] = useState(null)
   const [alternando, alternar] = useState(false)
@@ -151,13 +160,13 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     finally { atividadeEmVoo.current = false; if (montado.current) alternar(false) }
   }
   const mostraAtividade = podeEditar && temAtividadeNoEditor(tela, dados)
-  const titulo = `${podeEditar ? id ? 'Editar' : 'Novo' : 'Consultar'} ${({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro bancário' })[tela]}`
-  return <Modal titulo={titulo} largura="md" focarCampo aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
+  const titulo = ehFicha ? 'Ficha do cliente' : `${podeEditar ? id ? 'Editar' : 'Novo' : 'Consultar'} ${({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro bancário' })[tela]}`
+  return <Modal titulo={titulo} largura="md" focarCampo={!ehFicha} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
     {/* O vermelho fica só na confirmação: aqui o botão é discreto e afastado de Salvar. Com `motivo` sempre
         presente o invólucro não troca e o botão não remonta (#2258). */}
     {mostraAtividade && <span className={css.acaoAtividade}><Botao disabled={salvando || alterado || Boolean(editor.conflito || editor.semConfirmacao)} motivo={`Salve ou descarte as alterações antes de ${emAtividadeCadastro(dados) ? 'inativar' : 'reativar'}.`} onClick={() => { falharAtividade(null); confirmarAtividade(confirmacaoDeAtividade(tela, dados)) }}>{emAtividadeCadastro(dados) ? 'Inativar' : 'Reativar'}</Botao></span>}
-    <Botao onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))} disabled={salvando}>{podeEditar ? 'Cancelar' : 'Fechar'}</Botao>
-    {podeEditar && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : !alterado ? id ? 'Nada mudou para salvar.' : 'Preencha o cadastro para salvar.' : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
+    <Botao onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))} disabled={salvando}>{podeEditar && formularioAberto ? 'Cancelar' : 'Fechar'}</Botao>
+    {podeEditar && formularioAberto && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : !alterado ? id ? 'Nada mudou para salvar.' : 'Preencha o cadastro para salvar.' : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
   </>}>
     {erro && <p className={css.erro} role="alert">{erro}</p>}
     {tela === 'clientes' && editor.conflito && <section className={css.assistente} aria-label="Conferir versão do cadastro">
@@ -172,15 +181,17 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     </section>}
     {editor.reconferido && !editor.conflito && <p role="status">Versão atual conferida. Revise os campos e use Salvar cadastro para confirmar sua edição.</p>}
     {editor.semConfirmacao && <div className={css.erro} role="alert"><p>A resposta não chegou. O cadastro pode ter sido salvo. Feche e confira a lista antes de criar outro.</p></div>}
+    {ehFicha && <ResumoDoCliente key={`resumo:${id}`} dados={dados} relacionamento={relacionamento.dados} carregando={relacionamento.carregando && !relacionamento.dados}
+      editando={formularioAberto} aoEditar={podeEditar ? abrirFormulario : undefined} />}
     {/* `key`: o atalho por endereço troca a pessoa sem desmontar o editor; modal, aviso e notas abertas não passam adiante. */}
     {comRelacionamento && <RelacionamentoCliente key={id} clienteId={id} relacionamento={relacionamento} contexto={contexto} podeEditar={podeEditar} aoGravar={aoGravarRelacionamento} aoRascunhar={aoRascunharRelacionamento} restricoes={restricoes} />}
-    {conversa && podeEditar && <section className={css.assistente} aria-label="Assistência ao cadastro">
+    {conversa && podeEditar && formularioAberto && <section className={css.assistente} aria-label="Assistência ao cadastro">
       <div className={css.barra}><strong>Conferir dados da conversa</strong><Botao icone="sparkles" disabled={salvando || sugestao.carregando} onClick={sugestao.consultar}>{sugestao.carregando ? 'Consultando…' : 'Consultar com IA'}</Botao></div>
       <p>Usa até 20 mensagens recentes recebidas com texto nesta conversa para sugerir nome, telefone e e-mail.</p>
       {sugestao.erro && <p className={css.erro} role="alert">{sugestao.erro}</p>}
       {sugestao.campos.map(c => <div className={css.sugestao} key={c.campo}><span><strong>{({ nome: 'Nome', telefone: 'Telefone', email: 'E-mail' })[c.campo]}: {c.valor}</strong><q>{c.evidencia}</q></span><Botao disabled={salvando} onClick={() => sugestao.aplicar(c.campo)}>Usar este dado</Botao></div>)}
     </section>}
-    <form id={idForm} ref={formRef} onSubmit={salvar}>
+    <form id={idForm} ref={formRef} onSubmit={salvar} hidden={!formularioAberto}>
       {podeEditar && <p className={css.legenda}>Campos com * são obrigatórios.</p>}
       <fieldset disabled={salvando || !podeEditar} className={css.formulario}>
         {campo('nome', tela === 'bancos' ? 'Nome da conta' : 'Nome', { required: true, 'data-foco-inicial': true })}

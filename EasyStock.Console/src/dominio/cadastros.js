@@ -134,6 +134,26 @@ export function mensagemDeAtividade(tela, ativar, erro) {
   if (tela === 'fornecedores' && !ativar && /pedido aberto/i.test(erro?.message ?? '')) return 'Este fornecedor tem pedido de compra aberto ou em trânsito. Conclua ou cancele o pedido antes de inativar.'
   return erro?.message || 'Não deu para concluir agora. Tente de novo.'
 }
+// #2849: os dados de contato da ficha em leitura. Telefone, e-mail e documento aparecem sempre (vazio vira
+// null e a tela diz "Não informado"); o resto só entra preenchido. Com endereço na lista do cadastro, o
+// campo plano não aparece: seriam dois endereços para a mesma pessoa (#2776).
+export function dadosDeContato(dados) {
+  const texto = valor => String(valor ?? '').trim() || null
+  const juridica = dados.tipoPessoa === 'juridica'
+  const temLista = (dados.detalhe?.enderecos ?? []).length > 0
+  const endereco = temLista ? null : [texto(dados.endereco), texto(dados.apt)].filter(Boolean).join(', ') || null
+  return [
+    { rotulo: 'Telefone', valor: texto(dados.telefone) && telefoneNaTela(dados.telefone) },
+    { rotulo: 'E-mail', valor: texto(dados.email) },
+    { rotulo: juridica ? 'CNPJ' : 'CPF ou documento', valor: texto(dados.documento) && documentoNaTela(dados.documento) },
+    ...[
+      { rotulo: 'Nome fantasia', valor: juridica ? texto(dados.nomeFantasia) : null },
+      { rotulo: 'Inscrição estadual', valor: juridica ? texto(dados.inscricaoEstadual) : null },
+      { rotulo: 'Endereço', valor: endereco },
+      { rotulo: 'Observações', valor: texto(dados.observacoes) },
+    ].filter(dado => dado.valor),
+  ]
+}
 export function situacaoDaLinha(tela, item, soLeads) {
   if (soLeads) return { texto: 'Sem cadastro', tom: 'aviso' }
   if (!emAtividadeCadastro(item)) return { texto: 'Inativo', tom: null }

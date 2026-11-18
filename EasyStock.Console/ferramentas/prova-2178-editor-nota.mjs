@@ -173,7 +173,7 @@ try {
   assert.equal(await publico.evaluate(no => document.activeElement === no), false, 'desktop mantém seu retorno de foco existente')
   // #2360: o cadastro usa o modal e o contexto reais; remontar simula a troca de composição no celular.
   await pagina.evaluate(() => window.mostrarCadastroReal())
-  const cadastroCliente = pagina.getByRole('dialog', { name: 'Cadastro do cliente', exact: true })
+  const cadastroCliente = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true })
   await cadastroCliente.waitFor({ timeout: 5000 }).catch(erro => { assert.deepEqual(erros, []); throw erro })
   const abrirNotas = () => cadastroCliente.getByRole('tab', { name: /^Notas/ }).click()
   const notaCadastro = pagina.getByRole('textbox', { name: 'Nova nota', exact: true })

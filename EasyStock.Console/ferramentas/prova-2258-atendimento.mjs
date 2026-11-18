@@ -296,8 +296,8 @@ caso('T7  borda de prazo ganha ícone com texto acessível (cor não é o único
 
 // --- T11, T17, T18: ficha e cadastro ------------------------------------------------------------------
 
-caso('T11  o modal é "Cadastro do cliente" e o painel lateral é "Cliente"', () => {
-  assert.match(ler('features/ficha-cliente/ModalCliente.jsx'), /titulo="Cadastro do cliente"/)
+caso('T11  o modal é "Ficha do cliente" e o painel lateral é "Cliente"', () => {
+  assert.match(ler('features/ficha-cliente/ModalCliente.jsx'), /titulo="Ficha do cliente"/)
   assert.match(ler('features/ficha-cliente/PainelFicha.jsx'), /<h2>Cliente<\/h2>/)
 })
 
