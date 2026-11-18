@@ -46,7 +46,7 @@ public class OperationController(
     /// Cache curto (10s) seria bom em produção; por ora é always-fresh.
     /// </summary>
     [HttpGet("dashboard")]
-    [Authorize]
+    [Authorize(Policy = "Operador")] // #2842: vendas e caixa do dia, mesma regra de api/caixa/dia.
     public async Task<ActionResult<OperationDashboard>> GetDashboard(
         [FromQuery] Guid empresaId,
         [FromQuery] Guid? lojaId,
@@ -207,7 +207,7 @@ public class OperationController(
     ///   - revogado: status crítico
     /// </summary>
     [HttpGet("devices-health")]
-    [Authorize]
+    [Authorize(Policy = "Operador")] // #2842: traz o IP de cada aparelho.
     public async Task<ActionResult<DeviceHealthDto[]>> GetDevicesHealth(
         [FromQuery] Guid empresaId,
         CancellationToken ct)

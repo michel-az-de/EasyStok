@@ -29,6 +29,7 @@ public class MobileClientsController(
     /// - <c>pendingOnly</c>: ainda não linkados ao ERP (erp_cliente_id null)
     /// </summary>
     [HttpGet]
+    [Authorize(Policy = "Operador")] // #2842: nome, telefone e endereço, mesma regra de GET api/clientes.
     public async Task<IActionResult> List(
         [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
