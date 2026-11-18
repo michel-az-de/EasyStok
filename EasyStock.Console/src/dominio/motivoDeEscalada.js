@@ -39,6 +39,7 @@ const ROTULOS_CURTOS = [
   [/^cliente confirmou o endereço/i, 'Endereço não gravado'],
   [/^cliente pediu ajuda pela comanda/i, 'Ajuda na comanda'],
   [/^conversa reaberta/i, 'Conversa reaberta'],
+  [/^cota mensal de tokens do assistente esgotada/i, 'Cota do mês esgotada'],
 ]
 
 export function rotuloCurtoDoMotivo(motivo) {

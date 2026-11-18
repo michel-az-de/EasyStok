@@ -76,7 +76,7 @@ function AbaUso({ uso, podeEditar, painel }) {
         <div><dt>Tokens de entrada</dt><dd>{tokensCurtos(uso.tokensEntrada)}</dd></div>
         <div><dt>Tokens de saída</dt><dd>{tokensCurtos(uso.tokensSaida)}</dd></div>
         <div><dt>Lidos do cache</dt><dd>{tokensCurtos(uso.tokensCacheLido)}</dd></div>
-        <div><dt>Custo estimado</dt><dd>{custo.valor ?? '—'}</dd></div>
+        <div><dt>Custo estimado</dt><dd>{custo.valor ?? 'Não calculado'}</dd></div>
         {resumo.comCota && <div><dt>Restam no mês</dt><dd>{tokensCurtos(resumo.restante)}</dd></div>}
       </dl>
       {custo.nota && <p className={css.nota}>{custo.nota}</p>}

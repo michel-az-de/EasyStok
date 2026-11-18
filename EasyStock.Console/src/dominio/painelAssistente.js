@@ -1,6 +1,8 @@
 // #2853: regras puras do painel do Assistente (Gestão › Atendimento). O dado vem de
 // GET api/atendimento/assistente/{uso,fluxo,historico}; nada aqui fala com a rede.
 
+import { dolar } from './formato'
+
 export const PERCENTUAL_ALERTA = 80
 
 // Limites que espelham o servidor (RoteiroAtendimento): passar deles trava o Salvar.
@@ -49,7 +51,7 @@ export function custoDoUso(uso) {
   if (turnos > 0 && semPreco === turnos) return { valor: null, nota: 'Sem preço configurado para o modelo: o custo não é calculado.' }
   const valor = Number(uso.custoEstimado) || 0
   const nota = semPreco > 0 ? `${semPreco} de ${turnos} turnos ficaram fora da conta por falta de preço.` : null
-  return { valor: valor.toLocaleString('pt-BR', { style: 'currency', currency: 'USD' }), nota }
+  return { valor: dolar(valor), nota }
 }
 
 // Campo da cota em milhares de tokens; vazio ou 0 tira a cota.

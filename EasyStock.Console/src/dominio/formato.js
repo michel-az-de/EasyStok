@@ -21,6 +21,10 @@ export const moeda = (v) => {
   return v < 0 && /[1-9]/.test(texto) ? SINAL_NEGATIVO + texto : texto
 }
 
+// #2853: custo do Assistente, que o provedor cobra em dólar ("US$ 1,23"). Só para esse custo; o resto é real.
+const DOLARES = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' })
+export const dolar = (v) => (v == null ? 'Sem valor' : DOLARES.format(v))
+
 // O mesmo valor quando ele chega em centavos (frete, corrida, fechamento).
 export const moedaDosCentavos = (centavos) => moeda(centavos == null ? null : centavos / 100)
 
