@@ -19,18 +19,18 @@ public class EmailTemplateRenderSmokeTests
     private static readonly string[] Templates =
     {
         // Jobs financeiros / assinatura (reativados pelo fix — maior risco customer-facing)
-        "fatura_criada_email_v1", "fatura_vencendo_email_v1", "fatura_paga_email_v1",
-        "fatura_vencida_email_v1", "pagamento_falhou_email_v1",
+        "fatura_criada_email_v2", "fatura_vencendo_email_v2", "fatura_paga_email_v2",
+        "fatura_vencida_email_v2", "pagamento_falhou_email_v2",
         "assinatura_expirando_email_v1", "assinatura_expirada_dunning_email_v1",
         // Collectors de estoque
         "alerta_estoque_critico_email_v1", "produto_vencendo_email_v2", "produto_vencido_email_v1",
         // Helpdesk
-        "ticket_criado_email_v1", "ticket_respondido_admin_email_v1", "ticket_atribuido_email_v1",
-        "sla_proximo_vencer_email_v1", "sla_violado_email_v1", "bug_fix_criado_email_v1",
-        "convite_csat_email_v1",
+        "ticket_criado_email_v2", "ticket_respondido_admin_email_v2", "ticket_atribuido_email_v2",
+        "sla_proximo_vencer_email_v2", "sla_violado_email_v2", "bug_fix_criado_email_v2",
+        "convite_csat_email_v2",
         // Relatorios / auth
         "relatorio_pronto_email_v2", "relatorio_falhou_email_v2",
-        "reset_senha_email_v1", "confirmacao_email_email_v1",
+        "reset_senha_email_v2", "confirmacao_email_email_v2",
         // Catalogo de plataforma (N13)
         "convite_acesso_email_v3", "contato_alterado_email_v1", "incidente_sistema_email_v1", "prazo_estourado_email_v2", "resumo_diario_email_v1",
         // Contas a pagar e a receber (#2074)

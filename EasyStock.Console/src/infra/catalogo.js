@@ -137,9 +137,9 @@ export const RESPIRO_MINUTOS_PADRAO = 40
 export const janelaPorId = (id) => JANELAS_ENTREGA.find((j) => j.id === id) ?? null
 
 export const RESPOSTAS_RAPIDAS = [
-  { cat: 'Cardápio', titulo: 'Enviar cardápio', texto: 'Olá! Segue nosso cardápio de hoje. Me chama quando escolher que eu já anoto.' },
+  { cat: 'Cardápio', titulo: 'Enviar cardápio', texto: 'Olá! Quer que eu te mande o cardápio de hoje? Me conta o que você procura que eu já te ajudo a escolher.' },
   { cat: 'Cardápio', titulo: 'Item esgotado', texto: 'Esse hoje encerrou, produzi pouco. Posso te sugerir outra massa do cardápio?' },
-  { cat: 'Entrega', titulo: 'Janelas do dia', texto: 'Hoje tenho entrega das 12h30 às 13h30 e das 18h30 às 19h30. Qual fica melhor?' },
+  { cat: 'Entrega', titulo: 'Janelas do dia', texto: 'Qual horário fica melhor para você receber? Eu confiro as janelas de entrega de hoje e te confirmo.' },
   // Achado 5, P2 (banca 10): este texto é uma OFERTA da dona (encomenda
   // agendada), diferente da fala automática de fora de área que o agente
   // manda sozinho (dominio/areaEntrega.js#respostaDeAreaFora, com {nome} e
@@ -149,7 +149,7 @@ export const RESPOSTAS_RAPIDAS = [
   // Item E (US-009, critério de aceite literal): "o texto é enviado já
   // preenchido com nome do cliente e dados do pedido em curso". Das 11
   // respostas de fábrica, nenhuma citava {pedido} antes desta rodada.
-  { cat: 'Pagamento', titulo: 'Enviar cobrança', texto: 'Já gerei seu pedido {pedido}. Segue o link de pagamento, assim que cair eu começo o preparo.' },
+  { cat: 'Pagamento', titulo: 'Enviar cobrança', texto: 'Já gerei seu pedido {pedido}. Assim que o pagamento cair, eu começo o preparo.' },
   { cat: 'Pós-venda', titulo: 'Agradecer', texto: 'Obrigada pela preferência! Se puder, me conta o que achou. Boa massa.' },
 ]
 

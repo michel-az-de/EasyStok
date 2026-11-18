@@ -178,24 +178,27 @@ public static class NotificacoesGlobaisSeed
             nome: "Renovação de Assinatura — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.AssinaturaExpirando,
-            assuntoTemplate: "Renovação da sua assinatura EasyStock",
-            corpoTemplate: EmailTemplateLoader.LoadBody("assinatura_expirando_email_v1"));
+            assuntoTemplate: "Renovação da sua assinatura EasyStok",
+            corpoTemplate: EmailTemplateLoader.LoadBody("assinatura_expirando_email_v1"))
+            .ComVersao(2); // #2850: assunto com a marca do cabeçalho.
 
         yield return TemplateNotificacao.Criar(
             codigo: "assinatura_expirada_dunning_email_v1",
             nome: "Dunning — Pagamento Pendente — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.AssinaturaExpirada,
-            assuntoTemplate: "EasyStock — Pagamento pendente (aviso {{ numero_lembrete }}/3)",
-            corpoTemplate: EmailTemplateLoader.LoadBody("assinatura_expirada_dunning_email_v1"));
+            assuntoTemplate: "EasyStok — Pagamento pendente (aviso {{ numero_lembrete }}/3)",
+            corpoTemplate: EmailTemplateLoader.LoadBody("assinatura_expirada_dunning_email_v1"))
+            .ComVersao(2); // #2850: assunto com a marca do cabeçalho.
 
         yield return TemplateNotificacao.Criar(
             codigo: "alerta_estoque_critico_email_v1",
             nome: "Alerta de Estoque Crítico — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.AlertaEstoqueCritico,
-            assuntoTemplate: "EasyStock — Alerta de estoque crítico: {{ produto_nome }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("alerta_estoque_critico_email_v1"));
+            assuntoTemplate: "EasyStok — Alerta de estoque crítico: {{ produto_nome }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("alerta_estoque_critico_email_v1"))
+            .ComVersao(2); // #2850: assunto com a marca do cabeçalho.
 
         yield return TemplateNotificacao.Criar(
             codigo: "produto_vencendo_email_v1",
@@ -236,8 +239,9 @@ public static class NotificacoesGlobaisSeed
             nome: "Sua solicitacao foi respondida — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.TicketRespondidoAdmin,
-            assuntoTemplate: "EasyStock — Resposta no ticket: {{ titulo }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_respondido_admin_email_v1"));
+            assuntoTemplate: "EasyStok — Resposta no ticket: {{ titulo }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_respondido_admin_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "ticket_status_alterado_inapp_v1",
@@ -284,8 +288,9 @@ public static class NotificacoesGlobaisSeed
             nome: "SLA violado — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.SlaViolado,
-            assuntoTemplate: "EasyStock — SLA violado no ticket {{ titulo }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("sla_violado_email_v1"));
+            assuntoTemplate: "EasyStok — SLA violado no ticket {{ titulo }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("sla_violado_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "bug_fix_criado_inapp_v1",
@@ -300,8 +305,9 @@ public static class NotificacoesGlobaisSeed
             nome: "Bug-fix encaminhado — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.BugFixCriado,
-            assuntoTemplate: "EasyStock — Bug encaminhado: {{ titulo }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("bug_fix_criado_email_v1"));
+            assuntoTemplate: "EasyStok — Bug encaminhado: {{ titulo }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("bug_fix_criado_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         // ===== Auth =====
         yield return TemplateNotificacao.Criar(
@@ -309,16 +315,18 @@ public static class NotificacoesGlobaisSeed
             nome: "Reset de Senha — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ResetSenha,
-            assuntoTemplate: "EasyStok — Redefinicao de senha solicitada",
-            corpoTemplate: EmailTemplateLoader.LoadBody("reset_senha_email_v1"));
+            assuntoTemplate: "EasyStok — Redefinição de senha solicitada",
+            corpoTemplate: EmailTemplateLoader.LoadBody("reset_senha_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "confirmacao_email_email_v1",
             nome: "Confirmacao de Email — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ConfirmacaoEmail,
-            assuntoTemplate: "EasyStok — Confirme seu email",
-            corpoTemplate: EmailTemplateLoader.LoadBody("confirmacao_email_email_v1"));
+            assuntoTemplate: "EasyStok — Confirme seu e-mail",
+            corpoTemplate: EmailTemplateLoader.LoadBody("confirmacao_email_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         // ===== Operacional faltante =====
         yield return TemplateNotificacao.Criar(
@@ -352,7 +360,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.TicketCriado,
             assuntoTemplate: "EasyStok — Novo ticket: {{ titulo }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_criado_email_v1"));
+            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_criado_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         // ===== Templates do modulo de Relatorios =====
         yield return TemplateNotificacao.Criar(
@@ -385,9 +394,9 @@ public static class NotificacoesGlobaisSeed
             nome: "Relatorio Falhou — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.RelatorioFalhou,
-            assuntoTemplate: "Nao conseguimos gerar: {{ reportLabel }}",
+            assuntoTemplate: "Não conseguimos gerar: {{ reportLabel }}",
             corpoTemplate: EmailTemplateLoader.LoadBody("relatorio_falhou_email_v2"))
-            .ComVersao(2); // #2074: sem primeiroNome, que o Worker não envia.
+            .ComVersao(3); // #2074: sem primeiroNome, que o Worker não envia. #2850: assunto com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "ticket_respondido_cliente_inapp_v1",
@@ -402,16 +411,18 @@ public static class NotificacoesGlobaisSeed
             nome: "Ticket atribuido — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.TicketAtribuido,
-            assuntoTemplate: "EasyStok — Ticket atribuido a voce: {{ titulo }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_atribuido_email_v1"));
+            assuntoTemplate: "EasyStok — Ticket atribuído a você: {{ titulo }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("ticket_atribuido_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "sla_proximo_vencer_email_v1",
             nome: "SLA proximo de vencer — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.SlaProximoVencer,
-            assuntoTemplate: "EasyStok — SLA proximo de vencer: {{ titulo }}",
-            corpoTemplate: EmailTemplateLoader.LoadBody("sla_proximo_vencer_email_v1"));
+            assuntoTemplate: "EasyStok — SLA próximo de vencer: {{ titulo }}",
+            corpoTemplate: EmailTemplateLoader.LoadBody("sla_proximo_vencer_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "convite_csat_email_v1",
@@ -419,7 +430,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.ConviteCsat,
             assuntoTemplate: "EasyStok — Como avaliaria o atendimento?",
-            corpoTemplate: EmailTemplateLoader.LoadBody("convite_csat_email_v1"));
+            corpoTemplate: EmailTemplateLoader.LoadBody("convite_csat_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "convite_csat_inapp_v1",
@@ -435,8 +447,9 @@ public static class NotificacoesGlobaisSeed
             nome: "Fatura Criada — Email",
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.FaturaCriada,
-            assuntoTemplate: "EasyStok — Fatura {{ numero_fatura }} disponivel",
-            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_criada_email_v1"));
+            assuntoTemplate: "EasyStok — Fatura {{ numero_fatura }} disponível",
+            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_criada_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "fatura_criada_inapp_v1",
@@ -452,7 +465,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.FaturaVencendo,
             assuntoTemplate: "EasyStok — Fatura {{ numero_fatura }} vence em {{ dias_restantes }} dia(s)",
-            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_vencendo_email_v1"));
+            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_vencendo_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "fatura_vencendo_inapp_v1",
@@ -468,7 +482,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.FaturaPaga,
             assuntoTemplate: "EasyStok — Pagamento da fatura {{ numero_fatura }} confirmado",
-            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_paga_email_v1"));
+            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_paga_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "fatura_vencida_email_v1",
@@ -476,7 +491,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.FaturaVencida,
             assuntoTemplate: "EasyStok — Fatura {{ numero_fatura }} em atraso",
-            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_vencida_email_v1"));
+            corpoTemplate: EmailTemplateLoader.LoadBody("fatura_vencida_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "pagamento_confirmado_inapp_v1",
@@ -492,7 +508,8 @@ public static class NotificacoesGlobaisSeed
             canal: CanalNotificacao.Email,
             tipoEvento: TipoEventoNotificacao.PagamentoFalhou,
             assuntoTemplate: "EasyStok — Falha no pagamento",
-            corpoTemplate: EmailTemplateLoader.LoadBody("pagamento_falhou_email_v1"));
+            corpoTemplate: EmailTemplateLoader.LoadBody("pagamento_falhou_email_v2"))
+            .ComVersao(2); // #2850: português com acento.
 
         yield return TemplateNotificacao.Criar(
             codigo: "broadcast_super_admin_inapp_v1",
