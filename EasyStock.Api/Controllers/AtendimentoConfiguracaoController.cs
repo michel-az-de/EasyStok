@@ -66,7 +66,8 @@ public class AtendimentoConfiguracaoController(
                 body.ModeloAgente,
                 body.CotaTokensMes,
                 body.Roteiro,
-                body.ObservacoesLoja));
+                body.ObservacoesLoja,
+                body.FerramentasDesligadas));
 
             return DataOk(resultado);
         }
@@ -94,6 +95,7 @@ public sealed record AtualizarConfiguracaoAtendimentoBody(
     string? ModeloAgente = null,
     long? CotaTokensMes = null,
     IReadOnlyList<EasyStock.Application.Services.Atendimento.EtapaRoteiroAtendimento>? Roteiro = null,
-    string? ObservacoesLoja = null);
+    string? ObservacoesLoja = null,
+    IReadOnlyList<string>? FerramentasDesligadas = null);
 
 public sealed record ModeloRetomadaBody(string? Nome, string? Idioma);

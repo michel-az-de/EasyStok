@@ -123,6 +123,18 @@ public sealed class AgenteAtendimentoService(
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
 
+        // S69 (#2853): cota mensal esgotada. Não chama o modelo, passa para a equipe e deixa o turno no histórico como cota.
+        if (await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agora, ct) is { Barra: true, MotivoEscalada: { } motivoCota })
+        {
+            logger.LogWarning("Agente: cota mensal da empresa {EmpresaId} esgotada; conversa {ConversaId} fica para a equipe.",
+                empresaId, conversaId);
+            await escalador.EscalarAsync(empresaId, conversa, motivoCota, agora, ct);
+            await turnos!.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, null, null, 0, 0, 0, null, [], 0,
+                DesfechoTurnoAgente.Cota, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora), ct);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
+        }
+
         // #2126: o vínculo só é limpo em parte dos caminhos de cancelamento e entrega. Pedido já finalizado
         // não é atendimento em andamento: preso, a IA respondia "quero uma lasanha" com a comanda antiga e
         // não conseguia encerrar a conversa. Mesmo critério da reabertura (#1839). Solta sob a trava da
@@ -143,7 +155,9 @@ public sealed class AgenteAtendimentoService(
         var gravacao = new GravacaoSaidaTurno(conversaRepository, unitOfWork, logger, empresaId, dados.Mensagens, agora);
         var contexto = new ContextoTurnoAgente(empresaId, conversa, agora, gravacao.GravarAsync);
         var protecao = new ProtecaoVinculoTurno(conversaRepository, unitOfWork, contexto);
-        var ferramentasProtegidas = _ferramentas.ToDictionary(par => par.Key,
+        // #2853: a desligada pela loja nem vai ao modelo; pedida assim mesmo, o laço responde "desconhecida" sem executar.
+        var desligadas = FerramentasDaLoja.DaLoja(configuracao.FerramentasDesligadasJson);
+        var ferramentasProtegidas = _ferramentas.Where(par => !desligadas.Contains(par.Key)).ToDictionary(par => par.Key,
             par => (IFerramentaAgente)new FerramentaProtegida(par.Value, protecao));
 
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(

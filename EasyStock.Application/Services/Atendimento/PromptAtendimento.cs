@@ -75,6 +75,17 @@ public static class PromptAtendimento
             Escreva no máximo 3 frases curtas por mensagem; liste itens só quando o cliente pedir o cardápio ou opções.
             Vá direto ao ponto, sem floreio: não repita o que o cliente disse nem feche com oferta genérica de ajuda.
             Pontuação: nunca use travessão nem meia-risca; use vírgula, ponto ou dois-pontos.
-            """;
+            """ + Desligadas(configuracao);
+    }
+
+    // #2853: ferramenta desligada pela loja some da lista do modelo; o aviso evita que as regras acima o mandem usá-la.
+    // Sem nada desligado o prompt fica byte a byte igual (snapshot).
+    private static string Desligadas(ConfiguracaoAtendimento configuracao)
+    {
+        var desligadas = FerramentasDaLoja.DaLoja(configuracao.FerramentasDesligadasJson);
+        return desligadas.Count == 0
+            ? string.Empty
+            : $"\n\nFerramentas fora deste atendimento. Desligadas pela loja: {string.Join(", ", desligadas.Order(StringComparer.Ordinal))}. "
+              + "Não tente usá-las nem prometa o que elas fazem; se o cliente precisar disso, diga que a equipe responde e use escalar_para_dona.";
     }
 }
