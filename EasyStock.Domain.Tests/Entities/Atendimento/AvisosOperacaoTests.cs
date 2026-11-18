@@ -27,7 +27,7 @@ public class AvisosOperacaoTests
             CodigosAviso.ClienteSemResposta, CodigosAviso.PedidoAtrasado, CodigosAviso.ImpressaoTravada,
             CodigosAviso.CaixaEsquecido, CodigosAviso.ProntoSemEntregador, CodigosAviso.EncomendaProxima,
             CodigosAviso.EncomendaSemConfirmacao, CodigosAviso.EstoqueParaConferir, CodigosAviso.ReclamacaoCliente,
-            CodigosAviso.SuspeitaAtendimento,
+            CodigosAviso.SuspeitaAtendimento, CodigosAviso.CadastroComProblema,
         }.Should().OnlyContain(c => a.Ligado(c));
     }
 

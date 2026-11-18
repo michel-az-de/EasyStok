@@ -31,6 +31,7 @@ public static class AlertaOperacaoEvento
         CodigosAviso.EstoqueParaConferir => "es",
         CodigosAviso.ReclamacaoCliente => "rc",
         CodigosAviso.SuspeitaAtendimento => "sa",
+        CodigosAviso.CadastroComProblema => "cp",
         _ => throw new ArgumentOutOfRangeException(nameof(codigo), codigo, "Aviso sem sigla de correlação."),
     };
 

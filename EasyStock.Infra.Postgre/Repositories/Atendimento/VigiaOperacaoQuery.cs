@@ -87,4 +87,31 @@ public sealed class VigiaOperacaoQuery(EasyStockDbContext db) : IVigiaOperacaoQu
 
         return linhas.Select(x => new ItemFreezerParaConferir(x.Nome, x.Codigo, x.DataProducao, x.ExpiraEm, x.Unidades)).ToList();
     }
+
+    public async Task<IReadOnlyList<PedidoAbertoComCliente>> ListarPedidosAbertosComClienteAsync(
+        Guid empresaId, DateTime criadoDesdeUtc, int limite, CancellationToken ct = default)
+    {
+        var linhas = await db.Pedidos.AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && p.CriadoEm >= criadoDesdeUtc && !Finalizados.Contains(p.Status))
+            .OrderByDescending(p => p.CriadoEm)
+            .Take(limite)
+            .Select(p => new
+            {
+                p.Id, p.ClienteNome, p.ClienteId, p.EnderecoEntrega, p.EnderecoConfirmadoEm, p.Origem,
+                Cliente = db.Clientes.Where(c => c.EmpresaId == empresaId && c.Id == p.ClienteId)
+                    .Select(c => new
+                    {
+                        c.Nome,
+                        // O telefone mora no cadastro ou na lista de telefones do cliente.
+                        Telefone = c.Telefone != null && c.Telefone != "" ? c.Telefone
+                            : db.Set<ClienteTelefone>().Where(t => t.ClienteId == c.Id).Select(t => t.Numero).FirstOrDefault(),
+                        c.FotoChave,
+                    }).FirstOrDefault(),
+            })
+            .ToListAsync(ct);
+
+        // Cliente apagado: o pedido aponta para um cadastro que não existe mais, e isso é "sem cadastro ligado".
+        return linhas.Select(x => new PedidoAbertoComCliente(x.Id, x.ClienteNome, x.Cliente is null ? null : x.ClienteId,
+            x.Cliente?.Nome, x.Cliente?.Telefone, x.Cliente?.FotoChave, x.EnderecoEntrega, x.EnderecoConfirmadoEm, x.Origem)).ToList();
+    }
 }

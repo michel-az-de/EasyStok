@@ -30,6 +30,7 @@ public class VigiarOperacaoUseCaseTests
         _consultas.ListarProntosSemEntregadorAsync(default, default, default, default).ReturnsForAnyArgs([]);
         _consultas.ListarEncomendasAsync(default, default, default, default).ReturnsForAnyArgs([]);
         _consultas.ListarFreezerParaConferirAsync(default, default, default, default).ReturnsForAnyArgs([]);
+        _consultas.ListarPedidosAbertosComClienteAsync(default, default, default).ReturnsForAnyArgs([]);
         Avisos(AvisosOperacao.Padrao);
     }
 
@@ -90,7 +91,7 @@ public class VigiarOperacaoUseCaseTests
         Avisos(new AvisosOperacao
         {
             ProntoSemEntregadorMinutos = 0, EncomendaProximaHoras = 0, EncomendaSemConfirmacaoHoras = 0,
-            EstoqueVencendoDias = 0, EstoqueParadoDias = 0,
+            EstoqueVencendoDias = 0, EstoqueParadoDias = 0, CadastroComProblema = false,
         });
 
         await Criar().ExecuteAsync(_empresaId, Agora);
@@ -223,5 +224,128 @@ public class VigiarOperacaoUseCaseTests
         var texto = VigiarOperacaoUseCase.TextoFreezer(itens, Agora.AddDays(2), Agora);
 
         texto.Should().Contain("Item 8 (").And.NotContain("Item 9 (").And.EndWith("E mais 3 na tela de produção.");
+    }
+
+    // #2836: pedido em aberto de cliente com cadastro com problema avisa a dona e o gerente.
+    private static PedidoAbertoComCliente PedidoOk(Guid? clienteId = null) => new(
+        Guid.NewGuid(), "Maria Souza", clienteId ?? Guid.NewGuid(), "Maria Souza", "+5511999998888",
+        "clientes/x/y.jpg", "Rua A, 10", Agora.AddHours(-1));
+
+    private void Pedidos(params PedidoAbertoComCliente[] pedidos) =>
+        _consultas.ListarPedidosAbertosComClienteAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(pedidos);
+
+    public static TheoryData<string, string> Problemas => new()
+    {
+        { "sem_cliente", "sem cadastro ligado" },
+        { "sem_telefone", "sem telefone" },
+        { "endereco", "endereço de entrega não confirmado" },
+        { "provisorio", "cadastro provisório" },
+    };
+
+    [Theory]
+    [MemberData(nameof(Problemas))]
+    public async Task CadaProblemaDoCadastroViraAviso(string caso, string trecho)
+    {
+        var p = PedidoOk();
+        p = caso switch
+        {
+            "sem_cliente" => p with { ClienteId = null, NomeCadastro = null, TelefoneCadastro = null, FotoChave = null },
+            "sem_telefone" => p with { TelefoneCadastro = null },
+            "endereco" => p with { EnderecoConfirmadoEm = null },
+            _ => p with { NomeCadastro = "Cliente WhatsApp" },
+        };
+        Pedidos(p);
+
+        var r = await Criar().ExecuteAsync(_empresaId, Agora);
+
+        r.CadastrosComProblema.Should().Be(1);
+        var (tipo, payload, correlacao) = Enfileirados().Single();
+        tipo.Should().Be(TipoEventoNotificacao.AlertaOperacao);
+        payload.GetProperty("aviso").GetString().Should().Be(CodigosAviso.CadastroComProblema);
+        payload.GetProperty("texto").GetString().Should().Contain(trecho);
+        correlacao.Should().StartWith($"av:cp:{(p.ClienteId ?? p.PedidoId):N}:");
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task CadastroCompletoNaoAvisa()
+    {
+        Pedidos(PedidoOk());
+
+        var r = await Criar().ExecuteAsync(_empresaId, Agora);
+
+        r.CadastrosComProblema.Should().Be(0);
+        Enfileirados().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RetiradaNaoPedeEndereco()
+    {
+        Pedidos(PedidoOk() with { EnderecoEntrega = null, EnderecoConfirmadoEm = null });
+
+        (await Criar().ExecuteAsync(_empresaId, Agora)).CadastrosComProblema.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DoisPedidosDoMesmoClienteViramUmAvisoSo()
+    {
+        var cliente = Guid.NewGuid();
+        Pedidos(PedidoOk(cliente) with { TelefoneCadastro = null }, PedidoOk(cliente) with { TelefoneCadastro = null });
+
+        (await Criar().ExecuteAsync(_empresaId, Agora)).CadastrosComProblema.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ClienteJaAvisadoHojeNaoRepete()
+    {
+        var p = PedidoOk() with { TelefoneCadastro = null };
+        Pedidos(p);
+        _eventos.ExisteCorrelacaoAsync(_empresaId, Arg.Is<string>(c => c.StartsWith($"av:cp:{p.ClienteId:N}:")), Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        (await Criar().ExecuteAsync(_empresaId, Agora)).CadastrosComProblema.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DesligadoNaTelaNemConsulta()
+    {
+        Avisos(AvisosOperacao.Padrao with { CadastroComProblema = false });
+
+        await Criar().ExecuteAsync(_empresaId, Agora);
+
+        await _consultas.DidNotReceiveWithAnyArgs().ListarPedidosAbertosComClienteAsync(default, default, default);
+    }
+
+    // Revisão da #2840: quase todo cadastro está sem foto; sozinha ela só entra no texto de outro problema.
+    [Fact]
+    public async Task FotoSozinhaNaoAvisaMasEntraNoTextoDeOutroProblema()
+    {
+        Pedidos(PedidoOk() with { FotoChave = null });
+        (await Criar().ExecuteAsync(_empresaId, Agora)).CadastrosComProblema.Should().Be(0);
+
+        Pedidos(PedidoOk() with { FotoChave = null, TelefoneCadastro = null });
+        (await Criar().ExecuteAsync(_empresaId, Agora.Add(VigiarOperacaoUseCase.IntervaloDoCadastro))).CadastrosComProblema.Should().Be(1);
+        Enfileirados().Single().Payload.GetProperty("texto").GetString().Should().Contain("sem telefone").And.Contain("sem foto");
+    }
+
+    [Fact]
+    public async Task BalcaoSemClienteNaoAvisa()
+    {
+        Pedidos(PedidoOk() with { ClienteId = null, NomeCadastro = null, TelefoneCadastro = null, FotoChave = null, Origem = "balcao" });
+
+        (await Criar().ExecuteAsync(_empresaId, Agora)).CadastrosComProblema.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task FalhaNaConsultaNaoTravaAConferencia()
+    {
+        _consultas.ListarPedidosAbertosComClienteAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<PedidoAbertoComCliente>>(_ => throw new TimeoutException(), _ => [PedidoOk() with { TelefoneCadastro = null }]);
+
+        var falha = () => Criar().ExecuteAsync(_empresaId, Agora);
+        await falha.Should().ThrowAsync<TimeoutException>();
+
+        (await Criar().ExecuteAsync(_empresaId, Agora.AddMinutes(1))).CadastrosComProblema.Should().Be(1);
     }
 }

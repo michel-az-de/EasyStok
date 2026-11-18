@@ -83,7 +83,8 @@ public sealed record AvisosOperacaoBody(
     bool SuspeitaAtendimento = true,
     bool EquipeAtencao = true,
     bool EquipePedido = true,
-    bool EquipePagamento = true)
+    bool EquipePagamento = true,
+    bool CadastroComProblema = true)
 {
     public AvisosOperacao ParaDominio() => new()
     {
@@ -101,5 +102,6 @@ public sealed record AvisosOperacaoBody(
         EquipeAtencao = EquipeAtencao,
         EquipePedido = EquipePedido,
         EquipePagamento = EquipePagamento,
+        CadastroComProblema = CadastroComProblema,
     };
 }
