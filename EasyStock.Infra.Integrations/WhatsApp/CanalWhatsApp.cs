@@ -4,8 +4,14 @@ using EasyStock.Domain.Enums.Atendimento;
 namespace EasyStock.Infra.Integrations.WhatsApp;
 
 /// <summary>Adaptador do WhatsApp na porta de canal (S34): traduz para o <see cref="IWhatsAppCloudClient"/> (S02).</summary>
-public sealed class CanalWhatsApp(IWhatsAppCloudClient cloud) : ICanalMensageria, ICanalComAudio
+public sealed class CanalWhatsApp(IWhatsAppCloudClient cloud) : ICanalMensageria, ICanalComAudio, ICanalComAcoesNaMensagem
 {
+    public Task ReagirAsync(string contatoIdExterno, string idMensagemExterna, string? emoji, CancellationToken ct = default) =>
+        cloud.ReagirAsync(contatoIdExterno, idMensagemExterna, emoji, ct);
+
+    public Task ApagarParaTodosAsync(string contatoIdExterno, string idMensagemExterna, CancellationToken ct = default) =>
+        cloud.ApagarParaTodosAsync(contatoIdExterno, idMensagemExterna, ct);
+
     public CanalConversa Canal => CanalConversa.WhatsApp;
 
     public async Task<string> EnviarTextoAsync(string contatoIdExterno, string texto, CancellationToken ct = default) =>

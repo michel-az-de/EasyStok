@@ -10,6 +10,8 @@ import { BolhaArquivo, BolhaAudio, BolhaPeca } from './BolhaAnexo'
 import { BolhaAvaliacaoPedido, BolhaAvaliacaoResposta } from './BolhaAvaliacao'
 import { BolhaMidiaApi } from './BolhaMidiaApi'
 import { avisoDePedido } from './apresentacaoDaConversa'
+import { MenuDaMensagem } from './MenuDaMensagem'
+import { fraseDaApagada, podeReagir } from '../../dominio/acoesNaMensagem'
 import css from './atendimento.module.css'
 
 const CLASSE = { in: css.entrada, out: css.saida }
@@ -126,7 +128,9 @@ const TITULO_DO_ASSISTENTE = Object.freeze({
 
 // #1577: em `memo`. Mensagem nova na conversa não re-renderiza os balões antigos (até 100, cada um com a
 // regex de link). A mensagem compara por conteúdo: a leitura da API a devolve como objeto novo sem ter mudado.
-export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, numeroComanda = null }) {
+export const Balao = memo(function Balao({
+  mensagem, trocaDeVoz, aoAbrirDefinicaoAutomatica, aoReenviar, aoAbrirModelos, numeroComanda = null, aoReagir, aoApagar,
+}) {
   // #1761: o Reenviar não dava retorno nenhum. O botão diz "Reenviando…", trava o segundo toque
   // e, se o canal recusar de novo, a bolha diz que a nova tentativa também não saiu.
   const [reenvio, setReenvio] = useState(null)
@@ -163,9 +167,30 @@ export const Balao = memo(function Balao({ mensagem, trocaDeVoz, aoAbrirDefinica
   const tique = mensagem.dir === 'out' ? tiqueDaMensagem(mensagem.status) : null
   // #1761: o erro cru do canal vira frase de balcão; fora da janela ganha o caminho do modelo.
   const falha = mensagem.status === 'falhou' ? falhaDeEnvio(mensagem.erro) : null
+  // #2833: apagada para todos, o cliente não vê mais; a loja vê a frase no lugar do conteúdo.
+  const apagada = fraseDaApagada(mensagem, horaCurta)
+  if (apagada) {
+    return (
+      <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${css.apagada} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
+        <p><Icone nome="circle-x" tamanho={16} /><span>{apagada}</span></p>
+      </div>
+    )
+  }
+  const reagivel = Boolean(aoReagir) && podeReagir(mensagem)
   return (
-    <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''}`}>
+    <div className={`${css.balao} ${CLASSE[mensagem.dir]} ${mensagem.automatica ? css.doAutomatico : ''} ${trocaDeVoz ? css.trocaDeVoz : ''} ${mensagem.reacao ? css.comReacao : ''}`}>
+      {(aoReagir || aoApagar) && (
+        <MenuDaMensagem
+          mensagem={mensagem} podeReagir={reagivel} alinhamento={mensagem.dir === 'out' ? 'direita' : 'esquerda'}
+          aoReagir={(emoji) => aoReagir(mensagem.id, emoji)} aoApagar={aoApagar ? () => aoApagar(mensagem.id) : undefined}
+        />
+      )}
       <Corpo mensagem={mensagem} numeroComanda={numeroComanda} />
+      {mensagem.reacao && (
+        <span className={css.reacaoDaBolha} title="Reação da loja">
+          <span aria-hidden="true">{mensagem.reacao}</span><span className="sr">Reação da loja: {mensagem.reacao}</span>
+        </span>
+      )}
       <span className={css.meta}>
         {/* Item D (banca 10, pedido 24/09 04h12 "editar ali na hora"): a
             etiqueta que já marcava "automática" vira um botão que abre a

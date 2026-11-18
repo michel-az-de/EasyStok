@@ -35,7 +35,7 @@ export function PainelAtendimento({
   } = useAtendimento()
   const {
     enviar, reabrir, assumirAtendimento, devolverAutomatico,
-    selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores, transferirConversa,
+    selecionar, abrirEncerramento, reenviar, carregarMensagensAnteriores, transferirConversa, reagir, apagar,
   } = useAcoes()
   const { canais } = useCatalogo()
   const fotoCadastrada = useFotoCliente(selecionada?.cliente?.fotoUrl)
@@ -230,6 +230,8 @@ export function PainelAtendimento({
           agora={agora}
           aoAbrirDefinicaoAutomatica={(regra) => aoAbrirBiblioteca(itemDaBibliotecaPelaRegra(regra))}
           aoReenviar={reenviar ? (mensagemId) => reenviar(selecionada.id, mensagemId) : undefined}
+          aoReagir={reagir ? (mensagemId, emoji) => reagir(selecionada.id, mensagemId, emoji) : undefined}
+          aoApagar={apagar && !encerrada ? (mensagemId) => apagar(selecionada.id, mensagemId) : undefined}
           aoAbrirModelos={podeEnviarModelo ? () => setModelosDe(selecionada.id) : undefined}
           digitando={digitando}
           visivel={visivel}

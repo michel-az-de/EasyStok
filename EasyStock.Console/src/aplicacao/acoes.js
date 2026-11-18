@@ -275,6 +275,8 @@ export const CONFIRMAR_RESPONSAVEL_API = 'confirmar-responsavel-api'
 export const ANTERIORES_CARREGADAS = 'anteriores-carregadas'
 export const SINCRONIZACAO_FALHOU = 'sincronizacao-falhou'
 export const CONFIRMAR_ENVIO_API = 'confirmar-envio-api'
+// #2833: reação ou apagar para todos; a mensagem que a API devolveu troca a da conversa.
+export const ATUALIZAR_MENSAGEM_API = 'atualizar-mensagem-api'
 export const RECEBER_MODELO_API = 'receber-modelo-api'
 export const FALHAR_ENVIO_API = 'falhar-envio-api'
 export const AVISO_API = 'aviso-api'
