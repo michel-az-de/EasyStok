@@ -6,14 +6,18 @@ namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
 /// <summary>
 /// #2155: drena um <see cref="ColetarFotoPerfilWhatsAppJob"/>. A foto do perfil do WhatsApp vira a foto do cliente
-/// quando ele ainda não tem nenhuma, pelo mesmo caminho do upload do console (otimização, storage privado e
-/// histórico). Foto escolhida pela loja nunca é trocada. Sem foto, canal sem suporte ou falha da ponte: nada muda.
+/// pelo mesmo caminho do upload do console (otimização, storage privado e histórico). Foto escolhida pela loja nunca é
+/// trocada. Sem foto, canal sem suporte ou falha da ponte: nada muda.
+/// #2838: a foto que veio do WhatsApp é renovada depois de <see cref="Validade"/>, e a ponte é consultada no máximo uma
+/// vez por cliente na <see cref="JanelaFotoPerfilWhatsApp"/>.
 /// </summary>
 public sealed class ColetarFotoPerfilWhatsAppUseCase(
     IClienteRepository clientes,
     IWhatsAppCloudClient whatsApp,
     ClienteFotoUseCase fotos,
     ITenantContextAccessor tenantContext,
+    JanelaFotoPerfilWhatsApp janela,
+    TimeProvider relogio,
     ILogger<ColetarFotoPerfilWhatsAppUseCase> logger)
 {
     public async Task ExecuteAsync(ColetarFotoPerfilWhatsAppJob job, CancellationToken ct = default)
@@ -22,7 +26,8 @@ public sealed class ColetarFotoPerfilWhatsAppUseCase(
         tenantContext.SetCurrentTenant(job.EmpresaId);
 
         var cliente = await clientes.GetByIdAsync(job.EmpresaId, job.ClienteId);
-        if (cliente is null || cliente.FotoChave is not null) return;
+        if (cliente is null || !await PodeTrocarAsync(cliente)) return;
+        if (!janela.Reservar(job.EmpresaId, job.ClienteId)) return;
 
         FotoPerfilWhatsApp? foto;
         try
@@ -35,7 +40,11 @@ public sealed class ColetarFotoPerfilWhatsAppUseCase(
             return;
         }
 
-        if (foto is null || foto.Conteudo.Length is 0 or > FotoPerfilWhatsApp.TetoBytes) return;
+        if (foto is null || foto.Conteudo.Length is 0 or > FotoPerfilWhatsApp.TetoBytes)
+        {
+            logger.LogInformation("Foto do perfil do WhatsApp: o cliente {ClienteId} não tem foto visível.", job.ClienteId);
+            return;
+        }
 
         try
         {
@@ -47,5 +56,17 @@ public sealed class ColetarFotoPerfilWhatsAppUseCase(
         {
             logger.LogWarning("Foto do perfil do WhatsApp recusada para o cliente {ClienteId}: {Motivo}", job.ClienteId, ex.Message);
         }
+    }
+
+    public static readonly TimeSpan Validade = TimeSpan.FromDays(7);
+
+    /// <summary>Sem foto, ou com a foto que o próprio WhatsApp deu há mais de <see cref="Validade"/>.</summary>
+    private async Task<bool> PodeTrocarAsync(EasyStock.Domain.Entities.Cliente cliente)
+    {
+        if (cliente.FotoChave is null) return true;
+        var gravacao = (await clientes.GetAlteracoesAsync(cliente.Id) ?? [])
+            .FirstOrDefault(a => a.Campo == "Foto" && a.ValorNovo == cliente.FotoChave);
+        return gravacao is { Origem: PerfilClienteWhatsApp.Origem }
+            && relogio.GetUtcNow().UtcDateTime - gravacao.AlteradoEm >= Validade;
     }
 }

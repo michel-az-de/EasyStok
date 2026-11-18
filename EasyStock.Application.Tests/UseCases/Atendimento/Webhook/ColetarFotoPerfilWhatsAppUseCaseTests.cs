@@ -2,9 +2,11 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Storage;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.Cliente.Foto;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento.Webhook;
 
@@ -20,6 +22,8 @@ public sealed class ColetarFotoPerfilWhatsAppUseCaseTests
     private readonly IImageProcessor _images = Substitute.For<IImageProcessor>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly ITenantContextAccessor _tenant = Substitute.For<ITenantContextAccessor>();
+    private readonly FakeTimeProvider _relogio = new(new DateTimeOffset(2026, 11, 18, 12, 0, 0, TimeSpan.Zero));
+    private JanelaFotoPerfilWhatsApp? _janela;
 
     public ColetarFotoPerfilWhatsAppUseCaseTests()
     {
@@ -32,7 +36,18 @@ public sealed class ColetarFotoPerfilWhatsAppUseCaseTests
     }
 
     private ColetarFotoPerfilWhatsAppUseCase Criar() => new(_clientes, _whatsApp,
-        new ClienteFotoUseCase(_clientes, _storage, _images, _uow), _tenant, NullLogger<ColetarFotoPerfilWhatsAppUseCase>.Instance);
+        new ClienteFotoUseCase(_clientes, _storage, _images, _uow), _tenant, _janela ??= new JanelaFotoPerfilWhatsApp(_relogio),
+        _relogio, NullLogger<ColetarFotoPerfilWhatsAppUseCase>.Instance);
+
+    private void FotoGravadaPor(Cliente cliente, string origem, TimeSpan ha) =>
+        _clientes.GetAlteracoesAsync(cliente.Id, Arg.Any<int>()).Returns(new[]
+        {
+            new ClienteAlteracao
+            {
+                Id = Guid.NewGuid(), EmpresaId = _empresaId, ClienteId = cliente.Id, Campo = "Foto",
+                ValorNovo = cliente.FotoChave, Origem = origem, AlteradoEm = _relogio.GetUtcNow().UtcDateTime - ha,
+            },
+        });
 
     private Cliente Cliente(string? fotoChave = null)
     {
@@ -103,5 +118,58 @@ public sealed class ColetarFotoPerfilWhatsAppUseCaseTests
 
         await executar.Should().NotThrowAsync();
         cliente.FotoChave.Should().BeNull();
+    }
+
+    // #2838: a foto que veio do WhatsApp envelhece; a escolhida pela loja nunca é trocada.
+    [Fact]
+    public async Task FotoAntigaDoWhatsAppEAtualizada()
+    {
+        var cliente = Cliente($"clientes/{_empresaId}/x/{Guid.NewGuid():N}.jpg");
+        var antiga = cliente.FotoChave;
+        FotoGravadaPor(cliente, "whatsapp", TimeSpan.FromDays(8));
+        _whatsApp.ObterFotoPerfilAsync(Contato, Arg.Any<CancellationToken>()).Returns(new FotoPerfilWhatsApp(Jpeg, "image/jpeg"));
+
+        await Criar().ExecuteAsync(new ColetarFotoPerfilWhatsAppJob(_empresaId, cliente.Id, Contato));
+
+        cliente.FotoChave.Should().NotBe(antiga).And.StartWith($"clientes/{_empresaId}/{cliente.Id}/");
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task FotoRecenteDoWhatsAppNaoChamaAPonte()
+    {
+        var cliente = Cliente($"clientes/{_empresaId}/x/{Guid.NewGuid():N}.jpg");
+        FotoGravadaPor(cliente, "whatsapp", TimeSpan.FromDays(1));
+
+        await Criar().ExecuteAsync(new ColetarFotoPerfilWhatsAppJob(_empresaId, cliente.Id, Contato));
+
+        await _whatsApp.DidNotReceiveWithAnyArgs().ObterFotoPerfilAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task FotoAntigaEscolhidaPelaLojaNaoETrocada()
+    {
+        var cliente = Cliente($"clientes/{_empresaId}/x/{Guid.NewGuid():N}.jpg");
+        FotoGravadaPor(cliente, "console", TimeSpan.FromDays(30));
+
+        await Criar().ExecuteAsync(new ColetarFotoPerfilWhatsAppJob(_empresaId, cliente.Id, Contato));
+
+        await _whatsApp.DidNotReceiveWithAnyArgs().ObterFotoPerfilAsync(default!, default);
+    }
+
+    // Cada mensagem enfileira; a ponte é consultada no máximo uma vez por cliente dentro da janela.
+    [Fact]
+    public async Task MensagensSeguidasConsultamAPonteUmaVezSo()
+    {
+        var cliente = Cliente();
+        _whatsApp.ObterFotoPerfilAsync(Contato, Arg.Any<CancellationToken>()).Returns((FotoPerfilWhatsApp?)null);
+        var job = new ColetarFotoPerfilWhatsAppJob(_empresaId, cliente.Id, Contato);
+
+        await Criar().ExecuteAsync(job);
+        await Criar().ExecuteAsync(job);
+        _relogio.Advance(JanelaFotoPerfilWhatsApp.Intervalo + TimeSpan.FromMinutes(1));
+        await Criar().ExecuteAsync(job);
+
+        await _whatsApp.Received(2).ObterFotoPerfilAsync(Contato, Arg.Any<CancellationToken>());
     }
 }

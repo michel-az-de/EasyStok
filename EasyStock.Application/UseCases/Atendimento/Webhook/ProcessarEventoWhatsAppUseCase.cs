@@ -390,11 +390,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                     new ArmazenarMidiaWhatsAppJob(empresaId, conversa.Id, msg.Wamid, msg.MidiaId));
             }
 
-            // #2155: conversa nova de cliente sem foto busca a foto do perfil, fora da requisição.
-            if (perfilCliente is not null && identificacao is { Cliente.FotoChave: null })
+            // #2155: a foto do perfil é buscada fora da requisição. #2838: em toda mensagem de cliente, não só na
+            // conversa nova; o job decide se troca e a janela dele segura a ponte.
+            if (perfilCliente is not null && conversa.ClienteId is { } clienteDaConversa)
             {
                 await queueService.EnqueueAsync(FilaAtendimentoNomes.FotoPerfilWhatsApp,
-                    new ColetarFotoPerfilWhatsAppJob(empresaId, identificacao.Cliente.Id, conversa.ContatoIdExterno));
+                    new ColetarFotoPerfilWhatsAppJob(empresaId, clienteDaConversa, conversa.ContatoIdExterno));
             }
 
             // S24: conversa de cliente bloqueado já nasceu com a dona; nada automático responde.
