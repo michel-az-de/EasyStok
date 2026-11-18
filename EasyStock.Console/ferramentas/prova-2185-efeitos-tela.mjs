@@ -710,6 +710,8 @@ try {
     await p.getByRole('button', { name: 'Mais opções', exact: true }).tap()
     await p.getByRole('menuitem', { name: 'Gestão', exact: true }).tap()
     const gestao = p.getByRole('dialog', { name: 'Gestão da loja', exact: true })
+    // #2832: no modo API a Gestão abre no painel Agora; a busca das telas fica em Todas as telas.
+    await gestao.getByRole('button', { name: 'Todas as telas', exact: true }).tap()
     await gestao.getByRole('button', { name: 'Leads e clientes', exact: true }).tap()
     await gestao.getByRole('button', { name: 'Voltar à conversa', exact: true }).tap()
     assert.equal(await gestao.count(), 0)

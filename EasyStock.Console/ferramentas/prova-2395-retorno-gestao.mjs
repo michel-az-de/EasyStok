@@ -44,6 +44,8 @@ try {
   await page.goto(`${origem}/.build/2395/retorno-gestao/index.html#/m/atendimento/balcao`)
   await page.getByRole('button', { name: 'Gestão', exact: true }).tap()
   const gestao = page.getByRole('dialog', { name: 'Gestão da loja', exact: true })
+  // #2832: no modo API a Gestão abre no painel Agora; a busca das telas fica em Todas as telas.
+  await gestao.getByRole('button', { name: 'Todas as telas', exact: true }).tap()
   await gestao.getByRole('button', { name: 'Leads e clientes', exact: true }).tap()
   await gestao.getByRole('button', { name: 'Cadastrar pessoa da conversa', exact: true }).tap()
   const editor = page.getByRole('dialog', { name: 'Novo cliente', exact: true })

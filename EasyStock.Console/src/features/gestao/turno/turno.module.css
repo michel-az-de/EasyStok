@@ -1,0 +1,48 @@
+/* #2832: painel "Agora" da Gestão da loja. Três colunas no largo, uma no estreito. */
+.turno { display: grid; gap: var(--e-5); padding-block: var(--e-3); }
+.grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-5); align-items: start; }
+.coluna { display: grid; gap: var(--e-5); }
+.cartao {
+  display: grid; gap: var(--e-3); padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2);
+  background: var(--papel);
+}
+.cabecalho { display: flex; align-items: center; gap: var(--e-2); color: var(--marca-forte); }
+.titulo { flex: 1; margin: 0; color: var(--tinta); font-size: var(--t-forte); font-weight: 800; }
+.resumo { color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 600; }
+.vazio { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
+.lista { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; max-height: 420px; overflow-y: auto; }
+.linhaPrato, .pendencia {
+  display: flex; align-items: center; gap: var(--e-3); padding: var(--e-2) var(--e-3); border-radius: var(--r-1);
+  background: var(--preenchimento);
+}
+.nomePrato { display: grid; justify-items: start; gap: var(--e-1); flex: 1; min-width: 0; font-size: var(--t-corpo); }
+.nomePrato > span:not(:first-child) { color: var(--tinta-2); font-size: var(--t-apoio); }
+.pendencia_perigo { background: var(--erro-pastel); }
+.pendencia_aviso { background: var(--alerta-pastel); }
+.valor { display: flex; align-items: baseline; gap: var(--e-2); margin: 0; }
+.valor strong { font-size: var(--t-display); font-weight: 800; }
+.valor span { color: var(--tinta-2); font-size: var(--t-apoio); }
+.formas { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--e-2); margin: 0; }
+.formas div { padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--preenchimento); }
+.formas dt { color: var(--tinta-2); font-size: var(--t-apoio); }
+.formas dd { margin: 0; font-size: var(--t-forte); font-weight: 800; }
+.montes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-2); }
+.monte {
+  display: grid; justify-items: start; gap: var(--e-1); min-height: var(--toque); padding: var(--e-2) var(--e-3);
+  border: 0; border-radius: var(--r-1); background: var(--preenchimento); color: var(--tinta); text-align: left; cursor: pointer;
+}
+.monte strong { font-size: var(--t-valor); font-weight: 800; }
+.monte span { color: var(--tinta-2); font-size: var(--t-apoio); }
+.monte:hover { background: var(--preenchimento-forte); }
+.monte_aviso { background: var(--alerta-pastel); }
+.monte_ok { background: var(--sucesso-pastel); }
+.atalhos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); padding-top: var(--e-3); border-top: 1px solid var(--linha); }
+.rotuloAtalhos { margin-right: var(--e-2); color: var(--tinta-2); font-size: var(--t-apoio); font-weight: 700; }
+.atalho {
+  min-height: var(--toque); padding-inline: var(--e-4); border: 0; border-radius: var(--r-pilula);
+  background: var(--preenchimento); color: var(--tinta); font-size: var(--t-apoio); font-weight: 700; cursor: pointer;
+}
+.atalho:hover { background: var(--preenchimento-forte); }
+
+@media (max-width: 1080px) { .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .grade { grid-template-columns: 1fr; } }
