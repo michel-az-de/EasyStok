@@ -46,7 +46,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         var vendasQuery = dbContext.Vendas
             .AsNoTracking()
-            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de);
+            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.Natureza == NaturezaMovimentacaoEstoque.Venda); // #2844: doação, perda e ajuste não são receita
         if (lojaId.HasValue)
             vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
 
@@ -162,7 +162,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         var vendasQuery = dbContext.Vendas
             .AsNoTracking()
-            .Where(v => v.EmpresaId == empresaId &&
+            .Where(v => v.EmpresaId == empresaId && v.Natureza == NaturezaMovimentacaoEstoque.Venda && // #2844
                 v.DataVenda >= DateTime.SpecifyKind(de, DateTimeKind.Utc) &&
                 v.DataVenda <= DateTime.SpecifyKind(ate, DateTimeKind.Utc));
         if (lojaId.HasValue)
