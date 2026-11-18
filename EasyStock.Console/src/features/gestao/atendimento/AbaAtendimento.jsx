@@ -10,6 +10,7 @@ import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import css from './abaAtendimento.module.css'
+import { PainelAssistente } from './PainelAssistente'
 
 const TAMANHO_MENSAGEM = 500
 // #2792: limites que espelham o servidor; passar deles avisa no campo e trava o Salvar (sem `maxLength`).
@@ -399,6 +400,7 @@ export function AbaAtendimento({ horariosAtendimento = null }) {
   return (
     <div className={css.aba}>
       <LojaAgora horariosAtendimento={horariosAtendimento} />
+      <PainelAssistente podeEditar={acoes.editarAtendimento === true} />
       {acoes.editarAtendimento === true ? <>
         <MensagensDoExpediente />
         <ConfiguracaoDoAtendimento />

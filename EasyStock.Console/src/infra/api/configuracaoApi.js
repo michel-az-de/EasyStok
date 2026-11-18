@@ -52,3 +52,12 @@ const salvarGeral = (c, identidadeEsperada) => chamarApi(BASE, {
     ativo: c.ativo,
   },
 })
+
+// #2853: ajustes do painel do Assistente, cada um sozinho no corpo (o resto da configuração fica).
+// `cotaTokensMes` 0 tira a cota; `roteiro` vazio volta ao padrão; `ferramentasDesligadas` vazio liga todas.
+export const salvarAjusteDoAssistente = (ajuste) => chamarApi(BASE, {
+  metodo: 'PUT',
+  identidadeEsperada: identidadeDaSessao(lerSessao()),
+  sinal: AbortSignal.timeout(15000),
+  corpo: ajuste,
+})

@@ -96,10 +96,14 @@ export function ModalAssistente({ conversa, aoFechar }) {
           <details className={css.checagemDetalhes}>
             <summary>Ferramentas que ele pode usar ({checagem.ferramentas.length})</summary>
             <ul className={css.checagemFerramentas}>
-              {checagem.ferramentas.map((f) => <li key={f.nome}><code>{f.nome}</code> {f.descricao}</li>)}
+              {checagem.ferramentas.map((f) => (
+                <li key={f.nome} data-ligada={f.ligada !== false}>
+                  <code>{f.nome}</code> {f.ligada === false ? <strong>Desligada pela loja.</strong> : null} {f.descricao}
+                </li>
+              ))}
             </ul>
           </details>
-          <p className={css.checagemNota}>Tom, saudações e mensagens do Assistente ficam em Gestão › Atendimento.</p>
+          <p className={css.checagemNota}>Tom, saudações, cota, roteiro e ferramentas do Assistente ficam em Gestão › Atendimento.</p>
         </div>
       )}
     </Modal>

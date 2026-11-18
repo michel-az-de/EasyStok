@@ -1,0 +1,83 @@
+/* #2853: painel do Assistente. O fluxo é um mapa vertical de nós ligados por um fio; o nó escolhido abre o
+   ajuste ao lado (largo) ou embaixo (estreito). Cor nunca informa sozinha: rótulo e pílula vão junto. */
+.painel { display: grid; gap: var(--e-3); padding: var(--e-4) 0; min-width: 0; }
+.topo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.topo h3 { margin: 0 auto 0 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
+.conteudo { display: grid; gap: var(--e-4); min-width: 0; }
+
+.nota { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+.erro { margin: 0; font-size: var(--t-apoio); color: var(--erro); }
+.pendencia { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--marca-claro); color: var(--marca-forte); font-size: var(--t-apoio); }
+.acoes { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+
+/* Uso */
+.uso { display: grid; gap: var(--e-3); }
+.consumo { display: grid; gap: var(--e-2); padding: var(--e-4); border-radius: var(--r-2); border: 1px solid var(--linha); background: var(--papel); }
+.consumo_aviso { border-color: var(--alerta); background: var(--alerta-pastel); }
+.consumo_perigo { border-color: var(--erro); background: var(--erro-pastel); }
+.consumoTitulo { margin: 0; font-size: var(--t-titulo); color: var(--tinta); }
+.consumoDetalhe { margin: 0; font-size: var(--t-corpo); color: var(--tinta); }
+.barra { position: relative; height: 14px; border-radius: var(--r-pilula); background: var(--preenchimento); overflow: hidden; }
+.barraCheia { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--sucesso); transition: width var(--dur-media) var(--ease-padrao); }
+.consumo_aviso .barraCheia { background: var(--alerta); }
+.consumo_perigo .barraCheia { background: var(--erro); }
+.barraAlerta { position: absolute; top: 0; bottom: 0; left: 80%; width: 2px; background: var(--tinta-2); }
+
+.cartoes { display: grid; gap: var(--e-2); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 0; }
+.cartoes div { padding: var(--e-3); border-radius: var(--r-2); background: var(--papel); border: 1px solid var(--linha); }
+.cartoes dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.cartoes dd { margin: var(--e-1) 0 0; font-size: var(--t-titulo); font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.cota { display: grid; gap: var(--e-2); max-width: 420px; }
+
+/* Fluxo */
+.fluxo { display: grid; gap: var(--e-4); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) {
+  .fluxo { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
+  .detalhe { position: sticky; top: var(--e-3); }
+}
+.mapa, .portoes, .roteiro, .ferramentas { list-style: none; margin: 0; padding: 0; }
+.mapa { display: grid; gap: var(--e-4); position: relative; }
+/* O fio que liga os nós, de cima a baixo. */
+.mapa::before { content: ""; position: absolute; left: 22px; top: var(--e-4); bottom: var(--e-4); width: 2px; background: var(--linha-forte); }
+
+.grupo { position: relative; display: grid; gap: var(--e-2); padding: var(--e-3); margin-left: 44px; border: 1px dashed var(--linha-forte); border-radius: var(--r-2); background: var(--fundo); }
+.grupo::before { content: ""; position: absolute; left: -23px; top: 22px; width: 22px; height: 2px; background: var(--linha-forte); }
+.grupoTitulo { margin: 0; display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; font-weight: 700; color: var(--tinta); }
+.grupoTitulo small { font-weight: 400; font-size: var(--t-apoio); color: var(--tinta-2); }
+.portoes, .roteiro { display: grid; gap: var(--e-1); }
+.ferramentas { display: grid; gap: var(--e-1); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+.no { position: relative; min-width: 0; }
+.noBotao {
+  width: 100%; min-height: var(--toque); display: flex; align-items: center; gap: var(--e-2); text-align: left;
+  padding: var(--e-2) var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel);
+  color: var(--tinta); font: inherit; cursor: pointer; position: relative; z-index: 1;
+}
+.noBotao:hover { border-color: var(--marca); }
+.noBotao:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.noBotao[aria-pressed="true"] { border-color: var(--marca); box-shadow: 0 0 0 2px var(--marca-claro); background: var(--marca-claro); }
+.no_ponta .noBotao { border-radius: var(--r-pilula); border-width: 2px; font-weight: 700; }
+.no_portao .noBotao { padding-block: var(--e-1); }
+.noTexto { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.noTexto strong { overflow-wrap: anywhere; }
+.noTexto span { font-size: var(--t-apoio); color: var(--tinta-2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.no_ferramenta .noTexto strong { font-family: var(--f-dado); font-size: var(--t-apoio); font-weight: 600; }
+.desligado .noBotao { border-style: dashed; color: var(--tinta-2); background: var(--fundo); }
+.desligado .noTexto strong { text-decoration: line-through; }
+
+.detalhe { min-width: 0; padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); scroll-margin-top: var(--e-3); }
+.bloco { display: grid; gap: var(--e-3); }
+.bloco h4 { margin: 0; display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-forte); color: var(--tinta); overflow-wrap: anywhere; }
+.bloco p { margin: 0; }
+.chave { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
+.chave input { width: 20px; height: 20px; accent-color: var(--marca); }
+.prompt summary { cursor: pointer; font-size: var(--t-apoio); color: var(--tinta-2); min-height: var(--toque); display: flex; align-items: center; }
+.prompt pre { margin: 0; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--t-apoio); padding: var(--e-3); border-radius: var(--r-1); background: var(--fundo); }
+
+/* Histórico */
+.historico { display: grid; gap: var(--e-3); }
+.turnos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.turno { display: grid; gap: var(--e-1); padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
+.turno p { margin: 0; overflow-wrap: anywhere; }
+.turnoTopo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.turnoTopo time { font-size: var(--t-apoio); color: var(--tinta-2); font-variant-numeric: tabular-nums; }
