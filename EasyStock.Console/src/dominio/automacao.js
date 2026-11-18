@@ -61,7 +61,7 @@ export const REGRAS_PADRAO = [
     descricao: 'A dona fechou a loja na mão, no controle do topo, mesmo dentro do horário.',
     ativa: true,
     texto: 'Oi! Fechamos a loja por aqui agora. '
-      + 'Pode deixar o pedido anotado que eu separo para o próximo horário, sem prometer prazo ainda.',
+      + 'Pode deixar o pedido anotado que eu separo e te aviso quando a loja abrir de novo.',
   },
   // A regra "Link de pagamento" saiu daqui. Texto de regra é texto fixo, e o
   // Pix só existe depois da emissão: a regra prometia "segue o link" sem link
