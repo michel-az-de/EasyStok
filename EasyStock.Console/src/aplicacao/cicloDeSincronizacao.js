@@ -19,6 +19,15 @@ const VOLTAS_DO_EVENTO = 2
 // `lidaEm` (#2005, console-08): id da conversa -> instante em que saiu a leitura que trouxe o resumo dela.
 export const criarMemoriaDoLaco = () => ({ dono: null, resumos: new Map(), mensagens: new Map(), pedidos: new Map(), lidaEm: new Map() })
 
+// #2833: reagir e apagar mudam a mensagem sem mexer em `ultimaMensagemEm`, e a mensagem lida não "muda sozinha";
+// a volta seguinte devolveria a lista guardada, sem a mudança, e a mescla daria a vez a ela. A resposta da API
+// (o mesmo formato da lista) entra no lugar da guardada; a `ultima` fica, e com ela a regra de releitura.
+export function guardarMensagemNaMemoria(memoria, conversaId, mensagem) {
+  const guardado = memoria?.mensagens.get(conversaId)
+  if (!guardado?.mensagens || !mensagem?.id) return
+  memoria.mensagens.set(conversaId, { ...guardado, mensagens: guardado.mensagens.map((m) => (m.id === mensagem.id ? mensagem : m)) })
+}
+
 export function criarCicloDeSincronizacao({
   despachar, memoria = criarMemoriaDoLaco(), dono = null, comConversas = true,
   lerSelecionada = () => null, lerUsuario = () => null, estaVivo = () => true, lerConversaNaTela = conversaNaTela,

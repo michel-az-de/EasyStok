@@ -11,7 +11,8 @@ import { relacionamentoDaApi } from '../../dominio/vinculoCliente'
 // #2005 (console-09): a leitura da conversa traz até 100 mensagens (as mais recentes); página cheia sugere que há mais.
 export const MENSAGENS_POR_LEITURA = 100
 
-const ID_DA_PONTE = /^wpp:[^:]+:(true|false)_[^_]+_.+/
+// #2833: o mesmo id que o WppConnectClient lê para reagir e apagar (contato @c.us ou @lid; grupo fica de fora).
+const ID_DA_PONTE = /^wpp:[^:]+:(true|false)_[^_]+@(c\.us|lid)_.+/
 
 const NOME_DO_CANAL = {
   WhatsApp: 'WhatsApp', Instagram: 'Instagram', Messenger: 'Messenger',

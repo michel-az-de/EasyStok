@@ -104,4 +104,22 @@ assert.match(balao, /fraseDaApagada/, 'e mostra a mensagem apagada')
 assert.match(painel, /aoReagir=/, 'o painel liga a reação')
 assert.match(painel, /aoApagar=/, 'e o apagar')
 
+// 6. Grupo não sai pela ponte para reagir ou apagar: o WppConnectClient só lê o id de @c.us e @lid.
+assert.equal(daApi('wpp:loja:true_120363000000000000@g.us_3EB0ABC').pelaPonte, undefined, 'grupo não é da ponte')
+
+// 7. Reagir e apagar não mexem em `ultimaMensagemEm`: a volta de 5 s devolve a lista guardada no laço, e a mescla
+// dá a vez ao servidor. A resposta da API entra no lugar da mensagem guardada, sem mexer na `ultima`.
+const { criarMemoriaDoLaco, guardarMensagemNaMemoria } = await import('../src/aplicacao/cicloDeSincronizacao.js')
+const memoria = criarMemoriaDoLaco()
+memoria.mensagens.set('c1', { ultima: '2026-11-18T14:58:00Z', mensagens: [{ id: 'a', texto: 'Oi' }, { id: 'b', texto: 'Pix?' }] })
+guardarMensagemNaMemoria(memoria, 'c1', { id: 'b', texto: 'Pix?', reacao: '❤️' })
+assert.equal(memoria.mensagens.get('c1').mensagens[1].reacao, '❤️', 'a reação fica na lista do laço')
+assert.equal(memoria.mensagens.get('c1').mensagens[0].texto, 'Oi', 'as outras ficam como estavam')
+assert.equal(memoria.mensagens.get('c1').ultima, '2026-11-18T14:58:00Z', 'a última, que decide a releitura, não muda')
+guardarMensagemNaMemoria(memoria, 'outra', { id: 'b' })
+assert.equal(memoria.mensagens.has('outra'), false, 'conversa que o laço não guardou fica de fora')
+guardarMensagemNaMemoria(null, 'c1', { id: 'b' })
+const provider = readFileSync(new URL('../src/aplicacao/AtendimentoProvider.jsx', import.meta.url), 'utf8')
+assert.match(provider, /comApi\(acoes, \{[^}]*memoria: memoriaDoLaco/, 'as ações da API recebem a memória do laço')
+
 console.log('prova-2833: emoji, reação e apagar para todos ok')

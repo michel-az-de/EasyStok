@@ -360,8 +360,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   }, [conversasAgora, agoraEfetivo, estado.catalogo.janelas])
 
   const acoesAtivas = useMemo(
-    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef }) : acoes),
-    [acoes],
+    () => (FONTE_API ? comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef, memoria: memoriaDoLaco }) : acoes),
+    [acoes, memoriaDoLaco],
   )
   useEffect(() => { acoesAtivasRef.current = acoesAtivas }, [acoesAtivas])
 

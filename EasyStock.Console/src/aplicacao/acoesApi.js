@@ -32,6 +32,7 @@ import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/nao
 import { criarAssumirAntesDeEnviar } from './api/assumirAntesDeEnviar'
 import { criarChavesDeMensagem } from './chavesDeMensagem'
 import { proximoInstante } from './relogioDeLeitura'
+import { guardarMensagemNaMemoria } from './cicloDeSincronizacao'
 
 const FORA_DA_JANELA = 'fora_da_janela_24h'
 
@@ -67,12 +68,14 @@ const falhaDoEnvio = (id, mensagemId, erro) => ({
 // O despacho local vem antes, para a tela responder na hora; a próxima sincronização
 // traz o estado do servidor. As ações ainda não ligadas (lista única em
 // `api/naoLigadas.js`) não mexem na memória do navegador: só avisam na faixa.
-export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef = null }) {
+export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef = null, memoria = null }) {
   const avisar = (erro) => despachar({ tipo: acao.AVISO_API, mensagem: erro.message })
-  // #2833: a resposta é a mensagem inteira; devolve a traduzida, ou null quando a API recusou.
+  // #2833: a resposta é a mensagem inteira; devolve a traduzida, ou null quando a API recusou. Ela entra também
+  // na lista do laço, senão a volta seguinte desfaz a mudança na tela (`guardarMensagemNaMemoria`).
   const atualizarMensagem = (id, chamada) => chamada
     .then((m) => {
       const mensagem = mensagemDaApi(m, id)
+      guardarMensagemNaMemoria(memoria, id, m)
       despachar({ tipo: acao.ATUALIZAR_MENSAGEM_API, id, mensagem })
       return mensagem
     })

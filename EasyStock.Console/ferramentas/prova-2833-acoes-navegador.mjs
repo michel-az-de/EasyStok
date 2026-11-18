@@ -26,11 +26,11 @@ const conversas = [
 const mensagens = {
   'conversa-ponte': [
     { id: 'p-cliente', direcao: 'Entrada', autor: 'Cliente', status: 'Recebida', tipoConteudo: 'Texto', texto: 'Oi, a lasanha sai hoje?', enviadaEm: ha(4), externoId: 'wpp:loja:false_5511987650000@c.us_AAA' },
-    { id: 'p-loja', direcao: 'Saida', autor: 'Dona', status: 'Enviada', tipoConteudo: 'Texto', texto: 'Sai sim! Mando o Pix?', enviadaEm: ha(2), externoId: 'wpp:loja:true_5511987650000@c.us_BBB', enviadaPorUsuarioId: usuario },
+    { id: 'p-loja', direcao: 'Saida', autor: 'Dona', status: 'Lida', tipoConteudo: 'Texto', texto: 'Sai sim! Mando o Pix?', enviadaEm: ha(2), externoId: 'wpp:loja:true_5511987650000@c.us_BBB', enviadaPorUsuarioId: usuario },
   ],
   'conversa-meta': [
     { id: 'm-cliente', direcao: 'Entrada', autor: 'Cliente', status: 'Recebida', tipoConteudo: 'Texto', texto: 'Tem nhoque?', enviadaEm: ha(5), externoId: 'wamid.CLIENTE' },
-    { id: 'm-loja', direcao: 'Saida', autor: 'Dona', status: 'Enviada', tipoConteudo: 'Texto', texto: 'Tem, ao sugo.', enviadaEm: ha(3), externoId: 'wamid.LOJA', enviadaPorUsuarioId: usuario },
+    { id: 'm-loja', direcao: 'Saida', autor: 'Dona', status: 'Lida', tipoConteudo: 'Texto', texto: 'Tem, ao sugo.', enviadaEm: ha(3), externoId: 'wamid.LOJA', enviadaPorUsuarioId: usuario },
   ],
 }
 const browser = await chromium.launch({ headless: true })
@@ -78,6 +78,12 @@ const abrirMenuDa = async (texto) => {
   await bolhaDe(texto).getByRole('button', { name: 'Mais opções da mensagem' }).click()
   await page.getByRole('menu', { name: 'Mais opções da mensagem' }).waitFor()
 }
+// Revisão da #2833: reagir e apagar não mudam a última mensagem, e a mensagem lida não "muda sozinha"; a volta
+// seguinte do laço (5 s) usa a lista guardada. A mudança tem de seguir na tela depois dela.
+const umaVoltaDoLaco = async () => {
+  await page.waitForResponse((r) => new URL(r.url()).pathname === '/api/atendimento/conversas', { timeout: 12000 })
+  await page.waitForTimeout(500)
+}
 try {
   await page.goto(origem + '/#/m/atendimento/balcao')
   await page.getByRole('button', { name: /^Todas/ }).click()
@@ -113,6 +119,8 @@ try {
   ])
   assert.equal(JSON.parse(chamadas.findLast((c) => c.path.endsWith('/reacao')).corpo).emoji, '❤️')
   await bolhaDe('Sai sim! Mando o Pix?').getByTitle('Reação da loja').waitFor()
+  await umaVoltaDoLaco()
+  assert.equal(await bolhaDe('Sai sim! Mando o Pix?').getByTitle('Reação da loja').count(), 1, 'a volta do laço não tira a reação')
   await foto(page, '03-reacao-na-bolha-1280')
 
   // 3. Apagar para todos.
@@ -126,6 +134,8 @@ try {
   assert.match(perguntou ?? '', /não se desfaz/, 'pergunta antes de apagar')
   await page.getByText(/^Você apagou esta mensagem para todos · \d{2}:\d{2}$/).waitFor()
   assert.equal(await page.getByText('Sai sim! Mando o Pix?', { exact: true }).count(), 0, 'o texto apagado some da bolha')
+  await umaVoltaDoLaco()
+  assert.equal(await page.getByText(/^Você apagou esta mensagem para todos/).count(), 1, 'a volta do laço não desfaz o apagar')
   await foto(page, '04-apagada-1280')
 
   // 4. Meta.
