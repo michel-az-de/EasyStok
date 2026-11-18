@@ -17,7 +17,8 @@ const FALHA = { foto: 'Não foi possível alterar a foto. Tente de novo.', pdf: 
 // "Editar dados"; quem abre a ficha quer ver a pessoa antes de mexer nela. Foto e PDF, que só existiam no
 // modal do Atendimento, são daqui: valem em Cadastros, no Buscar na Casa e no Atendimento.
 export function ResumoDoCliente({ dados, relacionamento, carregando, editando, aoEditar, aoMudarFoto }) {
-  const fotoUrl = relacionamento?.fotoUrl ?? dados.fotoUrl ?? dados.detalhe?.fotoUrl ?? null
+  // Com o relacionamento lido, a foto é a dele: removida lá, não volta pela cópia do cadastro.
+  const fotoUrl = relacionamento ? relacionamento.fotoUrl ?? null : dados.fotoUrl ?? dados.detalhe?.fotoUrl ?? null
   const foto = useFotoCliente(fotoUrl)
   const [ocupado, ocupar] = useState(null)
   const [erro, falhar] = useState(null)

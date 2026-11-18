@@ -321,7 +321,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       </div>
 
-      {secao === 'cliente' && <FichaDoClienteNoAtendimento key={`ficha:${selecionada.id}`} conversa={selecionada} editarAoAbrir={editarFicha} aoFechar={() => { setSecao(null); setEditarFicha(false) }}>
+      {secao === 'cliente' && <FichaDoClienteNoAtendimento key={`ficha:${selecionada.id}:${selecionada.clienteId ?? ''}`} conversa={selecionada} editarAoAbrir={editarFicha} aoFechar={() => { setSecao(null); setEditarFicha(false) }}>
         {/* Rodada 11 (registro 92): onde o automático está no caminho do
             UC-01, enquanto ele monta o cadastro pela conversa. */}
         {selecionada.captura && selecionada.conta === 'lead' && (

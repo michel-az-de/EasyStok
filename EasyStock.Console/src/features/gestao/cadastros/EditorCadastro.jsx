@@ -161,7 +161,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   }
   const mostraAtividade = podeEditar && temAtividadeNoEditor(tela, dados)
   const titulo = ehFicha ? 'Ficha do cliente' : `${podeEditar ? id ? 'Editar' : 'Novo' : 'Consultar'} ${({ clientes: 'cliente', produtos: 'produto', fornecedores: 'fornecedor', bancos: 'cadastro bancário' })[tela]}`
-  return <Modal titulo={titulo} largura="md" focarCampo={!ehFicha} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
+  return <Modal titulo={titulo} largura="md" focarCampo={!ehFicha || editarAoAbrir} aoFechar={salvando ? undefined : aoFechar} segurarFechamento={salvando} confirmarDescarte={alterado && !salvando} rodape={<>
     {/* O vermelho fica só na confirmação: aqui o botão é discreto e afastado de Salvar. Com `motivo` sempre
         presente o invólucro não troca e o botão não remonta (#2258). */}
     {mostraAtividade && <span className={css.acaoAtividade}><Botao disabled={salvando || alterado || Boolean(editor.conflito || editor.semConfirmacao)} motivo={`Salve ou descarte as alterações antes de ${emAtividadeCadastro(dados) ? 'inativar' : 'reativar'}.`} onClick={() => { falharAtividade(null); confirmarAtividade(confirmacaoDeAtividade(tela, dados)) }}>{emAtividadeCadastro(dados) ? 'Inativar' : 'Reativar'}</Botao></span>}

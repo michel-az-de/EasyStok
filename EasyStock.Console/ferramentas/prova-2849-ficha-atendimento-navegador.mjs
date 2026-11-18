@@ -100,6 +100,8 @@ try {
   // 2. Quem pediu para editar cai com o formulário aberto.
   pagina = await abrir('cena=editar')
   await pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }).getByRole('textbox', { name: 'Nome', exact: true }).waitFor({ state: 'visible' })
+  // O formulário já nasce aberto: o foco vai para um campo, quem digita em seguida não perde a tecla.
+  await pagina.waitForFunction(() => ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName) && Boolean(document.activeElement.closest('dialog form')))
   await pagina.close()
 
   // 3. Lead ainda sem cadastro: segue o cadastro rápido da conversa.
