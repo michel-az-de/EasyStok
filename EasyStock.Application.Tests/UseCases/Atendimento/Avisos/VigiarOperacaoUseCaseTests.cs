@@ -241,7 +241,6 @@ public class VigiarOperacaoUseCaseTests
         { "sem_telefone", "sem telefone" },
         { "endereco", "endereço de entrega não confirmado" },
         { "provisorio", "cadastro provisório" },
-        { "sem_foto", "sem foto" },
     };
 
     [Theory]
@@ -254,8 +253,7 @@ public class VigiarOperacaoUseCaseTests
             "sem_cliente" => p with { ClienteId = null, NomeCadastro = null, TelefoneCadastro = null, FotoChave = null },
             "sem_telefone" => p with { TelefoneCadastro = null },
             "endereco" => p with { EnderecoConfirmadoEm = null },
-            "provisorio" => p with { NomeCadastro = "Cliente WhatsApp" },
-            _ => p with { FotoChave = null },
+            _ => p with { NomeCadastro = "Cliente WhatsApp" },
         };
         Pedidos(p);
 
@@ -293,7 +291,7 @@ public class VigiarOperacaoUseCaseTests
     public async Task DoisPedidosDoMesmoClienteViramUmAvisoSo()
     {
         var cliente = Guid.NewGuid();
-        Pedidos(PedidoOk(cliente) with { FotoChave = null }, PedidoOk(cliente) with { FotoChave = null });
+        Pedidos(PedidoOk(cliente) with { TelefoneCadastro = null }, PedidoOk(cliente) with { TelefoneCadastro = null });
 
         (await Criar().ExecuteAsync(_empresaId, Agora)).CadastrosComProblema.Should().Be(1);
     }
@@ -317,5 +315,37 @@ public class VigiarOperacaoUseCaseTests
         await Criar().ExecuteAsync(_empresaId, Agora);
 
         await _consultas.DidNotReceiveWithAnyArgs().ListarPedidosAbertosComClienteAsync(default, default, default);
+    }
+
+    // Revisão da #2840: quase todo cadastro está sem foto; sozinha ela só entra no texto de outro problema.
+    [Fact]
+    public async Task FotoSozinhaNaoAvisaMasEntraNoTextoDeOutroProblema()
+    {
+        Pedidos(PedidoOk() with { FotoChave = null });
+        (await Criar().ExecuteAsync(_empresaId, Agora)).CadastrosComProblema.Should().Be(0);
+
+        Pedidos(PedidoOk() with { FotoChave = null, TelefoneCadastro = null });
+        (await Criar().ExecuteAsync(_empresaId, Agora.Add(VigiarOperacaoUseCase.IntervaloDoCadastro))).CadastrosComProblema.Should().Be(1);
+        Enfileirados().Single().Payload.GetProperty("texto").GetString().Should().Contain("sem telefone").And.Contain("sem foto");
+    }
+
+    [Fact]
+    public async Task BalcaoSemClienteNaoAvisa()
+    {
+        Pedidos(PedidoOk() with { ClienteId = null, NomeCadastro = null, TelefoneCadastro = null, FotoChave = null, Origem = "balcao" });
+
+        (await Criar().ExecuteAsync(_empresaId, Agora)).CadastrosComProblema.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task FalhaNaConsultaNaoTravaAConferencia()
+    {
+        _consultas.ListarPedidosAbertosComClienteAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<PedidoAbertoComCliente>>(_ => throw new TimeoutException(), _ => [PedidoOk() with { TelefoneCadastro = null }]);
+
+        var falha = () => Criar().ExecuteAsync(_empresaId, Agora);
+        await falha.Should().ThrowAsync<TimeoutException>();
+
+        (await Criar().ExecuteAsync(_empresaId, Agora.AddMinutes(1))).CadastrosComProblema.Should().Be(1);
     }
 }

@@ -97,7 +97,7 @@ public sealed class VigiaOperacaoQuery(EasyStockDbContext db) : IVigiaOperacaoQu
             .Take(limite)
             .Select(p => new
             {
-                p.Id, p.ClienteNome, p.ClienteId, p.EnderecoEntrega, p.EnderecoConfirmadoEm,
+                p.Id, p.ClienteNome, p.ClienteId, p.EnderecoEntrega, p.EnderecoConfirmadoEm, p.Origem,
                 Cliente = db.Clientes.Where(c => c.EmpresaId == empresaId && c.Id == p.ClienteId)
                     .Select(c => new
                     {
@@ -110,7 +110,8 @@ public sealed class VigiaOperacaoQuery(EasyStockDbContext db) : IVigiaOperacaoQu
             })
             .ToListAsync(ct);
 
-        return linhas.Select(x => new PedidoAbertoComCliente(x.Id, x.ClienteNome, x.ClienteId, x.Cliente?.Nome,
-            x.Cliente?.Telefone, x.Cliente?.FotoChave, x.EnderecoEntrega, x.EnderecoConfirmadoEm)).ToList();
+        // Cliente apagado: o pedido aponta para um cadastro que não existe mais, e isso é "sem cadastro ligado".
+        return linhas.Select(x => new PedidoAbertoComCliente(x.Id, x.ClienteNome, x.Cliente is null ? null : x.ClienteId,
+            x.Cliente?.Nome, x.Cliente?.Telefone, x.Cliente?.FotoChave, x.EnderecoEntrega, x.EnderecoConfirmadoEm, x.Origem)).ToList();
     }
 }

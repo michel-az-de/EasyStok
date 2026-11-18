@@ -194,7 +194,6 @@ public sealed class VigiarOperacaoUseCase(
     {
         if (!avisos.CadastroComProblema) return 0;
         if (CadastroOlhadoEm.TryGetValue(empresaId, out var olhado) && agora - olhado < IntervaloDoCadastro) return 0;
-        CadastroOlhadoEm[empresaId] = agora;
 
         var pedidos = await consultas.ListarPedidosAbertosComClienteAsync(empresaId, agora - JanelaDoCadastro, MaximoPorLeitura, ct);
         var dia = DateOnly.FromDateTime(HorarioBrasil.ConverterParaBrasilia(agora)).ToString("yyyyMMdd", CultureInfo.InvariantCulture);
@@ -206,7 +205,10 @@ public sealed class VigiarOperacaoUseCase(
 
             var pedido = grupo.First();
             var nome = NomesDeContato.PrimeiroNome(pedido.NomeCadastro ?? pedido.ClienteNomePedido, SemNome);
-            var codigos = string.Join(", ", grupo.Select(p => CodigoCurto.De(p.PedidoId)));
+            // O texto do aviso é cortado em 600: até 5 códigos, o resto vira "e mais N".
+            var todos = grupo.Select(p => CodigoCurto.De(p.PedidoId)).ToList();
+            var codigos = string.Join(", ", todos.Take(MaximoDeCodigos)) +
+                          (todos.Count > MaximoDeCodigos ? $" e mais {todos.Count - MaximoDeCodigos}" : "");
             if (await AlertaOperacaoEvento.EnfileirarAsync(notificador, eventos, opcoes,
                     CodigosAviso.CadastroComProblema, empresaId, grupo.Key,
                     titulo: "Cadastro com problema",
@@ -217,26 +219,36 @@ public sealed class VigiarOperacaoUseCase(
                 enfileirados++;
         }
 
+        // Só marca depois de conferir: a falha na leitura não trava a conferência por 15 min.
+        CadastroOlhadoEm[empresaId] = agora;
         return enfileirados;
     }
 
-    /// <summary>As cinco conferências da #2836, na frase que vai no aviso.</summary>
+    private const int MaximoDeCodigos = 5;
+
+    /// <summary>
+    /// As conferências da #2836, na frase que vai no aviso. Venda de balcão sem cliente é normal. A falta de foto é quase
+    /// regra nos cadastros, então sozinha não avisa: só entra no texto quando já há outro problema.
+    /// </summary>
     public static IEnumerable<string> ProblemasDoCadastro(PedidoAbertoComCliente p)
     {
+        var problemas = new List<string>();
         if (p.ClienteId is null)
         {
-            yield return "sem cadastro ligado";
+            if (p.Origem != "balcao") problemas.Add("sem cadastro ligado");
         }
         else
         {
             if (string.IsNullOrWhiteSpace(p.NomeCadastro) || p.NomeCadastro.Trim() == IdentificarClientePorTelefoneUseCase.NomePadraoLead)
-                yield return "cadastro provisório";
-            if (string.IsNullOrWhiteSpace(p.TelefoneCadastro)) yield return "sem telefone";
-            if (p.FotoChave is null) yield return "sem foto";
+                problemas.Add("cadastro provisório");
+            if (string.IsNullOrWhiteSpace(p.TelefoneCadastro)) problemas.Add("sem telefone");
         }
 
         if (!string.IsNullOrWhiteSpace(p.EnderecoEntrega) && p.EnderecoConfirmadoEm is null)
-            yield return "endereço de entrega não confirmado";
+            problemas.Add("endereço de entrega não confirmado");
+
+        if (problemas.Count > 0 && p.ClienteId is not null && p.FotoChave is null) problemas.Add("sem foto");
+        return problemas;
     }
 
     /// <summary>

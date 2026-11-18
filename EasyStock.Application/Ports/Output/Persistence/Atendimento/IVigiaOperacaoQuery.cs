@@ -16,7 +16,7 @@ public sealed record ItemFreezerParaConferir(string Nome, string CodigoLote, Dat
 /// </summary>
 public sealed record PedidoAbertoComCliente(
     Guid PedidoId, string? ClienteNomePedido, Guid? ClienteId, string? NomeCadastro, string? TelefoneCadastro,
-    string? FotoChave, string? EnderecoEntrega, DateTime? EnderecoConfirmadoEm);
+    string? FotoChave, string? EnderecoEntrega, DateTime? EnderecoConfirmadoEm, string? Origem = null);
 
 /// <summary>Leituras da vigia da operação, sempre de uma empresa só (o job liga o tenant antes).</summary>
 public interface IVigiaOperacaoQuery
