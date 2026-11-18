@@ -122,3 +122,23 @@
 .itensFicha li { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding: var(--e-2) var(--e-3); background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--r-1); }
 .itensFicha li > span:first-child { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .itensFicha small { color: var(--tinta-2); font-size: var(--t-micro); }
+
+/* #2849: topo da ficha do cliente, em leitura. Mesma ordem em Cadastros, na Busca e a partir do Atendimento. */
+.resumoCliente { display: grid; gap: var(--e-4); margin-block-end: var(--e-4); min-width: 0; }
+.identidadeCliente { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
+.identidadeCliente > div { flex: 1; min-width: 0; display: grid; gap: var(--e-1); justify-items: start; }
+.identidadeCliente strong { font-size: var(--t-titulo); overflow-wrap: anywhere; }
+.quadroCliente { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-3); margin: 0; padding: var(--e-3); background: var(--elevado); border-radius: var(--r-2); }
+.quadroCliente > div { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
+.quadroCliente dd { margin: 0; font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700; font-variant-numeric: tabular-nums; }
+.quadroCliente dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.contatoCliente { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3) var(--e-4); margin: 0; }
+.contatoCliente > div { display: grid; gap: var(--e-1); min-width: 0; }
+.contatoCliente dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.contatoCliente dd { margin: 0; overflow-wrap: anywhere; }
+.contatoCliente .naoInformado { color: var(--tinta-3); font-style: italic; }
+@media (max-width: 480px) {
+  .quadroCliente { grid-template-columns: minmax(0, 1fr); }
+  .contatoCliente { grid-template-columns: minmax(0, 1fr); }
+}
+.acoesDoResumo { display: flex; flex-wrap: wrap; gap: var(--e-2, 8px); }

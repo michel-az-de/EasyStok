@@ -69,8 +69,8 @@ try {
   const chegouPessoa = new Promise(resolve => { avisarPessoa = resolve })
   await page.getByRole('option').filter({ hasText: 'Pessoas' }).tap(); await chegouPessoa
   await buscar('nada'); segurarPessoa = false; soltarPessoa(); await page.waitForTimeout(150)
-  const abriuFichaAntiga = await page.getByRole('dialog', { name: 'Editar cliente', exact: true }).count()
-  if (abriuFichaAntiga) await page.getByRole('dialog', { name: 'Editar cliente', exact: true }).getByRole('button', { name: 'Cancelar', exact: true }).tap()
+  const abriuFichaAntiga = await page.getByRole('dialog', { name: 'Ficha do cliente', exact: true }).count()
+  if (abriuFichaAntiga) await page.getByRole('dialog', { name: 'Ficha do cliente', exact: true }).getByRole('button', { name: 'Fechar', exact: true }).last().tap()
   const saiuLeads = page.waitForRequest(r => new URL(r.url()).pathname === '/api/clientes/buscar' && new URL(r.url()).searchParams.get('termo') === 'Leads')
   await dialogo.getByRole('combobox').fill('Leads'); await saiuLeads
   await dialogo.getByRole('combobox').press('Enter'); await page.waitForTimeout(150)
@@ -81,7 +81,7 @@ try {
   await buscar('joao'); await page.getByRole('option').filter({ hasText: 'Pessoas' }).waitFor()
   await page.screenshot({ path: resolve(pasta, 'resultados-390.png'), fullPage: true })
   await dialogo.getByRole('combobox').press('Enter')
-  let editor = page.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  let editor = page.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   assert.equal(await editor.getByRole('textbox', { name: 'Nome', exact: true }).inputValue(), pessoa.nome)
   await editor.getByRole('button', { name: 'Cancelar', exact: true }).tap()
   await dialogo.getByRole('combobox').focus()
@@ -115,7 +115,7 @@ try {
   await composer.fill('Rascunho preservado ao consultar outra pessoa')
   await page.keyboard.press('Control+k'); dialogo = page.getByRole('dialog', { name: 'Buscar na Casa', exact: true }); await buscar('joao')
   await page.getByRole('option').filter({ hasText: 'Pessoas' }).tap()
-  await page.getByRole('dialog', { name: 'Editar cliente', exact: true }).getByRole('button', { name: 'Cancelar', exact: true }).tap()
+  await page.getByRole('dialog', { name: 'Ficha do cliente', exact: true }).getByRole('button', { name: 'Fechar', exact: true }).last().tap()
   await dialogo.getByRole('button', { name: /Fechar/ }).first().tap()
   assert.equal(await composer.inputValue(), 'Rascunho preservado ao consultar outra pessoa')
   await page.setViewportSize({ width: 1440, height: 900 }); await page.keyboard.press('Control+k')

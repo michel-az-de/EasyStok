@@ -59,8 +59,8 @@ try {
   await linha('Ana Ativa').waitFor()
 
   // Cancelar não chama a API.
-  await pagina.getByRole('button', { name: 'Editar Ana Ativa', exact: true }).click()
-  let editor = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  await pagina.getByRole('button', { name: 'Abrir ficha de Ana Ativa', exact: true }).click()
+  let editor = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   await editor.getByRole('button', { name: 'Inativar', exact: true }).click()
   let confirmar = pagina.getByRole('dialog', { name: 'Inativar Ana Ativa?', exact: true }); await confirmar.waitFor()
   await pagina.screenshot({ path: resolve(pasta, 'confirmar-inativar-1280.png'), fullPage: true })
@@ -78,8 +78,8 @@ try {
   await linha('Ana Ativa').getByText('Inativo', { exact: true }).waitFor()
 
   // Reativar a inativa: POST /reativar.
-  await pagina.getByRole('button', { name: 'Editar Bia Inativa', exact: true }).click()
-  editor = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  await pagina.getByRole('button', { name: 'Abrir ficha de Bia Inativa', exact: true }).click()
+  editor = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   await editor.getByRole('button', { name: 'Reativar', exact: true }).click()
   confirmar = pagina.getByRole('dialog', { name: 'Reativar Bia Inativa?', exact: true }); await confirmar.waitFor()
   await confirmar.getByRole('button', { name: 'Reativar cliente', exact: true }).click()
@@ -87,8 +87,8 @@ try {
   assert.deepEqual(escritas.at(-1), { metodo: 'POST', path: '/api/clientes/B/reativar', empresaId: 'empresa' })
 
   // Com alteração sem salvar, Inativar fica parado com motivo (fechar perderia o que foi digitado).
-  await pagina.getByRole('button', { name: 'Editar Bia Inativa', exact: true }).click()
-  editor = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  await pagina.getByRole('button', { name: 'Abrir ficha de Bia Inativa', exact: true }).click()
+  editor = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   await editor.getByRole('textbox', { name: 'E-mail', exact: true }).fill('bia@exemplo.com')
   assert.equal(await editor.getByRole('button', { name: 'Inativar', exact: true }).isDisabled(), true, 'Com edição pendente não inativa')
   await editor.getByRole('textbox', { name: 'E-mail', exact: true }).fill('')
