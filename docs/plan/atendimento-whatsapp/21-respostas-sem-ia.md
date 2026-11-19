@@ -68,14 +68,20 @@ Peça nova de verdade: só o classificador de mensagem curta e o serviço que o 
 4. Ao responder: envia, grava a saída, marca a entrada com `MarcarProcessada` e registra `TurnoAgente` com
    `DesfechoTurnoAgente.SemIa = 6`, 0 token e modelo `sem-ia`.
 5. Conversa nova (`GravarEntradaAsync` abre a conversa e só então há `identificacao`, linhas 281 a 296): quando a
-   entrada que abriu a conversa é saudação solta, quem fala é o que já fala hoje sem modelo, a saudação RN-01 ou, com
-   ela ligada, a automática de entrada (#2004, `DispararAutomacaoUseCase.cs:81`). A RN-01 sai sem a `FraseEspera`. Nos
-   dois caminhos o turno não é enfileirado, a entrada é marcada como processada e o `TurnoAgente` `SemIa` é
-   registrado, igual ao item 4. A regra `SaudacaoSolta` não dispara em cima delas.
+   entrada que abriu a conversa é saudação solta e quem fala é a saudação RN-01, ela sai sem a `FraseEspera`, o turno
+   não é enfileirado, a entrada é marcada como processada e o `TurnoAgente` `SemIa` é registrado, igual ao item 4. A
+   regra `SaudacaoSolta` não dispara em conversa nova. O modelo só é dispensado quando a RN-01 saiu de fato: se o
+   envio falha, o turno é enfileirado como hoje.
+   Revisão na implementação (#2885): com a automática de entrada ligada (#2004, `DispararAutomacaoUseCase.cs:81`) o
+   turno do modelo CONTINUA sendo enfileirado. A automática sai por outro caminho e, quando falha, cai na saudação de
+   reserva com a frase de espera; dispensar o modelo ali deixaria o cliente com uma promessa sem resposta. Economizar
+   esse turno fica para uma fatia própria, se o medidor da S78 mostrar que compensa.
+6. Só texto puro é classificado: "oi" na legenda de foto segue para o modelo. "tudo bem", "tudo bom" e "opa" sozinhos
+   são `Nenhuma` (concordância, como "ok"); só contam junto de uma saudação ("oi, tudo bem?").
 
 **Aceite.**
-- "Oi" em conversa nova gera 1 saída, 0 turno do modelo e 1 registro `SemIa`, com a automática de entrada ligada
-  ou desligada.
+- "Oi" em conversa nova, com a automática de entrada desligada, gera 1 saída, 0 turno do modelo e 1 registro `SemIa`.
+  Com a automática ligada, ou se o envio da saudação falha, o turno do modelo é enfileirado como hoje.
 - "Bom dia" em conversa parada há mais de N minutos gera a resposta da regra e 0 turno do modelo.
 - "Oi, quero 2 bolos" e "oi" 5 minutos depois de uma pergunta do Assistente seguem para o modelo.
 - Conversa com a equipe, pausada, bloqueada ou acima do limite por hora: nenhuma resposta sem IA.
@@ -85,8 +91,8 @@ Peça nova de verdade: só o classificador de mensagem curta e o serviço que o 
 **Testes (Red).** Tabela do classificador com as 24 saudações reais de produção mais 20 contraexemplos ("oi quero",
 "bom dia tem bolo?", "ok", "sim"). `RespostaSemIa`: um teste por condição do item 3, cada um falhando por falta do
 serviço. Webhook: `EnqueueAsync` não é chamado quando `TentarAsync` devolve `true`, nem em conversa nova aberta por saudação
-solta (um teste com a automática de entrada ligada, outro com ela desligada). Laço: 10 "oi" seguidos param no
-limite por hora.
+solta com a automática de entrada desligada; com ela ligada, ou com falha no envio da saudação, é chamado. Laço:
+10 "oi" seguidos param no limite por hora.
 
 **Depende de:** nada. **Tamanho:** M.
 

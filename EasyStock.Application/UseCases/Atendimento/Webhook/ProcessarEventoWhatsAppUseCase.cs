@@ -44,7 +44,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     Ports.Output.Ai.ITranscritorAudio? transcritor = null,
     IPedidoRepository? pedidos = null,
     IRegraAutomaticaRepository? regrasAutomaticas = null,
-    PerfilClienteWhatsApp? perfilCliente = null)
+    PerfilClienteWhatsApp? perfilCliente = null,
+    RespostaSemIa? respostaSemIa = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -409,9 +410,15 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s. Sem agente para cumprir
             // o "já te respondo" (botão "acao:", reação), não há saudação (issue 1285). #2004: com a automática da
             // situação ligada, é ela que fala (a saudação direta e a automática eram duas mensagens para a mesma entrada).
-            if (identificacao is not null && !SemRespostaAutomatica(msg.Tipo, mensagem.BotaoId)
-                && !await AutomaticaDeEntradaFalaNoLugarDaSaudacaoAsync(empresaId, ct))
-                await EnviarSaudacaoAsync(empresaId, conversa, configuracao, identificacao, ct);
+            // #2885: saudação solta em conversa nova dispensa o modelo; então a saudação sai sem a frase de espera. Só vale
+            // quando a saudação direta saiu de fato: se o envio falha, ou se quem fala é a automática de entrada (que pode
+            // não sair e cair na saudação de reserva, com a promessa de resposta), o turno do modelo segue como antes.
+            var conversaNova = identificacao is not null && !SemRespostaAutomatica(msg.Tipo, mensagem.BotaoId);
+            var automaticaFala = conversaNova && await AutomaticaDeEntradaFalaNoLugarDaSaudacaoAsync(empresaId, ct);
+            var dispensaModelo = conversaNova && !automaticaFala
+                && await SaudacaoSoltaDispensaOModeloAsync(empresaId, conversa, mensagem, ct);
+            if (identificacao is not null && conversaNova && !automaticaFala)
+                dispensaModelo &= await EnviarSaudacaoAsync(empresaId, conversa, configuracao, identificacao, dispensaModelo, ct);
 
             if (EhAcaoDeBotao(mensagem.BotaoId))
             {
@@ -434,6 +441,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             else if (await optOut.TentarAsync(empresaId, conversa, mensagem.Texto, DateTime.UtcNow, ct))
             {
                 // S38: "SAIR" revogou o marketing do canal e já confirmou; o agente não responde.
+            }
+            else if (dispensaModelo && await SaudacaoRegistradaSemIaAsync(empresaId, conversa, mensagem, ct))
+            {
+                // #2885: a saudação já respondeu a conversa nova; o modelo não é chamado.
+            }
+            else if (identificacao is null && await RegraDeSaudacaoSoltaRespondeuAsync(empresaId, conversa, mensagem, ct))
+            {
+                // #2885: saudação solta em conversa parada respondida pela regra automática; o modelo não é chamado.
             }
             else
             {
@@ -524,12 +539,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     /// Envia a saudação e grava como <c>Mensagem(Saida, Sistema)</c>. Falha aqui nunca derruba o
     /// processamento: a mensagem de entrada já foi confirmada e o agente ainda precisa ser enfileirado.
     /// </summary>
-    private async Task EnviarSaudacaoAsync(
-        Guid empresaId, Conversa conversa, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct)
+    /// <returns><c>true</c> só quando a saudação saiu pelo canal e ficou gravada.</returns>
+    private async Task<bool> EnviarSaudacaoAsync(
+        Guid empresaId, Conversa conversa, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao,
+        bool semFraseEspera, CancellationToken ct)
     {
         try
         {
-            var texto = await MontarPrimeiraRespostaAsync(empresaId, configuracao, identificacao, ct);
+            var texto = await MontarPrimeiraRespostaAsync(empresaId, configuracao, identificacao, semFraseEspera, ct);
 
             // #2072: a saída fica marcada na conversa antes da rede. A saudação de reserva do outbox (#2004) só sai em
             // conversa sem saída depois da entrada, e o envio pode demorar (a ponte do WAHA "digita" antes): sem a marca,
@@ -538,11 +555,13 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             await unitOfWork.CommitAsync();
 
             Mensagem saida;
+            var enviada = false;
             try
             {
                 var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);
                 saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
                     TipoConteudoMensagem.Texto, texto, envio.Wamid);
+                enviada = true;
             }
             catch (Exception ex)
             {
@@ -555,12 +574,73 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             conversa.RegistrarSaida(saida.EnviadaEm);
             await conversaRepository.AddMensagemAsync(saida, ct);
             await unitOfWork.CommitAsync();
+            return enviada;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook WhatsApp: falha registrando a saudação da conversa {ConversaId}.", conversa.Id);
             // Não deixa o insert pendente contaminar o commit da próxima mensagem do lote.
             unitOfWork.DescartarAlteracoesPendentes();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// #2885: a saudação solta que abriu a conversa dispensa o turno do modelo? Falha ao consultar nunca tira a saudação
+    /// nem o turno do cliente: na dúvida, o fluxo segue como antes.
+    /// </summary>
+    private async Task<bool> SaudacaoSoltaDispensaOModeloAsync(
+        Guid empresaId, Conversa conversa, Mensagem mensagem, CancellationToken ct)
+    {
+        if (respostaSemIa is null) return false;
+        try
+        {
+            return await respostaSemIa.PodeDispensarOModeloAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: falha ao decidir a saudação sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// #2885: marca como tratada a entrada que a saudação já respondeu. Se o registro falha, devolve <c>false</c> e o turno
+    /// do modelo é enfileirado, para a entrada não ficar pendente sem ninguém para respondê-la.
+    /// </summary>
+    private async Task<bool> SaudacaoRegistradaSemIaAsync(
+        Guid empresaId, Conversa conversa, Mensagem mensagem, CancellationToken ct)
+    {
+        try
+        {
+            await respostaSemIa!.RegistrarSemRespostaPropriaAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: falha ao registrar a saudação sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// #2885: a regra "Saudação solta" respondeu a conversa parada? Falha no meio devolve <c>false</c> e o turno do modelo é
+    /// enfileirado: resposta em dobro é melhor que cliente sem resposta.
+    /// </summary>
+    private async Task<bool> RegraDeSaudacaoSoltaRespondeuAsync(
+        Guid empresaId, Conversa conversa, Mensagem mensagem, CancellationToken ct)
+    {
+        if (respostaSemIa is null) return false;
+        try
+        {
+            return await respostaSemIa.TentarAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: falha na resposta sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
+            return false;
         }
     }
 
@@ -596,11 +676,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     /// frase de espera ("já te ajudo") prometeria uma resposta que não vem. Sem registro, vale o expediente padrão.
     /// </summary>
     private async Task<string> MontarPrimeiraRespostaAsync(
-        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct)
+        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, bool semFraseEspera,
+        CancellationToken ct)
     {
         var expediente = await expedientes.GetByEmpresaIdAsync(empresaId, ct) ?? ExpedienteLoja.CriarPadrao(empresaId);
         return expediente.MensagemParaCliente(relogio.GetUtcNow().UtcDateTime)
-            ?? await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
+            ?? await saudacao.MontarAsync(empresaId, configuracao, identificacao, semFraseEspera, ct);
     }
 
     private async Task<ConfiguracaoAtendimento> AtualizarUltimaMensagemRecebidaAsync(Guid empresaId, DateTime agora)

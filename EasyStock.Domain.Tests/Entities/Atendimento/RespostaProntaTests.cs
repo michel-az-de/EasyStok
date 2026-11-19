@@ -108,8 +108,20 @@ public class RegraAutomaticaTests
 
         // "Pagamento confirmado" também nasce ligada (#1765-4); os demais seguem desligados.
         foreach (var antigo in Enum.GetValues<GatilhoAutomacao>()
-                     .Where(g => g is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado)))
+                     .Where(g => g is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado
+                         or GatilhoAutomacao.SaudacaoSolta)))
             RegraAutomatica.Padrao(Empresa, antigo, Agora).Should().BeNull();
+    }
+
+    /// <summary>#2885 (S75, D3): a saudação solta nasce desligada, com o texto sugerido.</summary>
+    [Fact]
+    public void SaudacaoSoltaNasceDesligadaComTextoSugerido()
+    {
+        var padrao = RegraAutomatica.Padrao(Empresa, GatilhoAutomacao.SaudacaoSolta, Agora);
+
+        padrao.Should().NotBeNull();
+        padrao!.Ligada.Should().BeFalse();
+        padrao.Texto.Should().Be("Oi! Como posso te ajudar?");
     }
 
     [Theory]

@@ -1,0 +1,71 @@
+using EasyStock.Application.Services.Atendimento;
+
+namespace EasyStock.Application.Tests.Services.Atendimento;
+
+/// <summary>#2885 (S75): só a saudação solta sai sem modelo. Mensagem com qualquer outra palavra segue para o Assistente.</summary>
+public class ClassificadorDeMensagemCurtaTests
+{
+    [Theory]
+    [InlineData("Oi")]
+    [InlineData("oi!")]
+    [InlineData("Olá")]
+    [InlineData("OLA")]
+    [InlineData("Bom dia")]
+    [InlineData("bom dia!!")]
+    [InlineData("Boa tarde")]
+    [InlineData("boa noite")]
+    [InlineData("oi bom dia")]
+    [InlineData("Oi, boa tarde")]
+    [InlineData("Olá, tudo bem?")]
+    [InlineData("oie")]
+    [InlineData("oii")]
+    [InlineData("oiii")]
+    [InlineData("oii 😊")]
+    [InlineData("Oi tudo bom")]
+    [InlineData("oi tudo bem")]
+    [InlineData("opa bom dia")]
+    [InlineData("e aí")]
+    [InlineData("E ai")]
+    [InlineData("eai")]
+    [InlineData("opa oi bom dia")]
+    [InlineData("Oi!!! 👋")]
+    [InlineData("  oi   bom dia  ")]
+    public void SaudacoesSoltasSaoSaudacao(string texto) =>
+        ClassificadorDeMensagemCurta.Classificar(texto).Should().Be(TipoMensagemCurta.Saudacao);
+
+    [Theory]
+    [InlineData("oi quero 2 bolos")]
+    [InlineData("bom dia tem bolo?")]
+    [InlineData("ok")]
+    [InlineData("sim")]
+    [InlineData("não")]
+    [InlineData("nao")]
+    [InlineData("2")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    [InlineData("obrigada")]
+    [InlineData("cardápio")]
+    [InlineData("oi, qual o valor")]
+    [InlineData("boa")]
+    [InlineData("bom")]
+    [InlineData("dia")]
+    [InlineData("tudo")]
+    [InlineData("oi bom dia tudo bem agora")]
+    [InlineData("ola boa tarde tudo bem")]
+    [InlineData("oi oi oi oi oi")]
+    [InlineData("olá, quero um bolo de cenoura")]
+    [InlineData("oi 2")]
+    [InlineData("oi, meu pedido")]
+    [InlineData("tudo bem? e o pedido")]
+    [InlineData("oi oi oi oi oi oi oi oi oi oi oi oi oi oi oi")]
+    [InlineData("eu queria saber se vocês entregam amanhã de manhã")]
+    [InlineData("opa")]
+    [InlineData("tudo bem")]
+    [InlineData("tudo bom")]
+    [InlineData("td bem")]
+    [InlineData("td bem?")]
+    [InlineData("opa tudo bem")]
+    public void OutrasMensagensNaoSaoSaudacao(string? texto) =>
+        ClassificadorDeMensagemCurta.Classificar(texto).Should().Be(TipoMensagemCurta.Nenhuma);
+}
