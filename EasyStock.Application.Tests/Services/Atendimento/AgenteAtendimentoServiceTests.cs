@@ -524,7 +524,7 @@ public partial class AgenteAtendimentoServiceTests
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         _conversa.PedidoEmAndamentoId.Should().BeNull();
-        _requisicoes[0].System.Should().Contain("Pedido em andamento: nenhum")
+        _requisicoes[0].TextoCompleto().Should().Contain("Pedido em andamento: nenhum")
             .And.NotContain(pedido.Id.ToString());
         await _conversaRepository.Received(1).TravarParaPedidoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>());
     }
@@ -576,7 +576,7 @@ public partial class AgenteAtendimentoServiceTests
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         _conversa.PedidoEmAndamentoId.Should().Be(pedido.Id);
-        _requisicoes[0].System.Should().Contain(pedido.Id.ToString());
+        _requisicoes[0].TextoCompleto().Should().Contain(pedido.Id.ToString());
     }
 
     [Theory]
@@ -712,7 +712,7 @@ public partial class AgenteAtendimentoServiceTests
 
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
-        var system = _requisicoes[0].System;
+        var system = _requisicoes[0].TextoCompleto();
         system.Should().Contain("Abrimos de terça a sábado.").And.Contain($"[{troca.Codigo}] Troca");
         system.IndexOf("Abrimos de terça a sábado.", StringComparison.Ordinal)
             .Should().BeLessThan(system.IndexOf("Dossiê desta conversa", StringComparison.Ordinal));
@@ -725,7 +725,7 @@ public partial class AgenteAtendimentoServiceTests
 
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
-        _requisicoes[0].System.Should().NotContain("Caderno da loja")
+        _requisicoes[0].TextoCompleto().Should().NotContain("Caderno da loja")
             .And.StartWith(PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(_empresaId)) + "\n\nDossiê desta conversa");
     }
 
@@ -1195,7 +1195,7 @@ public partial class AgenteAtendimentoServiceTests
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         var requisicao = _requisicoes.Should().ContainSingle().Subject;
-        requisicao.System.Should().Contain("[interno] cliente pediu desconto na última compra");
+        requisicao.TextoCompleto().Should().Contain("[interno] cliente pediu desconto na última compra");
         requisicao.Mensagens.SelectMany(m => m.Conteudo).OfType<BlocoTextoLlm>()
             .Should().NotContain(b => b.Texto.Contains("desconto"));
     }
@@ -1215,9 +1215,9 @@ public partial class AgenteAtendimentoServiceTests
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         var requisicao = _requisicoes.Should().ContainSingle().Subject;
-        requisicao.System.Should().Contain("vegano");
-        requisicao.System.Should().Contain("[interno] ").And.Contain("não gosta de coco");
-        requisicao.System.Split('\n').Where(l => l.Contains("coco"))
+        requisicao.TextoCompleto().Should().Contain("vegano");
+        requisicao.TextoCompleto().Should().Contain("[interno] ").And.Contain("não gosta de coco");
+        requisicao.TextoCompleto().Split('\n').Where(l => l.Contains("coco"))
             .Should().OnlyContain(l => l.StartsWith("- [interno]"));
     }
 
