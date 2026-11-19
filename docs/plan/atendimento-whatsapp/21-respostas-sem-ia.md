@@ -1,7 +1,7 @@
 # Onda 16 · Respostas do Assistente sem IA (#2879)
 
-Issue #2879. Continua o polimento do fluxo (#2861, #2862, #2863, #2869). Tier alto: o código só começa depois de o
-Felipe aprovar esta spec e responder as decisões do fim.
+Issue #2879. Continua o polimento do fluxo (#2861, #2862, #2863, #2869). Tier alto: o código só começa depois da
+label `aprovado` nesta PR. As decisões do fim já foram respondidas.
 
 ## Problema
 
@@ -155,6 +155,15 @@ própria.
 | D2 | Como a resposta sem IA aparece e conta no limite | a) como fala do Assistente (`AutorMensagem.Agente`): conta no limite sem mudar a consulta e entra no histórico do modelo como fala dele · b) como Sistema, igual à saudação: o histórico trata Sistema à parte (`GeracaoAgenteAtendimento.cs:243` e `:335`) e a contagem do limite precisa ser estendida |
 | D3 | As regras novas nascem | a) desligadas, com texto sugerido; você liga na tela Respostas automáticas · b) ligadas com o texto sugerido |
 | D4 | "Conversa parada" para a saudação | a) 30 minutos sem saída · b) 2 horas · c) só em conversa nova |
+
+**Decidido pelo Felipe em 19/11/2026: opção a nas quatro.**
+
+| # | Vale |
+|---|---|
+| D1 | Entram S75 e S78. S76 e S77 ficam para depois, decididas com o número da aba Uso |
+| D2 | A resposta sem IA é gravada como fala do Assistente (`AutorMensagem.Agente`) e conta no limite por hora |
+| D3 | As regras novas nascem desligadas, com texto sugerido |
+| D4 | Conversa parada: 30 minutos sem saída |
 
 ## Prova
 
