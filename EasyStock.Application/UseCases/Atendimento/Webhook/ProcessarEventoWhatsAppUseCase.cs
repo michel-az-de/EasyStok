@@ -597,7 +597,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         {
             return await respostaSemIa.PodeDispensarOModeloAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Webhook WhatsApp: falha ao decidir a saudação sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
             return false;
@@ -616,7 +616,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             await respostaSemIa!.RegistrarSemRespostaPropriaAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Webhook WhatsApp: falha ao registrar a saudação sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
             unitOfWork.DescartarAlteracoesPendentes();
@@ -636,7 +636,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         {
             return await respostaSemIa.TentarAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Webhook WhatsApp: falha na resposta sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
             unitOfWork.DescartarAlteracoesPendentes();
