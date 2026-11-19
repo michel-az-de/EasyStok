@@ -30,9 +30,11 @@
 .cota { display: grid; gap: var(--e-2); max-width: 420px; }
 
 /* Fluxo */
+/* Pela largura do painel, não da janela: no modal da conversa (880 px) o ajuste vai para baixo do desenho. */
+.conteudo { container-type: inline-size; }
 .fluxo { display: grid; gap: var(--e-4); grid-template-columns: minmax(0, 1fr); align-items: start; }
-@media (min-width: 900px) {
-  .fluxo { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
+@container (min-width: 1000px) {
+  .fluxo { grid-template-columns: minmax(0, 1fr) minmax(280px, 320px); }
   .detalhe { position: sticky; top: var(--e-3); }
 }
 .mapa, .portoes, .roteiro, .ferramentas { list-style: none; margin: 0; padding: 0; }
@@ -81,3 +83,9 @@
 .turno p { margin: 0; overflow-wrap: anywhere; }
 .turnoTopo { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .turnoTopo time { font-size: var(--t-apoio); color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+
+/* #2855: o Fluxo é um canvas (React Flow). A barra de cima escolhe a direção; o ajuste do nó fica ao lado (desktop) ou abaixo. */
+.fluxoCaixa { display: grid; gap: var(--e-3); min-width: 0; }
+.barraDoFluxo { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
+.seletor { display: inline-flex; gap: var(--e-1); }
+.barraDoFluxo .nota { flex: 1 1 240px; }

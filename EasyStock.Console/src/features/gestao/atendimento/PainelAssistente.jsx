@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useHistoricoAssistente, usePainelAssistente } from '../../../aplicacao/usePainelAssistente'
 import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
 import { Botao } from '../../../componentes/Botao'
@@ -6,12 +6,15 @@ import { CampoArea, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
 import { Pilula } from '../../../componentes/Pilula'
 import {
-  ROTEIRO_ETAPAS_MAXIMO, ROTEIRO_INSTRUCAO_MAXIMO, ROTEIRO_NOME_MAXIMO, cotaDoCampo, cotaParaCampo, custoDoUso,
-  desfechoDoTurno, desligadasDoFluxo, erroDoRoteiro, formatarTokens, mesmoRoteiro, moverEtapa, resumoDoUso, tokensCurtos,
+  ROTEIRO_ETAPAS_MAXIMO, ROTEIRO_INSTRUCAO_MAXIMO, ROTEIRO_NOME_MAXIMO, cotaDoCampo, cotaParaCampo,
+  desfechoDoTurno, desligadasDoFluxo, erroDoRoteiro, formatarTokens, linhaDoUso, mesmoRoteiro, moverEtapa, resumoDoUso,
 } from '../../../dominio/painelAssistente'
+import { GRUPOS, ORIENTACOES, desenharFluxo, idsDoGrupo } from '../../../dominio/desenhoDoFluxo'
 import css from './painelAssistente.module.css'
 
 const OBSERVACOES_MAXIMO = 500
+// O canvas (React Flow) só baixa quando a aba Fluxo abre: a biblioteca não entra no bundle inicial do console.
+const CanvasDoFluxo = lazy(() => import('./CanvasDoFluxo'))
 const ABAS = [
   { id: 'uso', nome: 'Uso e cota', rotulo: 'Uso e cota' },
   { id: 'fluxo', nome: 'Fluxo', rotulo: 'Fluxo' },
@@ -21,20 +24,31 @@ const ABAS = [
 // #2853: painel do Assistente na Gestão › Atendimento. Uso do mês contra a cota, o fluxo do turno como mapa
 // (etapas fixas, instruções, roteiro e ferramentas, cada nó com o seu ajuste) e o histórico de turnos.
 // Quem não administra a loja vê tudo e não muda nada.
-export function PainelAssistente({ podeEditar }) {
-  const [aba, setAba] = useState('uso')
+// `abaAntes` ({ id, rotulo, conteudo }): aba extra na frente, aberta primeiro. O modal da conversa (#2855) põe
+// ali a checagem da conversa; as outras abas são as mesmas da Gestão.
+export function PainelAssistente({ podeEditar, abaAntes = null, sinalRecarregar = 0 }) {
+  const [aba, setAba] = useState(abaAntes?.id ?? 'uso')
   const painel = usePainelAssistente()
+  const recarregar = painel.recarregar
+  const ultimoSinal = useRef(sinalRecarregar)
+  useEffect(() => {
+    if (sinalRecarregar !== ultimoSinal.current) { ultimoSinal.current = sinalRecarregar; recarregar() }
+  }, [sinalRecarregar, recarregar])
+  const abas = abaAntes ? [{ id: abaAntes.id, nome: abaAntes.rotulo, rotulo: abaAntes.rotulo }, ...ABAS] : ABAS
 
   return (
-    <section className={css.painel} aria-labelledby="painel-assistente-titulo">
-      <div className={css.topo}>
-        <h3 id="painel-assistente-titulo">Painel do Assistente</h3>
-        <Botao icone="refresh-cw" onClick={painel.recarregar} disabled={painel.carregando}>Atualizar</Botao>
-      </div>
-      <BarraDeAbas abas={ABAS} ativa={aba} aoTrocar={setAba} idPainel="painel-assistente-conteudo" prefixoId="painel-assistente" rotulo="Partes do painel do Assistente" />
+    <section className={css.painel} {...(abaAntes ? { 'aria-label': 'Painel do Assistente' } : { 'aria-labelledby': 'painel-assistente-titulo' })}>
+      {!abaAntes && (
+        <div className={css.topo}>
+          <h3 id="painel-assistente-titulo">Painel do Assistente</h3>
+          <Botao icone="refresh-cw" onClick={painel.recarregar} disabled={painel.carregando}>Atualizar</Botao>
+        </div>
+      )}
+      <BarraDeAbas abas={abas} ativa={aba} aoTrocar={setAba} idPainel="painel-assistente-conteudo" prefixoId="painel-assistente" rotulo="Partes do painel do Assistente" />
       <div id="painel-assistente-conteudo" role="tabpanel" aria-labelledby={`painel-assistente-${aba}`} className={css.conteudo} aria-busy={painel.carregando}>
-        {painel.erro && <p role="alert" className={css.erro}>Não consegui ler o Assistente agora: {painel.erro}</p>}
-        {!painel.uso && painel.carregando && <output className={css.nota}>Carregando…</output>}
+        {painel.erro && aba !== abaAntes?.id && <p role="alert" className={css.erro}>Não consegui ler o Assistente agora: {painel.erro}</p>}
+        {!painel.uso && painel.carregando && aba !== abaAntes?.id && <output className={css.nota}>Carregando…</output>}
+        {abaAntes && aba === abaAntes.id && abaAntes.conteudo}
         {aba === 'uso' && painel.uso && <AbaUso uso={painel.uso} podeEditar={podeEditar} painel={painel} />}
         {aba === 'fluxo' && painel.fluxo && <AbaFluxo fluxo={painel.fluxo} podeEditar={podeEditar} painel={painel} />}
         {aba === 'historico' && <AbaHistorico />}
@@ -52,7 +66,6 @@ function Retorno({ gravacao, qual }) {
 
 function AbaUso({ uso, podeEditar, painel }) {
   const resumo = resumoDoUso(uso)
-  const custo = custoDoUso(uso)
   const [campo, setCampo] = useState(() => cotaParaCampo(uso.cotaTokensMes))
   const cota = cotaDoCampo(campo)
   const mudou = cota.valor !== null && cota.valor !== (Number(uso.cotaTokensMes) || 0)
@@ -68,30 +81,14 @@ function AbaUso({ uso, podeEditar, painel }) {
             <span className={css.barraAlerta} aria-hidden="true" />
           </div>
         )}
-        <p className={css.consumoDetalhe}>{resumo.detalhe}</p>
+        <p className={css.consumoDetalhe}>{linhaDoUso(uso)}</p>
       </div>
-
-      <dl className={css.cartoes}>
-        <div><dt>Turnos no mês</dt><dd>{formatarTokens(uso.turnos)}</dd></div>
-        <div><dt>Tokens de entrada</dt><dd>{tokensCurtos(uso.tokensEntrada)}</dd></div>
-        <div><dt>Tokens de saída</dt><dd>{tokensCurtos(uso.tokensSaida)}</dd></div>
-        <div><dt>Lidos do cache</dt><dd>{tokensCurtos(uso.tokensCacheLido)}</dd></div>
-        <div><dt>Custo estimado</dt><dd>{custo.valor ?? 'Não calculado'}</dd></div>
-        {resumo.comCota && <div><dt>Restam no mês</dt><dd>{tokensCurtos(resumo.restante)}</dd></div>}
-      </dl>
-      {custo.nota && <p className={css.nota}>{custo.nota}</p>}
-      <p className={css.nota}>
-        Mês de {String(uso.mes).padStart(2, '0')}/{uso.ano}, só o Assistente. O provedor de IA não informa saldo pela API:
-        a cota abaixo é o limite que a loja define para si.
-      </p>
 
       <form className={css.cota} onSubmit={(e) => { e.preventDefault(); if (mudou) painel.salvar('cota', { cotaTokensMes: cota.valor }) }}>
         <CampoTexto
           rotulo="Cota mensal (mil tokens)" inputMode="numeric" value={campo} disabled={!podeEditar}
           onChange={(e) => setCampo(e.target.value)} erro={cota.erro}
-          dica={podeEditar
-            ? 'Vazio ou 0 tira a cota. Em 80% aparece o alerta; em 100% o Assistente passa as conversas para a equipe até virar o mês.'
-            : 'Só quem administra a loja muda a cota.'}
+          dica={podeEditar ? 'Vazio tira a cota. Em 100% passa para a equipe.' : 'Só quem administra a loja muda a cota.'}
         />
         {podeEditar && (
           <div className={css.acoes}>
@@ -106,6 +103,9 @@ function AbaUso({ uso, podeEditar, painel }) {
 
 function AbaFluxo({ fluxo, podeEditar, painel }) {
   const [selecionado, setSelecionado] = useState('entrada')
+  const [orientacao, setOrientacao] = useState(() => (window.matchMedia?.('(max-width: 899px)').matches ? ORIENTACOES.vertical : ORIENTACOES.horizontal))
+  const [abertos, setAbertos] = useState([])
+  const [foco, setFoco] = useState({ ids: null })
   const [roteiro, setRoteiro] = useState(fluxo.roteiro)
   const detalhe = useRef(null)
   const roteiroMudou = !mesmoRoteiro(roteiro, fluxo.roteiro)
@@ -115,88 +115,74 @@ function AbaFluxo({ fluxo, podeEditar, painel }) {
     setBase(fluxo.roteiro)
     if (mesmoRoteiro(roteiro, base)) setRoteiro(fluxo.roteiro)
   }
+  const desenho = useMemo(() => desenharFluxo({ fluxo, roteiro, orientacao, abertos }), [fluxo, roteiro, orientacao, abertos])
 
   function selecionar(id) {
     setSelecionado(id)
-    if (window.matchMedia?.('(max-width: 899px)').matches) {
+    if (!id.startsWith('grupo:') && window.matchMedia?.('(max-width: 899px)').matches) {
       requestAnimationFrame(() => detalhe.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     }
   }
 
-  const ligadas = fluxo.ferramentas.filter((f) => f.ligada).length
-  const etapasAtivas = roteiro.filter((e) => e.ativo).length
+  // Abre ou fecha o grupo (Verificações, Roteiro, Ferramentas) e enquadra o que apareceu.
+  function alternarGrupo(chave, abrir, roteiroNovo = roteiro) {
+    const proximos = abrir ? [...abertos.filter((g) => g !== chave), chave] : abertos.filter((g) => g !== chave)
+    setAbertos(proximos)
+    setFoco({ ids: abrir ? idsDoGrupo(desenharFluxo({ fluxo, roteiro: roteiroNovo, orientacao, abertos: proximos }), chave) : null })
+  }
+
+  function ativar(id) {
+    selecionar(id)
+    const chave = Object.keys(GRUPOS).find((g) => GRUPOS[g] === id)
+    if (chave) alternarGrupo(chave, !abertos.includes(chave))
+  }
+
+  function trocarOrientacao(nova) {
+    setOrientacao(nova)
+    setFoco({ ids: null })
+  }
+
+  function alternarNo(dados) {
+    selecionar(dados.id)
+    if (dados.tipo === 'ferramenta') alternarFerramenta({ nome: dados.titulo, ligada: dados.ligada }, fluxo, painel)
+    else if (dados.tipo === 'roteiro') setRoteiro(roteiro.map((e, i) => (i === dados.indice ? { ...e, ativo: !e.ativo } : e)))
+  }
+
+  const dadosDoNo = (dados) => ({
+    ...dados, selecionado: dados.id === selecionado, podeEditar, ocupado: painel.gravacao.salvando === 'ferramentas',
+    aoAtivar: ativar, aoAlternar: alternarNo,
+  })
+
+  function acrescentarEtapa() {
+    const novo = [...roteiro, { nome: 'Nova etapa', instrucao: '', ativo: true }]
+    setRoteiro(novo)
+    alternarGrupo('roteiro', true, novo)
+    selecionar(`roteiro:${roteiro.length}`)
+  }
 
   return (
-    <div className={css.fluxo}>
-      <ol className={css.mapa} aria-label="Fluxo do Assistente, na ordem do turno">
-        <No id="entrada" icone="inbox" titulo="Mensagem do cliente chega" selecionado={selecionado} aoSelecionar={selecionar} tipo="ponta" />
-
-        <li className={css.grupo}>
-          <p className={css.grupoTitulo}><Icone nome="lock" tamanho={16} /> Etapas que decidem se o robô responde <small>fixas, na ordem</small></p>
-          <ol className={css.portoes}>
-            {fluxo.portoes.map((p) => (
-              <No key={p.codigo} id={`portao:${p.codigo}`} titulo={p.titulo} subtitulo={p.checa} selecionado={selecionado} aoSelecionar={selecionar} tipo="portao"
-                marca={p.escala ? <Pilula tom="marca" tamanho="inline">barra → equipe</Pilula> : null} />
-            ))}
-          </ol>
-        </li>
-
-        <No id="prompt" icone="settings" titulo="Instruções da loja" subtitulo={`${fluxo.prompt.length.toLocaleString('pt-BR')} caracteres: tom, regras e observações`} selecionado={selecionado} aoSelecionar={selecionar} />
-
-        <li className={css.grupo}>
-          <p className={css.grupoTitulo}>Roteiro do atendimento <small>{etapasAtivas} de {roteiro.length} ligadas{fluxo.roteiroPersonalizado ? '' : ', padrão'}</small></p>
-          <ol className={css.roteiro}>
-            {roteiro.map((etapa, i) => (
-              <No key={i} id={`roteiro:${i}`} titulo={`${i + 1}. ${etapa.nome || 'Sem nome'}`} subtitulo={etapa.instrucao} selecionado={selecionado} aoSelecionar={selecionar}
-                desligado={!etapa.ativo} tipo="roteiro" />
-            ))}
-          </ol>
-          {podeEditar && roteiro.length < ROTEIRO_ETAPAS_MAXIMO && (
-            <Botao variante="texto" icone="arrow-down" onClick={() => {
-              setRoteiro([...roteiro, { nome: 'Nova etapa', instrucao: '', ativo: true }])
-              selecionar(`roteiro:${roteiro.length}`)
-            }}>Acrescentar etapa</Botao>
-          )}
-        </li>
-
-        <li className={css.grupo}>
-          <p className={css.grupoTitulo}>Ferramentas <small>{ligadas} de {fluxo.ferramentas.length} ligadas</small></p>
-          <ul className={css.ferramentas}>
-            {fluxo.ferramentas.map((f) => (
-              <No key={f.nome} id={`ferramenta:${f.nome}`} titulo={f.nome} selecionado={selecionado} aoSelecionar={selecionar} desligado={!f.ligada} tipo="ferramenta" item="li"
-                marca={f.travada ? <Icone nome="lock" tamanho={16} rotulo="Sempre ligada" /> : null} />
-            ))}
-          </ul>
-        </li>
-
-        <No id="saida" icone="circle-check" titulo="Resposta ao cliente ou passa à equipe" selecionado={selecionado} aoSelecionar={selecionar} tipo="ponta" />
-      </ol>
-
-      <aside ref={detalhe} className={css.detalhe} aria-label="Ajuste do item escolhido" aria-live="polite">
-        <Detalhe
-          id={selecionado} fluxo={fluxo} podeEditar={podeEditar} painel={painel}
-          roteiro={roteiro} setRoteiro={setRoteiro} roteiroMudou={roteiroMudou} aoSelecionar={selecionar}
-        />
-      </aside>
+    <div className={css.fluxoCaixa}>
+      <div className={css.barraDoFluxo}>
+        <div role="group" aria-label="Direção do desenho" className={css.seletor}>
+          {[[ORIENTACOES.horizontal, 'Horizontal'], [ORIENTACOES.vertical, 'Vertical']].map(([valor, rotulo]) => (
+            <Botao key={valor} variante={orientacao === valor ? 'primario' : 'secundario'} aria-pressed={orientacao === valor} onClick={() => trocarOrientacao(valor)}>{rotulo}</Botao>
+          ))}
+        </div>
+        {podeEditar && roteiro.length < ROTEIRO_ETAPAS_MAXIMO && <Botao variante="texto" icone="mais" onClick={acrescentarEtapa}>Acrescentar etapa</Botao>}
+        <p className={css.nota}>Toque num nó para ajustar. Verificações, Roteiro e Ferramentas abrem ao tocar.</p>
+      </div>
+      <div className={css.fluxo}>
+        <Suspense fallback={<output className={css.nota}>Carregando o desenho…</output>}>
+          <CanvasDoFluxo desenho={desenho} dadosDoNo={dadosDoNo} foco={foco} rotuloDoDesenho="Fluxo do Assistente, na ordem do turno" />
+        </Suspense>
+        <aside ref={detalhe} className={css.detalhe} aria-label="Ajuste do item escolhido" aria-live="polite">
+          <Detalhe
+            id={selecionado} fluxo={fluxo} podeEditar={podeEditar} painel={painel}
+            roteiro={roteiro} setRoteiro={setRoteiro} roteiroMudou={roteiroMudou} aoSelecionar={selecionar}
+          />
+        </aside>
+      </div>
     </div>
-  )
-}
-
-function No({ id, icone, titulo, subtitulo, selecionado, aoSelecionar, desligado = false, tipo = 'passo', marca = null, item = 'li' }) {
-  const Item = item
-  const ativo = selecionado === id
-  return (
-    <Item className={`${css.no} ${css['no_' + tipo]} ${desligado ? css.desligado : ''}`}>
-      <button type="button" className={css.noBotao} aria-pressed={ativo} data-no={id} onClick={() => aoSelecionar(id)}>
-        {icone && <Icone nome={icone} tamanho={20} />}
-        <span className={css.noTexto}>
-          <strong>{titulo}</strong>
-          {subtitulo && <span>{subtitulo}</span>}
-        </span>
-        {desligado && <Pilula tom="neutro" tamanho="inline">Desligada</Pilula>}
-        {marca}
-      </button>
-    </Item>
   )
 }
 
@@ -211,6 +197,32 @@ function Detalhe({ id, fluxo, podeEditar, painel, roteiro, setRoteiro, roteiroMu
     return <Bloco titulo="Resposta ou equipe">
       <p>Com tudo passando, o modelo lê as instruções, o roteiro e o histórico, usa as ferramentas ligadas e responde.</p>
       <p>Quando uma etapa barra, ou quando o modelo usa escalar_para_dona, a conversa vai para a equipe com o motivo.</p>
+    </Bloco>
+  }
+  if (id === 'assistente') {
+    return <Bloco titulo="Assistente IA" icone="sparkles">
+      <p>Com todas as verificações passando, o modelo lê as instruções, o roteiro e o histórico, usa as ferramentas ligadas e responde.</p>
+      <p>Chave da loja: <strong>{fluxo.ativo ? 'ligado' : 'desligado'}</strong>. Modelo de IA: <strong>{fluxo.modeloDisponivel ? 'disponível' : 'indisponível no servidor'}</strong>.</p>
+    </Bloco>
+  }
+  if (id === 'equipe') {
+    return <Bloco titulo="Equipe" icone="usuarios">
+      <p>Recebe a conversa quando uma verificação barra com aviso, ou quando o Assistente pede ajuda com escalar_para_dona. Vai com o motivo.</p>
+    </Bloco>
+  }
+  if (id === GRUPOS.portoes) {
+    return <Bloco titulo="Verificações" icone="lock">
+      <p>{fluxo.portoes.length} etapas fixas, sempre na mesma ordem. A primeira que barra para o robô; as marcadas com o ícone de equipe passam a conversa para você.</p>
+    </Bloco>
+  }
+  if (id === GRUPOS.roteiro) {
+    return <Bloco titulo="Roteiro" icone="extrato">
+      <p>{roteiro.length} etapas que o Assistente segue na ordem{fluxo.roteiroPersonalizado ? '' : ' (roteiro padrão)'}. Toque numa etapa para editar.</p>
+    </Bloco>
+  }
+  if (id === GRUPOS.ferramentas) {
+    return <Bloco titulo="Ferramentas" icone="plug">
+      <p>{fluxo.ferramentas.filter((f) => f.ligada).length} de {fluxo.ferramentas.length} ligadas. Use a chave em cada ferramenta para ligar ou desligar.</p>
     </Bloco>
   }
   if (id.startsWith('portao:')) {
@@ -272,14 +284,17 @@ function DetalhePrompt({ fluxo, podeEditar, painel }) {
   )
 }
 
+// Liga ou desliga uma ferramenta da loja: pergunta antes de desligar e grava só a lista de desligadas.
+function alternarFerramenta(ferramenta, fluxo, painel) {
+  const ligar = !ferramenta.ligada
+  if (!ligar && !window.confirm(`Desligar ${ferramenta.nome}? O Assistente deixa de usar em todas as conversas e passa à equipe o que dependia dela.`)) return
+  const desligadas = new Set(desligadasDoFluxo(fluxo.ferramentas))
+  if (ligar) desligadas.delete(ferramenta.nome); else desligadas.add(ferramenta.nome)
+  painel.salvar('ferramentas', { ferramentasDesligadas: [...desligadas].sort() })
+}
+
 function DetalheFerramenta({ ferramenta, fluxo, podeEditar, painel }) {
-  function alternar() {
-    const ligar = !ferramenta.ligada
-    if (!ligar && !window.confirm(`Desligar ${ferramenta.nome}? O Assistente deixa de usar em todas as conversas e passa à equipe o que dependia dela.`)) return
-    const desligadas = new Set(desligadasDoFluxo(fluxo.ferramentas))
-    if (ligar) desligadas.delete(ferramenta.nome); else desligadas.add(ferramenta.nome)
-    painel.salvar('ferramentas', { ferramentasDesligadas: [...desligadas].sort() })
-  }
+  const alternar = () => alternarFerramenta(ferramenta, fluxo, painel)
   return (
     <Bloco titulo={ferramenta.nome} icone={ferramenta.travada ? 'lock' : null}>
       <p>{ferramenta.descricao}</p>

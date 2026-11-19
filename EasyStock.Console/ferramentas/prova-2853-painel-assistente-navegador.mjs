@@ -81,7 +81,7 @@ try {
   assert.equal(await painel.locator('[data-tom]').getAttribute('data-tom'), 'aviso')
   await painel.getByText(/Passou de 80%/).waitFor()
   assert.equal(await painel.getByRole('meter').getAttribute('aria-valuenow'), '85')
-  await painel.getByText('Sem preço configurado para o modelo: o custo não é calculado.', { exact: true }).waitFor()
+  await painel.getByText(/custo sem preço configurado/).waitFor()
   await pagina.screenshot({ path: resolve(pasta, 'uso-1280.png'), fullPage: true })
 
   let marca = pedidos.length
@@ -93,6 +93,8 @@ try {
 
   // Fluxo: as 11 etapas fixas na ordem do turno, depois instruções, roteiro e ferramentas.
   await painel.getByRole('tab', { name: 'Fluxo' }).click()
+  await painel.locator('[data-no="grupo:portoes"]').click()
+  await painel.locator('[data-no="portao:cota"]').waitFor()
   const nos = await painel.locator('[data-no^="portao:"]').evaluateAll(b => b.map(x => x.dataset.no.slice(7)))
   assert.deepEqual(nos, PORTOES.map(p => p.codigo), 'as 11 etapas na ordem do turno')
   await painel.locator('[data-no="portao:cota"]').click()
@@ -101,6 +103,7 @@ try {
 
   // Roteiro: a etapa 2 sobe e o roteiro salvo vai inteiro, na ordem nova.
   marca = pedidos.length
+  await painel.locator('[data-no="grupo:roteiro"]').click()
   await painel.locator('[data-no="roteiro:1"]').click()
   await painel.getByRole('button', { name: 'Subir' }).click()
   await painel.getByText('Roteiro com mudanças não salvas.', { exact: true }).waitFor()
@@ -115,6 +118,7 @@ try {
 
   // Ferramenta: desligar pergunta antes e grava a lista; a saída para a equipe não tem chave.
   marca = pedidos.length
+  await painel.locator('[data-no="grupo:ferramentas"]').click()
   await painel.locator('[data-no="ferramenta:consultar_pedido"]').click()
   await painel.getByRole('switch', { name: 'Ligada na loja' }).click()
   await painel.getByRole('switch', { name: 'Desligada na loja' }).waitFor()
@@ -123,7 +127,7 @@ try {
   await painel.getByText('2 de 3 ligadas', { exact: true }).waitFor()
   await painel.locator('[data-no="ferramenta:escalar_para_dona"]').click()
   await painel.getByText('Sempre ligada: é o caminho do cliente até a equipe.', { exact: true }).waitFor()
-  assert.equal(await painel.getByRole('switch').count(), 0, 'saída para a equipe sem chave')
+  assert.equal(await painel.locator('[data-no="ferramenta:escalar_para_dona"]').getByRole('switch').count() + await painel.getByRole('switch', { name: /na loja/ }).count(), 0, 'saída para a equipe sem chave')
   await pagina.screenshot({ path: resolve(pasta, 'fluxo-ferramenta-1280.png'), fullPage: true })
 
   // Histórico.
@@ -133,6 +137,9 @@ try {
 
   await pagina.setViewportSize({ width: 375, height: 812 })
   await painel.getByRole('tab', { name: 'Fluxo' }).click()
+  // Voltar do Histórico remonta o Fluxo com os grupos fechados: abre o roteiro de novo.
+  await painel.locator('[data-no="grupo:roteiro"]').click()
+  await painel.locator('[data-no="roteiro:2"]').waitFor()
   await painel.locator('[data-no="roteiro:2"]').click()
   await pagina.screenshot({ path: resolve(pasta, 'fluxo-375.png'), fullPage: true })
   const largura = await pagina.evaluate(() => document.documentElement.scrollWidth)

@@ -27,6 +27,7 @@ import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
 import { ContextoFichaUnicaDoCliente } from '../aplicacao/fichaUnicaDoCliente'
+import { ContextoPainelDoAssistente } from '../aplicacao/painelDoAssistente'
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
@@ -59,6 +60,7 @@ import { HallDeModulos } from '../features/hall/HallDeModulos'
 import { BuscaNaCasa } from '../features/busca/BuscaNaCasa'
 import { EditorCadastro } from '../features/gestao/cadastros/EditorCadastro'
 import { DetalhePedido } from '../features/gestao/cadastros/DetalhePedido'
+import { PainelAssistente } from '../features/gestao/atendimento/PainelAssistente'
 import { PainelAgora } from '../features/agora/PainelAgora'
 import { avisoDeResponder, filasDoAgora } from '../dominio/agora'
 import { hashDoModulo } from '../dominio/modulos'
@@ -87,6 +89,8 @@ import css from './moldura.module.css'
 const semEfeito = () => {}
 // #2849: a ficha única do cliente. A Busca e o Atendimento desenham o cliente por esta mesma função.
 const renderizarFichaUnica = props => <EditorCadastro {...props} restricoes={RESTRICOES} />
+// #2855: o painel do Assistente também abre no modal da conversa.
+const renderizarPainelDoAssistente = props => <PainelAssistente {...props} />
 const { useReacaoClienteSimulado = semEfeito, useDigitacaoAutomatica = semEfeito } = demonstracao ?? {}
 const {
   TelaCardapioLink = null, TelaCozinha = null, GavetaEntregas = null, TelaEntregas = null,
@@ -715,7 +719,7 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else tela = <AppPrincipal rota={rota} sessao={sessao} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} lerFiltrosDaVisita={lerFiltrosDaVisita} aoGuardarFiltros={guardarFiltrosDaVisita} lerRascunhosDaVisita={lerRascunhosDaVisita} aoGuardarRascunhos={guardarRascunhosDaVisita} memoriaDoLaco={memoriaDoLaco} visitaSoNaMemoria={visitaSoNaMemoria} conversaEncontrada={conversaEncontrada} aoConsumirConversa={consumirConversaEncontrada} />
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
-      <ContextoFichaUnicaDoCliente.Provider value={renderizarFichaUnica}>{tela}</ContextoFichaUnicaDoCliente.Provider>{confirmacaoSaida}
+      <ContextoFichaUnicaDoCliente.Provider value={renderizarFichaUnica}><ContextoPainelDoAssistente.Provider value={renderizarPainelDoAssistente}>{tela}</ContextoPainelDoAssistente.Provider></ContextoFichaUnicaDoCliente.Provider>{confirmacaoSaida}
       {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={renderizarFichaUnica} renderizarPedido={props => <DetalhePedido {...props} />} aoAbrirConversa={resumo => {
         memoriaDoLaco.dono = sessao.usuario?.id ?? null
         memoriaDoLaco.resumos.set(resumo.id, resumo)

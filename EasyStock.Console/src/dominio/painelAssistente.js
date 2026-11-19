@@ -43,6 +43,20 @@ export function resumoDoUso(uso) {
     titulo: `${tokensCurtos(total)} de ${tokensCurtos(cota)} tokens (${percentual}%)`, detalhe }
 }
 
+// Uma linha só para a aba Uso (#2855): o que resta, os turnos e o custo.
+export function linhaDoUso(uso) {
+  const resumo = resumoDoUso(uso)
+  const custo = custoDoUso(uso)
+  const partes = []
+  if (resumo.comCota) {
+    if (resumo.restante <= 0) partes.push('Cota esgotada')
+    else partes.push(`${resumo.tom === 'aviso' ? `Passou de ${PERCENTUAL_ALERTA}%, r` : 'R'}estam ${tokensCurtos(resumo.restante)}`)
+  }
+  partes.push(`${formatarTokens(uso.turnos)} turnos`)
+  partes.push(custo.valor ? `custo estimado ${custo.valor}` : 'custo sem preço configurado')
+  return partes.join(' · ')
+}
+
 // Custo: a API soma só turnos com preço configurado. Sem nenhum preço, não inventa R$ 0,00.
 export function custoDoUso(uso) {
   if (!uso) return null
