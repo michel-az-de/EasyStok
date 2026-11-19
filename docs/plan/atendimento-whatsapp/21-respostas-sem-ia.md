@@ -15,9 +15,11 @@ Medido em produção (Casa da Baba, 19/11/2026):
 |---|---|
 | Entradas de cliente em 45 dias | 182 |
 | Entradas que são só saudação ("oi", "bom dia") | 24 (13%) |
+| Dessas, as que viraram turno do modelo | 7 (9% das 76 respostas do Assistente no período) |
 | Custo de um turno | cerca de 15 mil tokens (59,3 mil em 4 turnos, aba Uso) |
 | Resposta do modelo a um "oi" | cerca de 2 s, depois da saudação que já saiu sem IA |
-| Agradecimento e pedido de cardápio | NÃO MEDIDO (a consulta por texto não abriu pelo papel de leitura) |
+| Agradecimento | NÃO MEDIDO (a consulta de 19/11 falhou no acesso ao banco, causa não apurada) |
+| Pedido de cardápio | cerca de 10, contagem frouxa em amostra com mensagens de teste |
 
 O que muda para quem usa:
 
@@ -28,7 +30,7 @@ O que muda para quem usa:
 | Cliente fecha com "Obrigada" | Turno do modelo para dizer "por nada" | Texto pronto da loja | 0 token |
 | Cliente manda só "Cardápio" | Turno do modelo, que chama ferramenta e escreve | Texto pronto com o link | 0 token (fatia opcional, ver D1) |
 | "Oi, quero 2 bolos para sábado" | Turno do modelo | Igual a hoje | Nada muda |
-| Conversa com a equipe (caso Thatiane) | Ninguém automático responde | Igual a hoje | Nada muda; devolver ao Assistente segue manual |
+| Conversa com a equipe (caso `6bb73f77`) | Ninguém automático responde | Igual a hoje | Nada muda; devolver ao Assistente segue manual |
 
 ## O que já existe e é reaproveitado
 
@@ -65,11 +67,15 @@ Peça nova de verdade: só o classificador de mensagem curta e o serviço que o 
    Qualquer condição falsa devolve `false` e o fluxo segue como hoje (o turno é enfileirado).
 4. Ao responder: envia, grava a saída, marca a entrada com `MarcarProcessada` e registra `TurnoAgente` com
    `DesfechoTurnoAgente.SemIa = 6`, 0 token e modelo `sem-ia`.
-5. Conversa nova: quando a entrada que abriu a conversa é saudação solta, a saudação RN-01 sai sem a `FraseEspera` e o
-   turno não é enfileirado. A regra `SaudacaoSolta` não dispara em cima dela.
+5. Conversa nova (`GravarEntradaAsync` abre a conversa e só então há `identificacao`, linhas 281 a 296): quando a
+   entrada que abriu a conversa é saudação solta, quem fala é o que já fala hoje sem modelo, a saudação RN-01 ou, com
+   ela ligada, a automática de entrada (#2004, `DispararAutomacaoUseCase.cs:81`). A RN-01 sai sem a `FraseEspera`. Nos
+   dois caminhos o turno não é enfileirado, a entrada é marcada como processada e o `TurnoAgente` `SemIa` é
+   registrado, igual ao item 4. A regra `SaudacaoSolta` não dispara em cima delas.
 
 **Aceite.**
-- "Oi" em conversa nova gera 1 saída e 0 turno do modelo.
+- "Oi" em conversa nova gera 1 saída, 0 turno do modelo e 1 registro `SemIa`, com a automática de entrada ligada
+  ou desligada.
 - "Bom dia" em conversa parada há mais de N minutos gera a resposta da regra e 0 turno do modelo.
 - "Oi, quero 2 bolos" e "oi" 5 minutos depois de uma pergunta do Assistente seguem para o modelo.
 - Conversa com a equipe, pausada, bloqueada ou acima do limite por hora: nenhuma resposta sem IA.
@@ -78,7 +84,8 @@ Peça nova de verdade: só o classificador de mensagem curta e o serviço que o 
 
 **Testes (Red).** Tabela do classificador com as 24 saudações reais de produção mais 20 contraexemplos ("oi quero",
 "bom dia tem bolo?", "ok", "sim"). `RespostaSemIa`: um teste por condição do item 3, cada um falhando por falta do
-serviço. Webhook: `EnqueueAsync` não é chamado quando `TentarAsync` devolve `true`. Laço: 10 "oi" seguidos param no
+serviço. Webhook: `EnqueueAsync` não é chamado quando `TentarAsync` devolve `true`, nem em conversa nova aberta por saudação
+solta (um teste com a automática de entrada ligada, outro com ela desligada). Laço: 10 "oi" seguidos param no
 limite por hora.
 
 **Depende de:** nada. **Tamanho:** M.
@@ -122,7 +129,8 @@ por teste. Recomendo deixar para depois da medição da S78.
 
 **Depende de:** S75. **Tamanho:** P.
 
-Ordem: S75 → S78 → S76 → S77. S75 e S78 juntas já entregam o ganho medido (13% das entradas) e o medidor.
+Ordem: S75 → S78 → S76 → S77. S75 e S78 juntas já entregam o ganho medido e o medidor: 7 turnos em 45 dias, perto de 105 mil tokens pela média de
+15 mil por turno (estimativa sobre 4 turnos).
 
 ## Riscos
 
@@ -131,12 +139,12 @@ Ordem: S75 → S78 → S76 → S77. S75 e S78 juntas já entregam o ganho medido
 | Texto pronto responder o que pedia atenção | Lista fechada, mensagem inteira, até 4 palavras; guardas de conversa parada e de pergunta em aberto |
 | Laço com robô de terceiros (a ouvidoria de operadora recebeu 16 respostas em 45 dias) | Conta no limite por hora (D2); barrando, a conversa vai para a equipe como hoje |
 | Tela dizer uma coisa e o robô fazer outra | Mesmos `PortoesDoAssistente`; Checar o Assistente continua verdadeiro |
-| Pedido em andamento receber "Olá, como posso ajudar?" | A janela de conversa parada cobre o caso comum. No Red da S75, localizar o estado de pedido aberto da conversa e, existindo, mandar ao modelo |
+| Pedido em andamento receber "Olá, como posso ajudar?" | A janela de conversa parada cobre o caso comum. O webhook já sabe de pedido em andamento (`ReabrirSePedidoEmAndamentoAsync`); conversa reaberta por ele manda ao modelo |
 | Valor novo de enum pedir migration | Conferido: `TurnoAgenteConfiguration` e `RegraAutomaticaConfiguration` não têm check constraint. Se o Red mostrar o contrário, a S75 ganha migration e a PR diz isso |
-| Ganho menor que o esperado | Base de cálculo pequena (4 turnos no mês). A S78 mede antes de S76 e S77 |
+| Ganho menor que o esperado | É o cenário provável em volume baixo: 7 turnos em 45 dias. O ganho que não depende de volume é a mensagem duplicada que some. A S78 mede antes de S76 e S77 |
 
 Fora de escopo: devolver a conversa ao Assistente por tempo. `Conversa.LiberarAutomatico` diz "nunca por tempo"
-(`Conversa.cs:298`) e foi isso que deixou a Thatiane 13 dias sem resposta automática. É decisão de produto separada, com issue
+(`Conversa.cs:298`) e foi isso que deixou a conversa `6bb73f77` 13 dias sem resposta automática. É decisão de produto separada, com issue
 própria.
 
 ## Decisões do Felipe
@@ -151,4 +159,5 @@ própria.
 ## Prova
 
 Para cada fatia: Red que falha pelo motivo esperado, Green, gate do commit. Em produção, depois do deploy: mandar "Oi"
-de um número de teste e conferir no Console 1 saída e, na aba Uso, 0 token novo e "Respostas sem IA" somando 1.
+de um número de teste (conversa nova, item 5 da S75) e conferir no Console 1 saída e, na aba Uso, 0 token novo e
+"Respostas sem IA" somando 1. Depois, com a regra ligada, mandar "Bom dia" na mesma conversa passada a janela da D4.
