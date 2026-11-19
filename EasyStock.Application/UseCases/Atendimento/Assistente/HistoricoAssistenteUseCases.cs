@@ -35,14 +35,20 @@ public sealed record UsoAssistenteResult(
     long TokensCacheLido,
     long TotalTokens,
     decimal CustoEstimado,
-    int TurnosSemPreco);
+    int TurnosSemPreco,
+    long? CotaTokensMes = null,
+    int? Percentual = null,
+    bool Alerta = false);
 
 /// <summary>
 /// S67 (#2534): consumo do mês só do Assistente, pelo registro dos turnos (não por <c>UsoIa</c>, que mistura o
 /// gerador de anúncios). Mês civil de Brasília; sem ano e mês, o mês corrente.
 /// </summary>
-public sealed class ObterUsoAssistenteUseCase(ITurnoAgenteRepository turnos, TimeProvider relogio)
+public sealed class ObterUsoAssistenteUseCase(ITurnoAgenteRepository turnos, TimeProvider relogio,
+    IConfiguracaoAtendimentoRepository? configuracoes = null)
 {
+    public const int PercentualAlerta = 80;
+
     public async Task<UsoAssistenteResult> ExecuteAsync(ObterUsoAssistenteQuery query, CancellationToken ct = default)
     {
         var hoje = HorarioBrasil.DataOperacional(relogio.GetUtcNow().UtcDateTime);
@@ -53,7 +59,13 @@ public sealed class ObterUsoAssistenteUseCase(ITurnoAgenteRepository turnos, Tim
 
         var (de, ate) = HorarioBrasil.JanelaMesUtc(new DateOnly(ano, mes, 1));
         var soma = await turnos.SomarAsync(query.EmpresaId, de, ate, ct);
-        return new UsoAssistenteResult(ano, mes, soma.Turnos, soma.TokensEntrada, soma.TokensSaida, soma.TokensCacheLido,
+        var resultado = new UsoAssistenteResult(ano, mes, soma.Turnos, soma.TokensEntrada, soma.TokensSaida, soma.TokensCacheLido,
             soma.TotalTokens, soma.Custo, soma.TurnosSemPreco);
+
+        // S69 (#2853): a mesma soma que a etapa da cota usa no turno; alerta a partir de 80%.
+        var cota = configuracoes is null ? null : (await configuracoes.GetByEmpresaIdAsync(query.EmpresaId))?.CotaTokensMes;
+        if (cota is not > 0) return resultado;
+        var percentual = (int)Math.Min(int.MaxValue, soma.TotalTokens * 100 / cota.Value);
+        return resultado with { CotaTokensMes = cota, Percentual = percentual, Alerta = percentual >= PercentualAlerta };
     }
 }

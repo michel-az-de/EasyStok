@@ -117,6 +117,8 @@ os registros.
 
 ### S69 · Cota com alerta
 
+**Estado (18/11/2026, #2853).** Entregue no código. O turno barra na etapa `cota` antes de chamar o modelo e escala pelo motivo da cota. O registro sai com `Desfecho = Cota`. O `GET uso` traz `cotaTokensMes`, `percentual` e `alerta`. A checagem da conversa mostra a cota como a 11ª etapa.
+
 **Escopo.**
 - Antes de chamar o modelo, o turno lê o uso do mês (S67).
 - Com o uso em 100% ou mais da `CotaTokensMes`:
@@ -161,6 +163,32 @@ os registros.
 **Rollback.** Reverter. A API continua igual.
 
 **Tier.** BAIXO (spec aprovada, sem migração).
+
+**Estado (18/11/2026, #2853).** O painel entrou como bloco "Painel do Assistente" em Gestão › Atendimento, com 3 abas.
+- **Uso e cota:** barra contra a cota, alerta em 80% e custo honesto sem preço configurado.
+- **Fluxo:** mapa do turno. Etapas fixas, instruções com observações editáveis, roteiro editável, reordenável e com chave por etapa, e ferramentas com chave.
+- **Histórico:** turno a turno.
+
+O Felipe pediu o fluxo "tipo n8n" no lugar da aba Roteiro. Ficam para depois:
+- a engrenagem no topo da lista;
+- as abas Geral e Respostas prontas, que continuam em "Como o Assistente atende" e em Respostas.
+
+### S71 · Chave por loja para as ferramentas (#2853, ADR-0067)
+
+**Escopo.**
+- `FerramentasDesligadasJson` (jsonb). O turno filtra as ferramentas antes do modelo, e o prompt avisa quais estão fora.
+- `escalar_para_dona`, `encaminhar_para_responsavel` e `avisar_gestao` são travadas.
+- Novo `GET api/atendimento/assistente/fluxo` com etapas, roteiro, ferramentas e prompt.
+
+**Testes (Red).**
+- Ferramenta desligada não vai ao modelo e não roda se pedida.
+- Travada e desconhecida dão 400.
+- Lista vazia liga todas.
+- O fluxo vem na ordem do turno.
+
+**Rollback.** Reverter. A coluna nula volta a ligar todas.
+
+**Tier.** ALTO (migração, ferramenta, D7 da ADR-0065, sem eval: `agents/` ainda não existe).
 
 ## Ordem e dependências
 

@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -28,7 +29,8 @@ public sealed record ConfiguracaoAtendimentoResult(
     long? CotaTokensMes = null,
     IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
     bool RoteiroPersonalizado = false,
-    string? ObservacoesLoja = null);
+    string? ObservacoesLoja = null,
+    IReadOnlyList<string>? FerramentasDesligadas = null);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -54,7 +56,8 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
         c.SlaRespostaMinutos, c.MensagemEscalada, c.MensagemEncaminhamento,
         // S68 (#2597): o roteiro sai sempre efetivo (o da loja ou o padrão), com a marca de qual dos dois.
         c.NomeDona, c.ModeloAgente, c.CotaTokensMes, RoteiroAtendimento.DaLoja(c.RoteiroJson),
-        !ReferenceEquals(RoteiroAtendimento.DaLoja(c.RoteiroJson), RoteiroAtendimento.Padrao), c.ObservacoesLoja);
+        !ReferenceEquals(RoteiroAtendimento.DaLoja(c.RoteiroJson), RoteiroAtendimento.Padrao), c.ObservacoesLoja,
+        FerramentasDaLoja.DaLoja(c.FerramentasDesligadasJson).Order(StringComparer.Ordinal).ToList());
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -75,7 +78,8 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     string? ModeloAgente = null,
     long? CotaTokensMes = null,
     IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
-    string? ObservacoesLoja = null);
+    string? ObservacoesLoja = null,
+    IReadOnlyList<string>? FerramentasDesligadas = null);
 
 /// <remarks>
 /// S68 (#2597): nulo mantém cada campo do Assistente; vazio volta ao padrão (roteiro vazio, modelo vazio, cota 0). O
@@ -84,7 +88,8 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
 public sealed class AtualizarConfiguracaoAtendimentoUseCase(
     IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork, ICacheService? cacheService = null,
     ILogger<AtualizarConfiguracaoAtendimentoUseCase>? logger = null,
-    IOptions<ModelosAprovadosAgenteOptions>? modelos = null)
+    IOptions<ModelosAprovadosAgenteOptions>? modelos = null,
+    IEnumerable<IFerramentaAgente>? ferramentas = null)
 {
     public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(AtualizarConfiguracaoAtendimentoCommand command)
     {
@@ -95,6 +100,7 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         // A recusa do modelo ou do roteiro vem antes de qualquer mudança na entidade rastreada.
         var modeloAgente = ModeloValidado(command.ModeloAgente, configuracao.ModeloAgente);
         var roteiroJson = RoteiroValidado(command.Roteiro);
+        var desligadasJson = DesligadasValidadas(command.FerramentasDesligadas);
 
         try
         {
@@ -112,6 +118,7 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
             configuracao.DefinirMoldes(command.MensagemEscalada, command.MensagemEncaminhamento);
             configuracao.DefinirAssistente(command.NomeDona, modeloAgente, command.CotaTokensMes, roteiroJson,
                 command.ObservacoesLoja);
+            configuracao.DefinirFerramentasDesligadas(desligadasJson);
         }
         catch (Exception ex) when (ex is ArgumentOutOfRangeException or RegraDeDominioVioladaException)
         {
@@ -146,6 +153,15 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         if (modelos?.Value.Aprovado(id) != true)
             throw new UseCaseValidationException("Modelo fora da lista aprovada do Assistente.");
         return id;
+    }
+
+    // #2853: só nome que existe e que não seja saída para a equipe; vazio liga todas de novo.
+    private string? DesligadasValidadas(IReadOnlyList<string>? nomes)
+    {
+        if (nomes is null) return null;
+        var conhecidas = ferramentas?.Select(f => f.Nome) ?? nomes.Select(n => n.Trim());
+        if (FerramentasDaLoja.Erro(nomes, conhecidas) is { } erro) throw new UseCaseValidationException(erro);
+        return FerramentasDaLoja.Serializar(nomes);
     }
 
     private static string? RoteiroValidado(IReadOnlyList<EtapaRoteiroAtendimento>? roteiro)

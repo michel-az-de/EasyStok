@@ -11,7 +11,8 @@ using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.UseCases.Atendimento;
 
-public sealed record FerramentaDoAssistente(string Nome, string Descricao);
+/// <param name="Ligada">#2853: falso quando a loja desligou a ferramenta; ela não vai ao modelo.</param>
+public sealed record FerramentaDoAssistente(string Nome, string Descricao, bool Ligada = true);
 
 /// <param name="Ativo">Chave "Atendimento automático" da loja.</param>
 /// <param name="Responde">Se o robô responderia agora à próxima mensagem do cliente nesta conversa.</param>
@@ -40,7 +41,8 @@ public sealed class ChecarAssistenteConversaUseCase(
     ObterDossieClienteUseCase dossies,
     IEnumerable<IFerramentaAgente> ferramentas,
     IContatoDaEquipeAvisada? equipe = null,
-    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null)
+    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null,
+    ITurnoAgenteRepository? turnos = null)
 {
     public async Task<ChecagemAssistenteResult> ExecuteAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
@@ -55,8 +57,10 @@ public sealed class ChecarAssistenteConversaUseCase(
             .Concat(await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct))
             .Concat(PortoesDoAssistente.DaPessoa(cliente))
             .Append(await portoes.DoLimiteAsync(empresaId, conversaId, agora, ct))
+            .Append(await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agora, ct))
             .ToList();
         var bloqueio = etapas.FirstOrDefault(e => e.Barra);
+        var desligadas = FerramentasDaLoja.DaLoja(configuracao.FerramentasDesligadasJson);
         var prompt = await GeracaoAgenteAtendimento.MontarSystemAsync(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossies, ct);
 
@@ -67,7 +71,8 @@ public sealed class ChecarAssistenteConversaUseCase(
             AgenteAtendimentoService.EntradasPendentes(dados.Mensagens).Count,
             etapas,
             prompt,
-            ferramentas.Select(f => new FerramentaDoAssistente(f.Nome, f.Descricao)).OrderBy(f => f.Nome, StringComparer.Ordinal).ToList());
+            ferramentas.Select(f => new FerramentaDoAssistente(f.Nome, f.Descricao, !desligadas.Contains(f.Nome)))
+                .OrderBy(f => f.Nome, StringComparer.Ordinal).ToList());
     }
 
     // A pergunta é "responde à próxima mensagem": a mensagem nova do cliente reabre a janela de 24 h, e numa
