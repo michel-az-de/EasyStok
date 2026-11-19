@@ -185,8 +185,34 @@ public class NotificarClienteStatusPedidoHandlerTests
             $"{_pedido.Id:N}|{StatusPedidoMapper.SaiuParaEntrega}", CanalNotificacao.WhatsApp));
     }
 
+    [Fact]
+    public async Task ProntoAvisaQueOPedidoEstaPronto()
+    {
+        // #2880: o Pronto avisa pela comanda atualizada (modelo `pedido_atualizado` fora da janela de 24 h).
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+
+        await MudarStatusAsync(StatusPedidoMapper.Preparando, StatusPedidoMapper.Pronto);
+        await MudarStatusAsync(StatusPedidoMapper.Preparando, StatusPedidoMapper.Pronto);
+
+        var mensagem = _outbox.Should().ContainSingle().Subject;
+        mensagem.CorpoRenderizado.Should().Be("Seu pedido está pronto.");
+        mensagem.IdempotencyKey.Should().Be(OutboxMensagemNotificacao.ComputarIdempotencyKey(
+            $"{_pedido.Id:N}|{StatusPedidoMapper.Pronto}", CanalNotificacao.WhatsApp));
+    }
+
+    [Fact]
+    public async Task ProntoRespeitaAvisosDesligados()
+    {
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+        _cliente.DefinirAvisosStatus(false, DateTime.UtcNow);
+
+        await MudarStatusAsync(StatusPedidoMapper.Preparando, StatusPedidoMapper.Pronto);
+
+        _eventos.Should().BeEmpty();
+        _outbox.Should().BeEmpty();
+    }
+
     [Theory]
-    [InlineData(StatusPedidoMapper.Pronto)]
     [InlineData(StatusPedidoMapper.Aguardando)]
     public async Task StatusSemAvisoNaoGeraNada(string statusNovo)
     {

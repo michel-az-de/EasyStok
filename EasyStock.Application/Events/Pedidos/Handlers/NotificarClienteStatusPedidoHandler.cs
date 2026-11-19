@@ -11,9 +11,10 @@ namespace EasyStock.Application.Events.Pedidos.Handlers;
 /// Avisa o cliente pelo WhatsApp quando a dona marca um status relevante (S13, RN-32): <c>preparando</c> →
 /// <see cref="TipoEventoNotificacao.PedidoEmPreparo"/> (com a previsão da janela), <c>saiu_para_entrega</c> →
 /// <see cref="TipoEventoNotificacao.PedidoSaiuParaEntrega"/> e <c>entregue</c> →
-/// <see cref="TipoEventoNotificacao.PedidoEntregue"/> (agradecimento, RN-37). Cancelamento usa o aviso existente
-/// <see cref="TipoEventoNotificacao.ComandaAtualizada"/>, sem afirmar devolução. Demais status não avisam.
-/// Preparo e saída respeitam os avisos desligados pelo cliente (S24); agradecimento e cancelamento saem sempre.
+/// <see cref="TipoEventoNotificacao.PedidoEntregue"/> (agradecimento, RN-37). Pronto (#2880) e cancelamento usam o
+/// aviso existente <see cref="TipoEventoNotificacao.ComandaAtualizada"/>; o cancelamento não afirma devolução. Demais
+/// status não avisam. Preparo, pronto e saída respeitam os avisos desligados pelo cliente (S24); agradecimento e
+/// cancelamento saem sempre.
 /// Roda ao lado do <see cref="PedidoMudouStatusLogHandler"/>; idempotente por pedido + status novo.
 /// </summary>
 public sealed class NotificarClienteStatusPedidoHandler(AvisoStatusPedidoCliente aviso) : IIntegrationEventHandler
@@ -29,8 +30,7 @@ public sealed class NotificarClienteStatusPedidoHandler(AvisoStatusPedidoCliente
 
         await aviso.EnfileirarAsync(tipo, evento.EmpresaId, mudanca.PedidoId, mudanca.StatusNovo, ct,
             respeitaPreferenciaAvisos: tipo != TipoEventoNotificacao.PedidoEntregue && mudanca.StatusNovo != StatusPedidoMapper.Cancelado,
-            mensagem: mudanca.StatusNovo == StatusPedidoMapper.Cancelado
-                ? "Seu pedido foi cancelado. Fale com a loja se precisar de ajuda." : null);
+            mensagem: MensagemDaComanda(mudanca.StatusNovo));
 
         // S26: pedido de avaliação em dois botões 30 min após a entrega. É pós-venda: respeita os avisos
         // desligados pelo cliente (o agradecimento acima é incondicional).
@@ -56,7 +56,15 @@ public sealed class NotificarClienteStatusPedidoHandler(AvisoStatusPedidoCliente
         StatusPedidoMapper.Preparando => TipoEventoNotificacao.PedidoEmPreparo,
         StatusPedidoMapper.SaiuParaEntrega => TipoEventoNotificacao.PedidoSaiuParaEntrega,
         StatusPedidoMapper.Entregue => TipoEventoNotificacao.PedidoEntregue,
-        StatusPedidoMapper.Cancelado => TipoEventoNotificacao.ComandaAtualizada,
+        StatusPedidoMapper.Pronto or StatusPedidoMapper.Cancelado => TipoEventoNotificacao.ComandaAtualizada,
+        _ => null,
+    };
+
+    /// <summary>Texto de uma linha da comanda atualizada para os status sem modelo próprio (Pronto e Cancelado).</summary>
+    private static string? MensagemDaComanda(string statusNovo) => statusNovo switch
+    {
+        StatusPedidoMapper.Pronto => "Seu pedido está pronto.",
+        StatusPedidoMapper.Cancelado => "Seu pedido foi cancelado. Fale com a loja se precisar de ajuda.",
         _ => null,
     };
 }
