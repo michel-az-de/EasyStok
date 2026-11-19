@@ -99,6 +99,27 @@ public class ChatSiteAssistenteTests
     }
 
     [Theory]
+    [InlineData("conferencia")]
+    [InlineData("equipe")]
+    public async Task ConversaQueOAssistenteNaoAtende_RecebeConfirmacaoESemTurno(string situacao)
+    {
+        LigarAssistente();
+        var token = SessaoValida();
+        await Enviar().ExecuteAsync(Slug, token, "oi");
+        var conversa = _criadas.Single();
+        if (situacao == "conferencia") conversa.ExigirConferenciaCliente();
+        else conversa.Escalar(DateTime.UtcNow, "cliente pediu a dona");
+        _fila.ClearReceivedCalls();
+        _conversas.ClearReceivedCalls();
+
+        await Enviar().ExecuteNaConversaAsync(Slug, token, "alguem ai?", conversa.Id);
+
+        await _conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Autor == AutorMensagem.Sistema && m.Texto!.Contains("Recebemos sua mensagem")), Arg.Any<CancellationToken>());
+        await _fila.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    [Theory]
     [InlineData(AutorMensagem.Agente, "assistente")]
     [InlineData(AutorMensagem.Dona, "equipe")]
     [InlineData(AutorMensagem.Atendente, "equipe")]

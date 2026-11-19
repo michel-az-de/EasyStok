@@ -177,8 +177,10 @@ public sealed class EnviarMensagemVisitanteUseCase(
             var entrada = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
             conversa.RegistrarEntrada(agora);
             await conversaRepository.AddMensagemAsync(entrada, tokenCt);
-            // #2876: com o Assistente atendendo, ele responde no turno e a confirmação automática não entra.
-            assistenteAtende = await conversaChat.AssistenteAtendeAsync(sessao.EmpresaId);
+            // #2876: com o Assistente atendendo ESTA conversa, ele responde no turno e a confirmação automática não entra.
+            // Conversa em conferência, escalada ou assumida pela equipe não tem turno: sem a confirmação o visitante ficaria no silêncio.
+            assistenteAtende = await conversaChat.AssistenteAtendeAsync(sessao.EmpresaId)
+                && !PortoesDoAssistente.DaConversa(conversa, agora).Any(etapa => etapa.Barra);
             var confirmacaoId = PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N");
             // #1991-4: 1 µs depois da entrada (a precisão do timestamp no banco): com o mesmo instante a ordem do chat variava.
             if (!assistenteAtende && await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
@@ -263,17 +265,22 @@ public sealed class IdentificarVisitanteChatSiteUseCase(
             throw new SessaoChatSiteInvalidaException();
 
         conversa.RegistrarContatoInformado(contato);
+        string? leadNovo = null;
         if (conversa.ClienteId is null && !conversa.VinculoEmRevisao)
-            await IdentificarClienteAsync(sessao.EmpresaId, conversa, contato, agora, ct);
+            leadNovo = await IdentificarClienteAsync(sessao.EmpresaId, conversa, contato, agora, ct);
 
         await unitOfWork.CommitAsync();
+        // O aviso sai depois do commit: commit que falha não deixa aviso de lead que não existe.
+        if (leadNovo is not null)
+            await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(sessao.EmpresaId, conversa.Id, leadNovo, MotivoLeadNovo, ct);
         // #1643-5: o console troca nome e contato na hora, sem esperar a próxima sincronização.
         await operacaoEventos.PublicarAsync(EventosOperacao.ConversaAtualizada, sessao.EmpresaId,
             new ConversaAtualizadaOperacao(conversa.Id), ct);
         return new IdentificacaoVisitanteResult(contato.Nome, contato.Telefone, contato.Email, contato.InformadoEm);
     }
 
-    private async Task IdentificarClienteAsync(
+    /// <summary>Devolve o nome do cliente recém-cadastrado (lead novo a avisar à equipe) ou nulo.</summary>
+    private async Task<string?> IdentificarClienteAsync(
         Guid empresaId, Conversa conversa, ContatoInformadoVisitante contato, DateTime agora, CancellationToken ct)
     {
         IdentificacaoCliente identificacao;
@@ -286,13 +293,13 @@ public sealed class IdentificarVisitanteChatSiteUseCase(
         catch (TelefoneExigeVerificacaoException)
         {
             await ExigirConferenciaAsync(empresaId, conversa, agora, ct);
-            return;
+            return null;
         }
 
         if (identificacao is not { Cliente: { } cliente, EhNovo: true })
         {
             await ExigirConferenciaAsync(empresaId, conversa, agora, ct);
-            return;
+            return null;
         }
 
         cliente.Email = contato.Email;
@@ -301,7 +308,7 @@ public sealed class IdentificarVisitanteChatSiteUseCase(
         await consentimentos.AddAsync(ConsentimentoContato.Registrar(empresaId, cliente.Id, CanalConversa.ChatSite,
             FinalidadeContato.Transacional, SituacaoConsentimento.Concedido,
             ClienteDaConversa.CadastrarClienteDaConversaUseCase.OrigemAceiteChatSite, contato.InformadoEm), ct);
-        await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(empresaId, conversa.Id, cliente.Nome, MotivoLeadNovo, ct);
+        return cliente.Nome;
     }
 
     private async Task ExigirConferenciaAsync(Guid empresaId, Conversa conversa, DateTime agora, CancellationToken ct)
