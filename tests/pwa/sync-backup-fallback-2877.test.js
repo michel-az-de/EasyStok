@@ -114,6 +114,9 @@ module.exports = function ({ test, sandbox, assert }) {
     });
     assert.ok(log.indexOf('fs:DATA') >= 0, 'tentou a memoria interna');
     assert.ok(log.indexOf('envio') > log.indexOf('fs:DATA'), 'envio depois do backup interno');
+    assert.strictEqual(relatos.length, 1, 'servidor sabe que o backup ficou so no interno');
+    assert.ok(/^so-interno/.test(relatos[0].errors[0].message));
+    assert.ok(/MediaStore negou/.test(relatos[0].errors[0].message));
   });
 
   test('#2877: todos os caminhos falham, nada sai e o motivo vai ao servidor', async () => {
@@ -132,6 +135,7 @@ module.exports = function ({ test, sandbox, assert }) {
     assert.strictEqual(erro.context, 'backup-pre-sync');
     assert.ok(/MediaStore negou/.test(erro.message), 'motivo do publico no relato');
     assert.ok(/EACCES DATA/.test(erro.message), 'motivo da memoria interna no relato');
+    assert.ok(!('operatorName' in relatos[0]) && !('operator' in erro), 'sem nome do operador');
   });
 
   test('#2877: relato do backup falho respeita a janela de 5 minutos', async () => {

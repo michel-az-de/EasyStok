@@ -946,25 +946,26 @@
     } catch (_) {}
   }
 
-  // #2877: sem relato o servidor nao via por que a fila parou. Best effort,
-  // na mesma janela de 5 min do toast, sem bloquear o flush.
-  function _relatarBackupFalhou(backup, excecao, tamanhoFila) {
+  // #2877: sem relato o servidor nao via por que a fila parou, nem que o
+  // backup ficou so na memoria interna (some se o app for desinstalado).
+  // Best effort, janela de 5 min, sem nome do operador (endpoint anonimo).
+  function _relatarBackup(situacao, backup, excecao, tamanhoFila) {
     const agora = Date.now();
     if (agora - _ultimoRelatoBackupFalhou < 300000) return;
     _ultimoRelatoBackupFalhou = agora;
     try {
-      const partes = [(backup && backup.reason) || 'excecao', 'fila=' + tamanhoFila];
-      if (backup && backup.falhas && backup.falhas.length) partes.push(backup.falhas.join(' | '));
+      const partes = [situacao, 'fila=' + tamanhoFila];
+      if (backup && backup.reason) partes.push(backup.reason);
+      const falhas = (backup && (backup.falhas || backup.avisos)) || [];
+      if (falhas.length) partes.push(falhas.join(' | '));
       if (excecao) partes.push('excecao: ' + _mensagemDeErro(excecao));
-      const operador = (window.cdbApp && window.cdbApp.getOperator) ? window.cdbApp.getOperator() : null;
       fetch(API_BASE_URL + API_PREFIX + '/diagnostics/errors', {
         method: 'POST',
         headers: baseHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           deviceId: deviceId,
-          operatorName: operador,
           bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null,
-          errors: [{ timestamp: agora, context: 'backup-pre-sync', message: partes.join('; ').slice(0, 1000), screen: null, operator: operador }]
+          errors: [{ timestamp: agora, context: 'backup-pre-sync', message: partes.join('; ').slice(0, 500), screen: null }]
         })
       }).catch(() => {});
     } catch (_) {}
@@ -999,9 +1000,10 @@
         try { backup = await localBackupToFile('pre-sync'); } catch (e) { backup = null; excecao = e; }
         if (!backup || !backup.ok) {
           _avisarBackupFalhou();
-          _relatarBackupFalhou(backup, excecao, queue.length);
+          _relatarBackup('falhou', backup, excecao, queue.length);
           return 'backup-failed';
         }
+        if (backup.details && backup.details.internalUri) _relatarBackup('so-interno', backup, null, queue.length);
         _chaveBackupPreSync = chaveFila;
       }
     }
