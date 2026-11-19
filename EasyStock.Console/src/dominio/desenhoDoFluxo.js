@@ -58,7 +58,7 @@ const dadosDeVerificacoes = (portoes, aberto) => ({
   descricao: `Verificações: ${portoes.length} etapas fixas, sempre na mesma ordem`,
 })
 const dadosDoAssistente = (fluxo) => ({
-  tipo: 'assistente', icone: 'sparkles', titulo: 'Assistente IA', subtitulo: fluxo?.ativo ? 'Ligado' : 'Desligado',
+  tipo: 'assistente', icone: 'agente', titulo: 'Assistente IA', subtitulo: fluxo?.ativo ? 'Ligado' : 'Desligado',
   descricao: `Assistente IA: ${fluxo?.ativo ? 'ligado' : 'desligado'} na loja`,
 })
 const dadosDasInstrucoes = (fluxo) => ({

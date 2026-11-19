@@ -183,7 +183,7 @@ function Detalhe({ id, fluxo, podeEditar, painel, roteiro, setRoteiro, roteiroMu
     </Bloco>
   }
   if (id === 'assistente') {
-    return <Bloco titulo="Assistente IA" icone="sparkles">
+    return <Bloco titulo="Assistente IA" icone="agente">
       <p>Com todas as verificações passando, o modelo lê as instruções, o roteiro e o histórico, usa as ferramentas ligadas e responde.</p>
       <p>Chave da loja: <strong>{fluxo.ativo ? 'ligado' : 'desligado'}</strong>. Modelo de IA: <strong>{fluxo.modeloDisponivel ? 'disponível' : 'indisponível no servidor'}</strong>.</p>
     </Bloco>
