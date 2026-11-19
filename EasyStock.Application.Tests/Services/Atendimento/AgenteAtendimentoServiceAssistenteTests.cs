@@ -48,7 +48,7 @@ public partial class AgenteAtendimentoServiceTests
         await _cloudClient.Received(1).EnviarTextoAsync(WaId,
             "Vou encaminhar sua mensagem para Michele conferir e responder por aqui.",
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        _requisicoes[0].System.Should().Contain("a dona se chama Michele");
+        _requisicoes[0].TextoCompleto().Should().Contain("a dona se chama Michele");
     }
 
     [Fact]

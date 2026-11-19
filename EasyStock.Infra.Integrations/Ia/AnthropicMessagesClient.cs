@@ -69,7 +69,11 @@ public sealed class AnthropicMessagesClient(
             throw new HttpRequestException($"Anthropic respondeu {(int)response.StatusCode}.", null, response.StatusCode);
         }
 
-        return LerResposta(corpo, requisicao.Modelo);
+        var resposta = LerResposta(corpo, requisicao.Modelo);
+        // #2862: prova do cache em produção. Só números e o modelo; nunca texto de mensagem.
+        logger.LogInformation("Anthropic uso: modelo={Modelo} entrada={Entrada} saida={Saida} cache_escrito={CacheEscrito} cache_lido={CacheLido}",
+            resposta.Modelo, resposta.TokensEntrada, resposta.TokensSaida, resposta.TokensCacheEscrito, resposta.TokensCacheLido);
+        return resposta;
     }
 
     internal byte[] MontarCorpo(RequisicaoLlm requisicao)
@@ -80,7 +84,27 @@ public sealed class AnthropicMessagesClient(
             w.WriteStartObject();
             w.WriteString("model", ModeloDe(requisicao.Modelo));
             w.WriteNumber("max_tokens", _opcoes.MaxTokensAgente);
-            w.WriteString("system", requisicao.System);
+            if (string.IsNullOrEmpty(requisicao.SystemVolatil))
+            {
+                w.WriteString("system", requisicao.System);
+            }
+            else
+            {
+                // #2862: o breakpoint no bloco estável cobre ferramentas e system (vêm antes no prefixo). O bloco volátil fica depois.
+                w.WriteStartArray("system");
+                w.WriteStartObject();
+                w.WriteString("type", "text");
+                w.WriteString("text", requisicao.System);
+                w.WriteStartObject("cache_control");
+                w.WriteString("type", "ephemeral");
+                w.WriteEndObject();
+                w.WriteEndObject();
+                w.WriteStartObject();
+                w.WriteString("type", "text");
+                w.WriteString("text", requisicao.SystemVolatil);
+                w.WriteEndObject();
+                w.WriteEndArray();
+            }
 
             w.WriteStartArray("messages");
             foreach (var mensagem in requisicao.Mensagens)
@@ -179,12 +203,13 @@ public sealed class AnthropicMessagesClient(
         }
 
         var stopReason = raiz.TryGetProperty("stop_reason", out var sr) && sr.ValueKind == JsonValueKind.String ? sr.GetString() : null;
-        int entrada = 0, saida = 0, cacheLido = 0;
+        int entrada = 0, saida = 0, cacheLido = 0, cacheEscrito = 0;
         if (raiz.TryGetProperty("usage", out var usage))
         {
             if (usage.TryGetProperty("input_tokens", out var i) && i.ValueKind == JsonValueKind.Number) entrada = i.GetInt32();
             if (usage.TryGetProperty("output_tokens", out var o) && o.ValueKind == JsonValueKind.Number) saida = o.GetInt32();
             if (usage.TryGetProperty("cache_read_input_tokens", out var c) && c.ValueKind == JsonValueKind.Number) cacheLido = c.GetInt32();
+            if (usage.TryGetProperty("cache_creation_input_tokens", out var ce) && ce.ValueKind == JsonValueKind.Number) cacheEscrito = ce.GetInt32();
         }
 
         // S67 (#2534): o modelo que respondeu (versão datada); sem ele, o configurado.
@@ -192,6 +217,6 @@ public sealed class AnthropicMessagesClient(
             ? m.GetString()
             : ModeloDe(modeloPedido);
 
-        return new RespostaLlm(stopReason, blocos, entrada, saida, cacheLido, modelo);
+        return new RespostaLlm(stopReason, blocos, entrada, saida, cacheLido, modelo, cacheEscrito);
     }
 }
