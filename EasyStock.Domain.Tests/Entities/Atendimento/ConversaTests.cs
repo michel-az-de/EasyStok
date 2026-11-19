@@ -223,7 +223,7 @@ public class ConversaTests
     }
 
     [Fact]
-    public void TemAgente_SoNoWhatsApp()
+    public void TemAgente_ConversaDoWhatsApp()
     {
         Nova().TemAgente.Should().BeTrue();
     }

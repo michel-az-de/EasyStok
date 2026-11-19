@@ -117,4 +117,23 @@ public class ChatSiteAssistenteTests
 
         MensagemChatSiteResult.De(mensagem).Autor.Should().Be("visitante");
     }
+
+    [Fact]
+    public async Task Stream_EntregaAoWidgetAsSaidasGravadasPeloAgente()
+    {
+        var token = SessaoValida();
+        var conversaId = Guid.NewGuid();
+        var sessao = await _sessoes.ObterPorTokenHashAsync(_loja.EmpresaId, AcessoChatSite.HashDoToken(token), CancellationToken.None);
+        sessao!.VincularConversa(conversaId);
+        var resposta = Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Agente, DateTime.UtcNow, TipoConteudoMensagem.Texto,
+            "Oi! Posso ajudar?", CanalChatSite.PrefixoIdExterno + Guid.NewGuid().ToString("N"));
+        var nota = Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Sistema, DateTime.UtcNow, TipoConteudoMensagem.Texto, "nota interna");
+        _conversas.ListarMensagensDepoisAsync(_loja.EmpresaId, conversaId, Arg.Any<DateTime?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([resposta, nota]);
+
+        var entregues = await new ListarMensagensChatSiteUseCase(_acesso, _sessoes, _conversas)
+            .ListarParaStreamAsync(_loja.EmpresaId, AcessoChatSite.HashDoToken(token), null);
+
+        entregues.Should().ContainSingle().Which.Should().Match<MensagemChatSiteResult>(m => m.Autor == "assistente" && !m.DoVisitante);
+    }
 }

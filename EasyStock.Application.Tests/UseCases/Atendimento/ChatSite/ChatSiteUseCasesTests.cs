@@ -408,7 +408,8 @@ public class ChatSiteUseCasesTests
             Arg.Is<ConversaAtualizadaOperacao>(e => e.ConversaId == conversa.Id), Arg.Any<CancellationToken>());
         Received.InOrder(() =>
         {
-            _uow.CommitAsync();
+            _uow.CommitAsync(); // a conversa (ObterOuCriarAsync)
+            _uow.CommitAsync(); // contato, cliente e aceite
             _operacao.PublicarAsync(EventosOperacao.ConversaAtualizada, _loja.EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
         });
     }
