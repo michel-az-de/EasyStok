@@ -7,7 +7,7 @@ registerHooks({
   resolve(s, c, next) { if (s.startsWith('.') && !/\.[a-z]+$/i.test(s)) { try { return next(s + '.js', c) } catch { /* resolução original */ } } return next(s, c) },
   load(url, c, next) { return url.endsWith('/infra/fonteDados.js') ? { format: 'module', shortCircuit: true, source: "export const FONTE_API = true; export const API_BASE = ''" } : next(url, c) },
 })
-const { criarCanalDeAbertura } = await import('../src/aplicacao/aberturaDeConversa.js')
+const { criarCanalDeAbertura, destinoDoNovoPedido, VALIDADE_DO_NOVO_PEDIDO_MS } = await import('../src/aplicacao/aberturaDeConversa.js')
 const { criarAcoesComandaApi } = await import('../src/aplicacao/api/comanda.js')
 const { situacaoDoEnvio } = await import('../src/dominio/resumoPedido.js')
 
@@ -23,6 +23,17 @@ const { situacaoDoEnvio } = await import('../src/dominio/resumoPedido.js')
   canal.anunciar('c3', { novoPedido: true, id: 'outro' })
   assert.deepEqual(tardio.at(-1), ['c3', true], 'a intenção não troca a conversa anunciada')
   sair()
+}
+
+// 1b. Revisão da #2874: a comanda abre só se a conversa pedida for selecionada logo. Depois do prazo a intenção é
+// descartada, para não abrir o cardápio sozinho quando a operadora entrar nessa conversa mais tarde.
+{
+  const pendente = { id: 'c1', ate: 1000 + VALIDADE_DO_NOVO_PEDIDO_MS }
+  assert.equal(destinoDoNovoPedido(null, 'c1', 1000), 'nada')
+  assert.equal(destinoDoNovoPedido(pendente, 'c1', 1000), 'abrir')
+  assert.equal(destinoDoNovoPedido(pendente, 'outra', 1000), 'esperar', 'a seleção ainda pode chegar')
+  assert.equal(destinoDoNovoPedido(pendente, 'c1', pendente.ate + 1), 'descartar', 'vencida não abre mais')
+  assert.equal(destinoDoNovoPedido(pendente, 'outra', pendente.ate + 1), 'descartar')
 }
 
 // 2. Resumo pela fila (fora da janela) e resumo que não saiu (canal fora): avisos e marca diferentes.

@@ -70,12 +70,36 @@ public static partial class ResumoPedidoConversa
     public static string EmUmaLinha(string texto)
     {
         ArgumentNullException.ThrowIfNull(texto);
-        var paragrafos = texto.Replace("\r\n", "\n", StringComparison.Ordinal)
+        var linhas = texto.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var linha = Juntar(linhas);
+        // Revisão da #2874: longo demais, saem os últimos itens ("- "), não o fim, onde ficam total, link e agradecimento.
+        var itens = Enumerable.Range(0, linhas.Length).Where(i => linhas[i].TrimStart().StartsWith("- ", StringComparison.Ordinal)).ToArray();
+        for (var omitidos = 1; linha.Length > TamanhoMaximoEmUmaLinha && omitidos < itens.Length; omitidos++)
+            linha = Juntar(SemOsUltimosItens(linhas, itens[^omitidos..]));
+        if (linha.Length <= TamanhoMaximoEmUmaLinha) return linha;
+        var fim = TamanhoMaximoEmUmaLinha - 1;
+        if (char.IsHighSurrogate(linha[fim - 1])) fim--;
+        return linha[..fim].TrimEnd() + "…";
+    }
+
+    private static string Juntar(IEnumerable<string> linhas)
+    {
+        var paragrafos = string.Join('\n', linhas)
             .Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(ParagrafoEmUmaLinha)
             .Where(p => p.Length > 0);
-        var linha = EspacosSeguidos().Replace(string.Join(' ', paragrafos), " ").Trim();
-        return linha.Length <= TamanhoMaximoEmUmaLinha ? linha : linha[..(TamanhoMaximoEmUmaLinha - 1)].TrimEnd() + "…";
+        return EspacosSeguidos().Replace(string.Join(' ', paragrafos), " ").Trim();
+    }
+
+    private static IEnumerable<string> SemOsUltimosItens(string[] linhas, int[] omitidos)
+    {
+        for (var i = 0; i < linhas.Length; i++)
+        {
+            if (i == omitidos[0])
+                yield return string.Create(CultureInfo.InvariantCulture, $"- e mais {omitidos.Length} {(omitidos.Length == 1 ? "item" : "itens")}");
+            else if (!omitidos.Contains(i))
+                yield return linhas[i];
+        }
     }
 
     private static string ParagrafoEmUmaLinha(string paragrafo)

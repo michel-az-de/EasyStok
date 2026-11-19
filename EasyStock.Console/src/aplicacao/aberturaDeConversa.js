@@ -35,6 +35,15 @@ export function criarCanalDeAbertura(alvo) {
   }
 }
 
+// #2871 (revisão da #2874): o "Novo pedido" abre a comanda quando a conversa pedida chega à seleção. Se ela não chegar
+// logo, a intenção vence, para o cardápio não abrir sozinho quando a operadora entrar nessa conversa mais tarde.
+export const VALIDADE_DO_NOVO_PEDIDO_MS = 10000
+export function destinoDoNovoPedido(pendente, selecionadaId, agora = Date.now()) {
+  if (!pendente) return 'nada'
+  if (agora > pendente.ate) return 'descartar'
+  return selecionadaId === pendente.id ? 'abrir' : 'esperar'
+}
+
 const canal = criarCanalDeAbertura(globalThis.window)
 
 export const anunciarAberturaDeConversa = (id, intencao) => canal.anunciar(id, intencao)

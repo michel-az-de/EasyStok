@@ -84,13 +84,30 @@ public class ResumoPedidoConversaTests
     }
 
     [Fact]
-    public void EmUmaLinha_SemEspacosSeguidosECortadoNoLimiteDoModelo()
+    public void EmUmaLinha_LongoDemaisOmiteOsUltimosItensEMantemTotalLinkEAgradecimento()
     {
-        var longo = "Resumo:\n" + string.Join("\n", Enumerable.Range(1, 80).Select(i => $"- 1x Item     {i}: R$ 1,00"));
+        // Revisão da #2874: cortar o fim levava o link de pagamento e o agradecimento; saem os últimos itens.
+        var longo = "Resumo do seu pedido:\n" + string.Join("\n", Enumerable.Range(1, 80).Select(i => $"- 1x Item     {i}: R$ 1,00"))
+            + "\nTotal: R$ 80,00\nPagamento: link online (Pix ou cartão)"
+            + "\n\nPague por este link, válido por 30 minutos: https://mp.test/pref-1\n\nObrigado pelo pedido!";
 
         var linha = ResumoPedidoConversa.EmUmaLinha(longo);
 
-        linha.Should().NotContain("\n").And.NotContain("  ").And.EndWith("…");
-        linha.Length.Should().BeInRange(ResumoPedidoConversa.TamanhoMaximoEmUmaLinha - 5, ResumoPedidoConversa.TamanhoMaximoEmUmaLinha);
+        linha.Should().NotContain("\n").And.NotContain("  ").And.StartWith("Resumo do seu pedido: 1x Item 1: R$ 1,00; ")
+            .And.Contain("; e mais ").And.Contain(" itens; Total: R$ 80,00; Pagamento: link online (Pix ou cartão).")
+            .And.EndWith("https://mp.test/pref-1 Obrigado pelo pedido!");
+        linha.Length.Should().BeLessThanOrEqualTo(ResumoPedidoConversa.TamanhoMaximoEmUmaLinha);
+    }
+
+    [Fact]
+    public void EmUmaLinha_SemItensParaOmitirCortaNoLimiteSemPartirEmoji()
+    {
+        var longo = "Ob: " + string.Concat(Enumerable.Repeat("\U0001F600", 600));
+
+        var linha = ResumoPedidoConversa.EmUmaLinha(longo);
+
+        linha.Should().EndWith("…");
+        linha.Length.Should().BeLessThanOrEqualTo(ResumoPedidoConversa.TamanhoMaximoEmUmaLinha);
+        char.IsHighSurrogate(linha[^2]).Should().BeFalse("o corte não parte um emoji ao meio");
     }
 }

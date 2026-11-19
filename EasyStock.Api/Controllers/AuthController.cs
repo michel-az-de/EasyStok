@@ -446,6 +446,9 @@ public class AuthController(
                 gerenciarOcorrencias = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 reabrirConversa = usuario.TemPermissao(Permissao.AtenderConversas)
                     && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                // #2871: o "Novo pedido" abre conversa pela rota `do-cliente`, mesma regra (policy Atendendo).
+                atenderConversas = usuario.TemPermissao(Permissao.AtenderConversas)
+                    && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 // #1992: respostas prontas e mensagens programadas, mesma regra das rotas (policy Gerente e AtenderConversas).
                 editarRespostas = gerente && usuario.TemPermissao(Permissao.AtenderConversas)
                     && modulos.Any(m => m.id == "atendimento" && m.liberado),

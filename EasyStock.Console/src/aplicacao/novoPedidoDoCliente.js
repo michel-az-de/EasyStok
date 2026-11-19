@@ -7,11 +7,12 @@ import { hashDoModulo } from '../dominio/modulos'
 // #2871: "Novo pedido" na lista e na Ficha de Clientes, em Pedidos e na busca do Balcão. O cliente pediu pelo WhatsApp
 // pessoal da dona; a equipe registra pelo Console. A API abre (ou reaproveita) a conversa do WhatsApp da loja com ele,
 // o Balcão a seleciona e o cardápio da comanda abre nela. O resumo do pedido é o primeiro contato com o cliente.
-// Só no modo API e para quem abre o Atendimento: sem a ação `abrirConversaDoCliente` (demonstração) o botão não aparece.
+// Só no modo API e para quem atende conversas: sem a ação `abrirConversaDoCliente` (demonstração) o botão não aparece, e
+// sem a permissão de atender (`acoes.atenderConversas`, a regra da rota `do-cliente`) a API responderia 403.
 export function useNovoPedidoDoCliente({ aoAbrir } = {}) {
   const { abrirConversaDoCliente, selecionar } = useAcoes()
-  const { permite } = useAcessoModulos()
-  const disponivel = Boolean(abrirConversaDoCliente) && permite('atendimento')
+  const { permite, acoes } = useAcessoModulos()
+  const disponivel = Boolean(abrirConversaDoCliente) && permite('atendimento') && acoes?.atenderConversas === true
   const [abrindo, marcarAbrindo] = useState(null)
   const [erro, falhar] = useState(null)
   const emVoo = useRef(false)

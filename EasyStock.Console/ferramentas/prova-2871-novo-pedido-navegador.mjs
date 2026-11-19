@@ -18,7 +18,7 @@ const conversaDe = (p) => ({
 
 const browser = await chromium.launch({ headless: true })
 const erros = []
-async function preparar({ hash = '#/', modulos = ['atendimento', 'cadastros'], largura = 1440, altura = 900 } = {}) {
+async function preparar({ hash = '#/', modulos = ['atendimento', 'cadastros'], atende = true, largura = 1440, altura = 900 } = {}) {
   const abertas = []
   const contexto = await browser.newContext({ viewport: { width: largura, height: altura }, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', reducedMotion: 'reduce' })
   await contexto.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'fixture-controlada', expiraEm: Date.now() + 3600000, empresa: { id: 'empresa', nome: 'Loja do novo pedido' }, usuario: { id: 'tatiana', nome: 'Atendente de teste' } })))
@@ -34,7 +34,7 @@ async function preparar({ hash = '#/', modulos = ['atendimento', 'cadastros'], l
       return ok(conversaDe(pessoa))
     }
     assert.ok(req.method() === 'GET' || path.endsWith('/marcar-lida'), `Escrita inesperada: ${req.method()} ${path}`)
-    if (path === '/api/auth/me/modulos') return ok({ modulos: modulos.map((id) => ({ id, liberado: true })), acoes: { verPedidos: true } })
+    if (path === '/api/auth/me/modulos') return ok({ modulos: modulos.map((id) => ({ id, liberado: true })), acoes: { verPedidos: true, atenderConversas: atende } })
     if (path === '/api/clientes') return ok(pessoas, { meta: { total: pessoas.length, totalCount: pessoas.length } })
     if (path === '/api/clientes/buscar') {
       const termo = (url.searchParams.get('termo') ?? '').toLowerCase()
@@ -147,6 +147,14 @@ try {
     assert.equal(await page.getByRole('button', { name: /^Novo pedido/ }).count(), 0)
     await page.evaluate(() => { window.location.hash = '#/m/cadastros/pedidos' })
     await page.getByRole('heading', { name: 'Pedidos', exact: true, level: 2 }).waitFor()
+    assert.equal(await page.getByRole('button', { name: /^Novo pedido/ }).count(), 0)
+    await contexto.close()
+  }
+
+  // 7. Revisão da #2874: com o Atendimento mas sem a permissão de atender, a rota responderia 403; o botão não aparece.
+  {
+    const { contexto, page } = await preparar({ hash: '#/m/cadastros/clientes', atende: false })
+    await page.getByRole('row').filter({ hasText: 'Ana Paula' }).waitFor()
     assert.equal(await page.getByRole('button', { name: /^Novo pedido/ }).count(), 0)
     await contexto.close()
   }
