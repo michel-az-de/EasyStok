@@ -1,8 +1,10 @@
 package com.casadababa.app;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.text.InputType;
+import android.view.ContextThemeWrapper;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.webkit.JsPromptResult;
@@ -70,7 +72,8 @@ public class PilotChromeClient extends BridgeWebChromeClient {
     @Override
     public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, final JsPromptResult result) {
         if (bridge.getActivity().isFinishing()) return true;
-        final EditText input = new EditText(view.getContext());
+        final Context themed = new ContextThemeWrapper(view.getContext(), R.style.PilotDialog);
+        final EditText input = new EditText(themed);
         input.setSingleLine(true);
         input.setImeOptions(EditorInfo.IME_ACTION_DONE);
         if (defaultValue != null && defaultValue.matches("\\d{1,4}")) input.setInputType(InputType.TYPE_CLASS_NUMBER);

@@ -55,6 +55,10 @@ test('prompt: valor padrão numérico curto abre teclado numérico com foco e tu
   assert.match(source, /EditorInfo\.IME_ACTION_DONE/);
   assert.match(source, /BUTTON_POSITIVE\)\.performClick\(\)/, 'Concluir do teclado confirma pelo mesmo caminho do OK');
   assert.match(source, /R\.dimen\.dialog_input_inset/, 'campo com margem da caixa');
+  // No emulador o campo criado com o contexto da Activity ignorava o PilotDialog e ficava teal.
+  assert.match(source, /new ContextThemeWrapper\(view\.getContext\(\), R\.style\.PilotDialog\)/);
+  assert.match(source, /new EditText\(themed\)/);
+  assert.doesNotMatch(source, /new EditText\(view\.getContext\(\)\)/);
 });
 
 test('diálogos usam o tema da marca no claro e no escuro', () => {
@@ -64,5 +68,11 @@ test('diálogos usam o tema da marca no claro e no escuro', () => {
   const night = read('res', 'values-night', 'styles.xml');
   assert.match(light, /<style name="PilotDialog" parent="android:Theme\.DeviceDefault\.Light\.Dialog\.Alert">[\s\S]*?<item name="android:colorAccent">#496B56<\/item>/);
   assert.match(night, /<style name="PilotDialog" parent="android:Theme\.DeviceDefault\.Dialog\.Alert">[\s\S]*?<item name="android:colorAccent">#A5C3AD<\/item>/);
+  // No emulador o sublinhado e a seleção do campo seguiam o teal do sistema: só colorAccent não basta.
+  const pilotStyle = xml => xml.slice(xml.indexOf('<style name="PilotDialog"'), xml.indexOf('</style>', xml.indexOf('<style name="PilotDialog"')));
+  assert.match(pilotStyle(light), /<item name="android:colorControlActivated">#496B56<\/item>/);
+  assert.match(pilotStyle(light), /<item name="android:textColorHighlight">#[0-9A-F]{2}496B56<\/item>/);
+  assert.match(pilotStyle(night), /<item name="android:colorControlActivated">#A5C3AD<\/item>/);
+  assert.match(pilotStyle(night), /<item name="android:textColorHighlight">#[0-9A-F]{2}A5C3AD<\/item>/);
   assert.match(read('res', 'values', 'dimens.xml'), /<dimen name="dialog_input_inset">24dp<\/dimen>/);
 });
