@@ -43,21 +43,24 @@ public sealed class ConversaWhatsAppDoCliente(IConversaRepository conversas, IUn
     /// <summary>
     /// A conversa aberta do contato, travada, ou uma nova, já gravada. Duas atendentes (ou o cliente escrevendo) no mesmo instante: o
     /// índice único de conversa aberta recusa a segunda gravação, e a segunda volta uma vez e segue na conversa que ficou.
+    /// <paramref name="assumidaAoCriarPor"/>: quem atende pessoalmente; a conversa CRIADA nasce Assumida por ele (#2902), a reaproveitada não muda.
     /// </summary>
-    public async Task<Conversa> AbrirOuReaproveitarAsync(Guid empresaId, ClienteEntity cliente, string contato, CancellationToken ct)
+    public async Task<Conversa> AbrirOuReaproveitarAsync(
+        Guid empresaId, ClienteEntity cliente, string contato, CancellationToken ct, Guid? assumidaAoCriarPor = null)
     {
         try
         {
-            return await AbrirOuReaproveitarUmaVezAsync(empresaId, cliente, contato, ct);
+            return await AbrirOuReaproveitarUmaVezAsync(empresaId, cliente, contato, assumidaAoCriarPor, ct);
         }
         catch (Exception ex) when (unitOfWork.EhViolacaoDeUnicidade(ex))
         {
             unitOfWork.DescartarAlteracoesPendentes();
-            return await AbrirOuReaproveitarUmaVezAsync(empresaId, cliente, contato, ct);
+            return await AbrirOuReaproveitarUmaVezAsync(empresaId, cliente, contato, assumidaAoCriarPor, ct);
         }
     }
 
-    private Task<Conversa> AbrirOuReaproveitarUmaVezAsync(Guid empresaId, ClienteEntity cliente, string contato, CancellationToken ct) =>
+    private Task<Conversa> AbrirOuReaproveitarUmaVezAsync(
+        Guid empresaId, ClienteEntity cliente, string contato, Guid? assumidaAoCriarPor, CancellationToken ct) =>
         unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
         {
             var agora = relogio.GetUtcNow().UtcDateTime;
@@ -65,6 +68,8 @@ public sealed class ConversaWhatsAppDoCliente(IConversaRepository conversas, IUn
             if (conversa is null)
             {
                 conversa = Conversa.Abrir(empresaId, contato, agora, cliente.Nome, cliente.Id);
+                // #2902: só a conversa criada aqui nasce com a dona; a que já existia segue com quem a atendia.
+                if (assumidaAoCriarPor is { } usuario) conversa.Assumir(agora, usuario);
                 await conversas.AddAsync(conversa, token);
             }
             else if (conversa.ClienteId is null)

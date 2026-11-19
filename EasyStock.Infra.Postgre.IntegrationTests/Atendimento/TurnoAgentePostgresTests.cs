@@ -32,7 +32,35 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
         await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
         var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
 
-        soma.Should().Be(new SomaTurnosAgente(2, 300, 50, 50, 0.001m, 1));
+        soma.Should().Be(new SomaTurnosAgente(2, 300, 50, 50, 0.001m, 1, RespostasSemIa: 0, TurnosComTokens: 2));
+    }
+
+    [SkippableFact]
+    public async Task Soma_conta_como_resposta_sem_IA_so_o_desfecho_SemIa()
+    {
+        // S78 (#2896): um turno de cada desfecho e dois sem IA. Todos são turnos; só os dois entram como sem IA.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var outra = Guid.NewGuid(); var conversa = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        await Gravar(empresa,
+            Turno(empresa, conversa, em, 100, 20, 0, 0.001m, DesfechoTurnoAgente.Respondeu),
+            Turno(empresa, conversa, em, 100, 20, 0, 0.001m, DesfechoTurnoAgente.Escalou),
+            Turno(empresa, conversa, em, 0, 0, 0, null, DesfechoTurnoAgente.Cota),
+            Turno(empresa, conversa, em, 0, 0, 0, null, DesfechoTurnoAgente.Erro),
+            Turno(empresa, conversa, em, 100, 20, 0, 0.001m, DesfechoTurnoAgente.Interrompido),
+            Turno(empresa, conversa, em, 0, 0, 0, null, DesfechoTurnoAgente.SemIa),
+            Turno(empresa, conversa, em, 0, 0, 0, null, DesfechoTurnoAgente.SemIa),
+            // Fora da janela: não conta.
+            Turno(empresa, conversa, new DateTime(2026, 11, 1, 3, 30, 0, DateTimeKind.Utc), 0, 0, 0, null, DesfechoTurnoAgente.SemIa));
+        await Gravar(outra, Turno(outra, Guid.NewGuid(), em, 0, 0, 0, null, DesfechoTurnoAgente.SemIa));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        soma.Turnos.Should().Be(7);
+        soma.RespostasSemIa.Should().Be(2);
+        // Respondeu, Escalou e Interrompido gastaram token; Cota, Erro e os dois SemIa, não.
+        soma.TurnosComTokens.Should().Be(3);
     }
 
     [SkippableFact]

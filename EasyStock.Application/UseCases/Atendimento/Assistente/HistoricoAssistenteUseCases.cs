@@ -38,7 +38,9 @@ public sealed record UsoAssistenteResult(
     int TurnosSemPreco,
     long? CotaTokensMes = null,
     int? Percentual = null,
-    bool Alerta = false);
+    bool Alerta = false,
+    int RespostasSemIa = 0,
+    long? TokensPoupadosEstimados = null);
 
 /// <summary>
 /// S67 (#2534): consumo do mês só do Assistente, pelo registro dos turnos (não por <c>UsoIa</c>, que mistura o
@@ -60,7 +62,11 @@ public sealed class ObterUsoAssistenteUseCase(ITurnoAgenteRepository turnos, Tim
         var (de, ate) = HorarioBrasil.JanelaMesUtc(new DateOnly(ano, mes, 1));
         var soma = await turnos.SomarAsync(query.EmpresaId, de, ate, ct);
         var resultado = new UsoAssistenteResult(ano, mes, soma.Turnos, soma.TokensEntrada, soma.TokensSaida, soma.TokensCacheLido,
-            soma.TotalTokens, soma.Custo, soma.TurnosSemPreco);
+            soma.TotalTokens, soma.Custo, soma.TurnosSemPreco)
+        {
+            RespostasSemIa = soma.RespostasSemIa,
+            TokensPoupadosEstimados = soma.TokensPoupadosEstimados,
+        };
 
         // S69 (#2853): a mesma soma que a etapa da cota usa no turno; alerta a partir de 80%.
         var cota = configuracoes is null ? null : (await configuracoes.GetByEmpresaIdAsync(query.EmpresaId))?.CotaTokensMes;

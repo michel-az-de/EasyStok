@@ -26,11 +26,11 @@ public class ConfiguracaoAtendimento
     /// <summary>Com <c>{nome}</c> — cliente já conhecido, identificado pelo telefone (S05). Sem link (#2544).</summary>
     public string SaudacaoRetorno { get; set; } = SaudacaoRetornoPadrao;
 
-    public const string SaudacaoPrimeiroContatoPadrao = "Oi! Seja bem-vindo(a) à Casa da Baba 🍝";
-    public const string SaudacaoRetornoPadrao = "Oi, {nome}! Que bom te ver de novo por aqui.";
+    public const string SaudacaoPrimeiroContatoPadrao = "Oi! Aqui é a Casa da Baba.";
+    public const string SaudacaoRetornoPadrao = "Oi, {nome}! Que bom ter você de volta.";
 
     /// <summary>Frase de espera enviada junto da saudação, antes do agente responder (RN-01).</summary>
-    public string FraseEspera { get; set; } = "Só um instante que já te ajudo!";
+    public string FraseEspera { get; set; } = "Um instante, a Casa já responde.";
 
     public string MensagemForaArea { get; set; } = "Por enquanto a gente só entrega em algumas regiões.";
 

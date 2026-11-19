@@ -37,9 +37,9 @@ export const REGRAS_PADRAO = [
     // verdade, o mesmo que o botão "Enviar cardápio" do composer monta
     // (dominio/cardapioLink.js, linkDoCardapio). Antes só prometia em texto,
     // sem anexar nada (achado P0.1, banca10/simulacao).
-    texto: 'Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. '
-      + 'Segue nosso cardápio de hoje, é só escolher: {linkCardapio} '
-      + 'Me chama quando escolher que eu já anoto.',
+    texto: 'Oi! Aqui é a Casa da Baba, massa artesanal com entrega agendada. '
+      + 'O cardápio de hoje está aqui: {linkCardapio} '
+      + 'Escolha com calma e a Casa anota.',
   },
   // Fora do horário e Loja fechada (pedido do dono, 24/09/2026): dois
   // gatilhos próprios de novo (o corte #16 da rodada 5 tinha fundido "Fora
@@ -53,8 +53,8 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.FORA_DO_HORARIO,
     descricao: 'Cliente escreve com a loja aberta no controle, mas fora do horário configurado.',
     ativa: true,
-    texto: 'Oi! Hoje já fechamos por aqui, voltamos {abre}. '
-      + 'Se quiser já deixar o pedido anotado, me diz o que você quer que eu separo para o próximo horário.',
+    texto: 'Oi! A Casa fechou por hoje e volta {abre}. '
+      + 'Pode deixar seu pedido aqui, e a Casa confirma na abertura.',
   },
   {
     id: 'loja-fechada',
@@ -62,8 +62,8 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.LOJA_FECHADA,
     descricao: 'A dona fechou a loja na mão, no controle do topo, mesmo dentro do horário.',
     ativa: true,
-    texto: 'Oi! Fechamos a loja por aqui agora. '
-      + 'Pode deixar o pedido anotado que eu separo e te aviso quando a loja abrir de novo.',
+    texto: 'Oi! A Casa está fechada agora. '
+      + 'Pode deixar seu pedido aqui, e a Casa avisa quando abrir.',
   },
   // A regra "Link de pagamento" saiu daqui. Texto de regra é texto fixo, e o
   // Pix só existe depois da emissão: a regra prometia "segue o link" sem link
@@ -77,7 +77,7 @@ export const REGRAS_PADRAO = [
     ativa: true,
     // #2734 (T8): o mesmo texto que o EasyStok usa enquanto a dona não grava o dela
     // (RegraAutomatica.TextoPadraoPagamentoConfirmado). Copiar, não reescrever.
-    texto: 'Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!',
+    texto: 'Oi, {nome}! Pagamento recebido. Seu pedido está confirmado para {faixa}.',
   },
   {
     id: 'agradecimento',
@@ -85,7 +85,7 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.POS_ENTREGA,
     descricao: 'Depois que o pedido é marcado como entregue.',
     ativa: true,
-    texto: 'Obrigada pela preferência! Se puder, me conta o que achou. Boa massa.',
+    texto: 'A Casa agradece o pedido. Se puder, conte o que achou. Boa massa!',
   },
   {
     id: 'encerramento',
@@ -93,7 +93,7 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.ENCERRAMENTO,
     descricao: 'Oferecida na confirmação de Concluir conversa, só sai quando a dona marca "mandar mensagem".',
     ativa: true,
-    texto: 'Por hoje é só, {nome}! Qualquer coisa é só chamar de novo por aqui. Até a próxima!',
+    texto: 'Por hoje é só, {nome}. Precisando, é só chamar por aqui. Boa massa!',
   },
 ]
 
@@ -193,7 +193,7 @@ const MENSAGEM_DE_ENTRADA = {
 }
 
 // #1474: no pagamento e na entrega o EasyStok já avisa o cliente pelo status do pedido
-// ("Recebemos seu pagamento…", "pedido entregue"); a automática sai além desse aviso.
+// ("Pagamento recebido…", "pedido entregue"); a automática sai além desse aviso.
 const AVISO_DO_PEDIDO = {
   [GATILHOS.PAGAMENTO_CONFIRMADO]: 'o aviso de pagamento confirmado do pedido',
   [GATILHOS.POS_ENTREGA]: 'o aviso de pedido entregue',

@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.TestHelpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
@@ -110,6 +111,9 @@ public partial class AtendimentoConversasControllerTests
         var conversa = _repositorio.Conversas.Should().ContainSingle().Subject;
         ok.Value.Should().BeOfType<ApiResponse<ConversaResumoResult>>().Which.Data.Id.Should().Be(conversa.Id);
         conversa.ClienteId.Should().Be(cliente.Id);
+        // #2902: o Assistente não responde na conversa que a dona abriu para atender.
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.AssumidaPorUsuarioId.Should().Be(_currentUser.UsuarioId);
         _repositorio.Mensagens.Should().BeEmpty();
         (await _controller.AbrirDoCliente(new(semCelular.Id), useCase)).Should().BeOfType<BadRequestObjectResult>();
     }

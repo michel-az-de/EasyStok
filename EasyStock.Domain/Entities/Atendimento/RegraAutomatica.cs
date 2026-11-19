@@ -41,18 +41,18 @@ public class RegraAutomatica
     /// sempre preenche: <c>{nome}</c> pode faltar, e variável sem valor não sai.
     /// </summary>
     public const string TextoPadraoCobrancaVencendo =
-        "Oi! O link de pagamento do pedido {pedido} vence em poucos minutos. Se ainda quiser garantir, é só pagar por ele. "
-        + "Se precisar de outro link, me chama aqui.";
+        "Oi! O link de pagamento do pedido {pedido} vence em poucos minutos. Para garantir o pedido, é só pagar por ele. "
+        + "Se precisar de outro link, é só pedir por aqui.";
 
     /// <summary>
     /// Texto de "Pagamento confirmado" enquanto a dona não grava o dela, com o que o aviso S13 de pago diz (nome e
     /// entrega). Pedido sem horário agendado não tem <c>{faixa}</c>: a automática não sai e o aviso S13 avisa.
     /// </summary>
     public const string TextoPadraoPagamentoConfirmado =
-        "Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!";
+        "Oi, {nome}! Pagamento recebido. Seu pedido está confirmado para {faixa}.";
 
     /// <summary>#2885 (S75, D3): texto sugerido da saudação solta. A regra nasce desligada.</summary>
-    public const string TextoPadraoSaudacaoSolta = "Oi! Como posso te ajudar?";
+    public const string TextoPadraoSaudacaoSolta = "Oi! Como a Casa pode ajudar?";
 
     /// <summary>
     /// Regra que vale enquanto a empresa não gravou a do gatilho (não é persistida). Nascem ligadas "Pagamento

@@ -58,7 +58,7 @@ public static class RoteiroAtendimento
     public static IReadOnlyList<EtapaRoteiroAtendimento> Padrao { get; } =
     [
         new("Acolher",
-            "Cumprimente pelo primeiro nome quando o dossiê trouxer, apresente-se como o assistente da loja e pergunte como pode ajudar. " +
+            "Cumprimente pelo primeiro nome quando o dossiê trouxer, diga que é o atendimento da loja, pelo nome dela e sem citar nome de pessoa, e pergunte como ajudar. " +
             "Não mande link nem cardápio sem o cliente pedir."),
         new("Entender",
             "Descubra a ocasião, a data, quantas pessoas e se há restrição alimentar. Uma pergunta por mensagem e nada que já foi dito. " +

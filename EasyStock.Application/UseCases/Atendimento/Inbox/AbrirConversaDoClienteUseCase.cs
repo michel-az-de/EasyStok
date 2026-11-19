@@ -4,7 +4,7 @@ using EasyStock.Domain.Entities.Atendimento;
 
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
-public sealed record AbrirConversaDoClienteCommand(Guid EmpresaId, Guid ClienteId);
+public sealed record AbrirConversaDoClienteCommand(Guid EmpresaId, Guid UsuarioId, Guid ClienteId);
 
 /// <summary>
 /// #2871: "Novo pedido" na Ficha, em Pedidos e no Atendimento. O cliente pediu pelo WhatsApp pessoal da dona e a equipe
@@ -24,7 +24,8 @@ public sealed class AbrirConversaDoClienteUseCase(
 
         var cliente = await clientes.GetByIdAsync(command.EmpresaId, command.ClienteId);
         var contato = ConversaWhatsAppDoCliente.ContatoDoCliente(cliente, command.EmpresaId);
-        var conversa = await conversaDoCliente.AbrirOuReaproveitarAsync(command.EmpresaId, cliente!, contato, ct);
+        var conversa = await conversaDoCliente.AbrirOuReaproveitarAsync(
+            command.EmpresaId, cliente!, contato, ct, assumidaAoCriarPor: command.UsuarioId);
         // O SLA da loja chega na próxima leitura da inbox; a conversa sem fala do cliente não está atrasada.
         return ConversaResumoResult.De(ConversaInboxItem.De(conversa, ultimaMensagemTexto: null),
             relogio.GetUtcNow().UtcDateTime, ConfiguracaoAtendimento.SlaRespostaPadraoMinutos);
