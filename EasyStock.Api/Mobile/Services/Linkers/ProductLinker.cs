@@ -54,7 +54,7 @@ public sealed class ProductLinker(
             catch (Exception ex)
             {
                 errorSkip++;
-                DescartarPendencias();
+                db.DescartarMudancasPendentes();
                 // A categoria e o usuário de sistema criados neste produto foram descartados junto.
                 cachedCategoriaId = null;
                 cachedSysUserId = null;
@@ -176,24 +176,6 @@ public sealed class ProductLinker(
             created++;
             log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
                 pid, novoProd.Id, nomeLimpo);
-        }
-    }
-
-    /// <summary>
-    /// #2911: desfaz no contexto o que o produto que falhou deixou pendente (Produto novo, histórico, vínculo), para
-    /// a próxima gravação não tentar de novo o mesmo erro. O linker roda antes de clientes e pedidos, então o que
-    /// está pendente aqui é só deste produto.
-    /// </summary>
-    private void DescartarPendencias()
-    {
-        foreach (var entry in db.ChangeTracker.Entries().ToList())
-        {
-            if (entry.State == EntityState.Added) entry.State = EntityState.Detached;
-            else if (entry.State is EntityState.Modified or EntityState.Deleted)
-            {
-                entry.CurrentValues.SetValues(entry.OriginalValues);
-                entry.State = EntityState.Unchanged;
-            }
         }
     }
 

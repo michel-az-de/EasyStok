@@ -65,7 +65,7 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
         await ProdutoNoErpAsync(empresaId, "Lasanha Bolonhesa tradicional 800g", StatusProduto.Inativo);
         var (colide, bom, cliente, pedido) = (NovoId("p"), NovoId("p"), NovoId("c"), NovoId("o"));
 
-        // O envio de produção de 19/11: um nome de inativo no meio do lote derrubava o vínculo do envio inteiro.
+        // O envio de produção de 19/11: com um nome de inativo no meio do lote, o vínculo do envio inteiro caía.
         await PushAsync(aparelho,
             Produto(colide, "Lasanha Bolonhesa tradicional 800g"), Produto(bom, "Nhoque"),
             Cliente(cliente, "Andreza"), Pedido(pedido, cliente, bom));
@@ -82,13 +82,22 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         var (empresaId, aparelho) = await AparelhoAsync();
         var (cliente, pedido, cancelado) = (NovoId("c"), NovoId("o"), NovoId("o"));
-        await OrfaosAsync(empresaId, cliente, pedido, cancelado);
+        var (clienteDoOutro, pedidoDoOutro) = (NovoId("c"), NovoId("o"));
+        await OrfaosAsync(empresaId, aparelho.DeviceId, cliente, pedido, cancelado);
+        await OrfaosAsync(empresaId, "dev-outro", clienteDoOutro, pedidoDoOutro, NovoId("o"));
 
         await PushAsync(aparelho, Produto(NovoId("p"), "Talharim Fresco"));
 
         (await ErpDoClienteAsync(cliente)).Should().NotBeNull();
         (await ErpDoPedidoAsync(pedido)).Should().NotBeNull();
         (await ErpDoPedidoAsync(cancelado)).Should().BeNull("pedido cancelado que nunca foi ao ERP não vira pedido");
+        // O órfão de outro aparelho espera o envio dele: dois envios simultâneos promoveriam o mesmo pedido duas vezes.
+        (await ErpDoClienteAsync(clienteDoOutro)).Should().BeNull();
+        (await ErpDoPedidoAsync(pedidoDoOutro)).Should().BeNull();
+
+        // Reenvio: o pedido já promovido não vira um segundo Pedido no ERP.
+        await PushAsync(aparelho, Produto(NovoId("p"), "Talharim Fresco"));
+        (await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters().CountAsync(p => p.MobileOrderId == pedido))).Should().Be(1);
     }
 
     // ---------- preparo ----------
@@ -116,15 +125,15 @@ public class SyncAutoLinkNomeRepetidoE2ETests(MobileE2EFixture fixture)
     }
 
     /// <summary>Cliente e pedidos gravados pelo aparelho num envio cujo vínculo caiu, como na Casa da Baba.</summary>
-    private async Task OrfaosAsync(Guid empresaId, string cliente, string pedido, string cancelado)
+    private async Task OrfaosAsync(Guid empresaId, string deviceId, string cliente, string pedido, string cancelado)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
-        db.Set<Client>().Add(new Client { Id = cliente, Name = "Thatiane", Phone = "11988887777", EmpresaId = empresaId });
+        db.Set<Client>().Add(new Client { Id = cliente, Name = "Thatiane", Phone = "11988887777", EmpresaId = empresaId, LastDeviceId = deviceId });
         foreach (var (id, status) in new[] { (pedido, "preparando"), (cancelado, "cancelado") })
             db.Set<Order>().Add(new Order
             {
-                Id = id, ClientId = cliente, ClientSnapshotName = "Thatiane", Total = 30m, Status = status, EmpresaId = empresaId,
+                Id = id, ClientId = cliente, ClientSnapshotName = "Thatiane", Total = 30m, Status = status, EmpresaId = empresaId, LastDeviceId = deviceId,
                 Items = [new OrderItem { OrderId = id, ProductId = "p-x", Name = "Lasanha", Unit = "300g", Qty = 1, UnitPrice = 30m }]
             });
         await db.SaveChangesAsync();
