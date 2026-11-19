@@ -96,10 +96,10 @@ public class Conversa
         EstaAberta && UltimaMensagemEntradaEm is { } entrada && entrada >= UltimaMensagemEm;
 
     /// <summary>
-    /// O agente so responde no WhatsApp (envia pelo cliente da Cloud API). Nos demais canais quem
-    /// atende e sempre a dona (#1288).
+    /// O agente responde no WhatsApp (envia pelo cliente da Cloud API) e no chat do site (#2876: grava a saida
+    /// que o stream do widget le). Nos demais canais quem atende e sempre a dona (#1288).
     /// </summary>
-    public bool TemAgente => Canal == CanalConversa.WhatsApp;
+    public bool TemAgente => Canal is CanalConversa.WhatsApp or CanalConversa.ChatSite;
 
     // EF Core ctor sem parametros
     private Conversa() { }

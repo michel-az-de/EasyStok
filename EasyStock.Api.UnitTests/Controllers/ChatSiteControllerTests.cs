@@ -172,9 +172,31 @@ public class ChatSiteControllerTests
         result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
     }
 
+    private IUnitOfWork UowQueExecuta()
+    {
+        var criadas = new List<EasyStock.Domain.Entities.Atendimento.Conversa>();
+        _conversas.When(x => x.AddAsync(Arg.Any<EasyStock.Domain.Entities.Atendimento.Conversa>(), Arg.Any<CancellationToken>()))
+            .Do(ci => criadas.Add(ci.Arg<EasyStock.Domain.Entities.Atendimento.Conversa>()));
+        _conversas.ObterPorIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(ci => criadas.FirstOrDefault(c => c.Id == ci.ArgAt<Guid>(1)));
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Domain.Entities.Atendimento.Conversa>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Domain.Entities.Atendimento.Conversa>>>()(ci.Arg<CancellationToken>()));
+        return uow;
+    }
+
     private IdentificarVisitanteChatSiteUseCase Identificacao() => new(
         new AcessoChatSite(_lojas, _flags, Substitute.For<ITenantContextAccessor>(), _sessoes), _conversas, Substitute.For<IUnitOfWork>(),
-        Substitute.For<IOperacaoEventPublisher>());
+        Substitute.For<IOperacaoEventPublisher>(),
+        new EasyStock.Application.Services.Atendimento.ConversaChatSiteService(_conversas, UowQueExecuta(), _sessoes),
+        new EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase(
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.IClienteRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IClienteStorefrontRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase>.Instance),
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository>(),
+        Substitute.For<EasyStock.Application.Services.Atendimento.IEscaladorConversa>(),
+        Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>());
 
     [Fact]
     public async Task IdentificacaoValida200SemAceite400TokenInvalido403()

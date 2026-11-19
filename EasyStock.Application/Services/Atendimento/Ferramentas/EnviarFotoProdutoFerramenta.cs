@@ -48,12 +48,20 @@ public sealed class EnviarFotoProdutoFerramenta(
         if (item is null) return Recusa("item_nao_encontrado", "Use o id de um item que consultar_cardapio devolveu.");
 
         var url = MidiaPublica.Url(item.ImagemUrl, configuration);
-        if (url is null) return Recusa("sem_foto", "Este item não tem foto; descreva-o com o que consultar_cardapio devolveu.");
+        var noSite = SaidaDoChatSite.Eh(contexto.Conversa);
+        if (url is null && !noSite) return Recusa("sem_foto", "Este item não tem foto; descreva-o com o que consultar_cardapio devolveu.");
 
         var preco = FerramentaJson.FormatarReais(item.PrecoCentavos / 100m);
         var legenda = $"{item.Nome}, {preco}";
+        if (noSite)
+        {
+            // #2876: sem mídia no site, o item vai por texto (nome e preço).
+            await SaidaDoChatSite.GravarTextoAsync(contexto, conversaRepository, legenda, ct);
+            contexto.RegistrarFotoEnviada();
+            return FerramentaJson.Serializar(new { enviado = true, item = item.Nome, preco });
+        }
         var conversa = contexto.Conversa;
-        var envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, url, legenda, ct);
+        var envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, url!, legenda, ct);
         contexto.RegistrarFotoEnviada();
 
         if (conversa.EstaAberta) conversa.RegistrarSaida(contexto.Agora);

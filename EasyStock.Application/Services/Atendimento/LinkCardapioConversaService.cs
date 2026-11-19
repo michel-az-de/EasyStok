@@ -63,6 +63,19 @@ public sealed partial class LinkCardapioConversaService(ILinkCardapioConversaRep
         !string.IsNullOrEmpty(texto) && TokenDaComanda().Matches(texto)
             .Any(m => string.Equals(AcessoChatSite.HashDoToken(m.Groups["token"].Value), link.TokenHash, StringComparison.Ordinal));
 
+    /// <summary>
+    /// #2876: a URL da comanda deste link que já saiu em alguma das mensagens (o banco guarda só o hash, então só o texto
+    /// enviado carrega o token). Nula quando a comanda ainda não foi mandada.
+    /// </summary>
+    public static string? UrlEnviada(IEnumerable<string?> textos, LinkCardapioConversa link) =>
+        textos.Where(t => !string.IsNullOrEmpty(t))
+            .SelectMany(t => UrlDaComanda().Matches(t!).Cast<Match>())
+            .Where(m => string.Equals(AcessoChatSite.HashDoToken(m.Groups["token"].Value), link.TokenHash, StringComparison.Ordinal))
+            .Select(m => m.Groups["url"].Value).FirstOrDefault();
+
+    [GeneratedRegex(@"(?<url>https://[^\s/]+/comanda\.html\?c=(?<token>[A-Za-z0-9_-]{20,512}))")]
+    private static partial Regex UrlDaComanda();
+
     [GeneratedRegex(@"comanda\.html\?c=(?<token>[A-Za-z0-9_-]+)")]
     private static partial Regex TokenDaComanda();
 

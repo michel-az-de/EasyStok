@@ -1,9 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -19,11 +23,18 @@ public sealed record SessaoChatSiteAberta(Guid SessaoId, string Token, DateTime 
 /// <c>GET mensagens/{id}/midia</c> com o mesmo <c>X-Chat-Token</c>; foto pode vir sem texto.
 /// </summary>
 public sealed record MensagemChatSiteResult(
-    Guid Id, bool DoVisitante, string? Texto, DateTime EnviadaEm, string Tipo = "texto", bool TemMidia = false)
+    Guid Id, bool DoVisitante, string? Texto, DateTime EnviadaEm, string Tipo = "texto", bool TemMidia = false,
+    string Autor = "equipe")
 {
-    internal static MensagemChatSiteResult De(Mensagem m) =>
+    /// <summary>
+    /// #2876: <c>Autor</c> é <c>visitante</c>, <c>assistente</c> (resposta do agente) ou <c>equipe</c> (console ou aviso do sistema).
+    /// </summary>
+    public static MensagemChatSiteResult De(Mensagem m) =>
         new(m.Id, m.Direcao == DirecaoMensagem.Entrada, m.Texto, m.EnviadaEm,
-            m.TipoConteudo.ToString().ToLowerInvariant(), m.MidiaChave is not null);
+            m.TipoConteudo.ToString().ToLowerInvariant(), m.MidiaChave is not null, AutorDe(m));
+
+    private static string AutorDe(Mensagem m) => m.Direcao == DirecaoMensagem.Entrada ? "visitante"
+        : m.Autor == AutorMensagem.Agente ? "assistente" : "equipe";
 }
 
 /// <summary>Loja inexistente, inativa ou sem o chat ligado: 404, sem dizer qual dos três.</summary>
@@ -116,7 +127,8 @@ public sealed class EnviarMensagemVisitanteUseCase(
     IOperacaoEventPublisher eventPublisher,
     IUnitOfWork unitOfWork,
     ILogger<EnviarMensagemVisitanteUseCase> logger,
-    EasyStock.Application.Services.Atendimento.ConversaChatSiteService conversaChat)
+    EasyStock.Application.Services.Atendimento.ConversaChatSiteService conversaChat,
+    IQueueService? fila = null)
 {
     public const int TextoTamanhoMaximo = 1000;
     public const string PrefixoConfirmacaoRecebimento = "chatsite:recepcao:";
@@ -140,6 +152,7 @@ public sealed class EnviarMensagemVisitanteUseCase(
         sessao.RegistrarUso(agora);
 
         // A trava de contato do serviço dura até entrada e confirmação estarem persistidas.
+        var assistenteAtende = false;
         var mensagem = await unitOfWork.ExecuteInTransactionSemRetryAsync(async tokenCt =>
         {
             Conversa conversa;
@@ -164,15 +177,23 @@ public sealed class EnviarMensagemVisitanteUseCase(
             var entrada = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
             conversa.RegistrarEntrada(agora);
             await conversaRepository.AddMensagemAsync(entrada, tokenCt);
+            // #2876: com o Assistente atendendo ESTA conversa, ele responde no turno e a confirmação automática não entra.
+            // Conversa em conferência, escalada ou assumida pela equipe não tem turno: sem a confirmação o visitante ficaria no silêncio.
+            assistenteAtende = await conversaChat.AssistenteAtendeAsync(sessao.EmpresaId)
+                && !PortoesDoAssistente.DaConversa(conversa, agora).Any(etapa => etapa.Barra);
             var confirmacaoId = PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N");
             // #1991-4: 1 µs depois da entrada (a precisão do timestamp no banco): com o mesmo instante a ordem do chat variava.
-            if (await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
+            if (!assistenteAtende && await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
                 await conversaRepository.AddMensagemAsync(Mensagem.Saida(sessao.EmpresaId, conversa.Id,
                     AutorMensagem.Sistema, agora.AddTicks(TimeSpan.TicksPerMicrosecond), TipoConteudoMensagem.Texto,
                     "Recebemos sua mensagem. A equipe da loja responde por aqui.", confirmacaoId), tokenCt);
             await unitOfWork.CommitAsync();
             return entrada;
         }, ct);
+
+        // #2876: o turno roda depois do commit, para o agente já enxergar a mensagem do visitante.
+        if (assistenteAtende && fila is not null)
+            await fila.EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, new ProcessarTurnoAgenteJob(sessao.EmpresaId, mensagem.ConversaId));
 
         try
         {
@@ -199,13 +220,23 @@ public sealed record IdentificacaoVisitanteResult(string Nome, string Telefone, 
 /// <summary>
 /// #1430: formulário curto antes do chat. Grava nome, telefone, e-mail e o aceite da política na sessão; a
 /// conversa já aberta recebe o contato na hora, e a que nascer depois nasce com ele
-/// (<see cref="EasyStock.Application.Services.Atendimento.ConversaChatSiteService"/>). Não procura nem liga
-/// cliente pelo telefone: o dado fica "informado pelo visitante" até a loja confirmar pela Ficha.
+/// (<see cref="EasyStock.Application.Services.Atendimento.ConversaChatSiteService"/>).
+/// #2876: o formulário também cria o Cliente (lead do site, com o aceite do canal e aviso à equipe). Telefone que já é de
+/// um cadastro, ou compartilhado, não é provado só por ter sido digitado: a conversa fica em conferência, sem cliente
+/// ligado, e passa para a equipe. Sem cliente ligado o Assistente não carrega dossiê, histórico, endereço nem pedidos.
 /// </summary>
 public sealed class IdentificarVisitanteChatSiteUseCase(
     AcessoChatSite acesso, IConversaRepository conversaRepository, IUnitOfWork unitOfWork,
-    IOperacaoEventPublisher operacaoEventos)
+    IOperacaoEventPublisher operacaoEventos,
+    EasyStock.Application.Services.Atendimento.ConversaChatSiteService conversaChat,
+    IdentificarClientePorTelefoneUseCase identificarCliente,
+    IConsentimentoContatoRepository consentimentos,
+    IEscaladorConversa escalador,
+    INotificadorService notificador)
 {
+    public const string MotivoConferencia = "Telefone do formulário do site já tem cadastro: confira a pessoa antes de atender.";
+    public const string MotivoLeadNovo = "Novo contato pelo chat do site.";
+
     public async Task<IdentificacaoVisitanteResult> ExecuteAsync(
         string slug, string? token, IdentificacaoVisitanteInput? input, CancellationToken ct = default)
     {
@@ -228,23 +259,62 @@ public sealed class IdentificarVisitanteChatSiteUseCase(
         sessao.RegistrarUso(agora);
         sessao.Identificar(contato);
 
-        Guid? conversaAtualizada = null;
-        if (sessao.ConversaId is { } conversaId)
-        {
-            var conversa = await conversaRepository.ObterPorIdAsync(sessao.EmpresaId, conversaId, ct);
-            if (conversa is { EstaAberta: true, Canal: CanalConversa.ChatSite } && conversa.EmpresaId == sessao.EmpresaId)
-            {
-                conversa.RegistrarContatoInformado(contato);
-                conversaAtualizada = conversa.Id;
-            }
-        }
+        var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, ct);
+        conversa = await conversaRepository.ObterPorIdAsync(sessao.EmpresaId, conversa.Id, ct) ?? conversa;
+        if (conversa is not { EstaAberta: true, Canal: CanalConversa.ChatSite } || conversa.EmpresaId != sessao.EmpresaId)
+            throw new SessaoChatSiteInvalidaException();
+
+        conversa.RegistrarContatoInformado(contato);
+        string? leadNovo = null;
+        if (conversa.ClienteId is null && !conversa.VinculoEmRevisao)
+            leadNovo = await IdentificarClienteAsync(sessao.EmpresaId, conversa, contato, agora, ct);
 
         await unitOfWork.CommitAsync();
+        // O aviso sai depois do commit: commit que falha não deixa aviso de lead que não existe.
+        if (leadNovo is not null)
+            await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(sessao.EmpresaId, conversa.Id, leadNovo, MotivoLeadNovo, ct);
         // #1643-5: o console troca nome e contato na hora, sem esperar a próxima sincronização.
-        if (conversaAtualizada is { } atualizada)
-            await operacaoEventos.PublicarAsync(EventosOperacao.ConversaAtualizada, sessao.EmpresaId,
-                new ConversaAtualizadaOperacao(atualizada), ct);
+        await operacaoEventos.PublicarAsync(EventosOperacao.ConversaAtualizada, sessao.EmpresaId,
+            new ConversaAtualizadaOperacao(conversa.Id), ct);
         return new IdentificacaoVisitanteResult(contato.Nome, contato.Telefone, contato.Email, contato.InformadoEm);
+    }
+
+    /// <summary>Devolve o nome do cliente recém-cadastrado (lead novo a avisar à equipe) ou nulo.</summary>
+    private async Task<string?> IdentificarClienteAsync(
+        Guid empresaId, Conversa conversa, ContatoInformadoVisitante contato, DateTime agora, CancellationToken ct)
+    {
+        IdentificacaoCliente identificacao;
+        try
+        {
+            // ReutilizarCadastro:false: cadastro existente nunca é ligado só pelo telefone digitado.
+            identificacao = await identificarCliente.ExecuteAsync(
+                new IdentificarClientePorTelefoneInput(empresaId, contato.Telefone.TrimStart('+'), contato.Nome, ReutilizarCadastro: false), ct);
+        }
+        catch (TelefoneExigeVerificacaoException)
+        {
+            await ExigirConferenciaAsync(empresaId, conversa, agora, ct);
+            return null;
+        }
+
+        if (identificacao is not { Cliente: { } cliente, EhNovo: true })
+        {
+            await ExigirConferenciaAsync(empresaId, conversa, agora, ct);
+            return null;
+        }
+
+        cliente.Email = contato.Email;
+        conversa.VincularCliente(cliente.Id);
+        conversa.AtualizarContatoNome(cliente.Nome);
+        await consentimentos.AddAsync(ConsentimentoContato.Registrar(empresaId, cliente.Id, CanalConversa.ChatSite,
+            FinalidadeContato.Transacional, SituacaoConsentimento.Concedido,
+            ClienteDaConversa.CadastrarClienteDaConversaUseCase.OrigemAceiteChatSite, contato.InformadoEm), ct);
+        return cliente.Nome;
+    }
+
+    private async Task ExigirConferenciaAsync(Guid empresaId, Conversa conversa, DateTime agora, CancellationToken ct)
+    {
+        conversa.ExigirConferenciaCliente();
+        await escalador.EscalarAsync(empresaId, conversa, MotivoConferencia, agora, ct);
     }
 }
 

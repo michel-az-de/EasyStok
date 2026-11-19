@@ -71,7 +71,7 @@ public sealed class PortoesDoAssistente(
         new(Janela, "Janela de 24 h", "O cliente escreveu nas últimas 24 h (regra da Meta).", false, null),
         new(Chave, "Assistente na loja", "A chave do Assistente está ligada.", true, "Chave nesta tela"),
         new(Modelo, "Modelo de IA", "O servidor tem modelo e chave de API.", true, "Configuração do servidor"),
-        new(Canal, "Canal", "A conversa é do WhatsApp.", true, null),
+        new(Canal, "Canal", "A conversa é do WhatsApp ou do chat do site.", true, null),
         new(Equipe, "Contato da equipe", "Quem escreve não é contato que recebe os avisos da equipe.", true, "Devolver na conversa"),
         new(Bloqueado, "Cliente bloqueado", "O cadastro do cliente não está bloqueado.", true, "Cadastro do cliente"),
         new(Pausado, "Encaminhado à responsável", "O cliente não foi encaminhado à responsável.", true, "Devolver na conversa"),
@@ -140,7 +140,7 @@ public sealed class PortoesDoAssistente(
                 : EtapaAssistente.Barrou(Modelo, "Modelo de IA", "Desligado ou sem chave no servidor.",
                     AgenteAtendimentoService.MotivoAgenteDesligado),
             conversa.TemAgente
-                ? EtapaAssistente.Passou(Canal, "Canal", "O Assistente atende no WhatsApp.")
+                ? EtapaAssistente.Passou(Canal, "Canal", $"O Assistente atende no canal {(conversa.Canal == CanalConversa.ChatSite ? "chat do site" : "WhatsApp")}.")
                 : EtapaAssistente.Barrou(Canal, "Canal", $"O Assistente não atende no canal {conversa.Canal}.",
                     $"o canal {conversa.Canal} não tem agente"),
         };
