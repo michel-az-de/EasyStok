@@ -73,7 +73,7 @@ public class PilotChromeClient extends BridgeWebChromeClient {
         final EditText input = new EditText(view.getContext());
         input.setSingleLine(true);
         input.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        if (defaultValue != null && defaultValue.matches("\d{1,4}")) input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        if (defaultValue != null && defaultValue.matches("\\d{1,4}")) input.setInputType(InputType.TYPE_CLASS_NUMBER);
         if (defaultValue != null) input.setText(defaultValue);
         input.setSelectAllOnFocus(true);
         final FrameLayout box = new FrameLayout(view.getContext());

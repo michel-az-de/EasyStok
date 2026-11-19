@@ -47,7 +47,7 @@ test('MainActivity instala o cliente após criar a Bridge e não troca o cliente
 // #2886: prompt de quantidade abria teclado de letras, sem foco, campo colado na borda e teal padrão.
 test('prompt: valor padrão numérico curto abre teclado numérico com foco e tudo selecionado', () => {
   const source = read(...clientPath);
-  assert.match(source, /defaultValue\.matches\("\\d\{1,4\}"\)/, 'só número de até 4 dígitos vira teclado numérico');
+  assert.match(source, /defaultValue\.matches\("\\\\d\{1,4\}"\)/, 'só número de até 4 dígitos vira teclado numérico');
   assert.match(source, /InputType\.TYPE_CLASS_NUMBER/);
   assert.match(source, /setSelectAllOnFocus\(true\)/);
   assert.match(source, /input\.requestFocus\(\)/);
