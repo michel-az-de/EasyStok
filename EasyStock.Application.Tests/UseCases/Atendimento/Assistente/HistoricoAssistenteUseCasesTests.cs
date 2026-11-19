@@ -66,6 +66,46 @@ public class HistoricoAssistenteUseCasesTests
     }
 
     [Fact]
+    public async Task UsoDizQuantasRespostasSairamSemIaEAEstimativaPoupada()
+    {
+        // S78 (#2896): 3 respostas sem IA e 2 turnos do modelo que gastaram 30 mil tokens. Média de 15 mil por turno
+        // do modelo: as 3 sem IA pouparam perto de 45 mil.
+        _turnos.SomarAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(new SomaTurnosAgente(5, 20_000, 4_000, 6_000, 0.05m, 3, RespostasSemIa: 3));
+
+        var uso = await new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System).ExecuteAsync(new ObterUsoAssistenteQuery(_empresaId));
+
+        uso.Turnos.Should().Be(5);
+        uso.RespostasSemIa.Should().Be(3);
+        uso.TokensPoupadosEstimados.Should().Be(45_000);
+    }
+
+    [Fact]
+    public async Task UsoSemTurnoDoModeloNaoInventaEstimativa()
+    {
+        // Sem turno do modelo no mês não há média: a contagem aparece, a estimativa não.
+        _turnos.SomarAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(new SomaTurnosAgente(2, 0, 0, 0, 0m, 2, RespostasSemIa: 2));
+
+        var uso = await new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System).ExecuteAsync(new ObterUsoAssistenteQuery(_empresaId));
+
+        uso.RespostasSemIa.Should().Be(2);
+        uso.TokensPoupadosEstimados.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UsoSemRespostaSemIaNaoTemEstimativa()
+    {
+        _turnos.SomarAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(new SomaTurnosAgente(4, 40_000, 0, 0, 0m, 0));
+
+        var uso = await new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System).ExecuteAsync(new ObterUsoAssistenteQuery(_empresaId));
+
+        uso.RespostasSemIa.Should().Be(0);
+        uso.TokensPoupadosEstimados.Should().BeNull();
+    }
+
+    [Fact]
     public async Task UsoDeMesInvalidoEhRecusado()
     {
         var act = () => new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System)

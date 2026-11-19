@@ -57,6 +57,18 @@ export function linhaDoUso(uso) {
   return partes.join(' · ')
 }
 
+// S78 (#2896): quantas respostas do mês saíram sem chamar o modelo e a estimativa do que deixaram de gastar.
+// A estimativa vem da API (respostas sem IA vezes a média dos turnos com IA do mês); sem ela, a tela não inventa.
+export function semIaDoUso(uso) {
+  if (!uso) return null
+  const semIa = Number(uso.respostasSemIa) || 0
+  const poupados = uso.tokensPoupadosEstimados == null ? null : Number(uso.tokensPoupadosEstimados)
+  const titulo = `Respostas sem IA: ${formatarTokens(semIa)} de ${formatarTokens(uso.turnos)}`
+  if (semIa === 0) return { titulo, detalhe: null }
+  if (poupados === null) return { titulo, detalhe: 'sem turno com IA no mês para estimar o que foi poupado' }
+  return { titulo, detalhe: `cerca de ${tokensCurtos(poupados)} tokens poupados, pela média dos turnos com IA do mês` }
+}
+
 // Custo: a API soma só turnos com preço configurado. Sem nenhum preço, não inventa R$ 0,00.
 export function custoDoUso(uso) {
   if (!uso) return null

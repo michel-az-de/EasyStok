@@ -36,16 +36,33 @@ public sealed record TurnoAgenteLido(
 
 public sealed record PaginaTurnosAgente(IReadOnlyList<TurnoAgenteLido> Itens, int Total);
 
-/// <summary><paramref name="Custo"/> soma só os turnos com preço; <paramref name="TurnosSemPreco"/> diz quantos ficaram fora.</summary>
+/// <summary>
+/// <paramref name="Custo"/> soma só os turnos com preço; <paramref name="TurnosSemPreco"/> diz quantos ficaram fora.
+/// <paramref name="RespostasSemIa"/> (S78, #2896) conta, dentro de <paramref name="Turnos"/>, os de desfecho <c>SemIa</c>.
+/// </summary>
 public sealed record SomaTurnosAgente(
     int Turnos,
     long TokensEntrada,
     long TokensSaida,
     long TokensCacheLido,
     decimal Custo,
-    int TurnosSemPreco)
+    int TurnosSemPreco,
+    int RespostasSemIa = 0)
 {
     public static readonly SomaTurnosAgente Vazia = new(0, 0, 0, 0, 0m, 0);
 
     public long TotalTokens => TokensEntrada + TokensSaida + TokensCacheLido;
+
+    /// <summary>
+    /// S78 (#2896): as respostas sem IA vezes a média de tokens por turno do modelo no mesmo período. Sem resposta sem IA
+    /// ou sem turno do modelo não há o que estimar.
+    /// </summary>
+    public long? TokensPoupadosEstimados
+    {
+        get
+        {
+            var turnosDoModelo = Turnos - RespostasSemIa;
+            return RespostasSemIa > 0 && turnosDoModelo > 0 ? TotalTokens * RespostasSemIa / turnosDoModelo : null;
+        }
+    }
 }

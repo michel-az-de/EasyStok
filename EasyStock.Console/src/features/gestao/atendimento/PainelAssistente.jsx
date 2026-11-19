@@ -5,7 +5,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import {
-  cotaDoCampo, cotaParaCampo, desfechoDoTurno, formatarTokens, linhaDoUso, resumoDoUso,
+  cotaDoCampo, cotaParaCampo, desfechoDoTurno, formatarTokens, linhaDoUso, resumoDoUso, semIaDoUso,
 } from '../../../dominio/painelAssistente'
 import { AbaFluxo } from './AbaFluxo'
 import { Retorno } from './Retorno'
@@ -55,6 +55,7 @@ export function PainelAssistente({ podeEditar, abaAntes = null, sinalRecarregar 
 
 function AbaUso({ uso, podeEditar, painel }) {
   const resumo = resumoDoUso(uso)
+  const semIa = semIaDoUso(uso)
   const [campo, setCampo] = useState(() => cotaParaCampo(uso.cotaTokensMes))
   const cota = cotaDoCampo(campo)
   const mudou = cota.valor !== null && cota.valor !== (Number(uso.cotaTokensMes) || 0)
@@ -71,6 +72,7 @@ function AbaUso({ uso, podeEditar, painel }) {
           </div>
         )}
         <p className={css.consumoDetalhe}>{linhaDoUso(uso)}</p>
+        <p className={css.consumoDetalhe}>{semIa.titulo}{semIa.detalhe && ` · ${semIa.detalhe}`}</p>
       </div>
 
       <form className={css.cota} onSubmit={(e) => { e.preventDefault(); if (mudou) painel.salvar('cota', { cotaTokensMes: cota.valor }) }}>
