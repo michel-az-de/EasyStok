@@ -49,6 +49,9 @@ try {
   await page.getByRole('button', { name: 'Conferir destino da edição', exact: true }).click()
   await page.getByRole('dialog').getByText('Pessoa B', { exact: true }).waitFor()
   await page.evaluate(() => window.trocarPessoa())
+  // A troca de pessoa chega ao React depois do evaluate: espera o botão desabilitar (antes, `isEnabled()` lia o estado
+  // anterior e a prova falhava às vezes, no CI e localmente).
+  await page.getByRole('button', { name: 'Manter texto para esta pessoa', disabled: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Manter texto para esta pessoa' }).isEnabled(), false)
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
   await page.evaluate(() => window.remontarFicha())
