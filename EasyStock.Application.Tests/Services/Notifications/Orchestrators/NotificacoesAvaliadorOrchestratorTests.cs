@@ -1,10 +1,14 @@
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Security;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Notifications;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -25,9 +29,10 @@ public class NotificacoesAvaliadorOrchestratorTests
     private readonly IRowLevelSecurityBypass _bypass = Substitute.For<IRowLevelSecurityBypass>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
 
-    private NotificacoesAvaliadorOrchestrator NovoSut()
+    private NotificacoesAvaliadorOrchestrator NovoSut(Action<IServiceCollection>? registrar = null)
     {
         var services = new ServiceCollection();
+        registrar?.Invoke(services);
         services.AddSingleton(_notificador);
         services.AddSingleton(_eventoRepo);
         services.AddSingleton(_tenant);
@@ -130,5 +135,59 @@ public class NotificacoesAvaliadorOrchestratorTests
         await NovoSut().ExecutarRodadaAsync(TimeSpan.FromMinutes(2));
 
         await _notificador.DidNotReceiveWithAnyArgs().AvaliarEventoAsync(default!, default);
+    }
+
+    /// <summary>
+    /// #2875: o aviso ao cliente que expira sem ser avaliado vai à conversa como não entregue, no escopo da empresa e
+    /// com commit próprio, depois do commit da expiração.
+    /// </summary>
+    [Fact]
+    public async Task ExecutarRodadaAsync_leva_o_aviso_ao_cliente_expirado_a_conversa_no_escopo_da_empresa()
+    {
+        const string telefone = "5511987654321";
+        var empresa = Guid.NewGuid();
+        var evento = EventoNotificacao.Criar(TipoEventoNotificacao.ComandaAtualizada, empresa,
+            $$"""{"telefone":"+{{telefone}}","nome":"Maria","numero":"12"}""", Guid.NewGuid());
+        evento.MarcarComoExpirado("Expirado: passou do prazo de 120 min sem ser avaliado");
+        _eventoRepo.ObterAsync(empresa, evento.Id, Arg.Any<CancellationToken>()).Returns(evento);
+        _eventoRepo.ExpirarPendentesAsync(Arg.Any<PoliticaValidadeNotificacao>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([new NotificacaoExpirada(evento.Id, empresa, evento.Tipo),
+                      new NotificacaoExpirada(Guid.NewGuid(), empresa, TipoEventoNotificacao.ProdutoVencendo)]);
+        ListaPendentes();
+
+        var rotina = RotinaNotificacao.Criar(
+            codigo: "comanda_atualizada_global", nome: "Comanda atualizada", tipoEvento: TipoEventoNotificacao.ComandaAtualizada,
+            triggerTipo: TriggerTipoRotina.Evento, templateCodigo: "comanda_atualizada_whatsapp_v1",
+            categoria: CategoriaConteudoNotificacao.Transacional);
+        rotina.DefinirFallback("[\"WhatsApp\"]", "system");
+        var rotinas = Substitute.For<IRotinaRepository>();
+        rotinas.ListarAtivasAsync(TipoEventoNotificacao.ComandaAtualizada, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns([rotina]);
+        var templates = Substitute.For<ITemplateRepository>();
+        templates.GetAtivoAsync("comanda_atualizada_whatsapp_v1", CanalNotificacao.WhatsApp, Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns(TemplateNotificacao.Criar(
+                codigo: "comanda_atualizada_whatsapp_v1", nome: "Comanda atualizada", canal: CanalNotificacao.WhatsApp,
+                tipoEvento: TipoEventoNotificacao.ComandaAtualizada, assuntoTemplate: "",
+                corpoTemplate: "{{ nome }}, comanda nº {{ numero }}."));
+        var conversas = Substitute.For<IConversaRepository>();
+        conversas.ObterAbertaPorContatoAsync(empresa, CanalConversa.WhatsApp, telefone, Arg.Any<CancellationToken>())
+            .Returns(Conversa.Abrir(empresa, telefone, DateTime.UtcNow.AddDays(-1), "Maria"));
+
+        await NovoSut(services =>
+        {
+            services.AddSingleton(rotinas);
+            services.AddSingleton(templates);
+            services.AddSingleton(conversas);
+            services.AddSingleton<IRendererTemplate>(new NotificadorServiceMetadadosTests.RendererTemplateSimples());
+            services.AddSingleton(new PoliticaValidadeNotificacao());
+            services.AddScoped<AvisoNaoEntregueNaConversa>();
+            services.AddScoped<AvisoEventoExpiradoNaConversa>();
+        }).ExecutarRodadaAsync(TimeSpan.FromMinutes(2));
+
+        await conversas.Received(1).AddMensagemAsync(
+            Arg.Is<Mensagem>(m => m.Status == StatusMensagem.Falhou && m.Texto == "Maria, comanda nº 12."),
+            Arg.Any<CancellationToken>());
+        _tenant.Received().SetCurrentTenant(empresa);
+        await _unitOfWork.Received(2).CommitAsync(); // a expiração e o registro na conversa
     }
 }

@@ -84,6 +84,12 @@ public sealed record ResultadoEnvio(
     /// </summary>
     public string? IdExterno { get; init; }
 
+    /// <summary>
+    /// Código de erro do canal, quando ele devolve um (o da Meta no WhatsApp; negativo é recusa nossa antes da rede).
+    /// #2875: o motivo do aviso não entregue na conversa sai dele, não do texto cru do provider.
+    /// </summary>
+    public int? CodigoErro { get; init; }
+
     /// <summary>Nada saiu e o canal disse isso (stub, console). <see cref="Sucesso"/> segue verdadeiro para quem está fora do motor.</summary>
     public static ResultadoEnvio Simulado(string provider, long duracaoMs = 0) =>
         new(Sucesso: true, ProviderUsado: provider, DuracaoMs: duracaoMs) { Desfecho = DesfechoEnvio.Simulado };

@@ -2,10 +2,13 @@ using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Infra.Async;
 using EasyStock.Infra.Async.DependencyInjection;
@@ -153,12 +156,14 @@ public class DispatcherDesfechoTests(PostgreSqlDatabaseFixture fixture) : IClass
         string fallbackJson = "[]",
         string? metadadosJson = null,
         DateTime? agendarPara = null,
-        string corpo = "Seu codigo: 482913")
+        string corpo = "Seu codigo: 482913",
+        Action<OutboxMensagemNotificacao>? ajustar = null)
     {
         var mensagem = OutboxMensagemNotificacao.Criar(s.EventoId, s.TemplateId, s.EmpresaId, canal,
             canal == CanalNotificacao.Email ? "maria@example.com" : "+5511999990001", "Redefinir senha", corpo, categoria,
             canaisFallbackRestantesJson: fallbackJson, metadadosJson: metadadosJson);
         if (agendarPara is { } quando) mensagem.AgendarPara(quando);
+        ajustar?.Invoke(mensagem);
 
         await using var db = fixture.CreateDbContext();
         using var _ = db.UseRowLevelSecurityBypass();
@@ -570,5 +575,96 @@ public class DispatcherDesfechoTests(PostgreSqlDatabaseFixture fixture) : IClass
         gravada.AssuntoRenderizado.Should().Be("Redefinir senha");
         gravada.MetadadosJson.Should().Contain("aviso");
         (await LerEventoAsync(s.EventoId)).PayloadJson.Should().Contain("482913");
+    }
+
+    // ----- #2875: aviso ao cliente que não chega vira não entregue na conversa -----
+
+    private const string AvisoDoPedido = "Maria, sua comanda nº 12 saiu para entrega.";
+
+    /// <summary>Evento de aviso ao cliente e a conversa aberta dele no WhatsApp (o contato do outbox, normalizado).</summary>
+    private async Task<(Semente Semente, Conversa Conversa)> SemearAvisoAoClienteAsync()
+    {
+        var s = await SemearAsync("""{"cliente_nome":"Maria"}""", TipoEventoNotificacao.ComandaAtualizada);
+        var conversa = Conversa.Abrir(s.EmpresaId, "5511999990001", DateTime.UtcNow.AddMinutes(-30), "Maria");
+
+        await using var db = fixture.CreateDbContext();
+        using var _ = db.UseRowLevelSecurityBypass();
+        db.AtendimentoConversas.Add(conversa);
+        await db.SaveChangesAsync();
+        return (s, conversa);
+    }
+
+    private async Task<IReadOnlyList<MensagemNaoEntregue>> NaoEntreguesAsync(ServiceProvider provider, Guid empresaId)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IConversaRepository>().ListarNaoEntreguesAsync(empresaId, 50);
+    }
+
+    [SkippableFact]
+    public async Task Aviso_ao_cliente_com_modelo_recusado_pela_Meta_aparece_em_nao_entregues_com_o_motivo()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var (s, conversa) = await SemearAvisoAoClienteAsync();
+        var mensagem = await SemearMensagemAsync(s, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Transacional,
+            corpo: AvisoDoPedido);
+        var whatsapp = new CanalFalso(CanalNotificacao.WhatsApp, _ =>
+            new ResultadoEnvio(false, "meta", "(#132001) Template name does not exist in the translation", StatusHttp: 404,
+                FalhaPermanente: true) { CodigoErro = 132001 });
+        await using var provider = ConstruirProvider(whatsapp);
+
+        await RodarAsync(provider);
+
+        (await LerMensagemAsync(mensagem.Id)).Status.Should().Be(StatusOutbox.Falhado);
+        var naoEntregue = (await NaoEntreguesAsync(provider, s.EmpresaId)).Should().ContainSingle().Subject;
+        naoEntregue.Conversa.Id.Should().Be(conversa.Id);
+        naoEntregue.Mensagem.Status.Should().Be(StatusMensagem.Falhou);
+        naoEntregue.Mensagem.Texto.Should().Be(AvisoDoPedido);
+        naoEntregue.Mensagem.Erro.Should().Be("Não enviada: a Meta recusou o modelo da mensagem (código Meta 132001).");
+        naoEntregue.Mensagem.PodeReenviar.Should().BeTrue("a loja reenvia quando a janela abrir");
+    }
+
+    [SkippableFact]
+    public async Task Aviso_ao_cliente_expirado_na_fila_aparece_em_nao_entregues_sem_chamar_o_canal()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var (s, conversa) = await SemearAvisoAoClienteAsync();
+        // O prazo do ComandaAtualizada é 2 h: três horas parada na fila vence a quarentena.
+        var mensagem = await SemearMensagemAsync(s, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Transacional,
+            corpo: AvisoDoPedido, ajustar: m => m.ProximaTentativaEm = DateTime.UtcNow.AddHours(-3));
+        var whatsapp = new CanalFalso(CanalNotificacao.WhatsApp, _ => new ResultadoEnvio(true, "meta"));
+        await using var provider = ConstruirProvider(whatsapp);
+
+        await RodarAsync(provider);
+
+        (await LerMensagemAsync(mensagem.Id)).Status.Should().Be(StatusOutbox.Expirado);
+        whatsapp.ChamadasDe(mensagem.Id).Should().Be(0);
+        var naoEntregue = (await NaoEntreguesAsync(provider, s.EmpresaId)).Should().ContainSingle().Subject;
+        naoEntregue.Conversa.Id.Should().Be(conversa.Id);
+        naoEntregue.Mensagem.Texto.Should().Be(AvisoDoPedido);
+        naoEntregue.Mensagem.Erro.Should().Be("Não enviada: o aviso ficou 2 h na fila sem sair e expirou.");
+    }
+
+    [SkippableFact]
+    public async Task Falha_de_aviso_que_nao_e_ao_cliente_nao_vai_a_conversa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var s = await SemearAsync();
+        var conversa = Conversa.Abrir(s.EmpresaId, "5511999990001", DateTime.UtcNow.AddMinutes(-30), "Maria");
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var _ = db.UseRowLevelSecurityBypass();
+            db.AtendimentoConversas.Add(conversa);
+            await db.SaveChangesAsync();
+        }
+
+        var mensagem = await SemearMensagemAsync(s, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Operacional);
+        var whatsapp = new CanalFalso(CanalNotificacao.WhatsApp, _ =>
+            new ResultadoEnvio(false, "meta", "recusada", StatusHttp: 400, FalhaPermanente: true) { CodigoErro = 132001 });
+        await using var provider = ConstruirProvider(whatsapp);
+
+        await RodarAsync(provider);
+
+        (await LerMensagemAsync(mensagem.Id)).Status.Should().Be(StatusOutbox.Falhado);
+        (await NaoEntreguesAsync(provider, s.EmpresaId)).Should().BeEmpty();
     }
 }
