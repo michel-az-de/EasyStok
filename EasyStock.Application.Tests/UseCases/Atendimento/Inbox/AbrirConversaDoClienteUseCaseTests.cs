@@ -16,6 +16,7 @@ namespace EasyStock.Application.Tests.UseCases.Atendimento.Inbox;
 public class AbrirConversaDoClienteUseCaseTests
 {
     private readonly Guid _empresa = Guid.NewGuid();
+    private readonly Guid _usuario = Guid.NewGuid();
     private readonly IConversaRepository _conversas = Substitute.For<IConversaRepository>();
     private readonly IClienteRepository _clientes = Substitute.For<IClienteRepository>();
     private readonly FakeUnitOfWork _uow = new();
@@ -39,7 +40,7 @@ public class AbrirConversaDoClienteUseCaseTests
         new(_clientes, new ConversaWhatsAppDoCliente(_conversas, _uow, TimeProvider.System), TimeProvider.System);
 
     private Task<ConversaResumoResult> Abrir(Guid? clienteId = null) =>
-        UseCase().ExecuteAsync(new AbrirConversaDoClienteCommand(_empresa, clienteId ?? _cliente.Id));
+        UseCase().ExecuteAsync(new AbrirConversaDoClienteCommand(_empresa, _usuario, clienteId ?? _cliente.Id));
 
     [Fact]
     public async Task ClienteSemConversa_AbreConversaVinculadaSemMandarMensagem()
@@ -57,6 +58,31 @@ public class AbrirConversaDoClienteUseCaseTests
         conversa.ContatoNome.Should().Be("Ana Souza");
         _uow.CommitCount.Should().Be(1);
         await _conversas.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
+    }
+
+    /// <summary>#2902: a dona abriu a conversa para atender pessoalmente; o Assistente não pode responder nela.</summary>
+    [Fact]
+    public async Task ConversaCriada_NasceAssumidaPeloUsuarioQueClicou()
+    {
+        var r = await Abrir();
+
+        var conversa = _abertas.Should().ContainSingle().Subject;
+        conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        conversa.AssumidaPorUsuarioId.Should().Be(_usuario);
+        r.Situacao.Should().Be(SituacaoConversa.Assumida);
+    }
+
+    /// <summary>#2902: reaproveitar não tira do Assistente uma conversa que já existia.</summary>
+    [Fact]
+    public async Task ConversaAutomaticaExistente_ContinuaAutomatica()
+    {
+        var existente = Conversa.Abrir(_empresa, "5511988887777", DateTime.UtcNow.AddDays(-1), clienteId: _cliente.Id);
+        _abertas.Add(existente);
+
+        await Abrir();
+
+        existente.Situacao.Should().Be(SituacaoConversa.Automatica);
+        existente.AssumidaPorUsuarioId.Should().BeNull();
     }
 
     [Fact]

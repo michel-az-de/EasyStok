@@ -185,7 +185,7 @@ public class AtendimentoConversasController(
     public Task<IActionResult> AbrirDoCliente([FromBody] AbrirConversaDoClienteBody body,
         [FromServices] AbrirConversaDoClienteUseCase useCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await useCase.ExecuteAsync(
-            new AbrirConversaDoClienteCommand(currentUser.EmpresaId, body.ClienteId), ct)));
+            new AbrirConversaDoClienteCommand(currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId), ct)));
 
     [SwaggerOperation(Summary = "Messages that did not reach the customer (S59)",
         Description = "Saída que falhou, mais recente primeiro: inclui a que espera o cliente responder ao modelo de retomada e a que saiu por SMS.")]
