@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -5,7 +6,8 @@ using EasyStock.Domain.Enums.Atendimento;
 namespace EasyStock.Application.Services.Atendimento;
 
 public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnitOfWork unitOfWork,
-    ISessaoChatSiteRepository sessoes, IPedidoRepository? pedidos = null)
+    ISessaoChatSiteRepository sessoes, IPedidoRepository? pedidos = null,
+    IConfiguracaoAtendimentoRepository? configuracoes = null, IAgenteLlmClient? llm = null)
 {
     /// <summary>Nome do contato quando o visitante não preencheu o formulário (#1430).</summary>
     public const string NomeSemFormulario = "Visitante do site";
@@ -42,7 +44,8 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
             await GarantirSessaoAsync(sessao, agora, token);
             conversa = Conversa.Abrir(sessao.EmpresaId, contato, agora, sessao.ContatoInformado?.Nome ?? NomeSemFormulario,
                 clienteVerificadoId, CanalConversa.ChatSite);
-            conversa.Escalar(agora, MotivoFilaHumana);
+            // #2876: com o Assistente atendendo, a conversa nasce com ele, sem escalada para a fila humana.
+            if (!await AssistenteAtendeAsync(sessao.EmpresaId)) conversa.Escalar(agora, MotivoFilaHumana);
             await conversas.AddAsync(conversa, token);
         }
         else
@@ -69,6 +72,13 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
         if (conversa is null || conversa.EmpresaId != sessao.EmpresaId || !conversa.EstaAberta
             || conversa.VinculoEmRevisao || conversa.ClienteId != clienteId || conversa.VinculoRevisao != revisao)
             throw new RegraDeDominioVioladaException("A identidade mudou. Reabra o atendimento antes de enviar o pedido.");
+    }
+
+    /// <summary>#2876: o Assistente atende o chat do site quando está ligado na loja e o LLM está disponível.</summary>
+    public async Task<bool> AssistenteAtendeAsync(Guid empresaId)
+    {
+        if (configuracoes is null || llm is null || !llm.Disponivel) return false;
+        return (await configuracoes.GetOrDefaultAsync(empresaId)).Ativo;
     }
 
     internal async Task<SessaoChatSite> GarantirSessaoAsync(SessaoChatSite sessao, DateTime agora, CancellationToken ct)

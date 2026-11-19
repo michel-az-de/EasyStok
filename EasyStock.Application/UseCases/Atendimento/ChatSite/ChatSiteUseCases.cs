@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
+using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -19,11 +20,18 @@ public sealed record SessaoChatSiteAberta(Guid SessaoId, string Token, DateTime 
 /// <c>GET mensagens/{id}/midia</c> com o mesmo <c>X-Chat-Token</c>; foto pode vir sem texto.
 /// </summary>
 public sealed record MensagemChatSiteResult(
-    Guid Id, bool DoVisitante, string? Texto, DateTime EnviadaEm, string Tipo = "texto", bool TemMidia = false)
+    Guid Id, bool DoVisitante, string? Texto, DateTime EnviadaEm, string Tipo = "texto", bool TemMidia = false,
+    string Autor = "equipe")
 {
-    internal static MensagemChatSiteResult De(Mensagem m) =>
+    /// <summary>
+    /// #2876: <c>Autor</c> é <c>visitante</c>, <c>assistente</c> (resposta do agente) ou <c>equipe</c> (console ou aviso do sistema).
+    /// </summary>
+    public static MensagemChatSiteResult De(Mensagem m) =>
         new(m.Id, m.Direcao == DirecaoMensagem.Entrada, m.Texto, m.EnviadaEm,
-            m.TipoConteudo.ToString().ToLowerInvariant(), m.MidiaChave is not null);
+            m.TipoConteudo.ToString().ToLowerInvariant(), m.MidiaChave is not null, AutorDe(m));
+
+    private static string AutorDe(Mensagem m) => m.Direcao == DirecaoMensagem.Entrada ? "visitante"
+        : m.Autor == AutorMensagem.Agente ? "assistente" : "equipe";
 }
 
 /// <summary>Loja inexistente, inativa ou sem o chat ligado: 404, sem dizer qual dos três.</summary>
@@ -116,7 +124,8 @@ public sealed class EnviarMensagemVisitanteUseCase(
     IOperacaoEventPublisher eventPublisher,
     IUnitOfWork unitOfWork,
     ILogger<EnviarMensagemVisitanteUseCase> logger,
-    EasyStock.Application.Services.Atendimento.ConversaChatSiteService conversaChat)
+    EasyStock.Application.Services.Atendimento.ConversaChatSiteService conversaChat,
+    IQueueService? fila = null)
 {
     public const int TextoTamanhoMaximo = 1000;
     public const string PrefixoConfirmacaoRecebimento = "chatsite:recepcao:";
@@ -140,6 +149,7 @@ public sealed class EnviarMensagemVisitanteUseCase(
         sessao.RegistrarUso(agora);
 
         // A trava de contato do serviço dura até entrada e confirmação estarem persistidas.
+        var assistenteAtende = false;
         var mensagem = await unitOfWork.ExecuteInTransactionSemRetryAsync(async tokenCt =>
         {
             Conversa conversa;
@@ -164,15 +174,21 @@ public sealed class EnviarMensagemVisitanteUseCase(
             var entrada = Mensagem.Entrada(sessao.EmpresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, limpo);
             conversa.RegistrarEntrada(agora);
             await conversaRepository.AddMensagemAsync(entrada, tokenCt);
+            // #2876: com o Assistente atendendo, ele responde no turno e a confirmação automática não entra.
+            assistenteAtende = await conversaChat.AssistenteAtendeAsync(sessao.EmpresaId);
             var confirmacaoId = PrefixoConfirmacaoRecebimento + conversa.Id.ToString("N");
             // #1991-4: 1 µs depois da entrada (a precisão do timestamp no banco): com o mesmo instante a ordem do chat variava.
-            if (await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
+            if (!assistenteAtende && await conversaRepository.ObterMensagemPorExternoIdAsync(sessao.EmpresaId, confirmacaoId, tokenCt) is null)
                 await conversaRepository.AddMensagemAsync(Mensagem.Saida(sessao.EmpresaId, conversa.Id,
                     AutorMensagem.Sistema, agora.AddTicks(TimeSpan.TicksPerMicrosecond), TipoConteudoMensagem.Texto,
                     "Recebemos sua mensagem. A equipe da loja responde por aqui.", confirmacaoId), tokenCt);
             await unitOfWork.CommitAsync();
             return entrada;
         }, ct);
+
+        // #2876: o turno roda depois do commit, para o agente já enxergar a mensagem do visitante.
+        if (assistenteAtende && fila is not null)
+            await fila.EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, new ProcessarTurnoAgenteJob(sessao.EmpresaId, mensagem.ConversaId));
 
         try
         {

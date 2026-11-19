@@ -339,6 +339,14 @@ public sealed class AgenteAtendimentoService(
 
         Mensagem saida;
         var enviou = false;
+        if (conversa.Canal == CanalConversa.ChatSite)
+        {
+            // #2876: o widget lê a saída gravada pelo id "chatsite:..."; nada sai por provedor externo.
+            saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Agente, agora, TipoConteudoMensagem.Texto, texto,
+                CanalChatSite.PrefixoIdExterno + Guid.NewGuid().ToString("N"));
+            enviou = true;
+        }
+        else
         try
         {
             var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);

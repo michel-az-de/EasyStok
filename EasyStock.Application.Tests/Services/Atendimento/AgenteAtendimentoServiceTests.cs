@@ -1141,7 +1141,6 @@ public partial class AgenteAtendimentoServiceTests
     [Theory]
     [InlineData(CanalConversa.Instagram, "IGSID-9")]
     [InlineData(CanalConversa.Messenger, "PSID-3")]
-    [InlineData(CanalConversa.ChatSite, "sessao-1")]
     public async Task AgenteNaoRespondeForaDoWhatsApp(CanalConversa canal, string contato)
     {
         // S35: o agente envia pelo cliente do WhatsApp; em outro canal sairia pelo canal errado.
