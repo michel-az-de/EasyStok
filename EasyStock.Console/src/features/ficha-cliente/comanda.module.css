@@ -175,8 +175,8 @@
    contra queda de luz ou internet até existir impressora de verdade (D6). */
 .canhotoTela { width: 360px; max-width: 100%; margin: 0 auto; }
 .canhotoAviso {
-  margin: 0 0 var(--e-2); font-size: var(--t-apoio); font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.04em; color: var(--tinta-2);
+ margin: 0 0 var(--e-2); font-size: var(--t-apoio); font-weight: 700;
+ color: var(--tinta-2);
 }
 
 /* Só a impressão fixa a largura de bobina térmica de 80 mm; sem `@page`,

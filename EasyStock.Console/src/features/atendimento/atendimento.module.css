@@ -129,8 +129,8 @@
    reabre o mesmo atendimento, o fio precisa mostrar onde um terminou e o
    próximo começou. Linha fina com rótulo, sem virar balão de mensagem. */
 .divisoriaAtendimento {
-  display: flex; align-items: center; gap: var(--e-2); margin: var(--e-4) 0;
-  color: var(--tinta-3); font-size: var(--t-micro); text-transform: uppercase; letter-spacing: .04em;
+ display: flex; align-items: center; gap: var(--e-2); margin: var(--e-4) 0;
+ color: var(--tinta-3); font-size: var(--t-micro); 
 }
 .divisoriaAtendimento::before, .divisoriaAtendimento::after {
   content: ''; flex: 1 1 auto; height: var(--b-1); background: var(--linha);

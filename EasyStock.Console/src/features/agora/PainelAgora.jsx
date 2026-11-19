@@ -60,7 +60,6 @@ export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = 
   if (!podeVer.atendimento && !podeVer.cozinha && !podeVer.entregas) return null
   return (
     <section className={css.painel} aria-label="Agora">
-      <p className={css.legenda}>Agora</p>
       <div className={css.filas}>
         {podeVer.atendimento && <Fila titulo="Responder" apoio="Conversas que precisam de você"
           itens={filas.responder} emDia="Ninguém esperando você." aviso={avisoResponder}

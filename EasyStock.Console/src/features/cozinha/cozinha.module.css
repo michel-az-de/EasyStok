@@ -51,8 +51,8 @@
     opacity var(--dur-curta) var(--ease-padrao);
 }
 .coluna h2 {
-  margin: 0; font-size: var(--t-apoio); text-transform: uppercase; letter-spacing: .04em;
-  color: var(--tinta-3); font-weight: 700; display: flex; align-items: center; gap: var(--e-1);
+ margin: 0; font-size: var(--t-apoio); 
+ color: var(--tinta); font-weight: 700; display: flex; align-items: center; gap: var(--e-1);
 }
 .contagem { font-family: var(--f-dado); }
 
@@ -60,10 +60,10 @@
    só que em botão, porque a coluna vira contagem que abre com um toque. #2326: o texto alinha no
    topo, na linha dos outros títulos; centralizado nos 40 px do toque, descia 10 px. */
 .tituloRecolhivel {
-  margin: 0; padding: 0; width: 100%; min-height: var(--toque);
-  font: inherit; font-size: var(--t-apoio); text-transform: uppercase; letter-spacing: .04em;
-  color: var(--tinta-3); font-weight: 700; display: flex; align-items: center; gap: var(--e-1);
-  background: none; border: 0; text-align: left; cursor: pointer;
+ margin: 0; padding: 0; width: 100%; min-height: var(--toque);
+ font: inherit; font-size: var(--t-apoio); 
+ color: var(--tinta); font-weight: 700; display: flex; align-items: center; gap: var(--e-1);
+ background: none; border: 0; text-align: left; cursor: pointer;
 }
 /* #2326: o alvo de toque fica com 40 px, mas o texto sobe para a linha dos outros títulos
    (centralizado, "ENTREGUE" ficava 10 px abaixo de "PAGO" e "PRONTO"). */
@@ -202,7 +202,7 @@ escritos e desliga as animações, inclusive a volta do overlay. */
 
 @media (prefers-reduced-motion: reduce) {
   .cartaoErguido { transform: none; }
-  .cartao, .dicaColuna, .contagemPula, .gavetaCanhotos, .pontoVivo, .pontoVivo::after { animation: none !important; }
+  .cartao, .dicaColuna, .contagemPula, .gavetaCanhotos { animation: none !important; }
   .coluna, .barraTempo > span { transition: none !important; }
 }
 
@@ -263,20 +263,8 @@ escritos e desliga as animações, inclusive a volta do overlay. */
 .aoVivo { display: inline-flex; align-items: center; gap: var(--e-1); color: var(--tinta-2); font-size: var(--t-apoio); }
 .pontoVivo { position: relative; width: 8px; height: 8px; border-radius: var(--r-pilula); background: var(--tinta-3); }
 .aoVivoLigado .pontoVivo { background: var(--sucesso); }
-/* #1577: o anel do "ao vivo" pulsa o dia inteiro no KDS. Em `box-shadow`, cada quadro repintava
-   a página; num disco sobre o ponto, só com `transform` e `opacity`, quem anima é o compositor.
-   O desenho é o mesmo: o disco vai de 8 a 20 px (o ponto mais 6 px de anel de cada lado) e de 50%
-   a transparente, e sobre o ponto a cor dele é a do próprio ponto. */
-.aoVivoLigado .pontoVivo::after {
-  content: ''; position: absolute; inset: 0; border-radius: var(--r-pilula);
-  background: var(--sucesso); opacity: 0; pointer-events: none;
-  animation: pulsarVivo 2s var(--ease-padrao) infinite;
-}
-@keyframes pulsarVivo {
-  0% { transform: scale(1); opacity: .5; }
-  70% { transform: scale(2.5); opacity: 0; }
-  100% { transform: scale(1); opacity: 0; }
-}
+/* #2859: o "ao vivo" é ponto parado. Anel pulsando o dia inteiro é enfeite de painel e tira o
+   olho de quem lê a fila; a cor e o texto já dizem se a fila está ligada. */
 
 .chipsFiltro { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; flex: 1; }
 .topoPagina > .chipsFiltro { flex: none; flex-wrap: nowrap; }
