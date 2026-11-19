@@ -234,7 +234,9 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var renderer = sp.GetRequiredService<IRendererTemplate>();
         var bloqueioRepo = sp.GetRequiredService<IBloqueioNotificacaoRepository>();
         var canais = sp.GetRequiredService<IEnumerable<ICanalNotificacao>>().ToList();
-        var avisoNaoEntregue = new AvisoNaoEntregueNaConversa(sp.GetRequiredService<IConversaRepository>());
+        // Sob demanda: só o aviso ao cliente que falhou precisa da conversa; os demais itens não dependem dela.
+        var avisoNaoEntregue = new Lazy<AvisoNaoEntregueNaConversa>(
+            () => new AvisoNaoEntregueNaConversa(sp.GetRequiredService<IConversaRepository>()));
 
         await ProcessarMensagemAsync(
             mensagem, estado, canais, outboxRepo, logRepo, eventoRepo, templateRepo, rotinaRepo, bloqueioRepo, renderer,
@@ -284,7 +286,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         IRotinaRepository rotinaRepo,
         IBloqueioNotificacaoRepository bloqueioRepo,
         IRendererTemplate renderer,
-        AvisoNaoEntregueNaConversa avisoNaoEntregue,
+        Lazy<AvisoNaoEntregueNaConversa> avisoNaoEntregue,
         EasyStockDbContext db,
         CancellationToken ct)
     {
@@ -460,12 +462,12 @@ public sealed class NotificacoesDispatcherOrchestrator(
     /// envio que falhou em <c>Indeterminado</c>.
     /// </summary>
     private async Task RegistrarFalhaNaConversaAsync(
-        AvisoNaoEntregueNaConversa avisoNaoEntregue, EventoNotificacao evento, OutboxMensagemNotificacao mensagem,
+        Lazy<AvisoNaoEntregueNaConversa> avisoNaoEntregue, EventoNotificacao evento, OutboxMensagemNotificacao mensagem,
         ResultadoEnvio resultado, CancellationToken ct)
     {
         try
         {
-            await avisoNaoEntregue.RegistrarFalhaAsync(evento, mensagem, resultado, DateTime.UtcNow, ct);
+            await avisoNaoEntregue.Value.RegistrarFalhaAsync(evento, mensagem, resultado, DateTime.UtcNow, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
