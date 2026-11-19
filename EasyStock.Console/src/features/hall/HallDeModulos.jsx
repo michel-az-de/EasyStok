@@ -12,7 +12,7 @@ import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { MenuDaConta } from '../../componentes/MenuDaConta'
 import { Vazio } from '../../componentes/Vazio'
-import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, tituloDoHall } from '../../dominio/modulos'
+import { atalhosDiretos, buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, tituloDoHall } from '../../dominio/modulos'
 import {
   alternarFavoritoDoHall, favoritosDoHall, moverModuloDoHall, moverPainelDoHall,
   ordenarModulosDoHall, ordenarPaineisDoHall, FOCOS_DO_HALL,
@@ -84,6 +84,17 @@ function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, ind
   )
 }
 
+// #2870: atalho para uma tela (Clientes, Pedidos), com o mesmo desenho do cartão de área e a linha do que ela tem.
+function CartaoAtalho({ atalho }) {
+  return (
+    <li data-atalho={atalho.id} className={css.cartao}>
+      <span className={css.iconeCartao} aria-hidden="true"><IconeDoModulo modulo={atalho.modulo} telaId={atalho.telaId} tamanho={24} /></span>
+      <a className={css.abrir} href={atalho.href} draggable={false}><span className={css.nome}>{atalho.nome}</span></a>
+      <span className={css.pendencia}>{atalho.resumo}</span>
+    </li>
+  )
+}
+
 export function HallDeModulos(props) {
   const chavePreferencia = chaveDasPreferenciasHall(props.sessao)
   return <HallPersonalizado key={chavePreferencia ?? 'visita'} {...props} chavePreferencia={chavePreferencia} />
@@ -122,6 +133,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const permitidosDaGrade = modulosPermitidos.filter((modulo) => !linksDoRodape.some((link) => link.id === modulo.id))
   const modulos = filtrarModulos(daGrade, busca)
   const moduloArrastando = modulos.find((modulo) => modulo.id === arrastando)
+  // #2870: Clientes e Pedidos entram na grade como cartões fixos, depois das áreas. Não arrastam nem viram favorito.
+  const atalhos = organizar ? [] : atalhosDiretos({ fonteApi, acoes, permite })
   const favoritos = favoritosDoHall(permitidosDaGrade, preferencia)
   const buscando = Boolean(busca.trim())
   const destinos = buscarDestinosDoConsole(todos, busca)
@@ -264,11 +277,12 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             },
           }} onDragEnd={({ active, over }) => { clique.aoTerminar(); setArrastando(null); if (over) mover(active.id, over.id) }}>
           <SortableContext items={modulos.map((modulo) => modulo.id)} strategy={rectSortingStrategy}>
-            <ul className={css.grade} data-colunas={colunasDaGrade(modulos.length)} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
+            <ul className={css.grade} data-colunas={colunasDaGrade(modulos.length + atalhos.length)} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
               {modulos.map((modulo, indice) => <CartaoModulo key={modulo.id} modulo={modulo}
                 favorito={preferencia.favoritos.includes(modulo.id)} organizar={podeOrganizar} arrastavel={!buscando} movimentos={preferencia.movimentos}
                 indice={indice} total={modulos.length} pendencia={estadoDoCartao(modulo.id, fontes)}
                 aoFavoritar={favoritar} aoMover={moverPorBotao} />)}
+              {atalhos.map((atalho) => <CartaoAtalho key={`atalho-${atalho.id}`} atalho={atalho} />)}
             </ul>
           </SortableContext>
           <DragOverlay dropAnimation={null}>
