@@ -33,8 +33,8 @@
 /* Pela largura do painel, não da janela: no modal da conversa (880 px) o ajuste vai para baixo do desenho. */
 .conteudo { container-type: inline-size; }
 .fluxo { display: grid; gap: var(--e-4); grid-template-columns: minmax(0, 1fr); align-items: start; }
-@container (min-width: 1000px) {
-  .fluxo { grid-template-columns: minmax(0, 1fr) minmax(280px, 320px); }
+@container (min-width: 900px) {
+  .fluxo { grid-template-columns: minmax(0, 1fr) minmax(300px, 340px); }
   .detalhe { position: sticky; top: var(--e-3); }
 }
 .mapa, .portoes, .roteiro, .ferramentas { list-style: none; margin: 0; padding: 0; }
@@ -67,7 +67,7 @@
 .desligado .noBotao { border-style: dashed; color: var(--tinta-2); background: var(--fundo); }
 .desligado .noTexto strong { text-decoration: line-through; }
 
-.detalhe { min-width: 0; padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); scroll-margin-top: var(--e-3); }
+.detalhe { min-width: 0; padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); scroll-margin-top: calc(var(--e-3) + var(--cabecalho-fixo, 0px)); }
 .bloco { display: grid; gap: var(--e-3); }
 .bloco h4 { margin: 0; display: flex; align-items: center; gap: var(--e-2); font-size: var(--t-forte); color: var(--tinta); overflow-wrap: anywhere; }
 .bloco p { margin: 0; }
@@ -89,3 +89,31 @@
 .barraDoFluxo { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
 .seletor { display: inline-flex; gap: var(--e-1); }
 .barraDoFluxo .nota { flex: 1 1 240px; }
+
+/* #2857: altura do canvas por contexto. No modal desconta o cabeçalho, o topo do painel, as abas, a barra do fluxo e o rodapé
+   (cerca de 440 px dos 86dvh da folha); na página usa a altura útil da tela. */
+.painel[data-contexto="modal"] { --altura-do-canvas: clamp(300px, calc(86dvh - 440px), 640px); --cabecalho-fixo: 72px; }
+@media (max-width: 759px) { .painel[data-contexto="modal"] { --altura-do-canvas: clamp(300px, calc(92dvh - 480px), 640px); } }
+.painel[data-contexto="pagina"] { --altura-do-canvas: max(420px, calc(100dvh - var(--altura-regiao) - var(--altura-item-trilho) - 14rem)); }
+.abas { padding-bottom: 0; }
+.detalhe h4:focus-visible, .bloco h4:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 2px; border-radius: var(--r-1); }
+/* #2857 (V11, V12, I16): nenhum botão tracejado; Salvar parado fica sólido e apagado. Link e ícone sem caixa. */
+.painel button:disabled, .bloco button:disabled { border-style: solid; border-color: var(--linha); background: var(--preenchimento); }
+.bloco .link, .bloco .link:hover:not(:disabled), .bloco .link:active:not(:disabled) {
+  background: none; border-color: transparent; padding-inline: var(--e-1); min-height: var(--toque);
+  color: var(--marca-forte); text-decoration: underline; text-underline-offset: 3px;
+}
+.bloco .soIcone { min-width: var(--toque); padding-inline: 0; justify-content: center; }
+
+/* #2857 (V17): a altura da modal não pula entre as abas. */
+.painel[data-contexto="modal"] .conteudo { min-height: min(520px, calc(86dvh - 220px)); align-content: start; }
+/* #2857 (V2): no celular, os controles do fluxo ficam numa faixa só, rolável de lado. */
+@media (max-width: 899px) {
+  .barraDoFluxo { flex-wrap: nowrap; overflow-x: auto; gap: var(--e-2); }
+  .barraDoFluxo > * { flex: none; }
+  .barraDoFluxo .nota { display: none; }
+}
+/* #2857 (NN1): abaixo de 600 px a faixa quebra em linhas em vez de rolar de lado, e o Expandir fica inteiro à vista. */
+@media (max-width: 599px) {
+  .barraDoFluxo { flex-wrap: wrap; overflow-x: visible; }
+}
