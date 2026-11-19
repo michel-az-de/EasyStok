@@ -424,7 +424,7 @@ public class NotificarClienteStatusPedidoHandlerTests
         await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
         await AvaliarEventosAsync();
 
-        _gravadas.Should().ContainSingle().Which.Texto.Should().StartWith("Oi, Maria! Recebemos seu pagamento e seu pedido está confirmado");
+        _gravadas.Should().ContainSingle().Which.Texto.Should().StartWith("Oi, Maria! Pagamento recebido. Seu pedido está confirmado");
         _eventos.Should().BeEmpty("o aviso S13 só sai quando a automática não sai");
     }
 
