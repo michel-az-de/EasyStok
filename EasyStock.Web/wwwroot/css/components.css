@@ -33,12 +33,12 @@
   border-radius: 14px;
   padding: 18px 22px;
   display: grid; grid-template-columns: 44px 1fr auto; gap: 16px; align-items: center;
-  border-left-width: 4px;
+  border-width: 1px; /* #2894: borda inteira na cor do estado */
 }
-.alert.ok   { border-left-color: var(--ok-600);     background: var(--ok-50); }
-.alert.warn { border-left-color: var(--warn-600);   background: var(--warn-50); }
-.alert.crit { border-left-color: var(--crit-600);   background: var(--crit-50); }
-.alert.info { border-left-color: var(--navy-600); background: var(--navy-50); }
+.alert.ok   { border-color: var(--ok-600);     background: var(--ok-50); }
+.alert.warn { border-color: var(--warn-600);   background: var(--warn-50); }
+.alert.crit { border-color: var(--crit-600);   background: var(--crit-50); }
+.alert.info { border-color: var(--navy-600); background: var(--navy-50); }
 .alert .ic {
   width: 44px; height: 44px; border-radius: 12px;
   display: grid; place-items: center; font-weight: 700; font-size: 22px; color: #fff;
@@ -57,10 +57,10 @@
 /* ---------- Validade rows (lista crítica) ---------- */
 .vrow {
   display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
-  padding: 10px 12px; border-radius: 10px; border-left: 3px solid transparent;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid transparent;
 }
-.vrow.warn { border-left: 3px solid var(--warn-600); background: var(--warn-50); }
-.vrow.crit { border-left: 3px solid var(--crit-600); background: var(--crit-50); }
+.vrow.warn { border-color: var(--warn-600); background: var(--warn-50); }
+.vrow.crit { border-color: var(--crit-600); background: var(--crit-50); }
 .vrow .nm   { font-weight: 600; font-size: 14px; color: var(--text-primary); }
 .vrow .meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 .vdays {
@@ -76,11 +76,10 @@
 .op-card {
   background: var(--bg-surface); border: 1px solid var(--border-soft); border-radius: 14px;
   padding: 22px; display: flex; flex-direction: column; gap: 14px;
-  border-top: 3px solid transparent;
 }
-.op-card.crit { border-top-color: var(--crit-600); }
-.op-card.warn { border-top-color: var(--warn-600); }
-.op-card.ok   { border-top-color: var(--ok-600); }
+.op-card.crit { border-color: var(--crit-600); }
+.op-card.warn { border-color: var(--warn-600); }
+.op-card.ok   { border-color: var(--ok-600); }
 .op-card .ic-box {
   width: 44px; height: 44px; border-radius: 10px;
   display: grid; place-items: center; font-size: 20px; color: #fff;
