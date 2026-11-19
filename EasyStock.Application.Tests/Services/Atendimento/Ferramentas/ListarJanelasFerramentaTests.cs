@@ -124,7 +124,7 @@ public class ListarJanelasFerramentaTests
         var json = JsonDocument.Parse(resultado).RootElement;
         json.GetProperty("prazoMinimoMinutos").GetInt32().Should().Be(100);
         json.GetProperty("opcoesNoMenu").GetInt32().Should().Be(2);
-        json.GetProperty("janelas").EnumerateArray().Select(j => j.GetProperty("janelaId").GetGuid())
+        json.GetProperty("janelas").EnumerateArray().Select(j => j.GetProperty("janela_id").GetGuid())
             .Should().Equal(hoje13.Id, hoje14.Id);
 
         // #2515: o menu sai depois do texto do agente, no fim do turno; a ferramenta só o deixa pronto.
@@ -148,6 +148,17 @@ public class ListarJanelasFerramentaTests
     }
 
     [Fact]
+    public void DescricaoDizQueAsJanelasVaoComoBotoes()
+    {
+        // O modelo lê a descrição: ela tem de bater com o envio real (botões), não com menu numerado.
+        var ferramenta = new ListarJanelasFerramenta(null!, null!, null!, NullLogger<ListarJanelasFerramenta>.Instance);
+
+        ferramenta.Descricao.Should().Contain("como botões logo depois da sua mensagem")
+            .And.NotContain("numeradas")
+            .And.Contain("janela_id");
+    }
+
+    [Fact]
     public async Task PrazoUsaMaiorPreparoDosItens()
     {
         // Item de 90 min + respiro 40 = 130: nada antes de 13:10, então 13:00 sai.
@@ -161,7 +172,7 @@ public class ListarJanelasFerramentaTests
 
         var json = JsonDocument.Parse(resultado).RootElement;
         json.GetProperty("prazoMinimoMinutos").GetInt32().Should().Be(130);
-        json.GetProperty("janelas").EnumerateArray().Select(j => j.GetProperty("janelaId").GetGuid())
+        json.GetProperty("janelas").EnumerateArray().Select(j => j.GetProperty("janela_id").GetGuid())
             .Should().Equal(hoje14.Id);
     }
 
@@ -228,7 +239,7 @@ public class ListarJanelasFerramentaTests
         var resultado = await c.ExecutarAsync(new { data = "2026-06-02" });
 
         var json = JsonDocument.Parse(resultado).RootElement;
-        json.GetProperty("janelas")[0].GetProperty("janelaId").GetGuid().Should().Be(hoje13.Id);
+        json.GetProperty("janelas")[0].GetProperty("janela_id").GetGuid().Should().Be(hoje13.Id);
         (await c.Contexto!.EnviarAdiadoAsync()).Should().BeFalse();
         var saida = c.Mensagens.Should().ContainSingle().Subject;
         saida.Status.Should().Be(StatusMensagem.Falhou);

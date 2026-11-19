@@ -17,7 +17,7 @@ public sealed class RegistrarAvaliacaoFerramenta(RegistrarAvaliacaoSimplesUseCas
 
     public string Descricao =>
         "Registra a avaliação do cliente sobre um pedido entregue, quando ele responde em texto em vez do botão. " +
-        "Use resultado \"positiva\" ou \"negativa\"; na negativa, diga que a Tatiana vai falar com ele.";
+        "Use resultado \"positiva\" ou \"negativa\"; na negativa, diga que a dona da loja vai falar com ele.";
 
     public string SchemaJson =>
         """{"type":"object","properties":{"pedido_id":{"type":"string"},"resultado":{"type":"string","enum":["positiva","negativa"]},"comentario":{"type":"string","maxLength":500}},"required":["pedido_id","resultado"],"additionalProperties":false}""";

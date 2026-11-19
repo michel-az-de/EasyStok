@@ -31,20 +31,20 @@ public sealed class EnviarResumoPedidoFerramenta(
 
     public string Descricao =>
         "Manda ao cliente o resumo do pedido como imagem (itens, frete, total, entrega e endereço) para ele conferir. " +
-        "Use depois de criar_pedido, com o pedidoId devolvido, e peça o ok. Com o ok, use enviar_link_pagamento.";
+        "Use depois de criar_pedido, com o pedido_id devolvido, e peça o ok. Com o ok, use enviar_link_pagamento.";
 
     public string SchemaJson =>
-        """{"type":"object","properties":{"pedidoId":{"type":"string","description":"id devolvido por criar_pedido"}},"required":["pedidoId"],"additionalProperties":false}""";
+        """{"type":"object","properties":{"pedido_id":{"type":"string","description":"id devolvido por criar_pedido"}},"required":["pedido_id"],"additionalProperties":false}""";
 
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
-        if (entrada.ValueKind != JsonValueKind.Object
-            || !Guid.TryParse(FerramentaJson.LerTexto(entrada, "pedidoId"), out var pedidoId))
-            return Recusa("pedido_nao_encontrado", "Use o pedidoId que criar_pedido devolveu.");
+        // A grafia nova (pedido_id) é a que o modelo recebe; a antiga (pedidoId) segue aceita.
+        if (!Guid.TryParse(FerramentaJson.LerTexto(entrada, "pedido_id") ?? FerramentaJson.LerTexto(entrada, "pedidoId"), out var pedidoId))
+            return Recusa("pedido_nao_encontrado", "Use o pedido_id que criar_pedido devolveu.");
 
         var pedido = await pedidoRepository.GetByIdWithDetailsAsync(contexto.EmpresaId, pedidoId);
         if (pedido is null || contexto.ClienteIdEsperado is not { } clienteId || pedido.ClienteId != clienteId)
-            return Recusa("pedido_nao_encontrado", "Use o pedidoId que criar_pedido devolveu.");
+            return Recusa("pedido_nao_encontrado", "Use o pedido_id que criar_pedido devolveu.");
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))
             return Recusa("pedido_finalizado",
                 "O pedido foi cancelado ou já foi entregue. Se o cliente ainda quiser, monte de novo com criar_pedido.");

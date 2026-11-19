@@ -31,12 +31,12 @@ public sealed class EnviarFotoProdutoFerramenta(
         "a foto, com o id de um item de consultar_cardapio que tenha temFoto=true. Depois da foto, responda normalmente.";
 
     public string SchemaJson =>
-        """{"type":"object","properties":{"itemId":{"type":"string","description":"id do item em consultar_cardapio"}},"required":["itemId"],"additionalProperties":false}""";
+        """{"type":"object","properties":{"cardapio_item_id":{"type":"string","description":"id do item em consultar_cardapio"}},"required":["cardapio_item_id"],"additionalProperties":false}""";
 
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
-        if (entrada.ValueKind != JsonValueKind.Object || !entrada.TryGetProperty("itemId", out var id)
-            || !Guid.TryParse(id.GetString(), out var itemId))
+        // A grafia nova (cardapio_item_id) é a que o modelo recebe; a antiga (itemId) segue aceita.
+        if (!Guid.TryParse(FerramentaJson.LerTexto(entrada, "cardapio_item_id") ?? FerramentaJson.LerTexto(entrada, "itemId"), out var itemId))
             return Recusa("item_nao_encontrado", "Use o id de um item que consultar_cardapio devolveu.");
         if (contexto.FotosEnviadas >= LimitePorTurno)
             return Recusa("limite_do_turno", $"Já saíram {LimitePorTurno} fotos nesta resposta; pergunte qual o cliente prefere.");
