@@ -3,7 +3,7 @@
 .caixa {
   margin: auto; padding: 0; border: 0; border-radius: var(--r-3);
   background: var(--papel); color: var(--tinta);
-  width: min(560px, calc(100vw - var(--e-6))); max-height: 86dvh; overflow: hidden;
+  width: min(560px, calc(100vw - var(--e-6))); max-height: 86dvh; overflow: hidden; overflow: clip;
   max-width: calc(100vw - var(--e-4));
   box-shadow: var(--sombra-alta);
   /* `.caixa` em coluna e `.conteudo` como item flexível de `min-height: 0`
@@ -42,6 +42,7 @@
 .caixa h2.titulo {
   margin: 0; padding: var(--e-5) calc(var(--e-24) + var(--toque) + var(--e-3)) var(--e-2) var(--e-5); font-size: var(--t-titulo);
   font-family: var(--f-corpo); font-weight: 700; line-height: var(--lh-compacto); letter-spacing: var(--ls-titulo); flex: none;
+  position: sticky; top: 0; z-index: 1; background: var(--papel);
 }
 .sub { margin: 0 0 var(--e-4); color: var(--tinta-2); font-size: var(--t-apoio); }
 .rodape {

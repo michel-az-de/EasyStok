@@ -36,3 +36,6 @@
 
 /* #2185 (R04): o número é a `Pilula contagem`; aqui só o lugar dele ao lado do rótulo. */
 .contador { margin-left: 0; }
+
+/* #2857 (V13): barra rolável (painel do Assistente): o rótulo não quebra; cabendo, as abas dividem a largura; sem caber, o trilho rola. */
+.rolavel .aba { flex: 1 0 auto; white-space: nowrap; padding-inline: var(--e-3); }

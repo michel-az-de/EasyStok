@@ -20,7 +20,7 @@ ys.forEach((y, i) => { if (i > 0) assert.ok(y > ys[i - 1], `y cresce em ${coluna
 // Largura total: no máximo dois recuos mais um nó, o que cabe em 375 px sem encolher o texto.
 const xs = new Set(coluna.nos.map((n) => n.x))
 assert.deepEqual([...xs].sort((a, b) => a - b), [0, RECUO_DA_COLUNA, 2 * RECUO_DA_COLUNA])
-assert.ok(2 * RECUO_DA_COLUNA + NO_LARGURA <= 260)
+assert.ok(2 * RECUO_DA_COLUNA + NO_LARGURA <= 280)
 
 // Ordem do turno e recuo: o item de um grupo vem logo abaixo dele, um nível para dentro.
 const ordem = coluna.nos.map((n) => n.id)

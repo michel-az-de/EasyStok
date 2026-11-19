@@ -1,0 +1,62 @@
+/* Expandir do fluxo: tela inteira (dialog em top layer, acima do Modal da casa). */
+.caixa {
+  position: fixed; inset: 0; box-sizing: border-box; width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0;
+  padding: calc(var(--e-3) + env(safe-area-inset-top, 0px)) calc(var(--e-4) + env(safe-area-inset-right, 0px))
+    calc(var(--e-3) + env(safe-area-inset-bottom, 0px)) calc(var(--e-4) + env(safe-area-inset-left, 0px));
+  border: 0; border-radius: 0; background: var(--papel); color: var(--tinta);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.caixa::backdrop { background: var(--papel); }
+
+.barra { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); flex: none; }
+.titulo { margin: 0; flex: 1 1 auto; font-size: var(--t-titulo); }
+/* Celular: o título continua nomeando o diálogo, mas só para leitor de tela; a linha vai para o desenho. */
+@media (max-width: 599px) {
+  .caixa { padding: calc(var(--e-2) + env(safe-area-inset-top, 0px)) calc(var(--e-2) + env(safe-area-inset-right, 0px)) calc(var(--e-2) + env(safe-area-inset-bottom, 0px)) calc(var(--e-2) + env(safe-area-inset-left, 0px)); }
+  .titulo { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .seletor { flex: 1 1 auto; }
+  .opcao, .opcaoAtiva { flex: 1 1 0; padding: 0 var(--e-2); }
+}
+.seletor { display: flex; gap: var(--e-2); }
+.opcao, .opcaoAtiva, .recolher {
+  min-height: var(--toque); padding: 0 var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  font: inherit; cursor: pointer;
+}
+.opcao, .recolher { background: var(--elevado); color: var(--tinta); }
+.opcaoAtiva { background: var(--acao); color: var(--sobre-acao); border-color: var(--acao); }
+.opcao:focus-visible, .opcaoAtiva:focus-visible, .recolher:focus-visible, .fecharAjuste:focus-visible {
+  outline: 2px solid var(--acao); outline-offset: 2px;
+}
+
+.corpo {
+  flex: 1; min-height: 0; margin-top: var(--e-3);
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--e-3);
+}
+.canvas { position: relative; min-width: 0; min-height: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-2); overflow: hidden; }
+.nota { margin: var(--e-4); color: var(--tinta-2); }
+
+.ajuste {
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  position: fixed; left: 0; right: 0; bottom: 0; max-height: 50dvh; z-index: 1;
+  padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--papel); border-top: var(--b-1) solid var(--linha);
+  box-shadow: var(--sombra-alta);
+}
+.ajusteRolagem { flex: 1; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4); }
+.fecharAjuste {
+  flex: none; min-height: var(--toque); margin: 0 var(--e-4) var(--e-2); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
+  background: var(--elevado); color: var(--tinta); font: inherit; cursor: pointer;
+}
+.ajusteOculto { display: none; }
+
+@media (min-width: 600px) {
+  .corpo { grid-template-columns: minmax(0, 1fr) 360px; }
+  .ajuste {
+    position: static; max-height: none; padding-bottom: 0; border-top: 0; box-shadow: none;
+    border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
+  }
+  .semAjuste { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 599px) {
+  .corpo { margin-top: var(--e-2); }
+}

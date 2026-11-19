@@ -43,6 +43,8 @@ export function ModalAssistente({ conversa, aoFechar }) {
     )
   }
   const etapasQueBarram = (checagem?.etapas ?? []).filter((etapa) => estadoDaEtapa(etapa).chave === 'barra')
+  // #2857: com o painel, o motivo do bloqueio (a cota, por exemplo) aparece uma vez só: na etapa que barra, não também no veredito.
+  const detalheDoVeredito = renderizarPainel && etapasQueBarram.length > 0 ? null : veredito?.detalhe
 
   const daConversa = (
     <>
@@ -54,7 +56,7 @@ export function ModalAssistente({ conversa, aoFechar }) {
               <Icone nome={checagem.responde ? 'circle-check' : 'circle-x'} />
               <span className={css.checagemTexto}>
                 <strong>{veredito.titulo}</strong>
-                {veredito.detalhe && <span>{veredito.detalhe}</span>}
+                {detalheDoVeredito && <span>{detalheDoVeredito}</span>}
               </span>
             </p>
 
