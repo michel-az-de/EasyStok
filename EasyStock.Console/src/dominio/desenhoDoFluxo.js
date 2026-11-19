@@ -41,8 +41,9 @@ export function idDoGrupo(chave) {
  * `abertos` traz as chaves dos grupos abertos: 'portoes', 'roteiro', 'ferramentas'.
  * @returns {{ nos: Array, arestas: Array, orientacao: string }}
  */
-export function desenharFluxo({ fluxo, roteiro = fluxo?.roteiro ?? [], orientacao = ORIENTACOES.horizontal, abertos = [] }) {
+export function desenharFluxo({ fluxo, roteiro = fluxo?.roteiro ?? [], orientacao = ORIENTACOES.horizontal, abertos = [], compacto = false }) {
   const o = orientacao === ORIENTACOES.vertical ? ORIENTACOES.vertical : ORIENTACOES.horizontal
+  if (compacto && o === ORIENTACOES.vertical) return desenharEmColuna({ fluxo, roteiro, abertos })
   const aberto = new Set(abertos)
   const lado = LADOS[o]
   const horizontal = o === ORIENTACOES.horizontal
@@ -135,6 +136,86 @@ export function desenharFluxo({ fluxo, roteiro = fluxo?.roteiro ?? [], orientaca
   }
 
   return { nos, arestas, orientacao: o }
+}
+
+// #2857: no celular o vertical vira uma coluna só, como um sumário: cada grupo aberto cresce PARA BAIXO, recuado
+// sob quem o contém, e nada cresce para o lado. A largura total cabe numa tela de 375 px sem diminuir o texto.
+//   trilho da esquerda   liga o turno: Mensagem > Verificações > Assistente IA > Resposta
+//   tronco recuado       liga cada grupo aos seus itens (sai da alça `tronco`, embaixo e à esquerda do nó)
+//   corredor da direita  leva Verificações e Assistente à Equipe, que fica no fim, alinhada ao recuo maior
+export const RECUO_DA_COLUNA = 32
+const FOLGA_DA_COLUNA = 24
+
+function desenharEmColuna({ fluxo, roteiro, abertos }) {
+  const aberto = new Set(abertos)
+  const nos = []
+  const arestas = []
+  let linha = 0
+  const no = (id, nivel, dados) => {
+    nos.push({ id, x: nivel * RECUO_DA_COLUNA, y: linha * (NO_ALTURA + FOLGA_DA_COLUNA), dados: { id, ...dados } })
+    linha += 1
+  }
+  const aresta = (origem, origemLado, destino, destinoLado, extra = {}) => arestas.push({
+    id: `${origem}>${destino}`, origem, origemLado, destino, destinoLado, ...extra,
+  })
+  const trilho = (origem, destino) => aresta(origem, 'left', destino, 'left')
+  const tronco = (origem, destino) => aresta(origem, 'tronco', destino, 'left', { tracejada: true, semSeta: true })
+
+  const portoes = fluxo?.portoes ?? []
+  const ferramentas = fluxo?.ferramentas ?? []
+  const { ligadas, total } = contagemDasFerramentas(ferramentas)
+
+  no('entrada', 0, { tipo: 'ponta', icone: 'inbox', titulo: 'Mensagem do cliente', subtitulo: 'WhatsApp' })
+  no(GRUPOS.portoes, 0, {
+    tipo: 'grupo', icone: 'lock', titulo: 'Verificações', subtitulo: `${portoes.length} etapas fixas`, grupo: 'portoes', aberto: aberto.has('portoes'),
+  })
+  trilho('entrada', GRUPOS.portoes)
+  if (aberto.has('portoes')) {
+    portoes.forEach((p, i) => {
+      const id = `portao:${p.codigo}`
+      no(id, 1, {
+        tipo: 'portao', icone: 'lock', titulo: p.titulo, subtitulo: p.escala ? 'Barra e passa à equipe' : 'Barra e o robô só não responde',
+        escala: Boolean(p.escala), ordem: i + 1,
+      })
+      tronco(GRUPOS.portoes, id)
+    })
+  }
+
+  no('assistente', 0, { tipo: 'assistente', icone: 'sparkles', titulo: 'Assistente IA', subtitulo: fluxo?.ativo ? 'Ligado na loja' : 'Desligado na loja' })
+  trilho(GRUPOS.portoes, 'assistente')
+  no('prompt', 1, { tipo: 'prompt', icone: 'settings', titulo: 'Instruções da loja', subtitulo: `${(fluxo?.prompt ?? '').length.toLocaleString('pt-BR')} caracteres` })
+  tronco('assistente', 'prompt')
+  no(GRUPOS.roteiro, 1, {
+    tipo: 'grupo', icone: 'extrato', titulo: 'Roteiro', subtitulo: `${roteiro.filter((e) => e.ativo).length} de ${roteiro.length} etapas`, grupo: 'roteiro', aberto: aberto.has('roteiro'),
+  })
+  tronco('assistente', GRUPOS.roteiro)
+  if (aberto.has('roteiro')) {
+    roteiro.forEach((etapa, i) => {
+      const id = `roteiro:${i}`
+      no(id, 2, { tipo: 'roteiro', icone: 'extrato', titulo: `${i + 1}. ${etapa.nome || 'Sem nome'}`, subtitulo: etapa.instrucao, ativo: etapa.ativo, desligado: !etapa.ativo, indice: i })
+      tronco(GRUPOS.roteiro, id)
+    })
+  }
+  no(GRUPOS.ferramentas, 1, {
+    tipo: 'grupo', icone: 'plug', titulo: 'Ferramentas', subtitulo: `${ligadas} de ${total} ligadas`, grupo: 'ferramentas', aberto: aberto.has('ferramentas'),
+  })
+  tronco('assistente', GRUPOS.ferramentas)
+  if (aberto.has('ferramentas')) {
+    ferramentas.forEach((f) => {
+      const id = `ferramenta:${f.nome}`
+      no(id, 2, { tipo: 'ferramenta', icone: f.travada ? 'lock' : 'plug', titulo: f.nome, ligada: Boolean(f.ligada), travada: Boolean(f.travada), desligado: !f.ligada })
+      tronco(GRUPOS.ferramentas, id)
+    })
+  }
+
+  no('saida', 0, { tipo: 'ponta', icone: 'circle-check', titulo: 'Resposta ao cliente', subtitulo: 'Sai pelo WhatsApp' })
+  trilho('assistente', 'saida')
+  // A Equipe fica no fim, alinhada ao recuo maior: o corredor da direita passa por fora de todos os nós.
+  no('equipe', 2, { tipo: 'equipe', icone: 'usuarios', titulo: 'Equipe', subtitulo: 'Quando barra ou pede ajuda' })
+  aresta(GRUPOS.portoes, 'right', 'equipe', 'right', { tom: 'equipe' })
+  aresta('assistente', 'right', 'equipe', 'right', { tom: 'equipe' })
+
+  return { nos, arestas, orientacao: ORIENTACOES.vertical, compacto: true }
 }
 
 /** Ids a enquadrar quando um grupo abre: o grupo, o Assistente que o contém e os nós novos. */

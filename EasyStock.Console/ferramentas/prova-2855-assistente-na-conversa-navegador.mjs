@@ -197,6 +197,33 @@ try {
   await pagina.screenshot({ path: resolve(pasta, 'fluxo-375.png') })
   const a = await caixa('assistente'), s = await caixa('saida')
   assert.ok(Math.abs(a.x - s.x) < 2 && s.y > a.y, 'vertical por padrão no celular')
+  // #2857: no celular o vertical é uma coluna. O roteiro aberto desce (mesmo x, y crescente), cada nó inteiro dentro
+  // do desenho e em tamanho legível (zoom >= 0,9: o título de 15 px fica com 13,5 px ou mais na tela).
+  const dentro = async (c, rotulo) => {
+    const area = await modal.locator('[data-orientacao]').boundingBox()
+    assert.ok(
+    c.x >= area.x - 1 && c.x + c.w <= area.x + area.width + 1 && c.y >= area.y - 1 && c.y + c.h <= area.y + area.height + 1,
+    `${rotulo} inteiro no desenho em 375 px (${JSON.stringify(c)} em ${JSON.stringify(area)})`)
+  }
+  const etapas = await modal.locator('[data-no^="roteiro:"]').count()
+  const caixasDoRoteiro = []
+  for (let i = 0; i < etapas; i++) caixasDoRoteiro.push(await caixa(`roteiro:${i}`))
+  for (const [i, c] of caixasDoRoteiro.entries()) {
+    await dentro(c, `roteiro:${i}`)
+    assert.ok(c.w / 188 >= 0.9, `roteiro:${i} legível em 375 px (zoom ${(c.w / 188).toFixed(2)})`)
+    if (i > 0) assert.ok(Math.abs(c.x - caixasDoRoteiro[0].x) < 2 && c.y > caixasDoRoteiro[i - 1].y, 'o roteiro desce, não vai para o lado')
+  }
+  // Ferramentas abertas: descem na mesma coluna, e a chave de cada uma tem alvo de toque de 44 px ou mais.
+  await modal.locator('[data-no="grupo:ferramentas"]').click()
+  await modal.locator('[data-no="ferramenta:consultar_pedido"]').waitFor()
+  await pagina.waitForTimeout(400)
+  await pagina.screenshot({ path: resolve(pasta, 'fluxo-375-ferramentas.png') })
+  const ferramenta = await caixa('ferramenta:consultar_pedido')
+  await dentro(ferramenta, 'ferramenta:consultar_pedido')
+  const alvo = await modal.locator('[data-no="ferramenta:consultar_pedido"] label').boundingBox()
+  assert.ok(alvo.height >= 44 && alvo.width >= 44, `alvo da chave com 44 px ou mais (${alvo.width.toFixed(0)}x${alvo.height.toFixed(0)})`)
+  const proxima = await caixa('ferramenta:consultar_cardapio')
+  assert.ok(Math.abs(proxima.x - ferramenta.x) < 2 && proxima.y > ferramenta.y, 'as ferramentas descem, não vão para o lado')
   await modal.getByRole('tab', { name: 'Uso e cota' }).click()
   await modal.getByText('850 mil de 1 mi tokens (85%)', { exact: true }).waitFor()
   const largura = await pagina.evaluate(() => document.documentElement.scrollWidth)

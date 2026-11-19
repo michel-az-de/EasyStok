@@ -44,7 +44,8 @@
   flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
   border-radius: var(--r-1); background: var(--marca-claro); color: var(--marca-forte);
 }
-.no_ferramenta .icone { display: none; }
+/* #2857: ferramenta e etapa do roteiro dispensam o ícone, que é o do grupo; o espaço vai para o nome. */
+.no_ferramenta .icone, .no_roteiro .icone { display: none; }
 .no_ferramenta .texto strong { font-size: var(--t-apoio); }
 .no_assistente .icone { background: var(--marca); color: var(--marca-contraste); }
 .no_equipe .icone, .no_ponta .icone { background: var(--preenchimento); color: var(--tinta); }
@@ -60,4 +61,6 @@
 .abrir { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--r-pilula); background: var(--marca); color: var(--marca-contraste); }
 .ordem { flex: none; display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-apoio); font-weight: 700; color: var(--tinta-2); font-variant-numeric: tabular-nums; }
 .cadeado { flex: none; display: inline-flex; align-items: center; padding-right: var(--e-3); color: var(--tinta-2); }
-.chave { margin: auto var(--e-3) auto 0; }
+.alvoDaChave { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 52px; min-height: 48px; margin: auto var(--e-1) auto 0; cursor: pointer; }
+/* #2857: a alça do tronco fica embaixo, à esquerda (metade do recuo da coluna), para a linha descer ao lado dos itens. */
+.alcaTronco { left: 14px; }

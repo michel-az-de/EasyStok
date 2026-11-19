@@ -115,7 +115,9 @@ function AbaFluxo({ fluxo, podeEditar, painel }) {
     setBase(fluxo.roteiro)
     if (mesmoRoteiro(roteiro, base)) setRoteiro(fluxo.roteiro)
   }
-  const desenho = useMemo(() => desenharFluxo({ fluxo, roteiro, orientacao, abertos }), [fluxo, roteiro, orientacao, abertos])
+  // #2857: em tela estreita o vertical vira coluna (cresce só para baixo); a largura é lida uma vez, como a orientação.
+  const [compacto] = useState(() => Boolean(window.matchMedia?.('(max-width: 599px)').matches))
+  const desenho = useMemo(() => desenharFluxo({ fluxo, roteiro, orientacao, abertos, compacto }), [fluxo, roteiro, orientacao, abertos, compacto])
 
   function selecionar(id) {
     setSelecionado(id)
@@ -128,7 +130,7 @@ function AbaFluxo({ fluxo, podeEditar, painel }) {
   function alternarGrupo(chave, abrir, roteiroNovo = roteiro) {
     const proximos = abrir ? [...abertos.filter((g) => g !== chave), chave] : abertos.filter((g) => g !== chave)
     setAbertos(proximos)
-    setFoco({ ids: abrir ? idsDoGrupo(desenharFluxo({ fluxo, roteiro: roteiroNovo, orientacao, abertos: proximos }), chave) : null })
+    setFoco({ ids: abrir ? idsDoGrupo(desenharFluxo({ fluxo, roteiro: roteiroNovo, orientacao, abertos: proximos, compacto }), chave) : null })
   }
 
   function ativar(id) {
