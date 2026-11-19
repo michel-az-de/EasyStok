@@ -89,6 +89,12 @@ namespace EasyStock.Domain.Entities
         public string? Origem { get; set; }
 
         /// <summary>
+        /// #409: por onde a cliente pediu, marcado por quem lançou o pedido. Não é a <see cref="Origem"/>,
+        /// que diz qual sistema gravou. NULL = não informado.
+        /// </summary>
+        public string? Canal { get; set; }
+
+        /// <summary>
         /// ID do pedido no app mobile (mobile_orders.id) quando o pedido foi
         /// originado lá. Permite linkar reverso e evitar duplicação na sync.
         /// </summary>

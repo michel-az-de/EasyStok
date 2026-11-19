@@ -398,6 +398,7 @@ public class SyncMutationDispatcher(
                 FactAt = factAt,
                 ScheduledDeliveryAt = scheduledDeliveryAt,
                 Metodo = FormaPagamentoMobile.Normalizar(dto.Metodo),
+                Channel = CanalPedidoMobile.Normalizar(dto.Channel),
                 EmpresaId = empresaId,
                 LojaId = lojaId
             };
@@ -441,6 +442,8 @@ public class SyncMutationDispatcher(
             // #1493 — reenvio sem forma (aparelho antigo) nao apaga a forma ja gravada.
             var metodo = FormaPagamentoMobile.Normalizar(dto.Metodo);
             if (metodo is not null) existing.Metodo = metodo;
+            // #409: reenvio sem canal (aparelho antigo) não apaga o canal já gravado.
+            if (CanalPedidoMobile.Normalizar(dto.Channel) is { } canal) existing.Channel = canal;
             _db.RemoveRange(existing.Items);
             foreach (var i in dto.Items)
                 existing.Items.Add(new OrderItem
