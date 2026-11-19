@@ -32,7 +32,7 @@ import { MenuDeAcoes } from '../componentes/MenuDeAcoes'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
 import { HASH_HALL, HASH_MODULO_COZINHA } from '../dominio/rota'
-import { NOME_INICIO, NOME_RESPOSTAS_AUTOMATICAS, moduloPorId } from '../dominio/modulos'
+import { NOME_INICIO, NOME_RESPOSTAS_AUTOMATICAS, atalhosDiretos, moduloPorId } from '../dominio/modulos'
 import { IconeDoModulo } from '../componentes/IconeDoModulo'
 import { JANELA_COZINHA } from '../dominio/janelaAvulsa'
 import { AvisoDaAcaoApi } from './FaixaApi'
@@ -242,7 +242,7 @@ function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
   atendente, aoAbrirAjuda, disposicao,
 }) {
-  const { permite, notificacoes, busca, aoSair, sessaoPersistente, conta } = useAcessoModulos()
+  const { permite, notificacoes, busca, aoSair, sessaoPersistente, conta, acoes } = useAcessoModulos()
   return (
     <nav className={css.trilho} aria-label="Navegação">
       <a className={css.inicioTrilho} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
@@ -267,6 +267,11 @@ function Trilho({
         <IconeDoModulo modulo={MODULO_ATENDIMENTO} />
         <span>{MODULO_ATENDIMENTO.nome}</span>
       </span>
+      {/* #2870: a ficha, o histórico e os pedidos do cliente a um clique da conversa, sem passar por Cadastros. */}
+      {atalhosDiretos({ fonteApi: FONTE_API, acoes, permite }).map((atalho) => <a key={atalho.id} className={css.itemTrilho} href={atalho.href} title={atalho.nome}>
+        <IconeDoModulo modulo={atalho.modulo} telaId={atalho.telaId} tamanho={24} />
+        <span>{atalho.nome}</span>
+      </a>)}
       {/* #2559 (Q11): Cozinha antes de Entregas, como ORDEM_DOS_MODULOS no trilho da gestão. */}
       {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
         <IconeDoModulo modulo={MODULO_COZINHA} tamanho={24} />
