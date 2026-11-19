@@ -46,117 +46,18 @@ public sealed class ProductLinker(
         {
             try
             {
-                var mobileP = await db.Set<Product>()
-                    .FirstOrDefaultAsync(p => p.Id == pid && p.EmpresaId == empresaId);
-                if (mobileP == null) { idempotentSkip++; continue; }
-                if (mobileP.ErpProductId.HasValue)
-                {
-                    cachedSysUserId = await EspelharCustoEMinimoAsync(mobileP, empresaId.Value, cachedSysUserId);
-                    idempotentSkip++;
-                    continue;
-                }
-
-                // PROD-002 (#612): o nome vem do push do PWA/app sem validacao de tags. Sanitiza
-                // antes de matchear/criar o Produto ERP para nao persistir markup (XSS armazenado
-                // que vazaria em PDF/etiqueta/exportacao). Em background nao da pra rejeitar:
-                // sanitiza-e-loga.
-                var nomeLimpo = UseCaseGuards.RemoverTagsHtml(mobileP.Name) ?? string.Empty;
-                if (!string.Equals(nomeLimpo, mobileP.Name, StringComparison.Ordinal))
-                    log.LogWarning("AutoLink Produto: nome do mobile continha tags HTML e foi sanitizado. mobile={MobileId} empresaId={EmpresaId}", pid, empresaId);
-
-                var webP = await db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
-                    .FirstOrDefaultAsync(p =>
-                        p.EmpresaId == empresaId
-                        && p.Status == StatusProduto.Ativo
-                        // #2477: "%" e "_" no nome do app são texto; sem escape, "Bolo_" casava com "Bolos".
-                        && EF.Functions.ILike(p.Nome, PadraoILike.Literal(nomeLimpo), PadraoILike.Escape));
-
-                if (webP != null)
-                {
-                    mobileP.ErpProductId = webP.Id;
-                    matched++;
-                    log.LogInformation("AutoLink Produto matched: mobile={MobileId} → erp={ErpId} via nome match", pid, webP.Id);
-                    cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
-                    db.Add(new ProdutoAlteracao
-                    {
-                        Id = Guid.NewGuid(),
-                        EmpresaId = empresaId.Value,
-                        ProdutoId = webP.Id,
-                        UsuarioId = cachedSysUserId.Value,
-                        Acao = "atualizado",
-                        AlteracoesJson = $"[{{\"campo\":\"vinculacao_mobile\",\"de\":null,\"para\":\"mobile_product={pid}\"}}]",
-                        Motivo = "Sync mobile",
-                        Observacao = $"Vinculado ao mobile_product {pid}",
-                        AlteradoEm = DateTime.UtcNow
-                    });
-                    continue;
-                }
-
-                var produtoDoPrato = await ProdutoDoPratoAsync(nomeLimpo, empresaId.Value, pid);
-                if (produtoDoPrato.HasValue)
-                {
-                    mobileP.ErpProductId = produtoDoPrato.Value;
-                    matched++;
-                    log.LogInformation("AutoLink Produto matched: mobile={MobileId} → erp={ErpId} via prato do cardapio", pid, produtoDoPrato.Value);
-                    cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
-                    db.Add(new ProdutoAlteracao
-                    {
-                        Id = Guid.NewGuid(),
-                        EmpresaId = empresaId.Value,
-                        ProdutoId = produtoDoPrato.Value,
-                        UsuarioId = cachedSysUserId.Value,
-                        Acao = "atualizado",
-                        AlteracoesJson = $"[{{\"campo\":\"vinculacao_mobile\",\"de\":null,\"para\":\"mobile_product={pid}\"}}]",
-                        Motivo = "Sync mobile",
-                        Observacao = $"Vinculado ao mobile_product {pid} pelo nome do prato do cardápio",
-                        AlteradoEm = DateTime.UtcNow
-                    });
-                    continue;
-                }
-
-                cachedCategoriaId ??= await CategoriaDefaultHelper.GetOrCreateAsync(db, log, empresaId.Value);
-
-                var novoProd = new Produto
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = empresaId.Value,
-                    CategoriaId = cachedCategoriaId.Value,
-                    Nome = nomeLimpo,
-                    Tipo = TipoProduto.Alimento,
-                    Status = StatusProduto.Ativo,
-                    PrecoReferencia = mobileP.Price is { } pr && pr > 0 ? Dinheiro.FromDecimal(pr) : null,
-                    CustoReferencia = mobileP.Cost is { } cu && cu > 0 ? Dinheiro.FromDecimal(cu) : null,
-                    QuantidadeMinima = mobileP.MinStock,
-                    CodigoBarras = mobileP.Sku,
-                    ControlaValidade = mobileP.DefaultValidityDays.HasValue,
-                    CriadoEm = DateTime.UtcNow,
-                    AlteradoEm = DateTime.UtcNow
-                };
-                await produtoRepository.InsertAsync(novoProd);
-                mobileP.ErpProductId = novoProd.Id;
-                cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
-                db.Add(new ProdutoAlteracao
-                {
-                    Id = Guid.NewGuid(),
-                    EmpresaId = empresaId.Value,
-                    ProdutoId = novoProd.Id,
-                    UsuarioId = cachedSysUserId.Value,
-                    Acao = "cadastrado",
-                    AlteracoesJson = null,
-                    Motivo = "Sync mobile",
-                    Observacao = $"Criado via mobile_product {pid}; Nome={novoProd.Nome}; Preco={novoProd.PrecoReferencia?.Valor}",
-                    AlteradoEm = DateTime.UtcNow
-                });
-                created++;
-                log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
-                    pid, novoProd.Id, nomeLimpo);
+                await VincularAsync(pid);
+                // #2911: grava produto a produto. O produto seguinte de mesmo nome acha este no banco, e a recusa
+                // de um não leva junto clientes e pedidos do envio, que o SyncAutoLinker grava depois.
+                if (db.ChangeTracker.HasChanges()) await db.SaveChangesAsync();
             }
             catch (Exception ex)
             {
                 errorSkip++;
-                // Antes: LogWarning sem tipo. Agora exType e Mensagem em props
-                // estruturadas (Serilog/OTel) permitem filtrar por classe de erro
-                // sem precisar baixar e parsear stack trace.
+                DescartarPendencias();
+                // A categoria e o usuário de sistema criados neste produto foram descartados junto.
+                cachedCategoriaId = null;
+                cachedSysUserId = null;
                 log.LogError(ex,
                     "AutoLink Produto FALHOU mobile={MobileId} empresaId={EmpresaId} exType={ExType}: {Mensagem}",
                     pid, empresaId, ex.GetType().Name, ex.Message);
@@ -165,6 +66,135 @@ public sealed class ProductLinker(
         log.LogInformation(
             "AutoLink Produto summary empresaId={EmpresaId} total={Total} matched={Matched} created={Created} idempotent={Idempotent} errors={Errors}",
             empresaId, idsList.Count, matched, created, idempotentSkip, errorSkip);
+
+        async Task VincularAsync(string pid)
+        {
+            var mobileP = await db.Set<Product>()
+                .FirstOrDefaultAsync(p => p.Id == pid && p.EmpresaId == empresaId);
+            if (mobileP == null) { idempotentSkip++; return; }
+            if (mobileP.ErpProductId.HasValue)
+            {
+                cachedSysUserId = await EspelharCustoEMinimoAsync(mobileP, empresaId.Value, cachedSysUserId);
+                idempotentSkip++;
+                return;
+            }
+
+            // PROD-002 (#612): o nome vem do push do PWA/app sem validacao de tags. Sanitiza
+            // antes de matchear/criar o Produto ERP para nao persistir markup (XSS armazenado
+            // que vazaria em PDF/etiqueta/exportacao). Em background nao da pra rejeitar:
+            // sanitiza-e-loga.
+            var nomeLimpo = UseCaseGuards.RemoverTagsHtml(mobileP.Name) ?? string.Empty;
+            if (!string.Equals(nomeLimpo, mobileP.Name, StringComparison.Ordinal))
+                log.LogWarning("AutoLink Produto: nome do mobile continha tags HTML e foi sanitizado. mobile={MobileId} empresaId={EmpresaId}", pid, empresaId);
+
+            // #2911: o inativo de mesmo nome também casa (sem reativar). Antes o linker tentava criar outro
+            // Produto com o nome dele, o índice único (EmpresaId, Nome) recusava e o envio perdia o vínculo.
+            var webP = await db.Set<Produto>().IgnoreQueryFilters().AsNoTracking()
+                .Where(p =>
+                    p.EmpresaId == empresaId
+                    // #2477: "%" e "_" no nome do app são texto; sem escape, "Bolo_" casava com "Bolos".
+                    && EF.Functions.ILike(p.Nome, PadraoILike.Literal(nomeLimpo), PadraoILike.Escape))
+                .OrderBy(p => p.Status == StatusProduto.Ativo ? 0 : 1)
+                .FirstOrDefaultAsync();
+
+            if (webP != null)
+            {
+                mobileP.ErpProductId = webP.Id;
+                matched++;
+                log.LogInformation("AutoLink Produto matched: mobile={MobileId} → erp={ErpId} via nome match", pid, webP.Id);
+                cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
+                db.Add(new ProdutoAlteracao
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId.Value,
+                    ProdutoId = webP.Id,
+                    UsuarioId = cachedSysUserId.Value,
+                    Acao = "atualizado",
+                    AlteracoesJson = $"[{{\"campo\":\"vinculacao_mobile\",\"de\":null,\"para\":\"mobile_product={pid}\"}}]",
+                    Motivo = "Sync mobile",
+                    Observacao = $"Vinculado ao mobile_product {pid}",
+                    AlteradoEm = DateTime.UtcNow
+                });
+                return;
+            }
+
+            var produtoDoPrato = await ProdutoDoPratoAsync(nomeLimpo, empresaId.Value, pid);
+            if (produtoDoPrato.HasValue)
+            {
+                mobileP.ErpProductId = produtoDoPrato.Value;
+                matched++;
+                log.LogInformation("AutoLink Produto matched: mobile={MobileId} → erp={ErpId} via prato do cardapio", pid, produtoDoPrato.Value);
+                cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
+                db.Add(new ProdutoAlteracao
+                {
+                    Id = Guid.NewGuid(),
+                    EmpresaId = empresaId.Value,
+                    ProdutoId = produtoDoPrato.Value,
+                    UsuarioId = cachedSysUserId.Value,
+                    Acao = "atualizado",
+                    AlteracoesJson = $"[{{\"campo\":\"vinculacao_mobile\",\"de\":null,\"para\":\"mobile_product={pid}\"}}]",
+                    Motivo = "Sync mobile",
+                    Observacao = $"Vinculado ao mobile_product {pid} pelo nome do prato do cardápio",
+                    AlteradoEm = DateTime.UtcNow
+                });
+                return;
+            }
+
+            cachedCategoriaId ??= await CategoriaDefaultHelper.GetOrCreateAsync(db, log, empresaId.Value);
+
+            var novoProd = new Produto
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId.Value,
+                CategoriaId = cachedCategoriaId.Value,
+                Nome = nomeLimpo,
+                Tipo = TipoProduto.Alimento,
+                Status = StatusProduto.Ativo,
+                PrecoReferencia = mobileP.Price is { } pr && pr > 0 ? Dinheiro.FromDecimal(pr) : null,
+                CustoReferencia = mobileP.Cost is { } cu && cu > 0 ? Dinheiro.FromDecimal(cu) : null,
+                QuantidadeMinima = mobileP.MinStock,
+                CodigoBarras = mobileP.Sku,
+                ControlaValidade = mobileP.DefaultValidityDays.HasValue,
+                CriadoEm = DateTime.UtcNow,
+                AlteradoEm = DateTime.UtcNow
+            };
+            await produtoRepository.InsertAsync(novoProd);
+            mobileP.ErpProductId = novoProd.Id;
+            cachedSysUserId ??= await systemUserResolver.GetOrCreateAsync(empresaId.Value);
+            db.Add(new ProdutoAlteracao
+            {
+                Id = Guid.NewGuid(),
+                EmpresaId = empresaId.Value,
+                ProdutoId = novoProd.Id,
+                UsuarioId = cachedSysUserId.Value,
+                Acao = "cadastrado",
+                AlteracoesJson = null,
+                Motivo = "Sync mobile",
+                Observacao = $"Criado via mobile_product {pid}; Nome={novoProd.Nome}; Preco={novoProd.PrecoReferencia?.Valor}",
+                AlteradoEm = DateTime.UtcNow
+            });
+            created++;
+            log.LogInformation("AutoLink Produto CRIADO: mobile={MobileId} → erp={ErpId} ({Nome})",
+                pid, novoProd.Id, nomeLimpo);
+        }
+    }
+
+    /// <summary>
+    /// #2911: desfaz no contexto o que o produto que falhou deixou pendente (Produto novo, histórico, vínculo), para
+    /// a próxima gravação não tentar de novo o mesmo erro. O linker roda antes de clientes e pedidos, então o que
+    /// está pendente aqui é só deste produto.
+    /// </summary>
+    private void DescartarPendencias()
+    {
+        foreach (var entry in db.ChangeTracker.Entries().ToList())
+        {
+            if (entry.State == EntityState.Added) entry.State = EntityState.Detached;
+            else if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                entry.CurrentValues.SetValues(entry.OriginalValues);
+                entry.State = EntityState.Unchanged;
+            }
+        }
     }
 
     /// <summary>

@@ -45,6 +45,9 @@ public class SyncAutoLinker(
         var autoLinkBatch  = _appConfig.GetValue<bool>("MobileSync:AutoLink:Batch", true);
         var autoLinkCash   = _appConfig.GetValue<bool>("MobileSync:AutoLink:CashEntry", true);
 
+        if (empresaId is { } empresa)
+            (productIds, clientIds, orderIds) = await ComOrfaosAsync(empresa, productIds, clientIds, orderIds);
+
         if (autoLinkProd   && productIds.Count > 0) await _productLinker.ExecuteAsync(productIds, empresaId);
         if (autoLinkClient && clientIds.Count  > 0) await _clientLinker.ExecuteAsync(clientIds, empresaId, documentosDosClientes);
         // F1/F2/F3 â€” promove orders/batches/cash DEPOIS de products/clients pra que
@@ -57,8 +60,39 @@ public class SyncAutoLinker(
         if (autoLinkCash   && cashIds.Count    > 0) await _cashEntryLinker.ExecuteAsync(cashIds, empresaId);
     }
 
+    /// <summary>Quantos órfãos de cada tipo um envio tenta de novo, para um órfão que sempre falha não pesar no sync.</summary>
+    private const int OrfaosPorEnvio = 50;
+
     /// <summary>
-    /// F5 â€” Backfill: iterates all unlinked entities for the empresa and runs
+    /// #2911: produto, cliente e pedido cujo vínculo falhou num envio ficavam só no aparelho; o app não os reenvia e
+    /// o backfill não tem quem chame. Cada envio da empresa tenta de novo os mais recentes. Pedido cancelado que
+    /// nunca foi ao ERP fica de fora, e pedido do fluxo antigo de venda (ErpVendaId) também.
+    /// </summary>
+    private async Task<(HashSet<string>, HashSet<string>, HashSet<string>)> ComOrfaosAsync(
+        Guid empresaId, HashSet<string> productIds, HashSet<string> clientIds, HashSet<string> orderIds)
+    {
+        var produtos = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId && p.ErpProductId == null)
+            .OrderByDescending(p => p.UpdatedAt).Take(OrfaosPorEnvio).Select(p => p.Id).ToListAsync();
+        var clientes = await _db.Set<Client>().IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.EmpresaId == empresaId && c.ErpClienteId == null)
+            .OrderByDescending(c => c.UpdatedAt).Take(OrfaosPorEnvio).Select(c => c.Id).ToListAsync();
+        var pedidos = await _db.Set<Order>().IgnoreQueryFilters().AsNoTracking()
+            .Where(o => o.EmpresaId == empresaId && o.ErpPedidoId == null && o.ErpVendaId == null && o.Status != "cancelado")
+            .OrderByDescending(o => o.UpdatedAt).Take(OrfaosPorEnvio).Select(o => o.Id).ToListAsync();
+
+        if (produtos.Count + clientes.Count + pedidos.Count > 0)
+            _log.LogInformation("AutoLink: tentando de novo órfãos empresa={EmpresaId} products={P} clients={C} orders={O}",
+                empresaId, produtos.Count, clientes.Count, pedidos.Count);
+
+        return (Uniao(productIds, produtos), Uniao(clientIds, clientes), Uniao(orderIds, pedidos));
+
+        static HashSet<string> Uniao(HashSet<string> doEnvio, List<string> orfaos) =>
+            new(doEnvio.Concat(orfaos), StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// F5â€” Backfill: iterates all unlinked entities for the empresa and runs
     /// the full auto-link pipeline. Idempotent.
     /// </summary>
     public async Task<BackfillCounts> BackfillAsync(Guid empresaId, CancellationToken ct)
