@@ -18,13 +18,18 @@ public sealed class AvaliacaoAcaoBotao(
     IEscaladorConversa escalador,
     ResolvedorCanal canais,
     IConversaRepository conversas,
+    IConfiguracaoAtendimentoRepository configuracoes,
     ILogger<AvaliacaoAcaoBotao> logger) : IAcaoBotaoHandler
 {
     public const string NomeAcao = "avaliacao";
     public const string RespostaPositiva = "Que bom que você gostou! Obrigada pela avaliação.";
-    public const string RespostaNegativa = "Sinto muito que não foi como esperado. A Tatiana vai falar com você.";
     public const string RespostaDuplicada = "Você já avaliou esse pedido. Obrigada!";
     public const string MotivoEscalada = "cliente avaliou o pedido como negativo";
+
+    /// <summary>Sem nome da dona configurado, usa o mesmo termo genérico do prompt do agente.</summary>
+    public static string RespostaNegativa(string? nomeDona) => string.IsNullOrWhiteSpace(nomeDona)
+        ? "Sinto muito que não foi como esperado. A dona vai falar com você."
+        : $"Sinto muito que não foi como esperado. A {nomeDona.Trim()} vai falar com você.";
 
     public string Nome => NomeAcao;
 
@@ -47,7 +52,9 @@ public sealed class AvaliacaoAcaoBotao(
         try
         {
             await registrar.ExecutarAsync(empresaId, clienteId, pedidoId, resultado, null, agora, ct);
-            resposta = resultado == ResultadoAvaliacao.Positiva ? RespostaPositiva : RespostaNegativa;
+            resposta = resultado == ResultadoAvaliacao.Positiva
+                ? RespostaPositiva
+                : RespostaNegativa(await NomeDonaAsync(empresaId));
             if (resultado == ResultadoAvaliacao.Negativa)
                 await escalador.EscalarAsync(empresaId, conversa, MotivoEscalada, agora, ct);
         }
@@ -63,6 +70,12 @@ public sealed class AvaliacaoAcaoBotao(
         }
 
         await ResponderAsync(empresaId, conversa, resposta, ct);
+    }
+
+    private async Task<string?> NomeDonaAsync(Guid empresaId)
+    {
+        var configuracao = await configuracoes.GetOrDefaultAsync(empresaId);
+        return configuracao?.NomeDona;
     }
 
     private async Task ResponderAsync(Guid empresaId, Conversa conversa, string texto, CancellationToken ct)

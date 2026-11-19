@@ -27,8 +27,8 @@ public sealed class CriarPedidoFerramenta(
 
     public string Descricao =>
         "Cria o pedido do cliente desta conversa, ainda sem link de pagamento. Use os ids de consultar_cardapio. " +
-        "Devolve pedidoId, itens, frete, total e entrega; se faltar janela ou endereço, devolve as opções para você " +
-        "perguntar ao cliente. Depois use enviar_resumo_pedido com o pedidoId.";
+        "Devolve pedido_id, itens, frete, total e entrega; se faltar janela ou endereço, devolve as opções para você " +
+        "perguntar ao cliente. Depois use enviar_resumo_pedido com o pedido_id.";
 
     public string SchemaJson => """
         {"type":"object","properties":{
@@ -112,7 +112,7 @@ public sealed class CriarPedidoFerramenta(
 
         return FerramentaJson.Serializar(new
         {
-            pedidoId = reservado.Pedido.Id,
+            pedido_id = reservado.Pedido.Id,
             itens = reservado.Itens.Select(i => new
             {
                 nome = i.Nome,
@@ -123,7 +123,7 @@ public sealed class CriarPedidoFerramenta(
             frete = FerramentaJson.FormatarReais(reservado.ItemFrete.PrecoUnitario),
             total = FerramentaJson.FormatarReais(reservado.Total),
             entrega = dataEntrega.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-            orientacao = "Pedido criado, ainda sem link. Use enviar_resumo_pedido com este pedidoId e peça o ok do cliente; " +
+            orientacao = "Pedido criado, ainda sem link. Use enviar_resumo_pedido com este pedido_id e peça o ok do cliente; " +
                 "com o ok, use enviar_link_pagamento.",
         });
     }

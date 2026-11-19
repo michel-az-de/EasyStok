@@ -125,7 +125,7 @@ public class CriarPedidoFerramentaTests
         using var json = JsonDocument.Parse(resultado);
         json.RootElement.TryGetProperty("erro", out _).Should().BeFalse(resultado);
         json.RootElement.TryGetProperty("linkPagamento", out _).Should().BeFalse(resultado);
-        json.RootElement.GetProperty("pedidoId").GetString().Should().NotBeNullOrWhiteSpace();
+        json.RootElement.GetProperty("pedido_id").GetString().Should().NotBeNullOrWhiteSpace();
         json.RootElement.GetProperty("total").GetString().Should().NotBeNullOrWhiteSpace();
         json.RootElement.GetProperty("itens")[0].GetProperty("observacao").GetString().Should().Be("sem granulado");
         json.RootElement.GetProperty("orientacao").GetString().Should().Contain("enviar_resumo_pedido");

@@ -49,6 +49,13 @@ public class EnviarLinkPagamentoFerramentaTests
 
         public ContextoTurnoAgente Contexto { get; private set; } = null!;
 
+        public async Task<JsonElement> ExecutarComEntradaAsync(object entrada)
+        {
+            Contexto = new ContextoTurnoAgente(Cobranca.EmpresaId, Conversa, Agora);
+            var resultado = await _ferramenta.ExecutarAsync(Contexto, JsonSerializer.SerializeToElement(entrada));
+            return JsonDocument.Parse(resultado).RootElement.Clone();
+        }
+
         public async Task<JsonElement> ExecutarAsync(Guid? pedidoId = null)
         {
             Contexto = new ContextoTurnoAgente(Cobranca.EmpresaId, Conversa, Agora);
@@ -94,6 +101,17 @@ public class EnviarLinkPagamentoFerramentaTests
         resultado.GetProperty("linkGerado").GetBoolean().Should().BeTrue();
         c.Cobranca.Cobrancas.Should().ContainSingle().Which.ConversaId.Should().Be(c.Conversa.Id);
         c.Contexto.RespostaVerificada.Should().Contain("https://mp.test/pref-1").And.Contain("R$ 25,00").And.Contain("Pix");
+    }
+
+    [Fact]
+    public async Task ResumoComOk_AceitaPedidoIdNovaGrafia()
+    {
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        var resultado = await c.ExecutarComEntradaAsync(new { pedido_id = c.Cobranca.Pedido.Id });
+
+        resultado.GetProperty("linkGerado").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
