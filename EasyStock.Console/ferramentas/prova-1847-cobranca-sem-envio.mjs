@@ -21,7 +21,7 @@ for (const enviarAoCliente of [false, true]) {
   if (enviarAoCliente) await acoes.gerarPedido('conversa', 'pix')
   else await acoes.gerarCobranca('conversa', pedido, 'pix', false)
   assert.equal(pedidos.length, 1)
-  assert.equal(pedidos[0].enviarAoCliente, enviarAoCliente, 'o default mantém envio; a janela fechada usa false explícito')
+  assert.equal(pedidos[0].enviarAoCliente, enviarAoCliente, 'o default mantém envio; false só quando o chamador pede explicitamente')
   const sincronizado = despachados.findLast(a => a.pedido)?.pedido
   assert.ok(sincronizado?.cobranca?.link, 'o link fica disponível para copiar')
   if (!enviarAoCliente) {

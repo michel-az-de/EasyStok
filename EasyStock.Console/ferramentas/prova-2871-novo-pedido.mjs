@@ -60,7 +60,20 @@ async function gerar(resposta) {
 }
 {
   const { avisos, sincronizado } = await gerar({ enviadoAoCliente: false })
-  assert.ok(avisos.some(m => /o resumo não saiu ao cliente/.test(m)), 'sem a fila o aviso de falha continua')
+  assert.ok(avisos.some(m => /o cliente não foi avisado/.test(m)), 'sem a fila o aviso diz com todas as letras que o cliente não foi avisado')
   assert.equal(situacaoDoEnvio(sincronizado).chave, 'nao-enviada')
 }
+// 3. #2901: com a janela fechada o Console pede o envio (o servidor escolhe texto livre ou fila) e não promete "gerar
+// sem enviar". A decisão vive em PainelFicha; os textos, nos dois blocos da ficha.
+{
+  const { readFileSync } = await import('node:fs')
+  const fonte = (nome) => readFileSync(new URL(`../src/features/ficha-cliente/${nome}`, import.meta.url), 'utf8')
+  const painel = fonte('PainelFicha.jsx')
+  assert.ok(!/gerarPedido\(selecionada\.id, meio, !/.test(painel), 'gerar pedido não desliga o envio por causa da janela')
+  assert.ok(!/gerarCobranca\(selecionada\.id, pedido, meio, !/.test(painel), 'gerar cobrança não desliga o envio por causa da janela')
+  assert.ok(!/gerarSemEnviar/.test(painel + fonte('BlocoPedido.jsx') + fonte('BarraProximoPasso.jsx')), 'a flag que desligava o envio saiu')
+  assert.ok(!/gere sem enviar|gerada sem envio/i.test(fonte('BarraProximoPasso.jsx') + fonte('BlocoPedido.jsx')), 'o texto não manda gerar sem enviar')
+  assert.ok(/modelo aprovado do WhatsApp/.test(fonte('BarraProximoPasso.jsx')) && /modelo aprovado do WhatsApp/.test(fonte('BlocoPedido.jsx')), 'o texto diz que o resumo sai pelo modelo aprovado')
+}
+
 console.log('ok prova-2871: intenção de novo pedido no anúncio e resumo pela fila fora da janela')
