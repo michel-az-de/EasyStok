@@ -71,7 +71,7 @@ public class HistoricoAssistenteUseCasesTests
         // S78 (#2896): 3 respostas sem IA e 2 turnos do modelo que gastaram 30 mil tokens. Média de 15 mil por turno
         // do modelo: as 3 sem IA pouparam perto de 45 mil.
         _turnos.SomarAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns(new SomaTurnosAgente(5, 20_000, 4_000, 6_000, 0.05m, 3, RespostasSemIa: 3));
+            .Returns(new SomaTurnosAgente(5, 20_000, 4_000, 6_000, 0.05m, 3, RespostasSemIa: 3, TurnosComTokens: 2));
 
         var uso = await new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System).ExecuteAsync(new ObterUsoAssistenteQuery(_empresaId));
 
@@ -94,10 +94,36 @@ public class HistoricoAssistenteUseCasesTests
     }
 
     [Fact]
+    public async Task UsoSoComTurnoDeCotaNaoInventaEstimativa()
+    {
+        // 2 sem IA e 1 de cota esgotada: nenhum turno gastou token, então não há média. Nulo, não "0 poupados".
+        _turnos.SomarAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(new SomaTurnosAgente(3, 0, 0, 0, 0m, 3, RespostasSemIa: 2, TurnosComTokens: 0));
+
+        var uso = await new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System).ExecuteAsync(new ObterUsoAssistenteQuery(_empresaId));
+
+        uso.RespostasSemIa.Should().Be(2);
+        uso.TokensPoupadosEstimados.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UsoTiraDaMediaOTurnoQueNaoGastouToken()
+    {
+        // 2 sem IA, 2 turnos do modelo com 30 mil no total e 1 de cota esgotada. A média é 15 mil (30 mil em 2), não
+        // 10 mil (30 mil em 3): o turno de cota não chamou o modelo e não pode baratear a estimativa.
+        _turnos.SomarAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(new SomaTurnosAgente(5, 30_000, 0, 0, 0m, 5, RespostasSemIa: 2, TurnosComTokens: 2));
+
+        var uso = await new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System).ExecuteAsync(new ObterUsoAssistenteQuery(_empresaId));
+
+        uso.TokensPoupadosEstimados.Should().Be(30_000);
+    }
+
+    [Fact]
     public async Task UsoSemRespostaSemIaNaoTemEstimativa()
     {
         _turnos.SomarAsync(_empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
-            .Returns(new SomaTurnosAgente(4, 40_000, 0, 0, 0m, 0));
+            .Returns(new SomaTurnosAgente(4, 40_000, 0, 0, 0m, 0, TurnosComTokens: 4));
 
         var uso = await new ObterUsoAssistenteUseCase(_turnos, TimeProvider.System).ExecuteAsync(new ObterUsoAssistenteQuery(_empresaId));
 

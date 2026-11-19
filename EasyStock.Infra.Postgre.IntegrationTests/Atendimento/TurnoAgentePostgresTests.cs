@@ -32,7 +32,7 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
         await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
         var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
 
-        soma.Should().Be(new SomaTurnosAgente(2, 300, 50, 50, 0.001m, 1));
+        soma.Should().Be(new SomaTurnosAgente(2, 300, 50, 50, 0.001m, 1, RespostasSemIa: 0, TurnosComTokens: 2));
     }
 
     [SkippableFact]
@@ -59,6 +59,8 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
 
         soma.Turnos.Should().Be(7);
         soma.RespostasSemIa.Should().Be(2);
+        // Respondeu, Escalou e Interrompido gastaram token; Cota, Erro e os dois SemIa, não.
+        soma.TurnosComTokens.Should().Be(3);
     }
 
     [SkippableFact]
