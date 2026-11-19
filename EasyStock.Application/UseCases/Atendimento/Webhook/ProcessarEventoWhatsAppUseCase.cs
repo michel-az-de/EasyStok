@@ -422,6 +422,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             {
                 // Reação, mensagem sem suporte ou de sistema: fica gravada para a dona; o agente não responde.
             }
+            else if (MidiaQueOAgenteNaoLe(msg.Tipo, msg.TextoCorpo))
+            {
+                // #2869: figurinha e vídeo sem legenda ficam gravados para a dona; o agente não vê o conteúdo e não responde.
+            }
             else if (!string.IsNullOrWhiteSpace(msg.MidiaId)
                 && ProcessarMidiaWhatsAppJobUseCase.AguardaTranscricao(mensagem.TipoConteudo, transcritor?.Disponivel == true))
             {
@@ -619,6 +623,9 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
     private static bool SemRespostaAutomatica(string tipo, string? botaoId) =>
         EhAcaoDeBotao(botaoId) || TiposSemTurnoDoAgente.Contains(tipo);
+
+    private static bool MidiaQueOAgenteNaoLe(string tipo, string? legenda) =>
+        tipo == "sticker" || (tipo == "video" && string.IsNullOrWhiteSpace(legenda));
 
     private static TipoConteudoMensagem MapearTipoConteudo(string tipo) => tipo switch
     {
