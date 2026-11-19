@@ -37,6 +37,8 @@ public static partial class ServiceCollectionExtensions
         // #2007: o registro de pagamento (muitos hosts) só materializa o aviso no ramo do sinal manual.
         services.AddScoped(sp => new Lazy<AvisoStatusPedidoCliente>(() => sp.GetRequiredService<AvisoStatusPedidoCliente>()));
         services.AddScoped<AvisoPedidoNaConversa>(); // #1991-1: o mesmo aviso no chat do site
+        services.AddScoped<ResumoPedidoForaDaJanela>(); // #2871: resumo do pedido pela fila fora da janela de 24 h
+        services.AddScoped<ConversaWhatsAppDoCliente>(); // #1408/#2871: conversa do WhatsApp com cliente cadastrado
         services.AddScoped<AvisoEquipeNoAparelho>(); // #1807: avisos do Balcão no aparelho (Web Push)
         services.AddScoped<OptOutPorPalavra>();
         services.AddScoped<SaudacaoAtendimento>();

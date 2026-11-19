@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
@@ -12,7 +13,7 @@ namespace EasyStock.Application.Services.Atendimento;
 /// Texto do pedido da conversa: itens, frete, total, entrega e forma de pagamento. Serve à nota do
 /// cardápio do site (S48) e ao resumo que a operadora manda ao cliente pelo console (F03).
 /// </summary>
-public static class ResumoPedidoConversa
+public static partial class ResumoPedidoConversa
 {
     public static string Texto(PedidoReservado reservado, DateOnly dataEntrega, string forma, string cabecalho)
     {
@@ -57,6 +58,46 @@ public static class ResumoPedidoConversa
             ? dia
             : string.Create(CultureInfo.InvariantCulture, $"{dia}, das {janela.HoraInicio:HH:mm} às {janela.HoraFim:HH:mm}");
     }
+
+    /// <summary>Limite do resumo em uma linha: o corpo do modelo da Meta aceita até 1024 caracteres com nome e número.</summary>
+    public const int TamanhoMaximoEmUmaLinha = 900;
+
+    /// <summary>
+    /// #2871: o resumo como parâmetro do modelo <c>pedido_atualizado</c>, que sai fora da janela de 24 h. A Meta recusa
+    /// parâmetro com quebra de linha ou com mais de quatro espaços seguidos: as linhas de cada parágrafo viram itens
+    /// separados por ponto e vírgula e cada parágrafo termina em ponto, a não ser que já termine em pontuação ou em link.
+    /// </summary>
+    public static string EmUmaLinha(string texto)
+    {
+        ArgumentNullException.ThrowIfNull(texto);
+        var paragrafos = texto.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(ParagrafoEmUmaLinha)
+            .Where(p => p.Length > 0);
+        var linha = EspacosSeguidos().Replace(string.Join(' ', paragrafos), " ").Trim();
+        return linha.Length <= TamanhoMaximoEmUmaLinha ? linha : linha[..(TamanhoMaximoEmUmaLinha - 1)].TrimEnd() + "…";
+    }
+
+    private static string ParagrafoEmUmaLinha(string paragrafo)
+    {
+        var sb = new StringBuilder();
+        foreach (var bruta in paragrafo.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var linha = bruta.StartsWith("- ", StringComparison.Ordinal) ? bruta[2..].TrimStart() : bruta;
+            if (sb.Length > 0) sb.Append(sb[^1] == ':' ? " " : "; ");
+            sb.Append(linha);
+        }
+        var texto = sb.ToString();
+        if (texto.Length == 0 || ".!?…:".Contains(texto[^1], StringComparison.Ordinal)) return texto;
+        var ultimaPalavra = texto[(texto.LastIndexOf(' ') + 1)..];
+        return ultimaPalavra.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || ultimaPalavra.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            ? texto
+            : texto + ".";
+    }
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex EspacosSeguidos();
 
     /// <summary>Corta no limite de texto da mensagem, como toda saída gravada na conversa.</summary>
     public static string Limitar(string texto) =>

@@ -67,4 +67,30 @@ public class ResumoPedidoConversaTests
 
         texto.Should().Contain("Sinal agora por link: R$ 22,50").And.Contain("Restante na entrega: R$ 22,50");
     }
+
+    // #2871: fora da janela o resumo vai como parâmetro do modelo pedido_atualizado, que a Meta recusa com quebra
+    // de linha ou com mais de quatro espaços seguidos.
+    [Fact]
+    public void EmUmaLinha_JuntaAsLinhasSemQuebraEPontuaOsParagrafos()
+    {
+        const string texto = "Resumo do seu pedido:\n- 2x Brigadeiro (sem granulado): R$ 20,00\nFrete: R$ 5,00\nTotal: R$ 25,00"
+            + "\nPagamento: link online (Pix ou cartão)\n\nPague por este link, válido por 30 minutos: https://mp.test/pref-1"
+            + "\n\nObrigado pelo pedido!";
+
+        ResumoPedidoConversa.EmUmaLinha(texto).Should().Be(
+            "Resumo do seu pedido: 2x Brigadeiro (sem granulado): R$ 20,00; Frete: R$ 5,00; Total: R$ 25,00; "
+            + "Pagamento: link online (Pix ou cartão). Pague por este link, válido por 30 minutos: https://mp.test/pref-1 "
+            + "Obrigado pelo pedido!");
+    }
+
+    [Fact]
+    public void EmUmaLinha_SemEspacosSeguidosECortadoNoLimiteDoModelo()
+    {
+        var longo = "Resumo:\n" + string.Join("\n", Enumerable.Range(1, 80).Select(i => $"- 1x Item     {i}: R$ 1,00"));
+
+        var linha = ResumoPedidoConversa.EmUmaLinha(longo);
+
+        linha.Should().NotContain("\n").And.NotContain("  ").And.EndWith("…");
+        linha.Length.Should().BeInRange(ResumoPedidoConversa.TamanhoMaximoEmUmaLinha - 5, ResumoPedidoConversa.TamanhoMaximoEmUmaLinha);
+    }
 }
