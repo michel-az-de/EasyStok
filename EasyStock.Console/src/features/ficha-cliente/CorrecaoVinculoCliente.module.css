@@ -13,7 +13,8 @@
 .revisao { display: grid; gap: var(--e-3); padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); }
 .revisao p { margin: 0; color: var(--tinta-2); }
 .confirmacao { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
-.confirmacao input, .candidato input { width: 20px; height: 20px; flex: none; accent-color: var(--marca); }
+/* #2893: caixa e opção com 24 px, o mínimo da WCAG 2.5.8 mesmo sem contar o rótulo clicável. */
+.confirmacao input, .candidato input { width: 24px; height: 24px; flex: none; accent-color: var(--marca); }
 .historico { padding-left: var(--e-5); }
 .historico li { margin-bottom: var(--e-4); }
 .historico small { display: block; margin-top: var(--e-1); }
