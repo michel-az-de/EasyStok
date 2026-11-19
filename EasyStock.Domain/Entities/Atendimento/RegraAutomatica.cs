@@ -51,16 +51,20 @@ public class RegraAutomatica
     public const string TextoPadraoPagamentoConfirmado =
         "Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!";
 
+    /// <summary>#2885 (S75, D3): texto sugerido da saudação solta. A regra nasce desligada.</summary>
+    public const string TextoPadraoSaudacaoSolta = "Oi! Como posso te ajudar?";
+
     /// <summary>
     /// Regra que vale enquanto a empresa não gravou a do gatilho (não é persistida). Nascem ligadas "Pagamento
-    /// confirmado" (decisão do Felipe, 23/10, #1765-4) e o lembrete do link (#1610); as demais nascem desligadas
-    /// (nulo). Salvar a regra, ligada ou desligada, substitui o padrão.
+    /// confirmado" (decisão do Felipe, 23/10, #1765-4) e o lembrete do link (#1610); a saudação solta (#2885) nasce
+    /// desligada com texto sugerido; as demais nascem desligadas (nulo). Salvar a regra, ligada ou desligada, substitui o padrão.
     /// </summary>
     public static RegraAutomatica? Padrao(Guid empresaId, GatilhoAutomacao gatilho, DateTime agora) =>
         gatilho switch
         {
             GatilhoAutomacao.PagamentoConfirmado => Criar(empresaId, gatilho, TextoPadraoPagamentoConfirmado, ligada: true, agora),
             GatilhoAutomacao.CobrancaVencendo => Criar(empresaId, gatilho, TextoPadraoCobrancaVencendo, ligada: true, agora),
+            GatilhoAutomacao.SaudacaoSolta => Criar(empresaId, gatilho, TextoPadraoSaudacaoSolta, ligada: false, agora),
             _ => null
         };
 

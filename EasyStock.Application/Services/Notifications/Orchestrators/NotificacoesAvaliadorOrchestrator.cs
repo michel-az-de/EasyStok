@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Security;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -48,18 +49,26 @@ public sealed class NotificacoesAvaliadorOrchestrator(
         {
             // Leitura curta cross-tenant: o bypass entra ANTES da primeira conexão (o interceptor lê a flag na abertura).
             IReadOnlyList<EventoPendente> pendentes;
+            IReadOnlyList<NotificacaoExpirada> expirados;
             using (bypassRls.Begin())
             {
                 // Quarentena: o evento Pendente além do prazo do tipo vira Expirado antes da lista, então o backlog
                 // velho nunca é avaliado (e nunca vira mensagem).
-                var expirados = await eventoRepo.ExpirarPendentesAsync(politicaValidade, LimiteExpiracaoPorPrazo, ct);
-                if (expirados > 0)
+                expirados = await eventoRepo.ExpirarPendentesAsync(politicaValidade, LimiteExpiracaoPorPrazo, ct);
+                if (expirados.Count > 0)
                 {
                     await unitOfWork.CommitAsync();
-                    logger.LogWarning("AvaliadorOrchestrator: {Count} eventos expirados por prazo.", expirados);
+                    logger.LogWarning("AvaliadorOrchestrator: {Count} eventos expirados por prazo.", expirados.Count);
                 }
 
                 pendentes = await eventoRepo.ListarPendentesParaAvaliarAsync(LimitePorRodada, ct);
+            }
+
+            // #2875: o aviso ao cliente que expirou sem ser avaliado vai à conversa dele como não entregue.
+            foreach (var expirado in expirados.Where(e => AvisoNaoEntregueNaConversa.Cobre(e.Tipo)))
+            {
+                ct.ThrowIfCancellationRequested();
+                await RegistrarExpiradoNaConversaAsync(expirado, ct);
             }
 
             // 1. Processa eventos pendentes (criados por coletores de estado / publicação direta)
@@ -106,6 +115,32 @@ public sealed class NotificacoesAvaliadorOrchestrator(
         {
             logger.LogError(ex, "Erro ao avaliar evento {EventoId}", pendente.Id);
             await MarcarFalhadoEmEscopoLimpoAsync(pendente, ex, ct);
+        }
+    }
+
+    /// <summary>
+    /// #2875: escopo da empresa do evento expirado, com tenant fixado e commit próprio. Uma falha aqui perde só o registro
+    /// na conversa (o evento já expirou e foi gravado), nunca a rodada. Nunca lança, salvo cancelamento do host.
+    /// </summary>
+    private async Task RegistrarExpiradoNaConversaAsync(NotificacaoExpirada expirado, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var sp = scope.ServiceProvider;
+            sp.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(expirado.EmpresaId);
+
+            if (await sp.GetRequiredService<AvisoEventoExpiradoNaConversa>()
+                    .RegistrarAsync(expirado.EmpresaId, expirado.Id, DateTime.UtcNow, ct))
+                await sp.GetRequiredService<IUnitOfWork>().CommitAsync();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Aviso expirado {EventoId} não foi registrado na conversa do cliente.", expirado.Id);
         }
     }
 

@@ -1,6 +1,6 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
+  abrirConversaDoCliente, assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
   transferir,
 } from '../infra/api/conversasApi'
 import { conversaDaApi, mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
@@ -178,6 +178,8 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
         avisar(erro)
         return null
       }),
+    // #2871: só no modo API; sem a ação (demonstração) o "Novo pedido" do cliente não aparece.
+    abrirConversaDoCliente,
     // S59: painel "Não entregues", direto da API (não passa pelo reducer).
     listarNaoEntregues: () => listarNaoEntregues().then((linhas) => (linhas ?? []).map(naoEntregueDaApi)),
     selecionar: (id, resumoEncontrado = null) => {

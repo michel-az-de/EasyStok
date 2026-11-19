@@ -108,5 +108,6 @@ const DESFECHOS = Object.freeze({
   Cota: Object.freeze({ rotulo: 'Cota esgotada', tom: 'aviso' }),
   Erro: Object.freeze({ rotulo: 'Erro', tom: 'perigo' }),
   Interrompido: Object.freeze({ rotulo: 'Interrompido', tom: 'neutro' }),
+  SemIa: Object.freeze({ rotulo: 'Sem IA', tom: 'neutro' }),
 })
 export const desfechoDoTurno = (desfecho) => DESFECHOS[desfecho] ?? Object.freeze({ rotulo: String(desfecho ?? '?'), tom: 'neutro' })

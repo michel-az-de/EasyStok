@@ -417,6 +417,19 @@ public class MetaCloudWhatsAppProviderTests
         resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
     }
 
+    /// <summary>#2875: o código e o status da Meta seguem no resultado; o motivo do aviso não entregue sai deles.</summary>
+    [Fact]
+    public async Task Recusa_da_Meta_devolve_o_codigo_e_o_status_no_resultado()
+    {
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new WhatsAppCloudException(132001, "Template name does not exist", ehPermanente: true, statusHttp: 404));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.CodigoErro.Should().Be(132001);
+        resultado.StatusHttp.Should().Be(404);
+    }
+
     [Fact]
     public async Task Cancelamento_do_chamador_nao_vira_Indeterminado()
     {

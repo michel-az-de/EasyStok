@@ -29,11 +29,11 @@ public sealed class EventoNotificacaoRepository(EasyStockDbContext db) : IEvento
             .ToListAsync(ct);
     }
 
-    public async Task<int> ExpirarPendentesAsync(
+    public async Task<IReadOnlyList<NotificacaoExpirada>> ExpirarPendentesAsync(
         PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
-        var total = 0;
+        var expirados = new List<NotificacaoExpirada>();
         // Um grupo por prazo (poucos): o prazo vai no WHERE, em vez de trazer o backlog inteiro para decidir tipo a tipo.
         foreach (var (prazo, tipos) in politica.PorPrazo())
         {
@@ -51,10 +51,10 @@ public sealed class EventoNotificacaoRepository(EasyStockDbContext db) : IEvento
                 evento.MarcarComoExpirado(
                     $"Expirado: passou do prazo de {prazo.TotalMinutes:0} min sem ser avaliado",
                     purgarPayload: PoliticaValidadeNotificacao.CarregaSegredo(evento.Tipo));
-            total += vencidos.Count;
+            expirados.AddRange(vencidos.Select(e => new NotificacaoExpirada(e.Id, e.EmpresaId, e.Tipo)));
         }
 
-        return total;
+        return expirados;
     }
 
     public async Task AddAsync(EventoNotificacao evento, CancellationToken ct = default) =>

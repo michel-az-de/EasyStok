@@ -10,6 +10,15 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#2871): `prova-2395-ficha-navegador` lia o botão antes da troca de pessoa
+
+Falhou no CI da PR #2874 em 19/11/2026 (17:27Z, linha 52, `true !== false`) e 1 vez em 21 rodadas locais. A prova
+chamava `window.trocarPessoa()` e lia `isEnabled()` de "Manter texto para esta pessoa" logo em seguida; o `setState`
+ainda não tinha sido aplicado e o botão às vezes seguia habilitado. Agora a prova espera o botão desabilitado
+(`getByRole(..., { disabled: true }).waitFor()`) antes de afirmar.
+
+---
+
 ## ✅ CORRIGIDO (#2770): provas do Caixa do dia falhavam nos primeiros minutos depois da meia-noite de São Paulo
 
 Visto em `EasyStock.Infra.Postgre.IntegrationTests/Workflows/CaixaDoDiaNumerosIntegrationTests.cs`, em 16/11/2026

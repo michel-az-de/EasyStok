@@ -3,6 +3,7 @@ import { anunciarAberturaDeConversa } from '../../../aplicacao/aberturaDeConvers
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { contextoCadastro, useContextoVisualCadastro } from '../../../aplicacao/cadastros'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
+import { useNovoPedidoDoCliente } from '../../../aplicacao/novoPedidoDoCliente'
 import { obterPedido, useListaPedidos } from '../../../aplicacao/pedidosCadastro'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
@@ -17,6 +18,7 @@ import {
   situacaoDoPagamento, situacaoPedeAcao, tituloDoPedido,
 } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
+import { EscolherClienteDoPedido } from './EscolherClienteDoPedido'
 import { useRolagemDaLista } from './rolagemDaLista'
 import base from './cadastros.module.css'
 import css from './pedidos.module.css'
@@ -47,6 +49,8 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
   const tabela = useRef(null)
   const { conversas } = useAtendimento()
   const { selecionar } = useAcoes()
+  const [escolhendoCliente, escolherCliente] = useState(false)
+  const novoPedido = useNovoPedidoDoCliente({ aoAbrir: (id) => { escolherCliente(false); aoAbrirConversa?.(id) } })
   const comFiltro = FILTROS.some((campo) => memoria[campo] !== INICIAL[campo])
   const paginas = Math.max(1, Math.ceil(consulta.total / PAGINA_PEDIDOS))
   useEffect(() => () => leitura.current?.abort(), [])
@@ -78,6 +82,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
   return <section className={base.painel} aria-label="Pedidos">
     <header className={base.cabecalho}>
       <div><h2>Pedidos</h2><p>Todos os pedidos da loja, de qualquer canal e de qualquer dia.</p></div>
+      {novoPedido.disponivel && <Botao variante="primario" icone="mais" onClick={() => { novoPedido.limparErro(); escolherCliente(true) }}>Novo pedido</Botao>}
     </header>
     {(erro || consulta.erro) && <div className={base.erro} role="alert"><p>{erro || consulta.erro}</p>
       <Botao onClick={() => { falhar(null); if (consulta.erro) consulta.recarregar() }}>{consulta.erro ? 'Tentar de novo' : 'Entendi'}</Botao></div>}
@@ -124,6 +129,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
         </div>}
       </footer>
     </div>
+    {escolhendoCliente && <EscolherClienteDoPedido novoPedido={novoPedido} aoFechar={() => escolherCliente(false)} />}
     {detalhe && <DetalhePedido dados={detalhe} aoFechar={() => mostrar(null)} abrirConversa={abridorDaConversa(detalhe.pedido)} />}
   </section>
 }

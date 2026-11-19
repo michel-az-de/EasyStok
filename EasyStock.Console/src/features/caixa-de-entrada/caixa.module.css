@@ -110,6 +110,9 @@
   font-family: var(--f-corpo); font-size: var(--t-apoio); height: 100%;
 }
 .entradaBusca:focus { outline: none; }
+/* #2884: o contorno sai do campo e vai para a caixa da busca, no padrão do Campo (foco: fundo forte; teclado: contorno da marca). */
+.campoBusca:has(.entradaBusca:focus) { background: var(--preenchimento-forte); }
+.campoBusca:has(.entradaBusca:focus-visible) { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .entradaBusca::-webkit-search-cancel-button { display: none; }
 .limparBusca { margin: 0 calc(-1 * var(--e-3)); }
 .comOrdenar { position: relative; flex-shrink: 0; }
