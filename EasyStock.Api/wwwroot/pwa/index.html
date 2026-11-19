@@ -3484,6 +3484,7 @@ button:disabled {
   z-index: 13000;
 }
 .toast.show { display: flex; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .toast .msg { font-size: 13px; flex: 1; line-height: 1.4; }
 .toast .undo {
   background: transparent;
@@ -8227,6 +8228,7 @@ body.ux-calm [data-screen="producao"] .section-label {
   <div class="toast" id="toast">
     <div class="msg" id="toastMsg">Feito</div>
   </div>
+  <div id="srStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <!-- Action toast (aparece após criar pedido, com próximas ações) -->
   <div class="action-toast" id="actionToast" role="status" aria-live="polite">
@@ -12597,6 +12599,41 @@ function attachTileHandlers(tile, p) {
   tile.addEventListener('pointercancel', cancelTimers);
 }
 
+// #2886: markup do card de produção. Rótulos levam o nome do produto para o leitor de tela.
+function productTileHtml(p) {
+  const qty = Number(p.count) || 0;
+  const stock = Number(p.stock) || 0;
+  const hasPhoto = p.photo ? ' has-photo' : '';
+  const name = escapeHtml(p.name);
+  return `
+        <div class="pt-main">
+          <div class="emoji">${escapeHtml(p.emoji || '📦')}</div>
+          <div class="pt-info">
+            <div class="pname">${name}</div>
+            <div class="punit">
+              ${escapeHtml(p.unit || '')}
+              <span class="stock-badge ${stock <= 0 ? 'empty' : ''}">${stock} no estoque</span>
+              ${qty > 0 ? `<span class="stock-after-prod" title="Saldo previsto após registrar essa producao">&rarr; ${stock + qty} após</span>` : ''}
+              <span class="prod-tap-hint">${qty > 0 ? qty + ' selecionado' : 'selecionar'}</span>
+            </div>
+          </div>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn minus" ${p.count <= 0 ? 'disabled' : ''} onclick="event.stopPropagation(); decProduct(${jsString(p.id)})" aria-label="Diminuir ${name}">−</button>
+          <span class="qty-readout">${p.count || 0}</span>
+          <button class="qty-btn plus" onclick="event.stopPropagation(); incProduct(${jsString(p.id)})" aria-label="Aumentar ${name}">+</button>
+        </div>
+        <div class="prod-tile-actions">
+          <button class="prod-tile-action" onclick="event.stopPropagation(); openProductModalForEdit(${jsString(p.id)})">Editar</button>
+          <button class="prod-tile-action danger" onclick="event.stopPropagation(); archiveProduct(${jsString(p.id)})">Excluir</button>
+        </div>
+        <div class="pcount">${p.count}</div>
+        <button class="camera-btn${hasPhoto}" onclick="event.stopPropagation(); pickPhotoFor(${jsString(p.id)})" aria-label="${p.photo ? 'Trocar foto de ' : 'Foto de '}${name}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+`;
+}
+
 function renderProductGrid() {
   const grid = document.getElementById('productGrid');
   grid.innerHTML = '';
@@ -12631,34 +12668,8 @@ function renderProductGrid() {
       }
       const tile = document.createElement('div');
       tile.className = 'product-tile' + (p.count > 0 ? ' counted' : '') + (p.custom ? ' custom' : '');
-      const hasPhoto = p.photo ? ' has-photo' : '';
-      tile.innerHTML = `
-        <div class="pt-main">
-          <div class="emoji">${escapeHtml(p.emoji || '📦')}</div>
-          <div class="pt-info">
-            <div class="pname">${escapeHtml(p.name)}</div>
-            <div class="punit">
-              ${escapeHtml(p.unit || '')}
-              <span class="stock-badge ${stock <= 0 ? 'empty' : ''}">${stock} no estoque</span>
-              ${qty > 0 ? `<span class="stock-after-prod" title="Saldo previsto após registrar essa producao">&rarr; ${stock + qty} após</span>` : ''}
-              <span class="prod-tap-hint">${qty > 0 ? qty + ' selecionado' : 'selecionar'}</span>
-            </div>
-          </div>
-        </div>
-        <div class="qty-controls">
-          <button class="qty-btn minus" ${p.count <= 0 ? 'disabled' : ''} onclick="event.stopPropagation(); decProduct(${jsString(p.id)})" aria-label="Diminuir">−</button>
-          <span class="qty-readout">${p.count || 0}</span>
-          <button class="qty-btn plus" onclick="event.stopPropagation(); incProduct(${jsString(p.id)})" aria-label="Aumentar">+</button>
-        </div>
-        <div class="prod-tile-actions">
-          <button class="prod-tile-action" onclick="event.stopPropagation(); openProductModalForEdit(${jsString(p.id)})">Editar</button>
-          <button class="prod-tile-action danger" onclick="event.stopPropagation(); archiveProduct(${jsString(p.id)})">Excluir</button>
-        </div>
-        <div class="pcount">${p.count}</div>
-        <button class="camera-btn${hasPhoto}" onclick="event.stopPropagation(); pickPhotoFor(${jsString(p.id)})" aria-label="Foto">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        </button>
-      `;
+      tile.dataset.productId = String(p.id);
+      tile.innerHTML = productTileHtml(p);
       attachTileHandlers(tile, p);
       grid.appendChild(tile);
     });
@@ -21932,16 +21943,36 @@ function shareShoppingList() {
 function incProduct(id) {
   const p = products.find(x => x.id === id);
   if (!p) return;
+  const keepFocus = focusInsideProductGrid();
   p.count = (p.count || 0) + 1;
   renderProductGrid();
+  afterQtyChange(p, 'plus', keepFocus);
   haptic();
 }
 function decProduct(id) {
   const p = products.find(x => x.id === id);
   if (!p || (p.count || 0) <= 0) return;
+  const keepFocus = focusInsideProductGrid();
   p.count = p.count - 1;
   renderProductGrid();
+  afterQtyChange(p, 'minus', keepFocus);
   haptic();
+}
+// #2886: renderProductGrid refaz a grade e o foco caía no BODY. Devolve o foco ao mesmo botão
+// (ou ao "+" quando o "-" fica desativado) e anuncia a nova quantidade.
+function focusInsideProductGrid() {
+  const active = document.activeElement;
+  return !!(active && active.closest && active.closest('#productGrid'));
+}
+function afterQtyChange(p, kind, keepFocus) {
+  if (keepFocus) {
+    const tile = Array.from(document.querySelectorAll('#productGrid .product-tile'))
+      .find(t => t.dataset && t.dataset.productId === String(p.id));
+    const wanted = tile && tile.querySelector('.qty-btn.' + kind);
+    const target = wanted && !wanted.disabled ? wanted : tile && tile.querySelector('.qty-btn.plus');
+    if (target) try { target.focus({ preventScroll: true }); } catch (e) {}
+  }
+  announce(`${p.name}: ${p.count || 0}`);
 }
 
 let _isSavingProduction = false;
@@ -23528,9 +23559,18 @@ document.addEventListener('DOMContentLoaded', function () {
 // TOAST
 // =========================
 let toastTimer = null;
+// #2886: região viva única (#srStatus). Repetir a mesma frase troca um espaço rígido no fim
+// para o leitor de tela anunciar de novo.
+function announce(msg) {
+  const live = document.getElementById('srStatus');
+  if (!live) return;
+  const text = String(msg == null ? '' : msg);
+  live.textContent = live.textContent === text ? text + ' ' : text;
+}
 function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toastMsg').textContent = msg;
+  announce(msg);
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 4000);

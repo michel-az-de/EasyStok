@@ -43,3 +43,26 @@ test('MainActivity instala o cliente após criar a Bridge e não troca o cliente
   assert.ok(created > 0 && installed > created, 'instalado depois de super.load(), em onCreate');
   assert.equal((source.match(/setWebChromeClient/g) || []).length, 1);
 });
+
+// #2886: prompt de quantidade abria teclado de letras, sem foco, campo colado na borda e teal padrão.
+test('prompt: valor padrão numérico curto abre teclado numérico com foco e tudo selecionado', () => {
+  const source = read(...clientPath);
+  assert.match(source, /defaultValue\.matches\("\\d\{1,4\}"\)/, 'só número de até 4 dígitos vira teclado numérico');
+  assert.match(source, /InputType\.TYPE_CLASS_NUMBER/);
+  assert.match(source, /setSelectAllOnFocus\(true\)/);
+  assert.match(source, /input\.requestFocus\(\)/);
+  assert.match(source, /SOFT_INPUT_STATE_ALWAYS_VISIBLE/);
+  assert.match(source, /EditorInfo\.IME_ACTION_DONE/);
+  assert.match(source, /BUTTON_POSITIVE\)\.performClick\(\)/, 'Concluir do teclado confirma pelo mesmo caminho do OK');
+  assert.match(source, /R\.dimen\.dialog_input_inset/, 'campo com margem da caixa');
+});
+
+test('diálogos usam o tema da marca no claro e no escuro', () => {
+  const source = read(...clientPath);
+  assert.equal((source.match(/new AlertDialog\.Builder\(view\.getContext\(\), R\.style\.PilotDialog\)/g) || []).length, 3);
+  const light = read('res', 'values', 'styles.xml');
+  const night = read('res', 'values-night', 'styles.xml');
+  assert.match(light, /<style name="PilotDialog" parent="android:Theme\.DeviceDefault\.Light\.Dialog\.Alert">[\s\S]*?<item name="android:colorAccent">#496B56<\/item>/);
+  assert.match(night, /<style name="PilotDialog" parent="android:Theme\.DeviceDefault\.Dialog\.Alert">[\s\S]*?<item name="android:colorAccent">#A5C3AD<\/item>/);
+  assert.match(read('res', 'values', 'dimens.xml'), /<dimen name="dialog_input_inset">24dp<\/dimen>/);
+});

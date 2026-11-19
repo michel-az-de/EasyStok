@@ -483,9 +483,14 @@ body.pilot-app .phone [data-screen=producao] > .prod-hero::after { display: none
 body.pilot-app .phone .pilot-production-metrics { margin-top: 4px; }
 body.pilot-app .phone .pilot-production-metrics > summary { padding-block: 8px; }
 body.pilot-app .phone [data-screen=producao] .grid-section { margin-top: 8px; margin-bottom: 0; }
-body.pilot-app .phone [data-screen=producao] .product-tile .prod-tile-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 0; border-top: 0; }
+body.pilot-app .phone [data-screen=producao] .product-tile .prod-tile-actions { display: flex; grid-row: 2; justify-content: flex-end; gap: 8px; padding-top: 0; border-top: 0; }
 body.pilot-app .phone [data-screen=producao] .product-tile .prod-tile-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: 0 0 auto; min-width: 48px; min-height: 48px; padding: 6px 8px; color: var(--ink-dim); background: transparent; border: 1px solid transparent; box-shadow: none; font-size: 14px; font-weight: 600; }
 body.pilot-app .phone [data-screen=producao] .product-tile .prod-tile-action:hover { color: var(--ink); background: var(--bg-elev-2); }
+/* #2886: o Foto de 48dp no canto cobria a metade de cima do "+" do card selecionado; agora divide a linha de Editar e Excluir. */
+body.pilot-app .phone [data-screen=producao] .product-tile .camera-btn { position: static; grid-row: 2; grid-column: 1; justify-self: start; align-self: center; z-index: 1; width: auto; min-width: 48px; height: 48px; gap: 6px; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: var(--pilot-r-sm); background: transparent; color: var(--ink-dim); box-shadow: none; font-size: 14px; font-weight: 600; }
+body.pilot-app .phone [data-screen=producao] .product-tile .camera-btn::after { content: 'Foto'; }
+body.pilot-app .phone [data-screen=producao] .product-tile .camera-btn svg { width: 18px; height: 18px; }
+body.pilot-app .phone [data-screen=producao] .product-tile .camera-btn.has-photo { color: var(--basil); border-color: var(--basil); background: var(--basil-soft); }
 /* Geometrias canônicas: EasyStock.Console/src/componentes/Icone.jsx, lapis/lixeira. */
 @supports (mask-image: url("")) or (-webkit-mask-image: url("")) {
   body.pilot-app .phone .prod-tile-action { --pilot-action-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M21.174%206.812a1%201%200%200%200-3.986-3.987L3.842%2016.174a2%202%200%200%200-.5.83l-1.321%204.352a.5.5%200%200%200%20.623.622l4.353-1.32a2%202%200%200%200%20.83-.497zM15%205l4%204%22%2F%3E%3C%2Fsvg%3E"); }
