@@ -128,6 +128,10 @@ por teste. Recomendo deixar para depois da medição da S78.
 
 **Abordagem.** A aba Uso e cota mostra, no mês, "Respostas sem IA: X de Y" ao lado dos tokens. Sai da contagem de
 `TurnoAgente` por desfecho.
+Na implementação (#2896): Y é o total de turnos do mês, com e sem IA. A estimativa de tokens poupados é X vezes a
+média de tokens dos turnos que gastaram token no mesmo mês (a conta dos 15 mil por turno do Problema, refeita com o mês
+corrente). Turno de cota esgotada ou de erro sem consumo fica fora da média. Sem turno com token no mês não há média e a
+tela diz isso.
 
 **Aceite.** Depois de 3 respostas sem IA e 2 turnos do modelo, a aba mostra "3 de 5".
 

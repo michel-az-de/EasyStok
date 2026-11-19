@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
@@ -52,11 +53,14 @@ public sealed class TurnoAgenteRepository(EasyStockDbContext db) : ITurnoAgenteR
                 CacheLido = g.Sum(t => (long)t.TokensCacheLido),
                 Custo = g.Sum(t => t.CustoEstimado ?? 0m),
                 SemPreco = g.Count(t => t.CustoEstimado == null),
+                SemIa = g.Count(t => t.Desfecho == DesfechoTurnoAgente.SemIa),
+                ComTokens = g.Count(t => t.TokensEntrada + t.TokensSaida + t.TokensCacheLido > 0),
             })
             .FirstOrDefaultAsync(ct);
 
         return soma is null
             ? SomaTurnosAgente.Vazia
-            : new SomaTurnosAgente(soma.Turnos, soma.Entrada, soma.Saida, soma.CacheLido, soma.Custo, soma.SemPreco);
+            : new SomaTurnosAgente(soma.Turnos, soma.Entrada, soma.Saida, soma.CacheLido, soma.Custo, soma.SemPreco, soma.SemIa,
+                soma.ComTokens);
     }
 }

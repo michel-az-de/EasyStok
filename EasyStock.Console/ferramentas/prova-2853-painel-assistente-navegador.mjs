@@ -37,7 +37,8 @@ let roteiro = [
 const FERRAMENTAS = [['consultar_pedido', 'Consulta o pedido'], ['enviar_link_pagamento', 'Envia o link'], ['escalar_para_dona', 'Passa à equipe']]
 const uso = () => ({ ano: 2026, mes: 11, turnos: 120, tokensEntrada: 700_000, tokensSaida: 100_000, tokensCacheLido: 50_000,
   totalTokens: 850_000, custoEstimado: 0, turnosSemPreco: 120, cotaTokensMes: cota || null,
-  percentual: cota ? Math.floor(850_000 * 100 / cota) : null, alerta: cota ? 850_000 * 100 / cota >= 80 : false })
+  percentual: cota ? Math.floor(850_000 * 100 / cota) : null, alerta: cota ? 850_000 * 100 / cota >= 80 : false,
+  respostasSemIa: 20, tokensPoupadosEstimados: 170_000 })
 const fluxo = () => ({ ativo: true, modeloDisponivel: true, portoes: PORTOES, roteiro, roteiroPersonalizado: true,
   ferramentas: FERRAMENTAS.map(([nome, descricao]) => ({ nome, descricao, ligada: !desligadas.includes(nome), travada: nome === 'escalar_para_dona' })),
   prompt: 'Você é o assistente virtual da loja.\nRegras (obrigatórias): ...', observacoesLoja: 'Domingo sem entrega.' })
@@ -82,6 +83,8 @@ try {
   await painel.getByText(/Passou de 80%/).waitFor()
   assert.equal(await painel.getByRole('meter').getAttribute('aria-valuenow'), '85')
   await painel.getByText(/custo sem preço configurado/).waitFor()
+  // #2896 (S78): quantas respostas saíram sem IA e a estimativa do que pouparam.
+  await painel.getByText('Respostas sem IA: 20 de 120 · cerca de 170 mil tokens poupados, pela média dos turnos com IA do mês', { exact: true }).waitFor()
   await pagina.screenshot({ path: resolve(pasta, 'uso-1280.png'), fullPage: true })
 
   let marca = pedidos.length
