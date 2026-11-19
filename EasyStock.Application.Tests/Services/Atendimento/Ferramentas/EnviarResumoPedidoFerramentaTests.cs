@@ -78,6 +78,13 @@ public class EnviarResumoPedidoFerramentaTests
             return item;
         }
 
+        public async Task<JsonElement> ExecutarComEntradaAsync(object entrada)
+        {
+            Contexto = new ContextoTurnoAgente(EmpresaId, Conversa, Agora);
+            var resultado = await _ferramenta.ExecutarAsync(Contexto, JsonSerializer.SerializeToElement(entrada));
+            return JsonDocument.Parse(resultado).RootElement.Clone();
+        }
+
         public async Task<JsonElement> ExecutarAsync()
         {
             Contexto = new ContextoTurnoAgente(EmpresaId, Conversa, Agora);
@@ -104,6 +111,26 @@ public class EnviarResumoPedidoFerramentaTests
         c.Mensagens.Should().ContainSingle(m => m.Direcao == DirecaoMensagem.Saida && m.TipoConteudo == TipoConteudoMensagem.Imagem
             && m.Texto == legenda && m.ExternoId == "wamid.resumo");
         c.Contexto.HouveEnvio.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task EntradaPedidoId_NovaGrafia_Envia()
+    {
+        var c = new Cenario();
+
+        var resultado = await c.ExecutarComEntradaAsync(new { pedido_id = c.Pedido.Id });
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task EntradaPedidoId_GrafiaAntiga_AindaEnvia()
+    {
+        var c = new Cenario();
+
+        var resultado = await c.ExecutarComEntradaAsync(new { pedidoId = c.Pedido.Id });
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeTrue();
     }
 
     [Fact]

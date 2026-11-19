@@ -22,7 +22,13 @@ public sealed class AtendimentoFilaTurnoAgenteBackgroundService(
         var intervalo = TimeSpan.FromMilliseconds(
             configuration.GetValue("Atendimento:FilaTurnoAgente:PollingIntervalMs", defaultValue: 500));
 
-        logger.LogInformation("AtendimentoFilaTurnoAgenteBackgroundService iniciado — polling={Intervalo}.", intervalo);
+        var paralelismo = Math.Max(1, configuration.GetValue("Atendimento:FilaTurnoAgente:Paralelismo", defaultValue: 4));
+        var executor = new ExecutorPorChave(paralelismo, (empresaId, ex) =>
+            logger.LogError(ex, "AtendimentoFilaTurnoAgenteBackgroundService: turno da loja {EmpresaId} falhou.", empresaId));
+
+        logger.LogInformation(
+            "AtendimentoFilaTurnoAgenteBackgroundService iniciado — polling={Intervalo}, paralelismo={Paralelismo}.",
+            intervalo, paralelismo);
 
         await RecuperarTurnosPerdidosAsync(stoppingToken);
 
@@ -32,11 +38,17 @@ public sealed class AtendimentoFilaTurnoAgenteBackgroundService(
             {
                 await queueService.ProcessQueueAsync<ProcessarTurnoAgenteJob>(
                     FilaAtendimentoNomes.TurnoAgente,
-                    async job =>
+                    job =>
                     {
-                        using var scope = serviceProvider.CreateScope();
-                        var useCase = scope.ServiceProvider.GetRequiredService<ProcessarTurnoAgenteUseCase>();
-                        await useCase.ExecuteAsync(job, stoppingToken);
+                        // #2863: a chave é a loja, não a conversa. Dois turnos da mesma loja em paralelo disputariam
+                        // o registro mensal de uso (leitura e gravação sem trava) e a conferência da cota.
+                        executor.Agendar(job.EmpresaId, async ct =>
+                        {
+                            using var scope = serviceProvider.CreateScope();
+                            var useCase = scope.ServiceProvider.GetRequiredService<ProcessarTurnoAgenteUseCase>();
+                            await useCase.ExecuteAsync(job, ct);
+                        }, stoppingToken);
+                        return Task.CompletedTask;
                     },
                     stoppingToken);
             }
@@ -51,6 +63,23 @@ public sealed class AtendimentoFilaTurnoAgenteBackgroundService(
 
             try { await Task.Delay(intervalo, stoppingToken); }
             catch (OperationCanceledException) { break; }
+        }
+
+        await AguardarTurnosEmCursoAsync(executor);
+    }
+
+    /// <summary>Espera os turnos em curso no desligamento, com teto curto; loga quantos ficaram para trás.</summary>
+    private async Task AguardarTurnosEmCursoAsync(ExecutorPorChave executor)
+    {
+        var teto = TimeSpan.FromSeconds(5);
+        await Task.WhenAny(executor.AguardarTudoAsync(), Task.Delay(teto));
+
+        var pendentes = executor.TrabalhosPendentes;
+        if (pendentes > 0)
+        {
+            logger.LogWarning(
+                "AtendimentoFilaTurnoAgenteBackgroundService: desligamento sem esperar {Pendentes} turno(s) em curso.",
+                pendentes);
         }
     }
 

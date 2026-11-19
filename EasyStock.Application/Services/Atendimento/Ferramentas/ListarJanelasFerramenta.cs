@@ -37,8 +37,8 @@ public sealed class ListarJanelasFerramenta(
     public string Descricao =>
         "Lista as janelas de entrega com vaga que respeitam o prazo mínimo do pedido (maior tempo de preparo dos itens " +
         "mais o respiro). Informe os itens (ids de consultar_cardapio) para o prazo sair certo e, se o cliente pediu, a data. " +
-        "As primeiras vão ao cliente como opções numeradas logo depois da sua mensagem: não as repita, só convide a escolher. " +
-        "Use o janelaId e a data escolhidos em criar_pedido.";
+        "As primeiras vão ao cliente como botões logo depois da sua mensagem: não as repita, só convide a escolher. " +
+        "Use o janela_id e a data escolhidos em criar_pedido.";
 
     public string SchemaJson => """
         {"type":"object","properties":{
@@ -89,7 +89,7 @@ public sealed class ListarJanelasFerramenta(
             opcoesNoMenu = opcoes.Count,
             janelas = janelas.Select(j => new
             {
-                janelaId = j.JanelaId,
+                janela_id = j.JanelaId,
                 data = j.Data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 janela = Titulo(j),
                 vagas = j.VagasRestantes

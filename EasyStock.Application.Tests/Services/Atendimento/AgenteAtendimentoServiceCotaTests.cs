@@ -76,7 +76,7 @@ public partial class AgenteAtendimentoServiceTests
 
         var requisicao = _requisicoes.Should().ContainSingle().Subject;
         requisicao.Ferramentas.Select(f => f.Nome).Should().NotContain("consultar_pedido");
-        requisicao.System.Should().Contain("Desligadas pela loja: consultar_pedido.");
+        requisicao.TextoCompleto().Should().Contain("Desligadas pela loja: consultar_pedido.");
     }
 
     [Fact]

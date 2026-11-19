@@ -1073,6 +1073,34 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
     }
 
+    // #2869: figurinha e vídeo sem legenda não trazem nada que o agente leia; o turno seria respondido no escuro.
+    [Fact]
+    public async Task FigurinhaNaoEnfileiraTurnoDoAgente()
+    {
+        await _useCase.ExecuteAsync(PayloadTipo("wamid.figurinha", "sticker",
+            "\"sticker\":{\"id\":\"media-figurinha\",\"mime_type\":\"image/webp\"}"));
+
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    [Fact]
+    public async Task VideoSemLegendaNaoEnfileiraTurnoDoAgente()
+    {
+        await _useCase.ExecuteAsync(PayloadTipo("wamid.video", "video",
+            "\"video\":{\"id\":\"media-video\",\"mime_type\":\"video/mp4\"}"));
+
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
+    [Fact]
+    public async Task VideoComLegendaEnfileiraTurnoDoAgente()
+    {
+        await _useCase.ExecuteAsync(PayloadTipo("wamid.video.legenda", "video",
+            "\"video\":{\"id\":\"media-video\",\"mime_type\":\"video/mp4\",\"caption\":\"olha o defeito\"}"));
+
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+    }
+
     [Fact]
     public async Task ConversaNovaAbertaPorBotaoAcaoNaoSaudaNemPublicaConversaAberta()
     {
