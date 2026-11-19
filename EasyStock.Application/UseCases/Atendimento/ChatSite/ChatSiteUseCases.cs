@@ -269,10 +269,10 @@ public sealed class IdentificarVisitanteChatSiteUseCase(
         if (conversa.ClienteId is null && !conversa.VinculoEmRevisao)
             leadNovo = await IdentificarClienteAsync(sessao.EmpresaId, conversa, contato, agora, ct);
 
-        await unitOfWork.CommitAsync();
-        // O aviso sai depois do commit: commit que falha não deixa aviso de lead que não existe.
+        // #2908 (ADR-0030): o aviso só é estagiado na UoW e grava no mesmo commit do lead. Depois do commit ele se perderia.
         if (leadNovo is not null)
             await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(sessao.EmpresaId, conversa.Id, leadNovo, MotivoLeadNovo, ct);
+        await unitOfWork.CommitAsync();
         // #1643-5: o console troca nome e contato na hora, sem esperar a próxima sincronização.
         await operacaoEventos.PublicarAsync(EventosOperacao.ConversaAtualizada, sessao.EmpresaId,
             new ConversaAtualizadaOperacao(conversa.Id), ct);

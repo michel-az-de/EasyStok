@@ -11,6 +11,7 @@ using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Notifications;
 using Microsoft.Extensions.Logging.Abstractions;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
@@ -86,6 +87,22 @@ public class ChatSiteIdentificacaoClienteTests
             Arg.Any<CancellationToken>());
         await _notificador.ReceivedWithAnyArgs().EnfileirarEventoAsync(default, default, default!, default, default, default);
         await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task TelefoneNovo_AvisoDeLeadEstagiaAntesDoCommit_SenaoNuncaEGravado()
+    {
+        // #2908 (ADR-0030): EnfileirarEventoAsync só estagia na UoW. Enfileirado depois do commit, o aviso some no fim do pedido.
+        var token = Sessao();
+        var ordem = new List<string>();
+        _uow.When(u => u.CommitAsync()).Do(_ => ordem.Add("commit"));
+        _notificador.When(n => n.EnfileirarEventoAsync(Arg.Any<TipoEventoNotificacao>(), Arg.Any<Guid>(), Arg.Any<string>(),
+            Arg.Any<Guid?>(), Arg.Any<CancellationToken>(), Arg.Any<string?>())).Do(_ => ordem.Add("aviso"));
+
+        await Sut().ExecuteAsync(Slug, token, Formulario());
+
+        ordem.Should().Contain("aviso");
+        ordem.LastIndexOf("commit").Should().BeGreaterThan(ordem.IndexOf("aviso"), "o aviso precisa entrar no último commit do pedido");
     }
 
     [Fact]
