@@ -72,7 +72,7 @@ await confere('2. automático ligado: "Automático"', () => {
   const e = linha.estadoDaLinha(conversa(), { pausado: false })
   assert.equal(e.chave, 'automatico')
   assert.equal(e.texto, 'Assistente')
-  assert.equal(e.icone, 'sparkles')
+  assert.equal(e.icone, 'agente')
 })
 await confere('2. ela assumiu ou escreveu: "Com você"', () => {
   assert.equal(linha.estadoDaLinha(conversa(), { pausado: PAUSA_POR_ASSUMIR }).texto, 'Com você')
