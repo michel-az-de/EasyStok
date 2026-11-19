@@ -25,7 +25,7 @@ try {
   await bloquearRede(pagina)
   pagina.setDefaultTimeout(5000)
   await pagina.goto(dist.url, { waitUntil: 'networkidle', timeout: 90000 }) // #2437: o Vite frio otimiza dependências na primeira carga
-  await pagina.getByText('Abrir Atendimento', { exact: true }).click()
+  await pagina.locator('li[data-modulo="atendimento"] a').click()
   await pagina.getByRole('button', { name: /Renan Okamoto/ }).click()
   await pagina.getByRole('button', { name: 'Adicionar nota', exact: true }).click()
   const texto = 'Nota de Renan preservada ao navegar #1847'

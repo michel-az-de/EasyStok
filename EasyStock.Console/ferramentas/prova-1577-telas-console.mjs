@@ -686,12 +686,12 @@ await confere('3. SSE: fechar por fora e fim do stream desligam a vigia', async 
 const { readFileSync } = await import('node:fs')
 const folhaDe = (caminho) => readFileSync(new URL(`../src/${caminho}`, import.meta.url), 'utf8')
 const quadrosDe = (folha, nome) => folha.match(new RegExp(`@keyframes ${nome}\\s*\\{((?:[^{}]*\\{[^{}]*\\})*)\\s*\\}`))?.[1] ?? null
-const propriedadesDe = (quadros) => [...new Set([...quadros.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]))].toSorted()
 const regraDe = (folha, seletor) => folha.match(new RegExp(`(?:^|\\n)\\${seletor}\\s*\\{([^}]*)\\}`))?.[1] ?? null
 
-await confere('4. "ao vivo" do KDS anima só opacity/transform; SLA vencido conserva o alerta estático', () => {
-  const pulso = quadrosDe(folhaDe('features/cozinha/cozinha.module.css'), 'pulsarVivo')
-  assert.deepEqual(propriedadesDe(pulso), ['opacity', 'transform'], 'box-shadow animado repinta a cada quadro')
+await confere('4. "ao vivo" do KDS é ponto parado (#2859); SLA vencido conserva o alerta estático', () => {
+  const cozinha = folhaDe('features/cozinha/cozinha.module.css')
+  assert.equal(quadrosDe(cozinha, 'pulsarVivo'), null, 'o ponto ao vivo não pulsa o dia inteiro')
+  assert.doesNotMatch(cozinha, /\.pontoVivo[^{}]*\{[^}]*animation/, 'nenhuma animação no ponto ao vivo')
   const folha = folhaDe('features/caixa-de-entrada/caixa.module.css')
   assert.equal(quadrosDe(folha, 'piscaSla'), null, 'SLA vencido não pisca sobre a conversa selecionada')
   assert.doesNotMatch(folha, /\.slaEstourado[^{}]*\{[^}]*animation/, 'o alerta de prazo permanece estático')

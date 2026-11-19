@@ -145,25 +145,20 @@ provar('leitura falha, ausente ou módulo sem fonte não inventa linha', () => {
 const { createElement: h } = await import('react')
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { HallDeModulos } = await import('../src/features/hall/HallDeModulos.jsx')
-const { IlustracaoDoModulo } = await import('../src/features/hall/IlustracaoDoModulo.jsx')
 const { ContextoAcessoModulos } = await import('../src/aplicacao/acessoModulos.jsx')
 globalThis.document ??= { documentElement: { dataset: { theme: 'light' } } }
 const html = renderToStaticMarkup(h(ContextoAcessoModulos.Provider, { value: { permite: () => true, acoes: {}, aoSair: () => {} } },
   h(HallDeModulos, { fonteApi: true, sessao: null, agora: Date.parse('2026-10-15T18:00:00Z') })))
 
-// #1891: módulo congelado conserva a ilustração no catálogo, mas não tem cartão no hall.
-provar('os oito módulos têm ilustração própria, decorativa e no tema; só os vivos têm cartão', () => {
+// #2859: cartão leva o ícone do módulo, sem ilustração de 88 px (grade de cartões ilustrados lia como modelo pronto).
+// #1891: módulo congelado não tem cartão; #2232 (H10): Configurações fica no rodapé.
+provar('cartão de cada módulo vivo leva só ícone e nome; nenhum traz ilustração', () => {
+  assert.doesNotMatch(html, /data-ilustracao=/, 'sem ilustração no hall')
   for (const { id } of MODULOS) {
-    const svg = renderToStaticMarkup(h(IlustracaoDoModulo, { id }))
-    assert.match(svg, /aria-hidden="true"/, `${id} decorativa`)
-    assert.match(svg, /var\(--il-tinta\)/, `${id} usa as cores do tema`)
-    assert.doesNotMatch(svg, /#[0-9a-f]{6}/i, `${id} sem cor fixa`)
-    if (moduloCongelado(id)) assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} congelado sem cartão`)
-    // #2232 (H10): Configurações sai da grade e vira link de rodapé, sem cartão ilustrado.
-    else if (id === 'configuracoes') assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} no rodapé, sem cartão`)
-    else assert.match(html, new RegExp(`data-ilustracao="${id}"`), `${id} no cartão`)
+    const cartao = new RegExp(`<li[^>]*data-modulo="${id}"`)
+    if (moduloCongelado(id) || id === 'configuracoes') assert.doesNotMatch(html, cartao, `${id} sem cartão`)
+    else assert.match(html, cartao, `${id} no cartão`)
   }
-  assert.equal(renderToStaticMarkup(h(IlustracaoDoModulo, { id: 'privado' })), '')
 })
 
 provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue sendo link', () => {

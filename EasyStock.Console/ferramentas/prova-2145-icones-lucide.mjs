@@ -91,10 +91,10 @@ try {
   pagina.on('pageerror', (erro) => falhasDePagina.push(erro.message))
   await pagina.goto(dist.url, { waitUntil: 'networkidle', timeout: 90000 }) // #2437: o Vite frio otimiza dependências na primeira carga
 
-  await pagina.getByText('Abrir Atendimento', { exact: true }).waitFor()
+  await pagina.locator('li[data-modulo="atendimento"] a').waitFor() // #2859: a faixa "Abrir Atendimento" saiu; o cartão leva ao módulo
   await conferirTela(pagina, 'Hall', { minimo: 3 })
 
-  await pagina.getByText('Abrir Atendimento', { exact: true }).click()
+  await pagina.locator('li[data-modulo="atendimento"] a').click()
   await pagina.getByRole('button', { name: /Renan Okamoto/ }).click()
   await pagina.getByLabel('Mensagem para o cliente', { exact: true }).waitFor()
   const atendimento = await conferirTela(pagina, 'Atendimento', { minimo: 15 })
@@ -152,7 +152,7 @@ try {
   celular.setDefaultTimeout(8000)
   celular.on('pageerror', (erro) => falhasDePagina.push(erro.message))
   await celular.goto(dist.url, { timeout: 90000 })
-  await celular.getByText('Abrir Atendimento', { exact: true }).click()
+  await celular.locator('li[data-modulo="atendimento"] a').click()
   await celular.getByRole('button', { name: 'Mais opções', exact: true }).waitFor() // #2437: o rótulo virou "Mais opções"
   const noCelular = await conferirTela(celular, 'Celular', { minimo: 3 })
   await confere('Celular: "Mais" desenha ellipsis-vertical (⋮), sem reticências horizontais', async () => {

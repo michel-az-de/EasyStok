@@ -463,13 +463,8 @@
 .passoFeito .passoMarca { border-color: transparent; background: var(--sucesso); color: var(--papel); }
 .capturaPassos .passoAgora {
   color: var(--marca); border-color: var(--marca); font-weight: 600;
-  animation: passoAgoraPulso 1.4s ease-in-out infinite;
 }
 .passoAgora .passoMarca { border-color: var(--marca); }
-@keyframes passoAgoraPulso {
-  0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  50% { box-shadow: 0 0 0 3px var(--halo); }
-}
 
 /* Rodada 13 · campo "Cupom" da Cobrança (Fidelidade e cupons, issue #45,
    registro 107). */
