@@ -35,11 +35,11 @@ public sealed class OutboxNotificacaoRepository(EasyStockDbContext db) : IOutbox
         return reservadas;
     }
 
-    public async Task<int> ExpirarPendentesAsync(
+    public async Task<IReadOnlyList<NotificacaoExpirada>> ExpirarPendentesAsync(
         PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
-        var total = 0;
+        var expiradas = new List<NotificacaoExpirada>();
         // Um grupo por prazo (poucos): o prazo vai no WHERE, em vez de trazer o backlog inteiro para decidir tipo a tipo.
         foreach (var (prazo, tipos) in politica.PorPrazo())
         {
@@ -53,16 +53,18 @@ public sealed class OutboxNotificacaoRepository(EasyStockDbContext db) : IOutbox
                           && m.ProximaTentativaEm < limite
                           && tiposDoGrupo.Contains(e.Tipo)
                     orderby m.ProximaTentativaEm
-                    select m)
+                    select new { Mensagem = m, e.Tipo })
                 .Take(limitePorPrazo)
                 .ToListAsync(ct);
 
-            foreach (var mensagem in vencidas)
-                mensagem.Expirar($"Expirada: passou do prazo de {prazo.TotalMinutes:0} min sem sair");
-            total += vencidas.Count;
+            foreach (var vencida in vencidas)
+            {
+                vencida.Mensagem.Expirar($"Expirada: passou do prazo de {prazo.TotalMinutes:0} min sem sair");
+                expiradas.Add(new NotificacaoExpirada(vencida.Mensagem.Id, vencida.Mensagem.EmpresaId, vencida.Tipo));
+            }
         }
 
-        return total;
+        return expiradas;
     }
 
     // SQL cru de propósito (FOR UPDATE SKIP LOCKED não sai do LINQ): duas réplicas não reclamam a mesma mensagem.
