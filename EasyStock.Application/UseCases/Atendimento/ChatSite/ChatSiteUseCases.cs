@@ -1,8 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
@@ -215,13 +218,23 @@ public sealed record IdentificacaoVisitanteResult(string Nome, string Telefone, 
 /// <summary>
 /// #1430: formulário curto antes do chat. Grava nome, telefone, e-mail e o aceite da política na sessão; a
 /// conversa já aberta recebe o contato na hora, e a que nascer depois nasce com ele
-/// (<see cref="EasyStock.Application.Services.Atendimento.ConversaChatSiteService"/>). Não procura nem liga
-/// cliente pelo telefone: o dado fica "informado pelo visitante" até a loja confirmar pela Ficha.
+/// (<see cref="EasyStock.Application.Services.Atendimento.ConversaChatSiteService"/>).
+/// #2876: o formulário também cria o Cliente (lead do site, com o aceite do canal e aviso à equipe). Telefone que já é de
+/// um cadastro, ou compartilhado, não é provado só por ter sido digitado: a conversa fica em conferência, sem cliente
+/// ligado, e passa para a equipe. Sem cliente ligado o Assistente não carrega dossiê, histórico, endereço nem pedidos.
 /// </summary>
 public sealed class IdentificarVisitanteChatSiteUseCase(
     AcessoChatSite acesso, IConversaRepository conversaRepository, IUnitOfWork unitOfWork,
-    IOperacaoEventPublisher operacaoEventos)
+    IOperacaoEventPublisher operacaoEventos,
+    EasyStock.Application.Services.Atendimento.ConversaChatSiteService conversaChat,
+    IdentificarClientePorTelefoneUseCase identificarCliente,
+    IConsentimentoContatoRepository consentimentos,
+    IEscaladorConversa escalador,
+    INotificadorService notificador)
 {
+    public const string MotivoConferencia = "Telefone do formulário do site já tem cadastro: confira a pessoa antes de atender.";
+    public const string MotivoLeadNovo = "Novo contato pelo chat do site.";
+
     public async Task<IdentificacaoVisitanteResult> ExecuteAsync(
         string slug, string? token, IdentificacaoVisitanteInput? input, CancellationToken ct = default)
     {
@@ -244,23 +257,57 @@ public sealed class IdentificarVisitanteChatSiteUseCase(
         sessao.RegistrarUso(agora);
         sessao.Identificar(contato);
 
-        Guid? conversaAtualizada = null;
-        if (sessao.ConversaId is { } conversaId)
-        {
-            var conversa = await conversaRepository.ObterPorIdAsync(sessao.EmpresaId, conversaId, ct);
-            if (conversa is { EstaAberta: true, Canal: CanalConversa.ChatSite } && conversa.EmpresaId == sessao.EmpresaId)
-            {
-                conversa.RegistrarContatoInformado(contato);
-                conversaAtualizada = conversa.Id;
-            }
-        }
+        var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, agora, ct);
+        conversa = await conversaRepository.ObterPorIdAsync(sessao.EmpresaId, conversa.Id, ct) ?? conversa;
+        if (conversa is not { EstaAberta: true, Canal: CanalConversa.ChatSite } || conversa.EmpresaId != sessao.EmpresaId)
+            throw new SessaoChatSiteInvalidaException();
+
+        conversa.RegistrarContatoInformado(contato);
+        if (conversa.ClienteId is null && !conversa.VinculoEmRevisao)
+            await IdentificarClienteAsync(sessao.EmpresaId, conversa, contato, agora, ct);
 
         await unitOfWork.CommitAsync();
         // #1643-5: o console troca nome e contato na hora, sem esperar a próxima sincronização.
-        if (conversaAtualizada is { } atualizada)
-            await operacaoEventos.PublicarAsync(EventosOperacao.ConversaAtualizada, sessao.EmpresaId,
-                new ConversaAtualizadaOperacao(atualizada), ct);
+        await operacaoEventos.PublicarAsync(EventosOperacao.ConversaAtualizada, sessao.EmpresaId,
+            new ConversaAtualizadaOperacao(conversa.Id), ct);
         return new IdentificacaoVisitanteResult(contato.Nome, contato.Telefone, contato.Email, contato.InformadoEm);
+    }
+
+    private async Task IdentificarClienteAsync(
+        Guid empresaId, Conversa conversa, ContatoInformadoVisitante contato, DateTime agora, CancellationToken ct)
+    {
+        IdentificacaoCliente identificacao;
+        try
+        {
+            // ReutilizarCadastro:false: cadastro existente nunca é ligado só pelo telefone digitado.
+            identificacao = await identificarCliente.ExecuteAsync(
+                new IdentificarClientePorTelefoneInput(empresaId, contato.Telefone.TrimStart('+'), contato.Nome, ReutilizarCadastro: false), ct);
+        }
+        catch (TelefoneExigeVerificacaoException)
+        {
+            await ExigirConferenciaAsync(empresaId, conversa, agora, ct);
+            return;
+        }
+
+        if (identificacao is not { Cliente: { } cliente, EhNovo: true })
+        {
+            await ExigirConferenciaAsync(empresaId, conversa, agora, ct);
+            return;
+        }
+
+        cliente.Email = contato.Email;
+        conversa.VincularCliente(cliente.Id);
+        conversa.AtualizarContatoNome(cliente.Nome);
+        await consentimentos.AddAsync(ConsentimentoContato.Registrar(empresaId, cliente.Id, CanalConversa.ChatSite,
+            FinalidadeContato.Transacional, SituacaoConsentimento.Concedido,
+            ClienteDaConversa.CadastrarClienteDaConversaUseCase.OrigemAceiteChatSite, contato.InformadoEm), ct);
+        await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(empresaId, conversa.Id, cliente.Nome, MotivoLeadNovo, ct);
+    }
+
+    private async Task ExigirConferenciaAsync(Guid empresaId, Conversa conversa, DateTime agora, CancellationToken ct)
+    {
+        conversa.ExigirConferenciaCliente();
+        await escalador.EscalarAsync(empresaId, conversa, MotivoConferencia, agora, ct);
     }
 }
 

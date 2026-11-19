@@ -174,7 +174,16 @@ public class ChatSiteControllerTests
 
     private IdentificarVisitanteChatSiteUseCase Identificacao() => new(
         new AcessoChatSite(_lojas, _flags, Substitute.For<ITenantContextAccessor>(), _sessoes), _conversas, Substitute.For<IUnitOfWork>(),
-        Substitute.For<IOperacaoEventPublisher>());
+        Substitute.For<IOperacaoEventPublisher>(),
+        new EasyStock.Application.Services.Atendimento.ConversaChatSiteService(_conversas, Substitute.For<IUnitOfWork>(), _sessoes),
+        new EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase(
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.IClienteRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IClienteStorefrontRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase>.Instance),
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository>(),
+        Substitute.For<EasyStock.Application.Services.Atendimento.IEscaladorConversa>(),
+        Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>());
 
     [Fact]
     public async Task IdentificacaoValida200SemAceite400TokenInvalido403()

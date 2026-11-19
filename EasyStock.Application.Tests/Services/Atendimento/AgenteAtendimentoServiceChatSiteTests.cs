@@ -1,3 +1,4 @@
+using EasyStock.Application.Services.Atendimento;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
@@ -34,5 +35,30 @@ public partial class AgenteAtendimentoServiceTests
         await _conversaRepository.Received(1).AddMensagemAsync(Arg.Is<Mensagem>(m =>
             m.Autor == AutorMensagem.Agente && m.ExternoId != null && m.ExternoId.StartsWith("chatsite:")
             && m.Texto == "Vou encaminhar sua mensagem para Michele conferir e responder por aqui."), Arg.Any<CancellationToken>());
+    }
+}
+
+/// <summary>#2876, seguranca: conversa do site em conferencia de cadastro nao deixa o Assistente ver nada do cliente existente.</summary>
+public partial class AgenteAtendimentoServiceTests
+{
+    [Fact]
+    public async Task ConversaDoSiteEmConferencia_AssistenteNaoCarregaClienteNemDossieNemCriaPedido()
+    {
+        var conversa = Conversa.Abrir(_empresaId, "sessao-2", Agora.AddMinutes(-1), "Visitante", canal: CanalConversa.ChatSite);
+        conversa.RegistrarEntrada(Agora.AddMinutes(-1));
+        conversa.ExigirConferenciaCliente();
+        var entrada = Mensagem.Entrada(_empresaId, conversa.Id, Agora.AddMinutes(-1), TipoConteudoMensagem.Texto,
+            "quero ver meus pedidos", "chatsite:in2");
+        _conversaRepository.ObterComMensagensAsync(_empresaId, conversa.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ConversaComMensagens(conversa, [entrada]));
+        LojaLigada(nomeDona: "Michele");
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, conversa.Id, Agora);
+
+        resultado.Should().Be(ResultadoTurnoAgente.Ignorado);
+        await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+        await _clienteRepository.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+        await _clienteRepository.DidNotReceiveWithAnyArgs().GetByIdWithDetailsAsync(default, default);
+        await _conversaRepository.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
     }
 }
