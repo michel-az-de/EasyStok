@@ -38,8 +38,10 @@ export function idDoGrupo(chave) {
 }
 
 /** "consultar_pedido" vira "Consultar pedido": o nome técnico não aparece na tela. */
+const ACENTOS = { cardapio: 'cardápio', endereco: 'endereço', avaliacao: 'avaliação', producao: 'produção', restricao: 'restrição', associacoes: 'associações' }
+
 export function rotuloDaFerramenta(nome = '') {
-  const texto = String(nome).replaceAll('_', ' ').trim()
+  const texto = String(nome).split('_').map((p) => ACENTOS[p] ?? p).join(' ').trim()
   return texto ? texto[0].toLocaleUpperCase('pt-BR') + texto.slice(1) : ''
 }
 
@@ -74,8 +76,12 @@ const dadosDasFerramentas = (ligadas, total, aberto) => ({
   tipo: 'grupo', icone: 'plug', titulo: 'Ferramentas', subtitulo: `${ligadas} de ${total} ligadas`, grupo: 'ferramentas', aberto: aberto.has('ferramentas'),
   descricao: `Ferramentas: ${ligadas} de ${total} ligadas`,
 })
-const dadosDoPortao = (p, i) => ({
-  tipo: 'portao', icone: 'lock', titulo: p.titulo, subtitulo: p.escala ? 'Passa à equipe' : 'Só o robô para', escala: Boolean(p.escala), ordem: i + 1,
+// #2857 (V4, I5): o número vai no título, para a ordem não depender de a linha do meio ser lida ao contrário; o subtítulo
+// aparece uma vez por tipo (o ícone de equipe e a legenda dizem o resto).
+const dadosDoPortao = (p, i, portoes = []) => ({
+  tipo: 'portao', icone: 'lock', titulo: `${i + 1}. ${p.titulo}`,
+  subtitulo: portoes.findIndex((x) => Boolean(x.escala) === Boolean(p.escala)) === i ? (p.escala ? 'Passa à equipe' : 'Só o robô para') : undefined,
+  escala: Boolean(p.escala), ordem: i + 1,
   descricao: `${i + 1}. ${p.titulo}: ${p.escala ? 'quando barra, passa a conversa para a equipe' : 'quando barra, só o robô deixa de responder'}`,
 })
 const dadosDaEtapa = (etapa, i) => {
@@ -158,7 +164,7 @@ export function desenharFluxo({ fluxo, roteiro = fluxo?.roteiro ?? [], orientaca
       const posicao = i % PORTOES_POR_LINHA
       const volta = linha % 2 === 1
       const id = `portao:${p.codigo}`
-      no(id, 1 + (volta ? PORTOES_POR_LINHA - 1 - posicao : posicao), -2.6 - linha, dadosDoPortao(p, i))
+      no(id, 1 + (volta ? PORTOES_POR_LINHA - 1 - posicao : posicao), -2.6 - linha, dadosDoPortao(p, i, portoes))
       if (i === 0) {
         aresta(GRUPOS.portoes, lado.cruzaIni, id, lado.cruzaFim, { tracejada: true })
         return
@@ -227,7 +233,7 @@ function desenharEmColuna({ fluxo, roteiro, abertos }) {
   if (aberto.has('portoes')) {
     portoes.forEach((p, i) => {
       const id = `portao:${p.codigo}`
-      no(id, 1, dadosDoPortao(p, i))
+      no(id, 1, dadosDoPortao(p, i, portoes))
       tronco(GRUPOS.portoes, id)
     })
   }
@@ -270,6 +276,7 @@ export function idsDoGrupo(desenho, chave) {
   const prefixo = { portoes: 'portao:', roteiro: 'roteiro:', ferramentas: 'ferramenta:' }[chave]
   if (!prefixo) return []
   const raiz = GRUPOS[chave]
-  const grupos = Object.values(GRUPOS).filter((id) => id !== raiz && desenho.nos.some((n) => n.id === id))
-  return [raiz, ...grupos, ...desenho.nos.filter((n) => n.id.startsWith(prefixo)).map((n) => n.id)]
+  // O grupo, os itens e o nó que o liga ao desenho; os outros grupos ficam de fora para o zoom não encolher o texto.
+  const pais = desenho.arestas.filter((x) => x.destino === raiz).map((x) => x.origem)
+  return [...new Set([...pais, raiz, ...desenho.nos.filter((n) => n.id.startsWith(prefixo)).map((n) => n.id)])]
 }

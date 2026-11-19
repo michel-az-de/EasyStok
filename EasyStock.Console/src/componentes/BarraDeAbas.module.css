@@ -39,3 +39,15 @@
 
 /* #2857 (V13): barra rolável (painel do Assistente): o rótulo não quebra; cabendo, as abas dividem a largura; sem caber, o trilho rola. */
 .rolavel .aba { flex: 1 0 auto; white-space: nowrap; padding-inline: var(--e-3); }
+
+/* #2857 (V13): trilho rolável com esmaecido nas bordas que ainda têm o que rolar (nenhum rótulo fica cortado sem aviso). */
+.rolavel .trilho {
+  background:
+    linear-gradient(to right, var(--papel), var(--papel)) left center / 20px 100% no-repeat local,
+    linear-gradient(to left, var(--papel), var(--papel)) right center / 20px 100% no-repeat local,
+    linear-gradient(to right, var(--linha-forte), transparent) left center / 14px 100% no-repeat scroll,
+    linear-gradient(to left, var(--linha-forte), transparent) right center / 14px 100% no-repeat scroll;
+  scrollbar-width: none;
+}
+.rolavel .trilho::-webkit-scrollbar { display: none; }
+.rolavel .aba { padding-inline: var(--e-2); }

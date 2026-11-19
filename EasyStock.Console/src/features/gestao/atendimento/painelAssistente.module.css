@@ -92,7 +92,7 @@
 
 /* #2857: altura do canvas por contexto. No modal desconta o cabeçalho, o topo do painel, as abas, a barra do fluxo e o rodapé
    (cerca de 440 px dos 86dvh da folha); na página usa a altura útil da tela. */
-.painel[data-contexto="modal"] { --altura-do-canvas: clamp(300px, calc(86dvh - 440px), 640px); --cabecalho-fixo: 0px; }
+.painel[data-contexto="modal"] { --altura-do-canvas: clamp(300px, calc(86dvh - 440px), 640px); --cabecalho-fixo: 72px; }
 @media (max-width: 759px) { .painel[data-contexto="modal"] { --altura-do-canvas: clamp(300px, calc(92dvh - 480px), 640px); } }
 .painel[data-contexto="pagina"] { --altura-do-canvas: max(420px, calc(100dvh - var(--altura-regiao) - var(--altura-item-trilho) - 14rem)); }
 .abas { padding-bottom: 0; }
@@ -104,3 +104,16 @@
   color: var(--marca-forte); text-decoration: underline; text-underline-offset: 3px;
 }
 .bloco .soIcone { min-width: var(--toque); padding-inline: 0; justify-content: center; }
+
+/* #2857 (V17): a altura da modal não pula entre as abas. */
+.painel[data-contexto="modal"] .conteudo { min-height: min(520px, calc(86dvh - 220px)); align-content: start; }
+/* #2857 (V2): no celular, os controles do fluxo ficam numa faixa só, rolável de lado. */
+@media (max-width: 899px) {
+  .barraDoFluxo { flex-wrap: nowrap; overflow-x: auto; gap: var(--e-2); }
+  .barraDoFluxo > * { flex: none; }
+  .barraDoFluxo .nota { display: none; }
+}
+/* #2857 (NN1): abaixo de 600 px a faixa quebra em linhas em vez de rolar de lado, e o Expandir fica inteiro à vista. */
+@media (max-width: 599px) {
+  .barraDoFluxo { flex-wrap: wrap; overflow-x: visible; }
+}

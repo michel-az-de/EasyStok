@@ -81,7 +81,7 @@ function AbaUso({ uso, podeEditar, painel }) {
         />
         {podeEditar && (
           <div className={css.acoes}>
-            <Botao variante="primario" tipo="submit" disabled={!mudou || painel.gravacao.salvando === 'cota'}>Salvar cota</Botao>
+            {mudou && <Botao variante="primario" tipo="submit" disabled={painel.gravacao.salvando === 'cota'}>Salvar cota</Botao>}
             <Retorno gravacao={painel.gravacao} qual="cota" />
           </div>
         )}
@@ -116,11 +116,11 @@ function AbaHistorico() {
           )
         })}
       </ul>
-      <div className={css.acoes}>
+      {paginas > 1 && <div className={css.acoes}>
         <Botao icone="arrow-left" onClick={() => setPagina(pagina - 1)} disabled={pagina <= 1 || carregando}>Mais novos</Botao>
         <span className={css.nota}>Página {pagina} de {paginas}</span>
         <Botao onClick={() => setPagina(pagina + 1)} disabled={pagina >= paginas || carregando}>Mais antigos</Botao>
-      </div>
+      </div>}
     </div>
   )
 }

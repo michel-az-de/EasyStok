@@ -18,6 +18,7 @@
   .opcao, .opcaoAtiva { flex: 1 1 0; padding: 0 var(--e-2); }
 }
 .seletor { display: flex; gap: var(--e-2); }
+.recolher { display: inline-flex; align-items: center; gap: var(--e-2); }
 .opcao, .opcaoAtiva, .recolher {
   min-height: var(--toque); padding: 0 var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
   font: inherit; cursor: pointer;
@@ -35,12 +36,13 @@
 .canvas { position: relative; min-width: 0; min-height: 0; border: var(--b-1) solid var(--linha); border-radius: var(--r-2); overflow: hidden; }
 .nota { margin: var(--e-4); color: var(--tinta-2); }
 
+/* Celular: o ajuste é uma gaveta na própria grade, abaixo do desenho (o desenho encolhe e os botões de zoom ficam à vista). */
 .ajuste {
-  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
-  position: fixed; left: 0; right: 0; bottom: 0; max-height: 50dvh; z-index: 1;
-  padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--papel); border-top: var(--b-1) solid var(--linha);
-  box-shadow: var(--sombra-alta);
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden; max-height: 42dvh;
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: var(--papel); border-top: var(--b-1) solid var(--linha); box-shadow: var(--sombra-alta);
 }
+.alca { flex: none; align-self: center; width: 40px; height: 4px; margin: var(--e-2) 0 var(--e-1); border-radius: var(--r-pilula); background: var(--linha-forte); }
 .ajusteRolagem { flex: 1; min-height: 0; overflow-y: auto; padding: var(--e-3) var(--e-4); }
 .fecharAjuste {
   flex: none; min-height: var(--toque); margin: 0 var(--e-4) var(--e-2); border: var(--b-1) solid var(--linha); border-radius: var(--r-2);
@@ -49,14 +51,18 @@
 .ajusteOculto { display: none; }
 
 @media (min-width: 600px) {
-  .corpo { grid-template-columns: minmax(0, 1fr) 360px; }
+  .corpo { grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr); }
+  .alca { display: none; }
   .ajuste {
-    position: static; max-height: none; padding-bottom: 0; border-top: 0; box-shadow: none;
+    max-height: none; padding: 0; border-top: 0; box-shadow: none;
     border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
   }
   .semAjuste { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 599px) {
-  .corpo { margin-top: var(--e-2); }
+  .corpo { margin-top: var(--e-2); grid-template-rows: minmax(0, 1fr) auto; }
+  .semAjuste { grid-template-rows: minmax(0, 1fr); gap: 0; }
+  /* No celular o desenho já é uma coluna só: não há o que escolher entre horizontal e vertical. */
+  .seletor { display: none; }
 }

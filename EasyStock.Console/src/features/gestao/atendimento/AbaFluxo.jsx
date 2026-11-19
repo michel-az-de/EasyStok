@@ -6,8 +6,9 @@ import { Icone } from '../../../componentes/Icone'
 import {
   ROTEIRO_ETAPAS_MAXIMO, ROTEIRO_INSTRUCAO_MAXIMO, ROTEIRO_NOME_MAXIMO, desligadasDoFluxo, erroDoRoteiro, mesmoRoteiro, moverEtapa,
 } from '../../../dominio/painelAssistente'
-import { GRUPOS, ORIENTACOES, desenharFluxo, idsDoGrupo } from '../../../dominio/desenhoDoFluxo'
+import { GRUPOS, ORIENTACOES, rotuloDaFerramenta, desenharFluxo, idsDoGrupo } from '../../../dominio/desenhoDoFluxo'
 import { FluxoExpandido } from './FluxoExpandido'
+import { LegendaDoFluxo } from './LegendaDoFluxo'
 import { Retorno } from './Retorno'
 import css from './painelAssistente.module.css'
 
@@ -20,6 +21,8 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
   const [orientacao, setOrientacao] = useState(() => (window.matchMedia?.('(max-width: 899px)').matches ? ORIENTACOES.vertical : ORIENTACOES.horizontal))
   const [abertos, setAbertos] = useState([])
   const [expandido, setExpandido] = useState(false)
+  const [selecoes, setSelecoes] = useState(0)
+  const botaoExpandir = useRef(null)
   const [foco, setFoco] = useState({ ids: null })
   const [roteiro, setRoteiro] = useState(fluxo.roteiro)
   const detalhe = useRef(null)
@@ -48,6 +51,7 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
   // rolável até ele. O foco vai para o título do ajuste e um aviso curto diz o que mudou.
   function selecionar(id) {
     setSelecionado(id)
+    setSelecoes((n) => n + 1)
     if (id.startsWith('grupo:')) return
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const titulo = document.querySelector('[data-ajuste-titulo]')
@@ -64,7 +68,9 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
   function alternarGrupo(chave, abrir, roteiroNovo = roteiro) {
     const proximos = abrir ? [...abertos.filter((g) => g !== chave), chave] : abertos.filter((g) => g !== chave)
     setAbertos(proximos)
-    setFoco({ ids: abrir ? idsDoGrupo(desenharFluxo({ fluxo, roteiro: roteiroNovo, orientacao, abertos: proximos, compacto }), chave) : null })
+    // Abrir enquadra o grupo aberto agora; fechar volta para o último grupo ainda aberto (ou o desenho todo).
+    const alvo = abrir ? chave : proximos[proximos.length - 1]
+    setFoco({ ids: alvo ? idsDoGrupo(desenharFluxo({ fluxo, roteiro: roteiroNovo, orientacao, abertos: proximos, compacto }), alvo) : null })
   }
 
   function ativar(id) {
@@ -79,7 +85,7 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
   }
 
   function alternarNo(dados) {
-    selecionar(dados.id)
+    // A chave liga ou desliga sem escolher o nó nem tirar o foco dela.
     if (dados.tipo === 'ferramenta') alternarFerramenta({ nome: dados.nome, ligada: dados.ligada }, fluxo, painel)
     else if (dados.tipo === 'roteiro') setRoteiro(roteiro.map((e, i) => (i === dados.indice ? { ...e, ativo: !e.ativo } : e)))
   }
@@ -98,7 +104,7 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
 
   const ajuste = (
     <>
-      <p role="status" className="sr">{aviso}</p>
+      {!expandido && <p role="status" className="sr">{aviso}</p>}
       <Detalhe
         id={selecionado} fluxo={fluxo} podeEditar={podeEditar} painel={painel}
         roteiro={roteiro} setRoteiro={setRoteiro} roteiroMudou={roteiroMudou} aoSelecionar={selecionar}
@@ -110,13 +116,14 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
   return (
     <div className={css.fluxoCaixa}>
       <div className={css.barraDoFluxo}>
-        <div role="group" aria-label="Direção do desenho" className={css.seletor}>
+        {!compacto && <div role="group" aria-label="Direção do desenho" className={css.seletor}>
           {[[ORIENTACOES.horizontal, 'Horizontal'], [ORIENTACOES.vertical, 'Vertical']].map(([valor, rotulo]) => (
             <Botao key={valor} variante={orientacao === valor ? 'primario' : 'secundario'} aria-pressed={orientacao === valor} onClick={() => trocarOrientacao(valor)}>{rotulo}</Botao>
           ))}
-        </div>
+        </div>}
         {podeEditar && roteiro.length < ROTEIRO_ETAPAS_MAXIMO && <Botao variante="texto" icone="mais" onClick={acrescentarEtapa}>Acrescentar etapa</Botao>}
-        <Botao variante="secundario" onClick={() => setExpandido(true)}>Expandir</Botao>
+        <LegendaDoFluxo />
+          <Botao ref={botaoExpandir} variante="secundario" icone="ampliar" onClick={() => setExpandido(true)}>Expandir</Botao>
         <p className={css.nota}>Toque num nó para ajustar. Verificações, Roteiro e Ferramentas abrem ao tocar.</p>
       </div>
       <div ref={grade} className={css.fluxo}>
@@ -129,8 +136,8 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
         <FluxoExpandido
           aoFechar={() => setExpandido(false)} orientacao={orientacao} aoTrocarOrientacao={trocarOrientacao}
           desenho={desenho} dadosDoNo={dadosDoNo} foco={foco} rotuloDoDesenho="Fluxo do Assistente, na ordem do turno"
-          chaveDoAjuste={selecionado}
-          ajuste={ajuste}
+          chaveDoAjuste={`${selecionado}#${selecoes}`} retornoDoFoco={botaoExpandir}
+          ajuste={ajuste} aviso={aviso}
         />
       )}
     </div>
@@ -150,7 +157,14 @@ function rolarAte(el) {
   if (!raiz) return
   const margem = parseFloat(getComputedStyle(el).scrollMarginTop) || 0
   const topo = raiz === document.scrollingElement ? 0 : raiz.getBoundingClientRect().top
-  const destino = Math.max(0, raiz.scrollTop + el.getBoundingClientRect().top - topo - margem)
+  const base = raiz === document.scrollingElement ? window.innerHeight : raiz.getBoundingClientRect().bottom
+  const r = el.getBoundingClientRect()
+  // Como block 'nearest': se o ajuste já está visível não rola; senão rola o mínimo, sem passar o topo dele da margem do cabeçalho fixo.
+  const sobe = r.top - topo - margem
+  const desce = Math.min(r.bottom - base, sobe)
+  const delta = sobe < 0 ? sobe : Math.max(0, desce)
+  if (delta === 0) return
+  const destino = Math.max(0, raiz.scrollTop + delta)
   const suave = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   raiz.scrollTo({ top: destino, behavior: suave ? 'smooth' : 'auto' })
 }
@@ -238,7 +252,7 @@ function DetalhePrompt({ fluxo, podeEditar, painel, observacoes, setObservacoes 
             onChange={(e) => setObservacoes(e.target.value)}
             dica="Ex.: aos domingos não há entrega; a torta de limão sai só por encomenda. Não mudam as regras." />
           <div className={css.acoes}>
-            <Botao variante="primario" tipo="submit" disabled={!mudou || passou || painel.gravacao.salvando === 'observacoes'} motivo={!mudou ? 'Nada mudou.' : undefined}>Salvar observações</Botao>
+            {mudou && <Botao variante="primario" tipo="submit" disabled={passou || painel.gravacao.salvando === 'observacoes'}>Salvar observações</Botao>}
             <Retorno gravacao={painel.gravacao} qual="observacoes" />
           </div>
         </form>
@@ -265,8 +279,8 @@ function alternarFerramenta(ferramenta, fluxo, painel) {
 function DetalheFerramenta({ ferramenta, fluxo, podeEditar, painel }) {
   const alternar = () => alternarFerramenta(ferramenta, fluxo, painel)
   return (
-    <Bloco titulo={ferramenta.nome} icone={ferramenta.travada ? 'lock' : null}>
-      <p>{ferramenta.descricao}</p>
+    <Bloco titulo={rotuloDaFerramenta(ferramenta.nome)} icone={ferramenta.travada ? 'lock' : null}>
+      {ferramenta.descricao && <p>{ferramenta.descricao}</p>}
       {ferramenta.travada
         ? <p className={css.nota}>Sempre ligada: é o caminho do cliente até a equipe.</p>
         : (
@@ -307,18 +321,21 @@ function DetalheRoteiro({ indice, roteiro, setRoteiro, roteiroMudou, fluxo, pode
           <div className={css.acoes}>
             <BotaoIcone tom="secundario" icone="arrow-up" rotulo="Subir etapa" onClick={() => mover(-1)} disabled={indice === 0} />
             <BotaoIcone tom="secundario" icone="arrow-down" rotulo="Descer etapa" onClick={() => mover(1)} disabled={indice === roteiro.length - 1} />
-            <Botao variante="texto" className={css.link} onClick={tirar}>Tirar etapa</Botao>
+            <BotaoIcone tom="secundario" icone="lixeira" rotulo="Tirar etapa" onClick={tirar} />
           </div>
           {erro && <p role="alert" className={css.erro}>{erro}</p>}
           <div className={css.acoes}>
-            <Botao variante="primario" disabled={!roteiroMudou || Boolean(erro) || painel.gravacao.salvando === 'roteiro'}
-              motivo={!roteiroMudou ? 'Nada mudou no roteiro.' : erro ?? undefined}
-              onClick={() => painel.salvar('roteiro', { roteiro: roteiro.map((e) => ({ nome: e.nome.trim(), instrucao: e.instrucao.trim(), ativo: e.ativo })) })}>
-              Salvar roteiro
-            </Botao>
-            {roteiroMudou && <Botao variante="texto" className={css.link} onClick={() => { setRoteiro(fluxo.roteiro); aoSelecionar('prompt') }}>Desfazer</Botao>}
+            {roteiroMudou && (
+              <>
+                <Botao variante="primario" disabled={Boolean(erro) || painel.gravacao.salvando === 'roteiro'} motivo={erro ?? undefined}
+                  onClick={() => painel.salvar('roteiro', { roteiro: roteiro.map((e) => ({ nome: e.nome.trim(), instrucao: e.instrucao.trim(), ativo: e.ativo })) })}>
+                  Salvar roteiro
+                </Botao>
+                <Botao variante="secundario" onClick={() => { setRoteiro(fluxo.roteiro); aoSelecionar('prompt') }}>Desfazer</Botao>
+              </>
+            )}
             {fluxo.roteiroPersonalizado && !roteiroMudou && (
-              <Botao variante="texto" className={css.link} onClick={() => { if (window.confirm('Voltar ao roteiro padrão do EasyStok?')) painel.salvar('roteiro', { roteiro: [] }) }}>Voltar ao padrão</Botao>
+              <Botao variante="secundario" onClick={() => { if (window.confirm('Voltar ao roteiro padrão do EasyStok?')) painel.salvar('roteiro', { roteiro: [] }) }}>Voltar ao padrão</Botao>
             )}
             <Retorno gravacao={painel.gravacao} qual="roteiro" />
           </div>

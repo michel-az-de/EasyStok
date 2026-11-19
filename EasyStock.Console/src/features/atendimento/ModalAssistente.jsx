@@ -30,21 +30,21 @@ export function ModalAssistente({ conversa, aoFechar }) {
     mudarChave(ativo)
   }
 
-  const desenharEtapa = (etapa) => {
+  const desenharEtapa = (etapa, semDetalhe = false) => {
     const estado = estadoDaEtapa(etapa)
     return (
       <li key={etapa.codigo} className={css['etapa_' + estado.chave]} data-etapa={etapa.codigo} data-estado={estado.chave}>
         <Pilula tom={estado.tom} icone={estado.icone} tamanho="inline">{estado.rotulo}</Pilula>
         <span className={css.checagemTexto}>
           <strong>{etapa.titulo}</strong>
-          <span>{etapa.detalhe}</span>
+          {!semDetalhe && <span>{etapa.detalhe}</span>}
         </span>
       </li>
     )
   }
   const etapasQueBarram = (checagem?.etapas ?? []).filter((etapa) => estadoDaEtapa(etapa).chave === 'barra')
-  // #2857: com o painel, o motivo do bloqueio (a cota, por exemplo) aparece uma vez só: na etapa que barra, não também no veredito.
-  const detalheDoVeredito = renderizarPainel && etapasQueBarram.length > 0 ? null : veredito?.detalhe
+  // #2857: com o painel, o motivo do bloqueio (a cota, por exemplo) aparece no veredito e dentro de "Etapas do robô"; a linha da etapa que barra mostra só o selo e o título.
+  const detalheDoVeredito = veredito?.detalhe
 
   const daConversa = (
     <>
@@ -82,7 +82,7 @@ export function ModalAssistente({ conversa, aoFechar }) {
 
             {renderizarPainel ? (
               <>
-                {etapasQueBarram.length > 0 && <ol className={css.checagemEtapas}>{etapasQueBarram.map(desenharEtapa)}</ol>}
+                {etapasQueBarram.length > 0 && <ol className={css.checagemEtapas}>{etapasQueBarram.map((e) => desenharEtapa(e, true))}</ol>}
                 <details className={css.checagemDetalhes}>
                   <summary>Etapas do robô ({contagem.passa} passam, {contagem.barra} barram, {contagem.fora} não se aplicam)</summary>
                   <ol className={css.checagemEtapas}>{checagem.etapas.map(desenharEtapa)}</ol>

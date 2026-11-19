@@ -125,7 +125,12 @@ async function cenario(largura, altura) {
     const des = await caixa(dialogo.locator('.react-flow').first())
     assert.ok(aj.x >= des.x + des.w - 2, `${largura}px: ajuste na coluna à direita do desenho (ajuste x=${aj.x}, desenho até ${des.x + des.w})`)
   } else {
-    assert.ok(aj.y > altura * 0.3 && Math.abs(aj.y + aj.h - altura) <= 2, `${largura}px: ajuste é uma gaveta colada na base: ${JSON.stringify(aj)}`)
+    assert.ok(aj.y > altura * 0.3 && altura - (aj.y + aj.h) >= 0 && altura - (aj.y + aj.h) <= 10 && aj.h <= altura * 0.42 + 2, `${largura}px: ajuste é uma gaveta na base (até 42dvh, dentro do padding do diálogo): ${JSON.stringify(aj)}`)
+  }
+  // #2857 (N4): os botões de zoom ficam acima da gaveta, nunca debaixo dela.
+  if (largura < 600) {
+    const zoom = await caixa(dialogo.locator('.react-flow__controls').first())
+    assert.ok(zoom.y + zoom.h <= aj.y + 1, `${largura}px: botões de zoom acima da gaveta (zoom até ${zoom.y + zoom.h}, gaveta em ${aj.y})`)
   }
   const fechar = dialogo.getByRole('button', { name: 'Fechar ajuste' })
   assert.equal(await fechar.isVisible(), true, `${largura}px: Fechar ajuste visível`)

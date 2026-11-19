@@ -98,3 +98,5 @@
 }
 .descarte p { margin: 0; font-weight: 600; }
 .descarteAcoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+
+.titulo:focus { outline: none; }
