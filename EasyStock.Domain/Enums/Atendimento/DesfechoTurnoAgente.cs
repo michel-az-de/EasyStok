@@ -17,4 +17,7 @@ public enum DesfechoTurnoAgente
 
     /// <summary>A conversa mudou durante o turno (a dona assumiu ou o cliente foi corrigido) e nada saiu.</summary>
     Interrompido = 5,
+
+    /// <summary>#2885 (S75): resposta automática sem chamar o modelo (saudação solta). Tokens zerados.</summary>
+    SemIa = 6,
 }

@@ -114,7 +114,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
     }
 
     private ProcessarEventoWhatsAppUseCase CriarUseCase(EasyStock.Application.Ports.Output.Ai.ITranscritorAudio? transcritor = null,
-        PerfilClienteWhatsApp? perfil = null) =>
+        PerfilClienteWhatsApp? perfil = null, RespostaSemIa? respostaSemIa = null) =>
         new ProcessarEventoWhatsAppUseCase(
             _empresaRepository, _featureFlagRepository, _configuracaoRepository, _conversaRepository,
             _webhookRecebidoRepository, _cloudClient, _queueService, _eventPublisher, _tenantContext,
@@ -136,7 +136,8 @@ public class ProcessarEventoWhatsAppUseCaseTests
             transcritor,
             _pedidoRepository,
             _regrasAutomaticas,
-            perfil);
+            perfil,
+            respostaSemIa);
 
     private void ConfigurarCenario()
     {
@@ -158,6 +159,10 @@ public class ProcessarEventoWhatsAppUseCaseTests
             .TryRegistrarAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => WebhookRecebido.Criar("meta_whatsapp", callInfo.ArgAt<string>(1), callInfo.ArgAt<string>(2)));
     }
+
+    /// <summary>#2885: a janela de 24 h do Assistente lê o relógio real (DateTime.UtcNow); o payload padrão é de 2023.</summary>
+    private static string PayloadTextoAgora(string wamid, string texto) =>
+        PayloadTexto(wamid, texto).Replace("\"timestamp\":\"1700000000\"", $"\"timestamp\":\"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}\"");
 
     private static string PayloadTexto(string wamid, string texto) => """
         {"entry":[{"changes":[{"value":{
@@ -1157,5 +1162,120 @@ public class ProcessarEventoWhatsAppUseCaseTests
         await _useCase.ExecuteAsync(PayloadBotaoAcao("wamid.botao-falha", "acao:confirmar_endereco:123"));
 
         _unitOfWork.Received().DescartarAlteracoesPendentes();
+    }
+
+    // ── #2885 (S75): saudação solta sem modelo ─────────────────────────────────────────────────────────────
+
+    private readonly EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnoAgenteRepository _turnos =
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnoAgenteRepository>();
+    private readonly List<Mensagem> _historicoSemIa = [];
+
+    private RespostaSemIa CriarRespostaSemIa()
+    {
+        // Assistente ligado na loja: com ele desligado a loja barra e nenhuma saudação dispensa o modelo.
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        configuracao.Ativo = true;
+        _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns(configuracao);
+        var llm =Substitute.For<EasyStock.Application.Ports.Output.Ai.IAgenteLlmClient>();
+        llm.Disponivel.Returns(true);
+        return new RespostaSemIa(_regrasAutomaticas, _configuracaoRepository, _conversaRepository, _clienteRepository, _turnos,
+            llm, new ResolvedorCanal([_canalWhatsApp]), _unitOfWork, NullLogger<RespostaSemIa>.Instance);
+    }
+
+    [Fact]
+    public async Task ConversaNovaComOiEAutomaticaDesligada_SaudacaoSemFraseDeEsperaESemModelo()
+    {
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        var padrao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        string? enviado = null;
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Do<string>(t => enviado = t), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.saudacao-sem-ia"));
+
+        await CriarUseCase(respostaSemIa: CriarRespostaSemIa()).ExecuteAsync(PayloadTextoAgora("wamid.sem-ia-off", "Oi"));
+
+        enviado.Should().StartWith(padrao.SaudacaoPrimeiroContato).And.NotContain(padrao.FraseEspera);
+        await _cloudClient.Received(1).EnviarTextoAsync(ContatoWaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _turnos.Received(1).AddAsync(Arg.Is<TurnoAgente>(t => t.Desfecho == DesfechoTurnoAgente.SemIa), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConversaNovaComOiEAutomaticaLigada_TurnoVaiParaOAgenteSemRegistroSemIa()
+    {
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        LigarAutomatica(GatilhoAutomacao.PrimeiroContato);
+
+        await CriarUseCase(respostaSemIa: CriarRespostaSemIa()).ExecuteAsync(PayloadTextoAgora("wamid.sem-ia-on", "Oi"));
+
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _turnos.DidNotReceive().AddAsync(Arg.Any<TurnoAgente>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConversaNovaComPerguntaDeVerdade_SegueParaOAgenteComAFraseDeEspera()
+    {
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        var padrao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        string? enviado = null;
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Do<string>(t => enviado = t), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.saudacao-pedido"));
+
+        await CriarUseCase(respostaSemIa: CriarRespostaSemIa()).ExecuteAsync(PayloadTextoAgora("wamid.sem-ia-pedido", "Oi, quero 2 bolos"));
+
+        enviado.Should().EndWith(padrao.FraseEspera);
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _turnos.DidNotReceive().AddAsync(Arg.Any<TurnoAgente>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConversaParadaComOiERegraLigada_RespondeSemModeloENaoEnfileiraOAgente()
+    {
+        var conversa = Conversa.Abrir(_empresaId, ContatoWaId, DateTime.UtcNow.AddHours(-1), "Ana Souza");
+        conversa.RegistrarEntrada(DateTime.UtcNow.AddMinutes(-5));
+        _historicoSemIa.Clear();
+        _conversaRepository.ObterAbertaPorContatoComLockAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(conversa);
+        _conversaRepository.ObterPorIdComLockAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        _conversaRepository.AddMensagemAsync(Arg.Do<Mensagem>(m => _historicoSemIa.Add(m)), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        _conversaRepository.ObterComMensagensAsync(_empresaId, conversa.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ConversaComMensagens(conversa, _historicoSemIa.ToList()));
+        _regrasAutomaticas.ObterPorGatilhoAsync(_empresaId, GatilhoAutomacao.SaudacaoSolta, Arg.Any<CancellationToken>())
+            .Returns(RegraAutomatica.Criar(_empresaId, GatilhoAutomacao.SaudacaoSolta, "Oi! Como posso te ajudar?", ligada: true, DateTime.UtcNow));
+
+        await CriarUseCase(respostaSemIa: CriarRespostaSemIa()).ExecuteAsync(PayloadTextoAgora("wamid.parada-oi", "Oi"));
+
+        await _canalWhatsApp.Received(1).EnviarTextoAsync(ContatoWaId, "Oi! Como posso te ajudar?", Arg.Any<CancellationToken>());
+        await _queueService.DidNotReceive().EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _turnos.Received(1).AddAsync(Arg.Is<TurnoAgente>(t => t.Desfecho == DesfechoTurnoAgente.SemIa), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConversaNovaComOiEAutomaticaDesligadaEEnvioFalha_TurnoVaiParaOAgenteSemRegistroSemIa()
+    {
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns<Task<EnvioWhatsAppResult>>(_ => throw new HttpRequestException("canal indisponível"));
+
+        await CriarUseCase(respostaSemIa: CriarRespostaSemIa()).ExecuteAsync(PayloadTextoAgora("wamid.sem-ia-falha", "Oi"));
+
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
+        await _turnos.DidNotReceive().AddAsync(Arg.Any<TurnoAgente>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ConversaNovaComOiEFalhaAoDecidirOModelo_SaudacaoSaiEOTurnoVaiParaOAgente()
+    {
+        _expedientes.GetByEmpresaIdAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(ExpedienteLoja.CriarPadrao(_empresaId));
+        _cloudClient.EnviarTextoAsync(ContatoWaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new EnvioWhatsAppResult("wamid.saudacao-decisao"));
+        _conversaRepository.ContarRespostasDoAgenteDesdeAsync(_empresaId, Arg.Any<Guid>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns<Task<int>>(_ => throw new InvalidOperationException("banco caiu"));
+
+        await CriarUseCase(respostaSemIa: CriarRespostaSemIa()).ExecuteAsync(PayloadTextoAgora("wamid.sem-ia-decisao", "Oi"));
+
+        await _cloudClient.Received(1).EnviarTextoAsync(ContatoWaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _queueService.Received(1).EnqueueAsync(FilaAtendimentoNomes.TurnoAgente, Arg.Any<ProcessarTurnoAgenteJob>());
     }
 }

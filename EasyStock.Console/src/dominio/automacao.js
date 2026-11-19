@@ -22,6 +22,8 @@ export const GATILHOS = {
   // #1610: lembrete do link de pagamento perto de vencer. Só existe no modo API
   // (quem dispara é o job de cobranças do EasyStok); a demonstração não tem.
   COBRANCA_VENCENDO: 'cobranca-vencendo',
+  // Saudação solta (enum SaudacaoSolta do EasyStok): só um oi ou bom dia em conversa parada.
+  SAUDACAO_SOLTA: 'saudacao-solta',
 }
 
 export const REGRAS_PADRAO = [
@@ -144,6 +146,10 @@ export const GATILHOS_DA_API = {
   PrimeiroContato: {
     id: 'boas-vindas', gatilho: GATILHOS.PRIMEIRO_CONTATO, nome: 'Primeira resposta',
     descricao: 'Primeira mensagem de uma conversa nova, com a loja aberta no horário.',
+  },
+  SaudacaoSolta: {
+    id: 'saudacao-solta', gatilho: GATILHOS.SAUDACAO_SOLTA, nome: 'Saudação solta',
+    descricao: 'Quando o cliente manda só um oi ou bom dia em conversa parada. O Assistente não gasta IA.',
   },
   ForaDoHorario: {
     id: 'fora-do-horario', gatilho: GATILHOS.FORA_DO_HORARIO, nome: 'Fora do horário',

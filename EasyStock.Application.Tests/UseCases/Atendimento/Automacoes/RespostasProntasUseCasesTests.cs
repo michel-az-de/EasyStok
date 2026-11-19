@@ -100,7 +100,7 @@ public class RespostasProntasUseCasesTests
         var lembrete = lista.Should().ContainSingle(r => r.Gatilho == GatilhoAutomacao.CobrancaVencendo).Subject;
         lembrete.Ligada.Should().BeTrue();
         lembrete.Texto.Should().Contain("{pedido}");
-        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado))
+        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.SaudacaoSolta))
             .Should().OnlyContain(r => !r.Ligada && r.Texto == null);
     }
 
@@ -134,8 +134,22 @@ public class RespostasProntasUseCasesTests
         pago.Ligada.Should().BeTrue();
         pago.Texto.Should().Be(RegraAutomatica.TextoPadraoPagamentoConfirmado);
         pago.AlteradaEm.Should().BeNull("o padrão não foi gravado por ninguém");
-        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.CobrancaVencendo))
+        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.SaudacaoSolta))
             .Should().OnlyContain(r => !r.Ligada && r.Texto == null);
+    }
+
+    [Fact]
+    public async Task ListarSemRegraGravada_SaudacaoSoltaVemDesligadaComTextoSugerido()
+    {
+        _regras.ListarAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(new List<RegraAutomatica>());
+
+        var lista = await new AutomacoesUseCases(_regras, _uow, _relogio).ListarAsync(_empresaId);
+
+        // #2885 (D3): a regra nasce desligada, com texto sugerido para a dona só ligar.
+        var saudacao = lista.Single(r => r.Gatilho == GatilhoAutomacao.SaudacaoSolta);
+        saudacao.Ligada.Should().BeFalse();
+        saudacao.Texto.Should().Be(RegraAutomatica.TextoPadraoSaudacaoSolta);
+        saudacao.AlteradaEm.Should().BeNull("o padrão não foi gravado por ninguém");
     }
 
     [Fact]

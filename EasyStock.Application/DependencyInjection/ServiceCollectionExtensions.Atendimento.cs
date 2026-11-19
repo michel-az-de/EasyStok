@@ -41,6 +41,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ConversaWhatsAppDoCliente>(); // #1408/#2871: conversa do WhatsApp com cliente cadastrado
         services.AddScoped<AvisoEquipeNoAparelho>(); // #1807: avisos do Balcão no aparelho (Web Push)
         services.AddScoped<OptOutPorPalavra>();
+        services.AddScoped<RespostaSemIa>(); // #2885: saudação solta respondida sem o modelo
         services.AddScoped<SaudacaoAtendimento>();
         services.AddScoped<PerfilClienteWhatsApp>(); // #2155: nome, e-mail e localização no cadastro
         services.AddSingleton<JanelaFotoPerfilWhatsApp>(); // #2838: uma consulta da foto por cliente a cada 12 h
