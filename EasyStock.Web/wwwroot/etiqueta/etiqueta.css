@@ -158,8 +158,8 @@
   color:      var(--ink-600, #4D5665);
   padding:    6px 10px;
   background: var(--warn-50, #FFFBEB);
-  border-left: 3px solid var(--warn-600, #D97706);
-  border-radius: 0 4px 4px 0;
+  border: 1px solid var(--warn-600, #D97706);
+  border-radius: 4px;
 }
 
 /* ── Print layer ─────────────────────────────────────────────────────────── */
