@@ -16,11 +16,8 @@ function Fila({ titulo, apoio, itens, emDia, href, rotuloDoLink, renderizar, avi
     return (
       <section className={css.fila} aria-label={titulo}>
         <header className={css.cabeca}>
-          <span className={css.numero} data-vazio="true" aria-hidden="true">–</span>
-          <div>
-            <h2 className={css.titulo}>{titulo}</h2>
-            <p className={css.apoio}>{apoio}</p>
-          </div>
+          <h2 className={css.titulo}>{titulo}</h2>
+          <p className={css.apoio}>{apoio}</p>
         </header>
         <p className={css.emDia} role="status">{aviso}</p>
         <a className={css.abrir} href={href}>Abrir {rotuloDoLink}<MarcaIcone nome="proximo" tamanho={16} /></a>
@@ -29,12 +26,10 @@ function Fila({ titulo, apoio, itens, emDia, href, rotuloDoLink, renderizar, avi
   }
   return (
     <section className={css.fila} aria-label={`${titulo}: ${itens.length}`}>
+      {/* #2859: a contagem fica no título, em corpo de texto; número de vitrine ao lado lia como painel genérico. */}
       <header className={css.cabeca}>
-        <span className={css.numero} data-vazio={itens.length === 0}>{itens.length}</span>
-        <div>
-          <h2 className={css.titulo}>{titulo}</h2>
-          <p className={css.apoio}>{apoio}</p>
-        </div>
+        <h2 className={css.titulo}>{titulo} <span className={css.numero} data-vazio={itens.length === 0}>{itens.length}</span></h2>
+        <p className={css.apoio}>{apoio}</p>
       </header>
       {itens.length === 0
         ? <p className={css.emDia}><MarcaIcone nome="confirmar" tamanho={16} /> {emDia}</p>
