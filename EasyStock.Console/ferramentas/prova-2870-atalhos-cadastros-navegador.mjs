@@ -36,7 +36,8 @@ async function preparar({ largura = 1440, altura = 900, verPedidos = true, hash 
       return ok(filtrados, { meta: { total: filtrados.length, totalCount: filtrados.length } })
     }
     const ficha = path.match(/^\/api\/clientes\/(cli-\d)$/)
-    if (ficha) return ok({ ...pessoas.find((p) => p.id === ficha[1]), enderecos: [], consentimentos: [] })
+    // A ficha vem como `{ cliente, ... }` (obterCadastro em infra/api/cadastrosApi.js).
+    if (ficha) return ok({ cliente: pessoas.find((p) => p.id === ficha[1]), enderecos: [], consentimentos: [] })
     if (path === '/api/atendimento/conversas') return ok([])
     if (path === '/api/atendimento/configuracao') return ok({ slaRespostaMinutos: 5 })
     if (path === '/api/atendimento/agenda') return ok({ lojaDisponivel: true, dias: [] })
@@ -81,11 +82,12 @@ try {
     await page.getByRole('searchbox', { name: 'Buscar pedido' }).fill('bruno')
     await trilho.getByRole('link', { name: 'Clientes', exact: true }).click()
     assert.equal(await buscaDeClientes(page).inputValue(), 'ana', 'dentro de Cadastros a busca continua')
-    // Abrir a ficha (ainda Cadastros) e voltar à lista também mantém a busca.
-    await page.evaluate(() => { window.location.hash = '#/m/cadastros/clientes/cli-0' })
-    await page.waitForFunction(() => window.location.hash === '#/m/cadastros/clientes/cli-0')
-    await page.waitForTimeout(300)
-    await page.goBack()
+    // Abrir a ficha (ainda Cadastros) e fechá-la pelo botão também mantém a busca.
+    await page.getByRole('button', { name: 'Abrir ficha de Ana Paula', exact: true }).click()
+    const ficha = page.getByRole('dialog', { name: 'Ficha do cliente' })
+    await ficha.waitFor()
+    await ficha.getByRole('button', { name: 'Fechar', exact: true }).click()
+    await ficha.waitFor({ state: 'hidden' })
     await page.getByRole('row').filter({ hasText: 'Ana Paula' }).waitFor()
     assert.equal(await buscaDeClientes(page).inputValue(), 'ana', 'fechar a ficha mantém a busca')
 
