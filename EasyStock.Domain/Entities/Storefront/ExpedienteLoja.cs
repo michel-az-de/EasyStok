@@ -48,11 +48,11 @@ public class ExpedienteLoja
 
     /// <summary>Enviada fora do horário; <c>{abre}</c> vira a próxima abertura ("amanhã às 08:00").</summary>
     public string MensagemForaDoHorario { get; private set; } =
-        "Oi! No momento estamos fechados. Abrimos {abre} e te respondemos assim que der.";
+        "Oi! A Casa está fechada agora e abre {abre}. Sua mensagem fica guardada, e a resposta vem na abertura.";
 
     /// <summary>Enviada com a loja fechada na mão (sem hora para voltar).</summary>
     public string MensagemLojaFechada { get; private set; } =
-        "Oi! Hoje não estamos atendendo. Assim que voltarmos, te respondemos por aqui.";
+        "Oi! A Casa não está atendendo hoje. Sua mensagem fica guardada, e a resposta vem por aqui na volta.";
 
     public DateTime CriadoEm { get; private set; }
     public DateTime AlteradoEm { get; private set; }

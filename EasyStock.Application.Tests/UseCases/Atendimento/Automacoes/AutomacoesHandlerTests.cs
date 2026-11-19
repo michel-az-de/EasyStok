@@ -262,7 +262,7 @@ public class AutomacoesHandlerTests
             .Should().Be(ResultadoAutomacao.Enviada);
 
         await _whats.Received(1).EnviarTextoAsync(_conversa.ContatoIdExterno,
-            "Oi, Ana! Recebemos seu pagamento e seu pedido está confirmado para 01/10 às 14:00. Obrigada pela preferência!",
+            "Oi, Ana! Pagamento recebido. Seu pedido está confirmado para 01/10 às 14:00.",
             Arg.Any<CancellationToken>());
     }
 

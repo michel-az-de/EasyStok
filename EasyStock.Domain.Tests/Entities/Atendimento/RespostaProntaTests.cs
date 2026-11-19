@@ -121,7 +121,7 @@ public class RegraAutomaticaTests
 
         padrao.Should().NotBeNull();
         padrao!.Ligada.Should().BeFalse();
-        padrao.Texto.Should().Be("Oi! Como posso te ajudar?");
+        padrao.Texto.Should().Be("Oi! Como a Casa pode ajudar?");
     }
 
     [Theory]
@@ -141,7 +141,7 @@ public class RegraAutomaticaTests
         padrao!.Ligada.Should().BeTrue();
         padrao.Texto.Should().Be(RegraAutomatica.TextoPadraoPagamentoConfirmado);
         padrao.Renderizar(new Dictionary<string, string?> { ["nome"] = "Ana", ["faixa"] = "01/10 às 14:00" })
-            .Should().Be("Oi, Ana! Recebemos seu pagamento e seu pedido está confirmado para 01/10 às 14:00. Obrigada pela preferência!");
+            .Should().Be("Oi, Ana! Pagamento recebido. Seu pedido está confirmado para 01/10 às 14:00.");
     }
 
     [Theory]
