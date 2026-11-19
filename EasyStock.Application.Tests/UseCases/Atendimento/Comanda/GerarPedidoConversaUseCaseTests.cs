@@ -1,9 +1,13 @@
+using System.Text.Json;
+using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Tests.Helpers;
@@ -15,6 +19,7 @@ using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Notifications;
 using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute.ExceptionExtensions;
@@ -42,15 +47,18 @@ public class GerarPedidoConversaUseCaseTests
         public List<Mensagem> Mensagens { get; } = new();
         public List<CobrancaPedido> Cobrancas { get; } = new();
         public IUnitOfWork Uow { get; } = Substitute.For<IUnitOfWork>();
+        public INotificadorService Notificador { get; } = Substitute.For<INotificadorService>();
+        public List<(TipoEventoNotificacao Tipo, string Payload)> Fila { get; } = new();
         public GerarPedidoConversaUseCase UseCase { get; }
         public Guid EmpresaId => Checkout.Storefront.EmpresaId;
 
         public Cenario(bool comEndereco = true, bool janelaFechada = false, string cep = "01310-100")
         {
-            Cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Maria" };
+            Cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = EmpresaId, Nome = "Maria", Telefone = "(11) 99999-8888" };
             if (comEndereco)
                 Cliente.Enderecos.Add(new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = Cliente.Id, Cep = cep, Padrao = true });
             ClienteRepo.GetByIdWithDetailsAsync(EmpresaId, Cliente.Id).Returns(Cliente);
+            ClienteRepo.GetByIdAsync(EmpresaId, Cliente.Id).Returns(Cliente);
 
             var agora = DateTime.UtcNow.AddDays(janelaFechada ? -2 : 0);
             Conversa = Conversa.Abrir(EmpresaId, WaId, agora.AddMinutes(-2), "Maria", Cliente.Id);
@@ -89,10 +97,20 @@ public class GerarPedidoConversaUseCaseTests
             ConversaRepo.TravarParaPedidoAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>())
                 .Returns(_ => Conversa.PedidoEmAndamentoId);
 
+            // #2871: fora da janela de 24 h o resumo vai pela fila de avisos (modelo pedido_atualizado).
+            Pedidos.GetByIdAsync(EmpresaId, Arg.Any<Guid>())
+                .Returns(ci => Checkout.PedidosAdicionados.FirstOrDefault(p => p.Id == ci.ArgAt<Guid>(1)));
+            Notificador.When(n => n.EnfileirarEventoAsync(Arg.Any<TipoEventoNotificacao>(), EmpresaId, Arg.Any<string>(),
+                    Arg.Any<Guid?>(), Arg.Any<CancellationToken>(), Arg.Any<string?>()))
+                .Do(ci => Fila.Add((ci.ArgAt<TipoEventoNotificacao>(0), ci.ArgAt<string>(2))));
+            var avisoStatus = new AvisoStatusPedidoCliente(Pedidos, ClienteRepo, Substitute.For<IVagaOcupadaRepository>(),
+                Substitute.For<IStorefrontRepository>(), new PoliticaEnvioCliente(Substitute.For<IConsentimentoContatoRepository>()),
+                Notificador, Substitute.For<ITenantContextAccessor>(), NullLogger<AvisoStatusPedidoCliente>.Instance);
+
             UseCase = new GerarPedidoConversaUseCase(
                 ConversaRepo, ClienteRepo,
                 Checkout.CriarPedidoAtendimento(ConversaRepo, ClienteRepo, Uow, Pedidos),
-                gerar, trocar, aviso, TimeProvider.System);
+                gerar, trocar, aviso, TimeProvider.System, new ResumoPedidoForaDaJanela(avisoStatus, Uow));
         }
 
         public GerarPedidoConversaInput Input(Guid? empresaId = null, string? forma = null) => new(
@@ -187,6 +205,72 @@ public class GerarPedidoConversaUseCaseTests
         var saida = c.Mensagens.Should().ContainSingle().Subject;
         saida.Direcao.Should().Be(DirecaoMensagem.Saida);
         saida.ExternoId.Should().Be("wamid.resumo");
+    }
+
+    // #2871: o cliente falou no WhatsApp pessoal da dona e a equipe registrou o pedido pelo Console. A conversa da
+    // loja está fora da janela de 24 h (ou nunca teve mensagem): o resumo sai pela fila de avisos, no modelo
+    // pedido_atualizado, numa linha só (a Meta recusa quebra de linha no parâmetro).
+    [Fact]
+    public async Task ForaDaJanela_ResumoVaiPelaFilaDeAvisosEmUmaLinha()
+    {
+        var c = new Cenario(janelaFechada: true);
+
+        var resultado = await c.UseCase.ExecuteAsync(c.Input());
+
+        resultado.ResumoNaFila.Should().BeTrue();
+        resultado.EnviadoAoCliente.Should().BeFalse();
+        var (tipo, payload) = c.Fila.Should().ContainSingle().Subject;
+        tipo.Should().Be(TipoEventoNotificacao.ComandaAtualizada);
+        using var json = JsonDocument.Parse(payload);
+        var mensagem = json.RootElement.GetProperty("mensagem").GetString()!;
+        mensagem.Should().StartWith("Resumo do seu pedido: 2x Brigadeiro")
+            .And.Contain("Total: R$ 25,00")
+            .And.Contain("https://mp.test/pref-1")
+            .And.EndWith("Obrigado pelo pedido!")
+            .And.NotContain("\n");
+        mensagem.Length.Should().BeLessThanOrEqualTo(ResumoPedidoConversa.TamanhoMaximoEmUmaLinha);
+        json.RootElement.GetProperty("telefone").GetString().Should().Be("+5511999998888");
+        json.RootElement.GetProperty(EasyStock.Application.Services.Notifications.NotificadorService.ChaveIdempotenciaPayload).GetString()
+            .Should().Be($"{resultado.PedidoId:N}|resumo");
+        c.Mensagens.Should().BeEmpty("a mensagem entra no histórico quando o envio da fila sai");
+        await c.Canal.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task DentroDaJanela_ResumoSaiNaConversaENaoVaiPelaFila()
+    {
+        var c = new Cenario();
+
+        var resultado = await c.UseCase.ExecuteAsync(c.Input());
+
+        resultado.EnviadoAoCliente.Should().BeTrue();
+        resultado.ResumoNaFila.Should().BeFalse();
+        c.Fila.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Resumo_AgradeceNoFim()
+    {
+        var c = new Cenario();
+
+        await c.UseCase.ExecuteAsync(c.Input());
+
+        await c.Canal.Received(1).EnviarTextoAsync(WaId, Arg.Is<string>(t => t.EndsWith("\n\nObrigado pelo pedido!")),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ForaDaJanela_SemTelefone_RegistraFalhaComoAntes()
+    {
+        var c = new Cenario(janelaFechada: true);
+        c.Cliente.Telefone = null;
+
+        var resultado = await c.UseCase.ExecuteAsync(c.Input());
+
+        resultado.ResumoNaFila.Should().BeFalse();
+        resultado.EnviadoAoCliente.Should().BeFalse();
+        c.Fila.Should().BeEmpty();
+        c.Mensagens.Should().ContainSingle().Which.Status.Should().Be(StatusMensagem.Falhou);
     }
 
     // #1991-7 (#1989-6): o resumo que a atendente manda pelo console é dela, não "automática": autor humano e quem enviou.

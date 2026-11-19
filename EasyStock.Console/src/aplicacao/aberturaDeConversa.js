@@ -13,16 +13,18 @@ export function criarCanalDeAbertura(alvo) {
   let ouvintes = 0
   let pendente = null
   return {
-    anunciar(id) {
-      if (ouvintes === 0) pendente = { id }
-      try { alvo?.dispatchEvent(new CustomEvent(EVENTO_ABRIR_CONVERSA, { detail: { id } })) } catch { /* sem janela */ }
+    // #2871: `intencao` diz o que fazer na conversa aberta (`{ novoPedido: true }` abre o cardápio da comanda).
+    anunciar(id, intencao = {}) {
+      const detalhe = { ...intencao, id }
+      if (ouvintes === 0) pendente = detalhe
+      try { alvo?.dispatchEvent(new CustomEvent(EVENTO_ABRIR_CONVERSA, { detail: detalhe })) } catch { /* sem janela */ }
     },
     inscrever(aoAbrir) {
-      const ouvir = (evento) => aoAbrir(evento.detail?.id ?? null)
+      const ouvir = (evento) => aoAbrir(evento.detail?.id ?? null, evento.detail ?? {})
       ouvintes += 1
       alvo?.addEventListener(EVENTO_ABRIR_CONVERSA, ouvir)
       if (pendente) {
-        aoAbrir(pendente.id)
+        aoAbrir(pendente.id, pendente)
         setTimeout(() => { pendente = null })
       }
       return () => {
@@ -33,12 +35,21 @@ export function criarCanalDeAbertura(alvo) {
   }
 }
 
+// #2871 (revisão da #2874): o "Novo pedido" abre a comanda quando a conversa pedida chega à seleção. Se ela não chegar
+// logo, a intenção vence, para o cardápio não abrir sozinho quando a operadora entrar nessa conversa mais tarde.
+export const VALIDADE_DO_NOVO_PEDIDO_MS = 10000
+export function destinoDoNovoPedido(pendente, selecionadaId, agora = Date.now()) {
+  if (!pendente) return 'nada'
+  if (agora > pendente.ate) return 'descartar'
+  return selecionadaId === pendente.id ? 'abrir' : 'esperar'
+}
+
 const canal = criarCanalDeAbertura(globalThis.window)
 
-export const anunciarAberturaDeConversa = (id) => canal.anunciar(id)
+export const anunciarAberturaDeConversa = (id, intencao) => canal.anunciar(id, intencao)
 
 export function useAoAbrirConversa(aoAbrir) {
   const atual = useRef(aoAbrir)
   useEffect(() => { atual.current = aoAbrir })
-  useEffect(() => canal.inscrever((id) => atual.current?.(id)), [])
+  useEffect(() => canal.inscrever((id, detalhe) => atual.current?.(id, detalhe)), [])
 }

@@ -21,7 +21,7 @@ const tiposProduto = [{ valor: 'Alimento', rotulo: 'Alimento' }, { valor: 'Fisic
 const tiposConta = [{ valor: 'corrente', rotulo: 'Conta corrente' }, { valor: 'poupanca', rotulo: 'Poupança' }, { valor: 'pagamento', rotulo: 'Conta de pagamento' }]
 const opcoesStatus = [{ valor: 'Inativo', rotulo: 'Inativo' }, { valor: 'Ativo', rotulo: 'Ativo' }]
 
-export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade, aoAbrirCadastro, conversasNoAtendimento, aoAbrirConversa, aoGravarRelacionamento, aoRascunharRelacionamento, restricoes, editarAoAbrir = false, complemento }) {
+export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, podeEditar, aoFechar, aoSalvo, aoAlternarAtividade, aoAbrirCadastro, conversasNoAtendimento, aoAbrirConversa, aoGravarRelacionamento, aoRascunharRelacionamento, restricoes, editarAoAbrir = false, complemento, novoPedido = null }) {
   const idForm = useId()
   const formRef = useRef(null)
   const { dados, inicial } = editor
@@ -165,10 +165,13 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     {/* O vermelho fica só na confirmação: aqui o botão é discreto e afastado de Salvar. Com `motivo` sempre
         presente o invólucro não troca e o botão não remonta (#2258). */}
     {mostraAtividade && <span className={css.acaoAtividade}><Botao disabled={salvando || alterado || Boolean(editor.conflito || editor.semConfirmacao)} motivo={`Salve ou descarte as alterações antes de ${emAtividadeCadastro(dados) ? 'inativar' : 'reativar'}.`} onClick={() => { falharAtividade(null); confirmarAtividade(confirmacaoDeAtividade(tela, dados)) }}>{emAtividadeCadastro(dados) ? 'Inativar' : 'Reativar'}</Botao></span>}
+    {/* #2871: o pedido que o cliente fez pelo WhatsApp pessoal da dona nasce na conversa dele, no Atendimento. */}
+    {novoPedido && id && emAtividadeCadastro(dados) && <Botao icone="mais" disabled={salvando || alterado || Boolean(novoPedido.abrindo)} motivo="Salve ou descarte as alterações antes de registrar um pedido." onClick={() => novoPedido.iniciar(id)}>{novoPedido.abrindo ? 'Abrindo…' : 'Novo pedido'}</Botao>}
     <Botao onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))} disabled={salvando}>{podeEditar && formularioAberto ? 'Cancelar' : 'Fechar'}</Botao>
     {podeEditar && formularioAberto && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : !alterado ? id ? 'Nada mudou para salvar.' : 'Preencha o cadastro para salvar.' : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
   </>}>
     {erro && <p className={css.erro} role="alert">{erro}</p>}
+    {novoPedido?.erro && <p className={css.erro} role="alert">{novoPedido.erro}</p>}
     {tela === 'clientes' && editor.conflito && <section className={css.assistente} aria-label="Conferir versão do cadastro">
       <p>Outra edição foi salva para esta pessoa. Conferir a versão atual não grava nem descarta o que você digitou.</p>
       <Botao disabled={conferindo} onClick={carregarVersaoAtual}>{conferindo ? 'Carregando versão…' : 'Conferir versão atual'}</Botao>

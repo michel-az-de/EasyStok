@@ -74,6 +74,9 @@ export const transferir = (id, paraUsuarioId) => comConfirmacaoDeOutra((confirma
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })
 export const reabrir = (id) => chamarApi(`${BASE}/${id}/reabrir`, { metodo: 'POST' })
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })
+// #2871: "Novo pedido" do cliente que pediu pelo WhatsApp pessoal da dona. Abre (ou reaproveita) a conversa do WhatsApp
+// da loja com ele, sem mandar mensagem, e devolve a linha da inbox para o Balcão mostrar antes da próxima leitura.
+export const abrirConversaDoCliente = (clienteId) => chamarApi(`${BASE}/do-cliente`, { metodo: 'POST', corpo: { clienteId } })
 
 // Sugestão do agente para a dona (#1420): `{ texto, tokens, latenciaMs }`. Nada sai ao cliente.
 // Sem a chave da Anthropic na API, 503 com a mensagem que o painel mostra.

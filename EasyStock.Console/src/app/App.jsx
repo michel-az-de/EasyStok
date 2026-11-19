@@ -3,7 +3,7 @@ import {
   closestCenter, DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
-import { anunciarAberturaDeConversa } from '../aplicacao/aberturaDeConversa'
+import { anunciarAberturaDeConversa, destinoDoNovoPedido, useAoAbrirConversa, VALIDADE_DO_NOVO_PEDIDO_MS } from '../aplicacao/aberturaDeConversa'
 import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
 import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicacao/rascunhosDosAjustes'
 import { useEsquecerCadastrosAoSair } from '../aplicacao/cadastros'
@@ -288,6 +288,18 @@ function Composicao({ rota }) {
     if (tela === 'comanda' && selecionada?.pedido) { solicitarPainel('ficha', 'comanda'); return }
     setModal('cardapio')
   }
+  // #2871: o "Novo pedido" do cliente (Clientes, Pedidos, busca do Balcão) abre a comanda na conversa dele, depois que a
+  // seleção chega a esta tela: sem pedido, o cardápio; com pedido em andamento, a comanda dele na Ficha.
+  const [novoPedidoNaConversa, pedirNovoPedido] = useState(null)
+  useAoAbrirConversa((id, detalhe) => {
+    if (detalhe?.novoPedido) pedirNovoPedido({ id, ate: Date.now() + VALIDADE_DO_NOVO_PEDIDO_MS })
+  })
+  useEffect(() => {
+    const destino = destinoDoNovoPedido(novoPedidoNaConversa, selecionada?.id)
+    if (destino === 'nada' || destino === 'esperar') return
+    pedirNovoPedido(null)
+    if (destino === 'abrir') abrirTelaDoAssistente('comanda')
+  }, [novoPedidoNaConversa, selecionada?.id])
 
   return (
     <DndContext

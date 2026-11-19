@@ -35,6 +35,9 @@ const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora e
 
 const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.'
 
+// #2871: fora da janela de 24 h o resumo do pedido vai pela fila de avisos, no modelo aprovado.
+const RESUMO_NA_FILA = 'O resumo sai pelo WhatsApp em instantes (conversa fora da janela de 24 h).'
+
 // #1942 (#1923): 409 que o EasyStok recusou antes de criar o pedido. Mostra o motivo, sem reler. O resto dos
 // 409 (PEDIDO_EM_ANDAMENTO, a corrida do clique duplo, e código desconhecido) pode ter criado: relê.
 const RECUSA_DEFINITIVA = new Set(['LOJA_FECHADA', 'JANELA_ESGOTADA', 'CEP_SEM_COBERTURA', 'CLIENTE_BLOQUEADO', 'VINCULO_CLIENTE_ALTERADO'])
@@ -159,13 +162,16 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
         if (!gerado?.cobranca && corpo.forma === FORMA_ONLINE) {
           faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "Gerar cobrança" para emitir o link')
         }
-        if (!gerado?.enviadoAoCliente) {
+        // #2871: fora da janela de 24 h o resumo vai pela fila de avisos (modelo aprovado) e sai em instantes.
+        const resumoNaFila = Boolean(gerado?.resumoNaFila)
+        if (!gerado?.enviadoAoCliente && !resumoNaFila) {
           if (gerado?.pedidoId) semResumo.add(gerado.pedidoId)
           if (enviarAoCliente) faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
         }
         const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
         limparAviso()
-        if (aviso) avisar(aviso)
+        if (aviso) avisar(resumoNaFila ? `${aviso} ${RESUMO_NA_FILA}` : aviso)
+        else if (resumoNaFila) avisar(`Pedido criado. ${RESUMO_NA_FILA}`)
         else if (!enviarAoCliente) avisar(gerado?.cobranca?.linkPagamento
           ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar um modelo aprovado.'
           : 'Pedido e cobrança criados sem envio. Confira a forma de recebimento em Pagamento.')
