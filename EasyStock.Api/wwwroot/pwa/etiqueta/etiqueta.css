@@ -37,7 +37,7 @@
   align-items:   center;
   border-radius: var(--r-pill, 999px);
   padding:       2px 8px;
-  font-size:     11px;
+  font-size:     var(--fs-micro, 12px);
   font-weight:   500;
   font-family:   var(--font-sans, 'Inter', sans-serif);
 }
@@ -76,7 +76,7 @@
 .etq-page-title  { font-size:18px; font-weight:700; color:var(--ink-900,#1A1F26); font-family:var(--font-sans,'Inter',sans-serif); }
 .etq-section-lbl { font-size:14px; font-weight:600; color:var(--ink-700,#3A4350); font-family:var(--font-sans,'Inter',sans-serif); }
 .etq-body        { font-size:13px; font-weight:400; color:var(--ink-600,#4D5665); font-family:var(--font-sans,'Inter',sans-serif); }
-.etq-caption     { font-size:11px; color:var(--ink-500,#6B7480); font-family:var(--font-sans,'Inter',sans-serif); }
+.etq-caption     { font-size:var(--fs-micro, 12px); color:var(--ink-500,#6B7480); font-family:var(--font-sans,'Inter',sans-serif); }
 .etq-mono        { font-size:12px; font-family:var(--font-mono,'JetBrains Mono','Courier New',monospace); }
 
 /* ── Model card ─────────────────────────────────────────────────────────── */
@@ -121,7 +121,7 @@
   display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;
 }
 .etq-tpl-feat {
-  font-size: 10px; font-weight: 600; padding: 2px 6px;
+  font-size: var(--fs-micro, 12px); font-weight: 600; padding: 2px 6px;
   border-radius: var(--r-pill, 999px); letter-spacing: 0.02em;
   font-family: var(--font-sans, 'Inter', sans-serif);
 }
@@ -154,7 +154,7 @@
 /* ── ANVISA disclaimer ───────────────────────────────────────────────────── */
 
 .etq-disclaimer {
-  font-size:  11px;
+  font-size:  var(--fs-micro, 12px);
   color:      var(--ink-600, #4D5665);
   padding:    6px 10px;
   background: var(--warn-50, #FFFBEB);
