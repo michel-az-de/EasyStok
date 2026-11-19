@@ -20,7 +20,7 @@ const { GATILHOS } = automacao
 const lerFonte = (caminho) => readFileSync(new URL(`../src/${caminho}`, import.meta.url), 'utf8')
 
 // T8: o texto padrão de "Pagamento confirmado" é o do servidor (RegraAutomatica.TextoPadraoPagamentoConfirmado).
-const TEXTO_DO_SERVIDOR = 'Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!'
+const TEXTO_DO_SERVIDOR = 'Oi, {nome}! Pagamento recebido. Seu pedido está confirmado para {faixa}.'
 assert.equal(automacao.REGRAS_PADRAO.find((r) => r.id === 'recibo').texto, TEXTO_DO_SERVIDOR, 'T8: texto padrão igual ao do servidor')
 
 // T2: o servidor só troca {nome}, {pedido} e {faixa}. Grafia diferente sai literal, e a tela diz qual.
