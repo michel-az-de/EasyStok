@@ -6,6 +6,7 @@ import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
 import { anunciarAberturaDeConversa, destinoDoNovoPedido, useAoAbrirConversa, VALIDADE_DO_NOVO_PEDIDO_MS } from '../aplicacao/aberturaDeConversa'
 import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
 import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicacao/rascunhosDosAjustes'
+import { useEsquecerCadastrosAoSair } from '../aplicacao/cadastros'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { CHAVE_CARDAPIO, usePreferenciaDePainel } from '../aplicacao/preferenciaDosPaineis'
 import { CARDAPIO, larguraDoCardapio, larguraMaxima, normalizarCardapio } from '../dominio/paineis'
@@ -600,6 +601,7 @@ export function App() {
   const hash = useHash()
   const { sessao, entrarNaEmpresa, entrarPorCodigo, google, encerrarSessao, avisoSaida, retomando, erroRetomada } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
+  useEsquecerCadastrosAoSair(moduloDaRota(rota))
   // #1582: cada tela diz o próprio nome na aba. No Balcão quem escreve é a `Composicao`, com a contagem.
   useTituloDaAba(FONTE_API && !sessao ? TITULO_BASE : rota.tipo === ROTA_PRINCIPAL ? null : tituloDaAba(rota))
   // #1753: o token sai da barra de endereço assim que é lido, para não ficar no histórico do navegador.

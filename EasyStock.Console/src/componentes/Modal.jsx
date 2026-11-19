@@ -77,6 +77,10 @@ export function Modal({
     const dialogo = dialogoRef.current
     const dialogoPai = dialogo.parentElement?.closest('dialog[open]')
     if (!dialogo.open) dialogo.showModal()
+    // #2857 (V16): sem campo pedido, o foco inicial do showModal() cai no X e abre o tooltip "Fechar (Esc)"; vai para o título.
+    if (!focarCampoRef.current && document.activeElement?.matches?.('[data-fechar-canto]')) {
+      dialogo.querySelector('[data-titulo-do-dialogo]')?.focus({ preventScroll: true })
+    }
     if (focarCampoRef.current) {
       const campo = dialogo.querySelector('[data-foco-inicial]:not(:disabled)')
         ?? dialogo.querySelector('input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')
@@ -138,12 +142,12 @@ export function Modal({
       aria-modal="true"
     >
       {/* Distingue fechar a janela de sair da sessão e do botão do rodapé. */}
-      <BotaoIcone rotulo="Fechar janela" dica="Fechar (Esc)" icone="x" tom="secundario" className={css.fecharCanto} disabled={!aoFechar}
+      <BotaoIcone rotulo="Fechar janela" dica="Fechar (Esc)" icone="x" tom="secundario" className={css.fecharCanto} data-fechar-canto disabled={!aoFechar}
         onClick={() => { if (confirmarDescarte && !segurarFechamento) abrirPergunta(); else aoFechar?.() }} />
       {/* Integração: título e rodapé fora da rolagem. Folha comprida (resumo
           do Encerrar, canhoto) rolava o título para fora e escondia o botão de
           ação lá embaixo; agora só o miolo rola. */}
-      <h2 id={`${id}-titulo`} className={css.titulo}>{titulo}</h2>
+      <h2 id={`${id}-titulo`} className={css.titulo} tabIndex={-1} data-titulo-do-dialogo>{titulo}</h2>
       <div className={css.conteudo}>
         {perguntaValida && (
           <div className={css.descarte} role="alert">

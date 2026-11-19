@@ -201,7 +201,7 @@ try {
         await moduloAtivoNoTrilho(page, modulo).waitFor()
         assert.equal(await page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true }).count(), 0)
       }
-      assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), MODULOS.length + 1)
+      assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), MODULOS.length + 1 + 2) // #2870: + Clientes e Pedidos
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
       if (modulo.id === MODULOS[0].id && telaId === undefined) await escolherTema(page, 'Claro')
       if (telaId) await capturarTela(page, modulo, telas.find(tela => tela.id === telaId), 'light')

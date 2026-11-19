@@ -195,6 +195,21 @@ export function modulosDoHall({ fonteApi = false, acoes = null } = {}) {
   })
 }
 
+// #2870 (teste da Tatiana, 19/11): Clientes e Pedidos são o trabalho de toda hora do atendimento e moravam só no menu
+// de Cadastros. O atalho leva direto à tela, no Início e nos dois trilhos. Aparece só onde a tela aparece: mesmo modo,
+// mesma matriz de ações e o módulo liberado para o perfil.
+const ATALHOS_DIRETOS = [
+  { id: 'clientes', nome: 'Clientes', resumo: 'Ficha, histórico e pedidos', moduloId: 'cadastros', telaId: 'clientes' },
+  { id: 'pedidos', nome: 'Pedidos', resumo: 'Todos os pedidos da loja', moduloId: 'cadastros', telaId: 'pedidos' },
+]
+export function atalhosDiretos({ fonteApi = false, acoes = null, permite = () => true } = {}) {
+  return ATALHOS_DIRETOS
+    .filter((atalho) => permite(atalho.moduloId)
+      && telasDoMenu(moduloPorId(atalho.moduloId), { fonteApi, acoes }).some((tela) => tela.id === atalho.telaId))
+    .map((atalho) => ({ ...atalho, modulo: moduloPorId(atalho.moduloId), href: hashDoModulo(atalho.moduloId, atalho.telaId) }))
+}
+export const ehAtalhoDireto = (moduloId, telaId) => ATALHOS_DIRETOS.some((a) => a.moduloId === moduloId && a.telaId === telaId)
+
 // Busca somente no catálogo de navegação, sem consultar dados de clientes.
 const textoDeBusca = (valor) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
 export function filtrarModulos(modulos, busca) {

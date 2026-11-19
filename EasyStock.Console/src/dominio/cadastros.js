@@ -4,6 +4,10 @@ const campos = (dados, nomes) => Object.fromEntries(nomes.map(nome => [nome, tex
 export const normalizarBuscaCadastro = (valor) => String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
 export const termoBuscaCadastro = (valor) => /^[+\d\s().-]+$/.test(String(valor).trim()) ? String(valor).replace(/\D/g, '') : String(valor).trim()
 export const chaveContextoCadastro = (tela, conversaId) => `cadastros:${tela}:${conversaId ?? 'geral'}`
+// #2870 (teste da Tatiana): a busca, o filtro e a página das listas de Cadastros valem enquanto a pessoa está no módulo
+// (abrir a ficha e voltar, trocar de tela); ao sair dele, a próxima visita começa limpa. Pedidos (chave `pedidos`)
+// guarda os filtros de propósito: abre a conversa do pedido e volta para a mesma lista (#2478).
+export const contextoVisualEsquecidoAoSair = (chave) => String(chave).startsWith('cadastros:')
 export const telefoneCadastro = (c) => c.telefone || c.contatoInformado?.telefone || c.cliente?.telefoneCanal || (['WhatsApp', 'SMS'].includes(c.canal) ? c.contato : null)
 export const emailCadastro = (c) => c.email || c.contatoInformado?.email || (c.canal === 'E-mail' ? c.contato : null)
 export const filtrarSemCadastro = (conversas, busca) => {

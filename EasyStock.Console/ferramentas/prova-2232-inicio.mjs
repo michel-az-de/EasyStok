@@ -157,7 +157,8 @@ confere('H6  KPIs em grade 2×2 e o alerta do caixa vira estado do cartão com a
 
 confere('H7  o cartão todo clicável perde a seta ">"', () => {
   const abrir = html.match(/<a [^>]*class="abrir"[^>]*>[^]*?<\/a>/g) ?? []
-  assert.equal(abrir.length, 7)
+  // #2870: 7 áreas + o atalho Clientes (com `acoes: {}` o perfil não vê Pedidos, então esse atalho não entra).
+  assert.equal(abrir.length, 8)
   for (const link of abrir) assert.doesNotMatch(link, /<svg/, link.slice(0, 80))
   assert.doesNotMatch(css, /\.abrir > svg/)
   assert.doesNotMatch(jsxHall.slice(jsxHall.indexOf('<a className={css.abrir}'), jsxHall.indexOf('</a>', jsxHall.indexOf('<a className={css.abrir}'))), /MarcaIcone/)
