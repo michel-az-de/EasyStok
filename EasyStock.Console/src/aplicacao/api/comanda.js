@@ -166,7 +166,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
         const resumoNaFila = Boolean(gerado?.resumoNaFila)
         if (!gerado?.enviadoAoCliente && !resumoNaFila) {
           if (gerado?.pedidoId) semResumo.add(gerado.pedidoId)
-          if (enviarAoCliente) faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
+          if (enviarAoCliente) faltas.push('o cliente não foi avisado: o resumo não saiu (conversa fora da janela de 24 h sem modelo aprovado, ou canal fora do ar)')
         }
         const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
         limparAviso()
