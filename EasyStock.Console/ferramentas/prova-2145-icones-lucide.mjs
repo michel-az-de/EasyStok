@@ -105,14 +105,14 @@ try {
   })
   await confere('Atendimento: a chave de conceito desenha o ícone da tabela 3.2', async () => {
     // Conceitos presentes neste cenário. A Assistente usa AvatarAssistente e o botão de
-    // completar com Sparkles só existe na API; seus dois aliases são provados no host abaixo.
+    // completar com o robô só existe na API; seus dois aliases são provados no host abaixo.
     // #2437: o atalho de cardápio (book-open) saiu do Atendimento; `respostas` (message-square-text) o substituiu na tela.
     for (const nome of ['message-square-text', 'bike', 'sticky-note']) {
       assert.ok(atendimento.some((i) => i.classe.split(' ').includes('lucide-' + nome)), 'falta lucide-' + nome)
     }
   })
 
-  await confere('Icone real: agente e sparkles desenham o mesmo conceito, com tamanho e nome acessível preservados', async () => {
+  await confere('Icone real: agente e sparkles desenham o mesmo conceito (#2864: o robô), com tamanho e nome acessível preservados', async () => {
     const arquivo = new URL('../src/componentes/Icone.jsx', import.meta.url)
     const estilo = new URL('../src/componentes/Icone.module.css', import.meta.url)
     const compilado = (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo.pathname, { jsx: { runtime: 'automatic' } })).code
@@ -133,7 +133,7 @@ try {
       )))
       const aliases = await lerIcones(host)
       assert.equal(aliases.length, 2)
-      assert.ok(aliases.every((icone) => icone.classe.split(' ').includes('lucide-sparkles') && icone.desenhos > 0))
+      assert.ok(aliases.every((icone) => icone.classe.split(' ').includes('lucide-bot') && icone.desenhos > 0))
       assert.ok(aliases.every((icone) => icone.largura === 24 && icone.traco === '1.75' && icone.ponta === 'round' && icone.juncao === 'round'))
       assert.equal(aliases[0].rotulo, 'Assistente')
       assert.equal(await host.getByRole('img', { name: 'Assistente', exact: true }).count(), 1)

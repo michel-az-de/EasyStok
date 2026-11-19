@@ -130,11 +130,12 @@
   --e-24: 24px;
   --e-0: var(--e-1);
 
-  /* raio por papel (banca UX/UI de 04/11, #2246): 8 px em controle, cartão e painel; pílula em
-     chip, avatar e contador; ponta é o canto de direção do balão. */
-  --r-1: 8px;
-  --r-2: 8px;
-  --r-3: 8px;
+  /* raio por papel (#2864, revendo o 8 px único da #2246): controle 6 px, cartão 10 px, painel e
+     janela 14 px, de modo que o de dentro é sempre menor que o de fora; pílula em chip, avatar e
+     contador; ponta é o canto de direção do balão. */
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 14px;
   --r-pilula: 999px;
   --r-ponta: 2px;
 

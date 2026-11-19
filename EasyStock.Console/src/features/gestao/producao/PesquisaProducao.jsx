@@ -14,7 +14,7 @@ function Fontes({ fontes }) {
 
 export function PesquisaReceitaIa({ nome, aoAplicar, disabled }) {
   const [aberto, setAberto] = useState(false)
-  return <><Botao icone="sparkles" aria-haspopup="dialog" disabled={disabled} onClick={() => setAberto(true)}>Pesquisar receita</Botao>
+  return <><Botao icone="lupa" aria-haspopup="dialog" disabled={disabled} onClick={() => setAberto(true)}>Pesquisar receita</Botao>
     {aberto && <ModalPesquisaReceita nome={nome} aoAplicar={(sugestao) => { aoAplicar(sugestao); setAberto(false) }} aoFechar={() => setAberto(false)} />}
   </>
 }
