@@ -91,8 +91,8 @@
    quebrar linha). */
 .estatistica { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
 .rotuloEstatistica {
-  margin: 0; font-size: var(--t-apoio); color: var(--tinta-2);
-  text-transform: uppercase; letter-spacing: 0.04em;
+ margin: 0; font-size: var(--t-apoio); color: var(--tinta-2);
+ 
 }
 /* --t-valor (26px) só cabe numa coluna larga; nas quatro colunas apertadas da
    folha, --t-forte (21px) é o maior tamanho que ainda sobra espaço para
@@ -105,8 +105,8 @@
 
 .secao { display: flex; flex-direction: column; gap: var(--e-2); }
 .tituloSecao {
-  margin: 0; font-size: var(--t-apoio); color: var(--tinta-2);
-  text-transform: uppercase; letter-spacing: 0.04em;
+ margin: 0; font-size: var(--t-apoio); color: var(--tinta-2);
+ 
 }
 
 .barraMensagens {
@@ -128,8 +128,8 @@
 /* Achado 4 (pendência 22 da banca 64): cabeçalho em caixa alta pequena, igual
    a `.tituloSecao`, e a coluna Valor alinhada à direita (número, não texto). */
 .tabelaVendas th {
-  text-align: left; color: var(--tinta-2); font-weight: 600; padding: var(--e-1) var(--e-2);
-  text-transform: uppercase; letter-spacing: 0.04em; font-size: var(--t-micro);
+ text-align: left; color: var(--tinta-2); font-weight: 600; padding: var(--e-1) var(--e-2);
+ font-size: var(--t-micro);
 }
 .tabelaVendas td { padding: var(--e-1) var(--e-2); border-top: var(--b-1) solid var(--linha); }
 .tabelaVendas tfoot td { font-weight: 700; border-top: var(--b-2) solid var(--linha-forte); }

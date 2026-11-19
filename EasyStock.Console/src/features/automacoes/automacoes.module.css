@@ -48,9 +48,9 @@
   border-top-color: transparent;
 }
 .marcaHoje {
-  padding: 1px var(--e-2); border-radius: var(--r-pilula);
-  background: var(--preenchimento-forte); color: var(--tinta-2);
-  font-size: var(--t-micro); font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+ padding: 1px var(--e-2); border-radius: var(--r-pilula);
+ background: var(--preenchimento-forte); color: var(--tinta-2);
+ font-size: var(--t-micro); font-weight: 700; 
 }
 
 /* Chave com rótulo de estado. Ligado e desligado não podem ser parecidos. */

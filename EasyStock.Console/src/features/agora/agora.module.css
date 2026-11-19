@@ -1,10 +1,9 @@
 .painel { margin-bottom: var(--e-6); padding-bottom: var(--e-6); border-bottom: 0; }
-.legenda { margin: 0 0 var(--e-3); font-size: var(--t-micro); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--marca-forte); }
 .filas { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--e-4); }
 
 .fila { display: flex; flex-direction: column; gap: var(--e-3); min-width: 0; padding: var(--e-4); background: var(--papel); border: 0; border-radius: var(--r-2); }
-.cabeca { display: flex; align-items: center; gap: var(--e-3); }
-.numero { flex: none; min-width: 2ch; font-family: var(--f-dado); font-size: clamp(2rem, 2.5vw, 2.75rem); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: var(--tinta); text-align: center; }
+.cabeca { display: grid; gap: var(--e-1); }
+.numero { margin-left: var(--e-1); font-variant-numeric: tabular-nums; color: var(--marca-forte); }
 .numero[data-vazio="true"] { color: var(--tinta-2); }
 .titulo { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
 .apoio { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }

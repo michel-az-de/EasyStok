@@ -80,11 +80,11 @@
 }
 
 .grupo h3 {
-  margin: 0 0 var(--e-2);
-  font-size: var(--t-apoio);
-  color: var(--tinta-2);
-  text-transform: uppercase;
-  letter-spacing: .04em;
+ margin: 0 0 var(--e-2);
+ font-size: var(--t-apoio);
+ color: var(--tinta-2);
+ 
+ 
 }
 
 .listaCenarios {

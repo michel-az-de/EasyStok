@@ -150,7 +150,7 @@ public sealed class AgenteAtendimentoService(
                 await unitOfWork.CommitAsync();
             }, ct);
 
-        var system = await GeracaoAgenteAtendimento.MontarSystemAsync(
+        var system = await GeracaoAgenteAtendimento.MontarSystemTurnoAsync(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
         var gravacao = new GravacaoSaidaTurno(conversaRepository, unitOfWork, logger, empresaId, dados.Mensagens, agora);
         var contexto = new ContextoTurnoAgente(empresaId, conversa, agora, gravacao.GravarAsync);
@@ -161,8 +161,9 @@ public sealed class AgenteAtendimentoService(
             par => (IFerramentaAgente)new FerramentaProtegida(par.Value, protecao));
 
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
-            llm, system, mensagens, ferramentasProtegidas, contexto, MaximoIteracoes, logger, ct,
-            modelos?.Value.DoTurno(configuracao.ModeloAgente)); // S68: modelo da loja só se aprovado
+            llm, system.Estavel, mensagens, ferramentasProtegidas, contexto, MaximoIteracoes, logger, ct,
+            modelos?.Value.DoTurno(configuracao.ModeloAgente), // S68: modelo da loja só se aprovado
+            systemVolatil: system.Volatil); // #2862: data e dossiê fora do bloco cacheado
         var tokens = geracao.Tokens;
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;

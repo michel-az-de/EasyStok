@@ -62,6 +62,12 @@ public class EnviarFotoProdutoFerramentaTests
 
         public ContextoTurnoAgente NovoContexto() => new(_storefront.EmpresaId, Conversa, Agora);
 
+        public async Task<JsonElement> ExecutarComEntradaAsync(object entrada)
+        {
+            var resultado = await _ferramenta.ExecutarAsync(NovoContexto(), JsonSerializer.SerializeToElement(entrada));
+            return JsonDocument.Parse(resultado).RootElement.Clone();
+        }
+
         public async Task<JsonElement> ExecutarAsync(Guid itemId, ContextoTurnoAgente? contexto = null)
         {
             var resultado = await _ferramenta.ExecutarAsync(contexto ?? NovoContexto(),
@@ -87,6 +93,28 @@ public class EnviarFotoProdutoFerramentaTests
         // A foto não é a resposta: o texto do agente sai depois dela.
         contexto.HouveEnvio.Should().BeTrue();
         contexto.EnvioVerificado.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EntradaCardapioItemId_NovaGrafia_MandaAFoto()
+    {
+        var c = new Cenario();
+        var item = c.Item("lasanha bolonhesa", "https://cdn.exemplo/files/cardapios/lasanha.jpg");
+
+        var resultado = await c.ExecutarComEntradaAsync(new { cardapio_item_id = item.Id });
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task EntradaItemId_GrafiaAntiga_AindaMandaAFoto()
+    {
+        var c = new Cenario();
+        var item = c.Item("lasanha bolonhesa", "https://cdn.exemplo/files/cardapios/lasanha.jpg");
+
+        var resultado = await c.ExecutarComEntradaAsync(new { itemId = item.Id });
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
