@@ -15,7 +15,7 @@
 
 import { moduloCongelado, telaCongelada } from './congelados'
 import { podeAjustarEntrega } from './acessoModulos'
-import { partesNoFuso } from './formato'
+import { FUSO } from './formato'
 
 // #2258 (auditoria de UX, dicionário de nomes): um nome por conceito, em constante única. A tela
 // inicial é "Início" em todo lugar; as respostas e mensagens que saem sozinhas são "Respostas automáticas".
@@ -220,10 +220,8 @@ export function buscarDestinosDoConsole(modulos, busca) {
   })
 }
 
-// Saudação do topo do hall, pela hora da loja (não a do navegador nem a UTC).
-export function saudacaoDoHall(agora, nome) {
-  const { horas } = partesNoFuso(agora)
-  const periodo = horas < 12 ? 'Bom dia' : horas < 18 ? 'Boa tarde' : 'Boa noite'
-  const primeiro = (nome ?? '').trim().split(/\s+/)[0]
-  return primeiro ? `${periodo}, ${primeiro}` : periodo
+// Título do hall (#2859): o dia da loja por extenso, pelo fuso da loja. Saudação genérica não informa nada.
+export function tituloDoHall(agora) {
+  const dia = new Date(agora).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: FUSO })
+  return dia.charAt(0).toUpperCase() + dia.slice(1)
 }

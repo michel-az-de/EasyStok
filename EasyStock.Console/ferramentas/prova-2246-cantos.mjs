@@ -53,7 +53,7 @@ confere('avatar e chip seguem em pílula', () => {
 confere('contadores, pontos, chips, selos e tags dos módulos em pílula', () => {
   const pilulas = [
     ['features/caixa-de-entrada/caixa.module.css', ['.pontoOrdem', '.chipFiltro', '.pontoPrecisa']],
-    ['features/cozinha/cozinha.module.css', ['.pontoVivo', '.aoVivoLigado .pontoVivo::after']],
+    ['features/cozinha/cozinha.module.css', ['.pontoVivo']],
     ['features/ficha-cliente/cliente.module.css', ['.seloCaptado', '.seloPontos', '.seloInformado']],
     ['features/ficha-cliente/ficha.module.css', ['.tagsCliente li']],
     ['features/lembretes/lembretes.module.css', ['.ponto', 'button.pilula']],

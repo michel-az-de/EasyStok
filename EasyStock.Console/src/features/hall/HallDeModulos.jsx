@@ -12,7 +12,7 @@ import { Botao } from '../../componentes/Botao'
 import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { MenuDaConta } from '../../componentes/MenuDaConta'
 import { Vazio } from '../../componentes/Vazio'
-import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, saudacaoDoHall } from '../../dominio/modulos'
+import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, tituloDoHall } from '../../dominio/modulos'
 import {
   alternarFavoritoDoHall, favoritosDoHall, moverModuloDoHall, moverPainelDoHall,
   ordenarModulosDoHall, ordenarPaineisDoHall, FOCOS_DO_HALL,
@@ -22,7 +22,6 @@ import {
 } from '../../dominio/estadoDoHall'
 import { usePulsoDoHall } from '../../aplicacao/usePulsoDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
-import { IlustracaoDoModulo } from './IlustracaoDoModulo'
 import { alcaDoLink, transicaoDoArrasto, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
 import { PulsoDoHall } from './PulsoDoHall'
@@ -46,7 +45,7 @@ function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, ind
     <li ref={setNodeRef} data-modulo={modulo.id}
       className={[css.cartao, !modulo.disponivel && css.emBreve, isDragging && css.arrastando, organizar && css.organizando].filter(Boolean).join(' ')}
       style={{ transform: CSS.Transform.toString(transform), transition: arrastavel ? transition : undefined }}>
-      <IlustracaoDoModulo id={modulo.id} className={css.ilustracaoCartao} />
+      <span className={css.iconeCartao} aria-hidden="true"><IconeDoModulo modulo={modulo} tamanho={24} /></span>
       {organizar && <div className={css.cabecaCartao}>
         <div className={css.controlesCartao}>
           {organizar && modulo.disponivel && <button type="button" className={css.favoritar} aria-pressed={favorito}
@@ -127,7 +126,6 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const buscando = Boolean(busca.trim())
   const destinos = buscarDestinosDoConsole(todos, busca)
   const foco = FOCOS_DO_HALL.find((item) => item.id === preferencia.foco)
-  const destaque = foco.ordem.map((id) => modulosPermitidos.find((modulo) => modulo.id === id && modulo.disponivel)).find(Boolean) ?? todos.find((modulo) => modulo.disponivel)
   const idsDoPulso = ordenarPaineisDoHall(preferencia, modulosPermitidos.map((modulo) => modulo.id))
   const podeOrganizar = organizar && !buscando
   const sensores = useSensoresDoHall()
@@ -192,7 +190,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
       <main className={css.conteudo}>
         <div className={css.abertura}>
           <div className={css.cabeca}>
-            <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
+            <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{tituloDoHall(agora)}</h1>
             {/* #2232 (M3): o resumo do dia saiu do menu do Atendimento e mora aqui. */}
             {fonteApi && <ResumoDoDia fontes={fontes} ids={idsDoPulso} />}
             {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada. Ao trocar de pessoa, use Sair no menu da conta.</p>}
@@ -212,12 +210,6 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         </div>
         {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos}
           podeFecharCaixa={acoes?.gerenciarCaixa === true} aoMover={moverPainel} />}
-        {/* #1810: no modo API o destaque repetia um cartão de área; ficam só os números e as áreas. */}
-        {!buscando && destaque && !fonteApi && <section className={css.destaque} aria-labelledby="destaque-hall">
-          <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={40} /></div>
-          <div className={css.textoDestaque}><h2 id="destaque-hall">{destaque.nome}</h2></div>
-          <a className={css.acaoDestaque} href={destaque.href}>Abrir {destaque.nome}<MarcaIcone nome="proximo" tamanho={22} /></a>
-        </section>}
         {/* #1608: o que fazer agora vem antes da lista de módulos. Quem compõe é o App. */}
         {!buscando && painel}
         {!buscando && favoritos.length > 0 && <nav className={css.rotina} aria-label="Favoritos da sua rotina">

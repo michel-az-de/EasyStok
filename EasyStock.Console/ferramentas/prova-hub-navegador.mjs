@@ -66,7 +66,7 @@ async function preparar({ permitidos = catalogo, modo = 'normal', segura = false
   const erros = []
   page.on('pageerror', (erro) => { erros.push(erro.message); console.error('Erro de página:', erro.message) })
   await page.goto(origem + '/#/')
-  await page.getByRole('heading', { name: /Felipe/ }).waitFor()
+  await page.getByRole('heading', { level: 1 }).waitFor() // #2859: o título é o dia da loja, não a saudação com o nome
   return { context, page, controle, erros, soltar }
 }
 const ordem = (page) => page.locator('[data-modulo]').evaluateAll((itens) => itens.map((item) => item.dataset.modulo))
@@ -234,7 +234,7 @@ try {
     sessao.empresa.id = empresa + '-outra'; sessao.usuario.id = usuario + '-outro'; sessao.usuario.nome = 'Outra pessoa'
     sessionStorage.setItem('easystok.sessao', JSON.stringify(sessao)); window.dispatchEvent(new Event('easystok:sessao-alterada'))
   }, { empresa, usuario })
-  await page.getByRole('heading', { name: /Outra/ }).waitFor()
+  await page.waitForFunction(() => document.querySelector('[data-modulo]')?.dataset.modulo === 'atendimento') // #2859: a troca remonta o Hall sem a personalização
   assert.equal((await ordem(page))[0], 'atendimento') // #2258 A2: ordem padrão começa pelo Atendimento
   assert.equal(await atendimento.locator('strong').innerText(), 'Carregando…') // #2762 (B10): esqueleto na espera
   soltarTroca()
