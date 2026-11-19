@@ -18,7 +18,8 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 public sealed class EnviarLinkPagamentoFerramenta(
     IPedidoRepository pedidoRepository,
     GerarCobrancaPedidoUseCase gerarCobranca,
-    IConversaRepository conversaRepository) : IFerramentaAgente, IFerramentaForaDaTransacao
+    IConversaRepository conversaRepository,
+    LinkCardapioConversaService? linkCardapio = null) : IFerramentaAgente, IFerramentaForaDaTransacao
 {
     public string Nome => "enviar_link_pagamento";
 
@@ -85,11 +86,15 @@ public sealed class EnviarLinkPagamentoFerramenta(
             return Recusa("sem_link", "O pedido não tem link de pagamento; use escalar_para_dona.");
 
         var valor = FerramentaJson.FormatarReais(cobranca.Valor);
+        // #2876: no site o widget só abre URL da comanda; ela já mostra o pagamento. Sem comanda enviada, segue o link do Mercado Pago.
+        var linkNoTexto = SaidaDoChatSite.Eh(contexto.Conversa)
+            ? await UrlDaComandaEnviadaAsync(contexto, ct) ?? cobranca.LinkPagamento
+            : cobranca.LinkPagamento;
         var validoAte = cobranca.ExpiraEm is { } expira
             ? HorarioBrasil.ConverterParaBrasilia(expira).ToString("HH:mm", CultureInfo.InvariantCulture)
             : null;
         contexto.RegistrarRespostaVerificada(
-            $"{QuantoCobra(pedido.Total.Valor, cobranca.Valor)} Pague por Pix ou cartão neste link{(validoAte is null ? "" : $", válido até {validoAte}")}: {cobranca.LinkPagamento}");
+            $"{QuantoCobra(pedido.Total.Valor, cobranca.Valor)} Pague por Pix ou cartão neste link{(validoAte is null ? "" : $", válido até {validoAte}")}: {linkNoTexto}");
         return FerramentaJson.Serializar(new
         {
             linkGerado = true,
@@ -97,6 +102,16 @@ public sealed class EnviarLinkPagamentoFerramenta(
             validoAte,
             orientacao = "O link sai ao cliente como sua resposta deste turno.",
         });
+    }
+
+    private async Task<string?> UrlDaComandaEnviadaAsync(ContextoTurnoAgente contexto, CancellationToken ct)
+    {
+        if (linkCardapio is null || await linkCardapio.VigenteAsync(contexto.EmpresaId, contexto.Conversa.Id, contexto.Agora, ct) is not { } vigente)
+            return null;
+        var mensagens = await conversaRepository.ListarMensagensDepoisAsync(
+            contexto.EmpresaId, contexto.Conversa.Id, vigente.CriadoEm.AddSeconds(-1), 500, ct);
+        return LinkCardapioConversaService.UrlEnviada(
+            mensagens.Where(m => m.Direcao == DirecaoMensagem.Saida && m.Status != StatusMensagem.Falhou).Select(m => m.Texto), vigente);
     }
 
     // #2544: na encomenda com sinal o link cobra só uma parte; chamar a parte de "Total" engana o cliente.

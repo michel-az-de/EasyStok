@@ -48,7 +48,8 @@ public sealed class EnviarResumoPedidoFerramenta(
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))
             return Recusa("pedido_finalizado",
                 "O pedido foi cancelado ou já foi entregue. Se o cliente ainda quiser, monte de novo com criar_pedido.");
-        if (renderizador is null || armazenamento is null)
+        var noSite = SaidaDoChatSite.Eh(contexto.Conversa);
+        if (!noSite && (renderizador is null || armazenamento is null))
             return Recusa("resumo_indisponivel", "O resumo não pode sair agora; use escalar_para_dona.");
 
         var storefront = await storefrontRepository.GetByEmpresaAsync(contexto.EmpresaId, ct);
@@ -64,15 +65,23 @@ public sealed class EnviarResumoPedidoFerramenta(
                 : "a combinar",
             pedido.EnderecoEntrega);
 
+        if (noSite)
+        {
+            // Sem imagem no site: o mesmo resumo em texto. Começa pelo código do pedido, que enviar_link_pagamento procura.
+            await SaidaDoChatSite.GravarTextoAsync(contexto, conversaRepository, ResumoPedidoAtendimento.TextoCompleto(resumo, pedido.Id), ct);
+            contexto.RegistrarEnvio();
+            return RespostaEnviado(pedido);
+        }
+
         var legenda = ResumoPedidoAtendimento.Legenda(pedido.Id);
         var conversa = contexto.Conversa;
         EnvioWhatsAppResult envio;
         try
         {
-            var imagem = await renderizador.RenderizarAsync(resumo, ct);
+            var imagem = await renderizador!.RenderizarAsync(resumo, ct);
             // Nome aleatório: a URL é pública porque o WhatsApp baixa a mídia por ela. Guid no formato D é o
             // que o /files serve em atendimento/* (PublicUploadFileProvider).
-            var salvo = await armazenamento.UploadAsync(new FileUploadRequest(
+            var salvo = await armazenamento!.UploadAsync(new FileUploadRequest(
                 $"atendimento/resumos/{contexto.EmpresaId:N}", $"{Guid.NewGuid():D}.{imagem.Extensao}",
                 imagem.ContentType, imagem.Conteudo), ct);
             var url = MidiaPublica.Url(salvo.Url, configuration)
@@ -92,13 +101,15 @@ public sealed class EnviarResumoPedidoFerramenta(
                 TipoConteudoMensagem.Imagem, legenda, envio.Wamid), ct);
         await contexto.GravarSaidaAsync(ct);
 
-        return FerramentaJson.Serializar(new
-        {
-            enviado = true,
-            total = FerramentaJson.FormatarReais(pedido.Total.Valor),
-            orientacao = "O resumo chegou ao cliente com o pedido de ok. Responda curto; o link sai com enviar_link_pagamento depois do ok.",
-        });
+        return RespostaEnviado(pedido);
     }
+
+    private static string RespostaEnviado(Pedido pedido) => FerramentaJson.Serializar(new
+    {
+        enviado = true,
+        total = FerramentaJson.FormatarReais(pedido.Total.Valor),
+        orientacao = "O resumo chegou ao cliente com o pedido de ok. Responda curto; o link sai com enviar_link_pagamento depois do ok.",
+    });
 
     private static string Recusa(string motivo, string orientacao) =>
         FerramentaJson.Serializar(new { enviado = false, motivo, orientacao });

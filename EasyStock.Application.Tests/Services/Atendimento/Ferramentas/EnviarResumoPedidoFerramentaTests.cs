@@ -38,7 +38,7 @@ public class EnviarResumoPedidoFerramentaTests
         public ResumoPedidoDto? Desenhado { get; private set; }
         public ContextoTurnoAgente Contexto { get; private set; } = null!;
 
-        public Cenario()
+        public Cenario(CanalConversa canal = CanalConversa.WhatsApp)
         {
             var clienteId = Guid.NewGuid();
             Pedido = Pedido.Criar(EmpresaId, origem: "whatsapp");
@@ -66,7 +66,7 @@ public class EnviarResumoPedidoFerramentaTests
             var configuracao = new ConfigurationBuilder().AddInMemoryCollection(
                 new Dictionary<string, string?> { ["App:BaseUrl"] = "https://loja.exemplo" }).Build();
 
-            Conversa = Conversa.Abrir(EmpresaId, "5511999998888", Agora, "Maria", clienteId);
+            Conversa = Conversa.Abrir(EmpresaId, canal == CanalConversa.ChatSite ? "chatsite:abc" : "5511999998888", Agora, "Maria", clienteId, canal);
             _ferramenta = new EnviarResumoPedidoFerramenta(pedidos, storefronts, conversas, Cloud, configuracao,
                 Renderizador, Armazenamento);
         }
@@ -91,6 +91,23 @@ public class EnviarResumoPedidoFerramentaTests
             var resultado = await _ferramenta.ExecutarAsync(Contexto, JsonSerializer.SerializeToElement(new { pedidoId = Pedido.Id }));
             return JsonDocument.Parse(resultado).RootElement.Clone();
         }
+    }
+
+    [Fact]
+    public async Task NoChatDoSite_GravaOResumoComoTextoSemCloudApiNemImagem()
+    {
+        var c = new Cenario(CanalConversa.ChatSite);
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeTrue();
+        await c.Cloud.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+        var mensagem = c.Mensagens.Should().ContainSingle().Subject;
+        mensagem.Autor.Should().Be(AutorMensagem.Agente);
+        mensagem.TipoConteudo.Should().Be(TipoConteudoMensagem.Texto);
+        mensagem.ExternoId.Should().StartWith(CanalChatSite.PrefixoIdExterno);
+        ResumoPedidoAtendimento.EhResumo(mensagem.Texto, c.Pedido.Id).Should().BeTrue();
+        mensagem.Texto.Should().Contain("Lasanha Bolonhesa").And.Contain("R$ 68,00").And.Contain("Rua das Flores, 10");
     }
 
     [Fact]
