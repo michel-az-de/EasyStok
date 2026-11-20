@@ -8,6 +8,7 @@ import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
 import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao, situacaoDaCobranca } from '../../dominio/cobranca'
 import { pedeConfirmacaoDoSaldo, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
+import { ERRO_MOTIVO_CANCELAMENTO, motivoDoCancelamentoValido } from '../../dominio/pedidosCadastro'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
 import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
 import { ROTULOS } from '../../dominio/rotulos'
@@ -371,8 +372,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
     },
     cancelarPedido: (id, motivo) => {
       if (!pedidoCriado(id)) return soNoEasyStok('Cancelar pedido')(id)
-      if (!motivo?.trim() || motivo.trim().length < 3 || motivo.trim().length > 500)
-        return Promise.resolve({ erro: 'Informe um motivo entre 3 e 500 caracteres.' })
+      if (!motivoDoCancelamentoValido(motivo)) return Promise.resolve({ erro: ERRO_MOTIVO_CANCELAMENTO })
       return umaPorConversa(id, 'cancelar', async () => {
         try {
           await cancelarPedido(pedidoCriado(id), motivo.trim())

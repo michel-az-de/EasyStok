@@ -39,6 +39,25 @@ export const situacaoPedeAcao = (status) => Boolean(situacaoDoToken(status)?.ped
 // #2944 (E1-17): pedido entregue ou cancelado não volta atrás; o botão diz por que não cancela.
 export const motivoParaNaoCancelar = (status) => (status === 'entregue' ? 'Já foi entregue' : status === 'cancelado' ? 'Já foi cancelado' : null)
 
+// A mesma regra da Ficha (acoesDoPedido): precisa da permissão `cancelarPedido` e, com pagamento recebido, da capacidade
+// `cancelarPedidoPago`. Devolve o motivo de não poder, ou null quando pode.
+export function motivoParaNaoCancelarPedido(item, { permitido = true, capacidades = null } = {}) {
+  const porSituacao = motivoParaNaoCancelar(item?.status)
+  if (porSituacao) return porSituacao
+  if (!permitido) return 'Seu perfil não cancela pedidos'
+  if (centavos(item?.totalPago) > 0 && capacidades?.cancelarPedidoPago !== true) return 'Pedido com pagamento: só a gerência cancela'
+  return null
+}
+
+// O motivo do cancelamento: 3 a 500 caracteres, igual na Ficha (api/comanda.js) e na lista de Pedidos.
+export const MOTIVO_CANCELAMENTO_MINIMO = 3
+export const MOTIVO_CANCELAMENTO_MAXIMO = 500
+export const ERRO_MOTIVO_CANCELAMENTO = `Informe um motivo entre ${MOTIVO_CANCELAMENTO_MINIMO} e ${MOTIVO_CANCELAMENTO_MAXIMO} caracteres.`
+export function motivoDoCancelamentoValido(motivo) {
+  const tamanho = String(motivo ?? '').trim().length
+  return tamanho >= MOTIVO_CANCELAMENTO_MINIMO && tamanho <= MOTIVO_CANCELAMENTO_MAXIMO
+}
+
 // `Origem` é texto livre na API; os conhecidos ganham o nome que a loja usa.
 const CANAIS = {
   web: 'Painel',

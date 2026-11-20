@@ -5,6 +5,7 @@ import { contextoCadastro, useContextoVisualCadastro } from '../../../aplicacao/
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useNovoPedidoDoCliente } from '../../../aplicacao/novoPedidoDoCliente'
 import { cancelarPedido, obterPedido, useListaPedidos } from '../../../aplicacao/pedidosCadastro'
+import { useAcaoDisponivel } from '../../../aplicacao/useAcaoDisponivel'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Combobox } from '../../../componentes/Combobox'
@@ -15,7 +16,7 @@ import { telefoneNaTela } from '../../../dominio/cadastros'
 import { horaCurta, moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import {
-  motivoParaNaoCancelar, numeroDoPedido, ORDENS_PEDIDO, PAGINA_PEDIDOS, PERIODOS_PEDIDO, rotuloDaSituacao, rotuloDoCanal, SITUACOES_PEDIDO,
+  ERRO_MOTIVO_CANCELAMENTO, MOTIVO_CANCELAMENTO_MAXIMO, motivoDoCancelamentoValido, motivoParaNaoCancelarPedido, numeroDoPedido, ORDENS_PEDIDO, PAGINA_PEDIDOS, PERIODOS_PEDIDO, rotuloDaSituacao, rotuloDoCanal, SITUACOES_PEDIDO,
   situacaoDoPagamento, situacaoPedeAcao, tituloDoPedido,
 } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
@@ -47,6 +48,9 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
   const [abrindo, abrir] = useState(null)
   const [erro, falhar] = useState(null)
   const [cancelando, cancelar] = useState(null)
+  const disponivel = useAcaoDisponivel()
+  const { acoes: capacidades } = useAcessoModulos()
+  const semCancelar = (item) => motivoParaNaoCancelarPedido(item, { permitido: disponivel('cancelarPedido'), capacidades })
   const leitura = useRef(null)
   const tabela = useRef(null)
   const { conversas } = useAtendimento()
@@ -72,12 +76,13 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
     finally { if (!controle.signal.aborted) abrir(null) }
   }
 
-  // #2944 (E1-17): o motivo é opcional na API. Cancelado, a lista recarrega e a Ficha relê a conversa pelo laço de sincronização.
+  // #2944 (E1-17): mesma regra da Ficha (3 a 500 caracteres). Cancelado, a lista recarrega e a Ficha relê a conversa pelo laço de sincronização.
   async function confirmarCancelamento() {
     const { item, motivo } = cancelando
+    if (!motivoDoCancelamentoValido(motivo)) { cancelar({ ...cancelando, erro: ERRO_MOTIVO_CANCELAMENTO }); return }
     cancelar({ ...cancelando, ocupado: true, erro: null })
     try {
-      await cancelarPedido(item.id, motivo.trim() || undefined)
+      await cancelarPedido(item.id, motivo.trim())
       cancelar(null); consulta.recarregar(); globalThis.dispatchEvent(new Event('easystok:sincronizar-agora'))
     } catch (e) { cancelar({ ...cancelando, ocupado: false, erro: e.message || 'Não foi possível cancelar o pedido. Tente de novo.' }) }
   }
@@ -128,7 +133,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
                 <td>{situacaoNaLinha}</td>
                 <td className={css.valor}><span>{moeda(item.total)}</span>{(pagamento?.falta > 0 || pagamento?.sobra > 0) && <small className={css.falta}>{pagamento.texto}</small>}</td>
                 <td><Botao disabled={Boolean(abrindo)} onClick={() => verPedido(item)} aria-label={`Abrir ${tituloDoPedido(item)}, ${nome}`}>{abrindo === item.id ? 'Abrindo…' : 'Abrir'}</Botao>
-                  <Botao variante="texto" disabled={Boolean(motivoParaNaoCancelar(item.status))} motivo={motivoParaNaoCancelar(item.status)} onClick={() => cancelar({ item, motivo: '' })} aria-label={`Cancelar pedido ${tituloDoPedido(item)}, ${nome}`}>Cancelar pedido</Botao></td>
+                  <Botao variante="texto" disabled={Boolean(semCancelar(item))} motivo={semCancelar(item) ?? undefined} onClick={() => cancelar({ item, motivo: '' })} aria-label={`Cancelar pedido ${tituloDoPedido(item)}, ${nome}`}>Cancelar pedido</Botao></td>
               </tr>
             })}</tbody>
           </table>
@@ -146,11 +151,11 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
     {cancelando && <Modal titulo={`Cancelar ${tituloDoPedido(cancelando.item)}?`} descricao="O pedido sai da fila e a cliente deixa de esperar por ele." focarCampo
       aoFechar={cancelando.ocupado ? undefined : () => cancelar(null)} segurarFechamento={cancelando.ocupado}
       rodape={<>
-        <Botao variante="perigo" disabled={cancelando.ocupado} motivo="Cancelando…" onClick={confirmarCancelamento}>{cancelando.ocupado ? 'Cancelando…' : 'Cancelar pedido'}</Botao>
+        <Botao variante="perigo" disabled={cancelando.ocupado || !motivoDoCancelamentoValido(cancelando.motivo)} motivo={cancelando.ocupado ? 'Cancelando…' : 'Informe o motivo (3 a 500 caracteres)'} onClick={confirmarCancelamento}>{cancelando.ocupado ? 'Cancelando…' : 'Cancelar pedido'}</Botao>
         <Botao disabled={cancelando.ocupado} onClick={() => cancelar(null)}>Manter pedido</Botao>
       </>}>
       {cancelando.erro && <p className={base.erro} role="alert">{cancelando.erro}</p>}
-      <CampoTexto rotulo="Motivo (opcional)" maxLength={500} value={cancelando.motivo} onChange={(e) => cancelar({ ...cancelando, motivo: e.target.value })} />
+      <CampoTexto rotulo="Motivo do cancelamento" limite={MOTIVO_CANCELAMENTO_MAXIMO} value={cancelando.motivo} onChange={(e) => cancelar({ ...cancelando, motivo: e.target.value })} />
     </Modal>}
     {detalhe && <DetalhePedido dados={detalhe} aoFechar={() => mostrar(null)} abrirConversa={abridorDaConversa(detalhe.pedido)} />}
   </section>
