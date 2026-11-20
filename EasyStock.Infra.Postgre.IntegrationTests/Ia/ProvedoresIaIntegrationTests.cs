@@ -17,8 +17,8 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Ia;
 public class ProvedoresIaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
-    private const string MigracaoAnterior = "20261120123520_OrigemDoAnuncio";
-    private const string Migracao = "20261120153704_ProvedoresIa";
+    private const string MigracaoAnterior = "20261120145818_OrigemAnuncioNaSessaoChat";
+    private const string Migracao = "20261120160109_ProvedoresIa";
     private static readonly DateTime Agora = new(2026, 11, 20, 15, 0, 0, DateTimeKind.Utc);
 
     private static ProvedorIa Provedor(Guid empresa) =>

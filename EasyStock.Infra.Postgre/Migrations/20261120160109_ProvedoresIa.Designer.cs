@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20261120153704_ProvedoresIa")]
+    [Migration("20261120160109_ProvedoresIa")]
     partial class ProvedoresIa
     {
         /// <inheritdoc />
@@ -12069,6 +12069,70 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasForeignKey("StorefrontId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.OwnsOne("EasyStock.Domain.ValueObjects.OrigemAnuncio", "OrigemAnuncio", b1 =>
+                        {
+                            b1.Property<Guid>("SessaoChatSiteId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Campanha")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<DateTimeOffset>("CapturadaEm")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("Conteudo")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Fonte")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("IdAnuncio")
+                                .HasMaxLength(60)
+                                .HasColumnType("character varying(60)");
+
+                            b1.Property<string>("IdClique")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)");
+
+                            b1.Property<string>("Meio")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Plataforma")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)");
+
+                            b1.Property<string>("Termo")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("TipoIdClique")
+                                .HasMaxLength(10)
+                                .HasColumnType("character varying(10)");
+
+                            b1.Property<string>("TituloAnuncio")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Via")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)");
+
+                            b1.HasKey("SessaoChatSiteId");
+
+                            b1.ToTable("sessoes_chat_site");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SessaoChatSiteId");
+                        });
+
+                    b.Navigation("OrigemAnuncio");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.UsoCreditoClienteComanda", b =>
