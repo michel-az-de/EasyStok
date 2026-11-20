@@ -167,7 +167,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
             "Ninguém esperando você" ocupava a coluna e escondia o resto. */}
         {vazia && !semBusca
           && (filtros.aba === 'precisa' || encerradasDoBalcao.length + bloqueadasDoBalcao.length === 0) && (
-          <VazioEmLinha texto={`Nada com "${filtros.busca.trim()}".`} acao="Limpar busca" aoAgir={() => mudarFiltro('busca', '')} />
+          <VazioEmLinha texto={`Nenhuma conversa com "${filtros.busca.trim()}".`} acao="Limpar busca" aoAgir={() => mudarFiltro('busca', '')} />
         )}
         {vazia && semBusca && !semCanal && (
           <VazioEmLinha
