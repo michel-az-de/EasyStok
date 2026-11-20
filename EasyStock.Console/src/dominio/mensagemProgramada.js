@@ -5,6 +5,7 @@
 
 import { instanteNoFuso, partesNoFuso } from './formato'
 import { avisoDeVariaveisNaoResolvidas } from './respostas'
+import { ROTULOS } from './rotulos'
 
 const MS_POR_MINUTO = 60000
 const dois = (n) => String(n).padStart(2, '0')
@@ -53,7 +54,7 @@ export function faltaParaProgramar({ agendadaPara, agoraMs, usarModelo, texto, n
   if (!agendadaPara || !Number.isFinite(new Date(agendadaPara).getTime())) return 'Escolha a data e a hora do envio.'
   if (new Date(agendadaPara).getTime() <= agoraMs) return 'Escolha um horário depois de agora.'
   if (usarModelo ? !nomeModelo?.trim() : !texto?.trim()) {
-    return usarModelo ? 'Informe o nome do modelo aprovado.' : 'Escreva a mensagem.'
+    return usarModelo ? `Informe o nome da ${ROTULOS.MENSAGEM_PADRAO}.` : 'Escreva a mensagem.'
   }
   return usarModelo ? null : avisoDeVariaveisNaoResolvidas(texto)
 }

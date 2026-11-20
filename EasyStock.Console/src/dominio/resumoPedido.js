@@ -2,6 +2,7 @@ import { itensDetalhados, totalDoPedido } from './pedido'
 import { dataIsoNoFuso, horaCurta, moeda, somarDiasIso } from './formato'
 import { faixaDepoisDeEntre } from './entrega'
 import { nomeDoMeio, sinalDeEncomenda } from './cobranca'
+import { ROTULOS } from './rotulos'
 
 // Texto do pedido que vai para o cliente. Fica no domínio porque é regra de
 // negócio, não formatação de tela: é o que a casa se compromete a entregar.
@@ -26,7 +27,7 @@ export const ROTULO_ENVIAR = 'Enviar ao cliente'
 
 // #1474 (R4): no modo API "Enviar ao cliente", "Gerar cobrança" do bloco e o da barra criavam
 // o mesmo pedido. Fica um botão só, o da barra fixa, e a comanda diz que vai junto.
-export const ROTULO_GERAR_E_ENVIAR = 'Gerar cobrança e enviar'
+export const ROTULO_GERAR_E_ENVIAR = `${ROTULOS.GERAR_COBRANCA} e enviar`
 export const LINHA_COMANDA_VAI_JUNTO = 'A comanda vai ao cliente junto com a cobrança.'
 // #1587: pedido já criado (`comandaTravada`). O console não troca item de pedido criado; a frase
 // diz só isso, sem prometer caminho que não existe.
@@ -35,7 +36,7 @@ export const LINHA_COMANDA_TRAVADA = 'O pedido já está no EasyStok: os itens n
 // da comanda e a loja aprova ("Confirmar alteração" na Ficha); sem pagamento, dá também para
 // cancelar e montar de novo.
 export function caminhoParaTrocarItem(pedido) {
-  const pelaComanda = 'Para trocar um item, mande o link da comanda: o cliente altera e você aprova aqui.'
+  const pelaComanda = 'Para trocar um item, mande o link do pedido: o cliente altera e você aprova aqui.'
   return pedido?.estado === 'aguardando' ? `${pelaComanda} Ou cancele este pedido e monte outro.` : pelaComanda
 }
 export const podeCancelarParaRefazer = (pedido, { fonteApi = false } = {}) =>
@@ -135,7 +136,7 @@ export function situacaoDoEnvio(pedido, { bloqueado = false } = {}) {
     return { chave: 'andou', pode: false, texto: 'Pedido já passou da cobrança. Não há o que enviar ao cliente.' }
   }
   if (!pedido || pedido.itens.length === 0) {
-    return { chave: 'vazia', pode: false, texto: 'Comanda vazia. Abra o cardápio para montar o pedido.' }
+    return { chave: 'vazia', pode: false, texto: 'Pedido vazio. Abra o cardápio para montar o pedido.' }
   }
   if (bloqueado) {
     return { chave: 'bloqueado', pode: false, texto: 'Cliente bloqueado. Nada sai para ele.' }
@@ -149,7 +150,7 @@ export function situacaoDoEnvio(pedido, { bloqueado = false } = {}) {
 export function avisoDoEnvio(cobranca, nomeCliente) {
   const nome = nomeDoMeio(cobranca?.meio)
   if (cobranca?.link) {
-    return `Comanda enviada para ${nomeCliente} com o ${nome}. Entra na cozinha quando o pagamento cair.`
+    return `Pedido enviado para ${nomeCliente} com o ${nome}. Entra na cozinha quando o pagamento cair.`
   }
-  return `Comanda enviada para ${nomeCliente}. Pagamento na entrega (${nome}), o pedido já está na cozinha.`
+  return `Pedido enviado para ${nomeCliente}. Pagamento na entrega (${nome}), o pedido já está na cozinha.`
 }

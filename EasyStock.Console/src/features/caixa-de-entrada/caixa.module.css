@@ -16,8 +16,8 @@
   width: calc(100% - 2 * var(--e-2)); margin: 0 var(--e-2);
   background: transparent; border: 0; padding: 10px var(--e-3); border-radius: var(--r-1);
   transition: background var(--dur-curta) var(--ease-padrao);
-  animation: entradaCartao var(--dur-media) var(--ease-saida);
 }
+.cartaoNovo { animation: entradaCartao var(--dur-media) var(--ease-saida); }
 @keyframes entradaCartao {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }

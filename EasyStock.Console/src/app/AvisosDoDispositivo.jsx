@@ -15,7 +15,7 @@ export function AvisosDoDispositivo({ children, visitaSoNaMemoria = false }) {
       <div className={css.conteudo}>{children}</div>
       {(mostrarDispositivo || visitaSoNaMemoria || rascunhosSoNaMemoria) && <div className={`${css.faixa} ${css.empilhada}`}>
         {rascunhosSoNaMemoria && <><span role="alert">Não foi possível guardar o texto das conversas neste navegador. Ele continua nesta sessão e pode ser perdido ao recarregar ou fechar a aba.</span><Botao variante="texto" onClick={tentarGuardarRascunhos}>Tentar guardar o texto</Botao></>}
-        {visitaSoNaMemoria && <span role="alert">Não foi possível guardar as comandas neste navegador. Elas continuam nesta página e podem ser perdidas ao recarregar ou fechar a aba.</span>}
+        {visitaSoNaMemoria && <span role="alert">Não foi possível guardar os pedidos neste navegador. Elas continuam nesta página e podem ser perdidas ao recarregar ou fechar a aba.</span>}
         {mostrarDispositivo && <>{avisos.map((aviso) => <span key={aviso.id} role="status">{aviso.texto}</span>)}
           <Botao variante="texto" aria-label="Dispensar avisos do aparelho" onClick={() => dispensar(chave)}>Dispensar</Botao></>}
       </div>}

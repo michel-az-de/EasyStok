@@ -125,7 +125,7 @@ export function CartaoEntrega({
             comanda é interna, fica ao lado para a cozinha achar o canhoto. */}
         <span>
           <span className={css.numeroEntrega}>Pedido {numeroParaEntregador(pedido)}</span>
-          {' · comanda '}{numeroCurto(pedido.numero)} · {plural(totalItens, 'item', 'itens')} · {bairro || 'sem bairro'}
+          {' · pedido '}{numeroCurto(pedido.numero)} · {plural(totalItens, 'item', 'itens')} · {bairro || 'sem bairro'}
         </span>
         <span className={css.faixaCartao}>{janelas.find((j) => j.id === pedido.janela)?.faixa}</span>
       </div>

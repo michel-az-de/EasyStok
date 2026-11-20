@@ -43,7 +43,7 @@ function motivoDaLinha(motivo, origem) {
 // já resolvido, senão a mudança de UMA conversa re-renderizava a lista inteira.
 export const CartaoConversa = memo(function CartaoConversa({
   conversa, selecionada, agora, pausado = false, pagamentoNaoVisto = false, aberta = true, expediente = null,
-  grupo, busca, aoAbrir, fonteApi = false, usuario = null,
+  grupo, busca, aoAbrir, fonteApi = false, usuario = null, novo = false,
 }) {
   const { canais, janelas, cardapio } = useCatalogo()
   const fotoCadastrada = useFotoCliente(conversa.cliente?.fotoUrl)
@@ -88,7 +88,7 @@ export const CartaoConversa = memo(function CartaoConversa({
   return (
     <button
       type="button"
-      className={classesDoCartao(css, { motivo, slaEstourado })}
+      className={novo ? `${classesDoCartao(css, { motivo, slaEstourado })} ${css.cartaoNovo}` : classesDoCartao(css, { motivo, slaEstourado })}
       aria-current={selecionada}
       aria-label={rotuloDoCartao({
         nome: nome.titulo, estado: estado.texto, pendentes, contexto: contexto.map((item) => item.texto),
@@ -109,7 +109,7 @@ export const CartaoConversa = memo(function CartaoConversa({
           <strong className={pendentes > 0 ? css.semResposta : ''}>
             <NomeDoContato
               completo={nome.principal} curto={nome.curto} capsula={nome.capsula} titulo={nome.titulo}
-              complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.complemento.replace(/^Comanda /, '#')}</small>}
+              complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.numeroPedido ? `#${nome.numeroPedido}` : nome.complemento}</small>}
             />
           </strong>
           {/* #2258 (T7): a cor da borda não é o único sinal; o prazo estourado e a vez da equipe têm ícone e texto. */}

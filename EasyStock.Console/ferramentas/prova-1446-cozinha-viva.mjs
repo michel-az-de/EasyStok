@@ -213,9 +213,9 @@ const { nomeDoPedido } = await import('../src/dominio/pedido.js')
 // (suporte); o número do dia, quando a API manda, vai ao lado da comanda.
 confere('#1899/#1641-1: nome do pedido é "Comanda N" com o número do dia; o curto só no título', () => {
   assert.deepEqual(nomeDoPedido({ numeroComanda: 12, numeroCurto: '76A32A4D' }),
-    { principal: 'Comanda 12', referencia: null, frase: 'Comanda 12', titulo: 'Comanda 12 · ref 76A32A4D' })
+    { principal: 'Pedido 12', referencia: null, frase: 'Pedido 12', titulo: 'Pedido 12 · ref 76A32A4D' })
   assert.deepEqual(nomeDoPedido({ numeroComanda: 12, numeroCurto: '76A32A4D', numeroDoDia: 42 }),
-    { principal: 'Comanda 12', referencia: 'nº 042', frase: 'Comanda 12', titulo: 'Comanda 12 · nº 042 · ref 76A32A4D' })
+    { principal: 'Pedido 12', referencia: 'nº 042', frase: 'Pedido 12', titulo: 'Pedido 12 · nº 042 · ref 76A32A4D' })
   assert.deepEqual(nomeDoPedido({ numeroCurto: '76A32A4D', numeroDoDia: 7 }),
     { principal: 'Nº 007', referencia: null, frase: 'Pedido nº 007', titulo: 'Nº 007 · ref 76A32A4D' })
   assert.equal(nomeDoPedido({ numeroComanda: 12, numeroDoDia: null }).referencia, null, 'campo ausente ou nulo não inventa número')
@@ -413,7 +413,7 @@ confere('K-1 o troco do dinheiro na entrega chega ao roteiro, à parada fora da 
 
 confere('K-3 a parada diz "Comanda N" ou o nº do dia, como o roteiro, e não o código curto', () => {
   const parada = { pedidoId: 'p9', numeroPedido: '57A22217', numeroDoDia: 4 }
-  assert.equal(roteiroMod.paradaDaViagem(parada, { numeroComanda: 12, numeroCurto: '57A22217', numeroDoDia: 4 }).identificacao.principal, 'Comanda 12')
+  assert.equal(roteiroMod.paradaDaViagem(parada, { numeroComanda: 12, numeroCurto: '57A22217', numeroDoDia: 4 }).identificacao.principal, 'Pedido 12')
   assert.equal(roteiroMod.paradaDaViagem(parada, undefined).identificacao.principal, 'Nº 004')
   const tela = fonte('features/entregas/ConteudoEntregasApi.jsx')
   assert.doesNotMatch(tela, /\{parada\.ordem\}\. \{parada\.numeroPedido\}/)

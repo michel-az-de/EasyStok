@@ -10,6 +10,7 @@ import { hashDoModulo } from '../../dominio/modulos'
 import { nomeDaConversa } from '../../dominio/nomeDoContato'
 import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './atendimento.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // #2792: o limite de cada campo do modelo espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o envio trava.
 const LIMITE_PARAMETRO = 1024
@@ -84,8 +85,8 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
     finally { ocupado.current = false; setEnviando(false) }
   }
   return (
-    <Modal titulo={cliente ? 'Chamar no WhatsApp' : 'Enviar modelo aprovado'} descricao={cliente
-      ? `Primeira mensagem para ${cliente.nome}: sem conversa recente, só sai modelo aprovado. Enviado, a conversa abre no Balcão.`
+    <Modal titulo={cliente ? 'Chamar no WhatsApp' : `Enviar ${ROTULOS.MENSAGEM_PADRAO}`} descricao={cliente
+      ? `Primeira mensagem para ${cliente.nome}: sem conversa recente, só sai ${ROTULOS.MENSAGEM_PADRAO}. Enviado, a conversa abre no Balcão.`
       : `Confira a prévia antes de enviar para ${nomeDaConversa(conversa)}. Este modelo é enviado diretamente pelo canal; não entra no rascunho de respostas rápidas.`}
       aoFechar={fechar} segurarFechamento={!resultado && (escolha !== '' || parametros.some((p) => p.trim()))} rodape={<>
         <Botao disabled={enviando} onClick={fechar}>Fechar</Botao>
@@ -98,10 +99,10 @@ export function ModalEnviarModelo({ conversa = null, cliente = null, aoFechar, a
           ? 'Cadastre um celular válido na Ficha do cliente para chamar no WhatsApp.'
           : 'Cadastre o cliente e confira se a conversa está aberta e desbloqueada na Ficha.'}</p>}
         <Botao onClick={() => carregar(true)} disabled={enviando || Boolean(resultado)}>Atualizar modelos</Botao>
-        {lista === null && <output>Carregando modelos aprovados…</output>}
-        {lista?.length === 0 && !erro && <p>Nenhum modelo aprovado nesta conta. Crie e aprove o modelo no Gerenciador da Meta.</p>}
+        {lista === null && <output>Carregando as opções de {ROTULOS.MENSAGEM_PADRAO}…</output>}
+        {lista?.length === 0 && !erro && <p>Nenhuma {ROTULOS.MENSAGEM_PADRAO} nesta conta. Crie e aprove o modelo no Gerenciador da Meta.</p>}
         {Boolean(lista?.length) && <fieldset className={css.programarCampos} disabled={enviando || bloqueado || Boolean(resultado)}>
-          <CampoSelecao rotulo="Modelo aprovado" value={escolha} opcoes={[
+          <CampoSelecao rotulo={ROTULOS.MENSAGEM_PADRAO_INICIAL} value={escolha} opcoes={[
             { valor: '', rotulo: 'Selecione um modelo' },
             ...lista.map((m, i) => ({ valor: String(i), rotulo: `${m.nome} · ${m.idioma}${m.indisponivel ? ' · indisponível aqui' : ''}` })),
           ]} onChange={e => {

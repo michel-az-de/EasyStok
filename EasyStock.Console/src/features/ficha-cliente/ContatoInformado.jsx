@@ -4,6 +4,7 @@ import { telefoneDoE164 } from '../../dominio/formato'
 import { identidadeDaEdicao } from '../../dominio/identidadeDaEdicao'
 import { ConferirDestinoDaEdicao } from './ConferirDestinoDaEdicao'
 import css from './cliente.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 export const SELO_INFORMADO = 'Informado pelo visitante'
 
@@ -56,7 +57,7 @@ export function ContatoInformado({ contato, aoConfirmar, conversa }) {
             <dd>{contato.nome}</dd>
           </>
         )}
-        <dt>Telefone</dt>
+        <dt>{ROTULOS.CELULAR}</dt>
         <dd>{telefoneDoE164(contato.telefone)}</dd>
         {contato.email && (
           <>

@@ -199,7 +199,7 @@ await confere('C  "esteira" saiu da barra de modo e do aviso de encerrar; o núm
 const TEMPO = "The operation didn't complete within the allowed timeout of '00:00:30'."
 await confere('D  os três erros crus do provedor viram frase em português, sem o inglês', () => {
   assert.equal(textoDaFalhaDeEnvio('Message undeliverable'), 'O WhatsApp não conseguiu entregar: confira se o número está certo.')
-  assert.equal(textoDaFalhaDeEnvio('Re-engagement message'), 'Passaram 24 h desde a última mensagem do cliente: só modelo aprovado chega.')
+  assert.equal(textoDaFalhaDeEnvio('Re-engagement message'), 'Passou o prazo de 24 h desde a última mensagem do cliente: só mensagem padrão do WhatsApp chega.')
   assert.equal(textoDaFalhaDeEnvio(TEMPO), 'O WhatsApp demorou a responder. Pode ter chegado: confira com o cliente antes de reenviar.')
   assert.equal(textoDaFalhaDeEnvio('Falha ao enviar pelo canal: ' + TEMPO), FRASE_DA_FALHA[TIPOS_DE_FALHA.TEMPO_ESGOTADO])
   assert.equal(textoDaFalhaDeEnvio('(#131026) Recipient cannot be reached'), FRASE_DA_FALHA[TIPOS_DE_FALHA.NAO_ENTREGAVEL])

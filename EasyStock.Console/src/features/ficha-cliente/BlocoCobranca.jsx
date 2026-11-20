@@ -27,6 +27,7 @@ import { RelogioPix } from './RelogioPix'
 import { cobrancaRepeteExtrato, perguntaDaBaixa } from './apresentacaoDaFicha'
 import { ConferirPagamento } from './ConferirPagamento'
 import css from './ficha.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Campo "Cupom" da Cobrança (frente Fidelidade e cupons, rodada 13, issue
 // #45, registro 107): aplica o desconto ANTES de gerar a cobrança e mostra o
@@ -329,7 +330,7 @@ export function BlocoCobranca({
       return (
         <Bloco titulo="Cobrança">
           <Vazio
-            titulo="Comanda vazia"
+            titulo="Pedido vazio"
             acao={<Botao onClick={aoAbrirCardapio} disabled={!editavel}>Adicionar itens</Botao>}
           />
         </Bloco>
@@ -375,7 +376,7 @@ export function BlocoCobranca({
             disabled={!editavel || !meioEscolhido}
             onClick={() => geracao.emitir(meioEscolhido)}
           >
-            Gerar cobrança
+            {ROTULOS.GERAR_COBRANCA}
           </Botao>
         )}
       </Bloco>

@@ -43,6 +43,7 @@ import { AvisosDoCliente } from './AvisosDoCliente'
 import { ContatoInformado } from './ContatoInformado'
 import { ConferirDestinoDaEdicao } from './ConferirDestinoDaEdicao'
 import css from './cliente.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 const dataCurta = (iso) =>
   new Date(iso + (iso.length === 10 ? 'T12:00:00' : '')).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
@@ -347,7 +348,7 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
             {fonteApi && <ConferirDestinoDaEdicao identidade={identidadeForm} conversa={conversa} aoConferir={identidade => guardarRapido({ form, identidade })} />}
             {(!cliente.telefone || rascunhoRapido) && (
               <CampoMascarado
-                tipo="telefone" rotulo="Telefone"
+                tipo="telefone" rotulo={ROTULOS.CELULAR}
                 valor={form.telefone}
                 aoMudarDigitos={(d, texto) => setForm((f) => ({ ...f, telefone: telefoneNaTela(texto ?? d) }))}
                 id={idDoCampo('telefone')}
@@ -385,8 +386,8 @@ export function BlocoCliente({ conversa, recolhidas = NADA_RECOLHIDO, integrado 
           <div className={css.dadosCliente} data-dados-cliente>
             <div key={`tel-${captado.telefone ?? ''}`} data-campo-ficha="telefone cadastro" className={`${css.linhaDado} ${captado.telefone ? css.captadoAgora : ''}`}>
               <span className={`${css.azulejo} ${css.azVerde}`} aria-hidden="true"><Icone nome="phone" tamanho={16} /></span>
-              <span className={css.rotuloDado}>Telefone <SeloCaptado quando={captado.telefone} /></span>
-              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:telefone`} conversa={fonteApi ? conversa : undefined} rotulo="Telefone" aoMudarSujo={sujoEmLinha.telefone} valor={cliente.telefone}
+              <span className={css.rotuloDado}>{ROTULOS.CELULAR} <SeloCaptado quando={captado.telefone} /></span>
+              <CampoEmLinha key={chaveCadastro} chaveRascunho={`${chaveCadastro}:telefone`} conversa={fonteApi ? conversa : undefined} rotulo={ROTULOS.CELULAR} aoMudarSujo={sujoEmLinha.telefone} valor={cliente.telefone}
                 vazio={automaticoCaptando ? 'O Assistente está pedindo na conversa' : 'Adicionar telefone'} tipo="telefone"
                 validar={validarTelefone} aoSalvar={(v, identidade) => editarDadoCliente(conversa.id, 'telefone', v, agora, identidade)} />
             </div>

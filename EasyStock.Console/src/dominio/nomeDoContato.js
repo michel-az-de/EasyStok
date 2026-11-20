@@ -3,6 +3,7 @@
 // verdade passa intacto.
 
 import { mascaraTelefone } from './formato'
+import { CODIGOS, ROTULOS } from './rotulos'
 
 export function nomeDoContato(nome) {
   const texto = String(nome ?? '').trim()
@@ -15,15 +16,29 @@ export function nomeDoContato(nome) {
   return texto
 }
 
-// #2276 (06·1): o padrão do lead sem nome de perfil ("Cliente WhatsApp") não é nome de ninguém. Quando o
-// contato é telefone, a tela mostra o número formatado; sem telefone, o nome segue como veio.
-const NOME_PADRAO_DO_LEAD = 'cliente whatsapp'
+// #2276 (06·1), #2944 (E1-13): o padrão do lead sem nome de perfil ("Cliente WhatsApp") não é nome de ninguém. Quando há
+// telefone, a tela mostra o número formatado; sem telefone, a conversa mostra o nome como veio e as demais telas
+// "Contato sem nome". Uma regra só para a conversa, o cadastro, a escolha do cliente e a Ficha.
+const ehTelefone = (texto) => /^\+?[\d\s().-]+$/.test(texto) && /^\d{10,13}$/.test(texto.replace(/\D/g, ''))
+const semNomeDeVerdade = (nome) => nome.trim() === '' || nome.trim().toLowerCase() === CODIGOS.NOME_PADRAO_DO_LEAD
+
+function nomeDoTelefone(nome, telefone) {
+  const contato = String(telefone ?? '').trim()
+  return semNomeDeVerdade(nome) && ehTelefone(contato) ? nomeDoContato(contato) : null
+}
+
+// Cliente do cadastro: { nome, telefone }. Telefone formatado no lugar do padrão; a tela põe o selo "Sem nome".
+export function nomeExibido(cliente) {
+  const nome = String(cliente?.nome ?? '')
+  return nomeDoTelefone(nome, cliente?.telefone) ?? (semNomeDeVerdade(nome) ? ROTULOS.SEM_NOME : nome)
+}
+
+export const clienteSemNome = (cliente) => semNomeDeVerdade(String(cliente?.nome ?? '')) && ehTelefone(String(cliente?.telefone ?? '').trim())
+
 export function nomeDaConversa(conversa) {
   const nome = String(conversa?.nome ?? '')
-  if (nome.trim().toLowerCase() !== NOME_PADRAO_DO_LEAD) return nome
-  const contato = String(conversa?.contato ?? '').trim()
-  const telefone = /^\+?[\d\s().-]+$/.test(contato) && /^\d{10,13}$/.test(contato.replace(/\D/g, ''))
-  return telefone ? nomeDoContato(contato) : nome
+  if (nome.trim().toLowerCase() !== CODIGOS.NOME_PADRAO_DO_LEAD) return nome
+  return nomeDoTelefone(nome, conversa?.contato) ?? nome
 }
 
 // #2276: o primeiro nome para frases ao usuário ("Passar a conversa de Maria"). Contato que é só telefone sai
@@ -84,7 +99,7 @@ export function apresentacaoDoNome(nome, { comanda = null } = {}) {
       completo: VISITANTE,
       curto: VISITANTE,
       capsula: numero ? { texto: `#${numero}`, tom: 'neutro' } : null,
-      titulo: numero ? `${VISITANTE} do site · Comanda ${numero}` : `${VISITANTE} do site`,
+      titulo: numero ? `${VISITANTE} do site · ${ROTULOS.PEDIDO} ${numero}` : `${VISITANTE} do site`,
       rotulo: numero ? `${VISITANTE} #${numero}` : VISITANTE,
     }
   }

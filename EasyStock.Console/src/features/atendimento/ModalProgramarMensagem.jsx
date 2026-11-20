@@ -13,6 +13,7 @@ import {
   parametrosDoTexto, podeCancelar,
 } from '../../dominio/mensagemProgramada'
 import css from './atendimento.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // #1424: programar mensagem ao cliente. Quem guarda e dispara é o EasyStok (S39); aqui só
 // se agenda, lista e cancela. O erro da API (janela de 24 h no horário do envio, cliente
@@ -154,7 +155,7 @@ export function ModalProgramarMensagem({
         {canal.aceitaModelo && (
           <label className={css.programarOpcao}>
             <input type="checkbox" checked={usarModelo} onChange={(e) => setUsarModelo(e.target.checked)} />
-            Usar modelo aprovado (obrigatório se o horário cair fora das 24 h depois da última mensagem do cliente)
+            Usar {ROTULOS.MENSAGEM_PADRAO} (obrigatório se o horário cair fora das 24 h depois da última mensagem do cliente)
           </label>
         )}
 

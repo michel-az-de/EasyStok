@@ -66,20 +66,20 @@ const nome = (html, texto) => botao(html, texto).match(/aria-label="([^"]+)"/)?.
 
 for (const [status, toque] of [['aguardando', 'Começar preparo'], ['preparando', 'Marcar pronto'], ['pronto', 'Saiu para entrega']]) {
   await confere(`K1: ${toque} nomeia o pedido`, () => {
-    assert.equal(nome(cartao(pedido({ status })), toque), `${toque}: Comanda 4 de Ana Souza`)
+    assert.equal(nome(cartao(pedido({ status })), toque), `${toque}: Pedido 4 de Ana Souza`)
   })
 }
 
 await confere('K1: Enviando… também nomeia o pedido', () => {
-  assert.equal(nome(cartao(pedido(), { movendo: true }), 'Enviando'), 'Enviando…: Comanda 4 de Ana Souza')
+  assert.equal(nome(cartao(pedido(), { movendo: true }), 'Enviando'), 'Enviando…: Pedido 4 de Ana Souza')
 })
 
 await confere('K1: Ver comanda nomeia o pedido', () => {
-  assert.equal(nome(cartao(pedido()), 'Ver comanda'), 'Ver comanda: Comanda 4 de Ana Souza')
+  assert.equal(nome(cartao(pedido()), 'Ver pedido'), 'Ver pedido: Pedido 4 de Ana Souza')
 })
 
 await confere('K1: Imprimir pedido nomeia o pedido', () => {
-  assert.equal(nome(cartao(pedido()), 'Imprimir pedido'), 'Imprimir pedido: Comanda 4 de Ana Souza')
+  assert.equal(nome(cartao(pedido()), 'Imprimir pedido'), 'Imprimir pedido: Pedido 4 de Ana Souza')
 })
 
 await confere('K2: no celular a faixa de chips ocupa a linha inteira da barra de filtros', () => {

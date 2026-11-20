@@ -26,7 +26,7 @@ export function ModalCompartilharComanda({ conversa, aoFechar }) {
   const podeEnviar = permissaoDeEscrita(conversa, agora, canal).pode
   async function gerar() {
     const resultado = await obterLinkCardapio(conversa.id)
-    if (!resultado?.url) throw new Error('Não foi possível obter o link da comanda. Tente novamente.')
+    if (!resultado?.url) throw new Error('Não foi possível obter o link do pedido. Tente novamente.')
     const numero = resultado.numeroComanda || conversa.numeroComanda
     return { link: resultado.url, daLoja: resultado.daLoja, numeroComanda: numero,
       texto: textoConviteCardapio(conversa.nome, resultado.url, numero) }

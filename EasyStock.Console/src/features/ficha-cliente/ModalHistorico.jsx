@@ -7,6 +7,7 @@ import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { useNovoPedidoDoCliente } from '../../aplicacao/novoPedidoDoCliente'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { ehLead } from '../../dominio/conversa'
 import { enviosAutomaticos } from '../../dominio/automacao'
@@ -40,12 +41,18 @@ function comandaAberta(conversa) {
   return { total: typeof pedido.totalApi === 'number' ? pedido.totalApi : totalDaComanda(pedido) }
 }
 
-const textoDaComandaAberta = (aberta) => `1 comanda aberta${aberta.total == null ? '' : ` · ${moeda(aberta.total)}`}`
+const textoDaComandaAberta = (aberta) => `1 pedido aberto${aberta.total == null ? '' : ` · ${moeda(aberta.total)}`}`
 
-function AbaPedidos({ historico, pedidosAnteriores, aberta }) {
+function AbaPedidos({ historico, pedidosAnteriores, aberta, clienteId = null, nome }) {
+  const novoPedido = useNovoPedidoDoCliente()
+  const comAcao = novoPedido.disponivel && Boolean(clienteId)
   if (historico.length === 0) {
+    // #2944 (E1-14): o vazio da Ficha diz o que fazer e já traz o botão.
+    const acao = !aberta && comAcao
+      ? <Botao variante="primario" disabled={Boolean(novoPedido.abrindo)} onClick={() => novoPedido.iniciar(clienteId, { nome })}>Novo pedido</Botao>
+      : null
     return (
-      <Vazio titulo={aberta ? textoDaComandaAberta(aberta) : 'Nenhum pedido ainda'}>
+      <Vazio acao={acao} titulo={aberta ? textoDaComandaAberta(aberta) : `Nenhum pedido ainda${comAcao ? '. Use Novo pedido para começar.' : ''}`}>
         {aberta ? 'Ela entra no histórico quando o pedido for concluído.' : pedidosAnteriores > 0
           ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe para mostrar aqui.`
           : 'Primeira vez na casa.'}
@@ -263,7 +270,7 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido 
       />
 
       <div role="tabpanel" id={`${id}-painel`} aria-labelledby={`${id}-aba-${aba}`} tabIndex={0} className={css.painelAba}>
-        {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} aberta={aberta} />}
+        {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} aberta={aberta} clienteId={conversa.clienteId} nome={conversa.nome} />}
         {aba === 'atendimentos' && (
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
         )}
