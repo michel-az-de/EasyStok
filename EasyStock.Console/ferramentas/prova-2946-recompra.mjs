@@ -22,7 +22,7 @@ for (const ruim of [null, undefined, '', 'abc', '99999', '12345678901234', '5511
 const texto = textoDoConvite('Maria Souza', 'Loja Teste')
 assert.ok(texto.startsWith('Oi, Maria! Aqui é da Loja Teste.'), 'só o primeiro nome e o nome da loja')
 assert.ok(!texto.includes('Souza'), 'não usa o sobrenome')
-assert.ok(textoDoConvite('', null).startsWith('Oi! Aqui é da loja.'), 'sem nome e sem loja')
+assert.ok(textoDoConvite('', null).startsWith('Oi! Aqui é da Casa da Baba.'), 'sem nome na sessão vale o nome da Casa')
 assert.ok(textoDoConvite(null, 'X').startsWith('Oi! '), 'nome nulo')
 assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(texto), 'sem emoji')
 
