@@ -114,6 +114,11 @@ public sealed partial class PedidoConversaConcorrenciaTests
         {
             await scope.ServiceProvider.GetRequiredService<IIntegrationEventDispatcher>().ExecutarRodadaAsync(100, CancellationToken.None);
             await scope.ServiceProvider.GetRequiredService<INotificacoesAvaliadorOrchestrator>().ExecutarRodadaAsync(TimeSpan.FromMinutes(1));
+            // #2937: o canhoto em imagem sai no pagamento, com a cliente ainda liberada. Este teste guarda o aviso
+            // enfileirado: só ele não pode sair depois do bloqueio ou da revogação.
+            cloud.ReceivedCalls().Should().ContainSingle(x => x.GetMethodInfo().Name == nameof(IWhatsAppCloudClient.EnviarImagemAsync)
+                && x.GetArguments().OfType<string>().Any(a => a.StartsWith("Canhoto do pedido ")));
+            cloud.ClearReceivedCalls();
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             var versoes = await db.NotifTemplates.IgnoreQueryFilters().Where(t => t.Codigo == "pedido_pago_whatsapp_v1").ToListAsync();
             versoes.Single(t => t.Versao == 1).Ativo.Should().Be(templateHumano);

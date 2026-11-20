@@ -183,6 +183,11 @@ public class ConfiguracaoAtendimento
     /// <summary>S68: orientação livre da loja para o Assistente, abaixo das regras. Nulo: nenhuma.</summary>
     public string? ObservacoesLoja { get; private set; }
 
+    public const int FraseFechoCanhotoTamanhoMaximo = 60;
+
+    /// <summary>#2937: frase que fecha o canhoto em imagem mandado à cliente (ex.: "Boa massa!"). Nula: sem fecho.</summary>
+    public string? FraseFechoCanhoto { get; private set; }
+
     public const int FerramentasDesligadasTamanhoMaximo = 4_000;
 
     /// <summary>#2853: nomes das ferramentas do Assistente que a loja desligou, em JSON. Nulo: todas ligadas.</summary>
@@ -226,6 +231,18 @@ public class ConfiguracaoAtendimento
         if (cotaTokensMes.HasValue) CotaTokensMes = cotaTokensMes == 0 ? null : cotaTokensMes;
         if (roteiro is not null) RoteiroJson = Vazio(roteiro);
         if (observacoes is not null) ObservacoesLoja = Vazio(observacoes);
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>#2937: nulo mantém; vazio tira o fecho. Uma linha curta, que cabe na faixa do canhoto.</summary>
+    public void DefinirFraseFechoCanhoto(string? frase)
+    {
+        if (frase is null) return;
+        var limpa = frase.Trim();
+        if (limpa.Length > FraseFechoCanhotoTamanhoMaximo || limpa.Contains(Convert.ToChar(10)) || limpa.Contains(Convert.ToChar(13)))
+            throw new RegraDeDominioVioladaException(
+                $"A frase de fecho tem de caber em uma linha de até {FraseFechoCanhotoTamanhoMaximo} caracteres.");
+        FraseFechoCanhoto = Vazio(limpa);
         AlteradoEm = DateTime.UtcNow;
     }
 

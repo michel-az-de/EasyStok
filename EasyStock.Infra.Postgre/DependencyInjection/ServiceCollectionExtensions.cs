@@ -211,6 +211,13 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AvisarEquipePedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            // #2937: canhoto em imagem à cliente. O marco é commitado no envio, então repetir o evento não repete a
+            // imagem; fica antes das automáticas (#1506).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.CanhotoPedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.CanhotoPedidoEmPreparoHandler>("pedido.mudou_status");
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AvisarEquipeContatoNovoHandler>(
                 EasyStock.Application.Events.Atendimento.ConversaAbertaEvent.TipoEvento);

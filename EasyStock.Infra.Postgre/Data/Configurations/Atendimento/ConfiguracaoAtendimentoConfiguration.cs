@@ -18,6 +18,8 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
         builder.Property(x => x.SaudacaoRetorno).IsRequired().HasMaxLength(500);
         builder.Property(x => x.FraseEspera).IsRequired().HasMaxLength(200);
         builder.Property(x => x.MensagemForaArea).IsRequired().HasMaxLength(500);
+        // #2937: fecho do canhoto em imagem; nulo é sem fecho.
+        builder.Property(x => x.FraseFechoCanhoto).HasMaxLength(ConfiguracaoAtendimento.FraseFechoCanhotoTamanhoMaximo);
         // #2249: moldes das ações do robô; linha antiga ganha o texto padrão.
         builder.Property(x => x.MensagemEscalada).IsRequired().HasMaxLength(ConfiguracaoAtendimento.MoldeTamanhoMaximo)
             .HasDefaultValue(ConfiguracaoAtendimento.MensagemEscaladaPadrao);

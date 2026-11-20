@@ -602,6 +602,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("FraseFechoCanhoto")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
                     b.Property<string>("MensagemEncaminhamento")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

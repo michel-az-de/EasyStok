@@ -13,6 +13,24 @@ public static class ResumoPedidoAtendimento
 
     public static string Codigo(Guid pedidoId) => pedidoId.ToString("N")[..6].ToUpperInvariant();
 
+    /// <summary>
+    /// #2937: o que a imagem mostra, montado num lugar só. O resumo do Assistente não leva "Pago" nem fecho; o
+    /// canhoto do pagamento (<see cref="CanhotoPedidoCliente"/>) leva.
+    /// </summary>
+    public static ResumoPedidoDto Montar(Pedido pedido, string? nomeLoja, bool pago = false, string? fecho = null) => new(
+        nomeLoja ?? string.Empty,
+        Codigo(pedido.Id),
+        pedido.Itens.Where(i => !i.EhLinhaDeFrete)
+            .Select(i => new ResumoPedidoItemDto(i.Nome, i.Quantidade, i.Subtotal, i.Observacao)).ToList(),
+        pedido.Frete,
+        pedido.Total.Valor,
+        pedido.AgendadoParaEm is { } quando
+            ? HorarioBrasil.ConverterParaBrasilia(quando).ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)
+            : "a combinar",
+        pedido.EnderecoEntrega,
+        pago,
+        fecho);
+
     public static string Legenda(Guid pedidoId) =>
         $"{Prefixo}{Codigo(pedidoId)}. Está tudo certo? Com o seu ok, mando o link do pagamento.";
 

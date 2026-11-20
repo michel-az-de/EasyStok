@@ -30,7 +30,8 @@ public sealed record ConfiguracaoAtendimentoResult(
     IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
     bool RoteiroPersonalizado = false,
     string? ObservacoesLoja = null,
-    IReadOnlyList<string>? FerramentasDesligadas = null);
+    IReadOnlyList<string>? FerramentasDesligadas = null,
+    string? FraseFechoCanhoto = null);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -57,7 +58,8 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
         // S68 (#2597): o roteiro sai sempre efetivo (o da loja ou o padrão), com a marca de qual dos dois.
         c.NomeDona, c.ModeloAgente, c.CotaTokensMes, RoteiroAtendimento.DaLoja(c.RoteiroJson),
         !ReferenceEquals(RoteiroAtendimento.DaLoja(c.RoteiroJson), RoteiroAtendimento.Padrao), c.ObservacoesLoja,
-        FerramentasDaLoja.DaLoja(c.FerramentasDesligadasJson).Order(StringComparer.Ordinal).ToList());
+        FerramentasDaLoja.DaLoja(c.FerramentasDesligadasJson).Order(StringComparer.Ordinal).ToList(),
+        c.FraseFechoCanhoto);
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -79,7 +81,8 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     long? CotaTokensMes = null,
     IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
     string? ObservacoesLoja = null,
-    IReadOnlyList<string>? FerramentasDesligadas = null);
+    IReadOnlyList<string>? FerramentasDesligadas = null,
+    string? FraseFechoCanhoto = null);
 
 /// <remarks>
 /// S68 (#2597): nulo mantém cada campo do Assistente; vazio volta ao padrão (roteiro vazio, modelo vazio, cota 0). O
@@ -119,6 +122,7 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
             configuracao.DefinirAssistente(command.NomeDona, modeloAgente, command.CotaTokensMes, roteiroJson,
                 command.ObservacoesLoja);
             configuracao.DefinirFerramentasDesligadas(desligadasJson);
+            configuracao.DefinirFraseFechoCanhoto(command.FraseFechoCanhoto);
         }
         catch (Exception ex) when (ex is ArgumentOutOfRangeException or RegraDeDominioVioladaException)
         {

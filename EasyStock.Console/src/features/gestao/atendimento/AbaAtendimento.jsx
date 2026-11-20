@@ -15,6 +15,7 @@ import { PainelAssistente } from './PainelAssistente'
 const TAMANHO_MENSAGEM = 500
 // #2792: limites que espelham o servidor; passar deles avisa no campo e trava o Salvar (sem `maxLength`).
 const TAMANHO_NOME_DONA = 60
+const TAMANHO_FECHO_CANHOTO = 60
 const TAMANHO_MODELO_RETOMADA = 512
 
 const NIVEIS_DE_SUGESTAO = [
@@ -25,7 +26,7 @@ const NIVEIS_DE_SUGESTAO = [
 const OCIOSO = { estado: 'ocioso' }
 const CAMPOS_CONFIGURACAO = [
   'ativo', 'tom', 'nivelSugestao', 'saudacaoPrimeiroContato', 'saudacaoRetorno',
-  'fraseEspera', 'mensagemForaArea', 'mensagemEscalada', 'mensagemEncaminhamento', 'nomeDona', 'modeloRetomadaNome', 'respiroMinutos',
+  'fraseEspera', 'mensagemForaArea', 'mensagemEscalada', 'mensagemEncaminhamento', 'nomeDona', 'fraseFechoCanhoto', 'modeloRetomadaNome', 'respiroMinutos',
   'tempoPreparoPadraoMinutos', 'slaRespostaMinutos',
 ]
 const valorComparavel = (valor) => String(valor ?? '')
@@ -236,7 +237,7 @@ function ConfiguracaoDoAtendimento() {
   }
   const pendente = camposMudaram(form, gravado, CAMPOS_CONFIGURACAO)
   const passaDoLimite = algumPassaDoLimite(
-    [form.nomeDona, TAMANHO_NOME_DONA], [form.mensagemEscalada, TAMANHO_MENSAGEM],
+    [form.nomeDona, TAMANHO_NOME_DONA], [form.fraseFechoCanhoto, TAMANHO_FECHO_CANHOTO], [form.mensagemEscalada, TAMANHO_MENSAGEM],
     [form.mensagemEncaminhamento, TAMANHO_MENSAGEM], [form.modeloRetomadaNome, TAMANHO_MODELO_RETOMADA],
   )
 
@@ -318,6 +319,13 @@ function ConfiguracaoDoAtendimento() {
           value={form.fraseEspera}
           required
           onChange={mudar('fraseEspera')}
+        />
+        <CampoTexto
+          rotulo="Frase de fecho do canhoto"
+          dica="Fecha a imagem do pedido que a cliente recebe quando paga, por exemplo Boa massa! Em branco, a imagem sai sem fecho."
+          value={form.fraseFechoCanhoto ?? ''}
+          limite={TAMANHO_FECHO_CANHOTO}
+          onChange={mudar('fraseFechoCanhoto')}
         />
         <CampoArea rotulo="Mensagem para endereço fora da área" value={form.mensagemForaArea} required onChange={mudar('mensagemForaArea')} />
         <CampoArea
