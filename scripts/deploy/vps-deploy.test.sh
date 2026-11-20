@@ -72,6 +72,23 @@ r=$(local_run X=0 -- --dry-run --rollback "$A" --motivo "API quebrou no boot")
 r=$(local_run "ROLLBACK_CONFIRMA=${C:0:8}" -- --rollback "$C" --motivo "fora do master")
                                           confere "rollback fora do master: exit 7"     "rc=7" "$r"
 r=$(local_run X=0 -- --nao-existe);      confere "opcao desconhecida: exit 2"          "rc=2" "$r"
+r=$(local_run X=0 -- --origem outra);    confere "origem invalida: exit 2"             "rc=2" "$r"
+# #2958: GitHub fora. origin aponta para lugar inexistente; o espelho da VPS e o origin.git
+# (caminho Windows no Git Bash: o git nativo nao entende /tmp com MSYS_NO_PATHCONV)
+W_T="$(cd "$W" && (pwd -W 2>/dev/null || pwd))"
+g remote set-url origin "$W_T/github-fora.git"
+r=$(local_run X=0 -- "$B");              confere "github fora: exit 7"                 "rc=7" "$r"
+                                          confere "github fora: aponta o espelho"       "--origem espelho" "$r"
+                                          confere "github fora: nao chama ssh"          "ssh=nao" "$r"
+r=$(local_run "ESPELHO_URL=$W_T/origin.git" -- --origem espelho "$B")
+                                          confere "espelho: exit 0"                     "rc=0" "$r"
+                                          confere "espelho: avisa a origem"             "origem: ESPELHO" "$r"
+                                          confere "espelho: chama ssh"                  "ssh=sim" "$r"
+r=$(local_run "ESPELHO_URL=$W_T/origin.git" -- --origem espelho "$A")
+                                          confere "espelho: SHA antigo exit 7"          "rc=7" "$r"
+r=$(local_run "ESPELHO_URL=$W_T/nao-ha.git" -- --origem espelho "$B")
+                                          confere "espelho inacessivel: exit 7"         "rc=7" "$r"
+g remote set-url origin "$W_T/origin.git"
 # copia do script diferente da do origin/master: recusa o deploy de verdade
 mkdir -p "$W/c/scripts/deploy"; echo "# outra versao" > "$W/c/scripts/deploy/vps-deploy.sh"
 g add scripts/deploy/vps-deploy.sh; g commit -q -m D; g push -q origin HEAD:master; D=$(g rev-parse HEAD)

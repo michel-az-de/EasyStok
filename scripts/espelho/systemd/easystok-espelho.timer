@@ -1,0 +1,11 @@
+# A cada 15 minutos: o aceite da #2958 pede o master igual ao do GitHub em ate 1 h.
+[Unit]
+Description=Atualiza o espelho do EasyStok a cada 15 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

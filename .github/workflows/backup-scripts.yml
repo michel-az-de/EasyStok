@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - 'scripts/backup/**'
+      - 'scripts/espelho/**'
       - 'scripts/deploy/vps-deploy*.sh'
       - '.github/workflows/backup-scripts.yml'
 
@@ -31,5 +32,7 @@ jobs:
       - name: estacao (restauracao dos 4 itens)
         shell: pwsh
         run: ./scripts/backup/estacao/estacao.test.ps1
+      - name: espelho do repositorio (#2958)
+        run: bash scripts/espelho/espelho.test.sh
       - name: gancho no vps-deploy.sh
         run: bash scripts/deploy/vps-deploy.test.sh
