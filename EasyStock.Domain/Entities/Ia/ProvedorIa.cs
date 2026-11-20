@@ -89,8 +89,7 @@ public sealed class ProvedorIa
 
     private static void ValidarOrcamento(decimal? valor)
     {
-        if (valor < 0)
-            throw new RegraDeDominioVioladaException("Orçamento mensal não pode ser negativo.");
+        LimitesIa.ValidarValor(valor, "Orçamento mensal");
     }
 
     private static string ValidarUrl(string? url)
@@ -100,6 +99,9 @@ public sealed class ProvedorIa
             || !Uri.TryCreate(texto, UriKind.Absolute, out var uri)
             || uri.Scheme != Uri.UriSchemeHttps)
             throw new RegraDeDominioVioladaException("A URL do provedor precisa ser https e absoluta.");
+        // #2967: segredo vai no cofre, nunca na URL.
+        if (uri.UserInfo.Length > 0 || uri.Query.Length > 0 || uri.Fragment.Length > 0)
+            throw new RegraDeDominioVioladaException("A URL do provedor não pode ter usuário, senha, query nem fragmento.");
         return texto.TrimEnd('/');
     }
 }

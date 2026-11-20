@@ -67,6 +67,75 @@ public class ProvedoresIaIntegrationTests(PostgreSqlDatabaseFixture fixture)
             .Should().Be(1);
     }
 
+    [SkippableFact]
+    public async Task RlsEscondeEBarraModeloDeOutraLoja()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresaA = Guid.NewGuid();
+        var empresaB = Guid.NewGuid();
+        var provedorA = await SalvarProvedorAsync(empresaA);
+        var provedorB = await SalvarProvedorAsync(empresaB);
+        foreach (var (empresa, provedor) in new[] { (empresaA, provedorA), (empresaB, provedorB) })
+        {
+            await using var db = fixture.CreateDbContext();
+            db.SetMobileTenantContext(empresa);
+            db.ModelosIa.Add(ModeloLigado(empresa, provedor.Id, "deepseek-chat"));
+            await db.SaveChangesAsync();
+        }
+
+        await using var cliente = fixture.CreateRlsClientDbContext();
+        await cliente.Database.OpenConnectionAsync();
+        await cliente.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('app.empresa_id', {empresaA.ToString()}, false)");
+
+        (await ContarAsync(cliente, "SELECT COUNT(*)::int AS \"Value\" FROM modelo_ia WHERE empresa_id = {0}", empresaB))
+            .Should().Be(0, "modelo de outra loja é invisível pela policy tenant_isolation");
+        (await ContarAsync(cliente, "SELECT COUNT(*)::int AS \"Value\" FROM modelo_ia WHERE empresa_id = {0}", empresaA))
+            .Should().Be(1);
+
+        // WITH CHECK: com a sessão na loja A, gravar modelo da loja B é recusado pela policy.
+        cliente.ModelosIa.Add(ModeloLigado(empresaB, provedorB.Id, "deepseek-reasoner"));
+        var gravar = () => cliente.SaveChangesAsync();
+        (await gravar.Should().ThrowAsync<DbUpdateException>())
+            .WithInnerException<Npgsql.PostgresException>()
+            .Which.SqlState.Should().Be("42501");
+    }
+
+    [SkippableFact]
+    public async Task TrocaDePadraoEmDuasGravacoesNaMesmaTransacao()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var provedor = await SalvarProvedorAsync(empresa);
+        var antigo = ModeloLigado(empresa, provedor.Id, "deepseek-chat");
+        var novo = ModeloLigado(empresa, provedor.Id, "deepseek-reasoner");
+        antigo.TornarPadrao(Agora);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            db.ModelosIa.AddRange(antigo, novo);
+            await db.SaveChangesAsync();
+        }
+
+        // O índice único não é DEFERRABLE: desmarcar o antigo precisa chegar ao banco antes de marcar o novo.
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            await using var tx = await db.Database.BeginTransactionAsync();
+            var a = await db.ModelosIa.SingleAsync(m => m.Id == antigo.Id);
+            var n = await db.ModelosIa.SingleAsync(m => m.Id == novo.Id);
+            a.DeixarDeSerPadrao(Agora);
+            await db.SaveChangesAsync();
+            n.TornarPadrao(Agora);
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(empresa);
+        (await leitura.ModelosIa.Where(m => m.EmpresaId == empresa && m.Padrao).Select(m => m.Id).ToListAsync())
+            .Should().Equal(novo.Id);
+    }
+
     private static Task<int> ContarAsync(EasyStockDbContext db, string sql, Guid empresa) =>
         db.Database.SqlQueryRaw<int>(sql, empresa).SingleAsync();
 
