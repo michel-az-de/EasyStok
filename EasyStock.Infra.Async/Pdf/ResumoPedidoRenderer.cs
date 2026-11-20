@@ -1,7 +1,6 @@
 using System.Globalization;
 using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Application.Services.Notifications.Anexos;
-using QuestPDF.Drawing;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
 
@@ -30,19 +29,7 @@ public sealed class ResumoPedidoRenderer : IRenderizadorResumoPedido
     static ResumoPedidoRenderer()
     {
         QuestPDF.Settings.License = LicenseType.Community;
-        RegistrarFonte("Lora.ttf");
-        // A Nunito Sans vai em instâncias estáticas sob um nome só: o QuestPDF escolhe pelo peso de cada arquivo.
-        foreach (var peso in new[] { "Regular", "SemiBold", "Bold" })
-            RegistrarFonte($"NunitoSans-{peso}.ttf", FonteCorpo);
-    }
-
-    private static void RegistrarFonte(string arquivo, string? familia = null)
-    {
-        var nome = $"EasyStock.Infra.Async.Pdf.Fontes.{arquivo}";
-        using var fonte = typeof(ResumoPedidoRenderer).Assembly.GetManifestResourceStream(nome)
-            ?? throw new InvalidOperationException($"Fonte da marca ausente no assembly: {nome}.");
-        if (familia is null) FontManager.RegisterFont(fonte);
-        else FontManager.RegisterFontWithCustomName(familia, fonte);
+        FontesDaMarca.Registrar();
     }
 
     public Task<AnexoGerado> RenderizarAsync(ResumoPedidoDto resumo, CancellationToken ct = default)

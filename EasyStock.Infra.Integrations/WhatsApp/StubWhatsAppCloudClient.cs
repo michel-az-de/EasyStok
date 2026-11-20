@@ -22,6 +22,10 @@ public sealed class StubWhatsAppCloudClient : IWhatsAppCloudClient
         string waId, string urlPublica, string? legenda = null, CancellationToken ct = default)
         => Registrar("imagem", waId, urlPublica);
 
+    public Task<EnvioWhatsAppResult> EnviarDocumentoAsync(
+        string waId, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default)
+        => Registrar("documento", waId, urlPublica);
+
     public Task<EnvioWhatsAppResult> EnviarAudioAsync(
         string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default)
         => Registrar("audio", waId, urlPublica);

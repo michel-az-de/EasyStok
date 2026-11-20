@@ -267,6 +267,69 @@ public class CanhotoPedidoClienteTests
         c.Desenhado!.Fecho.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Pagamento_ComPdfLigado_EnviaOComprovanteEmPdfNoLugarDaImagem()
+    {
+        var c = new Cenario(comPdf: true);
+
+        (await c.EnviarAsync(GatilhoCanhoto.Pagamento)).Should().BeTrue();
+
+        await c.Cloud.Received(1).EnviarDocumentoAsync("5511999998888", "https://loja.exemplo/files/comprovante.pdf",
+            PublicadorDocumentoPedido.NomeDoComprovante(ResumoPedidoAtendimento.Codigo(c.Pedido.Id)),
+            CanhotoPedidoCliente.LegendaComprovante(c.Pedido.Id), Arg.Any<CancellationToken>());
+        await c.Cloud.DidNotReceive().EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        c.Mensagens.Should().ContainSingle(m => m.TipoConteudo == TipoConteudoMensagem.Documento);
+        c.Eventos.Should().ContainSingle(e => e.Tipo == CanhotoPedidoCliente.Marco);
+    }
+
+    [Fact]
+    public async Task ComprovanteEmPdf_NaoSaiDeNovoPeloMarco()
+    {
+        var c = new Cenario(comPdf: true);
+        (await c.EnviarAsync(GatilhoCanhoto.Pagamento)).Should().BeTrue();
+
+        (await c.EnviarAsync(GatilhoCanhoto.Pagamento)).Should().BeFalse();
+
+        await c.Cloud.Received(1).EnviarDocumentoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        c.Eventos.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task PdfQueNaoSai_CaiNoCanhotoEmImagemDeAntes()
+    {
+        var c = new Cenario(comPdf: true);
+        c.Cloud.EnviarDocumentoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Throws(new HttpRequestException("500"));
+
+        (await c.EnviarAsync(GatilhoCanhoto.Pagamento)).Should().BeTrue();
+
+        await c.Cloud.Received(1).EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        c.Eventos.Should().ContainSingle(e => e.Tipo == CanhotoPedidoCliente.Marco);
+    }
+
+    [Fact]
+    public async Task EnviarPdfDesligado_MantemOCanhotoEmImagem()
+    {
+        var c = new Cenario(comPdf: true, enviarPdf: "false");
+
+        (await c.EnviarAsync(GatilhoCanhoto.Pagamento)).Should().BeTrue();
+
+        await c.Cloud.DidNotReceive().EnviarDocumentoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await c.Cloud.Received(1).EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EmPreparoSemPagamento_ComPdfLigado_ContinuaSendoImagemSemPago()
+    {
+        var c = new Cenario(comPdf: true);
+        c.ComCobrancaNaEntrega();
+
+        (await c.EnviarAsync(GatilhoCanhoto.EmPreparo)).Should().BeTrue();
+
+        await c.Cloud.DidNotReceive().EnviarDocumentoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        c.Desenhado!.Pago.Should().BeFalse();
+    }
+
     private sealed class Cenario
     {
         private readonly CanhotoPedidoCliente _servico;
@@ -286,7 +349,7 @@ public class CanhotoPedidoClienteTests
         public ResumoPedidoDto? Desenhado { get; private set; }
 
         public Cenario(CanalConversa canal = CanalConversa.WhatsApp, DateTime? ultimaEntrada = null, bool comConversa = true,
-            string? fecho = "Boa massa!", Guid? donoDaConversa = null)
+            string? fecho = "Boa massa!", Guid? donoDaConversa = null, bool comPdf = false, string? enviarPdf = null)
         {
             _comConversa = comConversa;
             Cliente = Cliente.Criar(EmpresaId, "Maria");
@@ -334,13 +397,29 @@ public class CanhotoPedidoClienteTests
             Cloud.EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
                 .Returns(new EnvioWhatsAppResult("wamid.canhoto"));
             var appConfig = new ConfigurationBuilder().AddInMemoryCollection(
-                new Dictionary<string, string?> { ["App:BaseUrl"] = "https://loja.exemplo" }).Build();
+                new Dictionary<string, string?>
+                {
+                    ["App:BaseUrl"] = "https://loja.exemplo",
+                    [PublicadorDocumentoPedido.ChaveEnviarPdf] = enviarPdf,
+                }).Build();
+            PublicadorDocumentoPedido? documentos = null;
+            if (comPdf)
+            {
+                var renderizadorPdf = Substitute.For<IRenderizadorPdfPedido>();
+                renderizadorPdf.RenderizarComprovanteAsync(Arg.Any<ResumoPedidoDto>(), Arg.Any<DateTime?>(), Arg.Any<CancellationToken>())
+                    .Returns(new AnexoGerado([37, 80, 68, 70], "application/pdf", "pdf"));
+                armazenamento.CreatePreSignedDownloadUrlAsync(Arg.Any<string>(), Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                    .Returns(new Uri("https://loja.exemplo/files/comprovante.pdf"));
+                Cloud.EnviarDocumentoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                    .Returns(new EnvioWhatsAppResult("wamid.pdf"));
+                documentos = new PublicadorDocumentoPedido(renderizadorPdf, armazenamento, appConfig);
+            }
             var relogio = Substitute.For<TimeProvider>();
             relogio.GetUtcNow().Returns(new DateTimeOffset(Agora));
 
             _servico = new CanhotoPedidoCliente(pedidos, clientes, conversas, cobrancas, storefronts, configuracoes,
                 new PoliticaEnvioCliente(consentimentos), Cloud, appConfig, UnitOfWork, relogio, Tenant,
-                NullLogger<CanhotoPedidoCliente>.Instance, renderizador, armazenamento);
+                NullLogger<CanhotoPedidoCliente>.Instance, renderizador, armazenamento, documentos: documentos);
         }
 
         public void ComCobrancaNaEntrega() =>
