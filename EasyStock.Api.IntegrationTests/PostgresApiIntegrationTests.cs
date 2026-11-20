@@ -158,8 +158,8 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     /// <summary>
     /// Guarda anti-falso-verde do projeto (#2176), no desenho de
-    /// <c>EasyStock.Infra.Postgre.IntegrationTests/HarnessCanaryTests</c>. O job
-    /// <c>api-integration</c> não define <c>EASYSTOCK_IT_PG</c> e depende do
+    /// <c>EasyStock.Infra.Postgre.IntegrationTests/HarnessCanaryTests</c>. Os jobs
+    /// <c>Integração (parte N)</c> do <c>ci.yml</c> rodam este projeto e dependem do
     /// Testcontainers: se o Docker do runner degradar, todos os
     /// <c>[SkippableFact]</c> deste projeto pulam e o gate fica verde-vazio. No GitHub
     /// Actions isso vira VERMELHO. Localmente, sem a env var, SKIPa visível (ADR-0023).
