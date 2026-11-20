@@ -50,7 +50,7 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
           <span className={css.chamarClienteAcoes}>
             {novoPedido.disponivel && (
               <Botao icone="mais" disabled={Boolean(novoPedido.abrindo)} aria-label={`Novo pedido de ${cliente.nome}`}
-                onClick={() => novoPedido.iniciar(cliente.id)}>{novoPedido.abrindo === cliente.id ? 'Abrindo…' : 'Novo pedido'}</Botao>
+                onClick={() => novoPedido.iniciar(cliente.id)}>{novoPedido.abrindo === cliente.id ? 'Abrindo…' : novoPedido.rotulo(cliente.id)}</Botao>
             )}
             <Botao disabled={Boolean(novoPedido.abrindo)} onClick={() => setEscolhido(cliente)}>Chamar no WhatsApp</Botao>
           </span>

@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { useAcoes } from './contextos'
+import { useAcoes, useAtendimento } from './contextos'
+import { lerSessao } from '../infra/api/sessao'
 import { useAcessoModulos } from './acessoModulos'
-import { novoPedidoDisponivel } from './janelaDoPedido'
+import { novoPedidoDisponivel, rotuloDoNovoPedido } from './janelaDoPedido'
 
 // #2871, #2921: "Novo pedido" na lista e na Ficha de Clientes, em Pedidos e na busca do Balcão. O cliente pediu pelo
 // WhatsApp pessoal da dona; a equipe registra pelo Console. A API abre (ou reaproveita) a conversa do WhatsApp da loja com
@@ -12,6 +13,8 @@ import { novoPedidoDisponivel } from './janelaDoPedido'
 export function useNovoPedidoDoCliente({ aoAbrir } = {}) {
   const { abrirConversaDoCliente, abrirJanelaDoPedido } = useAcoes()
   const { permite, acoes } = useAcessoModulos()
+  // Ler a janela refaz o render ao abrir e ao fechar (Registrar e Descartar também fecham): o rótulo acompanha o rascunho.
+  useAtendimento()
   const disponivel = Boolean(abrirJanelaDoPedido) && novoPedidoDisponivel({ abrirConversaDoCliente, permite, acoes })
   const [abrindo, marcarAbrindo] = useState(null)
   const [erro, falhar] = useState(null)
@@ -34,5 +37,6 @@ export function useNovoPedidoDoCliente({ aoAbrir } = {}) {
       marcarAbrindo(null)
     }
   }
-  return { disponivel, abrindo, erro, iniciar, limparErro: () => falhar(null) }
+  const rotulo = (clienteId) => rotuloDoNovoPedido(lerSessao(), clienteId)
+  return { disponivel, abrindo, erro, iniciar, rotulo, limparErro: () => falhar(null) }
 }

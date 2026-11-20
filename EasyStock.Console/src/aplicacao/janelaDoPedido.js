@@ -1,4 +1,5 @@
 import { disponivelHoje, itemPorSku } from '../dominio/cardapio'
+import { temRascunhoDoPedido } from '../infra/api/rascunhosDoPedido'
 
 // #2921: regras puras da janela "Novo pedido" na tela. A montagem mora em `conversas[].pedido` do Provider (o mesmo
 // lugar da comanda do Balcão), na conversa da janela: o "+" soma sempre nela, qualquer que seja a `selecionada`.
@@ -52,3 +53,6 @@ export function restaurarRascunho(rascunho, cardapio) {
 
 export const novoPedidoDisponivel = ({ abrirConversaDoCliente, permite, acoes }) =>
   Boolean(abrirConversaDoCliente) && permite('atendimento') && acoes?.atenderConversas === true
+
+// Rótulo do botão de entrada: com rascunho guardado da cliente, "Continuar pedido"; sem cliente conhecida, "Novo pedido".
+export const rotuloDoNovoPedido = (sessao, clienteId) => (temRascunhoDoPedido(sessao, clienteId) ? 'Continuar pedido' : 'Novo pedido')
