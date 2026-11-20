@@ -92,14 +92,16 @@ Uma mudança pequena na fase 1, sem migração. Decisão do Felipe (19/11, 22:08
 
 Contrato usado como está: `POST /api/atendimento/conversas/{id}/pedido`, `/pedido/simulacao` e a rota `do-cliente` que abre a conversa.
 
-Fase 2 (cliente nova): usa a criação de cliente que o Console já tem. Se o cliente sem celular (furo 2 da #2919) não puder abrir conversa, a fase 2 espera a correção de lá; não se resolve aqui.
+Cliente sem telefone (furo 2 da #2919, resolvido pela #2930): o `POST .../conversas/do-cliente` aceita `celular` opcional e grava no cadastro só se ele estiver sem telefone (PR #2932, `9506ec100`, no ar). Na fase 1, o passo Cliente da janela reaproveita o componente `cadastros/CelularDoPedido.jsx` (PR #2935) e manda o `celular` na abertura da conversa. Nada a duplicar aqui.
+
+Fase 2 (cliente nova): usa a criação de cliente que o Console já tem, com o mesmo `celular`.
 
 ## 9. Fases
 
 | Fase | Entrega | Gate objetivo | Abandono |
 |---|---|---|---|
 | 1 | Janela em Pedidos, Clientes e Ficha, cliente já cadastrada. Sem mudar hash. Registrar fecha e mostra o pedido | Provas Red/Green verdes; prova de tela nos 3 pontos de entrada; resumo sai dentro e fora das 24 h; a conversa por baixo não aparece na fila até a cliente responder | Se o desacoplamento do cardápio e da comanda passar de 2 PRs, ou a Ficha do Atendimento regredir, parar e voltar ao fluxo atual |
-| 2 | "Cliente nova" com cadastro rápido na janela | Cliente nova registra pedido sem sair da tela; prova de tela | Se depender do furo 2 ainda aberto na #2919, esperar; não duplicar a correção |
+| 2 | "Cliente nova" com cadastro rápido na janela | Cliente nova registra pedido sem sair da tela; prova de tela | Se o `celular` da #2932 não bastar para a cliente nova, parar e rever com o Felipe |
 
 Cada fase é uma PR de tier alto (feat), até `aprovado`.
 
