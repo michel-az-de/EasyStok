@@ -110,3 +110,20 @@ export const novoPedidoDisponivel = ({ abrirConversaDoCliente, permite, acoes })
 
 // Rótulo do botão de entrada: com rascunho guardado da cliente, "Continuar pedido"; sem cliente conhecida, "Novo pedido".
 export const rotuloDoNovoPedido = (sessao, clienteId) => (temRascunhoDoPedido(sessao, clienteId) ? 'Continuar pedido' : 'Novo pedido')
+
+// #2944 (E1-01): por que Continuar/Registrar está parado. `null` quando nada bloqueia (mesma regra de `podeAvancarDaEntrega`).
+export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null }) {
+  if (itens.length === 0) return 'Some ao menos um item'
+  if (passo !== 'entrega') return null
+  if (!pedido?.janela) return 'Escolha a janela de entrega'
+  if (!pedido?.meio) return 'Escolha a forma de pagamento'
+  if (entrega !== 'retirada' && faltaEndereco(erroSimulacao)) return 'Falta o endereço de entrega'
+  return null
+}
+
+// #2944 (E1-03): faixa fixa do rodapé da janela, em todos os passos. `total` já vem formatado.
+export function textoDaFaixa(itens, total) {
+  const qtd = (itens ?? []).reduce((soma, l) => soma + (l.qtd ?? 0), 0)
+  if (qtd === 0) return 'Nenhum item ainda'
+  return `${qtd} ${qtd === 1 ? 'item' : 'itens'} · ${total}`
+}
