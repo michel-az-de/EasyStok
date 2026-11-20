@@ -26,11 +26,11 @@
 .ordenar:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .lista td small { display: block; margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-micro); }
 .clicavel { cursor: pointer; }
-.clicavel:hover td { background: var(--elevado); }
+.clicavel:hover td, .clicavel:focus-within td { background: var(--elevado); }
 .identidade { display: flex; gap: var(--e-3); align-items: center; }
 .icone { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: var(--r-1); background: var(--preenchimento); color: var(--marca-forte); }
 .acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
-.lista .acoes button { white-space: nowrap; }
+@media (min-width: 701px) { .lista .acoes button { white-space: nowrap; } }
 /* #2476 (U6): situação sem ação pendente é texto, não pílula (Pilula.module.css). */
 .situacao { color: var(--tinta-2); font-size: var(--t-apoio); }
 .rodape { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--e-3); padding: var(--e-3) var(--e-4); border-top: 1px solid var(--linha); color: var(--tinta-2); font-size: var(--t-micro); }
@@ -129,7 +129,7 @@
 .identidadeCliente > div { flex: 1; min-width: 0; display: grid; gap: var(--e-1); justify-items: start; }
 .identidadeCliente strong { font-size: var(--t-titulo); overflow-wrap: anywhere; }
 .quadroCliente { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-3); margin: 0; padding: var(--e-3); background: var(--elevado); border-radius: var(--r-2); }
-.quadroCliente > div { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
+.quadroCliente > div { display: flex; flex-direction: column-reverse; gap: var(--e-1); min-width: 0; }
 .quadroCliente dd { margin: 0; font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700; font-variant-numeric: tabular-nums; }
 .quadroCliente dt { font-size: var(--t-apoio); color: var(--tinta-2); }
 .contatoCliente { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3) var(--e-4); margin: 0; }

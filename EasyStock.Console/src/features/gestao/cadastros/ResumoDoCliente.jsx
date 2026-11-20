@@ -21,6 +21,7 @@ export function ResumoDoCliente({ dados, relacionamento, carregando, editando, a
   const fotoUrl = relacionamento ? relacionamento.fotoUrl ?? null : dados.fotoUrl ?? dados.detalhe?.fotoUrl ?? null
   const foto = useFotoCliente(fotoUrl)
   const [ocupado, ocupar] = useState(null)
+  const [removendoFoto, removerFoto] = useState(false)
   const [erro, falhar] = useState(null)
   const arquivo = useRef(null)
   const situacao = situacaoDaLinha('clientes', dados, false)
@@ -53,14 +54,19 @@ export function ResumoDoCliente({ dados, relacionamento, carregando, editando, a
         <input ref={arquivo} type="file" hidden accept="image/jpeg,image/png,image/webp" aria-label="Foto do cliente"
           onChange={(e) => { const escolhido = e.target.files?.[0]; e.target.value = ''; if (escolhido) mudarFoto(escolhido) }} />
         <Botao variante="texto" icone="camera" disabled={Boolean(ocupado)} onClick={() => arquivo.current?.click()}>{ocupado === 'foto' ? 'Salvando foto…' : fotoUrl ? 'Trocar foto' : 'Adicionar foto'}</Botao>
-        {fotoUrl && <Botao variante="texto" disabled={Boolean(ocupado)} onClick={() => mudarFoto()}>Remover foto</Botao>}
+        {fotoUrl && (removendoFoto
+          ? <>
+            <Botao variante="perigo" disabled={Boolean(ocupado)} onClick={() => { removerFoto(false); mudarFoto() }}>Confirmar remoção da foto</Botao>
+            <Botao variante="texto" onClick={() => removerFoto(false)}>Manter foto</Botao>
+          </>
+          : <Botao variante="texto" disabled={Boolean(ocupado)} onClick={() => removerFoto(true)}>Remover foto</Botao>)}
       </>}
       <Botao variante="texto" icone="download" disabled={Boolean(ocupado)} onClick={baixar}>{ocupado === 'pdf' ? 'Preparando PDF…' : 'Baixar PDF'}</Botao>
     </div>
     {(erro || foto.erro) && <p role="alert" className={css.erro}>{erro || foto.erro}</p>}
     {carregando && <p role="status" className={css.legenda}>Carregando os números do cliente…</p>}
     {quadro.length > 0 && <dl className={css.quadroCliente} aria-label="Números do cliente">
-      {quadro.map(n => <div key={n.rotulo}><dd>{n.valor}</dd><dt>{n.rotulo}</dt></div>)}
+      {quadro.map(n => <div key={n.rotulo}><dt>{n.rotulo}</dt><dd>{n.valor}</dd></div>)}
     </dl>}
     {!editando && <dl className={css.contatoCliente} aria-label="Dados de contato">
       {dadosDeContato(dados).map(d => <div key={d.rotulo}><dt>{d.rotulo}</dt><dd className={d.valor ? undefined : css.naoInformado}>{d.valor ?? 'Não informado'}</dd></div>)}
