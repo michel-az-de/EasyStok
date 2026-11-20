@@ -22,7 +22,11 @@ export const casosApi = {
   // `lidaEm`: id da conversa -> instante em que saiu a leitura do resumo dela (console-08).
   [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas, semMensagens, lidaEm }) => {
     const locais = new Map(estado.conversas.map((c) => [c.id, c]))
-    const lidas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c, semMensagens?.includes(c.id), lidaEm?.[c.id]))
+    const doServidor = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c, semMensagens?.includes(c.id), lidaEm?.[c.id]))
+    // #2921: a conversa da janela "Novo pedido" não está na fila (o servidor a esconde até a cliente escrever);
+    // a volta de 5 s não pode descartá-la com a montagem dentro.
+    const daJanela = locais.get(estado.janelaDoPedido?.conversaId)
+    const lidas = daJanela && !doServidor.some((c) => c.id === daJanela.id) ? [...doServidor, daJanela] : doServidor
     const mescladas = mesmaLista(estado.conversas, lidas) ? estado.conversas : lidas
     const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
     // #2005 (console-07): "Chamar no WhatsApp" seleciona a conversa nova antes de a lista conhecê-la. A volta que
@@ -45,6 +49,9 @@ export const casosApi = {
       && automaticoPausado === estado.automaticoPausado && sincronizacao === estado.sincronizacao) return estado
     return { ...estado, conversas: mescladas, selecionadaId, selecaoPendente, automaticoPausado, sincronizacao }
   },
+
+  [acao.ABRIR_JANELA_DO_PEDIDO]: (estado, { janela }) => ({ ...estado, janelaDoPedido: janela }),
+  [acao.FECHAR_JANELA_DO_PEDIDO]: (estado) => (estado.janelaDoPedido ? { ...estado, janelaDoPedido: null } : estado),
 
   // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
   // #2185 (F4): o cadastro é um só. Bloqueio, nome e notas lidos numa conversa valem em todas as do mesmo

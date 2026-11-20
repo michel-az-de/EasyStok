@@ -3,6 +3,7 @@ import {
   closestCenter, DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
+import { NovoPedidoJanela } from './NovoPedidoJanela'
 import { anunciarAberturaDeConversa, destinoDoNovoPedido, useAoAbrirConversa, VALIDADE_DO_NOVO_PEDIDO_MS } from '../aplicacao/aberturaDeConversa'
 import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
 import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicacao/rascunhosDosAjustes'
@@ -556,6 +557,7 @@ function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComa
       <LimparAvisoAoNavegar />
       <AvisosDoDispositivo visitaSoNaMemoria={visitaSoNaMemoria}><TelaDaRota rota={rota} /></AvisosDoDispositivo>
       {permite('atendimento') && <PilhaDeAvisos />}
+      <NovoPedidoJanela />
     </AtendimentoProvider>
   )
 }

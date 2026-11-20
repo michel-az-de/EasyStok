@@ -71,7 +71,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   }
   const soLeads = tela === 'clientes' && tipo === 'sem-cadastro'
   // #2871: aberto o pedido no Atendimento, a ficha fecha; voltar a Clientes não a reabre como rascunho.
-  const novoPedido = useNovoPedidoDoCliente({ aoAbrir: (id) => { pedirCelular(null); definir({ editor: null }); aoFixarContexto(false); aoAbrirConversa?.(id) } })
+  const novoPedido = useNovoPedidoDoCliente({ aoAbrir: () => { pedirCelular(null) } })
   const podeNovoPedido = tela === 'clientes' && !soLeads && novoPedido.disponivel
   // #2930: cliente sem telefone pede o celular antes de abrir o pedido, em vez de parar no erro do topo.
   const [celularDe, pedirCelular] = useState(null)

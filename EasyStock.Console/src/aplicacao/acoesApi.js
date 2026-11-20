@@ -180,6 +180,16 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       }),
     // #2871: só no modo API; sem a ação (demonstração) o "Novo pedido" do cliente não aparece.
     abrirConversaDoCliente,
+    // #2921: a janela "Novo pedido" prepara a conversa SEM selecioná-la (nada de hash nem anúncio): entra no estado
+    // para guardar a montagem, fica fora da fila e a volta de 5 s a retém enquanto a janela estiver aberta.
+    abrirJanelaDoPedido: (resumo, { clienteId, nome } = {}) => {
+      if (!estadoRef.current.conversas.some((c) => c.id === resumo.id)) {
+        const encontrada = conversaDaApi(resumo, null, lerSessao()?.usuario)
+        despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [...estadoRef.current.conversas, encontrada], semMensagens: [resumo.id] })
+      }
+      despachar({ tipo: acao.ABRIR_JANELA_DO_PEDIDO, janela: { conversaId: resumo.id, clienteId: clienteId ?? resumo.clienteId ?? null, nome: nome ?? resumo.nome ?? '' } })
+    },
+    fecharJanelaDoPedido: () => despachar({ tipo: acao.FECHAR_JANELA_DO_PEDIDO }),
     // S59: painel "Não entregues", direto da API (não passa pelo reducer).
     listarNaoEntregues: () => listarNaoEntregues().then((linhas) => (linhas ?? []).map(naoEntregueDaApi)),
     selecionar: (id, resumoEncontrado = null) => {
