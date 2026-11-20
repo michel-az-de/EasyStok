@@ -49,6 +49,8 @@ VPS_HOST="${VPS_HOST:-hostinger}"
 STACK_DIR="${STACK_DIR:-/opt/stacks/easystok}"
 BUILD_ROOT="${BUILD_ROOT:-/home/felipe/build}"
 BACKUP_DIR="${BACKUP_DIR:-/home/felipe/backups}"
+# E3 (#2977, ADR-0068): o dump pre-deploy tambem vai para o restic, em segundo plano.
+BACKUP_HOOK="${BACKUP_HOOK:-/home/felipe/backup-restic/backup.sh}"
 DB_CONTAINER="${DB_CONTAINER:-shared-postgres}"
 DB_NAME="${DB_NAME:-easystock}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
@@ -111,6 +113,12 @@ mkdir -p "$BACKUP_DIR"
 DUMP="$BACKUP_DIR/$DB_NAME-predeploy-$TS.dump"
 docker exec "$DB_CONTAINER" pg_dump -U postgres -Fc "$DB_NAME" >"$DUMP"
 [ -s "$DUMP" ] || { echo "ERRO: dump vazio; nada foi trocado nos containers" >&2; exit 5; }
+# Envio ao Drive em segundo plano (setsid): falha ou demora do backup nao segura o deploy;
+# o vigia da estacao acusa a falta do snapshot.
+if [ -x "${BACKUP_HOOK:-}" ]; then
+  setsid "$BACKUP_HOOK" pre-deploy "$DUMP" </dev/null >>"$BUILD_ROOT/backup-predeploy.log" 2>&1 &
+  echo "    dump enviado ao backup em segundo plano"
+fi
 
 echo "==> [4/6] guarda :vps como vps-prev-$TS e promove vps-$SHA"
 for s in $SERVICES; do
@@ -258,6 +266,7 @@ fi
 
 ENVS="SHA=$SHA SHA_FULL=$SHA_FULL TS=$TS STACK_DIR=$STACK_DIR BUILD_ROOT=$BUILD_ROOT"
 ENVS="$ENVS BACKUP_DIR=$BACKUP_DIR DB_CONTAINER=$DB_CONTAINER DB_NAME=$DB_NAME"
+ENVS="$ENVS BACKUP_HOOK=$BACKUP_HOOK"
 ENVS="$ENVS HEALTH_TIMEOUT=$HEALTH_TIMEOUT SERVICES='$SERVICES'"
 ENVS="$ENVS RETEM_PREV=$RETEM_PREV CACHE_TETO=$CACHE_TETO"
 ENVS="$ENVS MODO=$MODO QUEM=$(printf '%q' "$QUEM") MOTIVO=$(printf '%q' "$MOTIVO")"

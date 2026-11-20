@@ -1,0 +1,35 @@
+name: Backup scripts
+
+# Testes do backup restic (E3, #2977, ADR-0068): backup.sh contra um postgres:17 descartavel,
+# instalar.sh com as units validadas pelo systemd-analyze e a restauracao da estacao nos 4 itens.
+# Nao toca na VPS nem no Drive: restic e rclone sao falsos ou nem sao chamados.
+on:
+  pull_request:
+    paths:
+      - 'scripts/backup/**'
+      - 'scripts/deploy/vps-deploy*.sh'
+      - '.github/workflows/backup-scripts.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-scripts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: Testes do backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: backup.sh
+        run: bash scripts/backup/backup.test.sh
+      - name: instalar.sh e units
+        run: bash scripts/backup/instalar.test.sh
+      - name: estacao (restauracao dos 4 itens)
+        shell: pwsh
+        run: ./scripts/backup/estacao/estacao.test.ps1
+      - name: gancho no vps-deploy.sh
+        run: bash scripts/deploy/vps-deploy.test.sh
