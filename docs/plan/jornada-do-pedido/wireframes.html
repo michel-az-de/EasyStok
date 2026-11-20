@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1200">
+<title>Wireframes do console EasyStok</title>
+<style>
+  :root{--am:#b45309;--amf:#fff7ed;--tx:#1f1f1f;--bd:#555;--cz:#e8e8e8;--cz2:#f4f4f4}
+  *{box-sizing:border-box}
+  html{font-size:16px}
+  body{margin:0;background:#d9d9d9;color:var(--tx);font:16px/1.5 "Segoe UI",system-ui,Arial,sans-serif}
+  small,sub,sup{font-size:16px}
+  .pagina{width:1200px;margin:0 auto;padding:32px 0 64px}
+  h1{font-size:34px;line-height:1.2;margin:0 0 8px}
+  h2{font-size:26px;line-height:1.25;margin:0 0 6px}
+  h3{font-size:18px;margin:0 0 8px}
+  p{margin:0 0 8px}
+  .intro{background:#fff;border:2px solid var(--bd);border-radius:6px;padding:18px 22px;margin:16px 0 8px}
+  .leg{display:flex;gap:28px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .tela{background:#f1f1f1;border:2px solid var(--bd);border-radius:8px;padding:24px;margin:36px 0}
+  .tela>.sub{margin:0 0 18px;max-width:1000px}
+  .num{display:inline-block;background:var(--tx);color:#fff;border-radius:4px;padding:0 10px;margin-right:10px;font-size:22px}
+  .par{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .lado>.rot{font-weight:700;letter-spacing:.06em;margin-bottom:8px}
+  .rot.a{color:#444}
+  .rot.d{color:var(--am)}
+  .wf{border:2px solid var(--bd);background:#fff;border-radius:6px;padding:14px}
+  .wf.dep{border-color:var(--bd)}
+  .mod{border:2px solid var(--bd);border-radius:6px;background:#fff}
+  .mod .topo{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--bd);padding:10px 14px;font-weight:700;background:var(--cz2)}
+  .mod .corpo{padding:14px}
+  .mod .pe{border-top:2px solid var(--bd);padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;background:var(--cz2)}
+  .passos{display:flex;gap:6px;margin-bottom:12px}
+  .passos span{flex:1;text-align:center;border:2px solid var(--bd);border-radius:4px;padding:4px 6px;background:#fff}
+  .passos span.at{background:var(--bd);color:#fff;font-weight:700}
+  .btn{display:inline-block;border:2px solid var(--bd);border-radius:4px;padding:6px 12px;background:var(--cz);white-space:nowrap}
+  .btn.pri{background:var(--bd);color:#fff;font-weight:700}
+  .btn.off{border-style:dashed;color:#6b6b6b;background:var(--cz2)}
+  .campo{border:2px solid var(--bd);border-radius:4px;padding:6px 10px;background:#fff;color:#555;min-height:38px}
+  .rotulo{font-weight:700;margin:10px 0 4px}
+  .nota{color:#555;font-style:italic}
+  .mud{border-color:var(--am)!important;background:var(--amf)!important;color:var(--tx)!important}
+  .btn.mud.pri{background:var(--am)!important;color:#fff!important}
+  .btn.mud.off{color:#6b3a0c!important}
+  .m{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--am);color:#fff;font-weight:700;font-size:16px;line-height:1;margin-right:6px;vertical-align:middle;flex:none}
+  .tag{display:inline-block;border:2px solid var(--am);color:var(--am);border-radius:12px;padding:0 10px;font-weight:700;background:#fff}
+  .tagc{display:inline-block;border:2px solid var(--bd);color:#444;border-radius:12px;padding:0 10px;background:var(--cz)}
+  table{border-collapse:collapse;width:100%;background:#fff}
+  th,td{border:2px solid var(--bd);padding:8px 12px;text-align:left;vertical-align:top}
+  th{background:var(--cz)}
+  .linha{display:flex;justify-content:space-between;align-items:center;gap:10px;border:2px solid var(--bd);border-radius:4px;padding:8px 12px;margin-bottom:8px;background:#fff}
+  .linha .tt{font-weight:700}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+  .card{background:#fff;border:2px solid var(--bd);border-left:8px solid var(--am);border-radius:6px;padding:14px 16px}
+  .card h3{display:flex;align-items:center;font-size:18px}
+  .card p{margin-bottom:6px}
+  .card b{color:#111}
+  .mm{background:#fff;border:2px solid var(--bd);border-radius:6px;padding:10px;overflow:hidden}
+  .mm .mermaid{text-align:center}
+  .estado{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .estado span{border:2px solid var(--bd);border-radius:14px;padding:0 10px;background:#fff}
+  .estado span.at{background:var(--bd);color:#fff;font-weight:700}
+  .estado span.mud.at{background:var(--am)!important;color:#fff!important}
+  .alerta{border:2px solid var(--bd);border-radius:4px;padding:8px 12px;background:var(--cz2);margin:8px 0}
+  .alerta.mud{background:var(--amf)}
+  .rodape{margin-top:36px}
+  .fase h3{margin-top:0}
+</style>
+</head>
+<body>
+<div class="pagina">
+
+<h1>Console EasyStok: wireframes das melhorias</h1>
+<p>Antes e depois de 7 telas do console web, para uma loja pequena de massas: vender, atender pelo WhatsApp e cobrar. Dados fictícios (Maria, (11) 9xxxx-0000).</p>
+
+<div class="intro">
+  <h3>Como ler</h3>
+  <div class="leg">
+    <span><span class="tagc">cinza</span> estado atual, lido no código e nas auditorias de 2026-11-19</span>
+    <span><span class="m">1</span> <span class="tag">âmbar</span> mudança proposta, com cartão de justificativa abaixo</span>
+  </div>
+  <p style="margin-top:10px">Fontes: auditoria de UX, de copy e da banca, mais <code>NovoPedidoJanela.jsx</code>, <code>fichaCliente.js</code>, <code>ModalHistorico.jsx</code> e <code>nomeDoContato.js</code>. Nada aqui foi validado em produção: a janela do Novo pedido ainda não foi usada em produção (prova local apenas). Onde uma decisão é inferência, o cartão diz.</p>
+</div>
+
+<!-- ============ TELA 1 ============ -->
+<section class="tela">
+  <h2><span class="num">1</span>Navegação geral: onde o pedido nasce</h2>
+  <p class="sub">O pedido deixa de nascer como "Comanda 21" dentro do Atendimento e passa a nascer numa janela aberta sobre a tela em que a lojista já está.</p>
+  <div class="par">
+    <div class="lado">
+      <div class="rot a">ANTES</div>
+      <div class="mm"><pre class="mermaid">
+flowchart TD
+  I["Início"] --> C["Clientes"]
+  C --> F["Ficha"]
+  F -->|"Novo pedido: troca de tela"| A["Atendimento"]
+  A --> N["Comanda 21 nasce aqui"]
+  N --> P["Pedidos"]
+  classDef nasce stroke:#222,stroke-width:4px,stroke-dasharray:6 4,fill:#fff,color:#1f1f1f
+  class N nasce
+      </pre></div>
+    </div>
+    <div class="lado">
+      <div class="rot d">DEPOIS</div>
+      <div class="mm"><pre class="mermaid">
+flowchart TD
+  I["Início"] --> C["Clientes"]
+  C --> F["Ficha"]
+  F -->|"Novo pedido"| J["Janela Novo pedido: o pedido nasce aqui"]
+  C -->|"Novo pedido"| J
+  P["Pedidos"] -->|"Novo pedido"| J
+  J -->|"registra"| P
+  J -.->|"conversa assumida, visível na fila"| A["Atendimento"]
+  classDef mud stroke:#b45309,stroke-width:4px,fill:#fff7ed,color:#1f1f1f
+  class J mud
+      </pre></div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="m">1</span>O pedido nasce na janela, de qualquer entrada</h3>
+      <p><b>Problema.</b> Pedido via Atendimento (conversa de WhatsApp, "Comanda 21") foi apontado como "confuso" por Felipe. Auditoria de UX: severidade 3, falhas H2, H3 e H4.</p>
+      <p><b>Princípio.</b> H3 (controle e liberdade), H7 (eficiência) e Fitts: menos cliques até a tarefa principal.</p>
+      <p><b>Decisão.</b> Janela sobre Pedidos, Clientes, Ficha e Balcão (#2940, no master; prova local nas 4 entradas, produção ainda não validada).</p>
+      <p><b>Por que não a alternativa.</b> Manter o Atendimento como porta única obriga a trocar de tela e criar conversa só para vender.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">2</span>Atendimento recebe a conversa, não é passagem obrigatória</h3>
+      <p><b>Problema.</b> Atendimento misturava conversar e montar pedido. A conversa criada pela equipe precisa continuar visível (<code>selecaoRetida</code>, achado Alto já corrigido).</p>
+      <p><b>Princípio.</b> H2 (correspondência com o mundo real): conversa é conversa, pedido é pedido.</p>
+      <p><b>Decisão.</b> A janela assume a conversa e ela aparece na fila; a lojista acompanha e responde ali.</p>
+      <p><b>Por que não a alternativa.</b> Tirar o Atendimento da navegação: é onde se responde a cliente e se acompanha o preparo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELA 2 ============ -->
+<section class="tela">
+  <h2><span class="num">2</span>Lista de Clientes: quem não tem nome</h2>
+  <p class="sub">Hoje a API grava "Cliente WhatsApp" quando o contato não tem nome de perfil. Esse texto ocupa o lugar do título e parece o nome de uma pessoa.</p>
+  <div class="par">
+    <div class="lado">
+      <div class="rot a">ANTES</div>
+      <div class="wf">
+        <div class="rotulo" style="margin-top:0">Clientes</div>
+        <div class="linha"><div><div class="tt">Maria Alves</div><div>(11) 9xxxx-0000</div></div><span class="tagc">3 pedidos</span></div>
+        <div class="linha"><div><div class="tt">Cliente WhatsApp</div><div>(11) 9xxxx-0001</div></div><span class="tagc">Nenhum pedido ainda</span></div>
+        <div class="linha"><div><div class="tt">Cliente WhatsApp</div><div>(11) 9xxxx-0002</div></div><span class="tagc">Nenhum pedido ainda</span></div>
+        <p class="nota">Duas linhas com o mesmo título: não dá para distinguir sem ler o número.</p>
+      </div>
+    </div>
+    <div class="lado">
+      <div class="rot d">DEPOIS</div>
+      <div class="wf dep">
+        <div class="rotulo" style="margin-top:0">Clientes</div>
+        <div class="linha"><div><div class="tt">Maria Alves</div><div>(11) 9xxxx-0000</div></div><span class="tagc">3 pedidos</span></div>
+        <div class="linha"><div><div class="tt mud" style="border:2px solid;padding:0 6px;display:inline-block"><span class="m">1</span>(11) 9xxxx-0001</div> <span class="tag"><span class="m" style="width:22px;height:22px">2</span>sem nome</span></div><span class="btn mud"><span class="m">3</span>Dar nome</span></div>
+        <div class="linha"><div><div class="tt mud" style="border:2px solid;padding:0 6px;display:inline-block">(11) 9xxxx-0002</div> <span class="tag">sem nome</span></div><span class="btn mud">Dar nome</span></div>
+        <p class="nota">O título passa a ser o dado que identifica a pessoa de fato: o número.</p>
+      </div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="m">1</span>Telefone como título</h3>
+      <p><b>Problema.</b> "Cliente WhatsApp" não é nome de ninguém: o código já diz isso em <code>nomeDoContato.js</code> (#2276) e a API o grava como padrão (#1643). Evidência de código, não das três auditorias.</p>
+      <p><b>Princípio.</b> H2 e H6: mostrar o que a lojista reconhece (o número que ela vê no WhatsApp), não um texto genérico.</p>
+      <p><b>Decisão.</b> O celular vira o título enquanto não houver nome.</p>
+      <p><b>Por que não a alternativa.</b> Esconder esses contatos da lista: some gente que já escreveu para a loja.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">2</span>Selo "sem nome"</h3>
+      <p><b>Problema.</b> Sem sinal, a lista parece completa. Quem não tem nome precisa ser distinguível de relance.</p>
+      <p><b>Princípio.</b> H1 (visibilidade do estado do sistema).</p>
+      <p><b>Decisão.</b> Selo ao lado do número, no mesmo estilo dos outros selos.</p>
+      <p><b>Por que não a alternativa.</b> Só trocar o título: sem selo, parece que o número é o nome cadastrado.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">3</span>Ação "Dar nome"</h3>
+      <p><b>Problema.</b> Hoje não há caminho da lista até corrigir o nome; o defeito aparece e não oferece saída.</p>
+      <p><b>Princípio.</b> H9 (ajudar a recuperar) e Fitts: a ação fica na própria linha.</p>
+      <p><b>Decisão.</b> Botão na linha que abre o campo de nome. A confirmar no código se reaproveita a edição de cadastro existente (inferência).</p>
+      <p><b>Por que não a alternativa.</b> Exigir o nome ao criar o contato: o WhatsApp entrega o contato sem nome, não há como obrigar.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELA 3 ============ -->
+<section class="tela">
+  <h2><span class="num">3</span>Ficha do cliente: vazio com saída e celular com motivo</h2>
+  <p class="sub">Um cliente sem pedidos é o melhor momento para oferecer o primeiro pedido. Hoje o vazio só informa.</p>
+  <div class="par">
+    <div class="lado">
+      <div class="rot a">ANTES</div>
+      <div class="wf">
+        <div class="tt" style="font-size:20px;font-weight:700">Maria Alves</div>
+        <div class="rotulo">Telefone</div>
+        <div class="campo">(11) 9xxxx-0000</div>
+        <div class="rotulo">Pedidos</div>
+        <div class="wf" style="border-style:dashed;text-align:center;padding:22px">
+          <div class="tt" style="font-weight:700">Nenhum pedido ainda</div>
+          <div>Primeira vez na casa.</div>
+        </div>
+        <p class="nota" style="margin-top:8px">O botão Novo pedido fica só no topo, longe do vazio.</p>
+      </div>
+    </div>
+    <div class="lado">
+      <div class="rot d">DEPOIS</div>
+      <div class="wf dep">
+        <div class="tt" style="font-size:20px;font-weight:700">Maria Alves</div>
+        <div class="rotulo"><span class="m">2</span>Celular (com DDD)</div>
+        <div class="campo mud">(11) 9xxxx-0000</div>
+        <div class="mud" style="border:2px solid;border-radius:4px;padding:2px 8px;margin-top:6px">Usado para enviar o resumo do pedido no WhatsApp.</div>
+        <div class="rotulo">Pedidos</div>
+        <div class="wf" style="border-style:dashed;text-align:center;padding:22px">
+          <div class="tt" style="font-weight:700">Nenhum pedido ainda. Use Novo pedido para começar.</div>
+          <div style="margin-top:10px"><span class="btn pri mud"><span class="m">1</span>Novo pedido</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="m">1</span>Botão primário Novo pedido no vazio</h3>
+      <p><b>Problema.</b> "Nenhum pedido ainda" é um vazio sem próximo passo (auditoria de copy). Antes, o clique em Novo pedido sem celular não fazia nada: 6 cliques em 3 s recusados em produção, severidade 4 (corrigido na #2932).</p>
+      <p><b>Princípio.</b> H7 e Fitts: a ação mais provável fica onde o olho já está. Estado vazio é convite, não relatório.</p>
+      <p><b>Decisão.</b> Botão primário dentro do vazio, que abre a janela Novo pedido. O texto passa a "Nenhum pedido ainda. Use Novo pedido para começar."</p>
+      <p><b>Por que não a alternativa.</b> Link de texto: peso visual baixo para a ação principal da tela.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">2</span>Celular com o motivo</h3>
+      <p><b>Problema.</b> Ficha diz "Telefone", Clientes diz "Celular com DDD", e nenhum diz para que serve. 13 de 36 clientes estão sem telefone (inferência da auditoria), e a janela agora pede o número na hora.</p>
+      <p><b>Princípio.</b> H4 (consistência) e H10 (ajuda no ponto da dúvida).</p>
+      <p><b>Decisão.</b> Um rótulo único, "Celular (com DDD)", com a frase do motivo logo abaixo.</p>
+      <p><b>Por que não a alternativa.</b> Tooltip: some no celular e a dúvida surge justamente quando o campo está vazio.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELA 4 ============ -->
+<section class="tela">
+  <h2><span class="num">4</span>Novo pedido, passo Entrega: modo, endereço e motivo do bloqueio</h2>
+  <p class="sub">No código, o modo é fixo (<code>const entrega = 'entrega'</code>) e o endereço é um único campo de texto. O botão Continuar trava sem dizer por quê, ao lado dele.</p>
+  <div class="par">
+    <div class="lado">
+      <div class="rot a">ANTES</div>
+      <div class="mod">
+        <div class="topo"><span>Novo pedido de Maria</span><span>X</span></div>
+        <div class="corpo">
+          <div class="passos"><span>Itens</span><span class="at">Entrega e pagamento</span><span>Revisar</span></div>
+          <div class="rotulo" style="margin-top:0">Janela de entrega</div>
+          <div class="campo">Hoje, 18h às 20h</div>
+          <div class="rotulo">Endereço de entrega</div>
+          <div class="campo">&nbsp;</div>
+          <div style="margin-top:8px"><span class="btn off">Cadastrar endereço</span></div>
+          <div class="rotulo">Forma de pagamento</div>
+          <div class="estado" style="margin-top:0"><span>Pix</span><span>Cartão</span><span>Dinheiro</span></div>
+        </div>
+        <div class="pe"><span class="btn" style="border:none;background:none;text-decoration:underline">Descartar rascunho</span><span class="btn">Voltar</span><span class="btn pri off" style="background:#9a9a9a;color:#fff">Continuar</span></div>
+      </div>
+    </div>
+    <div class="lado">
+      <div class="rot d">DEPOIS</div>
+      <div class="mod">
+        <div class="topo"><span>Novo pedido de Maria</span><span>X</span></div>
+        <div class="corpo">
+          <div class="passos"><span>Itens</span><span class="at">Entrega e pagamento</span><span>Revisar</span></div>
+          <div class="rotulo" style="margin-top:0"><span class="m">1</span>Como Maria recebe?</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <span class="btn mud pri">Entrega</span>
+            <span class="btn mud off">Retirada no balcão</span>
+          </div>
+          <div style="margin-top:6px"><span class="tag">fase 2, exige API</span></div>
+          <div class="rotulo">Horário de entrega</div>
+          <div class="campo">Hoje, 18h às 20h</div>
+          <div class="rotulo"><span class="m">2</span>Endereço de entrega</div>
+          <div class="mud" style="border:2px solid;border-radius:4px;padding:8px 12px">
+            <div>( ) Rua das Flores, 120, Centro <span class="tagc">padrão</span></div>
+            <div>( ) Av. Brasil, 45, apto 2</div>
+            <div>(●) <b>Outro endereço</b></div>
+            <div class="campo" style="margin:6px 0">&nbsp;</div>
+            <span class="btn off">Cadastrar endereço</span>
+          </div>
+          <div class="rotulo">Forma de pagamento</div>
+          <div class="estado" style="margin-top:0"><span>Pix</span><span>Cartão</span><span>Dinheiro</span></div>
+        </div>
+        <div class="pe"><span class="btn" style="border:none;background:none;text-decoration:underline">Descartar rascunho</span><span class="btn">Voltar</span><span class="m">3</span><span class="mud" style="border:2px solid;border-radius:4px;padding:2px 8px;font-weight:700">Falta o endereço de entrega</span><span class="btn pri off" style="background:#9a9a9a;color:#fff">Continuar</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="m">1</span>Escolha Entrega ou Retirada no balcão</h3>
+      <p><b>Problema.</b> Sem retirada, só entrega: a API só aceita entrega e a busca no código não achou retirada na janela (UX, severidade 3). Loja pequena tem balcão.</p>
+      <p><b>Princípio.</b> H2 e H7: o sistema fala o modelo da loja e atende o caminho mais curto.</p>
+      <p><b>Decisão.</b> Dois botões lado a lado. Retirada aparece desativada e marcada "fase 2, exige API", para a lojista ver que está planejada e não achar que é defeito.</p>
+      <p><b>Por que não a alternativa.</b> Esconder Retirada até a API existir: a lacuna fica invisível e o pedido de balcão segue saindo do fluxo.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">2</span>Lista de endereços com "Outro endereço"</h3>
+      <p><b>Problema.</b> Só vale o endereço padrão do cadastro; cliente com 2 endereços não é atendido (severidade 2). A banca confirma: <code>EnderecoId</code> não existe na API e não há issue.</p>
+      <p><b>Princípio.</b> H6: reconhecer opções é mais barato que digitar de novo. H3: o padrão não vira prisão.</p>
+      <p><b>Decisão.</b> Rádios com os endereços da cliente e "Outro endereço" que abre o campo atual de cadastro.</p>
+      <p><b>Por que não a alternativa.</b> Menu suspenso: esconde as opções e piora para 2 ou 3 endereços, que é o caso comum.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">3</span>Motivo ao lado do Continuar</h3>
+      <p><b>Problema.</b> "Continuar" travado sem endereço, sem motivo ao lado (auditoria de copy). O texto de erro existe no passo, mas longe do botão; padrão do agente: corrige o clique morto, não a regra "toda ação sem efeito explica o porquê".</p>
+      <p><b>Princípio.</b> H1 e H9: botão desativado precisa dizer a causa onde o olho está.</p>
+      <p><b>Decisão.</b> Frase "Falta o endereço de entrega" encostada no botão. A regra vale para todo botão desabilitado (item "Alto" da lista de melhorias).</p>
+      <p><b>Por que não a alternativa.</b> Habilitar o botão e errar depois: o 409 só aparece ao Registrar, tarde demais.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELA 5 ============ -->
+<section class="tela">
+  <h2><span class="num">5</span>Novo pedido, passo Revisar: um verbo para cada ato</h2>
+  <p class="sub">A copy usa 4 rótulos para o mesmo passo (Gerar cobrança e enviar, Confirmar e gerar, Confirmar e enviar, Gerar e enviar) e um "Registrar" sem objeto.</p>
+  <div class="par">
+    <div class="lado">
+      <div class="rot a">ANTES</div>
+      <div class="mod">
+        <div class="topo"><span>Novo pedido de Maria</span><span>X</span></div>
+        <div class="corpo">
+          <div class="passos"><span>Itens</span><span>Entrega e pagamento</span><span class="at">Revisar</span></div>
+          <div class="linha"><span>2x Lasanha bolonhesa</span></div>
+          <div class="linha"><span>1x Molho sugo</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Frete</span><span>R$ 8,00</span></div>
+          <div style="display:flex;justify-content:space-between;font-weight:700"><span>Total</span><span>R$ 68,00</span></div>
+          <div class="alerta">Janela fechada: o resumo sai pelo modelo aprovado do WhatsApp.</div>
+          <div>[x] Vamos enviar o resumo para Maria no WhatsApp</div>
+        </div>
+        <div class="pe"><span class="btn" style="border:none;background:none;text-decoration:underline">Descartar rascunho</span><span class="btn">Voltar</span><span class="btn pri">Registrar</span></div>
+      </div>
+    </div>
+    <div class="lado">
+      <div class="rot d">DEPOIS</div>
+      <div class="mod">
+        <div class="topo"><span>Novo pedido de Maria</span><span>X</span></div>
+        <div class="corpo">
+          <div class="passos"><span>Itens</span><span>Entrega e pagamento</span><span class="at">Revisar</span></div>
+          <div class="linha"><span>2x Lasanha bolonhesa</span></div>
+          <div class="linha"><span>1x Molho sugo</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Frete</span><span>R$ 8,00</span></div>
+          <div style="display:flex;justify-content:space-between;font-weight:700"><span>Total</span><span>R$ 68,00</span></div>
+          <div class="alerta mud" style="border:2px solid"><span class="m">3</span>Maria não escreve há mais de 24 horas. O resumo vai como mensagem padrão do WhatsApp.</div>
+          <div class="alerta mud" style="border:2px solid"><span class="m">4</span>Depois do clique: "Enviando o resumo. Se não chegar, avisamos aqui."</div>
+        </div>
+        <div class="pe"><span class="btn" style="border:none;background:none;text-decoration:underline">Descartar rascunho</span><span class="btn">Voltar</span><span class="m">2</span><span class="btn mud">Registrar pedido</span><span class="m">1</span><span class="btn pri mud">Enviar cobrança</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="m">1</span>Um rótulo só: "Enviar cobrança"</h3>
+      <p><b>Problema.</b> Quatro rótulos para o mesmo passo e o 1º clique de "Gerar cobrança" só abria uma confirmação: parecia falha (copy e UX, severidade 2).</p>
+      <p><b>Princípio.</b> H4 (consistência) e H2: cada verbo faz o que diz. No glossário, Gerar cria o link, Enviar manda ao cliente.</p>
+      <p><b>Decisão.</b> "Enviar cobrança" é o botão primário e age no primeiro clique; a tela Revisar já é a confirmação. O Voltar fica ao lado.</p>
+      <p><b>Por que não a alternativa.</b> "Revisar cobrança" e depois "Gerar e enviar": é o passo extra que a auditoria aponta como clique sem retorno visível.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">2</span>"Registrar pedido" com objeto</h3>
+      <p><b>Problema.</b> "Registrar" é genérico, sem objeto, e já fechou a janela sem criar pedido (auditoria de copy).</p>
+      <p><b>Princípio.</b> H2 e H5: a ação que só salva precisa estar separada da que também envia.</p>
+      <p><b>Decisão.</b> Botão secundário "Registrar pedido" salva sem enviar nada. Substitui a caixa "Vamos enviar o resumo", que escondia essa escolha.</p>
+      <p><b>Por que não a alternativa.</b> Manter a caixa: o rótulo do botão não mudaria com ela e a lojista teria de ler o estado para saber o efeito.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">3</span>Prazo de 24 h em língua de loja</h3>
+      <p><b>Problema.</b> "Janela fechada: o resumo sai pelo modelo aprovado do WhatsApp" é jargão (janela, modelo aprovado). Houve regressão real: com a janela fechada o resumo não enviava (#2874, corrigida na #2905).</p>
+      <p><b>Princípio.</b> H2: usar a linguagem do usuário, não a do sistema.</p>
+      <p><b>Decisão.</b> "Maria não escreve há mais de 24 horas. O resumo vai como mensagem padrão do WhatsApp." Mesmo texto em BarraProximoPasso e BlocoPedido.</p>
+      <p><b>Por que não a alternativa.</b> Esconder o aviso: a lojista não saberia por que a mensagem chega com outro formato.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">4</span>Resposta honesta depois do clique</h3>
+      <p><b>Problema.</b> "Sai em instantes" promete um envio que pode falhar (era o achado Major M1 da revisão).</p>
+      <p><b>Princípio.</b> H1: dizer o estado real, não o desejado.</p>
+      <p><b>Decisão.</b> "Enviando o resumo. Se não chegar, avisamos aqui." A falha cai no aviso da fila (#2883).</p>
+      <p><b>Por que não a alternativa.</b> Confirmar "Enviado" no clique: o envio é assíncrono e ainda não aconteceu.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELA 6 ============ -->
+<section class="tela">
+  <h2><span class="num">6</span>Atendimento, item da fila: quem pediu e em que pé está</h2>
+  <p class="sub">A fila mostra um número interno, um estado que pode ser falso e status com nomes diferentes de tela para tela.</p>
+  <div class="par">
+    <div class="lado">
+      <div class="rot a">ANTES</div>
+      <div class="wf">
+        <div class="linha" style="display:block">
+          <div class="tt">Comanda 21</div>
+          <div>Assistente respondendo</div>
+          <div class="estado"><span class="at">Preparando</span><span>Pronto</span><span>Saiu</span><span>Entregue</span></div>
+          <div class="alerta" style="margin-bottom:0">Atendimento precisa de você</div>
+        </div>
+        <p class="nota">Com a IA desligada, a conversa criada pela equipe aparecia como "Assistente respondendo".</p>
+      </div>
+    </div>
+    <div class="lado">
+      <div class="rot d">DEPOIS</div>
+      <div class="wf dep">
+        <div class="linha" style="display:block">
+          <div class="tt mud" style="border:2px solid;padding:0 6px;display:inline-block"><span class="m">1</span>Pedido de Maria</div>
+          <div class="mud" style="border:2px solid;padding:0 6px;display:inline-block;margin-top:4px"><span class="m">2</span>Conversa assumida por você</div>
+          <div class="estado"><span class="mud at"><span class="m" style="margin-left:-6px">3</span>Em preparo</span><span>Pronto</span><span>Saiu para entrega</span><span>Entregue</span></div>
+          <div class="alerta mud" style="margin-bottom:0;border:2px solid"><span class="m">4</span>Maria aguarda resposta</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="m">1</span>"Pedido de Maria" no lugar de "Comanda 21"</h3>
+      <p><b>Problema.</b> "Comanda 21" é número interno no lugar de quem pediu (copy). Resta o rótulo sem "Novo pedido de X" (UX, severidade 3, ação P).</p>
+      <p><b>Princípio.</b> H2: o nome da cliente é o que a lojista guarda na cabeça. Comanda fica como nome interno.</p>
+      <p><b>Decisão.</b> Título "Pedido de Maria", coerente com a janela "Novo pedido de Maria".</p>
+      <p><b>Por que não a alternativa.</b> "Comanda 21 (Maria)": mantém o jargão e o número vence o nome na leitura rápida.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">2</span>Estado honesto da conversa</h3>
+      <p><b>Problema.</b> "Assistente respondendo" com a IA desligada informa o contrário do real (UX, severidade 3, sem PR).</p>
+      <p><b>Princípio.</b> H1: o sistema não pode mentir sobre o estado.</p>
+      <p><b>Decisão.</b> "Conversa assumida por você" quando a equipe criou a conversa; a #2904 já faz a conversa nascer assumida.</p>
+      <p><b>Por que não a alternativa.</b> "IA desligada": descreve o sistema, não o que a lojista deve fazer.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">3</span>Status canônicos</h3>
+      <p><b>Problema.</b> Preparando e Em preparo, Saiu e Saiu para entrega, Pronto e "Seu pedido está pronto": quatro estados com nomes que variam por tela (copy).</p>
+      <p><b>Princípio.</b> H4: um estado, um nome, em toda tela e no aviso ao cliente.</p>
+      <p><b>Decisão.</b> Em preparo, Pronto, Saiu para entrega, Entregue. "Saiu" cortado deixa de existir.</p>
+      <p><b>Por que não a alternativa.</b> Abreviar para caber: o corte já gerou ambiguidade.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">4</span>"Maria aguarda resposta"</h3>
+      <p><b>Problema.</b> "Atendimento precisa de você" é vago: não diz quem nem o quê (copy).</p>
+      <p><b>Princípio.</b> H2 e H10: nome e pendência na mesma frase.</p>
+      <p><b>Decisão.</b> Frase com o nome da cliente.</p>
+      <p><b>Por que não a alternativa.</b> Contador de pendências: soma tudo e não leva a ninguém.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TELA 7 ============ -->
+<section class="tela">
+  <h2><span class="num">7</span>Marcar entregue com saldo a receber</h2>
+  <p class="sub">A API responde 409 <code>SALDO_A_RECEBER</code> quando falta dinheiro. Hoje a saída é um "mesmo assim" que não diz o que se aceita.</p>
+  <div class="par">
+    <div class="lado">
+      <div class="rot a">ANTES</div>
+      <div class="mod">
+        <div class="topo"><span>Marcar entregue</span><span>X</span></div>
+        <div class="corpo">
+          <p>Falta receber R$ 50,00. Recebeu na porta? Diga como...</p>
+          <div class="estado"><span>Pix</span><span>Cartão</span><span>Dinheiro</span></div>
+        </div>
+        <div class="pe"><span class="btn">Cancelar</span><span class="btn pri">Marcar entregue mesmo assim</span></div>
+      </div>
+    </div>
+    <div class="lado">
+      <div class="rot d">DEPOIS</div>
+      <div class="mod">
+        <div class="topo"><span>Marcar entregue</span><span>X</span></div>
+        <div class="corpo">
+          <p class="mud" style="border:2px solid;border-radius:4px;padding:6px 10px"><span class="m">1</span>Falta receber R$ 50,00 deste pedido. Confirme que recebeu na porta ou que vai cobrar depois.</p>
+          <p class="nota">Ao escolher "Recebi agora", pergunta como foi pago: Pix, Cartão ou Dinheiro.</p>
+        </div>
+        <div class="pe"><span class="btn">Voltar</span><span class="m">3</span><span class="btn mud">Entregar e cobrar depois</span><span class="m">2</span><span class="btn pri mud">Recebi agora</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="m">1</span>Texto com fato, valor e as duas saídas</h3>
+      <p><b>Problema.</b> "Falta receber X. Recebeu na porta? Diga como..." (<code>ConteudoEntregasApi.jsx:287</code>) é a copy boa a manter no conceito, mas termina em reticências e não nomeia a segunda saída.</p>
+      <p><b>Princípio.</b> H9: dizer o fato, o valor e a ação em língua de loja.</p>
+      <p><b>Decisão.</b> Frase da auditoria de copy, que já nomeia as duas saídas.</p>
+      <p><b>Por que não a alternativa.</b> Mostrar o código do erro: é detalhe do sistema, sem valor para quem está na porta.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">2</span>"Recebi agora"</h3>
+      <p><b>Problema.</b> A confirmação "mesmo assim" vira rotina (H5) e não registra se o dinheiro entrou. #2916 foi fechada sem mudança porque o print já mostrava o motivo.</p>
+      <p><b>Princípio.</b> H5 (prevenção de erro): cada escolha leva a um estado diferente e verdadeiro.</p>
+      <p><b>Decisão.</b> Botão primário que registra o recebimento e entrega. Reutiliza a escolha de meio de pagamento (a confirmar no código, inferência).</p>
+      <p><b>Por que não a alternativa.</b> Manter um botão único e uma lista de meios: mistura "recebi" com "vou cobrar" no mesmo clique.</p>
+    </div>
+    <div class="card">
+      <h3><span class="m">3</span>"Entregar e cobrar depois"</h3>
+      <p><b>Problema.</b> "Marcar entregue mesmo assim" não diz o que se aceita: o saldo em aberto (copy).</p>
+      <p><b>Princípio.</b> H2 e H5: o rótulo descreve a consequência, não a insistência.</p>
+      <p><b>Decisão.</b> Botão secundário com o efeito no próprio nome; o saldo segue como cobrança em aberto.</p>
+      <p><b>Por que não a alternativa.</b> Pedir confirmação dupla: reproduz o "mesmo assim" que se quer eliminar.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GLOSSARIO ============ -->
+<section class="tela rodape">
+  <h2>Glossário canônico</h2>
+  <p class="sub">Um termo por conceito, em toda tela e no aviso ao cliente. Fonte: tabela de inconsistências da auditoria de copy.</p>
+  <table>
+    <tr><th style="width:42%">Termo antigo</th><th style="width:36%">Termo novo</th><th>Onde</th></tr>
+    <tr><td>Comanda 21</td><td>Pedido de Maria</td><td>Fila, janela</td></tr>
+    <tr><td>Gerar cobrança e enviar, Confirmar e gerar, Confirmar e enviar, Gerar e enviar</td><td>Enviar cobrança</td><td>Revisar</td></tr>
+    <tr><td>Registrar</td><td>Registrar pedido</td><td>Revisar</td></tr>
+    <tr><td>Janela fechada, modelo aprovado</td><td>Prazo de 24 h do WhatsApp, mensagem padrão do WhatsApp</td><td>Revisar, Composer</td></tr>
+    <tr><td>Janela de entrega</td><td>Horário de entrega</td><td>Entrega</td></tr>
+    <tr><td>Sai em instantes</td><td>Enviando o resumo. Se não chegar, avisamos aqui.</td><td>Revisar</td></tr>
+    <tr><td>Marcar entregue mesmo assim</td><td>Recebi agora, Entregar e cobrar depois</td><td>Entrega</td></tr>
+    <tr><td>Preparando, Saiu</td><td>Em preparo, Saiu para entrega</td><td>Fila, avisos</td></tr>
+    <tr><td>Assistente respondendo (IA desligada)</td><td>Conversa assumida por você</td><td>Fila</td></tr>
+    <tr><td>Atendimento precisa de você</td><td>Maria aguarda resposta</td><td>Fila</td></tr>
+    <tr><td>Cliente WhatsApp (sem nome)</td><td>Telefone como título, selo "sem nome", ação Dar nome</td><td>Clientes</td></tr>
+    <tr><td>Telefone, Celular com DDD</td><td>Celular (com DDD)</td><td>Ficha, Clientes</td></tr>
+    <tr><td>Nenhum pedido ainda</td><td>Nenhum pedido ainda. Use Novo pedido para começar.</td><td>Ficha</td></tr>
+    <tr><td>Não entregues</td><td>Mensagens não entregues</td><td>Fila</td></tr>
+    <tr><td>Cadastros, Ficha do cliente</td><td>Clientes no menu, Ficha só na página da pessoa</td><td>Menu</td></tr>
+  </table>
+</section>
+
+<!-- ============ FASES ============ -->
+<section class="tela rodape fase" style="margin-top:0">
+  <h2>Fases e tier</h2>
+  <p class="sub">Tier pela natureza da mudança, como no CLAUDE.md do repositório: baixo faz merge no verde; alto fica com PR aberta até a label <code>aprovado</code>.</p>
+  <table>
+    <tr><th style="width:8%">Fase</th><th style="width:30%">Escopo</th><th style="width:14%">Telas</th><th style="width:12%">Tier</th><th>Observação e gate</th></tr>
+    <tr><td><b>P1</b></td><td>Copy e visual: rótulos únicos, aviso das 24 h, status canônicos, "Pedido de Maria", motivo ao lado do Continuar, textos e dois botões de saldo</td><td>5, 6, 7 e o aviso da 4</td><td>Baixo</td><td>Sem API nova. Os dois botões de saldo (tela 7) reaproveitam o fluxo existente de meio de pagamento: a confirmar no código. Gate: teste de ponta a ponta no navegador real.</td></tr>
+    <tr><td><b>P2</b></td><td>Nome na lista de Clientes e vazio da Ficha com Novo pedido e celular com motivo</td><td>2, 3</td><td>Baixo, a confirmar</td><td>Baixo se "Dar nome" reaproveitar a edição de cadastro existente. Se pedir endpoint novo, sobe de tier.</td></tr>
+    <tr><td><b>P3</b></td><td>Retirada no balcão e escolha de endereço (<code>EnderecoId</code>)</td><td>4</td><td>Alto</td><td>Muda API e janela, pode tocar migração. Exige spec, issue e label <code>aprovado</code>. Esforço G na auditoria de UX.</td></tr>
+  </table>
+  <p style="margin-top:14px" class="nota">Ainda pendente em todas as fases: validar a janela do Novo pedido em produção (prova local e regex apenas, segundo a banca).</p>
+</section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: "loose",
+      theme: "base",
+      themeVariables: {
+        fontSize: "16px",
+        fontFamily: "Segoe UI, system-ui, Arial, sans-serif",
+        primaryColor: "#ffffff",
+        primaryBorderColor: "#555555",
+        primaryTextColor: "#1f1f1f",
+        lineColor: "#555555",
+        edgeLabelBackground: "#ffffff"
+      },
+      flowchart: { htmlLabels: true, curve: "basis" }
+    });
+  }
+</script>
+</body>
+</html>
