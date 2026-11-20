@@ -70,7 +70,7 @@ const abrirComanda = async () => {
   if (await dia.isVisible()) return
   const aba = page.getByRole('tab', { name: 'Cliente', exact: true })
   if (await aba.isVisible()) { await aba.click(); await page.waitForTimeout(500) }
-  if (!(await dia.isVisible())) await page.getByRole('button', { name: /^Revisar comanda/ }).click()
+  if (!(await dia.isVisible())) await page.getByRole('button', { name: /^Revisar pedido/ }).click()
   await dia.waitFor()
 }
 // O painel da comanda flutua sobre a barra no celular; recolhe antes de usar o "Gerar cobrança".
@@ -127,7 +127,7 @@ try {
   pedidoCriado = true
   await page.reload()
   await page.getByRole('tab', { name: 'Cliente', exact: true }).click()
-  await page.getByRole('button', { name: /^Revisar comanda/ }).waitFor()
+  await page.getByRole('button', { name: /^Revisar pedido/ }).waitFor()
   await page.waitForTimeout(500)
   assert.equal(await aviso.count(), 0, 'Pedido criado não mostra aviso de geração')
   await foto(page, '04-pedido-criado-sem-aviso-390')

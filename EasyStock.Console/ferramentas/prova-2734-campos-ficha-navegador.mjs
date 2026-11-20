@@ -45,12 +45,12 @@ const chamadas = (pagina) => pagina.evaluate(() => window.__chamadas)
 try {
   // A16: o nome acessível do botão contém o texto visível (WCAG 2.5.3).
   let p = await abrir('ficha')
-  await p.getByRole('button', { name: '(11) 99999-9999, editar Telefone', exact: true }).waitFor()
+  await p.getByRole('button', { name: '(11) 99999-9999, editar Celular (com DDD)', exact: true }).waitFor()
   await p.getByRole('button', { name: 'Pessoa A, editar Nome do cliente', exact: true }).waitFor()
 
   // A01: colar com DDI grava o número certo.
-  await p.getByRole('button', { name: '(11) 99999-9999, editar Telefone', exact: true }).click()
-  const tel = p.getByRole('textbox', { name: 'Telefone', exact: true })
+  await p.getByRole('button', { name: '(11) 99999-9999, editar Celular (com DDD)', exact: true }).click()
+  const tel = p.getByRole('textbox', { name: 'Celular (com DDD)', exact: true })
   await tel.fill('+55 11 98225-4398')
   assert.equal(await tel.inputValue(), '(11) 98225-4398')
   // A31: o X da edição se chama Cancelar edição.
@@ -60,7 +60,7 @@ try {
 
   // Número de outro país: a conversa grava pelo E.164 do Brasil e o servidor devolve 400 (visto na tela real).
   // A tela não corta o número nem o troca por um do Brasil: mostra como foi digitado, recusa e diz onde ele entra.
-  await p.getByRole('button', { name: '(11) 99999-9999, editar Telefone', exact: true }).click()
+  await p.getByRole('button', { name: '(11) 99999-9999, editar Celular (com DDD)', exact: true }).click()
   await tel.fill('+44 7911 123456')
   assert.equal(await tel.inputValue(), '+44 7911 123456')
   await tel.press('Enter')
@@ -133,7 +133,7 @@ try {
   // segue restrição (alerta e primeiro lugar) no cartão do Resumo, na Ficha e no cartão do Assistente.
   p = await abrir('gravadas')
   // O cartão é o resumo e a Ficha é a lista que se edita: cada uma tem o seu nome, e o alerta tem nome nas duas.
-  const noCartao = p.locator('section[aria-label^="Cliente "] ul[aria-label="Resumo das tags do cliente"] li')
+  const noCartao = p.locator('section[aria-label^="Pedido de "] ul[aria-label="Resumo das tags do cliente"] li')
   await noCartao.first().waitFor()
   assert.deepEqual(await noCartao.allInnerTexts(), ['sem gluten', 'cliente antiga'])
   assert.deepEqual(await noCartao.evaluateAll(lis => lis.map(li => li.querySelectorAll('svg').length)), [1, 0], 'no cartão, só a restrição leva o alerta')
@@ -149,7 +149,7 @@ try {
 
   // A02: no cadastro rápido, o telefone colado com DDI vira o número certo; mais de 11 dígitos é recusado.
   p = await abrir('lead')
-  const rapido = p.getByRole('textbox', { name: 'Telefone', exact: true })
+  const rapido = p.getByRole('textbox', { name: 'Celular (com DDD)', exact: true })
   await rapido.fill('+55 11 98225-4398')
   assert.equal(await rapido.inputValue(), '(11) 98225-4398')
   // DDD 55: um dígito a mais não vira outro número. O campo mostra o que foi digitado e o salvar recusa.

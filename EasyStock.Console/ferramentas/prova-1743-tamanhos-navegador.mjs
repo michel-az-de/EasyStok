@@ -81,7 +81,7 @@ const recolherPedido = async () => { // a comanda aberta fica sobre o cardápio 
 }
 const abrirPedido = async () => {
   await page.getByRole('tab', { name: 'Cliente', exact: true }).click()
-  if (!await page.locator('#comanda-pedido').isVisible()) await page.getByRole('button', { name: /^(Revisar comanda|Consultar pedido vinculado)/ }).click()
+  if (!await page.locator('#comanda-pedido').isVisible()) await page.getByRole('button', { name: /^(Revisar pedido|Consultar pedido vinculado)/ }).click()
 }
 page.on('pageerror', erro => erros.push(erro.message))
 try {
@@ -104,13 +104,13 @@ try {
   writeFileSync(join(pasta, 'corpo-43-ids.json'), JSON.stringify(corpo, null, 2))
   await foto(page, '01-cardapio-1280')
   if (!process.env.ANTES) {
-    await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 600 g na comanda', exact: true }).click()
+    await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 600 g no pedido', exact: true }).click()
     // #2437: a comanda da Ficha é um resumo; o alvo do arrasto (#comanda-pedido) só existe com ela aberta.
-    await page.getByRole('button', { name: /^Revisar comanda/ }).click()
+    await page.getByRole('button', { name: /^Revisar pedido/ }).click()
     // #2437: a comanda aberta flutua sobre o cardápio e cobre o prato; a atendente encolhe o painel pela alça.
-    await page.getByRole('button', { name: /^Redimensionar Comanda/ }).focus()
+    await page.getByRole('button', { name: /^Redimensionar Pedido/ }).focus()
     for (let i = 0; i < 9; i++) await page.keyboard.press('Shift+ArrowUp')
-    const tamanho = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g na comanda', exact: true })
+    const tamanho = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g no pedido', exact: true })
     const r = await tamanho.boundingBox(), alvo = await page.locator('#comanda-pedido').boundingBox()
     await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2)
     await page.mouse.down()
@@ -119,7 +119,7 @@ try {
     await page.getByText('Soltar aqui', { exact: true }).waitFor()
     await page.mouse.up()
     await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 800 g', exact: true }).waitFor()
-    await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 1 kg na comanda', exact: true }).click()
+    await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 1 kg no pedido', exact: true }).click()
     await foto(page, '01b-arrasto-tamanho-1280')
     await page.getByRole('button', { name: 'Tirar uma unidade de Lasanha Bolonhesa Clássica 800 g', exact: true }).click()
     assert.equal(await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 800 g', exact: true }).count(), 0)
@@ -137,7 +137,7 @@ try {
     assert.equal(await page.getByRole('list', { name: /^Apresentações de / }).count(), 17)
     const escapar = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     for (const item of itens) {
-      const escolha = page.getByRole('button', { name: new RegExp('^(Somar )?' + escapar(item.nome) + '( na comanda)?(?:$| )') })
+      const escolha = page.getByRole('button', { name: new RegExp('^(Somar )?' + escapar(item.nome) + '( no pedido)?(?:$| )') })
       assert.equal(await escolha.count(), 1, 'Uma escolha direta para ' + item.id)
       assert.equal(await escolha.isEnabled(), item.disponivel !== false, 'Disponibilidade própria: ' + item.id)
       const box = await escolha.boundingBox()
@@ -191,7 +191,7 @@ try {
     await abrirPedido() // #2437: com o pedido criado, o "Ver cardápio" mora na comanda aberta
     await page.getByRole('button', { name: 'Ver cardápio', exact: true }).click()
     for (const item of itens) {
-      const escolha = page.getByRole('button', { name: new RegExp('^(Somar )?' + escapar(item.nome) + '( na comanda)?(?:$| )') })
+      const escolha = page.getByRole('button', { name: new RegExp('^(Somar )?' + escapar(item.nome) + '( no pedido)?(?:$| )') })
       assert.equal(await escolha.isEnabled(), false, 'Pedido criado bloqueia ' + item.id)
     }
     assert.equal(await porcoes.getByRole('button', { name: /^300 g/ }).isEnabled(), false)
@@ -200,7 +200,7 @@ try {
     const pedido = page.locator('#comanda-pedido')
     const pedidoAntes = await pedido.innerText()
     const escritasAntes = chamadas.filter(escritaNoPedido).length
-    const bloqueado = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g na comanda', exact: true })
+    const bloqueado = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g no pedido', exact: true })
     await bloqueado.scrollIntoViewIfNeeded()
     const r = await bloqueado.boundingBox(), alvo = await pedido.boundingBox()
     await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
