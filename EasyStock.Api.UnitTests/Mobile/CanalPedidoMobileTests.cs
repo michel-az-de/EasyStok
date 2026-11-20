@@ -81,6 +81,7 @@ public sealed class CanalPedidoMobileTests : IDisposable
     [InlineData("balcao", "balcao")]
     [InlineData("  WhatsApp ", "whatsapp")]
     [InlineData("whatsapp-pessoal", "whatsapp-pessoal")]
+    [InlineData("whatsapp-loja", "whatsapp-loja")]
     public async Task PedidoNovo_GuardaOCanalMarcadoNoPwa(string enviado, string esperado)
     {
         await AplicarAsync(Pedido("o-1", enviado));
