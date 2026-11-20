@@ -29,7 +29,7 @@ assert.ok(corpos.every(([url]) => url.endsWith('/api/atendimento/conversas/do-cl
 // 3. O campo "Celular com DDD" mora num componente só, usado na escolha do cliente (Pedidos) e na linha de Clientes.
 const ler = (caminho) => readFileSync(new URL(`../src/features/gestao/cadastros/${caminho}`, import.meta.url), 'utf8')
 const campo = ler('CelularDoPedido.jsx')
-assert.match(campo, /rotulo="Celular com DDD"/)
+assert.match(campo, /rotulo="Celular com DDD \(para enviar o resumo\)"/)
 assert.match(campo, /novoPedido\.iniciar\(clienteId, \{ celular: celular\.texto \}\)/)
 assert.match(ler('EscolherClienteDoPedido.jsx'), /<CelularDoPedido clienteId=\{cliente\.id\}/)
 const painel = ler('PainelCadastros.jsx')

@@ -408,7 +408,7 @@ export function BarraProximoPasso({
           </Botao>
           {pedeSaldo && (
             <Botao largo variante="secundario" disabled={emVoo} onClick={() => avancarPasso(proximo.id, { confirmarSaldoAReceber: true })}>
-              Marcar entregue mesmo assim
+              Entregar e cobrar depois
             </Botao>
           )}
           {botaoComplemento}

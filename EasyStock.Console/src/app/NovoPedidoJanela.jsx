@@ -163,7 +163,7 @@ function Montagem({ janela, conversa }) {
       : <Botao variante="texto" onClick={() => setDescartando(true)}>Descartar rascunho</Botao>)}
     {anterior && <Botao onClick={() => setPasso(anterior.id)} disabled={registrando} motivo={motivoRegistrando}>Voltar</Botao>}
     {proximo && <Botao variante="primario" disabled={!podeAvancar} motivo={motivoAvancar ?? 'Pode continuar'} onClick={() => setPasso(proximo.id)}>Continuar</Botao>}
-    {passo === 'revisar' && <Botao variante="primario" disabled={registrando || itens.length === 0} motivo={motivoAvancar ?? motivoRegistrando} onClick={registrar}>{registrando ? 'Registrando…' : 'Registrar'}</Botao>}
+    {passo === 'revisar' && <Botao variante="primario" disabled={registrando || itens.length === 0} motivo={motivoAvancar ?? motivoRegistrando} onClick={registrar}>{registrando ? 'Registrando…' : 'Registrar pedido'}</Botao>}
   </>
 
   if (mostrarAvisoDePedidoEmAndamento({ jaTemPedido, registrando })) {

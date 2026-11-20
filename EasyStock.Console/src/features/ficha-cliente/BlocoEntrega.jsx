@@ -33,7 +33,7 @@ export function BlocoEntrega({ conversa }) {
             rotulo: pedido.estado === 'entregue' ? 'Quem levou' : 'Quem leva',
             valor: textoDoEntregador(quem) ?? (doEasyStok ? 'Definido na viagem, em Entregas' : 'A definir no despacho'),
           },
-          { rotulo: 'Saiu', valor: registro?.saiuEm ? horaCurta(registro.saiuEm) : null },
+          { rotulo: 'Saiu para entrega', valor: registro?.saiuEm ? horaCurta(registro.saiuEm) : null },
           { rotulo: 'Entregue', valor: registro?.entregueEm ? horaCurta(registro.entregueEm) : null },
         ]}
       />

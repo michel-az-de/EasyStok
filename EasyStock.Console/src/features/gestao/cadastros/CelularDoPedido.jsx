@@ -15,7 +15,7 @@ export function CelularDoPedido({ clienteId, novoPedido }) {
     novoPedido.iniciar(clienteId, { celular: celular.texto })
   }
   return <form className={css.celular} onSubmit={abrir} noValidate>
-    <CampoTexto rotulo="Celular com DDD" tipo="tel" inputMode="tel" autoComplete="off" autoFocus placeholder="(11) 98888-7777"
+    <CampoTexto rotulo="Celular com DDD (para enviar o resumo)" tipo="tel" inputMode="tel" autoComplete="off" autoFocus placeholder="(11) 98888-7777"
       value={celular.texto} erro={celular.erro} dica="Fica gravado no cadastro do cliente."
       onChange={(e) => digitar({ texto: e.target.value, erro: null })} />
     <Botao tipo="submit" variante="primario" disabled={Boolean(novoPedido.abrindo)}>{novoPedido.abrindo === clienteId ? 'Abrindo…' : 'Abrir pedido'}</Botao>
