@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../componentes/Botao'
 import { CampoTexto } from '../componentes/Campo'
+import { CampoReais } from '../componentes/CampoReais'
 import { EsqueletoDeLista } from '../componentes/Esqueleto'
 import { Modal } from '../componentes/Modal'
 import { AvisoDaAcaoApi } from './FaixaApi'
@@ -18,7 +19,7 @@ import { disponivelHoje, itemPorSku, itensAtivos, porcaoDoToque, produtoDaPorcao
 import { simulacaoVale } from '../dominio/simulacaoPedido'
 import { filtrarCardapio } from '../dominio/filtroDoCardapio'
 import { lerSessao } from '../infra/api/sessao'
-import { moeda } from '../dominio/formato'
+import { lerMoeda, moeda } from '../dominio/formato'
 import { apagarRascunhoDoPedido, gravarRascunhoDoPedido, lerRascunhoDoPedido } from '../infra/api/rascunhosDoPedido'
 import css from './novoPedidoJanela.module.css'
 
@@ -149,13 +150,13 @@ function Montagem({ janela, conversa }) {
     for (const linha of itens) acoes.removerItem(janela.conversaId, linha.sku)
     fechar()
   }
-  const podeAvancar = passo === 'itens' ? itens.length > 0 : passo === 'entrega' ? podeAvancarDaEntrega({ pedido, entrega, erroSimulacao }) : false
+  const podeAvancar = passo === 'itens' ? itens.length > 0 : passo === 'entrega' ? podeAvancarDaEntrega({ pedido, entrega, erroSimulacao, simulacao }) : false
   const anterior = PASSOS[PASSOS.findIndex((p) => p.id === passo) - 1]
   const proximo = PASSOS[PASSOS.findIndex((p) => p.id === passo) + 1]
 
   // #2944 (E1-01): o motivo do bloqueio fica visível ao lado do botão. O texto "Pode continuar" nunca aparece (só com o
   // botão desabilitado); ele mantém o invólucro do Botao estável para o foco não se perder ao habilitar.
-  const motivoAvancar = motivoDeBloqueio({ passo, itens, pedido, entrega, erroSimulacao })
+  const motivoAvancar = motivoDeBloqueio({ passo, itens, pedido, entrega, erroSimulacao, simulacao })
   const motivoRegistrando = 'Registrando o pedido'
   const rodape = <>
     <AvisoDaAcaoApi />
@@ -218,6 +219,18 @@ function Montagem({ janela, conversa }) {
           <Botao disabled={cadastrando || !enderecoTexto.trim()} motivo={cadastrando ? 'Cadastrando…' : 'Escreva o endereço de entrega'} onClick={cadastrarEndereco}>{cadastrando ? 'Cadastrando…' : 'Cadastrar endereço'}</Botao>
           {enderecoVigente(enderecoCadastrado, enderecoTexto) && !faltaEndereco(erroSimulacao) && <p className={css.aviso} role="status">Endereço cadastrado: {enderecoVigente(enderecoCadastrado, enderecoTexto)}</p>}
           {erroSimulacao && <p className={css.erro} role="alert">{textoDoErro(erroSimulacao)}</p>}
+          {/* #2974: fora da área o frete é combinado com a cliente, como na comanda do Atendimento (#2219). */}
+          {(simulacao?.freteACombinar || pedido.freteCombinado !== undefined) && (
+            <CampoReais
+              rotulo="Frete combinado"
+              dica="CEP fora da área de entrega. Digite o frete que você combinou com a cliente; zero é frete grátis."
+              placeholder="A combinar"
+              mostrarZero
+              centavos={pedido.freteCombinado != null ? Math.round(pedido.freteCombinado * 100) : null}
+              ler={lerMoeda}
+              aoMudar={(centavos) => acoes.definirFreteCombinado(janela.conversaId, centavos == null ? null : centavos / 100)}
+            />
+          )}
           <h3 className={css.subtitulo}>Forma de pagamento</h3>
           <EscolhaDeMeio escolhido={pedido.meio ?? null} pedido={pedido} conversaId={janela.conversaId} aoEscolher={(meio) => acoes.escolherMeioPagamento(janela.conversaId, meio)} />
         </>
