@@ -67,6 +67,9 @@ public class Conversa
     public SituacaoConversa Situacao { get; private set; }
     public Guid? PedidoEmAndamentoId { get; private set; }
 
+    /// <summary>#2928: anúncio que trouxe a conversa (o último vence, D2). Nula quando não veio de anúncio.</summary>
+    public OrigemAnuncio? OrigemAnuncio { get; private set; }
+
     /// <summary>Objeto JSON com o estado do atendimento (carrinho em montagem, endereco extraido, etapa).</summary>
     public string ContextoJson { get; private set; } = "{}";
 
@@ -392,6 +395,13 @@ public class Conversa
         PedidoEmAndamentoId = pedidoId;
         if (pedidoId is { } id && !PedidosHistoricoIds.Contains(id))
             PedidosHistoricoIds = [.. PedidosHistoricoIds, id];
+    }
+
+    /// <summary>#2928, D2: um anúncio novo substitui o anterior. Null não apaga a origem já gravada.</summary>
+    public void RegistrarOrigemAnuncio(OrigemAnuncio? origem)
+    {
+        if (origem is not null)
+            OrigemAnuncio = origem;
     }
 
     public CapacidadesCanal Capacidades => CapacidadesCanal.Para(Canal);
