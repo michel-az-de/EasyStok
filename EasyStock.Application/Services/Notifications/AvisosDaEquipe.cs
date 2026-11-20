@@ -47,7 +47,7 @@ public sealed class PublicadorAvisoEquipe(INotificadorService notificador)
         {
             ["conversaId"] = conversaId.ToString(),
             ["cliente"] = cliente,
-            ["motivo"] = motivo,
+            ["motivo"] = SemPontoFinal(motivo),
         }, chave: null, ct);
 
     public Task PedidoComCanhotoAsync(
@@ -68,8 +68,11 @@ public sealed class PublicadorAvisoEquipe(INotificadorService notificador)
             ["pedidoId"] = pedidoId.ToString(),
             ["numero"] = CodigoCurto.De(pedidoId),
             ["cliente"] = cliente,
-            ["problema"] = problema,
+            ["problema"] = SemPontoFinal(problema),
         }, chave: $"aviso-equipe-pagamento:{chave}", ct);
+
+    /// <summary>#2917: o template já fecha a frase com ponto; texto livre com ponto final sairia com "..".</summary>
+    private static string SemPontoFinal(string texto) => texto.Trim().TrimEnd('.').TrimEnd();
 
     private async Task EnfileirarAsync(
         AvisoDaEquipe aviso, Guid empresaId, Guid entidadeId, Dictionary<string, string?> payload, string? chave,
