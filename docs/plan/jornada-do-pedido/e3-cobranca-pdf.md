@@ -30,9 +30,9 @@ Texto e PDF nascem na API (`TextoCobrancaPix`, `IRenderizadorPdfPedido`). O Cons
 
 | Situação | Resultado |
 |---|---|
-| Balão 1 falha | Nada sai. Grava 1 `Mensagem` com falha SEM o código. Tenta o texto único atual (fallback) |
-| Balão 1 sai, balão 2 falha | Balão 1 fica gravado. Grava falha do balão 2 e tenta de novo uma vez o texto do código. Persistindo, devolve `false` |
-| PDF não renderiza, não sobe ou URL não é HTTPS pública | Fallback para o texto único atual |
+| Balão 1 falha (PDF e legenda em texto) | Nada sai. Grava 1 `Mensagem` com falha SEM o código. Sem texto único (fallback) |
+| Balão 1 sai, balão 2 falha | Balão 1 fica gravado. Grava falha do balão 2, sem repetir o código (o canal pode ter aceitado) e sem reenvio automático. Devolve `false` |
+| PDF não renderiza ou não sobe | Balão 1 vai como legenda em texto; o balão 2 segue igual. Sem texto único |
 | Canal sem documento | Legenda e link assinado em texto (padrão da porta), depois o código |
 
 Modelo: `TextoAposImagemFalhouException` (Meta). Aqui a regra vive no serviço, não no provedor.
