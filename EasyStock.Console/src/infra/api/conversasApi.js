@@ -13,6 +13,10 @@ const PAGINAS_NO_MAXIMO = 10
 export const listarConversas = ({ limite = POR_PAGINA, pagina = 1 } = {}) =>
   chamarApi(`${BASE}?limite=${limite}&pagina=${pagina}`)
 
+// #2921: a conversa que a equipe iniciou fica fora da fila até a cliente responder, mas a busca aceita o id dela.
+export const buscarConversaPorId = (id) =>
+  chamarApi(`${BASE}?q=${encodeURIComponent(id)}&limite=5`).then((itens) => (itens ?? []).find((c) => c.id === id) ?? null)
+
 export const listarAtendentes = () => chamarApi('/api/atendimento/atendentes')
 
 // Leitura da polling. Inbox inteira (F07, item 7): segue as páginas até uma vir incompleta;

@@ -17,7 +17,7 @@ const ESPERA_DA_DIGITACAO_MS = 300
 // #2871: "Novo pedido" registra o pedido de quem pediu por outro canal (WhatsApp pessoal da dona): abre a conversa da
 // loja sem mandar mensagem e a comanda já vem aberta; o resumo do pedido é o primeiro contato.
 export function ChamarClientes({ busca, conversas, aoAbrir }) {
-  const { buscarClientesParaChamar, selecionar } = useAcoes()
+  const { buscarClientesParaChamar, selecionar, selecionarIniciada } = useAcoes()
   const novoPedido = useNovoPedidoDoCliente({ aoAbrir })
   const [achados, setAchados] = useState({ termo: '', lista: [] })
   const [escolhido, setEscolhido] = useState(null)
@@ -60,7 +60,7 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
         <ModalEnviarModelo
           cliente={escolhido}
           aoFechar={() => setEscolhido(null)}
-          aoIniciar={(conversaId) => { selecionar(conversaId); aoAbrir?.(conversaId) }}
+          aoIniciar={(conversaId) => { (selecionarIniciada ?? selecionar)(conversaId); aoAbrir?.(conversaId) }}
         />
       )}
     </section>

@@ -26,7 +26,10 @@ export const casosApi = {
     // #2921: a conversa da janela "Novo pedido" não está na fila (o servidor a esconde até a cliente escrever);
     // a volta de 5 s não pode descartá-la com a montagem dentro.
     const daJanela = locais.get(estado.janelaDoPedido?.conversaId)
-    const lidas = daJanela && !doServidor.some((c) => c.id === daJanela.id) ? [...doServidor, daJanela] : doServidor
+    // #2921: a conversa que a equipe iniciou (Iniciar / Chamar no WhatsApp) e está selecionada também fica escondida
+    // até a cliente responder; fica na lista enquanto selecionada e sai quando a atendente sai dela.
+    const retida = estado.selecaoRetida && estado.selecaoRetida === estado.selecionadaId ? locais.get(estado.selecionadaId) : null
+    const lidas = [daJanela, retida].reduce((lista, c) => (c && !lista.some((x) => x.id === c.id) ? [...lista, c] : lista), doServidor)
     const mescladas = mesmaLista(estado.conversas, lidas) ? estado.conversas : lidas
     const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
     // #2005 (console-07): "Chamar no WhatsApp" seleciona a conversa nova antes de a lista conhecê-la. A volta que
