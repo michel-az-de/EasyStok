@@ -26,12 +26,14 @@ BR=master
 publica() { git -C $T/dev push -q origin "$@"; }
 git -C $T/dev commit -q --allow-empty -m A; publica "$BR"; publica "$BR:velha"
 A="$(git -C $T/dev rev-parse HEAD)"
+git -C $T/github.git update-ref refs/pull/1/head "$A"   # o GitHub expoe 1289 refs de PR
 export ORIGEM_URL=$T/github.git ESPELHO_GIT=$T/git/EasyStok.git ESTADO=$T/git/estado-espelho META_DIR=$T/git/meta META_HORAS=0
 roda() { set +e; out="$(bash /s/espelho.sh 2>&1)"; echo "rc=$?"; echo "$out"; set -e; }
 
 r="$(roda)";                         confere "primeira vez: exit 0"            "rc=0" "$r"
                                      confere "primeira vez: espelho bare"      "true" "$(git -C $ESPELHO_GIT rev-parse --is-bare-repository)"
                                      confere "primeira vez: estado com master" "master=$A" "$(cat $ESTADO)"
+                                     confere "sem refs de PR no espelho"       "^0$" "$(git -C $ESPELHO_GIT for-each-ref refs/pull | wc -l)"
 git -C $T/dev commit -q --allow-empty -m B; publica "$BR"; publica --delete velha
 B="$(git -C $T/dev rev-parse HEAD)"
 r="$(roda)";                         confere "push novo: master atualizado"    "master=$B" "$(cat $ESTADO)"
@@ -62,5 +64,11 @@ printf '#!/bin/sh\nexit 22\n' > $T/bin/curl
 rm -rf $META_DIR; r="$(PATH=$T/bin:$PATH META_HORAS=20 roda)"
                                      confere "meta falha: espelho segue ok"    "rc=0" "$r"
                                      confere "meta falha: avisa"               "aviso: exportacao" "$r"
+printf '#!/bin/sh
+echo chamado >> %s/curl.calls
+exit 22
+' $T > $T/bin/curl
+r="$(PATH=$T/bin:$PATH META_HORAS=20 roda)"
+                                     confere "meta falha: so tenta 1 vez por dia" "^0$" "$(cat $T/curl.calls 2>/dev/null | wc -l)"
 
 [ "$falhas" = 0 ] && echo "TODOS OS CASOS PASSARAM" || { echo "$falhas FALHA(S)"; exit 1; }
