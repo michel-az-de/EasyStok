@@ -57,18 +57,18 @@ public class ProvedoresIaIntegrationTests(PostgreSqlDatabaseFixture fixture)
         await cliente.Database.OpenConnectionAsync();
         await cliente.Database.ExecuteSqlInterpolatedAsync($"SELECT set_config('app.empresa_id', {empresaA.ToString()}, false)");
 
-        foreach (var tabela in new[] { "provedor_ia", "chamada_ia" })
-        {
-            var deB = await cliente.Database
-                .SqlQueryRaw<int>($"SELECT COUNT(*)::int AS \"Value\" FROM {tabela} WHERE empresa_id = {{0}}", empresaB)
-                .SingleAsync();
-            var deA = await cliente.Database
-                .SqlQueryRaw<int>($"SELECT COUNT(*)::int AS \"Value\" FROM {tabela} WHERE empresa_id = {{0}}", empresaA)
-                .SingleAsync();
-            deB.Should().Be(0, $"{tabela} de outra loja é invisível pela policy tenant_isolation");
-            deA.Should().Be(1);
-        }
+        (await ContarAsync(cliente, "SELECT COUNT(*)::int AS \"Value\" FROM provedor_ia WHERE empresa_id = {0}", empresaB))
+            .Should().Be(0, "provedor de outra loja é invisível pela policy tenant_isolation");
+        (await ContarAsync(cliente, "SELECT COUNT(*)::int AS \"Value\" FROM provedor_ia WHERE empresa_id = {0}", empresaA))
+            .Should().Be(1);
+        (await ContarAsync(cliente, "SELECT COUNT(*)::int AS \"Value\" FROM chamada_ia WHERE empresa_id = {0}", empresaB))
+            .Should().Be(0, "chamada de outra loja é invisível pela policy tenant_isolation");
+        (await ContarAsync(cliente, "SELECT COUNT(*)::int AS \"Value\" FROM chamada_ia WHERE empresa_id = {0}", empresaA))
+            .Should().Be(1);
     }
+
+    private static Task<int> ContarAsync(EasyStockDbContext db, string sql, Guid empresa) =>
+        db.Database.SqlQueryRaw<int>(sql, empresa).SingleAsync();
 
     [SkippableFact]
     public async Task IndiceParcialRecusaDoisModelosPadraoNaMesmaLoja()
