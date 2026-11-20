@@ -142,3 +142,6 @@
   .contatoCliente { grid-template-columns: minmax(0, 1fr); }
 }
 .acoesDoResumo { display: flex; flex-wrap: wrap; gap: var(--e-2, 8px); }
+/* #2946: o convite é um link (abre outra aba), com a cara de ação da linha. */
+.chamar { display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--e-3); font-weight: 600; color: var(--sucesso); border: 1px solid currentColor; border-radius: var(--r-1); text-decoration: none; white-space: nowrap; }
+.chamar:hover { background: var(--sucesso-pastel); }

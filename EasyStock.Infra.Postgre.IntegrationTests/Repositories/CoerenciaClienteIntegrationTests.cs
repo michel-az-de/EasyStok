@@ -1,4 +1,5 @@
 using EasyStock.Application.UseCases.AdicionarClienteTelefone;
+using EasyStock.Application.UseCases.ListarClientes;
 using EasyStock.Application.UseCases.RemoverClienteTelefone;
 using EasyStock.Domain.Entities;
 using EasyStock.Infra.Postgre.Repositories;
@@ -118,6 +119,53 @@ public sealed class CoerenciaClienteIntegrationTests(PostgreSqlDatabaseFixture f
             (await uso.ExecuteAsync(new RemoverClienteTelefoneCommand(empresa.Id, paula.Id, segundo))).Should().BeTrue();
         }
         (await Lidos()).Should().ContainSingle().Which.Should().Be((primeiro, true), "remover o principal promove o que sobrou");
+    }
+
+    [SkippableFact]
+    public async Task ListaDeRecompraTrazQuemComprouDuasVezesESumiuHaTrintaDias()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Empresa.Criar("Recompra 2946", "46464646000191");
+        var outra = Empresa.Criar("Recompra 2946 alheia", "64646464000191");
+        var agora = DateTime.UtcNow;
+        var pedidos = new List<Pedido>();
+        Cliente Nova(string nome, params int[] diasDeCadaCompra)
+        {
+            var cliente = Cliente.Criar(empresa.Id, "Recompra 2946 " + nome);
+            foreach (var dias in diasDeCadaCompra)
+            {
+                var pedido = Pedido.Criar(empresa.Id, cliente);
+                pedido.CriadoEm = agora.AddDays(-dias);
+                pedidos.Add(pedido);
+            }
+            return cliente;
+        }
+
+        var sumida = Nova("Sumida", 60, 40);
+        var maisAntiga = Nova("Mais antiga", 120, 90);
+        var recente = Nova("Recente", 60, 5);
+        var umaCompra = Nova("Uma compra", 60);
+        var inativa = Nova("Inativa", 60, 40);
+        inativa.Desativar();
+        var bloqueada = Nova("Bloqueada", 60, 40);
+        bloqueada.Bloquear(null, agora);
+        var convidada = Nova("Convidada", 60, 40);
+        convidada.AdicionarTag("recompra-convidada", OrigemClienteTag.Dona, agora.AddDays(-3));
+        var conviteVencido = Nova("Convite vencido", 80, 70);
+        conviteVencido.AdicionarTag("recompra-convidada", OrigemClienteTag.Dona, agora.AddDays(-45));
+        var umaValida = Nova("Uma valida", 60, 40);
+        pedidos.Last().Cancelar();
+        await Gravar(empresa, outra, [sumida, maisAntiga, recente, umaCompra, inativa, bloqueada, convidada, conviteVencido, umaValida], [.. pedidos]);
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa.Id);
+        var resultado = await new ListarClientesUseCase(new ClienteRepository(db)).ExecuteAsync(
+            new ListarClientesQuery(empresa.Id, Search: "recompra 2946", Sort: "lastorderat", Order: "asc", Relacionamento: "recompra"));
+
+        resultado.Items.Select(c => c.Id).Should().Equal(
+            [maisAntiga.Id, conviteVencido.Id, sumida.Id],
+            "entra quem tem 2 compras ou mais, nenhuma há 30 dias e nenhum convite nos últimos 30 dias");
+        resultado.Total.Should().Be(3);
     }
 
     private async Task Gravar(Empresa empresa, Empresa outra, Cliente[] clientes, Pedido[] pedidos)
