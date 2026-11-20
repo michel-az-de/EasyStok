@@ -1,4 +1,5 @@
 import { diasDeCalendarioEntre, plural } from './formato'
+import { TITULO_BASE } from './tituloDaAba'
 
 // #2946: lista de recompra. A tag marca quem já foi convidado; a API a esconde da lista por 30 dias.
 export const TAG_RECOMPRA_CONVIDADA = 'recompra-convidada'
@@ -15,9 +16,10 @@ export function telefoneParaWhatsapp(telefone) {
 const primeiroNome = (nome) => String(nome ?? '').trim().split(/\s+/)[0] || null
 
 // O sistema só abre a conversa: não sabe se a dona enviou. Sem emoji e com saída fácil para quem não quer receber.
+// #2951: a sessão abre sem o nome da empresa; sem ele vale o nome da Casa, o mesmo do título da aba.
 export function textoDoConvite(nome, nomeDaLoja) {
   const primeiro = primeiroNome(nome)
-  return `${primeiro ? `Oi, ${primeiro}!` : 'Oi!'} Aqui é ${nomeDaLoja ? `da ${nomeDaLoja}` : 'da loja'}. Faz um tempo que você não pede e lembrei de você. `
+  return `${primeiro ? `Oi, ${primeiro}!` : 'Oi!'} Aqui é da ${nomeDaLoja || TITULO_BASE}. Faz um tempo que você não pede e lembrei de você. `
     + 'Quer que eu separe sua massa essa semana? Se preferir que eu não escreva, é só me dizer.'
 }
 
