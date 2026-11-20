@@ -26,7 +26,7 @@ public sealed class CheckoutSiteUseCase(
         string? chatToken, Guid? chave, CancellationToken ct = default)
     {
         endereco = endereco?.Validar(input.Cep, input.Numero);
-        var sessao = await SessaoAsync(input.Slug, chatToken, ct);
+        var sessao = await SessaoAsync(input.Slug, chatToken, input.Campanha, ct);
         if (sessao is null)
             return await logado.ExecuteAsync(input with { Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
                 Observacoes = endereco?.Snapshot(input.Observacoes) ?? input.Observacoes }, ct);
@@ -43,7 +43,7 @@ public sealed class CheckoutSiteUseCase(
         {
             var conversa = await conversaChat.ObterOuCriarAsync(sessao, cliente.Id, relogio.GetUtcNow().UtcDateTime, ct);
             var result = await logado.ExecuteAsync(input with { IdempotencyKey = null, ContentHash = null,
-                ConversaId = conversa.Id, Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
+                ConversaId = conversa.Id, OrigemDaConversa = conversa.OrigemAnuncio, Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
                 Observacoes = endereco?.Snapshot(input.Observacoes) ?? input.Observacoes }, ct,
                 (id, token) => CheckpointAsync(sessao, conversa, key, hash, id, token),
                 TravaIdentidade(sessao, conversa));
@@ -62,7 +62,7 @@ public sealed class CheckoutSiteUseCase(
         string? chatToken, Guid? chave, CancellationToken ct = default)
     {
         endereco = endereco?.Validar(input.Cep, input.Numero);
-        var sessao = await SessaoAsync(input.Slug, chatToken, ct);
+        var sessao = await SessaoAsync(input.Slug, chatToken, input.Campanha, ct);
         if (sessao is null)
             return await guest.ExecuteAsync(input with { Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
                 Observacoes = endereco?.Snapshot(input.Observacoes) ?? input.Observacoes }, ct);
@@ -82,7 +82,7 @@ public sealed class CheckoutSiteUseCase(
         try
         {
             var conversa = await conversaChat.ObterOuCriarAsync(sessao, null, relogio.GetUtcNow().UtcDateTime, ct);
-            var result = await guest.ExecuteAsync(input with { ConversaId = conversa.Id, Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
+            var result = await guest.ExecuteAsync(input with { ConversaId = conversa.Id, OrigemDaConversa = conversa.OrigemAnuncio, Numero = endereco?.Numero ?? input.Numero, EnderecoEntrega = Entrega(endereco),
                 Observacoes = endereco?.Snapshot(input.Observacoes) ?? input.Observacoes }, ct,
                 (id, token) => CheckpointAsync(sessao, conversa, key, hash, id, token),
                 TravaIdentidade(sessao, conversa));
@@ -101,12 +101,12 @@ public sealed class CheckoutSiteUseCase(
     private static EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega? Entrega(EnderecoCheckout? e) => e is null ? null
         : new(e.Logradouro, e.Numero, e.Complemento, e.Bairro, e.Cidade, e.Uf, e.Cep);
 
-    private async Task<SessaoChatSite?> SessaoAsync(string slug, string? token, CancellationToken ct)
+    private async Task<SessaoChatSite?> SessaoAsync(string slug, string? token, CampanhaInput? campanha, CancellationToken ct)
     {
         // Sem token, uma loja legada sem chat conserva seu checkout comercial. Com token, nunca há downgrade.
         if (string.IsNullOrWhiteSpace(token))
         {
-            try { token = (await abrirSessao.ExecuteAsync(slug, ct)).Token; }
+            try { token = (await abrirSessao.ExecuteAsync(slug, campanha, ct)).Token; }
             catch (ChatSiteIndisponivelException) { return null; }
         }
         return await acessoChat.ResolverSessaoAsync(slug, token, relogio.GetUtcNow().UtcDateTime, ct);

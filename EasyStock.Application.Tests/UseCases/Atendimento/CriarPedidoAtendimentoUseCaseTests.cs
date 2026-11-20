@@ -430,7 +430,28 @@ public class CriarPedidoAtendimentoUseCaseTests
         await unitOfWork.Received(1).CommitAsync();
     }
 
-    private static async Task<(PedidoReservado Reservado, Conversa Conversa)> CriarNaConversa(bool? foraDeAreaLiberado)
+    // #2928 S4: o pedido nasce com o anúncio que valia na conversa, e não muda se a conversa mudar depois.
+    [Fact]
+    public async Task PedidoNasceComAOrigemDoAnuncioDaConversa()
+    {
+        var origem = EasyStock.Domain.ValueObjects.OrigemAnuncio.DoAnuncioWhatsApp("111", "Promo", "ctwa", new DateTimeOffset(Agora));
+
+        var (reservado, conversa) = await CriarNaConversa(null, origem);
+
+        reservado.Pedido.OrigemAnuncio.Should().BeSameAs(origem);
+        conversa.OrigemAnuncio.Should().BeSameAs(origem);
+    }
+
+    [Fact]
+    public async Task ConversaSemAnuncio_PedidoSemOrigem()
+    {
+        var (reservado, _) = await CriarNaConversa(null);
+
+        reservado.Pedido.OrigemAnuncio.Should().BeNull();
+    }
+
+    private static async Task<(PedidoReservado Reservado, Conversa Conversa)> CriarNaConversa(
+        bool? foraDeAreaLiberado, EasyStock.Domain.ValueObjects.OrigemAnuncio? origem = null)
     {
         var c = new CheckoutCoreServiceTests.Cenario();
         var empresaId = c.Storefront.EmpresaId;
@@ -443,6 +464,7 @@ public class CriarPedidoAtendimentoUseCaseTests
 
         var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
         ContextoConversaJson.Gravar(conversa, ContextoConversaJson.ForaDeAreaLiberado, foraDeAreaLiberado);
+        conversa.RegistrarOrigemAnuncio(origem);
         var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 

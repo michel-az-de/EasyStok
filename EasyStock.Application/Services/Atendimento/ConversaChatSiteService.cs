@@ -58,6 +58,8 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
         // #1430: a conversa nasce (ou fica) com o que o visitante informou no formulário antes do chat.
         if (sessao.ContatoInformado is { } informado && conversa.ContatoInformadoEm is null)
             conversa.RegistrarContatoInformado(informado);
+        // #2928: o anúncio da sessão vai para a conversa (nova ou reaproveitada); o último anúncio vence (D2).
+        if (sessao.OrigemAnuncio is { } origem && conversa.OrigemAnuncio != origem) conversa.RegistrarOrigemAnuncio(origem);
         sessao.VincularConversa(conversa.Id);
         sessao.RegistrarUso(agora);
         await unitOfWork.CommitAsync();
