@@ -16,12 +16,13 @@ export function useNovoPedidoDoCliente({ aoAbrir } = {}) {
   const [abrindo, marcarAbrindo] = useState(null)
   const [erro, falhar] = useState(null)
   const emVoo = useRef(false)
-  const iniciar = async (clienteId) => {
+  // #2930: `celular` vem do campo da escolha do cliente quando o cadastro está sem telefone.
+  const iniciar = async (clienteId, { celular } = {}) => {
     if (!disponivel || !clienteId || emVoo.current) return false
     emVoo.current = true
     marcarAbrindo(clienteId); falhar(null)
     try {
-      const resumo = await abrirConversaDoCliente(clienteId)
+      const resumo = await abrirConversaDoCliente(clienteId, celular)
       selecionar(resumo.id, resumo)
       window.location.hash = hashDoModulo('atendimento', 'balcao')
       anunciarAberturaDeConversa(resumo.id, { novoPedido: true })

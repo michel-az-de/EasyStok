@@ -32,6 +32,10 @@
 .lista li > span { min-width: 0; overflow-wrap: anywhere; }
 .apoio { margin: 0; color: var(--tinta-2); }
 .escolha { display: grid; gap: var(--e-3); min-width: 0; }
+/* #2930: o celular de quem está sem telefone abre embaixo do nome, na largura da linha. */
+.lista li:has(.celular) { flex-wrap: wrap; }
+.celular { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e-3); flex: 1 1 100%; min-width: 0; }
+.celular > :first-child { flex: 1 1 14rem; min-width: 0; }
 .observacoes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--e-3); border-radius: var(--r-1); background: var(--preenchimento); }
 .historico { border-top: 1px solid var(--linha); padding-top: var(--e-3); }
 .historico summary { cursor: pointer; min-height: var(--toque); display: flex; align-items: center; font-weight: 600; }

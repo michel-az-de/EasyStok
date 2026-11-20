@@ -185,7 +185,7 @@ public class AtendimentoConversasController(
     public Task<IActionResult> AbrirDoCliente([FromBody] AbrirConversaDoClienteBody body,
         [FromServices] AbrirConversaDoClienteUseCase useCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await useCase.ExecuteAsync(
-            new AbrirConversaDoClienteCommand(currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId), ct)));
+            new AbrirConversaDoClienteCommand(currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId, body.Celular), ct)));
 
     [SwaggerOperation(Summary = "Messages that did not reach the customer (S59)",
         Description = "Saída que falhou, mais recente primeiro: inclui a que espera o cliente responder ao modelo de retomada e a que saiu por SMS.")]
@@ -464,7 +464,7 @@ public sealed record IniciarConversaClienteBody(
     Guid ClienteId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null,
     bool Confirmar = false);
 
-public sealed record AbrirConversaDoClienteBody(Guid ClienteId, Guid? EmpresaId = null);
+public sealed record AbrirConversaDoClienteBody(Guid ClienteId, Guid? EmpresaId = null, [property: MaxLength(32)] string? Celular = null);
 
 public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda, bool Confirmar = false);
 

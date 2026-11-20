@@ -3,6 +3,7 @@ import { useAcoes } from '../../../aplicacao/contextos'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
+import { erroDoCelular } from '../../../dominio/celularDoPedido'
 import { telefoneDoE164 } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import css from './pedidos.module.css'
@@ -19,6 +20,15 @@ export function EscolherClienteDoPedido({ novoPedido, aoFechar }) {
   const busca = termo.trim()
   const ativa = Boolean(buscarClientesParaChamar) && busca.length >= MINIMO_DE_LETRAS
   const ocupado = Boolean(novoPedido.abrindo)
+  // #2930: cliente sem telefone no cadastro. O celular é pedido aqui e a API grava no cadastro ao abrir o pedido.
+  const [pedeCelular, mudarPedeCelular] = useState({ id: null, texto: '', erro: null })
+  function abrirComCelular(evento, cliente) {
+    evento.preventDefault()
+    const celular = pedeCelular.texto
+    const erro = erroDoCelular(celular)
+    if (erro) { mudarPedeCelular((atual) => ({ ...atual, erro })); return }
+    novoPedido.iniciar(cliente.id, { celular })
+  }
 
   useEffect(() => {
     if (!ativa) return undefined
@@ -47,9 +57,16 @@ export function EscolherClienteDoPedido({ novoPedido, aoFechar }) {
               : <ul className={css.lista} aria-label="Clientes encontrados">{achados.lista.map((cliente) => (
                 <li key={cliente.id}>
                   <span><strong>{cliente.nome || 'Cliente sem nome'}</strong><small>{telefoneDoE164(cliente.telefone) || 'Sem telefone no cadastro'}</small></span>
-                  <Botao variante="primario" disabled={ocupado} onClick={() => novoPedido.iniciar(cliente.id)} aria-label={`Novo pedido de ${cliente.nome || 'cliente sem nome'}`}>
+                  {pedeCelular.id !== cliente.id && <Botao variante="primario" disabled={ocupado} aria-label={`Novo pedido de ${cliente.nome || 'cliente sem nome'}`}
+                    onClick={() => (cliente.telefone ? novoPedido.iniciar(cliente.id) : mudarPedeCelular({ id: cliente.id, texto: '', erro: null }))}>
                     {novoPedido.abrindo === cliente.id ? 'Abrindo…' : 'Novo pedido'}
-                  </Botao>
+                  </Botao>}
+                  {pedeCelular.id === cliente.id && <form className={css.celular} onSubmit={(e) => abrirComCelular(e, cliente)} noValidate>
+                    <CampoTexto rotulo="Celular com DDD" tipo="tel" inputMode="tel" autoComplete="off" autoFocus placeholder="(11) 98888-7777"
+                      value={pedeCelular.texto} erro={pedeCelular.erro} dica="Fica gravado no cadastro do cliente."
+                      onChange={(e) => mudarPedeCelular({ id: cliente.id, texto: e.target.value, erro: null })} />
+                    <Botao tipo="submit" variante="primario" disabled={ocupado}>{novoPedido.abrindo === cliente.id ? 'Abrindo…' : 'Abrir pedido'}</Botao>
+                  </form>}
                 </li>
               ))}</ul>}
     </div>
