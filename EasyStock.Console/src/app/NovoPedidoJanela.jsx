@@ -3,9 +3,10 @@ import { Botao } from '../componentes/Botao'
 import { CampoTexto } from '../componentes/Campo'
 import { Modal } from '../componentes/Modal'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
-import { useSimulacaoDoPedido } from '../aplicacao/useSimulacaoDoPedido'
+import { useSimulacaoDoPedidoComErro } from '../aplicacao/useSimulacaoDoPedido'
 import {
-  ajustarNaJanela, rascunhoDaMontagem, registrarDaJanela, restaurarRascunho, somarNaJanela,
+  ajustarNaJanela, cadastrarEnderecoDaJanela, faltaEndereco, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela,
+  restaurarRascunho, somarNaJanela, textoDoErro,
 } from '../aplicacao/janelaDoPedido'
 import { EscolhaDeMeio } from '../features/ficha-cliente/EscolhaDeMeio'
 import { SeletorJanelaApi } from '../features/ficha-cliente/SeletorJanelaApi'
@@ -48,6 +49,12 @@ function Montagem({ janela, conversa }) {
   const [registrando, setRegistrando] = useState(false)
   const [erro, setErro] = useState(null)
   const [descartando, setDescartando] = useState(false)
+  // Entrega e endereço como na comanda: a API usa o endereço do cadastro; sem ele, a janela o cadastra aqui.
+  const entrega = 'entrega'
+  const [enderecoTexto, setEnderecoTexto] = useState(() => conversa.cliente?.endereco ?? conversa.cliente?.enderecoCapturado ?? '')
+  const [enderecoCadastrado, setEnderecoCadastrado] = useState(null)
+  const [cadastrando, setCadastrando] = useState(false)
+  const [erroEndereco, setErroEndereco] = useState(null)
   const restaurado = useRef(false)
 
   // Reabrir a mesma cliente: refaz a montagem com o cardápio de hoje e volta ao passo em que parou.
@@ -62,6 +69,7 @@ function Montagem({ janela, conversa }) {
       for (let i = 0; i < linha.qtd; i += 1) somarNaJanela(acoes, janela, item)
       if (linha.obs) acoes.ajustarObservacao(janela.conversaId, linha.sku, linha.obs)
     }
+    if (volta.endereco) setEnderecoTexto(volta.endereco)
     if (volta.janela) acoes.escolherJanela(janela.conversaId, volta.janela)
     if (volta.meio) acoes.escolherMeioPagamento?.(janela.conversaId, volta.meio)
     setAvisos(volta.avisos)
@@ -71,10 +79,12 @@ function Montagem({ janela, conversa }) {
   // Fechar, trocar de tela ou recarregar guarda a montagem (sessionStorage, por cliente).
   useEffect(() => {
     if (!restaurado.current || registrando) return
-    gravarRascunhoDoPedido(sessao, janela.clienteId, rascunhoDaMontagem(janela, pedido, passo, cardapio))
-  }, [pedido, passo])
+    gravarRascunhoDoPedido(sessao, janela.clienteId, rascunhoDaMontagem(janela, pedido, passo, cardapio, { entrega, endereco: enderecoTexto }))
+  }, [pedido, passo, enderecoTexto])
 
-  const simulacao = useSimulacaoDoPedido({ conversaId: janela.conversaId, clienteId: janela.clienteId, pedido, ativo: passo !== 'itens' })
+  const { simulacao, erro: erroSimulacao } = useSimulacaoDoPedidoComErro({
+    conversaId: janela.conversaId, clienteId: janela.clienteId, endereco: enderecoCadastrado, pedido, ativo: passo !== 'itens',
+  })
   const ativos = useMemo(() => filtrarCardapio(itensAtivos(cardapio), { busca }).filter((i) => disponivelHoje(i)), [cardapio, busca])
   const itens = pedido.itens ?? []
   const total = simulacao?.total ?? itens.reduce((soma, l) => soma + (itemPorSku(cardapio, l.sku)?.preco ?? 0) * l.qtd, 0)
@@ -89,12 +99,19 @@ function Montagem({ janela, conversa }) {
     })
     if (resultado.erro) { setErro(resultado.erro); setRegistrando(false) }
   }
+  async function cadastrarEndereco() {
+    setCadastrando(true); setErroEndereco(null)
+    const r = await cadastrarEnderecoDaJanela({ acoes, conversa, texto: enderecoTexto })
+    if (r.erro) setErroEndereco(r.erro)
+    else setEnderecoCadastrado(enderecoTexto.trim())
+    setCadastrando(false)
+  }
   function descartar() {
     apagarRascunhoDoPedido(sessao, janela.clienteId)
     for (const linha of itens) acoes.removerItem(janela.conversaId, linha.sku)
     fechar()
   }
-  const podeAvancar = passo === 'itens' ? itens.length > 0 : passo === 'entrega' ? Boolean(pedido.janela && pedido.meio) : false
+  const podeAvancar = passo === 'itens' ? itens.length > 0 : passo === 'entrega' ? podeAvancarDaEntrega({ pedido, entrega, erroSimulacao }) : false
   const anterior = PASSOS[PASSOS.findIndex((p) => p.id === passo) - 1]
   const proximo = PASSOS[PASSOS.findIndex((p) => p.id === passo) + 1]
 
@@ -140,6 +157,12 @@ function Montagem({ janela, conversa }) {
       {passo === 'entrega' && (
         <>
           <SeletorJanelaApi key={janela.conversaId} pedido={pedido} editavel aoEscolher={(j, avisar) => acoes.escolherJanela(janela.conversaId, j, avisar)} />
+          <h3 className={css.subtitulo}>Endereço de entrega</h3>
+          <CampoTexto rotulo="Endereço de entrega" value={enderecoTexto} onChange={(e) => { setEnderecoTexto(e.target.value); setErroEndereco(null) }} />
+          <Botao disabled={cadastrando || !enderecoTexto.trim()} onClick={cadastrarEndereco}>{cadastrando ? 'Cadastrando…' : 'Cadastrar endereço'}</Botao>
+          {erroEndereco && <p className={css.erro} role="alert">{erroEndereco}</p>}
+          {enderecoCadastrado && !faltaEndereco(erroSimulacao) && <p className={css.aviso} role="status">Endereço cadastrado: {enderecoCadastrado}</p>}
+          {erroSimulacao && <p className={css.erro} role="alert">{textoDoErro(erroSimulacao)}</p>}
           <h3 className={css.subtitulo}>Forma de pagamento</h3>
           <EscolhaDeMeio escolhido={pedido.meio ?? null} pedido={pedido} conversaId={janela.conversaId} aoEscolher={(meio) => acoes.escolherMeioPagamento(janela.conversaId, meio)} />
         </>

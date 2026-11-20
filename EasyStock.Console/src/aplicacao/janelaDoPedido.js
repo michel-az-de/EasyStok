@@ -1,4 +1,5 @@
 import { disponivelHoje, itemPorSku } from '../dominio/cardapio'
+import { identidadeDaEdicao } from '../dominio/identidadeDaEdicao'
 import { temRascunhoDoPedido } from '../infra/api/rascunhosDoPedido'
 
 // #2921: regras puras da janela "Novo pedido" na tela. A montagem mora em `conversas[].pedido` do Provider (o mesmo
@@ -20,12 +21,36 @@ export const ajustarNaJanela = (acoes, janela, sku, delta) => {
 export async function registrarDaJanela({ acoes, janela, meio, enviarAoCliente = true, aoRegistrar }) {
   if (!janela?.conversaId) return { erro: 'Abra o Novo pedido de novo.' }
   const resposta = await acoes.gerarPedido(janela.conversaId, meio ?? null, enviarAoCliente)
-  if (resposta?.erro) return { erro: resposta.erro }
+  if (resposta?.erro) return { erro: faltaEndereco({ status: 409, message: resposta.erro }) ? `${resposta.erro} Volte ao passo Entrega e pagamento e cadastre o endereço.` : resposta.erro }
   aoRegistrar?.(resposta)
   return { ok: true, pedido: resposta ?? null }
 }
 
-export function rascunhoDaMontagem(janela, pedido, passo = 'itens', cardapio = []) {
+// Entrega e endereço (como a comanda): a API usa o endereço do cadastro do cliente. Sem ele, 409 na simulação e no
+// Registrar. O caminho é cadastrar o endereço aqui, pelo mesmo `editarDadoCliente('endereco')` da Ficha.
+export const faltaEndereco = (erro) => erro?.status === 409 && /endere[cç]o/i.test(erro.message ?? '')
+
+export const podeAvancarDaEntrega = ({ pedido, entrega = 'entrega', erroSimulacao = null }) =>
+  Boolean(pedido?.janela && pedido?.meio) && !(entrega !== 'retirada' && faltaEndereco(erroSimulacao))
+
+// Texto claro para qualquer recusa da API; a de endereço diz onde resolver.
+export function textoDoErro(erro) {
+  const texto = erro?.message || 'Não foi possível calcular o pedido. Tente de novo.'
+  return faltaEndereco(erro) ? `${texto} Cadastre o endereço no passo Entrega e pagamento.` : texto
+}
+
+export async function cadastrarEnderecoDaJanela({ acoes, conversa, texto }) {
+  const endereco = (texto ?? '').trim()
+  if (!endereco) return { erro: 'Escreva o endereço de entrega.' }
+  try {
+    const r = await acoes.editarDadoCliente(conversa.id, 'endereco', endereco, undefined, identidadeDaEdicao(conversa))
+    return r?.erro ? { erro: r.erro } : { ok: true }
+  } catch (falha) {
+    return { erro: falha.message || 'Não foi possível cadastrar o endereço. Tente de novo.' }
+  }
+}
+
+export function rascunhoDaMontagem(janela, pedido, passo = 'itens', cardapio = [], { entrega, endereco } = {}) {
   if (!janela?.clienteId || !pedido?.itens?.length) return null
   return {
     clienteId: janela.clienteId,
@@ -34,7 +59,8 @@ export function rascunhoDaMontagem(janela, pedido, passo = 'itens', cardapio = [
     itens: pedido.itens.map((l) => ({ sku: l.sku, qtd: l.qtd, obs: l.obs ?? '', nome: itemPorSku(cardapio, l.sku)?.nome ?? null })),
     janela: pedido.janela ?? null,
     meio: pedido.meio ?? null,
-    entrega: pedido.entrega ?? 'entrega',
+    entrega: entrega ?? pedido.entrega ?? 'entrega',
+    endereco: endereco ?? null,
   }
 }
 
@@ -48,7 +74,8 @@ export function restaurarRascunho(rascunho, cardapio) {
       avisos.push(`${prato?.nome ?? linha.nome ?? 'Um item'} saiu do cardápio e foi tirado do pedido`)
     } else itens.push(linha)
   }
-  return { itens, avisos, passo: rascunho?.passo ?? 'itens', janela: rascunho?.janela ?? null, meio: rascunho?.meio ?? null }
+  return { itens, avisos, passo: rascunho?.passo ?? 'itens', janela: rascunho?.janela ?? null, meio: rascunho?.meio ?? null,
+    entrega: rascunho?.entrega ?? 'entrega', endereco: rascunho?.endereco ?? null }
 }
 
 export const novoPedidoDisponivel = ({ abrirConversaDoCliente, permite, acoes }) =>
