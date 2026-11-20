@@ -3,15 +3,18 @@ using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Storefront;
+using EasyStock.Domain.Sales;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
@@ -46,7 +49,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     IPedidoRepository? pedidos = null,
     IRegraAutomaticaRepository? regrasAutomaticas = null,
     PerfilClienteWhatsApp? perfilCliente = null,
-    RespostaSemIa? respostaSemIa = null)
+    RespostaSemIa? respostaSemIa = null,
+    INotificadorService? notificador = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -312,6 +316,17 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         var botaoId = msg.BotaoRespostaId ?? msg.BotaoPayload;
         var texto = msg.Tipo is "interactive" or "button" ? null : CortarNoLimite(msg.TextoCorpo);
+
+        // #2992: o cliente desistiu do pedido que a equipe atende. A equipe é avisada uma vez e a cobrança daquele pedido para.
+        if (existenteConversa is not null && pedidos is not null && notificador is not null
+            && conversa.PedidoEmAndamentoId is { } pedidoDaConversa
+            && DetectorDesistenciaPedido.EhDesistencia(texto)
+            && await pedidos.GetByIdAsync(empresaId, pedidoDaConversa) is { StatusEnum: StatusPedido.AguardandoPagamento }
+            && conversa.MarcarClienteDesistiuDoPedido(pedidoDaConversa))
+        {
+            await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(empresaId, conversa.Id, nomePerfil,
+                "O cliente desistiu do pedido: confira e decida o acerto com ele", ct);
+        }
         // Resposta de lista ou de fluxo não traz o id do botão: fica o registro, sem o tipo Botao.
         var tipoConteudo = MapearTipoConteudo(msg.Tipo);
         if (tipoConteudo == TipoConteudoMensagem.Botao && string.IsNullOrWhiteSpace(botaoId))

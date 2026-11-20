@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -42,6 +43,9 @@ public enum ResultadoExpiracaoCobranca
     /// <c>AguardandoPagamento</c> e a conversa recebe o aviso; a atendente reemite ou cancela.
     /// </summary>
     AguardandoAtendente = 7,
+
+    /// <summary>#2992: o cliente desistiu do pedido na conversa assumida. Sem link novo, sem cancelamento.</summary>
+    ClienteDesistiu = 8,
 }
 
 /// <summary>
@@ -66,6 +70,7 @@ public enum ResultadoExpiracaoCobranca
 public sealed class ProcessarCobrancaVencidaUseCase(
     IPedidoStorefrontRepository pedidoRepository,
     ICobrancaPedidoRepository cobrancaRepository,
+    IConversaRepository conversas,
     GerarCobrancaPedidoUseCase gerarCobranca,
     CancelarPedidoUseCase cancelarPedido,
     AvisoCobrancaConversa aviso,
@@ -148,6 +153,9 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         return (await ConferirPagamentoPedidoUseCase.ConsultarAsync(mercadoPagoClient, confirmarPagamento, item, ct)).Confirmado;
     }
 
+    private async Task<bool> ClienteDesistiuDoPedidoAsync(CobrancaPedidoVencida item, Guid conversaId, Guid pedidoId, CancellationToken ct) =>
+        (await conversas.ObterPorIdAsync(item.EmpresaId, conversaId, ct))?.ClienteDesistiuDoPedido(pedidoId) == true;
+
     private async Task<(ResultadoExpiracaoCobranca, Guid?, string?)> ProcessarNoLockAsync(
         CobrancaPedidoVencida item, CancellationToken ct)
     {
@@ -167,6 +175,14 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         {
             await unitOfWork.CommitAsync();
             return (ResultadoExpiracaoCobranca.Expirada, null, null);
+        }
+
+        // #2992: o cliente desistiu do pedido na conversa assumida. A equipe já foi avisada na entrada; aqui não há
+        // link novo, aviso de link vencido nem cancelamento. O pedido segue AguardandoPagamento.
+        if (cobranca.ConversaId is { } conversaDaCobranca && await ClienteDesistiuDoPedidoAsync(item, conversaDaCobranca, pedido.Id, ct))
+        {
+            await unitOfWork.CommitAsync();
+            return (ResultadoExpiracaoCobranca.ClienteDesistiu, null, null);
         }
 
         if (cobranca.Tentativa < CobrancaPedido.TentativaMaxima && cobranca.ConversaId is { } conversaId)
