@@ -9,23 +9,21 @@ namespace EasyStock.Infra.Async.Pdf;
 
 /// <summary>
 /// O resumo do pedido para o cliente conferir no WhatsApp (#2544, S73, D2): 90 mm de largura e altura contínua, PNG em
-/// 200 dpi, numa imagem só. Desde a #2929 sai com a marca: Lora nos títulos, Nunito Sans no corpo e as cores do
-/// Console (<c>tokens.css</c>). As fontes vão embutidas no assembly, porque o servidor não as tem instaladas.
+/// 200 dpi, numa imagem só. Desde a #2929 sai com a marca: Lora nos títulos, Nunito Sans no corpo e as cores da marca
+/// (<see cref="MarcaDaCasa"/>). As fontes vão embutidas no assembly, porque o servidor não as tem instaladas.
 /// </summary>
 public sealed class ResumoPedidoRenderer : IRenderizadorResumoPedido
 {
     private const float LarguraMm = 90;
     private const int DpiImagem = 200;
-    private const string FonteTitulo = "Lora";
-    private const string FonteCorpo = "Nunito Sans";
-
-    // Mesmos valores de EasyStock.Console/src/estilos/tokens.css.
-    private const string Marca = "#A25803";
-    private const string MarcaForte = "#874902";
-    private const string MarcaClaro = "#FFF0D8";
-    private const string Tinta = "#302A25";
-    private const string Tinta3 = "#6B6258";
-    private const string Papel = "#FEFEFE";
+    private const string FonteTitulo = MarcaDaCasa.FonteTitulo;
+    private const string FonteCorpo = MarcaDaCasa.FonteCorpo;
+    private const string Marca = MarcaDaCasa.Marca;
+    private const string MarcaForte = MarcaDaCasa.MarcaForte;
+    private const string MarcaClaro = MarcaDaCasa.MarcaClaro;
+    private const string Tinta = MarcaDaCasa.Cacau;
+    private const string Tinta3 = MarcaDaCasa.CacauSuave;
+    private const string Papel = MarcaDaCasa.Papel;
 
     private static readonly CultureInfo PtBr = new("pt-BR");
 
