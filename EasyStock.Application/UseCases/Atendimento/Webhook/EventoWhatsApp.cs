@@ -27,7 +27,15 @@ public sealed record MensagemRecebidaWhatsApp(
     string? MidiaMime,
     string? BotaoRespostaId,
     string? BotaoPayload,
-    LocalizacaoWhatsApp? Localizacao = null);
+    LocalizacaoWhatsApp? Localizacao = null,
+    ReferralAnuncioWhatsApp? Referral = null);
+
+/// <summary>
+/// <c>messages[].referral</c> da Cloud API: a primeira mensagem de quem clicou num anúncio Click-to-WhatsApp (#2928).
+/// <see cref="SourceUrl"/> e <see cref="Body"/> ficam só no parse; a origem gravada usa id, título e <see cref="CtwaClid"/>.
+/// </summary>
+public sealed record ReferralAnuncioWhatsApp(
+    string? SourceUrl, string? SourceId, string? SourceType, string? Headline, string? Body, string? MediaType, string? CtwaClid);
 
 /// <summary>Mensagem do tipo <c>location</c>: as coordenadas e, quando o cliente escolheu um lugar, nome e endereço.</summary>
 public sealed record LocalizacaoWhatsApp(double Latitude, double Longitude, string? Nome, string? Endereco)

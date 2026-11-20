@@ -12,6 +12,7 @@ using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Storefront;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
@@ -276,6 +277,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         identificacao?.IdentidadePendente == true
         || identificacao?.Cliente is { Bloqueado: true } or { AtendimentoAutomaticoPausado: true };
 
+    /// <summary>
+    /// #2928: ponto único que monta a origem do anúncio Click-to-WhatsApp. Sem <c>referral</c>, null (a conversa não perde a anterior).
+    /// O <c>ctwa_clid</c> fica DESLIGADO (null): a política de privacidade do site ainda não registra a base legal para
+    /// guardá-lo (spec, riscos). Para ligar, depois de atualizar a política, troque o null por <c>r.CtwaClid</c>.
+    /// </summary>
+    private static OrigemAnuncio? OrigemDoAnuncio(MensagemRecebidaWhatsApp msg) =>
+        msg.Referral is { } r ? OrigemAnuncio.DoAnuncioWhatsApp(r.SourceId, r.Headline, ctwaClid: null, msg.Timestamp) : null;
+
     private async Task<(Conversa, Mensagem, ConfiguracaoAtendimento, IdentificacaoCliente?)> GravarEntradaAsync(
         Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, DateTime enviadaEm, CancellationToken ct)
     {
@@ -297,6 +306,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         }
 
         conversa.RegistrarEntrada(enviadaEm);
+        conversa.RegistrarOrigemAnuncio(OrigemDoAnuncio(msg));
         if (existenteConversa is null)
             await conversaRepository.AddAsync(conversa, ct);
 
