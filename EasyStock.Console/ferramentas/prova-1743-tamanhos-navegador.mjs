@@ -120,6 +120,8 @@ try {
     await page.mouse.up()
     await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 800 g', exact: true }).waitFor()
     await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 1 kg no pedido', exact: true }).click()
+    // #2982: `.count()` não espera; a linha de 1 kg precisa existir antes da contagem lá embaixo.
+    await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 1 kg', exact: true }).waitFor()
     await foto(page, '01b-arrasto-tamanho-1280')
     await page.getByRole('button', { name: 'Tirar uma unidade de Lasanha Bolonhesa Clássica 800 g', exact: true }).click()
     assert.equal(await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 800 g', exact: true }).count(), 0)

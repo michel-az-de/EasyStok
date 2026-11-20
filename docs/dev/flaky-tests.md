@@ -10,7 +10,7 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
-## ⚠️ TOLERADO (#2973): `prova-1743-tamanhos-navegador` conta a linha de 1 kg antes de ela aparecer
+## ✅ CORRIGIDO (#2982, registrado na #2973): `prova-1743-tamanhos-navegador` conta a linha de 1 kg antes de ela aparecer
 
 Falhou 1 vez no workflow `console` do master em `925309989` (20/11/2026, 18:08Z), linha 127:
 `Retirar 800 g preserva 1 kg`, esperado 1 e veio 0. A asserção de 600 g, logo antes, passou. O rerun do mesmo
@@ -25,6 +25,7 @@ SHA (attempt 2, 18:28Z) passou sem mudança nenhuma; a mesma prova também passo
   `await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 1 kg', exact: true }).waitFor()`
   logo depois do clique de 1 kg.
 - **Quando promover a "corrigir":** na segunda falha com a mesma mensagem, ou antes, se alguém mexer nessa prova.
+- **Correção (#2982):** o `waitFor()` acima entrou logo depois do clique de 1 kg.
 
 ---
 
