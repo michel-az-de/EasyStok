@@ -1,4 +1,6 @@
 import { disponivelHoje, itemPorSku } from '../dominio/cardapio'
+import { telefoneNaTela } from '../dominio/cadastros'
+import { erroDoCelular } from '../dominio/celularDoPedido'
 import { identidadeDaEdicao } from '../dominio/identidadeDaEdicao'
 import { pedidoEncerrado } from '../dominio/pedido'
 import { temRascunhoDoPedido } from '../infra/api/rascunhosDoPedido'
@@ -74,6 +76,25 @@ export async function cadastrarEnderecoDaJanela({ acoes, conversa, texto }) {
     return r?.erro ? { erro: r.erro } : { ok: true }
   } catch (falha) {
     return { erro: falha.message || 'Não foi possível cadastrar o endereço. Tente de novo.' }
+  }
+}
+
+// #2944 (E1-21): o resumo sai pelo WhatsApp; sem celular (nem o número do canal) a cliente não é avisada. A loja precisa saber antes de registrar.
+export const avisoSemCelular = (conversa, enviarAoCliente) => {
+  if (!enviarAoCliente) return null
+  const cliente = conversa?.cliente ?? {}
+  return cliente.telefone || (conversa?.canal === 'WhatsApp' && cliente.telefoneCanal) ? null : 'A cliente não será avisada: falta o celular'
+}
+
+// Atalho do aviso: grava o celular no cadastro pelo mesmo `editarDadoCliente('telefone')` da Ficha, com a regra do #2930.
+export async function cadastrarCelularDaJanela({ acoes, conversa, texto }) {
+  const erro = erroDoCelular(texto)
+  if (erro) return { erro }
+  try {
+    const r = await acoes.editarDadoCliente(conversa.id, 'telefone', telefoneNaTela(texto), undefined, identidadeDaEdicao(conversa))
+    return r?.erro ? { erro: r.erro } : { ok: true }
+  } catch (falha) {
+    return { erro: falha.message || 'Não foi possível gravar o celular. Tente de novo.' }
   }
 }
 

@@ -9,7 +9,7 @@ import { ligarVoltarDaJanela } from '../aplicacao/historicoDaJanela'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useSimulacaoDoPedidoComErro } from '../aplicacao/useSimulacaoDoPedido'
 import {
-  ajustarNaJanela, cadastrarEnderecoDaJanela, motivoDeBloqueio, textoDaFaixa, cardapioPronto, comandaDeFora, enderecoVigente, mostrarAvisoDePedidoEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, precisaNovaComanda, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela, somaEhDaJanela,
+  ajustarNaJanela, avisoSemCelular, cadastrarCelularDaJanela, cadastrarEnderecoDaJanela, motivoDeBloqueio, textoDaFaixa, cardapioPronto, comandaDeFora, enderecoVigente, mostrarAvisoDePedidoEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, precisaNovaComanda, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela, somaEhDaJanela,
   restaurarRascunho, somarNaJanela, textoDoErro,
 } from '../aplicacao/janelaDoPedido'
 import { EscolhaDeMeio } from '../features/ficha-cliente/EscolhaDeMeio'
@@ -61,6 +61,7 @@ function Montagem({ janela, conversa }) {
   const [enderecoCadastrado, setEnderecoCadastrado] = useState(null)
   const [cadastrando, setCadastrando] = useState(false)
   const [erroEndereco, setErroEndereco] = useState(null)
+  const [celular, setCelular] = useState({ texto: '', erro: null, gravando: false })
   const restaurado = useRef(false)
   // #2944 (E1-02): a troca de passo remove o botão focado; o foco vai ao título do passo (WCAG 2.4.3).
   const tituloDoPasso = useRef(null)
@@ -137,6 +138,11 @@ function Montagem({ janela, conversa }) {
     if (r.erro) setErroEndereco(r.erro)
     else setEnderecoCadastrado(enderecoTexto.trim())
     setCadastrando(false)
+  }
+  async function cadastrarCelular() {
+    setCelular((c) => ({ ...c, erro: null, gravando: true }))
+    const r = await cadastrarCelularDaJanela({ acoes, conversa, texto: celular.texto })
+    setCelular((c) => ({ ...c, erro: r.erro ?? null, gravando: false }))
   }
   function descartar() {
     apagarRascunhoDoPedido(sessao, janela.clienteId)
@@ -219,6 +225,12 @@ function Montagem({ janela, conversa }) {
       {passo === 'revisar' && (
         <>
           <Linhas itens={itens} cardapio={cardapio} janela={janela} acoes={acoes} />
+          {avisoSemCelular(conversa, enviarAoCliente) && <>
+            <p className={css.aviso} role="status">{avisoSemCelular(conversa, enviarAoCliente)}</p>
+            <CampoTexto rotulo="Celular com DDD" tipo="tel" inputMode="tel" autoComplete="off" placeholder="(11) 98888-7777" value={celular.texto} erro={celular.erro}
+              dica="Fica gravado no cadastro da cliente." onChange={(e) => setCelular({ texto: e.target.value, erro: null, gravando: false })} />
+            <Botao disabled={celular.gravando || !celular.texto.trim()} motivo={celular.gravando ? 'Gravando…' : 'Digite o celular com DDD'} onClick={cadastrarCelular}>{celular.gravando ? 'Gravando…' : 'Salvar celular'}</Botao>
+          </>}
           <dl className={css.resumo}>
             {simulacao?.frete != null && <><dt>Frete</dt><dd>{moeda(simulacao.frete)}</dd></>}
             <dt>Total</dt><dd aria-busy={calculando}>{moeda(total)}</dd>

@@ -86,4 +86,31 @@ await caso('19b. a janela anuncia ao registrar e a lista recarrega e destaca', (
   assert.match(painel, /consulta.novoId/)
   assert.match(fonte('features/gestao/cadastros/pedidos.module.css'), /\.linhaNova/)
 })
+
+// E1-21: cliente sem celular não é avisada; a loja precisa saber antes de registrar.
+const jp = await import('../src/aplicacao/janelaDoPedido.js')
+await caso('21a. sem celular e com envio ligado, o Revisar diz que a cliente não será avisada', () => {
+  assert.equal(typeof jp.avisoSemCelular, 'function', 'avisoSemCelular ainda não existe')
+  const sem = { canal: 'Instagram', cliente: {} }
+  assert.equal(jp.avisoSemCelular(sem, true), 'A cliente não será avisada: falta o celular')
+  assert.equal(jp.avisoSemCelular(sem, false), null, 'sem envio o aviso não se aplica')
+  assert.equal(jp.avisoSemCelular({ canal: 'WhatsApp', cliente: { telefoneCanal: '5511988887777' } }, true), null, 'o número do WhatsApp conta')
+  assert.equal(jp.avisoSemCelular({ canal: 'Instagram', cliente: { telefone: '5511988887777' } }, true), null)
+})
+await caso('21b. o cadastro do celular valida e grava como a Ficha', async () => {
+  assert.equal(typeof jp.cadastrarCelularDaJanela, 'function', 'cadastrarCelularDaJanela ainda não existe')
+  const gravados = []
+  const acoes = { editarDadoCliente: async (...a) => { gravados.push(a); return {} } }
+  const conversa = { id: 'c1', cliente: {} }
+  assert.match((await jp.cadastrarCelularDaJanela({ acoes, conversa, texto: '1133334444' })).erro, /celular/i)
+  assert.equal(gravados.length, 0)
+  assert.deepEqual(await jp.cadastrarCelularDaJanela({ acoes, conversa, texto: '(11) 98888-7777' }), { ok: true })
+  assert.equal(gravados[0][1], 'telefone')
+})
+await caso('21c. o passo Revisar mostra a linha e o atalho para informar o número', () => {
+  const jsx = fonte('app/NovoPedidoJanela.jsx')
+  assert.match(jsx, /avisoSemCelular\(conversa, enviarAoCliente\)/)
+  assert.match(jsx, /cadastrarCelularDaJanela\(/)
+  assert.match(jsx, /Celular com DDD/)
+})
 fim()
