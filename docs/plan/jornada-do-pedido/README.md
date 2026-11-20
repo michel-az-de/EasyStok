@@ -2,7 +2,7 @@
 
 - Data: 2026-11-20
 - Base medida: `master` `6c93bfe0a`
-- Specs: [E1](e1-console-ux-copy-visual.md) (tier baixo) e [E2](e2-retirada-endereco-cliente-nova.md) (tier alto)
+- Specs: [E1](e1-console-ux-copy-visual.md) (tier baixo) e [E2](e2-retirada-endereco-cliente-nova.md) (tier alto) e [E3](e3-cobranca-pdf.md) (tier baixo)
 - Regra do plano: nada de micro PR. Cada entrega é UMA PR completa, testada (Red, Green), validada no navegador real (390 px e desktop, prints antes e depois), mergeada e deployada.
 
 ## 1. Problema
