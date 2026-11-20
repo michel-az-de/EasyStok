@@ -45,6 +45,8 @@ const salvarGeral = (c, identidadeEsperada) => chamarApi(BASE, {
     mensagemEncaminhamento: c.mensagemEncaminhamento,
     // S68 (#2597): como o robô chama a dona; null mantém, vazio volta a "a equipe".
     nomeDona: c.nomeDona ?? null,
+    // #2937: fecho do canhoto em imagem; null mantém, vazio tira.
+    fraseFechoCanhoto: c.fraseFechoCanhoto ?? null,
     respiroMinutos: Number(c.respiroMinutos),
     tempoPreparoPadraoMinutos: Number(c.tempoPreparoPadraoMinutos),
     // #1427: SLA de primeira resposta da loja (1..240); vazio mantém o atual.
