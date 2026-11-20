@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import * as api from '../infra/api/pedidosCadastroApi'
 export { listarPedidosDoCliente, obterPedido } from '../infra/api/pedidosCadastroApi'
+export { cancelarPedido } from '../infra/api/comandaApi'
 
 export function useListaPedidos(filtros, contexto) {
   const [resultado, definir] = useState({ itens: [], total: 0, carregando: true, erro: null, carregado: false })

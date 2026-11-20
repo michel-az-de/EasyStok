@@ -4,17 +4,18 @@ import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { contextoCadastro, useContextoVisualCadastro } from '../../../aplicacao/cadastros'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import { useNovoPedidoDoCliente } from '../../../aplicacao/novoPedidoDoCliente'
-import { obterPedido, useListaPedidos } from '../../../aplicacao/pedidosCadastro'
+import { cancelarPedido, obterPedido, useListaPedidos } from '../../../aplicacao/pedidosCadastro'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Combobox } from '../../../componentes/Combobox'
+import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { telefoneNaTela } from '../../../dominio/cadastros'
 import { horaCurta, moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import {
-  numeroDoPedido, ORDENS_PEDIDO, PAGINA_PEDIDOS, PERIODOS_PEDIDO, rotuloDaSituacao, rotuloDoCanal, SITUACOES_PEDIDO,
+  motivoParaNaoCancelar, numeroDoPedido, ORDENS_PEDIDO, PAGINA_PEDIDOS, PERIODOS_PEDIDO, rotuloDaSituacao, rotuloDoCanal, SITUACOES_PEDIDO,
   situacaoDoPagamento, situacaoPedeAcao, tituloDoPedido,
 } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
@@ -45,6 +46,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
   const [detalhe, mostrar] = useState(null)
   const [abrindo, abrir] = useState(null)
   const [erro, falhar] = useState(null)
+  const [cancelando, cancelar] = useState(null)
   const leitura = useRef(null)
   const tabela = useRef(null)
   const { conversas } = useAtendimento()
@@ -68,6 +70,16 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
       if (!controle.signal.aborted) mostrar(dados)
     } catch (e) { if (!controle.signal.aborted) falhar(e.message) }
     finally { if (!controle.signal.aborted) abrir(null) }
+  }
+
+  // #2944 (E1-17): o motivo é opcional na API. Cancelado, a lista recarrega e a Ficha relê a conversa pelo laço de sincronização.
+  async function confirmarCancelamento() {
+    const { item, motivo } = cancelando
+    cancelar({ ...cancelando, ocupado: true, erro: null })
+    try {
+      await cancelarPedido(item.id, motivo.trim() || undefined)
+      cancelar(null); consulta.recarregar(); globalThis.dispatchEvent(new Event('easystok:sincronizar-agora'))
+    } catch (e) { cancelar({ ...cancelando, ocupado: false, erro: e.message || 'Não foi possível cancelar o pedido. Tente de novo.' }) }
   }
 
   // A conversa da cliente já carregada no Atendimento; sem ela o detalhe não oferece o atalho.
@@ -115,7 +127,8 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
                 <td><span>{nome}</span>{(telefone || item.clienteApt) && <small>{[telefone, item.clienteApt && `Apto ${item.clienteApt}`].filter(Boolean).join(' · ')}</small>}</td>
                 <td>{situacaoNaLinha}</td>
                 <td className={css.valor}><span>{moeda(item.total)}</span>{(pagamento?.falta > 0 || pagamento?.sobra > 0) && <small className={css.falta}>{pagamento.texto}</small>}</td>
-                <td><Botao disabled={Boolean(abrindo)} onClick={() => verPedido(item)} aria-label={`Abrir ${tituloDoPedido(item)}, ${nome}`}>{abrindo === item.id ? 'Abrindo…' : 'Abrir'}</Botao></td>
+                <td><Botao disabled={Boolean(abrindo)} onClick={() => verPedido(item)} aria-label={`Abrir ${tituloDoPedido(item)}, ${nome}`}>{abrindo === item.id ? 'Abrindo…' : 'Abrir'}</Botao>
+                  <Botao variante="texto" disabled={Boolean(motivoParaNaoCancelar(item.status))} motivo={motivoParaNaoCancelar(item.status)} onClick={() => cancelar({ item, motivo: '' })} aria-label={`Cancelar pedido ${tituloDoPedido(item)}, ${nome}`}>Cancelar pedido</Botao></td>
               </tr>
             })}</tbody>
           </table>
@@ -130,6 +143,15 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
       </footer>
     </div>
     {escolhendoCliente && <EscolherClienteDoPedido novoPedido={novoPedido} aoFechar={() => escolherCliente(false)} />}
+    {cancelando && <Modal titulo={`Cancelar ${tituloDoPedido(cancelando.item)}?`} descricao="O pedido sai da fila e a cliente deixa de esperar por ele." focarCampo
+      aoFechar={cancelando.ocupado ? undefined : () => cancelar(null)} segurarFechamento={cancelando.ocupado}
+      rodape={<>
+        <Botao variante="perigo" disabled={cancelando.ocupado} motivo="Cancelando…" onClick={confirmarCancelamento}>{cancelando.ocupado ? 'Cancelando…' : 'Cancelar pedido'}</Botao>
+        <Botao disabled={cancelando.ocupado} onClick={() => cancelar(null)}>Manter pedido</Botao>
+      </>}>
+      {cancelando.erro && <p className={base.erro} role="alert">{cancelando.erro}</p>}
+      <CampoTexto rotulo="Motivo (opcional)" maxLength={500} value={cancelando.motivo} onChange={(e) => cancelar({ ...cancelando, motivo: e.target.value })} />
+    </Modal>}
     {detalhe && <DetalhePedido dados={detalhe} aoFechar={() => mostrar(null)} abrirConversa={abridorDaConversa(detalhe.pedido)} />}
   </section>
 }

@@ -36,6 +36,9 @@ const legivel = (texto) => {
 export const rotuloDaSituacao = (status) => situacaoDoToken(status)?.rotulo ?? (legivel(status) || 'Sem situação')
 export const situacaoPedeAcao = (status) => Boolean(situacaoDoToken(status)?.pedeAcao)
 
+// #2944 (E1-17): pedido entregue ou cancelado não volta atrás; o botão diz por que não cancela.
+export const motivoParaNaoCancelar = (status) => (status === 'entregue' ? 'Já foi entregue' : status === 'cancelado' ? 'Já foi cancelado' : null)
+
 // `Origem` é texto livre na API; os conhecidos ganham o nome que a loja usa.
 const CANAIS = {
   web: 'Painel',
