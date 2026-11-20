@@ -161,7 +161,9 @@ jobs:
         run: |
           set -euo pipefail
           dirs=""; for p in $INTEGRACAO; do dirs="$dirs $p/bin/Release"; done
-          tar -czf integracao.tgz $dirs listas partes
+          # Em Development a Api serve static web assets a partir do obj (staticwebassets.runtime.json).
+          estaticos="$(ls -d */obj/Release/net10.0/compressed 2>/dev/null || true)"
+          tar -czf integracao.tgz $dirs $estaticos listas partes
 
       - name: Upload binários
         uses: actions/upload-artifact@v6

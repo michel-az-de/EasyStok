@@ -103,14 +103,17 @@ internal sealed class PostgresCluster
     /// </summary>
     public async Task RecriarAsync(string banco, string modelo)
     {
-        NpgsqlConnection.ClearPool(new NpgsqlConnection(ConexaoDe(banco)));
+        // Todos os pools: o teste abre o banco também com outro usuário ou outros parâmetros, e a
+        // conexão ociosa morta pelo FORCE voltaria do pool com 57P01. Fechar ociosas de outros
+        // bancos só custa reabrir.
+        NpgsqlConnection.ClearAllPools();
         await ExecutarAsync($"DROP DATABASE IF EXISTS {Citar(banco)} WITH (FORCE)");
         await ExecutarAsync($"CREATE DATABASE {Citar(banco)} TEMPLATE {Citar(modelo)}");
     }
 
     public async Task DescartarAsync(string banco)
     {
-        NpgsqlConnection.ClearPool(new NpgsqlConnection(ConexaoDe(banco)));
+        NpgsqlConnection.ClearAllPools();
         await ExecutarAsync($"DROP DATABASE IF EXISTS {Citar(banco)} WITH (FORCE)");
     }
 
