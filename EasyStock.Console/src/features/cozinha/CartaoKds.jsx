@@ -88,7 +88,7 @@ export function CartaoKds({
       )}
       {!saindo && (
         <div className={css.acoesCartao}>
-          <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)} aria-label={doPedido('Ver comanda')}>Ver comanda</Botao>
+          <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)} aria-label={doPedido('Ver pedido')}>Ver pedido</Botao>
           {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}
           <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" rotulo="Imprimir pedido"
             aria-label={doPedido('Imprimir pedido')} />

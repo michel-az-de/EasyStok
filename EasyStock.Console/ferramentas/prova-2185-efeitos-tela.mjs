@@ -396,7 +396,7 @@ try {
     await botao.waitFor()
     assert.equal(await botao.isDisabled(), true)
     const id = await botao.getAttribute('aria-describedby')
-    assert.equal(await p.locator(`[id="${id}"]`).innerText(), 'Conversa concluída: não há comanda para montar.')
+    assert.equal(await p.locator(`[id="${id}"]`).innerText(), 'Conversa concluída: não há pedido para montar.')
     await ctx.close()
   })
 

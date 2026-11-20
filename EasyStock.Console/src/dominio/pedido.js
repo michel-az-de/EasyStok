@@ -1,4 +1,5 @@
 import { itemPorSku } from './cardapio.js'
+import { rotuloDoPedido } from './rotulos.js'
 import { passoPorId } from './esteira.js'
 import { faixaDeHorarios } from './entrega.js'
 import { dataCurtaComSemana } from './formato.js'
@@ -110,7 +111,7 @@ export function nomeDoPedido({ numeroComanda = null, numeroCurto = null, numeroD
   const dia = numeroDoDiaNaTela(numeroDoDia)
   const titulo = (partes) => [...partes, curto ? `ref ${curto}` : null].filter(Boolean).join(' · ')
   if (numeroComanda) {
-    const frase = `Comanda ${numeroComanda}`
+    const frase = rotuloDoPedido(numeroComanda)
     return { principal: frase, referencia: dia ? `nº ${dia}` : null, frase, titulo: titulo([frase, dia ? `nº ${dia}` : null]) }
   }
   if (dia) return { principal: `Nº ${dia}`, referencia: null, frase: `Pedido nº ${dia}`, titulo: titulo([`Nº ${dia}`]) }
