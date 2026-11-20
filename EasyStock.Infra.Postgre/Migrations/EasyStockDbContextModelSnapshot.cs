@@ -11612,6 +11612,70 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .WithMany()
                         .HasForeignKey("ClienteId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.OwnsOne("EasyStock.Domain.ValueObjects.OrigemAnuncio", "OrigemAnuncio", b1 =>
+                        {
+                            b1.Property<Guid>("ConversaId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Campanha")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<DateTimeOffset>("CapturadaEm")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("Conteudo")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Fonte")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("IdAnuncio")
+                                .HasMaxLength(60)
+                                .HasColumnType("character varying(60)");
+
+                            b1.Property<string>("IdClique")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)");
+
+                            b1.Property<string>("Meio")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Plataforma")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)");
+
+                            b1.Property<string>("Termo")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("TipoIdClique")
+                                .HasMaxLength(10)
+                                .HasColumnType("character varying(10)");
+
+                            b1.Property<string>("TituloAnuncio")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Via")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)");
+
+                            b1.HasKey("ConversaId");
+
+                            b1.ToTable("atendimento_conversas");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ConversaId");
+                        });
+
+                    b.Navigation("OrigemAnuncio");
                 });
 
             modelBuilder.Entity("EasyStock.Domain.Entities.Atendimento.CorridaExterna", b =>
@@ -12921,11 +12985,75 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasForeignKey("VendaId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.OwnsOne("EasyStock.Domain.ValueObjects.OrigemAnuncio", "OrigemAnuncio", b1 =>
+                        {
+                            b1.Property<Guid>("PedidoId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Campanha")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<DateTimeOffset>("CapturadaEm")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("Conteudo")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Fonte")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("IdAnuncio")
+                                .HasMaxLength(60)
+                                .HasColumnType("character varying(60)");
+
+                            b1.Property<string>("IdClique")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)");
+
+                            b1.Property<string>("Meio")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Plataforma")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)");
+
+                            b1.Property<string>("Termo")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("TipoIdClique")
+                                .HasMaxLength(10)
+                                .HasColumnType("character varying(10)");
+
+                            b1.Property<string>("TituloAnuncio")
+                                .HasMaxLength(120)
+                                .HasColumnType("character varying(120)");
+
+                            b1.Property<string>("Via")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)");
+
+                            b1.HasKey("PedidoId");
+
+                            b1.ToTable("pedidos");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PedidoId");
+                        });
+
                     b.Navigation("Cliente");
 
                     b.Navigation("Empresa");
 
                     b.Navigation("Loja");
+
+                    b.Navigation("OrigemAnuncio");
 
                     b.Navigation("Venda");
                 });
