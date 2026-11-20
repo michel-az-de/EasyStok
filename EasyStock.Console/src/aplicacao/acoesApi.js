@@ -207,7 +207,11 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     // #2921: "Iniciar" e "Chamar no WhatsApp": a conversa nova some da fila até a cliente responder; busca-a pelo id e
     // a retém enquanto selecionada. Sem achá-la, cai no caminho antigo (espera a sincronização).
     selecionarIniciada: async (id) => {
+      const antes = estadoRef.current.selecionadaId
       const resumo = await buscarConversaPorId(id).catch(() => null)
+      // Vigência: se a usuária escolheu outra conversa durante a espera, o GET tardio não rouba a seleção.
+      const agora = estadoRef.current.selecionadaId
+      if (agora != null && agora !== antes && agora !== id) return undefined
       return selecionar(id, resumo, { reter: true })
     },
     assumirAtendimento: assumirDaConversa.assumir,

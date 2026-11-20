@@ -5,7 +5,7 @@ import { Modal } from '../componentes/Modal'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useSimulacaoDoPedidoComErro } from '../aplicacao/useSimulacaoDoPedido'
 import {
-  ajustarNaJanela, cadastrarEnderecoDaJanela, cardapioPronto, comandaEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela,
+  ajustarNaJanela, cadastrarEnderecoDaJanela, cardapioPronto, comandaEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, precisaNovaComanda, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela,
   restaurarRascunho, somarNaJanela, textoDoErro,
 } from '../aplicacao/janelaDoPedido'
 import { EscolhaDeMeio } from '../features/ficha-cliente/EscolhaDeMeio'
@@ -63,6 +63,8 @@ function Montagem({ janela, conversa }) {
   // Reabrir a mesma cliente: refaz a montagem com o cardápio de hoje e volta ao passo em que parou.
   useEffect(() => {
     if (restaurado.current) return
+    // Pedido anterior já entregue ou cancelado: comanda nova (mesmo caminho do Atendimento) e restaura na volta.
+    if (precisaNovaComanda(conversa)) { acoes.novaComanda(janela.conversaId); return }
     if (comandaDaConversa.current || jaTemPedido) { restaurado.current = true; return }
     const guardado = lerRascunhoDoPedido(sessao, janela.clienteId)
     if (guardado && !cardapioPronto(cardapio)) return
@@ -79,7 +81,7 @@ function Montagem({ janela, conversa }) {
     if (volta.meio) acoes.escolherMeioPagamento?.(janela.conversaId, volta.meio)
     setAvisos(volta.avisos)
     setPasso(volta.itens.length > 0 ? volta.passo : 'itens')
-  }, [cardapio])
+  }, [cardapio, conversa.pedido])
 
   // Fechar, trocar de tela ou recarregar guarda a montagem (sessionStorage, por cliente).
   useEffect(() => {

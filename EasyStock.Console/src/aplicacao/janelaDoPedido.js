@@ -1,5 +1,6 @@
 import { disponivelHoje, itemPorSku } from '../dominio/cardapio'
 import { identidadeDaEdicao } from '../dominio/identidadeDaEdicao'
+import { pedidoEncerrado } from '../dominio/pedido'
 import { temRascunhoDoPedido } from '../infra/api/rascunhosDoPedido'
 
 // #2921: regras puras da janela "Novo pedido" na tela. A montagem mora em `conversas[].pedido` do Provider (o mesmo
@@ -28,11 +29,14 @@ export async function registrarDaJanela({ acoes, janela, meio, enviarAoCliente =
   return { ok: true, pedido: resposta }
 }
 
-// Conversa que já virou pedido: o modo API ainda não começa outra comanda nela (`novaComanda` é não ligada), então a
-// janela avisa na abertura em vez de deixar montar algo que o Registrar não criaria.
-export const pedidoJaCriadoNaConversa = (conversa) => Boolean(conversa?.pedido?.pedidoId)
+// Conversa com pedido ainda em andamento: o Registrar não criaria outro, então a janela avisa na abertura em vez de
+// deixar montar. Pedido entregue ou cancelado não trava (o backend não limpa `PedidoEmAndamentoId` nesse caso).
+export const pedidoJaCriadoNaConversa = (conversa) => Boolean(conversa?.pedido?.pedidoId) && !pedidoEncerrado(conversa.pedido)
+// Pedido anterior já encerrado: a janela começa comanda nova pelo mesmo `novaComanda` do Atendimento (só da tela;
+// o pedido nasce no EasyStok no Registrar).
+export const precisaNovaComanda = (conversa) => Boolean(conversa?.pedido?.pedidoId) && pedidoEncerrado(conversa.pedido)
 // Comanda em montagem que já estava na conversa (Atendimento/Balcão): não é rascunho da janela.
-export const comandaEmAndamento = (conversa) => (conversa?.pedido?.itens?.length ?? 0) > 0
+export const comandaEmAndamento = (conversa) => (conversa?.pedido?.itens?.length ?? 0) > 0 && !pedidoEncerrado(conversa.pedido)
 // Sem cardápio carregado todo item pareceria "fora do cardápio".
 export const cardapioPronto = (cardapio) => Array.isArray(cardapio) && cardapio.length > 0
 

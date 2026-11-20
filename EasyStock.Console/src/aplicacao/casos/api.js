@@ -28,7 +28,10 @@ export const casosApi = {
     const daJanela = locais.get(estado.janelaDoPedido?.conversaId)
     // #2921: a conversa que a equipe iniciou (Iniciar / Chamar no WhatsApp) e está selecionada também fica escondida
     // até a cliente responder; fica na lista enquanto selecionada e sai quando a atendente sai dela.
-    const retida = estado.selecaoRetida && estado.selecaoRetida === estado.selecionadaId ? locais.get(estado.selecionadaId) : null
+    // A retenção vale só enquanto o servidor ainda não a lista; depois, a cópia dele manda (encerrar/arquivar de outra atendente).
+    const listadaPeloServidor = conversas.some((c) => c.id === estado.selecaoRetida)
+    const selecaoRetida = estado.selecaoRetida && !listadaPeloServidor ? estado.selecaoRetida : null
+    const retida = selecaoRetida && selecaoRetida === estado.selecionadaId ? locais.get(estado.selecionadaId) : null
     const lidas = [daJanela, retida].reduce((lista, c) => (c && !lista.some((x) => x.id === c.id) ? [...lista, c] : lista), doServidor)
     const mescladas = mesmaLista(estado.conversas, lidas) ? estado.conversas : lidas
     const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
@@ -49,8 +52,9 @@ export const casosApi = {
     }
     // #1565: volta sem novidade devolve o mesmo estado; o Provider não recalcula nem a tela re-renderiza.
     if (mescladas === estado.conversas && selecionadaId === estado.selecionadaId && selecaoPendente === (estado.selecaoPendente ?? null)
+      && selecaoRetida === (estado.selecaoRetida ?? null)
       && automaticoPausado === estado.automaticoPausado && sincronizacao === estado.sincronizacao) return estado
-    return { ...estado, conversas: mescladas, selecionadaId, selecaoPendente, automaticoPausado, sincronizacao }
+    return { ...estado, conversas: mescladas, selecionadaId, selecaoPendente, selecaoRetida, automaticoPausado, sincronizacao }
   },
 
   [acao.ABRIR_JANELA_DO_PEDIDO]: (estado, { janela }) => ({ ...estado, janelaDoPedido: janela }),

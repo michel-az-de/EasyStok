@@ -45,6 +45,6 @@ const jsx = fonte('app/NovoPedidoJanela.jsx')
   assert.equal(j.cardapioPronto(undefined), false)
   assert.equal(j.cardapioPronto([{ sku: 'a' }]), true)
   assert.ok(jsx.includes('guardado && !cardapioPronto(cardapio)) return'), 'sem cardápio, não restaura nem marca restaurado')
-  assert.ok(jsx.includes('}, [cardapio])'), 'e tenta de novo quando o cardápio chega')
+  assert.ok(jsx.includes('}, [cardapio, conversa.pedido])'), 'e tenta de novo quando o cardápio chega')
 }
 console.log('prova-2921-janela-honesta: 3 blocos ok')
