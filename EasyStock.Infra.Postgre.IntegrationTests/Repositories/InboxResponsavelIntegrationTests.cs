@@ -26,6 +26,7 @@ public class InboxResponsavelIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var semDono = Conversa.Abrir(empresa.Id, "5511999990003", agora.AddSeconds(-2));
         var vinculoInvalido = Conversa.Abrir(empresa.Id, "5511999990004", agora.AddSeconds(-3));
         var alheia = Conversa.Abrir(outra.Id, "5511999990005", agora.AddSeconds(-4));
+        foreach (var c in new[] { minha, deOutra, semDono, vinculoInvalido, alheia }) c.RegistrarEntrada(agora); // #2921: sem entrada da cliente a conversa fica fora da fila
         minha.Assumir(agora, ana.Id); deOutra.Assumir(agora, homonima.Id);
         vinculoInvalido.Assumir(agora, fora.Id); alheia.Assumir(agora, fora.Id);
         await using (var seed = fixture.CreateDbContext())

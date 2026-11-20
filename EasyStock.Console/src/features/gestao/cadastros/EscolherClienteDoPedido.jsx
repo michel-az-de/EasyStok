@@ -52,7 +52,7 @@ export function EscolherClienteDoPedido({ novoPedido, aoFechar }) {
                   <span><strong>{cliente.nome || 'Cliente sem nome'}</strong><small>{telefoneDoE164(cliente.telefone) || 'Sem telefone no cadastro'}</small></span>
                   {pedeCelularDe !== cliente.id && <Botao variante="primario" disabled={ocupado} aria-label={`Novo pedido de ${cliente.nome || 'cliente sem nome'}`}
                     onClick={() => (cliente.telefone ? novoPedido.iniciar(cliente.id) : pedirCelular(cliente.id))}>
-                    {novoPedido.abrindo === cliente.id ? 'Abrindo…' : 'Novo pedido'}
+                    {novoPedido.abrindo === cliente.id ? 'Abrindo…' : novoPedido.rotulo(cliente.id)}
                   </Botao>}
                   {pedeCelularDe === cliente.id && <CelularDoPedido clienteId={cliente.id} novoPedido={novoPedido} />}
                 </li>

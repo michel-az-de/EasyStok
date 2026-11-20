@@ -50,7 +50,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
   const { conversas } = useAtendimento()
   const { selecionar } = useAcoes()
   const [escolhendoCliente, escolherCliente] = useState(false)
-  const novoPedido = useNovoPedidoDoCliente({ aoAbrir: (id) => { escolherCliente(false); aoAbrirConversa?.(id) } })
+  const novoPedido = useNovoPedidoDoCliente({ aoAbrir: () => escolherCliente(false) })
   const comFiltro = FILTROS.some((campo) => memoria[campo] !== INICIAL[campo])
   const paginas = Math.max(1, Math.ceil(consulta.total / PAGINA_PEDIDOS))
   useEffect(() => () => leitura.current?.abort(), [])

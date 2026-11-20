@@ -527,6 +527,24 @@ await confere('07. selecionar uma conversa que existe não deixa espera nenhuma'
   assert.equal(sincronizar(estado, [resumo('a')]).selecionadaId, null, 'conversa que sumiu da lista sai da seleção, sem espera')
 })
 
+// #2921: a conversa que a equipe iniciou fica escondida da fila até a cliente responder; selecionada, fica utilizável.
+await confere('07. conversa iniciada pela equipe e escondida da fila fica enquanto selecionada e sai quando a atendente sai dela', () => {
+  const iniciada = conversaDaApi(resumo('nova'), [], USUARIO)
+  let estado = reducer(estadoCom(resumo('a')), { tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [conversaDaApi(resumo('a'), [], USUARIO), iniciada], semMensagens: ['nova'] })
+  estado = reducer(estado, { tipo: acao.SELECIONAR_CONVERSA, id: 'nova', reter: true })
+  for (let volta = 1; volta <= 6; volta += 1) {
+    estado = sincronizar(estado, [resumo('a')])
+    assert.equal(estado.selecionadaId, 'nova', `volta ${volta}: a selecionada não cai`)
+    assert.ok(estado.conversas.some((c) => c.id === 'nova'), `volta ${volta}: continua na lista`)
+  }
+  estado = reducer(estado, { tipo: acao.SELECIONAR_CONVERSA, id: 'a' })
+  estado = sincronizar(estado, [resumo('a')])
+  assert.ok(!estado.conversas.some((c) => c.id === 'nova'), 'saiu da seleção, sai da lista')
+  // sem `reter` (#2135) a escolhida que some do servidor continua virando nenhuma
+  const comum = reducer(sincronizar(estadoCom(resumo('a')), [resumo('a'), resumo('b')]), { tipo: acao.SELECIONAR_CONVERSA, id: 'b' })
+  assert.equal(sincronizar(comum, [resumo('a')]).selecionadaId, null)
+})
+
 // ================================================================================================
 // 08. Leitura em voo não desfaz Assumir/Encerrar
 // ================================================================================================

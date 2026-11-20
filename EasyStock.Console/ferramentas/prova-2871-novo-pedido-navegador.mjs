@@ -61,12 +61,12 @@ async function preparar({ hash = '#/', modulos = ['atendimento', 'cadastros'], a
   await page.goto(`${URL_CONSOLE}/${hash}`)
   return { contexto, page, abertas }
 }
-async function cardapioAbertoPara(page, nome) {
-  await page.waitForFunction(() => window.location.hash === '#/m/atendimento/balcao')
-  await page.getByRole('complementary', { name: 'Cardápio de hoje' }).waitFor()
-  // O cabeçalho do cardápio diz de quem é a comanda pelo primeiro nome: a conversa certa ficou selecionada.
-  const comanda = page.getByRole('complementary', { name: 'Cardápio de hoje' }).locator('p', { hasText: 'Comanda de' })
-  assert.equal((await comanda.innerText()).trim(), `Comanda de ${nome.split(' ')[0]}`)
+async function cardapioAbertoPara(page, nome, hashDeOrigem) {
+  // #2921: o Novo pedido abre numa janela SOBRE a tela de origem; a hash não muda e não há campo de mensagem.
+  const janela = page.getByRole('dialog', { name: `Novo pedido de ${nome}` })
+  await janela.waitFor()
+  assert.equal(await page.evaluate(() => window.location.hash), hashDeOrigem, 'a hash não muda')
+  assert.equal(await janela.getByRole('textbox', { name: /mensagem/i }).count(), 0, 'sem campo de mensagem na janela')
 }
 
 try {
@@ -76,7 +76,7 @@ try {
     await page.getByRole('row').filter({ hasText: 'Ana Paula' }).waitFor()
     await page.screenshot({ path: `${pasta}/clientes-1440.png` })
     await page.getByRole('button', { name: 'Novo pedido de Ana Paula', exact: true }).click()
-    await cardapioAbertoPara(page, 'Ana Paula')
+    await cardapioAbertoPara(page, 'Ana Paula', '#/m/cadastros/clientes')
     assert.deepEqual(abertas, ['cli-0'])
     await page.screenshot({ path: `${pasta}/balcao-cardapio-1440.png` })
     await contexto.close()
@@ -90,8 +90,7 @@ try {
     await ficha.getByRole('button', { name: 'Novo pedido', exact: true }).waitFor()
     await page.screenshot({ path: `${pasta}/ficha-1440.png` })
     await ficha.getByRole('button', { name: 'Novo pedido', exact: true }).click()
-    await cardapioAbertoPara(page, 'Carla Souza')
-    assert.equal(await page.getByRole('dialog', { name: 'Ficha do cliente' }).count(), 0, 'a ficha fecha')
+    await cardapioAbertoPara(page, 'Carla Souza', '#/m/cadastros/clientes')
     assert.deepEqual(abertas, ['cli-2'])
     await contexto.close()
   }
@@ -108,8 +107,8 @@ try {
     await escolha.getByRole('button', { name: 'Novo pedido de Bruno Lima', exact: true }).waitFor()
     await page.screenshot({ path: `${pasta}/pedidos-escolher-1440.png` })
     await escolha.getByRole('button', { name: 'Novo pedido de Bruno Lima', exact: true }).click()
-    await cardapioAbertoPara(page, 'Bruno Lima')
-    assert.equal(await page.getByRole('dialog', { name: 'Novo pedido' }).count(), 0, 'a escolha fecha')
+    await cardapioAbertoPara(page, 'Bruno Lima', '#/m/cadastros/pedidos')
+    assert.equal(await page.getByRole('dialog', { name: 'Novo pedido', exact: true }).count(), 0, 'a escolha fecha')
     assert.deepEqual(abertas, ['cli-1'])
     await contexto.close()
   }
@@ -122,7 +121,7 @@ try {
     await page.getByRole('button', { name: 'Chamar no WhatsApp', exact: true }).waitFor()
     await page.screenshot({ path: `${pasta}/balcao-busca-1440.png` })
     await page.getByRole('button', { name: 'Novo pedido de Ana Paula', exact: true }).click()
-    await cardapioAbertoPara(page, 'Ana Paula')
+    await cardapioAbertoPara(page, 'Ana Paula', '#/m/atendimento/balcao')
     assert.deepEqual(abertas, ['cli-0'])
     await contexto.close()
   }
