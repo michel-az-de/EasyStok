@@ -12,6 +12,7 @@
 A janela fixa `const entrega = 'entrega'` (`EasyStock.Console/src/app/NovoPedidoJanela.jsx:55`): loja de balcão não registra retirada, cliente com dois endereços só usa o padrão e cliente nova sai do fluxo para cadastrar em outro lugar. Os ganchos já existem pela metade: `aplicacao/janelaDoPedido.js:60-61` tem `entrega !== 'retirada'` em `podeAvancarDaEntrega`, `GerarPedidoConversaInput` aceita `EnderecoId` (`GerarPedidoConversaUseCase.cs:27`) e `POST /api/clientes` existe (`ClientesController.cs:85`). Falta o domínio guardar a modalidade e o Console usar o que a API já oferece.
 
 ## 2. Decisão pendente do Felipe
+**Decidido pelo Felipe em 2026-11-20:** opção A (coluna `Modalidade` no Pedido, com migração). O horário da retirada fica na janela: a retirada também escolhe `JanelaId` e `DataEntrega`, que continuam obrigatórios no input. Não há janela especial nem campo novo de horário.
 
 | Opção | Efeito | Custo |
 |---|---|---|

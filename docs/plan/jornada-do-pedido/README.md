@@ -82,6 +82,7 @@ Em todo nó, ação bloqueada mostra o motivo.
 Gate não executado é `Pendente`, nunca "verde" por inferência.
 
 ## 7. Decisão pendente do Felipe (E2)
+**Decidido pelo Felipe em 2026-11-20:** opção A (coluna `Modalidade` no Pedido, com migração). O horário da retirada fica na janela: a retirada também escolhe `JanelaId` e `DataEntrega`, que continuam obrigatórios no input. Não há janela especial nem campo novo de horário.
 
 Como saber se um pedido é retirada:
 
