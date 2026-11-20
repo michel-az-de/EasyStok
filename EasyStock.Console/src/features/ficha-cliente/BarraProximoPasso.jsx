@@ -27,6 +27,7 @@ import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { acaoDoPix } from './acaoDoPix'
 import { criarExecucaoDaEtapa, houveAvancoConfirmado, marcoDaComanda } from './progressoDaComanda'
 import css from './ficha.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Rótulo curto sob cada ícone da trilha (banca estética, item 3). O nome
 // completo do passo continua no aria-label de cada item.
@@ -238,7 +239,7 @@ export function BarraProximoPasso({
     const info = acaoDoPix(situacaoCob, {
       prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
       // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
-      rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
+      rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : ROTULOS.GERAR_COBRANCA,
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
@@ -272,7 +273,7 @@ export function BarraProximoPasso({
     } else {
       corpoAcao = (
         <div className={css.botoesPrimarios}>
-          {foraDaJanela && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: o resumo sai pelo mensagem padrão do WhatsApp do WhatsApp.</p>}
+          {foraDaJanela && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: o resumo sai pela mensagem padrão do WhatsApp.</p>}
           {/* #1686 (item 9): o motivo que segura o botão leva ao campo que resolve. */}
           {info.motivo && (info.motivo === prerequisito && alvoDoPrerequisito && aoIrParaMotivo
             ? <p className={css.motivoDesabilitado}><button type="button" className={css.linkMotivo} data-alvo-motivo={alvoDoPrerequisito}

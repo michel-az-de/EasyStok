@@ -47,7 +47,7 @@ const confere = (descricao, fn) => {
 confere('1  visitante genérico com comanda: a comanda vira o nome e o nome inteiro fica no title', () => {
   const nome = cartao.nomeDoCartao({ nome: 'Visitante do site', numeroComanda: 16 })
   // #2258 (auditoria T4): o visitante é "Visitante" e a comanda vira a cápsula "#16", a mesma do cabeçalho e da ficha.
-  assert.deepEqual(nome, { principal: 'Visitante', curto: 'Visitante', capsula: { texto: '#16', tom: 'neutro' }, complemento: null, titulo: 'Visitante do site · Comanda 16' })
+  assert.deepEqual(nome, { principal: 'Visitante', curto: 'Visitante', capsula: { texto: '#16', tom: 'neutro' }, complemento: null, titulo: 'Visitante do site · Pedido 16' })
 })
 confere('1  cliente com nome de verdade mantém o nome e a comanda ao lado', () => {
   // #2258 (auditoria T4 e T5): o objeto ganhou `curto` (forma abreviada) e `capsula`.

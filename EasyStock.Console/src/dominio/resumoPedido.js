@@ -2,6 +2,7 @@ import { itensDetalhados, totalDoPedido } from './pedido'
 import { dataIsoNoFuso, horaCurta, moeda, somarDiasIso } from './formato'
 import { faixaDepoisDeEntre } from './entrega'
 import { nomeDoMeio, sinalDeEncomenda } from './cobranca'
+import { ROTULOS } from './rotulos'
 
 // Texto do pedido que vai para o cliente. Fica no domínio porque é regra de
 // negócio, não formatação de tela: é o que a casa se compromete a entregar.
@@ -26,7 +27,7 @@ export const ROTULO_ENVIAR = 'Enviar ao cliente'
 
 // #1474 (R4): no modo API "Enviar ao cliente", "Gerar cobrança" do bloco e o da barra criavam
 // o mesmo pedido. Fica um botão só, o da barra fixa, e a comanda diz que vai junto.
-export const ROTULO_GERAR_E_ENVIAR = 'Gerar cobrança e enviar'
+export const ROTULO_GERAR_E_ENVIAR = `${ROTULOS.GERAR_COBRANCA} e enviar`
 export const LINHA_COMANDA_VAI_JUNTO = 'A comanda vai ao cliente junto com a cobrança.'
 // #1587: pedido já criado (`comandaTravada`). O console não troca item de pedido criado; a frase
 // diz só isso, sem prometer caminho que não existe.

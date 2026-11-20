@@ -10,6 +10,7 @@ import { pedeConfirmacaoDoSaldo, ultimoPagamentoApi } from '../../dominio/pagame
 import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
 import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Comanda e cobrança no modo API (F03, S10/S11). Montar a comanda (itens, observação,
 // janela, meio) continua local até o envio; "Gerar cobrança e enviar" cria o pedido no
@@ -180,7 +181,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
         // Mercado Pago fora: o pedido nasce sem link e nada o emite sozinho (#1287).
         const faltas = []
         if (!gerado?.cobranca && corpo.forma === FORMA_ONLINE) {
-          faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "Gerar cobrança" para emitir o link')
+          faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "' + ROTULOS.GERAR_COBRANCA + '" para emitir o link')
         }
         // #2871: fora do prazo de 24 h o resumo vai pela fila de avisos (mensagem padrão do WhatsApp) e sai em instantes.
         const resumoNaFila = Boolean(gerado?.resumoNaFila)

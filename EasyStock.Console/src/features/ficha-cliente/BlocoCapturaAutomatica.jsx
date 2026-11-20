@@ -2,6 +2,7 @@ import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { CAMPOS, automaticoConduzindo } from '../../dominio/captura'
 import css from './ficha.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Rodada 11 (issue #8, registro 92). O pedido do dono: "atendimento ao
 // cliente deveria ser automatizado cadastro do cliente conversas eu nao vi
@@ -11,7 +12,7 @@ import css from './ficha.module.css'
 // (o toque "Assumir" continua um só, na barra da conversa: US-004).
 const PASSOS = [
   { chave: CAMPOS.NOME, rotulo: 'Nome' },
-  { chave: CAMPOS.TELEFONE, rotulo: 'Telefone' },
+  { chave: CAMPOS.TELEFONE, rotulo: ROTULOS.CELULAR },
   { chave: CAMPOS.ENDERECO, rotulo: 'Endereço' },
   { chave: 'cadastro', rotulo: 'Cadastro' },
   { chave: CAMPOS.PEDIDO, rotulo: 'Pedido' },

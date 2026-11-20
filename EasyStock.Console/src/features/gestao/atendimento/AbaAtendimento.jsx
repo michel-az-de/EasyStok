@@ -11,6 +11,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import css from './abaAtendimento.module.css'
 import { PainelAssistente } from './PainelAssistente'
+import { ROTULOS } from '../../../dominio/rotulos'
 
 const TAMANHO_MENSAGEM = 500
 // #2792: limites que espelham o servidor; passar deles avisa no campo e trava o Salvar (sem `maxLength`).
@@ -346,7 +347,7 @@ function ConfiguracaoDoAtendimento() {
         />
         <CampoTexto
           rotulo="Modelo de retomada (WhatsApp)"
-          dica="Nome do modelo aprovado pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa."
+          dica={`Nome da ${ROTULOS.MENSAGEM_PADRAO} aprovada pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa.`}
           value={form.modeloRetomadaNome ?? ''}
           limite={TAMANHO_MODELO_RETOMADA}
           pattern="[a-z0-9_]+"

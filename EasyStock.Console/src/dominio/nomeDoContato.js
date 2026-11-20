@@ -99,7 +99,7 @@ export function apresentacaoDoNome(nome, { comanda = null } = {}) {
       completo: VISITANTE,
       curto: VISITANTE,
       capsula: numero ? { texto: `#${numero}`, tom: 'neutro' } : null,
-      titulo: numero ? `${VISITANTE} do site · Comanda ${numero}` : `${VISITANTE} do site`,
+      titulo: numero ? `${VISITANTE} do site · ${ROTULOS.PEDIDO} ${numero}` : `${VISITANTE} do site`,
       rotulo: numero ? `${VISITANTE} #${numero}` : VISITANTE,
     }
   }
