@@ -17,4 +17,6 @@ Para refazer (fontTools 4.63):
 fonttools varLib.instancer NunitoSans.ttf wght=400 wdth=100 opsz=12 YTLC=500 -o NunitoSans-Regular.ttf
 ```
 
-A Lora é embutida direto do arquivo da impressão: o QuestPDF a reconhece pelo nome e varia o peso.
+A Lora é cópia do arquivo variável da impressão (`EasyStock.Api/wwwroot/impressao/fontes/Lora.ttf`, licença em
+`Lora-OFL.txt`): o QuestPDF a reconhece pelo nome e varia o peso. Fica copiada aqui, e não linkada, porque a imagem
+do Worker não leva a pasta `EasyStock.Api`.

@@ -66,10 +66,9 @@
 
   <ItemGroup>
     <!-- #2929: as fontes da marca (OFL) vão dentro do assembly. A API e o Worker desenham o resumo do pedido,
-         e o container não as tem instaladas. A Lora é o .ttf que a impressão já serve; a Nunito Sans vai em
-         instâncias estáticas (ver Pdf\Fontes\LEIAME.md). -->
-    <EmbeddedResource Include="..\EasyStock.Api\wwwroot\impressao\fontes\Lora.ttf" Link="Pdf\Fontes\Lora.ttf" LogicalName="EasyStock.Infra.Async.Pdf.Fontes.Lora.ttf" />
-    <EmbeddedResource Include="Pdf\Fontes\NunitoSans-*.ttf" LogicalName="EasyStock.Infra.Async.Pdf.Fontes.%(Filename)%(Extension)" />
+         e o container não as tem instaladas. Ficam neste projeto, e não linkadas da API, porque a imagem do
+         Worker não leva a pasta EasyStock.Api (ver Pdf\Fontes\LEIAME.md). -->
+    <EmbeddedResource Include="Pdf\Fontes\*.ttf" LogicalName="EasyStock.Infra.Async.Pdf.Fontes.%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

@@ -43,7 +43,7 @@ public sealed class ResumoPedidoRendererTests
         // #2929: o servidor não tem Lora nem Nunito Sans instaladas; sem o recurso, o QuestPDF cai na fonte padrão.
         var recursos = typeof(ResumoPedidoRenderer).Assembly.GetManifestResourceNames();
 
-        Assert.Contains(recursos, r => r.EndsWith(arquivo, StringComparison.Ordinal));
+        Assert.Contains($"EasyStock.Infra.Async.Pdf.Fontes.{arquivo}", recursos);
     }
 
     [Fact]
