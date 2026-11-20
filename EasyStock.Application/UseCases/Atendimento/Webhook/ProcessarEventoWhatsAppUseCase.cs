@@ -324,8 +324,16 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             && await pedidos.GetByIdAsync(empresaId, pedidoDaConversa) is { StatusEnum: StatusPedido.AguardandoPagamento }
             && conversa.MarcarClienteDesistiuDoPedido(pedidoDaConversa))
         {
-            await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(empresaId, conversa.Id, nomePerfil,
-                "O cliente desistiu do pedido: confira e decida o acerto com ele", ct);
+            // O aviso não pode derrubar a gravação da mensagem do cliente: a marca segue e a cobrança para mesmo assim.
+            try
+            {
+                await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(empresaId, conversa.Id, nomePerfil,
+                    "O cliente desistiu do pedido: confira e decida o acerto com ele", ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Webhook WhatsApp: desistência marcada na conversa {ConversaId}, aviso à equipe falhou.", conversa.Id);
+            }
         }
         // Resposta de lista ou de fluxo não traz o id do botão: fica o registro, sem o tipo Botao.
         var tipoConteudo = MapearTipoConteudo(msg.Tipo);

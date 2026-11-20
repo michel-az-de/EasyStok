@@ -22,6 +22,8 @@ public class DetectorDesistenciaPedidoTests
     [InlineData("quero cancelar o pedido")]
     [InlineData("Desisti")]
     [InlineData("eu desisti do pedido")]
+    [InlineData("pode cancelar o pedido")]
+    [InlineData("pode cancelar a compra")]
     public void FraseDeDesistenciaPausa(string texto)
     {
         DetectorDesistenciaPedido.EhDesistencia(texto).Should().BeTrue(texto);
@@ -39,6 +41,12 @@ public class DetectorDesistenciaPedidoTests
     [InlineData("não cancela o pedido")]
     [InlineData("não quero cancelar o pedido")]
     [InlineData("como cancelo o pedido?")]
+    [InlineData("como cancelar o pedido?")]
+    [InlineData("posso cancelar o pedido?")]
+    [InlineData("não vou cancelar o pedido")]
+    [InlineData("pode cancelar a bebida")]
+    [InlineData("pode cancelar o outro sabor")]
+    [InlineData("desisti de esperar o motoboy, pode mandar")]
     [InlineData("")]
     [InlineData(null)]
     public void MensagemComumNaoPausa(string? texto)
