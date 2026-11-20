@@ -59,8 +59,13 @@ export const cardapioPronto = (cardapio) => Array.isArray(cardapio) && cardapio.
 // Registrar. O caminho é cadastrar o endereço aqui, pelo mesmo `editarDadoCliente('endereco')` da Ficha.
 export const faltaEndereco = (erro) => erro?.status === 409 && /endere[cç]o/i.test(erro.message ?? '')
 
-export const podeAvancarDaEntrega = ({ pedido, entrega = 'entrega', erroSimulacao = null }) =>
+// #2974: CEP fora da área (sem zona ativa nem raio) volta como `freteACombinar`; sem o frete combinado pela equipe o
+// Registrar recebe 422. Zero vale (frete grátis combinado).
+export const faltaFreteCombinado = (simulacao, pedido) => Boolean(simulacao?.freteACombinar) && pedido?.freteCombinado == null
+
+export const podeAvancarDaEntrega = ({ pedido, entrega = 'entrega', erroSimulacao = null, simulacao = null }) =>
   Boolean(pedido?.janela && pedido?.meio) && !(entrega !== 'retirada' && faltaEndereco(erroSimulacao))
+  && !faltaFreteCombinado(simulacao, pedido)
 
 // Texto claro para qualquer recusa da API; a de endereço diz onde resolver.
 export function textoDoErro(erro) {
@@ -133,12 +138,13 @@ export const novoPedidoDisponivel = ({ abrirConversaDoCliente, permite, acoes })
 export const rotuloDoNovoPedido = (sessao, clienteId) => (temRascunhoDoPedido(sessao, clienteId) ? 'Continuar pedido' : 'Novo pedido')
 
 // #2944 (E1-01): por que Continuar/Registrar está parado. `null` quando nada bloqueia (mesma regra de `podeAvancarDaEntrega`).
-export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null }) {
+export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null, simulacao = null }) {
   if (itens.length === 0) return 'Some ao menos um item'
   if (passo !== 'entrega') return null
   if (!pedido?.janela) return 'Escolha a janela de entrega'
   if (!pedido?.meio) return 'Escolha a forma de pagamento'
   if (entrega !== 'retirada' && faltaEndereco(erroSimulacao)) return 'Falta o endereço de entrega'
+  if (faltaFreteCombinado(simulacao, pedido)) return 'Informe o frete combinado'
   return null
 }
 
