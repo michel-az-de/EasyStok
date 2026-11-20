@@ -6,20 +6,17 @@ using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.Services.Atendimento;
 
-/// <summary>Documento pronto para sair no WhatsApp: link assinado que expira e o nome que a cliente vê.</summary>
+/// <summary>Documento pronto para sair no WhatsApp: URL HTTPS pública e o nome que a cliente vê.</summary>
 public sealed record DocumentoPublicado(string Url, string NomeArquivo);
 
 /// <summary>
-/// #2962 (E3): gera o PDF do pedido (ou o comprovante), grava no armazenamento PRIVADO com nome aleatório e devolve o
-/// link assinado. O PDF leva a chave Pix da loja: o arquivo nunca é público e o link expira
-/// (<c>Atendimento:Cobranca:ValidadeLinkHoras</c>, padrão 24 h).
+/// #2962 (E3): gera o PDF do pedido (ou o comprovante) e sobe com nome aleatório, como o canhoto (#2544), para o WhatsApp
+/// baixar pela URL pública. O nome aleatório é a proteção: a chave do arquivo não se adivinha.
 /// </summary>
 public sealed class PublicadorDocumentoPedido(
     IRenderizadorPdfPedido renderizador, IFileStorage armazenamento, IConfiguration configuration)
 {
     public const string ChaveEnviarPdf = "Atendimento:Cobranca:EnviarPdf";
-    public const string ChaveValidadeHoras = "Atendimento:Cobranca:ValidadeLinkHoras";
-    public const int ValidadePadraoHoras = 24;
 
     /// <summary>O envio de PDF vem ligado; <c>Atendimento:Cobranca:EnviarPdf=false</c> volta ao texto e à imagem de antes.</summary>
     public static bool PdfLigado(IConfiguration configuration) =>
@@ -45,15 +42,12 @@ public sealed class PublicadorDocumentoPedido(
 
     private async Task<DocumentoPublicado> SubirAsync(Guid empresaId, AnexoGerado pdf, string nomeArquivo, CancellationToken ct)
     {
-        // Nome aleatório, como o canhoto: a chave do arquivo não se adivinha. Privado: só o link assinado abre.
+        // Como o canhoto (#2544): nome aleatório em atendimento/*, URL pública porque o WhatsApp baixa por ela.
+        // O link assinado do armazenamento local (/api/files/local-signed/...) não existe na API e dava 404.
         var salvo = await armazenamento.UploadAsync(new FileUploadRequest(
-            $"atendimento/documentos/{empresaId:N}", $"{Guid.NewGuid():N}.pdf", pdf.ContentType, pdf.Conteudo, IsPublic: false), ct);
-        var assinada = await armazenamento.CreatePreSignedDownloadUrlAsync(salvo.StorageKey, Validade(), nomeArquivo, ct);
-        var url = MidiaPublica.Url(assinada.ToString(), configuration)
+            $"atendimento/documentos/{empresaId:N}", $"{Guid.NewGuid():N}.pdf", pdf.ContentType, pdf.Conteudo), ct);
+        var url = MidiaPublica.Url(salvo.Url, configuration)
             ?? throw new InvalidOperationException("O PDF não ficou em link HTTPS público.");
         return new DocumentoPublicado(url, nomeArquivo);
     }
-
-    private TimeSpan Validade() =>
-        TimeSpan.FromHours(int.TryParse(configuration[ChaveValidadeHoras], out var horas) && horas > 0 ? horas : ValidadePadraoHoras);
 }

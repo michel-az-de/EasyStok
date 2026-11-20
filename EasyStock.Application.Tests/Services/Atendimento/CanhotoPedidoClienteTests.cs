@@ -392,8 +392,12 @@ public class CanhotoPedidoClienteTests
             renderizador.RenderizarAsync(Arg.Do<ResumoPedidoDto>(r => Desenhado = r), Arg.Any<CancellationToken>())
                 .Returns(new AnexoGerado([1, 2, 3], "image/png", "png"));
             var armazenamento = Substitute.For<IFileStorage>();
-            armazenamento.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
-                .Returns(new StoredFileResult("k", "https://loja.exemplo/files/canhoto.png", "image/png", 3));
+            armazenamento.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>()).Returns(ci =>
+            {
+                var pdf = ci.Arg<FileUploadRequest>().ContentType == "application/pdf";
+                return new StoredFileResult("k", pdf ? "https://loja.exemplo/files/comprovante.pdf" : "https://loja.exemplo/files/canhoto.png",
+                    pdf ? "application/pdf" : "image/png", 3);
+            });
             Cloud.EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
                 .Returns(new EnvioWhatsAppResult("wamid.canhoto"));
             var appConfig = new ConfigurationBuilder().AddInMemoryCollection(
@@ -408,8 +412,6 @@ public class CanhotoPedidoClienteTests
                 var renderizadorPdf = Substitute.For<IRenderizadorPdfPedido>();
                 renderizadorPdf.RenderizarComprovanteAsync(Arg.Any<ResumoPedidoDto>(), Arg.Any<DateTime?>(), Arg.Any<CancellationToken>())
                     .Returns(new AnexoGerado([37, 80, 68, 70], "application/pdf", "pdf"));
-                armazenamento.CreatePreSignedDownloadUrlAsync(Arg.Any<string>(), Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-                    .Returns(new Uri("https://loja.exemplo/files/comprovante.pdf"));
                 Cloud.EnviarDocumentoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
                     .Returns(new EnvioWhatsAppResult("wamid.pdf"));
                 documentos = new PublicadorDocumentoPedido(renderizadorPdf, armazenamento, appConfig);

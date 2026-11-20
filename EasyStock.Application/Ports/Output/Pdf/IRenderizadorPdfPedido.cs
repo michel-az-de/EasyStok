@@ -8,7 +8,7 @@ namespace EasyStock.Application.Ports.Output.Pdf;
 /// </summary>
 public interface IRenderizadorPdfPedido
 {
-    /// <summary>PDF do pedido com o QR Pix e o copia e cola. A chave Pix da loja vai dentro: o arquivo só sai por link assinado.</summary>
+    /// <summary>PDF do pedido com o QR Pix e o copia e cola. A chave Pix da loja vai dentro: o arquivo sobe com nome aleatório (#3000).</summary>
     Task<AnexoGerado> RenderizarPedidoAsync(ResumoPedidoDto resumo, PixPdfDto pix, CancellationToken ct = default);
 
     /// <summary>Comprovante com o selo "Pago", a data e o valor. Não leva o copia e cola.</summary>
