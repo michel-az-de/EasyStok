@@ -17,6 +17,8 @@ public sealed record OrigemAnuncio
     /// <summary>Por quanto tempo o id de clique é guardado; passado isso o job de poda o anula (janela de importação do Google Ads).</summary>
     public static readonly TimeSpan RetencaoIdClique = TimeSpan.FromDays(90);
 
+    private static readonly char[] SeparadoresDaFonte = ['_', '-', '.', ' '];
+
     public const string PlataformaGoogle = "google";
     public const string PlataformaMeta = "meta";
     public const string PlataformaOutra = "outra";
@@ -126,7 +128,9 @@ public sealed record OrigemAnuncio
         var f = fonte?.ToLowerInvariant();
         if (f is null) return PlataformaOutra;
         if (f.Contains("google")) return PlataformaGoogle;
-        if (f.Contains("facebook") || f.Contains("instagram") || f.Contains("meta") || f is "fb" or "ig")
+        // "meta" só como termo inteiro (#2986): "metabase" ou "metas_novembro" não são a Meta.
+        if (f.Contains("facebook") || f.Contains("instagram") || f is "fb" or "ig"
+            || f.Split(SeparadoresDaFonte).Contains("meta"))
             return PlataformaMeta;
         return PlataformaOutra;
     }
