@@ -111,6 +111,24 @@ public sealed class CanalPedidoMobileTests : IDisposable
         Gravado("o-2").Channel.Should().Be("ifood", "aparelho antigo reenvia o pedido sem o campo");
     }
 
+    [Theory]
+    [InlineData("whatsapp")]
+    [InlineData("canal invalido")]
+    public async Task ReenvioComOutroCanal_MantemODaCriacao(string reenviado)
+    {
+        await AplicarAsync(Pedido("o-4", "balcao"));
+        await AplicarAsync(Pedido("o-4", reenviado));
+
+        Gravado("o-4").Channel.Should().Be("balcao", "o pedido do ERP copia o canal uma vez só");
+    }
+
+    [Fact]
+    public void Normalizar_RespeitaOLimiteDaColuna()
+    {
+        CanalPedidoMobile.Normalizar(new string('a', 20)).Should().Be(new string('a', 20));
+        CanalPedidoMobile.Normalizar(new string('a', 21)).Should().BeNull();
+    }
+
     [Fact]
     public async Task PayloadAntigoSemOCampo_ContinuaAceito()
     {
@@ -135,6 +153,7 @@ public sealed class CanalPedidoMobileTests : IDisposable
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("canal com espaço")]
+    [InlineData("balcão")]
     [InlineData("<script>")]
     [InlineData("um-codigo-longo-demais-para-a-coluna")]
     public void Normalizar_SemValorOuForaDoFormato_ViraNaoInformado(string? canal)
