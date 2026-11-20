@@ -37,6 +37,19 @@ export const pedidoJaCriadoNaConversa = (conversa) => Boolean(conversa?.pedido?.
 export const precisaNovaComanda = (conversa) => Boolean(conversa?.pedido?.pedidoId) && pedidoEncerrado(conversa.pedido)
 // Comanda em montagem que já estava na conversa (Atendimento/Balcão): não é rascunho da janela.
 export const comandaEmAndamento = (conversa) => (conversa?.pedido?.itens?.length ?? 0) > 0 && !pedidoEncerrado(conversa.pedido)
+// #2941: comanda "de fora" é a que já existia ao abrir ou surgiu por fora (outra atendente) e a janela NÃO montou. É derivada a cada
+// render: `montouNaJanela` vira true quando a própria janela soma itens (clique no "+" ou restauração do rascunho), e aí os itens
+// são rascunho dela (grava rascunho, mostra Descartar). Limite conhecido: itens que chegam por fora depois de a janela já ter
+// montado os seus entram na conta dela, porque o estado não diz de quem é cada linha.
+export const comandaDeFora = (conversa, montouNaJanela) => comandaEmAndamento(conversa) && !montouNaJanela
+// #2941: o "+" sobre uma comanda de fora soma nela, mas não a torna rascunho da janela (senão o Descartar apagaria os itens
+// que já existiam). Só marca a montagem quando a janela começa do vazio ou já montou.
+export const somaEhDaJanela = (conversa, montouNaJanela) => !comandaDeFora(conversa, montouNaJanela)
+// #2941: no Registrar, o POST cria o pedido e a recarga o põe na conversa antes de a janela fechar; nesse intervalo o aviso de
+// "pedido em andamento" não pode tomar o lugar da janela (pisca). Só aparece quando não há registro em curso.
+export const mostrarAvisoDePedidoEmAndamento = ({ jaTemPedido, registrando }) => Boolean(jaTemPedido) && !registrando
+// #2941: o endereço "cadastrado" só vale como confirmação enquanto o campo ainda mostra o que foi salvo; editou, a linha some.
+export const enderecoVigente = (cadastrado, texto) => (cadastrado && cadastrado === (texto ?? '').trim() ? cadastrado : null)
 // Sem cardápio carregado todo item pareceria "fora do cardápio".
 export const cardapioPronto = (cardapio) => Array.isArray(cardapio) && cardapio.length > 0
 

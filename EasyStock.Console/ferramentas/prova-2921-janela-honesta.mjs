@@ -34,9 +34,9 @@ const jsx = fonte('app/NovoPedidoJanela.jsx')
 {
   assert.equal(j.comandaEmAndamento({ pedido: { itens: [{ sku: 'a', qtd: 1 }] } }), true)
   assert.equal(j.comandaEmAndamento({ pedido: { itens: [] } }), false)
-  assert.match(jsx, /comandaDaConversa/, 'a janela lembra a comanda que já existia')
-  assert.match(jsx, /!comandaDaConversa\.current && itens\.length > 0/, 'Descartar some com comanda alheia')
-  assert.ok(jsx.includes('!restaurado.current || comandaDaConversa.current || jaTemPedido || registrando'), 'o efeito não grava a comanda alheia')
+  assert.match(jsx, /comandaDeFora\(conversa, montouNaJanela\.current\)/, 'a janela distingue a comanda de fora da própria montagem (#2941)')
+  assert.match(jsx, /!deFora && itens\.length > 0/, 'Descartar some com comanda alheia')
+  assert.ok(jsx.includes('!restaurado.current || deFora || jaTemPedido || registrando'), 'o efeito não grava a comanda alheia')
 }
 
 // C. Só restaura com o cardápio carregado.
