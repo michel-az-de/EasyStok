@@ -46,6 +46,15 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (ativo.HasValue) query = query.Where(c => c.Ativo == ativo.Value);
             if (relacionamento == "lead") query = query.Where(c => !compras.Any(p => p.ClienteId == c.Id));
             if (relacionamento == "cliente") query = query.Where(c => compras.Any(p => p.ClienteId == c.Id));
+            if (relacionamento == RegraDeRecompra.Relacionamento)
+            {
+                // #2946: bloqueado e inativo ficam fora mesmo sem o filtro de situação, porque a lista é de quem chamar.
+                var corte = DateTime.UtcNow.AddDays(-RegraDeRecompra.DiasSemCompra);
+                query = query.Where(c => c.Ativo && !c.Bloqueado
+                    && compras.Count(p => p.ClienteId == c.Id) >= RegraDeRecompra.MinimoDeCompras
+                    && !compras.Any(p => p.ClienteId == c.Id && p.CriadoEm > corte)
+                    && !db.ClienteTags.Any(t => t.ClienteId == c.Id && t.Tag == RegraDeRecompra.TagConvidada && t.CriadoEm > corte));
+            }
 
             if (!string.IsNullOrWhiteSpace(search))
             {
