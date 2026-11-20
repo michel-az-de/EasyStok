@@ -14,6 +14,9 @@ public sealed record OrigemAnuncio
     public const int TamanhoTipoIdClique = 10;
     public const int TamanhoIdClique = 200;
 
+    /// <summary>Por quanto tempo o id de clique é guardado; passado isso o job de poda o anula (janela de importação do Google Ads).</summary>
+    public static readonly TimeSpan RetencaoIdClique = TimeSpan.FromDays(90);
+
     public const string PlataformaGoogle = "google";
     public const string PlataformaMeta = "meta";
     public const string PlataformaOutra = "outra";
