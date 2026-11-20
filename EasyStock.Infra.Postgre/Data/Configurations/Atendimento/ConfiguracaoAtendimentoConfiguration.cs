@@ -60,5 +60,13 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
             .WithMany()
             .HasForeignKey(x => x.EmpresaId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // #2957: modelo de IA da loja; FK composta impede apontar para modelo de outra loja.
+        builder.HasOne<EasyStock.Domain.Entities.Ia.ModeloIa>()
+            .WithMany()
+            .HasForeignKey(x => new { x.EmpresaId, x.ModeloIaId })
+            .HasPrincipalKey(m => new { m.EmpresaId, m.Id })
+            .HasConstraintName("fk_configuracoes_atendimento_modelo_ia")
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
