@@ -17,7 +17,7 @@ label `backup`.
 
 ## Instalação (Felipe, uma vez)
 
-Os segredos são criados e colados só pelo Felipe. Nenhum agente vê a senha, as chaves das contas de
+Os segredos são criados e colados só pelo Felipe; o roteiro com os valores reais está em [backup-segredos-felipe.md](backup-segredos-felipe.md). Nenhum agente vê a senha, as chaves das contas de
 serviço nem as KEKs.
 
 1. **Drive compartilhado.** No Drive da empresa, crie o Drive compartilhado do backup. Anote o ID (o
