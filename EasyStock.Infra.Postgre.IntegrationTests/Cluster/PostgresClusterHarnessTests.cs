@@ -6,8 +6,9 @@ using Npgsql;
 namespace EasyStock.Infra.Postgre.IntegrationTests.Cluster;
 
 /// <summary>
-/// Aceite 5 da E1 (#2976): o harness do banco modelo aguenta clones seguidos, reset do mesmo banco
-/// e criação concorrente do mesmo papel, os três pontos onde o Postgres dá 55006 ou 23505.
+/// Aceite 5 da E1 (#2976): o harness do banco modelo aguenta clones seguidos, reset do mesmo banco,
+/// criação concorrente do mesmo papel e nova tentativa do modelo após falha, os pontos onde o
+/// Postgres dá 55006 ou 23505 ou onde uma falha ficaria em cache.
 /// </summary>
 public sealed class PostgresClusterHarnessTests
 {
@@ -55,6 +56,45 @@ public sealed class PostgresClusterHarnessTests
             await PostgresCluster.RemoverPapelAsync(cluster.ConexaoDe(primeiro), papel);
             await cluster.DescartarAsync(primeiro);
             await cluster.DescartarAsync(segundo);
+        }
+    }
+
+    [SkippableFact]
+    public async Task Modelo_que_falhou_ao_construir_e_reconstruido_no_pedido_seguinte()
+    {
+        PostgresCluster cluster;
+        try
+        {
+            cluster = await PostgreSqlDatabaseFixture.ObterClusterComModeloAsync();
+        }
+        catch (DockerUnavailableException ex)
+        {
+            throw new SkipException("Docker indisponível: " + ex.Message);
+        }
+
+        var modelo = "m_" + Guid.NewGuid().ToString("N");
+        var falha = () => cluster.GarantirModeloAsync(modelo, _ => throw new InvalidOperationException("falha simulada"));
+        await falha.Should().ThrowAsync<InvalidOperationException>();
+
+        // A falha não fica em cache nem deixa o banco meio criado: o segundo pedido constrói do zero.
+        await cluster.GarantirModeloAsync(modelo, async conexao =>
+        {
+            await using var c = new NpgsqlConnection(conexao);
+            await c.OpenAsync();
+            await using var cmd = new NpgsqlCommand("CREATE TABLE marca (id int)", c);
+            await cmd.ExecuteNonQueryAsync();
+        });
+        var clone = await cluster.ClonarAsync(modelo);
+        try
+        {
+            await using var c = new NpgsqlConnection(cluster.ConexaoDe(clone));
+            await c.OpenAsync();
+            await using var cmd = new NpgsqlCommand("SELECT count(*) FROM marca", c);
+            ((long)(await cmd.ExecuteScalarAsync())!).Should().Be(0);
+        }
+        finally
+        {
+            await cluster.DescartarAsync(clone);
         }
     }
 

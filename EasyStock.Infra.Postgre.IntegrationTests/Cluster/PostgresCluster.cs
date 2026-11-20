@@ -75,18 +75,30 @@ internal sealed class PostgresCluster
     /// <summary>
     /// Cria o banco modelo uma vez por processo. Depois de construído, fecha todos os pools e
     /// proíbe conexões (<c>datallowconn=false</c>): clonar um banco com conexão aberta dá 55006.
+    /// Se a construção falha, o banco meio criado sai e a entrada deixa o cache: o próximo pedido
+    /// tenta de novo em vez de herdar a mesma exceção.
     /// </summary>
     public Task GarantirModeloAsync(string modelo, Func<string, Task> construir) =>
         _modelos.GetOrAdd(modelo, nome => new Lazy<Task>(() => ConstruirModeloAsync(nome, construir))).Value;
 
     private async Task ConstruirModeloAsync(string modelo, Func<string, Task> construir)
     {
-        await ExecutarAsync($"CREATE DATABASE {Citar(modelo)}");
-        await construir(ConexaoDe(modelo));
-        NpgsqlConnection.ClearAllPools();
-        await ExecutarAsync($"ALTER DATABASE {Citar(modelo)} WITH ALLOW_CONNECTIONS false");
-        await ExecutarAsync(
-            $"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{modelo}' AND pid <> pg_backend_pid()");
+        try
+        {
+            await ExecutarAsync($"CREATE DATABASE {Citar(modelo)}");
+            await construir(ConexaoDe(modelo));
+            NpgsqlConnection.ClearAllPools();
+            await ExecutarAsync($"ALTER DATABASE {Citar(modelo)} WITH ALLOW_CONNECTIONS false");
+            await ExecutarAsync(
+                $"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{modelo}' AND pid <> pg_backend_pid()");
+        }
+        catch
+        {
+            NpgsqlConnection.ClearAllPools();
+            await ExecutarAsync($"DROP DATABASE IF EXISTS {Citar(modelo)} WITH (FORCE)");
+            _modelos.TryRemove(modelo, out _);
+            throw;
+        }
     }
 
     /// <summary>Banco novo, clonado do modelo, com nome único no cluster.</summary>
