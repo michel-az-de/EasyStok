@@ -100,7 +100,7 @@ public partial class AtendimentoConversasControllerTests
         var semCelular = new EasyStock.Domain.Entities.Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Bia", Telefone = "1133334444", Ativo = true };
         clientes.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
         clientes.GetByIdAsync(_empresaId, semCelular.Id).Returns(semCelular);
-        var useCase = new AbrirConversaDoClienteUseCase(clientes, new ConversaWhatsAppDoCliente(_repositorio, new FakeUnitOfWork(), TimeProvider.System), TimeProvider.System);
+        var useCase = new AbrirConversaDoClienteUseCase(clientes, new ConversaWhatsAppDoCliente(_repositorio, new FakeUnitOfWork(), TimeProvider.System), new FakeUnitOfWork(), TimeProvider.System);
 
         _currentUser.TemPermissao(Permissao.AtenderConversas).Returns(false);
         (await _controller.AbrirDoCliente(new(cliente.Id), useCase)).Should().BeOfType<ForbidResult>();
