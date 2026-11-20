@@ -18,7 +18,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Integracoes;
 
@@ -30,7 +29,7 @@ namespace EasyStock.Api.IntegrationTests.Integracoes;
 /// </summary>
 public sealed class IntegracoesE2ETests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
     private readonly VariaveisDeProcesso _variaveis = new();
 
@@ -43,11 +42,7 @@ public sealed class IntegracoesE2ETests : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_integracoes_e2e")
-                .WithUsername("postgres")
-                .WithPassword("e2e-integracoes-senha")
-                .Build();
+            _pg = new BancoDeTeste();
             await _pg.StartAsync();
             _isAvailable = true;
         }

@@ -10,7 +10,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
-using Testcontainers.PostgreSql;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
@@ -30,7 +29,7 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Auth;
 /// </summary>
 public sealed class ValidarOtpControllerTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
     private string? _connString;
     private readonly VariaveisDeProcesso _variaveis = new();
@@ -61,11 +60,7 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
 
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_validarotp_tests")
-                .WithUsername("postgres")
-                .WithPassword("Si6IT-" + Guid.NewGuid().ToString("N"))
-                .Build();
+            _pg = new BancoDeTeste();
             await _pg.StartAsync();
             _connString = _pg.GetConnectionString();
             await using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()

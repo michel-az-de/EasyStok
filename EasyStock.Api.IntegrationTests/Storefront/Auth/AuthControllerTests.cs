@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Testcontainers.PostgreSql;
 using DotNet.Testcontainers.Builders;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -28,7 +27,7 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Auth;
 /// </summary>
 public sealed class AuthControllerTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
 
     private const string JwtIssuer = "EasyStock";
@@ -39,11 +38,7 @@ public sealed class AuthControllerTests : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_storefront_auth_tests")
-                .WithUsername("postgres")
-                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             _isAvailable = true;

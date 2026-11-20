@@ -27,4 +27,9 @@
     <ProjectReference Include="..\EasyStock.Api\EasyStock.Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- #2976: o mesmo cluster Postgres por processo dos testes de infra. -->
+    <Compile Include="..\EasyStock.Infra.Postgre.IntegrationTests\Cluster\PostgresCluster.cs" Link="Cluster\PostgresCluster.cs" />
+  </ItemGroup>
+
 </Project>

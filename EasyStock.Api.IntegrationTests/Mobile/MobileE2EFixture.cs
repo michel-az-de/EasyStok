@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Mobile;
 
@@ -22,7 +21,7 @@ namespace EasyStock.Api.IntegrationTests.Mobile;
 /// </summary>
 public class MobileE2EFixture : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     public bool IsAvailable { get; private set; }
     public WebApplicationFactory<Program>? Factory { get; private set; }
 
@@ -33,12 +32,7 @@ public class MobileE2EFixture : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_mobile_e2e")
-                .WithUsername("postgres")
-                // O StartupHardening recusa a dupla postgres/postgres; container descartavel.
-                .WithPassword("senha-de-teste-descartavel")
-                .Build();
+            _pg = new BancoDeTeste();
             await _pg.StartAsync();
             IsAvailable = true;
         }

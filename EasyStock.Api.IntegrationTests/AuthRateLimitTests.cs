@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http.Json;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests;
 
@@ -16,7 +15,7 @@ namespace EasyStock.Api.IntegrationTests;
 /// </summary>
 public sealed class AuthRateLimitTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
 
     private const string JwtIssuer = "EasyStock";
@@ -27,11 +26,7 @@ public sealed class AuthRateLimitTests : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_ratelimit_tests")
-                .WithUsername("postgres")
-                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             _isAvailable = true;
