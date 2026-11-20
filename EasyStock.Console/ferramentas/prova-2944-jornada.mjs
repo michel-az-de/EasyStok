@@ -11,9 +11,21 @@ await caso('17a. elegibilidade: entregue e cancelado dizem por que não cancelam
   assert.equal(pc.motivoParaNaoCancelar('cancelado'), 'Já foi cancelado')
   for (const s of ['aguardando_pagamento', 'aguardando', 'aprovado_baba', 'preparando', 'pronto', 'saiu_para_entrega', 'rascunho']) assert.equal(pc.motivoParaNaoCancelar(s), null, s)
 })
+await caso('17c. a lista segue a regra da Ficha: permissão, pedido pago só com cancelarPedidoPago, motivo de 3 a 500', () => {
+  const quem = (item, o) => pc.motivoParaNaoCancelarPedido(item, o)
+  assert.equal(quem({ status: 'preparando', totalPago: 0 }, { permitido: true, capacidades: {} }), null)
+  assert.match(quem({ status: 'preparando', totalPago: 0 }, { permitido: false, capacidades: {} }), /perfil/)
+  assert.match(quem({ status: 'preparando', totalPago: 10 }, { permitido: true, capacidades: {} }), /pagamento/)
+  assert.match(quem({ status: 'preparando', totalPago: 10 }, { permitido: true, capacidades: { cancelarPedidoPago: false } }), /pagamento/)
+  assert.equal(quem({ status: 'preparando', totalPago: 10 }, { permitido: true, capacidades: { cancelarPedidoPago: true } }), null)
+  assert.equal(quem({ status: 'entregue', totalPago: 0 }, { permitido: true }), 'Já foi entregue')
+  for (const [m, ok] of [['', false], ['ab', false], ['  ab ', false], ['abc', true], ['x'.repeat(500), true], ['x'.repeat(501), false], [undefined, false]]) assert.equal(pc.motivoDoCancelamentoValido(m), ok, String(m).slice(0, 8))
+})
 await caso('17b. a linha oferece "Cancelar pedido" com motivo de bloqueio, confirmação e recarga da lista e da Ficha', () => {
   assert.match(painel, /Cancelar pedido/)
-  assert.match(painel, /motivo=\{motivoParaNaoCancelar\(item\.status\)\}/)
+  assert.match(painel, /motivo=\{semCancelar\(item\) \?\? undefined\}/)
+  assert.match(painel, /motivoParaNaoCancelarPedido\(item, \{ permitido: disponivel\('cancelarPedido'\), capacidades \}\)/)
+  assert.match(painel, /motivoDoCancelamentoValido\(motivo\)/)
   assert.match(painel, /cancelarPedido\(/)
   assert.match(painel, /Manter pedido/)
   assert.match(painel, /consulta\.recarregar\(\)/)
@@ -21,10 +33,11 @@ await caso('17b. a linha oferece "Cancelar pedido" com motivo de bloqueio, confi
 })
 
 // E1-18: voltar do navegador fecha só a janela. A regra é pura; o navegador entra por um duplo de `window`.
-const duplo = () => {
+const duplo = ({ assincrono = false } = {}) => {
   const ouvintes = {}
   const pilha = [{ estado: null, url: '#/atendimento' }]
   let i = 0
+  const fila = []
   const w = {
     location: { get hash() { return pilha[i].url } },
     addEventListener: (n, f) => { (ouvintes[n] ??= new Set()).add(f) },
@@ -32,11 +45,14 @@ const duplo = () => {
     history: {
       get state() { return pilha[i].estado },
       pushState: (estado, _t, url) => { pilha.splice(i + 1); pilha.push({ estado, url: url ?? pilha[i].url }); i += 1 },
-      back: () => { if (i > 0) { i -= 1; for (const f of [...(ouvintes.popstate ?? [])]) f({ state: pilha[i].estado }) } },
+      back: () => {
+        const voltar = () => { if (i > 0) { i -= 1; const e = { state: pilha[i].estado }; for (const f of [...(ouvintes.popstate ?? [])]) f(e) } }
+        if (assincrono) fila.push(voltar); else voltar()
+      },
       forward: () => { if (i < pilha.length - 1) { i += 1; for (const f of [...(ouvintes.popstate ?? [])]) f({ state: pilha[i].estado }) } },
     },
   }
-  return { w, pilha, indice: () => i }
+  return { w, pilha, indice: () => i, descarregar: () => { while (fila.length) fila.shift()() } }
 }
 await caso('18a. abrir empilha um estado sem mexer na hash; voltar fecha a janela', async () => {
   const h = await import('../src/aplicacao/historicoDaJanela.js').catch(() => ({}))
@@ -61,6 +77,18 @@ await caso('18b. fechar pela tela desfaz a entrada do histórico sem fechar de n
   const d2 = h.ligarVoltarDaJanela(dois.w, () => { n += 1 })
   dois.w.history.back(); d2()
   assert.equal(n, 1); assert.equal(dois.indice(), 0, 'já voltou: não volta outra vez')
+})
+await caso('18d. StrictMode: o back() do cleanup é assíncrono e o popstate dele não fecha a janela remontada', async () => {
+  const h = await import('../src/aplicacao/historicoDaJanela.js')
+  const { w, descarregar } = duplo({ assincrono: true })
+  let fechou = 0
+  const desligar = h.ligarVoltarDaJanela(w, () => { fechou += 1 })
+  desligar()
+  h.ligarVoltarDaJanela(w, () => { fechou += 1 })
+  descarregar()
+  assert.equal(fechou, 0, 'o popstate do back() do próprio cleanup fechou a janela remontada')
+  w.history.back(); descarregar()
+  assert.equal(fechou, 1, 'o voltar do navegador de verdade ainda fecha a janela')
 })
 await caso('18c. a janela liga o histórico e ignora o voltar enquanto registra', () => {
   const jsx = fonte('app/NovoPedidoJanela.jsx')
