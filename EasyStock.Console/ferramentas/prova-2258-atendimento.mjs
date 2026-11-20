@@ -176,7 +176,7 @@ caso('T4  cartão, cabeçalho, ficha e botões "Abrir" falam o mesmo nome', () =
   assert.equal(nome.complemento, null)
   assert.deepEqual(nome.capsula, { texto: '#16', tom: 'neutro' })
   assert.equal(nome.titulo, 'Visitante do site · Pedido 16')
-  assert.equal(cartao.nomeDoCartao({ nome: 'Felipel Azevedo', numeroComanda: 3 }).complemento, 'Comanda 3', 'quem tem nome mantém a comanda ao lado')
+  assert.equal(cartao.nomeDoCartao({ nome: 'Felipel Azevedo', numeroComanda: 3 }).complemento, 'Pedido 3', 'quem tem nome mantém a comanda ao lado')
   assert.equal(cartao.nomeDoCartao({ nome: '555434619500' }).principal, '(54) 3461-9500')
   assert.equal(cartao.nomeDoCartao({ nome: 'Thais Regina' }).curto, 'Thais R.')
   const painel = ler('features/atendimento/PainelAtendimento.jsx')

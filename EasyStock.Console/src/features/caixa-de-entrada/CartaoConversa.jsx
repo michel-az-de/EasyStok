@@ -109,7 +109,7 @@ export const CartaoConversa = memo(function CartaoConversa({
           <strong className={pendentes > 0 ? css.semResposta : ''}>
             <NomeDoContato
               completo={nome.principal} curto={nome.curto} capsula={nome.capsula} titulo={nome.titulo}
-              complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.complemento.replace(/^Comanda /, '#')}</small>}
+              complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.numeroPedido ? `#${nome.numeroPedido}` : nome.complemento}</small>}
             />
           </strong>
           {/* #2258 (T7): a cor da borda não é o único sinal; o prazo estourado e a vez da equipe têm ícone e texto. */}

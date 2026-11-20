@@ -12,6 +12,7 @@ import { faltaPagar } from '../../dominio/pagamento'
 import { ehLead } from '../../dominio/conversa'
 import { passoPorId } from '../../dominio/esteira'
 import { moeda } from '../../dominio/formato'
+import { rotuloDoPedido } from '../../dominio/rotulos'
 import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 
 export const NOME_DO_VISITANTE = 'Visitante do site'
@@ -22,7 +23,7 @@ export const NOME_DO_VISITANTE = 'Visitante do site'
 // inteiro segue no `title`, e `curto` é a forma que a tela usa quando o espaço aperta.
 export function nomeDoCartao(conversa) {
   const apresentacao = apresentacaoDoNome(nomeDaConversa(conversa), { comanda: conversa?.numeroComanda })
-  const comanda = conversa?.numeroComanda ? `Comanda ${conversa.numeroComanda}` : null
+  const comanda = conversa?.numeroComanda ? rotuloDoPedido(conversa.numeroComanda) : null
   const visitante = apresentacao.completo === 'Visitante'
   const titulo = visitante || !comanda ? apresentacao.titulo : `${apresentacao.titulo} · ${comanda}`
   return {
@@ -30,6 +31,7 @@ export function nomeDoCartao(conversa) {
     curto: apresentacao.curto,
     capsula: apresentacao.capsula,
     complemento: visitante ? null : comanda,
+    numeroPedido: conversa?.numeroComanda || null,
     titulo,
   }
 }

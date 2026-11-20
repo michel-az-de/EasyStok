@@ -22,6 +22,7 @@ import { ModalCompartilharComanda } from './CompartilharComanda'
 import { ModalAssistente } from './ModalAssistente'
 import { ModalDevolverAssistente } from './ModalDevolverAssistente'
 import { ModalPassarConversa } from './PassarConversa'
+import { rotuloDoPedido } from '../../dominio/rotulos'
 import { Thread } from './Thread'
 import css from './atendimento.module.css'
 
@@ -179,7 +180,7 @@ export function PainelAtendimento({
                 #1761 (L4): a quantidade de pedidos saiu (está em Histórico) e o prazo só aparece
                 perto do fim (`prazoNoCabecalho`); a linha quebrava em duas. */}
             <small>
-              {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>Comanda {selecionada.numeroComanda} · </>}
+              {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>{rotuloDoPedido(selecionada.numeroComanda)} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
               {prazo && <>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></>}
             </small>
