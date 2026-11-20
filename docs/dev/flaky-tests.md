@@ -10,6 +10,24 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ⚠️ TOLERADO (#2973): `prova-1743-tamanhos-navegador` conta a linha de 1 kg antes de ela aparecer
+
+Falhou 1 vez no workflow `console` do master em `925309989` (20/11/2026, 18:08Z), linha 127:
+`Retirar 800 g preserva 1 kg`, esperado 1 e veio 0. A asserção de 600 g, logo antes, passou. O rerun do mesmo
+SHA (attempt 2, 18:28Z) passou sem mudança nenhuma; a mesma prova também passou na PR #2963.
+
+- **Por que é flaky:** depois de clicar "Somar Lasanha Bolonhesa Clássica 1 kg no pedido", a prova não espera a
+  linha nova. Em seguida tira uma unidade de 800 g e conta "Anotação para ... 1 kg" com `.count()`, que lê o DOM
+  na hora e não espera. Se a comanda ainda não renderizou a linha de 1 kg, a contagem dá 0. A linha de 600 g
+  entrou antes do arrasto e por isso não sofre o mesmo atraso.
+- **Como confirmar:** rodar de novo o job `console` no mesmo SHA. Passar no rerun sem mudança é o sinal.
+- **Por que não foi corrigido:** a issue pediu só o registro. A correção é uma linha:
+  `await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 1 kg', exact: true }).waitFor()`
+  logo depois do clique de 1 kg.
+- **Quando promover a "corrigir":** na segunda falha com a mesma mensagem, ou antes, se alguém mexer nessa prova.
+
+---
+
 ## ✅ CORRIGIDO (#2871): `prova-2395-ficha-navegador` lia o botão antes da troca de pessoa
 
 Falhou no CI da PR #2874 em 19/11/2026 (17:27Z, linha 52, `true !== false`) e 1 vez em 21 rodadas locais. A prova
