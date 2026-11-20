@@ -234,7 +234,7 @@ public sealed class CobrancaPedidoJobRotacaoTests
                 var tenant = Substitute.For<ITenantContextAccessor>();
                 tenant.When(t => t.SetCurrentTenant(Arg.Any<Guid>())).Do(call => db.SetMobileTenantContext(call.Arg<Guid>()));
                 return new ProcessarCobrancaVencidaUseCase(pedidos, sp.GetRequiredService<ICobrancaPedidoRepository>(),
-                    sp.GetRequiredService<IConversaRepository>(), null!, null!, null!, mercadoPago, null!, tenant, db, _relogio,
+                    Substitute.For<IConversaRepository>(), null!, null!, null!, mercadoPago, null!, tenant, db, _relogio,
                     NullLogger<ProcessarCobrancaVencidaUseCase>.Instance, null!, null!);
             });
             _services = services.BuildServiceProvider();
