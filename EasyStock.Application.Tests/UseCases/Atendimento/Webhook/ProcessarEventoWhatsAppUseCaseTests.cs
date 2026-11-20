@@ -13,6 +13,7 @@ using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.AcoesBotao;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
@@ -215,6 +216,66 @@ public class ProcessarEventoWhatsAppUseCaseTests
         .Replace("__WAMID__", wamid).Replace("__TEXTO__", texto);
 
     // #1765-6: gravar a entrada não é ler. O "lida" vai à Meta quando a atendente abre a conversa (marcar-lida do console).
+    // #2928 S2
+    private static string PayloadComReferral(string wamid, string? sourceId, string? headline, string? ctwaClid)
+    {
+        var referral = sourceId is null && headline is null && ctwaClid is null
+            ? ""
+            : $$"""
+                ,"referral":{"source_url":"https://fb.me/x","source_id":"{{sourceId}}","source_type":"ad","headline":"{{headline}}","ctwa_clid":"{{ctwaClid}}"}
+                """;
+        return PayloadTexto(wamid, "Oi, vi o anuncio").Replace("\"text\":{\"body\":\"Oi, vi o anuncio\"}", "\"text\":{\"body\":\"Oi, vi o anuncio\"}" + referral);
+    }
+
+    [Fact]
+    public async Task MensagemDeAnuncioGravaAOrigemNaConversaNova()
+    {
+        Conversa? aberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => aberta = c), Arg.Any<CancellationToken>());
+
+        (await _useCase.ExecuteAsync(PayloadComReferral("wamid.ad1", "AD-1", "Bolo de pote", "CLID-1"))).Should().BeTrue();
+
+        var origem = aberta!.OrigemAnuncio;
+        origem.Should().NotBeNull();
+        origem!.Plataforma.Should().Be(OrigemAnuncio.PlataformaMeta);
+        origem.Via.Should().Be(OrigemAnuncio.ViaAnuncioWhatsApp);
+        origem.IdAnuncio.Should().Be("AD-1");
+        origem.TituloAnuncio.Should().Be("Bolo de pote");
+        // ctwa_clid desligado: a política de privacidade do site (privacidade.html:80) ainda não registra a base legal (spec, riscos).
+        origem.TipoIdClique.Should().BeNull();
+        origem.IdClique.Should().BeNull();
+        origem.CapturadaEm.Should().Be(DateTimeOffset.FromUnixTimeSeconds(1700000000));
+    }
+
+    [Fact]
+    public async Task MensagemSemAnuncioDeixaAConversaSemOrigem()
+    {
+        Conversa? aberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => aberta = c), Arg.Any<CancellationToken>());
+
+        (await _useCase.ExecuteAsync(PayloadTexto("wamid.semad", "Oi"))).Should().BeTrue();
+
+        aberta!.OrigemAnuncio.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SegundoAnuncioSubstituiOPrimeiro()
+    {
+        Conversa? aberta = null;
+        await _conversaRepository.AddAsync(Arg.Do<Conversa>(c => aberta = c), Arg.Any<CancellationToken>());
+        (await _useCase.ExecuteAsync(PayloadComReferral("wamid.ad2", "AD-1", "Primeiro", "CLID-1"))).Should().BeTrue();
+        _conversaRepository.ObterAbertaPorContatoComLockAsync(_empresaId, CanalConversa.WhatsApp, ContatoWaId, Arg.Any<CancellationToken>())
+            .Returns(aberta);
+        _conversaRepository.ObterPorIdComLockAsync(_empresaId, aberta!.Id, Arg.Any<CancellationToken>()).Returns(aberta);
+
+        (await _useCase.ExecuteAsync(PayloadComReferral("wamid.ad3", "AD-2", "Segundo", "CLID-2"))).Should().BeTrue();
+        aberta.OrigemAnuncio!.IdAnuncio.Should().Be("AD-2");
+        aberta.OrigemAnuncio.TituloAnuncio.Should().Be("Segundo");
+
+        (await _useCase.ExecuteAsync(PayloadTexto("wamid.semad2", "Outra"))).Should().BeTrue();
+        aberta.OrigemAnuncio!.IdAnuncio.Should().Be("AD-2", "mensagem sem referral não apaga a origem");
+    }
+
     [Fact]
     public async Task EntradaDoClienteNaoMarcaLidaNaMeta()
     {

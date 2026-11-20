@@ -125,7 +125,18 @@ public static class WebhookWhatsAppParser
                 break;
         }
 
-        return new MensagemRecebidaWhatsApp(de, wamid, timestamp, tipo, texto, midiaId, midiaMime, botaoRespostaId, botaoPayload, localizacao);
+        return new MensagemRecebidaWhatsApp(de, wamid, timestamp, tipo, texto, midiaId, midiaMime, botaoRespostaId, botaoPayload, localizacao,
+            ParseReferral(m));
+    }
+
+    /// <summary>#2928: <c>referral</c> de anúncio Click-to-WhatsApp. Objeto ausente, vazio ou de outro tipo vira null.</summary>
+    private static ReferralAnuncioWhatsApp? ParseReferral(JsonElement m)
+    {
+        if (!m.TryGetProperty("referral", out var r) || r.ValueKind != JsonValueKind.Object) return null;
+
+        var referral = new ReferralAnuncioWhatsApp(GetString(r, "source_url"), GetString(r, "source_id"), GetString(r, "source_type"),
+            GetString(r, "headline"), GetString(r, "body"), GetString(r, "media_type"), GetString(r, "ctwa_clid"));
+        return referral == new ReferralAnuncioWhatsApp(null, null, null, null, null, null, null) ? null : referral;
     }
 
     private static StatusRecebidoWhatsApp ParseStatus(JsonElement s)
