@@ -172,6 +172,32 @@ public class WahaWhatsAppClientTests
     }
 
     [Fact]
+    public async Task DocumentoVaiPeloSendFileComONomeEOTipoPdf()
+    {
+        var waha = new WahaFalso();
+
+        await waha.Cliente().EnviarDocumentoAsync(Cliente, "https://api.exemplo.com/files/assinado/x?sig=1", "Pedido-A1B2C3.pdf", "Pedido A1B2C3");
+
+        using var corpo = JsonDocument.Parse(waha.Em("api/sendFile").Single().Corpo);
+        var arquivo = corpo.RootElement.GetProperty("file");
+        arquivo.GetProperty("url").GetString().Should().Be("https://api.exemplo.com/files/assinado/x?sig=1");
+        arquivo.GetProperty("mimetype").GetString().Should().Be("application/pdf");
+        arquivo.GetProperty("filename").GetString().Should().Be("Pedido-A1B2C3.pdf");
+        corpo.RootElement.GetProperty("caption").GetString().Should().Be("Pedido A1B2C3");
+    }
+
+    [Fact]
+    public async Task DocumentoSemUrlAbsolutaEhRecusadoAntesDaRede()
+    {
+        var waha = new WahaFalso();
+
+        var acao = () => waha.Cliente().EnviarDocumentoAsync(Cliente, "/files/x.pdf", "x.pdf");
+
+        await acao.Should().ThrowAsync<ArgumentException>();
+        waha.Chamadas.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ImagemSemUrlAbsolutaEhRecusadaAntesDaRede()
     {
         var waha = new WahaFalso();

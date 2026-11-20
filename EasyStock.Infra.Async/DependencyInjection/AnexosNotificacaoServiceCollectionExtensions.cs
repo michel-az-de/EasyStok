@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Pdf;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Notifications.Anexos;
 using EasyStock.Infra.Async.Pdf;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,9 @@ public static class AnexosNotificacaoServiceCollectionExtensions
         services.TryAddSingleton<IRenderizadorCanhoto, CanhotoDocumentoRenderer>();
         // #2544: o resumo do pedido do Assistente sobe pelo mesmo armazenamento público dos anexos.
         services.TryAddSingleton<IRenderizadorResumoPedido, ResumoPedidoRenderer>();
+        // #2962: PDF do pedido e comprovante; o publicador só existe onde há armazenamento (sem ele a cobrança segue em texto).
+        services.TryAddSingleton<IRenderizadorPdfPedido, PdfPedidoRenderer>();
+        services.TryAddScoped<PublicadorDocumentoPedido>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IModeloAnexoNotificacao, ModeloAnexoCanhoto>());
         services.TryAddScoped<IAnexadorMensagem, AnexadorMensagem>();
         return services;

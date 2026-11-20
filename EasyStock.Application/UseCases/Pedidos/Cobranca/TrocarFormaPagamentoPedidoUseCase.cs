@@ -2,6 +2,7 @@ using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -61,7 +62,8 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     IConferenciaPagamentoPedido conferencia,
     SaldoFinanceiroPedido? saldos = null,
     ILojaRepository? lojas = null,
-    ITenantFeatureFlagRepository? flags = null)
+    ITenantFeatureFlagRepository? flags = null,
+    CobrancaPixConversa? cobrancaPix = null)
 {
     public const string FormaOnline = "online";
     public const string FormaNaEntrega = "na_entrega";
@@ -103,8 +105,9 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         }
 
         string? textoPix = null;
+        PixPdfDto? pixPdf = null;
         var (cobranca, conversaId, preferenciaSubstituida, mudanca, impressao) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
-            async token => await TrocarNoLockAsync(input, forma, linkConferido, texto => textoPix = texto, token), ct);
+            async token => await TrocarNoLockAsync(input, forma, linkConferido, (texto, pix) => { textoPix = texto; pixPdf = pix; }, token), ct);
 
         // A cozinha só relê depois que a transação terminou; na entrega ainda não é pagamento.
         if (mudanca is not null)
@@ -123,7 +126,11 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
                 relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
         else if (conversaId is { } conversaPix && textoPix is not null)
             // #2233: o copia e cola sai em nome de quem trocou; o texto tem a chave e não vai para log.
-            enviada = await aviso.EnviarAsync(input.EmpresaId, conversaPix, textoPix, relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
+            enviada = cobrancaPix is not null && pixPdf is not null
+                // #2962: dois balões, PDF do pedido e só o código; sem PDF, o texto único de antes.
+                ? await cobrancaPix.EnviarAsync(new CobrancaPixAviso(input.EmpresaId, conversaPix, input.PedidoId, pixPdf, textoPix),
+                    relogio.GetUtcNow().UtcDateTime, input.UsuarioId, ct)
+                : await aviso.EnviarAsync(input.EmpresaId, conversaPix, textoPix, relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
 
         return new TrocarFormaPagamentoPedidoResult(cobranca, enviada);
     }
@@ -156,7 +163,7 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     /// pela troca para a entrega; outro link pendente nascido no meio não foi consultado e continua recusando.
     /// </param>
     private async Task<(CobrancaPedidoResult, Guid?, string?, PedidoMudouStatusOperacao?, ImpressaoPendenteOperacao?)> TrocarNoLockAsync(
-        TrocarFormaPagamentoPedidoInput input, string forma, Guid? linkConferido, Action<string> textoPix, CancellationToken ct)
+        TrocarFormaPagamentoPedidoInput input, string forma, Guid? linkConferido, Action<string, PixPdfDto> textoPix, CancellationToken ct)
     {
         var agora = relogio.GetUtcNow().UtcDateTime;
         var pedido = await pedidoRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, ct);
@@ -245,11 +252,12 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
     /// da entrega) e o copia e cola pede só o que falta do sinal.
     /// </summary>
     private static CobrancaPedido PixDireto(TrocarFormaPagamentoPedidoInput input, PedidoEntity pedido, decimal valor,
-        RecebedorPix recebedor, DateTime agora, Guid? conversaId, Action<string> textoPix)
+        RecebedorPix recebedor, DateTime agora, Guid? conversaId, Action<string, PixPdfDto> textoPix)
     {
         var valorDoPix = ValorDoPix(pedido, valor);
         var cobranca = CobrancaPedido.CriarPixDireto(input.EmpresaId, pedido.Id, valor, recebedor, agora, conversaId, valorDoPix);
-        textoPix(PixDiretoDoPedido.Texto(cobranca, recebedor, valorDoPix));
+        textoPix(PixDiretoDoPedido.Texto(cobranca, recebedor, valorDoPix),
+            new PixPdfDto(cobranca.PixCopiaCola!, valorDoPix, cobranca.Valor - valorDoPix, recebedor.Nome));
         return cobranca;
     }
 

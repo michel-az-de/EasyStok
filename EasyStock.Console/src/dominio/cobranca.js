@@ -326,16 +326,25 @@ export function textoDaCobranca(cobranca, pedido, cardapio) {
       'Já coloquei na fila de preparo.',
     ].filter(Boolean).join('\n')
   }
+  // Pix (#2962): o balão 1 é a legenda, sem o código; o código sai no balão 2 (`codigoDaCobranca`).
+  // Cartão por link segue com o link no texto, porque não tem copia e cola.
+  const cobrancaPorLink = cobranca.meio === 'cartao-link'
+    ? 'Link de pagamento de ' + MINUTOS_PARA_EXPIRAR + ' minutos: ' + cobranca.link
+    : 'Pague em até ' + MINUTOS_PARA_EXPIRAR + ' min pelo Pix abaixo'
   return [
     abertura,
     cobranca.diferenca ? null : resumirItens(pedido, cardapio) + '.',
     'Total: ' + moeda(cobranca.valor),
-    (cobranca.meio === 'cartao-link' ? 'Link de pagamento' : 'Pix') + ' de ' + MINUTOS_PARA_EXPIRAR
-      + ' minutos: ' + cobranca.link,
-    cobranca.copiaECola ? 'Copia e cola: ' + cobranca.copiaECola : null,
+    cobrancaPorLink,
     'Assim que cair eu já coloco na fila de preparo.',
   ].filter(Boolean).join('\n')
 }
+
+// Balão 2 do Pix: SÓ o copia e cola, sem texto em volta, para o toque longo copiar tudo (espelha
+// `TextoCobrancaPix.BalaoDoCodigo` da API). Null quando não há balão separado.
+export const codigoDaCobranca = (cobranca) => (cobranca.link && cobranca.meio !== 'cartao-link'
+  ? cobranca.copiaECola || null
+  : null)
 
 // Resposta ao print. O cliente que manda comprovante quer saber que chegou, e é
 // esse silêncio que faz ele perguntar três vezes se caiu.

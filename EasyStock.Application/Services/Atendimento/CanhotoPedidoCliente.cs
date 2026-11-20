@@ -14,7 +14,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace EasyStock.Application.Services.Atendimento;
 
-/// <summary>O fato do pedido que dispara o canhoto em imagem (#2937).</summary>
+/// <summary>O fato do pedido que dispara o canhoto em imagem (#2937) ou o comprovante em PDF (#2962).</summary>
 public enum GatilhoCanhoto
 {
     /// <summary><c>pedido.pago</c>: o pedido ficou quitado. A imagem leva o selo "Pago".</summary>
@@ -51,13 +51,17 @@ public sealed class CanhotoPedidoCliente(
     ILogger<CanhotoPedidoCliente> logger,
     IRenderizadorResumoPedido? renderizador = null,
     IFileStorage? armazenamento = null,
-    EasyStock.Application.UseCases.Atendimento.Entregas.ConfiguracaoLogistica? logistica = null)
+    EasyStock.Application.UseCases.Atendimento.Entregas.ConfiguracaoLogistica? logistica = null,
+    PublicadorDocumentoPedido? documentos = null)
 {
     /// <summary>Tipo do <see cref="PedidoEvento"/> que registra o envio; um por pedido.</summary>
     public const string Marco = "canhoto_enviado";
 
     /// <summary>Não começa como o resumo do Assistente: não conta como o resumo que pede o ok antes do link.</summary>
     public static string Legenda(Guid pedidoId) => $"Canhoto do pedido {ResumoPedidoAtendimento.Codigo(pedidoId)}.";
+
+    /// <summary>#2962: o PDF "Pago" que substitui a imagem no pagamento.</summary>
+    public static string LegendaComprovante(Guid pedidoId) => $"Comprovante do pedido {ResumoPedidoAtendimento.Codigo(pedidoId)}.";
 
     /// <summary>Envia o canhoto se couber. Retorna se a imagem saiu. Nunca lança por regra ou por falha do canal.</summary>
     public async Task<bool> EnviarAsync(
@@ -79,7 +83,8 @@ public sealed class CanhotoPedidoCliente(
     private async Task<bool> DecidirEEnviarAsync(
         Guid empresaId, Guid pedidoId, GatilhoCanhoto gatilho, Guid? conversaId, CancellationToken ct)
     {
-        if (renderizador is null || armazenamento is null) return false;
+        var temImagem = renderizador is not null && armazenamento is not null;
+        if (!temImagem && documentos is null) return false;
         if (logistica is not null && logistica.EmpresaDemonstracaoId != Guid.Empty && empresaId == logistica.EmpresaDemonstracaoId)
             return false;
         // O dispatcher de integração roda sem claim JWT: sem o tenant, o filtro global e a RLS zeram a busca.
@@ -109,18 +114,41 @@ public sealed class CanhotoPedidoCliente(
         var fecho = (await configuracoes.GetOrDefaultAsync(empresaId)).FraseFechoCanhoto;
         var resumo = ResumoPedidoAtendimento.Montar(pedido, storefront?.TituloPublico, pago, fecho);
         var legenda = Legenda(pedido.Id);
+        var tipo = TipoConteudoMensagem.Imagem;
 
-        EnvioWhatsAppResult envio;
+        EnvioWhatsAppResult? envio = null;
         try
         {
-            var imagem = await renderizador.RenderizarAsync(resumo, ct);
-            // Nome aleatório em atendimento/*: a URL é pública porque o WhatsApp baixa a mídia por ela.
-            var salvo = await armazenamento.UploadAsync(new FileUploadRequest(
-                $"atendimento/resumos/{empresaId:N}", $"{Guid.NewGuid():D}.{imagem.Extensao}",
-                imagem.ContentType, imagem.Conteudo), ct);
-            var url = MidiaPublica.Url(salvo.Url, configuration)
-                ?? throw new InvalidOperationException("O canhoto não ficou em URL HTTPS pública.");
-            envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, url, legenda, ct);
+            // #2962: no pagamento sai o comprovante em PDF (link assinado); falhou, a imagem de antes ainda cobre.
+            if (pago && documentos is not null && PublicadorDocumentoPedido.PdfLigado(configuration))
+            {
+                try
+                {
+                    var comprovante = await documentos.PublicarComprovanteAsync(empresaId, resumo, agora, ct);
+                    legenda = LegendaComprovante(pedido.Id);
+                    envio = await cloudClient.EnviarDocumentoAsync(
+                        conversa.ContatoIdExterno, comprovante.Url, comprovante.NomeArquivo, legenda, ct);
+                    tipo = TipoConteudoMensagem.Documento;
+                }
+                catch (Exception ex) when (ex is not (OperationCanceledException or TimeoutException))
+                {
+                    logger.LogWarning(ex, "Comprovante em PDF do pedido {PedidoId} não saiu; segue a imagem", pedidoId);
+                    legenda = Legenda(pedido.Id);
+                }
+            }
+
+            if (envio is null)
+            {
+                if (!temImagem) return false;
+                var imagem = await renderizador!.RenderizarAsync(resumo, ct);
+                // Nome aleatório em atendimento/*: a URL é pública porque o WhatsApp baixa a mídia por ela.
+                var salvo = await armazenamento!.UploadAsync(new FileUploadRequest(
+                    $"atendimento/resumos/{empresaId:N}", $"{Guid.NewGuid():D}.{imagem.Extensao}",
+                    imagem.ContentType, imagem.Conteudo), ct);
+                var url = MidiaPublica.Url(salvo.Url, configuration)
+                    ?? throw new InvalidOperationException("O canhoto não ficou em URL HTTPS pública.");
+                envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, url, legenda, ct);
+            }
         }
         catch (TimeoutException ex)
         {
@@ -136,12 +164,13 @@ public sealed class CanhotoPedidoCliente(
         }
 
         await MarcarAsync(pedido.Id, agora,
-            pago ? "Canhoto em imagem enviado à cliente, com o selo de pago." : "Canhoto em imagem enviado à cliente.",
+            tipo == TipoConteudoMensagem.Documento ? "Comprovante em PDF enviado à cliente, com o selo de pago."
+                : pago ? "Canhoto em imagem enviado à cliente, com o selo de pago." : "Canhoto em imagem enviado à cliente.",
             () =>
             {
                 if (conversa.EstaAberta) conversa.RegistrarSaida(agora);
                 return conversas.AddMensagemAsync(
-                    Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Imagem, legenda, envio.Wamid), ct);
+                    Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora, tipo, legenda, envio.Wamid), ct);
             });
         return true;
     }

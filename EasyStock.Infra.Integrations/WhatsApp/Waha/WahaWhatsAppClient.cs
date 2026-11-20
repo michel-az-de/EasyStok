@@ -62,6 +62,17 @@ public sealed class WahaWhatsAppClient(
             new { session = _opcoes.Sessao, chatId = conversa, file = arquivo, caption = legenda }, ct);
     }
 
+    /// <summary>PDF pelo <c>sendFile</c> do WAHA (#2962): o WAHA baixa o arquivo pela URL e o envia como documento.</summary>
+    public async Task<EnvioWhatsAppResult> EnviarDocumentoAsync(
+        string waId, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default)
+    {
+        ExigirUrlAbsoluta(urlPublica);
+        var conversa = await ConversaDaEmpresaAsync(waId, ct);
+        var arquivo = new { mimetype = "application/pdf", url = urlPublica, filename = nomeArquivo };
+        return await EnviarAsync("api/sendFile", conversa, legenda?.Length ?? 0,
+            new { session = _opcoes.Sessao, chatId = conversa, file = arquivo, caption = legenda }, ct);
+    }
+
     /// <summary>Sai como mensagem de voz. Ogg/Opus marcado como nota de voz vai como está; o resto o WAHA converte.</summary>
     public async Task<EnvioWhatsAppResult> EnviarAudioAsync(
         string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default)
