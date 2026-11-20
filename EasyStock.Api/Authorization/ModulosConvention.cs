@@ -28,7 +28,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
     private static readonly HashSet<string> Bastidor =
     [
         "Financeiro", "ContasAPagar", "ContasAReceber", "CategoriasFinanceiras", "CentrosCusto",
-        "Fornecedor", "Analytics", "Reports", "Inteligencia", "InteligenciaLojas", "EntityAudit"
+        "Fornecedor", "Analytics", "Reports", "Relatorios", "Inteligencia", "InteligenciaLojas", "EntityAudit"
     ];
 
     public static string Chave(Type tipo) => tipo.FullName!

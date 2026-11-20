@@ -17,6 +17,7 @@ using EasyStock.Application.UseCases.Analytics.Validade;
 using EasyStock.Application.UseCases.Analytics.Parados;
 using EasyStock.Application.UseCases.Analytics.ReceitaCusto;
 using EasyStock.Application.UseCases.Analytics.VendasPorCanal;
+using EasyStock.Application.UseCases.Analytics.PedidosPorAnuncio;
 using EasyStock.Application.UseCases.Analytics.DashboardExtras;
 using EasyStock.Application.UseCases.Inteligencia.Board;
 using EasyStock.Application.UseCases.Inteligencia.ProjecaoRuptura;
@@ -57,6 +58,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<ObterParadosUseCase>();
         services.AddScoped<ObterDiasAlertaParadoUseCase>();
         services.AddScoped<ObterVendasPorCanalUseCase>();
+        services.AddScoped<ObterPedidosPorAnuncioUseCase>();
         services.AddScoped<GetReceitaCustoUseCase>();
         services.AddScoped<GetDashboardExtrasUseCase>();
 

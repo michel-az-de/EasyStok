@@ -131,6 +131,9 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
             => _receita.GetVendasPorCanalAsync(empresaId, de, ate, lojaId);
 
+        public Task<IReadOnlyList<PedidoPorAnuncio>> GetPedidosPorAnuncioAsync(Guid empresaId, DateTime de, DateTime ate)
+            => _receita.GetPedidosPorAnuncioAsync(empresaId, de, ate);
+
         // â”€â”€ Delegation â€” Estoque â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public Task<(IReadOnlyList<ValidadeAlerta> Items, int TotalCount)> GetAlertasValidadeAsync(

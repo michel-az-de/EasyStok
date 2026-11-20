@@ -13,6 +13,7 @@ import { STATUS_CONTAS, nomeStatusConta, tomDoStatusConta, nomeStatusPagamento, 
 import { dataPorExtenso, moeda } from '../../../dominio/formato'
 import { avisoDeDevolucoesNoExtrato, nomeDoMetodoCaixa } from '../../../dominio/caixa'
 import { hashDoModulo } from '../../../dominio/modulos'
+import { PedidosPorAnuncio } from './PedidosPorAnuncio'
 import { ModalContaFinanceira, ModalPagamentoFinanceiro, ModalConfirmacaoFinanceira, ModalCadastroFinanceiro, ModalParcelaFinanceira, ErroFinanceiro } from './ModaisFinanceiras'
 import css from './financeiro.module.css'
 
@@ -342,7 +343,7 @@ export function PainelFinanceiro({ tela }) {
   if (!permitido) return <Vazio titulo="Seu perfil não pode consultar estas contas">Consulte o Caixa do dia ou peça à administração da loja para revisar seu acesso.</Vazio>
   if (['pagar', 'receber'].includes(tela)) return <ContasFinanceiras key={tela} lado={tela} />
   if (tela === 'extrato') return <ExtratoFinanceiro />
-  if (tela === 'relatorios') return <RelatoriosFinanceiros />
+  if (tela === 'relatorios') return <><RelatoriosFinanceiros /><PedidosPorAnuncio /></>
   if (['categorias', 'centros'].includes(tela)) return <CadastrosFinanceiros key={tela} tipo={tela} />
   return <ResumoFinanceiro />
 }
