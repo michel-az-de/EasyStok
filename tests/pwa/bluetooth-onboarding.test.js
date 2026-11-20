@@ -1,10 +1,11 @@
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
 module.exports = function ({ test, assert }) {
-  const html = fs.readFileSync(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
   const start = html.indexOf('let initialBluetoothOfferStarted = false;');
   const end = html.indexOf('// Hooks globais de erro', start);
   assert.ok(start >= 0 && end > start, 'bloco real de onboarding Bluetooth precisa existir');

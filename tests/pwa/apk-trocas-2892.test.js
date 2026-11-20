@@ -10,7 +10,8 @@ module.exports = function ({ test, assert }) {
   const carregar = () => require(path.join(scripts, 'pwa-trocas.cjs'));
   const fontePwa = () => {
     const { adaptAppMarkup } = require(path.join(scripts, 'app-markup.cjs'));
-    return adaptAppMarkup(fs.readFileSync(path.join(raiz, 'EasyStock.Api/wwwroot/pwa/index.html'), 'utf8'));
+    const { lerPwaMontada } = require(path.join(scripts, 'pwa-montagem.cjs'));
+    return adaptAppMarkup(lerPwaMontada(path.join(raiz, 'EasyStock.Api/wwwroot/pwa/index.html')));
   };
 
   test('#2892 toda troca do APK casa com a PWA atual', () => {

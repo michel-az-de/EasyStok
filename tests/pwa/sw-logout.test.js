@@ -4,6 +4,7 @@
 // então o LOGOUT_CLEAR precisa apagar o cache de render inteiro; senão o próximo usuário do aparelho recebe o
 // render do anterior. E quem desconecta o aparelho precisa mandar a mensagem.
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 const fs = require('fs');
 const path = require('path');
@@ -69,7 +70,7 @@ module.exports = function ({ test, assert }) {
   });
 
   test('#2369 pwa: desconectar o aparelho envia LOGOUT_CLEAR ao service worker', () => {
-    const html = fs.readFileSync(path.join(PWA_DIR, 'index.html'), 'utf8');
+    const html = lerPwaMontada(path.join(PWA_DIR, 'index.html'));
     const inicio = html.indexOf('function unpairDevice(');
     assert.ok(inicio >= 0, 'unpairDevice existe');
     const corpo = html.slice(inicio, html.indexOf('\n}', inicio));

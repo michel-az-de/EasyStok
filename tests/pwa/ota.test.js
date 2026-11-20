@@ -11,6 +11,7 @@
 // e contratos com o backend. Backend é coberto por unit tests separados
 // (ver EasyStock.Api.UnitTests/Mobile/PwaVersionProviderTests.cs).
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 module.exports = function ({ test, sandbox, assert }) {
 
@@ -218,11 +219,10 @@ module.exports = function ({ test, sandbox, assert }) {
     // o registro do SW não roda (navigator.serviceWorker é undefined).
     // Validamos via leitura raw do index.html que o updatefound listener foi
     // adicionado.
-    const idx = require('fs').readFileSync(
+    const idx = lerPwaMontada(
       sandbox.location && sandbox.location.href.startsWith('file:')
         ? sandbox.location.href.replace('file://', '')
-        : (process.env.PWA_HTML || require('path').resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html')),
-      'utf8'
+        : (process.env.PWA_HTML || require('path').resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'))
     );
     assert.ok(idx.includes('updatefound'),
       'index.html deve registrar listener updatefound pra SKIP_WAITING o novo SW');
@@ -231,9 +231,8 @@ module.exports = function ({ test, sandbox, assert }) {
   });
 
   test('index.html: controllerchange listener recarrega a página', () => {
-    const idx = require('fs').readFileSync(
-      process.env.PWA_HTML || require('path').resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'),
-      'utf8'
+    const idx = lerPwaMontada(
+      process.env.PWA_HTML || require('path').resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html')
     );
     assert.ok(idx.includes('controllerchange'),
       'controllerchange listener é o que dispara reload silencioso quando novo SW assume');

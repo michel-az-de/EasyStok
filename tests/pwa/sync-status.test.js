@@ -1,10 +1,11 @@
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
 module.exports = function ({ test, assert }) {
-  const html = fs.readFileSync(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
   const start = html.indexOf('function updateSync() {');
   const end = html.indexOf("window.addEventListener('online', updateSync);", start);
   assert.ok(start >= 0 && end > start);

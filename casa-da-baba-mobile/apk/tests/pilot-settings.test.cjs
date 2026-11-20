@@ -1,4 +1,5 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -82,7 +83,7 @@ test('Voltar não atravessa um diagnóstico, uma impressora ou uma prévia abert
   assert.equal(s.environment.cdbHandleNativeBack(), false);
   assert.equal(s.modal.dataset.view, 'eq'); assert.equal(s.calls.at(-1), 'native');
 });
-const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+const source = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
 
 test('Voltar preserva o rascunho quando o descarte é cancelado; confirmar restaura o salvo ao reabrir', () => {
   const s = settings(); s.environment.openAjustes(); s.environment.setAjustesTab('loja');

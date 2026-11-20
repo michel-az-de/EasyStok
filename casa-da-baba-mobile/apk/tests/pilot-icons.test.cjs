@@ -1,4 +1,5 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test, before, after } = require('node:test');
 const { loadConsoleIcons, geometry } = require('./helpers/console-icons.cjs');
 let canonical;
@@ -50,7 +51,7 @@ test('adaptador aplica somente SVGs fixos conhecidos e respeita significado dos 
 });
 
 test('os dez atalhos reais do menu recebem ícones canônicos sem trocar rótulos ou ações', () => {
-  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
   const menu = html.slice(html.indexOf('<div class="more-menu" id="moreMenu"'), html.indexOf('<!-- Bottom nav -->'));
   const buttons = [...menu.matchAll(/<button\b([^>]+)>([\s\S]*?)<\/button>/g)]
     .filter(match => /class="more-menu-(?:search-)?icon"/.test(match[2]))

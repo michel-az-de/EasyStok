@@ -12,12 +12,13 @@
 // - aviso de pareamento apontando "Ajustes > Diagnostico", que não existe no piloto;
 // - "Hoje" em Finalizados mostrando o que foi entregue ontem à tarde.
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 const fs = require('fs');
 const path = require('path');
 
 module.exports = function ({ test, runInSandbox, assert }) {
-  const HTML = fs.readFileSync(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const HTML = lerPwaMontada(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
   const run = body => JSON.parse(runInSandbox('(function(){ ' + body + ' })()'));
   const trecho = (inicio, tamanho) => {
     const i = HTML.indexOf(inicio);

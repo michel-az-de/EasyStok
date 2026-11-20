@@ -7,13 +7,14 @@
 // 4. Cache de render de etiqueta: LOGOUT_CLEAR nunca era enviado e filtrava por
 //    userId=, que a URL não tem. Ao desparear, o cache inteiro tem de sair.
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 const fs = require('fs');
 const path = require('path');
 
 module.exports = function ({ test, assert }) {
   const PWA_DIR = path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa');
-  const ler = (rel) => fs.readFileSync(path.join(PWA_DIR, rel), 'utf8');
+  const ler = (rel) => rel === 'index.html' ? lerPwaMontada(path.join(PWA_DIR, rel)) : fs.readFileSync(path.join(PWA_DIR, rel), 'utf8');
 
   test('#2401: nenhum handler inline interpola ${...} entre aspas simples', () => {
     const linhas = ler('index.html').split(/\r?\n/);
