@@ -1,8 +1,11 @@
 name: Build e homologação
 
 on:
+  # #2976: mesmos filtros do ci.yml (rascunho e caminhos só de plano, notas e changelog).
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ['docs/plan/**', 'docs/dev/**', 'changelog.d/**']
   workflow_dispatch:
     inputs:
       api_url:
@@ -28,6 +31,7 @@ permissions:
 jobs:
   build:
     name: Build (preview)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
