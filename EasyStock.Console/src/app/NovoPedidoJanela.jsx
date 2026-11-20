@@ -4,6 +4,7 @@ import { CampoTexto } from '../componentes/Campo'
 import { EsqueletoDeLista } from '../componentes/Esqueleto'
 import { Modal } from '../componentes/Modal'
 import { AvisoDaAcaoApi } from './FaixaApi'
+import { ligarVoltarDaJanela } from '../aplicacao/historicoDaJanela'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useSimulacaoDoPedidoComErro } from '../aplicacao/useSimulacaoDoPedido'
 import {
@@ -117,6 +118,10 @@ function Montagem({ janela, conversa }) {
   const nome = janela.nome || conversa.nome || 'a cliente'
 
   const fechar = () => acoes.fecharJanelaDoPedido()
+  // #2944 (E1-18): voltar do navegador fecha a janela (rascunho já guardado), menos no meio do Registrar.
+  const registrandoRef = useRef(false)
+  registrandoRef.current = registrando
+  useEffect(() => ligarVoltarDaJanela(window, () => { if (!registrandoRef.current) acoes.fecharJanelaDoPedido() }), [])
   async function registrar() {
     setRegistrando(true); setErro(null)
     const resultado = await registrarDaJanela({
