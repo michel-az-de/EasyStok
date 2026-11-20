@@ -120,7 +120,8 @@ public sealed class IniciarCheckoutGuestUseCase(
                     Slug: input.Slug,
                     Observacoes: MontarObservacoes(input.Observacoes, cep, input.Numero),
                     Numero: input.Numero,
-                    EnderecoEntrega: input.EnderecoEntrega),
+                    EnderecoEntrega: input.EnderecoEntrega,
+                    Campanha: input.Campanha, OrigemDaConversa: input.OrigemDaConversa),
                 ct);
 
             var pedidoNovo = reservaNova.Pedido;
@@ -176,6 +177,7 @@ public sealed class IniciarCheckoutGuestUseCase(
         var pedido = DomainPedido.Criar(
             empresaId: empresaId, cliente: cliente, origem: OrigemPedido.StorefrontGuest,
             statusInicial: StatusPedido.AguardandoAprovacaoBaba);
+        pedido.DefinirOrigemAnuncio(checkoutCore.OrigemDoPedido(input.Campanha, input.OrigemDaConversa));
         await enderecoEntrega.RegistrarAsync(pedido,
             input.EnderecoEntrega ?? new EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega(null, input.Numero, null, null, null, null, input.Cep), ct);
         pedido.ClienteNome = nome;

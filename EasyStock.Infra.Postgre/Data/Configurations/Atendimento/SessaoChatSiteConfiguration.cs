@@ -24,6 +24,8 @@ public class SessaoChatSiteConfiguration : IEntityTypeConfiguration<SessaoChatSi
         builder.Property(s => s.VisitanteTelefone).HasMaxLength(TelefoneE164.TamanhoMaximo);
         builder.Property(s => s.VisitanteEmail).HasMaxLength(ContatoInformadoVisitante.EmailTamanhoMaximo);
 
+        builder.OwnsOne(s => s.OrigemAnuncio, OrigemAnuncioMapeamento.Mapear); // #2928
+
         // Toda requisição do visitante busca a sessão pelo hash do token.
         builder.HasIndex(s => s.TokenHash).IsUnique().HasDatabaseName("uq_sessoes_chat_site_token_hash");
         // Limpeza das vencidas.
