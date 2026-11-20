@@ -1,6 +1,8 @@
 # ADR 0012 — Backup e storage de rótulos publicados
 
-**Status:** Accepted (2026-05-16)
+**Status:** Substituída pela [ADR-0068](0068-backup-restic-drive-compartilhado.md) (2026-11-20). Os workflows `backup-rotulos.yml` e `restore-test-rotulos.yml` nunca rodaram e foram removidos na #2977; a retenção de 5 anos dos rótulos vive na tag `rotulos` do restic.
+
+_Status original:_ Accepted (2026-05-16)
 **Contexto do plano:** P-02 (Módulo Incremental de Rotulagem Nutricional) — [docs/plan/p-02-rotulagem-nutricional.md](../plan/p-02-rotulagem-nutricional.md). Aborda os "3 furos reais" levantados em revisão: storage de PDFs/PNGs/snapshots, backup com retenção legal, processo de restore-test.
 
 ## Decisão
