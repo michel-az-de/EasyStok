@@ -80,11 +80,14 @@ Escolha: **o endpoint da conversa, com a conversa por baixo**. `POST /api/pedido
 | `src/features/pedidos/useMontagemDoPedido.js` (novo) | Estado da montagem (itens, janela, endereço, forma), cotação e geração por `conversaId` |
 | `PainelPedidos.jsx:53`, `PainelCadastros.jsx:73`, `EditorCadastro.jsx` (prop `novoPedido`) | Trocam "iniciar e navegar" por "abrir a janela" |
 | `app/App.jsx` (~466) | A janela precisa do `AtendimentoProvider`, hoje só nas telas de ajuste. Conferir se Pedidos, Clientes e Ficha estão sob ele; senão, provider mínimo para a janela |
+| `EasyStock.Infra.Postgre/Repositories/Atendimento/ConversaRepository.cs` (`ListarInboxAsync` e contadores) | Muda: esconde da fila, sem busca, a conversa em que a cliente nunca escreveu (seção 8) |
 | `ferramentas/prova-2921-*.mjs` (novos) | Seção 10 |
 
 ## 8. API
 
-Nenhuma mudança na fase 1. Contrato usado como está: `POST /api/atendimento/conversas/{id}/pedido`, `/pedido/simulacao` e a rota `do-cliente` que abre a conversa.
+Uma mudança pequena na fase 1, sem migração. Decisão do Felipe (19/11, 22:08): a conversa criada por baixo **fica escondida** da fila do Atendimento até a cliente responder. Regra: sem busca, `ConversaRepository.ListarInboxAsync` não lista conversa com `UltimaMensagemEntradaEm` nulo (a cliente nunca escreveu); com busca, lista. A primeira mensagem da cliente preenche o campo e a conversa volta à fila. Contadores da fila seguem a mesma regra. Medido em produção (19/11, 22:10): 21 conversas, 0 sem mensagem da cliente; hoje a regra não esconde nada.
+
+Contrato usado como está: `POST /api/atendimento/conversas/{id}/pedido`, `/pedido/simulacao` e a rota `do-cliente` que abre a conversa.
 
 Fase 2 (cliente nova): usa a criação de cliente que o Console já tem. Se o cliente sem celular (furo 2 da #2919) não puder abrir conversa, a fase 2 espera a correção de lá; não se resolve aqui.
 
@@ -92,7 +95,7 @@ Fase 2 (cliente nova): usa a criação de cliente que o Console já tem. Se o cl
 
 | Fase | Entrega | Gate objetivo | Abandono |
 |---|---|---|---|
-| 1 | Janela em Pedidos, Clientes e Ficha, cliente já cadastrada. Sem mudar hash. Registrar fecha e mostra o pedido | Provas Red/Green verdes; prova de tela nos 3 pontos de entrada; resumo sai dentro e fora das 24 h | Se o desacoplamento do cardápio e da comanda passar de 2 PRs, ou a Ficha do Atendimento regredir, parar e voltar ao fluxo atual |
+| 1 | Janela em Pedidos, Clientes e Ficha, cliente já cadastrada. Sem mudar hash. Registrar fecha e mostra o pedido | Provas Red/Green verdes; prova de tela nos 3 pontos de entrada; resumo sai dentro e fora das 24 h; a conversa por baixo não aparece na fila até a cliente responder | Se o desacoplamento do cardápio e da comanda passar de 2 PRs, ou a Ficha do Atendimento regredir, parar e voltar ao fluxo atual |
 | 2 | "Cliente nova" com cadastro rápido na janela | Cliente nova registra pedido sem sair da tela; prova de tela | Se depender do furo 2 ainda aberto na #2919, esperar; não duplicar a correção |
 
 Cada fase é uma PR de tier alto (feat), até `aprovado`.
@@ -106,6 +109,7 @@ Provas no padrão `EasyStock.Console/ferramentas/prova-*.mjs` (Red antes, Green 
 3. Registrar chama `POST .../conversas/{id}/pedido` com `ClienteId`, `VinculoRevisao`, itens, janela, data, endereço, forma e `enviarAoCliente`; falha mantém a janela aberta com a montagem.
 4. Sem `atenderConversas` o botão não aparece.
 5. Resumo fora das 24 h: segue coberto pelos testes da #2905 (não pode regredir).
+6. Teste de repositório: sem busca, `ListarInboxAsync` não traz conversa com `UltimaMensagemEntradaEm` nulo; com busca, traz; depois da primeira mensagem da cliente, volta à fila.
 
 Prova de tela no Console real (build do worktree) nos 3 pontos de entrada, Pedidos, Clientes e Ficha. Em cada um: abrir a janela, hash inalterada, montar, registrar, janela fecha, pedido visível na tela de origem, nenhum campo de mensagem na janela.
 
@@ -117,15 +121,15 @@ Prova de tela no Console real (build do worktree) nos 3 pontos de entrada, Pedid
 | Comanda em montagem perdida ao fechar | Confirmação ao fechar com itens; montagem mantida enquanto a janela estiver aberta; rascunho persistente fica fora (pergunta 2) |
 | A mesma conversa aberta no Atendimento por outra pessoa | A comanda é da conversa: a outra pessoa vê os itens aparecerem. Aviso na janela se houver outra pessoa atendendo; não bloquear |
 | Permissão `atenderConversas` | Botão só aparece com a permissão; a API responde 403 sem ela; erro claro na janela |
-| Conversa criada por baixo polui a fila do Atendimento | Medir no gate da fase 1; se poluir, marcar como interna (pergunta 1) |
+| Conversa criada por baixo polui a fila do Atendimento | Escondida da fila até a cliente responder (seção 8). Efeito colateral: a conversa aberta pela equipe em "Iniciar" também some da fila até a resposta; 0 casos em produção hoje, e segue achável pela busca |
 | Mensagem acidental | Sem campo de texto; único envio é o resumo, com aviso e opção de desligar |
 
 ## 12. Rollback
 
-Reverter a PR da fase: o botão volta ao fluxo atual pelo Atendimento. Sem migração e sem mudança de API, não há dado a desfazer.
+Reverter a PR da fase: o botão volta ao fluxo atual pelo Atendimento e a fila volta a listar todas as conversas. Sem migração, não há dado a desfazer.
 
 ## 13. Perguntas abertas para o Felipe
 
-1. A conversa criada por baixo pode aparecer na fila do Atendimento, ou fica escondida até a cliente responder?
+1. ~~A conversa criada por baixo pode aparecer na fila do Atendimento, ou fica escondida até a cliente responder?~~ Respondida 19/11, 22:08: **fica escondida** (seção 8).
 2. Fechar a janela no meio da montagem: perde tudo (com confirmação) ou guarda rascunho para retomar?
 3. O resumo continua saindo pelo WhatsApp da loja no Registrar (escolha desta spec). No futuro, prefere pedido sem conversa por `POST /api/pedidos` mais um aviso novo de "pedido recebido"?
