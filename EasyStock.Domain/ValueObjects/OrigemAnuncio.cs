@@ -133,6 +133,9 @@ public sealed record OrigemAnuncio
         if (string.IsNullOrWhiteSpace(valor)) return null;
         var limpo = new string(valor.Where(c => !char.IsControl(c)).ToArray()).Trim();
         if (limpo.Length == 0) return null;
-        return limpo.Length > max ? limpo[..max].TrimEnd() : limpo;
+        if (limpo.Length <= max) return limpo;
+        // Não parte um par substituto (emoji): meio par vira UTF-8 inválido e o Npgsql recusa o INSERT.
+        var corte = char.IsHighSurrogate(limpo[max - 1]) ? max - 1 : max;
+        return limpo[..corte].TrimEnd();
     }
 }

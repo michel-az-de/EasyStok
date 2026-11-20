@@ -72,4 +72,16 @@ public class OrigemAnuncioNasEntidadesTests
         Assert.Equal(TimeSpan.Zero, origem.CapturadaEm.Offset);
         Assert.Equal(local, origem.CapturadaEm);
     }
+
+    [Fact]
+    public void Corte_no_tamanho_maximo_nao_parte_emoji_ao_meio()
+    {
+        // Emoji (par substituto) cruzando a posição 120: o corte não pode deixar meio par, que o Npgsql recusa.
+        var titulo = new string('a', OrigemAnuncio.TamanhoTexto - 1) + "🎁" + "fim";
+
+        var origem = OrigemAnuncio.DoAnuncioWhatsApp("1", titulo, null, Agora);
+
+        Assert.False(char.IsHighSurrogate(origem.TituloAnuncio![^1]));
+        Assert.True(origem.TituloAnuncio.Length <= OrigemAnuncio.TamanhoTexto);
+    }
 }
