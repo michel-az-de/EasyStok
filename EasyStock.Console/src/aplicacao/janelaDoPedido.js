@@ -22,9 +22,19 @@ export async function registrarDaJanela({ acoes, janela, meio, enviarAoCliente =
   if (!janela?.conversaId) return { erro: 'Abra o Novo pedido de novo.' }
   const resposta = await acoes.gerarPedido(janela.conversaId, meio ?? null, enviarAoCliente)
   if (resposta?.erro) return { erro: faltaEndereco({ status: 409, message: resposta.erro }) ? `${resposta.erro} Volte ao passo Entrega e pagamento e cadastre o endereço.` : resposta.erro }
+  // `criarPedido` devolve undefined quando não há pedido a criar ou a conversa já tem um: nada foi registrado.
+  if (!resposta) return { erro: 'Não consegui confirmar o pedido. Confira em Pedidos antes de tentar de novo; a montagem foi mantida.' }
   aoRegistrar?.(resposta)
-  return { ok: true, pedido: resposta ?? null }
+  return { ok: true, pedido: resposta }
 }
+
+// Conversa que já virou pedido: o modo API ainda não começa outra comanda nela (`novaComanda` é não ligada), então a
+// janela avisa na abertura em vez de deixar montar algo que o Registrar não criaria.
+export const pedidoJaCriadoNaConversa = (conversa) => Boolean(conversa?.pedido?.pedidoId)
+// Comanda em montagem que já estava na conversa (Atendimento/Balcão): não é rascunho da janela.
+export const comandaEmAndamento = (conversa) => (conversa?.pedido?.itens?.length ?? 0) > 0
+// Sem cardápio carregado todo item pareceria "fora do cardápio".
+export const cardapioPronto = (cardapio) => Array.isArray(cardapio) && cardapio.length > 0
 
 // Entrega e endereço (como a comanda): a API usa o endereço do cadastro do cliente. Sem ele, 409 na simulação e no
 // Registrar. O caminho é cadastrar o endereço aqui, pelo mesmo `editarDadoCliente('endereco')` da Ficha.

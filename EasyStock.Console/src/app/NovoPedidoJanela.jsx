@@ -5,7 +5,7 @@ import { Modal } from '../componentes/Modal'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useSimulacaoDoPedidoComErro } from '../aplicacao/useSimulacaoDoPedido'
 import {
-  ajustarNaJanela, cadastrarEnderecoDaJanela, faltaEndereco, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela,
+  ajustarNaJanela, cadastrarEnderecoDaJanela, cardapioPronto, comandaEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela,
   restaurarRascunho, somarNaJanela, textoDoErro,
 } from '../aplicacao/janelaDoPedido'
 import { EscolhaDeMeio } from '../features/ficha-cliente/EscolhaDeMeio'
@@ -21,6 +21,7 @@ import css from './novoPedidoJanela.module.css'
 // conversa. A montagem mora em `conversas[].pedido` da conversa da janela (`janelaDoPedido.conversaId`). Fica em `app/`
 // porque junta Atendimento, Ficha e Cardápio, e feature não importa feature. Não há campo de mensagem aqui: o resumo
 // sai pelo `enviarAoCliente` do próprio pedido.
+const AVISO_PEDIDO_EM_ANDAMENTO = 'Esta cliente já tem um pedido em andamento nesta conversa. Veja e ajuste o pedido em Pedidos ou no Atendimento; um novo pedido só pode ser montado depois que ele for concluído.'
 const PASSOS = [{ id: 'itens', rotulo: 'Itens' }, { id: 'entrega', rotulo: 'Entrega e pagamento' }, { id: 'revisar', rotulo: 'Revisar' }]
 
 const doToque = (item) => {
@@ -56,13 +57,17 @@ function Montagem({ janela, conversa }) {
   const [cadastrando, setCadastrando] = useState(false)
   const [erroEndereco, setErroEndereco] = useState(null)
   const restaurado = useRef(false)
+  const comandaDaConversa = useRef(comandaEmAndamento(conversa))
+  const jaTemPedido = pedidoJaCriadoNaConversa(conversa)
 
   // Reabrir a mesma cliente: refaz a montagem com o cardápio de hoje e volta ao passo em que parou.
   useEffect(() => {
     if (restaurado.current) return
-    restaurado.current = true
+    if (comandaDaConversa.current || jaTemPedido) { restaurado.current = true; return }
     const guardado = lerRascunhoDoPedido(sessao, janela.clienteId)
-    if (!guardado || (conversa.pedido?.itens?.length ?? 0) > 0) return
+    if (guardado && !cardapioPronto(cardapio)) return
+    restaurado.current = true
+    if (!guardado) return
     const volta = restaurarRascunho(guardado, cardapio)
     for (const linha of volta.itens) {
       const item = itemPorSku(cardapio, linha.sku)
@@ -74,11 +79,11 @@ function Montagem({ janela, conversa }) {
     if (volta.meio) acoes.escolherMeioPagamento?.(janela.conversaId, volta.meio)
     setAvisos(volta.avisos)
     setPasso(volta.itens.length > 0 ? volta.passo : 'itens')
-  }, [])
+  }, [cardapio])
 
   // Fechar, trocar de tela ou recarregar guarda a montagem (sessionStorage, por cliente).
   useEffect(() => {
-    if (!restaurado.current || registrando) return
+    if (!restaurado.current || comandaDaConversa.current || jaTemPedido || registrando) return
     gravarRascunhoDoPedido(sessao, janela.clienteId, rascunhoDaMontagem(janela, pedido, passo, cardapio, { entrega, endereco: enderecoTexto }))
   }, [pedido, passo, enderecoTexto])
 
@@ -123,13 +128,21 @@ function Montagem({ janela, conversa }) {
         Vamos enviar o resumo para {nome} no WhatsApp
       </label>
     )}
-    {itens.length > 0 && (descartando
+    {!comandaDaConversa.current && itens.length > 0 && (descartando
       ? <><Botao variante="texto" onClick={descartar}>Confirmar descarte</Botao><Botao variante="texto" onClick={() => setDescartando(false)}>Manter rascunho</Botao></>
       : <Botao variante="texto" onClick={() => setDescartando(true)}>Descartar rascunho</Botao>)}
     {anterior && <Botao onClick={() => setPasso(anterior.id)} disabled={registrando}>Voltar</Botao>}
     {proximo && <Botao variante="primario" disabled={!podeAvancar} onClick={() => setPasso(proximo.id)}>Continuar</Botao>}
     {passo === 'revisar' && <Botao variante="primario" disabled={registrando || itens.length === 0} onClick={registrar}>{registrando ? 'Registrando…' : 'Registrar'}</Botao>}
   </>
+
+  if (jaTemPedido) {
+    return (
+      <Modal titulo={`Novo pedido de ${nome}`} largura="lg" aoFechar={fechar} rodape={<Botao variante="primario" onClick={fechar}>Entendi</Botao>}>
+        <p className={css.aviso} role="status">{AVISO_PEDIDO_EM_ANDAMENTO}</p>
+      </Modal>
+    )
+  }
 
   return (
     <Modal titulo={`Novo pedido de ${nome}`} largura="lg" aoFechar={registrando ? undefined : fechar} segurarFechamento={registrando} rodape={rodape}>
