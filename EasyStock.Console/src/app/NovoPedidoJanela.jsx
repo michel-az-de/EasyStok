@@ -4,6 +4,7 @@ import { CampoTexto } from '../componentes/Campo'
 import { EsqueletoDeLista } from '../componentes/Esqueleto'
 import { Modal } from '../componentes/Modal'
 import { AvisoDaAcaoApi } from './FaixaApi'
+import { anunciarPedidoRegistrado } from '../aplicacao/pedidoRegistrado'
 import { ligarVoltarDaJanela } from '../aplicacao/historicoDaJanela'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useSimulacaoDoPedidoComErro } from '../aplicacao/useSimulacaoDoPedido'
@@ -126,7 +127,7 @@ function Montagem({ janela, conversa }) {
     setRegistrando(true); setErro(null)
     const resultado = await registrarDaJanela({
       acoes, janela, meio: pedido.meio, enviarAoCliente,
-      aoRegistrar: () => { apagarRascunhoDoPedido(sessao, janela.clienteId); fechar() },
+      aoRegistrar: (pedidoNovo) => { apagarRascunhoDoPedido(sessao, janela.clienteId); anunciarPedidoRegistrado(pedidoNovo); fechar() },
     })
     if (resultado.erro) { setErro(resultado.erro); setRegistrando(false) }
   }

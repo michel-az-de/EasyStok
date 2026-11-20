@@ -60,3 +60,4 @@
   .totais { justify-content: stretch; }
   .totais > div { min-width: 0; }
 }
+.linhaNova { background: var(--marca-claro); box-shadow: inset 3px 0 0 var(--marca); }

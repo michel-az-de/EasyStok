@@ -121,7 +121,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
               const nome = item.clienteNome || 'Cliente sem nome'
               const rotulo = rotuloDaSituacao(item.status)
               const situacaoNaLinha = situacaoPedeAcao(item.status) ? <Pilula tom="aviso">{rotulo}</Pilula> : rotulo
-              return <tr key={item.id} className={base.clicavel} onClick={(e) => { if (!e.target.closest('button, a')) verPedido(item) }}>
+              return <tr key={item.id} className={`${base.clicavel} ${item.id === consulta.novoId ? css.linhaNova : ''}`.trim()} onClick={(e) => { if (!e.target.closest('button, a')) verPedido(item) }}>
                 <td><strong>{numeroDoPedido(item)}</strong><small>{[item.criadoEm && horaCurta(item.criadoEm), canal].filter(Boolean).join(' · ')}</small>
                   <span className={css.soCelular}><small>{nome}</small><small>{situacaoNaLinha}</small></span></td>
                 <td><span>{nome}</span>{(telefone || item.clienteApt) && <small>{[telefone, item.clienteApt && `Apto ${item.clienteApt}`].filter(Boolean).join(' · ')}</small>}</td>

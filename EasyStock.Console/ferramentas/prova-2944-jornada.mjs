@@ -67,4 +67,23 @@ await caso('18c. a janela liga o histórico e ignora o voltar enquanto registra'
   assert.match(jsx, /ligarVoltarDaJanela\(/)
   assert.match(jsx, /registrandoRef/)
 })
+
+// E1-19: registrar avisa a lista de Pedidos e a Ficha (laço de sincronização) e destaca o pedido novo.
+await caso('19a. o canal anuncia o pedido registrado, pede a sincronização e a lista escuta', async () => {
+  const c = await import('../src/aplicacao/pedidoRegistrado.js').catch(() => ({}))
+  assert.equal(typeof c.criarCanalDePedidoRegistrado, 'function', 'criarCanalDePedidoRegistrado ainda não existe')
+  const alvo = new EventTarget(); const vistos = []; let sincronizou = 0
+  alvo.addEventListener('easystok:sincronizar-agora', () => { sincronizou += 1 })
+  const canal = c.criarCanalDePedidoRegistrado(alvo)
+  const sair = canal.inscrever((id) => vistos.push(id))
+  canal.anunciar({ pedidoId: 'p1' }); canal.anunciar({}); canal.anunciar(undefined)
+  assert.deepEqual(vistos, ['p1']); assert.equal(sincronizou, 3)
+  sair(); canal.anunciar({ pedidoId: 'p2' }); assert.deepEqual(vistos, ['p1'])
+})
+await caso('19b. a janela anuncia ao registrar e a lista recarrega e destaca', () => {
+  assert.match(fonte('app/NovoPedidoJanela.jsx'), /anunciarPedidoRegistrado\(/)
+  assert.match(fonte('aplicacao/pedidosCadastro.js'), /inscreverPedidoRegistrado\(/)
+  assert.match(painel, /consulta.novoId/)
+  assert.match(fonte('features/gestao/cadastros/pedidos.module.css'), /\.linhaNova/)
+})
 fim()
