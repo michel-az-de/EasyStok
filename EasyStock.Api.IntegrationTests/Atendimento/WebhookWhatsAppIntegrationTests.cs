@@ -17,7 +17,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Atendimento;
 
@@ -36,18 +35,14 @@ public sealed class WebhookWhatsAppIntegrationTests : IAsyncLifetime
     private static readonly Guid EmpresaA = Guid.NewGuid();
     private static readonly Guid EmpresaB = Guid.NewGuid();
 
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
 
     public async Task InitializeAsync()
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_webhook_whatsapp_tests")
-                .WithUsername("postgres")
-                .WithPassword("senha-de-teste-descartavel")
-                .Build();
+            _pg = new BancoDeTeste();
             await _pg.StartAsync();
             _isAvailable = true;
         }

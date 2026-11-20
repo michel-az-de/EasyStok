@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests;
 
@@ -23,16 +22,17 @@ namespace EasyStock.Api.IntegrationTests;
 /// </summary>
 public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
     private string? _motivoIndisponivel;
     private string? _connString;
-    private readonly VariaveisDeProcesso _variaveis = new();
 
     private const string JwtIssuer  = "EasyStock";
     private const string JwtAudience = "EasyStock";
     private const string JwtSecret  = "EasyStock-Test-SuperSecretKey-Min32Chars!!";
 
+    // #2976: o cache segue válido com o banco clonado: o modelo só tem migrações e o seed da demo
+    // roda no startup de cada factory, então a resposta é a mesma para todo teste do processo.
     // Cache classe-scoped: a checagem de "seed demo disponível" é determinística
     // dentro do mesmo processo (mesma Program.cs, mesma config). Sem cache, cada
     // um dos 12 testes que dependem do seed pagava ~30s subindo WebApplicationFactory
@@ -43,36 +43,10 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // Prioridade 1: Postgres externo via env var EASYSTOCK_IT_PG (CI ou ambiente
-        // sem Docker — ex.: Postgres local/WSL). Permite rodar a integração web→API
-        // DE VERDADE onde o Testcontainers não consegue subir um container.
-        var externalPg = Environment.GetEnvironmentVariable("EASYSTOCK_IT_PG");
-        if (!string.IsNullOrWhiteSpace(externalPg))
-        {
-            _connString = externalPg;
-            // WebApplicationFactory + Minimal API top-level: o ConfigureAppConfiguration
-            // nem sempre sobrescreve o que o Program lê no startup (o GetConnectionString
-            // saía null → AddNpgSql quebrava). Env vars são lidas pelo CreateBuilder de
-            // forma confiável (precedência alta, cedo).
-            _variaveis
-                .Definir("ConnectionStrings__DefaultConnection", externalPg)
-                .Definir("Database__Provider", "PostgreSql")
-                .Definir("RunMigrationsOnStartup", "true")
-                .Definir("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001")
-                // Production exige a senha do bootstrap de SuperAdmin via env var.
-                .Definir("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
-            _isAvailable = true;
-            return;
-        }
-
-        // Prioridade 2: Testcontainers (Docker disponível).
+        // #2976: o ramo EASYSTOCK_IT_PG saiu. Todo teste usa um banco clonado do cluster do processo.
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_api_tests")
-                .WithUsername("postgres")
-                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             _connString = _pg.GetConnectionString();
@@ -87,7 +61,6 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        _variaveis.Dispose();
         if (_pg is not null)
             await _pg.DisposeAsync();
     }
@@ -185,8 +158,8 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     /// <summary>
     /// Guarda anti-falso-verde do projeto (#2176), no desenho de
-    /// <c>EasyStock.Infra.Postgre.IntegrationTests/HarnessCanaryTests</c>. O job
-    /// <c>api-integration</c> não define <c>EASYSTOCK_IT_PG</c> e depende do
+    /// <c>EasyStock.Infra.Postgre.IntegrationTests/HarnessCanaryTests</c>. Os jobs
+    /// <c>Integração (parte N)</c> do <c>ci.yml</c> rodam este projeto e dependem do
     /// Testcontainers: se o Docker do runner degradar, todos os
     /// <c>[SkippableFact]</c> deste projeto pulam e o gate fica verde-vazio. No GitHub
     /// Actions isso vira VERMELHO. Localmente, sem a env var, SKIPa visível (ADR-0023).
