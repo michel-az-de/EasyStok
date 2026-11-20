@@ -272,7 +272,7 @@ export function BarraProximoPasso({
     } else {
       corpoAcao = (
         <div className={css.botoesPrimarios}>
-          {foraDaJanela && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: o resumo sai pelo modelo aprovado do WhatsApp.</p>}
+          {foraDaJanela && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: o resumo sai pelo mensagem padrão do WhatsApp do WhatsApp.</p>}
           {/* #1686 (item 9): o motivo que segura o botão leva ao campo que resolve. */}
           {info.motivo && (info.motivo === prerequisito && alvoDoPrerequisito && aoIrParaMotivo
             ? <p className={css.motivoDesabilitado}><button type="button" className={css.linkMotivo} data-alvo-motivo={alvoDoPrerequisito}

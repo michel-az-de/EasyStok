@@ -319,7 +319,7 @@ export function BlocoPedido({
                 enviar"); aqui só a linha que diz que a comanda vai junto.
                 #1587: com o pedido já criado ela não vai mais a lugar nenhum; fica só o motivo acima. */}
             {fonteApi && (podeGerar || envio.chave === 'vazia') ? (
-              !itensTravados && <p className={css.situacaoEnvio}>{foraDaJanela ? 'Janela fechada: o resumo sai pelo modelo aprovado do WhatsApp.' : LINHA_COMANDA_VAI_JUNTO}</p>
+              !itensTravados && <p className={css.situacaoEnvio}>{foraDaJanela ? 'Janela fechada: o resumo sai pelo mensagem padrão do WhatsApp do WhatsApp.' : LINHA_COMANDA_VAI_JUNTO}</p>
             ) : (podeGerar || envio.chave === 'vazia') ? (
               <Botao
                 largo variante="primario" icone="enviar" disabled={!podeGerar || enviando}

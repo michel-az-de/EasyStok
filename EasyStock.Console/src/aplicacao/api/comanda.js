@@ -27,7 +27,7 @@ import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
 const NAO_LIGADO = 'esta ação ainda não está disponível nesta tela.'
 const SEM_PEDIDO = 'o pedido ainda não foi criado. Gere a cobrança ou envie ao cliente primeiro.'
 // #1924: textos do link novo pela Ficha.
-export const LINK_NOVO_SEM_ENVIO = 'Link novo gerado, mas não saiu na conversa (fora da janela de 24 h ou canal fora do ar). '
+export const LINK_NOVO_SEM_ENVIO = 'Link novo gerado, mas não saiu na conversa (fora do prazo de 24 h ou canal fora do ar). '
   + 'Copie o link em Pagamento e mande ao cliente.'
 export const LINK_AINDA_VALE = 'O link desta cobrança ainda vale. Para mandar de novo, copie o link em Pagamento.'
 const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
@@ -35,8 +35,8 @@ const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora e
 
 const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.'
 
-// #2871: fora da janela de 24 h o resumo do pedido vai pela fila de avisos, no modelo aprovado.
-const RESUMO_NA_FILA = 'O resumo sai pelo WhatsApp em instantes (conversa fora da janela de 24 h).'
+// #2871: fora do prazo de 24 h o resumo do pedido vai pela fila de avisos, no mensagem padrão do WhatsApp.
+const RESUMO_NA_FILA = 'O resumo sai pelo WhatsApp em instantes (conversa fora do prazo de 24 h).'
 
 // #1942 (#1923): 409 que o EasyStok recusou antes de criar o pedido. Mostra o motivo, sem reler. O resto dos
 // 409 (PEDIDO_EM_ANDAMENTO, a corrida do clique duplo, e código desconhecido) pode ter criado: relê.
@@ -182,18 +182,18 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
         if (!gerado?.cobranca && corpo.forma === FORMA_ONLINE) {
           faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "Gerar cobrança" para emitir o link')
         }
-        // #2871: fora da janela de 24 h o resumo vai pela fila de avisos (modelo aprovado) e sai em instantes.
+        // #2871: fora do prazo de 24 h o resumo vai pela fila de avisos (mensagem padrão do WhatsApp) e sai em instantes.
         const resumoNaFila = Boolean(gerado?.resumoNaFila)
         if (!gerado?.enviadoAoCliente && !resumoNaFila) {
           if (gerado?.pedidoId) semResumo.add(gerado.pedidoId)
-          if (enviarAoCliente) faltas.push('o cliente não foi avisado: o resumo não saiu (conversa fora da janela de 24 h sem modelo aprovado, ou canal fora do ar)')
+          if (enviarAoCliente) faltas.push('o cliente não foi avisado: o resumo não saiu (conversa fora do prazo de 24 h sem mensagem padrão do WhatsApp, ou canal fora do ar)')
         }
         const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
         limparAviso()
         if (aviso) avisar(resumoNaFila ? `${aviso} ${RESUMO_NA_FILA}` : aviso)
         else if (resumoNaFila) avisar(`Pedido criado. ${RESUMO_NA_FILA}`)
         else if (!enviarAoCliente) avisar(gerado?.cobranca?.linkPagamento
-          ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar um modelo aprovado.'
+          ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar uma mensagem padrão do WhatsApp.'
           : 'Pedido e cobrança criados sem envio. Confira a forma de recebimento em Pagamento.')
         return recarregar(id).catch(() => {
           if (gerado?.pedidoId) criadoSemRecarga.set(id, { pedidoId: gerado.pedidoId, numero: pedido.numero })

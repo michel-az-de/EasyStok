@@ -71,7 +71,7 @@ export function ModalEnviarCardapio({
     >
       <div className={css.cardapioEnvio}>
         {erro && <p role="alert">{erro}</p>}
-        {!podeEnviar && <p>O canal não permite enviar texto agora. Você pode copiar o link ou usar um modelo aprovado na conversa.</p>}
+        {!podeEnviar && <p>O canal não permite enviar texto agora. Você pode copiar o link ou usar uma mensagem padrão do WhatsApp na conversa.</p>}
         {!conteudo && <>
           <p>O cliente escolhe pelo link. Você acompanha os itens nesta conversa.</p>
           <p>Se houver um link ainda não confirmado, ele será substituído ao gerar outro.</p>
