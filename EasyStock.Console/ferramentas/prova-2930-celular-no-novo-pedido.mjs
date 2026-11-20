@@ -26,10 +26,15 @@ await abrirConversaDoCliente('c2')
 assert.deepEqual(corpos.map(([, corpo]) => corpo), [{ clienteId: 'c1', celular: '(11) 98888-7777' }, { clienteId: 'c2' }])
 assert.ok(corpos.every(([url]) => url.endsWith('/api/atendimento/conversas/do-cliente')))
 
-// 3. Na escolha do cliente, quem não tem telefone ganha o campo "Celular com DDD" e o celular segue para o hook.
-const escolha = readFileSync(new URL('../src/features/gestao/cadastros/EscolherClienteDoPedido.jsx', import.meta.url), 'utf8')
-assert.match(escolha, /rotulo="Celular com DDD"/)
-assert.match(escolha, /novoPedido\.iniciar\(cliente\.id, \{ celular \}\)/)
+// 3. O campo "Celular com DDD" mora num componente só, usado na escolha do cliente (Pedidos) e na linha de Clientes.
+const ler = (caminho) => readFileSync(new URL(`../src/features/gestao/cadastros/${caminho}`, import.meta.url), 'utf8')
+const campo = ler('CelularDoPedido.jsx')
+assert.match(campo, /rotulo="Celular com DDD"/)
+assert.match(campo, /novoPedido\.iniciar\(clienteId, \{ celular: celular\.texto \}\)/)
+assert.match(ler('EscolherClienteDoPedido.jsx'), /<CelularDoPedido clienteId=\{cliente\.id\}/)
+const painel = ler('PainelCadastros.jsx')
+assert.match(painel, /telefoneCadastro\(item\) \? novoPedido\.iniciar\(id\) : pedirCelular\(/, 'linha sem telefone pede o celular')
+assert.match(painel, /<PedirCelularDoPedido cliente=\{celularDe\}/)
 const hook = readFileSync(new URL('../src/aplicacao/novoPedidoDoCliente.js', import.meta.url), 'utf8')
 assert.match(hook, /abrirConversaDoCliente\(clienteId, celular\)/)
 
