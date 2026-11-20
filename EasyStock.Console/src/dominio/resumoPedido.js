@@ -154,3 +154,17 @@ export function avisoDoEnvio(cobranca, nomeCliente) {
   }
   return `Pedido enviado para ${nomeCliente}. Pagamento na entrega (${nome}), o pedido já está na cozinha.`
 }
+
+// #2978: o que o Revisar mostra além dos itens. Janela, endereço, pagamento e frete moram no passo Entrega e
+// pagamento; `pendente` marca o que falta (a tela pede "Alterar" em todas as linhas).
+export function linhasDaRevisao({ pedido, simulacao = null, endereco = null, rotuloDaJanela = null }) {
+  const combinado = pedido?.freteCombinado
+  const frete = combinado != null ? `${moeda(combinado)} (combinado)` : simulacao?.frete != null ? moeda(simulacao.frete) : null
+  const linha = (chave, rotulo, valor, faltando) => ({ chave, rotulo, valor: valor ?? faltando, pendente: valor == null })
+  return [
+    linha('janela', 'Janela de entrega', pedido?.janela ? rotuloDaJanela ?? 'Janela escolhida' : null, 'Falta escolher a janela'),
+    linha('endereco', 'Endereço', endereco, 'Falta cadastrar o endereço'),
+    linha('pagamento', 'Pagamento', pedido?.meio ? nomeDoMeio(pedido.meio).replace(/^./, (c) => c.toUpperCase()) : null, 'Falta escolher o pagamento'),
+    linha('frete', 'Frete', frete, simulacao?.freteACombinar ? 'Falta combinar o frete' : 'Calculando…'),
+  ]
+}

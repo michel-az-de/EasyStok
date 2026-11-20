@@ -24,6 +24,8 @@ export const ajustarNaJanela = (acoes, janela, sku, delta) => {
 export async function registrarDaJanela({ acoes, janela, meio, enviarAoCliente = true, aoRegistrar }) {
   if (!janela?.conversaId) return { erro: 'Abra o Novo pedido de novo.' }
   const resposta = await acoes.gerarPedido(janela.conversaId, meio ?? null, enviarAoCliente)
+  // #2978: o erro aparece uma vez, junto do Registrar; o aviso do provedor (e a barra de cima) repetiria o mesmo texto.
+  if (resposta?.erro) acoes.fecharAvisoApi?.()
   if (resposta?.erro) return { erro: faltaEndereco({ status: 409, message: resposta.erro }) ? `${resposta.erro} Volte ao passo Entrega e pagamento e cadastre o endereço.` : resposta.erro }
   // `criarPedido` devolve undefined quando não há pedido a criar ou a conversa já tem um: nada foi registrado.
   if (!resposta) return { erro: 'Não consegui confirmar o pedido. Confira em Pedidos antes de tentar de novo; a montagem foi mantida.' }
@@ -103,7 +105,7 @@ export async function cadastrarCelularDaJanela({ acoes, conversa, texto }) {
   }
 }
 
-export function rascunhoDaMontagem(janela, pedido, passo = 'itens', cardapio = [], { entrega, endereco } = {}) {
+export function rascunhoDaMontagem(janela, pedido, passo = 'itens', cardapio = [], { entrega, endereco, enderecoCadastrado } = {}) {
   if (!janela?.clienteId || !pedido?.itens?.length) return null
   return {
     clienteId: janela.clienteId,
@@ -114,6 +116,7 @@ export function rascunhoDaMontagem(janela, pedido, passo = 'itens', cardapio = [
     meio: pedido.meio ?? null,
     entrega: entrega ?? pedido.entrega ?? 'entrega',
     endereco: endereco ?? null,
+    enderecoCadastrado: enderecoCadastrado ?? null,
   }
 }
 
@@ -128,7 +131,8 @@ export function restaurarRascunho(rascunho, cardapio) {
     } else itens.push(linha)
   }
   return { itens, avisos, passo: rascunho?.passo ?? 'itens', janela: rascunho?.janela ?? null, meio: rascunho?.meio ?? null,
-    entrega: rascunho?.entrega ?? 'entrega', endereco: rascunho?.endereco ?? null }
+    entrega: rascunho?.entrega ?? 'entrega', endereco: rascunho?.endereco ?? null,
+    enderecoCadastrado: rascunho?.enderecoCadastrado ?? null }
 }
 
 export const novoPedidoDisponivel = ({ abrirConversaDoCliente, permite, acoes }) =>
@@ -138,11 +142,13 @@ export const novoPedidoDisponivel = ({ abrirConversaDoCliente, permite, acoes })
 export const rotuloDoNovoPedido = (sessao, clienteId) => (temRascunhoDoPedido(sessao, clienteId) ? 'Continuar pedido' : 'Novo pedido')
 
 // #2944 (E1-01): por que Continuar/Registrar está parado. `null` quando nada bloqueia (mesma regra de `podeAvancarDaEntrega`).
-export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null, simulacao = null }) {
+// #2978: o Revisar repete as regras da Entrega e ainda exige endereço válido (`enderecoValido`), para não registrar às cegas.
+export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null, simulacao = null, enderecoValido = true }) {
   if (itens.length === 0) return 'Some ao menos um item'
-  if (passo !== 'entrega') return null
+  if (passo === 'itens') return null
   if (!pedido?.janela) return 'Escolha a janela de entrega'
   if (!pedido?.meio) return 'Escolha a forma de pagamento'
+  if (entrega !== 'retirada' && passo === 'revisar' && !enderecoValido) return 'Cadastre o endereço de entrega: o pedido usa o do cadastro, não o digitado'
   if (entrega !== 'retirada' && faltaEndereco(erroSimulacao)) return 'Falta o endereço de entrega'
   if (faltaFreteCombinado(simulacao, pedido)) return 'Informe o frete combinado'
   return null
