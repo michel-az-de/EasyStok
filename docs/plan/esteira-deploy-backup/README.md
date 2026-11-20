@@ -96,3 +96,4 @@ Regra "uma feature, uma PR": muda ADR-0055, `CLAUDE.md` e `AGENTS.md`. Vira ADR 
 | P3 | Nível do backup do banco | a) nível 1 agora · b) nível 2 já |
 | P4 | Ordem | a) E1, E2, E3 · b) E3 primeiro · c) E1 e E3 em paralelo |
 | P5 | Deploy depois do verde | a) manual com portão · b) automático |
+
