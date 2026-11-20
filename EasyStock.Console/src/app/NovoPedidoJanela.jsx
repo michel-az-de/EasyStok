@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../componentes/Botao'
 import { CampoTexto } from '../componentes/Campo'
 import { CampoReais } from '../componentes/CampoReais'
@@ -20,6 +20,7 @@ import { simulacaoVale } from '../dominio/simulacaoPedido'
 import { filtrarCardapio } from '../dominio/filtroDoCardapio'
 import { lerSessao } from '../infra/api/sessao'
 import { lerMoeda, moeda } from '../dominio/formato'
+import { linhasDaRevisao } from '../dominio/resumoPedido'
 import { apagarRascunhoDoPedido, gravarRascunhoDoPedido, lerRascunhoDoPedido } from '../infra/api/rascunhosDoPedido'
 import css from './novoPedidoJanela.module.css'
 
@@ -62,6 +63,9 @@ function Montagem({ janela, conversa }) {
   const [enderecoCadastrado, setEnderecoCadastrado] = useState(null)
   const [cadastrando, setCadastrando] = useState(false)
   const [erroEndereco, setErroEndereco] = useState(null)
+  // #2978: o Revisar mostra o rótulo da janela escolhida; o seletor só existe no passo Entrega.
+  const [janelasLidas, setJanelasLidas] = useState([])
+  const lerJanelas = useCallback((lidas) => { if (lidas.length > 0) setJanelasLidas(lidas) }, [])
   const [celular, setCelular] = useState({ texto: '', erro: null, gravando: false })
   const restaurado = useRef(false)
   // #2944 (E1-02): a troca de passo remove o botão focado; o foco vai ao título do passo (WCAG 2.4.3).
@@ -90,6 +94,7 @@ function Montagem({ janela, conversa }) {
       if (linha.obs) acoes.ajustarObservacao(janela.conversaId, linha.sku, linha.obs)
     }
     if (volta.endereco) setEnderecoTexto(volta.endereco)
+    if (volta.enderecoCadastrado) setEnderecoCadastrado(volta.enderecoCadastrado)
     if (volta.janela) acoes.escolherJanela(janela.conversaId, volta.janela)
     if (volta.meio) acoes.escolherMeioPagamento?.(janela.conversaId, volta.meio)
     setAvisos(volta.avisos)
@@ -99,8 +104,8 @@ function Montagem({ janela, conversa }) {
   // Fechar, trocar de tela ou recarregar guarda a montagem (sessionStorage, por cliente).
   useEffect(() => {
     if (!restaurado.current || deFora || jaTemPedido || registrando) return
-    gravarRascunhoDoPedido(sessao, janela.clienteId, rascunhoDaMontagem(janela, pedido, passo, cardapio, { entrega, endereco: enderecoTexto }))
-  }, [pedido, passo, enderecoTexto, deFora])
+    gravarRascunhoDoPedido(sessao, janela.clienteId, rascunhoDaMontagem(janela, pedido, passo, cardapio, { entrega, endereco: enderecoTexto, enderecoCadastrado }))
+  }, [pedido, passo, enderecoTexto, enderecoCadastrado, deFora])
 
   const { simulacao, erro: erroSimulacao } = useSimulacaoDoPedidoComErro({
     conversaId: janela.conversaId, clienteId: janela.clienteId, endereco: enderecoCadastrado, pedido, ativo: passo !== 'itens',
@@ -119,6 +124,12 @@ function Montagem({ janela, conversa }) {
   const qtdDe = (sku) => itens.find((l) => l.sku === sku)?.qtd ?? 0
   const total = simulacao?.total ?? itens.reduce((soma, l) => soma + (itemPorSku(cardapio, l.sku)?.preco ?? 0) * l.qtd, 0)
   const nome = janela.nome || conversa.nome || 'a cliente'
+  // #2978: o Revisar só registra com endereço do cadastro (ou cadastrado agora) e igual ao que está digitado.
+  const enderecoDoPedido = enderecoVigente(enderecoCadastrado ?? conversa.cliente?.endereco ?? null, enderecoTexto)
+  const enderecoValido = Boolean(enderecoDoPedido) && !faltaEndereco(erroSimulacao)
+  // #2978: sem celular a caixa fica desmarcada e desabilitada, e o aviso explica; nunca "vamos enviar" junto de "não será avisada".
+  const semCelular = Boolean(avisoSemCelular(conversa, true))
+  const enviar = enviarAoCliente && !semCelular
 
   const fechar = () => acoes.fecharJanelaDoPedido()
   // #2944 (E1-18): voltar do navegador fecha a janela (rascunho já guardado), menos no meio do Registrar.
@@ -128,7 +139,7 @@ function Montagem({ janela, conversa }) {
   async function registrar() {
     setRegistrando(true); setErro(null)
     const resultado = await registrarDaJanela({
-      acoes, janela, meio: pedido.meio, enviarAoCliente,
+      acoes, janela, meio: pedido.meio, enviarAoCliente: enviar,
       aoRegistrar: (pedidoNovo) => { apagarRascunhoDoPedido(sessao, janela.clienteId); anunciarPedidoRegistrado(pedidoNovo); fechar() },
     })
     if (resultado.erro) { setErro(resultado.erro); setRegistrando(false) }
@@ -156,7 +167,7 @@ function Montagem({ janela, conversa }) {
 
   // #2944 (E1-01): o motivo do bloqueio fica visível ao lado do botão. O texto "Pode continuar" nunca aparece (só com o
   // botão desabilitado); ele mantém o invólucro do Botao estável para o foco não se perder ao habilitar.
-  const motivoAvancar = motivoDeBloqueio({ passo, itens, pedido, entrega, erroSimulacao, simulacao })
+  const motivoAvancar = motivoDeBloqueio({ passo, itens, pedido, entrega, erroSimulacao, simulacao, enderecoValido })
   const motivoRegistrando = 'Registrando o pedido'
   const rodape = <>
     <AvisoDaAcaoApi />
@@ -164,8 +175,8 @@ function Montagem({ janela, conversa }) {
     {erro && <p className={css.erro} role="alert">{erro}</p>}
     {passo === 'revisar' && (
       <label className={css.enviar}>
-        <input type="checkbox" checked={enviarAoCliente} onChange={(e) => setEnviar(e.target.checked)} />
-        Vamos enviar o resumo para {nome} no WhatsApp
+        <input type="checkbox" checked={enviar} disabled={semCelular} onChange={(e) => setEnviar(e.target.checked)} />
+        {semCelular ? 'Enviar o resumo no WhatsApp (precisa do celular)' : `Vamos enviar o resumo para ${nome} no WhatsApp`}
       </label>
     )}
     {!deFora && itens.length > 0 && (descartando
@@ -176,7 +187,7 @@ function Montagem({ janela, conversa }) {
       : <Botao variante="texto" onClick={() => setDescartando(true)}>Descartar rascunho</Botao>)}
     {anterior && <Botao onClick={() => setPasso(anterior.id)} disabled={registrando} motivo={motivoRegistrando}>Voltar</Botao>}
     {proximo && <Botao variante="primario" disabled={!podeAvancar} motivo={motivoAvancar ?? 'Pode continuar'} onClick={() => setPasso(proximo.id)}>Continuar</Botao>}
-    {passo === 'revisar' && <Botao variante="primario" disabled={registrando || itens.length === 0} motivo={motivoAvancar ?? motivoRegistrando} onClick={registrar}>{registrando ? 'Registrando…' : 'Registrar pedido'}</Botao>}
+    {passo === 'revisar' && <Botao variante="primario" disabled={registrando || Boolean(motivoAvancar)} motivo={motivoAvancar ?? motivoRegistrando} onClick={registrar}>{registrando ? 'Registrando…' : 'Registrar pedido'}</Botao>}
   </>
 
   if (mostrarAvisoDePedidoEmAndamento({ jaTemPedido, registrando })) {
@@ -201,8 +212,8 @@ function Montagem({ janela, conversa }) {
             {!cardapioPronto(cardapio) ? <EsqueletoDeLista linhas={4}>Carregando o cardápio…</EsqueletoDeLista> : ativos.length === 0 ? <p className={css.vazio}>{busca ? `Nada no cardápio com "${busca}".` : 'Nada disponível no cardápio hoje.'}</p> : <ul className={css.lista}>
               {ativos.map((item) => {
                 const produto = doToque(item)
-                return <li key={item.sku}><span>{qtdDe(item.sku) > 0 && <strong className={css.qtd}>{qtdDe(item.sku)}x </strong>}{item.nome} <small>{moeda(produto?.preco ?? item.preco)}</small></span>
-                  <Botao disabled={!produto} motivo="Sem porção disponível" aria-label={`Somar ${item.nome}`} onClick={() => { if (somaEhDaJanela(conversa, montouNaJanela.current)) montouNaJanela.current = true; somarNaJanela(acoes, janela, produto) }}>+</Botao></li>
+                return <li key={item.sku}><span>{item.nome} {qtdDe(item.sku) > 0 && <strong className={css.selo} aria-label={`${qtdDe(item.sku)} no pedido`}>{qtdDe(item.sku)}</strong>} <small>{moeda(produto?.preco ?? item.preco)}</small></span>
+                  <Botao className={css.toque44} disabled={!produto} motivo="Sem porção disponível" aria-label={`Somar ${item.nome}`} onClick={() => { if (somaEhDaJanela(conversa, montouNaJanela.current)) montouNaJanela.current = true; somarNaJanela(acoes, janela, produto) }}>+</Botao></li>
               })}
             </ul>}
           </section>
@@ -213,7 +224,7 @@ function Montagem({ janela, conversa }) {
       )}
       {passo === 'entrega' && (
         <>
-          <SeletorJanelaApi key={janela.conversaId} pedido={pedido} editavel aoEscolher={(j, avisar) => acoes.escolherJanela(janela.conversaId, j, avisar)} />
+          <SeletorJanelaApi key={janela.conversaId} pedido={pedido} editavel aoLerJanelas={lerJanelas} aoEscolher={(j, avisar) => acoes.escolherJanela(janela.conversaId, j, avisar)} />
           <h3 className={css.subtitulo}>Endereço de entrega</h3>
           <CampoTexto rotulo="Endereço de entrega" value={enderecoTexto} erro={erroEndereco} onChange={(e) => { setEnderecoTexto(e.target.value); setErroEndereco(null) }} />
           <Botao disabled={cadastrando || !enderecoTexto.trim()} motivo={cadastrando ? 'Cadastrando…' : 'Escreva o endereço de entrega'} onClick={cadastrarEndereco}>{cadastrando ? 'Cadastrando…' : 'Cadastrar endereço'}</Botao>
@@ -245,8 +256,13 @@ function Montagem({ janela, conversa }) {
             <Botao disabled={celular.gravando || !celular.texto.trim()} motivo={celular.gravando ? 'Gravando…' : 'Digite o celular com DDD'} onClick={cadastrarCelular}>{celular.gravando ? 'Gravando…' : 'Salvar celular'}</Botao>
           </>}
           <dl className={css.resumo}>
-            {simulacao?.frete != null && <><dt>Frete</dt><dd>{moeda(simulacao.frete)}</dd></>}
-            <dt>Total</dt><dd aria-busy={calculando}>{moeda(total)}</dd>
+            {linhasDaRevisao({ pedido, simulacao, endereco: enderecoDoPedido, rotuloDaJanela: janelasLidas.find((j) => j.id === pedido.janela)?.rotulo }).map((l) => (
+              <div key={l.chave} className={css.linhaRevisao}>
+                <dt>{l.rotulo}</dt><dd className={l.pendente ? css.pendente : undefined}>{l.valor}</dd>
+                <Botao variante="texto" aria-label={`Alterar ${l.rotulo.toLowerCase()}`} onClick={() => setPasso('entrega')}>Alterar</Botao>
+              </div>
+            ))}
+            <div className={css.linhaRevisao}><dt>Total</dt><dd aria-busy={calculando}>{moeda(total)}</dd></div>
           </dl>
         </>
       )}
@@ -255,16 +271,21 @@ function Montagem({ janela, conversa }) {
 }
 
 function Linhas({ itens, cardapio, janela, acoes, editavel = false }) {
+  const nomeDe = (sku) => itemPorSku(cardapio, sku)?.nome ?? sku
   if (itens.length === 0) return <p className={css.vazio}>Some itens do cardápio para montar o pedido.</p>
   return (
     <ul className={css.lista}>
       {itens.map((l) => (
         <li key={l.sku}>
-          <span>{l.qtd}x {itemPorSku(cardapio, l.sku)?.nome ?? l.sku}</span>
+          <span>{editavel ? nomeDe(l.sku) : `${l.qtd}x ${nomeDe(l.sku)}`}</span>
           {editavel && (
             <>
-              <div className={css.obs}><CampoTexto rotulo={`Observação de ${itemPorSku(cardapio, l.sku)?.nome ?? l.sku}`} value={l.obs ?? ''} onChange={(e) => acoes.ajustarObservacao(janela.conversaId, l.sku, e.target.value)} /></div>
-              <Botao aria-label={`Tirar um ${itemPorSku(cardapio, l.sku)?.nome ?? l.sku}`} onClick={() => ajustarNaJanela(acoes, janela, l.sku, -1)}>−</Botao>
+              <div className={css.contador} role="group" aria-label={`Quantidade de ${nomeDe(l.sku)}`}>
+                <Botao className={css.toque44} aria-label={`Tirar um ${nomeDe(l.sku)}`} onClick={() => ajustarNaJanela(acoes, janela, l.sku, -1)}>−</Botao>
+                <output aria-label={`${l.qtd} no pedido`}>{l.qtd}</output>
+                <Botao className={css.toque44} aria-label={`Somar um ${nomeDe(l.sku)}`} onClick={() => ajustarNaJanela(acoes, janela, l.sku, 1)}>+</Botao>
+              </div>
+              <div className={css.obs}><CampoTexto rotulo={`Observação de ${nomeDe(l.sku)}`} value={l.obs ?? ''} onChange={(e) => acoes.ajustarObservacao(janela.conversaId, l.sku, e.target.value)} /></div>
             </>
           )}
         </li>
