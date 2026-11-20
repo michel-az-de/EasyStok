@@ -14,8 +14,8 @@ permissions:
 jobs:
   coverage:
     name: Test + Coverage Gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: [self-hosted, easystok]
+    timeout-minutes: 50
 
     steps:
       - name: Checkout

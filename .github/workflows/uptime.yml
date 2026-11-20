@@ -33,7 +33,7 @@ jobs:
   testes:
     name: Testes do vigia
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, easystok]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
   vigia:
     name: Vigia da producao
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, easystok]
     timeout-minutes: 8  # pior caso: 5 alvos x (15 s + 20 s + 15 s) = 250 s
     permissions:
       contents: read

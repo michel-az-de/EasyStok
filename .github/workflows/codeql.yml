@@ -16,8 +16,8 @@ permissions:
 jobs:
   analyze:
     name: Analyze C#
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: [self-hosted, easystok]
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:

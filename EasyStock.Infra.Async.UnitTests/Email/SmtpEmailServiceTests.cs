@@ -24,10 +24,11 @@ public class SmtpEmailServiceTests
     // O CRLF final e do protocolo (termina a ultima linha antes do ponto), nao do conteudo da mensagem.
     private static readonly char[] SemQuebraFinal = ['\r', '\n'];
 
+    // #2537: runner próprio é mais lento; o handshake StartTls passava de 5 s com a suíte inteira rodando.
     private static SmtpConfiguracao Configuracao(
         ServidorSmtpDeTeste servidor,
         SmtpModo modo = SmtpModo.Nenhum,
-        int timeoutSegundos = 5,
+        int timeoutSegundos = 30,
         Action<SmtpOpcoes>? ajustar = null)
     {
         var opcoes = new SmtpOpcoes
