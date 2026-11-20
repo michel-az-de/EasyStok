@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { adicionarTagCliente, removerTagCliente } from '../infra/api/tagsClienteApi'
 import { TAG_RECOMPRA_CONVIDADA } from '../dominio/recompra'
 
@@ -8,7 +8,11 @@ import { TAG_RECOMPRA_CONVIDADA } from '../dominio/recompra'
 export function useConviteDeRecompra({ aoMudar }) {
   const [convite, definir] = useState(null)
   const [erro, falhar] = useState(null)
+  const emCurso = useRef(new Set())
   async function convidar(clienteId, nome) {
+    // Dois cliques seguidos não disputam o mesmo cliente: o segundo cairia no 409 e trocaria a tag no meio do primeiro.
+    if (emCurso.current.has(clienteId)) return
+    emCurso.current.add(clienteId)
     falhar(null)
     try {
       try { await adicionarTagCliente(clienteId, TAG_RECOMPRA_CONVIDADA) } catch (e) {
@@ -16,7 +20,7 @@ export function useConviteDeRecompra({ aoMudar }) {
         await removerTagCliente(clienteId, TAG_RECOMPRA_CONVIDADA)
         await adicionarTagCliente(clienteId, TAG_RECOMPRA_CONVIDADA)
       }
-    } catch { falhar(`Não consegui registrar o convite de ${nome}. Ele continua na lista.`); return }
+    } catch { falhar(`Não consegui registrar o convite de ${nome}. Ele continua na lista.`); return } finally { emCurso.current.delete(clienteId) }
     definir({ clienteId, nome }); aoMudar()
   }
   async function desfazer() {

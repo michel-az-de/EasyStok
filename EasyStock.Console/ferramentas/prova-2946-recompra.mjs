@@ -14,10 +14,10 @@ registerHooks({
 const { linkDoConvite, resumoDaRecompra, telefoneParaWhatsapp, textoDoConvite } = await import('../src/dominio/recompra.js')
 
 assert.equal(telefoneParaWhatsapp('11999990000'), '5511999990000', '11 dígitos ganham 55')
-assert.equal(telefoneParaWhatsapp('(11) 3333-0000'), '551133330000', '10 dígitos ganham 55')
+assert.equal(telefoneParaWhatsapp('(11) 8888-0000'), '551188880000', 'celular antigo de 10 dígitos ganha 55')
 assert.equal(telefoneParaWhatsapp('+55 11 99999-0000'), '5511999990000', 'com 55 e 13 dígitos fica')
-assert.equal(telefoneParaWhatsapp('551133330000'), '551133330000', 'com 55 e 12 dígitos fica')
-for (const ruim of [null, undefined, '', 'abc', '99999', '12345678901234', '5511999']) assert.equal(telefoneParaWhatsapp(ruim), null, `fora do padrão: ${ruim}`)
+assert.equal(telefoneParaWhatsapp('551188880000'), '551188880000', 'com 55 e 12 dígitos fica')
+for (const ruim of [null, undefined, '', 'abc', '99999', '12345678901234', '5511999', '(11) 3333-0000', '551133330000', '11899990000']) assert.equal(telefoneParaWhatsapp(ruim), null, `fora do padrão: ${ruim}`)
 
 const texto = textoDoConvite('Maria Souza', 'Loja Teste')
 assert.ok(texto.startsWith('Oi, Maria! Aqui é da Loja Teste.'), 'só o primeiro nome e o nome da loja')

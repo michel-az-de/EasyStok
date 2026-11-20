@@ -3,13 +3,13 @@ import { diasDeCalendarioEntre, plural } from './formato'
 // #2946: lista de recompra. A tag marca quem já foi convidado; a API a esconde da lista por 30 dias.
 export const TAG_RECOMPRA_CONVIDADA = 'recompra-convidada'
 
-// wa.me quer só dígitos com DDI. Número fora do padrão do Brasil vira null: a linha o trata como sem telefone
-// em vez de abrir uma conversa com a pessoa errada.
+// wa.me quer só dígitos com DDI. Fixo e número fora do padrão do Brasil viram null: a linha os trata como sem
+// telefone em vez de marcar como convidado quem não tem WhatsApp naquele número.
 export function telefoneParaWhatsapp(telefone) {
   const digitos = String(telefone ?? '').replace(/\D/g, '')
-  if ([10, 11].includes(digitos.length)) return `55${digitos}`
-  if (digitos.startsWith('55') && [12, 13].includes(digitos.length)) return digitos
-  return null
+  const nacional = digitos.startsWith('55') && [12, 13].includes(digitos.length) ? digitos.slice(2) : digitos
+  const celular = nacional.length === 11 ? nacional[2] === '9' : nacional.length === 10 && '6789'.includes(nacional[2])
+  return celular ? `55${nacional}` : null
 }
 
 const primeiroNome = (nome) => String(nome ?? '').trim().split(/\s+/)[0] || null
