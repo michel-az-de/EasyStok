@@ -1,3 +1,6 @@
+using System.Text.Json;
+using EasyStock.Application.Events.Atendimento;
+using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Pdf;
@@ -12,6 +15,7 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Integration;
 using EasyStock.Domain.Sales;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -188,6 +192,72 @@ public class CanhotoPedidoClienteTests
     }
 
     [Fact]
+    public async Task EnvioIncerto_MarcaParaOOutroGatilhoNaoRepetir()
+    {
+        var c = new Cenario();
+        c.Quitado();
+        c.Cloud.EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new TimeoutException("a mensagem pode ter saído"));
+
+        (await c.EnviarAsync(GatilhoCanhoto.Pagamento)).Should().BeFalse();
+        (await c.EnviarAsync(GatilhoCanhoto.EmPreparo)).Should().BeFalse();
+
+        c.Eventos.Should().ContainSingle(e => e.Tipo == CanhotoPedidoCliente.Marco);
+        c.Mensagens.Should().BeEmpty();
+        await c.Cloud.Received(1).EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await c.UnitOfWork.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task ConversaDeOutraCliente_NaoEnviaNemMarca()
+    {
+        var c = new Cenario(donoDaConversa: Guid.NewGuid());
+
+        (await c.EnviarAsync(GatilhoCanhoto.Pagamento)).Should().BeFalse();
+
+        c.NadaSaiu();
+    }
+
+    [Fact]
+    public async Task FalhaAntesDoEnvio_NaoLancaNemMarca()
+    {
+        var c = new Cenario();
+        c.Tenant.When(t => t.SetCurrentTenant(Arg.Any<Guid>())).Do(_ => throw new InvalidOperationException("banco fora"));
+
+        (await c.EnviarAsync(GatilhoCanhoto.Pagamento)).Should().BeFalse();
+
+        c.NadaSaiu();
+    }
+
+    [Theory]
+    [InlineData(StatusPedidoMapper.Preparando, 1)]
+    [InlineData(StatusPedidoMapper.Entregue, 0)]
+    public async Task HandlerDeStatus_SoPassaOPreparando(string statusNovo, int envios)
+    {
+        var c = new Cenario();
+        c.ComCobrancaNaEntrega();
+        var evento = OutboxEventoIntegracao.Criar(c.EmpresaId, "pedido.mudou_status", "pedido", c.Pedido.Id,
+            JsonSerializer.Serialize(new { pedidoId = c.Pedido.Id, statusNovo }));
+
+        await new CanhotoPedidoEmPreparoHandler(c.Servico).HandleAsync(evento, CancellationToken.None);
+
+        await c.Cloud.Received(envios).EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandlerDePagamento_EnviaComPago()
+    {
+        var c = new Cenario();
+        var evento = OutboxEventoIntegracao.Criar(c.EmpresaId, PedidoPagoEvent.TipoEvento, "pedido", c.Pedido.Id,
+            JsonSerializer.Serialize(new { pedidoId = c.Pedido.Id, conversaId = c.Conversa.Id }));
+
+        await new CanhotoPedidoPagoHandler(c.Servico).HandleAsync(evento, CancellationToken.None);
+
+        c.Desenhado!.Pago.Should().BeTrue();
+        c.Eventos.Should().ContainSingle(e => e.Tipo == CanhotoPedidoCliente.Marco);
+    }
+
+    [Fact]
     public async Task SemFechoNaLoja_ImagemSaiSemFecho()
     {
         var c = new Cenario(fecho: null);
@@ -200,6 +270,7 @@ public class CanhotoPedidoClienteTests
     private sealed class Cenario
     {
         private readonly CanhotoPedidoCliente _servico;
+        public CanhotoPedidoCliente Servico => _servico;
         private readonly bool _comConversa;
         private readonly List<CobrancaPedido> _cobrancas = [];
         public Guid EmpresaId { get; } = Guid.NewGuid();
@@ -215,7 +286,7 @@ public class CanhotoPedidoClienteTests
         public ResumoPedidoDto? Desenhado { get; private set; }
 
         public Cenario(CanalConversa canal = CanalConversa.WhatsApp, DateTime? ultimaEntrada = null, bool comConversa = true,
-            string? fecho = "Boa massa!")
+            string? fecho = "Boa massa!", Guid? donoDaConversa = null)
         {
             _comConversa = comConversa;
             Cliente = Cliente.Criar(EmpresaId, "Maria");
@@ -226,7 +297,7 @@ public class CanhotoPedidoClienteTests
             Pedido.Itens.Add(Item(PedidoItem.PrefixoDoFrete + "Centro", 1, 8m));
             Pedido.RecalcularTotal();
             Conversa = Conversa.Abrir(EmpresaId, canal == CanalConversa.ChatSite ? "chatsite:abc" : "5511999998888",
-                Agora.AddDays(-3), "Maria", Cliente.Id, canal);
+                Agora.AddDays(-3), "Maria", donoDaConversa ?? Cliente.Id, canal);
             Conversa.RegistrarEntrada(ultimaEntrada ?? Agora.AddHours(-1));
 
             var pedidos = Substitute.For<IPedidoRepository>();

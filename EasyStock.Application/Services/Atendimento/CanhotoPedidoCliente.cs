@@ -63,6 +63,22 @@ public sealed class CanhotoPedidoCliente(
     public async Task<bool> EnviarAsync(
         Guid empresaId, Guid pedidoId, GatilhoCanhoto gatilho, Guid? conversaId, CancellationToken ct)
     {
+        try
+        {
+            return await DecidirEEnviarAsync(empresaId, pedidoId, gatilho, conversaId, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            // Falha de leitura antes do envio: o canhoto não pode derrubar os outros avisos do evento.
+            logger.LogError(ex, "Canhoto do pedido {PedidoId} não foi avaliado", pedidoId);
+            unitOfWork.DescartarAlteracoesPendentes();
+            return false;
+        }
+    }
+
+    private async Task<bool> DecidirEEnviarAsync(
+        Guid empresaId, Guid pedidoId, GatilhoCanhoto gatilho, Guid? conversaId, CancellationToken ct)
+    {
         if (renderizador is null || armazenamento is null) return false;
         if (logistica is not null && logistica.EmpresaDemonstracaoId != Guid.Empty && empresaId == logistica.EmpresaDemonstracaoId)
             return false;
@@ -106,31 +122,48 @@ public sealed class CanhotoPedidoCliente(
                 ?? throw new InvalidOperationException("O canhoto não ficou em URL HTTPS pública.");
             envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, url, legenda, ct);
         }
+        catch (TimeoutException ex)
+        {
+            // Envio incerto: a imagem pode ter saído. Marca o pedido para o outro gatilho não mandar a segunda.
+            logger.LogWarning(ex, "Canhoto do pedido {PedidoId} com envio incerto: não será repetido", pedidoId);
+            await MarcarAsync(pedido.Id, agora, "Canhoto em imagem com envio incerto (o canal não respondeu a tempo).", null);
+            return false;
+        }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Canhoto do pedido {PedidoId} não chegou à cliente", pedidoId);
             return false;
         }
 
+        await MarcarAsync(pedido.Id, agora,
+            pago ? "Canhoto em imagem enviado à cliente, com o selo de pago." : "Canhoto em imagem enviado à cliente.",
+            () =>
+            {
+                if (conversa.EstaAberta) conversa.RegistrarSaida(agora);
+                return conversas.AddMensagemAsync(
+                    Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Imagem, legenda, envio.Wamid), ct);
+            });
+        return true;
+    }
+
+    /// <summary>Grava e commita o marco na hora. Não lança: a imagem já pode ter saído.</summary>
+    private async Task MarcarAsync(Guid pedidoId, DateTime agora, string detalhes, Func<Task>? registrarNaConversa)
+    {
         try
         {
             await pedidos.AddEventoAsync(new PedidoEvento
             {
-                Id = Guid.NewGuid(), PedidoId = pedido.Id, Tipo = Marco, OcorridoEm = agora, Origem = "sistema",
-                Detalhes = pago ? "Canhoto em imagem enviado à cliente, com o selo de pago." : "Canhoto em imagem enviado à cliente.",
+                Id = Guid.NewGuid(), PedidoId = pedidoId, Tipo = Marco, OcorridoEm = agora, Origem = "sistema", Detalhes = detalhes,
             });
-            if (conversa.EstaAberta) conversa.RegistrarSaida(agora);
-            await conversas.AddMensagemAsync(
-                Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Imagem, legenda, envio.Wamid), ct);
+            if (registrarNaConversa is not null) await registrarNaConversa();
             await unitOfWork.CommitAsync();
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        catch (Exception ex)
         {
             // A imagem já saiu: lançar faria o outbox repetir o evento e mandar a segunda.
             logger.LogError(ex, "Canhoto do pedido {PedidoId} enviado, mas o marco não foi gravado", pedidoId);
             unitOfWork.DescartarAlteracoesPendentes();
         }
-        return true;
     }
 
     /// <summary>Nulo quando o gatilho não vale para o pedido; senão, se a imagem leva o selo "Pago".</summary>
@@ -146,6 +179,8 @@ public sealed class CanhotoPedidoCliente(
     {
         var id = conversaId ?? await conversas.ObterIdPorPedidoAsync(empresaId, pedido.Id, ct);
         var conversa = id is { } achado ? await conversas.ObterPorIdAsync(empresaId, achado, ct) : null;
+        // O número de destino sai da conversa: ela tem de ser da cliente do pedido, a mesma do consentimento.
+        if (conversa is not null && conversa.ClienteId != clienteId) conversa = null;
         // Pedido lançado pela equipe não tem conversa própria: vale a conversa aberta da cliente no WhatsApp.
         return conversa is { Canal: CanalConversa.WhatsApp }
             ? conversa
