@@ -93,6 +93,13 @@ public class Order
     public string? Metodo { get; set; }
 
     /// <summary>
+    /// #409: por onde o pedido chegou, marcado no PWA ("balcao" | "whatsapp" | "ifood" | "telefone").
+    /// NULL = não informado ou aparelho antigo.
+    /// </summary>
+    [Column("channel"), MaxLength(20)]
+    public string? Channel { get; set; }
+
+    /// <summary>
     /// Idempotência das notificações de agendamento (AgendamentoNotificacaoService).
     /// NULL = ainda nao enviada; preenchido = enviada naquele momento. So pedidos com
     /// ScheduledDeliveryAt != null sao candidatos. Nao apagar — preserva historico.

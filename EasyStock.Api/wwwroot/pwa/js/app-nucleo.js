@@ -1879,7 +1879,8 @@ function orderItemsTotal(items) {
 }
 function haptic() { if (navigator.vibrate) navigator.vibrate(8); }
 // #409: rotulos do canal/origem do pedido.
-const CHANNEL_LABELS = { balcao: 'Balcão', whatsapp: 'WhatsApp', ifood: 'iFood', telefone: 'Telefone' };
+// 'whatsapp' fica só para ler pedido antigo: o seletor passou a separar loja e pessoal (#409).
+const CHANNEL_LABELS = { balcao: 'Balcão', whatsapp: 'WhatsApp', 'whatsapp-loja': 'WhatsApp da loja', 'whatsapp-pessoal': 'WhatsApp pessoal', ifood: 'iFood', telefone: 'Telefone' };
 function channelLabel(c) { return CHANNEL_LABELS[c] || c || ''; }
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
