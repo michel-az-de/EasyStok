@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
+import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { useFotoCliente } from '../../aplicacao/useFotoCliente'
 import { Avatar } from '../../componentes/Avatar'
@@ -52,7 +52,7 @@ export function CartaoDoCliente({ conversa, fonteApi, aoAbrir, foto = null, aoVe
   const semCadastro = conversa.conta === 'lead' || !conversa.clienteId
   const semPedido = !semCadastro && conversa.relacionamento === 'lead' // #2461
   // #2258 (T4): o mesmo nome do cartão da lista, do cabeçalho e dos botões "Abrir".
-  const nome = apresentacaoDoNome(conversa.nome, { comanda: conversa.numeroComanda })
+  const nome = apresentacaoDoNome(nomeDaConversa(conversa), { comanda: conversa.numeroComanda })
   const { restricoes } = useCatalogo()
   const tags = ordenarTags(cliente.tags ?? [], restricoes).filter((tag, indice) => indice < 4 || ehRestricao(tag, restricoes))
   return (

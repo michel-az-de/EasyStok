@@ -6,7 +6,8 @@ import { Avatar } from '../../../componentes/Avatar'
 import { Botao } from '../../../componentes/Botao'
 import { Pilula } from '../../../componentes/Pilula'
 import { baixarPdf } from '../../../componentes/pdfNoNavegador'
-import { dadosDeContato, situacaoDaLinha } from '../../../dominio/cadastros'
+import { dadosDeContato, situacaoDaLinha, telefoneCadastro } from '../../../dominio/cadastros'
+import { nomeExibido } from '../../../dominio/nomeDoContato'
 import { quadroDoCliente } from '../../../dominio/fichaCliente'
 import css from './cadastros.module.css'
 
@@ -26,7 +27,7 @@ export function ResumoDoCliente({ dados, relacionamento, carregando, editando, a
   const arquivo = useRef(null)
   const situacao = situacaoDaLinha('clientes', dados, false)
   const quadro = quadroDoCliente(relacionamento)
-  const nome = dados.nome?.trim() || 'Cliente sem nome'
+  const nome = nomeExibido({ nome: dados.nome, telefone: telefoneCadastro(dados) })
 
   async function executar(tipo, acao) {
     if (ocupado) return

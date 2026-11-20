@@ -18,6 +18,7 @@ import { hashDoModulo } from '../../../dominio/modulos'
 import { clienteDaHash } from '../../../dominio/fichaCliente'
 import { conversasDoCliente } from '../../../dominio/conversa'
 import { moeda } from '../../../dominio/formato'
+import { nomeExibido } from '../../../dominio/nomeDoContato'
 import { abrirEdicaoCadastro, chaveContextoCadastro, emailCadastro, emAtividadeCadastro, filtrarSemCadastro, leituraDaLista, ordemDoCabecalhoNome, ORDENS_CADASTRO, situacaoDaLinha, sortDoNome, telefoneCadastro, telefoneNaTela, temProximaPagina, TEXTOS_CADASTRO, TITULOS_CADASTROS } from '../../../dominio/cadastros'
 import { EditorCadastro } from './EditorCadastro'
 import { PedirCelularDoPedido } from './CelularDoPedido'
@@ -32,7 +33,7 @@ const ABAS_DE_PESSOAS = [['todos', 'Todos'], ['lead', 'Leads'], ['cliente', 'Cli
 const ICONE = { clientes: 'usuarios', produtos: 'package', fornecedores: 'house', bancos: 'dollar-sign' }
 const CHAVE_LEITURA = { produtos: 'verCadastrosProdutos', categorias: 'verCadastrosProdutos', fornecedores: 'verCadastrosFornecedores', bancos: 'verCadastrosFinanceiros', pagamentos: 'verCadastrosFinanceiros' }
 const CHAVE_EDICAO = { produtos: 'editarCadastrosProdutos', fornecedores: 'editarCadastrosFornecedores', bancos: 'gerenciarCadastrosFinanceiros' }
-const nome = (c) => c.nome || c.contatoInformado?.nome || 'Contato sem nome'
+const nome = (c) => nomeExibido({ nome: c.nome || c.contatoInformado?.nome, telefone: telefoneCadastro(c) })
 // #2457 (U2): telefone na máscara da tela, não no E.164 que a API grava.
 const telefone = (item) => telefoneNaTela(telefoneCadastro(item))
 const SEM_RESTRICOES = []
