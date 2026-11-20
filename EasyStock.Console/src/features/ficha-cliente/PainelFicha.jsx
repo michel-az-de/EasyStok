@@ -15,6 +15,7 @@ import { conversaEncerrada, estaBloqueada } from '../../dominio/conversa'
 import { faltaDaCobranca, situacaoDaCobranca, valorSugeridoParaBaixa } from '../../dominio/cobranca'
 import { faixaDoPedido } from '../../dominio/entrega'
 import { faixasDeDistancia, situacaoDoCep } from '../../dominio/areaEntrega'
+import { ROTULOS, rotuloDoPedido } from '../../dominio/rotulos'
 import { comandaTravada, numeroDaComanda, pedidoEncerrado, rotuloDoResumo, totalDoPedido } from '../../dominio/pedido'
 import { faltaPagar, totalPago } from '../../dominio/pagamento'
 import { moeda } from '../../dominio/formato'
@@ -178,7 +179,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
   const numero = selecionada.numeroComanda || (pedido ? numeroDaComanda(pedido, { fonteApi }) : null)
   const posVenda = pedido && pedidoEncerrado(pedido)
   const pedidoCriado = Boolean(pedido && (fonteApi ? pedido.pedidoId : pedido.cobranca || pedido.estado !== 'aguardando'))
-  const tituloPedido = 'Revisar comanda'
+  const tituloPedido = 'Revisar pedido'
   const total = pedido?.totalApi ?? totalDoPedido(pedido, cardapio)
   const saldo = faltaPagar(pedido, cardapio)
   const estadoDoResumo = pedido?.estado === 'aguardando' && pedido.cobranca && situacaoDaCobranca(pedido.cobranca, agora).chave === 'aguardando'
@@ -277,7 +278,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
           aoConsultarFrete={() => setFreteAberto(true)} />
 
         <section ref={receberPrato} className={css.resumoAtual} data-recebendo-prato={recebendoPrato || undefined} aria-label="Resumo do atendimento">
-          <h3>{!editavel ? 'Conversa concluída' : numero ? `Comanda ${numero}` : 'Comanda'}</h3>
+          <h3>{!editavel ? 'Conversa concluída' : numero ? rotuloDoPedido(numero) : ROTULOS.PEDIDO}</h3>
           <p>{!editavel ? 'O histórico está guardado.'
             : pedido ? linhaDoResumo({ estado: pedidoCriado ? estadoDoResumo : 'Em montagem', itens, total, saldo, destaque: destacaSaldo, sinal: sinalDoResumo })
               : cadastrarPrimeiro ? 'Cadastre o cliente para montar o pedido.'
@@ -289,7 +290,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
           {/* #1686 (item 3): pedido entregue ou cancelado, a mesma conversa começa outra compra. #2427: no cartão. */}
           {editavel && fonteApi && posVenda && novaComanda && (
             <div className={css.acaoMontar}>
-              <Botao largo variante="secundario" icone="plus" onClick={() => novaComanda(selecionada.id)}>Nova comanda</Botao>
+              <Botao largo variante="secundario" icone="plus" onClick={() => novaComanda(selecionada.id)}>Novo pedido</Botao>
             </div>
           )}
         </section>
@@ -344,7 +345,7 @@ function FichaDoAtendimento({ aoAbrirCardapio, aoAbrirNota, aoRascunho, acaoComp
 
       </FichaDoClienteNoAtendimento>}
 
-      {pedido && <PainelMovel controle={comandaMovel} titulo={`Comanda · ${selecionada.nome}`} larguraInicial={480} alturaInicial={480} alinharDireita visivel={comandaVisivel}>
+      {pedido && <PainelMovel controle={comandaMovel} titulo={`${ROTULOS.PEDIDO} · ${selecionada.nome}`} larguraInicial={480} alturaInicial={480} alinharDireita visivel={comandaVisivel}>
         {editavel && !pedidoCriado && <p>Estes itens ainda estão em montagem. O pedido será criado ao gerar a cobrança.</p>}
         {!editavel && <p>Consulta da conversa concluída.</p>}
         <BlocoPedido

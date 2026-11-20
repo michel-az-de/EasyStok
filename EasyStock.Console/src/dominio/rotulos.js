@@ -14,6 +14,9 @@ export const ROTULOS = {
   CONVERSA_ASSUMIDA_POR_VOCE: 'Conversa assumida por você',
 }
 
+// "Pedido 12": o nome do pedido que a tela diz (a chave de dado segue `numeroComanda`).
+export const rotuloDoPedido = (numero) => `${ROTULOS.PEDIDO} ${numero}`
+
 // Valores que a API e o provedor gravam. A tela só os reconhece; quem os escreve é o EasyStok.
 export const CODIGOS = {
   FORA_DA_JANELA: 'fora_da_janela_24h',
