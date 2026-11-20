@@ -42,8 +42,9 @@ public sealed class ChamadaIa
             throw new RegraDeDominioVioladaException("Empresa é obrigatória na chamada de IA.");
         if (tokensEntrada < 0 || tokensSaida < 0 || tokensCacheLido < 0 || tokensCacheEscrito < 0 || duracaoMs < 0)
             throw new RegraDeDominioVioladaException("Tokens e duração da chamada não podem ser negativos.");
-        if (custoUsd < 0)
-            throw new RegraDeDominioVioladaException("Custo da chamada não pode ser negativo.");
+        // #2967: arredonda como o numeric(12,6) arredondaria; o resto do limite vale como no modelo.
+        custoUsd = custoUsd is { } c ? decimal.Round(c, LimitesIa.CasasValor) : null;
+        LimitesIa.ValidarValor(custoUsd, "Custo da chamada");
         if (!Enum.IsDefined(finalidade) || !Enum.IsDefined(desfecho))
             throw new RegraDeDominioVioladaException("Finalidade ou desfecho da chamada inválido.");
 

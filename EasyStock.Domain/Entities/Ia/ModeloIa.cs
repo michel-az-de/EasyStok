@@ -59,10 +59,12 @@ public sealed class ModeloIa
 
     public void DefinirPrecos(decimal? entrada, decimal? saida, decimal? cacheLido, decimal fatorForaPico, DateTime agora)
     {
-        if (entrada < 0 || saida < 0 || cacheLido < 0)
-            throw new RegraDeDominioVioladaException("Preço do modelo não pode ser negativo.");
-        if (fatorForaPico <= 0 || fatorForaPico > 1)
-            throw new RegraDeDominioVioladaException("Fator fora do pico precisa ficar entre 0 (exclusivo) e 1.");
+        LimitesIa.ValidarValor(entrada, "Preço do modelo");
+        LimitesIa.ValidarValor(saida, "Preço do modelo");
+        LimitesIa.ValidarValor(cacheLido, "Preço do modelo");
+        if (fatorForaPico <= 0 || fatorForaPico > 1 || decimal.Round(fatorForaPico, LimitesIa.CasasFator) != fatorForaPico)
+            throw new RegraDeDominioVioladaException(
+                $"Fator fora do pico precisa ficar entre 0 (exclusivo) e 1, com até {LimitesIa.CasasFator} casas.");
         PrecoEntrada = entrada;
         PrecoSaida = saida;
         PrecoCacheLido = cacheLido;
@@ -98,9 +100,14 @@ public sealed class ModeloIa
         AlteradoEm = Datas.Utc(agora);
     }
 
-    /// <summary>Custo em US$ da chamada; nulo quando falta preço de entrada ou saída. Cache sem preço custa zero.</summary>
+    /// <summary>
+    /// Custo em US$ da chamada; nulo quando falta preço de entrada ou saída. Cache sem preço custa zero.
+    /// Cache escrito fica fora: a DeepSeek não cobra a mais por ele, e o preço próprio só entra com outro provedor.
+    /// </summary>
     public decimal? Custo(int tokensEntrada, int tokensSaida, int tokensCacheLido, bool foraDoPico)
     {
+        if (tokensEntrada < 0 || tokensSaida < 0 || tokensCacheLido < 0)
+            throw new RegraDeDominioVioladaException("Tokens da chamada não podem ser negativos.");
         if (PrecoEntrada is not { } entrada || PrecoSaida is not { } saida) return null;
         var cheio = (tokensEntrada * entrada + tokensSaida * saida + tokensCacheLido * (PrecoCacheLido ?? 0m)) / Milhao;
         return foraDoPico ? cheio * FatorForaPico : cheio;
