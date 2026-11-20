@@ -74,4 +74,29 @@ for (const arquivo of telas) {
 }
 assert.equal(apresentacaoDoNome('Comanda 6').capsula.texto, '#6', 'ehVisitante segue casando "Comanda 6"')
 
+// Item 6 (E1, telas que ficaram de fora): Ficha, frases do resumo, Cozinha e cartão da lista dizem "Pedido".
+// Impressão (`impressao.js`, `ComandaHtml.cs`) fica de fora por regra da spec (linha "NÃO trocar").
+const semComentario = (arquivo) => fonte(arquivo).replace(/^\s*\/\/.*$/gm, '')
+const ficha = semComentario('features/ficha-cliente/PainelFicha.jsx')
+assert.doesNotMatch(ficha, /'Revisar comanda'|`Comanda \$\{numero\}`|: 'Comanda'\}|>Nova comanda<|`Comanda · /, 'PainelFicha diz Pedido')
+assert.match(ficha, /Revisar pedido/)
+const resumo = await import('../src/dominio/resumoPedido.js')
+const frasesDoResumo = [
+  resumo.situacaoDoEnvio({ itens: [], estado: 'aguardando' }).texto,
+  resumo.avisoDoEnvio({ link: 'x', meio: 'pix' }, 'Ana'),
+  resumo.avisoDoEnvio({ meio: 'dinheiro' }, 'Ana'),
+  resumo.caminhoParaTrocarItem({ estado: 'aguardando' }),
+]
+for (const frase of frasesDoResumo) assert.doesNotMatch(frase, /comanda/i, `resumoPedido: "${frase}"`)
+const { nomeDoPedido } = await import('../src/dominio/pedido.js')
+assert.equal(nomeDoPedido({ numeroComanda: 12 }).frase, 'Pedido 12')
+assert.equal(nomeDoPedido({ numeroComanda: 12 }).principal, 'Pedido 12')
+assert.doesNotMatch(semComentario('features/cozinha/CartaoKds.jsx'), /Ver comanda/)
+const { nomeDoCartao } = await import('../src/features/caixa-de-entrada/apresentacaoDoCartao.js')
+const cartaoNomeado = nomeDoCartao({ nome: 'Ana Souza', numeroComanda: 16 })
+assert.equal(cartaoNomeado.complemento, 'Pedido 16')
+assert.equal(cartaoNomeado.numeroPedido, 16, 'o número vai como dado, sem regex de texto')
+assert.doesNotMatch(semComentario('features/caixa-de-entrada/CartaoConversa.jsx'), /\.replace\(\/\^Comanda/)
+assert.doesNotMatch(semComentario('features/atendimento/PainelAtendimento.jsx'), />Comanda \{|<>Comanda /)
+
 console.log('prova-2944-vocabulario: ok')
