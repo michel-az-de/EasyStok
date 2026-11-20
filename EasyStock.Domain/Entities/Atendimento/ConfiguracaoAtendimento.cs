@@ -105,6 +105,9 @@ public class ConfiguracaoAtendimento
     public ModeloRetomada? ModeloRetomada =>
         ModeloRetomadaNome is null ? null : new ModeloRetomada(ModeloRetomadaNome, ModeloRetomadaIdioma);
 
+    /// <summary>#2957: modelo de IA escolhido para o atendimento; nulo segue o padrão da loja. Só coluna na S1.</summary>
+    public Guid? ModeloIaId { get; private set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime AlteradoEm { get; set; }
 
