@@ -40,13 +40,15 @@ Escolha: **o endpoint da conversa, com a conversa por baixo**. `POST /api/pedido
 
 ## 5. Jornada da Tatiana
 
-1. Em Pedidos, Clientes ou Ficha, clica em **Novo pedido**. A janela abre sobre a tela; a hash não muda.
+1. Em Pedidos, Clientes ou Ficha, clica em **Novo pedido**. A janela abre sobre a tela; a hash não muda. Se essa cliente tem rascunho guardado, o botão diz **Continuar pedido** e a janela reabre nele.
 2. **Cliente**: na Ficha e em Clientes já vem preenchida; em Pedidos escolhe por busca (nome, telefone, documento). Fase 2: "Cliente nova" com cadastro rápido.
 3. **Itens**: cardápio do dia dentro da janela, "+" soma no pedido da janela, observação por item.
 4. **Entrega**: retirada ou entrega, endereço da cliente, janela e data. Cotação de frete ao vivo (`/pedido/simulacao`).
 5. **Pagamento**: forma de pagamento; em encomenda mostra sinal e restante.
 6. **Revisar e Registrar**: resumo com itens, frete, total e a linha "Vamos enviar o resumo para a cliente no WhatsApp" (com opção de desligar, como o `enviarAoCliente` de hoje). Um clique registra.
 7. A janela fecha. A lista recarrega e destaca o pedido novo; em Clientes e na Ficha o pedido aparece na lista da cliente, com o aviso "Pedido registrado".
+
+**Fechar no meio** (decisão do Felipe, 19/11, 23:05: guarda rascunho). Fechar a janela, trocar de tela ou recarregar guarda a montagem (cliente, itens com observação, retirada ou entrega, endereço, janela, data e forma). Na reabertura para a mesma cliente, a janela volta no passo em que parou e refaz a cotação pela `/pedido/simulacao`; item que saiu do cardápio do dia some da montagem com o aviso "Bolo de pote saiu do cardápio e foi tirado do pedido". Registrar apaga o rascunho. Na janela há **Descartar rascunho**, com confirmação.
 
 ## 6. Wireframe
 
@@ -78,6 +80,7 @@ Escolha: **o endpoint da conversa, com a conversa por baixo**. `POST /api/pedido
 | `src/features/cardapio/PainelCardapio.jsx` (~linha 552, `selecionada`) | Principal acoplamento (#1587). O "+" ganha um alvo explícito (`conversaId` por prop); sem a prop, mantém o comportamento atual |
 | `src/features/pedidos/NovoPedidoJanela.jsx` (novo) | Janela em 5 passos |
 | `src/features/pedidos/useMontagemDoPedido.js` (novo) | Estado da montagem (itens, janela, endereço, forma), cotação e geração por `conversaId` |
+| `src/infra/api/rascunhosDoPedido.js` (novo) | Rascunho da montagem por cliente, no mesmo padrão de `infra/api/rascunhosDaSessao.js`: `sessionStorage`, chave por empresa e usuário, apagado no "Sair" (`esquecerRascunhos`) e ao Registrar. Chave por `clienteId`, não por conversa: a conversa é detalhe interno |
 | `PainelPedidos.jsx:53`, `PainelCadastros.jsx:73`, `EditorCadastro.jsx` (prop `novoPedido`) | Trocam "iniciar e navegar" por "abrir a janela" |
 | `app/App.jsx` (~466) | A janela precisa do `AtendimentoProvider`, hoje só nas telas de ajuste. Conferir se Pedidos, Clientes e Ficha estão sob ele; senão, provider mínimo para a janela |
 | `EasyStock.Infra.Postgre/Repositories/Atendimento/ConversaRepository.cs` (`ListarInboxAsync` e contadores) | Muda: esconde da fila, sem busca, a conversa em que a cliente nunca escreveu (seção 8) |
@@ -109,7 +112,8 @@ Provas no padrão `EasyStock.Console/ferramentas/prova-*.mjs` (Red antes, Green 
 3. Registrar chama `POST .../conversas/{id}/pedido` com `ClienteId`, `VinculoRevisao`, itens, janela, data, endereço, forma e `enviarAoCliente`; falha mantém a janela aberta com a montagem.
 4. Sem `atenderConversas` o botão não aparece.
 5. Resumo fora das 24 h: segue coberto pelos testes da #2905 (não pode regredir).
-6. Teste de repositório: sem busca, `ListarInboxAsync` não traz conversa com `UltimaMensagemEntradaEm` nulo; com busca, traz; depois da primeira mensagem da cliente, volta à fila.
+6. Rascunho: fechar com itens guarda; reabrir a mesma cliente restaura no mesmo passo; item fora do cardápio do dia sai com aviso; Registrar e "Sair" apagam; rascunho de um usuário não aparece para outro.
+7. Teste de repositório: sem busca, `ListarInboxAsync` não traz conversa com `UltimaMensagemEntradaEm` nulo; com busca, traz; depois da primeira mensagem da cliente, volta à fila.
 
 Prova de tela no Console real (build do worktree) nos 3 pontos de entrada, Pedidos, Clientes e Ficha. Em cada um: abrir a janela, hash inalterada, montar, registrar, janela fecha, pedido visível na tela de origem, nenhum campo de mensagem na janela.
 
@@ -118,7 +122,8 @@ Prova de tela no Console real (build do worktree) nos 3 pontos de entrada, Pedid
 | Risco | Mitigação |
 |---|---|
 | Estado `selecionada` do provider: abrir a conversa por baixo muda a seleção, e a Ficha e o cardápio do Atendimento passam a mostrar outra cliente | A janela usa `conversaId` próprio e não chama `selecionar`; prova 2 |
-| Comanda em montagem perdida ao fechar | Confirmação ao fechar com itens; montagem mantida enquanto a janela estiver aberta; rascunho persistente fica fora (pergunta 2) |
+| Comanda em montagem perdida ao fechar | Rascunho guardado ao fechar (seção 5). Limite: o `sessionStorage` some ao fechar a aba ou o navegador, como os rascunhos de mensagem de hoje |
+| Rascunho com preço ou cardápio velho | Na reabertura, cotação refeita e item fora do cardápio do dia tirado com aviso; nada é registrado sem passar pelo Revisar |
 | A mesma conversa aberta no Atendimento por outra pessoa | A comanda é da conversa: a outra pessoa vê os itens aparecerem. Aviso na janela se houver outra pessoa atendendo; não bloquear |
 | Permissão `atenderConversas` | Botão só aparece com a permissão; a API responde 403 sem ela; erro claro na janela |
 | Conversa criada por baixo polui a fila do Atendimento | Escondida da fila até a cliente responder (seção 8). Efeito colateral: a conversa aberta pela equipe em "Iniciar" também some da fila até a resposta; 0 casos em produção hoje, e segue achável pela busca |
@@ -131,5 +136,5 @@ Reverter a PR da fase: o botão volta ao fluxo atual pelo Atendimento e a fila v
 ## 13. Perguntas abertas para o Felipe
 
 1. ~~A conversa criada por baixo pode aparecer na fila do Atendimento, ou fica escondida até a cliente responder?~~ Respondida 19/11, 22:08: **fica escondida** (seção 8).
-2. Fechar a janela no meio da montagem: perde tudo (com confirmação) ou guarda rascunho para retomar?
+2. ~~Fechar a janela no meio da montagem: perde tudo (com confirmação) ou guarda rascunho para retomar?~~ Respondida 19/11, 23:05: **guarda rascunho** (seção 5).
 3. O resumo continua saindo pelo WhatsApp da loja no Registrar (escolha desta spec). No futuro, prefere pedido sem conversa por `POST /api/pedidos` mais um aviso novo de "pedido recebido"?
