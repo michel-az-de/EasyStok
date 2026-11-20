@@ -14,7 +14,7 @@
 #             globals sem senha (role easystock NOBYPASSRLS e grants) e o initdb/30-easystok.sql
 #   config/   .env (com EZ_CRYPTO_KEK e as KEKs anteriores), compose e wppconnect
 #   volumes/  tar de cada volume (uploads, DataProtection, wppconnect)
-#   git/      bundle do espelho da #2958, quando ESPELHO_GIT existir
+#   git/      bundle do espelho da #2958 e o JSON de issues e PRs (ESPELHO_META), quando existirem
 # Depois apaga o stage: dado em claro nao fica no disco entre execucoes.
 #
 # Retencao: forget por tag, SEM --prune. Quem apaga dado do Drive e a estacao (puxar.ps1),
@@ -26,7 +26,8 @@
 # Env (padrao): BASE (~/backup-restic), RESTIC (~/bin/restic), RCLONE (~/bin/rclone),
 #   CONF_DIR (~/.config/easystok-backup), RESTIC_REPOSITORY (rclone:ezdrive:easystok-restic),
 #   DB_CONTAINER (shared-postgres), DB_NAME (easystock), STACK_DIR (/opt/stacks/easystok),
-#   SHARED_DIR (/opt/stacks/shared), VOLUMES, CONFIG_ARQUIVOS, ESPELHO_GIT, HOST_TAG
+#   SHARED_DIR (/opt/stacks/shared), VOLUMES, CONFIG_ARQUIVOS, ESPELHO_GIT (~/git/EasyStok.git),
+#   ESPELHO_META (~/git/EasyStok-meta), HOST_TAG
 #   (easystok-vps), IMAGEM_TAR (alpine:latest), ROTULOS_TABELAS (vazio), DIA_DO_MES (hoje).
 # =============================================================================
 set -euo pipefail
@@ -47,7 +48,8 @@ VOLUMES="${VOLUMES:-easystok_uploads-data easystok_dataprotection-api-keys easys
 CONFIG_ARQUIVOS="${CONFIG_ARQUIVOS:-$STACK_DIR/.env $STACK_DIR/compose.yaml $STACK_DIR/compose.override.yaml $STACK_DIR/compose.wppconnect.yaml $STACK_DIR/compose.observabilidade.yaml $STACK_DIR/wppconnect/runtime.env $STACK_DIR/wppconnect/configurar.cjs $SHARED_DIR/compose.yaml $SHARED_DIR/Caddyfile}"
 CONFIG_OBRIGATORIOS="${CONFIG_OBRIGATORIOS:-$STACK_DIR/.env $STACK_DIR/compose.yaml}"
 INITDB="${INITDB:-$SHARED_DIR/initdb/30-easystok.sql}"
-ESPELHO_GIT="${ESPELHO_GIT:-}"
+ESPELHO_GIT="${ESPELHO_GIT:-$HOME/git/EasyStok.git}"
+ESPELHO_META="${ESPELHO_META:-$HOME/git/EasyStok-meta}"
 HOST_TAG="${HOST_TAG:-easystok-vps}"
 IMAGEM_TAR="${IMAGEM_TAR:-alpine:latest}"
 ROTULOS_TABELAS="${ROTULOS_TABELAS:-}"
@@ -144,6 +146,7 @@ bundle_git() {
   if [ -d "$ESPELHO_GIT" ]; then
     mkdir -p "$STAGE/git"
     git -C "$ESPELHO_GIT" bundle create "$STAGE/git/easystok.bundle" --all 2>&1 || falha 5 "git bundle falhou"
+    [ ! -d "$ESPELHO_META" ] || cp -r "$ESPELHO_META" "$STAGE/git/meta" || falha 5 "copia de $ESPELHO_META falhou"
   else
     log "aviso: espelho $ESPELHO_GIT ausente (#2958)"
   fi

@@ -12,7 +12,7 @@ SCRIPT="$(pwd)/backup.sh"
 if ! command -v flock >/dev/null 2>&1; then
   dir="$(pwd -W 2>/dev/null || pwd)"
   exec docker run --rm -v //var/run/docker.sock:/var/run/docker.sock -v "$dir":/s:ro docker:27-cli \
-    sh -c 'apk add -q bash util-linux findutils coreutils grep sed procps tar >/dev/null && bash /s/backup.test.sh'
+    sh -c 'apk add -q bash util-linux findutils coreutils grep sed procps tar git >/dev/null && bash /s/backup.test.sh'
 fi
 
 falhas=0
@@ -128,6 +128,17 @@ confere "dia 1 sem tabela: rotulos dormente"  "retencao de 5 anos dormente" "$r"
 r=$(caso DIA_DO_MES=01 ROTULOS_TABELAS=produtos)
 confere "dia 1 com tabela: snapshot rotulos"  "tag rotulos --stdin-filename easystock-rotulos.dump" "$r"
 confere "dia 1 com tabela: 5 anos"            "tag rotulos --group-by host,tags --keep-within 5y" "$r"
+
+# #2958: bundle do espelho e o JSON de issues e PRs entram no snapshot diario
+git init -q --bare "$W/espelho.git"
+git -C "$W/espelho.git" -c user.name=t -c user.email=t@t commit-tree -m A "$(git -C "$W/espelho.git" mktree </dev/null)"   | xargs git -C "$W/espelho.git" update-ref refs/heads/master
+mkdir -p "$W/meta"; echo '[{"number": 1}]' > "$W/meta/issues-001.json"
+r=$(caso ESPELHO_GIT="$W/espelho.git" ESPELHO_META="$W/meta")
+confere "espelho: exit 0"                     "rc=0" "$r"
+confere "espelho: leva o bundle"              "./git/easystok.bundle" "$r"
+confere "espelho: leva issues e PRs"          "./git/meta/issues-001.json" "$r"
+r=$(caso ESPELHO_GIT="$W/nao-ha.git")
+confere "espelho ausente: exit 0 com aviso"   "aviso: espelho" "$r"
 
 echo dump > "$W/pre.dump"
 r=$(ARGS="pre-deploy $W/pre.dump" ESTADO_MODO=pre-deploy caso X=1)
