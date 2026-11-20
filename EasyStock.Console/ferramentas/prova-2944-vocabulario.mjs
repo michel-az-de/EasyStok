@@ -64,4 +64,14 @@ assert.equal(apresentacaoDoNome('Comanda 21').capsula.texto, '#21')
 assert.match(fonte('features/ficha-cliente/CartaoDoCliente.jsx'), /Pedido de \$\{/)
 assert.match(fonte('features/ficha-cliente/CartaoDoCliente.jsx'), /clienteSemNome|semNomeDeVerdade|SEM_NOME/)
 
+// Item 5: "Comanda" vira "Pedido" no texto exibido (telas inteiras); a lógica segue com a chave.
+const telas = ['features/cardapio/PainelCardapio.jsx', 'features/ficha-cliente/ComandaDoCliente.jsx', 'features/ficha-cliente/BlocoPedido.jsx', 'features/ficha-cliente/ConferenciaPessoaDaComanda.jsx', 'features/atendimento/ModalEnviarCardapio.jsx', 'features/ficha-cliente/Cabecalho.jsx']
+const TEXTO = new RegExp(["'[^'\\n]*'",'"[^"\n]*"', '`[^`\n]*`', '>[^<>{}\n]+<'].join('|'), 'g')
+for (const arquivo of telas) {
+  const exibido = [...fonte(arquivo).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*(\/\/|\*|\/\*).*$/gm, '').matchAll(TEXTO)].map((m) => m[0])
+  const velho = exibido.filter((t) => /(?<![\w-])[Cc]omanda(?![\w:-])/.test(t) && !/id=|comanda-|data-|.css|comanda:/.test(t) && !/^['"`]comanda['"`]$/.test(t))
+  assert.deepEqual(velho, [], `${arquivo} ainda diz "comanda" na tela`)
+}
+assert.equal(apresentacaoDoNome('Comanda 6').capsula.texto, '#6', 'ehVisitante segue casando "Comanda 6"')
+
 console.log('prova-2944-vocabulario: ok')

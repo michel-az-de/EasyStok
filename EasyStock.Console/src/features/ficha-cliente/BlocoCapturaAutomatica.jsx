@@ -36,7 +36,7 @@ export function BlocoCapturaAutomatica({ conversa, pausado }) {
   if (conversa.cliente.enderecoCapturado) status = 'Endereço fora da área: a decisão é sua, logo abaixo.'
   else if (esperaVoce) status = 'Passou para você: o Assistente parou aqui. O que ele captou continua na ficha.'
   else if (!conduzindo) status = 'Você está no controle: o Assistente parou aqui. O que ele captou continua na ficha.'
-  else if (tudoFeito) status = 'Pedido anotado pelo Assistente. Confira a comanda e gere a cobrança.'
+  else if (tudoFeito) status = 'Pedido anotado pelo Assistente. Confira o pedido e gere a cobrança.'
   const selo = esperaVoce ? 'com você' : conduzindo ? 'ativo' : 'parado'
 
   return (

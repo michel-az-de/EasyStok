@@ -22,7 +22,7 @@ export function BlocoEntrega({ conversa }) {
   const doEasyStok = Boolean(pedido.pedidoId)
   const numero = doEasyStok
     ? numeroParaEntregador(pedido)
-    : `${numeroParaEntregador(pedido)} (comanda ${numeroCurto(pedido.numero)} é interna)`
+    : `${numeroParaEntregador(pedido)} (pedido ${numeroCurto(pedido.numero)} é interno)`
 
   return (
     <Bloco titulo="Entrega">

@@ -34,7 +34,7 @@ export const GUIA_POR_MODULO = {
     passos: Object.values(PASSOS_POR_TELA.cadastros),
   },
   atendimento: {
-    faz: 'Conversas com os clientes, a ficha de cada um e a comanda do pedido, tudo na tela Conversas.',
+    faz: 'Conversas com os clientes, a ficha de cada um e o pedido, tudo na tela Conversas.',
     passos: [
       'Em Conversas, escolha o cliente na lista. As conversas que precisam de você aparecem marcadas e tocam um som.',
       'Responda no campo da mensagem; / busca uma resposta pronta. Confira o texto antes de enviar.',

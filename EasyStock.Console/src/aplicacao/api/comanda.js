@@ -165,7 +165,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
     const identidade = pedido.identidadeProposta
     if (!identidade?.clienteId || !Number.isInteger(identidade.vinculoRevisao) || identidade.vinculoRevisao < 0
       || identidade.clienteId !== conversa?.clienteId || identidade.vinculoRevisao !== conversa?.vinculoRevisao) {
-      const erro = 'Confira a pessoa da comanda na ficha antes de gerar a cobrança. Os itens foram preservados.'
+      const erro = 'Confira a pessoa do pedido na ficha antes de gerar a cobrança. Os itens foram preservados.'
       avisar(erro)
       return { erro }
     }

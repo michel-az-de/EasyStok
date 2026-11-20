@@ -189,7 +189,7 @@ for (const alteracao of [{ clienteId: 'cliente-corrigido' }, { vinculoRevisao: 2
 await provar('comanda, frete, cardápio, rascunho e soltar usam apenas callbacks explícitos da conversa atual', async () => {
   const chamadas = [], antes = g.chamadas.length
   for (const [bloco, rotulo, nome, args] of [
-    [resposta().blocos[1], 'Ver comanda', 'comanda', []],
+    [resposta().blocos[1], 'Ver pedido', 'comanda', []],
     [resposta().blocos[2], 'Consultar frete', 'frete', []],
     [{ id: 'acao-2', tipo: 'acao', acao: 'abrir_cardapio', texto: 'Confira os pratos.' }, 'Abrir cardápio', 'cardapio', []],
     [resposta().blocos[3], 'Usar no rascunho', 'rascunho', ['Qual horário você prefere?']],

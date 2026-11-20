@@ -41,7 +41,7 @@ function comandaAberta(conversa) {
   return { total: typeof pedido.totalApi === 'number' ? pedido.totalApi : totalDaComanda(pedido) }
 }
 
-const textoDaComandaAberta = (aberta) => `1 comanda aberta${aberta.total == null ? '' : ` · ${moeda(aberta.total)}`}`
+const textoDaComandaAberta = (aberta) => `1 pedido aberto${aberta.total == null ? '' : ` · ${moeda(aberta.total)}`}`
 
 function AbaPedidos({ historico, pedidosAnteriores, aberta, clienteId = null, nome }) {
   const novoPedido = useNovoPedidoDoCliente()

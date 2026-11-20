@@ -207,7 +207,7 @@ export function BlocoPedido({
         id="comanda-pedido"
         tabIndex={-1}
         className={`${css.comanda} ${alvoDoArrasto ? css.alvoArrasto : ''}`}
-        aria-label={numeroComanda ? `Comanda número ${numeroComanda}` : 'Comanda em rascunho'}
+        aria-label={numeroComanda ? `Pedido número ${numeroComanda}` : 'Pedido em rascunho'}
       >
         {/* #1474 (R6, R3): o número é o do EasyStok quando o pedido existe; sem janela, o
             cabeçalho avisa. A faixa do modo API vem do seletor, não do catálogo local.
@@ -253,7 +253,7 @@ export function BlocoPedido({
         {alvoDoArrasto && <p className={css.soltarAqui}>Soltar aqui</p>}
 
         {grupos.length === 0 && (
-          <p className={css.vazio}>{clienteEscolhendo ? LINHA_CLIENTE_ESCOLHENDO : 'Comanda vazia. Abra o cardápio para montar o pedido.'}</p>
+          <p className={css.vazio}>{clienteEscolhendo ? LINHA_CLIENTE_ESCOLHENDO : 'Pedido vazio. Abra o cardápio para montar o pedido.'}</p>
         )}
 
         {grupos.map((grupo) => (
@@ -337,7 +337,7 @@ export function BlocoPedido({
               <EscolhaDeMeio
                 escolhido={null}
                 aoEscolher={(meio) => { setPedindoMeio(false); enviar(meio) }}
-                pergunta="Como o cliente vai pagar? A comanda sai com a cobrança."
+                pergunta="Como o cliente vai pagar? O pedido sai com a cobrança."
               />
             )}
           </>

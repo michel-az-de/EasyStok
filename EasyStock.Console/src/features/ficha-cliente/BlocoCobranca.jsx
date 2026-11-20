@@ -330,7 +330,7 @@ export function BlocoCobranca({
       return (
         <Bloco titulo="Cobrança">
           <Vazio
-            titulo="Comanda vazia"
+            titulo="Pedido vazio"
             acao={<Botao onClick={aoAbrirCardapio} disabled={!editavel}>Adicionar itens</Botao>}
           />
         </Bloco>

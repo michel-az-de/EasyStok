@@ -22,7 +22,7 @@ export function ModalEnviarCardapio({
   async function preparar() {
     if (conteudo) return conteudo
     const resultado = await aoGerar()
-    if (!resultado?.link) throw new Error('Não foi possível obter o link da comanda. Tente novamente.')
+    if (!resultado?.link) throw new Error('Não foi possível obter o link do pedido. Tente novamente.')
     setConteudo(resultado)
     return resultado
   }
@@ -49,7 +49,7 @@ export function ModalEnviarCardapio({
     setEnviando(true); setErro('')
     try {
       const dados = await preparar()
-      if (await aoEnviar(dados.texto) === false) throw new Error('A comanda não foi enviada. Confira o motivo na conversa. O link continua disponível para copiar ou tentar novamente.')
+      if (await aoEnviar(dados.texto) === false) throw new Error('O pedido não foi enviado. Confira o motivo na conversa. O link continua disponível para copiar ou tentar novamente.')
       aoFechar()
     } catch (e) { setErro(e.message) }
     finally { trava.current = false; setEnviando(false) }
@@ -58,7 +58,7 @@ export function ModalEnviarCardapio({
   return (
     <Modal
       titulo="Enviar cardápio"
-      descricao={`${primeiroNome(nomeCliente)}${numero ? ` · Comanda ${numero}` : ''} · ${canalNome}`}
+      descricao={`${primeiroNome(nomeCliente)}${numero ? ` · Pedido ${numero}` : ''} · ${canalNome}`}
       aoFechar={() => { if (!trava.current) aoFechar() }}
       rodape={(
         <>
@@ -87,7 +87,7 @@ export function ModalEnviarCardapio({
         {conteudo.daLoja ? (
           // #1353: o mesmo link que o agente manda (S48). Vale 24 h e um pedido.
           <p>
-            É a comanda pessoal no site da Casa da Baba (<strong>{endereco}</strong>). Cliente e
+            É o pedido pessoal no site da Casa da Baba (<strong>{endereco}</strong>). Cliente e
             atendimento acompanham os mesmos itens. Cada link aceita uma confirmação; outro link permite
             acrescentar ou solicitar uma troca antes da entrega. O pagamento é por pedido ou diferença.
             Um novo link mantém o número e substitui a edição anterior ainda não confirmada.

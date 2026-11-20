@@ -237,7 +237,7 @@ export function BarraProximoPasso({
   } else if (pedido.estado === 'aguardando') {
     const situacaoCob = situacaoDaCobranca(pedido.cobranca, agora)
     const info = acaoDoPix(situacaoCob, {
-      prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
+      prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'O pedido está vazio.'),
       // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
       rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : ROTULOS.GERAR_COBRANCA,
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
