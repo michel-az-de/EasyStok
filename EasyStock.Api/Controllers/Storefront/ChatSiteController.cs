@@ -40,14 +40,16 @@ public class ChatSiteController(
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    [SwaggerOperation(Summary = "Open an anonymous chat session", Description = "Devolve o token uma vez só. 404 se a loja não tem o chat ligado.")]
+    [SwaggerOperation(Summary = "Open an anonymous chat session", Description = "Devolve o token uma vez só. 404 se a loja não tem o chat ligado. O corpo é opcional; #2928: " +
+                      "`campanha` (UTMs, ids de clique e a flag `marketing`) guarda de qual anúncio o visitante veio.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     [EnableRateLimiting(ChatSiteRateLimit.AbrirSessao)]
     [HttpPost("sessoes")]
-    public Task<IActionResult> AbrirSessao(string slug, CancellationToken ct) =>
-        Tratar(async () => DataOk(await abrirSessao.ExecuteAsync(slug, ct)));
+    public Task<IActionResult> AbrirSessao(
+        string slug, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AbrirSessaoBody? body, CancellationToken ct = default) =>
+        Tratar(async () => DataOk(await abrirSessao.ExecuteAsync(slug, body?.Campanha, ct)));
 
     [SwaggerOperation(Summary = "Send a visitor message")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -202,6 +204,9 @@ public class ChatSiteController(
         ? DataNotFound(ex.Message)
         : StatusCode(StatusCodes.Status403Forbidden, new ApiErrorResponse(new ApiError("SESSAO_CHAT_INVALIDA", ex.Message, null, null)));
 }
+
+/// <summary>Corpo opcional do <c>POST sessoes</c>; o widget antigo manda <c>{}</c> ou nada (#2928).</summary>
+public sealed record AbrirSessaoBody(CampanhaInput? Campanha = null);
 
 public sealed record MensagemVisitanteBody(string? Texto);
 

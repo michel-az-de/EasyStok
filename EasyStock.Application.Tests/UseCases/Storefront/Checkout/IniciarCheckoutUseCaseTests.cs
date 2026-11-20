@@ -514,6 +514,43 @@ public class IniciarCheckoutUseCaseTests
             Arg.Any<CancellationToken>());
     }
 
+    // #2928 S4: a campanha do site vira a origem do pedido; sem ela, vale a da conversa vinculada (último anúncio, D2).
+    [Fact]
+    public async Task CampanhaDoCheckout_GravaAOrigemDoAnuncioNoPedido()
+    {
+        var f = BuildFakes();
+        var campanha = new EasyStock.Application.UseCases.Common.CampanhaInput(
+            UtmSource: "google", UtmCampaign: "natal", Gclid: "abc", Marketing: true);
+
+        await BuildUseCase(f).ExecuteAsync(InputValido() with { Campanha = campanha });
+
+        await f.PedidoRepo.Received().UpdateAsync(
+            Arg.Is<EasyStock.Domain.Entities.Pedido>(p => p.OrigemAnuncio != null && p.OrigemAnuncio.Campanha == "natal"
+                && p.OrigemAnuncio.Via == "site" && p.OrigemAnuncio.IdClique == "abc"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SemCampanha_HerdaAOrigemDaConversa_ECampanhaDoCheckoutVence()
+    {
+        var daConversa = EasyStock.Domain.ValueObjects.OrigemAnuncio.DoAnuncioWhatsApp("111", "Promo", null, DateTimeOffset.UtcNow);
+        var f = BuildFakes();
+        var herdada = await BuildUseCase(f).ExecuteAsync(InputValido() with { OrigemDaConversa = daConversa });
+        await f.PedidoRepo.Received().UpdateAsync(
+            Arg.Is<EasyStock.Domain.Entities.Pedido>(p => ReferenceEquals(p.OrigemAnuncio, daConversa)), Arg.Any<CancellationToken>());
+
+        var g = BuildFakes();
+        await BuildUseCase(g).ExecuteAsync(InputValido() with
+        {
+            OrigemDaConversa = daConversa,
+            Campanha = new EasyStock.Application.UseCases.Common.CampanhaInput(UtmSource: "instagram", UtmCampaign: "nova"),
+        });
+        await g.PedidoRepo.Received().UpdateAsync(
+            Arg.Is<EasyStock.Domain.Entities.Pedido>(p => p.OrigemAnuncio != null && p.OrigemAnuncio.Campanha == "nova"),
+            Arg.Any<CancellationToken>());
+        herdada.PedidoId.Should().NotBeEmpty();
+    }
+
     [Fact]
     public async Task PedidoDoSiteMarcaDestinatarioDaCampanhaComoPediu()
     {
