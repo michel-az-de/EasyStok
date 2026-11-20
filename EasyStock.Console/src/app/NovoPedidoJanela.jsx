@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Botao } from '../componentes/Botao'
 import { CampoTexto } from '../componentes/Campo'
 import { Modal } from '../componentes/Modal'
+import { AvisoDaAcaoApi } from './FaixaApi'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { useSimulacaoDoPedidoComErro } from '../aplicacao/useSimulacaoDoPedido'
 import {
-  ajustarNaJanela, cadastrarEnderecoDaJanela, cardapioPronto, comandaEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, precisaNovaComanda, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela,
+  ajustarNaJanela, cadastrarEnderecoDaJanela, cardapioPronto, comandaDeFora, enderecoVigente, mostrarAvisoDePedidoEmAndamento, pedidoJaCriadoNaConversa, faltaEndereco, precisaNovaComanda, podeAvancarDaEntrega, rascunhoDaMontagem, registrarDaJanela, somaEhDaJanela,
   restaurarRascunho, somarNaJanela, textoDoErro,
 } from '../aplicacao/janelaDoPedido'
 import { EscolhaDeMeio } from '../features/ficha-cliente/EscolhaDeMeio'
@@ -57,7 +58,9 @@ function Montagem({ janela, conversa }) {
   const [cadastrando, setCadastrando] = useState(false)
   const [erroEndereco, setErroEndereco] = useState(null)
   const restaurado = useRef(false)
-  const comandaDaConversa = useRef(comandaEmAndamento(conversa))
+  // #2941: a montagem da própria janela não é "comanda de fora"; a de fora é reavaliada a cada render.
+  const montouNaJanela = useRef(false)
+  const deFora = comandaDeFora(conversa, montouNaJanela.current)
   const jaTemPedido = pedidoJaCriadoNaConversa(conversa)
 
   // Reabrir a mesma cliente: refaz a montagem com o cardápio de hoje e volta ao passo em que parou.
@@ -65,7 +68,7 @@ function Montagem({ janela, conversa }) {
     if (restaurado.current) return
     // Pedido anterior já entregue ou cancelado: comanda nova (mesmo caminho do Atendimento) e restaura na volta.
     if (precisaNovaComanda(conversa)) { acoes.novaComanda(janela.conversaId); return }
-    if (comandaDaConversa.current || jaTemPedido) { restaurado.current = true; return }
+    if (deFora || jaTemPedido) { restaurado.current = true; return }
     const guardado = lerRascunhoDoPedido(sessao, janela.clienteId)
     if (guardado && !cardapioPronto(cardapio)) return
     restaurado.current = true
@@ -73,7 +76,7 @@ function Montagem({ janela, conversa }) {
     const volta = restaurarRascunho(guardado, cardapio)
     for (const linha of volta.itens) {
       const item = itemPorSku(cardapio, linha.sku)
-      for (let i = 0; i < linha.qtd; i += 1) somarNaJanela(acoes, janela, item)
+      for (let i = 0; i < linha.qtd; i += 1) { montouNaJanela.current = true; somarNaJanela(acoes, janela, item) }
       if (linha.obs) acoes.ajustarObservacao(janela.conversaId, linha.sku, linha.obs)
     }
     if (volta.endereco) setEnderecoTexto(volta.endereco)
@@ -85,9 +88,9 @@ function Montagem({ janela, conversa }) {
 
   // Fechar, trocar de tela ou recarregar guarda a montagem (sessionStorage, por cliente).
   useEffect(() => {
-    if (!restaurado.current || comandaDaConversa.current || jaTemPedido || registrando) return
+    if (!restaurado.current || deFora || jaTemPedido || registrando) return
     gravarRascunhoDoPedido(sessao, janela.clienteId, rascunhoDaMontagem(janela, pedido, passo, cardapio, { entrega, endereco: enderecoTexto }))
-  }, [pedido, passo, enderecoTexto])
+  }, [pedido, passo, enderecoTexto, deFora])
 
   const { simulacao, erro: erroSimulacao } = useSimulacaoDoPedidoComErro({
     conversaId: janela.conversaId, clienteId: janela.clienteId, endereco: enderecoCadastrado, pedido, ativo: passo !== 'itens',
@@ -123,6 +126,7 @@ function Montagem({ janela, conversa }) {
   const proximo = PASSOS[PASSOS.findIndex((p) => p.id === passo) + 1]
 
   const rodape = <>
+    <AvisoDaAcaoApi />
     {erro && <p className={css.erro} role="alert">{erro}</p>}
     {passo === 'revisar' && (
       <label className={css.enviar}>
@@ -130,7 +134,7 @@ function Montagem({ janela, conversa }) {
         Vamos enviar o resumo para {nome} no WhatsApp
       </label>
     )}
-    {!comandaDaConversa.current && itens.length > 0 && (descartando
+    {!deFora && itens.length > 0 && (descartando
       ? <><Botao variante="texto" onClick={descartar}>Confirmar descarte</Botao><Botao variante="texto" onClick={() => setDescartando(false)}>Manter rascunho</Botao></>
       : <Botao variante="texto" onClick={() => setDescartando(true)}>Descartar rascunho</Botao>)}
     {anterior && <Botao onClick={() => setPasso(anterior.id)} disabled={registrando}>Voltar</Botao>}
@@ -138,7 +142,7 @@ function Montagem({ janela, conversa }) {
     {passo === 'revisar' && <Botao variante="primario" disabled={registrando || itens.length === 0} onClick={registrar}>{registrando ? 'Registrando…' : 'Registrar'}</Botao>}
   </>
 
-  if (jaTemPedido) {
+  if (mostrarAvisoDePedidoEmAndamento({ jaTemPedido, registrando })) {
     return (
       <Modal titulo={`Novo pedido de ${nome}`} largura="lg" aoFechar={fechar} rodape={<Botao variante="primario" onClick={fechar}>Entendi</Botao>}>
         <p className={css.aviso} role="status">{AVISO_PEDIDO_EM_ANDAMENTO}</p>
@@ -160,7 +164,7 @@ function Montagem({ janela, conversa }) {
               {ativos.map((item) => {
                 const produto = doToque(item)
                 return <li key={item.sku}><span>{item.nome} <small>{moeda(produto?.preco ?? item.preco)}</small></span>
-                  <Botao disabled={!produto} aria-label={`Somar ${item.nome}`} onClick={() => somarNaJanela(acoes, janela, produto)}>+</Botao></li>
+                  <Botao disabled={!produto} aria-label={`Somar ${item.nome}`} onClick={() => { if (somaEhDaJanela(conversa, montouNaJanela.current)) montouNaJanela.current = true; somarNaJanela(acoes, janela, produto) }}>+</Botao></li>
               })}
             </ul>
           </section>
@@ -176,7 +180,7 @@ function Montagem({ janela, conversa }) {
           <CampoTexto rotulo="Endereço de entrega" value={enderecoTexto} onChange={(e) => { setEnderecoTexto(e.target.value); setErroEndereco(null) }} />
           <Botao disabled={cadastrando || !enderecoTexto.trim()} onClick={cadastrarEndereco}>{cadastrando ? 'Cadastrando…' : 'Cadastrar endereço'}</Botao>
           {erroEndereco && <p className={css.erro} role="alert">{erroEndereco}</p>}
-          {enderecoCadastrado && !faltaEndereco(erroSimulacao) && <p className={css.aviso} role="status">Endereço cadastrado: {enderecoCadastrado}</p>}
+          {enderecoVigente(enderecoCadastrado, enderecoTexto) && !faltaEndereco(erroSimulacao) && <p className={css.aviso} role="status">Endereço cadastrado: {enderecoVigente(enderecoCadastrado, enderecoTexto)}</p>}
           {erroSimulacao && <p className={css.erro} role="alert">{textoDoErro(erroSimulacao)}</p>}
           <h3 className={css.subtitulo}>Forma de pagamento</h3>
           <EscolhaDeMeio escolhido={pedido.meio ?? null} pedido={pedido} conversaId={janela.conversaId} aoEscolher={(meio) => acoes.escolherMeioPagamento(janela.conversaId, meio)} />

@@ -138,7 +138,27 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
   // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e
   // manda o resumo pela conversa. Só o POST decide "não criado" (#1287): a recarga que
   // falha depois dele é só a tela atrasada, a polling traz o pedido.
+  // #2941: POST ok e recarga que falhou deixa a tela sem `pedidoId`; sem esta marca um novo clique postaria de novo e
+  // duplicaria o pedido. A marca faz a nova tentativa só reler o pedido. Devolve `{ pedidoId, atualizando: true }`
+  // enquanto a leitura não volta: o pedido existe, só a tela está atrasada.
+  const criadoSemRecarga = new Map()
+  const aindaAtualizando = (id, pedidoId) => {
+    avisar('Pedido criado no EasyStok, atualizando a tela…')
+    return { pedidoId, atualizando: true }
+  }
   const criarPedido = (id, meio = null, enviarAoCliente = true, pedido = pedidoDe(id)) => umaPorConversa(id, 'criarPedido', () => {
+    if (pedidoCriado(id)) criadoSemRecarga.delete(id)
+    // A marca vale só para a comanda que foi postada: comanda nova (outro número) depois do pedido entregue posta de novo.
+    if (criadoSemRecarga.get(id)?.numero !== pedidoDe(id)?.numero) criadoSemRecarga.delete(id)
+    if (!pedidoCriado(id) && criadoSemRecarga.has(id)) {
+      const { pedidoId } = criadoSemRecarga.get(id)
+      return recarregar(id).then((atual) => {
+        if (!atual?.pedidoId) return aindaAtualizando(id, pedidoId)
+        criadoSemRecarga.delete(id)
+        limparAviso()
+        return atual
+      }, () => aindaAtualizando(id, pedidoId))
+    }
     if (!pedido || pedidoCriado(id)) return undefined
     const conversa = estadoRef.current.conversas.find(c => c.id === id)
     const identidade = pedido.identidadeProposta
@@ -175,7 +195,11 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
         else if (!enviarAoCliente) avisar(gerado?.cobranca?.linkPagamento
           ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar um modelo aprovado.'
           : 'Pedido e cobrança criados sem envio. Confira a forma de recebimento em Pagamento.')
-        return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
+        return recarregar(id).catch(() => {
+          if (gerado?.pedidoId) criadoSemRecarga.set(id, { pedidoId: gerado.pedidoId, numero: pedido.numero })
+          avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…')
+          return gerado?.pedidoId ? { pedidoId: gerado.pedidoId, atualizando: true } : undefined
+        })
       },
       (erro) => {
         if (!erro.status || erro.status >= 500 || (erro.status === 409 && !RECUSA_DEFINITIVA.has(erro.codigo))) {
