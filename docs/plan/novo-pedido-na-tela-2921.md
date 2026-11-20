@@ -36,7 +36,7 @@ Felipe, 19/11, 21:24, com print de Pedidos > Novo pedido: "TA ERRADO EU FAZER O 
 | Resumo à cliente | `EnviarAoCliente`, inclusive fora das 24 h pelo modelo `pedido_atualizado` (#2901/#2905) | nenhum. `NotificarClienteStatusPedidoHandler.TipoDoAviso` cobre Preparando, SaiuParaEntrega, Entregue, Pronto e Cancelado, não "pedido recebido" |
 | Permissão | `AtenderConversas` | `Operador` |
 
-Escolha: **o endpoint da conversa, com a conversa por baixo**. `POST /api/pedidos` é o pedido cru (origem `web`): não tem cardápio do dia, janela, frete, cobrança nem resumo. Usá-lo exigiria portar essas regras para a API e criar o aviso de "pedido recebido", com risco de divergir do que a Tatiana já vê na comanda. O aviso de status por telefone sem conversa (`AvisoStatusPedidoCliente.cs`) continua valendo depois da criação, mas não cobre o "recebido". Fica como alternativa futura na pergunta 3.
+Escolha: **o endpoint da conversa, com a conversa por baixo**. `POST /api/pedidos` é o pedido cru (origem `web`): não tem cardápio do dia, janela, frete, cobrança nem resumo. Usá-lo exigiria portar essas regras para a API e criar o aviso de "pedido recebido", com risco de divergir do que a Tatiana já vê na comanda. O aviso de status por telefone sem conversa (`AvisoStatusPedidoCliente.cs`) continua valendo depois da criação, mas não cobre o "recebido". O Felipe descartou essa alternativa em 20/11 (pergunta 3): o pedido segue pela conversa.
 
 ## 5. Jornada da Tatiana
 
@@ -92,7 +92,7 @@ Uma mudança pequena na fase 1, sem migração. Decisão do Felipe (19/11, 22:08
 
 Contrato usado como está: `POST /api/atendimento/conversas/{id}/pedido`, `/pedido/simulacao` e a rota `do-cliente` que abre a conversa.
 
-Cliente sem telefone (furo 2 da #2919, resolvido pela #2930): o `POST .../conversas/do-cliente` aceita `celular` opcional e grava no cadastro só se ele estiver sem telefone (PR #2932, `9506ec100`, no ar). Na fase 1, o passo Cliente da janela reaproveita o componente `cadastros/CelularDoPedido.jsx` (PR #2935) e manda o `celular` na abertura da conversa. Nada a duplicar aqui.
+Cliente sem telefone (furo 2 da #2919, resolvido pela #2930): o `POST .../conversas/do-cliente` aceita `celular` opcional e grava no cadastro só se ele estiver sem telefone (PR #2932, `9506ec100`, no ar). Na fase 1, o passo Cliente da janela reaproveita o componente `cadastros/CelularDoPedido.jsx` (PR #2935, `4b0529572`, no ar) e manda o `celular` na abertura da conversa. Nada a duplicar aqui.
 
 Fase 2 (cliente nova): usa a criação de cliente que o Console já tem, com o mesmo `celular`.
 
@@ -135,8 +135,8 @@ Prova de tela no Console real (build do worktree) nos 3 pontos de entrada, Pedid
 
 Reverter a PR da fase: o botão volta ao fluxo atual pelo Atendimento e a fila volta a listar todas as conversas. Sem migração, não há dado a desfazer.
 
-## 13. Perguntas abertas para o Felipe
+## 13. Perguntas para o Felipe (todas respondidas)
 
 1. ~~A conversa criada por baixo pode aparecer na fila do Atendimento, ou fica escondida até a cliente responder?~~ Respondida 19/11, 22:08: **fica escondida** (seção 8).
 2. ~~Fechar a janela no meio da montagem: perde tudo (com confirmação) ou guarda rascunho para retomar?~~ Respondida 19/11, 23:05: **guarda rascunho** (seção 5).
-3. O resumo continua saindo pelo WhatsApp da loja no Registrar (escolha desta spec). No futuro, prefere pedido sem conversa por `POST /api/pedidos` mais um aviso novo de "pedido recebido"?
+3. ~~O resumo continua saindo pelo WhatsApp da loja no Registrar (escolha desta spec). No futuro, prefere pedido sem conversa por `POST /api/pedidos` mais um aviso novo de "pedido recebido"?~~ Respondida 20/11, 00:58: **mantém a conversa** (seção 4). Não há aviso de "pedido recebido" a criar.
