@@ -1,4 +1,5 @@
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -139,7 +140,7 @@ module.exports = function ({ test, assert }) {
     assert.ok(!Buffer.from(bytes).toString('latin1').includes('Lasanha'), 'nome não vai como texto');
   });
   function fromIndex(names, context) {
-    const html = fs.readFileSync(process.env.PWA_HTML || path.join(PWA, 'index.html'), 'utf8');
+    const html = lerPwaMontada(process.env.PWA_HTML || path.join(PWA, 'index.html'));
     vm.createContext(context);
     for (const name of names) {
       const start = html.indexOf('function ' + name + '(');

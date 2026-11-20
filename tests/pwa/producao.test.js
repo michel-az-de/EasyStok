@@ -1,5 +1,6 @@
 // Testes unitarios — modulo PRODUCAO
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 module.exports = function ({ test, runInSandbox, sandbox, assert }) {
   // #2247: o padrão é o da regra (D4 da v2: só QR até o número curto do lote).
@@ -46,7 +47,7 @@ module.exports = function ({ test, runInSandbox, sandbox, assert }) {
 
   function labelSelectionFixture(mode) {
     const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
-    const html = fs.readFileSync(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+    const html = lerPwaMontada(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
     const chips = [...html.matchAll(/<button[^>]*onclick="setEtqCode\('([^']+)'\)"[^>]*>([^<]+)<\/button>/g)].map(match => {
       const chip = { mode: match[1], textContent: match[2], active: false };
       chip.classList = { toggle: (_, selected) => { chip.active = selected; } }; return chip;

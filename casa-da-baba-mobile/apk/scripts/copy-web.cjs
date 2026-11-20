@@ -9,6 +9,7 @@ const version = require('../package.json');
 const contract = require('./ota-contract.cjs');
 const { adaptAppMarkup } = require('./app-markup.cjs');
 const { TROCAS, aplicarTrocas } = require('./pwa-trocas.cjs');
+const { arquivosDoApp, montarHtmlUnico } = require('./pwa-montagem.cjs');
 const bundleVersion = process.env.CDB_BUNDLE_VERSION || version.version;
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(bundleVersion)) throw new Error('Versão do conteúdo inválida.');
 const apiBaseUrl = process.env.CDB_API_BASE_URL || 'https://api.easystok.online';
@@ -43,7 +44,11 @@ const config = {
 fs.writeFileSync(path.join(target, 'config.js'), 'window.CDB_CONFIG = ' + JSON.stringify(config) + ';\n');
 fs.writeFileSync(path.join(target, 'bundle.json'), JSON.stringify({ schemaVersion: 1, appId: config.appId, channel: contract.CHANNEL, bundleVersion, nativeVersionCode: contract.NATIVE_VERSION_CODE, dataSchemaVersion: contract.DATA_SCHEMA }));
 const htmlPath = path.join(target, 'index.html');
-let html = adaptAppMarkup(fs.readFileSync(htmlPath, 'utf8'));
+// O APK segue com o HTML único: CSS e JS do app voltam inline e saem da pasta (#2892).
+const htmlFonte = fs.readFileSync(htmlPath, 'utf8');
+let html = adaptAppMarkup(montarHtmlUnico(htmlFonte, target));
+for (const arquivo of arquivosDoApp(htmlFonte)) fs.rmSync(path.join(target, arquivo));
+for (const pasta of ['css', 'js']) if (fs.existsSync(path.join(target, pasta)) && !fs.readdirSync(path.join(target, pasta)).length) fs.rmdirSync(path.join(target, pasta));
 // Mantém as mesmas famílias/eixos sem depender da rede para abrir o APK.
 let localFontsLinked = false;
 html = html.replace(/<link\b[^>]*href=["']https:\/\/fonts\.(?:googleapis\.com|gstatic\.com)[^"']*["'][^>]*>\s*/gi, () => {

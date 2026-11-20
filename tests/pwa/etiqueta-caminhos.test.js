@@ -4,6 +4,7 @@
 // Caminho absoluto '/etiqueta/...' dava 404 no navegador (nao existe wwwroot/etiqueta);
 // so funcionava no APK, que serve o bundle na raiz. Caminho relativo vale nos dois.
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +14,7 @@ module.exports = function ({ test, assert }) {
 
   function arquivos() {
     const etq = path.join(PWA_DIR, 'etiqueta');
-    const lista = [path.join(PWA_DIR, 'index.html')];
+    const lista = [path.join(PWA_DIR, 'index.html'), path.join(PWA_DIR, 'css/app.css'), ...fs.readdirSync(path.join(PWA_DIR, 'js')).map(n => path.join(PWA_DIR, 'js', n))];
     (function andar(dir) {
       for (const nome of fs.readdirSync(dir)) {
         const p = path.join(dir, nome);
@@ -36,7 +37,7 @@ module.exports = function ({ test, assert }) {
   });
 
   test('#1509: caminhos de etiqueta apontam para arquivos que existem', () => {
-    const html = fs.readFileSync(path.join(PWA_DIR, 'index.html'), 'utf8');
+    const html = lerPwaMontada(path.join(PWA_DIR, 'index.html'));
     const re = /(?:src|href)=["'](?:\.\/)?(etiqueta\/[^"'?]+)|from\s+['"]\.\/(etiqueta\/[^'"]+)['"]/g;
     const vistos = [];
     let m;

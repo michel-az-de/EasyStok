@@ -1,11 +1,12 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { commandFor } = require('../pilot-ui.js');
 
-const html = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'EasyStock.Api', 'wwwroot', 'pwa', 'index.html'), 'utf8');
+const html = lerPwaMontada(path.join(__dirname, '..', '..', '..', 'EasyStock.Api', 'wwwroot', 'pwa', 'index.html'));
 const pilot = fs.readFileSync(path.join(__dirname, '..', 'pilot.js'), 'utf8');
 
 test('confirmações que a operadora lê antes de cancelar estão acentuadas', () => {

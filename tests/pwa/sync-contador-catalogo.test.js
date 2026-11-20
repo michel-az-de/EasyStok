@@ -1,12 +1,13 @@
 // #2316 — SYNC-4 (catalogo semente nao entra em aparelho pareado) e SYNC-7 (contador de
 // pendentes deriva so da fila, sem ++ manual que somava duas vezes o mesmo item).
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
 module.exports = function ({ test, assert }) {
-  const html = fs.readFileSync(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
 
   function extrairFuncao(nome) {
     const ini = html.indexOf('function ' + nome + '(');
