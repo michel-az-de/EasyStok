@@ -28,7 +28,9 @@ public sealed record CriarPedidoCommand(
     Guid? CriadoPorUserId = null,
     [property: MaxLength(120)] string? CriadoPorNome = null,
     // F5 — agendamento (MVP). NULL = pedido pra agora.
-    DateTime? AgendadoParaEm = null);
+    DateTime? AgendadoParaEm = null,
+    // #409: por onde a cliente pediu. NULL = não informado.
+    [property: MaxLength(20)] string? Canal = null);
 
 /// <summary>
 /// Cria um novo pedido (encomenda) — Onda P2. Se <see cref="ClienteId"/>
@@ -106,6 +108,7 @@ public class CriarPedidoUseCase(
         }
         pedido.Observacoes = cmd.Observacoes;
         pedido.MobileOrderId = cmd.MobileOrderId;
+        pedido.Canal = string.IsNullOrWhiteSpace(cmd.Canal) ? null : cmd.Canal.Trim();
         pedido.AgendadoParaEm = agendadoParaEm;
         if (cliente is not null && pedido.Origem != "balcao")
             await enderecoEntrega.RegistrarAsync(pedido, DadosEnderecoEntrega.De(cliente));

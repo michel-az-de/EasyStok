@@ -36,6 +36,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
 
             b.Property(p => p.Observacoes).HasColumnType("text");
             b.Property(p => p.Origem).HasMaxLength(20);
+            b.Property(p => p.Canal).HasMaxLength(20);
             b.Property(p => p.MobileOrderId).HasMaxLength(64);
             b.Property(p => p.AvaliacaoSolicitadaEm)
                 .HasColumnName("avaliacao_solicitada_em")

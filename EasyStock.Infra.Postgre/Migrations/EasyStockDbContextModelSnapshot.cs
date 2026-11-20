@@ -6003,6 +6003,11 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("agendamento_notificado_dia_em");
 
+                    b.Property<string>("Channel")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("channel");
+
                     b.Property<string>("ClientId")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -8047,6 +8052,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("BairroEntrega")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Canal")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTime?>("CanceladoEm")
                         .HasColumnType("timestamp with time zone");
