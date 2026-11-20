@@ -3,7 +3,7 @@
 - Data: 2026-11-19
 - Origem: estudo de ads do Atlas (michel-az-de/atlas#118, `01-rodada2-gestao-de-campanhas.md`) e banca R2 de utilidade do plano
 - Tier: alto (migração e `feat` nova). Esta spec, depois de mergeada, dá às fatias S1 a S6 o tier baixo da ADR-0055
-- Estado: proposta, aguarda a label `aprovado` e as 3 decisões da seção 7
+- Estado: proposta com as 3 decisões da seção 7 tomadas; aguarda a label `aprovado`
 - Repositórios: EasyStok (S1, S2, S4, S5, S6) e casa-da-baba (S3, PR própria)
 
 ## 1. Problema medido
@@ -73,7 +73,7 @@ Regras:
 | S2 | EasyStok | Parser lê `referral`; `MensagemRecebidaWhatsApp.Referral`; `GravarEntradaAsync` grava a origem na conversa | `WebhookWhatsAppParser.cs`, `EventoWhatsApp.cs`, `ProcessarEventoWhatsAppUseCase.cs` | `EasyStock.Application.Tests` com payload real de CTWA (fixture) e sem `referral` |
 | S3 | casa-da-baba | Chat do site e checkout enviam `campanha` (de `campanhaAtual()`) e a flag `marketing`; `whatsapp-origem.js` passa a consultar o consentimento | `src/api/chat.js`, checkout, `src/ui/whatsapp-origem.js` | Teste unitário do front: sem consentimento não envia id |
 | S4 | EasyStok | `POST sessoes` e os dois checkouts aceitam `campanha` opcional; a origem é copiada da conversa ou do checkout para o pedido em todo ponto que cria pedido | `ChatSiteController.cs`, `IniciarCheckout*Input.cs`, `CriarPedidoAtendimentoUseCase`, `IniciarCheckout*UseCase`, `AprovarPedidoStorefrontUseCase` | `EasyStock.Api.IntegrationTests`: pedido nascido de conversa com `referral` sai com a origem; corpo antigo sem `campanha` continua 200 |
-| S5 | EasyStok | `GET api/relatorios/pedidos-por-anuncio?de&ate`: pedidos, valor e ticket por plataforma e campanha, com a linha "Sem origem de anúncio" (D3) | controller de relatórios, query | Integração com 3 pedidos (Google, Meta, sem origem) |
+| S5 | EasyStok | `GET api/relatorios/pedidos-por-anuncio?de&ate`: pedidos, valor e ticket por plataforma e campanha, com a linha "Sem origem de anúncio", e tela de tabela simples no console (D3) | controller de relatórios, query, tela do console | Integração com 3 pedidos (Google, Meta, sem origem) |
 | S6 | EasyStok | Job diário anula `IdClique` com mais de 90 dias; mantém campanha e plataforma | job do `Infra.Async` | Teste do job com relógio fixo |
 
 Ordem: S1, depois S2 e S4 em paralelo, S3 depois de S4 no ar, S5 e S6 por último. Fora do escopo: subir conversão offline ao Google Ads e à Conversions API da Meta. Fica para a issue seguinte, que depende desta.
@@ -105,3 +105,5 @@ Ordem: S1, depois S2 e S4 em paralelo, S3 depois de S4 no ar, S5 e S6 por últim
 | D1 | Clique no botão do WhatsApp do site (sem chat): como ligar à conversa? | (a) Não ligar nesta fase; só chat do site, checkout e CTWA. (b) Código curto no texto ("ref. K7Q2") que o site registra antes de abrir o WhatsApp e o webhook reconhece. | (a). A (b) depende de a cliente não apagar o texto e exige endpoint público novo; medir primeiro quanto do volume vem por esse botão |
 | D2 | Regra de atribuição | (a) Último anúncio. (b) Primeiro anúncio. | (a). É o padrão do Google Ads e da Meta para conversão importada |
 | D3 | Onde mostrar o relatório | (a) Só endpoint nesta fase, lido por SQL ou pelo console depois. (b) Tela no console já no S5. | (b) se couber em uma tela de tabela simples; senão (a) |
+
+**Decidido pelo Felipe em 2026-11-19:** D1 (a), não ligar o botão do WhatsApp do site nesta fase; D2 (a), último anúncio; D3 (b), tela de tabela simples no console dentro do S5.
