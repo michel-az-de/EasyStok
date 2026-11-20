@@ -278,6 +278,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Atendimento.AtendenteRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ISessaoChatSiteRepository,
                 Repositories.Atendimento.SessaoChatSiteRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IOrigemAnuncioRepository,
+                Repositories.Atendimento.OrigemAnuncioRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILinkCardapioConversaRepository,
                 Repositories.Atendimento.LinkCardapioConversaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICreditoClienteComandaRepository,
