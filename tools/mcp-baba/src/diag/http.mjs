@@ -56,8 +56,10 @@ function lerCorpo(req, max) {
   return new Promise((ok, falha) => {
     if (Number(req.headers['content-length'] ?? 0) > max) { req.resume(); return falha(Object.assign(new Error('grande'), { status: 413 })); }
     const partes = []; let n = 0;
-    req.on('data', d => { n += d.length; if (n <= max) partes.push(d); });
-    req.on('end', () => (n > max ? falha(Object.assign(new Error('grande'), { status: 413 })) : ok(Buffer.concat(partes).toString('utf8'))));
+    // passou do limite: para de ler e responde na hora, sem esperar o fim de um corpo chunked (#3078)
+    const estourou = () => { req.removeAllListeners('data'); req.pause(); falha(Object.assign(new Error('grande'), { status: 413, fechar: true })); };
+    req.on('data', d => { n += d.length; if (n > max) return estourou(); partes.push(d); });
+    req.on('end', () => ok(Buffer.concat(partes).toString('utf8')));
     req.on('error', falha);
   });
 }
@@ -92,7 +94,7 @@ export function criarApp({
 
     let corpo;
     try { corpo = JSON.parse(await lerCorpo(req, maxCorpo)); } catch (e) {
-      return responder(res, e.status ?? 400, { erro: e.status ? 'corpo grande' : 'json invalido' });
+      return responder(res, e.status ?? 400, { erro: e.status ? 'corpo grande' : 'json invalido' }, e.fechar ? { connection: 'close' } : {});
     }
     const servidor = criarServidor({
       aoChamar: c => auditar({ quando: new Date(agora()).toISOString(), pessoa, ip, ferramenta: c.ferramenta,

@@ -127,3 +127,20 @@ test('http: corpo grande, metodo errado e caminho desconhecido', async () => {
   assert.equal((await pedir(porta, { headers: bearer(TOKEN), corpo: '{nao json' })).status, 400);
   s.close();
 });
+
+// #3078: corpo chunked (sem content-length) acima do limite recebe 413 na hora, sem esperar o fim do stream.
+test('http: corpo chunked grande e cortado sem esperar o fim', async () => {
+  const { s, porta } = await subir();
+  let r;
+  try {
+    const status = await new Promise((ok, falha) => {
+      r = request({ host: '127.0.0.1', port: porta, path: '/diag', method: 'POST',
+        headers: { host: '127.0.0.1', 'content-type': 'application/json', 'transfer-encoding': 'chunked', ...bearer(TOKEN) } },
+        res => { res.resume(); ok(res.statusCode); });
+      r.on('error', () => {});
+      r.write('x'.repeat(70 * 1024)); // nunca chama end(): o servidor nao pode ficar esperando
+      setTimeout(() => falha(new Error('sem resposta: o corpo grande continuou sendo lido')), 3000).unref();
+    });
+    assert.equal(status, 413);
+  } finally { r?.destroy(); s.closeAllConnections(); s.close(); }
+});

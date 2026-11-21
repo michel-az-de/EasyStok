@@ -60,3 +60,16 @@ test('linha gigante nao trava (sem ReDoS)', () => {
   redigir('a'.repeat(400_000));
   assert.ok(Date.now() - t0 < 1000);
 });
+
+// #3078: Basic leva a credencial inteira; valor entre aspas com espaco nao sai pela metade.
+test('redige Authorization Basic inteiro', () => {
+  const s = redigir('Authorization: Basic dXNlcjpwYXNz');
+  assert.ok(!s.includes('dXNlcjpwYXNz'), `vazou: ${s}`);
+});
+test('redige segredo entre aspas com espaco', () => {
+  for (const [e, dado] of [['password="abc def ghi" ok=1', 'def ghi'], ['"token": "a b c"', 'b c'], ["senha='x y'", 'y']]) {
+    const s = redigir(e);
+    assert.ok(!s.includes(dado), `vazou: ${s}`);
+  }
+  assert.match(redigir('password="abc def" ok=1'), /ok=1$/);
+});
