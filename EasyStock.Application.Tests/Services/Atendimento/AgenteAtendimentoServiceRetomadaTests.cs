@@ -259,7 +259,10 @@ public partial class AgenteAtendimentoServiceTests
     public async Task Retomada_EquipeRespondeEnquantoOTurnoDecide_NaoRetomaNemResponde()
     {
         var entrada = ClienteEscreveuComAEquipeHa(AlemDoPrazo);
-        // A resposta da atendente entra no banco depois da leitura do turno; quem trava a conversa já a enxerga.
+        // Cada leitura devolve uma foto do histórico: só quem relê depois do lock enxerga a resposta da atendente,
+        // que entra no banco depois da primeira leitura do turno.
+        _conversaRepository.ObterComMensagensAsync(_empresaId, _conversa.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new ConversaComMensagens(_conversa, _historico.ToList()));
         var respondeu = false;
         _conversaRepository.When(r => r.ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()))
             .Do(_ =>
@@ -284,13 +287,18 @@ public partial class AgenteAtendimentoServiceTests
     {
         ClienteEscreveuComAEquipeHa(AlemDoPrazo);
         var servico = CriarServicoComRetomada();
-        _unitOfWork.ExecuteInTransactionSemRetryAsync(
-                Arg.Any<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<(ConversaComMensagens, Mensagem)?>(new InvalidOperationException("banco fora")));
+        // A falha vem no commit, com a retomada já aplicada na entidade rastreada.
+        var situacaoNoCommit = (SituacaoConversa?)null;
+        _unitOfWork.CommitAsync().Returns<Task<int>>(_ =>
+        {
+            situacaoNoCommit = _conversa.Situacao;
+            throw new InvalidOperationException("banco fora");
+        });
 
         var acao = () => servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora, retomada: true);
 
         await acao.Should().ThrowAsync<InvalidOperationException>();
+        situacaoNoCommit.Should().Be(SituacaoConversa.Automatica, "a retomada estava pendente quando o banco falhou");
         _unitOfWork.Received().DescartarAlteracoesPendentes();
         _requisicoes.Should().BeEmpty();
     }
