@@ -33,7 +33,7 @@ try {
     titulo: 'Desligar a ferramenta?', descricao: 'O Assistente deixa de usar.', rotuloConfirmar: 'Desligar ferramenta', aoConfirmar() {}, aoFechar() {},
   }))
   assert.match(html, /<h2[^>]*>Desligar a ferramenta\?<\/h2>/, 'título')
-  assert.match(html, /<button[^>]*data-foco-inicial[^>]*>Continuar<\/button>/, 'foco inicial no botão seguro (Continuar)')
+  assert.match(html, /<button[^>]*data-foco-inicial[^>]*>Cancelar<\/button>/, 'foco inicial no botão seguro (Cancelar)')
   assert.doesNotMatch(html, /data-foco-inicial[^>]*>Desligar ferramenta/, 'o destrutivo não recebe o foco')
   assert.match(html, />Desligar ferramenta<\/button>/, 'o botão leva o verbo da ação, não "OK"')
   assert.doesNotMatch(html, />OK<\/button>/)

@@ -124,6 +124,22 @@ try {
   ] }])
   assert.equal(await painel.locator('[data-no="roteiro:0"]').innerText().then(t => t.startsWith('1. Entender o pedido')), true)
 
+  // #3011: no Expandir, Esc com a pergunta de desligar aberta cancela só a pergunta: o Expandir segue aberto e nada é gravado.
+  marca = pedidos.length
+  await painel.getByRole('button', { name: 'Expandir' }).click()
+  const expandido = pagina.getByRole('dialog', { name: 'Fluxo do atendimento' })
+  await expandido.locator('[data-no="grupo:ferramentas"]').click()
+  await expandido.locator('[data-no="ferramenta:consultar_pedido"]').click()
+  await expandido.getByRole('switch', { name: 'Ligada na loja' }).click()
+  await pagina.getByRole('button', { name: 'Desligar ferramenta', exact: true }).waitFor()
+  await pagina.keyboard.press('Escape')
+  await pagina.getByRole('button', { name: 'Desligar ferramenta', exact: true }).waitFor({ state: 'detached' })
+  assert.equal(await expandido.isVisible(), true, 'Esc na pergunta não fecha o Expandir')
+  assert.deepEqual(putsDesde(marca), [], 'Esc cancela sem gravar')
+  await expandido.getByRole('button', { name: 'Recolher' }).click()
+  await expandido.waitFor({ state: 'detached' })
+  await painel.locator('[data-no="grupo:ferramentas"]').click() // o grupo aberto no Expandir segue aberto aqui: fecha para o passo seguinte abrir
+
   // Ferramenta: desligar pergunta antes e grava a lista; a saída para a equipe não tem chave.
   marca = pedidos.length
   await painel.locator('[data-no="grupo:ferramentas"]').click()
