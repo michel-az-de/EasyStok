@@ -421,8 +421,12 @@ public sealed class OrderLinker(
     private async Task PublicarEntregaAsync(Guid pedidoId, Order mobileO, string statusAnterior, Guid? lojaId, DateTime carimboDoAparelho)
     {
         if (publicadorEventos is null || mobileO.EmpresaId is not { } empresaId
-            || !string.Equals(mobileO.Status, StatusPedidoMapper.Entregue, StringComparison.OrdinalIgnoreCase))
+            || !string.Equals(mobileO.Status, StatusPedidoMapper.Entregue, StringComparison.OrdinalIgnoreCase)
+            // Cancelado não volta: quem cancelou não recebe agradecimento nem pedido de avaliação.
+            || string.Equals(statusAnterior, StatusPedidoMapper.Cancelado, StringComparison.OrdinalIgnoreCase))
             return;
+        // O carimbo do aparelho é o da última edição do pedido, não o do toque em "entregue": editar um pedido já
+        // entregue há dias e sincronizar reabre a janela. Aceito: o espelho só chega aqui quando o status muda.
         var agora = DateTime.UtcNow;
         if ((agora - carimboDoAparelho).Duration() > JanelaDoAvisoDeEntrega)
         {
@@ -441,7 +445,9 @@ public sealed class OrderLinker(
         catch (Exception ex)
         {
             db.DescartarMudancasPendentes();
-            log.LogWarning(ex, "Pedido do ERP {ErpId}: a entrega feita no aparelho não foi publicada: {Msg}", pedidoId, ex.Message);
+            // O status já foi espelhado em outra gravação e o espelho não roda de novo: esta perda é definitiva.
+            log.LogError(ex, "Pedido do ERP {ErpId}: a entrega feita no aparelho não foi publicada e não será reenviada; "
+                + "o cliente fica sem o agradecimento e sem o pedido de avaliação: {Msg}", pedidoId, ex.Message);
         }
     }
 

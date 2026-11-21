@@ -154,6 +154,20 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
 
         await AparelhoManda(provider, s, "entregue");
 
+        (await StatusNoErp(s)).Should().Be("entregue");
+        (await MudancasDeStatusPublicadas(s, await PedidoDoErp(s))).Should().BeEmpty();
+    }
+
+    [SkippableFact]
+    public async Task PedidoCanceladoQueOAparelhoMarcaEntregue_NaoPublicaAEntrega()
+    {
+        // Cancelado não volta: quem cancelou não recebe agradecimento nem pedido de avaliação.
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+
+        await AparelhoManda(provider, s, "cancelado");
+        await AparelhoManda(provider, s, "entregue");
+
         (await MudancasDeStatusPublicadas(s, await PedidoDoErp(s))).Should().BeEmpty();
     }
 
