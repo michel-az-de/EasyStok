@@ -59,7 +59,7 @@ for (const [nome, enviar] of Object.entries(casos)) {
   if (nome === 'modelo' || nome === 'iniciar') assert.equal(chamadas[1].corpo.tentativaId, 't1', `${nome}: mesma tentativa`)
 
   chamadas = []; perguntas = []; resposta = false
-  await assert.rejects(enviar(), (e) => e.codigo === 'CONVERSA_DE_OUTRA', `${nome}: recusar a pergunta mantém o erro`)
+  await assert.rejects(enviar(), (e) => e.codigo === 'CONFIRMACAO_RECUSADA' && !/Confirme/.test(e.message), `${nome}: recusar a pergunta rejeita com CONFIRMACAO_RECUSADA, sem pedir confirmação`)
   assert.equal(chamadas.length, 1, `${nome}: sem confirmação da dona não repete`)
 }
 

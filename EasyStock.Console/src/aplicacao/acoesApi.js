@@ -1,6 +1,6 @@
 import * as acao from './acoes'
 import {
-  abrirConversaDoCliente, assumir, buscarConversaPorId, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
+  CONFIRMACAO_RECUSADA, abrirConversaDoCliente, assumir, buscarConversaPorId, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
   transferir,
 } from '../infra/api/conversasApi'
 import { conversaDaApi, mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
@@ -85,7 +85,8 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, confirmadaEm: proximoInstante(), situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) })
       return true
     })
-    .catch((erro) => { avisar(erro); return false })
+    // #3039: recusar a pergunta não é falha: sem aviso, a faixa fica limpa.
+    .catch((erro) => { if (erro?.codigo !== CONFIRMACAO_RECUSADA) avisar(erro); return false })
   // #2185 (F12, E09): o botão Assumir, o campo e todo envio humano assumem pelo mesmo caminho.
   const assumirDaConversa = criarAssumirAntesDeEnviar({
     despachar, estadoRef, agoraRef, assumirNaApi: (id) => confirmarResponsavel(id, assumir),
