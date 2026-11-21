@@ -286,10 +286,12 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
         Guid empresaId, int periodoDias = 30, Guid? lojaId = null, int pageSize = 50)
     {
         var de = DateTime.UtcNow.AddDays(-periodoDias);
+        // #2813: o entregue quitado pelo histórico não deve nada (marca, sem pagamento). O filtro vai no SQL, antes do
+        // Take(200): Pedido.QuitadoHistorico (calculada) não traduz e o importado não pode ocupar as vagas dos pendentes.
         var query = dbContext.Pedidos.AsNoTracking()
             .Include(p => p.Itens)
             .Include(p => p.Pagamentos)
-            .Where(p => p.EmpresaId == empresaId && p.CriadoEm >= de && p.Status != "cancelado");
+            .Where(p => p.EmpresaId == empresaId && p.CriadoEm >= de && p.Status != "cancelado" && p.QuitadoHistoricoEm == null);
         if (lojaId.HasValue)
             query = query.Where(p => p.LojaId == lojaId.Value);
 
@@ -313,8 +315,10 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
     public async Task<int> GetEntreguesSemVendaCountAsync(Guid empresaId, int periodoDias = 30, Guid? lojaId = null)
     {
         var de = DateTime.UtcNow.AddDays(-periodoDias);
+        // #2813: o entregue do histórico nunca tem venda, por desenho: não é um entregue sem venda.
         var query = dbContext.Pedidos.AsNoTracking()
-            .Where(p => p.EmpresaId == empresaId && p.Status == "entregue" && p.VendaId == null && p.CriadoEm >= de);
+            .Where(p => p.EmpresaId == empresaId && p.Status == "entregue" && p.VendaId == null
+                && p.QuitadoHistoricoEm == null && p.CriadoEm >= de);
         if (lojaId.HasValue)
             query = query.Where(p => p.LojaId == lojaId.Value);
         return await query.CountAsync();

@@ -62,6 +62,7 @@ public static class ApiServicesExtensions
         // SyncController decomposition: mutation dispatch, auto-link pipeline, reverse pull.
         services.AddScoped<SyncMutationDispatcher>();
         services.AddScoped<LegacySnapshotImportService>();
+        services.AddScoped<LegacyCashClosingsReadService>();
         services.AddScoped<SyncAutoLinker>();
         // #2209: número curto do lote do ERP no push e no pull do app.
         services.AddScoped<NumeroCurtoDosLotesMobile>();

@@ -9,6 +9,7 @@ import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { MODULOS, NOME_INICIO, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import { HASH_HALL, ROTA_PRINCIPAL, rotaDaHash } from '../../dominio/rota'
 import { AbaCaixaApi } from './caixa/AbaCaixaApi'
+import { AbaFechamentosLegados } from './caixa/AbaFechamentosLegados'
 import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
 import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
@@ -296,6 +297,8 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     producao: AbaProducao && <AbaProducao />,
     // #1443: no modo API o caixa é o do EasyStok; a demonstração segue com a massa local.
     caixa: fonteApi ? <AbaCaixaApi /> : AbaCaixa && <AbaCaixa />,
+    // #2813: fechamentos do aparelho antigo, só leitura (só modo API).
+    'fechamentos-legados': <AbaFechamentosLegados />,
     janelas: fonteApi && janelasApi ? janelasApi : AbaJanelas && <AbaJanelas />,
     fidelidade: AbaFidelidade && <AbaFidelidade />,
     integracoes: fonteApi ? <AbaIntegracoesApi /> : AbaIntegracoes && <AbaIntegracoes />,

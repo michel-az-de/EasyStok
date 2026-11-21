@@ -66,7 +66,7 @@ public class GerarContaReceberDePedidoUseCase(
         // Pedido pago no site não vira conta aberta e depois "vencida". Sem o serviço (teste antigo), só os pagamentos.
         var valor = saldos is not null
             ? await saldos.AReceberAsync(pedido, ct)
-            : Math.Max(0m, pedido.Total.Valor - pedido.TotalPago);
+            : pedido.AReceberPelosPagamentos; // #2813: o quitado do histórico dá zero também sem o serviço
         if (valor <= 0m)
         {
             logger.LogDebug("Pedido {PedidoId} sem saldo a receber — sem CR.", pedido.Id);

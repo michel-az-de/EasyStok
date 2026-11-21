@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20261121211115_ReacaoEApagarMensagemAtendimento")]
-    partial class ReacaoEApagarMensagemAtendimento
+    [Migration("20261121211557_MarcasDoHistoricoImportado")]
+    partial class MarcasDoHistoricoImportado
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1375,12 +1375,6 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<DateTime?>("AguardaClienteDesde")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("ApagadaEm")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ApagadaPorUsuarioId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Assunto")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
@@ -1451,10 +1445,6 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.Property<DateTime?>("ProximoReenvioEm")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Reacao")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("ReservaSmsEm")
                         .HasColumnType("timestamp with time zone");
@@ -5910,6 +5900,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("metodo");
 
+                    b.Property<DateTime?>("NaoPromoverEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nao_promover_em");
+
                     b.Property<DateTime>("ServerUpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -8388,6 +8382,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("Origem")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("QuitadoHistoricoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("quitado_historico_em");
 
                     b.Property<DateTime?>("RecusadoEm")
                         .HasColumnType("timestamp with time zone")

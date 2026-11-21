@@ -23,7 +23,7 @@
 /// <param name="MotivoCancelamento">Mensagem ao cliente quando status == Cancelado/Recusado. Null caso contrário.</param>
 /// <param name="Pagamento">Pagamento confirmado (método + timestamp). Null se ainda sem pagamento.</param>
 /// <param name="Historico">Mapa stepKey → timestamp (pagamento/aprovacao/preparo/finalizando/entrega/entregue) derivado dos PedidoEvento; finalizando é o pronto e entrega é o saiu_para_entrega (#1927). Null se sem eventos relevantes.</param>
-/// <param name="PagoCentavos">Soma dos pagamentos do pedido (#1865): com o sinal da encomenda, o restante é <c>TotalCentavos - PagoCentavos</c>.</param>
+/// <param name="PagoCentavos">Soma dos pagamentos do pedido (#1865): com o sinal da encomenda, o restante é <c>TotalCentavos - PagoCentavos</c>. No entregue quitado do histórico (#2813) não há pagamento e vale o total.</param>
 public sealed record PedidoStorefrontDto(
     Guid PedidoId,
     DateTime CriadoEm,

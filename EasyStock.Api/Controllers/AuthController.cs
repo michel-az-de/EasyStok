@@ -437,6 +437,8 @@ public class AuthController(
                 editarAtendimento = usuario.Nivel is NivelAcesso.SuperAdmin or NivelAcesso.Admin
                     && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 controlarLoja = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
+                // #2813: GET api/mobile/legacy-import/fechamentos é da policy Gerente, exige empresa e não depende de módulo.
+                verFechamentosLegados = usuario.EmpresaId != Guid.Empty && gerente,
                 cancelarPedidoPago = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 devolverPagamentoManual = gerente && modulos.Any(m => m.id == "atendimento" && m.liberado),
                 // #2478: a tela Pedidos de Cadastros lê `GET api/pedidos` (policy Operador, módulo Atendimento, empresa).

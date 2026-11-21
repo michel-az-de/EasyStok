@@ -52,7 +52,12 @@ public class LegacySnapshotImportE2ETests(MobileE2EFixture fixture)
             (await db.Set<Venda>().CountAsync()).Should().Be(0);
             (await db.Set<CobrancaPedido>().CountAsync()).Should().Be(0);
             (await db.Set<OutboxMensagemNotificacao>().CountAsync()).Should().Be(0);
-            (await db.Set<MovimentoCaixa>().SingleAsync()).Valor.Should().Be(4.5m);
+            // #2813 (opção B): o lançamento manual do histórico fica só como arquivo, com a marca e a data original; o caixa do ERP não recebe nada.
+            (await db.Set<MovimentoCaixa>().CountAsync()).Should().Be(0);
+            var arquivo = await db.Set<CashEntry>().IgnoreQueryFilters().SingleAsync(c => c.EmpresaId == s.Device.EmpresaId);
+            arquivo.Amount.Should().Be(4.5m);
+            arquivo.ErpMovimentoCaixaId.Should().BeNull();
+            arquivo.NaoPromoverEm.Should().Be(arquivo.CreatedAt);
             return 0;
         });
         var inspection = await fixture.SeedMobileDeviceAsync(s.Device.EmpresaId, s.Device.LojaId);
@@ -79,7 +84,7 @@ public class LegacySnapshotImportE2ETests(MobileE2EFixture fixture)
             (await db.Set<Product>().SingleAsync(p => p.Id == s.ProductId)).Stock.Should().Be(7);
             (await db.Set<ItemEstoque>().CountAsync()).Should().Be(1);
             (await db.Set<Batch>().CountAsync(x => x.EmpresaId == s.Device.EmpresaId)).Should().Be(1);
-            (await db.Set<MovimentoCaixa>().CountAsync()).Should().Be(1);
+            (await db.Set<MovimentoCaixa>().CountAsync()).Should().Be(0);
             return 0;
         });
         // Rotacao de backups comuns nunca apaga o original da primeira carga.
