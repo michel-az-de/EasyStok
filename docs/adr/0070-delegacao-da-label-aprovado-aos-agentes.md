@@ -28,7 +28,9 @@ abertos sem regra escrita. À pergunta "Ajusto a ADR-0070 para aceitar item de p
 hora da label?", o Felipe respondeu "Sim, ajuste". O item 6 da Decisão registra o ajuste. A
 pergunta dizia "pós-deploy"; a regra cobre também o CI do master no commit mergeado, que tem a
 mesma natureza e antecede o deploy (precedente: PR #3070, issue #3063). Essa leitura é da sessão
-gestora, não frase do Felipe; ele pode restringir a regra ao pós-deploy.
+gestora, não frase do Felipe; ele pode restringir a regra ao pós-deploy. Também é leitura da sessão
+estender o mecanismo ao merge de tier baixo (a pergunta falava só da hora da label); ele pode
+restringi-lo ao tier alto.
 
 ## Decisão
 
@@ -51,11 +53,13 @@ gestora, não frase do Felipe; ele pode restringir a regra ao pós-deploy.
    `pg_dump` e deixa a migration rodar no startup da API. Isso está dentro da delegação. O
    `dotnet ef database update` manual continua exigindo GO.
 6. **Aceite de pós-merge (ajuste de 21/11/2026, issue #3077).** Fica aberto na hora da label (ou do
-   merge, no tier baixo) o item de aceite que, por natureza, só se mede depois do merge: CI do
-   master no commit mergeado, deploy e validação em produção. O que dá para medir na PR (teste,
+   merge, no tier baixo) o item de aceite que, por natureza, só se mede depois do merge, e somente
+   estes: CI do master no commit mergeado, deploy e validação em produção.
+   O que dá para medir na PR (teste,
    build, revisão, prova local) não é pós-merge e continua barrando a label. Validação em produção
    não dispensa a prova na PR: o mesmo comportamento precisa estar provado por teste ou prova local
-   antes da label. Salvaguardas: a prova da label lista cada item aberto e por que só se mede
+   antes da label; comportamento que só existe em produção e não tem prova na PR fica sem label.
+   Salvaguardas: a prova da label lista cada item aberto e por que só se mede
    depois; a PR usa `refs #N`, não `closes #N`, para o merge não fechar a issue; no merge, a sessão
    comenta na issue os itens pendentes; ela mede cada item, marca com a prova e fecha a issue antes
    de se declarar concluída. Se ela cair antes de medir, qualquer sessão retoma pela issue aberta.
