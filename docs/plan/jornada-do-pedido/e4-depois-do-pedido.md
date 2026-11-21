@@ -29,7 +29,7 @@ A onda 1 corrigiu os bugs. Ficaram três lacunas que pedem comportamento novo, e
 
 1. L1: o detalhe do pedido ganha cabeçalho com entrega (janela, endereço ou retirada) e pagamento (forma, pago ou saldo), e o botão "Registrar pagamento" para pedido com saldo, reaproveitando o caso de pagamento que a conversa já usa (`aplicacao/pagamento.js`). Sem regra nova de valor.
 2. L2: coluna "Entrega" na lista (dia e janela), ordenável, e filtro "Entrega hoje". Pede o campo na resposta da listagem, se ainda não vier.
-3. L3: o card "A receber" soma pedidos com saldo dentro do período, com o detalhe "N contas, M pedidos". Decisão do Felipe: somar no mesmo número (A) ou mostrar em linha própria (B, recomendada: não mistura conta lançada com pedido).
+3. L3: o número do card "A receber" segue só com as contas; embaixo entra a linha "Pedidos a receber: R$ X (M pedidos)" com os pedidos com saldo dentro do período. **Decidido pelo Felipe em 2026-11-21, 18:27**, na sessão gestora, literal: "Linha própria" (opção B; a A somava pedidos e contas no mesmo número).
 
 ## 3. Fora
 
@@ -42,7 +42,7 @@ A onda 1 corrigiu os bugs. Ficaram três lacunas que pedem comportamento novo, e
 
 - [ ] T3 em Pedidos: abrir o pedido, registrar o pagamento e ver saldo zero, em no máximo 4 cliques.
 - [ ] Lista de Pedidos com a data da entrega visível em 1440 e 390 px.
-- [ ] "A receber" com os pedidos pendentes conforme a decisão L3.
+- [ ] "A receber" com a linha própria "Pedidos a receber" e o número do card só com as contas (decisão L3).
 - [ ] Prova Red→Green por lacuna e roteiro de navegador com as 4 tarefas, antes e depois.
 - [ ] `npm run qualidade` verde; CI verde; `/code-review` sem Critical.
 
