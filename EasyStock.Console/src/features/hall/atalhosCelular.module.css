@@ -19,7 +19,7 @@
 
 @media (max-width: 640px) {
   .faixa { display: grid; margin-bottom: var(--e-3); }
-  /* A faixa rola por dentro, na horizontal; a página não ganha rolagem lateral. */
-  .lista { overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: var(--e-1); }
+  /* A faixa rola por dentro, na horizontal; a página não ganha rolagem lateral. O respiro (8 px) cobre o anel de foco (3 + 2 px), que o overflow cortaria. */
+  .lista { overflow-x: auto; scroll-snap-type: x proximity; padding: var(--e-2); }
   .item { scroll-snap-align: start; }
 }
