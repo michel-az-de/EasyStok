@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro, useRelacionamentoCliente } from '../../../aplicacao/cadastros'
+import { enderecoDeEntregaDoCadastro, erroDoEnderecoDoCadastro } from '../../../dominio/fichaCliente'
+import { adicionarEnderecoCliente, alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro, useRelacionamentoCliente } from '../../../aplicacao/cadastros'
 import { useSugestaoCadastro } from '../../../aplicacao/useSugestaoCadastro'
 import { useGravacaoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
@@ -132,12 +133,21 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     evento.preventDefault()
     if (salvando || !podeEditar || editor.semConfirmacao || editor.conflito) return
     const faltas = errosDoFormularioCadastro(tela, dados)
+    const recusaDoEndereco = tela === 'clientes' ? erroDoEnderecoDoCadastro(dados, inicial) : null
+    if (recusaDoEndereco) faltas.endereco = recusaDoEndereco
     if (Object.keys(faltas).length) { definirErros(faltas); focarPrimeiroErro(); return }
     const concluir = iniciar(); if (!concluir) return
     falhar(null)
     try {
       const atual = await salvarCadastro(tela, dados, contexto)
-      if (montado.current) aoSalvo({ anterior: inicial, atual })
+      // #3076 (#2776): o pedido entrega no endereço estruturado; o cadastro já salvo não volta atrás se só este falhar.
+      const entrega = tela === 'clientes' && atual?.id ? enderecoDeEntregaDoCadastro(dados, { empresaId: contexto.empresaId, inicial }) : null
+      let aviso
+      if (entrega) {
+        try { await adicionarEnderecoCliente(atual.id, entrega, contexto) }
+        catch (e) { aviso = `Cadastro salvo, mas o endereço de entrega não foi gravado: ${e.message} Adicione em Endereços, na ficha.` }
+      }
+      if (montado.current) aoSalvo({ anterior: inicial, atual, aviso })
     } catch (e) {
       if (!montado.current) return
       const semConfirmacao = bloqueiaRepeticaoDoCadastro(tela, dados, e)
@@ -210,7 +220,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
             {aoAbrirCadastro && <Botao onClick={() => pedirAbrirOutro(duplicado.cliente)}>Abrir cadastro de {duplicado.cliente.nome?.trim() || 'cliente sem nome'}</Botao>}
           </div>}
           {dados.tipoPessoa === 'juridica' && <>{campo('nomeFantasia', 'Nome fantasia')}{campo('inscricaoEstadual', 'Inscrição estadual')}</>}
-          {campo('endereco', 'Endereço')}{campo('apt', 'Complemento')}
+          {campo('endereco', 'Endereço', tela === 'clientes' ? { placeholder: 'Rua, número, bairro, CEP' } : {})}{campo('apt', 'Complemento')}
           {area('observacoes', 'Observações')}
         </>}
         {tela === 'fornecedores' && <>

@@ -45,7 +45,9 @@ await caso('1c. [regex] o aviso do cadastro aparece dentro da janela (AvisoDaAca
   const jsx = fonte('app/NovoPedidoJanela.jsx')
   assert.match(jsx, /import \{[^}]*AvisoDaAcaoApi[^}]*\} from '\.\/FaixaApi'/, 'AvisoDaAcaoApi não é importado')
   assert.match(jsx, /const rodape = <>\s*<AvisoDaAcaoApi \/>/, 'o rodapé da janela não renderiza <AvisoDaAcaoApi />')
-  assert.match(jsx, /enderecoVigente\(enderecoCadastrado, enderecoTexto\)/, 'a linha "Endereço cadastrado" não passa por enderecoVigente')
+  // #3076: a linha vale também para o endereço Padrão lido do dossiê; continua só quando o texto é o do cadastro.
+  assert.match(jsx, /const enderecoDoPedido = enderecoVigente\(enderecoCadastrado \?\? conversa\.cliente\?\.endereco \?\? null, enderecoTexto\)/, 'o endereço do pedido não passa por enderecoVigente')
+  assert.match(jsx, /\{enderecoValido && <p [^>]*>Entrega no endereço do cadastro: \{enderecoDoPedido\}<\/p>\}/, 'a linha do endereço do cadastro não sai de enderecoDoPedido')
 })
 
 // --- 2. Comanda de fora x montagem da própria janela ---------------------------

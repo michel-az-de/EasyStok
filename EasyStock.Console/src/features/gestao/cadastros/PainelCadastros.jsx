@@ -7,6 +7,7 @@ import { useConviteDeRecompra } from '../../../aplicacao/conviteDeRecompra'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { contextoCadastro, obterCadastro, salvarCadastro, useContextoVisualCadastro, useListaCadastros } from '../../../aplicacao/cadastros'
 import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
+import { useAviso } from '../../../componentes/Aviso'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { BuscaComSugestoes } from '../../../componentes/BuscaComSugestoes'
@@ -84,7 +85,10 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   // #2930: cliente sem telefone pede o celular antes de abrir o pedido, em vez de parar no erro do topo.
   const [celularDe, pedirCelular] = useState(null)
   const consulta = useListaCadastros(tela, { busca, pagina, filtro: emRecompra ? '' : filtro, ordem: emRecompra ? 'sem-comprar' : ordem, relacionamento: emRecompra ? 'recompra' : tela === 'clientes' && ['lead', 'cliente'].includes(tipo) ? tipo : '' }, contexto, !soLeads)
-  const [aviso, avisar] = useState(null)
+  // #3076: o sucesso vai ao Aviso, que some sozinho; só o que pede ação (endereço não gravado) fica na tela.
+  const avisoDaTela = useAviso()
+  const avisar = (texto) => avisoDaTela.mostrar({ texto, tom: 'sucesso' })
+  const [pendencia, anotarPendencia] = useState(null)
   const recompra = useConviteDeRecompra({ aoMudar: () => consulta.recarregar() })
   const [reversao, prepararReversao] = useState(null)
   const [desfazendo, iniciarDesfazer] = useGravacaoDoAjuste(`cadastros:bancos:${reversao?.id}`)
@@ -134,10 +138,10 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
     if (conversa && conversa.clienteId === clienteId) alvos.add(conversa.id)
     alvos.forEach(id => relerClienteDaConversa?.(id))
   }
-  const salvo = ({ anterior, atual } = {}) => {
+  const salvo = ({ anterior, atual, aviso } = {}) => {
     prepararReversao(tela === 'bancos' && anterior?.id && atual?.id === anterior.id && Number.isInteger(atual.revisao)
       ? { ...anterior, revisao: atual.revisao, requestId: crypto.randomUUID() } : null)
-    definir({ editor: null }); aoFixarContexto(false); avisar(editor?.origemConversa ? 'Cadastro salvo. Volte à conversa e confira o vínculo com a pessoa.' : 'Cadastro salvo.'); consulta.recarregar()
+    definir({ editor: null }); aoFixarContexto(false); anotarPendencia(aviso ?? null); if (!aviso) avisar((editor?.origemConversa ? 'Cadastro salvo. Volte à conversa e confira o vínculo com a pessoa.' : 'Cadastro salvo.')); consulta.recarregar()
     relerConversasDoCliente(editor?.dados.id)
   }
   // #2495 (S2): inativar ou reativar fecha o editor, avisa e relê a lista (e as conversas desse cliente).
@@ -187,7 +191,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
       {tela === 'clientes' && conversa.clienteId && <Botao disabled={Boolean(abrindo)} onClick={() => editar({ id: conversa.clienteId })}>Conferir cadastro</Botao>}
       {tela === 'clientes' && !conversa.clienteId && podeEditar && <Botao onClick={novo}>Preencher novo cadastro</Botao>}
     </div>}
-    {aviso && <p className={css.sucesso} role="status">{aviso}</p>}
+    {pendencia && <div className={css.erro} role="alert"><p>{pendencia}</p><Botao onClick={() => anotarPendencia(null)}>Entendi</Botao></div>}
     {emRecompra && recompra.convite && <div className={css.contexto} role="status"><span>Convite aberto para <strong>{recompra.convite.nome}</strong>. Sai da lista por 30 dias.</span><Botao variante="texto" onClick={recompra.desfazer} aria-label={`Desfazer o convite de ${recompra.convite.nome}`}>Desfazer</Botao></div>}
     {emRecompra && recompra.erro && <div className={css.erro} role="alert"><p>{recompra.erro}</p></div>}
     {reversao && podeEditar && <div className={css.contexto}><span>Desfazer restaura somente a edição da conta <strong>{reversao.nome}</strong> e registra uma nova alteração.</span><Botao disabled={desfazendo} onClick={desfazer}>{desfazendo ? 'Desfazendo…' : 'Desfazer edição desta conta'}</Botao></div>}
