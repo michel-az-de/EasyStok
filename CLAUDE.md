@@ -1,5 +1,7 @@
 # CLAUDE.md — EasyStok (Claude Code)
 
+**Plano vivo (D15):** atividade que edita arquivo, roda comando com efeito ou delega a agente começa com um plano em `~/.claude/planos/<sessão>.md`, que passa por banca, é relido a cada ação e vira o handoff. Regra completa na seção D15 de `ATLAS_AGENT_DISCIPLINE_V1`, projetada em `~/.claude/CLAUDE.md` e `~/.codex/AGENTS.md`.
+
 Protocolo PR-first (ADR-0043, tiers na ADR-0055). Regras comuns a todo agente: @AGENTS.md. Aqui só o que é específico do Claude Code. Pedido explícito da sessão e segurança prevalecem.
 
 ## Repo
