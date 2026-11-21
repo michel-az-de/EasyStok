@@ -30,7 +30,7 @@ rclone --config "$d\ezdrive.conf" config
 ```
 
 No assistente: `n` (novo remote), nome `ezdrive`, tipo `drive`, cole o ID e o segredo do passo 0,
-escopo `drive.file` (opção 2), ID do Drive compartilhado `0AOtKvTkSaRWCUk9PVA` em `team_drive`, e
+escopo: digite `drive.file` por extenso (não use número: no rclone 1.75.1 a opção 2 é `drive.readonly`), ID do Drive compartilhado `0AOtKvTkSaRWCUk9PVA` em `team_drive`, e
 `Use auto config` = sim. O navegador abre; entre com a conta do Drive. Não há chave JSON.
 
 ## 2. VPS: copie só o arquivo novo
