@@ -23,7 +23,8 @@ if [ "$SEM_TIMER" = 1 ]; then echo "==> timer nao ligado (--sem-timer)"; exit 0;
 echo "==> timer"
 systemctl --user daemon-reload
 systemctl --user enable --now easystok-espelho.timer
+systemctl --user restart easystok-espelho.timer   # numa reinstalacao, o enable --now nao recarrega o timer ativo (#3007)
 systemctl --user list-timers easystok-espelho.timer --no-pager
 if [ "$(loginctl show-user "$USER" -p Linger --value 2>/dev/null)" != yes ]; then
-  echo "AVISO: linger desligado; o timer so roda com sessao aberta. Rode: sudo loginctl enable-linger $USER"
+  echo "AVISO: linger desligado; o timer so roda com sessao aberta. Rode (sem sudo): loginctl enable-linger"
 fi
