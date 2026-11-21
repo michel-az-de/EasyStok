@@ -15,9 +15,14 @@ public sealed class RegistroChamadaIaLlmClient(
     IAgenteLlmClient interno,
     IRegistroChamadaIa registro,
     TimeProvider relogio,
-    ILogger<RegistroChamadaIaLlmClient> logger) : IAgenteLlmClient
+    ILogger<RegistroChamadaIaLlmClient> logger,
+    TimeSpan? prazoRegistro = null) : IAgenteLlmClient
 {
-    private static readonly TimeSpan PrazoRegistro = TimeSpan.FromSeconds(3);
+    /// <summary>
+    /// #3083: acima do pior caso frio (modelo do EF, conexão, SET do tenant), que passou de 3 s no CI e perdia a linha;
+    /// abaixo do CommandTimeout de 30 s do Npgsql.
+    /// </summary>
+    public static readonly TimeSpan PrazoRegistroPadrao = TimeSpan.FromSeconds(20);
 
     public bool Disponivel => interno.Disponivel;
 
@@ -68,7 +73,7 @@ public sealed class RegistroChamadaIaLlmClient(
                 resposta?.TokensCacheEscrito ?? 0, null, (int)Math.Min(duracaoMs, int.MaxValue), desfecho,
                 relogio.GetUtcNow().UtcDateTime);
             // Sem o token de quem chamou (a resposta já veio), mas com prazo próprio: banco lento não segura a IA.
-            using var prazo = new CancellationTokenSource(PrazoRegistro);
+            using var prazo = new CancellationTokenSource(prazoRegistro ?? PrazoRegistroPadrao);
             await registro.RegistrarAsync(chamada, prazo.Token);
         }
         catch (Exception ex)

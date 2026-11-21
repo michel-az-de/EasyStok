@@ -129,11 +129,27 @@ public class RegistroChamadaIaLlmClientTests
         _registro.RegistrarAsync(Arg.Any<ChamadaIa>(), Arg.Any<CancellationToken>())
             .Returns(c => Task.Delay(Timeout.Infinite, c.Arg<CancellationToken>()));
 
-        var tarefa = Cliente().EnviarAsync(Requisicao());
+        var tarefa = new RegistroChamadaIaLlmClient(_interno, _registro, TimeProvider.System,
+            NullLogger<RegistroChamadaIaLlmClient>.Instance, TimeSpan.FromSeconds(1)).EnviarAsync(Requisicao());
         var venceu = await Task.WhenAny(tarefa, Task.Delay(TimeSpan.FromSeconds(10)));
 
         venceu.Should().BeSameAs(tarefa, "o registro tem prazo próprio e não prende a resposta da IA");
         (await tarefa).Should().BeSameAs(resposta);
+    }
+
+    [Fact]
+    public async Task PrimeiraGravacaoLentaAcimaDeTresSegundosNaoPerdeALinha()
+    {
+        // #3083: provedor frio (modelo do EF, conexão, SET do tenant) passou de 3 s no CI e a linha sumiu.
+        var concluidas = 0;
+        var resposta = new RespostaLlm("end_turn", [], 1, 1);
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(resposta);
+        _registro.RegistrarAsync(Arg.Any<ChamadaIa>(), Arg.Any<CancellationToken>())
+            .Returns(async c => { await Task.Delay(TimeSpan.FromSeconds(3.5), c.Arg<CancellationToken>()); concluidas++; });
+
+        await Cliente().EnviarAsync(Requisicao());
+
+        concluidas.Should().Be(1, "a gravação lenta terminou dentro do prazo e a linha existe");
     }
 
     [Fact]
