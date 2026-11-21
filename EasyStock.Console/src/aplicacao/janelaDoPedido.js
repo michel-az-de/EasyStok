@@ -156,11 +156,13 @@ export const rotuloDoNovoPedido = (sessao, clienteId) => (temRascunhoDoPedido(se
 
 // #2944 (E1-01): por que Continuar/Registrar está parado. `null` quando nada bloqueia (mesma regra de `podeAvancarDaEntrega`).
 // #2978: o Revisar repete as regras da Entrega e ainda exige endereço válido (`enderecoValido`), para não registrar às cegas.
-export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null, simulacao = null, enderecoValido = true }) {
+export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null, simulacao = null, enderecoValido = true, calculando = false }) {
   if (itens.length === 0) return 'Some ao menos um item'
   if (passo === 'itens') return null
   if (!pedido?.janela) return 'Escolha a janela de entrega'
   if (!pedido?.meio) return 'Escolha a forma de pagamento'
+  // #3076: com o frete ainda calculando, o total não fecha; Continuar e Registrar esperam a resposta.
+  if (calculando) return 'Calculando o frete…'
   if (entrega !== 'retirada' && passo === 'revisar' && !enderecoValido) return 'Cadastre o endereço de entrega: o pedido usa o do cadastro, não o digitado'
   if (entrega !== 'retirada' && faltaEndereco(erroSimulacao)) return 'Falta o endereço de entrega'
   if (faltaFreteCombinado(simulacao, pedido)) return 'Informe o frete combinado'

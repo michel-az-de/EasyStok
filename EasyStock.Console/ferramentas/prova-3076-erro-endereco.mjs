@@ -18,3 +18,14 @@ assert.equal(erroDaSimulacaoNaEntrega(semEndereco, null), semEndereco, 'sem recu
 const esgotada = { status: 409, message: 'Janela esgotada.' }
 assert.equal(erroDaSimulacaoNaEntrega(esgotada, 'Não salvei…'), esgotada, 'outro erro da simulação continua')
 console.log('ok prova-3076-erro-endereco')
+
+// Re-pontuação da #3076: "Registrar pedido" ficava ativo com o frete ainda "Calculando…" e o total sem frete.
+{
+  const { motivoDeBloqueio } = await import('../src/aplicacao/janelaDoPedido.js')
+  const base = { itens: [{ sku: 'a', qtd: 1 }], pedido: { janela: 'j1', meio: 'link' }, enderecoValido: true }
+  if (motivoDeBloqueio({ ...base, passo: 'revisar', calculando: true }) == null) throw new Error('Registrar não espera o frete calculado')
+  if (motivoDeBloqueio({ ...base, passo: 'entrega', calculando: true }) == null) throw new Error('Continuar não espera o frete calculado')
+  if (motivoDeBloqueio({ ...base, passo: 'revisar', calculando: false }) != null) throw new Error('com o frete calculado, libera')
+  const jsx = (await import('node:fs')).readFileSync(new URL('../src/app/NovoPedidoJanela.jsx', import.meta.url), 'utf8')
+  if (!/motivoDeBloqueio\(\{[^}]*calculando[^}]*\}\)/.test(jsx)) throw new Error('a janela não passa `calculando` ao motivo')
+}

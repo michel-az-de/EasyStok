@@ -177,7 +177,7 @@ function Montagem({ janela, conversa }) {
 
   // #2944 (E1-01): o motivo do bloqueio fica visível ao lado do botão. O texto "Pode continuar" nunca aparece (só com o
   // botão desabilitado); ele mantém o invólucro do Botao estável para o foco não se perder ao habilitar.
-  const motivoAvancar = motivoDeBloqueio({ passo, itens, pedido, entrega, erroSimulacao, simulacao, enderecoValido })
+  const motivoAvancar = motivoDeBloqueio({ passo, itens, pedido, entrega, erroSimulacao, simulacao, enderecoValido, calculando })
   const motivoRegistrando = 'Registrando o pedido'
   const rodape = <>
     <AvisoDaAcaoApi />
