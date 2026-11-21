@@ -1,6 +1,7 @@
 // #3009: três defeitos de UX do Balcão, medidos no Chromium em modo demonstração (1440x900 e 390x844, 2 temas).
 //   a  a prévia das respostas prontas aparece (antes: ~3,7 px, só o título), a lista rola e o teclado segue o item ativo;
 //   b  o selo de dinheiro ("Falta R$ 68,00") cabe inteiro na fileira visível da `.contextoLinha` (#1761, L16);
+//   d  o motivo do cartão continua visível (etiqueta na fileira ou ícone no topo) quando o selo de dinheiro passa à frente;
 //   c  o placeholder dos campos crus tem contraste >= 4,5:1 em repouso e com foco, nos dois temas.
 // PLAYWRIGHT_MODULE aponta para o runtime externo; sem ele usa o `playwright` do node_modules.
 // O Vite do runner está no modo API; esta prova sobe o seu, em demonstração (como a prova-1653).
@@ -110,6 +111,25 @@ for (const [nome, tela] of TELAS) {
     })
     await contexto.close()
   }
+}
+
+// --- d. o motivo não some quando o selo de dinheiro passa à frente (#2258 T7) ----------------------------------------
+for (const [nome, tela] of TELAS) {
+  const { contexto, pagina } = await abrir(tela, 'light')
+  const cartoes = await pagina.evaluate(() => [...document.querySelectorAll('[class*=contextoLinha]')].map((linha) => {
+    const caixa = linha.getBoundingClientRect()
+    const pilulas = [...linha.children].map((p) => ({ texto: p.textContent.trim(), r: p.getBoundingClientRect() }))
+    const etiquetaVisivel = (re) => pilulas.some((p) => re.test(p.texto) && p.r.bottom <= caixa.bottom + 0.5 && p.r.right <= caixa.right + 0.5)
+    const icone = Boolean(linha.closest('button')?.querySelector('[class*=sinalAtencao]'))
+    return { titulo: linha.title, dinheiro: pilulas.some((p) => /R\$/.test(p.texto)), etiquetaVisivel: etiquetaVisivel(/Diz que pagou|Cobrança venceu|Reclamação|atrasado/i), icone }
+  }))
+  confere(`d ${nome}: todo cartão com motivo e selo de dinheiro mostra a etiqueta na fileira ou o ícone no topo`, () => {
+    const comMotivo = cartoes.filter((c) => c.dinheiro && /Diz que pagou|Cobrança venceu|Reclamação|atrasado/i.test(c.titulo))
+    assert.ok(comMotivo.length >= 1, 'a demonstração não tem cartão com motivo e selo de dinheiro')
+    const sumidos = comMotivo.filter((c) => !c.etiquetaVisivel && !c.icone).map((c) => c.titulo)
+    assert.deepEqual(sumidos, [], `motivo sem sinal visível: ${sumidos.join(' | ')}`)
+  })
+  await contexto.close()
 }
 
 // --- c. contraste do placeholder -----------------------------------------------------------------------------------

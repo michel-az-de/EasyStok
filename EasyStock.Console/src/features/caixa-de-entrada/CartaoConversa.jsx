@@ -82,6 +82,7 @@ export const CartaoConversa = memo(function CartaoConversa({
   // Com você também saem da etiqueta (quem conduz está na BarraModo).
   const nome = nomeDoCartao(conversa)
   const etiqueta = mostraEtiquetaDoEstado(estado)
+  const seloAFrente = contexto.some(ehSeloDeDinheiro)
   // #2232 (L8): "21:48", "ontem", "26 out"; o alerta de cor fica só para o prazo estourado.
   const hora = horaDaLista(conversa.ultimaEm, agora)
 
@@ -118,7 +119,8 @@ export const CartaoConversa = memo(function CartaoConversa({
               <Icone nome="relogio" tamanho={16} />
             </span>
           )}
-          {!slaEstourado && motivo && !etiqueta && (
+          {/* #3009: com o selo de dinheiro à frente a etiqueta pode sair da fileira visível; o ícone leva o motivo. */}
+          {(seloAFrente ? (motivo || etiqueta) : (!slaEstourado && motivo && !etiqueta)) && (
             <span className={`${css.sinalPrazo} ${css.sinalAtencao}`} title={estado.texto} role="img" aria-label={estado.texto}>
               <Icone nome={estado.icone ?? 'hand'} tamanho={16} />
             </span>
