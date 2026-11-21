@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { useEscape } from '../hooks/useEscape'
 import { Avatar } from './Avatar'
 import { Botao } from './Botao'
+import { InterruptorTema } from './InterruptorTema'
 import css from './MenuDaConta.module.css'
 
 // Onde a camada abre, em coordenadas da janela. `fixed` porque o trilho rola (overflow) e
@@ -23,9 +24,9 @@ function posicaoDaCamada(gatilho, lado) {
 // #1870: o "Sair" mora num lugar só, atrás do avatar de quem está logado: no pé do trilho do
 // Balcão e dos módulos, e no canto do hall, que não tem trilho. Quem é e em qual casa saem
 // do rodapé fixo e vêm para cá. `lado` diz para onde a camada abre: à direita do trilho ou
-// abaixo do canto do hall. `children` entra antes do Sair (o tema, no trilho do Balcão). Sem
-// `aoSair` (modo demonstração) a camada mostra só o nome e o que vier em `children`.
-export function MenuDaConta({ nome: nomeDaSessao, detalhe, aoSair, rotuloSair = 'Sair', tituloSair, lado = 'direita', children }) {
+// abaixo do canto do hall. #3004: o Tema e a Ajuda moram aqui, em toda rota, e saíram do pé do Início e
+// dos botões soltos; `children` entra antes da Ajuda. Sem `aoSair` (demonstração) não há Sair.
+export function MenuDaConta({ nome: nomeDaSessao, detalhe, aoSair, aoAbrirAjuda, rotuloSair = 'Sair', tituloSair, lado = 'direita', children }) {
   const [aberto, setAberto] = useState(false)
   const [posicao, setPosicao] = useState(null)
   const caixaRef = useRef(null)
@@ -62,9 +63,8 @@ export function MenuDaConta({ nome: nomeDaSessao, detalhe, aoSair, rotuloSair = 
     document.addEventListener('pointerdown', aoTocarFora)
     return () => document.removeEventListener('pointerdown', aoTocarFora)
   }, [aberto])
-  // Sessão sem nome ainda precisa sair: o avatar vira "Sua conta" (no desktop não há outro Sair).
-  const nome = nomeDaSessao || (aoSair ? 'Sua conta' : null)
-  if (!nome) return null
+  // #3004: a conta existe em toda rota, com ou sem sessão nomeada (demonstração): Tema e Ajuda moram aqui.
+  const nome = nomeDaSessao || 'Sua conta'
   return (
     <div ref={caixaRef} className={`${css.conta} ${css[lado]}`}>
       <button ref={botaoRef} type="button" className={css.gatilho} aria-expanded={aberto} aria-controls={id}
@@ -79,7 +79,9 @@ export function MenuDaConta({ nome: nomeDaSessao, detalhe, aoSair, rotuloSair = 
             <strong>{nome}</strong>
             {detalhe && <small>{detalhe}</small>}
           </p>
+          <InterruptorTema />
           {children}
+          {aoAbrirAjuda && <Botao variante="texto" icone="ajuda" aria-haspopup="dialog" className={css.ajuda} onClick={() => { fechar(); aoAbrirAjuda() }}>Ajuda</Botao>}
           {aoSair && <Botao icone="log-out" className={css.sair} title={tituloSair} onClick={aoSair}>{rotuloSair}</Botao>}
         </div>
       )}

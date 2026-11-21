@@ -1,0 +1,18 @@
+/* Trilho único do Console (#3004). A medida e o desenho do item vêm de `componentes/Trilho.module.css`;
+   aqui ficam a rolagem dos itens, a conta fixa no pé e os itens que só abrem no Balcão. */
+.trilho {
+  composes: trilho from '../../componentes/Trilho.module.css';
+  position: relative; z-index: 20; min-height: 0; overflow: hidden;
+  padding: calc(var(--e-3) + env(safe-area-inset-top, 0px)) 0 var(--e-3);
+}
+.itens {
+  flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--e-1);
+  overflow-x: hidden; overflow-y: auto;
+}
+.inicio { composes: inicio from '../../componentes/Trilho.module.css'; margin-bottom: var(--e-2); }
+.item { composes: item from '../../componentes/Trilho.module.css'; cursor: pointer; }
+.atual { composes: ativo from '../../componentes/Trilho.module.css'; }
+.atual:is(span) { cursor: default; }
+.conta { composes: avatar from '../../componentes/Trilho.module.css'; flex: none; }
+/* No menu do celular a lista cabe em 60% da altura e rola dentro dele; a conta continua no pé. */
+.emModal { max-height: 60dvh; }

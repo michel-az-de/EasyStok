@@ -14,6 +14,7 @@ registerHooks({ resolve(spec, contexto, proximo) {
 const { MODULOS, hashDoModulo, telasDoMenu } = await import('../src/dominio/modulos.js')
 const { telaCongelada, moduloCongelado } = await import('../src/dominio/congelados.js')
 const { HASH_HALL } = await import('../src/dominio/rota.js')
+const { itensDoTrilho } = await import('../src/dominio/trilhoDoConsole.js')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5186'
 const evidencias = process.env.EVIDENCIAS_UX ?? 'builds/prova-financeiro'
@@ -41,7 +42,7 @@ function chip(page, nome, pressionado) {
 }
 
 function moduloAtivoNoTrilho(page, modulo) {
-  return page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).locator(`a[href="${hashDoModulo(modulo.id)}"][aria-current="true"]`)
+  return page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).locator(`a[href="${hashDoModulo(modulo.id)}"][aria-current="page"]`)
 }
 
 async function capturarTela(page, modulo, tela, tema) {
@@ -92,6 +93,7 @@ contaReceber.descricao = 'Venda de encomenda'
 contaReceber.parcelas[0].id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 // #2395: a Dona da navegação recebe as leituras de Cadastros expostas por /auth/me/modulos.
 const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasReceber', 'gerenciarContasPagar', 'gerenciarContasReceber', 'gerenciarCategoriasFinanceiras', 'gerenciarCentrosCusto', 'gerenciarCaixa', 'editarProducao', 'editarCardapio', 'editarAtendimento', 'verCadastrosProdutos', 'verCadastrosFornecedores', 'verCadastrosFinanceiros', 'verPedidos'].map((nome) => [nome, true]))
+const linksDoTrilho = (moduloId, telaId) => itensDoTrilho({ permite: (id) => modulosPermitidos.has(id), acoes, fonteApi: true, simulacoes: false, onde: { moduloId, telaId } }).filter((item) => item.href).length
 let modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
 const escritas = []
 const erros = []
@@ -201,7 +203,8 @@ try {
         await moduloAtivoNoTrilho(page, modulo).waitFor()
         assert.equal(await page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true }).count(), 0)
       }
-      assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), MODULOS.length + 1 + 2) // #2870: + Clientes e Pedidos
+      assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), linksDoTrilho(modulo.id, telaId))
+      // #3004: os links vêm da mesma fonte do trilho (`itensDoTrilho`): Início, áreas, atalhos e os itens que só existem no Balcão (que fora dele viram link para ele).
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
       if (modulo.id === MODULOS[0].id && telaId === undefined) await escolherTema(page, 'Claro')
       if (telaId) await capturarTela(page, modulo, telas.find(tela => tela.id === telaId), 'light')
