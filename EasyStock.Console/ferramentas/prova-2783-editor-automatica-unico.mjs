@@ -37,6 +37,7 @@ import {ContextoEstado,ContextoAcoes,ContextoCatalogo} from '../../../src/aplica
 import {EditorDeAutomatica} from '../../../src/componentes/EditorDeAutomatica';
 import {AbaRespostas} from '../../../src/features/gestao/respostas/AbaRespostas';
 import {ModalProgramarMensagem} from '../../../src/features/atendimento/ModalProgramarMensagem';
+import {ModalAutomacoes} from '../../../src/features/automacoes/ModalAutomacoes';
 import {analisarAutomatica} from '../../../src/dominio/automacao';
 import {FUNCIONAMENTO_PADRAO} from '../../../src/dominio/funcionamento';
 import '../../../src/estilos/base.css';
@@ -44,7 +45,7 @@ document.body.style.cssText='margin:0;padding:16px;background:var(--fundo);font-
 const MODELOS=[{nome:'lembrete_pedido',idioma:'pt_BR',categoria:'UTILITY',quantidadeParametros:1,corpo:'Oi, seu pedido {{1}} sai hoje.'},{nome:'promo_cor',idioma:'pt_BR',categoria:'MARKETING',quantidadeParametros:0,corpo:'Chegou cor nova.'}];
 window.__programadas=[]; window.__salvas=[];
 const regra={id:'r1',nome:'Primeira resposta',descricao:'Primeira mensagem.',ativa:true,texto:'Oi, {nome}!',gatilho:'primeiro-contato'};
-const estado={regras:[regra],fonteApi:false,cargaDasRegras:{estado:'pronto'},agora:Date.parse('2026-11-04T12:00:00Z'),funcionamento:FUNCIONAMENTO_PADRAO};
+const estado={regras:[regra],fonteApi:false,cargaDasRegras:{estado:'pronto'},agora:Date.parse('2026-11-04T12:00:00Z'),funcionamento:FUNCIONAMENTO_PADRAO,aberta:true,lojaAberta:null,permissaoNotificacao:'default',som:{},audioBloqueado:false,selecionada:null};
 const acoes={alternarRegra(){},editarRegra:async(id,c)=>{window.__salvas.push([id,c.texto])},incluirRespostaPronta(){},editarRespostaPronta(){},alternarArquivamentoRespostaPronta(){},
   listarModelos:async()=>MODELOS,listarProgramadas:async()=>[],cancelarProgramada:async()=>({}),
   programarMensagem:async(id,d)=>{window.__programadas.push(d);return {id:'p1',situacao:'Agendada',agendadaPara:d.agendadaPara,modelo:d.modelo}}};
@@ -52,11 +53,12 @@ const acoesFalha={...acoes,listarModelos:async()=>{throw new Error('falhou')}};
 const conversa={id:'c1',nome:'Maria Souza'};
 const canal={nome:'WhatsApp',aceitaModelo:true};
 const cena=new URLSearchParams(location.search).get('c');
-function Cena(){return <ContextoEstado.Provider value={estado}><ContextoAcoes.Provider value={acoes}><ContextoCatalogo.Provider value={{respostasProntas:[]}}>
+function Cena(){return <ContextoEstado.Provider value={estado}><ContextoAcoes.Provider value={acoes}><ContextoCatalogo.Provider value={{respostasProntas:[],janelas:[],canais:[]}}>
   {cena==='editor'&&<section id="editor"><EditorDeAutomatica regra={regra} analisar={(texto)=>analisarAutomatica({regra,texto,fonteApi:true,editavel:true,valores:{nome:'Maria'}})} editavel avisoApi='A variável {xyz} não existe. Use {nome}, {pedido} ou {faixa}.' aoSalvar={async()=>false}/></section>}
   {cena==='salvou'&&<section id="salvou"><EditorDeAutomatica regra={regra} analisar={(texto)=>analisarAutomatica({regra,texto,fonteApi:false,editavel:true,valores:{nome:'Maria'}})} editavel aoSalvar={async()=>true}/></section>}
   {cena==='falha'&&<ContextoAcoes.Provider value={acoesFalha}><section id="falha"><ModalProgramarMensagem conversa={conversa} canal={canal} rascunho="" aoAgendar={()=>{}} aoFechar={()=>{}}/></section></ContextoAcoes.Provider>}
   {cena==='aba'&&<section id="aba"><AbaRespostas comAutomaticas/></section>}
+  {cena==='automacoes'&&<section id="automacoes"><ModalAutomacoes regras={[regra]} aoAlternar={()=>{}} aoFechar={()=>{}}/></section>}
   {cena==='programar'&&<section id="programar"><ModalProgramarMensagem conversa={conversa} canal={canal} rascunho="" aoAgendar={()=>{}} aoFechar={()=>{}}/></section>}
 </ContextoCatalogo.Provider></ContextoAcoes.Provider></ContextoEstado.Provider>}
 createRoot(document.getElementById('root')).render(<Cena/>);
@@ -100,6 +102,12 @@ try {
   await editorAba.getByRole('button', { name: 'Salvar', exact: true }).click()
   await pagina.waitForFunction(() => window.__salvas.length === 1)
   assert.deepEqual(await pagina.evaluate(() => window.__salvas[0]), ['r1', 'Oi, {nome}, tudo bem?'])
+
+  // #3056: Automações montada de verdade (a prova lia só o fonte e deixou passar o import do Pilula).
+  await pagina.goto(`${base}?c=automacoes`)
+  await pagina.locator('#automacoes').getByText('Aberta agora', { exact: true }).waitFor()
+  await pagina.locator('#automacoes [data-editor-automatica]').first().waitFor()
+  assert.deepEqual(erros, [], 'Automações abre sem erro de página')
 
   // Falha ao carregar a lista: o erro real aparece e a frase de "nenhuma mensagem padrão" não.
   await pagina.goto(`${base}?c=falha`)
