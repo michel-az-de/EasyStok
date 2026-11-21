@@ -74,9 +74,10 @@ public sealed class ClienteProvedorIa(
         var corpo = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
         {
-            var trecho = corpo.Length > 500 ? corpo[..500] : corpo;
+            // Sanitiza antes de cortar: o corte no meio da chave deixaria o começo dela no log.
+            var limpo = Sanitizar(corpo, destino.Chave);
             logger.LogWarning("Provedor de IA {ProvedorId} retornou {StatusCode}: {Erro}",
-                destino.ProvedorId, (int)response.StatusCode, Sanitizar(trecho, destino.Chave));
+                destino.ProvedorId, (int)response.StatusCode, limpo.Length > 500 ? limpo[..500] : limpo);
             throw new HttpRequestException($"O provedor de IA respondeu {(int)response.StatusCode}.", null, response.StatusCode);
         }
 

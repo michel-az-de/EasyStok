@@ -126,6 +126,18 @@ public class ClienteProvedorIaTests
     }
 
     [Fact]
+    public async Task ChaveNoLimiteDoCorteDoLogNaoVazaPelaMetade()
+    {
+        var handler = new FilaHandler((HttpStatusCode.BadRequest, new string('x', 490) + Chave));
+
+        await FluentActions.Awaiting(() => Criar(handler).EnviarAsync(Destino(), Requisicao()))
+            .Should().ThrowAsync<HttpRequestException>();
+
+        var comeco = Chave.Substring(0, 10);
+        _log.Linhas.Should().NotContain(l => l.Contains(comeco));
+    }
+
+    [Fact]
     public async Task O429NaoAbreODisjuntorMasO503Abre()
     {
         var registro = new ResiliencePipelineRegistry<string>();
