@@ -5,6 +5,7 @@ using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Common;
 using EasyStock.Application.DependencyInjection;
+using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.UseCases.AdicionarItemPedido;
@@ -93,6 +94,79 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
         leitura.SetMobileTenantContext(s.EmpresaId);
         var pagoEm = await leitura.Set<PedidoPagamento>().Where(p => p.PedidoId == pedidoId).Select(p => p.PagoEm).SingleAsync();
         pagoEm.Should().BeOnOrAfter(antes);
+    }
+
+    [SkippableFact]
+    public async Task AparelhoEntregaOPedidoQueNasceuNele_PublicaAEntregaUmaVez()
+    {
+        // #3075: o espelho grava o status por fora da esteira. Sem o evento, o cliente não recebe o agradecimento
+        // nem o pedido de avaliação.
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        await AparelhoManda(provider, s, "aguardando");
+        await AparelhoManda(provider, s, "pronto");
+        var antes = DateTime.UtcNow;
+
+        await AparelhoManda(provider, s, "entregue");
+        await AparelhoManda(provider, s, "entregue");
+
+        var pedidoId = await PedidoDoErp(s);
+        var entrega = (await MudancasDeStatusPublicadas(s, pedidoId)).Should().ContainSingle("o reenvio do aparelho não avisa de novo").Subject;
+        entrega.Should().BeEquivalentTo(new { PedidoId = pedidoId, s.EmpresaId, StatusAntigo = "pronto", StatusNovo = "entregue", Origem = "mobile" });
+        entrega.OcorridoEm.Should().BeOnOrAfter(antes, "a avaliação conta 30 min da chegada ao servidor");
+    }
+
+    [SkippableFact]
+    public async Task AparelhoAvancaSemEntregar_NaoPublicaNada()
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+
+        await AparelhoManda(provider, s, "aguardando");
+        await AparelhoManda(provider, s, "preparando");
+        await AparelhoManda(provider, s, "pronto");
+
+        (await MudancasDeStatusPublicadas(s, await PedidoDoErp(s))).Should().BeEmpty("só a entrega avisa o cliente");
+    }
+
+    [SkippableFact]
+    public async Task EntregueOfflineHaDias_NaoPublicaAEntrega()
+    {
+        // Entregue no aparelho sem rede e sincronizado dias depois: o cliente não recebe agradecimento fora de hora.
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        _relogioDoAparelho = new DateTimeOffset(DateTime.UtcNow.AddDays(-3)).ToUnixTimeMilliseconds();
+
+        await AparelhoManda(provider, s, "pronto");
+        await AparelhoManda(provider, s, "entregue");
+
+        (await StatusNoErp(s)).Should().Be("entregue");
+        (await MudancasDeStatusPublicadas(s, await PedidoDoErp(s))).Should().BeEmpty();
+    }
+
+    [SkippableFact]
+    public async Task PedidoQueChegaJaEntregueHaDias_NaoPublicaAEntrega()
+    {
+        // Lançado e entregue sem rede: o primeiro envio já traz "entregue" e o vínculo cria o pedido na hora.
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        _relogioDoAparelho = new DateTimeOffset(DateTime.UtcNow.AddDays(-3)).ToUnixTimeMilliseconds();
+
+        await AparelhoManda(provider, s, "entregue");
+
+        (await MudancasDeStatusPublicadas(s, await PedidoDoErp(s))).Should().BeEmpty();
+    }
+
+    private async Task<List<PedidoMudouStatusEvent>> MudancasDeStatusPublicadas(Semente s, Guid pedidoId)
+    {
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(s.EmpresaId);
+        var payloads = await db.OutboxEventosIntegracao
+            .Where(e => e.EmpresaId == s.EmpresaId && e.TipoEvento == "pedido.mudou_status" && e.AggregateId == pedidoId)
+            .Select(e => e.PayloadJson).ToListAsync();
+        // Mesma leitura do consumidor (NotificarClienteStatusPedidoHandler): camelCase.
+        var camel = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        return [.. payloads.Select(p => JsonSerializer.Deserialize<PedidoMudouStatusEvent>(p, camel)!)];
     }
 
     [SkippableFact]
