@@ -3,6 +3,7 @@ import {
   closestCenter, DndContext, KeyboardSensor, PointerSensor, TouchSensor, useDroppable, useSensor,
   useSensors,
 } from '@dnd-kit/core'
+import { CampoSelecao } from '../../componentes/Campo'
 import { Chip } from '../../componentes/Chip'
 import { Vazio } from '../../componentes/Vazio'
 import { horaCurta, plural } from '../../dominio/formato'
@@ -167,33 +168,29 @@ export function ConteudoEntregas({
               </Chip>
             ))}
           </div>
-          <div className={css.linhaChips} role="radiogroup" aria-label="Ordenar entregas">
-            <strong>Ordenar:</strong>
-            {CHIPS_ORDEM.map(({ valor, rotulo }) => (
-              <Chip key={valor} papel="escolha" ativo={modoOrdem === valor} onClick={() => setModoOrdem(valor)}>
-                {rotulo}
-              </Chip>
-            ))}
-          </div>
-          {modoOrdem === 'janela' && <p className={css.dicaJanela}>{EXPLICACAO_JANELA}</p>}
-          {bairrosDoDia.length > 1 && (
-            <div className={css.linhaChips} role="radiogroup" aria-label="Filtrar entregas por bairro">
-              <strong>Bairro:</strong>
-              <Chip papel="escolha" ativo={bairroAtivo === null} onClick={() => setFiltroBairro(null)}>
-                Todos <span className={css.contadorChip}>{visiveis.length}</span>
-              </Chip>
-              {bairrosDoDia.map(({ bairro, itens }) => (
-                <Chip key={bairro} papel="escolha" ativo={bairroAtivo === bairro} onClick={() => setFiltroBairro(bairro)}>
-                  {bairro} <span className={css.contadorChip}>{itens.length}</span>
-                </Chip>
-              ))}
-            </div>
-          )}
-          <div className={css.linhaChips}>
+          {/* #3042: Ordenar e Bairro são escolha única, então viram select rotulado: a faixa cai de 4 linhas
+              de chips para 2 e o primeiro cartão sobe. Mostrar segue em chips (filtro primário). */}
+          <div className={css.linhaControles}>
+            <CampoSelecao
+              rotulo="Ordenar" value={modoOrdem}
+              onChange={(e) => setModoOrdem(e.target.value)}
+              opcoes={CHIPS_ORDEM.map(({ valor, rotulo }) => ({ valor, rotulo }))}
+            />
+            {bairrosDoDia.length > 1 && (
+              <CampoSelecao
+                rotulo="Bairro" value={bairroAtivo ?? ''}
+                onChange={(e) => setFiltroBairro(e.target.value || null)}
+                opcoes={[
+                  { valor: '', rotulo: `Todos (${visiveis.length})` },
+                  ...bairrosDoDia.map(({ bairro, itens }) => ({ valor: bairro, rotulo: `${bairro} (${itens.length})` })),
+                ]}
+              />
+            )}
             <Chip papel="filtro" ativo={alcanceAberto} icone="map-pin" onClick={() => setAlcanceAberto((v) => !v)}>
               Alcance por bairro
             </Chip>
           </div>
+          {modoOrdem === 'janela' && <p className={css.dicaJanela}>{EXPLICACAO_JANELA}</p>}
           <ResumoDoDia conversas={conversas} cardapio={cardapio} agora={agora} />
           {proximaConferencia && (
             <p className={css.proximaConferencia}>
