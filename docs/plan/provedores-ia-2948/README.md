@@ -1,6 +1,6 @@
 # Provedores e modelos de IA por loja (#2948)
 
-- Status: proposta v2, revisada por uma revisão adversarial (`revisao-adversarial.md`); aguarda a aprovação do Felipe
+- Status: proposta v2, revisada por uma revisão adversarial (`revisao-adversarial.md`); aprovada pelo Felipe em 21/11 ("Sim, aprovo", https://github.com/michel-az-de/EasyStok/issues/2948#issuecomment-7066321177). Cada PR de tier alto segue esperando a label `aprovado`
 - Data: 2026-11-20
 - Tier: alto (migração, cofre, `Program.cs` e DI)
 - Relacionados: ADR-0010 (RLS), ADR-0061 (cofre e conexões), ADR-0066 (modelo por loja e cota), #1305 (DeepSeek via Fireworks), S67 (`TurnoAgente`)
