@@ -10,6 +10,9 @@ const REGRAS = [
   [/[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,24}/g, '[EMAIL]'],
   [/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, '[CPF]'],
   [/(?<![\d])(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}-?\d{4}(?![\d])/g, '[TELEFONE]'],
+  // LGPD (ADR-0069): nome, endereco e CEP por chave (JSON ou chave=valor). Ids e nome de produto ficam.
+  [/(\b(?:nome(?:cliente|completo|destinatario|contato|pessoa|usuario)?|cliente(?:nome)?|destinatario|endere(?:c|ç)o\w*|logradouro|bairro|complemento|cep)["']?\s*[=:]\s*["']?)[^"'\n,;|&{}[\]]+/gi, '$1[REDIGIDO]'],
+  [/\b\d{5}-\d{3}\b/g, '[CEP]'],
 ];
 
 const MAX_LINHA = 4096;

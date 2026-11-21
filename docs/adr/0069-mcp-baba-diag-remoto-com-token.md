@@ -1,6 +1,6 @@
 # ADR-0069 · MCP baba-diag publicado em mcp.easystok.online, com token por pessoa
 
-- Status: Proposto (aguarda a label `aprovado` na PR da #3057)
+- Status: Aceito (Felipe no chat, 2026-11-21: "aprovo mergiar e publciar"; PR #3059). Implementação: #3062
 - Data: 2026-11-21
 - Decisor: Felipe
 - Revisa: decisão 2 de `docs/plan/mcp-casa-da-baba/README.md` ("nenhuma porta de MCP exposta na
@@ -29,26 +29,27 @@
    `baba-producao` e `baba-atendimento` continuam locais, porque usam o login nominal da pessoa.
 2. **Container `ez-mcp`** com o código de `tools/mcp-baba` e o transporte Streamable HTTP do SDK
    oficial (já presente na versão fixada 1.32.2). O servidor vira fábrica (`criarServidorDiag()`),
-   usada pelo stdio local e pelo HTTP, que cria um servidor por sessão. O modo stdio continua igual. O
+   usada pelo stdio local e pelo HTTP, que cria um servidor por requisição (sem sessão). O modo stdio continua igual. O
    SHA chega por build-arg `GIT_SHA`, como nos outros serviços.
 3. **Endereço:** `https://mcp.easystok.online/diag`, num bloco próprio do Caddyfile compartilhado,
    aplicado por script versionado no padrão do `console-cache.sh`: backup do arquivo, `caddy validate`,
    `caddy reload` e restauração do backup se algo falhar. Registro DNS A apontando para a VPS.
 4. **Acesso ao host continua pelo `gate.sh`.** O container faz SSH para `baba-mcp` no host com uma
-   chave própria, montada como segredo (arquivo root 600, fora da imagem). A linha no
-   `authorized_keys` leva `from="<subnet da rede do ez-mcp>",command="/opt/baba-mcp/gate.sh",restrict`.
-   Sem `docker.sock`, sem acesso ao banco, sem grupo docker. `known_hosts` fixo, montado junto. A
-   allowlist do gate (`logs`, `containers`, `deploy_historico`) não muda.
+   chave própria, fora da imagem, em `/opt/stacks/mcp/ssh` (dono felipe, uid 1000 como o usuário do
+   container, 600, montada só leitura). A linha no `authorized_keys` leva
+   `from="172.16.8.0/24",command="/opt/baba-mcp/gate.sh --sem-banco",restrict`. O modo `--sem-banco`
+   recusa o `psql_ro`: a chave do container só alcança `logs`, `containers` e `deploy_historico`. Sem
+   `docker.sock`, sem acesso ao banco, sem grupo docker. `known_hosts` fixo, montado junto.
 5. **Rede própria.** O `ez-mcp` fica só numa rede `mcp`, compartilhada com o Caddy, e não entra na
    `edge`. Sem acesso lateral a `shared-postgres`, `ez-redis` e à porta interna do `ez-api`. A saúde
    da API é lida pela URL pública.
 6. **Token por pessoa.**
-   - Emissão: o Felipe gera na VPS com um script (`mcp-token.sh emitir <pessoa>`): 32 bytes aleatórios,
-     mostrados uma única vez.
-   - Guarda: só o SHA-256 do token, em arquivo root 600 montado somente leitura
-     (`/opt/baba-mcp/tokens`), uma linha por pessoa com nome e validade.
+   - Emissão: `scripts/deploy/mcp-deploy.sh token-emitir <pessoa>`: 32 bytes aleatórios, mostrados uma
+     única vez.
+   - Guarda: só o SHA-256 do token, em `/opt/stacks/mcp/auth/tokens` (felipe 600, diretório montado
+     somente leitura), uma linha `pessoa:sha256:validade`.
    - Validade de 90 dias, renovada pelo mesmo script.
-   - Revogação: `mcp-token.sh revogar <pessoa>`. O servidor relê o arquivo a cada requisição, sem
+   - Revogação: `mcp-deploy.sh token-revogar <pessoa>`. O servidor relê o arquivo a cada requisição, sem
      reinício.
    - Verificação: `Authorization: Bearer`, comparação de hash em tempo constante
      (`crypto.timingSafeEqual`), resposta 401 sem detalhe.
@@ -63,8 +64,11 @@
    ```
 
    O conector do claude.ai e do Desktop exige OAuth e fica para outra ADR.
-10. **Deploy:** o `ez-mcp` entra no compose de produção e no `SERVICES` do `vps-deploy.sh`, com
-    healthcheck e o mesmo fluxo de imagem com SHA dos outros serviços.
+10. **Deploy:** stack própria `/opt/stacks/mcp` (`scripts/deploy/mcp/compose.yaml`), gerida por
+    `scripts/deploy/mcp-deploy.sh`, separada do deploy do ERP. Repete a guarda do `vps-deploy.sh` (SHA
+    igual ao `origin/master` ou descendente), a trava e o `deploy-history.log`; imagem
+    `easystok-mcp:vps-<sha>`, healthcheck e volta à imagem anterior se não ficar healthy. A rede `mcp`
+    (172.16.8.0/24) nunca é apagada, porque o `from=` aponta para ela.
 
 ## Segurança
 
@@ -83,7 +87,7 @@ senha, connection string, e-mail, CPF e telefone, mas não nome nem endereço. T
 
 - Tokens só para quem já lê esses logs pelo SSH hoje (operação da Casa da Baba).
 - A saída das ferramentas não entra na auditoria e o servidor não guarda cache das respostas.
-- Ampliar a redação para nome e endereço é pendência da implementação, antes do primeiro token.
+- A redação cobre nome, endereço e CEP por chave (JSON ou chave=valor) e CEP com hífen (#3062).
 
 ## Alternativas
 
@@ -96,14 +100,13 @@ senha, connection string, e-mail, CPF e telefone, mas não nome nem endereço. T
 
 ## Rollback
 
-`docker compose stop ez-mcp`, remover o bloco do Caddyfile pelo mesmo script (restaura o backup) e
-apagar a linha da chave do container no `authorized_keys`. O modo stdio local segue disponível o
+`scripts/deploy/mcp-deploy.sh descer` tira o bloco do Caddyfile e derruba a stack; apagar a linha da
+chave do container no `authorized_keys`. O modo stdio local segue disponível o
 tempo todo.
 
 ## Consequências
 
 - Instalar em outro computador vira um comando e um token.
-- A implementação é tier alto (Dockerfile, compose, `vps-deploy.sh`) e vira issue própria depois do
-  `aprovado`.
+- A implementação é tier alto (Dockerfile, compose, script de deploy, `gate.sh`): #3062.
 - A spec e o `tools/mcp-baba/README.md` apontam para esta ADR na decisão 2.
 - Ficam fora: OAuth para claude.ai e Desktop; `baba-db` remoto depois da migração da policy.
