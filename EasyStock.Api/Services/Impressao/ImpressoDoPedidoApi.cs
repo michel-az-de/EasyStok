@@ -20,7 +20,7 @@ public sealed class ImpressoDoPedidoApi(
         if (pedido is null) return null;
         var baseUrl = configuracao["App:BaseUrl"]?.TrimEnd('/') ?? string.Empty;
         var pagina = await html.RenderizarAsync(
-            pedido, PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80, baseUrl, ct: ct, fontesRelativas: true);
+            pedido, PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80, baseUrl, new ImpressoOpcoes(Pix: pix), ct, fontesRelativas: true);
         var recursos = new List<RecursoHtml>(Fontes.Length);
         foreach (var fonte in Fontes)
         {
