@@ -68,6 +68,16 @@ public class RetomadasPendentesIntegrationTests(PostgreSqlDatabaseFixture fixtur
         Escalar(antiga, 119);
         var deLojaDesligada = ComEntrada(desligada, "5511999993076", 5, out _);
         Escalar(deLojaDesligada, 4);
+        // A equipe respondeu e o cliente só reagiu: reação não é pergunta esperando resposta.
+        var soReagiu = ComEntrada(casa, "5511999993077", 5, out _);
+        soReagiu.Assumir(agora.AddMinutes(-10), Guid.NewGuid());
+        mensagens.Add(Mensagem.Saida(casa.Id, soReagiu.Id, AutorMensagem.Atendente, agora.AddMinutes(-4),
+            TipoConteudoMensagem.Texto, "Sai às 18h.", "resposta-equipe-3077"));
+        soReagiu.RegistrarEntrada(agora.AddMinutes(-2));
+        mensagens.Add(Mensagem.Entrada(casa.Id, soReagiu.Id, agora.AddMinutes(-2), TipoConteudoMensagem.Outro, null, "reacao-3077"));
+        // A atendente acabou de assumir: o prazo dela começa ali.
+        var recemAssumida = ComEntrada(casa, "5511999993078", 3, out _);
+        recemAssumida.Assumir(agora.AddSeconds(-20), Guid.NewGuid());
 
         var ligada = ConfiguracaoAtendimento.CriarPadrao(casa.Id);
         ligada.Ativo = true;
@@ -78,7 +88,7 @@ public class RetomadasPendentesIntegrationTests(PostgreSqlDatabaseFixture fixtur
             db.Empresas.AddRange(casa, desligada);
             db.ConfiguracoesAtendimento.AddRange(ligada, ConfiguracaoAtendimento.CriarPadrao(desligada.Id));
             db.AtendimentoConversas.AddRange(escalada, semResposta, respondidaPelaEquipe, atendidaPeloRobo, jaDecidida,
-                automatica, dentroDoPrazo, antiga, deLojaDesligada);
+                automatica, dentroDoPrazo, antiga, deLojaDesligada, soReagiu, recemAssumida);
             db.AtendimentoMensagens.AddRange(mensagens);
             await db.SaveChangesAsync();
         }

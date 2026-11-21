@@ -18,11 +18,15 @@ public sealed class RetomadasPendentesQuery(EasyStockDbContext db) : IRetomadasP
                 && (c.Canal == CanalConversa.WhatsApp || c.Canal == CanalConversa.ChatSite)
                 && !c.VinculoEmRevisao
                 && c.UltimaMensagemEntradaEm >= desde && c.UltimaMensagemEntradaEm <= ate
+                // Assumir e transferir movem a última atividade: quem acabou de pegar tem o prazo inteiro.
+                && c.UltimaMensagemEm <= ate
             where db.ConfiguracoesAtendimento.IgnoreQueryFilters().Any(k => k.EmpresaId == c.EmpresaId && k.Ativo)
             where c.ClienteId == null || !db.Clientes.IgnoreQueryFilters().Any(p => p.EmpresaId == c.EmpresaId && p.Id == c.ClienteId
                 && (p.Bloqueado || p.AtendimentoAutomaticoPausadoEm != null))
             let entrada = db.AtendimentoMensagens.IgnoreQueryFilters()
-                .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id && m.Autor == AutorMensagem.Cliente)
+                // Mesmo corte de RetomadaDoAssistente.EhEntradaQueEsperaResposta: reação e figurinha não esperam resposta.
+                .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id && m.Autor == AutorMensagem.Cliente
+                    && m.TipoConteudo != TipoConteudoMensagem.Outro)
                 .OrderByDescending(m => m.EnviadaEm)
                 .ThenByDescending(m => m.Id)
                 .Select(m => new { m.Id, m.EnviadaEm })

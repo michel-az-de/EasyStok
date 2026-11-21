@@ -63,7 +63,7 @@ public static class RetomadaDoAssistente
 
         var indice = -1;
         for (var i = historico.Count - 1; i >= 0 && indice < 0; i--)
-            if (historico[i].Autor == AutorMensagem.Cliente) indice = i;
+            if (EhEntradaQueEsperaResposta(historico[i])) indice = i;
         if (indice < 0) return null;
 
         var entrada = historico[indice];
@@ -82,8 +82,19 @@ public static class RetomadaDoAssistente
         var ultimaFala = historico.Skip(indice)
             .Where(m => m.Status != StatusMensagem.Falhou && (m.Autor != AutorMensagem.Sistema || m.EnviadaPorUsuarioId is not null))
             .Max(m => m.EnviadaEm);
+        // Assumir e transferir não gravam mensagem, mas movem a última atividade da conversa: quem acabou de pegar
+        // o atendimento tem o prazo inteiro.
+        if (conversa.UltimaMensagemEm > ultimaFala) ultimaFala = conversa.UltimaMensagemEm;
         return agora - ultimaFala >= prazo ? entrada : null;
     }
+
+    /// <summary>
+    /// Reação, figurinha, vídeo e mensagem sem suporte chegam como <see cref="TipoConteudoMensagem.Outro"/>: o fluxo
+    /// normal não as leva ao robô, e aqui elas não contam como cliente esperando. A consulta da varredura
+    /// (<c>RetomadasPendentesQuery</c>) usa o mesmo corte.
+    /// </summary>
+    public static bool EhEntradaQueEsperaResposta(Mensagem mensagem) =>
+        mensagem.Autor == AutorMensagem.Cliente && mensagem.TipoConteudo != TipoConteudoMensagem.Outro;
 
     /// <summary>
     /// Orientação do turno retomado. Sem futuro sobre a equipe ("a equipe vai..."): a guarda da resposta barra promessa de

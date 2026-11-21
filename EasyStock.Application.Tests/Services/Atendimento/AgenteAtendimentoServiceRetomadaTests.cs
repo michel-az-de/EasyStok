@@ -256,6 +256,56 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task Retomada_ClienteSoReagiuDepoisDaRespostaDaEquipe_NaoRetoma()
+    {
+        ClienteEscreveuComAEquipeHa(TimeSpan.FromMinutes(5));
+        _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Atendente, Agora.AddMinutes(-4),
+            TipoConteudoMensagem.Texto, "Sai às 18h.", "wamid.out12"));
+        // Reação, figurinha, vídeo sem legenda e mensagem sem suporte chegam como Outro: o fluxo normal não as leva ao robô.
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora - AlemDoPrazo, TipoConteudoMensagem.Outro, null, "wamid.in12"));
+
+        var resultado = await Retomar();
+
+        resultado.Should().Be(ResultadoTurnoAgente.Ignorado);
+        _conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        _requisicoes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Retomada_SoFigurinhaNaConversa_NaoRetoma()
+    {
+        _historico.Clear();
+        _conversa.Assumir(Agora.AddMinutes(-10), Guid.NewGuid());
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora - AlemDoPrazo, TipoConteudoMensagem.Outro, null, "wamid.in13"));
+
+        (await Retomar()).Should().Be(ResultadoTurnoAgente.Ignorado);
+        _conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+    }
+
+    [Fact]
+    public async Task Retomada_AtendenteAcabouDeAssumir_OPrazoComecaAli()
+    {
+        ClienteEscreveuComAEquipeHa(AlemDoPrazo);
+        var atendente = Guid.NewGuid();
+        _conversa.Assumir(Agora.AddSeconds(-5), atendente);
+
+        (await Retomar()).Should().Be(ResultadoTurnoAgente.Ignorado);
+        _conversa.AssumidaPorUsuarioId.Should().Be(atendente);
+        _requisicoes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Retomada_ConversaAcabouDeSerTransferida_OPrazoComecaAli()
+    {
+        ClienteEscreveuComAEquipeHa(AlemDoPrazo);
+        var destino = Guid.NewGuid();
+        _conversa.Transferir(destino, Agora.AddSeconds(-5));
+
+        (await Retomar()).Should().Be(ResultadoTurnoAgente.Ignorado);
+        _conversa.AssumidaPorUsuarioId.Should().Be(destino);
+    }
+
+    [Fact]
     public async Task Retomada_EquipeRespondeEnquantoOTurnoDecide_NaoRetomaNemResponde()
     {
         var entrada = ClienteEscreveuComAEquipeHa(AlemDoPrazo);
