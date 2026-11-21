@@ -34,7 +34,8 @@ public sealed class CadastrarClienteFerramenta(
         if (contexto.Conversa.ClienteId is not { } clienteId || contexto.Conversa.VinculoEmRevisao)
             return Erro("cliente_nao_identificado");
 
-        var nome = FerramentaJson.LerTexto(entrada, "nome")?.Trim();
+        // Forma composta: acento digitado em separado (teclado do macOS) vira a mesma letra acentuada do cadastro.
+        var nome = FerramentaJson.LerTexto(entrada, "nome")?.Trim().Normalize(System.Text.NormalizationForm.FormC);
         var email = FerramentaJson.LerTexto(entrada, "email")?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(nome) && string.IsNullOrEmpty(email))
             return Erro("nada_para_gravar");
@@ -51,7 +52,8 @@ public sealed class CadastrarClienteFerramenta(
 
         var gravarEmail = !string.IsNullOrEmpty(email) && string.IsNullOrWhiteSpace(cliente.Email);
         // O e-mail recebido pela loja é ligado ao cadastro que tem o endereço: o de outra pessoa não entra aqui. A
-        // resposta é a mesma de "o cadastro já tem e-mail", para a conversa não servir de consulta a quem é cliente.
+        // resposta não diz que o endereço é de alguém. Risco residual aceito: num cadastro sem e-mail, "mantido" ainda
+        // indica que o endereço já existe na loja; quem sonda para no primeiro e-mail livre, que fica gravado.
         if (gravarEmail && await emails.ObterClienteIdPorEmailAsync(contexto.EmpresaId, email!, ct) is { } dono && dono != cliente.Id)
             gravarEmail = false;
 
@@ -89,11 +91,14 @@ public sealed class CadastrarClienteFerramenta(
 
     /// <summary>
     /// O nome volta no prompt dos próximos turnos e nas mensagens à equipe: quebra de linha, pontuação de frase e
-    /// texto longo não entram, para o campo não carregar instrução.
+    /// texto longo não entram. Isso reduz, e não elimina, o risco de o campo carregar instrução: frase curta só com
+    /// letras ainda passa.
     /// </summary>
     private static bool EhNomeDePessoa(string nome) =>
         nome.Length <= NomeTamanhoMaximo && nome.Count(char.IsLetter) >= 2
-        && nome.All(c => char.IsLetter(c) || c is ' ' or '\'' or '-' or '.')
+        && nome.All(c => char.IsLetter(c) || c is ' ' or '\'' or '’' or '-' or '.'
+            || char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.NonSpacingMark
+                or System.Globalization.UnicodeCategory.SpacingCombiningMark)
         && nome.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= NomeMaximoDePalavras;
 
     private static bool EhEmailValido(string email)

@@ -69,6 +69,36 @@ public class CadastrarClienteFerramentaTests
         cliente.Nome.Should().Be("Beatriz Souza");
     }
 
+    [Theory]
+    [InlineData("Maria José", "Maria José")]
+    [InlineData("Ana-Lúcia D'Ávila", "Ana-Lúcia D'Ávila")]
+    [InlineData("Luís D’Ávila", "Luís D’Ávila")] // apóstrofo tipográfico, que o iPhone põe sozinho
+    [InlineData("João Jr.", "João Jr.")]
+    [InlineData("José Conceição", "José Conceição")] // acento decomposto vira composto
+    [InlineData("Юлия Иванова", "Юлия Иванова")]
+    public async Task NomeRealEhAceitoEGravadoNormalizado(string informado, string gravado)
+    {
+        var (cliente, conversa) = ConversaDe(IdentificarClientePorTelefoneUseCase.NomePadraoLead);
+
+        var resultado = await Cadastrar(conversa, new { nome = informado });
+
+        resultado.Should().Contain("\"nome\":\"gravado\"");
+        cliente.Nome.Should().Be(gravado);
+    }
+
+    [Fact]
+    public async Task EmailDeOutroCadastroNaoImpedeONomeDeEntrar()
+    {
+        var (cliente, conversa) = ConversaDe(IdentificarClientePorTelefoneUseCase.NomePadraoLead);
+        _emails.ObterClienteIdPorEmailAsync(_empresaId, "lucia@exemplo.com", Arg.Any<CancellationToken>()).Returns(Guid.NewGuid());
+
+        var resultado = await Cadastrar(conversa, new { nome = "Beatriz Souza", email = "lucia@exemplo.com" });
+
+        resultado.Should().Be("""{"nome":"gravado","email":"mantido"}""");
+        cliente.Nome.Should().Be("Beatriz Souza");
+        cliente.Email.Should().BeNull();
+    }
+
     [Fact]
     public async Task NomeQueAEquipeArrumouEhMantido()
     {
