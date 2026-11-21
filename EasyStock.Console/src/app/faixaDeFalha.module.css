@@ -54,6 +54,11 @@
 }
 .aparelho > svg { flex-shrink: 0; }
 .aparelhoTexto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.aparelhoPasso { display: flex; align-items: center; gap: var(--e-1); width: 100%; min-height: var(--toque); padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; text-align: left; }
+.aparelhoRotulo { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: underline dotted; text-underline-offset: 3px; }
+.aparelhoPasso > svg { flex-shrink: 0; }
+/* #3043: o passo a passo fica fora da faixa (a altura de uma linha não muda); contorno uniforme e fundo tingido. */
+.aparelhoPassoTexto { align-self: center; box-sizing: border-box; width: min(720px, calc(100% - 2 * var(--e-3))); margin: 0 var(--e-3) var(--e-1); padding: var(--e-2); font-size: var(--t-micro); line-height: 1.4; color: var(--tinta-2); background: var(--preenchimento); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); }
 .aparelhoBotao { flex-shrink: 0; padding: 0 var(--e-2); white-space: nowrap; }
 
 .quadro { display: flex; flex-direction: column; height: 100%; min-height: 0; }
