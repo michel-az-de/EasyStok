@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using EasyStock.Api.Configuration;
@@ -23,7 +22,7 @@ using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 namespace EasyStock.Api.UnitTests.Controllers;
 
 /// <summary>
-/// Chat do site (S36) na borda HTTP: a resposta da loja chega pelo stream em menos de 2 s, sessão
+/// Chat do site (S36) na borda HTTP: a resposta da loja sai pelo stream na leitura que a encontra, sessão
 /// inválida é 403, chat desligado é 404, e cada endpoint tem o seu rate limit.
 /// </summary>
 public class ChatSiteControllerTests
@@ -39,7 +38,7 @@ public class ChatSiteControllerTests
 
     public ChatSiteControllerTests()
     {
-        _loja = StorefrontEntity.Criar(empresaId: Guid.NewGuid(), slug: Slug, tituloPublico: "Casa da Babá", pedidoMinimoEntrega: 0m);
+        _loja = StorefrontEntity.Criar(empresaId: Guid.NewGuid(), slug: Slug, tituloPublico: "Casa da Baba", pedidoMinimoEntrega: 0m);
         _loja.Ativar();
         _lojas.GetBySlugAsync(Slug, Arg.Any<CancellationToken>()).Returns(_loja);
         _flags.ListarAtivasAsync(_loja.EmpresaId, Arg.Any<CancellationToken>())
@@ -51,7 +50,7 @@ public class ChatSiteControllerTests
             acesso,
             new AbrirSessaoChatSiteUseCase(acesso, _sessoes, uow),
             new EnviarMensagemVisitanteUseCase(acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), uow,
-                NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new EasyStock.Application.Services.Atendimento.ConversaChatSiteService(_conversas, uow)),
+                NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new EasyStock.Application.Services.Atendimento.ConversaChatSiteService(_conversas, uow, _sessoes)),
             new ListarMensagensChatSiteUseCase(acesso, _sessoes, _conversas));
         var http = new DefaultHttpContext();
         http.Response.Body = _corpo;
@@ -67,29 +66,49 @@ public class ChatSiteControllerTests
         return (sessao, token);
     }
 
+    /// <summary>
+    /// #2357/#2010: medir o relógio de parede abaixo de 2 s falhava com o runner carregado (2,05 a 3,25 s no CI, passando
+    /// no rerun do mesmo SHA). O que importa é a ordem: a resposta sai no stream na própria leitura que a encontra, antes
+    /// da leitura seguinte, e as leituras são a cada <see cref="ChatSiteController.IntervaloStream"/>. A leitura que acha a
+    /// resposta demora 1,5 s de propósito: quem voltar a medir tempo de parede vê a falha sempre, não de vez em quando.
+    /// </summary>
     [Fact]
-    public async Task RespostaDaLojaChegaPeloStreamEmMenosDeDoisSegundos()
+    public async Task RespostaDaLojaSaiNoStreamNaLeituraQueAEncontra()
     {
+        const string Texto = "Entregamos sim!";
         var (sessao, token) = Sessao();
         var conversaId = Guid.NewGuid();
         sessao.VincularConversa(conversaId);
         Mensagem? resposta = null;
+        var leiturasComResposta = 0;
+        var leituraAntesDeSair = false;
         _conversas.ListarMensagensDepoisAsync(_loja.EmpresaId, conversaId, Arg.Any<DateTime?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(_ => resposta is null ? [] : new[] { resposta });
+            .Returns(async _ =>
+            {
+                if (Volatile.Read(ref resposta) is not { } achada) return (IReadOnlyList<Mensagem>)[];
+                if (Interlocked.Increment(ref leiturasComResposta) == 1)
+                    await Task.Delay(1500);
+                else if (!_corpo.Texto.Contains(Texto, StringComparison.Ordinal))
+                    Volatile.Write(ref leituraAntesDeSair, true);
+                return [achada];
+            });
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var stream = _controller.Stream(Slug, token, null, cts.Token);
-        await Task.Delay(300);
-
-        var relogio = Stopwatch.StartNew();
-        resposta = Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Dona, DateTime.UtcNow, TipoConteudoMensagem.Texto, "Entregamos sim!", "chatsite:1");
-        var chegou = await _corpo.EsperarAsync("Entregamos sim!", TimeSpan.FromSeconds(5));
-        relogio.Stop();
+        Volatile.Write(ref resposta, Mensagem.Saida(_loja.EmpresaId, conversaId, AutorMensagem.Dona, DateTime.UtcNow,
+            TipoConteudoMensagem.Texto, Texto, "chatsite:1"));
+        var chegou = await _corpo.EsperarAsync(Texto, TimeSpan.FromSeconds(20));
+        var fim = DateTime.UtcNow.AddSeconds(20);
+        while (Volatile.Read(ref leiturasComResposta) < 2 && DateTime.UtcNow < fim)
+            await Task.Delay(20);
         await cts.CancelAsync();
         await stream;
 
         chegou.Should().BeTrue();
-        relogio.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
+        leiturasComResposta.Should().BeGreaterThanOrEqualTo(2, "a leitura seguinte prova a ordem");
+        leituraAntesDeSair.Should().BeFalse("a resposta sai na leitura que a encontra, sem esperar outro ciclo");
+        ChatSiteController.IntervaloStream.Should().BeLessThanOrEqualTo(TimeSpan.FromSeconds(1),
+            "o widget não espera ciclo longo pela resposta da loja");
         _controller.Response.ContentType.Should().Be("text/event-stream");
         _corpo.Texto.Should().Contain("event: mensagem");
     }
@@ -153,9 +172,31 @@ public class ChatSiteControllerTests
         result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
     }
 
+    private IUnitOfWork UowQueExecuta()
+    {
+        var criadas = new List<EasyStock.Domain.Entities.Atendimento.Conversa>();
+        _conversas.When(x => x.AddAsync(Arg.Any<EasyStock.Domain.Entities.Atendimento.Conversa>(), Arg.Any<CancellationToken>()))
+            .Do(ci => criadas.Add(ci.Arg<EasyStock.Domain.Entities.Atendimento.Conversa>()));
+        _conversas.ObterPorIdComLockAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(ci => criadas.FirstOrDefault(c => c.Id == ci.ArgAt<Guid>(1)));
+        var uow = Substitute.For<IUnitOfWork>();
+        uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Domain.Entities.Atendimento.Conversa>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Domain.Entities.Atendimento.Conversa>>>()(ci.Arg<CancellationToken>()));
+        return uow;
+    }
+
     private IdentificarVisitanteChatSiteUseCase Identificacao() => new(
         new AcessoChatSite(_lojas, _flags, Substitute.For<ITenantContextAccessor>(), _sessoes), _conversas, Substitute.For<IUnitOfWork>(),
-        Substitute.For<IOperacaoEventPublisher>());
+        Substitute.For<IOperacaoEventPublisher>(),
+        new EasyStock.Application.Services.Atendimento.ConversaChatSiteService(_conversas, UowQueExecuta(), _sessoes),
+        new EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase(
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.IClienteRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Storefront.IClienteStorefrontRepository>(),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase>.Instance),
+        Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository>(),
+        Substitute.For<EasyStock.Application.Services.Atendimento.IEscaladorConversa>(),
+        Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>());
 
     [Fact]
     public async Task IdentificacaoValida200SemAceite400TokenInvalido403()

@@ -53,7 +53,7 @@ public class WebhookWhatsAppControllerTests
             new IdentificarClientePorTelefoneUseCase(
                 Substitute.For<IClienteRepository>(),
                 Substitute.For<IClienteStorefrontRepository>(),
-                NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new SaudacaoAtendimento(Substitute.For<IStorefrontRepository>(), new ConfigurationBuilder().Build()),
             new RoteadorAcoesBotao([], NullLogger<RoteadorAcoesBotao>.Instance),
             new OptOutPorPalavra(Substitute.For<IConsentimentoContatoRepository>(), Substitute.For<IConversaRepository>(),

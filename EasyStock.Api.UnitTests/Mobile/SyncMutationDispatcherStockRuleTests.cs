@@ -83,6 +83,7 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
             _db, dispatcher,
             new SyncAutoLinker(_db, semAutoLink, NullLogger<SyncAutoLinker>.Instance, null!, null!, null!, null!, null!),
             null!, broker, produtoRepo, semAutoLink, TimeProvider.System,
+            new EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile(_db, NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Persistence.ILoteNumeroCurtoRepository>(), NullLogger<EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile>.Instance),
             NullLogger<SyncController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = _http }
@@ -632,6 +633,83 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
             .Which.Reason.Should().Contain(Produto);
     }
 
+    // ---------- #2083: pedido do console com quantidade fracionada ----------
+
+    [Theory]
+    [InlineData("preparando")]
+    [InlineData("entregue")]
+    public async Task PedidoDoConsoleCom1_5Kg_VoltaDoAparelho_ServidorAceitaENaoMexeNoPedido(string status)
+    {
+        var pedido = EasyStock.Domain.Entities.Pedido.Criar(_empresaId, cliente: null, lojaId: null, "console");
+        pedido.Itens.Add(new PedidoItem
+        {
+            Id = Guid.NewGuid(), PedidoId = pedido.Id, ProdutoId = _produtoErpId, Nome = "Queijo", Quantidade = 1.5m,
+            PrecoUnitario = 30m, Subtotal = 45m, CriadoEm = DateTime.UtcNow
+        });
+        pedido.RecalcularTotal();
+        _db.Add(pedido);
+        _db.SaveChanges();
+        _db.ChangeTracker.Clear();
+        var agora = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        // O aparelho devolve o que recebeu do pull: qty 1,5 no JSON.
+        var eco = Mutation("order.upsert", new
+        {
+            id = pedido.Id.ToString(), clientId = (string?)null, clientSnapshot = new { name = "Ana" },
+            items = new[] { new { productId = _produtoErpId.ToString(), name = "Queijo", emoji = (string?)null, unit = "kg", qty = 1.5m, unitPrice = 30m } },
+            total = 45m, status, metodo = "pix", createdAt = agora, updatedAt = agora
+        });
+
+        var resposta = await Push("dev-a", eco);
+
+        resposta.Rejected.Should().BeNullOrEmpty("1,5 no JSON não pode travar o sync do pedido");
+        resposta.AcceptedIds.Should().Contain(eco.Id);
+        _db.Set<Order>().AsNoTracking().Any(o => o.Id == pedido.Id.ToString()).Should().BeTrue("o espelho do pedido foi gravado");
+        var doErp = _db.Set<EasyStock.Domain.Entities.Pedido>().AsNoTracking().Include(p => p.Itens).Single(p => p.Id == pedido.Id);
+        doErp.Itens.Single().Quantidade.Should().Be(1.5m, "o eco do aparelho não reescreve o item do pedido do console");
+        doErp.Total.Valor.Should().Be(45m);
+    }
+
+    // ---------- #2718: saldo fracionado ----------
+
+    [Fact]
+    public async Task ProdutoNovoComSaldoFracionado_GravaSemTruncar()
+    {
+        await Push("dev-a", Mutation("product.upsert",
+            new { id = Produto, name = "Queijo", category = "extra", unit = "kg", stock = 1.5m }));
+
+        Estoque().Should().Be(1.5m);
+    }
+
+    [Fact]
+    public async Task ProdutoNovoComSaldoInteiro_AparelhoAntigoContinuaAceito()
+    {
+        await Push("dev-a", Mutation("product.upsert",
+            new { id = Produto, name = "Lasanha", category = "massa", stock = 3 }));
+
+        Estoque().Should().Be(3m);
+    }
+
+    [Fact]
+    public async Task CadastroComSaldoAbsolutoFracionado_GravaSemTruncar()
+    {
+        SemearProduto(estoque: 10);
+
+        await Push("dev-a", Mutation("product.upsert",
+            new { id = Produto, name = "Lasanha", category = "massa", price = 30m, stock = 2.25m }));
+
+        Estoque().Should().Be(2.25m);
+    }
+
+    [Fact]
+    public async Task MovimentoInteiroSobreSaldoFracionado_NaoTrunca()
+    {
+        SemearProduto(estoque: 1.5m);
+
+        await Push("dev-a", Movimento(-1));
+
+        Estoque().Should().Be(0.5m, "1,5 - 1 = 0,5; o delta inteiro e a #2707, o saldo nao pode truncar");
+    }
+
     // ---------- apoio ----------
 
     private async Task<SyncPushResponse> Push(string deviceId, params MutationDto[] mutations)
@@ -677,7 +755,7 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
         Discarded: descartado ? true : null,
         DiscardedAt: descartado ? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() : null));
 
-    private void SemearProduto(int estoque, bool comVinculo = false, Guid? lojaId = null)
+    private void SemearProduto(decimal estoque, bool comVinculo = false, Guid? lojaId = null)
     {
         if (comVinculo)
             _db.Add(new Produto
@@ -734,7 +812,7 @@ public sealed class SyncMutationDispatcherStockRuleTests : IDisposable
         _db.ChangeTracker.Clear();
     }
 
-    private int Estoque() => _db.Set<Product>().AsNoTracking().Single(p => p.Id == Produto).Stock;
+    private decimal Estoque() => _db.Set<Product>().AsNoTracking().Single(p => p.Id == Produto).Stock;
 
     private decimal SaldoErp() => _db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking()
         .Where(i => i.EmpresaId == _empresaId && i.ProdutoId == _produtoErpId)

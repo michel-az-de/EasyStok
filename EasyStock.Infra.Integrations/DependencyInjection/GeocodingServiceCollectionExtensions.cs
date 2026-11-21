@@ -5,6 +5,7 @@ using EasyStock.Infra.Integrations.TomTom;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Polly.Registry;
 
 namespace EasyStock.Infra.Integrations.DependencyInjection;
 
@@ -66,6 +67,8 @@ public static class GeocodingServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddEasyStockIntegrationResilience(); // #2177: rota e geocoding pelos pipelines
+
         // Cadeia (I8.1, #1658): provedor com chave, depois Nominatim. Um elo só é registrado direto;
         // nenhum é NoOp (frete por zona, nada bate na rede).
         var elos = new List<Func<IServiceProvider, IGeocodingClient>>();
@@ -158,6 +161,7 @@ public static class GeocodingServiceCollectionExtensions
         services.AddScoped<IRotaClient>(sp => new GoogleRotasClient(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GoogleRotasClient)),
             googleKey,
+            sp.GetRequiredService<ResiliencePipelineProvider<string>>(),
             sp.GetRequiredService<ILogger<GoogleRotasClient>>()));
     }
 
@@ -172,11 +176,13 @@ public static class GeocodingServiceCollectionExtensions
         services.AddScoped<IRotaClient>(sp => new TomTomRotasClient(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(TomTomBaseUrl)),
             apiKey,
+            sp.GetRequiredService<ResiliencePipelineProvider<string>>(),
             sp.GetRequiredService<ILogger<TomTomRotasClient>>()));
 
         return sp => new TomTomGeocodingClient(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(TomTomBaseUrl)),
             apiKey,
+            sp.GetRequiredService<ResiliencePipelineProvider<string>>(),
             sp.GetRequiredService<ILogger<TomTomGeocodingClient>>());
     }
 

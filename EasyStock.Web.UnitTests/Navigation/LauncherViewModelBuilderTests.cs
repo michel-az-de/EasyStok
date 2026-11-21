@@ -225,7 +225,9 @@ public class LauncherViewModelBuilderTests
 
         vm.Missoes.Select(m => m.Chave).Should().NotContain("caixa");
         vm.Missoes.Select(m => m.Chave).Should().NotContain("parcelas-vencidas");
-        vm.Missoes.Should().HaveCount(3);
+        // #2744: os pedidos em aberto vêm do resumo do dia, que quem não lê relatórios não recebe (403).
+        vm.Missoes.Select(m => m.Chave).Should().NotContain("pedidos");
+        vm.Missoes.Should().HaveCount(2);
     }
 
     [Fact]

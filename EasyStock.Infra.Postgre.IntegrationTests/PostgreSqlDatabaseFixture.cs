@@ -2,7 +2,7 @@ using EasyStock.Infra.Postgre.Data;
 using DotNet.Testcontainers.Builders;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using Testcontainers.PostgreSql;
+using EasyStock.Testes.Postgres;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests;
 
@@ -15,7 +15,15 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     private const string RlsClientRole = "rls_test_client";
     private const string RlsClientPassword = "rls_test_pwd";
 
-    private PostgreSqlContainer? _container;
+    // #2976 (S1.1): um contêiner por processo e um banco modelo migrado uma vez; cada fixture clona
+    // o modelo num banco de nome único. Ver EasyStock.Testes.Postgres.PostgresCluster.
+    private const string Imagem = "postgres:16-alpine";
+    private const string SenhaCluster = "postgres";
+    internal const string Modelo = "easystock_template";
+
+    private PostgresCluster? _cluster;
+    private string? _banco;
+    private string? _conexaoLocal;
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
 
@@ -23,15 +31,21 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     {
         try
         {
-            _container = new PostgreSqlBuilder("postgres:16-alpine")
-                .WithDatabase("easystock_tests")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
+            // Opt-in exclusivo do laboratório descartável #2184; o reset abaixo nunca aceita outro destino.
+            if (Environment.GetEnvironmentVariable("EASYSTOK_2184_TEST_POSTGRES") is { Length: > 0 } local)
+            {
+                var destino = new NpgsqlConnectionStringBuilder(local);
+                if (destino.Host != "127.0.0.1" || destino.Port != 25484 || destino.Database != "easystock_it_2184")
+                    throw new InvalidOperationException("O laboratório 2184 só aceita 127.0.0.1:25484/easystock_it_2184.");
+                _conexaoLocal = destino.ConnectionString;
+                IsAvailable = true;
+                await ResetDatabaseAsync();
+                return;
+            }
 
-            await _container.StartAsync();
+            _cluster = await ObterClusterComModeloAsync();
             IsAvailable = true;
-            await ResetDatabaseAsync();
+            _banco = await _cluster.ClonarAsync(Modelo);
         }
         catch (DockerUnavailableException ex)
         {
@@ -40,22 +54,33 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Cluster do processo com o modelo pronto: o papel <see cref="RlsClientRole"/> é criado uma vez,
+    /// antes do modelo, e os GRANTs feitos no modelo vêm em cada clone.
+    /// </summary>
+    internal static async Task<PostgresCluster> ObterClusterComModeloAsync()
+    {
+        var cluster = await PostgresCluster.ObterAsync(Imagem, SenhaCluster);
+        await cluster.GarantirModeloAsync(Modelo, async conexao =>
+        {
+            await cluster.GarantirPapelAsync(RlsClientRole, RlsClientPassword, "NOSUPERUSER NOBYPASSRLS");
+            await using var context = CriarContexto(conexao);
+            await context.Database.MigrateAsync();
+            await ConcederAoRlsClientAsync(context);
+        });
+        return cluster;
+    }
+
     public async Task DisposeAsync()
     {
-        if (_container is not null)
-            await _container.DisposeAsync();
+        if (_cluster is not null && _banco is not null)
+            await _cluster.DescartarAsync(_banco);
     }
 
-    public EasyStockDbContext CreateDbContext()
-    {
-        if (_container is null) throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
+    public EasyStockDbContext CreateDbContext() => CriarContexto(ConnectionString);
 
-        var options = new DbContextOptionsBuilder<EasyStockDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
-            .Options;
-
-        return new EasyStockDbContext(options);
-    }
+    private static EasyStockDbContext CriarContexto(string conexao) =>
+        new(new DbContextOptionsBuilder<EasyStockDbContext>().UseNpgsql(conexao).Options);
 
     /// <summary>
     /// Connection string do superuser 'postgres' (a mesma de <see cref="CreateDbContext"/>) —
@@ -63,7 +88,9 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     /// (AddEasyStockPostgreInfrastructure) para validar o wiring dos interceptors.
     /// </summary>
     public string ConnectionString =>
-        _container?.GetConnectionString() ?? throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
+        _conexaoLocal
+        ?? (_cluster is not null && _banco is not null ? _cluster.ConexaoDe(_banco) : null)
+        ?? throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
 
     /// <summary>
     /// Connection string de um login NOSUPERUSER/NOBYPASSRLS — sujeito as policies
@@ -76,8 +103,7 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
     {
         get
         {
-            if (_container is null) throw new InvalidOperationException("PostgreSQL de teste indisponivel.");
-            return new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
+            return new NpgsqlConnectionStringBuilder(ConnectionString)
             {
                 Username = RlsClientRole,
                 Password = RlsClientPassword,
@@ -101,22 +127,28 @@ public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
         return new EasyStockDbContext(options);
     }
 
+    /// <summary>
+    /// Devolve o banco da classe ao estado recém-migrado: <c>DROP ... WITH (FORCE)</c> e novo clone do
+    /// modelo, com o mesmo nome. Teste com host vivo sobre o banco para o host antes de chamar.
+    /// </summary>
     public async Task ResetDatabaseAsync()
     {
-        if (!IsAvailable || _container is null) return;
+        Skip.IfNot(IsAvailable, UnavailableReason ?? "PostgreSQL de teste indisponível.");
 
+        if (_cluster is not null && _banco is not null)
+        {
+            await _cluster.RecriarAsync(_banco, Modelo);
+            return;
+        }
+
+        // Laboratório #2184: banco fixo fora do cluster, recriado do zero.
         await using var context = CreateDbContext();
         await context.Database.EnsureDeletedAsync();
         await context.Database.MigrateAsync();
         await EnsureRlsClientRoleAsync(context);
     }
 
-    /// <summary>
-    /// Cria (idempotente) o login NOSUPERUSER e concede DML em todas as tabelas.
-    /// Reaplicado a cada reset: <see cref="EnsureDeletedAsync"/> recria o banco e
-    /// zera os grants, mas o role e cluster-level e persiste. As migrations rodam
-    /// como 'postgres' (dono); este role serve apenas as queries dos testes de RLS.
-    /// </summary>
+    /// <summary>Caminho do laboratório #2184: papel idempotente e GRANTs no banco recriado.</summary>
     private static async Task EnsureRlsClientRoleAsync(EasyStockDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync($@"
@@ -125,10 +157,18 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{RlsClientRole}') THEN
         CREATE ROLE {RlsClientRole} LOGIN PASSWORD '{RlsClientPassword}' NOSUPERUSER NOBYPASSRLS;
     END IF;
-END $$;
+END $$;");
+        await ConcederAoRlsClientAsync(context);
+    }
+
+    /// <summary>
+    /// DML em todas as tabelas para o papel sujeito a RLS. As migrations rodam como 'postgres' (dono);
+    /// este papel serve apenas as queries dos testes de RLS.
+    /// </summary>
+    private static Task ConcederAoRlsClientAsync(EasyStockDbContext context) =>
+        context.Database.ExecuteSqlRawAsync($@"
 GRANT USAGE ON SCHEMA public TO {RlsClientRole};
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {RlsClientRole};
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {RlsClientRole};
 ");
-    }
 }

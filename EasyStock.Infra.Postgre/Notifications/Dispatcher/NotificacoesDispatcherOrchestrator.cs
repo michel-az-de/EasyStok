@@ -3,7 +3,9 @@ using System.Diagnostics.Metrics;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Security;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Services.Notifications.Orchestrators;
 using EasyStock.Domain.Entities.Notifications;
@@ -54,10 +56,19 @@ public sealed class NotificacoesDispatcherOrchestrator(
     /// <summary>Mensagem reservada pelo claim: o mínimo para abrir o escopo da empresa e reler a linha.</summary>
     private sealed record MensagemReservada(Guid EmpresaId, Guid Id, CanalNotificacao Canal);
 
+    /// <summary>O que a reserva devolve: as mensagens a enviar e as que expiraram por prazo nela (#2875).</summary>
+    private sealed record Reserva(IReadOnlyList<MensagemReservada> Mensagens, IReadOnlyList<NotificacaoExpirada> Expiradas)
+    {
+        public static readonly Reserva Vazia = new([], []);
+    }
+
     /// <summary>O que o escopo da mensagem já fez, para a falha saber se o canal chegou a ser chamado.</summary>
     private sealed class EstadoDoItem
     {
         public bool CanalChamado { get; set; }
+
+        /// <summary>O resultado do canal, quando ele foi chamado: o motivo do aviso não entregue sai dele (#2875).</summary>
+        public ResultadoEnvio? Resultado { get; set; }
     }
 
     /// <summary>O parâmetro de shards é ignorado (N1): o claim não depende de <c>ShardKey</c>.</summary>
@@ -76,7 +87,15 @@ public sealed class NotificacoesDispatcherOrchestrator(
         {
             for (var lote = 0; lote < MaxLotesPorRodada && !ct.IsCancellationRequested; lote++)
             {
-                var reservadas = await ReservarAsync(batchSize, ct);
+                var reserva = await ReservarAsync(batchSize, ct);
+                // #2875: o aviso ao cliente que expirou na fila vai à conversa dele como não entregue.
+                foreach (var expirada in reserva.Expiradas.Where(e => AvisoNaoEntregueNaConversa.Cobre(e.Tipo)))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    await RegistrarExpiradaNaConversaAsync(expirada, ct);
+                }
+
+                var reservadas = reserva.Mensagens;
                 if (reservadas.Count == 0) break;
 
                 foreach (var reservada in reservadas)
@@ -109,7 +128,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
     /// WhatsApp e SMS viram <c>Indeterminado</c>); (c) reserva as elegíveis. Devolve só ids: as linhas são relidas no
     /// escopo da empresa.
     /// </summary>
-    private async Task<IReadOnlyList<MensagemReservada>> ReservarAsync(int batchSize, CancellationToken ct)
+    private async Task<Reserva> ReservarAsync(int batchSize, CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
         var sp = scope.ServiceProvider;
@@ -120,24 +139,58 @@ public sealed class NotificacoesDispatcherOrchestrator(
 
         // #1566: o loop acorda a cada 10 s. Sem nenhuma Pendente ou EmEnvio os três passos abaixo não têm o que fazer
         // (expiração e reserva só leem Pendente; a reclamação de lease, só EmEnvio): uma consulta e o wakeup acaba.
-        if (!await outboxRepo.ExisteMensagemAbertaAsync(ct)) return [];
+        if (!await outboxRepo.ExisteMensagemAbertaAsync(ct)) return Reserva.Vazia;
 
-        return await unitOfWork.ExecuteInTransactionSemRetryAsync<IReadOnlyList<MensagemReservada>>(async token =>
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
         {
             var expiradas = await outboxRepo.ExpirarPendentesAsync(politica, LimiteExpiracaoPorPrazo, token);
             var reclamadas = await outboxRepo.ReclamarLeasesVencidosAsync(LimiteLeasesPorReserva, token);
-            if (expiradas + reclamadas > 0)
+            if (expiradas.Count + reclamadas > 0)
             {
                 // Grava antes de reservar: a reserva lê o banco e as mensagens devolvidas à fila precisam estar lá.
                 await unitOfWork.CommitAsync();
                 logger.LogWarning("Dispatcher: {Expiradas} mensagens expiradas por prazo e {Reclamadas} reclamadas por lease vencido.",
-                    expiradas, reclamadas);
+                    expiradas.Count, reclamadas);
             }
 
             var mensagens = await outboxRepo.ReservarParaEnvioAsync(batchSize, token);
             await unitOfWork.CommitAsync();
-            return mensagens.Select(m => new MensagemReservada(m.EmpresaId, m.Id, m.Canal)).ToList();
+            return new Reserva(mensagens.Select(m => new MensagemReservada(m.EmpresaId, m.Id, m.Canal)).ToList(), expiradas);
         }, ct);
+    }
+
+    /// <summary>
+    /// #2875: escopo da empresa da mensagem expirada, com commit próprio depois do commit da expiração. Uma falha aqui
+    /// perde só o registro na conversa, nunca a rodada. Nunca lança, salvo cancelamento do host.
+    /// </summary>
+    private async Task RegistrarExpiradaNaConversaAsync(NotificacaoExpirada expirada, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var sp = scope.ServiceProvider;
+            sp.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(expirada.EmpresaId);
+
+            var mensagem = await sp.GetRequiredService<IOutboxNotificacaoRepository>()
+                .ObterAsync(expirada.EmpresaId, expirada.Id, ct);
+            if (mensagem is not { Status: StatusOutbox.Expirado }) return;
+            var evento = await sp.GetRequiredService<IEventoNotificacaoRepository>()
+                .ObterAsync(expirada.EmpresaId, mensagem.EventoId, ct);
+            if (evento is null) return;
+
+            var prazo = sp.GetRequiredService<PoliticaValidadeNotificacao>().PrazoDe(evento.Tipo);
+            if (await new AvisoNaoEntregueNaConversa(sp.GetRequiredService<IConversaRepository>())
+                    .RegistrarExpiradoAsync(evento, mensagem, prazo, DateTime.UtcNow, ct))
+                await sp.GetRequiredService<IUnitOfWork>().CommitAsync();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Dispatcher: aviso expirado {OutboxId} não foi registrado na conversa do cliente.", expirada.Id);
+        }
     }
 
     /// <summary>Passo 2: escopo da empresa com <c>try/catch</c> próprio. Nunca lança, salvo cancelamento do host.</summary>
@@ -181,9 +234,13 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var renderer = sp.GetRequiredService<IRendererTemplate>();
         var bloqueioRepo = sp.GetRequiredService<IBloqueioNotificacaoRepository>();
         var canais = sp.GetRequiredService<IEnumerable<ICanalNotificacao>>().ToList();
+        // Sob demanda: só o aviso ao cliente que falhou precisa da conversa; os demais itens não dependem dela.
+        var avisoNaoEntregue = new Lazy<AvisoNaoEntregueNaConversa>(
+            () => new AvisoNaoEntregueNaConversa(sp.GetRequiredService<IConversaRepository>()));
 
         await ProcessarMensagemAsync(
-            mensagem, estado, canais, outboxRepo, logRepo, eventoRepo, templateRepo, rotinaRepo, bloqueioRepo, renderer, db, ct);
+            mensagem, estado, canais, outboxRepo, logRepo, eventoRepo, templateRepo, rotinaRepo, bloqueioRepo, renderer,
+            avisoNaoEntregue, db, ct);
     }
 
     /// <summary>
@@ -229,6 +286,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         IRotinaRepository rotinaRepo,
         IBloqueioNotificacaoRepository bloqueioRepo,
         IRendererTemplate renderer,
+        Lazy<AvisoNaoEntregueNaConversa> avisoNaoEntregue,
         EasyStockDbContext db,
         CancellationToken ct)
     {
@@ -262,6 +320,9 @@ public sealed class NotificacoesDispatcherOrchestrator(
         {
             abriuFallback = await EnviarERegistrarAsync(
                 mensagem, estado, canal, logRepo, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
+            if (!abriuFallback && mensagem.Status == StatusOutbox.Falhado && evento is not null
+                && estado.Resultado is { } resultado)
+                await RegistrarFalhaNaConversaAsync(avisoNaoEntregue, evento, mensagem, resultado, ct);
         }
 
         await PurgarPayloadSeForAUltimaAsync(mensagem, abriuFallback, outboxRepo, eventoRepo, ct);
@@ -319,6 +380,7 @@ public sealed class NotificacoesDispatcherOrchestrator(
         var sw = Stopwatch.StartNew();
         estado.CanalChamado = true;
         var resultado = await canal.EnviarAsync(mensagemPronta, ct);
+        estado.Resultado = resultado;
         sw.Stop();
         // O id do provider (wamid da Meta) vai no mesmo commit do resultado, qualquer que seja o desfecho: a N6 casa o
         // webhook de status por ele, inclusive o de uma entrega Indeterminada.
@@ -391,6 +453,26 @@ public sealed class NotificacoesDispatcherOrchestrator(
                 return mensagem.Status == StatusOutbox.Falhado
                     && await TentarFallbackCanalAsync(mensagem, eventoRepo, templateRepo, rotinaRepo, renderer, db, ct);
             }
+        }
+    }
+
+    /// <summary>
+    /// #2875: a falha definitiva do aviso ao cliente, sem fallback de canal aberto, vira não entregue na conversa dele,
+    /// no mesmo commit do item. A falha do registro só vai ao log: o canal já respondeu, e deixá-la subir viraria o
+    /// envio que falhou em <c>Indeterminado</c>.
+    /// </summary>
+    private async Task RegistrarFalhaNaConversaAsync(
+        Lazy<AvisoNaoEntregueNaConversa> avisoNaoEntregue, EventoNotificacao evento, OutboxMensagemNotificacao mensagem,
+        ResultadoEnvio resultado, CancellationToken ct)
+    {
+        try
+        {
+            await avisoNaoEntregue.Value.RegistrarFalhaAsync(evento, mensagem, resultado, DateTime.UtcNow, ct);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Dispatcher: aviso {OutboxId} que falhou não foi registrado na conversa do cliente.",
+                mensagem.Id);
         }
     }
 

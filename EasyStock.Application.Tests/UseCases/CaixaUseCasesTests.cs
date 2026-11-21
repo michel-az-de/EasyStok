@@ -23,7 +23,8 @@ public class CaixaUseCasesTests
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
     // #1547: a saída interativa roda dentro de ExecuteInTransactionSemRetryAsync.
-    public CaixaUseCasesTests() => _uow.SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>();
+    public CaixaUseCasesTests() => _uow.SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>()
+        .SetupExecuteInTransactionSemRetry<FechamentoCaixaResult>();
 
     // ════════════════════════════════════════════════════════════════════
     // AbrirCaixa
@@ -38,6 +39,36 @@ public class CaixaUseCasesTests
         var act = () => useCase.ExecuteAsync(new AbrirCaixaCommand(Guid.Empty, 100m));
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
+    }
+
+    // #2343 (R2-API-8): loja que nao e da empresa vira 400, nao DbUpdateException de FK (500).
+    [Fact]
+    public async Task AbrirCaixa_DeveLancarValidation_QuandoLojaNaoEhDaEmpresa()
+    {
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns((EasyStock.Domain.Entities.Loja?)null);
+        var useCase = new AbrirCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<AbrirCaixaUseCase>>(), null, lojas);
+
+        var act = () => useCase.ExecuteAsync(new AbrirCaixaCommand(Guid.NewGuid(), 100m, LojaId: Guid.NewGuid()));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*encontrada*");
+    }
+
+    [Fact]
+    public async Task AbrirCaixa_LojaExistenteNaEmpresa_NaoEhRecusada()
+    {
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(empresaId, lojaId).Returns(EasyStock.Domain.Entities.Loja.Criar(empresaId, "Centro"));
+        var useCase = new AbrirCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<AbrirCaixaUseCase>>(), null, lojas);
+
+        var ex = await Record.ExceptionAsync(() => useCase.ExecuteAsync(new AbrirCaixaCommand(empresaId, 100m, LojaId: lojaId)));
+
+        (ex is UseCaseValidationException { Message: var msg } && msg.Contains("encontrada")).Should().BeFalse();
+        await lojas.Received(1).GetByIdAsync(empresaId, lojaId);
     }
 
     [Fact]
@@ -175,6 +206,59 @@ public class CaixaUseCasesTests
     }
 
     [Fact]
+    public async Task FecharCaixa_ResolveOsAvisosDoSinoDoCaixaQueFechou()
+    {
+        // #2258 (F1): fechou o caixa, o sino não pode seguir dizendo que ele está aberto.
+        var empresaId = Guid.NewGuid();
+        var data = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var avisos = Substitute.For<INotificacaoRepository>();
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(MovimentoCaixa.Criar(empresaId, "abertura", 100m));
+        _repo.GetFechamentoDoDiaAsync(empresaId, data, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, data, null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow, Substitute.For<ILogger<FecharCaixaUseCase>>(), null, avisos);
+        await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, data));
+
+        await avisos.Received(1).ResolverAvisosDeCaixaFechadoAsync(empresaId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FecharCaixa_FalhaAoResolverAvisosNaoDesfazOFechamento()
+    {
+        var empresaId = Guid.NewGuid();
+        var data = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var avisos = Substitute.For<INotificacaoRepository>();
+        avisos.ResolverAvisosDeCaixaFechadoAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<int>(new InvalidOperationException("banco")));
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(MovimentoCaixa.Criar(empresaId, "abertura", 100m));
+        _repo.GetFechamentoDoDiaAsync(empresaId, data, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, data, null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 100m) });
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow, Substitute.For<ILogger<FecharCaixaUseCase>>(), null, avisos);
+        var result = await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, data));
+
+        result.EmpresaId.Should().Be(empresaId);
+        await _uow.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task FecharCaixa_Idempotente_NaoMexeNosAvisos()
+    {
+        var empresaId = Guid.NewGuid();
+        var data = DateOnly.FromDateTime(DateTime.UtcNow);
+        var avisos = Substitute.For<INotificacaoRepository>();
+        _repo.GetFechamentoDoDiaAsync(empresaId, data, null)
+            .Returns(FechamentoCaixa.Criar(empresaId, data, 100, 500, 0, 0, 0));
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow, Substitute.For<ILogger<FecharCaixaUseCase>>(), null, avisos);
+        await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, data));
+
+        await avisos.DidNotReceiveWithAnyArgs().ResolverAvisosDeCaixaFechadoAsync(default, default);
+    }
+
+    [Fact]
     public async Task FecharCaixa_MarcadorFechamento_DeveUsarDataMovimentoUtc()
     {
         // Regressao #615: data.ToDateTime(TimeOnly.MaxValue) gerava Kind=Unspecified, que o
@@ -246,6 +330,61 @@ public class CaixaUseCasesTests
         await _uow.Received(1).CommitAsync();
     }
 
+    [Fact]
+    public async Task FecharCaixa_AvisoDeDiasIntermediarios_DeveSairComAcentoESemCaixaAlta()
+    {
+        // #2256: o aviso fica gravado nas observações e aparece na tela do fechamento.
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var dia = hoje.AddDays(-3);
+        var abertura = MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-3));
+        var esquecido = MovimentoCaixa.Criar(empresaId, "entrada", 20m, DateTime.UtcNow.AddDays(-2));
+
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(abertura);
+        _repo.GetFechamentoDoDiaAsync(empresaId, dia, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, dia, null).Returns(new[] { abertura });
+        _repo.GetMovimentosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(new[] { esquecido });
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<FecharCaixaUseCase>>());
+
+        await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId));
+
+        var esperado = $"Atenção: há lançamentos entre {dia.AddDays(1):dd/MM/yyyy} e {hoje.AddDays(-1):dd/MM/yyyy} " +
+                       "nesta sessão que não entraram neste fechamento. Revise e reconcilie manualmente.";
+        await _repo.Received(1).AddFechamentoAsync(Arg.Is<FechamentoCaixa>(f => f.Observacoes == esperado));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FecharCaixa_ExpoeSinalTipadoDeLancamentosForaDoFechamento(bool haLancamentoOrfao)
+    {
+        // #2507 (N1): o Web decide o toast por este campo, não pela frase das observações. O teste trava o nome
+        // que vai no JSON da API (camelCase, JsonSerializerDefaults.Web), o mesmo que CaixaFechamentoAvisoTests lê.
+        var empresaId = Guid.NewGuid();
+        var hoje = EasyStock.Application.Common.HorarioBrasil.Hoje();
+        var dia = hoje.AddDays(-3);
+        var abertura = MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-3));
+        var esquecido = MovimentoCaixa.Criar(empresaId, "entrada", 20m, DateTime.UtcNow.AddDays(-2));
+
+        _repo.GetAberturaPendenteAsync(empresaId, null).Returns(abertura);
+        _repo.GetFechamentoDoDiaAsync(empresaId, dia, null).Returns((FechamentoCaixa?)null);
+        _repo.GetMovimentosDoDiaAsync(empresaId, dia, null).Returns(new[] { abertura });
+        _repo.GetMovimentosNoIntervaloAsync(empresaId, Arg.Any<DateTime>(), Arg.Any<DateTime>(), null)
+            .Returns(haLancamentoOrfao ? new[] { esquecido } : Array.Empty<MovimentoCaixa>());
+
+        var useCase = new FecharCaixaUseCase(_repo, _uow,
+            Substitute.For<ILogger<FecharCaixaUseCase>>());
+
+        var result = await useCase.ExecuteAsync(new FecharCaixaCommand(empresaId, Observacoes: "Nota do operador"));
+
+        var json = System.Text.Json.JsonSerializer.Serialize(result,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        json.Should().Contain($"\"lancamentosForaDoFechamento\":{(haLancamentoOrfao ? "true" : "false")}");
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // RegistrarMovimentoCaixa
     // ════════════════════════════════════════════════════════════════════
@@ -282,6 +421,24 @@ public class CaixaUseCasesTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>()
             .WithMessage("*maior que zero*");
+    }
+
+    // #2481: a loja vem do corpo do lançamento. Loja de outra empresa ou inexistente vira 400, não movimento com
+    // loja alheia nem FK (500) no insert, como já faz a abertura (#2343).
+    [Fact]
+    public async Task RegistrarMovimento_DeveLancarValidation_QuandoLojaNaoEhDaEmpresa()
+    {
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns((EasyStock.Domain.Entities.Loja?)null);
+        var useCase = new RegistrarMovimentoCaixaUseCase(_repo, _uow,
+            new ObterCaixaDiaUseCase(new CaixaSaldoCalculator(_repo)),
+            Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>(), lojas);
+
+        var act = () => useCase.ExecuteAsync(
+            new RegistrarMovimentoCaixaCommand(Guid.NewGuid(), "entrada", 50m, LojaId: Guid.NewGuid()));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*encontrada*");
+        await _repo.DidNotReceive().AddMovimentoAsync(Arg.Any<EasyStock.Domain.Entities.MovimentoCaixa>());
     }
 
     [Fact]
@@ -419,7 +576,7 @@ public class CaixaUseCasesTests
     // #1547: a saída interativa confere o saldo e grava atrás da trava do caixa, na mesma transação.
     // A corrida em si é provada contra Postgres em SangriaSimultaneaIntegrationTests.
     [Fact]
-    public async Task RegistrarMovimento_SaidaInterativa_TravaOCaixaAntesDeLerOSaldo_EMobileNaoTrava()
+    public async Task RegistrarMovimento_SaidaInterativa_TravaOCaixaAntesDeLerOSaldo_EMobileTravaSemConferirSaldo()
     {
         var empresaId = Guid.NewGuid();
         var lojaId = Guid.NewGuid();
@@ -443,7 +600,9 @@ public class CaixaUseCasesTests
 
         _repo.ClearReceivedCalls();
         await useCase.ExecuteAsync(new RegistrarMovimentoCaixaCommand(empresaId, "saida", 80m, LojaId: lojaId, Origem: "mobile"));
-        await _repo.DidNotReceive().TravarSaidasAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        // #2629: o sync do mobile também espera o fechamento em curso, mas não confere saldo (fato já ocorrido).
+        await _repo.Received(1).TravarSaidasAsync(empresaId, lojaId, Arg.Any<CancellationToken>());
+        await _repo.DidNotReceive().GetMovimentosDoDiaAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid?>());
         await _repo.Received(1).AddMovimentoAsync(Arg.Any<MovimentoCaixa>());
     }
 
@@ -642,6 +801,36 @@ public class CaixaUseCasesTests
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
         await _uow.DidNotReceive().CommitAsync();
+    }
+
+    // #2687 (F2, homologação #1769): o lançamento que nasce do pagamento de uma parcela só sai junto com o
+    // pagamento. Estornado pelo Caixa, a conta seguia paga e Extrato e Visão geral divergiam; estornar pela
+    // conta já desfaz o Caixa (EstornarPagamentoParcelaUseCase).
+    [Theory]
+    [InlineData("cp", "saida")]
+    [InlineData("cr", "entrada")]
+    public async Task EstornarMovimento_recusa_lancamento_de_pagamento_de_parcela(string lado, string tipo)
+    {
+        var empresaId = Guid.NewGuid();
+        var mov = MovimentoCaixa.Criar(empresaId, tipo, 100m);
+        mov.Referencia = ReferenciaDeParcela.DoPagamento(lado, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        _repo.GetMovimentoAsync(empresaId, mov.Id).Returns(mov);
+        var useCase = NovoEstornar();
+
+        var act = () => useCase.ExecuteAsync(new EstornarMovimentoCaixaCommand(empresaId, mov.Id, Motivo: "teste"));
+
+        (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Message.Should().Contain("pela conta");
+        mov.EstornadoEm.Should().BeNull();
+        await _repo.DidNotReceive().UpdateMovimentoAsync(Arg.Any<MovimentoCaixa>());
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public void Referencia_de_parcela_e_reconhecida_e_a_comum_nao()
+    {
+        ReferenciaDeParcela.EhDeParcela(ReferenciaDeParcela.DoPix("cr", Guid.NewGuid(), Guid.NewGuid(), "txid123")).Should().BeTrue();
+        ReferenciaDeParcela.EhDeParcela("pedido:123").Should().BeFalse();
+        ReferenciaDeParcela.EhDeParcela(null).Should().BeFalse();
     }
 
     [Fact]
@@ -1111,6 +1300,7 @@ public class CaixaUseCasesTests
             new EstornarMovimentoCaixaCommand(empresaId, suprimento.Id, Origem: "mobile"));
 
         result!.EstornadoEm.Should().NotBeNull();
-        await _repo.DidNotReceive().TravarSaidasAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+        // #2736: a trava vale para qualquer origem (o fechamento a toma); só a conferência da gaveta fica de fora.
+        await _repo.Received(1).TravarSaidasAsync(empresaId, null, Arg.Any<CancellationToken>());
     }
 }

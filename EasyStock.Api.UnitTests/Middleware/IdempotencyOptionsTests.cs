@@ -14,6 +14,14 @@ public class IdempotencyOptionsTests
             .PathMatchesAny(rota).Should().BeTrue();
     }
 
+    // #2401 (C3.5): o console repetia "Nova viagem" depois de uma resposta perdida e criava duas viagens.
+    [Fact]
+    public void Criar_viagem_usa_a_protecao_de_retentativa()
+    {
+        EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
+            .PathMatchesAny("/api/atendimento/viagens").Should().BeTrue();
+    }
+
     [Fact]
     public void Gerar_pedidos_da_lista_de_compras_usa_a_protecao_de_retentativa()
     {
@@ -31,6 +39,18 @@ public class IdempotencyOptionsTests
     {
         EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
             .PathMatchesAny($"/api/atendimento/conversas/{Guid.NewGuid()}/{sufixo}").Should().BeTrue();
+    }
+
+    // #2462: timeout que gravou e o mesmo cadastro enviado de novo criavam um segundo registro.
+    [Theory]
+    [InlineData("/api/clientes")]
+    [InlineData("/api/fornecedores")]
+    [InlineData("/api/produtos")]
+    [InlineData("/api/notificacoes/templates")]
+    public void Criacao_de_cadastro_usa_a_protecao_de_retentativa(string rota)
+    {
+        EasyStock.Api.Hosting.PipelineExtensions.ConfigurarRotasIdempotentes(new IdempotencyOptions())
+            .PathMatchesAny(rota).Should().BeTrue();
     }
 
     [Fact]

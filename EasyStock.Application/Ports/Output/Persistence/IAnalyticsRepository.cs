@@ -26,7 +26,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         int Mes,
         decimal ReceitaBruta,
         int TotalVendas,
-        int TotalItensVendidos,
+        decimal TotalItensVendidos,
         decimal TicketMedio);
 
     public sealed record MargemPorProduto(
@@ -36,7 +36,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         decimal PrecoMedioVenda,
         decimal MargemAbsoluta,
         decimal MargemPercentual,
-        int QuantidadeVendida);
+        decimal QuantidadeVendida);
 
     public sealed record MovimentacaoResumo(
         int Ano,
@@ -70,7 +70,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public sealed record SazonalidadeMensal(
         int Ano,
         int Mes,
-        int TotalSaidas,
+        decimal TotalSaidas,
         decimal ValorTotal,
         decimal MediaMovelTresMeses);
 
@@ -99,10 +99,17 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public sealed record VendaPorCanal(
         CanalVenda Canal,
         int TotalVendas,
-        int TotalItensVendidos,
+        decimal TotalItensVendidos,
         decimal ReceitaTotal,
         decimal TicketMedio,
         decimal PercentualReceita);
+
+    /// <summary>#2928 (S5): pedidos válidos agrupados por plataforma e campanha; nulos = sem origem ou sem campanha.</summary>
+    public sealed record PedidoPorAnuncio(
+        string? Plataforma,
+        string? Campanha,
+        int TotalPedidos,
+        decimal ValorTotal);
 
     // ── Store Intelligence DTOs ──────────────────────────────────────────
 
@@ -147,7 +154,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
     public sealed record ProdutoTurnover(
         Guid ProdutoId,
         string NomeProduto,
-        int QuantidadeVendida,
+        decimal QuantidadeVendida,
         decimal ReceitaGerada,
         decimal TaxaSaidaDiaria);
 
@@ -336,7 +343,7 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null);
 
         /// <summary>Margem por produto nos últimos N dias.</summary>
-        Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null);
+        Task<(IReadOnlyList<MargemPorProduto> Items, int TotalCount)> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null);
 
         /// <summary>Resumo de movimentações agrupado por dia/mês.</summary>
         Task<IReadOnlyList<MovimentacaoResumo>> GetMovimentacoesResumoAsync(
@@ -375,6 +382,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
 
         /// <summary>Vendas agrupadas por canal de venda.</summary>
         Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null);
+
+        /// <summary>#2928 (S5): pedidos (não cancelados nem rascunhos, por <c>CriadoEm</c>) por plataforma e campanha do anúncio.</summary>
+        Task<IReadOnlyList<PedidoPorAnuncio>> GetPedidosPorAnuncioAsync(Guid empresaId, DateTime de, DateTime ate);
 
         // ── Receita × Custo ─────────────────────────────────────────────
 

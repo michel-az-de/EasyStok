@@ -227,7 +227,9 @@ public sealed class ContaReceberRepository(EasyStockDbContext db, TimeProvider? 
             .IgnoreQueryFilters()
             .Where(p =>
                 p.EfiTxid != null &&
-                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga) &&
+                // #2501: a vencida também; o cliente pode pagar o Pix depois do vencimento.
+                (p.Status == StatusParcela.Pendente || p.Status == StatusParcela.ParcialmentePaga ||
+                 p.Status == StatusParcela.Vencida) &&
                 (p.PixExpiraEm == null || p.PixExpiraEm > horizonte))
             .ToListAsync(ct);
     }

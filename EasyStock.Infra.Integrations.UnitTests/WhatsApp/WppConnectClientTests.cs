@@ -40,6 +40,29 @@ public class WppConnectClientTests
         _http.Chamadas.Should().HaveCount(1);
     }
 
+    /// <summary>
+    /// #2515: a conta comum não tem botão. As opções saem numeradas e o menu fica guardado para o "2" do cliente voltar
+    /// como o toque no segundo botão.
+    /// </summary>
+    [Fact]
+    public async Task Botoes_saem_numerados_e_o_menu_fica_guardado_para_a_resposta()
+    {
+        var menus = Substitute.For<IMenusNumeradosWppConnect>();
+        _http.Quando(HttpMethod.Post, $"/api/{_sessao.Sessao}/send-message")
+            .Responde(HttpStatusCode.Created, """{"status":"success","response":[{"id":{"_serialized":"true_contato_MENU"}}]}""");
+        var client = new WppConnectClient(_http.CriarClient("http://wpp.test/"),
+            Options.Create(new WppConnectOptions { Habilitado = true, SecretKey = "segredo-teste", WebhookToken = "token-webhook-teste" }),
+            _remetente, menus: menus);
+        (string Id, string Titulo)[] opcoes = [("acao:escolher_janela:a:2026-11-14", "14/11 09:00-12:00"), ("acao:escolher_janela:b:2026-11-14", "14/11 12:00-15:00")];
+
+        await client.EnviarBotoesAsync("5511999999999", "Escolha a janela de entrega:", opcoes);
+
+        System.Text.Json.JsonDocument.Parse(_http.UltimaChamada!.Corpo!).RootElement.GetProperty("message").GetString()
+            .Should().Be("Escolha a janela de entrega:\n1. 14/11 09:00-12:00\n2. 14/11 12:00-15:00");
+        await menus.Received(1).GuardarAsync(_sessao.Sessao, "5511999999999",
+            Arg.Is<IReadOnlyList<(string Id, string Titulo)>>(o => o.SequenceEqual(opcoes)), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Falha_do_servidor_nao_repete_envio()
     {
@@ -125,6 +148,21 @@ public class WppConnectClientTests
         _http.Quando(HttpMethod.Get, $"/api/{_sessao.Sessao}/contact/pn-lid/123%40lid")
             .Responde(HttpStatusCode.OK, """{"lid":{"_serialized":"123@lid"},"phoneNumber":{"id":"5511999999999","server":"c.us","_serialized":"5511999999999@c.us"},"contact":null}""");
         (await Client.ResolverTelefoneAsync(_sessao, "123@lid")).Should().Be("5511999999999");
+    }
+
+    [Fact]
+    public async Task Lista_mensagens_recentes_com_id_em_texto_ou_objeto_e_descarta_as_sem_id()
+    {
+        // #2590: a mensagem lida depois do evento já traz o id que o webhook perdeu.
+        _http.Quando(HttpMethod.Get, $"/api/{_sessao.Sessao}/get-messages/5511999999999%40c.us")
+            .Responde(HttpStatusCode.OK, """{"status":"success","response":[{"id":"false_5511999999999@c.us_ABC","t":1793000000,"fromMe":false,"type":"chat","body":"Oi"},{"id":{"_serialized":"true_5511999999999@c.us_DEF"},"t":1793000001,"fromMe":true,"type":"image"},{"t":1793000002,"fromMe":false}]}""");
+
+        var recentes = await Client.ListarMensagensRecentesAsync(_sessao, "5511999999999@c.us");
+
+        recentes.Should().Equal(
+            new MensagemRecenteWppConnect("false_5511999999999@c.us_ABC", 1793000000, false, "chat", "Oi"),
+            new MensagemRecenteWppConnect("true_5511999999999@c.us_DEF", 1793000001, true, "image", null));
+        _http.UltimaChamada!.Uri.Query.Should().Be("?count=30");
     }
 
     [Fact]

@@ -1,31 +1,20 @@
 /* Campo com máscara (seção 2 e 4 da direção visual): moeda, telefone e cep.
    Mesmo alvo de toque e mesmo acabamento do Campo.jsx comum; o dado sai
-   alinhado à direita, em algarismo tabular, porque é número que a mão
-   precisa comparar. */
-.campo { min-width: 0; }
-.rotulo {
-  display: block; font-size: var(--t-apoio); font-weight: 600;
-  color: var(--tinta-2); margin-bottom: var(--e-2); line-height: var(--lh-compacto);
-}
+   em algarismo tabular; só a moeda sai à direita (#2258, T15). */
+.campo { composes: campo from './Campo.module.css'; }
+.rotulo { composes: rotulo from './Campo.module.css'; }
+/* #2762 (A17): fundo, linha, hover, foco, desabilitado e fonte de 16 px no celular vêm do Campo.module.css;
+   aqui só o que é da máscara: dado em fonte tabular, negrito e texto à esquerda. */
 .controle {
-  width: 100%; min-width: 0; max-width: 100%; min-height: var(--toque); padding: var(--e-2) var(--e-3);
-  border: 0; border-radius: var(--r-1);
-  background: var(--preenchimento); color: var(--tinta);
-  font-family: var(--f-dado); font-size: var(--t-corpo); font-weight: 600; text-align: right;
-  font-variant-numeric: tabular-nums;
-  transition: background-color var(--dur-curta) var(--ease-padrao);
+  composes: controle from './Campo.module.css';
+  font-family: var(--f-dado); font-weight: 600; text-align: left; font-variant-numeric: tabular-nums;
 }
-.controle:is(input) { height: var(--toque); padding-block: var(--e-1); }
 /* #1761 (L22): o exemplo de telefone e de CEP, à direita e em negrito, parecia dado preenchido.
    Vazio, o campo mostra o exemplo à esquerda e com cara de exemplo. Moeda segue à direita. */
 .controle::placeholder { color: var(--tinta-3); font-weight: 400; }
-.controle:not([data-tipo='moeda']):placeholder-shown { text-align: left; }
-.controle:hover:not(:disabled) { background: var(--preenchimento-forte); }
-.controle:focus { outline: none; background: var(--preenchimento-forte); }
-.controle:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
-.controle:disabled { background: var(--preenchimento); color: var(--tinta-3); }
-.controle.erro { box-shadow: inset 0 -2px 0 var(--erro); }
-.erroTexto { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--erro); }
+/* #2258 (T15): texto à esquerda em todo campo; à direita só dinheiro, que se compara pela casa decimal. */
+.controle[data-tipo='moeda'] { text-align: right; }
+.controle.erro { box-shadow: inset 0 0 0 var(--b-2) var(--erro); }
+.erroTexto { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--erro); font-weight: 600; }
 .dica { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3); }
 output.dica { display: block; }
-@media (max-width: 759px), (pointer: coarse) { .controle { font-size: 1rem; } }

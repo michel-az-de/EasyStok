@@ -3,16 +3,13 @@ using System.Text.Json;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.Atendimento;
-using EasyStock.Application.UseCases.Pedidos.Cobranca;
-using EasyStock.Domain.Exceptions.Storefront;
 
 namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 
 /// <summary>
 /// <c>criar_pedido</c> (S06 ligada na S11): fecha o pedido da conversa pelo núcleo do checkout (S10,
-/// <see cref="CriarPedidoAtendimentoUseCase"/>) e cobra pelo Mercado Pago (<see cref="GerarCobrancaPedidoUseCase"/>).
-/// Devolve resumo, total e o link; o agente responde ao cliente, e a resposta sai pela porta do canal da
-/// conversa como toda mensagem do agente.
+/// <see cref="CriarPedidoAtendimentoUseCase"/>) sem cobrar (#2544, S73): devolve <c>pedidoId</c> e o resumo. O cliente
+/// confere o resumo em imagem (<c>enviar_resumo_pedido</c>) e só com o ok o link sai (<c>enviar_link_pagamento</c>).
 ///
 /// <para>
 /// Janela e endereço são opcionais: sem janela, vale a única ativa do dia; sem endereço, o padrão (ou o
@@ -22,7 +19,6 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 /// </summary>
 public sealed class CriarPedidoFerramenta(
     CriarPedidoAtendimentoUseCase criarPedido,
-    GerarCobrancaPedidoUseCase gerarCobranca,
     IClienteRepository clienteRepository,
     IStorefrontRepository storefrontRepository,
     IJanelaEntregaRepository janelaRepository) : IFerramentaAgente
@@ -30,9 +26,9 @@ public sealed class CriarPedidoFerramenta(
     public string Nome => "criar_pedido";
 
     public string Descricao =>
-        "Cria o pedido do cliente desta conversa e gera o link de pagamento (Pix ou cartão, válido por 30 minutos). " +
-        "Use os ids de consultar_cardapio. Devolve resumo, total e link; se faltar janela ou endereço, devolve as opções " +
-        "para você perguntar ao cliente.";
+        "Cria o pedido do cliente desta conversa, ainda sem link de pagamento. Use os ids de consultar_cardapio. " +
+        "Devolve pedido_id, itens, frete, total e entrega; se faltar janela ou endereço, devolve as opções para você " +
+        "perguntar ao cliente. Depois use enviar_resumo_pedido com o pedido_id.";
 
     public string SchemaJson => """
         {"type":"object","properties":{
@@ -51,7 +47,7 @@ public sealed class CriarPedidoFerramenta(
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
         var conversa = contexto.Conversa;
-        if (conversa.ClienteId is not { } clienteId)
+        if (contexto.ClienteIdEsperado is not { } clienteId)
             return Erro("cliente_nao_identificado");
 
         var itens = LerItens(entrada);
@@ -96,20 +92,27 @@ public sealed class CriarPedidoFerramenta(
         {
             reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
                 contexto.EmpresaId, conversa.Id, clienteId, itens, janelaId.Value, dataEntrega, enderecoId.Value,
-                FerramentaJson.LerTexto(entrada, "observacoes")), ct);
+                FerramentaJson.LerTexto(entrada, "observacoes"),
+                VinculoRevisaoEsperada: contexto.VinculoRevisaoEsperada,
+                SituacaoEsperada: contexto.SituacaoEsperada), ct);
         }
         catch (ClienteBloqueadoException)
         {
             return Erro(ClienteBloqueadoException.CodigoErro);
+        }
+        catch (ContextoPedidoAtendimentoAlteradoException)
+        {
+            contexto.Interromper();
+            return Erro("contexto_alterado");
         }
         catch (RegraDeDominioVioladaException ex)
         {
             return FerramentaJson.Serializar(new { erro = "pedido_recusado", motivo = ex.Message });
         }
 
-        var resumo = new
+        return FerramentaJson.Serializar(new
         {
-            pedidoId = reservado.Pedido.Id,
+            pedido_id = reservado.Pedido.Id,
             itens = reservado.Itens.Select(i => new
             {
                 nome = i.Nome,
@@ -120,37 +123,9 @@ public sealed class CriarPedidoFerramenta(
             frete = FerramentaJson.FormatarReais(reservado.ItemFrete.PrecoUnitario),
             total = FerramentaJson.FormatarReais(reservado.Total),
             entrega = dataEntrega.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
-        };
-
-        try
-        {
-            var cobranca = await gerarCobranca.ExecuteAsync(reservado, conversa.Id, ct);
-            contexto.RegistrarRespostaVerificada($"Pedido registrado. Total: {resumo.total}. Entrega agendada para {resumo.entrega}. " +
-                $"Aguardando pagamento. Pague por este link: {cobranca.LinkPagamento}");
-            return FerramentaJson.Serializar(new
-            {
-                resumo.pedidoId,
-                resumo.itens,
-                resumo.frete,
-                resumo.total,
-                resumo.entrega,
-                linkPagamento = cobranca.LinkPagamento,
-                validoAte = cobranca.ExpiraEm is { } expira
-                    ? HorarioBrasil.ConverterParaBrasilia(expira).ToString("HH:mm", CultureInfo.InvariantCulture)
-                    : null,
-                formasPagamento = "Pix ou cartão, como preferir",
-            });
-        }
-        catch (MercadoPagoIndisponivelException)
-        {
-            // #1301: a cobrança desfez o pedido e liberou a vaga; nada fica preso esperando reemissão.
-            return FerramentaJson.Serializar(new
-            {
-                erro = "pagamento_indisponivel",
-                resumo.total,
-                orientacao = "O link de pagamento não saiu e o pedido não foi fechado. Peça um instante ao cliente e chame criar_pedido de novo; se falhar outra vez, use escalar_para_dona.",
-            });
-        }
+            orientacao = "Pedido criado, ainda sem link. Use enviar_resumo_pedido com este pedido_id e peça o ok do cliente; " +
+                "com o ok, use enviar_link_pagamento.",
+        });
     }
 
     private static string Erro(string codigo) => FerramentaJson.Serializar(new { erro = codigo });

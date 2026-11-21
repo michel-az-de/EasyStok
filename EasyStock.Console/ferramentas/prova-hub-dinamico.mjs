@@ -25,7 +25,8 @@ assert.deepEqual(normalizarPreferenciasHall({ paineis: [] }).paineis, [])
 assert.equal(normalizarPreferenciasHall({ foco: 'privado' }).foco, 'atendimento')
 assert.equal('ritmo' in normalizarPreferenciasHall({ ritmo: true }), false)
 for (const [foco, esperado] of [
-  ['atendimento', ['atendimento', 'entregas', 'cozinha', 'financeiro']],
+  // #2258 (auditoria A2): Cozinha antes de Entregas na ordem de uso.
+  ['atendimento', ['atendimento', 'cozinha', 'entregas', 'financeiro']],
   ['gestao', ['financeiro', 'atendimento', 'entregas', 'cozinha']],
   ['producao', ['cozinha', 'entregas', 'atendimento', 'financeiro']],
 ]) {

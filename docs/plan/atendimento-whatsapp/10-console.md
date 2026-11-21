@@ -183,3 +183,164 @@ aditiva em `KdsPedidoDto`, com `EmpresaId` no WHERE da leitura do cliente e test
 
 **Fora.** Arrastar parada, editar entregador, editar janela e zona já criadas (só ativar e desativar),
 relatório por bairro e o endereço de `ClienteEndereco` (a leitura usa os campos primários do cliente).
+
+## R4 · Cadastros no contexto do Atendimento (#2395)
+
+Cadastros reutiliza os contratos de clientes, produtos, fornecedores, respostas prontas, etiquetas e
+impressão. O menu compartilha o acesso ao Atendimento; cada recurso mantém sua autorização própria.
+Leads são clientes persistidos sem pedidos. Conversas sem `ClienteId` aparecem como “Sem cadastro”.
+Filtros de relacionamento e produto são aplicados no servidor antes da paginação.
+Listagem e detalhe de clientes calculam quantidade e última compra pelos pedidos da empresa,
+incluindo Atendimento; o contador legado não determina se a pessoa continua sendo lead.
+
+- `api/cadastros/contas-bancarias` e `metodos-pagamento`: tenant do JWT, revisão concorrente e
+  `requestId`. Gestão exige perfil de gerência e permissão financeira; recebimento usa apenas métodos
+  ativos. Recibos repetidos e pagamentos confirmados pelo provedor continuam recuperáveis.
+- `api/atendimento/conversas/{id}/vinculo-cliente`: retirada, restauração ou escolha explícita com
+  revisão esperada, motivo e ator. Qualquer pedido histórico bloqueia a correção; conversas legadas
+  sem histórico verificável também bloqueiam. Auditoria, expiração de links e revogação das sessões
+  daquele chat são transacionais. Cadastros, OTP pessoal, mensagens e rascunhos são preservados.
+- `candidatos-cliente`: telefone compartilhado não escolhe nem funde pessoas automaticamente.
+- Criar pedido pela comanda exige `clienteId` e `vinculoRevisao` da proposta vista no Console.
+  O servidor confere esse snapshot novamente sob lock, inclusive após retirar e restaurar a mesma pessoa.
+- Salvar nome, telefone ou endereço pela ficha também exige a identidade capturada ao abrir a edição.
+  `clienteId: null` é explícito para cadastro inicial; ausência dos campos recebe 400 e revisão obsoleta
+  recebe 409 `VINCULO_CLIENTE_ALTERADO`. Reconferir o destino preserva o texto sem gravar automaticamente.
+- Desfazer a edição de uma conta bancária gera uma nova alteração somente nessa conta, usando a revisão
+  da gravação original. Uma edição posterior recebe 409; alterações independentes permanecem.
+- Falha de armazenamento local mantém a proposta em memória e avisa que ela não será retomada após
+  recarregar. Pagamento na entrega sem recebimento não dispara confirmação de pagamento.
+- `api/atendimento/assistente/cadastro`: propõe até três campos com evidência literal de mensagens
+  recebidas. Reutiliza `IMontagemFichaLlmClient`, sua configuração e o adaptador CLI restrito ou API;
+  não grava cadastro nem envia mensagens. Mudança de sessão, conversa, cliente ou revisão invalida a
+  sugestão e impede aplicar uma resposta atrasada.
+- Modelos de notificação mantêm a versão publicada enquanto a próxima é rascunho. Aprovar a versão
+  atual publica e desativa a anterior na mesma transação; `apenasAtuais=true` filtra antes da paginação.
+
+Ao liberar pedido com cobrança online, a decisão é tomada sob lock, mas a troca de forma e a
+conciliação usam suas próprias transações. A recusa de troca por pagamento já confirmado não pode
+desfazer o recebimento. O caminho normal mantém status, estoque, auditoria e outbox atômicos.
+
+Provas reproduzíveis: `prova-2395-cadastros.mjs`, `prova-2395-vinculo.mjs` e
+`prova-2395-navegador.mjs` cobrem regras e componentes. `prova-2395-api-real.mjs` e
+`prova-2395-jornada-api.mjs` usam a fixture opt-in `R4_FixtureLocalComLoginReal` com PostgreSQL e JWT.
+Somente provedores externos são substituídos nessa fixture. `CadastroClaudeCliRealTests` é uma prova
+opt-in separada do provedor real com dados sintéticos; não equivale à homologação de mensagens ou
+pagamentos. Evidências de execução e aceite ficam na issue e na PR.
+
+Auditoria factual dos 25 casos da matriz externa `aceites.json`, em 12/11/2026: as provas abaixo
+demonstram os recortes descritos, não uma aprovação integral de 25/25. Artefatos locais estão em
+`EasyStock.Console/.build/2395/` e não são versionados. `real/` usa UI, JWT, API e PostgreSQL reais,
+com provedores de mensagem, pagamento e LLM controlados; resultados de componentes com HTTP
+controlado e testes de contrato são identificados separadamente. A leitura desta tabela não reexecuta
+as baterias anteriores ao rebase.
+
+Complemento da candidata `95f915a7dfb5ca77a609bca5e650ecdab64270ea`: API
+`1.11.0+95f915a7dfb5ca77a609bca5e650ecdab64270ea`, SHA-256
+`71a96c4031613078951d72fdef4c523bffd7debc9d8db46a4e80def4a4f78a1d`.
+Nesta tabela, `banca/` indica a pasta local de evidências independentes
+`C:/Users/felip/.codex/visualizations/2026/11/12/01a1d012-e600-7dc3-b035-129f9186bf5e/acompanhamento-implementacao-r4/`.
+Os resultados identificam a versão em que foram executados; não aprovam automaticamente versões posteriores.
+Os retestes abaixo usam a candidata `d70b62b5340b9b4839e5c620d56e5965f1443c37`, API
+`1.11.0+d70b62b5340b9b4839e5c620d56e5965f1443c37`, SHA-256
+`97eab0f3211d8b563f78227d5583bd748b8f770d98e91c7380812254b90427a0`.
+O operacional fecha sete recortes e a jornada mobile foi repetida nessa versão.
+I01 e S01 foram retestados no WIP de integração sobre
+`48325986293b9f02ad36eae334cd14b0af71bfc8`, base `02c704b0f75ce7c48caed0dff2ac403de83f48b2`.
+Esse WIP não é uma árvore limpa: dez arquivos e onze assets estão identificados por hash em
+`.build/r4-final-wip-runtime.json` (SHA-256 `f9571e3581b919237319d9541397f9aab385375504182e07771f23fddb045071`).
+A API exercitada tem SHA-256 `afd622a29c8b5da83e247b67793150b8e3dfd10027517649cf18e9b548ade8f4`.
+Cada artefato conserva a versão/origem da prova; não se atribuem as jornadas anteriores a um commit futuro.
+O ajuste final dos rótulos, sem mudar EhCompra/EhLead, está em `.build/r4-final-rotulos-runtime.json`
+(SHA-256 `5add5e253940531d2e7b10468286f2faf039845ad6ec7fd4b206ca401b56076c`), com doze arquivos e onze assets identificados.
+
+Validação do WIP integrado: gate 69, Application 4137, APIUnit 2062, PostgreSQL 13 e HTTP/API 13,
+sem falhas ou ignorados nesses filtros .NET. Os 13 HTTP incluem os três REDs da CI95, o controle,
+sete C01, autoria J05 e origem/fila E02. A correção mantém o CAS externo: nova unidade de trabalho
+após rollback de cobertura e cadastro/encaminhamento sob a mesma transação.
+Logs: `.build/r4-{gate,app,api-unit,postgre,api}-final-integrado.log`.
+Console: 213 provas executadas verdes e 71 excetuadas pelo runner, discriminadas em
+`EasyStock.Console/.build/2395/qualidade-final-integrada.log`; não são 284 execuções. Domain/Conversa
+teve 50 aprovações na d70 (`.build/r4-domain-onda3.log`).
+
+Após integrar o master `601d48502`, o executor passou a fornecer `CONSOLE_URL` e
+`CONSOLE_TEST_URL` para o mesmo Vite e incluiu as doze provas R4 com HTTP controlado.
+As dez jornadas R4 de API/PostgreSQL reais continuam opt-in. A prova de navegação financeira
+recebeu no mock da Dona as três permissões de leitura de Cadastros já expostas pela API;
+preserva a exigência das seis entradas e seus destinos, sem ampliar permissões do produto.
+Qualidade e build passaram com 229 provas, zero falhas, 55 exceções explícitas e zero puladas
+por ausência de Chromium (`EasyStock.Console/.build/2395/qualidade-pos-master-601d.log`).
+O gate do rebase passou com 69 testes (`.build/r4-gate-4653b901.log`). O delta do master
+não altera .NET, migrations nem contratos financeiros; as evidências anteriores mantêm
+suas versões e não são apresentadas como novas execuções.
+O smoke do delta identificou alvos de 32 px nos botões de porção do Banco de imagens;
+o ajuste usa `--toque` na mesma condição móvel dos tokens, preservando os 32 px no desktop com mouse.
+
+Na integração do master `93ab2afd5` (13/11), os quatro filtros `SyncPull*` focais passaram
+com 23 testes; o PWA teve 492 aprovações e um skip por IndexedDB indisponível na VM, que também
+não executa dois módulos ESM. Logs: `.build/r4-sync-pull-5cda7203.log` e `.build/r4-pwa-5cda7203.log`.
+O novo prazo de escrita com keepalive revelou uma certeza indevida na Cozinha após perder o ACK.
+A prova 2005 reproduziu o defeito (43/44); o ramo `SEM_RESPOSTA` passou a conservar o aviso de
+incerteza, e a releitura confirma o estado aplicado sem repetir o PATCH (44/44).
+A prova 2379 passou em 18 casos, incluindo timeout do recebimento, GET do saldo e repetição
+explícita com a mesma chave. São transportes controlados; a persistência idempotente continua
+coberta por `PagamentoRespostaPerdidaIntegrationTests` com HTTP/PostgreSQL.
+Qualidade completa: 229 provas, zero falhas, 55 exceções e zero puladas por Chromium,
+em `EasyStock.Console/.build/2395/qualidade-keepalive-final.log`.
+
+O complemento `.build/2395/mobile-sync-b8c51734/resultado.json` passou em quatro etapas e 23
+requisições HTTP/Kestrel/PostgreSQL reais, na API `1.11.0+b8c51734e9c842119342509e2114d4dc3547b621`.
+O pagamento sintético pela rota usada pelo Console produz uma única `order.aReceber=0` no
+aparelho autor; novo pull não repete a mutação nem reescreve pedido/pagamento/espelho mobile.
+Outra empresa não recebe os dados, o pedido retorna 404 e o pull anônimo retorna 401.
+O pagamento foi por HTTP, sem clique na UI; a preservação de edição local e a ausência de
+criação de pedido no PWA são provas complementares da suíte de VM. Nenhum provedor externo foi chamado.
+
+W5-01: `Agente_PedidoEVagaCommitadosSobrevivemAFalhaSqlDepoisDoProvedor` passou em PostgreSQL real,
+com serviço de agente resolvido por DI e UoW reais; LLM e Mercado Pago controlados. Outra unidade
+de trabalho vê pedido/vaga antes do retorno do provedor; SQL 22012 injetado no INSERT posterior
+da cobrança não desfaz pedido/vaga/vínculo já commitados. Releitura confirma zero cobranças, zero
+envios, uma chamada LLM e uma chamada MP. Não é uma chamada por endpoint HTTP do agente nem
+homologação de provedor externo. Evidências: `.build/r4-w5-durabilidade-pg.log` e
+`.build/r4-complemento-tests/w5-durabilidade-pg.trx` (1 aprovado, zero falhas/ignorados).
+
+| Caso | Evidência existente e limite observado |
+|---|---|
+| J01 | `real/resultado.json`: retirada/restauração, três candidatos, escolha explícita e rascunho preservado. `real/excecoes/resultado.json`: transferência confirmada e retomada pela atendente. Não equivale a testar todos os estados da fila. |
+| J02 | `real/jornada-ui-{1,2}-estado.json` e `real/operacao-complementos-candidata-d70b62b5/resultado.json`: duas unidades, subtotal 64 + frete 5 = 69, endereço/janela e pedido persistido. No d70, duplo gesto e resposta perdida resultam em um único POST/pedido; reload preserva o estado e o cadastro passa a ter um pedido. Janela lotada não foi repetida nessa prova. |
+| J03 | Mesmas jornadas: KDS inicia preparo sem baixa; Pronto altera saldo 8→6 uma vez, confirmado após recarga. Estoque foi reconciliado por GET, sem operação pela tela Estoque. |
+| J04 | Jornadas iniciais usam KDS. Complemento `real/entregas/resultado.json`: novo pedido, responsável cadastrado e atribuído, viagem despachada e entregue pelo módulo Entregas, recebimento na porta e reconciliação após reload. Não exercita todos os impedimentos de despacho. |
+| J05 | `real/operacao-complementos-candidata-d70b62b5/resultado.json`: recebimento único de 69 pela UI, autoria Dona R4 no extrato da conversa, GET do pedido e Caixa; reload mantém os valores. O RED de autoria omitida na 95 foi corrigido e retestado. Jornadas anteriores cobrem mensagem, encerramento e leitura posterior. Custos/taxas não foram estimados nem auditados integralmente. |
+| E01 | `real/excecoes/resultado.json`: falta visível e política de descoberta sem saldo negativo. No d70, `real/operacao-complementos-candidata-d70b62b5/resultado.json` registra produto com saldo zero retirado antes do pedido e alternativa de 32 + frete 5 = 37, com prazo/janela conferidos na UI. A escolha do cliente é explicitamente SIMULADA em nota, com responsável Dona; não é resposta real de cliente nem reposição de estoque. |
+| E02 | `real/operacao-complementos-candidata-d70b62b5/resultado.json`: Dona registra atraso na Cozinha, ocorrência conserva pedido/conversa e aparece em Precisa de você sem responsável; o RED da 95 foi corrigido. Falha offline preserva janela e proposta; retry muda Manhã→Tarde uma vez, com capacidade reconciliada e estado igual em Atendimento/Cozinha/Entregas. `real/complementos-literais-d70b62b5/resultado.json` confirma a nova janela antes de comunicar por uma mensagem, sem alterar pedido/recebimentos/estoque. Usa capacidade da Dona, sem concedê-la ao perfil Cozinha; envio externo controlado. |
+| E03 | `real/operacao-complementos-candidata-d70b62b5/resultado.json`: atendente sem privilégio registra solicitação contextual, gerente recusa com motivo e próximo passo visíveis e persistidos; a atendente retoma. `real/complementos-literais-d70b62b5/resultado.json` repete a negativa real com 403 FORBIDDEN, corpo completo e GET antes/depois iguais. `real/excecoes/resultado.json` cobre decisão autorizada de cancelar. São notas e ações autorizadas reais, sem workflow formal de aprovação. |
+| E04 | `real/operacao-complementos-candidata-d70b62b5/resultado.json`: Pronto baixa uma unidade (8→7); cancelar repõe uma (7→8) e libera uma vaga. Devolução posterior de 37 conserva o recebimento e gera uma saída no Caixa. Resposta perdida/retry pela UI enviam a mesma operação duas vezes, com um estorno/saída e sem repetir estoque/capacidade. IDs e valores reconciliados após reload; provedores externos controlados. |
+| M01 | `real/m01-intermediario/green-candidata-95f915a7/mensagem-ui.json`: 11/11 casos Chromium com JWT/API/PostgreSQL reais. Perda de resposta e ACK retido são controlados após gravação real; polling e replay mantêm um balão/ID por intenção e duas intenções de texto igual permanecem distintas. Variável ausente bloqueia envio; janela real encerrada bloqueia texto. Falha de transporte do catálogo é controlada; atualização real retorna 409 WHATSAPP_NAO_CONECTADO. Não houve autorização/envio de modelo pela Meta; publicação editorial não prova essa autorização. |
+| I01 | `real/i01-excecoes/green-wip-final-integrado-390/identidade-ui.json`: 6/6 casos reais em 390. Compara três ativos do mesmo telefone com históricos 0/1/2 e datas, escolhe explicitamente a alternativa, confirma reload/ID/status do histórico e preserva cadastros. Inativo separado recebe 409 com motivo correto; cancelamento, telefone divergente e cadastro sem telefone passam. A fixture declara cancelados sintéticos, sem estoque/pagamento: candidatos contam todos os pedidos; dossiê conserva IDs/status e conta zero compras válidas, pela regra existente. `real/i01-rotulos-wip-390-1440/resultado.json` confere os rótulos finais “pedidos no histórico”/“compras válidas”, com candidatos reais e somente GET do vínculo controlado, sem escrita de negócio. Não redefine Cliente nem inventa compra entregue/paga. |
+| S01 | `banca/s01-r01-candidata95/parecer-independente.json` prova busca global real e restrições por perfil; `banca/s01-local-d70/resultado.json` e complemento confirmam Cadastros por telefone/acentos/ID e filtros, mas revelaram divergência de telefone dentro de mensagens. O WIP corrigido passa em `real/s01-telefone/green-wip-final-integrado/resultado.json`: máscara, dígitos e +55 retornam o mesmo conjunto, incluindo contato sem cadastro encontrado pela mensagem, sem escrita e com assets/fontes estáveis. São preservadas substrings textuais; 188 casos puros complementam a prova. `banca/cadastros-w3-wip-48325986-1794532987651/resultado.json` W3-05 confirma parâmetros/filtros de produtos na UI com HTTP controlado; PostgreSQL cobre SQL antes do limite. |
+| R01 | `memoria-atendimento/green/resultado.json`: App real/HTTP controlado restaura filtros e 700 px. `banca/s01-r01-candidata95/r01-e-restricoes.json` e `r01-comanda.json`: lista real filtrada, scroll 480 e primeiro cartão Fila 06 restaurados; Hall, reload e reabrir rota preservam conversa, resposta integral, quantidade 2 e observação após descarte. Mesma aba e sem pedido confirmado nesse recorte. W3-04 no artefato de Cadastros citado em S01 libera uma leitura antiga após abrir novo cadastro e preserva o novo nome/e-mail; é UI com HTTP controlado, sem escrita real. |
+| R02 | `real/excecoes/resultado.json`: zero retira item, comanda vazia não confirma; vazio/zero/negativo/acima do limite recusados, 69 recebido e persistido. `recebimento-invalido/resultado.json` cobre moeda negativa e correção decimal; quantidade usa controles inteiros, sem campo livre fracionário. |
+| R03 | `real/r03-textos-final-95f915a7/textos-ui.json`: 11/11 casos repetidos na candidata 95 com API/PostgreSQL reais. Resposta 4095/4096/4097/4001 preservada após navegação/recarga; 4097 bloqueia envio com aviso. Nota interna 499/500 salva integralmente; 501/4001 recebe 400 visível e mantém original recuperável. Observação de item, sem limite finito declarado, preserva 3999/4000/4001. Comprimentos, hashes e finais reconciliados, sem envio de mensagem ou criação de pedido. |
+| R04 | `banca/r04-resposta-perdida-d70-1794530397683/resultado.json`: quatro casos com conta própria, UI/API/PostgreSQL reais; PATCH persiste, resposta perdida mostra erro e preserva texto; retry usa a mesma intenção e reload confirma efeito/revisão únicos. `storage-d70b62b5/resultado.json`: quota de comandas bloqueada preserva proposta na página; após restaurar armazenamento, quantidade/observação retornam no reload. Não promete recuperar dados não gravados antes de recarregar. `memoria-atendimento/green/resultado.json` cobre quota exclusiva de texto e retry após restauração. Somente as provas de quota usam HTTP controlado. |
+| C01 | HTTP/PostgreSQL passou para duas pessoas, 409 obsoleto, 400 sem revisão, tenant, corrida entre contextos e rollback da auditoria; cinco escritas por ficha/endereço/telefone invalidam editor central aberto. `clientes-concorrencia-real/resultado.json` na 95 usa duas abas, JWT/API/PostgreSQL reais, sem interceptação HTTP: duas pessoas independentes, 409 preservando rascunho, reconferência somente leitura, outro 409 após nova alteração e save explícito preservando e-mail externo e a outra pessoa. |
+| C02 | `desfazer-conta-real/resultado.json`: Desfazer A preserva B, A posterior recusa 409, resultado confirmado por GET/reload, ator/operação registrados. Reversão limitada à conta; efeitos financeiros usam compensação, não restauração de base. |
+| P01 | `banca/p01-1794526958098/resultado.json`: 104 verificações, zero falhas, com navegador/API reais para Dona, Atendimento, Cozinha e combinações explícitas Consulta R4/Entrega R4. Menu, busca, link direto e GET/PATCH obedecem às capacidades observadas. Revogação do usuário exclusivo encerra sessão e recusa JWT antigo com 401 sem gravar. `banca/compilado-95f915a7/isolamento-jwt-real.json`: JWT de outra empresa recebe 404 em pessoa/produto/pedido/mensagens/vínculo/IA; empresa divergente recebe 400 sem alteração. Não generaliza a todos os perfis possíveis. |
+| A01 | `real/operacao-complementos-candidata-d70b62b5/resultado.json`: use case/harness/consultar_pedido reais com LLM controlado identificam o pedido correto e saldo pendente de 37; prévia, descarte, 503 controlado, resposta retida durante troca de conversa e rascunho manual não alteram pedido/mensagens. A ferramenta não expõe a ocorrência de atraso. `real/resultado.json` cobre cadastro com aplicação individual e evidência. CLI real opt-in é prova separada, sem homologação externa nesta jornada. |
+| A02 | Aviso informa até 20 mensagens recebidas com texto, três campos e aplicação individual; bancos não oferecem IA. HTTP real resolve o adaptador CLI com executor controlado: 25 entradas resultam em exatamente 20 objetos `{mensagemId,texto}`; outra empresa recebe 404 e não executa provedor. `.build/r4-a02-cli-payload.json` captura stdin e somente flags autorizadas de prompt/schema/tools/MCP para comparar com a divulgação da UI, sem ambiente ou credenciais. Não é homologação de provedor externo. |
+| U01 | Capturas das jornadas e Cadastros, mapa real de ícones e provas de gramática; estados lead/cliente/sem cadastro, recebido/devolvido separados. Não houve medição exaustiva de contraste e tipografia de todos os módulos. |
+| U02 | `banca/mobile-final-d70/resultado.json`: jornada d70 em 390×844 com toque, JWT/API/PostgreSQL reais; lead assistido e vínculo explícito, duas unidades de legumes (64 + 5 = 69), recebimento/autoria Dona, estoque 8→6 uma vez, entrega, mensagem, encerramento e consulta após reload, zero pageerrors. Navegador emulado; provedores externos/LLM controlados. Aviso: oito toques independentes em 320/390 (`banca/aviso-toque-d70b62b5/resultado.json`) e seis após o rebase no WIP, em 390/1440 sem remontagem/perda de texto (`.build/2395/avisos-final-wip-48325986/resultado.json` na raiz), com HTTP controlado e hashes estáveis. `u02-resultado.json` da banca95 cobre foco/orientação/ampliação nativa 2×; sem aparelho físico nem zoom da barra. |
+| N01 | `real/resultado-financeiro.json`: módulo/tela inválidos mostram aviso e recuperação; acesso financeiro negado testado. `banca/compilado-95f915a7/n01-resultado.json`: Console compilado com HTTP integralmente controlado recupera alias antigo para Atendimento; cadastro ausente mostra erro, não abre editor e permite refazer busca. Não houve remoção real de entidade nem escrita no banco nessa prova. |
+| Q01 | Jornadas iniciais reais preservam produtos/pedidos distintos, pagamentos e estoque; `real/entregas/resultado.json` acrescenta viagem com responsável. Na d70, operacional comprova pedido de 69 e exceção de 37 cancelada/devolvida com estoque 8→7→8; jornada mobile independente comprova duas unidades de legumes, 69, estoque 8→6, entrega e encerramento. I01/S01 e aviso foram retestados no WIP identificado por hashes. É evidência composta: versões, controles e limites de cada caso permanecem explícitos; não equivale a reexecutar todas as jornadas no commit posterior. |
+
+O complemento Entregas usou pedido `a26446ef-ecb6-437b-b92a-b021c4f6b5ba`, viagem
+`a4f7f974-b993-41eb-9908-b1b0ea6ce8e3` e entregador `7d2c3e39-9ac4-45ef-ab4c-986fdadd2c56`.
+Foi executado antes da integração posterior do fix de status/estoque #2403; não prova por si uma
+versão futura do backend. Não houve mutação HTTP direta nas jornadas UI.
+
+A migração complementar `20261112225605_MensagensCorrelacionadasERevisaoClienteR4` foi aplicada
+sobre a migração R4 anterior em PostgreSQL 17 descartável com cliente e mensagem preexistentes.
+Contagens e hashes dos conteúdos permaneceram iguais; a mensagem legada mantém `ChaveEnvio`
+nula. O SQL acrescenta somente essa coluna nullable de 120 caracteres. A revisão usa o `xmin`
+de sistema: primeira atualização alterou a revisão e tentativa com revisão anterior afetou zero
+linhas. `has-pending-model-changes` não detectou divergência. Logs locais:
+`.build/r4-migration-{baseline,upgrade,dados-antes,dados-depois,pending}.log`.

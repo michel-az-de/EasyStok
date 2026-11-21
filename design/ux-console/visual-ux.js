@@ -72,7 +72,7 @@ fs.mkdirSync(OUT, { recursive: true });
   await page.waitForTimeout(600);
   await shot('16-a11y');
   await page.evaluate(() => closeDrawer());
-  /* tema casa da babá */
+  /* tema casa da baba */
   await page.evaluate(() => setTheme('casa'));
   await page.evaluate(() => goHome());
   await page.waitForTimeout(700);

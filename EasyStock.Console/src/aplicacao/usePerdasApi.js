@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { criarGestaoPerdas, lerResumoDePerdas, lerVencidos, porcoesComSaldo } from './perdas'
+import { comNomeDoCardapio, comPorcaoDoLote, criarGestaoPerdas, lerResumoDePerdas, lerVencidos, porcoesComSaldo } from './perdas'
 import { lerEstoqueDoDia } from './estoqueDoDia'
 import { lerInsumos } from './insumos'
 
@@ -20,7 +20,9 @@ export function usePerdasApi() {
     const [resumo, vencidos, estoque, insumos] = await Promise.all([
       lerResumoDePerdas(periodo.de, periodo.ate), lerVencidos(), lerEstoqueDoDia().catch(() => null), lerInsumos().catch(() => []),
     ])
-    return { resumo, vencidos, opcoes: opcoesDe(estoque, insumos) }
+    const pratos = estoque?.pratos ?? []
+    const resumoComNome = resumo ? { ...resumo, lancamentos: comNomeDoCardapio(resumo.lancamentos ?? [], pratos) } : resumo
+    return { resumo: resumoComNome, vencidos: comPorcaoDoLote(comNomeDoCardapio(vencidos, pratos), pratos), opcoes: opcoesDe(estoque, insumos) }
   }, [periodo.de, periodo.ate])
 
   const recarregar = useCallback(() => ler()

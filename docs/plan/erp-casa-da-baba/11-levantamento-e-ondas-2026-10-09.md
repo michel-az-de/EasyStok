@@ -1056,3 +1056,8 @@ As correções `604b64f9` e `e03ea319` chegaram ao master durante esta execuçã
 - KDS, viagem/rota Maps, canhoto, impresso do pedido e agregação de entregas por bairro usam o endereço salvo no pedido. O cadastro atual só serve de fallback para o legado.
 - Validação local: suítes da aplicação e da API aprovadas (1.201 testes da API), build da solução CI e 37 testes de arquitetura aprovados no gate Poka-Yoke. Cinco provas do KDS com PostgreSQL/Testcontainers aprovadas: migração aplicada e endereço preservado no KDS e na consulta do impresso após alterar o cadastro em outra sessão; bairro original conservado na agregação; fallback do legado e isolamento por empresa conferidos. Testes de criação pela conversa, site, API, retirada, geocodificação indisponível/imprecisa, viagens e impressos aprovados. Sem deploy.
 - Próxima fatia de M8.3: troca do endereço do pedido antes da saída, com revalidação de área/frete, aprovação fora da área, isolamento do `PATCH` e aviso operacional no Console. M8.3 permanece parcial.
+
+### 35. D8-03 revisto, sinal só com 2 dias de antecedência (05/11/2026)
+
+- Felipe revisou D8-03 depois do teste real da comanda 5: o cliente pediu para o dia seguinte e recebeu cobrança de sinal sem ter combinado. Decisão: o sinal automático de 50% vale só para entrega com 2 dias ou mais de antecedência, contados na data de Brasília. Mesmo dia e dia seguinte pagam o valor integral (#2259).
+- A regra fica em um ponto, `PlanoPagamentoEncomenda.TemSinal`, que o link, o resumo ao cliente, a simulação, a troca de forma e a confirmação já usavam. A prévia do Console (`resumoPedido.js`) segue a mesma conta. O aviso de encomenda do Vigia de operação é outro conceito e não mudou.

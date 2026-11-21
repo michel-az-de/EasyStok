@@ -48,8 +48,8 @@ public sealed class SessoesValidasDesdeIntegrationTests(PostgreSqlDatabaseFixtur
         var repo = new UsuarioRepository(db);
 
         (await repo.AtualizarSessoesValidasDesdeAsync(ana.Id, Corte)).Should().Be(1);
-        (await repo.AtualizarSessoesValidasDesdeAsync(ana.Id, Corte.AddMinutes(-5))).Should().Be(0, "instante anterior não recua");
-        (await repo.AtualizarSessoesValidasDesdeAsync(ana.Id, Corte)).Should().Be(0, "o mesmo instante não regrava");
+        (await repo.AtualizarSessoesValidasDesdeAsync(ana.Id, Corte.AddMinutes(-5))).Should().Be(1, "trava a linha sem recuar o corte");
+        (await repo.AtualizarSessoesValidasDesdeAsync(ana.Id, Corte)).Should().Be(1, "o mesmo instante também serializa com o login nativo");
         (await repo.ObterSessaoAsync(ana.Id))!.SessoesValidasDesde.Should().Be(Corte);
 
         (await repo.AtualizarSessoesValidasDesdeAsync(ana.Id, Corte.AddSeconds(1))).Should().Be(1);

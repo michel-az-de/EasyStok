@@ -18,7 +18,7 @@ public class ConsultarCardapioFerramentaTests
     private sealed class Cenario
     {
         private readonly List<CardapioItem> _itens = [];
-        private readonly StorefrontEntity _storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);
+        private readonly StorefrontEntity _storefront = StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Baba", 0m);
         private readonly ConsultarCardapioFerramenta _ferramenta;
         private readonly Conversa _conversa;
 
@@ -41,11 +41,12 @@ public class ConsultarCardapioFerramentaTests
             _conversa = Conversa.Abrir(_storefront.EmpresaId, "5511999998888", Agora, "Maria", Guid.NewGuid());
         }
 
-        public CardapioItem Item(string nome, string? alergenos = null, string? ingredientes = null)
+        public CardapioItem Item(string nome, string? alergenos = null, string? ingredientes = null, string? foto = null)
         {
             var item = CardapioItem.CriarAvulso(_storefront.Id, nome, 30m);
             item.TornarVisivel(); // o repositório devolve só os visíveis (GetVisiveisDoStorefrontAsync)
             item.AtualizarMetadata(alergenos: alergenos, ingredientes: ingredientes);
+            if (foto is not null) item.AdicionarFotoGaleria(foto);
             _itens.Add(item);
             return item;
         }
@@ -65,6 +66,22 @@ public class ConsultarCardapioFerramentaTests
             return JsonDocument.Parse(resultado).RootElement.GetProperty("itens").EnumerateArray()
                 .Single(i => i.GetProperty("nome").GetString() == nome).Clone();
         }
+    }
+
+    /// <summary>#2544 (S72): o agente sabe qual item tem foto para oferecer; a URL fica com a ferramenta que envia.</summary>
+    [Fact]
+    public async Task Item_DizSeTemFoto_SemExporAUrl()
+    {
+        var c = new Cenario();
+        c.Item("lasanha", foto: "https://cdn.exemplo/files/cardapios/lasanha.jpg");
+        c.Item("nhoque");
+
+        var comFoto = await c.ItemDoResultadoAsync("Lasanha");
+        var semFoto = await c.ItemDoResultadoAsync("Nhoque");
+
+        comFoto.GetProperty("temFoto").GetBoolean().Should().BeTrue();
+        semFoto.GetProperty("temFoto").GetBoolean().Should().BeFalse();
+        comFoto.ToString().Should().NotContain("cdn.exemplo");
     }
 
     [Fact]

@@ -3,7 +3,7 @@ import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { codigoEmGrupos, gerarCodigo, lojasParaParear, tempoRestante } from '../../../aplicacao/aparelhos'
+import { codigoEmGrupos, gerarCodigo, lerEstadoDosAparelhos, lojasParaParear, tempoRestante } from '../../../aplicacao/aparelhos'
 import css from './producao.module.css'
 
 // #2081 (A6): "Conectar aparelho". O APK piloto pede o código à equipe; a dona ou a gerente gera aqui
@@ -12,12 +12,26 @@ import css from './producao.module.css'
 export function ConectarAparelho() {
   const { acoes } = useAcessoModulos()
   const [aberto, setAberto] = useState(false)
-  if (acoes?.editarProducao !== true) return null
+  const pode = acoes?.editarProducao === true
+  // #2235 (banca P2-2): ao lado do botão, qual aparelho está ligado ("Tablet da cozinha · ativo agora").
+  // Sem resposta da API, o botão fica sozinho: não inventa estado.
+  const [estado, setEstado] = useState(null)
+  // Relê a cada minuto: o pareamento acontece no aparelho depois que o modal fecha.
+  useEffect(() => {
+    if (!pode || aberto) return undefined
+    let vivo = true
+    const ler = () => lerEstadoDosAparelhos().then((e) => { if (vivo) setEstado(e) }).catch(() => { if (vivo) setEstado(null) })
+    ler()
+    const timer = setInterval(ler, 60_000)
+    return () => { vivo = false; clearInterval(timer) }
+  }, [pode, aberto])
+  if (!pode) return null
   return (
-    <>
+    <span className={css.aparelho}>
+      {estado && <span className={css.estadoDoAparelho}>{estado}</span>}
       <Botao variante="secundario" icone="phone" aria-haspopup="dialog" onClick={() => setAberto(true)}>Conectar aparelho</Botao>
       {aberto && <ModalDoCodigo aoFechar={() => setAberto(false)} />}
-    </>
+    </span>
   )
 }
 

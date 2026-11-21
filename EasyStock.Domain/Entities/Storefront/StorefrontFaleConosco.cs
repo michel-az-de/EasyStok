@@ -1,12 +1,12 @@
 ﻿namespace EasyStock.Domain.Entities.Storefront;
 
 /// <summary>
-/// Canal alternativo ao WhatsApp para contato do cliente (público) com a Babá.
+/// Canal alternativo ao WhatsApp para contato do cliente (público) com a Baba.
 ///
 /// <para>
 /// Aceita mensagens de clientes autenticados (<see cref="ClienteId"/> setado)
 /// ou anônimos (<see cref="ClienteId"/> = null). O telefone é obrigatório
-/// para resposta — e-mail é opcional. Babá responde fora do sistema
+/// para resposta — e-mail é opcional. Baba responde fora do sistema
 /// (telefone/e-mail/WhatsApp) e marca como <see cref="MarcarRespondido"/>.
 /// </para>
 /// </summary>
@@ -82,7 +82,7 @@ public class StorefrontFaleConosco
     }
 
     /// <summary>
-    /// Marca a mensagem como respondida pela Babá (fora do sistema).
+    /// Marca a mensagem como respondida pela Baba (fora do sistema).
     /// Idempotente — primeira chamada é canônica.
     /// </summary>
     public void MarcarRespondido(string respondidoPor)

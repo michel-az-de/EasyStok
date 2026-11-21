@@ -1,9 +1,10 @@
 import {
-  cobrancaTrocada, criarCobranca, estadoDepoisDaTroca, nomeDoMeio, podeAlterarMeio, textoDaCobranca,
+  codigoDaCobranca, cobrancaTrocada, criarCobranca, estadoDepoisDaTroca, nomeDoMeio, podeAlterarMeio,
+  textoDaCobranca,
 } from '../../dominio/cobranca'
 import { indiceDoPasso } from '../../dominio/esteira'
 import * as acao from '../acoes'
-import { comMensagem, mapear } from '../reducer/auxiliares'
+import { comBaloesDaCobranca, comMensagem, mapear } from '../reducer/auxiliares'
 import { ATENDENTE } from '../reducer/estadoInicial'
 
 // Meio de pagamento, troco e andamento da esteira sem link. O modo API também despacha estes casos
@@ -46,6 +47,14 @@ export const casosMeioDePagamento = {
     return mapear(estado, id, (c) => ({ ...c, pedido: { ...c.pedido, trocoPara } }))
   },
 
+  // #2219: CEP fora da área deixa o frete a combinar. O valor que a equipe combinou com o cliente mora
+  // no rascunho, como o troco, e vai na simulação e no POST do pedido. Pedido criado: vale o gravado.
+  [acao.DEFINIR_FRETE_COMBINADO]: (estado, { id, freteCombinado }) => {
+    const conversa = estado.conversas.find((c) => c.id === id)
+    if (!conversa?.pedido || conversa.pedido.pedidoId) return estado
+    return mapear(estado, id, (c) => ({ ...c, pedido: { ...c.pedido, freteCombinado } }))
+  },
+
   // Rodada 12 (issue #13): "Alterar forma de pagamento". Numa ação só: a
   // cobrança pendente vai para o histórico, cancelada; sai uma nova na forma
   // escolhida, com texto que conta a troca ao cliente; a conversa ganha o
@@ -72,12 +81,10 @@ export const casosMeioDePagamento = {
     }
     const registro = `Forma de pagamento alterada de ${nomeDoMeio(anterior.meio)} para `
       + `${nomeDoMeio(cobranca.meio)} por ${ATENDENTE}. A cobrança anterior foi cancelada.`
-    return mapear(estado, id, (c) => comMensagem(
+    const texto = textoDaCobranca(cobranca, novoPedido, estado.catalogo.cardapio)
+    return mapear(estado, id, (c) => comBaloesDaCobranca(
       comMensagem({ ...c, pedido: novoPedido }, { dir: 'sistema', texto: registro }, { id: sistemaId, agora }),
-      {
-        dir: 'out', texto: textoDaCobranca(cobranca, novoPedido, estado.catalogo.cardapio),
-        status: 'lida', automatica: true, regra: 'cobranca-pix',
-      },
+      { texto, codigo: codigoDaCobranca(cobranca) },
       { id: mensagemId, agora },
     ))
   },

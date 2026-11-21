@@ -35,6 +35,12 @@ public class CorridaExterna
     /// <summary>A Lalamove só cancela sem custo até 5 minutos depois de achar o motorista.</summary>
     public static readonly TimeSpan JanelaCancelamentoAposMatch = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// #2168: o POST de criação tem 15 s de timeout. Sem confirmação depois disto, o pedido pode existir na Lalamove
+    /// sem o EasyStok saber o número: a corrida segue travando a viagem até a atendente conferir no painel.
+    /// </summary>
+    public static readonly TimeSpan PrazoConfirmacao = TimeSpan.FromMinutes(2);
+
     public StatusCorrida? Status { get; private set; }
     public VeiculoCorrida? Veiculo { get; private set; }
     public string? CotacaoId { get; private set; }
@@ -50,6 +56,30 @@ public class CorridaExterna
 
     /// <summary>Corrida da API ainda em curso: é a que o índice "uma ativa por viagem" protege.</summary>
     public bool Ativa => Status is { } s && !Finais.Contains(s);
+
+    /// <summary>
+    /// Gorjeta (priority fee) já no preço: o preço do provedor inclui a gorjeta, e na Lalamove a gorjeta nova
+    /// substitui a anterior. Zero na corrida manual e na que encerrou sem custo.
+    /// </summary>
+    public int GorjetaCentavos => Origem == OrigemCorridaExterna.Api && CustoCotadoCentavos is { } cotado && CustoCentavos > cotado
+        ? CustoCentavos - cotado : 0;
+
+    /// <summary>Até quando a Lalamove cancela sem custo depois do match. Nulo procurando motorista (sem prazo) e depois.</summary>
+    public DateTime? CancelaSemCustoAte => Status == StatusCorrida.MotoristaACaminho && MotoristaAtribuidoEm is { } em
+        ? em + JanelaCancelamentoAposMatch : null;
+
+    /// <summary>Pedida há mais que <see cref="PrazoConfirmacao"/> sem o número do pedido: a atendente confere no painel.</summary>
+    public bool AguardaConferencia(DateTime agora) =>
+        Status == StatusCorrida.Solicitando && Datas.Utc(agora) - RegistradoEm > PrazoConfirmacao;
+
+    // Depois da coleta a moto está carregada: a resposta atrasada de antes dela não volta a corrida.
+    private static int Etapa(StatusCorrida status) => status switch
+    {
+        StatusCorrida.ProcurandoMotorista => 1,
+        StatusCorrida.MotoristaACaminho => 2,
+        StatusCorrida.Coletada => 3,
+        _ => 0,
+    };
 
     private static readonly HashSet<StatusCorrida> Finais =
         [StatusCorrida.Entregue, StatusCorrida.Cancelada, StatusCorrida.Rejeitada, StatusCorrida.Expirada, StatusCorrida.Falha];
@@ -74,6 +104,9 @@ public class CorridaExterna
         if (viagem.Situacao != SituacaoViagem.Montando)
             throw new RegraDeDominioVioladaException("Só viagem montando pode chamar corrida.");
         if (viagem.Paradas.Count == 0) throw new RegraDeDominioVioladaException("Viagem sem parada não chama corrida.");
+        // R7: uma parada por corrida. Com mais, a coleta e a entrega marcariam todos os pedidos de uma vez.
+        if (viagem.Paradas.Count != 1)
+            throw new RegraDeDominioVioladaException("A Lalamove leva um pedido por vez: deixe uma parada só nesta viagem.");
         if (!Enum.IsDefined(veiculo)) throw new RegraDeDominioVioladaException("Veículo da corrida inválido.");
         if (string.IsNullOrWhiteSpace(cotacaoId)) throw new RegraDeDominioVioladaException("Cotação é obrigatória.");
         if (usuarioId == Guid.Empty) throw new RegraDeDominioVioladaException("Quem chamou a corrida é obrigatório.");
@@ -118,6 +151,20 @@ public class CorridaExterna
     }
 
     /// <summary>
+    /// A atendente conferiu no painel da Lalamove que o pedido não foi criado e libera a viagem. Só depois do
+    /// <see cref="PrazoConfirmacao"/>: antes disso a resposta do POST ainda pode chegar.
+    /// </summary>
+    public void DescartarSemPedidoNoProvedor(DateTime agora)
+    {
+        GarantirApi();
+        if (!AguardaConferencia(agora))
+            throw new RegraDeDominioVioladaException(Status == StatusCorrida.Solicitando
+                ? "A Lalamove ainda pode confirmar: aguarde 2 minutos antes de liberar a viagem."
+                : "Só a corrida sem confirmação da Lalamove é liberada assim.");
+        FalharSolicitacao(agora);
+    }
+
+    /// <summary>
     /// Aplica o status lido do provedor, que é a fonte da verdade (o webhook chega fora de ordem e por isso
     /// sempre se reconsulta). Pular etapa é aceito; estado final não reabre. Devolve se mudou.
     /// </summary>
@@ -130,6 +177,7 @@ public class CorridaExterna
             throw new RegraDeDominioVioladaException("A corrida ainda não foi confirmada pelo provedor.");
         if (Status == novo) return false;
         if (!Ativa) throw new RegraDeDominioVioladaException("A corrida já foi encerrada.");
+        if (Status == StatusCorrida.Coletada && Etapa(novo) is > 0 and < 3) return false;
 
         if (novo == StatusCorrida.MotoristaACaminho) MotoristaAtribuidoEm ??= Datas.Utc(agora);
         if (novo == StatusCorrida.ProcurandoMotorista) LimparMotorista();
@@ -141,10 +189,12 @@ public class CorridaExterna
     public void AtribuirMotorista(string? idExterno, string? nome, string? telefone, string? placa)
     {
         GarantirApi();
+        // #2168: dado do provedor acima do limite é cortado. Recusar travaria a reconsulta da corrida inteira.
         MotoristaIdExterno = Texto(idExterno, IdExternoTamanhoMaximo, "Id do motorista");
-        Motorista = MotoristaValido(nome);
-        MotoristaTelefone = Texto(telefone, TelefoneTamanhoMaximo, "Telefone do motorista");
-        MotoristaPlaca = Texto(placa, PlacaTamanhoMaximo, "Placa do motorista");
+        Motorista = Cortado(nome, MotoristaTamanhoMaximo);
+        MotoristaTelefone = Cortado(telefone, TelefoneTamanhoMaximo);
+        // A placa vai para a parada na coleta, que guarda o tamanho do cadastro de entregador.
+        MotoristaPlaca = Cortado(placa, Entregador.PlacaTamanhoMaximo);
     }
 
     /// <summary>Cancelamento sem custo: procurando motorista, ou até 5 minutos depois do match.</summary>
@@ -191,6 +241,13 @@ public class CorridaExterna
     private void GarantirApi()
     {
         if (Origem != OrigemCorridaExterna.Api) throw new RegraDeDominioVioladaException("Corrida manual não tem status do provedor.");
+    }
+
+    private static string? Cortado(string? valor, int maximo)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return null;
+        var limpo = valor.Trim();
+        return limpo.Length > maximo ? limpo[..maximo].TrimEnd() : limpo;
     }
 
     private static string? Texto(string? valor, int maximo, string campo)

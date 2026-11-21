@@ -7,6 +7,7 @@ using EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal;
 using EasyStock.Application.Reporting.Definitions.Fiscal.TotalizadoresFiscais;
 using EasyStock.Application.Reporting.Definitions.Fiscal.XmlBulkDownload;
 using EasyStock.Application.Reporting.Definitions.VendasPorPeriodo;
+using EasyStock.Api.Services.Relatorios;
 using EasyStock.Application.UseCases.Reports;
 using EasyStock.Infra.Async.Reporting.QuickReports;
 using EasyStock.Infra.Async.Reporting;
@@ -72,6 +73,10 @@ public static class ReportingApiExtensions
         services.AddScoped<GetReportSchemaUseCase>();
         services.AddScoped<PreviewReportUseCase>();
         services.AddScoped<GetReportDataUseCase>();
+
+        // ── Link de download do artefato (#2668): token assinado no storage local, pré-assinada no S3 ──
+        services.AddSingleton<IRelatorioDownloadLink, RelatorioDownloadLink>();
+        services.AddScoped<BaixarArtefatoRelatorioUseCase>();
 
         // ── Quick Reports (mobile/PWA — síncronos, sem fila, §27.7) ─────────────
         services.AddScoped<GetVendasHojeQuery>();

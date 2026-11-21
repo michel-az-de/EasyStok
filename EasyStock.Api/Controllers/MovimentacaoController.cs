@@ -1,3 +1,4 @@
+using EasyStock.Application.UseCases.Common;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace EasyStock.Api.Controllers;
@@ -35,8 +36,13 @@ public class MovimentacaoController(
 
         var (p, ps) = NormalisePage(page, pageSize);
         var (items, totalCount) = await movimentacaoRepository.GetByEmpresaAsync(
-            resolvedEmpresaId, de, ate, tipo, natureza, p, ps);
+            resolvedEmpresaId, DataUtc.InicioDoPeriodoUtc(de), DataUtc.FimDoPeriodoUtc(ate), tipo, natureza, p, ps);
 
+        // #2821: o valor de cada saída é venda, e venda é relatório. O estorno copia o preço da venda,
+        // então segue a mesma regra. Entrada e ajuste mantêm o custo.
+        var podeVerValoresDeVenda = currentUser.TemPermissao(Permissao.VisualizarRelatorios);
+        bool MostraValor(MovimentacaoEstoque m) => podeVerValoresDeVenda
+            || (m.Tipo != TipoMovimentacaoEstoque.Saida && m.Natureza != NaturezaMovimentacaoEstoque.Estorno);
         var dtos = items.Select(m => new
         {
             id = m.Id.ToString(),
@@ -46,8 +52,8 @@ public class MovimentacaoController(
             tipo = m.Tipo.ToString(),
             natureza = m.Natureza.ToString(),
             quantidade = m.Quantidade.Value,
-            valorUnitario = m.ValorUnitario != null ? (decimal?)m.ValorUnitario.Valor : null,
-            valorTotal = m.ValorTotal != null ? (decimal?)m.ValorTotal.Valor : null,
+            valorUnitario = m.ValorUnitario != null && MostraValor(m) ? (decimal?)m.ValorUnitario.Valor : null,
+            valorTotal = m.ValorTotal != null && MostraValor(m) ? (decimal?)m.ValorTotal.Valor : null,
             dataMovimentacao = m.DataMovimentacao,
             descricao = m.Descricao,
             documentoReferencia = m.DocumentoReferencia,
@@ -92,14 +98,21 @@ public class MovimentacaoController(
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
-        var kpis = await movimentacaoRepository.GetKpisAsync(resolvedEmpresaId, de, ate, tipo, natureza);
-        return DataOk(kpis);
+        // #2738: mesmo periodo da lista (dia civil de Brasilia, ultimo dia inclusivo) e mesma barreira de intervalo invertido.
+        if (de.HasValue && ate.HasValue && de.Value.Date > ate.Value.Date)
+            return DataBadRequest("Período inválido: a data inicial não pode ser posterior à data final.");
+
+        var kpis = await movimentacaoRepository.GetKpisAsync(
+            resolvedEmpresaId, DataUtc.InicioDoPeriodoUtc(de), DataUtc.FimDoPeriodoUtc(ate), tipo, natureza);
+        return DataOk(KpisMovimentacaoResponse.De(kpis, currentUser.TemPermissao(Permissao.VisualizarRelatorios)));
     }
 
     [SwaggerOperation(Summary = "List movements for a specific stock item")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    // #2821: o histórico do item traz o valor de cada saída; nenhum cliente o usa hoje.
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("item/{itemEstoqueId}")]
     public async Task<IActionResult> GetByItem(Guid itemEstoqueId, [FromQuery] Guid empresaId)
     {

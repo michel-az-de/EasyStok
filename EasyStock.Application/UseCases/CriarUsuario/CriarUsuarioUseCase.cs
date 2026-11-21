@@ -36,6 +36,7 @@ namespace EasyStock.Application.UseCases.CriarUsuario
         IUsuarioEmpresaRepository usuarioEmpresaRepository,
         IUsuarioPerfilRepository usuarioPerfilRepository,
         IPerfilRepository perfilRepository,
+        ILojaRepository lojaRepository,
         IConsentimentoRepository consentimentoRepository,
         ConvitesDeAcesso convites,
         ICurrentUserAccessor currentUser,
@@ -48,7 +49,7 @@ namespace EasyStock.Application.UseCases.CriarUsuario
         {
             logger.LogInformation("Criando usuario para empresa {EmpresaId}", command.EmpresaId);
 
-            EmailValidator.EnsureValid(command.Email);
+            EmailValidator.EnsureValidDeUsuario(command.Email);
 
             var convidar = string.IsNullOrEmpty(command.Senha);
             TelefoneE164? telefone = null;
@@ -60,6 +61,10 @@ namespace EasyStock.Application.UseCases.CriarUsuario
             }
             // Vale tambem para o cadastro legado com senha: antes so o convite barrava SuperAdmin.
             var perfil = await ExigirPerfilAtribuivelAsync(command.PerfilId, command.EmpresaId);
+
+            // #2569: o token leva a loja do perfil; loja de outra empresa não entra, como em AtribuirPerfilUsuario.
+            if (command.LojaId is { } lojaId && await lojaRepository.GetByIdAsync(command.EmpresaId, lojaId) is null)
+                throw new UseCaseValidationException("Loja invalida.");
 
             var emailExistente = await usuarioRepository.GetByEmailAsync(command.Email);
             if (emailExistente is not null)

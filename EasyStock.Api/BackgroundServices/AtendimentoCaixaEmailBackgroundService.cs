@@ -14,16 +14,18 @@ namespace EasyStock.Api.BackgroundServices;
 public sealed class AtendimentoCaixaEmailBackgroundService(
     IServiceProvider serviceProvider,
     IConfiguration configuration,
+    TimeProvider relogio,
     ILogger<AtendimentoCaixaEmailBackgroundService> logger) : BackgroundService
 {
+    private readonly TimeSpan _intervalo = Intervalo(configuration);
+    private readonly RecuoCaixaEmail _recuo = new(Intervalo(configuration));
+
     /// <summary>E-mails por caixa por rodada: o resto fica para a próxima, sem segurar a rodada das outras empresas.</summary>
     public const int LotePorCaixa = 20;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var intervalo = TimeSpan.FromSeconds(
-            configuration.GetValue("Atendimento:CaixaEmail:PollingIntervalSeconds", defaultValue: 60));
-        logger.LogInformation("AtendimentoCaixaEmailBackgroundService iniciado — polling={Intervalo}.", intervalo);
+        logger.LogInformation("AtendimentoCaixaEmailBackgroundService iniciado — polling={Intervalo}.", _intervalo);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -40,10 +42,13 @@ public sealed class AtendimentoCaixaEmailBackgroundService(
                 logger.LogError(ex, "AtendimentoCaixaEmailBackgroundService: erro na rodada — continua no próximo tick.");
             }
 
-            try { await Task.Delay(intervalo, stoppingToken); }
+            try { await Task.Delay(_intervalo, stoppingToken); }
             catch (OperationCanceledException) { break; }
         }
     }
+
+    private static TimeSpan Intervalo(IConfiguration configuration) => TimeSpan.FromSeconds(
+        configuration.GetValue("Atendimento:CaixaEmail:PollingIntervalSeconds", defaultValue: 60));
 
     private async Task RodadaAsync(CancellationToken ct)
     {
@@ -56,11 +61,15 @@ public sealed class AtendimentoCaixaEmailBackgroundService(
 
         foreach (var empresaId in empresas)
         {
+            var agora = relogio.GetUtcNow().UtcDateTime;
+            if (!_recuo.PodeLer(empresaId, agora))
+                continue;
             try
             {
                 using var scope = serviceProvider.CreateScope();
                 var r = await scope.ServiceProvider.GetRequiredService<LerCaixaEmailAtendimentoUseCase>()
-                    .ExecuteAsync(empresaId, LotePorCaixa, ct);
+                    .ExecuteAsync(empresaId, LotePorCaixa, ct, _recuo.Quarentena(empresaId, agora));
+                _recuo.RegistrarSucesso(empresaId);
                 if (r.Gravados + r.Duplicados + r.Ignorados + r.Falhas > 0)
                     logger.LogInformation(
                         "Caixa de e-mail da empresa {EmpresaId}: {Gravados} gravados, {Duplicados} repetidos, {Ignorados} ignorados, {Falhas} falhas.",
@@ -68,7 +77,10 @@ public sealed class AtendimentoCaixaEmailBackgroundService(
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                logger.LogWarning(ex, "Caixa de e-mail da empresa {EmpresaId} não foi lida nesta rodada.", empresaId);
+                // #1642 (item 3): senha trocada ou servidor fora não vira tentativa a cada rodada para sempre.
+                var espera = _recuo.RegistrarFalha(empresaId, agora);
+                logger.LogWarning(ex, "Caixa de e-mail da empresa {EmpresaId} não foi lida; próxima tentativa em {Espera}.",
+                    empresaId, espera);
             }
         }
     }

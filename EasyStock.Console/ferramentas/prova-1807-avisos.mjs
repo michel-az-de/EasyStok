@@ -45,7 +45,7 @@ const confere = async (descricao, fn) => {
 }
 
 const linha = (extra = {}) => ({
-  pago: false, precisa: false, ultimaMensagemClienteId: 'm1', etapa: null, nome: 'Marina Souza', motivo: null, ...extra,
+  pago: false, recebido: extra.pago ? 50 : 0, precisa: false, ultimaMensagemClienteId: 'm1', etapa: null, nome: 'Marina Souza', motivo: null, ...extra,
 })
 const retrato = (pares) => new Map(pares)
 const avisosDe = (antes, depois) => aviso.avisosDoRetrato(antes, depois)
@@ -269,26 +269,28 @@ await confere('#1989-8 no celular a pilha de avisos fica no topo, fora da barra 
   assert.doesNotMatch(celular, /bottom:\s*calc\(/, 'a pilha ainda ancora no rodapé, sobre a barra inferior')
   assert.match(celular, /top:\s*calc\([^;]*env\(safe-area-inset-top/, 'topo com a área segura do aparelho')
   // Revisão da PR #1997: abaixo do topo da Moldura, para não cobrir o menu e o sino.
-  const topo = /min-height:\s*(\d+)px/.exec(readFileSync(new URL('../src/app/moldura.module.css', import.meta.url), 'utf8')
-    .split('.topo {')[1] ?? '')?.[1]
-  assert.ok(topo, 'altura do topo da Moldura não encontrada')
-  assert.match(celular, new RegExp(`top:\\s*calc\\(${topo}px`), `a pilha começa dentro do topo de ${topo} px`)
+  // #2185 (R10): o topo da Moldura passou a ter a altura do token `--altura-regiao` (64 px); a pilha parte da mesma medida.
+  const regraDoTopo = readFileSync(new URL('../src/app/moldura.module.css', import.meta.url), 'utf8').split('.topo {')[1] ?? ''
+  const topo = /min-height:\s*(\d+)px/.exec(regraDoTopo)?.[1]
+  const topoPorToken = /min-height:\s*var\(--altura-regiao\)/.test(regraDoTopo)
+  assert.ok(topo || topoPorToken, 'altura do topo da Moldura não encontrada')
+  assert.match(celular, new RegExp(`top:\\s*calc\\(${topoPorToken ? 'var\\(--altura-regiao\\)' : `${topo}px`}`), `a pilha começa dentro do topo de ${topoPorToken ? '--altura-regiao' : topo + ' px'}`)
   assert.match(celular, /left:\s*var\(--e-16\)/, 'largura da tela com o respiro de 16 px dos dois lados')
 })
 
 // --- K. Frente K (#2007, item 8): o sinal não é o pedido inteiro ------------------------------------
 const sonoro = await import('../src/dominio/avisoSonoro.js')
 await confere('K8. só o sinal pago avisa "pagou o sinal"; a quitação depois avisa "pagou o pedido"', () => {
-  const encomenda = { estado: 'pago', sinalNaReserva: true, totalApi: 50, alocadoApi: 25 }
-  assert.deepEqual(sonoro.pagamentoDoRetrato(encomenda), { pago: false, sinal: true })
-  assert.deepEqual(sonoro.pagamentoDoRetrato({ ...encomenda, alocadoApi: 50 }), { pago: true, sinal: false })
-  assert.deepEqual(sonoro.pagamentoDoRetrato({ estado: 'aguardando' }), { pago: false, sinal: false })
+  const encomenda = { estado: 'pago', sinalNaReserva: true, totalApi: 50, totalPagoApi: 25, alocadoApi: 25 }
+  assert.deepEqual(sonoro.pagamentoDoRetrato(encomenda), { pago: false, sinal: true, recebido: 25 })
+  assert.deepEqual(sonoro.pagamentoDoRetrato({ ...encomenda, totalPagoApi: 50, alocadoApi: 50 }), { pago: true, sinal: false, recebido: 50 })
+  assert.deepEqual(sonoro.pagamentoDoRetrato({ estado: 'aguardando' }), { pago: false, sinal: false, recebido: 0 })
   const antes = retrato([['c1', linha({ etapa: 'aguardando' })]])
   const comSinal = retrato([['c1', linha({ etapa: 'pago', ...sonoro.pagamentoDoRetrato(encomenda) })]])
   const lista = avisosDe(antes, comSinal)
   assert.deepEqual(tipos(lista), [T.PAGAMENTO_CONFIRMADO])
   assert.equal(lista[0].corpo, 'Marina pagou o sinal')
-  const quitado = retrato([['c1', linha({ etapa: 'pago', ...sonoro.pagamentoDoRetrato({ ...encomenda, alocadoApi: 50 }) })]])
+  const quitado = retrato([['c1', linha({ etapa: 'pago', ...sonoro.pagamentoDoRetrato({ ...encomenda, totalPagoApi: 50, alocadoApi: 50 }) })]])
   const depois = avisosDe(comSinal, quitado)
   assert.deepEqual(tipos(depois), [T.PAGAMENTO_CONFIRMADO])
   assert.equal(depois[0].corpo, 'Marina pagou o pedido')

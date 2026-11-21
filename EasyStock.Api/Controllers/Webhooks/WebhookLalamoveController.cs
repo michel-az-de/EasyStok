@@ -18,6 +18,7 @@ public class WebhookLalamoveController(
     ILogger<WebhookLalamoveController> logger) : ControllerBase
 {
     [HttpPost]
+    [RequestSizeLimit(2_000_000)] // #2280: anônimo; sem teto o Kestrel aceita 30 MB antes da assinatura.
     [EnableRateLimiting("webhook-meta")]
     public async Task<IActionResult> Receber(CancellationToken ct)
     {

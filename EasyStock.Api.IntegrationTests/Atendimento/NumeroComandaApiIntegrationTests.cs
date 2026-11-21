@@ -27,6 +27,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var c = await SemearAsync(factory);
         var criado = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/pedido", new
         {
+            clienteId = c.ClienteId, vinculoRevisao = c.VinculoRevisao,
             itens = new[] { new { cardapioItemId = c.CardapioItemId, qtd = 1 } },
             janelaId = c.JanelaId, dataEntrega = c.DataEntrega.ToString("yyyy-MM-dd"), forma = "na_entrega",
         });
@@ -93,6 +94,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var c = await SemearAsync(factory);
         var criado = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/pedido", new
         {
+            clienteId = c.ClienteId, vinculoRevisao = c.VinculoRevisao,
             itens = new[] { new { cardapioItemId = c.CardapioItemId, qtd = 1 } },
             janelaId = c.JanelaId, dataEntrega = c.DataEntrega.ToString("yyyy-MM-dd"), forma = "na_entrega",
         });

@@ -58,6 +58,7 @@ foreach($nome in @('Dona','Atendimento','Cozinha')) {
         Conferir ((Request PUT '/api/atendimento/producao/insumos/00000000-0000-0000-0000-000000000001' $sessao.token @{}).StatusCode -eq 403) "$nome não edita insumo"
         Conferir ((Request PUT '/api/atendimento/producao/receitas/00000000-0000-0000-0000-000000000001/baixa-automatica' $sessao.token @{ligada=$true}).StatusCode -eq 403) "$nome não altera baixa automática"
         Conferir ((Request PUT '/api/produtos/00000000-0000-0000-0000-000000000001/composicao' $sessao.token @{}).StatusCode -eq 403) "$nome não edita receita"
+        Conferir ((Request POST '/api/atendimento/producao/receitas/pratos/00000000-0000-0000-0000-000000000001/ligar' $sessao.token @{}).StatusCode -eq 403) "$nome não liga prato ao estoque"
         Conferir ((Request POST '/api/atendimento/comanda/cardapio/secoes' $sessao.token @{nome='Nao deve gravar'}).StatusCode -eq 403) "$nome não edita categorias"
     }
     $refresh=Request POST '/api/auth/refresh' $null @{refreshToken=$sessao.refreshToken}

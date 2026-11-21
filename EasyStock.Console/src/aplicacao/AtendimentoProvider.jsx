@@ -15,7 +15,7 @@ import {
 import { montarPromptLivre } from '../dominio/assistente'
 import { historicoComPedidoVivo } from '../dominio/cliente'
 import {
-  conversasBloqueadasDoBalcao, conversasDoBalcao, conversasEncerradasDoBalcao, ordenarBalcao,
+  conversasBloqueadasDoBalcao, conversasDoBalcao, conversasDoCliente, conversasEncerradasDoBalcao, ordenarBalcao,
 } from '../dominio/conversa'
 import { conversasParaEncerrarPorJanela } from '../dominio/janela'
 import { ocupacaoDeHoje } from '../dominio/entrega'
@@ -26,13 +26,15 @@ import { pedirPermissaoDeNotificacao, permissaoDeNotificacao } from '../infra/no
 import { lembretesAutomaticos, listaDeLembretes } from '../dominio/lembrete'
 import { useAvisoSonoro } from './useAvisoSonoro'
 import { useFilaDeAvisos } from './useFilaDeAvisos'
-import { audioDestravado, destravarAudio } from '../infra/som'
+import { semOPagamentoDaAberta } from './pagamentosNaoVistos'
+import { audioDestravado, destravarAudio, observarAudio } from '../infra/som'
 import { gravarPreferenciaSom, lerPreferenciaSom } from '../infra/preferenciaSom'
 import { demonstracao } from '../infra/demonstracao'
 import { FONTE_API } from '../infra/fonteDados'
 import { useAcessoModulos } from './acessoModulos'
 import { podeVerDesacertos, podeVerItensFora } from '../dominio/acessoModulos'
 import { comApi } from './acoesApi'
+import { assinarMudancaNoCliente } from './mudancasDoCliente'
 import { criarAcoes } from './criarAcoes'
 import { useSincronizacaoApi } from './useSincronizacaoApi'
 import { precisaLerFicha } from './api/cliente'
@@ -44,7 +46,9 @@ import { comandasLocaisDaVisita, restaurarComandasDaVisita } from './comandasDaV
 const carregar = () => ({
   conversas: carregarConversas(),
   // #1441: no modo API as respostas prontas são as do EasyStok, nunca as da demonstração.
-  catalogo: FONTE_API ? { ...carregarCatalogo(), respostasProntas: [] } : carregarCatalogo(),
+  catalogo: FONTE_API ? { ...carregarCatalogo(), respostasProntas: [] } : { ...carregarCatalogo(), entregadores: demonstracao.ENTREGADORES_CADASTRADOS },
+  // #2391: cupons, recompensas e entregadores de exemplo são da demonstração; produção nasce vazia.
+  fidelidadeSemente: demonstracao?.FIDELIDADE_SEMENTE,
   // #1441: no modo API as automáticas chegam do EasyStok; até lá, nenhuma (não as da demonstração).
   regras: FONTE_API ? [] : REGRAS_PADRAO,
   funcionamento: FUNCIONAMENTO_PADRAO,
@@ -60,10 +64,12 @@ const carregar = () => ({
   som: lerPreferenciaSom(),
 })
 
-export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, lerComandasDaVisita, aoGuardarComandas, memoriaDoLaco = null, children }) {
+export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = true, lerComandasDaVisita, aoGuardarComandas, lerFiltrosDaVisita, aoGuardarFiltros, lerRascunhosDaVisita, aoGuardarRascunhos, memoriaDoLaco = null, children }) {
   const reduzir = (atual, evento) => reducer(restaurarComandasDaVisita(atual, evento, lerComandasDaVisita?.()), evento)
-  const [estado, despachar] = useReducer(reduzir, null, () => ({
-    ...estadoInicial(carregar()),
+  const [estado, despachar] = useReducer(reduzir, null, () => {
+    const inicial = estadoInicial(carregar())
+    return {
+    ...inicial,
     // Modo API (F01): a lista nasce vazia e chega pelo polling.
     sincronizacao: { estado: FONTE_API ? 'carregando' : 'desligada', mensagem: null, aviso: null },
     // Modo API (F02): mensagens do expediente (S40); horário e controle vivem em
@@ -72,12 +78,23 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     // #1474: carregando, ok ou erro das automáticas da API, para a tela não confundir com vazio.
     cargaDasRegras: { estado: FONTE_API ? 'carregando' : 'ok', mensagem: null },
     // F07, item 6: o rascunho de antes do 401 volta depois do novo login.
-    ...(FONTE_API ? { rascunhos: lerRascunhos(sessao) } : {}),
-  }))
+    ...(FONTE_API ? { rascunhos: lerRascunhosDaVisita?.() ?? lerRascunhos(sessao), filtros: { ...inicial.filtros, ...lerFiltrosDaVisita?.() } } : {}),
+  } })
+  const [rascunhosSoNaMemoria, avisarRascunhos] = useState(false)
+  const rascunhosAtuais = useRef(estado.rascunhos)
+  const persistirRascunhos = useCallback(rascunhos => {
+    rascunhosAtuais.current = rascunhos
+    aoGuardarRascunhos?.(rascunhos)
+    const gravados = gravarRascunhos(sessao, rascunhos)
+    avisarRascunhos(Object.values(rascunhos).some(t => typeof t === 'string' && t.trim()) && !gravados)
+    return gravados
+  }, [sessao, aoGuardarRascunhos])
+  const tentarGuardarRascunhos = useCallback(() => persistirRascunhos(rascunhosAtuais.current), [persistirRascunhos])
+  useLayoutEffect(() => { if (FONTE_API) aoGuardarFiltros?.(estado.filtros) }, [aoGuardarFiltros, estado.filtros])
   useLayoutEffect(() => {
     if (estado.sincronizacao.estado === 'ok' || estado.conversas.length) aoGuardarComandas?.(comandasLocaisDaVisita(estado.conversas))
   }, [aoGuardarComandas, estado.conversas, estado.sincronizacao.estado])
-  useEffect(() => { if (FONTE_API) gravarRascunhos(sessao, estado.rascunhos) }, [sessao, estado.rascunhos])
+  useEffect(() => { if (FONTE_API) persistirRascunhos(estado.rascunhos) }, [persistirRascunhos, estado.rascunhos])
   const { acoes: acoesDoPerfil } = useAcessoModulos()
   const comItensFora = podeVerItensFora(acoesDoPerfil)
   const comItensForaRef = useRef(comItensFora)
@@ -122,11 +139,9 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
 
   // #1577: o campo de escrever descarrega com a tela saindo (401, ida ao Hall, aba oculta). O despacho pode
   // não render mais e o efeito de `gravarRascunhos` lá em cima não roda; aqui o texto vai direto ao storage.
-  const sessaoRef = useRef(sessao)
-  useEffect(() => { sessaoRef.current = sessao }, [sessao])
   const guardarRascunhoJa = useCallback((despacho) => {
-    if (FONTE_API) gravarRascunhos(sessaoRef.current, comRascunhoDoCampo(estadoRef.current, despacho).rascunhos)
-  }, [])
+    if (FONTE_API) persistirRascunhos(comRascunhoDoCampo(estadoRef.current, despacho).rascunhos)
+  }, [persistirRascunhos])
 
   // Sincronia com a janela de Entregas (seção 6): esta janela é sempre a
   // "principal" do canal. Sem nenhuma janela de Entregas aberta, o canal só
@@ -223,6 +238,12 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // Provider, não do reducer: `Notification.permission` não é dado do
   // atendimento, e a promessa do pedido resolve fora do fluxo de ações.
   const [permissaoNotificacao, setPermissaoNotificacao] = useState(() => permissaoDeNotificacao())
+  useEffect(() => {
+    // #2393: a dona pode reativar a permissão pelo cadeado do navegador; relê na volta de foco.
+    const reler = () => setPermissaoNotificacao(permissaoDeNotificacao())
+    window.addEventListener('focus', reler)
+    return () => window.removeEventListener('focus', reler)
+  }, [])
   const pedirNotificacaoDoNavegador = useCallback(async () => {
     setPermissaoNotificacao(await pedirPermissaoDeNotificacao())
   }, [])
@@ -238,6 +259,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // precisa viajar pelo canal entre janelas (rodada 10, fronteira da 82).
   const [eventosSonoros, setEventosSonoros] = useState([])
   const [pagamentosNaoVistos, setPagamentosNaoVistos] = useState(() => new Set())
+  // A moldura diz se o painel da conversa está na tela: em Entregas, no Hall ou na aba Conversas do celular, não.
+  const [painelDaConversaNaTela, setPainelDaConversaNaTela] = useState(false)
 
   // Som da cozinha (D6, US-010). O timbre de cada evento mora em
   // infra/som.js; aqui só o QUANDO, por diferença de estado. Rodada 10:
@@ -265,15 +288,14 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   // "Visto" nasce de um jeito só: ela abriu a conversa. Passar o tempo ou
   // fechar a tela nunca conta como ter visto (é exatamente o que o achado 4
   // reclamava do sinal verde).
+  // #2185 (F24): também limpa quando o pagamento cai na conversa que está mesmo à vista: aba do navegador
+  // visível e painel da conversa na tela.
   useEffect(() => {
-    if (!estado.selecionadaId) return
-    setPagamentosNaoVistos((atual) => {
-      if (!atual.has(estado.selecionadaId)) return atual
-      const novo = new Set(atual)
-      novo.delete(estado.selecionadaId)
-      return novo
-    })
-  }, [estado.selecionadaId])
+    const limpar = () => setPagamentosNaoVistos((atual) => semOPagamentoDaAberta(atual, estado.selecionadaId, painelDaConversaNaTela && document.visibilityState !== 'hidden'))
+    limpar()
+    document.addEventListener('visibilitychange', limpar)
+    return () => document.removeEventListener('visibilitychange', limpar)
+  }, [estado.selecionadaId, pagamentosNaoVistos, painelDaConversaNaTela])
 
   // Lembra a escolha da chave entre uma visita e outra.
   useEffect(() => { gravarPreferenciaSom(estado.som) }, [estado.som])
@@ -292,6 +314,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
     window.addEventListener('pointerdown', aoGesto)
     return () => window.removeEventListener('pointerdown', aoGesto)
   }, [audioBloqueado])
+  // #2393: depois de hibernar o áudio volta suspenso; re-arma e atualiza o aviso visível.
+  useEffect(() => observarAudio(() => setAudioBloqueado(!audioDestravado())), [])
 
   // Lembrete que nasce sozinho: conversa devolvida sem resposta e pedido
   // gerado sem pagamento. O reducer devolve o mesmo estado quando nada muda,
@@ -341,6 +365,12 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   )
   useEffect(() => { acoesAtivasRef.current = acoesAtivas }, [acoesAtivas])
 
+  // #2734: o cadastro gravado fora daqui (Buscar na Casa) avisa; a Ficha relê as conversas dessa pessoa.
+  useEffect(() => assinarMudancaNoCliente((clienteId) => {
+    conversasDoCliente(estadoRef.current.conversas, clienteId)
+      .forEach((id) => acoesAtivasRef.current?.relerClienteDaConversa?.(id))
+  }), [])
+
   // Modo API (F02): o expediente vem da API uma vez ao entrar; depois, a cada gravação.
   useEffect(() => {
     if (FONTE_API && atendimentoAtivo) acoesAtivas.recarregarExpediente()
@@ -368,6 +398,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
     const usuario = FONTE_API ? sessao?.usuario : { nome: ATENDENTE }
+    const idDaJanela = estado.janelaDoPedido?.conversaId
+    const conversasDaFila = idDaJanela ? estado.conversas.filter((c) => c.id !== idDaJanela) : estado.conversas
     return {
       conversas: estado.conversas,
       selecionadaId: estado.selecionadaId,
@@ -381,7 +413,10 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       agente: estado.agente,
       automaticoPausado: estado.automaticoPausado,
       alertasEstoque: estado.alertasEstoque,
+      // #2921: a conversa da janela "Novo pedido" não entra na fila do Balcão.
+      janelaDoPedido: estado.janelaDoPedido ?? null,
       rascunho: estado.rascunhos[estado.selecionadaId] ?? '',
+      rascunhosSoNaMemoria, tentarGuardarRascunhos,
       // #1577: carimbo de escrita de fora do campo; é por ele que o campo adota o rascunho global.
       escritaDeFora: estado.escritasDeFora?.[estado.selecionadaId] ?? 0,
       // Ordenado aqui, uma vez só: quem lê `visiveis` (Balcão e o "abrir
@@ -390,7 +425,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       // diferente da que está no topo da lista (achado da auditoria QA5).
       visiveis: ordenarBalcao(
         conversasDoBalcao(
-          estado.conversas, estado.filtros, agoraEfetivo, estado.automaticoPausado, aberta, estado.catalogo.janelas,
+          conversasDaFila, estado.filtros, agoraEfetivo, estado.automaticoPausado, aberta, estado.catalogo.janelas,
           horarioDaLoja, usuario,
         ),
         agoraEfetivo,
@@ -406,8 +441,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesmo canal e
       // busca da lista de cima, sem aba, porque nenhum dos dois existe em
       // "Precisa de você".
-      encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros, usuario),
-      bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros, usuario),
+      encerradasDoBalcao: conversasEncerradasDoBalcao(conversasDaFila, estado.filtros, usuario),
+      bloqueadasDoBalcao: conversasBloqueadasDoBalcao(conversasDaFila, estado.filtros, usuario),
       historico: selecionada ? historicoComPedidoVivo(selecionada.cliente?.historico ?? (demonstracao ? demonstracao.carregarHistorico(selecionada.id) : []), selecionada.pedido) : [],
       ultimoAvanco: estado.ultimoAvanco,
       // Lote de papel (US-042): banner de queda e a modal de lançamento leem
@@ -433,6 +468,10 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       // #1807: pilha de avisos da tela (toast) e quem tira um da pilha.
       avisosNaTela: filaDeAvisos.avisos,
       dispensarAviso: filaDeAvisos.dispensar,
+      // #2185 (F28): ponteiro ou foco em cima do aviso para o relógio dele.
+      pausarAvisos: filaDeAvisos.pausar,
+      marcarPainelDaConversa: setPainelDaConversaNaTela,
+      retomarAvisos: filaDeAvisos.retomar,
       // `ui.encerrando` (seção 5): id da conversa com a modal de
       // encerramento aberta, ou `null`.
       encerrando: estado.ui.encerrando,
@@ -456,7 +495,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       cargaDasRegras: estado.cargaDasRegras,
       sessao,
     }
-  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar])
+  }, [estado, sessao, agoraEfetivo, audioBloqueado, aberta, horarioDaLoja, eventosSonoros, pagamentosNaoVistos, permissaoNotificacao, consultaLembretes, filaDeAvisos.avisos, filaDeAvisos.dispensar, filaDeAvisos.pausar, filaDeAvisos.retomar, rascunhosSoNaMemoria, tentarGuardarRascunhos])
 
   return (
     <ContextoCatalogo.Provider value={estado.catalogo}>

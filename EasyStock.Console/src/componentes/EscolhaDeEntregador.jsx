@@ -4,6 +4,9 @@ import { Chip } from './Chip'
 import { CampoSelecao, CampoTexto } from './Campo'
 import css from './EscolhaDeEntregador.module.css'
 
+// #2792: teto da placa no servidor, sem `maxLength` (cortava em silêncio). Componente não importa `dominio`: a conta é só o tamanho.
+const LIMITE_PLACA = 8
+
 // US-040: pergunta quem leva só quando o despacho ainda não sabe (ficha,
 // cozinha ou o cartão solto de Entregas; `dominio/viagem.js:
 // entregadorResolvido` decide se isto precisa aparecer).
@@ -29,12 +32,13 @@ export function EscolhaDeEntregador({
   })
   const [tentou, setTentou] = useState(false)
   const motivo = validar(dados)
+  const placaLonga = dados.placa.length > LIMITE_PLACA
 
   const mudar = (campo) => (e) => setDados((atual) => ({ ...atual, [campo]: e.target.value }))
 
   const confirmar = () => {
     setTentou(true)
-    if (motivo) return
+    if (motivo || placaLonga) return
     aoEscolher(montar ? montar(dados) : { tipo: 'motoboy', nome: dados.nome.trim() })
   }
   const aoTeclar = (e) => { if (e.key === 'Enter') confirmar() }
@@ -65,14 +69,14 @@ export function EscolhaDeEntregador({
             />
             <CampoSelecao rotulo="Veículo" opcoes={veiculos} value={dados.veiculo} onChange={mudar('veiculo')} />
             <CampoTexto
-              rotulo="Placa" placeholder="ABC1D23" value={dados.placa} maxLength={8} autoCapitalize="characters"
+              rotulo="Placa" placeholder="ABC1D23" value={dados.placa} limite={LIMITE_PLACA} autoCapitalize="characters"
               onChange={mudar('placa')} onKeyDown={aoTeclar}
             />
             <CampoSelecao rotulo="Empresa" opcoes={empresas} value={dados.empresa} onChange={mudar('empresa')} />
           </div>
           {tentou && motivo && <p className={css.motivo} role="alert">{motivo}</p>}
           <div className={css.rodape}>
-            <Botao variante="primario" onClick={confirmar}>Confirmar entregador</Botao>
+            <Botao variante="primario" disabled={placaLonga} motivo={placaLonga ? 'Encurte a placa para confirmar.' : undefined} onClick={confirmar}>Confirmar entregador</Botao>
           </div>
           {aviso && <p className={css.aviso}>{aviso}</p>}
         </div>

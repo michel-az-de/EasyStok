@@ -9,22 +9,26 @@
 // Console completo em demonstração (o `dist/` do `npm run build` sem VITE_FONTE_DADOS=api), aberto
 // por file:// no Chromium. Nenhum servidor, nenhuma API.
 //
-//   npm run build
+//   (sem build: sobe um Vite proprio sobre o codigo-fonte, #2437)
 //   PLAYWRIGHT_MODULE=<pasta do playwright> node ferramentas/prova-2145-icones-lucide.mjs
 // Com EVIDENCIAS_2145=<pasta> grava uma captura por tela.
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { createRequire, registerHooks } from 'node:module'
-import { transformWithOxc } from 'vite'
+import { createServer, transformWithOxc } from 'vite'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const raiz = fileURLToPath(new URL('..', import.meta.url))
-const indice = resolve(raiz, 'dist/index.html')
-assert.ok(existsSync(indice), 'rode npm run build antes: falta dist/index.html')
+// #2437: serve o código-fonte por um Vite próprio em modo demonstração (sem VITE_FONTE_DADOS=api), em vez de exigir o dist/
+// do build, que no `npm run qualidade` só roda depois das provas. O DOM e os ícones são os mesmos.
+delete process.env.VITE_FONTE_DADOS
+const servidor = await createServer({ root: raiz, logLevel: 'silent', server: { host: '127.0.0.1', port: 0, strictPort: false } })
+await servidor.listen()
+const dist = { url: servidor.resolvedUrls.local[0], fechar: () => servidor.close() }
 const evidencias = process.env.EVIDENCIAS_2145
 if (evidencias) mkdirSync(evidencias, { recursive: true })
 
@@ -82,15 +86,15 @@ const conferirTela = async (pagina, tela, { minimo }) => {
 const navegador = await chromium.launch({ headless: true })
 try {
   const pagina = await navegador.newPage({ viewport: { width: 1440, height: 1000 } })
-  pagina.setDefaultTimeout(8000)
+  pagina.setDefaultTimeout(15000)
   const falhasDePagina = []
   pagina.on('pageerror', (erro) => falhasDePagina.push(erro.message))
-  await pagina.goto(pathToFileURL(indice).href)
+  await pagina.goto(dist.url, { waitUntil: 'networkidle', timeout: 90000 }) // #2437: o Vite frio otimiza dependências na primeira carga
 
-  await pagina.getByText('Abrir Atendimento', { exact: true }).waitFor()
+  await pagina.locator('li[data-modulo="atendimento"] a').waitFor() // #2859: a faixa "Abrir Atendimento" saiu; o cartão leva ao módulo
   await conferirTela(pagina, 'Hall', { minimo: 3 })
 
-  await pagina.getByText('Abrir Atendimento', { exact: true }).click()
+  await pagina.locator('li[data-modulo="atendimento"] a').click()
   await pagina.getByRole('button', { name: /Renan Okamoto/ }).click()
   await pagina.getByLabel('Mensagem para o cliente', { exact: true }).waitFor()
   const atendimento = await conferirTela(pagina, 'Atendimento', { minimo: 15 })
@@ -101,13 +105,14 @@ try {
   })
   await confere('Atendimento: a chave de conceito desenha o ícone da tabela 3.2', async () => {
     // Conceitos presentes neste cenário. A Assistente usa AvatarAssistente e o botão de
-    // completar com Sparkles só existe na API; seus dois aliases são provados no host abaixo.
-    for (const nome of ['book-open', 'bike', 'sticky-note']) {
+    // completar com o robô só existe na API; seus dois aliases são provados no host abaixo.
+    // #2437: o atalho de cardápio (book-open) saiu do Atendimento; `respostas` (message-square-text) o substituiu na tela.
+    for (const nome of ['message-square-text', 'bike', 'sticky-note']) {
       assert.ok(atendimento.some((i) => i.classe.split(' ').includes('lucide-' + nome)), 'falta lucide-' + nome)
     }
   })
 
-  await confere('Icone real: agente e sparkles desenham o mesmo conceito, com tamanho e nome acessível preservados', async () => {
+  await confere('Icone real: agente e sparkles desenham o mesmo conceito (#2864: o robô), com tamanho e nome acessível preservados', async () => {
     const arquivo = new URL('../src/componentes/Icone.jsx', import.meta.url)
     const estilo = new URL('../src/componentes/Icone.module.css', import.meta.url)
     const compilado = (await transformWithOxc(readFileSync(arquivo, 'utf8'), arquivo.pathname, { jsx: { runtime: 'automatic' } })).code
@@ -128,7 +133,7 @@ try {
       )))
       const aliases = await lerIcones(host)
       assert.equal(aliases.length, 2)
-      assert.ok(aliases.every((icone) => icone.classe.split(' ').includes('lucide-sparkles') && icone.desenhos > 0))
+      assert.ok(aliases.every((icone) => icone.classe.split(' ').includes('lucide-bot') && icone.desenhos > 0))
       assert.ok(aliases.every((icone) => icone.largura === 24 && icone.traco === '1.75' && icone.ponta === 'round' && icone.juncao === 'round'))
       assert.equal(aliases[0].rotulo, 'Assistente')
       assert.equal(await host.getByRole('img', { name: 'Assistente', exact: true }).count(), 1)
@@ -146,9 +151,9 @@ try {
   const celular = await navegador.newPage({ viewport: { width: 390, height: 844 } })
   celular.setDefaultTimeout(8000)
   celular.on('pageerror', (erro) => falhasDePagina.push(erro.message))
-  await celular.goto(pathToFileURL(indice).href)
-  await celular.getByText('Abrir Atendimento', { exact: true }).click()
-  await celular.getByRole('button', { name: 'Mais', exact: true }).waitFor()
+  await celular.goto(dist.url, { timeout: 90000 })
+  await celular.locator('li[data-modulo="atendimento"] a').click()
+  await celular.getByRole('button', { name: 'Mais opções', exact: true }).waitFor() // #2437: o rótulo virou "Mais opções"
   const noCelular = await conferirTela(celular, 'Celular', { minimo: 3 })
   await confere('Celular: "Mais" desenha ellipsis-vertical (⋮), sem reticências horizontais', async () => {
     const classes = noCelular.map((i) => i.classe.split(' '))
@@ -159,6 +164,7 @@ try {
   await confere('nenhum erro de página durante o roteiro', async () => assert.deepEqual(falhasDePagina, []))
 } finally {
   await navegador.close()
+  await dist.fechar()
 }
 
 console.log(`\n${passou} ok, ${erros.length} falha(s)`)

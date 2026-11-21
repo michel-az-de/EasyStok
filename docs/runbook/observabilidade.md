@@ -26,6 +26,6 @@ Abra a tela pelo túnel (`acesso`). Vá em Logs e escolha o stream `easystok`. P
 ## Limites
 
 - Nível dos logs que chegam: API a partir de Warning (`appsettings.Production.json`); Web e Worker a partir de Information, porque não têm configuração própria de produção. Acompanhe o disco no `status` nas primeiras semanas: o OpenObserve divide a VPS com o Postgres.
-- O healthcheck do Worker só fica `healthy` depois do primeiro deploy com o `ArquivoDeVidaService`. Antes disso aparece `unhealthy`, sem efeito: o `ligar` e o `vps-deploy.sh` olham se o Worker está rodando e sem reinício.
+- O healthcheck do Worker só fica `healthy` depois do primeiro deploy com o `ArquivoDeVidaService`. Antes disso aparece `unhealthy`, sem efeito: o `ligar` olha se o Worker está rodando e sem reinício. Desde a #2372 o `vps-deploy.sh` exige o Worker `healthy` quando ele tem healthcheck e volta a imagem anterior se ele não ficar `healthy` no prazo (`HEALTH_TIMEOUT`).
 - Ainda não há alerta no OpenObserve. Queda é avisada pelo vigia externo.
 - O redis fica fora do override, porque recriá-lo apaga as sessões.

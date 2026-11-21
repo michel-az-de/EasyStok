@@ -15,12 +15,44 @@
 
 import { moduloCongelado, telaCongelada } from './congelados'
 import { podeAjustarEntrega } from './acessoModulos'
-import { partesNoFuso } from './formato'
+import { FUSO } from './formato'
+
+// #2258 (auditoria de UX, dicionário de nomes): um nome por conceito, em constante única. A tela
+// inicial é "Início" em todo lugar; as respostas e mensagens que saem sozinhas são "Respostas automáticas".
+export const NOME_INICIO = 'Início'
+export const NOME_RESPOSTAS_AUTOMATICAS = 'Respostas automáticas'
+// A tela de regras do Atendimento não pode se chamar "Avisos", como o sino do cabeçalho.
+export const NOME_REGRAS_DE_AVISO = 'Regras de aviso'
+
+// #2258 (A2): a ordem dos módulos segue o caminho do pedido e vale na home, na Ajuda, no Menu e na
+// Busca. A lista `MODULOS` guarda a numeração do plano (ADR-0056) e não muda; quem lista ordena por aqui.
+export const ORDEM_DOS_MODULOS = ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro', 'cadastros', 'configuracoes', 'campanhas']
+const posicaoNaOrdem = (id) => {
+  const posicao = ORDEM_DOS_MODULOS.indexOf(id)
+  return posicao < 0 ? ORDEM_DOS_MODULOS.length : posicao
+}
+export const emOrdemDosModulos = (modulos) => [...modulos].sort((a, b) => posicaoNaOrdem(a.id) - posicaoNaOrdem(b.id))
 
 export const TELA_OPERACAO = 'operacao'
 export const TELA_AJUSTE = 'ajuste'
 
 export const MODULOS = [
+  {
+    numero: 9, id: 'cadastros', nome: 'Cadastros', icone: 'usuarios',
+    resumo: 'Leads, clientes e dados da operação',
+    telas: [
+      { id: 'clientes', rotulo: 'Leads e clientes', tipo: TELA_AJUSTE, aba: 'cadastros-clientes', soApi: true },
+      // #2478: todos os pedidos, de qualquer canal e dia; a API libera pela policy de `GET api/pedidos`.
+      { id: 'pedidos', rotulo: 'Pedidos', tipo: TELA_AJUSTE, aba: 'cadastros-pedidos', soApi: true, acao: 'verPedidos' },
+      { id: 'produtos', rotulo: 'Produtos', tipo: TELA_AJUSTE, aba: 'cadastros-produtos', soApi: true, acao: 'verCadastrosProdutos' },
+      // #2495 (S4): a API de categorias não tem policy própria; a tela segue o acesso de produtos.
+      { id: 'categorias', rotulo: 'Categorias de produto', tipo: TELA_AJUSTE, aba: 'cadastros-categorias', soApi: true, acao: 'verCadastrosProdutos' },
+      { id: 'fornecedores', rotulo: 'Fornecedores', tipo: TELA_AJUSTE, aba: 'cadastros-fornecedores', soApi: true, acao: 'verCadastrosFornecedores' },
+      { id: 'bancos', rotulo: 'Contas bancárias', tipo: TELA_AJUSTE, aba: 'cadastros-bancos', soApi: true, acao: 'verCadastrosFinanceiros' },
+      { id: 'pagamentos', rotulo: 'Formas de pagamento', tipo: TELA_AJUSTE, aba: 'cadastros-pagamentos', soApi: true, acao: 'verCadastrosFinanceiros' },
+      { id: 'modelos', rotulo: 'Modelos', tipo: TELA_AJUSTE, aba: 'cadastros-modelos', soApi: true },
+    ],
+  },
   {
     numero: 1, id: 'cardapio', nome: 'Cardápio', icone: 'cardapio',
     resumo: 'Pratos, preços, combos e fotos',
@@ -59,9 +91,9 @@ export const MODULOS = [
       { id: 'balcao', rotulo: 'Conversas', tipo: TELA_OPERACAO },
       { id: 'horarios', rotulo: 'Horários e mensagens', tipo: TELA_AJUSTE, aba: 'atendimento', soApi: true },
       // #2096: o que chama a dona e o gerente (aparelho, e-mail e sino); mesma permissão do módulo.
-      { id: 'avisos', rotulo: 'Avisos', tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
+      { id: 'avisos', rotulo: NOME_REGRAS_DE_AVISO, tipo: TELA_AJUSTE, aba: 'avisos', soApi: true },
       // #1441: criar, editar e arquivar respostas prontas; ligar e escrever as automáticas.
-      { id: 'respostas', rotulo: 'Respostas e mensagens automáticas', tipo: TELA_AJUSTE, aba: 'respostas' },
+      { id: 'respostas', rotulo: NOME_RESPOSTAS_AUTOMATICAS, tipo: TELA_AJUSTE, aba: 'respostas' },
     ],
   },
   {
@@ -131,6 +163,10 @@ export const hashDoModulo = (moduloId, telaId) => `#/m/${moduloId}${telaId ? '/'
 // (`acoes` ausente: demonstração, catálogo do guia) a tela fica.
 const verContas = (acoes) => acoes?.visualizarContasPagar === true || acoes?.visualizarContasReceber === true
 const PODE_NA_TELA = {
+  verCadastrosProdutos: (acoes) => acoes?.verCadastrosProdutos === true,
+  verCadastrosFornecedores: (acoes) => acoes?.verCadastrosFornecedores === true,
+  verCadastrosFinanceiros: (acoes) => acoes?.verCadastrosFinanceiros === true,
+  verPedidos: (acoes) => acoes?.verPedidos === true,
   ajustarEntrega: podeAjustarEntrega,
   verContas,
   verContasPagar: (acoes) => acoes?.visualizarContasPagar === true,
@@ -147,7 +183,7 @@ export const telasDoMenu = (modulo, { fonteApi = false, acoes = null } = {}) =>
 // Cartões do hall: disponível = tem pelo menos uma tela no modo atual. Módulo congelado
 // (#1891) não vira cartão; `MODULOS` segue inteiro para quem precisa do catálogo.
 export function modulosDoHall({ fonteApi = false, acoes = null } = {}) {
-  return MODULOS.filter((modulo) => !moduloCongelado(modulo.id)).map((modulo) => {
+  return emOrdemDosModulos(MODULOS.filter((modulo) => !moduloCongelado(modulo.id))).map((modulo) => {
     const telas = telasDoMenu(modulo, { fonteApi, acoes })
     const disponivel = telas.length > 0
     return {
@@ -158,6 +194,21 @@ export function modulosDoHall({ fonteApi = false, acoes = null } = {}) {
     }
   })
 }
+
+// #2870 (teste da Tatiana, 19/11): Clientes e Pedidos são o trabalho de toda hora do atendimento e moravam só no menu
+// de Cadastros. O atalho leva direto à tela, no Início e nos dois trilhos. Aparece só onde a tela aparece: mesmo modo,
+// mesma matriz de ações e o módulo liberado para o perfil.
+const ATALHOS_DIRETOS = [
+  { id: 'clientes', nome: 'Clientes', resumo: 'Ficha, histórico e pedidos', moduloId: 'cadastros', telaId: 'clientes' },
+  { id: 'pedidos', nome: 'Pedidos', resumo: 'Todos os pedidos da loja', moduloId: 'cadastros', telaId: 'pedidos' },
+]
+export function atalhosDiretos({ fonteApi = false, acoes = null, permite = () => true } = {}) {
+  return ATALHOS_DIRETOS
+    .filter((atalho) => permite(atalho.moduloId)
+      && telasDoMenu(moduloPorId(atalho.moduloId), { fonteApi, acoes }).some((tela) => tela.id === atalho.telaId))
+    .map((atalho) => ({ ...atalho, modulo: moduloPorId(atalho.moduloId), href: hashDoModulo(atalho.moduloId, atalho.telaId) }))
+}
+export const ehAtalhoDireto = (moduloId, telaId) => ATALHOS_DIRETOS.some((a) => a.moduloId === moduloId && a.telaId === telaId)
 
 // Busca somente no catálogo de navegação, sem consultar dados de clientes.
 const textoDeBusca = (valor) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
@@ -184,10 +235,8 @@ export function buscarDestinosDoConsole(modulos, busca) {
   })
 }
 
-// Saudação do topo do hall, pela hora da loja (não a do navegador nem a UTC).
-export function saudacaoDoHall(agora, nome) {
-  const { horas } = partesNoFuso(agora)
-  const periodo = horas < 12 ? 'Bom dia' : horas < 18 ? 'Boa tarde' : 'Boa noite'
-  const primeiro = (nome ?? '').trim().split(/\s+/)[0]
-  return primeiro ? `${periodo}, ${primeiro}` : periodo
+// Título do hall (#2859): o dia da loja por extenso, pelo fuso da loja. Saudação genérica não informa nada.
+export function tituloDoHall(agora) {
+  const dia = new Date(agora).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: FUSO })
+  return dia.charAt(0).toUpperCase() + dia.slice(1)
 }

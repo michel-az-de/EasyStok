@@ -71,12 +71,13 @@ public sealed class NotificacoesConfiguracaoController(
         [FromQuery] string? canal,
         [FromQuery] bool? ativo,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] bool apenasAtuais = false)
     {
         (page, pageSize) = NormalisePage(page, pageSize);
         var (items, total) = await templateRepo.ListarAsync(
             Empresa, Enumerado<TipoEventoNotificacao>(tipoEvento), Enumerado<CanalNotificacao>(canal),
-            ativo, page, pageSize);
+            ativo, page, pageSize, apenasAtuais: apenasAtuais);
         return DataPaged(items, total, page, pageSize);
     }
 

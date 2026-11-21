@@ -4,6 +4,7 @@ using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Infra.Integrations.Ia;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -25,7 +26,7 @@ public class AnthropicMessagesClientTests
     {
         opcoes ??= new AnthropicAgenteOptions { Enabled = true, ApiKey = "chave-de-teste", ModeloAgente = "claude-sonnet-5" };
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://anthropic.test/") };
-        return new AnthropicMessagesClient(http, Options.Create(opcoes), NullLogger<AnthropicMessagesClient>.Instance);
+        return new AnthropicMessagesClient(http, Options.Create(opcoes), PipelinesDeTeste.Reais(), NullLogger<AnthropicMessagesClient>.Instance);
     }
 
     [Fact]
@@ -163,6 +164,133 @@ public class AnthropicMessagesClientTests
 
         var ex = await acao.Should().ThrowAsync<HttpRequestException>();
         ex.Which.Message.Should().Contain("429").And.NotContain("chave-de-teste");
+    }
+
+    private const string RespostaComCache = """
+        {"id":"msg_3","type":"message","role":"assistant","model":"claude-sonnet-5",
+         "content":[{"type":"text","text":"Oi"}],"stop_reason":"end_turn",
+         "usage":{"input_tokens":40,"output_tokens":8,"cache_creation_input_tokens":1200,"cache_read_input_tokens":900}}
+        """;
+
+    [Fact]
+    public async Task SystemVolatilVaiEmOutroBlocoEBreakpointSoNoEstavel()
+    {
+        var handler = new CapturaHandler(HttpStatusCode.OK, RespostaToolUse);
+        var client = Criar(handler);
+
+        await client.EnviarAsync(new RequisicaoLlm("Prompt estável.",
+            [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], [],
+            SystemVolatil: "Agora: 19/11/2026 10:00"));
+
+        using var corpo = JsonDocument.Parse(handler.Corpo!);
+        var system = corpo.RootElement.GetProperty("system");
+        system.ValueKind.Should().Be(JsonValueKind.Array);
+        system.GetArrayLength().Should().Be(2);
+        system[0].GetProperty("type").GetString().Should().Be("text");
+        system[0].GetProperty("text").GetString().Should().Be("Prompt estável.");
+        system[0].GetProperty("cache_control").GetProperty("type").GetString().Should().Be("ephemeral");
+        system[1].GetProperty("type").GetString().Should().Be("text");
+        system[1].GetProperty("text").GetString().Should().Be("Agora: 19/11/2026 10:00");
+        system[1].TryGetProperty("cache_control", out _).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task SemSystemVolatilCorpoFicaComSystemTexto(string? volatil)
+    {
+        var handler = new CapturaHandler(HttpStatusCode.OK, RespostaToolUse);
+        var client = Criar(handler);
+
+        await client.EnviarAsync(new RequisicaoLlm("Você é o atendente.",
+            [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], [], SystemVolatil: volatil));
+
+        using var corpo = JsonDocument.Parse(handler.Corpo!);
+        corpo.RootElement.GetProperty("system").ValueKind.Should().Be(JsonValueKind.String);
+        corpo.RootElement.GetProperty("system").GetString().Should().Be("Você é o atendente.");
+    }
+
+    [Fact]
+    public async Task LeCacheEscritaDaResposta()
+    {
+        var client = Criar(new CapturaHandler(HttpStatusCode.OK, RespostaComCache));
+
+        var resposta = await client.EnviarAsync(RequisicaoSimples());
+
+        resposta.TokensCacheEscrito.Should().Be(1200);
+        resposta.TokensCacheLido.Should().Be(900);
+    }
+
+    [Fact]
+    public async Task RegistraUsoDaRespostaSemTextoDaMensagem()
+    {
+        var logger = new CapturaLogger();
+        var http = new HttpClient(new CapturaHandler(HttpStatusCode.OK, RespostaComCache)) { BaseAddress = new Uri("https://anthropic.test/") };
+        var client = new AnthropicMessagesClient(http,
+            Options.Create(new AnthropicAgenteOptions { Enabled = true, ApiKey = "chave-de-teste", ModeloAgente = "claude-sonnet-5" }),
+            PipelinesDeTeste.Reais(), logger);
+
+        await client.EnviarAsync(new RequisicaoLlm("s",
+            [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("texto-secreto-do-cliente")])], [], SystemVolatil: "v"));
+
+        var linha = logger.Mensagens.Should().ContainSingle(m => m.StartsWith("Anthropic uso")).Subject;
+        linha.Should().Contain("modelo=claude-sonnet-5").And.Contain("entrada=40").And.Contain("saida=8")
+            .And.Contain("cache_escrito=1200").And.Contain("cache_lido=900");
+        linha.Should().NotContain("texto-secreto-do-cliente");
+    }
+
+    private sealed class CapturaLogger : ILogger<AnthropicMessagesClient>
+    {
+        public List<string> Mensagens { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) => Mensagens.Add(formatter(state, exception));
+    }
+
+    private static RequisicaoLlm RequisicaoSimples() =>
+        new("Você é o atendente.", [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], []);
+
+    [Fact]
+    public async Task DevolveOModeloQueRespondeuEOCacheLido()
+    {
+        // S67 (#2534): o registro do turno guarda o modelo que respondeu e o cache lido, que tem preço próprio.
+        const string corpo = """
+            {"id":"msg_2","type":"message","role":"assistant","model":"claude-sonnet-5-20261101",
+             "content":[{"type":"text","text":"Oi"}],"stop_reason":"end_turn",
+             "usage":{"input_tokens":40,"output_tokens":8,"cache_read_input_tokens":900}}
+            """;
+
+        var resposta = await Criar(new CapturaHandler(HttpStatusCode.OK, corpo)).EnviarAsync(RequisicaoSimples());
+
+        resposta.Modelo.Should().Be("claude-sonnet-5-20261101");
+        resposta.TokensEntrada.Should().Be(40);
+        resposta.TokensSaida.Should().Be(8);
+        resposta.TokensCacheLido.Should().Be(900);
+    }
+
+    [Fact]
+    public async Task ModeloDaRequisicaoSubstituiOConfigurado()
+    {
+        // S68 (#2597): o turno pede o modelo da loja, já conferido na lista aprovada; sem ele, vale o configurado.
+        var handler = new CapturaHandler(HttpStatusCode.OK, """{"content":[],"stop_reason":"end_turn"}""");
+
+        var resposta = await Criar(handler).EnviarAsync(RequisicaoSimples() with { Modelo = "claude-haiku-5" });
+
+        using var corpo = JsonDocument.Parse(handler.Corpo!);
+        corpo.RootElement.GetProperty("model").GetString().Should().Be("claude-haiku-5");
+        resposta.Modelo.Should().Be("claude-haiku-5");
+    }
+
+    [Fact]
+    public async Task SemModeloNaRespostaFicaOConfiguradoESemCacheZero()
+    {
+        var resposta = await Criar(new CapturaHandler(HttpStatusCode.OK, """{"content":[],"stop_reason":"end_turn"}"""))
+            .EnviarAsync(RequisicaoSimples());
+
+        resposta.Modelo.Should().Be("claude-sonnet-5");
+        resposta.TokensCacheLido.Should().Be(0);
     }
 
     private sealed class CapturaHandler(HttpStatusCode status, string resposta) : HttpMessageHandler

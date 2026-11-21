@@ -1,0 +1,149 @@
+.painel { display: grid; gap: var(--e-5); min-width: 0; color: var(--tinta); }
+.cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--e-4); }
+.cabecalho h2 { margin: 0 0 var(--e-2); font-size: var(--t-display); font-weight: 700; }
+.cabecalho p { margin: 0; color: var(--tinta-2); }
+.contexto { display: flex; flex-wrap: wrap; gap: var(--e-3); align-items: center; padding: var(--e-3) var(--e-4); border-radius: var(--r-2); background: var(--marca-claro); }
+.contexto > span { flex: 1; min-width: 160px; }
+.contexto > svg { color: var(--marca-forte); flex: none; }
+.superficie { border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); min-width: 0; }
+.filtros { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 240px) auto; gap: var(--e-3); align-items: end; padding: var(--e-4); }
+/* Contas bancárias: só busca e Atualizar. */
+.filtros.soBusca { grid-template-columns: minmax(180px, 1fr) auto; }
+/* #2495 (S1): Situação e Ordem lado a lado, Atualizar na mesma linha. */
+.filtros.comOrdem { grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(160px, 220px)) auto; }
+/* #2792: sem rolagem própria (era uma segunda, de 62vh, dentro da página); o cabeçalho gruda no topo da página. */
+.lista { min-width: 0; }
+.lista th { position: sticky; top: 0; z-index: 1; }
+/* #2734 (A12): a lista que está na tela espera a nova chegar, mais apagada, em vez de sumir a cada busca. */
+.lista[aria-busy='true'] { opacity: 0.6; }
+/* #3016: os cartões (Formas de pagamento, Modelos, Etiquetas) esperam do mesmo jeito na recarga. */
+.cartoes[aria-busy='true'] { opacity: 0.6; }
+.lista table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--t-apoio); }
+.lista th { padding: var(--e-3) var(--e-4); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; background: var(--elevado); }
+.lista td { border-top: 1px solid var(--linha); padding: var(--e-4); vertical-align: middle; overflow-wrap: anywhere; }
+.lista th:first-child { width: 38%; }
+/* #2495 (S1): o cabeçalho Nome ordena; alvo de 44px e foco visível. */
+.ordenar { display: inline-flex; align-items: center; gap: var(--e-2); min-height: 44px; margin: calc(var(--e-3) * -1) 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.ordenar:hover { color: var(--tinta); }
+.ordenar:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.lista td small { display: block; margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-micro); }
+.clicavel { cursor: pointer; }
+.clicavel:hover td, .clicavel:focus-within td { background: var(--elevado); }
+.identidade { display: flex; gap: var(--e-3); align-items: center; }
+.icone { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: var(--r-1); background: var(--preenchimento); color: var(--marca-forte); }
+.acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+@media (min-width: 701px) { .lista .acoes button { white-space: nowrap; } }
+/* #2476 (U6): situação sem ação pendente é texto, não pílula (Pilula.module.css). */
+.situacao { color: var(--tinta-2); font-size: var(--t-apoio); }
+.rodape { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--e-3); padding: var(--e-3) var(--e-4); border-top: 1px solid var(--linha); color: var(--tinta-2); font-size: var(--t-micro); }
+.links { display: flex; gap: var(--e-4); flex-wrap: wrap; }
+.links a { color: var(--marca-forte); min-height: var(--toque); display: inline-flex; align-items: center; text-underline-offset: 3px; }
+.erro { color: var(--erro); padding: var(--e-3); background: var(--erro-pastel); border-radius: var(--r-1); margin: 0; overflow-wrap: anywhere; }
+.erro p { margin: 0 0 var(--e-2); }
+/* #2495 (S2): Inativar e Reativar ficam à esquerda do rodapé do editor, longe de Salvar. */
+.acaoAtividade { margin-inline-end: auto; }
+/* #2495 (S4): subcategorias dentro do cartão da categoria, uma por linha com as ações ao lado. */
+.subcategorias { display: grid; gap: var(--e-2); padding: 0; margin: 0; list-style: none; }
+.subcategorias > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); padding-block: var(--e-2); border-top: 1px solid var(--linha); }
+.subcategorias > li > span { overflow-wrap: anywhere; min-width: 0; }
+.sucesso { margin: 0; padding: var(--e-3); color: var(--sucesso); background: var(--sucesso-pastel); border-radius: var(--r-1); }
+/* #2734: a região de aviso (role="status") fica sempre na tela, para o leitor de tela anunciar o que entra nela.
+   Vazia, sai do fluxo e não ocupa uma linha da grade; nunca `display: none`, que a tiraria da árvore de acessibilidade. */
+.vivo:empty { position: absolute; }
+.formulario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-4); padding: var(--e-3) 0; margin: 0; border: 0; min-width: 0; }
+.larguraTotal { grid-column: 1 / -1; }
+/* #2495 (S5): aviso de cliente com o mesmo telefone ou documento; não bloqueia salvar. */
+.avisoDuplicado { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding: var(--e-3); color: var(--tinta); background: var(--alerta-pastel); border: var(--b-1) solid var(--alerta); border-radius: var(--r-1); }
+.avisoDuplicado p { margin: 0; }
+.legenda { margin: 0; color: var(--tinta-2); font-size: var(--t-micro); }
+.check { display: flex; align-items: center; gap: var(--e-2); min-height: var(--toque); }
+.check input { width: 20px; height: 20px; accent-color: var(--marca); }
+.historico { margin-top: var(--e-5); border-top: 1px solid var(--linha); padding-top: var(--e-3); }
+.historico summary { cursor: pointer; min-height: var(--toque); }
+.historico ul { padding-left: var(--e-5); }
+.historico li { margin-bottom: var(--e-3); }
+.historico small { display: block; color: var(--tinta-2); overflow-wrap: anywhere; }
+.assistente { padding: var(--e-4); border-radius: var(--r-2); border: 1px solid var(--linha); background: var(--elevado); margin-bottom: var(--e-4); }
+.barra { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
+.barra > div { min-width: min(240px, 100%); }
+.sugestao { display: flex; justify-content: space-between; align-items: center; gap: var(--e-3); margin-top: var(--e-3); padding-top: var(--e-3); border-top: 1px solid var(--linha); }
+.sugestao q { display: block; color: var(--tinta-2); margin-top: var(--e-1); overflow-wrap: anywhere; }
+.sugestao dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: var(--e-4); padding: 0; margin: 0; list-style: none; }
+.cartoes > li { display: flex; flex-direction: column; gap: var(--e-4); justify-content: space-between; padding: var(--e-5); min-width: 0; border-radius: var(--r-2); border: 1px solid var(--linha); background: var(--papel); }
+.cartoes h3 { margin: var(--e-2) 0 var(--e-3); font-size: var(--t-titulo); overflow-wrap: anywhere; }
+.cartoes p, .cartoes small, .apoio { color: var(--tinta-2); }
+.amostra { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
+.previa { border-top: 1px solid var(--linha); padding-top: var(--e-4); margin-top: var(--e-4); }
+.previa iframe { width: 100%; min-height: 240px; border: 1px solid var(--linha); border-radius: var(--r-1); background: var(--papel); }
+.previaTexto { white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--e-4); background: var(--preenchimento); border-radius: var(--r-1); }
+.lista .contatoMovel { display: none; }
+@media (max-width: 700px) {
+  .cabecalho { align-items: stretch; flex-direction: column; }
+  .cabecalho h2 { font-size: var(--t-valor); }
+  .filtros, .filtros.comOrdem { grid-template-columns: minmax(0, 1fr); padding: var(--e-3); }
+  .lista table { table-layout: fixed; }
+  .lista th, .lista td { padding: var(--e-3) var(--e-2); }
+  .lista th:first-child { width: 39%; }
+  .lista th:nth-child(2), .lista td:nth-child(2) { display: none; }
+  .lista th:nth-child(3) { width: 25%; }
+  .icone { display: none; }
+  .lista .contatoMovel { display: block; }
+  .acoes { align-items: stretch; }
+  .lista .acoes { flex-direction: column; }
+  .lista .acoes button { min-width: 0; padding-inline: var(--e-2); }
+  .formulario { grid-template-columns: minmax(0, 1fr); }
+  .sugestao { align-items: stretch; flex-direction: column; }
+  .contexto { gap: var(--e-2); padding: var(--e-3); }
+  .rodape { padding: var(--e-3); }
+}
+/* #2734: relacionamento do cliente no editor (bloqueio, notas internas e tags), com as palavras da Ficha do
+   Atendimento. Destaque por contorno uniforme e fundo, sem barra lateral. */
+.relacionamento { display: grid; gap: var(--e-4); margin-block-end: var(--e-4); }
+.relacionamento section { display: grid; gap: var(--e-2); min-width: 0; align-content: start; }
+.relacionamento h3 { margin: 0; font-size: var(--t-corpo); }
+.avisoBloqueio { display: grid; gap: var(--e-1); padding: var(--e-3); background: var(--elevado); border: var(--b-1) solid color-mix(in srgb, var(--erro) 30%, transparent); border-radius: var(--r-1); }
+.avisoBloqueio p { margin: 0; overflow-wrap: anywhere; }
+.tituloBloqueio { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-2); color: var(--erro); }
+.tituloBloqueio span { color: var(--tinta-2); font-size: var(--t-micro); }
+.notasETags { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--e-5); align-items: start; }
+.notas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.notas li { display: grid; gap: var(--e-1); padding: var(--e-2) var(--e-3); background: var(--fundo); border: var(--b-1) solid var(--linha); border-radius: var(--r-1); }
+.notas p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notas small { color: var(--tinta-2); font-size: var(--t-micro); }
+.tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--e-2); }
+/* #2734: a restrição tem o mesmo destaque da Ficha do Atendimento (cliente.module.css, .chipRestricao). */
+.tags .tagRestricao { border-color: var(--alerta); background: var(--alerta-pastel); color: var(--tinta); }
+@media (max-width: 700px) { .notasETags { grid-template-columns: minmax(0, 1fr); } }
+/* #2495 (S6): ficha do cliente no editor. */
+.ficha { display: grid; gap: var(--e-5); padding-block-start: var(--e-4); border-block-start: 1px solid var(--linha); }
+.ficha section { display: grid; gap: var(--e-2); min-width: 0; }
+.ficha h3 { margin: 0; font-size: var(--t-corpo); }
+.ficha section > p { margin: 0; }
+.itensFicha { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.itensFicha li { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding: var(--e-2) var(--e-3); background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--r-1); }
+.itensFicha li > span:first-child { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.itensFicha small { color: var(--tinta-2); font-size: var(--t-micro); }
+
+/* #2849: topo da ficha do cliente, em leitura. Mesma ordem em Cadastros, na Busca e a partir do Atendimento. */
+.resumoCliente { display: grid; gap: var(--e-4); margin-block-end: var(--e-4); min-width: 0; }
+.identidadeCliente { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
+.identidadeCliente > div { flex: 1; min-width: 0; display: grid; gap: var(--e-1); justify-items: start; }
+.identidadeCliente strong { font-size: var(--t-titulo); overflow-wrap: anywhere; }
+.quadroCliente { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-3); margin: 0; padding: var(--e-3); background: var(--elevado); border-radius: var(--r-2); }
+.quadroCliente > div { display: flex; flex-direction: column-reverse; gap: var(--e-1); min-width: 0; }
+.quadroCliente dd { margin: 0; font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700; font-variant-numeric: tabular-nums; }
+.quadroCliente dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.contatoCliente { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3) var(--e-4); margin: 0; }
+.contatoCliente > div { display: grid; gap: var(--e-1); min-width: 0; }
+.contatoCliente dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.contatoCliente dd { margin: 0; overflow-wrap: anywhere; }
+.contatoCliente .naoInformado { color: var(--tinta-3); font-style: italic; }
+@media (max-width: 480px) {
+  .quadroCliente { grid-template-columns: minmax(0, 1fr); }
+  .contatoCliente { grid-template-columns: minmax(0, 1fr); }
+}
+.acoesDoResumo { display: flex; flex-wrap: wrap; gap: var(--e-2, 8px); }
+/* #2946: o convite é um link (abre outra aba), com a cara de ação da linha. */
+.chamar { display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--e-3); font-weight: 600; color: var(--sucesso); border: 1px solid currentColor; border-radius: var(--r-1); text-decoration: none; white-space: nowrap; }
+.chamar:hover { background: var(--sucesso-pastel); }

@@ -31,13 +31,17 @@ public sealed record ConversaInboxItem(
     string? PedidoStatus = null,
     long NumeroComanda = 0,
     string? Assunto = null,
-    string? FotoClienteChave = null)
+    string? FotoClienteChave = null,
+    long VinculoRevisao = 0,
+    bool VinculoEmRevisao = false,
+    bool? TemPedido = null)
 {
     /// <summary>Linha a partir da entidade carregada. Sem <paramref name="aguardaResposta"/> vale a regra do dominio.</summary>
     public static ConversaInboxItem De(Conversa c, string? ultimaMensagemTexto, bool? aguardaResposta = null, string? assumidaPorNome = null, string? pedidoStatus = null) => new(
         c.Id, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
         c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
-        ultimaMensagemTexto, aguardaResposta ?? c.AguardaResposta, assumidaPorNome, pedidoStatus, c.NumeroComanda, c.Assunto);
+        ultimaMensagemTexto, aguardaResposta ?? c.AguardaResposta, assumidaPorNome, pedidoStatus, c.NumeroComanda, c.Assunto,
+        VinculoRevisao: c.VinculoRevisao, VinculoEmRevisao: c.VinculoEmRevisao);
 }
 
 /// <summary>Mensagem que não chegou ao cliente, com a conversa dela (S59).</summary>
@@ -88,6 +92,9 @@ public interface IConversaRepository
     /// para a entrada depois do encerramento voltar ao atendimento que ainda tem pedido em andamento.
     /// </summary>
     Task<Conversa?> ObterUltimaEncerradaPorContatoAsync(Guid empresaId, CanalConversa canal, string contatoIdExterno, CancellationToken ct = default);
+
+    /// <summary>#2285: respostas do agente (saída, autor Agente) na conversa desde <paramref name="desde"/>; base do anti-loop.</summary>
+    Task<int> ContarRespostasDoAgenteDesdeAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default);
 
     Task<ConversaComMensagens?> ObterComMensagensAsync(Guid empresaId, Guid id, int ultimasN, CancellationToken ct = default);
 

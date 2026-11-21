@@ -10,3 +10,6 @@ export async function gravarAvisos(avisos) {
   if (!salvo || typeof salvo !== 'object') throw new Error('O EasyStok não confirmou os avisos. Tente novamente; sua edição continua nesta tela.')
   return normalizarAvisos(salvo)
 }
+
+// #2211: quem da equipe recebe os avisos no WhatsApp da loja; uma pessoa por gravação.
+export { obterEquipeAvisada as carregarEquipeAvisada, salvarPessoaAvisada as gravarPessoaAvisada } from '../infra/api/avisosApi'

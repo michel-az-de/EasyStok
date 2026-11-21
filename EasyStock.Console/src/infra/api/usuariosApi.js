@@ -21,6 +21,8 @@ export const convidarUsuario = ({ nome, email, perfilId }) =>
   })
 
 export const reenviarConvite = (usuarioId) => chamarApi(`/api/usuarios/${usuarioId}/convite`, { metodo: 'POST' })
+// #2201: o texto do código vem uma vez, nesta resposta; a API guarda só o hash.
+export const gerarCodigoDeAcesso = (usuarioId) => chamarApi(`/api/usuarios/${usuarioId}/chave-acesso`, { metodo: 'POST' })
 
 export const trocarPerfil = (usuarioId, perfilId) =>
   chamarApi(`/api/usuarios/${usuarioId}/perfis`, { metodo: 'PUT', corpo: { empresaId: empresa(), perfilId, lojaId: null } })

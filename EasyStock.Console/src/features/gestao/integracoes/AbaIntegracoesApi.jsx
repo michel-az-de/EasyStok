@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useIntegracoesApi } from '../../../aplicacao/useIntegracoesApi'
+import { useStatusWhatsAppApi } from '../../../aplicacao/useStatusWhatsAppApi'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
-import { ORIGEM, rotuloDoCampo, textoDoUltimoTeste } from '../../../dominio/chavesIntegracao'
+import { ORIGEM, rotuloDoCampo, situacaoDoCartao, textoDoUltimoTeste } from '../../../dominio/chavesIntegracao'
+import { CartaoPixDireto } from './CartaoPixDireto'
 import css from './AbaIntegracoes.module.css'
 
 // Aba Integrações no modo API (F16, #1246): uma por integração do EasyStok. O segredo só se
@@ -15,7 +18,8 @@ function vazio(campos) {
   return Object.fromEntries((campos ?? []).map((c) => [c, '']))
 }
 
-function CartaoIntegracao({ item, ocupado, acoes }) {
+function CartaoIntegracao({ item, ocupado, acoes, statusWhatsApp }) {
+  const situacao = situacaoDoCartao(item, statusWhatsApp)
   const [editando, setEditando] = useState(false)
   const [valores, setValores] = useState(() => vazio(item.campos))
   const [ambiente, setAmbiente] = useState(item.ambiente ?? 'producao')
@@ -42,8 +46,9 @@ function CartaoIntegracao({ item, ocupado, acoes }) {
     <li className={css.cartao}>
       <div className={css.cabecalho}>
         <strong className={css.nomeProvedor}>{item.nome}</strong>
-        <Pilula tom={item.ativo ? 'ok' : 'neutro'} fina>{item.ativo ? 'Ligado' : 'Desligado'}</Pilula>
+        <Pilula tom={situacao.pilula.tom} fina>{situacao.pilula.texto}</Pilula>
       </div>
+      {situacao.avisos.map((a) => <Pilula key={a.texto} tom={a.tom} fina>{a.texto}</Pilula>)}
       {item.alerta === 'parada' && <Pilula tom="perigo" fina>Parada: o último teste falhou</Pilula>}
       {item.alerta === 'vencendo' && <Pilula tom="aviso" fina>A chave vence em menos de 7 dias</Pilula>}
 
@@ -106,9 +111,11 @@ function CartaoIntegracao({ item, ocupado, acoes }) {
 
 export function AbaIntegracoesApi() {
   const { lista, erro, ocupado, ...acoes } = useIntegracoesApi()
+  // #2600 (Q02): a mesma fonte da tela Canais diz quem envia o WhatsApp.
+  const { status: statusWhatsApp } = useStatusWhatsAppApi()
 
   if (erro && !lista) return <div className={css.aba}><p role="alert">Não foi possível carregar as integrações. {erro}</p></div>
-  if (!lista) return <div className={css.aba}><p>Carregando integrações…</p></div>
+  if (!lista) return <div className={css.aba}><EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 3)">Carregando integrações…</EsqueletoDeLista></div>
 
   return (
     <div className={css.aba}>
@@ -116,7 +123,8 @@ export function AbaIntegracoesApi() {
         Configure e teste as conexões da loja. Os testes não geram cobranças nem pedidos.
       </p>
       <ul className={css.lista}>
-        {lista.map((item) => <CartaoIntegracao key={item.provider} item={item} ocupado={ocupado} acoes={acoes} />)}
+        {lista.map((item) => <CartaoIntegracao key={item.provider} item={item} ocupado={ocupado} acoes={acoes} statusWhatsApp={statusWhatsApp} />)}
+        <CartaoPixDireto />
         <li className={css.cartao}>
           <div className={css.cabecalho}>
             <strong className={css.nomeProvedor}>Entregador próprio</strong>

@@ -19,6 +19,8 @@ export const SO_DA_TELA = [
   'escolherMeioPagamento',
   // J2 (#1990): o troco do dinheiro na entrega também segue no corpo do pedido (observações).
   'definirTroco',
+  // #2219: o frete combinado também segue no corpo da simulação e do pedido.
+  'definirFreteCombinado',
   // Marca de canhoto já impresso nesta tela; a impressão em si não depende dela.
   'marcarCanhotoImpresso',
   // Fechar o modal do gesto da loja (#1443): abrir e fechar de verdade são ligadas.
@@ -28,6 +30,8 @@ export const SO_DA_TELA = [
   // #1686 (item 3): comanda nova depois do pedido entregue ou cancelado. É rascunho da tela; o
   // pedido nasce no EasyStok no "Gerar cobrança e enviar", como o primeiro.
   'novaComanda',
+  // #2395: confirmação da pessoa preserva o rascunho; o snapshot segue no POST do pedido.
+  'reconferirPessoaDaComanda',
 ]
 
 const grupo = (rotulo, nomes) => Object.fromEntries(nomes.map((nome) => [nome, rotulo]))

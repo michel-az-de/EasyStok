@@ -7,6 +7,14 @@ const BASE = '/api/atendimento/configuracao'
 
 export const obterConfiguracao = () => chamarApi(BASE, { sinal: AbortSignal.timeout(15000) })
 
+// #2496: a chave "Atendimento automático" sozinha, da checagem do Assistente. Só `ativo` no corpo: o resto fica.
+export const salvarAtendimentoAutomatico = (ativo) => chamarApi(BASE, {
+  metodo: 'PUT',
+  identidadeEsperada: identidadeDaSessao(lerSessao()),
+  sinal: AbortSignal.timeout(15000),
+  corpo: { ativo: Boolean(ativo) },
+})
+
 // S58 (#1391): o modelo de retomada vai num PUT próprio; a resposta dele é a configuração inteira gravada.
 export const salvarConfiguracao = async (c) => {
   const identidadeEsperada = identidadeDaSessao(lerSessao())
@@ -32,10 +40,26 @@ const salvarGeral = (c, identidadeEsperada) => chamarApi(BASE, {
     saudacaoRetorno: c.saudacaoRetorno,
     fraseEspera: c.fraseEspera,
     mensagemForaArea: c.mensagemForaArea,
+    // #2249: o que o robô diz ao passar a conversa para a equipe e a quem não é cliente.
+    mensagemEscalada: c.mensagemEscalada,
+    mensagemEncaminhamento: c.mensagemEncaminhamento,
+    // S68 (#2597): como o robô chama a dona; null mantém, vazio volta a "a equipe".
+    nomeDona: c.nomeDona ?? null,
+    // #2937: fecho do canhoto em imagem; null mantém, vazio tira.
+    fraseFechoCanhoto: c.fraseFechoCanhoto ?? null,
     respiroMinutos: Number(c.respiroMinutos),
     tempoPreparoPadraoMinutos: Number(c.tempoPreparoPadraoMinutos),
     // #1427: SLA de primeira resposta da loja (1..240); vazio mantém o atual.
     slaRespostaMinutos: c.slaRespostaMinutos == null || c.slaRespostaMinutos === '' ? null : Number(c.slaRespostaMinutos),
     ativo: c.ativo,
   },
+})
+
+// #2853: ajustes do painel do Assistente, cada um sozinho no corpo (o resto da configuração fica).
+// `cotaTokensMes` 0 tira a cota; `roteiro` vazio volta ao padrão; `ferramentasDesligadas` vazio liga todas.
+export const salvarAjusteDoAssistente = (ajuste) => chamarApi(BASE, {
+  metodo: 'PUT',
+  identidadeEsperada: identidadeDaSessao(lerSessao()),
+  sinal: AbortSignal.timeout(15000),
+  corpo: ajuste,
 })

@@ -27,14 +27,16 @@ function manterCursorNoFim(evento) {
 }
 
 export function CampoMascarado({
-  tipo, rotulo, rotuloOculto, dica, erro, valor, aoMudarDigitos, aoColarTexto, id: idInformado, className, ...resto
+  tipo, rotulo, rotuloOculto, dica, erro, obrigatorio, valor, aoMudarDigitos, aoColarTexto, id: idInformado, className, ...resto
 }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
 
   function aoDigitar(evento) {
     const texto = evento.target.value
-    aoMudarDigitos(tipo === 'moeda' ? digitosDeMoeda(String(valor ?? ''), texto) : texto.replace(/\D/g, ''))
+    // #2734: o texto do campo vai junto. Só com os dígitos, um telefone de DDD 55 com um dígito a mais parecia
+    // "55 + número" e a máscara trocava o DDD; com o texto, quem monta a tela vê que já havia "(55)".
+    aoMudarDigitos(tipo === 'moeda' ? digitosDeMoeda(String(valor ?? ''), texto) : texto.replace(/\D/g, ''), texto)
   }
 
   function aoColar(evento) {
@@ -45,7 +47,7 @@ export function CampoMascarado({
 
   return (
     <div className={css.campo}>
-      <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}</label>
+      <label className={rotuloOculto ? 'sr' : css.rotulo} htmlFor={id}>{rotulo}{obrigatorio && <span aria-hidden="true"> *</span>}</label>
       <input
         id={id}
         inputMode="numeric"
@@ -56,6 +58,7 @@ export function CampoMascarado({
         onPaste={aoColar}
         onSelect={tipo === 'moeda' ? manterCursorNoFim : undefined}
         aria-invalid={Boolean(erro) || undefined}
+        aria-required={obrigatorio || undefined}
         {...resto}
         aria-describedby={[resto['aria-describedby'], erro ? `${id}-erro` : dica ? `${id}-dica` : null].filter(Boolean).join(' ') || undefined}
       />

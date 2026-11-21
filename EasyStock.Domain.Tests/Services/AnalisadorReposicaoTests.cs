@@ -191,6 +191,16 @@ public class AnalisadorReposicaoTests
         item.QuantidadeSugerida.Should().Be(1m);
     }
 
+    [Fact] // #2510: dinheiro arredonda meio centavo para cima, como o resto do domínio (ADR-0031).
+    public void Custo_estimado_arredonda_meio_centavo_para_cima()
+    {
+        // Sem giro: sugere repor até o mínimo, 5 un a R$ 0,025 = R$ 0,125.
+        var item = _sut.Avaliar(Snap(vigente: 0, prodMin: 5, prodCrit: 2) with { CustoUnitario = 0.025m }, Opcoes)!;
+
+        item.QuantidadeSugerida.Should().Be(5m);
+        item.CustoEstimadoReposicao.Should().Be(0.13m);
+    }
+
     private static ProdutoReposicaoSnapshot Snap(
         decimal vigente,
         int? prodMin = null, int? prodCrit = null,

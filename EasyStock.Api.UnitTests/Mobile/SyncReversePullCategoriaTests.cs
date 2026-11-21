@@ -33,7 +33,8 @@ public sealed class SyncReversePullCategoriaTests : IDisposable
                 .Options,
             currentUser);
         _servico = new SyncReversePullService(
-            _db, new ConfigurationBuilder().Build(), NullLogger<SyncReversePullService>.Instance);
+            _db, new ConfigurationBuilder().Build(), NullLogger<SyncReversePullService>.Instance,
+            new EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile(_db, NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Persistence.ILoteNumeroCurtoRepository>(), NullLogger<EasyStock.Api.Mobile.Services.NumeroCurtoDosLotesMobile>.Instance));
     }
 
     private void Produto(string nome, string nomeCategoria)

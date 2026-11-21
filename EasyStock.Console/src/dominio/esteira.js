@@ -94,7 +94,7 @@ export const proximoPasso = (atual) => PASSOS[indiceDoPasso(atual) + 1] ?? null
 // fecharia o ciclo esteira -> conversa -> automatico -> cozinha -> esteira.
 const PASSOS_TRAVADOS_POR_BLOQUEIO = new Set(['preparo', 'embalado', 'entrega'])
 
-export const MOTIVO_CLIENTE_BLOQUEADO = 'Cliente bloqueado: desbloqueie para seguir com o pedido.'
+export const MOTIVO_CLIENTE_BLOQUEADO = 'Cliente bloqueado: a gerência desbloqueia na ficha.'
 
 // `null` quando pode avançar; senão, o texto que a tela mostra junto do
 // botão desabilitado. O reducer usa a mesma resposta para recusar.

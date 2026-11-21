@@ -32,7 +32,7 @@ export function tiqueDaMensagem(status) {
 // para não inventar uma segunda conta do que "parece pergunta".
 export const ehPerguntaSemResposta = (texto) => /\?\s*$/.test((texto ?? '').trim())
 
-export const MOTIVO_PERGUNTA_FORA_DO_ROTEIRO = 'Pergunta fora do roteiro automático, sem resposta pronta.'
+export const MOTIVO_PERGUNTA_FORA_DO_ROTEIRO = 'Pergunta fora do roteiro do Assistente, sem resposta pronta.'
 
 // --- Resposta real vs aviso transacional (issue #41, RN-05/RN-32) -----------
 // Aviso de esteira (dominio/reducer AVANCAR_ESTEIRA, regra `esteira-<passo>`)

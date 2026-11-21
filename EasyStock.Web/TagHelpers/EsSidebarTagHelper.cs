@@ -59,7 +59,7 @@ public sealed class EsSidebarTagHelper(
         catch { fav = new MenuFavoritosBff(null, false); }
 
         MenuBadges badges;
-        try { badges = (await resumoSvc.ObterAsync(empresaId, lojaId)).Badges; }
+        try { badges = (await resumoSvc.ObterAsync(empresaId, lojaId, usuarioId)).Badges; }
         catch { badges = MenuBadges.Zero; }
 
         // Falha aqui esconde item gated (fail-closed, ADR-0048) em vez de derrubar o menu.

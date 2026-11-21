@@ -83,7 +83,8 @@ module.exports = function ({ test, runInSandbox, assert }) {
     assert.ok(idxZerou < idxDois, 'menor stock vem primeiro');
   });
 
-  test('attention: caixa de dia anterior aberto vira err', () => {
+  test('attention: caixa de dia anterior aberto nao vira card sem acao no PWA (#2319)', () => {
+    // #2319: o PWA nao fecha mais caixa; um card que leva a tela sem "Fechar" seria beco sem saida.
     const r = runInSandbox(`(function(){
       ${RESET}
       // mocka prior days
@@ -92,9 +93,7 @@ module.exports = function ({ test, runInSandbox, assert }) {
       finally { ${RESTORE} }
     })()`);
     const cash = JSON.parse(r).find(i => i.kind === 'cash-prior');
-    assert.ok(cash, 'card cash-prior presente');
-    assert.strictEqual(cash.severity, 'err');
-    assert.strictEqual(cash.count, 1);
+    assert.strictEqual(cash, undefined, 'card cash-prior ausente');
   });
 
   test('attention: validade proxima (<7d) vira card warn', () => {

@@ -1,10 +1,11 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+const html = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
 function fn(name) {
   const start = html.indexOf('function ' + name + '('), end = html.indexOf('\nfunction ', start + 1);
   assert.ok(start >= 0 && end > start); return html.slice(start, end);
@@ -28,6 +29,7 @@ function fixture(orders = [], pilot = true) {
         return null;
       } },
     updatePedidosTabBadge() {}, escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
+    jsString: value => ctx.escapeHtml(JSON.stringify(String(value == null ? '' : value))),
     getConferStatus: () => 'pendente', CONFER_STATUS: { PENDENTE: 'pendente' }, conferStatusLabel: value => value,
     safeRefDisplay: value => value || '', money: value => 'R$ ' + value, timeOf: () => '10:30', renderProgressDots: () => '',
     renderScheduledBadge: value => '<span class="scheduled">' + value + '</span>', channelLabel: value => value,
@@ -38,7 +40,7 @@ function fixture(orders = [], pilot = true) {
   };
   vm.createContext(ctx);
   const start = html.indexOf('const KANBAN_COLS = ['), end = html.indexOf('function renderProgressDots(', start);
-  vm.runInContext(html.slice(start, end) + '\n' + fn('advanceOrder') + '\n' + fn('updateFab') + '\n' + fn('goPedidosTab'), ctx);
+  vm.runInContext(html.slice(start, end) + '\n' + fn('advanceOrder') + '\n' + fn('updateFab') + '\n' + fn('goPedidosTab') + '\n' + fn('contaItens'), ctx);
   return { ctx, list, header, title, fab, sections, active: value => { active = value; }, defer: () => { deferred = true; }, focus: () => focus, confer: () => confer,
     highlight: id => vm.runInContext('highlightOrderId = ' + JSON.stringify(id), ctx) };
 }
@@ -100,7 +102,8 @@ test('card APK preserva avisos, ações, segurança dos textos e filtro de quant
   assert.doesNotMatch(card, /Conferência|openConfer|openCestaCalc/); assert.match(card, /pilot-order-meta/); assert.match(card, /10:30/);
   assert.match(card, /&lt;img>/); assert.match(card, /&lt;script>/); assert.match(card, /&lt;faltou>/); assert.match(card, /&lt;canal>/);
   assert.doesNotMatch(card, /invisivel|class="apt"|class="k-time"/);
-  for (const handler of ['advanceOrder', 'openCobranca', 'printEtiqueta', 'openHistorico', 'cancelOrder']) assert.ok(card.includes(handler + "('a')"));
+  assert.match(card, /<span>1 item<\/span>/, '#2735: contagem em português, no singular');
+  for (const handler of ['advanceOrder', 'openCobranca', 'printEtiqueta', 'openHistorico', 'cancelOrder']) assert.ok(card.includes(handler + "(&quot;a&quot;)"));
 });
 test('card de total zero não oferece cobrança e metadados ausentes não criam slots vazios', () => {
   const o = order('', 'pronto', 0); o.total = 0; const f = fixture([o]); f.ctx.renderKanban();

@@ -299,8 +299,8 @@ body.search-open .search-panel{transform:translateX(0)}
   </div>
   <button class="icon-btn" id="bell-btn" aria-label="Eventos" data-tip="2 eventos esperando você" onclick="toggleEvents()"><svg width="16" height="16"><use href="#i-bell"/></svg><span class="dot"></span></button>
   <button class="icon-btn" id="a11y-btn" aria-label="Acessibilidade" data-tip="Acessibilidade" onclick="openA11y()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="5" r="2.2"/><path d="M4 9.5c2.7.8 5.3 1.2 8 1.2s5.3-.4 8-1.2M12 11v4m0 0-3 6m3-6 3 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-  <button class="icon-btn" id="theme-btn" aria-label="Tema" data-tip="Tema: claro, escuro ou Casa da Babá" onclick="toggleThemeMenu()"><svg width="16" height="16"><use href="#i-moon"/></svg></button>
-  <div class="avatar-tb" title="Felipe · Casa da Babá">FA</div>
+  <button class="icon-btn" id="theme-btn" aria-label="Tema" data-tip="Tema: claro, escuro ou Casa da Baba" onclick="toggleThemeMenu()"><svg width="16" height="16"><use href="#i-moon"/></svg></button>
+  <div class="avatar-tb" title="Felipe · Casa da Baba">FA</div>
 </header>
 <!-- segunda faixa: tabs do contexto ativo (sempre visível dentro do módulo) -->
 <div class="subbar" id="subbar" hidden></div>
@@ -499,7 +499,7 @@ function renderHome(){
   main.innerHTML = `
     <div class="hello-wrap">
       <div class="hello">Bom dia.</div>
-      <p class="hello-sub">Sexta, 15 de agosto · Casa da Babá · caixa aberto desde <b>08h12</b></p>
+      <p class="hello-sub">Sexta, 15 de agosto · Casa da Baba · caixa aberto desde <b>08h12</b></p>
     </div>
     <div class="now-line">
       <div class="now-item"><div class="n-v mono">${fmt$(vendas)}</div><div class="n-l">vendido hoje</div></div>
@@ -1264,7 +1264,7 @@ body.ev-open .ev-panel{transform:none}
 .logo-mark{width:34px;height:34px;border-radius:8px;background:#111;color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:.02em}
 .receipt .logo-mark{margin:0 auto 6px}
 
-/* ═══ TEMA CASA DA BABÁ (as cores do PWA: dark warm terracota) ═══ */
+/* ═══ TEMA CASA DA BABA (as cores do PWA: dark warm terracota) ═══ */
 :root[data-theme="casa"]{
   --page:#131009; --card:#1D1712; --hover:#251D16; --pressed:#2E241B;
   --text:#F7F2E8; --text-2:#CFC5B4; --text-3:#94886F; --text-4:#6B6252;
@@ -2033,7 +2033,7 @@ function printFechamento(){
     <div class="drawer-body" style="background:var(--hover)">
       <div class="receipt">
         <div class="logo-mark">CB</div>
-        <div class="r-center r-title">CASA DA BABÁ</div>
+        <div class="r-center r-title">CASA DA BABA</div>
         <div class="r-center">FECHAMENTO DE CAIXA</div>
         <div class="r-center">15/08/2026 18:30 · Loja Centro</div>
         <div class="r-line"></div>
@@ -2389,7 +2389,7 @@ function tCaixa(){
     </div>`;
 }
 
-/* ═══ GESTÃO = DASHBOARD da Casa da Babá (denso inteligente) ═══ */
+/* ═══ GESTÃO = DASHBOARD da Casa da Baba (denso inteligente) ═══ */
 function tDashboard(){
   return `
     <span class="eyebrow">Decisões de hoje</span>
@@ -2516,7 +2516,7 @@ function tAtendimento(){
           ${cur.msgs.map(m => `<div class="msg ${m.dir}">${esc(m.t)}<span class="m-t">${m.h}</span></div>`).join('')}
         </div>
         <div class="chat-input">
-          <input class="f-input" id="chat-in" placeholder="Responder como Casa da Babá…" onkeydown="if(event.key==='Enter')sendChat()">
+          <input class="f-input" id="chat-in" placeholder="Responder como Casa da Baba…" onkeydown="if(event.key==='Enter')sendChat()">
           <button class="btn btn-primary" onclick="sendChat()">Enviar</button>
         </div>
       </div>
@@ -2821,7 +2821,7 @@ function printLabel(loteId){
     <div class="drawer-head"><h2>Etiqueta de lote</h2><button class="icon-btn" onclick="closeDrawer()">${ico('x', 15)}</button></div>
     <div class="drawer-body" style="background:var(--hover)">
       <div class="label-prev">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="logo-mark">CB</span><b style="font-size:12px">CASA DA BABÁ</b></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="logo-mark">CB</span><b style="font-size:12px">CASA DA BABA</b></div>
         <div style="font-size:13px;font-weight:700">${esc(l.prod)}</div>
         <div>LOTE ${l.id.toUpperCase()} · ${l.qty} ${l.un}</div>
         <div class="r-line" style="border-top:1px dashed #999;margin:7px 0"></div>
@@ -2994,8 +2994,8 @@ function pushEvent(e){
   pushEvento(e);
 }
 
-/* ═══ 3 TEMAS: claro / escuro / Casa da Babá (cores do PWA) ═══ */
-const THEMES = [['light','Claro','#F6F8FB'],['dark','Escuro','#0A1220'],['casa','Casa da Babá','#E76845']];
+/* ═══ 3 TEMAS: claro / escuro / Casa da Baba (cores do PWA) ═══ */
+const THEMES = [['light','Claro','#F6F8FB'],['dark','Escuro','#0A1220'],['casa','Casa da Baba','#E76845']];
 function toggleThemeMenu(){
   let el = document.querySelector('.theme-menu');
   if(el){ el.remove(); return; }
@@ -3145,7 +3145,7 @@ function tAtendimento(){
         <div class="chat-input">
           ${closed
             ? `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="sendTemplate()">📋 Enviar template “Atualização de pedido”</button>`
-            : `<input class="f-input" id="chat-in" placeholder="Responder como Casa da Babá…" onkeydown="if(event.key==='Enter')sendChat()">
+            : `<input class="f-input" id="chat-in" placeholder="Responder como Casa da Baba…" onkeydown="if(event.key==='Enter')sendChat()">
                <button class="btn btn-primary" onclick="sendChat()">Enviar</button>`}
         </div>
       </div>
@@ -3167,7 +3167,7 @@ function tAtendimento(){
 }
 function sendTemplate(){
   const cur = S.conversas.find(c => c.id === (S.chatId || S.conversas[0].id));
-  cur.msgs.push({ dir:'out', t:'📋 [template] Olá! Aqui é a Casa da Babá. Passando pra atualizar sobre seu pedido…', h:'agora' });
+  cur.msgs.push({ dir:'out', t:'📋 [template] Olá! Aqui é a Casa da Baba. Passando pra atualizar sobre seu pedido…', h:'agora' });
   META_WIN[cur.id] = 'open';
   audit(`enviou template Meta pra ${cur.nome}`);
   rerender();
@@ -3295,7 +3295,7 @@ function tAtendimento(){
           ${closed
             ? `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="sendTemplate()">📋 Enviar template “Atualização de pedido”</button>`
             : `<button class="icon-btn" style="width:34px;height:34px" data-tip="Anexar foto" onclick="attachMedia()">${ico('plus', 14)}</button>
-               <input class="f-input" id="chat-in" placeholder="Responder como Casa da Babá…" onkeydown="if(event.key==='Enter')sendChat()">
+               <input class="f-input" id="chat-in" placeholder="Responder como Casa da Baba…" onkeydown="if(event.key==='Enter')sendChat()">
                <button class="btn btn-primary" onclick="sendChat()">Enviar</button>`}
         </div>
       </div>
@@ -3326,8 +3326,8 @@ function moveFila(id){
 }
 function exportChat(id){
   const c = S.conversas.find(x => x.id === id);
-  const body = `CASA DA BABÁ — backup de conversa\n${c.nome} · ${c.canal} · origem: ${c.origem}\nexportado em ${new Date().toLocaleString('pt-BR')}\n\n` +
-    c.msgs.map(m => `[${m.h}] ${m.dir === 'out' ? 'Casa da Babá' : c.nome}: ${m.t}${m.img ? ' [foto]' : ''}`).join('\n');
+  const body = `CASA DA BABA — backup de conversa\n${c.nome} · ${c.canal} · origem: ${c.origem}\nexportado em ${new Date().toLocaleString('pt-BR')}\n\n` +
+    c.msgs.map(m => `[${m.h}] ${m.dir === 'out' ? 'Casa da Baba' : c.nome}: ${m.t}${m.img ? ' [foto]' : ''}`).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([body], { type:'text/plain' }));
   a.download = `conversa-${c.nome.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '')}.txt`;
@@ -3427,7 +3427,7 @@ function tAvaliacoes(){
           <span style="margin-left:auto">${a.respondida ? '<span class="pill pill-ok">respondida</span>' : '<span class="pill pill-warn">pública · sem resposta</span>'}</span>
         </div>
         <div style="font-size:13.5px;margin-top:6px">“${esc(a.texto)}”</div>
-        ${a.resposta ? `<div class="rev-reply"><div class="rr-by">Resposta da Casa da Babá (pública)</div>${esc(a.resposta)}</div>` : ''}
+        ${a.resposta ? `<div class="rev-reply"><div class="rr-by">Resposta da Casa da Baba (pública)</div>${esc(a.resposta)}</div>` : ''}
         <div class="rev-actions">
           ${!a.respondida ? `<button class="btn btn-primary btn-sm" onclick="revReplyOpen('${a.id}')">Responder (público)</button>` : ''}
           ${a.nota <= 3 && !a.recuperada ? `<button class="btn btn-secondary btn-sm" data-tip="Cupom + mensagem no WhatsApp" onclick="recuperarCliente('${a.id}')">Recuperar cliente</button>` : ''}

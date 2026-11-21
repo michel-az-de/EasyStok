@@ -3,15 +3,19 @@ using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Storefront;
+using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
@@ -44,7 +48,9 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     Ports.Output.Ai.ITranscritorAudio? transcritor = null,
     IPedidoRepository? pedidos = null,
     IRegraAutomaticaRepository? regrasAutomaticas = null,
-    PerfilClienteWhatsApp? perfilCliente = null)
+    PerfilClienteWhatsApp? perfilCliente = null,
+    RespostaSemIa? respostaSemIa = null,
+    INotificadorService? notificador = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -150,8 +156,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             {
                 // A loja puxou a conversa pelo celular: identifica (ou cria o lead) como na 1ª mensagem do cliente.
                 var identificacao = await identificarCliente.ExecuteAsync(
-                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, conversa.ContatoNome), ct);
-                conversa.VincularCliente(identificacao.Cliente.Id);
+                    new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, conversa.ContatoNome,
+                        HonrarDecisaoDaEquipe: true), ct);
+                if (identificacao.Cliente is { } cliente) conversa.VincularCliente(cliente.Id);
+                else conversa.ExigirConferenciaCliente();
                 await conversaRepository.AddAsync(conversa, ct);
             }
 
@@ -246,7 +254,9 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // #1792: a conversa fica travada até o commit; outro webhook ou o marcar-lida não grava não lidas velhas por cima.
             (conversa, mensagemEntidade, configuracao, identificacao) = await unitOfWork.ExecuteInTransactionSemRetryAsync(
                 token => GravarEntradaAsync(empresaId, entrada, msg, enviadaEm, token), ct);
-            await webhookRecebidoRepository.MarcarProcessadoAsync(registro!.Id, sucesso: true, ct: ct);
+            // #2280: gravada a entrada, nada mais depende da requisição. A Meta desiste em poucos segundos e a reentrega
+            // acha a mensagem e não refaz os efeitos: com o token dela, o turno do agente se perdia.
+            await webhookRecebidoRepository.MarcarProcessadoAsync(registro!.Id, sucesso: true, ct: CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -255,16 +265,29 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // O que ficou rastreado reenviaria os mesmos inserts no próximo commit do lote.
             unitOfWork.DescartarAlteracoesPendentes();
             if (registro is not null)
-                await webhookRecebidoRepository.MarcarProcessadoAsync(registro.Id, sucesso: false, ex.Message, ct);
+                await webhookRecebidoRepository.MarcarProcessadoAsync(registro.Id, sucesso: false, ex.Message, CancellationToken.None);
 
             // Regra de domínio (ex.: wa_id inválido) não passa num reenvio: pedir retry travaria o
             // payload por dias. O resto (concorrência, banco) passa.
             return ex is RegraDeDominioVioladaException;
         }
 
-        await DispararEfeitosAposGravarAsync(empresaId, conversa, mensagemEntidade, msg, configuracao, identificacao, ct);
+        await DispararEfeitosAposGravarAsync(empresaId, conversa, mensagemEntidade, msg, configuracao, identificacao, CancellationToken.None);
         return true;
     }
+
+    /// <summary>S24 e #2249: bloqueado ou encaminhado à responsável não recebe nada automático.</summary>
+    private static bool SemAutomatico(IdentificacaoCliente? identificacao) =>
+        identificacao?.IdentidadePendente == true
+        || identificacao?.Cliente is { Bloqueado: true } or { AtendimentoAutomaticoPausado: true };
+
+    /// <summary>
+    /// #2928: ponto único que monta a origem do anúncio Click-to-WhatsApp. Sem <c>referral</c>, null (a conversa não perde a anterior).
+    /// O <c>ctwa_clid</c> fica DESLIGADO (null): a política de privacidade do site ainda não registra a base legal para
+    /// guardá-lo (spec, riscos). Para ligar, depois de atualizar a política, troque o null por <c>r.CtwaClid</c>.
+    /// </summary>
+    private static OrigemAnuncio? OrigemDoAnuncio(MensagemRecebidaWhatsApp msg) =>
+        msg.Referral is { } r ? OrigemAnuncio.DoAnuncioWhatsApp(r.SourceId, r.Headline, ctwaClid: null, msg.Timestamp) : null;
 
     private async Task<(Conversa, Mensagem, ConfiguracaoAtendimento, IdentificacaoCliente?)> GravarEntradaAsync(
         Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, DateTime enviadaEm, CancellationToken ct)
@@ -281,16 +304,37 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         {
             // S05: identifica (ou cria o lead) na mesma transação que abre a conversa.
             identificacao = await identificarCliente.ExecuteAsync(
-                new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil), ct);
-            conversa.VincularCliente(identificacao.Cliente.Id);
+                new IdentificarClientePorTelefoneInput(empresaId, conversa.ContatoIdExterno, nomePerfil, HonrarDecisaoDaEquipe: true), ct);
+            if (identificacao.Cliente is { } cliente) conversa.VincularCliente(cliente.Id);
+            else conversa.ExigirConferenciaCliente();
         }
 
         conversa.RegistrarEntrada(enviadaEm);
+        conversa.RegistrarOrigemAnuncio(OrigemDoAnuncio(msg));
         if (existenteConversa is null)
             await conversaRepository.AddAsync(conversa, ct);
 
         var botaoId = msg.BotaoRespostaId ?? msg.BotaoPayload;
         var texto = msg.Tipo is "interactive" or "button" ? null : CortarNoLimite(msg.TextoCorpo);
+
+        // #2992: o cliente desistiu do pedido que a equipe atende. A equipe é avisada uma vez e a cobrança daquele pedido para.
+        if (existenteConversa is not null && pedidos is not null && notificador is not null
+            && conversa.PedidoEmAndamentoId is { } pedidoDaConversa
+            && DetectorDesistenciaPedido.EhDesistencia(texto)
+            && await pedidos.GetByIdAsync(empresaId, pedidoDaConversa) is { StatusEnum: StatusPedido.AguardandoPagamento }
+            && conversa.MarcarClienteDesistiuDoPedido(pedidoDaConversa))
+        {
+            // O aviso não pode derrubar a gravação da mensagem do cliente: a marca segue e a cobrança para mesmo assim.
+            try
+            {
+                await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(empresaId, conversa.Id, nomePerfil,
+                    "O cliente desistiu do pedido: confira e decida o acerto com ele", ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Webhook WhatsApp: desistência marcada na conversa {ConversaId}, aviso à equipe falhou.", conversa.Id);
+            }
+        }
         // Resposta de lista ou de fluxo não traz o id do botão: fica o registro, sem o tipo Botao.
         var tipoConteudo = MapearTipoConteudo(msg.Tipo);
         if (tipoConteudo == TipoConteudoMensagem.Botao && string.IsNullOrWhiteSpace(botaoId))
@@ -318,13 +362,19 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
         // S24: cliente bloqueado não é saudado nem atendido pelo agente; a conversa nasce com a
         // dona (Assumir + nota interna + aviso). O evento entra no outbox deste mesmo commit (ADR-0030).
-        if (identificacao?.Cliente.Bloqueado == true)
+        if (identificacao?.IdentidadePendente == true)
+            await escalador.EscalarAsync(empresaId, conversa,
+                "Telefone compartilhado: confira a pessoa e escolha o cadastro antes de continuar.", DateTime.UtcNow, ct);
+        else if (identificacao?.Cliente is { Bloqueado: true })
             await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(identificacao.Cliente), DateTime.UtcNow, ct);
+        // #2249: quem foi encaminhado à responsável também nasce com a equipe, sem saudação de cliente.
+        else if (identificacao?.Cliente is { AtendimentoAutomaticoPausado: true })
+            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoContatoPausado(identificacao.Cliente), DateTime.UtcNow, ct);
 
         // S42: conversa nova dispara a automática de entrada (primeiro contato, fora do horário ou loja
         // fechada) pelo outbox deste mesmo commit. Cliente bloqueado não recebe nada automático (S24),
         // nem entrada que o agente não vai responder (botão "acao:", reação; issue 1285).
-        if (existenteConversa is null && identificacao?.Cliente.Bloqueado != true
+        if (existenteConversa is null && !SemAutomatico(identificacao)
             && !SemRespostaAutomatica(msg.Tipo, botaoId) && publicadorEventos is not null)
             await publicadorEventos.PublicarAsync(empresaId, ConversaAbertaEvent.TipoEvento, "Conversa", conversa.Id,
                 new ConversaAbertaEvent(conversa.Id, conversa.ClienteId), ct: ct);
@@ -374,15 +424,16 @@ public sealed class ProcessarEventoWhatsAppUseCase(
                     new ArmazenarMidiaWhatsAppJob(empresaId, conversa.Id, msg.Wamid, msg.MidiaId));
             }
 
-            // #2155: conversa nova de cliente sem foto busca a foto do perfil, fora da requisição.
-            if (perfilCliente is not null && identificacao is { Cliente.FotoChave: null })
+            // #2155: a foto do perfil é buscada fora da requisição. #2838: em toda mensagem de cliente, não só na
+            // conversa nova; o job decide se troca e a janela dele segura a ponte.
+            if (perfilCliente is not null && conversa.ClienteId is { } clienteDaConversa)
             {
                 await queueService.EnqueueAsync(FilaAtendimentoNomes.FotoPerfilWhatsApp,
-                    new ColetarFotoPerfilWhatsAppJob(empresaId, identificacao.Cliente.Id, conversa.ContatoIdExterno));
+                    new ColetarFotoPerfilWhatsAppJob(empresaId, clienteDaConversa, conversa.ContatoIdExterno));
             }
 
             // S24: conversa de cliente bloqueado já nasceu com a dona; nada automático responde.
-            if (identificacao?.Cliente.Bloqueado == true)
+            if (conversa.VinculoEmRevisao || SemAutomatico(identificacao))
             {
                 await eventPublisher.PublicarAsync("conversa.mensagem_recebida", empresaId,
                     new { conversaId = conversa.Id, mensagemId = mensagem.Id }, ct);
@@ -392,9 +443,15 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             // RN-01: a saudação sai antes do agente, sem LLM, para caber nos 5 s. Sem agente para cumprir
             // o "já te respondo" (botão "acao:", reação), não há saudação (issue 1285). #2004: com a automática da
             // situação ligada, é ela que fala (a saudação direta e a automática eram duas mensagens para a mesma entrada).
-            if (identificacao is not null && !SemRespostaAutomatica(msg.Tipo, mensagem.BotaoId)
-                && !await AutomaticaDeEntradaFalaNoLugarDaSaudacaoAsync(empresaId, ct))
-                await EnviarSaudacaoAsync(empresaId, conversa, configuracao, identificacao, ct);
+            // #2885: saudação solta em conversa nova dispensa o modelo; então a saudação sai sem a frase de espera. Só vale
+            // quando a saudação direta saiu de fato: se o envio falha, ou se quem fala é a automática de entrada (que pode
+            // não sair e cair na saudação de reserva, com a promessa de resposta), o turno do modelo segue como antes.
+            var conversaNova = identificacao is not null && !SemRespostaAutomatica(msg.Tipo, mensagem.BotaoId);
+            var automaticaFala = conversaNova && await AutomaticaDeEntradaFalaNoLugarDaSaudacaoAsync(empresaId, ct);
+            var dispensaModelo = conversaNova && !automaticaFala
+                && await SaudacaoSoltaDispensaOModeloAsync(empresaId, conversa, mensagem, ct);
+            if (identificacao is not null && conversaNova && !automaticaFala)
+                dispensaModelo &= await EnviarSaudacaoAsync(empresaId, conversa, configuracao, identificacao, dispensaModelo, ct);
 
             if (EhAcaoDeBotao(mensagem.BotaoId))
             {
@@ -405,6 +462,10 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             {
                 // Reação, mensagem sem suporte ou de sistema: fica gravada para a dona; o agente não responde.
             }
+            else if (MidiaQueOAgenteNaoLe(msg.Tipo, msg.TextoCorpo))
+            {
+                // #2869: figurinha e vídeo sem legenda ficam gravados para a dona; o agente não vê o conteúdo e não responde.
+            }
             else if (!string.IsNullOrWhiteSpace(msg.MidiaId)
                 && ProcessarMidiaWhatsAppJobUseCase.AguardaTranscricao(mensagem.TipoConteudo, transcritor?.Disponivel == true))
             {
@@ -413,6 +474,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             else if (await optOut.TentarAsync(empresaId, conversa, mensagem.Texto, DateTime.UtcNow, ct))
             {
                 // S38: "SAIR" revogou o marketing do canal e já confirmou; o agente não responde.
+            }
+            else if (dispensaModelo && await SaudacaoRegistradaSemIaAsync(empresaId, conversa, mensagem, ct))
+            {
+                // #2885: a saudação já respondeu a conversa nova; o modelo não é chamado.
+            }
+            else if (identificacao is null && await RegraDeSaudacaoSoltaRespondeuAsync(empresaId, conversa, mensagem, ct))
+            {
+                // #2885: saudação solta em conversa parada respondida pela regra automática; o modelo não é chamado.
             }
             else
             {
@@ -460,6 +529,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             return;
         }
 
+        // #2746: o provedor pode mandar status para o id de uma mensagem RECEBIDA; o domínio só aceita status de
+        // entrega na saída, e a exceção derrubaria o webhook (500, reenvio e perda do resto do lote).
+        if (mensagem.Direcao != DirecaoMensagem.Saida)
+        {
+            logger.LogInformation("Webhook WhatsApp: status para mensagem que não é de saída ({Wamid}), ignorado.", status.Wamid);
+            return;
+        }
+
         var novoStatus = MapearStatus(status.Status);
         if (novoStatus is null) return;
 
@@ -495,12 +572,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     /// Envia a saudação e grava como <c>Mensagem(Saida, Sistema)</c>. Falha aqui nunca derruba o
     /// processamento: a mensagem de entrada já foi confirmada e o agente ainda precisa ser enfileirado.
     /// </summary>
-    private async Task EnviarSaudacaoAsync(
-        Guid empresaId, Conversa conversa, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct)
+    /// <returns><c>true</c> só quando a saudação saiu pelo canal e ficou gravada.</returns>
+    private async Task<bool> EnviarSaudacaoAsync(
+        Guid empresaId, Conversa conversa, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao,
+        bool semFraseEspera, CancellationToken ct)
     {
         try
         {
-            var texto = await MontarPrimeiraRespostaAsync(empresaId, configuracao, identificacao, ct);
+            var texto = await MontarPrimeiraRespostaAsync(empresaId, configuracao, identificacao, semFraseEspera, ct);
 
             // #2072: a saída fica marcada na conversa antes da rede. A saudação de reserva do outbox (#2004) só sai em
             // conversa sem saída depois da entrada, e o envio pode demorar (a ponte do WAHA "digita" antes): sem a marca,
@@ -509,11 +588,13 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             await unitOfWork.CommitAsync();
 
             Mensagem saida;
+            var enviada = false;
             try
             {
                 var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);
                 saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, DateTime.UtcNow,
                     TipoConteudoMensagem.Texto, texto, envio.Wamid);
+                enviada = true;
             }
             catch (Exception ex)
             {
@@ -526,12 +607,73 @@ public sealed class ProcessarEventoWhatsAppUseCase(
             conversa.RegistrarSaida(saida.EnviadaEm);
             await conversaRepository.AddMensagemAsync(saida, ct);
             await unitOfWork.CommitAsync();
+            return enviada;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Webhook WhatsApp: falha registrando a saudação da conversa {ConversaId}.", conversa.Id);
             // Não deixa o insert pendente contaminar o commit da próxima mensagem do lote.
             unitOfWork.DescartarAlteracoesPendentes();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// #2885: a saudação solta que abriu a conversa dispensa o turno do modelo? Falha ao consultar nunca tira a saudação
+    /// nem o turno do cliente: na dúvida, o fluxo segue como antes.
+    /// </summary>
+    private async Task<bool> SaudacaoSoltaDispensaOModeloAsync(
+        Guid empresaId, Conversa conversa, Mensagem mensagem, CancellationToken ct)
+    {
+        if (respostaSemIa is null) return false;
+        try
+        {
+            return await respostaSemIa.PodeDispensarOModeloAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: falha ao decidir a saudação sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// #2885: marca como tratada a entrada que a saudação já respondeu. Se o registro falha, devolve <c>false</c> e o turno
+    /// do modelo é enfileirado, para a entrada não ficar pendente sem ninguém para respondê-la.
+    /// </summary>
+    private async Task<bool> SaudacaoRegistradaSemIaAsync(
+        Guid empresaId, Conversa conversa, Mensagem mensagem, CancellationToken ct)
+    {
+        try
+        {
+            await respostaSemIa!.RegistrarSemRespostaPropriaAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: falha ao registrar a saudação sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// #2885: a regra "Saudação solta" respondeu a conversa parada? Falha no meio devolve <c>false</c> e o turno do modelo é
+    /// enfileirado: resposta em dobro é melhor que cliente sem resposta.
+    /// </summary>
+    private async Task<bool> RegraDeSaudacaoSoltaRespondeuAsync(
+        Guid empresaId, Conversa conversa, Mensagem mensagem, CancellationToken ct)
+    {
+        if (respostaSemIa is null) return false;
+        try
+        {
+            return await respostaSemIa.TentarAsync(empresaId, conversa, mensagem, DateTime.UtcNow, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Webhook WhatsApp: falha na resposta sem IA da conversa {ConversaId}; o modelo assume.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
+            return false;
         }
     }
 
@@ -567,11 +709,12 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     /// frase de espera ("já te ajudo") prometeria uma resposta que não vem. Sem registro, vale o expediente padrão.
     /// </summary>
     private async Task<string> MontarPrimeiraRespostaAsync(
-        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct)
+        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, bool semFraseEspera,
+        CancellationToken ct)
     {
         var expediente = await expedientes.GetByEmpresaIdAsync(empresaId, ct) ?? ExpedienteLoja.CriarPadrao(empresaId);
         return expediente.MensagemParaCliente(relogio.GetUtcNow().UtcDateTime)
-            ?? await saudacao.MontarAsync(empresaId, configuracao, identificacao, ct);
+            ?? await saudacao.MontarAsync(empresaId, configuracao, identificacao, semFraseEspera, ct);
     }
 
     private async Task<ConfiguracaoAtendimento> AtualizarUltimaMensagemRecebidaAsync(Guid empresaId, DateTime agora)
@@ -594,6 +737,9 @@ public sealed class ProcessarEventoWhatsAppUseCase(
 
     private static bool SemRespostaAutomatica(string tipo, string? botaoId) =>
         EhAcaoDeBotao(botaoId) || TiposSemTurnoDoAgente.Contains(tipo);
+
+    private static bool MidiaQueOAgenteNaoLe(string tipo, string? legenda) =>
+        tipo == "sticker" || (tipo == "video" && string.IsNullOrWhiteSpace(legenda));
 
     private static TipoConteudoMensagem MapearTipoConteudo(string tipo) => tipo switch
     {

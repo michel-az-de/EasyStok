@@ -84,19 +84,23 @@ confere('quem escreve o título: o App pela rota e o Balcão com a contagem', ()
 confere('o topo do Balcão tem link para os módulos (tablet de 1024 a 1179 px, sem Mais e sem trilho)', () => {
   const moldura = fonte('app/Moldura.jsx')
   const cabecalho = moldura.slice(moldura.indexOf('function Cabecalho('), moldura.indexOf('function Trilho('))
-  assert.match(cabecalho, /<a className=\{css\.marca\} href=\{HASH_HALL\} aria-label="Ir para os módulos"/)
+  assert.match(cabecalho, /<a className=\{css\.marca\} href=\{HASH_HALL\} aria-label=\{`Ir para o \$\{NOME_INICIO\}`\}/) // #2258 (auditoria T9): Início no lugar de Módulos
   assert.match(cabecalho, /<h1 className="sr">Casa da Baba<\/h1>/)
 })
 
 // ---------------------------------------------------------------- Ajuda e Sair no celular
 
-for (const [arquivo, grade] of [['features/hall/hall.module.css', '.topo'], ['features/hall/moldura.module.css', '.barra']]) {
-  confere(`${arquivo}: Ajuda e Sair em colunas próprias no celular`, () => {
+// #2762 (B17, VF1): no celular o topo do Início e a barra dos módulos trocaram a grade por uma linha flex.
+// O defeito da #1582 (o Ajuda por baixo do Sair) segue impedido de outro jeito: cada ação é um item da
+// linha, na ordem da tela, sem `display: contents` reposicionando por coluna e sem deslocamento fixo.
+for (const [arquivo, linha] of [['features/hall/hall.module.css', '.topo'], ['features/hall/moldura.module.css', '.barra']]) {
+  confere(`${arquivo}: Ajuda e conta em itens próprios da mesma linha no celular`, () => {
     const css = fonte(arquivo)
-    const celular = css.slice(css.indexOf('@media (max-width: 640px)'))
-    assert.match(celular, new RegExp(`\\${grade} \\{ display: grid; grid-template-columns: minmax\\(0, 1fr\\) auto auto;`))
-    assert.match(celular, /\[data-ajuda-console\]\) \{ grid-row: 1; grid-column: 2; \}/)
-    assert.match(celular, /\.sair \{ grid-row: 1; grid-column: 3;/)
+    const inicio = css.indexOf('@media (max-width: 640px)')
+    const celular = css.slice(inicio, css.indexOf('\n}', inicio))
+    assert.match(celular, new RegExp(`\\${linha} \\{ flex-wrap: (nowrap|wrap);`))
+    assert.match(celular, /\.acoes \{[^}]*flex-wrap: nowrap;[^}]*margin-left: auto;/)
+    assert.doesNotMatch(celular, /grid-column|grid-row/, 'sem reposicionar por grade no celular, a ordem do Tab é a da tela')
     // O deslocamento fixo era o defeito: supunha um Ajuda de 84 px, e ele mede 104 px.
     assert.doesNotMatch(css, /\.sair \{[^}]*margin-left/)
   })

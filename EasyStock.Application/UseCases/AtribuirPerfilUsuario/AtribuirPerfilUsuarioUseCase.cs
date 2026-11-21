@@ -12,6 +12,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
         IUsuarioRepository usuarioRepository,
         IUsuarioPerfilRepository usuarioPerfilRepository,
         IPerfilRepository perfilRepository,
+        ILojaRepository lojaRepository,
         RevogadorSessoes revogadorSessoes,
         ICurrentUserAccessor currentUser,
         IAuditLogRepository auditLogRepository,
@@ -19,6 +20,12 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
         ILogger<AtribuirPerfilUsuarioUseCase> logger)
     {
         public async Task ExecuteAsync(AtribuirPerfilUsuarioCommand command)
+        {
+            var revogou = await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => ExecutarAsync(command));
+            if (revogou) await revogadorSessoes.ApagarCacheAsync(command.UsuarioId);
+        }
+
+        private async Task<bool> ExecutarAsync(AtribuirPerfilUsuarioCommand command)
         {
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
 
@@ -34,6 +41,15 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
             if (perfil.Nivel == NivelAcesso.SuperAdmin || (perfil.EmpresaId is not null && perfil.EmpresaId != command.EmpresaId))
                 throw new UseCaseValidationException("Perfil invalido.");
 
+            // #2448: a rota só confere a empresa de quem chama. Fora o SuperAdmin, o usuário alvo precisa ter vínculo
+            // com a empresa (ativo ou não, como na reativação); a mesma mensagem do inexistente não revela contas alheias.
+            if (currentUser.Nivel != NivelAcesso.SuperAdmin && !usuario.Empresas.Any(e => e.EmpresaId == command.EmpresaId))
+                throw new UseCaseValidationException("Usuario nao encontrado.");
+
+            // O token leva a loja do perfil; loja de outra empresa não entra, nem pelo SuperAdmin.
+            if (command.LojaId is { } lojaId && await lojaRepository.GetByIdAsync(command.EmpresaId, lojaId) is null)
+                throw new UseCaseValidationException("Loja invalida.");
+
             var vinculoAtivo = usuario.Empresas.Any(e => e.EmpresaId == command.EmpresaId && e.Ativo);
 
             // Quem se rebaixa perde a tela que desfaz o engano; a troca do próprio perfil é de outro administrador.
@@ -48,13 +64,13 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
             if (mantido is not null && anteriores.Count == 0)
             {
                 // O perfil é o mesmo: não há troca a registrar. Só a loja muda o que o token carrega.
-                if (mantido.LojaId == command.LojaId) return;
+                if (mantido.LojaId == command.LojaId) return false;
                 mantido.LojaId = command.LojaId;
                 mantido.AtribuidoEm = DateTime.UtcNow;
                 await usuarioPerfilRepository.UpdateAsync(mantido);
                 if (vinculoAtivo) await revogadorSessoes.RevogarAsync(usuario);
                 await unitOfWork.CommitAsync();
-                return;
+                return vinculoAtivo;
             }
 
             foreach (var anterior in anteriores)
@@ -87,6 +103,7 @@ namespace EasyStock.Application.UseCases.AtribuirPerfilUsuario
                 usuario.Id, RastroDeUsuarios.PerfilTrocado, $"Perfil trocado de {de} para {perfil.Nome} por {autor}", currentUser, command.EmpresaId));
 
             await unitOfWork.CommitAsync();
+            return vinculoAtivo;
         }
     }
 }

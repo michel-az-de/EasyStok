@@ -13,6 +13,10 @@
 #   6. compose up -d, espera healthy e confere GIT_SHA no ez-api
 #   7. se falhar: volta as imagens para vps-prev-<ts> e sobe de novo.
 #      O banco NAO e revertido: o dump do passo 4 fica para restauracao manual.
+#   8. se ficou no ar: faxina (issue #2545). Guarda so as RETEM_PREV imagens
+#      vps-prev-<ts> mais novas por servico, remove as tags vps-<sha> de deploys
+#      anteriores e poda o cache de build acima de CACHE_TETO. Falha na faxina
+#      nao derruba o deploy. Dumps, volumes e banco ficam fora.
 #
 # Guarda (issue #1336, incidente 2026-10-01): antes do git archive faz git fetch
 # e RECUSA o SHA que nao for o origin/master atual nem descendente dele, porque
@@ -29,6 +33,8 @@
 #                                                # commit anterior do master; pede
 #                                                # para digitar o sha (ou ROLLBACK_CONFIRMA=<sha8>)
 #   scripts/deploy/vps-deploy.sh --dry-run [...] # guarda + plano + sintaxe, sem SSH
+#   scripts/deploy/vps-deploy.sh --origem espelho [...] # GitHub fora (#2958): a guarda
+#                                                # usa o master do espelho da VPS
 #
 # Saidas: 0 ok | 2 uso invalido | 3 outro deploy em andamento | 4 build falhou
 # | 5 dump vazio | 6 nao ficou healthy (imagem revertida) | 7 SHA recusado pela
@@ -36,7 +42,9 @@
 #
 # Variaveis: VPS_HOST (hostinger), STACK_DIR (/opt/stacks/easystok),
 # BUILD_ROOT (/home/felipe/build), BACKUP_DIR (/home/felipe/backups; /opt/backups e do root), DB_CONTAINER
-# (shared-postgres), DB_NAME (easystock), HEALTH_TIMEOUT (180 s).
+# (shared-postgres), DB_NAME (easystock), HEALTH_TIMEOUT (180 s), RETEM_PREV (3
+# imagens de rollback por servico), CACHE_TETO (10GB de cache de build),
+# ESPELHO_URL ($VPS_HOST:git/EasyStok.git, espelho bare da #2958).
 # =============================================================================
 set -euo pipefail
 
@@ -44,25 +52,34 @@ VPS_HOST="${VPS_HOST:-hostinger}"
 STACK_DIR="${STACK_DIR:-/opt/stacks/easystok}"
 BUILD_ROOT="${BUILD_ROOT:-/home/felipe/build}"
 BACKUP_DIR="${BACKUP_DIR:-/home/felipe/backups}"
+# E3 (#2977, ADR-0068): o dump pre-deploy tambem vai para o restic, em segundo plano.
+BACKUP_HOOK="${BACKUP_HOOK:-/home/felipe/backup-restic/backup.sh}"
 DB_CONTAINER="${DB_CONTAINER:-shared-postgres}"
 DB_NAME="${DB_NAME:-easystock}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
+RETEM_PREV="${RETEM_PREV:-3}"
+CACHE_TETO="${CACHE_TETO:-10GB}"
 SERVICES="api worker web"
 
 uso() { echo "ERRO: $*" >&2; sed -n '/^# Uso:/,/^# Saidas:/p' "$0" | sed '$d; s/^# \{0,1\}//' >&2; exit 2; }
 
-DRY_RUN=0 ROLLBACK=0 MOTIVO="" REF=""
+ESPELHO_URL="${ESPELHO_URL:-$VPS_HOST:git/EasyStok.git}"
+DRY_RUN=0 ROLLBACK=0 MOTIVO="" REF="" ORIGEM=github
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --rollback) [ -n "${2:-}" ] || uso "--rollback exige um sha"; ROLLBACK=1; REF="$2"; shift ;;
     --motivo) [ -n "${2:-}" ] || uso "--motivo exige um texto"; MOTIVO="$2"; shift ;;
+    --origem) [ "${2:-}" = espelho ] || uso "--origem so aceita 'espelho'"; ORIGEM=espelho; shift ;;
     -*) uso "opcao desconhecida: $1" ;;
     *) [ -z "$REF" ] || uso "mais de um sha informado"; REF="$1" ;;
   esac
   shift
 done
-REF="${REF:-origin/master}"
+# Ref do master que a guarda usa: o do GitHub ou, com --origem espelho, o do espelho da VPS.
+MASTER_REF=origin/master
+[ "$ORIGEM" = github ] || MASTER_REF=espelho/master
+REF="${REF:-$MASTER_REF}"
 [ "$ROLLBACK" = 1 ] || [ -z "$MOTIVO" ] || uso "--motivo so vale com --rollback"
 
 # Script executado na VPS. Heredoc literal: nada aqui e expandido localmente.
@@ -104,6 +121,12 @@ mkdir -p "$BACKUP_DIR"
 DUMP="$BACKUP_DIR/$DB_NAME-predeploy-$TS.dump"
 docker exec "$DB_CONTAINER" pg_dump -U postgres -Fc "$DB_NAME" >"$DUMP"
 [ -s "$DUMP" ] || { echo "ERRO: dump vazio; nada foi trocado nos containers" >&2; exit 5; }
+# Envio ao Drive em segundo plano (setsid): falha ou demora do backup nao segura o deploy;
+# o vigia da estacao acusa a falta do snapshot.
+if [ -x "${BACKUP_HOOK:-}" ]; then
+  setsid "$BACKUP_HOOK" pre-deploy "$DUMP" </dev/null >>"$BUILD_ROOT/backup-predeploy.log" 2>&1 &
+  echo "    dump enviado ao backup em segundo plano"
+fi
 
 echo "==> [4/6] guarda :vps como vps-prev-$TS e promove vps-$SHA"
 for s in $SERVICES; do
@@ -123,6 +146,12 @@ healthy() {
       [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = healthy ] || ok=0
     done
     [ "$(docker inspect -f '{{.State.Running}}' ez-worker 2>/dev/null)" = true ] || ok=0
+    # #2372: com healthcheck (arquivo de vida, #2107) o Worker precisa ficar healthy; Running nao prova loop vivo.
+    # Sem healthcheck no compose, vale so o Running acima.
+    case "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}sem{{end}}' ez-worker 2>/dev/null)" in
+      healthy|sem) ;;
+      *) ok=0 ;;
+    esac
     # I4.1 (#1674): Worker em laco de restart fica "Running" entre uma queda e outra. O container acabou
     # de ser recriado, entao qualquer restart ja e falha; nao adianta esperar o resto do prazo.
     reinicios=$(docker inspect -f '{{.RestartCount}}' ez-worker 2>/dev/null || echo 0)
@@ -140,15 +169,28 @@ sha_no_ar() {
   docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' ez-api | sed -n 's/^GIT_SHA=//p' | head -1
 }
 
+# #2545: sem isto o disco enche (80 GB de cache e 30 imagens de rollback por
+# servico em 14/11/2026). So roda depois do deploy saudavel: o caminho de falha
+# precisa das imagens antigas. Remover a tag nao apaga camada ainda em uso.
+faxina() {
+  local s t
+  for s in $SERVICES; do
+    docker images "easystok-$s" --format '{{.Tag}}' | grep '^vps-prev-' | sort -r       | tail -n +"$(( ${RETEM_PREV:-3} + 1 ))"       | while read -r t; do docker rmi "easystok-$s:$t" >/dev/null || true; done
+    docker images "easystok-$s" --format '{{.Tag}}' | grep -E '^vps-[0-9a-f]{7,40}$' | grep -vx "vps-$SHA"       | while read -r t; do docker rmi "easystok-$s:$t" >/dev/null || true; done
+  done
+  docker builder prune -af --reserved-space "${CACHE_TETO:-10GB}" >/dev/null
+}
+
 echo "==> [5/6] compose up"
 up
 if healthy && [ "$(sha_no_ar)" = "$SHA_FULL" ]; then
   echo "$SHA" >"$BUILD_ROOT/easystok-current"
   echo "==> [6/6] OK: $SHA no ar. Dump pre-deploy: $DUMP"
+  faxina || echo "AVISO: faxina de imagens e cache falhou; o deploy esta no ar" >&2
   exit 0
 fi
 
-echo "ERRO: $SHA nao passou na verificacao (api e web healthy, worker rodando sem reiniciar) em ${HEALTH_TIMEOUT}s; voltando para vps-prev-$TS" >&2
+echo "ERRO: $SHA nao passou na verificacao (api e web healthy, worker healthy ou rodando sem healthcheck, sem reiniciar) em ${HEALTH_TIMEOUT}s; voltando para vps-prev-$TS" >&2
 docker logs --tail 40 ez-api >&2 || true
 # I4.1 (#1674): a falha pode ser so do Worker; sem o log dele o motivo fica na VPS.
 docker logs --tail 40 ez-worker >&2 || true
@@ -169,8 +211,12 @@ REMOTE_EOF
 recusa() { echo "RECUSADO: $1" >&2; shift; [ $# = 0 ] || printf '%s\n' "$@" >&2; exit 7; }
 
 # --- guarda (#1336): o SHA tem de ser o origin/master atual ou descendente dele
-git fetch -q origin || recusa "git fetch origin falhou; sem o origin/master atual nao da para conferir o SHA."
-MASTER="$(git rev-parse --verify 'origin/master^{commit}')"
+if [ "$ORIGEM" = github ]; then
+  git fetch -q origin || recusa "git fetch origin falhou; sem o origin/master atual nao da para conferir o SHA."     "Com o GitHub fora, use o espelho da VPS (#2958): --origem espelho"
+else
+  git fetch -q "$ESPELHO_URL" '+refs/heads/master:refs/remotes/espelho/master'     || recusa "git fetch do espelho $ESPELHO_URL falhou; sem o master do espelho nao da para conferir o SHA."
+fi
+MASTER="$(git rev-parse --verify "$MASTER_REF^{commit}")"
 SHA_FULL="$(git rev-parse --verify -q "$REF^{commit}")" || recusa "'$REF' nao e um commit conhecido (rode git fetch?)."
 SHA="${SHA_FULL:0:8}"
 ATRAS="$(git rev-list --count "$SHA_FULL..$MASTER")"
@@ -200,7 +246,7 @@ else
 fi
 
 # Copia antiga deste script (worktree parado) nao tem as guardas novas: so roda a do master.
-ESPERADO="$(git rev-parse -q --verify 'origin/master:scripts/deploy/vps-deploy.sh' || true)"
+ESPERADO="$(git rev-parse -q --verify "$MASTER_REF:scripts/deploy/vps-deploy.sh" || true)"
 if [ -n "$ESPERADO" ] && [ "$(git hash-object --path=scripts/deploy/vps-deploy.sh "$0")" != "$ESPERADO" ]; then
   msg="esta copia do vps-deploy.sh ($0) difere da do origin/master: script desatualizado ou alterado. Rode o do master atualizado."
   if [ "$DRY_RUN" = 1 ]; then echo "AVISO: $msg" >&2; else recusa "$msg"; fi
@@ -213,6 +259,7 @@ MOTIVO="${MOTIVO//[$'\t\n\r']/ }"
 
 echo "==> Deploy de $SHA ($(git log -1 --format=%s "$SHA_FULL" | cut -c1-70)) em $VPS_HOST"
 echo "    guarda: OK, $guarda"
+[ "$ORIGEM" = github ] || echo "    origem: ESPELHO da VPS ($ESPELHO_URL), GitHub nao consultado"
 echo "    servicos: $SERVICES | dump: $BACKUP_DIR/$DB_NAME-predeploy-$TS.dump | rollback: vps-prev-$TS"
 echo "    historico: $BUILD_ROOT/deploy-history.log ($MODO, $QUEM)"
 
@@ -232,7 +279,9 @@ fi
 
 ENVS="SHA=$SHA SHA_FULL=$SHA_FULL TS=$TS STACK_DIR=$STACK_DIR BUILD_ROOT=$BUILD_ROOT"
 ENVS="$ENVS BACKUP_DIR=$BACKUP_DIR DB_CONTAINER=$DB_CONTAINER DB_NAME=$DB_NAME"
+ENVS="$ENVS BACKUP_HOOK=$BACKUP_HOOK"
 ENVS="$ENVS HEALTH_TIMEOUT=$HEALTH_TIMEOUT SERVICES='$SERVICES'"
+ENVS="$ENVS RETEM_PREV=$RETEM_PREV CACHE_TETO=$CACHE_TETO"
 ENVS="$ENVS MODO=$MODO QUEM=$(printf '%q' "$QUEM") MOTIVO=$(printf '%q' "$MOTIVO")"
 
 # stdin do ssh = fonte (tar); o script remoto vai como argumento de bash -c.

@@ -26,7 +26,7 @@ export const CAMPOS = { NOME: 'nome', TELEFONE: 'telefone', ENDERECO: 'endereco'
 // Marca que a ficha mostra ao lado de cada campo preenchido pelo automático.
 export const SELO_CAPTADO = 'captado da conversa'
 
-export const TEXTO_CADASTRO_CRIADO = 'Cadastro criado pelo automático com nome, telefone e endereço captados da conversa.'
+export const TEXTO_CADASTRO_CRIADO = 'Cadastro criado pelo Assistente com nome, telefone e endereço captados da conversa.'
 
 const semAcento = (texto) => String(texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
 

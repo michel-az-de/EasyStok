@@ -40,7 +40,7 @@ public class LauncherController(
         // compartilhado, então abrir o portal não dispara requests a mais.
         // Degrada como o menu: falha vira resumo vazio / seed conservador.
         MenuResumoRaw resumo;
-        try { resumo = await resumoSvc.ObterRawAsync(empresaId, lojaId); }
+        try { resumo = await resumoSvc.ObterRawAsync(empresaId, lojaId, usuarioId); }
         catch { resumo = new MenuResumoRaw(null, null, Ok: false); }
 
         MenuFavoritosBff fav;

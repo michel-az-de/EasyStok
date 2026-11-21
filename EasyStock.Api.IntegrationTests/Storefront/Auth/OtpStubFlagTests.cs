@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
 using DotNet.Testcontainers.Builders;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -25,7 +24,7 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Auth;
 /// </summary>
 public sealed class OtpStubFlagTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
 
     private const string JwtIssuer = "EasyStock";
@@ -36,11 +35,7 @@ public sealed class OtpStubFlagTests : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_otp_stub_flag_tests")
-                .WithUsername("postgres")
-                .WithPassword("Si6IT-" + Guid.NewGuid().ToString("N"))
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             await using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()

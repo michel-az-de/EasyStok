@@ -5,10 +5,13 @@ using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.Assistente;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -17,6 +20,17 @@ namespace EasyStock.Api.UnitTests.Controllers;
 /// <summary>Assistente da dona (S47): contrato HTTP. O LLM é substituto; nenhuma chamada de rede.</summary>
 public class AtendimentoAssistenteControllerTests
 {
+    [Theory]
+    [InlineData(nameof(AtendimentoAssistenteController.Perguntar))]
+    [InlineData(nameof(AtendimentoAssistenteController.MontarFicha))]
+    [InlineData(nameof(AtendimentoAssistenteController.SugerirCadastro))]
+    public void ConsultasUsamLimiteExistenteDeIa(string metodo)
+    {
+        var limite = typeof(AtendimentoAssistenteController).GetMethod(metodo)!
+            .GetCustomAttributes(typeof(EnableRateLimitingAttribute), true).Cast<EnableRateLimitingAttribute>().Single();
+        limite.PolicyName.Should().Be("ai");
+    }
+
     private readonly IAgenteLlmClient _llm = Substitute.For<IAgenteLlmClient>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly IConversaRepository _conversas = Substitute.For<IConversaRepository>();
@@ -51,6 +65,20 @@ public class AtendimentoAssistenteControllerTests
         await _conversas.DidNotReceive().AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>S68 (#2597): a lista aprovada, com o modelo atual em primeiro, para a aba Geral escolher.</summary>
+    [Fact]
+    public void ModelosDevolveAListaAprovada()
+    {
+        var lista = new EasyStock.Application.Services.Atendimento.ModelosAprovadosAgenteOptions();
+        lista.Modelos.Add(new("claude-sonnet-5", "Padrão", "padrão"));
+
+        var result = Criar().Modelos(Microsoft.Extensions.Options.Options.Create(lista));
+
+        result.Should().BeOfType<OkObjectResult>().Subject.Value.Should()
+            .BeOfType<ApiResponse<IReadOnlyList<EasyStock.Application.Services.Atendimento.ModeloAprovadoAgente>>>()
+            .Subject.Data.Should().Equal(new EasyStock.Application.Services.Atendimento.ModeloAprovadoAgente("claude-sonnet-5", "Padrão", "padrão"));
+    }
+
     [Fact]
     public async Task SemChave_Devolve503ComMensagemClara()
     {
@@ -72,5 +100,32 @@ public class AtendimentoAssistenteControllerTests
         var result = await Criar().Perguntar(new PerguntarAssistenteBody("  ", null));
 
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Historico_LeSoDaEmpresaDoUsuarioComOsFiltros()
+    {
+        // S67 (#2534): a empresa vem do token, nunca da query.
+        var turnos = Substitute.For<ITurnoAgenteRepository>();
+        var conversaId = Guid.NewGuid();
+        turnos.ListarAsync(_empresaId, Arg.Any<FiltroTurnosAgente>(), Arg.Any<CancellationToken>())
+            .Returns(new PaginaTurnosAgente([], 0));
+
+        var result = await Criar().Historico(conversaId, DesfechoTurnoAgente.Escalou, new ListarHistoricoAssistenteUseCase(turnos), 2, 10);
+
+        result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<ApiResponse<PaginaTurnosAgente>>();
+        await turnos.Received(1).ListarAsync(_empresaId, new FiltroTurnosAgente(conversaId, DesfechoTurnoAgente.Escalou, 2, 10),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Uso_MesInvalido_Devolve400()
+    {
+        var turnos = Substitute.For<ITurnoAgenteRepository>();
+
+        var result = await Criar().Uso(2026, 13, new ObterUsoAssistenteUseCase(turnos, TimeProvider.System));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        await turnos.DidNotReceiveWithAnyArgs().SomarAsync(default, default, default, default);
     }
 }

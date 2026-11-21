@@ -15,6 +15,7 @@ public class CobrancaPedidoConfiguration : IEntityTypeConfiguration<CobrancaPedi
         b.Property(c => c.Provedor).IsRequired().HasMaxLength(CobrancaPedido.ProvedorTamanhoMaximo);
         b.Property(c => c.ReferenciaExterna).HasMaxLength(CobrancaPedido.ReferenciaTamanhoMaximo);
         b.Property(c => c.LinkPagamento).HasMaxLength(CobrancaPedido.LinkTamanhoMaximo);
+        b.Property(c => c.PixCopiaCola).HasMaxLength(CobrancaPedido.PixCopiaColaTamanhoMaximo);
         b.Property(c => c.Valor).HasColumnType("numeric(14,2)").IsRequired();
         b.Property(c => c.ValorPago).HasColumnType("numeric(14,2)");
         b.Property(c => c.Status).HasConversion<int>().IsRequired();

@@ -24,4 +24,7 @@ public enum CategoriaIntegracao
 
     /// <summary>Mapas e geocodificação (Google Maps). F16, #1246.</summary>
     Mapas = 6,
+
+    /// <summary>Provedores de IA da loja, uma chave por provedor (<c>ia:{provedor_id}</c>). #2957.</summary>
+    Ia = 7,
 }

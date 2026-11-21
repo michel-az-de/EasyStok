@@ -2,6 +2,7 @@ using FluentAssertions;
 
 namespace EasyStock.ArchitectureTests;
 
+[Trait("Category", "Architecture")]
 public class ProjectFileHygieneTests
 {
     [Fact]

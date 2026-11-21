@@ -7,10 +7,13 @@ import { Botao } from '../../componentes/Botao'
 import { CampoArea, CampoSelecao } from '../../componentes/Campo'
 import { Pilula } from '../../componentes/Pilula'
 import { dataHora, moeda } from '../../dominio/formato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './ficha.module.css'
 
 const categorias = { produto_improprio: 'Produto impróprio', atraso: 'Atraso', preferencia: 'Preferência', outro: 'Outro' }
-const origens = { dona: 'Loja', avaliacao: 'Avaliação', agente: 'Agente' }
+// #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o envio trava.
+const LIMITE_TEXTO = 1000
+const origens = { dona: 'Loja', avaliacao: 'Avaliação', agente: 'Assistente' }
 
 function NovaOcorrencia({ ocupado, abrir }) {
   const [formulario, setFormulario] = useState(false)
@@ -25,7 +28,7 @@ function NovaOcorrencia({ ocupado, abrir }) {
   }
   async function registrar(e) {
     e.preventDefault()
-    if (relato.trim() && await abrir(categoria, relato.trim())) {
+    if (relato.trim() && !algumPassaDoLimite([relato, LIMITE_TEXTO]) && await abrir(categoria, relato.trim())) {
       setRelato(''); setCategoria('outro'); fechar()
     }
   }
@@ -33,9 +36,9 @@ function NovaOcorrencia({ ocupado, abrir }) {
     <CampoSelecao rotulo="Motivo da ocorrência" value={categoria} onChange={e => setCategoria(e.target.value)} disabled={ocupado}
       opcoes={Object.entries(categorias).map(([valor, rotulo]) => ({ valor, rotulo }))} />
     <CampoArea ref={campo} rotulo="O que aconteceu?" value={relato} onChange={e => setRelato(e.target.value)}
-      maxLength={1000} required disabled={ocupado} rows={3} />
+      limite={LIMITE_TEXTO} required disabled={ocupado} rows={3} />
     <p className={css.corpoBloco}>O relato fica no histórico deste pedido. Nenhum valor será devolvido ao registrar.</p>
-    <Botao tipo="submit" variante="primario" disabled={ocupado || !relato.trim()}>Salvar ocorrência</Botao>
+    <Botao tipo="submit" variante="primario" disabled={ocupado || !relato.trim() || algumPassaDoLimite([relato, LIMITE_TEXTO])}>Salvar ocorrência</Botao>
     <Botao disabled={ocupado} onClick={fechar}>Voltar</Botao>
   </form> : <Botao ref={botao} variante="primario" disabled={ocupado} onClick={() => setFormulario(true)}>Registrar ocorrência</Botao>
 }
@@ -49,7 +52,7 @@ function Ocorrencia({ o, podeGerenciar, ocupado, apurar, encerrar, retomar }) {
 
   async function salvar(e) {
     e.preventDefault()
-    if (resolucao.trim() && await encerrar(o.id, resolucao.trim())) setFormulario(false)
+    if (resolucao.trim() && !algumPassaDoLimite([resolucao, LIMITE_TEXTO]) && await encerrar(o.id, resolucao.trim())) setFormulario(false)
   }
 
   return <article className={css.acoesPedido} aria-label={`Ocorrência: ${o.relato}`}>
@@ -69,9 +72,9 @@ function Ocorrencia({ o, podeGerenciar, ocupado, apurar, encerrar, retomar }) {
       {pendente ? <Botao disabled={ocupado} onClick={() => retomar(o)}>Conferir reembolso e concluir</Botao> : <>
         {!formulario && <Botao disabled={ocupado} onClick={() => setFormulario(true)}>Encerrar ocorrência</Botao>}
         {formulario && <form className={css.acoesPedido} onSubmit={salvar}>
-          <CampoArea rotulo="Resolução da ocorrência" value={resolucao} onChange={(e) => setResolucao(e.target.value)} maxLength={1000} required disabled={ocupado} rows={3} />
+          <CampoArea rotulo="Resolução da ocorrência" value={resolucao} onChange={(e) => setResolucao(e.target.value)} limite={LIMITE_TEXTO} required disabled={ocupado} rows={3} />
           <p className={css.corpoBloco}>A resolução fica no histórico do cliente. Para devolver valores, use Devoluções e confira a confirmação antes de encerrar.</p>
-          <Botao type="submit" variante="primario" disabled={ocupado || !resolucao.trim()}>Confirmar encerramento</Botao>
+          <Botao type="submit" variante="primario" disabled={ocupado || !resolucao.trim() || algumPassaDoLimite([resolucao, LIMITE_TEXTO])}>Confirmar encerramento</Botao>
           <Botao type="button" disabled={ocupado} onClick={() => setFormulario(false)}>Voltar</Botao>
         </form>}
       </>}

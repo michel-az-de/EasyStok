@@ -348,4 +348,87 @@ public class ResolvedorAudienciaTests
 
         r.Should().ContainSingle().Which.Nome.Should().Be("Leo");
     }
+
+    // ── #2211: audiência "inscritos", quem a dona marcou para receber o aviso da equipe pelo número da loja ───
+
+    private RotinaNotificacao RotinaInscritos() =>
+        Reclassificar(Rotina("inscritos"), TipoEventoNotificacao.AvisoEquipePedidoComCanhoto);
+
+    private static RotinaNotificacao Reclassificar(RotinaNotificacao rotina, TipoEventoNotificacao tipo)
+    {
+        rotina.TipoEvento = tipo;
+        rotina.Codigo = AvisosDaEquipe.PedidoComCanhoto.RotinaCodigo;
+        return rotina;
+    }
+
+    private void Equipe(params UsuarioParaAudiencia[] pessoas) =>
+        _usuarios.ListarDaEmpresaAsync(_empresaId, Arg.Any<IReadOnlyCollection<EasyStock.Domain.Enums.NivelAcesso>>(), Arg.Any<CancellationToken>())
+            .Returns(pessoas);
+
+    private void Inscrever(params UsuarioParaAudiencia[] pessoas) =>
+        _preferencias.ListarDaRotinaAsync(
+                _empresaId, AvisosDaEquipe.PedidoComCanhoto.RotinaCodigo, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(pessoas.Select(p => PreferenciaNotificacaoUsuario.Criar(p.Id, _empresaId, AvisosDaEquipe.PedidoComCanhoto.RotinaCodigo)).ToList());
+
+    [Fact]
+    public async Task InscritosSoTrazQuemADonaMarcou()
+    {
+        var ana = Pessoa("Ana", telefone: "+5511999991234", verificadoEm: Verificado);
+        var bia = Pessoa("Bia", telefone: "+5511999995678", verificadoEm: Verificado);
+        Equipe(ana, bia);
+        Inscrever(ana);
+
+        var r = await Criar().ResolverAsync(RotinaInscritos(), _empresaId, null);
+
+        r.Should().ContainSingle().Which.UsuarioId.Should().Be(ana.Id);
+    }
+
+    [Fact]
+    public async Task InscritoRecebeWhatsAppDaLojaSemSegundoNumeroNemOptInProprio()
+    {
+        // A marcação da dona é o atestado; o 2º número não entra porque o remetente do tipo é a loja.
+        _config.Remove(ResolvedorAudiencia.ChaveWhatsAppPlataforma);
+        var ana = Pessoa("Ana", telefone: "+5511999991234", verificadoEm: Verificado);
+        Equipe(ana);
+        Inscrever(ana);
+
+        var r = await Criar().ResolverAsync(RotinaInscritos(), _empresaId, null);
+
+        r.Should().ContainSingle().Which.Telefone.Should().Be("+5511999991234");
+    }
+
+    [Fact]
+    public async Task InscritoComOptOutExplicitoNaoRecebeWhatsApp()
+    {
+        var ana = Pessoa("Ana", telefone: "+5511999991234", verificadoEm: Verificado);
+        Equipe(ana);
+        Inscrever(ana);
+        OptIn(ana.Id, CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Operacional, optIn: false);
+
+        var r = await Criar().ResolverAsync(RotinaInscritos(), _empresaId, null);
+
+        r.Should().ContainSingle().Which.Telefone.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task InscritoSemTelefoneVerificadoNaoRecebeWhatsApp()
+    {
+        var ana = Pessoa("Ana", telefone: "+5511999991234", verificadoEm: null);
+        Equipe(ana);
+        Inscrever(ana);
+
+        var r = await Criar().ResolverAsync(RotinaInscritos(), _empresaId, null);
+
+        r.Should().ContainSingle().Which.Telefone.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SemNinguemInscritoNinguemRecebe()
+    {
+        Equipe(Pessoa("Ana", telefone: "+5511999991234", verificadoEm: Verificado));
+
+        var r = await Criar().ResolverAsync(RotinaInscritos(), _empresaId, null);
+
+        r.Should().BeEmpty();
+    }
 }

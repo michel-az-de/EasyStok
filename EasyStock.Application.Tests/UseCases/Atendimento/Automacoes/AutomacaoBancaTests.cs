@@ -395,7 +395,7 @@ public class AutomacaoBancaTests
 
         (await UseCase().DispararPrimeiraEntradaAsync(_empresaId, nova.Id)).Should().Be(ResultadoAutomacao.VariavelSemValor);
 
-        await _whats.Received(1).EnviarTextoAsync(nova.ContatoIdExterno, Arg.Is<string>(t => t.Contains("/cardapio")), Arg.Any<CancellationToken>());
+        await _whats.Received(1).EnviarTextoAsync(nova.ContatoIdExterno, Arg.Is<string>(t => t.StartsWith(ConfiguracaoAtendimento.SaudacaoPrimeiroContatoPadrao)), Arg.Any<CancellationToken>());
         gravadas.Should().ContainSingle(m => m.Autor == AutorMensagem.Sistema && m.Status == StatusMensagem.Enviada);
     }
 
@@ -409,7 +409,7 @@ public class AutomacaoBancaTests
 
         (await UseCase().DispararPrimeiraEntradaAsync(_empresaId, nova.Id)).Should().Be(ResultadoAutomacao.Falhou);
 
-        await _whats.Received(1).EnviarTextoAsync(nova.ContatoIdExterno, Arg.Is<string>(t => t.Contains("/cardapio")), Arg.Any<CancellationToken>());
+        await _whats.Received(1).EnviarTextoAsync(nova.ContatoIdExterno, Arg.Is<string>(t => t.StartsWith(ConfiguracaoAtendimento.SaudacaoPrimeiroContatoPadrao)), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -435,7 +435,7 @@ public class AutomacaoBancaTests
 
         (await UseCase().DispararPrimeiraEntradaAsync(_empresaId, nova.Id)).Should().Be(ResultadoAutomacao.SemRegra);
 
-        await _whats.Received(1).EnviarTextoAsync(nova.ContatoIdExterno, Arg.Is<string>(t => t.Contains("/cardapio")), Arg.Any<CancellationToken>());
+        await _whats.Received(1).EnviarTextoAsync(nova.ContatoIdExterno, Arg.Is<string>(t => t.StartsWith(ConfiguracaoAtendimento.SaudacaoPrimeiroContatoPadrao)), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -57,6 +57,9 @@ public class CheckoutSiteUseCaseTests
             Acesso = new AcessoChatSite(Core.StorefrontRepo, Flags, tenant, Sessoes);
             Sessao = SessaoChatSite.Abrir(Empresa, Core.Storefront.Id, AcessoChatSite.HashDoToken(Token), DateTime.UtcNow);
             Sessoes.ObterPorTokenHashAsync(Empresa, Sessao.TokenHash, Arg.Any<CancellationToken>()).Returns(Sessao);
+            Sessoes.ObterSnapshotPorTokenHashAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(c => Sessoes.ObterPorTokenHashAsync(c.Arg<Guid>(), c.Arg<string>(), c.Arg<CancellationToken>()));
+            Uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<PedidoReservado>>>(), Arg.Any<CancellationToken>()).Returns(c => c.Arg<Func<CancellationToken, Task<PedidoReservado>>>()(c.Arg<CancellationToken>()));
+            Uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<(PedidoReservado?, IniciarCheckoutGuestResult?)>>>(), Arg.Any<CancellationToken>()).Returns(c => c.Arg<Func<CancellationToken, Task<(PedidoReservado?, IniciarCheckoutGuestResult?)>>>()(c.Arg<CancellationToken>()));
             Conversas.When(x => x.AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>())).Do(ci => ListaConversas.Add(ci.Arg<Conversa>()));
             Conversas.When(x => x.AddMensagemAsync(Arg.Any<Mensagem>(), Arg.Any<CancellationToken>())).Do(ci => Mensagens.Add(ci.Arg<Mensagem>()));
             Conversas.ObterPorIdAsync(Empresa, Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -105,7 +108,7 @@ public class CheckoutSiteUseCaseTests
             var logado = new IniciarCheckoutUseCase(Core.Servico(), Core.StorefrontRepo, Clientes, idempotencia, cobrar,
                 Core.Atribuicao(), tenant, Uow, NullLogger<IniciarCheckoutUseCase>.Instance);
             UseCase = new CheckoutSiteUseCase(Acesso, new AbrirSessaoChatSiteUseCase(Acesso, Sessoes, Uow),
-                new ConversaChatSiteService(Conversas, Uow), Clientes, Core.PedidoRepo, idempotencia, repo,
+                new ConversaChatSiteService(Conversas, Uow, Sessoes), Clientes, Core.PedidoRepo, idempotencia, repo,
                 logado, guest, acompanhar, Substitute.For<IOperacaoEventPublisher>(), cobrancas, Uow, TimeProvider.System, NullLogger<CheckoutSiteUseCase>.Instance);
         }
 

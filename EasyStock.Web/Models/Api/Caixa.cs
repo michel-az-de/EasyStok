@@ -39,6 +39,9 @@ public record FechamentoCaixa
     public string? FechadoPorNome { get; init; }
     public string? Observacoes { get; init; }
     public DateTime FechadoEm { get; init; }
+    /// <summary>#2507: a API avisa por este campo que a sessão tinha lançamentos fora do fechamento. O toast decide
+    /// por ele, nunca pela frase das observações (a frase mudou na #2256 e o aviso ficou cego).</summary>
+    public bool LancamentosForaDoFechamento { get; init; }
 }
 
 /// <summary>Venda ou pagamento de pedido que compõe o saldo do caixa mas não é um

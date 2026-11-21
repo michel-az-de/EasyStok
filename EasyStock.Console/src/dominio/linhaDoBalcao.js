@@ -9,13 +9,14 @@
 
 import { PAUSA_POR_OUTRO } from './automatico'
 import { mensagensSemRespostaReal } from './mensagem'
+import { rotuloDaTag } from './tag'
 
 const ESTADOS = {
   bloqueado: { chave: 'bloqueado', texto: 'Bloqueado', tom: 'perigo', icone: 'lock' },
-  encerrada: { chave: 'encerrada', texto: 'Encerrada', tom: 'neutro', icone: 'log-out' },
+  encerrada: { chave: 'encerrada', texto: 'Concluída', tom: 'neutro', icone: 'circle-check' },
   outro: { chave: 'outro', texto: 'Outro atendente', tom: 'neutro', icone: null },
   voce: { chave: 'voce', texto: 'Com você', tom: 'ok', icone: 'hand' },
-  automatico: { chave: 'automatico', texto: 'Automático', tom: 'neutro', icone: 'raio' },
+  automatico: { chave: 'automatico', texto: 'Assistente', tom: 'neutro', icone: 'agente' },
 }
 
 // Um estado por linha, por precedência: bloqueio e encerramento calam o resto;
@@ -57,6 +58,6 @@ export function contextoDaLinha({
   if (pedido) itens.push({ chave: 'pedido', ...pedido })
   if (janelaFechada) itens.push({ chave: 'janela', texto: 'Só modelo', icone: 'lock', tom: 'neutro' })
   else if (entregaAte) itens.push({ chave: 'entrega', texto: `entrega até ${entregaAte}`, icone: 'moto', tom: 'neutro' })
-  if (tagAchada) itens.push({ chave: 'tag', texto: `Tag: ${tagAchada}`, icone: null, tom: 'neutro' })
+  if (tagAchada) itens.push({ chave: 'tag', texto: `Tag: ${rotuloDaTag(tagAchada)}`, icone: null, tom: 'neutro' })
   return itens
 }

@@ -25,7 +25,7 @@ const SITUACAO_DA_OCORRENCIA = {
 //
 // "Confirmar reembolso" (rodada 10, item P1.5/"o que falta construir" 4,
 // UC-06 passos 5-6, RN-36) é atalho para o MESMO `marcarEstorno` que a barra
-// do pedido (MenuDoPedido/BarraProximoPasso) já expõe: antes só existia por
+// do pedido (menu Ações da ficha/BarraProximoPasso) já expõe: antes só existia por
 // lá, e a banca (achado P1.5) precisava abrir mais uma camada para achar o
 // reembolso a partir da própria ocorrência. `marcarEstorno` já fecha a
 // ocorrência com estorno e grava a nota no cadastro (reducer.js,

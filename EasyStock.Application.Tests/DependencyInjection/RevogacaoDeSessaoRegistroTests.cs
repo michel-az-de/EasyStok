@@ -55,6 +55,8 @@ public class RevogacaoDeSessaoRegistroTests
             // N9: o convite le o nome da empresa, o perfil (superadmin nunca nasce por convite) e a assinatura do plano.
             .AddSingleton(Substitute.For<IEmpresaRepository>())
             .AddSingleton(Substitute.For<IPerfilRepository>())
+            // #2448: atribuir perfil confere que a loja pertence à empresa.
+            .AddSingleton(Substitute.For<ILojaRepository>())
             .AddSingleton(Substitute.For<IAssinaturaEmpresaRepository>())
             .AddSingleton(Substitute.For<IGoogleIdTokenValidator>())
             .AddSingleton(Substitute.For<IEmailConfirmationTokenRepository>())

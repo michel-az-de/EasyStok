@@ -256,10 +256,10 @@ await confere('R6 comanda sem pedido no EasyStok não mostra número inventado',
 
 // ── R7 ─────────────────────────────────────────────────────────────────────
 await confere('R7 recusar pede confirmação com o que acontece', () => {
-  // #1899: o pedido chega nomeado (nomeDoPedido().frase): 'Comanda 12' ou 'Pedido <curto>'.
+  // #1899: o pedido chega nomeado (nomeDoPedido().frase): 'Pedido 12' ou 'Pedido <curto>'.
   assert.equal(entregasApi.confirmacaoDaRecusa('Pedido 3F2A9B1C', 'Ana Souza'),
     'Recusar Pedido 3F2A9B1C de Ana Souza? O pedido é cancelado, o pagamento volta ao cliente e ele recebe aviso.')
-  assert.match(entregasApi.confirmacaoDaRecusa('Comanda 12', 'Ana Souza'), /^Recusar Comanda 12 de Ana Souza?/)
+  assert.match(entregasApi.confirmacaoDaRecusa('Pedido 12', 'Ana Souza'), /^Recusar Pedido 12 de Ana Souza?/)
 })
 
 // ── R8 ─────────────────────────────────────────────────────────────────────

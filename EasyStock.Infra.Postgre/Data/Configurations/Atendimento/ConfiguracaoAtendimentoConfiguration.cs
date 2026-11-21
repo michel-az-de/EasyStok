@@ -18,6 +18,13 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
         builder.Property(x => x.SaudacaoRetorno).IsRequired().HasMaxLength(500);
         builder.Property(x => x.FraseEspera).IsRequired().HasMaxLength(200);
         builder.Property(x => x.MensagemForaArea).IsRequired().HasMaxLength(500);
+        // #2937: fecho do canhoto em imagem; nulo é sem fecho.
+        builder.Property(x => x.FraseFechoCanhoto).HasMaxLength(ConfiguracaoAtendimento.FraseFechoCanhotoTamanhoMaximo);
+        // #2249: moldes das ações do robô; linha antiga ganha o texto padrão.
+        builder.Property(x => x.MensagemEscalada).IsRequired().HasMaxLength(ConfiguracaoAtendimento.MoldeTamanhoMaximo)
+            .HasDefaultValue(ConfiguracaoAtendimento.MensagemEscaladaPadrao);
+        builder.Property(x => x.MensagemEncaminhamento).IsRequired().HasMaxLength(ConfiguracaoAtendimento.MoldeTamanhoMaximo)
+            .HasDefaultValue(ConfiguracaoAtendimento.MensagemEncaminhamentoPadrao);
         builder.Property(x => x.NivelSugestao).HasConversion<int>();
         builder.Property(x => x.RespiroMinutos).HasDefaultValue(40);
         builder.Property(x => x.TempoPreparoPadraoMinutos).HasDefaultValue(60);
@@ -38,6 +45,14 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
                 v => JsonSerializer.Serialize(v, AvisosJson),
                 v => JsonSerializer.Deserialize<AvisosOperacao>(v, AvisosJson) ?? AvisosOperacao.Padrao,
                 new ValueComparer<AvisosOperacao>((a, b) => a == b, v => v.GetHashCode(), v => v));
+        // S68 (#2597): Assistente por loja; tudo anulável, nulo = padrão (linha antiga segue igual).
+        builder.Property(x => x.NomeDona).HasMaxLength(ConfiguracaoAtendimento.NomeDonaTamanhoMaximo);
+        builder.Property(x => x.ModeloAgente).HasMaxLength(ConfiguracaoAtendimento.ModeloAgenteTamanhoMaximo);
+        builder.Property(x => x.CotaTokensMes);
+        builder.Property(x => x.RoteiroJson).HasColumnType("jsonb");
+        builder.Property(x => x.ObservacoesLoja).HasMaxLength(ConfiguracaoAtendimento.ObservacoesLojaTamanhoMaximo);
+        // #2853: ferramentas desligadas pela loja; nulo = todas ligadas.
+        builder.Property(x => x.FerramentasDesligadasJson).HasColumnType("jsonb");
         builder.Property(x => x.CriadoEm).IsRequired();
         builder.Property(x => x.AlteradoEm).IsRequired();
 
@@ -45,5 +60,13 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
             .WithMany()
             .HasForeignKey(x => x.EmpresaId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // #2957: modelo de IA da loja; FK composta impede apontar para modelo de outra loja.
+        builder.HasOne<EasyStock.Domain.Entities.Ia.ModeloIa>()
+            .WithMany()
+            .HasForeignKey(x => new { x.EmpresaId, x.ModeloIaId })
+            .HasPrincipalKey(m => new { m.EmpresaId, m.Id })
+            .HasConstraintName("fk_configuracoes_atendimento_modelo_ia")
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -113,7 +113,7 @@
                                         <span class="ml-2 inline-flex items-center px-1.5 py-0 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200" title="Produto marcado como Embalado — peso obrigatório por RDC 727/2022">Embalado</span>
                                     }
                                 </td>
-                                <td class="text-right">@it.Quantidade.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</td>
+                                <td class="text-right">@((it.QuantidadeMedida ?? it.Quantidade).ToString("0.###", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")))</td>
                                 <td class="text-right">
                                     @* C2 (R3 + backfill): inline edit do peso. Bloqueado se lote finalizado. *@
                                     <div x-show="!editando">

@@ -30,6 +30,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task<int> InvalidarConvitesAbertosAsync(Guid usuarioId);
 
         /// <summary>
+        /// Revoga, num UPDATE só, as chaves de acesso abertas do usuário (<c>Finalidade = Ativacao</c>, #2201). Imediato.
+        /// Devolve as linhas alteradas.
+        /// </summary>
+        Task<int> InvalidarChavesDeAcessoAbertasAsync(Guid usuarioId);
+
+        /// <summary>
         /// Quantas vezes o convite foi emitido para o usuário desde <paramref name="desde"/> (N9): conta as linhas
         /// <c>Convite</c> do canal <c>Email</c>, uma por emissão, e é o que limita o reenvio a 3 por hora.
         /// </summary>

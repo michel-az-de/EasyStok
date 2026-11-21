@@ -37,7 +37,7 @@ export function ConferirPagamento({ conversaId }) {
   if (typeof conferirPagamento !== 'function') return null
   return (
     <div className={css.acoesCobranca}>
-      <Botao largo variante="secundario" disabled={conferindo} onClick={conferir}>
+      <Botao largo variante="secundario" disabled={conferindo} aria-busy={conferindo || undefined} onClick={conferir}>
         {conferindo ? 'Conferindo pagamento…' : 'Conferir pagamento'}
       </Botao>
       {resposta && <p className={css.corpoBloco} role={resposta.erro ? 'alert' : 'status'}>{resposta.texto}</p>}

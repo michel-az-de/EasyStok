@@ -41,13 +41,15 @@ export function BotaoGoogle({ buscarClientId, aoReceberToken, aoFalhar, opcoes =
       .then(() => {
         if (!vivo || !alvo.current) return
         // #1810: com a conta Google já escolhida neste navegador, entra sem clicar (One Tap).
-        const { auto_select: autoSelect, oferecer } = opcoesAtuais.current?.() ?? { auto_select: false, oferecer: false }
+        // #2225: fedcm_no_botao vem de infra/entradaGoogle (só no Chrome do Android).
+        const { auto_select: autoSelect, oferecer, fedcm_no_botao: fedcmNoBotao = false } = opcoesAtuais.current?.() ?? {}
         window.google.accounts.id.initialize({
           client_id: clientId,
           callback: (resposta) => aoReceberTokenAtual.current(resposta.credential),
           auto_select: autoSelect,
           cancel_on_tap_outside: true,
           use_fedcm_for_prompt: true,
+          use_fedcm_for_button: fedcmNoBotao,
         })
         // #1354: o renderButton acrescenta; limpar antes garante um botão só.
         alvo.current.replaceChildren()

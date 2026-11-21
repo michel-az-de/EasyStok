@@ -4,6 +4,7 @@ public record Cliente
 {
     public required string Id { get; init; }
     public Guid EmpresaId { get; init; }
+    public uint Revisao { get; init; }
     public required string Nome { get; init; }
     public string? Apt { get; init; }
     public string? Endereco { get; init; }

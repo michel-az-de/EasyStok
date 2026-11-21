@@ -76,22 +76,25 @@ confere('3  com dinheiro já recebido, ou sem a informação (demonstração), s
   assert.equal(rotuloDoResumo('aprovado baba', 0, 0), 'Pago')
   assert.equal(rotuloDoResumo('aguardando pagamento', 88, 0), 'Aguardando pagamento')
 })
+// #2167 passou a ler o pedido com `?.` (Ficha sem pedido) e pôs "Cobrança pendente" antes; o terceiro
+// argumento segue só com a API trazendo os pagamentos (#2699).
 confere('3  a Ficha passa o que entrou só quando a API trouxe os pagamentos', () => {
   assert.match(fonte('features/ficha-cliente/PainelFicha.jsx'),
-    /rotuloDoResumo\(pedido\.estado, saldo, Array\.isArray\(pedido\.pagamentosApi\) \? totalPago\(pedido\) : null\)/)
+    /rotuloDoResumo\(pedido\?\.estado, saldo, Array\.isArray\(pedido\?\.pagamentosApi\) \? totalPago\(pedido\) : null\)/)
 })
 
 // --- 4. Frase repetida -----------------------------------------------------------------------------
 
-confere('4  o cartão compara o resumo da IA sem a pontuação do fim', () => {
-  const jsx = fonte('features/ficha-cliente/CartaoDoCliente.jsx')
-  assert.match(jsx, /\{resumo\.texto && !mesmaFrase\(resumo\.texto, numeros\) && /)
-  const corpo = jsx.match(/const mesmaFrase = (\(a, b\) => .+)\r?\n/)?.[1]
-  assert.ok(corpo, 'mesmaFrase declarada')
-  const mesmaFrase = new Function(`return ${corpo}`)()
-  assert.equal(mesmaFrase('Ainda não comprou com a casa.', 'Ainda não comprou com a casa'), true)
-  assert.equal(mesmaFrase('Cliente fiel, pede toda semana.', 'Ainda não comprou com a casa'), false)
-  assert.equal(mesmaFrase(null, 'Ainda não comprou com a casa'), false)
+// #2143 tirou do cartão o resumo da IA e a linha de compras: o resumo mora só em Apontamentos, na Ficha,
+// sem frase fixa de compra ao lado. A frase não tem com o que se repetir; a prova guarda essa separação
+// (#2699). Se o resumo voltar ao cartão, este caso cai e a comparação sem pontuação precisa voltar junto.
+confere('4  o resumo da IA não divide espaço com a frase de compras', () => {
+  const cartao = fonte('features/ficha-cliente/CartaoDoCliente.jsx')
+  assert.doesNotMatch(cartao, /useResumoDoCliente|resumo\.texto|resumoIa/, 'o cartão não mostra o resumo da IA')
+  const bloco = fonte('features/ficha-cliente/BlocoCliente.jsx')
+  assert.match(bloco, /\{resumoIa && <section data-resumo-cliente aria-label="Resumo do assistente">/)
+  assert.match(bloco, /<div><h3>Apontamentos<\/h3><p>\{resumoIa\}<\/p><\/div>/)
+  assert.doesNotMatch(bloco, /comprou com a casa/)
 })
 
 // --- 5. Trilho -------------------------------------------------------------------------------------
@@ -118,7 +121,8 @@ confere('6  E.164 da API vira a máscara da tela e editar não troca o DDD', () 
 confere('6  o campo em linha mostra, abre e compara o telefone já na máscara', () => {
   const jsx = fonte('features/ficha-cliente/CampoEmLinha.jsx')
   assert.match(jsx, /const exibido = tipo === 'telefone' && valor \? telefoneDoE164\(valor\) : \(valor \?\? ''\)/)
-  assert.match(jsx, /setRascunho\(exibido\)/)
+  // #2400 guarda o rascunho fora do campo: abrir grava `{ valor: exibido }` em vez de `setRascunho(exibido)` (#2699).
+  assert.match(jsx, /function abrir\(\) \{\s*setEdicao\(\{ valor: exibido, /)
   assert.match(jsx, /if \(rascunho === exibido\)/)
   assert.match(jsx, /\{exibido \|\| vazio\}/)
 })

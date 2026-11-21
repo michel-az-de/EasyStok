@@ -123,6 +123,32 @@ public class AtualizarStatusPedidoUseCaseTests
         pedido.Status.Should().Be("entregue");
     }
 
+    // #2441: a conferência do saldo roda dentro da transação e tem de usar o token dela, não CancellationToken.None.
+    [Fact]
+    public async Task Entregue_ConferenciaDoSaldo_UsaOTokenDaTransacao()
+    {
+        var pedidos = Substitute.For<IPedidoRepository>();
+        pedidos.ListarEstornosManuaisAsync(default, default, default).ReturnsForAnyArgs([]);
+        var estornos = Substitute.For<EasyStock.Application.Ports.Output.Persistence.Pagamentos.IEstornoOnlineRepository>();
+        estornos.ListarAsync(default, default, default).ReturnsForAnyArgs([]);
+        estornos.RecebimentosAsync(default, default, default).ReturnsForAnyArgs([]);
+        var creditos = Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICreditoClienteComandaRepository>();
+        creditos.TotaisDoPedidoAsync(default, default, default).ReturnsForAnyArgs((0m, 0m));
+        var (uc, repo, _, _, uow, _) = Build(saldos: new SaldoFinanceiroPedido(pedidos, estornos, creditos));
+        using var cts = new CancellationTokenSource();
+        uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(cts.Token));
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, Guid.NewGuid(), Guid.NewGuid(), 5, "saiu_para_entrega");
+        pedido.Total = Dinheiro.FromDecimal(50m);
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = 50m });
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "entregue", ConferirSaldoNaEntrega: true));
+
+        await pedidos.Received().ListarEstornosManuaisAsync(empresaId, pedido.Id, cts.Token);
+    }
+
     // #1863: o lote da fila offline (status-lote) não é porta lateral da trava; recusa o item com o código
     // e o valor, e os demais itens seguem.
     [Fact]
@@ -279,6 +305,37 @@ public class AtualizarStatusPedidoUseCaseTests
         await movRepo.Received(1).InsertAsync(Arg.Is<MovimentacaoEstoque>(
             m => m.Natureza == NaturezaMovimentacaoEstoque.Venda));
         pedido.Status.Should().Be("pronto");
+    }
+
+    [Fact]
+    public async Task Status_para_pronto_trava_o_pedido_e_desconta_estoque_dentro_da_transacao()
+    {
+        // #2401: o FOR UPDATE do estoque só vale dentro de transação; fora dela é no-op.
+        var (uc, repo, itemRepo, movRepo, uow, _) = Build();
+        var empresaId = Guid.NewGuid();
+        var lojaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var pedido = NovoPedido(empresaId, lojaId, produtoId, 2, "preparando");
+        repo.GetByIdWithDetailsAsync(empresaId, pedido.Id).Returns(pedido);
+        itemRepo.GetByProdutoAsync(empresaId, produtoId).Returns(new[]
+        {
+            new ItemEstoque { Id = Guid.NewGuid(), EmpresaId = empresaId, LojaId = lojaId, ProdutoId = produtoId, QuantidadeAtual = Quantidade.From(10) }
+        });
+        var dentro = false;
+        uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>(), Arg.Any<CancellationToken>())
+            .Returns(async ci =>
+            {
+                dentro = true;
+                try { return await ci.Arg<Func<CancellationToken, Task<EasyStock.Application.UseCases.Pedidos.PedidoResult?>>>()(ci.Arg<CancellationToken>()); }
+                finally { dentro = false; }
+            });
+        var descontouDentro = false;
+        movRepo.When(m => m.InsertAsync(Arg.Any<MovimentacaoEstoque>())).Do(_ => descontouDentro = dentro);
+
+        await uc.ExecuteAsync(new AtualizarStatusPedidoCommand(empresaId, pedido.Id, "pronto"));
+
+        descontouDentro.Should().BeTrue("o desconto de estoque precisa rodar dentro da transação");
+        await repo.Received(1).TravarAsync(empresaId, pedido.Id, Arg.Any<CancellationToken>());
     }
 
     [Fact]

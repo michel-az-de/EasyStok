@@ -44,6 +44,26 @@ export function destravarAudio() {
   if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {})
 }
 
+// #2393: depois de hibernar o computador ou da aba ir ao fundo, o navegador suspende o áudio e
+// ele não volta sozinho. Observa o `statechange` e a volta de foco: ao voltar, tenta religar
+// (só vale se já houve gesto) e avisa quem mostra o aviso de "som bloqueado".
+export function observarAudio(ouvinte, janela = window, documento = document) {
+  const ctx = obterContexto()
+  const rearmar = () => {
+    if (documento.hidden) return
+    destravarAudio()
+    ouvinte()
+  }
+  ctx?.addEventListener?.('statechange', ouvinte)
+  janela.addEventListener('focus', rearmar)
+  documento.addEventListener('visibilitychange', rearmar)
+  return () => {
+    ctx?.removeEventListener?.('statechange', ouvinte)
+    janela.removeEventListener('focus', rearmar)
+    documento.removeEventListener('visibilitychange', rearmar)
+  }
+}
+
 // Para a tela decidir se mostra o aviso "Toque para ligar o som".
 export function audioDestravado() {
   return Boolean(contexto) && contexto.state === 'running'

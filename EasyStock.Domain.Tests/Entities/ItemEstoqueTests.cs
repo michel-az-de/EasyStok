@@ -1,4 +1,4 @@
-using EasyStock.Domain.Entities;
+﻿using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Exceptions;
 using EasyStock.Domain.ValueObjects;
@@ -76,6 +76,34 @@ public class ItemEstoqueTests
 
         item.Status.Should().Be(StatusItemEstoque.Bloqueado);
         item.QuantidadeAtual.Value.Should().Be(15);
+    }
+
+    [Fact]
+    public void Reposicao_com_validade_mais_longa_mantem_a_validade_mais_curta_do_lote()
+    {
+        // #2575: as unidades antigas do lote vencem antes; trocar pela validade nova escondia o vencimento.
+        var atual = Validade.From(new DateTime(2026, 11, 20, 0, 0, 0, DateTimeKind.Utc));
+        var item = CriarItem(status: StatusItemEstoque.Ok, validade: atual);
+
+        item.RegistrarReposicao(Quantidade.From(5), new DateTime(2026, 11, 14, 0, 0, 0, DateTimeKind.Utc),
+            null, null, null, null, null,
+            Validade.From(new DateTime(2026, 11, 30, 0, 0, 0, DateTimeKind.Utc)),
+            null, null, DateTime.UtcNow);
+
+        item.ValidadeEm!.DataValidade.Should().Be(atual.DataValidade);
+    }
+
+    [Fact]
+    public void Reposicao_com_validade_mais_curta_adota_a_nova_validade()
+    {
+        var item = CriarItem(status: StatusItemEstoque.Ok,
+            validade: Validade.From(new DateTime(2026, 11, 30, 0, 0, 0, DateTimeKind.Utc)));
+        var nova = Validade.From(new DateTime(2026, 11, 20, 0, 0, 0, DateTimeKind.Utc));
+
+        item.RegistrarReposicao(Quantidade.From(5), new DateTime(2026, 11, 14, 0, 0, 0, DateTimeKind.Utc),
+            null, null, null, null, null, nova, null, null, DateTime.UtcNow);
+
+        item.ValidadeEm!.DataValidade.Should().Be(nova.DataValidade);
     }
 
     [Fact]
@@ -212,6 +240,19 @@ public class ItemEstoqueTests
         item.RegistrarSaida(Quantidade.From(1), new DateTime(2026, 6, 15, 1, 0, 0, DateTimeKind.Utc), DateTime.UtcNow);
 
         item.QuantidadeAtual.Value.Should().Be(4);
+    }
+
+    [Fact]
+    public void RecalcularIndicadores_MovimentoEReferenciaNoMesmoDiaEmBrasilia_NaoContaDiaParado()
+    {
+        // #2401: 20:00 BRT (23:00 UTC do dia 10) e 22:00 BRT (01:00 UTC do dia 11) são o mesmo dia operacional;
+        // o .Date em UTC contava 1 dia parado.
+        var item = CriarItem(StatusItemEstoque.Ok);
+        item.UltimaMovimentacaoEm = new DateTime(2026, 4, 10, 23, 0, 0, DateTimeKind.Utc);
+
+        item.RecalcularIndicadores(new DateTime(2026, 4, 11, 1, 0, 0, DateTimeKind.Utc));
+
+        item.DiasSemMovimentacao.Should().Be(0);
     }
 
     private static ItemEstoque CriarItem(StatusItemEstoque status, int quantidadeAtual = 10, Validade? validade = null) =>

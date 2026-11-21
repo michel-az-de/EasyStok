@@ -127,4 +127,50 @@ public sealed class ConsultasFiltradasNoBancoIntegrationTests(PostgreSqlDatabase
         }
         EstoqueDoDiaUseCase.SaldoEDescoberto(filtrados[produto.Id], hoje).Should().Be((4m, 3m));
     }
+
+    // #1776 (revisão da #2638): prato é o produto ligado a item do cardápio de uma vitrine da empresa, mesmo
+    // arquivado. Revenda fora do cardápio e outra empresa não contam.
+    [SkippableFact]
+    public async Task ProdutoEstaNoCardapio_SoParaProdutoLigadoAItemDeVitrineDaEmpresa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var empresa = Empresa.Criar("Prato no cardápio", null);
+        var outraEmpresa = Empresa.Criar("Outra casa", null);
+        var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresa.Id, Nome = "Cardápio", CriadoEm = Agora, AlteradoEm = Agora };
+        Produto Novo(string nome) => new()
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresa.Id, CategoriaId = categoria.Id, Nome = nome,
+            Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo, CriadoEm = Agora, AlteradoEm = Agora,
+        };
+        var lasanha = Novo("Lasanha");
+        var torta = Novo("Torta");
+        var refrigerante = Novo("Refrigerante lata");
+        var vitrine = Domain.Entities.Storefront.Storefront.Criar(empresa.Id, $"sf-{Guid.NewGuid():N}", "Loja", 0m);
+        CardapioItem Ligado(Produto produto, bool arquivado)
+        {
+            var item = CardapioItem.CriarAvulso(vitrine.Id, produto.Nome, 30m);
+            item.VincularProduto(produto.Id);
+            if (arquivado) item.Arquivar(Agora);
+            return item;
+        }
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa.Id);
+            seed.Empresas.AddRange(empresa, outraEmpresa);
+            seed.Categorias.Add(categoria);
+            seed.Produtos.AddRange(lasanha, torta, refrigerante);
+            seed.Storefronts.Add(vitrine);
+            seed.CardapioItens.AddRange(Ligado(lasanha, arquivado: false), Ligado(torta, arquivado: true));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var db = fixture.CreateDbContext();
+        db.SetMobileTenantContext(empresa.Id);
+        var repo = new CardapioItemRepository(db);
+
+        (await repo.ProdutoEstaNoCardapioAsync(empresa.Id, lasanha.Id)).Should().BeTrue();
+        (await repo.ProdutoEstaNoCardapioAsync(empresa.Id, torta.Id)).Should().BeTrue("arquivado segue sendo prato");
+        (await repo.ProdutoEstaNoCardapioAsync(empresa.Id, refrigerante.Id)).Should().BeFalse("revenda fora do cardápio");
+        (await repo.ProdutoEstaNoCardapioAsync(outraEmpresa.Id, lasanha.Id)).Should().BeFalse("vitrine de outra empresa");
+    }
 }

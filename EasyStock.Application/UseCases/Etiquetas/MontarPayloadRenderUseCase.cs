@@ -11,7 +11,8 @@ public sealed record MontarPayloadRenderQuery(
 public class MontarPayloadRenderUseCase(
     IEtiquetaTemplateRepository templateRepo,
     ILoteRepository loteRepo,
-    ILojaRepository lojaRepo)
+    ILojaRepository lojaRepo,
+    ILoteNumeroCurtoRepository numeroCurtoRepo)
 {
     public async Task<EtiquetaRenderPayload?> ExecuteAsync(MontarPayloadRenderQuery q)
     {
@@ -28,6 +29,10 @@ public class MontarPayloadRenderUseCase(
         var empresa = new EmpresaRenderDto(
             loja?.Nome ?? "EasyStok",
             loja?.LogoUrl);
+
+        // #2199 (D4): o código de barras leva o número curto; lote de antes dele ganha o seu aqui, uma vez só.
+        var numeroCurto = etiquetas.Select(e => e.Lote?.NumeroCurto).FirstOrDefault(n => n is not null)
+            ?? await numeroCurtoRepo.GarantirAsync(q.EmpresaId, q.LoteId);
 
         var produtosSemFicha = new List<Guid>();
         var items = new List<EtiquetaRenderItem>();
@@ -63,7 +68,8 @@ public class MontarPayloadRenderUseCase(
                 e.Id, e.Sequencial, e.Codigo, e.Status,
                 produtoDto,
                 e.Lote?.Codigo, e.LoteItem?.ExpiraEm, e.Lote?.DataProducao ?? DateTime.UtcNow,
-                e.LayoutSnapshotJson, e.LayoutSnapshotMeta));
+                e.LayoutSnapshotJson, e.LayoutSnapshotMeta,
+                numeroCurto));
         }
 
         return new EtiquetaRenderPayload(layoutJson, empresa, items, produtosSemFicha);

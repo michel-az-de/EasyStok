@@ -7,6 +7,10 @@ public interface ITemplateRepository
 {
     Task<TemplateNotificacao?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Trava a família empresa/código até o fim da transação e relê suas versões.</summary>
+    Task<IReadOnlyList<TemplateNotificacao>> ListarFamiliaComLockAsync(
+        Guid? empresaId, string codigo, CancellationToken ct = default);
+
     /// <summary>
     /// Busca o template ativo para um código+canal. Tenta empresa-specific primeiro,
     /// depois global (EmpresaId = null) como fallback.
@@ -35,7 +39,8 @@ public interface ITemplateRepository
         bool? ativo = null,
         int page = 1,
         int pageSize = 20,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        bool apenasAtuais = false);
 
     Task AddAsync(TemplateNotificacao template, CancellationToken ct = default);
     Task UpdateAsync(TemplateNotificacao template, CancellationToken ct = default);

@@ -40,7 +40,8 @@ public class RegistrarPagamentoPedidoUseCase(
     ICaixaRepository? caixaRepo = null,
     SaldoFinanceiroPedido? saldos = null,
     Lazy<EasyStock.Application.Services.Atendimento.AvisoStatusPedidoCliente>? avisoCliente = null,
-    EasyStock.Application.UseCases.ListarFechamentosCaixa.ListarFechamentosCaixaUseCase? fechamentos = null)
+    EasyStock.Application.UseCases.ListarFechamentosCaixa.ListarFechamentosCaixaUseCase? fechamentos = null,
+    ICadastrosFinanceirosRepository? cadastrosFinanceiros = null)
 {
     private static readonly HashSet<string> MetodosValidos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -80,6 +81,16 @@ public class RegistrarPagamentoPedidoUseCase(
             // Um takeover pode ter ocorrido enquanto o primeiro recebimento segurava este lock.
             // O recibo e o pagamento foram gravados juntos; releia antes de aplicar outro parcial.
             if (recuperarRecibo is not null && await recuperarRecibo(token) is { } recibo) return recibo;
+
+            // Configuração vale para novas confirmações manuais. Recibos e dinheiro já recebido pelo
+            // provedor permanecem recuperáveis mesmo depois de a loja desativar o método.
+            if (!cmd.ConfirmadoPeloProvedor && cadastrosFinanceiros is not null
+                && await cadastrosFinanceiros.ObterMetodoAsync(cmd.EmpresaId, metodo, token) is { } configurado)
+            {
+                if (configurado.EmpresaId != cmd.EmpresaId) throw new UseCaseValidationException("Método de outra empresa.");
+                if (!configurado.Ativo)
+                    throw new UseCaseValidationException("Esta forma de pagamento está inativa. Escolha outra forma ou revise Cadastros.");
+            }
 
             // Pagamento manual so em pedido operacional: pre-operacional (montagem / pagamento
             // online pendente / aprovacao do cardapio guest) ainda nao e recebivel. Fecha o
@@ -250,6 +261,15 @@ public class RegistrarPagamentoPedidoUseCase(
             var movimentos = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data, pedido.LojaId);
             if (movimentos.Any(m => m.Tipo == "abertura")) return;
 
+            // #2341: a abertura da empresa (sem loja), feita no console sem loja corrente, vale para o pedido da loja,
+            // como o fechamento da empresa já vale (#1598). Sem isso o pix abria uma segunda sessão "auto-pagamento"
+            // da loja com a gaveta herdada, e o saldo inicial do dia somava as duas.
+            if (pedido.LojaId.HasValue)
+            {
+                var daEmpresa = await caixaRepo.GetMovimentosDoDiaAsync(cmd.EmpresaId, data);
+                if (daEmpresa.Any(m => m.Tipo == "abertura" && m.LojaId == null)) return;
+            }
+
             // #1506: sessao de dia anterior ainda aberta: nao abre o dia por cima (a antiga ficaria
             // orfa, sem fechamento). O pagamento ja esta gravado e entra no caixa do dia dele.
             var pendente = await caixaRepo.GetAberturaPendenteAsync(cmd.EmpresaId, pedido.LojaId);
@@ -257,6 +277,18 @@ public class RegistrarPagamentoPedidoUseCase(
             {
                 logger.LogInformation("Caixa de {Pendente} ainda aberto; pagamento {PedidoId} não abre o caixa de {Data}.",
                     HorarioBrasil.DataOperacional(pendente.DataMovimento), pedido.Id, data);
+                return;
+            }
+
+            // #1709-2: a sessão da empresa (sem loja) aberta num dia anterior vale para o pedido da loja, como no mesmo dia
+            // (#2341). Sem isso o pix da loja abria uma sessão nova por cima e o caixa do dia sem loja começava nela,
+            // perdendo o troco inicial e os pagamentos desde a abertura da empresa.
+            if (pedido.LojaId.HasValue
+                && await caixaRepo.GetAberturaPendenteAsync(cmd.EmpresaId) is { LojaId: null } daEmpresaPendente
+                && HorarioBrasil.DataOperacional(daEmpresaPendente.DataMovimento) < data)
+            {
+                logger.LogInformation("Caixa da empresa de {Pendente} ainda aberto; pagamento {PedidoId} não abre o caixa da loja.",
+                    HorarioBrasil.DataOperacional(daEmpresaPendente.DataMovimento), pedido.Id);
                 return;
             }
 

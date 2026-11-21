@@ -1,7 +1,10 @@
-.lista { margin: 0; }
+/* #2762 (A9): a coluna do rótulo é da lista e as fileiras herdam (subgrid). Ela mede a palavra mais larga, com
+   piso de 80 px e teto de 128 px: "Comprovante" não parte no meio, e rótulo de várias palavras quebra entre elas
+   sem tirar largura do valor. */
+.lista { margin: 0; display: grid; grid-template-columns: minmax(80px, min-content) minmax(0, 1fr); column-gap: var(--e-3); }
 .fileira {
-  display: flex; gap: var(--e-3); align-items: baseline;
+  display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: baseline;
   padding: 6px 0; font-size: var(--t-apoio);
 }
-.fileira dt { color: var(--tinta-3); flex: 0 0 80px; overflow-wrap: anywhere; }
+.fileira dt { color: var(--tinta-3); min-width: 0; max-width: 128px; overflow-wrap: break-word; }
 .fileira dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--tinta); }

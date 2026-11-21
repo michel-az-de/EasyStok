@@ -413,7 +413,8 @@ public class LembretesIntegrationTests(PostgreSqlDatabaseFixture fixture)
         var avaliador = new AvaliarLembretesUseCase(
             new LembreteRepository(db), new CandidatosLembreteQuery(db), Substitute.For<INotificadorService>(),
             Substitute.For<IOperacaoEventPublisher>(), db, new RelogioFixo(instante),
-            Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions()));
+            Microsoft.Extensions.Options.Options.Create(new EasyStock.Application.Services.Notifications.PrazosOptions()),
+            new EasyStock.Infra.Postgre.Repositories.NotificacaoRepository(db));
         await avaliador.ExecuteAsync();
     }
 

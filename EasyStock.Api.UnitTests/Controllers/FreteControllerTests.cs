@@ -22,7 +22,7 @@ public class FreteControllerTests
     private const string Slug = "casa-da-baba";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    private readonly StorefrontEntity _loja = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Babá", 0m);
+    private readonly StorefrontEntity _loja = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Baba", 0m);
     private readonly IFreteZonaRepository _zonas = Substitute.For<IFreteZonaRepository>();
     private readonly IGeocodingClient _geocoding = Substitute.For<IGeocodingClient>();
     private readonly IRotaClient _rotas = Substitute.For<IRotaClient>();

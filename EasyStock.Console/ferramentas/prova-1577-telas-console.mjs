@@ -686,19 +686,19 @@ await confere('3. SSE: fechar por fora e fim do stream desligam a vigia', async 
 const { readFileSync } = await import('node:fs')
 const folhaDe = (caminho) => readFileSync(new URL(`../src/${caminho}`, import.meta.url), 'utf8')
 const quadrosDe = (folha, nome) => folha.match(new RegExp(`@keyframes ${nome}\\s*\\{((?:[^{}]*\\{[^{}]*\\})*)\\s*\\}`))?.[1] ?? null
-const propriedadesDe = (quadros) => [...new Set([...quadros.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]))].toSorted()
 const regraDe = (folha, seletor) => folha.match(new RegExp(`(?:^|\\n)\\${seletor}\\s*\\{([^}]*)\\}`))?.[1] ?? null
 
-await confere('4. "ao vivo" do KDS anima só opacity/transform; SLA vencido conserva o alerta estático', () => {
-  const pulso = quadrosDe(folhaDe('features/cozinha/cozinha.module.css'), 'pulsarVivo')
-  assert.deepEqual(propriedadesDe(pulso), ['opacity', 'transform'], 'box-shadow animado repinta a cada quadro')
+await confere('4. "ao vivo" do KDS é ponto parado (#2859); SLA vencido conserva o alerta estático', () => {
+  const cozinha = folhaDe('features/cozinha/cozinha.module.css')
+  assert.equal(quadrosDe(cozinha, 'pulsarVivo'), null, 'o ponto ao vivo não pulsa o dia inteiro')
+  assert.doesNotMatch(cozinha, /\.pontoVivo[^{}]*\{[^}]*animation/, 'nenhuma animação no ponto ao vivo')
   const folha = folhaDe('features/caixa-de-entrada/caixa.module.css')
   assert.equal(quadrosDe(folha, 'piscaSla'), null, 'SLA vencido não pisca sobre a conversa selecionada')
   assert.doesNotMatch(folha, /\.slaEstourado[^{}]*\{[^}]*animation/, 'o alerta de prazo permanece estático')
-  assert.match(folha, /\.cartao\.slaEstourado \.avatarCartao::after\s*\{[^}]*content:\s*'!'/, 'o prazo vencido tem marcador visível no avatar')
-  assert.match(folha, /\.cartao\.slaEstourado \.avatarCartao::after\s*\{[^}]*background:\s*var\(--erro\)/, 'o marcador usa o tom de perigo')
-  assert.match(folhaDe('features/caixa-de-entrada/CartaoConversa.jsx'), /slaEstourado && <span className="sr">, prazo de resposta estourado<\/span>/, 'o prazo vencido também é anunciado ao leitor de tela')
-  assert.doesNotMatch(folha, /\[aria-current='true'\][^{]*\.avatarCartao::after\s*\{[^}]*(?:display:\s*none|visibility:\s*hidden|content:\s*(?:none|''|""))/, 'selecionar a conversa não esconde o marcador')
+  // #2420: o traço lateral saiu do cartão; o prazo vencido é o ícone em erro e o texto vai no nome acessível.
+  assert.doesNotMatch(folha, /\.cartao[^{}]*::before/, 'o cartão não tem traço lateral')
+  assert.match(folha, /\.sinalPrazo\s*\{[^}]*color:\s*var\(--erro\)/, 'o prazo vencido tem ícone no tom de perigo')
+  assert.match(folhaDe('features/caixa-de-entrada/CartaoConversa.jsx'), /atrasada: slaEstourado/, 'o prazo vencido também é anunciado ao leitor de tela')
 })
 
 await confere('4. topo e rodapé da moldura sem desfoque de fundo; o botão flutuante mantém', () => {

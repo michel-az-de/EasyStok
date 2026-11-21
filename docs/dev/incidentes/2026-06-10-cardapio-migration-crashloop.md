@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-10
 **Duração estimada do impacto:** ~algumas horas (noite 2026-06-09 / manhã 2026-06-10) até ~11:30 BRT 2026-06-10
-**Severidade:** SEV2 (API pública degradada → site público da Casa da Babá fora do ar durante o crash loop)
+**Severidade:** SEV2 (API pública degradada → site público da Casa da Baba fora do ar durante o crash loop)
 **Status:** Resolvido (auto-recuperado via deploy do fix); postmortem blameless
 **Autor:** Sessão Claude Code (verificação ao vivo na VM `easystok-vm`)
 
@@ -10,7 +10,7 @@
 
 ## Resumo
 
-A migration `20260609182615_CardapioItemProdutoAgnostico` (ADR-0031) escrevia nomes de coluna em **snake_case** (`produto_id`, `nome_publico`) no SQL cru do filtro de índice, do CHECK e do índice de avulso, mas a tabela `cardapio_item` usa colunas em **PascalCase citado** (`"ProdutoId"`, `"NomePublico"`). No startup, o EF aplicava a migration e o Postgres falhava com `SqlState 42703` (coluna inexistente). Como a API roda com `RunMigrationsOnStartup=true` + `MigrationsFailFast=true`, a falha derrubava o processo no boot → **crash loop** na VM (RestartCount observado 15 no momento do diagnóstico do fix). Com a API fora, o site público da Casa da Babá (que consome `GET /api/storefront/{slug}/menu`) ficou indisponível.
+A migration `20260609182615_CardapioItemProdutoAgnostico` (ADR-0031) escrevia nomes de coluna em **snake_case** (`produto_id`, `nome_publico`) no SQL cru do filtro de índice, do CHECK e do índice de avulso, mas a tabela `cardapio_item` usa colunas em **PascalCase citado** (`"ProdutoId"`, `"NomePublico"`). No startup, o EF aplicava a migration e o Postgres falhava com `SqlState 42703` (coluna inexistente). Como a API roda com `RunMigrationsOnStartup=true` + `MigrationsFailFast=true`, a falha derrubava o processo no boot → **crash loop** na VM (RestartCount observado 15 no momento do diagnóstico do fix). Com a API fora, o site público da Casa da Baba (que consome `GET /api/storefront/{slug}/menu`) ficou indisponível.
 
 O fix `18c135da` (closes #567) trocou o SQL para PascalCase citado, trocou `ADD CONSTRAINT IF NOT EXISTS` (sintaxe inválida no PG) por DROP+ADD idempotente, e alinhou `HasFilter` na config e no snapshot. O deploy automático (cron `*/5` → `vm-deploy.sh`) aplicou o fix ~15min após o push; a API subiu estável e o site recuperou.
 
@@ -18,7 +18,7 @@ O fix `18c135da` (closes #567) trocou o SQL para PascalCase citado, trocou `ADD 
 
 ## Impacto
 
-- **Quem:** visitantes do site público da Casa da Babá (storefront) e qualquer consumidor da API durante a janela de crash loop.
+- **Quem:** visitantes do site público da Casa da Baba (storefront) e qualquer consumidor da API durante a janela de crash loop.
 - **Duração:** estimada em algumas horas (da publicação da migration quebrada até ~11:30 BRT de 2026-06-10).
 - **Negócio:** storefront público indisponível na janela; sem perda de dados (a falha era no boot, antes de servir tráfego).
 

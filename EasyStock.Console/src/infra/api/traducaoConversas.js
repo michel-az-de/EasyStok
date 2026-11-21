@@ -6,6 +6,7 @@
 import { pausaDaSituacao, respostaAtrasada } from '../../dominio/automatico'
 import { ACOES } from '../../dominio/agente'
 import { motivoDeEscalada, notaDeReabertura, notaDeSistema } from '../../dominio/motivoDeEscalada'
+import { relacionamentoDaApi } from '../../dominio/vinculoCliente'
 
 // #2005 (console-09): a leitura da conversa traz até 100 mensagens (as mais recentes); página cheia sugere que há mais.
 export const MENSAGENS_POR_LEITURA = 100
@@ -20,6 +21,10 @@ const CANAL_DO_NOME = Object.fromEntries(Object.entries(NOME_DO_CANAL).map(([api
 export const canalParaApi = (nome) => CANAL_DO_NOME[nome] ?? nome
 
 const ESTADO_DA_SITUACAO = { Automatica: 'Aberto', Assumida: 'Em atendimento', Encerrada: 'Encerrado' }
+
+// #2734: as conversas recentes do dossiê usam os mesmos nomes de canal e de estado da lista do Atendimento.
+export const nomeDoCanal = (canal) => NOME_DO_CANAL[canal] ?? canal ?? null
+export const estadoDaSituacao = (situacao) => ESTADO_DA_SITUACAO[situacao] ?? situacao ?? null
 
 const STATUS_DA_MENSAGEM = {
   Pendente: 'enviando', Enviada: 'enviada', Entregue: 'entregue', Lida: 'lida', Falhou: 'falhou',
@@ -65,6 +70,8 @@ export function mensagemDaApi(m, conversaId = null) {
   const avaliacao = !saida && m.tipoConteudo === 'Botao' ? BOTAO_DE_AVALIACAO.exec(m.botaoId ?? '')?.[1].toLowerCase() : null
   return {
     id: m.id,
+    ...(saida && m.chaveEnvio ? { chaveEnvio: m.chaveEnvio } : {}),
+    ...(m.enviadaPorUsuarioId ? { enviadaPorUsuarioId: m.enviadaPorUsuarioId } : {}),
     dir: saida ? 'out' : 'in',
     texto: m.texto?.trim() ? m.texto : avaliacao ? `Avaliação ${avaliacao}` : ROTULO_DO_CONTEUDO[m.tipoConteudo] || 'Conteúdo não disponível nesta mensagem.',
     ...(avaliacao ? { formato: 'avaliacaoResposta', valor: avaliacao } : {}),
@@ -109,7 +116,9 @@ function passagemDaApi(resumo) {
     // #1761: o motivo gravado pelo EasyStok é texto de sistema; cartão, faixa e lembrete leem o traduzido.
     motivo: motivoDeEscalada(resumo.motivoEscalada), em: null, assumida: false,
     ...(resumo.motivoEscalada === 'Conversa reaberta para atendimento.' ? { origem: 'reabertura' }
-      : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' } : {}),
+      : resumo.canal === 'ChatSite' ? { origem: 'chat-site', motivo: resumo.motivoEscalada || 'Visitante do site aguardando atendimento da equipe.' }
+        // #2185: só o WhatsApp tem Assistente; nos outros canais a conversa já nasce na fila da equipe.
+        : resumo.canal !== 'WhatsApp' ? { origem: 'fila', motivo: resumo.motivoEscalada || 'Cliente aguardando atendimento da equipe.' } : {}),
   }
 }
 
@@ -119,6 +128,7 @@ export function situacaoConversaDaApi(resumo, usuario) {
     estado: ESTADO_DA_SITUACAO[resumo.situacao] ?? 'Aberto',
     situacaoApi: resumo.situacao,
     assumidaPorUsuarioId: resumo.assumidaPorUsuarioId ?? null,
+    assumidaPorNome: resumo.assumidaPorNome?.trim() || null,
     responsavel: resumo.assumidaPorUsuarioId ? (resumo.assumidaPorNome?.trim() || (minha ? usuario.nome : 'Outro atendente')) : null,
     pausaApi: pausaDaSituacao(resumo, usuario?.id ?? null),
     passagem: passagemDaApi(resumo),
@@ -135,9 +145,12 @@ export function conversaDaApi(resumo, mensagensDaApi, usuario, agora = Date.now(
     id: resumo.id,
     numeroComanda: resumo.numeroComanda || null,
     conta: resumo.clienteId ? 'cliente' : 'lead',
+    relacionamento: relacionamentoDaApi(resumo.clienteId, resumo.temPedido), // #2461
     // Chave do cadastro na API: consentimento (S38) e o que mais for por cliente.
     clienteId: resumo.clienteId ?? null,
-    nome: resumo.contatoNome || resumo.contatoIdExterno,
+    vinculoRevisao: resumo.vinculoRevisao ?? 0,
+    vinculoEmRevisao: resumo.vinculoEmRevisao === true,
+    nome: resumo.vinculoEmRevisao && !resumo.clienteId ? 'Identidade em revisão' : resumo.contatoNome || resumo.contatoIdExterno,
     contato: resumo.contatoIdExterno,
     assunto: resumo.assunto ?? null, // #1432: assunto do último e-mail (canal E-mail)
     canal: NOME_DO_CANAL[resumo.canal] ?? resumo.canal,

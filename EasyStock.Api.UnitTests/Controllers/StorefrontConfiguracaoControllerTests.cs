@@ -98,6 +98,38 @@ public class StorefrontConfiguracaoControllerTests
     }
 
     [Fact]
+    public async Task Editar_so_o_whatsapp_mantem_o_resto_do_branding()
+    {
+        // #2244: o PUT parcial apagava os campos de branding que não vinham no corpo.
+        _vitrineA.AtualizarBranding(
+            subtituloPublico: "Doces da A", logoUrl: "https://a.example/logo.png",
+            corPrimaria: "#5C2E0D", mensagemForaArea: "Só no Butantã.");
+
+        var result = await _controller.Editar(
+            new(null, null, null, "5511988887777", null, null, null, null, null, null, null));
+
+        var detalhe = DadosDe<StorefrontAdminDetalhe>(result);
+        detalhe.WhatsappPedidos.Should().Be("5511988887777");
+        detalhe.SubtituloPublico.Should().Be("Doces da A");
+        detalhe.LogoUrl.Should().Be("https://a.example/logo.png");
+        detalhe.CorPrimaria.Should().Be("#5C2E0D");
+        detalhe.MensagemForaArea.Should().Be("Só no Butantã.");
+    }
+
+    [Fact]
+    public async Task Editar_com_string_vazia_limpa_o_campo_de_branding()
+    {
+        _vitrineA.AtualizarBranding(subtituloPublico: "Doces da A", corPrimaria: "#5C2E0D");
+
+        var result = await _controller.Editar(
+            new("", null, "", null, null, null, null, null, null, null, null));
+
+        var detalhe = DadosDe<StorefrontAdminDetalhe>(result);
+        detalhe.SubtituloPublico.Should().BeNull();
+        detalhe.CorPrimaria.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Editar_sem_vitrine_nao_cai_na_vitrine_de_outra_empresa()
     {
         _storefronts.GetByEmpresaAsync(_empresaA).Returns((StorefrontEntity?)null);

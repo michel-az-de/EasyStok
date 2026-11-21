@@ -36,7 +36,7 @@ public class ObterLoteDetalhesUseCase(ILoteRepository repo, IProdutoRepository p
                 return new LoteItemResult(
                     i.Id, i.LoteId, i.ProdutoId, i.Nome, i.Emoji, i.Unidade,
                     i.Quantidade, i.PesoG, i.ValidadeDias, i.ExpiraEm,
-                    i.FotoUrl, i.CriadoEm, tipoEmb);
+                    i.FotoUrl, i.CriadoEm, tipoEmb, i.QuantidadeMedida);
             }).ToList(),
             l.Etiquetas.OrderBy(e => e.Sequencial).Select(e => new LoteEtiquetaResult(
                 e.Id, e.LoteId, e.LoteItemId, e.Sequencial, e.Codigo, e.Status,

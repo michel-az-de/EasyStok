@@ -17,7 +17,8 @@ import { transformWithOxc } from 'vite'
 
 const pastaDasTelas = new URL('../src/features/gestao/producao/', import.meta.url)
 const telasCompiladas = new Map()
-for (const nome of readdirSync(pastaDasTelas).filter((n) => n.endsWith('Api.jsx'))) {
+// #2247 (v3): a prévia das etiquetas é a mesma nas duas telas e roda de verdade aqui.
+for (const nome of [...readdirSync(pastaDasTelas).filter((n) => n.endsWith('Api.jsx')), 'etiqueta/PreviaDasEtiquetas.jsx']) {
   const url = new URL(nome, pastaDasTelas)
   telasCompiladas.set(url.href, (await transformWithOxc(readFileSync(url, 'utf8'), url.pathname, { jsx: { runtime: 'automatic' } })).code)
 }
@@ -44,7 +45,7 @@ const hooks = {
     atual.efeitos.push(() => { antes?.limpar?.(); atual.valores[i].limpar = fn() })
   },
 }
-globalThis.__prova1585 = { hooks, catalogo: { cardapio: [] } }
+globalThis.__prova1585 = { motor: { png: 'data:image/png;base64,', larguraMm: 80, alturaMm: 40, recusa: null }, hooks, catalogo: { cardapio: [] } }
 const inline = (source) => ({ format: 'module', shortCircuit: true, source })
 
 registerHooks({
@@ -61,6 +62,8 @@ registerHooks({
     if (url.endsWith('/infra/fonteDados.js')) return inline("export const FONTE_API = true\nexport const API_BASE = ''\n")
     if (url.endsWith('/aplicacao/contextos.js')) return inline('export const useCatalogo=()=>globalThis.__prova1585.catalogo')
     if (url.includes('/aplicacao/acessoModulos.')) return inline('export const useAcessoModulos=()=>({acoes:{editarProducao:true},permite:()=>true})')
+    // #2247 (v3): o motor da etiqueta pede canvas e fonte, que só o navegador tem; aqui ele devolve a imagem pronta.
+    if (url.includes('/aplicacao/etiquetaDoMotor.')) return inline('export const useEtiquetaDoMotor=(e)=>(e?globalThis.__prova1585.motor:{png:null,recusa:null})')
     if (url.endsWith('.css')) return inline('export default new Proxy({},{get:(_,p)=>String(p)})')
     if (url.endsWith('.json')) return inline('export default ' + readFileSync(new URL(url), 'utf8'))
     // Componente de fora das telas (Botao, CampoTexto, Vazio) vira o próprio nome: aparece na árvore sem rodar.
@@ -205,7 +208,7 @@ await confere('quem está na tela é avisado quando o lote grava, e só enquanto
 await confere('o erro da linha traz o número do cartão e o nome do prato, sem chamar a API', async () => {
   const chamadas = montarFetch()
   const producao = criarProducaoDoDia()
-  assert.equal((await producao.produzir([linha(), linha({ nome: 'Lasanha', porcoes: 0 })])).erro, 'Prato 02 (Lasanha): Quantas porções saíram?')
+  assert.equal((await producao.produzir([linha(), linha({ nome: 'Lasanha', porcoes: 0 })])).erro, 'Prato 02 (Lasanha): Informe porções inteiras maiores que zero.')
   assert.equal((await producao.produzir([linha({ sku: '', nome: null })])).erro, 'Prato 01: Escolha o prato.')
   assert.equal((await producao.produzir([linha(), linha(), linha({ nome: 'Nhoque', pesoRealG: 900 })])).erro, 'Prato 03 (Nhoque): O peso real não fecha as porções.')
   assert.equal((await producao.produzir([])).erro, 'Adicione ao menos um prato.')
@@ -289,6 +292,11 @@ const andar = (no, fn, achados = []) => {
 }
 const texto = (no) => (no == null ? '' : typeof no !== 'object' ? String(no) : Array.isArray(no) ? no.map(texto).join('') : texto(no.props?.children))
 const botoes = (no, rotulo) => andar(no, (n) => n.type === 'Botao' && texto(n).includes(rotulo))
+// #2247 (v3): o botão do lote abre a prévia; quem imprime é o "Imprimir" dela.
+const imprimirNaPrevia = async (t) => {
+  const previa = andar(t.renderizar(), (n) => n.type === 'Modal' && String(n.props.titulo).startsWith('Etiquetas do lote '))[0]
+  await andar(previa.props.rodape, (n) => n.type === 'Botao' && /^Imprimir /.test(texto(n)))[0].props.onClick()
+}
 const botoesEtiquetas = (no, codigo) => andar(no, (n) => n.type === 'BotaoIcone' && n.props.rotulo === `Etiquetas do lote ${codigo}`)
 const campos = (no, tipo, rotulo) => andar(no, (n) => n.type === tipo && n.props.rotulo === rotulo)
 const alertas = (no) => andar(no, (n) => n.props?.role === 'alert')
@@ -395,6 +403,8 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   await botoesEtiquetas(t.renderizar(), 'LOT-261011-002')[0].props.onClick()
   await esperar(80)
   assert.match(etiquetasDaFolha(folha(t)[0]), /Lote LOT-261011-002 · 6\/6/)
+  assert.equal(impressoes, 0, 'abrir a prévia não imprime')
+  await imprimirNaPrevia(t)
   assert.equal(impressoes, 1)
   // Lote 1 com a rede fora: a folha do lote 2 sai, nada imprime e o erro aparece no aviso do lote 1.
   cair = true
@@ -410,6 +420,7 @@ await confere('Produção do dia: cada lote imprime as próprias etiquetas, o er
   await botoesEtiquetas(t.arvore, 'LOT-261011-001')[0].props.onClick()
   await esperar(80)
   assert.match(etiquetasDaFolha(folha(t)[0]), /Lote LOT-261011-001 · 2\/2/)
+  await imprimirNaPrevia(t)
   assert.equal(impressoes, 2)
   assert.equal(chamadas.filter((c) => c.url.includes('/etiquetas/')).length, 3)
   // Dispensar o lote 1 leva a folha dele; o lote 2 continua.
@@ -468,9 +479,9 @@ await confere('Insumos: o aviso sai no formulário que o causou; sem formulário
   botoes(t.arvore, 'Cadastrar insumo')[0].props.onClick()
   t.renderizar()
   // Cadastro com mínimo inválido: o aviso fica dentro do formulário, antes do botão, e nada é enviado.
-  andar(cadastro(), (n) => n.type === 'NomeInsumoPesquisado')[0].props.onChange(digitar('Massa'))
+  campos(cadastro(), 'CampoTexto', 'Nome do insumo')[0].props.onChange(digitar('Massa'))
   t.renderizar()
-  campos(cadastro(), 'CampoTexto', 'Mínimo (opcional)')[0].props.onChange(digitar('1,5'))
+  campos(cadastro(), 'CampoTexto', 'Mínimo')[0].props.onChange(digitar('1,5'))
   t.renderizar()
   cadastro().props.onSubmit(evento)
   await t.assentar()
@@ -523,7 +534,7 @@ await confere('Planejamento: a lista gerada aparece na tela e o botão só destr
   t.renderizar()
   assert.equal(listasCriadas(), 1)
   assert.equal(gerar().props.disabled, true)
-  assert.equal(texto(lista()[0]), 'Compras da produção de 12/10Molhofalta para a produção1,4 KgBandejarepõe o mínimo30 UnPara gerar outra lista, mude as porções ou a data.')
+  assert.equal(texto(lista()[0]), 'Compras da produção de 12/10Molhofalta para a produção1,4 kgBandejarepõe o mínimo30 unPara gerar outra lista, mude as porções ou a data.')
   // Sair, voltar e calcular de novo sem mudar nada: a lista segue na tela e o botão travado.
   t = montar(AbaPlanejamentoApi)
   await t.assentar()
@@ -540,16 +551,41 @@ await confere('Planejamento: a lista gerada aparece na tela e o botão só destr
   assert.equal(listasCriadas(), 2)
 })
 
+// #2439: o − e o + ajustam uma porção na linha do prato; o − para no zero e porção mudada invalida o cálculo.
+await confere('Planejamento: − e + mexem uma porção, o − trava no zero e o cálculo antigo sai', async () => {
+  montarFetch([
+    [(m, u) => m === 'GET' && u.includes('/producao/sugestao'), { data: { ate: '2026-10-12', pratos: [{ cardapioItemId: 'i-1', produtoId: 'p-1', nome: 'Ravióli', minimo: 0, saldo: 0, agendados: 0, descoberto: 0, sugestao: 1 }] } }],
+    [(m, u) => m === 'POST' && u.endsWith('/producao/planejamento'), { data: { itens: [{ produtoFinalId: 'p-1', status: 'Ok' }], tudoDisponivel: true, custoEstimadoTotal: 10, consolidado: [] } }],
+  ])
+  const t = montar(await tela('AbaPlanejamentoApi'))
+  await t.assentar()
+  const botao = (rotulo) => andar(t.arvore, (n) => n.type === 'BotaoIcone' && n.props.rotulo === rotulo)[0]
+  const porcoes = () => campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value
+  botao('Somar 1 porção de Ravióli').props.onClick()
+  t.renderizar()
+  assert.equal(porcoes(), '2')
+  await botoes(t.arvore, 'Calcular insumos')[0].props.onClick()
+  t.renderizar()
+  assert.equal(andar(t.arvore, (n) => n.type === 'section' && n.props['aria-label'] === 'Insumos do planejamento').length, 1)
+  botao('Tirar 1 porção de Ravióli').props.onClick()
+  botao('Tirar 1 porção de Ravióli').props.onClick()
+  t.renderizar()
+  assert.equal(porcoes(), '0')
+  assert.equal(botao('Tirar 1 porção de Ravióli').props.disabled, true, 'no zero, o − trava')
+  assert.equal(andar(t.arvore, (n) => n.type === 'section' && n.props['aria-label'] === 'Insumos do planejamento').length, 0, 'porção mudada tira o cálculo antigo')
+})
+
 await confere('os textos de Estoque do dia, Receitas e Planejamento têm link para a tela citada', async () => {
   const PRODUCAO_DO_DIA = [hashDoModulo('producao', 'producao'), 'Produção do dia']
   assert.equal(rotaDaHash(PRODUCAO_DO_DIA[0], { fonteApi: true }).aba, 'producao-do-dia')
   assert.equal(rotaDaHash(hashDoModulo('producao', 'perdas'), { fonteApi: true }).aba, 'perdas')
-  // Sem prato ligado ao estoque, as três telas mandam lançar a primeira produção.
+  // Sem prato ligado ao estoque, Estoque e Planejamento mandam lançar a primeira produção. Receitas
+  // vem antes da produção (#2235, banca A1): sem prato no cardápio, ela manda cadastrar os itens.
   montarFetch()
   const vazia = async (nome) => { const t = montar(await tela(nome)); await t.assentar(); return links(t.arvore) }
   assert.deepEqual(await vazia('AbaEstoqueDoDiaApi'), [PRODUCAO_DO_DIA])
   assert.deepEqual(await vazia('AbaPlanejamentoApi'), [PRODUCAO_DO_DIA])
-  assert.deepEqual(await vazia('AbaReceitasApi'), [PRODUCAO_DO_DIA, PRODUCAO_DO_DIA])
+  assert.deepEqual(await vazia('AbaReceitasApi'), [[hashDoModulo('cardapio', 'itens'), 'Itens do cardápio']])
   // Contagem de prato com porção vencida guardada: o texto manda lançar em Perdas, com link.
   montarFetch([[(m, u) => m === 'GET' && u.endsWith('/producao/estoque-do-dia'), { data: { alertas: [], pratos: [{
     cardapioItemId: 'i-1', produtoId: 'p-1', nome: 'Ravióli', saldo: 3, fisico: 5, descoberto: 0, lotes: [], porcoes: [] }] } }]])
@@ -583,7 +619,7 @@ await confere('Planejamento: consulta de outra data preserva o formulário, bloq
   await calcular().props.onClick()
   t.renderizar()
   assert.ok(texto(t.arvore).includes('Custo estimado'))
-  andar(t.arvore, (n) => n.type === 'input' && n.props.type === 'date')[0].props.onChange(digitar('2026-10-13'))
+  andar(t.arvore, (n) => (n.type === 'input' && n.props.type === 'date') || (n.type === 'CampoTexto' && n.props.tipo === 'date'))[0].props.onChange(digitar('2026-10-13'))
   await t.assentar()
   assert.equal(porcoes().props.value, '99', 'a consulta não desmonta nem apaga o formulário')
   assert.equal(porcoes().props.disabled, true)
@@ -614,7 +650,7 @@ await confere('Planejamento: falha da nova data conserva as porções e permite 
   await t.assentar()
   campos(t.arvore, 'CampoTexto', 'Porções')[0].props.onChange(digitar('99'))
   t.renderizar()
-  andar(t.arvore, (n) => n.type === 'input' && n.props.type === 'date')[0].props.onChange(digitar(''))
+  andar(t.arvore, (n) => (n.type === 'input' && n.props.type === 'date') || (n.type === 'CampoTexto' && n.props.tipo === 'date'))[0].props.onChange(digitar(''))
   await t.assentar()
   assert.equal(consultas, 2, 'consulta vazia igual à inicial ainda inicia nova leitura')
   assert.equal(campos(t.arvore, 'CampoTexto', 'Porções')[0].props.value, '99')

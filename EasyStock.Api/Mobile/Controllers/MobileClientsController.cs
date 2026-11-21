@@ -29,6 +29,7 @@ public class MobileClientsController(
     /// - <c>pendingOnly</c>: ainda não linkados ao ERP (erp_cliente_id null)
     /// </summary>
     [HttpGet]
+    [Authorize(Policy = "Operador")] // #2842: nome, telefone e endereço, mesma regra de GET api/clientes.
     public async Task<IActionResult> List(
         [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
@@ -55,6 +56,7 @@ public class MobileClientsController(
     /// cria um Cliente novo no ERP a partir dos dados do mobile_client e linka.
     /// </summary>
     [HttpPost("{id}/link")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Link(string id, [FromBody] LinkClienteRequest? req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -100,6 +102,7 @@ public class MobileClientsController(
 
     /// <summary>Desfaz o link. Cliente ERP permanece — só remove a associação.</summary>
     [HttpPost("{id}/unlink")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;

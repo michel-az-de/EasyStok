@@ -1,3 +1,4 @@
+using EasyStock.Api.Authentication;
 using EasyStock.Application.UseCases.Atendimento.Producao;
 using EasyStock.Application.UseCases.CalcularProducao;
 using EasyStock.Application.UseCases.Common;
@@ -19,8 +20,10 @@ public sealed record PerdaRequest(
 public sealed record ProduzirPratosRequest(IReadOnlyList<PratoProduzidoInput>? Pratos, string? Observacao = null);
 
 /// <param name="Unidade">G, Kg, Ml, L, Un...; null = não mexe (no cadastro, Un).</param>
+/// <param name="Custo">Por unidade-base, até 6 casas (#2363: R$ 45 por 10 kg = 0,0045 por g).</param>
+/// <param name="SaldoInicial">#2363: só no cadastro. Quanto tem hoje, na unidade-base; vira entrada de ajuste.</param>
 public sealed record InsumoRequest(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null,
-    bool LimparMinimo = false, bool LimparCusto = false);
+    bool LimparMinimo = false, bool LimparCusto = false, decimal? SaldoInicial = null);
 
 /// <summary>
 /// Produção pelo console (M2, plano docs/plan/erp-casa-da-baba/03-m2-producao.md). D-M2-06 (Felipe,
@@ -120,7 +123,7 @@ public class AtendimentoProducaoController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return DataSemLoja(planejamento.SugestaoVazia(ate));
         }
         catch (UseCaseValidationException ex)
         {
@@ -161,7 +164,7 @@ public class AtendimentoProducaoController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return DataSemLoja(Array.Empty<ReceitaDoPrato>());
         }
     }
 
@@ -179,6 +182,34 @@ public class AtendimentoProducaoController(
         catch (UseCaseValidationException ex)
         {
             return DataBadRequest(ex);
+        }
+    }
+
+    [SwaggerOperation(Summary = "Link a menu dish without stock to a stock product, so its recipe can be built before the first production (#2235; Gerente)",
+        Description = "Prato já ligado devolve o produto que tem.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Policy = "Gerente")]
+    [HttpPost("receitas/pratos/{cardapioItemId:guid}/ligar")]
+    public async Task<IActionResult> LigarPrato(Guid cardapioItemId, [FromServices] LigarPratoAoEstoqueUseCase ligar, CancellationToken ct)
+    {
+        try
+        {
+            var produtoId = await ligar.ExecuteAsync(currentUser.EmpresaId, cardapioItemId, currentUser.UsuarioId, ct);
+            return DataOk(new { produtoId });
+        }
+        catch (StorefrontNaoEncontradoException)
+        {
+            return VitrineDesligada();
+        }
+        catch (CardapioItemNaoEncontradoException)
+        {
+            return DataNotFound("Prato do cardápio não encontrado.");
+        }
+        catch (Exception ex) when (ex is UseCaseValidationException or RegraDeDominioVioladaException)
+        {
+            return DataBadRequest(ex.Message);
         }
     }
 
@@ -220,7 +251,7 @@ public class AtendimentoProducaoController(
         try
         {
             var id = await insumos.CriarAsync(currentUser.EmpresaId, currentUser.UsuarioId,
-                new InsumoInput(req.Nome, req.Unidade, req.Minimo, req.Custo, req.Embalagem), ct);
+                new InsumoInput(req.Nome, req.Unidade, req.Minimo, req.Custo, req.Embalagem, SaldoInicial: req.SaldoInicial), ct);
             return DataCreated($"/api/produtos/{id}", new { produtoId = id });
         }
         catch (Exception ex) when (ex is UseCaseValidationException or RegraDeDominioVioladaException)
@@ -258,13 +289,15 @@ public class AtendimentoProducaoController(
         if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
         try
         {
+            // #1776 (item 9): o lote guarda quem produziu; o null deixava OperadorNome vazio no console.
+            var operador = User.NomeExibicao() is { } nome ? nome[..Math.Min(nome.Length, 120)] : null;
             var r = await produzirPratos.ExecuteAsync(new ProduzirPratosCommand(
-                currentUser.EmpresaId, currentUser.UsuarioId, null, req.Pratos, req.Observacao), ct);
+                currentUser.EmpresaId, currentUser.UsuarioId, operador, req.Pratos, req.Observacao), ct);
             return DataCreated($"/api/lotes/{r.LoteId}", r);
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return VitrineDesligada();
         }
         catch (CardapioItemNaoEncontradoException)
         {
@@ -289,7 +322,7 @@ public class AtendimentoProducaoController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return DataSemLoja(new EstoqueDoDiaResult([], []));
         }
     }
 }

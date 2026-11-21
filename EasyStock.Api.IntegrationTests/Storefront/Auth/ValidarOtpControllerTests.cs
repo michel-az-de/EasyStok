@@ -10,7 +10,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
-using Testcontainers.PostgreSql;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.UseCases.Atendimento.Comanda;
@@ -24,16 +23,14 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Auth;
 /// <summary>
 /// Testes de integração do fluxo validar-OTP (EZ-AUTH-002, ADR-0012).
 ///
-/// Requer Docker (Testcontainers) ou env var EASYSTOCK_IT_PG apontando para
-/// Postgres externo. Sem nenhum dos dois, os testes retornam sem Assert —
-/// não falham como falso-positivo.
+/// Requer Docker: o banco vem de um clone do modelo já migrado (BancoDeTeste, #2976). Sem Docker,
+/// os testes retornam sem Assert e não falham como falso-positivo.
 /// </summary>
 public sealed class ValidarOtpControllerTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
     private string? _connString;
-    private readonly VariaveisDeProcesso _variaveis = new();
 
     private const string JwtIssuer = "EasyStock";
     private const string JwtAudience = "EasyStock";
@@ -45,33 +42,11 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        var externalPg = Environment.GetEnvironmentVariable("EASYSTOCK_IT_PG");
-        if (!string.IsNullOrWhiteSpace(externalPg))
-        {
-            _connString = externalPg;
-            _variaveis
-                .Definir("ConnectionStrings__DefaultConnection", externalPg)
-                .Definir("Database__Provider", "PostgreSql")
-                .Definir("RunMigrationsOnStartup", "true")
-                .Definir("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001")
-                .Definir("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
-            _isAvailable = true;
-            return;
-        }
-
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_validarotp_tests")
-                .WithUsername("postgres")
-                .WithPassword("Si6IT-" + Guid.NewGuid().ToString("N"))
-                .Build();
+            _pg = new BancoDeTeste();
             await _pg.StartAsync();
             _connString = _pg.GetConnectionString();
-            await using var db = new EasyStockDbContext(new DbContextOptionsBuilder<EasyStockDbContext>()
-                .UseNpgsql(_connString).Options);
-            using var bypass = db.UseRowLevelSecurityBypass();
-            await db.Database.MigrateAsync();
             _isAvailable = true;
         }
         catch (DockerUnavailableException)
@@ -82,7 +57,6 @@ public sealed class ValidarOtpControllerTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        _variaveis.Dispose();
         if (_pg is not null)
             await _pg.DisposeAsync();
     }

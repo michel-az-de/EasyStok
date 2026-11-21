@@ -2,39 +2,19 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Modal } from '../../../componentes/Modal'
-import { pesquisarInsumosWeb, pesquisarReceitaIa } from '../../../aplicacao/calculosReceita'
+import { pesquisarReceitaIa } from '../../../aplicacao/calculosReceita'
 import { combinarSinais } from '../../../aplicacao/sinais'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import css from './pesquisaProducao.module.css'
+// #2792: o limite de 100 (espelha o servidor) vira aviso no campo e trava o Buscar, em vez de cortar o texto colado.
 
 function Fontes({ fontes }) {
   return <ul className={css.fontes}>{fontes.map((fonte) => <li key={fonte.url}><a href={fonte.url} target="_blank" rel="noopener noreferrer">{fonte.titulo}</a> · consultada em {new Date(fonte.consultadaEm).toLocaleDateString('pt-BR')}</li>)}</ul>
 }
 
-export function NomeInsumoPesquisado({ value, onChange, disabled }) {
-  const id = useId()
-  const [fontes, setFontes] = useState([])
-  const [erro, setErro] = useState(null)
-  useEffect(() => {
-    setFontes([]); setErro(null)
-    if (disabled || value.trim().length < 3 || value.trim().length > 100) return undefined
-    const controle = new AbortController()
-    const tempo = setTimeout(() => {
-      pesquisarInsumosWeb(value.trim(), combinarSinais([controle.signal, AbortSignal.timeout(15000)]))
-        .then((dados) => { if (!controle.signal.aborted) setFontes(dados) })
-        .catch(() => { if (!controle.signal.aborted) setErro('Pesquisa indisponível. Você pode continuar escrevendo o nome.') })
-    }, 700)
-    return () => { clearTimeout(tempo); controle.abort() }
-  }, [value, disabled])
-  return <div className={css.nome}><CampoTexto disabled={disabled} rotulo="Nome do insumo" dica="Sugestões da Wikipédia" placeholder="Ex.: farinha de trigo" maxLength={180} value={value} onChange={onChange} list={id} autoComplete="off" />
-    <datalist id={id}>{fontes.map((fonte) => <option key={fonte.url} value={fonte.titulo} />)}</datalist>
-    {erro && <p role="status">{erro}</p>}
-    {!!fontes.length && <Fontes fontes={fontes} />}
-  </div>
-}
-
 export function PesquisaReceitaIa({ nome, aoAplicar, disabled }) {
   const [aberto, setAberto] = useState(false)
-  return <><Botao icone="sparkles" aria-haspopup="dialog" disabled={disabled} onClick={() => setAberto(true)}>Pesquisar receita</Botao>
+  return <><Botao icone="lupa" aria-haspopup="dialog" disabled={disabled} onClick={() => setAberto(true)}>Pesquisar receita</Botao>
     {aberto && <ModalPesquisaReceita nome={nome} aoAplicar={(sugestao) => { aoAplicar(sugestao); setAberto(false) }} aoFechar={() => setAberto(false)} />}
   </>
 }
@@ -62,10 +42,10 @@ function ModalPesquisaReceita({ nome, aoAplicar, aoFechar }) {
   }
   return <Modal titulo="Pesquisar receita" aoFechar={aoFechar} largura="min(900px, calc(100vw - 24px))" rodape={<>
     <Botao onClick={aoFechar}>Cancelar</Botao>
-    <Botao tipo="submit" form={formId} disabled={ocupado || termo.trim().length < 3 || termo.trim().length > 100}>{ocupado ? 'Pesquisando…' : 'Buscar receita'}</Botao>
+    <Botao tipo="submit" form={formId} disabled={ocupado || termo.trim().length < 3 || algumPassaDoLimite([termo, 100])}>{ocupado ? 'Pesquisando…' : 'Buscar receita'}</Botao>
     {resultado && <Botao variante="primario" onClick={() => aoAplicar(resultado)}>Aplicar ao rascunho</Botao>}
   </>}>
-    <form id={formId} onSubmit={pesquisar}><CampoTexto rotulo="Nome para pesquisar" value={termo} maxLength={100} disabled={ocupado} onChange={(e) => { setTermo(e.target.value); setResultado(null) }} /></form>
+    <form id={formId} onSubmit={pesquisar}><CampoTexto rotulo="Nome para pesquisar" value={termo} limite={100} disabled={ocupado} onChange={(e) => { setTermo(e.target.value); setResultado(null) }} /></form>
     <p>O Assistente pesquisa no Livro de receitas do Wikilivros. Aplicar substitui os insumos do rascunho; a receita só é gravada em Salvar receita.</p>
     {erro && <p role="alert">{erro}</p>}
     {resultado && <section aria-label="Receita sugerida">

@@ -78,6 +78,21 @@ public class ProcessarTurnoAgenteUseCaseTests
         _conversaRepository.ObterComMensagensAsync(_empresaId, _conversaId, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns<ConversaComMensagens?>(_ => throw new InvalidOperationException("LLM quebrou"));
 
+    /// <summary>#2902: a conversa que a dona abriu pelo "Novo pedido" nasce Assumida e o turno do agente a ignora.</summary>
+    [Fact]
+    public async Task ConversaAssumidaPelaDona_TurnoEhIgnorado()
+    {
+        var conversa = ConversaAutomatica();
+        conversa.Assumir(Agora, Guid.NewGuid());
+        _conversaRepository.ObterPorIdAsync(_empresaId, _conversaId, Arg.Any<CancellationToken>()).Returns(conversa);
+        FazOTurnoFalhar();
+
+        var resultado = await CriarUseCase().ExecuteAsync(new ProcessarTurnoAgenteJob(_empresaId, _conversaId));
+
+        resultado.Should().Be(ResultadoTurnoAgente.Ignorado);
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+    }
+
     [Fact]
     public async Task FalhaDoTurnoDevolveAConversaParaAEquipe()
     {

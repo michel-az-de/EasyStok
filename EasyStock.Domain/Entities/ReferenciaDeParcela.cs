@@ -17,6 +17,12 @@ public static class ReferenciaDeParcela
     public static string DoPix(string origem, Guid contaId, Guid parcelaId, string txid) =>
         Montar(origem, contaId, parcelaId, "txid", txid);
 
+    /// <summary>#2687: o lançamento que nasce de uma parcela só se desfaz pelo estorno do pagamento, que leva o Caixa junto.</summary>
+    public static bool EhDeParcela(string? referencia) =>
+        referencia is not null
+        && (referencia.StartsWith("cp:", StringComparison.Ordinal) || referencia.StartsWith("cr:", StringComparison.Ordinal))
+        && referencia.Contains(":parcela:", StringComparison.Ordinal);
+
     private static string Montar(string origem, Guid contaId, Guid parcelaId, string tipo, string valor)
     {
         var referencia = $"{origem}:{contaId:N}:parcela:{parcelaId:N}:{tipo}:{valor}";

@@ -43,13 +43,13 @@ public class AtendimentoItensCardapioController(
     [HttpGet("fora")]
     [Authorize(Policy = "Gerente")]
     public Task<IActionResult> Fora(CancellationToken ct)
-        => Tratar(async () => DataOk(await itens.ListarForaAsync(currentUser.EmpresaId, ct)));
+        => Tratar(() => LerDaLoja(() => itens.ListarForaAsync(currentUser.EmpresaId, ct), []));
 
     [SwaggerOperation(Summary = "All menu items for the management screen (M1.1), hidden and off-today included")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [HttpGet("gestao")]
     public Task<IActionResult> Gestao(CancellationToken ct)
-        => Tratar(async () => DataOk(await itens.ListarGestaoAsync(currentUser.EmpresaId, ct)));
+        => Tratar(() => LerDaLoja(() => itens.ListarGestaoAsync(currentUser.EmpresaId, ct), []));
 
     [SwaggerOperation(Summary = "Move a menu item one position up or down (server renumbers 1..n)",
         Description = "direcao: Subir | Descer. Na ponta não muda nada.")]
@@ -169,7 +169,7 @@ public class AtendimentoItensCardapioController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return VitrineDesligada();
         }
         catch (CardapioItemNaoEncontradoException)
         {

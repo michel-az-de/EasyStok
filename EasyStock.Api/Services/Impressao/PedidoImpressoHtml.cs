@@ -3,13 +3,14 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.UseCases.Operacao.Impressao;
 using static EasyStock.Api.Services.Impressao.ImpressoHtml;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Ports.Output.Pdf;
 
 namespace EasyStock.Api.Services.Impressao;
 
 /// <summary>O que varia por aparelho ou por pedido na hora de imprimir.</summary>
 /// <param name="LogoNaTermica">Sai o logo também na térmica (10×15, 80 mm, 58 mm). Padrão: nome da casa em texto.</param>
 /// <param name="Alergias">Alergias do cadastro da cliente, para a confirmação de agendamento.</param>
-public sealed record ImpressoOpcoes(bool LogoNaTermica = false, IReadOnlyList<string>? Alergias = null, string Codigo = "qr");
+public sealed record ImpressoOpcoes(bool LogoNaTermica = false, IReadOnlyList<string>? Alergias = null, string Codigo = "qr", PixPdfDto? Pix = null);
 
 /// <summary>
 /// Impressos do pedido voltados à cliente e ao entregador (#1632): pedido, agendamento e entrega, um modelo
@@ -33,7 +34,8 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
 
     /// <param name="baseUrl">Origem da Api (ex.: <c>https://api.casadababa.com.br</c>), para as fontes.</param>
     public async Task<string> RenderizarAsync(
-        PedidoImpressoDto pedido, string documento, string modelo, string baseUrl, ImpressoOpcoes? opcoes = null, CancellationToken ct = default)
+        PedidoImpressoDto pedido, string documento, string modelo, string baseUrl, ImpressoOpcoes? opcoes = null, CancellationToken ct = default,
+        bool fontesRelativas = false)
     {
         ArgumentNullException.ThrowIfNull(pedido);
         if (!Documentos.Contains(documento))
@@ -46,7 +48,9 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
             new Dictionary<string, object?> { ["m"] = Modelo(pedido, documento, modelo, baseUrl, opcoes ?? new ImpressoOpcoes()) },
             htmlEscape: false,
             ct);
-        return CodigoImpresso.AjustarPagina(Pagina(Titulo(documento) + " #" + pedido.Numero, modelo, baseUrl, corpo), opcoes?.Codigo ?? "qr");
+        var titulo = Titulo(documento) + " #" + pedido.Numero;
+        var pagina = fontesRelativas ? PaginaComFontesRelativas(titulo, modelo, corpo) : Pagina(titulo, modelo, baseUrl, corpo);
+        return CodigoImpresso.AjustarPagina(pagina, opcoes?.Codigo ?? "qr");
     }
 
     private Dictionary<string, object?> Modelo(PedidoImpressoDto p, string documento, string modelo, string baseUrl, ImpressoOpcoes opcoes)
@@ -98,14 +102,33 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
             ["pago"] = p.Cobranca.Pago,
             ["saldo"] = Moeda(p.Cobranca.Saldo),
             ["forma"] = T(forma),
-            ["cobranca_frase"] = T(p.Cobranca.Pago
-                ? "Tudo pago" + (forma is null ? string.Empty : " no " + forma) + ". Obrigada!"
-                : (p.Cobranca.Recebido > 0 ? "Falta " + Moeda(p.Cobranca.Saldo) + ", a acertar na entrega" : "A acertar na entrega")
-                  + (forma is null ? string.Empty : " · " + forma) + "."),
-            ["qr"] = CodigoImpresso.Gerar(opcoes.Codigo, p.Numero, link),
+            ["cobranca_frase"] = T(FraseDaCobranca(p, forma, opcoes.Pix)),
+            ["qr"] = opcoes.Pix is null ? CodigoImpresso.Gerar(opcoes.Codigo, p.Numero, link) : null,
+            ["pix"] = opcoes.Pix is { } pix ? BlocoPix(pix) : null,
             ["codigo_barras"] = opcoes.Codigo == "barras",
         };
     }
+
+    private static string FraseDaCobranca(PedidoImpressoDto p, string? forma, PixPdfDto? pix)
+    {
+        if (pix is not null)
+            return pix.RestanteNaEntrega > 0
+                ? $"Pix de {Moeda(pix.ValorDoPix)} agora; {Moeda(pix.RestanteNaEntrega)} na entrega."
+                : "Pague com o Pix abaixo.";
+        return p.Cobranca.Pago
+            ? "Tudo pago" + (forma is null ? string.Empty : " no " + forma) + ". Obrigada!"
+            : (p.Cobranca.Recebido > 0 ? "Falta " + Moeda(p.Cobranca.Saldo) + ", a acertar na entrega" : "A acertar na entrega")
+              + (forma is null ? string.Empty : " · " + forma) + ".";
+    }
+
+    /// <summary>O CopiaCola só entra dentro do QR, nunca como texto do impresso.</summary>
+    private static Dictionary<string, object?> BlocoPix(PixPdfDto pix) => new()
+    {
+        ["qr"] = QrSvg.Gerar(pix.CopiaCola),
+        ["valor"] = Moeda(pix.ValorDoPix),
+        ["restante"] = pix.RestanteNaEntrega > 0 ? Moeda(pix.RestanteNaEntrega) : null,
+        ["recebedor"] = T(pix.Recebedor),
+    };
 
     private string Assinatura(string casa) =>
         configuracao?[ChaveAssinatura] is { Length: > 0 } quem ? $"{quem.Trim()} · {casa}" : casa;

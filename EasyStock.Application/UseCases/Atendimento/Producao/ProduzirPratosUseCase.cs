@@ -1,5 +1,4 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
-using EasyStock.Application.UseCases.CadastrarProduto;
 using EasyStock.Application.UseCases.Producao;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Exceptions.Storefront;
@@ -31,13 +30,12 @@ public sealed record ProduzirPratosResult(
 public sealed class ProduzirPratosUseCase(
     IStorefrontRepository storefrontRepository,
     ICardapioItemRepository cardapioRepository,
-    ICategoriaRepository categoriaRepository,
-    CadastrarProdutoUseCase cadastrarProduto,
+    LigarPratoAoEstoqueUseCase ligarAoEstoque,
     RegistrarProducaoUseCase registrarProducao,
     IUnitOfWork unitOfWork,
     EasyStock.Application.UseCases.Atendimento.Comanda.VincularPorcoesAoEstoqueUseCase vincularPorcoes)
 {
-    public const string CategoriaPratos = "Cardápio";
+    public const string CategoriaPratos = LigarPratoAoEstoqueUseCase.CategoriaPratos;
 
     public async Task<ProduzirPratosResult> ExecuteAsync(ProduzirPratosCommand cmd, CancellationToken ct = default)
     {
@@ -67,7 +65,7 @@ public sealed class ProduzirPratosUseCase(
             pratos.Add(item);
         }
 
-        await VincularAvulsosAsync(cmd, pratos, ct);
+        await ligarAoEstoque.LigarAsync(cmd.EmpresaId, cmd.UsuarioId, pratos);
         await VincularPorcoesAsync(cmd.EmpresaId, pratos);
         var porcoes = cmd.Pratos.Select((p, i) => pratos[i].Variacoes.FirstOrDefault(v => v.Id == p.VariacaoId)).ToList();
 
@@ -84,26 +82,9 @@ public sealed class ProduzirPratosUseCase(
         return new ProduzirPratosResult(
             producao.LoteId, producao.CodigoLote, producao.TotalEtiquetas,
             producao.Itens.Select((r, i) => new PratoProduzidoResult(
-                pratos[i].Id, Exibicao(pratos[i].NomeEfetivo()) + (porcoes[i] is { } v ? $" {v.Rotulo}" : ""),
+                pratos[i].Id, LigarPratoAoEstoqueUseCase.Exibicao(pratos[i].NomeEfetivo()) + (porcoes[i] is { } v ? $" {v.Rotulo}" : ""),
                 r.Porcoes, r.SobraG, r.ValidadeEm)).ToList(),
             producao.Avisos ?? []);
-    }
-
-    private async Task VincularAvulsosAsync(ProduzirPratosCommand cmd, IReadOnlyList<CardapioItem> pratos, CancellationToken ct)
-    {
-        var avulsos = pratos.Where(p => !p.ProdutoId.HasValue).Distinct().ToList();
-        if (avulsos.Count == 0) return;
-
-        var categoriaId = await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, cmd.EmpresaId,
-            CategoriaPratos, "Pratos produzidos pela casa (criada pela produção do console)");
-        foreach (var prato in avulsos)
-        {
-            var produto = await cadastrarProduto.ExecuteAsync(new CadastrarProdutoCommand(
-                cmd.EmpresaId, categoriaId, null, Exibicao(prato.NomeEfetivo()), null, null, TipoProduto.Alimento,
-                null, null, true, null, null, prato.PrecoEfetivo(), null, null, null, null, null, null, cmd.UsuarioId));
-            prato.VincularProduto(produto.ProdutoId);
-        }
-        await unitOfWork.CommitAsync();
     }
 
     // M1.4c (#1537): porção sem variação do estoque (prato avulso recém-ligado, porção antiga) ganha a dela
@@ -114,12 +95,5 @@ public sealed class ProduzirPratosUseCase(
         if (pendentes.Count == 0) return;
         foreach (var prato in pendentes) await vincularPorcoes.ExecuteAsync(empresaId, prato);
         await unitOfWork.CommitAsync();
-    }
-
-    // O nome do avulso é gravado em minúsculo (factory do item): o produto nasce com inicial maiúscula.
-    private static string Exibicao(string? nome)
-    {
-        var limpo = (nome ?? "Prato").Trim();
-        return limpo.Length == 0 ? "Prato" : char.ToUpperInvariant(limpo[0]) + limpo[1..];
     }
 }

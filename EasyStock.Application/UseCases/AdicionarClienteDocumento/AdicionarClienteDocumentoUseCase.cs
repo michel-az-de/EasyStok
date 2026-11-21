@@ -33,6 +33,14 @@ public class AdicionarClienteDocumentoUseCase(
             _      => cmd.Valor.Trim()
         };
 
+        // Mesma validação do cadastro (CLI-01, #2563): DV de CPF/CNPJ e nada de documento vazio.
+        if (tipoNorm is "cpf" or "cnpj")
+        {
+            if (!valorNormalizado.Any(char.IsDigit))
+                throw new UseCaseValidationException($"{tipoNorm.ToUpperInvariant()} sem dígitos.");
+            DocumentoValidator.EnsureValido(valorNormalizado, tipoNorm.ToUpperInvariant());
+        }
+
         var agora = DateTime.UtcNow;
         var doc = new ClienteDocumento
         {

@@ -15,9 +15,12 @@ public class SimularPedidoConversaUseCaseTests
 {
     private const string WaId = "5511999998888";
 
+    /// <summary>31/05, 12:00 em Brasília: dois dias antes da janela de 02/06, o que faz do pedido uma encomenda com sinal (#2259).</summary>
+    private static readonly DateTimeOffset Antevespera = new(2026, 5, 31, 15, 0, 0, TimeSpan.Zero);
+
     private sealed class Cenario
     {
-        public CheckoutCoreServiceTests.Cenario Checkout { get; } = new();
+        public CheckoutCoreServiceTests.Cenario Checkout { get; } = new(Antevespera);
         public Cliente Cliente { get; }
         public Conversa Conversa { get; }
         public IConversaRepository ConversaRepo { get; } = Substitute.For<IConversaRepository>();
@@ -55,9 +58,9 @@ public class SimularPedidoConversaUseCaseTests
     }
 
     [Fact]
-    public async Task EncomendaDeOutroDia_SinalEMetadeDoTotalComFrete()
+    public async Task EncomendaComDoisDiasDeAntecedencia_SinalEMetadeDoTotalComFrete()
     {
-        // Véspera, 12:00 em Brasília: 2 x R$ 10,00 + frete da zona R$ 5,00 = R$ 25,00; sinal R$ 12,50.
+        // Antevéspera, 12:00 em Brasília: 2 x R$ 10,00 + frete da zona R$ 5,00 = R$ 25,00; sinal R$ 12,50.
         var c = new Cenario();
 
         var r = await c.UseCase.ExecuteAsync(c.Input());
@@ -83,6 +86,23 @@ public class SimularPedidoConversaUseCaseTests
         par.Total.Should().Be(15m);
         par.Sinal.Should().Be(7.50m);
         par.Restante.Should().Be(7.50m);
+        await c.ConferirSemEfeitoColateralAsync();
+    }
+
+    [Fact]
+    public async Task Vespera_PagaIntegralSemSinal()
+    {
+        // #2259: 01/06, 12:00 em Brasília, para a janela de 02/06. Pedido para o dia seguinte não é encomenda com sinal.
+        var c = new Cenario();
+        c.Checkout.Relogio.Advance(new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero) - c.Checkout.Relogio.GetUtcNow());
+        var useCase = new SimularPedidoConversaUseCase(c.ConversaRepo, ClientesDe(c), c.Checkout.ConfiguracaoAtendimentoRepo, c.Checkout.Servico(), c.Checkout.Relogio);
+
+        var r = await useCase.ExecuteAsync(c.Input());
+
+        r.Total.Should().Be(25m);
+        r.Encomenda.Should().BeFalse();
+        r.Sinal.Should().BeNull();
+        r.Restante.Should().BeNull();
         await c.ConferirSemEfeitoColateralAsync();
     }
 
@@ -117,6 +137,23 @@ public class SimularPedidoConversaUseCaseTests
         r.Total.Should().BeNull();
         r.Sinal.Should().BeNull();
         r.Restante.Should().BeNull();
+        await c.ConferirSemEfeitoColateralAsync();
+    }
+
+    [Fact]
+    public async Task CepForaDaArea_ComFreteCombinado_CalculaTotalESinalComOValorDaEquipe()
+    {
+        // #2219: a equipe combinou R$ 12,50 com o cliente: 2 x R$ 10,00 + R$ 12,50 = R$ 32,50; sinal R$ 16,25.
+        var c = new Cenario(cep: "99999-999");
+
+        var r = await c.UseCase.ExecuteAsync(c.Input() with { FreteCombinado = 12.50m });
+
+        r.FreteACombinar.Should().BeFalse();
+        r.Frete.Should().Be(12.50m);
+        r.Total.Should().Be(32.50m);
+        r.Encomenda.Should().BeTrue();
+        r.Sinal.Should().Be(16.25m);
+        r.Restante.Should().Be(16.25m);
         await c.ConferirSemEfeitoColateralAsync();
     }
 

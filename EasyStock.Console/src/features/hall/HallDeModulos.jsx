@@ -9,28 +9,33 @@ import { CampoTexto } from '../../componentes/Campo'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { chaveDasPreferenciasHall, gravarPreferenciasHall, lerPreferenciasHall } from '../../aplicacao/preferenciasHall'
 import { Botao } from '../../componentes/Botao'
-import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { MenuDaConta } from '../../componentes/MenuDaConta'
+import { rotuloDoSair } from '../../componentes/contaDoMenu'
+import { pedirAjuda } from '../../aplicacao/pedirAjuda'
+import { TrilhoDoConsole } from './TrilhoDoConsole'
 import { Vazio } from '../../componentes/Vazio'
-import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, saudacaoDoHall } from '../../dominio/modulos'
+import { atalhosDiretos, buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, tituloDoHall } from '../../dominio/modulos'
 import {
-  alternarFavoritoDoHall, favoritosDoHall, favoritosPrimeiroNoHall, moverModuloDoHall, moverPainelDoHall,
-  ordenarModulosDoHall, ordenarPaineisDoHall, restaurarOrdemDoHall, FOCOS_DO_HALL,
+  alternarFavoritoDoHall, favoritosDoHall, moverModuloDoHall, moverPainelDoHall,
+  ordenarModulosDoHall, ordenarPaineisDoHall, FOCOS_DO_HALL,
 } from '../../dominio/preferenciasHall'
-import { pendenciaDoModulo } from '../../dominio/pulsoDoHall'
+import {
+  colunasDaGrade, comOrdemPorUso, estadoDoCartao, favoritosPrimeiroPorUso, MODULOS_NO_RODAPE, restaurarOrdemPorUso,
+} from '../../dominio/estadoDoHall'
 import { usePulsoDoHall } from '../../aplicacao/usePulsoDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
-import { IlustracaoDoModulo } from './IlustracaoDoModulo'
-import { alcaDoLink, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
+import { alcaDoLink, transicaoDoArrasto, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
+import { FaixaDeAtalhos } from './FaixaDeAtalhos'
 import { PulsoDoHall } from './PulsoDoHall'
+import { ResumoDoDia } from './ResumoDoDia'
 import { PersonalizarHall } from './PersonalizarHall'
 import css from './hall.module.css'
 
 function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, indice, total, pendencia, aoFavoritar, aoMover }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: modulo.id, disabled: !arrastavel,
-    transition: movimentos ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' } : null,
+    transition: movimentos ? transicaoDoArrasto() : null,
   })
   // #1839 D: fora do modo Organizar o próprio link é a alça; dentro dele, o botão Mover.
   const alcaNoLink = arrastavel && !organizar ? { ref: setActivatorNodeRef, ...alcaDoLink(attributes, listeners) } : { draggable: false }
@@ -43,7 +48,7 @@ function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, ind
     <li ref={setNodeRef} data-modulo={modulo.id}
       className={[css.cartao, !modulo.disponivel && css.emBreve, isDragging && css.arrastando, organizar && css.organizando].filter(Boolean).join(' ')}
       style={{ transform: CSS.Transform.toString(transform), transition: arrastavel ? transition : undefined }}>
-      <IlustracaoDoModulo id={modulo.id} className={css.ilustracaoCartao} />
+      <span className={css.iconeCartao} aria-hidden="true"><IconeDoModulo modulo={modulo} tamanho={24} /></span>
       {organizar && <div className={css.cabecaCartao}>
         <div className={css.controlesCartao}>
           {organizar && modulo.disponivel && <button type="button" className={css.favoritar} aria-pressed={favorito}
@@ -55,10 +60,11 @@ function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, ind
         </div>
       </div>}
       {modulo.disponivel ? <>
-        <a className={css.abrir} href={modulo.href} {...alcaNoLink}>
+        {/* #2258 (C1/P1): com pendência a ser resolvida o cartão leva ao ponto exato; sem ela, ao módulo. */}
+        <a className={css.abrir} href={pendencia?.href ?? modulo.href} {...alcaNoLink}>
           <span className={css.nome}>{modulo.nome}</span>
-          <MarcaIcone nome="proximo" tamanho={20} />
         </a>
+        {/* #2232 (H7): o cartão inteiro é o link, então não leva seta. (H8): todo cartão tem linha de estado. */}
         {pendencia && <span className={css.pendencia} data-atencao={pendencia.atencao || undefined}>{pendencia.texto}</span>}
         {/* #1810: as telas de cada área ficam na busca e no menu do módulo; o cartão só leva à área. */}
       </> : <>
@@ -81,16 +87,29 @@ function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, ind
   )
 }
 
+// #2870: atalho para uma tela (Clientes, Pedidos), com o mesmo desenho do cartão de área e a linha do que ela tem.
+function CartaoAtalho({ atalho }) {
+  return (
+    <li data-atalho={atalho.id} className={css.cartao}>
+      <span className={css.iconeCartao} aria-hidden="true"><IconeDoModulo modulo={atalho.modulo} telaId={atalho.telaId} tamanho={24} /></span>
+      <a className={css.abrir} href={atalho.href} draggable={false}><span className={css.nome}>{atalho.nome}</span></a>
+      <span className={css.pendencia}>{atalho.resumo}</span>
+    </li>
+  )
+}
+
 export function HallDeModulos(props) {
   const chavePreferencia = chaveDasPreferenciasHall(props.sessao)
   return <HallPersonalizado key={chavePreferencia ?? 'visita'} {...props} chavePreferencia={chavePreferencia} />
 }
 
 function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, painel = null, chavePreferencia }) {
-  const { permite, aoSair, notificacoes, conta, acoes } = useAcessoModulos()
+  const { permite, aoSair, notificacoes, busca: buscaDaCasa, conta, acoes } = useAcessoModulos()
   const [busca, setBusca] = useState('')
   const [organizar, setOrganizar] = useState(false)
-  const [preferencia, setPreferencia] = useState(() => lerPreferenciasHall(chavePreferencia))
+  const [preferenciaSalva, setPreferencia] = useState(() => lerPreferenciasHall(chavePreferencia))
+  // #2232 (H10): quem nunca mexeu na ordem vê as áreas na ordem de uso, não na do catálogo.
+  const preferencia = comOrdemPorUso(preferenciaSalva)
   const [anterior, setAnterior] = useState(null)
   const [mensagem, setMensagem] = useState('')
   const [arrastando, setArrastando] = useState(null)
@@ -108,13 +127,21 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   }, [organizar])
   const modulosPermitidos = modulosDoHall({ fonteApi, acoes }).filter((modulo) => permite(modulo.id))
   const todos = ordenarModulosDoHall(modulosPermitidos, preferencia)
-  const modulos = filtrarModulos(todos, busca)
+  // #2232 (H10): Configurações não é área de trabalho do dia; vira link de rodapé e deixa a grade sem órfão.
+  // Se for a única área do perfil, fica na grade. A busca continua achando as telas dela.
+  const noRodape = todos.filter((modulo) => MODULOS_NO_RODAPE.includes(modulo.id) && modulo.disponivel)
+  const daGrade = noRodape.length < todos.length ? todos.filter((modulo) => !noRodape.includes(modulo)) : todos
+  const linksDoRodape = daGrade === todos ? [] : noRodape
+  // Favorito e posição anunciada contam só o que está na grade: o link do rodapé não tem botão de favoritar.
+  const permitidosDaGrade = modulosPermitidos.filter((modulo) => !linksDoRodape.some((link) => link.id === modulo.id))
+  const modulos = filtrarModulos(daGrade, busca)
   const moduloArrastando = modulos.find((modulo) => modulo.id === arrastando)
-  const favoritos = favoritosDoHall(modulosPermitidos, preferencia)
+  // #2870: Clientes e Pedidos entram na grade como cartões fixos, depois das áreas. Não arrastam nem viram favorito.
+  const atalhos = organizar ? [] : atalhosDiretos({ fonteApi, acoes, permite })
+  const favoritos = favoritosDoHall(permitidosDaGrade, preferencia)
   const buscando = Boolean(busca.trim())
   const destinos = buscarDestinosDoConsole(todos, busca)
   const foco = FOCOS_DO_HALL.find((item) => item.id === preferencia.foco)
-  const destaque = foco.ordem.map((id) => modulosPermitidos.find((modulo) => modulo.id === id && modulo.disponivel)).find(Boolean) ?? todos.find((modulo) => modulo.disponivel)
   const idsDoPulso = ordenarPaineisDoHall(preferencia, modulosPermitidos.map((modulo) => modulo.id))
   const podeOrganizar = organizar && !buscando
   const sensores = useSensoresDoHall()
@@ -123,7 +150,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const permitido = (id) => modulosPermitidos.some((modulo) => modulo.id === id)
   const { fontes } = usePulsoDoHall({
     ativo: fonteApi, atendimento: permitido('atendimento'), pedidos: permitido('cozinha') || permitido('entregas'),
-    financeiro: permitido('financeiro'), cardapio: permitido('cardapio'),
+    financeiro: permitido('financeiro'), cardapio: permitido('cardapio'), producao: permitido('producao'),
   })
   const gravar = (proxima, texto, guardarAnterior = true) => {
     if (guardarAnterior && JSON.stringify(proxima) !== JSON.stringify(preferencia)) setAnterior(preferencia)
@@ -146,7 +173,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const mover = (id, destino) => {
     if (buscando || !modulos.some((modulo) => modulo.id === id) || !modulos.some((modulo) => modulo.id === destino) || id === destino) return
     const proxima = moverModuloDoHall(preferencia, id, destino)
-    const ordenados = ordenarModulosDoHall(modulosPermitidos, proxima)
+    const ordenados = ordenarModulosDoHall(permitidosDaGrade, proxima)
     gravar(proxima, `${ordenados.find((modulo) => modulo.id === id).nome} movido para a posição ${ordenados.findIndex((modulo) => modulo.id === id) + 1} de ${ordenados.length}.`)
   }
   const moverPorBotao = (id, direcao) => {
@@ -160,39 +187,48 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   }
   const anuncio = (id) => modulos.find((modulo) => modulo.id === id)?.nome ?? 'Módulo'
   return (
+    <div className={css.raiz}>
+    <aside className={css.lateral}><TrilhoDoConsole onde="hall" fonteApi={fonteApi} rotuloNav="Navegação" aoAbrirAjuda={pedirAjuda} /></aside>
     <div className={[css.hall, !preferencia.movimentos && css.semMovimentos].filter(Boolean).join(' ')}>
       <header className={css.topo}>
-        <Marca />
+        {/* #2232 (H1): uma marca só no canto, a da loja. */}
+        <Marca compacta />
         <div className={css.acoes}>
+          {buscaDaCasa}
           {ajuda}
-          <InterruptorTema />
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
-          {/* #1870: o Sair fica atrás do avatar, como no pé do trilho do Balcão e dos módulos. */}
-          {aoSair && <MenuDaConta lado="abaixo" nome={conta?.nome ?? sessao?.usuario?.nome} detalhe={conta?.casa} aoSair={aoSair}
-            rotuloSair={sessao?.persistente ? 'Sair deste aparelho' : 'Sair'} />}
+          {/* #1870: o Sair fica atrás do avatar, como no pé do trilho do Balcão e dos módulos.
+              #2232 (H2): o tema mora no mesmo menu, como no Balcão, e sai do topo do Início. */}
+          <div className={css.contaNoTopo}>
+            <MenuDaConta lado="abaixo" nome={conta?.nome ?? sessao?.usuario?.nome} detalhe={conta?.casa} aoSair={aoSair} aoAbrirAjuda={pedirAjuda}
+              rotuloSair={rotuloDoSair(sessao?.persistente)} />
+          </div>
         </div>
       </header>
       <main className={css.conteudo}>
         <div className={css.abertura}>
           <div className={css.cabeca}>
-            <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
+            <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{tituloDoHall(agora)}</h1>
+            {/* #2232 (M3): o resumo do dia saiu do menu do Atendimento e mora aqui. */}
+            {fonteApi && <ResumoDoDia fontes={fontes} ids={idsDoPulso} />}
             {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada. Ao trocar de pessoa, use Sair no menu da conta.</p>}
             {modulos.length === 0 && !busca && <output>Seu perfil não tem módulos liberados. Peça à administração da loja para revisar seu acesso.</output>}
           </div>
           <div className={css.busca}>
-            <CampoTexto ref={buscaRef} rotulo="Buscar módulo ou tela" tipo="search"
-              placeholder="Ex.: insumos, caixa ou entregas" value={busca}
-              onChange={(evento) => setBusca(evento.target.value)} />
-            {buscando && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
+            {/* #2232 (H4): a lupa é decorativa; o rótulo do campo continua sendo o nome. */}
+            <div className={css.campoBusca}>
+              <CampoTexto ref={buscaRef} rotulo="Buscar módulo ou tela" tipo="search" className={css.entradaBusca}
+                placeholder="Ex.: insumos, caixa ou entregas" value={busca}
+                onChange={(evento) => setBusca(evento.target.value)} />
+              <MarcaIcone nome="buscar" tamanho={20} className={css.lupa} />
+            </div>
+            {/* #2258 (A10): sem resultado o aviso traz o único botão de limpar. #3012: com resultado, o X do campo limpa. */}
           </div>
         </div>
-        {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos} aoMover={moverPainel} />}
-        {/* #1810: no modo API o destaque repetia um cartão de área; ficam só os números e as áreas. */}
-        {!buscando && destaque && !fonteApi && <section className={css.destaque} aria-labelledby="destaque-hall">
-          <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={40} /></div>
-          <div className={css.textoDestaque}><h2 id="destaque-hall">{destaque.nome}</h2></div>
-          <a className={css.acaoDestaque} href={destaque.href}>Abrir {destaque.nome}<MarcaIcone nome="proximo" tamanho={22} /></a>
-        </section>}
+        {/* #3013: no celular os módulos ficam logo abaixo da busca, com a linha de estado do cartão. */}
+        {!buscando && !organizar && <FaixaDeAtalhos modulos={modulos} estadoDe={(id) => estadoDoCartao(id, fontes)} />}
+        {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos}
+          podeFecharCaixa={acoes?.gerenciarCaixa === true} aoMover={moverPainel} />}
         {/* #1608: o que fazer agora vem antes da lista de módulos. Quem compõe é o App. */}
         {!buscando && painel}
         {!buscando && favoritos.length > 0 && <nav className={css.rotina} aria-label="Favoritos da sua rotina">
@@ -204,7 +240,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
         {!buscando && organizar && <div className={css.organizacao}>
           <div className={css.instrucoes}>
             <h2 className={css.subtitulo}>Organizar áreas</h2>
-            <p>Arraste pelo botão Mover ou use as setas de cada cartão. Favorite as áreas da sua rotina.</p>
+            {/* #2258 (H8): a dica de arrastar mora aqui, no modo de ajuste, e não no rodapé do Início. */}
+            <p>Arraste pelo botão Mover ou use as setas de cada cartão.{fonteApi && ' Os números do painel também arrastam.'} Favorite as áreas da sua rotina.</p>
           </div>
           <div className={css.ferramentas}>
             {anterior && <Botao variante="texto" onClick={() => desfazer(organizarRef)}>Desfazer</Botao>}
@@ -214,12 +251,12 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           </div>
         </div>}
         {podeOrganizar && <div className={css.opcoesOrdem}>
-          <Botao variante="texto" disabled={favoritos.length === 0} onClick={() => gravar(favoritosPrimeiroNoHall(preferencia), 'Favoritos primeiro. As outras áreas seguem a ordem original.')}>Favoritos primeiro</Botao>
-          <Botao variante="texto" onClick={() => gravar(restaurarOrdemDoHall(preferencia), 'Ordem original restaurada. Seus favoritos foram mantidos.')}>Restaurar ordem original</Botao>
+          <Botao variante="texto" disabled={favoritos.length === 0} onClick={() => gravar(favoritosPrimeiroPorUso(preferencia), 'Favoritos primeiro. As outras áreas seguem a ordem original.')}>Favoritos primeiro</Botao>
+          <Botao variante="texto" onClick={() => gravar(restaurarOrdemPorUso(preferencia),'Ordem original restaurada. Seus favoritos foram mantidos.')}>Restaurar ordem original</Botao>
           <span>Teclado: Espaço para pegar, setas para mover, Espaço para soltar ou Esc para cancelar.</span>
         </div>}
         <output className={css.resultado} aria-live="polite">
-          {buscando ? (destinos.length === 1 ? '1 tela encontrada.' : `${destinos.length} telas encontradas.`) : mensagem}
+          {buscando ? (destinos.length === 0 ? '' : destinos.length === 1 ? '1 tela encontrada.' : `${destinos.length} telas encontradas.`) : mensagem}
         </output>
         {buscando ? <section aria-label="Resultados da busca">
           {destinos.length > 0 ? <ul className={css.destinos}>
@@ -230,7 +267,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
                 <MarcaIcone nome="proximo" tamanho={20} />
               </a>
             </li>)}
-          </ul> : <Vazio titulo="Nenhum módulo ou tela encontrado" acao={<Botao onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Ver todos os módulos</Botao>}>
+          </ul> : <Vazio como="output" titulo="Nenhum módulo ou tela encontrado" acao={<Botao onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Ver todos os módulos</Botao>}>
             Tente o nome de uma área ou tela, como insumos, caixa ou entregas.
           </Vazio>}
         </section> : <DndContext sensors={sensores} collisionDetection={colisoesDoHall}
@@ -246,11 +283,12 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             },
           }} onDragEnd={({ active, over }) => { clique.aoTerminar(); setArrastando(null); if (over) mover(active.id, over.id) }}>
           <SortableContext items={modulos.map((modulo) => modulo.id)} strategy={rectSortingStrategy}>
-            <ul className={css.grade} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
+            <ul className={css.grade} data-colunas={colunasDaGrade(modulos.length + atalhos.length)} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
               {modulos.map((modulo, indice) => <CartaoModulo key={modulo.id} modulo={modulo}
                 favorito={preferencia.favoritos.includes(modulo.id)} organizar={podeOrganizar} arrastavel={!buscando} movimentos={preferencia.movimentos}
-                indice={indice} total={modulos.length} pendencia={fonteApi ? pendenciaDoModulo(modulo.id, fontes) : null}
+                indice={indice} total={modulos.length} pendencia={estadoDoCartao(modulo.id, fontes)}
                 aoFavoritar={favoritar} aoMover={moverPorBotao} />)}
+              {atalhos.map((atalho) => <CartaoAtalho key={`atalho-${atalho.id}`} atalho={atalho} />)}
             </ul>
           </SortableContext>
           <DragOverlay dropAnimation={null}>
@@ -266,13 +304,17 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           <Botao ref={ajustarRef} variante="texto" onClick={() => setPersonalizando(true)}><MarcaIcone nome="configuracoes" tamanho={20} />Ajustar tela inicial</Botao>
           {/* #1839 (F1): as automáticas só abriam pelo trilho do Balcão; fora da grade arrastável. */}
           {permite('atendimento') && <Botao variante="texto" onClick={() => { window.location.hash = hashDoModulo('atendimento', 'respostas') }}>
-            <Icone nome="raio" tamanho={20} />Automáticas
+            <Icone nome="raio" tamanho={20} />{NOME_RESPOSTAS_AUTOMATICAS}
           </Botao>}
-          <span className={css.dicaArrasto}>Arraste {fonteApi ? 'os números e os cartões' : 'os cartões'} para mudar a ordem.</span>
+          {/* #2232 (H10): Configurações é link de rodapé. */}
+          {linksDoRodape.map((modulo) => <a key={modulo.id} className={css.linkRodape} href={modulo.href}>
+            <IconeDoModulo modulo={modulo} tamanho={20} />{modulo.nome}
+          </a>)}
         </div>}
       </main>
       {personalizando && <PersonalizarHall preferencia={preferencia} modulos={modulosPermitidos} aoFechar={() => setPersonalizando(false)}
         aoOrganizar={todos.length > 0 ? () => { setPersonalizando(false); setOrganizar(true); setMensagem(''); focoAposOrganizar.current = 'organizar' } : null} aoSalvar={(proxima) => { gravar(proxima, 'Painel personalizado.'); setPersonalizando(false) }} />}
+    </div>
     </div>
   )
 }

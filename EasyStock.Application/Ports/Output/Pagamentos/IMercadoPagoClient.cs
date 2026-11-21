@@ -46,6 +46,9 @@ public interface IMercadoPagoClient
     Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default);
     Task<IReadOnlyList<EstornoMercadoPagoResult>> ListarEstornosAsync(string pagamentoId, CancellationToken ct = default);
 
+    /// <summary>Reconsulta a ordem e localiza pagamentos Pix pelo E2E exato; ids numericos preservam estorno e idempotencia.</summary>
+    Task<IReadOnlyList<PagamentoMercadoPago>> BuscarPagamentosPixDaOrdemAsync(string ordemId, CancellationToken ct = default);
+
     /// <summary>
     /// Encerra a validade de uma preferência (<c>PUT checkout/preferences/{id}</c> com
     /// <c>expiration_date_to</c>, S32): usado na troca de forma de pagamento para o link antigo parar de aceitar.

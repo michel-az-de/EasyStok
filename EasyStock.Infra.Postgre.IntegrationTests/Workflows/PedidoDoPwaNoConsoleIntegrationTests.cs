@@ -385,6 +385,13 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
         var vendidos = await leitura.Set<ItemVenda>().IgnoreQueryFilters().CountAsync(i => i.ProdutoId == produtoId);
         vendidos.Should().Be(produtoVinculado ? 1 : 0);
         (await Saldo(s)).Should().Be(produtoVinculado ? 8m : 10m);
+        if (produtoVinculado)
+        {
+            // #2083: a Venda do pedido nascido no aparelho continua saindo dos itens do aparelho.
+            var vendido = await leitura.Set<ItemVenda>().IgnoreQueryFilters().SingleAsync(i => i.ProdutoId == produtoId);
+            vendido.Quantidade.Value.Should().Be(2m);
+            vendido.PrecoTotal.Valor.Should().Be(60m);
+        }
     }
 
     [SkippableTheory]
@@ -453,6 +460,102 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
             });
         }
     }
+    // #950: pedido misto entregue e recebido ontem (lasanha ligada ao ERP, torta avulsa) não vira Venda. Hoje a torta ganha
+    // vínculo e o aparelho reenvia "entregue" sem novo pagamento: a Venda nasce e passa a contar no caixa no lugar do
+    // recebimento. Ela levava o instante do reenvio, então o dinheiro de ontem sumia de ontem e aparecia hoje.
+    [SkippableFact]
+    public async Task PedidoMistoRecebidoOntem_ConsolidadoHoje_RecebimentoFicaNoDiaOriginal()
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        var torta = Guid.NewGuid();
+        await using (var seed = fixture.CreateDbContext())
+        {
+            var agora = DateTime.UtcNow;
+            seed.Set<Produto>().Add(new Produto
+            {
+                Id = torta, EmpresaId = s.EmpresaId, CategoriaId = s.CategoriaId, Nome = "Torta", Status = StatusProduto.Ativo,
+                CriadoEm = agora, AlteradoEm = agora
+            });
+            seed.Set<Product>().Add(new Product { Id = "p-torta", Name = "Torta", Category = "doce", EmpresaId = s.EmpresaId });
+            await seed.SaveChangesAsync();
+        }
+        List<OrderItemDto> itens =
+        [
+            new(NoAparelho(Lasanha), Lasanha, null, "un", 1, 30m),
+            new("p-torta", "Torta", null, "un", 1, 20m),
+        ];
+        await AparelhoManda(provider, s, "entregue", itens, metodo: "dinheiro");
+
+        // O recebimento foi gravado ontem (o vínculo cria o pedido do ERP com a hora do servidor, então o estado de
+        // ontem é posto direto): R$ 50 pagos, sem Venda.
+        var ontem = DateTime.UtcNow.AddDays(-1);
+        await using (var vinculo = fixture.CreateDbContext())
+        {
+            vinculo.SetMobileTenantContext(s.EmpresaId);
+            var doPedido = await vinculo.Set<PedidoPagamento>().IgnoreQueryFilters().SingleAsync();
+            doPedido.Valor.Should().Be(50m);
+            doPedido.PagoEm = ontem;
+            (await vinculo.Set<Venda>().IgnoreQueryFilters().AnyAsync()).Should().BeFalse("a torta ainda não tem vínculo");
+            var produtoDoAparelho = await vinculo.Set<Product>().IgnoreQueryFilters().SingleAsync(p => p.Id == "p-torta");
+            produtoDoAparelho.ErpProductId = torta;
+            await vinculo.SaveChangesAsync();
+        }
+        _relogioDoAparelho = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        await AparelhoManda(provider, s, "entregue", itens, metodo: "dinheiro");
+
+        var pedidoId = await PedidoDoErp(s);
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var pedido = await leitura.Set<Pedido>().Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId);
+        var pagoEm = pedido.Pagamentos.Single().PagoEm;
+        pedido.VendaId.Should().NotBeNull("com os dois itens ligados o reenvio consolida a Venda");
+        var diaDoRecebimento = HorarioBrasil.DataOperacional(pagoEm);
+        diaDoRecebimento.Should().Be(HorarioBrasil.DataOperacional(ontem));
+
+        await Escopo(provider, s.EmpresaId, async sp =>
+        {
+            var caixa = sp.GetRequiredService<ObterCaixaDiaUseCase>();
+            var doDia = await caixa.ExecuteAsync(new ObterCaixaDiaQuery(s.EmpresaId, diaDoRecebimento));
+            var deHoje = await caixa.ExecuteAsync(new ObterCaixaDiaQuery(s.EmpresaId, HorarioBrasil.DataOperacional(DateTime.UtcNow)));
+            using (new AssertionScope())
+            {
+                (doDia.TotalVendas + doDia.TotalPagamentosPedidos).Should().Be(50m, "o recebimento foi ontem");
+                (deHoje.TotalVendas + deHoje.TotalPagamentosPedidos).Should().Be(0m, "hoje não entrou dinheiro");
+            }
+        });
+    }
+
+    // #1630 (item 1): a Venda que o sync do PWA cria leva a forma do pedido, e o caixa do dia põe na gaveta só o
+    // dinheiro. Antes a Venda nascia sem forma e a gaveta esperada ficava sem os pedidos pagos em dinheiro.
+    [SkippableTheory]
+    [InlineData("dinheiro", 60)]
+    [InlineData("pix", 0)]
+    public async Task PedidoDoPwaEntreguePagoNaForma_VendaLevaAForma_EAGavetaDoDiaSoContaDinheiro(string metodo, int naGaveta)
+    {
+        var (s, provider) = await ComecarAsync();
+        await using var _ = provider;
+        await AparelhoManda(provider, s, "pronto", metodo: metodo);
+        await AparelhoManda(provider, s, "entregue", metodo: metodo);
+
+        var pedidoId = await PedidoDoErp(s);
+        await using var leitura = fixture.CreateDbContext();
+        leitura.SetMobileTenantContext(s.EmpresaId);
+        var pedido = await leitura.Set<Pedido>().Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId);
+        var venda = await leitura.Set<Venda>().SingleAsync();
+        pedido.VendaId.Should().Be(venda.Id);
+        venda.FormaPagamentoPrincipal.Should().Be(metodo);
+        var dia = HorarioBrasil.DataOperacional(pedido.Pagamentos.Single().PagoEm);
+
+        await Escopo(provider, s.EmpresaId, async sp =>
+        {
+            var caixa = await sp.GetRequiredService<ObterCaixaDiaUseCase>().ExecuteAsync(new ObterCaixaDiaQuery(s.EmpresaId, dia));
+            caixa.TotalVendas.Should().Be(60m);
+            caixa.TotalPagamentosPedidos.Should().Be(0m, "com a Venda o recebimento do pedido não conta de novo");
+            GavetaCaixa.DinheiroNaGaveta(caixa).Should().Be(naGaveta);
+        });
+    }
+
     private sealed record Semente(Guid EmpresaId, Guid CategoriaId, Dictionary<string, Guid> Produtos);
 
     private static string NoAparelho(string prato) => $"p-{prato.ToLowerInvariant()}";
@@ -501,14 +604,15 @@ public class PedidoDoPwaNoConsoleIntegrationTests(PostgreSqlDatabaseFixture fixt
     /// O envio do aparelho como no <c>SyncController</c>: a mutation num SaveChanges só, e depois o
     /// vínculo. Sem <paramref name="itens"/>, o pedido tem 2 lasanhas.
     /// </summary>
-    private Task AparelhoManda(ServiceProvider provider, Semente s, string status, List<OrderItemDto>? itens = null, bool comVinculo = true) =>
+    private Task AparelhoManda(ServiceProvider provider, Semente s, string status, List<OrderItemDto>? itens = null, bool comVinculo = true,
+        string? metodo = null) =>
         Escopo(provider, s.EmpresaId, async sp =>
         {
             var ts = ++_relogioDoAparelho;
             itens ??= [new OrderItemDto(NoAparelho(Lasanha), Lasanha, null, "un", 2, 30m)];
             var pedido = new OrderDto(
                 PedidoNoAparelho, null, new ClientSnapshotDto("Ana", null), itens,
-                null, itens.Sum(i => i.Qty * i.UnitPrice), status, ts, ts);
+                null, itens.Sum(i => i.Qty * i.UnitPrice), status, ts, ts, Metodo: metodo);
             var mutation = new MutationDto($"m-{ts}-{Guid.NewGuid():N}", "dev-a", "order.upsert", JsonSerializer.SerializeToElement(pedido, Json), ts);
 
             await sp.GetRequiredService<SyncMutationDispatcher>().ApplyMutationAsync(mutation, "dev-a", "Thati", s.EmpresaId, null);

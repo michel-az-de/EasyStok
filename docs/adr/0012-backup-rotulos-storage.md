@@ -1,6 +1,8 @@
 # ADR 0012 — Backup e storage de rótulos publicados
 
-**Status:** Accepted (2026-05-16)
+**Status:** Substituída pela [ADR-0068](0068-backup-restic-drive-compartilhado.md) (2026-11-20). Os workflows `backup-rotulos.yml` e `restore-test-rotulos.yml` nunca rodaram e foram removidos na #2977; a retenção de 5 anos dos rótulos vive na tag `rotulos` do restic.
+
+_Status original:_ Accepted (2026-05-16)
 **Contexto do plano:** P-02 (Módulo Incremental de Rotulagem Nutricional) — [docs/plan/p-02-rotulagem-nutricional.md](../plan/p-02-rotulagem-nutricional.md). Aborda os "3 furos reais" levantados em revisão: storage de PDFs/PNGs/snapshots, backup com retenção legal, processo de restore-test.
 
 ## Decisão
@@ -21,7 +23,7 @@
 2. **Backup não-testado = backup inexistente**: dump diário que ninguém testa pode estar corrompido por semanas sem que se saiba. Restore-test mensal automatizado obriga validação.
 
 **Por que Fly volume no MVP, não R2 desde já?**
-- Casa da Babá (cliente principal hoje): 50 lotes/mês × 5 anos = 3000 PDFs. PDF médio 80KB + PNG 200KB + snapshot 8KB = ~300KB/rótulo. Total ≈ 900MB. Fly volume mínimo 1GB (US$ 0,15/GB/mês ≈ R$ 0,75/mês). Latência local de leitura.
+- Casa da Baba (cliente principal hoje): 50 lotes/mês × 5 anos = 3000 PDFs. PDF médio 80KB + PNG 200KB + snapshot 8KB = ~300KB/rótulo. Total ≈ 900MB. Fly volume mínimo 1GB (US$ 0,15/GB/mês ≈ R$ 0,75/mês). Latência local de leitura.
 - R2 entra quando volume passar 50GB (≈ 150k rótulos publicados) — sinal de sucesso de mercado, momento natural para migrar.
 - Migração futura sem dor: storage é abstraído por `IRotuloBlobStorage` (interface no Application; impl Fly volume no MVP, impl R2 quando precisar).
 
@@ -46,7 +48,7 @@
   - Conta Resend criada + domínio verificado (ação manual do Felipe).
   - Interface `IRotuloBlobStorage` + impl `FlyVolumeRotuloBlobStorage` em `EasyStock.Infra.*` (entregue em F7 junto com geração de rótulo).
 
-## Custos estimados (Casa da Babá no ano 1)
+## Custos estimados (Casa da Baba no ano 1)
 
 | Item | Custo mensal |
 |---|---|

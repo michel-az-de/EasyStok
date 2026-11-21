@@ -5,6 +5,7 @@ using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Exceptions.Storefront;
+using MensagemConversa = EasyStock.Domain.Entities.Atendimento.Mensagem;
 
 using EasyStock.Domain.Entities.Pagamentos;
 
@@ -14,9 +15,12 @@ namespace EasyStock.Application.UseCases.Atendimento.Comanda;
 /// <param name="EnviarAoCliente">False cria a cobrança para copiar, sem mensagem ou falsa falha de envio (#1847).</param>
 /// <param name="Forma"><c>online</c> (padrão, link do Mercado Pago) ou <c>na_entrega</c>.</param>
 /// <param name="UsuarioId">Quem gerou pelo console (#1991-7): o resumo ao cliente sai em nome dele, não como automática.</param>
+/// <param name="FreteCombinado">#2219: frete em reais combinado pela equipe com o cliente (CEP fora da área). Nulo usa a cotação.</param>
 public sealed record GerarPedidoConversaInput(
     Guid EmpresaId,
     Guid ConversaId,
+    Guid ClienteId,
+    long VinculoRevisao,
     IReadOnlyList<ItemPedidoCheckout> Itens,
     Guid JanelaId,
     DateOnly DataEntrega,
@@ -25,21 +29,25 @@ public sealed record GerarPedidoConversaInput(
     string? Observacoes = null,
     string? UsuarioNome = null,
     bool EnviarAoCliente = true,
-    Guid? UsuarioId = null);
+    Guid? UsuarioId = null,
+    decimal? FreteCombinado = null);
 
 /// <param name="Cobranca">Cobrança da forma escolhida. Mercado Pago fora: <see cref="MercadoPagoIndisponivelException"/> com o pedido já desfeito (#1301).</param>
 /// <param name="EnviadoAoCliente">O resumo saiu pelo canal da conversa (falso fora da janela ou com o canal fora).</param>
+/// <param name="ResumoNaFila">#2871: fora da janela do WhatsApp o resumo foi para a fila de avisos e sai pelo modelo aprovado.</param>
 public sealed record PedidoConversaGeradoResult(
     Guid PedidoId,
     decimal Total,
     string Forma,
     CobrancaPedidoResult? Cobranca,
-    bool EnviadoAoCliente);
+    bool EnviadoAoCliente,
+    bool ResumoNaFila = false);
 
 /// <summary>
 /// F03 do console: a operadora fecha a comanda da conversa. O pedido nasce pelo caminho da conversa
 /// (S10, <see cref="CriarPedidoAtendimentoUseCase"/>), a cobrança pela S11 na forma escolhida e o resumo,
-/// com o link quando houver, sai ao cliente pela porta do canal (<see cref="AvisoCobrancaConversa"/>).
+/// com o link quando houver, sai ao cliente pela porta do canal (<see cref="AvisoCobrancaConversa"/>). Fora da janela
+/// do WhatsApp, pela fila de avisos (<see cref="ResumoPedidoForaDaJanela"/>, #2871).
 ///
 /// <para>
 /// Um pedido por vez: com pedido em andamento ainda não finalizado na conversa, recusa (clique duplo
@@ -53,14 +61,19 @@ public sealed class GerarPedidoConversaUseCase(
     GerarCobrancaPedidoUseCase gerarCobranca,
     TrocarFormaPagamentoPedidoUseCase trocarForma,
     AvisoCobrancaConversa aviso,
-    TimeProvider relogio)
+    TimeProvider relogio,
+    ResumoPedidoForaDaJanela? foraDaJanela = null)
 {
     public const string CabecalhoResumo = "Resumo do seu pedido:";
+    public const string Agradecimento = "Obrigado pelo pedido!";
+    private const string Separador = "\n\n";
 
     public async Task<PedidoConversaGeradoResult> ExecuteAsync(GerarPedidoConversaInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
         UseCaseGuards.EnsureEmpresaId(input.EmpresaId);
+        UseCaseGuards.EnsureNotEmpty(input.ClienteId, "ClienteId");
+        if (input.VinculoRevisao < 0) throw new UseCaseValidationException("Informe a revisão da pessoa conferida na comanda.");
         var forma = CobrancaDoPedidoReservado.NormalizarForma(input.Forma);
         if (input.Itens is null || input.Itens.Count == 0)
             throw new UseCaseValidationException("A comanda está vazia.");
@@ -70,24 +83,29 @@ public sealed class GerarPedidoConversaUseCase(
         if (!conversa.EstaAberta)
             throw new RegraDeDominioVioladaException("A conversa está encerrada.");
 
-        if (conversa.ClienteId is not { } clienteId)
-            throw new RegraDeDominioVioladaException("Cadastre o cliente desta conversa antes de gerar o pedido.");
-        var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, clienteId)
+        if (conversa.VinculoEmRevisao || conversa.VinculoRevisao != input.VinculoRevisao
+            || conversa.ClienteId != input.ClienteId)
+            throw new ContextoPedidoAtendimentoAlteradoException("A identidade mudou. Confira a pessoa e a comanda antes de gerar o pedido.");
+        var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.ClienteId)
             ?? throw new RegraDeDominioVioladaException("Cadastre o cliente desta conversa antes de gerar o pedido.");
         var enderecoId = input.EnderecoId ?? CriarPedidoAtendimentoUseCase.EnderecoPadrao(cliente)
             ?? throw new RegraDeDominioVioladaException("Cadastre o endereço de entrega do cliente antes de gerar o pedido.");
 
         var reservado = await criarPedido.ExecuteAsync(new CriarPedidoAtendimentoInput(
-            input.EmpresaId, conversa.Id, clienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId,
-            input.Observacoes), ct);
+            input.EmpresaId, conversa.Id, input.ClienteId, input.Itens, input.JanelaId, input.DataEntrega, enderecoId,
+            input.Observacoes, input.FreteCombinado, VinculoRevisaoEsperada: input.VinculoRevisao), ct);
 
         var cobranca = await CobrancaDoPedidoReservado.CobrarAsync(gerarCobranca, trocarForma, reservado, conversa.Id, forma,
             QuemCobra.Atendente, input.UsuarioNome ?? "console", ct);
         var texto = TextoAoCliente(reservado, input.DataEntrega, forma, cobranca);
-        var enviado = input.EnviarAoCliente && await aviso.EnviarAsync(input.EmpresaId, conversa.Id, texto,
-            relogio.GetUtcNow().UtcDateTime, ct, input.UsuarioId);
+        var agora = relogio.GetUtcNow().UtcDateTime;
+        var naFila = input.EnviarAoCliente && foraDaJanela is not null && ResumoPedidoForaDaJanela.Atende(conversa, agora)
+            && await foraDaJanela.EnfileirarAsync(input.EmpresaId, reservado.Pedido.Id, texto, ct);
+        // Sem a fila (sem celular, WhatsApp revogado), o envio direto registra a falha na conversa, como antes.
+        var enviado = input.EnviarAoCliente && !naFila
+            && await aviso.EnviarAsync(input.EmpresaId, conversa.Id, texto, agora, ct, input.UsuarioId);
 
-        return new PedidoConversaGeradoResult(reservado.Pedido.Id, reservado.Total, forma, cobranca, enviado);
+        return new PedidoConversaGeradoResult(reservado.Pedido.Id, reservado.Total, forma, cobranca, enviado, naFila);
     }
 
     private static string TextoAoCliente(PedidoReservado reservado, DateOnly dataEntrega, string forma, CobrancaPedidoResult? cobranca)
@@ -98,12 +116,21 @@ public sealed class GerarPedidoConversaUseCase(
         var resumo = ResumoPedidoConversa.Texto(reservado, dataEntrega,
             naEntrega ? TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega : forma, CabecalhoResumo);
         if (naEntrega && PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
-            return ResumoPedidoConversa.Limitar($"{resumo}\n\nCombine com a equipe como pagar o sinal.");
+            return ComAgradecimento($"{resumo}\n\nCombine com a equipe como pagar o sinal.");
         if ((naEntrega || forma == TrocarFormaPagamentoPedidoUseCase.FormaNaEntrega)
-            && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm)) return resumo;
+            && !PlanoPagamentoEncomenda.TemSinal(reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm))
+            return ComAgradecimento(resumo);
         var pagamento = cobranca?.LinkPagamento is { } link
             ? $"Pague por este link, válido por 30 minutos: {link}"
             : "O link de pagamento chega em instantes.";
-        return ResumoPedidoConversa.Limitar($"{resumo}\n\n{pagamento}");
+        return ComAgradecimento($"{resumo}\n\n{pagamento}");
+    }
+
+    /// <summary>#2871: o resumo termina agradecendo, também quando o texto passa do limite da mensagem.</summary>
+    private static string ComAgradecimento(string texto)
+    {
+        var fim = Separador + Agradecimento;
+        var corpo = texto.Length + fim.Length > MensagemConversa.TextoTamanhoMaximo ? texto[..(MensagemConversa.TextoTamanhoMaximo - fim.Length)] : texto;
+        return corpo + fim;
     }
 }

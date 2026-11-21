@@ -721,5 +721,20 @@ await confere('7. leitura das mensagens que falhou não marca o que a tela não 
   assert.equal(s.de('/marcar-lida').length, 1)
 })
 
+await confere('8. #2285: depois de uma queda do SSE, o ready relê a conversa aberta e varre a inbox; o primeiro ready não', async () => {
+  const { criarRastroDaConexao } = await plano()
+  const rastro = criarRastroDaConexao()
+  assert.equal(rastro.aoReady(), false, 'o primeiro ready não perdeu nada')
+  rastro.aoCair()
+  assert.equal(rastro.aoReady(), true, 'ready depois da queda: o que passou no intervalo não veio pelo evento')
+  assert.equal(rastro.aoReady(), false, 'a releitura é uma só por queda')
+  rastro.aoCair(); rastro.aoCair()
+  assert.equal(rastro.aoReady(), true, 'queda repetida também vale uma releitura')
+  const hook = readFileSync(new URL('../src/aplicacao/useSincronizacaoApi.js', import.meta.url), 'utf8')
+  assert.match(hook, /criarRastroDaConexao\(\)/)
+  assert.match(hook, /rastro\.aoCair\(\)/)
+  assert.match(hook, /rastro\.aoReady\(\)[\s\S]*sincronizar\.atualizarConversa\(selecionadaRef\.current\)[\s\S]*ciclos = 0[\s\S]*ciclo\(\)/)
+})
+
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)
 if (falhas.length) process.exit(1)

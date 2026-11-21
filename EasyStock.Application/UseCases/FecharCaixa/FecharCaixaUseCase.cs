@@ -34,16 +34,63 @@ public class FecharCaixaUseCase(
     ICaixaRepository repo,
     IUnitOfWork uow,
     ILogger<FecharCaixaUseCase> logger,
-    ObterCaixaDiaUseCase? caixaDia = null)
+    ObterCaixaDiaUseCase? caixaDia = null,
+    INotificacaoRepository? avisos = null)
 {
     public async Task<FechamentoCaixaResult> ExecuteAsync(FecharCaixaCommand cmd)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
         if (cmd.ValorContado is { } contado && (contado < 0 || contado != decimal.Round(contado, 2)))
             throw new UseCaseValidationException("O valor contado deve ser positivo e ter até duas casas decimais.");
+        if (cmd.ValorContado is { } contadoMax) ValidacaoCaixa.ExigirValorMonetario(contadoMax, "O valor contado");
 
         var hoje = HorarioBrasil.Hoje();   // dia operacional em Brasilia (alinha com o card; BUG-09)
 
+        // #2613: o retrato do dia sai atrás da trava do caixa da loja, a mesma dos lançamentos manuais (#1547). Sem
+        // ela, uma entrada que passou pela guarda de dia fechado antes do retrato era gravada depois dele: o dinheiro
+        // ficava num dia fechado e fora do fechamento.
+        var gravacao = new Gravacao();
+        FechamentoCaixaResult resultado;
+        try
+        {
+            resultado = await uow.ExecuteInTransactionSemRetryAsync(async ct =>
+            {
+                await repo.TravarSaidasAsync(cmd.EmpresaId, cmd.LojaId, ct);
+                return await FecharSobTravaAsync(cmd, hoje, gravacao);
+            });
+        }
+        catch (Exception ex) when (gravacao.Dia is { } dia)
+        {
+            // Race: 2 fechamentos concorrentes do mesmo dia/loja. O índice único coalescido
+            // (migration AddUniqueFechamentoCaixaPorDia) rejeita o perdedor; re-query confirma o
+            // vencedor. Se não houver vencedor, é erro real -> propaga. (Espelha EmitirNfceUseCase.)
+            var vencedor = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, dia, cmd.LojaId);
+            if (vencedor == null) throw;
+            logger.LogInformation(ex,
+                "Fechamento {Dia} race-resolved: outra TX venceu o indice unico (empresa {Empresa}).",
+                dia, cmd.EmpresaId);
+            return Map(vencedor);
+        }
+
+        if (gravacao.Novo is { } novo)
+        {
+            logger.LogInformation("Caixa {Data} fechado (saldo final={Saldo}, vendas={Vendas}).",
+                novo.Data, novo.SaldoFinal, novo.TotalVendas);
+            await ResolverAvisosDoSinoAsync(cmd.EmpresaId);
+        }
+        return resultado;
+    }
+
+    /// <summary>Dia do retrato em gravação e o fechamento gravado; o tratamento da corrida e os avisos pós-commit
+    /// leem daqui.</summary>
+    private sealed class Gravacao
+    {
+        public DateOnly? Dia { get; set; }
+        public FechamentoCaixa? Novo { get; set; }
+    }
+
+    private async Task<FechamentoCaixaResult> FecharSobTravaAsync(FecharCaixaCommand cmd, DateOnly hoje, Gravacao gravacao)
+    {
         // Fonte de verdade: a sessão aberta (última abertura sem fechamento posterior), que
         // pode ser de um dia anterior. É o mesmo sinal que a tela usa (ObterCaixaDia, #596).
         var pendente = await repo.GetAberturaPendenteAsync(cmd.EmpresaId, cmd.LojaId);
@@ -86,6 +133,7 @@ public class FecharCaixaUseCase(
         // início de hoje) não entram neste fechamento e não pertencem ao caixa de hoje → ficariam
         // órfãos. Não descartar em silêncio: detecta e anexa aviso persistido + log (ADR-0033).
         var observacoes = cmd.Observacoes;
+        var lancamentosForaDoFechamento = false;
         if (dia < hoje)
         {
             var iniInter = HorarioBrasil.JanelaDiaUtc(dia).FimUtc;   // = 00:00 do dia seguinte à abertura
@@ -97,10 +145,12 @@ public class FecharCaixaUseCase(
                 var pagInter = await repo.GetTotalPagamentosPedidosNoIntervaloAsync(cmd.EmpresaId, iniInter, fimInter, cmd.LojaId);
                 if (movsInter.Any() || vendasInter != 0m || pagInter != 0m)
                 {
-                    var aviso = $"Atencao: ha lancamentos entre {dia.AddDays(1):dd/MM/yyyy} e " +
-                                $"{hoje.AddDays(-1):dd/MM/yyyy} sob esta sessao que NAO foram incluidos " +
-                                "neste fechamento (revisar/reconciliar manualmente).";
+                    // #2256: o aviso aparece na tela do fechamento; português correto e sem caixa alta.
+                    var aviso = $"Atenção: há lançamentos entre {dia.AddDays(1):dd/MM/yyyy} e " +
+                                $"{hoje.AddDays(-1):dd/MM/yyyy} nesta sessão que não entraram neste fechamento. " +
+                                "Revise e reconcilie manualmente.";
                     observacoes = string.IsNullOrWhiteSpace(observacoes) ? aviso : $"{observacoes}\n{aviso}";
+                    lancamentosForaDoFechamento = true;
                     logger.LogWarning(
                         "Fechamento {Dia} (empresa {Empresa}, loja {Loja}): lancamentos em dias intermediarios nao cobertos.",
                         dia, cmd.EmpresaId, cmd.LojaId);
@@ -129,28 +179,27 @@ public class FecharCaixaUseCase(
         mov.RegistradoPorNome = cmd.FechadoPorNome;
         mov.Origem = "web";
 
+        gravacao.Dia = dia;
+        await repo.AddFechamentoAsync(fechamento);
+        await repo.AddMovimentoAsync(mov);
+        await uow.CommitAsync();
+        gravacao.Novo = fechamento;
+        return Map(fechamento) with { LancamentosForaDoFechamento = lancamentosForaDoFechamento };
+    }
+
+    // #2258 (F1): o aviso "caixa aberto desde ..." do sino sai de circulação quando o caixa fecha. O fechamento já está
+    // gravado; se resolver o aviso falhar, o job diário varre de novo, então nunca desfaz nem falha o fechamento.
+    private async Task ResolverAvisosDoSinoAsync(Guid empresaId)
+    {
+        if (avisos is null) return;
         try
         {
-            await repo.AddFechamentoAsync(fechamento);
-            await repo.AddMovimentoAsync(mov);
-            await uow.CommitAsync();
+            await avisos.ResolverAvisosDeCaixaFechadoAsync(empresaId);
         }
         catch (Exception ex)
         {
-            // Race: 2 fechamentos concorrentes do mesmo dia/loja. O índice único coalescido
-            // (migration AddUniqueFechamentoCaixaPorDia) rejeita o perdedor; re-query confirma o
-            // vencedor. Se não houver vencedor, é erro real -> propaga. (Espelha EmitirNfceUseCase.)
-            var vencedor = await repo.GetFechamentoDoDiaAsync(cmd.EmpresaId, dia, cmd.LojaId);
-            if (vencedor == null) throw;
-            logger.LogInformation(ex,
-                "Fechamento {Dia} race-resolved: outra TX venceu o indice unico (empresa {Empresa}).",
-                dia, cmd.EmpresaId);
-            return Map(vencedor);
+            logger.LogWarning(ex, "Caixa fechado, mas os avisos do sino não foram resolvidos (empresa {Empresa}).", empresaId);
         }
-
-        logger.LogInformation("Caixa {Data} fechado (saldo final={Saldo}, vendas={Vendas}).",
-            dia, fechamento.SaldoFinal, totalVendas);
-        return Map(fechamento);
     }
 
     /// <summary>

@@ -27,6 +27,9 @@ try {
   for (const caso of casos) {
     const context = await browser.newContext({ viewport: caso.celular ? { width: 390, height: 844 } : { width: 1440, height: 960 }, reducedMotion: 'reduce' })
     await context.grantPermissions(['local-network-access'], { origin: origem })
+    // #2437: o Chromium sem cabeça nega notificações e a faixa "avisos do navegador bloqueados" (#2393) cobre o rodapé e
+    // intercepta o clique. A prova é do e-mail: simula a permissão concedida, só nela.
+    await context.addInitScript(() => Object.defineProperty(Notification, 'permission', { get: () => 'granted' }))
     await context.addInitScript(({ empresaId, nivel }) => sessionStorage.setItem('easystok.sessao', JSON.stringify({
       token: 'teste-ui-controlado', expiraEm: Date.now() + 3600000, empresa: { id: empresaId, nome: 'Empresa de teste' },
       usuario: { id: '22222222-2222-4222-8222-222222222222', nome: 'Felipe de teste', email: 'felipe@exemplo.invalid', nivel },
@@ -60,6 +63,9 @@ try {
     })
     const page = await context.newPage()
     page.setDefaultTimeout(10000)
+    // #2814: abrir a página depende do Vite e da máquina, não do que a prova confere. Com a suíte em paralelo e
+    // a máquina carregada, o goto passava de 10 s. Só a navegação ganha folga; as esperas da tela seguem em 10 s.
+    page.setDefaultNavigationTimeout(60000)
     const erros = []
     page.on('pageerror', erro => erros.push(erro.message))
     try {

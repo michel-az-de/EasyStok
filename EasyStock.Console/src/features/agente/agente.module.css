@@ -32,8 +32,8 @@
 }
 
 .sugestao {
-  margin: var(--e-3) 0 0; padding: 0 0 0 var(--e-2);
-  border-left: var(--trilho) solid var(--marca);
+  margin: var(--e-3) 0 0; padding: var(--e-2);
+  background: var(--marca-claro); border-radius: var(--r-1);
   font-size: var(--t-corpo); color: var(--tinta);
 }
 .sugestao p { margin: 0; }
@@ -52,15 +52,15 @@
   display: flex; align-items: flex-start; gap: var(--e-2);
   margin: var(--e-2) 0 0; padding: var(--e-2) var(--e-3);
   font-size: var(--t-apoio); color: var(--erro);
-  border-left: var(--trilho) solid var(--erro); background: var(--elevado);
+  border: var(--b-1) solid color-mix(in srgb, var(--erro) 30%, transparent); background: var(--elevado);
   border-radius: var(--r-1);
 }
 
 /* Resposta que o automático não pode dar sozinho: restrição alimentar,
    item sem saldo, reclamação. Mesmo bloco, cor de aviso, sem "Enviar assim". */
 .sugestaoDona {
-  margin: var(--e-3) 0 0; padding: 0 0 0 var(--e-2);
-  border-left: var(--trilho) solid var(--alerta);
+  margin: var(--e-3) 0 0; padding: var(--e-2);
+  background: var(--alerta-pastel); border-radius: var(--r-1);
   font-size: var(--t-corpo); color: var(--tinta);
 }
 .sugestaoDona p { margin: 0; }

@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore.Metadata;
+
 namespace EasyStock.Infra.Postgre.Data.Configurations
 {
     public class LoteConfiguration : IEntityTypeConfiguration<Lote>
@@ -15,6 +17,12 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.MobileBatchId).HasMaxLength(64);
 
             b.HasIndex(x => new { x.EmpresaId, x.Codigo }).IsUnique();
+
+            // #2199 (D4): o banco gera no INSERT e a aplicação nunca regrava (nem num Update de entidade destacada).
+            b.Property(x => x.NumeroCurto).HasMaxLength(10).ValueGeneratedOnAdd()
+                .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+            // Único por loja. LojaId nulo fica fora (NULLS DISTINCT): a loja apagada vira SET NULL sem colidir.
+            b.HasIndex(x => new { x.EmpresaId, x.LojaId, x.NumeroCurto }).IsUnique();
             // Suporta GetProducaoPorOperadorAsync (filtra Status + DataProducao por período).
             b.HasIndex(x => new { x.EmpresaId, x.Status, x.DataProducao });
 
@@ -38,6 +46,7 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.Nome).IsRequired().HasMaxLength(150);
             b.Property(x => x.Emoji).HasMaxLength(16);
             b.Property(x => x.Unidade).HasMaxLength(32);
+            b.Property(x => x.QuantidadeMedida).HasColumnType("numeric(14,3)"); // #2373
             b.Property(x => x.FotoUrl).HasColumnType("text");
 
             b.HasOne(x => x.Produto).WithMany().HasForeignKey(x => x.ProdutoId).OnDelete(DeleteBehavior.SetNull);
@@ -57,7 +66,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             b.Property(x => x.LayoutSnapshotJson).HasColumnType("text");
             b.Property(x => x.LayoutSnapshotMeta).HasColumnType("text");
 
-            b.HasIndex(x => x.Codigo).IsUnique();
+            // #2506: o código repete entre empresas (LOT-aammdd-001-0001); único só dentro do lote.
+            b.HasIndex(x => new { x.LoteId, x.Codigo }).IsUnique();
             b.HasIndex(x => new { x.LoteId, x.Status });
 
             b.HasOne(x => x.LoteItem).WithMany().HasForeignKey(x => x.LoteItemId).OnDelete(DeleteBehavior.Cascade);

@@ -1,5 +1,8 @@
+using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.UseCases.Atendimento;
 
@@ -18,7 +21,17 @@ public sealed record ConfiguracaoAtendimentoResult(
     bool Ativo,
     string? ModeloRetomadaNome = null,
     string ModeloRetomadaIdioma = ConfiguracaoAtendimento.IdiomaModeloPadrao,
-    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos);
+    int SlaRespostaMinutos = ConfiguracaoAtendimento.SlaRespostaPadraoMinutos,
+    string MensagemEscalada = ConfiguracaoAtendimento.MensagemEscaladaPadrao,
+    string MensagemEncaminhamento = ConfiguracaoAtendimento.MensagemEncaminhamentoPadrao,
+    string? NomeDona = null,
+    string? ModeloAgente = null,
+    long? CotaTokensMes = null,
+    IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
+    bool RoteiroPersonalizado = false,
+    string? ObservacoesLoja = null,
+    IReadOnlyList<string>? FerramentasDesligadas = null,
+    string? FraseFechoCanhoto = null);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -41,7 +54,12 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
         c.EmpresaId, c.Tom, c.NivelSugestao, c.SaudacaoPrimeiroContato, c.SaudacaoRetorno,
         c.FraseEspera, c.MensagemForaArea, c.RespiroMinutos, c.TempoPreparoPadraoMinutos,
         c.WebhookVerificadoEm, c.UltimaMensagemRecebidaEm, c.Ativo, c.ModeloRetomadaNome, c.ModeloRetomadaIdioma,
-        c.SlaRespostaMinutos);
+        c.SlaRespostaMinutos, c.MensagemEscalada, c.MensagemEncaminhamento,
+        // S68 (#2597): o roteiro sai sempre efetivo (o da loja ou o padrão), com a marca de qual dos dois.
+        c.NomeDona, c.ModeloAgente, c.CotaTokensMes, RoteiroAtendimento.DaLoja(c.RoteiroJson),
+        !ReferenceEquals(RoteiroAtendimento.DaLoja(c.RoteiroJson), RoteiroAtendimento.Padrao), c.ObservacoesLoja,
+        FerramentasDaLoja.DaLoja(c.FerramentasDesligadasJson).Order(StringComparer.Ordinal).ToList(),
+        c.FraseFechoCanhoto);
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -55,11 +73,26 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     int? RespiroMinutos,
     int? TempoPreparoPadraoMinutos,
     bool? Ativo,
-    int? SlaRespostaMinutos = null);
+    int? SlaRespostaMinutos = null,
+    string? MensagemEscalada = null,
+    string? MensagemEncaminhamento = null,
+    string? NomeDona = null,
+    string? ModeloAgente = null,
+    long? CotaTokensMes = null,
+    IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
+    string? ObservacoesLoja = null,
+    IReadOnlyList<string>? FerramentasDesligadas = null,
+    string? FraseFechoCanhoto = null);
 
+/// <remarks>
+/// S68 (#2597): nulo mantém cada campo do Assistente; vazio volta ao padrão (roteiro vazio, modelo vazio, cota 0). O
+/// modelo só entra se estiver na lista aprovada (ADR-0066); sem a lista, nenhum entra.
+/// </remarks>
 public sealed class AtualizarConfiguracaoAtendimentoUseCase(
     IConfiguracaoAtendimentoRepository repository, IUnitOfWork unitOfWork, ICacheService? cacheService = null,
-    ILogger<AtualizarConfiguracaoAtendimentoUseCase>? logger = null)
+    ILogger<AtualizarConfiguracaoAtendimentoUseCase>? logger = null,
+    IOptions<ModelosAprovadosAgenteOptions>? modelos = null,
+    IEnumerable<IFerramentaAgente>? ferramentas = null)
 {
     public async Task<ConfiguracaoAtendimentoResult> ExecuteAsync(AtualizarConfiguracaoAtendimentoCommand command)
     {
@@ -67,6 +100,10 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         ObterConfiguracaoAtendimentoUseCase.ValidarEmpresa(configuracao, command.EmpresaId);
         var nova = configuracao is null;
         configuracao ??= ConfiguracaoAtendimento.CriarPadrao(command.EmpresaId);
+        // A recusa do modelo ou do roteiro vem antes de qualquer mudança na entidade rastreada.
+        var modeloAgente = ModeloValidado(command.ModeloAgente, configuracao.ModeloAgente);
+        var roteiroJson = RoteiroValidado(command.Roteiro);
+        var desligadasJson = DesligadasValidadas(command.FerramentasDesligadas);
 
         try
         {
@@ -81,8 +118,13 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
                 command.TempoPreparoPadraoMinutos,
                 command.Ativo,
                 command.SlaRespostaMinutos);
+            configuracao.DefinirMoldes(command.MensagemEscalada, command.MensagemEncaminhamento);
+            configuracao.DefinirAssistente(command.NomeDona, modeloAgente, command.CotaTokensMes, roteiroJson,
+                command.ObservacoesLoja);
+            configuracao.DefinirFerramentasDesligadas(desligadasJson);
+            configuracao.DefinirFraseFechoCanhoto(command.FraseFechoCanhoto);
         }
-        catch (ArgumentOutOfRangeException ex)
+        catch (Exception ex) when (ex is ArgumentOutOfRangeException or RegraDeDominioVioladaException)
         {
             throw new UseCaseValidationException(ex.Message);
         }
@@ -104,6 +146,34 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         }
 
         return ObterConfiguracaoAtendimentoUseCase.ToResult(configuracao);
+    }
+
+    private string? ModeloValidado(string? modelo, string? gravado)
+    {
+        if (string.IsNullOrWhiteSpace(modelo)) return modelo;
+        var id = modelo.Trim();
+        // O já gravado que saiu da lista volta igual sem travar o resto; o turno já usa o padrão no lugar dele.
+        if (string.Equals(id, gravado, StringComparison.Ordinal)) return id;
+        if (modelos?.Value.Aprovado(id) != true)
+            throw new UseCaseValidationException("Modelo fora da lista aprovada do Assistente.");
+        return id;
+    }
+
+    // #2853: só nome que existe e que não seja saída para a equipe; vazio liga todas de novo.
+    private string? DesligadasValidadas(IReadOnlyList<string>? nomes)
+    {
+        if (nomes is null) return null;
+        var conhecidas = ferramentas?.Select(f => f.Nome) ?? nomes.Select(n => n.Trim());
+        if (FerramentasDaLoja.Erro(nomes, conhecidas) is { } erro) throw new UseCaseValidationException(erro);
+        return FerramentasDaLoja.Serializar(nomes);
+    }
+
+    private static string? RoteiroValidado(IReadOnlyList<EtapaRoteiroAtendimento>? roteiro)
+    {
+        if (roteiro is null) return null;
+        if (roteiro.Count == 0) return string.Empty;
+        if (RoteiroAtendimento.Erro(roteiro) is { } erro) throw new UseCaseValidationException(erro);
+        return RoteiroAtendimento.Serializar(roteiro.Select(e => e with { Nome = e.Nome.Trim(), Instrucao = e.Instrucao.Trim() }));
     }
 }
 

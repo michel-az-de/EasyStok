@@ -1,3 +1,6 @@
+using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.ValueObjects.Pix;
+
 namespace EasyStock.Domain.Entities
 {
     public class Loja
@@ -13,6 +16,12 @@ namespace EasyStock.Domain.Entities
         public bool Ativa { get; set; }
         public DateTime CriadoEm { get; set; }
         public DateTime AlteradoEm { get; set; }
+
+        /// <summary>#2233: chave Pix da loja para o Pix direto. As quatro colunas vêm juntas ou ficam todas nulas.</summary>
+        public TipoChavePix? PixTipo { get; private set; }
+        public string? PixChave { get; private set; }
+        public string? PixNomeRecebedor { get; private set; }
+        public string? PixCidade { get; private set; }
 
         public Empresa? Empresa { get; set; }
         public ICollection<ItemEstoque> Itens { get; set; } = new List<ItemEstoque>();
@@ -39,6 +48,22 @@ namespace EasyStock.Domain.Entities
             Ativa = false;
             AlteradoEm = DateTime.UtcNow;
         }
+
+        /// <summary>#2233: grava ou remove (null) a chave Pix da loja.</summary>
+        public void DefinirRecebedorPix(RecebedorPix? recebedor)
+        {
+            PixTipo = recebedor?.Chave.Tipo;
+            PixChave = recebedor?.Chave.Valor;
+            PixNomeRecebedor = recebedor?.Nome;
+            PixCidade = recebedor?.Cidade;
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>#2233: recebedor do Pix direto, ou null quando a loja não cadastrou a chave.</summary>
+        public RecebedorPix? ObterRecebedorPix() =>
+            PixTipo is { } tipo && PixChave is not null && PixNomeRecebedor is not null && PixCidade is not null
+                ? RecebedorPix.Criar(ChavePix.Criar(tipo, PixChave), PixNomeRecebedor, PixCidade)
+                : null;
 
         public void Reativar()
         {

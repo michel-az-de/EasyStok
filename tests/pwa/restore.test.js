@@ -4,6 +4,7 @@
 // local (MediaStore publico ou Filesystem scoped) sobreviveu, oferecemos
 // restore via evento window 'cdb-restore-prompt' que index.html escuta.
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 module.exports = function ({ test, sandbox, assert }) {
   const cdbSync = () => sandbox.window && sandbox.window.cdbSync;
@@ -12,7 +13,7 @@ module.exports = function ({ test, sandbox, assert }) {
   // do harness nem depender de permissões Android para reproduzir o primeiro boot.
   function onboardingFixture(backup, accept = false, existing = null) {
     const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
-    const html = fs.readFileSync(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+    const html = lerPwaMontada(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
     const begin = html.indexOf('async function maybeOfferLocalRestore() {');
     const end = html.indexOf('// HEALTH CHECK', begin);
     assert.ok(begin >= 0 && end > begin);

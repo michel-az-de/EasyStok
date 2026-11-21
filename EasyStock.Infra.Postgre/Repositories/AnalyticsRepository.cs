@@ -15,14 +15,15 @@ namespace EasyStock.Infra.Postgre.Repositories
     public sealed partial class AnalyticsRepository(
         EasyStockDbContext dbContext,
         ICaixaSaldoCalculator caixaSaldo,
-        IDistributedCache? cache = null)
+        IDistributedCache? cache = null,
+        TimeProvider? relogio = null)
         : IAnalyticsRepository
     {
         // â”€â”€ Specialised query objects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private readonly DashboardAnalyticsQueries _dashboard = new(dbContext, cache);
         private readonly ReceitaAnalyticsQueries   _receita   = new(dbContext, cache);
-        private readonly EstoqueAnalyticsQueries   _estoque   = new(dbContext, cache);
+        private readonly EstoqueAnalyticsQueries   _estoque   = new(dbContext, cache, relogio);
 
         // â”€â”€ Cache helpers (used only by store-intelligence methods below) â”€â”€â”€â”€
 
@@ -124,11 +125,14 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<IReadOnlyList<ReceitaPorPeriodo>> GetReceitaPorPeriodoAsync(Guid empresaId, int meses = 12, Guid? lojaId = null)
             => _receita.GetReceitaPorPeriodoAsync(empresaId, meses, lojaId);
 
-        public Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
+        public Task<(IReadOnlyList<MargemPorProduto> Items, int TotalCount)> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
             => _receita.GetMargemPorProdutoAsync(empresaId, dias, page, pageSize, lojaId);
 
         public Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null)
             => _receita.GetVendasPorCanalAsync(empresaId, de, ate, lojaId);
+
+        public Task<IReadOnlyList<PedidoPorAnuncio>> GetPedidosPorAnuncioAsync(Guid empresaId, DateTime de, DateTime ate)
+            => _receita.GetPedidosPorAnuncioAsync(empresaId, de, ate);
 
         // â”€â”€ Delegation â€” Estoque â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

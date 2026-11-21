@@ -22,7 +22,10 @@ public sealed record ClienteResult(
     string? NomeFantasia = null,
     string? InscricaoEstadual = null,
     string? FotoUrl = null
-);
+)
+{
+    public uint Revisao { get; init; }
+}
 
 /// <summary>Cliente com sub-coleções (pra tela de detalhe rica).</summary>
 public sealed record ClienteDetalheResult(

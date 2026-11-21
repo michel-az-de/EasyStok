@@ -55,6 +55,7 @@ public class CriarTenantPorAdminUseCase(
             throw new UseCaseValidationException("Nome do responsável é obrigatório.");
         if (string.IsNullOrWhiteSpace(command.EmailAdmin))
             throw new UseCaseValidationException("E-mail do responsável é obrigatório.");
+        EmailValidator.RecusarReservado(command.EmailAdmin);
 
         var emailNorm = command.EmailAdmin.Trim().ToLowerInvariant();
         var emailExistente = await usuarioRepository.GetByEmailAsync(emailNorm);

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests;
 
@@ -23,15 +22,17 @@ namespace EasyStock.Api.IntegrationTests;
 /// </summary>
 public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
+    private string? _motivoIndisponivel;
     private string? _connString;
-    private readonly VariaveisDeProcesso _variaveis = new();
 
     private const string JwtIssuer  = "EasyStock";
     private const string JwtAudience = "EasyStock";
     private const string JwtSecret  = "EasyStock-Test-SuperSecretKey-Min32Chars!!";
 
+    // #2976: o cache segue válido com o banco clonado: o modelo só tem migrações e o seed da demo
+    // roda no startup de cada factory, então a resposta é a mesma para todo teste do processo.
     // Cache classe-scoped: a checagem de "seed demo disponível" é determinística
     // dentro do mesmo processo (mesma Program.cs, mesma config). Sem cache, cada
     // um dos 12 testes que dependem do seed pagava ~30s subindo WebApplicationFactory
@@ -42,50 +43,24 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // Prioridade 1: Postgres externo via env var EASYSTOCK_IT_PG (CI ou ambiente
-        // sem Docker — ex.: Postgres local/WSL). Permite rodar a integração web→API
-        // DE VERDADE onde o Testcontainers não consegue subir um container.
-        var externalPg = Environment.GetEnvironmentVariable("EASYSTOCK_IT_PG");
-        if (!string.IsNullOrWhiteSpace(externalPg))
-        {
-            _connString = externalPg;
-            // WebApplicationFactory + Minimal API top-level: o ConfigureAppConfiguration
-            // nem sempre sobrescreve o que o Program lê no startup (o GetConnectionString
-            // saía null → AddNpgSql quebrava). Env vars são lidas pelo CreateBuilder de
-            // forma confiável (precedência alta, cedo).
-            _variaveis
-                .Definir("ConnectionStrings__DefaultConnection", externalPg)
-                .Definir("Database__Provider", "PostgreSql")
-                .Definir("RunMigrationsOnStartup", "true")
-                .Definir("Mobile__ApiKey", "easystock-integration-test-mobile-key-0001")
-                // Production exige a senha do bootstrap de SuperAdmin via env var.
-                .Definir("SEED_SUPERADMIN_PASSWORD", "Integr4cao-T3st-SuperAdmin");
-            _isAvailable = true;
-            return;
-        }
-
-        // Prioridade 2: Testcontainers (Docker disponível).
+        // #2976: o ramo EASYSTOCK_IT_PG saiu. Todo teste usa um banco clonado do cluster do processo.
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_api_tests")
-                .WithUsername("postgres")
-                .WithPassword("senha-de-teste-descartavel") // #1890: StartupHardening recusa postgres/postgres
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             _connString = _pg.GetConnectionString();
             _isAvailable = true;
         }
-        catch (DockerUnavailableException)
+        catch (DockerUnavailableException ex)
         {
             _isAvailable = false;
+            _motivoIndisponivel = ex.Message;
         }
     }
 
     public async Task DisposeAsync()
     {
-        _variaveis.Dispose();
         if (_pg is not null)
             await _pg.DisposeAsync();
     }
@@ -177,6 +152,29 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
         {
             _seedDemoCheckLock.Release();
         }
+    }
+
+    // ─── Canário do harness ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Guarda anti-falso-verde do projeto (#2176), no desenho de
+    /// <c>EasyStock.Infra.Postgre.IntegrationTests/HarnessCanaryTests</c>. Os jobs
+    /// <c>Integração (parte N)</c> do <c>ci.yml</c> rodam este projeto e dependem do
+    /// Testcontainers: se o Docker do runner degradar, todos os
+    /// <c>[SkippableFact]</c> deste projeto pulam e o gate fica verde-vazio. No GitHub
+    /// Actions isso vira VERMELHO. Localmente, sem a env var, SKIPa visível (ADR-0023).
+    /// </summary>
+    [SkippableFact]
+    public void Harness_executa_de_verdade_no_CI()
+    {
+        var noGitHubActions = string.Equals(
+            Environment.GetEnvironmentVariable("GITHUB_ACTIONS"), "true",
+            StringComparison.OrdinalIgnoreCase);
+        Skip.IfNot(noGitHubActions, "GITHUB_ACTIONS ausente (rodada local).");
+
+        _isAvailable.Should().BeTrue(
+            "no CI o Postgres de teste é obrigatório; sem ele os SkippableFact deste "
+            + "projeto pulariam verdes: " + (_motivoIndisponivel ?? "(sem motivo)"));
     }
 
     // ─── Health Check ─────────────────────────────────────────────────────────
@@ -321,6 +319,48 @@ public sealed class PostgresApiIntegrationTests : IAsyncLifetime
             HttpStatusCode.NoContent,
             HttpStatusCode.NotFound // aceitável em coleções vazias com ID
         );
+    }
+
+    // ─── Idempotência na criação de cadastro (#2462) ──────────────────────────
+
+    [SkippableFact]
+    public async Task Criar_fornecedor_duas_vezes_com_a_mesma_chave_grava_um_so_e_o_segundo_e_replay()
+    {
+        Skip.IfNot(_isAvailable, "Docker indisponível — Postgres de teste não pôde subir.");
+        Skip.IfNot(await SeedDemoDisponivelAsync(),
+            "Seed demo (admin) indisponível neste ambiente — fluxo autenticado web→API pulado.");
+
+        await using var factory = CriarFactory();
+        using var client = await ClienteAutenticadoAdminAsync(factory);
+        var nome = $"Fornecedor idempotente {Guid.NewGuid():N}";
+        var chave = Guid.NewGuid().ToString();
+
+        Task<HttpResponseMessage> Criar(object corpo)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/fornecedores") { Content = JsonContent.Create(corpo) };
+            request.Headers.Add("Idempotency-Key", chave);
+            return client.SendAsync(request);
+        }
+
+        using var primeira = await Criar(new { nome, origem = "console" });
+        primeira.StatusCode.Should().Be(HttpStatusCode.Created, await primeira.Content.ReadAsStringAsync());
+        primeira.Headers.Contains("X-Idempotent-Replay").Should().BeFalse();
+
+        using var segunda = await Criar(new { nome, origem = "console" });
+        segunda.StatusCode.Should().Be(HttpStatusCode.Created, await segunda.Content.ReadAsStringAsync());
+        segunda.Headers.GetValues("X-Idempotent-Replay").Should().ContainSingle().Which.Should().Be("true");
+
+        var id1 = (await primeira.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data").GetProperty("id").GetString();
+        var id2 = (await segunda.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data").GetProperty("id").GetString();
+        id2.Should().Be(id1, "a repetição devolve o cadastro já gravado");
+
+        using var divergente = await Criar(new { nome = nome + " outro", origem = "console" });
+        divergente.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await divergente.Content.ReadAsStringAsync()).Should().Contain("IDEMPOTENCY_PAYLOAD_MISMATCH");
+
+        var lista = await client.GetFromJsonAsync<JsonElement>($"/api/fornecedores?search={Uri.EscapeDataString(nome)}&pageSize=50");
+        lista.GetProperty("data").EnumerateArray()
+            .Count(f => f.GetProperty("nome").GetString()!.StartsWith(nome)).Should().Be(1, "só um fornecedor foi gravado");
     }
 
     // ─── Migrations ───────────────────────────────────────────────────────────

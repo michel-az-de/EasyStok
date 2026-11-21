@@ -6,6 +6,7 @@ using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -16,7 +17,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace EasyStock.Application.Tests.Services.Atendimento;
 
 /// <summary>O LLM é um fake (<see cref="IAgenteLlmClient"/> substituído): nenhuma chamada de rede.</summary>
-public class AgenteAtendimentoServiceTests
+public partial class AgenteAtendimentoServiceTests
 {
     private const string WaId = "5511999998888";
     private static readonly DateTime Agora = new(2026, 9, 26, 15, 0, 0, DateTimeKind.Utc);
@@ -58,6 +59,11 @@ public class AgenteAtendimentoServiceTests
             .Returns(_ => new ConversaComMensagens(_conversa, _historico));
         _conversaRepository.ObterSituacaoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>())
             .Returns(_ => _situacaoNoBanco ?? _conversa.Situacao);
+        _conversaRepository.ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()).Returns(_conversa);
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<string>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<string>>>()(c.Arg<CancellationToken>()));
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<ResultadoTurnoAgente>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<ResultadoTurnoAgente>>>()(c.Arg<CancellationToken>()));
 
         // #1889: o padrão nasce desligado; estes cenários exercitam o agente ligado pela dona.
         var ligada = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
@@ -77,10 +83,148 @@ public class AgenteAtendimentoServiceTests
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
         [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos);
+        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
+        turnos: _turnos, precos: Microsoft.Extensions.Options.Options.Create(_precos),
+        modelos: Microsoft.Extensions.Options.Options.Create(_modelos));
+
+    private AgenteAtendimentoService CriarServicoComLimite(int maximoPorHora) => new(
+        _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
+        [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+        new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
+        limiteRespostas: Microsoft.Extensions.Options.Options.Create(new LimiteRespostasAgenteOptions { MaximoPorHora = maximoPorHora }));
+
+    private void RespostasDoAgenteNaUltimaHora(int total) =>
+        _conversaRepository.ContarRespostasDoAgenteDesdeAsync(_empresaId, _conversa.Id, Agora.AddHours(-1), Arg.Any<CancellationToken>())
+            .Returns(total);
+
+    [Fact]
+    public async Task NoLimiteDeRespostasDaHora_NaoChamaOLlmEPassaParaADona()
+    {
+        // #2285: anti-loop de custo. Outro robô do lado do cliente faria o agente responder (e gastar) sem fim.
+        RespostasDoAgenteNaUltimaHora(LimiteRespostasAgenteOptions.PadraoPorHora);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Should().Be(new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true));
+        _requisicoes.Should().BeEmpty();
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            AgenteAtendimentoService.MotivoLimiteRespostas(LimiteRespostasAgenteOptions.PadraoPorHora), Agora, Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task AbaixoDoLimite_RespondeNormalmente()
+    {
+        RespostasDoAgenteNaUltimaHora(LimiteRespostasAgenteOptions.PadraoPorHora - 1);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task LimiteVemDaConfiguracao_EZeroDesliga()
+    {
+        RespostasDoAgenteNaUltimaHora(5);
+
+        (await CriarServicoComLimite(5).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeFalse();
+        (await CriarServicoComLimite(0).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).ChamouLlm.Should().BeTrue();
+    }
 
     private static RespostaLlm Texto(string texto) =>
         new("end_turn", [new BlocoTextoLlm(texto)], 100, 20);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CorrecaoDeVinculoEnquantoLlmRespondeImpedeFerramentaEEnvio(bool ferramenta)
+    {
+        var aguardando = new TaskCompletionSource<RespostaLlm>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var chamou = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(_ => { chamou.SetResult(); return aguardando.Task; });
+        var turno = CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        await chamou.Task;
+        _conversa.VincularCliente(Guid.NewGuid());
+        aguardando.SetResult(ferramenta ? UsoFerramenta("consultar_pedido") : Texto("Resposta da pessoa anterior."));
+        var resultado = await turno;
+        resultado.Respondeu.Should().BeFalse(); resultado.Escalou.Should().BeFalse();
+        await _consultarPedido.DidNotReceiveWithAnyArgs().ExecutarAsync(default!, default, default);
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+        await _usoIaRepository.Received(1).AddAsync(Arg.Any<UsoIa>());
+    }
+
+    [Fact]
+    public async Task EnvioFicaNaMesmaTransacaoDaConferenciaDoVinculoELlmFicaFora()
+    {
+        var transacao = false;
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<ResultadoTurnoAgente>>>(), Arg.Any<CancellationToken>())
+            .Returns(async c => { transacao = true; try { return await c.Arg<Func<CancellationToken, Task<ResultadoTurnoAgente>>>()(c.Arg<CancellationToken>()); } finally { transacao = false; } });
+        _llm.When(l => l.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())).Do(_ => transacao.Should().BeFalse());
+        _conversaRepository.When(r => r.ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>())).Do(_ => transacao.Should().BeTrue());
+        _cloudClient.When(c => c.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())).Do(_ => transacao.Should().BeTrue());
+        (await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora)).Respondeu.Should().BeTrue();
+        transacao.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task FerramentaComProvedorExternoRodaForaDaTransacaoDaConversa()
+    {
+        // #2544: enviar_link_pagamento chama o Mercado Pago; a conversa não pode ficar travada durante a rede.
+        var transacao = false;
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<string>>>(), Arg.Any<CancellationToken>())
+            .Returns(async c => { transacao = true; try { return await c.Arg<Func<CancellationToken, Task<string>>>()(c.Arg<CancellationToken>()); } finally { transacao = false; } });
+        var link = Substitute.For<IFerramentaAgente, IFerramentaForaDaTransacao>();
+        link.Nome.Returns("enviar_link_pagamento");
+        var dentro = (bool?)null;
+        link.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { dentro = transacao; return "{}"; });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(UsoFerramenta("enviar_link_pagamento"), Texto("Pronto"));
+
+        await CriarServico(link).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        dentro.Should().BeFalse("a chamada ao provedor sai depois de conferir o vínculo, fora da transação");
+        await _conversaRepository.Received().ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NovaRevisaoEntreFerramentasInterrompeRestanteDoTurno()
+    {
+        var travas = 0;
+        _conversaRepository.ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (++travas == 2) _conversa.VincularCliente(Guid.NewGuid());
+            return _conversa;
+        });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(RespostaLlm.StopToolUse,
+            [new BlocoUsoFerramentaLlm("um", "consultar_pedido", JsonSerializer.SerializeToElement(new { })),
+             new BlocoUsoFerramentaLlm("dois", "consultar_pedido", JsonSerializer.SerializeToElement(new { }))], 10, 5));
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        resultado.Respondeu.Should().BeFalse(); _requisicoes.Should().ContainSingle();
+        await _consultarPedido.Received(1).ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>());
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task FerramentaQueAlteraEntidadeELancaDescartaTrackerAntesDoConsumo()
+    {
+        var pendente = false;
+        _consultarPedido.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>()).Returns<string>(_ =>
+        {
+            pendente = true;
+            _conversa.VincularCliente(Guid.NewGuid());
+            throw new InvalidOperationException("falha depois da mutação");
+        });
+        _unitOfWork.When(u => u.DescartarAlteracoesPendentes()).Do(_ => pendente = false);
+        _unitOfWork.CommitAsync().Returns(_ => { pendente.Should().BeFalse("a mutação abortada nunca chega ao commit posterior"); return 1; });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(UsoFerramenta("consultar_pedido"), Texto("Não pode sair"));
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+        resultado.Respondeu.Should().BeFalse(); _requisicoes.Should().ContainSingle();
+        _unitOfWork.Received(1).DescartarAlteracoesPendentes();
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
 
     private static RespostaLlm UsoFerramenta(string nome, string id = "toolu_1") =>
         new(RespostaLlm.StopToolUse,
@@ -283,7 +427,13 @@ public class AgenteAtendimentoServiceTests
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
             UsoFerramenta("consultar_pedido"), UsoFerramenta("consultar_pedido", "toolu_2"), Texto("Seu estorno já caiu na conta."));
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
-        resultado.Escalou.Should().BeTrue();
+        resultado.Escalou.Should().Be(!lanca);
+        if (lanca)
+        {
+            await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+            _unitOfWork.Received(1).DescartarAlteracoesPendentes();
+            return;
+        }
         await _cloudClient.Received(1).EnviarTextoAsync(WaId,
             Arg.Is<string>(s => s.Contains("equipe") && !s.Contains("anterior") && !s.Contains("caiu")),
             Arg.Any<string?>(), Arg.Any<CancellationToken>());
@@ -374,7 +524,7 @@ public class AgenteAtendimentoServiceTests
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         _conversa.PedidoEmAndamentoId.Should().BeNull();
-        _requisicoes[0].System.Should().Contain("Pedido em andamento: nenhum")
+        _requisicoes[0].TextoCompleto().Should().Contain("Pedido em andamento: nenhum")
             .And.NotContain(pedido.Id.ToString());
         await _conversaRepository.Received(1).TravarParaPedidoAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>());
     }
@@ -395,7 +545,6 @@ public class AgenteAtendimentoServiceTests
     [Fact]
     public async Task ConversaPresaAPedidoCanceladoVoltaAEncerrar()
     {
-        _situacaoNoBanco = SituacaoConversa.Encerrada;
         var cancelado = Pedido.Criar(_empresaId, origem: "whatsapp");
         cancelado.Cancelar();
         VincularFinalizado(cancelado, noBanco: cancelado.Id);
@@ -427,7 +576,7 @@ public class AgenteAtendimentoServiceTests
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         _conversa.PedidoEmAndamentoId.Should().Be(pedido.Id);
-        _requisicoes[0].System.Should().Contain(pedido.Id.ToString());
+        _requisicoes[0].TextoCompleto().Should().Contain(pedido.Id.ToString());
     }
 
     [Theory]
@@ -447,6 +596,113 @@ public class AgenteAtendimentoServiceTests
             await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
     }
 
+    /// <summary>
+    /// #2515, conversa 96ca9f9e: listar_janelas mandava as janelas no meio do laço e o texto do agente, que pedia para
+    /// confirmar o endereço, chegava depois do menu. O menu fica para o fim do turno e sai depois do texto; sem texto
+    /// do agente, sai só o menu; com o texto barrado ou a conversa escalada, o menu não sai.
+    /// </summary>
+    [Theory]
+    [InlineData("Confirma o endereço de entrega? Depois é só escolher a janela.", new[] { "texto", "menu" }, false)]
+    [InlineData("", new[] { "menu" }, false)]
+    [InlineData("Seu pedido foi registrado.", new[] { "texto" }, true)]
+    public async Task MenuAdiadoPorFerramentaSaiDepoisDoTextoDoAgente(string fala, string[] esperado, bool escala)
+    {
+        var ordem = new List<string>();
+        var janelas = Substitute.For<IFerramentaAgente>();
+        janelas.Nome.Returns("listar_janelas");
+        janelas.Descricao.Returns("Lista as janelas");
+        janelas.SchemaJson.Returns("""{"type":"object","properties":{}}""");
+        janelas.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(c =>
+            {
+                c.Arg<ContextoTurnoAgente>().AdiarEnvio(_ =>
+                {
+                    ordem.Add("menu");
+                    return Task.FromResult(true);
+                });
+                return """{"opcoesNoMenu":2}""";
+            });
+        _cloudClient.When(c => c.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("texto"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("listar_janelas"), Texto(fala));
+
+        var resultado = await CriarServico(janelas).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        ordem.Should().Equal(esperado);
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().Be(escala);
+    }
+
+    /// <summary>
+    /// #2515 (revisão): o cliente foi convidado a escolher e o menu não saiu (sessão caída). Sem resposta nenhuma, sai o
+    /// encaminhamento; em todo caso a conversa vai para a equipe.
+    /// </summary>
+    [Theory]
+    [InlineData("", new[] { "menu", "texto" })]
+    [InlineData("Escolha uma das janelas abaixo.", new[] { "texto", "menu" })]
+    public async Task MenuAdiadoQueNaoSaiEscalaParaAEquipe(string fala, string[] esperado)
+    {
+        var ordem = new List<string>();
+        var janelas = Substitute.For<IFerramentaAgente>();
+        janelas.Nome.Returns("listar_janelas");
+        janelas.Descricao.Returns("Lista as janelas");
+        janelas.SchemaJson.Returns("""{"type":"object","properties":{}}""");
+        janelas.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(c =>
+            {
+                c.Arg<ContextoTurnoAgente>().AdiarEnvio(_ =>
+                {
+                    ordem.Add("menu");
+                    return Task.FromResult(false);
+                });
+                return """{"opcoesNoMenu":2}""";
+            });
+        _cloudClient.When(c => c.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("texto"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("listar_janelas"), Texto(fala));
+
+        var resultado = await CriarServico(janelas).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        ordem.Should().Equal(esperado);
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// #2544 (S72): a foto do produto já chegou ao cliente. Sem texto do agente, a foto basta e nada vai para a equipe;
+    /// com texto, ele sai depois da foto.
+    /// </summary>
+    [Theory]
+    [InlineData("", new[] { "foto" })]
+    [InlineData("Essa é a lasanha. Quer pedir?", new[] { "foto", "texto" })]
+    public async Task FotoDoProdutoNaoEhRespostaVaziaNemEscala(string fala, string[] esperado)
+    {
+        var ordem = new List<string>();
+        var foto = Substitute.For<IFerramentaAgente>();
+        foto.Nome.Returns("enviar_foto_produto");
+        foto.Descricao.Returns("Manda a foto");
+        foto.SchemaJson.Returns("""{"type":"object","properties":{}}""");
+        foto.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
+            .Returns(c =>
+            {
+                ordem.Add("foto");
+                c.Arg<ContextoTurnoAgente>().RegistrarFotoEnviada();
+                return """{"enviado":true}""";
+            });
+        _cloudClient.When(c => c.EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()))
+            .Do(_ => ordem.Add("texto"));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns(UsoFerramenta("enviar_foto_produto"), Texto(fala));
+
+        var resultado = await CriarServico(foto).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        ordem.Should().Equal(esperado);
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeFalse();
+    }
+
     [Fact]
     public async Task CadernoEntraNoPromptAntesDoDossie()
     {
@@ -456,7 +712,7 @@ public class AgenteAtendimentoServiceTests
 
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
-        var system = _requisicoes[0].System;
+        var system = _requisicoes[0].TextoCompleto();
         system.Should().Contain("Abrimos de terça a sábado.").And.Contain($"[{troca.Codigo}] Troca");
         system.IndexOf("Abrimos de terça a sábado.", StringComparison.Ordinal)
             .Should().BeLessThan(system.IndexOf("Dossiê desta conversa", StringComparison.Ordinal));
@@ -469,7 +725,7 @@ public class AgenteAtendimentoServiceTests
 
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
-        _requisicoes[0].System.Should().NotContain("Caderno da loja")
+        _requisicoes[0].TextoCompleto().Should().NotContain("Caderno da loja")
             .And.StartWith(PromptAtendimento.Montar(ConfiguracaoAtendimento.CriarPadrao(_empresaId)) + "\n\nDossiê desta conversa");
     }
 
@@ -483,6 +739,73 @@ public class AgenteAtendimentoServiceTests
         resultado.ChamouLlm.Should().BeFalse();
         await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
         await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task EncaminharParaResponsavelPausaAPessoaEEnviaOMoldeComOPrimeiroNome()
+    {
+        // #2249: fornecedor pedindo retorno de orçamento vai para a responsável; o robô para de atender a pessoa.
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        var cliente = Cliente.Criar(_empresaId, "Joao Fornecedor");
+        _clienteRepository.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        _conversa.VincularCliente(cliente.Id);
+        _escalador.When(e => e.EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>()))
+            .Do(_ => _conversa.Escalar(Agora, "encaminhado"));
+        var entrada = JsonSerializer.SerializeToElement(new { assunto = "retorno do orçamento de embalagens" });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(RespostaLlm.StopToolUse,
+            [new BlocoTextoLlm("Não trabalhamos com isso."), new BlocoUsoFerramentaLlm("enc", "encaminhar_para_responsavel", entrada)], 1, 1));
+
+        var resultado = await CriarServico(new EncaminharParaResponsavelFerramenta(_escalador, _clienteRepository))
+            .ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        cliente.AtendimentoAutomaticoPausado.Should().BeTrue();
+        cliente.MotivoPausaAtendimento.Should().Be("retorno do orçamento de embalagens");
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            "encaminhado à responsável: retorno do orçamento de embalagens", Agora, Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId,
+            "Oi, Joao! Eu sou o atendimento automático da Casa da Baba. Já passei sua mensagem para a responsável, que te responde por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EscaladaComumUsaOMoldeDaLoja()
+    {
+        // #2249: o texto de cada ação é da loja, editável na aba Atendimento.
+        _situacaoNoBanco = SituacaoConversa.Automatica;
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        configuracao.Ativo = true;
+        configuracao.DefinirMoldes("Já chamei a equipe, {nome}. Respondemos por aqui.", null);
+        _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns(configuracao);
+        _escalador.When(e => e.EscalarAsync(_empresaId, _conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>()))
+            .Do(_ => _conversa.Escalar(Agora, "quer falar com gente"));
+        var entrada = JsonSerializer.SerializeToElement(new { motivo = "quer falar com gente" });
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(RespostaLlm.StopToolUse,
+            [new BlocoUsoFerramentaLlm("esc", "escalar_para_dona", entrada)], 1, 1));
+
+        await CriarServico(new EscalarParaDonaFerramenta(_escalador)).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        await _cloudClient.Received(1).EnviarTextoAsync(WaId, "Já chamei a equipe, Maria. Respondemos por aqui.",
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ContatoPausadoNaoChamaLlmNemRespondeEFicaComAEquipe()
+    {
+        var cliente = Cliente.Criar(_empresaId, "Joao Fornecedor");
+        cliente.PausarAtendimentoAutomatico("orçamento", Agora.AddDays(-1));
+        _clienteRepository.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        _conversa.VincularCliente(cliente.Id);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeFalse();
+        resultado.Escalou.Should().BeTrue();
+        await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa,
+            EscalarConversaUseCase.MotivoContatoPausado(cliente), Agora, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -561,6 +884,37 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task BlipDoLlmNaoEscala_TentaDeNovoUmaVezEResponde()
+    {
+        // #2285: uma queda de rede no POST do LLM não pode mandar a conversa para a dona; 1 nova tentativa antes de escalar.
+        VerificarConsulta("Seu pedido fica pronto por volta das 15h40.");
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new HttpRequestException("connection reset"),
+                _ => UsoFerramenta("consultar_pedido"), _ => Texto("Seu pedido fica pronto por volta das 15h40."));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Respondeu.Should().BeTrue();
+        resultado.Escalou.Should().BeFalse();
+        await _escalador.DidNotReceiveWithAnyArgs().EscalarAsync(default, default!, default!, default, default);
+        await _llm.Received(3).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LlmQueFalhaNasDuasTentativasEscalaSemTerceira()
+    {
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new HttpRequestException("fora do ar"));
+        _escalador.When(e => e.EscalarAsync(Arg.Any<Guid>(), Arg.Any<Conversa>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()))
+            .Do(ci => ci.Arg<Conversa>().Assumir(ci.Arg<DateTime>()));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _llm.Received(2).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task CancelamentoDoTurnoPropaga()
     {
         using var cts = new CancellationTokenSource();
@@ -575,7 +929,7 @@ public class AgenteAtendimentoServiceTests
     }
 
     [Fact]
-    public async Task TimeoutNaFerramentaViraResultadoDeErro()
+    public async Task TimeoutNaFerramentaInterrompeTurnoEDescartaPossiveisEscritas()
     {
         _consultarPedido.ExecutarAsync(Arg.Any<ContextoTurnoAgente>(), Arg.Any<JsonElement>(), Arg.Any<CancellationToken>())
             .Returns<string>(_ => throw new TaskCanceledException("timeout"));
@@ -584,8 +938,9 @@ public class AgenteAtendimentoServiceTests
 
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
-        resultado.Respondeu.Should().BeTrue();
-        _requisicoes[1].Mensagens[^1].Conteudo.OfType<BlocoResultadoFerramentaLlm>().Single().EhErro.Should().BeTrue();
+        resultado.Respondeu.Should().BeFalse(); _requisicoes.Should().ContainSingle();
+        _unitOfWork.Received(1).DescartarAlteracoesPendentes();
+        await _cloudClient.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default, default);
     }
 
     [Fact]
@@ -786,7 +1141,6 @@ public class AgenteAtendimentoServiceTests
     [Theory]
     [InlineData(CanalConversa.Instagram, "IGSID-9")]
     [InlineData(CanalConversa.Messenger, "PSID-3")]
-    [InlineData(CanalConversa.ChatSite, "sessao-1")]
     public async Task AgenteNaoRespondeForaDoWhatsApp(CanalConversa canal, string contato)
     {
         // S35: o agente envia pelo cliente do WhatsApp; em outro canal sairia pelo canal errado.
@@ -840,7 +1194,7 @@ public class AgenteAtendimentoServiceTests
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         var requisicao = _requisicoes.Should().ContainSingle().Subject;
-        requisicao.System.Should().Contain("[interno] cliente pediu desconto na última compra");
+        requisicao.TextoCompleto().Should().Contain("[interno] cliente pediu desconto na última compra");
         requisicao.Mensagens.SelectMany(m => m.Conteudo).OfType<BlocoTextoLlm>()
             .Should().NotContain(b => b.Texto.Contains("desconto"));
     }
@@ -860,9 +1214,9 @@ public class AgenteAtendimentoServiceTests
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
         var requisicao = _requisicoes.Should().ContainSingle().Subject;
-        requisicao.System.Should().Contain("vegano");
-        requisicao.System.Should().Contain("[interno] ").And.Contain("não gosta de coco");
-        requisicao.System.Split('\n').Where(l => l.Contains("coco"))
+        requisicao.TextoCompleto().Should().Contain("vegano");
+        requisicao.TextoCompleto().Should().Contain("[interno] ").And.Contain("não gosta de coco");
+        requisicao.TextoCompleto().Split('\n').Where(l => l.Contains("coco"))
             .Should().OnlyContain(l => l.StartsWith("- [interno]"));
     }
 
@@ -969,5 +1323,46 @@ public class AgenteAtendimentoServiceTests
 
         segundo.ChamouLlm.Should().BeFalse();
         _gravadas.Select(m => m.ExternoId).Should().Contain("wamid.cardapio");
+    }
+
+    [Fact]
+    public async Task ContatoDaEquipeAvisadaVaiParaAgenteSemChamarOLlm()
+    {
+        // #2211: a pessoa que recebe os avisos responde pelo número da loja; o robô não conversa com ela.
+        var equipe = Substitute.For<EasyStock.Application.Services.Notifications.IContatoDaEquipeAvisada>();
+        equipe.EhInscritoAsync(_empresaId, WaId, Arg.Any<CancellationToken>()).Returns(true);
+        var servico = new AgenteAtendimentoService(
+            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
+            [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+            _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos, equipe);
+
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Should().Be(new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true));
+        _requisicoes.Should().BeEmpty();
+        await _escalador.Received(1).EscalarAsync(_empresaId, _conversa, AgenteAtendimentoService.MotivoContatoDaEquipe,
+            Agora, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ContatoDaEquipeComConversaDevolvidaAoRoboRecebeResposta()
+    {
+        // #2493: "devolver ao robô" era desfeito na mensagem seguinte pela regra da #2211.
+        var equipe = Substitute.For<EasyStock.Application.Services.Notifications.IContatoDaEquipeAvisada>();
+        equipe.EhInscritoAsync(_empresaId, WaId, Arg.Any<CancellationToken>()).Returns(true);
+        _conversa.Assumir(Agora.AddMinutes(-5), Guid.NewGuid());
+        _conversa.LiberarAutomatico();
+        var servico = new AgenteAtendimentoService(
+            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
+            [_consultarPedido], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+            _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos, equipe);
+
+        var resultado = await servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.ChamouLlm.Should().BeTrue();
+        await _escalador.DidNotReceive().EscalarAsync(_empresaId, _conversa, AgenteAtendimentoService.MotivoContatoDaEquipe,
+            Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
 }

@@ -20,7 +20,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 
@@ -29,7 +28,7 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 ///
 /// <para>
 /// Sobe Postgres real via Testcontainers, registra um <c>ICurrentUserAccessor</c>
-/// stubado + <c>TestAuth</c> scheme para autenticar o caller como Babá ativa
+/// stubado + <c>TestAuth</c> scheme para autenticar o caller como Baba ativa
 /// (sem precisar passar pelo middleware JWT). Faz request HTTP completa e valida:
 /// </para>
 /// <list type="bullet">
@@ -44,22 +43,18 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 /// </summary>
 public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
 
     private static readonly Guid EmpresaId = Guid.NewGuid();
     private static readonly Guid UsuarioBabaId = Guid.NewGuid();
-    private const string UsuarioBabaNome = "Babá Maria";
+    private const string UsuarioBabaNome = "Baba Maria";
 
     public async Task InitializeAsync()
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_aprovacao_tests")
-                .WithUsername("postgres")
-                .WithPassword("senha-de-teste-descartavel")
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             _isAvailable = true;
@@ -106,7 +101,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 
                 b.ConfigureTestServices(services =>
                 {
-                    // Substitui ICurrentUserAccessor: caller é Babá ativa do tenant.
+                    // Substitui ICurrentUserAccessor: caller é Baba ativa do tenant.
                     var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ICurrentUserAccessor));
                     if (descriptor is not null) services.Remove(descriptor);
                     services.AddSingleton<ICurrentUserAccessor>(new StubCurrentUserAccessor(

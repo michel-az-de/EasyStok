@@ -1,0 +1,38 @@
+# #2372: mantém atualizados os pins por digest (Dockerfiles) e por SHA (actions).
+# Só esses dois ecossistemas; NuGet e npm ficam fora até haver decisão própria.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore(ci)
+    labels: [infra, priority:p3]
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /EasyStock.Worker
+      - /EasyStock.Console
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore(docker)
+    labels: [infra, priority:p3]
+    groups:
+      imagens-base:
+        patterns: ["*"]
+        update-types: [minor, patch]

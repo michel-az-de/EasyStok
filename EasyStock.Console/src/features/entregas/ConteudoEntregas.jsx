@@ -3,7 +3,9 @@ import {
   closestCenter, DndContext, KeyboardSensor, PointerSensor, TouchSensor, useDroppable, useSensor,
   useSensors,
 } from '@dnd-kit/core'
+import { CampoSelecao } from '../../componentes/Campo'
 import { Chip } from '../../componentes/Chip'
+import { Vazio } from '../../componentes/Vazio'
 import { horaCurta, plural } from '../../dominio/formato'
 import { ocupacaoDeHoje, rotuloDaOcupacao } from '../../dominio/entrega'
 import { EXPLICACAO_JANELA, opcoesDoDespacho } from '../../dominio/despacho'
@@ -23,7 +25,7 @@ import css from './dashboard.module.css'
 const CHIPS_ESTADO = [
   { chave: 'preparar', rotulo: 'A preparar' },
   { chave: 'pronta', rotulo: 'Prontas' },
-  { chave: 'com-entregador', rotulo: 'Com entregador' },
+  { chave: 'com-entregador', rotulo: 'Com o entregador' },
   { chave: 'entregue', rotulo: 'Entregues' },
   { chave: 'cancelada', rotulo: 'Canceladas' },
 ]
@@ -158,40 +160,37 @@ export function ConteudoEntregas({
     <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={aoTerminarArrasto}>
       <div className={css.dashboard}>
         <div className={css.faixaControles}>
-          <div className={css.linhaChips}>
+          <div className={css.linhaChips} role="group" aria-label="Filtrar por situação">
+            <strong>Mostrar:</strong>
             {CHIPS_ESTADO.map(({ chave, rotulo }) => (
               <Chip key={chave} papel="filtro" ativo={filtroEstados.has(chave)} onClick={() => alternarFiltro(chave)}>
                 {rotulo} <span className={css.contadorChip}>{contagemPorEstado[chave]}</span>
               </Chip>
             ))}
           </div>
-          <div className={css.linhaChips} role="radiogroup" aria-label="Ordenar entregas">
-            <strong>Ordenar:</strong>
-            {CHIPS_ORDEM.map(({ valor, rotulo }) => (
-              <Chip key={valor} papel="escolha" ativo={modoOrdem === valor} onClick={() => setModoOrdem(valor)}>
-                {rotulo}
-              </Chip>
-            ))}
-          </div>
-          {modoOrdem === 'janela' && <p className={css.dicaJanela}>{EXPLICACAO_JANELA}</p>}
-          {bairrosDoDia.length > 1 && (
-            <div className={css.linhaChips} role="radiogroup" aria-label="Filtrar entregas por bairro">
-              <strong>Bairro:</strong>
-              <Chip papel="escolha" ativo={bairroAtivo === null} onClick={() => setFiltroBairro(null)}>
-                Todos <span className={css.contadorChip}>{visiveis.length}</span>
-              </Chip>
-              {bairrosDoDia.map(({ bairro, itens }) => (
-                <Chip key={bairro} papel="escolha" ativo={bairroAtivo === bairro} onClick={() => setFiltroBairro(bairro)}>
-                  {bairro} <span className={css.contadorChip}>{itens.length}</span>
-                </Chip>
-              ))}
-            </div>
-          )}
-          <div className={css.linhaChips}>
+          {/* #3042: Ordenar e Bairro são escolha única, então viram select rotulado: a faixa cai de 4 linhas
+              de chips para 2 e o primeiro cartão sobe. Mostrar segue em chips (filtro primário). */}
+          <div className={css.linhaControles}>
+            <CampoSelecao
+              rotulo="Ordenar" value={modoOrdem}
+              onChange={(e) => setModoOrdem(e.target.value)}
+              opcoes={CHIPS_ORDEM.map(({ valor, rotulo }) => ({ valor, rotulo }))}
+            />
+            {bairrosDoDia.length > 1 && (
+              <CampoSelecao
+                rotulo="Bairro" value={bairroAtivo ?? ''}
+                onChange={(e) => setFiltroBairro(e.target.value || null)}
+                opcoes={[
+                  { valor: '', rotulo: `Todos (${visiveis.length})` },
+                  ...bairrosDoDia.map(({ bairro, itens }) => ({ valor: bairro, rotulo: `${bairro} (${itens.length})` })),
+                ]}
+              />
+            )}
             <Chip papel="filtro" ativo={alcanceAberto} icone="map-pin" onClick={() => setAlcanceAberto((v) => !v)}>
               Alcance por bairro
             </Chip>
           </div>
+          {modoOrdem === 'janela' && <p className={css.dicaJanela}>{EXPLICACAO_JANELA}</p>}
           <ResumoDoDia conversas={conversas} cardapio={cardapio} agora={agora} />
           {proximaConferencia && (
             <p className={css.proximaConferencia}>
@@ -206,7 +205,7 @@ export function ConteudoEntregas({
         <div className={css.colunas}>
           <section className={css.coluna}>
             <h2>Entregas sem viagem</h2>
-            {soltas.length === 0 && <p className={css.proximaConferencia}>Nenhuma entrega solta agora.</p>}
+            {soltas.length === 0 && <Vazio variante="linha" titulo="Nenhuma entrega solta agora." />}
             {grupos
               ? (
                 <div className={css.listaColuna}>
@@ -232,7 +231,7 @@ export function ConteudoEntregas({
                   integracoesLogistica={integracoesLogistica}
                 />
               ))}
-              {viagens.length === 0 && <p className={css.proximaConferencia}>Nenhuma viagem montada. Arraste uma entrega para o quadro ao lado.</p>}
+              {viagens.length === 0 && <li><Vazio variante="linha" titulo='Nenhuma viagem montada. Arraste uma entrega até "Solte aqui: nova viagem" ou escolha Nova viagem em Mais opções do cartão.' /></li>}
             </ul>
           </section>
         </div>

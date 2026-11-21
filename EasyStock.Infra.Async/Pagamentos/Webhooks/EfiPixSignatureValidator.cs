@@ -24,8 +24,8 @@ namespace EasyStock.Infra.Async.Pagamentos.Webhooks;
 /// </para>
 /// <list type="bullet">
 ///   <item><c>X-Efi-Signature</c> (hex lowercase) — obrigatorio quando ha secret.</item>
-///   <item><c>X-Efi-Timestamp</c> (unix ms) — opcional. Quando presente,
-///   janela maxima ±5min para protecao anti-replay; e incluido no payload assinado
+///   <item><c>X-Efi-Timestamp</c> (unix ms) — obrigatorio quando ha secret (#2370).
+///   Janela maxima ±5min para protecao anti-replay; e incluido no payload assinado
 ///   como <c>{ts}.{body}</c>.</item>
 /// </list>
 /// </summary>
@@ -64,20 +64,23 @@ public sealed class EfiPixSignatureValidator(
             || string.IsNullOrWhiteSpace(headerSig))
             return false;
 
-        // Replay protection: header X-Efi-Timestamp em ms unix; aceita janela ±5min.
-        headers.TryGetValue("X-Efi-Timestamp", out var tsHeader);
-        if (long.TryParse(tsHeader, out var ts))
+        // Replay protection: header X-Efi-Timestamp em ms unix; aceita janela ±5min. #2370: obrigatório, como no
+        // WebhookPixController; sem ele o mesmo POST capturado valeria para sempre.
+        if (!headers.TryGetValue("X-Efi-Timestamp", out var tsHeader) || !long.TryParse(tsHeader, out var ts))
         {
-            var diff = Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - ts);
-            if (diff > 5 * 60 * 1000)
-            {
-                logger.LogWarning("Webhook Pix: timestamp fora da janela ({Diff}ms). Recusando.", diff);
-                return false;
-            }
+            logger.LogWarning("Webhook Pix: X-Efi-Timestamp ausente ou invalido. Recusando.");
+            return false;
         }
 
-        // Inclui timestamp no payload assinado se presente (anti-replay).
-        var toSign = string.IsNullOrWhiteSpace(tsHeader) ? rawBody : $"{tsHeader}.{rawBody}";
+        var diff = Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - ts);
+        if (diff > 5 * 60 * 1000)
+        {
+            logger.LogWarning("Webhook Pix: timestamp fora da janela ({Diff}ms). Recusando.", diff);
+            return false;
+        }
+
+        // O timestamp prefixa o body assinado (anti-replay).
+        var toSign = $"{tsHeader}.{rawBody}";
 
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(toSign));

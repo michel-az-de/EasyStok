@@ -116,7 +116,7 @@ internal sealed class CobrancaPedidoFixture
             .Do(ci => Cobrancas.Add(ci.Arg<CobrancaPedido>()));
         CobrancaRepo.ObterEmpresaIdDoPedidoAsync(Pedido.Id, Arg.Any<CancellationToken>()).Returns(EmpresaId);
 
-        var storefront = StorefrontEntity.Criar(EmpresaId, "casa-da-baba", "Casa da Babá", 0m);
+        var storefront = StorefrontEntity.Criar(EmpresaId, "casa-da-baba", "Casa da Baba", 0m);
         StorefrontRepo.GetByEmpresaAsync(EmpresaId, Arg.Any<CancellationToken>()).Returns(storefront);
 
         var sequencia = 0;
@@ -179,7 +179,7 @@ internal sealed class CobrancaPedidoFixture
 
     public GerarCobrancaPedidoUseCase Gerar() =>
         new(PedidoRepo, StorefrontRepo, CobrancaRepo, MpClient, CheckoutCore(), Uow, Relogio,
-            NullLogger<GerarCobrancaPedidoUseCase>.Instance, Saldos());
+            NullLogger<GerarCobrancaPedidoUseCase>.Instance, Saldos(), ConversaRepo, LojaRepo);
 
     /// <summary>Núcleo do checkout sobre a vaga e o pedido da fixture: só a reserva desfeita (#1301) passa por ele aqui.</summary>
     public CheckoutCoreService CheckoutCore() =>
@@ -195,7 +195,7 @@ internal sealed class CobrancaPedidoFixture
         new(new Lazy<IMercadoPagoClient>(() => MpClient), Relogio, NullLogger<ExpiracaoPreferenciaMercadoPago>.Instance);
 
     private QuitacaoPedido Quitacao() => QuitacaoPedidoTeste.Criar(PedidoRepo, CobrancaRepo, ConversaRepo, ImpressaoRepo, Publicador,
-        OperacaoEventos, PrazoQueries, Expiracao(), Saldos());
+        OperacaoEventos, PrazoQueries, Expiracao(), Saldos(), Notificador);
 
     /// <summary>Baixa manual pelo console (Pix, dinheiro, maquininha) sobre o mesmo pedido.</summary>
     public RegistrarPagamentoPedidoUseCase RegistrarManual() =>
@@ -228,10 +228,23 @@ internal sealed class CobrancaPedidoFixture
         new(PedidoStorefrontRepo, OperacaoEventos, Tenant, Uow, Notificador, Options.Create(Prazos), Relogio,
             NullLogger<NotificarAtrasoPedidoUseCase>.Instance);
 
+    /// <summary>Lojas da empresa; a chave Pix direto (#2233) mora na loja do pedido.</summary>
+    public ILojaRepository LojaRepo { get; } = Substitute.For<ILojaRepository>();
+
+    /// <summary>Flags ativas do tenant; sem configuração, nenhuma (o Pix direto nasce desligado).</summary>
+    public ITenantFeatureFlagRepository Flags { get; } = SemFlags();
+
+    private static ITenantFeatureFlagRepository SemFlags()
+    {
+        var flags = Substitute.For<ITenantFeatureFlagRepository>();
+        flags.ListarAtivasAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(Array.Empty<string>());
+        return flags;
+    }
+
     public TrocarFormaPagamentoPedidoUseCase Trocar(IConferenciaPagamentoPedido? conferencia = null, SaldoFinanceiroPedido? saldos = null) =>
         new(PedidoStorefrontRepo, CobrancaRepo, Gerar(), Aviso(), Publicador, MpClient, Uow, Relogio,
             NullLogger<TrocarFormaPagamentoPedidoUseCase>.Instance, new CalculadoraInicioPrevistoPedido(PrazoQueries), OperacaoEventos, Quitacao(),
-            conferencia ?? Conferir(), saldos);
+            conferencia ?? Conferir(), saldos, LojaRepo, Flags);
 
     public ConferirPagamentoPedidoUseCase Conferir() => new(PedidoRepo, CobrancaRepo, MpClient, Confirmar());
 
@@ -255,7 +268,7 @@ internal sealed class CobrancaPedidoFixture
         var cancelar = new CancelarPedidoUseCase(PedidoRepo, estoque,
             new EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido(Substitute.For<IContaReceberRepository>(), VagaRepo, NullLogger<EasyStock.Application.Services.Pedidos.EfeitosCancelamentoPedido>.Instance), Uow,
             NullLogger<CancelarPedidoUseCase>.Instance, CobrancaRepo, Substitute.For<EasyStock.Application.Ports.Output.Integration.IPublicadorEventoIntegracao>(), Substitute.For<EasyStock.Application.Ports.Output.Atendimento.IOperacaoEventPublisher>());
-        return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, Gerar(), cancelar,
+        return new ProcessarCobrancaVencidaUseCase(PedidoStorefrontRepo, CobrancaRepo, ConversaRepo, Gerar(), cancelar,
             Aviso(), MpClient, Confirmar(), Tenant, Uow, Relogio, NullLogger<ProcessarCobrancaVencidaUseCase>.Instance, OperacaoEventos,
             Notificador);
     }

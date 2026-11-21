@@ -10,6 +10,191 @@ Sem este inventário, próxima sessão tropeça no teste e perde 30 min investig
 
 ---
 
+## ✅ CORRIGIDO (#2982, registrado na #2973): `prova-1743-tamanhos-navegador` conta a linha de 1 kg antes de ela aparecer
+
+Falhou 1 vez no workflow `console` do master em `925309989` (20/11/2026, 18:08Z), linha 127:
+`Retirar 800 g preserva 1 kg`, esperado 1 e veio 0. A asserção de 600 g, logo antes, passou. O rerun do mesmo
+SHA (attempt 2, 18:28Z) passou sem mudança nenhuma; a mesma prova também passou na PR #2963.
+
+- **Por que é flaky:** depois de clicar "Somar Lasanha Bolonhesa Clássica 1 kg no pedido", a prova não espera a
+  linha nova. Em seguida tira uma unidade de 800 g e conta "Anotação para ... 1 kg" com `.count()`, que lê o DOM
+  na hora e não espera. Se a comanda ainda não renderizou a linha de 1 kg, a contagem dá 0. A linha de 600 g
+  entrou antes do arrasto e por isso não sofre o mesmo atraso.
+- **Como confirmar:** rodar de novo o job `console` no mesmo SHA. Passar no rerun sem mudança é o sinal.
+- **Por que não foi corrigido:** a issue pediu só o registro. A correção é uma linha:
+  `await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 1 kg', exact: true }).waitFor()`
+  logo depois do clique de 1 kg.
+- **Quando promover a "corrigir":** na segunda falha com a mesma mensagem, ou antes, se alguém mexer nessa prova.
+- **Correção (#2982):** o `waitFor()` acima entrou logo depois do clique de 1 kg.
+
+---
+
+## ✅ CORRIGIDO (#2871): `prova-2395-ficha-navegador` lia o botão antes da troca de pessoa
+
+Falhou no CI da PR #2874 em 19/11/2026 (17:27Z, linha 52, `true !== false`) e 1 vez em 21 rodadas locais. A prova
+chamava `window.trocarPessoa()` e lia `isEnabled()` de "Manter texto para esta pessoa" logo em seguida; o `setState`
+ainda não tinha sido aplicado e o botão às vezes seguia habilitado. Agora a prova espera o botão desabilitado
+(`getByRole(..., { disabled: true }).waitFor()`) antes de afirmar.
+
+---
+
+## ✅ CORRIGIDO (#2770): provas do Caixa do dia falhavam nos primeiros minutos depois da meia-noite de São Paulo
+
+Visto em `EasyStock.Infra.Postgre.IntegrationTests/Workflows/CaixaDoDiaNumerosIntegrationTests.cs`, em 16/11/2026
+às 03:02:20Z (00:02 em São Paulo), em duas PRs sem relação com o caixa. Três provas falharam:
+`Dia_fechado_mostra_o_fechamento_e_o_que_entrou_depois_fica_em_pos_fechamento` ("Expected caixa.PosFechamento to
+be 80M ... but found 0.00M"), `Lancamento_gravado_depois_do_fechamento_some_do_retrato_e_o_estorno_diz_o_motivo_certo`
+("Expected caixa.PosFechamento to be 30M, but found 0.00M") e
+`Linha_de_pagamento_de_pedido_traz_numero_do_dia_cliente_e_quem_registrou` (lista sem a primeira linha).
+
+- **Por que era flaky:** as provas derivavam os instantes de `DateTime.UtcNow` menos 5, 3, 2 ou 1 min e calculavam
+  o dia operacional a partir de um deles. Nos primeiros minutos depois das 03:00Z parte dos lançamentos caía no
+  dia anterior, e o dia consultado não continha o que o teste semeou. Os use cases usam o relógio real
+  (`HorarioBrasil.Hoje()`, `DateTime.UtcNow`), então deslocar tudo para outro horário não resolvia.
+- **Como foi confirmado:** `InstantesDoDiaOperacionalTests` com a derivação antiga (o próprio `agora`, sem
+  empurrar para dentro do dia) falhou em 3 de 3 para `03:02:20Z`, `02:59:58Z` e `03:00:00Z`, com os lançamentos
+  espalhados por 15/11 e 16/11.
+- **Fix (#2770):** `InstantesDoDiaOperacional.Ancora` empurra `agora` para dentro do dia operacional dele, com
+  folga para o maior recuo e o maior avanço da prova. Todas as provas do arquivo derivam daí, e a ordem e o
+  espaçamento entre os instantes não mudam. A prova do helper roda sem banco e sem relógio, com `agora` fixo.
+- **Se voltar a falhar:** ver se algum use case novo carimba ou filtra por um relógio que não seja o dia
+  operacional de agora, ou se a prova voltou a semear com `DateTime.UtcNow.AddMinutes(-N)` solto. Instante
+  semeado depois de `FecharCaixa` precisa ser derivado depois dele, como `Ancora(DateTime.UtcNow, ...)` de novo.
+- **Limite conhecido:** as provas com banco só rodaram em horário comum; a virada é provada pelo helper, com
+  `agora` fixo. Se a meia-noite real cair entre o semeio e o `FecharCaixa` da mesma prova (milissegundos a poucos
+  segundos por dia), o fechamento vale para o dia novo e a prova ainda pode falhar. Isso só some com relógio
+  injetável no use case, que é mudança de produção e ficou fora da #2770.
+- **Classes vizinhas conferidas (#2769):** `CaixaFechamentoTravaIntegrationTests`,
+  `SangriaSimultaneaIntegrationTests` e `MobileCashPromoverIntegrationTests` também semeiam com "agora menos N",
+  mas nenhuma prova delas depende de a abertura cair no dia de hoje; não falham na virada.
+
+---
+
+## ✅ CORRIGIDO (#2814): três provas de navegador do Console dependiam de tempo e falhavam com a máquina carregada
+
+Visto em 16/11/2026, em `npm run qualidade` na #2803, com outra medição de navegador na mesma máquina. Sozinhas,
+as 3 passaram no mesmo commit.
+
+| Prova | Falha | Causa |
+|---|---|---|
+| `prova-1728-teste-email-navegador.mjs` | `page.goto` passou de 10 s | o teto de 10 s da prova valia também para abrir a página |
+| `prova-1743-tamanhos-navegador.mjs` | `5 !== 4` em "Tentativa bloqueada não escreve na API" | o POST `/sugestao`, que o aplicativo manda sozinho ao abrir a conversa, chegou depois da contagem |
+| `prova-hub-navegador.mjs` | `waitFor` do `data-estado="carregando"` passou de 30 s | a leitura demorava 900 ms de relógio real; com a máquina lenta, acabava antes de a prova olhar |
+
+- **Como foi confirmado:** com 8 processos ocupando CPU numa máquina de 12, a 1728 falhou de novo no `goto` de
+  10 s e a 1743 falhou no próprio `goto`. As outras duas causas saem da mensagem da falha e do código: a da 1743
+  nomeia o POST `/sugestao` a mais, e a do hub espera um estado que dura 900 ms.
+- **Fix (#2814):** o hub segura a leitura num portão que a prova solta depois de conferir o "Carregando…" (três
+  pontos da prova usavam os 900 ms). A 1743 conta só as escritas que mexem no pedido; `/marcar-lida` e `/sugestao`
+  já eram aceitas pela asserção do fim da prova, mas a contagem de escritas não as ignorava. A 1728 e a 1743 dão
+  60 s só à navegação; as esperas da tela seguem em 10 s. O hub não mexeu na navegação.
+- **Se voltar a falhar:** `goto` acima de 60 s é máquina sem CPU, não a prova. No hub, ver se alguma leitura
+  nova ficou fora do portão. Na 1743, ver se o aplicativo passou a mandar outra escrita ao abrir a conversa.
+- **Limite conhecido:** com o portão fechado, a leitura presa conta os 25 s de `AbortSignal.timeout` do
+  `usePulsoDoHall.js`, que o relógio falso da prova não controla. Se a prova levar mais de 25 s entre fechar e
+  soltar o portão, o cartão vira "erro" em vez de "carregando". A entrada do hub mais abaixo (arrasto por toque) é
+  outro ponto e segue tolerada. As provas da entrada #2809 não foram mexidas.
+
+---
+
+## ⚠️ TOLERADO (#2809): provas de navegador do Console estouram o tempo no gate local carregado
+
+Visto em 16/11/2026, no head `777ffef10` da PR #2806, em duas rodadas completas de `npm run qualidade` com outras
+sessões usando a máquina. Cada rodada falhou em uma prova diferente, sempre por timeout do Playwright:
+
+| Rodada | Prova | Falha |
+|---|---|---|
+| 1 | `prova-1847-nota-resumo.mjs` | `click` em "Abrir Atendimento" passou de 5 s |
+| 1 | `prova-2478-pedidos-navegador.mjs` | `waitFor` da navegação "Telas de Cadastros" passou de 12 s |
+| 2 | `prova-1685-sinal-navegador.mjs` | `page.goto` passou de 8 s |
+
+- **Por que é flaky:** causa provável, não medida. O runner roda as provas em paralelo, e cada prova de navegador
+  abre seu Chromium (a 1847 sobe também seu próprio Vite). Com a CPU disputada, o `goto` e o primeiro render
+  passam dos timeouts fixos de 5 a 12 s. Isolada, a 1847 levou 68 s.
+- **Como confirmar:** `node ferramentas/rodar-provas.mjs <nome>` no mesmo commit. As 3 passaram isoladas, e cada
+  uma passou na outra rodada completa. O CI do mesmo head ficou verde (job `qualidade`).
+- **Por que não foi corrigido:** só aparece com a máquina carregada por fora. Subir timeout sem medir esconderia
+  lentidão real da tela.
+- **Quando promover a "corrigir":** se a mesma prova falhar em duas rodadas completas seguidas, ou se aparecer no CI.
+
+---
+
+## ⚠️ TOLERADO (#2697): impresso entrega/a5 falhou uma vez na suíte local carregada
+
+Visto em `EasyStock.Api.UnitTests/Services/Impressao/PedidoImpressoHtmlTests.cs:107`,
+`TodoDocumentoSaiEmTodoPapelComONumeroEOQr(documento: "entrega", modelo: "a5")`, em 15/11/2026. A suíte
+local deu 2177/1 com os testes de integração Postgres rodando em paralelo na mesma máquina. A mensagem da
+falha não foi guardada. Isolado, o teste passou 3 de 3.
+
+- **Por que é flaky:** causa não confirmada. O teste usa dados fixos. A suspeita é o `RenderTimeout` do
+  `ScribanRenderer`, que vale 500 ms fora do CI (o CI usa 2 s, ver #910 abaixo). Com
+  `EASYSTOK_SCRIBAN_TIMEOUT_MS=1`, o teste falha com `TimeoutException`, então o mecanismo existe. Duas
+  rodadas de carga não reproduziram: 3 e depois 8 suítes completas em paralelo, 0 falhas em 11.
+- **Como confirmar:** rodar de novo. Se voltar, guardar a mensagem. `TimeoutException: Renderizacao de
+  template excedeu 500ms` confirma a suspeita.
+- **Por que não foi corrigido:** apareceu uma vez, só localmente e sob carga externa. Subir o timeout de
+  produção ou mexer no teste sem reproduzir seria chute.
+- **Quando promover a "corrigir":** na segunda falha, ou se aparecer no CI (lá o timeout já é 2 s).
+
+---
+
+## ⚠️ TOLERADO: prova do hub não vê a troca de ordem depois do arrasto por toque
+
+Visto em `EasyStock.Console/ferramentas/prova-hub-navegador.mjs:161`, no job `qualidade` da PR #2616
+(run 43667676409, head `276a3b392`). A tentativa 1 falhou com `page.waitForFunction: Timeout 30000ms
+exceeded`, logo depois do log "Produção movido para a posição 2 de 6". O rerun do mesmo job no mesmo SHA
+passou, e localmente a prova passou 4 de 4 vezes nesse head. A PR não toca `features/hall`.
+
+- **Por que é flaky:** causa não confirmada. A prova usa `page.clock` falso, e o arrasto por toque
+  depende de timers e quadros. A suspeita é que, com o runner carregado, a reordenação só aplique depois
+  de um `runFor` que vem depois da espera da linha 161.
+- **Como confirmar:** rerun do job no mesmo SHA. Para reproduzir, rodar a prova com CPU limitada
+  (`cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })`) e ver se a espera expira.
+- **Por que não foi corrigido:** apareceu uma vez, numa PR fora do hall. Corrigir sem reproduzir
+  seria chute.
+- **Quando promover a "corrigir":** na segunda falha em qualquer branch, ou se reproduzir com CPU
+  limitada.
+
+---
+
+## ✅ CORRIGIDO (#2357, #2010): stream do chat do site media relógio de parede abaixo de 2 s
+
+Visto em `ChatSiteControllerTests.RespostaDaLojaChegaPeloStreamEmMenosDeDoisSegundos`: 2,43 s, 2,74 s e 3,25 s
+em PRs de 23/10 (#1929, #1931), 2,05 s na #2310 e 2,275 s no master `d3c31ea72` (run 43175092348). Todas
+passaram no rerun do mesmo SHA, em PRs que não tocam o chat.
+
+- **Por que era flaky:** o stream lê a cada `IntervaloStream` (1 s) e o teste exigia a resposta em menos de 2 s
+  de parede. Com o runner carregado, uma leitura lenta somada ao ciclo passava do limite.
+- **Como foi confirmado:** com a leitura que acha a resposta atrasada em 1,5 s, o teste antigo falhava em 1 de 1.
+- **Fix:** `RespostaDaLojaSaiNoStreamNaLeituraQueAEncontra` afirma a ordem, não o tempo: a resposta sai no
+  stream antes da leitura seguinte, e `IntervaloStream` fica em até 1 s. O atraso de 1,5 s ficou no teste, então
+  quem voltar a medir parede vê a falha sempre. 20 de 20 verdes localmente.
+- **Se voltar a falhar:** não é mais carga do runner. Ver se o controller passou a escrever a mensagem depois
+  da leitura seguinte ou se o intervalo subiu.
+
+---
+
+## ✅ CORRIGIDO (#2433): prova do Financeiro contava o Sair da tela de carregamento
+
+Visto em `EasyStock.Console/ferramentas/prova-financeiro-navegador.mjs:69`, no job `console` do master em
+`7edefc785` (run 43349117808). A tentativa 1 falhou com `1 !== 0` e a 2 passou com o mesmo SHA.
+
+- **Por que era flaky:** a prova passou a rodar no CI com a #2410. Logo depois do `page.reload()`, o App
+  mostra "Carregando seus módulos / Aguarde um instante.", e essa tela tem um botão Sair próprio
+  (`App.jsx`, `if (!dados)`). Depois do segundo reload, a prova só esperava textos sumirem. Esses textos
+  também não existem na tela de carregamento, e a `conferirSessao` contava Sair solto antes de a
+  moldura montar. O log da falha mostra "Aguarde um instante.".
+- **Como foi confirmado:** com `/api/auth/me/modulos` atrasado em 1,5 s, a prova falhava em 1 de 1, na
+  mesma linha e com o mesmo `1 !== 0`.
+- **Fix (#2433):**
+  - A `conferirSessao` espera o avatar da conta à vista antes de contar. A tela de carregamento e a
+    moldura nunca aparecem juntas, e com a tela pronta o Sair solto continua proibido.
+  - O atraso de 1,5 s ficou na prova, no segundo reload. Assim, quem tirar a espera vê a falha sempre,
+    não de vez em quando.
+- **Se voltar a falhar:** não é mais a carga dos módulos. Ver qual tela tinha o Sair na captura.
+
+---
+
 ## ✅ CORRIGIDO (#1680) — teste do canário de telemetria dependia do timeout de produção
 
 Visto em `TelemetriaGeocodingTests.Sem_a_protecao_o_canario_vaza_no_span_e_no_log` (os três testes da

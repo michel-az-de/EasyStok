@@ -5,8 +5,11 @@ import { Botao } from '../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { CampoReais } from '../../componentes/CampoReais'
 import { lerMoeda, moeda } from '../../dominio/formato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './ficha.module.css'
 
+// #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o envio trava.
+const LIMITE_MOTIVO = 500
 const data = (valor) => new Date(valor).toLocaleString('pt-BR')
 // Só a intenção que nunca saiu daqui pode ser descartada; depois do envio a API responde 409.
 const podeDescartar = (estorno) => estorno.situacao === 'pendente' && estorno.enviadoEm == null
@@ -37,7 +40,8 @@ export function EstornosOnline({ pedidoId, aoAlterado = null }) {
   const disponiveis = dados?.pagamentos.filter((p) => p.disponivel > 0 && p.reservado === 0) ?? []
   const pagamento = disponiveis.find((p) => p.id === pagamentoId)
   const valor = Number(centavos || 0) / 100
-  const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && confirmado
+  const passaDoLimite = algumPassaDoLimite([motivo, LIMITE_MOTIVO])
+  const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && confirmado && !passaDoLimite
 
   function escolher(id) {
     setPagamentoId(id)
@@ -87,10 +91,10 @@ export function EstornosOnline({ pedidoId, aoAlterado = null }) {
     {podeSolicitar && !semResposta && aberto && <form className={css.acoesPedido} onSubmit={salvar}>
       <CampoSelecao rotulo="Recebimento do Mercado Pago" value={pagamentoId} disabled={ocupado} onChange={(e) => escolher(e.target.value)} opcoes={disponiveis.map((p) => ({ valor: p.id, rotulo: `${data(p.pagoEm)} · ${p.metodo} · disponível ${moeda(p.disponivel)}` }))} />
       <CampoReais rotulo="Valor do estorno online" centavos={centavos ? Number(centavos) : null} ler={lerMoeda} aoMudar={(valor) => setCentavos(valor == null ? '' : String(valor))} disabled={ocupado} dica={pagamento ? `Até ${moeda(pagamento.disponivel)} deste recebimento.` : 'Atualize para conferir o recebimento.'} />
-      <CampoTexto rotulo="Motivo do estorno online" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} required disabled={ocupado} />
+      <CampoTexto rotulo="Motivo do estorno online" value={motivo} onChange={(e) => setMotivo(e.target.value)} limite={LIMITE_MOTIVO} required disabled={ocupado} />
       <label className={css.corpoBloco}><input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} disabled={ocupado} /> Confirmo a solicitação de devolução de {moeda(valor)} pelo Mercado Pago.</label>
       <p className={css.corpoBloco}>O Mercado Pago devolverá pelo meio original. A saída no Caixa será registrada quando o provedor confirmar. Não faça uma devolução manual para o mesmo valor.</p>
-      <Botao type="submit" variante="primario" disabled={!valido || ocupado}>{ocupado ? 'Conferindo estorno…' : 'Confirmar solicitação de estorno'}</Botao>
+      <Botao type="submit" variante="primario" disabled={!valido || ocupado} aria-busy={ocupado || undefined} motivo={passaDoLimite ? 'Encurte o motivo, que passa do limite.' : undefined}>{ocupado ? 'Conferindo estorno…' : 'Confirmar solicitação de estorno'}</Botao>
       <Botao type="button" disabled={ocupado} onClick={() => setAberto(false)}>Voltar</Botao>
     </form>}
     <Botao disabled={ocupado} onClick={atualizar}>Atualizar estornos online</Botao>

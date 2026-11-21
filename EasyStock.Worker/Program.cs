@@ -119,6 +119,8 @@ builder.Services.AddHostedService<IntegrationOutboxBackgroundService>();
 // Sem este registro o Worker não resolvia IFileStorage e o ReportRunner falhava em runtime
 // (gap fechado — provider lido de "FileStorage:Provider", default Local).
 builder.Services.AddEasyStockFileStorageCore(builder.Configuration);
+// #2211: anexo dos avisos (canhoto em PNG/PDF), gerado aqui porque o Worker avalia os eventos.
+builder.Services.AddAnexosDeNotificacao();
 
 // Motor de relatórios assíncrono (PR-C0 — ADR-R02/R03/R04/R06/R07)
 // Registra ReportRunnerBackgroundService + ReportWatchdogBackgroundService +
@@ -155,7 +157,12 @@ builder.Services.AddEasyStockDataProtection();
 // consome e o HealthchecksPingService, que pinga o Healthchecks.io enquanto estao saudaveis e chama /fail quando nao.
 builder.Services.AddHealthChecks()
     .AddNotificationsHosting()
-    .AddNotificacoesBacklog();
+    .AddNotificacoesBacklog()
+    // #2536: os outros loops do Worker (outbox, agendamento, relatorios...) tambem alimentam o arquivo de vida.
+    .AddCheck<EasyStock.Infra.Notifications.Hosting.LoopsDoWorkerHealthCheck>(
+        EasyStock.Infra.Notifications.Hosting.LoopsDoWorkerHealthCheck.Nome,
+        tags: EasyStock.Infra.Notifications.Hosting.LoopsDoWorkerHealthCheck.Tags);
+builder.Services.AddSingleton<EasyStock.Infra.Notifications.Hosting.LoopsDoWorker>();
 builder.Services.AddHttpClient(HealthchecksPingService.NomeDoCliente);
 builder.Services.AddHostedService<HealthchecksPingService>();
 // #2107: sinal de vida para o healthcheck do Docker (Notifications:Monitoring:ArquivoDeVida; vazio desliga).

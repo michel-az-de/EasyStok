@@ -352,6 +352,31 @@
     if (hasData) throw new Error('Este aparelho já tem dados vinculados. A equipe precisa revisar a conexão antes de parear novamente ou trocar de loja. Seus dados foram mantidos; não desinstale o app.');
   }
 
+  // A autenticação não autoriza escolher outra origem para uma fila já existente.
+  // Na retomada da mesma origem só a credencial muda, nunca os dados ou os IDs.
+  function applySessionPairing(data, options) {
+    const reject = (code, message) => { throw Object.assign(new Error(message), { code }); };
+    const sameContextId = (first, second) => String(first).toLowerCase() === String(second).toLowerCase();
+    if (!data || typeof data.apiKey !== 'string' || !data.apiKey || typeof data.empresaId !== 'string' || !data.empresaId
+      || typeof data.lojaId !== 'string' || !data.lojaId || data.deviceId !== deviceId)
+      reject('SESSION_PAIRING_INVALID', 'A conexão da conta não corresponde a este aparelho. Seus dados foram mantidos.');
+    const origin = pilotDataContext();
+    if (origin && (origin.invalid || !sameContextId(origin.empresaId, data.empresaId) || !sameContextId(origin.lojaId, data.lojaId)))
+      reject('LOCAL_CONTEXT_MISMATCH', 'Os dados deste aparelho pertencem a outra empresa ou loja. Nenhum dado foi enviado.');
+    const hasData = loadQueue().length > 0 || ['cdb-products', 'cdb-clients', 'cdb-orders', 'cdb-batches', 'cdb-cash', 'cdb-cash-closings', 'cdb-shopping', 'cdb-audit-log']
+      .some(key => { try { const rows = JSON.parse(localStorage.getItem(key) || '[]'); return !Array.isArray(rows) || rows.length > 0; } catch (_) { return true; } });
+    if (!origin && hasData && options?.confirmLocalContext !== true)
+      reject('LOCAL_CONTEXT_REQUIRED', 'Confira a empresa e a loja dos dados já existentes antes de sincronizar.');
+    savePairing({ apiKey: data.apiKey, empresaId: data.empresaId, lojaId: data.lojaId, deviceId,
+      label: data.label || null, defaultOperatorName: data.defaultOperatorName || null, pairedAt: data.pairedAt || null,
+      empresaNome: data.empresaNome || null, lojaNome: data.lojaNome || null });
+    if (!origin) resetPullCursor();
+    applyEmpresaNomeDoPareamento(data.empresaNome);
+    _pairingInvalid = false;
+    emitSyncStateChange();
+    return { paired: true };
+  }
+
   // ---- Device ID (primeiro boot gera um UUID, persiste) ----
   function getDeviceId() {
     let id = localStorage.getItem(DEVICE_ID_KEY);
@@ -422,6 +447,7 @@
     return true;
   }
   function getApiKey() {
+    if (window.CDB_CONFIG?.requiresGoogleSession && window.cdbAuth?.canSync?.() !== true) return null;
     const p = loadPairing();
     return (p && p.apiKey) || null;
   }
@@ -898,8 +924,53 @@
   // server caido por 1h causaria ~120 reqs/h por device — com backoff cai
   // pra ~6 reqs/h apos 5 falhas consecutivas.
   let _consecutiveFlushFailures = 0;
+  const PERIODIC_PULL_MIN_INTERVAL_MS = 60000; // #2347: mínimo entre pulls do laço (não dobra com o SSE)
   const FLUSH_DELAY_NORMAL_MS = 30000;   // 30s — delay padrao
   const FLUSH_DELAY_CAP_MS = 600000;     // 10min — cap maximo do backoff
+  // #2184: backup 'pre-sync' antes de enviar a fila (ver _flushInner).
+  let _chaveBackupPreSync = null;
+  let _ultimoAvisoBackupFalhou = 0;
+  let _ultimoRelatoBackupFalhou = 0;
+  function _temCanalDeBackupNativo() {
+    return !!(_getPublicBackupPlugin() || _getFilesystemPlugin());
+  }
+  function _avisarBackupFalhou() {
+    // O flush de 30s repete a falha: avisa no maximo a cada 5 min.
+    const agora = Date.now();
+    if (agora - _ultimoAvisoBackupFalhou < 300000) return;
+    _ultimoAvisoBackupFalhou = agora;
+    try {
+      if (window.cdbApp && window.cdbApp.showToast) {
+        window.cdbApp.showToast('Não foi possível salvar o backup deste aparelho. Nada foi enviado; as alterações continuam na fila.');
+      }
+    } catch (_) {}
+  }
+
+  // #2877: sem relato o servidor nao via por que a fila parou, nem que o
+  // backup ficou so na memoria interna (some se o app for desinstalado).
+  // Best effort, janela de 5 min, sem nome do operador (endpoint anonimo).
+  function _relatarBackup(situacao, backup, excecao, tamanhoFila) {
+    const agora = Date.now();
+    if (agora - _ultimoRelatoBackupFalhou < 300000) return;
+    _ultimoRelatoBackupFalhou = agora;
+    try {
+      const partes = [situacao, 'fila=' + tamanhoFila];
+      if (backup && backup.reason) partes.push(backup.reason);
+      const falhas = (backup && (backup.falhas || backup.avisos)) || [];
+      if (falhas.length) partes.push(falhas.join(' | '));
+      if (excecao) partes.push('excecao: ' + _mensagemDeErro(excecao));
+      fetch(API_BASE_URL + API_PREFIX + '/diagnostics/errors', {
+        method: 'POST',
+        headers: baseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          deviceId: deviceId,
+          bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null,
+          errors: [{ timestamp: agora, context: 'backup-pre-sync', message: partes.join('; ').slice(0, 500), screen: null }]
+        })
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
   async function flush() {
     // F10-C-1: re-entry retorna a MESMA promise pendente. Sem race.
     if (flushPromise) return flushPromise;
@@ -917,6 +988,25 @@
       return 'empty';
     }
     if (!navigator.onLine) return 'offline';
+
+    // #2184: backup local antes de qualquer envio. Sem canal nativo (navegador)
+    // nao ha onde gravar, entao segue como antes. A mesma fila ja coberta pelo
+    // ultimo backup pre-sync (ex: retry) nao grava de novo.
+    if (_temCanalDeBackupNativo()) {
+      const chaveFila = queue.map((m) => m.id).join('|');
+      if (chaveFila !== _chaveBackupPreSync) {
+        let backup = null;
+        let excecao = null;
+        try { backup = await localBackupToFile('pre-sync'); } catch (e) { backup = null; excecao = e; }
+        if (!backup || !backup.ok) {
+          _avisarBackupFalhou();
+          _relatarBackup('falhou', backup, excecao, queue.length);
+          return 'backup-failed';
+        }
+        if (backup.details && backup.details.internalUri) _relatarBackup('so-interno', backup, null, queue.length);
+        _chaveBackupPreSync = chaveFila;
+      }
+    }
 
     try {
       const url = API_BASE_URL + API_PREFIX + '/sync';
@@ -985,6 +1075,10 @@
         saveQueue(remaining);
       }
       // Se acceptedIds ausente, mantém a fila intacta (melhor reenviar do que perder).
+      // #2209: o pull nunca devolve a este aparelho o lote que ele lançou; o número vem aqui.
+      if (result.numerosCurtos && typeof result.numerosCurtos === 'object') {
+        try { _gravarNumerosCurtos(result.numerosCurtos); } catch (e) { console.warn('[sync] número do lote:', e && e.message); }
+      }
       // F4 — feedback visual: avisa o app pra mostrar toast com qtd sincronizada.
       if (acceptedCount > 0) {
         try {
@@ -1088,6 +1182,7 @@
   // F7: contador de falhas consecutivas — abre ticket auto apos 5.
   let _consecutivePullFailures = 0;
   let pullPromise = null;
+  let _lastPullAt = 0;
   let _pullDeferred = false;
   async function pull() {
     if (pullPromise) return pullPromise;
@@ -1095,6 +1190,7 @@
     return pullPromise;
   }
   async function _pullInner() {
+    _lastPullAt = Date.now();
     if (syncHeldForImport() || (window.CDB_CONFIG?.isPilot && !getApiKey())) return;
     if (!navigator.onLine) return;
     if (_pairingInvalid) return;
@@ -1171,6 +1267,31 @@
   const _MARCAS_DE_LOTE = ['deleted', 'deletedAt', 'deletedBy', 'discarded', 'discardedAt', 'discardedBy', 'discardReason', 'legacyImported'];
   let _consecutiveApplyFailures = 0;
 
+  // #2209: número curto do lote (#2199), o da chave de 12 dígitos da barra. Só o servidor o dá
+  // (8 dígitos, 10 depois de 99.999.999). Gravá-lo não é mudança do aparelho: o snapshot também
+  // o recebe, para o próximo save não devolver o lote ao servidor, e a tela não recarrega.
+  const _NUMERO_CURTO = /^(\d{8}|\d{10})$/;
+  function _numeroCurtoValido(n) { return typeof n === 'string' && _NUMERO_CURTO.test(n); }
+  function _numeroNoSnapshot(id, n) {
+    const s = lastSnapshot && Array.isArray(lastSnapshot.batches) ? lastSnapshot.batches.find(x => x && x.id === id) : null;
+    if (s) s.numeroCurto = n;
+  }
+  function _gravarNumerosCurtos(numeros) {
+    if (!window.cdbApp) return;
+    const state = window.cdbApp.getState();
+    if (!state || !Array.isArray(state.batches)) return;
+    let mudou = false;
+    state.batches.forEach(b => {
+      if (!b || !Object.prototype.hasOwnProperty.call(numeros, b.id)) return;
+      const n = numeros[b.id];
+      if (!_numeroCurtoValido(n) || b.numeroCurto === n) return;
+      b.numeroCurto = n;
+      _numeroNoSnapshot(b.id, n);
+      mudou = true;
+    });
+    if (mudou) localStorage.setItem(_SERVER_MUTATION_MAP.batch.storage, JSON.stringify(state.batches));
+  }
+
   function applyServerMutations(mutations, unresolved = []) {
     _pullDeferred = syncHeldForImport();
     if (_pullDeferred) return false;
@@ -1200,6 +1321,22 @@
           return;
         }
 
+        // #2431: pedido do app pago no console ou no Mercado Pago. Desce so o saldo a receber; trocar o
+        // pedido inteiro apagaria o que o aparelho ainda nao enviou. O snapshot do diff recebe o mesmo
+        // valor, senao um save antes do reload devolveria o pedido ao servidor como edicao deste aparelho.
+        if (type === 'order' && op === 'aReceber') {
+          const bruto = m.payload.aReceber;
+          const valor = bruto == null ? NaN : Number(bruto);
+          if (idx < 0 || !Number.isFinite(valor) || coll[idx].aReceber === valor) return;
+          coll[idx].aReceber = valor;
+          const base = lastSnapshot && Array.isArray(lastSnapshot.orders)
+            ? lastSnapshot.orders.find(x => x && x.id === m.payload.id) : null;
+          if (base) base.aReceber = valor;
+          changed = true;
+          localStorage.setItem(map.storage, JSON.stringify(coll));
+          return;
+        }
+
         // #1520: lote que o aparelho ja tem recebe so as marcas de exclusao e descarte, como
         // o servidor faz (itens sao imutaveis). Trocar o lote inteiro apagava a foto e o status
         // locais, que o servidor nao guarda. O saldo vem pelo produto, nao daqui.
@@ -1210,8 +1347,18 @@
             if (novo === undefined) delete coll[idx][k]; else coll[idx][k] = novo;
             changed = true;
           });
+          // #2209: o número entra sem recarregar; o servidor antigo, sem o campo, não o apaga.
+          const numero = m.payload.numeroCurto;
+          if (_numeroCurtoValido(numero) && coll[idx].numeroCurto !== numero) {
+            coll[idx].numeroCurto = numero;
+            _numeroNoSnapshot(coll[idx].id, numero);
+          }
           localStorage.setItem(map.storage, JSON.stringify(coll));
           return;
+        }
+        if (type === 'batch' && op === 'upsert' && m.payload.numeroCurto != null && !_numeroCurtoValido(m.payload.numeroCurto)) {
+          m.payload = Object.assign({}, m.payload);
+          delete m.payload.numeroCurto;
         }
 
         if (op === 'upsert') {
@@ -1285,7 +1432,7 @@
   //   ok / empty     → 30s (normal)
   //   retry          → 30s * 2^(failures-1), cap 10min (60/120/240/480/600)
   //   auth           → 10min (so re-pareamento destrava; loop checa de vez em quando)
-  //   offline / busy → 30s (sem mudar contador — proximo tick vai tentar)
+  //   offline / busy / backup-failed → 30s (sem mudar contador — proximo tick vai tentar)
   function computeFlushDelay(status) {
     if (status === 'auth') return FLUSH_DELAY_CAP_MS;
     if (status === 'retry') {
@@ -1343,8 +1490,7 @@
     flushIntervalId = setTimeout(async function flushTick() {
       let status = 'ok';
       try {
-        status = (await flush()) || 'ok';
-        fetchAndProcessCommands();
+        status = await runSyncCycle();
       } catch (e) {
         try { console.warn('[sync] tick falhou:', e && e.message); } catch (_) {}
         status = 'retry';
@@ -1352,6 +1498,19 @@
         scheduleNextFlush(computeFlushDelay(status));
       }
     }, delay);
+  }
+  // Um ciclo do laço: flush, comandos remotos, regra de impressão e, passado o intervalo mínimo, pull.
+  async function runSyncCycle() {
+    const status = (await flush()) || 'ok';
+    fetchAndProcessCommands();
+    // #2209: a regra de impressão da loja; o próprio atualizar segura o intervalo de 10 min.
+    atualizarRegraImpressao();
+    // #2347: mudança feita no servidor (console, site, pagamento) não gera SSE para este aparelho.
+    // Sem 'review'/'auth' (import ou pareamento inválido); falha do pull não vira retry do flush.
+    if (status !== 'review' && status !== 'auth' && Date.now() - _lastPullAt >= PERIODIC_PULL_MIN_INTERVAL_MS) {
+      pull().catch(() => {});
+    }
+    return status;
   }
   function stop() {
     if (flushIntervalId) { clearTimeout(flushIntervalId); flushIntervalId = null; }
@@ -1431,7 +1590,8 @@
         else if (fila === 'degraded') resolveLocalReady({ ready: true, degraded: true });
         else resolveLocalReady({ ready: false, reason: 'local-storage-unavailable' });
       });
-      flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup);
+      flush().then(pull).then(fetchAndProcessCommands).then(startRealtime).then(maybeAutoBackup)
+        .then(function () { atualizarRegraImpressao(); });
       // Loop self-rescheduling com backoff exponencial em erro (substitui o
       // antigo setInterval(30000) fixo). Em rede OK fica a 30s; em incidente
       // longo do server escala ate 10min entre tentativas, economizando
@@ -1575,26 +1735,25 @@
   async function localBackupToFile(note) {
     var json = JSON.stringify(_buildBackupPayload(note));
 
-    // Sanity-check de espaco antes de tentar escrever. StorageEstimate
-    // reporta quota da origin (IndexedDB/localStorage) — nao reflete
-    // exatamente o filesystem do device, mas se quota esta cheia
-    // tipicamente indica pouco espaco geral. Aborta cedo em vez de
-    // explodir no Filesystem.writeFile silenciosamente.
+    // Estimativa de espaco: so aviso (#2877). StorageEstimate mede a quota da
+    // origin, nao o disco do aparelho; abortar aqui travava o envio da fila
+    // (#2184) mesmo com disco livre. Quem decide e a gravacao real abaixo.
+    var falhas = [];
     try {
       if (navigator.storage && navigator.storage.estimate) {
         var est = await navigator.storage.estimate();
         if (est && typeof est.quota === 'number' && typeof est.usage === 'number') {
           var livre = est.quota - est.usage;
           if (livre < Math.max(json.length * 4, 1024 * 1024)) {
-            console.warn('[localBackup] espaco insuficiente (livre=' + livre + 'B). Abortando.');
-            return { ok: false, reason: 'insufficient-storage' };
+            console.warn('[localBackup] estimativa de espaco baixa (livre=' + livre + 'B). Tentando gravar.');
+            falhas.push('estimativa: livre=' + livre + 'B');
           }
         }
       }
     } catch (_) { /* nao bloqueia se API indisponivel */ }
 
     var anyOk = false;
-    var details = { publicUris: null, scopedUri: null };
+    var details = { publicUris: null, scopedUri: null, internalUri: null };
 
     // CAMINHO 1 (PRIORITARIO): MediaStore publico via plugin custom.
     // Sobrevive uninstall — esse e o ponto crucial.
@@ -1613,6 +1772,7 @@
         console.log('[localBackup] publico OK', details.publicUris);
       } catch (e) {
         console.warn('[localBackup] publico falhou:', e && e.message);
+        falhas.push('publico: ' + _mensagemDeErro(e));
       }
     }
 
@@ -1634,14 +1794,41 @@
         anyOk = true;
       } catch (e) {
         console.warn('[localBackup] scoped falhou:', e && e.message);
+        falhas.push('documents: ' + _mensagemDeErro(e));
+      }
+    }
+
+    // CAMINHO 3 (#2877): memoria interna do app (Directory.Data). So quando
+    // os anteriores falharam. Nao precisa de permissao nem de MediaStore, e
+    // garante que o backup pre-sync (#2184) nao trave a fila para sempre.
+    if (!anyOk && FS) {
+      try {
+        var resInterno = await FS.writeFile({
+          path: LOCAL_BACKUP_FILE,
+          data: json,
+          directory: 'DATA',
+          encoding: 'utf8',
+          recursive: true
+        });
+        details.internalUri = resInterno && resInterno.uri;
+        anyOk = true;
+        console.log('[localBackup] memoria interna OK', details.internalUri);
+      } catch (e) {
+        console.warn('[localBackup] memoria interna falhou:', e && e.message);
+        falhas.push('interno: ' + _mensagemDeErro(e));
       }
     }
 
     if (anyOk) {
       try { localStorage.setItem(LAST_LOCAL_BACKUP_KEY, String(Date.now())); } catch (e) {}
-      return { ok: true, details: details };
+      return { ok: true, details: details, avisos: falhas };
     }
-    return { ok: false, reason: 'no-storage-available' };
+    return { ok: false, reason: 'no-storage-available', falhas: falhas };
+  }
+
+  function _mensagemDeErro(e) {
+    var m = (e && (e.message || e.code)) || String(e);
+    return String(m).slice(0, 200);
   }
 
   // Le backup local existente. Retorna o JSON parseado ou null.
@@ -1832,6 +2019,61 @@
     } finally { clearTimeout(timeoutId); }
   }
 
+  // #2209 (F4): regra de impressão da loja do pareamento, por GET api/mobile/impressao. O servidor
+  // acha a loja pela chave do aparelho; aqui só se confere que a resposta é da loja pareada. Sem
+  // rede, 404 ou resposta de outra loja, fica a regra guardada; a loja sem regra (null) volta ao
+  // padrão do aparelho. Uma busca por vez e no máximo uma a cada 10 min, salvo forcar; a que
+  // falhou tenta de novo em 1 min. A forçada durante outra espera a outra acabar e busca de novo,
+  // para a troca de loja não ficar com a resposta da loja antiga.
+  const REGRA_IMPRESSAO_KEY = 'cdb-regra-impressao.v1';
+  const REGRA_IMPRESSAO_INTERVALO_MS = 10 * 60 * 1000;
+  const REGRA_IMPRESSAO_RETRY_MS = 60 * 1000;
+  let _regraImpressaoProxima = 0;
+  let _regraImpressaoPromise = null;
+  function esquecerRegraImpressao() {
+    _regraImpressaoProxima = 0;
+    try { localStorage.removeItem(REGRA_IMPRESSAO_KEY); } catch (_) {}
+  }
+  function atualizarRegraImpressao(opts) {
+    const forcar = !!(opts && opts.forcar);
+    if (_regraImpressaoPromise) return forcar ? _regraImpressaoPromise.then(() => atualizarRegraImpressao(opts)) : _regraImpressaoPromise;
+    if (!forcar && Date.now() < _regraImpressaoProxima) return Promise.resolve(false);
+    _regraImpressaoProxima = Date.now() + REGRA_IMPRESSAO_RETRY_MS;
+    _regraImpressaoPromise = _buscarRegraImpressao()
+      .then(ok => { if (ok) _regraImpressaoProxima = Date.now() + REGRA_IMPRESSAO_INTERVALO_MS; return ok; })
+      .catch(e => { console.warn('[impressao] regra da loja:', e && e.message); return false; })
+      .finally(() => { _regraImpressaoPromise = null; });
+    return _regraImpressaoPromise;
+  }
+  async function _buscarRegraImpressao() {
+    const pareamento = loadPairing();
+    if (!pareamento || !pareamento.apiKey || !pareamento.lojaId) return false;
+    // A loja é a do pareamento de agora, não a do começo da busca: o switchLoja pode trocá-la no meio.
+    const mesmaLoja = id => { const atual = loadPairing(); return !!(atual && atual.lojaId) && String(id || '').toLowerCase() === String(atual.lojaId).toLowerCase(); };
+    try {
+      const guardada = JSON.parse(localStorage.getItem(REGRA_IMPRESSAO_KEY) || 'null');
+      if (guardada && guardada.lojaId && !mesmaLoja(guardada.lojaId)) localStorage.removeItem(REGRA_IMPRESSAO_KEY);
+    } catch (_) {}
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const limite = ctrl ? setTimeout(() => ctrl.abort(), 10000) : null;
+    let resp;
+    try {
+      // #2321: a carga chama antes do login Google; baseHeaders() então sai sem a chave e o servidor responde 401.
+      // A chave é a do pareamento, a mesma credencial do aparelho nas outras chamadas mobile.
+      resp = await fetch(API_BASE_URL + API_PREFIX + '/impressao', { method: 'GET', headers: { 'X-Device-Id': deviceId, 'X-Mobile-Api-Key': pareamento.apiKey }, signal: ctrl ? ctrl.signal : undefined });
+    } finally { if (limite) clearTimeout(limite); }
+    if (!resp || !resp.ok) return false;
+    const corpo = await resp.json();
+    const d = corpo && corpo.data;
+    if (!d || !mesmaLoja(d.lojaId)) return false;
+    if (d.impressao == null) { localStorage.removeItem(REGRA_IMPRESSAO_KEY); return true; }
+    const I = window.cdbImpressoras;
+    if (!I || typeof I.normalizarRegra !== 'function') return false;
+    localStorage.setItem(REGRA_IMPRESSAO_KEY, JSON.stringify(Object.assign({}, I.normalizarRegra(d.impressao),
+      { lojaId: d.lojaId, versao: d.versao, alteradoEm: d.alteradoEm || null })));
+    return true;
+  }
+
   async function switchLoja(lojaId) {
     if (!navigator.onLine) throw new Error('sem rede');
     if (!getApiKey()) throw new Error('nao pareado');
@@ -1882,11 +2124,14 @@
         p.label = p.label; // preserva
         savePairing(p);
       }
+      // #2209: a regra de impressão era da loja antiga; a da nova vem logo depois do pull.
+      esquecerRegraImpressao();
       // #1474: loja nova = pull completo, nao a partir do cursor da antiga.
       resetPullCursor();
       // Drena fila atual + pega dados da loja nova
       try { await flush(); } catch (_) {}
       try { await pull(); } catch (_) {}
+      atualizarRegraImpressao({ forcar: true });
       // Reinicia SSE pra pegar grupo da nova loja
       try { stopRealtime(); startRealtime(); } catch (_) {}
     }
@@ -1950,6 +2195,7 @@
     // Tenta token efemero. Se servidor antigo (404) ou rede falha, cai no
     // fallback ?apiKey= pra nao perder realtime durante a transicao.
     const token = await fetchSseToken();
+    if (apiKey !== getApiKey()) return;
     const queryParam = token ? ('token=' + encodeURIComponent(token))
                               : ('apiKey=' + encodeURIComponent(apiKey));
 
@@ -2630,7 +2876,7 @@
     // do periodo offline / sem pairing.
     try { flush(); } catch (_) {}
     // Pull inicial pra trazer produtos/clientes/pedidos. Sem isso a UI
-    // fica vazia ate o ciclo de 30s do sync loop disparar o proximo pull.
+    // fica vazia ate o laço periódico (a cada 60s no minimo) puxar de novo.
     try { await pull(); } catch (_) {}
     if (typeof window !== 'undefined') {
       try {
@@ -2901,7 +3147,9 @@
   window.cdbSync = {
     flush, pull, stop, localReady,
     pingVersion, uploadErrorLog,
-    pairWithCode, pairAuto,
+    pairWithCode, pairAuto, applySessionPairing, runSyncCycle,
+    getDeviceId: () => deviceId,
+    getDataContext: pilotDataContext,
     openTicketAuto,
     // Contingência: trace + diagnóstico expostos pro Diagnóstico UI usar
     getTrace, clearTrace, exportTraceText,
@@ -2925,6 +3173,7 @@
     startRealtime, stopRealtime,
     realtimeConnected: () => _sseSource && _sseSource.readyState === 1,
     listLojasDisponiveis, switchLoja,
+    atualizarRegraImpressao, esquecerRegraImpressao,
     uploadBackup, maybeAutoBackup,
     localBackupToFile, readLocalBackup, scheduleLocalBackup,
     pickBackupViaSAF,
@@ -2946,7 +3195,8 @@
       swSupported: () => _swSupported,                    // D2
       initQueueStore: _initQueueStore,                    // #1509
       bloquearMutations: (v) => { _mutationsBlocked = !!v; }, // #1520 (teste do bloqueio de OTA)
-      confirmarExclusoesPendentes: confirmarExclusoesPendentes // #1520
+      confirmarExclusoesPendentes: confirmarExclusoesPendentes, // #1520
+      resetAvisosBackup: () => { _ultimoAvisoBackupFalhou = 0; _ultimoRelatoBackupFalhou = 0; } // #2877
     },
     hasPublicBackupPlugin: () => !!_getPublicBackupPlugin(),
     lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,

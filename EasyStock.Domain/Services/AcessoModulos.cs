@@ -7,6 +7,8 @@ public static class AcessoModulos
         Modulo.Cardapio => Permissao.AcessarModuloCardapio,
         Modulo.Producao => Permissao.AcessarModuloProducao,
         Modulo.Atendimento => Permissao.AcessarModuloAtendimento,
+        // A entrada de Cadastros acompanha Atendimento; cada recurso conserva sua própria autorização.
+        Modulo.Cadastros => Permissao.AcessarModuloAtendimento,
         Modulo.Cozinha => Permissao.AcessarModuloCozinha,
         Modulo.Caixa => Permissao.AcessarModuloCaixa,
         Modulo.Campanhas => Permissao.AcessarModuloCampanhas,

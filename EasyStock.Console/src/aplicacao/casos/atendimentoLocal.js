@@ -85,7 +85,7 @@ export const casosAtendimentoLocal = {
     const idsAlvo = new Set(alvos.map((c) => c.id))
     const bloqueio = novoBloqueio({ motivo, em, por })
     const texto = `Cadastro bloqueado por ${por}. Motivo: ${bloqueio.motivo} `
-      + 'Atendimento automático suspenso em todos os canais.'
+      + 'Assistente suspenso em todos os canais.'
     const conversas = bloquearCadastro(estado.conversas, cadastroId, bloqueio).map((c) =>
       (idsAlvo.has(c.id)
         ? comMensagem(c, { dir: 'sistema', texto }, { id: `${mensagemId}-${c.id}`, agora })
@@ -107,7 +107,7 @@ export const casosAtendimentoLocal = {
     if (alvos.length === 0) return estado
     const idsAlvo = new Set(alvos.map((c) => c.id))
     const texto = `Bloqueio removido por ${por}. `
-      + 'O atendimento automático segue desligado até você retomar.'
+      + 'O Assistente segue desligado até você retomar.'
     const conversas = desbloquearCadastro(estado.conversas, cadastroId).map((c) =>
       (idsAlvo.has(c.id)
         ? comMensagem(c, { dir: 'sistema', texto }, { id: `${mensagemId}-${c.id}`, agora })

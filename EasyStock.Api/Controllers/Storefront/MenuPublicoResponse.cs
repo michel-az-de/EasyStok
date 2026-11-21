@@ -6,7 +6,7 @@ namespace EasyStock.Api.Controllers.Storefront;
 /// Envelope de resposta do cardápio público (<c>GET /api/storefront/{slug}/menu</c>).
 ///
 /// <para>
-/// Contrato canônico <c>menu-publico.contract.md</c>: a vitrine Casa da Babá
+/// Contrato canônico <c>menu-publico.contract.md</c>: a vitrine Casa da Baba
 /// (<c>menu.js</c>) exige <c>{ "itens": [...] }</c> — <c>Array.isArray(data.itens)</c>.
 /// Reusa <see cref="CardapioItemPublicoDto"/> (projeção pública medida: sem campos
 /// internos, 10 chaves, nulls emitidos) — não introduz item type paralelo.

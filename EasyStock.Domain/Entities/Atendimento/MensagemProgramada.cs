@@ -18,6 +18,9 @@ public class MensagemProgramada
     public const int TextoTamanhoMaximo = 4096;
     public const int ErroTamanhoMaximo = 500;
 
+    /// <summary>Tentativas de envio, a primeira incluída, antes de uma falha transitória virar <c>Falhou</c>.</summary>
+    public const int TentativasMaximas = 3;
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public Guid Id { get; private set; }
@@ -132,12 +135,37 @@ public class MensagemProgramada
         AlteradaEm = Utc(em);
     }
 
+    /// <summary>#2280: só o envio em curso falha; o que já saiu não volta a "Falhou" (a dona reenviaria em dobro).</summary>
     public void RegistrarFalha(string motivo, DateTime em)
     {
+        if (Situacao != SituacaoMensagemProgramada.Enviando)
+            throw new RegraDeDominioVioladaException($"Falha registrada fora de hora (situação: {Situacao}).");
         Situacao = SituacaoMensagemProgramada.Falhou;
         var limpo = string.IsNullOrWhiteSpace(motivo) ? "falha sem detalhe" : motivo.Trim();
         Erro = limpo.Length > ErroTamanhoMaximo ? limpo[..ErroTamanhoMaximo] : limpo;
         AlteradaEm = Utc(em);
+    }
+
+    /// <summary>
+    /// #2285: falha transitória (nada saiu: rede antes do POST, limite de taxa) volta a <c>Agendada</c> para uma nova
+    /// tentativa em <paramref name="novaTentativaEm"/>, até <see cref="TentativasMaximas"/>. Esgotadas, vira <c>Falhou</c>.
+    /// Devolve true quando reagendou. O motivo fica em <c>Erro</c> para a dona ver o que houve enquanto espera.
+    /// </summary>
+    public bool ReagendarPorFalhaTransitoria(string motivo, DateTime em, DateTime novaTentativaEm)
+    {
+        if (Situacao != SituacaoMensagemProgramada.Enviando)
+            throw new RegraDeDominioVioladaException($"Falha registrada fora de hora (situação: {Situacao}).");
+        if (Tentativas >= TentativasMaximas)
+        {
+            RegistrarFalha(motivo, em);
+            return false;
+        }
+        var limpo = string.IsNullOrWhiteSpace(motivo) ? "falha sem detalhe" : motivo.Trim();
+        Erro = limpo.Length > ErroTamanhoMaximo ? limpo[..ErroTamanhoMaximo] : limpo;
+        Situacao = SituacaoMensagemProgramada.Agendada;
+        AgendadaPara = Utc(novaTentativaEm);
+        AlteradaEm = Utc(em);
+        return true;
     }
 
     public void Cancelar(DateTime em)

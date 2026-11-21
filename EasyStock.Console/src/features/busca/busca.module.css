@@ -1,0 +1,9 @@
+.busca { min-height: 20rem; }
+.busca p { color: var(--tinta-2); }
+/* #2762 (B3): falha da busca com cara de erro; vence a regra de apoio acima pela especificidade. O alvo é o
+   papel de alerta, que a tela já declara: o estilo não pede classe nova no JSX. */
+.busca [role="alert"] { padding: var(--e-3); border-radius: var(--r-1); background: var(--erro-pastel); overflow-wrap: anywhere; }
+.busca [role="alert"], .busca [role="alert"] p { color: var(--erro); }
+.busca [role="alert"] ul { margin-block: var(--e-2); padding-left: var(--e-5); }
+.busca [role="listbox"] { position: static; }
+.busca [role="option"] > span { min-width: 0; overflow-wrap: anywhere; }

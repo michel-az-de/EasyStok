@@ -7,8 +7,8 @@ namespace EasyStock.Api.BackgroundServices;
 /// <summary>
 /// Consulta de contingência das corridas da Lalamove (#2160, R6). O webhook chega fora de ordem, pode não chegar, e
 /// a Lalamove desativa a URL depois de 10 falhas: a cada 2 min, cada corrida da API em curso é reconsultada pelo mesmo
-/// <see cref="SincronizarCorridaUseCase"/> do webhook. Também é quem dá como não criada a corrida que ficou
-/// "solicitando" depois de um timeout. Advisory lock: só um host roda a rodada.
+/// <see cref="SincronizarCorridaUseCase"/> do webhook. A corrida que ficou "solicitando" sem o id do pedido não entra:
+/// só a atendente, conferindo o painel da Lalamove, a libera (#2168). Advisory lock: só um host roda a rodada.
 /// Desligado por <c>BackgroundJobs:EnableCorridasLalamove=false</c>.
 /// </summary>
 public sealed class CorridasLalamoveJob(IServiceProvider serviceProvider, ILogger<CorridasLalamoveJob> logger) : BackgroundService

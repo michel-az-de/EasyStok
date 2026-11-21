@@ -1,11 +1,14 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Exceptions.Storefront;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects.Pix;
 
 namespace EasyStock.Application.UseCases.Pedidos.Cobranca;
 
@@ -32,8 +35,28 @@ public sealed record CobrancaPedidoResult(
     [System.Text.Json.Serialization.JsonIgnore]
     public string? PreferenciaSubstituida { get; init; }
 
+    /// <summary>
+    /// #2233: copia e cola do Pix direto. Carrega a chave da loja, por isso só sai para quem cuida do pedido (console)
+    /// ou para o próprio cliente; nunca para o cardápio público.
+    /// </summary>
+    public string? PixCopiaCola { get; init; }
+
+    /// <summary>
+    /// #2684: mensagem pronta ao cliente quando a cobrança é Pix direto (valor, recebedor e copia e cola), para quem
+    /// avisa na conversa. Leva a chave da loja: nunca sai na resposta da API.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? TextoPix { get; init; }
+
+    /// <summary>#2684: o Pix direto pendente caiu porque a loja ficou sem chave; a cobrança voltou para a entrega.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool PixDiretoSemChave { get; init; }
+
     public static CobrancaPedidoResult De(CobrancaPedido c, bool reutilizada = false) =>
-        new(c.Id, c.PedidoId, c.Provedor, c.Status.ToString(), c.LinkPagamento, c.Valor, c.ExpiraEm, c.Tentativa, reutilizada);
+        new(c.Id, c.PedidoId, c.Provedor, c.Status.ToString(), c.LinkPagamento, c.Valor, c.ExpiraEm, c.Tentativa, reutilizada)
+        {
+            PixCopiaCola = c.PixCopiaCola,
+        };
 }
 
 /// <summary>
@@ -64,7 +87,9 @@ public sealed class GerarCobrancaPedidoUseCase(
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
     ILogger<GerarCobrancaPedidoUseCase> logger,
-    SaldoFinanceiroPedido? saldoFinanceiro = null)
+    SaldoFinanceiroPedido? saldoFinanceiro = null,
+    IConversaRepository? conversaRepository = null,
+    ILojaRepository? lojas = null)
 {
     public static readonly TimeSpan Validade = TimeSpan.FromMinutes(30);
 
@@ -82,7 +107,8 @@ public sealed class GerarCobrancaPedidoUseCase(
         var itens = reservado.Itens.Append(reservado.ItemFrete).ToList();
         var dados = new DadosCobranca(
             reservado.Pedido.EmpresaId, reservado.Pedido.Id, reservado.Storefront.Id,
-            reservado.Storefront.TituloPublico, reservado.Total, itens, reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm);
+            reservado.Storefront.TituloPublico, reservado.Total, itens, reservado.Pedido.AgendadoParaEm, reservado.Pedido.CriadoEm,
+            RetornoWhatsApp: reservado.Storefront.LinkWhatsAppPedidos());
         try
         {
             return await CobrarAsync(dados, conversaId, tentativa: 1, ct);
@@ -156,7 +182,7 @@ public sealed class GerarCobrancaPedidoUseCase(
         var dados = new DadosCobranca(
             pedido.EmpresaId, pedido.Id, storefront?.Id ?? Guid.Empty, storefront?.TituloPublico ?? string.Empty,
             pedido.Total.Valor, pedido.Itens.ToList(), pedido.AgendadoParaEm, pedido.CriadoEm, alocado, cobrarSaldo,
-            input.NaEntregaSemProvedor);
+            input.NaEntregaSemProvedor, storefront?.LinkWhatsAppPedidos(), pedido.LojaId);
         return await CobrarAsync(dados, input.ConversaId, input.Tentativa, ct);
     }
 
@@ -175,6 +201,27 @@ public sealed class GerarCobrancaPedidoUseCase(
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoJaPago, "Pedido já pago.");
 
         var pendente = existentes.FirstOrDefault(c => c.EstaPendente);
+        if (pendente is { EhPixDireto: true })
+        {
+            var recebedor = await RecebedorPixAsync(dados);
+            var temSinal = PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm);
+            if (recebedor is not null && (dados.NaEntregaSemProvedor || temSinal))
+                return await PixDiretoAsync(pendente, dados, recebedor, conversaId, agora, ct);
+            // A alteração da comanda sem chave na loja: o código velho cobra o valor antigo; a diferença fica na entrega.
+            if (recebedor is null && dados.NaEntregaSemProvedor)
+            {
+                pendente.Cancelar(MotivoValorAlterado, agora);
+                var naEntrega = CobrancaPedido.CriarNaEntrega(dados.EmpresaId, dados.PedidoId, dados.Total - dados.Alocado,
+                    agora, conversaId ?? pendente.ConversaId);
+                await cobrancaRepository.AddAsync(naEntrega, ct);
+                await unitOfWork.CommitAsync();
+                return CobrancaPedidoResult.De(naEntrega) with { PixDiretoSemChave = true };
+            }
+            // Sem chave na loja, a encomenda segue a cobrança manual de sempre (abaixo); o resto é pedido de link.
+            if (recebedor is not null || !temSinal)
+                throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.FormaPixDireto,
+                    "O pedido está combinado para Pix na chave da loja; troque a forma para gerar link.");
+        }
         if (pendente is not null && !pendente.EhOnline)
         {
             if (PlanoPagamentoEncomenda.TemSinal(dados.AgendadoParaEm, dados.CriadoEm))
@@ -212,9 +259,11 @@ public sealed class GerarCobrancaPedidoUseCase(
             ValorTotal: valorCobrado,
             Items: valorCobrado == dados.Total
                 ? dados.Itens.Where(i => i.PrecoUnitario > 0m).Select(ItemDaPreferencia).ToList()
-                : [new PreferenceItemCommand(dados.CobrarSaldo ? "Restante do pedido" :"Sinal da encomenda (50%)", 1, valorCobrado)],
+                : [new PreferenceItemCommand(await TituloDaParcelaAsync(dados, conversaId, ct), 1, valorCobrado)],
             ExpiraEm: expiraEm,
-            IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}");
+            IdempotencyKey: $"{dados.PedidoId:N}-{existentes.Count + 1}",
+            // #2228: da conversa, o checkout devolve o cliente ao WhatsApp da loja; do site, as back_urls do site.
+            RetornoUrl: conversaId is null ? null : dados.RetornoWhatsApp);
 
         PreferenceCriadaResult preferencia;
         try
@@ -290,8 +339,43 @@ public sealed class GerarCobrancaPedidoUseCase(
         }
     }
 
+    /// <summary>
+    /// #2228: o Mercado Pago mostra "Pague por &lt;item&gt;" no checkout e na prévia do link. A parcela (sinal ou restante)
+    /// leva o pedido e a loja, com o número que o cliente lê na conversa; o resumo no WhatsApp explica sinal e restante.
+    /// </summary>
+    private async Task<string> TituloDaParcelaAsync(DadosCobranca dados, Guid? conversaId, CancellationToken ct)
+    {
+        var conversa = conversaId is { } id && conversaRepository is not null
+            ? await conversaRepository.ObterPorIdAsync(dados.EmpresaId, id, ct)
+            : null;
+        var pedido = $"Pedido {VariaveisAtendimento.NumeroDoPedido(dados.PedidoId, conversa)}";
+        return string.IsNullOrWhiteSpace(dados.StorefrontNome) ? pedido : $"{pedido} · {dados.StorefrontNome}";
+    }
+
+    /// <summary>
+    /// #2684: a alteração da comanda (ou a encomenda) com Pix direto pendente continua no Pix direto. Mesmo saldo e mesmo
+    /// copia e cola: reaproveita. Mudou: cancela e sai outro, porque o código velho cobra o valor antigo.
+    /// </summary>
+    private async Task<CobrancaPedidoResult> PixDiretoAsync(CobrancaPedido pendente, DadosCobranca dados, RecebedorPix recebedor,
+        Guid? conversaId, DateTime agora, CancellationToken ct)
+    {
+        var valor = dados.Total - dados.Alocado;
+        var valorDoPix = PixDiretoDoPedido.ValorDoPix(dados.AgendadoParaEm, dados.CriadoEm, dados.Total, valor);
+        if (pendente.Valor == valor && pendente.PixCopiaCola == PixDiretoDoPedido.CopiaECola(recebedor, dados.PedidoId, valorDoPix))
+            return CobrancaPedidoResult.De(pendente, reutilizada: true) with { TextoPix = PixDiretoDoPedido.Texto(pendente, recebedor, valorDoPix) };
+        pendente.Cancelar(MotivoValorAlterado, agora);
+        var nova = CobrancaPedido.CriarPixDireto(dados.EmpresaId, dados.PedidoId, valor, recebedor, agora,
+            conversaId ?? pendente.ConversaId, valorDoPix);
+        await cobrancaRepository.AddAsync(nova, ct);
+        await unitOfWork.CommitAsync();
+        return CobrancaPedidoResult.De(nova) with { TextoPix = PixDiretoDoPedido.Texto(nova, recebedor, valorDoPix) };
+    }
+
+    private Task<RecebedorPix?> RecebedorPixAsync(DadosCobranca dados) =>
+        PixDiretoDoPedido.RecebedorAsync(lojas, dados.EmpresaId, dados.LojaId);
+
     private sealed record DadosCobranca(
         Guid EmpresaId, Guid PedidoId, Guid StorefrontId, string StorefrontNome, decimal Total,
         IReadOnlyList<PedidoItem> Itens, DateTime? AgendadoParaEm, DateTime CriadoEm, decimal Alocado = 0m, bool CobrarSaldo = false,
-        bool NaEntregaSemProvedor = false);
+        bool NaEntregaSemProvedor = false, string? RetornoWhatsApp = null, Guid? LojaId = null);
 }

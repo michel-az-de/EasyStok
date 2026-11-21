@@ -1,11 +1,14 @@
 using EasyStock.Api.Authorization;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.HealthChecks;
 using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Storage;
 using EasyStock.Infra.Async.Storage;
+using EasyStock.Observabilidade;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using EasyStock.Infra.Integrations.DependencyInjection;
@@ -82,6 +85,12 @@ public static class ApiServiceCollectionExtensions
         services.AddSingleton<EasyStock.Api.Services.Impressao.PedidoImpressoHtml>(); // S49: impresso do pedido
         services.AddSingleton<EasyStock.Api.Services.Impressao.ComandaHtml>(); // S52: comanda de cozinha
         services.AddSingleton<EasyStock.Api.Services.Impressao.ResumoAtendimentoHtml>(); // #1839: resumo do atendimento
+        // #3017: balão 1 da cobrança Pix = PNG do impresso. Sem Impressao:Renderizador:Url nada disso entra e a conversa segue como hoje.
+        if (!string.IsNullOrWhiteSpace(configuration[EasyStock.Infra.Async.Pdf.GotenbergRenderizadorHtml.ChaveUrl]))
+        {
+            services.AddScoped<EasyStock.Application.Ports.Output.Impressao.IImpressoDoPedido, EasyStock.Api.Services.Impressao.ImpressoDoPedidoApi>();
+            services.AddScoped<EasyStock.Application.Services.Atendimento.PublicadorImpressoPedido>();
+        }
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
             sp.GetRequiredService<EasyStock.Api.Services.IJwtTokenService>());
@@ -427,6 +436,9 @@ public static class ApiServiceCollectionExtensions
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddEnderecoForaDoLogHttp();
+        // #2376: espaço livre do disco no /health/disco, vigiado de fora (scripts/uptime/alvos.txt).
+        services.AddHealthChecks().Add(new HealthCheckRegistration(
+            "Disco", _ => DiscoHealthCheck.DoSistema(configuration), HealthStatus.Unhealthy, [DiscoHealthCheck.Tag]));
 
         // Opt-in, como no Web e no Worker (issue 1002): sem endpoint nao ha provider nem exporter.
         // Antes caia em localhost:4317 e mandava traces e metricas para o vazio em producao (#2107).
@@ -435,6 +447,9 @@ public static class ApiServiceCollectionExtensions
         if (string.IsNullOrWhiteSpace(otlpConfigured))
             return services;
         var otlpEndpoint = new Uri(otlpConfigured);
+
+        // #2440: a exceção que o Npgsql grava no span sai redigida (o evento não passa pelo SpanQueRedige).
+        ExcecaoDoSpanQueRedige.Instalar("Npgsql");
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService("EasyStock.Api"))
@@ -451,6 +466,8 @@ public static class ApiServiceCollectionExtensions
                     .AddHttpClientInstrumentation(http =>
                         http.EnrichWithHttpRequestMessage = EnderecoForaDaTelemetria.OcultarUrlNoSpan(configuration))
                     .AddNpgsql()
+                    // #2376: o span sai com o mesmo mascaramento do log; antes do exporter.
+                    .AddProcessor(new SpanQueRedige())
                     .AddOtlpExporter(options => options.Endpoint = otlpEndpoint);
 
                 if (environment.IsDevelopment())

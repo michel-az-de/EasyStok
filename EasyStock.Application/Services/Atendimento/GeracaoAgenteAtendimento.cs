@@ -1,5 +1,6 @@
 using System.Text;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
@@ -11,9 +12,44 @@ namespace EasyStock.Application.Services.Atendimento;
 
 /// <summary>
 /// Resultado do laço do LLM. <see cref="Concluiu"/> falso sem <see cref="MotivoFalha"/> = atingiu o
-/// limite de iterações sem resposta final.
+/// limite de iterações sem resposta final. <see cref="Consumo"/> (S67) traz o detalhe para o registro do turno.
 /// </summary>
-public sealed record GeracaoAgente(string? Texto, int Tokens, bool Concluiu, string? MotivoFalha);
+public sealed record GeracaoAgente(string? Texto, int Tokens, bool Concluiu, string? MotivoFalha, ConsumoGeracaoAgente? Consumo = null);
+
+/// <summary>
+/// S67 (#2534): o que o laço gastou e pediu, para o registro do turno. Cada resposta do modelo é um passo; o modelo é
+/// o da última resposta. Ferramenta fica sem ok quando falhou, não existe ou não rodou porque a conversa mudou.
+/// </summary>
+public sealed class ConsumoGeracaoAgente
+{
+    private readonly List<FerramentaDoTurno> _ferramentas = [];
+
+    public int TokensEntrada { get; private set; }
+    public int TokensSaida { get; private set; }
+    public int TokensCacheLido { get; private set; }
+    public string? Modelo { get; private set; }
+    public int Passos { get; private set; }
+
+    /// <summary>A chamada ao modelo falhou (depois da nova tentativa).</summary>
+    public bool FalhaLlm { get; private set; }
+
+    public IReadOnlyList<FerramentaDoTurno> Ferramentas => _ferramentas;
+
+    internal void Somar(RespostaLlm resposta)
+    {
+        // #2862: a escrita de cache entra na entrada, sem migração. A cota do mês soma entrada, saída e cache lido e
+        // a escrita não pode sumir dela. O custo estimado fica um pouco abaixo: a escrita custa mais que a entrada comum.
+        TokensEntrada += resposta.TokensEntrada + resposta.TokensCacheEscrito;
+        TokensSaida += resposta.TokensSaida;
+        TokensCacheLido += resposta.TokensCacheLido;
+        Modelo = resposta.Modelo ?? Modelo;
+        Passos++;
+    }
+
+    internal void RegistrarFerramenta(string nome, bool ok) => _ferramentas.Add(new FerramentaDoTurno(nome, ok));
+
+    internal void RegistrarFalhaLlm() => FalhaLlm = true;
+}
 
 /// <summary>
 /// Geração do agente de atendimento, sem efeito colateral próprio: monta o contexto (prompt fixo, caderno,
@@ -21,14 +57,20 @@ public sealed record GeracaoAgente(string? Texto, int Tokens, bool Concluiu, str
 /// (<see cref="AgenteAtendimentoService"/>) envia a resposta verificada das ferramentas ou o texto que passar pela
 /// <see cref="GuardaRespostaAgente"/>; a sugestão da dona (#1420) só devolve.
 /// </summary>
+/// <summary>System do turno em duas partes (#2862). <see cref="Texto"/> junta as duas, como o modelo recebia antes.</summary>
+public sealed record SystemTurnoAgente(string Estavel, string Volatil)
+{
+    public string Texto => Estavel + Volatil;
+}
+
 public static class GeracaoAgenteAtendimento
 {
     /// <summary>
-    /// System prompt do turno. S54: caderno da loja (núcleo + índice) logo depois do prompt base e antes do
-    /// dossiê, para o começo do prompt ser igual entre conversas da mesma empresa e aproveitar o cache do
-    /// provedor. S25: histórico do cadastro (tags, pedidos, favorito, notas [interno]) quando há cliente.
+    /// System prompt do turno em duas partes (#2862). <see cref="SystemTurnoAgente.Estavel"/>: prompt fixo e caderno da
+    /// loja (S54), iguais entre turnos da empresa, para o cache do provedor reaproveitar o prefixo.
+    /// <see cref="SystemTurnoAgente.Volatil"/>: data e hora, dossiê e histórico do cadastro (S25), que mudam a cada turno.
     /// </summary>
-    public static async Task<string> MontarSystemAsync(
+    public static async Task<SystemTurnoAgente> MontarSystemTurnoAsync(
         Guid empresaId,
         ConfiguracaoAtendimento configuracao,
         Conversa conversa,
@@ -40,16 +82,29 @@ public static class GeracaoAgenteAtendimento
         CancellationToken ct)
     {
         var blocoCaderno = CadernoParaAgente.Montar(await caderno.ListarAsync(empresaId, incluirArquivados: false, ct));
-        var system = PromptAtendimento.Montar(configuracao)
-            + (blocoCaderno.Length > 0 ? "\n\n" + blocoCaderno : string.Empty)
-            + "\n\n" + MontarDossie(conversa, cliente, historico, agora);
+        var estavel = PromptAtendimento.Montar(configuracao)
+            + (blocoCaderno.Length > 0 ? "\n\n" + blocoCaderno : string.Empty);
 
+        var volatil = "\n\n" + MontarDossie(conversa, cliente, historico, agora);
         if (cliente is not null
             && await dossieUseCase.ExecuteAsync(new ObterDossieClienteQuery(empresaId, cliente.Id), ct) is { } dossie)
-            system += "\n\n" + ResumoDossieParaAgente.Montar(dossie);
+            volatil += "\n\n" + ResumoDossieParaAgente.Montar(dossie);
 
-        return system;
+        return new SystemTurnoAgente(estavel, volatil);
     }
+
+    /// <summary>System do turno como texto único, para quem não usa cache: as duas partes, na ordem de sempre.</summary>
+    public static async Task<string> MontarSystemAsync(
+        Guid empresaId,
+        ConfiguracaoAtendimento configuracao,
+        Conversa conversa,
+        Cliente? cliente,
+        IReadOnlyList<Mensagem> historico,
+        DateTime agora,
+        ICadernoRepository caderno,
+        ObterDossieClienteUseCase dossieUseCase,
+        CancellationToken ct) =>
+        (await MontarSystemTurnoAsync(empresaId, configuracao, conversa, cliente, historico, agora, caderno, dossieUseCase, ct)).Texto;
 
     /// <summary>
     /// Laço do LLM com as <paramref name="ferramentas"/>: executa as ferramentas pedidas e repete até a
@@ -64,12 +119,17 @@ public static class GeracaoAgenteAtendimento
         ContextoTurnoAgente contexto,
         int maximoIteracoes,
         ILogger logger,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? modelo = null,
+        string? systemVolatil = null)
     {
+        // #2862: ordem fixa (ordinal, não de cultura) para o prefixo de ferramentas ser igual entre turnos.
         var definicoes = ferramentas.Values
+            .OrderBy(f => f.Nome, StringComparer.Ordinal)
             .Select(f => new FerramentaLlm(f.Nome, f.Descricao, f.SchemaJson))
             .ToList();
         var tokens = 0;
+        var consumo = new ConsumoGeracaoAgente();
         var situacaoInicial = contexto.Conversa.Situacao;
 
         for (var iteracao = 0; iteracao < maximoIteracoes; iteracao++)
@@ -77,42 +137,73 @@ public static class GeracaoAgenteAtendimento
             RespostaLlm resposta;
             try
             {
-                resposta = await llm.EnviarAsync(new RequisicaoLlm(system, [.. mensagens], definicoes), ct);
+                resposta = await EnviarComUmaNovaTentativaAsync(
+                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
+                    { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento },
+                    contexto.Conversa.Id, logger, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 contexto.LimparRespostaVerificada();
+                consumo.RegistrarFalhaLlm();
                 logger.LogError(ex, "Agente de atendimento: falha chamando o LLM na conversa {ConversaId}.", contexto.Conversa.Id);
-                return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)");
+                return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)", consumo);
             }
 
-            tokens += resposta.TokensEntrada + resposta.TokensSaida;
+            // #2862: cache lido e escrito contam no total da cota (UsoIa); sem eles o número cai com o cache ligado.
+            tokens += resposta.TokensEntrada + resposta.TokensSaida + resposta.TokensCacheLido + resposta.TokensCacheEscrito;
+            consumo.Somar(resposta);
 
             if (resposta.StopReason != RespostaLlm.StopToolUse)
             {
                 var texto = string.Join("\n", resposta.Conteudo.OfType<BlocoTextoLlm>().Select(b => b.Texto)).Trim();
                 return new GeracaoAgente(texto, tokens, true,
                     texto.Length == 0 && !(situacaoInicial == SituacaoConversa.Automatica
-                        && (contexto.EnvioVerificado || contexto.RespostaVerificada is { Length: > 0 }))
-                        ? $"o agente não produziu resposta (stop_reason={resposta.StopReason})" : null);
+                        && (contexto.HouveEnvio || contexto.TemEnvioAdiado || contexto.RespostaVerificada is { Length: > 0 }))
+                        ? $"o agente não produziu resposta (stop_reason={resposta.StopReason})" : null, consumo);
             }
 
             mensagens.Add(new MensagemLlm(MensagemLlm.Assistente, resposta.Conteudo));
             var resultados = new List<BlocoLlm>();
             foreach (var uso in resposta.Conteudo.OfType<BlocoUsoFerramentaLlm>())
             {
-                resultados.Add(await ExecutarFerramentaAsync(ferramentas, contexto, uso, logger, ct));
+                var resultado = await ExecutarFerramentaAsync(ferramentas, contexto, uso, logger, ct);
+                resultados.Add(resultado);
+                consumo.RegistrarFerramenta(uso.Nome, !resultado.EhErro && !contexto.Interrompido);
+                if (contexto.Interrompido) return new GeracaoAgente(null, tokens, false, "o contexto da conversa mudou", consumo);
                 if (situacaoInicial == SituacaoConversa.Automatica && contexto.Conversa.Situacao != SituacaoConversa.Automatica)
                 {
                     if (contexto.Conversa.Situacao != SituacaoConversa.Encerrada) contexto.LimparRespostaVerificada();
-                    return new GeracaoAgente(null, tokens, true, null);
+                    return new GeracaoAgente(null, tokens, true, null, consumo);
                 }
             }
             mensagens.Add(new MensagemLlm(MensagemLlm.Usuario, resultados));
         }
 
-        return new GeracaoAgente(null, tokens, false, null);
+        return new GeracaoAgente(null, tokens, false, null, consumo);
     }
+
+    /// <summary>
+    /// #2285: um blip do LLM (reset de conexão, 5xx, timeout) não manda a conversa para a dona: 1 nova tentativa da mesma
+    /// chamada. Só a chamada ao LLM se repete: a ferramenta que o turno já executou não roda de novo, porque o laço segue
+    /// adiante a partir da resposta e não de volta. O desligamento (<paramref name="ct"/> cancelado) sobe sem tentar.
+    /// </summary>
+    private static async Task<RespostaLlm> EnviarComUmaNovaTentativaAsync(
+        IAgenteLlmClient llm, RequisicaoLlm requisicao, Guid conversaId, ILogger logger, CancellationToken ct)
+    {
+        try
+        {
+            return await llm.EnviarAsync(requisicao, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Agente de atendimento: a chamada ao LLM falhou na conversa {ConversaId}; tenta de novo uma vez.", conversaId);
+            await Task.Delay(EsperaAntesDaNovaTentativa, ct);
+            return await llm.EnviarAsync(requisicao, ct);
+        }
+    }
+
+    private static readonly TimeSpan EsperaAntesDaNovaTentativa = TimeSpan.FromMilliseconds(300);
 
     private static async Task<BlocoResultadoFerramentaLlm> ExecutarFerramentaAsync(
         IReadOnlyDictionary<string, IFerramentaAgente> ferramentas, ContextoTurnoAgente contexto,
@@ -157,7 +248,7 @@ public static class GeracaoAgenteAtendimento
             var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
             var texto = msg.Autor switch
             {
-                AutorMensagem.Cliente => TextoDoCliente(msg),
+                AutorMensagem.Cliente => TextoExternoPrompt.Neutralizar(TextoDoCliente(msg)),
                 AutorMensagem.Dona => $"(dona) {msg.Texto}",
                 AutorMensagem.Atendente => $"(equipe) {msg.Texto}",
                 _ => msg.Texto ?? string.Empty
@@ -229,16 +320,18 @@ public static class GeracaoAgenteAtendimento
         sb.AppendLine("Dossiê desta conversa (contexto para você, não para citar):");
         sb.AppendLine($"- Agora: {HorarioBrasil.ConverterParaBrasilia(agora):dd/MM/yyyy HH:mm} (horário de Brasília).");
 
-        var nome = cliente?.Nome is { } n && n != IdentificarClientePorTelefoneUseCase.NomePadraoLead ? n : conversa.ContatoNome;
-        sb.AppendLine($"- Nome: {(string.IsNullOrWhiteSpace(nome) ? "não informado" : nome)}.");
+        // #2280: o nome do perfil é escrito pelo cliente; numa linha só, não abre item novo no dossiê.
+        var nome = TextoExternoPrompt.Linha(
+            cliente?.Nome is { } n && n != IdentificarClientePorTelefoneUseCase.NomePadraoLead ? n : conversa.ContatoNome);
+        sb.AppendLine($"- Nome: {(nome.Length == 0 ? "não informado" : nome)}.");
         sb.AppendLine(cliente is null || cliente.OrderCount == 0
             ? "- Situação: lead (ainda não comprou)."
             : $"- Situação: cliente com {cliente.OrderCount} pedido(s).");
         sb.AppendLine(conversa.PedidoEmAndamentoId is { } pedidoId
             ? $"- Pedido vinculado à conversa: {pedidoId}. Consulte consultar_pedido para saber a situação atual; o vínculo não comprova pedido em andamento."
             : "- Pedido em andamento: nenhum registrado nesta conversa.");
-        if (conversa.ContextoJson != "{}")
-            sb.AppendLine($"- Contexto salvo: {conversa.ContextoJson}");
+        if (ContextoConversaJson.ParaDossie(conversa) is { Length: > 0 } contextoSalvo)
+            sb.AppendLine($"- Contexto salvo: {TextoExternoPrompt.Linha(contextoSalvo)}");
         if (!string.IsNullOrWhiteSpace(cliente?.Observacoes))
             sb.AppendLine($"- {interno} Observações do cadastro: {cliente.Observacoes}");
 

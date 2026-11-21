@@ -17,6 +17,9 @@ namespace EasyStock.Infra.Postgre.Data
 {
     public class EasyStockDbContext : DbContext, IUnitOfWork, IDataProtectionKeyContext
     {
+        [DbFunction(Name = "translate", IsBuiltIn = true)]
+        public static string TraduzirTexto(string texto, string origem, string destino) => throw new NotSupportedException();
+
         private readonly ILogger<EasyStockDbContext>? _logger;
         private readonly ICurrentUserAccessor? _currentUser;
 
@@ -189,6 +192,7 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<FornecedorAlteracao> FornecedorAlteracoes { get; set; } = null!;
         public DbSet<VendaAlteracao> VendaAlteracoes { get; set; } = null!;
         public DbSet<Lote> Lotes { get; set; } = null!;
+        public DbSet<LoteNumeroContador> LoteNumeroContadores { get; set; } = null!; // #2199
         public DbSet<EtiquetaTemplateSistema> EtiquetaTemplatesSistema { get; set; } = null!;
         public DbSet<EtiquetaTemplate> EtiquetaTemplates { get; set; } = null!;
         public DbSet<EtiquetaEmpresaDefault> EtiquetaEmpresaDefaults { get; set; } = null!;
@@ -202,6 +206,10 @@ namespace EasyStock.Infra.Postgre.Data
         public DbSet<EasyStock.Domain.Entities.Atendimento.Lembrete> Lembretes { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.RespostaPronta> RespostasProntas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.TrechoCaderno> CadernoTrechos { get; set; } = null!;
+        public DbSet<EasyStock.Domain.Entities.Atendimento.TurnoAgente> TurnosAgente { get; set; } = null!; // S67
+        public DbSet<EasyStock.Domain.Entities.Ia.ProvedorIa> ProvedoresIa { get; set; } = null!; // #2957
+        public DbSet<EasyStock.Domain.Entities.Ia.ModeloIa> ModelosIa { get; set; } = null!; // #2957
+        public DbSet<EasyStock.Domain.Entities.Ia.ChamadaIa> ChamadasIa { get; set; } = null!; // #2957
         public DbSet<EasyStock.Domain.Entities.Atendimento.RegraAutomatica> RegrasAutomaticas { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.Entregador> Entregadores { get; set; } = null!;
         public DbSet<EasyStock.Domain.Entities.Atendimento.Viagem> Viagens { get; set; } = null!;

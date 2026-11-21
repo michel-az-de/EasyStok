@@ -37,6 +37,12 @@ nada em produção:
    - O remetente é escolhido por mensagem: o da Loja para avisos ao cliente e campanhas, o da
      Plataforma para o sistema.
    - A notificação de plataforma nunca toca `Conversa` nem o número da loja.
+   - **Emenda de 2026-11-04 (#2211): avisos da equipe.** Atenção no atendimento, pedido pago com o
+     canhoto e problema no pagamento saem pelo número da loja, só para quem a dona inscreveu
+     (audiência `inscritos`, preferência como opt-in, telefone verificado obrigatório). Não usam o
+     2º número porque a equipe já conversa com a loja e o 2º número ainda não existe. O contato
+     inscrito nunca é atendido pelo agente como cliente, o que evita laço entre aviso e resposta.
+     O interruptor por loja fica na tela Avisos.
 3. **Isolamento.**
    - Os loops só reservam trabalho com bypass, por uma porta, numa transação curta com
      `FOR UPDATE SKIP LOCKED`, que é o padrão da S39.

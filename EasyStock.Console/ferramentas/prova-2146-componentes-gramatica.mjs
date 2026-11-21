@@ -77,7 +77,11 @@ await confere('1. o Composer não tem `title` nativo em controle nem <button> cr
   const composer = fonte('features/atendimento/Composer.jsx')
   const anexos = fonte('features/atendimento/ComposerAnexos.jsx')
   // A restrição continua em texto acessível; controles usam Tooltip e não title nativo.
-  const titulos = [...composer.matchAll(/<(\w+)[^<>]*?\stitle=/g)].map((m) => m[1])
+  // #2706: a única exceção é o parágrafo "Só texto neste canal" (texto, não controle), que leva a
+  // frase inteira no title como antes da #2143 (prova 1868).
+  const titulos = [...composer.matchAll(/<(\w+)([^<>]*?)\stitle=/g)]
+    .filter((m) => !(m[1] === 'p' && /^ id=\{idRestricao\} className=\{css\.restricao\}$/.test(m[2])))
+    .map((m) => m[1])
   assert.deepEqual(titulos, [], `title em: ${titulos.join(', ')}`)
   assert.equal((composer.match(/<button\b/g) ?? []).length, 0, '<button> cru no Composer')
   assert.doesNotMatch(anexos, /<label[^>]*\stitle=/, 'o Anexar ainda usa title nativo')
@@ -108,28 +112,36 @@ if (!pastaDoPlaywright) {
     await contexto.route(`${ORIGEM}/**`, (rota) => {
       const url = new URL(rota.request().url())
       if (url.pathname.startsWith('/api/')) return rota.fulfill({ json: { data: [] } })
+      // #2254: o build publica JS/CSS separados; servir HTML para assets impede o React de montar.
+      if (url.pathname.startsWith('/assets/')) {
+        const contentType = url.pathname.endsWith('.js') ? 'text/javascript' : url.pathname.endsWith('.css') ? 'text/css' : undefined
+        return rota.fulfill({ body: readFileSync(join(pasta, url.pathname.slice(1))), contentType })
+      }
       return rota.fulfill({ body: html, contentType: 'text/html' })
     })
     const pagina = await contexto.newPage()
     await pagina.goto(`${ORIGEM}/#/m/atendimento`)
+    await pagina.getByRole('button', { name: /^Todas/ }).click()
     const cartao = pagina.locator('button[aria-current]').filter({ has: pagina.locator('time') }).filter({ hasText: 'José Moretti' })
     if (celular) await cartao.tap()
     else await cartao.click()
     const campo = pagina.getByRole('textbox', { name: 'Mensagem para o cliente' })
     await campo.waitFor()
+    const dispensarAvisos = pagina.getByRole('button', { name: 'Dispensar avisos do aparelho' })
+    if (await dispensarAvisos.isVisible()) await dispensarAvisos.click()
     const composer = pagina.locator('[class*="_composer_"]').filter({ has: campo }).last()
     return { contexto, pagina, campo, composer }
   }
   const dicaVisivel = (pagina) => pagina.locator('[role="tooltip"]').filter({ visible: true })
   const esperar = (pagina, ms) => pagina.waitForTimeout(ms)
   async function abrirFerramentas(pagina, celular = false) {
-    const resumo = pagina.locator('summary[aria-label="Mais ferramentas"]')
-    await resumo.waitFor({ state: 'visible' })
-    if (!await resumo.evaluate((el) => el.closest('details').open)) {
-      if (celular) await resumo.tap()
-      else await resumo.click()
+    const gatilho = pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
+    await gatilho.waitFor({ state: 'visible' })
+    if (await gatilho.getAttribute('aria-expanded') !== 'true') {
+      if (celular) await gatilho.tap()
+      else await gatilho.click()
     }
-    await pagina.getByRole('button', { name: 'Nota interna', exact: true }).waitFor({ state: 'visible' })
+    await pagina.getByRole('menu', { name: 'Mais ferramentas', exact: true }).waitFor({ state: 'visible' })
   }
 
   try {
@@ -207,7 +219,7 @@ if (!pastaDoPlaywright) {
       assert.ok(Math.round(tempo.abriu - tempo.inicio) >= 500, 'o relógio do navegador confirmou a espera de500ms')
       const dica = dicaVisivel(pagina)
       assert.equal(await dica.count(), 1, 'não apareceu depois de 500 ms')
-      assert.equal(await dica.innerText(), 'Nota interna: fica na ficha, o cliente nunca vê')
+      assert.equal(await dica.innerText(), 'Anotar para a equipe sem sair da conversa')
       const descrito = (await nota.getAttribute('aria-describedby')) ?? ''
       assert.ok(descrito.split(' ').includes(await dica.getAttribute('id')), 'o botão não aponta para a dica')
       // Acima do botão (cabe acima).
@@ -233,25 +245,49 @@ if (!pastaDoPlaywright) {
       await contexto.close()
     })
 
-    await confere('3. nota no menu: teclado mostra a dica, Escape fecha menu e devolve foco ao abridor', async () => {
-      const { contexto, pagina } = await abrir()
-      await abrirFerramentas(pagina)
+    await confere('3. nota direta: teclado mostra a dica e Escape fecha a dica', async () => {
+      const { contexto, pagina, campo } = await abrir()
+      const nota = pagina.getByRole('button', { name: 'Nota interna', exact: true })
+      await campo.click()
       await pagina.keyboard.press('Tab')
-      await pagina.getByRole('button', { name: 'Nota interna', exact: true }).focus()
+      await pagina.keyboard.press('Tab')
+      assert.equal(await nota.evaluate((el) => document.activeElement === el), true)
       await esperar(pagina, 700)
-      assert.equal(await dicaVisivel(pagina).innerText(), 'Nota interna: fica na ficha, o cliente nunca vê')
+      assert.equal(await dicaVisivel(pagina).innerText(), 'Anotar para a equipe sem sair da conversa')
       await pagina.keyboard.press('Escape')
       await esperar(pagina, 50)
       assert.equal(await dicaVisivel(pagina).count(), 0)
-      const resumo = pagina.locator('summary[aria-label="Mais ferramentas"]')
-      assert.equal(await resumo.evaluate((el) => document.activeElement === el), true)
-      assert.equal(await resumo.evaluate((el) => el.closest('details').open), false)
+      assert.equal(await nota.evaluate((el) => document.activeElement === el), true)
       await contexto.close()
     })
+
+    await confere('3. ferramentas: Escape fecha menu e devolve foco ao abridor', async () => {
+      const { contexto, pagina } = await abrir()
+      await abrirFerramentas(pagina)
+      await pagina.keyboard.press('Escape')
+      const gatilho = pagina.getByRole('button', { name: 'Mais ferramentas', exact: true })
+      assert.equal(await gatilho.evaluate((el) => document.activeElement === el), true)
+      assert.equal(await gatilho.getAttribute('aria-expanded'), 'false')
+      await contexto.close()
+    })
+
+    for (const [texto, menuAberto] of [['Rascunho interrompido', true], ['/cardapio', false]]) {
+      await confere(`2178. nota preserva "${texto}" e recolhe ferramentas`, async () => {
+        const { contexto, pagina, campo } = await abrir()
+        await campo.fill(texto)
+        if (menuAberto) await abrirFerramentas(pagina)
+        await pagina.getByRole('button', { name: 'Nota interna', exact: true }).click()
+        assert.equal(await campo.inputValue(), texto)
+        assert.equal(await pagina.getByRole('button', { name: 'Mais ferramentas', exact: true }).getAttribute('aria-expanded'), 'false')
+        await contexto.close()
+      })
+    }
 
     await confere('3. toque (hasTouch, isMobile): nem hover nem foco mostram a dica', async () => {
       const { contexto, pagina, campo } = await abrir({ largura: 390, altura: 844, celular: true })
       await abrirFerramentas(pagina, true)
+      // #2185: no celular o menu vira folha no pé da tela, por cima da barra; fecha antes do hover.
+      await pagina.keyboard.press('Escape')
       await pagina.getByRole('button', { name: 'Nota interna', exact: true }).hover()
       await esperar(pagina, 700)
       assert.equal(await dicaVisivel(pagina).count(), 0, 'apareceu no hover em toque')

@@ -271,7 +271,7 @@ forma reversível (tooltip já agrega valor independente da decisão).
 ## Pendência de input (Achado F): fechada
 
 JSON do relatório truncado em TICK-003. Busca no repo retornou apenas `docs/plan/04-ux.md`,
-que é wireframe do módulo Pagamentos (Casa da Babá), não o relatório. Conclusão: o relatório
+que é wireframe do módulo Pagamentos (Casa da Baba), não o relatório. Conclusão: o relatório
 chegou inline no prompt e não tem cópia no repositório; TICK-004+ não são recuperáveis.
 Encaminhamento: assumir TICK-003 como último item recebido de Tickets e pedir ao QA
 confirmação de que não há itens além dele. Não bloqueia o épico.

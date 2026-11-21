@@ -38,8 +38,8 @@ recebe por uma porta implementada em `EasyStock.Infra.Postgre/Services/<família
 
 | Tipo de chamada | Pipeline | Exemplo |
 |---|---|---|
-| Leitura ou consulta idempotente | Categoria de `IntegrationCategories.All` (retry exponencial, disjuntor, timeout de 30 s) | `IntegrationCategories.WhatsApp`, `Payments`, `Logistics` |
-| Escrita no provedor (cria cobrança, envia mensagem, pede entrega) | Categoria fora de `All`: só disjuntor e timeout, SEM retry | `IntegrationCategories.WhatsAppEnvio` (#1292) |
+| Leitura ou consulta idempotente | Categoria com retry exponencial, disjuntor e timeout de 30 s. Prefira a que também repete resposta 5xx/408/429 (`FalhaHttpTransitoria`, #2177); as de `All` só repetem exceção | `IntegrationCategories.Payments`, `GoogleRotas`, `TomTom`; em `All`: `WhatsApp`, `Logistics` |
+| Escrita no provedor (cria cobrança, envia mensagem, pede entrega) | Categoria só com disjuntor e timeout, SEM retry | `IntegrationCategories.PagamentosEscrita` (#2177), `WhatsAppEnvio` (#1292) |
 
 Escrita repetida às cegas duplica cobrança, mensagem ou corrida. Se o provedor aceita chave de
 idempotência, envie sempre (molde: `X-Idempotency-Key` em `MercadoPagoClient.cs`).

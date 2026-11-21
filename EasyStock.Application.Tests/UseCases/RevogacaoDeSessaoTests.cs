@@ -33,6 +33,7 @@ public class RevogacaoDeSessaoTests
     private readonly IUsuarioRepository _usuarios = Substitute.For<IUsuarioRepository>();
     private readonly IRefreshTokenRepository _refreshTokens = Substitute.For<IRefreshTokenRepository>();
     private readonly ICacheService _cache = Substitute.For<ICacheService>();
+    private readonly IResetTokenRepository _resetTokens = Substitute.For<IResetTokenRepository>();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private readonly RevogadorSessoes _revogador;
     private readonly Usuario _usuario;
@@ -45,12 +46,12 @@ public class RevogacaoDeSessaoTests
         _usuarios.GetByIdAsync(_usuario.Id).Returns(_usuario);
     }
 
-    private async Task DeveTerRevogadoOUsuarioTodo()
+    private async Task DeveTerRevogadoOUsuarioTodo(int remocoesCache = 1)
     {
         _usuario.SessoesValidasDesde.Should().Be(Corte);
         await _usuarios.Received(1).AtualizarSessoesValidasDesdeAsync(_usuario.Id, Corte);
         await _refreshTokens.Received(1).RevogarSessoesAtivasAsync(_usuario.Id, Agora.UtcDateTime);
-        await _cache.Received(1).RemoveAsync(CacheKeys.Sessao(_usuario.Id));
+        await _cache.Received(remocoesCache).RemoveAsync(CacheKeys.Sessao(_usuario.Id));
         _unitOfWork.CommitCount.Should().Be(1, "o commit continua sendo do use case");
     }
 
@@ -124,6 +125,9 @@ public class RevogacaoDeSessaoTests
 
         await DeveTerRevogadoOUsuarioTodo();
         _usuario.SenhaHash.Should().Be(FakePasswordHasher.MakeHash("NovaSenha@456"));
+        // #2569: como no reset, o link de redefinição e a chave de acesso abertos caem junto.
+        await _resetTokens.Received(1).InvalidarAbertosAsync(_usuario.Id, Arg.Any<DateTime>());
+        await _resetTokens.Received(1).InvalidarChavesDeAcessoAbertasAsync(_usuario.Id);
     }
 
     [Theory]
@@ -134,6 +138,8 @@ public class RevogacaoDeSessaoTests
         await Assert.ThrowsAnyAsync<Exception>(() => TrocarSenhaAsync(fluxo, senhaAtual: "SenhaErrada@999"));
 
         await NaoDeveTerRevogadoNada();
+        await _resetTokens.DidNotReceiveWithAnyArgs().InvalidarAbertosAsync(default, default);
+        await _resetTokens.DidNotReceiveWithAnyArgs().InvalidarChavesDeAcessoAbertasAsync(default);
         _unitOfWork.CommitCount.Should().Be(0);
     }
 
@@ -145,12 +151,12 @@ public class RevogacaoDeSessaoTests
             var logado = Substitute.For<ICurrentUserAccessor>();
             logado.UsuarioId.Returns(_usuario.Id);
             return new AlterarSenhaUseCase(
-                    _usuarios, logado, _revogador, _unitOfWork, hasher, Substitute.For<ILogger<AlterarSenhaUseCase>>())
+                    _usuarios, logado, _revogador, _resetTokens, _unitOfWork, hasher, Substitute.For<ILogger<AlterarSenhaUseCase>>())
                 .ExecuteAsync(new AlterarSenhaCommand(senhaAtual, "NovaSenha@456"));
         }
 
         return new AlterarSenhaUsuarioUseCase(
-                _usuarios, new AlterarSenhaUsuarioCommandValidator(), _revogador, _unitOfWork, hasher,
+                _usuarios, new AlterarSenhaUsuarioCommandValidator(), _revogador, _resetTokens, _unitOfWork, hasher,
                 Substitute.For<ILogger<AlterarSenhaUsuarioUseCase>>())
             .ExecuteAsync(new AlterarSenhaUsuarioCommand(_usuario.Id, senhaAtual, "NovaSenha@456"));
     }
@@ -171,7 +177,7 @@ public class RevogacaoDeSessaoTests
             .ExecuteAsync(new DesativarUsuarioCommand(_usuario.Id, empresaId));
 
         vinculo.Ativo.Should().BeFalse();
-        await DeveTerRevogadoOUsuarioTodo();
+        await DeveTerRevogadoOUsuarioTodo(remocoesCache: 2);
     }
 
     [Fact]
@@ -192,6 +198,14 @@ public class RevogacaoDeSessaoTests
     private void VincularA(Guid empresaId, bool ativo = true) =>
         _usuario.Empresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = _usuario.Id, EmpresaId = empresaId, Ativo = ativo, CriadoEm = DateTime.UtcNow });
 
+    // Estes testes tratam da revogação; a loja da atribuição é sempre da empresa.
+    private static ILojaRepository LojaQualquer()
+    {
+        var repo = Substitute.For<ILojaRepository>();
+        repo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns(c => new Loja { Id = c.ArgAt<Guid>(1), EmpresaId = c.ArgAt<Guid>(0), Nome = "Loja" });
+        return repo;
+    }
+
     private static IPerfilRepository PerfilComum(NivelAcesso nivel = NivelAcesso.Admin, Guid? empresaId = null)
     {
         var repo = Substitute.For<IPerfilRepository>();
@@ -203,7 +217,7 @@ public class RevogacaoDeSessaoTests
     public async Task AtribuirPerfil_DeveRecusarPerfilSuperAdmin()
     {
         var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
-            PerfilComum(NivelAcesso.SuperAdmin), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            PerfilComum(NivelAcesso.SuperAdmin), LojaQualquer(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
             Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
         var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
@@ -215,7 +229,7 @@ public class RevogacaoDeSessaoTests
     public async Task AtribuirPerfil_DeveRecusarPerfilDeOutraEmpresa()
     {
         var uc = new AtribuirPerfilUsuarioUseCase(_usuarios, Substitute.For<IUsuarioPerfilRepository>(),
-            PerfilComum(NivelAcesso.Admin, Guid.NewGuid()), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+            PerfilComum(NivelAcesso.Admin, Guid.NewGuid()), LojaQualquer(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
             Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
         var act = () => uc.ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, Guid.NewGuid(), Guid.NewGuid(), null));
@@ -224,7 +238,7 @@ public class RevogacaoDeSessaoTests
     }
 
     private AtribuirPerfilUsuarioUseCase AtribuirPerfil(IUsuarioPerfilRepository perfis) =>
-        new(_usuarios, perfis, PerfilComum(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
+        new(_usuarios, perfis, PerfilComum(), LojaQualquer(), _revogador, Substitute.For<ICurrentUserAccessor>(), Substitute.For<IAuditLogRepository>(), _unitOfWork,
             Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
     [Fact]
@@ -240,7 +254,7 @@ public class RevogacaoDeSessaoTests
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, perfilId, LojaId: null));
 
         await perfis.Received(1).AddAsync(Arg.Is<UsuarioPerfil>(p => p.PerfilId == perfilId));
-        await DeveTerRevogadoOUsuarioTodo();
+        await DeveTerRevogadoOUsuarioTodo(remocoesCache: 2);
     }
 
     [Fact]
@@ -257,7 +271,7 @@ public class RevogacaoDeSessaoTests
             .ExecuteAsync(new AtribuirPerfilUsuarioCommand(_usuario.Id, empresaId, perfilId, LojaId: Guid.NewGuid()));
 
         await perfis.Received(1).UpdateAsync(existente);
-        await DeveTerRevogadoOUsuarioTodo();
+        await DeveTerRevogadoOUsuarioTodo(remocoesCache: 2);
     }
 
     [Theory]

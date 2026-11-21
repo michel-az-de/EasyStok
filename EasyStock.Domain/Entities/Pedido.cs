@@ -89,6 +89,15 @@ namespace EasyStock.Domain.Entities
         public string? Origem { get; set; }
 
         /// <summary>
+        /// #409: por onde a cliente pediu, marcado por quem lançou o pedido. Não é a <see cref="Origem"/>,
+        /// que diz qual sistema gravou. NULL = não informado.
+        /// </summary>
+        public string? Canal { get; set; }
+
+        /// <summary>#2928: anúncio que valia quando o pedido nasceu; não muda depois. Nula sem anúncio.</summary>
+        public OrigemAnuncio? OrigemAnuncio { get; private set; }
+
+        /// <summary>
         /// ID do pedido no app mobile (mobile_orders.id) quando o pedido foi
         /// originado lá. Permite linkar reverso e evitar duplicação na sync.
         /// </summary>
@@ -119,22 +128,22 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public DateTime? AgendadoParaEm { get; set; }
 
-        // ── Resolução Storefront pela Babá (TASK-EZ-APROVAR-001) ───────
+        // ── Resolução Storefront pela Baba (TASK-EZ-APROVAR-001) ───────
 
         /// <summary>
-        /// Timestamp da aprovação pela Babá. Preenchido pelo
+        /// Timestamp da aprovação pela Baba. Preenchido pelo
         /// <c>AprovarPedidoStorefrontUseCase</c> na transição
         /// <see cref="StatusPedido.AguardandoAprovacaoBaba"/> → <see cref="StatusPedido.AprovadoBaba"/>.
         /// </summary>
         public DateTime? AprovadoEm { get; set; }
 
-        /// <summary>Usuário Babá/staff que clicou "Aprovar" no painel ERP.</summary>
+        /// <summary>Usuário Baba/staff que clicou "Aprovar" no painel ERP.</summary>
         public Guid? AprovadoPorUsuarioId { get; set; }
 
-        /// <summary>Timestamp da recusa pela Babá. Espelha <see cref="CanceladoEm"/> no caso de recusa.</summary>
+        /// <summary>Timestamp da recusa pela Baba. Espelha <see cref="CanceladoEm"/> no caso de recusa.</summary>
         public DateTime? RecusadoEm { get; set; }
 
-        /// <summary>Usuário Babá/staff que clicou "Recusar" no painel ERP.</summary>
+        /// <summary>Usuário Baba/staff que clicou "Recusar" no painel ERP.</summary>
         public Guid? RecusadoPorUsuarioId { get; set; }
 
         /// <summary>
@@ -144,7 +153,7 @@ namespace EasyStock.Domain.Entities
         public string? MotivoRecusa { get; set; }
 
         /// <summary>
-        /// Mensagem livre (max 280 chars) que vai no WhatsApp ao cliente quando a Babá recusa.
+        /// Mensagem livre (max 280 chars) que vai no WhatsApp ao cliente quando a Baba recusa.
         /// Não é audit trail interno (use <see cref="Observacoes"/> para esse fim).
         /// </summary>
         public string? MensagemRecusaCliente { get; set; }
@@ -202,6 +211,12 @@ namespace EasyStock.Domain.Entities
             InicioPrevistoEm = inicioPrevistoEm;
             AtrasoNotificadoEm = null;
             AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>#2928: grava a origem do anúncio uma vez só; a primeira que chega vale.</summary>
+        public void DefinirOrigemAnuncio(OrigemAnuncio? origem)
+        {
+            OrigemAnuncio ??= origem;
         }
 
         /// <summary>Atrasado = ainda aguardando e o início previsto já passou (US-037, UC-04 E2).</summary>

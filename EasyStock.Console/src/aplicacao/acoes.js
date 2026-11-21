@@ -11,6 +11,7 @@ export const CADASTRAR_ENDERECO = 'cadastrar-endereco'
 export const ADICIONAR_ITEM = 'adicionar-item'
 // #1686 (item 3): comanda nova na mesma conversa depois de o pedido anterior terminar.
 export const NOVA_COMANDA = 'nova-comanda'
+export const RECONFERIR_PESSOA_COMANDA = 'reconferir-pessoa-comanda'
 export const REMOVER_ITEM = 'remover-item'
 export const GERAR_PEDIDO = 'gerar-pedido'
 export const SALVAR_NOTA = 'salvar-nota'
@@ -104,6 +105,8 @@ export const DESPACHAR_MESMO_ASSIM = 'despachar-mesmo-assim'
 export const ESCOLHER_MEIO_PAGAMENTO = 'escolher-meio-pagamento'
 // J2 (#1990): "troco para R$" do dinheiro na entrega, antes de o pedido nascer.
 export const DEFINIR_TROCO = 'definir-troco'
+// #2219: frete combinado pela equipe com o cliente quando o CEP está fora da área.
+export const DEFINIR_FRETE_COMBINADO = 'definir-frete-combinado'
 // Rodada 12 (issue #13): trocar a forma depois que a cobrança saiu (cancela a
 // pendente e emite outra) e desfazer a baixa marcada por engano.
 export const ALTERAR_MEIO_PAGAMENTO = 'alterar-meio-pagamento'
@@ -266,6 +269,9 @@ export const RESGATAR_RECOMPENSA = 'resgatar-recompensa'
 // Modo API (ADR-0054, F01): a lista vem do EasyStok por polling e o envio da dona
 // é confirmado ou recusado pela API depois do balão otimista.
 export const SINCRONIZAR_CONVERSAS = 'sincronizar-conversas'
+// #2921: janela "Novo pedido" na tela; a conversa por baixo não aparece na fila.
+export const ABRIR_JANELA_DO_PEDIDO = 'abrir-janela-do-pedido'
+export const FECHAR_JANELA_DO_PEDIDO = 'fechar-janela-do-pedido'
 export const CONFIRMAR_REABERTURA_API = 'confirmar-reabertura-api'
 export const CONFIRMAR_RESPONSAVEL_API = 'confirmar-responsavel-api'
 // #2005 (console-09): mensagens mais antigas que a página lida pela polling, abertas pela atendente.
@@ -284,6 +290,7 @@ export const SINCRONIZAR_PEDIDO = 'sincronizar-pedido'
 export const FECHAR_AVISO_API = 'fechar-aviso-api'
 // #1276: o cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
 export const CLIENTE_DA_API = 'cliente-da-api'
+export const VINCULO_CLIENTE_DA_API = 'vinculo-cliente-da-api'
 // #1276: nome que a dona escreveu para o lead ainda sem cadastro; vai junto no cadastro.
 export const RENOMEAR_LEAD_API = 'renomear-lead-api'
 // #1430: nome e contato que o visitante do chat do site informou, até a dona confirmar o cadastro.

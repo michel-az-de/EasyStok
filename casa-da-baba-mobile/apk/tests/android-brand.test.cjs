@@ -55,6 +55,18 @@ test('tema de abertura usa a marca e deixa de referenciar splash Capacitor', () 
   assert.ok(!launch.includes('@drawable/splash<'));
 });
 
+test('Workspace usa tema de conteúdo sem herdar splash e mantém a abertura da MainActivity', () => {
+  const manifest = fs.readFileSync(path.join(root, 'android/app/src/main/AndroidManifest.xml'), 'utf8');
+  const activities = [...manifest.matchAll(/<activity\b[^>]*>/g)].map(match => match[0]);
+  const workspace = activities.find(tag => tag.includes('android:name=".WorkspaceActivity"'));
+  const main = activities.find(tag => tag.includes('android:name=".MainActivity"'));
+  assert.match(workspace, /android:theme="@style\/AppTheme\.NoActionBar"/);
+  assert.match(main, /android:theme="@style\/AppTheme\.NoActionBarLaunch"/);
+  const content = read('values/styles.xml').match(/<style name="AppTheme.NoActionBar"[\s\S]*?<\/style>/)[0];
+  assert.match(content, /name="android:background">@null</);
+  assert.doesNotMatch(content, /Theme\.SplashScreen|@drawable\/casa_da_baba_splash/);
+});
+
 test('feedback nativo reutiliza marca oficial e progresso indeterminado, sem janela sobre o Android', () => {
   const layout = read('layout/startup_loading.xml');
   assert.match(layout, /android:background="@drawable\/casa_da_baba_splash"/);

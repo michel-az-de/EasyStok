@@ -7,8 +7,8 @@ namespace EasyStock.Application.Services.Atendimento;
 
 /// <summary>
 /// Monta a saudação que o webhook envia antes do agente na primeira mensagem de uma conversa nova
-/// (S05, RN-01): texto de <see cref="ConfiguracaoAtendimento"/>, link do cardápio e frase de espera,
-/// numa única mensagem. Sem LLM, para caber nos 5 s.
+/// (S05, RN-01): texto de <see cref="ConfiguracaoAtendimento"/> e frase de espera, numa única mensagem. Sem LLM,
+/// para caber nos 5 s. O link do cardápio só entra se o texto da loja tiver <c>{link}</c> (#2544, D1).
 /// </summary>
 public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontRepository, IConfiguration configuration)
 {
@@ -18,33 +18,34 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
     public const string CaminhoCardapio = "/cardapio";
 
     public async Task<string> MontarAsync(
-        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct = default)
+        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao,
+        bool semFraseEspera = false, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(configuracao);
         ArgumentNullException.ThrowIfNull(identificacao);
 
         var link = await ResolverLinkCardapioAsync(empresaId, ct);
-        var primeiroNome = identificacao.EhNovo ? null : NomesDeContato.PrimeiroNome(identificacao.Cliente.Nome);
-        return Montar(configuracao, primeiroNome, link);
+        var primeiroNome = identificacao.EhNovo ? null : NomesDeContato.PrimeiroNome(identificacao.Cliente?.Nome);
+        return Montar(configuracao, primeiroNome, link, semFraseEspera);
     }
 
     /// <summary>
     /// Cliente conhecido e com nome → <see cref="ConfiguracaoAtendimento.SaudacaoRetorno"/> com <c>{nome}</c>;
-    /// senão <see cref="ConfiguracaoAtendimento.SaudacaoPrimeiroContato"/>. Texto configurado sem
-    /// <c>{link}</c> recebe o link numa linha própria: o cardápio sempre vai.
+    /// senão <see cref="ConfiguracaoAtendimento.SaudacaoPrimeiroContato"/>. <c>{link}</c> vira o link do cardápio; sem
+    /// ele, nada é anexado: a comanda é recurso que o Assistente oferece (#2544).
     /// </summary>
-    public static string Montar(ConfiguracaoAtendimento configuracao, string? primeiroNome, string linkCardapio)
+    /// <param name="semFraseEspera">#2885: quando a saudação responde sozinha (sem o modelo), não promete resposta depois.</param>
+    public static string Montar(ConfiguracaoAtendimento configuracao, string? primeiroNome, string linkCardapio,
+        bool semFraseEspera = false)
     {
         var modelo = string.IsNullOrWhiteSpace(primeiroNome)
             ? configuracao.SaudacaoPrimeiroContato
             : configuracao.SaudacaoRetorno;
 
         var saudacao = modelo.Replace("{nome}", primeiroNome ?? string.Empty, StringComparison.Ordinal);
-        saudacao = saudacao.Contains("{link}", StringComparison.Ordinal)
-            ? saudacao.Replace("{link}", linkCardapio, StringComparison.Ordinal)
-            : $"{saudacao}\n{linkCardapio}";
+        saudacao = saudacao.Replace("{link}", linkCardapio, StringComparison.Ordinal);
 
-        return string.IsNullOrWhiteSpace(configuracao.FraseEspera)
+        return semFraseEspera || string.IsNullOrWhiteSpace(configuracao.FraseEspera)
             ? saudacao
             : $"{saudacao}\n\n{configuracao.FraseEspera}";
     }

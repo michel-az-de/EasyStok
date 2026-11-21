@@ -1,4 +1,4 @@
-import { dataIsoNoFuso, horaCurta } from './formato'
+import { dataIsoNoFuso, horaCurta, mascaraCep } from './formato'
 import { agruparPorLinha } from './pedido'
 
 // KDS sobre Pedido (S19), usado pela cozinha no modo API (F05). Os status são os
@@ -96,17 +96,40 @@ export const gruposDoKds = (pedido, linhas) => agruparPorLinha(itensDoKds(pedido
 
 export const nomeNaComanda = (pedido) => [pedido.clienteNome ?? 'Cliente', pedido.clienteApt].filter(Boolean).join(' · ')
 
+// Achado D2 da homologação #1769: o checkout grava o endereço nas observações com
+// rótulos de máquina ("[Entrega] ...", "[Guest] CEP ..., numero ..."; `EnderecoCheckout.Snapshot`
+// e `IniciarCheckoutGuestUseCase`). A Cozinha lê só o endereço formatado e o que o cliente
+// escreveu; o dado gravado não muda.
+const SEPARADOR = ' | '
+const MARCA_ENTREGA = '[Entrega] '
+const MARCA_CONVIDADO = '[Guest] '
+
+export function leituraDasObservacoes(observacoes) {
+  const partes = String(observacoes ?? '').split(SEPARADOR).map((p) => p.trim()).filter(Boolean)
+  const comMarca = (marca) => partes.find((p) => p.startsWith(marca))?.slice(marca.length) ?? null
+  const retrato = comMarca(MARCA_ENTREGA)
+  const convidado = comMarca(MARCA_CONVIDADO)
+  const doCliente = partes.filter((p) => !p.startsWith(MARCA_ENTREGA) && !p.startsWith(MARCA_CONVIDADO))
+  const endereco = retrato?.replace(/CEP (\d{8})\b/, (_, cep) => `CEP ${mascaraCep(cep)}`)
+    ?? convidado?.replace(/, numero /, ', nº ')
+    ?? null
+  return { endereco, observacoes: doCliente.length ? doCliente.join(SEPARADOR) : null }
+}
+
 // Dados de `documentoDoCanhoto` (dominio/impressao.js): o MESMO PDF de 80 mm da cozinha do
 // protótipo, sem preço (não é cupom fiscal) e com a observação do pedido.
-export const canhotoDoKds = (pedido, linhas) => ({
-  pedido: { numero: pedido.numeroCurto, cobranca: null },
-  itens: itensDoKds(pedido),
-  linhas,
-  nomeCliente: nomeNaComanda(pedido),
-  endereco: pedido.endereco ?? null,
-  faixa: pedido.janela?.label ?? null,
-  observacoes: pedido.observacoes ?? null,
-})
+export const canhotoDoKds = (pedido, linhas) => {
+  const leitura = leituraDasObservacoes(pedido.observacoes)
+  return {
+    pedido: { numero: pedido.numeroCurto, cobranca: null },
+    itens: itensDoKds(pedido),
+    linhas,
+    nomeCliente: nomeNaComanda(pedido),
+    endereco: pedido.endereco ?? leitura.endereco,
+    faixa: pedido.janela?.label ?? null,
+    observacoes: leitura.observacoes,
+  }
+}
 
 export const filtrarPorLinha = (pedidos, linha) => (linha
   ? pedidos.filter((p) => (p.itens ?? []).some((i) => chaveDaLinha(i.linha) === linha))
@@ -171,11 +194,23 @@ export function tempoAteInicio(pedido, agora) {
   return Math.min(1, Math.max(0, (inicio - agora) / total))
 }
 
-// Fila vazia (#1474): a cozinha mostra um dia por vez. O pedido pago para amanhã não aparece
+// #3044: há quanto tempo o pedido sem janela espera na cozinha, na mesma base de `tempoAteInicio` (pagamento ou
+// criação). Não há carimbo de entrada em preparo na API; pedido com janela já tem o aviso de início, sem segundo tempo.
+export function tempoNaCozinha(pedido, agora) {
+  if (pedido.inicioPrevistoEm || !['aguardando', 'preparando'].includes(colunaDoStatusKds(pedido.status))) return null
+  const base = Date.parse(pedido.pagoEm ?? pedido.criadoEm)
+  if (Number.isNaN(base)) return null
+  const min = Math.max(0, Math.floor((agora - base) / 60000))
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  return h < 24 ? `há ${h} h ${min % 60} min` : `há ${Math.floor(h / 24)} d`
+}
+
+// Fila vazia (#1474): a cozinha mostra um dia por vez. O pedido liberado para amanhã não aparece
 // em Hoje, e a tela dizia "Cozinha em dia" como se nada faltasse.
 export const textoDaCozinhaVazia = ({ amanha }) => (amanha
-  ? 'Nenhum pedido pago para amanhã ainda.'
-  : 'Cozinha em dia hoje. O pedido pago para hoje aparece aqui sozinho; o de amanhã, em Amanhã.')
+  ? 'Nenhum pedido liberado para o preparo de amanhã ainda.'
+  : 'Cozinha em dia hoje. Os pedidos liberados para o preparo de hoje aparecem aqui; os de amanhã, em Amanhã.')
 
 // Dia da fila (#1584): "Amanhã" vale só no dia da loja em que foi escolhido (`amanhaDesde`,
 // YYYY-MM-DD). Virou o dia, a fila volta para Hoje: o amanhã de ontem é o hoje de agora, e o

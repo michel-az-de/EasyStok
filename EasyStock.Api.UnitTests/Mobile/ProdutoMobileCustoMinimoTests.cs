@@ -54,7 +54,8 @@ public sealed class ProdutoMobileCustoMinimoTests : IDisposable
             Substitute.For<IProdutoRepository>(),
             DispatcherDeTeste.EstornoDeCaixa(_db),
             NullLogger<SyncMutationDispatcher>.Instance);
-        _linker = new ProductLinker(_db, sysUser, NullLogger<ProductLinker>.Instance);
+        _linker = new ProductLinker(_db, sysUser, NullLogger<ProductLinker>.Instance,
+            new EasyStock.Infra.Postgre.Repositories.ProdutoRepository(_db));
     }
 
     private async Task PushAsync(JsonObject produto)
@@ -121,6 +122,21 @@ public sealed class ProdutoMobileCustoMinimoTests : IDisposable
 
         Erp().CustoReferencia!.Valor.Should().Be(9m);
         Erp().QuantidadeMinima.Should().Be(6);
+    }
+
+    [Fact]
+    public async Task EditarCustoNoPwa_NaoDeixaOCustoDe6CasasVelhoNaFicha()
+    {
+        // #2401 A: o espelho gravava só CustoReferencia e CustoDaFicha seguia no CustoUnitarioInsumo antigo.
+        await PushAsync(Produto());
+        var erp = Erp();
+        erp.EhInsumo = true;
+        erp.DefinirCustoDoInsumo(0.0045m);
+        await _db.SaveChangesAsync();
+
+        await PushAsync(Produto(custo: 9m, minimo: 4));
+
+        Erp().CustoDaFicha.Should().Be(9m);
     }
 
     [Fact]

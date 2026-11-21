@@ -100,7 +100,7 @@ public class ImpressaoControllerTests
     public async Task TextoCabeEm42Colunas()
     {
         var f = new Fakes();
-        var storefront = StorefrontEntity.Criar(f.EmpresaId, "casa-da-baba", "Casa da Babá", 0m);
+        var storefront = StorefrontEntity.Criar(f.EmpresaId, "casa-da-baba", "Casa da Baba", 0m);
         var coxinha = CardapioItem.CriarAvulso(storefront.Id, "Coxinha", 10m);
         coxinha.AtualizarMetadata(sugestaoMolho: "Molho rosé da casa com páprica defumada");
         var pedido = Pedido.Criar(f.EmpresaId, origem: "whatsapp");

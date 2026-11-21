@@ -46,9 +46,9 @@ public sealed class OutboxEventoIntegracaoRepository(EasyStockDbContext db) : IO
             .IgnoreQueryFilters()
             .Where(e => e.Status == StatusOutboxIntegracao.Pendente
                      && e.ProximaTentativaEm <= agora)
-            // Mesma ordem do laço por shard que isto substitui: shard 0 a 3 e, em cada um, FIFO.
-            .OrderBy(e => e.ShardKey)
-            .ThenBy(e => e.CriadoEm)
+            // FIFO global: o shard é um hash, não uma partição, então ordenar por ele embaralha a sequência.
+            .OrderBy(e => e.CriadoEm)
+            .ThenBy(e => e.Id)
             .Take(max)
             .ToListAsync(ct);
     }

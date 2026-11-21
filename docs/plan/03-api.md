@@ -357,7 +357,7 @@
   ```json
   {
     "valido": true,
-    "empresa": "Casa da Babá",
+    "empresa": "Casa da Baba",
     "loja": null,
     "data": "2026-05-16",
     "hashSha256": "a3f1...",

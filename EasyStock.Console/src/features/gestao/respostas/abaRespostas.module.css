@@ -3,10 +3,11 @@
 .aba { display: grid; gap: var(--e-5); }
 
 .secao { display: grid; gap: var(--e-3); }
-.secao h3 { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
+.secao h3 { margin: 0; font-size: var(--t-forte); font-weight: 700; color: var(--tinta); }
 
 .topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .descricao { margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 60ch; }
+.descricao a { color: var(--marca-forte); text-underline-offset: 3px; }
 
 .filtros { display: flex; align-items: flex-start; gap: var(--e-3); flex-wrap: wrap; }
 .filtroBusca { flex: 1 1 320px; min-width: 0; display: grid; gap: var(--e-1); }
@@ -31,13 +32,14 @@
   flex: 1 1 320px; min-width: 0;
   display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; column-gap: var(--e-2); row-gap: var(--e-1);
 }
-.titulo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); }
+.titulo { font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
 .atalho { font-family: var(--f-corpo); font-size: var(--t-micro); color: var(--tinta-3); }
 .marca { font-size: var(--t-micro); color: var(--tinta-3); justify-self: start; }
 .texto {
   grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2);
   overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere;
 }
+.textoDaLinha { grid-column: 1 / -1; display: flex; flex-direction: column; gap: var(--e-1); }
 .textoInteiro { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2); white-space: pre-line; }
 .quando { grid-column: 1 / -1; font-size: var(--t-micro); color: var(--tinta-3); }
 .semTexto { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--alerta); }
@@ -51,6 +53,7 @@
 .form { display: grid; gap: var(--e-3); padding: var(--e-2) 0; }
 .duas { display: grid; gap: var(--e-3); grid-template-columns: 2fr 1fr; }
 .acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.rotuloPrevia { margin: 0; font-size: var(--t-apoio); color: var(--tinta-3); }
 .alerta { grid-column: 1 / -1; margin: 0; font-size: var(--t-apoio); color: var(--alerta); }
 .vazio { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 
@@ -59,3 +62,10 @@
   .filtros > .chave { margin-top: 0; }
   .acoesLinha { margin-left: 0; }
 }
+
+/* Pergunta de descarte do formulário em linha: mesma cara da do Modal (confirmarDescarte). */
+.descarte {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2);
+  padding: var(--e-3); border-radius: var(--r-2); background: var(--erro-pastel); color: var(--tinta);
+}
+.descarte p { margin: 0; font-weight: 600; }

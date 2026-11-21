@@ -20,7 +20,9 @@ public class MobileCashController(
     ICurrentUserAccessor currentUser,
     ILogger<MobileCashController> log) : MobileManagementControllerBase(currentUser)
 {
+    // #2828: traz valor; mesma regra da leitura do caixa do ERP.
     [HttpGet]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> List(
         [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
@@ -28,7 +30,8 @@ public class MobileCashController(
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
 
-        var q = db.Set<CashEntry>().AsNoTracking().Where(c => c.EmpresaId == emp);
+        // #2730: excluído no PWA não entra na revisão; o tombstone do sync sai pelo SyncController.
+        var q = db.Set<CashEntry>().AsNoTracking().Where(c => c.EmpresaId == emp && c.DeletedAt == null);
         if (pendingOnly == true) q = q.Where(c => c.ErpMovimentoCaixaId == null);
 
         var items = await q.OrderByDescending(c => c.CreatedAt).Take(500).ToListAsync(ct);
@@ -46,6 +49,7 @@ public class MobileCashController(
     /// tem que ser representado 1:1 no ERP — sempre promove se não estiver linkado.)
     /// </summary>
     [HttpPost("{id}/promover")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Promover(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -100,6 +104,7 @@ public class MobileCashController(
     }
 
     [HttpPost("{id}/unlink")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;

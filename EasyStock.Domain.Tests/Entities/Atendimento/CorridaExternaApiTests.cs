@@ -132,6 +132,89 @@ public class CorridaExternaApiTests
         corrida.MotoristaAtribuidoEm.Should().BeNull();
         corrida.MotoristaIdExterno.Should().BeNull();
         corrida.Motorista.Should().BeNull();
+        corrida.MotoristaTelefone.Should().BeNull("a atendente não liga para quem desistiu");
+        corrida.MotoristaPlaca.Should().BeNull();
+    }
+
+    // #2168: depois da coleta a moto está carregada. Resposta atrasada não volta a corrida para "procurando".
+    [Theory]
+    [InlineData(StatusCorrida.ProcurandoMotorista)]
+    [InlineData(StatusCorrida.MotoristaACaminho)]
+    public void ColetadaNaoRegrideComRespostaAtrasada(StatusCorrida atrasado)
+    {
+        var corrida = Confirmada();
+        corrida.AplicarStatus(StatusCorrida.MotoristaACaminho, Agora.AddMinutes(1));
+        corrida.AtribuirMotorista("drv-9", "Carlos", "11988887777", "XYZ9A88");
+        corrida.AplicarStatus(StatusCorrida.Coletada, Agora.AddMinutes(8));
+
+        var mudou = corrida.AplicarStatus(atrasado, Agora.AddMinutes(9));
+
+        mudou.Should().BeFalse();
+        corrida.Status.Should().Be(StatusCorrida.Coletada);
+        corrida.Motorista.Should().Be("Carlos");
+        corrida.PodeCancelar(Agora.AddMinutes(9)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void SolicitarExigeUmaParadaSo()
+    {
+        var viagem = ViagemComParada();
+        viagem.IncluirParada(Guid.NewGuid(), clienteBloqueado: false);
+
+        var act = () => Solicitada(viagem);
+
+        act.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*um pedido por vez*");
+    }
+
+    [Fact]
+    public void DadosDoMotoristaDoProvedorAcimaDoLimiteSaoCortadosSemTravarACorrida()
+    {
+        var corrida = Confirmada();
+
+        corrida.AtribuirMotorista("drv-9", new string('C', 200), new string('9', 40), "ABC1D23-EXTRA-LONGA");
+
+        corrida.Motorista.Should().HaveLength(CorridaExterna.MotoristaTamanhoMaximo);
+        corrida.MotoristaTelefone.Should().HaveLength(CorridaExterna.TelefoneTamanhoMaximo);
+        corrida.MotoristaPlaca.Should().Be("ABC1D23-EX", "a placa vai para a parada, que guarda 10 caracteres");
+    }
+
+    [Fact]
+    public void GorjetaEhOQueOProvedorCobraAlemDaCotacao()
+    {
+        var corrida = Confirmada();
+        corrida.GorjetaCentavos.Should().Be(0);
+
+        corrida.AtualizarCustoDoProvedor(2390);
+
+        corrida.GorjetaCentavos.Should().Be(500);
+    }
+
+    [Fact]
+    public void CancelaSemCustoAteCincoMinutosDepoisDoMatch()
+    {
+        var corrida = Confirmada();
+        corrida.CancelaSemCustoAte.Should().BeNull("procurando motorista cancela sem prazo");
+
+        corrida.AplicarStatus(StatusCorrida.MotoristaACaminho, Agora.AddMinutes(1));
+
+        corrida.CancelaSemCustoAte.Should().Be(Agora.AddMinutes(6));
+    }
+
+    [Fact]
+    public void SolicitacaoSemRespostaPedeConferenciaEOperadorLibera()
+    {
+        var corrida = Solicitada();
+
+        corrida.AguardaConferencia(Agora.AddMinutes(1)).Should().BeFalse();
+        corrida.AguardaConferencia(Agora.Add(CorridaExterna.PrazoConfirmacao).AddSeconds(1)).Should().BeTrue();
+        var cedo = () => corrida.DescartarSemPedidoNoProvedor(Agora.AddMinutes(1));
+        cedo.Should().Throw<RegraDeDominioVioladaException>().WithMessage("*aguarde*");
+
+        corrida.DescartarSemPedidoNoProvedor(Agora.Add(CorridaExterna.PrazoConfirmacao).AddSeconds(1));
+
+        corrida.Status.Should().Be(StatusCorrida.Falha);
+        corrida.CustoCentavos.Should().Be(0);
+        corrida.Ativa.Should().BeFalse();
     }
 
     [Fact]

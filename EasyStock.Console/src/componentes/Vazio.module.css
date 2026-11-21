@@ -5,6 +5,10 @@
   display: grid; justify-items: center; align-content: start; gap: var(--e-3);
   animation: surgirVazio var(--dur-media) var(--ease-saida) both;
 }
+/* #2762: o vazio que é o painel inteiro (centro do Atendimento, coluna sem seleção) fica no meio da área,
+   não colado no topo com 800 px de branco embaixo. É opt-in: em coluna que estica o padrão segue `start`
+   (#2135), e `center` também não reparte as linhas pela altura. */
+.centro { align-content: center; min-height: 100%; }
 .icone { display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--r-2); color: var(--marca); background: var(--preenchimento); }
 /* Título em 21 px, não em cinza pequeno: o estado vazio é a primeira coisa que
    ela lê quando a tela está parada. */
@@ -20,4 +24,10 @@
 @keyframes surgirVazio {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
+}
+
+/* #2185 (R13): vazio em linha. A frase em secundário (13) e a ação, texto da marca, na mesma linha. */
+.linha {
+  margin: 0; padding: var(--e-3) var(--e-4); display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-1) var(--e-2);
+  font-size: var(--t-apoio); color: var(--tinta-3);
 }

@@ -66,7 +66,11 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(p => p.Pagamentos)
                 .Where(p => p.EmpresaId == empresaId);
 
-            if (!string.IsNullOrWhiteSpace(status)) query = query.Where(p => p.Status == status);
+            // #2478: uma situação ou várias separadas por vírgula ("aguardando,aprovado_baba" é a "Na fila" da Cozinha).
+            var situacoes = (status ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (situacoes.Length == 1) query = query.Where(p => p.Status == situacoes[0]);
+            else if (situacoes.Length > 1) query = query.Where(p => situacoes.Contains(p.Status));
             if (clienteId.HasValue && clienteId.Value != Guid.Empty)
                 query = query.Where(p => p.ClienteId == clienteId);
             if (desde.HasValue) query = query.Where(p => p.CriadoEm >= desde.Value);
@@ -75,11 +79,18 @@ namespace EasyStock.Infra.Postgre.Repositories
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
+                var padrao = PadraoILike.Contendo(BuscaTextual.Normalizar(termo));
+                var padraoLiteral = PadraoILike.Contendo(termo);
+                var digitos = BuscaTextual.DigitosTelefone(termo);
+                var buscaId = Guid.TryParse(termo, out var id);
+                var buscaNumero = int.TryParse(termo.TrimStart('#'), out var numero);
                 query = query.Where(p =>
-                    (p.ClienteNome != null && EF.Functions.ILike(p.ClienteNome, $"%{termo}%")) ||
-                    (p.ClienteApt  != null && EF.Functions.ILike(p.ClienteApt,  $"%{termo}%")) ||
-                    (p.ClienteTelefone != null && EF.Functions.ILike(p.ClienteTelefone, $"%{termo}%")) ||
-                    (p.Observacoes != null && EF.Functions.ILike(p.Observacoes, $"%{termo}%")));
+                    (buscaId && p.Id == id) || (buscaNumero && p.NumeroDoDia == numero) ||
+                    (p.ClienteNome != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.ClienteNome.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)) ||
+                    (p.ClienteApt  != null && EF.Functions.ILike(p.ClienteApt,  padraoLiteral, PadraoILike.Escape)) ||
+                    (p.ClienteTelefone != null && EF.Functions.ILike(p.ClienteTelefone, padraoLiteral, PadraoILike.Escape)) ||
+                    (digitos.Length >= 3 && p.ClienteTelefone != null && EasyStockDbContext.TraduzirTexto(p.ClienteTelefone, BuscaTextual.MascaraTelefone, "").Contains(digitos)) ||
+                    (p.Observacoes != null && EF.Functions.ILike(EasyStockDbContext.TraduzirTexto(p.Observacoes.ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)));
             }
 
             var total = await query.CountAsync();

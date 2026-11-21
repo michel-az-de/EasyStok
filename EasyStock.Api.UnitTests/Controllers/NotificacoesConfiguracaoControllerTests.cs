@@ -53,6 +53,12 @@ public class NotificacoesConfiguracaoControllerTests
         _templateGlobal = Template(null);
         foreach (var t in new[] { _templateA, _templateB, _templateGlobal })
             _templates.GetByIdAsync(t.Id, Arg.Any<CancellationToken>()).Returns(t);
+        _templates.ListarFamiliaComLockAsync(_empresaA, _templateA.Codigo, Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<TemplateNotificacao>)[_templateA]);
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<TemplateResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<TemplateResult>>>()(c.Arg<CancellationToken>()));
+        _uow.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<AprovarTemplateResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<AprovarTemplateResult>>>()(c.Arg<CancellationToken>()));
 
         _rotinaA = Rotina(_empresaA);
         _rotinaB = Rotina(_empresaB);
@@ -121,6 +127,13 @@ public class NotificacoesConfiguracaoControllerTests
         (await _controller.ListarTemplates(null, null, null)).Should().BeOfType<OkObjectResult>();
 
         await _templates.Received(1).ListarAsync(_empresaA, null, null, null, 1, 20, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ListarTemplates_encaminha_apenas_atuais_ao_repositorio()
+    {
+        await _controller.ListarTemplates(null, null, null, apenasAtuais: true);
+        await _templates.Received(1).ListarAsync(_empresaA, null, null, null, 1, 20, Arg.Any<CancellationToken>(), true);
     }
 
     [Fact]

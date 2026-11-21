@@ -16,6 +16,7 @@ namespace EasyStock.ArchitectureTests;
 ///   <c>DateTime.UtcNow</c> ou <c>DateTimeOffset.UtcNow</c> diretamente —
 ///   testes precisam ser determinísticos (avançar tempo via FakeTime).
 /// </summary>
+[Trait("Category", "Architecture")]
 public class StorefrontOtpArchitectureTests
 {
     // ── Privacidade: sem plaintext em propriedades públicas ────────────

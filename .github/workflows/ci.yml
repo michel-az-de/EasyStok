@@ -1,43 +1,50 @@
 name: CI
 
+# #2976 (E1): ready_for_review volta a rodar o CI quando o rascunho fica pronto; o rascunho não roda
+# .NET (if dos jobs). paths-ignore só para planos, notas de dev e fragmentos de changelog: **/*.md fica
+# de fora porque guardas de arquitetura leem .md, .yml e docs/ (GrafiaDaMarcaTests e outras). Esses
+# caminhos rodam só a arquitetura, no ci-docs.yml.
 on:
   pull_request:
     branches: [master, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ['docs/plan/**', 'docs/dev/**', 'changelog.d/**']
   push:
     branches: [master, main]
+    paths-ignore: ['docs/plan/**', 'docs/dev/**', 'changelog.d/**']
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# PR: push novo cancela o run anterior do mesmo PR. Push no master: group por SHA, cada commit
+# conclui o proprio run (#2554).
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: true
 
 env:
   DOTNET_VERSION: '10.0.x'
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  # Partes da integração. A divisão é por tempo medido (scripts/ci/tempos-testes.json).
+  PARTES: '6'
+  INTEGRACAO: 'EasyStock.Infra.Postgre.IntegrationTests EasyStock.Api.IntegrationTests'
 
 jobs:
-  build-and-test:
-    name: Build + dotnet test
+  # Unidade, arquitetura e Inventario.IntegrationTests (usa o banco do service e faz DROP SCHEMA), sem
+  # matriz. Compila a solução CI inteira com -warnaserror; corre em paralelo com o job compilar.
+  unidade:
+    name: Unidade, arquitetura e Inventario
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    # O gate atingiu 20 min no post-cache após testes aprovados; reserve tempo para finalizar o job.
     timeout-minutes: 30
-    # Postgres efemero para os testes de integracao (EasyStock.Inventario.IntegrationTests,
-    # ADR Inventario/Fatia 0). O fixture le a conn string de EASYSTOCK_IT_PG (setada no
-    # step Test) e cria o role NOSUPERUSER rls_test_client sujeito a RLS. Sem este service,
-    # os testes [SkippableFact] SKIPam; o guard nao-skip Harness_executa... vira o gate
-    # vermelho se a env var estiver setada mas o banco indisponivel. Bloco espelha
-    # restore-test-rotulos.yml.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       # #1796: o Postgres sobe num passo, e não em `services:`, para a imagem vir por espelhos com
-      # nova tentativa (scripts/ci/puxar-imagem.sh). O `services:` puxa de uma fonte só e reprova o
-      # job inteiro quando ela limita o runner.
+      # nova tentativa (scripts/ci/puxar-imagem.sh).
       - name: Postgres efemero
         run: |
           set -euo pipefail
@@ -57,7 +64,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
@@ -70,56 +77,44 @@ jobs:
       - name: Build
         run: dotnet build EasyStok.CI.slnf -c Release --no-restore -warnaserror
 
-      # #1514: as imagens dos fixtures Testcontainers vem de espelhos e recebem a tag do Docker Hub;
-      # com a imagem local o Testcontainers nao puxa nada (limite anonimo do Hub). Puxadas em serie
-      # e com fallback entre espelhos (#1796).
-      - name: Imagens dos testes por espelho
-        run: |
-          set -euo pipefail
-          bash scripts/ci/puxar-imagem.sh postgres:16-alpine postgres:17-alpine
-          for i in 1 2 3 4 5; do docker pull -q ghcr.io/axllent/mailpit:v1.31.3 && break; [ "$i" = 5 ] && exit 1; sleep $((i * 5)); done
-          docker tag ghcr.io/axllent/mailpit:v1.31.3 axllent/mailpit:v1.31.3
-
       - name: Test
         env:
-          # Conn string do service postgres (superuser). SSL Mode=Disable: o container
-          # oficial nao tem TLS e o Npgsql 9.x tentaria handshake. O fixture deriva dela
-          # o login NOSUPERUSER rls_test_client para exercer a RLS de verdade.
+          # Conn string do service postgres (superuser) para o Inventario. SSL Mode=Disable: o container
+          # oficial nao tem TLS. O fixture deriva dela o login NOSUPERUSER rls_test_client.
           EASYSTOCK_IT_PG: "Host=localhost;Port=5432;Database=easystock_ci;Username=postgres;Password=postgres;SSL Mode=Disable"
-          # Timeout do ScribanRenderer: 2s no CI (500ms em prod/local). O runner sob JIT frio/GC
-          # estoura 500ms na primeira renderizacao de template -- flaky de timing (issue #910,
-          # flaky-tests.md). NAO relaxa a guarda de producao, so o piso do runner lento.
+          # Timeout do ScribanRenderer: 2s no CI (issue #910, flaky-tests.md).
           EASYSTOK_SCRIBAN_TIMEOUT_MS: '2000'
-          # #1514: o Ryuk (testcontainers/ryuk) viria do Docker Hub, que estoura o limite anonimo; o
-          # runner e descartado ao fim do job, entao a limpeza dele nao faz falta.
-          TESTCONTAINERS_RYUK_DISABLED: 'true'
+        # Infra.Postgre.IntegrationTests roda nas partes; aqui o assembly só descobre e sai sem teste.
         run: >-
           dotnet test EasyStok.CI.slnf
           -c Release --no-build --no-restore
-          --filter "Category!=ArchitectureDebt"
-          --logger "trx;LogFileName=test-results.trx"
-          --logger "console;verbosity=normal"
+          --filter "Category!=ArchitectureDebt&FullyQualifiedName!~EasyStock.Infra.Postgre.IntegrationTests."
+          --logger "trx;LogFilePrefix=test-results"
+          --logger "console;verbosity=minimal"
           --results-directory ./TestResults
+
+      # #2371: um teste pulado no CI não prova nada. Só passa pulo de ensaio opt-in (lista no script).
+      - name: Nenhum teste pulado fora do opt-in
+        run: |
+          bash scripts/ci/checar-testes-pulados.test.sh
+          python3 scripts/ci/checar-testes-pulados.py ./TestResults
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results
           path: ./TestResults/**/*.trx
           retention-days: 14
 
-  # #1890: os 176 testes de EasyStock.Api.IntegrationTests (API inteira + Postgres real por
-  # Testcontainers) ficavam fora do EasyStok.CI.slnf desde #824 e vermelhos no coverage sem
-  # ninguem ver. Job proprio para nao estourar o teto do gate acima (#912). Cada classe sobe o
-  # proprio container e passa conexao e JWT por UseSetting, que chega antes de o Program.cs ler
-  # a configuracao (ConfigureAppConfiguration chega tarde). Sem EASYSTOCK_IT_PG de proposito:
-  # com ela as classes usariam o banco compartilhado do job acima, que sofre DROP SCHEMA dos
-  # fixtures de RLS.
-  api-integration:
-    name: Api.IntegrationTests (Postgres real)
+  # Compila os dois projetos de integração uma vez, lista os testes e divide em partes por tempo.
+  compilar:
+    name: Compilar integração
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    outputs:
+      matriz: ${{ steps.particionar.outputs.matriz }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -130,39 +125,179 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Imagem do Postgres por espelho
-        run: bash scripts/ci/puxar-imagem.sh postgres:17-alpine
-
-      - name: Restore
-        run: dotnet restore EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj
-
       - name: Build
-        run: dotnet build EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj -c Release --no-restore -warnaserror
+        run: |
+          set -euo pipefail
+          for p in $INTEGRACAO; do
+            dotnet build "$p/$p.csproj" -c Release -warnaserror
+          done
+
+      - name: Testes do particionador
+        run: bash scripts/ci/particionar-testes.test.sh
+
+      - name: Listar e particionar
+        id: particionar
+        run: |
+          set -euo pipefail
+          mkdir -p listas
+          for p in $INTEGRACAO; do
+            dotnet test "$p/bin/Release/net10.0/$p.dll" --list-tests > "listas/$p.txt"
+            echo "$p: $(grep -c '^    ' "listas/$p.txt") testes"
+          done
+          python3 scripts/ci/particionar-testes.py particionar --listas listas \
+            --tempos scripts/ci/tempos-testes.json --partes "$PARTES" --saida partes
+          echo "matriz=$(cat partes/matriz.json)" >> "$GITHUB_OUTPUT"
+
+      # O WebApplicationFactory acha a raiz do conteúdo pelo caminho do repositório: as partes fazem
+      # checkout e extraem o bin no mesmo lugar.
+      - name: Empacotar
+        run: |
+          set -euo pipefail
+          dirs=""; for p in $INTEGRACAO; do dirs="$dirs $p/bin/Release"; done
+          # Em Development a Api serve static web assets a partir do obj (staticwebassets.runtime.json).
+          estaticos="$(ls -d */obj/Release/net10.0/compressed 2>/dev/null || true)"
+          tar -czf integracao.tgz $dirs $estaticos listas partes
+
+      - name: Upload binários
+        uses: actions/upload-artifact@v6
+        with:
+          name: integracao-bin
+          path: integracao.tgz
+          retention-days: 1
+
+  # Cada parte roda o seu filtro com --no-build. Cada assembly sobe um contêiner Postgres por processo
+  # e clona o banco modelo por classe (PostgresCluster, #2976).
+  integracao:
+    name: Integração (parte ${{ matrix.parte }})
+    needs: compilar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: ${{ fromJSON(needs.compilar.outputs.matriz) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # #1514: as imagens dos fixtures Testcontainers vem de espelhos e recebem a tag do Docker Hub (#1796).
+      - name: Imagens dos testes por espelho
+        run: |
+          set -euo pipefail
+          bash scripts/ci/puxar-imagem.sh postgres:16-alpine postgres:17-alpine
+          for i in 1 2 3 4 5; do docker pull -q ghcr.io/axllent/mailpit:v1.31.3 && break; [ "$i" = 5 ] && exit 1; sleep $((i * 5)); done
+          docker tag ghcr.io/axllent/mailpit:v1.31.3 axllent/mailpit:v1.31.3
+
+      - name: Baixar binários
+        uses: actions/download-artifact@v7
+        with:
+          name: integracao-bin
 
       - name: Test
         env:
           EASYSTOK_SCRIBAN_TIMEOUT_MS: '2000'
+          # #1514: o Ryuk viria do Docker Hub; o runner é descartado ao fim do job.
           TESTCONTAINERS_RYUK_DISABLED: 'true'
           # As factories usam Development, mas este job nao tem coletor OTLP.
           OpenTelemetry__OtlpEndpoint: ''
-        run: >-
-          dotnet test EasyStock.Api.IntegrationTests/EasyStock.Api.IntegrationTests.csproj
-          -c Release --no-build --no-restore
-          --logger "trx;LogFileName=api-integration.trx"
-          --logger "console;verbosity=normal"
-          --results-directory ./TestResults
+        run: |
+          set -uo pipefail
+          tar -xzf integracao.tgz
+          falhou=0
+          for filtro in partes/parte-${{ matrix.parte }}/*.filtro; do
+            [ -e "$filtro" ] || continue
+            p="$(basename "$filtro" .filtro)"
+            # Canários HarnessCanary e MailpitCanary do Infra só exigem a variável presente; o
+            # Infra usa o próprio contêiner. A Api não lê mais EASYSTOCK_IT_PG.
+            marcador=""; [ "$p" = EasyStock.Infra.Postgre.IntegrationTests ] && marcador="ci"
+            EASYSTOCK_IT_PG="$marcador" dotnet test "$p/bin/Release/net10.0/$p.dll" \
+              --filter "$(cat "$filtro")" \
+              --logger "trx;LogFileName=$p-parte-${{ matrix.parte }}.trx" \
+              --logger "console;verbosity=minimal" \
+              --results-directory ./TestResults || falhou=1
+          done
+          exit $falhou
+
+      - name: Nenhum teste pulado fora do opt-in
+        run: python3 scripts/ci/checar-testes-pulados.py ./TestResults
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: api-integration-results
+          name: integracao-parte-${{ matrix.parte }}
           path: ./TestResults/**/*.trx
           retention-days: 14
+
+  # Cada teste listado rodou em exatamente uma parte. Também grava a tabela de tempos deste run, para
+  # atualizar scripts/ci/tempos-testes.json quando a divisão desequilibrar.
+  guarda:
+    name: Guarda da partição
+    needs: [compilar, integracao]
+    if: always() && needs.compilar.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Baixar binários
+        uses: actions/download-artifact@v7
+        with:
+          name: integracao-bin
+
+      - name: Baixar resultados das partes
+        uses: actions/download-artifact@v7
+        with:
+          pattern: integracao-parte-*
+          path: trx
+          merge-multiple: true
+
+      - name: Cada teste uma vez
+        run: |
+          set -euo pipefail
+          tar -xzf integracao.tgz listas
+          python3 scripts/ci/particionar-testes.py guardar --listas listas --trx trx
+          python3 scripts/ci/checar-testes-pulados.py trx
+
+      - name: Tempos deste run
+        if: always()
+        run: python3 scripts/ci/particionar-testes.py tempos --trx trx --saida tempos-testes.json
+
+      - name: Upload tempos
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tempos-testes
+          path: tempos-testes.json
+          retention-days: 14
+
+  # Nome estável para o portão do deploy (E2) e para uma proteção de branch futura.
+  ci-ok:
+    name: ci-ok
+    needs: [unidade, compilar, integracao, guarda]
+    if: always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Todos os jobs verdes
+        env:
+          RESULTADOS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTADOS" | python3 -c '
+          import json, sys
+          r = {k: v["result"] for k, v in json.load(sys.stdin).items()}
+          print(r)
+          sys.exit(0 if all(v == "success" for v in r.values()) else 1)'

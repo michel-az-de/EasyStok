@@ -65,6 +65,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.ProcessarCobrancaVencidaUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.Pedidos.Cobranca.RetomarCobrancasAguardandoCredencialUseCase>(); // I3.2
         services.AddScoped<EasyStock.Application.Services.Atendimento.AvisoCobrancaConversa>();
+        services.AddScoped<EasyStock.Application.Services.Atendimento.CobrancaPixConversa>(); // #2962: cobrança Pix em 2 balões
 
         // S20: canhoto e fila de impressão (o pedido pago entra na fila dentro do ConfirmarPagamento).
         services.AddScoped<EasyStock.Application.UseCases.Operacao.Impressao.MontarCanhotoUseCase>();
@@ -94,7 +95,7 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<AcompanhamentoTokenService>();
         services.AddScoped<IniciarCheckoutGuestUseCase>();
 
-        // TASK-EZ-APROVAR-001 — use cases Babá aprovar/recusar pedido.
+        // TASK-EZ-APROVAR-001 — use cases Baba aprovar/recusar pedido.
         services.AddScoped<AprovarPedidoStorefrontUseCase>();
         services.AddScoped<RecusarPedidoStorefrontUseCase>();
 

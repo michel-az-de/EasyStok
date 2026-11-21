@@ -261,7 +261,7 @@ export const CENARIOS = [
     id: 'lead-novo',
     grupo: GRUPOS.CHEGANDO,
     titulo: 'Cliente novo chega',
-    resumo: 'Lead do Instagram manda oi; o automático responde sozinho, capta nome, telefone e endereço, cria o cadastro e anota o pedido.',
+    resumo: 'Lead do Instagram manda oi; o Assistente responde sozinho, capta nome, telefone e endereço, cria o cadastro e anota o pedido.',
     ancora: 'US-001, US-011, UC-01 passos 2 a 8, issue #8',
     dependeDe: 'F2',
     // Rodada 11 (registro 92): cada fala espera a resposta "digitando" da
@@ -281,7 +281,7 @@ export const CENARIOS = [
     id: 'recorrente',
     grupo: GRUPOS.CHEGANDO,
     titulo: 'Recorrente pede o de sempre',
-    resumo: 'Cliente com histórico escreve; o automático saúda pelo nome e oferece favorito e novidade.',
+    resumo: 'Cliente com histórico escreve; o Assistente saúda pelo nome e oferece favorito e novidade.',
     ancora: 'US-002, RN-02, RN-07',
     roteiro: [
       { aposMs: 0, tipo: 'conversa' },
@@ -292,7 +292,7 @@ export const CENARIOS = [
     id: 'restricao',
     grupo: GRUPOS.CHEGANDO,
     titulo: 'Pergunta de restrição',
-    resumo: 'Cliente pergunta sobre glúten; o automático nunca responde composição, passa para você.',
+    resumo: 'Cliente pergunta sobre glúten; o Assistente nunca responde composição, passa para você.',
     ancora: 'RN-52',
     dependeDe: 'F1',
     roteiro: [
@@ -340,7 +340,7 @@ export const CENARIOS = [
     id: 'fora-de-area',
     grupo: GRUPOS.CHEGANDO,
     titulo: 'Cliente fora de área',
-    resumo: 'CEP fora do alcance; o automático avisa e pergunta se quer seguir, o lead insiste e passa para você decidir na ficha.',
+    resumo: 'CEP fora do alcance; o Assistente avisa e pergunta se quer seguir, o lead insiste e passa para você decidir na ficha.',
     ancora: 'UC-01 A, UC-02, RN-10, RN-11',
     dependeDe: 'F2',
     roteiro: [
@@ -410,7 +410,7 @@ export const CENARIOS = [
     id: 'saldo-zero',
     grupo: GRUPOS.PROBLEMAS,
     titulo: 'Saldo zero',
-    resumo: 'Cliente pede lasanha verde (saldo 0); o automático não vende e passa para você.',
+    resumo: 'Cliente pede lasanha verde (saldo 0); o Assistente não vende e passa para você.',
     ancora: 'UC-09, RN-48, RN-53',
     roteiro: [
       { aposMs: 0, tipo: 'conversa' },
@@ -421,7 +421,7 @@ export const CENARIOS = [
     id: 'janela-lotada',
     grupo: GRUPOS.PEDIDO,
     titulo: 'Janela lotada',
-    resumo: 'Cliente pede a janela das 11h30, cheia; fica esperando você, e ao consultar o agente ele já sugere só o que tem vaga.',
+    resumo: 'Cliente pede a janela das 11h30, cheia; fica esperando você, e ao consultar o Assistente ele já sugere só o que tem vaga.',
     ancora: 'UC-03 E1, RN-21',
     roteiro: [
       { aposMs: 0, tipo: 'conversa' },

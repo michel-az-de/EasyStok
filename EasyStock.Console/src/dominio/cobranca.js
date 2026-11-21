@@ -59,6 +59,7 @@ export const NOME_DO_MEIO = {
   maquininha: 'maquininha',
   'vale-refeicao': 'vale',
   'dinheiro-entrega': 'dinheiro na entrega',
+  'pix-direto': 'Pix na chave da loja',
 }
 // Cobrança sem `meio` é da massa anterior à F4, quando só existia Pix.
 export const nomeDoMeio = (meio) => NOME_DO_MEIO[meio ?? 'pix'] ?? 'cobrança'
@@ -70,6 +71,26 @@ export const nomeDoMeio = (meio) => NOME_DO_MEIO[meio ?? 'pix'] ?? 'cobrança'
 // transforma o pedido em maquininha.
 export const DINHEIRO_NA_ENTREGA = 'dinheiro-entrega'
 export const MEIOS_NA_ENTREGA = new Set([DINHEIRO_NA_ENTREGA, 'maquininha', 'vale-refeicao'])
+
+// --- Pix direto pela chave da loja (#2233) -------------------------------------
+// Sem Mercado Pago: o EasyStok manda o copia e cola da chave da loja e a equipe confere e dá baixa
+// ("Marcar pago"). Fica fora de `infra/catalogo.js` porque depende do tenant: o chip só aparece com a
+// API dizendo que está disponível (flag `pagamento.pix_direto` e loja com chave) e com o pedido já
+// criado, que é quando a troca de forma existe. Demonstração e cardápio público não o veem.
+export const MEIO_PIX_DIRETO = 'pix-direto'
+const CHIP_PIX_DIRETO = {
+  id: MEIO_PIX_DIRETO, rotulo: 'Pix na chave da loja', situacao: 'ativo', provedor: 'pix_direto',
+  liberaEsteiraSemPagar: true, destaque: true,
+}
+export const meiosDaEscolha = (meios, { pixDireto = false, pedidoCriado = false } = {}) =>
+  pixDireto && pedidoCriado ? [...meios, CHIP_PIX_DIRETO] : meios
+
+// O cartão da aba Integrações só existe com a flag `pagamento.pix_direto` ligada: com ela desligada
+// (ou ainda carregando) não aparece, nem com chave salva. Ligada, diz se falta cadastrar a chave.
+export const situacaoDoPixDireto = (pix) => {
+  if (!pix?.pixDiretoLigado) return null
+  return pix.configurada ? { tom: 'ok', texto: 'Ligado' } : { tom: 'neutro', texto: 'Sem chave' }
+}
 const PREFIXO_DINHEIRO = 'Pagamento na entrega: dinheiro'
 
 // `trocoPara` em reais; vazio ou zero é "sem troco".
@@ -305,16 +326,25 @@ export function textoDaCobranca(cobranca, pedido, cardapio) {
       'Já coloquei na fila de preparo.',
     ].filter(Boolean).join('\n')
   }
+  // Pix (#2962): o balão 1 é a legenda, sem o código; o código sai no balão 2 (`codigoDaCobranca`).
+  // Cartão por link segue com o link no texto, porque não tem copia e cola.
+  const cobrancaPorLink = cobranca.meio === 'cartao-link'
+    ? 'Link de pagamento de ' + MINUTOS_PARA_EXPIRAR + ' minutos: ' + cobranca.link
+    : 'Pague em até ' + MINUTOS_PARA_EXPIRAR + ' min pelo Pix abaixo'
   return [
     abertura,
     cobranca.diferenca ? null : resumirItens(pedido, cardapio) + '.',
     'Total: ' + moeda(cobranca.valor),
-    (cobranca.meio === 'cartao-link' ? 'Link de pagamento' : 'Pix') + ' de ' + MINUTOS_PARA_EXPIRAR
-      + ' minutos: ' + cobranca.link,
-    cobranca.copiaECola ? 'Copia e cola: ' + cobranca.copiaECola : null,
+    cobrancaPorLink,
     'Assim que cair eu já coloco na fila de preparo.',
   ].filter(Boolean).join('\n')
 }
+
+// Balão 2 do Pix: SÓ o copia e cola, sem texto em volta, para o toque longo copiar tudo (espelha
+// `TextoCobrancaPix.BalaoDoCodigo` da API). Null quando não há balão separado.
+export const codigoDaCobranca = (cobranca) => (cobranca.link && cobranca.meio !== 'cartao-link'
+  ? cobranca.copiaECola || null
+  : null)
 
 // Resposta ao print. O cliente que manda comprovante quer saber que chegou, e é
 // esse silêncio que faz ele perguntar três vezes se caiu.
@@ -447,6 +477,24 @@ export function trocaDeFormaNoEasyStok(cobranca, nomeCliente) {
     meio: 'cartao-link',
     texto: `O EasyStok gera um link de pagamento (Pix ou cartão) e manda para ${nomeCliente} se a conversa estiver aberta.`,
   }
+}
+
+// #2998: com o Pix direto disponível (flag `pagamento.pix_direto` e loja com chave), a troca também oferece o
+// Pix na chave da loja, inclusive com o link vencido ou pendente. A API confere o link aberto no Mercado Pago
+// antes de cancelar e recusa com pagamento em andamento; a frase dela aparece no aviso da tela.
+const ROTULO_DA_TROCA = { maquininha: 'Receber na entrega', 'cartao-link': 'Link de pagamento (Pix ou cartão)' }
+export function trocasDeFormaNoEasyStok(cobranca, nomeCliente, { pixDireto = false } = {}) {
+  const troca = trocaDeFormaNoEasyStok(cobranca, nomeCliente)
+  const opcoes = [{ ...troca, rotulo: ROTULO_DA_TROCA[troca.meio] }]
+  if (!pixDireto || cobranca?.meio === MEIO_PIX_DIRETO) return opcoes
+  const envio = `${nomeCliente} recebe o Pix na chave da loja (QR em PDF e copia e cola) se a conversa estiver aberta.`
+  return [...opcoes, {
+    meio: MEIO_PIX_DIRETO,
+    rotulo: nomeDoMeio(MEIO_PIX_DIRETO),
+    texto: cobranca?.link
+      ? `O link de pagamento é cancelado e ${envio} Com o link em aberto, o EasyStok confere o Mercado Pago antes e recusa a troca se houver pagamento em andamento ou se não conseguir conferir.`
+      : `A cobrança atual é cancelada e ${envio}`,
+  }]
 }
 
 // "Como recebeu" já preenchido com o meio da cobrança quando ele é um dos métodos

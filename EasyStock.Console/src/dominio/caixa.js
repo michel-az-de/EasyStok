@@ -11,7 +11,8 @@
 // `dominio/pagamento.js: pagamentosDoPedido` já devolve) e o resumo do caixa
 // SOMA os dois mundos sem misturar os dados de um dentro do outro.
 
-import { inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { dataIsoNoFuso, horaCurta, inicioDoDiaNoFuso, moeda, plural } from './formato.js'
+import { aDevolverDe } from './cobranca.js'
 import { pagamentosDoPedido } from './pagamento.js'
 import { itemPorSku } from './cardapio.js'
 import { numeroDoDiaNaTela } from './pedido.js'
@@ -35,12 +36,52 @@ export const AVISO_AO_FECHAR_CAIXA = 'Depois de fechar, o caixa de hoje não rea
 // J2 (#1990), item 5: devolução pendente não trava o fechamento (o dinheiro pode sair amanhã), mas o
 // modal diz quanto e onde se resolve. Sem nada a devolver, nada.
 // Pedido que não deu para conferir (`falhas`) é dito, para "nada a devolver" não ser presumido.
-export function avisoDeDevolucoesPendentes({ total = 0, pedidos = 0, falhas = 0 } = {}) {
+function avisoDeDevolucoes({ total = 0, pedidos = 0, falhas = 0 } = {}, orientacao, recorte = '') {
   const semConferir = falhas > 0 ? ` ${plural(falhas, 'pedido cancelado não foi conferido', 'pedidos cancelados não foram conferidos')}.` : ''
   if (!(total > 0)) return semConferir ? `Não deu para conferir tudo:${semConferir}` : null
-  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}. `
-    + `O fechamento não espera: registre a devolução no Pós-venda de cada pedido.${semConferir}`
+  return `Há ${moeda(total)} a devolver de ${plural(pedidos, 'pedido cancelado', 'pedidos cancelados')}${recorte}. ${orientacao}${semConferir}`
 }
+
+export const avisoDeDevolucoesPendentes = (leitura) =>
+  avisoDeDevolucoes(leitura, 'O fechamento não espera: registre a devolução no Pós-venda de cada pedido.')
+
+// #2267: no Caixa do dia e no Extrato o pagamento do pedido cancelado parecia receita comum.
+// #2512 (Q03): com `recorte`, o Caixa diz de quando é o pagamento que ele conta (hoje, ou desde a
+// abertura no caixa esquecido aberto) e manda ao Extrato, que soma os cancelados de 90 dias.
+export const avisoDeDevolucoesNasTelas = (leitura, recorte = null) => {
+  if (!recorte) return avisoDeDevolucoes(leitura, 'Esse dinheiro entrou e está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido.')
+  const quando = recorte.desde ? `desde ${recorte.desde.slice(8, 10)}/${recorte.desde.slice(5, 7)}` : 'hoje'
+  return avisoDeDevolucoes(
+    leitura,
+    'Esse dinheiro está nos totais, mas não é da loja: registre a devolução no Pós-venda do pedido. Cancelados de outros dias ficam no Extrato.',
+    ` com pagamento recebido ${quando}`,
+  )
+}
+
+// #2275: o Extrato lê os cancelados dos últimos 90 dias, não o período da tela: o aviso diz isso e não
+// afirma que o valor está nos totais.
+export const avisoDeDevolucoesNoExtrato = (leitura) =>
+  avisoDeDevolucoes(leitura, 'São pedidos cancelados dos últimos 90 dias: registre a devolução no Pós-venda de cada pedido.')
+
+// #2275: o aviso do Caixa do dia conta só o que está nos totais: o pagamento que entrou no período
+// (o mesmo recorte dos totais), sem o que já foi devolvido dele, limitado ao que ainda falta devolver.
+// Período é "AAAA-MM-DD" de `de` a `ate` (o dia; ou desde a abertura, no caixa esquecido aberto).
+// Cancelado de fora do período não some: segue no Pós-venda e no Extrato. Pagamento sem data válida não conta.
+export function aDevolverDoDia(dados, de, ate = de) {
+  const aDevolver = aDevolverDe(dados)
+  const noPeriodo = (dados?.pagamentos ?? [])
+    .filter((p) => {
+      const ms = Date.parse(p.pagoEm)
+      if (!Number.isFinite(ms)) return false
+      const dia = dataIsoNoFuso(ms)
+      return dia >= de && dia <= ate
+    })
+    .reduce((soma, p) => soma + Math.max(0, (Number(p.valor) || 0) - (Number(p.devolvido) || 0)), 0)
+  return Math.round(Math.min(aDevolver, noPeriodo) * 100) / 100
+}
+
+// #2275: um token só para o status do caixa, no topo e na tabela. O caixa esquecido aberto é aviso.
+export const tomDoCaixa = ({ fechado = false, esquecido = false } = {}) => (fechado ? 'neutro' : esquecido ? 'aviso' : 'ok')
 
 // #1584: a sugestão é do tipo. Trocar Entrada/Saída com "Sangria" marcada gravava uma entrada
 // rotulada Sangria. A sugerida do outro tipo sai; a que a dona digitou fica.
@@ -53,11 +94,15 @@ export function categoriaAoTrocarTipo(categoria, novoTipo) {
 // meio da cobrança por conversa: pix/dinheiro/credito/debito/transferencia/outro).
 export const METODOS_CAIXA = ['pix', 'dinheiro', 'credito', 'debito', 'transferencia', 'outro']
 
+// #2305: o servidor compara a forma sem caixa e sem espaço nas pontas (`MetodosPagamentoCaixa.Normalizar`);
+// comparar estrito aqui dava gaveta diferente da do servidor com "Dinheiro " gravado.
+export const normalizarMetodoCaixa = (metodo) => (typeof metodo === 'string' ? metodo.trim().toLowerCase() : metodo)
+
 const NOME_DO_METODO_CAIXA = {
   pix: 'Pix', dinheiro: 'Dinheiro', credito: 'Crédito', debito: 'Débito',
   transferencia: 'Transferência', outro: 'Outro',
 }
-export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[metodo] ?? 'Outro'
+export const nomeDoMetodoCaixa = (metodo) => NOME_DO_METODO_CAIXA[normalizarMetodoCaixa(metodo)] ?? 'Outro'
 
 // Proposta ajustável para a Thati: o protótipo nasceu antes deste caixa
 // existir e a cobrança por conversa (F4, `dominio/cobranca.js`) guarda um meio
@@ -323,7 +368,7 @@ export function fecharCaixaMovimento(resumo, contado, agora, autorNome) {
 // não conta. Movimento sem método é do caixa físico (nasceu antes de o método existir);
 // pagamento sem método fica fora da gaveta, porque ninguém sabe onde ele caiu.
 const centavos = (v) => Math.round((Number(v) || 0) * 100)
-const ehDinheiro = (meio, semMetodoEhDinheiro) => meio === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
+const ehDinheiro = (meio, semMetodoEhDinheiro) => normalizarMetodoCaixa(meio) === 'dinheiro' || (meio == null && semMetodoEhDinheiro)
 const sinalDoMovimento = (tipo) => (tipo === TIPOS_MOVIMENTO.ENTRADA ? 1 : tipo === TIPOS_MOVIMENTO.SAIDA ? -1 : 0)
 
 // #1627: o que veio sem forma de pagamento fica à parte (`semForma`). A venda do pedido entregue
@@ -350,6 +395,52 @@ export function gavetaDoDia(dia) {
   }
   return { naGaveta: gaveta / 100, pixECartao: fora / 100, semForma: semForma / 100 }
 }
+
+// #2512 (Q08, N3): o resumo em duas contas que fecham no mesmo total. "Onde está" separa a gaveta do que
+// não está nela; "De onde veio" diz a origem. Numa fileira só, o Pix do pedido aparecia ao lado do saldo
+// inicial (como se estivesse na gaveta) e de novo em "Fora da gaveta". `saida` marca a linha que subtrai.
+// Sem abertura ninguém disse quanto havia na gaveta (#1627): nada de "gaveta" nem de "saldo inicial".
+export function resumoEmDuasContas(dia, gaveta, semAbertura = false) {
+  const lugar = [
+    { forte: !semAbertura, rotulo: semAbertura ? 'Em dinheiro' : 'Na gaveta (dinheiro)', valor: gaveta.naGaveta },
+    { rotulo: semAbertura ? ROTULO_FORA_DO_DINHEIRO : ROTULO_FORA_DA_GAVETA, valor: gaveta.pixECartao },
+    gaveta.semForma !== 0 && { rotulo: 'Sem forma de pagamento', valor: gaveta.semForma },
+  ].filter(Boolean)
+  const origem = [
+    !semAbertura && { rotulo: 'Saldo inicial', valor: dia.saldoInicial },
+    dia.totalVendas !== 0 && { rotulo: 'Vendas', valor: dia.totalVendas },
+    { rotulo: 'Pagamentos de pedidos', valor: dia.totalPagamentosPedidos },
+    { rotulo: 'Outras entradas', valor: dia.totalEntradasExtras },
+    { rotulo: 'Outras saídas', valor: dia.totalSaidasExtras, saida: true },
+  ].filter(Boolean)
+  return { lugar, origem }
+}
+
+// #2512 (Q04): no caixa aberto há dias, "21:39" sozinho não diz de que dia é o lançamento. A data entra
+// quando o dia do lançamento (no fuso da loja) não é o dia do caixa.
+export function quandoNoCaixa(iso, dataDoCaixa) {
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) return ''
+  const hora = horaCurta(iso)
+  const dia = dataIsoNoFuso(ms)
+  return dia === dataDoCaixa ? hora : `${dia.slice(8, 10)}/${dia.slice(5, 7)} ${hora}`
+}
+
+// #2535 (Q05): o fechamento de uma sessão de vários dias grava em `observacoes`, depois da nota do operador,
+// o aviso de lançamentos que ficaram fora dele. Antes da #2256 a frase era "Atencao: ha lancamentos entre ...
+// NAO foram incluidos ..."; hoje é "Atenção: há lançamentos entre ... não entraram ...". As duas trazem o
+// período no mesmo formato, e é só ele que a tela precisa para dizer o que houve e para onde ir.
+const AVISO_FORA_DO_FECHAMENTO = /^\s*Aten[cç][aã]o: h[aá] lan[cç]amentos entre (\d{2})\/(\d{2})\/\d{4} e (\d{2})\/(\d{2})\/\d{4}.*$/imu
+
+export function observacaoDoFechamento(texto) {
+  const bruto = String(texto ?? '')
+  const achado = bruto.match(AVISO_FORA_DO_FECHAMENTO)
+  if (!achado) return { nota: bruto.trim(), foraDoFechamento: null }
+  const [linha, diaDe, mesDe, diaAte, mesAte] = achado
+  return { nota: bruto.replace(linha, '').trim(), foraDoFechamento: { de: `${diaDe}/${mesDe}`, ate: `${diaAte}/${mesAte}` } }
+}
+
+export const avisoForaDoFechamento = ({ de, ate }) => `Os lançamentos de ${de} a ${ate} ficaram fora deste fechamento.`
 
 // --- Fluxo de caixa de vários dias (#1624) ----------------------------------
 // Uma linha por dia, com as palavras da dona: entrou (vendas, pagamentos de pedido e outras
@@ -394,10 +485,10 @@ export function totaisDoFluxo(linhas) {
   return { entrou: soma('entrou'), saiu: soma('saiu'), saldo: soma('saldo') }
 }
 
-// O dia tem dinheiro para mostrar mesmo sem abertura? A rota do dia não devolve lançamento estornado:
-// dia cujo único lançamento foi estornado não tem movimento.
+// O dia tem dinheiro para mostrar mesmo sem abertura? A rota do dia devolve o lançamento estornado marcado
+// (A3, #1769): dia cujo único lançamento foi estornado não tem movimento.
 export const temMovimentoNoDia = (dia) =>
-  (dia?.movimentos ?? []).some((m) => m.tipo !== TIPOS_MOVIMENTO.ABERTURA && m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
+  (dia?.movimentos ?? []).some((m) => !m.estornadoEm && m.tipo !== TIPOS_MOVIMENTO.ABERTURA && m.tipo !== TIPOS_MOVIMENTO.FECHAMENTO)
   || (dia?.linhasExtras ?? []).length > 0
   || [dia?.totalVendas, dia?.totalPagamentosPedidos, dia?.totalEntradasExtras, dia?.totalSaidasExtras].some((v) => centavos(v) !== 0)
 

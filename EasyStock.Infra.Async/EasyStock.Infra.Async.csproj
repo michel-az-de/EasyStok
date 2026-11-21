@@ -53,6 +53,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EasyStock.Application\EasyStock.Application.csproj" />
+    <ProjectReference Include="..\EasyStock.Observabilidade\EasyStock.Observabilidade.csproj" />
     <ProjectReference Include="..\EasyStock.Infra.Postgre\EasyStock.Infra.Postgre.csproj" />
   </ItemGroup>
 
@@ -61,6 +62,13 @@
     <InternalsVisibleTo Include="EasyStock.Infra.Async.UnitTests" />
     <!-- N3 (#1351): o teste de integracao com o Mailpit injeta o validador de certificado (certificado proprio). -->
     <InternalsVisibleTo Include="EasyStock.Infra.Postgre.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- #2929: as fontes da marca (OFL) vão dentro do assembly. A API e o Worker desenham o resumo do pedido,
+         e o container não as tem instaladas. Ficam neste projeto, e não linkadas da API, porque a imagem do
+         Worker não leva a pasta EasyStock.Api (ver Pdf\Fontes\LEIAME.md). -->
+    <EmbeddedResource Include="Pdf\Fontes\*.ttf" LogicalName="EasyStock.Infra.Async.Pdf.Fontes.%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

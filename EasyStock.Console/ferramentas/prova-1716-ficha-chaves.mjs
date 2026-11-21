@@ -7,12 +7,43 @@
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { parseSync } from 'vite'
 
 const fonte = readFileSync(new URL('../src/features/ficha-cliente/PainelFicha.jsx', import.meta.url), 'utf8')
-// Chave de item de lista (`.map`) repete a expressão por desenho; as demais são de blocos fixos da Ficha.
-const chaves = [...fonte.matchAll(/\bkey=\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/g)].map((m) => m[1].trim()).filter((k) => k !== 'item.id')
-
-assert.ok(chaves.length >= 5, 'a Ficha deixou de dar chave aos blocos: ' + chaves.length)
-const repetidas = chaves.filter((k, i) => chaves.indexOf(k) !== i)
+// React exige unicidade entre irmãos. Notas, endereço e reconferência pertencem a pais diferentes.
+function conferir(texto) {
+  const arvore = parseSync('Ficha.jsx', texto), porPai = new Map(), repetidas = []
+  assert.deepEqual(arvore.errors, [])
+  let quantidade = 0
+  function visitar(no, pai = null) {
+    if (!no || typeof no !== 'object') return
+    if (no.type === 'JSXElement' || no.type === 'JSXFragment') {
+      const atributo = no.openingElement?.attributes.find(a => a.type === 'JSXAttribute' && a.name.name === 'key')
+      if (atributo) {
+        const valor = atributo.value.expression ?? atributo.value
+        const chave = texto.slice(valor.start, valor.end)
+        if (chave !== 'item.id') {
+          quantidade++
+          if (pai) {
+            const chaves = porPai.get(pai) ?? new Set()
+            if (chaves.has(chave)) repetidas.push(chave)
+            chaves.add(chave); porPai.set(pai, chaves)
+          }
+        }
+      }
+      pai = no
+    }
+    for (const valor of Object.values(no)) {
+      if (Array.isArray(valor)) valor.forEach(filho => visitar(filho, pai))
+      else visitar(valor, pai)
+    }
+  }
+  visitar(arvore.program)
+  return { quantidade, repetidas }
+}
+assert.deepEqual(conferir('const ficha = <div><A key={id}/><B key={id}/></div>').repetidas, ['id'])
+assert.deepEqual(conferir('const ficha = <div><aside><A key={id}/></aside><main><B key={id}/></main></div>').repetidas, [])
+const { quantidade, repetidas } = conferir(fonte)
+assert.ok(quantidade >= 5, 'a Ficha deixou de dar chave aos blocos: ' + quantidade)
 assert.deepEqual(repetidas, [], 'blocos irmãos da Ficha com a mesma key: ' + repetidas.join(', '))
-console.log('ok  ' + chaves.length + ' blocos da Ficha, cada um com a sua chave')
+console.log('ok  ' + quantidade + ' blocos da Ficha, sem chave repetida entre irmãos')

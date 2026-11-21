@@ -32,7 +32,8 @@ public class AtendimentoComandaController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [HttpGet("comanda/cardapio")]
     public Task<IActionResult> Cardapio(CancellationToken ct = default)
-        => Tratar(async () => DataOk(await cardapioUseCase.ExecuteAsync(currentUser.EmpresaId, ct)));
+        => Tratar(() => LerDaLoja(() => cardapioUseCase.ExecuteAsync(currentUser.EmpresaId, ct),
+            new CardapioDaComandaResult([], "", "", new Dictionary<Guid, IReadOnlyList<PorcaoDaComanda>>())));
 
     [SwaggerOperation(Summary = "Delivery windows with vacancies that respect the order lead time (S16)",
         Description = "itens: cardapio_item_id da comanda (o prazo sai do maior preparo). Sem datas, os próximos 14 dias.")]
@@ -68,13 +69,16 @@ public class AtendimentoComandaController(
             return Task.FromResult<IActionResult>(Forbid());
         if (body?.Itens is not { Count: > 0 })
             return Task.FromResult(DataBadRequest("A comanda está vazia."));
+        if (body.ClienteId is not { } clienteId || clienteId == Guid.Empty || body.VinculoRevisao is not { } revisao || revisao < 0)
+            return Task.FromResult(DataBadRequest("Informe o cliente e a revisão da pessoa conferida na comanda."));
 
         return Tratar(async () => DataOk(await gerarPedidoUseCase.ExecuteAsync(new GerarPedidoConversaInput(
-            currentUser.EmpresaId, id,
+            currentUser.EmpresaId, id, clienteId, revisao,
             body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
             body.JanelaId, body.DataEntrega, body.EnderecoId, body.Forma, body.Observacoes,
             EnviarAoCliente: body.EnviarAoCliente,
-            UsuarioId: currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null), ct)));
+            UsuarioId: currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            FreteCombinado: body.FreteCombinado), ct)));
     }
 
     [SwaggerOperation(Summary = "Quote of the order before creating it: freight, total, deposit and rest (#1884)",
@@ -94,7 +98,7 @@ public class AtendimentoComandaController(
         return Tratar(async () => DataOk(await simularPedidoUseCase.ExecuteAsync(new SimularPedidoConversaInput(
             currentUser.EmpresaId, id,
             body.Itens.Select(i => new ItemPedidoCheckout(i.CardapioItemId, i.Qtd, i.Observacao, i.VariacaoId)).ToList(),
-            body.JanelaId, body.DataEntrega, body.EnderecoId), ct)));
+            body.JanelaId, body.DataEntrega, body.EnderecoId, body.FreteCombinado), ct)));
     }
 
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)
@@ -109,7 +113,7 @@ public class AtendimentoComandaController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return VitrineDesligada();
         }
         catch (Exception ex) when (ex is UseCaseValidationException or CepInvalidoException)
         {
@@ -147,11 +151,13 @@ public class AtendimentoComandaController(
         CepSemCoberturaException => ("CEP_SEM_COBERTURA", ex.Message),
         ClienteBloqueadoException => ("CLIENTE_BLOQUEADO", MensagemClienteBloqueado),
         PedidoEmAndamentoException => ("PEDIDO_EM_ANDAMENTO", ex.Message),
+        ContextoPedidoAtendimentoAlteradoException => ("VINCULO_CLIENTE_ALTERADO", ex.Message),
         _ => null,
     };
 }
 
-/// <summary>Comanda fechada pela operadora. <c>Forma</c>: <c>online</c> (padrão) ou <c>na_entrega</c>.</summary>
+/// <summary>Comanda fechada pela operadora. <c>Forma</c>: <c>online</c> (padrão) ou <c>na_entrega</c>.
+/// <c>FreteCombinado</c> (#2219): frete em reais combinado com o cliente quando o CEP está fora da área.</summary>
 public sealed record GerarPedidoConversaBody(
     IReadOnlyList<ItemComandaBody> Itens,
     Guid JanelaId,
@@ -159,14 +165,18 @@ public sealed record GerarPedidoConversaBody(
     Guid? EnderecoId = null,
     string? Forma = null,
     string? Observacoes = null,
-    bool EnviarAoCliente = true);
+    bool EnviarAoCliente = true,
+    decimal? FreteCombinado = null,
+    Guid? ClienteId = null,
+    long? VinculoRevisao = null);
 
 /// <summary>Comanda a simular (#1884): o mesmo corpo do pedido, sem forma de pagamento nem envio.</summary>
 public sealed record SimularPedidoConversaBody(
     IReadOnlyList<ItemComandaBody> Itens,
     Guid JanelaId,
     DateOnly DataEntrega,
-    Guid? EnderecoId = null);
+    Guid? EnderecoId = null,
+    decimal? FreteCombinado = null);
 
 /// <param name="VariacaoId">M1.4b (#1531): a porção escolhida; null em prato com porções usa a padrão.</param>
 public sealed record ItemComandaBody(Guid CardapioItemId, int Qtd, string? Observacao = null, Guid? VariacaoId = null);

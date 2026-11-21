@@ -1,5 +1,7 @@
 # AGENTS.md — EasyStok
 
+**Plano vivo (D15):** atividade que edita arquivo, roda comando com efeito ou delega a agente começa com um plano em `~/.claude/planos/<sessão>.md`, que passa por banca, é relido a cada ação e vira o handoff. Regra completa na seção D15 de `ATLAS_AGENT_DISCIPLINE_V1`, projetada em `~/.claude/CLAUDE.md` e `~/.codex/AGENTS.md`.
+
 Regras comuns a qualquer agente (Claude Code, Codex, Kimi, Copilot). Claude Code acrescenta o `CLAUDE.md`.
 
 ## Projeto
@@ -29,6 +31,7 @@ issue -> branch `tipo/slug-N` -> commits -> push -> PR `closes #N` -> CI + revie
 | Artefatos | bin/, obj/, publish/, dist/, admin/, .claude/projects/, *.dll, *.exe, *.pdb nunca entram no commit. |
 | Assinatura | Mudou assinatura pública: todos os call-sites no mesmo commit (`git grep` antes). |
 | Worktree | Paralelo ou arriscado: `C:\rep\.worktrees\EasyStok\<slug>`, 1 worktree = 1 branch = 1 issue. WIP alheio não se descarta nem se reaproveita. |
+| Limpeza | Worktrees vivem em `C:\rep\.worktrees\EasyStok\`, `.claude/worktrees/` (harness) e `~/.codex/worktrees/` (Codex). Integrada = limpa e PR `MERGED` com head local igual ao `headRefOid`; squash não é ancestral, então `branch -d` recusa e só nesse caso vale `-D`. PR fechada sem merge: remove o worktree e mantém a branch. Antes do `worktree remove`, `git config core.longpaths true`. |
 | Inacabado | Fica na branch e na issue aberta. Stash não é memória. |
 | Pronto | Só com PR `MERGEABLE` no instante do relatório, checks verdes e aceite marcado. CI verde não prova integração com o trunk atual. |
 | Medir | Toda afirmação de estado exige comando antes (git, build, gh). Premissa refutada: pare e reporte. |
@@ -37,6 +40,8 @@ issue -> branch `tipo/slug-N` -> commits -> push -> PR `closes #N` -> CI + revie
 ## Comunicação
 
 PT-BR direto, sem floreio, sem travessão. Resposta = ação + resultado. Código, identificadores e commits seguem o padrão do repo.
+
+**Grafia da marca:** escreva sempre "Casa da Baba" e "Baba", sem acento, em código, tela, teste, doc, commit, issue e PR. A grafia com acento é erro; o teste `GrafiaDaMarcaTests` barra a volta (#2517). Regra definitiva do Felipe, 13/11/2026.
 
 <!-- BEGIN CASA-BABA-HUB -->
 ## Hub da Casa da Baba

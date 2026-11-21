@@ -1,4 +1,5 @@
 using EasyStock.Api.Controllers;
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AbrirCaixa;
@@ -22,7 +23,7 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class CaixaControllerOrigemTests
 {
     private readonly ICaixaRepository _repo = Substitute.For<ICaixaRepository>();
-    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly Guid _empresaId = Guid.NewGuid();
 
@@ -32,6 +33,9 @@ public class CaixaControllerOrigemTests
         _currentUser.EmpresaId.Returns(_empresaId);
         _repo.GetFechamentoDoDiaAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid?>())
             .Returns((FechamentoCaixa?)null);
+        // #2319: o lançamento manual exige caixa aberto.
+        _repo.GetAberturaPendenteAsync(Arg.Any<Guid>(), Arg.Any<Guid?>())
+            .Returns(MovimentoCaixa.Criar(_empresaId, "abertura", 0m, DateTime.UtcNow, null));
 
         var registrar = new RegistrarMovimentoCaixaUseCase(
             _repo, _uow,
@@ -39,7 +43,7 @@ public class CaixaControllerOrigemTests
             Substitute.For<ILogger<RegistrarMovimentoCaixaUseCase>>());
 
         // Apenas RegistrarMovimento e exercitado; os demais UCs nao sao tocados neste teste.
-        return new CaixaController(null!, null!, registrar, null!, null!, null!, null!, _currentUser);
+        return new CaixaController(null!, null!, registrar, null!, null!, null!, null!, null!, _currentUser);
     }
 
     [Fact]
@@ -84,7 +88,7 @@ public class CaixaControllerOrigemTests
         await _repo.AddMovimentoAsync(Arg.Do<MovimentoCaixa>(m => persistido = m));
         CriarController();
         var abrir = new AbrirCaixaUseCase(_repo, _uow, Substitute.For<ILogger<AbrirCaixaUseCase>>());
-        var controller = new CaixaController(abrir, null!, null!, null!, null!, null!, null!, _currentUser);
+        var controller = new CaixaController(abrir, null!, null!, null!, null!, null!, null!, null!, _currentUser);
 
         await controller.Abrir(new AbrirCaixaCommand(_empresaId, 0m, DataMovimento: DateTime.UtcNow.AddYears(50)));
 

@@ -1,3 +1,4 @@
+using EasyStock.Domain.Sales;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
@@ -46,7 +47,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         var vendasQuery = dbContext.Vendas
             .AsNoTracking()
-            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de);
+            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.Natureza == NaturezaMovimentacaoEstoque.Venda); // #2844: doação, perda e ajuste não são receita
         if (lojaId.HasValue)
             vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
 
@@ -58,7 +59,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
             {
                 v.DataVenda,
                 ValorTotal = (decimal)v.ValorTotal,
-                TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
+                TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (decimal)i.Quantidade) : 0
             })
             .ToListAsync();
 
@@ -84,9 +85,16 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
         return result;
     }
 
-    public async Task<IReadOnlyList<MargemPorProduto>> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
+    public async Task<(IReadOnlyList<MargemPorProduto> Items, int TotalCount)> GetMargemPorProdutoAsync(Guid empresaId, int dias = 30, int page = 1, int pageSize = 20, Guid? lojaId = null)
     {
-        var cacheKey = $"analytics:margem:{empresaId}:{dias}:{page}:{pageSize}:{lojaId}";
+        // #2510: guarda a lista inteira ordenada; o total é dela, não da página.
+        var todos = await GetMargemOrdenadaAsync(empresaId, dias, lojaId);
+        return (todos.Skip((page - 1) * pageSize).Take(pageSize).ToList(), todos.Count);
+    }
+
+    private async Task<List<MargemPorProduto>> GetMargemOrdenadaAsync(Guid empresaId, int dias, Guid? lojaId)
+    {
+        var cacheKey = $"analytics:margem-ordenada:{empresaId}:{dias}:{lojaId}";
         var cached = await GetCachedAsync<List<MargemPorProduto>>(cacheKey);
         if (cached is not null) return cached;
 
@@ -118,7 +126,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
                     NomeProduto = x.p.Nome,
                     CustoUnitario = ie != null ? (decimal)ie.CustoUnitario : (x.p.CustoReferencia != null ? (decimal)x.p.CustoReferencia : 0m),
                     PrecoVenda = (decimal)x.m.ValorUnitario!,
-                    Quantidade = (int)x.m.Quantidade
+                    Quantidade = (decimal)x.m.Quantidade
                 })
             .ToListAsync();
 
@@ -141,8 +149,6 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
                     QuantidadeVendida: qtdVendida);
             })
             .OrderByDescending(x => x.MargemPercentual)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .ToList();
 
         await SetCachedAsync(cacheKey, result, MargemTtl);
@@ -157,7 +163,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         var vendasQuery = dbContext.Vendas
             .AsNoTracking()
-            .Where(v => v.EmpresaId == empresaId &&
+            .Where(v => v.EmpresaId == empresaId && v.Natureza == NaturezaMovimentacaoEstoque.Venda && // #2844
                 v.DataVenda >= DateTime.SpecifyKind(de, DateTimeKind.Utc) &&
                 v.DataVenda <= DateTime.SpecifyKind(ate, DateTimeKind.Utc));
         if (lojaId.HasValue)
@@ -168,7 +174,7 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
             {
                 v.Canal,
                 ValorTotal = (decimal)v.ValorTotal,
-                TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (int)i.Quantidade) : 0
+                TotalItens = v.ItensVenda != null ? v.ItensVenda.Sum(i => (decimal)i.Quantidade) : 0
             })
             .ToListAsync();
 
@@ -194,5 +200,33 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         await SetCachedAsync(cacheKey, result, CanalTtl);
         return result;
+    }
+
+    /// <summary>
+    /// #2928 (S5): pedidos por plataforma e campanha do anúncio. Pedido válido = não cancelado e não rascunho, na
+    /// janela de <c>CriadoEm</c>. Campanha é a UTM; sem UTM (Click-to-WhatsApp) cai no título do anúncio. Total é
+    /// value object convertido, então a soma fecha em memória sobre colunas mínimas, como as consultas vizinhas.
+    /// </summary>
+    public async Task<IReadOnlyList<PedidoPorAnuncio>> GetPedidosPorAnuncioAsync(Guid empresaId, DateTime de, DateTime ate)
+    {
+        var linhas = await dbContext.Pedidos
+            .AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId
+                && p.Status != StatusPedidoMapper.Cancelado && p.Status != StatusPedidoMapper.Rascunho
+                && p.CriadoEm >= DateTime.SpecifyKind(de, DateTimeKind.Utc)
+                && p.CriadoEm <= DateTime.SpecifyKind(ate, DateTimeKind.Utc))
+            .Select(p => new
+            {
+                Plataforma = p.OrigemAnuncio!.Plataforma,
+                p.OrigemAnuncio!.Campanha,
+                p.OrigemAnuncio!.TituloAnuncio,
+                Total = p.Total,
+            })
+            .ToListAsync();
+
+        return linhas
+            .GroupBy(l => (l.Plataforma, Campanha: l.Campanha ?? l.TituloAnuncio))
+            .Select(g => new PedidoPorAnuncio(g.Key.Plataforma, g.Key.Campanha, g.Count(), g.Sum(l => (decimal)l.Total)))
+            .ToList();
     }
 }

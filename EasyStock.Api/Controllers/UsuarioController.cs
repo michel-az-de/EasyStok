@@ -90,6 +90,34 @@ public class UsuarioController(
         }
     }
 
+    [SwaggerOperation(
+        Summary = "Issue a single-use access key (Admin only)",
+        Description = "#2201. Revoga a chave aberta e emite outra: 30 dias, uso único, só o hash no banco. O texto sai uma vez, nesta " +
+                      "resposta (no-store). Superadmin nunca é alvo.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [HttpPost("{id}/chave-acesso")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> EmitirChaveAcesso(
+        Guid id, [FromServices] EasyStock.Application.UseCases.ChaveDeAcesso.EmitirChaveDeAcessoUseCase emitir)
+    {
+        var emitida = await emitir.ExecuteAsync(new EasyStock.Application.UseCases.ChaveDeAcesso.EmitirChaveDeAcessoCommand(id));
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
+        return DataOk(new { chave = emitida.Chave, expiraEm = emitida.ExpiraEm, prefixo = emitida.PrefixoDoHash });
+    }
+
+    [SwaggerOperation(Summary = "Revoke the open access key (Admin only)", Description = "#2201. Idempotente.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [HttpDelete("{id}/chave-acesso")]
+    [Authorize(Policy = "Admin")]
+    public async Task<IActionResult> RevogarChaveAcesso(
+        Guid id, [FromServices] EasyStock.Application.UseCases.ChaveDeAcesso.EmitirChaveDeAcessoUseCase emitir)
+    {
+        await emitir.RevogarAsync(id);
+        return NoContent();
+    }
+
     [SwaggerOperation(Summary = "Update user (Admin only)")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

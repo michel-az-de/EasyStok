@@ -13,7 +13,12 @@ const DIA = { singular: 'dia', plural: 'dias', curta: 'dias' }
 export const GRUPOS_DE_AVISOS = [
   {
     id: 'atendimento', titulo: 'Atendimento',
-    avisos: [ligado('clienteSemResposta', 'Cliente esperando resposta')],
+    avisos: [
+      ligado('clienteSemResposta', 'Cliente esperando resposta'),
+      // #2836: a vigia confere o cadastro de quem tem pedido em aberto.
+      ligado('cadastroComProblema', 'Cliente com pedido e cadastro com problema',
+        'Sem cadastro ligado, telefone, nome, foto ou endereço de entrega confirmado. Um aviso por cliente por dia.'),
+    ],
   },
   {
     id: 'pedidos', titulo: 'Pedidos e cozinha',
@@ -44,10 +49,19 @@ export const GRUPOS_DE_AVISOS = [
     ],
   },
   {
-    id: 'ia', titulo: 'IA',
+    id: 'ia', titulo: 'Assistente',
     avisos: [
-      ligado('reclamacaoCliente', 'A IA percebeu reclamação do cliente'),
-      ligado('suspeitaAtendimento', 'A IA percebeu algo suspeito na conversa'),
+      ligado('reclamacaoCliente', 'O Assistente percebeu reclamação do cliente'),
+      ligado('suspeitaAtendimento', 'O Assistente percebeu algo suspeito na conversa'),
+    ],
+  },
+  {
+    // #2211: saem pelo WhatsApp da loja só para quem está inscrito em "Quem recebe no WhatsApp".
+    id: 'equipe', titulo: 'WhatsApp da equipe',
+    avisos: [
+      ligado('equipeAtencao', 'Atendimento precisa de atenção', 'Quando o Assistente tem dúvida ou chama uma pessoa.'),
+      ligado('equipePedido', 'Pedido pago com a via da cozinha', 'Manda a imagem da via da cozinha de cada pedido pago.'),
+      ligado('equipePagamento', 'Problema no pagamento', 'Pagamento recusado, estornado, em disputa ou vencido.'),
     ],
   },
 ]
@@ -121,5 +135,5 @@ export const avisosMudaram = (atual, salvo) => AVISOS.some((aviso) =>
   String(atual?.[aviso.campo] ?? '') !== String(salvo?.[aviso.campo] ?? ''))
 
 export const textoDoSla = (sla) => (sla
-  ? `Avisa depois de ${sla} ${sla === 1 ? 'minuto' : 'minutos'} sem resposta; ajuste na aba Atendimento.`
-  : 'Avisa quando passa o prazo de primeira resposta; ajuste na aba Atendimento.')
+  ? `Avisa depois de ${sla} ${sla === 1 ? 'minuto' : 'minutos'} sem resposta; ajuste em Horários e mensagens.`
+  : 'Avisa quando passa o prazo de primeira resposta; ajuste em Horários e mensagens.')

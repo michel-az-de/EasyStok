@@ -4,8 +4,9 @@
 // Puro: recebe o texto gravado, devolve o que a tela mostra.
 
 import { dataHora } from './formato'
+import { FRASES_DA_API, ROTULOS } from './rotulos'
 
-export const AUTOMATICO_DESLIGADO = 'o atendimento automático está desligado'
+export const AUTOMATICO_DESLIGADO = 'o Assistente está desligado'
 
 const MOTIVOS_CONHECIDOS = [
   [/^agente desligado/i, AUTOMATICO_DESLIGADO],
@@ -19,6 +20,34 @@ export function motivoDeEscalada(motivo) {
   const conhecido = MOTIVOS_CONHECIDOS.find(([padrao]) => padrao.test(texto))
   if (conhecido) return conhecido[1]
   return texto.replace(/\s*\([^)]*\)/g, '').replace(/\s{2,}/g, ' ').trim() || null
+}
+
+// #2543 (Q13): rótulo curto do chip no cartão da lista para cada motivo fixo que a API grava. Sem
+// ele, o chip cortava a frase em 28 letras ("Contato encaminhado à…"). A frase inteira continua na
+// barra da conversa. `ferramentas/prova-2543-chip-do-motivo.mjs` confere cada trecho no C#.
+const ROTULOS_CURTOS = [
+  [/^(contato )?encaminhado à responsável/i, 'Com a responsável'],
+  [/^contato da equipe/i, 'Contato da equipe'],
+  [/^o robô respondeu \d+ vezes/i, 'Limite de respostas'],
+  [/^o assistente falhou ao responder|^o agente não conseguiu responder/i, 'Assistente falhou'],
+  [/^o agente não produziu resposta/i, 'Assistente sem resposta'],
+  [/^resposta do agente barrada/i, 'Resposta para conferir'],
+  [/^o agente atingiu o limite/i, 'Assistente não concluiu'],
+  [/^o menu de janelas não saiu/i, 'Menu não enviado'],
+  [/^o canal \S+ não tem agente/i, 'Canal sem Assistente'],
+  [/^cliente avaliou o pedido como negativo/i, 'Avaliação negativa'],
+  [/^botão de avaliação/i, 'Avaliação a conferir'],
+  [/^cliente confirmou o endereço/i, 'Endereço não gravado'],
+  [FRASES_DA_API.AJUDA_PELA_COMANDA, () => ROTULOS.CHIP_AJUDA_NO_PEDIDO],
+  [/^conversa reaberta/i, 'Conversa reaberta'],
+  [/^cota mensal de tokens do assistente esgotada/i, 'Cota do mês esgotada'],
+  [/^telefone do formulário do site já tem cadastro/i, 'Conferir cadastro'],
+]
+
+export function rotuloCurtoDoMotivo(motivo) {
+  const texto = String(motivo ?? '').trim()
+  const rotulo = ROTULOS_CURTOS.find(([padrao]) => padrao.test(texto))?.[1]
+  return typeof rotulo === 'function' ? rotulo() : rotulo ?? null
 }
 
 // `EscalarConversaUseCase.PrefixoMotivo`: a nota que o EasyStok põe na conversa ao passar para a equipe.

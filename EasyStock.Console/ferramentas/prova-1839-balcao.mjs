@@ -45,8 +45,9 @@ await provar('pagamento já recebido ao montar entra recolhido: reabrir a modal 
 
 await provar('a Ficha mantém o cliente, identifica a comanda ativa e abre o extrato no pagamento', () => {
   const painel = ler('features/ficha-cliente/PainelFicha.jsx')
-  assert.match(painel, /<h2>Ficha<\/h2>/)
-  assert.match(painel, /editavel && numero && <small>Comanda \{numero\}<\/small>/)
+  // #2258 (auditoria T11): o painel lateral passou de "Ficha" para "Cliente".
+  assert.match(painel, /<h2>Cliente<\/h2>/)
+  assert.match(painel, /<h3>\{!editavel \? 'Conversa concluída' : numero \? rotuloDoPedido\(numero\) : ROTULOS\.PEDIDO\}<\/h3>/)
   assert.match(painel, /<CartaoDoCliente conversa=\{selecionada\}/)
   assert.match(painel, /\{secao === 'pagamento' && editavel && pedido && <Modal[\s\S]*?\{fonteApi && <ExtratoDoPedido pedido=\{pedido\} aDevolver=\{aDevolver\} \/>\}/)
 })
@@ -54,8 +55,9 @@ await provar('a Ficha mantém o cliente, identifica a comanda ativa e abre o ext
 await provar('a nota interna abre como post-it pequeno, foca só ao abrir e o Esc é dela', () => {
   const nota = ler('features/notas/ModalNota.jsx')
   assert.doesNotMatch(nota, /from '..\/..\/componentes\/Modal'/)
-  assert.match(nota, /<dialog ref=\{postit\} open=\{visivel\} className=\{css\.postit\} aria-label="Nota interna" onKeyDown=\{aoTeclar\}>/)
-  assert.match(nota, /useEffect\(\(\) => \{ if \(visivel\) campo\.current\?\.focus\(\) \}, \[visivel\]\)/)
+  assert.match(nota, /<dialog ref=\{postit\} open=\{visivel\}[^]*?aria-label=\{`Nota interna de \$\{nomeCliente\}`\} onKeyDown=\{aoTeclar\}/)
+  assert.match(nota, /useLayoutEffect\(\(\) => \{\s*if \(!visivel \|\| !campo\.current\) return[^]*?campo\.current\.focus\([^]*?\}, \[visivel\]\)/)
+  assert.match(nota, /e\.key === 'Escape' && !e\.defaultPrevented[^]*?e\.stopPropagation\(\); fechar\(\)/)
   assert.doesNotMatch(nota, /document\.addEventListener/)
 })
 

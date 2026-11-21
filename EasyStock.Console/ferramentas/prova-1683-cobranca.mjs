@@ -80,7 +80,8 @@ const doServidor = (extra = {}) => ({
     linkPagamento: 'https://mp/x', criadaEm: AGORA, expiraEm: '2026-10-12T15:30:00Z' },
   ...extra,
 })
-const rascunho = (extra = {}) => ({ estado: 'aguardando', itens: [{ sku: 'massa', qtd: 1, obs: '' }], janela: 'j1|2026-10-13', meio: 'pix', ...extra })
+const IDENTIDADE = { clienteId: 'cliente-da-comanda', vinculoRevisao: 2 }
+const rascunho = (extra = {}) => ({ estado: 'aguardando', identidadeProposta: { ...IDENTIDADE }, itens: [{ sku: 'massa', qtd: 1, obs: '' }], janela: 'j1|2026-10-13', meio: 'pix', ...extra })
 
 function montar(pedido, responder) {
   const chamadas = []
@@ -89,7 +90,7 @@ function montar(pedido, responder) {
     chamadas.push({ url: String(url), metodo: opcoes.method ?? 'GET', corpo: opcoes.body ? JSON.parse(opcoes.body) : null })
     return responder(String(url), opcoes.method ?? 'GET')
   }
-  const estadoRef = { current: { conversas: [{ id: 'conversa', pedido }] } }
+  const estadoRef = { current: { conversas: [{ id: 'conversa', ...IDENTIDADE, pedido }] } }
   const acoes = criarAcoesComandaApi({}, { despachar: (a) => despachados.push(a), estadoRef })
   const avisos = () => despachados.filter((d) => d.mensagem).map((d) => d.mensagem)
   const posts = () => chamadas.filter((c) => c.metodo === 'POST')
@@ -276,8 +277,10 @@ await confere('5  no EasyStok a troca é só entre link e na entrega, com o text
 
 await confere('5  a tela usa essa troca no modo API e não pergunta meio que o back ignora', () => {
   const alterar = trecho(bloco, 'function AlterarForma(', '// Bloco Cobrança da ficha.')
-  assert.match(alterar, /const trocaApi = fonteApi \? trocaDeFormaNoEasyStok\(cobranca, nomeCliente\) : null/)
-  assert.match(alterar, /\{trocaApi \? <p>\{trocaApi\.texto\}<\/p> : \(/)
+  // #2998: as opções vêm de `trocasDeFormaNoEasyStok` (a de antes e, com o Pix direto disponível, o Pix da loja).
+  assert.match(alterar, /const trocasApi = fonteApi \? trocasDeFormaNoEasyStok\(cobranca, nomeCliente, \{ pixDireto \}\) : null/)
+  assert.match(alterar, /\{trocasApi \? \(/)
+  assert.match(alterar, /\{trocaApi && <p>\{trocaApi\.texto\}<\/p>\}/)
   assert.match(bloco, /<AlterarForma cobranca=\{cobranca\} nomeCliente=\{nomeCliente\} fonteApi=\{fonteApi\} aoAlterar=\{troca\.emitir\} \/>/)
 })
 

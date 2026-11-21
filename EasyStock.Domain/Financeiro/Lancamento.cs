@@ -1,3 +1,4 @@
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Domain.Financeiro.Events;
 
 namespace EasyStock.Domain.Financeiro;
@@ -68,7 +69,7 @@ public sealed class Lancamento
         get
         {
             var saldo = Valor - TotalBaixado;
-            return saldo < 0m ? 0m : decimal.Round(saldo, 2, MidpointRounding.ToEven);
+            return saldo < 0m ? 0m : Dinheiro.Arredondar(saldo);
         }
     }
 
@@ -103,7 +104,7 @@ public sealed class Lancamento
             EmpresaId = empresaId,
             Tipo = tipo,
             Descricao = descricao.Trim(),
-            Valor = decimal.Round(valor, 2, MidpointRounding.ToEven),
+            Valor = Dinheiro.Arredondar(valor),
             DataEmissao = dataEmissao,
             DataVencimento = dataVencimento,
             Status = StatusLancamento.Pendente,
@@ -150,7 +151,7 @@ public sealed class Lancamento
             if (existente != null) return existente;
         }
 
-        var valorArredondado = decimal.Round(valor, 2, MidpointRounding.ToEven);
+        var valorArredondado = Dinheiro.Arredondar(valor);
         if (valorArredondado > ValorRestante)
             throw new RegraDeDominioVioladaException(
                 $"Baixa de {valorArredondado:F2} excede o saldo restante ({ValorRestante:F2}).");

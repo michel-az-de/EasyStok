@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { AlcaLargura } from '../../componentes/AlcaLargura'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
@@ -47,13 +48,13 @@ const PEDE_ACAO = new Set(['esgotado', 'fora-do-dia', 'pouco'])
 const LARGURA_MINIMA = 440
 
 const PAPEIS = [
-  { id: 'escolher', rotulo: 'Anotar na comanda' },
+  { id: 'escolher', rotulo: 'Anotar no pedido' },
   { id: 'gerir', rotulo: 'Gerir o dia' },
 ]
 
 // Foto real do item (#1448), a mesma da vitrine. Sem foto, ou se ela não carregar, a carta
 // desenhada: honesta, parece arte de cardápio e não finge ser fotografia.
-function FotoDoItem({ item, className, alt = '' }) {
+function FotoDoItem({ item, className, alt = '', tamanho }) {
   const foto = fotoDoItem(item)
   const [falhou, setFalhou] = useState(null)
   const usarFoto = foto && falhou !== foto
@@ -62,6 +63,7 @@ function FotoDoItem({ item, className, alt = '' }) {
       className={className}
       src={usarFoto ? foto : cartaDoItem(item)}
       alt={alt}
+      width={tamanho} height={tamanho}
       onError={usarFoto ? () => setFalhou(foto) : undefined}
     />
   )
@@ -82,7 +84,7 @@ function FichaDoItem({ item, adicionais, linhas, aoEditar }) {
   return (
     <div className={css.ficha}>
       {(detalhe?.descricao || item.descricao) && <p className={css.descricaoPrato}>{detalhe?.descricao || item.descricao}</p>}
-      {fonteApi && !detalhe && !erro && <output>Consultando informações do prato…</output>}
+      {fonteApi && !detalhe && !erro && <EsqueletoDeLista linhas={3} altura="var(--e-5)">Consultando informações do prato…</EsqueletoDeLista>}
       {erro && <p role="alert">{erro} <Botao variante="texto" onClick={() => setTentativa((v) => v + 1)}>Tentar de novo</Botao></p>}
       <dl className={css.dados}>
         <div><dt>Como sai</dt><dd>{linhas[item.linha]?.dica}</dd></div>
@@ -146,7 +148,7 @@ function ItemEscolher({
           type="button"
           ref={setNodeRef}
           className={css.linha}
-          aria-label={compacto ? `Somar ${item.nome} na comanda` : undefined}
+          aria-label={compacto ? `Somar ${item.nome} no pedido` : undefined}
           disabled={!situacao.vendavel || !doToque || travada}
           title={travada ? LINHA_COMANDA_TRAVADA : undefined}
           style={isDragging ? { opacity: 0.5 } : undefined}
@@ -154,7 +156,7 @@ function ItemEscolher({
           {...listeners}
           {...attributes}
         >
-          {!compacto && <FotoDoItem item={item} className={css.foto} />}
+          {!compacto && <FotoDoItem item={item} className={css.foto} tamanho={72} />}
           {/* Sete itens viravam sete manchas de cor. O estado do item é
               texto na segunda linha, e só aparece quando muda a venda. */}
           <span className={css.nome}>
@@ -170,7 +172,7 @@ function ItemEscolher({
           <span className={css.preco}>{moeda(item.preco)}</span>
           {!travada && (
             <span className={css.somar}>
-              <Icone nome="mais" rotulo={'Somar ' + item.nome + ' na comanda, ou arrastar até a comanda'} />
+              <Icone nome="mais" rotulo={'Somar ' + item.nome + ' no pedido, ou arrastar até o pedido'} />
             </span>
           )}
         </button>
@@ -181,7 +183,7 @@ function ItemEscolher({
             nem depende de posição absoluta pra não se sobrepor. */}
         {quantos > 0 && porcoes.length === 0 && (
           <div className={css.ajusteNaLinha}>
-            <span className={css.contagem}>{quantos} na comanda</span>
+            <span className={css.contagem}>{quantos} no pedido</span>
             {!travada && (
               <button
                 type="button"
@@ -215,11 +217,11 @@ function ItemEscolher({
                     <small>{p.disponivel ? (p.padrao ? 'padrão' : '') : 'esgotada'}</small>
                   </span>
                   <span className={css.preco}>{moeda(p.preco)}</span>
-                  {qtd === 0 && p.disponivel && !travada && <Icone nome="mais" rotulo={`Somar ${item.nome} ${p.rotulo} na comanda`} />}
+                  {qtd === 0 && p.disponivel && !travada && <Icone nome="mais" rotulo={`Somar ${item.nome} ${p.rotulo} no pedido`} />}
                 </button>
                 {qtd > 0 && (
                   <div className={css.ajusteNaLinha}>
-                    <span className={css.contagem}>{qtd} na comanda</span>
+                    <span className={css.contagem}>{qtd} no pedido</span>
                     {!travada && (
                       <button type="button" className={css.botaoMenosCardapio} onClick={() => aoAjustar(produto.sku, -1)}>
                         <Icone nome="menos" rotulo={`Tirar uma unidade de ${item.nome} ${p.rotulo}`} />
@@ -481,7 +483,7 @@ function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
   useEffect(() => {
     const ultimo = itens.at(-1)
     if (!ultimo) return
-    setEco(`${ultimo.produto?.nome ?? 'Item'} na comanda. Total ${moeda(total)}.`)
+    setEco(`${ultimo.produto?.nome ?? 'Item'} no pedido. Total ${moeda(total)}.`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qtdItens])
 
@@ -498,13 +500,13 @@ function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
       >
         <span className={css.rodapeTitulo}>
           {/* #1587: de quem é a comanda, sempre à vista (o painel não fecha ao trocar de conversa). */}
-          Comanda{nomeCliente ? ` de ${nomeCliente}` : ''} · {numero ? `Nº ${numero}` : 'rascunho'} · {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
+          Pedido{nomeCliente ? ` de ${nomeCliente}` : ''} · {numero ? `Nº ${numero}` : 'rascunho'} · {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
         </span>
         <span className={`${css.rodapeTotal} ${somaEmDestaque ? css.rodapeTotalSomando : ''}`}>
           {somaEmDestaque != null && <b className={css.rodapeSoma}>+ {moeda(somaEmDestaque)}</b>}
           {moeda(total)}
         </span>
-        <Icone nome="chevron-up" tamanho={20} rotulo={aberto ? 'Recolher itens da comanda' : 'Ver itens da comanda'} />
+        <Icone nome="chevron-up" tamanho={20} rotulo={aberto ? 'Recolher itens do pedido' : 'Ver itens do pedido'} />
       </button>
 
       {diferencaPosPagamento > 0 && (
@@ -517,7 +519,7 @@ function RodapeComanda({ pedido, cardapio, linhas, nomeCliente }) {
         <div className={css.rodapeItens}>
           {grupos.map((grupo) => (
             <div key={grupo.chave}>
-              <span className={css.rotuloGrupo}>{grupo.rotulo}</span>
+              <span>{grupo.rotulo}</span>
               <ul>
                 {grupo.itens.map((linha) => (
                   <li key={linha.sku}>
@@ -661,9 +663,9 @@ export function PainelCardapio({
         <header className={css.cabecalhoPainel}>
           <div>
             <h2>{travada && papel === 'escolher' ? 'Consulta do cardápio' : 'Cardápio de hoje'}</h2>
-            {nomeCliente && <p className={css.donoDaComanda} aria-live="polite">Comanda de <b>{nomeCliente}</b></p>}
+            {nomeCliente && <p className={css.donoDaComanda} aria-live="polite">Pedido de <b>{nomeCliente}</b></p>}
             <p className={css.subPainel}>{noDia} de {ativos.length} itens no dia.</p>
-            {papel === 'escolher' && !travada && <p className={css.subPainel}>Busque um prato e escolha a porção para adicionar à comanda.</p>}
+            {papel === 'escolher' && !travada && <p className={css.subPainel}>Busque um prato e escolha a porção para adicionar ao pedido.</p>}
           </div>
           <div className={css.ferramentasPainel}>
             {/* #1806: lado e tamanho do painel, lembrados por aparelho. Só ícone para caber nos
@@ -695,6 +697,9 @@ export function PainelCardapio({
             </button>
           </div>
         </header>
+        {/* #1587 e #2634: pedido já criado não soma nem tira por aqui. O motivo vem antes dos pratos,
+            à vista de quem abriu "Ver cardápio"; o `title` de cada prato não aparece no toque. */}
+        {papel === 'escolher' && travada && <output className={css.comandaTravada}>{LINHA_COMANDA_TRAVADA}</output>}
 
         {/* Botão de alternância em vez do padrão ARIA de aba: aba promete
             navegação por seta, e prometer teclado que não existe é pior que
@@ -784,8 +789,6 @@ export function PainelCardapio({
         {/* `cardapio` cheio (não só `ativos`) de propósito: um item já anotado
             na comanda continua precificando certo mesmo depois de tirado do
             cardápio (RN de não apagar histórico). */}
-        {/* #1587: pedido já criado não soma nem tira por aqui; o motivo fica escrito acima do total. */}
-        {papel === 'escolher' && travada && <output className={css.comandaTravada}>{LINHA_COMANDA_TRAVADA}</output>}
         {papel === 'escolher' && pedido && <RodapeComanda pedido={pedido} cardapio={cardapio} linhas={linhas} nomeCliente={nomeCliente} />}
       </div>
 

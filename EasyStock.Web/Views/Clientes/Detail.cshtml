@@ -100,6 +100,7 @@
 
             <form asp-action="Editar" asp-controller="Clientes" asp-route-id="@c.Id" method="post" x-show="editando" x-cloak>
                 @Html.AntiForgeryToken()
+                <input type="hidden" name="revisao" value="@c.Revisao" />
                 <div class="space-y-3">
                     @* O hidden garante que "pessoa física" seja enviado quando o toggle está
                        desmarcado — checkbox não marcado não vai no POST clássico. *@

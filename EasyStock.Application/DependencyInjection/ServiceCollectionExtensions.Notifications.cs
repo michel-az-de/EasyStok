@@ -18,6 +18,8 @@ public static partial class ServiceCollectionExtensions
         // Quarentena (N1): prazos por tipo; sobrescritas em Notifications:Quarentena:Prazos (bind em AddNotificationsCore).
         services.TryAddSingleton<PoliticaValidadeNotificacao>();
         services.AddScoped<IResolvedorAudiencia, ResolvedorAudiencia>();
+        // #2211: avisos da equipe pelo WhatsApp da loja (quem é inscrito, para o robô não atender a resposta dela).
+        services.AddScoped<IContatoDaEquipeAvisada, ContatoDaEquipeAvisada>();
         services.AddScoped<NotificadorService>();
         // #2096: o interruptor da loja (tela Avisos) fica na frente do motor; sem a chave "aviso" no payload, passa direto.
         services.AddScoped(sp => new NotificadorComAvisosDaLoja(sp.GetRequiredService<NotificadorService>(), sp,
@@ -26,6 +28,9 @@ public static partial class ServiceCollectionExtensions
         // N10: porta única dos avisos de problema no sistema (monitor de endpoint, snapshot de saúde, coletor de 5xx).
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IPublicadorIncidenteSistema, PublicadorIncidenteSistema>();
+        // #2875: aviso ao cliente que não chega (recusa, desconexão, expiração) vira não entregue na conversa dele.
+        services.TryAddScoped<Services.Atendimento.AvisoNaoEntregueNaConversa>();
+        services.TryAddScoped<AvisoEventoExpiradoNaConversa>();
 
         // Rotinas agendadas (N12): um construtor de payload por tipo agendado; o coletor (Infra.Postgre) é genérico.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IConstrutorPayloadAgendado, ConstrutorPayloadResumoDiario>());

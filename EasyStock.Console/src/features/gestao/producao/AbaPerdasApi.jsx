@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
@@ -6,7 +7,8 @@ import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { usePerdasApi } from '../../../aplicacao/usePerdasApi'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
-import { MOTIVOS_PERDA, perdasSemCusto, semCusto, textoDaPerda } from '../../../aplicacao/perdas'
+import { detalheDoVencido, MOTIVOS_PERDA, perdasSemCusto, semCusto, textoDaPerda } from '../../../aplicacao/perdas'
+import { rotuloDaUnidade } from '../../../aplicacao/insumos'
 import { moeda } from '../../../dominio/formato'
 import css from '../cardapio/abaCardapio.module.css'
 import producao from './producao.module.css'
@@ -36,7 +38,7 @@ export function AbaPerdasApi() {
   }
   const confirmar = (acao) => executar(acao).then((ok) => { if (ok) setConfirmando(null) })
 
-  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as perdas…</output>
+  if (gestao.estado === 'carregando') return <EsqueletoDeLista linhas={4} altura="calc(var(--toque) * 2)">Carregando as perdas…</EsqueletoDeLista>
   if (gestao.estado === 'erro' && !gestao.resumo) {
     return (
       <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as perdas"
@@ -66,10 +68,15 @@ export function AbaPerdasApi() {
       </p>}
       {/* #2081 (E11): a ação principal fica no topo, do tamanho do texto, como "Lançamento" no Caixa. */}
       <div className={css.topo}>
-        <p className={css.descricao}>
-          O que se perdeu e por quê. A baixa segue a validade dos lotes e considera o custo de cada lote. Acima de {moeda(50)} quem
-          lança é o Gerente. Ajuste de contagem não é perda e não entra aqui.
-        </p>
+        {/* #2235 (banca B1): uma linha de resumo; as regras da loja ficam em "Saiba mais". */}
+        <div className={css.resumo}>
+          <p className={css.descricao}>O que se perdeu e por quê.</p>
+          <details className={css.saibaMais}>
+            <summary>Saiba mais</summary>
+            A baixa segue a validade dos lotes e considera o custo de cada lote. Acima de {moeda(50)} quem
+            lança é o Gerente. Ajuste de contagem não é perda e não entra aqui.
+          </details>
+        </div>
         <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { gestao.fecharAviso(); setLancamentoAberto(true) }}>Lançar perda</Botao>
       </div>
       {gestao.aviso && <p className={css.aviso} role="alert">{gestao.aviso} <Botao variante="texto" onClick={gestao.fecharAviso}>Fechar</Botao></p>}
@@ -83,17 +90,17 @@ export function AbaPerdasApi() {
               <li key={v.itemEstoqueId} className={css.linha}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{v.nome}</span>
-                  <span className={css.detalhe}>{v.lote ?? 'sem lote'} · {qtd(v.quantidade)} · venceu há {v.diasVencido} {v.diasVencido === 1 ? 'dia' : 'dias'} · {moeda(v.valor)}</span>
+                  <span className={css.detalhe}>{detalheDoVencido(v)}</span>
                 </div>
                 <div className={css.acoes}>
                   {confirmando === `vencido:${v.itemEstoqueId}` ? (
                     <>
                       <span className={css.descricao}>Lançar o lote inteiro como perda por vencimento?</span>
-                      <Botao variante="secundario" disabled={enviando} onClick={() => confirmar(() => gestao.lancarVencido(v))}>Registrar perda</Botao>
+                      <Botao variante="perigo" icone="lixeira" disabled={enviando} onClick={() => confirmar(() => gestao.lancarVencido(v))}>Registrar perda</Botao>
                       <Botao variante="texto" disabled={enviando} onClick={() => setConfirmando(null)}>Manter lote</Botao>
                     </>
                   ) : (
-                    <Botao variante="texto" disabled={enviando} aria-label={`Registrar perda de todo o lote ${v.lote ?? ''} de ${v.nome}`} onClick={() => setConfirmando(`vencido:${v.itemEstoqueId}`)}>Registrar perda do lote</Botao>
+                    <Botao variante="secundario" icone="lixeira" disabled={enviando} aria-label={`Registrar perda do lote ${v.lote ?? ''} de ${v.nome}`} onClick={() => setConfirmando(`vencido:${v.itemEstoqueId}`)}>Registrar perda do lote</Botao>
                   )}
                 </div>
               </li>
@@ -108,7 +115,7 @@ export function AbaPerdasApi() {
           <CampoSelecao disabled={enviando} rotulo="Prato ou insumo" value={rascunho.produtoId}
             onChange={(e) => setRascunho((atual) => ({ ...atual, produtoId: e.target.value, porcao: '' }))}
             opcoes={[{ valor: '', rotulo: 'Escolha o prato ou insumo' }, ...gestao.opcoes.map((o) => ({
-              valor: o.produtoId, rotulo: `${o.nome} (${o.tipo}, tem ${qtd(o.saldo)}${o.unidade ? ` ${o.unidade}` : ''})`,
+              valor: o.produtoId, rotulo: `${o.nome} (${o.tipo}, tem ${qtd(o.saldo)}${o.unidade ? ` ${rotuloDaUnidade(o.unidade)}` : ''})`,
             }))]} />
           {porcoes.length > 0 && (
             <div className={css.linhaCompleta}>
@@ -116,7 +123,7 @@ export function AbaPerdasApi() {
                 opcoes={[{ valor: '', rotulo: 'Escolha a porção perdida' }, ...porcoes.map((s) => ({ valor: s.chave, rotulo: `${s.rotulo} (tem ${qtd(s.saldo)})` }))]} />
             </div>
           )}
-          <CampoTexto disabled={enviando} inputMode="decimal" rotulo={escolhido?.unidade ? `Quantidade (${escolhido.unidade})` : 'Quantidade'} value={rascunho.quantidade} onChange={mudar('quantidade')} />
+          <CampoTexto disabled={enviando} inputMode="decimal" rotulo={escolhido?.unidade ? `Quantidade (${rotuloDaUnidade(escolhido.unidade)})` : 'Quantidade'} value={rascunho.quantidade} onChange={mudar('quantidade')} />
           <CampoSelecao disabled={enviando} rotulo="Motivo" value={rascunho.motivo} onChange={mudar('motivo')}
             opcoes={MOTIVOS_PERDA.map((m) => ({ valor: m.id, rotulo: m.rotulo }))} />
           {rascunho.motivo === 'Outro' && (
@@ -129,7 +136,7 @@ export function AbaPerdasApi() {
       </form></Modal>}
 
       <section className={css.aba} aria-label="Resumo do período">
-        <div className={css.campos}>
+        <div className={`${css.campos} ${producao.periodoDasPerdas}`}>
           <CampoTexto disabled={enviando} tipo="date" rotulo="Data inicial" value={gestao.periodo.de ?? resumo?.de ?? ''}
             onChange={(e) => gestao.setPeriodo((p) => ({ ...p, de: e.target.value || null }))} />
           <CampoTexto disabled={enviando} tipo="date" rotulo="Data final" value={gestao.periodo.ate ?? resumo?.ate ?? ''}
@@ -138,19 +145,23 @@ export function AbaPerdasApi() {
         {/* #2081 (A5/E7): o total perdido é o número da tela; perda sem custo não entra como R$ 0,00. */}
         <dl className={`${css.resumoOperacao} ${producao.resumoDasPerdas}`} aria-label="Total do período">
           <div><dt>Perdido no período</dt><dd>{moeda(resumo?.valor ?? 0)}</dd></div>
+          {/* #2235 (banca B6): o total ao lado do que ainda espera baixa, para o zero não parecer "nada perdido". */}
+          {gestao.vencidos.length > 0 && (
+            <div className={css.resumoAtencao}><dt>{gestao.vencidos.length === 1 ? 'lote vencido sem baixa' : 'lotes vencidos sem baixa'}</dt><dd>{gestao.vencidos.length}</dd></div>
+          )}
           {semCustoNoPeriodo > 0 && (
             <div><dt>{semCustoNoPeriodo === 1 ? 'perda sem custo cadastrado, fora do total' : 'perdas sem custo cadastrado, fora do total'}</dt><dd>{semCustoNoPeriodo}</dd></div>
           )}
         </dl>
         {(resumo?.porMotivo ?? []).length > 0 && (
-          <p className={css.descricao}>{resumo.porMotivo.map((m) => `${m.rotulo}: ${m.valor > 0 || !(m.quantidade > 0) ? moeda(m.valor) : 'sem custo'}`).join(' · ')}</p>
+          <ul className={css.chips} aria-label="Perdas por motivo">{resumo.porMotivo.map((m) => <li key={m.motivo ?? m.rotulo}><Pilula fina>{`${m.rotulo}: ${m.valor > 0 || !(m.quantidade > 0) ? moeda(m.valor) : 'sem custo'}`}</Pilula></li>)}</ul>
         )}
         {(resumo?.lancamentos ?? []).length === 0 ? (
-          <p className={css.descricao}>Nenhuma perda no período.</p>
+          <Vazio variante="linha" titulo="Nenhuma perda no período. Use Lançar perda, no topo, para registrar a primeira." />
         ) : (
           <ul className={css.lista}>
             {resumo.lancamentos.map((l) => (
-              <li key={l.id} className={css.linha}>
+              <li key={l.id} className={`${css.linha} ${css.linhaPerda}`}>
                 <div className={css.resumo}>
                   <span className={css.nome}>{l.nome}</span>
                   <span className={css.detalhe}>{quando(l.data)} · {qtd(l.quantidade)} · {textoDaPerda(l)}{l.lote ? ` · ${l.lote}` : ''}</span>

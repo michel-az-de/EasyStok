@@ -83,3 +83,6 @@
 # colapsar o diff e sinalizar que NAO se edita a mao (a fonte manda; ver .poka-yoke/registry.yaml).
 EasyStock.Web/wwwroot/etiqueta/**             linguist-generated=true
 EasyStock.Web/wwwroot/css/tailwind.dist.css   linguist-generated=true
+
+# Vao para a VPS e sao lidos pelo gate: sempre LF (CRLF faria o gate recusar toda funcao).
+scripts/mcp/* text eol=lf

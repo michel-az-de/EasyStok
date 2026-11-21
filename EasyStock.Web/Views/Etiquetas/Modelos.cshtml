@@ -46,6 +46,11 @@ let _templates   = [];
 let _aba         = 'sistema';
 
 function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+// Escape de valor de atributo HTML: alem de & < >, cobre aspas duplas e simples.
+function _escAttr(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 async function init() {
     const res = await apiFetch(`/api/etiquetas/templates?empresaId=${EMPRESA_ID}`);
@@ -54,6 +59,17 @@ async function init() {
     document.getElementById('tab-empresa-count').textContent = empresa.length;
     renderLista('sistema');
 }
+
+// Delegacao: id e nome ficam em data-*, nunca dentro de JS de atributo (aspas no nome quebravam o onclick).
+document.getElementById('modelos-lista').addEventListener('click', function (ev) {
+    const btn = ev.target.closest('button[data-acao]');
+    if (!btn) return;
+    const { acao, id, nome, origem } = btn.dataset;
+    if (acao === 'definirPadrao') window.definirPadrao(origem, id);
+    else if (acao === 'duplicar') window.duplicar(id, nome);
+    else if (acao === 'excluir') window.excluir(id, nome);
+    else if (acao === 'editar') window.location = '/etiquetas/editor/' + encodeURIComponent(id);
+});
 
 window.abaModelos = function(aba) {
     _aba = aba;
@@ -73,7 +89,8 @@ function renderLista(aba) {
     }
 
     lista.innerHTML = items.map(t => {
-        const eId = _esc(t.Id), eNome = _esc(t.Nome), eOrigem = _esc(t.Origem);
+        const eId = _esc(t.Id), eNome = _esc(t.Nome);
+        const aId = _escAttr(t.Id), aNome = _escAttr(t.Nome), aOrigem = _escAttr(t.Origem);
         const eDesc = t.Descricao ? _esc(t.Descricao) : '';
         return `
         <div class="etq-tpl-card" style="padding:14px;display:flex;gap:12px;align-items:flex-start">
@@ -89,12 +106,12 @@ function renderLista(aba) {
                 ${t.Nome === 'Com tabela nutricional' ? '<div class="etq-disclaimer" style="margin-top:6px">ℹ️ Confira a RDC 727 antes de usar em embalagem de venda. O EasyStok não valida conformidade nutricional.</div>' : ''}
                 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
                     ${aba === 'sistema' ? `
-                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="definirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>
-                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="duplicar('${eId}','${eNome}')">Duplicar para personalizar</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" data-acao="definirPadrao" data-origem="${aOrigem}" data-id="${aId}">Definir como padrão</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" data-acao="duplicar" data-id="${aId}" data-nome="${aNome}">Duplicar para personalizar</button>
                     ` : `
-                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="window.location='/etiquetas/editor/${eId}'">Editar</button>
-                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" onclick="definirPadrao('${eOrigem}','${eId}')">Definir como padrão</button>
-                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px;color:var(--crit-600)" onclick="excluir('${eId}','${eNome}')">Excluir</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" data-acao="editar" data-id="${aId}">Editar</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px" data-acao="definirPadrao" data-origem="${aOrigem}" data-id="${aId}">Definir como padrão</button>
+                        <button class="etq-btn-secondary" style="font-size:12px;padding:4px 10px;color:var(--crit-600)" data-acao="excluir" data-id="${aId}" data-nome="${aNome}">Excluir</button>
                     `}
                 </div>
             </div>

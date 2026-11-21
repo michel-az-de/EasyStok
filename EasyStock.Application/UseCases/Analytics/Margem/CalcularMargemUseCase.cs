@@ -8,12 +8,12 @@ public class CalcularMargemUseCase(
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
-        var items = await analyticsRepository.GetMargemPorProdutoAsync(cmd.EmpresaId, cmd.Dias, cmd.Page, cmd.PageSize, cmd.LojaId);
+        var (items, total) = await analyticsRepository.GetMargemPorProdutoAsync(cmd.EmpresaId, cmd.Dias, cmd.Page, cmd.PageSize, cmd.LojaId);
         var results = items.Select(CalcularMargemResult.FromDto).ToList();
 
         logger.LogInformation("Calculated margin for {Count} products for empresa {EmpresaId}",
             results.Count, cmd.EmpresaId);
 
-        return (results, results.Count);
+        return (results, total);
     }
 }

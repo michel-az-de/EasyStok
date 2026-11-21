@@ -10,7 +10,7 @@ namespace EasyStock.Domain.Tests.Storefront.Frete;
 public class FreteRaioConfigFactoryTests
 {
     private static StorefrontEntity StorefrontBase() =>
-        StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Babá", 0m);
+        StorefrontEntity.Criar(Guid.NewGuid(), "casa-da-baba", "Casa da Baba", 0m);
 
     [Fact]
     public void Sem_config_retorna_null()

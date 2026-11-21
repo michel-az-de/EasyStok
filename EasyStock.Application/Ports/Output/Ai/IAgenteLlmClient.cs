@@ -5,7 +5,8 @@ namespace EasyStock.Application.Ports.Output.Ai;
 /// <summary>
 /// Chamada ao LLM com ferramentas usada pelo agente de atendimento (S06). A implementação real
 /// fala com a API Messages da Anthropic (<c>AnthropicMessagesClient</c>); o modelo, a chave e o
-/// liga/desliga vêm de configuração (<c>Anthropic:*</c>), nunca do chamador.
+/// liga/desliga vêm de configuração (<c>Anthropic:*</c>). Exceção (S68, ADR-0066): o turno pode pedir
+/// <see cref="RequisicaoLlm.Modelo"/>, sempre um da lista aprovada; nulo usa o configurado.
 /// </summary>
 public interface IAgenteLlmClient
 {
@@ -18,10 +19,27 @@ public interface IAgenteLlmClient
     Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default);
 }
 
+/// <summary>
+/// <paramref name="System"/> é a parte estável do prompt (a que o provedor pode guardar em cache). <paramref name="SystemVolatil"/>
+/// é o que muda a cada turno (data, hora, dossiê): vai num bloco à parte, depois do breakpoint de cache. Nulo ou vazio
+/// mantém o corpo de antes, com <c>system</c> como texto único.
+/// </summary>
 public sealed record RequisicaoLlm(
     string System,
     IReadOnlyList<MensagemLlm> Mensagens,
-    IReadOnlyList<FerramentaLlm> Ferramentas);
+    IReadOnlyList<FerramentaLlm> Ferramentas,
+    string? Modelo = null,
+    string? SystemVolatil = null)
+{
+    /// <summary>Modelo do agente quando a configuração não diz outro (<c>Anthropic:ModeloAgente</c> ausente).</summary>
+    public const string ModeloPadrao = "claude-sonnet-5";
+
+    /// <summary>#3063: loja que paga a chamada. Vazio não grava <c>chamada_ia</c> (só testes antigos).</summary>
+    public Guid EmpresaId { get; init; }
+
+    /// <summary>#3063: para que a chamada serve, no registro de uso.</summary>
+    public EasyStock.Domain.Enums.Ia.FinalidadeIa Finalidade { get; init; } = EasyStock.Domain.Enums.Ia.FinalidadeIa.Outra;
+}
 
 /// <summary><paramref name="Papel"/> é <c>user</c> ou <c>assistant</c>.</summary>
 public sealed record MensagemLlm(string Papel, IReadOnlyList<BlocoLlm> Conteudo)
@@ -47,11 +65,18 @@ public sealed record BlocoResultadoFerramentaLlm(string UsoFerramentaId, string 
 /// </summary>
 public sealed record BlocoOpacoLlm(JsonElement Bruto) : BlocoLlm;
 
+/// <summary>
+/// S67 (#2534): <paramref name="TokensCacheLido"/> é o prompt lido do cache do provedor (preço próprio, fora de
+/// <paramref name="TokensEntrada"/>); <paramref name="Modelo"/> é o modelo que respondeu, nulo quando o cliente não sabe.
+/// </summary>
 public sealed record RespostaLlm(
     string? StopReason,
     IReadOnlyList<BlocoLlm> Conteudo,
     int TokensEntrada,
-    int TokensSaida)
+    int TokensSaida,
+    int TokensCacheLido = 0,
+    string? Modelo = null,
+    int TokensCacheEscrito = 0)
 {
     public const string StopToolUse = "tool_use";
 }

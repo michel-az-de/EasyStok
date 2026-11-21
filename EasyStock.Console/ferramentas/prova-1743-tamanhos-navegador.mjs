@@ -1,7 +1,7 @@
 // Console real em1280x720 e390px; HTTP controlado, sem chamadas à loja.
 // PLAYWRIGHT_MODULE deve apontar para um runtime instalado de Playwright.
 import { createRequire } from 'node:module'
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { join, resolve } from 'node:path'
 const require = createRequire(import.meta.url)
@@ -21,7 +21,19 @@ const empresa = '11111111-1111-4111-8111-111111111111', usuario = '22222222-2222
 const conversas = ['Maria', 'Joana'].map((nome, i) => ({ id: 'conversa-' + i, contatoNome: nome, contatoIdExterno: '551198765000' + i,
   clienteId: 'cliente-' + i, canal: 'WhatsApp', situacao: 'Assumida', assumidaPorUsuarioId: usuario, assumidaPorNome: 'Dona de teste',
   ultimaMensagemEm: new Date(Date.now() - i * 60000).toISOString(), naoLidas: 0 }))
-const itens = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../.build/1743/menu-publico-auditoria.json'), 'utf8')).itens
+// #2437: cardápio sintético no formato da API, no lugar da auditoria do menu público que outra prova gravava em
+// .build/. São 17 receitas com 2 ou 3 tamanhos (43 itens), todas conhecidas do agrupamento; o 1 kg do Talharim está esgotado.
+const receitas = ['Lasanha Bolonhesa Clássica', 'Lasanha Verde com Bolonhesa', 'Talharim', 'Fettuccine', 'Espaguete', 'Linguini',
+  'Ravioli de Limão Siciliano e Mussarela', 'Ravioli de Ricota e Espinafre', 'Ravioli de Abóbora e Alho-Poró', 'Tortellini de Costela',
+  'Sorrentino de Ricota e Espinafre', 'Capeletti de Carne', 'Capeletti de Frango', 'Nhoque Artesanal', 'Panqueca de Carne',
+  'Panqueca de Frango', 'Molho Bolonhesa']
+const itens = receitas.flatMap((receita, r) => (r < 9 ? [r < 2 ? '600 g' : '500 g', '800 g', '1 kg'] : ['500 g', '1 kg']).map((peso, i) => ({
+  id: `item-${String(r).padStart(2, '0')}-${i}`, nome: `${receita} ${peso}`, descricao: `Ingredientes de ${receita}`, pesoExibicao: peso,
+  precoCentavos: 3800 + r * 100 + i * 700, disponivel: !(receita === 'Talharim' && peso === '1 kg'), estoqueAtual: 10,
+  categoria: r < 2 ? 'Lasanhas' : 'Massas',
+  imagemUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+})))
+assert.equal(itens.length, 43)
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, reducedMotion: 'reduce' })
 await context.addInitScript(({ empresa, usuario }) => {
@@ -56,12 +68,29 @@ await context.route('**/api/**', async route => {
 })
 const page = await context.newPage()
 page.setDefaultTimeout(10000)
+// #2814: abrir e recarregar a página dependem do Vite e da máquina, não do que a prova confere. Com a máquina
+// carregada, o goto passava de 10 s. Só a navegação ganha folga; as esperas da tela seguem em 10 s.
+page.setDefaultNavigationTimeout(60000)
+// #2437: abrir a conversa marca como lida e pede a sugestão da Assistente; nenhuma das duas mexe no pedido.
+// #2814: essas duas saem quando o aplicativo quer, então a prova conta só as escritas que mudam o pedido.
+const escritaNoPedido = c => c.metodo !== 'GET' && !c.path.endsWith('/marcar-lida') && !c.path.endsWith('/sugestao')
+// #2437: no celular a aba "Pedido" virou "Cliente", e a comanda é um resumo que se abre em "Revisar comanda".
+const recolherPedido = async () => { // a comanda aberta fica sobre o cardápio e é lembrada entre recargas
+  const recolher = page.getByRole('button', { name: /^Recolher Comanda/ })
+  if (await recolher.isVisible()) await recolher.click()
+}
+const abrirPedido = async () => {
+  await page.getByRole('tab', { name: 'Cliente', exact: true }).click()
+  if (!await page.locator('#comanda-pedido').isVisible()) await page.getByRole('button', { name: /^(Revisar pedido|Consultar pedido vinculado)/ }).click()
+}
 page.on('pageerror', erro => erros.push(erro.message))
 try {
   await page.goto(origem + '/#/m/atendimento/balcao')
-  await page.getByText('Maria', { exact: true }).first().waitFor()
+  // #2437: a lista abre em "Precisa de você"; as conversas da prova já estão assumidas, então vêm em "Todas".
+  await page.getByRole('button', { name: /^Todas/ }).click({ timeout: 30000 }) // a primeira carga, com a suíte em paralelo, passa de 10s
+  await page.getByRole('button', { name: /^Maria/ }).first().waitFor() // #2437: o nome visível vem em dois spans; o botão da lista é o alvo estável
   // #2135: a tela abre sem conversa escolhida; a atendente abre a Maria.
-  await page.getByText('Maria', { exact: true }).first().click()
+  await page.getByRole('button', { name: /^Maria/ }).first().click()
   await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
   await page.getByRole('heading', { name: 'Cardápio de hoje', exact: true }).waitFor()
   const corpo = await page.evaluate(async itensDoMenu => {
@@ -75,8 +104,13 @@ try {
   writeFileSync(join(pasta, 'corpo-43-ids.json'), JSON.stringify(corpo, null, 2))
   await foto(page, '01-cardapio-1280')
   if (!process.env.ANTES) {
-    await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 600 g na comanda', exact: true }).click()
-    const tamanho = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g na comanda', exact: true })
+    await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 600 g no pedido', exact: true }).click()
+    // #2437: a comanda da Ficha é um resumo; o alvo do arrasto (#comanda-pedido) só existe com ela aberta.
+    await page.getByRole('button', { name: /^Revisar pedido/ }).click()
+    // #2437: a comanda aberta flutua sobre o cardápio e cobre o prato; a atendente encolhe o painel pela alça.
+    await page.getByRole('button', { name: /^Redimensionar Pedido/ }).focus()
+    for (let i = 0; i < 9; i++) await page.keyboard.press('Shift+ArrowUp')
+    const tamanho = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g no pedido', exact: true })
     const r = await tamanho.boundingBox(), alvo = await page.locator('#comanda-pedido').boundingBox()
     await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2)
     await page.mouse.down()
@@ -85,7 +119,9 @@ try {
     await page.getByText('Soltar aqui', { exact: true }).waitFor()
     await page.mouse.up()
     await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 800 g', exact: true }).waitFor()
-    await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 1 kg na comanda', exact: true }).click()
+    await page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 1 kg no pedido', exact: true }).click()
+    // #2982: `.count()` não espera; a linha de 1 kg precisa existir antes da contagem lá embaixo.
+    await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 1 kg', exact: true }).waitFor()
     await foto(page, '01b-arrasto-tamanho-1280')
     await page.getByRole('button', { name: 'Tirar uma unidade de Lasanha Bolonhesa Clássica 800 g', exact: true }).click()
     assert.equal(await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica 800 g', exact: true }).count(), 0)
@@ -103,7 +139,7 @@ try {
     assert.equal(await page.getByRole('list', { name: /^Apresentações de / }).count(), 17)
     const escapar = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     for (const item of itens) {
-      const escolha = page.getByRole('button', { name: new RegExp('^(Somar )?' + escapar(item.nome) + '( na comanda)?(?:$| )') })
+      const escolha = page.getByRole('button', { name: new RegExp('^(Somar )?' + escapar(item.nome) + '( no pedido)?(?:$| )') })
       assert.equal(await escolha.count(), 1, 'Uma escolha direta para ' + item.id)
       assert.equal(await escolha.isEnabled(), item.disponivel !== false, 'Disponibilidade própria: ' + item.id)
       const box = await escolha.boundingBox()
@@ -131,31 +167,33 @@ try {
     await detalhes.click()
     await busca.fill('')
     await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
-    await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
+    await abrirPedido()
     for (const item of itens.filter(i => i.disponivel !== false)) {
       assert.equal(await page.getByRole('button', { name: 'Anotação para ' + item.nome, exact: true }).count(), 1,
         'Cada tamanho fica no pedido com seu nome original: ' + item.id)
     }
-    assert.equal(chamadas.filter(c => c.metodo !== 'GET').every(c => c.path.endsWith('/marcar-lida')), true)
+    assert.deepEqual(chamadas.filter(escritaNoPedido), [], 'Montar a comanda não escreve no pedido')
     await foto(page, '04-pedido-390')
+    await recolherPedido()
     nativa = true
     await page.reload()
-    await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
-    await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
+    await page.getByRole('tab', { name: 'Cliente', exact: true }).click() // #2437: o botão fica no resumo da aba, com a comanda fechada
+    await page.getByRole('button', { name: 'Adicionar itens', exact: true }).first().click() // #2437: o resumo e a comanda aberta têm o botão
     const porcoes = page.getByRole('list', { name: 'Porções de Lasanha Bolonhesa Clássica', exact: true })
     await porcoes.waitFor()
     assert.equal(await page.getByRole('list', { name: /^Apresentações de / }).count(), 17, 'A nativa continua separada')
     await porcoes.getByRole('button', { name: /^300 g/ }).click()
     await foto(page, '05-porcao-nativa-390')
     await page.getByRole('button', { name: 'Fechar cardápio', exact: true }).click()
-    await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
+    await abrirPedido()
     await page.getByRole('button', { name: 'Anotação para Lasanha Bolonhesa Clássica · 300 g', exact: true }).waitFor()
+    await recolherPedido()
     pedidoCriado = true
     await page.reload()
-    await page.getByRole('tab', { name: 'Pedido', exact: true }).click()
+    await abrirPedido() // #2437: com o pedido criado, o "Ver cardápio" mora na comanda aberta
     await page.getByRole('button', { name: 'Ver cardápio', exact: true }).click()
     for (const item of itens) {
-      const escolha = page.getByRole('button', { name: new RegExp('^(Somar )?' + escapar(item.nome) + '( na comanda)?(?:$| )') })
+      const escolha = page.getByRole('button', { name: new RegExp('^(Somar )?' + escapar(item.nome) + '( no pedido)?(?:$| )') })
       assert.equal(await escolha.isEnabled(), false, 'Pedido criado bloqueia ' + item.id)
     }
     assert.equal(await porcoes.getByRole('button', { name: /^300 g/ }).isEnabled(), false)
@@ -163,8 +201,8 @@ try {
     await page.setViewportSize({ width: 1280, height: 720 })
     const pedido = page.locator('#comanda-pedido')
     const pedidoAntes = await pedido.innerText()
-    const escritasAntes = chamadas.filter(c => c.metodo !== 'GET').length
-    const bloqueado = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g na comanda', exact: true })
+    const escritasAntes = chamadas.filter(escritaNoPedido).length
+    const bloqueado = page.getByRole('button', { name: 'Somar Lasanha Bolonhesa Clássica 800 g no pedido', exact: true })
     await bloqueado.scrollIntoViewIfNeeded()
     const r = await bloqueado.boundingBox(), alvo = await pedido.boundingBox()
     await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2)
@@ -175,7 +213,9 @@ try {
     assert.equal(await page.getByText('Soltar aqui', { exact: true }).count(), 0, 'Comanda bloqueada não aceita arrasto')
     await page.mouse.up()
     assert.equal(await pedido.innerText(), pedidoAntes, 'Clique e arrasto bloqueados preservam os itens do pedido')
-    assert.equal(chamadas.filter(c => c.metodo !== 'GET').length, escritasAntes, 'Tentativa bloqueada não escreve na API')
+    const escritasDepois = chamadas.filter(escritaNoPedido)
+    assert.equal(escritasDepois.length, escritasAntes, 'Tentativa bloqueada não escreve na API: '
+      + JSON.stringify(escritasDepois.slice(escritasAntes)))
     await foto(page, '07-clique-arrasto-bloqueados-1280')
   }
   assert.deepEqual(erros, [])

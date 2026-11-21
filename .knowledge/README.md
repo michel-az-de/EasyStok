@@ -6,7 +6,7 @@
 
 ## O que é o projeto (em 3 frases)
 
-EasyStok é um SaaS multi-tenant de gestão de estoque/foodservice em **.NET 9 + Postgres** com Clean Architecture, PWA mobile (Casa da Babá em produção real) e MAUI Android (produto SaaS em maturação). Hoje em **2026-05-06** tem **714+ commits**, 17 projetos, ~50 controllers, 57 entidades. Posicionado como ERP para microempresas que NÃO precisam de NF-e ainda; auditoria honesta estima **30–35% de feature parity** vs Bling/Tiny/Omie (`audit-brutal.md`).
+EasyStok é um SaaS multi-tenant de gestão de estoque/foodservice em **.NET 9 + Postgres** com Clean Architecture, PWA mobile (Casa da Baba em produção real) e MAUI Android (produto SaaS em maturação). Hoje em **2026-05-06** tem **714+ commits**, 17 projetos, ~50 controllers, 57 entidades. Posicionado como ERP para microempresas que NÃO precisam de NF-e ainda; auditoria honesta estima **30–35% de feature parity** vs Bling/Tiny/Omie (`audit-brutal.md`).
 
 ## Quem é o usuário
 

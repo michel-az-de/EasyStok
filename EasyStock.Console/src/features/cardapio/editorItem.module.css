@@ -18,14 +18,17 @@
 .campo input, .campo select, .campo textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--linha-media); border-radius: var(--r-1); color: var(--tinta); background: var(--papel); font: 400 1rem/1.4 var(--f-corpo); }
 .campo textarea { resize: vertical; }
 .campo small { color: var(--tinta-3); font-size: .8125rem; font-weight: 400; }
+/* #2792: a frase do limite do texto, na mesma cor de erro do Campo. */
+.campo small.limite { color: var(--erro); font-weight: 600; }
+.campo [aria-invalid='true'] { border-color: var(--erro); box-shadow: inset 0 0 0 1px var(--erro); }
 .dupla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .opcao { display: flex; align-items: center; gap: 8px; min-height: var(--toque); }
 .opcao input { width: 18px; height: 18px; accent-color: var(--marca); }
 .vinculo { margin: 0; padding: 16px 0; display: flex; align-items: flex-start; gap: 12px; color: var(--tinta-3); font-size: .875rem; }
 .vinculo span { display: grid; gap: 4px; }
 .vinculo strong { color: var(--tinta); font-size: .9375rem; }
-.erro, .confirmacao { padding: 16px; margin-bottom: 20px; border-left: 3px solid var(--erro); background: var(--erro-pastel); color: var(--erro); }
-.confirmacao { border-color: var(--alerta); background: var(--alerta-pastel); color: var(--alerta); }
+.erro, .confirmacao { padding: 16px; margin-bottom: 20px; border: 1px solid color-mix(in srgb, var(--erro) 30%, transparent); border-radius: var(--r-1); background: var(--erro-pastel); color: var(--erro); }
+.confirmacao { border-color: color-mix(in srgb, var(--alerta) 30%, transparent); background: var(--alerta-pastel); color: var(--alerta); }
 .confirmacao button { margin-right: 8px; }
 .statusRodape { margin-right: auto; align-self: center; color: var(--tinta-3); font-size: .875rem; }
 .fotosEditor { display: grid; gap: 12px; margin-top: 20px; }

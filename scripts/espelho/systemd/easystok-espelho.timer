@@ -1,0 +1,11 @@
+# A cada 15 minutos: o aceite da #2958 pede o master igual ao do GitHub em ate 1 h.
+# OnCalendar e nao OnUnitActiveSec: com Type=oneshot o servico nunca fica active e o timer nao rearma.
+[Unit]
+Description=Atualiza o espelho do EasyStok a cada 15 minutos
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

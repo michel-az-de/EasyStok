@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Auth;
 using EasyStock.Application.UseCases.AlterarSenha;
 using EasyStock.Application.UseCases.AutenticarUsuario;
+using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.AtualizarUsuarioAtual;
 using EasyStock.Application.UseCases.ConfirmEmail;
 using EasyStock.Application.UseCases.EsqueciSenha;
@@ -53,6 +54,8 @@ public class AuthControllerTests
         _mockJwtService.ExpiresInSeconds.Returns(3600);
 
         _unitOfWork.CommitAsync().Returns(1);
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<Microsoft.AspNetCore.Mvc.IActionResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<Microsoft.AspNetCore.Mvc.IActionResult>>>()(c.Arg<CancellationToken>()));
 
         var usuarioRepo2 = Substitute.For<IUsuarioRepository>();
         var unitOfWork2 = Substitute.For<IUnitOfWork>();
@@ -116,7 +119,7 @@ public class AuthControllerTests
             Substitute.For<IEmpresaPadraoResolver>(), Substitute.For<ITenantContextAccessor>(), currentUser, passwordHasher,
             unitOfWork2, config, TimeProvider.System, Substitute.For<ILogger<TrocaDeContatoService>>());
         var atualizarUsuarioAtualUseCase = new AtualizarUsuarioAtualUseCase(usuarioRepo2, currentUser, unitOfWork2, trocaDeContato, atualizarUsuarioAtualLogger);
-        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, revogadorSessoes, unitOfWork2, passwordHasher, alterarSenhaLogger);
+        var alterarSenhaUseCase = new AlterarSenhaUseCase(usuarioRepo2, currentUser, revogadorSessoes, Substitute.For<IResetTokenRepository>(), unitOfWork2, passwordHasher, alterarSenhaLogger);
         var confirmEmailLogger = Substitute.For<ILogger<ConfirmEmailUseCase>>();
         var confirmEmailUseCase = new ConfirmEmailUseCase(emailTokenRepo, usuarioRepo2, auditLogRepo2, revogadorSessoes, unitOfWork2, confirmEmailLogger);
 
@@ -168,7 +171,42 @@ public class AuthControllerTests
     }
 
     [Fact]
-    public async Task Login_RevogaORefreshDosOutrosAparelhosMasNaoGravaOCarimboDeSessao()
+    public async Task GoogleNativo_NaoRevogaRefreshDoPc_EVinculaAparelhoAEmpresaEscolhida()
+    {
+        var empresa = Guid.NewGuid();
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = empresa, Ativo = true });
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("client-id-da-prova");
+        google.ValidarAsync("id-token-da-prova", Arg.Any<CancellationToken>())
+            .Returns(new EasyStock.Application.Ports.Output.Auth.IdentidadeGoogle(usuario.Email, true));
+        var identificar = new IdentificarUsuarioGoogleUseCase(google, _usuarioRepository, null!, _unitOfWork, TimeProvider.System);
+        var resolver = Substitute.For<IEmpresaPadraoResolver>();
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() };
+        var request = System.Text.Json.JsonSerializer.Deserialize<LoginGoogleRequest>(
+            System.Text.Json.JsonSerializer.Serialize(new { idToken = "id-token-da-prova", empresaId = empresa, dispositivoId = "android-prova-2184" }),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+
+        await _controller.LoginGoogle(request, google, identificar, resolver, CancellationToken.None);
+
+        await _refreshTokenRepository.DidNotReceive().RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
+        await _refreshTokenRepository.Received(1).TravarDispositivoAsync("android-prova-2184");
+        var resultado = _mockJwtService.ReceivedCalls().Single(c => c.GetMethodInfo().Name == "GerarToken").GetArguments()[0]!;
+        var claims = System.Text.Json.JsonSerializer.SerializeToElement(resultado);
+        claims.GetProperty("EmpresaId").GetGuid().Should().Be(empresa);
+        claims.GetProperty("DispositivoId").GetString().Should().Be("android-prova-2184");
+        claims.GetProperty("SessaoId").GetGuid().Should().NotBeEmpty();
+        await _controller.LoginGoogle(request, google, identificar, resolver, CancellationToken.None);
+        var familias = _mockJwtService.ReceivedCalls().Where(c => c.GetMethodInfo().Name == "GerarToken")
+            .Select(c => ((AutenticarUsuarioResult)c.GetArguments()[0]!).SessaoId).ToArray();
+        familias.Should().OnlyHaveUniqueItems("cada login explícito cria sua família para não ser encerrado por um logout offline anterior");
+        await _refreshTokenRepository.DidNotReceive().RevogarSessoesWebAsync(usuario.Id, Arg.Any<DateTime>());
+    }
+
+    [Fact]
+    public async Task LoginWeb_RevogaSomenteOutrosRefreshWeb_SemDerrubarSessaoNativa()
     {
         // #1352: logar em outro aparelho revoga só o refresh dos outros; o JWT deles segue valendo, então o
         // carimbo de sessão não pode mudar no login (logar o tablet derrubaria o balcão).
@@ -181,7 +219,8 @@ public class AuthControllerTests
 
         await _controller.Login(new LoginRequest(usuario.Email, "Senha@12345", null));
 
-        await _refreshTokenRepository.Received(1).RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
+        await _refreshTokenRepository.Received(1).RevogarSessoesWebAsync(usuario.Id, Arg.Any<DateTime>());
+        await _refreshTokenRepository.DidNotReceive().RevogarSessoesAtivasAsync(usuario.Id, Arg.Any<DateTime>());
         await _usuarioRepository.DidNotReceiveWithAnyArgs().AtualizarSessoesValidasDesdeAsync(default, default);
         usuario.SessoesValidasDesde.Should().BeNull();
     }
@@ -202,6 +241,8 @@ public class AuthControllerTests
     [InlineData(NivelAcesso.Gerente, Modulo.Atendimento, true, false, false, false)]
     [InlineData(NivelAcesso.Operador, Modulo.Atendimento, true, false, false, false)]
     [InlineData(NivelAcesso.Admin, Modulo.Atendimento, false, false, false, false)]
+    [InlineData(NivelAcesso.Visualizador, Modulo.Atendimento, true, false, false, false)]
+    [InlineData(NivelAcesso.Operador, Modulo.Cadastros, true, false, false, false)]
     public void CapacidadesDeEdicaoExigemNivelEmpresaEModulo(
         NivelAcesso nivel, Modulo modulo, bool comEmpresa, bool producao, bool caixa, bool cardapio)
     {
@@ -231,6 +272,10 @@ public class AuthControllerTests
             comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
         acoes.GetProperty("devolverPagamentoManual").GetBoolean().Should().Be(
             comEmpresa && modulo == Modulo.Atendimento && nivel is NivelAcesso.Admin or NivelAcesso.SuperAdmin or NivelAcesso.Gerente);
+        // #2478: a tela Pedidos de Cadastros lê `GET api/pedidos`, que pede policy Operador, módulo Atendimento e empresa.
+        // Cadastros entra pela mesma permissão de Atendimento (AcessoModulos), então quem abre Cadastros lê pedidos.
+        acoes.GetProperty("verPedidos").GetBoolean().Should().Be(
+            comEmpresa && modulo is Modulo.Atendimento or Modulo.Cadastros && nivel is not NivelAcesso.Visualizador);
     }
 
     [Theory]
@@ -248,6 +293,8 @@ public class AuthControllerTests
         var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
         acoes.GetProperty("reabrirConversa").GetBoolean().Should().Be(esperado);
+        // Revisão da #2874: o "Novo pedido" só aparece para quem a rota `do-cliente` (policy Atendendo) aceita.
+        acoes.GetProperty("atenderConversas").GetBoolean().Should().Be(esperado);
     }
 
     // #1921 / #1940 (frente C da #1889): o console da atendente pedia desacertos, integrações e o
@@ -416,11 +463,12 @@ public class AuthControllerTests
         var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
         google.ClientId.Returns((string?)null);
 
-        var resposta = _controller.ConfigGoogle(google);
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa("true"));
 
         var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
         var dados = DadosDaResposta(ok);
         dados.GetProperty("habilitado").GetBoolean().Should().BeFalse();
+        dados.GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeTrue();
         (dados.TryGetProperty("clientId", out var clientId) ? clientId.ValueKind : System.Text.Json.JsonValueKind.Null)
             .Should().Be(System.Text.Json.JsonValueKind.Null);
     }
@@ -431,13 +479,116 @@ public class AuthControllerTests
         var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
         google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
 
-        var resposta = _controller.ConfigGoogle(google);
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa("true"));
 
         var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
         var dados = DadosDaResposta(ok);
         dados.GetProperty("habilitado").GetBoolean().Should().BeTrue();
+        dados.GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeTrue();
         dados.GetProperty("clientId").GetString().Should().Be("cliente-123.apps.googleusercontent.com");
     }
+
+    [Fact]
+    public void ConfigGoogleComChaveSessaoNativaFalsaAnunciaDesligada()
+    {
+        // #2184: o deploy liga a sessão nativa; Auth__SessaoNativaHabilitada=false desliga sem novo deploy de código.
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
+
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa("false"));
+
+        var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
+        DadosDaResposta(ok).GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConfigGoogleSemChaveSessaoNativaAnunciaDesligada()
+    {
+        // Ambiente que não recebeu a configuração (produção antes do deploy) nunca promete o que não liga.
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
+
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa(null));
+
+        var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
+        DadosDaResposta(ok).GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConfigGoogleComChaveSessaoNativaInvalidaAnunciaDesligada()
+    {
+        var google = Substitute.For<EasyStock.Application.Ports.Output.Auth.IGoogleIdTokenValidator>();
+        google.ClientId.Returns("cliente-123.apps.googleusercontent.com");
+
+        var resposta = _controller.ConfigGoogle(google, ConfiguracaoComSessaoNativa("talvez"));
+
+        var ok = resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject;
+        DadosDaResposta(ok).GetProperty("sessaoNativaHabilitada").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Login_ComCredencialValida_Devolve200ComTokenERefreshGravadoPeloHash()
+    {
+        // #827: o caminho feliz do login nunca era asserido no controller, só a falha.
+        var usuario = UsuarioComSenhaDaProva();
+        _mockJwtService.GerarToken(Arg.Any<AutenticarUsuarioResult>()).Returns("jwt-da-prova");
+        _mockJwtService.GerarRefreshToken().Returns("refresh-da-prova");
+
+        var resposta = await _controller.Login(new LoginRequest(usuario.Email, "Senha@12345", null));
+
+        var dados = DadosDaResposta(resposta.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>().Subject);
+        dados.GetProperty("token").GetString().Should().Be("jwt-da-prova");
+        dados.GetProperty("refreshToken").GetString().Should().Be("refresh-da-prova");
+        await _refreshTokenRepository.Received(1).AddAsync(Arg.Is<RefreshToken>(t =>
+            t.UsuarioId == usuario.Id && t.TokenHash == TokenHashHelper.ComputeSha256Hash("refresh-da-prova")));
+        await _unitOfWork.Received().CommitAsync(); // a sessão nova é gravada, não fica só na resposta
+    }
+
+    [Fact]
+    public async Task Login_ComEmpresaIdVazio_RecusaSemEmitirSessao()
+    {
+        // #827: Guid.Empty não é "sem empresa" (null); é uma empresa que não existe, e o login recusa (401 no handler).
+        var usuario = UsuarioComSenhaDaProva();
+
+        var tentar = () => _controller.Login(new LoginRequest(usuario.Email, "Senha@12345", Guid.Empty));
+
+        await tentar.Should().ThrowAsync<CredenciaisInvalidasException>();
+        await _refreshTokenRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        _mockJwtService.DidNotReceiveWithAnyArgs().GerarToken(default!);
+    }
+
+    [Fact]
+    public void RotasQueConferemCredencialUsamOBaldeAuth_EORefreshTemBaldeProprio()
+    {
+        // #827 / #747: o refresh no balde do login fazia os BFFs esfomearem o login (429 no login-admin).
+        static string? Politica(string acao) => typeof(AuthController).GetMethod(acao)!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), false)
+            .Cast<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>().SingleOrDefault()?.PolicyName;
+
+        string[] conferemCredencial =
+        [
+            nameof(AuthController.Login), nameof(AuthController.LoginGoogle), nameof(AuthController.LoginChaveAcesso),
+            nameof(AuthController.ListarEmpresasParaLogin), nameof(AuthController.ForgotPassword),
+            nameof(AuthController.ResetPassword), nameof(AuthController.ResetPasswordCode), nameof(AuthController.AceitarConvite),
+        ];
+        conferemCredencial.Select(a => (a, Politica(a))).Should().AllSatisfy(p => p.Item2.Should().Be("auth", p.a));
+        Politica(nameof(AuthController.Refresh)).Should().Be("auth-refresh");
+    }
+
+    private Usuario UsuarioComSenhaDaProva()
+    {
+        var usuario = Usuario.Criar("Ana", "ana@casadababa.com", "hash");
+        usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        _usuarioRepository.GetByEmailAsync(usuario.Email).Returns(usuario);
+        _passwordHasher.Verify("Senha@12345", "hash").Returns(true);
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() };
+        return usuario;
+    }
+
+    private static IConfiguration ConfiguracaoComSessaoNativa(string? valor) =>
+        new ConfigurationBuilder().AddInMemoryCollection(valor is null
+            ? new Dictionary<string, string?>()
+            : new Dictionary<string, string?> { ["Auth:SessaoNativaHabilitada"] = valor }).Build();
 
     /// <summary>O <c>data</c> do envelope <c>{ data, meta }</c>, como o console o lê.</summary>
     private static System.Text.Json.JsonElement DadosDaResposta(Microsoft.AspNetCore.Mvc.OkObjectResult ok) =>

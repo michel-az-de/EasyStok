@@ -22,8 +22,13 @@ export function resumoCategoriasAntigas(previa) {
   const acao = novas
     ? `cria ${contar(novas, 'categoria', 'categorias')} e ${liga}${novas < categorias.length ? ', usando as que já existem com o mesmo nome' : ''}`
     : `${liga} às categorias que já existem com o mesmo nome`
-  const efeito = `Converter ${acao}. Uma categoria por nome; o texto antigo fica guardado e dá para repetir sem duplicar.`
-  return { texto, efeito, novas, pratos }
+  const efeito = `A conversão ${acao}. Mantém os nomes antigos, sem duplicar.`
+  // #2424: a tela mostra título, subtítulo e a lista dos nomes em vez de uma frase longa.
+  const total = categorias.length
+  const titulo = contar(total, 'categoria antiga encontrada', 'categorias antigas encontradas')
+  const subtitulo = `${pratos === 1 ? '1 prato usa' : `${pratos} pratos usam`} ${total === 1 ? 'esta categoria. Converta para gerenciá-la.' : 'estas categorias. Converta para gerenciá-las.'}`
+  const botao = `Converter ${contar(total, 'categoria', 'categorias')}`
+  return { texto, efeito, novas, pratos, titulo, subtitulo, botao, nomes: categorias.map((c) => c.nome) }
 }
 
 export function criarGestaoSecoes({ obterSecoes, recarregar, aoErro, aoAviso = () => {} }) {

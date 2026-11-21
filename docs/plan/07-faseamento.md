@@ -7,9 +7,9 @@
 Premissas:
 - Felipe trabalha **2-3h/dia úteis** + **4-6h fins de semana** = ~14-20h/semana.
 - Buffer 25% para imprevistos (memory: GitHub Actions parado por billing,
-  Casa da Babá pode pedir bugfix urgente).
+  Casa da Baba pode pedir bugfix urgente).
 - Nenhum paralelismo entre fases (solo dev).
-- Plano premissivo: Casa da Babá é o cliente piloto; fases têm marcos com
+- Plano premissivo: Casa da Baba é o cliente piloto; fases têm marcos com
   ela.
 
 #### F0 — Reconhecimento, ADRs e decisões fundacionais
@@ -69,7 +69,7 @@ Premissas:
 - Unit + integration tests (G.1.1–G.1.3, G.2.2)
 
 **Critério de pronto**:
-- Casa da Babá em ambiente de staging consegue: criar pedido, pagar parcial,
+- Casa da Baba em ambiente de staging consegue: criar pedido, pagar parcial,
   estornar com motivo, ver badges corretos.
 - 85% cobertura nos UseCases novos.
 - 0 erros no NetArchTest.
@@ -87,10 +87,10 @@ designer dedicado). Buffer 20% extra na UI.
   as 7 queries de validação, alerta em log se algo != 0.
 
 **Critério de pronto**:
-- Em DB de staging com cópia da Casa da Babá: 7 queries retornam 0.
+- Em DB de staging com cópia da Casa da Baba: 7 queries retornam 0.
 - Backfill idempotente: rodar 2x não duplica nada.
 
-**Bloqueadores**: tamanho real da tabela em prod — se Casa da Babá tem mais
+**Bloqueadores**: tamanho real da tabela em prod — se Casa da Baba tem mais
 de 100k linhas, precisa fragmentar batch (F.2.5).
 
 #### F4 — SessaoCaixa: abertura, movimentos manuais, listagem
@@ -128,7 +128,7 @@ de 100k linhas, precisa fragmentar batch (F.2.5).
 - Backfill retroativo de SessaoCaixa (F.3) executado em staging.
 
 **Critério de pronto**:
-- Casa da Babá em staging com flag ON: abre caixa, faz pedido pago, vê
+- Casa da Baba em staging com flag ON: abre caixa, faz pedido pago, vê
   movimento de caixa linkado.
 - Empresa de teste com flag OFF: comportamento idêntico ao master pré-feature
   (assert: nenhuma `SessaoCaixa` nem `MovimentoCaixa` novo criado).
@@ -211,7 +211,7 @@ MovimentoCaixa)
   `fechamento_render_upload_seconds`).
 - E2E manual completo (G.5).
 - Validação contábil final (assinatura do contador).
-- Banner in-app para Casa da Babá (7 dias antes).
+- Banner in-app para Casa da Baba (7 dias antes).
 - Deploy em staging por 5 dias para "soak test".
 - Deploy em produção com flag OFF.
 - **Liga flag em SÁBADO DE MANHÃ (não domingo 22h)** — máxima janela de
@@ -229,29 +229,29 @@ thinking):
 | Dom 09h-22h | Disponível | WhatsApp |
 | Dom 22h-seg 19h | **Janela mais longa de indisponibilidade** (15h pior caso) | Mensagem fica para 19h de segunda |
 
-**Por isso**: liga flag para Casa da Babá em sábado de manhã. Felipe
+**Por isso**: liga flag para Casa da Baba em sábado de manhã. Felipe
 acompanha sábado inteiro (até 22h) + domingo inteiro. Se um problema
 aparecer fora da janela:
 
 - **Fluxo automático de fallback**: flag desligada → operadora volta ao
-  fluxo legacy imediatamente, sem ação do Felipe. Casa da Babá não
+  fluxo legacy imediatamente, sem ação do Felipe. Casa da Baba não
   perde funcionalidade — perde só os ganhos do v2 nesse intervalo.
 - **Mecanismo**: endpoint `POST /api/empresa/feature-flags/desligar-emergencia`
   (admin-only, idempotente) deixa Thatiane ou suporte primeiro-nível
   desativar autônomamente. Documentar em `docs/operacao/emergencia-caixa.md`
   com prints e número do WhatsApp.
-- **SLA combinado com Casa da Babá**: "Suporte por Felipe nas janelas
+- **SLA combinado com Casa da Baba**: "Suporte por Felipe nas janelas
   acima. Fora delas, flag de emergência reverte para fluxo antigo em <1
   minuto. Tempo de resposta de Felipe a mensagens fora da janela: até 19h
   do próximo dia útil ou 09h do próximo sáb/dom."
 - Documentar tudo em `docs/operacao/janela-suporte-felipe.md` e enviar à
-  Casa da Babá ANTES do go-live (assinatura por escrito).
+  Casa da Baba ANTES do go-live (assinatura por escrito).
 
 **Critério de pronto**:
-- Casa da Babá fecha caixa em produção com sucesso.
+- Casa da Baba fecha caixa em produção com sucesso.
 - Nenhum erro 5xx nos 3 primeiros fechamentos reais.
 - Operadora Thatiane confirma "uso natural".
-- Casa da Babá assinou `docs/operacao/janela-suporte-felipe.md`.
+- Casa da Baba assinou `docs/operacao/janela-suporte-felipe.md`.
 - Botão de emergência `desligar-emergencia` testado em staging com
   ≥ 1 operador além de Felipe.
 
@@ -276,16 +276,16 @@ produtivas).
 
 ### H.3 Marcos de validação com cliente
 
-- **M1 (fim de F2)**: Casa da Babá em staging consegue registrar pagamento
+- **M1 (fim de F2)**: Casa da Baba em staging consegue registrar pagamento
   e estorno via PWA. Felipe pede confirmação da Thatiane que UI é clara.
-- **M2 (fim de F6)**: Casa da Babá em staging consegue **fechar caixa
+- **M2 (fim de F6)**: Casa da Baba em staging consegue **fechar caixa
   completo**. PDF é enviado ao contador.
 - **M3 (fim de F8)**: produção, flag ligada, primeiros 3 fechamentos
   vigiados. Aprovação final.
 
 ### H.4 Critério go/no-go para produção (final de F8)
 
-**Checklist obrigatório antes de ligar flag para Casa da Babá**:
+**Checklist obrigatório antes de ligar flag para Casa da Baba**:
 
 - [ ] Todos os 7 queries de validação (F.5) retornam 0 em produção
 - [ ] Build em master verde (quando GitHub Actions billing voltar — caso
@@ -294,7 +294,7 @@ produtivas).
 - [ ] ArchitectureTests verde
 - [ ] E2E manual roteiro executado com sucesso em staging
 - [ ] PDF aprovado por contador (assinatura por escrito ou ata)
-- [ ] PDF e página pública abrem em iOS Safari (Casa da Babá pode ter
+- [ ] PDF e página pública abrem em iOS Safari (Casa da Baba pode ter
       cliente iPhone)
 - [ ] `fly status` mostra app saudável
 - [ ] Teste de rollback de flag executado em staging (F4 critério): liga
@@ -302,7 +302,7 @@ produtivas).
       pagamentos NÃO criam SessaoCaixa
 - [ ] **Liga flag em sábado de manhã** (não domingo à noite) — máxima
       janela de suporte de Felipe à frente
-- [ ] `docs/operacao/janela-suporte-felipe.md` assinado pela Casa da Babá
+- [ ] `docs/operacao/janela-suporte-felipe.md` assinado pela Casa da Baba
 - [ ] Endpoint `POST /api/empresa/feature-flags/desligar-emergencia` testado
       em staging com 1 operador adicional que NÃO é Felipe
 - [ ] Banner in-app exibido há ≥ 5 dias

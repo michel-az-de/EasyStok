@@ -4,12 +4,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAtendimento } from '../../../aplicacao/contextos'
 import {
-  convidarUsuario, desativarUsuario, listarPerfis, listarUsuarios, reativarUsuario, reenviarConvite, trocarPerfil,
+  convidarUsuario, desativarUsuario, gerarCodigoDeAcesso, listarPerfis, listarUsuarios, reativarUsuario, reenviarConvite,
+  trocarPerfil,
 } from '../../../aplicacao/usuarios'
 import { Botao } from '../../../componentes/Botao'
 import { CampoSelecao, CampoTexto } from '../../../componentes/Campo'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { haQuantoTempo } from '../../../dominio/formato'
 import {
   SITUACAO, acoesDoUsuario, erroDoConvite, fraseDeFalha, fraseDeRetorno, instanteDaApi, ordenarPerfis, resumoDoPerfil,
@@ -56,7 +58,7 @@ function Convite({ perfis, aoConvidar, aoCancelar }) {
   return (
     <form ref={formulario} className={css.convite} onSubmit={enviar} aria-label="Convidar pessoa" aria-busy={enviando} noValidate>
       <CampoTexto rotulo="Nome" autoComplete="off" value={campos.nome} onChange={trocar('nome')} readOnly={enviando} />
-      <CampoTexto rotulo="E-mail" tipo="email" autoComplete="off" value={campos.email} onChange={trocar('email')} readOnly={enviando} dica="O convite vai para este e-mail" />
+      <CampoTexto rotulo="E-mail" tipo="email" autoComplete="off" value={campos.email} onChange={trocar('email')} readOnly={enviando} dica="O convite vai para este e-mail." />
       <CampoSelecao rotulo="Perfil" opcoes={opcoes} value={campos.perfilId} onChange={trocar('perfilId')} disabled={enviando} dica={resumo} />
       <div className={css.botoesDoConvite}>
         <Botao variante="primario" tipo="submit" disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar convite'}</Botao>
@@ -67,7 +69,38 @@ function Convite({ perfis, aoConvidar, aoCancelar }) {
   )
 }
 
-function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirmacao }) {
+// #2201: mostrado uma vez. A dona copia e manda pelo WhatsApp; a pessoa cola em "Entrar com código de acesso".
+// #2672: o painel abre no topo da lista; quem gerou numa linha de baixo não o via e o foco ficava na linha.
+// O foco vai para o código e o painel entra na tela (o `key` da chave refaz isso a cada código novo).
+function CodigoGerado({ codigo, aoCopiar, aoFechar }) {
+  const painel = useRef(null)
+  const campo = useRef(null)
+  const validade = new Date(codigo.expiraEm).toLocaleDateString('pt-BR')
+  useEffect(() => {
+    painel.current?.scrollIntoView?.({ block: 'nearest' })
+    campo.current?.focus({ preventScroll: true })
+    campo.current?.select()
+  }, [])
+  async function copiar() {
+    try { await navigator.clipboard.writeText(codigo.chave); aoCopiar() }
+    catch { campo.current?.select() }
+  }
+  return (
+    <section ref={painel} className={css.convite} aria-label={`Código de acesso de ${codigo.nome}`}>
+      <CampoTexto
+        ref={campo} rotulo={`Código de acesso de ${codigo.nome}`} readOnly value={codigo.chave}
+        autoComplete="off" spellCheck={false} onFocus={(e) => e.target.select()}
+        dica={`Vale uma vez, até ${validade}. Mande só para ${codigo.nome}. Ele não aparece de novo.`}
+      />
+      <div className={css.botoesDoConvite}>
+        <Botao variante="primario" onClick={copiar}>{codigo.copiado ? 'Copiado' : 'Copiar código'}</Botao>
+        <Botao variante="texto" onClick={aoFechar}>Fechar</Botao>
+      </div>
+    </section>
+  )
+}
+
+function Pessoa({ usuario, perfis, meuId, souSuporte, agora, ocupado, aoAgir, aoAbrirConfirmacao }) {
   const linha = useRef(null)
   const cancelar = useRef(null)
   const jaAbriu = useRef(false)
@@ -75,7 +108,7 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
   // Escolher no select não troca nada: seta do teclado num select fechado já mudava o perfil e derrubava a sessão da pessoa.
   const [perfilEscolhido, setPerfilEscolhido] = useState(null)
   const situacao = situacaoDoUsuario(usuario)
-  const pode = acoesDoUsuario(usuario, meuId)
+  const pode = acoesDoUsuario(usuario, meuId, souSuporte)
   const eu = usuario.usuarioId === meuId
   const ultimo = instanteDaApi(usuario.ultimoAcessoEm)
   const aberta = confirmando || perfilEscolhido !== null
@@ -121,10 +154,19 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
       </div>
       <div className={css.acoes}>
         {pode.reenviarConvite && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reenviar', usuario)}>Reenviar convite</Botao>
+          <Botao variante="texto" disabled={ocupado} aria-label={`Reenviar convite para ${usuario.nome}`} onClick={() => aoAgir('reenviar', usuario)}>
+            Reenviar convite
+          </Botao>
+        )}
+        {pode.gerarCodigo && !aberta && (
+          <Botao variante="texto" disabled={ocupado} aria-label={`Gerar código de acesso de ${usuario.nome}`} onClick={() => aoAgir('codigo', usuario)}>
+            Gerar código de acesso
+          </Botao>
         )}
         {pode.desativar && !aberta && (
-          <Botao variante="texto" disabled={ocupado} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>Desativar</Botao>
+          <Botao variante="texto" className={css.desativar} disabled={ocupado} aria-label={`Desativar ${usuario.nome}`} onClick={() => { setConfirmando(true); aoAbrirConfirmacao() }}>
+            Desativar
+          </Botao>
         )}
         {confirmando && (
           <>
@@ -142,7 +184,9 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
             <Botao ref={cancelar} variante="texto" disabled={ocupado} onClick={() => setPerfilEscolhido(null)}>Cancelar</Botao>
           </>
         )}
-        {pode.reativar && <Botao variante="texto" disabled={ocupado} onClick={() => aoAgir('reativar', usuario)}>Reativar</Botao>}
+        {pode.reativar && (
+          <Botao variante="texto" disabled={ocupado} aria-label={`Reativar ${usuario.nome}`} onClick={() => aoAgir('reativar', usuario)}>Reativar</Botao>
+        )}
       </div>
     </li>
   )
@@ -151,6 +195,7 @@ function Pessoa({ usuario, perfis, meuId, agora, ocupado, aoAgir, aoAbrirConfirm
 export function AbaUsuarios() {
   const { sessao, agora } = useAtendimento()
   const meuId = sessao?.usuario?.id ?? null
+  const souSuporte = sessao?.usuario?.nivel === 'SuperAdmin'
   const titulo = useRef(null)
   const lista = useRef(null)
   const botaoConvidar = useRef(null)
@@ -161,6 +206,8 @@ export function AbaUsuarios() {
   const [convidando, setConvidando] = useState(false)
   // Para onde o foco volta depois de uma ação: a linha da pessoa, ou o título quando a linha mudou de lugar.
   const [foco, setFoco] = useState(null)
+  // #2201: o código aparece uma vez, só na memória desta tela. Fechar ou sair da aba apaga.
+  const [codigo, setCodigo] = useState(null)
 
   const carregar = useCallback(async (sinal) => {
     try {
@@ -201,9 +248,16 @@ export function AbaUsuarios() {
   const agir = useCallback(async (acao, usuario, valor) => {
     setOcupado(true)
     setRetorno(null)
+    // #2672: código gerado fica com o foco no painel do código; só a falha devolve o foco à linha.
+    let focoNoCodigo = false
     try {
       if (acao === 'perfil') await trocarPerfil(usuario.usuarioId, valor)
       else if (acao === 'reenviar') await reenviarConvite(usuario.usuarioId)
+      else if (acao === 'codigo') {
+        const gerado = await gerarCodigoDeAcesso(usuario.usuarioId)
+        setCodigo({ nome: usuario.nome, chave: gerado.chave, expiraEm: gerado.expiraEm, copiado: false })
+        focoNoCodigo = true
+      }
       else if (acao === 'desativar') await desativarUsuario(usuario.usuarioId)
       else await reativarUsuario(usuario.usuarioId)
       const perfil = estado.perfis.find((p) => p.perfilId === valor)?.nome
@@ -216,7 +270,7 @@ export function AbaUsuarios() {
     } finally {
       setOcupado(false)
       // Desativar e reativar mudam a linha de lugar: o foco vai para o título da lista.
-      setFoco({ usuarioId: acao === 'desativar' || acao === 'reativar' ? null : usuario.usuarioId })
+      if (!focoNoCodigo) setFoco({ usuarioId: acao === 'desativar' || acao === 'reativar' ? null : usuario.usuarioId })
     }
   }, [carregar, estado.perfis])
 
@@ -229,7 +283,7 @@ export function AbaUsuarios() {
     [estado.usuarios],
   )
 
-  if (estado.carregando) return <output className={css.descricao}>Carregando as pessoas…</output>
+  if (estado.carregando) return <EsqueletoDeLista linhas={4} altura="calc(var(--e-6) * 2 + var(--e-2))">Carregando as pessoas…</EsqueletoDeLista>
   if (estado.erro && !estado.carregada) {
     return (
       <Vazio titulo="A lista não carregou" role="alert" acao={<Botao onClick={recarregar}>Tentar de novo</Botao>}>
@@ -248,6 +302,7 @@ export function AbaUsuarios() {
           )}
         </div>
         {convidando && <Convite perfis={estado.perfis} aoConvidar={convidar} aoCancelar={() => setConvidando(false)} />}
+        {codigo && <CodigoGerado key={codigo.chave} codigo={codigo} aoCopiar={() => setCodigo((c) => c && { ...c, copiado: true })} aoFechar={() => setCodigo(null)} />}
         {/* Sempre montado e com a altura reservada: a lista não pula quando o aviso chega. */}
         <div className={css.aviso}>
           <output className={css.retorno} data-tom={retorno?.tom} role={retorno?.tom === 'erro' ? 'alert' : undefined}>{retorno?.texto}</output>
@@ -261,7 +316,7 @@ export function AbaUsuarios() {
         <ul ref={lista} className={css.pessoas}>
           {pessoas.map((usuario) => (
             <Pessoa
-              key={usuario.usuarioId} usuario={usuario} perfis={estado.perfis} meuId={meuId} agora={agora} ocupado={ocupado}
+              key={usuario.usuarioId} usuario={usuario} perfis={estado.perfis} meuId={meuId} souSuporte={souSuporte} agora={agora} ocupado={ocupado}
               aoAgir={agir} aoAbrirConfirmacao={limparRetorno}
             />
           ))}

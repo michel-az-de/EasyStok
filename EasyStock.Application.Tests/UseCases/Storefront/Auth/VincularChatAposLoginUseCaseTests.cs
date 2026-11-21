@@ -37,14 +37,16 @@ public sealed class VincularChatAposLoginUseCaseTests
         flags.ListarAtivasAsync(loja.EmpresaId, Arg.Any<CancellationToken>()).Returns([FeatureCatalogo.ModuloAtendimento, FeatureCatalogo.CanalChatSite]);
         var chats = Substitute.For<ISessaoChatSiteRepository>();
         chats.ObterPorTokenHashAsync(loja.EmpresaId, AcessoChatSite.HashDoToken(token), Arg.Any<CancellationToken>()).Returns(chat);
+        chats.ObterSnapshotPorTokenHashAsync(loja.EmpresaId, chat.TokenHash, Arg.Any<CancellationToken>()).Returns(chat);
         var sessoes = Substitute.For<IClienteSessionRepository>();
         sessoes.GetByIdAsync(session.Id, Arg.Any<CancellationToken>()).Returns(session);
         var conversas = Substitute.For<IConversaRepository>();
         conversas.ListarPorClienteAsync(loja.EmpresaId, session.ClienteId, 50, Arg.Any<CancellationToken>()).Returns(Array.Empty<Conversa>());
         conversas.ObterPorIdAsync(loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        conversas.ObterPorIdComLockAsync(loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
         var sut = new VincularChatAposLoginUseCase(
             new AcessoChatSite(lojas, flags, Substitute.For<ITenantContextAccessor>(), chats), sessoes,
-            new ConversaChatSiteService(conversas, new FakeUnitOfWork()), TimeProvider.System);
+            new ConversaChatSiteService(conversas, new FakeUnitOfWork(), chats), TimeProvider.System);
 
         if (!mesmoTenant && sessaoValida)
             await sut.Invoking(x => x.ExecuteAsync("casa-da-baba", session.Id, token)).Should().ThrowAsync<SessaoChatSiteInvalidaException>();

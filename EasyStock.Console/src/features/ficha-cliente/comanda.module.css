@@ -5,8 +5,8 @@
   position: relative;
   background: var(--comanda);
   border: 0;
-  border-radius: 0;
-  box-shadow: 0 3px 12px rgb(0 0 0 / 6%);
+  border-radius: var(--r-2);
+  box-shadow: var(--sombra);
   padding: var(--e-4);
   margin-bottom: var(--e-3);
   min-width: 0;
@@ -28,8 +28,7 @@
 .anotacaoCompartilhada summary, .enderecoCompartilhado summary, .historicoCompartilhado > summary { cursor: pointer; min-height: var(--toque); align-content: center; font-size: var(--t-apoio); color: var(--tinta-2); }
 .anotacaoCompartilhada summary small { display: block; padding-left: var(--e-3); color: var(--tinta); overflow-wrap: anywhere; }
 .anotacaoCompartilhada[open] summary small { display: none; }
-.anotacaoCompartilhada summary:focus-visible, .enderecoCompartilhado summary:focus-visible, .historicoCompartilhado > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-.clienteCompartilhado .estadoCompartilhado { font-size: var(--t-apoio); color: var(--tinta-2); }
+.anotacaoCompartilhada summary:focus-visible, .enderecoCompartilhado summary:focus-visible, .historicoCompartilhado > summary:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .clienteCompartilhado .totalCompartilhado { padding-block: var(--e-2); border-block: 0; }
 .salvarCompartilhado { display: flex; flex-wrap: wrap; gap: var(--e-2); position: sticky; bottom: 0; padding: var(--e-2) 0; background: var(--papel); }
 .adicionarCompartilhado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); }
@@ -37,13 +36,13 @@
 .clienteCompartilhado input, .clienteCompartilhado textarea, .clienteCompartilhado select { max-width: 100%; min-width: 0; width: 100%; min-height: var(--toque); padding: var(--e-2); border: 0; border-radius: var(--r-1); color: var(--tinta); background: var(--papel); font: inherit; }
 .comparativo { padding: var(--e-2); border-left: 0; }
 .historicoFinanceiro summary { display: list-item; min-height: var(--toque); align-content: center; cursor: pointer; color: var(--tinta); }
-.historicoFinanceiro summary:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+.historicoFinanceiro summary:focus-visible { outline: var(--b-3) solid var(--tinta); outline-offset: 2px; }
 /* #1899: aviso de situação como <output> (role status nativo), em bloco como o <p> que substituiu. */
 .avisoCompartilhado { display: block; }
 .ajudaCompartilhada { display: grid; gap: var(--e-1); margin-block: var(--e-2); padding: var(--e-2) var(--e-3); border-left: 0; background: var(--alerta-pastel); border-radius: var(--r-1); }
 .transporteCompartilhado { margin-block: var(--e-2); }
 .transporteCompartilhado > summary { min-height: var(--toque); align-content: center; cursor: pointer; font-weight: 600; }
-.transporteCompartilhado > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
+.transporteCompartilhado > summary:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .freteCompartilhado { margin-block: var(--e-3); }
 .confirmarCompartilhado { margin-block: var(--e-3); }
 
@@ -97,7 +96,7 @@
   text-align: left; cursor: pointer; border-radius: var(--r-1); min-height: var(--toque); justify-content: center;
 }
 .corpoAnotar:hover, .corpoAnotar[aria-pressed='true'] { background: var(--papel); }
-.corpoAnotar:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.corpoAnotar:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .corpoAnotar svg { color: var(--tinta-3); }
 
 /* O apontamento escrito permanece legível sem acrescentar linhas ao papel. */
@@ -176,8 +175,8 @@
    contra queda de luz ou internet até existir impressora de verdade (D6). */
 .canhotoTela { width: 360px; max-width: 100%; margin: 0 auto; }
 .canhotoAviso {
-  margin: 0 0 var(--e-2); font-size: var(--t-apoio); font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.04em; color: var(--tinta-2);
+ margin: 0 0 var(--e-2); font-size: var(--t-apoio); font-weight: 700;
+ color: var(--tinta-2);
 }
 
 /* Só a impressão fixa a largura de bobina térmica de 80 mm; sem `@page`,
@@ -233,10 +232,10 @@
 .etapaCompartilhada p { margin-bottom: 0; }
 .pedidoAtualCompartilhado { margin-block: var(--e-3); padding: var(--e-3); border: 0; border-radius: 0; }
 .pedidoAtualCompartilhado summary { min-height: var(--toque); align-content: center; cursor: pointer; font-weight: 600; }
-.pedidoAtualCompartilhado summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.pedidoAtualCompartilhado summary:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 .entregaDaSelecao { margin-block: var(--e-3); border-block: 0; }
 .entregaDaSelecao > summary { min-height: var(--toque); align-content: center; cursor: pointer; font-weight: 600; }
-.entregaDaSelecao > summary:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+.entregaDaSelecao > summary:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; }
 
 /* #1686 (item 4): o caminho para trocar item, com os botões que fazem a troca. */
 .caminhoTroca { display: grid; gap: var(--e-2); }

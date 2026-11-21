@@ -1,5 +1,6 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
@@ -42,6 +43,9 @@ public enum ResultadoExpiracaoCobranca
     /// <c>AguardandoPagamento</c> e a conversa recebe o aviso; a atendente reemite ou cancela.
     /// </summary>
     AguardandoAtendente = 7,
+
+    /// <summary>#2992: o cliente desistiu do pedido na conversa assumida. Sem link novo, sem cancelamento.</summary>
+    ClienteDesistiu = 8,
 }
 
 /// <summary>
@@ -66,6 +70,7 @@ public enum ResultadoExpiracaoCobranca
 public sealed class ProcessarCobrancaVencidaUseCase(
     IPedidoStorefrontRepository pedidoRepository,
     ICobrancaPedidoRepository cobrancaRepository,
+    IConversaRepository conversas,
     GerarCobrancaPedidoUseCase gerarCobranca,
     CancelarPedidoUseCase cancelarPedido,
     AvisoCobrancaConversa aviso,
@@ -148,6 +153,9 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         return (await ConferirPagamentoPedidoUseCase.ConsultarAsync(mercadoPagoClient, confirmarPagamento, item, ct)).Confirmado;
     }
 
+    private async Task<bool> ClienteDesistiuDoPedidoAsync(CobrancaPedidoVencida item, Guid conversaId, Guid pedidoId, CancellationToken ct) =>
+        (await conversas.ObterPorIdAsync(item.EmpresaId, conversaId, ct))?.ClienteDesistiuDoPedido(pedidoId) == true;
+
     private async Task<(ResultadoExpiracaoCobranca, Guid?, string?)> ProcessarNoLockAsync(
         CobrancaPedidoVencida item, CancellationToken ct)
     {
@@ -167,6 +175,14 @@ public sealed class ProcessarCobrancaVencidaUseCase(
         {
             await unitOfWork.CommitAsync();
             return (ResultadoExpiracaoCobranca.Expirada, null, null);
+        }
+
+        // #2992: o cliente desistiu do pedido na conversa assumida. A equipe já foi avisada na entrada; aqui não há
+        // link novo, aviso de link vencido nem cancelamento. O pedido segue AguardandoPagamento.
+        if (cobranca.ConversaId is { } conversaDaCobranca && await ClienteDesistiuDoPedidoAsync(item, conversaDaCobranca, pedido.Id, ct))
+        {
+            await unitOfWork.CommitAsync();
+            return (ResultadoExpiracaoCobranca.ClienteDesistiu, null, null);
         }
 
         if (cobranca.Tentativa < CobrancaPedido.TentativaMaxima && cobranca.ConversaId is { } conversaId)
@@ -199,7 +215,7 @@ public sealed class ProcessarCobrancaVencidaUseCase(
     public static string CorrelacaoAvisoEquipe(Guid cobrancaId) => $"cobranca-aguardando-equipe:{cobrancaId:N}";
 
     // Sem usuarioId: vale a audiência da rotina. Só primeiro nome e referência, como os avisos do Balcão.
-    private Task AvisarEquipeAsync(EasyStock.Domain.Entities.Pedido pedido, CobrancaPedido cobranca, CancellationToken ct)
+    private async Task AvisarEquipeAsync(EasyStock.Domain.Entities.Pedido pedido, CobrancaPedido cobranca, CancellationToken ct)
     {
         var payload = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>
         {
@@ -207,7 +223,10 @@ public sealed class ProcessarCobrancaVencidaUseCase(
             ["referencia"] = CodigoCurto.De(pedido.Id),
             [NotificadorService.ChaveIdempotenciaPayload] = CorrelacaoAvisoEquipe(cobranca.Id),
         });
-        return notificador.EnfileirarEventoAsync(TipoEventoNotificacao.CobrancaAguardandoEquipe, pedido.EmpresaId, payload,
+        await notificador.EnfileirarEventoAsync(TipoEventoNotificacao.CobrancaAguardandoEquipe, pedido.EmpresaId, payload,
             pedido.Id, ct, CorrelacaoAvisoEquipe(cobranca.Id));
+        // #2211: o WhatsApp da equipe inscrita.
+        await new PublicadorAvisoEquipe(notificador).ProblemaNoPagamentoAsync(pedido.EmpresaId, pedido.Id,
+            pedido.ClienteNome, "o link de pagamento venceu sem pagamento", $"vencida:{cobranca.Id:N}", ct);
     }
 }

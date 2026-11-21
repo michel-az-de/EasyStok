@@ -108,4 +108,49 @@ public class DinheiroTests
 
         str.Should().Be("10.50");
     }
+
+    // #2373: o rateio por lote arredondava cada lote e perdia o centavo da soma.
+    [Fact]
+    public void Ratear_tres_lotes_de_um_terco_soma_o_total_e_o_residuo_vai_para_o_ultimo()
+    {
+        var partes = Dinheiro.Ratear(10m, new[] { 0.3333m, 0.3333m, 0.3334m });
+
+        partes.Select(p => p.Valor).Should().Equal(3.33m, 3.33m, 3.34m);
+        partes.Sum(p => p.Valor).Should().Be(10.00m);
+    }
+
+    [Fact]
+    public void Ratear_um_lote_so_e_o_preco_vezes_a_quantidade()
+    {
+        Dinheiro.Ratear(2.50m, new[] { 3m }).Select(p => p.Valor).Should().Equal(7.50m);
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(100)]
+    public void Ratear_meios_centavos_nao_ultrapassa_o_total(int quantidadeDeLotes)
+    {
+        var quantidades = Enumerable.Repeat(0.5m, quantidadeDeLotes).ToArray();
+
+        var partes = Dinheiro.Ratear(0.01m, quantidades);
+
+        partes.Should().HaveCount(quantidadeDeLotes);
+        partes.Should().OnlyContain(parte => parte.Valor >= 0m);
+        partes.Sum(parte => parte.Valor).Should().Be(0.01m * quantidadeDeLotes / 2);
+    }
+
+    [Fact]
+    public void Ratear_sem_lotes_devolve_lista_vazia()
+    {
+        Dinheiro.Ratear(10m, Array.Empty<decimal>()).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(10.005, 10.01)]
+    [InlineData(10.015, 10.02)]
+    public void Arredondar_e_meio_para_longe_do_zero(decimal valor, decimal esperado)
+    {
+        Dinheiro.Arredondar(valor).Should().Be(esperado);
+    }
 }

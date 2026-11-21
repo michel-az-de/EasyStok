@@ -109,8 +109,14 @@ export const deveCarregarDossie = (conversa) => Boolean(conversa?.clienteId && !
 
 // Aviso da faixa quando o cardápio da vitrine não vem (#1474): a vitrine desligada é um 404
 // com texto técnico; a dona precisa saber o que ligar.
+// #2596: o mesmo 404 aparece em Cardápio, Banco de imagens e Produção num inquilino sem loja
+// online. Quem precisa trocar o erro cru por um vazio com o próximo passo testa por aqui.
+// #2598: a API diz pelo código, nunca pela mensagem. A escrita responde 404 VITRINE_DESLIGADA e a leitura 200 vazio com
+// meta.lojaDisponivel=false, que `lerDaLoja` (infra/api/cliente) transforma no mesmo erro.
+export const lojaDesligada = (erro) => erro?.codigo === 'VITRINE_DESLIGADA'
+
 export function avisoDoCardapio(erro) {
-  if (erro?.status === 404 && /vitrine ativa/i.test(erro.message ?? '')) {
+  if (lojaDesligada(erro)) {
     return 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.'
   }
   return `Cardápio: ${erro?.message ?? 'não carregou.'}`
@@ -129,4 +135,19 @@ export function alvoDoEvento(evento, dados) {
   if (evento === 'conversa.comanda_atualizada' && dados?.conversaId) return { tipo: 'comanda', conversaId: dados.conversaId }
   if (evento === 'conversa.atualizada' && dados?.conversaId) return { tipo: 'conversa', conversaId: dados.conversaId }
   return null
+}
+
+// #2285: o SSE da operação não repete o que passou enquanto ficou caído (`Last-Event-ID` é ignorado na API).
+// O `ready` que chega depois de uma queda é o aviso de que pode ter faltado evento: aí o laço relê a conversa
+// aberta e varre a inbox, sem esperar o ritmo de sempre. O primeiro `ready` da visita não perdeu nada.
+export function criarRastroDaConexao() {
+  let caiu = false
+  return {
+    aoCair() { caiu = true },
+    aoReady() {
+      const precisaRele = caiu
+      caiu = false
+      return precisaRele
+    },
+  }
 }

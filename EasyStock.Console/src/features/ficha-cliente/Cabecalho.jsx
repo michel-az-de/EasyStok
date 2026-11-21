@@ -1,5 +1,6 @@
 import { horaCurta } from '../../dominio/formato'
 import { numeroCurto } from '../../dominio/pedido'
+import { apresentacaoDoNome } from '../../dominio/nomeDoContato'
 import css from './comanda.module.css'
 
 // Cabeçalho da comanda, reusado pelo canhoto (mesmo desenho, seção 7): o
@@ -12,12 +13,13 @@ export function Cabecalho({ numero, nomeCliente, faixa, enviadaEm, semJanela = f
   return (
     <header className={css.cabecalho}>
       <div className={css.linhaCabecalho}>
-        <h2>Comanda</h2>
+        <h2>Pedido</h2>
         <span className={css.numero}>{numero == null ? 'Rascunho' : `Nº ${numeroCurto(numero)}`}</span>
       </div>
       <p className={css.subCabecalho}>
         {/* #1474: só a janela escolhida; sem escolha, o aviso "Sem janela". */}
-        {nomeCliente}{faixa && ` · Janela ${faixa}`}
+        {/* #2258 (T4): o mesmo nome do cartão e dos botões "Abrir". */}
+        {apresentacaoDoNome(nomeCliente).rotulo}{faixa && ` · Janela ${faixa}`}
         {!faixa && semJanela && <span className={css.semJanela}> · Sem janela</span>}
         {enviadaEm != null && ` · Enviada ${horaCurta(enviadaEm)}`}
       </p>

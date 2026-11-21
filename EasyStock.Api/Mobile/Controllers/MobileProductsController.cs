@@ -1,5 +1,8 @@
 using System.Security.Claims;
+using EasyStock.Api.Mobile.DTOs;
+using EasyStock.Api.Mobile.Services;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Specifications;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Controllers;
@@ -50,7 +53,7 @@ public class MobileProductsController(
             Category: p.Category,
             Unit: p.Unit,
             Price: p.Price,
-            Stock: p.Stock,
+            Stock: SaldoSemZerosFinaisJsonConverter.SemZerosFinais(p.Stock),
             IsCustom: p.IsCustom,
             IsApproved: p.IsApproved,
             ErpProductId: p.ErpProductId,
@@ -70,6 +73,7 @@ public class MobileProductsController(
     /// precisa entrar no catálogo principal.
     /// </summary>
     [HttpPost("{id}/approve")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Approve(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -94,6 +98,7 @@ public class MobileProductsController(
     /// for ativada — também valor de estoque.
     /// </summary>
     [HttpPost("{id}/link")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Link(string id, [FromBody] LinkRequest req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (req == null || req.ErpProductId == Guid.Empty)
@@ -154,15 +159,14 @@ public class MobileProductsController(
             .Where(i => i.EmpresaId == emp && produtoIds.Contains(i.ProdutoId))
             .ToListAsync(ct);
 
-        // Match (ProdutoId, LojaId) — se LojaId é null no ItemEstoque, casa
-        // com qualquer mobile. Senão exige loja igual.
+        // Match (ProdutoId, loja): item sem loja pertence a qualquer loja da empresa (EstoqueDaLoja, #2318).
         var divergences = new List<StockDivergence>();
         foreach (var mp in mobileLinked)
         {
-            var item = itensEstoque.FirstOrDefault(i =>
-                i.ProdutoId == mp.ErpProductId &&
-                (i.LojaId == null || i.LojaId == mp.LojaId));
-            var erpStock = item?.QuantidadeAtual?.Value ?? 0;
+            // PROD-4 (#2318): compara a soma do estoque da loja, nao um unico lote.
+            var itensDaLoja = EstoqueDaLojaMobile.ItensDaLoja(itensEstoque, mp.ErpProductId!.Value, mp.LojaId).ToList();
+            var item = itensDaLoja.FirstOrDefault();
+            var erpStock = EstoqueDaLojaMobile.Soma(itensDaLoja, mp.ErpProductId!.Value, mp.LojaId);
             if (mp.Stock == erpStock) continue; // bate, sem divergência
             divergences.Add(new StockDivergence(
                 MobileProductId: mp.Id,
@@ -170,9 +174,9 @@ public class MobileProductsController(
                 Emoji: mp.Emoji,
                 ErpProductId: mp.ErpProductId!.Value,
                 LojaId: mp.LojaId,
-                MobileStock: mp.Stock,
-                ErpStock: (int)erpStock,
-                Delta: (int)erpStock - mp.Stock,
+                MobileStock: SaldoSemZerosFinaisJsonConverter.SemZerosFinais(mp.Stock),
+                ErpStock: SaldoSemZerosFinaisJsonConverter.SemZerosFinais(erpStock),
+                Delta: SaldoSemZerosFinaisJsonConverter.SemZerosFinais(erpStock - mp.Stock),
                 ItemEstoqueExists: item != null,
                 LastDeviceId: mp.LastDeviceId,
                 LastOperatorName: mp.LastOperatorName,
@@ -190,35 +194,47 @@ public class MobileProductsController(
     public async Task<IActionResult> ReconcileStock(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
+        // #2448: mesma permissão do ajuste de desacerto no web (EstoqueDesacertosController.Ajustar).
+        if (!CurrentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
         var product = await _db.Set<Product>().FirstOrDefaultAsync(p => p.Id == id && p.EmpresaId == emp, ct);
         if (product == null) return NotFound();
         if (product.ErpProductId == null)
             return BadRequest(new { error = "Produto não está linkado ao ERP" });
 
-        var item = await _db.Set<ItemEstoque>().AsNoTracking().FirstOrDefaultAsync(i =>
-            i.EmpresaId == product.EmpresaId &&
-            i.ProdutoId == product.ErpProductId &&
-            (i.LojaId == null || i.LojaId == product.LojaId), ct);
+        // PROD-4 (#2318): mesma soma por (ProdutoId, LojaId) da lista de divergencias.
+        var itensDaLoja = await _db.Set<ItemEstoque>().AsNoTracking()
+            .Where(i => i.EmpresaId == product.EmpresaId && i.ProdutoId == product.ErpProductId)
+            .Where(EstoqueDaLoja.Pertence(product.LojaId))
+            .ToListAsync(ct);
 
-        if (item == null)
+        if (itensDaLoja.Count == 0)
             return BadRequest(new { error = "ItemEstoque não existe no ERP. Crie o estoque inicial primeiro." });
 
         var oldStock = product.Stock;
-        product.Stock = (int)(item.QuantidadeAtual?.Value ?? 0m);
+        product.Stock = EstoqueDaLojaMobile.Soma(itensDaLoja, product.ErpProductId.Value, product.LojaId);
         product.UpdatedAt = DateTime.UtcNow;
+        // Alteração do servidor deve chegar também ao aparelho que gravou o saldo anterior.
+        product.LastDeviceId = null;
         await _db.SaveChangesAsync(ct);
 
+        // id vem da rota: sem quebra de linha para nao forjar entrada de log.
+        var idLog = id.Replace("\r", string.Empty).Replace("\n", string.Empty);
         _log.LogInformation(
-            "Reconcile stock: mobile_product {Id} {Old}→{New} (ERP item={ItemId})",
-            id, oldStock, product.Stock, item.Id);
+            "Reconcile stock: mobile_product {Id} {Old}→{New} (ERP itens={Itens})",
+            idLog, oldStock, product.Stock, itensDaLoja.Count);
 
-        return Ok(new { mobileStock = product.Stock, previousStock = oldStock });
+        return Ok(new
+        {
+            mobileStock = SaldoSemZerosFinaisJsonConverter.SemZerosFinais(product.Stock),
+            previousStock = SaldoSemZerosFinaisJsonConverter.SemZerosFinais(oldStock)
+        });
     }
 
     /// <summary>
     /// Desfaz a aprovação/link. Útil em caso de erro de operador.
     /// </summary>
     [HttpPost("{id}/unlink")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -253,7 +269,7 @@ public record MobileProductSummary(
     string Category,
     string? Unit,
     decimal? Price,
-    int Stock,
+    decimal Stock,
     bool IsCustom,
     bool IsApproved,
     Guid? ErpProductId,
@@ -277,9 +293,9 @@ public record StockDivergence(
     string? Emoji,
     Guid ErpProductId,
     Guid? LojaId,
-    int MobileStock,
-    int ErpStock,
-    int Delta,
+    decimal MobileStock,
+    decimal ErpStock,
+    decimal Delta,
     bool ItemEstoqueExists,
     string? LastDeviceId,
     string? LastOperatorName,

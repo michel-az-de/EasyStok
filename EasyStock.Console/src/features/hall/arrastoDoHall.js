@@ -30,3 +30,22 @@ export function useCliqueAposArrasto() {
     onClickCapture: (evento) => { if (arrastou.current) { evento.preventDefault(); evento.stopPropagation() } },
   }
 }
+
+// #2762 (B14): a transição do arrastar vem dos tokens (`--dur-curta`, `--ease-saida`), não de literais em JS.
+// Lê uma vez; sem documento (prova em servidor) ou sem o token, cai nos mesmos valores do tokens.css.
+let transicao = null
+export function transicaoDoArrasto() {
+  if (transicao) return transicao
+  let duration = 150
+  let easing = 'cubic-bezier(.16, 1, .3, 1)'
+  if (typeof document !== 'undefined' && typeof getComputedStyle === 'function') {
+    const estilo = getComputedStyle(document.documentElement)
+    const dur = Number.parseFloat(estilo.getPropertyValue('--dur-curta'))
+    const curva = estilo.getPropertyValue('--ease-saida').trim()
+    if (Number.isFinite(dur) && dur > 0) duration = dur
+    if (curva) easing = curva
+    transicao = { duration, easing }
+    return transicao
+  }
+  return { duration, easing }
+}

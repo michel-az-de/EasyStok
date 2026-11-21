@@ -3,18 +3,21 @@ import { Modal } from '../../../componentes/Modal'
 import { Botao } from '../../../componentes/Botao'
 import { Vazio } from '../../../componentes/Vazio'
 import { CampoTexto } from '../../../componentes/Campo'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Pilula } from '../../../componentes/Pilula'
 import { useSecoesCardapioApi } from '../../../aplicacao/useSecoesCardapioApi'
 import { resumoCategoriasAntigas } from '../../../aplicacao/gestaoSecoes'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
+// #2792: o limite de 100 (espelha o servidor) avisa no campo e trava o envio, em vez de cortar o texto colado.
 import css from './abaCardapio.module.css'
 
 // M1 › Categorias (M1.3, #1483). As categorias que o cliente vê no site e que agrupam a comanda,
 // na ordem que ela define. Renomear, esconder (sem apagar os pratos), subir/descer e excluir só a
-// vazia. "Converter as categorias antigas" cria uma categoria por texto livre que os pratos já
+// vazia (#2656: o Excluir parado diz o motivo e o Ocultar nomeia a categoria). "Converter as categorias antigas" cria uma categoria por texto livre que os pratos já
 // tinham e liga cada prato a ela; pode rodar de novo sem duplicar. #1803: enquanto houver prato só
 // com o texto antigo, a tela diz quais categorias são e o que a conversão faz (prévia do servidor).
-function LinhaCategoria({ secao, primeira, ultima, gestao }) {
+export function LinhaCategoria({ secao, primeira, ultima, gestao }) {
   const [editando, setEditando] = useState(false)
   const [nome, setNome] = useState(secao.nome)
   const [ocupado, setOcupado] = useState(false)
@@ -31,7 +34,7 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
   }
 
   return (
-    <li className={css.linha} aria-busy={ocupado}>
+    <li className={`${css.linha} ${css.linhaCategoria}`} aria-busy={ocupado}>
       {editando && <Modal titulo={`Renomear ${secao.nome}`} aoFechar={ocupado ? undefined : () => setEditando(false)}>
         <form className={css.resumo} onSubmit={salvar}>
           <CampoTexto
@@ -39,11 +42,11 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
             aria-label={`Novo nome de ${secao.nome}`}
             value={nome}
             disabled={ocupado}
-            maxLength={100}
+            limite={100}
             onChange={(e) => setNome(e.target.value)}
           />
           {gestao.aviso && <p role="alert" className={css.aviso}>{gestao.aviso}</p>}
-          <div className={css.acoes}><Botao disabled={ocupado} onClick={() => setEditando(false)}>Cancelar</Botao><Botao tipo="submit" variante="primario" disabled={ocupado || !nome.trim()}>Salvar nome</Botao></div>
+          <div className={css.acoes}><Botao disabled={ocupado} onClick={() => setEditando(false)}>Cancelar</Botao><Botao tipo="submit" variante="primario" disabled={ocupado || !nome.trim() || algumPassaDoLimite([nome, 100])}>Salvar nome</Botao></div>
         </form>
       </Modal>}
         <div className={css.resumo}>
@@ -56,24 +59,24 @@ function LinhaCategoria({ secao, primeira, ultima, gestao }) {
       <div className={css.acoes}>
           <>
             <Botao variante="texto" icone="lapis" disabled={ocupado} aria-label={`Renomear ${secao.nome}`} aria-haspopup="dialog" onClick={() => { setNome(secao.nome); gestao.fecharAviso(); setEditando(true) }}>Renomear</Botao>
-            <Botao variante="texto" disabled={ocupado} onClick={() => fazer(() => gestao.alternarVisivel(secao.id))}>
+            <Botao variante="texto" icone={secao.visivel ? 'ocultoNoSite' : 'globo'} disabled={ocupado} aria-label={`${secao.visivel ? 'Ocultar' : 'Mostrar'} ${secao.nome} no site`}
+              onClick={() => fazer(() => gestao.alternarVisivel(secao.id))}>
               {secao.visivel ? 'Ocultar no site' : 'Mostrar no site'}
             </Botao>
             <Botao
-              className={css.acaoDiscreta}
               variante="texto"
               icone="lixeira"
               disabled={ocupado || secao.itens > 0}
               aria-label={`Excluir ${secao.nome}`}
-              title={secao.itens > 0 ? 'Mude os pratos de categoria antes de excluir' : undefined}
+              motivo={secao.itens > 0 ? 'Mude os pratos de categoria antes de excluir' : undefined}
               onClick={() => fazer(() => gestao.excluir(secao.id))}
             >
               Excluir
             </Botao>
             <span className={css.ordem}>
-              <Botao className={css.acaoDiscreta} variante="texto" icone="chevron-up" aria-label={`Subir ${secao.nome}`}
+              <Botao variante="texto" icone="chevron-up" aria-label={`Subir ${secao.nome}`}
                 disabled={primeira || ocupado} onClick={() => fazer(() => gestao.mover(secao.id, 'subir'))} />
-              <Botao className={css.acaoDiscreta} variante="texto" icone="chevron-down" aria-label={`Descer ${secao.nome}`}
+              <Botao variante="texto" icone="chevron-down" aria-label={`Descer ${secao.nome}`}
                 disabled={ultima || ocupado} onClick={() => fazer(() => gestao.mover(secao.id, 'descer'))} />
             </span>
           </>
@@ -103,8 +106,9 @@ export function AbaCategoriasApi() {
     Promise.resolve(gestao.criar(nova)).then((ok) => { if (ok !== false) { setNova(''); setCadastroAberto(false) } }).finally(() => setCriando(false))
   }
 
-  if (gestao.estado === 'carregando') return <output className={css.descricao}>Carregando as categorias…</output>
+  if (gestao.estado === 'carregando') return <EsqueletoDeLista linhas={4} altura="calc(var(--toque) * 2)">Carregando as categorias…</EsqueletoDeLista>
   if (gestao.estado === 'erro' && gestao.secoes.length === 0) {
+    if (gestao.semLoja) return <Vazio icone="globo" titulo="A loja online ainda não está ligada">A loja online desta empresa ainda não está ligada. Peça ao suporte do EasyStok para ligar.</Vazio>
     return (
       <Vazio icone="alerta" role="alert" titulo="Não foi possível carregar as categorias"
         acao={<Botao icone="refresh-cw" onClick={gestao.recarregar}>Tentar de novo</Botao>}>
@@ -133,24 +137,30 @@ export function AbaCategoriasApi() {
         As categorias não foram atualizadas. A lista abaixo pode estar desatualizada. {gestao.erro}
         {' '}<Botao variante="texto" icone="refresh-cw" onClick={gestao.recarregar}>Recarregar categorias</Botao>
       </p>}
+      {/* #2424: descrição curta e "Nova categoria" secundário no topo; a regra de ocultar e excluir mora no "Sobre". */}
       <div className={css.topo}>
-        <p className={css.descricao}>
-          As categorias que o cliente vê no site e que agrupam a comanda, nesta ordem. Ocultar tira a categoria
-          inteira do site sem apagar os pratos. Só dá para excluir categoria vazia.
-        </p>
-        {!antigas && !gestao.previa && (
-          <Botao disabled={convertendo} onClick={converter}>{convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}</Botao>
-        )}
+        <p className={css.descricao}>Organize os pratos no site e no pedido.</p>
+        <div className={css.acoesDireita}>
+          {!antigas && !gestao.previa && (
+            <Botao variante="texto" disabled={convertendo} onClick={converter}>{convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}</Botao>
+          )}
+          <Botao icone="mais" aria-haspopup="dialog" onClick={() => { gestao.fecharAviso(); setCadastroAberto(true) }}>Nova categoria</Botao>
+        </div>
       </div>
 
       {antigas && (
-        <section className={css.secao} aria-labelledby="categorias-antigas">
-          <p id="categorias-antigas" className={css.nome}>{antigas.texto}</p>
-          <p id="efeito-conversao" className={css.descricao}>{antigas.efeito}</p>
-          <div>
-            <Botao variante={gestao.secoes.length === 0 ? 'primario' : undefined} disabled={convertendo}
+        <section className={css.antigas} aria-labelledby="categorias-antigas" aria-describedby="resumo-antigas">
+          <div className={css.cabecalhoAntigas}>
+            <h3 id="categorias-antigas" className={css.tituloSecao}>{antigas.titulo}</h3>
+            <Pilula tom="aviso">Conversão pendente</Pilula>
+          </div>
+          <p id="resumo-antigas" className={css.descricao}>{antigas.subtitulo}<span className="sr"> {antigas.texto}</span></p>
+          <ul className={css.nomesAntigos}>{antigas.nomes.map((nome) => <li key={nome}>{nome}</li>)}</ul>
+          <div className={css.converter}>
+            <p id="efeito-conversao" className={css.descricao}>{antigas.efeito}</p>
+            <Botao variante="primario" disabled={convertendo}
               aria-describedby="efeito-conversao" onClick={converter}>
-              {convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}
+              {convertendo ? 'Convertendo…' : antigas.botao}
             </Botao>
           </div>
         </section>
@@ -162,18 +172,17 @@ export function AbaCategoriasApi() {
         </output>
       )}
 
-      <Botao variante="primario" icone="mais" aria-haspopup="dialog" onClick={() => { gestao.fecharAviso(); setCadastroAberto(true) }}>Nova categoria</Botao>
       {cadastroAberto && <Modal titulo="Nova categoria do cardápio" aoFechar={criando ? undefined : () => setCadastroAberto(false)}><form className={`${css.campos} ${css.formulario} ${css.cadastroCurto}`} onSubmit={criar}>
         <CampoTexto
           rotulo="Nome da nova categoria"
           placeholder="Nova categoria (ex.: Massas)"
-          maxLength={100}
+          limite={100}
           value={nova}
           disabled={criando}
           onChange={(e) => setNova(e.target.value)}
         />
         {gestao.aviso && <p className={css.aviso} role="alert">{gestao.aviso}</p>}
-        <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim()}>{criando ? 'Criando…' : 'Criar categoria'}</Botao>
+        <Botao tipo="submit" variante="primario" icone="plus" disabled={criando || !nova.trim() || algumPassaDoLimite([nova, 100])}>{criando ? 'Criando…' : 'Criar categoria'}</Botao>
       </form></Modal>}
 
       {gestao.secoes.length === 0 ? (!antigas && (
@@ -195,6 +204,10 @@ export function AbaCategoriasApi() {
           ))}
         </ol>
       )}
+      <details className={css.saibaMais}>
+        <summary>Sobre ocultar e excluir categorias</summary>
+        <p>A ordem desta lista é a do site e do pedido. Ocultar tira a categoria inteira do site sem apagar os pratos. Só dá para excluir categoria vazia.</p>
+      </details>
     </div>
   )
 }

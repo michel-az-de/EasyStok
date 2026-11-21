@@ -16,9 +16,10 @@ public class ObterClienteDetalhesUseCase(IClienteRepository repo)
         if (c == null) return null;
 
         var alteracoes = await repo.GetAlteracoesAsync(c.Id, q.MaxAlteracoes);
+        var metricas = await repo.ObterMetricasPedidosAsync(q.EmpresaId, c.Id);
 
         return new ClienteDetalheResult(
-            CriarClienteUseCase.Map(c),
+            CriarClienteUseCase.Map(c) with { OrderCount = metricas.OrderCount, LastOrderAt = metricas.LastOrderAt },
             c.Enderecos.Select(e => new ClienteEnderecoResult(
                 e.Id, e.ClienteId, e.Tipo, e.Logradouro, e.Numero, e.Complemento,
                 e.Bairro, e.Cidade, e.Estado, e.Cep, e.Pais, e.Referencia,

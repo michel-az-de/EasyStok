@@ -9,7 +9,7 @@ using EasyStock.Domain.Enums.Atendimento;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 /// <param name="UsuarioNome">Nome de quem agiu, para as notas internas que a dona lê no fio (#1474: nunca o id).</param>
-public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string? UsuarioNome = null)
+public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string? UsuarioNome = null, bool Confirmada = false)
 {
     /// <summary>Nome para a nota; sem nome, "a equipe" (o id não diz nada a quem lê).</summary>
     public string QuemAgiu => string.IsNullOrWhiteSpace(UsuarioNome) ? "a equipe" : UsuarioNome.Trim();
@@ -23,26 +23,31 @@ public sealed record AcaoConversaCommand(Guid EmpresaId, Guid UsuarioId, Guid Co
 public sealed class GerenciarConversaAtendimentoUseCase(
     IConversaRepository conversaRepository, IUnitOfWork unitOfWork, IPublicadorEventoIntegracao? publicador = null,
     IQueueService? fila = null, ResolvedorCanal? resolvedorCanal = null,
-    ILogger<GerenciarConversaAtendimentoUseCase>? logger = null)
+    ILogger<GerenciarConversaAtendimentoUseCase>? logger = null, IClienteRepository? clientes = null,
+    IAtendenteRepository? atendentes = null)
 {
     public const string PrefixoLiberacao = "atendimento automático retomado por ";
 
     public Task<ConversaSituacaoResult> AssumirAsync(AcaoConversaCommand command, CancellationToken ct = default) =>
-        ExecutarAsync(command, (conversa, agora) =>
+        ExecutarAsync(command, async (conversa, agora) =>
         {
+            await GuardaAtribuicaoConversa.GarantirAsync(atendentes, conversa, command.UsuarioId, command.Confirmada, ct);
             conversa.Assumir(agora, command.UsuarioId);
-            return Task.CompletedTask;
         }, ct);
 
     /// <summary>Volta a <see cref="SituacaoConversa.Automatica"/> e deixa nota interna com quem liberou.</summary>
     public async Task<ConversaSituacaoResult> LiberarAutomaticoAsync(AcaoConversaCommand command, CancellationToken ct = default)
     {
         var retomou = false;
-        var resultado = await ExecutarAsync(command, (conversa, agora) =>
+        var resultado = await ExecutarAsync(command, async (conversa, agora) =>
         {
             retomou = conversa.Situacao != SituacaoConversa.Automatica;
             conversa.LiberarAutomatico();
-            return conversaRepository.AddMensagemAsync(
+            // #2249: devolver ao robô também devolve a pessoa encaminhada à responsável.
+            if (clientes is not null && conversa.ClienteId is { } clienteId
+                && await clientes.GetByIdAsync(command.EmpresaId, clienteId) is { AtendimentoAutomaticoPausado: true } cliente)
+                cliente.RetomarAtendimentoAutomatico(agora);
+            await conversaRepository.AddMensagemAsync(
                 Mensagem.Saida(command.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora,
                     TipoConteudoMensagem.Texto, PrefixoLiberacao + command.QuemAgiu),
                 ct);

@@ -1,3 +1,4 @@
+using EasyStock.Infra.Notifications.Hosting;
 using System.Diagnostics.Metrics;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Services.Notifications;
@@ -29,6 +30,7 @@ public sealed class EndpointHealthMonitorService(
     IOptions<WorkerOptions> options,
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration,
+    LoopsDoWorker loops,
     ILogger<EndpointHealthMonitorService> logger) : BackgroundService
 {
     // PEHM = Plataforma Endpoint Health Monitor
@@ -52,8 +54,11 @@ public sealed class EndpointHealthMonitorService(
 
         var intervalSeconds = Math.Max(60, options.Value.EndpointHealthIntervalSeconds);
 
+        loops.Iniciar("endpoint-health", TimeSpan.FromSeconds(intervalSeconds)); // #2536: arquivo de vida do Worker
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            loops.Bater("endpoint-health");
             try
             {
                 await TickAsync(stoppingToken);

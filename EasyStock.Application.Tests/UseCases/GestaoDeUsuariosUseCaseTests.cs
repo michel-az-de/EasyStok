@@ -19,6 +19,7 @@ public class GestaoDeUsuariosUseCaseTests
     private readonly IUsuarioEmpresaRepository _vinculos = Substitute.For<IUsuarioEmpresaRepository>();
     private readonly IUsuarioPerfilRepository _usuariosPerfis = Substitute.For<IUsuarioPerfilRepository>();
     private readonly IPerfilRepository _perfis = Substitute.For<IPerfilRepository>();
+    private readonly ILojaRepository _lojas = Substitute.For<ILojaRepository>();
     private readonly IAssinaturaEmpresaRepository _assinaturas = Substitute.For<IAssinaturaEmpresaRepository>();
     private readonly List<UsuarioPerfil> _removidos = [];
     private readonly List<UsuarioPerfil> _adicionados = [];
@@ -35,6 +36,11 @@ public class GestaoDeUsuariosUseCaseTests
         _atual.Nivel.Returns(NivelAcesso.Admin);
         _usuariosPerfis.RemoveAsync(Arg.Do<UsuarioPerfil>(_removidos.Add)).Returns(Task.CompletedTask);
         _usuariosPerfis.AddAsync(Arg.Do<UsuarioPerfil>(_adicionados.Add)).Returns(Task.CompletedTask);
+        _c.Usuarios.AtualizarSessoesValidasDesdeAsync(Arg.Any<Guid>(), Arg.Any<DateTime>()).Returns(_ =>
+        {
+            _c.UnitOfWork.EmTransacao.Should().BeTrue("corte e alteração do acesso precisam do mesmo commit");
+            return 1;
+        });
     }
 
     private Usuario Atendente(bool ativo = true, params Perfil[] perfis)
@@ -66,7 +72,7 @@ public class GestaoDeUsuariosUseCaseTests
         _c.Usuarios, _vinculos, _assinaturas, _atual, _c.Auditoria, _c.UnitOfWork, Substitute.For<ILogger<ReativarUsuarioUseCase>>());
 
     private AtribuirPerfilUsuarioUseCase Atribuir() => new(
-        _c.Usuarios, _usuariosPerfis, _perfis, _c.Revogador(), _atual, _c.Auditoria, _c.UnitOfWork,
+        _c.Usuarios, _usuariosPerfis, _perfis, _lojas, _c.Revogador(), _atual, _c.Auditoria, _c.UnitOfWork,
         Substitute.For<ILogger<AtribuirPerfilUsuarioUseCase>>());
 
     [Fact]
@@ -145,6 +151,54 @@ public class GestaoDeUsuariosUseCaseTests
         _c.UnitOfWork.CommitCount.Should().Be(0);
     }
 
+    // #2695: a conta interna do sync móvel nasce com Ativo = false e o vínculo ativo (MobileSystemUserResolver).
+    private Usuario ContaDoSyncMovel()
+    {
+        var conta = Usuario.CriarContaDeSistema(_empresaId);
+        var vinculo = new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = conta.Id, EmpresaId = _empresaId, Ativo = true };
+        conta.Empresas.Add(vinculo);
+        _c.Usuarios.GetByIdAsync(conta.Id).Returns(conta);
+        _vinculos.GetByUsuarioEEmpresaAsync(conta.Id, _empresaId).Returns(vinculo);
+        return conta;
+    }
+
+    [Fact]
+    public async Task ReativarContaDeSistemaRecusaEmVezDeFingirQueReativou()
+    {
+        var conta = ContaDoSyncMovel();
+
+        var acao = () => Reativar().ExecuteAsync(new ReativarUsuarioCommand(conta.Id, _empresaId));
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("CONTA_DE_SISTEMA");
+        _c.Auditorias.Should().BeEmpty();
+        _c.UnitOfWork.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DesativarContaDeSistemaRecusaENaoDesligaOSyncMovel()
+    {
+        var conta = ContaDoSyncMovel();
+
+        var acao = () => Desativar().ExecuteAsync(new DesativarUsuarioCommand(conta.Id, _empresaId));
+
+        (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("CONTA_DE_SISTEMA");
+        conta.Empresas.Single().Ativo.Should().BeTrue("o sync móvel grava com este vínculo");
+        _c.Auditorias.Should().BeEmpty();
+    }
+
+    // #2695 (devolução da #2696): pessoa gravada com o domínio antes da guarda segue desativável.
+    [Fact]
+    public async Task PessoaComODominioReservadoSegueDesativavel()
+    {
+        var fulano = Atendente();
+        fulano.Email = "fulano@system.local";
+
+        await Desativar().ExecuteAsync(new DesativarUsuarioCommand(fulano.Id, _empresaId));
+
+        fulano.Empresas.Single().Ativo.Should().BeFalse();
+        _c.Auditorias.Should().ContainSingle(a => a.Acao == "usuario-desativado");
+    }
+
     [Fact]
     public async Task ReativarUsuarioDeOutraEmpresaNaoAchaNada()
     {
@@ -196,5 +250,46 @@ public class GestaoDeUsuariosUseCaseTests
 
         (await acao.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("USUARIO_PROPRIO");
         _adicionados.Should().BeEmpty();
+    }
+    [Fact]
+    public async Task AdminNaoAtribuiPerfilAUsuarioSemVinculoComAEmpresa()
+    {
+        // #2448: a rota confere só a empresa de quem chama; o usuário alvo também precisa ser da empresa.
+        var cozinha = NovoPerfil("Cozinha");
+        var deFora = Usuario.Criar("Bia", "bia@outra.com", "$2a$11$hash");
+        deFora.Empresas.Add(new UsuarioEmpresa { Id = Guid.NewGuid(), UsuarioId = deFora.Id, EmpresaId = Guid.NewGuid(), Ativo = true });
+        _c.Usuarios.GetByIdAsync(deFora.Id).Returns(deFora);
+
+        var acao = () => Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(deFora.Id, _empresaId, cozinha.Id, null));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>();
+        _adicionados.Should().BeEmpty();
+        _c.Auditorias.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task NaoAtribuiPerfilComLojaDeOutraEmpresa()
+    {
+        var cozinha = NovoPerfil("Cozinha");
+        var ana = Atendente();
+        var lojaDeOutraEmpresa = Guid.NewGuid();
+
+        var acao = () => Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(ana.Id, _empresaId, cozinha.Id, lojaDeOutraEmpresa));
+
+        await acao.Should().ThrowAsync<UseCaseValidationException>();
+        _adicionados.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AtribuiPerfilComLojaDaEmpresa()
+    {
+        var cozinha = NovoPerfil("Cozinha");
+        var ana = Atendente();
+        var loja = new Loja { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Centro" };
+        _lojas.GetByIdAsync(_empresaId, loja.Id).Returns(loja);
+
+        await Atribuir().ExecuteAsync(new AtribuirPerfilUsuarioCommand(ana.Id, _empresaId, cozinha.Id, loja.Id));
+
+        _adicionados.Should().ContainSingle().Which.LojaId.Should().Be(loja.Id);
     }
 }

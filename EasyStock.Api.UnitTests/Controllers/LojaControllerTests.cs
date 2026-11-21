@@ -38,7 +38,7 @@ public class LojaControllerTests
         _criarUseCase = new CriarLojaUseCase(_lojaRepository, _assinaturaRepository, _unitOfWork, _criarLogger);
         _atualizarUseCase = new AtualizarLojaUseCase(_lojaRepository, _unitOfWork, _atualizarLogger);
         _desativarUseCase = new DesativarLojaUseCase(_lojaRepository, _unitOfWork, _desativarLogger);
-        var reativarUseCase = new ReativarLojaUseCase(_lojaRepository, _unitOfWork, Substitute.For<ILogger<ReativarLojaUseCase>>());
+        var reativarUseCase = new ReativarLojaUseCase(_lojaRepository, Substitute.For<IAssinaturaEmpresaRepository>(), _unitOfWork, Substitute.For<ILogger<ReativarLojaUseCase>>());
         _listarUseCase = new ListarLojasUseCase(_lojaRepository);
 
         _currentUser.Nivel.Returns(NivelAcesso.SuperAdmin);

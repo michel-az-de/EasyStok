@@ -1,3 +1,4 @@
+using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Infra.Postgre.Concurrency;
 using EasyStock.Infra.Postgre.Notifications.Agendamento;
 using Microsoft.Extensions.Options;
@@ -23,6 +24,7 @@ public sealed class AgendamentoNotificacaoService(
     IServiceProvider serviceProvider,
     LembretesPedidoAgendadoTick tick,
     IOptions<WorkerOptions> options,
+    LoopsDoWorker loops,
     ILogger<AgendamentoNotificacaoService> logger) : BackgroundService
 {
     private const long LockId = 0x5045_4147_4E00_0001L;
@@ -33,8 +35,11 @@ public sealed class AgendamentoNotificacaoService(
 
         var intervaloSegundos = Math.Max(60, options.Value.AgendamentoNotificacaoIntervalSeconds);
 
+        loops.Iniciar("agendamento-notificacao", TimeSpan.FromSeconds(intervaloSegundos)); // #2536: arquivo de vida do Worker
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            loops.Bater("agendamento-notificacao");
             try
             {
                 await ExecutarTickAsync(stoppingToken);

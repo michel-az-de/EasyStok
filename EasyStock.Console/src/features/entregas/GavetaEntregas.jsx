@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useEscape } from '../../hooks/useEscape'
@@ -47,12 +47,9 @@ export function GavetaEntregas({ aoFechar }) {
           <Icone nome="moto" />
           <h2 tabIndex={-1} ref={tituloRef}>Entregas de hoje</h2>
           <span className={css.horaTopo}>{horaCurta(new Date(agora).toISOString())}</span>
-          <Botao variante="secundario" icone="external-link" onClick={abrirOutraJanela}>
-            Abrir em outra janela
-          </Botao>
-          <Botao variante="texto" onClick={aoFechar}>
-            <Icone nome="fechar" /> Fechar
-          </Botao>
+          {/* #2762: ícone com rótulo acessível (como a gaveta da API): o botão com texto virava 3 linhas a 390 px. */}
+          <BotaoIcone rotulo="Abrir em outra janela" icone="external-link" tom="secundario" className={css.empurra} onClick={abrirOutraJanela} />
+          <BotaoIcone rotulo="Fechar" icone="fechar" tom="secundario" onClick={aoFechar} />
         </header>
         <ConteudoEntregas
           conversas={conversas} janelas={janelas} agora={agora} cardapio={cardapio}

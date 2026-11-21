@@ -4,6 +4,7 @@
 // Extensão .js: `dominio/assistente.js` chega aqui pelo Node puro.
 import { diasDeCalendarioEntre, partesDoEndereco, telefoneDoE164 } from './formato.js'
 import { conversaEncerrada } from './conversa.js'
+import { chaveDaTag } from './tag.js'
 
 // #1761: endereço que a Ficha não consegue separar (sem o CEP no fim, depois de vírgula) ia ao
 // EasyStok como nulo, voltava 200 e o campo esvaziava sem dizer nada. A recusa diz o formato.
@@ -18,10 +19,15 @@ export function recusaDoEndereco(texto) {
 // Restrição decide campanha (RN-39) e o que o agente não responde sozinho
 // (RN-52): vem sempre primeiro entre as tags. Substring sem caixa porque a
 // tag digitada varia ("Lactose", "Alergia a lactose").
+// #2734: compara pela chave (sem acento nem "_"). O EasyStok devolve "sem_gluten" e "celiaco", e a
+// comparação com acento deixava justamente Glúten e Celíaco sem o alerta de restrição.
 export function ehRestricao(tag, restricoes = []) {
-  const alvo = tag.toLowerCase()
-  return restricoes.some((r) => alvo.includes(r.toLowerCase()))
+  const alvo = chaveDaTag(tag)
+  return restricoes.some((r) => { const chave = chaveDaTag(r); return chave !== '' && alvo.includes(chave) })
 }
+// #2734: o alerta da restrição é só um ícone. O nome dele é um só, lido por leitor de tela na Ficha, no cartão
+// do cliente e em Cadastros.
+export const ROTULO_RESTRICAO = 'Restrição alimentar'
 
 // Restrição primeiro, o resto na ordem em que foi criado. `sort` só troca
 // posição quando o critério de restrição muda: mantém estável o resto.
@@ -119,9 +125,7 @@ export const MOTIVO_BLOQUEIO_SEM_CADASTRO = 'Salve o cadastro do cliente antes d
 export const motivoParaNaoBloquear = (conversa, { fonteApi = false } = {}) =>
   (fonteApi && !conversa?.clienteId ? MOTIVO_BLOQUEIO_SEM_CADASTRO : null)
 
-export const rotuloDaTag = (tag) => String(tag ?? '').replace(/_/g, ' ')
-export const chaveDaTag = (tag) => rotuloDaTag(tag).normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .toLowerCase().replace(/\s+/g, ' ').trim()
+export { rotuloDaTag, chaveDaTag } from './tag.js'
 
 export function sugestoesDeTag(texto, { conversas, cadastroIdAtual, tagsAtuais, restricoes }) {
   const termo = chaveDaTag(texto)

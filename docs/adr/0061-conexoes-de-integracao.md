@@ -112,6 +112,15 @@ Pix não é pagável no ambiente de teste do Mercado Pago. O aceite do Pix é um
 produção, com estorno. Efí continua onde já está vivo (`IEfiPixService` em contas a receber); este ADR
 não o toca.
 
+**Emenda de 15/11/2026 (#2233): Pix direto pela chave da loja.** A D4 continua valendo como padrão. A
+exceção é a forma `pix_direto`, atrás da flag `pagamento.pix_direto` do tenant, desligada por padrão: o
+pedido recebe o copia e cola estático (BR Code, mesmo formato do `pix.js`) da chave Pix da loja, sem
+chamada a provedor. Não é PSP nem webhook: ninguém confirma sozinho. O pedido entra na fila como o da
+entrega, com o saldo a receber (decisão do Felipe de 05/11), nenhum job o expira, e a baixa é o
+"Marcar pago" da equipe, que registra quem e quando. A chave fica em `lojas`, nunca em log, evento, erro
+ou endpoint público; o console só vê o tipo e o final. Se o pedido deve esperar o Pix antes da fila
+continua decisão do Felipe, e por isso a flag nasce desligada.
+
 ### D5 · `CorridaExterna` é o lugar único do custo de corrida
 
 O custo de uma corrida feita por terceiro (99 registrada à mão, Lalamove pela API) mora em uma entidade

@@ -8,13 +8,15 @@ import { semearRespostasProntas } from '../dominio/respostas.js'
 // Telegram) entra acrescentando uma linha, sem tocar em componente nenhum.
 //
 //   temJanela    janela de resposta livre depois da última mensagem do cliente
-//   aceitaModelo modelo aprovado pela mensageria fura a janela fechada
+//   aceitaModelo mensagem padrão do WhatsApp pela mensageria fura a janela fechada
 //   aceitaMidia  o que a casa consegue mandar por ali ('arquivo' é PDF/
 //                documento; imagem entra por 'foto', rodada 7, frente Anexos)
 //   temFoto      o canal entrega foto de perfil do cliente
 export const CANAIS = [
   {
     nome: 'WhatsApp',
+    // #2185: só este canal tem o Assistente (`Conversa.TemAgente` no servidor).
+    temAssistente: true,
     icone: 'whatsapp',
     temJanela: true,
     horasJanela: 24,
@@ -25,7 +27,7 @@ export const CANAIS = [
     temFoto: true,
     explicacao: [
       'Janela de 24 h contada da última mensagem do cliente.',
-      'Fora da janela só sai modelo aprovado. Aceita foto, figurinha, áudio e arquivo.',
+      'Fora da janela só sai mensagem padrão do WhatsApp. Aceita foto, figurinha, áudio e arquivo.',
     ],
   },
   {
@@ -39,7 +41,7 @@ export const CANAIS = [
     },
     temFoto: true,
     explicacao: [
-      'Janela de 24 h, sem modelo aprovado para furar.',
+      'Janela de 24 h, sem mensagem padrão do WhatsApp para furar.',
       'Fora da janela, espera o cliente voltar. Sem figurinha nem arquivo (documento).',
     ],
   },
@@ -135,9 +137,9 @@ export const RESPIRO_MINUTOS_PADRAO = 40
 export const janelaPorId = (id) => JANELAS_ENTREGA.find((j) => j.id === id) ?? null
 
 export const RESPOSTAS_RAPIDAS = [
-  { cat: 'Cardápio', titulo: 'Enviar cardápio', texto: 'Olá! Segue nosso cardápio de hoje. Me chama quando escolher que eu já anoto.' },
+  { cat: 'Cardápio', titulo: 'Enviar cardápio', texto: 'Olá! Quer que eu te mande o cardápio de hoje? Me conta o que você procura que eu já te ajudo a escolher.' },
   { cat: 'Cardápio', titulo: 'Item esgotado', texto: 'Esse hoje encerrou, produzi pouco. Posso te sugerir outra massa do cardápio?' },
-  { cat: 'Entrega', titulo: 'Janelas do dia', texto: 'Hoje tenho entrega das 12h30 às 13h30 e das 18h30 às 19h30. Qual fica melhor?' },
+  { cat: 'Entrega', titulo: 'Janelas do dia', texto: 'Qual horário fica melhor para você receber? Eu confiro as janelas de entrega de hoje e te confirmo.' },
   // Achado 5, P2 (banca 10): este texto é uma OFERTA da dona (encomenda
   // agendada), diferente da fala automática de fora de área que o agente
   // manda sozinho (dominio/areaEntrega.js#respostaDeAreaFora, com {nome} e
@@ -147,7 +149,7 @@ export const RESPOSTAS_RAPIDAS = [
   // Item E (US-009, critério de aceite literal): "o texto é enviado já
   // preenchido com nome do cliente e dados do pedido em curso". Das 11
   // respostas de fábrica, nenhuma citava {pedido} antes desta rodada.
-  { cat: 'Pagamento', titulo: 'Enviar cobrança', texto: 'Já gerei seu pedido {pedido}. Segue o link de pagamento, assim que cair eu começo o preparo.' },
+  { cat: 'Pagamento', titulo: 'Enviar cobrança', texto: 'Já gerei seu pedido {pedido}. Assim que o pagamento cair, eu começo o preparo.' },
   { cat: 'Pós-venda', titulo: 'Agradecer', texto: 'Obrigada pela preferência! Se puder, me conta o que achou. Boa massa.' },
 ]
 

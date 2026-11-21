@@ -4,6 +4,7 @@ const idsDoCatalogo = MODULOS.map((modulo) => modulo.id)
 const idsValidos = (valor, catalogo = idsDoCatalogo) => Array.isArray(valor)
   ? [...new Set(valor.filter((id) => catalogo.includes(id)))] : []
 const PAINEIS = ['atendimento', 'cozinha', 'entregas', 'financeiro']
+export const PAINEIS_DO_HALL = PAINEIS
 
 export function normalizarPreferenciasHall(valor) {
   const ordem = idsValidos(valor?.ordem)
@@ -23,7 +24,8 @@ export function normalizarPreferenciasHall(valor) {
 }
 
 export const FOCOS_DO_HALL = [
-  { id: 'atendimento', nome: 'Cliente primeiro', ordem: ['atendimento', 'entregas', 'cozinha', 'cardapio', 'financeiro', 'producao'] },
+  // #2258 (A2): a ordem de uso do dia: atender, preparar, entregar, e só depois cardápio, produção e dinheiro.
+  { id: 'atendimento', nome: 'Cliente primeiro', ordem: ['atendimento', 'cozinha', 'entregas', 'cardapio', 'producao', 'financeiro'] },
   { id: 'gestao', nome: 'Gestão da casa', ordem: ['financeiro', 'atendimento', 'producao', 'cardapio', 'entregas', 'cozinha'] },
   { id: 'producao', nome: 'Produção e entregas', ordem: ['producao', 'cozinha', 'entregas', 'atendimento', 'cardapio', 'financeiro'] },
 ]
@@ -83,14 +85,3 @@ export function moverModuloDoHall(preferencia, id, destino) {
   return { ...atual, ordem }
 }
 
-export function favoritosPrimeiroNoHall(preferencia) {
-  const atual = normalizarPreferenciasHall(preferencia)
-  return { ...atual, ordem: [
-    ...idsDoCatalogo.filter((id) => atual.favoritos.includes(id)),
-    ...idsDoCatalogo.filter((id) => !atual.favoritos.includes(id)),
-  ] }
-}
-
-export function restaurarOrdemDoHall(preferencia) {
-  return { ...normalizarPreferenciasHall(preferencia), ordem: [...idsDoCatalogo] }
-}

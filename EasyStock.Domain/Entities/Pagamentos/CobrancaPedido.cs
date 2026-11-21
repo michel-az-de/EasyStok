@@ -1,4 +1,5 @@
 using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Domain.ValueObjects.Pix;
 
 namespace EasyStock.Domain.Entities.Pagamentos;
 
@@ -10,6 +11,8 @@ namespace EasyStock.Domain.Entities.Pagamentos;
 /// <c>external_reference = PedidoId</c>, link (<c>init_point</c>) e expiração. O job reemite uma vez
 /// (<see cref="Tentativa"/> 2) quando o pedido veio da conversa; depois cancela o pedido.
 /// Na entrega (<see cref="ProvedorNaEntrega"/>): sem link nem expiração; maquininha ou dinheiro na entrega.
+/// Pix direto (<see cref="ProvedorPixDireto"/>, #2233): manual como a da entrega, com o copia e cola do BR Code
+/// estático da chave da loja; só uma pessoa a quita ("Marcar pago"), nenhum job a vence.
 /// </para>
 ///
 /// <para>
@@ -22,6 +25,8 @@ public class CobrancaPedido
 {
     public const string ProvedorMercadoPago = "mercadopago";
     public const string ProvedorNaEntrega = "na_entrega";
+    public const string ProvedorPixDireto = "pix_direto";
+    public const int PixCopiaColaTamanhoMaximo = 512;
     public const int ProvedorTamanhoMaximo = 30;
     public const int ReferenciaTamanhoMaximo = 120;
     public const int LinkTamanhoMaximo = 1000;
@@ -88,7 +93,11 @@ public class CobrancaPedido
 
     public bool AguardandoCredencial => AguardandoCredencialDesde is not null;
 
+    /// <summary>#2233: BR Code estático do Pix direto, com a chave da loja. Null nos outros provedores.</summary>
+    public string? PixCopiaCola { get; private set; }
+
     public bool EhOnline => Provedor == ProvedorMercadoPago;
+    public bool EhPixDireto => Provedor == ProvedorPixDireto;
     public bool EstaPendente => Status == StatusCobrancaPedido.Pendente;
 
     /// <summary>
@@ -181,6 +190,27 @@ public class CobrancaPedido
     {
         var c = Nova(empresaId, pedidoId, valor, ProvedorNaEntrega, agora, conversaId);
         c.Tentativa = 1;
+        return c;
+    }
+
+    /// <summary>
+    /// #2233: Pix direto para a chave da loja do pedido, com o código curto do pedido como identificador. Como a da
+    /// entrega, não tem link, prazo nem provedor que a confirme: fica pendente até alguém registrar o pagamento.
+    /// </summary>
+    /// <param name="valorDoPix">
+    /// Quanto o copia e cola pede agora; nulo é o <paramref name="valor"/> inteiro. A encomenda com sinal guarda o saldo na
+    /// cobrança (como a da entrega, que só se quita quando o pedido fecha) e pede só o sinal no Pix.
+    /// </param>
+    public static CobrancaPedido CriarPixDireto(
+        Guid empresaId, Guid pedidoId, decimal valor, RecebedorPix recebedor, DateTime agora, Guid? conversaId = null,
+        decimal? valorDoPix = null)
+    {
+        ArgumentNullException.ThrowIfNull(recebedor);
+        if (valorDoPix is { } parcial && (parcial <= 0m || parcial > valor))
+            throw new RegraDeDominioVioladaException("Valor do Pix deve ser maior que zero e até o valor da cobrança.");
+        var c = Nova(empresaId, pedidoId, valor, ProvedorPixDireto, agora, conversaId);
+        c.Tentativa = 1;
+        c.PixCopiaCola = BrCodePix.Estatico(recebedor, valorDoPix ?? valor, BrCodePix.TxidDoPedido(pedidoId));
         return c;
     }
 

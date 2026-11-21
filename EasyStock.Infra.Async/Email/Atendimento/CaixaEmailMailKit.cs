@@ -1,6 +1,8 @@
+using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using EasyStock.Application.Ports.Output.Atendimento.Email;
+using EasyStock.Application.UseCases.Atendimento.Email;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Smtp;
@@ -24,19 +26,40 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
     private readonly ILogger<CaixaEmailMailKit> _logger;
     private readonly RemoteCertificateValidationCallback? _validadorDeCertificado;
     private readonly TimeProvider _relogio;
+    private readonly bool _permiteHostInterno;
+    private readonly Func<string, CancellationToken, Task<IPAddress[]>> _resolverNome;
 
     public CaixaEmailMailKit(ILogger<CaixaEmailMailKit> logger, TimeProvider relogio)
-        : this(logger, relogio, null)
+        : this(logger, relogio, null, permiteHostInterno: false, null)
     {
     }
 
-    /// <summary>Seam de teste: o servidor falso usa certificado próprio.</summary>
+    /// <summary>Seam de teste: troca a resolução de nome, para provar a recusa de endereço interno depois do DNS.</summary>
+    internal CaixaEmailMailKit(
+        ILogger<CaixaEmailMailKit> logger, TimeProvider relogio, Func<string, CancellationToken, Task<IPAddress[]>> resolverNome)
+        : this(logger, relogio, null, permiteHostInterno: false, resolverNome)
+    {
+    }
+
+    /// <summary>
+    /// Seam de teste: o servidor falso usa certificado próprio e escuta em loopback, então esta sobrecarga também
+    /// libera host interno. A produção só usa a pública, que nunca libera.
+    /// </summary>
     internal CaixaEmailMailKit(
         ILogger<CaixaEmailMailKit> logger, TimeProvider relogio, RemoteCertificateValidationCallback? validadorDeCertificado)
+        : this(logger, relogio, validadorDeCertificado, permiteHostInterno: true, null)
+    {
+    }
+
+    private CaixaEmailMailKit(
+        ILogger<CaixaEmailMailKit> logger, TimeProvider relogio, RemoteCertificateValidationCallback? validadorDeCertificado,
+        bool permiteHostInterno, Func<string, CancellationToken, Task<IPAddress[]>>? resolverNome)
     {
         _logger = logger;
         _relogio = relogio;
         _validadorDeCertificado = validadorDeCertificado;
+        _permiteHostInterno = permiteHostInterno;
+        _resolverNome = resolverNome ?? ((nome, ct) => Dns.GetHostAddressesAsync(nome, ct));
     }
 
     internal static SecureSocketOptions SegurancaDaPorta(int porta) =>
@@ -63,7 +86,7 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
             using var smtp = NovoSmtp();
             await ExecutarAsync("SMTP", caixa.SmtpHost, caixa.SmtpPorta, teto, ct, async () =>
             {
-                await smtp.ConnectAsync(caixa.SmtpHost, caixa.SmtpPorta, SegurancaDaPorta(caixa.SmtpPorta), teto.Token);
+                await ConectarAsync(smtp, caixa.SmtpHost, caixa.SmtpPorta, teto.Token);
                 await smtp.AuthenticateAsync(caixa.Usuario, caixa.Senha, teto.Token);
                 await EncerrarSemFalharAsync(() => smtp.DisconnectAsync(true, CancellationToken.None));
             });
@@ -88,7 +111,7 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
             using var teto = Limite(ct);
             await ExecutarAsync("IMAP", caixa.ImapHost, caixa.ImapPorta, teto, ct, async () =>
             {
-                await imap.ConnectAsync(caixa.ImapHost, caixa.ImapPorta, SegurancaDaPorta(caixa.ImapPorta), teto.Token);
+                await ConectarAsync(imap, caixa.ImapHost, caixa.ImapPorta, teto.Token);
                 await imap.AuthenticateAsync(caixa.Usuario, caixa.Senha, teto.Token);
                 await imap.Inbox.OpenAsync(FolderAccess.ReadWrite, teto.Token);
             });
@@ -111,7 +134,7 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
         using var smtp = NovoSmtp();
         await ExecutarAsync("SMTP", caixa.SmtpHost, caixa.SmtpPorta, teto, ct, async () =>
         {
-            await smtp.ConnectAsync(caixa.SmtpHost, caixa.SmtpPorta, SegurancaDaPorta(caixa.SmtpPorta), teto.Token);
+            await ConectarAsync(smtp, caixa.SmtpHost, caixa.SmtpPorta, teto.Token);
             await smtp.AuthenticateAsync(caixa.Usuario, caixa.Senha, teto.Token);
             await smtp.SendAsync(mime, teto.Token);
         });
@@ -145,6 +168,65 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
         return mime;
     }
 
+    /// <summary>
+    /// Resolve o DNS aqui, recusa se qualquer IP for da rede interna e conecta no IP já validado (o nome só segue para
+    /// o TLS). Sem isso, trocar o DNS entre a checagem e a conexão furaria a regra.
+    /// </summary>
+    private async Task ConectarAsync(IMailService cliente, string host, int porta, CancellationToken ct)
+    {
+        var seguranca = SegurancaDaPorta(porta);
+        if (_permiteHostInterno)
+        {
+            await cliente.ConnectAsync(host, porta, seguranca, ct);
+            return;
+        }
+
+        if (HostDeCaixaEmail.NomeInterno(host))
+            throw new HostNaoPermitidoException();
+        var enderecos = IPAddress.TryParse(host, out var literal) ? [literal] : await _resolverNome(host, ct);
+        if (enderecos.Length == 0 || enderecos.Any(HostDeCaixaEmail.IpInterno))
+            throw new HostNaoPermitidoException();
+
+        var socket = await ConectarSocketAsync(enderecos, porta, ct);
+        try
+        {
+            await cliente.ConnectAsync(socket, host, porta, seguranca, ct);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
+    private static async Task<Socket> ConectarSocketAsync(IPAddress[] enderecos, int porta, CancellationToken ct)
+    {
+        Exception? ultima = null;
+        foreach (var endereco in enderecos)
+        {
+            var socket = new Socket(endereco.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            try
+            {
+                await socket.ConnectAsync(new IPEndPoint(endereco, porta), ct);
+                return socket;
+            }
+            catch (Exception ex) when (ex is SocketException or IOException)
+            {
+                socket.Dispose();
+                ultima = ex;
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        }
+
+        throw ultima ?? new SocketException((int)SocketError.HostNotFound);
+    }
+
+    private sealed class HostNaoPermitidoException : Exception;
+
     private SmtpClient NovoSmtp()
     {
         var smtp = new SmtpClient { Timeout = (int)Teto.TotalMilliseconds };
@@ -176,6 +258,7 @@ public sealed class CaixaEmailMailKit : ICaixaEmailCliente
             ct.ThrowIfCancellationRequested();
             var (motivo, permanente) = ex switch
             {
+                HostNaoPermitidoException => ("servidor não permitido", true),
                 AuthenticationException => ("usuário ou senha recusados", true),
                 SslHandshakeException => ($"falha no TLS com {host}:{porta} (porta e segurança não combinam?)", false),
                 SmtpCommandException smtp when (int)smtp.StatusCode >= 500 => ($"o servidor recusou ({(int)smtp.StatusCode})", true),

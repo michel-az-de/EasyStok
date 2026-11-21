@@ -37,4 +37,31 @@
 .comIcone.aviso { background: var(--alerta-pastel); color: var(--alerta); }
 .comIcone.perigo { background: var(--erro-pastel); color: var(--erro); }
 .comIcone.marca { background: var(--marca-claro); color: var(--marca); }
-.comIcone.neutro, .comIcone.info { background: var(--elevado); color: var(--tinta-3); }
+.comIcone.neutro { background: var(--elevado); color: var(--tinta-3); }
+.comIcone.info { background: var(--info-pastel); color: var(--info); }
+
+/* #2185 (R04): o contador, um desenho só. Quem usa dá o lugar (`className`), nunca o tamanho. */
+.contagem {
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  min-width: var(--contagem); height: var(--contagem); padding: 0 var(--e-1);
+  border-radius: var(--r-pilula);
+  font-family: var(--f-dado); font-size: var(--t-micro); font-weight: 700;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.contagem_neutro { background: var(--preenchimento-forte); color: var(--tinta-2); }
+.contagem_marca { background: var(--acao); color: var(--sobre-acao); }
+.contagem_perigo { background: var(--erro); color: var(--sobre-erro); }
+
+/* #2185 (R05): estado em linha miúda. Sempre com o fundo do tom; o ponto dá lugar ao ícone. */
+.inline {
+  height: 1.5em; padding: 0 6px; gap: var(--e-1); max-width: 100%; flex-shrink: 0;
+  border-radius: var(--r-1); font-size: var(--t-micro); font-weight: 600; white-space: nowrap;
+}
+.inline::before { content: none; }
+.inline.neutro { background: var(--preenchimento); color: var(--tinta-3); }
+.inline.ok { background: var(--sucesso-pastel); color: var(--sucesso); }
+.inline.aviso { background: var(--alerta-pastel); color: var(--alerta); }
+.inline.perigo { background: var(--erro-pastel); color: var(--erro); }
+.inline.marca { background: var(--marca-claro); color: var(--marca); }
+.inline.info { background: var(--info-pastel); color: var(--info); }
+.texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

@@ -12,20 +12,24 @@
 
 .cartao {
   display: flex; flex-direction: column; gap: var(--e-3);
-  padding: var(--e-4); border: 0; border-radius: var(--r-1); background: var(--papel);
+  padding: var(--e-4); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); background: var(--elevado);
 }
+/* #2762: provedor desligado fica em tinta secundária; o ponto do chip "Desligado" marca o estado como o ✓ do "Ligado". */
+.desligado .nomeProvedor { color: var(--tinta-2); }
 
 .cabecalho { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
 .nomeProvedor { min-width: 0; font-size: var(--t-forte); overflow-wrap: anywhere; }
 .chipLigar { flex-shrink: 0; }
+.chipLigar[aria-pressed="false"]::before { content: ''; flex: none; width: var(--ponto); height: var(--ponto); margin-inline: var(--e-1); border-radius: var(--r-pilula); background: var(--tinta-3); }
 
 .credencial { display: flex; flex-direction: column; gap: var(--e-2); }
+/* #2762 (VC13): o botão de texto alinha o ícone pelo texto do cartão (a folga do padding sai pela margem). */
+.credencial > button { align-self: flex-start; white-space: nowrap; margin-inline-start: calc((var(--e-4) + var(--b-1)) * -1); }
 .formularioCredencial { display: flex; flex-direction: column; gap: var(--e-2); }
 .formularioCredencial :global(input) { width: 100%; }
-.botoesCredencial { display: flex; gap: var(--e-2); }
+.botoesCredencial { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.botoesCredencial > button { white-space: nowrap; }
 
 .rodapeCartao { display: flex; flex-direction: column; gap: var(--e-1); align-items: flex-start; }
 .motivo { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); }
 
-.rodape { margin: 0; color: var(--tinta-3); font-size: var(--t-apoio); }
-.rodape code { font-size: inherit; }

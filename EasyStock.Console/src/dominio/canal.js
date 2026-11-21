@@ -16,6 +16,7 @@ export const CANAL_DESCONHECIDO = {
     foto: false, figurinha: false, audio: false, arquivo: false,
   },
   temFoto: false,
+  temAssistente: false,
   explicacao: ['Canal sem regra cadastrada.', 'Cadastre o canal para liberar envio.'],
 }
 
@@ -55,6 +56,14 @@ export function motivoDeAnexo(canal, tipo, { fonteApi = false } = {}) {
   if (bloqueio || !fonteApi) return bloqueio
   if (formato === 'foto' && canal.nome === CANAL_COM_FOTO_NA_API) return null
   return `${canal.nome} ainda não recebe ${NOME_DO_FORMATO[formato]} pelo EasyStok.`
+}
+
+// #2185 (F11): o áudio gravado também só sai pelo WhatsApp no modo API. No Instagram o microfone gravava,
+// o envio avisava "ainda não ligado" e a gravação se perdia sem balão. Sem o botão, não há o que perder.
+export function motivoDeAudio(canal, { fonteApi = false } = {}) {
+  const bloqueio = motivoDeFormato(canal, 'audio')
+  if (bloqueio || !fonteApi) return bloqueio
+  return canal.nome === CANAL_COM_FOTO_NA_API ? null : `${canal.nome} ainda não recebe áudio pelo EasyStok.`
 }
 
 // Uma linha só com tudo que o canal não aceita, para o pé do composer.

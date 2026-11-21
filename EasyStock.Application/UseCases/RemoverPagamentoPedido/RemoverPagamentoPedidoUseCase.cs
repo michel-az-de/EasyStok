@@ -1,3 +1,4 @@
+﻿using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Application.UseCases.Caixa;
@@ -31,7 +32,8 @@ public class RemoverPagamentoPedidoUseCase(
         UseCaseGuards.EnsureNotEmpty(cmd.PedidoId, "PedidoId");
         UseCaseGuards.EnsureNotEmpty(cmd.PagamentoId, "PagamentoId");
 
-        return await uow.ExecuteInTransactionSemRetryAsync(async token =>
+        PedidoMudouStatusOperacao? mudanca = null;
+        var resultado = await uow.ExecuteInTransactionSemRetryAsync(async token =>
         {
             await repo.TravarAsync(cmd.EmpresaId, cmd.PedidoId, token);
             var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
@@ -62,11 +64,17 @@ public class RemoverPagamentoPedidoUseCase(
             // do evento — atomico, sem ExecuteDeleteAsync imediato fora do UoW.
             pedido.Pagamentos.Remove(pag);
 
+            var agora = DateTime.UtcNow;
+            var statusAntigo = pedido.Status;
+            mudanca = await quitacao.ReverterSinalManualAsync(pedido, cmd.Origem, cmd.UsuarioId, cmd.UsuarioNome, agora, token);
+
             await repo.AddEventoAsync(new PedidoEvento
             {
                 Id = Guid.NewGuid(),
                 PedidoId = pedido.Id,
                 Tipo = "pagamento_removido",
+                StatusAntigo = statusAntigo,
+                StatusNovo = pedido.Status,
                 UsuarioId = cmd.UsuarioId,
                 UsuarioNome = cmd.UsuarioNome,
                 Origem = cmd.Origem,
@@ -74,10 +82,13 @@ public class RemoverPagamentoPedidoUseCase(
                 Detalhes = $"-{pag.Valor.ToString("C", Cultura.PtBr)} ({pag.Metodo})"
         });
 
-        await quitacao.ReabrirManualAsync(pedido, DateTime.UtcNow, token);
+        await quitacao.ReabrirManualAsync(pedido, agora, token);
         await uow.CommitAsync();
         logger.LogInformation("Pedido {Id}: pagamento {Pag} removido.", pedido.Id, pag.Id);
         return CriarPedidoUseCase.Map(pedido);
         });
+        // Depois do commit, como no registro do sinal: a fila da operação só ouve o que gravou.
+        await quitacao.PublicarAsync(cmd.EmpresaId, null, CancellationToken.None, mudanca);
+        return resultado;
     }
 }

@@ -197,6 +197,17 @@ public class GlobalExceptionHandler(
                 ex.Message,
                 false),
 
+            // #2288: o Kestrel diz o status na exceção (413 corpo acima do RequestSizeLimit, 400 corpo malformado). Sem este
+            // case, um anônimo mandando corpo grande ao webhook virava 500, métrica de falha e linha no SystemErrorLog.
+            BadHttpRequestException ex => (
+                ex.StatusCode,
+                ex.StatusCode == StatusCodes.Status413PayloadTooLarge ? "PAYLOAD_TOO_LARGE" : "BAD_REQUEST",
+                "Requisicao invalida",
+                ex.StatusCode == StatusCodes.Status413PayloadTooLarge
+                    ? "O corpo da requisicao passa do limite aceito."
+                    : "Requisicao malformada.",
+                false),
+
             InvalidOperationException ex => (
                 StatusCodes.Status409Conflict,
                 "INVALID_OPERATION",

@@ -74,12 +74,12 @@ confere('(a) cada módulo congelado existe no catálogo e some do hall, do menu,
     }
   }
   assert.equal(modulosDoHall({ fonteApi: true }).length, MODULOS.length - CONGELADOS.modulos.length, 'o hall perde exatamente os congelados')
-  assert.equal(MODULOS.length, 8, 'MODULOS segue inteiro: congelar não apaga o catálogo')
+  assert.equal(MODULOS.length, 9, 'MODULOS inclui Cadastros: congelar não apaga o catálogo')
 })
 
 // ---------------------------------------------------------------- (b) telas
 
-confere('(b) cada tela congelada existe no catálogo, some do menu e da busca, e a rota cai em outra tela viva', () => {
+confere('(b) cada tela congelada existe no catálogo, some do menu e da busca, e a rota explica a indisponibilidade', () => {
   for (const chave of CONGELADOS.telas) {
     const [moduloId, telaId] = chave.split('/')
     const modulo = moduloPorId(moduloId)
@@ -96,8 +96,8 @@ confere('(b) cada tela congelada existe no catálogo, some do menu e da busca, e
       }
       if (moduloCongelado(moduloId)) continue
       const rota = rotaDaHash(href, modo)
-      assert.notEqual(rota.tipo, ROTA_HALL, `${href}: o módulo segue vivo, a rota não cai no hall`)
-      assert.notEqual(rota.tela, telaId, `${href} cai em outra tela`)
+      assert.equal(rota.tipo, ROTA_HALL, `${href}: a tela congelada não vira outra tela`)
+      assert.ok(rota.aviso, `${href}: a indisponibilidade é explicada`)
       if (rota.tipo === ROTA_MODULO) assert.notEqual(rota.aba, tela.aba, `${href} não monta a aba congelada`)
     }
   }

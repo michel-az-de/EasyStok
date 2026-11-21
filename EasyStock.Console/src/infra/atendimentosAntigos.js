@@ -170,7 +170,7 @@ function atendimentoDoPedido(conversaId, nomeCliente, pedido, indiceMensagemInic
     vendas: [{
       numero: pedido.numero,
       itensTexto: pedido.itens.join(', '),
-      meio: '—',
+      meio: 'Forma não informada', // #2792
       valor: pedido.total,
       situacao: situacao.rotulo,
       situacaoTom: situacao.tom,

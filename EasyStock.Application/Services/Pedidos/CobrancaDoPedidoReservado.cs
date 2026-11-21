@@ -21,7 +21,7 @@ public enum QuemCobra
 ///
 /// <para>
 /// A regra: pagar "online" gera o link do Mercado Pago (o sinal, na encomenda). Pagar "na entrega" troca a forma do pedido e
-/// não gera link. A encomenda (entrega em outro dia, <see cref="PlanoPagamentoEncomenda.TemSinal"/>) exige o sinal antes da
+/// não gera link. A encomenda (entrega com 2 dias ou mais de antecedência, <see cref="PlanoPagamentoEncomenda.TemSinal"/>) exige o sinal antes da
 /// produção em qualquer forma: com a <see cref="QuemCobra.Atendente"/> a equipe combina o sinal (o resumo diz "Combine com a
 /// equipe como pagar o sinal"); com o <see cref="QuemCobra.ClientePeloLink"/> não há ninguém para combinar, então o sinal
 /// sai como link e o restante fica para a entrega.

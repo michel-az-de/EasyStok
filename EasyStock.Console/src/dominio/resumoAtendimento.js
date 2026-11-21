@@ -134,7 +134,7 @@ export function vendaDoTrecho(pedido, cardapio, desde) {
   const nome = recebidos.length > 0
     ? recebidos.join(' e ')
     : pedido.cobranca ? nomeDoMeio(pedido.cobranca.meio) : null
-  const meio = nome ? nome[0].toUpperCase() + nome.slice(1) : '—'
+  const meio = nome ? nome[0].toUpperCase() + nome.slice(1) : 'Forma não informada' // #2792: sem travessão
   // Número completo (achado 3, pendência 22 da banca 64: "mesmo número do
   // pedido em toda a folha"): o aviso do Encerrar já mostra "2026-0184"; a
   // tabela usava numeroCurto ("0184"), um formato diferente para o mesmo dado.
@@ -155,7 +155,7 @@ export function vendaDoTrecho(pedido, cardapio, desde) {
 // destes IDs); sem rótulo mapeado, mostra o próprio ID em vez de inventar
 // texto.
 const ROTULO_MARCO = {
-  'boas-vindas': 'primeira resposta automática',
+  'boas-vindas': 'primeira resposta do Assistente',
   recibo: 'pagamento confirmado',
   agradecimento: 'agradecimento enviado',
   'cobranca-pix': 'cobrança enviada',
@@ -219,9 +219,9 @@ export function avisoDoPedidoAoEncerrar(conversa, { fonteApi = false } = {}) {
   const comanda = fonteApi ? conversa.numeroComanda : null
   const quem = comanda ? `A comanda ${comanda}` : `O pedido Nº ${pedido.numero}`
   if (pedido.estado === 'aguardando') {
-    return `${quem} ainda não foi ${comanda ? 'paga' : 'pago'}. ${comanda ? 'Ela' : 'Ele'} continua valendo depois de encerrar.`
+    return `${quem} ainda não foi ${comanda ? 'paga' : 'pago'}. ${comanda ? 'Ela' : 'Ele'} continua valendo depois de concluir.`
   }
-  return `${quem} segue em preparo e entrega depois de encerrar.`
+  return `${quem} segue em preparo e entrega depois de concluir.`
 }
 
 export const ROTULO_CONVERTEU = {

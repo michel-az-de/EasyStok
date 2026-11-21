@@ -11,9 +11,12 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
         var query = db.Empresas.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
+        {
+            var padrao = PadraoILike.Contendo(search);
             query = query.Where(e =>
-                EF.Functions.ILike(e.Nome, $"%{search}%") ||
-                (e.Documento != null && EF.Functions.ILike(e.Documento, $"%{search}%")));
+                EF.Functions.ILike(e.Nome, padrao, PadraoILike.Escape) ||
+                (e.Documento != null && EF.Functions.ILike(e.Documento, padrao, PadraoILike.Escape)));
+        }
 
         if (status.HasValue)
             query = query.Where(e => db.AssinaturasEmpresa.Any(a => a.EmpresaId == e.Id && a.Status == status.Value));
@@ -76,9 +79,12 @@ public sealed class AdminTenantsQueries(EasyStockDbContext db) : IAdminTenantsQu
         else
         {
             if (!string.IsNullOrWhiteSpace(filtro.Search))
+            {
+                var padrao = PadraoILike.Contendo(filtro.Search);
                 query = query.Where(e =>
-                    EF.Functions.ILike(e.Nome, $"%{filtro.Search}%") ||
-                    (e.Documento != null && EF.Functions.ILike(e.Documento, $"%{filtro.Search}%")));
+                    EF.Functions.ILike(e.Nome, padrao, PadraoILike.Escape) ||
+                    (e.Documento != null && EF.Functions.ILike(e.Documento, padrao, PadraoILike.Escape)));
+            }
 
             if (filtro.Status.HasValue)
                 query = query.Where(e => db.AssinaturasEmpresa.Any(a => a.EmpresaId == e.Id && a.Status == filtro.Status.Value));

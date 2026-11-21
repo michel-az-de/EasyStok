@@ -6,11 +6,18 @@ import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { Botao } from '../../../componentes/Botao'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../../componentes/Campo'
+import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import css from './abaAtendimento.module.css'
+import { PainelAssistente } from './PainelAssistente'
+import { ROTULOS } from '../../../dominio/rotulos'
 
 const TAMANHO_MENSAGEM = 500
+// #2792: limites que espelham o servidor; passar deles avisa no campo e trava o Salvar (sem `maxLength`).
+const TAMANHO_NOME_DONA = 60
+const TAMANHO_FECHO_CANHOTO = 60
+const TAMANHO_MODELO_RETOMADA = 512
 
 const NIVEIS_DE_SUGESTAO = [
   { valor: 'Discreto', rotulo: 'Discreto: só responde o que perguntam' },
@@ -20,7 +27,7 @@ const NIVEIS_DE_SUGESTAO = [
 const OCIOSO = { estado: 'ocioso' }
 const CAMPOS_CONFIGURACAO = [
   'ativo', 'tom', 'nivelSugestao', 'saudacaoPrimeiroContato', 'saudacaoRetorno',
-  'fraseEspera', 'mensagemForaArea', 'modeloRetomadaNome', 'respiroMinutos',
+  'fraseEspera', 'mensagemForaArea', 'mensagemEscalada', 'mensagemEncaminhamento', 'nomeDona', 'fraseFechoCanhoto', 'modeloRetomadaNome', 'respiroMinutos',
   'tempoPreparoPadraoMinutos', 'slaRespostaMinutos',
 ]
 const valorComparavel = (valor) => String(valor ?? '')
@@ -93,7 +100,7 @@ function LojaAgora({ horariosAtendimento }) {
         {acoes.controlarLoja === true && <Botao className={css.toque} onClick={() => alternarLoja(agora)}>
           {aberta ? 'Fechar loja agora' : 'Abrir loja agora'}
         </Botao>}
-        {acoes.editarAtendimento === true && <Botao className={css.toque} disabled={lojaAberta == null} onClick={voltarAoHorario}>
+        {acoes.editarAtendimento === true && <Botao className={css.toque} disabled={lojaAberta == null} motivo="A loja já segue os horários da semana." onClick={voltarAoHorario}>
           Voltar a seguir o horário
         </Botao>}
       </div>
@@ -113,6 +120,7 @@ function MensagensDoExpediente() {
     mensagemLojaFechada: expediente.mensagemLojaFechada,
   }
   const pendente = camposMudaram(valor, expediente, ['mensagemForaDoHorario', 'mensagemLojaFechada'])
+  const passaDoLimite = algumPassaDoLimite([valor.mensagemForaDoHorario, TAMANHO_MENSAGEM], [valor.mensagemLojaFechada, TAMANHO_MENSAGEM])
   useAtualizarAposLimparRascunho(rascunho, situacao, recarregarExpediente, gravando)
   useEffect(() => {
     if (gravando) { expedienteDuranteGravacao.current = expediente; return }
@@ -128,7 +136,7 @@ function MensagensDoExpediente() {
 
   async function aoSalvar(evento) {
     evento.preventDefault()
-    if (!expediente.carregado || !pendente || gravando || situacao.estado === 'salvando') return
+    if (!expediente.carregado || !pendente || passaDoLimite || gravando || situacao.estado === 'salvando') return
     const { ok } = await salvar(() => salvarMensagensExpediente(valor))
     if (ok) setRascunho((atual) => atual === rascunho ? null : atual)
   }
@@ -140,16 +148,16 @@ function MensagensDoExpediente() {
       {!expediente.carregado && <output className={css.descricao}>Carregando o expediente…</output>}
       <CampoArea
         rotulo="Fora do horário"
-        dica="Substitui a saudação na primeira mensagem fora do horário."
-        maxLength={TAMANHO_MENSAGEM}
+        dica="Substitui a saudação na primeira mensagem fora do horário. {abre} vira a próxima abertura, por exemplo: amanhã às 08:00."
+        limite={TAMANHO_MENSAGEM}
         value={valor.mensagemForaDoHorario}
         disabled={!expediente.carregado || situacao.estado === 'salvando'}
         onChange={mudar('mensagemForaDoHorario')}
       />
       <CampoArea
-        rotulo="Loja fechada"
-        dica="Substitui a saudação na primeira mensagem com a loja fechada manualmente."
-        maxLength={TAMANHO_MENSAGEM}
+        rotulo="Loja fechada manualmente"
+        dica="Substitui a saudação na primeira mensagem enquanto a loja estiver fechada à mão."
+        limite={TAMANHO_MENSAGEM}
         value={valor.mensagemLojaFechada}
         disabled={!expediente.carregado || situacao.estado === 'salvando'}
         onChange={mudar('mensagemLojaFechada')}
@@ -159,7 +167,8 @@ function MensagensDoExpediente() {
           variante="primario"
           tipo="submit"
           className={css.toque}
-          disabled={!expediente.carregado || !pendente || gravando || situacao.estado === 'salvando'}
+          disabled={!expediente.carregado || !pendente || passaDoLimite || gravando || situacao.estado === 'salvando'}
+          motivo={passaDoLimite ? 'Encurte as mensagens que passam do limite.' : undefined}
         >
           Salvar mensagens
         </Botao>
@@ -228,10 +237,14 @@ function ConfiguracaoDoAtendimento() {
     setRascunho(gravando || camposMudaram(proximo, gravado, CAMPOS_CONFIGURACAO) ? proximo : null)
   }
   const pendente = camposMudaram(form, gravado, CAMPOS_CONFIGURACAO)
+  const passaDoLimite = algumPassaDoLimite(
+    [form.nomeDona, TAMANHO_NOME_DONA], [form.fraseFechoCanhoto, TAMANHO_FECHO_CANHOTO], [form.mensagemEscalada, TAMANHO_MENSAGEM],
+    [form.mensagemEncaminhamento, TAMANHO_MENSAGEM], [form.modeloRetomadaNome, TAMANHO_MODELO_RETOMADA],
+  )
 
   async function aoSalvar(evento) {
     evento.preventDefault()
-    if (!pendente || gravando || situacao.estado === 'salvando') return
+    if (!pendente || passaDoLimite || gravando || situacao.estado === 'salvando') return
     // Texto em branco é ignorado pela API. Impedir aqui evita confirmar uma alteração que não aconteceu.
     for (const campo of evento.currentTarget.querySelectorAll('[required]')) {
       campo.setCustomValidity(campo.value.trim() ? '' : 'Preencha este campo antes de salvar.')
@@ -256,7 +269,7 @@ function ConfiguracaoDoAtendimento() {
     <form className={css.secao} aria-labelledby="gestao-atend-config" onSubmit={aoSalvar}>
       <fieldset disabled={situacao.estado === 'salvando'} className={css.campos}>
         <div className={css.topo}>
-          <h3 id="gestao-atend-config">Como o automático atende</h3>
+          <h3 id="gestao-atend-config">Como o Assistente atende</h3>
           <label className={css.chave}>
             <input
               type="checkbox"
@@ -264,7 +277,7 @@ function ConfiguracaoDoAtendimento() {
               aria-describedby="gestao-atend-config-efeito"
               onChange={mudar('ativo', (e) => e.target.checked)}
             />
-            Atendimento automático
+            Assistente ligado
           </label>
         </div>
         <Pendencia visivel={pendente && situacao.estado !== 'salvando'} />
@@ -280,6 +293,13 @@ function ConfiguracaoDoAtendimento() {
           value={form.tom}
           required
           onChange={mudar('tom')}
+        />
+        <CampoTexto
+          rotulo="Nome da dona"
+          dica="Como o robô chama você ao passar a conversa, por exemplo Michele. Na mensagem padrão, seu nome entra no lugar de a equipe."
+          value={form.nomeDona ?? ''}
+          limite={TAMANHO_NOME_DONA}
+          onChange={mudar('nomeDona')}
         />
         <CampoSelecao
           rotulo="Sugestões"
@@ -301,12 +321,35 @@ function ConfiguracaoDoAtendimento() {
           required
           onChange={mudar('fraseEspera')}
         />
+        <CampoTexto
+          rotulo="Frase de fecho do canhoto"
+          dica="Fecha a imagem do pedido que a cliente recebe quando paga, por exemplo Boa massa! Em branco, a imagem sai sem fecho."
+          value={form.fraseFechoCanhoto ?? ''}
+          limite={TAMANHO_FECHO_CANHOTO}
+          onChange={mudar('fraseFechoCanhoto')}
+        />
         <CampoArea rotulo="Mensagem para endereço fora da área" value={form.mensagemForaArea} required onChange={mudar('mensagemForaArea')} />
+        <CampoArea
+          rotulo="Ao passar o cliente para a equipe"
+          dica="Enviada quando o cliente pede uma pessoa ou o Assistente não sabe responder. {nome} vira o primeiro nome e {dona}, o nome da dona."
+          value={form.mensagemEscalada ?? ''}
+          required
+          limite={TAMANHO_MENSAGEM}
+          onChange={mudar('mensagemEscalada')}
+        />
+        <CampoArea
+          rotulo="Ao encaminhar quem não é cliente"
+          dica="Fornecedor, orçamento ou assunto pessoal. O Assistente para de responder a pessoa até alguém devolver a conversa a ele. {nome} vira o primeiro nome."
+          value={form.mensagemEncaminhamento ?? ''}
+          required
+          limite={TAMANHO_MENSAGEM}
+          onChange={mudar('mensagemEncaminhamento')}
+        />
         <CampoTexto
           rotulo="Modelo de retomada (WhatsApp)"
-          dica="Nome do modelo aprovado pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa."
+          dica={`Nome da ${ROTULOS.MENSAGEM_PADRAO} aprovada pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa.`}
           value={form.modeloRetomadaNome ?? ''}
-          maxLength={512}
+          limite={TAMANHO_MODELO_RETOMADA}
           pattern="[a-z0-9_]+"
           title="Use somente letras minúsculas, números e sublinhado (_). Deixe vazio para desativar a retomada."
           onChange={mudar('modeloRetomadaNome')}
@@ -345,7 +388,7 @@ function ConfiguracaoDoAtendimento() {
           />
         </div>
         <div className={css.acoes}>
-          <Botao variante="primario" tipo="submit" className={css.toque} disabled={!pendente || gravando || situacao.estado === 'salvando'}>
+          <Botao variante="primario" tipo="submit" className={css.toque} disabled={!pendente || passaDoLimite || gravando || situacao.estado === 'salvando'} motivo={passaDoLimite ? 'Encurte os campos que passam do limite.' : undefined}>
             Salvar configuração
           </Botao>
           <Botao variante="texto" disabled={!pendente || situacao.estado === 'salvando'} onClick={() => { setRascunho(null); limpar() }}>
@@ -366,6 +409,7 @@ export function AbaAtendimento({ horariosAtendimento = null }) {
   return (
     <div className={css.aba}>
       <LojaAgora horariosAtendimento={horariosAtendimento} />
+      <PainelAssistente podeEditar={acoes.editarAtendimento === true} />
       {acoes.editarAtendimento === true ? <>
         <MensagensDoExpediente />
         <ConfiguracaoDoAtendimento />

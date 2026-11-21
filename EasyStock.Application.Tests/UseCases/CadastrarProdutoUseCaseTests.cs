@@ -30,6 +30,26 @@ public class CadastrarProdutoUseCaseTests
             && p.EhInsumo == insumo && p.PrecoReferencia == null));
     }
 
+    [Fact] // #2457 B1: a observação interna digitada na criação sumia sem aviso.
+    public async Task Deve_gravar_observacao_interna_informada_na_criacao()
+    {
+        var produtos = Substitute.For<IProdutoRepository>();
+        var categorias = Substitute.For<ICategoriaRepository>();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        categorias.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Teste" });
+        var sut = new CadastrarProdutoUseCase(produtos, categorias, Substitute.For<IProdutoCaracteristicaRepository>(),
+            Substitute.For<IProdutoEmbalagemRepository>(), Substitute.For<IProdutoVariacaoRepository>(),
+            new FakeUnitOfWork(), Substitute.For<ILogger<CadastrarProdutoUseCase>>());
+
+        await sut.ExecuteAsync(new CadastrarProdutoCommand(
+            empresaId, categoriaId, null, "Bolo de pote", null, null, TipoProduto.Alimento,
+            null, null, true, null, null, 12m, null, null, null, null, null, null,
+            ObservacaoInterna: "  Só sob encomenda  "));
+
+        await produtos.Received(1).InsertAsync(Arg.Is<Produto>(p => p.ObservacaoInterna == "Só sob encomenda"));
+    }
+
     [Fact]
     public async Task Deve_cadastrar_produto_com_variacoes_caracteristicas_e_embalagens()
     {

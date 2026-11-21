@@ -70,7 +70,7 @@ const sobe = [
   ['atraso já ocorrido', 'Chegou 20h10 e a gente tinha combinado 18h30 às 19h30', 'devolucao', null],
   ['cancelar', 'Cancela meu pedido, demorou demais', 'pede-a-dona', 'Quer cancelar ou mudar o pedido'],
   ['trocar endereço', 'Troca o endereço de entrega, vai ser na casa da minha mãe', 'pede-a-dona', 'Quer cancelar ou mudar o pedido'],
-  ['falar com gente', 'Quero falar com o responsável agora', 'pede-a-dona', 'Quer falar com você, não com o atendimento automático'],
+  ['falar com gente', 'Quero falar com o responsável agora', 'pede-a-dona', 'Quer falar com você, não com o Assistente'],
   ['ameaça', 'Vou reclamar no Procon e no Reclame Aqui', 'pede-a-dona', 'Ameaça reclamar fora (Procon, advogado ou rede social), responda você'],
   ['desconto', 'Faz um desconto que eu compro sempre aqui', 'pede-a-dona', 'Pede desconto ou reclama do valor'],
   ['frete absurdo', 'Esse frete é um absurdo, vocês estão me roubando', 'pede-a-dona', 'Pede desconto ou reclama do valor'],

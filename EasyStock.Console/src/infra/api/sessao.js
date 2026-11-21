@@ -13,6 +13,8 @@ const remover = (storage) => {
 }
 
 export const permitePersistir = (token) => cargaDoToken(token)?.sessaoPersistente === 'true'
+// #2201: a sessão aberta pela chave de acesso é do aparelho da pessoa e sobrevive ao Android fechar o app.
+const podePersistir = (sessao) => permitePersistir(sessao?.token) || sessao?.dispositivo === true
 export const identidadeDaSessao = (sessao) => `${sessao?.empresa?.id ?? '-'}:${sessao?.usuario?.id ?? '-'}`
 
 export function lerSessao() {
@@ -20,11 +22,11 @@ export function lerSessao() {
   if (temporaria) return temporaria.expiraEm > Date.now() ? temporaria : null
   const persistida = ler('localStorage')
   // A sessão vencida só serve para renovar. Nenhuma chamada usa seu JWT antigo.
-  return persistida?.persistente && persistida.refreshToken && permitePersistir(persistida.token) ? persistida : null
+  return persistida?.persistente && persistida.refreshToken && podePersistir(persistida) ? persistida : null
 }
 
 export function gravarSessao(sessao) {
-  const persistente = Boolean(sessao.persistente && sessao.refreshToken && permitePersistir(sessao.token))
+  const persistente = Boolean(sessao.persistente && sessao.refreshToken && podePersistir(sessao))
   const atual = { ...sessao, persistente }
   remover('sessionStorage')
   remover('localStorage')
@@ -36,6 +38,21 @@ export function gravarSessao(sessao) {
   }
   window.dispatchEvent(new Event(EVENTO_SESSAO_ALTERADA))
   return lerSessao()
+}
+
+// No APK só o proprietário nativo guarda/renova o refresh. O Console recebe JWT curto.
+export function gravarSessaoNativa(dados) {
+  if (!dados?.autenticado) { limparSessao(); return null }
+  const carga = cargaDoToken(dados.token)
+  if (carga?.sessaoNativa !== 'true' || !carga.sid || !carga.dispositivoId || !carga.empresaId
+    || carga.empresaId !== dados.empresaId || !dados.usuario?.id || carga.sub !== dados.usuario.id
+    || carga.dispositivoId !== dados.dispositivoId || dados.refreshToken) {
+    throw Object.assign(new Error('A sessão do aplicativo não pôde ser confirmada. Reabra o Atendimento.'), { status: 401, codigo: 'SESSAO_NATIVA_INVALIDA' })
+  }
+  const venceEm = vencimentoDoToken(dados.token)
+  if (!venceEm || venceEm <= Date.now()) throw Object.assign(new Error('Confira a conexão para retomar o Atendimento.'), { codigo: 'SESSAO_NATIVA_VENCIDA' })
+  return gravarSessao({ token: dados.token, usuario: dados.usuario, empresa: { id: carga.empresaId, nome: null },
+    nativa: true, persistente: false, venceEm, expiraEm: venceEm - 60000 })
 }
 
 export function limparSessao() {
@@ -53,7 +70,7 @@ export function atualizarTokens(sessao, dados) {
   const token = dados.accessToken ?? dados.token
   const venceEm = vencimentoDoToken(token) ?? Date.now() + dados.expiresIn * 1000
   return { ...sessao, token, refreshToken: dados.refreshToken, venceEm, expiraEm: venceEm - 60000,
-    persistente: permitePersistir(token) && Boolean(globalThis.navigator?.locks) }
+    persistente: podePersistir({ ...sessao, token }) && Boolean(globalThis.navigator?.locks) }
 }
 
 // Vencimento do JWT lido do próprio token (`exp`, segundos), em ms. Token sem `exp` ou

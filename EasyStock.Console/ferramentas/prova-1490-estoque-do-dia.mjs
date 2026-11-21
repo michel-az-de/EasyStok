@@ -73,7 +73,7 @@ await confere('lê pratos em porções, lotes e alertas ligados ao prato', async
   montarFetch([ESTOQUE])
   const r = await lerEstoqueDoDia()
   assert.equal(r.pratos[0].saldo, 8)
-  assert.deepEqual(r.pratos[0].lotes[0], { codigo: 'LOT-AMANHA', quantidade: 3, validade: '2026-10-10', diasParaVencer: 1, vencendo: true, vencido: false })
+  assert.deepEqual(r.pratos[0].lotes[0], { codigo: 'LOT-AMANHA', quantidade: 3, validade: '2026-10-10', diasParaVencer: 1, vencendo: true, vencido: false, itemEstoqueId: null, porcao: null, produtoId: 'p-1' })
   assert.deepEqual(r.alertas.map((a) => a.sku), ['i-1', null])
   assert.match(r.alertas[0].texto, /sem produção/)
 })

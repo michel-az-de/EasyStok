@@ -49,6 +49,75 @@ public class GerenciarProdutoUseCaseTests
     }
 
     [Fact]
+    public async Task Atualizar_carrega_produto_rastreado_para_preservar_xmin()
+    {
+        // SYNC-5 (#2318): red. Carregar sem rastreio zera o xmin e o UPDATE vira 409 sempre.
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
+        {
+            Id = produtoId,
+            EmpresaId = empresaId,
+            CategoriaId = categoriaId,
+            Nome = "Produto Original",
+            Status = StatusProduto.Ativo
+        });
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId,
+            EmpresaId = empresaId,
+            Nome = "Categoria"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, null, "Produto Atualizado",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            null, null, null, null, StatusProduto.Ativo,
+            null, null, null);
+
+        await useCase.AtualizarAsync(command);
+
+        await _produtoRepository.Received(1).GetByIdParaAtualizarAsync(empresaId, produtoId);
+        await _produtoRepository.DidNotReceive().GetByIdAsync(empresaId, produtoId);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Atualizar_custo_nao_deixa_o_custo_de_6_casas_velho_na_ficha(bool insumo)
+    {
+        // #2401 A: a edição gravava só CustoReferencia; CustoDaFicha seguia no CustoUnitarioInsumo antigo.
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produto = new Produto
+        {
+            Id = produtoId, EmpresaId = empresaId, CategoriaId = categoriaId,
+            Nome = "Farinha", Status = StatusProduto.Ativo, EhInsumo = insumo,
+        };
+        produto.DefinirCustoDoInsumo(0.0045m);
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(produto);
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria"
+        });
+
+        var command = new AtualizarProdutoCommand(
+            empresaId, produtoId, categoriaId, null, "Farinha",
+            null, null, TipoProduto.Fisico, null, null, false, null,
+            7.5m, null, null, null, StatusProduto.Ativo,
+            null, null, null);
+
+        await useCase.AtualizarAsync(command);
+
+        produto.CustoDaFicha.Should().Be(7.5m);
+    }
+
+    [Fact]
     public async Task Deve_atualizar_produto_com_caracteristicas_e_embalagens()
     {
         var useCase = CriarUseCase();
@@ -56,7 +125,7 @@ public class GerenciarProdutoUseCaseTests
         var produtoId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -149,7 +218,7 @@ public class GerenciarProdutoUseCaseTests
         var produtoId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -194,7 +263,7 @@ public class GerenciarProdutoUseCaseTests
         var produtoId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -243,7 +312,7 @@ public class GerenciarProdutoUseCaseTests
         var categoriaId = Guid.NewGuid();
         const string fichaJsonOriginal = """{"nutricional":{"kcal":250,"porcao_g":100}}""";
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -280,7 +349,7 @@ public class GerenciarProdutoUseCaseTests
         var produtoId = Guid.NewGuid();
         var categoriaId = Guid.NewGuid();
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -320,7 +389,7 @@ public class GerenciarProdutoUseCaseTests
         var categoriaId = Guid.NewGuid();
         const decimal precoLegado = 150_000_000m; // acima do teto, dado legado
 
-        _produtoRepository.GetByIdAsync(empresaId, produtoId).Returns(new Produto
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(new Produto
         {
             Id = produtoId,
             EmpresaId = empresaId,
@@ -345,5 +414,114 @@ public class GerenciarProdutoUseCaseTests
         await useCase.AtualizarAsync(command); // nao lanca
 
         await _produtoRepository.Received(1).UpdateAsync(Arg.Any<Produto>());
+    }
+
+    private (GerenciarProdutoUseCase useCase, Guid empresaId, Guid produtoId, Guid categoriaId, Produto produto) PrepararAtualizacao(bool insumo = false)
+    {
+        var useCase = CriarUseCase();
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produto = new Produto
+        {
+            Id = produtoId, EmpresaId = empresaId, CategoriaId = categoriaId,
+            Nome = "Produto", Status = StatusProduto.Ativo, EhInsumo = insumo,
+        };
+        _produtoRepository.GetByIdParaAtualizarAsync(empresaId, produtoId).Returns(produto);
+        _categoriaRepository.GetByIdAsync(empresaId, categoriaId).Returns(new Categoria
+        {
+            Id = categoriaId, EmpresaId = empresaId, Nome = "Categoria"
+        });
+        return (useCase, empresaId, produtoId, categoriaId, produto);
+    }
+
+    private static AtualizarProdutoCommand ComandoDeAtualizacao(
+        Guid empresaId, Guid produtoId, Guid categoriaId, decimal? preco, string? skuBase = null,
+        params string[] skusDasVariacoes) => new(
+            empresaId, produtoId, categoriaId, null, "Produto",
+            null, null, TipoProduto.Fisico, skuBase, null, false, null,
+            null, preco, null, null, StatusProduto.Ativo,
+            null, null,
+            skusDasVariacoes.Length == 0
+                ? null
+                : skusDasVariacoes.Select(s => new ProdutoVariacaoInput("Var " + s, null, null, null, s, null, null, null)).ToArray());
+
+    [Theory]
+    [InlineData(true, null, StatusProduto.Ativo)]
+    [InlineData(true, 0, StatusProduto.Ativo)]
+    [InlineData(false, null, StatusProduto.Inativo)]
+    [InlineData(false, 0, StatusProduto.Inativo)]
+    public async Task Atualizar_sem_preco_so_inativa_quem_nao_e_insumo(bool insumo, int? preco, StatusProduto esperado)
+    {
+        // #2606: insumo nao tem preco de venda; inativa-lo fazia a producao deixar de baixar o estoque dele.
+        var (useCase, empresaId, produtoId, categoriaId, produto) = PrepararAtualizacao(insumo);
+
+        await useCase.AtualizarAsync(ComandoDeAtualizacao(empresaId, produtoId, categoriaId, preco));
+
+        produto.Status.Should().Be(esperado);
+    }
+
+    [Fact]
+    public async Task Atualizar_rejeita_variacoes_com_o_mesmo_sku_no_comando()
+    {
+        var (useCase, empresaId, produtoId, categoriaId, _) = PrepararAtualizacao();
+
+        var act = () => useCase.AtualizarAsync(
+            ComandoDeAtualizacao(empresaId, produtoId, categoriaId, 10m, null, "ABC-1", "abc-1"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*mesmo SKU*");
+        await _variacaoRepository.DidNotReceive().DeleteByProdutoAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task Atualizar_rejeita_sku_de_variacao_igual_ao_sku_base_do_proprio_produto()
+    {
+        var (useCase, empresaId, produtoId, categoriaId, _) = PrepararAtualizacao();
+
+        var act = () => useCase.AtualizarAsync(
+            ComandoDeAtualizacao(empresaId, produtoId, categoriaId, 10m, "BASE-1", "base-1"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*SKU base*variacao*");
+        await _variacaoRepository.DidNotReceive().DeleteByProdutoAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task Atualizar_rejeita_sku_de_variacao_que_ja_e_sku_base_de_outro_produto()
+    {
+        var (useCase, empresaId, produtoId, categoriaId, _) = PrepararAtualizacao();
+        _produtoRepository.ExistsSkuBaseAsync(empresaId, "VAR-1", produtoId).Returns(true);
+
+        var act = () => useCase.AtualizarAsync(
+            ComandoDeAtualizacao(empresaId, produtoId, categoriaId, 10m, null, "VAR-1"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("SKU duplicado para esta empresa.");
+        await _variacaoRepository.DidNotReceive().DeleteByProdutoAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task Atualizar_rejeita_sku_de_variacao_que_ja_e_de_variacao_de_outro_produto()
+    {
+        var (useCase, empresaId, produtoId, categoriaId, _) = PrepararAtualizacao();
+        _variacaoRepository.ExistsSkuAsync(empresaId, "VAR-1", null, produtoId).Returns(true);
+
+        var act = () => useCase.AtualizarAsync(
+            ComandoDeAtualizacao(empresaId, produtoId, categoriaId, 10m, null, "VAR-1"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("SKU duplicado para esta empresa.");
+        await _variacaoRepository.DidNotReceive().DeleteByProdutoAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task Atualizar_nao_acusa_colisao_com_as_variacoes_do_proprio_produto_que_serao_recriadas()
+    {
+        var (useCase, empresaId, produtoId, categoriaId, _) = PrepararAtualizacao();
+        // So existe a variacao do proprio produto: o repositorio, ao ignorar o produto, responde false.
+        _variacaoRepository.ExistsSkuAsync(empresaId, "VAR-1", null, null).Returns(true);
+        _variacaoRepository.ExistsSkuAsync(empresaId, "VAR-1", null, produtoId).Returns(false);
+
+        await useCase.AtualizarAsync(
+            ComandoDeAtualizacao(empresaId, produtoId, categoriaId, 10m, null, "VAR-1"));
+
+        await _variacaoRepository.Received(1).InsertAsync(Arg.Is<ProdutoVariacao>(v => v.Sku!.Value == "VAR-1"));
     }
 }

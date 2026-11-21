@@ -1,3 +1,4 @@
+import { comSnapshotDaFicha } from './snapshotDaFichaNaProva.mjs'
 /* eslint-disable no-console */
 // Prova da issue #1761 (simulação de atendimento de 13/10/2026): o que a tela dizia errado ou em
 // língua de sistema durante um atendimento de ponta a ponta. Só regra pura e tradução da API,
@@ -158,7 +159,7 @@ await confere('B  Status 4 do banco (Lida) chega ao balão como "lida"', () => {
 // ── C  Motivo da passagem ────────────────────────────────────────────────────
 const MOTIVO_CRU = 'agente desligado (LLM indisponível)'
 await confere('C  motivo conhecido vira frase da casa; desconhecido perde o trecho entre parênteses', () => {
-  assert.equal(motivoDeEscalada(MOTIVO_CRU), 'o atendimento automático está desligado')
+  assert.equal(motivoDeEscalada(MOTIVO_CRU), 'o Assistente está desligado')
   assert.equal(motivoDeEscalada('atendimento automático desligado na configuração'), AUTOMATICO_DESLIGADO)
   assert.equal(motivoDeEscalada('cliente pediu prazo especial (tool_call falhou: 503)'), 'cliente pediu prazo especial')
   assert.equal(motivoDeEscalada('cliente avaliou o pedido como negativo'), 'cliente avaliou o pedido como negativo')
@@ -166,39 +167,39 @@ await confere('C  motivo conhecido vira frase da casa; desconhecido perde o trec
   assert.equal(motivoDeEscalada(null), null)
 })
 await confere('C  nota de sistema da conversa: "Passou para você: ...", sem "escalado" nem "LLM"', () => {
-  assert.equal(notaDeSistema('escalado para a dona: ' + MOTIVO_CRU), 'Passou para você: o atendimento automático está desligado')
+  assert.equal(notaDeSistema('escalado para a dona: ' + MOTIVO_CRU), 'Passou para você: o Assistente está desligado')
   assert.equal(notaDeSistema('Conversa reaberta por Ana.'), 'Conversa reaberta por Ana.')
   const m = mensagemDaApi({ id: 'n', direcao: 'Saida', autor: 'Sistema', status: 'Pendente', texto: 'escalado para a dona: ' + MOTIVO_CRU, enviadaEm: '2026-10-13T21:16:38Z' })
   assert.equal(m.dir, 'sistema')
-  assert.equal(m.texto, 'Passou para você: o atendimento automático está desligado')
+  assert.equal(m.texto, 'Passou para você: o Assistente está desligado')
 })
 await confere('C  cartão, faixa e linha longa da conversa da API não trazem "LLM" nem "não soube responder"', () => {
   const resumo = { id: 'c7', situacao: 'Assumida', assumidaPorUsuarioId: null, motivoEscalada: MOTIVO_CRU, canal: 'WhatsApp', contatoNome: 'Marina', ultimaMensagemEm: '2026-10-13T21:40:00Z', naoLidas: 1 }
   const conversa = conversaDaApi(resumo, [], { id: 'u1', nome: 'Dona' }, AGORA)
   const origem = origemDaPassagem(conversa.passagem)
-  assert.equal(origem.curto, 'Sem automático')
-  assert.equal(resumoDoModo(conversa, false, false).linha, 'o atendimento automático está desligado')
+  assert.equal(origem.curto, 'Sem Assistente')
+  assert.equal(resumoDoModo(conversa, false, false).linha, 'o Assistente está desligado')
   for (const texto of [origem.curto, origem.longo, origem.motivo]) assert.ok(!/LLM|agente desligado|não soube responder/i.test(texto), texto)
   // Motivo de verdade do agente segue com a frase de antes.
-  assert.equal(origemDaPassagem({ motivo: 'Cliente perguntou sobre alergia' }).curto, 'Automático não soube responder: cliente perguntou sobre alergia')
+  assert.equal(origemDaPassagem({ motivo: 'Cliente perguntou sobre alergia' }).curto, 'Assistente não soube responder: cliente perguntou sobre alergia')
 })
 await confere('C  "esteira" saiu da barra de modo e do aviso de encerrar; o número é o da comanda', () => {
   const pausada = modoDoAtendimento({ estado: 'Em atendimento', mensagens: [] }, PAUSA_POR_ASSUMIR, false)
   assert.ok(!/esteira/i.test(pausada.detalhe), pausada.detalhe)
   assert.ok(/preparo e entrega/.test(pausada.detalhe))
   const conversa = conversaDaMarina()
-  assert.equal(resumoDom.avisoDoPedidoAoEncerrar(conversa, { fonteApi: true }), 'A comanda 3 segue em preparo e entrega depois de encerrar.')
+  assert.equal(resumoDom.avisoDoPedidoAoEncerrar(conversa, { fonteApi: true }), 'A comanda 3 segue em preparo e entrega depois de concluir.')
   const aguardando = { ...conversa, pedido: { ...conversa.pedido, estado: 'aguardando' } }
-  assert.equal(resumoDom.avisoDoPedidoAoEncerrar(aguardando, { fonteApi: true }), 'A comanda 3 ainda não foi paga. Ela continua valendo depois de encerrar.')
+  assert.equal(resumoDom.avisoDoPedidoAoEncerrar(aguardando, { fonteApi: true }), 'A comanda 3 ainda não foi paga. Ela continua valendo depois de concluir.')
   const demo = { pedido: { numero: '2026-0184', estado: 'preparo' } }
-  assert.equal(resumoDom.avisoDoPedidoAoEncerrar(demo), 'O pedido Nº 2026-0184 segue em preparo e entrega depois de encerrar.')
+  assert.equal(resumoDom.avisoDoPedidoAoEncerrar(demo), 'O pedido Nº 2026-0184 segue em preparo e entrega depois de concluir.')
 })
 
 // ── D  Erro do canal ─────────────────────────────────────────────────────────
 const TEMPO = "The operation didn't complete within the allowed timeout of '00:00:30'."
 await confere('D  os três erros crus do provedor viram frase em português, sem o inglês', () => {
   assert.equal(textoDaFalhaDeEnvio('Message undeliverable'), 'O WhatsApp não conseguiu entregar: confira se o número está certo.')
-  assert.equal(textoDaFalhaDeEnvio('Re-engagement message'), 'Passaram 24 h desde a última mensagem do cliente: só modelo aprovado chega.')
+  assert.equal(textoDaFalhaDeEnvio('Re-engagement message'), 'Passou o prazo de 24 h desde a última mensagem do cliente: só mensagem padrão do WhatsApp chega.')
   assert.equal(textoDaFalhaDeEnvio(TEMPO), 'O WhatsApp demorou a responder. Pode ter chegado: confira com o cliente antes de reenviar.')
   assert.equal(textoDaFalhaDeEnvio('Falha ao enviar pelo canal: ' + TEMPO), FRASE_DA_FALHA[TIPOS_DE_FALHA.TEMPO_ESGOTADO])
   assert.equal(textoDaFalhaDeEnvio('(#131026) Recipient cannot be reached'), FRASE_DA_FALHA[TIPOS_DE_FALHA.NAO_ENTREGAVEL])
@@ -248,7 +249,7 @@ await confere('G  a ação devolve a recusa e não manda POST com endereço nulo
     return new Response(JSON.stringify({ data: { novo: false, nome: 'Joao Pedro', dentroDaArea: true, cliente: { id: 'cl2' }, enderecos: [] } }), { status: 200 })
   }
   const estadoRef = { current: { conversas: [{ id: 'c2', clienteId: 'cl2', canal: 'WhatsApp', nome: 'Joao Pedro', cliente: {} }] } }
-  const acoes = criarAcoesClienteApi({ despachar: () => {}, estadoRef })
+  const acoes = comSnapshotDaFicha(criarAcoesClienteApi({ despachar: () => {}, estadoRef }), estadoRef.current.conversas)
   const recusado = await acoes.editarDadoCliente('c2', 'endereco', SEM_VIRGULA)
   assert.equal(recusado?.erro, FORMATO_DO_ENDERECO)
   assert.equal(chamadas.filter((c) => c.metodo === 'POST').length, 0, 'nenhum POST saiu')
@@ -370,7 +371,7 @@ await confere('J  o cardápio fecha quando o pedido nasce na conversa aberta, e 
 })
 
 await confere('K  automático desligado continua valendo depois de reabrir a conversa', () => {
-  const nota = { dir: 'sistema', texto: 'Passou para você: o atendimento automático está desligado' }
+  const nota = { dir: 'sistema', texto: 'Passou para você: o Assistente está desligado' }
   assert.equal(automaticoDesligadoNaConversa({ passagem: { motivo: 'Conversa reaberta para atendimento.' }, mensagens: [nota] }), true)
   assert.equal(automaticoDesligadoNaConversa({ passagem: { motivo: 'cliente pediu atendente' }, mensagens: [] }), false)
 })
@@ -382,7 +383,7 @@ await confere('K  reenvio que demora de novo não afirma que não saiu', () => {
 
 await confere('K  a prévia do cartão passa pelo tradutor da nota', () => {
   assert.equal(notaDeSistema('escalado para a dona: agente desligado (LLM indisponível)'),
-    'Passou para você: o atendimento automático está desligado')
+    'Passou para você: o Assistente está desligado')
 })
 
 await confere('M  maquininha na entrega sem nada recebido não é "Pago em parte" nem "Sinal pago"', () => {
@@ -396,7 +397,7 @@ await confere('M  demonstração: pedido nascido pago, sem registro de pagamento
   if (venda) assert.equal(venda.situacao ?? venda[2], 'Pago')
 })
 await confere('M  o sinal de automático desligado acaba quando o automático volta a responder', () => {
-  const nota = { dir: 'sistema', texto: 'Passou para você: o atendimento automático está desligado' }
+  const nota = { dir: 'sistema', texto: 'Passou para você: o Assistente está desligado' }
   assert.equal(automaticoDesligadoNaConversa({ passagem: null, mensagens: [nota, { dir: 'out', origemAutomatica: 'sistema' }] }), true)
   assert.equal(automaticoDesligadoNaConversa({ passagem: null, mensagens: [nota, { dir: 'out', origemAutomatica: 'agente' }] }), false)
 })

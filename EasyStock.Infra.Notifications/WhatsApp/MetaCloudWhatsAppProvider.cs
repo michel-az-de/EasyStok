@@ -39,7 +39,7 @@ public sealed class MetaCloudWhatsAppProvider(
     ILogger<MetaCloudWhatsAppProvider> logger, IClienteRepository? clientes = null,
     PoliticaEnvioCliente? politica = null) : IProvedorWhatsApp
 {
-    public const string ErroForaDaJanelaSemTemplate = "fora_da_janela_24h_sem_template";
+    public const string ErroForaDaJanelaSemTemplate = RecusasEnvioWhatsApp.ForaDaJanelaSemModelo;
 
     /// <summary>Limite da Meta para a legenda de uma imagem.</summary>
     public const int LegendaImagemTamanhoMaximo = 1024;
@@ -69,10 +69,14 @@ public sealed class MetaCloudWhatsAppProvider(
             {
                 var cliente = await clientes.GetByIdAsync(mensagem.EmpresaId, clienteId);
                 if (cliente is null || cliente.EmpresaId != mensagem.EmpresaId || cliente.Bloqueado)
-                    return Falha("cliente_bloqueado_ou_indisponivel", permanente: true, sw);
+                    return Falha(RecusasEnvioWhatsApp.ClienteBloqueado, permanente: true, sw);
                 if (politica is not null && mensagem.Categoria == Domain.Enums.Notifications.CategoriaConteudoNotificacao.Transacional
                     && !await politica.PodeEnviarAsync(mensagem.EmpresaId, clienteId, CanalConversa.WhatsApp, FinalidadeContato.Transacional, ct))
-                    return Falha("contato_transacional_revogado", permanente: true, sw);
+                    return Falha(RecusasEnvioWhatsApp.TransacionalRevogado, permanente: true, sw);
+                // #2746: a onda foi enfileirada com consentimento; SAIR depois do enfileiramento barra a saída.
+                if (politica is not null && mensagem.Categoria == Domain.Enums.Notifications.CategoriaConteudoNotificacao.Marketing
+                    && await politica.RevogouAsync(mensagem.EmpresaId, clienteId, CanalConversa.WhatsApp, FinalidadeContato.Marketing, ct))
+                    return Falha(RecusasEnvioWhatsApp.MarketingRevogado, permanente: true, sw);
             }
             var dentroDaJanela = conversa?.DentroDaJanela(agora) == true;
 
@@ -128,7 +132,8 @@ public sealed class MetaCloudWhatsAppProvider(
         catch (WhatsAppCloudException ex)
         {
             logger.LogError(ex, "Falha Meta WhatsApp {Codigo} (outbox {OutboxId}).", ex.Codigo, mensagem.OutboxId);
-            return Falha(ex.Message, permanente: ex.EhPermanente, sw);
+            // #2875: código e status seguem para o motivo do aviso não entregue na conversa.
+            return Falha(ex.Message, permanente: ex.EhPermanente, sw) with { CodigoErro = ex.Codigo, StatusHttp = ex.StatusHttp };
         }
         catch (Exception ex) when (chamouAMeta && !ct.IsCancellationRequested && ClassificadorDeFalha.EhFalhaDeTransporte(ex))
         {

@@ -11,6 +11,7 @@ using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,6 +58,12 @@ public sealed partial class PedidoConversaConcorrenciaTests
             { Itens = [new(cenario.CardapioItemId, 1)], JanelaId = cenario.JanelaId, DataEntrega = cenario.DataEntrega });
             pedidoId = (await Enviar(client, token, 1)).PedidoId;
         }
+        if (caso is "criar" or "criar_falha")
+        {
+            // #2544: criar_pedido não cobra; o link sai em enviar_link_pagamento depois do resumo e do ok do cliente.
+            pedidoId = await CriarPedidoPeloAgente(factory, llm, cenario);
+            mensagens.Clear();
+        }
         using var scope = factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(EmpresaId);
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
@@ -68,6 +75,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
             conversa = Conversa.Abrir(EmpresaId, "5511988887777", DateTime.UtcNow, "Outro cliente sintético", outro.Id);
             db.AtendimentoConversas.Add(conversa);
         }
+        if (caso is "criar" or "criar_falha")
+            db.AtendimentoMensagens.Add(Mensagem.Saida(EmpresaId, conversa.Id, AutorMensagem.Agente, DateTime.UtcNow.AddMilliseconds(-50),
+                TipoConteudoMensagem.Imagem, ResumoPedidoAtendimento.Legenda(pedidoId), $"wamid.guard.resumo.{Guid.NewGuid():N}"));
         conversa.LiberarAutomatico(); conversa.RegistrarEntrada(DateTime.UtcNow);
         db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conversa.Id, DateTime.UtcNow,
             TipoConteudoMensagem.Texto, "Mensagem sintética do cliente", $"wamid.guard.in.{Guid.NewGuid():N}"));
@@ -78,11 +88,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
             "escalar" or "encerrar_com_pedido" or "encerrar_sem_pedido" => [consultar, new BlocoUsoFerramentaLlm("acao", caso == "escalar" ? "escalar_para_dona" : "encerrar_conversa",
                 JsonSerializer.SerializeToElement(new { motivo = "Conferência solicitada" })),
                 new BlocoUsoFerramentaLlm("proibida_apos_acao", "criar_pedido", JsonSerializer.SerializeToElement(new { }))],
-            "criar" or "criar_falha" => [new BlocoUsoFerramentaLlm("criar", "criar_pedido", JsonSerializer.SerializeToElement(new
-            {
-                itens = new[] { new { cardapio_item_id = cenario.CardapioItemId, quantidade = 1, observacao = "Nota livre não pode virar afirmação" } },
-                data_entrega = cenario.DataEntrega.ToString("yyyy-MM-dd"), janela_id = cenario.JanelaId
-            }))],
+            "criar" or "criar_falha" => [new BlocoUsoFerramentaLlm("link", "enviar_link_pagamento",
+                JsonSerializer.SerializeToElement(new { pedidoId }))],
             _ => [consultar]
         };
         llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
@@ -104,7 +111,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         resultado.Escalou.Should().Be(caso is not ("criar" or "encerrar_sem_pedido"));
         if (caso == "criar")
         {
-            texto.Should().Contain("Pedido registrado").And.Contain("Aguardando pagamento").And.Contain("R$ 15,00").And.Contain("https://");
+            texto.Should().Contain("R$ 15,00").And.Contain("https://");
             (await db.CobrancasPedido.CountAsync()).Should().Be(1);
         }
         else if (caso == "encerrar_sem_pedido")
@@ -128,8 +135,34 @@ public sealed partial class PedidoConversaConcorrenciaTests
             (await db.Pedidos.CountAsync()).Should().Be(1);
             (await db.CobrancasPedido.CountAsync()).Should().Be(1);
         }
-        if (caso == "criar_falha") (await db.CobrancasPedido.CountAsync()).Should().Be(0);
+        if (caso == "criar_falha")
+        {
+            (await db.CobrancasPedido.CountAsync()).Should().Be(0);
+            (await db.Pedidos.CountAsync()).Should().Be(1, "a falha do provedor não desfaz o pedido já criado");
+        }
         (await agente.ProcessarTurnoAsync(EmpresaId, conversa.Id, DateTime.UtcNow)).ChamouLlm.Should().BeFalse();
+    }
+
+    private async Task<Guid> CriarPedidoPeloAgente(WebApplicationFactory<Program> factory, IAgenteLlmClient llm, Cenario cenario)
+    {
+        llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
+            new RespostaLlm(RespostaLlm.StopToolUse, [new BlocoUsoFerramentaLlm("criar", "criar_pedido", JsonSerializer.SerializeToElement(new
+            {
+                itens = new[] { new { cardapio_item_id = cenario.CardapioItemId, quantidade = 1, observacao = "Nota livre não pode virar afirmação" } },
+                data_entrega = cenario.DataEntrega.ToString("yyyy-MM-dd"), janela_id = cenario.JanelaId
+            }))], 1, 1),
+            new RespostaLlm("end_turn", [new BlocoTextoLlm("Seu estorno já caiu na conta.")], 1, 1));
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(EmpresaId);
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        var conversa = await db.AtendimentoConversas.SingleAsync(c => c.Id == cenario.ConversaId);
+        conversa.LiberarAutomatico(); conversa.RegistrarEntrada(DateTime.UtcNow);
+        db.AtendimentoMensagens.Add(Mensagem.Entrada(EmpresaId, conversa.Id, DateTime.UtcNow,
+            TipoConteudoMensagem.Texto, "Quero fechar o pedido sintético", $"wamid.guard.pedido.{Guid.NewGuid():N}"));
+        await db.SaveChangesAsync();
+        await scope.ServiceProvider.GetRequiredService<AgenteAtendimentoService>().ProcessarTurnoAsync(EmpresaId, conversa.Id, DateTime.UtcNow);
+        llm.ClearReceivedCalls();
+        return (await db.AtendimentoConversas.AsNoTracking().SingleAsync(c => c.Id == cenario.ConversaId)).PedidoEmAndamentoId!.Value;
     }
 
     [SkippableTheory]

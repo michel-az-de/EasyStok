@@ -34,7 +34,9 @@ public sealed record EtiquetaRenderItem(
     Guid Id, int Sequencial, string Codigo, string Status,
     ProdutoRenderDto Produto,
     string? LoteCodigo, DateTime? LoteValidadeEm, DateTime LoteCriadoEm,
-    string? LayoutSnapshotJson, string? LayoutSnapshotMeta);
+    string? LayoutSnapshotJson, string? LayoutSnapshotMeta,
+    // #2199 (D4): número curto do lote, o conteúdo do código de barras Code128 C.
+    string? LoteNumeroCurto = null);
 
 public sealed record EtiquetaRenderPayload(
     string LayoutJson,

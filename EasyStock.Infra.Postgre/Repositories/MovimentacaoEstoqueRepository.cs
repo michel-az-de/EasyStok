@@ -78,7 +78,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             var aggregated = await query
                 .Select(m => new
                 {
-                    Quantidade = (int)m.Quantidade,
+                    Quantidade = (decimal)m.Quantidade,
                     ValorTotal = (decimal?)m.ValorTotal,
                     m.Natureza
                 })
@@ -227,7 +227,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return totais.ToDictionary(x => x.ProdutoId, x => x.TotalSaidas / dias);
         }
 
-        public async Task<IEnumerable<(int Ano, int Mes, int TotalSaidas, decimal ValorTotal)>> GetAgregacaoMensalAsync(
+        public async Task<IEnumerable<(int Ano, int Mes, decimal TotalSaidas, decimal ValorTotal)>> GetAgregacaoMensalAsync(
             Guid empresaId, Guid produtoId, int meses = 12)
         {
             var de = DateTime.UtcNow.AddMonths(-meses);
@@ -241,7 +241,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(m => new
                 {
                     m.DataMovimentacao,
-                    Quantidade = (int)m.Quantidade,
+                    Quantidade = (decimal)m.Quantidade,
                     ValorTotal = (decimal?)m.ValorTotal ?? 0m
                 })
                 .GroupBy(m => new { m.DataMovimentacao.Year, m.DataMovimentacao.Month })
@@ -260,14 +260,14 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IEnumerable<MovimentacaoEstoque>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {
-            var pattern = $"%{termo.Trim()}%";
+            var pattern = PadraoILike.Contendo(termo.Trim());
             return await dbContext.MovimentacoesEstoque
                 .AsNoTracking()
                 .Include(m => m.Produto)
                 .Where(m => m.EmpresaId == empresaId &&
-                    ((m.Descricao != null && EF.Functions.ILike(m.Descricao, pattern)) ||
-                     (m.DocumentoReferencia != null && EF.Functions.ILike(m.DocumentoReferencia, pattern)) ||
-                     (m.Produto != null && EF.Functions.ILike(m.Produto.Nome, pattern))))
+                    ((m.Descricao != null && EF.Functions.ILike(m.Descricao, pattern, PadraoILike.Escape)) ||
+                     (m.DocumentoReferencia != null && EF.Functions.ILike(m.DocumentoReferencia, pattern, PadraoILike.Escape)) ||
+                     (m.Produto != null && EF.Functions.ILike(m.Produto.Nome, pattern, PadraoILike.Escape))))
                 .OrderByDescending(m => m.DataMovimentacao)
                 .Take(maxResults)
                 .ToListAsync();

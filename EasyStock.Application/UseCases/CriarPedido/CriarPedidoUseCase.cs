@@ -28,7 +28,9 @@ public sealed record CriarPedidoCommand(
     Guid? CriadoPorUserId = null,
     [property: MaxLength(120)] string? CriadoPorNome = null,
     // F5 — agendamento (MVP). NULL = pedido pra agora.
-    DateTime? AgendadoParaEm = null);
+    DateTime? AgendadoParaEm = null,
+    // #409: por onde a cliente pediu. NULL = não informado.
+    [property: MaxLength(20)] string? Canal = null);
 
 /// <summary>
 /// Cria um novo pedido (encomenda) — Onda P2. Se <see cref="ClienteId"/>
@@ -106,6 +108,7 @@ public class CriarPedidoUseCase(
         }
         pedido.Observacoes = cmd.Observacoes;
         pedido.MobileOrderId = cmd.MobileOrderId;
+        pedido.Canal = string.IsNullOrWhiteSpace(cmd.Canal) ? null : cmd.Canal.Trim();
         pedido.AgendadoParaEm = agendadoParaEm;
         if (cliente is not null && pedido.Origem != "balcao")
             await enderecoEntrega.RegistrarAsync(pedido, DadosEnderecoEntrega.De(cliente));
@@ -176,8 +179,11 @@ public class CriarPedidoUseCase(
         {
             // Pedido balcão: tenta associar ao cliente cadastrado com o mesmo nome.
             var matches = await clienteRepo.SearchAsync(cmd.EmpresaId, cmd.ClienteNomeAdHoc, maxResults: 1);
-            var clienteAdHoc = matches.FirstOrDefault(c =>
+            var encontrado = matches.FirstOrDefault(c =>
                 string.Equals(c.Nome, cmd.ClienteNomeAdHoc, StringComparison.OrdinalIgnoreCase));
+            // SearchAsync e somente leitura; o sync pode ja ter este cliente rastreado pelo ClientLinker.
+            var clienteAdHoc = encontrado is null ? null
+                : await clienteRepo.GetByIdAsync(cmd.EmpresaId, encontrado.Id);
             if (clienteAdHoc != null)
             {
                 clienteAdHoc.RegistrarPedido(pedido.CriadoEm);
@@ -212,5 +218,5 @@ public class CriarPedidoUseCase(
         p.Observacoes, p.Origem, p.MobileOrderId, p.VendaId,
         p.Itens.Count,
         p.CriadoEm, p.AlteradoEm, p.EntreguEm, p.CanceladoEm,
-        p.AgendadoParaEm, p.NumeroDoDia);
+        p.AgendadoParaEm, p.NumeroDoDia, p.DataNumero);
 }

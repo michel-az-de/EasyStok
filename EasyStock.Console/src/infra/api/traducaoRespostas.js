@@ -1,4 +1,4 @@
-import { GATILHOS_DA_API, REGRAS_PADRAO } from '../../dominio/automacao'
+import { GATILHOS_DA_API, REGRAS_PADRAO, bloqueioDaAutomatica } from '../../dominio/automacao'
 
 // Respostas prontas e automáticas entre o console e o EasyStok (S42, #1441).
 // O console mostra o atalho sempre com "/" na frente; a API guarda o que a
@@ -25,7 +25,8 @@ export const corpoDaResposta = ({ titulo, atalho, texto }) => ({
 })
 
 // Gatilho sem regra na API vem desligado e sem texto: a sugestão é o texto da
-// demonstração, que a dona pode aproveitar antes de ligar.
+// demonstração, que a dona pode aproveitar antes de ligar. #2682 (A1): só o texto que o
+// Salvar aceita; com marcador que a API não preenche ({linkCardapio}, {abre}) o editor abre vazio.
 export function regraDaApi(r) {
   const mapa = GATILHOS_DA_API[r.gatilho] ?? { id: String(r.gatilho), gatilho: String(r.gatilho), nome: String(r.gatilho), descricao: '' }
   const padrao = REGRAS_PADRAO.find((p) => p.gatilho === mapa.gatilho)
@@ -34,7 +35,7 @@ export function regraDaApi(r) {
     gatilhoApi: r.gatilho,
     ativa: Boolean(r.ligada),
     texto: r.texto ?? '',
-    sugestao: r.texto ? null : padrao?.texto ?? null,
+    sugestao: r.texto || !padrao?.texto || bloqueioDaAutomatica(padrao.texto) ? null : padrao.texto,
     alteradaEm: r.alteradaEm ?? null,
   }
 }

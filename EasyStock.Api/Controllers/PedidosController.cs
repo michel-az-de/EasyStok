@@ -252,7 +252,7 @@ public class PedidosController(
         var result = await removePagUseCase.ExecuteAsync(new RemoverPagamentoPedidoCommand(
             emp, id, pagamentoId,
             currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
-            null, "web", currentUser.Nivel));
+            NomeDaSessao(), "web", currentUser.Nivel));
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }
 

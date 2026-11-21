@@ -101,6 +101,12 @@ public static class FeatureCatalogo
     /// <summary>Chat do site como canal de atendimento (S36, ADR-0051). Exige também <see cref="ModuloAtendimento"/>.</summary>
     public const string CanalChatSite = "atendimento.canal.chatsite";
 
+    /// <summary>
+    /// Pix direto para a chave da loja, sem Mercado Pago (#2233). Desligado por padrão para liberar loja por loja:
+    /// o pedido entra na fila antes de o pagamento ser conferido (decidido em 05/11) e a baixa é sempre de uma pessoa.
+    /// </summary>
+    public const string PagamentoPixDireto = "pagamento.pix_direto";
+
     /// <summary>Features conhecidas, na ordem em que aparecem no back-office.</summary>
     public static IReadOnlyList<FeatureConhecida> Conhecidas { get; } =
     [
@@ -110,6 +116,7 @@ public static class FeatureCatalogo
         new(CanalInstagram, "Instagram Direct: a loja atende as mensagens do perfil pelo console."),
         new(CanalMessenger, "Messenger: a loja atende as mensagens da página do Facebook pelo console."),
         new(CanalChatSite, "Chat do site: o visitante conversa com a loja pela vitrine."),
+        new(PagamentoPixDireto, "Pix direto: cobra pela chave Pix da loja, sem Mercado Pago; a equipe confere e dá baixa."),
     ];
 
     /// <summary>

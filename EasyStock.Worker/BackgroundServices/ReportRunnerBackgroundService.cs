@@ -1,3 +1,4 @@
+using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Reporting;
 using EasyStock.Application.Ports.Output.Storage;
@@ -23,6 +24,7 @@ public sealed class ReportRunnerBackgroundService(
     IServiceProvider               serviceProvider,
     ReportingMetricsService        metrics,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
+    LoopsDoWorker loops,
     ILogger<ReportRunnerBackgroundService> logger)
     : BackgroundService
 {
@@ -64,8 +66,11 @@ public sealed class ReportRunnerBackgroundService(
         try { await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken); }
         catch (OperationCanceledException) { return; }
 
+        loops.Iniciar("report-runner", pollingInterval); // #2536: arquivo de vida do Worker
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            loops.Bater("report-runner");
             try
             {
                 int dispatched = await DispatchBatchAsync(batchSize, leaseDuration, stoppingToken);
@@ -200,11 +205,8 @@ public sealed class ReportRunnerBackgroundService(
         // Contexto do tenant (ADR-R06).
         using var execContext = scope.Begin(run.EmpresaId, run.UsuarioSolicitanteId, run.Contexto);
 
-        // Storage key conforme convenção B-15.
-        var ext         = exporterFactory.Resolve(run.Format).FileExtension;
-        var storageKey  = run.Contexto == ReportContexto.AdminSaaS
-            ? $"admin/reports/{run.EnqueuedAt:yyyy}/{run.EnqueuedAt:MM}/{run.Id}{ext}"
-            : $"tenants/{run.EmpresaId}/reports/{run.EnqueuedAt:yyyy}/{run.EnqueuedAt:MM}/{run.Id}{ext}";
+        // Storage key conforme convenção B-15, na mesma fonte que o watchdog usa para apagar o envio interrompido (#2788).
+        var storageKey  = ReportArtefato.Chave(run);
 
         var contentType = exporterFactory.Resolve(run.Format).ContentType;
 
@@ -302,13 +304,29 @@ public sealed class ReportRunnerBackgroundService(
             var hexHash   = hashStream.GetHexHash();
             var sizeBytes = hashStream.BytesWritten;
 
-            // Commit: marca run como Succeeded em transação.
+            // Commit atômico (#2764): com a linha travada, Succeeded só é gravado se a pessoa não cancelou.
             await PararHeartbeatAsync();
-            await using var tx = await db.Database.BeginTransactionAsync(CancellationToken.None);
-            run.MarkSucceeded(storageKey, sizeBytes, hexHash, rowCount);
-            await AlinharVersaoAsync(db, run);
-            await db.SaveChangesAsync(CancellationToken.None);
-            await tx.CommitAsync(CancellationToken.None);
+            var desfecho = await repo.FecharAsync(
+                run, r => r.MarkSucceeded(storageKey, sizeBytes, hexHash, rowCount), CancellationToken.None);
+
+            if (desfecho == ReportRunDesfecho.CanceladoPeloUsuario)
+            {
+                logger.LogInformation(
+                    "ReportRunner: run {RunId} cancelada pela pessoa durante a geração; arquivo descartado e sem aviso.", run.Id);
+                try { await storage.DeleteAsync(storageKey, CancellationToken.None); }
+                catch { /* melhor esforço */ }
+                metrics.RecordCompleted(
+                    contextoTag, run.ReportKey, "Canceled",
+                    waitMs, execSw.ElapsedMilliseconds, rowCount, 0L, run.Format.ToString());
+                return;
+            }
+
+            if (desfecho == ReportRunDesfecho.TentativaPerdida)
+            {
+                logger.LogWarning(
+                    "ReportRunner: run {RunId} não pertence mais a esta tentativa; sucesso não gravado e sem aviso.", run.Id);
+                return;
+            }
 
             logger.LogInformation(
                 "ReportRunner: run {RunId} concluída — rows={Rows} bytes={Bytes}.",
@@ -369,8 +387,38 @@ public sealed class ReportRunnerBackgroundService(
                 run.Id, isTerminal, errorClass);
 
             await PararHeartbeatAsync();
-            run.MarkFailed(errorClass, friendlyMsg, isTerminal);
-            await SafeSaveAndCleanupAsync(db, run, storage, storageKey);
+            var desfechoFalha = ReportRunDesfecho.Gravado;
+            try
+            {
+                desfechoFalha = await repo.FecharAsync(
+                    run, r => r.MarkFailed(errorClass, friendlyMsg, isTerminal), CancellationToken.None);
+            }
+            catch (Exception saveEx)
+            {
+                logger.LogError(saveEx, "ReportRunner: falha ao salvar estado final da run {RunId}.", run.Id);
+            }
+
+            // Rollback compensatório: remove artefato parcialmente gravado.
+            try { await storage.DeleteAsync(storageKey, CancellationToken.None); }
+            catch { /* melhor esforço */ }
+
+            if (desfechoFalha == ReportRunDesfecho.CanceladoPeloUsuario)
+            {
+                logger.LogInformation(
+                    "ReportRunner: run {RunId} cancelada pela pessoa; falha da geração não reenfileira nem avisa.", run.Id);
+                metrics.RecordCompleted(
+                    contextoTag, run.ReportKey, "Canceled",
+                    waitMs, execSw.ElapsedMilliseconds, rowCount, 0L, run.Format.ToString());
+                return;
+            }
+
+            if (desfechoFalha == ReportRunDesfecho.TentativaPerdida)
+            {
+                logger.LogWarning(
+                    "ReportRunner: run {RunId} não pertence mais a esta tentativa; falha não gravada e sem aviso.", run.Id);
+                return;
+            }
+
             metrics.RecordCompleted(
                 contextoTag, run.ReportKey, isTerminal ? "Failed" : "FailedTransient",
                 waitMs, execSw.ElapsedMilliseconds, rowCount, 0L, run.Format.ToString());

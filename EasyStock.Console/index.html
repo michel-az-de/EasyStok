@@ -12,11 +12,23 @@
         } catch (erro) {}
       })()
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f5f1" media="(prefers-color-scheme: light)" />
     <title>Casa da Baba</title>
+    <style>
+      /* #2762 (B9): enquanto o pacote não executa, a raiz mostra um giro discreto no lugar da tela vazia.
+         Só aparece depois de 400 ms, para não piscar em carga rápida, e a tinta vem do tema (currentColor).
+         O React troca este conteúdo no primeiro desenho. */
+      .carga-inicial { position: fixed; inset: 0; display: grid; place-items: center; opacity: 0; animation: carga-surgir 150ms 400ms linear forwards; }
+      .carga-inicial::before { content: ''; box-sizing: border-box; width: 32px; height: 32px; border: 3px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: carga-girar 800ms linear infinite; }
+      @keyframes carga-surgir { to { opacity: .6; } }
+      @keyframes carga-girar { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="carga-inicial" role="status" aria-label="Carregando"></div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

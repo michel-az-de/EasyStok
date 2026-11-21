@@ -38,7 +38,8 @@ public sealed class RevogadorSessoes(
         return refreshRevogados;
     }
 
-    private async Task ApagarCacheAsync(Guid usuarioId)
+    /// <summary>Repete só a invalidação após o commit de uma transação externa, sem criar outro corte.</summary>
+    public async Task ApagarCacheAsync(Guid usuarioId)
     {
         try
         {

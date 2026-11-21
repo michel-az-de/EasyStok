@@ -34,6 +34,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         using var client = factory.CreateClient();
         var c = await SemearAsync(factory);
         var criado = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/pedido", new {
+            c.ClienteId, c.VinculoRevisao,
             Itens = new[] { new { CardapioItemId = c.CardapioItemId, Qtd = 6 } },
             c.JanelaId, c.DataEntrega, Forma = "online" });
         criado.StatusCode.Should().Be(HttpStatusCode.OK, await criado.Content.ReadAsStringAsync());

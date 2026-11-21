@@ -123,7 +123,7 @@ export function extratoDoPedido(pedido, { aDevolver = 0 } = {}) {
     itens: Math.max(pedido.totalApi - frete, 0),
     frete,
     total: pedido.totalApi,
-    pagamentos: pagamentos.map((p) => ({ id: p.pagamentoId, em: p.em, meio: p.meio, valor: p.valor })),
+    pagamentos: pagamentos.map((p) => ({ id: p.pagamentoId, em: p.em, meio: p.meio, valor: p.valor, ...(p.autorNome ? { autorNome: p.autorNome } : {}) })),
     ajuste: Math.round((pago - recebido) * 100) / 100,
     pago,
     saldo: cancelado ? 0 : saldoApi({ totalApi: pedido.totalApi, alocadoApi: pago }),

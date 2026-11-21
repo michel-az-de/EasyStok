@@ -243,7 +243,7 @@ Quaisquer divergências entre snapshot do PDF e tela = bug.
 ### G.6 Validação contábil
 
 - **Antes do go-live**: enviar 1 PDF de fechamento de teste para o contador
-  da Casa da Babá (Felipe coordena).
+  da Casa da Baba (Felipe coordena).
 - **Pergunta ao contador**: "Esse documento é suficiente para anexar à
   contabilidade mensal? Falta CFOP, NCM, alíquota, alguma coisa?"
 - **Critério go**: contador aprova ou aponta 1-3 ajustes pequenos. Se

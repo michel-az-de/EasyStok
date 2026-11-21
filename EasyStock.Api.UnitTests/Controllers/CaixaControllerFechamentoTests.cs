@@ -1,7 +1,10 @@
 using System.Security.Claims;
 using EasyStock.Api.Controllers;
+using EasyStock.Api.UnitTests.Helpers;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.Caixa;
+using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -20,7 +23,8 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class CaixaControllerFechamentoTests
 {
     private readonly ICaixaRepository _repo = Substitute.For<ICaixaRepository>();
-    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>().SetupExecuteInTransactionSemRetry<FechamentoCaixaResult>()
+        .SetupExecuteInTransactionSemRetry<MovimentoCaixaResult>();
     private readonly ICurrentUserAccessor _currentUser = Substitute.For<ICurrentUserAccessor>();
     private readonly Guid _empresaId = Guid.NewGuid();
     private readonly Guid _usuarioId = Guid.NewGuid();
@@ -39,7 +43,7 @@ public class CaixaControllerFechamentoTests
         _repo.AddMovimentoAsync(Arg.Do<MovimentoCaixa>(m => _marcador = m)).Returns(Task.CompletedTask);
 
         var fechar = new FecharCaixaUseCase(_repo, _uow, Substitute.For<ILogger<FecharCaixaUseCase>>());
-        return new CaixaController(null!, fechar, null!, null!, null!, null!, null!, _currentUser)
+        return new CaixaController(null!, fechar, null!, null!, null!, null!, null!, null!, _currentUser)
         {
             ControllerContext = new ControllerContext
             {
@@ -89,5 +93,48 @@ public class CaixaControllerFechamentoTests
         await controller.Fechar(new FecharCaixaCommand(_empresaId));
 
         _gravado!.FechadoPorNome.Should().HaveLength(120);
+    }
+
+    private CaixaController CriarControllerDeEstorno(MovimentoCaixa movimento, params Claim[] claims)
+    {
+        _currentUser.Nivel.Returns(NivelAcesso.Gerente);
+        _currentUser.EmpresaId.Returns(_empresaId);
+        _currentUser.UsuarioId.Returns(_usuarioId);
+        _repo.GetMovimentoAsync(_empresaId, movimento.Id).Returns(movimento);
+
+        var estornar = new EstornarMovimentoCaixaUseCase(_repo, _uow, null!, Substitute.For<ILogger<EstornarMovimentoCaixaUseCase>>());
+        return new CaixaController(null!, null!, null!, estornar, null!, null!, null!, null!, _currentUser)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Teste")) },
+            },
+        };
+    }
+
+    // #2583: o estorno gravava em EstornadoPorNome o nome que viesse no corpo.
+    [Fact]
+    public async Task Estornar_GravaONomeDoToken_EIgnoraODoCorpo()
+    {
+        var saida = MovimentoCaixa.Criar(_empresaId, "saida", 20m, DateTime.UtcNow.AddMinutes(-5));
+        var controller = CriarControllerDeEstorno(saida, new Claim("nome", "Dona Maria"));
+
+        await controller.EstornarMovimento(saida.Id,
+            new EstornarMovimentoCaixaCommand(_empresaId, saida.Id, Motivo: "lancado errado", UsuarioNome: "Outra Pessoa"));
+
+        saida.EstornadoEm.Should().NotBeNull();
+        saida.EstornadoPorNome.Should().Be("Dona Maria");
+    }
+
+    [Fact]
+    public async Task Estornar_SemNomeNoToken_NaoAceitaONomeDoCorpo()
+    {
+        var saida = MovimentoCaixa.Criar(_empresaId, "saida", 20m, DateTime.UtcNow.AddMinutes(-5));
+        var controller = CriarControllerDeEstorno(saida);
+
+        await controller.EstornarMovimento(saida.Id,
+            new EstornarMovimentoCaixaCommand(_empresaId, saida.Id, UsuarioNome: "Outra Pessoa"));
+
+        saida.EstornadoPorNome.Should().BeNull();
     }
 }

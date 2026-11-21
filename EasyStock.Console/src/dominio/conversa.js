@@ -1,5 +1,8 @@
 import { precisaDeVoce, respostaAtrasada } from './automatico'
 import { inicioDoPedidoAtivo } from './entrega'
+import { pedidoEncerrado } from './pedido'
+import { normalizarBuscaCadastro, termoBuscaCadastro, telefoneCadastro } from './cadastros'
+import { rotuloDaTag } from './tag'
 
 export const ehLead = (conversa) => conversa.conta === 'lead'
 
@@ -11,19 +14,25 @@ const ROTULO_DO_FORMATO = {
 }
 
 // Prefixo em 600 diz quem escreveu por último sem abrir a conversa:
-// "Automático:" quando foi a regra que respondeu, "Você:" quando foi a mão da
-// dona, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
+// "Assistente:" quando foi automático, "Você:" quando o usuário enviou,
+// Nome confirmado ou "Equipe:" para outro autor humano, nada quando foi o cliente. Devolve `{ prefixo, corpo }` em vez de uma
 // string só porque só o prefixo é 600 (seção 1); quem monta o texto plano
 // (título, aria-label) faz `prefixo + corpo`.
 //
 // #1474 (R11): nota de sistema ("escalado para a dona", "retomado pelo usuário") é evento da
 // conversa, não fala. A prévia mostra a última mensagem do cliente ou da loja.
-export function previaDaConversa(conversa) {
+export function previaDaConversa(conversa, usuario = null) {
   const ultima = conversa.mensagens.findLast((m) => m.dir !== 'sistema')
   // Modo API: conversa encerrada não carrega mensagens na inbox; o resumo traz o texto (#1287).
   if (!ultima) return { prefixo: '', corpo: conversa.ultimaMensagemTexto || 'Sem mensagens' }
+  const deOutro = ultima.enviadaPorUsuarioId
+    ? ultima.enviadaPorUsuarioId !== usuario?.id
+    : Boolean(conversa.situacaoApi)
+  const nomeDaAutora = usuario?.id && ultima.enviadaPorUsuarioId && deOutro
+    && ultima.enviadaPorUsuarioId === conversa.assumidaPorUsuarioId
+    ? conversa.assumidaPorNome : null
   const prefixo = ultima.dir === 'out'
-    ? (ultima.automatica ? 'Automático: ' : 'Você: ')
+    ? (ultima.automatica ? 'Assistente: ' : deOutro ? `${nomeDaAutora || 'Equipe'}: ` : 'Você: ')
     : ''
   return { prefixo, corpo: ROTULO_DO_FORMATO[ultima.formato] ?? ultima.texto }
 }
@@ -31,11 +40,14 @@ export function previaDaConversa(conversa) {
 export const conversaEncerrada = (conversa) => conversa?.estado === 'Encerrado'
 
 // Contagens do cabeçalho. Ficam aqui para o layout não conhecer estado nenhum.
+// #2185 (F19): "em andamento" é o que o Balcão lista em cima, sem a bloqueada (o chip também não a conta);
+// "na esteira" é pedido de verdade e em curso: nem cancelado, nem entregue. No modo API a comanda ainda
+// em montagem (sem pedido no EasyStok) não está na esteira.
 export const contarAbertas = (conversas) =>
-  conversas.filter((c) => c.estado !== 'Encerrado').length
+  conversas.filter((c) => c.estado !== 'Encerrado' && !estaBloqueada(c)).length
 
-export const contarNaEsteira = (conversas) =>
-  conversas.filter((c) => c.pedido && c.pedido.estado !== 'entregue').length
+export const contarNaEsteira = (conversas, { fonteApi = false } = {}) =>
+  conversas.filter((c) => c.pedido && !pedidoEncerrado(c.pedido) && (!fonteApi || c.pedido.pedidoId)).length
 
 // --- Balcão (seção 1, rodada 5) ---------------------------------------------
 // Duas abas (Precisa de você / Todas), chips de canal que ligam mais de um ao
@@ -52,15 +64,42 @@ export const contarNaEsteira = (conversas) =>
 // a partir de `infra/historicoPedidos.js`), não só contra a conversa de hoje.
 // Sem isso, quem só falou de lasanha meses atrás e hoje só troca mensagem
 // sobre outra coisa nunca aparecia buscando "lasanha", mesmo tendo comprado.
+// Busca somente no retrato de conversas já carregadas nesta sessão; não consulta outra empresa ou a API.
+const telefoneDaBusca = valor => {
+  const digitos = String(valor ?? '').replace(/\D/g, '')
+  return /^55\d{10,11}$/.test(digitos) ? digitos.slice(2) : digitos
+}
+
+
+const telefoneDoTermo = busca => {
+  const numero = termoBuscaCadastro(busca)
+  return /^\d+$/.test(numero) ? telefoneDaBusca(numero) : ''
+}
+
+const contemTextoOuTelefone = (valor, termo, telefone) => {
+  const texto = normalizarBuscaCadastro(valor)
+  if (!/^\d{10,11}$/.test(telefone)) return texto.includes(termo)
+  // Conserva a substring textual e reconhece cada telefone formatado, sem juntar números do parágrafo.
+  const numeros = texto.matchAll(/(?:\+?55[\s.-]*)?(?:\(\d{2}\)|\d{2})[\s.-]*\d{4,5}[\s.-]*\d{4}/g)
+  return texto.includes(telefone) || [...numeros].some(([numero]) => telefoneDaBusca(numero) === telefone)
+}
+
+// #2734: a tag gravada vem com "_" ("cliente_antiga"). A busca compara com o rótulo, do jeito que a tela mostra.
+const tagContem = (tag, termo, telefone) => contemTextoOuTelefone(rotuloDaTag(tag), termo.replace(/_/g, ' '), telefone)
+
 export const combinaBusca = (conversa, busca) => {
-  const termo = (busca ?? '').trim().toLowerCase()
+  const termo = normalizarBuscaCadastro(busca).trim()
   if (!termo) return true
-  return conversa.nome.toLowerCase().includes(termo)
+  const telefone = telefoneDoTermo(busca)
+  const contem = valor => contemTextoOuTelefone(valor, termo, telefone)
+  return contem(conversa.nome)
+    || [conversa.id, conversa.clienteId, conversa.pedido?.pedidoId].some(id => id && normalizarBuscaCadastro(id) === termo)
     || conversa.numeroComanda != null && ('comanda ' + conversa.numeroComanda).includes(termo)
-    || (conversa.cliente?.telefone ?? '').includes(termo)
-    || (conversa.cliente?.tags ?? []).some((tag) => tag.toLowerCase().includes(termo))
-    || conversa.mensagens.some((m) => (m.texto ?? '').toLowerCase().includes(termo))
-    || (conversa.historico ?? []).some((pedido) => pedido.itens.some((item) => item.toLowerCase().includes(termo)))
+    || [conversa.cliente?.telefone, telefoneCadastro(conversa)].some(valor => contem(valor)
+      || telefone && telefoneDaBusca(valor).includes(telefone))
+    || (conversa.cliente?.tags ?? []).some(tag => tagContem(tag, termo, telefone))
+    || conversa.mensagens.some(m => contem(m.texto))
+    || (conversa.historico ?? []).some(pedido => pedido.itens.some(contem))
 }
 
 // Qual tag respondeu pela busca (US-016): usado só pra mostrar no cartão o
@@ -68,9 +107,9 @@ export const combinaBusca = (conversa, busca) => {
 // "Marina" por causa da tag "Gosta de lasanha"). `null` quando não foi a tag
 // que achou.
 export function tagCorrespondida(conversa, busca) {
-  const termo = (busca ?? '').trim().toLowerCase()
+  const termo = normalizarBuscaCadastro(busca).trim()
   if (!termo) return null
-  return (conversa.cliente?.tags ?? []).find((tag) => tag.toLowerCase().includes(termo)) ?? null
+  return (conversa.cliente?.tags ?? []).find(tag => tagContem(tag, termo, telefoneDoTermo(busca))) ?? null
 }
 
 // Chip de canal liga e desliga (zero ou mais). Nenhum ligado é "todos", por
@@ -112,6 +151,14 @@ export const conversasEncerradasDoBalcao = (conversas, filtros, usuario = null) 
 export const conversasBloqueadasDoBalcao = (conversas, filtros, usuario = null) =>
   conversas.filter((c) =>
     estaBloqueada(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca) && combinaResponsavel(c, filtros.responsavel, usuario))
+
+// #2185 (F18): UM número para "Conversas" no título, no chip "Todas" e na aba do celular: o que o Balcão
+// lista em cima (nem encerrada, nem bloqueada), com a busca, o canal e o responsável ligados e sem a aba
+// "Precisa de você". Encerradas e bloqueadas têm a contagem própria nos grupos do fim da lista.
+export const contarAbertasDoBalcao = (conversas, filtros, usuario = null) =>
+  conversas.filter((c) =>
+    !foraDoTopo(c) && combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca)
+    && combinaResponsavel(c, filtros.responsavel, usuario)).length
 
 // Contador por canal do topo do Balcão (issue #2). Conta o que está aberto na
 // lista de cima (nem encerrada nem bloqueada) e, dentro disso, quantas
@@ -280,3 +327,8 @@ export function bloqueioDeSemente(conversa) {
     por: nota?.autor ?? 'Thatiane',
   })
 }
+
+// #2734: as conversas carregadas que mostram essa pessoa (mesmo cadastro). Quem grava o cadastro relê só elas.
+export const conversasDoCliente = (conversas, clienteId) => (
+  clienteId ? (conversas ?? []).filter((c) => c.clienteId === clienteId).map((c) => c.id) : []
+)

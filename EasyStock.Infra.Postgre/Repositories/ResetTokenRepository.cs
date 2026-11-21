@@ -58,6 +58,11 @@ public class ResetTokenRepository(EasyStockDbContext context) : IResetTokenRepos
             .Where(rt => rt.UsuarioId == usuarioId && !rt.Usado && rt.Finalidade == FinalidadeResetToken.Convite)
             .ExecuteUpdateAsync(s => s.SetProperty(rt => rt.Usado, true));
 
+    public Task<int> InvalidarChavesDeAcessoAbertasAsync(Guid usuarioId) =>
+        _context.ResetTokens
+            .Where(rt => rt.UsuarioId == usuarioId && !rt.Usado && rt.Finalidade == FinalidadeResetToken.Ativacao)
+            .ExecuteUpdateAsync(s => s.SetProperty(rt => rt.Usado, true));
+
     public Task<int> ContarEmissoesDeConviteAsync(Guid usuarioId, DateTime desde) =>
         _context.ResetTokens.AsNoTracking()
             .CountAsync(rt => rt.UsuarioId == usuarioId && rt.Finalidade == FinalidadeResetToken.Convite

@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { Icone } from './Icone'
+import { Pilula } from './Pilula'
 import css from './BarraDeAbas.module.css'
 
 // Ícone de cada aba (banca estética, item 6): mesmo desenho do trilho do desktop.
 const ICONE_DA_ABA = { balcao: 'inbox', atendimento: 'conversa', ficha: 'ficha' }
 
 // Navegação entre painéis quando a tela não comporta as três colunas.
-export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba', prefixoId = 'aba', desabilitada = false }) {
+// #2232 (X1/X3): `aba.nome` é o nome acessível composto com o número ("Conversas, 11 precisam de você");
+// o contador visível é a `Pilula contagem` do app e fica fora da leitura quando o nome já o traz.
+// #2734: `rotulo` é o nome da barra para o leitor de tela; cada tela diz o que as suas abas escolhem.
+export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba', prefixoId = 'aba', desabilitada = false, rotulo = 'Painéis', rolavel = false, className }) {
   const [focada, setFocada] = useState(null)
   const entrada = abas.some((aba) => aba.id === focada) ? focada : ativa
 
@@ -25,10 +29,10 @@ export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba',
   }
 
   return (
-    <nav className={css.barra} aria-label="Painéis">
+    <nav className={[css.barra, rolavel ? css.rolavel : '', className].filter(Boolean).join(' ')} aria-label={rotulo}>
       {/* role tab mais aria-selected: leitor de tela anuncia "aba 2 de 3,
           selecionada", que é o que a barra realmente é. */}
-      <div className={css.trilho} role="tablist" aria-label="Painéis"
+      <div className={css.trilho} role="tablist" aria-label={rotulo}
         onBlur={(evento) => { if (!evento.currentTarget.contains(evento.relatedTarget)) setFocada(null) }}>
         {abas.map((aba, indice) => (
           <button
@@ -37,6 +41,7 @@ export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba',
             role="tab"
             disabled={desabilitada}
             id={`${prefixoId}-${aba.id}`}
+            aria-label={aba.nome}
             aria-selected={aba.id === ativa}
             aria-controls={idPainel}
             tabIndex={aba.id === entrada ? 0 : -1}
@@ -47,7 +52,14 @@ export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba',
           >
             {ICONE_DA_ABA[aba.id] && <Icone nome={ICONE_DA_ABA[aba.id]} tamanho={24} />}
             <span>{aba.rotulo}</span>
-            {aba.contador != null && <span className={css.contador}>{aba.contador}</span>}
+            {aba.contador != null && (
+              <Pilula
+                contagem={aba.contador > 99 ? '99+' : aba.contador}
+                tom={aba.tom === 'alerta' ? 'perigo' : 'neutro'}
+                className={css.contador}
+                aria-hidden={aba.nome ? 'true' : undefined}
+              />
+            )}
           </button>
         ))}
       </div>

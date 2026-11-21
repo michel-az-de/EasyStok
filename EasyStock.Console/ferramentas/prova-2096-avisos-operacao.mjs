@@ -45,9 +45,9 @@ const DA_API = {
   slaRespostaMinutos: 7,
 }
 
-confere('aba Avisos: cinco grupos na ordem pedida, onze avisos, só no modo API', () => {
-  assert.deepEqual(GRUPOS_DE_AVISOS.map((g) => g.titulo), ['Atendimento', 'Pedidos e cozinha', 'Encomendas', 'Estoque', 'IA'])
-  assert.equal(AVISOS.length, 11)
+confere('aba Avisos: seis grupos na ordem pedida, quinze avisos, só no modo API', () => {
+  assert.deepEqual(GRUPOS_DE_AVISOS.map((g) => g.titulo), ['Atendimento', 'Pedidos e cozinha', 'Encomendas', 'Estoque', 'Assistente', 'WhatsApp da equipe'])
+  assert.equal(AVISOS.length, 15)
   const atendimento = moduloPorId('atendimento')
   assert.ok(telasDoMenu(atendimento, { fonteApi: true }).some((t) => t.id === 'avisos' && t.aba === 'avisos'))
   assert.ok(!telasDoMenu(atendimento, { fonteApi: false }).some((t) => t.id === 'avisos'))
@@ -59,7 +59,7 @@ confere('normaliza o que a API devolve e o SLA vira texto', () => {
   assert.equal(a.prontoSemEntregadorMinutos, 0)
   assert.equal(normalizarAvisos({ impressaoTravada: 'sim', estoqueParadoDias: -3 }).impressaoTravada, false)
   assert.equal(normalizarAvisos({ estoqueParadoDias: -3 }).estoqueParadoDias, 0)
-  assert.match(textoDoSla(7), /depois de 7 minutos sem resposta; ajuste na aba Atendimento/)
+  assert.match(textoDoSla(7), /depois de 7 minutos sem resposta; ajuste em Horários e mensagens/)
 })
 
 confere('desligar grava 0 e religar sugere o padrão de cada prazo', () => {

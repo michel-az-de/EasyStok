@@ -89,6 +89,21 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task<bool> UpdateAsync(ReportRun run, CancellationToken ct)
+    {
+        db.ReportRuns.Update(run);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            db.Entry(run).State = EntityState.Detached;
+            return false;
+        }
+    }
+
     // ── Worker: picking e locking ─────────────────────────────────────────────
 
     /// <summary>
@@ -195,9 +210,11 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
 
     /// <summary>
     /// Recicla runs com lease expirado. Incrementa tentativas; se esgotadas → Failed terminal.
+    /// Run em Canceling com lease vencido (worker morto) é fechada como Canceled (#2773).
+    /// Devolve as runs fechadas sem sucesso, para o watchdog apagar o envio interrompido delas (#2788).
     /// Executa dentro de advisory lock global para watchdog (G-15).
     /// </summary>
-    public async Task<int> ReclaimExpiredLeasesAsync(CancellationToken ct)
+    public async Task<ReportRunReciclagem> ReclaimExpiredLeasesAsync(CancellationToken ct)
     {
         // G-15: apenas 1 worker executa o watchdog por vez.
         var gotLock = await db.Database
@@ -205,7 +222,7 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
                 "SELECT pg_try_advisory_xact_lock(hashtextextended('reporting:watchdog', 0)) AS \"Value\"")
             .FirstOrDefaultAsync(ct);
 
-        if (!gotLock) return 0;
+        if (!gotLock) return new ReportRunReciclagem(0, []);
 
         // Runs que podem ser recicladas (tentativas < max)
         var pendingReclaim = await db.Database.ExecuteSqlRawAsync(
@@ -223,8 +240,9 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
             """,
             ct);
 
-        // Runs terminais (tentativas >= max)
-        var terminalReclaim = await db.Database.ExecuteSqlRawAsync(
+        // Runs terminais (tentativas >= max). RETURNING (#2788): quem fechou sai da mesma instrução que fechou.
+        // SqlQueryRaw não compõe UPDATE ... RETURNING (embrulharia em subselect): lista sem compor.
+        var terminalReclaim = await db.Database.SqlQueryRaw<Guid>(
             """
             UPDATE public.report_runs
                SET status          = 4,
@@ -236,10 +254,32 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
              WHERE status           = 1
                AND lease_expires_at < now()
                AND tentativas       >= max_tentativas
-            """,
-            ct);
+            RETURNING id AS "Value"
+            """)
+            .ToListAsync(ct);
 
-        return pendingReclaim + terminalReclaim;
+        // #2773: Canceling com lease vencido = worker morreu antes de fechar o cancelamento.
+        // Espelha ReportRun.MarkCanceled (Canceled, finished_at, lease nulo). Worker vivo fecha
+        // sozinho dentro do prazo; o lease não é renovado em Canceling (heartbeat só em Running).
+        var canceledReclaim = await db.Database.SqlQueryRaw<Guid>(
+            """
+            UPDATE public.report_runs
+               SET status          = 3,
+                   finished_at      = now(),
+                   lease_expires_at = NULL,
+                   alterado_em      = now()
+             WHERE status           = 5
+               AND lease_expires_at < now()
+            RETURNING id AS "Value"
+            """)
+            .ToListAsync(ct);
+
+        List<Guid> fechadas = [.. terminalReclaim, .. canceledReclaim];
+        IReadOnlyList<ReportRun> semSucesso = fechadas.Count == 0
+            ? []
+            : await db.ReportRuns.AsNoTracking().Where(r => fechadas.Contains(r.Id)).ToListAsync(ct);
+
+        return new ReportRunReciclagem(pendingReclaim + fechadas.Count, semSucesso);
     }
 
     // ── GC de artefatos ───────────────────────────────────────────────────────
@@ -271,4 +311,54 @@ public sealed class ReportRunRepository(EasyStockDbContext db) : IReportRunRepos
         return storageKeys;
     }
 
+    // ── Worker: fechamento atômico (#2764) ───────────────────────────────────
+
+    public async Task<ReportRunDesfecho> FecharAsync(
+        ReportRun run, Action<ReportRun> desfechoNormal, CancellationToken ct)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        // Trava a linha desta tentativa. SqlQueryRaw não compõe com FOR UPDATE: lista e pega o primeiro em memória.
+        var status = await db.Database
+            .SqlQueryRaw<int>(
+                """
+                SELECT status AS "Value"
+                  FROM public.report_runs
+                 WHERE id         = {0}
+                   AND tentativas = {1}
+                   FOR UPDATE
+                """,
+                run.Id, run.Tentativas)
+            .ToListAsync(ct);
+
+        if (status.Count == 0 || (status[0] != 1 && status[0] != 5))
+            return ReportRunDesfecho.TentativaPerdida;
+
+        // Cancelamento pedido durante a geração: vence qualquer desfecho normal (sucesso, retry ou falha).
+        var desfecho = status[0] == 5 ? ReportRunDesfecho.CanceladoPeloUsuario : ReportRunDesfecho.Gravado;
+        if (desfecho == ReportRunDesfecho.CanceladoPeloUsuario)
+            run.MarkCanceled();
+        else
+            desfechoNormal(run);
+
+        // Alinha o xmin DEPOIS da trava: o heartbeat avança o xmin com UPDATE direto.
+        var versoes = await db.Database
+            .SqlQueryRaw<long>(
+                """
+                SELECT xmin::text::bigint AS "Value"
+                  FROM public.report_runs
+                 WHERE id = {0}
+                """,
+                run.Id)
+            .ToListAsync(ct);
+
+        var entry = db.Entry(run);
+        entry.State = EntityState.Modified;
+        if (versoes.Count == 1)
+            entry.Property(r => r.Xmin).OriginalValue = (uint)versoes[0];
+
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return desfecho;
+    }
 }

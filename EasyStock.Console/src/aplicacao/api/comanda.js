@@ -8,8 +8,10 @@ import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
 import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao, situacaoDaCobranca } from '../../dominio/cobranca'
 import { pedeConfirmacaoDoSaldo, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
+import { ERRO_MOTIVO_CANCELAMENTO, motivoDoCancelamentoValido } from '../../dominio/pedidosCadastro'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
 import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Comanda e cobrança no modo API (F03, S10/S11). Montar a comanda (itens, observação,
 // janela, meio) continua local até o envio; "Gerar cobrança e enviar" cria o pedido no
@@ -27,7 +29,7 @@ import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
 const NAO_LIGADO = 'esta ação ainda não está disponível nesta tela.'
 const SEM_PEDIDO = 'o pedido ainda não foi criado. Gere a cobrança ou envie ao cliente primeiro.'
 // #1924: textos do link novo pela Ficha.
-export const LINK_NOVO_SEM_ENVIO = 'Link novo gerado, mas não saiu na conversa (fora da janela de 24 h ou canal fora do ar). '
+export const LINK_NOVO_SEM_ENVIO = 'Link novo gerado, mas não saiu na conversa (fora do prazo de 24 h ou canal fora do ar). '
   + 'Copie o link em Pagamento e mande ao cliente.'
 export const LINK_AINDA_VALE = 'O link desta cobrança ainda vale. Para mandar de novo, copie o link em Pagamento.'
 const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
@@ -35,13 +37,16 @@ const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora e
 
 const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.'
 
+// #2871: fora do prazo de 24 h o resumo do pedido vai pela fila de avisos, no mensagem padrão do WhatsApp.
+const RESUMO_NA_FILA = 'O resumo sai pelo WhatsApp em instantes (conversa fora do prazo de 24 h).'
+
 // #1942 (#1923): 409 que o EasyStok recusou antes de criar o pedido. Mostra o motivo, sem reler. O resto dos
 // 409 (PEDIDO_EM_ANDAMENTO, a corrida do clique duplo, e código desconhecido) pode ter criado: relê.
-const RECUSA_DEFINITIVA = new Set(['LOJA_FECHADA', 'JANELA_ESGOTADA', 'CEP_SEM_COBERTURA', 'CLIENTE_BLOQUEADO'])
+const RECUSA_DEFINITIVA = new Set(['LOJA_FECHADA', 'JANELA_ESGOTADA', 'CEP_SEM_COBERTURA', 'CLIENTE_BLOQUEADO', 'VINCULO_CLIENTE_ALTERADO'])
 
 const EDITA_COMANDA = ['adicionarItem', 'removerItem', 'ajustarQuantidade', 'ajustarObservacao', 'forcarEncaixe']
 
-export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
+export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnviar = (_id, fazer) => fazer() }) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   // #1474: o aviso de uma tentativa que falhou some quando a ação seguinte dá certo.
   const limparAviso = () => despachar({ tipo: acao.FECHAR_AVISO_API })
@@ -55,6 +60,9 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
   // aqui e volta ao pedido a cada recarga desta tela. A troca de forma
   // tira a marca: a recarga leva `false` para o reducer não herdar a antiga.
   const semResumo = new Set()
+  // #2379: timeout ou 5xx numa escrita não diz se o EasyStok gravou. Relê o pedido para a tela mostrar o que ficou.
+  const semConfirmacao = (erro) => !erro.status || erro.status >= 500
+  const conferir = (id) => recarregar(id).catch(() => {})
   async function recarregar(id) {
     const tinhaMarca = Boolean(pedidoDe(id)?.resumoNaoEnviado)
     const lido = pedidoDaApi(await obterPedido(id), pedidoDe(id))
@@ -118,12 +126,50 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
       })
   })
 
+  // #2185 (F12): trocar para o link online faz o EasyStok mandar o link na conversa (`TextoLinkTrocado`). É fala
+  // humana como a cobrança: com o Assistente atendendo, assume antes. Pagar na entrega não fala com o cliente.
+  // #2233: o Pix direto também fala (manda o copia e cola), então também assume antes.
+  const trocarFormaFalando = (id, meio) => (formaDoMeio(meio) !== FORMA_NA_ENTREGA
+    ? antesDeEnviar(id, () => trocarForma(id, meio), {
+      erro: formaDoMeio(meio) === FORMA_ONLINE
+        ? 'Não consegui assumir a conversa, então o link não saiu.'
+        : 'Não consegui assumir a conversa, então o Pix não saiu.',
+    })
+    : trocarForma(id, meio))
+
   // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e
   // manda o resumo pela conversa. Só o POST decide "não criado" (#1287): a recarga que
   // falha depois dele é só a tela atrasada, a polling traz o pedido.
-  const criarPedido = (id, meio = null, enviarAoCliente = true) => umaPorConversa(id, 'criarPedido', () => {
-    const pedido = pedidoDe(id)
+  // #2941: POST ok e recarga que falhou deixa a tela sem `pedidoId`; sem esta marca um novo clique postaria de novo e
+  // duplicaria o pedido. A marca faz a nova tentativa só reler o pedido. Devolve `{ pedidoId, atualizando: true }`
+  // enquanto a leitura não volta: o pedido existe, só a tela está atrasada.
+  const criadoSemRecarga = new Map()
+  const aindaAtualizando = (id, pedidoId) => {
+    avisar('Pedido criado no EasyStok, atualizando a tela…')
+    return { pedidoId, atualizando: true }
+  }
+  const criarPedido = (id, meio = null, enviarAoCliente = true, pedido = pedidoDe(id)) => umaPorConversa(id, 'criarPedido', () => {
+    if (pedidoCriado(id)) criadoSemRecarga.delete(id)
+    // A marca vale só para a comanda que foi postada: comanda nova (outro número) depois do pedido entregue posta de novo.
+    if (criadoSemRecarga.get(id)?.numero !== pedidoDe(id)?.numero) criadoSemRecarga.delete(id)
+    if (!pedidoCriado(id) && criadoSemRecarga.has(id)) {
+      const { pedidoId } = criadoSemRecarga.get(id)
+      return recarregar(id).then((atual) => {
+        if (!atual?.pedidoId) return aindaAtualizando(id, pedidoId)
+        criadoSemRecarga.delete(id)
+        limparAviso()
+        return atual
+      }, () => aindaAtualizando(id, pedidoId))
+    }
     if (!pedido || pedidoCriado(id)) return undefined
+    const conversa = estadoRef.current.conversas.find(c => c.id === id)
+    const identidade = pedido.identidadeProposta
+    if (!identidade?.clienteId || !Number.isInteger(identidade.vinculoRevisao) || identidade.vinculoRevisao < 0
+      || identidade.clienteId !== conversa?.clienteId || identidade.vinculoRevisao !== conversa?.vinculoRevisao) {
+      const erro = 'Confira a pessoa do pedido na ficha antes de gerar a cobrança. Os itens foram preservados.'
+      avisar(erro)
+      return { erro }
+    }
     // #1683: o erro volta como `{ erro }` para a barra mostrar ao lado do botão; o aviso fica.
     if (!janelaDoId(pedido.janela)) {
       const erro = 'Escolha a janela de entrega antes de enviar ao cliente.'
@@ -136,19 +182,26 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         // Mercado Pago fora: o pedido nasce sem link e nada o emite sozinho (#1287).
         const faltas = []
         if (!gerado?.cobranca && corpo.forma === FORMA_ONLINE) {
-          faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "Gerar cobrança" para emitir o link')
+          faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "' + ROTULOS.GERAR_COBRANCA + '" para emitir o link')
         }
-        if (!gerado?.enviadoAoCliente) {
+        // #2871: fora do prazo de 24 h o resumo vai pela fila de avisos (mensagem padrão do WhatsApp) e sai em instantes.
+        const resumoNaFila = Boolean(gerado?.resumoNaFila)
+        if (!gerado?.enviadoAoCliente && !resumoNaFila) {
           if (gerado?.pedidoId) semResumo.add(gerado.pedidoId)
-          if (enviarAoCliente) faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
+          if (enviarAoCliente) faltas.push('o cliente não foi avisado: o resumo não saiu (conversa fora do prazo de 24 h sem mensagem padrão do WhatsApp, ou canal fora do ar)')
         }
         const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
         limparAviso()
-        if (aviso) avisar(aviso)
+        if (aviso) avisar(resumoNaFila ? `${aviso} ${RESUMO_NA_FILA}` : aviso)
+        else if (resumoNaFila) avisar(`Pedido criado. ${RESUMO_NA_FILA}`)
         else if (!enviarAoCliente) avisar(gerado?.cobranca?.linkPagamento
-          ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar um modelo aprovado.'
+          ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar uma mensagem padrão do WhatsApp.'
           : 'Pedido e cobrança criados sem envio. Confira a forma de recebimento em Pagamento.')
-        return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
+        return recarregar(id).catch(() => {
+          if (gerado?.pedidoId) criadoSemRecarga.set(id, { pedidoId: gerado.pedidoId, numero: pedido.numero })
+          avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…')
+          return gerado?.pedidoId ? { pedidoId: gerado.pedidoId, atualizando: true } : undefined
+        })
       },
       (erro) => {
         if (!erro.status || erro.status >= 500 || (erro.status === 409 && !RECUSA_DEFINITIVA.has(erro.codigo))) {
@@ -195,14 +248,21 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
 
   // Com pedido criado, gerar ou reenviar a cobrança troca a forma (S11), sem cobrança online emite
   // o link e com o link vencido manda um novo (#1924). Link ainda valendo não sai de novo sozinho.
+  // #2185 (F12): a cobrança que manda o resumo ou o link ao cliente é fala humana; com o Assistente
+  // atendendo, assume antes. Gerar sem enviar não fala com ninguém.
   const cobrar = (id, meio, enviarAoCliente = true) => {
-    if (!pedidoCriado(id)) return criarPedido(id, meio, enviarAoCliente)
+    if (!pedidoCriado(id)) {
+      const proposta = pedidoDe(id)
+      return enviarAoCliente
+        ? antesDeEnviar(id, () => criarPedido(id, meio, enviarAoCliente, proposta), { erro: 'Não consegui assumir a conversa, então a cobrança não saiu.' })
+        : criarPedido(id, meio, enviarAoCliente, proposta)
+    }
     if (recusaPorStatusDesconhecido(id)) return undefined
     const atual = pedidoDe(id)
-    if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarForma(id, meio)
+    if (meio && formaDoMeio(meio) !== formaDoMeio(atual?.meio)) return trocarFormaFalando(id, meio)
     if (!atual?.cobranca && formaDoMeio(atual?.meio) === FORMA_ONLINE) return reemitir(id)
     if (formaDoMeio(atual?.meio) === FORMA_ONLINE && situacaoDaCobranca(atual.cobranca, Date.now()).chave === 'expirada') {
-      return mandarLinkNovo(id)
+      return antesDeEnviar(id, () => mandarLinkNovo(id), { erro: 'Não consegui assumir a conversa, então o link novo não saiu.' })
     }
     avisar(LINK_AINDA_VALE)
     return undefined
@@ -236,9 +296,10 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
         },
         (erro) => {
           const naoRegistrado = erro.codigo === 'pedido_ja_pago' ? erro.message
-            : !erro.status || erro.status >= 500
-              ? 'Não foi possível confirmar o registro do pagamento. Confira o pedido antes de tentar novamente.'
+            : semConfirmacao(erro)
+              ? 'Não foi possível confirmar o registro do pagamento. Conferindo o pedido; veja o saldo antes de tentar novamente.'
               : `Pagamento não registrado: ${erro.message}`
+          if (!cancelarLink && semConfirmacao(erro)) { avisar(naoRegistrado); return conferir(id).then(() => ({ erro: naoRegistrado })) }
           const recusar = (mensagem) => { avisar(mensagem); return { erro: mensagem } }
           if (!cancelarLink) return recusar(naoRegistrado)
           // O link pode já ter sido cancelado: a tela mostra o pedido como o EasyStok ficou. Sem
@@ -287,6 +348,11 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     return umaPorConversa(id, 'desfazer', () => desfazerPagamentoManual(pedidoCriado(id), motivo, pagamentoId).then(
       () => { limparAviso(); return recarregar(id).catch(() => avisar('Pagamento desfeito. Atualizando a tela…')) },
       (erro) => {
+        if (semConfirmacao(erro)) {
+          const mensagem = 'Não foi possível confirmar se o pagamento foi desfeito. Conferindo o pedido.'
+          avisar(mensagem)
+          return conferir(id).then(() => ({ erro: mensagem }))
+        }
         const mensagem = `Pagamento não desfeito: ${erro.message}`
         avisar(mensagem)
         return { erro: mensagem }
@@ -306,13 +372,15 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     },
     cancelarPedido: (id, motivo) => {
       if (!pedidoCriado(id)) return soNoEasyStok('Cancelar pedido')(id)
-      if (!motivo?.trim() || motivo.trim().length < 3 || motivo.trim().length > 500)
-        return Promise.resolve({ erro: 'Informe um motivo entre 3 e 500 caracteres.' })
+      if (!motivoDoCancelamentoValido(motivo)) return Promise.resolve({ erro: ERRO_MOTIVO_CANCELAMENTO })
       return umaPorConversa(id, 'cancelar', async () => {
         try {
           await cancelarPedido(pedidoCriado(id), motivo.trim())
         } catch (erro) {
-          avisar(`Não foi possível confirmar o cancelamento: ${erro.message}`)
+          if (semConfirmacao(erro)) {
+            avisar('Não foi possível confirmar o cancelamento. Conferindo o pedido.')
+            await conferir(id)
+          } else avisar(`Não foi possível confirmar o cancelamento: ${erro.message}`)
           return { erro: erro.message }
         }
         limparAviso()
@@ -358,7 +426,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef }) {
     // muda o meio nem diz que reenviou.
     alterarMeioPagamento: (id, meio) => {
       if (!pedidoCriado(id)) return acoes.alterarMeioPagamento(id, meio)
-      if (formaDoMeio(meio) !== formaDoMeio(pedidoDe(id)?.meio)) return trocarForma(id, meio)
+      if (formaDoMeio(meio) !== formaDoMeio(pedidoDe(id)?.meio)) return trocarFormaFalando(id, meio)
       avisar(MESMA_FORMA)
       return Promise.resolve({ erro: MESMA_FORMA })
     },

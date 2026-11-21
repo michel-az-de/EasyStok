@@ -9,6 +9,7 @@ public class ObterDiasAlertaValidadeUseCaseTests
 {
     private readonly IConfiguracaoLojaRepository _configuracaoRepository = Substitute.For<IConfiguracaoLojaRepository>();
     private readonly ILogger<ObterDiasAlertaValidadeUseCase> _logger = Substitute.For<ILogger<ObterDiasAlertaValidadeUseCase>>();
+    private static readonly Guid EmpresaId = Guid.NewGuid();
     private readonly IEasyStockConfiguracoes _config;
 
     public ObterDiasAlertaValidadeUseCaseTests()
@@ -23,7 +24,7 @@ public class ObterDiasAlertaValidadeUseCaseTests
     {
         // Arrange
         var useCase = new ObterDiasAlertaValidadeUseCase(_configuracaoRepository, _config, _logger);
-        var cmd = new ObterDiasAlertaValidadeCommand();
+        var cmd = new ObterDiasAlertaValidadeCommand(EmpresaId);
 
         // Act
         var result = await useCase.ExecuteAsync(cmd);
@@ -40,14 +41,14 @@ public class ObterDiasAlertaValidadeUseCaseTests
         _config.DiasAlertaVencimento.Returns(15);
 
         var useCase = new ObterDiasAlertaValidadeUseCase(_configuracaoRepository, _config, _logger);
-        var cmd = new ObterDiasAlertaValidadeCommand(lojaId);
+        var cmd = new ObterDiasAlertaValidadeCommand(EmpresaId, lojaId);
 
         // Act
         var result = await useCase.ExecuteAsync(cmd);
 
         // Assert - uses default when config returns null
         result.Dias.Should().Be(15);
-        await _configuracaoRepository.Received(1).GetByLojaIdAsync(lojaId);
+        await _configuracaoRepository.Received(1).GetDaLojaAsync(EmpresaId, lojaId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -55,10 +56,10 @@ public class ObterDiasAlertaValidadeUseCaseTests
     {
         // Arrange
         var lojaId = Guid.NewGuid();
-        _configuracaoRepository.GetByLojaIdAsync(lojaId).Returns((EasyStock.Domain.Entities.ConfiguracaoLoja?)null);
+        _configuracaoRepository.GetDaLojaAsync(EmpresaId, lojaId, Arg.Any<CancellationToken>()).Returns((EasyStock.Domain.Entities.ConfiguracaoLoja?)null);
 
         var useCase = new ObterDiasAlertaValidadeUseCase(_configuracaoRepository, _config, _logger);
-        var cmd = new ObterDiasAlertaValidadeCommand(lojaId);
+        var cmd = new ObterDiasAlertaValidadeCommand(EmpresaId, lojaId);
 
         // Act
         var result = await useCase.ExecuteAsync(cmd);

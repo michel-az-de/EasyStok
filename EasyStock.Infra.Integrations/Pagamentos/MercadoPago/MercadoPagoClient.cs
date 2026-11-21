@@ -5,8 +5,11 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Seguranca;
+using EasyStock.Infra.Integrations.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Polly.CircuitBreaker;
+using Polly.Registry;
 
 namespace EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 
@@ -14,7 +17,7 @@ namespace EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 /// Adapter HTTP direto para a API do MercadoPago (ADR-0005): Preferences do Checkout Pro
 /// (<c>checkout/preferences</c>) e Payments (<c>v1/payments</c>, S32).
 /// NÃO usa o SDK estático MercadoPago.NET — usa <see cref="HttpClient"/> tipado
-/// com timeout configurado externamente (5 s via caller em <c>IniciarCheckoutUseCase</c>).
+/// com timeout configurado externamente (5 s via caller em <c>IniciarCheckoutUseCase</c>), dentro do pipeline Polly (#2177).
 ///
 /// <para>
 /// Ids que entram no caminho da URL passam por formato fechado (pagamento: só dígitos; preferência:
@@ -25,6 +28,7 @@ namespace EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 public sealed partial class MercadoPagoClient(
     HttpClient httpClient,
     IOptions<MercadoPagoOptions> options,
+    ResiliencePipelineProvider<string> pipelines,
     ILogger<MercadoPagoClient> logger) : IMercadoPagoClient
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -58,11 +62,12 @@ public sealed partial class MercadoPagoClient(
             }),
             external_reference = command.PedidoId.ToString(),
             notification_url = options.Value.NotificationUrl,
+            // #2228: a cobrança da conversa volta ao WhatsApp da loja em qualquer resultado; sem ela, ao site.
             back_urls = new
             {
-                success = options.Value.BackUrlSuccess,
-                failure = options.Value.BackUrlFailure,
-                pending = options.Value.BackUrlPending,
+                success = command.RetornoUrl ?? options.Value.BackUrlSuccess,
+                failure = command.RetornoUrl ?? options.Value.BackUrlFailure,
+                pending = command.RetornoUrl ?? options.Value.BackUrlPending,
             },
             auto_return = "approved",
             // S11: o link vale 30 min (a expiração vem do use case de cobrança).
@@ -73,12 +78,12 @@ public sealed partial class MercadoPagoClient(
         };
 
         // S32: endpoint documentado do Checkout Pro (o antigo v1/payments/preferences nunca foi validado).
-        using var request = Requisicao(HttpMethod.Post, "checkout/preferences");
-        request.Content = JsonContent.Create(payload, options: JsonOpts);
-        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
-            request.Headers.Add("X-Idempotency-Key", command.IdempotencyKey);
-
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Post, "checkout/preferences", ct, request =>
+        {
+            request.Content = JsonContent.Create(payload, options: JsonOpts);
+            if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+                request.Headers.Add("X-Idempotency-Key", command.IdempotencyKey);
+        });
         await GarantirSucessoAsync(response, ct);
 
         using var doc = await JsonDocument.ParseAsync(
@@ -102,8 +107,7 @@ public sealed partial class MercadoPagoClient(
     {
         // Sem cache de propósito: é assim que credencial revogada (401) aparece antes de o job concluir
         // que não houve pagamento.
-        using var request = Requisicao(HttpMethod.Get, "users/me");
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Get, "users/me", ct);
         await GarantirSucessoAsync(response, ct);
 
         using var doc = await JsonDocument.ParseAsync(
@@ -116,8 +120,7 @@ public sealed partial class MercadoPagoClient(
     {
         var id = ValidarPagamentoId(pagamentoId);
 
-        using var request = Requisicao(HttpMethod.Get, $"v1/payments/{id}");
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Get, $"v1/payments/{id}", ct);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         await GarantirSucessoAsync(response, ct);
 
@@ -134,8 +137,7 @@ public sealed partial class MercadoPagoClient(
 
         var url = $"v1/payments/search?external_reference={Uri.EscapeDataString(referenciaExterna.Trim())}" +
                   "&sort=date_created&criteria=desc";
-        using var request = Requisicao(HttpMethod.Get, url);
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Get, url, ct);
         await GarantirSucessoAsync(response, ct);
 
         using var doc = await JsonDocument.ParseAsync(
@@ -144,6 +146,44 @@ public sealed partial class MercadoPagoClient(
             return [];
 
         return results.EnumerateArray().Select(LerPagamento).ToList();
+    }
+
+    [GeneratedRegex("^ORD[A-Z0-9]{1,60}$")]
+    private static partial Regex FormatoOrdemId();
+
+    public async Task<IReadOnlyList<PagamentoMercadoPago>> BuscarPagamentosPixDaOrdemAsync(string ordemId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(ordemId) || !FormatoOrdemId().IsMatch(ordemId))
+            throw new ArgumentException("Id de ordem Mercado Pago invalido.", nameof(ordemId));
+        using var response = await EnviarAsync(HttpMethod.Get, $"v1/orders/{Uri.EscapeDataString(ordemId)}", ct);
+        if (response.StatusCode == HttpStatusCode.NotFound) return [];
+        await GarantirSucessoAsync(response, ct);
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        var ordem = doc.RootElement;
+        if (Texto(ordem, "id") != ordemId)
+            throw new InvalidOperationException("Mercado Pago devolveu outra ordem.");
+        if (!Guid.TryParse(Texto(ordem, "external_reference"), out var pedidoId)
+            || !ordem.TryGetProperty("transactions", out var transacoes) || transacoes.ValueKind != JsonValueKind.Object
+            || !transacoes.TryGetProperty("payments", out var pagamentos) || pagamentos.ValueKind != JsonValueKind.Array)
+            return [];
+        var e2es = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var pagamento in pagamentos.EnumerateArray())
+        {
+            if (pagamento.ValueKind != JsonValueKind.Object
+                || !pagamento.TryGetProperty("payment_method", out var metodo) || metodo.ValueKind != JsonValueKind.Object
+                || Texto(metodo, "id") != "pix") continue;
+            var e2e = Texto(metodo, "e2e_id");
+            if (string.IsNullOrWhiteSpace(e2e)) return [];
+            e2es.Add(e2e);
+        }
+        if (e2es.Count == 0) return [];
+        var encontrados = await BuscarPagamentosPorReferenciaAsync(pedidoId.ToString(), ct);
+        var candidatos = encontrados.Where(p => Guid.TryParse(p.ExternalReference, out var referencia) && referencia == pedidoId
+            && p.PaymentMethodId == "pix" && !string.IsNullOrWhiteSpace(p.TransactionId) && e2es.Contains(p.TransactionId))
+            .DistinctBy(p => p.Id).ToArray();
+        // Uma busca ainda incompleta ou ambigua deve ser reenviada, nunca substituida por pagamento antigo.
+        return e2es.SetEquals(candidatos.Select(p => p.TransactionId!))
+            && candidatos.GroupBy(p => p.TransactionId).All(g => g.Count() == 1) ? candidatos : [];
     }
 
     public async Task<EstornoMercadoPagoResult> EstornarAsync(
@@ -158,13 +198,13 @@ public sealed partial class MercadoPagoClient(
             throw new ArgumentException("Chave de idempotência do estorno é obrigatória.", nameof(idempotencyKey));
         var chave = idempotencyKey.Trim();
 
-        using var request = Requisicao(HttpMethod.Post, $"v1/payments/{id}/refunds");
-        request.Headers.Add("X-Idempotency-Key", chave);
-        // Estorno total vai sem corpo; parcial leva amount (documentação de Reembolsos).
-        if (valor.HasValue)
-            request.Content = JsonContent.Create(new { amount = valor.Value }, options: JsonOpts);
-
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Post, $"v1/payments/{id}/refunds", ct, request =>
+        {
+            request.Headers.Add("X-Idempotency-Key", chave);
+            // Estorno total vai sem corpo; parcial leva amount (documentação de Reembolsos).
+            if (valor.HasValue)
+                request.Content = JsonContent.Create(new { amount = valor.Value }, options: JsonOpts);
+        });
         await GarantirSucessoAsync(response, ct);
 
         using var doc = await JsonDocument.ParseAsync(
@@ -179,8 +219,7 @@ public sealed partial class MercadoPagoClient(
 
     public async Task<EstornoMercadoPagoResult?> ConsultarEstornoAsync(string pagamentoId, string estornoId, CancellationToken ct = default)
     {
-        using var request = Requisicao(HttpMethod.Get, $"v1/payments/{ValidarPagamentoId(pagamentoId)}/refunds/{ValidarPagamentoId(estornoId)}");
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Get, $"v1/payments/{ValidarPagamentoId(pagamentoId)}/refunds/{ValidarPagamentoId(estornoId)}", ct);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         await GarantirSucessoAsync(response, ct);
         using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
@@ -189,8 +228,7 @@ public sealed partial class MercadoPagoClient(
 
     public async Task<IReadOnlyList<EstornoMercadoPagoResult>> ListarEstornosAsync(string pagamentoId, CancellationToken ct = default)
     {
-        using var request = Requisicao(HttpMethod.Get, $"v1/payments/{ValidarPagamentoId(pagamentoId)}/refunds");
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Get, $"v1/payments/{ValidarPagamentoId(pagamentoId)}/refunds", ct);
         await GarantirSucessoAsync(response, ct);
         using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
         return doc.RootElement.EnumerateArray().Select(LerEstorno).ToList();
@@ -205,11 +243,9 @@ public sealed partial class MercadoPagoClient(
         if (string.IsNullOrWhiteSpace(preferenceId) || !FormatoPreferenceId().IsMatch(preferenceId))
             throw new ArgumentException("Id de preferência fora do formato.", nameof(preferenceId));
 
-        using var request = Requisicao(HttpMethod.Put, $"checkout/preferences/{preferenceId}");
-        request.Content = JsonContent.Create(
-            new { expires = true, expiration_date_to = FormatarDataMp(expiraEm) }, options: JsonOpts);
-
-        using var response = await httpClient.SendAsync(request, ct);
+        using var response = await EnviarAsync(HttpMethod.Put, $"checkout/preferences/{preferenceId}", ct, request =>
+            request.Content = JsonContent.Create(
+                new { expires = true, expiration_date_to = FormatarDataMp(expiraEm) }, options: JsonOpts));
         await GarantirSucessoAsync(response, ct);
         logger.LogInformation("MP preference expirada preferenceId={PreferenceId}", preferenceId);
     }
@@ -231,11 +267,33 @@ public sealed partial class MercadoPagoClient(
             null, response.StatusCode);
     }
 
-    private HttpRequestMessage Requisicao(HttpMethod metodo, string caminho)
+    /// <summary>
+    /// Toda chamada passa pelo Polly (#2177): GET na categoria <see cref="IntegrationCategories.Payments"/>, que repete
+    /// 5xx; escrita na <see cref="IntegrationCategories.PagamentosEscrita"/>, sem retry (invariante 12). A requisição é
+    /// montada a cada tentativa, porque um <see cref="HttpRequestMessage"/> não sai duas vezes.
+    /// </summary>
+    private async Task<HttpResponseMessage> EnviarAsync(
+        HttpMethod metodo, string caminho, CancellationToken ct, Action<HttpRequestMessage>? montar = null)
     {
-        var request = new HttpRequestMessage(metodo, caminho);
-        request.Headers.Add("Authorization", $"Bearer {options.Value.AccessToken}");
-        return request;
+        var pipeline = pipelines.GetPipeline(metodo == HttpMethod.Get
+            ? IntegrationCategories.Payments
+            : IntegrationCategories.PagamentosEscrita);
+        try
+        {
+            return await pipeline.ExecuteAsync(async pollyCt =>
+            {
+                using var request = new HttpRequestMessage(metodo, caminho);
+                request.Headers.Add("Authorization", $"Bearer {options.Value.AccessToken}");
+                montar?.Invoke(request);
+                return await httpClient.SendAsync(request, pollyCt);
+            }, ct);
+        }
+        catch (BrokenCircuitException ex)
+        {
+            // Como na Meta (#2025): com o disjuntor aberto nada sai. Continua HttpRequestException, que os chamadores tratam.
+            throw new HttpRequestException(HttpRequestError.ConnectionError,
+                "Mercado Pago temporariamente indisponível; a chamada não saiu.", ex);
+        }
     }
 
     private static string ValidarPagamentoId(string pagamentoId)
@@ -257,7 +315,11 @@ public sealed partial class MercadoPagoClient(
         TransactionAmountRefunded: Numero(p, "transaction_amount_refunded") ?? 0,
         // collector_id no nível do pagamento; em respostas que só trazem o objeto, collector.id.
         CollectorId: Texto(p, "collector_id")
-                     ?? (p.TryGetProperty("collector", out var collector) && collector.ValueKind == JsonValueKind.Object ? Texto(collector, "id") : null));
+                     ?? (p.TryGetProperty("collector", out var collector) && collector.ValueKind == JsonValueKind.Object ? Texto(collector, "id") : null))
+    {
+        TransactionId = p.TryGetProperty("transaction_details", out var detalhes) && detalhes.ValueKind == JsonValueKind.Object
+            ? Texto(detalhes, "transaction_id") : null,
+    };
 
     /// <summary>String ou número (o Mercado Pago devolve ids numéricos) como texto; null/ausente = null.</summary>
     private static string? Texto(JsonElement e, string campo)

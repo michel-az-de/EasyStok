@@ -100,7 +100,7 @@ public class RespostasProntasUseCasesTests
         var lembrete = lista.Should().ContainSingle(r => r.Gatilho == GatilhoAutomacao.CobrancaVencendo).Subject;
         lembrete.Ligada.Should().BeTrue();
         lembrete.Texto.Should().Contain("{pedido}");
-        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado))
+        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.SaudacaoSolta))
             .Should().OnlyContain(r => !r.Ligada && r.Texto == null);
     }
 
@@ -134,8 +134,22 @@ public class RespostasProntasUseCasesTests
         pago.Ligada.Should().BeTrue();
         pago.Texto.Should().Be(RegraAutomatica.TextoPadraoPagamentoConfirmado);
         pago.AlteradaEm.Should().BeNull("o padrão não foi gravado por ninguém");
-        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.CobrancaVencendo))
+        lista.Where(r => r.Gatilho is not (GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.SaudacaoSolta))
             .Should().OnlyContain(r => !r.Ligada && r.Texto == null);
+    }
+
+    [Fact]
+    public async Task ListarSemRegraGravada_SaudacaoSoltaVemDesligadaComTextoSugerido()
+    {
+        _regras.ListarAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(new List<RegraAutomatica>());
+
+        var lista = await new AutomacoesUseCases(_regras, _uow, _relogio).ListarAsync(_empresaId);
+
+        // #2885 (D3): a regra nasce desligada, com texto sugerido para a dona só ligar.
+        var saudacao = lista.Single(r => r.Gatilho == GatilhoAutomacao.SaudacaoSolta);
+        saudacao.Ligada.Should().BeFalse();
+        saudacao.Texto.Should().Be(RegraAutomatica.TextoPadraoSaudacaoSolta);
+        saudacao.AlteradaEm.Should().BeNull("o padrão não foi gravado por ninguém");
     }
 
     [Fact]
@@ -149,5 +163,66 @@ public class RespostasProntasUseCasesTests
         var lista = await new AutomacoesUseCases(_regras, _uow, _relogio).ListarAsync(_empresaId);
 
         lista.Single(r => r.Gatilho == GatilhoAutomacao.PagamentoConfirmado).Ligada.Should().BeFalse();
+    }
+
+    // #2781: chave fora do catálogo é recusada ao salvar, com o nome da chave errada.
+    [Fact]
+    public async Task SalvarAutomacaoComChaveDesconhecidaRecusaListandoAChave()
+    {
+        var useCase = new AutomacoesUseCases(_regras, _uow, _relogio);
+
+        var act = () => useCase.SalvarAsync(new SalvarAutomacaoCommand(
+            _empresaId, GatilhoAutomacao.PosEntrega, "Oi {nome}, {chave_que_nao_existe} e {outra}", true));
+
+        var erro = await act.Should().ThrowAsync<UseCaseValidationException>();
+        erro.Which.Message.Should().Contain("{chave_que_nao_existe}, {outra}. Use só");
+        _uow.CommitCount.Should().Be(0);
+        await _regras.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task SalvarAutomacaoSoComChavesDoCatalogoContinuaSalvando()
+    {
+        var useCase = new AutomacoesUseCases(_regras, _uow, _relogio);
+
+        var salva = await useCase.SalvarAsync(new SalvarAutomacaoCommand(
+            _empresaId, GatilhoAutomacao.PosEntrega, "Oi {nome}, pedido {pedido} para {faixa}.", true));
+
+        salva.Texto.Should().Be("Oi {nome}, pedido {pedido} para {faixa}.");
+        _uow.CommitCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AlterarAutomacaoParaChaveDesconhecidaRecusaEMantemOTexto()
+    {
+        var existente = RegraAutomatica.Criar(_empresaId, GatilhoAutomacao.PosEntrega, "Chegou?", true, Agora);
+        _regras.ObterPorGatilhoAsync(_empresaId, GatilhoAutomacao.PosEntrega, Arg.Any<CancellationToken>()).Returns(existente);
+
+        var act = () => new AutomacoesUseCases(_regras, _uow, _relogio).SalvarAsync(
+            new SalvarAutomacaoCommand(_empresaId, GatilhoAutomacao.PosEntrega, "Oi {Nome}", true));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*{Nome}*");
+        existente.Texto.Should().Be("Chegou?");
+    }
+
+    [Fact]
+    public async Task CriarRespostaComChaveDesconhecidaRecusaListandoAChave()
+    {
+        var act = () => UseCases().CriarAsync(new SalvarRespostaProntaCommand(_empresaId, "Oi", "/oi", "Olá {nome_errado}"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*{nome_errado}*");
+        await _repo.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task EditarRespostaComChaveDesconhecidaRecusaEMantemOTexto()
+    {
+        var resposta = RespostaPronta.Criar(_empresaId, "A", "/a", "Olá {nome}", Agora);
+        _repo.ObterAsync(_empresaId, resposta.Id, Arg.Any<CancellationToken>()).Returns(resposta);
+
+        var act = () => UseCases().EditarAsync(resposta.Id, new SalvarRespostaProntaCommand(_empresaId, "A", "/a", "Olá {apelido}"));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*{apelido}*");
+        resposta.Texto.Should().Be("Olá {nome}");
     }
 }

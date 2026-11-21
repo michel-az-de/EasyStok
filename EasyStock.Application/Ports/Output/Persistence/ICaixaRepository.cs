@@ -23,6 +23,10 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// Base cross-day: agrega a sessão de caixa que pode atravessar a meia-noite BRT.</summary>
         Task<IEnumerable<MovimentoCaixa>> GetMovimentosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
 
+        /// <summary>A3 (#1769): só os movimentos ESTORNADOS lançados em [iniUtc, fimUtc), para a lista do dia mostrar
+        /// "Estornado por X". Nunca entram em total; os totais seguem em <see cref="GetMovimentosNoIntervaloAsync"/>.</summary>
+        Task<IReadOnlyList<MovimentoCaixa>> GetMovimentosEstornadosNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
+
         /// <summary>Última abertura sem fechamento posterior (sessão em aberto, possivelmente de um
         /// dia anterior). Null se o último evento abertura/fechamento foi um fechamento. Espelha a
         /// lógica de "último evento" do dashboard (AnalyticsRepository.ResumoDia) — issue #596.</summary>
@@ -57,6 +61,12 @@ namespace EasyStock.Application.Ports.Output.Persistence
         Task UpdateMovimentoAsync(MovimentoCaixa movimento);
 
         /// <summary>
+        /// #2763: quem leu o movimento antes da trava do Caixa chama atrás dela para ver o estorno que outra tela gravou
+        /// enquanto esperava. Só relê do banco quando o banco já tem o estorno; senão preserva a edição ainda não salva.
+        /// </summary>
+        Task RecarregarMovimentoAsync(MovimentoCaixa movimento, CancellationToken ct = default);
+
+        /// <summary>
         /// Tenta inserir o movimento; se colidir com <c>ix_movimentos_caixa_abertura_unica</c>
         /// (corrida perdida — outra transação já abriu o caixa do dia/loja), retorna
         /// <see langword="false"/> sem lançar, e a entidade é destrackeada. Qualquer OUTRA
@@ -74,7 +84,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         /// <summary>
         /// Serializa as saídas interativas do caixa de uma empresa/loja até o fim da transação
         /// (<c>pg_advisory_xact_lock</c>): conferência de saldo é checagem de limite, e o índice não
-        /// serializa isso sozinho (#1547). Precisa de transação explícita em andamento.
+        /// serializa isso sozinho (#1547). Com loja, toma antes a trava do caixa da empresa, que o fechamento sem
+        /// loja usa (#2629). Precisa de transação explícita em andamento.
         /// </summary>
         Task TravarSaidasAsync(Guid empresaId, Guid? lojaId, CancellationToken ct = default);
 
@@ -107,7 +118,8 @@ namespace EasyStock.Application.Ports.Output.Persistence
         // ── Linhas para a lista "Movimentos do dia" (BUG-5) ───────────
         /// <summary>Vendas (não-canceladas) de um intervalo [iniUtc, fimUtc) — para listar como
         /// linhas no caixa. Mesma seleção de <see cref="GetTotalVendasNoIntervaloAsync"/>, então a
-        /// soma das linhas == total que entra no saldo.</summary>
+        /// soma das linhas == total que entra no saldo. #2708/#2714: venda de pedido com recebimento de outro dia
+        /// ou de outra forma (sinal) vem com <c>ValorTotal</c> abatido desse recebimento, e a já paga inteira fora dela não vem.</summary>
         Task<IReadOnlyList<Venda>> GetVendasNoIntervaloAsync(Guid empresaId, DateTime iniUtc, DateTime fimUtc, Guid? lojaId = null);
 
         /// <summary>Pagamentos de pedidos não-cancelados de um intervalo [iniUtc, fimUtc) — para

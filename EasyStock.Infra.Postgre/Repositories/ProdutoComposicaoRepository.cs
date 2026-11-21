@@ -155,8 +155,8 @@ public class ProdutoComposicaoRepository(EasyStockDbContext context) : IProdutoC
 
         if (!string.IsNullOrWhiteSpace(termo))
         {
-            var pattern = $"%{termo.Trim()}%";
-            query = query.Where(p => EF.Functions.ILike(p.Nome, pattern));
+            var pattern = PadraoILike.Contendo(termo.Trim());
+            query = query.Where(p => EF.Functions.ILike(p.Nome, pattern, PadraoILike.Escape));
         }
 
         return await query

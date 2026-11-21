@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDndContext, useDroppable } from '@dnd-kit/core'
 import { Botao } from '../../componentes/Botao'
+import { CampoReais } from '../../componentes/CampoReais'
 import { CampoArea } from '../../componentes/Campo'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
-import { moeda } from '../../dominio/formato'
+import { lerMoeda, moeda } from '../../dominio/formato'
 import {
   LINHA_CLIENTE_ESCOLHENDO, agruparPorLinha, comandaTravada, itensDetalhados, numeroDaComanda, pedidoEncerrado, porcaoForaDoNome,
   precoDaLinha, totalDoPedido,
@@ -14,7 +15,7 @@ import { diferencaAposPagamento, totalPago } from '../../dominio/pagamento'
 import { linhasDaSimulacao } from '../../dominio/simulacaoPedido'
 import { situacaoDoItem } from '../../dominio/cardapio'
 import {
-  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, caminhoParaTrocarItem, podeCancelarParaRefazer, avisoDoEnvio, previaDoSinal, rotuloDoTotal, situacaoDoEnvio,
+  LINHA_COMANDA_TRAVADA, LINHA_COMANDA_VAI_JUNTO, ROTULO_ENVIAR, caminhoParaTrocarItem, podeCancelarParaRefazer, avisoDoEnvio, previaDoSinal, rotuloDoTotal, situacaoDoEnvio, podeVerCanhoto,
 } from '../../dominio/resumoPedido'
 import { Cabecalho } from './Cabecalho'
 import { ModalCanhoto } from './Canhoto'
@@ -82,7 +83,7 @@ function ItemComanda({
                 <button type="button" aria-label="Menos um" onClick={() => aoAjustar(linha.sku, -1)}>
                   <Icone nome="menos" rotulo={`Tirar uma unidade de ${linha.produto?.nome}`} />
                 </button>
-                <b>{linha.qtd}</b>
+                <b aria-live="polite">{linha.qtd}</b>
                 <button type="button" aria-label="Mais um" onClick={() => aoAjustar(linha.sku, 1)}>
                   <Icone nome="mais" rotulo={`Mais uma unidade de ${linha.produto?.nome}`} />
                 </button>
@@ -109,12 +110,12 @@ function ItemComanda({
 }
 
 export function BlocoPedido({
-  pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido, gerarSemEnviar = false,
+  pedido, editavel, aoTrocarJanela, aoAbrirCardapio, aoAjustar, aoAjustarObservacao, aoGerarPedido, foraDaJanela = false,
   aoForcarEncaixe, nomeCliente, endereco, faixa, bloqueado = false, conversaId, numeroComanda,
   clienteEscolhendo = false, simulacao = null, acaoAlterarPeloLink = null, aoCancelarParaRefazer = null,
 }) {
   const { cardapio, linhas } = useCatalogo()
-  const { marcarCanhotoImpresso } = useAcoes()
+  const { marcarCanhotoImpresso, definirFreteCombinado } = useAcoes()
   const { fonteApi, agora } = useAtendimento()
   const [canhotoAberto, setCanhotoAberto] = useState(false)
   // Ponta (a): "Enviar comanda" sem meio marcado pergunta o meio antes de
@@ -182,11 +183,13 @@ export function BlocoPedido({
   // #1875 ("Quanto fica?"): o que já dá para dizer antes de gerar a cobrança. O frete é do servidor.
   const previaSinal = previaDoSinal(pedido, { fonteApi, agora, total: pedido.totalApi ?? total })
   // #1884: com a simulação do servidor a comanda mostra frete, total com frete e sinal em número.
-  const linhasSimulacao = !pedido.pedidoId ? linhasDaSimulacao(simulacao) : null
+  const linhasSimulacao = !pedido.pedidoId ? linhasDaSimulacao(simulacao, { combinado: pedido.freteCombinado != null }) : null
+  // #2219: CEP fora da área. A equipe combina o frete com o cliente e digita aqui; o valor vai na simulação e
+  // no pedido, e a cobrança sai pela tela como qualquer outra. Vazio volta ao frete a combinar; o campo
+  // continua na tela depois de usado (null), para não sumir e perder o foco enquanto a simulação refaz.
+  const pedeFreteCombinado = fonteApi && !pedido.pedidoId && !fechado
+    && Boolean(simulacao?.freteACombinar || pedido.freteCombinado !== undefined)
   const linhaDe = (chave) => linhasSimulacao?.find((l) => l.chave === chave)?.texto ?? null
-  // #1875: na Seleção do atendimento (pedido ainda não criado) a janela vem antes da comanda: com a comanda
-  // primeiro, em 1366x768 a lista de 10 janelas começava a 541 px de um conteúdo de 1026 e nenhuma cabia sem rolar.
-  const janelaPrimeiro = !fechado && fonteApi && !pedido.pedidoId
   const seletorDeJanela = !fechado && fonteApi
     ? <SeletorJanelaApi key={conversaId} pedido={pedido} editavel={editavel} aoEscolher={aoTrocarJanela} />
     : null
@@ -199,13 +202,12 @@ export function BlocoPedido({
 
   return (
     <>
-      {janelaPrimeiro && seletorDeJanela}
       <section
         ref={soltarRef}
         id="comanda-pedido"
         tabIndex={-1}
         className={`${css.comanda} ${alvoDoArrasto ? css.alvoArrasto : ''}`}
-        aria-label={numeroComanda ? `Comanda número ${numeroComanda}` : 'Comanda em rascunho'}
+        aria-label={numeroComanda ? `Pedido número ${numeroComanda}` : 'Pedido em rascunho'}
       >
         {/* #1474 (R6, R3): o número é o do EasyStok quando o pedido existe; sem janela, o
             cabeçalho avisa. A faixa do modo API vem do seletor, não do catálogo local.
@@ -223,16 +225,27 @@ export function BlocoPedido({
         <div className={css.resumoTotal}>
           {pedido.frete > 0 && <p className={css.vazio}>Frete {moeda(pedido.frete)}</p>}
           {linhasSimulacao && <p className={css.vazio} data-simulacao-frete>{linhaDe('frete')}</p>}
+          {pedeFreteCombinado && (
+            <CampoReais
+              rotulo="Frete combinado"
+              dica="CEP fora da área de entrega. Digite o frete que você combinou com o cliente; zero é frete grátis."
+              placeholder="A combinar"
+              mostrarZero
+              centavos={pedido.freteCombinado != null ? Math.round(pedido.freteCombinado * 100) : null}
+              ler={lerMoeda}
+              aoMudar={(centavos) => definirFreteCombinado(conversaId, centavos == null ? null : centavos / 100)}
+            />
+          )}
           <p className={css.total}>
             <span>{fonteApi && !pedido.pedidoId ? 'Total dos itens' : rotuloDoTotal(pedido, { fonteApi })}</span>
             <b>{moeda(pedido.totalApi ?? total)}</b>
           </p>
           {linhaDe('total') && <p className={css.total} data-simulacao-total><span>Total com frete</span><b>{moeda(simulacao.total)}</b></p>}
-          {fonteApi && !pedido.pedidoId && !linhasSimulacao && <p className={css.notaTotal}>O frete entra ao gerar a cobrança.</p>}
+          {fonteApi && !pedido.pedidoId && !linhasSimulacao && <p className={css.notaTotal}>Confira o frete antes de gerar a cobrança.</p>}
           {linhaDe('sinal') && <p className={css.notaTotal} data-simulacao-sinal>{linhaDe('sinal')}</p>}
           {previaSinal && !linhasSimulacao && (
             <p className={css.notaTotal}>
-              Encomenda para outro dia: sinal de 50% do total com o frete antes da produção (nos itens, {moeda(previaSinal.sinal)}); o restante na entrega.
+              Encomenda com antecedência: sinal de 50% do total com o frete antes da produção (nos itens, {moeda(previaSinal.sinal)}); o restante na entrega.
             </p>
           )}
         </div>
@@ -240,7 +253,7 @@ export function BlocoPedido({
         {alvoDoArrasto && <p className={css.soltarAqui}>Soltar aqui</p>}
 
         {grupos.length === 0 && (
-          <p className={css.vazio}>{clienteEscolhendo ? LINHA_CLIENTE_ESCOLHENDO : 'Comanda vazia. Abra o cardápio para montar o pedido.'}</p>
+          <p className={css.vazio}>{clienteEscolhendo ? LINHA_CLIENTE_ESCOLHENDO : 'Pedido vazio. Abra o cardápio para montar o pedido.'}</p>
         )}
 
         {grupos.map((grupo) => (
@@ -278,7 +291,7 @@ export function BlocoPedido({
       {/* No modo API a janela é da vitrine, com data; pedido criado troca a vaga no servidor.
           #1474 (R3): vem antes das ações, logo abaixo da comanda, onde o motivo da barra aponta.
           #1551: remonta por conversa; o "Dia da entrega" de um cliente não vale para o seguinte. */}
-      {!janelaPrimeiro && seletorDeJanela}
+      {seletorDeJanela}
 
       <div className={css.acoesPedido}>
         {!fechado && (
@@ -306,7 +319,7 @@ export function BlocoPedido({
                 enviar"); aqui só a linha que diz que a comanda vai junto.
                 #1587: com o pedido já criado ela não vai mais a lugar nenhum; fica só o motivo acima. */}
             {fonteApi && (podeGerar || envio.chave === 'vazia') ? (
-              !itensTravados && <p className={css.situacaoEnvio}>{gerarSemEnviar ? 'A cobrança será gerada sem envio. Copie o link em Pagamento ou use um modelo aprovado.' : LINHA_COMANDA_VAI_JUNTO}</p>
+              !itensTravados && <p className={css.situacaoEnvio}>{foraDaJanela ? 'Janela fechada: o resumo sai pela mensagem padrão do WhatsApp.' : LINHA_COMANDA_VAI_JUNTO}</p>
             ) : (podeGerar || envio.chave === 'vazia') ? (
               <Botao
                 largo variante="primario" icone="enviar" disabled={!podeGerar || enviando}
@@ -324,12 +337,13 @@ export function BlocoPedido({
               <EscolhaDeMeio
                 escolhido={null}
                 aoEscolher={(meio) => { setPedindoMeio(false); enviar(meio) }}
-                pergunta="Como o cliente vai pagar? A comanda sai com a cobrança."
+                pergunta="Como o cliente vai pagar? O pedido sai com a cobrança."
               />
             )}
           </>
         )}
-        {itens.length > 0 && (
+        {/* #2185 (E30): no modo API o rascunho ainda não é pedido; imprimir seria mostrar algo que não existe. */}
+        {itens.length > 0 && podeVerCanhoto(pedido, { fonteApi }) && (
           <Botao largo icone="printer" onClick={() => setCanhotoAberto(true)}>Ver canhoto</Botao>
         )}
       </div>

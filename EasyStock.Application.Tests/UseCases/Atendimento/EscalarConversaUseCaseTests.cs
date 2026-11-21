@@ -106,4 +106,37 @@ public class EscalarConversaUseCaseTests
                && raiz.GetProperty("cliente").GetString() == "Maria"
                && raiz.GetProperty("motivo").GetString() == "cliente pediu desconto";
     }
+
+    [Fact]
+    public async Task EscaladaAvisaAEquipeInscritaPeloWhatsApp()
+    {
+        var conversa = NovaConversa();
+
+        await _useCase.EscalarAsync(_empresaId, conversa, "cliente pediu desconto", Agora);
+
+        // #2211: além do Push, o aviso da equipe com o motivo; sem rotina ligada o avaliador descarta.
+        await _notificador.Received(1).EnfileirarEventoAsync(
+            TipoEventoNotificacao.AvisoEquipeAtencaoAtendimento, _empresaId,
+            Arg.Is<string>(json => json.Contains("cliente pediu desconto")), conversa.Id, Arg.Any<CancellationToken>(),
+            Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task ConversaDaPropriaPessoaAvisadaNaoGeraOutroAviso()
+    {
+        var equipe = Substitute.For<EasyStock.Application.Services.Notifications.IContatoDaEquipeAvisada>();
+        equipe.EhInscritoAsync(_empresaId, "5511999998888", Arg.Any<CancellationToken>()).Returns(true);
+        var useCase = new EscalarConversaUseCase(_conversaRepository, _notificador, _eventPublisher, equipe);
+        var conversa = NovaConversa();
+
+        await useCase.EscalarAsync(_empresaId, conversa, "contato da equipe", Agora);
+
+        // A resposta ao aviso não vira outro aviso (laço); o console continua sabendo da conversa.
+        await _notificador.DidNotReceive().EnfileirarEventoAsync(
+            TipoEventoNotificacao.AvisoEquipeAtencaoAtendimento, Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>(), Arg.Any<string?>());
+        await _notificador.Received(1).EnfileirarEventoAsync(
+            TipoEventoNotificacao.ConversaEscalada, _empresaId, Arg.Any<string>(), conversa.Id, Arg.Any<CancellationToken>(),
+            Arg.Any<string?>());
+    }
 }

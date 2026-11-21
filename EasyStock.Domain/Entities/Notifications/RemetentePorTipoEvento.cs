@@ -3,7 +3,8 @@ using EasyStock.Domain.Enums.Notifications;
 namespace EasyStock.Domain.Entities.Notifications;
 
 /// <summary>
-/// Remetente de cada tipo de evento (N6). <b>Loja</b> só quando quem recebe é o cliente final; <b>Plataforma</b> para
+/// Remetente de cada tipo de evento (N6). <b>Loja</b> quando quem recebe é o cliente final e nos avisos da equipe sobre o
+/// atendimento (#2211); <b>Plataforma</b> para
 /// os demais, cujo destinatário é usuário interno. Sem valor padrão: tipo novo no enum sem classificação aqui lança, e
 /// o teste <c>TodoValorDoEnumTemRemetenteDeclarado</c> acusa antes de o esquecimento chegar à produção.
 /// </summary>
@@ -22,6 +23,12 @@ public static class RemetentePorTipoEvento
             or TipoEventoNotificacao.ReembolsoEfetuado
             or TipoEventoNotificacao.CampanhaMarketing
             or TipoEventoNotificacao.CampanhaLembreteEncerramento => OrigemRemetente.Loja,
+
+        // #2211 (Felipe, 04/11/2026, emenda da ADR-0057 item 2): o aviso da equipe sobre o atendimento sai pelo número
+        // da loja já cadastrado, o que a equipe acompanha. Só para quem a dona inscreveu (audiência "inscritos").
+        TipoEventoNotificacao.AvisoEquipeAtencaoAtendimento
+            or TipoEventoNotificacao.AvisoEquipePedidoComCanhoto
+            or TipoEventoNotificacao.AvisoEquipeProblemaPagamento => OrigemRemetente.Loja,
 
         // Usuário interno (dona, equipe, superadmin): sai pela plataforma.
         TipoEventoNotificacao.ProdutoVencendo

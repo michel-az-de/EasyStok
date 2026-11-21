@@ -34,11 +34,21 @@ public class UpdateCheckJob extends JobService {
         OtaManager.get(this).check(true, status -> main.post(() -> {
             if (running != params) return;
             running = null;
-            boolean retry = status.optBoolean("checking") || status.optBoolean("trial")
-                || !status.optBoolean("checkSucceeded");
-            jobFinished(params, retry);
+            announce(status.optString("pendingVersion", ""));
+            jobFinished(params, UpdatePolicy.shouldRetryCheck(status.optBoolean("checking"), status.optBoolean("trial"),
+                status.optBoolean("checkSucceeded")));
         }));
         return true;
+    }
+
+    /** O push só prepara o pacote; sem este aviso o usuário não sabe que precisa reabrir o app (#2195). */
+    private void announce(String pendingVersion) {
+        android.content.SharedPreferences prefs = getSharedPreferences("cdb-update-push", MODE_PRIVATE);
+        if (!UpdatePolicy.shouldAnnounceContent(pendingVersion, prefs.getString("announcedVersion", ""))) return;
+        try {
+            if (com.casadababa.app.AppNotifications.contentReady(this, pendingVersion))
+                prefs.edit().putString("announcedVersion", pendingVersion).apply();
+        } catch (RuntimeException ignored) { /* Aviso é conveniência; o pacote continua preparado para a próxima abertura. */ }
     }
 
     @Override public boolean onStopJob(JobParameters params) {

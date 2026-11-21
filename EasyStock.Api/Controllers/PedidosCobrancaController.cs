@@ -21,7 +21,7 @@ public sealed record RegistrarEstornoManualRequest(Guid OperacaoId, Guid Pagamen
 /// <para>
 /// Erros: 404 pedido de outro tenant ou inexistente; 409 com <c>error.code</c> =
 /// <c>pedido_ja_pago</c>, <c>use_estorno</c>, <c>preparo_iniciado</c>, <c>pedido_finalizado</c>,
-/// <c>sem_pagamento</c> ou <c>forma_na_entrega</c>; 503 Mercado Pago indisponível.
+/// <c>sem_pagamento</c>, <c>forma_na_entrega</c> ou <c>forma_pix_direto</c>; 503 Mercado Pago indisponível.
 /// </para>
 /// </summary>
 [SwaggerTag("Pedidos (encomendas)")]
@@ -91,7 +91,7 @@ public sealed class PedidosCobrancaController(
     public Task<IActionResult> Conferir(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct) =>
         ExecutarAsync(empresaId, async emp => DataOk(await conferencia.ExecuteAsync(emp, id, ct)));
 
-    [SwaggerOperation(Summary = "Trocar a forma de pagamento do pedido (online | na_entrega)")]
+    [SwaggerOperation(Summary = "Trocar a forma de pagamento do pedido (online | na_entrega | pix_direto)", Description = "pix_direto (#2233) exige a flag pagamento.pix_direto e a chave Pix da loja do pedido; a resposta traz pixCopiaCola.")]
     [HttpPost("{id}/cobranca/forma")]
     [Authorize(Policy = "Operador")]
     public Task<IActionResult> TrocarForma(

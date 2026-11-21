@@ -34,6 +34,9 @@ public class CatalogoMensagensCompletoTests
         TipoEventoNotificacao.PedidoSaiuParaEntrega, TipoEventoNotificacao.PedidoEntregue,
         TipoEventoNotificacao.PedidoReagendado, TipoEventoNotificacao.ComandaAtualizada,
         TipoEventoNotificacao.AvaliacaoSolicitada, TipoEventoNotificacao.ReembolsoEfetuado,
+        // #2211: avisos da equipe pelo WhatsApp.
+        TipoEventoNotificacao.AvisoEquipeAtencaoAtendimento, TipoEventoNotificacao.AvisoEquipePedidoComCanhoto,
+        TipoEventoNotificacao.AvisoEquipeProblemaPagamento,
     }.Select(t => new object[] { t });
 
     [Theory]

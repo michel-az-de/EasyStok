@@ -221,6 +221,12 @@ public class UpdaterTest {
         check(!UpdatePolicy.isUpdateAnnouncement("/topics/casa-da-baba-piloto-updates", "execute", "10"), "Other message kind rejected");
         for (String sequence : new String[] { "0", "-1", "1.5", "1e6", "9999999999999999999", " 1", "01" })
             check(!UpdatePolicy.isUpdateAnnouncement("/topics/casa-da-baba-piloto-updates", "ota-update", sequence), "Malformed push sequence rejected");
+        check(!UpdatePolicy.isUpdateAnnouncement("/topics/casa-da-baba-piloto-updates", "apk-update", "10"), "APK notice never triggers the silent OTA job");
+        check(UpdatePolicy.shouldAnnounceContent("0.8.8.1", ""), "First prepared content is announced");
+        check(!UpdatePolicy.shouldAnnounceContent("0.8.8.1", "0.8.8.1"), "Same prepared content is announced only once");
+        check(UpdatePolicy.shouldAnnounceContent("0.8.8.2", "0.8.8.1"), "Newer prepared content is announced");
+        check(!UpdatePolicy.shouldAnnounceContent("", "0.8.8.1"), "Nothing prepared, nothing announced");
+        check(!UpdatePolicy.shouldAnnounceContent(null, ""), "Missing pending version is not announced");
     }
 
     private static JSONObject checkUpdate(OtaManager app) throws Exception {
@@ -312,6 +318,40 @@ public class UpdaterTest {
         check(!checkUpdate(tamperApp).getBoolean("checkSucceeded"), "Different native APK manifest rejected");
         signedManifest(new JSONObject(next.toString()).put("bundleVersion", "0.3.2"), key);
         check(!checkUpdate(tamperApp).getBoolean("checkSucceeded"), "Internal bundle version mismatch rejected");
+        notPublishedTests(key, next, data.toByteArray());
+    }
+
+    /** Canal sem pacote publicado para este APK (manifesto 404) nao e falha; qualquer outro erro continua sendo. */
+    private static void notPublishedTests(KeyPair key, JSONObject next, byte[] zipBytes) throws Exception {
+        NetworkFixture.responses.put(URL, zipBytes);
+        signedManifest(next, key);
+        NetworkFixture.statusByUrl.put(UpdatePolicy.MANIFEST_URL, 404);
+        OtaManager unpublished = networkManager(directory("not-published"), key);
+        JSONObject quiet = checkUpdate(unpublished);
+        check(quiet.getBoolean("checkSucceeded"), "Manifest 404 is a successful check (nothing published for this APK)");
+        check(quiet.getString("lastError").isEmpty(), "Manifest 404 leaves no error");
+        check(quiet.getString("pendingVersion").isEmpty(), "Manifest 404 prepares nothing");
+        check(!jobRetries(quiet), "Manifest 404 ends the push job: the topic is shared, another channel's package must not keep this APK retrying");
+        for (int code : new int[] { 403, 500, 503 }) {
+            NetworkFixture.statusByUrl.put(UpdatePolicy.MANIFEST_URL, code);
+            JSONObject failed = checkUpdate(unpublished);
+            check(!failed.getBoolean("checkSucceeded") && !failed.getString("lastError").isEmpty(), "Manifest HTTP " + code + " stays an error");
+            check(jobRetries(failed), "Manifest HTTP " + code + " keeps the push job retrying");
+        }
+        NetworkFixture.statusByUrl.remove(UpdatePolicy.MANIFEST_URL);
+        NetworkFixture.statusByUrl.put(URL, 404);
+        JSONObject zip404 = checkUpdate(networkManager(directory("zip-404"), key));
+        check(!zip404.getBoolean("checkSucceeded") && !zip404.getString("lastError").isEmpty(), "Package ZIP 404 stays an error");
+        check(zip404.getString("pendingVersion").isEmpty(), "Package ZIP 404 prepares nothing");
+        check(jobRetries(zip404), "Package ZIP 404 keeps the push job retrying");
+        check(UpdatePolicy.shouldRetryCheck(true, false, true) && UpdatePolicy.shouldRetryCheck(false, true, true),
+            "A check still running or a bundle on trial keeps the push job retrying");
+        NetworkFixture.statusByUrl.clear();
+    }
+
+    /** A mesma decisao do UpdateCheckJob, que so roda no Android: repetir ou encerrar o job do push. */
+    private static boolean jobRetries(JSONObject status) {
+        return UpdatePolicy.shouldRetryCheck(status.optBoolean("checking"), status.optBoolean("trial"), status.optBoolean("checkSucceeded"));
     }
 
     private static File zip(String name, String[] entries, int largeBytes) throws Exception {

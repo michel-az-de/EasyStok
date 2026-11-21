@@ -32,6 +32,7 @@ public class AuthControllerRotasTests
         "POST reset-password-code",
         "POST aceitar-convite",
         "POST confirmar-email",
+        "POST chave-acesso", // #2201: chave de uso único, 30 dias, só hash no banco, teto por IP
     ];
 
     [Fact]

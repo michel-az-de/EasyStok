@@ -63,7 +63,7 @@ public sealed class RelatorioMensalJob(
             var mes = mesAnterior.Month;
 
             var receita = await analyticsRepo.GetReceitaPorPeriodoAsync(empresa.Id, 1);
-            var margem = await analyticsRepo.GetMargemPorProdutoAsync(empresa.Id, 30, 1, 50);
+            var (margem, _) = await analyticsRepo.GetMargemPorProdutoAsync(empresa.Id, 30, 1, 50);
             var dashboard = await analyticsRepo.GetDashboardResumoAsync(empresa.Id, 30);
 
             var htmlReport = GerarHtmlRelatorio(empresa, dashboard, receita.FirstOrDefault(), margem, ano, mes);
@@ -121,7 +121,7 @@ public sealed class RelatorioMensalJob(
     {(receita != null ? $@"
     <div class='metric'><strong>Receita Bruta:</strong> R$ {receita.ReceitaBruta:F2}</div>
     <div class='metric'><strong>Total de Vendas:</strong> {receita.TotalVendas}</div>
-    <div class='metric'><strong>Total de Itens Vendidos:</strong> {receita.TotalItensVendidos}</div>
+    <div class='metric'><strong>Total de Itens Vendidos:</strong> {receita.TotalItensVendidos:0.###}</div>
     <div class='metric'><strong>Ticket Médio:</strong> R$ {receita.TicketMedio:F2}</div>
     " : "<p>Sem dados de receita para o período.</p>")}
 
@@ -143,7 +143,7 @@ public sealed class RelatorioMensalJob(
                 <td>R$ {p.CustoMedio:F2}</td>
                 <td>R$ {p.PrecoMedioVenda:F2}</td>
                 <td>{p.MargemPercentual:F1}%</td>
-                <td>{p.QuantidadeVendida}</td>
+                <td>{p.QuantidadeVendida:0.###}</td>
             </tr>"))}
         </tbody>
     </table>

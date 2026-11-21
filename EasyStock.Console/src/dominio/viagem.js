@@ -161,13 +161,13 @@ export function proximoPassoDeEntrega(conversa, grupoDaViagem, janelas, agora, c
     return { chave: 'aguardando-viagem', quandoMs: marcos.sair, semAcao: true }
   }
   if (pedido.estado === 'embalado') {
-    return { chave: 'sair', quandoMs: marcos.sair, rotuloBotao: 'Saiu', proximoEstado: 'entrega' }
+    return { chave: 'sair', quandoMs: marcos.sair, rotuloBotao: 'Saiu para entrega', proximoEstado: 'entrega' }
   }
   if (pedido.estado === 'entrega') {
-    return { chave: 'entregar', quandoMs: minhaParada?.entregarAte, rotuloBotao: 'Entregue', proximoEstado: 'entregue' }
+    return { chave: 'entregar', quandoMs: minhaParada?.entregarAte, rotuloBotao: 'Marcar entregue', proximoEstado: 'entregue' }
   }
   // aguardando, pago ou preparo: ainda falta conferir.
-  return { chave: 'conferir', quandoMs: marcos.conferir, rotuloBotao: 'Conferi', proximoEstado: 'embalado' }
+  return { chave: 'conferir', quandoMs: marcos.conferir, rotuloBotao: 'Marcar pronto', proximoEstado: 'embalado' }
 }
 
 // Ordenação por clique (seção 6): nunca escrita, só clique. `viagensPorId`
@@ -176,7 +176,8 @@ export function ordenarEntregas(entregas, modo, { janelas, agora, constantes, vi
   const comChave = entregas.map((conversa) => {
     const grupo = conversa.pedido.viagem ? viagensPorId.get(conversa.pedido.viagem.id) : null
     const passo = proximoPassoDeEntrega(conversa, grupo, janelas, agora, constantes)
-    const minutos = passo ? Math.round((passo.quandoMs - agora) / 60000) : Number.POSITIVE_INFINITY
+    // #2236: sem marco (pedido sem janela) conta como sem prazo; o null virava 0 (1970) e subia ao topo.
+    const minutos = passo?.quandoMs != null ? Math.round((passo.quandoMs - agora) / 60000) : Number.POSITIVE_INFINITY
     const bairro = partesDoEndereco(conversa.cliente?.endereco).bairro || 'Sem bairro'
     return { conversa, minutos, bairro }
   })

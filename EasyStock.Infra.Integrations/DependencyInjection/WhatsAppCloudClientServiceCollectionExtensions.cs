@@ -57,6 +57,7 @@ public static class WhatsAppCloudClientServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(30);
         }).RemoveAllLoggers(); // generate-token carrega o segredo no caminho: nunca registrar a URL.
         services.AddScoped<IWppConnectSessaoClient>(sp => sp.GetRequiredService<WppConnectClient>());
+        services.AddScoped<IMenusNumeradosWppConnect, MenuNumeradoWppConnect>(); // #2515
 
         services.AddHttpClient<CatalogoModelosWhatsApp>((sp, client) =>
         {

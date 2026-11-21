@@ -4,25 +4,33 @@ import { Botao } from '../../componentes/Botao'
 import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { CampoTexto } from '../../componentes/Campo'
 import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { canalDaConversa } from '../../dominio/canal'
+import { permissaoDeEscrita } from '../../dominio/janela'
 import { identidadeDaMontagem, organizarFicha } from '../../aplicacao/montagemFicha'
+import { useContextoAssistencia } from '../../aplicacao/contextoAssistencia'
 import { comandaDaFichaIa, tituloDoBlocoIa } from '../../dominio/montagemFicha'
 import { horaCurta, moeda } from '../../dominio/formato'
 import { conversaEncerrada } from '../../dominio/conversa'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './AreaColaborativaIa.module.css'
 
+// #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o Organizar trava.
+const LIMITE_ORIENTACAO = 2000
+
 export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAbrirComanda, aoProporNota, aoCalcularFrete, aoAbrirCardapio, aoRascunho, aoSoltar }) {
-  const { selecionada, fonteApi } = useAtendimento()
-  const { cardapio } = useCatalogo()
+  const { selecionada, fonteApi, agora } = useAtendimento()
+  const { cardapio, canais } = useCatalogo()
   const [erro, setErro] = useState(null)
   const [ocupado, setOcupado] = useState(false)
   const executando = useRef(false)
   const atual = useRef(null)
-  const identidade = identidadeDaMontagem()
+  const { identidade, chave } = useContextoAssistencia(selecionada)
   const aberta = !conversaEncerrada(selecionada)
-  const valido = Boolean(fonteApi && aberta && selecionada?.id === conversaId && bloco.identidadeSessao === identidade)
-  useLayoutEffect(() => { atual.current = { conversaId: selecionada?.id, identidade, aberta } }, [selecionada?.id, identidade, aberta])
+  const valido = Boolean(fonteApi && aberta && selecionada?.id === conversaId && bloco.identidadeSessao === identidade && bloco.contextoAssistencia === chave)
+  useLayoutEffect(() => { atual.current = { conversaId: selecionada?.id, identidade, aberta, chave } }, [selecionada?.id, identidade, aberta, chave])
   const aindaAtual = () => valido && atual.current?.conversaId === conversaId
-    && atual.current?.aberta && atual.current?.identidade === bloco.identidadeSessao && identidadeDaMontagem() === bloco.identidadeSessao
+    && atual.current?.aberta && atual.current?.chave === bloco.contextoAssistencia
+    && atual.current?.identidade === bloco.identidadeSessao && identidadeDaMontagem() === bloco.identidadeSessao
   async function agir(callback, ...args) {
     if (!callback || !aindaAtual() || executando.current) return
     executando.current = true; setOcupado(true); setErro(null)
@@ -32,12 +40,15 @@ export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAb
     finally { executando.current = false; if (aindaAtual()) setOcupado(false) }
   }
   const comanda = bloco.tipo === 'comanda' && valido ? comandaDaFichaIa(selecionada, cardapio, fonteApi) : null
-  const acao = bloco.tipo === 'comanda' ? { rotulo: 'Ver comanda', callback: aoAbrirComanda, args: [] }
+  const acao = bloco.tipo === 'comanda' ? { rotulo: 'Ver pedido', callback: aoAbrirComanda, args: [] }
     : bloco.tipo === 'nota' ? { rotulo: 'Revisar nota', callback: aoProporNota, args: [bloco.texto] }
       : bloco.tipo === 'frete' ? { rotulo: 'Consultar frete', callback: aoCalcularFrete, args: [] }
         : bloco.acao === 'abrir_cardapio' ? { rotulo: 'Abrir cardápio', callback: aoAbrirCardapio, args: [] }
           : bloco.acao === 'rascunho' ? { rotulo: 'Usar no rascunho', callback: aoRascunho, args: [bloco.texto] } : null
   if (!valido) return null
+  // #2185 (E11): o rascunho não entra num campo fechado (janela de 24 h, conversa concluída, cadastro bloqueado).
+  const escrita = bloco.acao === 'rascunho' ? permissaoDeEscrita(selecionada, agora, canalDaConversa(canais, selecionada)) : null
+  const semCampo = escrita && !escrita.pode ? [escrita.motivo?.titulo, escrita.motivo?.detalhe].filter(Boolean).join(' ') : null
   return <article className={css.bloco} aria-label={tituloDoBlocoIa(bloco)}>
     <header className={css.cabecalhoBloco}>
       <h4>{tituloDoBlocoIa(bloco)}</h4>
@@ -46,13 +57,15 @@ export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAb
     </header>
     <p className={bloco.tipo === 'nota' ? css.nota : css.texto}>{bloco.texto}</p>
     {bloco.tipo === 'comanda' && (comanda ? <div className={css.comanda}>
-      <strong>{comanda.numero ? `Comanda ${comanda.numero}` : 'Pedido em montagem'} · {comanda.nome}</strong>
+      <strong>{comanda.numero ? `Pedido ${comanda.numero}` : 'Pedido em montagem'} · {comanda.nome}</strong>
       <ul>{comanda.itens.slice(0, 4).map((item, i) => <li key={`${item.id}:${i}`}>{item.quantidade} × {item.nome}</li>)}</ul>
-      {comanda.itens.length > 4 && <p>{comanda.itens.length - 4} outros itens na comanda.</p>}
+      {comanda.itens.length > 4 && <p>{comanda.itens.length - 4} outros itens no pedido.</p>}
       {comanda.total != null && <p className={css.total}>{comanda.rotuloTotal} <strong>{moeda(comanda.total)}</strong></p>}
     </div> : <p>Nenhum pedido nesta conversa.</p>)}
     {bloco.tipo === 'frete' && <p className={css.endereco}>{selecionada.cliente?.endereco || 'Confira o endereço do cliente para consultar o frete.'}</p>}
-    {acao && <Botao variante="texto" disabled={!acao.callback || ocupado} onClick={() => agir(acao.callback, ...acao.args)}>{acao.rotulo}</Botao>}
+    {acao && <Botao variante="texto" disabled={!acao.callback || ocupado || Boolean(semCampo)} aria-describedby={semCampo ? `${bloco.id}-sem-campo` : undefined}
+      onClick={() => agir(acao.callback, ...acao.args)}>{acao.rotulo}</Botao>}
+    {semCampo && <p id={`${bloco.id}-sem-campo`} className={css.texto}>{semCampo}</p>}
     {erro && <p role="alert" className={css.erro}>{erro}</p>}
   </article>
 }
@@ -66,49 +79,49 @@ export function AreaColaborativaIa({ conversaId, blocosSoltos = [], ...callbacks
   const pedido = useRef(null)
   const contexto = useRef(null)
   const sequencia = useRef(0)
-  const identidade = identidadeDaMontagem()
+  const { identidade, chave } = useContextoAssistencia(selecionada)
   const aberta = !conversaEncerrada(selecionada)
-  useLayoutEffect(() => { contexto.current = { conversaId, identidade, aberta } }, [conversaId, identidade, aberta])
+  useLayoutEffect(() => { contexto.current = { conversaId, identidade, aberta, chave } }, [conversaId, identidade, aberta, chave])
   useEffect(() => {
     setOrientacao(''); setMontagem(null); setErro(null); setCarregando(false)
     return () => { pedido.current?.abort(); pedido.current = null; sequencia.current++ }
-  }, [conversaId, identidade, aberta])
+  }, [conversaId, identidade, aberta, chave])
   const mesmaConversa = () => contexto.current?.conversaId === conversaId && contexto.current?.identidade === identidade
-    && contexto.current?.aberta && identidadeDaMontagem() === identidade
+    && contexto.current?.aberta && contexto.current?.chave === chave && identidadeDaMontagem() === identidade
   async function organizar(evento) {
     evento.preventDefault()
-    if (!fonteApi || selecionada?.id !== conversaId || pedido.current || !mesmaConversa()) return
+    if (!fonteApi || selecionada?.id !== conversaId || pedido.current || !mesmaConversa() || algumPassaDoLimite([orientacao, LIMITE_ORIENTACAO])) return
     const controle = new AbortController(), numero = ++sequencia.current
     pedido.current = controle; setCarregando(true); setErro(null)
     try {
       const proposta = await organizarFicha(conversaId, orientacao, { sinal: controle.signal, identidadeEsperada: identidade })
-      if (!controle.signal.aborted && mesmaConversa() && numero === sequencia.current) setMontagem(proposta)
+      if (!controle.signal.aborted && mesmaConversa() && numero === sequencia.current) setMontagem({ ...proposta, contextoAssistencia: chave })
     } catch (e) {
       if (!controle.signal.aborted && mesmaConversa() && numero === sequencia.current) setErro(e.message || 'Não foi possível organizar a ficha com IA agora.')
     } finally {
       if (numero === sequencia.current) { pedido.current = null; if (!controle.signal.aborted) setCarregando(false) }
     }
   }
-  const visivel = montagem?.conversaId === conversaId && montagem.identidadeSessao === identidade ? montagem : null
+  const visivel = montagem?.conversaId === conversaId && montagem.identidadeSessao === identidade && montagem.contextoAssistencia === chave ? montagem : null
   const movidos = new Set(blocosSoltos)
   if (!aberta) return null
-  return <section className={css.area} aria-label="Organizar a ficha com IA">
+  return <section className={css.area} aria-label="Organizar a ficha com o Assistente">
     <form onSubmit={organizar}>
       <header className={css.cabecalho}><AvatarAssistente tamanho={32} decorativo /><h3>Assistente</h3>
-        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com IA'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
+        <Botao type="submit" aria-label={carregando ? 'Organizando ficha' : 'Organizar com o Assistente'} data-organizar-ficha-ia={conversaId} disabled={!fonteApi || selecionada?.id !== conversaId || carregando || algumPassaDoLimite([orientacao, LIMITE_ORIENTACAO])}>{carregando ? 'Organizando…' : 'Organizar'}</Botao>
       </header>
       <details className={css.orientar}><summary>Orientar</summary>
-        <CampoTexto rotulo="Orientação (opcional)" placeholder="Ex.: preparar a retirada de sábado" maxLength={2000}
+        <CampoTexto rotulo="Orientação (opcional)" placeholder="Ex.: preparar a retirada de sábado" limite={LIMITE_ORIENTACAO}
           value={orientacao} disabled={carregando} onChange={(e) => setOrientacao(e.target.value)} />
       </details>
     </form>
-    {!fonteApi && <p>Conecte a loja para usar a IA.</p>}
+    {!fonteApi && <p>Conecte a loja para usar o Assistente.</p>}
     {carregando && <p role="status">Organizando a ficha…</p>}
     {erro && <p role="alert" className={css.erro}>{erro}</p>}
     {visivel && <><p className={css.data}>Proposta das {horaCurta(visivel.geradoEm)}</p><div className={css.blocos}>
       {visivel.blocos.filter((b) => !movidos.has(`${visivel.geracaoId}:${b.id}`)).map((b) => <BlocoColaborativoIa
         key={`${visivel.geracaoId}:${b.id}`} {...callbacks} conversaId={conversaId}
-        bloco={{ ...b, conversaId, geracaoId: visivel.geracaoId, geradoEm: visivel.geradoEm, identidadeSessao: visivel.identidadeSessao }} />)}
+        bloco={{ ...b, conversaId, geracaoId: visivel.geracaoId, geradoEm: visivel.geradoEm, identidadeSessao: visivel.identidadeSessao, contextoAssistencia: chave }} />)}
     </div></>}
   </section>
 }

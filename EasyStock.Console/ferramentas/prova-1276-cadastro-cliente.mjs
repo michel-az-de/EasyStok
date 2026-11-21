@@ -1,3 +1,4 @@
+import { comSnapshotDaFicha } from './snapshotDaFichaNaProva.mjs'
 /* eslint-disable no-console */
 // Prova da issue #1276: no modo API o cadastro do cliente da conversa vai ao EasyStok.
 // Salvar cadastro, cadastrar endereço e editar nome, telefone ou endereço fazem
@@ -71,7 +72,7 @@ function montar(conversa) {
   const despachados = []
   const estadoRef = { current: { conversas: [conversa], sincronizacao: { estado: 'ok', aviso: null } } }
   const despachar = (a) => despachados.push(a)
-  const acoes = modulo.criarAcoesClienteApi({ despachar, estadoRef })
+  const acoes = comSnapshotDaFicha(modulo.criarAcoesClienteApi({ despachar, estadoRef }), [conversa])
   return { acoes, despachados }
 }
 
@@ -95,6 +96,7 @@ await confere('Salvar cadastro faz POST com nome, telefone e endereço em partes
   assert.ok(post, 'sem POST')
   assert.match(post.url, /\/api\/atendimento\/conversas\/conv-1\/cliente$/)
   assert.deepEqual(post.corpo, {
+    clienteId: null, vinculoRevisao: 0,
     nome: 'Maria Souza', telefone: '(11) 98765-4321',
     endereco: { cep: '05500000', logradouro: 'Rua Alvarenga', numero: '120', complemento: 'apto 12', bairro: 'Butantã' },
   })
@@ -142,7 +144,7 @@ await confere('Editar telefone manda só o telefone; editar avisos ainda avisa s
   acoes.editarDadoCliente('conv-1', 'telefone', '(11) 91111-2222', 0)
   await esperar()
   const post = chamadas.find((c) => c.metodo === 'POST')
-  assert.deepEqual(post?.corpo, { nome: null, telefone: '(11) 91111-2222', endereco: null })
+  assert.deepEqual(post?.corpo, { clienteId: CLIENTE, vinculoRevisao: 0, nome: null, telefone: '(11) 91111-2222', endereco: null })
   chamadas.length = 0
   acoes.editarDadoCliente('conv-1', 'avisos', 'alergia a camarão', 0)
   await esperar()

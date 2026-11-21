@@ -3,13 +3,28 @@ export const chavePainelMovel = (escopoId, painelId) => `${PREFIXO}${encodeURICo
 
 export function limitarPainelMovel(posicao, tamanho, janela) {
   const margem = 8
-  const largura = Math.max(1, Math.min(tamanho.largura, janela.largura - margem * 2))
-  const altura = Math.max(1, Math.min(tamanho.altura, janela.altura - margem * 2))
-  return {
-    x: Math.min(Math.max(margem, posicao.x), Math.max(margem, janela.largura - largura - margem)),
-    y: Math.min(Math.max(margem, posicao.y), Math.max(margem, janela.altura - altura - margem)),
-    largura, altura,
+  const a = janela.area ?? { x: 0, y: 0, largura: janela.largura, altura: janela.altura }
+  const esquerda = Math.max(0, a.x) + margem, topo = Math.max(0, a.y) + margem
+  const direita = Math.min(janela.largura, a.x + a.largura) - margem
+  const fundo = Math.min(janela.altura, a.y + a.altura) - margem
+  const ajustar = (x, y, fimX, fimY) => {
+    const largura = Math.max(1, Math.min(tamanho.largura, fimX - x))
+    const altura = Math.max(1, Math.min(tamanho.altura, fimY - y))
+    return { x: Math.min(Math.max(x, posicao.x), Math.max(x, fimX - largura)),
+      y: Math.min(Math.max(y, posicao.y), Math.max(y, fimY - altura)), largura, altura }
   }
+  const atual = ajustar(esquerda, topo, direita, fundo), r = janela.reserva
+  const livre = p => !r || p.x + p.largura <= r.x || p.x >= r.x + r.largura
+    || p.y + p.altura <= r.y || p.y >= r.y + r.altura
+  if (livre(atual)) return atual
+  const distancia = p => (p.x - posicao.x) ** 2 + (p.y - posicao.y) ** 2
+  const opcoes = [[esquerda, topo, direita, Math.min(fundo, r.y - margem)],
+    [esquerda, topo, Math.min(direita, r.x - margem), fundo],
+    [Math.max(esquerda, r.x + r.largura + margem), topo, direita, fundo],
+    [esquerda, Math.max(topo, r.y + r.altura + margem), direita, fundo]]
+    .filter(([x, y, fimX, fimY]) => fimX > x && fimY > y).map(p => ajustar(...p)).filter(livre)
+    .sort((a, b) => b.largura * b.altura - a.largura * a.altura || distancia(a) - distancia(b))
+  return opcoes[0] ?? { ...atual, altura: 0 }
 }
 
 export function lerPainelMovel(escopoId, painelId, armazenamento) {

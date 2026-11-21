@@ -16,11 +16,8 @@ function Fila({ titulo, apoio, itens, emDia, href, rotuloDoLink, renderizar, avi
     return (
       <section className={css.fila} aria-label={titulo}>
         <header className={css.cabeca}>
-          <span className={css.numero} data-vazio="true" aria-hidden="true">–</span>
-          <div>
-            <h2 className={css.titulo}>{titulo}</h2>
-            <p className={css.apoio}>{apoio}</p>
-          </div>
+          <h2 className={css.titulo}>{titulo}</h2>
+          <p className={css.apoio}>{apoio}</p>
         </header>
         <p className={css.emDia} role="status">{aviso}</p>
         <a className={css.abrir} href={href}>Abrir {rotuloDoLink}<MarcaIcone nome="proximo" tamanho={16} /></a>
@@ -29,12 +26,10 @@ function Fila({ titulo, apoio, itens, emDia, href, rotuloDoLink, renderizar, avi
   }
   return (
     <section className={css.fila} aria-label={`${titulo}: ${itens.length}`}>
+      {/* #2859: a contagem fica no título, em corpo de texto; número de vitrine ao lado lia como painel genérico. */}
       <header className={css.cabeca}>
-        <span className={css.numero} data-vazio={itens.length === 0}>{itens.length}</span>
-        <div>
-          <h2 className={css.titulo}>{titulo}</h2>
-          <p className={css.apoio}>{apoio}</p>
-        </div>
+        <h2 className={css.titulo}>{titulo} <span className={css.numero} data-vazio={itens.length === 0}>{itens.length}</span></h2>
+        <p className={css.apoio}>{apoio}</p>
       </header>
       {itens.length === 0
         ? <p className={css.emDia}><MarcaIcone nome="confirmar" tamanho={16} /> {emDia}</p>
@@ -47,19 +42,19 @@ function Fila({ titulo, apoio, itens, emDia, href, rotuloDoLink, renderizar, avi
   )
 }
 
-const Pedido = (item) => (
-  <div className={css.item} data-tom={item.atrasado ? 'perigo' : undefined}>
+// Cada pedido leva à fila do módulo, como o item de Responder leva à conversa: nada com cara de botão fica inerte.
+const Pedido = (href) => (item) => (
+  <a className={css.item} href={href} data-tom={item.atrasado ? 'perigo' : undefined}>
     <span className={css.quem}>{item.nome}</span>
     <span className={css.selo}>{item.situacao}</span>
     <span className={css.detalhe}>Pedido {item.numero}{item.faixa ? ` · ${item.faixa}` : ''}</span>
-  </div>
+  </a>
 )
 
 export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = null }) {
   if (!podeVer.atendimento && !podeVer.cozinha && !podeVer.entregas) return null
   return (
     <section className={css.painel} aria-label="Agora">
-      <p className={css.legenda}>Agora</p>
       <div className={css.filas}>
         {podeVer.atendimento && <Fila titulo="Responder" apoio="Conversas que precisam de você"
           itens={filas.responder} emDia="Ninguém esperando você." aviso={avisoResponder}
@@ -73,10 +68,10 @@ export function PainelAgora({ filas, podeVer, aoAbrirConversa, avisoResponder = 
           )} />}
         {podeVer.cozinha && <Fila titulo="Preparar" apoio="Pedidos pagos, por horário de entrega"
           itens={filas.cozinhar} emDia="Nada na fila de preparo."
-          href={hashDoModulo('cozinha', 'fila')} rotuloDoLink="Cozinha" renderizar={Pedido} />}
+          href={hashDoModulo('cozinha', 'fila')} rotuloDoLink="Cozinha" renderizar={Pedido(hashDoModulo('cozinha', 'fila'))} />}
         {podeVer.entregas && <Fila titulo="Despachar" apoio="Pronto e a caminho"
           itens={filas.despachar} emDia="Nada esperando sair."
-          href={hashDoModulo('entregas', 'painel')} rotuloDoLink="Entregas" renderizar={Pedido} />}
+          href={hashDoModulo('entregas', 'painel')} rotuloDoLink="Entregas" renderizar={Pedido(hashDoModulo('entregas', 'painel'))} />}
       </div>
     </section>
   )

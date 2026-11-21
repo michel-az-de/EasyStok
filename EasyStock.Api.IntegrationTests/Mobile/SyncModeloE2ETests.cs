@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using EasyStock.Application.Common;
+using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.Enums;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -65,6 +67,74 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
         noA.Should().ContainSingle(m => m.Tipo == "product.upsert" && m.Id == produto)
             .Which.Payload.GetProperty("stock").GetInt32().Should().Be(7);
     }
+
+    // #2721: entrada no console muda so o ItemEstoque; o cadastro do produto ficou antes do cursor
+    // e o saldo novo nao chegava aos aparelhos. ADR-0060: a venda do aparelho conta uma vez.
+    [SkippableFact]
+    public async Task EntradaNoConsole_ChegaAosAparelhos_EVendaDoAparelhoNaoVoltaEmDobro()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresaId, lojaId) = await fixture.SeedEmpresaELojaAsync();
+        async Task<Aparelho> NovoAsync()
+        {
+            var cred = await fixture.SeedMobileDeviceAsync(empresaId, lojaId);
+            return new Aparelho(cred.DeviceId, fixture.CreateMobileClient(cred.ApiKey));
+        }
+        var a = await NovoAsync();
+        var b = await NovoAsync();
+        var produto = NovoId("p");
+
+        // A cadastra o produto sem saldo; o servidor cria o Produto do ERP e liga o espelho.
+        (await PushAsync(a, Cadastro(produto, saldoNoAparelho: 0, porMovimento: false))).Rejeitadas.Should().BeEmpty();
+        var produtoErp = await LerAsync(db => db.Set<Product>().AsNoTracking()
+            .Where(p => p.Id == produto).Select(p => p.ErpProductId).SingleAsync());
+        produtoErp.Should().NotBeNull("o cadastro do aparelho liga o espelho a um Produto do ERP");
+        // O cadastro e de ontem: fora da sobreposicao de 30 s do cursor (#2477).
+        await CadastroDeOntemAsync(produto, produtoErp!.Value);
+        await PullAsync(a);
+        await PullAsync(b);
+
+        // Entrada de 10 no console, pelo mesmo use case da tela de estoque. Nao toca no cadastro.
+        using (var scope = fixture.Factory!.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<EasyStockDbContext>().SetMobileTenantContext(empresaId);
+            await scope.ServiceProvider.GetRequiredService<RegistrarEntradaEstoqueUseCase>().ExecuteAsync(
+                new RegistrarEntradaEstoqueCommand(empresaId, produtoErp!.Value, null, 10, 1m, null, DateTime.UtcNow,
+                    NaturezaMovimentacaoEstoque.Producao, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                    LojaId: lojaId));
+        }
+
+        foreach (var aparelho in new[] { a, b })
+            (await PullAsync(aparelho)).Should().ContainSingle(m => m.Tipo == "product.upsert" && m.Id == produto,
+                    "a entrada do console precisa chegar ao aparelho {0}", aparelho.DeviceId)
+                .Which.Payload.GetProperty("stock").GetDecimal().Should().Be(10m, "aparelho {0}", aparelho == a ? "A (criador)" : "B");
+
+        // A vende 1 como o PWA manda: pedido pronto, cadastro por movimento e movimento de -1.
+        var pedido = NovoId("o");
+        await PushAsync(a, Pedido(pedido, produto, "preparando", qtd: 1));
+        (await PushAsync(a, Pedido(pedido, produto, "pronto", qtd: 1),
+            Cadastro(produto, saldoNoAparelho: 9, porMovimento: true), Movimento(produto, -1)))
+            .Rejeitadas.Should().BeEmpty();
+
+        (await SaldoNoErpAsync(produtoErp.Value)).Should().Be(9m, "o pedido pronto baixa 1 do ERP, uma vez");
+        (await PullAsync(a)).Should().ContainSingle(m => m.Tipo == "product.upsert" && m.Id == produto)
+            .Which.Payload.GetProperty("stock").GetDecimal().Should().Be(9m, "a venda de 1 conta uma vez, nunca 8");
+    }
+
+    private async Task CadastroDeOntemAsync(string produto, Guid produtoErp)
+    {
+        var ontem = DateTime.UtcNow.AddDays(-1);
+        using var scope = fixture.Factory!.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        await db.Set<Product>().IgnoreQueryFilters().Where(p => p.Id == produto)
+            .ExecuteUpdateAsync(u => u.SetProperty(p => p.ServerUpdatedAt, ontem));
+        await db.Set<Produto>().IgnoreQueryFilters().Where(p => p.Id == produtoErp)
+            .ExecuteUpdateAsync(u => u.SetProperty(p => p.AlteradoEm, ontem));
+    }
+
+    private Task<decimal> SaldoNoErpAsync(Guid produtoErp) => LerAsync(async db =>
+        (await db.Set<ItemEstoque>().IgnoreQueryFilters().AsNoTracking().Where(i => i.ProdutoId == produtoErp).ToListAsync())
+            .Sum(i => i.QuantidadeAtual?.Value ?? 0m));
 
     // ---------- b. producao e descarte ----------
 
@@ -272,6 +342,30 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
         (await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters()
             .CountAsync(p => p.MobileOrderId == pedido))).Should().Be(1);
     }
+
+    [SkippableFact]
+    public async Task CanalMarcadoNoApk_ChegaAoPedidoDoErp_EReenvioSemCanalNaoApaga()
+    {
+        // #409: pedidos.Canal é onde a medição lê; origem continua "mobile".
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (apk, _, _) = await TresAparelhosAsync();
+        var produto = NovoId("p");
+        var pedido = NovoId("o");
+        await PushAsync(apk, Cadastro(produto, saldoNoAparelho: 10, porMovimento: true));
+
+        (await PushAsync(apk, Pedido(pedido, produto, "aguardando", qtd: 1, canal: "whatsapp"))).Rejeitadas.Should().BeEmpty();
+
+        var registro = await PedidoAsync(pedido);
+        registro.Channel.Should().Be("whatsapp");
+        var noErp = await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(p => p.Id == registro.ErpPedidoId));
+        noErp.Canal.Should().Be("whatsapp");
+        noErp.Origem.Should().Be("mobile");
+
+        (await PushAsync(apk, Pedido(pedido, produto, "aguardando", qtd: 1,
+            horaDoAparelho: DateTime.UtcNow.AddSeconds(5)))).Rejeitadas.Should().BeEmpty();
+        (await PedidoAsync(pedido)).Channel.Should().Be("whatsapp");
+    }
     [SkippableFact]
     public async Task Sincronizacao_ChaveDoAparelhoIsolaEmpresaMesmoComDeviceIdForjado()
     {
@@ -363,14 +457,15 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
     private static Envio Movimento(string produto, int qtd) => Mutation("stock.delta",
         new { id = "sd_" + Guid.NewGuid(), productId = produto, qty = qtd });
 
-    private static Envio Pedido(string id, string produto, string status, int qtd, DateTime? horaDoAparelho = null)
+    private static Envio Pedido(string id, string produto, string status, int qtd, DateTime? horaDoAparelho = null,
+        string? canal = null)
     {
         var hora = Ms(horaDoAparelho ?? DateTime.UtcNow);
         return Mutation("order.upsert", new
         {
             id, clientId = (string?)null, clientSnapshot = new { name = "Ana", @ref = (string?)null },
             items = new[] { new { productId = produto, name = "Lasanha", emoji = (string?)null, unit = "300g", qty = qtd, unitPrice = 30m } },
-            notes = (string?)null, total = 30m * qtd, status, createdAt = hora, updatedAt = hora
+            notes = (string?)null, total = 30m * qtd, status, createdAt = hora, updatedAt = hora, channel = canal
         });
     }
 
@@ -401,7 +496,7 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
         return await consulta(db);
     }
 
-    private Task<int> SaldoAsync(string produto) => LerAsync(db =>
+    private Task<decimal> SaldoAsync(string produto) => LerAsync(db =>
         db.Set<Product>().AsNoTracking().Where(p => p.Id == produto).Select(p => p.Stock).SingleAsync());
 
     private Task<CashEntry> LancamentoAsync(string id) => LerAsync(db =>

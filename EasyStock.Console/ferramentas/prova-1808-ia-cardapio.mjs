@@ -53,7 +53,7 @@ await confere('a lista de Itens usa as explicações, a dica estática e a dica 
 await confere('as sugestões do acervo pedem confirmação e publicam pelo fluxo existente', () => {
   const sugestoes = fonte('../src/features/gestao/acervo/SugestoesDoAcervo.jsx')
   const api = fonte('../src/infra/api/acervoApi.js')
-  assert.match(api, /\/sugestoes`, \{ metodo: 'POST' \}/)
+  assert.match(api, /\/sugestoes`, \{ metodo: 'POST', prazoMs: PRAZO_DE_IA_MS \}/)
   assert.match(sugestoes, /a\.api\.publicarImagem\(/)
   assert.match(sugestoes, /Confirmar publicação/)
   assert.doesNotMatch(sugestoes, /useEffect\([^)]*sugerirAssociacoes/, 'não pede à IA ao abrir a tela')

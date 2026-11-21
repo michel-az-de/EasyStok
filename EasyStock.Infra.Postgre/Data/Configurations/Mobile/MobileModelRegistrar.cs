@@ -79,6 +79,7 @@ public static class MobileModelRegistrar
         //   - empresa_id (listagem no painel /dispositivos)
         mb.Entity<MobileDevice>(b =>
         {
+            b.HasOne<SessaoNativa>().WithMany().HasForeignKey(d => d.SessaoNativaId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(d => d.ApiKeyHash).IsUnique().HasDatabaseName("ux_mobile_devices_api_key_hash");
             b.HasIndex(d => d.PairingCode).HasDatabaseName("ix_mobile_devices_pairing_code");
             b.HasIndex(d => d.EmpresaId).HasDatabaseName("ix_mobile_devices_empresa_id");

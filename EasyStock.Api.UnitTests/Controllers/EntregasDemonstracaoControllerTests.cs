@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using EasyStock.Api.Controllers;
 using EasyStock.Api.Services;
@@ -8,6 +9,7 @@ using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Infra.Postgre.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
@@ -134,6 +136,17 @@ public sealed class EntregasDemonstracaoControllerTests
         var cache = Assert.Single(typeof(EntregasDemonstracaoController).GetMethod(nameof(EntregasDemonstracaoController.Obter))!
             .GetCustomAttributes(typeof(ResponseCacheAttribute), false).Cast<ResponseCacheAttribute>());
         Assert.True(cache.NoStore);
+    }
+
+    [Fact]
+    public void Link_anonimo_tem_limite_por_ip_da_politica_public_post()
+    {
+        var metodo = typeof(EntregasDemonstracaoController).GetMethod(nameof(EntregasDemonstracaoController.Obter))!;
+
+        var limite = metodo.GetCustomAttribute<EnableRateLimitingAttribute>();
+
+        Assert.NotNull(limite);
+        Assert.Equal("public-post", limite.PolicyName);
     }
 
     private sealed class Cenario : IDisposable

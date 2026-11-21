@@ -12,9 +12,10 @@ using Microsoft.Extensions.Options;
 namespace EasyStock.Application.UseCases.Atendimento.Avisos;
 
 /// <summary>O que uma rodada da vigia enfileirou numa empresa.</summary>
-public sealed record ResultadoVigiaOperacao(int ProntosSemEntregador, int EncomendasProximas, int EncomendasSemConfirmacao, int ResumosEstoque)
+public sealed record ResultadoVigiaOperacao(
+    int ProntosSemEntregador, int EncomendasProximas, int EncomendasSemConfirmacao, int ResumosEstoque, int CadastrosComProblema = 0)
 {
-    public int Total => ProntosSemEntregador + EncomendasProximas + EncomendasSemConfirmacao + ResumosEstoque;
+    public int Total => ProntosSemEntregador + EncomendasProximas + EncomendasSemConfirmacao + ResumosEstoque + CadastrosComProblema;
 }
 
 /// <summary>
@@ -56,16 +57,17 @@ public sealed class VigiarOperacaoUseCase(
         var prontos = await ProntosSemEntregadorAsync(empresaId, agoraUtc, avisos, opcoes, ct);
         var (proximas, semConfirmacao) = await EncomendasAsync(empresaId, agoraUtc, avisos, opcoes, ct);
         var estoque = await FreezerAsync(empresaId, agoraUtc, avisos, opcoes, ct);
+        var cadastros = await CadastrosComProblemaAsync(empresaId, agoraUtc, avisos, opcoes, ct);
 
-        var resultado = new ResultadoVigiaOperacao(prontos, proximas, semConfirmacao, estoque);
+        var resultado = new ResultadoVigiaOperacao(prontos, proximas, semConfirmacao, estoque, cadastros);
         if (resultado.Total > 0)
         {
             await unitOfWork.CommitAsync();
             // Só depois do commit: uma falha ao gravar não perde o resumo do freezer do dia.
             if (estoque > 0) FreezerOlhadoEm[empresaId] = DateOnly.FromDateTime(HorarioBrasil.ConverterParaBrasilia(agoraUtc));
             logger.LogInformation(
-                "Vigia da operação empresa={EmpresaId}: prontos={Prontos} encomendas={Proximas} semConfirmacao={SemConfirmacao} estoque={Estoque}",
-                empresaId, prontos, proximas, semConfirmacao, estoque);
+                "Vigia da operação empresa={EmpresaId}: prontos={Prontos} encomendas={Proximas} semConfirmacao={SemConfirmacao} estoque={Estoque} cadastros={Cadastros}",
+                empresaId, prontos, proximas, semConfirmacao, estoque, cadastros);
         }
 
         return resultado;
@@ -176,6 +178,77 @@ public sealed class VigiarOperacaoUseCase(
             ct, sufixo)
             ? 1
             : 0;
+    }
+
+    /// <summary>#2836: pedidos feitos de lá para cá entram na conferência do cadastro.</summary>
+    public static readonly TimeSpan JanelaDoCadastro = TimeSpan.FromDays(3);
+
+    /// <summary>A conferência do cadastro roda a cada tanto, não a cada minuto da vigia.</summary>
+    public static readonly TimeSpan IntervaloDoCadastro = TimeSpan.FromMinutes(15);
+
+    // Otimização de uma instância, como a do freezer: a trava de verdade é a correlação (um aviso por cliente por dia).
+    private static readonly ConcurrentDictionary<Guid, DateTime> CadastroOlhadoEm = new();
+
+    private async Task<int> CadastrosComProblemaAsync(
+        Guid empresaId, DateTime agora, AvisosOperacao avisos, PrazosOptions opcoes, CancellationToken ct)
+    {
+        if (!avisos.CadastroComProblema) return 0;
+        if (CadastroOlhadoEm.TryGetValue(empresaId, out var olhado) && agora - olhado < IntervaloDoCadastro) return 0;
+
+        var pedidos = await consultas.ListarPedidosAbertosComClienteAsync(empresaId, agora - JanelaDoCadastro, MaximoPorLeitura, ct);
+        var dia = DateOnly.FromDateTime(HorarioBrasil.ConverterParaBrasilia(agora)).ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        var enfileirados = 0;
+        foreach (var grupo in pedidos.GroupBy(p => p.ClienteId ?? p.PedidoId))
+        {
+            var problemas = grupo.SelectMany(ProblemasDoCadastro).Distinct().ToList();
+            if (problemas.Count == 0) continue;
+
+            var pedido = grupo.First();
+            var nome = NomesDeContato.PrimeiroNome(pedido.NomeCadastro ?? pedido.ClienteNomePedido, SemNome);
+            // O texto do aviso é cortado em 600: até 5 códigos, o resto vira "e mais N".
+            var todos = grupo.Select(p => CodigoCurto.De(p.PedidoId)).ToList();
+            var codigos = string.Join(", ", todos.Take(MaximoDeCodigos)) +
+                          (todos.Count > MaximoDeCodigos ? $" e mais {todos.Count - MaximoDeCodigos}" : "");
+            if (await AlertaOperacaoEvento.EnfileirarAsync(notificador, eventos, opcoes,
+                    CodigosAviso.CadastroComProblema, empresaId, grupo.Key,
+                    titulo: "Cadastro com problema",
+                    resumoCurto: $"{nome}: {problemas[0]}{(problemas.Count > 1 ? $" e mais {problemas.Count - 1}" : "")}",
+                    texto: $"{nome} tem pedido em aberto ({codigos}) com o cadastro {string.Join(", ", problemas)}. " +
+                           "Confira na ficha do cliente antes da entrega.",
+                    ct, dia))
+                enfileirados++;
+        }
+
+        // Só marca depois de conferir: a falha na leitura não trava a conferência por 15 min.
+        CadastroOlhadoEm[empresaId] = agora;
+        return enfileirados;
+    }
+
+    private const int MaximoDeCodigos = 5;
+
+    /// <summary>
+    /// As conferências da #2836, na frase que vai no aviso. Venda de balcão sem cliente é normal. A falta de foto é quase
+    /// regra nos cadastros, então sozinha não avisa: só entra no texto quando já há outro problema.
+    /// </summary>
+    public static IEnumerable<string> ProblemasDoCadastro(PedidoAbertoComCliente p)
+    {
+        var problemas = new List<string>();
+        if (p.ClienteId is null)
+        {
+            if (p.Origem != "balcao") problemas.Add("sem cadastro ligado");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(p.NomeCadastro) || p.NomeCadastro.Trim() == IdentificarClientePorTelefoneUseCase.NomePadraoLead)
+                problemas.Add("cadastro provisório");
+            if (string.IsNullOrWhiteSpace(p.TelefoneCadastro)) problemas.Add("sem telefone");
+        }
+
+        if (!string.IsNullOrWhiteSpace(p.EnderecoEntrega) && p.EnderecoConfirmadoEm is null)
+            problemas.Add("endereço de entrega não confirmado");
+
+        if (problemas.Count > 0 && p.ClienteId is not null && p.FotoChave is null) problemas.Add("sem foto");
+        return problemas;
     }
 
     /// <summary>

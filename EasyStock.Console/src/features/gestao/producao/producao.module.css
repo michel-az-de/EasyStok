@@ -19,7 +19,7 @@
 /* Formulários em superfície preenchida, com espaço entre os grupos. */
 .cartao {
   display: grid; gap: var(--e-3); padding: var(--e-4);
-  border: 0; border-radius: var(--r-2); background: var(--elevado);
+  border-radius: var(--r-2); background: var(--elevado);
 }
 .tituloCartao { margin: 0; font-size: var(--t-corpo); font-weight: 700; color: var(--tinta); }
 
@@ -38,10 +38,10 @@
 .linhaPorcao {
   display: grid; gap: var(--e-2); align-items: end;
   grid-template-columns: minmax(140px, 1fr) 90px 90px minmax(120px, 1fr) auto auto;
-  padding: var(--e-2); border: 0; border-radius: var(--r-1); background: var(--preenchimento);
+  padding: var(--e-2); border-radius: var(--r-1); background: var(--preenchimento);
 }
 @media (max-width: 640px) {
-  .linhaPorcao { grid-template-columns: 1fr 1fr; }
+  .linhaPorcao { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
 .erro { margin: 0; color: var(--erro); font-size: var(--t-apoio); font-weight: 600; }
@@ -84,17 +84,22 @@
 
 .linhaLote {
   display: grid; gap: var(--e-1); padding: var(--e-3);
-  border: 0; border-radius: var(--r-2);
- background: var(--preenchimento); }
+  border-radius: var(--r-2);
+  background: var(--preenchimento);
+}
+/* #2762 (VJ13): o que falta comprar, uma Pilula por insumo, quebrando entre itens e não no meio de um. */
+.listaComprar { display: flex; flex-wrap: wrap; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+.listaComprar > li { max-width: 100%; }
+
+/* #2762 (VJ8): em tela estreita o botão do alerta ocupa a largura da linha. */
+@media (max-width: 640px) {
+  .alertaAjustar, .alertaAjustar > button { width: 100%; }
+}
 .cabecalhoLote { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
 .porcoesLote { margin: var(--e-1) 0 0; padding-left: var(--e-4); font-size: var(--t-apoio); color: var(--tinta-2); }
 
-@media (prefers-reduced-motion: reduce) {
-  .linha, .cartao { transition: none; }
-}
-
 /* #2081 (E7): o total perdido em destaque, com a contagem do que ficou sem custo ao lado. */
-.resumoDasPerdas { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), max-content)); padding-top: 0; }
+.resumoDasPerdas { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 220px)); padding-top: 0; }
 
 /* #2081 (A6): o código de pareamento em dígitos grandes, para ditar ou digitar no celular. */
 .pareamento { display: grid; gap: var(--e-3); justify-items: center; text-align: center; min-height: 96px; align-content: center; }
@@ -104,3 +109,11 @@
 }
 .detalheDoCodigo { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); font-variant-numeric: tabular-nums; }
 .avisoDoCodigo { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-2); background: var(--alerta-pastel); color: var(--alerta); font-size: var(--t-apoio); }
+
+/* #2235 (banca P2-2): o estado do aparelho fica ao lado do botão que o conecta. */
+.aparelho { display: inline-flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; justify-content: flex-end; }
+.estadoDoAparelho { color: var(--tinta-2); font-size: var(--t-apoio); overflow-wrap: anywhere; }
+
+/* #2596: as duas datas do período ficam lado a lado em largura de data, não esticadas. */
+/* A classe dobrada vence o .campos de abaCardapio.module.css (mesma especificidade) em qualquer ordem do pacote. */
+.periodoDasPerdas.periodoDasPerdas { grid-template-columns: repeat(2, minmax(0, 220px)); }

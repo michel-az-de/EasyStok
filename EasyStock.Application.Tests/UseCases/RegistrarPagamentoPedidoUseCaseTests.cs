@@ -23,6 +23,24 @@ namespace EasyStock.Application.Tests.UseCases;
 /// </summary>
 public class RegistrarPagamentoPedidoUseCaseTests
 {
+    [Fact]
+    public async Task MetodoInativo_ImpedeNovoRecebimentoManual_MasPreservaConfirmacaoDoProvedor()
+    {
+        var empresa = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresa);
+        var cadastros = Substitute.For<ICadastrosFinanceirosRepository>();
+        var metodo = EasyStock.Domain.Entities.Financeiro.MetodoPagamentoEmpresa.Criar(empresa, "pix");
+        metodo.Configurar(0, Guid.NewGuid(), false, Guid.NewGuid());
+        cadastros.ObterMetodoAsync(empresa, "pix", Arg.Any<CancellationToken>()).Returns(metodo);
+        var caso = new RegistrarPagamentoPedidoUseCase(_repo, _uow, Substitute.For<ILogger<RegistrarPagamentoPedidoUseCase>>(),
+            new CalculadoraInicioPrevistoPedido(_prazoQueries), QuitacaoPedidoTeste.Criar(_repo), cadastrosFinanceiros: cadastros);
+        var manual = () => caso.ExecuteAsync(new(empresa, pedido.Id, "pix", 10));
+        await manual.Should().ThrowAsync<EasyStock.Application.UseCases.Common.UseCaseValidationException>();
+        pedido.TotalPago.Should().Be(0);
+        await caso.ExecuteAsync(new(empresa, pedido.Id, "pix", 10, ConfirmadoPeloProvedor: true));
+        pedido.TotalPago.Should().Be(10);
+    }
+
     private readonly IPedidoRepository _repo = Substitute.For<IPedidoRepository>();
     private readonly ICaixaRepository _caixaRepo = Substitute.For<ICaixaRepository>();
     private readonly FakeUnitOfWork _uow = new();
@@ -238,6 +256,62 @@ public class RegistrarPagamentoPedidoUseCaseTests
         result.Should().NotBeNull();
         pedido.Pagamentos.Should().ContainSingle();
         await _caixaRepo.DidNotReceiveWithAnyArgs().TryAddMovimentoAsync(default!, default);
+    }
+
+    // #1709-2: o caixa da empresa (sem loja) ficou aberto desde ontem; o pix de hoje de um pedido da loja não pode abrir
+    // uma sessão nova da loja por cima, senão o /caixa/dia sem loja começa nela e perde o saldo e os pagamentos de ontem.
+    [Fact]
+    public async Task Caixa_da_empresa_aberto_desde_ontem_impede_abertura_automatica_para_pedido_com_loja()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId, Guid.NewGuid());
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), Arg.Any<Guid?>())
+            .Returns(Array.Empty<MovimentoCaixa>());
+        _caixaRepo.GetAberturaPendenteAsync(empresaId, null)
+            .Returns(MovimentoCaixa.Criar(empresaId, "abertura", 100m, DateTime.UtcNow.AddDays(-1)));
+        _caixaRepo.TryAddMovimentoAsync(Arg.Any<MovimentoCaixa>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await UC().ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 29.80m));
+
+        await _caixaRepo.DidNotReceive().TryAddMovimentoAsync(
+            Arg.Is<MovimentoCaixa>(m => m.Tipo == "abertura"), Arg.Any<CancellationToken>());
+    }
+
+    // #2341 (R2-API-1): o console abriu o Caixa da empresa sem loja (R$20) e o pix de um pedido da loja criou uma
+    // segunda abertura "auto-pagamento" da loja com a gaveta herdada; o saldo inicial do dia somou as duas.
+    [Fact]
+    public async Task Caixa_da_empresa_aberto_hoje_impede_abertura_automatica_para_pedido_com_loja()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId, Guid.NewGuid());
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), pedido.LojaId)
+            .Returns(Array.Empty<MovimentoCaixa>());
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 20m, DateTime.UtcNow) });
+        _caixaRepo.TryAddMovimentoAsync(Arg.Any<MovimentoCaixa>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await UC().ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 29.80m));
+
+        pedido.Pagamentos.Should().ContainSingle();
+        await _caixaRepo.DidNotReceiveWithAnyArgs().TryAddMovimentoAsync(default!, default);
+    }
+
+    // #2341, limite: a abertura de OUTRA loja não abre o Caixa desta; o pedido da loja ainda abre o seu.
+    [Fact]
+    public async Task Caixa_de_outra_loja_aberto_hoje_nao_impede_abertura_automatica_da_loja_do_pedido()
+    {
+        var empresaId = Guid.NewGuid();
+        var pedido = NovoPedidoOperacional(empresaId, Guid.NewGuid());
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), pedido.LojaId)
+            .Returns(Array.Empty<MovimentoCaixa>());
+        _caixaRepo.GetMovimentosDoDiaAsync(empresaId, Arg.Any<DateOnly>(), null)
+            .Returns(new[] { MovimentoCaixa.Criar(empresaId, "abertura", 1m, DateTime.UtcNow, Guid.NewGuid()) });
+        _caixaRepo.TryAddMovimentoAsync(Arg.Any<MovimentoCaixa>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await UC().ExecuteAsync(new RegistrarPagamentoPedidoCommand(empresaId, pedido.Id, "pix", 29.80m));
+
+        await _caixaRepo.Received(1).TryAddMovimentoAsync(
+            Arg.Is<MovimentoCaixa>(m => m.Tipo == "abertura" && m.LojaId == pedido.LojaId), Arg.Any<CancellationToken>());
     }
 
     // #1598: o Caixa da empresa (sem loja) fechado vale para o pedido que tem loja. O pagamento

@@ -20,13 +20,15 @@ namespace EasyStock.Api.UnitTests.Controllers;
 public class MontagemFichaControllerTests
 {
     [Fact]
-    public void ApenasNovaMontagemExigeAPoliticaExistenteDeIa()
+    public void ChamadasAoModeloExigemAPoliticaExistenteDeIa()
     {
         var tipo = typeof(AtendimentoAssistenteController);
         tipo.GetMethod(nameof(AtendimentoAssistenteController.MontarFicha))!
             .GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName.Should().Be("ai");
         tipo.GetMethod(nameof(AtendimentoAssistenteController.Perguntar))!
-            .GetCustomAttribute<EnableRateLimitingAttribute>().Should().BeNull();
+            .GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName.Should().Be("ai");
+        tipo.GetMethod(nameof(AtendimentoAssistenteController.SugerirCadastro))!
+            .GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName.Should().Be("ai");
     }
 
     private readonly Guid _empresa = Guid.NewGuid();

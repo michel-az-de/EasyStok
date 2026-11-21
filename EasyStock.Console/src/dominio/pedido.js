@@ -1,4 +1,5 @@
 import { itemPorSku } from './cardapio.js'
+import { rotuloDoPedido } from './rotulos.js'
 import { passoPorId } from './esteira.js'
 import { faixaDeHorarios } from './entrega.js'
 import { dataCurtaComSemana } from './formato.js'
@@ -19,6 +20,14 @@ export function totalDoPedido(pedido, cardapio) {
   if (!pedido) return 0
   return pedido.itens
     .reduce((soma, linha) => soma + (itemPorSku(cardapio, linha.sku)?.preco ?? 0) * linha.qtd, 0)
+}
+
+// #2258 (T20): total da comanda a partir do retrato das linhas, para a Ficha mostrar o valor quando o
+// servidor não mandou `totalApi`. Linha sem preço gravado não se chuta: devolve null.
+export function totalDaComanda(pedido) {
+  const itens = pedido?.itens ?? []
+  if (!itens.length || itens.some((linha) => typeof linha.precoUnitario !== 'number')) return null
+  return itens.reduce((soma, linha) => soma + linha.precoUnitario * linha.qtd, 0)
 }
 
 // Preço da linha na Ficha: o que o pedido gravou; sem retrato (rascunho local), o do cardápio.
@@ -102,7 +111,7 @@ export function nomeDoPedido({ numeroComanda = null, numeroCurto = null, numeroD
   const dia = numeroDoDiaNaTela(numeroDoDia)
   const titulo = (partes) => [...partes, curto ? `ref ${curto}` : null].filter(Boolean).join(' · ')
   if (numeroComanda) {
-    const frase = `Comanda ${numeroComanda}`
+    const frase = rotuloDoPedido(numeroComanda)
     return { principal: frase, referencia: dia ? `nº ${dia}` : null, frase, titulo: titulo([frase, dia ? `nº ${dia}` : null]) }
   }
   if (dia) return { principal: `Nº ${dia}`, referencia: null, frase: `Pedido nº ${dia}`, titulo: titulo([`Nº ${dia}`]) }

@@ -5,6 +5,7 @@ using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Application.UseCases.FecharCaixa;
 using EasyStock.Application.UseCases.ListarFechamentosCaixa;
+using EasyStock.Application.UseCases.ListarLinhasCaixa;
 using EasyStock.Application.UseCases.ListarMovimentosCaixa;
 using EasyStock.Application.UseCases.ObterCaixaDia;
 using EasyStock.Application.UseCases.RegistrarMovimentoCaixa;
@@ -25,20 +26,23 @@ public class CaixaController(
     ListarMovimentosCaixaUseCase listarMovUseCase,
     ObterCaixaDiaUseCase obterDiaUseCase,
     ListarFechamentosCaixaUseCase listarFechUseCase,
+    ListarLinhasCaixaUseCase listarLinhasUseCase,
     ICurrentUserAccessor currentUser) : EasyStockControllerBase
 {
     [SwaggerOperation(Summary = "Cash summary for a day (open or closed)")]
     [HttpGet("dia")]
     [Authorize(Policy = "Operador")]
     public async Task<IActionResult> ObterDia(
-        [FromQuery] Guid? empresaId, [FromQuery] DateOnly? data, [FromQuery] Guid? lojaId)
+        [FromQuery] Guid? empresaId, [FromQuery] DateOnly? data, [FromQuery] Guid? lojaId,
+        // A3 (#1769): o console pede o estornado de volta, marcado e fora dos totais.
+        [FromQuery] bool incluirEstornados = false)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
         // Dia operacional em Brasilia (não UtcNow): na janela 21h-23h59 BRT o dia UTC já
         // virou o seguinte e o fallback abriria o caixa do dia errado. Alinha com o Web
         // (BrazilTime.Today()) e com Fechar/AbrirCaixa (HorarioBrasil.Hoje()). Issue #596.
         var d = data ?? HorarioBrasil.Hoje();
-        var result = await obterDiaUseCase.ExecuteAsync(new ObterCaixaDiaQuery(emp, d, lojaId));
+        var result = await obterDiaUseCase.ExecuteAsync(new ObterCaixaDiaQuery(emp, d, lojaId, incluirEstornados));
         return DataOk(result);
     }
 
@@ -52,6 +56,7 @@ public class CaixaController(
         {
             EmpresaId = emp,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            RegistradoPorNome = NomeDaSessao(),
             // Origem server-side (trilha de auditoria), NUNCA do body — o caminho mobile
             // legitimo abre caixa via MobileCashController. #766
             Origem = "web",
@@ -99,6 +104,21 @@ public class CaixaController(
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
     }
 
+    // #2262: recebimentos de pedido (Mercado Pago e baixa manual), vendas e estornos de venda do período, as
+    // linhas que o /dia soma fora dos movimentos. O Extrato do Financeiro junta estas linhas aos movimentos.
+    [SwaggerOperation(Summary = "Order payments, sales and sale refunds counted by the cash outside its movements")]
+    [HttpGet("linhas")]
+    [Authorize(Policy = "Operador")]
+    public async Task<IActionResult> ListarLinhas(
+        [FromQuery] Guid? empresaId, [FromQuery] DateTime? desde = null, [FromQuery] DateTime? ate = null)
+    {
+        if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
+        if (desde is null || ate is null) return DataBadRequest("Informe o início e o fim do período.");
+        var result = await listarLinhasUseCase.ExecuteAsync(new ListarLinhasCaixaQuery(
+            emp, DataUtc.InicioDoPeriodoUtc(desde)!.Value, DataUtc.FimDoPeriodoUtc(ate)!.Value));
+        return DataOk(result);
+    }
+
     [SwaggerOperation(Summary = "Register entry/exit (sangria, suprimento, despesa)")]
     [HttpPost("movimentos")]
     [Authorize(Policy = "Operador")]
@@ -109,10 +129,13 @@ public class CaixaController(
         {
             EmpresaId = emp,
             RegistradoPorUserId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            RegistradoPorNome = NomeDaSessao(),
             // Origem server-side, NUNCA do body: origem="mobile" no corpo burlaria as
             // guardas FIN-003 (metodo/justificativa + anti-caixa-negativo), que so sao
             // puladas no caminho mobile legitimo (MobileCashController seta "mobile"). #766
-            Origem = "web"
+            Origem = "web",
+            // #2319: lançamento manual exige caixa aberto; a abertura posterior não absorve mais entrada solta.
+            ExigirCaixaAberto = true
         });
         return DataCreated($"/api/caixa/movimentos/{result.Id}", result);
     }
@@ -128,6 +151,8 @@ public class CaixaController(
             EmpresaId = emp,
             Id = id,
             UsuarioId = currentUser.UsuarioId != Guid.Empty ? currentUser.UsuarioId : null,
+            // #2583: o nome de quem estornou sai do token, como na abertura e no fechamento, nunca do corpo.
+            UsuarioNome = NomeDaSessao(),
             // Origem server-side, nunca do body: "mobile" no corpo pularia a guarda da gaveta (#1623, #766).
             Origem = "web"
         });
@@ -147,5 +172,12 @@ public class CaixaController(
         var result = await listarFechUseCase.ExecuteAsync(new ListarFechamentosCaixaQuery(
             emp, p, sz, desde, ate));
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
+    }
+
+    // A coluna do autor aceita 120 caracteres; o nome da sessão, 150.
+    private string? NomeDaSessao()
+    {
+        var nome = User?.FindFirst("nome")?.Value;
+        return nome is { Length: > 120 } ? nome[..120] : nome;
     }
 }

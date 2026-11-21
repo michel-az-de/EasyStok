@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications.Anexos;
 using EasyStock.Domain.Entities.Notifications;
 using EasyStock.Domain.Enums.Notifications;
 
@@ -35,9 +36,11 @@ public sealed record ResultadoConstrucao(OutboxMensagemNotificacao? Mensagem, Mo
 /// O único lugar que, dados evento, rotina, canal e destinatário, monta a mensagem do outbox (N5): resolve o template
 /// (código da rotina e, sem ele, tipo e canal), renderiza assunto, corpo e metadados (com o prefixo <c>[TESTE]</c>),
 /// escolhe o contato do canal, calcula a chave de idempotência e aplica a janela e o <c>enviarApos</c>. Serve ao
-/// <see cref="NotificadorService"/> e ao fallback de canal do dispatcher, para os dois não divergirem.
+/// <see cref="NotificadorService"/> e ao fallback de canal do dispatcher, para os dois não divergirem. Com o
+/// <paramref name="anexador"/>, o metadado <c>anexo</c> do template vira o arquivo do aviso (#2211).
 /// </summary>
-public sealed class ConstrutorMensagemOutbox(ITemplateRepository templateRepository, IRendererTemplate renderer)
+public sealed class ConstrutorMensagemOutbox(
+    ITemplateRepository templateRepository, IRendererTemplate renderer, IAnexadorMensagem? anexador = null)
 {
     public async Task<ResultadoConstrucao> ConstruirAsync(
         EventoNotificacao evento,
@@ -70,6 +73,7 @@ public sealed class ConstrutorMensagemOutbox(ITemplateRepository templateReposit
                 && !string.IsNullOrWhiteSpace(assunto))
                 assunto = NotificadorService.PrefixoTeste + assunto;
             metadadosJson = await RenderizarMetadadosAsync(template.MetadadosJson, vars, ct);
+            if (anexador is not null) metadadosJson = await anexador.AnexarAsync(evento, metadadosJson, vars, ct);
             if (canal == CanalNotificacao.WhatsApp && RemetentePorTipoEvento.De(evento.Tipo) == OrigemRemetente.Loja
                 && vars.TryGetValue("clienteId", out var clienteId) && Guid.TryParse(clienteId?.ToString(), out var idCliente)
                 && idCliente != Guid.Empty)

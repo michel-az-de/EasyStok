@@ -4,6 +4,8 @@ import { SugestaoDeTexto } from '../../componentes/SugestaoDeTexto'
 import { useComplementoDeTexto } from '../../aplicacao/useComplementoDeTexto'
 import { Modal } from '../../componentes/Modal'
 import { moeda } from '../../dominio/formato'
+import { algumPassaDoLimite, erroDoLimite } from '../../componentes/limiteDoCampo'
+import campo from '../../componentes/Campo.module.css'
 import { partesDoSku, produtoDaPorcao } from '../../dominio/cardapio'
 import { itensDoDia } from '../../dominio/cardapioLink'
 import {
@@ -17,6 +19,10 @@ import { useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { SeletorJanelaApi } from './SeletorJanelaApi'
 import { Cabecalho } from './Cabecalho'
 import css from './comanda.module.css'
+
+// #2792: limites que espelham o servidor; sem `maxLength`, o texto colado fica inteiro, o aviso aparece e o Salvar trava.
+const LIMITE_OBSERVACAO_ITEM = 500
+const LIMITE_OBSERVACAO_PEDIDO = 2000
 
 // #2007 (item 4): a data e a janela que o cliente pediu pelo link aparecem ao lado dos itens, para aprovar sabendo.
 function MudancaDeData({ comanda: c }) {
@@ -43,7 +49,7 @@ function AcertoDaComanda({ comanda: c }) {
   const f = c.financeiro, a = c.acerto, uso = c.envio?.cupomAplicado
   if (!f && !a && !uso) return null
   const situacao = { pendente: 'Em acompanhamento', confirmado: 'Confirmado', recusado: 'Não confirmado' }
-  return <section className={css.comparativo} aria-label="Acerto da comanda">
+  return <section className={css.comparativo} aria-label="Acerto do pedido">
     {f && <details className={css.historicoFinanceiro}>
       <summary>Histórico financeiro</summary>
       <p>Dinheiro recebido: {moeda(f.recebido)}</p>
@@ -60,7 +66,7 @@ function AcertoDaComanda({ comanda: c }) {
       {a.tipo === 'cupom' && a.saldoCupom != null && <p>Saldo atual do cupom: {moeda(a.saldoCupom)}</p>}
       {a.devolucoes?.map(d => <p key={d.operacaoId}>{moeda(d.valor)} · {d.meio} · {situacao[d.situacao] ?? 'Em acompanhamento'}</p>)}
       {a.tipo === 'estorno' && a.situacao === 'confirmado' && <p>Confirmação registrada no provedor. O prazo para aparecer na conta depende do meio de pagamento.</p>}
-      {a.situacao === 'pendente' && <p>O acerto ainda não foi confirmado. O cliente acompanha a atualização nesta mesma comanda.</p>}
+      {a.situacao === 'pendente' && <p>O acerto ainda não foi confirmado. O cliente acompanha a atualização neste mesmo pedido.</p>}
       {a.situacao === 'recusado' && <p>O acerto ainda exige conferência. Confira os valores confirmados e não confirmados antes de solicitar outra devolução.</p>}
     </>}
     {uso && <>
@@ -147,6 +153,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
     setPrato('')
   }
   const pendente = !c.pedidoEncerrado && c.envio?.situacao === 'alteracao_aguardando_confirmacao'
+  const passaDoLimite = algumPassaDoLimite([rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO], ...rascunho.itens.map(i => [i.observacao, LIMITE_OBSERVACAO_ITEM]))
   // J2 (#1990): a diferença acompanha a edição antes de salvar (antes dizia "Sem diferença" com +R$ 38 na tela).
   const saldo = saldoDaAlteracao(c, edicao?.rascunho ?? null, catalogo)
   const naoSalvo = Boolean(edicao) && c.podeEditar && !c.pedidoEncerrado
@@ -168,7 +175,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       {c.rascunho.endereco.complemento && ' · ' + c.rascunho.endereco.complemento} · {c.rascunho.endereco.bairro}
       {' · ' + c.rascunho.endereco.cidade + '/' + c.rascunho.endereco.uf + ' · CEP ' + c.rascunho.endereco.cep}</p>
     </details>
-  return <section ref={selecaoRef} tabIndex={-1} className={css.papelSelecao} aria-label="Itens da comanda">
+  return <section ref={selecaoRef} tabIndex={-1} className={css.papelSelecao} aria-label="Itens do pedido">
     {(nomeCliente || numeroComanda) && <Cabecalho numero={numeroComanda} nomeCliente={nomeCliente} />}
     <div className={css.etapaCompartilhada}>
       <strong>{etapa.estado}</strong><p>{etapa.orientacao}</p>
@@ -205,8 +212,11 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
         {c.podeEditar ? <details className={css.anotacaoCompartilhada}>
           <summary>Observação do prato{i.observacao && <small className={css.apontamento}>{i.observacao}</small>}</summary>
           <label className={css.observacaoCompartilhada}>Observação de {nome}
-            <input value={i.observacao ?? ''} maxLength={500} disabled={ocupado} onChange={e => mudarItem(n, { observacao: e.target.value })} />
+            <input value={i.observacao ?? ''} disabled={ocupado} onChange={e => mudarItem(n, { observacao: e.target.value })}
+              aria-invalid={erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM) ? true : undefined}
+              aria-describedby={erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM) ? `${c.linkId}-obs-${n}-limite` : undefined} />
           </label>
+          {erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM) && <p id={`${c.linkId}-obs-${n}-limite`} className={campo.erro}>{erroDoLimite(i.observacao, LIMITE_OBSERVACAO_ITEM)}</p>}
         </details> : i.observacao && <small className={css.apontamento}>{i.observacao}</small>}
       </li>
     })}</ul>
@@ -223,10 +233,13 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       <details className={css.anotacaoCompartilhada}>
       <summary>Observação do pedido{rascunho.observacoes && <small>{rascunho.observacoes}</small>}</summary>
       <label className={css.observacaoCompartilhada}>Observação para a cozinha
-        <textarea value={rascunho.observacoes ?? ''} maxLength={2000} disabled={ocupado}
+        <textarea value={rascunho.observacoes ?? ''} disabled={ocupado}
+          aria-invalid={erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO) ? true : undefined}
+          aria-describedby={erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO) ? `${c.linkId}-obs-pedido-limite` : undefined}
           onChange={e => editar({ ...rascunho, observacoes: e.target.value })}
           onFocus={sugestao.aoFocar} onBlur={sugestao.aoSair} onKeyDown={sugestao.aoTeclar} />
       </label>
+      {erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO) && <p id={`${c.linkId}-obs-pedido-limite`} className={campo.erro}>{erroDoLimite(rascunho.observacoes, LIMITE_OBSERVACAO_PEDIDO)}</p>}
       <SugestaoDeTexto sugestao={sugestao} />
       </details>
       {!c.pedido && <details className={css.entregaDaSelecao} open={!janela || c.entregaACombinar || c.freteCombinado == null}>
@@ -258,7 +271,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
         <Botao disabled={ocupado} onClick={limparEdicao}>{conflito ? 'Usar itens atuais' : 'Descartar minha edição'}</Botao>
         {conflito ? <Botao disabled={ocupado || rascunho.pedidoId !== c.rascunho.pedidoId} onClick={() => setEdicao({ revisao: c.revisao, base: c.rascunho,
           rascunho: rascunhoMantendoEdicao(c.rascunho, rascunho, edicao.base) })}>Manter minha edição para conferir</Botao>
-          : <Botao variante="primario" disabled={ocupado} onClick={persistir}>Salvar itens</Botao>}
+          : <Botao variante="primario" disabled={ocupado || passaDoLimite} motivo={passaDoLimite ? 'Encurte as observações que passam do limite.' : undefined} onClick={persistir}>Salvar itens</Botao>}
       </div>}
       {edicao && <output className={css.avisoCompartilhado}>Alterações ainda não salvas. Salvar itens atualiza o link{c.pedido ? ', sem alterar o pedido atual.' : ', sem criar um pedido.'}</output>}
       {!c.pedido && !edicao && <div className={css.confirmarCompartilhado}>
@@ -287,10 +300,10 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
   const [linkAberto, setLinkAberto] = useState(null)
   if (pedido && !visiveis.length && !erro) return null
   const aberta = visiveis.find(c => c.linkId === linkAberto)
-  return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
+  return <section className={css.clienteCompartilhado} aria-label="Pedido compartilhado com o cliente">
     <div className={css.adicionarCompartilhado}><h3>Link do cliente</h3>{acaoCompartilhar}</div>
-    {erro && !aberta && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
-    {carregando && !dados.length ? <output className={css.avisoCompartilhado}>Consultando a comanda…</output> : <>
+    {erro && !aberta && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar pedido</Botao></>}
+    {carregando && !dados.length ? <output className={css.avisoCompartilhado}>Consultando o pedido…</output> : <>
       {acaoMontar}
       {!visiveis.length && !erro && !pedido && <p>O cliente também pode escolher pelo cardápio enviado.</p>}
       {visiveis.map(c => {
@@ -310,9 +323,9 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
         </div>
       })}
     </>}
-    {aberta && <Modal titulo={`${etapaDaSelecao(aberta).titulo}${nomeCliente ? ` · ${nomeCliente}` : ''}`} largura="760px"
+    {aberta && <Modal titulo={`${etapaDaSelecao(aberta).titulo}${nomeCliente ? ` · ${nomeCliente}` : ''}`} largura="md"
       aoFechar={ocupado ? undefined : () => setLinkAberto(null)}>
-      {erro && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
+      {erro && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar pedido</Botao></>}
       {selecaoDe(aberta)}
     </Modal>}
   </section>
@@ -332,9 +345,9 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     numeroComanda={numeroComanda} nomeCliente={nomeCliente} />
   if (compacta) return <ComandaCompacta pedido={pedido} visiveis={visiveis} erro={erro} carregando={carregando} dados={dados}
     acaoCompartilhar={acaoCompartilhar} acaoMontar={acaoMontar} ocupado={ocupado} selecaoDe={selecaoDe} nomeCliente={nomeCliente} atualizar={atualizar} />
-  return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
+  return <section className={css.clienteCompartilhado} aria-label="Pedido compartilhado com o cliente">
     <div className={css.adicionarCompartilhado}>
-      <h3>{tituloDaComanda(pedido, { temLinkComPedido: visiveis.some(c => c.pedido) })}<small>{numeroComanda ? 'Comanda ' + numeroComanda : 'Itens compartilhados'}</small></h3>
+      <h3>{tituloDaComanda(pedido, { temLinkComPedido: visiveis.some(c => c.pedido) })}<small>{numeroComanda ? 'Pedido ' + numeroComanda : 'Itens compartilhados'}</small></h3>
       {acaoCompartilhar}
     </div>
     {erro && <p role="alert">{erro}</p>}

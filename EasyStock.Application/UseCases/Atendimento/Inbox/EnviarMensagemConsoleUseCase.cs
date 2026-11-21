@@ -9,13 +9,13 @@ using EasyStock.Domain.ValueObjects;
 namespace EasyStock.Application.UseCases.Atendimento.Inbox;
 
 // #2007 (item 10): `Nivel` de quem envia decide o autor (Dona ou Atendente); sem ele, Dona, como antes.
-public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto, NivelAcesso? Nivel = null);
+public sealed record EnviarTextoConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string Texto, NivelAcesso? Nivel = null, bool Confirmada = false, string? ChaveEnvio = null);
 
 public sealed record EnviarImagemConsoleCommand(
-    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda, NivelAcesso? Nivel = null);
+    Guid EmpresaId, Guid UsuarioId, Guid ConversaId, string FileName, string ContentType, byte[] Conteudo, string? Legenda, NivelAcesso? Nivel = null, bool Confirmada = false);
 
 /// <summary>Áudio gravado no console (#1444): os bytes como vieram do navegador; o formato sai dos bytes.</summary>
-public sealed record EnviarAudioConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, byte[] Conteudo, NivelAcesso? Nivel = null);
+public sealed record EnviarAudioConsoleCommand(Guid EmpresaId, Guid UsuarioId, Guid ConversaId, byte[] Conteudo, NivelAcesso? Nivel = null, bool Confirmada = false);
 
 /// <summary>
 /// A dona responde pelo console (S07, RN-04, D4): envia pela porta do canal da conversa (S34), grava
@@ -33,7 +33,8 @@ public sealed class EnviarMensagemConsoleUseCase(
     ResolvedorCanal resolvedorCanal,
     GerenciarUploadsUseCase uploads,
     IUnitOfWork unitOfWork,
-    ILogger<EnviarMensagemConsoleUseCase>? logger = null)
+    ILogger<EnviarMensagemConsoleUseCase>? logger = null,
+    IAtendenteRepository? atendentes = null)
 {
     /// <summary>Código da Cloud API para mensagem fora da janela de 24 h sem modelo.</summary>
     public const int CodigoMetaForaDaJanela = WhatsAppCloudException.CodigoForaDaJanela;
@@ -50,17 +51,27 @@ public sealed class EnviarMensagemConsoleUseCase(
         var conversa = await ObterAbertaAsync(command.EmpresaId, command.ConversaId, ct);
         var canal = resolvedorCanal.Obter(conversa.Canal);
 
+        // ATD-1 (#2305): responder na conversa de outra atendente pede confirmação antes de sair.
+        await GuardaAtribuicaoConversa.GarantirAsync(atendentes, conversa, command.UsuarioId, command.Confirmada, ct);
+
         // Fora da janela, Instagram e Messenger aceitam resposta humana com HUMAN_AGENT (S35). O console
         // é humano; o domínio confere se a tag vale e se ainda está no prazo dela.
         var tag = TagHumanaForaDaJanela(conversa, canal, agora);
         GarantirJanela(conversa, agora, tag);
 
+        var mensagem = Mensagem.Saida(command.EmpresaId, conversa.Id, AutorDe(command.Nivel), agora,
+            TipoConteudoMensagem.Texto, texto);
+        mensagem.RegistrarChaveEnvio(command.ChaveEnvio);
+
         return await EnviarERegistrarAsync(conversa, command.UsuarioId, agora,
             token => tag is not null && canal is ICanalComTagHumana comTag
                 ? comTag.EnviarTextoComTagAsync(conversa.ContatoIdExterno, texto, tag, token)
                 : canal.EnviarTextoAsync(conversa.ContatoIdExterno, texto, token),
-            externoId => Mensagem.Saida(command.EmpresaId, conversa.Id, AutorDe(command.Nivel), agora,
-                TipoConteudoMensagem.Texto, texto, externoId));
+            externoId =>
+            {
+                if (externoId is not null) mensagem.ConfirmarEnvio(externoId);
+                return mensagem;
+            });
     }
 
     public async Task<MensagemAtendimentoResult> EnviarImagemAsync(EnviarImagemConsoleCommand command, CancellationToken ct = default)
@@ -70,7 +81,7 @@ public sealed class EnviarMensagemConsoleUseCase(
             throw new UseCaseValidationException($"Legenda excede {Mensagem.TextoTamanhoMaximo} caracteres.");
 
         var agora = DateTime.UtcNow;
-        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, agora, ct);
+        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, command.UsuarioId, command.Confirmada, agora, ct);
         if (!conversa.Capacidades.AceitaImagem)
             throw new UseCaseValidationException($"O canal {conversa.Canal} não aceita imagem.");
         var canal = resolvedorCanal.Obter(conversa.Canal);
@@ -96,7 +107,7 @@ public sealed class EnviarMensagemConsoleUseCase(
     public async Task<MensagemAtendimentoResult> EnviarAudioAsync(EnviarAudioConsoleCommand command, CancellationToken ct = default)
     {
         var agora = DateTime.UtcNow;
-        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, agora, ct);
+        var conversa = await ObterParaEnvioAsync(command.EmpresaId, command.ConversaId, command.UsuarioId, command.Confirmada, agora, ct);
         if (!conversa.Capacidades.AceitaAudio || resolvedorCanal.Obter(conversa.Canal) is not ICanalComAudio canal)
             throw new UseCaseValidationException($"O canal {conversa.Canal} ainda não envia áudio pelo EasyStok.");
 
@@ -117,9 +128,12 @@ public sealed class EnviarMensagemConsoleUseCase(
     public static AutorMensagem AutorDe(NivelAcesso? nivel) =>
         nivel is null or NivelAcesso.SuperAdmin or NivelAcesso.Admin ? AutorMensagem.Dona : AutorMensagem.Atendente;
 
-    private async Task<Conversa> ObterParaEnvioAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct)
+    private async Task<Conversa> ObterParaEnvioAsync(
+        Guid empresaId, Guid conversaId, Guid usuarioId, bool confirmada, DateTime agora, CancellationToken ct)
     {
         var conversa = await ObterAbertaAsync(empresaId, conversaId, ct);
+        // #2440: imagem, áudio e foto do cardápio passam pela mesma guarda do texto (ATD-1, #2305), antes de subir o arquivo.
+        await GuardaAtribuicaoConversa.GarantirAsync(atendentes, conversa, usuarioId, confirmada, ct);
         GarantirJanela(conversa, agora, tag: null);
         return conversa;
     }

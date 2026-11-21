@@ -9,6 +9,7 @@ public class ObterDiasAlertaParadoUseCaseTests
 {
     private readonly IConfiguracaoLojaRepository _configuracaoRepository = Substitute.For<IConfiguracaoLojaRepository>();
     private readonly ILogger<ObterDiasAlertaParadoUseCase> _logger = Substitute.For<ILogger<ObterDiasAlertaParadoUseCase>>();
+    private static readonly Guid EmpresaId = Guid.NewGuid();
     private readonly IEasyStockConfiguracoes _config;
 
     public ObterDiasAlertaParadoUseCaseTests()
@@ -23,7 +24,7 @@ public class ObterDiasAlertaParadoUseCaseTests
     {
         // Arrange
         var useCase = new ObterDiasAlertaParadoUseCase(_configuracaoRepository, _config, _logger);
-        var cmd = new ObterDiasAlertaParadoCommand();
+        var cmd = new ObterDiasAlertaParadoCommand(EmpresaId);
 
         // Act
         var result = await useCase.ExecuteAsync(cmd);
@@ -40,14 +41,14 @@ public class ObterDiasAlertaParadoUseCaseTests
         _config.DiasItemParado.Returns(90);
 
         var useCase = new ObterDiasAlertaParadoUseCase(_configuracaoRepository, _config, _logger);
-        var cmd = new ObterDiasAlertaParadoCommand(lojaId);
+        var cmd = new ObterDiasAlertaParadoCommand(EmpresaId, lojaId);
 
         // Act
         var result = await useCase.ExecuteAsync(cmd);
 
         // Assert - uses default when config returns null
         result.Dias.Should().Be(90);
-        await _configuracaoRepository.Received(1).GetByLojaIdAsync(lojaId);
+        await _configuracaoRepository.Received(1).GetDaLojaAsync(EmpresaId, lojaId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -55,10 +56,10 @@ public class ObterDiasAlertaParadoUseCaseTests
     {
         // Arrange
         var lojaId = Guid.NewGuid();
-        _configuracaoRepository.GetByLojaIdAsync(lojaId).Returns((EasyStock.Domain.Entities.ConfiguracaoLoja?)null);
+        _configuracaoRepository.GetDaLojaAsync(EmpresaId, lojaId, Arg.Any<CancellationToken>()).Returns((EasyStock.Domain.Entities.ConfiguracaoLoja?)null);
 
         var useCase = new ObterDiasAlertaParadoUseCase(_configuracaoRepository, _config, _logger);
-        var cmd = new ObterDiasAlertaParadoCommand(lojaId);
+        var cmd = new ObterDiasAlertaParadoCommand(EmpresaId, lojaId);
 
         // Act
         var result = await useCase.ExecuteAsync(cmd);

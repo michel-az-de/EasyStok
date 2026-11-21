@@ -27,23 +27,47 @@ public sealed class ValidadorSessaoUsuario(
     ICacheService cache,
     IUsuarioRepository usuarios,
     IConfiguration configuration,
-    ILogger<ValidadorSessaoUsuario> logger)
+    ILogger<ValidadorSessaoUsuario> logger,
+    EasyStock.Application.Ports.Output.Persistence.IRefreshTokenRepository? refreshTokens = null)
 {
     /// <summary>A sessão do <paramref name="principal"/> (claims do JWT já validado) ainda vale?</summary>
     public async Task<bool> ValidarAsync(ClaimsPrincipal principal)
     {
         ArgumentNullException.ThrowIfNull(principal);
-        if (!Habilitado()) return true;
+        var nativa = principal.FindFirstValue("sessaoNativa") == "true";
+        if (!Habilitado() && !nativa) return true;
 
         if (!Guid.TryParse(principal.FindFirstValue("sub"), out var usuarioId) || usuarioId == Guid.Empty)
             return false;
         if (!long.TryParse(principal.FindFirstValue("iat"), NumberStyles.None, CultureInfo.InvariantCulture, out var emitidoEm))
             return false;
 
+        if (nativa)
+        {
+            if (!Guid.TryParse(principal.FindFirstValue("sid"), out var sid)
+                || !Guid.TryParse(principal.FindFirstValue("empresaId"), out var empresa)
+                || principal.FindFirstValue("dispositivoId") is not { Length: > 0 } dispositivo) return false;
+            return await ValidarNativaAsync(sid, dispositivo, empresa, usuarioId);
+        }
+        if (principal.HasClaim(c => c.Type is "sid" or "dispositivoId")) return false;
+
         var sessao = await ObterSessaoAsync(usuarioId);
         if (!sessao.Ativo) return false;
-
         return sessao.SessoesValidasDesde is not { } corte || emitidoEm >= SegundosUnix(corte);
+    }
+
+    /// <summary>A API key nativa não é um JWT: só verifica o vínculo e a revogação da família que a emitiu.</summary>
+    public async Task<bool> ValidarNativaAsync(Guid id, string dispositivo, Guid empresa, Guid? usuarioEsperado = null)
+    {
+        if (refreshTokens is null) return false;
+        var nativa = await refreshTokens.ObterSessaoNativaAsync(id);
+        if (nativa is null || nativa.RevogadaEm is not null || nativa.EmpresaId != empresa
+            || nativa.DispositivoId != dispositivo || usuarioEsperado.HasValue && nativa.UsuarioId != usuarioEsperado
+            || await refreshTokens.DispositivoRevogadoAsync(dispositivo)) return false;
+        // Uma família cujo INSERT cruzou o corte pode não ter sido vista pelo UPDATE de revogação.
+        // O cache web de outra réplica não pode conceder a ela uma janela de acesso.
+        var usuario = await usuarios.ObterSessaoAsync(nativa.UsuarioId);
+        return usuario is { Ativo: true } && (usuario.SessoesValidasDesde is not { } corte || nativa.CriadaEm > corte);
     }
 
     /// <summary>Padrão <c>true</c>. Valor ausente ou que não é booleano não desliga a segurança por engano.</summary>

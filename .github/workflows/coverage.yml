@@ -32,12 +32,14 @@ jobs:
       - name: Build
         run: dotnet build EasyStok.sln --configuration Release --no-restore
 
+      # As suítes de integração (namespace *.IntegrationTests.*) ficam fora: rodam com Postgres real
+      # no ci.yml e, instrumentadas aqui, estouravam o teto de 25 min em todo run (#468).
       - name: Test with coverage
         run: |
           dotnet test EasyStok.sln \
             --configuration Release \
             --no-build \
-            --filter "Category!=ArchitectureDebt" \
+            --filter "Category!=ArchitectureDebt&FullyQualifiedName!~.IntegrationTests." \
             --collect:"XPlat Code Coverage" \
             --settings coverlet.runsettings \
             --logger "trx;LogFileName=test.trx" \
@@ -55,14 +57,14 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: coverage-report
           retention-days: 30
 
       - name: Coverage summary (global)
-        uses: irongut/CodeCoverageSummary@v1.3.0
+        uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 # v1.3.0
         with:
           filename: coverage-report/Cobertura.xml
           badge: true
@@ -80,7 +82,7 @@ jobs:
 
       - name: PR comment with coverage
         if: github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           recreate: true
           path: code-coverage-results.md

@@ -11,15 +11,18 @@ using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Pagamentos;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.Enums.Pagamentos;
+using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.Pagamentos.MercadoPago;
 using EasyStock.Infra.Postgre.Data;
 using EasyStock.Infra.Postgre.Repositories;
 using EasyStock.Infra.Postgre.Repositories.Pagamentos;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using Polly.Registry;
 using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Atendimento.Ocorrencias;
@@ -608,7 +611,10 @@ public sealed class EstornoOnlinePedidoIntegrationTests(PostgreSqlDatabaseFixtur
         {
             _pedidoId = pedidoId;
             Cliente = new(new HttpClient(this, false) { BaseAddress = new Uri("https://mp.test/") },
-                Options.Create(new MercadoPagoOptions { AccessToken = "teste-local" }), NullLogger<MercadoPagoClient>.Instance);
+                Options.Create(new MercadoPagoOptions { AccessToken = "teste-local" }),
+                new ServiceCollection().AddEasyStockIntegrationResilience().BuildServiceProvider()
+                    .GetRequiredService<ResiliencePipelineProvider<string>>(),
+                NullLogger<MercadoPagoClient>.Instance);
         }
         public void AprovarTodos() { lock (_gate) foreach (var k in Estornos.Keys.ToArray()) Estornos[k] = Estornos[k] with { Status = "approved" }; }
         public void AdicionarExterno(decimal valor) { lock (_gate) Estornos[Guid.NewGuid().ToString()] = new((Estornos.Count + 1000).ToString(), valor, "approved", "123456789", Agora); }

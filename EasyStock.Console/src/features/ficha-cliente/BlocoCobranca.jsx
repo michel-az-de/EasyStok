@@ -10,10 +10,13 @@ import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { useEmissao } from '../../aplicacao/useEmissao'
+import { useMetodosPagamento } from '../../aplicacao/useMetodosPagamento'
 import {
   AVISO_BAIXA_COM_LINK, MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, aguardaSinalManual, baixaEsperaAprovacao, baixaCancelaCobrancaOnline, metodoDaCobranca,
-  nomeDoMeio, podeAlterarMeio, situacaoDaCobranca, trocaDeFormaNoEasyStok, valorSugeridoParaBaixa,
+  nomeDoMeio, podeAlterarMeio, situacaoDaCobranca, trocasDeFormaNoEasyStok, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
+import { Chip } from '../../componentes/Chip'
+import { usePixDireto } from '../../aplicacao/usePixDireto'
 import { rotuloDoTotal } from '../../dominio/resumoPedido'
 import {
   horaCurta, lerMoeda, moeda, moedaAltaDemais,
@@ -23,9 +26,10 @@ import { totalDoPedido } from '../../dominio/pedido'
 import { encontrarCupom, validarCupom } from '../../dominio/fidelidade'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { RelogioPix } from './RelogioPix'
-import { cobrancaRepeteExtrato } from './apresentacaoDaFicha'
+import { cobrancaRepeteExtrato, perguntaDaBaixa } from './apresentacaoDaFicha'
 import { ConferirPagamento } from './ConferirPagamento'
 import css from './ficha.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Campo "Cupom" da Cobrança (frente Fidelidade e cupons, rodada 13, issue
 // #45, registro 107): aplica o desconto ANTES de gerar a cobrança e mostra o
@@ -134,7 +138,8 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
   const [metodo, setMetodo] = useState(() => metodoDaCobranca(pedido?.cobranca))
   const [enviando, setEnviando] = useState(false)
   const [recusa, setRecusa] = useState(null)
-  const valido = centavos > 0 && !excedeu && Boolean(metodo)
+  const formas = useMetodosPagamento()
+  const valido = centavos > 0 && !excedeu && formas.opcoes.some(o => o.valor === metodo) && !formas.carregando && !formas.erro
 
   if (baixaEsperaAprovacao(pedido)) {
     return (
@@ -143,7 +148,7 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
         <div className={css.acoesCobranca}>
           <Botao largo onClick={aoCancelar}>Voltar</Botao>
           {aoAprovar && aguardaAprovacao(pedido) && (
-            <Botao largo variante="primario" icone="circle-check" disabled={enviando} onClick={async () => {
+            <Botao largo variante="primario" icone="circle-check" disabled={enviando} aria-busy={enviando || undefined} onClick={async () => {
               setEnviando(true)
               try { await aoAprovar() } finally { setEnviando(false) }
             }}>
@@ -176,29 +181,29 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
       evento.preventDefault()
       return valido && !enviando ? registrar() : undefined
     }}>
+      {/* #2232 (F6): tocar em "Marcar pago" abre a pergunta com o valor que vai ser lançado. */}
+      <p className={css.perguntaDaBaixa}>{perguntaDaBaixa(centavos / 100, { sinal: aguardaSinalManual(pedido) })}</p>
       {baixaCancelaCobrancaOnline(pedido) && (
         <div className={css.avisoDiferenca} role="note">
           <p className={css.corpoBloco}><Icone nome="alerta" /> {AVISO_BAIXA_COM_LINK}</p>
         </div>
       )}
       <CampoSelecao rotulo="Como recebeu" value={metodo} onChange={(e) => setMetodo(e.target.value)}
-        opcoes={[
-          { valor: '', rotulo: 'Selecione' }, { valor: 'pix', rotulo: 'Pix' },
-          { valor: 'dinheiro', rotulo: 'Dinheiro' }, { valor: 'credito', rotulo: 'Cartão de crédito' },
-          { valor: 'debito', rotulo: 'Cartão de débito' }, { valor: 'transferencia', rotulo: 'Transferência' },
-          { valor: 'outro', rotulo: 'Outro' },
-        ]} />
+        disabled={formas.carregando || enviando}
+        opcoes={[{ valor: '', rotulo: formas.carregando ? 'Carregando formas…' : 'Selecione' }, ...formas.opcoes]} />
+      {formas.erro && <div role="alert"><p>{formas.erro}</p><Botao onClick={formas.recarregar}>Tentar novamente</Botao></div>}
+      {!formas.carregando && !formas.erro && formas.opcoes.length === 0 && <p role="status">Nenhuma forma de pagamento ativa. Revise Cadastros.</p>}
       <CampoReais
         rotulo="Valor recebido"
         centavos={centavos}
         ler={lerMoeda}
-        erro={excedeu ? 'Valor alto demais' : null}
+        erro={excedeu ? 'Valor alto demais' : centavos <= 0 ? 'Informe um valor maior que zero.' : null}
         aoMudar={(valor) => setCentavos(valor ?? 0)}
       />
       {recusa && <p className={css.motivoDesabilitado} role="alert">{recusa}</p>}
       <div className={css.acoesCobranca}>
         <Botao largo disabled={enviando} onClick={aoCancelar}>Voltar</Botao>
-        <Botao largo tipo="submit" variante="primario" disabled={!valido || enviando}>
+        <Botao largo tipo="submit" variante="primario" disabled={!valido || enviando} aria-busy={enviando || undefined}>
           {enviando ? 'Registrando…' : aguardaSinalManual(pedido) ? 'Registrar sinal' : 'Marcar pago'}
         </Botao>
       </div>
@@ -214,11 +219,15 @@ export function BaixaAMao({ valorCobrado, pedido = null, aoConfirmar, aoCancelar
 //
 // #1683: no modo API o EasyStok só troca entre link e na entrega (Pix e cartão são o mesmo
 // link). A tela não pergunta um meio que ele ignora e diz o que acontece de fato.
+// #2998: com o Pix direto disponível, o EasyStok também troca para o Pix na chave da loja. Com mais de
+// uma forma possível, ela escolhe; com uma só, a tela segue dizendo o que acontece.
 function AlterarForma({ cobranca, nomeCliente, fonteApi = false, aoAlterar }) {
   const [aberto, setAberto] = useState(false)
   const [escolhido, setNovo] = useState(null)
-  const trocaApi = fonteApi ? trocaDeFormaNoEasyStok(cobranca, nomeCliente) : null
-  const novo = trocaApi?.meio ?? escolhido
+  const pixDireto = usePixDireto()
+  const trocasApi = fonteApi ? trocasDeFormaNoEasyStok(cobranca, nomeCliente, { pixDireto }) : null
+  const trocaApi = trocasApi?.length === 1 ? trocasApi[0] : trocasApi?.find((t) => t.meio === escolhido) ?? null
+  const novo = trocasApi ? trocaApi?.meio ?? null : escolhido
   const atual = nomeDoMeio(cobranca.meio)
   const fechar = () => { setAberto(false); setNovo(null) }
   if (!aberto) {
@@ -230,7 +239,21 @@ function AlterarForma({ cobranca, nomeCliente, fonteApi = false, aoAlterar }) {
   }
   return (
     <div className={css.confirmarTroca}>
-      {trocaApi ? <p>{trocaApi.texto}</p> : (
+      {trocasApi ? (
+        <>
+          {trocasApi.length > 1 && (
+            <>
+              <p className={css.perguntaMeio}>{`Hoje: ${atual}. Mudar para:`}</p>
+              <div className={css.chipsMeio} role="radiogroup" aria-label="Forma de pagamento">
+                {trocasApi.map((t) => (
+                  <Chip key={t.meio} papel="escolha" ativo={escolhido === t.meio} onClick={() => setNovo(t.meio)}>{t.rotulo}</Chip>
+                ))}
+              </div>
+            </>
+          )}
+          {trocaApi && <p>{trocaApi.texto}</p>}
+        </>
+      ) : (
         <>
           <EscolhaDeMeio escolhido={novo} excluir={cobranca.meio ?? 'pix'} aoEscolher={setNovo} pergunta={`Hoje: ${atual}. Mudar para:`} />
           {novo && (
@@ -327,7 +350,7 @@ export function BlocoCobranca({
       return (
         <Bloco titulo="Cobrança">
           <Vazio
-            titulo="Comanda vazia"
+            titulo="Pedido vazio"
             acao={<Botao onClick={aoAbrirCardapio} disabled={!editavel}>Adicionar itens</Botao>}
           />
         </Bloco>
@@ -373,7 +396,7 @@ export function BlocoCobranca({
             disabled={!editavel || !meioEscolhido}
             onClick={() => geracao.emitir(meioEscolhido)}
           >
-            Gerar cobrança
+            {ROTULOS.GERAR_COBRANCA}
           </Botao>
         )}
       </Bloco>

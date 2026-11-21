@@ -19,7 +19,7 @@ public class CalcularFreteUseCaseRaioTests
 
     private static StorefrontEntity StorefrontComRaio()
     {
-        var s = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Babá", 0m);
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Baba", 0m);
         s.Ativar();
         s.ConfigurarFreteRaio(0, 0, 1.4, 500, 5000,
             """[{"id":"ate-2km","ateMetros":2000,"valorCentavos":1500},{"id":"ate-5km","ateMetros":5000,"valorCentavos":2500}]""");
@@ -28,7 +28,7 @@ public class CalcularFreteUseCaseRaioTests
 
     private static StorefrontEntity StorefrontSemRaio()
     {
-        var s = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Babá", 0m);
+        var s = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Baba", 0m);
         s.Ativar();
         return s;
     }

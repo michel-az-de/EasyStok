@@ -1,9 +1,9 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
+  CONFIRMACAO_RECUSADA, abrirConversaDoCliente, assumir, buscarConversaPorId, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
   transferir,
 } from '../infra/api/conversasApi'
-import { mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
+import { conversaDaApi, mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
 import { lerSessao } from '../infra/api/sessao'
 import { proximoId } from '../infra/numeracao'
 import { avisoDeVariaveisNaoResolvidas } from '../dominio/respostas'
@@ -29,6 +29,7 @@ import { criarAcoesMensagensProgramadasApi } from './api/mensagensProgramadas'
 import { criarAcoesModelosApi } from './api/modelos'
 import { criarAcoesMensagensAnterioresApi } from './api/mensagensAnteriores'
 import { criarAvisosNaoLigadas, envioNaoLigado, textoNaoLigado } from './api/naoLigadas'
+import { criarAssumirAntesDeEnviar } from './api/assumirAntesDeEnviar'
 import { criarChavesDeMensagem } from './chavesDeMensagem'
 import { proximoInstante } from './relogioDeLeitura'
 
@@ -74,7 +75,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     const { conversas = [], catalogo } = estadoRef.current
     const conversa = conversas.find((c) => c.id === id)
     if (!conversa || !envioBloqueado(conversa, agoraRef.current, canalDaConversa(catalogo?.canais, conversa))) return false
-    despachar({ tipo: acao.AVISO_API, mensagem: 'Cadastro bloqueado: a mensagem não saiu. Desbloqueie na ficha para escrever.' })
+    despachar({ tipo: acao.AVISO_API, mensagem: 'Cadastro bloqueado: a mensagem não saiu. A gerência desbloqueia na ficha.' })
     return true
   }
   const clienteApi = criarAcoesClienteApi({ despachar, estadoRef })
@@ -84,13 +85,29 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, confirmadaEm: proximoInstante(), situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) })
       return true
     })
-    .catch((erro) => { avisar(erro); return false })
+    // #3039: recusar a pergunta não é falha: sem aviso, a faixa fica limpa.
+    .catch((erro) => { if (erro?.codigo !== CONFIRMACAO_RECUSADA) avisar(erro); return false })
+  // #2185 (F12, E09): o botão Assumir, o campo e todo envio humano assumem pelo mesmo caminho.
+  const assumirDaConversa = criarAssumirAntesDeEnviar({
+    despachar, estadoRef, agoraRef, assumirNaApi: (id) => confirmarResponsavel(id, assumir),
+  })
 
+  const selecionar = (id, resumoEncontrado = null, { reter = false } = {}) => {
+    if (resumoEncontrado?.id === id && !estadoRef.current.conversas.some(c => c.id === id)) {
+      const encontrada = conversaDaApi(resumoEncontrado, null, lerSessao()?.usuario)
+      despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [...estadoRef.current.conversas, encontrada], semMensagens: [id] })
+    }
+    despachar({ tipo: acao.SELECIONAR_CONVERSA, id, reter })
+    marcarLida(id).catch(() => {})
+    // Conversa com cliente e Ficha ainda não lida do EasyStok: o dossiê preenche (#1276).
+    const c = estadoRef.current.conversas.find((x) => x.id === id)
+    if (precisaLerFicha(c)) clienteApi.carregarClienteDaConversa(id)
+  }
   return {
     ...acoes,
     listarAtendentes,
     ...criarAvisosNaoLigadas(despachar),
-    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves }),
+    ...criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves, assumirParaEnviar: assumirDaConversa.paraEnviar }),
     // #1474: sem `fixo`, fecha só o aviso de ação; o persistente (configuração) só com `fixo: true`.
     fecharAvisoApi: ({ fixo = false } = {}) => despachar({ tipo: acao.FECHAR_AVISO_API, fixo }),
     ...criarAcoesExpedienteApi({ despachar, estadoRef }),
@@ -98,10 +115,10 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     ...criarAcoesLembretesApi({ despachar }),
     ...criarAcoesConfiguracaoApi(),
     ...criarAcoesAssistenteApi(),
-    ...criarAcoesAgenteApi({ despachar }),
+    ...criarAcoesAgenteApi({ despachar, estadoRef }),
     ...criarAcoesConsentimentosApi(),
     ...criarAcoesOcorrenciasApi(),
-    ...criarAcoesComandaApi(acoes, { despachar, estadoRef }),
+    ...criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnviar: assumirDaConversa.antesDeEnviar }),
     ...clienteApi,
     // #1441: respostas prontas, automáticas e tags do cliente.
     ...criarAcoesRespostasApi({ despachar, estadoRef }),
@@ -111,7 +128,7 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
     // #1241: cardápio do dia (disponibilidade e saldo) no EasyStok.
     ...criarAcoesCardapioApi({ despachar, estadoRef, comItensForaRef }),
     ...criarAcoesMensagensProgramadasApi({ estadoRef }),
-    ...criarAcoesModelosApi({ despachar }),
+    ...criarAcoesModelosApi({ despachar, antesDeEnviar: assumirDaConversa.antesDeEnviar }),
     // #2005 (console-09): "Ver mensagens anteriores" no topo do fio.
     ...criarAcoesMensagensAnterioresApi({ despachar, estadoRef }),
     enviar: (id, texto, opcoes = {}) => {
@@ -133,17 +150,25 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
         return false
       }
       if (envioRecusado(id)) return false
-      const mensagemId = proximoId('msg')
-      despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
-      return chaves.enviar(id, { texto }, (chave) => enviarTexto(id, texto, { chave }))
-        .then((m) => {
-          despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, mensagem: mensagemDaApi(m) })
-          return true
+      // #2185 (F12): cardápio, Assistente e campo assumem antes de falar; sem o que assumir, sai na hora.
+      return assumirDaConversa.antesDeEnviar(id, () => {
+        let mensagemId = proximoId('msg')
+        let chaveEnvio
+        return chaves.enviar(id, { texto }, (chave) => {
+          chaveEnvio = chave
+          mensagemId = estadoRef.current?.conversas.find(c => c.id === id)?.mensagens?.find(m => m.dir === 'out' && m.chaveEnvio === chave)?.id ?? mensagemId
+          despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, chaveEnvio, agora: agoraRef.current })
+          return enviarTexto(id, texto, { chave })
         })
-        .catch((erro) => {
-          despachar(falhaDoEnvio(id, mensagemId, erro))
-          return false
-        })
+          .then((m) => {
+            despachar({ tipo: acao.CONFIRMAR_ENVIO_API, id, mensagemId, chaveEnvio, mensagem: mensagemDaApi(m) })
+            return true
+          })
+          .catch((erro) => {
+            despachar(falhaDoEnvio(id, mensagemId, erro))
+            return false
+          })
+      })
     },
     // S57: só no modo API (a massa local não tem envio de verdade). A resposta substitui o balão.
     reenviar: (id, mensagemId) =>
@@ -165,16 +190,32 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
         avisar(erro)
         return null
       }),
+    // #2871: só no modo API; sem a ação (demonstração) o "Novo pedido" do cliente não aparece.
+    abrirConversaDoCliente,
+    // #2921: a janela "Novo pedido" prepara a conversa SEM selecioná-la (nada de hash nem anúncio): entra no estado
+    // para guardar a montagem, fica fora da fila e a volta de 5 s a retém enquanto a janela estiver aberta.
+    abrirJanelaDoPedido: (resumo, { clienteId, nome } = {}) => {
+      if (!estadoRef.current.conversas.some((c) => c.id === resumo.id)) {
+        const encontrada = conversaDaApi(resumo, null, lerSessao()?.usuario)
+        despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [...estadoRef.current.conversas, encontrada], semMensagens: [resumo.id] })
+      }
+      despachar({ tipo: acao.ABRIR_JANELA_DO_PEDIDO, janela: { conversaId: resumo.id, clienteId: clienteId ?? resumo.clienteId ?? null, nome: nome ?? resumo.nome ?? '' } })
+    },
+    fecharJanelaDoPedido: () => despachar({ tipo: acao.FECHAR_JANELA_DO_PEDIDO }),
     // S59: painel "Não entregues", direto da API (não passa pelo reducer).
     listarNaoEntregues: () => listarNaoEntregues().then((linhas) => (linhas ?? []).map(naoEntregueDaApi)),
-    selecionar: (id) => {
-      despachar({ tipo: acao.SELECIONAR_CONVERSA, id })
-      marcarLida(id).catch(() => {})
-      // Conversa com cliente e Ficha ainda não lida do EasyStok: o dossiê preenche (#1276).
-      const c = estadoRef.current.conversas.find((x) => x.id === id)
-      if (precisaLerFicha(c)) clienteApi.carregarClienteDaConversa(id)
+    selecionar,
+    // #2921: "Iniciar" e "Chamar no WhatsApp": a conversa nova some da fila até a cliente responder; busca-a pelo id e
+    // a retém enquanto selecionada. Sem achá-la, cai no caminho antigo (espera a sincronização).
+    selecionarIniciada: async (id) => {
+      const antes = estadoRef.current.selecionadaId
+      const resumo = await buscarConversaPorId(id).catch(() => null)
+      // Vigência: se a usuária escolheu outra conversa durante a espera, o GET tardio não rouba a seleção.
+      const agora = estadoRef.current.selecionadaId
+      if (agora != null && agora !== antes && agora !== id) return undefined
+      return selecionar(id, resumo, { reter: true })
     },
-    assumirAtendimento: (id) => confirmarResponsavel(id, assumir),
+    assumirAtendimento: assumirDaConversa.assumir,
     devolverAutomatico: (id) => confirmarResponsavel(id, liberarAutomatico),
     // #1239: "Passar para…" do cabeçalho da conversa. A resposta é a situação nova (outro dono);
     // a recusa (destino que não atende, conversa mudou) volta como `{ erro }` para o modal.

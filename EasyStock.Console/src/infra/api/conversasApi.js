@@ -13,6 +13,10 @@ const PAGINAS_NO_MAXIMO = 10
 export const listarConversas = ({ limite = POR_PAGINA, pagina = 1 } = {}) =>
   chamarApi(`${BASE}?limite=${limite}&pagina=${pagina}`)
 
+// #2921: a conversa que a equipe iniciou fica fora da fila até a cliente responder, mas a busca aceita o id dela.
+export const buscarConversaPorId = (id) =>
+  chamarApi(`${BASE}?q=${encodeURIComponent(id)}&limite=5`).then((itens) => (itens ?? []).find((c) => c.id === id) ?? null)
+
 export const listarAtendentes = () => chamarApi('/api/atendimento/atendentes')
 
 // Leitura da polling. Inbox inteira (F07, item 7): segue as páginas até uma vir incompleta;
@@ -40,10 +44,41 @@ export const listarMensagens = (id, { limite = MENSAGENS_POR_LEITURA, antesDe = 
 export const baixarMidia = (conversaId, mensagemId) =>
   chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/midia`, { arquivo: true })
 
+// ATD-1 (#2305, #2440): assumir, transferir ou responder (texto, foto, áudio, cardápio, modelo) em conversa de outra
+// atendente pede confirmação. A API responde 409 CONVERSA_DE_OUTRA; a dona confirma e a mesma ação repete
+// com `confirmar`, com a mesma `chave` de idempotência.
+// #3037: quem pergunta é um modal da tela, registrado aqui por `definirPerguntaDeOutra` (a infra não importa UI).
+// Sem anfitrião registrado, o erro segue adiante e a mensagem da API aparece como em qualquer falha.
+const perguntadores = []
+export const definirPerguntaDeOutra = (pergunta) => {
+  perguntadores.push(pergunta)
+  return () => { const i = perguntadores.lastIndexOf(pergunta); if (i >= 0) perguntadores.splice(i, 1) }
+}
+
+export const CONFIRMACAO_RECUSADA = 'CONFIRMACAO_RECUSADA'
+
+export const comConfirmacaoDeOutra = async (chamada) => {
+  try {
+    return await chamada(false)
+  } catch (erro) {
+    const perguntar = perguntadores.at(-1)
+    if (erro?.codigo !== 'CONVERSA_DE_OUTRA' || !perguntar) throw erro
+    if (!(await perguntar(erro.message))) {
+      // #3039: recusou a pergunta; o aviso diz o estado verdadeiro, não pede uma confirmação que já foi negada.
+      const recusa = new Error('A conversa continua com a outra atendente.', { cause: erro })
+      recusa.codigo = CONFIRMACAO_RECUSADA
+      recusa.status = erro.status
+      throw recusa
+    }
+    return chamada(true)
+  }
+}
+
 // #1786: `chave` (Idempotency-Key) é a do balão. Repetir o mesmo envio depois de uma resposta perdida devolve a
 // mensagem já gravada em vez de mandar outra ao cliente.
 export const enviarTexto = (id, texto, { chave = null } = {}) =>
-  chamarApi(`${BASE}/${id}/mensagens`, { metodo: 'POST', corpo: { texto }, chave })
+  comConfirmacaoDeOutra((confirmar) =>
+    chamarApi(`${BASE}/${id}/mensagens`, { metodo: 'POST', corpo: confirmar ? { texto, confirmar } : { texto }, chave }))
 
 // Reenvio de texto que falhou (S57): devolve a mensagem atualizada (enviada, ou com o novo erro).
 export const reenviarMensagem = (conversaId, mensagemId) =>
@@ -52,17 +87,25 @@ export const reenviarMensagem = (conversaId, mensagemId) =>
 // Mensagens que não chegaram ao cliente, de todas as conversas (S59).
 export const listarNaoEntregues = ({ limite = 50 } = {}) => chamarApi(`${BASE}/nao-entregues?limite=${limite}`)
 
-export const assumir = (id) => chamarApi(`${BASE}/${id}/assumir`, { metodo: 'POST' })
+export const assumir = (id) => comConfirmacaoDeOutra((confirmar) =>
+  chamarApi(`${BASE}/${id}/assumir${confirmar ? '?confirmar=true' : ''}`, { metodo: 'POST' }))
 export const liberarAutomatico = (id) => chamarApi(`${BASE}/${id}/liberar-automatico`, { metodo: 'POST' })
 // #1239 (S41): passa a conversa para outro atendente da empresa.
-export const transferir = (id, paraUsuarioId) => chamarApi(`${BASE}/${id}/transferir`, { metodo: 'POST', corpo: { paraUsuarioId } })
+export const transferir = (id, paraUsuarioId) => comConfirmacaoDeOutra((confirmar) =>
+  chamarApi(`${BASE}/${id}/transferir`, { metodo: 'POST', corpo: confirmar ? { paraUsuarioId, confirmar } : { paraUsuarioId } }))
 export const encerrar = (id) => chamarApi(`${BASE}/${id}/encerrar`, { metodo: 'POST' })
 export const reabrir = (id) => chamarApi(`${BASE}/${id}/reabrir`, { metodo: 'POST' })
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })
+// #2871: "Novo pedido" do cliente que pediu pelo WhatsApp pessoal da dona. Abre (ou reaproveita) a conversa do WhatsApp
+// da loja com ele, sem mandar mensagem, e devolve a linha da inbox para o Balcão mostrar antes da próxima leitura.
+// #2930: `celular` só vale para cliente sem telefone no cadastro; a API grava antes de abrir a conversa.
+export const abrirConversaDoCliente = (clienteId, celular) =>
+  chamarApi(`${BASE}/do-cliente`, { metodo: 'POST', corpo: celular ? { clienteId, celular } : { clienteId } })
 
 // Sugestão do agente para a dona (#1420): `{ texto, tokens, latenciaMs }`. Nada sai ao cliente.
 // Sem a chave da Anthropic na API, 503 com a mensagem que o painel mostra.
-export const sugerirResposta = (id) => chamarApi(`${BASE}/${id}/sugestao`, { metodo: 'POST' })
+export const sugerirResposta = (id, { sinal, identidadeEsperada } = {}) =>
+  chamarApi(`${BASE}/${id}/sugestao`, { metodo: 'POST', sinal, identidadeEsperada })
 
 // Link do cardápio da loja ligado à conversa, o mesmo que o agente manda (#1353, S48).
 export const gerarLinkCardapio = (id) => chamarApi(`${BASE}/${id}/link-cardapio`, { metodo: 'POST' })
@@ -73,6 +116,8 @@ export const cadastrarClienteDaConversa = (id, corpo) => chamarApi(`${BASE}/${id
 export const obterDossie = (id) => chamarApi(`${BASE}/${id}/dossie`)
 // #1839: uma ou duas frases sobre o cliente, pela IA; texto nulo com a IA desligada.
 export const obterResumoDoCliente = (id, sinal) => chamarApi(`${BASE}/${id}/resumo-cliente`, { sinal, prazoComCancelamento: true })
+// #2496: etapas do turno do robô nesta conversa, chave da loja, prompt exato e ferramentas. Só lê.
+export const checarAssistente = (id, sinal) => chamarApi(`${BASE}/${id}/assistente`, { sinal, prazoComCancelamento: true })
 // #1436: nota interna no cadastro do cliente (o cliente nunca vê).
 export const adicionarNotaCliente = (clienteId, texto) =>
   chamarApi(`/api/clientes/${clienteId}/notas`, { metodo: 'POST', corpo: { texto } })
@@ -100,7 +145,8 @@ export async function enviarImagem(id, { dataUrl, nomeArquivo, legenda }, { chav
   const formulario = new FormData()
   formulario.append('file', blob, nome)
   if (legenda?.trim()) formulario.append('legenda', legenda.trim())
-  return chamarApi(`${BASE}/${id}/mensagens/imagem`, { metodo: 'POST', formulario, chave })
+  return comConfirmacaoDeOutra((confirmar) =>
+    chamarApi(`${BASE}/${id}/mensagens/imagem${confirmar ? '?confirmar=true' : ''}`, { metodo: 'POST', formulario, chave }))
 }
 
 // Áudio gravado no console (#1444). Vai como veio do navegador; o EasyStok converte o WebM do
@@ -110,12 +156,13 @@ export async function enviarAudio(id, { dataUrl }, { chave = null } = {}) {
   const { blob } = arquivoDoDataUrl(dataUrl)
   const formulario = new FormData()
   formulario.append('file', blob, nomeDoArquivoDeAudio(blob.type))
-  return chamarApi(`${BASE}/${id}/mensagens/audio`, { metodo: 'POST', formulario, chave })
+  return comConfirmacaoDeOutra((confirmar) =>
+    chamarApi(`${BASE}/${id}/mensagens/audio${confirmar ? '?confirmar=true' : ''}`, { metodo: 'POST', formulario, chave }))
 }
 
 // Foto da galeria do cardápio (#1437): o EasyStok lê a foto do storage pelo id do item e o índice;
 // o navegador não baixa a URL (cross-origin, host gravado pode estar fora do ar).
 export const enviarImagemCardapio = (id, { cardapioItemId, indice, legenda }, { chave = null } = {}) =>
-  chamarApi(`${BASE}/${id}/mensagens/imagem-cardapio`, {
-    metodo: 'POST', corpo: { cardapioItemId, indice, legenda: legenda?.trim() || null }, chave,
-  })
+  comConfirmacaoDeOutra((confirmar) => chamarApi(`${BASE}/${id}/mensagens/imagem-cardapio`, {
+    metodo: 'POST', corpo: { cardapioItemId, indice, legenda: legenda?.trim() || null, ...(confirmar && { confirmar }) }, chave,
+  }))

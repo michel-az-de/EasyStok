@@ -1,0 +1,229 @@
+name: easystok
+
+# EasyStok no VPS, construido do zero e sem dado, para provar a stack antes de decidir migracao.
+# Deriva do docker-compose.azure.yml do repositorio, com tres diferencas deliberadas:
+#
+#   1. Sem `postgres`. Usa o shared-postgres, com database e role proprios criados por
+#      initdb/30-easystok.sql. A role e NOBYPASSRLS por decisao do ADR 0010 do EasyStok, que
+#      escolheu app flag em vez de role privilegiada: o bypass legitimo vem de
+#      `SET app.bypass_rls` emitido pelo interceptor, nunca de privilegio de banco.
+#   2. Sem `caddy`. O Caddy compartilhado de /opt/stacks/shared publica os hosts.
+#   3. Sem `storefront`. O casa-da-baba tem stack propria em /opt/stacks/casadababa.
+#
+# O `redis` FICA, e nao e opcional: sem ele a sessao Web e in-process e todo redeploy causa logout
+# geral (issue 690 / BUG-006 do repositorio). Cache efemero, sem persistencia.
+#
+# `DOTNET_gcServer: 0` e os mem_limit vieram da VM de 1 CPU do Azure. Mantidos por serem o que roda
+# em producao hoje: mudar host e tuning na mesma janela transforma qualquer regressao num misterio.
+
+networks:
+  edge:
+    external: true
+    name: edge
+
+volumes:
+  uploads-data:
+  dataprotection-web-keys:
+  dataprotection-admin-keys:
+  dataprotection-api-keys:
+
+x-db-connection: &db-connection
+  "Host=shared-postgres;Port=5432;Database=easystock;Username=easystock;Password=__NA_VPS__;SSL Mode=Disable"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: ez-redis
+    restart: unless-stopped
+    mem_limit: 80m
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: easystok-api:vps
+    container_name: ez-api
+    restart: unless-stopped
+    mem_limit: 448m
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ENABLE_NOMINATIM_GEOCODING: "true"
+      DOTNET_gcServer: "0"
+      Database__Provider: PostgreSql
+      # A propria API aplica migrations e seeds no startup, serializado por advisory lock.
+      RunMigrationsOnStartup: "true"
+      MigrationsFailFast: "true"
+      ConnectionStrings__DefaultConnection: __NA_VPS__
+      Jwt__Issuer: EasyStock
+      Jwt__Audience: EasyStock
+      Jwt__SecretKey: __NA_VPS__
+      Jwt__ExpirationMinutes: "60"
+      Auth__Google__ClientId: __NA_VPS__
+      Auth__Google__EmpresaPadrao: __NA_VPS__
+      Anthropic__Enabled: "${EZ_AGENTE_ENABLED:-false}"
+      Anthropic__ApiKeyAgente: __NA_VPS__
+      Anthropic__AutenticacaoBearer: "true"
+      Anthropic__BaseUrl: "https://api.fireworks.ai/inference/"
+      Anthropic__ModeloAgente: "accounts/fireworks/models/deepseek-v4p1-flash"
+      FileStorage__Provider: Local
+      # Absoluta de proposito: relativa quebra a imagem na Web e no Admin, que sao outra origem.
+      FileStorage__PublicBaseUrl: "https://${API_HOST}/files"
+      # Obrigatorios em Production: a API faz fail-fast se faltarem.
+      SEED_SUPERADMIN_EMAIL: "${SEED_SUPERADMIN_EMAIL}"
+      SEED_SUPERADMIN_PASSWORD: __NA_VPS__
+      SEED_SUPERADMIN_NOME: "${SEED_SUPERADMIN_NOME}"
+      # Sem dado nenhum: a decisao de trazer os dados do Azure vem depois.
+      SEED_DEMO_DATA: "false"
+      Otp__UseStub: "false"
+      Acompanhamento__JwtSecret: __NA_VPS__
+      Avaliacao__JwtSecret: __NA_VPS__
+      OpenTelemetry__OtlpEndpoint: ""
+      # Meta Cloud API (webhook S03). Vazios ate o .env receber EZ_META_*; sem Provider=meta a
+      # validacao de startup nao exige nada, e o GET de verificacao so passa com VerifyToken.
+      Atendimento__WhatsApp__Cliente: "${EZ_ATENDIMENTO_WHATSAPP_CLIENTE:-stub}"
+      Notifications__WhatsApp__Meta__AccessToken: __NA_VPS__
+      Notifications__WhatsApp__Meta__AppSecret: __NA_VPS__
+      Notifications__WhatsApp__Meta__VerifyToken: __NA_VPS__
+      Notifications__WhatsApp__Meta__AppId: "${EZ_META_APP_ID:-}"
+      Notifications__WhatsApp__Meta__EmbeddedSignupConfigId: "${EZ_META_EMBEDDED_SIGNUP_CONFIG_ID:-}"
+      EZ_CRYPTO_KEK_ID: __NA_VPS__
+      EZ_CRYPTO_KEK: __NA_VPS__
+      Smtp__Host: "${EZ_SMTP_HOST:-}"
+      Smtp__Port: "${EZ_SMTP_PORT:-465}"
+      Smtp__Username: "${EZ_SMTP_USERNAME:-}"
+      Smtp__Password: __NA_VPS__
+      Smtp__FromEmail: "${EZ_SMTP_FROM_EMAIL:-}"
+      Smtp__FromName: "${EZ_SMTP_FROM_NAME:-EasyStok}"
+      WebPush__PublicKey: __NA_VPS__
+      WebPush__PrivateKey: __NA_VPS__
+      WebPush__Subject: "${EZ_WEBPUSH_SUBJECT:-mailto:avisos@easystok.online}"
+      # Mercado Pago (Checkout Pro, S11/S32). Vazio ate o .env receber EZ_MP_*: sem token a cobranca falha
+      # limpa e a reserva e desfeita (#1303). Sandbox = credencial de PRODUCAO do vendedor de teste.
+      # EZ_MP_BACK_URL_BASE: host para onde o cliente volta depois de pagar (sandbox: o sslip.io do site).
+      MercadoPago__UseStub: "false"
+      MercadoPago__AccessToken: __NA_VPS__
+      MercadoPago__WebhookSecret: __NA_VPS__
+      MercadoPago__WebhookAllowUnsigned: __NA_VPS__
+      MercadoPago__NotificationUrl: "https://api.easystok.online/api/webhooks/mercadopago"
+      MercadoPago__BackUrlSuccess: "${EZ_MP_BACK_URL_BASE:-https://casadababa.com}/pedido-status.html?resultado=sucesso"
+      MercadoPago__BackUrlFailure: "${EZ_MP_BACK_URL_BASE:-https://casadababa.com}/pedido-status.html?resultado=falha"
+      MercadoPago__BackUrlPending: "${EZ_MP_BACK_URL_BASE:-https://casadababa.com}/pedido-status.html?resultado=pendente"
+    volumes:
+      - uploads-data:/app/uploaded-files
+      # Caminho DIFERENTE do que a Web e o Admin usam, e de proposito: aqueles leem
+      # DataProtection__KeysPath, mas o EasyStock.Api chama AddDataProtection() puro
+      # (Startup/DatabaseModule.cs), sem PersistKeysToFileSystem. Entao a variavel nao teria efeito
+      # aqui, e o unico caminho que funciona e o default do framework: $HOME/.aspnet/DataProtection-Keys,
+      # com HOME=/app do appuser. Sem este volume a chave vive na camada gravavel do container e
+      # MORRE a cada recriacao, e e ela que o NfeCertificadoA1Service usa para cifrar certificado
+      # A1 de NFe. O conserto duravel e no repo (SetApplicationName + PersistKeysToFileSystem,
+      # como na Web e no Admin); enquanto nao vier, este mount e o que segura.
+      - dataprotection-api-keys:/app/.aspnet/DataProtection-Keys
+    networks: [edge]
+    healthcheck:
+      # As imagens aspnet nao trazem curl nem wget; por isso bash e /dev/tcp.
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+  web:
+    image: easystok-web:vps
+    container_name: ez-web
+    restart: unless-stopped
+    mem_limit: 192m
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DOTNET_gcServer: "0"
+      ApiSettings__BaseUrl: "http://ez-api:8080/api"
+      ApiSettings__TimeoutSeconds: "30"
+      ConnectionStrings__Redis: __NA_VPS__
+      # Publica, para o browser. Nao confundir com ApiSettings__BaseUrl, que e interna.
+      PublicApiUrl: "https://${API_HOST}"
+      OpenTelemetry__OtlpEndpoint: ""
+      # Sem isto o cookie de auth morre a cada deploy e todo mundo e deslogado.
+      DataProtection__KeysPath: __NA_VPS__
+    volumes:
+      - dataprotection-web-keys:/app/dataprotection-keys
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8081"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  admin:
+    # P01 (#1179): Admin removido do codigo; servico so sobe com --profile admin-legado.
+    profiles: ["admin-legado"]
+    image: easystok-admin:vps
+    container_name: ez-admin
+    restart: unless-stopped
+    mem_limit: 192m
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DOTNET_gcServer: "0"
+      ApiBaseUrl: "http://ez-api:8080"
+      EasyStockWebUrl: "https://${APP_HOST}"
+      OpenTelemetry__OtlpEndpoint: ""
+      DataProtection__KeysPath: __NA_VPS__
+    volumes:
+      - dataprotection-admin-keys:/app/dataprotection-keys
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # Sem ele nada de background roda: outbox parado, notificacoes, SLA e relatorios inertes.
+  # Nao expoe HTTP e nao aplica migrations: a API e a dona do schema e sobe antes.
+  worker:
+    image: easystok-worker:vps
+    container_name: ez-worker
+    restart: unless-stopped
+    mem_limit: 384m
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      EZ_CRYPTO_KEK_ID: __NA_VPS__
+      EZ_CRYPTO_KEK: __NA_VPS__
+      ASPNETCORE_ENVIRONMENT: Production
+      DOTNET_gcServer: "0"
+      Database__Provider: PostgreSql
+      RunMigrationsOnStartup: "false"
+      OpenTelemetry__OtlpEndpoint: ""
+      ConnectionStrings__DefaultConnection: __NA_VPS__
+      Jwt__Issuer: EasyStock
+      Jwt__Audience: EasyStock
+      Jwt__SecretKey: __NA_VPS__
+      Smtp__Host: "${EZ_SMTP_HOST:-}"
+      Smtp__Port: "${EZ_SMTP_PORT:-465}"
+      Smtp__Username: "${EZ_SMTP_USERNAME:-}"
+      Smtp__Password: __NA_VPS__
+      Smtp__FromEmail: "${EZ_SMTP_FROM_EMAIL:-}"
+      Smtp__FromName: "${EZ_SMTP_FROM_NAME:-EasyStok}"
+      WebPush__PublicKey: __NA_VPS__
+      WebPush__PrivateKey: __NA_VPS__
+      WebPush__Subject: "${EZ_WEBPUSH_SUBJECT:-mailto:avisos@easystok.online}"
+      # Mesmo volume da API: o motor de relatorios grava artefatos que a API serve em /files.
+      FileStorage__Provider: Local
+      FileStorage__PublicBaseUrl: "https://${API_HOST}/files"
+    volumes:
+      - uploads-data:/app/uploaded-files
+    networks: [edge]

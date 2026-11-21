@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
@@ -53,6 +54,58 @@ public class SnapshotReposicaoIntegrationTests(PostgresRlsFixture fixture)
         nunca.QuantidadeVigente.Should().Be(0m, "produto nunca estocado entra com vigente 0 (ESGOTADO)");
         nunca.VelocidadeMediaDia.Should().Be(0m);
         nunca.CustoUnitario.Should().Be(0m, "produto sem lote nao tem custo");
+    }
+
+    [SkippableFact]
+    public async Task GetSnapshotReposicaoAsync_as_22h_de_brasilia_conta_o_lote_que_vence_hoje()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+
+        // Issue #2561: 22h BRT ja e o dia seguinte em UTC. "Hoje" e a data de Brasilia, entao o lote
+        // com validade hoje (data civil gravada 00:00Z) ainda e vigente.
+        await fixture.ResetDatabaseAsync();
+        var hojeBrasilia = HorarioBrasil.Hoje();
+        var relogio = new RelogioFixo(new DateTimeOffset(HorarioBrasil.InstanteUtc(hojeBrasilia, new TimeOnly(22, 0))));
+        var empresaId = Guid.NewGuid();
+        Guid produtoId;
+
+        await using (var seed = fixture.CreateRlsClientDbContext())
+        {
+            await seed.Database.OpenConnectionAsync();
+            await seed.Database.ExecuteSqlRawAsync("SET app.bypass_rls = 'true'");
+            var categoria = new Categoria { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Geral", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
+            var produto = NovoProduto(empresaId, categoria.Id, "Vence hoje");
+            produtoId = produto.Id;
+            seed.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Fuso", Documento = "55555555555", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            seed.Categorias.Add(categoria);
+            seed.Produtos.Add(produto);
+            seed.ItensEstoque.Add(ItemEstoque.CriarParaEntrada(
+                Guid.NewGuid(), empresaId, produto, null,
+                Quantidade.From(7m), Dinheiro.FromDecimal(3m), null,
+                DateTime.UtcNow.AddDays(-2), "LOTE-HOJE", CodigoLote.From("LH-1"),
+                null, null, null, null, null, null, null,
+                Validade.From(HorarioBrasil.CivilComoInstanteUtc(hojeBrasilia)), null, DateTime.UtcNow));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        ctx.SetMobileTenantContext(empresaId);
+        await ctx.Database.OpenConnectionAsync();
+        await SetTenantAsync(ctx, empresaId);
+
+        var repo = new AnalyticsRepository(ctx, new CaixaSaldoCalculator(new CaixaRepository(ctx)), relogio: relogio);
+
+        var snapshot = await repo.GetSnapshotReposicaoAsync(
+            empresaId, lojaId: null, diasHistorico: 30, leadTimePadraoDias: 7,
+            configMinima: 5, configCritica: 2);
+
+        snapshot.Single(s => s.ProdutoId == produtoId).QuantidadeVigente
+            .Should().Be(7m, "a validade e hoje em Brasilia, mesmo com o relogio UTC ja no dia seguinte");
+    }
+
+    private sealed class RelogioFixo(DateTimeOffset agora) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => agora;
     }
 
     private async Task<(Guid EmpresaId, Guid VigenteId, Guid VencidoId, Guid NuncaId)> SeedAsync()

@@ -12,7 +12,7 @@
 /// </para>
 ///
 /// <para>
-/// Reflete fielmente o comportamento atual do ERP (Casa da Babá em produção):
+/// Reflete fielmente o comportamento atual do ERP (Casa da Baba em produção):
 /// transições agora vivem no domínio em vez de uma matriz hardcoded dentro
 /// de <c>AtualizarStatusPedidoUseCase</c>.
 /// </para>

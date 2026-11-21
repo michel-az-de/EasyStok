@@ -14,8 +14,11 @@
   border-radius: var(--r-2); background: var(--tinta); color: var(--papel); box-shadow: var(--sombra-alta);
   font-size: var(--t-apoio); font-weight: 600; line-height: var(--lh-compacto);
   /* Seção 3.4: o Aviso entra em fade, duração curta. */
-  animation: aparecerAviso var(--dur-curta) var(--ease-padrao) both;
+  /* #2762 (A7): o fade era cópia exata do global `esmaecer`. */
+  animation: global(esmaecer) var(--dur-curta) var(--ease-padrao) both;
 }
+/* #2762 (A5): dispensado, fica --dur-curta a mais só para sumir; sem clique (e inert no JSX). */
+.aviso.saindo { pointer-events: none; animation: global(sumir) var(--dur-curta) var(--ease-entrada) both; }
 .erro { background: var(--erro); color: var(--sobre-erro); }
 .icone { flex-shrink: 0; }
 .texto { margin: 0; padding: var(--e-1) 0; min-width: 0; overflow-wrap: anywhere; }
@@ -25,11 +28,12 @@
 .aviso .acao:hover:not(:disabled), .aviso .fechar:hover:not(:disabled) {
   color: inherit; background: color-mix(in srgb, currentColor 16%, transparent);
 }
-.aviso .acao:focus-visible, .aviso .fechar:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
-@keyframes aparecerAviso {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* #2762 (A12): o `:active` do Botao texto (0,3,0) vencia a regra de cima e o pressionado virava preenchimento
+   claro sobre a superfície invertida; aqui o pressionado é o mesmo véu do hover, um degrau mais forte. */
+.aviso .acao:active:not(:disabled), .aviso .fechar:active:not(:disabled) {
+  color: inherit; background: color-mix(in srgb, currentColor 24%, transparent);
 }
+.aviso .acao:focus-visible, .aviso .fechar:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 /* No celular ocupa a largura (menos o respiro) e sobe acima da barra de abas do pé, que tem a
    altura de um toque mais o respiro. */
 @media (max-width: 759px) {

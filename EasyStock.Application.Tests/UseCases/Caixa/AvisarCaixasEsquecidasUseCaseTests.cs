@@ -4,6 +4,7 @@ using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.Caixa;
 using EasyStock.Domain.Enums.Notifications;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.TestHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -23,6 +24,7 @@ public class AvisarCaixasEsquecidasUseCaseTests
     private readonly ICaixaRepository _caixa = Substitute.For<ICaixaRepository>();
     private readonly IRotinaRepository _rotinas = Substitute.For<IRotinaRepository>();
     private readonly IEventoNotificacaoRepository _eventos = Substitute.For<IEventoNotificacaoRepository>();
+    private readonly INotificacaoRepository _avisos = Substitute.For<INotificacaoRepository>();
     private readonly INotificadorService _notificador = Substitute.For<INotificadorService>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly PrazosOptions _opcoes = new();
@@ -46,7 +48,7 @@ public class AvisarCaixasEsquecidasUseCaseTests
     }
 
     private AvisarCaixasEsquecidasUseCase UseCase() =>
-        new(_caixa, _rotinas, _eventos, _notificador, _uow, Options.Create(_opcoes),
+        new(_caixa, _rotinas, _eventos, _avisos, _notificador, _uow, Options.Create(_opcoes),
             new FakeTimeProvider(new DateTimeOffset(Agora)), NullLogger<AvisarCaixasEsquecidasUseCase>.Instance);
 
     [Fact]
@@ -58,7 +60,7 @@ public class AvisarCaixasEsquecidasUseCaseTests
         await _notificador.Received(1).PublicarEventoAsync(
             TipoEventoNotificacao.CaixaAbertoEsquecido, _empresaId, _quemAbriu,
             Arg.Is<string>(p => p.Contains("\"data_abertura\":\"01/10/2026\"") && p.Contains(_abertura.Id.ToString())),
-            Arg.Any<IDictionary<string, object?>?>(), Arg.Any<CancellationToken>());
+            Arg.Any<IDictionary<string, object?>?>(), Arg.Any<CancellationToken>(), Arg.Any<Guid?>());
         await _caixa.Received(1).MarcarNotificadoEsquecidoAsync(_abertura.Id, Agora, Arg.Any<CancellationToken>());
     }
 
@@ -76,7 +78,7 @@ public class AvisarCaixasEsquecidasUseCaseTests
         _rotinas.ExisteAtivaAsync(TipoEventoNotificacao.CaixaAbertoEsquecido, Arg.Any<CancellationToken>()).Returns(false);
         (await UseCase().ExecuteAsync()).Should().Be(0);
 
-        await _notificador.DidNotReceiveWithAnyArgs().PublicarEventoAsync(default, default, default, default!, default, default);
+        await _notificador.DidNotReceiveWithAnyArgs().PublicarEventoAsync(default, default, default, default!, default, default, default);
         await _caixa.DidNotReceiveWithAnyArgs().MarcarNotificadoEsquecidoAsync(default, default, default);
     }
 
@@ -91,7 +93,7 @@ public class AvisarCaixasEsquecidasUseCaseTests
 
         await _notificador.Received(1).PublicarEventoAsync(
             TipoEventoNotificacao.CaixaAbertoEsquecido, _empresaId, dono, Arg.Any<string>(),
-            Arg.Any<IDictionary<string, object?>?>(), Arg.Any<CancellationToken>());
+            Arg.Any<IDictionary<string, object?>?>(), Arg.Any<CancellationToken>(), Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -138,8 +140,90 @@ public class AvisarCaixasEsquecidasUseCaseTests
 
         await _notificador.Received(1).PublicarEventoAsync(
             TipoEventoNotificacao.CaixaAbertoEsquecido, _empresaId, _quemAbriu, Arg.Any<string>(),
-            Arg.Any<IDictionary<string, object?>?>(), Arg.Any<CancellationToken>());
+            Arg.Any<IDictionary<string, object?>?>(), Arg.Any<CancellationToken>(), Arg.Any<Guid?>());
         _notificador.ReceivedCalls()
             .Should().NotContain(c => c.GetMethodInfo().Name == nameof(INotificadorService.EnfileirarEventoAsync));
+    }
+
+    // ── #2258 (F1): o sino não pode ter outra versão do caixa que a tela mostra ───────────────────────────────────────
+
+    [Theory]
+    [InlineData(300.03, "R$ 300,03")]
+    [InlineData(1000, "R$ 1.000,00")]
+    public async Task ValorDeAberturaSaiEmReaisNoPayloadDoSino(double valor, string esperado)
+    {
+        var abertura = MovimentoCaixa.Criar(_empresaId, "abertura", (decimal)valor, _abertura.DataMovimento);
+        abertura.RegistradoPorUserId = _quemAbriu;
+        _caixa.GetAberturasEsquecidasAsync(Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(new[] { abertura });
+
+        await UseCase().ExecuteAsync();
+
+        var payload = (string)_notificador.ReceivedCalls()
+            .Single(c => c.GetMethodInfo().Name == nameof(INotificadorService.PublicarEventoAsync)).GetArguments()[3]!;
+        JsonDocument.Parse(payload).RootElement.GetProperty("valor_abertura").GetString().Should().Be(esperado);
+    }
+
+    [Fact]
+    public async Task SinoGuardaAAberturaComoReferenciaDoFatoParaPoderSerResolvido()
+    {
+        await UseCase().ExecuteAsync();
+
+        await _notificador.Received(1).PublicarEventoAsync(
+            TipoEventoNotificacao.CaixaAbertoEsquecido, _empresaId, _quemAbriu, Arg.Any<string>(),
+            Arg.Any<IDictionary<string, object?>?>(), Arg.Any<CancellationToken>(), _abertura.Id);
+    }
+
+    [Fact]
+    public async Task AberturaComFechamentoPosteriorDaLojaNaoAvisaMesmoQueAConsultaAtrase()
+    {
+        // O mesmo critério da tela: o último fechamento da loja é depois da abertura, então o caixa já fechou.
+        var fechamento = FechamentoCaixa.Criar(_empresaId, new DateOnly(2026, 10, 1), 100m, 0m, 0m, 0m, 0m);
+        fechamento.FechadoEm = _abertura.DataMovimento.AddHours(30);
+        _caixa.GetUltimoFechamentoDaLojaAsync(_empresaId, _abertura.LojaId).Returns(fechamento);
+
+        (await UseCase().ExecuteAsync()).Should().Be(0);
+
+        _notificador.ReceivedCalls().Should().BeEmpty();
+        await _caixa.DidNotReceiveWithAnyArgs().MarcarNotificadoEsquecidoAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task FechamentoAnteriorAAberturaNaoImpedeOAviso()
+    {
+        var fechamento = FechamentoCaixa.Criar(_empresaId, new DateOnly(2026, 9, 30), 100m, 0m, 0m, 0m, 0m);
+        fechamento.FechadoEm = _abertura.DataMovimento.AddDays(-1);
+        _caixa.GetUltimoFechamentoDaLojaAsync(_empresaId, _abertura.LojaId).Returns(fechamento);
+
+        (await UseCase().ExecuteAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CadaRodadaResolveOsAvisosAntigosDeCaixaQueJaFechou()
+    {
+        await UseCase().ExecuteAsync();
+
+        await _avisos.Received(1).ResolverAvisosDeCaixaFechadoAsync(null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FalhaAoResolverAvisosAntigosNaoDerrubaOJob()
+    {
+        _avisos.ResolverAvisosDeCaixaFechadoAsync(null, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<int>(new InvalidOperationException("banco")));
+
+        (await UseCase().ExecuteAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PrazoEstouradoDoCaixaTrazDetalheSemOCodigoTecnicoDaAbertura()
+    {
+        await UseCase().ExecuteAsync();
+
+        var chamada = _notificador.ReceivedCalls()
+            .Single(c => c.GetMethodInfo().Name == nameof(INotificadorService.EnfileirarEventoAsync));
+        var payload = JsonDocument.Parse((string)chamada.GetArguments()[2]!).RootElement;
+        var detalhe = payload.GetProperty("detalhe").GetString()!;
+        detalhe.Should().Contain("01/10/2026").And.Contain("R$ 100,00");
+        detalhe.Should().NotContain(CodigoCurto.De(_abertura.Id));
     }
 }

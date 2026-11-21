@@ -97,14 +97,14 @@ export function AbaCaixa() {
   // (mesma lógica de "sem sessão de caixa" do mapa EasyStok, aplicada à UI).
   if (!abertura) {
     return (
-      <div className={css.painel}>
+      <div className={`${css.painel} ${css.abertura}`}>
         <p className={css.corpoBloco}>O caixa de hoje ainda não foi aberto.</p>
         <CampoReais
           rotulo="Saldo inicial"
           centavos={centavosAbertura}
           ler={lerMoeda}
           erro={moedaAltaDemais(centavosAbertura) ? 'Valor alto demais' : null}
-          dica="O dinheiro (ou nada) que já está na gaveta ao abrir o dia."
+          dica="O troco que está na gaveta ao abrir o dia."
           aoMudar={(valor) => setCentavosAbertura(valor ?? 0)}
         />
         <Botao

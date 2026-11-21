@@ -46,6 +46,6 @@
 - Geração de descrição de produto e anúncios. Conta consumo mensal por empresa em `IaUsoMensal`.
 - Limite mensal vem do plano. Reset 1º do mês.
 
-## PWA Mobile (Casa da Babá)
+## PWA Mobile (Casa da Baba)
 - White-label fixado. Config por empresa (`MobileTenantConfig`). PWA vanilla JS em `EasyStock.Api/wwwroot/pwa/`.
 - Sync offline via IndexedDB + service worker. Mantida como referência — não migrar pra framework agora.

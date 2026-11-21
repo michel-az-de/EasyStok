@@ -23,7 +23,7 @@ public class CadastroEntregaUseCasesTests
 
     public CadastroEntregaUseCasesTests()
     {
-        _loja = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Babá", pedidoMinimoEntrega: 0m);
+        _loja = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Baba", pedidoMinimoEntrega: 0m);
         _lojas.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(_loja);
     }
 

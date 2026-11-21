@@ -10,7 +10,7 @@ import css from './bolhaAvaliacao.module.css'
 export function BolhaAvaliacaoPedido({ mensagem }) {
   return (
     <p className={css.pedido}>
-      <span className={css.icone} aria-hidden="true"><Icone nome="sparkles" /></span>
+      <span className={css.icone} aria-hidden="true"><Icone nome="agente" /></span>
       {mensagem.texto}
     </p>
   )

@@ -23,6 +23,8 @@ public class ConfiguracaoLojaConfiguration : IEntityTypeConfiguration<Configurac
         builder.Property(x => x.KdsHabilitado).HasDefaultValue(false);
         builder.Property(x => x.Moeda).HasMaxLength(10).HasDefaultValue(OperacionalDefaults.Moeda);
         builder.Property(x => x.Timezone).HasMaxLength(100).HasDefaultValue(OperacionalDefaults.Timezone);
+        builder.Property(x => x.ImpressaoJson).HasColumnType("jsonb");
+        builder.Property(x => x.ImpressaoVersao).HasDefaultValue(0);
 
         builder.HasIndex(x => x.LojaId).IsUnique();
         builder.HasOne(x => x.Loja)

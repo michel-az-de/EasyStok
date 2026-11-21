@@ -6,6 +6,7 @@
 // precisa saber o que a casa falou em nome dela.
 import { faixaParaCliente, preencherFaixa } from './entrega'
 import { rotaDoCardapioLink } from './cardapioLink'
+import { descreverProximaAbertura, proximaAbertura } from './funcionamento'
 
 export const GATILHOS = {
   PRIMEIRO_CONTATO: 'primeiro-contato',
@@ -22,6 +23,8 @@ export const GATILHOS = {
   // #1610: lembrete do link de pagamento perto de vencer. Só existe no modo API
   // (quem dispara é o job de cobranças do EasyStok); a demonstração não tem.
   COBRANCA_VENCENDO: 'cobranca-vencendo',
+  // Saudação solta (enum SaudacaoSolta do EasyStok): só um oi ou bom dia em conversa parada.
+  SAUDACAO_SOLTA: 'saudacao-solta',
 }
 
 export const REGRAS_PADRAO = [
@@ -35,9 +38,9 @@ export const REGRAS_PADRAO = [
     // verdade, o mesmo que o botão "Enviar cardápio" do composer monta
     // (dominio/cardapioLink.js, linkDoCardapio). Antes só prometia em texto,
     // sem anexar nada (achado P0.1, banca10/simulacao).
-    texto: 'Olá! Aqui é a Casa da Baba, massa artesanal com entrega agendada. '
-      + 'Segue nosso cardápio de hoje, é só escolher: {linkCardapio} '
-      + 'Me chama quando escolher que eu já anoto.',
+    texto: 'Oi! Aqui é a Casa da Baba, massa artesanal com entrega agendada. '
+      + 'O cardápio de hoje está aqui: {linkCardapio} '
+      + 'Escolha com calma e a Casa anota.',
   },
   // Fora do horário e Loja fechada (pedido do dono, 24/09/2026): dois
   // gatilhos próprios de novo (o corte #16 da rodada 5 tinha fundido "Fora
@@ -51,8 +54,8 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.FORA_DO_HORARIO,
     descricao: 'Cliente escreve com a loja aberta no controle, mas fora do horário configurado.',
     ativa: true,
-    texto: 'Oi! Hoje já fechamos por aqui, voltamos {abre}. '
-      + 'Se quiser já deixar o pedido anotado, me diz o que você quer que eu separo para o próximo horário.',
+    texto: 'Oi! A Casa fechou por hoje e volta {abre}. '
+      + 'Pode deixar seu pedido aqui, e a Casa confirma na abertura.',
   },
   {
     id: 'loja-fechada',
@@ -60,8 +63,8 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.LOJA_FECHADA,
     descricao: 'A dona fechou a loja na mão, no controle do topo, mesmo dentro do horário.',
     ativa: true,
-    texto: 'Oi! Fechamos a loja por aqui agora. '
-      + 'Pode deixar o pedido anotado que eu separo para o próximo horário, sem prometer prazo ainda.',
+    texto: 'Oi! A Casa está fechada agora. '
+      + 'Pode deixar seu pedido aqui, e a Casa avisa quando abrir.',
   },
   // A regra "Link de pagamento" saiu daqui. Texto de regra é texto fixo, e o
   // Pix só existe depois da emissão: a regra prometia "segue o link" sem link
@@ -73,7 +76,9 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.PAGAMENTO_CONFIRMADO,
     descricao: 'Confirma o recebimento e avisa a janela de entrega.',
     ativa: true,
-    texto: 'Pagamento confirmado, obrigada! Entrego entre {faixa}.',
+    // #2734 (T8): o mesmo texto que o EasyStok usa enquanto a dona não grava o dela
+    // (RegraAutomatica.TextoPadraoPagamentoConfirmado). Copiar, não reescrever.
+    texto: 'Oi, {nome}! Pagamento recebido. Seu pedido está confirmado para {faixa}.',
   },
   {
     id: 'agradecimento',
@@ -81,15 +86,15 @@ export const REGRAS_PADRAO = [
     gatilho: GATILHOS.POS_ENTREGA,
     descricao: 'Depois que o pedido é marcado como entregue.',
     ativa: true,
-    texto: 'Obrigada pela preferência! Se puder, me conta o que achou. Boa massa.',
+    texto: 'A Casa agradece o pedido. Se puder, conte o que achou. Boa massa!',
   },
   {
     id: 'encerramento',
     nome: 'Encerramento do atendimento',
     gatilho: GATILHOS.ENCERRAMENTO,
-    descricao: 'Oferecida na confirmação de Encerrar, só sai quando a dona marca "mandar mensagem".',
+    descricao: 'Oferecida na confirmação de Concluir conversa, só sai quando a dona marca "mandar mensagem".',
     ativa: true,
-    texto: 'Por hoje é só, {nome}! Qualquer coisa é só chamar de novo por aqui. Até a próxima!',
+    texto: 'Por hoje é só, {nome}. Precisando, é só chamar por aqui. Boa massa!',
   },
 ]
 
@@ -108,7 +113,7 @@ export const contarAtivas = (regras) => regras.filter((r) => r.ativa).length
 export const VARIAVEIS = [
   { chave: 'nome', descricao: 'primeiro nome de quem está na conversa' },
   { chave: 'faixa', descricao: 'janela de entrega do pedido' },
-  { chave: 'pedido', descricao: 'número do pedido em andamento' },
+  { chave: 'pedido', descricao: 'número do pedido em andamento, o mesmo que o cliente lê' },
   { chave: 'abre', descricao: 'quando a loja abre de novo (só na regra Fora do horário)' },
   { chave: 'linkCardapio', descricao: 'link do cardápio (só na regra Primeira resposta)' },
 ]
@@ -131,6 +136,19 @@ export function contextoDePrevia(conversa, faixa, agora) {
   }
 }
 
+// #3010: exemplo verossímil para a prévia de quem lê o modelo sem uma conversa à frente: as cinco variáveis
+// preenchidas, o horário de abertura vindo do funcionamento da loja e o link na origem da tela.
+export function exemploDaPrevia({ agora, funcionamento, origem = '' } = {}) {
+  return {
+    nome: 'Maria',
+    faixa: 'amanhã às 14:00',
+    pedido: '12',
+    // Sem próxima abertura a frase de aviso do funcionamento não cabe dentro do texto do cliente: usa o horário-exemplo.
+    abre: agora && proximaAbertura(agora, funcionamento) ? descreverProximaAbertura(agora, funcionamento) : 'amanhã às 11:00',
+    linkCardapio: origem + rotaDoCardapioLink('exemplo'),
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Modo API (#1441): as automáticas do EasyStok (S42, `GatilhoAutomacao`)
 // casadas com as regras desta tela pelo gatilho. A descrição diz quando o
@@ -142,6 +160,10 @@ export const GATILHOS_DA_API = {
   PrimeiroContato: {
     id: 'boas-vindas', gatilho: GATILHOS.PRIMEIRO_CONTATO, nome: 'Primeira resposta',
     descricao: 'Primeira mensagem de uma conversa nova, com a loja aberta no horário.',
+  },
+  SaudacaoSolta: {
+    id: 'saudacao-solta', gatilho: GATILHOS.SAUDACAO_SOLTA, nome: 'Saudação solta',
+    descricao: 'Quando o cliente manda só um oi ou bom dia em conversa parada. O Assistente não gasta IA.',
   },
   ForaDoHorario: {
     id: 'fora-do-horario', gatilho: GATILHOS.FORA_DO_HORARIO, nome: 'Fora do horário',
@@ -185,7 +207,7 @@ const MENSAGEM_DE_ENTRADA = {
 }
 
 // #1474: no pagamento e na entrega o EasyStok já avisa o cliente pelo status do pedido
-// ("Recebemos seu pagamento…", "pedido entregue"); a automática sai além desse aviso.
+// ("Pagamento recebido…", "pedido entregue"); a automática sai além desse aviso.
 const AVISO_DO_PEDIDO = {
   [GATILHOS.PAGAMENTO_CONFIRMADO]: 'o aviso de pagamento confirmado do pedido',
   [GATILHOS.POS_ENTREGA]: 'o aviso de pedido entregue',
@@ -210,14 +232,84 @@ export function avisoDaAutomaticaDeEntrada(regra) {
 // chave entre chaves sai para o cliente do jeito que está escrita.
 export const VARIAVEIS_DA_API = [
   { chave: 'nome', descricao: 'primeiro nome do cliente' },
-  { chave: 'pedido', descricao: 'código do pedido em andamento' },
+  { chave: 'pedido', descricao: 'número do pedido em andamento, o mesmo que o cliente lê' },
   { chave: 'faixa', descricao: 'dia e hora agendados da entrega' },
 ]
 
+// #2734 (T2): o EasyStok só troca {nome}, {pedido} e {faixa}, em minúsculas e sem espaço
+// (ModeloTextoAtendimento.cs, regex `\{([a-z]+)\}`). {Nome}, {nome_cliente}, { nome } e {endereço} saem
+// escritos assim para o cliente. A busca é larga de propósito: acha tudo o que parece variável.
+const MARCADOR_LIVRE = /\{(\s*[\p{L}\p{N}_]+\s*)\}/gu
+const semAcentoNemCaixa = (texto) => String(texto).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+
+// A variável que o EasyStok preenche e que a grafia escrita quis dizer ({Nome} e {nome_cliente} querem {nome}), ou null.
+export function sugestaoDeVariavel(chave) {
+  const chaves = VARIAVEIS_DA_API.map((v) => v.chave)
+  const limpa = semAcentoNemCaixa(String(chave).trim())
+  return chaves.includes(limpa) ? limpa : limpa.split('_').find((parte) => chaves.includes(parte)) ?? null
+}
+
 export function variaveisForaDaApi(texto) {
   const conhecidas = new Set(VARIAVEIS_DA_API.map((v) => v.chave))
-  const chaves = [...String(texto ?? '').matchAll(/\{(\w+)\}/g)].map((m) => m[1])
+  const chaves = [...String(texto ?? '').matchAll(MARCADOR_LIVRE)].map((m) => m[1])
   return [...new Set(chaves.filter((c) => !conhecidas.has(c)))]
+}
+
+// #2476 (U8): a automática sai sozinha, sem ninguém revisar. Com variável que o EasyStok não preenche, o cliente
+// leria "{linkCardapio}"; por isso ela não liga nem salva assim. Devolve o motivo, ou null quando pode. Quem não
+// edita (Operador) não recebe a ordem de trocar o texto, só o porquê.
+export function bloqueioDaAutomatica(texto, editavel = true) {
+  const fora = variaveisForaDaApi(texto)
+  const soltas = fora.map((v) => `{${v}}`).join(', ')
+  if (!soltas) return null
+  if (!editavel) return `Tem ${soltas}, que o EasyStok não preenche: assim ela não liga.`
+  const trocas = fora.map((v) => [v, sugestaoDeVariavel(v)])
+  if (trocas.every(([, certa]) => certa)) {
+    return `Escreva ${trocas.map(([v, certa]) => `{${certa}} no lugar de {${v}}`).join(', ')}: o EasyStok só preenche {nome}, {pedido} e {faixa}.`
+  }
+  return `Troque ou apague ${soltas}: o EasyStok não preenche e o cliente leria assim.`
+}
+
+// #2734 (T7): a prévia do modo API faz a mesma troca do servidor. Variável conhecida com valor vira o valor;
+// o resto (desconhecida, ou conhecida sem valor, que no servidor nem sai) fica escrito e marcado como erro.
+// `conhecidas` é o catálogo da tela (`VARIAVEIS` na demonstração, que preenche as cinco).
+// Devolve pedaços `{ texto, tipo }`, tipo `texto`, `valor` ou `erro`, para a tela marcar o que o cliente não leria bem.
+export function previaDoServidor(texto, valores = {}, conhecidas = VARIAVEIS_DA_API) {
+  const partes = []
+  let cursor = 0
+  const origem = String(texto ?? '')
+  for (const m of origem.matchAll(MARCADOR_LIVRE)) {
+    if (m.index > cursor) partes.push({ texto: origem.slice(cursor, m.index), tipo: 'texto' })
+    const chave = m[1]
+    const valor = conhecidas.some((v) => v.chave === chave) ? String(valores[chave] ?? '').trim() : ''
+    partes.push(valor ? { texto: valor, tipo: 'valor' } : { texto: m[0], tipo: 'erro' })
+    cursor = m.index + m[0].length
+  }
+  if (cursor < origem.length) partes.push({ texto: origem.slice(cursor), tipo: 'texto' })
+  return partes
+}
+
+// #2734 (T5): o EasyStok não manda a automática quando falta valor (DispararAutomacaoUseCase: VariavelSemValor),
+// mesmo ligada. O que falta depende do gatilho: a primeira mensagem nasce antes de existir pedido.
+const GATILHOS_SEM_PEDIDO = new Set([GATILHOS.PRIMEIRO_CONTATO, GATILHOS.FORA_DO_HORARIO, GATILHOS.LOJA_FECHADA])
+const GATILHOS_DE_PEDIDO = new Set([GATILHOS.PAGAMENTO_CONFIRMADO, GATILHOS.POS_ENTREGA, GATILHOS.COBRANCA_VENCENDO])
+
+export function avisoDeValorFaltando(gatilho, texto) {
+  const usadas = new Set([...String(texto ?? '').matchAll(/\{([a-z]+)\}/g)].map((m) => m[1]))
+  const frases = []
+  if (usadas.has('nome')) frases.push('Com {nome} esta mensagem não sai se o contato não tiver nome, mesmo ligada.')
+  const semPedido = GATILHOS_SEM_PEDIDO.has(gatilho)
+  const faltaPedido = ['pedido', 'faixa'].filter((c) => usadas.has(c) && (semPedido || !GATILHOS_DE_PEDIDO.has(gatilho)))
+  if (faltaPedido.length > 0) {
+    const lista = faltaPedido.map((c) => `{${c}}`).join(' e ')
+    frases.push(semPedido
+      ? `Com ${lista} esta mensagem não sai: a primeira mensagem de uma conversa nova ainda não tem pedido.`
+      : `Com ${lista} esta mensagem não sai se a conversa não tiver pedido em andamento.`)
+  }
+  if (GATILHOS_DE_PEDIDO.has(gatilho) && usadas.has('faixa')) {
+    frases.push('Com {faixa} esta mensagem não sai se o pedido não tiver horário agendado, mesmo ligada.')
+  }
+  return frases.length === 0 ? null : frases.join(' ')
 }
 
 // O que a casa mandou sozinha nesta conversa, do mais novo ao mais antigo:
@@ -225,3 +317,20 @@ export function variaveisForaDaApi(texto) {
 export const enviosAutomaticos = (mensagens) => (mensagens ?? [])
   .filter((m) => m.dir === 'out' && m.automatica)
   .sort((a, b) => new Date(b.em) - new Date(a.em))
+
+// #2783: tudo que o editor da mensagem automática mostra sobre o texto digitado, igual em Respostas e em Automações.
+// `valores` são os de exemplo da prévia; `contexto` (só demonstração) é o da conversa escolhida, que preenche as
+// cinco variáveis como a conversa de verdade. Devolve as variáveis aceitas, o que impede salvar (`bloqueio`), os
+// avisos e a prévia em partes (`tipo: 'erro'` é a chave que o servidor deixaria escrita).
+export function analisarAutomatica({ regra, texto, fonteApi, editavel, valores, contexto = null }) {
+  const variaveis = fonteApi ? VARIAVEIS_DA_API : VARIAVEIS
+  return {
+    variaveis,
+    bloqueio: fonteApi ? bloqueioDaAutomatica(texto, editavel) : null,
+    semValor: fonteApi ? avisoDeValorFaltando(regra.gatilho, texto) : null,
+    avisoEntrada: fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null,
+    partes: !fonteApi && contexto
+      ? [{ texto: textoDaRegra({ ...regra, texto }, contexto), tipo: 'texto' }]
+      : previaDoServidor(texto, valores, variaveis),
+  }
+}

@@ -29,31 +29,36 @@ public class EstornarMovimentoCaixaUseCase(
 
         if (mov.Origem == PedidoEstornoManual.OrigemCaixa)
             throw new UseCaseValidationException("Esta saída confirma uma devolução ao cliente e não pode ser desfeita pelo Caixa.");
+        // #2687: estornado aqui, a conta seguia paga e Extrato e Visão geral divergiam.
+        if (ReferenciaDeParcela.EhDeParcela(mov.Referencia))
+            throw new UseCaseValidationException("Este lançamento é o pagamento de uma conta. Estorne pela conta, em Contas a pagar ou a receber: o Caixa sai junto.");
 
         // Abertura/fechamento definem a sessao do caixa; estornar quebraria saldo e reabertura.
         if (mov.Tipo is not ("entrada" or "saida"))
             throw new UseCaseValidationException("Somente movimentos de entrada ou saída podem ser estornados.");
-
-        // Bloquear estorno se o dia já foi fechado.
-        await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, mov.EmpresaId, mov.DataMovimento, mov.LojaId,
-            "Não é possível estornar movimento de dia já fechado.");
 
         // #1623: estornar uma entrada tira dinheiro do caixa, como uma sangria. Suprimento estornado
         // depois de uma sangria deixava a gaveta negativa. Mesma guarda e mesma trava da saída
         // (RegistrarMovimentoCaixaUseCase, #1521/#1547); o PWA promove o que já fez no aparelho e
         // segue sem a guarda, como a saída mobile.
         var origem = (cmd.Origem ?? "web").Trim().ToLowerInvariant();
-        if (mov.Tipo == "entrada" && origem != "mobile")
-        {
-            return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
-            {
-                await repo.TravarSaidasAsync(mov.EmpresaId, mov.LojaId, ct);
-                await ConferirCaixaParaEstornoAsync(mov);
-                return await EstornarAsync(mov, cmd);
-            });
-        }
+        var conferirGaveta = mov.Tipo == "entrada" && origem != "mobile";
 
-        return await EstornarAsync(mov, cmd);
+        // #2736: o fechamento toma a mesma trava (#2613). A guarda de dia fechado só vale lida atrás dela, senão o
+        // fechamento entre a guarda e a gravação deixa o estorno entrar num dia já retratado. Vale para entrada e
+        // saída, de qualquer origem: sem a trava a corrida da saída não era serializada.
+        return await uow.ExecuteInTransactionSemRetryAsync(async ct =>
+        {
+            await repo.TravarSaidasAsync(mov.EmpresaId, mov.LojaId, ct);
+            // #2763: o movimento foi lido antes da trava; outra tela pode tê-lo estornado enquanto esta esperava.
+            // Quem chega depois responde com o estorno que venceu, sem regravar autoria e motivo.
+            await repo.RecarregarMovimentoAsync(mov, ct);
+            if (mov.EstornadoEm != null) return AbrirCaixaUseCase.Map(mov);
+            await CaixaFechadoGuard.ExigirDiaAbertoAsync(repo, mov.EmpresaId, mov.DataMovimento, mov.LojaId,
+                "Não é possível estornar movimento de dia já fechado.");
+            if (conferirGaveta) await ConferirCaixaParaEstornoAsync(mov);
+            return await EstornarAsync(mov, cmd);
+        });
     }
 
     private async Task<MovimentoCaixaResult> EstornarAsync(MovimentoCaixa mov, EstornarMovimentoCaixaCommand cmd)

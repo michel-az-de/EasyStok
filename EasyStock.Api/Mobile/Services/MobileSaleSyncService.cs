@@ -1,3 +1,4 @@
+using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
@@ -31,6 +32,38 @@ public class MobileSaleSyncService(
 {
     private readonly EasyStockDbContext _db = db;
     private readonly ILogger<MobileSaleSyncService> _log = log;
+
+    /// <summary>
+    /// #2083: os itens que a Venda do pedido entregue leva. O pedido que nasceu no console vende os itens do
+    /// próprio Pedido (1,5 kg a R$ 30 dá R$ 45), porque o espelho do aparelho guarda a quantidade inteira (#2707).
+    /// O pedido que nasceu no aparelho vende o espelho, como sempre.
+    /// </summary>
+    public async Task<List<DTOs.OrderItemDto>> ItensDaVendaAsync(Order order, CancellationToken ct = default)
+    {
+        if (order.ErpPedidoId is not { } pedidoId
+            || !await SyncMutationDispatcher.PedidoNasceuNoErpAsync(_db, order.EmpresaId, pedidoId))
+            return order.Items.Select(i => new DTOs.OrderItemDto(
+                i.ProductId ?? "", i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).ToList();
+
+        var itens = (await _db.Set<EasyStock.Domain.Entities.PedidoItem>().IgnoreQueryFilters().AsNoTracking()
+                .Where(i => i.PedidoId == pedidoId)
+                .ToListAsync(ct))
+            .Where(i => !i.EhLinhaDeFrete)
+            .ToList();
+        var produtoIds = itens.Where(i => i.ProdutoId.HasValue).Select(i => i.ProdutoId).Distinct().ToList();
+        var espelhos = await _db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.EmpresaId == order.EmpresaId && produtoIds.Contains(p.ErpProductId))
+            .Select(p => new { p.Id, ErpProductId = p.ErpProductId!.Value })
+            .ToListAsync(ct);
+        // O pull leva o item com o id do produto do ERP; o espelho com esse id ganha, senão o primeiro vinculado.
+        var espelhoDoProduto = espelhos.GroupBy(p => p.ErpProductId).ToDictionary(g => g.Key, g => g
+            .OrderBy(p => p.Id == g.Key.ToString() ? 0 : 1).ThenBy(p => p.Id, StringComparer.Ordinal).First().Id);
+
+        // Item sem espelho vai com produto vazio: a Venda não nasce pela metade (#2049).
+        return itens.Select(i => new DTOs.OrderItemDto(
+            i.ProdutoId is { } produtoId && espelhoDoProduto.TryGetValue(produtoId, out var espelhoId) ? espelhoId : "",
+            i.Nome, i.Emoji, i.Unidade, i.Quantidade, i.PrecoUnitario)).ToList();
+    }
 
     /// <summary>
     /// Cria Venda + ItemVenda no ERP a partir de um Order mobile entregue.
@@ -77,6 +110,13 @@ public class MobileSaleSyncService(
                 return false;
             }
 
+            // #1621: a venda entra no caixa no lugar do pagamento do pedido; sincronizada depois do fechamento do
+            // dia do aparelho, vale o instante do registro, como o pagamento e o lançamento (#2030).
+            // #950: pedido já recebido por inteiro (ex.: entregue com item sem vínculo e consolidado depois) leva o
+            // instante do recebimento, senão o dinheiro sairia do dia em que entrou e apareceria no da consolidação.
+            var dataVenda = await InstanteDoRecebimentoIntegralAsync(order, ct)
+                ?? await InstanteNoCaixa.DoRegistroAsync(_db, order.EmpresaId.Value, order.UpdatedAt, order.LojaId);
+
             // Cria a Venda
             var vendaId = Guid.NewGuid();
             var venda = Venda.Criar(
@@ -84,7 +124,7 @@ public class MobileSaleSyncService(
                 empresaId: order.EmpresaId.Value,
                 canal: CanalVenda.Outro,
                 natureza: NaturezaMovimentacaoEstoque.Venda,
-                dataVenda: order.UpdatedAt,
+                dataVenda: dataVenda,
                 dataEnvio: null,
                 numeroNotaFiscal: null,
                 observacoes: $"Mobile · pedido #{order.Id.Substring(Math.Max(0, order.Id.Length - 8))} · {order.ClientSnapshotName}",
@@ -198,6 +238,27 @@ public class MobileSaleSyncService(
                 order.Id);
             return false;
         }
+    }
+
+    /// <summary>
+    /// #950: a Venda entra no caixa no lugar dos recebimentos do pedido (<c>Pedido.VendaId</c>). Quando eles já
+    /// cobrem o total, ela carrega o instante do último, e o dinheiro fica no dia em que entrou. Recebimento
+    /// parcial devolve null: a Venda segue no instante da entrega.
+    /// </summary>
+    private async Task<DateTime?> InstanteDoRecebimentoIntegralAsync(Order order, CancellationToken ct)
+    {
+        if (order.ErpPedidoId is not { } pedidoId) return null;
+        var total = await _db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.Id == pedidoId && p.EmpresaId == order.EmpresaId)
+            .Select(p => p.Total)
+            .FirstOrDefaultAsync(ct);
+        if (total is null || total.Valor <= 0) return null;
+        var recebimentos = await _db.Set<PedidoPagamento>().IgnoreQueryFilters().AsNoTracking()
+            .Where(pg => pg.PedidoId == pedidoId)
+            .Select(pg => new { pg.Valor, pg.PagoEm })
+            .ToListAsync(ct);
+        if (recebimentos.Count == 0 || recebimentos.Sum(r => r.Valor) < total.Valor) return null;
+        return recebimentos.Max(r => r.PagoEm);
     }
 
     /// <summary>

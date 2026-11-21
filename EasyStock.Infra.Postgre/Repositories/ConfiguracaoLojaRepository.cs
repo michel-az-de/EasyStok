@@ -37,7 +37,13 @@ public sealed class ConfiguracaoLojaRepository(EasyStockDbContext dbContext) : I
 
     public Task UpdateAsync(ConfiguracaoLoja configuracao)
     {
-        dbContext.ConfiguracoesLoja.Update(configuracao);
+        var entrada = dbContext.ConfiguracoesLoja.Update(configuracao);
+        if (entrada.State != EntityState.Modified) return Task.CompletedTask;
+        // #2199: a configuração chega destacada (lida sem tracking), então o Update marcaria todas as colunas. A regra de
+        // impressão tem gravação própria, condicional na versão; sem isto, salvar alertas apagaria a regra gravada no meio.
+        entrada.Property(x => x.ImpressaoJson).IsModified = false;
+        entrada.Property(x => x.ImpressaoVersao).IsModified = false;
+        entrada.Property(x => x.ImpressaoAlteradaEm).IsModified = false;
         return Task.CompletedTask;
     }
 }

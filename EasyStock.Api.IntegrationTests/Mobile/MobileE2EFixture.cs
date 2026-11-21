@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Mobile;
 
@@ -27,25 +26,21 @@ namespace EasyStock.Api.IntegrationTests.Mobile;
 /// </summary>
 public class MobileE2EFixture : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     public bool IsAvailable { get; private set; }
     public WebApplicationFactory<Program>? Factory { get; private set; }
 
     public const string TestCiKey = "test-ci-key-do-fixture-min-32-chars-please";
     public static readonly Guid OwnerEmpresaId = Guid.Parse("e0e0e0e0-0000-0000-0000-0000000000ce");
-    private const string AppRole = "easystock_app_e2e";
+    // O cluster é compartilhado entre as classes de teste: nome único por fixture.
+    private static readonly string AppRole = "mobile_e2e_" + Guid.NewGuid().ToString("N");
     private const string AppRolePassword = "senha-do-app-descartavel";
 
     public async Task InitializeAsync()
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_mobile_e2e")
-                .WithUsername("postgres")
-                // O StartupHardening recusa a dupla postgres/postgres; container descartavel.
-                .WithPassword("senha-de-teste-descartavel")
-                .Build();
+            _pg = new BancoDeTeste();
             await _pg.StartAsync();
             IsAvailable = true;
             await CriarLoginDoAppAsync();
@@ -98,15 +93,19 @@ public class MobileE2EFixture : IAsyncLifetime
         Password = AppRolePassword,
     }.ConnectionString;
 
-    /// <summary>Login do app: dono do banco e do schema (roda as migrations), sujeito ao FORCE RLS.</summary>
+    /// <summary>
+    /// Login do app: NOSUPERUSER e NOBYPASSRLS, sujeito às policies. O banco vem clonado do modelo já
+    /// migrado (#2976), então o login recebe privilégio nas tabelas em vez de virar dono do banco.
+    /// </summary>
     private async Task CriarLoginDoAppAsync()
     {
         await using var admin = new NpgsqlConnection(_pg!.GetConnectionString());
         await admin.OpenAsync();
         await using var cmd = new NpgsqlCommand($"""
             CREATE ROLE {AppRole} LOGIN PASSWORD '{AppRolePassword}' NOSUPERUSER NOBYPASSRLS;
-            ALTER DATABASE easystock_mobile_e2e OWNER TO {AppRole};
-            ALTER SCHEMA public OWNER TO {AppRole};
+            GRANT USAGE, CREATE ON SCHEMA public TO {AppRole};
+            GRANT ALL ON ALL TABLES IN SCHEMA public TO {AppRole};
+            GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO {AppRole};
             """, admin);
         await cmd.ExecuteNonQueryAsync();
     }

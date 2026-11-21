@@ -38,6 +38,8 @@ public class UsuarioControllerTests
 
     public UsuarioControllerTests()
     {
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(Arg.Any<Func<CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<bool>>>()(c.Arg<CancellationToken>()));
         var criarLogger = Substitute.For<ILogger<CriarUsuarioUseCase>>();
         var atualizarLogger = Substitute.For<ILogger<AtualizarUsuarioUseCase>>();
         var alterarSenhaLogger = Substitute.For<ILogger<AlterarSenhaUsuarioUseCase>>();
@@ -57,7 +59,7 @@ public class UsuarioControllerTests
             Substitute.For<ILogger<ConvitesDeAcesso>>());
         _criarUseCase = new CriarUsuarioUseCase(
             _usuarioRepository, _assinaturaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository,
-            Substitute.For<IPerfilRepository>(),
+            Substitute.For<IPerfilRepository>(), Substitute.For<ILojaRepository>(),
             Substitute.For<EasyStock.Application.Ports.Output.Notifications.IConsentimentoRepository>(), convites,
             _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, passwordHasher, criarLogger);
         _atualizarUseCase = new AtualizarUsuarioUseCase(
@@ -69,10 +71,10 @@ public class UsuarioControllerTests
                 _unitOfWork, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), TimeProvider.System,
                 Substitute.For<ILogger<TrocaDeContatoService>>()),
             convites, Substitute.For<IAuditLogRepository>(), atualizarLogger);
-        _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), revogadorSessoes, _unitOfWork, passwordHasher, alterarSenhaLogger);
+        _alterarSenhaUseCase = new AlterarSenhaUsuarioUseCase(_usuarioRepository, new AlterarSenhaUsuarioCommandValidator(), revogadorSessoes, Substitute.For<IResetTokenRepository>(), _unitOfWork, passwordHasher, alterarSenhaLogger);
         _desativarUseCase = new DesativarUsuarioUseCase(_usuarioRepository, _usuarioEmpresaRepository, revogadorSessoes, convites, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, desativarLogger);
         _listarUseCase = new ListarUsuariosUseCase(_usuarioRepository);
-        _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, Substitute.For<IPerfilRepository>(), revogadorSessoes, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, atribuirPerfilLogger);
+        _atribuirPerfilUseCase = new AtribuirPerfilUsuarioUseCase(_usuarioRepository, _usuarioPerfilRepository, Substitute.For<IPerfilRepository>(), Substitute.For<ILojaRepository>(), revogadorSessoes, _currentUser, Substitute.For<IAuditLogRepository>(), _unitOfWork, atribuirPerfilLogger);
 
         _reenviarConviteUseCase = new ReenviarConviteUseCase(
             _usuarioRepository, _currentUser, convites, Substitute.For<ITenantContextAccessor>(),

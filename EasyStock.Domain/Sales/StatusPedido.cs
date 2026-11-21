@@ -2,7 +2,7 @@
 
 /// <summary>
 /// Status do agregado <see cref="Entities.Pedido"/>. Ordem reflete o ciclo
-/// de vida atual do ERP (Casa da Babá em produção, mobile e PWA).
+/// de vida atual do ERP (Casa da Baba em produção, mobile e PWA).
 /// Valores numéricos explícitos pra estabilidade em serialização e
 /// persistência futura — adicionar novo estado nunca renumera os atuais.
 ///
@@ -46,7 +46,7 @@ public enum StatusPedido
     AguardandoPagamento = 6,
 
     /// <summary>
-    /// Pagamento confirmado pelo webhook MP; aguarda a Babá aprovar (ou recusar) no painel.
+    /// Pagamento confirmado pelo webhook MP; aguarda a Baba aprovar (ou recusar) no painel.
     /// Use cases <c>AprovarPedidoStorefrontUseCase</c> / <c>RecusarPedidoStorefrontUseCase</c>
     /// (TASK-EZ-APROVAR-001) transitam para <see cref="AprovadoBaba"/> ou
     /// <see cref="Cancelado"/> com SELECT FOR UPDATE.
@@ -54,7 +54,7 @@ public enum StatusPedido
     AguardandoAprovacaoBaba = 7,
 
     /// <summary>
-    /// Aprovado pela Babá — pedido entra na fila de produção do ERP via
+    /// Aprovado pela Baba — pedido entra na fila de produção do ERP via
     /// transição <see cref="AprovadoBaba"/> -&gt; <see cref="Preparando"/>.
     /// Notificação ao cliente via WhatsApp enfileirada no outbox.
     /// </summary>

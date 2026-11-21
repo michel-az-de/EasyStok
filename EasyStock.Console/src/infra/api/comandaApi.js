@@ -1,8 +1,8 @@
 import { API_BASE } from '../fonteDados'
 import { urlDeExibicaoDaFoto } from '../../dominio/vitrineCardapio'
 import { partesDoSku, skuDaPorcao } from '../../dominio/cardapio'
-import { MEIOS_NA_ENTREGA, observacaoDoPagamentoNaEntrega, pagamentoNaEntregaDasObservacoes } from '../../dominio/cobranca'
-import { chamarApi } from './cliente'
+import { MEIOS_NA_ENTREGA, MEIO_PIX_DIRETO, observacaoDoPagamentoNaEntrega, pagamentoNaEntregaDasObservacoes } from '../../dominio/cobranca'
+import { chamarApi, lerDaLoja } from './cliente'
 import { instante } from './traducaoConversas'
 import { lerSessao } from './sessao'
 
@@ -86,7 +86,12 @@ export const STATUS_DO_PASSO = {
 
 export const FORMA_NA_ENTREGA = 'na_entrega'
 export const FORMA_ONLINE = 'online'
-export const formaDoMeio = (meio) => (MEIOS_NA_ENTREGA.has(meio) ? FORMA_NA_ENTREGA : FORMA_ONLINE)
+// #2233: Pix pela chave da loja, sem Mercado Pago (`MEIO_PIX_DIRETO`).
+export const FORMA_PIX_DIRETO = 'pix_direto'
+export const formaDoMeio = (meio) => {
+  if (meio === MEIO_PIX_DIRETO) return FORMA_PIX_DIRETO
+  return MEIOS_NA_ENTREGA.has(meio) ? FORMA_NA_ENTREGA : FORMA_ONLINE
+}
 
 const ms = (valor) => (valor ? new Date(instante(valor)).getTime() : null)
 
@@ -95,11 +100,15 @@ const ms = (valor) => (valor ? new Date(instante(valor)).getTime() : null)
 function cobrancaDaApi(c, meioAnterior, naEntregaGravado = null) {
   if (!c) return null
   const naEntrega = c.provedor === FORMA_NA_ENTREGA
+  // #2233: Pix direto é baixa à mão como a na entrega, com o copia e cola da chave da loja.
+  const pixDireto = c.provedor === FORMA_PIX_DIRETO
   // Sem meio anterior (polling, recarga), o meio é o padrão da forma: link do Mercado Pago
   // online, maquininha na entrega. Antes caía em `undefined` e a tela mostrava "Pix" (F07).
   // J2 (#1990): sem meio anterior (página recarregada), o dinheiro na entrega gravado nas observações
   // vale mais que o padrão da forma. O meio que a tela já tem continua mandando.
-  const meio = meioAnterior && naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
+  const meio = pixDireto
+    ? MEIO_PIX_DIRETO
+    : meioAnterior && meioAnterior !== MEIO_PIX_DIRETO && naEntrega === MEIOS_NA_ENTREGA.has(meioAnterior)
     ? meioAnterior
     : naEntrega && naEntregaGravado
       ? naEntregaGravado.meio
@@ -109,9 +118,9 @@ function cobrancaDaApi(c, meioAnterior, naEntregaGravado = null) {
     id: c.cobrancaId,
     meio,
     metodoRecebido: c.metodoPagamento ?? null,
-    manual: naEntrega,
+    manual: naEntrega || pixDireto,
     valor: c.valor,
-    copiaECola: null,
+    copiaECola: pixDireto ? c.pixCopiaCola ?? null : null,
     link: c.linkPagamento ?? null,
     criadaEm,
     expiraEm: ms(c.expiraEm),
@@ -166,6 +175,7 @@ export function pedidoDaApi(p, anterior = null) {
     sinalNaReserva: Boolean(p.sinalNaReserva),
     pagamentosApi: p.pagamentos?.map((pag) => ({
       valor: pag.valor, coberto: pag.valor, em: ms(pag.pagoEm), meio: pag.metodo, pagamentoId: pag.id,
+      ...(pag.registradoPorNome ? { autorNome: pag.registradoPorNome } : {}),
     })),
     meio: cobranca?.meio ?? anterior?.meio ?? null,
     cobranca,
@@ -176,7 +186,7 @@ export function pedidoDaApi(p, anterior = null) {
 }
 
 export const listarCardapio = async () => {
-  const r = await chamarApi(`${BASE}/comanda/cardapio`)
+  const r = await lerDaLoja(`${BASE}/comanda/cardapio`)
   return (r?.itens ?? []).map((item) => produtoDaApi(item, r?.porcoes?.[item.id]))
 }
 
@@ -225,6 +235,7 @@ export function corpoDoPedido(pedido) {
   // Entregas leem). Outro meio não manda o campo: o corpo segue o de antes.
   const observacoes = observacaoDoPagamentoNaEntrega({ meio: pedido?.meio, trocoPara: pedido?.trocoPara })
   return {
+    ...(pedido?.identidadeProposta ? { clienteId: pedido.identidadeProposta.clienteId, vinculoRevisao: pedido.identidadeProposta.vinculoRevisao } : {}),
     ...(observacoes ? { observacoes } : {}),
     itens: (pedido?.itens ?? []).map((l) => {
       const { itemSku, variacaoId } = partesDoSku(l.sku)
@@ -233,6 +244,8 @@ export function corpoDoPedido(pedido) {
     janelaId: janela?.janelaId ?? null,
     dataEntrega: janela?.data ?? null,
     forma: formaDoMeio(pedido?.meio),
+    // #2219: frete combinado com o cliente (CEP fora da área). Zero é frete grátis combinado.
+    ...(pedido?.freteCombinado != null ? { freteCombinado: pedido.freteCombinado } : {}),
   }
 }
 
@@ -241,8 +254,8 @@ export const gerarPedido = (conversaId, corpo) =>
 
 // #1884 ("Quanto fica?"): o corpo do pedido sem forma de pagamento nem envio.
 export function corpoDaSimulacao(pedido) {
-  const { itens, janelaId, dataEntrega } = corpoDoPedido(pedido)
-  return { itens, janelaId, dataEntrega }
+  const { itens, janelaId, dataEntrega, freteCombinado } = corpoDoPedido(pedido)
+  return { itens, janelaId, dataEntrega, ...(freteCombinado != null ? { freteCombinado } : {}) }
 }
 
 // Só lê: o servidor calcula frete, total, sinal e restante com as regras do pedido e não cria nada.

@@ -61,7 +61,7 @@ public sealed class TenantFeatureFlagRepositoryIntegrationTests(PostgreSqlDataba
     [SkippableFact]
     public async Task Mesma_feature_em_tenants_diferentes_sao_linhas_independentes()
     {
-        // O índice único é (EmpresaId, Feature): desligar na Casa da Babá não pode desligar
+        // O índice único é (EmpresaId, Feature): desligar na Casa da Baba não pode desligar
         // na FMA. Sem o EmpresaId no lookup do upsert, uma sobrescreveria a outra.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var db = fixture.CreateDbContext();

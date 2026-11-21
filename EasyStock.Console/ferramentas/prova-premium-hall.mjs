@@ -14,9 +14,11 @@ registerHooks({
 
 const { MODULOS, filtrarModulos, modulosDoHall } = await import('../src/dominio/modulos.js')
 const {
-  alternarFavoritoDoHall, favoritosDoHall, favoritosPrimeiroNoHall, moverModuloDoHall,
-  normalizarPreferenciasHall, ordenarModulosDoHall, restaurarOrdemDoHall,
+  alternarFavoritoDoHall, favoritosDoHall, moverModuloDoHall,
+  normalizarPreferenciasHall, ordenarModulosDoHall,
 } = await import('../src/dominio/preferenciasHall.js')
+// #2232 (H10): os botões do Hall usam a ordem de uso do foco, não a do catálogo.
+const { favoritosPrimeiroPorUso, ordemOriginalDoHall, restaurarOrdemPorUso } = await import('../src/dominio/estadoDoHall.js')
 const { chaveDasPreferenciasHall, gravarPreferenciasHall, lerPreferenciasHall } = await import('../src/aplicacao/preferenciasHall.js')
 const { colisoesDoHall } = await import('../src/features/hall/colisoesDoHall.js')
 
@@ -87,7 +89,7 @@ provar('ordenar não reintroduz módulos proibidos em nenhuma combinação de ac
 provar('mover para frente conserva todos os módulos, favoritos e snapshot anterior', () => {
   const atual = alternarFavoritoDoHall(inicial, 'entregas')
   const antes = structuredClone(atual)
-  const movida = moverModuloDoHall(atual, 'entregas', 'cardapio')
+  const movida = moverModuloDoHall(atual, 'entregas', catalogo[0])
   assert.equal(movida.ordem[0], 'entregas')
   assert.deepEqual(movida.favoritos, ['entregas'])
   assert.deepEqual(new Set(movida.ordem), new Set(catalogo))
@@ -108,17 +110,20 @@ provar('subir entre módulos permitidos não exige conhecer módulos ocultos', (
   const movida = moverModuloDoHall(inicial, 'entregas', 'atendimento')
   assert.deepEqual(ids(ordenarModulosDoHall(permitidos, movida)), ['entregas', 'atendimento'])
 })
-provar('Favoritos primeiro é explícito e segue catálogo dentro de cada grupo', () => {
+provar('Favoritos primeiro é explícito e segue a ordem de uso dentro de cada grupo', () => {
   const atual = normalizarPreferenciasHall({ ordem: [...catalogo].reverse(), favoritos: ['entregas', 'atendimento'] })
-  const proxima = favoritosPrimeiroNoHall(atual)
-  assert.deepEqual(proxima.ordem.slice(0, 2), ['atendimento', 'entregas'])
-  assert.deepEqual(proxima.ordem.slice(2), catalogo.filter((id) => !atual.favoritos.includes(id)))
+  const proxima = favoritosPrimeiroPorUso(atual)
+  const base = ordemOriginalDoHall(atual.foco)
+  assert.deepEqual(proxima.ordem.slice(0, 2), base.filter((id) => atual.favoritos.includes(id)))
+  assert.deepEqual(new Set(proxima.ordem.slice(0, 2)), new Set(['atendimento', 'entregas']))
+  assert.deepEqual(proxima.ordem.slice(2), base.filter((id) => !atual.favoritos.includes(id)))
   assert.deepEqual(atual.ordem, [...catalogo].reverse())
 })
 provar('restaurar ordem original mantém os favoritos escolhidos', () => {
   const atual = normalizarPreferenciasHall({ ordem: [...catalogo].reverse(), favoritos: ['cozinha'] })
-  const restaurada = restaurarOrdemDoHall(atual)
-  assert.deepEqual(restaurada.ordem, catalogo)
+  const restaurada = restaurarOrdemPorUso(atual)
+  assert.deepEqual(restaurada.ordem, ordemOriginalDoHall(atual.foco))
+  assert.deepEqual([...restaurada.ordem].sort(), [...catalogo].sort())
   assert.deepEqual(restaurada.favoritos, ['cozinha'])
 })
 provar('mudança de token ou nome não mistura nem perde preferências da mesma conta', () => {
@@ -155,7 +160,7 @@ provar('Desfazer persiste snapshot anterior sem perder os atalhos', () => {
   const disco = storage()
   const chave = chaveDasPreferenciasHall(sessao('empresa-a', 'usuario-a'))
   const antes = alternarFavoritoDoHall(inicial, 'atendimento')
-  gravarPreferenciasHall(chave, favoritosPrimeiroNoHall(antes), disco)
+  gravarPreferenciasHall(chave, favoritosPrimeiroPorUso(antes), disco)
   gravarPreferenciasHall(chave, antes, disco)
   assert.deepEqual(lerPreferenciasHall(chave, disco), antes)
 })
@@ -268,7 +273,10 @@ provar('JSX final do Hall compila com o mesmo transformador do Vite', () => asse
     for (const modulo of api) assert.match(html, new RegExp(`>${modulo.nome}<`))
   })
   provar('#1810: hall mínimo cabe em até 20 controles (eram 54 em 1280x720)', () => {
-    const controles = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+    // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta: o limite vale para o conteúdo do Início.
+    // #3013: a faixa de atalhos (só celular, display none no desktop) repete a grade e é contada à parte na prova-1839; fora daqui.
+    const semFaixa = html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '').replace(/<nav [^>]*aria-label="Atalhos dos módulos"[^>]*>[\s\S]*?<\/nav>/, '')
+    const controles = (semFaixa.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
     assert.ok(controles <= 20, `${controles} controles`)
   })
 }

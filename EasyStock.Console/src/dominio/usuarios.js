@@ -12,12 +12,14 @@ export const situacaoDoUsuario = (usuario) =>
   !usuario.ativo ? SITUACAO.desativado : usuario.convite?.estado === 'pendente' ? SITUACAO.convite : SITUACAO.ativo
 
 // A API recusa mexer no próprio acesso (USUARIO_PROPRIO); a tela nem oferece.
-export function acoesDoUsuario(usuario, meuId) {
+export function acoesDoUsuario(usuario, meuId, souSuporte = false) {
   const eu = usuario.usuarioId === meuId
   const pendente = usuario.convite?.estado === 'pendente'
   return {
     trocarPerfil: !eu && usuario.ativo,
     reenviarConvite: !eu && usuario.ativo && pendente,
+    // #2201: código de acesso de uso único, para quem entra pelo app sem e-mail e senha. Para administrador, só o suporte.
+    gerarCodigo: !eu && usuario.ativo && (souSuporte || !['Admin', 'SuperAdmin'].includes(usuario.nivel)),
     desativar: !eu && usuario.ativo,
     reativar: !eu && !usuario.ativo,
   }
@@ -50,6 +52,7 @@ export function erroDoConvite({ nome, email, perfilId }) {
 const FEITO = {
   convite: (u) => `Convite enviado para ${u.email}. Chega em até um minuto.`,
   reenviar: (u) => `Convite reenviado para ${u.email}. O link anterior deixou de valer.`,
+  codigo: (u) => `Código de acesso de ${u.nome} gerado. Vale uma vez, por 30 dias. O código anterior deixou de valer.`,
   perfil: (u, perfil) => (u.ultimoAcessoEm
     ? `${u.nome} agora tem o perfil ${perfil}. A mudança vale na próxima vez que entrar.`
     : `${u.nome} agora tem o perfil ${perfil}.`),
@@ -61,6 +64,7 @@ const FEITO = {
 }
 const FALHOU = {
   reenviar: 'O convite não foi reenviado',
+  codigo: 'O código de acesso não foi gerado',
   perfil: 'O perfil não mudou',
   desativar: 'O acesso continua ativo',
   reativar: 'O acesso continua desativado',
@@ -80,13 +84,16 @@ export function opcoesDePessoas(pessoas) {
     .map((p) => ({ valor: p.usuarioId, rotulo: vezes.get(chave(p.nome)) > 1 ? `${p.nome} (${p.email})` : p.nome }))
 }
 
-// Política de senha da API (SenhaRules): a tela mostra o que falta antes de enviar.
+// Política de senha da API (PasswordPolicy): a tela mostra o que falta antes de enviar. Paridade com o char do C#:
+// avalia por unidade UTF-16 (letra e dígito do Unicode; símbolo é tudo que não é letra nem dígito, o sublinhado conta).
+const alguma = (s, ehDaClasse) => s.split('').some((c) => ehDaClasse.test(c))
 export const REGRAS_DE_SENHA = [
   { id: 'tamanho', rotulo: '10 caracteres ou mais', vale: (s) => s.length >= 10 },
-  { id: 'maiuscula', rotulo: 'uma letra maiúscula', vale: (s) => /[A-Z]/.test(s) },
-  { id: 'minuscula', rotulo: 'uma letra minúscula', vale: (s) => /[a-z]/.test(s) },
-  { id: 'numero', rotulo: 'um número', vale: (s) => /[0-9]/.test(s) },
-  { id: 'especial', rotulo: 'um símbolo, como ! ou @', vale: (s) => /\W/.test(s) },
+  { id: 'maximo', rotulo: 'no máximo 128 caracteres', vale: (s) => s.length <= 128 },
+  { id: 'maiuscula', rotulo: 'uma letra maiúscula', vale: (s) => alguma(s, /\p{Lu}/u) },
+  { id: 'minuscula', rotulo: 'uma letra minúscula', vale: (s) => alguma(s, /\p{Ll}/u) },
+  { id: 'numero', rotulo: 'um número', vale: (s) => alguma(s, /\p{Nd}/u) },
+  { id: 'especial', rotulo: 'um símbolo, como ! ou @', vale: (s) => alguma(s, /[^\p{L}\p{Nd}]/u) },
 ]
 export const regrasDaSenha = (senha) => REGRAS_DE_SENHA.map((r) => ({ id: r.id, rotulo: r.rotulo, ok: r.vale(senha) }))
 export const senhaValida = (senha) => REGRAS_DE_SENHA.every((r) => r.vale(senha))

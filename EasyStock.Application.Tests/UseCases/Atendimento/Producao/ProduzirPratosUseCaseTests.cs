@@ -9,6 +9,7 @@ using EasyStock.Application.UseCases.FinalizarLote;
 using EasyStock.Application.UseCases.Producao;
 using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 using EasyStock.Domain.Entities.Storefront;
+using EasyStock.Domain.Exceptions.Storefront;
 using Microsoft.Extensions.Logging;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -71,11 +72,65 @@ public class ProduzirPratosUseCaseTests
                 Substitute.For<IMovimentacaoEstoqueRepository>(), _uow, Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>(),
                 publicadorEventos: Substitute.For<IPublicadorEventos>(), loteRepository: _loteRepo),
             _produtoRepo, _uow, Substitute.For<ILogger<RegistrarProducaoUseCase>>());
-        var cadastrar = new CadastrarProdutoUseCase(_produtoRepo, _categorias,
-            Substitute.For<IProdutoCaracteristicaRepository>(), Substitute.For<IProdutoEmbalagemRepository>(), variacoes,
-            _uow, Substitute.For<ILogger<CadastrarProdutoUseCase>>());
-        return new ProduzirPratosUseCase(_storefronts, _cardapio, _categorias, cadastrar, registrar, _uow,
+        return new ProduzirPratosUseCase(_storefronts, _cardapio, Ligar(), registrar, _uow,
             new EasyStock.Application.UseCases.Atendimento.Comanda.VincularPorcoesAoEstoqueUseCase(_variacoes));
+    }
+
+    private LigarPratoAoEstoqueUseCase Ligar() => new(_storefronts, _cardapio, _categorias, _produtoRepo,
+        new CadastrarProdutoUseCase(_produtoRepo, _categorias,
+            Substitute.For<IProdutoCaracteristicaRepository>(), Substitute.For<IProdutoEmbalagemRepository>(), _variacoes,
+            _uow, Substitute.For<ILogger<CadastrarProdutoUseCase>>()),
+        _uow);
+
+    [Fact]
+    public async Task MontarReceitaAntesDaProducao_LigaOPratoAvulso_EADepoisReusaOProduto()
+    {
+        // #2235 (banca A1): a receita vem antes da produção. Ligar devolve o produto; ligar de novo não duplica.
+        var bolo = Avulso("Bolo de cenoura");
+
+        var produtoId = await Ligar().ExecuteAsync(EmpresaId, bolo.Id, Guid.NewGuid());
+
+        bolo.ProdutoId.Should().Be(produtoId);
+        _produtos.Should().ContainKey(produtoId);
+        _categoriasGravadas.Should().ContainSingle(c => c.Nome == LigarPratoAoEstoqueUseCase.CategoriaPratos);
+        (await Ligar().ExecuteAsync(EmpresaId, bolo.Id, Guid.NewGuid())).Should().Be(produtoId);
+        _produtos.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task LigarPratoComNomeDeProdutoExistente_DizOQueFazer_ENaoCria()
+    {
+        // #2235 (banca 4): o produto "Lasanha" já existe; o prato avulso "lasanha" não pode ficar travado sem saída.
+        var lasanha = Avulso("lasanha");
+        _produtoRepo.ExistsNomeAsync(EmpresaId, "Lasanha", Arg.Any<Guid?>()).Returns(true);
+
+        var act = () => Ligar().ExecuteAsync(EmpresaId, lasanha.Id, Guid.NewGuid());
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*produto chamado \"Lasanha\"*Mude o nome*");
+        lasanha.ProdutoId.Should().BeNull();
+        _produtos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LigarPratoDeOutraEmpresa_NaoAcha()
+    {
+        // O prato é buscado pela vitrine da empresa do token: o id de outra empresa não existe aqui.
+        var act = () => Ligar().ExecuteAsync(EmpresaId, Guid.NewGuid(), Guid.NewGuid());
+
+        await act.Should().ThrowAsync<CardapioItemNaoEncontradoException>();
+        _produtos.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LigarPratoForaDoCardapio_Recusa()
+    {
+        var torta = Avulso("Torta");
+        torta.Arquivar(DateTime.UtcNow);
+
+        var act = () => Ligar().ExecuteAsync(EmpresaId, torta.Id, Guid.NewGuid());
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*fora do cardápio*");
+        torta.ProdutoId.Should().BeNull();
     }
 
     private (CardapioItem Prato, CardapioItemVariacao P300, CardapioItemVariacao P800) AvulsoComPorcoes(string nome)

@@ -245,7 +245,7 @@ public class CorridasAtendimentoIntegrationTests(PostgreSqlDatabaseFixture fixtu
             new WebhookRecebidoRepository(db), Substitute.For<IWhatsAppCloudClient>(), Substitute.For<IQueueService>(),
             Substitute.For<IOperacaoEventPublisher>(), Substitute.For<ITenantContextAccessor>(), db,
             new IdentificarClientePorTelefoneUseCase(Substitute.For<IClienteRepository>(),
-                Substitute.For<IClienteStorefrontRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+                Substitute.For<IClienteStorefrontRepository>(), Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new SaudacaoAtendimento(Substitute.For<IStorefrontRepository>(), new ConfigurationBuilder().Build()),
             new RoteadorAcoesBotao([], NullLogger<RoteadorAcoesBotao>.Instance),
             new OptOutPorPalavra(Substitute.For<IConsentimentoContatoRepository>(), conversas, new ResolvedorCanal([canal]),

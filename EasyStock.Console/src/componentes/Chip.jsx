@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import css from './Chip.module.css'
+import { BotaoIcone } from './BotaoIcone'
 import { Icone } from './Icone'
 
 const radiosHabilitados = (grupo) => [...(grupo?.querySelectorAll('[role="radio"]') ?? [])]
@@ -15,7 +16,7 @@ const radiosHabilitados = (grupo) => [...(grupo?.querySelectorAll('[role="radio"
 // `reservarIcone` (#1474): guarda o lugar do ✓ desligado, para a fileira de chips não mudar de
 // largura a cada toque (dias da semana).
 export function Chip({
-  papel = 'filtro', ativo = false, emBreve = false, tracejado = false, reservarIcone = false, icone, className,
+  papel = 'filtro', ativo = false, emBreve = false, tracejado = false, reservarIcone = false, icone, rotuloIcone, className,
   onClick, onRemover, rotuloRemover, children, ...resto
 }) {
   const referencia = useRef(null)
@@ -55,12 +56,11 @@ export function Chip({
   if (papel === 'tag') {
     return (
       <span className={classes}>
-        {icone && <Icone nome={icone} tamanho={20} />}
+        {/* #2734: ícone que carrega sentido (o alerta da restrição) chega com nome; sem `rotuloIcone` segue enfeite. */}
+        {icone && <Icone nome={icone} tamanho={20} rotulo={rotuloIcone} />}
         <span className={css.textoTag}>{children}</span>
         {onRemover && (
-          <button type="button" className={css.remover} aria-label={rotuloRemover} onClick={onRemover}>
-            <Icone nome="x" tamanho={20} />
-          </button>
+          <BotaoIcone rotulo={rotuloRemover} icone="x" className={css.remover} onClick={onRemover} />
         )}
       </span>
     )

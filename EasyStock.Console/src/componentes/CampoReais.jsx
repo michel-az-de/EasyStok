@@ -9,9 +9,10 @@ import css from './CampoReais.module.css'
 // lidos por `ler` (a tela passa `lerMoeda`, do domínio: a fronteira de camada não deixa
 // `componentes` importar `dominio`). Ao sair do campo o valor volta escrito por inteiro.
 //
+// #3016: `obrigatorio` põe o * (fora do nome acessível) e aria-required, igual ao Campo (#2457 U4).
 // `centavos` nulo é campo vazio; `aoMudar` recebe nulo quando ela apaga tudo.
 export function CampoReais({
-  rotulo, rotuloOculto, dica, erro, centavos, aoMudar, ler, mostrarZero = false, id: idInformado, className, onBlur, placeholder = '0,00', ...resto
+  rotulo, rotuloOculto, dica, erro, obrigatorio, centavos, aoMudar, ler, mostrarZero = false, id: idInformado, className, onBlur, placeholder = '0,00', ...resto
 }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
@@ -21,7 +22,7 @@ export function CampoReais({
   const [texto, setTexto] = useState(() => mostrar(centavos))
   // #2080: "1,500" não cabe (centavos têm 2 casas): o campo diz o que ficou em vez de calar.
   const [cortou, setCortou] = useState(false)
-  const lido = (valor) => (valor.trim() ? ler(valor) : null)
+  const lido = (valor) => (valor.trim() ? (valor.trim().startsWith('-') ? -Math.abs(ler(valor)) : ler(valor)) : null)
 
   // Valor trocado por fora (zerou depois de lançar, a sugestão chegou): o texto acompanha. O que
   // ela mesma digitou não volta formatado no meio da digitação.
@@ -32,20 +33,20 @@ export function CampoReais({
   }
 
   function aoDigitar(evento) {
-    const novo = textoDigitadoEmReais(evento.target.value)
+    const novo = (/[-−]/.test(evento.target.value) ? '-' : '') + textoDigitadoEmReais(evento.target.value)
     setCortou(centavosCortados(evento.target.value))
     setTexto(novo)
     aoMudar(lido(novo))
   }
 
   function aoSair(evento) {
-    if (texto.trim()) setTexto(textoDosCentavos(ler(texto)))
+    if (texto.trim()) setTexto(textoDosCentavos(lido(texto)))
     onBlur?.(evento)
   }
 
   return (
     <div className={base.campo}>
-      <label className={rotuloOculto ? 'sr' : base.rotulo} htmlFor={id}>{rotulo}</label>
+      <label className={rotuloOculto ? 'sr' : base.rotulo} htmlFor={id}>{rotulo}{obrigatorio && <span aria-hidden="true"> *</span>}</label>
       <div className={css.envelope}>
         <span className={css.prefixo} aria-hidden="true">R$</span>
         <input
@@ -58,6 +59,7 @@ export function CampoReais({
           onChange={aoDigitar}
           onBlur={aoSair}
           aria-invalid={Boolean(erro) || undefined}
+          aria-required={obrigatorio || undefined}
           {...resto}
           aria-describedby={[resto['aria-describedby'], erro ? `${id}-erro` : dica ? `${id}-dica` : null].filter(Boolean).join(' ') || undefined}
         />

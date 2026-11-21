@@ -152,6 +152,11 @@ test('#2066 esquema de dados do empacotador é o mesmo do APK', () => {
   const java = fs.readFileSync(path.resolve(__dirname, '../android/app/src/main/java/com/casadababa/app/updater/UpdatePolicy.java'), 'utf8');
   assert.equal(Number(/DATA_SCHEMA\s*=\s*(\d+)/.exec(java)[1]), require('../scripts/ota-contract.cjs').DATA_SCHEMA);
 });
+test('#2735 o job do push decide a nova tentativa pela política coberta no harness nativo', () => {
+  const job = fs.readFileSync(path.resolve(__dirname, '../android/app/src/main/java/com/casadababa/app/updater/UpdateCheckJob.java'), 'utf8');
+  assert.match(job, /jobFinished\(params, UpdatePolicy\.shouldRetryCheck\(status\.optBoolean\("checking"\), status\.optBoolean\("trial"\),\s*status\.optBoolean\("checkSucceeded"\)\)\);/);
+  assert.doesNotMatch(job, /!status\.optBoolean\("checkSucceeded"\)/, 'a decisão não pode voltar a ficar solta no job, onde nenhum teste a alcança');
+});
 
 test('versão e código do APK vêm do manifesto, com lockfile consistente', () => {
   const manifest = require('../package.json');
@@ -204,4 +209,30 @@ test('APK novo mantém manifesto e recuperação legados intactos', () => {
   }
   assert.equal(current(root).sequence,7);
   assert.equal(ota.verify(read(path.join(channelRoot(root),'previous.json')),key).sequence,6);
+});
+
+// #2804 (#2123 item 1): o aparelho guarda a maior sequência mesmo ao trocar de APK, então
+// o servidor não pode aceitar sequência menor que alguma já publicada, em qualquer canal.
+test('instalação recusa sequência menor que release já publicada em outro canal', () => {
+  const root = fs.mkdtempSync(path.join(temporary, 'cross-channel-'));
+  const other = build('0.4.0', 9);
+  fs.copyFileSync(other.release, path.join(root, 'release-9.json'));
+  const lower = staging(root, build('0.4.1', 5));
+  run(root, lower, 'install', false);
+  assert.equal(fs.existsSync(path.join(root, 'release-5.json')), false);
+  const higher = staging(root, build('0.4.2', 10));
+  run(root, higher, 'install'); run(root, higher, 'activate');
+  assert.equal(current(root).sequence, 10);
+});
+
+// #2804 (revisão da PR): repetir o deploy da mesma release depois de falha entre install e activate continua possível.
+test('reinstalar a mesma release já instalada é idempotente e ativa em seguida', () => {
+  const root = fs.mkdtempSync(path.join(temporary, 'retry-'));
+  const release = build('0.4.5', 11);
+  run(root, staging(root, release), 'install');
+  const retry = staging(root, release);
+  run(root, retry, 'install'); run(root, retry, 'activate');
+  assert.equal(current(root).sequence, 11);
+  const other = staging(root, build('0.4.6', 11, 'outro conteudo'));
+  run(root, other, 'install', false);
 });

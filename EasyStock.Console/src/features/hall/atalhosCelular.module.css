@@ -1,0 +1,25 @@
+/* #3013: faixa de atalhos do Início, só no celular. Cores e medidas vêm dos tokens. */
+.faixa { display: none; }
+.lista { display: flex; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+.item { flex: 0 0 auto; min-width: 0; }
+.atalho {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 0 var(--e-2);
+  min-height: var(--toque); max-width: 16rem; padding: var(--e-2) var(--e-3);
+  border: var(--b-1) solid var(--linha-media); border-radius: var(--r-2);
+  background: var(--papel); color: var(--tinta); text-decoration: none;
+}
+.atalho:hover { border-color: var(--marca); background: var(--preenchimento); }
+.atalho:active { background: var(--preenchimento-forte); }
+.atalho:focus-visible { outline: 3px solid var(--marca); outline-offset: 2px; }
+.icone { grid-row: 1 / span 2; display: flex; color: var(--marca-forte); }
+.nome { font-family: var(--f-corpo); font-size: var(--t-forte); font-weight: 700; line-height: var(--lh-compacto); }
+.estado { grid-column: 2; font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2); overflow-wrap: anywhere; }
+/* Mesma regra do cartão: o que pede atenção usa a cor de estado, nunca a da marca. */
+.estado[data-atencao] { color: var(--alerta); font-weight: 700; }
+
+@media (max-width: 640px) {
+  .faixa { display: grid; margin-bottom: var(--e-3); }
+  /* A faixa rola por dentro, na horizontal; a página não ganha rolagem lateral. O respiro (8 px) cobre o anel de foco (3 + 2 px), que o overflow cortaria. */
+  .lista { overflow-x: auto; scroll-snap-type: x proximity; padding: var(--e-2); }
+  .item { scroll-snap-align: start; }
+}

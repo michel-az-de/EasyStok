@@ -15,6 +15,7 @@ registerHooks({
 globalThis.sessionStorage = { getItem: () => JSON.stringify({token:'teste',expiraEm:Date.now()+60000,empresa:{id:'empresa'}}) }
 const { criarAcoesComandaApi } = await import('../src/aplicacao/api/comanda.js')
 const pedidoId='11111111-1111-1111-1111-111111111111'
+const identidade={clienteId:'cliente-da-comanda',vinculoRevisao:2}
 const pedido = {pedidoId,estado:'aguardando',statusApi:'aguardando_pagamento',itens:[],totalApi:100,meio:'pix',cobranca:{id:'cb',link:'https://example.test/pagar',valor:100}}
 const dto = {pedidoId,status:'aguardando',total:100,totalPago:100,itens:[],pagamentos:[],cobranca:{cobrancaId:'cb',status:'Paga',valor:100,linkPagamento:'https://example.test/pagar',tentativa:1}}
 const ok = data => new Response(JSON.stringify({data}))
@@ -24,7 +25,7 @@ function montar(responder, atual=pedido) {
     chamadas.push({url:String(url),metodo:opcoes.method??'GET',corpo:opcoes.body??null})
     return responder(String(url),opcoes)
   }
-  const api=criarAcoesComandaApi({}, {estadoRef:{current:{conversas:[{id:'conversa',pedido:atual}]}},despachar:acao=>{
+  const api=criarAcoesComandaApi({}, {estadoRef:{current:{conversas:[{id:'conversa',...identidade,pedido:atual}]}},despachar:acao=>{
     if(acao.mensagem) avisos.push(acao.mensagem)
     if(acao.pedido) atualizacoes.push(acao.pedido)
   }})
@@ -78,7 +79,7 @@ for (const situacao of ['confirmado','ja_conferido']) {
 }
 {
   const t=montar((_url,opcoes)=>{if(opcoes.method==='POST')throw new TypeError('Failed to fetch');return ok(dto)},
-    {estado:'montagem',itens:[{sku:'massa',qtd:1,obs:''}],janela:'j1|2026-10-13',meio:'pix'})
+    {estado:'montagem',identidadeProposta:{...identidade},itens:[{sku:'massa',qtd:1,obs:''}],janela:'j1|2026-10-13',meio:'pix'})
   const resultado=await t.api.gerarPedido('conversa')
   assert.equal(resultado.pedidoId,pedidoId)
   assert.equal(t.chamadas.filter(x=>x.metodo==='POST').length,1)

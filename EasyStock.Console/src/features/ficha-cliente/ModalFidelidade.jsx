@@ -46,7 +46,7 @@ export function ModalFidelidade({
             return (
               <li key={recompensa.id} className={css.linhaRecompensa}>
                 <span className={css.iconeRecompensa} aria-hidden="true">
-                  <Icone nome={ICONE_POR_TIPO[recompensa.tipo] ?? 'presente'} tamanho={18} />
+                  <Icone nome={ICONE_POR_TIPO[recompensa.tipo] ?? 'presente'} tamanho={20} />
                 </span>
                 <span className={css.textoRecompensa}>
                   <strong>{recompensa.rotulo}</strong>

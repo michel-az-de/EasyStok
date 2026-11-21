@@ -20,7 +20,9 @@ public sealed record LoteResult(
     int EtiquetasDivergentes,
     DateTime CriadoEm,
     DateTime AlteradoEm,
-    DateTime? FinalizadoEm
+    DateTime? FinalizadoEm,
+    // #2199 (D4): número do código de barras; nulo só em lote anterior a ele que ainda não imprimiu.
+    string? NumeroCurto = null
 );
 
 public sealed record LoteDetalheResult(
@@ -36,7 +38,9 @@ public sealed record LoteItemResult(
     string? FotoUrl, DateTime CriadoEm,
     // C2 (RDC 727/2022): tipo do produto vinculado (Avulso default | Embalado).
     // Usado pela UI para exibir badge "Sem peso" e habilitar backfill.
-    string TipoEmbalagem = "Avulso"
+    string TipoEmbalagem = "Avulso",
+    // #2373: medida exata da entrada (ex.: 0,3 kg); null = item de produção, vale Quantidade.
+    decimal? QuantidadeMedida = null
 );
 
 public sealed record LoteEtiquetaResult(

@@ -55,6 +55,7 @@ const esperar = (ms = 20) => new Promise((r) => setTimeout(r, ms))
 const JANELA = '22222222-2222-2222-2222-222222222222'
 const ITEM = '11111111-1111-1111-1111-111111111111'
 const PEDIDO_ID = 'a1b2c3d4-e5f6-4711-8899-aabbccddeeff'
+const IDENTIDADE = { clienteId: '33333333-3333-3333-3333-333333333333', vinculoRevisao: 2 }
 const json = (data, status = 200) => new Response(JSON.stringify(status < 300 ? { data } : data), { status })
 
 const pedidoApi = (cobranca = null) => ({
@@ -78,12 +79,12 @@ function rede(rotas) {
 
 function montarComanda(pedido) {
   const despachados = []
-  const estadoRef = { current: { conversas: [{ id: 'conv-1', pedido }] } }
+  const estadoRef = { current: { conversas: [{ id: 'conv-1', ...IDENTIDADE, pedido }] } }
   const acoes = criarAcoesComandaApi({}, { despachar: (a) => despachados.push(a), estadoRef })
   const avisos = () => despachados.filter((a) => a.tipo === acao.AVISO_API).map((a) => a.mensagem)
   return { acoes, despachados, avisos }
 }
-const rascunho = (meio = 'cartao-link') => ({ pedidoId: null, janela: `${JANELA}|2026-10-02`, meio, itens: [{ sku: ITEM, qtd: 1, obs: '' }] })
+const rascunho = (meio = 'cartao-link') => ({ pedidoId: null, identidadeProposta: { ...IDENTIDADE }, janela: `${JANELA}|2026-10-02`, meio, itens: [{ sku: ITEM, qtd: 1, obs: '' }] })
 
 // --- 1. Pedido sem link nunca recebe cobrança ----------------------------------
 await confere('1a. pedido online criado sem cobrança avisa que o link não saiu', async () => {
@@ -241,6 +242,37 @@ await confere('9a. carga inicial não lê mensagens de conversa encerrada não s
 await confere('9b. cartão sem mensagens carregadas usa ultimaMensagemTexto do resumo', () => {
   const resumo = { id: 'c-enc', situacao: 'Encerrada', canal: 'WhatsApp', contatoIdExterno: '5511', ultimaMensagemEm: '2026-09-01T10:00:00', ultimaMensagemTexto: 'Obrigada!', naoLidas: 0 }
   assert.equal(previaDaConversa(conversaDaApi(resumo, [], null)).corpo, 'Obrigada!')
+})
+
+// --- #2320 ATD-6. Autoria na prévia -------------------------------------------------
+await confere('#2320 ATD-6: tradução preserva o ID de quem enviou a mensagem', () => {
+  const mensagem = mensagemDaApi({ id: 'm-equipe', direcao: 'Saida', autor: 'Dona', texto: 'Olá', enviadaPorUsuarioId: 'u-outra' })
+  assert.equal(mensagem.enviadaPorUsuarioId, 'u-outra')
+})
+
+await confere('#2320 ATD-6: prévia distingue minha mensagem da equipe pelo ID', () => {
+  const usuario = { id: 'u-atual', nome: 'Ana' }
+  const conversa = (usuarioId) => ({
+    situacaoApi: 'Assumida', assumidaPorUsuarioId: usuario.id, responsavel: usuario.nome,
+    mensagens: [mensagemDaApi({ id: 'm-equipe', direcao: 'Saida', autor: 'Dona', texto: 'Olá', enviadaPorUsuarioId: usuarioId })],
+  })
+  assert.deepEqual(previaDaConversa(conversa('u-outra'), usuario), { prefixo: 'Equipe: ', corpo: 'Olá' })
+  assert.equal(previaDaConversa(conversa(usuario.id), usuario).prefixo, 'Você: ')
+  assert.equal(previaDaConversa(conversa(null), usuario).prefixo, 'Equipe: ', 'sem autoria não atribui a mim')
+  assert.equal(previaDaConversa(conversa(usuario.id)).prefixo, 'Equipe: ', 'sem sessão não atribui a mim')
+  assert.equal(previaDaConversa(conversa(usuario.id), { nome: 'Ana' }).prefixo, 'Equipe: ', 'nome igual sem ID não comprova autoria')
+})
+
+await confere('#2320 ATD-6: prévia conserva assistente, cliente, notas e modo local', () => {
+  const usuario = { id: 'u-atual' }
+  for (const autor of ['Agente', 'Sistema']) {
+    const mensagem = mensagemDaApi({ id: 'm-auto', direcao: 'Saida', autor, status: 'Enviada', externoId: 'wamid.1', texto: 'Aviso', enviadaPorUsuarioId: usuario.id })
+    assert.equal(previaDaConversa({ situacaoApi: 'Assumida', mensagens: [mensagem] }, usuario).prefixo, 'Assistente: ')
+  }
+  const cliente = mensagemDaApi({ id: 'm-in', direcao: 'Entrada', autor: 'Cliente', texto: 'Quero uma lasanha' })
+  const nota = mensagemDaApi({ id: 'm-nota', direcao: 'Saida', autor: 'Sistema', status: 'Pendente', texto: 'Conversa assumida' })
+  assert.deepEqual(previaDaConversa({ mensagens: [cliente, nota] }, usuario), { prefixo: '', corpo: 'Quero uma lasanha' })
+  assert.equal(previaDaConversa({ mensagens: [{ dir: 'out', texto: 'Olá' }] }).prefixo, 'Você: ')
 })
 
 // --- 10. Mídia recebida ------------------------------------------------------------

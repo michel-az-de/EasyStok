@@ -6,7 +6,24 @@ export const FILTROS_DO_CARDAPIO = [
   { id: 'hoje', rotulo: 'Disponíveis hoje', aceita: (item) => item.hoje && !item.arquivado },
   { id: 'fora', rotulo: 'Fora de hoje', aceita: (item) => !item.hoje || item.arquivado },
   { id: 'sem-foto', rotulo: 'Sem foto', aceita: (item) => !item.foto },
+  // #2258 (auditoria C1): é o número "pratos com pendência" da home; o link dela cai neste filtro.
+  { id: 'pendencia', rotulo: 'Com pendência', aceita: (item) => !item.arquivado && item.pendencias?.length > 0 },
 ]
+
+// #2258 (auditoria C1): o filtro vai no terceiro segmento da rota, `#/m/cardapio/itens/pendencia`. O
+// roteador lê só módulo e tela; o resto é de quem monta a lista (mesmo desenho do Financeiro).
+export const hashDoFiltro = (id) => `#/m/cardapio/itens/${id}`
+export function filtroDaHash(hash) {
+  const id = String(hash ?? '').split('/')[4]
+  return FILTROS_DO_CARDAPIO.some((f) => f.id === id) ? id : null
+}
+
+// #2258 (auditoria C4): "massas recheadas" aparece como "Massas recheadas". Só a exibição muda; o
+// valor que filtra e que vai à API segue como está.
+export function rotuloDaCategoria(categoria) {
+  const texto = String(categoria ?? '').trim()
+  return texto.charAt(0).toLocaleUpperCase('pt-BR') + texto.slice(1)
+}
 
 const normalizar = (texto) => String(texto ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 const aceitaDoFiltro = (filtro) => (FILTROS_DO_CARDAPIO.find((f) => f.id === filtro) ?? FILTROS_DO_CARDAPIO[0]).aceita

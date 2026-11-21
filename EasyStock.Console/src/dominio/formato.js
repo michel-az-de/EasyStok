@@ -14,12 +14,16 @@ const REAIS = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL
 const SINAL_NEGATIVO = '−'
 
 // "R$ 1.234,56". Negativo leva um sinal só, o menos de verdade colado ao "R$" ("−R$ 3,00"), e o que
-// arredonda para zero não leva sinal ("-R$ 0,00" não existe). Sem valor (nulo) mostra traço.
+// arredonda para zero não leva sinal ("-R$ 0,00" não existe). Sem valor (nulo) mostra "Sem valor".
 export const moeda = (v) => {
-  if (v == null) return '—'
+  if (v == null) return 'Sem valor' // #2792: sem travessão em texto de tela
   const texto = REAIS.format(Math.abs(v))
   return v < 0 && /[1-9]/.test(texto) ? SINAL_NEGATIVO + texto : texto
 }
+
+// #2853: custo do Assistente, que o provedor cobra em dólar ("US$ 1,23"). Só para esse custo; o resto é real.
+const DOLARES = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' })
+export const dolar = (v) => (v == null ? 'Sem valor' : DOLARES.format(v))
 
 // O mesmo valor quando ele chega em centavos (frete, corrida, fechamento).
 export const moedaDosCentavos = (centavos) => moeda(centavos == null ? null : centavos / 100)
@@ -30,8 +34,14 @@ export const textoDosCentavos = (centavos) => (centavos == null
   ? ''
   : (centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 
-export const horaCurta = (iso) =>
-  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: FUSO })
+// #2258 (auditoria G1): sempre HH:MM com dois pontos, no fuso da loja. `toLocaleTimeString` troca o
+// separador conforme o navegador e o sistema ("16.23" apareceu em Canais).
+export const horaCurta = (iso) => {
+  const ms = new Date(iso).getTime()
+  if (Number.isNaN(ms)) return ''
+  const { horas, minutos } = partesNoFuso(ms)
+  return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`
+}
 
 const DIA_DA_SEMANA = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
 const PARTES = new Intl.DateTimeFormat('en-US', {
@@ -92,6 +102,14 @@ export const horaMono = (ms) => {
   return `${horas}h${String(minutos).padStart(2, '0')}`
 }
 
+// #2185 (F27): nota, post-it e histórico no fuso da casa, o mesmo do balão ao lado (#1600). O aparelho da
+// atendente pode estar em outro fuso.
+export const diaMesHora = (iso) =>
+  new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: FUSO })
+
+export const diaMes = (iso) =>
+  new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: FUSO })
+
 export const dataHora = (ms) =>
   new Date(ms).toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: FUSO,
@@ -104,6 +122,10 @@ export const dataHora = (ms) =>
 export const mesPorExtenso = (ms) =>
   new Date(ms).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: FUSO })
 
+// "2026-11-01" -> "1 de novembro de 2026" (#2553, Q09): o leitor de tela lia a data ISO na legenda.
+export const dataPorExtenso = (iso) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+
 export function haQuantoTempo(iso, agora) {
   const minutos = Math.floor((agora - new Date(iso).getTime()) / 60000)
   if (minutos < 1) return 'agora'
@@ -111,6 +133,20 @@ export function haQuantoTempo(iso, agora) {
   const horas = Math.floor(minutos / 60)
   if (horas < 24) return horas + ' h'
   return Math.floor(horas / 24) + ' d'
+}
+
+// #2303: a idade de um aviso do sino, por extenso. Sem data válida devolve null: melhor não dizer do
+// que inventar que é novo.
+export function idadeDoAviso(iso, agora) {
+  const instante = iso ? new Date(iso).getTime() : NaN
+  if (Number.isNaN(instante)) return null
+  const minutos = Math.floor((agora - instante) / 60000)
+  if (minutos < 1) return 'agora'
+  if (minutos < 60) return `há ${minutos} min`
+  const horas = Math.floor(minutos / 60)
+  if (horas < 24) return `há ${horas} h`
+  const dias = Math.floor(horas / 24)
+  return dias === 1 ? 'há 1 dia' : `há ${dias} dias`
 }
 
 // Rodada 2 · plural. "1 porções" é o tipo de descuido que faz a tela parecer

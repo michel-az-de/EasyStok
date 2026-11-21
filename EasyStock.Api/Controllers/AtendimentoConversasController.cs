@@ -112,6 +112,18 @@ public class AtendimentoConversasController(
         catch (ConversaNaoEncontradaException) { return DataNotFound("Conversa não encontrada."); }
     }
 
+    [SwaggerOperation(Summary = "Check whether the assistant answers this conversation",
+        Description = "#2496: etapas do turno do robô (passa, barra, não se aplica), se responde à próxima mensagem, " +
+            "a chave da loja, o prompt exato e as ferramentas. Só lê: não escala, não chama o modelo, não grava.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [HttpGet("{id:guid}/assistente")]
+    public async Task<IActionResult> Assistente(Guid id, [FromServices] ChecarAssistenteConversaUseCase checar, CancellationToken ct = default)
+    {
+        try { return DataOk(await checar.ExecuteAsync(currentUser.EmpresaId, id, DateTime.UtcNow, ct)); }
+        catch (ConversaNaoEncontradaException) { return DataNotFound("Conversa não encontrada."); }
+    }
+
     [SwaggerOperation(Summary = "Send a text message as the owner (takes over the conversation)",
         Description = "Fora da janela de 24 h: 409 { erro: \"fora_da_janela_24h\", sugestao: \"template\" } e nada gravado.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -122,7 +134,9 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/mensagens")]
     public Task<IActionResult> EnviarMensagem(Guid id, [FromBody] EnviarMensagemConsoleBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await enviarUseCase.EnviarTextoAsync(
-            new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty, currentUser.Nivel), ct)));
+            new EnviarTextoConsoleCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.Texto ?? string.Empty,
+                currentUser.Nivel, body?.Confirmar ?? false,
+                HttpContext is { } http && http.Request.Headers.TryGetValue("Idempotency-Key", out var chave) ? chave.ToString() : null), ct)));
 
     [HttpGet("~/api/atendimento/modelos")]
     [ValidateEmpresaId]
@@ -146,7 +160,7 @@ public class AtendimentoConversasController(
     public Task<IActionResult> EnviarModelo(Guid id, [FromBody] EnviarModeloConversaBody body,
         [FromServices] EnviarModeloConversaUseCase useCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await useCase.ExecuteAsync(new EnviarModeloConversaCommand(
-            currentUser.EmpresaId, currentUser.UsuarioId, id, body.TentativaId, body.Nome, body.Idioma, body.Parametros), ct)));
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body.TentativaId, body.Nome, body.Idioma, body.Parametros, body.Confirmar), ct)));
 
     [SwaggerOperation(Summary = "Start a WhatsApp conversation with a registered client (#1408)",
         Description = "Abre (ou reaproveita) a conversa do telefone do cliente e envia um modelo aprovado. Sem a conexão do WhatsApp: 409 WHATSAPP_NAO_CONECTADO.")]
@@ -158,7 +172,20 @@ public class AtendimentoConversasController(
     public Task<IActionResult> Iniciar([FromBody] IniciarConversaClienteBody body,
         [FromServices] IniciarConversaClienteUseCase useCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await useCase.ExecuteAsync(new IniciarConversaClienteCommand(
-            currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId, body.TentativaId, body.Nome, body.Idioma, body.Parametros), ct)));
+            currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId, body.TentativaId, body.Nome, body.Idioma, body.Parametros,
+            body.Confirmar), ct)));
+
+    [SwaggerOperation(Summary = "Open the WhatsApp conversation of a registered client without sending (#2871)",
+        Description = "Novo pedido pela Ficha, por Pedidos ou pelo Atendimento: abre (ou reaproveita) a conversa do celular do cliente, sem mandar mensagem. A comanda nasce nela.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [HttpPost("do-cliente")]
+    [ValidateEmpresaId]
+    public Task<IActionResult> AbrirDoCliente([FromBody] AbrirConversaDoClienteBody body,
+        [FromServices] AbrirConversaDoClienteUseCase useCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await useCase.ExecuteAsync(
+            new AbrirConversaDoClienteCommand(currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId, body.Celular), ct)));
 
     [SwaggerOperation(Summary = "Messages that did not reach the customer (S59)",
         Description = "Saída que falhou, mais recente primeiro: inclui a que espera o cliente responder ao modelo de retomada e a que saiu por SMS.")]
@@ -185,7 +212,7 @@ public class AtendimentoConversasController(
     [RequestSizeLimit(TamanhoMaximoImagem)]
     [RequestFormLimits(MultipartBodyLengthLimit = TamanhoMaximoImagem)]
     [HttpPost("{id:guid}/mensagens/imagem")]
-    public Task<IActionResult> EnviarImagem(Guid id, IFormFile file, [FromForm] string? legenda, CancellationToken ct = default)
+    public Task<IActionResult> EnviarImagem(Guid id, IFormFile file, [FromForm] string? legenda, [FromQuery] bool confirmar = false, CancellationToken ct = default)
         => Atendendo(async () =>
         {
             if (file is null || file.Length == 0)
@@ -196,7 +223,7 @@ public class AtendimentoConversasController(
             await using var memoria = new MemoryStream();
             await file.CopyToAsync(memoria, ct);
             return DataOk(await enviarUseCase.EnviarImagemAsync(new EnviarImagemConsoleCommand(
-                currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda, currentUser.Nivel), ct));
+                currentUser.EmpresaId, currentUser.UsuarioId, id, file.FileName, file.ContentType, memoria.ToArray(), legenda, currentUser.Nivel, confirmar), ct));
         });
 
     [SwaggerOperation(Summary = "Send a recorded audio as the owner (multipart; takes over the conversation)",
@@ -210,7 +237,7 @@ public class AtendimentoConversasController(
     [RequestSizeLimit(TamanhoMaximoAudio)]
     [RequestFormLimits(MultipartBodyLengthLimit = TamanhoMaximoAudio)]
     [HttpPost("{id:guid}/mensagens/audio")]
-    public Task<IActionResult> EnviarAudio(Guid id, IFormFile file, CancellationToken ct = default)
+    public Task<IActionResult> EnviarAudio(Guid id, IFormFile file, [FromQuery] bool confirmar = false, CancellationToken ct = default)
         => Atendendo(async () =>
         {
             if (file is null || file.Length == 0)
@@ -221,7 +248,7 @@ public class AtendimentoConversasController(
             await using var memoria = new MemoryStream();
             await file.CopyToAsync(memoria, ct);
             return DataOk(await enviarUseCase.EnviarAudioAsync(new EnviarAudioConsoleCommand(
-                currentUser.EmpresaId, currentUser.UsuarioId, id, memoria.ToArray(), currentUser.Nivel), ct));
+                currentUser.EmpresaId, currentUser.UsuarioId, id, memoria.ToArray(), currentUser.Nivel, confirmar), ct));
         });
 
     /// <remarks>Use case por <c>[FromServices]</c>: o construtor fica como está para os testes que o montam.</remarks>
@@ -240,7 +267,7 @@ public class AtendimentoConversasController(
         Guid id, [FromBody] EnviarImagemCardapioBody body,
         [FromServices] EnviarImagemCardapioConsoleUseCase imagemCardapioUseCase, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await imagemCardapioUseCase.ExecuteAsync(new EnviarImagemCardapioConsoleCommand(
-            currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda, currentUser.Nivel), ct)));
+            currentUser.EmpresaId, currentUser.UsuarioId, id, body?.CardapioItemId ?? Guid.Empty, body?.Indice ?? 0, body?.Legenda, currentUser.Nivel, body?.Confirmar ?? false), ct)));
 
     [SwaggerOperation(Summary = "Reopen a closed conversation in the human queue without renewing the channel window")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -257,8 +284,8 @@ public class AtendimentoConversasController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [HttpPost("{id:guid}/assumir")]
-    public Task<IActionResult> Assumir(Guid id, CancellationToken ct = default)
-        => Atendendo(async () => DataOk(await gerenciarUseCase.AssumirAsync(Acao(id), ct)));
+    public Task<IActionResult> Assumir(Guid id, [FromQuery] bool confirmar = false, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await gerenciarUseCase.AssumirAsync(Acao(id) with { Confirmada = confirmar }, ct)));
 
     [SwaggerOperation(Summary = "Transfer the conversation to another attendant",
         Description = "O destino precisa ser usuário ativo da empresa com permissão de atender; senão 422.")]
@@ -270,7 +297,7 @@ public class AtendimentoConversasController(
     [HttpPost("{id:guid}/transferir")]
     public Task<IActionResult> Transferir(Guid id, [FromBody] TransferirConversaBody body, CancellationToken ct = default)
         => Atendendo(async () => DataOk(await transferirUseCase.ExecuteAsync(
-            new TransferirConversaCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.ParaUsuarioId ?? Guid.Empty, User.NomeExibicao()), ct)));
+            new TransferirConversaCommand(currentUser.EmpresaId, currentUser.UsuarioId, id, body?.ParaUsuarioId ?? Guid.Empty, User.NomeExibicao(), body?.Confirmar ?? false), ct)));
 
     [SwaggerOperation(Summary = "Give the conversation back to the agent")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -305,9 +332,14 @@ public class AtendimentoConversasController(
     public Task<IActionResult> CadastrarCliente(
         Guid id, [FromBody] CadastrarClienteConversaBody body,
         [FromServices] CadastrarClienteDaConversaUseCase cadastrarUseCase, CancellationToken ct = default)
-        => Atendendo(async () => DataOk(await cadastrarUseCase.ExecuteAsync(
-            new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body?.Nome, body?.Telefone, body?.Endereco, body?.Email,
-                body?.ConfirmarVinculoExistente ?? false), ct)));
+        => Atendendo(async () =>
+        {
+            if (body is null || body.ClienteId == Guid.Empty || body.VinculoRevisao is not { } revisao || revisao < 0)
+                return DataBadRequest("Informe o cliente e a revisão da pessoa conferida na ficha.");
+            return DataOk(await cadastrarUseCase.ExecuteAsync(
+                new CadastrarClienteDaConversaCommand(currentUser.EmpresaId, id, body.ClienteId, revisao,
+                    body.Nome, body.Telefone, body.Endereco, body.Email, body.ConfirmarVinculoExistente), ct));
+        });
 
     [SwaggerOperation(Summary = "Close the conversation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -370,6 +402,10 @@ public class AtendimentoConversasController(
         {
             return DataNotFound(ex.Message);
         }
+        catch (ConversaAtribuidaOutraException ex)
+        {
+            return Conflict(new ApiErrorResponse(new ApiError(ConversaAtribuidaOutraException.Codigo, ex.Message, null, null)));
+        }
         catch (DestinoNaoAtendenteException ex)
         {
             return UnprocessableEntity(new ApiErrorResponse(new ApiError("DESTINO_NAO_ATENDE", ex.Message, null, null)));
@@ -388,6 +424,10 @@ public class AtendimentoConversasController(
         catch (UseCaseValidationException ex)
         {
             return DataBadRequest(ex);
+        }
+        catch (CadastroClienteConversaAlteradoException ex)
+        {
+            return Conflict(new ApiErrorResponse(new ApiError(CadastroClienteConversaAlteradoException.Codigo, ex.Message, null, null)));
         }
         catch (RegraDeDominioVioladaException ex)
         {
@@ -416,18 +456,23 @@ public class AtendimentoConversasController(
     }
 }
 
-public sealed record EnviarMensagemConsoleBody(string Texto);
+public sealed record EnviarMensagemConsoleBody(string Texto, bool Confirmar = false);
 
-public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
+public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null, bool Confirmar = false);
 
 public sealed record IniciarConversaClienteBody(
-    Guid ClienteId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null);
+    Guid ClienteId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null,
+    bool Confirmar = false);
 
-public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda);
+public sealed record AbrirConversaDoClienteBody(Guid ClienteId, Guid? EmpresaId = null, [property: MaxLength(32)] string? Celular = null);
 
-public sealed record TransferirConversaBody(Guid ParaUsuarioId);
+public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda, bool Confirmar = false);
+
+public sealed record TransferirConversaBody(Guid ParaUsuarioId, bool Confirmar = false);
 
 public sealed record LiberarForaDeAreaBody(string? Motivo);
 
 public sealed record CadastrarClienteConversaBody(
+    [property: System.Text.Json.Serialization.JsonRequired] Guid? ClienteId,
+    [property: System.Text.Json.Serialization.JsonRequired] long? VinculoRevisao,
     string? Nome, string? Telefone, EnderecoDaConversaInput? Endereco, string? Email = null, bool ConfirmarVinculoExistente = false);

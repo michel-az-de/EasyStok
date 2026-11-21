@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, useDroppable, useSensor, useSensors,
 } from '@dnd-kit/core'
@@ -18,10 +18,12 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import { Botao } from '../../componentes/Botao'
 import { Chip } from '../../componentes/Chip'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
 import { Icone } from '../../componentes/Icone'
 import { Vazio } from '../../componentes/Vazio'
 import { CartaoKds, CartaoKdsErguido } from './CartaoKds'
 import { ComandaKds } from './ComandaKds'
+import { FaixaColunas } from './FaixaColunas'
 import { FeedbackArrasto } from './FeedbackArrasto'
 import { colisaoPorColuna, coordenadasEntreColunas } from './arrastoEntreColunas'
 import css from './cozinha.module.css'
@@ -106,6 +108,8 @@ export function TelaCozinhaApi({ linhas }) {
   const respostaSobre = sobreId ? respostaPara(sobreId) : null
   const fantasmas = reduzMovimento() ? [] : saindo
   const visiveis = filtrarPorLinha(lista, linhaFiltro)
+  const quadroRef = useRef(null)
+  const cartoesPorColuna = new Map(COLUNAS_KDS.map((coluna) => [coluna.status, filtrarPorColunaKds(visiveis, coluna.status)]))
   const vazia = pedidos !== null && lista.length === 0
   const filtroVazio = !vazia && linhaFiltro !== null && visiveis.length === 0
 
@@ -152,8 +156,8 @@ export function TelaCozinhaApi({ linhas }) {
       <header className={css.topoPagina}>
         <h1>Cozinha</h1>
         <div className={css.chipsFiltro} role="radiogroup" aria-label="Dia da fila">
-          <Chip papel="escolha" reservarIcone ativo={!amanha} onClick={() => setAmanhaDesde(null)}>Hoje</Chip>
-          <Chip papel="escolha" reservarIcone ativo={amanha} onClick={() => setAmanhaDesde(dataIsoNoFuso(agora))}>Amanhã</Chip>
+          <Chip papel="escolha" ativo={!amanha} onClick={() => setAmanhaDesde(null)}>Hoje</Chip>
+          <Chip papel="escolha" ativo={amanha} onClick={() => setAmanhaDesde(dataIsoNoFuso(agora))}>Amanhã</Chip>
         </div>
         <span className={`${css.aoVivo} ${aoVivo ? css.aoVivoLigado : ''}`}>
           <span className={css.pontoVivo} aria-hidden="true" />
@@ -183,7 +187,7 @@ export function TelaCozinhaApi({ linhas }) {
         </p>
       )}
       {pedidos === null
-        ? !erro && <output className={css.aviso}>Carregando a fila da cozinha…</output>
+        ? !erro && <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 2)">Carregando a fila da cozinha…</EsqueletoDeLista>
         : (
           <DndContext
             sensors={sensores} collisionDetection={colisaoPorColuna}
@@ -229,9 +233,10 @@ export function TelaCozinhaApi({ linhas }) {
                   <Botao variante="secundario" onClick={() => setLinhaFiltro(null)}>Ver todas as linhas</Botao>
                 </div>
               )}
-              <div className={css.colunas}>
+              <FaixaColunas quadroRef={quadroRef} itens={COLUNAS_KDS.map((c) => ({ id: c.status, rotulo: c.rotulo, contagem: cartoesPorColuna.get(c.status).length }))} />
+              <div ref={quadroRef} className={css.colunas}>
                 {COLUNAS_KDS.map((coluna) => {
-                  const cartoes = filtrarPorColunaKds(visiveis, coluna.status)
+                  const cartoes = cartoesPorColuna.get(coluna.status)
                   const saindoDaqui = filtrarPorColunaKds(fantasmas, coluna.status)
                   return (
                     <ColunaKds
@@ -290,17 +295,21 @@ export function TelaCozinhaApi({ linhas }) {
 function PerguntaDoSaldo({ saldo, pedido, ocupado, aoReceber, aoEntregarSemReceber, aoVoltar }) {
   const [metodo, setMetodo] = useState(() => metodoSugeridoNaPorta(pedido.observacoes))
   const troco = trocoDaPorta(pedido.observacoes, saldo.valor)
+  // #2762: o foco vai para o botão que confirma, como a confirmação da corrida (CorridaLalamove).
+  const receberRef = useRef(null)
+  useEffect(() => { receberRef.current?.focus() }, [])
   return (
-    <div className={css.motivoRecusa} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
+    // Pergunta neutra (não é erro): tom de apoio no lugar do vermelho do `.motivoRecusa`.
+    <div className={css.motivoRecusa} style={{ background: 'var(--preenchimento)', color: 'var(--tinta)' }} role="alertdialog" aria-label="Confirmar a entrega com valor a receber">
       <Icone nome="alerta" tamanho={16} />
       <span>
         {nomeDoPedido(pedido).frase}: falta receber {moeda(saldo.valor)}. Recebeu na porta? Diga como e o pagamento
         entra no Caixa junto com a entrega.{troco && <> {troco}.</>}
       </span>
-      <span>
+      <span className={css.acoesCartao}>
         <CampoSelecao rotulo="Como recebeu" rotuloOculto opcoes={METODOS_NA_PORTA} value={metodo}
           disabled={ocupado} onChange={(e) => setMetodo(e.target.value)} />
-        <Botao variante="primario" disabled={ocupado || !metodo} onClick={() => aoReceber(metodo)}>
+        <Botao ref={receberRef} variante="primario" disabled={ocupado || !metodo} aria-busy={ocupado} onClick={() => aoReceber(metodo)}>
           Recebi {moeda(saldo.valor)}
         </Botao>
         <Botao variante="secundario" disabled={ocupado} onClick={aoEntregarSemReceber}>Entregue sem receber</Botao>
@@ -320,7 +329,7 @@ function ColunaKds({ coluna, resposta, arrastando, acao, children }) {
     arrastando && !aceita && !isOver && css.colunaQuieta,
   ].filter(Boolean).join(' ')
   return (
-    <section ref={setNodeRef} className={classes} aria-label={coluna.rotulo} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
+    <section ref={setNodeRef} className={classes} aria-label={coluna.rotulo} data-coluna={coluna.status} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
       {children}
       {aceita && (
         <p className={css.dicaColuna} aria-hidden="true">

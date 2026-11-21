@@ -10,6 +10,20 @@ public sealed class TemplateNotificacaoRepository(EasyStockDbContext db) : ITemp
     public Task<TemplateNotificacao?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         db.NotifTemplates.FirstOrDefaultAsync(t => t.Id == id, ct);
 
+    public async Task<IReadOnlyList<TemplateNotificacao>> ListarFamiliaComLockAsync(
+        Guid? empresaId, string codigo, CancellationToken ct = default)
+    {
+        if (db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("A versão do template exige transação aberta.");
+        var chave = $"notif-template:{empresaId:N}:{codigo}";
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({chave}, 0))", ct);
+        var familia = await db.NotifTemplates.Where(t => t.EmpresaId == empresaId && t.Codigo == codigo)
+            .OrderByDescending(t => t.Versao).ToListAsync(ct);
+        // A leitura anterior à espera pode estar no tracker; aprovação concorrente precisa aparecer aqui.
+        foreach (var template in familia) await db.Entry(template).ReloadAsync(ct);
+        return familia;
+    }
+
     public async Task<TemplateNotificacao?> GetAtivoAsync(
         string codigo, CanalNotificacao canal, Guid? empresaId, CancellationToken ct = default)
     {
@@ -61,17 +75,20 @@ public sealed class TemplateNotificacaoRepository(EasyStockDbContext db) : ITemp
     public async Task<(IReadOnlyList<TemplateNotificacao> Items, int TotalCount)> ListarAsync(
         Guid? empresaId, TipoEventoNotificacao? tipoEvento = null,
         CanalNotificacao? canal = null, bool? ativo = null,
-        int page = 1, int pageSize = 20, CancellationToken ct = default)
+        int page = 1, int pageSize = 20, CancellationToken ct = default, bool apenasAtuais = false)
     {
         var q = db.NotifTemplates.AsNoTracking()
             .Where(t => t.EmpresaId == empresaId);
+
+        if (apenasAtuais) q = q.Where(t => !db.NotifTemplates.Any(outra =>
+            outra.EmpresaId == empresaId && outra.Codigo == t.Codigo && outra.Versao > t.Versao));
 
         if (tipoEvento.HasValue) q = q.Where(t => t.TipoEvento == tipoEvento);
         if (canal.HasValue) q = q.Where(t => t.Canal == canal);
         if (ativo.HasValue) q = q.Where(t => t.Ativo == ativo);
 
         var total = await q.CountAsync(ct);
-        var items = await q.OrderByDescending(t => t.AtualizadoEm)
+        var items = await q.OrderByDescending(t => t.AtualizadoEm).ThenBy(t => t.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
 
         return ((IReadOnlyList<TemplateNotificacao>)items, total);

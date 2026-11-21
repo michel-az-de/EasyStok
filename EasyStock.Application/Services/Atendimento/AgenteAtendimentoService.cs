@@ -1,11 +1,12 @@
+using System.Diagnostics;
 using EasyStock.Application.Ports.Output.Ai;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
-using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using Microsoft.Extensions.Options;
 
 namespace EasyStock.Application.Services.Atendimento;
 
@@ -40,7 +41,12 @@ public sealed class AgenteAtendimentoService(
     ObterDossieClienteUseCase dossieUseCase,
     ICadernoRepository caderno,
     ILogger<AgenteAtendimentoService> logger,
-    IPedidoRepository? pedidos = null)
+    IPedidoRepository? pedidos = null,
+    Notifications.IContatoDaEquipeAvisada? equipe = null,
+    IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null,
+    ITurnoAgenteRepository? turnos = null,
+    IOptions<PrecosModelosAgenteOptions>? precos = null,
+    IOptions<ModelosAprovadosAgenteOptions>? modelos = null)
 {
     public const int MaximoIteracoes = 6;
     public const int UltimasMensagens = 20;
@@ -50,14 +56,19 @@ public sealed class AgenteAtendimentoService(
 
     public const string MotivoAgenteDesligado = "agente desligado (LLM indisponível)";
     public const string MotivoAtendimentoAutomaticoDesligado = "atendimento automático desligado na configuração";
+    public const string MotivoContatoDaEquipe = "contato da equipe que recebe os avisos: o robô não responde";
+
+    public static string MotivoLimiteRespostas(int maximo) =>
+        $"o robô respondeu {maximo} vezes nesta conversa na última hora; parou para não gastar sem limite (possível loop)";
 
     public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
     {
+        var cronometro = Stopwatch.StartNew();
         var dados = await conversaRepository.ObterComMensagensAsync(empresaId, conversaId, UltimasMensagens, ct);
         if (dados is null) return ResultadoTurnoAgente.Ignorado;
 
         var conversa = dados.Conversa;
-        if (conversa.Situacao != SituacaoConversa.Automatica || !conversa.DentroDaJanela(agora))
+        if (PortoesDoAssistente.DaConversa(conversa, agora).Any(e => e.Barra))
             return ResultadoTurnoAgente.Ignorado;
 
         var pendentes = EntradasPendentes(dados.Mensagens);
@@ -71,10 +82,11 @@ public sealed class AgenteAtendimentoService(
         // (Anthropic:Enabled=false ou sem chave) ou canal sem agente (o agente envia pelo cliente do WhatsApp;
         // em outro canal sairia pelo canal errado). Passa de fato para a dona, senão a conversa fica
         // Automatica sem ninguém e fora do lembrete (#1288).
-        var motivoSemAgente = !configuracao.Ativo ? MotivoAtendimentoAutomaticoDesligado
-            : !llm.Disponivel ? MotivoAgenteDesligado
-            : !conversa.TemAgente ? $"o canal {conversa.Canal} não tem agente"
-            : null;
+        // #2211: quem recebe os avisos pelo número da loja e responde a eles fala com gente, nunca com o robô,
+        // até a equipe devolver a conversa a ele (#2493). As etapas são as mesmas da checagem do console (#2496).
+        var portoes = new PortoesDoAssistente(llm, conversaRepository, equipe, limiteRespostas);
+        var motivoSemAgente = (await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct))
+            .FirstOrDefault(e => e.Barra)?.MotivoEscalada;
         if (motivoSemAgente is not null)
         {
             logger.LogInformation("Agente: conversa {ConversaId} fica para a dona ({Motivo}).", conversaId, motivoSemAgente);
@@ -92,9 +104,33 @@ public sealed class AgenteAtendimentoService(
             : null;
 
         // S24: bloqueado no meio da conversa → a dona assume; o agente não responde.
-        if (cliente?.Bloqueado == true)
+        // #2249: pessoa encaminhada à responsável. Fica com a equipe até alguém devolver a conversa ao robô.
+        if (PortoesDoAssistente.DaPessoa(cliente).FirstOrDefault(e => e.Barra)?.MotivoEscalada is { } motivoPessoa)
         {
-            await escalador.EscalarAsync(empresaId, conversa, EscalarConversaUseCase.MotivoClienteBloqueado(cliente), agora, ct);
+            await escalador.EscalarAsync(empresaId, conversa, motivoPessoa, agora, ct);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
+        }
+
+        // #2285: anti-loop de custo. Outro robô do lado do cliente (ou um loop de mensagens) faria o agente
+        // responder e gastar sem fim; no limite da hora, a conversa para nele e a escalada avisa a dona.
+        if (await portoes.DoLimiteAsync(empresaId, conversaId, agora, ct) is { Barra: true, MotivoEscalada: { } motivoLimite })
+        {
+            logger.LogWarning("Agente: conversa {ConversaId} chegou ao limite de respostas do robô na última hora; fica para a dona.",
+                conversaId);
+            await escalador.EscalarAsync(empresaId, conversa, motivoLimite, agora, ct);
+            await unitOfWork.CommitAsync();
+            return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
+        }
+
+        // S69 (#2853): cota mensal esgotada. Não chama o modelo, passa para a equipe e deixa o turno no histórico como cota.
+        if (await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agora, ct) is { Barra: true, MotivoEscalada: { } motivoCota })
+        {
+            logger.LogWarning("Agente: cota mensal da empresa {EmpresaId} esgotada; conversa {ConversaId} fica para a equipe.",
+                empresaId, conversaId);
+            await escalador.EscalarAsync(empresaId, conversa, motivoCota, agora, ct);
+            await turnos!.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, null, null, 0, 0, 0, null, [], 0,
+                DesfechoTurnoAgente.Cota, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora), ct);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
@@ -114,46 +150,71 @@ public sealed class AgenteAtendimentoService(
                 await unitOfWork.CommitAsync();
             }, ct);
 
-        var system = await GeracaoAgenteAtendimento.MontarSystemAsync(
+        var system = await GeracaoAgenteAtendimento.MontarSystemTurnoAsync(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
         var gravacao = new GravacaoSaidaTurno(conversaRepository, unitOfWork, logger, empresaId, dados.Mensagens, agora);
         var contexto = new ContextoTurnoAgente(empresaId, conversa, agora, gravacao.GravarAsync);
+        var protecao = new ProtecaoVinculoTurno(conversaRepository, unitOfWork, contexto);
+        // #2853: a desligada pela loja nem vai ao modelo; pedida assim mesmo, o laço responde "desconhecida" sem executar.
+        var desligadas = FerramentasDaLoja.DaLoja(configuracao.FerramentasDesligadasJson);
+        var ferramentasProtegidas = _ferramentas.Where(par => !desligadas.Contains(par.Key)).ToDictionary(par => par.Key,
+            par => (IFerramentaAgente)new FerramentaProtegida(par.Value, protecao));
 
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
-            llm, system, mensagens, _ferramentas, contexto, MaximoIteracoes, logger, ct);
+            llm, system.Estavel, mensagens, ferramentasProtegidas, contexto, MaximoIteracoes, logger, ct,
+            modelos?.Value.DoTurno(configuracao.ModeloAgente), // S68: modelo da loja só se aprovado
+            systemVolatil: system.Volatil); // #2862: data e dossiê fora do bloco cacheado
         var tokens = geracao.Tokens;
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
+
+        var final = await protecao.ExecutarAsync(Finalizar, ct, gravar: false);
+        if (final is not null) return final;
+        if (tokens > 0) await RegistrarUsoAsync(empresaId, tokens, agora);
+        await RegistrarTurnoAsync(geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro : DesfechoTurnoAgente.Interrompido, ct);
+        await unitOfWork.CommitAsync();
+        return new ResultadoTurnoAgente(true, contexto.HouveEnvio, false);
+
+        // S67 (#2534): um registro por turno que chamou o modelo, só com números e ids; vai no mesmo commit do consumo.
+        async Task RegistrarTurnoAsync(DesfechoTurnoAgente desfecho, CancellationToken token)
+        {
+            if (turnos is null) return;
+            var consumo = geracao.Consumo ?? new ConsumoGeracaoAgente();
+            await turnos.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, gravacao.UltimaSaidaId,
+                consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido,
+                precos?.Value.Estimar(consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido),
+                consumo.Ferramentas, consumo.Passos, desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora), token);
+        }
+
+        async Task<ResultadoTurnoAgente> Finalizar(CancellationToken token)
+        {
+        ct = token;
 
         // As entradas que foram ao LLM ficam processadas: um job repetido não responde de novo e a
         // mensagem que chegar durante o turno continua pendente para o próximo (#1288).
         await gravacao.MarcarProcessadasAsync(ct);
 
-        // A dona pode ter assumido (ou encerrado) enquanto o LLM respondia: a Situacao carregada no
-        // início está velha. Fora do automático o agente não envia nem escala (#1288).
-        if (await conversaRepository.ObterSituacaoAsync(empresaId, conversaId, ct) != SituacaoConversa.Automatica)
-        {
-            logger.LogInformation("Agente: conversa {ConversaId} saiu do automático durante o turno; resposta descartada.", conversaId);
-            if (tokens > 0)
-                await RegistrarUsoAsync(empresaId, tokens, agora);
-            await unitOfWork.CommitAsync();
-            return new ResultadoTurnoAgente(ChamouLlm: true, Respondeu: contexto.HouveEnvio,
-                Escalou: conversa.Situacao == SituacaoConversa.Assumida);
-        }
-
         var respondeu = contexto.HouveEnvio;
-        const string encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
+        // #2249: o texto de cada ação é molde da loja; quem não é cliente recebe o de encaminhamento.
+        var primeiroNome = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome);
+        var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MoldeEscalada(), primeiroNome, configuracao.NomeDona);
         if (conversa.Situacao == SituacaoConversa.Assumida)
         {
-            respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
+            var aoContato = contexto.Encaminhou
+                ? MoldeMensagemContato.Preencher(configuracao.MensagemEncaminhamento, primeiroNome, configuracao.NomeDona)
+                : encaminhamento;
+            respondeu = await EnviarRespostaAsync(gravacao, conversa, aoContato, ct) || respondeu;
         }
         else if (conversa.Situacao == SituacaoConversa.Encerrada && contexto.RespostaVerificada is { Length: > 0 } despedida)
             respondeu = await EnviarRespostaAsync(gravacao, conversa, despedida, ct) || respondeu;
         else if (conversa.Situacao == SituacaoConversa.Automatica)
         {
+            // #2515: sem texto do agente, o menu adiado basta como resposta. #2544: a foto do produto também.
+            var soMenu = concluiu && motivoEscalada is null && string.IsNullOrWhiteSpace(geracao.Texto)
+                && (contexto.TemEnvioAdiado || contexto.HouveEnvio);
             if (concluiu && motivoEscalada is null && contexto.RespostaVerificada is { Length: > 0 } verificada)
                 respondeu = await EnviarRespostaAsync(gravacao, conversa, verificada, ct) || respondeu;
-            else if (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu)
+            else if (!soMenu && (!contexto.EnvioVerificado || motivoEscalada is not null || !concluiu))
             {
                 // #1704: a conversa vai ao cliente; afirmação que nenhuma fonte do turno sustenta fica para a equipe.
                 var barrada = !concluiu || motivoEscalada is not null ? null
@@ -172,15 +233,101 @@ public sealed class AgenteAtendimentoService(
             }
         }
 
+        // #2515: o menu da ferramenta sai depois do texto; conversa escalada ou texto barrado não o recebe.
+        // Menu que não sai deixa o cliente convidado a escolher sem opções: a equipe confere, e quem não recebeu nada
+        // recebe o encaminhamento.
+        if (motivoEscalada is null && conversa.Situacao == SituacaoConversa.Automatica && contexto.TemEnvioAdiado)
+        {
+            if (await contexto.EnviarAdiadoAsync(ct))
+                respondeu = true;
+            else
+            {
+                if (!respondeu)
+                    respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct);
+                motivoEscalada = "o menu de janelas não saiu ao cliente; precisa de conferência humana";
+            }
+        }
+
         if (motivoEscalada is not null && conversa.Situacao == SituacaoConversa.Automatica)
             await escalador.EscalarAsync(empresaId, conversa, motivoEscalada, agora, ct);
 
         if (tokens > 0)
             await RegistrarUsoAsync(empresaId, tokens, agora);
 
+        var escalou = motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida;
+        await RegistrarTurnoAsync(geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro
+            : escalou ? DesfechoTurnoAgente.Escalou : DesfechoTurnoAgente.Respondeu, ct);
+
         await unitOfWork.CommitAsync();
-        return new ResultadoTurnoAgente(true, respondeu,
-            motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida);
+        return new ResultadoTurnoAgente(true, respondeu, escalou);
+        }
+    }
+
+    // A correção e cada efeito disputam a mesma linha. O LLM roda fora da transação;
+    // o lock continua retido durante envio/mutação, sem repetir um efeito externo.
+    private sealed class ProtecaoVinculoTurno(IConversaRepository conversas, IUnitOfWork uow, ContextoTurnoAgente contexto)
+    {
+        private readonly Guid? _clienteId = contexto.Conversa.ClienteId;
+        private readonly long _revisao = contexto.Conversa.VinculoRevisao;
+        private SituacaoConversa _situacao = contexto.Conversa.Situacao;
+
+        public async Task<string?> ExecutarPedidoAsync(Func<CancellationToken, Task<string>> efeito, CancellationToken ct)
+        {
+            // CriarPedidoAtendimento confere o snapshot e grava pedido+vínculo sob seu próprio lock.
+            // Depois desse commit, o histórico impede correção. A cobrança precisa rodar fora da transação.
+            if (await ExecutarAsync(_ => Task.FromResult("validado"), ct, gravar: false) is null) return null;
+            try { return await efeito(ct); }
+            catch
+            {
+                contexto.Interromper();
+                uow.DescartarAlteracoesPendentes();
+                throw;
+            }
+        }
+
+        public async Task<T?> ExecutarAsync<T>(Func<CancellationToken, Task<T>> efeito, CancellationToken ct, bool gravar = true) where T : class
+        {
+            if (contexto.Interrompido) return null;
+            try
+            {
+                return await uow.ExecuteInTransactionSemRetryAsync(async token =>
+                {
+                    var atual = await conversas.ObterPorIdComLockAsync(contexto.EmpresaId, contexto.Conversa.Id, token);
+                    if (atual is null || atual.EmpresaId != contexto.EmpresaId || atual.ClienteId != _clienteId
+                        || atual.VinculoRevisao != _revisao || atual.VinculoEmRevisao || atual.Situacao != _situacao
+                        || (_situacao == SituacaoConversa.Automatica
+                            && await conversas.ObterSituacaoAsync(contexto.EmpresaId, contexto.Conversa.Id, token) != SituacaoConversa.Automatica))
+                    {
+                        contexto.Interromper();
+                        return null;
+                    }
+                    var resultado = await efeito(token);
+                    if (gravar) await uow.CommitAsync();
+                    _situacao = contexto.Conversa.Situacao;
+                    return resultado;
+                }, ct);
+            }
+            catch
+            {
+                // Rollback SQL não limpa as entidades rastreadas, inclusive quando a ferramenta
+                // chama CommitAsync por dentro. Nenhuma delas pode vazar para o commit de consumo.
+                contexto.Interromper();
+                uow.DescartarAlteracoesPendentes();
+                throw;
+            }
+        }
+    }
+
+    private sealed class FerramentaProtegida(IFerramentaAgente ferramenta, ProtecaoVinculoTurno protecao) : IFerramentaAgente
+    {
+        public string Nome => ferramenta.Nome;
+        public string Descricao => ferramenta.Descricao;
+        public string SchemaJson => ferramenta.SchemaJson;
+        public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, System.Text.Json.JsonElement entrada, CancellationToken ct = default) =>
+            (ferramenta is CriarPedidoFerramenta or IFerramentaForaDaTransacao
+                ? await protecao.ExecutarPedidoAsync(token => ferramenta.ExecutarAsync(contexto, entrada, token), ct)
+                : await protecao.ExecutarAsync(token => ferramenta.ExecutarAsync(contexto, entrada, token), ct))
+            ?? "O contexto da conversa mudou. Nenhuma ação foi executada.";
     }
 
     private async Task<bool> EnviarRespostaAsync(GravacaoSaidaTurno gravacao, Conversa conversa, string texto, CancellationToken ct)
@@ -192,6 +339,14 @@ public sealed class AgenteAtendimentoService(
 
         Mensagem saida;
         var enviou = false;
+        if (conversa.Canal == CanalConversa.ChatSite)
+        {
+            // #2876: o widget lê a saída gravada pelo id "chatsite:..."; nada sai por provedor externo.
+            saida = Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Agente, agora, TipoConteudoMensagem.Texto, texto,
+                CanalChatSite.PrefixoIdExterno + Guid.NewGuid().ToString("N"));
+            enviou = true;
+        }
+        else
         try
         {
             var envio = await cloudClient.EnviarTextoAsync(conversa.ContatoIdExterno, texto, ct: ct);
@@ -208,6 +363,7 @@ public sealed class AgenteAtendimentoService(
         // encerrar_conversa pode ter fechado a conversa neste turno: a despedida ainda vai para o histórico.
         if (conversa.EstaAberta) conversa.RegistrarSaida(agora);
         await conversaRepository.AddMensagemAsync(saida, ct);
+        gravacao.UltimaSaidaId = saida.Id;
         await gravacao.GravarAsync(ct);
         return enviou;
     }
@@ -245,7 +401,7 @@ public sealed class AgenteAtendimentoService(
     /// antiga: qualquer resposta posterior, do agente ou da dona, conta. Resposta que falhou ao enviar (#2004) não conta:
     /// o cliente não a recebeu.
     /// </summary>
-    private static IReadOnlyList<Mensagem> EntradasPendentes(IReadOnlyList<Mensagem> historico)
+    internal static IReadOnlyList<Mensagem> EntradasPendentes(IReadOnlyList<Mensagem> historico)
     {
         var legado = !historico.Any(m => m.Autor == AutorMensagem.Cliente && m.ProcessadaEm is not null);
         var pendentes = new List<Mensagem>();
@@ -275,6 +431,9 @@ public sealed class AgenteAtendimentoService(
 
         public Guid EmpresaId => empresaId;
         public DateTime Agora => agora;
+
+        /// <summary>S67: a última resposta que o turno gravou, para o registro do turno.</summary>
+        public Guid? UltimaSaidaId { get; set; }
 
         public async Task GravarAsync(CancellationToken ct)
         {

@@ -31,7 +31,11 @@ public class RegraAutomatica
 
     public void Alterar(string texto, bool ligada, DateTime agora)
     {
-        Texto = RespostaPronta.Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        var novo = RespostaPronta.Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        // Só valida o que muda: desligar uma regra antiga manda o texto já gravado e não pode voltar 400.
+        if (novo != Texto && ModeloTextoAtendimento.ChavesDesconhecidas(novo) is { } desconhecidas)
+            throw new RegraDeDominioVioladaException(desconhecidas);
+        Texto = novo;
         Ligada = ligada;
         AlteradaEm = agora;
     }
@@ -41,26 +45,30 @@ public class RegraAutomatica
     /// sempre preenche: <c>{nome}</c> pode faltar, e variável sem valor não sai.
     /// </summary>
     public const string TextoPadraoCobrancaVencendo =
-        "Oi! O link de pagamento do pedido {pedido} vence em poucos minutos. Se ainda quiser garantir, é só pagar por ele. "
-        + "Se precisar de outro link, me chama aqui.";
+        "Oi! O link de pagamento do pedido {pedido} vence em poucos minutos. Para garantir o pedido, é só pagar por ele. "
+        + "Se precisar de outro link, é só pedir por aqui.";
 
     /// <summary>
     /// Texto de "Pagamento confirmado" enquanto a dona não grava o dela, com o que o aviso S13 de pago diz (nome e
     /// entrega). Pedido sem horário agendado não tem <c>{faixa}</c>: a automática não sai e o aviso S13 avisa.
     /// </summary>
     public const string TextoPadraoPagamentoConfirmado =
-        "Oi, {nome}! Recebemos seu pagamento e seu pedido está confirmado para {faixa}. Obrigada pela preferência!";
+        "Oi, {nome}! Pagamento recebido. Seu pedido está confirmado para {faixa}.";
+
+    /// <summary>#2885 (S75, D3): texto sugerido da saudação solta. A regra nasce desligada.</summary>
+    public const string TextoPadraoSaudacaoSolta = "Oi! Como a Casa pode ajudar?";
 
     /// <summary>
     /// Regra que vale enquanto a empresa não gravou a do gatilho (não é persistida). Nascem ligadas "Pagamento
-    /// confirmado" (decisão do Felipe, 23/10, #1765-4) e o lembrete do link (#1610); as demais nascem desligadas
-    /// (nulo). Salvar a regra, ligada ou desligada, substitui o padrão.
+    /// confirmado" (decisão do Felipe, 23/10, #1765-4) e o lembrete do link (#1610); a saudação solta (#2885) nasce
+    /// desligada com texto sugerido; as demais nascem desligadas (nulo). Salvar a regra, ligada ou desligada, substitui o padrão.
     /// </summary>
     public static RegraAutomatica? Padrao(Guid empresaId, GatilhoAutomacao gatilho, DateTime agora) =>
         gatilho switch
         {
             GatilhoAutomacao.PagamentoConfirmado => Criar(empresaId, gatilho, TextoPadraoPagamentoConfirmado, ligada: true, agora),
             GatilhoAutomacao.CobrancaVencendo => Criar(empresaId, gatilho, TextoPadraoCobrancaVencendo, ligada: true, agora),
+            GatilhoAutomacao.SaudacaoSolta => Criar(empresaId, gatilho, TextoPadraoSaudacaoSolta, ligada: false, agora),
             _ => null
         };
 

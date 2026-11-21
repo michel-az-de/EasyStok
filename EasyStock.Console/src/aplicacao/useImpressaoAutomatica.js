@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { dataIsoNoFuso } from '../dominio/formato'
 import {
-  ESPERA_ENTRE_FOLHAS_MS, INTERVALO_DA_FILA_MS, NOME_DA_TRAVA, pendentesParaImprimir, somarImpressa,
+  ESPERA_ENTRE_FOLHAS_MS, FILA_SAUDAVEL, INTERVALO_DA_FILA_MS, NOME_DA_TRAVA, pendentesParaImprimir, registrarListagem, somarImpressa,
 } from '../dominio/impressaoAutomatica'
+import { EVENTOS_DE_SOM } from '../dominio/automatico'
 import { DOCUMENTO_COZINHA } from '../dominio/impressos'
+import { tocarAviso } from '../infra/som'
 import {
   confirmarImpressao, listarImpressoesPendentes, obterCanhotoParaImprimir, registrarFalhaImpressao,
 } from '../infra/api/kdsApi'
@@ -41,6 +43,11 @@ export function useImpressaoAutomatica({ imprimir }) {
   const [contagem, setContagem] = useState(() => lerContagemAutomatica(hoje()))
   const [nestaAba, setNestaAba] = useState(false)
   const [falhas, setFalhas] = useState(0)
+  // #2377: folhas cujo `print()` demorou (diálogo humano): ninguém sabe se saiu, a pessoa confirma.
+  const [conferir, setConferir] = useState([])
+  const [fila, setFila] = useState(FILA_SAUDAVEL)
+  const filaRef = useRef(FILA_SAUDAVEL)
+  const acoesRef = useRef({})
   const tentadas = useRef(new Set())
   const imprimirRef = useRef(imprimir)
   useEffect(() => { imprimirRef.current = imprimir }, [imprimir])
@@ -62,18 +69,29 @@ export function useImpressaoAutomatica({ imprimir }) {
     const imprimirUma = async (item) => {
       tentadas.current.add(item.id)
       const atuais = lerPreferenciasImpressao()
+      let destino
       try {
         const html = await obterCanhotoParaImprimir(item.pedidoId, {
           modelo: atuais.papeis[DOCUMENTO_COZINHA], logoTermica: atuais.logoTermica,
         }, sinal)
         if (sinal.aborted) return
-        await imprimirRef.current(html, { sinal })
+        destino = await imprimirRef.current(html, { sinal })
       } catch (erro) {
         if (sinal.aborted) return
         setFalhas((n) => n + 1)
         await registrarFalhaImpressao(item.id, erro?.message).catch(() => {})
         return
       }
+      if (destino === 'dialogo-lento') {
+        // Sem `--kiosk-printing` o diálogo abriu: não dá para saber se saiu. Não confirma sozinho.
+        setConferir((lista) => (lista.some((outra) => outra.id === item.id) ? lista : [...lista, item]))
+        tocarAviso(EVENTOS_DE_SOM.PASSOU_PARA_VOCE)
+        return
+      }
+      await registrarSaida(item)
+    }
+
+    const registrarSaida = async (item) => {
       gravarSemConfirmar([...lerSemConfirmar(), item.id])
       const proxima = somarImpressa(lerContagemAutomatica(hoje()), hoje())
       gravarContagemAutomatica(proxima)
@@ -92,18 +110,34 @@ export function useImpressaoAutomatica({ imprimir }) {
       }
     }
 
+    const marcarListagem = (ok) => {
+      const anterior = filaRef.current
+      filaRef.current = registrarListagem(anterior, ok, Date.now())
+      setFila(filaRef.current)
+      if (!ok && anterior.falhas === 0) tocarAviso(EVENTOS_DE_SOM.PASSOU_PARA_VOCE)
+    }
+
+    acoesRef.current = {
+      saiu: async (item) => { await registrarSaida(item) },
+      denovo: async (item) => { await imprimirUma(item) },
+    }
+
     const trabalhar = async () => {
       setNestaAba(true)
       while (!sinal.aborted) {
         try {
           await confirmarPendentes()
           const lista = await listarImpressoesPendentes(desde)
+          marcarListagem(true)
           for (const item of pendentesParaImprimir(lista, { tentadas: tentadas.current, desde })) {
             if (sinal.aborted) break
             await imprimirUma(item)
             await esperar(ESPERA_ENTRE_FOLHAS_MS, sinal)
           }
-        } catch { /* fila fora (rede, perfil): tenta de novo na próxima volta */ }
+        } catch {
+          // Fila fora (rede, perfil): o indicador avisa desde quando; tenta de novo na próxima volta.
+          if (!sinal.aborted) marcarListagem(false)
+        }
         await esperar(INTERVALO_DA_FILA_MS, sinal)
       }
       setNestaAba(false)
@@ -116,6 +150,11 @@ export function useImpressaoAutomatica({ imprimir }) {
     return () => controle.abort()
   }, [ligada, desde])
 
+  const resolverConferencia = useCallback(async (item, acao) => {
+    setConferir((lista) => lista.filter((outra) => outra.id !== item.id))
+    await acoesRef.current[acao]?.(item)
+  }, [])
+
   const contagemDeHoje = contagem.dia === hoje() ? contagem.total : 0
-  return { ligada, nestaAba, contagem: contagemDeHoje, falhas }
+  return { ligada, nestaAba, contagem: contagemDeHoje, falhas, conferir, fila, resolverConferencia }
 }

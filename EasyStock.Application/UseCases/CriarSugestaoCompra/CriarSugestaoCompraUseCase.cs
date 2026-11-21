@@ -15,6 +15,7 @@ namespace EasyStock.Application.UseCases.CriarSugestaoCompra;
 public class CriarSugestaoCompraUseCase(
     IPedidoFornecedorRepository pedidoRepository,
     IFornecedorRepository fornecedorRepository,
+    IProdutoRepository produtoRepository,
     IPublicadorEventoIntegracao publicadorEvento,
     IUnitOfWork unitOfWork,
     ILogger<CriarSugestaoCompraUseCase> logger)
@@ -59,6 +60,12 @@ public class CriarSugestaoCompraUseCase(
                 if (item.CustoUnitario < 0)
                     throw new UseCaseValidationException("INVALID_COST",
                         $"Item {item.Nome}: custo nao pode ser negativo.");
+
+                // Mesma regra do preview: insumo de outra empresa ou inexistente nao vira item de pedido.
+                if (await produtoRepository.GetByIdAsync(command.EmpresaId, item.InsumoId) is null)
+                    throw new UseCaseValidationException(
+                        "CROSS_TENANT_INSUMO",
+                        $"Insumo {item.InsumoId} nao pertence a esta empresa.");
             }
 
             fornecedoresValidados.Add((grupo, fornecedor));

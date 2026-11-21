@@ -57,6 +57,9 @@ public sealed class StubMercadoPagoClient(ILogger<StubMercadoPagoClient> logger)
             $"stub-estorno-{Guid.NewGuid():N}", valor, EstornoMercadoPagoResult.Simulado));
     }
 
+    public Task<IReadOnlyList<PagamentoMercadoPago>> BuscarPagamentosPixDaOrdemAsync(string ordemId, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<PagamentoMercadoPago>>([]);
+
     public Task ExpirarPreferenciaAsync(string preferenceId, DateTime expiraEm, CancellationToken ct = default) =>
         Task.CompletedTask;
 }

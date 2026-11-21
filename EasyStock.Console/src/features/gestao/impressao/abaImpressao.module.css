@@ -31,13 +31,15 @@
   display: grid; gap: var(--e-2); align-content: start; min-width: 0; margin: 0;
   padding: var(--e-3); border: 0; border-radius: var(--r-1);
  background: var(--preenchimento); }
-.documento legend { padding: 0 var(--e-1); font-size: var(--t-apoio); font-weight: 700; color: var(--tinta); }
+/* #2762 (VH15): sem borda a legenda ficava colada ao topo do cartão; flutuada, entra no fluxo, dentro do respiro do cartão. */
+.documento legend { float: left; width: 100%; padding: 0; margin-bottom: var(--e-2); font-size: var(--t-apoio); font-weight: 700; color: var(--tinta); }
 
 .chave {
   display: inline-flex; align-items: center; gap: var(--e-2);
   min-height: var(--toque); font-size: var(--t-apoio); color: var(--tinta);
 }
-.chave input { width: 20px; height: 20px; accent-color: var(--marca); }
+.chave input { width: 24px; height: 24px; accent-color: var(--marca); }
+/* #2762 (VH15, VF2): o desenho de interruptor do checkbox com role=switch mora em estilos/base.css. */
 
 .aviso {
   margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); max-width: 72ch;

@@ -72,6 +72,16 @@ internal sealed class FakeResetTokenRepository : IResetTokenRepository
         }
     }
 
+    public Task<int> InvalidarChavesDeAcessoAbertasAsync(Guid usuarioId)
+    {
+        lock (_trava)
+        {
+            var abertos = Linhas.Where(l => l.UsuarioId == usuarioId && !l.Usado && l.Finalidade == FinalidadeResetToken.Ativacao).ToList();
+            abertos.ForEach(l => l.Usado = true);
+            return Task.FromResult(abertos.Count);
+        }
+    }
+
     public Task<int> ContarEmissoesDeConviteAsync(Guid usuarioId, DateTime desde)
     {
         lock (_trava)

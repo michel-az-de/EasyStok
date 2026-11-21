@@ -1,17 +1,18 @@
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
 module.exports = function ({ test, assert }) {
-  const html = fs.readFileSync(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
   const start = html.indexOf('let initialBluetoothOfferStarted = false;');
   const end = html.indexOf('// Hooks globais de erro', start);
   assert.ok(start >= 0 && end > start, 'bloco real de onboarding Bluetooth precisa existir');
   const source = html.slice(start, end);
   const offeredKey = 'cdb-bluetooth-initial-offer-v1';
 
-  function boot(store = new Map(), nativeReady = true) {
+  function boot(store = new Map([['cdb-onboarding-done', '1']]), nativeReady = true, pilot = false) {
     const listeners = {}, timers = [], callbacks = [];
     let requests = 0;
     const context = {
@@ -22,10 +23,12 @@ module.exports = function ({ test, assert }) {
       ensureBluetoothPermission: cb => { requests++; callbacks.push(cb); },
     };
     const ready = () => { context.window.Capacitor = { Plugins: { ThermalPrinter: { requestPermissions() {} } } }; };
+    if (pilot) context.window.CDB_CONFIG = { isPilot: true };
     if (nativeReady) ready();
     vm.runInNewContext(source, context);
     return { store, ready, context, callbacks, get requests() { return requests; },
       deviceReady: () => listeners.deviceready(),
+      operatorReady: () => listeners['cdb-operator-ready'](),
       load: () => { listeners.load(); timers.splice(0).forEach(fn => fn()); },
     };
   }
@@ -44,6 +47,26 @@ module.exports = function ({ test, assert }) {
     }
   });
 
+  test('Bluetooth: sem onboarding concluído, nada é pedido nem gravado', () => {
+    const app = boot(new Map([]));
+    app.deviceReady(); app.load();
+    assert.equal(app.requests, 0);
+    assert.equal(app.store.has(offeredKey), false);
+  });
+
+  test('Bluetooth: no piloto (sem tour) a oferta sai depois da boas-vindas, não antes', () => {
+    const store = new Map([]);
+    const app = boot(store, true, true);
+    app.deviceReady(); app.load();
+    assert.equal(app.requests, 0, 'sem nome a boas-vindas ainda está na tela');
+    store.set('cdb-operator-name', 'Ana');
+    app.operatorReady();
+    assert.equal(app.requests, 1, 'o piloto nunca grava cdb-onboarding-done: a oferta segue o fim da boas-vindas');
+    const reaberto = boot(new Map([['cdb-operator-name', 'Ana']]), true, true);
+    reaberto.deviceReady();
+    assert.equal(reaberto.requests, 1, 'aparelho já identificado recebe a oferta ao abrir');
+  });
+
   test('Bluetooth: reiniciar após recusa não repete oferta, mas ação explícita continua disponível', () => {
     const first = boot();
     first.deviceReady(); first.callbacks[0](false);
@@ -55,7 +78,7 @@ module.exports = function ({ test, assert }) {
   });
 
   test('Bluetooth: bridge ausente não consome a oferta e fallback pode atender bridge tardio', () => {
-    const app = boot(new Map(), false);
+    const app = boot(new Map([['cdb-onboarding-done', '1']]), false);
     app.deviceReady();
     assert.equal(app.requests, 0);
     assert.equal(app.store.has(offeredKey), false);

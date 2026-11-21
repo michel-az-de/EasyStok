@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities
@@ -63,7 +64,61 @@ namespace EasyStock.Domain.Entities
         /// </summary>
         public static string NormalizarEmail(string email) => email.Trim().ToLowerInvariant();
 
-        public static Usuario Criar(string nome, string email, string senhaHash)
+        /// <summary>
+        /// #2695: domínio das contas internas (o sync móvel grava com <c>mobile-sync+&lt;empresa&gt;@system.local</c>).
+        /// Não são pessoas da equipe: ficam fora da lista de usuários e da vaga do plano, e não se reativam nem desativam.
+        /// </summary>
+        public const string DominioDeSistema = "@system.local";
+
+        /// <summary>
+        /// #2695: só a conta criada por <see cref="CriarContaDeSistema"/>: prefixo, domínio E senha inutilizável. O domínio
+        /// sozinho não basta, porque uma pessoa gravada com ele antes da guarda sumiria da lista e ficaria sem como desativar.
+        /// O e-mail gravado já é normalizado (<see cref="NormalizarEmail"/>).
+        /// </summary>
+        public bool EhContaDeSistema =>
+            Email is not null
+            && Email.StartsWith(PrefixoDeContaDeSistema, StringComparison.Ordinal)
+            && Email.EndsWith(DominioDeSistema, StringComparison.Ordinal)
+            && SenhaHash == SenhaDeContaDeSistema;
+
+        /// <summary>#2695: a mesma regra de <see cref="EhContaDeSistema"/>, negada, na forma que o EF traduz para SQL.</summary>
+        public static readonly Expression<Func<Usuario, bool>> NaoEhContaDeSistema = u =>
+            !(u.Email.StartsWith(PrefixoDeContaDeSistema)
+              && u.Email.EndsWith(DominioDeSistema)
+              && u.SenhaHash == SenhaDeContaDeSistema);
+
+        /// <summary>#2695: o domínio das contas internas não serve para pessoa, em nenhuma entrada de e-mail.</summary>
+        public static bool EmailReservado(string email) =>
+            NormalizarEmail(email).EndsWith(DominioDeSistema, StringComparison.Ordinal);
+
+        /// <summary>#2695: ponto único da guarda. Toda gravação de e-mail de pessoa passa por aqui.</summary>
+        private static string EmailDePessoa(string email) =>
+            EmailReservado(email) ? throw new EmailReservadoException() : NormalizarEmail(email);
+
+        /// <summary>#2695: senha inutilizável que o sync móvel grava na conta interna; nenhum hash de senha bate com ela.</summary>
+        public const string SenhaDeContaDeSistema = "DISABLED_NO_LOGIN";
+
+        /// <summary>#2695: prefixo do e-mail da conta interna do sync móvel (<c>mobile-sync+&lt;empresa&gt;@system.local</c>).</summary>
+        public const string PrefixoDeContaDeSistema = "mobile-sync+";
+
+        /// <summary>
+        /// #2695: conta interna do sync móvel da empresa. Login travado (<see cref="Ativo"/> falso e senha inutilizável);
+        /// o vínculo com a empresa é de quem chama.
+        /// </summary>
+        public static Usuario CriarContaDeSistema(Guid empresaId)
+        {
+            var conta = Novo("Sistema Mobile Sync", EmailDaContaDeSistema(empresaId), SenhaDeContaDeSistema);
+            conta.Ativo = false;
+            return conta;
+        }
+
+        /// <summary>#2695: e-mail da conta interna do sync móvel, um por empresa.</summary>
+        public static string EmailDaContaDeSistema(Guid empresaId) =>
+            $"{PrefixoDeContaDeSistema}{empresaId:N}{DominioDeSistema}";
+
+        public static Usuario Criar(string nome, string email, string senhaHash) => Novo(nome, EmailDePessoa(email), senhaHash);
+
+        private static Usuario Novo(string nome, string email, string senhaHash)
         {
             var agora = DateTime.UtcNow;
             return new Usuario
@@ -229,7 +284,19 @@ namespace EasyStock.Domain.Entities
         {
             if (string.IsNullOrWhiteSpace(novoEmail))
                 throw new ArgumentException("E-mail novo não pode ser vazio.", nameof(novoEmail));
-            EmailPendente = NormalizarEmail(novoEmail);
+            EmailPendente = EmailDePessoa(novoEmail);
+            AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// N9: o convidado nunca teve acesso, então a troca de e-mail é imediata, sem <see cref="EmailPendente"/>, e o
+        /// endereço novo ainda não está confirmado.
+        /// </summary>
+        public void TrocarEmailDoConvidado(string novoEmail)
+        {
+            Email = EmailDePessoa(novoEmail);
+            EmailConfirmado = false;
+            EmailPendente = null;
             AlteradoEm = DateTime.UtcNow;
         }
 

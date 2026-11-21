@@ -36,7 +36,7 @@ public class CaixaControllerConfirmarAberturaTests
         }
         _repo.GetMovimentosDoDiaAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<Guid?>()).Returns(movimentos);
         var abrir = new AbrirCaixaUseCase(_repo, _uow, Substitute.For<ILogger<AbrirCaixaUseCase>>());
-        return new CaixaController(abrir, null!, null!, null!, null!, null!, null!, _currentUser);
+        return new CaixaController(abrir, null!, null!, null!, null!, null!, null!, null!, _currentUser);
     }
 
     [Fact]

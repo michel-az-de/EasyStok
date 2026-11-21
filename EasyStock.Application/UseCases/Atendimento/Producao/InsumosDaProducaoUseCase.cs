@@ -1,6 +1,6 @@
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.UseCases.CadastrarProduto;
-using EasyStock.Domain.ValueObjects;
+using EasyStock.Application.UseCases.RegistrarEntradaEstoque;
 
 namespace EasyStock.Application.UseCases.Atendimento.Producao;
 
@@ -14,8 +14,10 @@ public sealed record InsumoDaProducao(
 /// <param name="Embalagem">D-M2-03 (#1523): bandeja, selo, pote. Null = não mexe (no cadastro, não é).</param>
 /// <param name="LimparMinimo">#1563: no ajuste, grava o mínimo nulo (volta a herdar da categoria e da loja). Mínimo null sozinho continua "não mexe".</param>
 /// <param name="LimparCusto">#1600: no ajuste, grava o custo nulo ("sem custo informado": a ficha deixa de fechar o custo da receita). Custo null sozinho continua "não mexe".</param>
+/// <param name="Custo">Por unidade-base, até 6 casas (#2363).</param>
+/// <param name="SaldoInicial">#2363: no cadastro, "quanto tem hoje" na unidade-base. Vira uma entrada de ajuste; null ou zero não movimenta.</param>
 public sealed record InsumoInput(string? Nome, UnidadeMedida? Unidade, int? Minimo, decimal? Custo, bool? Embalagem = null,
-    bool LimparMinimo = false, bool LimparCusto = false);
+    bool LimparMinimo = false, bool LimparCusto = false, decimal? SaldoInicial = null);
 
 /// <summary>
 /// Insumos da produção pelo console (M2.3, #1496): o intermediário (molho, recheio, massa laminada)
@@ -30,8 +32,10 @@ public sealed class InsumosDaProducaoUseCase(
     CadastrarProdutoUseCase cadastrarProduto,
     IUnitOfWork unitOfWork,
     IStorefrontRepository storefrontRepository,
-    ICardapioItemRepository cardapioRepository)
+    ICardapioItemRepository cardapioRepository,
+    RegistrarEntradaEstoqueUseCase registrarEntrada)
 {
+    public const string ObservacaoSaldoInicial = "Saldo inicial do insumo";
     public const string CategoriaInsumos = "Insumos";
     public const string CategoriaEmbalagens = "Embalagens";
 
@@ -47,7 +51,7 @@ public sealed class InsumosDaProducaoUseCase(
         {
             var saldo = saldos.GetValueOrDefault(i.Id);
             return new InsumoDaProducao(
-                i.Id, i.Nome, i.UnidadeMedidaBase, saldo, i.QuantidadeMinima, i.CustoReferencia?.Valor,
+                i.Id, i.Nome, i.UnidadeMedidaBase, saldo, i.QuantidadeMinima, i.CustoDaFicha,
                 receitas.GetValueOrDefault(i.Id), i.QuantidadeMinima is { } minimo && saldo < minimo, i.EhEmbalagem,
                 porcoes.GetValueOrDefault(i.Id));
         }).ToList();
@@ -73,6 +77,14 @@ public sealed class InsumosDaProducaoUseCase(
         if (string.IsNullOrWhiteSpace(dados.Nome)) throw new UseCaseValidationException("Informe o nome do insumo.");
         Validar(dados);
 
+        // #2408: categoria, produto, custo e saldo inicial gravam juntos. Se a entrada do saldo falhar, o cadastro é
+        // desfeito em vez de deixar o insumo sem o saldo digitado. Sem retry: o cadastro cria Guid novo.
+        var nome = dados.Nome.Trim();
+        return await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => GravarNovoAsync(empresaId, usuarioId, nome, dados), ct);
+    }
+
+    private async Task<Guid> GravarNovoAsync(Guid empresaId, Guid usuarioId, string nome, InsumoInput dados)
+    {
         var embalagem = dados.Embalagem == true;
         var categoriaId = embalagem
             ? await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, empresaId,
@@ -80,10 +92,24 @@ public sealed class InsumosDaProducaoUseCase(
             : await CategoriaDeEstoque.ObterOuCriarAsync(categoriaRepository, unitOfWork, empresaId,
                 CategoriaInsumos, "Insumos da produção (criada pelo console)");
         var r = await cadastrarProduto.ExecuteAsync(new CadastrarProdutoCommand(
-            empresaId, categoriaId, null, dados.Nome.Trim(), null, null, TipoProduto.Alimento,
+            empresaId, categoriaId, null, nome, null, null, TipoProduto.Alimento,
             null, null, true, null, dados.Custo, null, null, null, null, null, null, null, usuarioId,
             EhInsumo: true, UnidadeMedidaBase: dados.Unidade ?? UnidadeMedida.Un, QuantidadeMinima: dados.Minimo,
             EhEmbalagem: embalagem));
+
+        if (dados.Custo is { } custo)
+        {
+            var produto = await produtoRepository.GetByIdParaAtualizarAsync(empresaId, r.ProdutoId)
+                ?? throw new UseCaseValidationException("Insumo não encontrado.");
+            produto.DefinirCustoDoInsumo(custo);
+            await produtoRepository.UpdateAsync(produto);
+            await unitOfWork.CommitAsync();
+        }
+        if (dados.SaldoInicial is > 0 and var saldo)
+            await registrarEntrada.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
+                empresaId, r.ProdutoId, null, saldo, Math.Round(dados.Custo ?? 0m, 2, MidpointRounding.AwayFromZero), null, DateTime.UtcNow,
+                NaturezaMovimentacaoEstoque.Ajuste, null, null, null, null, null, null, null, null, ObservacaoSaldoInicial,
+                null, null, null, null));
         return r.ProdutoId;
     }
 
@@ -102,8 +128,8 @@ public sealed class InsumosDaProducaoUseCase(
         // #1563: zero não serve para limpar, porque vence a herança da categoria e da loja (LimiarEstoqueResolver).
         if (dados.LimparMinimo) produto.QuantidadeMinima = null;
         else if (dados.Minimo.HasValue) produto.QuantidadeMinima = dados.Minimo;
-        if (dados.LimparCusto) produto.CustoReferencia = null;
-        else if (dados.Custo.HasValue) produto.CustoReferencia = Dinheiro.FromDecimal(dados.Custo.Value);
+        if (dados.LimparCusto) produto.DefinirCustoDoInsumo(null);
+        else if (dados.Custo.HasValue) produto.DefinirCustoDoInsumo(dados.Custo.Value);
         if (dados.Unidade.HasValue) produto.UnidadeMedidaBase = dados.Unidade.Value;
         if (dados.Embalagem.HasValue) produto.EhEmbalagem = dados.Embalagem.Value;
         produto.AlteradoEm = DateTime.UtcNow;
@@ -115,5 +141,6 @@ public sealed class InsumosDaProducaoUseCase(
     {
         if (dados.Minimo is < 0) throw new UseCaseValidationException("O mínimo não pode ser negativo.");
         if (dados.Custo is < 0) throw new UseCaseValidationException("O custo não pode ser negativo.");
+        if (dados.SaldoInicial is < 0) throw new UseCaseValidationException("O saldo inicial não pode ser negativo.");
     }
 }

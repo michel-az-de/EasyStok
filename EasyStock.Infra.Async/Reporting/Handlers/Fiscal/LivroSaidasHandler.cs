@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
@@ -65,8 +66,8 @@ public sealed class LivroSaidasHandler(
         LivroSaidasParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-        var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
+        // #2441: dia civil de Brasília em UTC real; timestamptz não aceita Kind=Unspecified.
+        var (de, ate) = HorarioBrasil.JanelaPeriodoUtc(parametros.De, parametros.Ate);
 
         // Livro fiscal: Autorizada + Cancelada com DataAutorizacao no período.
         var statusAutorizada = StatusNfe.Autorizada.ToString();
@@ -74,7 +75,7 @@ public sealed class LivroSaidasHandler(
 
         var documentosDoPeriodo = tenantQuery.Query<NfeDocumento>()
             .Where(n => (n.Status == StatusNfe.Autorizada || n.Status == StatusNfe.Cancelada)
-                        && n.DataAutorizacao >= de && n.DataAutorizacao <= ate);
+                        && n.DataAutorizacao >= de && n.DataAutorizacao < ate);
 
         // Itens do período numa query só, agregados por documento antes do laço (padrão do MapMensalHandler, #1507).
         // Antes eram 2 queries por NF-e (N+1), disparadas com o leitor do streaming de documentos ainda aberto.

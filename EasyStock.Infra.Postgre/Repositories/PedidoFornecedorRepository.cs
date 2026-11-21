@@ -121,15 +121,15 @@ public sealed class PedidoFornecedorRepository(EasyStockDbContext dbContext) : I
 
     public async Task<IEnumerable<PedidoFornecedor>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
     {
-        var pattern = $"%{termo.Trim()}%";
+        var pattern = PadraoILike.Contendo(termo.Trim());
         return await dbContext.PedidosFornecedor
             .AsNoTracking()
             .Include(p => p.Fornecedor)
             .Where(p => p.EmpresaId == empresaId &&
-                ((p.Observacoes != null && EF.Functions.ILike(p.Observacoes, pattern)) ||
-                 (p.Tracking != null && EF.Functions.ILike(p.Tracking, pattern)) ||
-                 (p.Canal != null && EF.Functions.ILike(p.Canal, pattern)) ||
-                 (p.Fornecedor != null && EF.Functions.ILike(p.Fornecedor.Nome, pattern))))
+                ((p.Observacoes != null && EF.Functions.ILike(p.Observacoes, pattern, PadraoILike.Escape)) ||
+                 (p.Tracking != null && EF.Functions.ILike(p.Tracking, pattern, PadraoILike.Escape)) ||
+                 (p.Canal != null && EF.Functions.ILike(p.Canal, pattern, PadraoILike.Escape)) ||
+                 (p.Fornecedor != null && EF.Functions.ILike(p.Fornecedor.Nome, pattern, PadraoILike.Escape))))
             .OrderByDescending(p => p.DataPedido)
             .Take(maxResults)
             .ToListAsync();

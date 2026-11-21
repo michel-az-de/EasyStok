@@ -5,7 +5,7 @@ namespace EasyStock.Api.Mobile.Services.Linkers;
 
 /// <summary>
 /// Auto-linker: matcheia <c>Client</c> mobile com <c>Cliente</c> ERP existente
-/// (por nome ILIKE ou telefone) ou cria novo. Loga em ClienteAlteracao.
+/// (por telefone normalizado; por nome só quando nenhum dos dois tem telefone) ou cria novo. Loga em ClienteAlteracao.
 ///
 /// Extraido do god-Service <c>SyncAutoLinker</c> (F8).
 /// </summary>
@@ -13,7 +13,8 @@ public sealed class ClientLinker(
     EasyStockDbContext db,
     ILogger<ClientLinker> log)
 {
-    public async Task ExecuteAsync(IEnumerable<string> mobileClientIds, Guid? empresaId)
+    public async Task ExecuteAsync(IEnumerable<string> mobileClientIds, Guid? empresaId,
+        IReadOnlyDictionary<string, string>? documentos = null)
     {
         var idsList = mobileClientIds as ICollection<string> ?? mobileClientIds.ToList();
         if (!empresaId.HasValue)
@@ -38,25 +39,37 @@ public sealed class ClientLinker(
                 var baseQuery = db.Set<Cliente>().IgnoreQueryFilters().AsNoTracking()
                     .Where(c => c.EmpresaId == empresaId && c.Ativo);
 
-                Cliente? match = await baseQuery
-                    .FirstOrDefaultAsync(c => EF.Functions.ILike(c.Nome, mobileC.Name));
+                var chaveApp = ChaveDeTelefone.De(mobileC.Phone);
+                var candidatos = await baseQuery
+                    .Select(c => new { c.Id, c.Nome, c.Telefone })
+                    .ToListAsync();
+                // Telefone manda: só casa por nome quando nenhum dos dois tem telefone (CLI-7, CLI-6).
+                var matchId = chaveApp.Length > 0
+                    ? candidatos.FirstOrDefault(c => ChaveDeTelefone.De(c.Telefone) == chaveApp)?.Id
+                    : candidatos.FirstOrDefault(c => ChaveDeTelefone.De(c.Telefone).Length == 0
+                        && string.Equals(c.Nome, mobileC.Name, StringComparison.OrdinalIgnoreCase))?.Id;
 
-                if (match == null && !string.IsNullOrWhiteSpace(mobileC.Phone))
-                {
-                    var phone = mobileC.Phone;
-                    match = await baseQuery.FirstOrDefaultAsync(c => c.Telefone == phone);
-                }
+                // CLI-5: documento que o app mandou neste envio (mobile_clients nao guarda).
+                string? documento = null;
+                if (documentos != null && documentos.TryGetValue(cid, out var bruto))
+                    documento = DocumentoClienteMobile.Normalizar(bruto);
 
-                if (match != null)
+                if (matchId is { } erpMatchId)
                 {
-                    mobileC.ErpClienteId = match.Id;
+                    mobileC.ErpClienteId = erpMatchId;
+                    if (documento != null)
+                    {
+                        var existente = await db.Set<Cliente>().IgnoreQueryFilters()
+                            .FirstOrDefaultAsync(c => c.Id == erpMatchId && c.EmpresaId == empresaId);
+                        if (existente != null) existente.Documento = documento;
+                    }
                     matched++;
-                    log.LogInformation("AutoLink Cliente matched: mobile={MobileId} → erp={ErpId}", cid, match.Id);
+                    log.LogInformation("AutoLink Cliente matched: mobile={MobileId} → erp={ErpId}", cid, erpMatchId);
                     db.Add(new ClienteAlteracao
                     {
                         Id = Guid.NewGuid(),
                         EmpresaId = empresaId.Value,
-                        ClienteId = match.Id,
+                        ClienteId = erpMatchId,
                         Campo = "vinculacao_mobile",
                         ValorAntigo = null,
                         ValorNovo = $"mobile_client={cid}",
@@ -72,6 +85,7 @@ public sealed class ClientLinker(
                 novoC.Telefone = mobileC.Phone;
                 novoC.LastOrderAt = mobileC.LastOrder;
                 novoC.OrderCount = mobileC.OrderCount;
+                novoC.Documento = documento;
                 db.Add(novoC);
                 mobileC.ErpClienteId = novoC.Id;
                 db.Add(new ClienteAlteracao

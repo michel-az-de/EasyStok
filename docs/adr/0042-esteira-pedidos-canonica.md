@@ -11,7 +11,7 @@ A esteira de pedidos hoje é **três pipelines sobrepostos numa única coluna
 `Pedido.Status` (varchar 32)**, e **cada superfície tem seu próprio dicionário
 de tradução de status**, sem uma projeção canônica. Isso é a raiz estrutural de
 uma classe inteira de bugs — inclusive os dois reportados pela operação da Casa
-da Babá — e bloqueia a integração com marketplaces e com o Hiram.
+da Baba — e bloqueia a integração com marketplaces e com o Hiram.
 
 Tudo abaixo foi medido no código em 2026-07-07 (arquivo:linha).
 

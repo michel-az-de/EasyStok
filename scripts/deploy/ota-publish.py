@@ -141,6 +141,11 @@ def publish(root, staging, mode):
         bundle_dir = root / payload["sha256"]
         require(not bundle_dir.is_symlink(), "Diretorio do pacote invalido.")
         if mode == "install":
+            # O aparelho mantém a maior sequência ao trocar de APK: a nova precisa superar todas as já publicadas.
+            published = [int(m.group(1)) for m in (re.fullmatch(r"release-(\d+)\.json", p.name) for p in root.glob("release-*.json")) if m]
+            # Repetir a mesma release (falha entre install e activate) é idempotente: mesmos bytes, mesma sequência.
+            reinstall = (root / release_name).is_file() and (root / release_name).read_bytes() == data
+            require(reinstall or not published or payload["sequence"] > max(published), "Sequencia deve superar todas as releases publicadas.")
             verify_zip(staging / "bundle.zip", payload)
             version_record = json.dumps({key: payload[key] for key in ('bundleVersion', 'sha256', 'nativeVersionCode', 'dataSchemaVersion')}, sort_keys=True).encode('utf-8')
             immutable(root / ('bundle-version-' + payload['bundleVersion'] + '.json'), version_record)

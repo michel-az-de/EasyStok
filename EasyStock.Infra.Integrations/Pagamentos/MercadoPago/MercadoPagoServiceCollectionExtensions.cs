@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Pagamentos;
-using Microsoft.Extensions.Configuration;
+using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.Simulacao;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -51,7 +52,9 @@ public static class MercadoPagoServiceCollectionExtensions
 
             // S32: registra a PORTA como client tipado. O antigo AddHttpClient<MercadoPagoClient> +
             // AddScoped<IMercadoPagoClient, MercadoPagoClient> resolvia a porta com um HttpClient sem BaseAddress.
-            // Sem handler de retry: escrita no provedor não repete sozinha (invariante 12).
+            // Sem handler de retry: escrita no provedor não repete sozinha (invariante 12). O cliente escolhe o pipeline por
+            // método (#2177): leitura em Payments, com retry; escrita em PagamentosEscrita, sem retry.
+            services.AddEasyStockIntegrationResilience();
             services.AddHttpClient<IMercadoPagoClient, MercadoPagoClient>(client =>
             {
                 client.BaseAddress = new Uri(baseUrl);

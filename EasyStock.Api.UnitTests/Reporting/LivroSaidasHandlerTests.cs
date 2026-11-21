@@ -95,4 +95,36 @@ public class LivroSaidasHandlerTests
         legada.TributosRastreados.Should().BeFalse();
         legada.BaseIcms.Should().Be(0m);
     }
+
+    // #2441: o período é o dia civil de Brasília. A NF das 22h de 30/11 (01h UTC de 01/12) é de novembro, e a
+    // janela vai em UTC real (Kind=Utc): o Npgsql recusa Kind=Unspecified em timestamptz.
+    [Fact]
+    public async Task Periodo_e_o_dia_civil_de_Brasilia_em_UTC_real()
+    {
+        Nota(10, StatusNfe.Autorizada, new DateTime(2026, 12, 1, 1, 0, 0, DateTimeKind.Utc));   // 30/11 22h BRT
+        Nota(11, StatusNfe.Autorizada, new DateTime(2026, 11, 30, 2, 0, 0, DateTimeKind.Utc));  // 29/11 23h BRT
+        await _db.SaveChangesAsync();
+
+        var handler = new LivroSaidasHandler(_db, _tenantQuery);
+        var linhas = new List<LivroSaidasRow>();
+        await foreach (var linha in handler.StreamAsync(new LivroSaidasParams(new DateOnly(2026, 11, 30), new DateOnly(2026, 11, 30)), default))
+            linhas.Add(linha);
+
+        linhas.Select(l => l.Numero).Should().Equal(10);
+    }
+
+    [Fact]
+    public async Task Mapa_mensal_agrupa_pelo_dia_de_Brasilia()
+    {
+        Nota(20, StatusNfe.Autorizada, new DateTime(2026, 12, 1, 1, 0, 0, DateTimeKind.Utc));   // 30/11 22h BRT
+        await _db.SaveChangesAsync();
+
+        var handler = new MapMensalHandler(_db, _tenantQuery);
+        var linhas = new List<EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal.MapMensalRow>();
+        await foreach (var linha in handler.StreamAsync(
+            new EasyStock.Application.Reporting.Definitions.Fiscal.MapMensal.MapMensalParams(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)), default))
+            linhas.Add(linha);
+
+        linhas.Should().ContainSingle().Which.Data.Should().Be(new DateOnly(2026, 11, 30));
+    }
 }

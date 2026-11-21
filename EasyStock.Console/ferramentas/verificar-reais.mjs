@@ -27,7 +27,7 @@ const REGRAS = {
   R2: { descricao: 'texto de reais montado à mão (use `textoDosCentavos`)', acha: /toFixed\(\s*2\s*\)\s*\.replace\(\s*['"]\.['"]\s*,\s*['"],['"]\s*\)/ },
   R3: { descricao: 'leitor de reais próprio (use `lerMoeda`/`lerReais`)', acha: /\.replace\(\s*['"],['"]\s*,\s*['"]\.['"]\s*\)/ },
   R4: { descricao: 'campo de reais em máscara de centavos (use `CampoReais`)', acha: /<CampoMascarado[^>]*tipo=["']moeda["']/ },
-  R5: { descricao: 'campo de reais que não é `CampoReais`', acha: /<CampoTexto[^>]*rotulo=["'](?![^"']*pontos)[^"']*(R\$|Preço|Valor|Custo)/ },
+  R5: { descricao: 'campo de reais que não é `CampoReais`', acha: /<CampoTexto[^>]*rotulo=(?:["']|\{`)(?![^"'`]*pontos)[^"'`]*(R\$|Preço|Valor|Custo)/ }, // #2258: pega também o rótulo em template literal (`Custo por ${un} (R$)`), que escapava da guarda
 }
 
 const MODULO_UNICO = 'dominio/formato.js'
@@ -46,7 +46,6 @@ const PERMANENTES = [
 ]
 
 const TEMPORARIAS = [
-  { arquivo: 'features/hall/PulsoDoHall.jsx', regras: ['R1'], motivo: 'formatador `dinheiro` do Hall', issue: '#2078' },
   { arquivo: 'aplicacao/insumos.js', regras: ['R3'], motivo: 'custo do insumo ("R$ 18,90" dá "Custo inválido")', issue: '#2081' },
   { arquivo: 'features/gestao/producao/AbaInsumosApi.jsx', regras: ['R5'], motivo: 'custo por unidade do insumo', issue: '#2081' },
   { arquivo: 'features/gestao/fidelidade/AbaFidelidade.jsx', regras: ['R5'], motivo: '"Pedido mínimo (R$)" e "A cada R$" são `type=number` nativo; passar para `CampoReais` é seguimento da #2080, fora do escopo dela', issue: '#2080 (seguimento)' },

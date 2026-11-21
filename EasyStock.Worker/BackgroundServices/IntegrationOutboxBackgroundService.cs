@@ -1,3 +1,4 @@
+using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence;
 
@@ -33,6 +34,7 @@ namespace EasyStock.Worker.BackgroundServices;
 public sealed class IntegrationOutboxBackgroundService(
     IServiceProvider serviceProvider,
     Microsoft.Extensions.Configuration.IConfiguration configuration,
+    LoopsDoWorker loops,
     ILogger<IntegrationOutboxBackgroundService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -56,8 +58,13 @@ public sealed class IntegrationOutboxBackgroundService(
         try { await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken); }
         catch (OperationCanceledException) { return; }
 
+        // #2536: arquivo de vida do Worker. A rodada despacha ate batchSize eventos em sequencia, sem prazo por evento, entao
+        // a janela parte de 3 min (15 min sem bater) para uma rodada lenta e legitima nao virar Worker parado.
+        loops.Iniciar("integration-outbox", pollingInterval > TimeSpan.FromMinutes(3) ? pollingInterval : TimeSpan.FromMinutes(3));
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            loops.Bater("integration-outbox");
             try
             {
                 // Watchdog (#928): reclama eventos presos em EmEnvio (worker caiu ou commit

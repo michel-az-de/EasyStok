@@ -7,12 +7,13 @@
 // W6: codigo do lote no subtitulo do modal de producao vinha da abertura do
 // modal; atravessando a meia-noite diferia do lote gravado e da etiqueta.
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 const fs = require('fs');
 const path = require('path');
 
 module.exports = function ({ test, sandbox, runInSandbox, assert }) {
-  const HTML = fs.readFileSync(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const HTML = lerPwaMontada(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
 
   // Captura showToast/alert durante fn e devolve as mensagens.
   async function capturando(fn) {
@@ -162,7 +163,8 @@ module.exports = function ({ test, sandbox, runInSandbox, assert }) {
       sandbox.Date = RealDate;
       sandbox.document.getElementById = getOriginal;
     }
-    assert.ok(/LOT-261008-/.test(r.naAbertura), 'abertura mostrou o lote do dia 8: ' + r.naAbertura);
+    assert.ok(/^lote 08\/10 às /.test(r.naAbertura), 'abertura mostrou a fabricação no dia 8: ' + r.naAbertura);
+    assert.ok(r.naAbertura.includes(r.codigo), 'a identidade do lote permanece a mesma ao atravessar meia-noite');
     assert.strictEqual(r.lote, 'LOT-261008', 'lote preserva a data de fabricação escolhida');
     assert.ok(subtitulo.textContent.includes(r.codigo),
       'subtitulo mostra o mesmo codigo da etiqueta: ' + subtitulo.textContent + ' vs ' + r.codigo);

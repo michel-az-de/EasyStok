@@ -95,4 +95,47 @@ public class WebhookWhatsAppParserTests
         entrada.Ecos[1].Tipo.Should().Be("image");
         entrada.Ecos[1].MidiaId.Should().Be("media-9");
     }
+
+    // #2928 S2: formato oficial da Meta para mensagem vinda de anúncio Click-to-WhatsApp.
+    private const string MensagemCtwa = """
+        {"entry":[{"changes":[{"value":{
+            "messaging_product":"whatsapp",
+            "metadata":{"display_phone_number":"551133334444","phone_number_id":"PHONE"},
+            "contacts":[{"profile":{"name":"Maria"},"wa_id":"5511999998888"}],
+            "messages":[{"from":"5511999998888","id":"wamid.ctwa1","timestamp":"1700000000","type":"text",
+                "text":{"body":"Oi, vi o anuncio"},
+                "referral":{
+                    "source_url":"https://fb.me/abc123",
+                    "source_id":"120210000000000001",
+                    "source_type":"ad",
+                    "headline":"Bolo de pote com 20% off",
+                    "body":"Peca pelo WhatsApp",
+                    "media_type":"image",
+                    "image_url":"https://scontent.xx.fbcdn.net/ad.jpg",
+                    "ctwa_clid":"ARAkLkA8rmlFeiCktEJQ-QTwRiyYHAFDLMNDBH0CD3qpjd0HR4irJ6LEkR7JwFF4XvjDFvOu"
+                }}]
+        }}]}]}
+        """;
+
+    [Fact]
+    public void MensagemDeAnuncioClickToWhatsApp_LevaOReferral()
+    {
+        var msg = WebhookWhatsAppParser.Parse(MensagemCtwa).Entradas.Single().Mensagens.Single();
+
+        msg.TextoCorpo.Should().Be("Oi, vi o anuncio");
+        msg.Referral.Should().Be(new ReferralAnuncioWhatsApp(
+            "https://fb.me/abc123", "120210000000000001", "ad", "Bolo de pote com 20% off", "Peca pelo WhatsApp", "image",
+            "ARAkLkA8rmlFeiCktEJQ-QTwRiyYHAFDLMNDBH0CD3qpjd0HR4irJ6LEkR7JwFF4XvjDFvOu"));
+    }
+
+    [Fact]
+    public void MensagemSemReferral_ReferralNulo() =>
+        Parse("text", "\"text\":{\"body\":\"oi\"}").Referral.Should().BeNull();
+
+    [Fact]
+    public void ReferralVazioOuDeTipoInesperado_ReferralNulo()
+    {
+        Parse("text", "\"text\":{\"body\":\"oi\"},\"referral\":{}").Referral.Should().BeNull();
+        Parse("text", "\"text\":{\"body\":\"oi\"},\"referral\":\"x\"").Referral.Should().BeNull();
+    }
 }

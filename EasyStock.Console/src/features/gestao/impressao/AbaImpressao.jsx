@@ -163,7 +163,9 @@ function PapeisDoAparelho() {
       <label className={css.chave}>
         <input
           type="checkbox"
+          role="switch"
           checked={preferencias.logoTermica}
+          aria-checked={preferencias.logoTermica}
           aria-describedby={`${id}-termica`}
           onChange={(evento) => aplicar(trocarLogoNaTermica(preferencias, evento.target.checked))}
         />

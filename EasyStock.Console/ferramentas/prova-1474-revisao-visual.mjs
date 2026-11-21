@@ -6,7 +6,7 @@
 //   C4  erro da API mostra o `detail` útil no lugar de "Requisição inválida";
 //   C5  baixa manual com cobrança online pendente cancela o link (na_entrega) antes do pagamento;
 //   C6  legenda da foto sem peso duplicado e sem "Foto N";
-//   C9  saldo sem valor vira "—", não "null porções";
+//   C9  saldo sem valor vira "Sem saldo" (#2792), não "null porções";
 //   C11 automáticas de entrada dizem a verdade sobre a saudação; carregando/erro/vazio separados;
 //   C12 sugestão de tag já presente some; "cliente_vip" aparece "cliente vip";
 //   C13 aviso velho some quando a ação seguinte dá certo; vitrine desligada vira texto acionável;
@@ -248,9 +248,9 @@ await confere('C6 peça da galeria do cardápio leva legenda sem "Foto N"', () =
 })
 
 // ── C9 ─────────────────────────────────────────────────────────────────────
-await confere('C9 saldo sem valor vira "—"', () => {
-  assert.equal(producao.rotuloDoSaldo(null), '—')
-  assert.equal(producao.rotuloDoSaldo(undefined), '—')
+await confere('C9 saldo sem valor vira "Sem saldo" (#2792: sem travessão)', () => {
+  assert.equal(producao.rotuloDoSaldo(null), 'Sem saldo')
+  assert.equal(producao.rotuloDoSaldo(undefined), 'Sem saldo')
   assert.equal(producao.rotuloDoSaldo(1), '1 porção')
   assert.equal(producao.rotuloDoSaldo(0), '0 porções')
 })
@@ -289,13 +289,16 @@ await confere('C12 sugestão já presente (sem acento/caixa) some; "_" vira espa
 
 // ── C13 ────────────────────────────────────────────────────────────────────
 await confere('C13 vitrine desligada vira aviso acionável', () => {
-  const texto = plano.avisoDoCardapio({ status: 404, message: 'A empresa não tem vitrine ativa.' })
+  // #2598: o código decide, não a mensagem (a leitura chega como 200 e vira VITRINE_DESLIGADA em lerDaLoja).
+  const texto = plano.avisoDoCardapio({ status: 200, codigo: 'VITRINE_DESLIGADA', message: 'A empresa não tem vitrine ativa.' })
+  assert.equal(plano.lojaDesligada({ status: 404, codigo: 'NOT_FOUND', message: 'A empresa não tem vitrine ativa.' }), false)
   assert.equal(texto, 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.')
   assert.equal(plano.avisoDoCardapio({ status: 500, message: 'Fora' }), 'Cardápio: Fora')
 })
 await confere('C13 escolher janela e criar pedido limpam o aviso velho', async () => {
   const despachos = []
-  const conversa = { id: 'c1', pedido: { numero: 'x', janela: null, itens: [{ sku: 's', qtd: 1, obs: '' }], meio: 'pix' } }
+  const identidade = { clienteId: 'cliente-da-comanda', vinculoRevisao: 2 }
+  const conversa = { id: 'c1', ...identidade, pedido: { numero: 'x', identidadeProposta: { ...identidade }, janela: null, itens: [{ sku: 's', qtd: 1, obs: '' }], meio: 'pix' } }
   const estadoRef = { current: { conversas: [conversa] } }
   const api = criarAcoesComandaApi({ escolherJanela: () => {} }, { despachar: (a) => despachos.push(a), estadoRef })
   api.gerarPedido('c1')

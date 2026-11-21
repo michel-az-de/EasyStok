@@ -116,6 +116,8 @@ const documentStub = {
 };
 
 const sandbox = {
+  // #2317: o PWA usa crypto.randomUUID (calcGerarUuid); o sandbox precisa do Web Crypto do Node.
+  crypto: require('crypto').webcrypto,
   console, setTimeout, clearTimeout, setInterval, clearInterval,
   Date, Math, JSON, parseInt, parseFloat, Number, String, Array, Object,
   RegExp, Error, Promise, Map, Set, Symbol, isNaN, isFinite,

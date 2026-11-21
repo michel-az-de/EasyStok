@@ -4,9 +4,11 @@
   pointer-events: auto;
   position: absolute; bottom: calc(100% + var(--e-2)); left: var(--e-3); right: var(--e-3);
   max-height: min(340px, 50dvh); overflow-y: auto;
-  background: var(--papel);
+  /* #2762 (VA13): fundo elevado e sombra alta separam a camada da bolha e do compositor atrás; no escuro a
+     sombra some e o degrau --papel/--elevado é que sustenta a borda (sem contorno de 1 px). */
+  background: var(--elevado);
   border: 0; border-radius: var(--r-2);
-  box-shadow: var(--sombra-media); padding: var(--e-2); z-index: 20;
+  box-shadow: var(--sombra-alta); padding: var(--e-2); z-index: 20;
   transform-origin: bottom center;
   animation: abrir var(--dur-curta) var(--ease-saida) both;
 }
@@ -14,6 +16,12 @@
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
+/* #2762 (A13): quem abre para baixo vem de cima; quem abre para cima (o padrão) vem de baixo. */
+@keyframes abrirAbaixo {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes subirFolha { from { transform: translateY(100%); } to { transform: none; } }
 .grupo { margin-bottom: var(--e-1); }
 .titulo {
   margin: var(--e-3) var(--e-2) var(--e-1); font-size: var(--t-apoio);
@@ -24,10 +32,20 @@
   display: block; width: 100%; text-align: left; background: none; border: 0;
   border-radius: var(--r-1); padding: var(--e-2) var(--e-3); min-height: var(--toque);
 }
-.item:hover:not(.informativo) { background: var(--preenchimento-forte); }
+/* #2621: mesmo degrau do MenuDeAcoes: hover no preenchimento, pressionado no forte. */
+.item:hover:not(.informativo) { background: var(--preenchimento); }
+.item:active:not(.informativo) { background: var(--preenchimento-forte); }
+/* #2232 (M1): opção ativa de um grupo de escolha única (tema): fundo de seleção e marca visível,
+   além do `aria-checked`. A marca, que é de seleção, é a única cor de marca do menu. */
+.item { position: relative; }
+.item.ativo, .item.ativo:hover { background: var(--marca-claro); color: var(--marca-forte); }
+.ativo { padding-right: var(--e-6); }
+.marca { position: absolute; right: var(--e-3); top: 50%; transform: translateY(-50%); }
+/* Itens do grupo lado a lado (o par Claro e Escuro numa linha só). */
+.linha { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-1); }
 .informativo { cursor: default; }
-.item strong { display: block; font-size: var(--t-corpo); font-weight: 600; }
-.item span { display: block; font-size: var(--t-apoio); color: var(--tinta-2); margin-top: var(--e-0); }
+.item strong { display: block; font-size: var(--t-apoio); font-weight: 600; }
+.item span { display: block; font-size: var(--t-micro); color: var(--tinta-2); margin-top: var(--e-0); }
 /* Popover que abre para baixo, para gatilho que mora no topo da tela. Largura
    própria porque o gatilho é um botão estreito, não a barra inteira.
    `max-height` mais folgada que a do `.popover` base (340px/50dvh): este é o
@@ -39,7 +57,10 @@
   width: min(360px, calc(100vw - var(--e-6)));
   max-height: min(70dvh, 560px);
   transform-origin: top right;
+  animation-name: abrirAbaixo;
 }
+/* #2258 (T1): gatilho na coluna da esquerda; a camada cresce para a direita. */
+.alinharEsquerda { left: 0; right: auto; transform-origin: top left; }
 /* Na tela estreita o gatilho pode estar em qualquer canto da barra, então a
    camada vira folha presa embaixo, sempre inteira e sempre no alcance do dedo. */
 @media (max-width: 759px) {
@@ -53,5 +74,20 @@
        `.popover`) segue como rede de segurança para o dia em que a lista
        crescer mais do que isso couber. */
     max-height: min(calc(100dvh - 96px), 640px);
+    /* #2762 (VB2): a cortina é a sombra espalhada da própria camada (sem nó extra, e o recorte de rolagem
+       dela não a corta): sem isto a conversa e as abas seguiam legíveis atrás do menu. */
+    box-shadow: var(--sombra-alta), 0 0 0 100vmax var(--cortina);
+    animation-name: abrir;
+  }
+  /* #2232 (M4): folha inferior de largura cheia, colada na borda; o conteúdo cabe sem rolar (o
+     `overflow-y` herdado do `.popover` fica só como rede de segurança). */
+  .folha {
+    left: 0; right: 0; bottom: 0; width: auto;
+    padding-bottom: calc(var(--e-2) + env(safe-area-inset-bottom, 0px));
+    border-top: var(--b-1) solid var(--linha); box-shadow: var(--sombra-alta), 0 0 0 100vmax var(--cortina);
+    max-height: calc(100dvh - 96px);
+    transform-origin: bottom center;
+    /* #2762 (A13): sobe como a folha do Modal, em vez de só aparecer. */
+    animation: subirFolha var(--dur-media) var(--ease-saida) both;
   }
 }

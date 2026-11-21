@@ -80,7 +80,7 @@ public sealed class TrocaDeContatoService(
     public async Task SolicitarTrocaDeEmailAsync(
         Usuario usuario, string novoEmail, string? baseUrl, Guid empresaId, CancellationToken ct = default)
     {
-        EmailValidator.EnsureValid(novoEmail);
+        EmailValidator.EnsureValidDeUsuario(novoEmail);
         var novo = novoEmail.Trim();
 
         var existente = await usuarios.GetByEmailAsync(novo);

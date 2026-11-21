@@ -34,7 +34,7 @@
 - Helpdesk: AdminTicket reformado (TicketAnexo, TicketHistorico, AdminTicketTecnicoMeta, SlaConfiguracao), SlaMonitorService, 9 eventos de notificação globais.
 - EasyStock.Admin completo: design system marca, audit trail, coupon engine, status page, gestão admins, feature flags, config sistema, gestão cliente P0–P3 (reset senha, força logout, sessões, edição usuário, CRUD lojas, atividade unificada, PII unmask + audit, LGPD anonimizar/exportar, Cmd+K, atalhos, recentes, notas internas, banner alerta).
 - Mobile MAUI (`EasyStok.Mobile`): F0 setup → F1 estrutura → F2 auth E2E (JWT+refresh+biometria) → F2b/c multi-tenant pickers + permissões → F3 produção SQLite + REST → F4 mutations otimistas (outbox SQLite) → F4b SyncEngine → F4c popup captura foto/peso/validade.
-- PWA Casa da Babá: scanner QR/Code128, conferência rápida, etiquetas térmicas WTP05, BT plugin nativo, LiveUpdater, offline-first.
+- PWA Casa da Baba: scanner QR/Code128, conferência rápida, etiquetas térmicas WTP05, BT plugin nativo, LiveUpdater, offline-first.
 
 ### 🟡 Parcial (usável com gap)
 - Analytics/Dashboard (números OK, drill-down limitado).

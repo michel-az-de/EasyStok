@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
@@ -62,12 +63,12 @@ public sealed class VendasPorPeriodoHandler(
         VendasPorPeriodoParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-        var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
+        // #2441: dia civil de Brasília em UTC real; timestamptz não aceita Kind=Unspecified.
+        var (de, ate) = HorarioBrasil.JanelaPeriodoUtc(parametros.De, parametros.Ate);
 
         // ADR-R07: query explícita com WHERE EmpresaId; IgnoreQueryFilters() via tenantQuery.Query<T>()
         var query = tenantQuery.Query<EasyStock.Domain.Entities.Venda>()
-            .Where(v => v.DataVenda >= de && v.DataVenda <= ate);
+            .Where(v => v.DataVenda >= de && v.DataVenda < ate);
 
         if (parametros.LojaId.HasValue)
             query = query.Where(v => v.LojaId == parametros.LojaId.Value);

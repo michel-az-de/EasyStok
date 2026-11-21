@@ -1,9 +1,9 @@
-import { chamarApi } from './cliente'
+import { chamarApi, lerDaLoja } from './cliente'
 
 // Produção pelo console (M2, #1490). Estoque do dia em porções, por prato do cardápio.
 const PRODUCAO = '/api/atendimento/producao'
 
-export const obterEstoqueDoDia = () => chamarApi(`${PRODUCAO}/estoque-do-dia`)
+export const obterEstoqueDoDia = () => lerDaLoja(`${PRODUCAO}/estoque-do-dia`)
 
 const loteDaApi = (l) => ({
   codigo: l.codigo ?? null,
@@ -12,6 +12,9 @@ const loteDaApi = (l) => ({
   diasParaVencer: l.diasParaVencer ?? null,
   vencendo: l.vencendo === true,
   vencido: l.vencido === true,
+  // #2235 (banca T1-4/T1-5): o tamanho da porção do lote e o item de estoque para lançar a perda.
+  itemEstoqueId: l.itemEstoqueId ?? null,
+  porcao: l.porcao ?? null,
 })
 
 export const estoqueDoDiaDaApi = (r) => ({
@@ -120,7 +123,7 @@ export const insumoDaApi = (i) => ({
 
 // M2.4a (#1498): receitas dos pratos. Ler é do Operador com estoque; gravar é o PUT da composição
 // que já existe (Gerente desde a #1462), que guarda o diff na auditoria.
-export const listarReceitas = () => chamarApi(`${PRODUCAO}/receitas`)
+export const listarReceitas = () => lerDaLoja(`${PRODUCAO}/receitas`)
 export const obterReceita = (produtoId) => chamarApi(`${PRODUCAO}/receitas/${produtoId}`)
 export const salvarReceita = (produtoId, { rendimentoBase, rendimentoUnidade, unidadeMedidaBase, linhas }) =>
   chamarApi(`/api/produtos/${produtoId}/composicao`, {
@@ -134,13 +137,18 @@ export const salvarReceita = (produtoId, { rendimentoBase, rendimentoUnidade, un
     },
   })
 
+// #2235 (banca A1): a receita vem antes da produção. O prato ainda sem estoque é ligado ao montar a
+// receita (Gerente); o prato já ligado devolve o produto que tem.
+export const ligarPratoAoEstoque = async (cardapioItemId) =>
+  (await chamarApi(`${PRODUCAO}/receitas/pratos/${cardapioItemId}/ligar`, { metodo: 'POST' }))?.produtoId ?? null
+
 // D-M2-01 (#1499): produzir o prato baixa os insumos da receita (Gerente liga e desliga).
 export const marcarBaixaAutomatica = (produtoId, ligada) =>
   chamarApi(`${PRODUCAO}/receitas/${produtoId}/baixa-automatica`, { metodo: 'PUT', corpo: { ligada } })
 
 export const receitaDaApi = (r) => ({
   sku: r.cardapioItemId,
-  produtoId: r.produtoId,
+  produtoId: r.produtoId ?? null,
   nome: r.nome,
   rendimento: r.rendimentoBase,
   unidadeRendimento: r.rendimentoUnidade,
@@ -168,7 +176,7 @@ export const detalheDaReceitaDaApi = (d) => ({
 
 // M2.5 (#1502): sugestão de produção (mínimo + agendados + descoberto − saldo) e planejamento dos
 // insumos pela mesma cesta da calculadora mobile. Ler exige a permissão de estoque.
-export const obterSugestao = (ate) => chamarApi(`${PRODUCAO}/sugestao${ate ? `?ate=${ate}` : ''}`)
+export const obterSugestao = (ate) => lerDaLoja(`${PRODUCAO}/sugestao${ate ? `?ate=${ate}` : ''}`)
 export const planejarProducao = async (pratos) => {
   const prazo = AbortSignal.timeout(20000)
   try {

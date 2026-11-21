@@ -292,7 +292,7 @@ async function _executarImpressao(ids, template, overwrite = false) {
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (overwrite) headers['X-Overwrite-Snapshot'] = 'true';
-    await fetch(`/api/lotes/${_loteId}/etiquetas/marcar-impressas?empresaId=${_empresaId}`, {
+    await _fetchOk(`/api/lotes/${_loteId}/etiquetas/marcar-impressas?empresaId=${_empresaId}`, {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -373,7 +373,7 @@ window.etqMarcarImpressas = async function() {
   const ids = _getSelectedIds();
   if (!ids.length || !_selectedTemplate) return;
   try {
-    await fetch(`/api/lotes/${_loteId}/etiquetas/marcar-impressas?empresaId=${_empresaId}`, {
+    await _fetchOk(`/api/lotes/${_loteId}/etiquetas/marcar-impressas?empresaId=${_empresaId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Overwrite-Snapshot': 'true' },
       credentials: 'include',
@@ -398,7 +398,7 @@ window.etqReverterPendente = async function() {
   const ids = _getSelectedIds();
   if (!ids.length || !_selectedTemplate) return;
   try {
-    await fetch(`/api/lotes/${_loteId}/etiquetas/marcar-impressas?empresaId=${_empresaId}`, {
+    await _fetchOk(`/api/lotes/${_loteId}/etiquetas/marcar-impressas?empresaId=${_empresaId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -418,6 +418,13 @@ window.etqReverterPendente = async function() {
     _setStatus('Erro: ' + err.message);
   }
 };
+
+// #2401: escrita recusada pela API (4xx/5xx) não pode aparecer como salva.
+async function _fetchOk(url, opts) {
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error('o servidor recusou (HTTP ' + res.status + ')');
+  return res;
+}
 
 function _invalidarCacheRender() {
   try {
@@ -539,7 +546,7 @@ window.etqModeloPreview = function(id) {
   if (!t) return;
   try {
     const layout = JSON.parse(t.LayoutJson);
-    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Babá', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Babá', LogoUrl: null } };
+    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Baba', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Baba', LogoUrl: null } };
     const el = renderEtiqueta(layout, dados);
     const wrap = document.getElementById('etq-tpl-preview-wrap');
     wrap.innerHTML = '';
@@ -564,7 +571,7 @@ async function _renderThumbnail(t) {
     const scale = Math.min((containerW - 16) / wPx, (containerH - 8) / hPx);
     const scaledW = wPx * scale;
 
-    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Babá', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Babá', LogoUrl: null } };
+    const dados = { produto: { Nome: 'Bolo de Cenoura', Marca: 'Casa da Baba', FichaKcal: 250, FichaCarbsG: 30, FichaProteinaG: 12, FichaGorduraG: 8, FichaGorduraSaturadaG: 3, FichaFibrasG: 2, FichaSodioMg: 400, FichaPorcaoG: 100, FichaAlergenos: ['gluten','lactose'] }, etiqueta: { Codigo: 'ETQ-001', Sequencial: 1 }, lote: { Codigo: 'LOT-260514-001', ValidadeEm: new Date(Date.now() + 7*86400000).toISOString(), CriadoEm: new Date().toISOString() }, empresa: { Nome: 'Casa da Baba', LogoUrl: null } };
 
     const el = renderEtiqueta(layout, dados);
     el.style.transform = `scale(${scale})`;
@@ -580,7 +587,7 @@ async function _renderThumbnail(t) {
 
 window.etqModeloDefinirPadrao = async function(origem, id) {
   try {
-    await fetch(`/api/etiquetas/templates/${origem}/${id}/set-default?empresaId=${_empresaId}`, {
+    await _fetchOk(`/api/etiquetas/templates/${origem}/${id}/set-default?empresaId=${_empresaId}`, {
       method: 'POST', credentials: 'include',
     });
     await _carregarModelos();
@@ -614,7 +621,7 @@ window.etqModeloExcluir = async function(id, nome) {
     btns: [
       { label: 'Excluir', primary: true, danger: true, action: async () => {
         try {
-          await fetch(`/api/etiquetas/templates/${id}?empresaId=${_empresaId}`, { method: 'DELETE', credentials: 'include' });
+          await _fetchOk(`/api/etiquetas/templates/${id}?empresaId=${_empresaId}`, { method: 'DELETE', credentials: 'include' });
           _showToastEtq('Modelo excluído.');
           await _carregarModelos();
         } catch (err) { _showToastEtq('Erro: ' + err.message); }

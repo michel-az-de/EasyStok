@@ -1,6 +1,7 @@
 import { chamarApi } from '../infra/api/cliente'
 import { identidadeDaSessao, lerSessao, EVENTO_SESSAO_ALTERADA } from '../infra/api/sessao'
 import { instante } from '../infra/api/traducaoConversas'
+import { diaMesHora } from '../dominio/formato'
 
 export { EVENTO_SESSAO_ALTERADA }
 export const identidadeAtualDaMesa = () => identidadeDaSessao(lerSessao())
@@ -33,7 +34,7 @@ export function guardarReferenciasDaMesa(escopo, referencias, armazenamento) {
 export function notaDaMesa(nota) {
   const criadoEm = instante(nota.criadoEm)
   return { id: nota.id, texto: nota.texto, autor: nota.autor, criadoEm,
-    em: new Date(criadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) }
+    em: diaMesHora(criadoEm) }
 }
 const clienteValido = (clienteId) => {
   if (!/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(clienteId)) throw new Error('Cliente inválido.')

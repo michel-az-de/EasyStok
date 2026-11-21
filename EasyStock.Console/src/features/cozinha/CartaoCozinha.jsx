@@ -201,8 +201,9 @@ function LinhaDespacho({ pedido }) {
   const quem = partesDoEntregador(pedido.estado === 'embalado' ? entregadorResolvido(pedido) : pedido.entregador)
   return (
     <div className={css.despacho}>
-      <span className={css.numeroEntrega} title="Número que o entregador confere na retirada">
+      <span className={css.numeroEntrega}>
         Pedido {numeroParaEntregador(pedido)}
+        <span className={css.notaDoNumero}> · o entregador confere este número</span>
       </span>
       <span className={css.quemLeva}>
         <Icone nome="moto" tamanho={16} />

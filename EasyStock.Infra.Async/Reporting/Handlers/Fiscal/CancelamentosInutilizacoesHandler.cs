@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
@@ -64,8 +65,8 @@ public sealed class CancelamentosInutilizacoesHandler(
         CancelamentosInutilizacoesParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-        var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
+        // #2441: dia civil de Brasília em UTC real; timestamptz não aceita Kind=Unspecified.
+        var (de, ate) = HorarioBrasil.JanelaPeriodoUtc(parametros.De, parametros.Ate);
 
         // JOIN com NfeDocumento garante escopo de tenant (NfeEvento não tem EmpresaId diretamente).
         var eventos = (
@@ -73,7 +74,7 @@ public sealed class CancelamentosInutilizacoesHandler(
             join doc in tenantQuery.Query<NfeDocumento>()
                 on evt.NfeDocumentoId equals doc.Id
             where _tiposRelevantes.Contains(evt.Tipo)
-                  && evt.OcorridoEm >= de && evt.OcorridoEm <= ate
+                  && evt.OcorridoEm >= de && evt.OcorridoEm < ate
             orderby evt.OcorridoEm
             select new
             {

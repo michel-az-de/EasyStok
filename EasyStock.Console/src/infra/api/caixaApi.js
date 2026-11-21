@@ -1,11 +1,14 @@
 import { chamarApi } from './cliente'
+import { normalizarMetodoCaixa } from '../../dominio/caixa'
 
 // Caixa do dia (#1443): `api/caixa` do EasyStok. O resumo e o saldo esperado são calculados pela
 // API (a mesma fonte do card do painel), nunca pelo console. A empresa sai do token.
 const BASE = '/api/caixa'
 
 // Sem data, a API devolve o dia de hoje da loja. Com data (#1624), o resumo daquele dia.
-export const obterCaixaDoDia = (data = null) => chamarApi(`${BASE}/dia${data ? `?data=${data}` : ''}`).then(caixaDiaDaApi)
+// A3 (#1769): pede também o lançamento estornado, que vem marcado e fora de todo total da API.
+export const obterCaixaDoDia = (data = null) =>
+  chamarApi(`${BASE}/dia?${data ? `data=${data}&` : ''}incluirEstornados=true`).then(caixaDiaDaApi)
 
 export const listarFechamentos = (quantos = 7) =>
   chamarApi(`${BASE}/fechamentos?page=1&pageSize=${quantos}`).then((itens) => (itens ?? []).map(fechamentoDaApi))
@@ -17,8 +20,10 @@ export const abrirCaixa = ({ saldoInicial, observacoes }) =>
 export const registrarMovimento = ({ tipo, valor, categoria, metodo, descricao }, chave = null) =>
   chamarApi(`${BASE}/movimentos`, { metodo: 'POST', chave, corpo: { tipo, valor, categoria, metodo, descricao } })
 
-export const estornarMovimento = (id, motivo) =>
-  chamarApi(`${BASE}/movimentos/${id}/estornar`, { metodo: 'POST', corpo: { motivo } })
+// #2378: `/api/caixa/movimentos` está no IdempotencyMiddleware (por prefixo), então o estorno honra a chave.
+// `abrir` e `fechar` ficam de fora: a API não as cobre (pendência na #2378); mandar chave ali não faria nada.
+export const estornarMovimento = (id, motivo, chave = null) =>
+  chamarApi(`${BASE}/movimentos/${id}/estornar`, { metodo: 'POST', chave, corpo: { motivo } })
 
 // Sem data: a API fecha a sessão aberta, que pode ser de um dia anterior (#640).
 // #2113 (B3 da #2084): o contado vai em campo próprio; a abertura seguinte parte dele.
@@ -41,12 +46,17 @@ export const fechamentoDaApi = (f) => (f ? {
   fechadoEm: f.fechadoEm,
 } : null)
 
+// #2687 (F3): o pagamento de uma conta lança no Caixa com a categoria técnica; a tela mostra como se lê.
+const CATEGORIA_LEGIVEL = { 'contas-a-pagar': 'Conta a pagar', 'contas-a-receber': 'Conta a receber' }
+// Referência montada por `ReferenciaDeParcela` (EasyStock.Domain): cp|cr:{conta}:parcela:{parcela}:...
+const REFERENCIA_DE_PARCELA = /^(cp|cr):[0-9a-f]{32}:parcela:/
+
 const movimentoDaApi = (m) => ({
   id: m.id,
   tipo: m.tipo,
   valor: m.valor,
-  categoria: m.categoria || (m.tipo === 'abertura' ? 'Abertura de caixa' : m.tipo === 'fechamento' ? 'Fechamento' : m.tipo),
-  meio: m.metodo ?? null,
+  categoria: CATEGORIA_LEGIVEL[m.categoria] || m.categoria || (m.tipo === 'abertura' ? 'Abertura de caixa' : m.tipo === 'fechamento' ? 'Fechamento' : m.tipo),
+  meio: normalizarMetodoCaixa(m.metodo) ?? null,
   descricao: m.descricao ?? '',
   em: m.dataMovimento,
   autorNome: m.registradoPorNome ?? null,
@@ -54,6 +64,8 @@ const movimentoDaApi = (m) => ({
   estornadoPorNome: m.estornadoPorNome ?? null,
   motivoEstorno: m.motivoEstorno ?? null,
   devolucaoPedido: m.origem === 'devolucao_pedido',
+  // #2687 (F2): sai junto com o pagamento, pela conta; estornado no Caixa, a conta seguiria paga.
+  pagamentoDeConta: REFERENCIA_DE_PARCELA.test(m.referencia ?? ''),
 })
 
 // `aberturaPendenteCrossDay`: o caixa de um dia anterior ficou aberto e ainda não fechou (#596).
@@ -82,9 +94,10 @@ export function caixaDiaDaApi(d) {
     dinheiroPosFechamento: d.dinheiroPosFechamento ?? 0,
     movimentos: (d.movimentos ?? []).map(movimentoDaApi),
     linhasExtras: (d.linhasExtras ?? []).map((l) => ({
-      em: l.hora, tipo: l.tipo, valor: l.valor, descricao: l.descricao ?? '', meio: l.metodo ?? null, origem: l.origem,
+      em: l.hora, tipo: l.tipo, valor: l.valor, descricao: l.descricao ?? '', meio: normalizarMetodoCaixa(l.metodo) ?? null, origem: l.origem,
       // #2098: só no pagamento de pedido.
       pedidoNumeroDoDia: l.pedidoNumeroDoDia ?? null, clienteNome: l.clienteNome ?? null,
+      ...(l.registradoPorNome ? { autorNome: l.registradoPorNome } : {}),
     })),
   }
 }

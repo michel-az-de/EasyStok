@@ -69,7 +69,7 @@ Custo estimado: 30–50 testes. Pega ~80% de bugs futuros.
   - [ ] Rotacionar secret
 - [ ] **Migrations idempotentes auditadas** (lição do `AddAdminModule` duplicando tabela).
 - [x] **Seed de demo** confiável pra onboarding e screenshot — 2026-05-07 (Onda 1 R6). Bloqueado em prod sem double opt-in, idempotencia testada 3x consecutivas em CI.
-- [ ] **PWA versioning + cache busting**: hoje `sw.js` controla, update fica preso pra usuários (Casa da Babá já viu). Estratégia formal de update.
+- [ ] **PWA versioning + cache busting**: hoje `sw.js` controla, update fica preso pra usuários (Casa da Baba já viu). Estratégia formal de update.
 
 ---
 

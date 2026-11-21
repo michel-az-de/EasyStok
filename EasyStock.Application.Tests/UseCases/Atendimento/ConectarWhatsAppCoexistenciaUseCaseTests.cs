@@ -110,6 +110,19 @@ public class ConectarWhatsAppCoexistenciaUseCaseTests
     }
 
     [Fact]
+    public async Task SincronizacaoComFalhaInterna_NaoMostraODetalheAoConsole()
+    {
+        // #2285: exceção que não é da Meta (driver, serialização) chegava ao console com o texto cru.
+        _meta.SolicitarSincronizacaoAsync(Numero, Token, TipoSincronizacaoWhatsApp.EstadoDoApp, Arg.Any<CancellationToken>())
+            .Returns<string?>(_ => throw new InvalidOperationException("Host=10.0.0.5;Password=segredo"));
+
+        var r = await Sut().ExecuteAsync(Comando());
+
+        r.Status.Should().Be(StatusConexaoWhatsApp.Conectado);
+        r.SincronizacaoEstadoApp!.Erro.Should().NotBeNullOrWhiteSpace().And.NotContain("segredo").And.NotContain("10.0.0.5");
+    }
+
+    [Fact]
     public async Task SincronizacaoQueFalhaNaoDerrubaAConexao()
     {
         _meta.SolicitarSincronizacaoAsync(Numero, Token, TipoSincronizacaoWhatsApp.EstadoDoApp, Arg.Any<CancellationToken>())

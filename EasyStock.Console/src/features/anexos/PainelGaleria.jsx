@@ -172,7 +172,7 @@ export function PainelGaleria({ aoFechar }) {
       descricao={fonteApi
         ? 'Fotos dos pratos do cardápio, prontas para enviar na conversa.'
         : 'Fotos prontas para enviar na conversa: prato, horário de funcionamento, ou o que você cadastrar.'}
-      largura="720px"
+      largura="md"
       aoFechar={aoFechar}
       rodape={<Botao onClick={aoFechar}>Fechar</Botao>}
     >
@@ -232,7 +232,7 @@ export function PainelGaleria({ aoFechar }) {
               {falhouId === peca.id && <p className={css.cartaoFalha} role="alert">{FOTO_NAO_ENVIADA}</p>}
             </li>
           ))}
-          {!fonteApi && <li className={css.cartaoNovo}>
+          {!fonteApi && <li>
             <button type="button" onClick={() => setModal({ modo: 'novo' })}>
               <Icone nome="plus" /> Nova peça
             </button>

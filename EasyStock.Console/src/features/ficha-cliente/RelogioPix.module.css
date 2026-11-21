@@ -20,26 +20,17 @@
    prefers-reduced-motion (base.css) já esmaga a duração da animação a
    quase zero, então ela termina no quadro final (opaco) sem piscar de
    verdade, sem precisar duplicar a media query aqui. */
-.zerado .numero, .zerado .legenda { animation: piscar 1.2s var(--ease-padrao) 5; }
-@keyframes piscar {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .35; }
-}
+.zerado .numero, .zerado .legenda { animation: global(respirar) var(--dur-respiro) var(--ease-padrao) 5; }
 
 .botoesZerado { display: grid; gap: var(--e-2); width: 100%; margin-top: var(--e-2); }
 
 /* Pago: linha grande nos primeiros 3s, depois recolhe para uma linha só. */
 .pago {
   display: flex; flex-direction: column; align-items: center; gap: var(--e-1); color: var(--sucesso);
-  animation: pagoEntra var(--dur-longa) var(--ease-pulo) both;
+  animation: global(estalar) var(--dur-longa) var(--ease-pulo) both;
 }
 /* Pagamento confirmado: o selo estala para dentro, o único momento de
    celebração da esteira. */
-@keyframes pagoEntra {
-  0% { opacity: 0; transform: scale(.6); }
-  60% { opacity: 1; transform: scale(1.06); }
-  100% { transform: none; }
-}
 .pago .rotuloPago { font-size: var(--t-forte); font-weight: 700; }
 .pago .horaPago { font-size: var(--t-apoio); color: var(--tinta-2); }
 .recolhido {

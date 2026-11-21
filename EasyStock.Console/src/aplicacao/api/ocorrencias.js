@@ -1,4 +1,5 @@
 import { apurarOcorrencia, resolverOcorrencia } from '../../infra/api/ocorrenciasApi'
+export { abrirOcorrencia } from '../../infra/api/ocorrenciasApi'
 
 export function criarAcoesOcorrenciasApi() {
   return {

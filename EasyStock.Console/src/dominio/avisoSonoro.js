@@ -16,10 +16,11 @@ export function mudancasDoRetrato(antes, retrato) {
     const contatoNovo = !velho && Boolean(atual.ultimaMensagemClienteId)
     const mensagemNova = Boolean(velho) && Boolean(atual.ultimaMensagemClienteId)
       && atual.ultimaMensagemClienteId !== velho.ultimaMensagemClienteId
-    const pagouAgora = Boolean(velho) && Boolean(atual.pago) && !velho.pago
+    const recebeuAgora = atual.recebido > (velho?.recebido ?? 0)
+    const pagouAgora = Boolean(velho) && recebeuAgora && Boolean(atual.pago) && !velho.pago
     // #2007 (item 8): o sinal da encomenda é aviso próprio; a quitação depois ainda avisa "pagou o pedido".
     // Pedido que estava quitado e teve o total aumentado (alteração aprovada) não "pagou o sinal".
-    const sinalAgora = Boolean(velho) && Boolean(atual.sinal) && !velho.sinal && !velho.pago && !atual.pago
+    const sinalAgora = Boolean(velho) && recebeuAgora && Boolean(atual.sinal) && !velho.sinal && !velho.pago && !atual.pago
     const passouAgora = Boolean(velho) && Boolean(atual.precisa) && !velho.precisa
     // Etapa só muda entre duas etapas de verdade: pedido que nasce ou some não é mudança, e o
     // que virou pago já é `pagouAgora`.
@@ -31,13 +32,13 @@ export function mudancasDoRetrato(antes, retrato) {
   return mudancas
 }
 
-// #2007 (item 8): "pago" no balcão é o pedido coberto. A encomenda com só o sinal pago fica no estado "pago" do console
-// (a cozinha já pode produzir), mas o aviso diz "pagou o sinal" e guarda o "pagou o pedido" para a quitação.
+// O estado operacional permite produzir antes de receber na entrega. Só recebimento real
+// dispara "pagou"; cobertura por cupom/crédito não é dinheiro novo. Sinal continua parcial.
 export function pagamentoDoRetrato(pedido) {
-  if (pedido?.estado !== 'pago') return { pago: false, sinal: false }
-  const total = pedido.totalApi
-  const cobertura = pedido.alocadoApi ?? pedido.totalPagoApi
-  const sinal = Boolean(pedido.sinalNaReserva) && typeof total === 'number' && typeof cobertura === 'number'
-    && cobertura > 0 && cobertura < total
-  return { pago: !sinal, sinal }
+  const recebido = Number.isFinite(pedido?.totalPagoApi) ? pedido.totalPagoApi : 0
+  const total = pedido?.totalApi
+  const cobertura = pedido?.alocadoApi ?? recebido
+  const confirmado = recebido > 0 && Number.isFinite(total) && total > 0 && Number.isFinite(cobertura) && cobertura > 0
+  return { pago: confirmado && cobertura >= total,
+    sinal: confirmado && Boolean(pedido.sinalNaReserva) && cobertura < total, recebido }
 }

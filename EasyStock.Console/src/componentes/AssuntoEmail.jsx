@@ -8,7 +8,7 @@ export function AssuntoEmail({ assunto, noFio = false }) {
   if (!assunto) return null
   return (
     <span className={noFio ? `${css.assunto} ${css.fio}` : css.assunto} title={assunto}>
-      <Icone nome="email" tamanho={14} />
+      <Icone nome="email" tamanho={16} />
       <span className="sr">Assunto: </span>
       <span className={css.texto}>{assunto}</span>
     </span>

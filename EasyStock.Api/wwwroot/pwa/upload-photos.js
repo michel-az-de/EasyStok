@@ -90,20 +90,8 @@
     var sync = window.cdbSync;
     if (!sync) return;
     var apiBase = '';
-    var headers = {};
-    try {
-      // Tenta pegar apiBase e apiKey do sync state
-      var pairing = JSON.parse(localStorage.getItem('cdb-pairing') || '{}');
-      var apiKey = pairing.apiKey || '';
-      var deviceId = pairing.deviceId || localStorage.getItem('cdb-device-id') || '';
-      if (!apiKey) return; // sem apiKey, nao pode fazer upload
-      headers = {
-        'X-Mobile-Api-Key': apiKey,
-        'X-Device-Id': deviceId
-      };
-    } catch (e) {
-      return;
-    }
+    var headers = deviceHeaders();
+    if (!headers) return; // sem apiKey, nao pode fazer upload
 
     _uploading = true;
     try {
@@ -151,10 +139,70 @@
     }
   }
 
+  /** Headers do aparelho pareado, ou null sem apiKey. */
+  function deviceHeaders() {
+    try {
+      var pairing = JSON.parse(localStorage.getItem('cdb-pairing') || '{}');
+      var apiKey = pairing.apiKey || '';
+      if (!apiKey) return null;
+      var deviceId = pairing.deviceId || localStorage.getItem('cdb-device-id') || '';
+      return { 'X-Mobile-Api-Key': apiKey, 'X-Device-Id': deviceId };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // #2459: a foto de lote no servidor exige a chave do aparelho. <img> nao manda header,
+  // entao buscamos com fetch e exibimos por blob URL (cacheada por URL na sessao).
+  var ROTA_FOTO_LOTE = /^\/api\/mobile\/batches\/[^/?#]+\/photos\/[A-Za-z0-9_-]+\.(jpg|png)$/;
+  var _fotosAutenticadas = new Map();
+
+  function ehFotoAutenticada(url) {
+    return typeof url === 'string' && ROTA_FOTO_LOTE.test(url) && url.indexOf('..') < 0;
+  }
+
+  function srcAutenticado(url) {
+    if (!ehFotoAutenticada(url)) return Promise.resolve(url || null);
+    if (!_fotosAutenticadas.has(url)) {
+      var busca = (async function () {
+        var headers = deviceHeaders();
+        if (!headers) return null;
+        try {
+          var resp = await fetch(url, { headers: headers });
+          if (!resp.ok) return null;
+          return URL.createObjectURL(await resp.blob());
+        } catch (e) {
+          return null;
+        }
+      })().then(function (src) {
+        if (!src) _fotosAutenticadas.delete(url); // falha nao fica em cache: tenta de novo depois
+        return src;
+      });
+      _fotosAutenticadas.set(url, busca);
+    }
+    return _fotosAutenticadas.get(url);
+  }
+
+  /** Preenche as <img data-foto-auth> de root; sem foto acessivel, a <img> sai. */
+  function hidratarFotos(root) {
+    if (!root || !root.querySelectorAll) return;
+    Array.prototype.forEach.call(root.querySelectorAll('img[data-foto-auth]'), function (img) {
+      var url = img.getAttribute('data-foto-auth');
+      img.removeAttribute('data-foto-auth');
+      srcAutenticado(url).then(function (src) {
+        if (src) img.src = src;
+        else if (img.parentNode) img.parentNode.removeChild(img);
+      });
+    });
+  }
+
   // ---------- Expose ----------
   window.cdbPhotoUpload = {
     flush: flushPhotos,
     cleanup: cleanupUploaded,
+    ehFotoAutenticada: ehFotoAutenticada,
+    srcAutenticado: srcAutenticado,
+    hidratarFotos: hidratarFotos,
     get uploading() { return _uploading; }
   };
 })();

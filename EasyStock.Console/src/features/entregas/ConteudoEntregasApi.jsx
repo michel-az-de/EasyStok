@@ -1,7 +1,9 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
-import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
+import { CampoArea, CampoSelecao, CampoTexto } from '../../componentes/Campo'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
+import { Pilula } from '../../componentes/Pilula'
 import { useEntregasApi } from '../../aplicacao/useEntregasApi'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { podeAjustarEntrega } from '../../dominio/acessoModulos'
@@ -12,7 +14,8 @@ import {
   EMPRESAS_ENTREGADOR, ENTREGA_PROPRIA, TIPOS_ENTREGADOR, confirmacaoDaRecusa, motivoDaAprovacao, motivoDeSaida,
   opcoesDeEntregador, paineisDeEntregas, rotuloSituacaoViagem, situacaoDaLista, viagensConcluidasNoDia,
 } from '../../dominio/entregasApi'
-import { moeda } from '../../dominio/formato'
+import { horaCurta, moeda } from '../../dominio/formato'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import { nomeDoPedido } from '../../dominio/pedido'
 import { paradaDaViagem, roteiroDoDia, trocoDaPorta } from '../../dominio/roteiroDoDia'
 import { CadastroEntregaApi } from './CadastroEntregaApi'
@@ -25,13 +28,17 @@ import css from './entregasApi.module.css'
 // viagens (S44, RN-32), entregadores, chamados e o cadastro da loja (S45). Desde a #1440
 // "Entregas de hoje" vem organizada por janela do dia, com o roteiro para imprimir.
 // A máquina de estados e as regras são da API; a tela só mostra e chama.
-const ABAS = [['hoje', 'Do dia'], ['entregadores', 'Entregadores'], ['cadastro', 'Janelas e frete']]
+// #2258 (auditoria E1): nomes únicos. A aba da operação é "Painel do dia" ("Hoje" é só o botão que escolhe o dia)
+// e a do cadastro tem o nome do menu de Gestão, "Janelas de entrega".
+const ABAS = [['hoje', 'Painel do dia'], ['entregadores', 'Entregadores'], ['cadastro', 'Janelas de entrega']]
 
-export function ConteudoEntregasApi() {
+// #2418: `topo(selo)` é a moldura de quem chama (o cabeçalho da gaveta) com o selo "Ao vivo" dentro;
+// sem ele, o selo fica ao lado das abas, como na janela própria.
+export function ConteudoEntregasApi({ topo } = {}) {
   const [aba, setAba] = useState('hoje')
   const id = useId()
   const abasRef = useRef({})
-  // #1921: "Janelas e frete" é da policy Admin; a atendente não vê a aba nem faz as leituras dela.
+  // #1921: "Janelas de entrega" é da policy Admin; a atendente não vê a aba nem faz as leituras dela.
   const comVitrine = podeAjustarEntrega(useAcessoModulos().acoes)
   const abas = comVitrine ? ABAS : ABAS.filter(([chave]) => chave !== 'cadastro')
   const {
@@ -40,7 +47,7 @@ export function ConteudoEntregasApi() {
   const situacao = situacaoDaLista(pedidos, erro)
   const trocarAba = (proxima) => {
     // #1577: o roteiro não relê mais janelas e bloqueios a cada evento de pedido; o que ela
-    // mexeu em "Janelas e frete" volta para ele na saída da aba.
+    // mexeu em "Janelas de entrega" volta para ele na saída da aba.
     if (aba === 'cadastro' && proxima !== 'cadastro') acoes.recarregar()
     setAba(proxima)
     abasRef.current[proxima]?.focus()
@@ -52,7 +59,15 @@ export function ConteudoEntregasApi() {
     trocarAba(abas[destino][0])
   }
 
+  const selo = (
+    <output className={css.seloAoVivo}>
+      <Pilula tom={aoVivo ? 'ok' : 'neutro'} className={aoVivo ? css.vivo : undefined}>{aoVivo ? 'Ao vivo' : 'Atualizando a cada 15 s'}</Pilula>
+    </output>
+  )
+
   return (
+    <>
+    {topo?.(selo)}
     <div className={css.conteudo}>
       <div className={css.navegacao}>
         <div className={css.abas} role="tablist" aria-label="Seções de entregas">
@@ -65,7 +80,7 @@ export function ConteudoEntregasApi() {
             </Botao>
           ))}
         </div>
-        <output className={css.apoio}>{aoVivo ? 'Ao vivo' : 'Atualizando a cada 15 s'}</output>
+        {!topo && selo}
       </div>
       {erro && (
         <p className={css.faixa} role="alert">
@@ -75,13 +90,14 @@ export function ConteudoEntregasApi() {
         </p>
       )}
       <div id={`${id}-painel`} role="tabpanel" aria-labelledby={`${id}-${aba}`} tabIndex={0} className={css.painel}>
-        {aba === 'hoje' && situacao === 'carregando' && <p className={css.vazio}>Carregando as entregas…</p>}
+        {aba === 'hoje' && situacao === 'carregando' && <EsqueletoDeLista linhas={3} altura="calc(var(--toque) * 2)">Carregando as entregas…</EsqueletoDeLista>}
         {aba === 'hoje' && situacao === 'falhou' && <p className={css.vazio}>Não foi possível carregar as entregas.</p>}
         {aba === 'hoje' && situacao === 'pronta' && <Hoje {...{ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, mudarDia, doDia }} aoAbrirCadastro={comVitrine ? () => trocarAba('cadastro') : null} />}
         {aba === 'entregadores' && <Entregadores entregadores={entregadores} ocupado={ocupado} acoes={acoes} />}
         {aba === 'cadastro' && comVitrine && <CadastroEntregaApi />}
       </div>
     </div>
+    </>
   )
 }
 
@@ -95,6 +111,10 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
   const pedidoPorId = new Map([...(doDia?.pedidos ?? []), ...pedidos].map((x) => [x.id, x]))
   // #1474 (R7): recusar cancela, estorna e avisa o cliente; confirma em linha antes.
   const [recusando, setRecusando] = useState(null)
+  // #2762: a confirmação inline leva o foco (teclado e leitor de tela percebem que ela abriu); em ação
+  // destrutiva o foco cai no lado seguro, "Manter pedido".
+  const manterRef = useRef(null)
+  useEffect(() => { if (recusando) manterRef.current?.focus() }, [recusando])
   const concluidas = viagensConcluidasNoDia(viagens, dia)
 
   return (
@@ -115,8 +135,8 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
                   <div role="alertdialog" aria-label={`Recusar ${nomeDoPedido(x).frase}`}>
                     <p>{confirmacaoDaRecusa(nomeDoPedido(x).frase, x.clienteNome)}</p>
                     <div className={css.linha}>
-                      <Botao variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter pedido</Botao>
-                      <Botao variante="primario" disabled={ocupado} onClick={() => { setRecusando(null); acoes.recusar(x.id) }}>
+                      <Botao ref={manterRef} variante="texto" disabled={ocupado} onClick={() => setRecusando(null)}>Manter pedido</Botao>
+                      <Botao variante="perigo" disabled={ocupado} aria-busy={ocupado} onClick={() => { setRecusando(null); acoes.recusar(x.id) }}>
                         Recusar e devolver
                       </Botao>
                     </div>
@@ -166,7 +186,15 @@ function Hoje({ pedidos, viagens, entregadores, chamados, ocupado, acoes, dia, m
           <h3 className={css.cresce}>Viagens</h3>
           <Botao variante="secundario" icone="plus" disabled={ocupado} onClick={() => acoes.criarViagem(null)}>Nova viagem</Botao>
         </div>
-        {p.montando.length + p.emRota.length === 0 && <p className={css.vazio}>Nenhuma viagem em preparação ou em rota.</p>}
+        {p.montando.length + p.emRota.length === 0 && (
+          <div className={css.vazioCartao}>
+            <Icone nome="caminhao" tamanho={32} />
+            <div className={css.cresce}>
+              <p className={css.tituloCartao}>Nenhuma viagem em andamento</p>
+              <p className={css.apoio}>Organize as próximas saídas em uma viagem.</p>
+            </div>
+          </div>
+        )}
       </section>
 
       {[...p.montando, ...p.emRota].map((v, i) => (
@@ -205,6 +233,8 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
   // conhece; se ele mudou desde a leitura, a API recusa com o valor certo e a pergunta aparece igual.
   // J2 (#1990): ali mesmo ela lança o que recebeu ("Recebi R$ X") e a entrega sai marcada.
   const [confirmando, setConfirmando] = useState(null) // { pedidoId, valor }
+  const receberRef = useRef(null)
+  useEffect(() => { if (confirmando) receberRef.current?.focus() }, [confirmando])
   const [metodoNaPorta, setMetodoNaPorta] = useState('')
   const perguntar = (parada, valor) => {
     setMetodoNaPorta(metodoSugeridoNaPorta(paradaDaViagem(parada, pedidoPorId?.get(parada.pedidoId)).observacoes))
@@ -259,7 +289,7 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
                 </span>
                 <CampoSelecao rotulo="Como recebeu" rotuloOculto opcoes={METODOS_NA_PORTA} value={metodoNaPorta}
                   disabled={ocupado} onChange={(e) => setMetodoNaPorta(e.target.value)} />
-                <Botao variante="primario" disabled={ocupado || !metodoNaPorta} onClick={() => receberEEntregar(parada)}>
+                <Botao ref={receberRef} variante="primario" disabled={ocupado || !metodoNaPorta} aria-busy={ocupado} onClick={() => receberEEntregar(parada)}>
                   Recebi {moeda(confirmando.valor)}
                 </Botao>
                 <Botao variante="secundario" disabled={ocupado} onClick={() => marcarEntregue(parada, true)}>Entregue sem receber</Botao>
@@ -287,7 +317,8 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
           )
         })}
       </ul>
-      <CorridasDaViagem viagem={viagem} entregadores={entregadores} ocupado={ocupado} />
+      <CorridasDaViagem viagem={viagem} entregadores={entregadores} ocupado={ocupado}
+        pedido={n === 1 ? pedidoPorId?.get(viagem.paradas[0].pedidoId) ?? null : null} />
       {montando && acoes.adiadoAte(chaveDaSaida(viagem.id)) && (
         <DesfazerComPrazo className={css.linha} ate={acoes.adiadoAte(chaveDaSaida(viagem.id))}
           texto="A viagem sai e os clientes são avisados" aoDesfazer={() => acoes.desfazerEnvio(chaveDaSaida(viagem.id))} />
@@ -305,35 +336,64 @@ function Viagem({ viagem, indice, pedidoPorId, entregadores, ocupado, acoes }) {
   )
 }
 
-function Chamados({ chamados, ocupado, acoes }) {
+// #2658: cada chamado se nomeia pelo pedido (o começo do texto basta para distinguir os cartões).
+const resumoDoChamado = (c) => { const t = c.texto ?? ''; return t.length > 60 ? t.slice(0, 59).trimEnd() + '…' : t }
+
+// #2658: o aviso aponta para a lista abaixo; sem chamado aberto não há lista, e o aviso sai.
+export function AvisoDoChamado({ texto, abertos }) {
+  if (!texto || abertos === 0) return null
+  return <output className={`${css.apoio} ${css.bloco}`}>{texto}</output>
+}
+
+// #2418: "Chamar entregador" é um cartão próprio; os chamados abertos vêm abaixo, um cartão por chamado.
+export function Chamados({ chamados, ocupado, acoes }) {
   const [texto, setTexto] = useState('')
   const [confirmacao, setConfirmacao] = useState(null)
+  // #2792: sem `maxLength` (cortava o texto colado); acima de 500 o Chamar fica parado.
+  const textoLongo = algumPassaDoLimite([texto, 500])
   const abrir = (e) => {
     e.preventDefault()
-    if (!texto.trim()) return
+    if (!texto.trim() || textoLongo) return
     setConfirmacao(null)
     acoes.abrirChamado(texto.trim(), null).then((ok) => { if (ok) { setTexto(''); setConfirmacao('Chamado aberto. Acompanhe o atendimento na lista abaixo.') } })
   }
   return (
-    <section className={css.secao} aria-label="Chamados de entregador">
-      <h3>Chamar entregador</h3>
-      <form className={css.linha} onSubmit={abrir}>
-        <div className={css.cresce}>
-          <CampoTexto rotulo="O que precisa" value={texto} onChange={(e) => setTexto(e.target.value)} maxLength={500} disabled={ocupado} />
-        </div>
-        <Botao tipo="submit" variante="secundario" disabled={ocupado || !texto.trim()}>Chamar entregador</Botao>
-      </form>
-      {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
-      <ul className={css.lista}>
-        {chamados.map((c) => (
-          <li key={c.id} className={`${css.cartao} ${css.linha}`}>
-            <span className={css.cresce}>{c.texto}</span>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.atenderChamado(c.id)}>Concluir chamado</Botao>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.cancelarChamado(c.id)}>Cancelar chamado</Botao>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <>
+      <section className={`${css.secao} ${css.cartaoChamar}`} aria-label="Chamar entregador">
+        <h3>Chamar entregador</h3>
+        <p className={css.apoio}>Descreva o que precisa e envie um chamado.</p>
+        <form className={css.formChamado} onSubmit={abrir}>
+          <CampoArea rotulo="O que você precisa?" value={texto} onChange={(e) => setTexto(e.target.value)} limite={500}
+            rows={2} disabled={ocupado} placeholder="Ex.: buscar um pedido ou realizar uma entrega" />
+          <Botao tipo="submit" variante="primario" icone="enviar" disabled={ocupado || !texto.trim() || textoLongo} motivo={textoLongo ? 'Encurte o texto para chamar.' : ocupado ? 'Aguarde o envio terminar' : 'Escreva o que precisa para enviar'}>Chamar entregador</Botao>
+        </form>
+        <AvisoDoChamado texto={confirmacao} abertos={chamados.length} />
+      </section>
+      {chamados.length > 0 && (
+        <section className={css.secao} aria-label="Chamados de entregador">
+          <h3>Chamados</h3>
+          <ul className={css.listaCartoes}>
+            {chamados.map((c) => (
+              <li key={c.id} className={css.cartaoChamado}>
+                <div className={css.topoCartao}>
+                  <div className={css.cresce}>
+                    <p className={css.tituloCartao}>{c.texto}</p>
+                    {horaCurta(c.abertoEm) && <p className={css.apoio}>Aberto às {horaCurta(c.abertoEm)}</p>}
+                  </div>
+                  <Pilula tom="aviso" className={css.selo}>Em aberto</Pilula>
+                </div>
+                <div className={css.acoesCartao}>
+                  <Botao variante="texto" className={css.acaoPerigo} disabled={ocupado} aria-label={`Cancelar chamado: ${resumoDoChamado(c)}`}
+                    onClick={() => acoes.cancelarChamado(c.id)}>Cancelar chamado</Botao>
+                  <Botao variante="secundario" icone="check" disabled={ocupado} aria-label={`Concluir chamado: ${resumoDoChamado(c)}`}
+                    onClick={() => acoes.atenderChamado(c.id)}>Concluir chamado</Botao>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   )
 }
 
@@ -351,30 +411,42 @@ function Entregadores({ entregadores, ocupado, acoes }) {
       if (ok) { setForm(ENTREGADOR_VAZIO); setConfirmacao('Entregador cadastrado. Você já pode selecioná-lo nas viagens.') }
     })
   }
+  // #2423: formulário em duas colunas (nome e telefone, tipo e empresa, veículo e placa) e a lista
+  // de ativos abaixo de uma divisória, com o estado vazio centralizado.
   return (
-    <section className={css.secao} aria-label="Entregadores">
-      <h3>Novo entregador</h3>
-      <form className={css.formulario} onSubmit={salvar}>
-        <CampoTexto rotulo="Nome" {...campo('nome')} required />
-        <CampoSelecao rotulo="Tipo" opcoes={TIPOS_ENTREGADOR} {...campo('tipo')} />
-        <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_ENTREGADOR} {...campo('empresa')} />
-        <CampoTexto rotulo="Telefone" tipo="tel" {...campo('telefone')} />
-        <CampoTexto rotulo="Veículo" {...campo('veiculo')} />
-        <CampoTexto rotulo="Placa" {...campo('placa')} />
-        <Botao tipo="submit" variante="primario" disabled={ocupado || !form.nome.trim()}>Cadastrar entregador</Botao>
-      </form>
-      {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
-      <h3>Ativos</h3>
-      {entregadores.length === 0 && <p className={css.vazio}>Nenhum entregador cadastrado.</p>}
-      <ul className={css.lista}>
-        {entregadores.map((e) => (
-          <li key={e.id} className={`${css.cartao} ${css.linha}`}>
-            <span className={css.cresce}>{e.nome}</span>
-            <span className={css.apoio}>{[e.veiculo, e.placa, e.telefone].filter(Boolean).join(' · ')}</span>
-            <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desativarEntregador(e.id)}>Desativar</Botao>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <div className={css.abaEntregadores}>
+      <section className={css.secao} aria-label="Novo entregador">
+        <h3>Novo entregador</h3>
+        <form className={css.formEntregador} onSubmit={salvar}>
+          <CampoTexto rotulo="Nome" placeholder="Nome do entregador" {...campo('nome')} required />
+          <CampoTexto rotulo="Telefone" tipo="tel" placeholder="(00) 00000-0000" {...campo('telefone')} />
+          <CampoSelecao rotulo="Tipo" opcoes={TIPOS_ENTREGADOR} {...campo('tipo')} />
+          <CampoSelecao rotulo="Empresa" opcoes={EMPRESAS_ENTREGADOR} {...campo('empresa')} />
+          <CampoTexto rotulo="Veículo" placeholder="Modelo do veículo" {...campo('veiculo')} />
+          <CampoTexto rotulo="Placa" placeholder="Ex.: ABC1D23" {...campo('placa')} />
+          <Botao tipo="submit" variante="primario" icone="plus" disabled={ocupado || !form.nome.trim()}>Cadastrar entregador</Botao>
+        </form>
+        {confirmacao && <output className={`${css.apoio} ${css.bloco}`}>{confirmacao}</output>}
+      </section>
+      <section className={`${css.secao} ${css.ativos}`} aria-label="Entregadores ativos">
+        <h3>Entregadores ativos <span className={css.contagem}>{entregadores.length}</span></h3>
+        {entregadores.length === 0 && (
+          <div className={css.vazioCentral}>
+            <Icone nome="moto" tamanho={32} />
+            <p className={css.tituloCartao}>Nenhum entregador cadastrado</p>
+            <p className={css.apoio}>Os entregadores cadastrados aparecerão aqui.</p>
+          </div>
+        )}
+        <ul className={css.lista}>
+          {entregadores.map((e) => (
+            <li key={e.id} className={`${css.cartao} ${css.linha}`}>
+              <span className={css.cresce}>{e.nome}</span>
+              <span className={css.apoio}>{[e.veiculo, e.placa, e.telefone].filter(Boolean).join(' · ')}</span>
+              <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desativarEntregador(e.id)}>Desativar</Botao>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
   )
 }

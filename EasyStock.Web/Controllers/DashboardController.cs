@@ -39,7 +39,8 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             // FIN-004: capital imobilizado e valorado a CUSTO, nao a preco de venda (que inflava ~17%).
             // ValorCustoEstoque ja vem somado de CustoUnitario * Quantidade no DashboardAnalyticsQueries.
             vm.ValorEstoque = d.ValorCustoEstoque;
-            vm.ReceitaMes = d.ReceitaEstimadaPeriodo;
+            vm.ReceitaMes = d.ReceitaEstimadaPeriodo ?? 0m;
+            vm.ReceitaDisponivel = d.ReceitaEstimadaPeriodo.HasValue;
             vm.MediaVendasDiaria = d.MediaVendasDiaria;
             vm.EstoqueCritico = d.AlertasEstoqueBaixo;
             vm.ProximosVencimento = d.AlertasVencimento;
@@ -132,7 +133,9 @@ public class DashboardController(ApiClient api, SessionService session) : BaseCo
             new("Registrar primeira entrada", vm.EntradasCount > 0, "/entradas/nova", "Registrar entrada"),
             new("Abrir o caixa", vm.CaixaAbertaHoje || vm.CaixaFechadaHoje, "/caixa", "Abrir o caixa"),
         ];
-        vm.MostrarChecklist = vm.OnboardingPassos.Exists(p => !p.Concluido) && !checklistDispensado;
+        // #2744: sem o resumo do dia (403 para quem não lê relatórios) não dá para saber o que a loja já fez.
+        vm.ResumoDiaDisponivel = diaResult.Success;
+        vm.MostrarChecklist = vm.ResumoDiaDisponivel && vm.OnboardingPassos.Exists(p => !p.Concluido) && !checklistDispensado;
 
         return View(vm);
     }

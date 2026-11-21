@@ -49,6 +49,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var c = await SemearAsync(factory);
         var criado = await client.PostAsJsonAsync($"/api/atendimento/conversas/{c.ConversaId}/pedido", new
         {
+            clienteId = c.ClienteId, vinculoRevisao = c.VinculoRevisao,
             itens = new[] { new { cardapioItemId = c.CardapioItemId, qtd = 1 } },
             janelaId = c.JanelaId, dataEntrega = c.DataEntrega.ToString("yyyy-MM-dd"), forma = "na_entrega",
         });
@@ -122,7 +123,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
         cliente.Nome.Should().Be("Cliente da sprint");
         cliente.Id.Should().NotBe(c.ClienteId, "telefone informado em link público não comprova a identidade do cadastro anterior");
         (await banco.Clientes.SingleAsync(x => x.Id == c.ClienteId)).Nome.Should().Be("Maria");
-        cliente.Enderecos.Should().Contain(x => x.Cep == cep && x.Numero == "42" && x.Cidade == "São Paulo");
+        cliente.Revisao.Should().BeGreaterThan(0u);
+        cliente.Cep.Should().Be(cep);
+        cliente.Enderecos.Should().ContainSingle(x => x.Cep == cep && x.Numero == "42" && x.Cidade == "São Paulo");
         if (fora)
         {
             final.Pedido.Should().BeNull();
@@ -132,6 +135,10 @@ public sealed partial class PedidoConversaConcorrenciaTests
             var notasAntes = await banco.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId);
             (await client.PostAsJsonAsync($"{Rota(token)}/confirmar", new { final.Revisao })).StatusCode.Should().Be(HttpStatusCode.OK);
             (await banco.AtendimentoMensagens.CountAsync(x => x.ConversaId == conversaId)).Should().Be(notasAntes);
+            // O fallback após cada rollback mantém um só cadastro/endereço, sem pedido nem cobrança parcial.
+            (await banco.Clientes.CountAsync(x => x.EmpresaId == EmpresaId && x.Telefone == cliente.Telefone)).Should().Be(1);
+            (await banco.Set<ClienteEndereco>().CountAsync(x => x.ClienteId == cliente.Id)).Should().Be(1);
+            (await banco.Pedidos.CountAsync(x => x.EmpresaId == EmpresaId && x.ClienteId == cliente.Id)).Should().Be(0);
             var rotaFrete = $"/api/atendimento/conversas/{conversaId}/comandas-cliente/{final.LinkId}/combinar-frete";
             (await client.PostAsJsonAsync(rotaFrete, new { final.Revisao })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
             (await client.PostAsJsonAsync(rotaFrete, new { final.Revisao, Valor = -1m })).StatusCode.Should().Be(HttpStatusCode.BadRequest);

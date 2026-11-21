@@ -68,7 +68,12 @@ public sealed class CaixaSaldoCalculator(ICaixaRepository repo) : ICaixaSaldoCal
 
         var movimentos = await repo.GetMovimentosDoDiaAsync(empresaId, data, lojaId);
         var movList = movimentos.ToList();
-        var aberturaNoDia = movList.Any(m => m.Tipo == "abertura");
+        // Mesmo criterio de GetAberturaPendenteAsync: uma abertura anterior nao mantem a
+        // sessao aberta depois de fechar, inclusive quando o resumo agrega varias lojas.
+        var aberturaNoDia = movList
+            .Where(m => m.Tipo is "abertura" or "fechamento")
+            .OrderByDescending(m => m.DataMovimento)
+            .FirstOrDefault()?.Tipo == "abertura";
 
         var (iniDia, fimDia) = HorarioBrasil.JanelaDiaUtc(data);
         var janelaInicio = iniDia;

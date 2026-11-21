@@ -9,7 +9,8 @@ namespace EasyStock.Application.Services.Atendimento;
 /// Versão curta do <see cref="DossieClienteDto"/> para o contexto do LLM (S25, S06). Toda nota interna
 /// sai numa linha só, prefixada por <see cref="PromptAtendimento.MarcadorInterno"/> (RN-08): quebra de
 /// linha dentro da nota não pode gerar linha sem marcador. Nota que o próprio agente registrou sai com
-/// <see cref="RotuloNotaDoAgente"/>: não pode voltar nos turnos seguintes como fato da equipe (#1292). O
+/// <see cref="RotuloNotaDoAgente"/>: não pode voltar nos turnos seguintes como fato da equipe (#1292); o texto dela nasce
+/// da conversa com o cliente e passa por <see cref="TextoExternoPrompt.Linha"/> (#2285). O
 /// sinal de mesmo domicílio fica de fora (D10): o agente não recebe nome nem dado de outro cadastro.
 /// </summary>
 public static class ResumoDossieParaAgente
@@ -48,7 +49,7 @@ public static class ResumoDossieParaAgente
             sb.AppendLine("Notas internas do cadastro:");
             foreach (var nota in dossie.Notas)
                 sb.AppendLine(nota.Autor == RegistrarNotaFerramenta.Autor
-                    ? $"- {interno} {Data(nota.CriadoEm)}, {RotuloNotaDoAgente}: {UmaLinha(nota.Texto)}"
+                    ? $"- {interno} {Data(nota.CriadoEm)}, {RotuloNotaDoAgente}: {TextoExternoPrompt.Linha(nota.Texto)}"
                     : $"- {interno} {Data(nota.CriadoEm)}: {UmaLinha(nota.Texto)}");
         }
 

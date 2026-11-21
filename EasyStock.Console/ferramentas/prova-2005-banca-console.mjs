@@ -508,21 +508,41 @@ await confere('07. selecionar uma conversa que o estado ainda não conhece esper
   assert.equal(estado.selecaoPendente ?? null, null, 'a espera acaba quando a conversa aparece')
 })
 
-await confere('07. conversa que nunca aparece não prende a seleção: depois de 3 voltas volta para a primeira', () => {
+// #2135: sem a escolhida, nenhuma. A primeira do servidor não é a primeira da fila exibida.
+await confere('07. conversa que nunca aparece não prende a seleção: depois de 3 voltas fica sem conversa escolhida', () => {
   let estado = reducer(estadoCom(resumo('a'), resumo('b')), { tipo: acao.SELECIONAR_CONVERSA, id: 'fantasma' })
   for (let volta = 1; volta <= 3; volta += 1) {
     estado = sincronizar(estado, [resumo('a'), resumo('b')])
     assert.equal(estado.selecionadaId, 'fantasma', `volta ${volta}`)
   }
   estado = sincronizar(estado, [resumo('a'), resumo('b')])
-  assert.equal(estado.selecionadaId, 'a')
+  assert.equal(estado.selecionadaId, null, 'a espera expirou e a seleção solta')
+  assert.equal(estado.selecaoPendente ?? null, null, 'sem espera sobrando')
 })
 
 await confere('07. selecionar uma conversa que existe não deixa espera nenhuma', () => {
   const estado = reducer(estadoCom(resumo('a'), resumo('b')), { tipo: acao.SELECIONAR_CONVERSA, id: 'b' })
   assert.equal(estado.selecionadaId, 'b')
   assert.equal(estado.selecaoPendente ?? null, null)
-  assert.equal(sincronizar(estado, [resumo('a')]).selecionadaId, 'a', 'conversa que sumiu da lista continua saindo da seleção')
+  assert.equal(sincronizar(estado, [resumo('a')]).selecionadaId, null, 'conversa que sumiu da lista sai da seleção, sem espera')
+})
+
+// #2921: a conversa que a equipe iniciou fica escondida da fila até a cliente responder; selecionada, fica utilizável.
+await confere('07. conversa iniciada pela equipe e escondida da fila fica enquanto selecionada e sai quando a atendente sai dela', () => {
+  const iniciada = conversaDaApi(resumo('nova'), [], USUARIO)
+  let estado = reducer(estadoCom(resumo('a')), { tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [conversaDaApi(resumo('a'), [], USUARIO), iniciada], semMensagens: ['nova'] })
+  estado = reducer(estado, { tipo: acao.SELECIONAR_CONVERSA, id: 'nova', reter: true })
+  for (let volta = 1; volta <= 6; volta += 1) {
+    estado = sincronizar(estado, [resumo('a')])
+    assert.equal(estado.selecionadaId, 'nova', `volta ${volta}: a selecionada não cai`)
+    assert.ok(estado.conversas.some((c) => c.id === 'nova'), `volta ${volta}: continua na lista`)
+  }
+  estado = reducer(estado, { tipo: acao.SELECIONAR_CONVERSA, id: 'a' })
+  estado = sincronizar(estado, [resumo('a')])
+  assert.ok(!estado.conversas.some((c) => c.id === 'nova'), 'saiu da seleção, sai da lista')
+  // sem `reter` (#2135) a escolhida que some do servidor continua virando nenhuma
+  const comum = reducer(sincronizar(estadoCom(resumo('a')), [resumo('a'), resumo('b')]), { tipo: acao.SELECIONAR_CONVERSA, id: 'b' })
+  assert.equal(sincronizar(comum, [resumo('a')]).selecionadaId, null)
 })
 
 // ================================================================================================
@@ -784,6 +804,57 @@ const aoEsconder = () => {
   globalThis.document.visibilityState = 'hidden'
   globalThis.document.dispatchEvent(new Event('visibilitychange'))
 }
+
+// #2395: o transporte perdeu o ACK, mas o servidor aplicou o status. A fronteira HTTP desta
+// prova devolve SEM_RESPOSTA; o prazo/keepalive real do wrapper é exercitado na prova-2379.
+await confere('E10. Cozinha: ACK perdido avisa incerteza; a conferência lê Pronto sem repetir o PATCH', async () => {
+  const antes = [{ id: 'p-incerto', status: 'preparando' }]
+  responder('GET', '/api/kds/pedidos', () => antes)
+  responder('GET', '/api/kds/pedidos', () => antes)
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    responder('PATCH', '/api/kds/pedidos/p-incerto/status', () => {
+      throw Object.assign(new Error('Não houve resposta. Confira antes de repetir.'), { status: 0, codigo: 'SEM_RESPOSTA' })
+    })
+    h.resultado.avancar('p-incerto', 'pronto')
+    globalThis.window.dispatchEvent(new Event('pagehide'))
+    await h.estabilizar()
+    assert.equal(escritas().length, 1)
+    assert.equal(escritas()[0].opcoes.keepalive, true)
+    assert.equal(h.resultado.erro, 'Não houve resposta. Confira antes de repetir.')
+    assert.doesNotMatch(h.resultado.erro, /não mudou/)
+    assert.equal(h.resultado.pedidos[0].status, 'preparando', 'não inventa confirmação local')
+    assert.equal(h.resultado.movendo.has('p-incerto'), false)
+    responder('GET', '/api/kds/pedidos', () => [{ id: 'p-incerto', status: 'pronto' }])
+    andar(29699)
+    await h.estabilizar()
+    assert.equal(daFila().length, 0)
+    andar(1)
+    await h.estabilizar()
+    assert.equal(daFila().length, 1)
+    assert.equal(h.resultado.pedidos[0].status, 'pronto', 'a leitura confirma o efeito já aplicado')
+    assert.equal(h.resultado.erro, null)
+    assert.equal(escritas().length, 1, 'reconciliação não repete a mudança de status')
+  } finally { h.desmontar() }
+})
+
+await confere('E10. Cozinha: recusa definitiva preserva o motivo e o status anterior', async () => {
+  const antes = [{ id: 'p-recusado', status: 'preparando' }]
+  responder('GET', '/api/kds/pedidos', () => antes)
+  responder('GET', '/api/kds/pedidos', () => antes)
+  const h = await montar(useCozinhaApi, { data: null })
+  try {
+    responder('PATCH', '/api/kds/pedidos/p-recusado/status', () => {
+      throw Object.assign(new Error('Estoque insuficiente.'), { status: 409, codigo: 'BUSINESS_RULE_VIOLATION' })
+    })
+    h.resultado.avancar('p-recusado', 'pronto')
+    globalThis.window.dispatchEvent(new Event('pagehide'))
+    await h.estabilizar()
+    assert.equal(h.resultado.erro, 'O pedido não mudou: Estoque insuficiente.')
+    assert.equal(h.resultado.pedidos[0].status, 'preparando')
+    assert.equal(escritas().length, 1)
+  } finally { h.desmontar() }
+})
 
 await confere('E10. Cozinha: fechar a aba (pagehide) com "Pronto" pendente manda o toque na hora, com keepalive', async () => {
   const h = await montar(useCozinhaApi, { data: null })

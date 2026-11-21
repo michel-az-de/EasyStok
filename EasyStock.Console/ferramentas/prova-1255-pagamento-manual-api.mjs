@@ -14,14 +14,26 @@ registerHooks({
 })
 const { pedidoDaApi } = await import('../src/infra/api/comandaApi.js')
 const { criarAcoesComandaApi } = await import('../src/aplicacao/api/comanda.js')
-const { totalPago } = await import('../src/dominio/pagamento.js')
+const { totalPago, extratoDoPedido } = await import('../src/dominio/pagamento.js')
+const { caixaDiaDaApi } = await import('../src/infra/api/caixaApi.js')
+const { lancamentosEmOrdem } = await import('../src/dominio/caixa.js')
 const { situacaoDaCobranca, podeDesfazerPagamento } = await import('../src/dominio/cobranca.js')
 const agora = '2026-10-06T15:00:00Z'
 const dados = { pedidoId: '11111111-1111-1111-1111-111111111111', status: 'aguardando', total: 25, frete: 5,
-  itens: [], totalPago: 25, pagamentos: [{ id: 'pagamento', valor: 25, metodo: 'dinheiro', pagoEm: agora }],
+  itens: [], totalPago: 25, pagamentos: [{ id: 'pagamento', valor: 25, metodo: 'dinheiro', pagoEm: agora, registradoPorNome: 'Dona da prova' }],
   cobranca: { cobrancaId: 'cobranca', provedor: 'na_entrega', status: 'Paga', valor: 25, valorPago: 25,
     criadaEm: agora, pagaEm: agora, metodoPagamento: 'dinheiro' } }
 const pedido = pedidoDaApi(dados)
+assert.equal(extratoDoPedido(pedido).pagamentos[0].autorNome, 'Dona da prova', 'o extrato preserva a autoria confirmada pelo servidor')
+assert.equal(extratoDoPedido(pedidoDaApi({ ...dados, pagamentos: [{ ...dados.pagamentos[0], registradoPorNome: null }] })).pagamentos[0].autorNome,
+  undefined, 'não atribui o pagamento legado à pessoa atualmente logada')
+const caixa = caixaDiaDaApi({ totalVendas: 25, totalPagamentosPedidos: 25, saldoEsperado: 25,
+  linhasExtras: [{ hora: agora, tipo: 'pagamento', valor: 25, registradoPorNome: 'Dona da prova', pedidoNumeroDoDia: 7 }],
+  movimentos: [{ id: 'saida', tipo: 'saida', valor: 10, dataMovimento: agora, registradoPorNome: 'Gerente da prova' }] })
+assert.deepEqual(lancamentosEmOrdem(caixa).map(l => [l.autorNome, l.valor]), [['Gerente da prova', 10], ['Dona da prova', 25]],
+  'Caixa preserva autoria e valores tanto da movimentação como do pagamento do pedido')
+assert.equal(caixa.linhasExtras[0].pedidoNumeroDoDia, 7, 'a autoria não perde a correlação com a comanda')
+assert.deepEqual([caixa.totalVendas, caixa.totalPagamentosPedidos, caixa.saldoEsperado], [25, 25, 25])
 assert.equal(totalPago(pedido), 25, 'não soma cobrança com o mesmo lançamento manual')
 assert.equal(situacaoDaCobranca(pedido.cobranca, Date.now()).chave, 'paga', 'manual não é conciliação bancária')
 assert.equal(podeDesfazerPagamento(pedido), true)

@@ -2,12 +2,118 @@ using EasyStock.Domain.Entities;
 using EasyStock.Domain.Enums;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Repositories;
+using EasyStock.Application.UseCases.Common;
+using EasyStock.Application.UseCases.GerenciarProduto.Comandos;
+using EasyStock.Application.UseCases.GerenciarProduto.Queries;
+using EasyStock.Application.Ports.Output;
+using EasyStock.Infra.Async;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using FluentAssertions;
+using EasyStock.Api.Mobile.Services;
+using EasyStock.Api.Mobile.Services.Linkers;
+using EasyStock.Application.Ports.Output.Persistence;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
 public class ProdutoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture) : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    [SkippableFact]
+    public async Task Produto_criado_pelo_app_deve_aparecer_na_listagem_com_cache_aquecido()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var outraEmpresaId = Guid.NewGuid();
+        context.Empresas.AddRange(
+            new Empresa { Id = empresaId, Nome = "Empresa app", Documento = "2348-a", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow },
+            new Empresa { Id = outraEmpresaId, Nome = "Outra empresa", Documento = "2348-b", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        var mobile = new EasyStock.Domain.Entities.Mobile.Product
+        {
+            Id = "custom-2348-cache", EmpresaId = empresaId, Name = "Produto novo do app", Price = 25, Stock = 10, IsCustom = true,
+        };
+        var estrangeiro = new EasyStock.Domain.Entities.Mobile.Product
+        {
+            Id = "custom-2348-outra", EmpresaId = outraEmpresaId, Name = mobile.Name, Price = 25, Stock = 10, IsCustom = true,
+        };
+        context.AddRange(mobile, estrangeiro);
+        await context.SaveChangesAsync();
+        context.SetMobileTenantContext(empresaId);
+        var cache = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
+        var repository = new ProdutoRepository(context, cache);
+        (await repository.GetProdutosPaginadosAsync(empresaId)).Produtos.Should().BeEmpty();
+        (await repository.GetProdutosPaginadosAsync(empresaId, sort: "nome")).Produtos.Should().BeEmpty();
+        using var services = new ServiceCollection().AddSingleton<IProdutoRepository>(repository).BuildServiceProvider();
+        var linker = ActivatorUtilities.CreateInstance<ProductLinker>(services, context,
+            new MobileSystemUserResolver(context), NullLogger<ProductLinker>.Instance);
+
+        await linker.ExecuteAsync([mobile.Id, estrangeiro.Id], empresaId);
+        await context.SaveChangesAsync();
+
+        mobile.ErpProductId.Should().NotBeNull();
+        estrangeiro.ErpProductId.Should().BeNull();
+        foreach (var ordem in new[] { "criadoem", "nome" })
+        {
+            var (produtos, total) = await repository.GetProdutosPaginadosAsync(empresaId, sort: ordem);
+            total.Should().Be(1);
+            produtos.Should().ContainSingle().Which.Id.Should().Be(mobile.ErpProductId.Value);
+        }
+    }
+
+    [SkippableFact]
+    public async Task AtualizarLimiares_deve_preservar_xmin_invalidar_cache_e_restringir_empresa()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await fixture.ResetDatabaseAsync();
+
+        await using var context = fixture.CreateDbContext();
+        var empresaId = Guid.NewGuid();
+        var categoriaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        context.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa limiar", Documento = "2334", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Limiar", CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+        context.Produtos.Add(new Produto
+        {
+            Id = produtoId, EmpresaId = empresaId, CategoriaId = categoriaId,
+            Nome = "Produto limiar", Tipo = TipoProduto.Fisico, Status = StatusProduto.Ativo,
+            CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow,
+        });
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        context.SetMobileTenantContext(empresaId);
+        var repository = new ProdutoRepository(context);
+        var cache = new RedisCacheService(
+            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
+            NullLogger<RedisCacheService>.Instance);
+        using var services = new ServiceCollection().AddSingleton<ICacheService>(cache).BuildServiceProvider();
+        var useCase = ActivatorUtilities.CreateInstance<AtualizarLimiaresProdutoUseCase>(services, repository, context);
+        var consulta = new ObterDetalheProdutoUseCase(repository, new ItemEstoqueRepository(context), new ProdutoVariacaoRepository(context), cache);
+        var antes = await consulta.ExecuteAsync(empresaId, produtoId);
+        antes.QuantidadeMinima.Should().BeNull();
+        antes.QuantidadeCritica.Should().BeNull();
+
+        await useCase.ExecuteAsync(empresaId, produtoId, 7, 1);
+        var depois = await consulta.ExecuteAsync(empresaId, produtoId);
+        depois.QuantidadeMinima.Should().Be(7);
+        depois.QuantidadeCritica.Should().Be(1);
+        await useCase.ExecuteAsync(empresaId, produtoId, 9, 2);
+        var segundaAlteracao = await consulta.ExecuteAsync(empresaId, produtoId);
+        segundaAlteracao.QuantidadeMinima.Should().Be(9);
+        segundaAlteracao.QuantidadeCritica.Should().Be(2);
+        var alterarOutraEmpresa = () => useCase.ExecuteAsync(Guid.NewGuid(), produtoId, 99, 3);
+        await alterarOutraEmpresa.Should().ThrowAsync<UseCaseValidationException>();
+
+        context.ChangeTracker.Clear();
+        var persistido = await repository.GetByIdAsync(empresaId, produtoId);
+        persistido.Should().NotBeNull();
+        persistido!.QuantidadeMinima.Should().Be(9);
+        persistido.QuantidadeCritica.Should().Be(2);
+    }
+
     [SkippableFact]
     public async Task SearchAsync_deve_buscar_por_nome_sku_e_marca_respeitando_empresa()
     {

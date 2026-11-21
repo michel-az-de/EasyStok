@@ -10,7 +10,8 @@ public record DashboardResumoApi
     public decimal ValorCustoEstoque { get; init; }
     public decimal MediaVendasDiaria { get; init; }
     public decimal ProjecaoVendasPeriodo { get; init; }
-    public decimal ReceitaEstimadaPeriodo { get; init; }
+    /// <summary>Nula para quem não tem a permissão de relatórios (#2821).</summary>
+    public decimal? ReceitaEstimadaPeriodo { get; init; }
     public int AlertasEstoqueBaixo { get; init; }
     public int AlertasVencimento { get; init; }
     public int AlertasItensParados { get; init; }

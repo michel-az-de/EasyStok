@@ -35,6 +35,8 @@ public sealed class ConcluidorDeReset(
 
         // Usar um dos segredos mata o outro, e qualquer pedido anterior ainda aberto.
         await tokens.InvalidarAbertosAsync(usuario.Id, agora);
+        // #2201: reset é a resposta a conta comprometida; a chave de acesso aberta cai junto.
+        await tokens.InvalidarChavesDeAcessoAbertasAsync(usuario.Id);
 
         await auditLog.AddAsync(AuditLog.Criar(
             usuario.Id, acao, true, $"Senha redefinida. {tokensRevogados} refresh tokens revogados.", ip, userAgent));

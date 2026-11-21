@@ -71,6 +71,47 @@ public class NotificadorComAvisosDaLojaTests
         await _interno.DidNotReceiveWithAnyArgs().EnfileirarEventoAsync(default, default, default!);
     }
 
+    public static TheoryData<string> AvisosDaEquipeDesligaveis() => new()
+    {
+        CodigosAviso.EquipeAtencao, CodigosAviso.EquipePedido, CodigosAviso.EquipePagamento,
+    };
+
+    [Theory]
+    [MemberData(nameof(AvisosDaEquipeDesligaveis))]
+    public async Task AvisoDaEquipeDesligadoNaoChegaAoMotor(string codigo)
+    {
+        // #2211: os três avisos da equipe usam o mesmo interruptor da tela Avisos.
+        var sut = Criar(new AvisosOperacao
+        {
+            EquipeAtencao = codigo != CodigosAviso.EquipeAtencao,
+            EquipePedido = codigo != CodigosAviso.EquipePedido,
+            EquipePagamento = codigo != CodigosAviso.EquipePagamento,
+        });
+        var publicador = new PublicadorAvisoEquipe(sut);
+        var pedido = Guid.NewGuid();
+
+        await (codigo switch
+        {
+            CodigosAviso.EquipeAtencao => publicador.AtencaoNoAtendimentoAsync(_empresaId, pedido, "Marina", "pediu uma pessoa"),
+            CodigosAviso.EquipePedido => publicador.PedidoComCanhotoAsync(_empresaId, pedido, "Marina", 10m),
+            _ => publicador.ProblemaNoPagamentoAsync(_empresaId, pedido, "Marina", "recusado", "p1"),
+        });
+
+        await _interno.DidNotReceiveWithAnyArgs().EnfileirarEventoAsync(default, default, default!);
+    }
+
+    [Fact]
+    public async Task AvisoDaEquipeLigadoPorPadraoChegaAoMotor()
+    {
+        var sut = Criar(AvisosOperacao.Padrao);
+
+        await new PublicadorAvisoEquipe(sut).PedidoComCanhotoAsync(_empresaId, Guid.NewGuid(), "Marina", 10m);
+
+        await _interno.Received(1).EnfileirarEventoAsync(TipoEventoNotificacao.AvisoEquipePedidoComCanhoto, _empresaId,
+            Arg.Is<string>(p => p.Contains("\"aviso\":\"equipe_pedido\"")), Arg.Any<Guid?>(), Arg.Any<CancellationToken>(),
+            Arg.Any<string?>());
+    }
+
     [Theory]
     [InlineData("{\"tipo_legivel\":\"Disparo de teste\"}")]
     [InlineData("não é json")]

@@ -54,7 +54,7 @@ export function PainelAlcance({ conversas, agora, cardapio }) {
               <span style={{ width: `${(b.pedidos / maior) * 100}%` }} />
             </span>
             <span className={css.alcanceNumeros}>
-              {plural(b.pedidos, 'pedido', 'pedidos')} · {moeda(b.total)} · {plural(b.clientes, 'cliente', 'clientes')}
+              <span>{plural(b.pedidos, 'pedido', 'pedidos')} · {moeda(b.total)} · {plural(b.clientes, 'cliente', 'clientes')}</span>
               {' '}<Variacao atual={b.pedidos} anterior={b.anterior} />
             </span>
           </li>

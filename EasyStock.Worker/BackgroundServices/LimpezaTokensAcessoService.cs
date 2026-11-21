@@ -1,3 +1,4 @@
+using EasyStock.Infra.Notifications.Hosting;
 using EasyStock.Application.Services.Auth;
 
 namespace EasyStock.Worker.BackgroundServices;
@@ -12,6 +13,7 @@ namespace EasyStock.Worker.BackgroundServices;
 public sealed class LimpezaTokensAcessoService(
     IServiceScopeFactory scopes,
     IConfiguration configuration,
+    LoopsDoWorker loops,
     ILogger<LimpezaTokensAcessoService> logger) : BackgroundService
 {
     public const double IntervaloPadraoEmHoras = 6;
@@ -31,8 +33,11 @@ public sealed class LimpezaTokensAcessoService(
         try { await Task.Delay(TimeSpan.FromMinutes(2), stoppingToken); }
         catch (OperationCanceledException) { return; }
 
+        loops.Iniciar("limpeza-tokens", intervalo); // #2536: arquivo de vida do Worker
+
         while (!stoppingToken.IsCancellationRequested)
         {
+            loops.Bater("limpeza-tokens");
             try
             {
                 using var escopo = scopes.CreateScope();

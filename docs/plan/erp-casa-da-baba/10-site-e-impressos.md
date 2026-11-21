@@ -30,7 +30,7 @@ Plano irmão: [12-impressos.md](../atendimento-whatsapp/12-impressos.md) é dono
 | API consumida | `api/storefront/{slug}/` `menu`, `frete`, `janelas`, `checkout`, `checkout/guest`, `auth/solicitar-otp`, `auth/validar-otp`, `pedidos`, `pedidos/{id}` | `src/api/*.js` (ex.: `checkout-guest.js:144`, `auth.js:142,213`) |
 | Mesma origem | build com `VITE_API_BASE_URL` vazio: o site chama `/api/...` e o Caddy repassa à API | `Dockerfile:26,32`; `Caddyfile:51-60` |
 | Chat do site (S36) e link do cardápio da conversa (S48) | backend mergeado (#1099, #1151); **o site não tem nenhum dos dois** (zero ocorrência de `api/public/chat` e de `cardapio-conversa`) | busca em `src/` e `*.html` |
-| Grafia | guarda de build proíbe "Babá" acentuado | `scripts/check-brand.js:16-17` |
+| Grafia | guarda de build proíbe "Baba" acentuado | `scripts/check-brand.js:16-17` |
 
 ### 1.2 Onde está em produção (contradição 5 do estudo, resolvida)
 
@@ -65,7 +65,7 @@ O prefixo é o mesmo (`--cdb-`), os valores não. Trocar o valor no `tokens.css`
 | Logo | **ausente** (`public/img` tem só `wheat.svg`, `grao-papel.png`) | `assets/logo-oficial.png` 1536×1024 sobre `#FEFEFE` | entra no cabeçalho e no `og-image`; fundo escuro exige ativo próprio (`GUIA:26`) |
 | `theme-color` | `#5C2E0D` nas 9 páginas (`index.html:12`) | | Cacau |
 
-A página de manutenção servida hoje usa "Casa da Babá" acentuado e `#2c1605`, `#d4a030`, `#B84A2C`: fora da marca e
+A página de manutenção servida hoje usa "Casa da Baba" acentuado e `#2c1605`, `#d4a030`, `#B84A2C`: fora da marca e
 da regra do `check-brand.js`.
 
 ### 1.4 Checkout hoje (site `a28c5af` + API master)
@@ -261,7 +261,7 @@ Aceite mínimo de cada uma: [ ] igual ao mockup aprovado; [ ] térmica só preto
 | 3 | Ponte #1308 "temporária" | corpo da #1308 × site #71 ainda usa o modo sem janela fora da área | código do site `cart-drawer.js:357-406` |
 | 4 | "PWA (Workbox)" | `README.md:16` × sem manifest nem service worker | `vite.config.js:7-10`, `package.json` |
 | 5 | Mesmo prefixo, valores diferentes | `--cdb-creme #FAF4E7` (site) × `#FFF8E8` (DS) | DS v1 |
-| 6 | Grafia na página de manutenção | "Casa da Babá" × regra "Baba" sem acento | `check-brand.js:16-17` |
+| 6 | Grafia na página de manutenção | "Casa da Baba" × regra "Baba" sem acento | `check-brand.js:16-17` |
 | 7 | S50/S51 sem rastreio | `12-impressos.md` lista as duas × issue-mãe #1267 fechada | GitHub |
 
 ## 5. Decisões pendentes do Felipe

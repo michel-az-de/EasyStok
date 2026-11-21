@@ -16,7 +16,7 @@ public class ObterDiasAlertaValidadeUseCase(
             return new ObterDiasAlertaValidadeResult(config.DiasAlertaVencimento);
         }
 
-        var configuracao = await configuracaoLojaRepository.GetByLojaIdAsync(cmd.LojaId.Value);
+        var configuracao = await configuracaoLojaRepository.GetDaLojaAsync(cmd.EmpresaId, cmd.LojaId.Value);
         var dias = configuracao?.DiasAlertaValidade ?? config.DiasAlertaVencimento;
 
         logger.LogInformation("Retrieved validity alert days for loja {LojaId}: {Dias}", cmd.LojaId, dias);

@@ -46,15 +46,18 @@ const confere = (descricao, fn) => {
 
 confere('1  visitante genérico com comanda: a comanda vira o nome e o nome inteiro fica no title', () => {
   const nome = cartao.nomeDoCartao({ nome: 'Visitante do site', numeroComanda: 16 })
-  assert.deepEqual(nome, { principal: 'Comanda 16', complemento: null, titulo: 'Visitante do site · Comanda 16' })
+  // #2258 (auditoria T4): o visitante é "Visitante" e a comanda vira a cápsula "#16", a mesma do cabeçalho e da ficha.
+  assert.deepEqual(nome, { principal: 'Visitante', curto: 'Visitante', capsula: { texto: '#16', tom: 'neutro' }, complemento: null, numeroPedido: 16, titulo: 'Visitante do site · Pedido 16' })
 })
 confere('1  cliente com nome de verdade mantém o nome e a comanda ao lado', () => {
+  // #2258 (auditoria T4 e T5): o objeto ganhou `curto` (forma abreviada) e `capsula`.
   assert.deepEqual(cartao.nomeDoCartao({ nome: 'Felipel Azevedo', numeroComanda: 3 }),
-    { principal: 'Felipel Azevedo', complemento: 'Comanda 3', titulo: 'Felipel Azevedo · Comanda 3' })
-  assert.deepEqual(cartao.nomeDoCartao({ nome: 'Ana Souza' }), { principal: 'Ana Souza', complemento: null, titulo: 'Ana Souza' })
+    { principal: 'Felipel Azevedo', curto: 'Felipel A.', capsula: null, complemento: 'Pedido 3', numeroPedido: 3, titulo: 'Felipel Azevedo · Pedido 3' })
+  assert.deepEqual(cartao.nomeDoCartao({ nome: 'Ana Souza' }), { principal: 'Ana Souza', curto: 'Ana S.', capsula: null, complemento: null, numeroPedido: null, titulo: 'Ana Souza' })
 })
 confere('1  visitante sem comanda continua "Visitante do site" (não inventa número)', () => {
-  assert.equal(cartao.nomeDoCartao({ nome: 'Visitante do site', numeroComanda: null }).principal, 'Visitante do site')
+  // #2258 (auditoria T4): "Visitante do site" passa a ser "Visitante" (o "do site" fica no title).
+  assert.equal(cartao.nomeDoCartao({ nome: 'Visitante do site', numeroComanda: null }).principal, 'Visitante')
 })
 confere('1  "Chat do site" sai da origem (o selo do avatar já diz); as outras origens dizem o porquê', () => {
   assert.equal(cartao.origemNoCartao({ origem: 'chat-site', motivo: 'Visitante do site aguardando atendimento da equipe.' }), null)
@@ -62,7 +65,8 @@ confere('1  "Chat do site" sai da origem (o selo do avatar já diz); as outras o
   const reabertura = cartao.origemNoCartao({ origem: 'reabertura', motivo: 'Cliente voltou a escrever' })
   assert.equal(reabertura.curto, 'Cliente voltou a escrever')
   const naoSoube = cartao.origemNoCartao({ motivo: 'pediu desconto', em: '2026-10-16T14:00:00Z' })
-  assert.match(naoSoube.curto, /^Automático não soube responder/)
+  // #2187 (harmonia do Atendimento) chamou o robô de Assistente em toda a tela (#2701).
+  assert.match(naoSoube.curto, /^Assistente não soube responder/)
 })
 // #1899: a função recebe o estado da linha (que herda a chave do motivo quando há motivo).
 confere('1  etiqueta do estado some na passagem, no Automático e no Com você; motivos, Bloqueado, Encerrada e Outro ficam', () => {
@@ -79,12 +83,15 @@ confere('1  a terceira linha só existe com etiqueta ou contexto', () => {
 })
 confere('1  sem a etiqueta, o estado vai para o leitor de tela e a atenção ganha marcador no avatar', () => {
   const jsx = fonte('features/caixa-de-entrada/CartaoConversa.jsx')
-  assert.match(jsx, /\{!etiqueta && <span className="sr">, \{estado\.texto\}<\/span>\}/)
-  assert.match(jsx, /title=\{nome\.titulo\}/)
+  // #2232 (X1): o estado sem etiqueta vai no nome acessível composto do cartão.
+  assert.match(jsx, /estado: estado\.texto/)
+  // #2258 (auditoria T4): o title do nome sai do NomeDoContato (prop `titulo`).
+  assert.match(jsx, /titulo=\{nome\.titulo\}/)
   const cssDaLista = fonte('features/caixa-de-entrada/caixa.module.css')
-  assert.match(cssDaLista, /\.cartao\.precisa \.avatarCartao::after/)
-  assert.match(cssDaLista, /content: '!'/)
-  assert.match(cssDaLista, /\.cartao\.slaEstourado \.avatarCartao::after \{ background: var\(--erro\)/)
+  // #2420: sem traço lateral e sem "!" no avatar; atenção e atraso são ícones ao lado da hora.
+  assert.doesNotMatch(cssDaLista, /\.cartao[^{}]*::before/)
+  assert.doesNotMatch(cssDaLista, /avatarCartao::after/)
+  assert.match(cssDaLista, /\.sinalAtencao\s*\{[^}]*color:\s*var\(--alerta\)/)
   assert.match(fonte('features/caixa-de-entrada/classesDoCartao.js'), /motivo && motivo\.tom !== 'perigo' \? css\.precisa/) // #2135: todo motivo tem trilho, não só o `aviso`
 })
 
@@ -150,7 +157,7 @@ confere('4  canal sem mídia: sem Anexar, Fotos e microfone; a barra fica enxuta
 confere('4  sem áudio o lugar do microfone fica com o Enviar, desligado até haver texto', () => {
   const jsx = fonte('features/atendimento/Composer.jsx')
   assert.match(jsx, /\{temTexto \|\| anexo \|\| !acoes\.audio \? \(/)
-  assert.match(jsx, /disabled=\{!podeEscrever \|\| assumindo \|\| Boolean\(variavelSobrando\) \|\| !\(temTexto \|\| anexo\)\}/)
+  assert.match(jsx, /disabled=\{!podeEscrever \|\| assumindo \|\| excedeLimite \|\| Boolean\(variavelSobrando\) \|\| !\(temTexto \|\| anexo\)\}/)
 })
 confere('4  o pedido do site no fio se lê como documento; aviso curto segue miúdo', () => {
   assert.equal(conversa.avisoDePedido('Pedido do site #13EF98F7: 1 × lasanha. Total R$ 65,00.'), true)
@@ -175,12 +182,16 @@ confere('5  a janela continua no acesso "Pedido e entrega" do Resumo e o aviso d
   assert.match(painel, /resumo=\{editavel \? faixa \|\| 'Itens, horário e acompanhamento'/)
   assert.match(fonte('features/atendimento/Composer.jsx'), /fixo acima do campo só perto do fim da janela de 24 h/)
 })
-confere('5  Balcão e Resumo sem cabeçalho só no desktop de três colunas; o nome segue no aria-label', () => {
+// #2156 tirou também do tablet o título repetido de Conversas: nenhuma coluna da Moldura tem cabeçalho
+// visível e o nome segue no aria-label (#2701).
+confere('5  Balcão e Resumo sem cabeçalho repetido no desktop e no tablet; o nome segue no aria-label', () => {
   const moldura = fonte('app/Moldura.jsx')
   assert.match(moldura, /<Coluna variante="entrada" titulo="Conversas" semTitulo>/)
   assert.match(moldura, /<Coluna variante="ficha" titulo="Ficha" semTitulo>/)
   assert.match(moldura, /<section className=\{`\$\{css\.coluna\} \$\{css\[variante\]\}`\} aria-label=\{titulo\}>/)
-  assert.equal((moldura.match(/titulo="Conversas" semTitulo/g) ?? []).length, 1, 'tablet e celular mantêm o título')
+  const colunas = moldura.match(/<Coluna variante=[^>]*>/g) ?? []
+  assert.equal(colunas.length, 3, 'Conversas no desktop e no tablet, Ficha no desktop')
+  assert.ok(colunas.every((c) => / semTitulo>$/.test(c)), 'toda coluna sem o cabeçalho repetido')
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

@@ -32,6 +32,12 @@ public class ConfiguracaoLoja
     public bool GerarContaPagarAutomaticaDePedidoFornecedor { get; set; } = false;
     public string StatusPedidoQueGeraContaReceber { get; set; } = "entregue";
 
+    // Regra de impressão da loja (#2199, jsonb v1): "como sai" cada documento. Só o repositório da regra grava estes
+    // três campos, por UPDATE condicional na versão; o UpdateAsync geral da configuração não os toca.
+    public string? ImpressaoJson { get; set; }
+    public int ImpressaoVersao { get; set; }
+    public DateTime? ImpressaoAlteradaEm { get; set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime AlteradoEm { get; set; }
 

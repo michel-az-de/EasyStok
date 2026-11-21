@@ -24,6 +24,13 @@ namespace EasyStock.Domain.Entities
         /// <summary>Código do lote (ex: "LOT-260430-001").</summary>
         public string Codigo { get; set; } = null!;
 
+        /// <summary>
+        /// Número curto do lote (#2199, D4), o que vai no código de barras Code128 C: sequencial por loja, 8 dígitos
+        /// (10 depois de 99.999.999). O banco preenche no INSERT (trigger <c>trg_lotes_numero_curto</c>); lote antigo
+        /// ganha sob demanda por <c>ILoteNumeroCurtoRepository</c>. A aplicação nunca grava.
+        /// </summary>
+        public string? NumeroCurto { get; set; }
+
         public string Status { get; set; } = "em_producao";
 
         public DateTime DataProducao { get; set; }
@@ -87,7 +94,14 @@ namespace EasyStock.Domain.Entities
         public string? Emoji { get; set; }
         public string? Unidade { get; set; }
 
+        /// <summary>Unidades (porções/embalagens): 1 etiqueta por unidade e base da baixa de insumos.</summary>
         public int Quantidade { get; set; }
+
+        /// <summary>
+        /// #2373: quantidade exata na unidade de medida do produto (ex.: 0,3 kg) quando o item vem de uma entrada
+        /// de estoque. <see cref="Quantidade"/> segue inteira para as etiquetas. Null = item de produção (só unidades).
+        /// </summary>
+        public decimal? QuantidadeMedida { get; set; }
         /// <summary>Peso unitário em gramas (vai na etiqueta).</summary>
         public int? PesoG { get; set; }
 

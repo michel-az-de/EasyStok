@@ -5,8 +5,10 @@ import { ImprimirPedido } from '../../componentes/ImprimirPedido'
 import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { Modal } from '../../componentes/Modal'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
+import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { RegistrarAtraso } from './RegistrarAtraso'
 import {
-  ETAPAS_KDS, avisoDeInicio, colunaDoStatusKds, gruposDoKds, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds,
+  ETAPAS_KDS, avisoDeInicio, colunaDoStatusKds, gruposDoKds, leituraDasObservacoes, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds,
 } from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
@@ -20,8 +22,11 @@ import css from './cozinha.module.css'
 export function ComandaKds({
   pedido, agora, linhas, movendo, erro, aoAvancar, aoReimprimir, aoLimparErro, aoFechar, adiado = null, aoDesfazer = null,
 }) {
+  const { acoes } = useAcessoModulos()
   const proximo = proximoStatusKds(pedido.status)
   const aviso = avisoDeInicio(pedido, agora)
+  const leitura = leituraDasObservacoes(pedido.observacoes)
+  const endereco = pedido.endereco ?? leitura.endereco
   const atual = ETAPAS_KDS.findIndex((e) => e.status === colunaDoStatusKds(pedido.status))
   // #1584: "Reimprimir na fila" não dava retorno. A ação guarda a própria falha no erro da
   // tela, então o erro antigo sai antes e a confirmação só vale se nenhum erro voltar.
@@ -39,7 +44,7 @@ export function ComandaKds({
       aoFechar={aoFechar}
       rodape={(
         <>
-          <Botao variante="texto" disabled={reimpressao === 'enviando'} onClick={reimprimir}>
+          <Botao variante="texto" disabled={reimpressao === 'enviando'} aria-busy={reimpressao === 'enviando'} onClick={reimprimir}>
             {reimpressao === 'enviando' ? 'Reenviando…' : 'Reimprimir na fila'}
           </Botao>
           {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}
@@ -68,7 +73,7 @@ export function ComandaKds({
           </output>
         )}
         <p className={css.comandaCliente}>{nomeNaComanda(pedido)}</p>
-        {pedido.endereco && <p className={css.comandaApoio}>{pedido.endereco}</p>}
+        {endereco && <p className={css.comandaApoio}>{endereco}</p>}
         <p className={css.comandaApoio}>
           <Icone nome="relogio" tamanho={16} /> {pedido.janela ? `Janela ${pedido.janela.label}` : 'Para já, sem janela'}
           {aviso && <span className={aviso.atrasado ? css.comandaAtraso : undefined}> · {aviso.texto}</span>}
@@ -79,7 +84,7 @@ export function ComandaKds({
             const estado = i < atual ? 'feita' : i === atual ? 'atual' : 'futura'
             return (
               <li key={etapa.status} className={css[`etapa-${estado}`]} aria-current={estado === 'atual' ? 'step' : undefined}>
-                <span className={css.marcaEtapa}>{estado === 'feita' ? <Icone nome="check" tamanho={14} /> : i + 1}</span>
+                <span className={css.marcaEtapa}>{estado === 'feita' ? <Icone nome="check" tamanho={16} /> : i + 1}</span>
                 {etapa.rotulo}
               </li>
             )
@@ -102,7 +107,8 @@ export function ComandaKds({
           </section>
         ))}
 
-        {pedido.observacoes && <p className={css.obsPedido}>{pedido.observacoes}</p>}
+        {leitura.observacoes && <p className={css.obsPedido}>{leitura.observacoes}</p>}
+        {acoes.gerenciarOcorrencias && <RegistrarAtraso key={pedido.id} pedidoId={pedido.id} />}
         {pedido.requerAprovacao && (
           <p className={css.motivoRecusa}>
             <Icone nome="alerta" tamanho={16} /> {pedido.motivoRequerAprovacao ?? 'Pedido aguarda aprovação da dona.'}

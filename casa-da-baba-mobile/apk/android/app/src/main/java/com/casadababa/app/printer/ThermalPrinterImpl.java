@@ -1,10 +1,12 @@
 package com.casadababa.app.printer;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,43 +32,53 @@ public class ThermalPrinterImpl {
         return s != null && o != null && s.isConnected();
     }
 
-    public void connect(final BluetoothDevice device, final UUID sppUuid, final ResultCallback cb) {
+    /** Uma tentativa de abrir o socket RFCOMM; cada etapa tem nome para o erro. */
+    interface SocketAttempt {
+        BluetoothSocket open() throws Exception;
+    }
+
+    /**
+     * #2193: seguro, inseguro e, por fim, canal 1 por reflexão. Térmica barata
+     * (MTP-II e similares) às vezes não publica o SPP no SDP, e só o canal fixo conecta.
+     */
+    public void connect(final BluetoothAdapter adapter, final BluetoothDevice device, final UUID sppUuid, final ResultCallback cb) {
         io.execute(new Runnable() {
             @Override public void run() {
                 closeQuietly();
+                String[] names = { "seguro", "inseguro", "canal 1" };
+                SocketAttempt[] attempts = {
+                    new SocketAttempt() { public BluetoothSocket open() throws Exception {
+                        return device.createRfcommSocketToServiceRecord(sppUuid); } },
+                    new SocketAttempt() { public BluetoothSocket open() throws Exception {
+                        return device.createInsecureRfcommSocketToServiceRecord(sppUuid); } },
+                    new SocketAttempt() { public BluetoothSocket open() throws Exception {
+                        Method m = device.getClass().getMethod("createRfcommSocket", int.class);
+                        return (BluetoothSocket) m.invoke(device, 1); } }
+                };
+                StringBuilder trail = new StringBuilder();
                 BluetoothSocket s = null;
-                IOException primary = null;
-                try {
-                    s = device.createRfcommSocketToServiceRecord(sppUuid);
-                    s.connect();
-                } catch (IOException ex) {
-                    primary = ex;
-                    if (s != null) try { s.close(); } catch (IOException ignore) {}
-                    s = null;
-                } catch (SecurityException ex) {
-                    cb.onError("Sem permissão BLUETOOTH_CONNECT");
-                    return;
-                } catch (Exception ex) {
-                    cb.onError(ex.getMessage() != null ? ex.getMessage() : "Erro inesperado ao conectar");
-                    return;
-                }
-                if (s == null) {
-                    // Fallback: insecure RFCOMM — alguns devices sem PIN exigem
+                for (int i = 0; i < attempts.length && s == null; i++) {
+                    try { if (adapter != null) adapter.cancelDiscovery(); } catch (Exception ignore) {}
+                    BluetoothSocket candidate = null;
                     try {
-                        s = device.createInsecureRfcommSocketToServiceRecord(sppUuid);
-                        s.connect();
-                    } catch (IOException ex2) {
-                        if (s != null) try { s.close(); } catch (IOException ignore) {}
-                        String msg = primary != null ? primary.getMessage() : ex2.getMessage();
-                        cb.onError("Falha ao conectar: " + (msg != null ? msg : "device pode estar desligado ou fora de alcance"));
-                        return;
-                    } catch (SecurityException ex2) {
+                        candidate = attempts[i].open();
+                        candidate.connect();
+                        s = candidate;
+                    } catch (SecurityException ex) {
+                        closeSocket(candidate);
                         cb.onError("Sem permissão BLUETOOTH_CONNECT");
                         return;
-                    } catch (Exception ex2) {
-                        cb.onError(ex2.getMessage() != null ? ex2.getMessage() : "Erro inesperado");
-                        return;
+                    } catch (Exception ex) {
+                        closeSocket(candidate);
+                        Throwable cause = ex.getCause() != null && ex instanceof java.lang.reflect.InvocationTargetException ? ex.getCause() : ex;
+                        String msg = cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName();
+                        if (trail.length() > 0) trail.append("; ");
+                        trail.append(names[i]).append(": ").append(msg);
                     }
+                }
+                if (s == null) {
+                    cb.onError("Falha ao conectar (" + trail + "). Confira se a impressora está ligada, perto e sem outro aparelho conectado.");
+                    return;
                 }
                 try {
                     OutputStream o = s.getOutputStream();
@@ -74,11 +86,16 @@ public class ThermalPrinterImpl {
                     out = o;
                     cb.onSuccess();
                 } catch (IOException ex) {
+                    closeSocket(s);
                     closeQuietly();
                     cb.onError("Falha ao abrir stream: " + ex.getMessage());
                 }
             }
         });
+    }
+
+    private static void closeSocket(BluetoothSocket s) {
+        if (s != null) try { s.close(); } catch (IOException ignore) {}
     }
 
     public void write(final byte[] data, final ResultCallback cb) {

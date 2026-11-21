@@ -1,16 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
 import { CampoReais } from '../../componentes/CampoReais'
 import { EscolhaDeEntregador } from '../../componentes/EscolhaDeEntregador'
 import { Icone } from '../../componentes/Icone'
 import {
-  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaDaCobranca, podeDesfazerPagamento, situacaoDaCobranca, valorSugeridoParaBaixa,
+  aguardaAprovacao, aguardaSinalManual, avisoDeLinkVencidoApi, esperaLinkNovoApi, faltaDaCobranca, situacaoDaCobranca, valorSugeridoParaBaixa,
 } from '../../dominio/cobranca'
 import { saldoApi, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { ROTULO_GERAR_E_ENVIAR, itensDoResumo, resumoDaCobrancaEscolhida } from '../../dominio/resumoPedido'
 import { totalDoPedido } from '../../dominio/pedido'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import {
   PASSOS, motivoParaNaoAvancar, passoAnterior, passoPorId, proximoPasso, situacaoDoPasso,
   SEGUNDOS_PARA_DESFAZER,
@@ -23,11 +23,11 @@ import { numeroParaEntregador, opcoesDoDespacho } from '../../dominio/despacho'
 import { useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcaoDisponivel } from '../../aplicacao/useAcaoDisponivel'
 import { BaixaAMao } from './BlocoCobranca'
-import { MenuDoPedido } from './MenuDoPedido'
 import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { acaoDoPix } from './acaoDoPix'
 import { criarExecucaoDaEtapa, houveAvancoConfirmado, marcoDaComanda } from './progressoDaComanda'
 import css from './ficha.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Rótulo curto sob cada ícone da trilha (banca estética, item 3). O nome
 // completo do passo continua no aria-label de cada item.
@@ -57,14 +57,16 @@ const PROXIMO_DE_AGUARDANDO = proximoPasso('aguardando')?.rotulo ?? 'Pago'
 // O passo "aguardando pagamento" não tem um botão único: o próximo passo muda com a situação da
 // cobrança (`acaoDoPix.js`, secao 2, "Alerta do Pix").
 const GERANDO_COBRANCA = 'Gerando cobrança…'
+// #2792: o limite espelha o servidor; sem `maxLength`, o texto colado fica inteiro e o cancelamento trava.
+const LIMITE_MOTIVO_CANCELAR = 500
 
 // O bloco Pedido: trilha, onde está e ação (secao 5 da direção visual). Um
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
 // listava os seis passos soltos) e da barra antiga somados.
 export function BarraProximoPasso({
-  pedido, conversaId, nomeCliente, agora, emDesfazer, simulacao = null, bloqueado = false, prerequisito = null, gerarSemEnviar = false, aoAvancar, aoDesfazer,
-  alvoDoPrerequisito = null, aoIrParaMotivo = null, pedidoDeCancelar = 0,
-  aoGerarPix, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
+  pedido, conversaId, nomeCliente, agora, emDesfazer, simulacao = null, bloqueado = false, prerequisito = null, foraDaJanela = false, aoAvancar, aoDesfazer,
+  alvoDoPrerequisito = null, aoIrParaMotivo = null, pedidoDeCancelar = 0, pedidoDeAcao = null,
+  aoGerarPix, aoPedirMeio, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
 }) {
   const [restam, setRestam] = useState(() => (emDesfazer ? SEGUNDOS_PARA_DESFAZER : 0))
@@ -78,7 +80,6 @@ export function BarraProximoPasso({
     setCancelarVisto(pedidoDeCancelar)
     if (pedidoDeCancelar) { setMotivoCancelar(''); setErroCancelar(null); setConfirmando('cancelar') }
   }
-  const { acoes: capacidades } = useAcessoModulos()
   const [abrindoBaixa, setAbrindoBaixa] = useState(false)
   const [pedindoMeio, setPedindoMeio] = useState(false)
   // #1875: o meio tocado na pergunta só fica marcado; criar o pedido e cobrar é o botão de confirmação.
@@ -128,6 +129,32 @@ export function BarraProximoPasso({
   // #1683: estorno e "Voltar etapa" seguem o mesmo padrão: esperam, mostram a recusa, fecham no sucesso.
   const [erroCorrecao, setErroCorrecao] = useState(null)
   const corrigindo = useRef(false)
+  const valorPago = pedido.cobranca?.valorPago ?? pedido.cobranca?.valor ?? 0
+
+  // UC-06 passo 5: o valor nasce pré-preenchido com o que foi pago, editável
+  // para um estorno parcial. Motivo some ao fechar, para não vazar de um
+  // pedido para o próximo em telas que reusam este componente.
+  const iniciarConfirmacao = (chave) => {
+    if (chave === 'estornar') {
+      setMotivoEstorno('')
+      setCentavosEstorno(Math.round(valorPago * 100))
+    }
+    if (chave === 'desfazer') { setMotivoDesfazer(''); setErroDesfazer(null) }
+    if (chave === 'cancelar') { setMotivoCancelar(''); setErroCancelar(null) }
+    setErroCorrecao(null)
+    setAbrindoBaixa(false)
+    setConfirmando(chave)
+  }
+  // #2232 (F7): as ações do pedido (cancelar, estornar, voltar etapa, desfazer pagamento) saíram do ⋮
+  // ao lado de "Marcar pago" e moram no menu "Ações da ficha" do cabeçalho; ele pede por aqui a mesma
+  // confirmação em linha. `n` muda a cada pedido, então escolher a mesma ação duas vezes reabre.
+  // A escolha no menu encerra o "Desfazer · N": a confirmação aparece na hora, não sozinha 10 s depois.
+  const [acaoVista, setAcaoVista] = useState(pedidoDeAcao?.n ?? 0)
+  if (pedidoDeAcao && pedidoDeAcao.n !== acaoVista) {
+    setAcaoVista(pedidoDeAcao.n)
+    setRestam(0)
+    iniciarConfirmacao(pedidoDeAcao.chave)
+  }
 
   // O retorno pertence ao pedido e à etapa que iniciaram a ação. A espera só termina
   // com a Promise, inclusive quando o rascunho ganha pedidoId durante a recarga.
@@ -210,19 +237,25 @@ export function BarraProximoPasso({
   } else if (pedido.estado === 'aguardando') {
     const situacaoCob = situacaoDaCobranca(pedido.cobranca, agora)
     const info = acaoDoPix(situacaoCob, {
-      prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
+      prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'O pedido está vazio.'),
       // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
-      rotuloGerar: fonteApi && !pedido.pedidoId && !gerarSemEnviar ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
+      rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : ROTULOS.GERAR_COBRANCA,
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
+      bloqueado,
       // #1989 (#1765-3): com a forma já escolhida também abre o resumo; quem gera é o "Confirmar".
-      aoGerarPix: () => { if (!pedindoMeio) setMeioNaBarra(pedido.meio ?? null); setPedindoMeio(true) },
+      // #2231: a pergunta cresce para cima; quem a abre tira da frente o que a cobriria.
+      aoGerarPix: () => { if (!pedindoMeio) setMeioNaBarra(pedido.meio ?? null); aoPedirMeio?.(); setPedindoMeio(true) },
       aoReenviarPix: () => executar(() => aoReenviarPix()),
       aoMandarLinkNovo: fonteApi && pedido.pedidoId && esperaLinkNovoApi(pedido.cobranca, pedido.statusApi)
         ? () => executar(() => aoReenviarPix()) : null,
     })
     rotuloEstado = fonteApi && aguardaSinalManual(pedido) ? 'Aguardando sinal' : info.rotuloEstado
+    if (situacaoCob.chave === 'nenhuma') {
+      rotuloEstado = pedido.pedidoId ? 'Sem cobrança' : 'Em montagem'
+      depoisTexto = null
+    }
     if (fonteApi && aguardaSinalManual(pedido)) depoisTexto = pedido.requerAprovacao ? 'Próximo: Aprovação da loja' : 'Próximo: Fila de preparo'
 
     if (info.divergente) {
@@ -240,7 +273,7 @@ export function BarraProximoPasso({
     } else {
       corpoAcao = (
         <div className={css.botoesPrimarios}>
-          {gerarSemEnviar && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: gere sem enviar. Depois copie o link em Pagamento ou use um modelo aprovado.</p>}
+          {foraDaJanela && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: o resumo sai pela mensagem padrão do WhatsApp.</p>}
           {/* #1686 (item 9): o motivo que segura o botão leva ao campo que resolve. */}
           {info.motivo && (info.motivo === prerequisito && alvoDoPrerequisito && aoIrParaMotivo
             ? <p className={css.motivoDesabilitado}><button type="button" className={css.linkMotivo} data-alvo-motivo={alvoDoPrerequisito}
@@ -280,7 +313,7 @@ export function BarraProximoPasso({
                 disabled={!meioNaBarra || emVoo}
                 onClick={() => { const meio = meioNaBarra; setPedindoMeio(false); setMeioNaBarra(null); return executar(() => aoGerarPix(meio), GERANDO_COBRANCA) }}
               >
-                {fonteApi && !pedido.pedidoId && !gerarSemEnviar ? 'Confirmar e enviar' : 'Confirmar e gerar'}
+                {fonteApi && !pedido.pedidoId ? 'Confirmar e enviar' : 'Confirmar e gerar'}
               </Botao>
               <Botao largo variante="secundario" disabled={emVoo} onClick={() => { setPedindoMeio(false); setMeioNaBarra(null) }}>
                 Voltar
@@ -376,7 +409,7 @@ export function BarraProximoPasso({
           </Botao>
           {pedeSaldo && (
             <Botao largo variante="secundario" disabled={emVoo} onClick={() => avancarPasso(proximo.id, { confirmarSaldoAReceber: true })}>
-              Marcar entregue mesmo assim
+              Entregar e cobrar depois
             </Botao>
           )}
           {botaoComplemento}
@@ -395,35 +428,11 @@ export function BarraProximoPasso({
   const alocadoApi = pedido.alocadoApi ?? pedido.totalPagoApi
   const naFilaSemQuitar = Boolean(pedido.pedidoId) && saldoApi(pedido) > 0
   if (naFilaSemQuitar && pedido.estado === 'pago' && !aguardaAprovacao(pedido)) rotuloEstado = 'Na fila de preparo'
-  const podeVoltarEtapa = Boolean(anterior) && disponivel('corrigirPasso')
   const temPagamento = alocadoApi > 0 || pedido.totalPagoApi > 0 || Boolean(pedido.cobranca?.pagaEm)
-  const podeCancelar = disponivel('cancelarPedido') && (fonteApi
-    ? Boolean(pedido.pedidoId) && (!temPagamento || capacidades?.cancelarPedidoPago === true)
-    : pedido.estado === 'aguardando')
-  // Estornar é devolver dinheiro que entrou. Pedido sem cobrança paga (venda
-  // antiga, massa de teste) não tem o que devolver, e oferecer o item aqui
-  // levava a confirmar "você já devolveu R$ 0,00" (QA7, achado 1).
-  const podeEstornar = pedido.estado !== 'aguardando' && Boolean(pedido.cobranca?.pagaEm) && disponivel('marcarEstorno')
-  const valorPago = pedido.cobranca?.valorPago ?? pedido.cobranca?.valor ?? 0
-  const podeDesfazer = podeDesfazerPagamento(pedido)
   const valorParaDesfazer = ultimoPagamentoApi(pedido)?.valor ?? valorPago
   const estornoValido = motivoEstorno.trim().length >= 3
     && centavosEstorno > 0 && !moedaAltaDemais(centavosEstorno)
     && centavosEstorno <= Math.round(valorPago * 100)
-
-  // UC-06 passo 5: o valor nasce pré-preenchido com o que foi pago, editável
-  // para um estorno parcial. Motivo some ao fechar, para não vazar de um
-  // pedido para o próximo em telas que reusam este componente.
-  const iniciarConfirmacao = (chave) => {
-    if (chave === 'estornar') {
-      setMotivoEstorno('')
-      setCentavosEstorno(Math.round(valorPago * 100))
-    }
-    if (chave === 'desfazer') { setMotivoDesfazer(''); setErroDesfazer(null) }
-    if (chave === 'cancelar') { setMotivoCancelar(''); setErroCancelar(null) }
-    setErroCorrecao(null)
-    setConfirmando(chave)
-  }
 
   const confirmarCancelamento = async () => {
     if (cancelando.current) return
@@ -502,16 +511,15 @@ export function BarraProximoPasso({
       >
         {PASSOS.map((passo) => {
           const situacao = situacaoDoPasso(passo.id, pedido.estado)
-          const concluido = situacao.chave === 'feito' || situacao.chave === 'atual'
           return (
             <li
               key={passo.id}
               aria-current={situacao.chave === 'atual' ? 'step' : undefined}
-              className={`${css.trilhaItem} ${css[situacao.chave === 'proximo' ? 'futuro' : situacao.chave]} ${concluido ? css.concluido : ''}`}
+              className={`${css.trilhaItem} ${css[situacao.chave === 'proximo' ? 'futuro' : situacao.chave]}`}
               aria-label={`${naFilaSemQuitar && passo.id === 'pago' ? 'Fila' : passo.rotulo}, ${situacao.rotulo}`}
             >
               <span className={css.circuloPasso} aria-hidden="true">
-                <Icone nome={ICONE_DA_TRILHA[passo.id]} tamanho={18} />
+                <Icone nome={ICONE_DA_TRILHA[passo.id]} tamanho={20} />
               </span>
               <span className={css.rotuloPasso} aria-hidden="true">{naFilaSemQuitar && passo.id === 'pago' ? 'Fila' : ROTULO_CURTO[passo.id] ?? passo.rotulo}</span>
             </li>
@@ -541,13 +549,6 @@ export function BarraProximoPasso({
       {confirmando === null && !abrindoBaixa && (
         <div className={css.linhaAcao} aria-busy={emVoo}>
           {corpoAcao}
-          <MenuDoPedido
-            podeCancelar={podeCancelar}
-            podeEstornar={podeEstornar}
-            podeVoltarEtapa={podeVoltarEtapa}
-            podeDesfazerPagamento={podeDesfazer}
-            aoEscolher={iniciarConfirmacao}
-          />
         </div>
       )}
 
@@ -575,20 +576,20 @@ export function BarraProximoPasso({
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape em qualquer campo fecha a confirmação; o form é o único ancestral comum.
         <form className={css.confirmarCorrecao} onKeyDown={teclaDaConfirmacao} onSubmit={(evento) => {
           evento.preventDefault()
-          if (!emVoo && !(fonteApi && motivoCancelar.trim().length < 3)) confirmarCancelamento()
+          if (!emVoo && !(fonteApi && (motivoCancelar.trim().length < 3 || algumPassaDoLimite([motivoCancelar, LIMITE_MOTIVO_CANCELAR])))) confirmarCancelamento()
         }}>
           <p className={css.corpoBloco}>
             Cancelar o pedido {pedido.numero}? {fonteApi ? 'Avise o cliente pela conversa após confirmar.' : `${nomeCliente} recebe aviso de cancelamento.`}
           </p>
           {fonteApi && <CampoArea rotulo="Motivo do cancelamento" value={motivoCancelar}
-            onChange={(e) => setMotivoCancelar(e.target.value)} maxLength={500} disabled={emVoo} autoFocus />}
+            onChange={(e) => setMotivoCancelar(e.target.value)} limite={LIMITE_MOTIVO_CANCELAR} disabled={emVoo} autoFocus />}
           {fonteApi && temPagamento && <p className={css.corpoBloco}>
             O cancelamento não devolve o pagamento automaticamente. A devolução deve ser tratada separadamente.
           </p>}
           {erroCancelar && <p className={css.motivoDesabilitado} role="alert">{erroCancelar}</p>}
           <p className={css.confirmarAcoes}>
             <Botao variante="texto" disabled={emVoo} autoFocus={!fonteApi} onClick={() => setConfirmando(null)}>Manter</Botao>
-            <Botao variante="perigo" tipo="submit" disabled={emVoo || (fonteApi && motivoCancelar.trim().length < 3)}>
+            <Botao variante="perigo" tipo="submit" disabled={emVoo || (fonteApi && (motivoCancelar.trim().length < 3 || algumPassaDoLimite([motivoCancelar, LIMITE_MOTIVO_CANCELAR])))}>
               {emVoo ? 'Cancelando…' : 'Cancelar pedido'}
             </Botao>
           </p>

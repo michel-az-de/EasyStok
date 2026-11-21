@@ -6,7 +6,7 @@ import { IconeDoModulo } from '../../componentes/IconeDoModulo'
 import { Modal } from '../../componentes/Modal'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
-import { MODULOS, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
+import { MODULOS, NOME_INICIO, TELA_AJUSTE, hashDoModulo, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 import { HASH_HALL, ROTA_PRINCIPAL, rotaDaHash } from '../../dominio/rota'
 import { AbaCaixaApi } from './caixa/AbaCaixaApi'
 import { PainelFinanceiro } from './financeiro/PainelFinanceiro'
@@ -14,6 +14,8 @@ import { AbaIntegracoesApi } from './integracoes/AbaIntegracoesApi'
 import { AbaAtendimento } from './atendimento/AbaAtendimento'
 import { AbaAvisos } from './avisos/AbaAvisos'
 import { AbaImpressao } from './impressao/AbaImpressao'
+import { PainelCadastros } from './cadastros/PainelCadastros'
+import { PainelPedidos } from './cadastros/PainelPedidos'
 import { AbaRespostas } from './respostas/AbaRespostas'
 import { TelaCanais } from './canais/TelaCanais'
 import { AbaUsuarios } from './usuarios/AbaUsuarios'
@@ -28,6 +30,9 @@ import { AbaReceitasApi } from './producao/AbaReceitasApi'
 import { AbaCalculadoraApi } from './producao/AbaCalculadoraApi'
 import { AbaPlanejamentoApi } from './producao/AbaPlanejamentoApi'
 import { AbaPerdasApi } from './producao/AbaPerdasApi'
+import { ChecklistConfiguracao } from './producao/ChecklistConfiguracao'
+import { PainelTurnoDeHoje } from './turno/PainelTurnoDeHoje'
+import { contarUsoDaGestao, identidadeDaGestao, lerUsoDaGestao } from '../../aplicacao/useTurnoDeHoje'
 import { useAtendimento } from '../../aplicacao/contextos'
 import css from './gestao.module.css'
 
@@ -49,7 +54,9 @@ function navegarAbas(evento, itens, indice, escolher, botoes, vertical = false) 
 
 // A janela e as rotas usam o mesmo catálogo, as mesmas permissões e o mesmo
 // PainelDeAjuste. Trocar uma aba aqui mantém a conversa e o pedido montados.
-export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
+// #2832: no modo API o início abre no painel "Agora" (Turno de hoje); "Todas as telas" é o índice de antes.
+// `renderizarEnviarCardapio` vem do App: o modal de enviar o cardápio é da feature do atendimento.
+export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, focoInicial = null, janelasApi = null, avisosApi = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null, renderizarEnviarCardapio = null }) {
   const { fonteApi } = useAtendimento()
   const { permite, acoes } = useAcessoModulos()
   const areas = useMemo(() => MODULOS
@@ -59,6 +66,10 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
   const [abaAtiva, setAbaAtiva] = useState(abaInicial)
   const [inicio, setInicio] = useState(!abaInicial)
   const [busca, setBusca] = useState('')
+  const [vista, setVista] = useState(fonteApi ? 'agora' : 'telas')
+  const [identidade] = useState(identidadeDaGestao)
+  const [uso, setUso] = useState(() => lerUsoDaGestao(identidade))
+  const telasDisponiveis = useMemo(() => areas.flatMap((modulo) => modulo.telas).filter((t) => !(fonteApi && t.indisponivelNaApi)), [areas, fonteApi])
   const termo = busca.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
   const encontradas = areas.map((modulo) => ({
     ...modulo,
@@ -79,6 +90,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
     else painelRef.current?.focus({ preventScroll: true })
   }, [inicio, abaAtiva])
   function escolherTela(item) {
+    setUso(contarUsoDaGestao(identidade, item.aba))
     mudarFoco.current = inicio
     setInicio(false)
     setAbaAtiva(item.aba)
@@ -121,7 +133,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
           {avisosApi && <div className={css.avisosGestao}>{avisosApi}</div>}
           <div className={css.acoesGestao}>
             <a className={css.verModulos} href={HASH_HALL} onClick={aoFechar}>
-              <Icone nome="painel" tamanho={18} /> Ver módulos
+              <Icone nome="painel" tamanho={20} /> {NOME_INICIO}
             </a>
             <Botao onClick={aoFechar}>Fechar</Botao>
           </div>
@@ -130,6 +142,15 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
     >
       {area && inicio ? (
         <div className={css.inicioGestao}>
+          {fonteApi && (
+            <div className={css.vistasGestao}>
+              <Botao variante={vista === 'agora' ? 'primario' : 'secundario'} aria-pressed={vista === 'agora'} onClick={() => setVista('agora')}>Agora</Botao>
+              <Botao variante={vista === 'telas' ? 'primario' : 'secundario'} aria-pressed={vista === 'telas'} onClick={() => setVista('telas')}>Todas as telas</Botao>
+            </div>
+          )}
+          {vista === 'agora' ? (
+            <PainelTurnoDeHoje telas={telasDisponiveis} uso={uso} aoAbrirAba={(aba) => escolherTela({ aba })} renderizarEnviarCardapio={renderizarEnviarCardapio} />
+          ) : <>
           <div ref={buscaRef}><CampoTexto rotulo="O que você quer fazer?" placeholder="Buscar por respostas, estoque, caixa…" value={busca} onChange={(evento) => setBusca(evento.target.value)} /></div>
           <div className={css.tarefasGestao}>
             {encontradas.map((modulo) => (
@@ -148,6 +169,7 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
             ))}
           </div>
           {encontradas.length === 0 && <Vazio titulo="Nenhuma tela encontrada">Tente outro nome.</Vazio>}
+          </>}
         </div>
       ) : area ? (
         <>
@@ -221,13 +243,13 @@ export function ModalGestao({ aoFechar, abaInicial = null, aoTrocarAba = null, f
               className={css.painelGestao}
               onClickCapture={seguirLink}
             >
-              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} renderizarEditorCardapio={renderizarEditorCardapio} horariosAtendimento={horariosAtendimento} abasDaDemonstracao={abasDaDemonstracao} />
+              <PainelDeAjuste aba={tela.aba} focoInicial={focoInicial} janelasApi={janelasApi} aoAbrirAba={abrirAba} aoAbrirConversa={aoFechar} renderizarEditorCardapio={renderizarEditorCardapio} horariosAtendimento={horariosAtendimento} abasDaDemonstracao={abasDaDemonstracao} />
             </div>
           </section>
         </div>
         </>
       ) : (
-        <Vazio titulo="Nenhum ajuste disponível">Consulte as telas disponíveis em Ver módulos.</Vazio>
+        <Vazio titulo="Nenhum ajuste disponível">Consulte as telas disponíveis no {NOME_INICIO}.</Vazio>
       )}
     </Modal>
   )
@@ -251,7 +273,7 @@ function AbaNaoLigada({ texto, saida = null }) {
   return (
     <Vazio titulo="Em preparação" acao={telas.length > 0
       ? telas.map(tela => <a className={css.saidaPreparacao} key={tela.id} href={hashDoModulo(modulo.id, tela.id)}>{tela.rotulo}</a>)
-      : <a className={css.saidaPreparacao} href={HASH_HALL}>Ver módulos</a>}>
+      : <a className={css.saidaPreparacao} href={HASH_HALL}>{NOME_INICIO}</a>}>
       {texto}
     </Vazio>
   )
@@ -262,7 +284,7 @@ function AbaNaoLigada({ texto, saida = null }) {
 // da S45 (o mesmo de Entregas › Janelas e frete), no lugar da aba de demonstração.
 // `abasDaDemonstracao` (#2017): as abas que só a demonstração tem (caixa, janelas, integrações, produção e
 // fidelidade com dados do navegador). O App as entrega; no build de produção não existem.
-export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
+export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoAbrirAba = null, aoAbrirConversa = null, renderizarEditorCardapio, horariosAtendimento, abasDaDemonstracao = null }) {
   const { fonteApi } = useAtendimento()
   const { AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao } = abasDaDemonstracao ?? {}
   const painelDaAba = useMemo(() => ({
@@ -303,7 +325,13 @@ export function PainelDeAjuste({ aba, focoInicial = null, janelasApi = null, aoA
     perdas: <AbaPerdasApi />,
   }), [fonteApi, focoInicial, janelasApi, aoAbrirAba, renderizarEditorCardapio, horariosAtendimento, AbaCaixa, AbaFidelidade, AbaIntegracoes, AbaJanelas, AbaProducao])
   if (fonteApi && aba?.startsWith('financeiro-')) return <PainelFinanceiro key={aba} tela={aba.slice('financeiro-'.length)} />
+  if (fonteApi && aba === 'cadastros-pedidos') return <PainelPedidos key={aba} aoAbrirConversa={aoAbrirConversa} />
+  if (fonteApi && aba?.startsWith('cadastros-')) return <PainelCadastros key={aba} tela={aba.slice('cadastros-'.length)} respostas={<AbaRespostas comAutomaticas={false} />} impressao={<AbaImpressao />} aoAbrirConversa={aoAbrirConversa} />
   const painel = painelDaAba[aba] ?? null
   if (fonteApi && AINDA_NAO_LIGADO[aba]) return <AbaNaoLigada {...AINDA_NAO_LIGADO[aba]} />
+  // #2362: toda tela da Produção mostra no topo o que falta configurar, nas duas casas (rota e Gestão).
+  if (fonteApi && ABAS_DA_PRODUCAO.has(aba)) return <><ChecklistConfiguracao key={aba} />{painel}</>
   return painel
 }
+
+const ABAS_DA_PRODUCAO = new Set(moduloPorId('producao')?.telas.map((t) => t.aba) ?? [])

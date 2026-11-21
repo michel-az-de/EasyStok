@@ -1,3 +1,4 @@
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
@@ -8,6 +9,7 @@ using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Application.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento;
@@ -16,8 +18,71 @@ public class CriarPedidoAtendimentoUseCaseTests
 {
     private static readonly DateTime Agora = new(2026, 6, 1, 15, 0, 0, DateTimeKind.Utc);
 
-    [Fact]
-    public async Task OrigemWhatsappEObservacaoPorItem()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SnapshotDoTurnoAnteriorRecusaPedidoAntesDaReserva(bool mudouIdentidade)
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresa = c.Storefront.EmpresaId;
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresa, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100" };
+        cliente.Enderecos.Add(endereco);
+        var clientes = Substitute.For<IClienteRepository>();
+        clientes.GetByIdWithDetailsAsync(empresa, cliente.Id).Returns(cliente);
+        var conversa = Conversa.Abrir(empresa, "5511999990001", Agora, clienteId: cliente.Id);
+        var revisaoDoTurno = conversa.VinculoRevisao;
+        if (mudouIdentidade)
+        {
+            conversa.CorrigirVinculoCliente(null, revisaoDoTurno);
+            conversa.CorrigirVinculoCliente(cliente.Id, conversa.VinculoRevisao);
+        }
+        else conversa.Assumir(Agora);
+        var conversas = Substitute.For<IConversaRepository>();
+        conversas.EspelharLeituraComLock();
+        conversas.ObterPorIdAsync(empresa, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var useCase = c.CriarPedidoAtendimento(conversas, clientes, Substitute.For<IUnitOfWork>());
+
+        await useCase.Invoking(s => s.ExecuteAsync(new(empresa, conversa.Id, cliente.Id,
+            [new(c.CardapioItemId, 2)], c.JanelaId, c.DataEntrega, endereco.Id,
+            VinculoRevisaoEsperada: revisaoDoTurno, SituacaoEsperada: SituacaoConversa.Automatica)))
+            .Should().ThrowAsync<RegraDeDominioVioladaException>();
+
+        c.PedidosAdicionados.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CorrecaoEnquantoEsperaLockRecusaPedidoComClienteAntigo(bool restaurarMesmaPessoa)
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresa = c.Storefront.EmpresaId;
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresa, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true };
+        cliente.Enderecos.Add(endereco);
+        var clientes = Substitute.For<IClienteRepository>();
+        clientes.GetByIdWithDetailsAsync(empresa, cliente.Id).Returns(cliente);
+        var conversa = Conversa.Abrir(empresa, "5511999990001", Agora, clienteId: cliente.Id);
+        var conversas = Substitute.For<IConversaRepository>();
+        conversas.ObterPorIdAsync(empresa, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        conversas.ObterPorIdComLockAsync(empresa, conversa.Id, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            conversa.CorrigirVinculoCliente(null, 0);
+            if (restaurarMesmaPessoa) conversa.CorrigirVinculoCliente(cliente.Id, 1);
+            return conversa;
+        });
+        var useCase = c.CriarPedidoAtendimento(conversas, clientes, Substitute.For<IUnitOfWork>());
+        await useCase.Invoking(s => s.ExecuteAsync(new(empresa, conversa.Id, cliente.Id,
+            [new(c.CardapioItemId, 2)], c.JanelaId, c.DataEntrega, endereco.Id)))
+            .Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("A identidade mudou*");
+        c.PedidosAdicionados.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(CanalConversa.WhatsApp, OrigemPedido.WhatsApp)]
+    [InlineData(CanalConversa.ChatSite, OrigemPedido.Storefront)]
+    public async Task OrigemDoCanalEObservacaoPorItem(CanalConversa canal, string origem)
     {
         var c = new CheckoutCoreServiceTests.Cenario();
         var empresaId = c.Storefront.EmpresaId;
@@ -32,8 +97,8 @@ public class CriarPedidoAtendimentoUseCaseTests
         var clienteRepo = Substitute.For<IClienteRepository>();
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
 
-        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
-        var conversaRepo = Substitute.For<IConversaRepository>();
+        var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id, canal);
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
@@ -51,7 +116,7 @@ public class CriarPedidoAtendimentoUseCaseTests
             Observacoes: "tocar a campainha"));
 
         var pedido = reservado.Pedido;
-        pedido.Origem.Should().Be(OrigemPedido.WhatsApp).And.Be("whatsapp");
+        pedido.Origem.Should().Be(origem);
         pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento);
         pedido.ClienteId.Should().Be(cliente.Id);
         pedido.Observacoes.Should().Be("tocar a campainha");
@@ -75,6 +140,44 @@ public class CriarPedidoAtendimentoUseCaseTests
     }
 
     [Fact]
+    public async Task OrigemDoPedidoDoChatDoSiteSegueOCanalDaConversa()
+    {
+        var c = new CheckoutCoreServiceTests.Cenario();
+        var empresaId = c.Storefront.EmpresaId;
+
+        var cliente = new Cliente { Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Maria" };
+        var endereco = new ClienteEndereco { Id = Guid.NewGuid(), ClienteId = cliente.Id, Cep = "01310-100", Padrao = true,
+            Logradouro = "Rua escolhida", Numero = "42", Bairro = "Centro", Cidade = "São Paulo", Estado = "SP" };
+        cliente.Endereco = "Rua do cadastro antigo, 10";
+        c.EntregaGeocoding.GeocodificarAsync(Arg.Any<EasyStock.Application.Ports.Output.Lookup.GeocodeQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new EasyStock.Application.Ports.Output.Lookup.GeocodeResultado(-23.55, -46.63, true));
+        cliente.Enderecos.Add(endereco);
+        var clienteRepo = Substitute.For<IClienteRepository>();
+        clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
+
+        var conversa = Conversa.Abrir(empresaId, "visitante-chat-1", Agora, "Maria", cliente.Id, EasyStock.Domain.Enums.Atendimento.CanalConversa.ChatSite);
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
+        conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+
+        var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, unitOfWork);
+
+        var reservado = await useCase.ExecuteAsync(new CriarPedidoAtendimentoInput(
+            EmpresaId: empresaId,
+            ConversaId: conversa.Id,
+            ClienteId: cliente.Id,
+            Itens: new List<ItemPedidoCheckout> { new(c.CardapioItemId, 3, "sem granulado") },
+            JanelaId: c.JanelaId,
+            DataEntrega: c.DataEntrega,
+            EnderecoId: endereco.Id,
+            Observacoes: "tocar a campainha"));
+
+        var pedido = reservado.Pedido;
+        pedido.Origem.Should().Be(OrigemPedido.Storefront).And.Be("storefront");
+    }
+
+    [Fact]
     public async Task PedidoNasceComNomeTelefoneEAptoDoCliente()
     {
         // #1474 B4: sem o retrato do cliente, o KDS e as Entregas mostravam "Cliente sem nome".
@@ -91,7 +194,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
 
         var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
-        var conversaRepo = Substitute.For<IConversaRepository>();
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());
@@ -123,7 +226,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
 
         var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Joana", Guid.NewGuid());
-        var conversaRepo = Substitute.For<IConversaRepository>();
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
@@ -157,7 +260,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
 
         var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
-        var conversaRepo = Substitute.For<IConversaRepository>();
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());
@@ -191,7 +294,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
 
         var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
-        var conversaRepo = Substitute.For<IConversaRepository>();
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
@@ -225,7 +328,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
 
         var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
-        var conversaRepo = Substitute.For<IConversaRepository>();
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
@@ -296,7 +399,7 @@ public class CriarPedidoAtendimentoUseCaseTests
         clienteRepo.GetByIdWithDetailsAsync(empresaId, cliente.Id).Returns(cliente);
 
         var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
-        var conversaRepo = Substitute.For<IConversaRepository>();
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var agora = c.Relogio.GetUtcNow().UtcDateTime;
@@ -327,7 +430,28 @@ public class CriarPedidoAtendimentoUseCaseTests
         await unitOfWork.Received(1).CommitAsync();
     }
 
-    private static async Task<(PedidoReservado Reservado, Conversa Conversa)> CriarNaConversa(bool? foraDeAreaLiberado)
+    // #2928 S4: o pedido nasce com o anúncio que valia na conversa, e não muda se a conversa mudar depois.
+    [Fact]
+    public async Task PedidoNasceComAOrigemDoAnuncioDaConversa()
+    {
+        var origem = EasyStock.Domain.ValueObjects.OrigemAnuncio.DoAnuncioWhatsApp("111", "Promo", "ctwa", new DateTimeOffset(Agora));
+
+        var (reservado, conversa) = await CriarNaConversa(null, origem);
+
+        reservado.Pedido.OrigemAnuncio.Should().BeSameAs(origem);
+        conversa.OrigemAnuncio.Should().BeSameAs(origem);
+    }
+
+    [Fact]
+    public async Task ConversaSemAnuncio_PedidoSemOrigem()
+    {
+        var (reservado, _) = await CriarNaConversa(null);
+
+        reservado.Pedido.OrigemAnuncio.Should().BeNull();
+    }
+
+    private static async Task<(PedidoReservado Reservado, Conversa Conversa)> CriarNaConversa(
+        bool? foraDeAreaLiberado, EasyStock.Domain.ValueObjects.OrigemAnuncio? origem = null)
     {
         var c = new CheckoutCoreServiceTests.Cenario();
         var empresaId = c.Storefront.EmpresaId;
@@ -340,7 +464,8 @@ public class CriarPedidoAtendimentoUseCaseTests
 
         var conversa = Conversa.Abrir(empresaId, "5511999998888", Agora, "Maria", cliente.Id);
         ContextoConversaJson.Gravar(conversa, ContextoConversaJson.ForaDeAreaLiberado, foraDeAreaLiberado);
-        var conversaRepo = Substitute.For<IConversaRepository>();
+        conversa.RegistrarOrigemAnuncio(origem);
+        var conversaRepo = Substitute.For<IConversaRepository>().EspelharLeituraComLock();
         conversaRepo.ObterPorIdAsync(empresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         var useCase = c.CriarPedidoAtendimento(conversaRepo, clienteRepo, Substitute.For<IUnitOfWork>());

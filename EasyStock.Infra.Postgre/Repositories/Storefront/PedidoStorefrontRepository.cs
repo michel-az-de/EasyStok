@@ -35,7 +35,7 @@ public sealed class PedidoStorefrontRepository(EasyStockDbContext db) : IPedidoS
             throw new InvalidOperationException(
                 "GetForUpdateAsync deve ser chamado dentro de IUnitOfWork.ExecuteInTransactionAsync — " +
                 "sem transação ativa, o FOR UPDATE é descartado pelo Postgres e a serialização entre " +
-                "agentes Babá fica quebrada (race em aprovar/recusar concorrente).");
+                "agentes Baba fica quebrada (race em aprovar/recusar concorrente).");
 
         // #1265-9: a empresa vai no WHERE; a linha de outra empresa não é travada.
         return await TravarAsync(

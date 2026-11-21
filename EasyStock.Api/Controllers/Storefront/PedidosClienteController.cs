@@ -190,42 +190,11 @@ public sealed class PedidosClienteController(
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Lê o cookie de sessão e extrai o sid (Guid). Aceita Guid direto (compat
-    /// com testes/dev) ou extrai do payload "sid" de JWT (parsing minimal —
-    /// validação de assinatura fica para middleware dedicado quando
-    /// TASK-EZ-AUTH-002 for integrado). Espelha <see cref="CheckoutController"/>.
+    /// Lê o cookie de sessão: o Guid da <c>ClienteSession</c> que o <c>AuthController</c> grava. #2370: o antigo
+    /// parse de JWT sem validar assinatura saiu; o cookie nunca foi JWT e decodificar sem assinatura é convite a forjar.
     /// </summary>
-    private Guid? ObterSessionId()
-    {
-        if (!Request.Cookies.TryGetValue(SessionCookieName, out var cookieValue)
-            || string.IsNullOrWhiteSpace(cookieValue))
-            return null;
-
-        if (Guid.TryParse(cookieValue, out var guid))
-            return guid;
-
-        try
-        {
-            var parts = cookieValue.Split('.');
-            if (parts.Length >= 2)
-            {
-                var payloadJson = System.Text.Encoding.UTF8.GetString(
-                    Convert.FromBase64String(PadBase64(parts[1])));
-                using var doc = System.Text.Json.JsonDocument.Parse(payloadJson);
-                if (doc.RootElement.TryGetProperty("sid", out var sidEl)
-                    && Guid.TryParse(sidEl.GetString(), out var sidGuid))
-                    return sidGuid;
-            }
-        }
-        catch { /* JWT malformado — retorna null */ }
-
-        return null;
-    }
-
-    private static string PadBase64(string base64) => (base64.Length % 4) switch
-    {
-        2 => base64 + "==",
-        3 => base64 + "=",
-        _ => base64,
-    };
+    private Guid? ObterSessionId() =>
+        Request.Cookies.TryGetValue(SessionCookieName, out var cookieValue) && Guid.TryParse(cookieValue, out var guid)
+            ? guid
+            : null;
 }

@@ -7,6 +7,8 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
             builder.ToTable("refresh_tokens");
 
             builder.HasKey(rt => rt.Id);
+            builder.HasOne<SessaoNativa>().WithMany().HasForeignKey(rt => rt.SessaoNativaId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Property(rt => rt.Id)
                 .ValueGeneratedOnAdd()

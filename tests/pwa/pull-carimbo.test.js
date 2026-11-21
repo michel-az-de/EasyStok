@@ -106,4 +106,56 @@ module.exports = function ({ test, sandbox, assert }) {
     assert.strictEqual(state.batches.length, 1);
     assert.strictEqual(state.batches[0].id, 'b-pull-1');
   });
+
+  // #2431: pedido do app pago no console ou no Mercado Pago desce so com o saldo a receber.
+  function pedidoLocal(extra) {
+    return Object.assign({
+      id: 'o-pull-1', status: 'aguardando', total: 50, updatedAt: 1,
+      clientSnapshot: { name: 'Ana' }, items: [{ productId: 'p1', name: 'Lasanha', qty: 1 }],
+      observacaoLocal: 'so no aparelho'
+    }, extra || {});
+  }
+  function estadoComPedidos(orders) {
+    return { products: [], clients: [], orders, cashEntries: [], batches: [], cashClosings: [] };
+  }
+  function aReceber(id, valor) {
+    return { id: 'srv-ar-' + id, deviceId: 'server', type: 'order.aReceber', ts: 1, payload: { id, aReceber: valor } };
+  }
+
+  test('#2431: saldo a receber chega ao pedido local sem trocar o resto', async () => {
+    const state = estadoComPedidos([pedidoLocal()]);
+
+    const reloads = await pullCom(state, [aReceber('o-pull-1', 0)]);
+
+    const pedido = state.orders[0];
+    assert.strictEqual(pedido.aReceber, 0);
+    assert.strictEqual(pedido.observacaoLocal, 'so no aparelho', 'campo local preservado');
+    assert.strictEqual(pedido.items.length, 1);
+    assert.strictEqual(reloads, 1, 'mudou: a tela recarrega');
+  });
+
+  test('#2431: saldo igual ao local nao recarrega a tela', async () => {
+    const state = estadoComPedidos([pedidoLocal({ aReceber: 30 })]);
+
+    const reloads = await pullCom(state, [aReceber('o-pull-1', 30)]);
+
+    assert.strictEqual(reloads, 0);
+  });
+
+  test('#2431: saldo de pedido que o aparelho nao tem nao cria pedido', async () => {
+    const state = estadoComPedidos([]);
+
+    const reloads = await pullCom(state, [aReceber('o-outro', 0)]);
+
+    assert.strictEqual(state.orders.length, 0);
+    assert.strictEqual(reloads, 0);
+  });
+
+  test('#2431: saldo sem valor nao marca o pedido como pago', async () => {
+    const state = estadoComPedidos([pedidoLocal({ aReceber: 50 })]);
+
+    await pullCom(state, [aReceber('o-pull-1', null)]);
+
+    assert.strictEqual(state.orders[0].aReceber, 50);
+  });
 };

@@ -45,8 +45,8 @@ public class ItensDoCardapioComandaUseCaseTests
         var aviso = new AvisoItemComInteresse(_storefronts, Substitute.For<IInteresseItemRepository>(), Substitute.For<IOperacaoEventPublisher>());
         return new ItensDoCardapioComandaUseCase(
             _storefronts,
-            new AdicionarCardapioItemAdminUseCase(_storefronts, _cardapio, Substitute.For<IProdutoRepository>(), _uow),
-            new EditarCardapioItemAdminUseCase(_cardapio, _uow),
+            new AdicionarCardapioItemAdminUseCase(_storefronts, _cardapio, Substitute.For<IProdutoRepository>(), _secoesRepo, _uow),
+            new EditarCardapioItemAdminUseCase(_cardapio, _secoesRepo, _uow),
             new ToggleVisibilidadeCardapioItemAdminUseCase(_cardapio, _uow, aviso),
             _cardapio,
             _secoesRepo,

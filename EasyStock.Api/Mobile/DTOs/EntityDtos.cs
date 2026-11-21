@@ -10,7 +10,9 @@ public record ProductDto(
     string Category,
     string? Unit,
     decimal? Price,
-    int Stock,
+    // #2718: saldo fracionado (1,5 kg). Inteiro continua saindo como inteiro no JSON (1, não 1.000).
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(SaldoSemZerosFinaisJsonConverter))]
+    decimal Stock,
     bool? Custom,
     // Etiquetas de produção (opcionais — APKs antigos não enviam).
     string? Sku = null,
@@ -43,15 +45,22 @@ public record ClientDto(
     string? Address,
     string? Phone,
     long LastOrder,
-    int OrderCount
+    int OrderCount,
+    // CLI-5 (#2321): CPF/CNPJ digitado no app. Opcional e no fim: APK antigo nao manda. Nao ha
+    // coluna em mobile_clients; o valor vai direto para Cliente.Documento do ERP.
+    string? Document = null
 );
 
+/// <summary>
+/// #2083: <c>Qty</c> é decimal porque o item do pedido do console pode ser fracionado (1,5 kg). O espelho
+/// <c>mobile_order_items.qty</c> ainda é inteiro (#2707): ver <see cref="Services.SyncMutationDispatcher.QtyDoEspelho"/>.
+/// </summary>
 public record OrderItemDto(
     string ProductId,
     string Name,
     string? Emoji,
     string? Unit,
-    int Qty,
+    decimal Qty,
     decimal UnitPrice
 );
 
@@ -76,7 +85,11 @@ public record OrderDto(
     long? ScheduledDeliveryAt = null,
     // #1493 — forma de pagamento escolhida no PWA ao entregar. NULL = aparelho antigo.
     string? Metodo = null,
-    string? LegacyHistoryStatus = null
+    string? LegacyHistoryStatus = null,
+    // #2307: quanto falta receber do Pedido ERP (desconta estorno e cupom). NULL = o servidor nao sabe.
+    decimal? AReceber = null,
+    // #409: por onde o pedido chegou (balcao, whatsapp, ifood, telefone). NULL = não informado.
+    string? Channel = null
 );
 
 public record BatchItemDto(
@@ -108,7 +121,9 @@ public record BatchDto(
     long? DiscardedAt = null,
     string? DiscardedBy = null,
     string? DiscardReason = null,
-    bool? LegacyImported = null
+    bool? LegacyImported = null,
+    // #2209: número curto do Lote do ERP, o da barra Code128 C. Só o servidor preenche; no push ele é ignorado.
+    string? NumeroCurto = null
 );
 
 public record CashEntryDto(

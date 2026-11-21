@@ -9,15 +9,17 @@ import { ATENDENTE } from '../reducer/estadoInicial'
 // mesmos casos (`aplicacao/acoesApi.js`, `api/*`): não são da demonstração.
 
 export const casosAtendimento = {
-  [acao.SELECIONAR_CONVERSA]: (estado, { id }) => ({
+  [acao.SELECIONAR_CONVERSA]: (estado, { id, reter = false }) => ({
     ...estado,
     selecionadaId: id,
+    // #2921: conversa iniciada pela equipe, fora da fila até a cliente responder: a sincronização a retém enquanto selecionada.
+    selecaoRetida: reter ? id : null,
     selecaoPendente: estado.conversas.some((c) => c.id === id) ? null : { id, voltas: 0 },
     agente: estado.agente.conversaId === id ? estado.agente : { estado: 'ocioso', sugestao: null, conversaId: null },
   }),
 
   [acao.MUDAR_FILTRO]: (estado, { chave, valor }) => ({
-    ...estado, filtros: { ...estado.filtros, [chave]: valor },
+    ...estado, filtros: { ...estado.filtros, ...('posicao' in estado.filtros ? { posicao: 0 } : {}), [chave]: valor },
   }),
 
   // O rascunho vive no estado da conversa, não dentro do componente. Assim o
@@ -26,17 +28,24 @@ export const casosAtendimento = {
   [acao.DEFINIR_RASCUNHO]: (estado, { id, texto, doCampo = false, escritaVista, adotar = false }) =>
     (doCampo ? comRascunhoDoCampo(estado, { id, texto, escritaVista, adotar }) : comRascunhoDeFora(estado, id, texto)),
 
-  [acao.ENVIAR_MENSAGEM]: (estado, { id, texto, agora, mensagemId, modelo = false, automatica = false, regra = null }) => {
+  [acao.ENVIAR_MENSAGEM]: (estado, { id, texto, agora, mensagemId, chaveEnvio, modelo = false, automatica = false, regra = null }) => {
     if (recusaEnvio(estado, id, agora)) return estado
-    const base = mapear(estado, id, (c) => ({
-      ...comMensagem(c, {
-        dir: 'out', texto, automatica, modelo, regra,
+    const base = mapear(estado, id, (c) => {
+      const anterior = chaveEnvio && c.mensagens?.find(m => m.dir === 'out' && m.chaveEnvio === chaveEnvio)
+      const conversa = anterior ? { ...c, mensagens: c.mensagens.map(m => m === anterior && !['enviada', 'entregue', 'lida'].includes(m.status)
+        ? { ...m, status: 'enviando', erro: undefined } : m) } : comMensagem(c, {
+        dir: 'out', texto, automatica, modelo, regra, ...(chaveEnvio ? { chaveEnvio } : {}),
         status: automatica ? 'lida' : 'enviando',
-      }, { id: mensagemId, agora }),
-      estado: c.estado === 'Aberto' ? 'Em atendimento' : c.estado,
-      responsavel: c.responsavel ?? ATENDENTE,
-    }))
-    const comRascunhoLimpo = comRascunhoDeFora(base, id, '')
+      }, { id: mensagemId, agora })
+      return { ...conversa,
+        estado: c.estado === 'Aberto' ? 'Em atendimento' : c.estado,
+        responsavel: c.responsavel ?? ATENDENTE,
+      }
+    })
+    // #2185 (F2): só o envio do próprio rascunho esvazia o campo. Cardápio, Assistente e despedida mandam
+    // outro texto, e o que ela estava digitando continua lá.
+    const doRascunho = (estado.rascunhos?.[id] ?? '').trim() === (texto ?? '').trim()
+    const comRascunhoLimpo = doRascunho ? comRascunhoDeFora(base, id, '') : base
     if (automatica) return comRascunhoLimpo
     return {
       ...comRascunhoLimpo,
@@ -87,12 +96,12 @@ export const casosAtendimento = {
 
   [acao.TROCAR_MODO_AGENTE]: (estado, { modo }) => ({ ...estado, modoAgente: modo }),
 
-  [acao.AGENTE_PEDINDO]: (estado, { id }) => ({
-    ...estado, agente: { estado: 'pensando', sugestao: null, conversaId: id },
+  [acao.AGENTE_PEDINDO]: (estado, { id, contextoAssistencia }) => ({
+    ...estado, agente: { estado: 'pensando', sugestao: null, conversaId: id, contextoAssistencia },
   }),
 
-  [acao.AGENTE_RESPONDEU]: (estado, { id, sugestao }) => ({
-    ...estado, agente: { estado: 'pronto', sugestao, conversaId: id },
+  [acao.AGENTE_RESPONDEU]: (estado, { id, sugestao, contextoAssistencia }) => ({
+    ...estado, agente: { estado: 'pronto', sugestao, conversaId: id, contextoAssistencia },
   }),
 
   [acao.AGENTE_LIMPOU]: (estado) => ({
@@ -101,8 +110,8 @@ export const casosAtendimento = {
 
   // Transporte falhou (servidor local fora, sem credencial, modelo recusou).
   // A falha fica visível na tela em vez de deixar o painel em "Lendo" para sempre.
-  [acao.AGENTE_FALHOU]: (estado, { id, erro }) => ({
-    ...estado, agente: { estado: 'erro', sugestao: null, conversaId: id, erro },
+  [acao.AGENTE_FALHOU]: (estado, { id, erro, contextoAssistencia }) => ({
+    ...estado, agente: { estado: 'erro', sugestao: null, conversaId: id, erro, contextoAssistencia },
   }),
 
   // US-049: abertura automática, disparada de `consultarAgente`

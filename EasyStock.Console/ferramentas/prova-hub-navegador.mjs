@@ -14,9 +14,17 @@ const usuario = '22222222-2222-4222-8222-222222222222'
 const chave = `easystok.hall.v1:${empresa}:${usuario}`
 const browser = await chromium.launch({ headless: true })
 let ultimaPagina
-async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bloqueiaStorage = false, saldoEsperado = 300.03 } = {}) {
+// #2814: a leitura fica presa num portão que a prova solta, em vez de demorar 900 ms de relógio real. Com a
+// máquina carregada, os 900 ms acabavam antes de a prova olhar e o "carregando" nunca era visto.
+function segurar(controle) {
+  let soltar
+  controle.portao = new Promise((resolve) => { soltar = resolve })
+  return () => { controle.portao = null; soltar() }
+}
+async function preparar({ permitidos = catalogo, modo = 'normal', segura = false, bloqueiaStorage = false, saldoEsperado = 300.03 } = {}) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce', hasTouch: true })
-  const controle = { modo, demora, chamadas: [] }
+  const controle = { modo, portao: null, chamadas: [] }
+  const soltar = segura ? segurar(controle) : () => {}
   await context.addInitScript(({ empresa, usuario, bloqueiaStorage }) => {
     sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'prova-controlada', expiraEm: Date.now() + 3600000, empresa: { id: empresa }, usuario: { id: usuario, nome: 'Felipe' } }))
     if (bloqueiaStorage) {
@@ -34,7 +42,7 @@ async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bl
     assert.equal(request.method(), 'GET', 'Hub não pode alterar operações')
     const ok = (data) => route.fulfill({ json: { data } })
     if (path === '/api/auth/me/modulos') return ok({ modulos: catalogo.map((id) => ({ id, liberado: permitidos.includes(id) })), acoes: {} })
-    if (['/api/atendimento/conversas', '/api/kds/pedidos', '/api/caixa/dia'].includes(path) && controle.demora) await new Promise((resolve) => setTimeout(resolve, controle.demora))
+    if (['/api/atendimento/conversas', '/api/kds/pedidos', '/api/caixa/dia'].includes(path) && controle.portao) await controle.portao
     if (path === '/api/atendimento/conversas') {
       if (controle.modo === 'erro' || controle.modo === 'revogado') return route.fulfill({ status: controle.modo === 'revogado' ? 403 : 503, json: { error: { message: 'Leitura indisponível na prova' } } })
       if (controle.modo === 'parcial') return ok(Array.from({ length: 100 }, (_, i) => ({ id: `${url.searchParams.get('pagina')}-${i}`, situacao: 'Assumida', aguardaResposta: true })))
@@ -48,7 +56,7 @@ async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bl
     if (path === '/api/kds/pedidos') return ok(controle.modo === 'parcial'
       ? Array.from({ length: 200 }, (_, i) => ({ id: String(i), status: 'pronto' }))
       : [{ id: 'a', status: 'aguardando' }, { id: 'b', status: 'preparando' }, { id: 'c', status: 'pronto' }])
-    if (path === '/api/caixa/dia') return ok({ saldoEsperado, aberto: true, fechado: false })
+    if (path === '/api/caixa/dia') return ok({ saldoEsperado: saldoEsperado + 50, saldoInicial: saldoEsperado, aberto: true, fechado: false, linhasExtras: [{ hora: '10:00', tipo: 'entrada', valor: 50, metodo: 'pix', descricao: 'Pix' }] }) // #2437: o Hall mostra só o dinheiro da gaveta (#2078); o Pix de 50 não entra no número
     if (path === '/api/atendimento/configuracao') return ok({})
     return ok([])
   })
@@ -58,8 +66,8 @@ async function preparar({ permitidos = catalogo, modo = 'normal', demora = 0, bl
   const erros = []
   page.on('pageerror', (erro) => { erros.push(erro.message); console.error('Erro de página:', erro.message) })
   await page.goto(origem + '/#/')
-  await page.getByRole('heading', { name: /Felipe/ }).waitFor()
-  return { context, page, controle, erros }
+  await page.getByRole('heading', { level: 1 }).waitFor() // #2859: o título é o dia da loja, não a saudação com o nome
+  return { context, page, controle, erros, soltar }
 }
 const ordem = (page) => page.locator('[data-modulo]').evaluateAll((itens) => itens.map((item) => item.dataset.modulo))
 const ordemIndicadores = (page) => page.locator('[data-indicador]').evaluateAll((itens) => itens.map((item) => item.dataset.indicador))
@@ -76,17 +84,19 @@ async function foto(page, nome) {
   await page.screenshot({ path: join(evidencias, nome + '.png'), fullPage: true })
 }
 try {
-  const { page, context, controle, erros } = await preparar({ demora: 900 })
+  const { page, context, controle, erros, soltar } = await preparar({ segura: true })
   const atendimento = page.locator('[data-indicador="atendimento"]')
   await atendimento.locator('xpath=self::*[@data-estado="carregando"]').waitFor()
-  assert.equal(await atendimento.locator('strong').innerText(), '—')
+  // #2762 (B10): a espera é um esqueleto do tamanho do número, com "Carregando…" para o leitor de tela; na falha, "Sem leitura" (#2792, sem traço).
+  assert.equal(await atendimento.locator('strong').innerText(), 'Carregando…')
+  soltar()
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
   assert.equal(await page.locator('[data-indicador="cozinha"] strong').innerText(), '2')
   assert.equal(await page.locator('[data-indicador="entregas"] strong').innerText(), '1')
   assert.match(await page.locator('[data-indicador="financeiro"]').innerText(), /300,03/)
-  assert.match(await page.locator('[data-indicador="financeiro"]').getAttribute('title'), /incluindo Pix e cartão/)
-  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'entregas', 'cozinha', 'financeiro'])
+  assert.match(await page.locator('[data-indicador="financeiro"]').getAttribute('title'), /Pix e cartão ficam no Caixa do dia/)
+  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'cozinha', 'entregas', 'financeiro']) // #2258 A2: atender, preparar, entregar
   assert.equal(await page.getByRole('progressbar').count(), 0)
   await page.setViewportSize({ width: 390, height: 844 })
   await conferirDobra(page)
@@ -103,7 +113,7 @@ try {
   await page.getByRole('button', { name: 'Aplicar ajustes' }).click()
   assert.deepEqual(await ordemIndicadores(page), ['financeiro', 'atendimento', 'entregas', 'cozinha'])
   await page.getByRole('button', { name: 'Desfazer', exact: true }).click()
-  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'entregas', 'cozinha', 'financeiro'])
+  assert.deepEqual(await ordemIndicadores(page), ['atendimento', 'cozinha', 'entregas', 'financeiro'])
   await personalizar.click()
   await page.getByLabel('Produção e entregas', { exact: true }).check()
   await page.getByRole('status').filter({ hasText: 'No painel: Cozinha → Entregas → Atendimento → Financeiro.' }).waitFor()
@@ -167,7 +177,10 @@ try {
   await page.evaluate(() => document.querySelector('main').scrollIntoView())
   await foto(page, 'hub-celular-compacto')
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+  // #2437: desde #2258 (A9) o tema mora atrás do avatar da conta.
+  await page.getByRole('button', { name: /^Conta de / }).first().click()
   await page.getByRole('radio', { name: 'Escuro', exact: true }).click()
+  await page.keyboard.press('Escape')
   await foto(page, 'hub-celular-escuro')
   await conferirDobra(page)
   await page.setViewportSize({ width: 320, height: 844 })
@@ -191,40 +204,40 @@ try {
   await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); document.dispatchEvent(new Event('visibilitychange')) })
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.ok(controle.chamadas.filter((item) => item.path === '/api/atendimento/conversas').length > antesOculto)
-  controle.demora = 0
-  controle.demora = 0; controle.modo = 'erro'
+  controle.modo = 'erro'
   await page.clock.runFor(61000)
   await atendimento.getByText(/Desatualizado/).waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
   controle.modo = 'revogado'; await page.clock.runFor(61000)
   await atendimento.getByText(/Não foi possível atualizar/).waitFor()
-  assert.equal(await atendimento.locator('strong').innerText(), '—')
+  assert.equal(await atendimento.locator('strong').innerText(), 'Sem leitura')
   controle.modo = 'vazio'; await page.clock.runFor(61000)
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '0')
   assert.equal(await page.getByRole('progressbar').count(), 0)
-  controle.demora = 900
+  const soltarReleitura = segurar(controle)
   await page.clock.runFor(61000)
   await atendimento.locator('xpath=self::*[@data-estado="carregando"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '0')
   assert.equal(await page.getByRole('progressbar').count(), 0)
+  soltarReleitura()
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
-  controle.demora = 0
   controle.modo = 'parcial'; await page.clock.runFor(61000)
   await atendimento.locator('strong', { hasText: '1000+' }).waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '1000+')
   assert.equal(await page.locator('[data-indicador="entregas"] strong').innerText(), '200+')
   assert.equal(await page.getByRole('progressbar').count(), 0)
   // Troca de pessoa e de empresa remonta a leitura e não herda a personalização.
-  controle.demora = 900; controle.modo = 'normal'
+  const soltarTroca = segurar(controle); controle.modo = 'normal'
   await page.evaluate(({ empresa, usuario }) => {
     const sessao = JSON.parse(sessionStorage.getItem('easystok.sessao'))
     sessao.empresa.id = empresa + '-outra'; sessao.usuario.id = usuario + '-outro'; sessao.usuario.nome = 'Outra pessoa'
     sessionStorage.setItem('easystok.sessao', JSON.stringify(sessao)); window.dispatchEvent(new Event('easystok:sessao-alterada'))
   }, { empresa, usuario })
-  await page.getByRole('heading', { name: /Outra/ }).waitFor()
-  assert.equal((await ordem(page))[0], 'cardapio')
-  assert.equal(await atendimento.locator('strong').innerText(), '—')
+  await page.waitForFunction(() => document.querySelector('[data-modulo]')?.dataset.modulo === 'atendimento') // #2859: a troca remonta o Hall sem a personalização
+  assert.equal((await ordem(page))[0], 'atendimento') // #2258 A2: ordem padrão começa pelo Atendimento
+  assert.equal(await atendimento.locator('strong').innerText(), 'Carregando…') // #2762 (B10): esqueleto na espera
+  soltarTroca()
   await atendimento.locator('xpath=self::*[@data-estado="ok"]').waitFor()
   assert.equal(await atendimento.locator('strong').innerText(), '2')
   assert.equal(await page.evaluate((chave) => JSON.parse(localStorage.getItem(chave)).ordem[0], chave), 'producao')
@@ -238,7 +251,7 @@ try {
   await restrito.context.close()
   const falha = await preparar({ permitidos: ['atendimento'], modo: 'revogado', bloqueiaStorage: true })
   await falha.page.locator('[data-indicador="atendimento"]').getByText(/Não foi possível atualizar/).waitFor()
-  assert.equal(await falha.page.locator('[data-indicador="atendimento"] strong').innerText(), '—')
+  assert.equal(await falha.page.locator('[data-indicador="atendimento"] strong').innerText(), 'Sem leitura')
   await falha.page.getByRole('button', { name: 'Ajustar tela inicial' }).click()
   await falha.page.getByRole('button', { name: 'Organizar áreas e favoritos' }).click()
   await falha.page.getByRole('button', { name: 'Adicionar Atendimento aos favoritos' }).click()
@@ -258,6 +271,11 @@ try {
   await ampliado.page.locator('[data-indicador="financeiro"]').scrollIntoViewIfNeeded()
   await foto(ampliado.page, 'hub-financeiro-texto-200')
   await ampliado.context.close()
+  // #2792 (revisão): caixa sem saldo esperado não fica "Carregando…": a leitura vira erro e diz "Sem leitura".
+  const semSaldo = await preparar({ permitidos: ['financeiro'], saldoEsperado: NaN })
+  await semSaldo.page.locator('[data-indicador="financeiro"]').locator('xpath=self::*[@data-estado="erro"]').waitFor()
+  assert.equal(await semSaldo.page.locator('[data-indicador="financeiro"] strong').innerText(), 'Sem leitura')
+  await semSaldo.context.close()
   console.log('Hub UI: números, erro/zero/parcial, modelos, persistência por pessoa/empresa, drag com mouse/toque, teclado/Esc, polling visível, celular/escuro, modal/foco e permissões aprovados. Nenhuma escrita operacional.')
 } catch (erro) {
   if (ultimaPagina && !ultimaPagina.isClosed()) console.error('Diagnóstico:', await ultimaPagina.evaluate(() => ({ foco: document.activeElement?.outerHTML.slice(0, 350), anuncios: [...document.querySelectorAll('[aria-live], [role="status"]')].map((el) => el.textContent.slice(0, 180)), ordem: [...document.querySelectorAll('[data-modulo]')].map((el) => el.dataset.modulo) })))

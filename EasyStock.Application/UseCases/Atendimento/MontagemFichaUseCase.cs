@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
@@ -58,7 +59,8 @@ public sealed class MontagemFichaUseCase(IMontagemFichaLlmClient llm, IConversaR
         try
         {
             var resposta = await llm.EnviarAsync(new RequisicaoLlm(SystemPrompt,
-                [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm(contexto)])], [BlocosMontagemFicha.Ferramenta]), ct);
+                [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm(contexto)])], [BlocosMontagemFicha.Ferramenta])
+                { EmpresaId = command.EmpresaId, Finalidade = FinalidadeIa.Ficha }, ct);
             var blocos = BlocosMontagemFicha.Traduzir(resposta);
             logger.LogInformation("Ficha por IA: empresa {EmpresaId}, conversa {ConversaId}, {Entrada}+{Saida} tokens, {LatenciaMs} ms, {Blocos} blocos",
                 command.EmpresaId, command.ConversaId, resposta.TokensEntrada, resposta.TokensSaida, tempo.ElapsedMilliseconds, blocos.Count);

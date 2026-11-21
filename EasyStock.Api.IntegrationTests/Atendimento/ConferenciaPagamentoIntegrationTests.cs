@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Pagamentos;
+using EasyStock.Domain.Sales;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +16,10 @@ namespace EasyStock.Api.IntegrationTests.Atendimento;
 public sealed partial class PedidoConversaConcorrenciaTests
 {
     [SkippableTheory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task TrocarLinkParaManual_ConsultaPagamentoAprovadoAntesDeCancelarCobrarDeNovo(bool conferirPeloEndpoint)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task TrocarLinkParaManual_ConsultaPagamentoAprovadoAntesDeCancelarCobrarDeNovo(bool conferirPeloEndpoint, bool pelaTrocaDeStatus)
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         var mp = Provedor(new());
@@ -29,7 +32,9 @@ public sealed partial class PedidoConversaConcorrenciaTests
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
             db.SetMobileTenantContext(EmpresaId);
-            var pedido = Pedido.Criar(EmpresaId, origem: "whatsapp");
+            var pedido = Pedido.Criar(EmpresaId, origem: "whatsapp",
+                statusInicial: pelaTrocaDeStatus ? StatusPedido.Rascunho : StatusPedido.Aguardando);
+            if (pelaTrocaDeStatus) pedido.MudarStatus(StatusPedido.AguardandoPagamento);
             pedido.ClienteId = c.ClienteId;
             pedido.Itens.Add(new PedidoItem
             {
@@ -50,9 +55,18 @@ public sealed partial class PedidoConversaConcorrenciaTests
 
         using var resposta = conferirPeloEndpoint
             ? await client.PostAsync($"/api/pedidos/{pedidoId}/cobranca/conferir", null)
-            : await client.PostAsJsonAsync($"/api/pedidos/{pedidoId}/cobranca/forma", new { forma = "na_entrega" });
+            : pelaTrocaDeStatus
+                ? await client.PatchAsJsonAsync($"/api/pedidos/{pedidoId}/status", new { EmpresaId, Id = pedidoId, Status = "aguardando" })
+                : await client.PostAsJsonAsync($"/api/pedidos/{pedidoId}/cobranca/forma", new { forma = "na_entrega" });
 
-        resposta.StatusCode.Should().Be(conferirPeloEndpoint ? HttpStatusCode.OK : HttpStatusCode.Conflict, await resposta.Content.ReadAsStringAsync());
+        var statusEsperado = conferirPeloEndpoint ? HttpStatusCode.OK : pelaTrocaDeStatus ? HttpStatusCode.BadRequest : HttpStatusCode.Conflict;
+        resposta.StatusCode.Should().Be(statusEsperado, await resposta.Content.ReadAsStringAsync());
+        if (pelaTrocaDeStatus)
+        {
+            using var erro = JsonDocument.Parse(await resposta.Content.ReadAsStringAsync());
+            erro.RootElement.GetProperty("error").GetProperty("message").GetString().Should().Be(
+                "Pagamento online conferido. Atualize o pedido antes de receber outro valor.");
+        }
         if (conferirPeloEndpoint)
         {
             (await resposta.Content.ReadAsStringAsync()).Should().Contain("\"situacao\":\"confirmado\"");
@@ -68,6 +82,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         banco.SetMobileTenantContext(EmpresaId);
         var relido = await banco.Pedidos.Include(p => p.Pagamentos).SingleAsync(p => p.Id == pedidoId);
         relido.TotalPago.Should().Be(100m);
+        relido.Pagamentos.Should().ContainSingle().Which.Referencia.Should().Be("pagamento-1733");
         var cobranca = await banco.CobrancasPedido.SingleAsync(p => p.PedidoId == pedidoId);
         cobranca.EhOnline.Should().BeTrue();
         cobranca.EstaPendente.Should().BeFalse();

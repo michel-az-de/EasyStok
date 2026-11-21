@@ -5,9 +5,11 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { Chip } from '../../componentes/Chip'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
+import { EsqueletoDeLista } from '../../componentes/Esqueleto'
+import { Vazio } from '../../componentes/Vazio'
 import { dataIsoNoFuso, listaEmPortugues, plural } from '../../dominio/formato'
 import { pdfDoRoteiro } from '../../dominio/impressao'
-import { confirmacaoDoCliente, resumoDoRoteiro, rotuloDaData, situacaoDoPagamento, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
+import { SEM_JANELA, confirmacaoDoCliente, resumoDoRoteiro, rotuloDoDiaPorExtenso, situacaoDoPagamento, textoDeQuemLeva } from '../../dominio/roteiroDoDia'
 import { useRelogio } from '../../hooks/useRelogio'
 import css from './entregasApi.module.css'
 import { ModalAlterarAgendamentoApi } from './ModalAlterarAgendamento'
@@ -53,22 +55,28 @@ function EscolhaDoDia({ dia, mudarDia }) {
   )
 }
 
+// #2658: com dois pedidos na mesma janela, os botões de cada cartão dizem de quem é a entrega.
+const quemRecebe = (pedido) => pedido.cliente || pedido.identificacao?.principal || pedido.numero
+
 // #2096: o cliente confirmou a encomenda? Selo quando sim; botão enquanto ela ainda vai acontecer.
 function ConfirmacaoDoCliente({ pedido, agora, ocupado, acoes }) {
   const situacao = confirmacaoDoCliente(pedido, agora)
+  const quem = quemRecebe(pedido)
   if (situacao === 'confirmada') return (
     <div className={css.linha}>
       <Pilula tom="ok">Cliente confirmou</Pilula>
-      <Botao variante="texto" disabled={ocupado} onClick={() => acoes.desfazerConfirmacaoDoCliente(pedido.id)}>Desfazer confirmação</Botao>
+      <Botao variante="texto" disabled={ocupado} aria-label={`Desfazer confirmação da entrega de ${quem}`}
+        onClick={() => acoes.desfazerConfirmacaoDoCliente(pedido.id)}>Desfazer confirmação</Botao>
     </div>
   )
   if (situacao === 'pendente') return (
-    <Botao variante="secundario" icone="check" disabled={ocupado} onClick={() => acoes.confirmarPeloCliente(pedido.id)}>Cliente confirmou</Botao>
+    <Botao variante="secundario" icone="check" disabled={ocupado} aria-label={`Cliente confirmou a entrega de ${quem}`}
+      onClick={() => acoes.confirmarPeloCliente(pedido.id)}>Cliente confirmou</Botao>
   )
   return null
 }
 
-function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
+export function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, aoReagendar }) {
   const detalhes = [
     situacaoDoPagamento(pedido),
     pedido.entregador ? `Leva ${textoDeQuemLeva(pedido.entregador)}` : null,
@@ -85,7 +93,8 @@ function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, ao
       <p className={css.apoio}>{detalhes}</p>
       <ConfirmacaoDoCliente pedido={pedido} agora={agora} ocupado={ocupado} acoes={acoes} />
       {!['entregue', 'cancelado'].includes(pedido.status) && (
-        <Botao variante="texto" disabled={ocupado} onClick={() => aoReagendar(pedido)}>Alterar agendamento</Botao>
+        <Botao variante="texto" disabled={ocupado} aria-label={`Alterar agendamento da entrega de ${quemRecebe(pedido)}`}
+          onClick={() => aoReagendar(pedido)}>Alterar agendamento</Botao>
       )}
       {pedido.podePorNaViagem && (
         <div className={css.linha}>
@@ -94,7 +103,8 @@ function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, ao
             <Botao variante="texto" onClick={aoVerViagens}>Ver viagens</Botao>
           </>}
           {montando.map((v, i) => (
-            <Botao key={v.id} variante="texto" disabled={ocupado} onClick={() => acoes.incluirParada(v.id, pedido.id)}>
+            <Botao key={v.id} variante="texto" disabled={ocupado} aria-label={`Pôr na viagem ${i + 1} a entrega de ${quemRecebe(pedido)}`}
+              onClick={() => acoes.incluirParada(v.id, pedido.id)}>
               Pôr na viagem {i + 1}
             </Botao>
           ))}
@@ -104,24 +114,42 @@ function PedidoDoDia({ pedido, agora, montando, ocupado, acoes, aoVerViagens, ao
   )
 }
 
+// #2418: cada janela é um cartão com o ícone do período, a faixa e as vagas livres.
+function iconeDaJanela(grupo) {
+  if (grupo.chave === SEM_JANELA || !grupo.inicio) return 'relogio'
+  const hora = Number(grupo.inicio.slice(0, 2))
+  return hora < 12 ? 'sun' : hora < 18 ? 'sunset' : 'moon'
+}
+
 function JanelaDoDia({ grupo, agora, montando, ocupado, acoes, aoVerViagens, aoReagendar, aoCotar }) {
   const n = grupo.pedidos.length
-  const titulo = grupo.chave === 'sem-janela' || grupo.label === grupo.faixa ? grupo.faixa : `${grupo.faixa} · ${grupo.label}`
+  const soFaixa = grupo.chave === SEM_JANELA || grupo.label === grupo.faixa
+  const titulo = soFaixa ? grupo.faixa : `${grupo.faixa} · ${grupo.label}`
+  const livres = grupo.capacidade ? Math.max(grupo.capacidade - n, 0) : null
   return (
-    <section className={css.janelaDoDia} aria-label={`Janela ${titulo}`}>
-      <div className={css.linha}>
-        <h3 className={css.cresce}>{titulo}</h3>
-        <span className={css.numero}>{grupo.capacidade ? `${n} de ${grupo.capacidade} vagas` : plural(n, 'entrega', 'entregas')}</span>
-        {n > 0 && aoCotar && <Botao variante="secundario" disabled={ocupado} onClick={() => aoCotar(grupo)}>Cotar esta janela</Botao>}
+    <section className={`${css.janelaDoDia} ${n > 0 ? css.janelaComPedidos : ''}`} aria-label={`Janela ${titulo}`}>
+      <div className={css.topoCartao}>
+        <span className={css.iconeJanela}><Icone nome={iconeDaJanela(grupo)} tamanho={24} /></span>
+        <div className={css.cresce}>
+          <h4>{soFaixa ? grupo.faixa : grupo.label}</h4>
+          {!soFaixa && <p className={css.numero}>{grupo.faixa}</p>}
+        </div>
+        {livres !== null && (
+          <Pilula tom={livres ? 'neutro' : 'aviso'} className={css.selo}>{livres ? plural(livres, 'vaga livre', 'vagas livres') : 'Lotada'}</Pilula>
+        )}
       </div>
+      <p className={css.ocupacao}>{grupo.capacidade ? `${n} de ${grupo.capacidade} ocupadas` : plural(n, 'entrega', 'entregas')}</p>
       {grupo.bloqueio && <p className={css.linha}><Pilula tom="aviso">Bloqueada</Pilula> <span className={css.apoio}>{grupo.bloqueio}</span></p>}
       {n > 0 && (
         <p className={css.apoio}>Quem leva: {grupo.quemLeva.length ? listaEmPortugues(grupo.quemLeva) : 'a definir'}</p>
       )}
-      {n === 0 && <p className={css.vazio}>Nenhum pedido nesta janela.</p>}
-      <ul className={css.lista}>
-        {grupo.pedidos.map((p) => <PedidoDoDia key={p.id} pedido={p} agora={agora} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar} />)}
-      </ul>
+      {n === 0 && <p className={css.apoio}>Nenhum pedido nesta janela.</p>}
+      {n > 0 && aoCotar && <Botao variante="secundario" className={css.acaoDoDia} disabled={ocupado} onClick={() => aoCotar(grupo)}>Cotar esta janela</Botao>}
+      {n > 0 && (
+        <ul className={css.lista}>
+          {grupo.pedidos.map((p) => <PedidoDoDia key={p.id} pedido={p} agora={agora} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar} />)}
+        </ul>
+      )}
     </section>
   )
 }
@@ -145,13 +173,34 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
         {demonstracao && <Botao variante="texto" className={css.acaoDoDia} onClick={() => fretes.abrir({ titulo: 'Transportes do dia', dia, selecionarTodos: false, pedidos: roteiro?.grupos.flatMap((g) => g.pedidos) ?? [] })}>Organizar transportes</Botao>}
         {roteiro && (
           <div className={css.cabecalhoDoDia}>
-            <div className={css.cresce}>
-              <p className={css.dataDoDia}>{rotuloDaData(roteiro.data)}</p>
-              <p className={css.apoio}>{resumoDoRoteiro(roteiro)}</p>
-              {roteiro.bloqueioDoDia && <p className={css.linha}><Pilula tom="aviso">Dia bloqueado</Pilula> <span className={css.apoio}>{roteiro.bloqueioDoDia}</span></p>}
-            </div>
-            <details className={css.impressaoDoDia}>
-              <summary>Roteiro e impressão</summary>
+            <p className={css.dataDoDia}>{rotuloDoDiaPorExtenso(roteiro.data, dataIsoNoFuso(agora))}</p>
+            <p className={css.apoio}>{resumoDoRoteiro(roteiro)}</p>
+            {roteiro.bloqueioDoDia && <p className={css.linha}><Pilula tom="aviso">Dia bloqueado</Pilula> <span className={css.apoio}>{roteiro.bloqueioDoDia}</span></p>}
+          </div>
+        )}
+      </section>
+      {!roteiro && <EsqueletoDeLista linhas={2} altura="calc(var(--toque) * 2)">Carregando o dia…</EsqueletoDeLista>}
+      {roteiro?.grupos.length === 0 && (
+        <Vazio
+          icone="moto" titulo="Nenhuma janela neste dia e nenhum pedido marcado."
+          acao={aoAbrirCadastro && <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>}
+        >
+          {aoAbrirCadastro ? 'Cadastre as janelas e o frete para organizar as entregas do dia.' : null}
+        </Vazio>
+      )}
+      {roteiro?.grupos.length > 0 && (
+        <section className={css.secao} aria-label="Janelas do dia">
+          <div className={css.linha}>
+            <h3 className={css.cresce}>Janelas do dia</h3>
+            {/* #2418: "Roteiro e impressão" é um botão no título; o papel e o PDF abrem logo abaixo dele. */}
+            {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape em qualquer campo do painel o fecha; o details é o único ancestral comum. */}
+            <details className={css.impressaoDoDia} onKeyDown={(e) => {
+              if (e.key !== 'Escape' || !e.currentTarget.open) return
+              e.stopPropagation()
+              e.currentTarget.open = false
+              e.currentTarget.querySelector('summary')?.focus()
+            }}>
+              <summary><Icone nome="printer" tamanho={20} /> Roteiro e impressão</summary>
               <div className={css.linha}>
                 <div className={css.campoData}>
                   <CampoSelecao rotulo="Papel" rotuloOculto opcoes={PAPEIS} value={papel} onChange={(e) => setPapel(e.target.value)} />
@@ -160,17 +209,12 @@ export function EntregasDoDia({ dia, mudarDia, roteiro, montando, ocupado, acoes
               </div>
             </details>
           </div>
-        )}
-      </section>
-      {!roteiro && <p className={css.vazio}>Carregando o dia…</p>}
-      {roteiro?.grupos.length === 0 && (
-        <div className={css.secao}>
-          <p className={css.vazio}>Nenhuma janela neste dia e nenhum pedido marcado.</p>
-          {aoAbrirCadastro && <Botao variante="secundario" onClick={aoAbrirCadastro}>Cadastrar janelas e frete</Botao>}
-        </div>
+          <div className={css.gradeJanelas}>
+            {roteiro.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} agora={agora} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar}
+              aoCotar={demonstracao ? (grupo) => fretes.abrir({ titulo: `Entrega · ${grupo.faixa}`, dia, pedidos: grupo.pedidos }) : null} />)}
+          </div>
+        </section>
       )}
-      {roteiro?.grupos.map((g) => <JanelaDoDia key={g.chave} grupo={g} agora={agora} montando={montando} ocupado={ocupado} acoes={acoes} aoVerViagens={aoVerViagens} aoReagendar={aoReagendar}
-        aoCotar={demonstracao ? (grupo) => fretes.abrir({ titulo: `Entrega · ${grupo.faixa}`, dia, pedidos: grupo.pedidos }) : null} />)}
       <ModalFrete controlador={fretes} />
       {reagendando && <ModalAlterarAgendamentoApi pedidoId={reagendando.id} nome={reagendando.nome}
         aoFechar={() => setReagendando(null)} aoAlterado={acoes.recarregar} />}

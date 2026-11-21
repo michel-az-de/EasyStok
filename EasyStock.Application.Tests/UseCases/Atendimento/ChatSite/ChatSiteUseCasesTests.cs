@@ -9,6 +9,7 @@ using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 using Microsoft.Extensions.Logging.Abstractions;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -33,12 +34,13 @@ public class ChatSiteUseCasesTests
 
     public ChatSiteUseCasesTests()
     {
-        _loja = StorefrontEntity.Criar(empresaId: Guid.NewGuid(), slug: Slug, tituloPublico: "Casa da Babá", pedidoMinimoEntrega: 0m);
+        _loja = StorefrontEntity.Criar(empresaId: Guid.NewGuid(), slug: Slug, tituloPublico: "Casa da Baba", pedidoMinimoEntrega: 0m);
         _loja.Ativar();
         _lojas.GetBySlugAsync(Slug, Arg.Any<CancellationToken>()).Returns(_loja);
         _flags.ListarAtivasAsync(_loja.EmpresaId, Arg.Any<CancellationToken>())
             .Returns([FeatureCatalogo.ModuloAtendimento, FeatureCatalogo.CanalChatSite]);
         _acesso = new AcessoChatSite(_lojas, _flags, _tenant, _sessoes);
+        _sessoes.ObterSnapshotPorTokenHashAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(c => _sessoes.ObterPorTokenHashAsync(c.Arg<Guid>(), c.Arg<string>(), c.Arg<CancellationToken>()));
         // #1797: a mensagem relê a conversa travada; no dublê, a já cadastrada ou a recém-criada.
         var criadas = new List<Conversa>();
         _conversas.When(x => x.AddAsync(Arg.Any<Conversa>(), Arg.Any<CancellationToken>())).Do(ci => criadas.Add(ci.Arg<Conversa>()));
@@ -51,16 +53,16 @@ public class ChatSiteUseCasesTests
             .Returns(ci => ci.Arg<Func<CancellationToken, Task<Mensagem>>>()(ci.Arg<CancellationToken>()));
     }
 
-    private (SessaoChatSite Sessao, string Token) SessaoValida(Guid? storefrontId = null, DateTime? abertaEm = null)
+    private (SessaoChatSite Sessao, string Token) SessaoValida(Guid? storefrontId = null, DateTime? abertaEm = null, OrigemAnuncio? origem = null)
     {
         var token = AcessoChatSite.NovoToken();
-        var sessao = SessaoChatSite.Abrir(_loja.EmpresaId, storefrontId ?? _loja.Id, AcessoChatSite.HashDoToken(token), abertaEm ?? DateTime.UtcNow);
+        var sessao = SessaoChatSite.Abrir(_loja.EmpresaId, storefrontId ?? _loja.Id, AcessoChatSite.HashDoToken(token), abertaEm ?? DateTime.UtcNow, origem);
         _sessoes.ObterPorTokenHashAsync(_loja.EmpresaId, AcessoChatSite.HashDoToken(token), Arg.Any<CancellationToken>()).Returns(sessao);
         return (sessao, token);
     }
 
     private EnviarMensagemVisitanteUseCase Enviar() => new(
-        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new ConversaChatSiteService(_conversas, _uow, _pedidos));
+        _acesso, _conversas, Substitute.For<IOperacaoEventPublisher>(), _uow, NullLogger<EnviarMensagemVisitanteUseCase>.Instance, new ConversaChatSiteService(_conversas, _uow, _sessoes, _pedidos));
 
     /// <summary>
     /// #1918: o visitante escreve depois do encerramento com o pedido feito pela página ainda em andamento. A conversa
@@ -120,6 +122,59 @@ public class ChatSiteUseCasesTests
             Arg.Any<CancellationToken>());
         _tenant.Received(1).SetCurrentTenant(_loja.EmpresaId);
         await _uow.Received(1).CommitAsync();
+    }
+
+    // #2928 S4: a campanha do site fica na sessão (a conversa só nasce na primeira mensagem) e vai para a conversa.
+    [Fact]
+    public async Task AbrirSessao_ComCampanha_GuardaAOrigemNaSessaoSemIdDeCliqueSemMarketing()
+    {
+        var campanha = new CampanhaInput(UtmSource: "google", UtmCampaign: "natal", Gclid: "abc", Marketing: false);
+
+        await new AbrirSessaoChatSiteUseCase(_acesso, _sessoes, _uow).ExecuteAsync(Slug, campanha);
+
+        await _sessoes.Received(1).AddAsync(
+            Arg.Is<SessaoChatSite>(s => s.OrigemAnuncio != null && s.OrigemAnuncio.Campanha == "natal"
+                && s.OrigemAnuncio.Via == OrigemAnuncio.ViaSiteChat && s.OrigemAnuncio.IdClique == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AbrirSessao_SemCampanhaOuVazia_NaoGuardaOrigem(bool vazia)
+    {
+        await new AbrirSessaoChatSiteUseCase(_acesso, _sessoes, _uow).ExecuteAsync(Slug, vazia ? new CampanhaInput() : null);
+
+        await _sessoes.Received(1).AddAsync(Arg.Is<SessaoChatSite>(s => s.OrigemAnuncio == null), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PrimeiraMensagem_CopiaAOrigemDaSessaoParaAConversa()
+    {
+        var (sessao, token) = SessaoValida(origem: OrigemAnuncio.DoSite(new("google", "cpc", "natal", null, null),
+            new(null, null, null, null), OrigemAnuncio.ViaSiteChat, false, DateTimeOffset.UtcNow));
+        Conversa? criada = null;
+        await _conversas.AddAsync(Arg.Do<Conversa>(c => criada = c), Arg.Any<CancellationToken>());
+
+        await Enviar().ExecuteAsync(Slug, token, "Oi");
+
+        criada!.OrigemAnuncio.Should().BeSameAs(sessao.OrigemAnuncio);
+    }
+
+    [Fact]
+    public async Task ConversaReaproveitadaPelaSessao_RecebeAOrigemNova()
+    {
+        var (sessao, token) = SessaoValida(origem: OrigemAnuncio.DoSite(new("instagram", null, "nova", null, null),
+            new(null, null, null, null), OrigemAnuncio.ViaSiteChat, false, DateTimeOffset.UtcNow));
+        var existente = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, DateTime.UtcNow.AddMinutes(-5),
+            ConversaChatSiteService.NomeSemFormulario, canal: CanalConversa.ChatSite);
+        existente.RegistrarOrigemAnuncio(OrigemAnuncio.DoAnuncioWhatsApp("111", "Antiga", null, DateTimeOffset.UtcNow));
+        sessao.VincularConversa(existente.Id);
+        _conversas.ObterPorIdAsync(_loja.EmpresaId, existente.Id, Arg.Any<CancellationToken>()).Returns(existente);
+
+        await Enviar().ExecuteAsync(Slug, token, "Oi de novo");
+
+        existente.OrigemAnuncio!.Campanha.Should().Be("nova"); // último anúncio vence (D2)
     }
 
     [Theory]
@@ -297,6 +352,28 @@ public class ChatSiteUseCasesTests
         EasyStock.Domain.ValueObjects.CapacidadesCanal.Para(CanalConversa.ChatSite).AceitaImagem.Should().BeFalse();
     }
     [Fact]
+    public async Task MensagemNaConversaRecusaSessaoRevogadaEnquantoAguardavaLock()
+    {
+        var (sessao, token) = SessaoValida();
+        var conversa = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, DateTime.UtcNow, canal: CanalConversa.ChatSite);
+        sessao.VincularConversa(conversa.Id);
+        var revogada = false;
+        _sessoes.ObterSnapshotPorTokenHashAsync(_loja.EmpresaId, sessao.TokenHash, Arg.Any<CancellationToken>())
+            .Returns(_ => revogada ? null : sessao);
+        _conversas.ObterPorIdComLockAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            revogada = true;
+            return conversa;
+        });
+
+        await Enviar().Invoking(s => s.ExecuteNaConversaAsync(Slug, token, "Mensagem antiga", conversa.Id))
+            .Should().ThrowAsync<RegraDeDominioVioladaException>().WithMessage("A sessão mudou*");
+
+        await _conversas.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
     public async Task Stream_UsaSnapshotAtualENaoSessaoRastreadaAntesDoLogout()
     {
         var (sessao, token) = SessaoValida();
@@ -312,13 +389,20 @@ public class ChatSiteUseCasesTests
 
     private readonly IOperacaoEventPublisher _operacao = Substitute.For<IOperacaoEventPublisher>();
 
-    private IdentificarVisitanteChatSiteUseCase Identificar() => new(_acesso, _conversas, _uow, _operacao);
+    private IdentificarVisitanteChatSiteUseCase Identificar() => new(_acesso, _conversas, _uow, _operacao,
+        new ConversaChatSiteService(_conversas, _uow, _sessoes),
+        new EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase(
+            Substitute.For<IClienteRepository>(), Substitute.For<IClienteStorefrontRepository>(),
+            Substitute.For<IVinculoClienteConversaRepository>(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<EasyStock.Application.UseCases.Atendimento.IdentificarClientePorTelefoneUseCase>.Instance),
+        Substitute.For<IConsentimentoContatoRepository>(), Substitute.For<IEscaladorConversa>(),
+        Substitute.For<EasyStock.Application.Ports.Output.Notifications.INotificadorService>());
 
     private static IdentificacaoVisitanteInput Formulario(string? email = "Maria@Exemplo.com", bool aceite = true) =>
         new("Maria Souza", "(11) 98765-4321", email, aceite);
 
     [Fact]
-    public async Task Identificar_GravaNaSessaoSemProcurarCliente()
+    public async Task Identificar_GravaNaSessaoEAbreAConversa()
     {
         var (sessao, token) = SessaoValida();
 
@@ -326,8 +410,7 @@ public class ChatSiteUseCasesTests
 
         r.Should().BeEquivalentTo(new { Nome = "Maria Souza", Telefone = "+5511987654321", Email = "maria@exemplo.com" });
         sessao.ContatoInformado!.Telefone.Should().Be("+5511987654321");
-        await _uow.Received(1).CommitAsync();
-        await _conversas.DidNotReceiveWithAnyArgs().ObterPorIdAsync(default, default, default);
+        await _uow.Received().CommitAsync();
     }
 
     [Fact]
@@ -367,6 +450,7 @@ public class ChatSiteUseCasesTests
         var conversa = Conversa.Abrir(_loja.EmpresaId, sessao.ContatoIdExterno, DateTime.UtcNow, "Visitante do site", canal: CanalConversa.ChatSite);
         sessao.VincularConversa(conversa.Id);
         _conversas.ObterPorIdAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        _conversas.ObterPorIdComLockAsync(_loja.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
 
         await Identificar().ExecuteAsync(Slug, token, Formulario(email: null));
 
@@ -378,19 +462,10 @@ public class ChatSiteUseCasesTests
             Arg.Is<ConversaAtualizadaOperacao>(e => e.ConversaId == conversa.Id), Arg.Any<CancellationToken>());
         Received.InOrder(() =>
         {
-            _uow.CommitAsync();
+            _uow.CommitAsync(); // a conversa (ObterOuCriarAsync)
+            _uow.CommitAsync(); // contato, cliente e aceite
             _operacao.PublicarAsync(EventosOperacao.ConversaAtualizada, _loja.EmpresaId, Arg.Any<object>(), Arg.Any<CancellationToken>());
         });
-    }
-
-    [Fact]
-    public async Task Identificar_SemConversaAberta_NaoAvisaOConsole()
-    {
-        var (_, token) = SessaoValida();
-
-        await Identificar().ExecuteAsync(Slug, token, Formulario());
-
-        await _operacao.DidNotReceiveWithAnyArgs().PublicarAsync(default!, default, default!, default);
     }
 
     // #1643-4: sessão inválida é a primeira resposta, antes de olhar o corpo (o aceite da #1430 pedia 404/403, não 400).

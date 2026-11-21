@@ -1,4 +1,4 @@
-using EasyStock.Application.Ports.Output.Events;
+﻿using EasyStock.Application.Ports.Output.Events;
 using EasyStock.Domain.Events;
 using EasyStock.Domain.Services;
 using EasyStock.Domain.Specifications;
@@ -200,7 +200,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                 var valorUnitario = Dinheiro.FromDecimal(comandoItem.ValorVendaUnitario);
                 var lotes = comandoItem.ItemEstoqueId.HasValue
                     ? [await ObterItemDiretoAsync(command.EmpresaId, comandoItem.ItemEstoqueId.Value)]
-                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo, permitirVencido)).ToArray();
+                    : (await itemEstoqueRepository.GetLotesDisponiveisParaSaidaAsync(command.EmpresaId, comandoItem.ProdutoId, comandoItem.ProdutoVariacaoId, fefo, permitirVencido, command.LojaId)).ToArray();
 
                 if (lotes.Length == 0 && comandoItem.ItemEstoqueId.HasValue)
                     throw new UseCaseValidationException("Item de estoque nao encontrado ou nao esta disponivel.");
@@ -264,9 +264,13 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                     new RegraDeConsumo(Fefo: fefo, VencidoPorUltimo: !permitirVencido));
                 plano.Aplicar(command.DataSaida, agora, permitirVencido);
 
+                // #2373: o resíduo do arredondamento vai para o último lote, para a soma bater com o total.
+                var totaisPorLote = Dinheiro.Ratear(valorUnitario.Valor, plano.Consumos.Select(c => c.Quantidade).ToList());
+                var indiceLote = 0;
                 foreach (var (lote, quantidadeConsumida, _) in plano.Consumos)
                 {
                     var quantidadeDoLote = Quantidade.From(quantidadeConsumida);
+                    var totalDoLote = totaisPorLote[indiceLote++];
 
                     var itemVenda = new ItemVenda
                     {
@@ -279,7 +283,7 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
                         VariacaoSnapshot = lote.VariacaoDescricao,
                         Quantidade = quantidadeDoLote,
                         PrecoUnitario = valorUnitario,
-                        PrecoTotal = Dinheiro.FromDecimal(valorUnitario.Valor * quantidadeConsumida),
+                        PrecoTotal = totalDoLote,
                         CriadoEm = agora,
                         Produto = produto
                     };

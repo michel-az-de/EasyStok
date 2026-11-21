@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence;
+using EasyStock.Application.UseCases.AdicionarItemLote;
 using EasyStock.Application.UseCases.CriarLote;
 using EasyStock.Application.UseCases.FinalizarLote;
 using Microsoft.Extensions.Logging;
@@ -120,6 +121,139 @@ public class LoteUseCasesTests
             .Should().Be(dataProd.AddDays(5));
         capturado.Itens.First(i => i.Nome == "Bolo").ExpiraEm.Should().BeNull();
         capturado.TotalUnidades.Should().Be(13);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(int.MaxValue)]
+    public async Task CriarLote_DeveLancarValidation_QuandoValidadeDiasForaDaFaixa(int validadeDias)
+    {
+        var empresaId = Guid.NewGuid();
+        var produtoId = Guid.NewGuid();
+        _repo.GetNextSequencialDoDiaAsync(empresaId, Arg.Any<DateOnly>()).Returns(1);
+        _produtoRepo.GetTipoEmbalagemMapAsync(empresaId, Arg.Any<IEnumerable<Guid>>())
+            .Returns((IReadOnlyDictionary<Guid, TipoEmbalagem>)new Dictionary<Guid, TipoEmbalagem>());
+        var useCase = new CriarLoteUseCase(_repo, _produtoRepo, _uow,
+            Substitute.For<ILogger<CriarLoteUseCase>>());
+
+        var act = () => useCase.ExecuteAsync(new CriarLoteCommand(empresaId,
+            Itens: new[] { new CriarLoteItemInput("Pão", 2, ProdutoId: produtoId, ValidadeDias: validadeDias) }));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Validade*");
+        await _repo.DidNotReceive().AddAsync(Arg.Any<Lote>());
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // AdicionarItemLote (#2605): mesmas regras do CriarLote
+    // ════════════════════════════════════════════════════════════════════
+
+    private (AdicionarItemLoteUseCase UseCase, Guid EmpresaId, Lote Lote) NovoAdicionar(
+        Guid? produtoId = null, TipoEmbalagem? tipo = null)
+    {
+        var empresaId = Guid.NewGuid();
+        var lote = Lote.Criar(empresaId, "LOT-ADD-1");
+        _repo.GetByIdWithDetailsAsync(empresaId, lote.Id).Returns(lote);
+        var mapa = new Dictionary<Guid, TipoEmbalagem>();
+        if (produtoId.HasValue && tipo.HasValue) mapa[produtoId.Value] = tipo.Value;
+        _produtoRepo.GetTipoEmbalagemMapAsync(empresaId, Arg.Any<IEnumerable<Guid>>())
+            .Returns((IReadOnlyDictionary<Guid, TipoEmbalagem>)mapa);
+        var useCase = new AdicionarItemLoteUseCase(_repo, _produtoRepo, _uow,
+            Substitute.For<ILogger<AdicionarItemLoteUseCase>>());
+        return (useCase, empresaId, lote);
+    }
+
+    [Fact]
+    public async Task AdicionarItem_DeveLancarValidation_QuandoItemSemProdutoId()
+    {
+        var (useCase, empresaId, lote) = NovoAdicionar();
+
+        var act = () => useCase.ExecuteAsync(new AdicionarItemLoteCommand(empresaId, lote.Id, "Pão", 2));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*vinculado a um produto*");
+        await _repo.DidNotReceive().AddItemAsync(Arg.Any<LoteItem>());
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task AdicionarItem_DeveLancarValidation_QuandoProdutoEmbaladoSemPesoG()
+    {
+        var produtoId = Guid.NewGuid();
+        var (useCase, empresaId, lote) = NovoAdicionar(produtoId, TipoEmbalagem.Embalado);
+
+        var act = () => useCase.ExecuteAsync(new AdicionarItemLoteCommand(empresaId, lote.Id, "Biscoito", 2,
+            ProdutoId: produtoId));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*RDC 727*");
+        await _repo.DidNotReceive().AddItemAsync(Arg.Any<LoteItem>());
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task AdicionarItem_DeveLancarValidation_QuandoValidadeDiasNegativa()
+    {
+        var produtoId = Guid.NewGuid();
+        var (useCase, empresaId, lote) = NovoAdicionar(produtoId, TipoEmbalagem.Avulso);
+
+        var act = () => useCase.ExecuteAsync(new AdicionarItemLoteCommand(empresaId, lote.Id, "Pão", 2,
+            ProdutoId: produtoId, ValidadeDias: -1));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Validade*");
+        await _repo.DidNotReceive().AddItemAsync(Arg.Any<LoteItem>());
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task AdicionarItem_DeveLancarValidation_QuandoValidadeDiasEnorme()
+    {
+        var produtoId = Guid.NewGuid();
+        var (useCase, empresaId, lote) = NovoAdicionar(produtoId, TipoEmbalagem.Avulso);
+
+        var act = () => useCase.ExecuteAsync(new AdicionarItemLoteCommand(empresaId, lote.Id, "Pão", 2,
+            ProdutoId: produtoId, ValidadeDias: int.MaxValue));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Validade*");
+        await _repo.DidNotReceive().AddItemAsync(Arg.Any<LoteItem>());
+    }
+
+    [Fact]
+    public async Task AdicionarItem_DeveLancarValidation_QuandoPesoGNaoPositivo()
+    {
+        var produtoId = Guid.NewGuid();
+        var (useCase, empresaId, lote) = NovoAdicionar(produtoId, TipoEmbalagem.Avulso);
+
+        var act = () => useCase.ExecuteAsync(new AdicionarItemLoteCommand(empresaId, lote.Id, "Pão", 2,
+            ProdutoId: produtoId, PesoG: 0));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Peso*");
+        await _repo.DidNotReceive().AddItemAsync(Arg.Any<LoteItem>());
+    }
+
+    [Fact]
+    public async Task AdicionarItem_DeveLancarValidation_QuandoNomeVazio()
+    {
+        var produtoId = Guid.NewGuid();
+        var (useCase, empresaId, lote) = NovoAdicionar(produtoId, TipoEmbalagem.Avulso);
+
+        var act = () => useCase.ExecuteAsync(new AdicionarItemLoteCommand(empresaId, lote.Id, "  ", 2,
+            ProdutoId: produtoId));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*Nome*");
+        await _repo.DidNotReceive().AddItemAsync(Arg.Any<LoteItem>());
+    }
+
+    [Fact]
+    public async Task AdicionarItem_DeveGravar_QuandoItemValidoEmbaladoComPeso()
+    {
+        var produtoId = Guid.NewGuid();
+        var (useCase, empresaId, lote) = NovoAdicionar(produtoId, TipoEmbalagem.Embalado);
+
+        var result = await useCase.ExecuteAsync(new AdicionarItemLoteCommand(empresaId, lote.Id, "Biscoito", 2,
+            ProdutoId: produtoId, PesoG: 200, ValidadeDias: 30));
+
+        result.Should().NotBeNull();
+        lote.Itens.Should().ContainSingle(i => i.PesoG == 200 && i.ValidadeDias == 30);
+        await _repo.Received(1).AddItemAsync(Arg.Any<LoteItem>());
+        await _uow.Received(1).CommitAsync();
     }
 
     // ════════════════════════════════════════════════════════════════════

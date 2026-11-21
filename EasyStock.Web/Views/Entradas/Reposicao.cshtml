@@ -313,7 +313,7 @@
                 produtoNome: @Json.Serialize(Model.ProdutoNome ?? ""),
                 produtoSku: '',
                 variacaoNome: @Json.Serialize(Model.VariacaoNome ?? ""),
-                estoqueAtual: @Model.EstoqueAtual,
+                estoqueAtual: @Model.EstoqueAtual.ToString(System.Globalization.CultureInfo.InvariantCulture),
 
                 // Campos do form
                 qty: 1,

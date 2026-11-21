@@ -25,7 +25,7 @@ public sealed class ObterReposicaoUseCase(
 
         // Política por loja; sem config (ou sem LojaId) cai nos defaults globais.
         var configuracao = cmd.LojaId.HasValue
-            ? await configuracaoRepository.GetByLojaIdAsync(cmd.LojaId.Value).ConfigureAwait(false)
+            ? await configuracaoRepository.GetDaLojaAsync(cmd.EmpresaId, cmd.LojaId.Value).ConfigureAwait(false)
             : null;
 
         var diasCoberturaAlvo = configuracao?.DiasCoberturaAlvo ?? OperacionalDefaults.DiasCoberturaAlvo;

@@ -1,0 +1,121 @@
+/* eslint-disable no-console */
+// Roda todas as provas `ferramentas/prova-*.mjs` (descobertas por glob, #2391), cada uma num processo Node
+// filho. Prova nova entra sozinha: não há lista a manter à mão, só a de EXCEÇÕES abaixo.
+//
+//   npm run provas                    todas, com PROVAS_PARALELO processos (padrão 4)
+//   node ferramentas/rodar-provas.mjs 2017 r12   só as que casam com os termos
+//
+// Prova de navegador (#2410) é a que carrega o Playwright: o script sobe um Vite só para elas, no modo API e em
+// 127.0.0.1, e passa a URL em CONSOLE_URL. Antes, uma vez por máquina: `npx playwright install chromium`.
+//
+// Exceção é prova que NÃO roda aqui; cada uma leva o motivo em uma linha. Prova que falha e não está na lista
+// derruba o script. Não conserte prova alheia aqui: marque, abra issue e tire da lista quando passar.
+import { spawn } from 'node:child_process'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { cpus } from 'node:os'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const EXCECOES = new Map([
+  ['prova-1693-frete-api-real.mjs', 'manual (#2437): lê .build/logistica-browser.json gerado por outra prova'],
+  ['prova-1739-pedido-final.mjs', 'manual (#2437): confere evidência de .build/pedido-final gerada por outra execução'],
+  ['prova-1742-chat-recepcao.mjs', 'manual (#2437): precisa de EVIDENCIAS_CHAT_RECEPCAO e do SITE_URL de uma vitrine no ar'],
+  ['prova-1747-acerto-cancelado.mjs', 'manual (#2437): confere evidência de .build/acerto-cancelado gerada por outra execução'],
+  ['prova-1748-chat-comanda.mjs', 'manual (#2437): precisa de EVIDENCIAS_CHAT_COMANDA e do SITE_URL de uma vitrine no ar'],
+  ['prova-1841-cardapio-acervo.mjs', 'manual (#2437): chama a API de homologação (HOMOLOGACAO_API_URL)'],
+  ['prova-1846-seletor-acervo.mjs', 'manual (#2437): chama a API de homologação (HOMOLOGACAO_API_URL)'],
+  ['prova-1693-dez-cenarios-api-real.mjs', 'lê .build/logistica-browser.json gerado por outra prova de navegador (Playwright e API real)'],
+  ['prova-1712-comanda-operador.mjs', 'SSR em camadas (#2701): useComplementoDeTexto (#2181) lê document no estado inicial e, com um document mínimo, o harness ainda monta componente undefined; sem jsdom no projeto'],
+  ['prova-2395-api-real.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
+  ['prova-2395-cadastros-concorrencia.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava cadastros'],
+  ['prova-2395-operacao-complementos.mjs', 'opt-in: Playwright e fixture R4 real final; requer R4_EXECUTAR_COMPLEMENTOS=1 e grava operações'],
+  ['prova-2395-textos-navegador.mjs', 'opt-in: R4_EXECUTAR_TEXTOS=1, Playwright e fixture API real; grava notas sintéticas'],
+  ['prova-2395-desfazer-conta-api-real.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; grava contas bancárias'],
+  ['prova-2395-entregas-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera entregas da jornada de teste'],
+  ['prova-2395-excecoes-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera a jornada de teste'],
+  ['prova-2395-jornada-api.mjs', 'opt-in: fixture R4 com API/PostgreSQL reais; cria pedidos e altera pagamentos e estoque'],
+  ['prova-2395-jornada-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera a jornada de teste'],
+  ['prova-2395-mensagem-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; envia mensagens ao transporte de teste'],
+  ['prova-r12-cardapio-cliente.mjs', 'prova velha em camadas (#2701): Dinheiro na entrega (#1998), frase depois do link (#1679) e o chip Pix que virou o link do MP (#1943); reescrever o cenário 2'],
+  ['prova-producao-ia-navegador.mjs', 'prova velha em camadas (#2701): pelo Vite do script cai no nome "Editar receita de …" (#2242) e depois no Cadastrar insumo; chama a API em 5245 e grava evidência em builds/ do checkout'],
+])
+
+const pasta = fileURLToPath(new URL('./', import.meta.url))
+const TETO_MS = 180_000
+const PRELOAD = pathToFileURL(`${pasta}ambienteDoVite.mjs`).href
+const paralelo = Number(process.env.PROVAS_PARALELO) || Math.min(4, cpus().length)
+const termos = process.argv.slice(2)
+
+const descobertas = readdirSync(pasta).filter((nome) => /^prova-.+\.mjs$/.test(nome)).sort()
+const selecionadas = termos.length > 0 ? descobertas.filter((nome) => termos.some((termo) => nome.includes(termo))) : descobertas
+const excetuadas = selecionadas.filter((nome) => EXCECOES.has(nome))
+const aRodar = selecionadas.filter((nome) => !EXCECOES.has(nome))
+
+const deNavegador = aRodar.filter((nome) => readFileSync(`${pasta}${nome}`, 'utf8').includes('PLAYWRIGHT_MODULE'))
+// Sem o Chromium, fora do CI, as de navegador são puladas com aviso; no CI (CI=true) a falta derruba o script.
+const semNavegador = deNavegador.length > 0 && !chromiumInstalado()
+if (semNavegador && process.env.CI) throw new Error('Chromium ausente: rode `npx playwright install --with-deps chromium` antes das provas.')
+// O createServer do Vite grava NODE_ENV=development no processo; o filho que compila o próprio harness com
+// build() herdaria isso e geraria JSX de desenvolvimento contra o React de produção (#2437).
+const nodeEnvOriginal = process.env.NODE_ENV
+const vite = deNavegador.length > 0 && !semNavegador ? await subirVite() : null
+const ambiente = vite ? { ...process.env, CONSOLE_URL: vite.url, CONSOLE_TEST_URL: vite.url } : { ...process.env }
+if (nodeEnvOriginal === undefined) delete ambiente.NODE_ENV
+else ambiente.NODE_ENV = nodeEnvOriginal
+const puladas = semNavegador ? deNavegador : []
+
+function chromiumInstalado() {
+  try {
+    const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
+    return existsSync(chromium.executablePath())
+  } catch { return false }
+}
+
+// O console no modo API (o mesmo do build de produção), com as rotas /api interceptadas por cada prova.
+async function subirVite() {
+  process.env.VITE_FONTE_DADOS = 'api'
+  const { createServer } = await import('vite')
+  const servidor = await createServer({ root: `${pasta}..`, logLevel: 'error', server: { host: '127.0.0.1', port: 5790, strictPort: false } })
+  await servidor.listen()
+  const url = servidor.resolvedUrls.local[0].replace(/\/$/, '')
+  // Aquece: a primeira página faz o Vite pré-empacotar as dependências e recarregar; sem isso, as provas que
+  // abrem primeiro estouram o tempo do goto.
+  const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
+  const navegador = await chromium.launch({ headless: true })
+  try {
+    const pagina = await navegador.newPage()
+    await pagina.goto(url, { waitUntil: 'networkidle', timeout: 120_000 })
+    await pagina.waitForTimeout(1_000)
+    await pagina.reload({ waitUntil: 'networkidle', timeout: 120_000 })
+  } finally { await navegador.close() }
+  return { url, fechar: () => servidor.close() }
+}
+
+const rodar = (nome) => new Promise((resolver) => {
+  const inicio = Date.now()
+  // #2701: todo filho nasce com o `import.meta.env` e o import de JSON que o Vite dá ao `src/`.
+  const filho = spawn(process.execPath, ['--import', PRELOAD, `${pasta}${nome}`], { cwd: `${pasta}..`, env: ambiente, stdio: ['ignore', 'pipe', 'pipe'] })
+  let saida = ''
+  filho.stdout.on('data', (parte) => { saida += parte })
+  filho.stderr.on('data', (parte) => { saida += parte })
+  const relogio = setTimeout(() => { saida += `\n[estourou ${TETO_MS / 1000}s]`; filho.kill() }, TETO_MS)
+  filho.on('close', (codigo) => { clearTimeout(relogio); resolver({ nome, codigo, saida, ms: Date.now() - inicio }) })
+})
+
+const inicio = Date.now()
+const falhas = []
+const fila = aRodar.filter((nome) => !puladas.includes(nome))
+await Promise.all(Array.from({ length: paralelo }, async () => {
+  while (fila.length > 0) {
+    const resultado = await rodar(fila.shift())
+    if (resultado.codigo === 0) console.log(`ok    ${resultado.nome} (${(resultado.ms / 1000).toFixed(1)}s)`)
+    else { falhas.push(resultado); console.log(`FALHA ${resultado.nome} (código ${resultado.codigo})`) }
+  }
+}))
+
+await vite?.fechar()
+for (const falha of falhas) console.log(`\n--- ${falha.nome} ---\n${falha.saida.split('\n').slice(-25).join('\n')}`)
+console.log(`\nprovas: ${descobertas.length} descobertas, ${aRodar.length - puladas.length - falhas.length} ok, ${falhas.length} falharam, ${excetuadas.length} excetuadas, ${puladas.length} puladas sem Chromium, ${((Date.now() - inicio) / 1000).toFixed(0)}s`)
+for (const nome of excetuadas) console.log(`  exceção ${nome}: ${EXCECOES.get(nome)}`)
+if (puladas.length > 0) console.log(`\nAVISO: ${puladas.length} provas de navegador puladas porque o Chromium não está instalado. Rode \`npx playwright install chromium\`.`)
+process.exit(falhas.length > 0 ? 1 : 0)

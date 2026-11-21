@@ -2,6 +2,7 @@ using EasyStock.Application.Ports.Output.Lookup;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Tests.Helpers;
 using EasyStock.Application.UseCases.AdicionarClienteEndereco;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.ClienteDaConversa;
@@ -32,7 +33,9 @@ public class CadastrarClienteDaConversaUseCaseTests
 
     public CadastrarClienteDaConversaUseCaseTests()
     {
-        _storefront = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Babá", pedidoMinimoEntrega: 0m);
+        _uow.SetupExecuteInTransactionSemRetry<ClienteDaConversaResult>();
+        _conversas.EspelharLeituraComLock();
+        _storefront = StorefrontEntity.Criar(empresaId: _empresaId, slug: "casa-da-baba", tituloPublico: "Casa da Baba", pedidoMinimoEntrega: 0m);
         _storefront.Ativar();
         _storefronts.GetByEmpresaAsync(_empresaId, Arg.Any<CancellationToken>()).Returns(_storefront);
         _storefronts.GetBySlugAsync("casa-da-baba", Arg.Any<CancellationToken>()).Returns(_storefront);
@@ -55,7 +58,7 @@ public class CadastrarClienteDaConversaUseCaseTests
         var frete = new CalcularFreteUseCase(_storefronts, _zonas, _cep, geocoding, Substitute.For<IRotaClient>(), NullLogger<CalcularFreteUseCase>.Instance);
         return new CadastrarClienteDaConversaUseCase(
             _conversas, _clientes, _uow,
-            new IdentificarClientePorTelefoneUseCase(_clientes, _clientesStorefront, NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
+            new IdentificarClientePorTelefoneUseCase(_clientes, _clientesStorefront, Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), NullLogger<IdentificarClientePorTelefoneUseCase>.Instance),
             new ValidarEnderecoUseCase(_storefronts, frete, _cep, _configuracao, NullLogger<ValidarEnderecoUseCase>.Instance),
             new ConfirmarEnderecoClienteUseCase(_clientes, _uow,
                 new AdicionarClienteEnderecoUseCase(_clientes, _uow, NullLogger<AdicionarClienteEnderecoUseCase>.Instance)),
@@ -79,7 +82,7 @@ public class CadastrarClienteDaConversaUseCaseTests
 
     private CadastrarClienteDaConversaCommand Comando(Conversa conversa, string? nome = "Maria Souza",
         string? telefone = "(11) 98765-4321", EnderecoDaConversaInput? endereco = null) =>
-        new(_empresaId, conversa.Id, nome, telefone, endereco);
+        new(_empresaId, conversa.Id, conversa.ClienteId, conversa.VinculoRevisao, nome, telefone, endereco);
 
     // #1643-3: a dona corrige só o telefone (o corpo vem sem nome) e o cadastro nascia "Cliente WhatsApp". Vale o nome
     // que a conversa já tem (o do perfil ou o informado pelo visitante).
@@ -219,9 +222,54 @@ public class CadastrarClienteDaConversaUseCaseTests
     [Fact]
     public async Task ConversaInexistente_LancaNaoEncontrada()
     {
-        var acao = () => UseCase().ExecuteAsync(new CadastrarClienteDaConversaCommand(_empresaId, Guid.NewGuid(), "Maria", "11987654321", null));
+        var ausente = Conversa.Abrir(_empresaId, "visitante-ausente", DateTime.UtcNow, canal: CanalConversa.ChatSite);
+        var acao = () => UseCase().ExecuteAsync(Comando(ausente));
 
         await acao.Should().ThrowAsync<ConversaNaoEncontradaException>();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task FichaAnteriorACorrecaoRecusaTrocaEAbaAntesDeAlterarQualquerPessoa(bool restaurarOriginal, bool corrigirAoTravar)
+    {
+        var original = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Ana",
+            Telefone = "+5511911111111", TelefoneHash = "hash-ana", Endereco = "Rua Ana, 10", Cep = "01310100" };
+        var outra = new Cliente { Id = Guid.NewGuid(), EmpresaId = _empresaId, Nome = "Bia",
+            Telefone = "+5511922222222", TelefoneHash = "hash-bia", Endereco = "Rua Bia, 20", Cep = "01310200" };
+        _clientes.GetByIdWithDetailsAsync(_empresaId, original.Id).Returns(original);
+        _clientes.GetByIdWithDetailsAsync(_empresaId, outra.Id).Returns(outra);
+        var conversa = ConversaDoSite(original.Id);
+        var ficha = Comando(conversa, "Nome da ficha antiga", "11933333333", Endereco());
+        void Corrigir()
+        {
+            conversa.CorrigirVinculoCliente(null, conversa.VinculoRevisao);
+            conversa.CorrigirVinculoCliente(outra.Id, conversa.VinculoRevisao);
+            if (!restaurarOriginal) return;
+            conversa.CorrigirVinculoCliente(null, conversa.VinculoRevisao);
+            conversa.CorrigirVinculoCliente(original.Id, conversa.VinculoRevisao);
+        }
+        if (corrigirAoTravar)
+            _conversas.ObterPorIdComLockAsync(_empresaId, conversa.Id, Arg.Any<CancellationToken>())
+                .Returns(_ => { Corrigir(); return conversa; });
+        else
+            Corrigir();
+
+        var acao = () => UseCase().ExecuteAsync(ficha);
+
+        await acao.Should().ThrowAsync<CadastroClienteConversaAlteradoException>();
+        (original.Nome, original.Telefone, original.TelefoneHash, original.Endereco, original.Cep)
+            .Should().Be(("Ana", "+5511911111111", "hash-ana", "Rua Ana, 10", "01310100"));
+        (outra.Nome, outra.Telefone, outra.TelefoneHash, outra.Endereco, outra.Cep)
+            .Should().Be(("Bia", "+5511922222222", "hash-bia", "Rua Bia, 20", "01310200"));
+        original.Enderecos.Should().BeEmpty();
+        outra.Enderecos.Should().BeEmpty();
+        await _clientes.DidNotReceive().AddAsync(Arg.Any<Cliente>());
+        await _clientes.DidNotReceive().UpdateAsync(Arg.Any<Cliente>());
+        await _uow.DidNotReceive().CommitAsync();
+        await _consentimentos.DidNotReceive().AddAsync(Arg.Any<ConsentimentoContato>(), Arg.Any<CancellationToken>());
     }
 
     // ── #1430: e-mail e aceite do formulário do chat do site ──
@@ -364,7 +412,7 @@ public class CadastrarClienteDaConversaUseCaseTests
         await _consentimentos.DidNotReceive().AddAsync(Arg.Any<ConsentimentoContato>(), Arg.Any<CancellationToken>());
     }
 
-    // Segundo toque ou outra aba: o pedido de ligar chega de novo com os dados do visitante, e a conversa já está ligada.
+    // Segundo toque ou outra aba carrega a revisão anterior à associação: recusa sem escrever no cadastro.
     [Fact]
     public async Task LigarAoCadastroRepetido_NaoGravaOsDadosDoVisitanteNoCadastro()
     {
@@ -373,7 +421,8 @@ public class CadastrarClienteDaConversaUseCaseTests
         var ligar = Comando(conversa, nome: "Maria do site") with { Email = "maria@exemplo.com", ConfirmarVinculoExistente = true };
 
         await UseCase().ExecuteAsync(ligar);
-        await UseCase().ExecuteAsync(ligar);
+        var repetir = () => UseCase().ExecuteAsync(ligar);
+        await repetir.Should().ThrowAsync<CadastroClienteConversaAlteradoException>();
 
         existente.Nome.Should().Be("Maria Cadastrada");
         existente.Email.Should().BeNull();

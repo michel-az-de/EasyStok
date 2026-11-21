@@ -1,3 +1,4 @@
+using EasyStock.Domain.Sales;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
@@ -13,7 +14,7 @@ namespace EasyStock.Infra.Postgre.Repositories.Atendimento;
 public sealed class ConversaRepository(EasyStockDbContext db) : IConversaRepository
 {
     public Task<Guid?> ObterIdPorPedidoAsync(Guid empresaId, Guid pedidoId, CancellationToken ct = default) =>
-        db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && (c.PedidoEmAndamentoId == pedidoId
+        db.AtendimentoConversas.Where(c => c.EmpresaId == empresaId && (c.PedidoEmAndamentoId == pedidoId || c.PedidosHistoricoIds.Contains(pedidoId)
             || db.LinksCardapioConversa.Any(l => l.EmpresaId == empresaId && l.ConversaId == c.Id && l.PedidoRegistradoId == pedidoId)))
             .Select(c => (Guid?)c.Id).FirstOrDefaultAsync(ct);
 
@@ -166,11 +167,22 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         if (responsavel is not null)
             query = query.Where(c => c.AssumidaPorUsuarioId == responsavel.UsuarioId);
 
-        if (!string.IsNullOrWhiteSpace(busca))
+        if (string.IsNullOrWhiteSpace(busca))
         {
-            var padrao = $"%{busca.Trim()}%";
-            query = query.Where(c => EF.Functions.ILike(c.ContatoNome ?? string.Empty, padrao)
-                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao));
+            // #2921: conversa aberta so para montar pedido na tela, sem nenhuma mensagem da cliente, fica fora da fila.
+            query = query.Where(c => c.UltimaMensagemEntradaEm != null);
+        }
+        else
+        {
+            var termo = busca.Trim();
+            var padrao = PadraoILike.Contendo(BuscaTextual.Normalizar(termo));
+            var digitos = BuscaTextual.DigitosTelefone(termo);
+            var buscaId = Guid.TryParse(termo, out var id);
+            var buscaNumero = long.TryParse(termo.TrimStart('#'), out var numero);
+            query = query.Where(c => (buscaId && c.Id == id) || (buscaNumero && c.NumeroComanda == numero)
+                                     || EF.Functions.ILike(EasyStockDbContext.TraduzirTexto((c.ContatoNome ?? string.Empty).ToLower(), BuscaTextual.Acentos, BuscaTextual.SemAcentos), padrao, PadraoILike.Escape)
+                                     || EF.Functions.ILike(c.ContatoIdExterno, padrao, PadraoILike.Escape)
+                                     || (digitos.Length >= 3 && EasyStockDbContext.TraduzirTexto(c.ContatoIdExterno, BuscaTextual.MascaraTelefone, "").Contains(digitos)));
         }
 
         // #1575: só as colunas do resumo. O ContextoJson (jsonb do carrinho) fica no banco: a inbox faz polling.
@@ -183,7 +195,7 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
             {
                 c.Id, c.NumeroComanda, c.EmpresaId, c.Canal, c.ContatoIdExterno, c.ContatoNome, c.ClienteId, c.Situacao, c.NaoLidas,
                 c.UltimaMensagemEm, c.UltimaMensagemEntradaEm, c.PedidoEmAndamentoId, c.AssumidaPorUsuarioId, c.MotivoEscalada,
-                c.Assunto, // #1432: assunto do último e-mail, para o cartão da conversa
+                c.Assunto, c.VinculoRevisao, c.VinculoEmRevisao, // #1432: assunto do último e-mail, para o cartão da conversa
                 AssumidaPorNome = db.UsuariosEmpresas
                     .Where(ue => ue.EmpresaId == empresaId && ue.UsuarioId == c.AssumidaPorUsuarioId)
                     .Select(ue => ue.Usuario!.Nome).FirstOrDefault(),
@@ -207,13 +219,16 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                 PedidoStatus = db.Pedidos
                     .Where(p => p.EmpresaId == empresaId && p.Id == c.PedidoEmAndamentoId)
                     .Select(p => p.Status).FirstOrDefault(),
+                // #2461 e #2777: mesma regra de lead do ClienteRepository (só compra conta); nulo para contato sem cadastro.
+                TemPedido = c.ClienteId == null ? (bool?)null
+                    : db.Pedidos.Where(RegraDeCompra.Pedido).Any(p => p.EmpresaId == empresaId && p.ClienteId == c.ClienteId),
             })
             .ToListAsync(ct);
 
         return linhas.Select(l => new ConversaInboxItem(
             l.Id, l.EmpresaId, l.Canal, l.ContatoIdExterno, l.ContatoNome, l.ClienteId, l.Situacao, l.NaoLidas,
             l.UltimaMensagemEm, l.UltimaMensagemEntradaEm, l.PedidoEmAndamentoId, l.AssumidaPorUsuarioId, l.MotivoEscalada,
-            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto, l.FotoClienteChave)).ToList();
+            l.UltimoTexto, l.AguardaResposta, l.AssumidaPorNome, l.PedidoStatus, l.NumeroComanda, l.Assunto, l.FotoClienteChave, l.VinculoRevisao, l.VinculoEmRevisao, l.TemPedido)).ToList();
     }
 
     public async Task<IReadOnlyList<Mensagem>> ListarMensagensAsync(
@@ -327,6 +342,11 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
                 """)
             .IgnoreQueryFilters()
             .ToListAsync(ct);
+
+    // #2285: usa o índice (ConversaId, EnviadaEm).
+    public Task<int> ContarRespostasDoAgenteDesdeAsync(Guid empresaId, Guid conversaId, DateTime desde, CancellationToken ct = default) =>
+        db.AtendimentoMensagens.CountAsync(m => m.EmpresaId == empresaId && m.ConversaId == conversaId
+            && m.Direcao == DirecaoMensagem.Saida && m.Autor == AutorMensagem.Agente && m.EnviadaEm >= desde, ct);
 
     public Task<bool> ExisteAguardandoClienteAsync(
         Guid empresaId, CanalConversa canal, string contatoIdExterno, Guid? clienteId, DateTime desde, CancellationToken ct = default) =>

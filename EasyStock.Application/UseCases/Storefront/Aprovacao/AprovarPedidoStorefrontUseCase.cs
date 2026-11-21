@@ -25,7 +25,7 @@ namespace EasyStock.Application.UseCases.Storefront.Aprovacao;
 /// </list>
 ///
 /// <para>
-/// <strong>Concorrência:</strong> dois agentes Babá clicando "Aprovar" simultaneamente —
+/// <strong>Concorrência:</strong> dois agentes Baba clicando "Aprovar" simultaneamente —
 /// um pega o lock, faz update, commita. O outro acorda, lê status novo
 /// (<c>aprovado_baba</c>) e lança <see cref="PedidoJaResolvidoException"/>. Garante 1 sucesso.
 /// </para>

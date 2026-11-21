@@ -6,6 +6,7 @@ using EasyStock.Application.Common;
 using EasyStock.Application.UseCases.Common;
 using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
+using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
 
 namespace EasyStock.Api.Mobile.Services;
@@ -48,7 +49,7 @@ public class SyncMutationDispatcher(
         finally { _snapshotImport = false; }
     }
 
-    public async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
+    public virtual async Task ApplyMutationAsync(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
         var parts = m.Type.Split('.');
@@ -66,7 +67,7 @@ public class SyncMutationDispatcher(
                 await ApplyCashEntryDelete(m, deviceId, operatorName, empresaId);
                 break;
             case "cashEntry": await ApplyCashEntry(m, deviceId, operatorName, empresaId, lojaId); break;
-            case "closing":   await ApplyClosing(m, deviceId, empresaId);                         break;
+            case "closing":   await ApplyClosing(empresaId);                                      break;
             case "stock":     await ApplyStockDelta(m, deviceId, operatorName, empresaId);        break;
             default: throw new ArgumentException($"Entidade desconhecida: {parts[0]}");
         }
@@ -119,7 +120,7 @@ public class SyncMutationDispatcher(
     private static void AssertHistoricalOrderUpdate(Order existing, OrderDto dto)
     {
         var sameItems = dto.Items is not null && existing.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).Order()
-            .SequenceEqual(dto.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, i.Qty, i.UnitPrice)).Order());
+            .SequenceEqual(dto.Items.Select(i => (i.ProductId, i.Name, i.Emoji, i.Unit, QtyDoEspelho(i.Qty), i.UnitPrice)).Order());
         var sameBase = sameItems && existing.Total == dto.Total && existing.ClientId == dto.ClientId
             && existing.ClientSnapshotName == dto.ClientSnapshot?.Name && existing.ClientSnapshotRef == dto.ClientSnapshot?.Ref
             && CarimboMs(existing.CreatedAt) == dto.CreatedAt;
@@ -146,7 +147,8 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
         // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
         var existing = await _db.Set<Product>().FindAsync(dto.Id);
-        if (existing != null && existing.EmpresaId != empresaId) existing = null;
+        if (existing != null && existing.EmpresaId != empresaId)
+            throw new CadastroDeOutraEmpresaException();
 
         // Onda 5: conflict detection. Tolerância de 2s pra clock skew.
         // #1520: compara com o carimbo do servidor (quando ele gravou), nao com UpdatedAt.
@@ -233,6 +235,9 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Client>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
+        // Id global: verifica apenas a existencia, sem carregar dados de outro tenant.
+        if (existing is null && await _db.Set<Client>().AnyAsync(c => c.Id == dto.Id && c.EmpresaId != empresaId))
+            throw new CadastroDeOutraEmpresaException();
         var lastOrderDate = DateTimeOffset.FromUnixTimeMilliseconds(dto.LastOrder).UtcDateTime;
         if (existing == null)
         {
@@ -248,6 +253,13 @@ public class SyncMutationDispatcher(
         }
         else
         {
+            // CLI-2: a edição no app chega ao Cliente do ERP ligado (mesma empresa).
+            var erp = existing.ErpClienteId is { } erpId && empresaId.HasValue
+                ? await _db.Set<Cliente>().IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(c => c.Id == erpId && c.EmpresaId == empresaId.Value)
+                : null;
+            if (erp != null) await RecusarSeOConsoleEditouDepoisAsync(m, erp, existing);
+
             existing.Name = dto.Name;
             existing.Apt = dto.Apt;
             existing.Address = dto.Address;
@@ -259,13 +271,77 @@ public class SyncMutationDispatcher(
             existing.LastOperatorName = operatorName;
             if (existing.EmpresaId == null && empresaId.HasValue) existing.EmpresaId = empresaId;
             if (existing.LojaId == null && lojaId.HasValue) existing.LojaId = lojaId;
+
+            if (erp != null)
+            {
+                // Campo vazio no app nao apaga o dado do ERP: o app nem sempre o recebeu.
+                if (!string.IsNullOrWhiteSpace(dto.Name)) erp.Nome = dto.Name;
+                if (!string.IsNullOrWhiteSpace(dto.Phone)) erp.Telefone = dto.Phone;
+                if (!string.IsNullOrWhiteSpace(dto.Apt)) erp.Apt = dto.Apt;
+                if (!string.IsNullOrWhiteSpace(dto.Address)) erp.Endereco = dto.Address;
+                if (DocumentoClienteMobile.Normalizar(dto.Document) is { } documento) erp.Documento = documento;
+            }
         }
+    }
+
+    // Campos que o CLI-2 grava no Cliente do ERP; so a edicao deles pelo console conta como conflito.
+    private static readonly string[] CamposDoClienteVindosDoApp = ["Nome", "Telefone", "Apt", "Endereco", "Documento"];
+
+    /// <summary>
+    /// #2440: um aparelho que ficou offline reenviava um <c>client.upsert</c> velho e apagava a edicao
+    /// mais nova do console. Como no produto, a mutacao mais antiga que a ultima edicao do console
+    /// (fora a do proprio app) vira conflito; o aparelho recebe a versao do ERP para decidir.
+    /// <c>Cliente.AlteradoEm</c> nao serve: muda a cada pedido e acesso da loja virtual.
+    /// </summary>
+    private async Task RecusarSeOConsoleEditouDepoisAsync(MutationDto m, Cliente erp, Client espelho)
+    {
+        if (m.Ts <= 0) return;
+        var ultimaEdicao = await _db.Set<ClienteAlteracao>().IgnoreQueryFilters().AsNoTracking()
+            .Where(a => a.ClienteId == erp.Id && a.EmpresaId == erp.EmpresaId && a.Origem != "mobile"
+                && CamposDoClienteVindosDoApp.Contains(a.Campo))
+            .MaxAsync(a => (DateTime?)a.AlteradoEm);
+        if (ultimaEdicao is null) return;
+        var edicaoMs = CarimboMs(DateTime.SpecifyKind(ultimaEdicao.Value, DateTimeKind.Utc));
+        if (edicaoMs <= m.Ts + 2000) return;
+        var versaoDoErp = SyncDtoConverters.ToDto(espelho) with
+        {
+            Name = erp.Nome, Phone = erp.Telefone, Apt = erp.Apt, Address = erp.Endereco
+        };
+        throw new ConflictException(
+            $"Servidor já tem versão mais nova do cliente ({DateTimeOffset.FromUnixTimeMilliseconds(edicaoMs):HH:mm:ss}) editada no console",
+            SyncDtoConverters.Serialize(versaoDoErp));
+    }
+
+    // #2343 (R2-API-11): campos que, ausentes, estouravam NullReferenceException no meio do apply.
+    private static readonly string[] CamposObrigatoriosDoPedido = ["id", "clientSnapshot", "items"];
+
+    private static OrderDto DeserializarOrderUpsert(MutationDto m)
+    {
+        if (m.Payload.ValueKind != System.Text.Json.JsonValueKind.Object)
+            throw new ArgumentException("order.upsert: o payload precisa ser um objeto.");
+        // #2343: campo nulo conta como ausente; tipo errado vira motivo legivel, nao NullReference/JsonException.
+        var ausentes = CamposObrigatoriosDoPedido
+            .Where(c => !m.Payload.TryGetProperty(c, out var v) || v.ValueKind is System.Text.Json.JsonValueKind.Null)
+            .ToList();
+        if (ausentes.Count > 0)
+            throw new ArgumentException($"order.upsert sem campos obrigatorios: {string.Join(", ", ausentes)}.");
+        ExigirTipo(m.Payload, "id", System.Text.Json.JsonValueKind.String, "texto");
+        ExigirTipo(m.Payload, "clientSnapshot", System.Text.Json.JsonValueKind.Object, "objeto");
+        ExigirTipo(m.Payload, "items", System.Text.Json.JsonValueKind.Array, "lista");
+        return m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)
+            ?? throw new ArgumentException("order.upsert: payload invalido.");
+    }
+
+    private static void ExigirTipo(System.Text.Json.JsonElement payload, string campo, System.Text.Json.JsonValueKind tipo, string nome)
+    {
+        if (payload.GetProperty(campo).ValueKind != tipo)
+            throw new ArgumentException($"order.upsert: campo {campo} deve ser {nome}.");
     }
 
     private async Task ApplyOrder(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
-        var dto = CaberNasColunas(m.Payload.Deserialize<OrderDto>(SyncDtoConverters.JsonOpts)!);
+        var dto = CaberNasColunas(DeserializarOrderUpsert(m));
         // Auditoria 2026-04-30 (CRITICAL fix tenant): filtra por empresa.
         var existing = await _db.Set<Order>().Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == dto.Id && o.EmpresaId == empresaId);
@@ -322,6 +398,7 @@ public class SyncMutationDispatcher(
                 FactAt = factAt,
                 ScheduledDeliveryAt = scheduledDeliveryAt,
                 Metodo = FormaPagamentoMobile.Normalizar(dto.Metodo),
+                Channel = CanalPedidoMobile.Normalizar(dto.Channel),
                 EmpresaId = empresaId,
                 LojaId = lojaId
             };
@@ -329,7 +406,7 @@ public class SyncMutationDispatcher(
                 order.Items.Add(new OrderItem
                 {
                     OrderId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                    Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
+                    Emoji = i.Emoji, Unit = i.Unit, Qty = QtyDoEspelho(i.Qty), UnitPrice = i.UnitPrice
                 });
             _db.Add(order);
             // #1543: pedido que ja chega "pronto" (ou adiante) baixa aqui; antes so a troca de status baixava.
@@ -365,12 +442,15 @@ public class SyncMutationDispatcher(
             // #1493 — reenvio sem forma (aparelho antigo) nao apaga a forma ja gravada.
             var metodo = FormaPagamentoMobile.Normalizar(dto.Metodo);
             if (metodo is not null) existing.Metodo = metodo;
+            // #409: o canal vale o da criação. Reenvio não apaga nem troca, senão diverge de pedidos.Canal,
+            // que o vínculo com o ERP copia uma vez só.
+            existing.Channel ??= CanalPedidoMobile.Normalizar(dto.Channel);
             _db.RemoveRange(existing.Items);
             foreach (var i in dto.Items)
                 existing.Items.Add(new OrderItem
                 {
                     OrderId = dto.Id, ProductId = i.ProductId, Name = i.Name,
-                    Emoji = i.Emoji, Unit = i.Unit, Qty = i.Qty, UnitPrice = i.UnitPrice
+                    Emoji = i.Emoji, Unit = i.Unit, Qty = QtyDoEspelho(i.Qty), UnitPrice = i.UnitPrice
                 });
 
             // Onda 3 — vendas mobile -> ERP. #1543: a Venda do pedido que nasceu no ERP so nasce, ou e
@@ -437,7 +517,7 @@ public class SyncMutationDispatcher(
         {
             // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
             var p = await _db.Set<Product>().FindAsync(doProduto.Key);
-            if (p != null && p.EmpresaId == empresaId) linhas.Add((p, doProduto.Sum(i => i.Qty)));
+            if (p != null && p.EmpresaId == empresaId) linhas.Add((p, doProduto.Sum(i => QtyDoEspelho(i.Qty))));
         }
         foreach (var (produto, quantidade) in MobileStockReconciler.PorProdutoDoErp(linhas))
             await _stockReconciler.BaixarVendaAsync(produto, quantidade, orderId, lojaDoPedido,
@@ -464,6 +544,14 @@ public class SyncMutationDispatcher(
     public static Task<bool> PedidoNasceuNoErpAsync(EasyStockDbContext db, Guid? empresaId, Guid pedidoId) =>
         db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
             .AnyAsync(p => p.Id == pedidoId && p.EmpresaId == empresaId && p.Origem != OrigemDoPwa);
+
+    /// <summary>
+    /// #2083: a quantidade do item no espelho (<c>mobile_order_items.qty</c>, inteiro). Só o pedido que nasceu no
+    /// console traz fração, e dele o espelho não decide nada: estoque é da esteira do ERP e a Venda sai dos itens do
+    /// Pedido (<see cref="MobileSaleSyncService.ItensDaVendaAsync"/>). Trunca em vez de recusar, para o eco do
+    /// aparelho não travar o sync do pedido. A coluna decimal fica para a #2707.
+    /// </summary>
+    public static int QtyDoEspelho(decimal qty) => (int)qty;
 
     /// <summary>Origem gravada no pedido do ERP que o <see cref="Linkers.OrderLinker"/> cria a partir do aparelho.</summary>
     public const string OrigemDoPwa = "mobile";
@@ -586,7 +674,7 @@ public class SyncMutationDispatcher(
     private static ClientDto CaberNasColunas(ClientDto d) => d with
     {
         Name = Cortar(d.Name, 120)!, Apt = Cortar(d.Apt, 32), Address = Cortar(d.Address, 255),
-        Phone = Cortar(d.Phone, 32)
+        Phone = Cortar(Telefone.TryFrom(d.Phone)?.Value ?? d.Phone, 32), Document = Cortar(d.Document, 32)
     };
 
     private static OrderDto CaberNasColunas(OrderDto d) => d with
@@ -724,10 +812,10 @@ public class SyncMutationDispatcher(
     /// aparelho criava ou sobrescrevia o <c>FechamentoCaixa</c> com saldo inicial e vendas zerados e sem marcador,
     /// e a abertura do dia seguinte recusava. O PWA não manda esta mutação; a de um cliente antigo é ignorada.
     /// </summary>
-    private Task ApplyClosing(MutationDto m, string deviceId, Guid? empresaId)
+    private Task ApplyClosing(Guid? empresaId)
     {
-        _log.LogWarning("Fechamento de caixa vindo do aparelho ignorado: device={DeviceId} empresa={EmpresaId} mutation={MutationId}",
-            deviceId, empresaId, m.Id);
+        // Só a empresa (do servidor): id do aparelho e da mutação vêm do corpo do sync (CodeQL cs/log-forging).
+        _log.LogWarning("Fechamento de caixa vindo do aparelho ignorado: empresa={EmpresaId}", empresaId);
         return Task.CompletedTask;
     }
 }

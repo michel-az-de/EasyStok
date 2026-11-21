@@ -173,6 +173,9 @@ public sealed partial class CardapioItemFotoUploadE2ETests
             using var form = FormularioNegativoAcervo(dados, bytes, mime);
             using var resposta = await client.PostAsync("/api/acervo/imagens", form);
             resposta.StatusCode.Should().Be(HttpStatusCode.BadRequest, $"MIME={mime}, tamanho={bytes.Length}; decodificação parcial não é sucesso");
+            var erro = await resposta.Content.ReadFromJsonAsync<JsonElement>();
+            erro.GetProperty("error").GetProperty("code").GetString().Should().Be("BAD_REQUEST");
+            erro.GetProperty("error").GetProperty("message").GetString().Should().NotBeNullOrWhiteSpace("o Console precisa mostrar por que o arquivo foi recusado");
         }
         (await client.GetFromJsonAsync<AcervoEnvelope<AcervoImagem[]>>("/api/acervo/imagens"))!.Data.Should().BeEmpty();
     }

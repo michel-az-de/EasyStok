@@ -7,6 +7,8 @@
 export { casosDaDemonstracao as casos } from './casos'
 export { criarAcoesDaDemonstracao as criarAcoes } from '../aplicacao/acoes/demonstracao'
 export { carregarConversas } from './conversas'
+export { FIDELIDADE_SEMENTE } from '../infra/fidelidadeSemente'
+export { ENTREGADORES_CADASTRADOS } from '../infra/entregadoresSemente'
 export { carregarHistorico } from '../infra/historicoPedidos'
 export { conectarPrincipal } from '../infra/canalEntreJanelas'
 export { useDigitacaoAutomatica } from '../aplicacao/useDigitacaoAutomatica'

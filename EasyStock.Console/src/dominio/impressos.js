@@ -9,7 +9,7 @@ export const DOCUMENTOS = [
   { valor: 'pedido', rotulo: 'Pedido' },
   { valor: 'agendamento', rotulo: 'Agendamento' },
   { valor: 'entrega', rotulo: 'Etiqueta de entrega' },
-  { valor: DOCUMENTO_COZINHA, rotulo: 'Canhoto de cozinha' },
+  { valor: DOCUMENTO_COZINHA, rotulo: 'Via da cozinha' },
 ]
 
 export const PAPEIS = [

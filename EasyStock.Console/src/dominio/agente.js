@@ -184,7 +184,7 @@ const PEDIDOS_PARA_A_DONA = [
   },
   {
     chave: 'quer-gente',
-    texto: 'Quer falar com você, não com o atendimento automático',
+    texto: 'Quer falar com você, não com o Assistente',
     padrao: /\bfalar com (alguem|uma pessoa|a pessoa|um atendente|o atendente|a atendente|um humano|o responsavel|a responsavel|o gerente|a gerente|o dono|a dona|a thati\w*)\b|\b(o responsavel|o gerente|a gerente|pessoa de verdade)\b/,
   },
   {

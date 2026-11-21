@@ -24,23 +24,26 @@ namespace EasyStock.Infra.Postgre.Repositories
         public async Task<(IEnumerable<Lote> items, int total)> ListAsync(
             Guid empresaId, int page, int pageSize,
             string? status = null, DateTime? desde = null, DateTime? ate = null,
-            string? search = null, string? sort = "dataproducao", string? order = "desc")
+            string? search = null, string? sort = "dataproducao", string? order = "desc", Guid? lojaId = null)
         {
             var q = db.Lotes
                 .Include(l => l.Itens)
                 .Include(l => l.Etiquetas)
                 .AsNoTracking()
                 .Where(l => l.EmpresaId == empresaId);
+            // #2318: lote sem loja vale para qualquer loja da empresa (mesma regra de EstoqueDaLoja); sem lojaId, a empresa toda.
+            if (lojaId.HasValue && lojaId.Value != Guid.Empty) q = q.Where(l => l.LojaId == lojaId.Value || l.LojaId == null);
             if (!string.IsNullOrWhiteSpace(status)) q = q.Where(l => l.Status == status);
             if (desde.HasValue) q = q.Where(l => l.DataProducao >= desde.Value);
             if (ate.HasValue)   q = q.Where(l => l.DataProducao <= ate.Value);
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var termo = search.Trim();
+                var padrao = PadraoILike.Contendo(termo);
                 q = q.Where(l =>
-                    EF.Functions.ILike(l.Codigo, $"%{termo}%") ||
-                    (l.OperadorNome != null && EF.Functions.ILike(l.OperadorNome, $"%{termo}%")) ||
-                    (l.Observacoes != null && EF.Functions.ILike(l.Observacoes, $"%{termo}%")));
+                    EF.Functions.ILike(l.Codigo, padrao, PadraoILike.Escape) ||
+                    (l.OperadorNome != null && EF.Functions.ILike(l.OperadorNome, padrao, PadraoILike.Escape)) ||
+                    (l.Observacoes != null && EF.Functions.ILike(l.Observacoes, padrao, PadraoILike.Escape)));
             }
 
             var total = await q.CountAsync();

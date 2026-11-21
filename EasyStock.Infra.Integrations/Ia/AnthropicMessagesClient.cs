@@ -1,8 +1,11 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Infra.Integrations.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Polly.CircuitBreaker;
+using Polly.Registry;
 
 namespace EasyStock.Infra.Integrations.Ia;
 
@@ -17,6 +20,7 @@ namespace EasyStock.Infra.Integrations.Ia;
 public sealed class AnthropicMessagesClient(
     HttpClient http,
     IOptions<AnthropicAgenteOptions> options,
+    ResiliencePipelineProvider<string> pipelines,
     ILogger<AnthropicMessagesClient> logger) : IAgenteLlmClient
 {
     public const string AnthropicVersion = "2023-06-01";
@@ -42,7 +46,19 @@ public sealed class AnthropicMessagesClient(
         request.Content = new ByteArrayContent(MontarCorpo(requisicao));
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-        using var response = await http.SendAsync(request, ct);
+        // #2177: só disjuntor. O POST não tem chave de idempotência; com o disjuntor aberto nada sai.
+        HttpResponseMessage enviada;
+        try
+        {
+            enviada = await pipelines.GetPipeline(IntegrationCategories.Anthropic)
+                .ExecuteAsync(async pollyCt => await http.SendAsync(request, pollyCt), ct);
+        }
+        catch (BrokenCircuitException ex)
+        {
+            throw new HttpRequestException(HttpRequestError.ConnectionError,
+                "Anthropic temporariamente indisponível; o agente não foi chamado.", ex);
+        }
+        using var response = enviada;
         var corpo = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -53,7 +69,11 @@ public sealed class AnthropicMessagesClient(
             throw new HttpRequestException($"Anthropic respondeu {(int)response.StatusCode}.", null, response.StatusCode);
         }
 
-        return LerResposta(corpo);
+        var resposta = LerResposta(corpo, requisicao.Modelo);
+        // #2862: prova do cache em produção. Só números e o modelo; nunca texto de mensagem.
+        logger.LogInformation("Anthropic uso: modelo={Modelo} entrada={Entrada} saida={Saida} cache_escrito={CacheEscrito} cache_lido={CacheLido}",
+            resposta.Modelo, resposta.TokensEntrada, resposta.TokensSaida, resposta.TokensCacheEscrito, resposta.TokensCacheLido);
+        return resposta;
     }
 
     internal byte[] MontarCorpo(RequisicaoLlm requisicao)
@@ -62,9 +82,29 @@ public sealed class AnthropicMessagesClient(
         using (var w = new Utf8JsonWriter(buffer))
         {
             w.WriteStartObject();
-            w.WriteString("model", _opcoes.ModeloAgente);
+            w.WriteString("model", ModeloDe(requisicao.Modelo));
             w.WriteNumber("max_tokens", _opcoes.MaxTokensAgente);
-            w.WriteString("system", requisicao.System);
+            if (string.IsNullOrEmpty(requisicao.SystemVolatil))
+            {
+                w.WriteString("system", requisicao.System);
+            }
+            else
+            {
+                // #2862: o breakpoint no bloco estável cobre ferramentas e system (vêm antes no prefixo). O bloco volátil fica depois.
+                w.WriteStartArray("system");
+                w.WriteStartObject();
+                w.WriteString("type", "text");
+                w.WriteString("text", requisicao.System);
+                w.WriteStartObject("cache_control");
+                w.WriteString("type", "ephemeral");
+                w.WriteEndObject();
+                w.WriteEndObject();
+                w.WriteStartObject();
+                w.WriteString("type", "text");
+                w.WriteString("text", requisicao.SystemVolatil);
+                w.WriteEndObject();
+                w.WriteEndArray();
+            }
 
             w.WriteStartArray("messages");
             foreach (var mensagem in requisicao.Mensagens)
@@ -136,7 +176,10 @@ public sealed class AnthropicMessagesClient(
         }
     }
 
-    private static RespostaLlm LerResposta(string corpo)
+    /// <summary>S68 (#2597): o modelo pedido pelo turno (já na lista aprovada) ou o configurado.</summary>
+    private string ModeloDe(string? pedido) => string.IsNullOrWhiteSpace(pedido) ? _opcoes.ModeloAgente : pedido;
+
+    private RespostaLlm LerResposta(string corpo, string? modeloPedido)
     {
         using var doc = JsonDocument.Parse(corpo);
         var raiz = doc.RootElement;
@@ -160,13 +203,20 @@ public sealed class AnthropicMessagesClient(
         }
 
         var stopReason = raiz.TryGetProperty("stop_reason", out var sr) && sr.ValueKind == JsonValueKind.String ? sr.GetString() : null;
-        int entrada = 0, saida = 0;
+        int entrada = 0, saida = 0, cacheLido = 0, cacheEscrito = 0;
         if (raiz.TryGetProperty("usage", out var usage))
         {
             if (usage.TryGetProperty("input_tokens", out var i) && i.ValueKind == JsonValueKind.Number) entrada = i.GetInt32();
             if (usage.TryGetProperty("output_tokens", out var o) && o.ValueKind == JsonValueKind.Number) saida = o.GetInt32();
+            if (usage.TryGetProperty("cache_read_input_tokens", out var c) && c.ValueKind == JsonValueKind.Number) cacheLido = c.GetInt32();
+            if (usage.TryGetProperty("cache_creation_input_tokens", out var ce) && ce.ValueKind == JsonValueKind.Number) cacheEscrito = ce.GetInt32();
         }
 
-        return new RespostaLlm(stopReason, blocos, entrada, saida);
+        // S67 (#2534): o modelo que respondeu (versão datada); sem ele, o configurado.
+        var modelo = raiz.TryGetProperty("model", out var m) && m.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(m.GetString())
+            ? m.GetString()
+            : ModeloDe(modeloPedido);
+
+        return new RespostaLlm(stopReason, blocos, entrada, saida, cacheLido, modelo, cacheEscrito);
     }
 }

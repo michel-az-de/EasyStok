@@ -18,7 +18,8 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 /// Um pedido mobile entregue vira uma <see cref="Venda"/> (VendaId setado) e o valor
 /// ja entra em <c>GetTotalVendas</c>; se o <see cref="PedidoPagamento"/> desse pedido
 /// tambem entrasse em <c>GetTotalPagamentosPedidos</c>, o mesmo dinheiro somaria duas
-/// vezes. O fix filtra <c>p.VendaId == null</c> nas duas queries (total e lista).
+/// vezes. O fix tira das duas queries (total e lista) o recebimento do mesmo dia operacional da Venda;
+/// recebimento de outro dia (sinal) conta no dia em que entrou e a Venda entra abatida dele (#2708).
 /// </para>
 ///
 /// <para>Estes testes travam o comportamento contra regressao:</para>

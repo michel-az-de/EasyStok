@@ -83,7 +83,7 @@ public class PedidoJsonContractTests
 
     [Theory]
     [InlineData("NOT_FOUND", 404)]               // pedido de outro tenant
-    [InlineData("CONFLICT", 409)]                // já resolvido (2 babás simultâneas)
+    [InlineData("CONFLICT", 409)]                // já resolvido (2 babas simultâneas)
     [InlineData("VALIDATION_ERROR", 422)]        // motivo inválido na recusa
     public void FromAcao_falha_propaga_status_e_corpo_de_erro(string code, int status)
     {

@@ -42,7 +42,8 @@ const confere = async (descricao, fn) => {
 
 const JANELA = '22222222-2222-2222-2222-222222222222'
 const ITEM = '11111111-1111-1111-1111-111111111111'
-const rascunho = () => ({ pedidoId: null, janela: `${JANELA}|2026-10-02`, meio: 'maquininha', itens: [{ sku: ITEM, qtd: 1, obs: '' }] })
+const IDENTIDADE = { clienteId: '33333333-3333-3333-3333-333333333333', vinculoRevisao: 2 }
+const rascunho = () => ({ pedidoId: null, identidadeProposta: { ...IDENTIDADE }, janela: `${JANELA}|2026-10-02`, meio: 'maquininha', itens: [{ sku: ITEM, qtd: 1, obs: '' }] })
 
 // Monta as ações com um rascunho de comanda (sem pedido no EasyStok), uma rede falsa e
 // ações locais que só registram que foram chamadas: chamar a local é a prova do defeito.
@@ -54,7 +55,7 @@ function montar() {
     chamadas.push(`${method} ${url}`)
     return new Response(JSON.stringify({ error: { code: 'X', message: 'sem servidor na prova' } }), { status: 500 })
   }
-  const estadoRef = { current: { conversas: [{ id: 'conv-1', pedido: rascunho() }] } }
+  const estadoRef = { current: { conversas: [{ id: 'conv-1', ...IDENTIDADE, pedido: rascunho() }] } }
   const local = (nome) => (...args) => { locais.push(nome); return args }
   const nomesLocais = ['gerarCobranca', 'reenviarCobranca', 'confirmarPagamento', 'marcarComprovante', 'aceitarDivergencia',
     'desfazerPagamento', 'marcarEstorno', 'cancelarPedido', 'avancarEsteira', 'corrigirPasso', 'desfazerEsteira',

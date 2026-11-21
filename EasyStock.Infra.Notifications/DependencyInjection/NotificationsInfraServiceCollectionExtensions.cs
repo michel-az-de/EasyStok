@@ -78,9 +78,10 @@ public static class NotificationsInfraServiceCollectionExtensions
             sp => sp.GetRequiredKeyedService<IProvedorWhatsApp>("whatsapp:active"));
 
         // Named HttpClients para providers externos
-        services.AddHttpClient("TwilioSms");
-        services.AddHttpClient("MetaWhatsApp");
-        services.AddHttpClient(WebPushCanal.NomeHttpClient);
+        // #2401: timeout de 15 s (o padrão é 100 s) e sem retry: o envio não é idempotente.
+        services.AddHttpClient("TwilioSms", c => c.Timeout = TimeSpan.FromSeconds(15));
+        services.AddHttpClient("MetaWhatsApp", c => c.Timeout = TimeSpan.FromSeconds(15));
+        services.AddHttpClient(WebPushCanal.NomeHttpClient, c => c.Timeout = TimeSpan.FromSeconds(15));
 
         return services;
     }

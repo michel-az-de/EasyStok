@@ -14,7 +14,7 @@
 // `#/entregas` e `#/cardapio-link/<id>` abrem a mesma tela de sempre.
 
 import { PREFIXO_ROTA as PREFIXO_CARDAPIO_LINK } from './cardapioLink'
-import { moduloCongelado } from './congelados'
+import { moduloCongelado, telaCongelada } from './congelados'
 import { TELA_OPERACAO, moduloPorId, telasDoMenu } from './modulos'
 
 export const ROTA_HALL = 'hall'
@@ -33,6 +33,9 @@ export const HASH_MODULO_COZINHA = '#/m/cozinha'
 export const HASH_MODULO_ENTREGAS = '#/m/entregas'
 
 const PREFIXO_MODULO = '#/m/'
+const minusculaInicial = (texto) => texto.charAt(0).toLocaleLowerCase('pt-BR') + texto.slice(1)
+const rotaEmPreparo = (nome) => ({ tipo: ROTA_HALL, aviso: `${nome} ainda está em preparo e não abre nesta versão. Escolha uma área para continuar.` })
+const rotaIndisponivel = () => ({ tipo: ROTA_HALL, aviso: 'Esta página não existe ou não está disponível. Escolha uma área para continuar.' })
 
 // Tela de operação de cada módulo: a mesma tela que abria antes do hall.
 const ROTA_DA_OPERACAO = {
@@ -45,9 +48,15 @@ const ROTA_DA_OPERACAO = {
 function rotaDoModulo(caminho, fonteApi) {
   const [moduloId, telaId] = caminho.split('/')
   const modulo = moduloPorId(moduloId)
-  // Módulo congelado (#1891) é tratado como inexistente: cai no hall, sem moldura vazia.
-  if (!modulo || moduloCongelado(modulo.id)) return { tipo: ROTA_HALL }
+  if (!modulo) return rotaIndisponivel()
+  // #3012: área ou tela congelada (#1891) existe no catálogo; o aviso diz que está em preparo, não que "não existe".
+  const doCatalogo = telaId ? modulo.telas.find((t) => t.id === telaId) : null
+  if (moduloCongelado(modulo.id) || (doCatalogo && telaCongelada(modulo.id, telaId))) {
+    if (!telaId) return rotaEmPreparo(`${modulo.nome} (${minusculaInicial(modulo.resumo)})`)
+    return doCatalogo ? rotaEmPreparo(doCatalogo.rotulo) : rotaIndisponivel()
+  }
   const telas = telasDoMenu(modulo, { fonteApi })
+  if (telaId && !telas.some((tela) => tela.id === telaId)) return rotaIndisponivel()
   // Módulo "em breve" digitado à mão: a moldura do módulo diz que ainda não há tela.
   if (telas.length === 0) return { tipo: ROTA_MODULO, modulo: modulo.id, tela: null, aba: null }
   const tela = telas.find((t) => t.id === telaId) ?? telas[0]
@@ -60,7 +69,7 @@ function rotaDoModulo(caminho, fonteApi) {
 // `hash` é `window.location.hash` (string vazia ou ausente na carga sem hash
 // nenhuma). Cardápio por link carrega o id da conversa junto, porque a tela
 // precisa dele (mesmo prefixo de dominio/cardapioLink.js). Hash desconhecida
-// cai no hall: nunca trava nem finge outra tela.
+// cai no hall com aviso: não aparenta ser a página solicitada.
 export function rotaDaHash(hash, { fonteApi = false } = {}) {
   const valor = hash ?? ''
   if (valor === HASH_ENTREGAS) return { tipo: ROTA_ENTREGAS }
@@ -69,5 +78,5 @@ export function rotaDaHash(hash, { fonteApi = false } = {}) {
     return { tipo: ROTA_CARDAPIO_LINK, conversaId: valor.slice(PREFIXO_CARDAPIO_LINK.length) }
   }
   if (valor.startsWith(PREFIXO_MODULO)) return rotaDoModulo(valor.slice(PREFIXO_MODULO.length), fonteApi)
-  return { tipo: ROTA_HALL }
+  return ['', '#', HASH_HALL].includes(valor) ? { tipo: ROTA_HALL } : rotaIndisponivel()
 }

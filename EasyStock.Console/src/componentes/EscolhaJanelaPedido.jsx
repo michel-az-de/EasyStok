@@ -24,7 +24,7 @@ export function EscolhaJanelaPedido({ data, mudarData, leitura, escolhida, escol
       )}
       <p><label><input type="checkbox" checked={avisar} disabled={enviando}
         onChange={(e) => mudarAviso(e.target.checked)} /> Solicitar aviso por WhatsApp</label></p>
-      {avisar && <p>O envio depende do canal e das preferências do cliente. Fora das 24 horas, exige modelo aprovado.</p>}
+      {avisar && <p>O envio depende do canal e das preferências do cliente. Fora das 24 horas, exige mensagem padrão do WhatsApp.</p>}
       <Botao variante="primario" disabled={enviando || !leitura || !escolhida || escolhida === leitura.atual?.id} onClick={salvar}>
         {enviando ? 'Alterando…' : 'Confirmar agendamento'}
       </Botao>

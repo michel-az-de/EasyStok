@@ -47,12 +47,13 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
         var resumos = await Inbox(db).ExecuteAsync(new ListarConversasAtendimentoQuery(cenario.EmpresaId, null, null, 1, 10));
 
         var real = JsonSerializer.SerializeToNode(resumos, Json)!.AsArray();
-        // Campos aditivos (#1575 `pedidoStatus`, #1432 `assunto`): ficam fora desta comparação, que fixa o que já
-        // existia. Cada um tem a prova dele logo abaixo.
+        // Campos aditivos (#1575 `pedidoStatus`, #1432 `assunto`, #2461 `temPedido`): ficam fora desta comparação,
+        // que fixa o que já existia. Cada um tem a prova dele (o `temPedido`, em LeadSemPedidoIntegrationTests).
         foreach (var linha in real)
         {
             linha!.AsObject().Remove("pedidoStatus");
             linha.AsObject().Remove("assunto");
+            linha.AsObject().Remove("temPedido");
         }
 
         var esperado = JsonSerializer.SerializeToNode(new object[]
@@ -78,6 +79,8 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 assumidaPorNome = "Ana",
                 numeroComanda = cenario.ComPedido.NumeroComanda,
                 fotoUrl = (string?)null,
+                vinculoRevisao = cenario.ComPedido.VinculoRevisao,
+                vinculoEmRevisao = cenario.ComPedido.VinculoEmRevisao,
             },
             new
             {
@@ -100,6 +103,8 @@ public sealed class InboxResumoIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 assumidaPorNome = (string?)null,
                 numeroComanda = cenario.Escalada.NumeroComanda,
                 fotoUrl = (string?)null,
+                vinculoRevisao = cenario.Escalada.VinculoRevisao,
+                vinculoEmRevisao = cenario.Escalada.VinculoEmRevisao,
             },
         }, Json)!;
 

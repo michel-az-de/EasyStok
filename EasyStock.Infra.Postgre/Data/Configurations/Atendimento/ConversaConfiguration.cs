@@ -13,6 +13,8 @@ public class ConversaConfiguration : IEntityTypeConfiguration<Conversa>
         builder.HasIndex(c => c.NumeroComanda).IsUnique();
 
         builder.Property(c => c.EmpresaId).IsRequired();
+        builder.Property(c => c.PedidosHistoricoIds).HasColumnType("uuid[]").IsRequired();
+        builder.Property(c => c.VinculoRevisao).IsConcurrencyToken();
         builder.Property(c => c.ContatoIdExterno).IsRequired().HasMaxLength(Conversa.ContatoIdExternoTamanhoMaximo);
         builder.Property(c => c.ContatoNome).HasMaxLength(Conversa.ContatoNomeTamanhoMaximo);
         // Contato informado pelo visitante do chat do site (#1430), até a loja confirmar o cadastro.
@@ -24,6 +26,7 @@ public class ConversaConfiguration : IEntityTypeConfiguration<Conversa>
         builder.Property(c => c.Canal).HasConversion<int>().IsRequired();
         builder.Property(c => c.Situacao).HasConversion<int>().IsRequired();
         builder.Property(c => c.ContextoJson).HasColumnType("jsonb").IsRequired();
+        builder.OwnsOne(c => c.OrigemAnuncio, OrigemAnuncioMapeamento.Mapear); // #2928
         builder.Property(c => c.IniciadaEm).IsRequired();
         builder.Property(c => c.UltimaMensagemEm).IsRequired();
         builder.Property(c => c.NaoLidas).IsRequired();

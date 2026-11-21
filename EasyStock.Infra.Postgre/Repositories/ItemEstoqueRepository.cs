@@ -1,3 +1,4 @@
+﻿using EasyStock.Domain.Specifications;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Domain.Defaults;
@@ -46,18 +47,18 @@ namespace EasyStock.Infra.Postgre.Repositories
             termo = termo.Trim();
             if (string.IsNullOrWhiteSpace(termo)) return [];
 
-            var pattern = $"%{termo}%";
+            var pattern = PadraoILike.Contendo(termo);
 
             return await dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId &&
-                    ((i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern)) ||
-                     (i.CodigoMarketplace != null && EF.Functions.ILike(i.CodigoMarketplace, pattern)) ||
-                     (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern)) ||
-                     (i.VariacaoDescricao != null && EF.Functions.ILike(i.VariacaoDescricao, pattern)) ||
-                     (i.Cor != null && EF.Functions.ILike(i.Cor, pattern)) ||
-                     (i.Tamanho != null && EF.Functions.ILike(i.Tamanho, pattern)) ||
-                     (i.DescricaoAnuncio != null && EF.Functions.ILike(i.DescricaoAnuncio, pattern))))
+                    ((i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern, PadraoILike.Escape)) ||
+                     (i.CodigoMarketplace != null && EF.Functions.ILike(i.CodigoMarketplace, pattern, PadraoILike.Escape)) ||
+                     (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern, PadraoILike.Escape)) ||
+                     (i.VariacaoDescricao != null && EF.Functions.ILike(i.VariacaoDescricao, pattern, PadraoILike.Escape)) ||
+                     (i.Cor != null && EF.Functions.ILike(i.Cor, pattern, PadraoILike.Escape)) ||
+                     (i.Tamanho != null && EF.Functions.ILike(i.Tamanho, pattern, PadraoILike.Escape)) ||
+                     (i.DescricaoAnuncio != null && EF.Functions.ILike(i.DescricaoAnuncio, pattern, PadraoILike.Escape))))
                 .OrderBy(i => i.ChavePesquisa)
                 .ThenBy(i => i.Id)
                 .Take(maxResults)
@@ -72,7 +73,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId && i.ValidadeEm != null && (DateTime?)i.ValidadeEm <= cutoff);
 
             if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -94,7 +95,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                     (i.UltimaMovimentacaoEm == null || i.UltimaMovimentacaoEm < cutoff));
 
             if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             var totalCount = await query.CountAsync();
             var items = await query
@@ -107,11 +108,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null)
+        public async Task<(IEnumerable<ItemEstoque> Items, int TotalCount)> GetItensEstoquePaginadosAsync(Guid empresaId, int page = 1, int pageSize = 20, string? status = null, Guid? categoriaId = null, string? termo = null, Guid? lojaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
+
+            if (lojaId.HasValue)
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             var vencendo = IsFiltroVencendo(status);
             if (vencendo)
@@ -156,11 +160,14 @@ namespace EasyStock.Infra.Postgre.Repositories
             return (items, totalCount);
         }
 
-        public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null)
+        public async Task<(int Cadastrados, int ComSaldo)> GetContadoresEstoqueAsync(Guid empresaId, string? status = null, Guid? categoriaId = null, Guid? lojaId = null)
         {
             var query = dbContext.ItensEstoque
                 .AsNoTracking()
                 .Where(i => i.EmpresaId == empresaId);
+
+            if (lojaId.HasValue)
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             if (IsFiltroVencendo(status))
                 query = AplicarFiltroVencendo(query);
@@ -193,18 +200,18 @@ namespace EasyStock.Infra.Postgre.Repositories
         private static IQueryable<ItemEstoque> AplicarFiltroBusca(IQueryable<ItemEstoque> query, string termo)
         {
             var t = termo.Trim();
-            var pattern = $"%{t}%";
+            var pattern = PadraoILike.Contendo(t);
 
             EasyStock.Domain.ValueObjects.CodigoSku? skuExato = null;
             try { skuExato = EasyStock.Domain.ValueObjects.CodigoSku.From(t); }
             catch (ArgumentException) { /* termo nao e um SKU valido (espaco/caractere) — ignora o ramo de SKU exato */ }
 
             return query.Where(i =>
-                (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern)) ||
-                (i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern)) ||
+                (i.ChavePesquisa != null && EF.Functions.ILike(i.ChavePesquisa, pattern, PadraoILike.Escape)) ||
+                (i.CodigoInterno != null && EF.Functions.ILike(i.CodigoInterno, pattern, PadraoILike.Escape)) ||
                 (i.Produto != null &&
-                    (EF.Functions.ILike(i.Produto.Nome, pattern) ||
-                     (i.Produto.CodigoBarras != null && EF.Functions.ILike(i.Produto.CodigoBarras, pattern)) ||
+                    (EF.Functions.ILike(i.Produto.Nome, pattern, PadraoILike.Escape) ||
+                     (i.Produto.CodigoBarras != null && EF.Functions.ILike(i.Produto.CodigoBarras, pattern, PadraoILike.Escape)) ||
                      (skuExato != null && i.Produto.SkuBase == skuExato))));
         }
 
@@ -253,7 +260,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Where(i => i.EmpresaId == empresaId && ids.Contains(i.ProdutoId));
 
             if (lojaId.HasValue)
-                query = query.Where(i => i.LojaId == lojaId.Value);
+                query = query.Where(EstoqueDaLoja.Pertence(lojaId));
 
             // #1575: lote zerado e sem descoberto soma zero no saldo e no descoberto; fica no banco.
             if (apenasComSaldoOuDescoberto)
@@ -295,7 +302,7 @@ namespace EasyStock.Infra.Postgre.Repositories
             return saldos.ToDictionary(s => s.ProdutoId, s => s.Saldo);
         }
 
-        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false)
+        public async Task<IReadOnlyCollection<ItemEstoque>> GetLotesDisponiveisParaSaidaAsync(Guid empresaId, Guid produtoId, Guid? produtoVariacaoId, bool fefo = true, bool incluirVencidos = false, Guid? lojaId = null)
         {
             // FOR UPDATE serializa concorrentes — lock adquirido no raw SQL DENTRO da
             // transacao do caller (DbContext.Database.CurrentTransaction). Evita estoque
@@ -347,6 +354,14 @@ namespace EasyStock.Infra.Postgre.Repositories
                 parametros.Add(HorarioBrasil.HojeInstanteUtc());
             }
 
+            // #2575: com loja, so o lote dela ou sem loja (a mesma regra de EstoqueDaLoja.Pertence).
+            var filtroLoja = string.Empty;
+            if (lojaId is { } loja && loja != Guid.Empty)
+            {
+                filtroLoja = $"AND (\"LojaId\" = {{{parametros.Count}}} OR \"LojaId\" IS NULL)";
+                parametros.Add(loja);
+            }
+
             var orderBy = fefo
                 ? "\"ValidadeEm\" NULLS LAST, \"EntradaEm\", \"CriadoEm\""
                 : "\"EntradaEm\", \"CriadoEm\"";
@@ -358,6 +373,7 @@ namespace EasyStock.Infra.Postgre.Repositories
                       AND ""QuantidadeAtual"" > 0
                       {variacaoFilter}
                       {filtroVencido}
+                      {filtroLoja}
                     ORDER BY {orderBy}
                     FOR UPDATE";
 

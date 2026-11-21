@@ -6,6 +6,7 @@ public sealed class AlterarSenhaUseCase(
     IUsuarioRepository usuarioRepository,
     ICurrentUserAccessor currentUserAccessor,
     RevogadorSessoes revogadorSessoes,
+    IResetTokenRepository resetTokens,
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
     ILogger<AlterarSenhaUseCase> logger) : IUseCase<AlterarSenhaCommand, AlterarSenhaResult>
@@ -38,6 +39,10 @@ public sealed class AlterarSenhaUseCase(
 
         // #1352: a senha mudou, então toda sessão anterior cai (inclusive a que pediu a troca: volta ao login).
         await revogadorSessoes.RevogarAsync(usuario);
+        // #2569: quem troca a senha por desconfiar da conta não pode deixar aberto um link de reset nem uma chave de
+        // acesso, como no reset (ConcluidorDeReset, #2201).
+        await resetTokens.InvalidarAbertosAsync(usuario.Id, usuario.AlteradoEm);
+        await resetTokens.InvalidarChavesDeAcessoAbertasAsync(usuario.Id);
         await unitOfWork.CommitAsync();
 
         logger.LogInformation("Senha alterada com sucesso para usuario {UsuarioId}", usuario.Id);

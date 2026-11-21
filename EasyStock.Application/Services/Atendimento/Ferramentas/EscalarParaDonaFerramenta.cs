@@ -9,7 +9,7 @@ public sealed class EscalarParaDonaFerramenta(IEscaladorConversa escalador) : IF
 
     public string Descricao =>
         "Passa a conversa para a dona. Depois disso você não responde mais nesta conversa; avise o cliente " +
-        "com uma frase curta que a Baba vai continuar o atendimento.";
+        "com uma frase curta que a responsável vai continuar o atendimento.";
 
     public string SchemaJson =>
         """{"type":"object","properties":{"motivo":{"type":"string","description":"Por que a dona precisa entrar, em uma frase"}},"required":["motivo"],"additionalProperties":false}""";

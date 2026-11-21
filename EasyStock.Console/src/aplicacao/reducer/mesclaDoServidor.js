@@ -1,4 +1,5 @@
 import { mensagemSoLocal } from '../../dominio/mensagem'
+import { preservarVinculoConfirmado } from '../../dominio/vinculoCliente'
 import { pedidoEncerrado } from '../../dominio/pedido'
 import { mesmoConteudo } from '../igualdade'
 
@@ -41,6 +42,11 @@ const clienteDaApiMantido = (local, doServidor) =>
   local.cliente?.daApi && local.clienteId && local.clienteId === doServidor.clienteId
 
 // #1565: `leitura` é só a ordem em que a consulta saiu; o mesmo pedido relido não é mudança.
+// #2446 (A1): o resumo da inbox não traz bloqueio, contato informado nem captura, então o spread manteria os do
+// cliente anterior quando outro operador troca ou retira o vínculo. Lead que ganha cadastro mantém o que informou.
+const SO_DO_CLIENTE = { bloqueio: null, contatoInformado: null, captura: null }
+const trocouDeCliente = (local, doServidor) => Boolean(local.clienteId) && local.clienteId !== (doServidor.clienteId ?? null)
+
 const mesmoPedido = (a, b) => Boolean(a) && Boolean(b) && mesmoConteudo({ ...a, leitura: null }, { ...b, leitura: null })
 
 // #2005 (console-08): o que a atendente acabou de mudar (assumir, devolver, encerrar, reabrir) e o servidor
@@ -59,6 +65,7 @@ const semConfirmacao = (local) => {
 // conversa vazia: ficam as mensagens da tela e o que se calcula delas (janela de 24 h, atraso).
 export function mesclarDoServidor(local, lida, semMensagens = false, lidaEm = undefined) {
   if (!local) return lida
+  lida = preservarVinculoConfirmado(local, lida)
   const leituraAtrasada = local.confirmadaEm != null && lidaEm != null && lidaEm <= local.confirmadaEm
   const base = local.confirmadaEm != null && !leituraAtrasada ? semConfirmacao(local) : local
   const doServidor = {
@@ -68,16 +75,18 @@ export function mesclarDoServidor(local, lida, semMensagens = false, lidaEm = un
     ...(leituraAtrasada ? situacaoLocal(local) : null),
   }
   const doServidorIds = new Set(doServidor.mensagens.map((m) => m.id))
+  const chavesDoServidor = new Set(doServidor.mensagens.filter(m => m.dir === 'out' && m.chaveEnvio).map(m => m.chaveEnvio))
+  const veioDoServidor = m => doServidorIds.has(m.id) || (m.dir === 'out' && m.chaveEnvio && chavesDoServidor.has(m.chaveEnvio))
   // #2005 (console-09): quem abriu as mensagens anteriores não as perde na volta de 5 s, que traz só a página mais
   // recente: o que já estava na tela e é mais velho que essa página fica (inclusive o trecho que a janela deslizou).
   // Vale para qualquer mensagem velha, também a saída que o servidor guarda como Falhou ou Pendente: ela já é do
   // servidor e fica no topo, em vez de virar "só local" no fim do fio com o Reenviar.
   const inicioDaPagina = semMensagens || !local.anterioresCarregadas ? null : Date.parse(doServidor.mensagens[0]?.em)
   const retidas = inicioDaPagina
-    ? local.mensagens.filter((m) => !doServidorIds.has(m.id) && Date.parse(m.em) < inicioDaPagina)
+    ? local.mensagens.filter((m) => !veioDoServidor(m) && Date.parse(m.em) < inicioDaPagina)
     : []
   const idsRetidos = new Set(retidas.map((m) => m.id))
-  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !doServidorIds.has(m.id) && !idsRetidos.has(m.id))
+  const soLocais = local.mensagens.filter((m) => mensagemSoLocal(m) && !veioDoServidor(m) && !idsRetidos.has(m.id))
   const mantido = clienteDaApiMantido(local, doServidor)
   const rascunhoDoNome = local.nomeDaDona && !doServidor.clienteId
   const lido = pedidoMesclado(local.pedido, doServidor.pedido)
@@ -85,6 +94,7 @@ export function mesclarDoServidor(local, lida, semMensagens = false, lidaEm = un
   if (pedido !== lido && lido.leitura > leituraDe(pedido)) confirmadoNaLeitura.set(pedido, lido.leitura)
   const mesclada = {
     ...base,
+    ...(trocouDeCliente(local, doServidor) ? SO_DO_CLIENTE : null),
     ...doServidor,
     ...(mantido ? { nome: local.nome, cliente: local.cliente } : {}),
     ...(rascunhoDoNome ? { nome: local.nome, nomeDaDona: true } : {}),

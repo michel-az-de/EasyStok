@@ -1,3 +1,5 @@
+using EasyStock.Application.Ports.Output.Notifications;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.Events.Pedidos;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration;
@@ -128,7 +130,8 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
     IEstornoPedidoGateway estorno,
     AvisoCobrancaConversa aviso,
     IPedidoRepository pedidos,
-    SaldoFinanceiroPedido? saldoFinanceiro = null, AvisoStatusPedidoCliente? avisoCliente = null)
+    SaldoFinanceiroPedido? saldoFinanceiro = null, AvisoStatusPedidoCliente? avisoCliente = null,
+    INotificadorService? notificador = null)
 {
     public const string StatusAprovado = "approved";
     private const string Origem = "mercadopago";
@@ -368,6 +371,11 @@ public sealed class ConfirmarPagamentoPedidoUseCase(
                     Origem = Origem,
                     OcorridoEm = agora,
                 }, ct);
+                // #2211: dinheiro retido sem devolução avisa a equipe inscrita pelo WhatsApp.
+                if (notificador is not null)
+                    await new PublicadorAvisoEquipe(notificador).ProblemaNoPagamentoAsync(pedido.EmpresaId, pedido.Id,
+                        pedido.ClienteNome, "o estorno automático falhou: o valor está retido e precisa ser devolvido",
+                        $"estorno-falhou:{input.PagamentoExternoId}", ct);
                 await unitOfWork.CommitAsync();
                 logger.LogError("Estorno automatico falhou pedidoId={PedidoId} pagamento={Pagamento} erro={Erro}",
                     pedido.Id, input.PagamentoExternoId, r.Erro);

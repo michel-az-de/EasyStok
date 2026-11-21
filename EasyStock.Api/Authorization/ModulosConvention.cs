@@ -11,7 +11,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
     private static readonly HashSet<string> Transversais =
     [
         "Auth", "Notificacao", "Uploads", "PreferenciaMenu", "PwaPush", "FeatureFlags", "EntregasDemonstracao",
-        "Consentimentos", "ContatoUsuario",
+        "Consentimentos", "ContatoUsuario", "ReportArtefatos",
         "AdminTenants", "AdminNotificacoes", "WebhookGateway", "WebhookPix",
         "Internal.NotificacoesJobs", "Webhooks.WebhookMensageriaMeta", "Webhooks.WebhookWhatsApp",
         "Webhooks.WebhookWhatsAppPlataforma", "Webhooks.WebhookWppConnect", "Webhooks.WebhookWaha", "Webhooks.WebhookLalamove",
@@ -23,12 +23,12 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Mobile.MobileCash", "Mobile.MobileClients", "Mobile.MobileDiagnostics", "Mobile.MobileDiagTrace",
         "Mobile.MobileEstoque", "Mobile.MobileOrders", "Mobile.MobileProducts", "Mobile.MobileQuickReports",
         "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot",
-        "Mobile.PushReceipts"
+        "Mobile.PushReceipts", "Mobile.MobileImpressao"
     ];
     private static readonly HashSet<string> Bastidor =
     [
         "Financeiro", "ContasAPagar", "ContasAReceber", "CategoriasFinanceiras", "CentrosCusto",
-        "Fornecedor", "Analytics", "Reports", "Inteligencia", "InteligenciaLojas", "EntityAudit"
+        "Fornecedor", "Analytics", "Reports", "Relatorios", "Inteligencia", "InteligenciaLojas", "EntityAudit"
     ];
 
     public static string Chave(Type tipo) => tipo.FullName!
@@ -47,8 +47,35 @@ public sealed class ModulosConvention : IApplicationModelConvention
         if (chave == "AtendimentoLogistica" && acao == "Pagar") return [Modulo.Caixa];
         // Upload transversal, menos a foto do produto: é edição de cardápio, como /api/produtos/{id}/fotos.
         if (chave == "Uploads" && acao == "UploadFotoProduto") return [Modulo.Cardapio];
+        // #2199: quem imprime lê a regra da loja; só Configurações grava.
+        if (chave == "LojaImpressao" && acao == "Obter")
+            return [Modulo.Configuracoes, Modulo.Producao, Modulo.Atendimento, Modulo.Caixa, Modulo.Cozinha, Modulo.Entregas];
+        // #2233: quem escolhe a forma de pagamento lê se a loja tem Pix direto (mascarado); só Configurações grava.
+        if (chave == "LojaPix" && acao is "Obter" or "Disponivel")
+            return [Modulo.Configuracoes, Modulo.Atendimento, Modulo.Caixa, Modulo.Entregas];
+        if (EscritaGestaoMobile.TryGetValue((chave, acao), out var mobile)) return mobile;
         return Mapa.GetValueOrDefault(chave);
     }
+
+    // #2448: a escrita da gestão mobile leva ao ERP o mesmo que a ação web equivalente, então exige o mesmo módulo.
+    // Leitura e rotas do aparelho pareado seguem transversais.
+    private static readonly Dictionary<(string Controller, string Acao), Modulo[]> EscritaGestaoMobile = new()
+    {
+        [("Mobile.MobileCash", "Promover")] = [Modulo.Caixa],
+        [("Mobile.MobileCash", "Unlink")] = [Modulo.Caixa],
+        [("Mobile.MobileProducts", "Approve")] = [Modulo.Cardapio],
+        [("Mobile.MobileProducts", "Link")] = [Modulo.Cardapio],
+        [("Mobile.MobileProducts", "Unlink")] = [Modulo.Cardapio],
+        [("Mobile.MobileProducts", "ReconcileStock")] = [Modulo.Producao],
+        [("Mobile.MobileOrders", "Link")] = [Modulo.Atendimento],
+        [("Mobile.MobileOrders", "Unlink")] = [Modulo.Atendimento],
+        [("Mobile.MobileOrders", "BackfillVendas")] = [Modulo.Caixa],
+        [("Mobile.MobileBatches", "Link")] = [Modulo.Producao],
+        [("Mobile.MobileBatches", "Unlink")] = [Modulo.Producao],
+        [("Mobile.MobileClients", "Link")] = [Modulo.Atendimento],
+        [("Mobile.MobileClients", "Unlink")] = [Modulo.Atendimento],
+        [("Mobile.MobileCalculadora", "CriarCompra")] = [Modulo.Producao],
+    };
 
     public void Apply(ApplicationModel application)
     {
@@ -81,16 +108,18 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Cardapio, "Acervo", "Produto", "Categoria", "IaAutoPreenchimento", "AtendimentoItensCardapio",
             "AtendimentoSecoesCardapio", "Storefront.TenantVitrineCardapio");
         Associar(Modulo.Producao, "Producao", "ProdutoComposicao", "Lotes", "ItemEstoque", "Movimentacao",
-            "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "AtendimentoProducao", "AtendimentoProducaoPesquisa");
+            "EstoqueDesacertos", "ListasCompras", "EtiquetaTemplates", "EtiquetasPdf", "AtendimentoProducao", "AtendimentoProducaoPesquisa");
         Associar(Modulo.Atendimento, "AtendimentoAtendentes", "AtendimentoCaderno", "AtendimentoAssistente",
             "AtendimentoAvisos", "AtendimentoComanda", "AtendimentoComandasCliente", "AtendimentoConfiguracao", "AtendimentoConsentimentos", "AtendimentoConversas",
             "AtendimentoAutomacoes", "AtendimentoEsteira", "AtendimentoExpediente", "AtendimentoMensagensProgramadas",
             "AtendimentoLembretes", "AtendimentoRespostasProntas", "Clientes", "ClientesFoto", "ClientesFrete", "ClientesViagem", "ClientesCrm", "ClienteInteresses",
             "Ocorrencias", "Pedidos", "PedidosCobranca");
+        Associar(Modulo.Atendimento, "AtendimentoVinculoCliente");
+        Associar(Modulo.Caixa, "CadastrosFinanceiros");
         Associar(Modulo.Cozinha, "Kds");
         Associar(Modulo.Caixa, "Caixa", "Venda");
         Associar(Modulo.Campanhas, "Campanhas", "CampanhasSugestoes");
-        Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "NotificacoesConfiguracao",
+        Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "LojaImpressao", "LojaPix", "NotificacoesConfiguracao",
             "Integracoes", "IntegracoesWhatsApp", "IntegracoesWppConnect", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
         Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega", "AtendimentoCorridas", "AtendimentoRelatorioCustoDeEntrega",
             "Storefront.TenantVitrineEntrega");

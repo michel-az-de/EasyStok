@@ -1,3 +1,4 @@
+using EasyStock.Application.Common;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using EasyStock.Application.Reporting;
@@ -50,13 +51,13 @@ public sealed class XmlBulkDownloadHandler(
         XmlBulkDownloadParams parametros,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var de  = parametros.De.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-        var ate = parametros.Ate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
+        // #2441: dia civil de Brasília em UTC real; timestamptz não aceita Kind=Unspecified.
+        var (de, ate) = HorarioBrasil.JanelaPeriodoUtc(parametros.De, parametros.Ate);
 
         // Apenas NFC-e autorizadas com XML disponível no storage.
         var documentos = tenantQuery.Query<NfeDocumento>()
             .Where(n => n.Status == StatusNfe.Autorizada
-                        && n.DataAutorizacao >= de && n.DataAutorizacao <= ate
+                        && n.DataAutorizacao >= de && n.DataAutorizacao < ate
                         && n.XmlAssinadoStorageKey != null)
             .OrderBy(n => n.DataAutorizacao)
             .Select(n => new

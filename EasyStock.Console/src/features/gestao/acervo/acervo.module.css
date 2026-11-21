@@ -1,49 +1,73 @@
-.raiz { display: grid; gap: 20px; color: var(--tinta); }
-.cabecalho, .linha { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.raiz { display: grid; gap: var(--e-5); color: var(--tinta); }
+.cabecalho, .linha { display: flex; justify-content: space-between; align-items: center; gap: var(--e-4); flex-wrap: wrap; }
 .cabecalho h2, .detalhe h3 { margin: 0; }
 .cabecalho p, .detalhe p { color: var(--tinta-2); }
-.acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 16px; }
-.fotosCardapio { display: grid; gap: 16px; }
+.acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.grade > :is(div, p):only-child { grid-column: 1 / -1; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: var(--e-4); }
+.fotosCardapio { display: grid; gap: var(--e-5); container-type: inline-size; }
 .fotosCardapio h3, .fotosCardapio p { margin: 0; }
 .fotosCardapio p { color: var(--tinta-2); }
 .fotosCardapio a { color: var(--tinta); text-decoration: none; }
-.fotosCardapio a:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-.grupoFoto { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 0; border-radius: var(--r-1); }
-.grupoFoto a { border: 0; padding: 0; }
-/* #1808: a foto do prato é um botão que abre a escolha da imagem; "Abrir foto" fica como link. */
-.grupoFoto > button { border: 0; padding: 0; background: transparent; }
-.grupoFoto > button:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-.grupoFoto > button:disabled { cursor: default; }
-.grupoFoto > a { color: var(--marca); font-size: .875rem; text-decoration: underline; }
-.tamanhos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
-.tamanhos button { min-height: var(--toque); min-width: var(--toque); padding: 8px 12px; color: var(--tinta); background: var(--papel); border: 1px solid var(--linha-media); border-radius: var(--r-1); font: inherit; cursor: pointer; }
-.tamanhos button[aria-pressed="true"] { background: var(--marca-claro); border-color: var(--marca); }
-.tamanhos button:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
-.cartao { display: grid; gap: 10px; padding: 12px; text-align: left; color: var(--tinta); background: var(--papel); border: var(--b-1) solid transparent; border-radius: var(--r-1); cursor: pointer; font: inherit; }
-.cartao span { color: var(--tinta-2); font-size: .875rem; }
-.cartao.ativo { outline: 2px solid var(--marca); outline-offset: 2px; }
+/* #2424: fotos do cardápio em até 3 colunas; cartão sem caixa, selo de estado e ação discreta. */
+.buscaFotos { position: relative; display: block; }
+.buscaFotos svg { position: absolute; left: var(--e-3); top: 50%; transform: translateY(-50%); color: var(--tinta-3); pointer-events: none; }
+.buscaFotos input { width: 100%; box-sizing: border-box; min-height: var(--toque); padding: var(--e-2) var(--e-3) var(--e-2) 44px; background: var(--preenchimento); color: var(--tinta); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); font: inherit; font-size: var(--t-corpo); }
+.buscaFotos input::placeholder { color: var(--tinta-3); }
+.gradeFotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: var(--e-5) var(--e-4); }
+@container (min-width: 900px) { .gradeFotos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.grupoFoto { display: flex; flex-direction: column; align-items: flex-start; gap: var(--e-2); min-width: 0; }
+.moldura { position: relative; width: 100%; }
+.moldura .foto { display: block; height: 200px; object-fit: cover; }
+.moldura .foto:not(img) { display: grid; }
+.selo { position: absolute; left: var(--e-2); top: var(--e-2); display: inline-flex; align-items: center; gap: var(--e-1); padding: 4px var(--e-2); border-radius: var(--r-pilula); background: var(--papel); color: var(--tinta); font-size: var(--t-micro); font-weight: 600; box-shadow: var(--sombra); }
+.ampliar { position: absolute; right: var(--e-2); top: var(--e-2); display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-1); background: var(--papel); color: var(--tinta); box-shadow: var(--sombra); opacity: .92; transition: opacity var(--dur-micro) var(--ease-padrao); }
+.ampliar:hover { opacity: 1; }
+/* #2762: alvo de toque do ampliar sobe a --toque em tela de toque; o ícone segue 16. */
+@media (max-width: 759px), (pointer: coarse) { .ampliar { width: var(--toque); height: var(--toque); } }
+.ampliar::after { content: ''; position: absolute; inset: -4px; }
+.nomeFoto { color: var(--tinta); font-size: var(--t-corpo); font-weight: 750; overflow-wrap: anywhere; }
+.porcao { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; color: var(--tinta-2); font-size: var(--t-apoio); }
+.porcaoUnica { padding: 4px var(--e-3); border: var(--b-1) solid var(--linha); border-radius: var(--r-pilula); color: var(--tinta); }
+.tamanhos { display: flex; flex-wrap: wrap; gap: var(--e-1); }
+.tamanhos button { min-height: 32px; padding: 4px var(--e-3); color: var(--tinta); background: transparent; border: var(--b-1) solid var(--linha-forte); border-radius: var(--r-pilula); font: inherit; font-size: var(--t-apoio); cursor: pointer; }
+@media (max-width: 759px), (pointer: coarse) { .tamanhos button { min-height: var(--toque); } }
+.tamanhos button[aria-pressed="true"] { color: var(--marca-forte); background: var(--marca-claro); border-color: var(--marca); font-weight: 650; }
+.trocar { display: inline-flex; align-items: center; gap: var(--e-1); min-height: var(--toque); padding: 0; border: 0; background: transparent; color: var(--marca-forte); font: inherit; font-size: var(--t-apoio); font-weight: 600; cursor: pointer; }
+.trocar:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.trocar:disabled { color: var(--tinta-3); cursor: default; }
+.cartao { display: grid; gap: var(--e-2); padding: var(--e-3); text-align: left; color: var(--tinta); background: var(--papel); border: var(--b-1) solid transparent; border-radius: var(--r-1); cursor: pointer; font: inherit; transition: background var(--dur-micro) var(--ease-padrao), border-color var(--dur-micro) var(--ease-padrao); }
+.cartao span { color: var(--tinta-2); font-size: var(--t-apoio); }
+/* #2762: hover e desabilitado do cartão; o selecionado vira cor (borda e fundo), sem anel igual ao de foco. */
+.cartao:hover:not(:disabled) { background: var(--elevado); border-color: var(--linha-forte); }
+.cartao:disabled { opacity: .6; cursor: default; }
+.cartao.ativo { border-color: var(--marca); background: var(--marca-claro); }
 .foto { width: 100%; height: 240px; object-fit: contain; background: var(--preenchimento); border-radius: var(--r-1); }
-.detalhe { display: grid; grid-template-columns: 1fr minmax(200px, 320px); gap: 24px; border-top: 1px solid var(--linha); padding-top: 24px; }
+/* #2762: placeholder de texto centrado e em tinta secundária; a imagem entra com esmaecer. */
+.foto:not(img) { display: grid; place-items: center; box-sizing: border-box; padding: var(--e-3); text-align: center; color: var(--tinta-2); font-size: var(--t-apoio); }
+img.foto { animation: global(esmaecer) var(--dur-media) var(--ease-saida) both; }
+.detalhe { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 320px); gap: var(--e-5); border-top: var(--b-1) solid var(--linha); padding-top: var(--e-5); }
 .detalhe .foto { height: 360px; }
-.detalhe .linha { padding: 12px 0; border-bottom: 1px solid var(--linha); }
-.formulario { display: grid; gap: 16px; }
+.detalhe .linha { padding: var(--e-3) 0; border-bottom: var(--b-1) solid var(--linha); }
+.formulario { display: grid; gap: var(--e-4); }
 .formulario label, .campo { display: grid; gap: 6px; }
-.formulario input, .formulario select, .formulario textarea, .campo input, .campo select { width: 100%; box-sizing: border-box; padding: 10px 12px; background: var(--papel); color: var(--tinta); border: 1px solid var(--linha-media); border-radius: var(--r-1); font: inherit; }
+.formulario input, .formulario select, .formulario textarea, .campo input, .campo select { width: 100%; box-sizing: border-box; padding: var(--e-2) var(--e-3); background: var(--papel); color: var(--tinta); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1); font: inherit; }
 .formulario input[type="checkbox"] { width: auto; }
 .formulario fieldset { min-width: 0; overflow-wrap: anywhere; border: 0; border-radius: var(--r-1); }
 .formulario fieldset label { display: flex; align-items: center; min-height: var(--toque); }
-.formulario fieldset.campos { display: grid; gap: 16px; padding: 0; border: 0; }
+.formulario fieldset.campos { display: grid; gap: var(--e-4); padding: 0; border: 0; }
 .formulario fieldset.campos > label { display: grid; }
-.producao { border: 0; border-radius: var(--r-1); padding: 16px; min-width: 0; }
-.filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px; margin-bottom: 16px; }
-.cobertura { padding: 14px; background: var(--papel); border: 0; border-radius: var(--r-1); overflow-wrap: anywhere; }
+.producao { border: 0; border-radius: var(--r-1); padding: var(--e-4); min-width: 0; }
+.filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: var(--e-3); margin-bottom: var(--e-4); }
+.cobertura { padding: var(--e-3); background: var(--papel); border: 0; border-radius: var(--r-1); overflow-wrap: anywhere; }
 .cobertura h4 { margin-top: 0; }
 .formulario textarea { min-height: 100px; resize: vertical; }
 .erro { color: var(--erro); }
 .texto { white-space: pre-wrap; overflow-wrap: anywhere; }
 .raiz small { overflow-wrap: anywhere; }
-.raiz details { padding: 10px 0; }
+.raiz details { padding: var(--e-2) 0; }
 .raiz summary { cursor: pointer; }
 .raiz a { color: var(--marca-forte); }
 @media (max-width: 700px) { .detalhe { grid-template-columns: 1fr; } .cabecalho { align-items: flex-start; } }
+.descricaoAba { margin: 0; color: var(--tinta-2); font-size: var(--t-apoio); line-height: var(--lh-corpo); }
+.cabecalho h3 { margin: 0; }

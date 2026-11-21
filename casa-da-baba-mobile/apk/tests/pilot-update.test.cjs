@@ -1,4 +1,5 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { validateManifest } = require('../pilot.js');
@@ -43,7 +44,7 @@ test('diferencia servidor acessível de aparelho pareado e envio pendente', () =
   assert.doesNotMatch(revoked.queue, /sincronizad|confirmad/);
 });
 
-function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch, updater } = {}) {
+function pilotHarness({ operator = 'Operadora', connected = true, manifestError = false, healthFetch, updater, manifestGate } = {}) {
   const nodes = new Map();
   const events = new Map();
   const doc = { activeElement: null, hidden: false, addEventListener: (name, callback) => events.set(name, callback), getElementById: id => nodes.get(id) };
@@ -57,7 +58,9 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
       addEventListener(name, callback) { handlers.set(name, callback); },
       async click(action) { await handlers.get('click')?.({ target: { closest: () => ({ dataset: { action } }) } }); }
     };
-    Object.defineProperty(el, 'innerHTML', { set(html) {
+    let markup = '';
+    Object.defineProperty(el, 'innerHTML', { get() { return markup; }, set(html) {
+      markup = html;
       for (const match of html.matchAll(/id="([^"]+)"/g)) nodes.set(match[1], makeElement('element'));
     } });
     return el;
@@ -77,6 +80,7 @@ function pilotHarness({ operator = 'Operadora', connected = true, manifestError 
   const fetch = async url => {
     requests.push(url);
     if (url.endsWith('/api/mobile/version')) return healthFetch ? healthFetch() : { ok: true, json: async () => ({ databaseOk: true }) };
+    if (manifestGate?.wait) await manifestGate.wait;
     if (manifestError) throw new Error('Network failure');
     return { ok: true, json: async () => manifest };
   };
@@ -101,7 +105,7 @@ function realAndroidListener() {
 }
 
 function installPwaBack(root, doc) {
-  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
   const start = html.indexOf('(function setupBackButton() {');
   const end = html.indexOf('\n})();', start) + '\n})();'.length;
   assert.ok(start >= 0 && end > start);
@@ -125,7 +129,8 @@ test('Back nativo fecha formulário com o fechador PWA real e só minimiza no in
   const context = installPwaBack(root, doc);
   assert.equal(root.cdbHandleNativeBack(), true);
   assert.equal(closed, 1); assert.equal(visible.size, 0);
-  context.goBack = () => { context.currentScreen = 'home'; doc.querySelector = () => ({ dataset: { screen: 'home' } }); };
+  // Produção é aba de topo no APK: o Voltar vai direto ao Início, sem depender da história.
+  context.go = screen => { context.currentScreen = screen; doc.querySelector = () => ({ dataset: { screen } }); };
   assert.equal(root.cdbHandleNativeBack(), true);
   assert.equal(nodes.get('pilotHome').open, true);
   assert.equal(root.cdbHandleNativeBack(), false);
@@ -142,7 +147,7 @@ for (const pilot of [true, false]) {
     const context = installPwaBack(root, doc); context.currentScreen = 'pedidos';
     nodes.set('orderNotes', { value: 'Separar amanhã' }); let historyCalls = 0;
     context.goBack = () => { historyCalls++; };
-    const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+    const source = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
     const bindings = ['selectedClient', 'currentOrderItems'].map(name => {
       const declaration = source.match(new RegExp('^let ' + name + ' = [^;]+;', 'm'))?.[0];
       assert.ok(declaration); return declaration;
@@ -167,7 +172,7 @@ test('Back protege impressão lexical antes de avisos/home, e libera navegação
   const notices = nodes.get('pilotNotices'); notices.showModal();
   doc.querySelectorAll = () => [];
   const context = installPwaBack(root, doc); let navigated = 0;
-  context.showToast = () => {}; context.goBack = () => { navigated++; };
+  context.showToast = () => {}; context.goBack = () => { navigated++; }; context.go = () => { navigated++; };
   vm.runInContext('isPrinting = true', context);
   assert.equal(root.isPrinting, undefined); assert.equal(context.isPrinting, undefined);
   assert.equal(root.cdbHandleNativeBack(), true); assert.equal(notices.open, true);
@@ -263,13 +268,66 @@ test('offline permite abrir Pedidos diretamente pelo início', async () => {
   assert.deepEqual(calls, ['pedidos']);
 });
 
-test('início limita as entradas principais a Produção e Pedidos', async () => {
+test('início preserva Produção, Pedidos e Conectar ao oferecer Atendimento', async () => {
   const { nodes, calls } = pilotHarness();
-  const markup = fs.readFileSync(path.resolve(__dirname, '../pilot.js'), 'utf8');
-  assert.doesNotMatch(markup, /workspace|Atendimento|atendimento/);
+  const markup = nodes.get('pilotHome').innerHTML;
+  assert.match(markup, /class="pilot-tile pilot-tile--support" data-action="workspace"[^]*?data-pilot-icon="mensagem"[^]*?<span>Atendimento<\/span>/);
+  assert.equal((markup.match(/data-action="workspace"/g) || []).length, 1);
+  assert.match(markup, /data-action="pair"[^]*?<span>Conectar<\/span>/);
   await nodes.get('pilotHome').click('production');
   await nodes.get('pilotHome').click('local-orders');
   assert.deepEqual(calls, ['producao', 'pedidos']);
+});
+
+test('Atendimento abre o workspace nativo uma vez e mantém a Home para o retorno', async () => {
+  const { root, nodes, calls } = pilotHarness();
+  let opens = 0, complete;
+  root.Capacitor = { Plugins: { PilotApp: { openWorkspace: () => { opens++; return new Promise(resolve => { complete = resolve; }); } } } };
+  const home = nodes.get('pilotHome');
+  const opening = home.click('workspace');
+  await home.click('workspace');
+  assert.equal(opens, 1);
+  assert.equal(nodes.get('pilotWorkspaceButton').disabled, true);
+  assert.equal(home.open, true);
+  complete();
+  await opening;
+  assert.equal(nodes.get('pilotWorkspaceButton').disabled, false);
+  assert.equal(home.open, true);
+  assert.deepEqual(calls, [], 'não troca o módulo local nem abre URL externa');
+});
+
+test('Atendimento offline mantém dados locais e explica a indisponibilidade', async () => {
+  const { root, doc, nodes, calls } = pilotHarness({ connected: false });
+  let opens = 0;
+  root.Capacitor = { Plugins: { PilotApp: { openWorkspace: async () => { opens++; } } } };
+  const sync = root.cdbSync;
+  await nodes.get('pilotHome').click('workspace');
+  assert.equal(opens, 0);
+  assert.equal(root.cdbSync, sync);
+  assert.equal(nodes.get('pilotHome').open, true);
+  assert.match(nodes.get('pilotError').textContent, /Atendimento precisa de conexão/);
+  assert.equal(doc.activeElement, nodes.get('pilotError'));
+  await nodes.get('pilotHome').click('local-orders');
+  assert.deepEqual(calls, ['pedidos']);
+});
+
+test('Atendimento sem bridge ou com falha permite tentar novamente sem simular abertura', async () => {
+  const { root, doc, nodes, calls } = pilotHarness();
+  const home = nodes.get('pilotHome');
+  await home.click('workspace');
+  assert.match(nodes.get('pilotError').textContent, /Atualize o APK/);
+  let opens = 0;
+  root.Capacitor = { Plugins: { PilotApp: { openWorkspace: async () => { opens++; throw new Error('Não foi possível abrir o atendimento.'); } } } };
+  await home.click('workspace');
+  assert.match(nodes.get('pilotError').textContent, /Não foi possível abrir o atendimento/);
+  assert.equal(home.open, true);
+  assert.equal(doc.activeElement, nodes.get('pilotError'));
+  assert.equal(nodes.get('pilotWorkspaceButton').disabled, false);
+  root.Capacitor.Plugins.PilotApp.openWorkspace = async () => { opens++; };
+  await home.click('workspace');
+  assert.equal(opens, 2);
+  assert.equal(nodes.get('pilotError').textContent, '');
+  assert.deepEqual(calls, []);
 });
 
 test('textos pequenos do início mantêm contraste mínimo de 4,5:1', () => {
@@ -285,9 +343,20 @@ test('textos pequenos do início mantêm contraste mínimo de 4,5:1', () => {
     return rgb.map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
       .reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
   };
+  // Cores vêm de tokens: confere nos dois temas (escuro em body.pilot-app, claro sobrepõe).
+  const tokens = selector => {
+    const rule = css.split('\n').find(line => line.startsWith(selector + ' {'));
+    assert.ok(rule, selector);
+    return Object.fromEntries([...rule.matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)].map(match => [match[1], match[2]]));
+  };
+  const dark = tokens('body.pilot-app');
+  const themes = { escuro: dark, claro: { ...dark, ...tokens('[data-theme=light] body.pilot-app') } };
+  const resolve = (value, theme) => value.replace(/var\((--[\w-]+)\)/, (_, name) => themes[theme][name]);
   for (const [text, background] of [['.pilot-topline', '.pilot-home'], ['.pilot-update', '.pilot-home'], ['.pilot-production', '.pilot-production'], ['.pilot-orders', '.pilot-orders'], ['.pilot-rail button span', '.pilot-rail'], ['.pilot-app .etq-actions .etq-save', '.pilot-app .etq-actions .etq-save'], ['.pilot-app .etq-actions .etq-share', '.pilot-app .etq-actions .etq-share']]) {
-    const levels = [luminance(style(text).color), luminance(style(background).background)].sort((a, b) => a - b);
-    assert.ok((levels[1] + .05) / (levels[0] + .05) >= 4.5, text);
+    for (const theme of Object.keys(themes)) {
+      const levels = [luminance(resolve(style(text).color, theme)), luminance(resolve(style(background).background, theme))].sort((a, b) => a - b);
+      assert.ok((levels[1] + .05) / (levels[0] + .05) >= 4.5, text + ' (' + theme + ')');
+    }
   }
   assert.equal(style('.pilot-card .pilot-step').opacity, undefined);
 });
@@ -654,4 +723,222 @@ test('resumo compacto mantém rede, vínculo, fila pendente e bloqueio de import
   assert.match(invalid.summary, /inválida.*1 alteração aguardando envio/);
   const importing = connectionStatus({ health: 'online', paired: true, invalid: false, pending: 2, importPending: true });
   assert.match(importing.summary, /Envio pausado.*2 alterações aguardando envio/);
+});
+
+// #2735: o bloco de apoio do Início fica oculto; o que a operadora precisa ver mora fora dele.
+test('Início explica o próximo passo quando o aparelho não envia ao EasyStok', () => {
+  const base = { invalid: false, pending: 0 };
+  assert.match(connectionStatus({ ...base, health: 'online', paired: false }).hint, /código da equipe/);
+  assert.match(connectionStatus({ ...base, health: 'online', paired: false, googleSession: true }).hint, /conta Google/);
+  assert.match(connectionStatus({ ...base, health: 'online', paired: true, invalid: true }).hint, /Conecte novamente/);
+  assert.match(connectionStatus({ ...base, health: 'offline', paired: true, pending: 2 }).hint, /fica salvo/);
+  assert.match(connectionStatus({ ...base, health: 'checking', paired: true, retrying: true }).hint, /fica salvo/);
+  for (const quiet of [{ health: 'online', paired: true }, { health: 'checking', paired: true }, { health: 'offline', paired: true, importPending: true }]) {
+    assert.equal(connectionStatus({ ...base, ...quiet }).hint, '');
+  }
+});
+
+test('Início mantém Verificar conexão, a dica e o estado do conteúdo fora do bloco oculto', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'pilot.js'), 'utf8');
+  const hidden = source.slice(source.indexOf('<div class="pilot-home-support" hidden>'), source.indexOf('<div class="pilot-update">'));
+  const visible = source.slice(source.indexOf('<div class="pilot-connection">'), source.indexOf('<div class="pilot-home-controls">'));
+  assert.ok(hidden.length > 0 && visible.length > 0);
+  for (const id of ['pilotReconnect', 'pilotConnectionHint', 'pilotOtaStatus']) assert.ok(!hidden.includes('id="' + id + '"'), id + ' não pode ficar no bloco oculto');
+  assert.ok(visible.includes('id="pilotReconnect"'));
+  assert.ok(visible.includes('id="pilotConnectionHint"'));
+});
+
+test('sem conexão, o Início oferece Verificar conexão e avisa que o registro fica salvo', async () => {
+  const { root, nodes } = pilotHarness({ connected: false });
+  root.cdbSync.getPairing = () => ({ empresaId: 'empresa', lojaId: 'loja' });
+  await nodes.get('pilotHome').click('reconnect');
+  assert.equal(nodes.get('pilotReconnect').hidden, false);
+  assert.equal(nodes.get('pilotConnectionHint').hidden, false);
+  assert.match(nodes.get('pilotConnectionHint').textContent, /fica salvo/);
+  assert.equal(nodes.get('pilotHome').dataset.sync, 'offline');
+});
+
+test('aparelho vinculado e com conexão não mostra dica nem Verificar conexão', async () => {
+  const { root, nodes } = pilotHarness();
+  root.cdbSync.getPairing = () => ({ empresaId: 'empresa', lojaId: 'loja' });
+  await new Promise(setImmediate); // a conferência da abertura termina antes da nova
+  await nodes.get('pilotHome').click('reconnect');
+  assert.equal(nodes.get('pilotConnectionHint').textContent, '');
+  assert.equal(nodes.get('pilotConnectionHint').hidden, true);
+  assert.equal(nodes.get('pilotReconnect').hidden, true);
+  assert.equal(nodes.get('pilotHome').dataset.sync, 'online');
+});
+
+test('nova tentativa a partir de sem conexão mantém o botão e a dica na tela até a resposta', async () => {
+  let complete;
+  const { root, nodes } = pilotHarness({ connected: false, healthFetch: () => new Promise(resolve => { complete = resolve; }) });
+  root.cdbSync.getPairing = () => ({ empresaId: 'empresa', lojaId: 'loja' });
+  root.navigator.onLine = true;
+  const pending = nodes.get('pilotHome').click('reconnect');
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotReconnect').hidden, false);
+  assert.equal(nodes.get('pilotReconnect').disabled, true);
+  assert.equal(nodes.get('pilotConnectionHint').hidden, false);
+  complete({ ok: true, json: async () => ({ databaseOk: true }) });
+  await pending;
+  assert.equal(nodes.get('pilotReconnect').hidden, true);
+  assert.equal(nodes.get('pilotConnectionHint').hidden, true);
+});
+
+test('sem versão nova, a conferência diz que não há o que instalar', async () => {
+  const { root, nodes } = pilotHarness();
+  root.CDB_CONFIG.versionCode = manifest.versionCode;
+  await root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotUpdateStatus').textContent, 'Nada novo para instalar. Versão publicada: ' + manifest.version + ' (' + manifest.versionCode + ').');
+});
+
+test('rodapé do Início só mostra o estado do conteúdo quando há o que dizer', async () => {
+  const base = { builtinVersion: '0.7.0', nativeVersionCode: 7, activeVersion: '0.7.0' };
+  const open = async state => {
+    const harness = pilotHarness({ updater: { status: async () => state, check: async () => state } });
+    await new Promise(setImmediate);
+    return harness;
+  };
+  const prepared = await open({ ...base, pendingVersion: '0.7.1' });
+  assert.equal(prepared.nodes.get('pilotOtaStatus').hidden, false);
+  assert.match(prepared.nodes.get('pilotOtaStatus').textContent, /0\.7\.1 preparada/);
+  const recovered = await open({ ...base, rolledBack: true });
+  assert.equal(recovered.nodes.get('pilotOtaStatus').hidden, false);
+  const usual = await open(base);
+  assert.equal(usual.nodes.get('pilotOtaStatus').hidden, true);
+  const failed = await open({ ...base, lastError: 'timeout' });
+  assert.equal(failed.nodes.get('pilotOtaStatus').hidden, true, 'falha passageira não ocupa o Início sozinha');
+  await failed.root.forceCheckUpdate();
+  assert.equal(failed.nodes.get('pilotOtaStatus').hidden, false, 'quem pediu a conferência vê a falha');
+  assert.match(failed.nodes.get('pilotOtaStatus').textContent, /não foi concluída/);
+});
+
+// #2785: sem o aviso do push, a oferta precisa aparecer na primeira dobra do Início, antes dos atalhos.
+test('oferta de APK novo fica no topo do Início, antes de Produção e fora do bloco oculto', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'pilot.js'), 'utf8');
+  const offer = source.indexOf('id="pilotUpdateOffer"');
+  assert.ok(offer > 0, 'Início precisa da faixa pilotUpdateOffer');
+  assert.ok(offer > source.indexOf('id="pilotTitle"') && offer < source.indexOf('<div class="pilot-actions">'), 'a faixa fica entre o título e os atalhos');
+  const block = source.slice(offer, source.indexOf('</section>', offer));
+  assert.match(block, /data-action="download"/, 'a faixa tem o próprio botão de instalar');
+});
+
+test('faixa do topo aparece só quando há APK novo e some quando a conferência falha', async () => {
+  const available = pilotHarness({ operator: '' });
+  await new Promise(setImmediate);
+  assert.equal(available.nodes.get('pilotUpdateOffer').hidden, false);
+  assert.match(available.nodes.get('pilotUpdateOfferText').textContent, /Versão 0\.1\.1 disponível/);
+  await available.nodes.get('pilotHome').click('download');
+  assert.deepEqual(available.calls.filter(url => String(url).endsWith('.apk')), [manifest.url]);
+
+  const current = pilotHarness({ operator: '' });
+  current.root.CDB_CONFIG.versionCode = manifest.versionCode;
+  await new Promise(setImmediate);
+  assert.equal(current.nodes.get('pilotUpdateOffer').hidden, true);
+
+  const failed = pilotHarness({ operator: '', manifestError: true });
+  await new Promise(setImmediate);
+  assert.equal(failed.nodes.get('pilotUpdateOffer').hidden, true);
+});
+
+// #2785 (revisão): a faixa não pisca nem empurra os atalhos enquanto uma nova conferência está em curso.
+test('faixa do topo continua no lugar durante a conferência seguinte', async () => {
+  const gate = {};
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
+  let release;
+  gate.wait = new Promise(resolve => { release = resolve; });
+  const pending = root.forceCheckUpdate();
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false, 'a faixa fica visível enquanto confere');
+  release();
+  await pending;
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
+});
+
+// #2804: na tela "Quem vai usar o app?" o Voltar não pode abrir o Início por cima e liberar a operação sem nome.
+test('boas-vindas visível bloqueia o Início e o Voltar minimiza sem navegar', () => {
+  const { root, doc, nodes } = pilotHarness({ operator: '' });
+  let welcomeVisible = true, backs = 0;
+  nodes.set('welcomeScreen', { classList: { contains: name => name === 'hidden' ? !welcomeVisible : false } });
+  root.cdbHandleBack = () => { backs++; return true; };
+  doc.querySelector = () => ({ dataset: { screen: 'home' } });
+  assert.equal(root.cdbHandleNativeBack(), false);
+  assert.equal(backs, 0, 'não chama o voltar do PWA, que levaria ao Início');
+  nodes.get('pilotHomeButton').click?.();
+  root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotHome').open, false, 'o Início não cobre as boas-vindas');
+  welcomeVisible = false;
+  root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotHome').open, true);
+});
+
+// #2804: falha de rede numa conferência posterior não apaga a oferta que já estava na tela.
+test('falha na conferência seguinte mantém a oferta de APK novo, o botão e o aviso do rodapé', async () => {
+  const gate = {};
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
+  gate.wait = Promise.reject(new Error('rede'));
+  gate.wait.catch(() => {});
+  await root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false, 'a faixa continua');
+  assert.equal(nodes.get('pilotDownload').hidden, false, 'o botão de baixar continua');
+  assert.match(nodes.get('pilotRailVersion').textContent, /atualização disponível/);
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Não foi possível conferir/);
+});
+
+// #2804: pedir a conferência enquanto a automática roda mostra o andamento em vez de ficar mudo.
+test('conferência manual durante a automática mostra que está conferindo', async () => {
+  let release;
+  const gate = { wait: new Promise(resolve => { release = resolve; }) };
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  await root.forceCheckUpdate();
+  assert.equal(nodes.get('pilotUpdateStatus').hidden, false);
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Conferindo a versão disponível/);
+  root.CDB_CONFIG.versionCode = manifest.versionCode;
+  release();
+  for (let i = 0; i < 5; i++) await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateStatus').hidden, false, 'quem pediu recebe a resposta');
+  assert.match(nodes.get('pilotUpdateStatus').textContent, /Nada novo para instalar/);
+});
+
+// #2804 (revisão da PR): manifesto recebido mas inválido cancela a oferta anterior; só falha de rede a mantém.
+test('manifesto inválido na conferência seguinte retira a oferta anterior', async () => {
+  const gate = {};
+  const { root, nodes } = pilotHarness({ operator: '', manifestGate: gate });
+  await new Promise(setImmediate);
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, false);
+  const original = manifest.url;
+  manifest.url = 'https://outro.exemplo/app.apk';
+  try { await root.forceCheckUpdate(); } finally { manifest.url = original; }
+  assert.equal(nodes.get('pilotUpdateOffer').hidden, true);
+  assert.equal(nodes.get('pilotDownload').hidden, true);
+});
+
+// #2804: envio bem-sucedido prova a conexão; o rodapé não fica preso em "Sem conexão confirmada".
+test('sincronização bem-sucedida confirma a conexão depois de uma checagem que estourou', async () => {
+  const { root, nodes, events } = pilotHarness({ healthFetch: () => { throw new Error('timeout'); } });
+  root.cdbSync.getPairing = () => ({ empresaId: 'empresa', lojaId: 'loja' });
+  await new Promise(setImmediate);
+  events.get('cdb-sync-success')();
+  assert.equal(nodes.get('pilotHome').dataset.sync, 'online');
+  root.navigator.onLine = false;
+  events.get('offline')();
+  events.get('cdb-sync-success')();
+  assert.equal(nodes.get('pilotHome').dataset.sync, 'offline', 'sem rede o envio não promove a conexão');
+});
+
+// #2804: o Voltar do Android fecha o diálogo de conta antes de minimizar ou navegar.
+test('Voltar fecha o diálogo de conta aberto', () => {
+  const { root, doc, nodes } = pilotHarness();
+  const account = doc.createElement('dialog');
+  account.open = true;
+  nodes.set('pilotAccountDialog', account);
+  assert.equal(nodes.get('pilotHome').open, true);
+  assert.equal(root.cdbHandleNativeBack(), true);
+  assert.equal(account.open, false);
+  assert.equal(nodes.get('pilotHome').open, true);
 });

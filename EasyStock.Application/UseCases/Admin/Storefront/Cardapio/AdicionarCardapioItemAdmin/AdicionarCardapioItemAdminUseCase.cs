@@ -54,6 +54,7 @@ public class AdicionarCardapioItemAdminUseCase(
     IStorefrontRepository storefrontRepository,
     ICardapioItemRepository cardapioRepository,
     IProdutoRepository produtoRepository,
+    ICardapioSecaoRepository secaoRepository,
     IUnitOfWork unitOfWork)
     : IUseCase<AdicionarCardapioItemAdminCommand, AdicionarCardapioItemAdminResult>
 {
@@ -183,8 +184,11 @@ public class AdicionarCardapioItemAdminUseCase(
         }
 
         // ADR-0035 (#652): seção + opções do item guarda-chuva (item recém-criado → tudo insert).
-        if (command.SecaoId.HasValue)
-            item.DefinirSecao(command.SecaoId);
+        if (command.SecaoId is { } secaoId)
+        {
+            await SecaoDaVitrine.ExigirAsync(secaoRepository, command.StorefrontId, secaoId);
+            item.DefinirSecao(secaoId);
+        }
         CardapioVariacaoSync.Reconciliar(item, command.Opcoes);
 
         // S15: linha e preparo numérico.

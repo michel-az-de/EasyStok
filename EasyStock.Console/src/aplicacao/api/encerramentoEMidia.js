@@ -43,12 +43,16 @@ export function falhaAoCancelarNoEncerramento(cancelamento, numero) {
   return `Não deu para cancelar o pedido Nº ${numero}${motivo} O atendimento continua aberto. Tente de novo ou desmarque a caixa de cancelar.`
 }
 
-export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves = criarChavesDeMensagem() }) {
+export function criarAcoesEncerramentoEMidiaApi({
+  despachar, agoraRef, estadoRef, falhaDoEnvio, envioRecusado, chaves = criarChavesDeMensagem(), assumirParaEnviar = () => true,
+}) {
   const avisar = (mensagem) => despachar({ tipo: acao.AVISO_API, mensagem })
   const conversaDe = (id) => estadoRef.current.conversas.find((c) => c.id === id) ?? null
 
   async function despedir(id, texto) {
     if (envioRecusado(id)) return false
+    // #2185 (F12): a despedida é uma fala humana; com o Assistente atendendo, assume antes.
+    if (!(await assumirParaEnviar(id))) return false
     const mensagemId = proximoId('msg')
     despachar({ tipo: acao.ENVIAR_MENSAGEM, id, texto, mensagemId, agora: agoraRef.current })
     try {
@@ -71,6 +75,7 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
       avisar(`Áudio: ainda não ligado para ${canal ?? 'este canal'} nesta versão. Pelo EasyStok sai só no WhatsApp.`)
       return false
     }
+    if (!(await assumirParaEnviar(id))) return false
     const mensagemId = proximoId('mid')
     despachar({
       tipo: acao.ENVIAR_MIDIA, id, formato: 'audio', arte, texto, ...extra, status: 'enviando', agora: agoraRef.current, mensagemId,
@@ -98,7 +103,7 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
     try {
       await encerrar(id)
     } catch (erro) {
-      const mensagem = `Atendimento não encerrado: ${erro.message}`
+      const mensagem = `Conversa não concluída: ${erro.message}`
       avisar(mensagem)
       return { erro: mensagem, despedidaSaiu: despedidaSaiu === true }
     }
@@ -107,10 +112,10 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
     despachar({ tipo: acao.FECHAR_ENCERRAMENTO })
     // Só ressalva acende a faixa: encerrar que deu certo não sai em tom de alerta.
     const ressalvas = []
-    if (despedidaSaiu === false) ressalvas.push('A despedida não saiu (veja a mensagem na conversa).')
+    if (despedidaSaiu === false) ressalvas.push('A despedida não saiu.')
     if (!pedidoCancelado && pedido?.pedidoId && pedido.estado === 'aguardando') ressalvas.push('O pedido sem pagamento segue aberto no EasyStok.')
     if (avisoEmail || avisoSms) ressalvas.push('O aviso por e-mail e SMS ainda não sai nesta versão.')
-    if (ressalvas.length > 0) avisar(['Atendimento encerrado no EasyStok.', ...ressalvas].join(' '))
+    if (ressalvas.length > 0) avisar(['Conversa concluída no EasyStok.', ...ressalvas].join(' '))
     else despachar({ tipo: acao.FECHAR_AVISO_API })
     return undefined
   }
@@ -138,6 +143,8 @@ export function criarAcoesEncerramentoEMidiaApi({ despachar, agoraRef, estadoRef
         avisar(`Foto: ainda não ligada para ${canal ?? 'este canal'} nesta versão. Pelo EasyStok sai só no WhatsApp.`)
         return false
       }
+      // #2185 (F12): foto do computador, da galeria e do cardápio assumem antes, como o texto.
+      if (!(await assumirParaEnviar(id))) return false
       const mensagemId = proximoId('mid')
       // Nasce "enviando" (não "lida"): só a resposta do EasyStok confirma que saiu.
       despachar({

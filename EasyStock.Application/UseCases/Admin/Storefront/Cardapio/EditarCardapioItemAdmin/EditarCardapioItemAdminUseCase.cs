@@ -42,6 +42,7 @@ public sealed record EditarCardapioItemAdminResult(Guid ItemId);
 
 public class EditarCardapioItemAdminUseCase(
     ICardapioItemRepository cardapioRepository,
+    ICardapioSecaoRepository secaoRepository,
     IUnitOfWork unitOfWork)
     : IUseCase<EditarCardapioItemAdminCommand, EditarCardapioItemAdminResult>
 {
@@ -91,8 +92,11 @@ public class EditarCardapioItemAdminUseCase(
 
         // ADR-0035 (#652): seção + reconciliação keyed-by-Id das opções (item rastreado via
         // GetByIdAndScope, que já inclui Variacoes — F3). null = não mexe.
-        if (command.SecaoId.HasValue)
-            item.DefinirSecao(command.SecaoId);
+        if (command.SecaoId is { } secaoId)
+        {
+            await SecaoDaVitrine.ExigirAsync(secaoRepository, command.StorefrontId, secaoId);
+            item.DefinirSecao(secaoId);
+        }
         CardapioVariacaoSync.Reconciliar(item, command.Opcoes);
 
         // S15: linha e preparo numérico.

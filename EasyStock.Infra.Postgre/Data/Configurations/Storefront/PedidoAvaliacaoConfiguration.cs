@@ -31,7 +31,7 @@ public class PedidoAvaliacaoConfiguration : IEntityTypeConfiguration<PedidoAvali
             .IsUnique()
             .HasDatabaseName("uq_pedido_avaliacao_pedido");
 
-        // Lookup por loja para listagem pública (Babá enxerga avaliações de seus pedidos).
+        // Lookup por loja para listagem pública (Baba enxerga avaliações de seus pedidos).
         builder.HasIndex(a => new { a.EmpresaId, a.RespondidoEm })
             .HasDatabaseName("ix_pedido_avaliacao_empresa_respondido");
 

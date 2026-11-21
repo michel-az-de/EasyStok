@@ -263,4 +263,11 @@ public class LancamentoTests
 
         b.Valor.Should().Be(33.33m);
     }
+
+    // #2373: o Financeiro usava ToEven (10,005 -> 10,00) e o resto do domínio AwayFromZero (10,01).
+    [Fact]
+    public void Valor_com_meio_centavo_arredonda_como_o_resto_do_dominio()
+    {
+        NovoReceber(10.005m).Valor.Should().Be(10.01m);
+    }
 }

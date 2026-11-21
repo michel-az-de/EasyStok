@@ -73,6 +73,71 @@ public class MetaCloudWhatsAppProviderTests
         await _canal.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
     }
 
+    [Theory]
+    [InlineData("bloqueado", "cliente_bloqueado_ou_indisponivel")]
+    [InlineData("marketing_revogado", "contato_marketing_revogado")]
+    public async Task CampanhaDeMarketingReconfereClienteNoEnvioMesmoSemConversaAberta(string impedimento, string erro)
+    {
+        // #2746: a onda foi enfileirada com consentimento; o cliente revogou ou foi bloqueado antes da saída.
+        _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((Conversa?)null);
+        var cliente = EasyStock.Domain.Entities.Cliente.Criar(_empresaId, "Ana");
+        if (impedimento == "bloqueado") cliente.Bloquear("teste", DateTime.UtcNow);
+        var provider = ProviderDeCampanha(cliente, impedimento == "marketing_revogado"
+            ? [ConsentimentoContato.Registrar(_empresaId, cliente.Id, CanalConversa.WhatsApp, FinalidadeContato.Marketing,
+                SituacaoConsentimento.Revogado, "palavra_sair", DateTime.UtcNow)]
+            : []);
+
+        var resultado = await provider.EnviarAsync(MensagemCampanhaDoCliente(cliente.Id), CancellationToken.None);
+
+        resultado.Sucesso.Should().BeFalse();
+        resultado.ErroDetalhado.Should().Be(erro);
+        resultado.FalhaPermanente.Should().BeTrue();
+        await _canal.DidNotReceiveWithAnyArgs().EnviarModeloAsync(default!, default!, default!, default!, default);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CampanhaDeMarketingSegueQuandoNaoHaRevogacaoExplicita(bool comConsentimentoConcedido)
+    {
+        // Legado sem linha de consentimento continua enviando; só a revogação explícita barra.
+        _conversas.ObterAbertaPorContatoAsync(_empresaId, CanalConversa.WhatsApp, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((Conversa?)null);
+        var cliente = EasyStock.Domain.Entities.Cliente.Criar(_empresaId, "Ana");
+        var provider = ProviderDeCampanha(cliente, comConsentimentoConcedido
+            ? [ConsentimentoContato.Registrar(_empresaId, cliente.Id, CanalConversa.WhatsApp, FinalidadeContato.Marketing,
+                SituacaoConsentimento.Concedido, "console", DateTime.UtcNow)]
+            : []);
+        _canal.EnviarModeloAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<CancellationToken>()).Returns("wamid.campanha");
+
+        var resultado = await provider.EnviarAsync(MensagemCampanhaDoCliente(cliente.Id), CancellationToken.None);
+
+        resultado.Sucesso.Should().BeTrue();
+    }
+
+    private MetaCloudWhatsAppProvider ProviderDeCampanha(EasyStock.Domain.Entities.Cliente cliente, ConsentimentoContato[] consentimentos)
+    {
+        var clientes = Substitute.For<IClienteRepository>();
+        clientes.GetByIdAsync(_empresaId, cliente.Id).Returns(cliente);
+        var repositorio = Substitute.For<IConsentimentoContatoRepository>();
+        repositorio.ListarDoClienteAsync(_empresaId, cliente.Id, Arg.Any<CancellationToken>()).Returns(consentimentos);
+        return new MetaCloudWhatsAppProvider(new ResolvedorCanal([_canal]), _conversas, _tenant, _uow,
+            NullLogger<MetaCloudWhatsAppProvider>.Instance, clientes, new PoliticaEnvioCliente(repositorio));
+    }
+
+    private MensagemPronta MensagemCampanhaDoCliente(Guid clienteId) => new(
+        Guid.NewGuid(), _empresaId, "+" + Telefone, "", TextoCampanha,
+        CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Marketing)
+    {
+        Metadados = new Dictionary<string, string>
+        {
+            ["template"] = "campanha_generica", ["idioma"] = "pt_BR", ["param1"] = "Ana", ["param2"] = TextoCampanha,
+            ["clienteId"] = clienteId.ToString(),
+        }
+    };
+
     private MensagemPronta Mensagem(IReadOnlyDictionary<string, string>? metadados = null) => new(
         Guid.NewGuid(), _empresaId, "+" + Telefone, "Seu pedido", "Seu pedido #123 foi pago.",
         CanalNotificacao.WhatsApp, CategoriaConteudoNotificacao.Transacional) { Metadados = metadados };
@@ -350,6 +415,19 @@ public class MetaCloudWhatsAppProviderTests
         var resultado = await Provider().EnviarAsync(Mensagem());
 
         resultado.Desfecho.Should().Be(DesfechoEnvio.FalhaPermanente);
+    }
+
+    /// <summary>#2875: o código e o status da Meta seguem no resultado; o motivo do aviso não entregue sai deles.</summary>
+    [Fact]
+    public async Task Recusa_da_Meta_devolve_o_codigo_e_o_status_no_resultado()
+    {
+        _canal.EnviarTextoAsync(Telefone, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new WhatsAppCloudException(132001, "Template name does not exist", ehPermanente: true, statusHttp: 404));
+
+        var resultado = await Provider().EnviarAsync(Mensagem());
+
+        resultado.CodigoErro.Should().Be(132001);
+        resultado.StatusHttp.Should().Be(404);
     }
 
     [Fact]

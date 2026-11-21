@@ -471,4 +471,38 @@ public class RegistrarEntradaEstoqueUseCaseTests
             i.LojaId == lojaId &&
             i.QuantidadeMinima == 12));
     }
+    [Fact]
+    public async Task Entrada_fracionada_com_codigo_de_lote_grava_a_medida_exata_no_item_do_lote()
+    {
+        // #2373: 0,3 kg virava Quantidade = 1 no LoteItem e a tela de Lotes mostrava "1".
+        var produtoRepository = Substitute.For<IProdutoRepository>();
+        var loteRepository = Substitute.For<ILoteRepository>();
+        var empresaId = Guid.NewGuid();
+        var produto = new Produto
+        {
+            Id = Guid.NewGuid(), EmpresaId = empresaId, Nome = "Queijo minas",
+            Status = StatusProduto.Ativo, SkuBase = CodigoSku.From("QJ-MINAS"),
+            UnidadeMedidaBase = UnidadeMedida.Kg
+        };
+        produtoRepository.GetByIdAsync(produto.Id).Returns(produto);
+        Lote? criado = null;
+        await loteRepository.AddAsync(Arg.Do<Lote>(l => criado = l));
+
+        var useCase = new RegistrarEntradaEstoqueUseCase(
+            produtoRepository, Substitute.For<IProdutoVariacaoRepository>(), Substitute.For<IItemEstoqueRepository>(),
+            Substitute.For<IMovimentacaoEstoqueRepository>(), Substitute.For<IUnitOfWork>(),
+            Substitute.For<ILogger<RegistrarEntradaEstoqueUseCase>>(), Substitute.For<IPublicadorEventos>(),
+            loteRepository: loteRepository);
+
+        await useCase.ExecuteAsync(new RegistrarEntradaEstoqueCommand(
+            empresaId, produto.Id, null, 0.3m, 40m, null,
+            new DateTime(2026, 11, 13, 12, 0, 0, DateTimeKind.Utc), NaturezaMovimentacaoEstoque.Compra,
+            null, "LOTE-QJ-01", null, null, null, null, null, null, null, null, null, null, null));
+
+        criado.Should().NotBeNull();
+        var item = criado!.Itens.Should().ContainSingle().Subject;
+        item.QuantidadeMedida.Should().Be(0.3m);
+        item.Unidade.Should().Be("kg");
+        item.Quantidade.Should().Be(1, "a contagem de etiquetas continua inteira");
+    }
 }

@@ -174,7 +174,8 @@ public class PrazoEstouradoChegaNoMailpitIntegrationTests(MailpitFixture mailpit
                     sp.GetRequiredService<ILembreteRepository>(), sp.GetRequiredService<ICandidatosLembreteQuery>(),
                     sp.GetRequiredService<INotificadorService>(), NSubstitute.Substitute.For<IOperacaoEventPublisher>(),
                     sp.GetRequiredService<EasyStock.Application.Ports.Output.Persistence.IUnitOfWork>(), new RelogioFixo(agora),
-                    Microsoft.Extensions.Options.Options.Create(new PrazosOptions()))
+                    Microsoft.Extensions.Options.Options.Create(new PrazosOptions()),
+                    sp.GetRequiredService<EasyStock.Application.Ports.Output.Persistence.INotificacaoRepository>())
                 .ExecuteAsync();
         }
         await using (var escopo = provider.CreateAsyncScope())

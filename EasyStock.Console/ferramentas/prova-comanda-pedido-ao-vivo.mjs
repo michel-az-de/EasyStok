@@ -175,11 +175,15 @@ await confere('falha mantém cache anterior e a volta periódica repete somente 
   assert.equal(m.s.chamadas.filter(c => c.endsWith('/b/pedido')).length, 0)
 })
 
-await confere('ready após reconexão confere pedidos conhecidos sem perder cache nem reler mensagens/inbox', async m => {
+await confere('ready após reconexão confere pedidos conhecidos sem perder cache e, depois da queda, relê a inbox e as mensagens (#2285)', async m => {
   m.cair(); await m.avancar(5000); assert.equal(m.conexoes(), 2)
   m.s.chamadas.length = 0; m.s.pedidos.a.alocado = 25; m.ready(); await m.avancar(300)
   assert.equal(m.pedido('a').alocadoApi, 25)
-  assert.deepEqual(m.s.chamadas.sort(), ['/api/atendimento/conversas/a/pedido', '/api/atendimento/conversas/b/pedido'])
+  assert.deepEqual(m.s.chamadas.sort(), [
+    '/api/atendimento/conversas/a/mensagens?limite=100', '/api/atendimento/conversas/a/pedido',
+    '/api/atendimento/conversas/b/mensagens?limite=100', '/api/atendimento/conversas/b/pedido',
+    '/api/atendimento/conversas?limite=100&pagina=1',
+  ])
 })
 
 await confere('desmontagem fecha SSE e cancela releitura agendada', async m => {

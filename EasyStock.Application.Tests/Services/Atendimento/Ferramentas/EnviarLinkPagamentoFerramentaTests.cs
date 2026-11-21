@@ -1,0 +1,237 @@
+using System.Text.Json;
+using EasyStock.Application.Ports.Output.Pagamentos;
+using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
+using EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
+using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Sales;
+using NSubstitute.ExceptionExtensions;
+
+namespace EasyStock.Application.Tests.Services.Atendimento.Ferramentas;
+
+/// <summary>
+/// #2544 (S74): o link de pagamento sai por ferramenta própria e só depois de o cliente responder ao resumo do pedido.
+/// Serve também para o link vencido.
+/// </summary>
+public class EnviarLinkPagamentoFerramentaTests
+{
+    private static readonly DateTime Agora = CobrancaPedidoFixture.Agora;
+
+    private sealed class Cenario
+    {
+        public CobrancaPedidoFixture Cobranca { get; } = new();
+        public Conversa Conversa { get; }
+        public List<Mensagem> Mensagens { get; } = [];
+        private readonly EnviarLinkPagamentoFerramenta _ferramenta;
+        public static readonly string TokenComanda = new('a', 43);
+        public static readonly string UrlComanda = "https://casadababa.com.br/comanda.html?c=" + TokenComanda;
+
+        public Cenario(CanalConversa canal = CanalConversa.WhatsApp, bool comandaEnviada = false)
+        {
+            var clienteId = Guid.NewGuid();
+            Cobranca.Pedido.ClienteId = clienteId;
+            Cobranca.Pedido.CriadoEm = Agora.AddMinutes(-10);
+            Cobranca.PedidoRepo.GetByIdAsync(Cobranca.EmpresaId, Cobranca.Pedido.Id).Returns(Cobranca.Pedido);
+            Conversa = Conversa.Abrir(Cobranca.EmpresaId, "5511999998888", Agora.AddMinutes(-20), "Maria", clienteId, canal);
+            Cobranca.ConversaRepo.ListarMensagensDepoisAsync(Cobranca.EmpresaId, Conversa.Id, Arg.Any<DateTime?>(),
+                    Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(_ => (IReadOnlyList<Mensagem>)Mensagens.ToList());
+            LinkCardapioConversaService? links = null;
+            if (comandaEnviada)
+            {
+                var repo = Substitute.For<ILinkCardapioConversaRepository>();
+                var link = LinkCardapioConversa.Gerar(Cobranca.EmpresaId, Conversa.Id, AcessoChatSite.HashDoToken(TokenComanda), Agora.AddMinutes(-15));
+                repo.ListarDaConversaAsync(Cobranca.EmpresaId, Conversa.Id, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+                    .Returns([link]);
+                links = new LinkCardapioConversaService(repo, null!);
+                Mensagens.Add(Mensagem.Saida(Cobranca.EmpresaId, Conversa.Id, AutorMensagem.Agente, Agora.AddMinutes(-15),
+                    TipoConteudoMensagem.Texto, $"Sua comanda: {UrlComanda}", CanalChatSite.PrefixoIdExterno + "x"));
+            }
+            _ferramenta = new EnviarLinkPagamentoFerramenta(Cobranca.PedidoRepo, Cobranca.Gerar(), Cobranca.ConversaRepo, links);
+        }
+
+        public void ResumoEnviado(bool clienteRespondeu)
+        {
+            Mensagens.Add(Mensagem.Saida(Cobranca.EmpresaId, Conversa.Id, AutorMensagem.Agente, Agora.AddMinutes(-5),
+                TipoConteudoMensagem.Imagem, ResumoPedidoAtendimento.Legenda(Cobranca.Pedido.Id), "wamid.resumo"));
+            if (clienteRespondeu)
+                Mensagens.Add(Mensagem.Entrada(Cobranca.EmpresaId, Conversa.Id, Agora.AddMinutes(-1),
+                    TipoConteudoMensagem.Texto, "ok, pode mandar", "wamid.ok"));
+        }
+
+        public ContextoTurnoAgente Contexto { get; private set; } = null!;
+
+        public async Task<JsonElement> ExecutarComEntradaAsync(object entrada)
+        {
+            Contexto = new ContextoTurnoAgente(Cobranca.EmpresaId, Conversa, Agora);
+            var resultado = await _ferramenta.ExecutarAsync(Contexto, JsonSerializer.SerializeToElement(entrada));
+            return JsonDocument.Parse(resultado).RootElement.Clone();
+        }
+
+        public async Task<JsonElement> ExecutarAsync(Guid? pedidoId = null)
+        {
+            Contexto = new ContextoTurnoAgente(Cobranca.EmpresaId, Conversa, Agora);
+            var resultado = await _ferramenta.ExecutarAsync(Contexto,
+                JsonSerializer.SerializeToElement(new { pedidoId = pedidoId ?? Cobranca.Pedido.Id }));
+            return JsonDocument.Parse(resultado).RootElement.Clone();
+        }
+    }
+
+    [Fact]
+    public async Task SemResumo_PedeOResumoAntesDoLink()
+    {
+        var c = new Cenario();
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("motivo").GetString().Should().Be("resumo_nao_enviado");
+        resultado.GetProperty("orientacao").GetString().Should().Contain("enviar_resumo_pedido");
+        c.Cobranca.Preferencias.Should().BeEmpty();
+        c.Contexto.RespostaVerificada.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ResumoSemOkDoCliente_PedeConfirmacao()
+    {
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: false);
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("motivo").GetString().Should().Be("aguardando_ok");
+        c.Cobranca.Preferencias.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ResumoComOk_GeraOLinkEMandaComoResposta()
+    {
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("linkGerado").GetBoolean().Should().BeTrue();
+        c.Cobranca.Cobrancas.Should().ContainSingle().Which.ConversaId.Should().Be(c.Conversa.Id);
+        c.Contexto.RespostaVerificada.Should().Contain("https://mp.test/pref-1").And.Contain("R$ 25,00").And.Contain("Pix");
+    }
+
+    [Fact]
+    public async Task NoChatDoSite_ComComandaEnviada_Manda_AUrlDaComandaEmVezDoLinkCru()
+    {
+        var c = new Cenario(CanalConversa.ChatSite, comandaEnviada: true);
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("linkGerado").GetBoolean().Should().BeTrue();
+        c.Contexto.RespostaVerificada.Should().Contain(Cenario.UrlComanda).And.NotContain("mp.test").And.Contain("R$ 25,00");
+    }
+
+    [Fact]
+    public async Task NoChatDoSite_SemComandaEnviada_MantemOLinkDoMercadoPago()
+    {
+        var c = new Cenario(CanalConversa.ChatSite);
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        await c.ExecutarAsync();
+
+        c.Contexto.RespostaVerificada.Should().Contain("https://mp.test/pref-1");
+    }
+
+    [Fact]
+    public async Task ResumoComOk_AceitaPedidoIdNovaGrafia()
+    {
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        var resultado = await c.ExecutarComEntradaAsync(new { pedido_id = c.Cobranca.Pedido.Id });
+
+        resultado.GetProperty("linkGerado").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task EncomendaComSinal_NaoChamaOSinalDeTotal()
+    {
+        // #2544: com 2 dias ou mais de antecedência o link cobra 50%; chamar R$ 12,50 de "Total" engana o cliente.
+        var c = new Cenario();
+        c.Cobranca.Pedido.AgendadoParaEm = Agora.AddDays(5);
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        await c.ExecutarAsync();
+
+        c.Contexto.RespostaVerificada.Should().Contain("Total do pedido: R$ 25,00").And.Contain("sinal de R$ 12,50")
+            .And.NotContain("Total: R$ 12,50");
+    }
+
+    [Fact]
+    public async Task LinkVencido_GeraOutro()
+    {
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+        c.Cobranca.AdicionarOnline(conversaId: c.Conversa.Id);
+        c.Cobranca.Relogio.Agora = Agora.AddMinutes(31);
+
+        await c.ExecutarAsync();
+
+        c.Contexto.RespostaVerificada.Should().Contain("https://mp.test/pref-1").And.NotContain("pref-antiga");
+    }
+
+    [Fact]
+    public async Task PedidoPago_NaoGeraLink()
+    {
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+        c.Cobranca.AdicionarPagamento("pref-antiga", 25m);
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("motivo").GetString().Should().Be("pedido_ja_pago");
+        c.Cobranca.Preferencias.Should().BeEmpty();
+        c.Contexto.RespostaVerificada.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task MercadoPagoFora_NaoInventaLinkEOrientaTentarDeNovo()
+    {
+        // #1301, agora no link (#2544): o provedor caído não vira link nem resposta pronta.
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+        c.Cobranca.MpClient.CriarPreferenceAsync(Arg.Any<CriarPreferenceCommand>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("500"));
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("motivo").GetString().Should().Be("pagamento_indisponivel");
+        c.Cobranca.Cobrancas.Should().BeEmpty();
+        c.Contexto.RespostaVerificada.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PedidoCancelado_OrientaMontarDeNovo()
+    {
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+        c.Cobranca.Pedido.Status = StatusPedidoMapper.Cancelado;
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("motivo").GetString().Should().Be("pedido_finalizado");
+        c.Cobranca.Preferencias.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PedidoDeOutroCliente_NaoEncontrado()
+    {
+        var c = new Cenario();
+        c.Cobranca.Pedido.ClienteId = Guid.NewGuid();
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("motivo").GetString().Should().Be("pedido_nao_encontrado");
+        c.Cobranca.Preferencias.Should().BeEmpty();
+    }
+}

@@ -22,7 +22,7 @@ public class AtendimentoSecoesCardapioController(
     [SwaggerOperation(Summary = "Menu categories (sections) in order, with the number of dishes")]
     [HttpGet]
     public Task<IActionResult> Listar(CancellationToken ct)
-        => Tratar(async () => DataOk(await secoes.ListarAsync(currentUser.EmpresaId, ct)));
+        => Tratar(() => LerDaLoja(() => secoes.ListarAsync(currentUser.EmpresaId, ct), []));
 
     [SwaggerOperation(Summary = "Create a menu category at the end of the list")]
     [ProducesResponseType(StatusCodes.Status201Created)]
@@ -87,7 +87,7 @@ public class AtendimentoSecoesCardapioController(
     [HttpGet("migrar-categorias/previa")]
     [Authorize(Policy = "Gerente")]
     public Task<IActionResult> PreviaDaMigracao(CancellationToken ct)
-        => Tratar(async () => DataOk(await secoes.PreviaDaMigracaoAsync(currentUser.EmpresaId, ct)));
+        => Tratar(() => LerDaLoja(() => secoes.PreviaDaMigracaoAsync(currentUser.EmpresaId, ct), new PreviaMigracaoCategorias([], 0)));
 
     private async Task<IActionResult> Tratar(Func<Task<IActionResult>> acao)
     {
@@ -97,7 +97,7 @@ public class AtendimentoSecoesCardapioController(
         }
         catch (StorefrontNaoEncontradoException)
         {
-            return DataNotFound("A empresa não tem vitrine ativa.");
+            return VitrineDesligada();
         }
         catch (Exception ex) when (ex is UseCaseValidationException or RegraDeDominioVioladaException)
         {

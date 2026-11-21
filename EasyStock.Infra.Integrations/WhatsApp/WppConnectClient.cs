@@ -14,7 +14,7 @@ public sealed class WppConnectOptions
 }
 
 public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions> options, IRemetenteWhatsApp remetente,
-    BaixadorFotoPerfilWhatsApp? fotos = null)
+    BaixadorFotoPerfilWhatsApp? fotos = null, IMenusNumeradosWppConnect? menus = null)
     : IWhatsAppCloudClient, IWppConnectSessaoClient
 {
     private readonly WppConnectOptions _options = options.Value;
@@ -98,21 +98,47 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
         return pn[..^5];
     }
 
+    /// <summary>#2590: as últimas mensagens da conversa, para recuperar o id que o evento perdeu.</summary>
+    public async Task<IReadOnlyList<MensagemRecenteWppConnect>> ListarMensagensRecentesAsync(CredencialWppConnect sessao, string chat,
+        CancellationToken ct = default)
+    {
+        using var doc = await ChamarAsync(HttpMethod.Get, Path(sessao, $"get-messages/{Uri.EscapeDataString(chat)}?count=30"), sessao, null, ct);
+        var lista = doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("response", out var r) ? r : default;
+        var itens = lista.ValueKind switch
+        {
+            JsonValueKind.Array => lista.EnumerateArray().ToList(),
+            JsonValueKind.Object => lista.EnumerateObject().Select(p => p.Value).ToList(),
+            _ => []
+        };
+        return [.. itens.Select(Recente).OfType<MensagemRecenteWppConnect>()];
+    }
+
+    private static MensagemRecenteWppConnect? Recente(JsonElement m) =>
+        m.ValueKind == JsonValueKind.Object && m.TryGetProperty("id", out var id) && Identificador(id) is { Length: > 0 } valor
+            && m.TryGetProperty("t", out var t) && t.TryGetInt64(out var quando)
+            ? new(valor, quando, m.TryGetProperty("fromMe", out var f) && f.ValueKind == JsonValueKind.True,
+                LerTexto(m, "type"), LerTexto(m, "body"))
+            : null;
+
     public async Task<EnvioWhatsAppResult> EnviarTextoAsync(string waId, string texto, string? responderAWamid = null, CancellationToken ct = default) =>
         await EnviarAsync("send-message", new { phone = waId, isGroup = false, message = texto }, ct);
 
     public Task<EnvioWhatsAppResult> EnviarImagemAsync(string waId, string urlPublica, string? legenda = null, CancellationToken ct = default) =>
         EnviarArquivoAsync(waId, urlPublica, legenda, false, ct);
 
+    public Task<EnvioWhatsAppResult> EnviarDocumentoAsync(
+        string waId, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default) =>
+        EnviarArquivoAsync(waId, urlPublica, legenda, false, ct, nomeArquivo);
+
     public Task<EnvioWhatsAppResult> EnviarAudioAsync(string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default) =>
         EnviarArquivoAsync(waId, urlPublica, null, notaDeVoz, ct);
 
-    private Task<EnvioWhatsAppResult> EnviarArquivoAsync(string waId, string url, string? legenda, bool voz, CancellationToken ct)
+    private Task<EnvioWhatsAppResult> EnviarArquivoAsync(string waId, string url, string? legenda, bool voz, CancellationToken ct, string? nomeArquivo = null)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
             throw new ArgumentException("A mídia precisa de URL HTTP(S) acessível pelo conector.", nameof(url));
         return EnviarAsync(voz ? "send-voice" : "send-file-base64",
-            new { phone = waId, isGroup = false, path = url, caption = legenda, filename = voz ? "audio.ogg" : System.IO.Path.GetFileName(uri.AbsolutePath) }, ct);
+            new { phone = waId, isGroup = false, path = url, caption = legenda, filename = voz ? "audio.ogg" : nomeArquivo ?? System.IO.Path.GetFileName(uri.AbsolutePath) }, ct);
     }
 
     private async Task<EnvioWhatsAppResult> EnviarAsync(string acao, object corpo, CancellationToken ct)
@@ -132,8 +158,14 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
         return new(sessao.IdExterno(id));
     }
 
-    public Task<EnvioWhatsAppResult> EnviarBotoesAsync(string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default) =>
-        EnviarTextoAsync(waId, corpo + "\n" + string.Join("\n", botoes.Select((b, i) => $"{i + 1}. {b.Titulo}")), ct: ct);
+    /// <summary>Conta comum não tem botão: as opções saem numeradas e o menu fica guardado para a resposta (#2515).</summary>
+    public async Task<EnvioWhatsAppResult> EnviarBotoesAsync(string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default)
+    {
+        var envio = await EnviarTextoAsync(waId, MenuNumeradoWhatsApp.Texto(corpo, botoes.Select(b => b.Titulo)), ct: ct);
+        if (menus is not null)
+            await menus.GuardarAsync((await SessaoAsync(ct)).Sessao, waId, botoes, ct);
+        return envio;
+    }
 
     public Task<EnvioWhatsAppResult> EnviarTemplateAsync(string waId, string nomeTemplate, string idioma, IReadOnlyList<string> parametrosCorpo,
         IReadOnlyList<(string Id, string Titulo)>? botoesQuickReply = null, string? imagemCabecalho = null, CancellationToken ct = default) =>

@@ -160,6 +160,32 @@ public class IdempotencyMiddlewareTests
         await repo.DidNotReceiveWithAnyArgs().MarcarFalhouAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// #2481: o cliente cai depois do commit (timeout do console). Gravar o desfecho com o token da requisição
+    /// cancelada deixava a chave Pendente; passado o lease, o reenvio tomava a chave e criava o cadastro outra vez.
+    /// </summary>
+    [Fact]
+    public async Task Cliente_desconecta_apos_o_commit_marca_concluido_mesmo_assim()
+    {
+        var empresaId = Guid.NewGuid();
+        using var conexao = new CancellationTokenSource();
+        var (mw, ctx, repo, _) = Setup(empresaId: empresaId, nextBody: async c =>
+        {
+            c.Response.StatusCode = StatusCodes.Status201Created;
+            await c.Response.WriteAsync("{\"id\":1}");
+            await conexao.CancelAsync();
+        });
+        ctx.RequestAborted = conexao.Token;
+        var entry = IdempotencyKey.CriarPendente(DefaultKey, empresaId, $"POST {DefaultPath}", null, TimeSpan.FromHours(24));
+        repo.TryBeginAsync(DefaultKey, empresaId, $"POST {DefaultPath}", Arg.Any<string?>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns((entry, true));
+
+        await mw.InvokeAsync(ctx);
+
+        await repo.Received(1).MarcarConcluidoAsync(entry.Id, StatusCodes.Status201Created, "{\"id\":1}",
+            Arg.Is<CancellationToken>(t => !t.IsCancellationRequested));
+    }
+
     [Fact]
     public async Task Reserva_com_handler_4xx_marca_falhou_em_vez_de_concluido()
     {

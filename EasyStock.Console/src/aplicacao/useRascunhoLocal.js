@@ -30,5 +30,6 @@ export function useRascunhoLocal({ conversaId, rascunho, escritaDeFora }) {
     }
   }, [campo])
 
-  return { texto, digitar: campo.digitar, escrever: campo.escrever, descarregar: campo.descarregar }
+  // `lerTexto`: o texto do campo AGORA (o `texto` acima é o do último render).
+  return { texto, lerTexto: campo.texto, digitar: campo.digitar, escrever: campo.escrever, descarregar: campo.descarregar }
 }

@@ -36,7 +36,9 @@ public record LoteItemDto(
     int Quantidade, int? PesoG, int? ValidadeDias, DateTime? ExpiraEm,
     string? FotoUrl, DateTime CriadoEm,
     // C2 (RDC 727/2022): "Avulso" (default) | "Embalado". Habilita badge "Sem peso" e backfill.
-    string TipoEmbalagem = "Avulso");
+    string TipoEmbalagem = "Avulso",
+    // #2373: medida exata da entrada (ex.: 0,3 kg); null = item de produção, vale Quantidade.
+    decimal? QuantidadeMedida = null);
 
 public record LoteEtiquetaDto(
     string Id, string LoteId, string LoteItemId,

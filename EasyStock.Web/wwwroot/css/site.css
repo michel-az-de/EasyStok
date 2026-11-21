@@ -473,11 +473,9 @@ a { color: inherit; }
   display: flex; flex-direction: column; gap: 12px;
   position: relative; overflow: hidden;
 }
-.site-pain::before {
-  content: ""; position: absolute; top: 0; left: 0; bottom: 0; width: 4px;
-  background: var(--orange-600);
-}
-.site-pain.crit::before { background: var(--crit-600); }
+/* #2894: borda inteira na cor da dor, sem faixa lateral */
+.site-pain { border-color: var(--orange-600); }
+.site-pain.crit { border-color: var(--crit-600); }
 .site-pain-tag {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;

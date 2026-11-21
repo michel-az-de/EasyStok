@@ -1,4 +1,3 @@
-using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CriarPedido;
@@ -130,7 +129,8 @@ public sealed class OrderLinker(
                             Itens: itens,
                             CriadoPorUserId: null,
                             CriadoPorNome: mobileO.LastOperatorName,
-                            AgendadoParaEm: mobileO.ScheduledDeliveryAt
+                            AgendadoParaEm: mobileO.ScheduledDeliveryAt,
+                            Canal: mobileO.Channel
                         ));
 
                         try
@@ -407,14 +407,8 @@ public sealed class OrderLinker(
 
             if (!trackedOrder.ErpVendaId.HasValue)
             {
-                var created = await saleSync.CreateVendaForDeliveredOrderAsync(trackedOrder, trackedOrder.Items.Select(i => new OrderItemDto(
-                    ProductId: i.ProductId ?? "",
-                    Name: i.Name,
-                    Emoji: i.Emoji,
-                    Unit: i.Unit,
-                    Qty: i.Qty,
-                    UnitPrice: i.UnitPrice
-                )).ToList());
+                var created = await saleSync.CreateVendaForDeliveredOrderAsync(trackedOrder,
+                    await saleSync.ItensDaVendaAsync(trackedOrder));
                 if (created && db.ChangeTracker.HasChanges())
                     await db.SaveChangesAsync();
             }
@@ -514,8 +508,9 @@ public sealed class OrderLinker(
         }
     }
 
-    /// <summary>F7-A: garante 1 PedidoPagamento default para pedido entregue. Idempotente via
-    /// AnyAsync check. NAO cria MovimentoCaixa "entrada" espelho: ele duplicava o pagamento no
+    /// <summary>F7-A: o pedido entregue no aparelho fica com recebimentos somando o total. #2711: o sinal
+    /// fica no dia em que entrou e a entrega grava só o restante (total menos o já recebido), com a
+    /// forma da entrega; se o recebido já cobre o total, nada. Idempotente: no reenvio o restante é zero. NAO cria MovimentoCaixa "entrada" espelho: ele duplicava o pagamento no
     /// resumo do caixa e no dashboard (double-count #564 / QA BUG-004). O fluxo web/balcao nunca
     /// criou esse espelho — o mobile agora fica consistente.</summary>
     private async Task EnsurePagamentoEntregueAsync(Guid pedidoId, Order mobileO)
@@ -525,9 +520,11 @@ public sealed class OrderLinker(
         if (pedido == null) return;
         if (pedido.Total.Valor <= 0) return;
 
-        var temPagamento = await db.Set<PedidoPagamento>().IgnoreQueryFilters().AsNoTracking()
-            .AnyAsync(pp => pp.PedidoId == pedidoId);
-        if (temPagamento) return;
+        var jaRecebido = await db.Set<PedidoPagamento>().IgnoreQueryFilters().AsNoTracking()
+            .Where(pp => pp.PedidoId == pedidoId)
+            .SumAsync(pp => (decimal?)pp.Valor) ?? 0m;
+        var restante = pedido.Total.Valor - jaRecebido;
+        if (restante <= 0) return;
 
         var pagamentoId = Guid.NewGuid();
         var metodo = FormaPagamentoMobile.ParaErp(mobileO.Metodo);
@@ -536,7 +533,7 @@ public sealed class OrderLinker(
             Id = pagamentoId,
             PedidoId = pedido.Id,
             Metodo = metodo,
-            Valor = pedido.Total.Valor,
+            Valor = restante,
             PagoEm = await InstanteNoCaixa.DoRegistroAsync(db, pedido.EmpresaId, mobileO.UpdatedAt, pedido.LojaId),
             RegistradoPorNome = mobileO.LastOperatorName,
             Observacao = mobileO.Metodo is null
@@ -553,7 +550,7 @@ public sealed class OrderLinker(
 
         await db.SaveChangesAsync();
         log.LogInformation(
-            "F7-A Pagamento CRIADO: pedido={ErpId} valor={Valor} metodo={Metodo}",
-            pedido.Id, pedido.Total.Valor, metodo);
+            "F7-A Pagamento CRIADO: pedido={ErpId} valor={Valor} de {Total} metodo={Metodo}",
+            pedido.Id, restante, pedido.Total.Valor, metodo);
     }
 }

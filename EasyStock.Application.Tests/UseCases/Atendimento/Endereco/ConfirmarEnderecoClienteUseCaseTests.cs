@@ -43,7 +43,7 @@ public class ConfirmarEnderecoClienteUseCaseTests
         cliente.Bairro.Should().Be("Butantã");
         cliente.Cidade.Should().Be("São Paulo");
         cliente.Complemento.Should().Be("apto 12");
-        await _clientes.Received(1).UpdateAsync(cliente);
+        await _clientes.Received(2).UpdateAsync(cliente);
         await _uow.Received().CommitAsync();
     }
 

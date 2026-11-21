@@ -132,13 +132,13 @@ public sealed class DevicePairingNomeEmpresaTests : IDisposable
         await _db.SaveChangesAsync();
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["AppProvisioning:Secret"] = "segredo-apenas-para-teste",
+            ["AppProvisioning:Secret"] = "segredo-de-teste-com-mais-de-32-caracteres",
             ["AppProvisioning:EmpresaId"] = _empresaId.ToString(),
             ["AppProvisioning:LojaId"] = _lojaId.ToString(),
         }).Build();
 
         var result = automatico
-            ? await Controller(config).PairAuto(new PairAutoRequest("segredo-apenas-para-teste", "dev-outra-empresa", null), CancellationToken.None)
+            ? await Controller(config).PairAuto(new PairAutoRequest("segredo-de-teste-com-mais-de-32-caracteres", "dev-outra-empresa", null), CancellationToken.None)
             : await Controller().Pair(new PairRequest("123456", "dev-outra-empresa", null), CancellationToken.None);
 
         result.Result.Should().BeOfType<ConflictObjectResult>();

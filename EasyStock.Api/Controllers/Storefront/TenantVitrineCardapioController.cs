@@ -175,6 +175,9 @@ public class TenantVitrineCardapioController(
         catch (CardapioItemNaoEncontradoException) { return DataNotFound("Item não encontrado."); }
     }
 
+    /// <summary>#2285: o 500 não devolve ex.Message (texto do driver ou do banco); o detalhe fica no log.</summary>
+    private const string ErroInesperado = "Não foi possível salvar o item agora. Tente de novo em instantes.";
+
     [HttpPost("cardapio")]
     public async Task<IActionResult> Adicionar([FromBody] AdicionarItemRequest req)
     {
@@ -218,7 +221,7 @@ public class TenantVitrineCardapioController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao adicionar item à vitrine {StorefrontId}", sf.Id);
-            return Problem(detail: ex.Message, statusCode: 500);
+            return Problem(detail: ErroInesperado, statusCode: 500);
         }
     }
 
@@ -265,7 +268,7 @@ public class TenantVitrineCardapioController(
         catch (Exception ex)
         {
             logger.LogError(ex, "Falha ao editar item {ItemId} da vitrine", itemId);
-            return Problem(detail: ex.Message, statusCode: 500);
+            return Problem(detail: ErroInesperado, statusCode: 500);
         }
     }
 

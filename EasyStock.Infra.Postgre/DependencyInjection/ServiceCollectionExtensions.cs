@@ -64,6 +64,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                     sp.GetRequiredService<EstoqueSaldoCacheInvalidationInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
+            services.TryAddSingleton<IRegistroChamadaIa, RegistroChamadaIaRepository>(); // #3063
             services.AddScoped<IAcervoRepository, Repositories.AcervoRepository>();
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
             services.AddScoped<IEmpresaRepository, EmpresaRepository>();
@@ -72,6 +73,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IProdutoVariacaoRepository, ProdutoVariacaoRepository>();
             services.AddScoped<IProdutoCaracteristicaRepository, ProdutoCaracteristicaRepository>();
             services.AddScoped<IProdutoEmbalagemRepository, ProdutoEmbalagemRepository>();
+            services.AddScoped<ICadastrosFinanceirosRepository, CadastrosFinanceirosRepository>();
             services.AddScoped<IItemEstoqueRepository, ItemEstoqueRepository>();
             services.AddScoped<IContagemRepository, ContagemRepository>();
             services.AddScoped<IItemVendaRepository, ItemVendaRepository>();
@@ -80,10 +82,13 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<INotificacaoRepository, NotificacaoRepository>();
             services.AddScoped<ILojaRepository, LojaRepository>();
             services.AddScoped<IConfiguracaoLojaRepository, ConfiguracaoLojaRepository>();
+            services.AddScoped<IRegraImpressaoLojaRepository, RegraImpressaoLojaRepository>();
+            services.AddScoped<ILoteNumeroCurtoRepository, LoteNumeroCurtoRepository>();
             services.AddScoped<IConfiguracaoAtendimentoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConfiguracaoAtendimentoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConsentimentoContatoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.ConsentimentoContatoRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IRespostaProntaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.RespostaProntaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICadernoRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.CadernoRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnoAgenteRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.TurnoAgenteRepository>(); // S67
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IRegraAutomaticaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.RegraAutomaticaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IMensagemProgramadaRepository, EasyStock.Infra.Postgre.Repositories.Atendimento.MensagemProgramadaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Campanhas.IInteresseItemRepository, EasyStock.Infra.Postgre.Repositories.Campanhas.InteresseItemRepository>(); // S31
@@ -98,6 +103,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IEntregasPorBairroQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.EntregasPorBairroQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAgendaPedidosQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.AgendaPedidosQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICandidatosLembreteQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.CandidatosLembreteQuery>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ITurnosPendentesQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.TurnosPendentesQuery>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVigiaOperacaoQuery, EasyStock.Infra.Postgre.Repositories.Atendimento.VigiaOperacaoQuery>(); // #2096
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Storefront.IExpedienteLojaRepository, EasyStock.Infra.Postgre.Repositories.Storefront.ExpedienteLojaRepository>();
             services.AddScoped<IPreferenciaMenuRepository, PreferenciaMenuRepository>();
@@ -124,6 +130,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddScoped<IUsuarioPerfilRepository, UsuarioPerfilRepository>();
             services.AddScoped<IAuditLogRepository, AuditLogRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Auth.IProtetorRefreshNativo, Services.Auth.ProtetorRefreshNativo>();
             services.AddScoped<IResetTokenRepository, ResetTokenRepository>();
             services.AddScoped<IEmailConfirmationTokenRepository, EmailConfirmationTokenRepository>();
             services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
@@ -205,6 +212,13 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AvisarEquipePedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            // #2937: canhoto em imagem à cliente. O marco é commitado no envio, então repetir o evento não repete a
+            // imagem; fica antes das automáticas (#1506).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.CanhotoPedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.CanhotoPedidoEmPreparoHandler>("pedido.mudou_status");
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AvisarEquipeContatoNovoHandler>(
                 EasyStock.Application.Events.Atendimento.ConversaAbertaEvent.TipoEvento);
@@ -259,10 +273,14 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             // Atendimento (S04, ADR-0050)
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IConversaRepository,
                 Repositories.Atendimento.ConversaRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository,
+                Repositories.Atendimento.VinculoClienteConversaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IAtendenteRepository,
                 Repositories.Atendimento.AtendenteRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ISessaoChatSiteRepository,
                 Repositories.Atendimento.SessaoChatSiteRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IOrigemAnuncioRepository,
+                Repositories.Atendimento.OrigemAnuncioRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILinkCardapioConversaRepository,
                 Repositories.Atendimento.LinkCardapioConversaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICreditoClienteComandaRepository,

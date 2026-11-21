@@ -72,7 +72,96 @@ public class LalamoveLogisticaGatewayTests
         var destinatario = data.GetProperty("recipients")[0];
         destinatario.GetProperty("phone").GetString().Should().Be("+5511999990000");
         destinatario.GetProperty("stopId").GetString().Should().Be("s2");
-        destinatario.GetProperty("name").GetString().Should().Be("Ana Portão azul");
+        destinatario.GetProperty("name").GetString().Should().Be("Ana");
+        destinatario.GetProperty("remarks").GetString().Should().Be("Portão azul", "o recado vai no campo do motorista, não no nome");
+    }
+
+    [Fact]
+    public async Task Post_com_5xx_vira_indisponivel_e_nao_repete()
+    {
+        _producao.Quando(HttpMethod.Post, "/v3/orders").Responde(HttpStatusCode.BadGateway, "");
+
+        var act = () => Sut().ChamarAsync(Empresa, Chamada());
+
+        await act.Should().ThrowAsync<LogisticaIndisponivelException>();
+        _producao.Chamadas.Should().ContainSingle();
+    }
+
+    // #2168: com o POST aceito, o pedido existe na Lalamove. Resposta que não se lê inteira não pode virar "recusa",
+    // senão a corrida encerra e o operador chama outra, paga, por cima da primeira. Com o id do pedido em mãos a
+    // corrida segue procurando motorista e a reconsulta traz o resto; sem o id, fica para a conferência.
+    [Theory]
+    [InlineData("""{"data":{"orderId":"3300000000000001","priceBreakdown":{"total":"17.40","currency":"BRL"},"status":"NOVO_STATUS"}}""")]
+    [InlineData("""{"data":{"orderId":"3300000000000001","priceBreakdown":{"total":"17.40","currency":"USD"},"status":"ASSIGNING_DRIVER"}}""")]
+    [InlineData("""{"data":{"orderId":"3300000000000001","priceBreakdown":{"total":"abc","currency":"BRL"},"status":"ASSIGNING_DRIVER"}}""")]
+    [InlineData("""{"data":{"orderId":"3300000000000001","status":"ASSIGNING_DRIVER"}}""")]
+    public async Task Resposta_incompleta_do_post_aceito_guarda_o_id_e_nunca_vira_recusa(string resposta)
+    {
+        _producao.Quando(HttpMethod.Post, "/v3/orders").Responde(HttpStatusCode.Created, resposta);
+
+        var situacao = await Sut().ChamarAsync(Empresa, Chamada());
+
+        situacao.Should().Be(new SituacaoCorridaProvedor("3300000000000001", StatusCorrida.ProcurandoMotorista, null, null, null, null));
+    }
+
+    [Fact]
+    public async Task Resposta_incompleta_do_post_aceito_guarda_o_link_de_rastreio()
+    {
+        _producao.Quando(HttpMethod.Post, "/v3/orders").Responde(HttpStatusCode.Created,
+            """{"data":{"orderId":"3300000000000001","status":"NOVO_STATUS","shareLink":"https://share.lalamove.com/x"}}""");
+
+        var situacao = await Sut().ChamarAsync(Empresa, Chamada());
+
+        situacao.LinkRastreio.Should().Be("https://share.lalamove.com/x");
+    }
+
+    [Fact]
+    public async Task Sem_recado_o_campo_remarks_nao_vai_no_corpo_assinado()
+    {
+        _producao.Quando(HttpMethod.Post, "/v3/orders").Responde(HttpStatusCode.Created, Pedido.Replace("__CORRIDA__", Corrida.ToString()));
+
+        await Sut().ChamarAsync(Empresa, Chamada() with { Observacao = "   " });
+
+        using var corpo = JsonDocument.Parse(_producao.Chamadas.Single().Corpo!);
+        var data = corpo.RootElement.GetProperty("data");
+        data.GetProperty("recipients")[0].TryGetProperty("remarks", out _).Should().BeFalse();
+        data.GetProperty("sender").TryGetProperty("remarks", out _).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("""{"data":{"status":"ASSIGNING_DRIVER"}}""")]
+    [InlineData("""{"data":null}""")]
+    [InlineData("não é json")]
+    public async Task Post_aceito_sem_id_do_pedido_vira_indisponivel_nunca_recusa(string resposta)
+    {
+        _producao.Quando(HttpMethod.Post, "/v3/orders").Responde(HttpStatusCode.Created, resposta);
+
+        var act = () => Sut().ChamarAsync(Empresa, Chamada());
+
+        await act.Should().ThrowAsync<LogisticaIndisponivelException>();
+    }
+
+    [Fact]
+    public async Task Cancelar_fora_da_janela_vira_recusa_com_mensagem_e_nao_indisponivel()
+    {
+        _producao.Quando(HttpMethod.Delete, "/v3/orders/1").Responde(HttpStatusCode.Conflict, """{"errors":[{"id":"ERR_CANCELLATION_FORBIDDEN"}]}""");
+
+        var act = () => Sut().CancelarAsync(Empresa, "1");
+
+        (await act.Should().ThrowAsync<LogisticaRecusadaException>()).Which.Message.Should().Be("A Lalamove não deixa mais cancelar esta corrida.");
+        _producao.Chamadas.Single().Metodo.Should().Be(HttpMethod.Delete);
+    }
+
+    [Theory]
+    [InlineData("ERR_INVALID_TIPS", "A gorjeta nova precisa ser maior que a anterior.")]
+    [InlineData("ERR_INVALID_ORDER_STATUS", "A Lalamove só aceita gorjeta enquanto procura motorista.")]
+    public async Task Gorjeta_recusada_explica_o_motivo(string erro, string mensagem)
+    {
+        _producao.Quando(HttpMethod.Post, "/v3/orders/1/priority-fee").Responde((HttpStatusCode)422, $$"""{"errors":[{"id":"{{erro}}"}]}""");
+
+        var act = () => Sut().AdicionarGorjetaAsync(Empresa, "1", 500);
+
+        (await act.Should().ThrowAsync<LogisticaRecusadaException>()).Which.Message.Should().Be(mensagem);
     }
 
     [Fact]

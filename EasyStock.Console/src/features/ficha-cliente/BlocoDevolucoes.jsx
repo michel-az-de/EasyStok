@@ -8,6 +8,7 @@ import { CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { CampoReais } from '../../componentes/CampoReais'
 import { lerMoeda, moeda } from '../../dominio/formato'
 import { aDevolverDe, referenciaObrigatoriaNaDevolucao, resumoDasDevolucoes, textoADevolver } from '../../dominio/cobranca'
+import { algumPassaDoLimite } from '../../componentes/limiteDoCampo'
 import css from './ficha.module.css'
 import { EstornosOnline } from './EstornosOnline'
 
@@ -16,6 +17,9 @@ const meios = [
   { valor: 'credito', rotulo: 'Cartão de crédito' }, { valor: 'debito', rotulo: 'Cartão de débito' },
   { valor: 'transferencia', rotulo: 'Transferência' }, { valor: 'outro', rotulo: 'Outro' },
 ]
+// #2792: limites que espelham o servidor; sem `maxLength`, o texto colado fica inteiro e o envio trava.
+const LIMITE_MOTIVO = 500
+const LIMITE_REFERENCIA = 120
 const data = (valor) => new Date(valor).toLocaleString('pt-BR')
 
 // #2079 (C4): `aoAlterado` pede à Ficha que releia o pedido depois de uma devolução (o "a devolver" do Resumo).
@@ -37,7 +41,8 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false, aoAlterado = null
   const podeRegistrar = acoes.devolverPagamentoManual === true
   // #1686 (item 10): devolução em dinheiro não tem comprovante; nos outros meios a referência segue obrigatória.
   const referenciaObrigatoria = referenciaObrigatoriaNaDevolucao(metodo)
-  const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && (!referenciaObrigatoria || referencia.trim()) && confirmado
+  const passaDoLimite = algumPassaDoLimite([motivo, LIMITE_MOTIVO], [referencia, LIMITE_REFERENCIA])
+  const valido = pagamento && valor > 0 && valor <= pagamento.disponivel && motivo.trim() && (!referenciaObrigatoria || referencia.trim()) && confirmado && !passaDoLimite
   const totalDevolvido = dados?.estornos.reduce((soma, e) => soma + e.valor, 0) ?? 0
   const conferirAcerto = cancelado && dados?.pagamentos.some((p) => p.valor > 0)
   // #1966: valor recebido do pedido cancelado que ainda falta devolver (evento `devolucao_a_fazer`).
@@ -90,11 +95,11 @@ export function BlocoDevolucoes({ pedidoId, cancelado = false, aoAlterado = null
           <CampoSelecao rotulo="Recebimento a devolver" value={pagamentoId} disabled={ocupado} onChange={(e) => escolher(e.target.value)} opcoes={disponiveis.map((p) => ({ valor: p.id, rotulo: `${data(p.pagoEm)} · ${p.metodo} · disponível ${moeda(p.disponivel)}` }))} />
           <CampoReais rotulo="Valor devolvido" centavos={centavos ? Number(centavos) : null} ler={lerMoeda} aoMudar={(valor) => setCentavos(valor == null ? '' : String(valor))} disabled={ocupado} dica={pagamento ? `Até ${moeda(pagamento.disponivel)} deste recebimento.` : 'Escolha um recebimento.'} />
           <CampoSelecao rotulo="Meio usado na devolução" value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={meios} disabled={ocupado} />
-          <CampoTexto rotulo="Motivo da devolução" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} required disabled={ocupado} />
-          <CampoTexto rotulo={referenciaObrigatoria ? 'Comprovante ou referência da devolução' : 'Comprovante ou referência (opcional em dinheiro)'} value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} required={referenciaObrigatoria} disabled={ocupado} />
+          <CampoTexto rotulo="Motivo da devolução" value={motivo} onChange={(e) => setMotivo(e.target.value)} limite={LIMITE_MOTIVO} required disabled={ocupado} />
+          <CampoTexto rotulo={referenciaObrigatoria ? 'Comprovante ou referência da devolução' : 'Comprovante ou referência (opcional em dinheiro)'} value={referencia} onChange={(e) => setReferencia(e.target.value)} limite={LIMITE_REFERENCIA} required={referenciaObrigatoria} disabled={ocupado} />
           <label className={css.corpoBloco}><input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} disabled={ocupado} /> Confirmo que já devolvi este valor ao cliente.</label>
           <p className={css.corpoBloco}>O registro gera uma saída no Caixa de hoje e preserva o recebimento original. O Caixa do dia precisa estar sem fechamento.</p>
-          <Botao type="submit" variante="primario" disabled={!valido || ocupado}>{ocupado ? 'Registrando…' : 'Confirmar devolução já realizada'}</Botao>
+          <Botao type="submit" variante="primario" disabled={!valido || ocupado} aria-busy={ocupado || undefined} motivo={passaDoLimite ? 'Encurte os campos que passam do limite.' : undefined}>{ocupado ? 'Registrando…' : 'Confirmar devolução já realizada'}</Botao>
           <Botao type="button" disabled={ocupado} onClick={() => setAberto(false)}>Voltar</Botao>
         </form>}
         <Botao disabled={ocupado} onClick={atualizar}>Atualizar devoluções</Botao>

@@ -1,0 +1,55 @@
+name: CI docs
+
+# #2976 (S1.9): o ci.yml ignora docs/plan, docs/dev e changelog.d. Guardas de arquitetura leem .md e
+# docs/ (GrafiaDaMarcaTests e outras), então esses caminhos ainda rodam a arquitetura, sem integração.
+on:
+  pull_request:
+    branches: [master, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: ['docs/plan/**', 'docs/dev/**', 'changelog.d/**']
+  push:
+    branches: [master, main]
+    paths: ['docs/plan/**', 'docs/dev/**', 'changelog.d/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-docs-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  arquitetura:
+    name: Arquitetura (docs)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Test
+        run: >-
+          dotnet test EasyStock.ArchitectureTests/EasyStock.ArchitectureTests.csproj
+          -c Release --filter "Category!=ArchitectureDebt"
+          --logger "trx;LogFileName=arquitetura.trx" --results-directory ./TestResults
+
+      - name: Nenhum teste pulado fora do opt-in
+        run: python3 scripts/ci/checar-testes-pulados.py ./TestResults

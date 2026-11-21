@@ -34,7 +34,8 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
 
         if (dashResult.Success && dashResult.Data is { } dash)
         {
-            vm.ReceitaEstimadaPeriodo = dash.ReceitaEstimadaPeriodo;
+            vm.ReceitaEstimadaPeriodo = dash.ReceitaEstimadaPeriodo ?? 0m;
+            vm.ReceitaDisponivel = dash.ReceitaEstimadaPeriodo.HasValue;
             vm.TotalEstoque = dash.QuantidadeTotalEmEstoque;
             vm.ValorEstoque = dash.ValorTotalEstoque;
             vm.MediaVendasDiaria = dash.MediaVendasDiaria;
@@ -42,7 +43,7 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
             vm.ProjUnidadesDia = dash.MediaVendasDiaria;
             vm.ProjUnidades7d = dash.MediaVendasDiaria * 7;
             vm.ProjUnidades30d = dash.MediaVendasDiaria * 30;
-            vm.ProjReceita30d = dash.ReceitaEstimadaPeriodo;
+            vm.ProjReceita30d = dash.ReceitaEstimadaPeriodo ?? 0m;
             vm.ReceitaProjetadaDisponivel = dash.ReceitaEstimadaPeriodo > 0;
         }
 
@@ -123,6 +124,11 @@ public class AnalyticsController(AnalyticsService svc, SessionService session) :
                     Data = new DateOnly(m.Ano, m.Mes, m.Dia)
                 });
             }
+        }
+        else if (!result.Success)
+        {
+            // #2744: sem a permissão de relatórios a Api responde 403; lista vazia diria "nada se moveu".
+            vm.ErroCarga = result.ErrorMessage ?? "Não foi possível carregar as movimentações.";
         }
 
         return View(vm);

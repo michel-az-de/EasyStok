@@ -4,11 +4,14 @@ namespace EasyStock.Web.Services;
 
 public class EstoqueService(ApiClient api, SessionService session) : TenantServiceBase(session)
 {
+    // #2318 (PROD-2): estoque e contadores sao da loja corrente da sessao; sem loja na sessao, a empresa toda.
+    private string LojaQs() =>
+        Guid.TryParse(Session.GetLojaId(), out var lojaId) && lojaId != Guid.Empty ? $"&lojaId={lojaId}" : string.Empty;
 
     public async Task<ApiResult<PagedResult<EstoqueSku>>> ListarAsync(
         int page = 1, string? status = null, string? categoria = null, string? search = null)
     {
-        var qs = $"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize=20";
+        var qs = $"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize=20{LojaQs()}";
         if (!string.IsNullOrEmpty(status))
             qs += $"&status={Uri.EscapeDataString(status)}";
         if (!string.IsNullOrEmpty(categoria) && Guid.TryParse(categoria, out var catId))
@@ -90,7 +93,7 @@ public class EstoqueService(ApiClient api, SessionService session) : TenantServi
 
     public async Task<ApiResult<EstoqueContadores>> ContadoresAsync(string? status = null, string? categoria = null)
     {
-        var qs = $"estoque/contadores?empresaId={GetEmpresaId()}";
+        var qs = $"estoque/contadores?empresaId={GetEmpresaId()}{LojaQs()}";
         if (!string.IsNullOrEmpty(status))
             qs += $"&status={Uri.EscapeDataString(status)}";
         if (!string.IsNullOrEmpty(categoria) && Guid.TryParse(categoria, out var catId))
@@ -108,7 +111,7 @@ public class EstoqueService(ApiClient api, SessionService session) : TenantServi
         api.GetAsync<ProdutoDetalhe>($"produtos/{id}?empresaId={GetEmpresaId()}");
 
     public Task<ApiResult<PagedResult<EstoqueSku>>> AlertasAsync() =>
-        api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&pageSize=20&status=critico");
+        api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&pageSize=20&status=critico{LojaQs()}");
 
     public async Task<ApiResult<PagedResult<EstoqueSku>>> ExportarAsync()
     {
@@ -118,7 +121,7 @@ public class EstoqueService(ApiClient api, SessionService session) : TenantServi
 
         while (true)
         {
-            var result = await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize={pageSize}");
+            var result = await api.GetAsync<PagedResult<EstoqueSku>>($"estoque?empresaId={GetEmpresaId()}&page={page}&pageSize={pageSize}{LojaQs()}");
             if (!result.Success)
                 return ApiResult<PagedResult<EstoqueSku>>.Fail(
                     result.ErrorCode!, result.ErrorMessage!, result.HttpStatus);

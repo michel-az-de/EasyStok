@@ -18,12 +18,12 @@ export const ehProvedorIntegrado = (provedor) => provedor === 'lalamove'
 // do provedor, não por adivinhação (RN-32, D8). Quatro passos da corrida mais
 // a falha, que devolve o despacho para escolher outro provedor.
 export const PASSOS_CORRIDA = {
-  procurando: { rotulo: 'Procurando entregador', icone: 'moto', tom: 'atencao' },
-  'a-caminho-coleta': { rotulo: 'A caminho da coleta', icone: 'moto', tom: 'atencao' },
+  procurando: { rotulo: 'Procurando entregador', icone: 'moto', tom: 'aviso' },
+  'a-caminho-coleta': { rotulo: 'A caminho da coleta', icone: 'moto', tom: 'aviso' },
   coletado: { rotulo: 'Coletado, saiu para entrega', icone: 'package', tom: 'ok' },
   entregue: { rotulo: 'Entregue', icone: 'house', tom: 'ok' },
-  falha: { rotulo: 'Não foi possível chamar', icone: 'circle-x', tom: 'parado' },
-  cancelado: { rotulo: 'Corrida cancelada', icone: 'circle-x', tom: 'parado' },
+  falha: { rotulo: 'Não foi possível chamar', icone: 'circle-x', tom: 'perigo' },
+  cancelado: { rotulo: 'Corrida cancelada', icone: 'circle-x', tom: 'perigo' },
 }
 
 export const rotuloDoStatusCorrida = (status) => PASSOS_CORRIDA[status]?.rotulo ?? status

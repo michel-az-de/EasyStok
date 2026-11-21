@@ -34,6 +34,9 @@ registerHooks({
 })
 
 const { MODULOS } = await import('../src/dominio/modulos.js')
+const { TETO_ITENS_DO_TRILHO } = await import('../src/dominio/trilhoDoConsole.js')
+const TETO_CONTEUDO = 20 // #1810
+const CONTROLES_DA_CONTA = 1
 const { moduloCongelado } = await import('../src/dominio/congelados.js')
 const { normalizarPreferenciasHall, ordenarPaineisDoHall, moverPainelDoHall, aplicarFocoDoHall } = await import('../src/dominio/preferenciasHall.js')
 const { gravarPreferenciasHall, lerPreferenciasHall } = await import('../src/aplicacao/preferenciasHall.js')
@@ -53,10 +56,11 @@ provar('sem ordem própria, os números seguem o foco (como antes)', () => {
 
 provar('arrastar um número grava a ordem livre e a tela a respeita', () => {
   const movida = moverPainelDoHall({ foco: 'atendimento' }, 'financeiro', 'atendimento')
-  assert.deepEqual(movida.ordemPaineis, ['financeiro', 'atendimento', 'entregas', 'cozinha'])
-  assert.deepEqual(ordenarPaineisDoHall(movida, todos), ['financeiro', 'atendimento', 'entregas', 'cozinha'])
+  // #2258 (auditoria A2): a ordem de uso é atender, preparar, entregar; a Cozinha vem antes das Entregas.
+  assert.deepEqual(movida.ordemPaineis, ['financeiro', 'atendimento', 'cozinha', 'entregas'])
+  assert.deepEqual(ordenarPaineisDoHall(movida, todos), ['financeiro', 'atendimento', 'cozinha', 'entregas'])
   const devolta = moverPainelDoHall(movida, 'financeiro', 'cozinha')
-  assert.deepEqual(devolta.ordemPaineis, ['atendimento', 'entregas', 'cozinha', 'financeiro'])
+  assert.deepEqual(devolta.ordemPaineis, ['atendimento', 'cozinha', 'financeiro', 'entregas'])
 })
 
 provar('a ordem livre sobrevive a gravar e ler, e lixo vira ordem válida', () => {
@@ -101,11 +105,11 @@ const cardapio = { estado: 'ok', dados: { itens: [
 const fontes = { atendimento: conversas, pedidos, financeiro: { estado: 'ok', dados: { saldoEsperado: 10, saldoInicial: 10, aberto: true } }, cardapio }
 
 provar('cada módulo com fonte diz o que pede atenção, com o mesmo número de cima', () => {
-  assert.deepEqual(pendenciaDoModulo('atendimento', fontes), { texto: '2 conversas sem resposta', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('atendimento', fontes), { texto: '2 conversas precisam de você', atencao: true }) // #2258 (auditoria H2/H3): o nome do cartão de número
   assert.deepEqual(pendenciaDoModulo('cozinha', fontes), { texto: '2 pedidos no preparo', atencao: true })
   assert.deepEqual(pendenciaDoModulo('entregas', fontes), { texto: '1 pedido pronto para sair', atencao: true })
   assert.deepEqual(pendenciaDoModulo('financeiro', fontes), { texto: 'Caixa aberto', atencao: false })
-  assert.deepEqual(pendenciaDoModulo('cardapio', fontes), { texto: '1 prato com pendência', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('cardapio', fontes), { texto: '1 prato com pendência', atencao: true, href: '#/m/cardapio/itens/pendencia' }) // #2258 (auditoria C1)
   assert.deepEqual(indicadoresDoHall(fontes, PAINEIS).map((i) => i.valor), [2, 2, 1, 10])
 })
 
@@ -127,7 +131,7 @@ provar('zero numa leitura parcial não declara fila vazia', () => {
 
 provar('contagens positivas parciais preservam o aviso de mais itens', () => {
   const parciais = Object.fromEntries(Object.entries(fontes).map(([id, fonte]) => [id, { ...fonte, dados: { ...fonte.dados, parcial: true } }]))
-  assert.deepEqual(pendenciaDoModulo('atendimento', parciais), { texto: '2+ conversas sem resposta', atencao: true })
+  assert.deepEqual(pendenciaDoModulo('atendimento', parciais), { texto: '2+ conversas precisam de você', atencao: true })
   assert.deepEqual(pendenciaDoModulo('cozinha', parciais), { texto: '2+ pedidos no preparo', atencao: true })
   assert.deepEqual(pendenciaDoModulo('entregas', parciais), { texto: '1+ pedido pronto para sair', atencao: true })
 })
@@ -144,23 +148,20 @@ provar('leitura falha, ausente ou módulo sem fonte não inventa linha', () => {
 const { createElement: h } = await import('react')
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { HallDeModulos } = await import('../src/features/hall/HallDeModulos.jsx')
-const { IlustracaoDoModulo } = await import('../src/features/hall/IlustracaoDoModulo.jsx')
 const { ContextoAcessoModulos } = await import('../src/aplicacao/acessoModulos.jsx')
 globalThis.document ??= { documentElement: { dataset: { theme: 'light' } } }
 const html = renderToStaticMarkup(h(ContextoAcessoModulos.Provider, { value: { permite: () => true, acoes: {}, aoSair: () => {} } },
   h(HallDeModulos, { fonteApi: true, sessao: null, agora: Date.parse('2026-10-15T18:00:00Z') })))
 
-// #1891: módulo congelado conserva a ilustração no catálogo, mas não tem cartão no hall.
-provar('os oito módulos têm ilustração própria, decorativa e no tema; só os vivos têm cartão', () => {
+// #2859: cartão leva o ícone do módulo, sem ilustração de 88 px (grade de cartões ilustrados lia como modelo pronto).
+// #1891: módulo congelado não tem cartão; #2232 (H10): Configurações fica no rodapé.
+provar('cartão de cada módulo vivo leva só ícone e nome; nenhum traz ilustração', () => {
+  assert.doesNotMatch(html, /data-ilustracao=/, 'sem ilustração no hall')
   for (const { id } of MODULOS) {
-    const svg = renderToStaticMarkup(h(IlustracaoDoModulo, { id }))
-    assert.match(svg, /aria-hidden="true"/, `${id} decorativa`)
-    assert.match(svg, /var\(--il-tinta\)/, `${id} usa as cores do tema`)
-    assert.doesNotMatch(svg, /#[0-9a-f]{6}/i, `${id} sem cor fixa`)
-    if (moduloCongelado(id)) assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} congelado sem cartão`)
-    else assert.match(html, new RegExp(`data-ilustracao="${id}"`), `${id} no cartão`)
+    const cartao = new RegExp(`<li[^>]*data-modulo="${id}"`)
+    if (moduloCongelado(id) || id === 'configuracoes') assert.doesNotMatch(html, cartao, `${id} sem cartão`)
+    else assert.match(html, cartao, `${id} no cartão`)
   }
-  assert.equal(renderToStaticMarkup(h(IlustracaoDoModulo, { id: 'privado' })), '')
 })
 
 provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue sendo link', () => {
@@ -168,12 +169,33 @@ provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue send
   const links = html.match(/<a [^>]*href="#\/[^"]*"[^>]*>/g) ?? []
   assert.ok(links.length >= 8, `${links.length} links`)
   for (const link of links.filter((l) => /data-modulo|class="abrir"/.test(l))) assert.match(link, /draggable="false"/)
-  assert.match(html, /Arraste os números e os cartões para mudar a ordem\./)
+  // #2258 (auditoria H8): a dica de arrastar saiu do rodapé do Início; mora só no modo "Organizar áreas".
+  assert.doesNotMatch(html, /Arraste os números e os cartões para mudar a ordem\./)
 })
 
 provar('#1810 continua valendo: até 20 controles na primeira vista', () => {
-  const controles = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
-  assert.ok(controles <= 20, `${controles} controles`)
+  // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta de conteúdo.
+  const semTrilho = html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '')
+  const contar = (trecho) => (trecho.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+  // #3013: a faixa de atalhos (nav "Atalhos dos módulos") só existe no celular (display none acima de 640 px, atalhosCelular.module.css) e repete os cartões disponíveis da grade.
+  // É contada de forma explícita: um link por cartão disponível da grade, derivado do mesmo HTML que monta a grade, e nada além de links.
+  const faixa = semTrilho.match(/<nav [^>]*aria-label="Atalhos dos módulos"[^>]*>[\s\S]*?<\/nav>/)?.[0] ?? ''
+  // Mesmo filtro da FaixaDeAtalhos (modulo.disponivel): o cartão "Em breve" (classe emBreve) fica fora da faixa.
+  const ITENS_DA_FAIXA = (html.match(/<li[^>]*data-modulo="[^>]*>/g) ?? []).filter((li) => !/emBreve/.test(li)).length
+  assert.ok(ITENS_DA_FAIXA > 0, 'a grade tem cartões de módulo')
+  assert.equal(contar(faixa), ITENS_DA_FAIXA, 'a faixa tem um link por cartão da grade')
+  assert.equal((faixa.match(/<a[\s>]/g) ?? []).length, ITENS_DA_FAIXA, 'a faixa só tem links')
+  // Desktop: a faixa sai da árvore de acessibilidade e do Tab por display none (prova-3013), então o conteúdo cabe em TETO_CONTEUDO (#1810).
+  const controles = contar(semTrilho.replace(faixa, ''))
+  assert.ok(controles <= TETO_CONTEUDO, `${controles} controles sem a faixa`)
+  // Celular: exceção explícita e contada à #1810; a faixa repete a grade para encurtar a rolagem a 390 px (#3013).
+  const noCelular = contar(semTrilho)
+  assert.ok(noCelular <= TETO_CONTEUDO + ITENS_DA_FAIXA, `${noCelular} controles no celular (teto ${TETO_CONTEUDO + ITENS_DA_FAIXA})`)
+  // Total: conteúdo (#1810) + trilho (mesmo teto da prova-3004) + controle da conta + faixa. A renderização é estática, igual em qualquer
+  // largura, então a faixa entra no HTML mesmo escondida. Medido hoje no Início a 1440 px: 40 controles no total (17 de conteúdo, 7 da faixa, 16 do trilho e conta).
+  const total = contar(html)
+  const teto = TETO_CONTEUDO + TETO_ITENS_DO_TRILHO + CONTROLES_DA_CONTA + ITENS_DA_FAIXA
+  assert.ok(total <= teto, `${total} controles na primeira vista, contando trilho e faixa (teto ${teto})`)
 })
 
 provar('teclado: Espaço pega, Enter abre (Enter fora das teclas de arrasto)', () => {

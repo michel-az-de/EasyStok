@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Icone } from '../../componentes/Icone'
+import { Pilula } from '../../componentes/Pilula'
 import { Popover } from '../../componentes/Popover'
+import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { precisaDeVoce } from '../../dominio/automatico'
 import { congelado } from '../../dominio/congelados'
-import { combinaBusca, combinaCanal, combinaResponsavel, contarPorCanal, mostraChipDoCanal } from '../../dominio/conversa'
+import {
+  combinaBusca, combinaCanal, combinaResponsavel, contarAbertasDoBalcao, contarPorCanal, mostraChipDoCanal,
+} from '../../dominio/conversa'
 import css from './caixa.module.css'
 
 const OPCOES_DE_ORDEM = [
@@ -45,7 +50,7 @@ function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
       onClick={aoTrocar}
     >
       <Icone nome={canal.icone} tamanho={16} className={css['canal_' + canal.icone]} />
-      <span key={subidas} className={`${css.numeroChip} ${subidas > 0 ? css.pulso : ''}`}>{abertas}</span>
+      <Pilula key={subidas} contagem={abertas} className={subidas > 0 ? css.pulso : ''} />
       {precisam > 0 && <span className={css.pontoPrecisa} aria-hidden="true" />}
     </button>
   )
@@ -54,7 +59,8 @@ function ChipCanal({ canal, rotulo, abertas, precisam, ligado, aoTrocar }) {
 // Linha A (busca e ordenar) e linha B (filtros) da seção 1. #1442
 // (homologação de 07/10): o Balcão abre em "Todas"; "Precisa de você" virou
 // filtro com contador e os três cartões de canal viraram chips na mesma linha.
-export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
+// #2227: `semContagem` enquanto a lista não chegou da API; 0 ali seria "não há conversa".
+export function BarraBalcao({ filtros, aoMudar, acoesCabecalho, semContagem = false }) {
   const [ordenarAberto, setOrdenarAberto] = useState(false)
   const botaoFiltros = useRef(null)
   const { canais, janelas } = useCatalogo()
@@ -65,6 +71,8 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
   // busca da linha A (seção 1): trocar canal ou digitar não pode deixar o
   // número da aba discordando da lista embaixo.
   const doUniverso = doResponsavel.filter((c) => combinaCanal(c, filtros.canais) && combinaBusca(c, filtros.busca))
+  // #2185 (F18): o mesmo número no título, no chip "Todas" e na aba do celular: as abertas da lista.
+  const quantasAbertas = contarAbertasDoBalcao(conversas, filtros, sessao?.usuario)
   const quantasPrecisam = doUniverso
     .filter((c) => precisaDeVoce(c, agora, automaticoPausado[c.id] ?? false, aberta, janelas, horarioDaLoja)).length
 
@@ -89,7 +97,8 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
   return (
     <div className={css.barra}>
       <header className={css.cabecalhoLista}>
-        <h2>Conversas <span>{doUniverso.length}</span></h2>
+        {/* #2232 (L1): o total já está no chip "Todas"; o título não repete número. */}
+        <h2>Conversas</h2>
         <span className={css.comOrdenar}>
           <Botao ref={botaoFiltros} variante="texto" className={css.botaoOrdenar} aria-haspopup="dialog" aria-expanded={ordenarAberto}
             aria-label={filtrando ? 'Filtrar conversas, filtros ativos' : 'Filtrar conversas'} title="Filtrar e ordenar conversas"
@@ -97,7 +106,7 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
             <Icone nome="list-filter" tamanho={20} />
             {filtrando && <span className={css.pontoOrdem} aria-hidden="true" />}
           </Botao>
-          {ordenarAberto && <Popover rotulo="Filtros das conversas" papel="dialog" posicao="abaixo" aoFechar={() => setOrdenarAberto(false)}>
+          {ordenarAberto && <Popover rotulo="Filtros das conversas" papel="dialog" posicao="abaixo" portal alinhamento="esquerda" aoFechar={() => setOrdenarAberto(false)}>
             <div className={css.painelFiltros}>
               <FiltroResponsavel valor={filtros.responsavel ?? 'todas'} aoMudar={valor => aoMudar('responsavel', valor)} />
               <fieldset className={css.canaisNoFiltro}>
@@ -107,7 +116,7 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
                     precisam={contagemPorCanal[indice].precisam} ligado={filtros.canais.includes(c.nome)} aoTrocar={() => trocarCanal(c.nome)} />
                 ))}
               </fieldset>
-              <span className={css.rotuloResponsavel}>Ordenar</span>
+              <span>Ordenar</span>
               <div className={css.menuOrdem}>
                 {OPCOES_DE_ORDEM.map(opcao => <button key={opcao.chave} type="button"
                   aria-pressed={filtros.ordenacao === opcao.chave} className={css.itemOrdem} onClick={() => escolherOrdem(opcao)}>
@@ -129,22 +138,20 @@ export function BarraBalcao({ filtros, aoMudar, acoesCabecalho }) {
               if (e.target.value.trim() && filtros.aba === 'precisa') aoMudar('aba', 'todas')
               aoMudar('busca', e.target.value)
             }} />
-          {filtros.busca && <button type="button" className={css.limparBusca} aria-label="Limpar busca" onClick={(evento) => {
+          {filtros.busca && <BotaoIcone rotulo="Limpar busca" icone="x" className={css.limparBusca} onClick={(evento) => {
             evento.currentTarget.parentElement.querySelector('input')?.focus()
             aoMudar('busca', '')
-          }}>
-            <Icone nome="x" tamanho={20} />
-          </button>}
+          }} />}
         </span>
       </div>
       <fieldset className={css.filtros}>
         <legend className="sr">Filtros das conversas</legend>
         <button type="button" aria-pressed={filtros.aba !== 'precisa'} className={`${css.chipFiltro} ${filtros.aba !== 'precisa' ? css.chipLigado : ''}`} onClick={() => aoMudar('aba', 'todas')}>
-          Todas <span className={css.numeroChip}>{doUniverso.length}</span>
+          Todas {!semContagem && <Pilula contagem={quantasAbertas} tom="neutro" aria-hidden="true" />}
         </button>
         <button type="button" aria-pressed={filtros.aba === 'precisa'} className={`${css.chipFiltro} ${filtros.aba === 'precisa' ? css.chipLigado : ''}`}
           onClick={() => aoMudar('aba', filtros.aba === 'precisa' ? 'todas' : 'precisa')}>
-          Precisa de você <span className={css.numeroChip}>{quantasPrecisam}</span>
+          Precisa de você {!semContagem && <Pilula contagem={quantasPrecisam} tom="marca" aria-hidden="true" />}
         </button>
       </fieldset>
     </div>
@@ -164,15 +171,15 @@ function FiltroResponsavel({ valor, aoMudar }) {
     return () => { vivo = false }
   }, [listarAtendentes, tentativa])
   if (consulta.estado === 'erro') return (
-    <output className={css.vazioLinha}>
-      Não foi possível consultar os atendentes.
-      <button type="button" className={css.linkVazio} onClick={() => { setConsulta({ estado: 'carregando', itens: [] }); setTentativa((n) => n + 1) }}>Tentar novamente</button>
-    </output>
+    <Vazio
+      como="output" variante="linha" titulo="Não foi possível consultar os atendentes."
+      acao={<Botao variante="texto" onClick={() => { setConsulta({ estado: 'carregando', itens: [] }); setTentativa((n) => n + 1) }}>Tentar novamente</Botao>}
+    />
   )
   if (consulta.itens.length <= 1 && valor === 'todas') return null
   return (
     <label className={css.filtroResponsavel}>
-      <span className={css.rotuloResponsavel}>Responsável</span>
+      <span>Responsável</span>
       <select aria-label="Responsável pelas conversas" value={valor} onChange={(e) => aoMudar(e.target.value)}>
         <option value="todas">Todos</option>
         <option value="minhas">Comigo</option>

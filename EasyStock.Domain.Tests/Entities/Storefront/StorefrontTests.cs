@@ -18,7 +18,7 @@ public class StorefrontTests
     private static EasyStock.Domain.Entities.Storefront.Storefront NovoStorefrontValido(
         Guid? empresaId = null,
         string slug = "casadababa",
-        string titulo = "Casa da Babá")
+        string titulo = "Casa da Baba")
     {
         return EasyStock.Domain.Entities.Storefront.Storefront.Criar(
             empresaId: empresaId ?? Guid.NewGuid(),
@@ -36,13 +36,13 @@ public class StorefrontTests
         var s = EasyStock.Domain.Entities.Storefront.Storefront.Criar(
             empresaId: empresaId,
             slug: "casadababa",
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 40m);
 
         s.Id.Should().NotBeEmpty();
         s.EmpresaId.Should().Be(empresaId);
         s.Slug.Should().Be("casadababa");
-        s.TituloPublico.Should().Be("Casa da Babá");
+        s.TituloPublico.Should().Be("Casa da Baba");
         s.PedidoMinimoEntrega.Should().Be(40m);
 
         // Defaults importantes — feature flags SEMPRE safe-by-default
@@ -104,7 +104,7 @@ public class StorefrontTests
     [InlineData("Casa Da Baba")]     // espaços
     [InlineData("casa.da.baba")]     // dots
     [InlineData("casa_da_baba")]     // underscore (não permitido — só hifen)
-    [InlineData("casadababá")]       // acento
+    [InlineData("cozinhadaavó")]     // acento
     [InlineData("CASADABABA")]       // uppercase (não vamos normalizar uppercase? sim, mas testa rejeição se não usar normalizador)
     [InlineData("-casadababa")]      // hífen no início
     [InlineData("casadababa-")]      // hífen no fim
@@ -307,6 +307,49 @@ public class StorefrontTests
         var act = () => s.AtualizarBranding(corPrimaria: cor);
         act.Should().NotThrow();
         s.CorPrimaria.Should().Be(cor);
+    }
+
+    private static EasyStock.Domain.Entities.Storefront.Storefront ComBrandingCompleto()
+    {
+        var s = NovoStorefrontValido();
+        s.AtualizarBranding(
+            subtituloPublico: "Massas frescas artesanais",
+            logoUrl: "https://example.com/logo.png",
+            corPrimaria: "#5C2E0D",
+            whatsappPedidos: "+5511997573992",
+            mensagemForaArea: "Por enquanto entregamos só no Butantã.");
+        return s;
+    }
+
+    [Fact]
+    public void AtualizarBranding_com_um_campo_so_mantem_os_demais()
+    {
+        // #2244: o PUT parcial mandava só o WhatsApp e apagava subtítulo, logo, cor e mensagem.
+        var s = ComBrandingCompleto();
+
+        s.AtualizarBranding(whatsappPedidos: " 5511988887777 ");
+
+        s.WhatsappPedidos.Should().Be("5511988887777");
+        s.SubtituloPublico.Should().Be("Massas frescas artesanais");
+        s.LogoUrl.Should().Be("https://example.com/logo.png");
+        s.CorPrimaria.Should().Be("#5C2E0D");
+        s.MensagemForaArea.Should().Be("Por enquanto entregamos só no Butantã.");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AtualizarBranding_com_string_vazia_limpa_o_campo(string vazio)
+    {
+        var s = ComBrandingCompleto();
+
+        s.AtualizarBranding(subtituloPublico: vazio, logoUrl: vazio, corPrimaria: vazio);
+
+        s.SubtituloPublico.Should().BeNull();
+        s.LogoUrl.Should().BeNull();
+        s.CorPrimaria.Should().BeNull("string vazia limpa a cor em vez de ser rejeitada como hex inválido");
+        s.WhatsappPedidos.Should().Be("+5511997573992");
+        s.MensagemForaArea.Should().Be("Por enquanto entregamos só no Butantã.");
     }
 
     [Fact]

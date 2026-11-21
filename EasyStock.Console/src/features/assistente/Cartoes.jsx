@@ -1,8 +1,10 @@
 import { Botao } from '../../componentes/Botao'
+import { BotaoIcone } from '../../componentes/BotaoIcone'
 import { Chip } from '../../componentes/Chip'
 import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { moeda } from '../../dominio/formato'
+import { rotuloDaTag } from '../../dominio/tag'
 import css from './assistente.module.css'
 
 // Casca comum aos seis cartões: ícone, título, "ok, entendi" (seção D da
@@ -13,9 +15,7 @@ function Cartao({ icone, titulo, tom, aoDispensar, children }) {
     <article className={`${css.cartao} ${tom ? css[tom] : ''}`}>
       <div className={css.cartaoTopo}>
         <h3><Icone nome={icone} tamanho={20} /> {titulo}</h3>
-        <Botao variante="texto" className={css.dispensar} aria-label={`Dispensar ${titulo.toLowerCase()}`} title="Ok, entendi" onClick={aoDispensar}>
-          <Icone nome="check" tamanho={18} />
-        </Botao>
+        <BotaoIcone rotulo={`Dispensar ${titulo.toLowerCase()}`} dica="Ok, entendi" icone="check" onClick={aoDispensar} />
       </div>
       <div className={css.cartaoCorpo}>{children}</div>
     </article>
@@ -28,7 +28,7 @@ export function CartaoCliente({ dado, aoDispensar }) {
     <Cartao icone="ficha" titulo="Perfil do cliente" aoDispensar={aoDispensar}>
       {dado.tags.length > 0 && (
         <div className={css.tagsCliente}>
-          {dado.tags.map((tag) => <Chip key={tag} papel="tag">{tag}</Chip>)}
+          {dado.tags.map((tag) => <Chip key={tag} papel="tag">{rotuloDaTag(tag)}</Chip>)}
         </div>
       )}
       <p>{dado.chegou ?? 'Sem data de chegada registrada'}</p>

@@ -6,7 +6,7 @@ public class GetDashboardExtrasUseCase(IAnalyticsRepository analyticsRepository)
     {
         UseCaseGuards.EnsureEmpresaId(cmd.EmpresaId);
 
-        var now = DateTime.UtcNow.AddMinutes(-cmd.TimezoneOffsetMinutes);
+        var now = DateTime.UtcNow; // janela em instantes UTC; o fuso (tz) só agrupa no repositório (#2561)
         var ate = now;
         var de = ate.AddDays(-cmd.PeriodoDias);
 

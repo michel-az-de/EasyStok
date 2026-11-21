@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { BarraDeAbas } from '../../componentes/BarraDeAbas'
 import { Botao } from '../../componentes/Botao'
 import { CampoArea } from '../../componentes/Campo'
@@ -7,11 +7,13 @@ import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { Vazio } from '../../componentes/Vazio'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
+import { useNovoPedidoDoCliente } from '../../aplicacao/novoPedidoDoCliente'
+import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../aplicacao/rascunhosDosAjustes'
 import { ehLead } from '../../dominio/conversa'
 import { enviosAutomaticos } from '../../dominio/automacao'
 import { diasEntre, quandoRelativo, resumoFinanceiro } from '../../dominio/cliente'
-import { moeda } from '../../dominio/formato'
-import { rotuloDoEstado } from '../../dominio/pedido'
+import { FUSO, diaMesHora, moeda } from '../../dominio/formato'
+import { pedidoEncerrado, rotuloDoEstado, totalDaComanda } from '../../dominio/pedido'
 import { numeroParaEntregador, textoDoEntregador } from '../../dominio/despacho'
 import css from './cliente.module.css'
 
@@ -30,12 +32,29 @@ function AvaliacaoCliente({ avaliacao }) {
   return <span className={css.avaliacaoVazia}>Sem avaliação</span>
 }
 
-function AbaPedidos({ historico, pedidosAnteriores }) {
+// #2258 (T20): a ficha dizia "Nenhum pedido ainda" com a Comanda 6 de R$ 495,00 aberta na conversa. Comanda
+// com itens e sem encerrar conta como aberta; o total só aparece quando o servidor o calculou (`totalApi`).
+function comandaAberta(conversa) {
+  const pedido = conversa.pedido
+  if (!pedido || pedido.itens.length === 0 || pedidoEncerrado(pedido)) return null
+  // #2258 (T20, banca): sem `totalApi`, o total calculado das linhas.
+  return { total: typeof pedido.totalApi === 'number' ? pedido.totalApi : totalDaComanda(pedido) }
+}
+
+const textoDaComandaAberta = (aberta) => `1 pedido aberto${aberta.total == null ? '' : ` · ${moeda(aberta.total)}`}`
+
+function AbaPedidos({ historico, pedidosAnteriores, aberta, clienteId = null, nome }) {
+  const novoPedido = useNovoPedidoDoCliente()
+  const comAcao = novoPedido.disponivel && Boolean(clienteId)
   if (historico.length === 0) {
+    // #2944 (E1-14): o vazio da Ficha diz o que fazer e já traz o botão.
+    const acao = !aberta && comAcao
+      ? <Botao variante="primario" disabled={Boolean(novoPedido.abrindo)} onClick={() => novoPedido.iniciar(clienteId, { nome })}>Novo pedido</Botao>
+      : null
     return (
-      <Vazio titulo="Nenhum pedido ainda">
-        {pedidosAnteriores > 0
-          ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe salvo neste protótipo.`
+      <Vazio acao={acao} titulo={aberta ? textoDaComandaAberta(aberta) : `Nenhum pedido ainda${comAcao ? '. Use Novo pedido para começar.' : ''}`}>
+        {aberta ? 'Ela entra no histórico quando o pedido for concluído.' : pedidosAnteriores > 0
+          ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe para mostrar aqui.`
           : 'Primeira vez na casa.'}
       </Vazio>
     )
@@ -68,11 +87,11 @@ function AbaPedidos({ historico, pedidosAnteriores }) {
 }
 
 // Desfecho e avisos (decisão 46, "Encerrar" v2): quem encerrou, quando, com
-// que desfecho, e se mandou mensagem, e-mail e SMS — o log de auditoria do
+// que desfecho, e se mandou mensagem, e-mail e SMS: o log de auditoria do
 // atendimento que a direção pede visível aqui. `desfecho` só existe a partir
 // desta decisão: atendimento antigo (nenhum nesta massa) cairia no rótulo
 // padrão "manual" em vez de quebrar.
-const ROTULO_DESFECHO = { manual: 'encerrado por', tempo: 'encerrado por tempo, sem mensagem —' }
+const ROTULO_DESFECHO = { manual: 'concluído por', tempo: 'concluído por tempo, sem mensagem ·' }
 
 function LogDeEncerramento({ atendimento }) {
   const desfecho = atendimento.desfecho ?? 'manual'
@@ -96,7 +115,7 @@ function LogDeEncerramento({ atendimento }) {
 function AbaAtendimentos({ conversaId, atendimentos }) {
   const { abrirEncerramento } = useAcoes()
   if (atendimentos.length === 0) {
-    return <Vazio titulo="Nenhum atendimento registrado">Aparece aqui a cada encerramento.</Vazio>
+    return <Vazio titulo="Nenhum atendimento registrado">Aparece aqui a cada conversa concluída.</Vazio>
   }
   return (
     <ul className={css.listaPedidos}>
@@ -105,10 +124,10 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
           <header>
             {/* `encerradoEm` é o relógio da tela em ms (casos/encerramento.js). */}
             <time dateTime={new Date(a.encerradoEm).toISOString()}>
-              {new Date(a.encerradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              {new Date(a.encerradoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', timeZone: FUSO })}
             </time>
             <span>{a.numero} · {a.faixaHorario} · {a.duracaoTexto}</span>
-            <b className={css.totalPedido}>{a.receita ? moeda(a.receita.liquido) : '—'}</b>
+            <b className={css.totalPedido}>{a.receita ? moeda(a.receita.liquido) : 'Sem venda'}</b>
             <AvaliacaoCliente avaliacao={a.avaliacaoCliente} />
           </header>
           <LogDeEncerramento atendimento={a} />
@@ -122,32 +141,29 @@ function AbaAtendimentos({ conversaId, atendimentos }) {
   )
 }
 
-function AbaNotas({ conversa, ocupado, aoOcupar }) {
+function AbaNotas({ conversa, ocupado, iniciarGravacao, texto, aoMudarTexto }) {
   const { salvarNota } = useAcoes()
-  const [texto, setTexto] = useState('')
   const [aviso, setAviso] = useState(null)
-  const salvando = useRef(false)
   const campo = useRef(null)
   const notas = conversa.cliente.notas
 
   async function salvar() {
-    if (!texto.trim() || salvando.current) return
-    salvando.current = true
+    if (!texto.trim()) return
+    const concluirGravacao = iniciarGravacao()
+    if (!concluirGravacao) return
     campo.current?.focus()
-    aoOcupar(true)
     setAviso(null)
     try {
       if (await salvarNota(conversa.id, texto.trim()) === false) {
         setAviso({ erro: true, texto: 'Sem confirmação da nota. Seu texto continua aqui. Confira a ficha antes de tentar de novo.' })
       } else {
-        setTexto('')
+        aoMudarTexto('')
         setAviso({ erro: false, texto: 'Nota salva.' })
       }
     } catch (erro) {
       setAviso({ erro: true, texto: erro.message || 'Não foi possível salvar a nota. Seu texto continua aqui.' })
     } finally {
-      salvando.current = false
-      aoOcupar(false)
+      concluirGravacao()
     }
   }
 
@@ -161,7 +177,7 @@ function AbaNotas({ conversa, ocupado, aoOcupar }) {
           ref={campo}
           readOnly={ocupado}
           aria-busy={ocupado}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => aoMudarTexto(e.target.value)}
           placeholder="Nunca chega ao cliente."
         />
         <Botao variante="primario" disabled={!texto.trim() || ocupado} onClick={salvar}>{ocupado ? 'Salvando…' : 'Salvar nota'}</Botao>
@@ -186,17 +202,17 @@ function AbaNotas({ conversa, ocupado, aoOcupar }) {
 // #1441: o que a casa mandou sozinha nesta conversa (automáticas do EasyStok, avisos do
 // pedido e o agente). A API grava cada envio como mensagem; o gatilho de cada uma e os
 // disparos que não saíram (fora da janela, desligada) ainda não ficam registrados.
-const ROTULO_ORIGEM = { agente: 'Agente', sistema: 'Automática' }
-const horaCompleta = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+const ROTULO_ORIGEM = { agente: 'Assistente', sistema: 'Assistente' }
+const horaCompleta = diaMesHora
 
 function AbaAutomaticas({ envios }) {
-  if (envios.length === 0) return <p className={css.corpoBloco}>Nada automático nesta conversa.</p>
+  if (envios.length === 0) return <p className={css.corpoBloco}>Nada do Assistente nesta conversa.</p>
   return (
     <ul className={css.listaNotas}>
       {envios.map((m) => (
         <li key={m.id} className={css.linhaNota}>
           <span className={css.quemNota}>
-            {ROTULO_ORIGEM[m.origemAutomatica] ?? 'Automática'} · {horaCompleta(m.em)}{m.status === 'falhou' ? ' · não entregue' : ''}
+            {ROTULO_ORIGEM[m.origemAutomatica] ?? 'Assistente'} · {horaCompleta(m.em)}{m.status === 'falhou' ? ' · não entregue' : ''}
           </span>
           {m.texto}
         </li>
@@ -205,10 +221,16 @@ function AbaAutomaticas({ envios }) {
   )
 }
 
-export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido = false, aoOcupar }) {
+export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido = false, aoOcupar, aoMudarSujo }) {
   const id = useId()
   const [aba, setAba] = useState('pedidos')
-  const [salvandoNota, setSalvandoNota] = useState(false)
+  const chaveNota = `nota-cadastro:${conversa.clienteId ?? conversa.cadastroId ?? conversa.id}`
+  const [rascunhoNota, definirNota] = useRascunhoDoAjuste(chaveNota)
+  const [salvandoNota, iniciarGravacao] = useGravacaoDoAjuste(chaveNota)
+  const textoNota = rascunhoNota?.texto ?? ''
+  useEffect(() => { aoMudarSujo?.(Boolean(textoNota)) }, [aoMudarSujo, textoNota])
+  useEffect(() => { aoOcupar?.(salvandoNota) }, [aoOcupar, salvandoNota])
+  const fechar = () => { definirNota(null); aoFechar() }
   // #1586: o resumo de cada encerramento só existe na demonstração; no modo API o EasyStok não
   // guarda, e a aba ficaria sempre vazia.
   const { fonteApi } = useAtendimento()
@@ -216,12 +238,13 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido 
   const lead = ehLead(conversa)
   const financeiro = resumoFinanceiro(historico)
   const automaticas = enviosAutomaticos(conversa.mensagens)
+  const aberta = comandaAberta(conversa)
 
   const conteudo = (
     <>
       {lead ? (
         <p className={css.faixaLead}>
-          Contato desde {quandoRelativo(diasEntre(conversa.mensagens[0]?.em ?? agora, agora))} · nenhum pedido
+          Contato {quandoRelativo(diasEntre(conversa.mensagens[0]?.em ?? agora, agora))} · {aberta ? textoDaComandaAberta(aberta) : 'nenhum pedido'}
         </p>
       ) : (
         <div className={css.faixaNumeros}>
@@ -240,26 +263,27 @@ export function ModalHistorico({ conversa, historico, agora, aoFechar, embutido 
           { id: 'pedidos', rotulo: 'Pedidos', contador: cliente.pedidos },
           ...(fonteApi ? [] : [{ id: 'atendimentos', rotulo: 'Atendimentos', contador: (conversa.atendimentos ?? []).length }]),
           { id: 'notas', rotulo: 'Notas', contador: cliente.notas.length },
-          { id: 'automaticas', rotulo: 'Automáticas', contador: automaticas.length },
+          { id: 'automaticas', rotulo: 'Assistente', contador: automaticas.length },
         ]}
         ativa={aba}
         aoTrocar={(novaAba) => { if (!salvandoNota) setAba(novaAba) }}
       />
 
       <div role="tabpanel" id={`${id}-painel`} aria-labelledby={`${id}-aba-${aba}`} tabIndex={0} className={css.painelAba}>
-        {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} />}
+        {aba === 'pedidos' && <AbaPedidos historico={historico} pedidosAnteriores={cliente.pedidos} aberta={aberta} clienteId={conversa.clienteId} nome={conversa.nome} />}
         {aba === 'atendimentos' && (
           <AbaAtendimentos conversaId={conversa.id} atendimentos={conversa.atendimentos ?? []} />
         )}
         <div hidden={aba !== 'notas'}>
-          <AbaNotas conversa={conversa} ocupado={salvandoNota} aoOcupar={(ocupado) => { setSalvandoNota(ocupado); aoOcupar?.(ocupado) }} />
+          <AbaNotas conversa={conversa} ocupado={salvandoNota} iniciarGravacao={iniciarGravacao}
+            texto={textoNota} aoMudarTexto={(texto) => definirNota(texto ? { texto } : null)} />
         </div>
         {aba === 'automaticas' && <AbaAutomaticas envios={automaticas} />}
       </div>
     </>
   )
   if (embutido) return <section data-historico-cliente aria-label="Histórico do cliente">{conteudo}</section>
-  return <Modal titulo={`Histórico · ${conversa.nome}`} aoFechar={salvandoNota ? undefined : aoFechar}
-    largura="min(880px, calc(100vw - 32px))"
-    rodape={<Botao disabled={salvandoNota} onClick={aoFechar}>Fechar</Botao>}>{conteudo}</Modal>
+  return <Modal titulo={`Histórico · ${conversa.nome}`} aoFechar={salvandoNota ? undefined : fechar}
+    largura="lg" confirmarDescarte={Boolean(textoNota)}
+    rodape={<Botao disabled={salvandoNota} onClick={(evento) => evento.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))}>Fechar</Botao>}>{conteudo}</Modal>
 }

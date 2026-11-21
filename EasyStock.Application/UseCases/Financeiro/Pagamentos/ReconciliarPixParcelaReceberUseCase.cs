@@ -1,3 +1,4 @@
+using System.Globalization;
 using EasyStock.Domain.Entities.Financeiro;
 using EasyStock.Domain.Enums.Financeiro;
 
@@ -55,14 +56,15 @@ public class ReconciliarPixParcelaReceberUseCase(
         if (conta is null)
             return new ReconciliarPixResult(null, parcela.Id, null, null, null, false, "parcela orfa");
 
-        // Idempotencia: ja confirmado
-        var jaConfirmado = parcela.Pagamentos.Any(p =>
+        // Idempotencia: o txid ja gerou pagamento. #2501: o estornado tambem conta; o estorno mantem o txid na
+        // parcela e o indice unico do txid barraria um segundo pagamento a cada rodada do job.
+        var jaProcessado = parcela.Pagamentos.FirstOrDefault(p =>
             p.GatewayProvedor == "EfiPix" &&
-            p.GatewayTransactionId == cmd.Txid &&
-            p.Status == StatusPagamentoParcela.Confirmado);
-        if (jaConfirmado)
+            p.GatewayTransactionId == cmd.Txid);
+        if (jaProcessado is not null)
             return new ReconciliarPixResult(null, parcela.Id, conta.Id,
-                parcela.Status.ToString(), conta.Status.ToString(), false, "ja reconciliado");
+                parcela.Status.ToString(), conta.Status.ToString(), false,
+                jaProcessado.Status == StatusPagamentoParcela.Estornado ? "pix estornado" : "ja reconciliado");
 
         // Se nao recebemos valor, consultar Efi
         decimal valorPago;
@@ -89,9 +91,10 @@ public class ReconciliarPixParcelaReceberUseCase(
         // Tolerancia: se valor pago for menor que saldo da parcela (cliente pagou parcial), aceitar
         // Se valor pago > saldo, cap no saldo (preserva invariante)
         var aplicado = Math.Min(valorPago, parcela.Saldo);
-        if (valorPago > parcela.Saldo)
+        var excedente = valorPago - aplicado;
+        if (excedente > 0m)
             // Sem o txid: na baixa manual ele vem do corpo da requisição (CodeQL, log de entrada do usuário).
-            logger.LogWarning("Pix acima do saldo: parcela={ParcId} pago={Pago} saldo={Saldo}; excedente sem registro na conta",
+            logger.LogWarning("Pix acima do saldo: parcela={ParcId} pago={Pago} saldo={Saldo}; excedente registrado na linha do tempo da conta",
                 parcela.Id, valorPago, parcela.Saldo);
         if (aplicado <= 0m)
             return new ReconciliarPixResult(null, parcela.Id, conta.Id,
@@ -99,41 +102,58 @@ public class ReconciliarPixParcelaReceberUseCase(
 
         try
         {
-            var pagamento = PagamentoParcela.CriarConfirmado(
-                conta.EmpresaId, TipoLadoFinanceiro.Receber,
-                aplicado, "pix", DataUtc.ParaUtc(pagoEm),
-                "EfiPix", cmd.Txid, "Reconciliado via Pix Efi");
-            parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
+            return await uow.ExecuteInTransactionSemRetryAsync(async tx =>
+            {
+                // #2763: o Pix de parcela entra no Caixa como o recebimento manual (#2736): toma a trava que o
+                // fechamento também toma, e o instante do movimento é lido depois dela, nunca antes.
+                await caixaRepo.TravarSaidasAsync(conta.EmpresaId, conta.LojaId, tx);
 
-            var mov = MovimentoCaixa.Criar(
-                conta.EmpresaId, "entrada", aplicado,
-                dataMovimento: DateTime.UtcNow,
-                lojaId: conta.LojaId);
-            mov.Descricao = $"Pix recebido — parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
-            mov.Metodo = "pix";
-            mov.Categoria = "contas-a-receber";
-            mov.Referencia = ReferenciaDeParcela.DoPix("cr", conta.Id, parcela.Id, cmd.Txid);
-            mov.Origem = "webhook";
+                var pagamento = PagamentoParcela.CriarConfirmado(
+                    conta.EmpresaId, TipoLadoFinanceiro.Receber,
+                    aplicado, "pix", DataUtc.ParaUtc(pagoEm),
+                    "EfiPix", cmd.Txid, "Reconciliado via Pix Efi");
+                parcela.RegistrarPagamento(pagamento, HorarioBrasil.HojeInstanteUtc());
 
-            await caixaRepo.AddMovimentoAsync(mov);
-            pagamento.AssociarMovimentoCaixa(mov.Id);
+                var mov = MovimentoCaixa.Criar(
+                    conta.EmpresaId, "entrada", aplicado,
+                    dataMovimento: DateTime.UtcNow,
+                    lojaId: conta.LojaId);
+                mov.Descricao = $"Pix recebido — parcela {parcela.Numero}/{conta.Parcelas.Count} — {conta.Descricao}";
+                mov.Metodo = "pix";
+                mov.Categoria = "contas-a-receber";
+                mov.Referencia = ReferenciaDeParcela.DoPix("cr", conta.Id, parcela.Id, cmd.Txid);
+                mov.Origem = "webhook";
 
-            conta.AtualizarStatusPorParcelas();
+                await caixaRepo.AddMovimentoAsync(mov);
+                pagamento.AssociarMovimentoCaixa(mov.Id);
 
-            await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
-                conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PixReconciliado,
-                descricao: $"Pix reconciliado: R$ {aplicado:F2} (txid={cmd.Txid})",
-                origem: "webhook"), ct);
+                conta.AtualizarStatusPorParcelas();
 
-            await contaRepo.UpdateAsync(conta, ct);
-            await uow.CommitAsync();
+                await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
+                    conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PixReconciliado,
+                    descricao: $"Pix reconciliado: R$ {aplicado:F2} (txid={cmd.Txid})",
+                    origem: "webhook"), ct);
 
-            logger.LogInformation("Pix reconciliado: parcela={ParcId} txid={Txid} valor={Valor}",
-                parcela.Id, cmd.Txid, aplicado);
+                // #2736: o que passou do saldo entrou na conta bancária e não vira crédito no Extrato: fica na linha do
+                // tempo da conta, para quem concilia o banco devolver ou lançar o valor.
+                if (excedente > 0m)
+                    await contaRepo.AddEventoAsync(ContaFinanceiraEvento.ParaContaReceber(
+                        conta.EmpresaId, conta.Id, TipoEventoContaFinanceira.PixReconciliado,
+                        descricao: $"Pix excedente de {excedente.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} " +
+                                   $"a devolver ou conciliar: o Pix foi de {valorPago.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} " +
+                                   $"e a parcela aceitou {aplicado.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))} (txid={cmd.Txid})",
+                        origem: "webhook"), ct);
 
-            return new ReconciliarPixResult(
-                pagamento.Id, parcela.Id, conta.Id,
-                parcela.Status.ToString(), conta.Status.ToString(), true, null);
+                await contaRepo.UpdateAsync(conta, ct);
+                await uow.CommitAsync();
+
+                logger.LogInformation("Pix reconciliado: parcela={ParcId} txid={Txid} valor={Valor}",
+                    parcela.Id, cmd.Txid, aplicado);
+
+                return new ReconciliarPixResult(
+                    pagamento.Id, parcela.Id, conta.Id,
+                    parcela.Status.ToString(), conta.Status.ToString(), true, null);
+            }, ct);
         }
         catch (RegraDeDominioVioladaException ex)
         {

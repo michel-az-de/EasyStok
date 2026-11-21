@@ -4,6 +4,7 @@ using EasyStock.Application.Services.Campanhas;
 using EasyStock.Application.Services.Storefront;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Atendimento;
+using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.Atendimento;
@@ -19,12 +20,15 @@ public sealed record CriarPedidoAtendimentoInput(
     Guid JanelaId,
     DateOnly DataEntrega,
     Guid EnderecoId,
-    string? Observacoes = null, decimal? FreteCombinado = null);
+    string? Observacoes = null, decimal? FreteCombinado = null,
+    long? VinculoRevisaoEsperada = null, SituacaoConversa? SituacaoEsperada = null);
+
+public sealed class ContextoPedidoAtendimentoAlteradoException(string message) : RegraDeDominioVioladaException(message);
 
 /// <summary>
 /// Cria o pedido da conversa pelo mesmo núcleo do site (<see cref="CheckoutCoreService"/>): itens com
 /// snapshot do cardápio e observação por item, frete pelo CEP do endereço escolhido, vaga ocupada e
-/// pedido em <c>AguardandoPagamento</c> com <c>Origem = "whatsapp"</c>. Grava
+/// pedido em <c>AguardandoPagamento</c> com a origem do canal da conversa (<see cref="OrigemPedido.DoCanal"/>). Grava
 /// <c>Conversa.PedidoEmAndamentoId</c>. A cobrança fica com a S11, que recebe o
 /// <see cref="PedidoReservado"/> devolvido aqui. O núcleo revalida o prazo mínimo (S16, RN-21) com o preparo
 /// padrão e o respiro de <c>ConfiguracaoAtendimento</c>.
@@ -61,10 +65,14 @@ public sealed class CriarPedidoAtendimentoUseCase(
 
         var conversa = await conversaRepository.ObterPorIdAsync(input.EmpresaId, input.ConversaId, ct)
             ?? throw new RegraDeDominioVioladaException("Conversa não encontrada. Atualize a tela e tente de novo.");
+        var revisaoVinculo = input.VinculoRevisaoEsperada ?? conversa.VinculoRevisao;
 
         if (conversa.ClienteId != input.ClienteId)
-            throw new RegraDeDominioVioladaException(
-                "O cliente escolhido não é o cliente desta conversa.");
+        {
+            if (input.VinculoRevisaoEsperada.HasValue)
+                throw new ContextoPedidoAtendimentoAlteradoException("A identidade mudou. Confira a pessoa antes de criar o pedido.");
+            throw new RegraDeDominioVioladaException("O cliente escolhido não é o cliente desta conversa.");
+        }
 
         var cliente = await clienteRepository.GetByIdWithDetailsAsync(input.EmpresaId, input.ClienteId)
             ?? throw new RegraDeDominioVioladaException("Cliente não encontrado. Atualize a tela e tente de novo.");
@@ -82,6 +90,14 @@ public sealed class CriarPedidoAtendimentoUseCase(
         return await unitOfWork.ExecuteInTransactionSemRetryAsync(async token =>
         {
             var emAndamento = await conversaRepository.TravarParaPedidoAsync(input.EmpresaId, conversa.Id, token);
+            // A identidade pode ter sido corrigida enquanto esta requisição aguardava a trava.
+            conversa = await conversaRepository.ObterPorIdComLockAsync(input.EmpresaId, conversa.Id, token)
+                ?? throw new RegraDeDominioVioladaException("Conversa não encontrada.");
+            if (conversa.EmpresaId != input.EmpresaId || conversa.ClienteId != input.ClienteId || conversa.VinculoEmRevisao
+                || conversa.VinculoRevisao != revisaoVinculo)
+                throw new ContextoPedidoAtendimentoAlteradoException("A identidade mudou. Confira a pessoa antes de criar o pedido.");
+            if (input.SituacaoEsperada is { } situacao && conversa.Situacao != situacao)
+                throw new ContextoPedidoAtendimentoAlteradoException("A situação da conversa mudou. Atualize antes de criar o pedido.");
             await GarantirSemPedidoEmAndamentoAsync(input.EmpresaId, emAndamento);
             return await ReservarAsync(input, conversa, cliente, endereco, configuracao, token);
         }, ct);
@@ -110,12 +126,13 @@ public sealed class CriarPedidoAtendimentoUseCase(
                 JanelaId: input.JanelaId,
                 DataEntrega: input.DataEntrega,
                 Cep: endereco.Cep ?? string.Empty,
-                Origem: OrigemPedido.WhatsApp,
+                Origem: OrigemPedido.DoCanal(conversa.Canal),
                 EmpresaId: input.EmpresaId,
                 Observacoes: input.Observacoes,
                 Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos),
                 Numero: endereco.Numero,
-                EnderecoEntrega: EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega.De(endereco), FreteCombinado: input.FreteCombinado),
+                EnderecoEntrega: EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega.De(endereco), FreteCombinado: input.FreteCombinado,
+                OrigemDaConversa: conversa.OrigemAnuncio), // #2928: o pedido leva o anúncio que valia na conversa
             ct);
 
         // Retrato do cliente, como o Pedido.Criar e o checkout guest gravam: sem ele o KDS e as Entregas

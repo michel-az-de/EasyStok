@@ -91,7 +91,9 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Include(u => u.Empresas!.Where(e => e.EmpresaId == empresaId))
                 .Include(u => u.Perfis!.Where(p => p.EmpresaId == empresaId))
                     .ThenInclude(up => up.Perfil)
-                .Where(u => u.Empresas!.Any(ue => ue.EmpresaId == empresaId));
+                .Where(u => u.Empresas!.Any(ue => ue.EmpresaId == empresaId))
+                // #2695: a conta interna do sync móvel não é pessoa da equipe.
+                .Where(Usuario.NaoEhContaDeSistema);
 
             var total = await query.CountAsync();
             var usuarios = await query
@@ -104,7 +106,12 @@ namespace EasyStock.Infra.Postgre.Repositories
         }
 
         public async Task<int> CountByEmpresaAsync(Guid empresaId) =>
-            await dbContext.UsuariosEmpresas.CountAsync(ue => ue.EmpresaId == empresaId && ue.Ativo);
+            // #2695: a conta interna do sync móvel não ocupa vaga do plano.
+            await dbContext.UsuariosEmpresas
+                .Where(ue => ue.EmpresaId == empresaId && ue.Ativo)
+                .Select(ue => ue.Usuario!)
+                .Where(Usuario.NaoEhContaDeSistema)
+                .CountAsync();
 
         public Task AddAsync(Usuario usuario) =>
             dbContext.Usuarios.AddAsync(usuario).AsTask();
@@ -130,12 +137,17 @@ namespace EasyStock.Infra.Postgre.Repositories
                 .Select(u => new SessaoDoUsuario(u.Ativo, u.SessoesValidasDesde))
                 .FirstOrDefaultAsync();
 
+        public async Task AtualizarUltimoAcessoAsync(Guid usuarioId, DateTime agora) =>
+            await dbContext.Usuarios.Where(u => u.Id == usuarioId).ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.UltimoAcessoEm, agora).SetProperty(u => u.AlteradoEm, agora));
+
         public Task<int> AtualizarSessoesValidasDesdeAsync(Guid usuarioId, DateTime desde) =>
-            // UPDATE atômico e monotônico: só avança. Revogações concorrentes e relógios diferentes entre
-            // réplicas nunca fazem o corte recuar.
+            // Sempre trava a linha, inclusive com corte igual/anterior. O login nativo espera essa mesma linha
+            // antes de reler o acesso; o valor continua monotônico entre réplicas e revogações concorrentes.
             dbContext.Usuarios
-                .Where(u => u.Id == usuarioId && (u.SessoesValidasDesde == null || u.SessoesValidasDesde < desde))
-                .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessoesValidasDesde, desde));
+                .Where(u => u.Id == usuarioId)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.SessoesValidasDesde,
+                    u => u.SessoesValidasDesde == null || u.SessoesValidasDesde < desde ? desde : u.SessoesValidasDesde));
 
         public async Task<bool> ReservarTentativaDeSenhaAsync(Guid usuarioId, DateTime agora)
         {
@@ -163,12 +175,12 @@ namespace EasyStock.Infra.Postgre.Repositories
 
         public async Task<IEnumerable<Usuario>> SearchAsync(Guid empresaId, string termo, int maxResults = 20)
         {
-            var pattern = $"%{termo.Trim()}%";
+            var pattern = PadraoILike.Contendo(termo.Trim());
             return await dbContext.Usuarios
                 .AsNoTracking()
                 .Where(u => u.Empresas!.Any(ue => ue.EmpresaId == empresaId) &&
-                    (EF.Functions.ILike(u.Nome, pattern) ||
-                     EF.Functions.ILike(u.Email, pattern)))
+                    (EF.Functions.ILike(u.Nome, pattern, PadraoILike.Escape) ||
+                     EF.Functions.ILike(u.Email, pattern, PadraoILike.Escape)))
                 .OrderBy(u => u.Nome)
                 .Take(maxResults)
                 .ToListAsync();

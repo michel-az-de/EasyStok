@@ -85,3 +85,40 @@ test('credencial dentro de repositório é recusada e erro de envio não vira su
   fs.unlinkSync(path.join(directory, '.git'));
   await assert.rejects(push.sendUpdate(options, async () => { throw new Error('falha de rede simulada'); }), /falha de rede/);
 });
+function apkRelease(overrides = {}) {
+  return { schemaVersion: 1, appId: ota.APP, version: '0.8.8', versionCode: 15, sha256: 'b'.repeat(64), fileName: 'casa-da-baba-15-bbbbbbbbbbbb.apk',
+    url: 'https://easystok.online/downloads/casa-da-baba/casa-da-baba-15-bbbbbbbbbbbb.apk', publishedAt: '2026-11-03T23:00:00Z', notes: [], ...overrides };
+}
+test('aviso de APK novo é visível no Android, vai ao tópico de updates e leva só dados públicos', () => {
+  assert.deepEqual(push.apkMessage(apkRelease(), true), { validate_only: true, message: {
+    topic: 'casa-da-baba-piloto-updates',
+    notification: { title: 'Casa da Baba 0.8.8 disponível', body: 'Abra o app e toque em Atualizar para instalar sem desinstalar. Se já estiver nesta versão, ignore.' },
+    data: { kind: 'apk-update', version: '0.8.8', versionCode: '15' },
+    android: { priority: 'high', ttl: '604800s', collapse_key: 'apk-update', notification: { channel_id: 'cdb-operacao', tag: 'apk-update' } } } });
+});
+test('aviso de APK recusa pacote, versão ou endereço fora da distribuição', () => {
+  for (const bad of [{ appId: 'com.outro.app' }, { versionCode: 0 }, { versionCode: '15' }, { version: '0.8' }, { url: 'https://example.invalid/app.apk' }, { url: 'https://easystok.online/downloads/casa-da-baba/../x.apk' }])
+    assert.throws(() => push.apkMessage(apkRelease(bad), true), /APK/);
+});
+test('aviso de APK usa validate_only por padrão e o mesmo OAuth do OTA', async () => {
+  const { options, directory } = fixture(), calls = [];
+  const file = path.join(directory, 'latest.json'); fs.writeFileSync(file, JSON.stringify(apkRelease()));
+  const result = await push.sendApkUpdate({ credentials: options.credentials, appConfig: options.appConfig, apkRelease: file }, async (url, body) => {
+    calls.push({ url, body });
+    return calls.length === 1 ? { access_token: 'test-token' } : { name: 'validated' };
+  });
+  assert.equal(calls.length, 2);
+  assert.equal(JSON.parse(calls[1].body).validate_only, true);
+  assert.equal(JSON.parse(calls[1].body).message.data.kind, 'apk-update');
+  assert.deepEqual(result, { status: 'validated', versionCode: 15, projectId: 'cdb-test-project', topic: push.TOPIC });
+});
+test('apk-deploy valida o push antes de publicar e só envia depois de ativar o latest', () => {
+  const script = fs.readFileSync(path.resolve(__dirname, '../../../scripts/deploy/apk-deploy.ps1'), 'utf8');
+  const preflight = script.indexOf('--apk-release'), stage = script.indexOf("Invoke-ApkRemote 'stage'");
+  const send = script.lastIndexOf('$apkPushMode'), activate = script.indexOf("Invoke-ApkRemote 'activate'");
+  assert.ok(preflight > 0 && stage > 0 && preflight < stage, 'preflight antes do staging');
+  assert.ok(send > activate && activate > 0, 'envio depois do activate');
+  assert.match(script, /\[switch\]\$SkipPush/);
+  assert.match(script, /\[switch\]\$PushValidateOnly/);
+  assert.match(script, /if \(\$PrepareOnly\) \{ return \}[\s\S]*--validate-only/);
+});

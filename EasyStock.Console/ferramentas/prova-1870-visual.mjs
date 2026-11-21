@@ -51,23 +51,24 @@ confere('1  o Sair mora no menu do avatar: trilho do Balcão, trilho dos módulo
   assert.match(conta, /const fecharComEsc = useCallback\(\(evento\) => \{ evento\.preventDefault\(\); fechar\(\) \}/, 'Esc não propaga o fechamento para outra camada')
   assert.match(conta, /useEscape\(aberto, fecharComEsc\)/, 'Esc fecha e devolve o foco ao avatar')
   assert.match(conta, /botaoRef\.current\?\.focus\(\)/)
-  assert.match(conta, /const nome = nomeDaSessao \|\| \(aoSair \? 'Sua conta' : null\)/, 'sessão sem nome ainda sai')
+  assert.match(conta, /const nome = nomeDaSessao \|\| 'Sua conta'/, 'sessão sem nome ainda sai (#3004: a conta existe em toda rota)')
   assert.match(fonte('app/Moldura.jsx'), /<MenuDaConta nome=\{atendente\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\}/)
-  assert.match(fonte('features/hall/MenuDosModulos.jsx'), /<MenuDaConta nome=\{conta\?\.nome\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\}/)
+  assert.match(fonte('features/hall/TrilhoDoConsole.jsx'), /<MenuDaConta nome=\{atendente \?\? conta\?\.nome\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\}/)
   assert.match(fonte('features/hall/HallDeModulos.jsx'), /<MenuDaConta lado="abaixo"/)
   assert.doesNotMatch(fonte('features/hall/HallDeModulos.jsx'), /<Botao className=\{css\.sair\}/)
   assert.match(fonte('app/App.jsx'), /conta: \{ nome: sessao\.usuario\?\.nome \?\? null, casa: sessao\.empresa\?\.nome \?\? null \}/)
 })
 confere('1  com o trilho à vista a barra do módulo não repete Sair nem os links do trilho; sem ele, o Sair fica na barra', () => {
   const css = fonte('features/hall/moldura.module.css')
-  assert.match(css, /@media \(min-width: 1101px\) \{\s*\.barra \.sair, \.contexto > a\.voltar \{ display: none; \}/)
-  assert.match(css, /@media \(max-width: 1100px\) \{\s*\.lateral > \.trilho \{ display: none; \}/)
-  assert.match(fonte('features/hall/MolduraDoModulo.jsx'), /\{aoSair && <Botao className=\{css\.sair\}/)
+  assert.match(css, /@media \(min-width: 1101px\) \{\s*\.barra \.contaNaBarra, \.contexto > a\.voltar, \.acoes > :global\(\[data-ajuda-console\]\) \{ display: none; \}/) // #2258 (auditoria A9): a conta da barra substitui o Sair solto
+  assert.match(css, /@media \(max-width: 1100px\) \{\s*\.lateral > nav \{ display: none; \}/)
+  assert.match(fonte('features/hall/MolduraDoModulo.jsx'), /<div className=\{css\.contaNaBarra\}>\s*<MenuDaConta/)
 })
 confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o trilho passava de 720 px)', () => {
   const moldura = fonte('app/Moldura.jsx')
   assert.doesNotMatch(moldura, /<InterruptorTema vertical \/>/)
-  assert.match(moldura, /rotuloSair=\{sessaoPersistente \? 'Sair deste aparelho' : 'Sair'\}>\s*<InterruptorTema \/>\s*<\/MenuDaConta>/)
+  assert.match(moldura, /rotuloSair=\{sessaoPersistente \? 'Sair deste aparelho' : 'Sair'\}\/>/)
+  assert.match(fonte('componentes/MenuDaConta.jsx'), /<InterruptorTema \/>/, '#3004: o tema mora dentro do MenuDaConta, em toda rota')
   assert.match(fonte('componentes/Trilho.module.css'), /width: var\(--largura-item-trilho\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
   assert.match(fonte('componentes/MenuDaConta.module.css'), /position: fixed;/, 'a camada não é recortada pelo trilho')
 })
@@ -77,36 +78,38 @@ confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o 
 confere('2  módulo com tela de operação mostra as telas na barra e esconde o menu lateral', () => {
   const moldura = fonte('features/hall/MolduraDoModulo.jsx')
   assert.match(moldura, /const telasNaBarra = telas\.length > 1 && telas\.some\(\(t\) => t\.tipo === TELA_OPERACAO\)/)
-  assert.match(moldura, /<nav className=\{css\.telasNaBarra\} aria-label=\{`Telas de \$\{modulo\.nome\}`\}>/)
-  assert.equal((moldura.match(/semMenu=\{telasNaBarra\}/g) ?? []).length, 2, 'lateral e menu do tablet')
+  assert.match(moldura, /<nav className=\{css\.telasNaBarra\} aria-label=\{`Telas de \$\{modulo\.nome\}`\} ref=\{abasRef\}>/)
+  assert.equal((moldura.match(/semMenu=\{semMenu\}/g) ?? []).length, 2, 'lateral e menu do tablet')
   assert.match(fonte('features/hall/MenuDosModulos.jsx'), /\{!semMenu && <nav className=\{css\.menu\}/)
 })
 confere('2  Entregas: o título fica para o leitor de tela e a aba não repete o nome do módulo', () => {
   assert.match(fonte('features/entregas/TelaEntregasApi.jsx'), /<h1 className="sr">\{agenda \? 'Agenda de encomendas' : 'Entregas'\}<\/h1>/)
-  assert.match(fonte('features/entregas/ConteudoEntregasApi.jsx'), /const ABAS = \[\['hoje', 'Do dia'\],/)
+  assert.match(fonte('features/entregas/ConteudoEntregasApi.jsx'), /const ABAS = \[\['hoje', 'Painel do dia'\],/) // #2258 (auditoria E1): "Do dia" virou "Painel do dia" (nome único em Entregas)
 })
 
 // --- 3. Trilho e escala ------------------------------------------------------------------------
 
 confere('3  Balcão e módulos usam o mesmo trilho, do token', () => {
   const tokens = fonte('estilos/tokens.css')
-  // #1872: a largura nasce de `TRILHO` (paineis.js) e o item é o trilho menos o respiro: 76 e 68 px.
+  // #1872: a largura nasce de `TRILHO` (paineis.js) e o item é o trilho menos o respiro: 76 e 72 px.
   assert.match(fonte('dominio/paineis.js'), /export const TRILHO = 76/, 'a geometria dos painéis é a fonte da largura')
-  assert.match(tokens, /--respiro-trilho: 4px;/)
+  assert.match(tokens, /--respiro-trilho: 2px;/)
   assert.match(tokens, /--largura-item-trilho: calc\(var\(--largura-trilho\) - 2 \* var\(--respiro-trilho\)\);/)
   assert.match(tokens, /--altura-item-trilho: 54px;/)
   const trilho = fonte('componentes/Trilho.module.css')
   assert.match(trilho, /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\); width: var\(--largura-trilho\);/)
   assert.match(trilho, /width: var\(--largura-item-trilho\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
-  for (const moldura of ['app/moldura.module.css', 'features/hall/moldura.module.css']) {
+  for (const moldura of ['features/hall/trilhoDoConsole.module.css']) { // #3004: o Balcão usa o mesmo TrilhoDoConsole
     assert.match(fonte(moldura), /\.trilho \{\s*composes: trilho from '(\.\.\/)+componentes\/Trilho\.module\.css'/, `${moldura} compõe o trilho único`)
   }
 })
 confere('3  o item do Balcão no trilho tem o nome e o ícone do módulo, como nos módulos', () => {
-  const moldura = fonte('app/Moldura.jsx')
-  assert.match(moldura, /const MODULO_ATENDIMENTO = moduloPorId\('atendimento'\)/)
-  assert.match(moldura, /<IconeDoModulo modulo=\{MODULO_ATENDIMENTO\} \/>\s*<span>\{MODULO_ATENDIMENTO\.nome\}<\/span>/)
-  assert.doesNotMatch(moldura, /<span>Balcão<\/span>/)
+  // #3004: o item vem de `itensDoTrilho` (módulo + nome) e o `TrilhoDoConsole` desenha o ícone do módulo e o rótulo.
+  const trilho = fonte('features/hall/TrilhoDoConsole.jsx')
+  assert.match(trilho, /<IconeDoModulo modulo=\{item\.modulo\} telaId=\{item\.telaId\} tamanho=\{24\} \/>/)
+  assert.match(trilho, /\{icone\}<span>\{item\.rotulo\}<\/span>/)
+  assert.match(fonte('dominio/trilhoDoConsole.js'), /id: modulo\.id, rotulo: ROTULO_CURTO\[modulo\.id\] \?\? modulo\.nome, nome: modulo\.nome, modulo,/)
+  assert.doesNotMatch(fonte('app/Moldura.jsx'), /<span>Balcão<\/span>/)
 })
 confere('3  a densidade compacta mora em tokens.css e é aplicada inteira, sem cópia parcial', () => {
   const tokens = fonte('estilos/tokens.css')
@@ -142,30 +145,37 @@ confere('4  ficha compacta mantém cabeçalho, cliente e acessos sem molduras, c
   assert.match(regra('acessoFicha'), /min-height: var\(--toque\);/, 'alvo acompanha desktop e toque')
   assert.match(regra('cabecalhoFicha'), /flex-shrink: 0;/, 'cabeçalho não participa da rolagem')
   const painel = fonte('features/ficha-cliente/PainelFicha.jsx')
-  assert.match(painel, /<header className=\{css\.cabecalhoFicha\}>/)
+  assert.match(painel, /<header className=\{css\.cabecalhoFicha\} data-cabecalho-ficha>/)
   assert.match(painel, /<div className=\{css\.conteudo\}>[\s\S]*?<CartaoDoCliente conversa=\{selecionada\}/)
   assert.match(painel, /<nav className=\{css\.acessosFicha\} aria-label="Detalhes do atendimento">/)
   assert.match(painel, /titulo="Pós-venda"/)
 })
 confere('4  faixa de modo: estado inteiro, Assumir à vista e demais ações no contexto', () => {
   const barra = fonte('features/atendimento/BarraModo.jsx')
-  assert.match(barra, /const fraseRepetida = \(resumo\.chave === MODOS\.COM_VOCE \|\| \(resumo\.chave === MODOS\.LIGADO && !semAutomatico\)\) && linha === resumo\.linha/)
-  assert.match(barra, /<p className=\{fraseRepetida \|\| !mostrarLinha \? 'sr' : css\.modoTexto\} title=/)
-  assert.match(barra, /const mostrarLinha = semAutomatico \|\| bloqueada/)
-  assert.match(barra, /\{podeAssumir && \([\s\S]*?onClick=\{aoAssumir\}[\s\S]*?Assumir/)
-  assert.match(barra, /<details[^>]+className=\{css\.maisAcoesModo\}/)
-  assert.match(barra, /<summary>Mais ações<\/summary>/)
-  assert.match(barra, /evento\.key === 'Escape'/)
+  // #2185: o motivo da passagem fica à vista; a frase que só repete a pílula é para o leitor de tela.
+  assert.match(barra, /<p className=\{mostrarLinha \? css\.modoTexto : 'sr'\} title=/)
+  assert.match(barra, /const mostrarLinha = semAssistente \|\| resumo\.chave === MODOS\.COM_VOCE/)
+  assert.match(barra, /\{acoes\.assumir && \([\s\S]*?Assumir/)
+  // Devolver e Concluir moram no menu ⋮ do cabeçalho: nenhum segundo menu na barra.
+  assert.doesNotMatch(barra, /<details|<summary|>Mais ações</)
   const css = fonte('features/atendimento/atendimento.module.css')
   assert.doesNotMatch(css, /\.modoTexto\s*\{[^}]*text-overflow:\s*ellipsis/)
-  assert.match(css, /\.maisAcoesModo > summary:focus-visible \{ outline: 3px solid var\(--halo\)/)
+  assert.doesNotMatch(css, /maisAcoesModo|listaAcoesModo/)
+  // #2232 (A4): o foco visível do item do menu ⋮ da conversa vale no MenuDeAcoes, o único menu de ações.
+  // #2762 (A1): o anel do item é o da casa (borda de foco na cor da marca), no lugar do halo de 2 px, que sumia no escuro.
+  assert.match(fonte('componentes/MenuDeAcoes.module.css'), /\.item:focus-visible\s*\{[^}]*outline: var\(--b-3\) solid var\(--marca\)/)
 })
 confere('4  restrição de formato permanece acessível e problemas de envio continuam visíveis junto do campo', () => {
   const composer = fonte('features/atendimento/Composer.jsx')
-  assert.match(composer, /\{restricao && \(podeAnexar \|\| podeAudio\s*\? <p id=\{idRestricao\} className=\{css\.restricao\}>\{restricao\}<\/p>\s*: <p id=\{idRestricao\} className="sr">\{restricao\}<\/p>\)\}/)
-  assert.match(composer, /aria-describedby=\{!podeFoto && restricao \? idRestricao : undefined\}/)
-  assert.match(composer, /descritoPor=\{!podeAnexar && restricao \? idRestricao : undefined\}/)
-  assert.match(composer, /\{motivo && \([\s\S]*?<p className=\{`\$\{css\.bloqueio\}[^`]*`\}>[\s\S]*?<strong>\{motivo\.titulo\}<\/strong>\s*<span>\{motivo\.detalhe\}<\/span>/, 'bloqueio e janela fora do prazo não ficam só no leitor de tela')
+  // #2706: canal só de texto volta a mostrar o curto "Só texto neste canal"; a frase inteira segue no leitor de tela.
+  assert.match(composer, /\{restricao && \(podeAnexar \|\| podeAudio\s*\? <p id=\{idRestricao\} className=\{css\.restricao\}>\{restricao\}<\/p>\s*: <p id=\{idRestricao\} className=\{css\.restricao\} title=\{restricao\}><span aria-hidden="true">Só texto neste canal<\/span><span className="sr">\{restricao\}<\/span><\/p>\)\}/)
+  // #2420: o aviso virou <div> para levar o botão Escolher modelo ao lado da explicação.
+  // #2185: Anexar e Fotos são itens do MenuDeAcoes; o motivo vai escrito no item (aria-describedby no componente).
+  assert.match(composer, /motivo: motivoDeFormato\(canal, 'foto'\)/)
+  assert.match(composer, /motivo: !podeAnexar \? restricao : null/)
+  assert.match(composer, /\{motivo && \([\s\S]*?<(?:p|div) className=\{`\$\{css\.bloqueio\}[^`]*`\}>[\s\S]*?<strong>\{motivo\.titulo\}<\/strong>\s*<span>\{motivo\.detalhe\}<\/span>/, 'bloqueio e janela fora do prazo não ficam só no leitor de tela')
+  // #2427: com a janela fechada, Escolher modelo fica no aviso, e só quando o modelo pode sair.
+  assert.match(composer, /\{motivo\.acao === 'janela' && podeEnviarModelo && aoAbrirModelos && \(\s*<Botao className=\{css\.escolherModelo\} aria-haspopup="dialog" onClick=\{aoAbrirModelos\}>\s*<Icone nome="modelo" \/> Escolher modelo/)
   for (const erro of ['erroAnexo', 'variavelSobrando']) assert.match(composer, new RegExp(`\\{${erro} && <p className=\\{css\\.restricao\\} role="alert">\\{${erro}\\}`))
   assert.match(composer, /\{erroAssumir && <p className=\{css\.erroAssumir\} role="alert">\{erroAssumir\}/)
   const css = fonte('features/atendimento/atendimento.module.css')

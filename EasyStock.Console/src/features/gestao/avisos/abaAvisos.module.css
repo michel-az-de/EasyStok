@@ -27,11 +27,12 @@
   min-height: var(--toque); cursor: pointer;
 }
 .interruptor input { flex: none; width: 24px; height: 24px; margin: 0; accent-color: var(--marca); }
+/* #2762 (VF2): o desenho de interruptor do checkbox com role=switch mora em estilos/base.css. */
 .rotulo { font-size: var(--t-corpo); font-weight: 600; color: var(--tinta); }
 
 .dica { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); max-width: 72ch; }
 
-.prazo { display: grid; gap: var(--e-1); padding-left: calc(24px + var(--e-3)); }
+.prazo { display: grid; gap: var(--e-1); padding-left: calc(40px + var(--e-3)); }
 .rotuloPrazo { font-size: var(--t-apoio); font-weight: 600; color: var(--tinta); }
 .numeroComUnidade { display: inline-flex; align-items: center; gap: var(--e-2); }
 .numero {
@@ -52,6 +53,8 @@
 .retorno { font-size: var(--t-apoio); color: var(--tinta-2); }
 .erro { color: var(--erro); font-size: var(--t-apoio); margin: 0; }
 .secao { display: grid; gap: var(--e-3); }
+/* #2211: uma pessoa da equipe e os avisos que recebe no WhatsApp. */
+.pessoa { display: grid; gap: var(--e-1); margin: 0; padding: 0; min-width: 0; border: 0; }
 
 @media (max-width: 420px) {
   .prazo { padding-left: 0; }

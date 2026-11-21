@@ -104,7 +104,9 @@ public sealed class LalamoveHttpClient(HttpClient http, string apiKey, string se
     {
         using var request = CriarRequest(HttpMethod.Delete, "/v3/orders/" + Uri.EscapeDataString(id), null);
         using var resposta = await http.SendAsync(request, ct);
-        resposta.EnsureSuccessStatusCode();
+        // #2168: 409 fora da janela é recusa com motivo, não "a Lalamove não respondeu".
+        if (!resposta.IsSuccessStatusCode)
+            throw new LalamoveErroException(resposta.StatusCode, PrimeiroErro(await resposta.Content.ReadAsStringAsync(ct)));
     }
 
     private async Task<T> EnviarAsync<T>(HttpMethod metodo, string caminho, object? dados, CancellationToken ct)

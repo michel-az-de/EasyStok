@@ -62,7 +62,7 @@ public class ValidarOtpUseCaseTests
         var storefront = StorefrontEntity.Criar(
             empresaId: empresaId,
             slug: SlugValido,
-            tituloPublico: "Casa da Babá",
+            tituloPublico: "Casa da Baba",
             pedidoMinimoEntrega: 0m);
         if (storefrontAtivo)
             storefront.Ativar();
@@ -112,7 +112,7 @@ public class ValidarOtpUseCaseTests
         f.ClienteRepository,
         f.ClienteSessionRepository,
         new IdentificarClientePorTelefoneUseCase(f.CadastroRepository, f.ClienteRepository,
-            Substitute.For<ILogger<IdentificarClientePorTelefoneUseCase>>()),
+            Substitute.For<EasyStock.Application.Ports.Output.Persistence.Atendimento.IVinculoClienteConversaRepository>(), Substitute.For<ILogger<IdentificarClientePorTelefoneUseCase>>()),
         f.PasswordHasher,
         f.UnitOfWork,
         f.Time,
@@ -129,6 +129,37 @@ public class ValidarOtpUseCaseTests
         AcceptLanguage: AcceptLanguageTeste);
 
     // ── Happy path — cliente novo ────────────────────────────────────────────
+
+    [Fact]
+    public async Task TelefoneCompartilhadoSemIdentidadeOtpNaoCriaSessaoPessoal()
+    {
+        var f = BuildFakes();
+        f.CadastroRepository.TemTelefoneCompartilhadoAsync(f.EmpresaId, Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await BuildUseCase(f).Invoking(u => u.ExecuteAsync(Input())).Should().ThrowAsync<TelefoneCompartilhadoException>();
+
+        await f.ClienteSessionRepository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
+        await f.CadastroRepository.DidNotReceiveWithAnyArgs().AddAsync(default!);
+        f.UnitOfWork.CommitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task TelefoneCompartilhadoPreservaDonoDaIdentidadeOtpJaExistente()
+    {
+        var cliente = Cliente.Criar(Guid.NewGuid(), "Ana");
+        cliente.TelefoneHash = ClienteOtp.CalcularTelefoneHash(TelefoneE164);
+        var f = BuildFakes(clienteExistente: cliente);
+        f.CadastroRepository.TemTelefoneCompartilhadoAsync(f.EmpresaId, Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await BuildUseCase(f).ExecuteAsync(Input());
+
+        await f.ClienteSessionRepository.Received(1).AddAsync(Arg.Is<ClienteSession>(s => s.ClienteId == cliente.Id),
+            Arg.Any<CancellationToken>());
+        await f.CadastroRepository.DidNotReceiveWithAnyArgs().TemTelefoneCompartilhadoAsync(default, default!, default!, default);
+        cliente.TelefoneHash.Should().Be(ClienteOtp.CalcularTelefoneHash(TelefoneE164));
+    }
 
     [Fact]
     public async Task ExecuteAsync_HappyPath_CriaClienteESession()

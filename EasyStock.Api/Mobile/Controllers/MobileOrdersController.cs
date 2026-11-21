@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using EasyStock.Api.Mobile.DTOs;
 using EasyStock.Api.Mobile.Services;
 using EasyStock.Application.UseCases.CriarPedido;
 using EasyStock.Domain.Entities.Mobile;
@@ -22,7 +21,9 @@ public class MobileOrdersController(
     ICurrentUserAccessor currentUser,
     ILogger<MobileOrdersController> log) : MobileManagementControllerBase(currentUser)
 {
+    // #2828: traz total; mesma regra da leitura dos pedidos do ERP.
     [HttpGet]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> List(
         [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
@@ -52,6 +53,7 @@ public class MobileOrdersController(
     /// (com snapshot do cliente + items) e linka.
     /// </summary>
     [HttpPost("{id}/link")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Link(string id, [FromBody] LinkPedidoRequest? req, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -121,7 +123,8 @@ public class MobileOrdersController(
                 CriadoPorUserId: ResolveUserId(),
                 CriadoPorNome: mobile.LastOperatorName,
                 // F5 — propaga agendamento do mobile pro ERP.
-                AgendadoParaEm: mobile.ScheduledDeliveryAt
+                AgendadoParaEm: mobile.ScheduledDeliveryAt,
+                Canal: mobile.Channel
             ));
             erpPedidoId = result.Id;
         }
@@ -135,6 +138,7 @@ public class MobileOrdersController(
     }
 
     [HttpPost("{id}/unlink")]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> Unlink(string id, [FromQuery] Guid? empresaId, CancellationToken ct)
     {
         if (!TryResolveEmpresaId(empresaId, out var emp, out var err)) return err!;
@@ -162,6 +166,7 @@ public class MobileOrdersController(
     /// Resposta inclui <c>hasMore</c> pra cliente saber se precisa repaginar.
     /// </summary>
     [HttpPost("backfill-vendas")]
+    [Authorize(Policy = "Gerente")]
     public async Task<IActionResult> BackfillVendas(
         [FromQuery] Guid? empresaId,
         [FromQuery] int? limit,
@@ -189,14 +194,8 @@ public class MobileOrdersController(
 
         foreach (var order in pendentes)
         {
-            var itens = order.Items.Select(i => new OrderItemDto(
-                ProductId: i.ProductId,
-                Name: i.Name,
-                Emoji: i.Emoji,
-                Unit: i.Unit,
-                Qty: i.Qty,
-                UnitPrice: i.UnitPrice
-            )).ToList();
+            // #2083: o pedido do console vende os itens do Pedido; o do aparelho, o espelho.
+            var itens = await saleSync.ItensDaVendaAsync(order, ct);
 
             // CreateVendaForDeliveredOrderAsync tem try/catch interno (fail-safe).
             // Retorna true se Venda foi criada, false em qualquer outro caso

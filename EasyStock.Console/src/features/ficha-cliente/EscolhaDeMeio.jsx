@@ -1,6 +1,8 @@
 import { Chip } from '../../componentes/Chip'
 import { CampoReais } from '../../componentes/CampoReais'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
+import { usePixDireto } from '../../aplicacao/usePixDireto'
+import { meiosDaEscolha } from '../../dominio/cobranca'
 import { lerMoeda, moeda } from '../../dominio/formato'
 import { avisoDeSinalAntesDeGerar } from '../../dominio/resumoPedido'
 import css from './ficha.module.css'
@@ -20,20 +22,25 @@ import css from './ficha.module.css'
 // "Gerar cobrança e enviar" ou bloco Cobrança). O pedido que nasce pela seleção do link (comanda
 // compartilhada) não leva o troco: o meio ali é o que o cliente escolheu. Pedido já criado no
 // EasyStok não regrava as observações: a tela diz o que ficou gravado ou pede para combinar pela conversa.
-export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir = null, pedido = null, geraAoEscolher = false }) {
+export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir = null, pedido = null, geraAoEscolher = false, conversaId = null }) {
   const { meiosDePagamento } = useCatalogo()
   const { fonteApi, agora, selecionada } = useAtendimento()
   const { definirTroco } = useAcoes()
-  const meios = meiosDePagamento.filter((meio) => meio.id !== excluir)
+  const pixDireto = usePixDireto()
+  // #2921: a janela "Novo pedido" monta numa conversa que não é a selecionada e passa o `conversaId` dela.
+  const alvo = conversaId ?? selecionada?.id ?? null
+  const pedidoAtual = pedido ?? selecionada?.pedido ?? null
+  // #2233: Pix na chave da loja só com a API dizendo que está disponível e o pedido já criado.
+  const meios = meiosDaEscolha(meiosDePagamento, { pixDireto, pedidoCriado: Boolean(pedidoAtual?.pedidoId) })
+    .filter((meio) => meio.id !== excluir)
   const principais = meios.filter((meio) => meio.destaque)
   const naEntrega = meios.filter((meio) => !meio.destaque)
   const escolhidoNaEntrega = naEntrega.find((meio) => meio.id === escolhido)
   const sinalNaEntrega = escolhidoNaEntrega && escolhidoNaEntrega.id !== 'vale-refeicao'
   const aviso = (sinalNaEntrega || (geraAoEscolher && !escolhido)) && naEntrega.some(meio => meio.id === 'maquininha')
     ? avisoDeSinalAntesDeGerar(pedido, { fonteApi, agora, meio: escolhido }) : null
-  const pedidoAtual = pedido ?? selecionada?.pedido ?? null
   const pedeTroco = Boolean(escolhidoNaEntrega?.pedeTroco) && Boolean(pedidoAtual)
-  const trocoGravavel = pedeTroco && !pedidoAtual.pedidoId && Boolean(selecionada)
+  const trocoGravavel = pedeTroco && !pedidoAtual.pedidoId && Boolean(alvo)
   const chip = (meio, className) => (
     <Chip
       key={meio.id}
@@ -65,7 +72,7 @@ export function EscolhaDeMeio({ escolhido, aoEscolher, pergunta = null, excluir 
             placeholder="Sem troco"
             centavos={pedidoAtual.trocoPara > 0 ? Math.round(pedidoAtual.trocoPara * 100) : null}
             ler={lerMoeda}
-            aoMudar={(centavos) => definirTroco(selecionada.id, centavos ? centavos / 100 : null)}
+            aoMudar={(centavos) => definirTroco(alvo, centavos ? centavos / 100 : null)}
           />
         )}
         {pedeTroco && !trocoGravavel && (

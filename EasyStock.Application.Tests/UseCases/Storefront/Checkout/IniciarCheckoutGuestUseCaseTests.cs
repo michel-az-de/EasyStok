@@ -66,7 +66,7 @@ public class IniciarCheckoutGuestUseCaseTests
 
         public Fixture()
         {
-            Storefront = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Babá", 0m);
+            Storefront = StorefrontEntity.Criar(Guid.NewGuid(), Slug, "Casa da Baba", 0m);
             Storefront.Ativar();
             StorefrontRepo.GetBySlugAsync(Slug, Arg.Any<CancellationToken>()).Returns(Storefront);
 
@@ -166,6 +166,45 @@ public class IniciarCheckoutGuestUseCaseTests
         r.FreteEstimado.Should().Be(5m);
         r.AcompanhamentoToken.Should().NotBeNullOrWhiteSpace();
         r.NumeroCurto.Should().Be(r.PedidoId.ToString("N")[..8].ToUpperInvariant());
+    }
+
+    // #2928 S4: a campanha do site vira a origem do pedido; sem ela, vale a da conversa vinculada (último anúncio, D2).
+    [Fact]
+    public async Task CampanhaDoCheckout_GravaAOrigemDoAnuncioNoPedido_SemIdDeCliqueSemMarketing()
+    {
+        var f = new Fixture();
+
+        await f.UseCase().ExecuteAsync(Input() with
+        {
+            Campanha = new EasyStock.Application.UseCases.Common.CampanhaInput(UtmSource: "google", UtmCampaign: "natal", Gclid: "abc"),
+        });
+
+        var origem = f.Pedidos.Should().ContainSingle().Subject.OrigemAnuncio;
+        origem.Should().NotBeNull();
+        origem!.Campanha.Should().Be("natal");
+        origem.Via.Should().Be("site");
+        origem.IdClique.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SemCampanha_HerdaAOrigemDaConversa()
+    {
+        var f = new Fixture();
+        var daConversa = EasyStock.Domain.ValueObjects.OrigemAnuncio.DoAnuncioWhatsApp("111", "Promo", null, DateTimeOffset.UtcNow);
+
+        await f.UseCase().ExecuteAsync(Input() with { OrigemDaConversa = daConversa });
+
+        f.Pedidos.Should().ContainSingle().Subject.OrigemAnuncio.Should().BeSameAs(daConversa);
+    }
+
+    [Fact]
+    public async Task SemCampanhaNemConversa_PedidoSemOrigem()
+    {
+        var f = new Fixture();
+
+        await f.UseCase().ExecuteAsync(Input());
+
+        f.Pedidos.Should().ContainSingle().Subject.OrigemAnuncio.Should().BeNull();
     }
 
     [Fact]

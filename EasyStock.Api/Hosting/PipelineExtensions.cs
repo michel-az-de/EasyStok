@@ -3,6 +3,7 @@ using System.Reflection;
 using EasyStock.Api.Configuration;
 using EasyStock.Api.Middleware;
 using EasyStock.Api.Observability;
+using EasyStock.Api.Observability.HealthChecks;
 using EasyStock.Api.Observability.Logging;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Storage;
@@ -306,9 +307,17 @@ public static class PipelineExtensions
             }
         });
 
+        // /health/disco (#2376): espaço livre do disco da VPS, dividido pelo Postgres e pelo OpenObserve. Fora de /health e
+        // de /health/ready: disco apertado avisa pelo vigia externo, mas não tira a API do LB.
+        app.MapHealthChecks("/health/disco", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains(DiscoHealthCheck.Tag),
+            ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
+        });
+
         app.MapHealthChecks("/health", new HealthCheckOptions
         {
-            Predicate = check => !check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag),
+            Predicate = check => !check.Tags.Contains(NotificacoesBacklogHealthCheck.Tag) && !check.Tags.Contains(DiscoHealthCheck.Tag),
             ResponseWriter = HealthCheckResponseWriter.WriteJsonAsync
         });
 
@@ -438,17 +447,26 @@ public static class PipelineExtensions
         // quebra outras mutacoes de pedido contra double-submit, o que e' estritamente
         // seguro (opt-in por header -- sem Idempotency-Key a rota segue como sempre).
         .Add("/api/pedidos")
+        .Add("/api/ocorrencias")
         // S23 (#1137): producao em porcoes cria lote + entrada; retry nao pode duplicar.
         .Add("/api/producao")
         // M2.2 (#1491): producao do dia pelo console (lote + entrada); retry nao pode duplicar.
         .Add("/api/atendimento/producao")
         .Add("/api/atendimento/mensagens-programadas")
         .Add("/api/atendimento/lembretes")
+        // #2401 (C3.5): "Nova viagem" repetida depois de uma resposta perdida criava outra viagem.
+        .Add("/api/atendimento/viagens")
         // #1786: envio de texto, foto e áudio pelo console. Resposta perdida e o mesmo envio de novo mandavam duas
         // mensagens ao cliente. O id da conversa fica no meio do path; as outras ações da conversa sem header seguem como sempre.
         .Add("/api/atendimento/conversas")
         // #1540: sangria ou suprimento repetido depois de resposta perdida virava dois lançamentos.
         .Add("/api/caixa/movimentos")
+        // #2462: cadastro criado num timeout e salvo de novo virava dois. O console manda a chave ao criar;
+        // as outras ações sob estes prefixos, sem header, seguem como sempre.
+        .Add("/api/clientes")
+        .Add("/api/fornecedores")
+        .Add("/api/produtos")
+        .Add("/api/notificacoes/templates")
         // S20: retorno do consumidor da fila de impressão (impressa/falhou); opt-in por header.
         .Add("/api/impressao");
 }

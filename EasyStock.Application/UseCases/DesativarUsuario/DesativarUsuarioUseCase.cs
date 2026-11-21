@@ -16,10 +16,18 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
     {
         public async Task ExecuteAsync(DesativarUsuarioCommand command)
         {
+            var revogou = await unitOfWork.ExecuteInTransactionSemRetryAsync(_ => ExecutarAsync(command));
+            if (revogou) await revogadorSessoes.ApagarCacheAsync(command.UsuarioId);
+        }
+
+        private async Task<bool> ExecutarAsync(DesativarUsuarioCommand command)
+        {
             logger.LogInformation("Desativando usuario {UsuarioId} da empresa {EmpresaId}", command.UsuarioId, command.EmpresaId);
 
             var usuario = await usuarioRepository.GetByIdAsync(command.UsuarioId)
                 ?? throw new UseCaseValidationException("Usuario nao encontrado.");
+            // #2695: desligar o vínculo da conta interna pararia o sync móvel.
+            ContaDeSistema.Recusar(usuario);
 
             // #1753: só administrador chega aqui, então barrar a própria desativação garante que sempre sobra
             // um administrador ativo na empresa. O suporte (SuperAdmin) não tem vínculo a perder.
@@ -32,7 +40,7 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
                 throw new UseCaseValidationException("Associacao do usuario com a empresa nao encontrada.");
 
             // Repetir o pedido não muda nada nem escreve outra linha de auditoria.
-            if (!linkEmpresa.Ativo) return;
+            if (!linkEmpresa.Ativo) return false;
 
             linkEmpresa.Ativo = false;
             await usuarioEmpresaRepository.UpdateAsync(linkEmpresa);
@@ -43,11 +51,14 @@ namespace EasyStock.Application.UseCases.DesativarUsuario
 
             // #1753: convite aberto cai junto. Sem isso a pessoa desativada ainda criava a senha pelo link e só o login recusava.
             await convites.RevogarAbertosAsync(usuario.Id);
+            // #2201: a chave de acesso também, para reativar depois não ressuscitar uma chave antiga.
+            await convites.RevogarChavesDeAcessoAbertasAsync(usuario.Id);
 
             var autor = await RastroDeUsuarios.AutorAsync(usuarioRepository, currentUser);
             await auditLogRepository.AddAsync(RastroDeUsuarios.Linha(
                 usuario.Id, RastroDeUsuarios.Desativado, $"Acesso desativado por {autor}", currentUser, command.EmpresaId));
             await unitOfWork.CommitAsync();
+            return true;
         }
     }
 }

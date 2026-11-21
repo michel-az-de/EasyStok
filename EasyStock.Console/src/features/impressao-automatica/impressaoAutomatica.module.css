@@ -2,12 +2,20 @@
    aparelho em que ela foi ligada. */
 .indicador {
   position: fixed; left: var(--e-3); bottom: var(--e-3); z-index: 25;
-  display: inline-flex; align-items: center; gap: var(--e-2);
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--e-2);
   max-width: calc(100vw - 2 * var(--e-3)); padding: var(--e-1) var(--e-3);
   border: 0; border-radius: var(--r-1);
   background: var(--elevado); color: var(--tinta);
   font-size: var(--t-apoio); pointer-events: none;
+  animation: global(surgir) var(--dur-media) var(--ease-saida) both;
 }
-.ponto { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--sucesso); }
+/* No celular a barra de abas ocupa o rodapé: o indicador sobe acima dela (mesma conta do aviso). */
+@media (max-width: 759px) {
+  .indicador { bottom: calc(var(--toque) + var(--e-5) + env(safe-area-inset-bottom, 0px)); }
+}
+.ponto { flex: none; width: var(--ponto); height: var(--ponto); border-radius: 50%; background: var(--sucesso); }
 .espera { background: var(--tinta-2); }
 .falhou { color: var(--erro); font-weight: 600; }
+.conferir { display: flex; flex-direction: column; gap: var(--e-1); pointer-events: auto; }
+.conferirLinha { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
+.acao { min-height: 32px; padding: 0 var(--e-2); border: 1px solid var(--tinta-2); border-radius: var(--r-1); background: transparent; color: inherit; font: inherit; cursor: pointer; }

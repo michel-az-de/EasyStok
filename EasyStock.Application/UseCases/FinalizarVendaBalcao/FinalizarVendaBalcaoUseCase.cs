@@ -105,6 +105,10 @@ public class FinalizarVendaBalcaoUseCase(
             if (it.PrecoUnitario <= 0)
                 throw new UseCaseValidationException($"Item \"{it.Nome}\": preço unitário deve ser maior que zero.");
 
+            // #2401: vale para produto novo e existente (antes só o novo era checado).
+            if (it.Quantidade <= 0)
+                throw new UseCaseValidationException($"Item \"{it.Nome}\": quantidade deve ser maior que zero.");
+
             var produtoId = it.ProdutoId;
             var ehNovo = (produtoId is null || produtoId == Guid.Empty) && it.NovoProduto;
             // Contrato: produto existente (ProdutoId) OU produto novo (NovoProduto + CategoriaId).
@@ -116,8 +120,6 @@ public class FinalizarVendaBalcaoUseCase(
             {
                 if (it.CategoriaId is null || it.CategoriaId == Guid.Empty)
                     throw new UseCaseValidationException($"Item \"{it.Nome}\": selecione a categoria do produto novo.");
-                if (it.Quantidade <= 0)
-                    throw new UseCaseValidationException($"Item \"{it.Nome}\": quantidade deve ser maior que zero.");
 
                 var prod = await cadastrarProdutoUC.ExecuteAsync(new CadastrarProdutoCommand(
                     EmpresaId: cmd.EmpresaId,

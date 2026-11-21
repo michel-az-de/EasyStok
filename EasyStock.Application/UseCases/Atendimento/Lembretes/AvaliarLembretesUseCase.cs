@@ -12,7 +12,7 @@ using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Lembretes;
 
-public sealed record ResultadoAvaliacaoLembretes(int Criados, int Resolvidos, int Avisados);
+public sealed record ResultadoAvaliacaoLembretes(int Criados, int Resolvidos, int Avisados, int AvisosResolvidos = 0);
 
 /// <summary>
 /// Avaliador dos lembretes da dona (S43), uma rodada por minuto (cross-tenant: o host liga o bypass
@@ -37,7 +37,8 @@ public sealed class AvaliarLembretesUseCase(
     IOperacaoEventPublisher publisher,
     IUnitOfWork unitOfWork,
     TimeProvider relogio,
-    IOptions<PrazosOptions> prazos)
+    IOptions<PrazosOptions> prazos,
+    INotificacaoRepository avisos)
 {
     public static readonly TimeSpan PagamentoSemBaixaApos = TimeSpan.FromMinutes(15);
     /// <summary>
@@ -118,9 +119,11 @@ public sealed class AvaliarLembretesUseCase(
         var menorPrazo = TimeSpan.FromMinutes(Math.Min(ConfiguracaoAtendimento.SlaRespostaMinimoMinutos, padrao.TotalMinutes));
         var semResposta = new List<(ConversaSemResposta Conversa, string Referencia, TimeSpan Sla)>();
         var nomePorConversa = new Dictionary<Guid, string?>();
+        var entradaPorConversa = new Dictionary<Guid, DateTime>();
         foreach (var conversa in await candidatos.ListarConversasSemRespostaAsync(agora - menorPrazo, ct))
         {
             nomePorConversa[conversa.ConversaId] = conversa.ContatoNome;
+            if (conversa.EntradaEm is { } desde) entradaPorConversa[conversa.ConversaId] = desde;
             var semRespostaApos = SlaDa(conversa, padrao);
             var expediente = conversa.Expediente ?? ExpedienteLoja.CriarPadrao(conversa.EmpresaId);
             if (expediente.EmpresaId != conversa.EmpresaId) continue;
@@ -161,8 +164,10 @@ public sealed class AvaliarLembretesUseCase(
         if (criados + resolvidos > 0)
             await unitOfWork.CommitAsync();
 
-        var avisados = await AvisarVencidosAsync(agora, slaPorEmpresa, aguardandoPrazo, nomePorConversa, ct);
-        return new ResultadoAvaliacaoLembretes(criados, resolvidos, avisados);
+        var avisados = await AvisarVencidosAsync(agora, slaPorEmpresa, aguardandoPrazo, nomePorConversa, entradaPorConversa, ct);
+        // #2303: o sino não guarda "cliente sem resposta" de conversa já atendida. Cross-tenant, como a rodada.
+        var avisosResolvidos = await avisos.ResolverAvisosDeClienteAtendidoAsync(null, ct);
+        return new ResultadoAvaliacaoLembretes(criados, resolvidos, avisados, avisosResolvidos);
     }
 
     private static TimeSpan SlaDa(ConversaSemResposta conversa, TimeSpan padrao) =>
@@ -191,7 +196,8 @@ public sealed class AvaliarLembretesUseCase(
 
     // `slaPorEmpresa`: o SLA aplicado nesta rodada, para o PrazoEstourado dizer o mesmo prazo que criou o lembrete.
     private async Task<int> AvisarVencidosAsync(DateTime agora, IReadOnlyDictionary<Guid, TimeSpan> slaPorEmpresa,
-        IReadOnlySet<Guid> aguardandoPrazo, IReadOnlyDictionary<Guid, string?> nomePorConversa, CancellationToken ct)
+        IReadOnlySet<Guid> aguardandoPrazo, IReadOnlyDictionary<Guid, string?> nomePorConversa,
+        IReadOnlyDictionary<Guid, DateTime> entradaPorConversa, CancellationToken ct)
     {
         var vencidos = (await repository.ListarVencidosSemAvisoAsync(agora, AvisosPorRodada, ct))
             .Where(l => l.Tipo != TipoLembrete.ClienteSemResposta || l.ConversaId is not { } c || !aguardandoPrazo.Contains(c))
@@ -213,9 +219,12 @@ public sealed class AvaliarLembretesUseCase(
                 // continua o lembrete, único por empresa).
                 var sla = slaPorEmpresa.GetValueOrDefault(lembrete.EmpresaId, prazos.Value.ClienteSemResposta);
                 var cliente = lembrete.ConversaId is { } conversaId ? nomePorConversa.GetValueOrDefault(conversaId) : null;
+                // #2302: o atraso é a espera medida agora; sem a entrada da conversa, o SLA é o piso verdadeiro.
+                var espera = lembrete.ConversaId is { } conversa && entradaPorConversa.TryGetValue(conversa, out var entrada)
+                    && agora - entrada > sla ? agora - entrada : sla;
                 await PrazoEstouradoEvento.EnfileirarAsync(notificador, prazos.Value, TipoPrazo.ClienteSemResposta,
                     lembrete.EmpresaId, lembrete.Id, CodigoCurto.De(lembrete.ConversaId ?? lembrete.Id),
-                    PrazoEstouradoEvento.Duracao(sla), PrazoEstouradoEvento.Duracao(sla), lembrete.ParaUsuarioId, ct,
+                    PrazoEstouradoEvento.Duracao(sla), PrazoEstouradoEvento.Duracao(espera), lembrete.ParaUsuarioId, ct,
                     cliente, fatoId: lembrete.ConversaId);
             }
             lembrete.MarcarAvisado(agora);

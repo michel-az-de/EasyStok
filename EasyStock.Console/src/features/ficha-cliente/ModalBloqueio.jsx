@@ -79,7 +79,7 @@ export function ModalBloqueio({ nome, canais, quantasConversas, motivos, aoFecha
       <ul className={css.consequencias}>
         <li>Vale em {canais}: o bloqueio é do cadastro, não da conversa.</li>
         <li>{quantasConversas === 1 ? '1 conversa deste cadastro fica' : `${quantasConversas} conversas deste cadastro ficam`} com o envio travado.</li>
-        <li>O atendimento automático desliga e não volta sozinho.</li>
+        <li>O Assistente desliga e não volta sozinho.</li>
         <li>O cliente não recebe aviso nenhum do bloqueio.</li>
       </ul>
     </Modal>
@@ -101,7 +101,7 @@ export function ModalDesbloqueio({ nome, aoFechar, aoConfirmar }) {
     >
       <ul className={css.consequencias}>
         <li>O motivo do bloqueio continua gravado na ficha, como histórico.</li>
-        <li>O atendimento automático segue desligado até você retomar.</li>
+        <li>O Assistente segue desligado até você retomar.</li>
       </ul>
     </Modal>
   )

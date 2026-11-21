@@ -112,6 +112,15 @@ test('histórico recuperado não vira prova de push e confirmações pendentes f
   assert.match(nodes.get('pilotNoticeHealthBody').textContent, /não confirma a entrega/);
 });
 
+test('#2735 origem do aviso fala em notificação, sem o termo técnico "push"', async () => {
+  const s = normal(); s.lastPushAt = 1793050000000;
+  const { nodes } = harness(s); await settle();
+  await nodes.get('pilotNoticeBell').click(); await settle(); await nodes.get('pilotNotices').click('open', 'notice-one');
+  assert.match(nodes.get('pilotNoticeDetailSource').textContent, /^Recebido por notificação · /);
+  assert.match(nodes.get('pilotNoticePush').textContent, /^Última notificação recebida: /);
+  assert.doesNotMatch(nodes.get('pilotNoticeDetailSource').textContent + nodes.get('pilotNoticePush').textContent, /push/i);
+});
+
 test('falha de rede preserva histórico e permite nova tentativa sem alegar sucesso', async () => {
   const { nodes, plugin, state } = harness(); await settle();
   plugin.noticeRefresh = async () => { throw new Error('segredo que não deve ir para a UI'); };

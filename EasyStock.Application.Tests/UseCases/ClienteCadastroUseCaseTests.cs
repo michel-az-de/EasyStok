@@ -1,6 +1,7 @@
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.AtualizarCliente;
 using EasyStock.Application.UseCases.CriarCliente;
+using EasyStock.Domain.Entities.Storefront;
 using Microsoft.Extensions.Logging;
 using ClienteEntity = EasyStock.Domain.Entities.Cliente;
 
@@ -35,6 +36,47 @@ public class ClienteCadastroUseCaseTests
         new(_repo, _uow, Substitute.For<ILogger<AtualizarClienteUseCase>>());
 
     // ── criar ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Atualizar_revisao_antiga_preserva_campos_e_nao_grava_auditoria()
+    {
+        var cliente = ClienteEntity.Criar(Empresa, "Ana atual");
+        cliente.Email = "confirmado@exemplo.test";
+        cliente.Telefone = "11999998888";
+        cliente.Revisao = 9;
+        _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
+        var salvar = () => Atualizar().ExecuteAsync(new(Empresa, cliente.Id, "Ana da aba antiga",
+            Email: null, Telefone: "11988887777", Revisao: 8));
+
+        await salvar.Should().ThrowAsync<ClienteCadastroAlteradoException>();
+        cliente.Nome.Should().Be("Ana atual");
+        cliente.Email.Should().Be("confirmado@exemplo.test");
+        cliente.Telefone.Should().Be("11999998888");
+        await _repo.DidNotReceiveWithAnyArgs().UpdateAsync(default!);
+        await _repo.DidNotReceiveWithAnyArgs().AddAlteracaoAsync(default!);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Atualizar_sem_revisao_recusa_antes_de_ler_ou_escrever()
+    {
+        var salvar = () => Atualizar().ExecuteAsync(new(Empresa, Guid.NewGuid(), "Ana"));
+        await salvar.Should().ThrowAsync<UseCaseValidationException>();
+        await _repo.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+        await _uow.DidNotReceive().CommitAsync();
+    }
+
+    [Fact]
+    public async Task Atualizar_nao_escreve_cliente_de_outra_empresa_retornado_pelo_repositorio()
+    {
+        var alheio = ClienteEntity.Criar(Guid.NewGuid(), "Outra pessoa");
+        _repo.GetByIdAsync(Empresa, alheio.Id).Returns(alheio);
+        var resultado = await Atualizar().ExecuteAsync(new(Empresa, alheio.Id, "Não deve mudar", Revisao: alheio.Revisao));
+        resultado.Should().BeNull();
+        alheio.Nome.Should().Be("Outra pessoa");
+        await _repo.DidNotReceiveWithAnyArgs().UpdateAsync(default!);
+        await _uow.DidNotReceive().CommitAsync();
+    }
 
     [Fact]
     public async Task Criar_pessoa_fisica_com_o_minimo_funciona()
@@ -129,7 +171,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, Arg.Any<Guid>()).Returns((ClienteEntity?)null);
 
         var r = await Atualizar().ExecuteAsync(
-            new AtualizarClienteCommand(Empresa, Guid.NewGuid(), "Ana"));
+            new AtualizarClienteCommand(Empresa, Guid.NewGuid(), "Ana", Revisao: 0));
 
         r.Should().BeNull();
     }
@@ -142,7 +184,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Ana Beatriz", Documento: CpfValidoDigitos));
+            Empresa, cliente.Id, "Ana Beatriz", Documento: CpfValidoDigitos, Revisao: cliente.Revisao));
 
         // Só o Nome mudou — documento igual não pode virar linha de auditoria.
         await _repo.Received(1).AddAlteracaoAsync(
@@ -159,7 +201,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         var act = () => Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Ana", Documento: "111.111.111-11"));
+            Empresa, cliente.Id, "Ana", Documento: "111.111.111-11", Revisao: cliente.Revisao));
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
@@ -175,7 +217,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         var r = await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Legado Corrigido", Documento: "11111111111"));
+            Empresa, cliente.Id, "Legado Corrigido", Documento: "11111111111", Revisao: cliente.Revisao));
 
         r.Should().NotBeNull();
         r!.Nome.Should().Be("Legado Corrigido");
@@ -185,7 +227,7 @@ public class ClienteCadastroUseCaseTests
     public async Task Atualizar_recusa_empresa_vazia()
     {
         var act = () => Atualizar().ExecuteAsync(
-            new AtualizarClienteCommand(Guid.Empty, Guid.NewGuid(), "Ana"));
+            new AtualizarClienteCommand(Guid.Empty, Guid.NewGuid(), "Ana", Revisao: 0));
 
         await act.Should().ThrowAsync<UseCaseValidationException>();
     }
@@ -249,7 +291,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         var r = await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Joao da Silva", PessoaJuridica: false));
+            Empresa, cliente.Id, "Joao da Silva", PessoaJuridica: false, Revisao: cliente.Revisao));
 
         r!.TipoPessoa.Should().Be("fisica");
         r.NomeFantasia.Should().BeNull(because: "corrigir para PF não pode deixar dado de PJ para trás");
@@ -263,7 +305,7 @@ public class ClienteCadastroUseCaseTests
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
         await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
-            Empresa, cliente.Id, "Distribuidora Sul", PessoaJuridica: true, InscricaoEstadual: "999"));
+            Empresa, cliente.Id, "Distribuidora Sul", PessoaJuridica: true, InscricaoEstadual: "999", Revisao: cliente.Revisao));
 
         await _repo.Received(1).AddAlteracaoAsync(
             Arg.Is<Domain.Entities.ClienteAlteracao>(a => a.Campo == "TipoPessoa" && a.ValorNovo == "juridica"));
@@ -277,7 +319,7 @@ public class ClienteCadastroUseCaseTests
         var cliente = ClienteEntity.Criar(Empresa, "Ana");
         _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
 
-        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(Empresa, cliente.Id, "Ana Beatriz"));
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(Empresa, cliente.Id, "Ana Beatriz", Revisao: cliente.Revisao));
 
         await _repo.DidNotReceive().AddAlteracaoAsync(
             Arg.Is<Domain.Entities.ClienteAlteracao>(a => a.Campo == "TipoPessoa"));
@@ -290,5 +332,92 @@ public class ClienteCadastroUseCaseTests
         TipoPessoaCliente.EhValido("juridica").Should().BeTrue();
         TipoPessoaCliente.EhValido("PJ").Should().BeFalse();
         TipoPessoaCliente.EhValido(null).Should().BeFalse();
+    }
+
+    // ── TelefoneHash acompanha o telefone (#2740) ────────────────────
+
+    private static string HashDe(string e164) => ClienteOtp.CalcularTelefoneHash(e164);
+
+    private ClienteEntity ClienteComTelefone(string telefone, string e164)
+    {
+        var cliente = ClienteEntity.Criar(Empresa, "Ana");
+        cliente.Telefone = telefone;
+        cliente.TelefoneHash = HashDe(e164);
+        _repo.GetByIdAsync(Empresa, cliente.Id).Returns(cliente);
+        return cliente;
+    }
+
+    [Fact]
+    public async Task Atualizar_telefone_novo_recalcula_o_hash_do_otp()
+    {
+        var cliente = ClienteComTelefone("11999998888", "+5511999998888");
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana", Telefone: "(11) 97777-6666", Revisao: cliente.Revisao));
+
+        cliente.TelefoneHash.Should().Be(HashDe("+5511977776666"));
+    }
+
+    [Fact]
+    public async Task Atualizar_telefone_removido_zera_o_hash()
+    {
+        var cliente = ClienteComTelefone("11999998888", "+5511999998888");
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana", Telefone: null, Revisao: cliente.Revisao));
+
+        cliente.TelefoneHash.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Atualizar_telefone_invalido_zera_o_hash_em_vez_de_manter_o_antigo()
+    {
+        var cliente = ClienteComTelefone("11999998888", "+5511999998888");
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana", Telefone: "123", Revisao: cliente.Revisao));
+
+        cliente.TelefoneHash.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Atualizar_sem_mudar_o_telefone_nao_mexe_no_hash()
+    {
+        var cliente = ClienteComTelefone("5511999998888", "+5511999998888");
+        cliente.TelefoneHash = "hash-do-otp-intocado";
+
+        await Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana Beatriz", Telefone: "5511999998888", Revisao: cliente.Revisao));
+
+        cliente.TelefoneHash.Should().Be("hash-do-otp-intocado");
+    }
+
+    [Fact]
+    public async Task Atualizar_telefone_de_outro_cliente_vira_erro_de_negocio_e_nao_500()
+    {
+        var cliente = ClienteComTelefone("11999998888", "+5511999998888");
+        var colisao = new InvalidOperationException("23505 ix_clientes_empresa_telefonehash");
+        _uow.CommitAsync().Returns<Task<int>>(_ => throw colisao);
+        _uow.EhViolacaoDeUnicidade(colisao).Returns(true);
+
+        var act = () => Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana", Telefone: "11977776666", Revisao: cliente.Revisao));
+
+        await act.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*telefone*");
+        _uow.Received(1).DescartarAlteracoesPendentes();
+    }
+
+    [Fact]
+    public async Task Atualizar_violacao_de_unicidade_sem_mudar_o_telefone_nao_e_reinterpretada()
+    {
+        var cliente = ClienteComTelefone("5511999998888", "+5511999998888");
+        var outra = new InvalidOperationException("23505 outro indice");
+        _uow.CommitAsync().Returns<Task<int>>(_ => throw outra);
+        _uow.EhViolacaoDeUnicidade(outra).Returns(true);
+
+        var act = () => Atualizar().ExecuteAsync(new AtualizarClienteCommand(
+            Empresa, cliente.Id, "Ana Beatriz", Telefone: "5511999998888", Revisao: cliente.Revisao));
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("23505 outro indice");
     }
 }
