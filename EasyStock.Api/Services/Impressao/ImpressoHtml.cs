@@ -62,11 +62,21 @@ public static class ImpressoHtml
     /// <summary>Documento HTML completo em volta do <paramref name="corpo"/> já renderizado.</summary>
     /// <param name="baseUrl">Origem da Api (ex.: <c>https://api.casadababa.com.br</c>), para as fontes.</param>
     public static string Pagina(string titulo, string modelo, string baseUrl, string corpo)
+        => Montar(titulo, modelo, baseUrl.TrimEnd('/') + CaminhoFontes, corpo);
+
+    /// <summary>
+    /// #3017: mesma página, com as fontes por nome relativo (<c>Lora.ttf</c>, <c>NunitoSans.ttf</c>), para o
+    /// renderizador receber os arquivos junto do HTML em vez de buscá-los pela rede.
+    /// </summary>
+    public static string PaginaComFontesRelativas(string titulo, string modelo, string corpo)
+        => Montar(titulo, modelo, ".", corpo);
+
+    private static string Montar(string titulo, string modelo, string pastaFontes, string corpo)
     {
         if (!TamanhoPagina.TryGetValue(modelo, out var pagina))
             throw new ArgumentException($"Modelo desconhecido: {modelo}.", nameof(modelo));
 
-        var fontes = Html.Encode(baseUrl.TrimEnd('/') + CaminhoFontes);
+        var fontes = Html.Encode(pastaFontes);
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\" />");
         sb.Append("<title>").Append(Html.Encode(titulo)).Append("</title><style>");
