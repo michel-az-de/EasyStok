@@ -46,7 +46,7 @@ modo() { stat -c %a "$1" 2>/dev/null; }
 # Login OAuth do rclone, em arquivo proprio (nao o rclone.conf do backup antigo). So chaves,
 # nunca valores. client_id vazio cai no compartilhado do rclone, que para em 2026: recusa.
 if [ -s "$CONF_DIR/ezdrive.conf" ] && [ "$(modo "$CONF_DIR/ezdrive.conf")" = 600 ]; then
-  for chave in '^\[ezdrive\]' '^type = drive$' '^scope = drive\.file$' '^team_drive = ' '^client_id = .' '^token = '; do
+  for chave in '^\[ezdrive\]' '^type = drive$' '^scope = drive\.file$' '^team_drive = ' '^client_id = *[^ ]' '^token = *[^ ]'; do
     grep -q "$chave" "$CONF_DIR/ezdrive.conf" || { echo "    ezdrive.conf sem a chave $chave (client_id precisa ter valor)"; falta=1; }
   done
 else

@@ -42,11 +42,11 @@ ssh hostinger 'install -d -m 700 ~/.config/easystok-backup'
 scp "$env:LOCALAPPDATA\easystok-backup\ezdrive.conf" hostinger:.config/easystok-backup/ezdrive.conf
 ```
 ```powershell
-ssh hostinger 'chmod 600 ~/.config/easystok-backup/ezdrive.conf; grep -c "^\[" ~/.config/easystok-backup/rclone.conf'
+ssh hostinger 'chmod 600 ~/.config/easystok-backup/ezdrive.conf; grep -c "^\[ezdrive\]" ~/.config/easystok-backup/ezdrive.conf'
 ```
 
-A última linha só conta os remotos do `rclone.conf` antigo; a saída precisa ser maior que zero e não
-mostra segredo.
+A última linha só conta o cabeçalho `[ezdrive]` do arquivo novo; a saída precisa ser 1 e não mostra
+segredo. O `rclone.conf` antigo não é lido.
 
 Senha do repositório restic: gere no cofre de senhas (32 caracteres ou mais) e cole no prompt. Ela
 não aparece na tela. Anote também em papel guardado fora do escritório.
