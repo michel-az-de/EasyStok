@@ -69,7 +69,7 @@ confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o 
   assert.doesNotMatch(moldura, /<InterruptorTema vertical \/>/)
   assert.match(moldura, /rotuloSair=\{sessaoPersistente \? 'Sair deste aparelho' : 'Sair'\}\/>/)
   assert.match(fonte('componentes/MenuDaConta.jsx'), /<InterruptorTema \/>/, '#3004: o tema mora dentro do MenuDaConta, em toda rota')
-  assert.match(fonte('componentes/Trilho.module.css'), /width: calc\(var\(--largura-trilho\) - 4px\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
+  assert.match(fonte('componentes/Trilho.module.css'), /width: var\(--largura-item-trilho\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
   assert.match(fonte('componentes/MenuDaConta.module.css'), /position: fixed;/, 'a camada não é recortada pelo trilho')
 })
 
@@ -91,15 +91,15 @@ confere('2  Entregas: o título fica para o leitor de tela e a aba não repete o
 
 confere('3  Balcão e módulos usam o mesmo trilho, do token', () => {
   const tokens = fonte('estilos/tokens.css')
-  // #1872: a largura nasce de `TRILHO` (paineis.js) e o item é o trilho menos o respiro: 76 e 68 px.
+  // #1872: a largura nasce de `TRILHO` (paineis.js) e o item é o trilho menos o respiro: 76 e 72 px.
   assert.match(fonte('dominio/paineis.js'), /export const TRILHO = 76/, 'a geometria dos painéis é a fonte da largura')
-  assert.match(tokens, /--respiro-trilho: 4px;/)
+  assert.match(tokens, /--respiro-trilho: 2px;/)
   assert.match(tokens, /--largura-item-trilho: calc\(var\(--largura-trilho\) - 2 \* var\(--respiro-trilho\)\);/)
   assert.match(tokens, /--altura-item-trilho: 54px;/)
   const trilho = fonte('componentes/Trilho.module.css')
   assert.match(trilho, /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\); width: var\(--largura-trilho\);/)
-  assert.match(trilho, /width: calc\(var\(--largura-trilho\) - 4px\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
-  for (const moldura of ['app/moldura.module.css', 'features/hall/trilhoDoConsole.module.css']) {
+  assert.match(trilho, /width: var\(--largura-item-trilho\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
+  for (const moldura of ['features/hall/trilhoDoConsole.module.css']) { // #3004: o Balcão usa o mesmo TrilhoDoConsole
     assert.match(fonte(moldura), /\.trilho \{\s*composes: trilho from '(\.\.\/)+componentes\/Trilho\.module\.css'/, `${moldura} compõe o trilho único`)
   }
 })

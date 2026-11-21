@@ -174,6 +174,9 @@ provar('#1810 continua valendo: até 20 controles na primeira vista', () => {
   // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta: o limite vale para o conteúdo do Início.
   const controles = (html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '').match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
   assert.ok(controles <= 20, `${controles} controles`)
+  // #3004: o trilho (<= 17 itens, pela prova-3004) e a conta somam até 18, e o conteúdo (<= 20) fica fora do nav; a primeira vista inteira, conteúdo mais trilho, fica em até 34.
+  const total = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+  assert.ok(total <= 34, `${total} controles na primeira vista, contando o trilho`)
 })
 
 provar('teclado: Espaço pega, Enter abre (Enter fora das teclas de arrasto)', () => {

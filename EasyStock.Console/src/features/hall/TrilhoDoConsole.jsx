@@ -1,7 +1,7 @@
 // Trilho lateral do desktop (#3004): o mesmo no Início, no Balcão e nos módulos. A lista e a ordem vêm
 // de `dominio/trilhoDoConsole.js`; aqui só o desenho. O que o Balcão desenha por conta própria (estado
 // da loja, Entregas com resumo, Lembretes, Disposição) chega em `balcao.itens`, por id; fora do Balcão
-// esses itens ficam desabilitados, com o motivo no nome acessível. A conta (Tema, Ajuda e Sair) fecha o
+// esses itens são links para o Balcão ("<rótulo>, abre no Balcão"). A conta (Tema, Ajuda e Sair) fecha o
 // trilho, fora da rolagem, para ficar sempre à vista.
 import { Fragment } from 'react'
 import { Icone } from '../../componentes/Icone'
@@ -15,14 +15,13 @@ import { itensDoTrilho } from '../../dominio/trilhoDoConsole'
 import { IconeDoModulo } from './IconeDoModulo'
 import css from './trilhoDoConsole.module.css'
 
-const ICONE_DO_ITEM = { loja: 'lock', gestao: 'painel', lembretes: 'relogio', disposicao: 'modelo', simular: 'flask-conical' }
+const ICONE_DO_ITEM = { loja: 'house', gestao: 'painel', lembretes: 'relogio', disposicao: 'modelo', simular: 'flask-conical' }
 
-function ItemDesabilitado({ item }) {
+function ItemParaOBalcao({ item, aoNavegar }) {
   return (
-    <button type="button" className={`${css.item} ${css.indisponivel}`} aria-disabled="true" aria-label={item.nome} title={item.nome}
-      onClick={(evento) => evento.preventDefault()}>
+    <a href={item.href} onClick={aoNavegar} className={css.item} aria-label={item.nome} title={item.nome}>
       <Icone nome={ICONE_DO_ITEM[item.id]} tamanho={24} /><span>{item.rotulo}</span>
-    </button>
+    </a>
   )
 }
 
@@ -33,7 +32,7 @@ function ItemDeLink({ item, aoNavegar }) {
     return <span className={classe} aria-current="page" title={item.nome}>{icone}<span>{item.rotulo}</span></span>
   }
   return (
-    <a href={item.href} onClick={aoNavegar} className={classe} aria-current={item.atual ? 'true' : undefined} title={item.nome}>
+    <a href={item.href} onClick={aoNavegar} className={classe} aria-current={item.atual ? 'page' : undefined} title={item.nome}>
       {icone}<span>{item.rotulo}</span>
     </a>
   )
@@ -50,12 +49,12 @@ export function TrilhoDoConsole({
       <div className={css.itens}>
         {itens.map((item) => {
           if (item.id === 'inicio') {
-            return <a key={item.id} className={css.inicio} href={item.href} onClick={aoNavegar} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
+            return <a key={item.id} className={css.inicio} href={item.href} onClick={aoNavegar} aria-current={item.atual ? 'page' : undefined} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
               <Marca compacta /><span>{NOME_INICIO}</span>
             </a>
           }
           if (balcao && desenhado[item.id]) return <Fragment key={item.id}>{desenhado[item.id]}</Fragment>
-          if (item.desabilitado) return <ItemDesabilitado key={item.id} item={item} />
+          if (item.soNoBalcao) return <ItemParaOBalcao key={item.id} item={item} aoNavegar={aoNavegar} />
           return <ItemDeLink key={item.id} item={{ ...item, noBalcao: onde === 'balcao' }} aoNavegar={aoNavegar} />
         })}
       </div>

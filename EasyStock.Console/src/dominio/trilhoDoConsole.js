@@ -11,6 +11,7 @@ import {
 } from './modulos'
 
 export const HASH_INICIO = '#/'
+export const HASH_BALCAO = '#/m/atendimento/balcao'
 
 // Em módulos o rail abre as telas por link; só estes dependem do Balcão aberto.
 const SO_NO_BALCAO = [
@@ -31,9 +32,9 @@ export function itensDoTrilho({ permite = () => true, acoes = null, fonteApi = f
   const naRespostas = rota.moduloId === 'atendimento' && rota.telaId === 'respostas'
   const noAtalho = naRespostas || ehAtalhoDireto(rota.moduloId, rota.telaId)
   const areaAtual = (id) => (doBalcao(onde) ? id === 'atendimento' : id === rota.moduloId && !noAtalho)
-  const desabilitadoFora = ({ id, rotulo, motivo }) => {
-    const bloqueado = !doBalcao(onde)
-    return { id, rotulo, nome: bloqueado ? `${rotulo}, indisponível aqui: ${motivo}` : rotulo, desabilitado: bloqueado, motivo, atual: false }
+  const soNoBalcao = ({ id, rotulo, motivo }) => {
+    const fora = !doBalcao(onde)
+    return { id, rotulo, nome: fora ? `${rotulo}, abre no Balcão` : rotulo, soNoBalcao: fora, href: fora ? HASH_BALCAO : undefined, motivo, atual: false }
   }
   const areas = emOrdemDosModulos(MODULOS)
     .filter((modulo) => permite(modulo.id) && telasDoMenu(modulo, { fonteApi, acoes }).length)
@@ -46,7 +47,7 @@ export function itensDoTrilho({ permite = () => true, acoes = null, fonteApi = f
     id: 'respostas', rotulo: NOME_RESPOSTAS_AUTOMATICAS, nome: NOME_RESPOSTAS_AUTOMATICAS, modulo: moduloPorId('atendimento'),
     telaId: 'respostas', href: hashDoModulo('atendimento', 'respostas'), atual: naRespostas,
   }] : []
-  const [loja, gestao, lembretes, disposicao] = SO_NO_BALCAO.map(desabilitadoFora)
+  const [loja, gestao, lembretes, disposicao] = SO_NO_BALCAO.map(soNoBalcao)
   return [
     { id: 'inicio', rotulo: NOME_INICIO, nome: NOME_INICIO, href: HASH_INICIO, atual: onde === 'hall' },
     loja,
@@ -56,6 +57,6 @@ export function itensDoTrilho({ permite = () => true, acoes = null, fonteApi = f
     gestao,
     lembretes,
     disposicao,
-    ...(simulacoes ? [desabilitadoFora(SIMULAR)] : []),
+    ...(simulacoes ? [soNoBalcao(SIMULAR)] : []),
   ]
 }

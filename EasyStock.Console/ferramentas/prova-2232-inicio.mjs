@@ -86,6 +86,7 @@ confere('H2  o tema sai do topo: fica no menu da conta e, sem conta, num lugar d
   // #3004: a conta existe em toda rota (com ou sem sessão nomeada), então o tema mora só no menu dela e o pé do Início não o repete.
   assert.match(fonte('componentes/MenuDaConta.jsx'), /<InterruptorTema \/>/, 'o tema mora no menu da conta')
   assert.match(jsxHall, /<MenuDaConta /)
+  assert.match(htmlSemConta, /Sua conta/, 'sem sessão nomeada o gatilho "Sua conta" aparece no HTML renderizado')
   assert.doesNotMatch(rodape(htmlSemConta), /role="radiogroup"/, 'sem sessão nomeada o menu da conta segue à mão: o tema não volta ao rodapé')
   assert.doesNotMatch(rodape(html), /role="radiogroup"/, 'com menu da conta o tema não aparece duas vezes')
   assert.doesNotMatch(corpo('.acoes > [role=\'radiogroup\']', celular), /grid-row/)

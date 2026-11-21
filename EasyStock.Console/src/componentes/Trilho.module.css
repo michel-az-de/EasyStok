@@ -23,7 +23,7 @@
 /* `.filhos` marca o contêiner de botões que outro componente desenha (avisos e lembretes). */
 .item, .filhos > button, .filhos > div > button {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex-shrink: 0;
-  width: calc(var(--largura-trilho) - 4px); min-height: max(var(--toque), var(--altura-item-trilho)); padding: 4px 0;
+  width: var(--largura-item-trilho); min-height: max(var(--toque), var(--altura-item-trilho)); padding: 4px 0;
   border: 0; border-radius: var(--r-1); background: transparent; color: var(--tinta-2); box-shadow: none;
   font-size: .75rem; font-weight: 600; letter-spacing: 0; line-height: 1.2; text-align: center; text-decoration: none;
   transition: background-color var(--dur-micro) var(--ease-padrao), color var(--dur-micro) var(--ease-padrao);

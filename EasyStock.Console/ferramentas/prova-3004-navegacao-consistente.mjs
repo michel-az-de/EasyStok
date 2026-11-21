@@ -1,8 +1,8 @@
 // Prova da #3004: a navegação do Console é a mesma em todas as telas.
 //
 // Regras puras (`dominio/trilhoDoConsole.js`): os itens do trilho têm a mesma lista e a mesma ordem no
-// Início, no Balcão, em Entregas e na Cozinha; o que não se aplica à tela fica desabilitado com o motivo
-// no nome acessível, e não some. Por leitura do fonte, os pontos que só existem no JSX e no CSS: o tema
+// Início, no Balcão, em Entregas e na Cozinha; o que só vale no Balcão vira link para ele ("<rótulo>, abre
+// no Balcão"), e não some nem vira parada de Tab morta. Por leitura do fonte, os pontos que só existem no JSX e no CSS: o tema
 // mora só no menu da conta (que existe também no Início, com Ajuda e Sair), os rótulos do trilho não
 // hifenizam e nenhum destaque usa barra colorida de um lado só.
 //
@@ -41,7 +41,9 @@ for (const fonteApi of [false, true]) {
 
   confere(`${modo}: Início, Balcão, Entregas e Cozinha têm os mesmos itens, na mesma ordem`, () => {
     const referencia = ids(itensDoTrilho({ ...base, onde: TELAS.inicio }))
-    assert.ok(referencia.length >= 8, `trilho curto demais: ${referencia}`)
+    // #3004: teto do trilho (medido: 16 itens em modo API e 17 com Simular na demonstração; a revisão estimou 13, abaixo do real): o trilho não pode
+    // crescer sem a prova dizer, porque ele entra na contagem de controles da primeira vista do Início.
+    assert.ok(referencia.length >= 8 && referencia.length <= 17, `trilho fora de 8 a 17 itens: ${referencia.length} (${referencia})`)
     for (const [nome, onde] of Object.entries(TELAS)) {
       assert.deepEqual(ids(itensDoTrilho({ ...base, onde })), referencia, nome)
     }
@@ -57,20 +59,25 @@ for (const fonteApi of [false, true]) {
   })
 }
 
-confere('o que é do Balcão fica desabilitado fora dele, com o motivo no nome acessível', () => {
+confere('o que é do Balcão vira link para o Balcão fora dele, sem item desabilitado', () => {
   const base = { permite: () => true, fonteApi: false, simulacoes: true }
   const doBalcao = ['loja', 'gestao', 'lembretes', 'disposicao', 'simular']
   for (const onde of [TELAS.inicio, TELAS.entregas, TELAS.cozinha]) {
     const itens = itensDoTrilho({ ...base, onde })
+    assert.ok(!itens.some((item) => item.desabilitado), 'sobrou item desabilitado')
     for (const id of doBalcao) {
       const item = itens.find((outro) => outro.id === id)
       assert.ok(item, `${id} sumiu`)
-      assert.equal(item.desabilitado, true, id)
-      assert.ok(item.motivo && item.nome.includes(item.motivo), `${id} sem motivo no nome: ${item.nome}`)
+      assert.equal(item.href, '#/m/atendimento/balcao', id)
+      assert.ok(item.nome.startsWith(item.rotulo) && item.nome.endsWith('abre no Balcão'), `${id}: nome ${item.nome}`)
     }
   }
   const noBalcao = itensDoTrilho({ ...base, onde: TELAS.balcao })
-  for (const id of doBalcao) assert.ok(!noBalcao.find((item) => item.id === id).desabilitado, `${id} desabilitado no Balcão`)
+  for (const id of doBalcao) assert.ok(!noBalcao.find((item) => item.id === id).soNoBalcao, `${id} aponta ao Balcão dentro dele`)
+  const jsx = fonte('features/hall/TrilhoDoConsole.jsx')
+  assert.doesNotMatch(jsx, /aria-disabled/)
+  assert.doesNotMatch(jsx, /loja: 'lock'/, 'lock no Balcão significa loja fechada')
+  assert.equal([...jsx.matchAll(/aria-current=\{[^}]*\? '(\w+)'/g)].map((m) => m[1]).filter((v) => v !== 'page').length, 0, 'o item atual usa aria-current="page" em toda rota')
 })
 
 confere('os itens que levam a uma tela são links iguais em todas as rotas', () => {
