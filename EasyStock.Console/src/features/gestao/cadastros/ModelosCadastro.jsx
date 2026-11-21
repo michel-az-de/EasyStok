@@ -6,6 +6,7 @@ import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
 import { Botao } from '../../../componentes/Botao'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
 import { Combobox } from '../../../componentes/Combobox'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
@@ -76,7 +77,8 @@ function ListaModelos({ contexto }) {
     <div className={css.barra}><Combobox rotulo="Canal" valor={memoria.filtro} opcoes={CANAIS} aoMudar={filtro => mudar({ filtro, pagina: 1 })} /><Botao variante="primario" icone="mais" onClick={novo}>Novo modelo</Botao></div>
     {sucesso && <p role="status" className={css.sucesso}>{sucesso}</p>}
     {(erro || consulta.erro) && <div role="alert" className={css.erro}>{erro || consulta.erro}<Botao onClick={() => { falhar(null); consulta.recarregar() }}>Tentar de novo</Botao></div>}
-    {consulta.carregando ? <Vazio titulo="Carregando modelos" /> : consulta.itens.length === 0 ? <Vazio titulo="Nenhum modelo neste canal">Crie o primeiro modelo da loja.</Vazio> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.id}>
+    {/* #3016: na recarga a lista fica (aria-busy); o esqueleto é só da primeira carga. */}
+    {consulta.carregando && consulta.itens.length === 0 ? <EsqueletoDeLista linhas={3}>Carregando modelos…</EsqueletoDeLista> : consulta.itens.length === 0 ? <Vazio titulo="Nenhum modelo neste canal">Crie o primeiro modelo da loja.</Vazio> : <ul className={css.cartoes} aria-busy={consulta.carregando}>{consulta.itens.map(m => <li key={m.id}>
       <div><small>{NOMES_CANAIS_MODELO[m.canal] ?? m.canal} · versão {m.versao}</small><h3>{m.nome}</h3><p className={css.amostra}>{m.assuntoTemplate || m.corpoTemplate}</p>{m.aprovado ? <span className={css.situacao}>Aprovado na loja</span> : <Pilula tom="aviso">Aguardando revisão</Pilula>}</div>
       <div className={css.acoes}><Botao disabled={ocupado} onClick={() => abrir(m)}>Editar</Botao>{!m.aprovado && <Botao disabled={ocupado} onClick={() => aprovar(m)}>Aprovar na loja</Botao>}</div>
     </li>)}</ul>}
@@ -156,7 +158,7 @@ function EtiquetasCadastro({ contexto }) {
     {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
     {(erro || consulta.erro) && <p className={css.erro} role="alert">{erro || consulta.erro}</p>}
     <div className={css.barra}><p>Modelos de etiqueta usados pela loja.</p><Botao onClick={consulta.recarregar} disabled={consulta.carregando}>Atualizar</Botao></div>
-    {consulta.carregando ? <Vazio titulo="Carregando etiquetas" /> : consulta.itens.length === 0 ? <Vazio titulo="Nenhum modelo de etiqueta disponível" /> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={`${m.origem}:${m.id}`}><div><small>{m.origem === 'Sistema' ? 'Modelo de origem' : 'Modelo da loja'}</small><h3>{m.nome}</h3><p>{m.descricao}</p>{m.isDefault && <span className={css.situacao}>Padrão</span>}</div><div className={css.acoes}>{m.origem === 'Empresa' && <Botao disabled={ocupado} onClick={() => abrir(m, true)}>Editar textos</Botao>}<Botao disabled={ocupado} onClick={() => abrir(m, false)}>Criar a partir deste</Botao><Botao disabled={ocupado || m.isDefault} onClick={() => executar(m)}>Usar como padrão</Botao></div></li>)}</ul>}
+    {consulta.carregando && consulta.itens.length === 0 ? <EsqueletoDeLista linhas={3}>Carregando etiquetas…</EsqueletoDeLista> : consulta.itens.length === 0 ? <Vazio titulo="Nenhum modelo de etiqueta disponível" /> : <ul className={css.cartoes} aria-busy={consulta.carregando}>{consulta.itens.map(m => <li key={`${m.origem}:${m.id}`}><div><small>{m.origem === 'Sistema' ? 'Modelo de origem' : 'Modelo da loja'}</small><h3>{m.nome}</h3><p>{m.descricao}</p>{m.isDefault && <span className={css.situacao}>Padrão</span>}</div><div className={css.acoes}>{m.origem === 'Empresa' && <Botao disabled={ocupado} onClick={() => abrir(m, true)}>Editar textos</Botao>}<Botao disabled={ocupado} onClick={() => abrir(m, false)}>Criar a partir deste</Botao><Botao disabled={ocupado || m.isDefault} onClick={() => executar(m)}>Usar como padrão</Botao></div></li>)}</ul>}
     {copiar && <Modal titulo={edicao ? 'Editar modelo de etiqueta' : 'Criar modelo de etiqueta'} largura="md" aoFechar={ocupado ? undefined : () => escolher(null)} segurarFechamento={ocupado} confirmarDescarte={nome !== copiar.nome || JSON.stringify(desenho) !== copiar.layoutJson}
       rodape={<><Botao disabled={ocupado} onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))}>Cancelar</Botao><Botao variante="primario" disabled={ocupado || !nome.trim()} onClick={() => executar(copiar, true)}>{ocupado ? 'Salvando…' : 'Salvar modelo'}</Botao></>}>
       <div className={css.painel}><CampoTexto rotulo="Nome" disabled={ocupado} value={nome} onChange={e => nomear(e.target.value)} /><p>Formato: {desenho.size.w_mm} × {desenho.size.h_mm} mm. Posições e códigos serão preservados.</p>

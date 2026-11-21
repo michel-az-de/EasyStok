@@ -16,6 +16,8 @@
 .lista th { position: sticky; top: 0; z-index: 1; }
 /* #2734 (A12): a lista que está na tela espera a nova chegar, mais apagada, em vez de sumir a cada busca. */
 .lista[aria-busy='true'] { opacity: 0.6; }
+/* #3016: os cartões (Formas de pagamento, Modelos, Etiquetas) esperam do mesmo jeito na recarga. */
+.cartoes[aria-busy='true'] { opacity: 0.6; }
 .lista table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--t-apoio); }
 .lista th { padding: var(--e-3) var(--e-4); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; background: var(--elevado); }
 .lista td { border-top: 1px solid var(--linha); padding: var(--e-4); vertical-align: middle; overflow-wrap: anywhere; }

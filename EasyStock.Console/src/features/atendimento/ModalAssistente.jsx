@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Botao } from '../../componentes/Botao'
 import { Icone } from '../../componentes/Icone'
 import { Modal } from '../../componentes/Modal'
+import { ModalConfirmar } from '../../componentes/ModalConfirmar'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { useChecagemAssistente } from '../../aplicacao/useChecagemAssistente'
@@ -25,8 +26,9 @@ export function ModalAssistente({ conversa, aoFechar }) {
   const podeLigar = podeLigarAssistente(acoes)
   const renderizarPainel = usePainelDoAssistenteNaConversa()
 
+  const [desligando, setDesligando] = useState(false)
   function aoMudarChave(ativo) {
-    if (!ativo && !window.confirm(PERGUNTA_AO_DESLIGAR)) return
+    if (!ativo) { setDesligando(true); return }
     mudarChave(ativo)
   }
 
@@ -133,6 +135,10 @@ export function ModalAssistente({ conversa, aoFechar }) {
       {renderizarPainel
         ? renderizarPainel({ podeEditar: acoes?.editarAtendimento === true, sinalRecarregar, abaAntes: { id: 'conversa', rotulo: 'Esta conversa', conteudo: daConversa } })
         : daConversa}
+      {desligando && (
+        <ModalConfirmar titulo="Desligar o Assistente?" descricao={PERGUNTA_AO_DESLIGAR} rotuloConfirmar="Desligar o Assistente"
+          aoConfirmar={() => mudarChave(false)} aoFechar={() => setDesligando(false)} />
+      )}
     </Modal>
   )
 }

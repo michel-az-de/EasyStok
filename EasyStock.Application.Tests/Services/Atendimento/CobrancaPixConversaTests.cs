@@ -99,7 +99,7 @@ public class CobrancaPixConversaTests
         (await c.EnviarAsync()).Should().BeTrue();
 
         c.Ordem.Should().Equal("documento", "texto:" + Codigo);
-        await c.Canal.Received(1).EnviarDocumentoAsync("5511999998888", "https://loja.exemplo/files/assinado.pdf?sig=1",
+        await c.Canal.Received(1).EnviarDocumentoAsync("5511999998888", "https://loja.exemplo/privado/k",
             "Pedido-" + ResumoPedidoAtendimento.Codigo(c.Pedido.Id) + ".pdf",
             Arg.Is<string?>(l => l!.StartsWith("Pedido ") && l.EndsWith("Pague em até 30 min pelo Pix abaixo") && !l.Contains(Codigo)),
             Arg.Any<CancellationToken>());
@@ -112,16 +112,15 @@ public class CobrancaPixConversaTests
     }
 
     [Fact]
-    public async Task PdfPrivadoComLinkAssinado_ComValidadeDe24Horas()
+    public async Task PdfComNomeAleatorioPublico_SemLinkAssinado()
     {
         var c = new Cenario();
 
         await c.EnviarAsync();
 
         await c.Armazenamento.Received(1).UploadAsync(
-            Arg.Is<FileUploadRequest>(r => !r.IsPublic && r.ContentType == "application/pdf"), Arg.Any<CancellationToken>());
-        await c.Armazenamento.Received(1).CreatePreSignedDownloadUrlAsync(
-            "k", TimeSpan.FromHours(24), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Is<FileUploadRequest>(r => r.IsPublic && r.ContentType == "application/pdf"), Arg.Any<CancellationToken>());
+        await c.Armazenamento.DidNotReceiveWithAnyArgs().CreatePreSignedDownloadUrlAsync(default!, default, default!, default);
     }
 
     [Fact]

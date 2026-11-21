@@ -9,9 +9,10 @@ import css from './CampoReais.module.css'
 // lidos por `ler` (a tela passa `lerMoeda`, do domínio: a fronteira de camada não deixa
 // `componentes` importar `dominio`). Ao sair do campo o valor volta escrito por inteiro.
 //
+// #3016: `obrigatorio` põe o * (fora do nome acessível) e aria-required, igual ao Campo (#2457 U4).
 // `centavos` nulo é campo vazio; `aoMudar` recebe nulo quando ela apaga tudo.
 export function CampoReais({
-  rotulo, rotuloOculto, dica, erro, centavos, aoMudar, ler, mostrarZero = false, id: idInformado, className, onBlur, placeholder = '0,00', ...resto
+  rotulo, rotuloOculto, dica, erro, obrigatorio, centavos, aoMudar, ler, mostrarZero = false, id: idInformado, className, onBlur, placeholder = '0,00', ...resto
 }) {
   const idGerado = useId()
   const id = idInformado ?? idGerado
@@ -45,7 +46,7 @@ export function CampoReais({
 
   return (
     <div className={base.campo}>
-      <label className={rotuloOculto ? 'sr' : base.rotulo} htmlFor={id}>{rotulo}</label>
+      <label className={rotuloOculto ? 'sr' : base.rotulo} htmlFor={id}>{rotulo}{obrigatorio && <span aria-hidden="true"> *</span>}</label>
       <div className={css.envelope}>
         <span className={css.prefixo} aria-hidden="true">R$</span>
         <input
@@ -58,6 +59,7 @@ export function CampoReais({
           onChange={aoDigitar}
           onBlur={aoSair}
           aria-invalid={Boolean(erro) || undefined}
+          aria-required={obrigatorio || undefined}
           {...resto}
           aria-describedby={[resto['aria-describedby'], erro ? `${id}-erro` : dica ? `${id}-dica` : null].filter(Boolean).join(' ') || undefined}
         />

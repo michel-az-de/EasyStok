@@ -32,10 +32,11 @@ const custoNaLista = (custo, unidade) => {
 }
 
 // "Paguei R$ __ por __ [kg]": o sistema faz a conta até a unidade do insumo.
+// #3016: obrigatório leva "*" (prop obrigatorio); o que pode ficar vazio fica sem marca.
 function CamposDaCompra({ valores, aoMudar, unidade, disabled, nome = '' }) {
   return (
     <fieldset className={`${css.compra} ${css.linhaCompleta}`} disabled={disabled}>
-      <legend>Preço de compra (opcional)</legend>
+      <legend>Preço de compra</legend>
       <CampoTexto inputMode="decimal" rotulo="Paguei (R$)" aria-label={`Preço pago${nome && ` por ${nome}`}`} value={valores.preco} onChange={aoMudar('preco')} />
       <CampoTexto inputMode="decimal" rotulo="por" aria-label={`Quantidade comprada${nome && ` de ${nome}`}`} value={valores.quantidade} onChange={aoMudar('quantidade')} />
       <CampoSelecao rotulo="Unidade da compra" value={valores.unidadeCompra} onChange={aoMudar('unidadeCompra')}
@@ -211,10 +212,10 @@ export function AbaInsumosApi() {
 
       {podeEditar ? <>
       {cadastroAberto && <Modal titulo="Cadastrar insumo" aoFechar={criando ? undefined : fecharCadastro} largura="min(720px, calc(100vw - 24px))"><form className={`${css.campos} ${css.formulario} ${css.cadastroInsumo}`} onSubmit={cadastrar} aria-label="Cadastrar insumo">
-        <CampoTexto ref={nomeRef} erro={erroDoNome} disabled={criando} rotulo="Nome do insumo" placeholder="Ex.: farinha de trigo" limite={180} value={novo.nome} onChange={mudarNovo('nome')} />
+        <CampoTexto ref={nomeRef} erro={erroDoNome} disabled={criando} rotulo="Nome do insumo" obrigatorio placeholder="Ex.: farinha de trigo" limite={180} value={novo.nome} onChange={mudarNovo('nome')} />
         <CampoSelecao disabled={criando} rotulo="Unidade" value={novo.unidade} onChange={mudarNovo('unidade')} opcoes={UNIDADES_INSUMO.map((u) => ({ valor: u, rotulo: rotuloDaUnidade(u) }))} />
-        <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo (opcional)" value={novo.minimo} onChange={mudarNovo('minimo')} />
-        <CampoTexto disabled={criando} inputMode="decimal" rotulo={`Quanto tem hoje (${rotuloDaUnidade(unidadeDoNovo)}, opcional)`} dica="Vira o saldo inicial no Estoque" value={novo.saldo} onChange={mudarNovo('saldo')} />
+        <CampoTexto disabled={criando} inputMode="numeric" rotulo="Mínimo" value={novo.minimo} onChange={mudarNovo('minimo')} />
+        <CampoTexto disabled={criando} inputMode="decimal" rotulo={`Quanto tem hoje (${rotuloDaUnidade(unidadeDoNovo)})`} dica="Vira o saldo inicial no Estoque" value={novo.saldo} onChange={mudarNovo('saldo')} />
         <CamposDaCompra disabled={criando} unidade={unidadeDoNovo} valores={novo} aoMudar={mudarNovo} />
         <label className={`${css.chave} ${css.linhaCompleta}`}>
           <input type="checkbox" disabled={criando} checked={novo.embalagem} onChange={(e) => { const embalagem = e.target.checked; setNovo((atual) => ({ ...atual, embalagem, unidadeCompra: unidadesDeCompra(embalagem ? 'Un' : atual.unidade)[0] })) }} />

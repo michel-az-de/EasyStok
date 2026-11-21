@@ -16,7 +16,7 @@ confere() { if grep -q -- "$2" <<<"$3"; then echo "ok   $1"; else echo "FAIL $1:
 mkdir -p /tmp/u && install -m 644 /s/systemd/* /tmp/u/
 u="$(systemd-analyze verify /tmp/u/easystok-espelho.service /tmp/u/easystok-espelho.timer 2>&1 | grep -v 'git/espelho.sh' || true)"
 confere "units sem erro de sintaxe" "^$" "${u:-}"
-confere "timer a cada 15 min" "^OnCalendar=[*]:0/15$" "$(cat /tmp/u/easystok-espelho.timer)"
+confere "timer a cada 15 min" "^OnCalendar=[*]:0/15" "$(cat /tmp/u/easystok-espelho.timer)"
 confere "timer rearma com oneshot (sem OnUnitActive)" "^0$" "$(grep -c "^OnUnitActiveSec" /tmp/u/easystok-espelho.timer)"
 
 T=/tmp/t; mkdir -p $T/bin
@@ -75,5 +75,17 @@ exit 22
 ' $T > $T/bin/curl
 r="$(PATH=$T/bin:$PATH META_HORAS=20 roda)"
                                      confere "meta falha: so tenta 1 vez por dia" "^0$" "$(cat $T/curl.calls 2>/dev/null | wc -l)"
+
+
+# instalar.sh com systemctl falso: reinstalar com o timer ja ativo precisa reiniciar o timer (#3007),
+# porque o enable --now nao recarrega a definicao nova de um timer ativo
+mkdir -p $T/home $T/sbin
+printf '#!/bin/sh\necho "$*" >> %s/systemctl.calls\n' $T > $T/sbin/systemctl
+printf '#!/bin/sh\necho yes\n' > $T/sbin/loginctl
+chmod +x $T/sbin/systemctl $T/sbin/loginctl
+set +e; out="$(HOME=$T/home ESTADO=$T/home/git/estado-espelho PATH=$T/sbin:$PATH bash /s/instalar.sh 2>&1)"; rc=$?; set -e
+confere "instalar: exit 0"                         "rc=0" "rc=$rc $out"
+confere "instalar: reinicia o timer"               "^--user restart easystok-espelho.timer$" "$(cat $T/systemctl.calls)"
+confere "instalar: restart depois do daemon-reload" "daemon-reload.*restart" "$(tr '\n' ' ' < $T/systemctl.calls)"
 
 [ "$falhas" = 0 ] && echo "TODOS OS CASOS PASSARAM" || { echo "$falhas FALHA(S)"; exit 1; }

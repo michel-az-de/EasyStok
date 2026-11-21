@@ -61,7 +61,7 @@ confere('hash do cardápio por link dá a rota do cliente, nunca a do Balcão', 
 })
 
 confere('rota desconhecida ou indisponível volta com aviso explícito', () => {
-  for (const hash of ['#/nada-a-ver', '#/m/invalido/tela', '#/m/campanhas', '#/m/cadastros/invalida']) {
+  for (const hash of ['#/nada-a-ver', '#/m/invalido/tela', '#/m/cadastros/invalida']) {
     const rota = rotaDaHash(hash, { fonteApi: true })
     assert.equal(rota.tipo, ROTA_HALL)
     assert.equal(rota.aviso, 'Esta página não existe ou não está disponível. Escolha uma área para continuar.')

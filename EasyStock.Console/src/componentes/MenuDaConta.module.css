@@ -23,6 +23,6 @@
 .quem { display: grid; gap: 2px; margin: 0; }
 .quem strong { font-size: var(--t-apoio); color: var(--tinta); overflow-wrap: anywhere; }
 .quem small { font-size: var(--t-micro); color: var(--tinta-2); overflow-wrap: anywhere; }
-.sair { justify-self: stretch; }
+.sair, .ajuda { justify-self: stretch; }
 @keyframes contaEntra { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .camada { animation: none; } }

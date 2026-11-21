@@ -30,17 +30,15 @@ serviço nem as KEKs.
    ```bash
    install -d -m 700 ~/.config/easystok-backup
    # copie a chave da ez-backup-vps para ~/.config/easystok-backup/sa.json e: chmod 600 nela
-   cat > ~/.config/easystok-backup/rclone.conf <<'EOF'
-   [ezdrive]
-   type = drive
-   scope = drive
-   service_account_file = /home/felipe/.config/easystok-backup/sa.json
-   team_drive = <ID do Drive compartilhado>
-   EOF
-   chmod 600 ~/.config/easystok-backup/rclone.conf
+   # o rclone.conf JA EXISTE na VPS ([gdrive] e [gdrive-crypt] do backup antigo): nunca use '>' nele.
+   # Copia datada e acrescimo do [ezdrive] so se faltar; comando pronto em backup-segredos-felipe.md
+   f=~/.config/easystok-backup/rclone.conf
+   [ -f $f ] && cp -p $f $f.antes-$(date +%Y%m%d-%H%M%S)
+   grep -q '^\[ezdrive\]' $f 2>/dev/null || printf '\n[ezdrive]\ntype = drive\nscope = drive\nservice_account_file = /home/felipe/.config/easystok-backup/sa.json\nteam_drive = <ID do Drive compartilhado>\n' >> $f
+   chmod 600 $f
    # senha do repositório: gere no cofre de senhas e cole no prompt (não aparece na tela)
    ( umask 077; read -rs -p 'senha: ' s; printf '%s\n' "$s" > ~/.config/easystok-backup/restic.senha; unset s; echo )
-   sudo loginctl enable-linger felipe
+   loginctl enable-linger   # sem sudo: a politica set-self-linger permite
    ```
 4. **Papel e cofre.** Anote a senha do repositório em papel guardado fora do escritório. Copie para
    o cofre de senhas os valores de `EZ_CRYPTO_KEK_ID`, `EZ_CRYPTO_KEK` e, se houver, os `_ANTERIOR`.
