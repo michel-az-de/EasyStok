@@ -11,6 +11,9 @@ public static class AReceberDoPedidoMobile
 {
     public static async Task<decimal> CalcularAsync(Pedido pedido, SaldoFinanceiroPedido? saldos, CancellationToken ct)
     {
+        // #2813: quitado pelo import do histórico, sem pagamento: nada a receber.
+        if (pedido.QuitadoHistorico) return 0m;
+
         var total = pedido.Total.Valor;
         if (total <= 0m) return 0m;
         if (pedido.TotalPago <= 0m) return total;

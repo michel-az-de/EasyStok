@@ -138,6 +138,46 @@ public class ListarPedidosClienteUseCaseTests
         await sut.VagaRepo.Received(1).GetByPedidoIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>());
     }
 
+    // ── #2813: o quitado do histórico no site da loja ───────────────────────
+
+    [Fact]
+    public async Task Entregue_quitado_no_historico_sai_pago_pelo_total_e_sem_restante()
+    {
+        var pedido = PedidoStub(total: 100m);
+        pedido.MarcarQuitadoHistorico(DateTime.UtcNow);
+        var sut = BuildSut(StorefrontAtivo(), [pedido]);
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        var dto = result.Pedidos.Should().ContainSingle().Subject;
+        dto.TotalCentavos.Should().Be(10_000);
+        dto.PagoCentavos.Should().Be(10_000, "o histórico não tem pagamento: a marca é a quitação, e o restante do site é TotalCentavos - PagoCentavos");
+    }
+
+    [Fact]
+    public async Task Entregue_sem_marca_e_sem_pagamento_sai_com_pago_zero()
+    {
+        var sut = BuildSut(StorefrontAtivo(), [PedidoStub(total: 100m)]);
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        result.Pedidos.Should().ContainSingle().Which.PagoCentavos.Should().Be(0, "sem a marca o site segue a conta de sempre");
+    }
+
+    [Theory]
+    [InlineData(40, 4_000)]
+    [InlineData(130, 13_000)]
+    public async Task Entregue_sem_marca_com_pagamento_sai_pago_pelos_pagamentos_inclusive_o_excedente(int pago, long esperado)
+    {
+        var pedido = PedidoStub(total: 100m);
+        pedido.Pagamentos.Add(new PedidoPagamento { Id = Guid.NewGuid(), PedidoId = pedido.Id, Metodo = "pix", Valor = pago, PagoEm = DateTime.UtcNow });
+        var sut = BuildSut(StorefrontAtivo(), [pedido]);
+
+        var result = await sut.UseCase.ExecuteAsync(new ListarPedidosClienteInput(Slug, ClienteId));
+
+        result.Pedidos.Should().ContainSingle().Which.PagoCentavos.Should().Be(esperado);
+    }
+
     // ── Validação de input ──────────────────────────────────────────────────
 
     [Fact]

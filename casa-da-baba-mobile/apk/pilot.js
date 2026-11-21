@@ -358,6 +358,7 @@
       <h1 id="pilotTitle" tabindex="-1">Início</h1>
       <p id="pilotError" class="pilot-feedback pilot-error" role="alert" tabindex="-1"></p>
       <section id="pilotUpdateOffer" class="pilot-update-offer" hidden aria-label="Atualização do aplicativo"><p id="pilotUpdateOfferText" role="status"></p><button type="button" data-action="download">${pilotIcon('refresh-cw')}<span>Atualizar agora</span></button></section>
+      <section id="pilotFirstImport" class="pilot-first-import" hidden aria-labelledby="pilotFirstImportTitle"><strong id="pilotFirstImportTitle">Primeiro acesso</strong><p>Este aparelho ainda não tem dados. Se você usava o Sistema Antigo, traga o histórico agora: escolha o arquivo de backup salvo.</p><button type="button" data-action="import-pwa">Importar histórico</button><button type="button" data-action="migration-guide">Como fazer</button></section>
       <section id="pilotImportReview" class="pilot-import-review" hidden aria-labelledby="pilotImportTitle"><strong id="pilotImportTitle">Confira os dados importados</strong><p id="pilotImportStatus" role="status"></p><button type="button" id="pilotConfirmImport" data-action="confirm-import">Confirmar origem e sincronizar</button><button type="button" id="pilotUndoImport" data-action="undo-import" hidden>Desfazer importação</button><p id="pilotUndoImportStatus" role="status"></p><div id="pilotMigration" hidden><p id="pilotMigrationStatus"></p><button type="button" id="pilotMigrateImport" data-action="migrate-import">Enviar primeira migração</button></div></section>
       <details id="pilotMigrationReceipt" class="pilot-help" hidden><summary>Última migração confirmada</summary><p id="pilotMigrationResult" class="pilot-feedback" role="status" tabindex="-1"></p></details>
       <div class="pilot-actions">
@@ -674,6 +675,7 @@
       : state.syncState === 'invalid' ? 'Reconectar' : root.cdbSync?.getPairing?.() ? 'Conexão' : 'Conectar';
     rail.dataset.sync = state.syncState;
     doc.getElementById('pilotImportReview').hidden = !review;
+    showFirstImport(review);
     const confirm = doc.getElementById('pilotConfirmImport');
     confirm.disabled = confirmingImport || undoingImport || migratingImport || !pairing || invalid || !!review?.invalid || !!review?.requiresReconciliation;
     confirm.hidden = !!review?.requiresReconciliation;
@@ -691,6 +693,13 @@
             ? 'Os dados estão neste aparelho, com envio pausado. Conecte a produção e confirme a empresa e a loja de origem para liberar a sincronização.'
             : 'Os dados estão neste aparelho, com envio pausado. Confira se o backup pertence a ' + pairingDestination(pairing) + ' antes de liberar a sincronização.') + photos;
     }
+  }
+  // #2813 (B1): aparelho novo nasce vazio. Sem dado local, sem revisão pendente e sem migração anterior,
+  // o Início oferece trazer o histórico. Estado ilegível não conta como vazio: não adivinha.
+  function showFirstImport(review) {
+    const state = root.cdbApp?.getState?.();
+    const empty = ['products', 'clients', 'orders', 'batches'].every(key => Array.isArray(state?.[key]) && state[key].length === 0);
+    doc.getElementById('pilotFirstImport').hidden = !empty || !!review || !!root.cdbSync?.getLastLegacyMigration?.();
   }
   function migrationCounts(counts = {}) {
     const labels = {products:['produto','produtos'],clients:['cliente','clientes'],orders:['pedido','pedidos'],cashEntries:['lançamento de caixa','lançamentos de caixa'],batches:['lote','lotes'],cashClosings:['fechamento de caixa','fechamentos de caixa']};

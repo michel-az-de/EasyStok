@@ -58,6 +58,7 @@ const ICONE_DO_CONSOLE = {
   'financeiro/relatorios': 'grafico-barras',
   'financeiro/categorias': 'etiqueta',
   'financeiro/centros-custo': 'alvo',
+  'financeiro/fechamentos-legados': 'archive',
   'configuracoes/canais': 'canal',
   'configuracoes/integracoes': 'plug',
   'configuracoes/impressao': 'printer',

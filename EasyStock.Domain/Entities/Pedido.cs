@@ -122,6 +122,13 @@ namespace EasyStock.Domain.Entities
         public DateTime? AvaliacaoSolicitadaEm { get; set; }
 
         /// <summary>
+        /// #2813: data original da entrega no aparelho antigo (nunca a de hoje) em que o import quitou o pedido entregue, sem pagamento nem
+        /// movimento de caixa. Só o import grava (setter privado, sem DTO, request ou mutação de sync). Null = pedido
+        /// comum, que segue a conta normal de recebimento.
+        /// </summary>
+        public DateTime? QuitadoHistoricoEm { get; private set; }
+
+        /// <summary>
         /// Data/hora agendada para entrega. NULL = pedido pra agora (caso padrão).
         /// Espelha <see cref="Mobile.Order.ScheduledDeliveryAt"/> para sync com app.
         /// MVP: sem alertas/recorrência — só ordenação visual no PWA/KDS/grid web.
@@ -433,6 +440,29 @@ namespace EasyStock.Domain.Entities
                 foreach (var p in Pagamentos) s += p.Valor;
                 return s;
             }
+        }
+
+        /// <summary>#2813: o import do histórico quitou o pedido. Não há pagamento: a marca é a quitação.</summary>
+        public bool QuitadoHistorico => QuitadoHistoricoEm is not null;
+
+        /// <summary>
+        /// #2813: o que falta receber pelos pagamentos do pedido (total menos o pago, nunca negativo). Zero para o quitado
+        /// do histórico: a marca é a quitação. Para quem não consulta o saldo financeiro (estornos e cupons).
+        /// </summary>
+        public decimal AReceberPelosPagamentos => QuitadoHistorico ? 0m : Math.Max(0m, Total.Valor - TotalPago);
+
+        /// <summary>
+        /// #2813: o import do histórico quita o pedido entregue pela marca, sem criar pagamento. Só o
+        /// <c>LegacySnapshotImportService</c> chama (teste de arquitetura). Recusa pedido que não esteja entregue ou que
+        /// já tenha pagamento: a marca não esconde dinheiro recebido.
+        /// </summary>
+        public void MarcarQuitadoHistorico(DateTime em)
+        {
+            if (StatusEnum != StatusPedido.Entregue)
+                throw new InvalidOperationException("Só o pedido entregue pode ser quitado pelo histórico.");
+            if (Pagamentos.Count > 0)
+                throw new InvalidOperationException("Pedido com pagamento não é quitado pelo histórico.");
+            QuitadoHistoricoEm = em;
         }
     }
 

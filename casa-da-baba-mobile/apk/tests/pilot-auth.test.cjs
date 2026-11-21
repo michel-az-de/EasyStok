@@ -114,6 +114,25 @@ test('Selecionar loja não solicita novo vínculo enquanto Sair está pendente',
   } finally { pending.resolve({ autenticado: false, versao: 2 }); await leaving; }
 });
 
+// #2813 B0: empresa sem loja ativa. O servidor devolve LOJA_INVALIDA e a dona precisa entender o que fazer.
+test('Empresa sem loja ativa explica o que fazer, mantém os dados e não envia nada', async () => {
+  const f = fixture({ pair: async () => { throw Object.assign(new Error('Loja inativa ou fora desta empresa.'), { code: 'LOJA_INVALIDA' }); } });
+  await f.start();
+  const text = f.element('#pilotAccountNotice').textContent;
+  assert.match(text, /não encontramos uma loja ativa/i, 'diz o que aconteceu');
+  assert.match(text, /nada foi enviado/i, 'tranquiliza sobre os dados');
+  assert.match(text, /suporte/i, 'diz quem resolve');
+  assert.doesNotMatch(text, /fora desta empresa/i, 'a frase técnica do servidor não vai para a dona');
+  assert.equal(f.calls.apply.length, 0);
+  assert.equal(f.calls.flush, 0);
+});
+
+test('Erro de pareamento sem código conhecido segue mostrando a mensagem do servidor', async () => {
+  const f = fixture({ pair: async () => { throw new Error('Sem conexão com a produção.'); } });
+  await f.start();
+  assert.equal(f.element('#pilotAccountNotice').textContent, 'Sem conexão com a produção.');
+});
+
 test('authPair recebido depois de Sair não reconecta nem envia a fila', async () => {
   const pending = deferred(), f = fixture({ pair: () => pending.promise });
   const starting = f.start(); await settle();
