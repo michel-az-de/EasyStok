@@ -14,11 +14,12 @@ import {ContextoEstado,ContextoAcoes} from '../../../src/aplicacao/contextos';
 import {ContextoAcessoModulos} from '../../../src/aplicacao/acessoModulos';
 import {ContextoRascunhosDosAjustes,useGravacoesDosAjustes} from '../../../src/aplicacao/rascunhosDosAjustes';
 import {PainelCadastros} from '../../../src/features/gestao/cadastros/PainelCadastros';
+import {ProvedorDeAviso} from '../../../src/componentes/Aviso';
 import '../../../src/estilos/base.css';
 document.body.style.cssText='margin:0;padding:16px;box-sizing:border-box;background:var(--fundo);font-family:var(--f-corpo);color:var(--tinta)';
 const tela = new URLSearchParams(location.search).get('tela') ?? 'clientes';
 function Cena(){const [rascunhos,definir]=useState({});const gravacoes=useGravacoesDosAjustes();return <ContextoAcessoModulos.Provider value={{acoes:{editarCadastrosFornecedores:true,verCadastrosFornecedores:true},permite:()=>true}}><ContextoEstado.Provider value={{fonteApi:true,conversas:[],selecionada:null}}><ContextoAcoes.Provider value={{}}><ContextoRascunhosDosAjustes.Provider value={{rascunhos,definir:(chave,valor)=>definir(atual=>({...atual,[chave]:valor})),...gravacoes}}><PainelCadastros tela={tela}/></ContextoRascunhosDosAjustes.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>}
-createRoot(document.getElementById('root')).render(<Cena/>);
+createRoot(document.getElementById('root')).render(<ProvedorDeAviso><Cena/></ProvedorDeAviso>);
 `)
 const browser = await chromium.launch({ headless: true })
 const contexto = await browser.newContext({ viewport: { width: 1280, height: 1400 }, locale: 'pt-BR', reducedMotion: 'reduce' })

@@ -160,13 +160,18 @@ export const casosApi = {
   [acao.SINCRONIZAR_CARDAPIO]: (estado, { cardapio }) => ({
     ...estado,
     catalogo: {
-      ...estado.catalogo, cardapio, adicionais: {},
+      ...estado.catalogo, cardapio, adicionais: {}, cardapioLido: true, cardapioFalha: null,
       galeria: cardapio.flatMap((item) => (item.fotos ?? []).map((foto, indice) => ({
         id: `${item.sku}-foto-${indice}`, nome: item.nome,
         descricao: `${item.porcao} · Foto ${indice + 1}`, legenda: legendaDoItem(item), foto, doCardapio: true,
         cardapioItemId: item.sku, indice,
       }))),
     },
+  }),
+
+  // #3076: recusa da leitura guarda o motivo; o cardápio que já estava na tela fica.
+  [acao.CARDAPIO_INDISPONIVEL]: (estado, { mensagem }) => ({
+    ...estado, catalogo: { ...estado.catalogo, cardapioFalha: mensagem },
   }),
 
   // F03: pedido que a API acabou de criar ou trocar de forma, sem esperar o próximo ciclo.

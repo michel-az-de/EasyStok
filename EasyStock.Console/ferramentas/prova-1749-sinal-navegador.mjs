@@ -66,7 +66,7 @@ page.on('pageerror', erro => erros.push(erro.message))
 const aviso = page.getByText('Maquininha na entrega: Encomenda com antecedência: sinal de 50% antes da produção. Restante na entrega.', { exact: true })
 // #2437: dia, meios e aviso moram no painel "Revisar comanda" (#2232); no celular a aba "Pedido" virou "Cliente".
 const abrirComanda = async () => {
-  const dia = page.getByLabel('Dia da entrega (opcional)', { exact: true })
+  const dia = page.getByLabel('Ver janelas do dia', { exact: true })
   if (await dia.isVisible()) return
   const aba = page.getByRole('tab', { name: 'Cliente', exact: true })
   if (await aba.isVisible()) { await aba.click(); await page.waitForTimeout(500) }
@@ -82,7 +82,7 @@ const escolherDia = async data => {
   await abrirComanda()
   await Promise.all([
     page.waitForResponse(r => r.url().includes('/comanda/janelas?') && new URL(r.url()).searchParams.get('dataInicio') === data),
-    page.getByLabel('Dia da entrega (opcional)', { exact: true }).fill(data),
+    page.getByLabel('Ver janelas do dia', { exact: true }).fill(data),
   ])
   const diaMes = data.slice(8, 10) + '/' + data.slice(5, 7)
   await page.getByRole('button', { name: new RegExp(diaMes + '.*Janela de prova') }).click()

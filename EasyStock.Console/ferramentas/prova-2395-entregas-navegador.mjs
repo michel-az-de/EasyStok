@@ -67,7 +67,7 @@ try {
     await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
     await page.getByRole('button', { name: new RegExp(`^(Somar )?${produto.nome}`, 'i') }).first().click(); await fecharPaineis()
     await page.getByRole('button', { name: /^Revisar comanda/ }).first().click()
-    await page.getByLabel('Dia da entrega (opcional)', { exact: true }).fill(fixture.dataEntrega)
+    await page.getByLabel('Ver janelas do dia', { exact: true }).fill(fixture.dataEntrega)
     await page.getByRole('button', { name: /Manhã.*vagas? livres?/ }).first().click(); await fecharPaineis()
     const avisos = page.getByRole('button', { name: 'Dispensar avisos do aparelho', exact: true }); if (await avisos.isVisible()) await avisos.click()
     await page.getByRole('button', { name: 'Gerar cobrança e enviar', exact: true }).click()

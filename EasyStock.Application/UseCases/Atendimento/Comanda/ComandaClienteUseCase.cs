@@ -317,9 +317,9 @@ public sealed class ComandaClienteUseCase(ILinkCardapioConversaRepository links,
             dados = dados with { PedidoResumoHash = pedido is null ? null : ResumoHash(pedido),
                 JanelaDoPedidoId = estado.Pedido?.Janela?.JanelaId, DataDoPedido = estado.Pedido?.Janela?.Data };
             link.SalvarRascunho(revisao, JsonSerializer.Serialize(dados, Json), relogio.GetUtcNow().UtcDateTime);
-            // Data e horário não alteram a cotação manual (#1717-6); qualquer outra edição continua exigindo novo acordo.
+            // Data e horário, inclusive a primeira escolha (#3087), não alteram a cotação manual (#1717-6); qualquer outra edição continua exigindo novo acordo.
             if (estado.Pedido is null && estado.FreteCombinado is decimal frete && dados.DataEntrega is not null &&
-                dados.JanelaId is not null && estado.Rascunho.JanelaId is not null &&
+                dados.JanelaId is not null &&
                 (dados.JanelaId != estado.Rascunho.JanelaId || dados.DataEntrega != estado.Rascunho.DataEntrega) &&
                 dados.Itens.SequenceEqual(estado.Rascunho.Itens) &&
                 (dados with { JanelaId = estado.Rascunho.JanelaId, DataEntrega = estado.Rascunho.DataEntrega, Itens = estado.Rascunho.Itens }) == estado.Rascunho)
