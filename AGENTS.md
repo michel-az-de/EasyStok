@@ -20,7 +20,7 @@ Regras comuns a qualquer agente (Claude Code, Codex, Kimi, Copilot). Claude Code
 
 ## Fluxo (ADR-0043, PR-first)
 
-issue -> branch `tipo/slug-N` -> commits -> push -> PR `closes #N` -> CI + review -> merge por tier -> limpeza.
+issue -> branch `tipo/slug-N` -> commits -> push -> PR `closes #N` (`refs #N` se a issue tem aceite de pós-merge, ADR-0070) -> CI + review -> merge por tier -> limpeza.
 
 | Regra | Conteúdo |
 |---|---|
@@ -33,7 +33,7 @@ issue -> branch `tipo/slug-N` -> commits -> push -> PR `closes #N` -> CI + revie
 | Worktree | Paralelo ou arriscado: `C:\rep\.worktrees\EasyStok\<slug>`, 1 worktree = 1 branch = 1 issue. WIP alheio não se descarta nem se reaproveita. |
 | Limpeza | Worktrees vivem em `C:\rep\.worktrees\EasyStok\`, `.claude/worktrees/` (harness) e `~/.codex/worktrees/` (Codex). Integrada = limpa e PR `MERGED` com head local igual ao `headRefOid`; squash não é ancestral, então `branch -d` recusa e só nesse caso vale `-D`. PR fechada sem merge: remove o worktree e mantém a branch. Antes do `worktree remove`, `git config core.longpaths true`. |
 | Inacabado | Fica na branch e na issue aberta. Stash não é memória. |
-| Pronto | Só com PR `MERGEABLE` no instante do relatório, checks verdes e aceite marcado. CI verde não prova integração com o trunk atual. |
+| Pronto | Só com PR `MERGEABLE` no instante do relatório, checks verdes e aceite marcado, salvo o de pós-merge (ADR-0070, item 6): só o que por natureza se mede depois do merge; o que dá para medir na PR barra, e a issue só fecha com a prova. CI verde não prova integração com o trunk atual. |
 | Medir | Toda afirmação de estado exige comando antes (git, build, gh). Premissa refutada: pare e reporte. |
 | Dúvida | Genuína e com consequência: uma pergunta, decisiva. Tarefa clara segue sem esperar. |
 
