@@ -4,6 +4,7 @@ import { useAcoes } from '../../aplicacao/contextos'
 import { useNovoPedidoDoCliente } from '../../aplicacao/novoPedidoDoCliente'
 import { clientesParaChamar } from '../../dominio/cliente'
 import { telefoneDoE164 } from '../../dominio/formato'
+import { AnfitriaoDeConfirmacao } from './AnfitriaoDeConfirmacao'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
 import css from './atendimento.module.css'
 
@@ -42,6 +43,7 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
 
   return (
     <section className={css.chamarClientes} aria-label="Clientes cadastrados sem conversa aberta">
+      <AnfitriaoDeConfirmacao />
       {lista.length > 0 && <p className={css.chamarClientesTitulo}>Clientes cadastrados sem conversa aberta</p>}
       {novoPedido.erro && <p className={css.chamarClienteErro} role="alert">{novoPedido.erro}</p>}
       {lista.map((cliente) => (

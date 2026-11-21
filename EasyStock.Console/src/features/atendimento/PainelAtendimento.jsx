@@ -16,6 +16,7 @@ import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
+import { AnfitriaoDeConfirmacao } from './AnfitriaoDeConfirmacao'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
 import { ModalCompartilharComanda } from './CompartilharComanda'
@@ -26,7 +27,17 @@ import { rotuloDoPedido } from '../../dominio/rotulos'
 import { Thread } from './Thread'
 import css from './atendimento.module.css'
 
-export function PainelAtendimento({
+// #3037: o anfitrião da confirmação de "conversa de outra" vale para todo o Painel, com ou sem conversa aberta.
+export function PainelAtendimento(props) {
+  return (
+    <>
+      <AnfitriaoDeConfirmacao />
+      <PainelDaConversa {...props} />
+    </>
+  )
+}
+
+function PainelDaConversa({
   aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   focarAoTrocar = false,
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, visivel = true,

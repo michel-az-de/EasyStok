@@ -45,13 +45,22 @@ export const baixarMidia = (conversaId, mensagemId) =>
   chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/midia`, { arquivo: true })
 
 // ATD-1 (#2305, #2440): assumir, transferir ou responder (texto, foto, áudio, cardápio, modelo) em conversa de outra
-// atendente pede confirmação. A API responde 409 CONVERSA_DE_OUTRA; a dona confirma aqui e a mesma ação repete
+// atendente pede confirmação. A API responde 409 CONVERSA_DE_OUTRA; a dona confirma e a mesma ação repete
 // com `confirmar`, com a mesma `chave` de idempotência.
+// #3037: quem pergunta é um modal da tela, registrado aqui por `definirPerguntaDeOutra` (a infra não importa UI).
+// Sem anfitrião registrado, o erro segue adiante e a mensagem da API aparece como em qualquer falha.
+const perguntadores = []
+export const definirPerguntaDeOutra = (pergunta) => {
+  perguntadores.push(pergunta)
+  return () => { const i = perguntadores.lastIndexOf(pergunta); if (i >= 0) perguntadores.splice(i, 1) }
+}
+
 export const comConfirmacaoDeOutra = async (chamada) => {
   try {
     return await chamada(false)
   } catch (erro) {
-    if (erro?.codigo !== 'CONVERSA_DE_OUTRA' || !window.confirm(erro.message)) throw erro
+    const perguntar = perguntadores.at(-1)
+    if (erro?.codigo !== 'CONVERSA_DE_OUTRA' || !perguntar || !(await perguntar(erro.message))) throw erro
     return chamada(true)
   }
 }
