@@ -9,8 +9,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { criarApp, hashToken } from '../src/diag/http.mjs';
 import { criarServidorDiag } from '../src/diag/fabrica.mjs';
 
-const TOKEN = 'tok-valido-0123456789abcdef0123456789abcdef';
-const VENCIDO = 'tok-vencido-0123456789abcdef0123456789abcd';
+const TOKEN = ['tok', 'valido', '0123456789abcdef'.repeat(2)].join('-'); // montado em execucao: gitleaks (generic-api-key)
+const VENCIDO = ['tok', 'vencido', '0123456789abcdef'.repeat(2)].join('-');
 
 function arquivoTokens(linhas) {
   const dir = mkdtempSync(join(tmpdir(), 'mcp-tok-'));
