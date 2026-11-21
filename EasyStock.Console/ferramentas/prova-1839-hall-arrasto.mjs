@@ -177,10 +177,11 @@ provar('#1810 continua valendo: até 20 controles na primeira vista', () => {
   // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta de conteúdo.
   const semTrilho = html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '')
   const contar = (trecho) => (trecho.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
-  // #3013: a faixa de atalhos (nav "Atalhos dos módulos") só existe no celular (display none acima de 759 px) e repete a grade.
-  // É contada de forma explícita: um link por cartão de módulo da grade, derivado do mesmo HTML que monta a grade, e nada além de links.
+  // #3013: a faixa de atalhos (nav "Atalhos dos módulos") só existe no celular (display none acima de 640 px, atalhosCelular.module.css) e repete os cartões disponíveis da grade.
+  // É contada de forma explícita: um link por cartão disponível da grade, derivado do mesmo HTML que monta a grade, e nada além de links.
   const faixa = semTrilho.match(/<nav [^>]*aria-label="Atalhos dos módulos"[^>]*>[\s\S]*?<\/nav>/)?.[0] ?? ''
-  const ITENS_DA_FAIXA = (html.match(/<li[^>]*data-modulo="/g) ?? []).length
+  // Mesmo filtro da FaixaDeAtalhos (modulo.disponivel): o cartão "Em breve" (classe emBreve) fica fora da faixa.
+  const ITENS_DA_FAIXA = (html.match(/<li[^>]*data-modulo="[^>]*>/g) ?? []).filter((li) => !/emBreve/.test(li)).length
   assert.ok(ITENS_DA_FAIXA > 0, 'a grade tem cartões de módulo')
   assert.equal(contar(faixa), ITENS_DA_FAIXA, 'a faixa tem um link por cartão da grade')
   assert.equal((faixa.match(/<a[\s>]/g) ?? []).length, ITENS_DA_FAIXA, 'a faixa só tem links')
