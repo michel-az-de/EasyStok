@@ -55,15 +55,35 @@ public class LimitesEntradaApiTests
         await arquivo.DidNotReceive().CopyToAsync(Arg.Any<Stream>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Upload_FotoProdutoAte10MB_NaoERecusadaPeloTetoDeImagem()
+    {
+        // revisao da PR: a foto de produto aceita 10 MB (igual a POST /api/produtos/{id}/fotos)
+        var controller = new UploadsController(null!, Substitute.For<ICurrentUserAccessor>());
+        var arquivo = Substitute.For<IFormFile>();
+        arquivo.Length.Returns(8L * 1024 * 1024);
+        arquivo.FileName.Returns("produto.jpg");
+
+        try { await controller.UploadFotoProduto(Guid.NewGuid(), Guid.NewGuid(), arquivo, CancellationToken.None); }
+        catch (NullReferenceException) { } // use case nulo: so importa que o arquivo passou do teto
+
+        await arquivo.Received(1).CopyToAsync(Arg.Any<Stream>(), Arg.Any<CancellationToken>());
+    }
+
     [Theory]
-    [InlineData(nameof(UploadsController.UploadAvatar))]
-    [InlineData(nameof(UploadsController.UploadLogoLoja))]
-    [InlineData(nameof(UploadsController.UploadFotoProduto))]
-    public void Upload_EndpointsDeImagem_TemTetoNoKestrel(string acao)
+    [InlineData(nameof(UploadsController.UploadAvatar), 6)]
+    [InlineData(nameof(UploadsController.UploadLogoLoja), 6)]
+    [InlineData(nameof(UploadsController.UploadFotoProduto), 10)]
+    public void Upload_EndpointsDeImagem_TemTetoNoKestrelComFolga(string acao, long mb)
     {
         var metodo = typeof(UploadsController).GetMethod(acao)!;
-        metodo.GetCustomAttribute<RequestSizeLimitAttribute>().Should().NotBeNull(
-            "sem o atributo o Kestrel aceita até 30 MB por pedido antes de o controller recusar");
+        var limite = metodo.GetCustomAttribute<RequestSizeLimitAttribute>();
+        limite.Should().NotBeNull("sem o atributo o Kestrel aceita até 30 MB por pedido antes de o controller recusar");
+        var tetoArquivo = mb * 1024 * 1024;
+        var bytes = (long)typeof(RequestSizeLimitAttribute)
+            .GetField("_bytes", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(limite)!;
+        bytes.Should().BeGreaterThan(tetoArquivo, "o multipart precisa de folga para cabecalhos e boundary")
+            .And.BeLessThan(tetoArquivo + 1024 * 1024);
     }
 
     [Fact]
@@ -88,7 +108,6 @@ public class LimitesEntradaApiTests
     public void Ia_CamposDaRequisicao_TemTamanhoMaximo()
     {
         var longo = new string('x', 5000);
-        var request = new CompletarProdutoRequest(longo, longo, longo, longo);
         var parametros = typeof(CompletarProdutoRequest).GetConstructors().Single().GetParameters();
 
         foreach (var p in parametros)
@@ -97,7 +116,6 @@ public class LimitesEntradaApiTests
             teto.Should().NotBeNull($"{p.Name} entra no prompt pago e precisa de teto");
             teto!.IsValid(longo).Should().BeFalse();
         }
-        request.NomeProduto.Should().HaveLength(5000);
     }
 
     private static async IAsyncEnumerable<string> Falhar(string mensagem)
