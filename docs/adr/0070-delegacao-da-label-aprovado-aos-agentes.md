@@ -25,12 +25,13 @@ novo?", respondeu "Sim, grave".
 
 1. **A label `aprovado` passa a ser aplicada pelo agente, em nome do Felipe.** Vale para toda PR de
    tier ALTO. Depois da label, o agente mergeia e faz deploy sem perguntar.
-2. **Condições, todas medidas no instante da label:** CI verde, `/code-review` sem achado Critical e
+2. **Condições, todas medidas no commit que será mergeado:** CI verde, `/code-review` sem achado Critical e
    aceite da issue todo marcado. O review é de subagente revisor sem o contexto da sessão autora,
    porque a ADR-0043 já registra que autor, revisor e merger são a mesma conta. Faltou uma, a PR
-   fica aberta com os achados comentados, sem label, sem merge e sem perguntar ao Felipe.
+   fica aberta com os achados comentados, sem label, sem merge e sem perguntar ao Felipe. Push
+   novo depois da label remove a label e refaz as três condições.
 3. **Registro.** Antes da label, o agente comenta na PR que aplica por delegação desta ADR e cola a
-   prova das três condições.
+   prova das três condições, com o link ou a saída que prova cada item do aceite.
 4. **O que não muda.** A lista "Exige GO nesta sessão" do `CLAUDE.md` (force push, `reset --hard`,
    `dotnet ef database update`, segredo de produção, mudança em produção fora dos scripts de deploy
    e as demais) continua exigindo o GO do Felipe. Segredo ou dado que só ele tem continua parando o
