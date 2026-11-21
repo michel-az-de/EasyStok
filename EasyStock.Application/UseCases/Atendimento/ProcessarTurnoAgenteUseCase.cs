@@ -34,7 +34,7 @@ public sealed class ProcessarTurnoAgenteUseCase(
 
         try
         {
-            return await agente.ProcessarTurnoAsync(job.EmpresaId, job.ConversaId, DateTime.UtcNow, ct);
+            return await agente.ProcessarTurnoAsync(job.EmpresaId, job.ConversaId, DateTime.UtcNow, ct, job.Retomada);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
