@@ -84,7 +84,7 @@ const MOTIVOS = [
   [`${UC}Comanda/ComandaClienteUseCase.cs`, '"Entrega e frete a combinar.',
     'Entrega e frete a combinar. Confira o endereço e a seleção da comanda.', 'Entrega e frete a combinar'],
   [`${UC}Comanda/ComandaClienteUseCase.cs`, '"Cliente pediu ajuda pela comanda.',
-    'Cliente pediu ajuda pela comanda. Confira a conversa e a seleção antes de continuar.', 'Ajuda na comanda'],
+    'Cliente pediu ajuda pela comanda. Confira a conversa e a seleção antes de continuar.', 'Ajuda no pedido'],
   [`${UC}Ocorrencias/AbrirOcorrenciaUseCase.cs`, '$"ocorrência aberta ({OcorrenciaDto.Snake(',
     'ocorrência aberta (atraso): o bolo não chegou', 'Ocorrência aberta'],
   ['EasyStock.Domain/Entities/Atendimento/Conversa.cs', '"Conversa reaberta para atendimento."',

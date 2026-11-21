@@ -167,7 +167,12 @@ public sealed class ConversaRepository(EasyStockDbContext db) : IConversaReposit
         if (responsavel is not null)
             query = query.Where(c => c.AssumidaPorUsuarioId == responsavel.UsuarioId);
 
-        if (!string.IsNullOrWhiteSpace(busca))
+        if (string.IsNullOrWhiteSpace(busca))
+        {
+            // #2921: conversa aberta so para montar pedido na tela, sem nenhuma mensagem da cliente, fica fora da fila.
+            query = query.Where(c => c.UltimaMensagemEntradaEm != null);
+        }
+        else
         {
             var termo = busca.Trim();
             var padrao = PadraoILike.Contendo(BuscaTextual.Normalizar(termo));

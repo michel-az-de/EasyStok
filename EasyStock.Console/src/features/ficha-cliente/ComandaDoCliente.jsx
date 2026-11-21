@@ -49,7 +49,7 @@ function AcertoDaComanda({ comanda: c }) {
   const f = c.financeiro, a = c.acerto, uso = c.envio?.cupomAplicado
   if (!f && !a && !uso) return null
   const situacao = { pendente: 'Em acompanhamento', confirmado: 'Confirmado', recusado: 'Não confirmado' }
-  return <section className={css.comparativo} aria-label="Acerto da comanda">
+  return <section className={css.comparativo} aria-label="Acerto do pedido">
     {f && <details className={css.historicoFinanceiro}>
       <summary>Histórico financeiro</summary>
       <p>Dinheiro recebido: {moeda(f.recebido)}</p>
@@ -66,7 +66,7 @@ function AcertoDaComanda({ comanda: c }) {
       {a.tipo === 'cupom' && a.saldoCupom != null && <p>Saldo atual do cupom: {moeda(a.saldoCupom)}</p>}
       {a.devolucoes?.map(d => <p key={d.operacaoId}>{moeda(d.valor)} · {d.meio} · {situacao[d.situacao] ?? 'Em acompanhamento'}</p>)}
       {a.tipo === 'estorno' && a.situacao === 'confirmado' && <p>Confirmação registrada no provedor. O prazo para aparecer na conta depende do meio de pagamento.</p>}
-      {a.situacao === 'pendente' && <p>O acerto ainda não foi confirmado. O cliente acompanha a atualização nesta mesma comanda.</p>}
+      {a.situacao === 'pendente' && <p>O acerto ainda não foi confirmado. O cliente acompanha a atualização neste mesmo pedido.</p>}
       {a.situacao === 'recusado' && <p>O acerto ainda exige conferência. Confira os valores confirmados e não confirmados antes de solicitar outra devolução.</p>}
     </>}
     {uso && <>
@@ -175,7 +175,7 @@ export function SelecaoCompartilhada({ conversaId, comanda: c, ocupado, erro, sa
       {c.rascunho.endereco.complemento && ' · ' + c.rascunho.endereco.complemento} · {c.rascunho.endereco.bairro}
       {' · ' + c.rascunho.endereco.cidade + '/' + c.rascunho.endereco.uf + ' · CEP ' + c.rascunho.endereco.cep}</p>
     </details>
-  return <section ref={selecaoRef} tabIndex={-1} className={css.papelSelecao} aria-label="Itens da comanda">
+  return <section ref={selecaoRef} tabIndex={-1} className={css.papelSelecao} aria-label="Itens do pedido">
     {(nomeCliente || numeroComanda) && <Cabecalho numero={numeroComanda} nomeCliente={nomeCliente} />}
     <div className={css.etapaCompartilhada}>
       <strong>{etapa.estado}</strong><p>{etapa.orientacao}</p>
@@ -300,10 +300,10 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
   const [linkAberto, setLinkAberto] = useState(null)
   if (pedido && !visiveis.length && !erro) return null
   const aberta = visiveis.find(c => c.linkId === linkAberto)
-  return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
+  return <section className={css.clienteCompartilhado} aria-label="Pedido compartilhado com o cliente">
     <div className={css.adicionarCompartilhado}><h3>Link do cliente</h3>{acaoCompartilhar}</div>
-    {erro && !aberta && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
-    {carregando && !dados.length ? <output className={css.avisoCompartilhado}>Consultando a comanda…</output> : <>
+    {erro && !aberta && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar pedido</Botao></>}
+    {carregando && !dados.length ? <output className={css.avisoCompartilhado}>Consultando o pedido…</output> : <>
       {acaoMontar}
       {!visiveis.length && !erro && !pedido && <p>O cliente também pode escolher pelo cardápio enviado.</p>}
       {visiveis.map(c => {
@@ -325,7 +325,7 @@ function ComandaCompacta({ pedido, visiveis, erro, carregando, dados, acaoCompar
     </>}
     {aberta && <Modal titulo={`${etapaDaSelecao(aberta).titulo}${nomeCliente ? ` · ${nomeCliente}` : ''}`} largura="md"
       aoFechar={ocupado ? undefined : () => setLinkAberto(null)}>
-      {erro && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar comanda</Botao></>}
+      {erro && <><p role="alert">{erro}</p><Botao onClick={atualizar} disabled={ocupado || carregando}>Atualizar pedido</Botao></>}
       {selecaoDe(aberta)}
     </Modal>}
   </section>
@@ -345,9 +345,9 @@ export function ComandaDoCliente({ conversaId, numeroComanda, ativo, acaoCompart
     numeroComanda={numeroComanda} nomeCliente={nomeCliente} />
   if (compacta) return <ComandaCompacta pedido={pedido} visiveis={visiveis} erro={erro} carregando={carregando} dados={dados}
     acaoCompartilhar={acaoCompartilhar} acaoMontar={acaoMontar} ocupado={ocupado} selecaoDe={selecaoDe} nomeCliente={nomeCliente} atualizar={atualizar} />
-  return <section className={css.clienteCompartilhado} aria-label="Comanda compartilhada com o cliente">
+  return <section className={css.clienteCompartilhado} aria-label="Pedido compartilhado com o cliente">
     <div className={css.adicionarCompartilhado}>
-      <h3>{tituloDaComanda(pedido, { temLinkComPedido: visiveis.some(c => c.pedido) })}<small>{numeroComanda ? 'Comanda ' + numeroComanda : 'Itens compartilhados'}</small></h3>
+      <h3>{tituloDaComanda(pedido, { temLinkComPedido: visiveis.some(c => c.pedido) })}<small>{numeroComanda ? 'Pedido ' + numeroComanda : 'Itens compartilhados'}</small></h3>
       {acaoCompartilhar}
     </div>
     {erro && <p role="alert">{erro}</p>}

@@ -35,7 +35,8 @@ public sealed record CheckoutCoreInput(
     string? Observacoes = null,
     PrazoPreparoCheckout? Prazo = null,
     string? Numero = null,
-    DadosEnderecoEntrega? EnderecoEntrega = null, decimal? FreteCombinado = null);
+    DadosEnderecoEntrega? EnderecoEntrega = null, decimal? FreteCombinado = null,
+    CampanhaInput? Campanha = null, OrigemAnuncio? OrigemDaConversa = null);
 
 /// <summary>
 /// Parâmetros do prazo mínimo (S16, RN-21): com eles o núcleo recusa a janela cujo início seja antes de
@@ -141,6 +142,10 @@ public sealed class CheckoutCoreService(
         return cepNormalizado;
     }
 
+    /// <summary>#2928: a campanha do site, se útil, senão a origem da conversa; o pedido guarda a de quando nasceu.</summary>
+    public OrigemAnuncio? OrigemDoPedido(CampanhaInput? campanha, OrigemAnuncio? daConversa) =>
+        CampanhaInput.Resolver(campanha, daConversa, OrigemAnuncio.ViaSite, timeProvider.GetUtcNow());
+
     public async Task<PedidoReservado> CriarPedidoComReservaAsync(
         CheckoutCoreInput input,
         CancellationToken ct = default)
@@ -190,6 +195,7 @@ public sealed class CheckoutCoreService(
             empresaId: storefront.EmpresaId,
             origem: input.Origem,
             statusInicial: StatusPedido.Rascunho);
+        pedido.DefinirOrigemAnuncio(OrigemDoPedido(input.Campanha, input.OrigemDaConversa));
 
         // Sobrescrever campos com dados do cliente Storefront
         pedido.ClienteId = input.ClienteId;

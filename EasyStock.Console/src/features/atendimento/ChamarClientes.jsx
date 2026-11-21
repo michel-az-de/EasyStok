@@ -4,6 +4,7 @@ import { useAcoes } from '../../aplicacao/contextos'
 import { useNovoPedidoDoCliente } from '../../aplicacao/novoPedidoDoCliente'
 import { clientesParaChamar } from '../../dominio/cliente'
 import { telefoneDoE164 } from '../../dominio/formato'
+import { AnfitriaoDeConfirmacao } from './AnfitriaoDeConfirmacao'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
 import css from './atendimento.module.css'
 
@@ -17,7 +18,7 @@ const ESPERA_DA_DIGITACAO_MS = 300
 // #2871: "Novo pedido" registra o pedido de quem pediu por outro canal (WhatsApp pessoal da dona): abre a conversa da
 // loja sem mandar mensagem e a comanda já vem aberta; o resumo do pedido é o primeiro contato.
 export function ChamarClientes({ busca, conversas, aoAbrir }) {
-  const { buscarClientesParaChamar, selecionar } = useAcoes()
+  const { buscarClientesParaChamar, selecionar, selecionarIniciada } = useAcoes()
   const novoPedido = useNovoPedidoDoCliente({ aoAbrir })
   const [achados, setAchados] = useState({ termo: '', lista: [] })
   const [escolhido, setEscolhido] = useState(null)
@@ -42,6 +43,7 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
 
   return (
     <section className={css.chamarClientes} aria-label="Clientes cadastrados sem conversa aberta">
+      <AnfitriaoDeConfirmacao />
       {lista.length > 0 && <p className={css.chamarClientesTitulo}>Clientes cadastrados sem conversa aberta</p>}
       {novoPedido.erro && <p className={css.chamarClienteErro} role="alert">{novoPedido.erro}</p>}
       {lista.map((cliente) => (
@@ -50,7 +52,7 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
           <span className={css.chamarClienteAcoes}>
             {novoPedido.disponivel && (
               <Botao icone="mais" disabled={Boolean(novoPedido.abrindo)} aria-label={`Novo pedido de ${cliente.nome}`}
-                onClick={() => novoPedido.iniciar(cliente.id)}>{novoPedido.abrindo === cliente.id ? 'Abrindo…' : 'Novo pedido'}</Botao>
+                onClick={() => novoPedido.iniciar(cliente.id)}>{novoPedido.abrindo === cliente.id ? 'Abrindo…' : novoPedido.rotulo(cliente.id)}</Botao>
             )}
             <Botao disabled={Boolean(novoPedido.abrindo)} onClick={() => setEscolhido(cliente)}>Chamar no WhatsApp</Botao>
           </span>
@@ -60,7 +62,7 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
         <ModalEnviarModelo
           cliente={escolhido}
           aoFechar={() => setEscolhido(null)}
-          aoIniciar={(conversaId) => { selecionar(conversaId); aoAbrir?.(conversaId) }}
+          aoIniciar={(conversaId) => { (selecionarIniciada ?? selecionar)(conversaId); aoAbrir?.(conversaId) }}
         />
       )}
     </section>

@@ -6,8 +6,9 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contex
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { automacoesEditaveis, respostasEditaveis } from '../../../dominio/acessoModulos'
 import {
-  VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica,
+  VARIAVEIS, VARIAVEIS_DA_API, analisarAutomatica, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica, exemploDaPrevia, previaDoServidor,
 } from '../../../dominio/automacao'
+import { EditorDeAutomatica, SelosDeVariaveis, TextoDaPrevia } from '../../../componentes/EditorDeAutomatica'
 import { plural } from '../../../dominio/formato'
 import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { ATALHO_MAXIMO, gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
@@ -25,7 +26,11 @@ const depois = (resultado, fechar) => Promise.resolve(resultado).then((ok) => { 
 const TITULO_MAXIMO = 120
 const TEXTO_MAXIMO = 4096
 
-const VARIAVEIS_TEXTO = VARIAVEIS_DA_API.map((v) => `{${v.chave}} ${v.descricao}`).join(' · ')
+// #2783: o editor da automática e as peças da prévia vivem em componentes/EditorDeAutomatica; daqui saem como sempre.
+export { SelosDeVariaveis }
+export function TextoPreenchido({ texto, exemplo, fonteApi, ...resto }) {
+  return <TextoDaPrevia partes={previaDoServidor(texto, exemplo, fonteApi ? VARIAVEIS_DA_API : VARIAVEIS)} {...resto} />
+}
 
 // #2792: o motivo do Salvar pede só o que falta.
 function faltando(titulo, texto) {
@@ -74,7 +79,8 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
           onChange={(e) => setAtalho(e.target.value.replace(/\s/g, '-'))}
         />
       </div>
-      <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} limite={TEXTO_MAXIMO} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
+      <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} limite={TEXTO_MAXIMO} onChange={(e) => setTexto(e.target.value)} />
+      <SelosDeVariaveis variaveis={VARIAVEIS_DA_API} />
       {descartando && (
         <div className={css.descarte} role="alert">
           <p>Descartar o que foi digitado?</p>
@@ -225,15 +231,17 @@ function SecaoRespostas() {
   )
 }
 
-function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
+function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
   const { alternarRegra, editarRegra } = useAcoes()
+  const { sincronizacao } = useAtendimento()
   const linhaRef = useRef(null)
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const editando = rascunho !== null
   // #2476 (U8): variável que o EasyStok não preenche sairia escrita para o cliente: não salva nem liga.
-  const bloqueio = fonteApi ? bloqueioDaAutomatica(rascunho ?? regra.texto, editavel) : null
+  const bloqueio = fonteApi && !editando ? bloqueioDaAutomatica(regra.texto, editavel) : null
   const idBloqueio = useId()
+  const idExemplo = useId()
   const naoLiga = !regra.ativa && fonteApi && Boolean(bloqueioDaAutomatica(regra.texto))
   // #1474: no modo API a saudação de Horários e mensagens sai sempre na primeira mensagem.
   const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
@@ -247,10 +255,10 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
     return () => cancelAnimationFrame(quadro)
   }, [emFoco])
 
-  function salvar() {
-    if (salvando || !rascunho?.trim() || bloqueio) return
+  // A chave da linha fica parada enquanto o editor grava (o motivo de uma recusa aparece dentro dele).
+  const gravar = (texto) => {
     setSalvando(true)
-    depois(editarRegra(regra.id, { texto: rascunho.trim() }), () => setRascunho(null)).finally(() => setSalvando(false))
+    return Promise.resolve(editarRegra(regra.id, { texto })).finally(() => setSalvando(false))
   }
 
   return (
@@ -272,30 +280,25 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
         <span className={css.quando}>{regra.descricao}</span>
         {!editando && (
           regra.texto
-            ? <span className={css.textoInteiro}>{regra.texto}</span>
+            ? (
+              <span className={css.textoDaLinha}>
+                <span id={idExemplo} className={css.rotuloPrevia}>Exemplo de como o cliente lê</span>
+                <TextoPreenchido texto={regra.texto} exemplo={exemplo} fonteApi={fonteApi} className={css.textoInteiro} rotuloId={idExemplo} />
+              </span>
+            )
             : !avisoEntrada && <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
         )}
-        {avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
-        {bloqueio && <span id={idBloqueio} className={css.alerta} role={editando ? 'alert' : undefined}>{bloqueio}</span>}
+        {!editando && avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
+        {bloqueio && <span id={idBloqueio} className={css.alerta}>{bloqueio}</span>}
       </div>
 
       {editando ? (
-        <div className={css.form}>
-          <CampoArea
-            rotulo={`Texto de ${regra.nome}`}
-            rotuloOculto
-            rows={3}
-            value={rascunho}
-            disabled={salvando}
-            onChange={(e) => setRascunho(e.target.value)}
-            dica={fonteApi ? VARIAVEIS_TEXTO : null}
-            autoFocus
-          />
-          <div className={css.acoes}>
-            <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando || Boolean(bloqueio)} aria-describedby={bloqueio ? idBloqueio : undefined} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
-            <Botao variante="texto" disabled={salvando} onClick={() => setRascunho(null)}>Cancelar</Botao>
-          </div>
-        </div>
+        <EditorDeAutomatica
+          regra={regra} inicial={rascunho} editavel={editavel}
+          analisar={(texto) => analisarAutomatica({ regra, texto, fonteApi, editavel, valores: exemplo })}
+          avisoApi={sincronizacao?.aviso ?? null} idBloqueio={idBloqueio} aoSalvar={gravar}
+          aoSalvou={() => setRascunho(null)} aoCancelar={() => setRascunho(null)} autoFocus
+        />
       ) : editavel && (
         <div className={css.acoesLinha}>
           <Botao variante="texto" icone="lapis" onClick={() => setRascunho(regra.texto || regra.sugestao || '')}>
@@ -308,7 +311,8 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
 }
 
 function SecaoAutomaticas({ focoInicial }) {
-  const { regras, fonteApi, cargaDasRegras } = useAtendimento()
+  const { regras, fonteApi, cargaDasRegras, agora, funcionamento } = useAtendimento()
+  const exemplo = useMemo(() => exemploDaPrevia({ agora, funcionamento, origem: window.location.origin }), [agora, funcionamento])
   const { acoes } = useAcessoModulos()
   // #1966: ligar, desligar e editar é da gerência do atendimento (a API recusa o Operador).
   const editavel = automacoesEditaveis({ fonteApi, acoes })
@@ -322,7 +326,7 @@ function SecaoAutomaticas({ focoInicial }) {
     <section className={css.secao} aria-labelledby="gestao-automaticas">
       <header className={css.topo}>
         <div>
-          <h3 id="gestao-automaticas">{NOME_RESPOSTAS_AUTOMATICAS}</h3>
+          <h3 id="gestao-automaticas">Mensagens que saem sozinhas</h3>
           <p className={css.descricao}>
             Saem sozinhas, só até 24 h depois da última mensagem do cliente e nunca para cliente bloqueado.
             Na conversa aparecem com a etiqueta automática.
@@ -336,7 +340,7 @@ function SecaoAutomaticas({ focoInicial }) {
         <p className={css.vazio} role={cargaDasRegras?.estado === 'erro' ? 'alert' : undefined}>{vazio}</p>
       ) : (
         <ul className={css.lista}>
-          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} editavel={editavel} emFoco={focoInicial === `regra-${r.id}`} />)}
+          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} editavel={editavel} exemplo={exemplo} emFoco={focoInicial === `regra-${r.id}`} />)}
         </ul>
       )}
     </section>

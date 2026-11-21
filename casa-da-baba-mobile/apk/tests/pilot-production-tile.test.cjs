@@ -1,4 +1,5 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 // #2886: no card selecionado da Produção o botão Foto (48dp no piloto) cobria a metade de cima do "+".
 // O Foto sai do canto e entra na linha de ações; a região viva única existe no markup.
 const { test } = require('node:test');
@@ -7,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const css = fs.readFileSync(path.join(__dirname, '..', 'pilot.css'), 'utf8');
-const html = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'EasyStock.Api', 'wwwroot', 'pwa', 'index.html'), 'utf8');
+const html = lerPwaMontada(path.join(__dirname, '..', '..', '..', 'EasyStock.Api', 'wwwroot', 'pwa', 'index.html'));
 const rule = selector => {
   const start = css.indexOf(selector + ' {');
   assert.ok(start >= 0, selector + ' ausente');

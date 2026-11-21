@@ -1,5 +1,6 @@
 using System.Text;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
@@ -137,7 +138,9 @@ public static class GeracaoAgenteAtendimento
             try
             {
                 resposta = await EnviarComUmaNovaTentativaAsync(
-                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil), contexto.Conversa.Id, logger, ct);
+                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
+                    { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento },
+                    contexto.Conversa.Id, logger, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {

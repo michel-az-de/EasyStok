@@ -3,15 +3,19 @@ using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Events.Atendimento;
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
+using EasyStock.Application.Services.Notifications;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Entities.Storefront;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Enums.Storefront;
+using EasyStock.Domain.Sales;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
@@ -45,7 +49,8 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     IPedidoRepository? pedidos = null,
     IRegraAutomaticaRepository? regrasAutomaticas = null,
     PerfilClienteWhatsApp? perfilCliente = null,
-    RespostaSemIa? respostaSemIa = null)
+    RespostaSemIa? respostaSemIa = null,
+    INotificadorService? notificador = null)
 {
     private const string Provedor = "meta_whatsapp";
 
@@ -276,6 +281,14 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         identificacao?.IdentidadePendente == true
         || identificacao?.Cliente is { Bloqueado: true } or { AtendimentoAutomaticoPausado: true };
 
+    /// <summary>
+    /// #2928: ponto único que monta a origem do anúncio Click-to-WhatsApp. Sem <c>referral</c>, null (a conversa não perde a anterior).
+    /// O <c>ctwa_clid</c> fica DESLIGADO (null): a política de privacidade do site ainda não registra a base legal para
+    /// guardá-lo (spec, riscos). Para ligar, depois de atualizar a política, troque o null por <c>r.CtwaClid</c>.
+    /// </summary>
+    private static OrigemAnuncio? OrigemDoAnuncio(MensagemRecebidaWhatsApp msg) =>
+        msg.Referral is { } r ? OrigemAnuncio.DoAnuncioWhatsApp(r.SourceId, r.Headline, ctwaClid: null, msg.Timestamp) : null;
+
     private async Task<(Conversa, Mensagem, ConfiguracaoAtendimento, IdentificacaoCliente?)> GravarEntradaAsync(
         Guid empresaId, EntradaWhatsApp entrada, MensagemRecebidaWhatsApp msg, DateTime enviadaEm, CancellationToken ct)
     {
@@ -297,11 +310,31 @@ public sealed class ProcessarEventoWhatsAppUseCase(
         }
 
         conversa.RegistrarEntrada(enviadaEm);
+        conversa.RegistrarOrigemAnuncio(OrigemDoAnuncio(msg));
         if (existenteConversa is null)
             await conversaRepository.AddAsync(conversa, ct);
 
         var botaoId = msg.BotaoRespostaId ?? msg.BotaoPayload;
         var texto = msg.Tipo is "interactive" or "button" ? null : CortarNoLimite(msg.TextoCorpo);
+
+        // #2992: o cliente desistiu do pedido que a equipe atende. A equipe é avisada uma vez e a cobrança daquele pedido para.
+        if (existenteConversa is not null && pedidos is not null && notificador is not null
+            && conversa.PedidoEmAndamentoId is { } pedidoDaConversa
+            && DetectorDesistenciaPedido.EhDesistencia(texto)
+            && await pedidos.GetByIdAsync(empresaId, pedidoDaConversa) is { StatusEnum: StatusPedido.AguardandoPagamento }
+            && conversa.MarcarClienteDesistiuDoPedido(pedidoDaConversa))
+        {
+            // O aviso não pode derrubar a gravação da mensagem do cliente: a marca segue e a cobrança para mesmo assim.
+            try
+            {
+                await new PublicadorAvisoEquipe(notificador).AtencaoNoAtendimentoAsync(empresaId, conversa.Id, nomePerfil,
+                    "O cliente desistiu do pedido: confira e decida o acerto com ele", ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Webhook WhatsApp: desistência marcada na conversa {ConversaId}, aviso à equipe falhou.", conversa.Id);
+            }
+        }
         // Resposta de lista ou de fluxo não traz o id do botão: fica o registro, sem o tipo Botao.
         var tipoConteudo = MapearTipoConteudo(msg.Tipo);
         if (tipoConteudo == TipoConteudoMensagem.Botao && string.IsNullOrWhiteSpace(botaoId))

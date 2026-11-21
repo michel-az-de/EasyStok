@@ -120,8 +120,10 @@ assert.doesNotMatch(modal, /Mensagens automáticas/, 'T9: sem o nome antigo')
 assert.equal(NOME_RESPOSTAS_AUTOMATICAS, 'Respostas automáticas')
 
 // T7/T5 na tela: o modal usa a prévia do servidor e o aviso de valor faltando só no modo API.
-assert.match(modal, /previaDoServidor\(/, 'T7: o modal monta a prévia pela regra do servidor')
-assert.match(modal, /avisoDeValorFaltando\(/, 'T5: o modal avisa quando falta valor')
+// #2783: a prévia e o aviso moram em analisarAutomatica, que o editor único chama.
+assert.match(lerFonte('dominio/automacao.js'), /previaDoServidor\(texto, valores, variaveis\)/, 'T7: a análise monta a prévia pela regra do servidor')
+assert.match(lerFonte('dominio/automacao.js'), /avisoDeValorFaltando\(regra\.gatilho, texto\)/, 'T5: a análise avisa quando falta valor')
+assert.match(modal, /analisarAutomatica/, 'T7: o modal usa a análise única')
 
 // T3 no atalho "/": a janela do pedido entra no preenchimento.
 const atalho = lerFonte('aplicacao/useAtalhoBarra.js')

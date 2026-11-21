@@ -20,7 +20,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 
@@ -44,7 +43,7 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Aprovacao;
 /// </summary>
 public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
 
     private static readonly Guid EmpresaId = Guid.NewGuid();
@@ -55,11 +54,7 @@ public sealed class AprovacaoPedidoControllerTests : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_aprovacao_tests")
-                .WithUsername("postgres")
-                .WithPassword("senha-de-teste-descartavel")
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             _isAvailable = true;

@@ -3,6 +3,7 @@ using System.Net.Mail;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Domain.Enums.Atendimento;
@@ -49,7 +50,8 @@ public sealed class SugerirCadastroConversaUseCase(IMontagemFichaLlmClient llm, 
         {
             var contexto = JsonSerializer.Serialize(fontes.Select(m => new { mensagemId = m.Key, texto = m.Value }));
             var resposta = await llm.EnviarAsync(new RequisicaoLlm(Instrucao,
-                [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm(contexto)])], [Ferramenta]), ct);
+                [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm(contexto)])], [Ferramenta])
+            { EmpresaId = command.EmpresaId, Finalidade = FinalidadeIa.SugestaoCadastro }, ct);
             var campos = Traduzir(resposta, fontes);
             logger.LogInformation("Sugestão de cadastro: empresa {EmpresaId}, conversa {ConversaId}, {Entrada}+{Saida} tokens, {LatenciaMs} ms, {Campos} campos",
                 command.EmpresaId, command.ConversaId, resposta.TokensEntrada, resposta.TokensSaida, tempo.ElapsedMilliseconds, campos.Count);

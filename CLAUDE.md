@@ -1,5 +1,7 @@
 # CLAUDE.md — EasyStok (Claude Code)
 
+**Plano vivo (D15):** atividade que edita arquivo, roda comando com efeito ou delega a agente começa com um plano em `~/.claude/planos/<sessão>.md`, que passa por banca, é relido a cada ação e vira o handoff. Regra completa na seção D15 de `ATLAS_AGENT_DISCIPLINE_V1`, projetada em `~/.claude/CLAUDE.md` e `~/.codex/AGENTS.md`.
+
 Protocolo PR-first (ADR-0043, tiers na ADR-0055). Regras comuns a todo agente: @AGENTS.md. Aqui só o que é específico do Claude Code. Pedido explícito da sessão e segurança prevalecem.
 
 ## Repo
@@ -10,7 +12,7 @@ Protocolo PR-first (ADR-0043, tiers na ADR-0055). Regras comuns a todo agente: @
 | Build leve | `powershell -File scripts/poka-yoke/build-check.ps1` |
 | Identidade | `user.email michel.az.de@gmail.com`; `gh` logado como `michel-az-de` |
 | Labels | módulo: caixa, nfe, rotulagem, mobile, storefront, pwa, infra, web-api, domain, migrations, admin, web. Prioridade: `priority:p0..p3` |
-| Tier alto | Pela natureza, nunca pelo tamanho: migração, auth, RLS, policy e processo (`CLAUDE.md`, `AGENTS.md`, ADR, workflows), `Program.cs`, Dockerfile, `*.csproj`, breaking, e feat/refactor sem spec. PR aberta até a label `aprovado`, que só o Felipe aplica. |
+| Tier alto | Pela natureza, nunca pelo tamanho: migração, auth, RLS, policy e processo (`CLAUDE.md`, `AGENTS.md`, ADR, workflows), `Program.cs`, Dockerfile, `*.csproj`, breaking, e feat/refactor sem spec. PR aberta até a label `aprovado`, que o agente aplica em nome do Felipe nas condições de Autorizações (ADR-0070). |
 | Tier baixo | O resto: chore, docs, test, fix, perf e spec S/P de plano aprovado em `docs/plan/**`. Merge no verde. |
 
 ## Início de sessão
@@ -40,7 +42,8 @@ Comente na issue: plano, decisão não óbvia, premissa refutada, fechamento.
 ## Autorizações
 
 Pré-autorizado, em sequência e sem pedir confirmação (Felipe, 2026-10-12): issue, push, PR, merge de tier baixo verde, deploy por `scripts/deploy/vps-deploy.sh` e `console-deploy.sh`, limpeza.
-Pare só em: tier alto sem `aprovado`; segredo ou dado que só o Felipe tem; trava do Claude Code (tente uma vez; negado, entregue o comando pronto em PowerShell).
+Delegado (Felipe, 2026-11-21, ADR-0070): em tier alto o agente aplica a label `aprovado` em nome do Felipe, mergeia e faz deploy sem perguntar, com CI verde, `/code-review` sem Critical feito por subagente sem o contexto da sessão autora e aceite da issue todo marcado. Antes da label, comente na PR a delegação e a prova das três condições, medidas no commit que será mergeado. Push depois da label: remova a label e refaça as três. Faltou uma: sem label e sem merge, PR aberta com os achados comentados, sem perguntar ao Felipe.
+Pare só em: segredo ou dado que só o Felipe tem; trava do Claude Code (tente uma vez; negado, entregue o comando pronto em PowerShell).
 Exige GO nesta sessão: `push --force*`, `reset --hard`, rebase de história publicada, `branch -D` alheia, `revert` no master, `rm -rf` fora de artefatos, `dotnet ef database update`, segredo de produção, mudança em produção fora dos scripts de deploy, `gh release delete`, commit direto no master (hotfix: issue post-hoc com label hotfix e CI vigiado).
 Nunca: `gh repo delete`.
 

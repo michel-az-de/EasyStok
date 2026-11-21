@@ -19,6 +19,8 @@ public sealed class RoteadorWhatsAppClient(IRemetenteWhatsApp remetente, WppConn
         await (await ClienteAsync(ct)).EnviarTextoAsync(waId, texto, responderAWamid, ct);
     public async Task<EnvioWhatsAppResult> EnviarImagemAsync(string waId, string urlPublica, string? legenda = null, CancellationToken ct = default) =>
         await (await ClienteAsync(ct)).EnviarImagemAsync(waId, urlPublica, legenda, ct);
+    public async Task<EnvioWhatsAppResult> EnviarDocumentoAsync(string waId, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default) =>
+        await (await ClienteAsync(ct)).EnviarDocumentoAsync(waId, urlPublica, nomeArquivo, legenda, ct);
     public async Task<EnvioWhatsAppResult> EnviarAudioAsync(string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default) =>
         await (await ClienteAsync(ct)).EnviarAudioAsync(waId, urlPublica, notaDeVoz, ct);
     public async Task<EnvioWhatsAppResult> EnviarBotoesAsync(string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default) =>

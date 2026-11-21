@@ -18,6 +18,8 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
         builder.Property(x => x.SaudacaoRetorno).IsRequired().HasMaxLength(500);
         builder.Property(x => x.FraseEspera).IsRequired().HasMaxLength(200);
         builder.Property(x => x.MensagemForaArea).IsRequired().HasMaxLength(500);
+        // #2937: fecho do canhoto em imagem; nulo é sem fecho.
+        builder.Property(x => x.FraseFechoCanhoto).HasMaxLength(ConfiguracaoAtendimento.FraseFechoCanhotoTamanhoMaximo);
         // #2249: moldes das ações do robô; linha antiga ganha o texto padrão.
         builder.Property(x => x.MensagemEscalada).IsRequired().HasMaxLength(ConfiguracaoAtendimento.MoldeTamanhoMaximo)
             .HasDefaultValue(ConfiguracaoAtendimento.MensagemEscaladaPadrao);
@@ -58,5 +60,13 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
             .WithMany()
             .HasForeignKey(x => x.EmpresaId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // #2957: modelo de IA da loja; FK composta impede apontar para modelo de outra loja.
+        builder.HasOne<EasyStock.Domain.Entities.Ia.ModeloIa>()
+            .WithMany()
+            .HasForeignKey(x => new { x.EmpresaId, x.ModeloIaId })
+            .HasPrincipalKey(m => new { m.EmpresaId, m.Id })
+            .HasConstraintName("fk_configuracoes_atendimento_modelo_ia")
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

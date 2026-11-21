@@ -15,6 +15,8 @@ public sealed record ResumoPedidoDto(
     decimal Frete,
     decimal Total,
     string Entrega,
-    string? Endereco);
+    string? Endereco,
+    bool Pago = false,
+    string? Fecho = null);
 
 public sealed record ResumoPedidoItemDto(string Nome, decimal Quantidade, decimal Subtotal, string? Observacao);

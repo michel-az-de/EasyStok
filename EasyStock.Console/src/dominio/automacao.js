@@ -6,6 +6,7 @@
 // precisa saber o que a casa falou em nome dela.
 import { faixaParaCliente, preencherFaixa } from './entrega'
 import { rotaDoCardapioLink } from './cardapioLink'
+import { descreverProximaAbertura, proximaAbertura } from './funcionamento'
 
 export const GATILHOS = {
   PRIMEIRO_CONTATO: 'primeiro-contato',
@@ -135,6 +136,19 @@ export function contextoDePrevia(conversa, faixa, agora) {
   }
 }
 
+// #3010: exemplo verossímil para a prévia de quem lê o modelo sem uma conversa à frente: as cinco variáveis
+// preenchidas, o horário de abertura vindo do funcionamento da loja e o link na origem da tela.
+export function exemploDaPrevia({ agora, funcionamento, origem = '' } = {}) {
+  return {
+    nome: 'Maria',
+    faixa: 'amanhã às 14:00',
+    pedido: '12',
+    // Sem próxima abertura a frase de aviso do funcionamento não cabe dentro do texto do cliente: usa o horário-exemplo.
+    abre: agora && proximaAbertura(agora, funcionamento) ? descreverProximaAbertura(agora, funcionamento) : 'amanhã às 11:00',
+    linkCardapio: origem + rotaDoCardapioLink('exemplo'),
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Modo API (#1441): as automáticas do EasyStok (S42, `GatilhoAutomacao`)
 // casadas com as regras desta tela pelo gatilho. A descrição diz quando o
@@ -258,15 +272,16 @@ export function bloqueioDaAutomatica(texto, editavel = true) {
 
 // #2734 (T7): a prévia do modo API faz a mesma troca do servidor. Variável conhecida com valor vira o valor;
 // o resto (desconhecida, ou conhecida sem valor, que no servidor nem sai) fica escrito e marcado como erro.
+// `conhecidas` é o catálogo da tela (`VARIAVEIS` na demonstração, que preenche as cinco).
 // Devolve pedaços `{ texto, tipo }`, tipo `texto`, `valor` ou `erro`, para a tela marcar o que o cliente não leria bem.
-export function previaDoServidor(texto, valores = {}) {
+export function previaDoServidor(texto, valores = {}, conhecidas = VARIAVEIS_DA_API) {
   const partes = []
   let cursor = 0
   const origem = String(texto ?? '')
   for (const m of origem.matchAll(MARCADOR_LIVRE)) {
     if (m.index > cursor) partes.push({ texto: origem.slice(cursor, m.index), tipo: 'texto' })
     const chave = m[1]
-    const valor = VARIAVEIS_DA_API.some((v) => v.chave === chave) ? String(valores[chave] ?? '').trim() : ''
+    const valor = conhecidas.some((v) => v.chave === chave) ? String(valores[chave] ?? '').trim() : ''
     partes.push(valor ? { texto: valor, tipo: 'valor' } : { texto: m[0], tipo: 'erro' })
     cursor = m.index + m[0].length
   }
@@ -302,3 +317,20 @@ export function avisoDeValorFaltando(gatilho, texto) {
 export const enviosAutomaticos = (mensagens) => (mensagens ?? [])
   .filter((m) => m.dir === 'out' && m.automatica)
   .sort((a, b) => new Date(b.em) - new Date(a.em))
+
+// #2783: tudo que o editor da mensagem automática mostra sobre o texto digitado, igual em Respostas e em Automações.
+// `valores` são os de exemplo da prévia; `contexto` (só demonstração) é o da conversa escolhida, que preenche as
+// cinco variáveis como a conversa de verdade. Devolve as variáveis aceitas, o que impede salvar (`bloqueio`), os
+// avisos e a prévia em partes (`tipo: 'erro'` é a chave que o servidor deixaria escrita).
+export function analisarAutomatica({ regra, texto, fonteApi, editavel, valores, contexto = null }) {
+  const variaveis = fonteApi ? VARIAVEIS_DA_API : VARIAVEIS
+  return {
+    variaveis,
+    bloqueio: fonteApi ? bloqueioDaAutomatica(texto, editavel) : null,
+    semValor: fonteApi ? avisoDeValorFaltando(regra.gatilho, texto) : null,
+    avisoEntrada: fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null,
+    partes: !fonteApi && contexto
+      ? [{ texto: textoDaRegra({ ...regra, texto }, contexto), tipo: 'texto' }]
+      : previaDoServidor(texto, valores, variaveis),
+  }
+}

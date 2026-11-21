@@ -106,6 +106,10 @@
 .linhaChips > button { flex-shrink: 0; white-space: nowrap; }
 .linhaChips strong { font-size: var(--t-apoio); color: var(--tinta-2); font-weight: 600; }
 .contadorChip { font-family: var(--f-dado); }
+/* #3042: Ordenar e Bairro (select rotulado) e o chip de Alcance numa linha só; quebra quando não cabe. */
+.linhaControles { display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--e-2) var(--e-3); }
+.linhaControles > button { flex-shrink: 0; white-space: nowrap; }
+.linhaControles > div { flex: 1 1 9rem; max-width: 16rem; }
 .proximaConferencia {
   margin: 0; font-size: var(--t-apoio); color: var(--tinta-2);
   display: flex; align-items: center; gap: var(--e-1);

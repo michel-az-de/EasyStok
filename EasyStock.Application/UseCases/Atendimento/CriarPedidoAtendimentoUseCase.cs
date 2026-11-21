@@ -131,7 +131,8 @@ public sealed class CriarPedidoAtendimentoUseCase(
                 Observacoes: input.Observacoes,
                 Prazo: new PrazoPreparoCheckout(configuracao.TempoPreparoPadraoMinutos, configuracao.RespiroMinutos),
                 Numero: endereco.Numero,
-                EnderecoEntrega: EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega.De(endereco), FreteCombinado: input.FreteCombinado),
+                EnderecoEntrega: EasyStock.Application.Services.Pedidos.DadosEnderecoEntrega.De(endereco), FreteCombinado: input.FreteCombinado,
+                OrigemDaConversa: conversa.OrigemAnuncio), // #2928: o pedido leva o anúncio que valia na conversa
             ct);
 
         // Retrato do cliente, como o Pedido.Criar e o checkout guest gravam: sem ele o KDS e as Entregas

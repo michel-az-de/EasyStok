@@ -3,6 +3,7 @@ import {
   closestCenter, DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
+import { NovoPedidoJanela } from './NovoPedidoJanela'
 import { anunciarAberturaDeConversa, destinoDoNovoPedido, useAoAbrirConversa, VALIDADE_DO_NOVO_PEDIDO_MS } from '../aplicacao/aberturaDeConversa'
 import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
 import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicacao/rascunhosDosAjustes'
@@ -82,6 +83,7 @@ import { Moldura } from './Moldura'
 import { PilhaDeAvisos } from './PilhaDeAvisos'
 import { AvisosDoDispositivo } from './AvisosDoDispositivo'
 import { AjudaDoConsole } from '../features/ajuda/AjudaDoConsole'
+import { useQuandoPedirAjuda } from '../aplicacao/pedirAjuda'
 import { NavegacaoDoConsole } from './NavegacaoDoConsole'
 import css from './moldura.module.css'
 
@@ -556,6 +558,7 @@ function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComa
       <LimparAvisoAoNavegar />
       <AvisosDoDispositivo visitaSoNaMemoria={visitaSoNaMemoria}><TelaDaRota rota={rota} /></AvisosDoDispositivo>
       {permite('atendimento') && <PilhaDeAvisos />}
+      <NovoPedidoJanela />
     </AtendimentoProvider>
   )
 }
@@ -570,6 +573,8 @@ function NoModulo({ rota, children }) {
 
 function ControleAjuda({ rota }) {
   const [aberta, setAberta] = useState(false)
+  // #3004: o menu da conta (pé do trilho) também abre a Ajuda; este controle está sempre montado na moldura.
+  useQuandoPedirAjuda(useCallback(() => setAberta(true), []))
   return <><Botao variante="texto" icone="ajuda" data-ajuda-console aria-label="Ajuda" title="Ajuda" aria-haspopup="dialog" onClick={() => setAberta(true)}>Ajuda</Botao>
     {aberta && <AjudaDoConsole rota={rota} fonteApi={FONTE_API} aoFechar={() => setAberta(false)} />}</>
 }

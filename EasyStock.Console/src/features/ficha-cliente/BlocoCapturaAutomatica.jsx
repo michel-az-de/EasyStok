@@ -2,6 +2,7 @@ import { Icone } from '../../componentes/Icone'
 import { Pilula } from '../../componentes/Pilula'
 import { CAMPOS, automaticoConduzindo } from '../../dominio/captura'
 import css from './ficha.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Rodada 11 (issue #8, registro 92). O pedido do dono: "atendimento ao
 // cliente deveria ser automatizado cadastro do cliente conversas eu nao vi
@@ -11,7 +12,7 @@ import css from './ficha.module.css'
 // (o toque "Assumir" continua um só, na barra da conversa: US-004).
 const PASSOS = [
   { chave: CAMPOS.NOME, rotulo: 'Nome' },
-  { chave: CAMPOS.TELEFONE, rotulo: 'Telefone' },
+  { chave: CAMPOS.TELEFONE, rotulo: ROTULOS.CELULAR },
   { chave: CAMPOS.ENDERECO, rotulo: 'Endereço' },
   { chave: 'cadastro', rotulo: 'Cadastro' },
   { chave: CAMPOS.PEDIDO, rotulo: 'Pedido' },
@@ -35,7 +36,7 @@ export function BlocoCapturaAutomatica({ conversa, pausado }) {
   if (conversa.cliente.enderecoCapturado) status = 'Endereço fora da área: a decisão é sua, logo abaixo.'
   else if (esperaVoce) status = 'Passou para você: o Assistente parou aqui. O que ele captou continua na ficha.'
   else if (!conduzindo) status = 'Você está no controle: o Assistente parou aqui. O que ele captou continua na ficha.'
-  else if (tudoFeito) status = 'Pedido anotado pelo Assistente. Confira a comanda e gere a cobrança.'
+  else if (tudoFeito) status = 'Pedido anotado pelo Assistente. Confira o pedido e gere a cobrança.'
   const selo = esperaVoce ? 'com você' : conduzindo ? 'ativo' : 'parado'
 
   return (

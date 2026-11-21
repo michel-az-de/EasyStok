@@ -148,8 +148,14 @@ public sealed class LeadSemPedidoIntegrationTests(PostgreSqlDatabaseFixture fixt
         cancelado.Cancelar();
 
         // ChatSite: a correção do vínculo não grava decisão por telefone (só o WhatsApp grava).
-        Conversa Abrir(int minutos, Guid? clienteId) => Conversa.Abrir(
-            empresa.Id, Guid.NewGuid().ToString("N"), agora.AddMinutes(-minutos), null, clienteId, CanalConversa.ChatSite);
+        // #2921: a fila só lista conversa em que a cliente já escreveu.
+        Conversa Abrir(int minutos, Guid? clienteId)
+        {
+            var conversa = Conversa.Abrir(
+                empresa.Id, Guid.NewGuid().ToString("N"), agora.AddMinutes(-minutos), null, clienteId, CanalConversa.ChatSite);
+            conversa.RegistrarEntrada(agora.AddMinutes(-minutos));
+            return conversa;
+        }
         var semCadastro = Abrir(4, null);
         var doLead = Abrir(3, lead.Id);
         var doCliente = Abrir(2, cliente.Id);

@@ -185,12 +185,12 @@ await confere('#1686-3 nova comanda na mesma conversa depois do pedido entregue 
   assert.equal(reducer(base(emAndamento), { tipo: acao.NOVA_COMANDA, id: 'c1', numeroPedido: '9' }).conversas[0].pedido, emAndamento, 'pedido em andamento não é trocado')
   const ficha = fonte('features/ficha-cliente/PainelFicha.jsx')
   assert.match(ficha, /\{editavel && fonteApi && posVenda && novaComanda && \(/)
-  assert.match(ficha, /onClick=\{\(\) => novaComanda\(selecionada\.id\)\}>Nova comanda<\/Botao>/)
+  assert.match(ficha, /onClick=\{\(\) => novaComanda\(selecionada\.id\)\}>Novo pedido<\/Botao>/)
 })
 
 await confere('#1686-4 pedido criado: a Seleção diz como trocar item e dá os botões (link da comanda, cancelar e refazer)', async () => {
   const r = await import('../src/dominio/resumoPedido.js')
-  assert.match(r.caminhoParaTrocarItem({ estado: 'aguardando' }), /mande o link da comanda: o cliente altera e você aprova aqui\. Ou cancele este pedido e monte outro\.$/)
+  assert.match(r.caminhoParaTrocarItem({ estado: 'aguardando' }), /mande o link do pedido: o cliente altera e você aprova aqui\. Ou cancele este pedido e monte outro\.$/)
   assert.doesNotMatch(r.caminhoParaTrocarItem({ estado: 'preparo' }), /cancele/, 'pedido pago não sugere cancelar')
   assert.equal(r.podeCancelarParaRefazer({ pedidoId: 'p', estado: 'aguardando' }, { fonteApi: true }), true)
   assert.equal(r.podeCancelarParaRefazer({ pedidoId: 'p', estado: 'aguardando', cobranca: { pagaEm: 1 } }, { fonteApi: true }), false)

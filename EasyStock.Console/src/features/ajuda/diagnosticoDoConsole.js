@@ -3,7 +3,7 @@ import { NOME_INICIO, moduloPorId, telasDoMenu } from '../../dominio/modulos'
 
 const GUIAS = {
   atendimento: [
-    'Escolha o cliente em Conversas. A conversa reúne as mensagens; a Ficha guarda os dados do cliente e a comanda.',
+    'Escolha o cliente em Conversas. A conversa reúne as mensagens; a Ficha guarda os dados do cliente e o pedido.',
     'Use Respostas para inserir um texto pronto. Confira o destinatário e o texto antes de enviar.',
     'Peça sugestões ao Assistente. Revise cada proposta antes de usar ou enviar ao cliente.',
   ],

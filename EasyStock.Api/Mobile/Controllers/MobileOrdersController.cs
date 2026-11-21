@@ -123,7 +123,8 @@ public class MobileOrdersController(
                 CriadoPorUserId: ResolveUserId(),
                 CriadoPorNome: mobile.LastOperatorName,
                 // F5 — propaga agendamento do mobile pro ERP.
-                AgendadoParaEm: mobile.ScheduledDeliveryAt
+                AgendadoParaEm: mobile.ScheduledDeliveryAt,
+                Canal: mobile.Channel
             ));
             erpPedidoId = result.Id;
         }

@@ -71,6 +71,7 @@ const painel = readFileSync(new URL('../src/features/atendimento/PainelAtendimen
 assert.match(painel, /fonteApi && !encerrada && \{ chave: 'assistente', rotulo: 'Checar o Assistente'/)
 assert.match(painel, /modalAberto === 'assistente' && <ModalAssistente/)
 const modal = readFileSync(new URL('../src/features/atendimento/ModalAssistente.jsx', import.meta.url), 'utf8')
-assert.match(modal, /if \(!ativo && !window\.confirm\(PERGUNTA_AO_DESLIGAR\)\) return/)
+assert.match(modal, /if \(!ativo\) \{ setDesligando\(true\); return \}/) // #3011: pergunta no ModalConfirmar
+assert.match(modal, /descricao=\{PERGUNTA_AO_DESLIGAR\}/)
 assert.match(modal, /role="switch"/)
 console.log('prova-2496-checagem-assistente: ok')

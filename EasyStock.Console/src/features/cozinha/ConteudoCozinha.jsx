@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor,
   useDroppable, useSensor, useSensors,
@@ -12,6 +12,7 @@ import { passoPorId } from '../../dominio/esteira'
 import { PASSOS_DA_COZINHA, ROTULO_DO_TOQUE, pedidosNaCozinha, respostaAoSoltar } from '../../dominio/cozinha'
 import { opcoesDoDespacho } from '../../dominio/despacho'
 import { CartaoCozinha, CartaoErguido } from './CartaoCozinha'
+import { FaixaColunas } from './FaixaColunas'
 import { FeedbackArrasto } from './FeedbackArrasto'
 import { colisaoPorColuna, coordenadasEntreColunas } from './arrastoEntreColunas'
 import css from './cozinha.module.css'
@@ -88,7 +89,7 @@ function ColunaCozinha({ passo, resposta, arrastando, acao, children }) {
     arrastando && !aceita && !isOver && css.colunaQuieta,
   ].filter(Boolean).join(' ')
   return (
-    <section ref={setNodeRef} className={classes} aria-label={passo.rotulo} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
+    <section ref={setNodeRef} className={classes} aria-label={passo.rotulo} data-coluna={passo.id} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
       {children}
       {aceita && (
         <p className={css.dicaColuna} aria-hidden="true">
@@ -170,6 +171,7 @@ export function ConteudoCozinha({
     return itens.some((l) => l.produto?.linha === linhaFiltro)
   }
 
+  const quadroRef = useRef(null)
   const colunas = PASSOS_DA_COZINHA.map((passo) => ({
     passo,
     cartoes: pedidos.filter((c) => c.pedido.estado === passo.id).filter(passaNoFiltro),
@@ -242,7 +244,8 @@ export function ConteudoCozinha({
         </div>
 
         <FeedbackArrasto feedback={feedback} />
-        <div className={css.colunas}>
+        <FaixaColunas quadroRef={quadroRef} itens={colunas.map(({ passo, cartoes }) => ({ id: passo.id, rotulo: rotuloDaColuna(passo.id), contagem: cartoes.length }))} />
+        <div ref={quadroRef} className={css.colunas}>
           {colunas.map(({ passo, cartoes }) => {
             const recolhivel = passo.id === 'entregue'
             return (

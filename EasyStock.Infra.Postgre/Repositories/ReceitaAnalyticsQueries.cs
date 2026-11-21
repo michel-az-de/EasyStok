@@ -1,3 +1,4 @@
+using EasyStock.Domain.Sales;
 using EasyStock.Application.Common;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Infra.Postgre.Data;
@@ -199,5 +200,33 @@ internal sealed class ReceitaAnalyticsQueries(EasyStockDbContext dbContext, IDis
 
         await SetCachedAsync(cacheKey, result, CanalTtl);
         return result;
+    }
+
+    /// <summary>
+    /// #2928 (S5): pedidos por plataforma e campanha do anúncio. Pedido válido = não cancelado e não rascunho, na
+    /// janela de <c>CriadoEm</c>. Campanha é a UTM; sem UTM (Click-to-WhatsApp) cai no título do anúncio. Total é
+    /// value object convertido, então a soma fecha em memória sobre colunas mínimas, como as consultas vizinhas.
+    /// </summary>
+    public async Task<IReadOnlyList<PedidoPorAnuncio>> GetPedidosPorAnuncioAsync(Guid empresaId, DateTime de, DateTime ate)
+    {
+        var linhas = await dbContext.Pedidos
+            .AsNoTracking()
+            .Where(p => p.EmpresaId == empresaId
+                && p.Status != StatusPedidoMapper.Cancelado && p.Status != StatusPedidoMapper.Rascunho
+                && p.CriadoEm >= DateTime.SpecifyKind(de, DateTimeKind.Utc)
+                && p.CriadoEm <= DateTime.SpecifyKind(ate, DateTimeKind.Utc))
+            .Select(p => new
+            {
+                Plataforma = p.OrigemAnuncio!.Plataforma,
+                p.OrigemAnuncio!.Campanha,
+                p.OrigemAnuncio!.TituloAnuncio,
+                Total = p.Total,
+            })
+            .ToListAsync();
+
+        return linhas
+            .GroupBy(l => (l.Plataforma, Campanha: l.Campanha ?? l.TituloAnuncio))
+            .Select(g => new PedidoPorAnuncio(g.Key.Plataforma, g.Key.Campanha, g.Count(), g.Sum(l => (decimal)l.Total)))
+            .ToList();
     }
 }

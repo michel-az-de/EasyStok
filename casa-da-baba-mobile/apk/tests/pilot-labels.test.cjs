@@ -1,4 +1,5 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,7 +8,7 @@ const { installLabelWorkspace } = require('../pilot.js');
 
 test('tipo de código permanece selecionado quando o APK encurta os rótulos', () => {
   const vm = require('node:vm');
-  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
   const start = html.indexOf('function setEtqCode('), end = html.indexOf('// Alias:', start);
   const modes = ['both', 'barcode', 'qr'];
   const chips = modes.map((mode, i) => ({
@@ -115,7 +116,7 @@ test('markup incompleto ou estrutura inesperada fica intacto', () => {
 });
 
 test('contrato de controles existe no HTML real e não renomeia ações de impressão', () => {
-  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
   const start = html.indexOf('id="etiquetasPreview"'), end = html.indexOf('id="cobrancaModal"', start);
   assert.ok(start >= 0 && end > start);
   const modal = html.slice(start, end);
@@ -127,7 +128,7 @@ test('contrato de controles existe no HTML real e não renomeia ações de impre
 
 test('prévia horizontal contém Code128 intrinsecamente largo sem mudar o gerador físico', () => {
   const vm = require('node:vm');
-  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
   const start = html.indexOf('const CODE128_PATTERNS = [');
   const end = html.indexOf('\n/**', html.indexOf('function generateCode128Svg(', start));
   assert.ok(start >= 0 && end > start);

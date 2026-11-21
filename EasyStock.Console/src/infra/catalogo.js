@@ -8,7 +8,7 @@ import { semearRespostasProntas } from '../dominio/respostas.js'
 // Telegram) entra acrescentando uma linha, sem tocar em componente nenhum.
 //
 //   temJanela    janela de resposta livre depois da última mensagem do cliente
-//   aceitaModelo modelo aprovado pela mensageria fura a janela fechada
+//   aceitaModelo mensagem padrão do WhatsApp pela mensageria fura a janela fechada
 //   aceitaMidia  o que a casa consegue mandar por ali ('arquivo' é PDF/
 //                documento; imagem entra por 'foto', rodada 7, frente Anexos)
 //   temFoto      o canal entrega foto de perfil do cliente
@@ -27,7 +27,7 @@ export const CANAIS = [
     temFoto: true,
     explicacao: [
       'Janela de 24 h contada da última mensagem do cliente.',
-      'Fora da janela só sai modelo aprovado. Aceita foto, figurinha, áudio e arquivo.',
+      'Fora da janela só sai mensagem padrão do WhatsApp. Aceita foto, figurinha, áudio e arquivo.',
     ],
   },
   {
@@ -41,7 +41,7 @@ export const CANAIS = [
     },
     temFoto: true,
     explicacao: [
-      'Janela de 24 h, sem modelo aprovado para furar.',
+      'Janela de 24 h, sem mensagem padrão do WhatsApp para furar.',
       'Fora da janela, espera o cliente voltar. Sem figurinha nem arquivo (documento).',
     ],
   },

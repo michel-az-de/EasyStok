@@ -16,7 +16,7 @@ import { horaMono } from '../../dominio/formato'
 import { horaDaLista } from '../../dominio/horaDaLista'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
-import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
+import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto, ehSeloDeDinheiro } from './apresentacaoDoCartao'
 
 // DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de
 // pagamento em outro lugar da tela, então não pede o vermelho de alarme aqui
@@ -43,7 +43,7 @@ function motivoDaLinha(motivo, origem) {
 // já resolvido, senão a mudança de UMA conversa re-renderizava a lista inteira.
 export const CartaoConversa = memo(function CartaoConversa({
   conversa, selecionada, agora, pausado = false, pagamentoNaoVisto = false, aberta = true, expediente = null,
-  grupo, busca, aoAbrir, fonteApi = false, usuario = null,
+  grupo, busca, aoAbrir, fonteApi = false, usuario = null, novo = false,
 }) {
   const { canais, janelas, cardapio } = useCatalogo()
   const fotoCadastrada = useFotoCliente(conversa.cliente?.fotoUrl)
@@ -82,13 +82,14 @@ export const CartaoConversa = memo(function CartaoConversa({
   // Com você também saem da etiqueta (quem conduz está na BarraModo).
   const nome = nomeDoCartao(conversa)
   const etiqueta = mostraEtiquetaDoEstado(estado)
+  const seloAFrente = contexto.some(ehSeloDeDinheiro)
   // #2232 (L8): "21:48", "ontem", "26 out"; o alerta de cor fica só para o prazo estourado.
   const hora = horaDaLista(conversa.ultimaEm, agora)
 
   return (
     <button
       type="button"
-      className={classesDoCartao(css, { motivo, slaEstourado })}
+      className={novo ? `${classesDoCartao(css, { motivo, slaEstourado })} ${css.cartaoNovo}` : classesDoCartao(css, { motivo, slaEstourado })}
       aria-current={selecionada}
       aria-label={rotuloDoCartao({
         nome: nome.titulo, estado: estado.texto, pendentes, contexto: contexto.map((item) => item.texto),
@@ -109,7 +110,7 @@ export const CartaoConversa = memo(function CartaoConversa({
           <strong className={pendentes > 0 ? css.semResposta : ''}>
             <NomeDoContato
               completo={nome.principal} curto={nome.curto} capsula={nome.capsula} titulo={nome.titulo}
-              complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.complemento.replace(/^Comanda /, '#')}</small>}
+              complemento={nome.complemento && <small aria-label={nome.complemento}> · {nome.numeroPedido ? `#${nome.numeroPedido}` : nome.complemento}</small>}
             />
           </strong>
           {/* #2258 (T7): a cor da borda não é o único sinal; o prazo estourado e a vez da equipe têm ícone e texto. */}
@@ -118,7 +119,8 @@ export const CartaoConversa = memo(function CartaoConversa({
               <Icone nome="relogio" tamanho={16} />
             </span>
           )}
-          {!slaEstourado && motivo && !etiqueta && (
+          {/* #3009: com o selo de dinheiro à frente a etiqueta pode sair da fileira visível; o ícone leva o motivo. */}
+          {(seloAFrente ? (motivo || etiqueta) : (!slaEstourado && motivo && !etiqueta)) && (
             <span className={`${css.sinalPrazo} ${css.sinalAtencao}`} title={estado.texto} role="img" aria-label={estado.texto}>
               <Icone nome={estado.icone ?? 'hand'} tamanho={16} />
             </span>
@@ -156,7 +158,7 @@ export const CartaoConversa = memo(function CartaoConversa({
         {temLinhaDeContexto({ etiqueta, contexto }) && <span className={css.contextoLinha} title={[etiqueta ? estado.texto : null, ...contexto.map((item) => item.texto)].filter(Boolean).join(' · ')}>
           {etiqueta && <Pilula tamanho="inline" tom={estado.tom} icone={estado.icone ?? undefined} titulo={estado.titulo ?? undefined}>{estado.texto}</Pilula>}
           {contexto.map((item) => (
-            <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined}>{item.texto}</Pilula>
+            <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined} className={ehSeloDeDinheiro(item) ? css.seloDinheiro : undefined}>{item.texto}</Pilula>
           ))}
         </span>}
       </span>

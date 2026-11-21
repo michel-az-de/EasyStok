@@ -4,6 +4,7 @@
 // Puro: recebe o texto gravado, devolve o que a tela mostra.
 
 import { dataHora } from './formato'
+import { FRASES_DA_API, ROTULOS } from './rotulos'
 
 export const AUTOMATICO_DESLIGADO = 'o Assistente está desligado'
 
@@ -37,7 +38,7 @@ const ROTULOS_CURTOS = [
   [/^cliente avaliou o pedido como negativo/i, 'Avaliação negativa'],
   [/^botão de avaliação/i, 'Avaliação a conferir'],
   [/^cliente confirmou o endereço/i, 'Endereço não gravado'],
-  [/^cliente pediu ajuda pela comanda/i, 'Ajuda na comanda'],
+  [FRASES_DA_API.AJUDA_PELA_COMANDA, () => ROTULOS.CHIP_AJUDA_NO_PEDIDO],
   [/^conversa reaberta/i, 'Conversa reaberta'],
   [/^cota mensal de tokens do assistente esgotada/i, 'Cota do mês esgotada'],
   [/^telefone do formulário do site já tem cadastro/i, 'Conferir cadastro'],
@@ -45,7 +46,8 @@ const ROTULOS_CURTOS = [
 
 export function rotuloCurtoDoMotivo(motivo) {
   const texto = String(motivo ?? '').trim()
-  return ROTULOS_CURTOS.find(([padrao]) => padrao.test(texto))?.[1] ?? null
+  const rotulo = ROTULOS_CURTOS.find(([padrao]) => padrao.test(texto))?.[1]
+  return typeof rotulo === 'function' ? rotulo() : rotulo ?? null
 }
 
 // `EscalarConversaUseCase.PrefixoMotivo`: a nota que o EasyStok põe na conversa ao passar para a equipe.

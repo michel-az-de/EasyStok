@@ -277,8 +277,10 @@ await confere('5  no EasyStok a troca é só entre link e na entrega, com o text
 
 await confere('5  a tela usa essa troca no modo API e não pergunta meio que o back ignora', () => {
   const alterar = trecho(bloco, 'function AlterarForma(', '// Bloco Cobrança da ficha.')
-  assert.match(alterar, /const trocaApi = fonteApi \? trocaDeFormaNoEasyStok\(cobranca, nomeCliente\) : null/)
-  assert.match(alterar, /\{trocaApi \? <p>\{trocaApi\.texto\}<\/p> : \(/)
+  // #2998: as opções vêm de `trocasDeFormaNoEasyStok` (a de antes e, com o Pix direto disponível, o Pix da loja).
+  assert.match(alterar, /const trocasApi = fonteApi \? trocasDeFormaNoEasyStok\(cobranca, nomeCliente, \{ pixDireto \}\) : null/)
+  assert.match(alterar, /\{trocasApi \? \(/)
+  assert.match(alterar, /\{trocaApi && <p>\{trocaApi\.texto\}<\/p>\}/)
   assert.match(bloco, /<AlterarForma cobranca=\{cobranca\} nomeCliente=\{nomeCliente\} fonteApi=\{fonteApi\} aoAlterar=\{troca\.emitir\} \/>/)
 })
 

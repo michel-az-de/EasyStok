@@ -1,0 +1,39 @@
+# Stack do MCP remoto baba-diag (ADR-0069), em /opt/stacks/mcp.
+# Gerida por scripts/deploy/mcp-deploy.sh (subir, caddy, token-*, status, descer). Nao rode compose a mao.
+# Sem docker.sock: o container chega ao host so pelo gate.sh, via SSH com chave presa a --sem-banco.
+name: mcp
+services:
+  diag:
+    image: easystok-mcp:vps
+    container_name: ez-mcp
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    pids_limit: 128
+    environment:
+      MCP_HOSTS: mcp.easystok.online
+      MCP_TOKENS: /run/mcp/tokens
+      BABA_SSH_TARGET: baba-mcp
+    volumes:
+      # diretorios, nao arquivos: token novo ou revogado vale sem reiniciar
+      - ./ssh:/home/node/.ssh:ro
+      - ./auth:/run/mcp:ro
+    networks: [mcp]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/saude').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "5" }
+
+networks:
+  # criada pelo mcp-deploy.sh (172.16.8.0/24, gateway 172.16.8.1) e nunca apagada: o from= do authorized_keys aponta para ela
+  mcp:
+    external: true

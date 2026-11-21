@@ -87,7 +87,9 @@ public record OrderDto(
     string? Metodo = null,
     string? LegacyHistoryStatus = null,
     // #2307: quanto falta receber do Pedido ERP (desconta estorno e cupom). NULL = o servidor nao sabe.
-    decimal? AReceber = null
+    decimal? AReceber = null,
+    // #409: por onde o pedido chegou (balcao, whatsapp, ifood, telefone). NULL = não informado.
+    string? Channel = null
 );
 
 public record BatchItemDto(

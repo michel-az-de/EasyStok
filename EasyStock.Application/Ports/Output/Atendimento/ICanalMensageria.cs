@@ -16,6 +16,14 @@ public interface ICanalMensageria
 
     Task<string> EnviarImagemAsync(string contatoIdExterno, string urlPublica, string? legenda = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Documento (PDF) pelo link HTTPS (#2962). Canal sem suporte a documento manda a legenda com o link em texto,
+    /// para a cliente ainda abrir o arquivo.
+    /// </summary>
+    Task<string> EnviarDocumentoAsync(
+        string contatoIdExterno, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default) =>
+        EnviarTextoAsync(contatoIdExterno, string.IsNullOrWhiteSpace(legenda) ? urlPublica : $"{legenda}\n{urlPublica}", ct);
+
     Task<string> EnviarBotoesAsync(
         string contatoIdExterno, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default);
 

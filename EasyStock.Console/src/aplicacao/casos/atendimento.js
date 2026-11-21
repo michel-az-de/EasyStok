@@ -9,9 +9,11 @@ import { ATENDENTE } from '../reducer/estadoInicial'
 // mesmos casos (`aplicacao/acoesApi.js`, `api/*`): não são da demonstração.
 
 export const casosAtendimento = {
-  [acao.SELECIONAR_CONVERSA]: (estado, { id }) => ({
+  [acao.SELECIONAR_CONVERSA]: (estado, { id, reter = false }) => ({
     ...estado,
     selecionadaId: id,
+    // #2921: conversa iniciada pela equipe, fora da fila até a cliente responder: a sincronização a retém enquanto selecionada.
+    selecaoRetida: reter ? id : null,
     selecaoPendente: estado.conversas.some((c) => c.id === id) ? null : { id, voltas: 0 },
     agente: estado.agente.conversaId === id ? estado.agente : { estado: 'ocioso', sugestao: null, conversaId: null },
   }),

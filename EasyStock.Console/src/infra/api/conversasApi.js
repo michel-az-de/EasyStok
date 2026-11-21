@@ -13,6 +13,10 @@ const PAGINAS_NO_MAXIMO = 10
 export const listarConversas = ({ limite = POR_PAGINA, pagina = 1 } = {}) =>
   chamarApi(`${BASE}?limite=${limite}&pagina=${pagina}`)
 
+// #2921: a conversa que a equipe iniciou fica fora da fila até a cliente responder, mas a busca aceita o id dela.
+export const buscarConversaPorId = (id) =>
+  chamarApi(`${BASE}?q=${encodeURIComponent(id)}&limite=5`).then((itens) => (itens ?? []).find((c) => c.id === id) ?? null)
+
 export const listarAtendentes = () => chamarApi('/api/atendimento/atendentes')
 
 // Leitura da polling. Inbox inteira (F07, item 7): segue as páginas até uma vir incompleta;
@@ -41,13 +45,31 @@ export const baixarMidia = (conversaId, mensagemId) =>
   chamarApi(`${BASE}/${conversaId}/mensagens/${mensagemId}/midia`, { arquivo: true })
 
 // ATD-1 (#2305, #2440): assumir, transferir ou responder (texto, foto, áudio, cardápio, modelo) em conversa de outra
-// atendente pede confirmação. A API responde 409 CONVERSA_DE_OUTRA; a dona confirma aqui e a mesma ação repete
+// atendente pede confirmação. A API responde 409 CONVERSA_DE_OUTRA; a dona confirma e a mesma ação repete
 // com `confirmar`, com a mesma `chave` de idempotência.
+// #3037: quem pergunta é um modal da tela, registrado aqui por `definirPerguntaDeOutra` (a infra não importa UI).
+// Sem anfitrião registrado, o erro segue adiante e a mensagem da API aparece como em qualquer falha.
+const perguntadores = []
+export const definirPerguntaDeOutra = (pergunta) => {
+  perguntadores.push(pergunta)
+  return () => { const i = perguntadores.lastIndexOf(pergunta); if (i >= 0) perguntadores.splice(i, 1) }
+}
+
+export const CONFIRMACAO_RECUSADA = 'CONFIRMACAO_RECUSADA'
+
 export const comConfirmacaoDeOutra = async (chamada) => {
   try {
     return await chamada(false)
   } catch (erro) {
-    if (erro?.codigo !== 'CONVERSA_DE_OUTRA' || !window.confirm(erro.message)) throw erro
+    const perguntar = perguntadores.at(-1)
+    if (erro?.codigo !== 'CONVERSA_DE_OUTRA' || !perguntar) throw erro
+    if (!(await perguntar(erro.message))) {
+      // #3039: recusou a pergunta; o aviso diz o estado verdadeiro, não pede uma confirmação que já foi negada.
+      const recusa = new Error('A conversa continua com a outra atendente.', { cause: erro })
+      recusa.codigo = CONFIRMACAO_RECUSADA
+      recusa.status = erro.status
+      throw recusa
+    }
     return chamada(true)
   }
 }
@@ -76,7 +98,9 @@ export const reabrir = (id) => chamarApi(`${BASE}/${id}/reabrir`, { metodo: 'POS
 export const marcarLida = (id) => chamarApi(`${BASE}/${id}/marcar-lida`, { metodo: 'POST' })
 // #2871: "Novo pedido" do cliente que pediu pelo WhatsApp pessoal da dona. Abre (ou reaproveita) a conversa do WhatsApp
 // da loja com ele, sem mandar mensagem, e devolve a linha da inbox para o Balcão mostrar antes da próxima leitura.
-export const abrirConversaDoCliente = (clienteId) => chamarApi(`${BASE}/do-cliente`, { metodo: 'POST', corpo: { clienteId } })
+// #2930: `celular` só vale para cliente sem telefone no cadastro; a API grava antes de abrir a conversa.
+export const abrirConversaDoCliente = (clienteId, celular) =>
+  chamarApi(`${BASE}/do-cliente`, { metodo: 'POST', corpo: celular ? { clienteId, celular } : { clienteId } })
 
 // Sugestão do agente para a dona (#1420): `{ texto, tokens, latenciaMs }`. Nada sai ao cliente.
 // Sem a chave da Anthropic na API, 503 com a mensagem que o painel mostra.

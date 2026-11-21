@@ -154,10 +154,10 @@
   --toque: 40px;
   --coluna: 320px;
   /* #1870/#1872: um trilho só no atendimento e nos módulos. Os rótulos de
-     12 px cabem no item de 68 px do trilho de 76 px.
+     12 px cabem no item de 72 px do trilho de 76 px ("Atendimento" mede ~67 px: folga de 2,5 px por lado).
      `--largura-trilho` não é declarado aqui: vem de `TRILHO` em `dominio/paineis.js` (a mesma conta
      da conversa visível), aplicado na partida por `main.jsx`. O item é o trilho menos o respiro. */
-  --respiro-trilho: 4px;
+  --respiro-trilho: 2px;
   --largura-item-trilho: calc(var(--largura-trilho) - 2 * var(--respiro-trilho));
   --altura-item-trilho: 54px;
   --gaveta: 400px;

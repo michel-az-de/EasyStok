@@ -16,8 +16,8 @@
   width: calc(100% - 2 * var(--e-2)); margin: 0 var(--e-2);
   background: transparent; border: 0; padding: 10px var(--e-3); border-radius: var(--r-1);
   transition: background var(--dur-curta) var(--ease-padrao);
-  animation: entradaCartao var(--dur-media) var(--ease-saida);
 }
+.cartaoNovo { animation: entradaCartao var(--dur-media) var(--ease-saida); }
 @keyframes entradaCartao {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -76,6 +76,9 @@
   display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--e-1); min-width: 0; overflow: hidden;
   font-size: var(--t-micro); line-height: 1.35; height: 1.5em; color: var(--tinta-3); white-space: nowrap;
 }
+
+/* #3009: o selo de dinheiro vai à frente da fileira visível (a etiqueta de estado e o resto seguem, e o que não cabe some, L16). */
+.seloDinheiro { order: -1; }
 
 /* Rodada 10, item 2: selo "novo, não visto" do pagamento, independente do
    sinal verde (RN-25) já ter expirado. Some assim que ela abre a conversa. */

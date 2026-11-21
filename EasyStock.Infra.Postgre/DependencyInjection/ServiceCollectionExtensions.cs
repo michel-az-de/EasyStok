@@ -64,6 +64,7 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                     sp.GetRequiredService<EstoqueSaldoCacheInvalidationInterceptor>()));
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
+            services.TryAddSingleton<IRegistroChamadaIa, RegistroChamadaIaRepository>(); // #3063
             services.AddScoped<IAcervoRepository, Repositories.AcervoRepository>();
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
             services.AddScoped<IEmpresaRepository, EmpresaRepository>();
@@ -211,6 +212,13 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AvisarEquipePedidoPagoHandler>(
                 EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            // #2937: canhoto em imagem à cliente. O marco é commitado no envio, então repetir o evento não repete a
+            // imagem; fica antes das automáticas (#1506).
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.CanhotoPedidoPagoHandler>(
+                EasyStock.Application.Events.Pedidos.PedidoPagoEvent.TipoEvento);
+            services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
+                EasyStock.Application.Events.Atendimento.CanhotoPedidoEmPreparoHandler>("pedido.mudou_status");
             services.AddKeyedScoped<EasyStock.Application.Ports.Output.Integration.IIntegrationEventHandler,
                 EasyStock.Application.Events.Atendimento.AvisarEquipeContatoNovoHandler>(
                 EasyStock.Application.Events.Atendimento.ConversaAbertaEvent.TipoEvento);
@@ -271,6 +279,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
                 Repositories.Atendimento.AtendenteRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ISessaoChatSiteRepository,
                 Repositories.Atendimento.SessaoChatSiteRepository>();
+            services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.IOrigemAnuncioRepository,
+                Repositories.Atendimento.OrigemAnuncioRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ILinkCardapioConversaRepository,
                 Repositories.Atendimento.LinkCardapioConversaRepository>();
             services.AddScoped<EasyStock.Application.Ports.Output.Persistence.Atendimento.ICreditoClienteComandaRepository,

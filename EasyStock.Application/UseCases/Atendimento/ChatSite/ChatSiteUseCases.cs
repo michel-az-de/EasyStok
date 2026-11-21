@@ -11,6 +11,7 @@ using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.ValueObjects;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
 namespace EasyStock.Application.UseCases.Atendimento.ChatSite;
@@ -106,11 +107,17 @@ public sealed class AcessoChatSite(
 public sealed class AbrirSessaoChatSiteUseCase(
     AcessoChatSite acesso, ISessaoChatSiteRepository sessaoRepository, IUnitOfWork unitOfWork)
 {
-    public async Task<SessaoChatSiteAberta> ExecuteAsync(string slug, CancellationToken ct = default)
+    public Task<SessaoChatSiteAberta> ExecuteAsync(string slug, CancellationToken ct = default) =>
+        ExecuteAsync(slug, null, ct);
+
+    /// <summary>#2928: <paramref name="campanha"/> (opcional) fica na sessão e vai para a conversa quando ela nascer.</summary>
+    public async Task<SessaoChatSiteAberta> ExecuteAsync(string slug, CampanhaInput? campanha, CancellationToken ct = default)
     {
         var loja = await acesso.ResolverLojaAsync(slug, ct);
         var token = AcessoChatSite.NovoToken();
-        var sessao = SessaoChatSite.Abrir(loja.EmpresaId, loja.Id, AcessoChatSite.HashDoToken(token), DateTime.UtcNow);
+        var agora = DateTime.UtcNow;
+        var sessao = SessaoChatSite.Abrir(loja.EmpresaId, loja.Id, AcessoChatSite.HashDoToken(token), agora,
+            campanha?.ParaOrigem(OrigemAnuncio.ViaSiteChat, agora));
         await sessaoRepository.AddAsync(sessao, ct);
         await unitOfWork.CommitAsync();
         return new SessaoChatSiteAberta(sessao.Id, token, sessao.ExpiraEm);

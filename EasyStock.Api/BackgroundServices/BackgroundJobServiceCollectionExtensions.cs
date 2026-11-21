@@ -120,6 +120,10 @@ public static class BackgroundJobServiceCollectionExtensions
         if (options.EnableLimpezaSessoesChatSite)
             services.AddHostedService<LimpezaSessoesChatSiteBackgroundService>();
 
+        // PodaIdCliqueAnuncioJob (#2928, S6) — diário 04:00 UTC, anula o id de clique com mais de 90 dias.
+        if (options.EnablePodaIdCliqueAnuncio)
+            services.AddHostedService<PodaIdCliqueAnuncioJob>();
+
         return services;
     }
 }

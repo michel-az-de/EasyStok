@@ -1,4 +1,5 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,7 +10,7 @@ const { pilotIcon } = require('../pilot.js');
 const { commandFor } = require('../pilot-ui.js');
 const { loadConsoleIcons, geometry } = require('./helpers/console-icons.cjs');
 
-const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+const source = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
 const start = '<!-- Modal novo produto -->';
 const end = '<!-- Modal novo cliente -->';
 function modal(html) { return html.slice(html.indexOf(start), html.indexOf(end)); }

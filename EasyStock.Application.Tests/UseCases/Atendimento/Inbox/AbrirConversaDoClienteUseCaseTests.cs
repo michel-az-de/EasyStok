@@ -37,10 +37,10 @@ public class AbrirConversaDoClienteUseCaseTests
     }
 
     private AbrirConversaDoClienteUseCase UseCase() =>
-        new(_clientes, new ConversaWhatsAppDoCliente(_conversas, _uow, TimeProvider.System), TimeProvider.System);
+        new(_clientes, new ConversaWhatsAppDoCliente(_conversas, _uow, TimeProvider.System), _uow, TimeProvider.System);
 
-    private Task<ConversaResumoResult> Abrir(Guid? clienteId = null) =>
-        UseCase().ExecuteAsync(new AbrirConversaDoClienteCommand(_empresa, _usuario, clienteId ?? _cliente.Id));
+    private Task<ConversaResumoResult> Abrir(Guid? clienteId = null, string? celular = null) =>
+        UseCase().ExecuteAsync(new AbrirConversaDoClienteCommand(_empresa, _usuario, clienteId ?? _cliente.Id, celular));
 
     [Fact]
     public async Task ClienteSemConversa_AbreConversaVinculadaSemMandarMensagem()
@@ -119,6 +119,45 @@ public class AbrirConversaDoClienteUseCaseTests
         await FluentActions.Awaiting(() => Abrir())
             .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*celular*");
         _abertas.Should().BeEmpty();
+    }
+
+    /// <summary>#2930: 11 de 24 clientes com pedido estavam sem telefone; o Novo pedido pede o celular ali mesmo e grava.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task ClienteSemTelefone_ComCelularValido_GravaNoCadastroEAbre(string? telefone)
+    {
+        _cliente.Telefone = telefone;
+
+        await Abrir(celular: "(11) 98888-7777");
+
+        _cliente.Telefone.Should().Be("11988887777");
+        await _clientes.Received(1).UpdateAsync(_cliente);
+        _abertas.Should().ContainSingle().Which.ContatoIdExterno.Should().Be("5511988887777");
+    }
+
+    [Theory]
+    [InlineData("123")]
+    [InlineData("(11) 3333-4444")]
+    public async Task ClienteSemTelefone_ComCelularInvalido_RecusaSemGravar(string celular)
+    {
+        _cliente.Telefone = null;
+
+        await FluentActions.Awaiting(() => Abrir(celular: celular))
+            .Should().ThrowAsync<UseCaseValidationException>().WithMessage("*celular*");
+        _cliente.Telefone.Should().BeNull();
+        await _clientes.DidNotReceiveWithAnyArgs().UpdateAsync(default!);
+        _abertas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ClienteComTelefone_IgnoraOCelularInformado()
+    {
+        await Abrir(celular: "(21) 97777-6666");
+
+        _cliente.Telefone.Should().Be("(11) 98888-7777");
+        await _clientes.DidNotReceiveWithAnyArgs().UpdateAsync(default!);
+        _abertas.Should().ContainSingle().Which.ContatoIdExterno.Should().Be("5511988887777");
     }
 
     [Fact]

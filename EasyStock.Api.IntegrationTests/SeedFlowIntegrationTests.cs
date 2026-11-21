@@ -8,7 +8,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests;
 
@@ -25,7 +24,7 @@ namespace EasyStock.Api.IntegrationTests;
 /// </summary>
 public sealed class SeedFlowIntegrationTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
     private readonly VariaveisDeProcesso _variaveis = new();
 
@@ -37,12 +36,7 @@ public sealed class SeedFlowIntegrationTests : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_seedflow_tests")
-                .WithUsername("postgres")
-                // Program.cs:577 falha-rapido em creds default (Username=postgres + Password=postgres).
-                .WithPassword("EasyStock-IT-NonDefault-2026!")
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             _isAvailable = true;

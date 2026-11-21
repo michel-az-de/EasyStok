@@ -185,6 +185,28 @@ public sealed class DispararAutomacaoUseCase(
         }
     }
 
+    /// <summary>
+    /// #2781: a automática que não saiu por faltar o valor de uma variável deixa na conversa uma nota interna do sistema
+    /// (sem envio ao canal, o cliente não vê), que o Console mostra no fio como as demais notas. Não é mensagem com
+    /// falha: o texto gravado não é o que iria ao cliente e não há o que reenviar. Best-effort, nunca lança.
+    /// </summary>
+    private async Task RegistrarNotaSemValorAsync(Conversa conversa, string variavel, DateTime agora, GatilhoAutomacao gatilho)
+    {
+        if (!conversa.EstaAberta && gatilho == GatilhoAutomacao.Encerramento) return;
+        try
+        {
+            var nota = Mensagem.Saida(conversa.EmpresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                $"A mensagem automática não saiu: falta o valor de {{{variavel}}} nesta conversa. Escreva à mão se for preciso.");
+            await conversas.AddMensagemAsync(nota);
+            await unitOfWork.CommitAsync();
+        }
+        catch (Exception erroAoGravar)
+        {
+            logger.LogWarning(erroAoGravar, "Automática não saiu e a nota do motivo também não gravou: conversa {ConversaId}.", conversa.Id);
+            unitOfWork.DescartarAlteracoesPendentes();
+        }
+    }
+
     /// <summary>O que a automática vai mandar (<see cref="Pronta"/>; falta só o canal aceitar), ou por que não sai.</summary>
     private abstract record Preparo;
     private sealed record NaoSai(ResultadoAutomacao Resultado) : Preparo;
@@ -236,9 +258,16 @@ public sealed class DispararAutomacaoUseCase(
         catch (VariavelSemValorException ex)
         {
             logger.LogWarning("Automática {Gatilho} não saiu: {Motivo}", disparo.Gatilho, ex.Message);
+            // Com reserva (S13 do pago, saudação do webhook) o cliente já recebe o aviso: a nota seria ruído no fio.
+            if (!TemReserva(disparo.Gatilho))
+                await RegistrarNotaSemValorAsync(conversa, ex.Variavel, agora, disparo.Gatilho);
             return new NaoSai(ResultadoAutomacao.VariavelSemValor);
         }
     }
+
+    private static bool TemReserva(GatilhoAutomacao gatilho) =>
+        gatilho is GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.PrimeiroContato
+            or GatilhoAutomacao.ForaDoHorario or GatilhoAutomacao.LojaFechada;
 
     private async Task<Conversa?> ConversaAsync(DisparoAutomacao disparo, CancellationToken ct)
     {

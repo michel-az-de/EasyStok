@@ -73,7 +73,7 @@ async function gerar(resposta) {
   assert.ok(!/gerarCobranca\(selecionada\.id, pedido, meio, !/.test(painel), 'gerar cobrança não desliga o envio por causa da janela')
   assert.ok(!/gerarSemEnviar/.test(painel + fonte('BlocoPedido.jsx') + fonte('BarraProximoPasso.jsx')), 'a flag que desligava o envio saiu')
   assert.ok(!/gere sem enviar|gerada sem envio/i.test(fonte('BarraProximoPasso.jsx') + fonte('BlocoPedido.jsx')), 'o texto não manda gerar sem enviar')
-  assert.ok(/modelo aprovado do WhatsApp/.test(fonte('BarraProximoPasso.jsx')) && /modelo aprovado do WhatsApp/.test(fonte('BlocoPedido.jsx')), 'o texto diz que o resumo sai pelo modelo aprovado')
+  assert.ok(/pela mensagem padrão do WhatsApp/.test(fonte('BarraProximoPasso.jsx')) && /pela mensagem padrão do WhatsApp/.test(fonte('BlocoPedido.jsx')), 'o texto diz que o resumo sai pela mensagem padrão')
 }
 
 console.log('ok prova-2871: intenção de novo pedido no anúncio e resumo pela fila fora da janela')

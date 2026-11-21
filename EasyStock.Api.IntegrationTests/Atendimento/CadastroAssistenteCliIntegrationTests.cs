@@ -3,10 +3,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Services.Ia;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Domain.Enums.Ia;
+using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.Ia;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
@@ -76,7 +79,11 @@ public sealed partial class PedidoConversaConcorrenciaTests
         var cenario = await SemearAsync(factory);
         using var scope = factory.Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<ITenantContextAccessor>().SetCurrentTenant(EmpresaId);
-        scope.ServiceProvider.GetRequiredService<IMontagemFichaLlmClient>().Should().BeOfType<ClaudeCliMontagemFichaClient>();
+        // #3063: o CLI passa pelo registro de uso (chamada_ia) antes de chegar ao processo.
+        scope.ServiceProvider.GetRequiredService<IMontagemFichaLlmClient>()
+            .Should().BeOfType<AgenteLlmServiceCollectionExtensions.MontagemFichaApiClient>()
+            .Which.Interno.Should().BeOfType<RegistroChamadaIaLlmClient>()
+            .Which.Interno.Should().BeOfType<ClaudeCliMontagemFichaClient>();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         var agora = DateTime.UtcNow;
         var mensagens = Enumerable.Range(0, 25).Select(i => Mensagem.Entrada(EmpresaId, cenario.ConversaId,
@@ -111,6 +118,8 @@ public sealed partial class PedidoConversaConcorrenciaTests
         campos[0].GetProperty("mensagemId").GetGuid().Should().Be(mensagem.Id);
         chamadas.Should().Be(1);
         (await Retrato()).Should().Be(antes, "sugerir não escreve cliente, vínculo, mensagem ou pedido");
+        (await db.ChamadasIa.AsNoTracking().Where(c => c.EmpresaId == EmpresaId).Select(c => c.Finalidade).ToListAsync())
+            .Should().Equal([FinalidadeIa.SugestaoCadastro], "a única chamada ao LLM gravou uma linha de uso na loja certa");
 
         async Task<string> Retrato() => JsonSerializer.Serialize(new
         {

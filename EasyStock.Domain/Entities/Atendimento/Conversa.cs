@@ -28,6 +28,7 @@ public class Conversa
     public const int MotivoEscaladaTamanhoMaximo = 500;
     public const string ChaveAjudaComandaSolicitadaEm = "comandaAjudaSolicitadaEm";
     public const string ChaveAutomaticoLiberadoPelaEquipe = "automaticoLiberadoPelaEquipe";
+    public const string ChaveClienteDesistiuPedidoId = "clienteDesistiuPedidoId";
 
     public Guid Id { get; private set; }
     public long NumeroComanda { get; private set; }
@@ -66,6 +67,9 @@ public class Conversa
     public CanalConversa Canal { get; private set; }
     public SituacaoConversa Situacao { get; private set; }
     public Guid? PedidoEmAndamentoId { get; private set; }
+
+    /// <summary>#2928: anúncio que trouxe a conversa (o último vence, D2). Nula quando não veio de anúncio.</summary>
+    public OrigemAnuncio? OrigemAnuncio { get; private set; }
 
     /// <summary>Objeto JSON com o estado do atendimento (carrinho em montagem, endereco extraido, etapa).</summary>
     public string ContextoJson { get; private set; } = "{}";
@@ -385,6 +389,28 @@ public class Conversa
         ContextoJson = contextoJson.Trim();
     }
 
+    /// <summary>
+    /// #2992: o cliente desistiu do pedido. Marca só na conversa assumida pela equipe e uma vez por pedido. Devolve
+    /// false se a conversa é automática ou se a desistência desse pedido já estava marcada.
+    /// </summary>
+    public bool MarcarClienteDesistiuDoPedido(Guid pedidoId)
+    {
+        if (Situacao != SituacaoConversa.Assumida || pedidoId == Guid.Empty || ClienteDesistiuDoPedido(pedidoId))
+            return false;
+        var contexto = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson)!;
+        contexto[ChaveClienteDesistiuPedidoId] = JsonSerializer.SerializeToElement(pedidoId);
+        ContextoJson = JsonSerializer.Serialize(contexto);
+        return true;
+    }
+
+    /// <summary>#2992: a desistência vale só para o pedido marcado; outro pedido da conversa segue normal.</summary>
+    public bool ClienteDesistiuDoPedido(Guid pedidoId) =>
+        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson) is { } contexto
+        && contexto.TryGetValue(ChaveClienteDesistiuPedidoId, out var valor)
+        && valor.ValueKind == JsonValueKind.String
+        && Guid.TryParse(valor.GetString(), out var marcado)
+        && marcado == pedidoId;
+
     public void DefinirPedidoEmAndamento(Guid? pedidoId)
     {
         if (pedidoId == Guid.Empty)
@@ -392,6 +418,13 @@ public class Conversa
         PedidoEmAndamentoId = pedidoId;
         if (pedidoId is { } id && !PedidosHistoricoIds.Contains(id))
             PedidosHistoricoIds = [.. PedidosHistoricoIds, id];
+    }
+
+    /// <summary>#2928, D2: um anúncio novo substitui o anterior. Null não apaga a origem já gravada.</summary>
+    public void RegistrarOrigemAnuncio(OrigemAnuncio? origem)
+    {
+        if (origem is not null)
+            OrigemAnuncio = origem;
     }
 
     public CapacidadesCanal Capacidades => CapacidadesCanal.Para(Canal);

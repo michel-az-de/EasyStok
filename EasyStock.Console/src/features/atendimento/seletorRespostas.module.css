@@ -9,7 +9,8 @@
 }
 .busca:focus-visible { outline: 2px solid var(--halo); outline-offset: 0; border-color: var(--marca); }
 
-.lista { list-style: none; margin: 0; padding: 0; display: grid; max-height: min(32dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
+/* #3009: linhas implícitas em max-content; sem isso, com 6+ respostas a grade as espreme em --toque e a prévia some. */
+.lista { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: max-content; max-height: min(32dvh, 240px); overflow-y: auto; overscroll-behavior: contain; }
 
 .linha {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--e-3);

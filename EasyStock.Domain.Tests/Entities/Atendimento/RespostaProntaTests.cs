@@ -93,6 +93,30 @@ public class RegraAutomaticaTests
             .Should().Throw<RegraDeDominioVioladaException>();
     }
 
+    // #2781: regra antiga com chave que o servidor não preenche; desligar (o rollback) manda o texto já gravado.
+    [Fact]
+    public void DesligarRegraComTextoAntigoSalva()
+    {
+        var regra = RegraAutomatica.Criar(Empresa, GatilhoAutomacao.PosEntrega, "Oi, {nome}", true, Agora);
+        typeof(RegraAutomatica).GetProperty(nameof(RegraAutomatica.Texto))!.SetValue(regra, "Oi {loja}");
+
+        regra.Alterar("Oi {loja}", false, Agora);
+
+        regra.Ligada.Should().BeFalse();
+        ((Action)(() => regra.Alterar("Oi {outra}", false, Agora))).Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void EditarRespostaComTextoAntigoMantemSalva()
+    {
+        var r = RespostaPronta.Criar(Empresa, "Titulo", "atalho", "Oi, {nome}", Agora);
+        typeof(RespostaPronta).GetProperty(nameof(RespostaPronta.Texto))!.SetValue(r, "Oi {loja}");
+
+        r.Editar("Novo titulo", "atalho", "Oi {loja}", Agora);
+
+        r.Titulo.Should().Be("Novo titulo");
+    }
+
     /// <summary>
     /// #1610: o lembrete do link nasce ligado com texto padrão, sem regra gravada. Os gatilhos antigos continuam
     /// desligados até a dona salvar.

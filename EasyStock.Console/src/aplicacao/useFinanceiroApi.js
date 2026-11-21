@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 export * from '../infra/api/financeiroApi'
+export { obterPedidosPorAnuncio } from '../infra/api/relatoriosApi'
 
 export function useConsultaFinanceira(carregar) {
   const [carga, setCarga] = useState({ dados: null, erro: null, carregando: true })

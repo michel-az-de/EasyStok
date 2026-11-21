@@ -164,10 +164,10 @@ caso('H10: o topo fica fixo ao rolar, com fundo opaco acima do conteúdo', () =>
   assert.match(topo, /background:\s*var\(--papel\)/)
 })
 
-caso('A10: busca sem resultado tem um aviso e um botão só', () => {
+caso('A10: busca sem resultado tem um aviso e um botão só (#3012: com resultado, só o X do campo)', () => {
   assert.equal(jsxHall.split('Nenhum módulo ou tela encontrado').length - 1, 1, 'o aviso aparece uma vez')
   assert.match(jsxHall, /destinos\.length === 0 \? ''/, 'o contador "0 telas encontradas" não é escrito')
-  assert.match(jsxHall, /buscando && destinos\.length > 0 && <Botao[^>]*>[^<]*Limpar busca/, '"Limpar busca" só com resultado')
+  assert.doesNotMatch(jsxHall, /Limpar busca/, '#3012: com resultado o X do campo limpa; não há botão duplicado')
   assert.equal(jsxHall.split('Ver todos os módulos').length - 1, 1)
 })
 

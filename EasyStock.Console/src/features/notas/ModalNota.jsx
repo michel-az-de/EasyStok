@@ -163,7 +163,7 @@ export function ModalNota({ nomeCliente, aoSalvar, aoFechar, aoComanda, aoGuarda
         : falha && <p className={css.erro} role="alert">{falha}</p>}
       <div className={css.acoes}>
         <Botao variante="texto" icone={embutida ? 'conversa' : undefined} onClick={fechar}>{embutida ? 'Conversa' : 'Recolher'}</Botao>
-        {embutida && <Botao variante="texto" icone="shopping-cart" onClick={() => { guardarCampo(); aoComanda?.() }}>Comanda</Botao>}
+        {embutida && <Botao variante="texto" icone="shopping-cart" onClick={() => { guardarCampo(); aoComanda?.() }}>Pedido</Botao>}
         <Botao variante="primario" disabled={(!precisaCadastrar && vazio) || emGravacao} onClick={salvar}
           className={precisaCadastrar ? css.cadastrar : undefined}
           aria-label={precisaCadastrar ? 'Cadastrar para salvar' : undefined}>

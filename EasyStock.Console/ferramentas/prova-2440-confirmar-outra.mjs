@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 // Prova da #2440 (A1): texto, foto, áudio, foto do cardápio e modelo em conversa de OUTRA atendente recebem o 409
-// CONVERSA_DE_OUTRA, perguntam (window.confirm com a mensagem da API) e repetem com `confirmar`, com a MESMA chave
+// CONVERSA_DE_OUTRA, perguntam (a pergunta registrada por definirPerguntaDeOutra, #3037, com a mensagem da API) e repetem com `confirmar`, com a MESMA chave
 // de idempotência. Sem confirmar a dona, não repete. Roda com: node ferramentas/prova-2440-confirmar-outra.mjs
 import { registerHooks } from 'node:module'
 import { readFileSync } from 'node:fs'
@@ -19,7 +19,7 @@ registerHooks({
 const storage = new Map()
 globalThis.sessionStorage = { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) }
 sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 'sintetico', empresa: { id: 'a' }, usuario: { id: 'u' }, expiraEm: Date.now() + 60000 }))
-const { enviarTexto, enviarImagem, enviarAudio, enviarImagemCardapio } = await import('../src/infra/api/conversasApi.js')
+const { enviarTexto, enviarImagem, enviarAudio, enviarImagemCardapio, definirPerguntaDeOutra } = await import('../src/infra/api/conversasApi.js')
 const { enviarModelo, iniciarConversaComModelo } = await import('../src/infra/api/modelosApi.js')
 
 const MENSAGEM = 'Conversa com Bia. Confirme para assumir.'
@@ -27,7 +27,7 @@ let chamadas = []
 let perguntas = []
 let resposta = true
 const json = (status, corpo) => new Response(JSON.stringify(corpo), { status, headers: { 'Content-Type': 'application/json' } })
-globalThis.window = { confirm: (m) => { perguntas.push(m); return resposta } }
+const removerPergunta = definirPerguntaDeOutra(async (m) => { perguntas.push(m); return resposta })
 // A API: sem `confirmar` (corpo ou query) responde 409; com, grava.
 globalThis.fetch = async (url, options) => {
   const corpo = typeof options.body === 'string' ? JSON.parse(options.body) : null
@@ -59,7 +59,7 @@ for (const [nome, enviar] of Object.entries(casos)) {
   if (nome === 'modelo' || nome === 'iniciar') assert.equal(chamadas[1].corpo.tentativaId, 't1', `${nome}: mesma tentativa`)
 
   chamadas = []; perguntas = []; resposta = false
-  await assert.rejects(enviar(), (e) => e.codigo === 'CONVERSA_DE_OUTRA', `${nome}: recusar a pergunta mantém o erro`)
+  await assert.rejects(enviar(), (e) => e.codigo === 'CONFIRMACAO_RECUSADA' && !/Confirme/.test(e.message), `${nome}: recusar a pergunta rejeita com CONFIRMACAO_RECUSADA, sem pedir confirmação`)
   assert.equal(chamadas.length, 1, `${nome}: sem confirmação da dona não repete`)
 }
 
@@ -69,4 +69,12 @@ globalThis.fetch = async (url) => { chamadas.push({ url: String(url) }); return 
 for (const enviar of Object.values(casos)) await enviar()
 assert.equal(chamadas.length, Object.keys(casos).length)
 assert.deepEqual(perguntas, [])
+
+// #3037: sem anfitrião registrado a infra não cai no window.confirm: repassa o erro, sem repetir.
+removerPergunta()
+globalThis.window = { confirm: () => { throw new Error('window.confirm não deve ser chamado') } }
+chamadas = []
+globalThis.fetch = async (url) => { chamadas.push({ url: String(url) }); return json(409, { error: { code: 'CONVERSA_DE_OUTRA', message: MENSAGEM } }) }
+await assert.rejects(enviarTexto('c1', 'Oi', { chave: 'k' }), (e) => e.codigo === 'CONVERSA_DE_OUTRA' && e.message === MENSAGEM, 'sem anfitrião: repassa o erro da API')
+assert.equal(chamadas.length, 1, 'sem anfitrião: não repete')
 console.log('prova-2440-confirmar-outra: ok')

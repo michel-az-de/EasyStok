@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Pdf;
@@ -53,17 +52,7 @@ public sealed class EnviarResumoPedidoFerramenta(
             return Recusa("resumo_indisponivel", "O resumo não pode sair agora; use escalar_para_dona.");
 
         var storefront = await storefrontRepository.GetByEmpresaAsync(contexto.EmpresaId, ct);
-        var resumo = new ResumoPedidoDto(
-            storefront?.TituloPublico ?? string.Empty,
-            ResumoPedidoAtendimento.Codigo(pedido.Id),
-            pedido.Itens.Where(i => !i.EhLinhaDeFrete)
-                .Select(i => new ResumoPedidoItemDto(i.Nome, i.Quantidade, i.Subtotal, i.Observacao)).ToList(),
-            pedido.Frete,
-            pedido.Total.Valor,
-            pedido.AgendadoParaEm is { } quando
-                ? HorarioBrasil.ConverterParaBrasilia(quando).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
-                : "a combinar",
-            pedido.EnderecoEntrega);
+        var resumo = ResumoPedidoAtendimento.Montar(pedido, storefront?.TituloPublico);
 
         if (noSite)
         {

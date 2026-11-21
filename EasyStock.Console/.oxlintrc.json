@@ -16,6 +16,7 @@
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "warn",
     "react/jsx-key": "error",
+    "react/jsx-no-undef": "error",
     "react/no-danger": "error",
     "react/only-export-components": [
       "warn",

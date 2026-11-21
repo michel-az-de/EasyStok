@@ -80,7 +80,7 @@ public sealed class IdentificarClientePorTelefoneUseCase(
         await clienteRepository.AddAsync(novo);
 
         logger.LogInformation(
-            "Atendimento: lead criado pelo WhatsApp. empresaId={EmpresaId} clienteId={ClienteId}",
+            "Atendimento: lead criado pelo telefone informado. empresaId={EmpresaId} clienteId={ClienteId}",
             input.EmpresaId, novo.Id);
 
         return new IdentificacaoCliente(novo, EhLead: true, EhNovo: true);

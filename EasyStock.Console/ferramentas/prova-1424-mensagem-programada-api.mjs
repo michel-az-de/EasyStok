@@ -150,7 +150,7 @@ assert.match(regras.horarioLocalPadrao(Date.parse('2026-10-07T10:00:30Z')), /^\d
 const agora = Date.parse('2026-10-07T12:00:00Z')
 assert.match(regras.faltaParaProgramar({ agendadaPara: '2026-10-07T11:00:00Z', agoraMs: agora, texto: 'oi' }), /depois de agora/)
 assert.match(regras.faltaParaProgramar({ agendadaPara: '2026-10-07T13:00:00Z', agoraMs: agora, texto: ' ' }), /Escreva/)
-assert.match(regras.faltaParaProgramar({ agendadaPara: '2026-10-07T13:00:00Z', agoraMs: agora, usarModelo: true }), /nome do modelo/)
+assert.match(regras.faltaParaProgramar({ agendadaPara: '2026-10-07T13:00:00Z', agoraMs: agora, usarModelo: true }), /mensagem padrão do WhatsApp/)
 assert.equal(regras.faltaParaProgramar({ agendadaPara: '2026-10-07T13:00:00Z', agoraMs: agora, texto: 'oi' }), null)
 assert.deepEqual(regras.parametrosDoTexto(' Maria \n\n sexta '), ['Maria', 'sexta'])
 assert.equal(regras.podeCancelar({ situacao: 'Agendada' }), true)

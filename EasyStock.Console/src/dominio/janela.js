@@ -75,13 +75,13 @@ export const MINUTOS_PARA_OFERECER_MODELO = 60
 export const modelosAVista = (janela) => Boolean(janela) && janela.restam != null
   && (!janela.textoLivre || janela.restam < MINUTOS_PARA_OFERECER_MODELO)
 
-// Fora da janela, quem não tem modelo aprovado não tem saída nenhuma: o texto
+// Fora da janela, quem não tem mensagem padrão do WhatsApp não tem saída nenhuma: o texto
 // que a pessoa digitasse cairia calado na mensageria.
 function motivoForaDaJanela(janela, canal) {
   if (canal.aceitaModelo) {
     return {
       titulo: `${janela.rotulo}.`,
-      detalhe: 'Só modelo aprovado sai até ele responder.',
+      detalhe: 'Só mensagem padrão do WhatsApp sai até ele responder.',
       acao: 'janela',
     }
   }
@@ -147,7 +147,7 @@ export function permissaoDeEscrita(conversa, agora, canal) {
       },
     }
   }
-  // Fora da janela o modelo aprovado é a única saída, e só existe onde o canal
+  // Fora da janela o mensagem padrão do WhatsApp é a única saída, e só existe onde o canal
   // tem modelo. Dentro da janela o texto livre resolve, então não se oferece.
   if (!janela.textoLivre) {
     return {
@@ -174,7 +174,7 @@ export function conversasParaEncerrarPorJanela(conversas, agora, canais) {
 }
 
 // Marca do motivo que nenhum caminho de envio fura. Fora da janela sobra o
-// modelo aprovado, conversa encerrada reabre; cadastro bloqueado não tem saída.
+// mensagem padrão do WhatsApp, conversa encerrada reabre; cadastro bloqueado não tem saída.
 export const MOTIVO_BLOQUEIO = 'bloqueio'
 
 // Uma pergunta, uma resposta: "esta conversa pode receber envio?". Quem decide é

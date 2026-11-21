@@ -3,6 +3,8 @@
 // "Não entregues" mostravam isso em inglês. Aqui o motivo vira uma frase que diz o que houve e o
 // que fazer. Puro: recebe o texto do erro, devolve o tipo e a frase.
 
+import { CODIGOS, ROTULOS } from './rotulos'
+
 export const TIPOS_DE_FALHA = {
   NAO_ENTREGAVEL: 'nao-entregavel',
   FORA_DA_JANELA: 'fora-da-janela',
@@ -13,7 +15,9 @@ export const TIPOS_DE_FALHA = {
 
 export const FRASE_DA_FALHA = {
   [TIPOS_DE_FALHA.NAO_ENTREGAVEL]: 'O WhatsApp não conseguiu entregar: confira se o número está certo.',
-  [TIPOS_DE_FALHA.FORA_DA_JANELA]: 'Passaram 24 h desde a última mensagem do cliente: só modelo aprovado chega.',
+  get [TIPOS_DE_FALHA.FORA_DA_JANELA]() {
+    return `Passou o ${ROTULOS.PRAZO_24H} desde a última mensagem do cliente: só ${ROTULOS.MENSAGEM_PADRAO} chega.`
+  },
   [TIPOS_DE_FALHA.TEMPO_ESGOTADO]: 'O WhatsApp demorou a responder. Pode ter chegado: confira com o cliente antes de reenviar.',
   [TIPOS_DE_FALHA.DESCONHECIDA]: 'Não foi enviada. Tente de novo.',
 }
@@ -21,7 +25,7 @@ export const FRASE_DA_FALHA = {
 // Código da Meta ou trecho estável do texto. A ordem importa: o primeiro que casar vale.
 const SINAIS = [
   [TIPOS_DE_FALHA.NAO_ENTREGAVEL, /undeliverable|\b131026\b/i],
-  [TIPOS_DE_FALHA.FORA_DA_JANELA, /re-?engagement|\b131047\b|fora_da_janela_24h|fora da janela de 24 h/i],
+  [TIPOS_DE_FALHA.FORA_DA_JANELA, /re-?engagement|\b131047\b|fora da janela de 24 h/i],
   [TIPOS_DE_FALHA.TEMPO_ESGOTADO, /timeout|timed out|task was cancell?ed|operation was cancell?ed|envio incerto/i],
 ]
 
@@ -39,6 +43,8 @@ export function falhaDeEnvio(erro) {
   const propria = Object.entries(FRASE_DA_FALHA).find(([, frase]) => frase === texto)
   if (propria) return { tipo: propria[0], texto }
   if (JA_EM_PORTUGUES.test(texto)) return { tipo: TIPOS_DE_FALHA.RECUSA, texto }
+  // O código vem primeiro; o texto da API fica como reserva (SINAIS).
+  if (texto.includes(CODIGOS.FORA_DA_JANELA)) return { tipo: TIPOS_DE_FALHA.FORA_DA_JANELA, texto: FRASE_DA_FALHA[TIPOS_DE_FALHA.FORA_DA_JANELA] }
   const sinal = SINAIS.find(([, padrao]) => padrao.test(texto))
   if (sinal) return { tipo: sinal[0], texto: FRASE_DA_FALHA[sinal[0]] }
   if (texto.startsWith(PREFIXO_DA_RECUSA) && !texto.includes(DETALHE_DO_CANAL)) return { tipo: TIPOS_DE_FALHA.RECUSA, texto }
