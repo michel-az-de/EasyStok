@@ -1,5 +1,5 @@
 import {
-  Archive, ArrowDown, ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen, Bot,
+  Archive, ArrowDown, ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellOff, BellPlus, Bike, BookOpen, Bot,
   Calendar, Camera, Car, ChartColumn, ChartLine, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
   ClipboardList, Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink, EyeOff,
   FlaskConical, Frown, Gift, Globe, GripVertical, Hand, History, Hourglass, House, Image, Inbox,
@@ -8,7 +8,7 @@ import {
   PanelLeft, PanelRight, Paperclip, Pause, Pencil, Phone, PictureInPicture2, Play, Plug, Plus, Printer, Radio, Receipt,
   RefreshCw, ScrollText, Search, SendHorizontal, Settings, ShoppingCart, Smile, Star, Sticker,
   StickyNote, Sun, Sunset, Tag, Target, Thermometer, ThumbsDown, ThumbsUp, Trash, TriangleAlert, Truck, Undo2, UserRound,
-  UserRoundPlus, Users, X, Zap,
+  UserRoundPlus, Users, VolumeX, X, Zap,
   createLucideIcon,
 } from 'lucide-react'
 import css from './Icone.module.css'
@@ -110,7 +110,7 @@ const ICONES = {
   bloqueio: Ban,
   lock: Lock,
   'circle-x': CircleX,
-  bell: Bell, 'bell-plus': BellPlus,
+  bell: Bell, 'bell-off': BellOff, 'bell-plus': BellPlus, 'volume-x': VolumeX,
   estrela: Star,
   presente: Gift,
 
