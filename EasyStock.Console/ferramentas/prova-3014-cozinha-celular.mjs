@@ -62,30 +62,35 @@ async function provar(browser, origem, modo) {
     const toque = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--toque')) || 40)
     const faixa = []
     for (const n of nomes) {
-      const botao = page.getByRole('button', { name: new RegExp(`^\\d+ ${n}$`) })
-      assert.equal(await botao.count(), 1, `[${modo}] a contagem de "${n}" não está visível sem rolar: falta o botão "N ${n}" na faixa`)
+      const botao = page.getByRole('button', { name: new RegExp(`^\\d+ ${n}, \\d+ pedidos?$`) })
+      assert.equal(await botao.count(), 1, `[${modo}] a contagem de "${n}" não está visível sem rolar: falta o botão "N ${n}, N pedidos" na faixa`)
       const caixa = await botao.boundingBox()
       assert.ok(caixa && caixa.x >= 0 && caixa.x + caixa.width <= 390 && caixa.y >= 0 && caixa.y + caixa.height <= 844,
         `[${modo}] "${n}" fora do viewport: ${JSON.stringify(caixa)}`)
       assert.ok(caixa.height >= toque - 0.5, `[${modo}] alvo de toque de "${n}" ${caixa.height}px < ${toque}px`)
       faixa.push(await botao.getAttribute('aria-label'))
     }
-    if (modo === 'api') assert.deepEqual(faixa, ['3 Na fila', '2 Em preparo', '1 Pronto', '1 Saiu para entrega'])
+    if (modo === 'api') assert.deepEqual(faixa, ['3 Na fila, 3 pedidos', '2 Em preparo, 2 pedidos', '1 Pronto, 1 pedido', '1 Saiu para entrega, 1 pedido'])
     // WCAG 2.5.3: o nome acessível de cada botão começa pelo texto visível.
     const visiveis = await page.locator('nav[aria-label="Colunas do quadro"] button').evaluateAll((bs) => bs.map((b) => ({
       nome: b.getAttribute('aria-label'), texto: b.innerText.replace(/\s+/g, ' ').trim() })))
     assert.equal(visiveis.length, nomes.length, `[${modo}] um botão por coluna`)
-    for (const { nome, texto } of visiveis) assert.ok(nome.startsWith(texto), `[${modo}] o nome "${nome}" começa pelo texto visível "${texto}"`)
+    for (const { nome, texto } of visiveis) {
+      assert.ok(nome.startsWith(texto), `[${modo}] o nome "${nome}" começa pelo texto visível "${texto}"`)
+      // Unidade para o leitor de tela, singular e plural certos, com a mesma contagem do texto visível.
+      const q = parseInt(texto, 10)
+      assert.ok(nome.endsWith(`, ${q} ${q === 1 ? 'pedido' : 'pedidos'}`), `[${modo}] unidade/plural errados em "${nome}"`)
+    }
     if (capturas) await page.screenshot({ path: join(capturas, `${modo}-390-claro.png`) })
     // 2. Tocar rola o carrossel até a coluna e a faixa marca a coluna à vista.
     const ultimo = nomes.at(-1)
-    await page.getByRole('button', { name: new RegExp(`^\\d+ ${ultimo}$`) }).click()
+    await page.getByRole('button', { name: new RegExp(`^\\d+ ${ultimo}, \\d+ pedidos?$`) }).click()
     await page.waitForFunction((i) => {
       const c = document.querySelectorAll('section[data-coluna]')[i]?.getBoundingClientRect()
       return c && c.left >= -1 && c.left < innerWidth - 40
     }, nomes.length - 1, { timeout: 5000 })
-    await page.waitForFunction((n) => document.querySelector('nav[aria-label="Colunas do quadro"] [aria-current="true"]')
-      ?.getAttribute('aria-label')?.endsWith(n), ultimo, { timeout: 5000 })
+    await page.waitForFunction((re) => new RegExp(re).test(document.querySelector('nav[aria-label="Colunas do quadro"] [aria-current="true"]')
+      ?.getAttribute('aria-label') ?? ''), `^\\d+ ${ultimo}, \\d+ pedidos?$`, { timeout: 5000 })
     if (capturas) await page.screenshot({ path: join(capturas, `${modo}-390-claro-ultima.png`) })
   } finally { await context.close() }
   // 2b. 320x568: nenhuma palavra do rótulo parte no meio e a página não rola na horizontal.
@@ -115,7 +120,7 @@ async function provar(browser, origem, modo) {
     assert.ok(tops.length >= 4 && new Set(tops.slice(0, 4)).size === 1, `[${modo}] as quatro colunas na mesma linha: ${tops}`)
     if (capturas) await larga.page.screenshot({ path: join(capturas, `${modo}-1440-escuro.png`) })
   } finally { await larga.context.close() }
-  console.log(`ok    [${modo}] faixa com as 4 contagens a 390 px, toque leva à coluna, desktop sem a faixa`)
+  console.log(`ok    [${modo}] faixa com as ${nomes.length} contagens a 390 px, toque leva à coluna, desktop sem a faixa`)
 }
 
 const browser = await chromium.launch({ headless: true })

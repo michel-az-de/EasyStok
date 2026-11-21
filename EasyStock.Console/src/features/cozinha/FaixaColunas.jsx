@@ -8,7 +8,7 @@ const reduzMovimento = () => typeof window !== 'undefined'
   && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 // itens: [{ id, rotulo, contagem }]. quadroRef é a ref do elemento que renderiza o quadro; cada coluna dele leva
-// data-coluna={id}. O nome acessível começa pelo texto visível (WCAG 2.5.3): "14 Na fila".
+// data-coluna={id}. O nome acessível começa pelo texto visível (WCAG 2.5.3): "14 Na fila, 14 pedidos" (singular: "1 Pronto, 1 pedido").
 export function FaixaColunas({ itens, quadroRef }) {
   const faixa = useRef(null)
   const chave = itens.map((i) => i.id).join('|')
@@ -40,7 +40,7 @@ export function FaixaColunas({ itens, quadroRef }) {
       {itens.map(({ id, rotulo, contagem }) => (
         <button
           key={id} type="button" className={css.faixaItem} data-alvo={id}
-          aria-label={`${contagem} ${rotulo}`} onClick={() => ir(id)}
+          aria-label={`${contagem} ${rotulo}, ${contagem} ${contagem === 1 ? 'pedido' : 'pedidos'}`} onClick={() => ir(id)}
         >
           <span className={css.faixaContagem} aria-hidden="true">{contagem}</span>
           <span className={css.faixaRotulo} aria-hidden="true">{rotulo}</span>
