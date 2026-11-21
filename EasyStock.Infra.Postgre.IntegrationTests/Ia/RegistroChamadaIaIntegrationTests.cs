@@ -8,7 +8,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace EasyStock.Infra.Postgre.IntegrationTests.Ia;
@@ -37,13 +36,13 @@ public class RegistroChamadaIaIntegrationTests(PostgreSqlDatabaseFixture fixture
         return services.BuildServiceProvider();
     }
 
-    private static RegistroChamadaIaLlmClient Cliente(IServiceProvider sp)
+    private static RegistroChamadaIaLlmClient Cliente(IServiceProvider sp, LogEmLista log)
     {
         var interno = Substitute.For<IAgenteLlmClient>();
         interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
             .Returns(new RespostaLlm("end_turn", [], 100, 20, 0, "deepseek-flash"));
         return new RegistroChamadaIaLlmClient(interno, sp.GetRequiredService<IRegistroChamadaIa>(), new RelogioFixo(),
-            NullLogger<RegistroChamadaIaLlmClient>.Instance);
+            log);
     }
 
     private static RequisicaoLlm Requisicao(Guid empresa, FinalidadeIa finalidade) =>
@@ -57,14 +56,15 @@ public class RegistroChamadaIaIntegrationTests(PostgreSqlDatabaseFixture fixture
         var empresaA = Guid.NewGuid();
         var empresaB = Guid.NewGuid();
         await using var sp = Provedor();
-        var cliente = Cliente(sp);
+        var log = new LogEmLista();
+        var cliente = Cliente(sp, log);
 
         for (var i = 0; i < 3; i++) await cliente.EnviarAsync(Requisicao(empresaA, FinalidadeIa.ResumoCliente));
         await cliente.EnviarAsync(Requisicao(empresaB, FinalidadeIa.Atendimento));
 
         await using var db = fixture.CreateDbContext();
         (await db.ChamadasIa.IgnoreQueryFilters().Where(c => c.EmpresaId == empresaA).Select(c => c.Finalidade).ToListAsync())
-            .Should().HaveCount(3).And.OnlyContain(f => f == FinalidadeIa.ResumoCliente);
+            .Should().HaveCount(3, "registro engoliu: {0}", string.Join(" | ", log.Erros)).And.OnlyContain(f => f == FinalidadeIa.ResumoCliente);
         (await db.ChamadasIa.IgnoreQueryFilters().CountAsync(c => c.EmpresaId == empresaB)).Should().Be(1);
 
         var uso = await sp.GetRequiredService<IRegistroChamadaIa>().SomarMesAsync(empresaA, Agora.UtcDateTime);
@@ -74,5 +74,15 @@ public class RegistroChamadaIaIntegrationTests(PostgreSqlDatabaseFixture fixture
     private sealed class RelogioFixo : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => Agora;
+    }
+
+    private sealed class LogEmLista : Microsoft.Extensions.Logging.ILogger<RegistroChamadaIaLlmClient>
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<string> Erros { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Erros.Enqueue(formatter(state, exception) + " " + exception?.GetType().Name + ": " + exception?.Message);
     }
 }
