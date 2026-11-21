@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Impressao;
 using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
@@ -37,7 +38,8 @@ public class CobrancaPixConversaTests
         public Conversa Conversa { get; }
         public ICanalMensageria Canal { get; } = Substitute.For<ICanalMensageria>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
-        public IRenderizadorPdfPedido Renderizador { get; } = Substitute.For<IRenderizadorPdfPedido>();
+        public IRenderizadorHtml Renderizador { get; } = Substitute.For<IRenderizadorHtml>();
+        public IImpressoDoPedido Impressos { get; } = Substitute.For<IImpressoDoPedido>();
         public IFileStorage Armazenamento { get; } = Substitute.For<IFileStorage>();
         public LoggerCapturado Log { get; } = new();
         public List<Mensagem> Gravadas { get; } = [];
@@ -57,8 +59,8 @@ public class CobrancaPixConversaTests
             Canal.Canal.Returns(CanalConversa.WhatsApp);
             Canal.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(ci => { Ordem.Add("texto:" + ci.ArgAt<string>(1)); return "wamid.texto"; });
-            Canal.EnviarDocumentoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-                .Returns(ci => { Ordem.Add("documento"); return "wamid.pdf"; });
+            Canal.EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                .Returns(ci => { Ordem.Add("imagem"); return "wamid.png"; });
 
             var conversas = Substitute.For<IConversaRepository>();
             conversas.ObterPorIdAsync(EmpresaId, Conversa.Id, Arg.Any<CancellationToken>()).Returns(Conversa);
@@ -69,10 +71,12 @@ public class CobrancaPixConversaTests
             storefronts.GetByEmpresaAsync(EmpresaId, Arg.Any<CancellationToken>())
                 .Returns(StorefrontEntity.Criar(EmpresaId, "loja", "Casa da Baba", 0m));
 
-            Renderizador.RenderizarPedidoAsync(Arg.Any<ResumoPedidoDto>(), Arg.Any<PixPdfDto>(), Arg.Any<CancellationToken>())
-                .Returns(new AnexoGerado([37, 80, 68, 70], "application/pdf", "pdf"));
+            Impressos.ObterComPixAsync(EmpresaId, Pedido.Id, Arg.Any<PixPdfDto>(), Arg.Any<CancellationToken>())
+                .Returns(new DocumentoHtml("<html></html>", []));
+            Renderizador.RenderizarPngAsync(Arg.Any<DocumentoHtml>(), PublicadorImpressoPedido.LarguraPapelMm, Arg.Any<CancellationToken>())
+                .Returns(new AnexoGerado([0x89, 0x50, 0x4E, 0x47], "image/png", "png"));
             Armazenamento.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
-                .Returns(new StoredFileResult("k", "https://loja.exemplo/privado/k", "application/pdf", 4));
+                .Returns(new StoredFileResult("k", "https://loja.exemplo/privado/k", "image/png", 4));
             Armazenamento.CreatePreSignedDownloadUrlAsync(Arg.Any<string>(), Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(new Uri("https://loja.exemplo/files/assinado.pdf?sig=1"));
 
@@ -81,7 +85,7 @@ public class CobrancaPixConversaTests
                 ["App:BaseUrl"] = "https://loja.exemplo",
                 [PublicadorDocumentoPedido.ChaveEnviarPdf] = enviarPdf,
             }).Build();
-            var publicador = comPublicador ? new PublicadorDocumentoPedido(Renderizador, Armazenamento, config) : null;
+            var publicador = comPublicador ? new PublicadorImpressoPedido(Impressos, Renderizador, Armazenamento, config) : null;
             Servico = new CobrancaPixConversa(conversas, new ResolvedorCanal([Canal]), UnitOfWork, pedidos, storefronts, config, Log, publicador);
         }
 
@@ -92,19 +96,18 @@ public class CobrancaPixConversaTests
     }
 
     [Fact]
-    public async Task EnviaDoisBaloesEmOrdem_PdfComLegendaEDepoisSoOCodigo()
+    public async Task EnviaDoisBaloesEmOrdem_ImagemComLegendaEDepoisSoOCodigo()
     {
         var c = new Cenario();
 
         (await c.EnviarAsync()).Should().BeTrue();
 
-        c.Ordem.Should().Equal("documento", "texto:" + Codigo);
-        await c.Canal.Received(1).EnviarDocumentoAsync("5511999998888", "https://loja.exemplo/privado/k",
-            "Pedido-" + ResumoPedidoAtendimento.Codigo(c.Pedido.Id) + ".pdf",
+        c.Ordem.Should().Equal("imagem", "texto:" + Codigo);
+        await c.Canal.Received(1).EnviarImagemAsync("5511999998888", "https://loja.exemplo/privado/k",
             Arg.Is<string?>(l => l!.StartsWith("Pedido ") && l.EndsWith("Pague em até 30 min pelo Pix abaixo") && !l.Contains(Codigo)),
             Arg.Any<CancellationToken>());
         c.Gravadas.Should().HaveCount(2);
-        c.Gravadas[0].TipoConteudo.Should().Be(TipoConteudoMensagem.Documento);
+        c.Gravadas[0].TipoConteudo.Should().Be(TipoConteudoMensagem.Imagem);
         c.Gravadas[1].TipoConteudo.Should().Be(TipoConteudoMensagem.Texto);
         c.Gravadas[1].Texto.Should().Be(Codigo);
         c.Gravadas.Should().OnlyContain(m => m.Status == StatusMensagem.Enviada);
@@ -112,22 +115,36 @@ public class CobrancaPixConversaTests
     }
 
     [Fact]
-    public async Task PdfComNomeAleatorioPublico_SemLinkAssinado()
+    public async Task ImagemComNomeAleatorioPublico_SemLinkAssinado()
     {
         var c = new Cenario();
 
         await c.EnviarAsync();
 
         await c.Armazenamento.Received(1).UploadAsync(
-            Arg.Is<FileUploadRequest>(r => r.IsPublic && r.ContentType == "application/pdf"), Arg.Any<CancellationToken>());
+            Arg.Is<FileUploadRequest>(r => r.IsPublic && r.ContentType == "image/png" && r.FileName.EndsWith(".png")), Arg.Any<CancellationToken>());
         await c.Armazenamento.DidNotReceiveWithAnyArgs().CreatePreSignedDownloadUrlAsync(default!, default, default!, default);
     }
 
+    private static bool NomeEGuidD(string arquivo) =>
+        Guid.TryParseExact(Path.GetFileNameWithoutExtension(arquivo), "D", out var _);
+
     [Fact]
-    public async Task PdfQueNaoGera_SaiALegendaEmTextoEOCodigoSegue()
+    public async Task NomeDoArquivoEGuidFormatoD_SenaoOPublicUploadFileProviderDa404()
     {
         var c = new Cenario();
-        c.Renderizador.RenderizarPedidoAsync(Arg.Any<ResumoPedidoDto>(), Arg.Any<PixPdfDto>(), Arg.Any<CancellationToken>())
+
+        await c.EnviarAsync();
+
+        await c.Armazenamento.Received(1).UploadAsync(
+            Arg.Is<FileUploadRequest>(r => r.BucketPath.StartsWith("atendimento/") && NomeEGuidD(r.FileName)), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ImagemQueNaoGera_SaiALegendaEmTextoEOCodigoSegue()
+    {
+        var c = new Cenario();
+        c.Renderizador.RenderizarPngAsync(Arg.Any<DocumentoHtml>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Throws(new InvalidOperationException("falhou " + Codigo));
 
         (await c.EnviarAsync()).Should().BeTrue();
@@ -137,6 +154,37 @@ public class CobrancaPixConversaTests
         c.Ordem[1].Should().Be("texto:" + Codigo);
         c.Gravadas[0].TipoConteudo.Should().Be(TipoConteudoMensagem.Texto);
         c.Log.Linhas.Should().NotContain(l => l.Contains(Codigo));
+    }
+
+    [Fact]
+    public async Task UploadQueFalha_SaiALegendaEmTextoEOCodigoSegue_SemOCodigoNoLog()
+    {
+        var c = new Cenario();
+        c.Armazenamento.UploadAsync(Arg.Any<FileUploadRequest>(), Arg.Any<CancellationToken>())
+            .Throws(new HttpRequestException("storage fora " + Codigo));
+
+        (await c.EnviarAsync()).Should().BeTrue();
+
+        c.Ordem.Should().HaveCount(2);
+        c.Ordem[0].Should().StartWith("texto:Pedido ").And.NotContain(Codigo);
+        c.Ordem[1].Should().Be("texto:" + Codigo);
+        c.Gravadas[0].TipoConteudo.Should().Be(TipoConteudoMensagem.Texto);
+        c.Log.Linhas.Should().NotContain(l => l.Contains(Codigo));
+    }
+
+    [Fact]
+    public async Task PedidoQueNaoE_DaEmpresa_SaiALegendaEmTexto()
+    {
+        var c = new Cenario();
+        c.Impressos.ObterComPixAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<PixPdfDto>(), Arg.Any<CancellationToken>())
+            .Returns((DocumentoHtml?)null);
+
+        (await c.EnviarAsync()).Should().BeTrue();
+
+        c.Ordem.Should().HaveCount(2);
+        c.Ordem[0].Should().StartWith("texto:Pedido ");
+        await c.Canal.DidNotReceive().EnviarImagemAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -164,7 +212,7 @@ public class CobrancaPixConversaTests
     public async Task PrimeiroBalaoNaoSaiNemEmTexto_SoFicaAFalha_SemEnviarOCodigo()
     {
         var c = new Cenario();
-        c.Canal.EnviarDocumentoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        c.Canal.EnviarImagemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Throws(new HttpRequestException("x"));
         c.Canal.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Throws(new HttpRequestException("x " + Codigo));
@@ -185,8 +233,8 @@ public class CobrancaPixConversaTests
         (await c.EnviarAsync()).Should().BeTrue();
 
         c.Ordem.Should().ContainSingle().Which.Should().StartWith("texto:TEXTO UNICO ANTIGO");
-        await c.Canal.DidNotReceive().EnviarDocumentoAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await c.Canal.DidNotReceive().EnviarImagemAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         c.Gravadas.Should().ContainSingle();
     }
 

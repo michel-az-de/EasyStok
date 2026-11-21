@@ -40,3 +40,18 @@ $script.Replace("`r","") | ssh hostinger "bash -s"
 
 Cole cada bloco no arquivo correspondente e revise o diff antes do commit; o gitleaks do CI é a
 segunda barreira.
+
+## Gotenberg (render do impresso Pix, #3017)
+
+Gotenberg (Chromium) transforma o HTML do impresso da cobrança Pix em PNG. Stack própria em
+`/opt/stacks/gotenberg`, na rede `edge` (externa) com o alias `gotenberg`, sem porta publicada: a API chama
+`http://gotenberg:3000`. Não entra no `compose up` do `vps-deploy.sh`, então uma falha dele não derruba a API
+nem o rollback. Com o Gotenberg fora do ar, a cobrança só cai para texto.
+
+Ordem (Gotenberg antes da API):
+
+1. Da máquina de dev: `scripts/deploy/gotenberg-deploy.sh` (`--dry-run` mostra o plano sem SSH). Espera `healthy`.
+2. Uma vez, no compose da stack na VPS (`/opt/stacks/easystok/compose.yaml`, serviços `api` e `worker`, bloco
+   `environment`), acrescente `Impressao__Renderizador__Url: "http://gotenberg:3000"`. O env da API é definido
+   nesse `environment` (chaves `Secao__Chave`, valores `${EZ_*}` do `.env`); não há mapeamento de `Impressao__*` hoje.
+3. Publique a API com `scripts/deploy/vps-deploy.sh`.
