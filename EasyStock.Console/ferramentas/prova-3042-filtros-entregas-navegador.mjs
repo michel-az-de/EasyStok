@@ -44,11 +44,11 @@ for (const [nome, largura, altura] of [['desktop', 1440, 900], ['celular', 390, 
 console.log(JSON.stringify(resultados))
 await navegador.close()
 await servidor.close()
-// Teto: no desktop e no celular, no máximo 5 chips de Mostrar + 1 de Alcance e 2 selects; primeiro cartão acima de 520px.
+// Teto: no desktop e no celular, no máximo 5 chips de Mostrar + 1 de Alcance e 2 selects; primeiro cartão acima de 400px no desktop e de 530px no celular.
 for (const [nome, r] of Object.entries(resultados)) {
   assert.ok(r.chips <= 6, `${nome}: ${r.chips} chips de filtro (máx. 6)`)
   assert.ok(r.linhasDeFiltro <= 3, `${nome}: ${r.linhasDeFiltro} linhas de filtro (máx. 3)`)
   assert.ok(r.selects >= 1, `${nome}: Ordenar deve ser um select rotulado`)
-  assert.ok(r.yPrimeiroCartao != null && r.yPrimeiroCartao < (nome === 'desktop' ? 400 : 620), `${nome}: primeiro cartão em y=${r.yPrimeiroCartao}`)
+  assert.ok(r.yPrimeiroCartao != null && r.yPrimeiroCartao < (nome === 'desktop' ? 400 : 530), `${nome}: primeiro cartão em y=${r.yPrimeiroCartao}`)
 }
 console.log('prova-3042: ok')
