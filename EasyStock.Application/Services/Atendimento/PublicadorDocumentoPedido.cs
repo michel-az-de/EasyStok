@@ -10,8 +10,8 @@ namespace EasyStock.Application.Services.Atendimento;
 public sealed record DocumentoPublicado(string Url, string NomeArquivo);
 
 /// <summary>
-/// #2962 (E3): gera o PDF do pedido (ou o comprovante) e sobe com nome aleatório, como o canhoto (#2544), para o WhatsApp
-/// baixar pela URL pública. O nome aleatório é a proteção: a chave do arquivo não se adivinha.
+/// #2962 (E3): gera o comprovante em PDF e sobe com nome aleatório, como o canhoto (#2544), para o WhatsApp baixar pela
+/// URL pública. O nome aleatório é a proteção: a chave do arquivo não se adivinha.
 /// </summary>
 public sealed class PublicadorDocumentoPedido(
     IRenderizadorPdfPedido renderizador, IFileStorage armazenamento, IConfiguration configuration)
@@ -22,16 +22,7 @@ public sealed class PublicadorDocumentoPedido(
     public static bool PdfLigado(IConfiguration configuration) =>
         !bool.TryParse(configuration[ChaveEnviarPdf], out var ligado) || ligado;
 
-    public static string NomeDoPedido(string codigo) => $"Pedido-{codigo}.pdf";
-
     public static string NomeDoComprovante(string codigo) => $"Comprovante-{codigo}.pdf";
-
-    public async Task<DocumentoPublicado> PublicarPedidoAsync(
-        Guid empresaId, ResumoPedidoDto resumo, PixPdfDto pix, CancellationToken ct)
-    {
-        var pdf = await renderizador.RenderizarPedidoAsync(resumo, pix, ct);
-        return await SubirAsync(empresaId, pdf, NomeDoPedido(resumo.Codigo), ct);
-    }
 
     public async Task<DocumentoPublicado> PublicarComprovanteAsync(
         Guid empresaId, ResumoPedidoDto resumo, DateTime? pagoEm, CancellationToken ct)

@@ -3,6 +3,7 @@
 - Data: 2026-11-20
 - Tier: baixo (sem migração, sem auth, sem `Program.cs`, Dockerfile ou `.csproj`)
 - Decisões do Felipe (2026-11-20): produção usa WAHA (`sendFile`); o comprovante PDF substitui o canhoto em imagem; o link do PDF é público com nome aleatório, como o canhoto (o link assinado local dava 404, #3000).
+- Estado em 2026-11-21: o balão 1 leva a imagem do impresso `pedido.sbn` no lugar do PDF do pedido (#3035, fonte única da #3017), e o desenho do pedido em PDF saiu do código (#3049). Só o comprovante segue em PDF.
 
 ## 1. Problema
 
@@ -22,7 +23,7 @@ Texto e PDF nascem na API (`TextoCobrancaPix`, `IRenderizadorPdfPedido`). O Cons
 
 - `ICanalMensageria.EnviarDocumentoAsync(contato, urlPublica, nomeArquivo, legenda)`. Padrão da interface: legenda e link em texto (canal sem documento cai no fallback de link).
 - `IWhatsAppCloudClient.EnviarDocumentoAsync(waId, urlPublica, nomeArquivo, legenda)`: Meta (`type: document`), WAHA (`api/sendFile`), WPPConnect (`send-file-base64`), roteador (delega), stub (registra `documento`).
-- `IRenderizadorPdfPedido`: `RenderizarPedidoAsync` e `RenderizarComprovanteAsync`, ambos PDF A4 com QuestPDF; o do pedido desenha o QR Pix (`IQrCodeEncoder`) e o copia e cola.
+- `IRenderizadorPdfPedido`: `RenderizarComprovanteAsync`, PDF com QuestPDF. O desenho do pedido com o QR Pix saiu na #3049; o pedido vai como imagem do impresso (#3035).
 - `CobrancaPixConversa`: envia os balões, grava uma `Mensagem` por balão e aplica a regra de falha parcial.
 - `PdfCobrancaOpcoes` (`Atendimento:Cobranca:*`): `EnviarPdf` (padrão `true`) e `ValidadeLinkHoras` (padrão 24).
 

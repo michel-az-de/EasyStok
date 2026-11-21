@@ -3,14 +3,11 @@ using EasyStock.Application.Services.Notifications.Anexos;
 namespace EasyStock.Application.Ports.Output.Pdf;
 
 /// <summary>
-/// #2962 (E3): PDF do pedido para a cobrança Pix e comprovante "Pago" para o pagamento confirmado. Pensados para a tela do
-/// celular: página estreita, fonte grande e alto contraste.
+/// #2962 (E3): comprovante "Pago" em PDF para o pagamento confirmado. Pensado para a tela do celular: página estreita,
+/// fonte grande e alto contraste. O pedido da cobrança Pix sai como imagem do impresso (#3035).
 /// </summary>
 public interface IRenderizadorPdfPedido
 {
-    /// <summary>PDF do pedido com o QR Pix e o copia e cola. A chave Pix da loja vai dentro: o arquivo sobe com nome aleatório (#3000).</summary>
-    Task<AnexoGerado> RenderizarPedidoAsync(ResumoPedidoDto resumo, PixPdfDto pix, CancellationToken ct = default);
-
     /// <summary>Comprovante com o selo "Pago", a data e o valor. Não leva o copia e cola.</summary>
     Task<AnexoGerado> RenderizarComprovanteAsync(ResumoPedidoDto resumo, DateTime? pagoEm, CancellationToken ct = default);
 }
