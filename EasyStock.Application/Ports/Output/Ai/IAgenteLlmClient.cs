@@ -16,6 +16,12 @@ public interface IAgenteLlmClient
     /// </summary>
     bool Disponivel { get; }
 
+    /// <summary>
+    /// #3064 (S2b de #2948): disponibilidade para a loja. Com a flag <c>ia.provedor_por_loja</c>, o roteador olha o
+    /// provedor, a chave e a cota da loja; sem ela, vale <see cref="Disponivel"/>. Decoradores encaminham ao interno.
+    /// </summary>
+    Task<bool> DisponivelAsync(Guid empresaId, CancellationToken ct = default) => Task.FromResult(Disponivel);
+
     Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default);
 }
 

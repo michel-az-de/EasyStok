@@ -39,7 +39,7 @@ public sealed class ObterFluxoAssistenteUseCase(
 
         return new FluxoAssistenteResult(
             configuracao.Ativo,
-            llm.Disponivel,
+            await llm.DisponivelAsync(empresaId),
             PortoesDoAssistente.Catalogo,
             roteiro,
             !ReferenceEquals(roteiro, RoteiroAtendimento.Padrao),

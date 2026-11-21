@@ -26,6 +26,12 @@ public class Mensagem
     // Mesmo limite do header no IdempotencyMiddleware e da coluna IdempotencyKey.Key.
     public const int ChaveEnvioTamanhoMaximo = 120;
 
+    /// <summary>#2833: cabe um emoji composto (família, bandeira, tom de pele), nunca uma frase.</summary>
+    public const int ReacaoTamanhoMaximo = 32;
+
+    /// <summary>#2833: prazo para apagar para todos. O WhatsApp aceita um pouco mais; 48 h é a regra da loja.</summary>
+    public static readonly TimeSpan PrazoApagarParaTodos = TimeSpan.FromHours(48);
+
     public Guid Id { get; private set; }
     public Guid EmpresaId { get; private set; }
     public Guid ConversaId { get; private set; }
@@ -374,6 +380,58 @@ public class Mensagem
             || (ChaveEnvio is not null && ChaveEnvio != normalizada))
             throw new RegraDeDominioVioladaException("Chave do envio de texto inválida.");
         ChaveEnvio = normalizada;
+    }
+
+    /// <summary>#2833: emoji com que a loja reagiu a esta mensagem; nulo sem reação.</summary>
+    public string? Reacao { get; private set; }
+
+    /// <summary>#2833: quando a loja apagou para todos. O registro fica, com o texto, como auditoria.</summary>
+    public DateTime? ApagadaEm { get; private set; }
+
+    public Guid? ApagadaPorUsuarioId { get; private set; }
+
+    /// <summary>Confere a reação sem gravar e devolve o emoji limpo; nulo retira a reação.</summary>
+    public string? ValidarReacao(string? emoji)
+    {
+        ExigirNoCanal();
+        if (ApagadaEm is not null)
+            throw new RegraDeDominioVioladaException("Mensagem apagada não recebe reação.");
+        if (string.IsNullOrWhiteSpace(emoji)) return null;
+        var limpo = emoji.Trim();
+        if (limpo.Length > ReacaoTamanhoMaximo || limpo.Any(char.IsWhiteSpace) || limpo.All(char.IsAscii))
+            throw new RegraDeDominioVioladaException("A reação precisa ser um único emoji.");
+        return limpo;
+    }
+
+    /// <summary>Grava a reação que o canal já confirmou.</summary>
+    public void Reagir(string? emoji) => Reacao = ValidarReacao(emoji);
+
+    /// <summary>Confere, sem gravar, se a loja ainda pode apagar esta mensagem para todos.</summary>
+    public void ValidarApagarParaTodos(DateTime agora)
+    {
+        if (Direcao != DirecaoMensagem.Saida)
+            throw new RegraDeDominioVioladaException("Só a mensagem enviada pela loja pode ser apagada.");
+        ExigirNoCanal();
+        if (ApagadaEm is not null)
+            throw new RegraDeDominioVioladaException("Esta mensagem já foi apagada.");
+        if (Utc(agora) - EnviadaEm > PrazoApagarParaTodos)
+            throw new RegraDeDominioVioladaException("Só dá para apagar para todos até 48 h depois do envio.");
+    }
+
+    /// <summary>Marca como apagada depois que o canal confirmou.</summary>
+    public void ApagarParaTodos(Guid usuarioId, DateTime agora)
+    {
+        if (usuarioId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("Quem apagou é obrigatório.");
+        ValidarApagarParaTodos(agora);
+        ApagadaEm = Utc(agora);
+        ApagadaPorUsuarioId = usuarioId;
+    }
+
+    private void ExigirNoCanal()
+    {
+        if (ExternoId is null)
+            throw new RegraDeDominioVioladaException("A mensagem ainda não tem identificação no WhatsApp.");
     }
 
     /// <summary>Autoria de ação humana registrada como nota interna, sem envio ao canal.</summary>

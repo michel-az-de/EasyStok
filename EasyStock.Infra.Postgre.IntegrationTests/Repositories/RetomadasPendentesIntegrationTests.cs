@@ -94,6 +94,14 @@ public class RetomadasPendentesIntegrationTests(PostgreSqlDatabaseFixture fixtur
         mensagens.Add(Mensagem.Entrada(casa.Id, reacaoEmPerguntaVelha.Id, agora.AddMinutes(-2), TipoConteudoMensagem.Outro, null,
             "reacao-3080"));
 
+        // #2833: a equipe respondeu e apagou a resposta para todos: o cliente não a vê, continua esperando.
+        var respostaApagada = ComEntrada(casa, "5511999993081", 5, out _);
+        respostaApagada.Assumir(agora.AddMinutes(-10), Guid.NewGuid());
+        var apagada = Mensagem.Saida(casa.Id, respostaApagada.Id, AutorMensagem.Atendente, agora.AddMinutes(-4),
+            TipoConteudoMensagem.Texto, "Fica R$ 5.", "resposta-apagada-3081");
+        apagada.ApagarParaTodos(Guid.NewGuid(), agora.AddMinutes(-3));
+        mensagens.Add(apagada);
+
         var ligada = ConfiguracaoAtendimento.CriarPadrao(casa.Id);
         ligada.Ativo = true;
 
@@ -103,7 +111,8 @@ public class RetomadasPendentesIntegrationTests(PostgreSqlDatabaseFixture fixtur
             db.Empresas.AddRange(casa, desligada);
             db.ConfiguracoesAtendimento.AddRange(ligada, ConfiguracaoAtendimento.CriarPadrao(desligada.Id));
             db.AtendimentoConversas.AddRange(escalada, semResposta, respondidaPelaEquipe, atendidaPeloRobo, jaDecidida,
-                automatica, dentroDoPrazo, antiga, deLojaDesligada, soReagiu, recemAssumida, tocouBotao, reacaoEmPerguntaVelha);
+                automatica, dentroDoPrazo, antiga, deLojaDesligada, soReagiu, recemAssumida, tocouBotao, reacaoEmPerguntaVelha,
+                respostaApagada);
             db.AtendimentoMensagens.AddRange(mensagens);
             await db.SaveChangesAsync();
         }
@@ -117,6 +126,7 @@ public class RetomadasPendentesIntegrationTests(PostgreSqlDatabaseFixture fixtur
                 .Should().BeEquivalentTo([
                     new { EmpresaId = casa.Id, ConversaId = escalada.Id },
                     new { EmpresaId = casa.Id, ConversaId = semResposta.Id },
+                    new { EmpresaId = casa.Id, ConversaId = respostaApagada.Id },
                 ]);
         }
     }

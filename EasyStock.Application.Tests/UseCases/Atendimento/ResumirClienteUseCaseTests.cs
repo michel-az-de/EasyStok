@@ -26,7 +26,7 @@ public class ResumirClienteUseCaseTests
         _conversa = Conversa.Abrir(_empresaId, "5511999998888", Agora, "Maria");
         _conversas.ObterPorIdAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()).Returns(_conversa);
         _conversas.ListarPorClienteAsync(_empresaId, Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([]);
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
             .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm("Cliente frequente — pede lasanha bolonhesa.")], 300, 30));
     }
@@ -89,10 +89,10 @@ public class ResumirClienteUseCaseTests
     public async Task IA_desligada_ou_em_falha_devolve_texto_nulo_para_a_tela_mostrar_so_os_numeros()
     {
         ClienteComPedidos();
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         (await Criar().ExecuteAsync(_empresaId, _conversa.Id)).Should().Be(new ResumoClienteResult(null, false));
 
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns<RespostaLlm>(_ => throw new HttpRequestException("fora"));
         (await Criar().ExecuteAsync(_empresaId, _conversa.Id)).Should().Be(new ResumoClienteResult(null, false));
 

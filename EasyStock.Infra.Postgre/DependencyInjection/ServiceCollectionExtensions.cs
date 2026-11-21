@@ -65,6 +65,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
 
             services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<EasyStockDbContext>());
             services.TryAddSingleton<IRegistroChamadaIa, RegistroChamadaIaRepository>(); // #3063
+            services.TryAddSingleton<IRotasIa, RotasIaRepository>(); // #3064
+            services.TryAddScoped<ITenantAtual, EasyStock.Infra.Postgre.TenantContextAccessor>(); // #3064
             services.AddScoped<IAcervoRepository, Repositories.AcervoRepository>();
             services.AddScoped<ICategoriaRepository, CategoriaRepository>();
             services.AddScoped<IEmpresaRepository, EmpresaRepository>();

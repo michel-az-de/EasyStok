@@ -46,7 +46,7 @@ public sealed class MontagemFichaUseCase(IMontagemFichaLlmClient llm, IConversaR
             throw new ConversaNaoEncontradaException(command.ConversaId);
         var dossie = await dossies.ObterPorConversaAsync(command.EmpresaId, command.ConversaId, ct)
             ?? throw new ConversaNaoEncontradaException(command.ConversaId);
-        if (!llm.Disponivel) throw new MontagemFichaIndisponivelException();
+        if (!await llm.DisponivelAsync(command.EmpresaId, ct)) throw new MontagemFichaIndisponivelException();
         var contexto = JsonSerializer.Serialize(new
         {
             orientacao = orientacao.Length > 0 ? orientacao : "Organize a ficha para atender esta conversa.",

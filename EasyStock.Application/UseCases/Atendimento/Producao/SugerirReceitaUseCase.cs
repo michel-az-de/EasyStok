@@ -28,7 +28,7 @@ public sealed class SugerirReceitaUseCase(IPesquisaProducaoWeb pesquisa, IAgente
         using var prazo = CancellationTokenSource.CreateLinkedTokenSource(ct);
         prazo.CancelAfter(TimeSpan.FromSeconds(75));
         ct = prazo.Token;
-        if (!llm.Disponivel) throw new UseCaseValidationException("A IA de produção não está disponível. Você pode montar a receita manualmente.");
+        if (!await llm.DisponivelAsync(empresaId, ct)) throw new UseCaseValidationException("A IA de produção não está disponível. Você pode montar a receita manualmente.");
         var fontes = await pesquisa.BuscarReceitasAsync(nome, ct);
         if (fontes.Count == 0) throw new UseCaseValidationException("Não encontrei uma receita nas fontes públicas. Tente um nome mais simples ou monte manualmente.");
         var resposta = await llm.EnviarAsync(new(

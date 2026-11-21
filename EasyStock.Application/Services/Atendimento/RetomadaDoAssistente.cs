@@ -69,7 +69,8 @@ public static class RetomadaDoAssistente
         var entrada = historico[indice];
         if (conversa.RetomadaPorTempoDecidida(entrada.Id)) return null;
 
-        var depois = historico.Skip(indice + 1).Where(m => m.Status != StatusMensagem.Falhou).ToList();
+        // #2833: a apagada para todos não é resposta: o cliente não a vê mais e continua esperando.
+        var depois = historico.Skip(indice + 1).Where(m => m.Status != StatusMensagem.Falhou && m.ApagadaEm is null).ToList();
         if (depois.Any(m => m.Autor.EhHumanoDaEmpresa())) return null;
 
         // Resposta do robô sem escalada depois dela: o cliente foi atendido e a equipe só assumiu a conversa.
@@ -81,7 +82,8 @@ public static class RetomadaDoAssistente
         // pela conversa, qualquer entrada ou saída gravada. Aviso automático no meio só adia a retomada.
         var ultimaFala = historico.Skip(indice)
             .Where(m => m.Status != StatusMensagem.Falhou && (m.Autor != AutorMensagem.Sistema || m.EnviadaPorUsuarioId is not null))
-            .Max(m => m.EnviadaEm);
+            // #2833: apagar para todos também é atividade: quem apagou está corrigindo e tem o prazo inteiro.
+            .Max(m => m.ApagadaEm ?? m.EnviadaEm);
         // Assumir e transferir não gravam mensagem, mas movem a última atividade da conversa: quem acabou de pegar
         // o atendimento tem o prazo inteiro.
         if (conversa.UltimaMensagemEm > ultimaFala) ultimaFala = conversa.UltimaMensagemEm;

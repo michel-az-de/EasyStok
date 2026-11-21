@@ -36,7 +36,7 @@ public class RespostaSemIaTests
     {
         _canal.Canal.Returns(CanalConversa.WhatsApp);
         _canal.EnviarTextoAsync(Destino, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("wamid.sem-ia");
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
 
         _conversa = Conversa.Abrir(Empresa, Destino, Agora.AddHours(-1), "Ana Souza");
         _conversa.RegistrarEntrada(Agora.AddMinutes(-5)); // a entrada conta para a janela de 24 h

@@ -213,6 +213,30 @@ public class ClaudeCliMontagemFichaClientTests
     }
 
     [Fact]
+    public void ComBancoORoteadorPorLojaFicaPorForaDoRegistroDoEnv()
+    {
+        // #3064: com flag, tenant, rota, cofre e registro, o roteador envolve o cliente do .env já com o registro da S2a.
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+            ["MontagemFicha:Cli:Enabled"] = "false", ["Anthropic:Enabled"] = "false" }).Build();
+        var services = new ServiceCollection(); services.AddLogging(); services.AddEasyStockAgenteLlm(config);
+        services.AddSingleton(NSubstitute.Substitute.For<IRegistroChamadaIa>());
+        services.AddSingleton(NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Persistence.ITenantFeatureFlagRepository>());
+        services.AddSingleton(NSubstitute.Substitute.For<ITenantAtual>());
+        services.AddSingleton(NSubstitute.Substitute.For<IRotasIa>());
+        services.AddSingleton(NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Integration.Crypto.IIntegrationCredentialResolver>());
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        using var escopo = provider.CreateScope();
+        var cliente = escopo.ServiceProvider.GetRequiredService<IAgenteLlmClient>();
+        cliente.Should().BeOfType<RoteadorIaLlmClient>()
+            .Which.DoEnv.Should().BeOfType<RegistroChamadaIaLlmClient>()
+            .Which.Interno.Should().BeOfType<AnthropicMessagesClient>();
+        escopo.ServiceProvider.GetRequiredService<IAgenteLlmClient>().Should().BeSameAs(cliente, "scoped: memo por requisição");
+        escopo.ServiceProvider.GetRequiredService<IMontagemFichaLlmClient>()
+            .Should().BeOfType<AgenteLlmServiceCollectionExtensions.MontagemFichaApiClient>()
+            .Which.Interno.Should().BeSameAs(cliente);
+    }
+
+    [Fact]
     public void Sem_opt_in_assistencia_tipificada_reutiliza_cliente_api()
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {

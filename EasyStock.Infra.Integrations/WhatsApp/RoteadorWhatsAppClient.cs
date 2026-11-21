@@ -32,6 +32,10 @@ public sealed class RoteadorWhatsAppClient(IRemetenteWhatsApp remetente, WppConn
         await (await ClienteAsync(ct)).MarcarComoLidaAsync(wamid, ct);
     public async Task<(Stream Conteudo, string MimeType)> BaixarMidiaAsync(string mediaId, CancellationToken ct = default) =>
         await (await ClienteAsync(ct)).BaixarMidiaAsync(mediaId, ct);
+    public async Task ReagirAsync(string waId, string wamid, string? emoji, CancellationToken ct = default) =>
+        await (await ClienteAsync(ct)).ReagirAsync(waId, wamid, emoji, ct);
+    public async Task ApagarParaTodosAsync(string waId, string wamid, CancellationToken ct = default) =>
+        await (await ClienteAsync(ct)).ApagarParaTodosAsync(waId, wamid, ct);
     public async Task<FotoPerfilWhatsApp?> ObterFotoPerfilAsync(string waId, CancellationToken ct = default) =>
         await (await ClienteAsync(ct)).ObterFotoPerfilAsync(waId, ct);
 }

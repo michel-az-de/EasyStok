@@ -66,7 +66,7 @@ public sealed class AssistenteDonaUseCase(
         if (pergunta.Length > TamanhoMaximoPergunta)
             throw new UseCaseValidationException($"A pergunta não pode passar de {TamanhoMaximoPergunta} caracteres.");
 
-        if (!llm.Disponivel)
+        if (!await llm.DisponivelAsync(command.EmpresaId, ct))
             throw new AssistenteDonaIndisponivelException();
 
         var contexto = command.ConversaId is { } conversaId

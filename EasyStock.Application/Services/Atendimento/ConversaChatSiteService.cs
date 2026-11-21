@@ -79,7 +79,7 @@ public sealed class ConversaChatSiteService(IConversaRepository conversas, IUnit
     /// <summary>#2876: o Assistente atende o chat do site quando está ligado na loja e o LLM está disponível.</summary>
     public async Task<bool> AssistenteAtendeAsync(Guid empresaId)
     {
-        if (configuracoes is null || llm is null || !llm.Disponivel) return false;
+        if (configuracoes is null || llm is null || !await llm.DisponivelAsync(empresaId)) return false;
         return (await configuracoes.GetOrDefaultAsync(empresaId)).Ativo;
     }
 

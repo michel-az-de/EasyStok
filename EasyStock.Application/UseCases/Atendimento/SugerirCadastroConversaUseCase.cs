@@ -44,7 +44,7 @@ public sealed class SugerirCadastroConversaUseCase(IMontagemFichaLlmClient llm, 
             .OrderBy(m => m.EnviadaEm).TakeLast(AssistenteDonaUseCase.MensagensDeContexto)
             .ToDictionary(m => m.Id, m => m.Texto!);
         if (fontes.Count == 0) return new(command.ConversaId, clienteId, revisao, []);
-        if (!llm.Disponivel) throw new AssistenteDonaIndisponivelException();
+        if (!await llm.DisponivelAsync(command.EmpresaId, ct)) throw new AssistenteDonaIndisponivelException();
         var tempo = Stopwatch.StartNew();
         try
         {

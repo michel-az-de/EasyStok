@@ -6,6 +6,7 @@ import { Icone } from './Icone'
 import css from './Popover.module.css'
 
 const SELETOR_ITENS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
+const DISPOSICAO = { linha: css.linha, faixa: css.faixa }
 const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) ?? [])]
   .filter((item) => !item.disabled && item.getAttribute('aria-disabled') !== 'true')
 
@@ -22,7 +23,8 @@ const itensHabilitados = (caixa) => [...(caixa?.querySelectorAll(SELETOR_ITENS) 
 //
 // #2232 (M1, M4): `item.marcado` (booleano) faz do item uma opção de grupo de escolha única
 // (`menuitemradio`, `aria-checked` e a marca visível); `grupo.disposicao === 'linha'` põe os itens do
-// grupo lado a lado; `folha` faz o menu `abaixo` abrir como folha inferior de largura cheia no celular,
+// grupo lado a lado (em pares); `'faixa'` (#2833) põe todos numa linha só, uma coluna por item, para
+// escolha curta como as reações da bolha; `folha` faz o menu `abaixo` abrir como folha inferior de largura cheia no celular,
 // sem rolagem interna para o conteúdo atual (o chamador mantém os itens curtos).
 //
 // `portal` (achado do Composer, generalizado aqui): um ancestral com
@@ -211,7 +213,7 @@ export function Popover({
         return (
           <div className={css.grupo} key={grupo.titulo}>
             <p className={css.titulo}>{grupo.titulo}</p>
-            {grupo.disposicao === 'linha' ? <div className={css.linha}>{linhas}</div> : linhas}
+            {DISPOSICAO[grupo.disposicao] ? <div className={DISPOSICAO[grupo.disposicao]}>{linhas}</div> : linhas}
           </div>
         )
       })}
