@@ -153,6 +153,22 @@ public class RegistroChamadaIaLlmClientTests
     }
 
     [Fact]
+    public async Task LinhaPerdidaViraLogDeErroMedivel()
+    {
+        // #3083: perda não pode ser silenciosa; "RegistroChamadaIa perdido" em nível Error é o que se conta em produção.
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm("end_turn", [], 1, 1));
+        _registro.RegistrarAsync(Arg.Any<ChamadaIa>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("banco fora"));
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<RegistroChamadaIaLlmClient>>();
+
+        await new RegistroChamadaIaLlmClient(_interno, _registro, TimeProvider.System, logger).EnviarAsync(Requisicao());
+
+        logger.ReceivedCalls().Select(c => c.GetArguments()).Where(a => a.Length == 5)
+            .Should().ContainSingle(a => (Microsoft.Extensions.Logging.LogLevel)a[0]! == Microsoft.Extensions.Logging.LogLevel.Error
+                && a[2]!.ToString()!.StartsWith("RegistroChamadaIa perdido"));
+    }
+
+    [Fact]
     public async Task SemEmpresaNaoGravaMasResponde()
     {
         var resposta = new RespostaLlm("end_turn", [], 1, 1);

@@ -78,7 +78,7 @@ public sealed class RegistroChamadaIaLlmClient(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Falha ao registrar chamada de IA da empresa {EmpresaId} ({Finalidade}).",
+            logger.LogError(ex, "RegistroChamadaIa perdido: falha ao registrar chamada de IA da empresa {EmpresaId} ({Finalidade}).",
                 requisicao.EmpresaId, requisicao.Finalidade);
         }
     }
