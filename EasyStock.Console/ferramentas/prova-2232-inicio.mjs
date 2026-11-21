@@ -83,8 +83,10 @@ confere('H1  uma marca só no canto: o logo da loja, sem o "EasyStok" ao lado', 
 confere('H2  o tema sai do topo: fica no menu da conta e, sem conta, num lugar discreto do rodapé', () => {
   assert.doesNotMatch(topo(html), /role="radiogroup"/)
   assert.doesNotMatch(jsxHall.slice(jsxHall.indexOf('<header'), jsxHall.indexOf('</header>')).replace(/<MenuDaConta[\s\S]*<\/MenuDaConta>/, ''), /InterruptorTema/)
-  assert.match(jsxHall, /<MenuDaConta[^>]*>[\s\S]*<InterruptorTema \/>[\s\S]*<\/MenuDaConta>/)
-  assert.match(rodape(htmlSemConta), /role="radiogroup"/, 'sem menu da conta o tema continua alcançável')
+  // #3004: a conta existe em toda rota (com ou sem sessão nomeada), então o tema mora só no menu dela e o pé do Início não o repete.
+  assert.match(fonte('componentes/MenuDaConta.jsx'), /<InterruptorTema \/>/, 'o tema mora no menu da conta')
+  assert.match(jsxHall, /<MenuDaConta /)
+  assert.doesNotMatch(rodape(htmlSemConta), /role="radiogroup"/, 'sem sessão nomeada o menu da conta segue à mão: o tema não volta ao rodapé')
   assert.doesNotMatch(rodape(html), /role="radiogroup"/, 'com menu da conta o tema não aparece duas vezes')
   assert.doesNotMatch(corpo('.acoes > [role=\'radiogroup\']', celular), /grid-row/)
 })

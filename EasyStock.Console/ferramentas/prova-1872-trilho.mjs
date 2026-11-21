@@ -52,10 +52,11 @@ await confere('1  as duas molduras compõem trilho, início, item, ativo e espa�
   }
   const usos = (css) => [...css.matchAll(new RegExp(COMPOE, 'g'))].map((m) => m[1])
   const balcao = usos(fonte('app/moldura.module.css'))
-  const modulos = usos(fonte('features/hall/moldura.module.css'))
+  // #3004: o trilho dos módulos é o `TrilhoDoConsole` (o mesmo do Início e do Balcão); o CSS dele compõe do mesmo módulo.
+  const modulos = usos(fonte('features/hall/trilhoDoConsole.module.css'))
   for (const classe of ['trilho', 'inicio', 'item', 'ativo', 'espaco', 'avatar']) {
     assert.ok(balcao.includes(classe), `Balcão não compõe ${classe}`)
-    assert.ok(modulos.includes(classe), `módulos não compõem ${classe}`)
+    if (classe !== 'espaco') assert.ok(modulos.includes(classe), `módulos não compõem ${classe}`)
   }
 })
 

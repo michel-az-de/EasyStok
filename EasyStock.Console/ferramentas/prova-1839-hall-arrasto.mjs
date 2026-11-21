@@ -171,7 +171,8 @@ provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue send
 })
 
 provar('#1810 continua valendo: até 20 controles na primeira vista', () => {
-  const controles = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+  // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta: o limite vale para o conteúdo do Início.
+  const controles = (html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '').match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
   assert.ok(controles <= 20, `${controles} controles`)
 })
 

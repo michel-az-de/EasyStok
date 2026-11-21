@@ -51,24 +51,25 @@ confere('1  o Sair mora no menu do avatar: trilho do Balcão, trilho dos módulo
   assert.match(conta, /const fecharComEsc = useCallback\(\(evento\) => \{ evento\.preventDefault\(\); fechar\(\) \}/, 'Esc não propaga o fechamento para outra camada')
   assert.match(conta, /useEscape\(aberto, fecharComEsc\)/, 'Esc fecha e devolve o foco ao avatar')
   assert.match(conta, /botaoRef\.current\?\.focus\(\)/)
-  assert.match(conta, /const nome = nomeDaSessao \|\| \(aoSair \? 'Sua conta' : null\)/, 'sessão sem nome ainda sai')
+  assert.match(conta, /const nome = nomeDaSessao \|\| 'Sua conta'/, 'sessão sem nome ainda sai (#3004: a conta existe em toda rota)')
   assert.match(fonte('app/Moldura.jsx'), /<MenuDaConta nome=\{atendente\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\}/)
-  assert.match(fonte('features/hall/MenuDosModulos.jsx'), /<MenuDaConta nome=\{conta\?\.nome\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\}/)
+  assert.match(fonte('features/hall/TrilhoDoConsole.jsx'), /<MenuDaConta nome=\{atendente \?\? conta\?\.nome\} detalhe=\{conta\?\.casa\} aoSair=\{aoSair\}/)
   assert.match(fonte('features/hall/HallDeModulos.jsx'), /<MenuDaConta lado="abaixo"/)
   assert.doesNotMatch(fonte('features/hall/HallDeModulos.jsx'), /<Botao className=\{css\.sair\}/)
   assert.match(fonte('app/App.jsx'), /conta: \{ nome: sessao\.usuario\?\.nome \?\? null, casa: sessao\.empresa\?\.nome \?\? null \}/)
 })
 confere('1  com o trilho à vista a barra do módulo não repete Sair nem os links do trilho; sem ele, o Sair fica na barra', () => {
   const css = fonte('features/hall/moldura.module.css')
-  assert.match(css, /@media \(min-width: 1101px\) \{\s*\.barra \.contaNaBarra, \.contexto > a\.voltar \{ display: none; \}/) // #2258 (auditoria A9): a conta da barra substitui o Sair solto
-  assert.match(css, /@media \(max-width: 1100px\) \{\s*\.lateral > \.trilho \{ display: none; \}/)
+  assert.match(css, /@media \(min-width: 1101px\) \{\s*\.barra \.contaNaBarra, \.contexto > a\.voltar, \.acoes > :global\(\[data-ajuda-console\]\) \{ display: none; \}/) // #2258 (auditoria A9): a conta da barra substitui o Sair solto
+  assert.match(css, /@media \(max-width: 1100px\) \{\s*\.lateral > nav \{ display: none; \}/)
   assert.match(fonte('features/hall/MolduraDoModulo.jsx'), /<div className=\{css\.contaNaBarra\}>\s*<MenuDaConta/)
 })
 confere('1  o tema do trilho do Balcão vai para o menu da conta (em 1280x720 o trilho passava de 720 px)', () => {
   const moldura = fonte('app/Moldura.jsx')
   assert.doesNotMatch(moldura, /<InterruptorTema vertical \/>/)
-  assert.match(moldura, /rotuloSair=\{sessaoPersistente \? 'Sair deste aparelho' : 'Sair'\}>\s*<InterruptorTema \/>\s*<\/MenuDaConta>/)
-  assert.match(fonte('componentes/Trilho.module.css'), /width: var\(--largura-item-trilho\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
+  assert.match(moldura, /rotuloSair=\{sessaoPersistente \? 'Sair deste aparelho' : 'Sair'\}\/>/)
+  assert.match(fonte('componentes/MenuDaConta.jsx'), /<InterruptorTema \/>/, '#3004: o tema mora dentro do MenuDaConta, em toda rota')
+  assert.match(fonte('componentes/Trilho.module.css'), /width: calc\(var\(--largura-trilho\) - 4px\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
   assert.match(fonte('componentes/MenuDaConta.module.css'), /position: fixed;/, 'a camada não é recortada pelo trilho')
 })
 
@@ -97,16 +98,18 @@ confere('3  Balcão e módulos usam o mesmo trilho, do token', () => {
   assert.match(tokens, /--altura-item-trilho: 54px;/)
   const trilho = fonte('componentes/Trilho.module.css')
   assert.match(trilho, /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\); width: var\(--largura-trilho\);/)
-  assert.match(trilho, /width: var\(--largura-item-trilho\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
-  for (const moldura of ['app/moldura.module.css', 'features/hall/moldura.module.css']) {
+  assert.match(trilho, /width: calc\(var\(--largura-trilho\) - 4px\); min-height: max\(var\(--toque\), var\(--altura-item-trilho\)\);/)
+  for (const moldura of ['app/moldura.module.css', 'features/hall/trilhoDoConsole.module.css']) {
     assert.match(fonte(moldura), /\.trilho \{\s*composes: trilho from '(\.\.\/)+componentes\/Trilho\.module\.css'/, `${moldura} compõe o trilho único`)
   }
 })
 confere('3  o item do Balcão no trilho tem o nome e o ícone do módulo, como nos módulos', () => {
-  const moldura = fonte('app/Moldura.jsx')
-  assert.match(moldura, /const MODULO_ATENDIMENTO = moduloPorId\('atendimento'\)/)
-  assert.match(moldura, /<IconeDoModulo modulo=\{MODULO_ATENDIMENTO\} \/>\s*<span>\{MODULO_ATENDIMENTO\.nome\}<\/span>/)
-  assert.doesNotMatch(moldura, /<span>Balcão<\/span>/)
+  // #3004: o item vem de `itensDoTrilho` (módulo + nome) e o `TrilhoDoConsole` desenha o ícone do módulo e o rótulo.
+  const trilho = fonte('features/hall/TrilhoDoConsole.jsx')
+  assert.match(trilho, /<IconeDoModulo modulo=\{item\.modulo\} telaId=\{item\.telaId\} tamanho=\{24\} \/>/)
+  assert.match(trilho, /\{icone\}<span>\{item\.rotulo\}<\/span>/)
+  assert.match(fonte('dominio/trilhoDoConsole.js'), /id: modulo\.id, rotulo: ROTULO_CURTO\[modulo\.id\] \?\? modulo\.nome, nome: modulo\.nome, modulo,/)
+  assert.doesNotMatch(fonte('app/Moldura.jsx'), /<span>Balcão<\/span>/)
 })
 confere('3  a densidade compacta mora em tokens.css e é aplicada inteira, sem cópia parcial', () => {
   const tokens = fonte('estilos/tokens.css')

@@ -8,8 +8,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { MarcaIcone } from '../../componentes/MarcaIcone'
 import { Botao } from '../../componentes/Botao'
-import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
+import { pedirAjuda } from '../../aplicacao/pedirAjuda'
+import { rotuloDoSair } from '../../componentes/contaDoMenu'
 import { Vazio } from '../../componentes/Vazio'
 import { Modal } from '../../componentes/Modal'
 import { MenuDaConta } from '../../componentes/MenuDaConta'
@@ -114,14 +115,12 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
           {busca}
           {ajuda}
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
-          {/* #2258 (auditoria A9, G4): tema e Sair moram só atrás do avatar, como no Balcão. Com o trilho à vista
+          {/* #2258 (auditoria A9, G4), #3004: Tema, Ajuda e Sair moram só atrás do avatar. Com o trilho à vista
               (a partir de 1101 px) o avatar é o do trilho e este não aparece. */}
           <div className={css.contaNaBarra}>
-            <MenuDaConta nome={conta?.nome} detalhe={conta?.casa} aoSair={aoSair} lado="abaixo"
-              rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}
-              tituloSair={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined}>
-              <InterruptorTema />
-            </MenuDaConta>
+            <MenuDaConta nome={conta?.nome} detalhe={conta?.casa} aoSair={aoSair} lado="abaixo" aoAbrirAjuda={pedirAjuda}
+              rotuloSair={rotuloDoSair(sessaoPersistente)}
+              tituloSair={sessaoPersistente ? 'A Cozinha permanece conectada ao fechar o navegador. Saia ao trocar de pessoa.' : undefined} />
           </div>
         </div>
       </header>
