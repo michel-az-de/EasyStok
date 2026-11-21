@@ -18,3 +18,5 @@ d12b2eaef83cc4b0bc86f6892287e56ad6ff4a4e:casa-da-baba-mobile/apk/android/app/src
 107b3189a06257cecd0b61c79a19ad7c113b4970:EasyStock.Api/wwwroot/pwa/js/app-arranque.js:generic-api-key:526
 # Mesmo falso positivo no squash da #2934 (o ignore da PR casa so com o SHA da branch) (#2936).
 2e2468a6d9d6d04c9fc7e7261cfa7f2920c80008:EasyStock.Api/wwwroot/pwa/js/app-arranque.js:generic-api-key:526
+# Falso positivo (token de teste do baba-diag remoto, ja montado em execucao no commit seguinte da mesma PR #3066).
+6991bf265621cd2f90e3386c3c6ed2c9daa3715b:tools/mcp-baba/test/http.test.mjs:generic-api-key:12

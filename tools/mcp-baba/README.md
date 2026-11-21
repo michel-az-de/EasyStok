@@ -1,6 +1,18 @@
 # mcp-baba
 
-Servidores MCP da Casa da Baba. Spec: [docs/plan/mcp-casa-da-baba](../../docs/plan/mcp-casa-da-baba/README.md). Roda na maquina de quem usa; nada fica exposto na internet. Em revisao: a [ADR-0069](../../docs/adr/0069-mcp-baba-diag-remoto-com-token.md) propoe publicar o `baba-diag` em `mcp.easystok.online` (vale apos a label `aprovado` na PR da #3057).
+Servidores MCP da Casa da Baba. Spec: [docs/plan/mcp-casa-da-baba](../../docs/plan/mcp-casa-da-baba/README.md). Roda na maquina de quem usa. Excecao: o `baba-diag` tambem esta publicado em `https://mcp.easystok.online/diag`, com token por pessoa ([ADR-0069](../../docs/adr/0069-mcp-baba-diag-remoto-com-token.md), #3062).
+
+## Usar o baba-diag remoto (outro computador, so Claude Code)
+
+1. O Felipe emite o token: `scripts/deploy/mcp-deploy.sh token-emitir <pessoa>` (validade de 90 dias). O token nao aparece na tela: vai para o arquivo `~/.mcp-token-<pessoa>` (permissao 600), que ele entrega a pessoa por canal privado.
+2. Na maquina da pessoa:
+
+```bash
+claude mcp add --transport http --scope user baba-diag https://mcp.easystok.online/diag --header "Authorization: Bearer <token>"
+claude mcp list   # baba-diag: ... Connected
+```
+
+Revogar: `scripts/deploy/mcp-deploy.sh token-revogar <pessoa>` (vale no proximo pedido, sem reiniciar). Ver quem tem token: `mcp-deploy.sh tokens`. Estado da stack: `mcp-deploy.sh status`. O container chega ao host so pelo `gate.sh --sem-banco` (sem `psql_ro`); `baba-db` e os demais continuam locais.
 
 Hoje: `baba-diag` (somente leitura, #2521).
 
