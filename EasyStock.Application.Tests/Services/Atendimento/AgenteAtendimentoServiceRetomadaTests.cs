@@ -283,6 +283,34 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task Retomada_ClienteSoTocouBotaoDeAcaoDepoisDaRespostaDaEquipe_NaoRetoma()
+    {
+        ClienteEscreveuComAEquipeHa(TimeSpan.FromMinutes(5));
+        _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Atendente, Agora.AddMinutes(-4),
+            TipoConteudoMensagem.Texto, "Sai às 18h.", "wamid.out14"));
+        // Botão "acao:" é resolvido sem o robô no fluxo normal: o toque não é pergunta esperando resposta.
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora - AlemDoPrazo, TipoConteudoMensagem.Botao,
+            "Avaliar", "wamid.in14", "acao:avaliar:5"));
+
+        var resultado = await Retomar();
+
+        resultado.Should().Be(ResultadoTurnoAgente.Ignorado);
+        _conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        _requisicoes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Retomada_ClienteRespondeuPorBotaoComum_Retoma()
+    {
+        _historico.Clear();
+        _conversa.Assumir(Agora.AddMinutes(-10), Guid.NewGuid());
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora - AlemDoPrazo, TipoConteudoMensagem.Botao,
+            "Quero falar do pedido", "wamid.in15", "menu:pedido"));
+
+        (await Retomar()).Should().NotBe(ResultadoTurnoAgente.Ignorado);
+    }
+
+    [Fact]
     public async Task Retomada_AtendenteAcabouDeAssumir_OPrazoComecaAli()
     {
         ClienteEscreveuComAEquipeHa(AlemDoPrazo);

@@ -79,6 +79,21 @@ public class RetomadasPendentesIntegrationTests(PostgreSqlDatabaseFixture fixtur
         var recemAssumida = ComEntrada(casa, "5511999993078", 3, out _);
         recemAssumida.Assumir(agora.AddSeconds(-20), Guid.NewGuid());
 
+        // A equipe respondeu e o cliente só tocou um botão de ação, que o fluxo normal resolve sem o robô.
+        var tocouBotao = ComEntrada(casa, "5511999993079", 5, out _);
+        tocouBotao.Assumir(agora.AddMinutes(-10), Guid.NewGuid());
+        mensagens.Add(Mensagem.Saida(casa.Id, tocouBotao.Id, AutorMensagem.Atendente, agora.AddMinutes(-4),
+            TipoConteudoMensagem.Texto, "Sai às 18h.", "resposta-equipe-3079"));
+        tocouBotao.RegistrarEntrada(agora.AddMinutes(-2));
+        mensagens.Add(Mensagem.Entrada(casa.Id, tocouBotao.Id, agora.AddMinutes(-2), TipoConteudoMensagem.Botao, "Avaliar",
+            "botao-3079", "acao:avaliar:5"));
+        // Pergunta de duas horas atrás e uma reação agora: a reação não traz a pergunta velha de volta para a faixa.
+        var reacaoEmPerguntaVelha = ComEntrada(casa, "5511999993080", 120, out _);
+        reacaoEmPerguntaVelha.Assumir(agora.AddMinutes(-119), Guid.NewGuid());
+        reacaoEmPerguntaVelha.RegistrarEntrada(agora.AddMinutes(-2));
+        mensagens.Add(Mensagem.Entrada(casa.Id, reacaoEmPerguntaVelha.Id, agora.AddMinutes(-2), TipoConteudoMensagem.Outro, null,
+            "reacao-3080"));
+
         var ligada = ConfiguracaoAtendimento.CriarPadrao(casa.Id);
         ligada.Ativo = true;
 
@@ -88,7 +103,7 @@ public class RetomadasPendentesIntegrationTests(PostgreSqlDatabaseFixture fixtur
             db.Empresas.AddRange(casa, desligada);
             db.ConfiguracoesAtendimento.AddRange(ligada, ConfiguracaoAtendimento.CriarPadrao(desligada.Id));
             db.AtendimentoConversas.AddRange(escalada, semResposta, respondidaPelaEquipe, atendidaPeloRobo, jaDecidida,
-                automatica, dentroDoPrazo, antiga, deLojaDesligada, soReagiu, recemAssumida);
+                automatica, dentroDoPrazo, antiga, deLojaDesligada, soReagiu, recemAssumida, tocouBotao, reacaoEmPerguntaVelha);
             db.AtendimentoMensagens.AddRange(mensagens);
             await db.SaveChangesAsync();
         }

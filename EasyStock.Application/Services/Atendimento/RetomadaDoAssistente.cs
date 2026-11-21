@@ -77,8 +77,8 @@ public static class RetomadaDoAssistente
             && m.Texto?.StartsWith(EscalarConversaUseCase.PrefixoMotivo, StringComparison.Ordinal) == true);
         if (depois.Any(m => m.Autor == AutorMensagem.Agente) && !escalada) return null;
 
-        // O relógio é o da última fala de gente ou do robô. Nota interna do sistema não o reinicia; a que tem autor
-        // (reabertura feita pela equipe) reinicia.
+        // O relógio é o da última atividade: fala de gente ou do robô, nota com autor (reabertura feita pela equipe) e,
+        // pela conversa, qualquer entrada ou saída gravada. Aviso automático no meio só adia a retomada.
         var ultimaFala = historico.Skip(indice)
             .Where(m => m.Status != StatusMensagem.Falhou && (m.Autor != AutorMensagem.Sistema || m.EnviadaPorUsuarioId is not null))
             .Max(m => m.EnviadaEm);
@@ -89,12 +89,14 @@ public static class RetomadaDoAssistente
     }
 
     /// <summary>
-    /// Reação, figurinha, vídeo e mensagem sem suporte chegam como <see cref="TipoConteudoMensagem.Outro"/>: o fluxo
-    /// normal não as leva ao robô, e aqui elas não contam como cliente esperando. A consulta da varredura
-    /// (<c>RetomadasPendentesQuery</c>) usa o mesmo corte.
+    /// Reação, figurinha, vídeo e mensagem sem suporte chegam como <see cref="TipoConteudoMensagem.Outro"/>, e o toque em
+    /// botão de ação (<see cref="RoteadorAcoesBotao.Prefixo"/>) é resolvido sem o robô: o fluxo normal não os leva ao
+    /// robô, e aqui eles não contam como cliente esperando. A consulta da varredura (<c>RetomadasPendentesQuery</c>) usa
+    /// o mesmo corte.
     /// </summary>
     public static bool EhEntradaQueEsperaResposta(Mensagem mensagem) =>
-        mensagem.Autor == AutorMensagem.Cliente && mensagem.TipoConteudo != TipoConteudoMensagem.Outro;
+        mensagem.Autor == AutorMensagem.Cliente && mensagem.TipoConteudo != TipoConteudoMensagem.Outro
+        && mensagem.BotaoId?.StartsWith(RoteadorAcoesBotao.Prefixo, StringComparison.Ordinal) != true;
 
     /// <summary>
     /// Orientação do turno retomado. Sem futuro sobre a equipe ("a equipe vai..."): a guarda da resposta barra promessa de

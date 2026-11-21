@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -24,14 +25,17 @@ public sealed class RetomadasPendentesQuery(EasyStockDbContext db) : IRetomadasP
             where c.ClienteId == null || !db.Clientes.IgnoreQueryFilters().Any(p => p.EmpresaId == c.EmpresaId && p.Id == c.ClienteId
                 && (p.Bloqueado || p.AtendimentoAutomaticoPausadoEm != null))
             let entrada = db.AtendimentoMensagens.IgnoreQueryFilters()
-                // Mesmo corte de RetomadaDoAssistente.EhEntradaQueEsperaResposta: reação e figurinha não esperam resposta.
+                // Mesmo corte de RetomadaDoAssistente.EhEntradaQueEsperaResposta: reação, figurinha e toque em botão de
+                // ação não esperam resposta.
                 .Where(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id && m.Autor == AutorMensagem.Cliente
-                    && m.TipoConteudo != TipoConteudoMensagem.Outro)
+                    && m.TipoConteudo != TipoConteudoMensagem.Outro
+                    && (m.BotaoId == null || !m.BotaoId.StartsWith(RoteadorAcoesBotao.Prefixo)))
                 .OrderByDescending(m => m.EnviadaEm)
                 .ThenByDescending(m => m.Id)
                 .Select(m => new { m.Id, m.EnviadaEm })
                 .FirstOrDefault()
-            where entrada != null
+            // A faixa vale para a entrada que espera: reação recente não traz de volta pergunta velha.
+            where entrada != null && entrada.EnviadaEm >= desde
             // A equipe já respondeu a essa mensagem: o atendimento é dela.
             where !db.AtendimentoMensagens.IgnoreQueryFilters().Any(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id
                 && m.EnviadaEm > entrada.EnviadaEm && m.Status != StatusMensagem.Falhou
