@@ -12,6 +12,12 @@ for (const arquivo of ['src/features/gestao/producao/AbaInsumosApi.jsx', 'src/fe
   if (/\bopcional\b/i.test(fonte)) falhas.push(`${arquivo}: o opcional fica sem marca; "(opcional)" convive com o padrão do "*"`)
   if (!/\bobrigatorio\b/.test(fonte)) falhas.push(`${arquivo}: o campo obrigatório não usa a prop obrigatorio ("*")`)
 }
+// Revisão #3025: dinheiro obrigatório também leva "*", e os cartões em recarga ficam mais apagados.
+const financeiro = readFileSync(resolve(raiz, 'src/features/gestao/financeiro/ModaisFinanceiras.jsx'), 'utf8')
+for (const rotulo of ['Valor total', 'Valor', 'Valor da parcela']) {
+  if (!new RegExp(`<DinheiroFinanceiro rotulo="${rotulo}" obrigatorio `).test(financeiro)) falhas.push(`ModaisFinanceiras.jsx: "${rotulo}" é obrigatório e fica sem "*"`)
+}
+if (!/\.cartoes\[aria-busy='true'\]\s*\{[^}]*opacity/.test(readFileSync(resolve(raiz, 'src/features/gestao/cadastros/cadastros.module.css'), 'utf8'))) falhas.push('cadastros.module.css: .cartoes[aria-busy] sem a regra mais apagada')
 
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const pasta = resolve(raiz, '.build/3016/cadastros-consistencia')
