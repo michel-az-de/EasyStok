@@ -54,7 +54,7 @@ function podar(mapa, agora, ms, teto = 5000) {
 
 function lerCorpo(req, max) {
   return new Promise((ok, falha) => {
-    if (Number(req.headers['content-length'] ?? 0) > max) { req.resume(); return falha(Object.assign(new Error('grande'), { status: 413 })); }
+    if (Number(req.headers['content-length'] ?? 0) > max) { req.resume(); return falha(Object.assign(new Error('grande'), { status: 413, fechar: true })); }
     const partes = []; let n = 0;
     // passou do limite: para de ler e responde na hora, sem esperar o fim de um corpo chunked (#3078)
     const estourou = () => { req.removeAllListeners('data'); req.pause(); falha(Object.assign(new Error('grande'), { status: 413, fechar: true })); };

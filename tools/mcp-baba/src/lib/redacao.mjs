@@ -5,8 +5,8 @@ const SEGREDO = String.raw`(?:password|pwd|senha|secret|apikey|api[_-]?key|token
 const REGRAS = [
   [/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, 'Bearer [REDIGIDO]'],
   [/eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g, '[JWT-REDIGIDO]'],
-  // Authorization com outro esquema (Basic, Digest...): a credencial vem depois do nome do esquema (#3078)
-  [/(authorization\s*["']?\s*[=:]\s*["']?\s*)(?:Basic|Digest|Negotiate|NTLM)\s+[^\s;,"'&]+/gi, '$1[REDIGIDO]'],
+  // Authorization com qualquer esquema (Basic, Token, AWS4...): o valor inteiro, ate a aspa ou o fim da linha (#3078)
+  [/(authorization\s*["']?\s*[=:]\s*["']?\s*)[A-Za-z][\w-]*\s+[^\n"']+/gi, '$1[REDIGIDO]'],
   // segredo entre aspas: tudo ate a aspa que fecha, espacos incluidos (#3078)
   [new RegExp(String.raw`(${SEGREDO}\\?["']?\s*[=:]\s*)(\\?["'])(?:(?!\2)[^\n])*\2`, 'gi'), '$1$2[REDIGIDO]$2'],
   [new RegExp(String.raw`(${SEGREDO}\s*["']?\s*[=:]\s*["']?)[^\s;,"'&]+`, 'gi'), '$1[REDIGIDO]'],

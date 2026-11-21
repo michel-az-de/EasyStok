@@ -20,7 +20,7 @@ test('executarRemoto: ssh que sai sem ler o stdin rejeita sem excecao nao tratad
   const pega = e => naoTratadas.push(e);
   process.on('uncaughtException', pega);
   try {
-    // node -e sai na hora com codigo 255, como um ssh com chave recusada; stdin grande forca o EPIPE.
+    // node com opcao invalida (-o) sai na hora com codigo 9, como um ssh com chave recusada; stdin grande forca o EPIPE.
     const falso = process.execPath;
     await assert.rejects(executarRemoto('containers', { ssh: falso, stdin: 'x'.repeat(8 * 1024 * 1024), timeoutMs: 10_000 }));
     await new Promise(r => setTimeout(r, 200));
