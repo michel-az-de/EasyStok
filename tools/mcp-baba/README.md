@@ -1,6 +1,6 @@
 # mcp-baba
 
-Servidores MCP da Casa da Baba. Spec: [docs/plan/mcp-casa-da-baba](../../docs/plan/mcp-casa-da-baba/README.md). Roda na maquina de quem usa; nada fica exposto na internet.
+Servidores MCP da Casa da Baba. Spec: [docs/plan/mcp-casa-da-baba](../../docs/plan/mcp-casa-da-baba/README.md). Roda na maquina de quem usa; nada fica exposto na internet. Em revisao: a [ADR-0069](../../docs/adr/0069-mcp-baba-diag-remoto-com-token.md) propoe publicar o `baba-diag` em `mcp.easystok.online` (vale apos a label `aprovado` na PR da #3057).
 
 Hoje: `baba-diag` (somente leitura, #2521).
 
