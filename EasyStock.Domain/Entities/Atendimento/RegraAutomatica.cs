@@ -31,7 +31,11 @@ public class RegraAutomatica
 
     public void Alterar(string texto, bool ligada, DateTime agora)
     {
-        Texto = RespostaPronta.Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        var novo = RespostaPronta.Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        // Só valida o que muda: desligar uma regra antiga manda o texto já gravado e não pode voltar 400.
+        if (novo != Texto && ModeloTextoAtendimento.ChavesDesconhecidas(novo) is { } desconhecidas)
+            throw new RegraDeDominioVioladaException(desconhecidas);
+        Texto = novo;
         Ligada = ligada;
         AlteradaEm = agora;
     }
