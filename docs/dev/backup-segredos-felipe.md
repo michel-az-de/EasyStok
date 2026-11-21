@@ -12,7 +12,9 @@ para baixo, no PowerShell da estação.
 
 ## 0. Crie o client ID OAuth (uma vez)
 
-No projeto `easystok-backup`, console do Google Cloud: **APIs e serviços > Tela de consentimento
+No projeto `easystok-backup`, console do Google Cloud: primeiro **APIs e serviços > Biblioteca >
+Google Drive API > Ativar** (sem ela o login do rclone falha com `403 accessNotConfigured`). Depois
+**APIs e serviços > Tela de consentimento
 OAuth** (tipo **interno**, só a organização FMA, nome `EasyStok Backup`; nunca externo: em status de teste
 o refresh token expira em 7 dias e o backup pararia em silêncio). Depois **Credenciais > Criar credenciais
 > ID do cliente OAuth > Aplicativo para computador**. Anote o **ID do cliente** e o **segredo do
