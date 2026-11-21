@@ -194,6 +194,18 @@ export function tempoAteInicio(pedido, agora) {
   return Math.min(1, Math.max(0, (inicio - agora) / total))
 }
 
+// #3044: há quanto tempo o pedido sem janela espera na cozinha, na mesma base de `tempoAteInicio` (pagamento ou
+// criação). Não há carimbo de entrada em preparo na API; pedido com janela já tem o aviso de início, sem segundo tempo.
+export function tempoNaCozinha(pedido, agora) {
+  if (pedido.inicioPrevistoEm || !['aguardando', 'preparando'].includes(colunaDoStatusKds(pedido.status))) return null
+  const base = Date.parse(pedido.pagoEm ?? pedido.criadoEm)
+  if (Number.isNaN(base)) return null
+  const min = Math.max(0, Math.floor((agora - base) / 60000))
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  return h < 24 ? `há ${h} h ${min % 60} min` : `há ${Math.floor(h / 24)} d`
+}
+
 // Fila vazia (#1474): a cozinha mostra um dia por vez. O pedido liberado para amanhã não aparece
 // em Hoje, e a tela dizia "Cozinha em dia" como se nada faltasse.
 export const textoDaCozinhaVazia = ({ amanha }) => (amanha
