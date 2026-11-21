@@ -88,11 +88,12 @@
 }
 
 .cabecaCartao { display: flex; align-items: center; gap: var(--e-2); }
-.numeroCartao { font-family: var(--f-corpo); font-size: var(--t-corpo); font-weight: 700; line-height: 1.35; }
+.numeroCartao { font-family: var(--f-corpo); font-size: var(--t-titulo); font-weight: 700; line-height: 1.35; }
 /* #1899: o código curto do EasyStok vira referência pequena ao lado de "Comanda N". */
 .referencia { margin-left: var(--e-1); font-size: var(--t-apoio); font-weight: 400; color: var(--tinta-2); }
 
-.rotuloSituacao { margin: 0; font-size: var(--t-apoio); font-weight: 700; }
+.rotuloSituacao { margin: 0; font-size: var(--t-forte); font-weight: 700; }
+.tempoDecorrido { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cor-esperando .rotuloSituacao { color: var(--info); }
 .cor-atraso .rotuloSituacao { color: var(--erro); }
 .cor-preparo .rotuloSituacao { color: var(--sucesso); }
