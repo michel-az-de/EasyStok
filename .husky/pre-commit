@@ -20,4 +20,17 @@
 ## or put your custom commands -------------------
 #echo 'Husky.Net is awesome!'
 
+# Gate roda via wscript (sem janela, issue 2922): a saida vai para o log, entao o
+# hook aponta o log quando bloqueia. Sem log = wscript nao rodou: falha fechado.
+LOG=.build/gate-ultimo.log
+rm -f "$LOG"
 dotnet husky run --group pre-commit
+rc=$?
+if [ "$rc" -eq 0 ] && [ ! -s "$LOG" ]; then
+  echo "[gate] sem log em $LOG: o gate nao rodou (wscript.exe desabilitado?). Commit bloqueado." >&2
+  rc=1
+elif [ "$rc" -ne 0 ]; then
+  echo "[gate] VERMELHO. Commit bloqueado. Log completo: $LOG" >&2
+  [ -s "$LOG" ] && tail -n 20 "$LOG" >&2
+fi
+exit "$rc"
