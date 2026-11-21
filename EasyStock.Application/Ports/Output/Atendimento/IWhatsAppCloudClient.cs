@@ -55,6 +55,25 @@ public interface IWhatsAppCloudClient
     /// </summary>
     Task<FotoPerfilWhatsApp?> ObterFotoPerfilAsync(string waId, CancellationToken ct = default) =>
         Task.FromResult<FotoPerfilWhatsApp?>(null);
+
+    /// <summary>
+    /// #2833: reage à mensagem <paramref name="wamid"/> com <paramref name="emoji"/>; nulo retira a reação. Quem não
+    /// implementa lança <see cref="AcaoNaoSuportadaWhatsAppException"/>.
+    /// </summary>
+    Task ReagirAsync(string waId, string wamid, string? emoji, CancellationToken ct = default) =>
+        throw new AcaoNaoSuportadaWhatsAppException("Esta conexão do WhatsApp não envia reação.");
+
+    /// <summary>
+    /// #2833: apaga para todos a mensagem que a loja enviou. A Cloud API da Meta não oferece; só as pontes apagam.
+    /// </summary>
+    Task ApagarParaTodosAsync(string waId, string wamid, CancellationToken ct = default) =>
+        throw new AcaoNaoSuportadaWhatsAppException("Esta conexão do WhatsApp não apaga mensagem para todos.");
+}
+
+/// <summary>#2833: a conexão ligada não oferece a ação (ex.: apagar para todos na Cloud API da Meta). Nada foi enviado.</summary>
+public sealed class AcaoNaoSuportadaWhatsAppException(string mensagem) : Exception(mensagem)
+{
+    public const string Codigo = "ACAO_NAO_SUPORTADA_NO_CANAL";
 }
 
 public sealed record EnvioWhatsAppResult(string Wamid);

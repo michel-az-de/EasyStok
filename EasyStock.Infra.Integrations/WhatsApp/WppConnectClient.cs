@@ -173,17 +173,60 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
 
     public async Task MarcarComoLidaAsync(string wamid, CancellationToken ct = default)
     {
-        var partes = wamid.Split(':', 3);
-        if (partes.Length != 3 || partes[0] != "wpp") return;
-        var id = partes[2].Split('_');
-        if (id.Length < 3) return;
-        var remoto = id[1];
-        var lid = remoto.EndsWith("@lid", StringComparison.Ordinal);
-        if (!lid && !remoto.EndsWith("@c.us", StringComparison.Ordinal)) return;
+        if (LerIdMensagem(wamid) is not { } msg) return;
         var sessao = await SessaoAsync(ct);
-        if (partes[1] != sessao.Sessao) throw Falha("A mensagem não pertence à sessão desta empresa.", permanente: true);
+        if (msg.Sessao != sessao.Sessao) throw Falha("A mensagem não pertence à sessão desta empresa.", permanente: true);
         using var doc = await ChamarAsync(HttpMethod.Post, Path(sessao, "send-seen"), sessao,
-            new { phone = remoto.Split('@')[0], isGroup = false, isLid = lid }, ct);
+            new { phone = msg.Conversa.Split('@')[0], isGroup = false, isLid = msg.EhLid }, ct);
+    }
+
+    /// <summary>#2833: <c>react-message</c> pelo id serializado; <c>false</c> retira a reação.</summary>
+    public async Task ReagirAsync(string waId, string wamid, string? emoji, CancellationToken ct = default)
+    {
+        var (sessao, msg) = await MensagemDaSessaoAsync(wamid, ct);
+        using var doc = await ChamarAsync(HttpMethod.Post, Path(sessao, "react-message"), sessao,
+            new { msgId = msg.Serializado, reaction = (object?)emoji ?? false }, ct);
+        ExigirSucesso(doc, "O WPPConnect não confirmou a reação.");
+    }
+
+    /// <summary>#2833: <c>delete-message</c> não completa o telefone, então vai a conversa inteira (<c>@c.us</c> ou <c>@lid</c>).</summary>
+    public async Task ApagarParaTodosAsync(string waId, string wamid, CancellationToken ct = default)
+    {
+        var (sessao, msg) = await MensagemDaSessaoAsync(wamid, ct);
+        using var doc = await ChamarAsync(HttpMethod.Post, Path(sessao, "delete-message"), sessao,
+            new { phone = msg.Conversa, isGroup = false, messageId = msg.Serializado, onlyLocal = false, deleteMediaInDevice = false }, ct);
+        ExigirSucesso(doc, "O WPPConnect não confirmou que apagou a mensagem.");
+    }
+
+    private async Task<(CredencialWppConnect Sessao, IdMensagemWpp Msg)> MensagemDaSessaoAsync(string wamid, CancellationToken ct)
+    {
+        var msg = LerIdMensagem(wamid)
+                  ?? throw new AcaoNaoSuportadaWhatsAppException("Esta mensagem não saiu pela conexão por QR; por ela não dá para reagir nem apagar.");
+        var sessao = await SessaoAsync(ct);
+        if (msg.Sessao != sessao.Sessao) throw Falha("A mensagem não pertence à sessão desta empresa.", permanente: true);
+        return (sessao, msg);
+    }
+
+    private static void ExigirSucesso(JsonDocument doc, string erro)
+    {
+        if (LerTexto(doc.RootElement, "status") != "success") throw Falha(erro, 502);
+    }
+
+    private sealed record IdMensagemWpp(string Sessao, string Serializado, string Conversa)
+    {
+        public bool EhLid => Conversa.EndsWith("@lid", StringComparison.Ordinal);
+    }
+
+    /// <summary>Id externo <c>wpp:{sessao}:{deMim}_{conversa}_{id}</c>; nulo fora desse formato ou de conversa em grupo.</summary>
+    private static IdMensagemWpp? LerIdMensagem(string wamid)
+    {
+        var partes = wamid.Split(':', 3);
+        if (partes.Length != 3 || partes[0] != "wpp") return null;
+        var id = partes[2].Split('_');
+        if (id.Length < 3) return null;
+        var conversa = id[1];
+        if (!conversa.EndsWith("@lid", StringComparison.Ordinal) && !conversa.EndsWith("@c.us", StringComparison.Ordinal)) return null;
+        return new(partes[1], partes[2], conversa);
     }
 
     public async Task<(Stream Conteudo, string MimeType)> BaixarMidiaAsync(string mediaId, CancellationToken ct = default)

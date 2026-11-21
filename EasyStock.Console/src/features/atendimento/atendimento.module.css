@@ -678,3 +678,33 @@
 @media (max-width: 560px) {
   .checagemEtapas li { grid-template-columns: 1fr; gap: var(--e-1); }
 }
+
+/* #2833: emoji no Composer, reação e apagar para todos. */
+.ancoraEmoji { position: relative; display: inline-flex; }
+/* Abaixo de 360px o botão a mais empurra o Enviar para fora da tela (#2178); ali o teclado do celular já tem emoji. */
+@media (max-width: 359px) { .ancoraEmoji { display: none; } }
+.seletorEmoji { display: flex; flex-direction: column; gap: var(--e-2); padding: var(--e-3); }
+.buscaEmoji {
+  min-height: var(--toque); padding: 0 var(--e-3); border: var(--b-1) solid var(--linha-media); border-radius: var(--r-1);
+  background: var(--papel); color: var(--tinta); font-size: var(--t-corpo);
+}
+.tituloEmoji, .semEmoji { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
+.gradeEmoji { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--e-1); }
+.gradeEmoji .emoji { min-width: var(--toque); min-height: var(--toque); padding: 0; font-size: var(--t-valor); line-height: 1; }
+
+/* O gatilho fica ao lado da bolha e só aparece no hover ou no foco; no toque, sempre. */
+.menuDaMensagem { position: absolute; top: 2px; }
+.entrada .menuDaMensagem { left: calc(100% + 2px); }
+.saida .menuDaMensagem { right: calc(100% + 2px); }
+.gatilhoDaMensagem { opacity: 0; transition: opacity var(--dur-micro) var(--ease-saida); }
+.balao:hover .gatilhoDaMensagem, .gatilhoDaMensagem:focus-visible, .gatilhoDaMensagem[aria-expanded='true'] { opacity: 1; }
+@media (hover: none) { .gatilhoDaMensagem { opacity: 1; } }
+
+/* Reação da loja: um selo no pé da bolha, como no WhatsApp. */
+.comReacao { margin-bottom: var(--e-4); }
+.reacaoDaBolha {
+  position: absolute; bottom: calc(-1 * var(--e-4)); right: var(--e-3); padding: 2px 6px;
+  border-radius: var(--r-pilula); background: var(--papel); box-shadow: 0 0 0 var(--b-1) var(--linha); font-size: var(--t-forte); line-height: 1.2;
+}
+.entrada .reacaoDaBolha { right: auto; left: var(--e-3); }
+.apagada p { display: flex; align-items: center; gap: var(--e-1); font-style: italic; color: var(--tinta-2); }

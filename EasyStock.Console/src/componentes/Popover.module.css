@@ -43,6 +43,11 @@
 .marca { position: absolute; right: var(--e-3); top: 50%; transform: translateY(-50%); }
 /* Itens do grupo lado a lado (o par Claro e Escuro numa linha só). */
 .linha { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-1); }
+/* #2833: todos numa linha só (as seis reações da bolha). A opção ativa fica no fundo de seleção, sem a marca. */
+.faixa { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--e-0); }
+.faixa .item, .faixa .ativo { padding-left: 0; padding-right: 0; text-align: center; }
+.faixa .item strong { font-size: var(--t-valor); font-weight: 400; }
+.faixa .marca { display: none; }
 .informativo { cursor: default; }
 .item strong { display: block; font-size: var(--t-apoio); font-weight: 600; }
 .item span { display: block; font-size: var(--t-micro); color: var(--tinta-2); margin-top: var(--e-0); }

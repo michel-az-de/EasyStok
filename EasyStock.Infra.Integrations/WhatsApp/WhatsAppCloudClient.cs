@@ -270,6 +270,25 @@ public sealed class WhatsAppCloudClient(
         }
     }
 
+    /// <summary>#2833: emoji vazio retira a reação (contrato da Cloud API).</summary>
+    public async Task ReagirAsync(string waId, string wamid, string? emoji, CancellationToken ct = default)
+    {
+        var payload = new
+        {
+            messaging_product = "whatsapp",
+            recipient_type = "individual",
+            to = waId,
+            type = "reaction",
+            reaction = new { message_id = wamid, emoji = emoji ?? string.Empty }
+        };
+        await EnviarEExtrairWamidAsync(payload, ct);
+    }
+
+    /// <summary>#2833: a Cloud API não revoga mensagem enviada.</summary>
+    public Task ApagarParaTodosAsync(string waId, string wamid, CancellationToken ct = default) =>
+        throw new AcaoNaoSuportadaWhatsAppException(
+            "O WhatsApp oficial (Meta) não permite apagar mensagem para todos. Só a conexão por QR apaga.");
+
     public async Task MarcarComoLidaAsync(string wamid, CancellationToken ct = default)
     {
         var payload = new { messaging_product = "whatsapp", status = "read", message_id = wamid };
