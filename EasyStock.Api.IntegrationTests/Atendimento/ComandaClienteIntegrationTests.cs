@@ -196,6 +196,63 @@ public sealed partial class PedidoConversaConcorrenciaTests
         }
     }
 
+    // #3087: como a página manda ao combinar a entrega: nome e telefone "", endereço fora da área e sem horário.
+    private static RascunhoComandaCliente RascunhoSemHorario(Guid itemId, int qtd = 2) => new([new(itemId, qtd)], Nome: "", Telefone: "",
+        Endereco: new("20040002", "Rua da sprint", "42", "Centro", "Rio de Janeiro", "RJ", "Casa 2"));
+
+    private static async Task<ComandaClienteResult> FreteCombinadoSemHorario(HttpClient client, string token, Guid conversaId, Guid itemId)
+    {
+        var estado = await Estado(client, token);
+        await Salvar(client, token, estado, RascunhoSemHorario(itemId));
+        estado = await Estado(client, token);
+        (await client.PostAsJsonAsync($"{Rota(token)}/encaminhar-entrega", new { estado.Revisao })).StatusCode.Should().Be(HttpStatusCode.OK);
+        estado = await Estado(client, token);
+        (await client.PostAsJsonAsync($"/api/atendimento/conversas/{conversaId}/comandas-cliente/{estado.LinkId}/combinar-frete",
+            new { estado.Revisao, Valor = 13.5m })).StatusCode.Should().Be(HttpStatusCode.OK);
+        estado = await Estado(client, token);
+        estado.FreteCombinado.Should().Be(13.5m);
+        estado.Rascunho.JanelaId.Should().BeNull();
+        return estado;
+    }
+
+    [SkippableFact]
+    public async Task Comanda_PrimeiroHorarioMantemOFreteCombinadoEOPedidoSaiComEle()
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        var cobrancas = new ConcurrentDictionary<string, CriarPreferenceCommand>();
+        await using var factory = CriarFactory(Provedor(cobrancas));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var token = await Link(factory, c.ConversaId);
+        var combinado = await FreteCombinadoSemHorario(client, token, c.ConversaId, c.CardapioItemId);
+        await Salvar(client, token, combinado, RascunhoSemHorario(c.CardapioItemId) with { JanelaId = c.JanelaId, DataEntrega = c.DataEntrega });
+        var comHorario = await Estado(client, token);
+        comHorario.Revisao.Should().BeGreaterThan(combinado.Revisao);
+        comHorario.FreteCombinado.Should().Be(13.5m, "escolher o primeiro horário não altera a cotação manual (#3087)");
+        comHorario.EntregaACombinar.Should().BeFalse();
+        comHorario.TotalPrevisto.Should().Be(33.5m);
+        (await Enviar(client, token, comHorario.Revisao)).Total.Should().Be(33.5m);
+        (await Estado(client, token)).Pedido!.Frete.Should().Be(13.5m);
+        cobrancas.Should().ContainSingle();
+    }
+
+    [SkippableTheory]
+    [InlineData("observacao")]
+    [InlineData("item")]
+    public async Task Comanda_PrimeiroHorarioComOutraMudancaDescartaOFreteCombinado(string mudanca)
+    {
+        Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
+        await using var factory = CriarFactory(Provedor(new()));
+        using var client = factory.CreateClient();
+        var c = await SemearAsync(factory);
+        var token = await Link(factory, c.ConversaId);
+        var combinado = await FreteCombinadoSemHorario(client, token, c.ConversaId, c.CardapioItemId);
+        var dados = RascunhoSemHorario(c.CardapioItemId, mudanca == "item" ? 3 : 2) with { JanelaId = c.JanelaId, DataEntrega = c.DataEntrega,
+            Observacoes = mudanca == "observacao" ? "Conferir transporte novamente" : null };
+        await Salvar(client, token, combinado, dados);
+        (await Estado(client, token)).FreteCombinado.Should().BeNull("qualquer mudança além de data e horário exige novo acordo");
+    }
+
     [SkippableFact]
     public async Task Comanda_NumeroEstavelNovaEdicaoPreservaSelecaoERecuperaRespostaPerdida()
     {
