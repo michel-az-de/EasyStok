@@ -43,6 +43,10 @@ namespace EasyStock.Infra.Postgre.Data.Configurations
                 .HasColumnName("avaliacao_solicitada_em")
                 .IsRequired(false);
 
+            b.Property(p => p.QuitadoHistoricoEm)
+                .HasColumnName("quitado_historico_em")
+                .IsRequired(false);
+
             // ── Resolução Storefront (TASK-EZ-APROVAR-001) ─────────────
             b.Property(p => p.AprovadoEm)
                 .HasColumnName("aprovado_em")

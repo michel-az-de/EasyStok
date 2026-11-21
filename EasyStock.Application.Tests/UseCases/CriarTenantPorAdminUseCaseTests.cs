@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Notifications;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.UseCases.Admin.CriarTenantPorAdmin;
 using Microsoft.Extensions.Logging;
+using LojaEntity = EasyStock.Domain.Entities.Loja;
 
 namespace EasyStock.Application.Tests.UseCases;
 
@@ -17,6 +18,7 @@ public class CriarTenantPorAdminUseCaseTests
     private readonly IPerfilRepository _perfilRepository = Substitute.For<IPerfilRepository>();
     private readonly IAssinaturaEmpresaRepository _assinaturaRepository = Substitute.For<IAssinaturaEmpresaRepository>();
     private readonly IEmpresaRepository _empresaRepository = Substitute.For<IEmpresaRepository>();
+    private readonly ILojaRepository _lojaRepository = Substitute.For<ILojaRepository>();
     private readonly IUsuarioEmpresaRepository _usuarioEmpresaRepository = Substitute.For<IUsuarioEmpresaRepository>();
     private readonly IUsuarioPerfilRepository _usuarioPerfilRepository = Substitute.For<IUsuarioPerfilRepository>();
     private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
@@ -36,7 +38,7 @@ public class CriarTenantPorAdminUseCaseTests
 
     private CriarTenantPorAdminUseCase CriarUseCase() =>
         new(_usuarioRepository, _planoRepository, _perfilRepository, _assinaturaRepository, _empresaRepository,
-            _usuarioEmpresaRepository, _usuarioPerfilRepository, _passwordHasher, _unitOfWork, _emailService, _logger);
+            _lojaRepository, _usuarioEmpresaRepository, _usuarioPerfilRepository, _passwordHasher, _unitOfWork, _emailService, _logger);
 
     private static CriarTenantPorAdminCommand Comando(bool enviarEmail = true) =>
         new("Padaria da Maria", null, "Maria Souza", "maria.souza@padaria.com", enviarEmail);
@@ -97,5 +99,36 @@ public class CriarTenantPorAdminUseCaseTests
         (await act.Should().ThrowAsync<UseCaseValidationException>()).Which.Code.Should().Be("EMAIL_RESERVADO");
         await _empresaRepository.DidNotReceive().AddAsync(Arg.Any<Empresa>());
         await _usuarioRepository.DidNotReceive().AddAsync(Arg.Any<Usuario>());
+    }
+
+    // #2813 (B0): empresa sem loja nao pareia aparelho (EMPRESA_SEM_LOJA) e o historico do PWA nao tem onde entrar.
+    // A loja padrao nasce com a empresa, com o nome dela; e a primeira loja, entao nao passa pelo limite do plano.
+    [Fact]
+    public async Task EmpresaNovaNasceComUmaLojaAtivaComONomeDaEmpresa()
+    {
+        LojaEntity? criada = null;
+        _ = _lojaRepository.AddAsync(Arg.Do<LojaEntity>(l => criada = l));
+
+        var resultado = await CriarUseCase().ExecuteAsync(Comando());
+
+        await _lojaRepository.Received(1).AddAsync(Arg.Any<LojaEntity>());
+        criada.Should().NotBeNull("a empresa criada pelo back-office precisa de ao menos uma loja");
+        criada!.EmpresaId.Should().Be(resultado.TenantId);
+        criada.Nome.Should().Be("Padaria da Maria");
+        criada.Ativa.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ALojaPadraoEGravadaNaMesmaUnidadeDeTrabalhoDaEmpresa()
+    {
+        await CriarUseCase().ExecuteAsync(Comando());
+
+        Received.InOrder(() =>
+        {
+            _empresaRepository.AddAsync(Arg.Any<Empresa>());
+            _lojaRepository.AddAsync(Arg.Any<LojaEntity>());
+            _unitOfWork.CommitAsync();
+        });
+        await _unitOfWork.Received(1).CommitAsync();
     }
 }

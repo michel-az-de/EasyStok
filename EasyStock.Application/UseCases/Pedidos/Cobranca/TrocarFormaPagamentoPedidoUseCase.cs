@@ -169,6 +169,9 @@ public sealed class TrocarFormaPagamentoPedidoUseCase(
         var pedido = await pedidoRepository.GetForUpdateAsync(input.EmpresaId, input.PedidoId, ct);
         if (pedido is null || pedido.EmpresaId != input.EmpresaId)
             throw new CobrancaPedidoNaoEncontradoException(input.PedidoId);
+        // #2813: o entregue do histórico já foi pago na origem; trocar a forma geraria cobrança nova.
+        if (pedido.QuitadoHistorico)
+            throw new UseCaseValidationException("Não é possível trocar a forma de pagamento: o pedido do histórico já está quitado.");
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))
             throw new CobrancaPedidoConflitoException(CobrancaPedidoConflitoException.PedidoFinalizado,
                 "Pedido cancelado ou entregue não troca a forma de pagamento.");

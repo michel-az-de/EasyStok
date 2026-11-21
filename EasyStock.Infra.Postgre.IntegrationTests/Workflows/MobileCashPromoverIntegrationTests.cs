@@ -82,6 +82,45 @@ public sealed class MobileCashPromoverIntegrationTests(PostgreSqlDatabaseFixture
         (await MovimentosAsync(empresaId)).Should().BeEmpty("lançamento excluído não entra no caixa do ERP");
     }
 
+    [SkippableFact]
+    public async Task Promover_ArquivoDoHistoricoImportado_RecusaESemMovimento()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await SemearAsync();
+        await ArquivarAsync(empresaId);
+        await using var db = Contexto(empresaId);
+
+        var resposta = await Controller(db, empresaId).Promover(Lancamento, null, default);
+
+        resposta.Should().BeOfType<BadRequestObjectResult>();
+        (await MovimentosAsync(empresaId)).Should().BeEmpty("o arquivo do histórico (#2813) não entra no caixa do ERP");
+        (await LancamentoAsync(empresaId)).ErpMovimentoCaixaId.Should().BeNull();
+    }
+
+    [SkippableFact]
+    public async Task Listar_SoPendentes_NaoTrazOArquivoDoHistoricoImportado()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var empresaId = await SemearAsync();
+        await ArquivarAsync(empresaId);
+        await using var db = Contexto(empresaId);
+        var controller = Controller(db, empresaId);
+
+        var pendentes = (await controller.List(empresaId, true, default) as OkObjectResult)!.Value as MobileCashSummary[];
+        var todos = (await controller.List(empresaId, false, default) as OkObjectResult)!.Value as MobileCashSummary[];
+
+        pendentes.Should().BeEmpty("o arquivo do histórico não é pendência de promoção");
+        todos.Should().ContainSingle("a lista completa ainda mostra o arquivo");
+    }
+
+    private async Task ArquivarAsync(Guid empresaId)
+    {
+        await using var db = Contexto(empresaId);
+        var lancamento = await db.Set<CashEntry>().SingleAsync(c => c.EmpresaId == empresaId);
+        lancamento.MarcarNaoPromover(lancamento.CreatedAt);
+        await db.SaveChangesAsync();
+    }
+
     private EasyStockDbContext Contexto(Guid empresaId)
     {
         var db = fixture.CreateDbContext();

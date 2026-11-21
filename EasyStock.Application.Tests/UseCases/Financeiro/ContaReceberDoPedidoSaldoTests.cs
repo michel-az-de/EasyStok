@@ -62,6 +62,26 @@ public class ContaReceberDoPedidoSaldoTests
     }
 
     [Fact]
+    public async Task Pedido_quitado_no_historico_nao_gera_conta_nem_sem_o_saldo_financeiro()
+    {
+        var (sut, gravada) = Montar();
+        var quitado = PedidoDe(120m, 0m);
+        quitado.Status = "entregue";
+        quitado.MarcarQuitadoHistorico(DateTime.UtcNow);
+        var semMarca = PedidoDe(120m, 0m);
+        semMarca.Status = "entregue";
+
+        var r = await sut.ExecuteAsync(new GerarContaReceberDePedidoCommand(Empresa, quitado));
+
+        r.Should().BeNull("o histórico já foi pago na origem: não há o que cobrar");
+        gravada().Should().BeNull();
+
+        await sut.ExecuteAsync(new GerarContaReceberDePedidoCommand(Empresa, semMarca));
+
+        gravada()!.ValorTotal.Should().Be(120m, "sem a marca o entregue sem pagamento segue a receber");
+    }
+
+    [Fact]
     public async Task Com_o_saldo_financeiro_do_pedido_o_estorno_manual_volta_a_ser_cobrado()
     {
         var pedidos = Substitute.For<IPedidoRepository>();

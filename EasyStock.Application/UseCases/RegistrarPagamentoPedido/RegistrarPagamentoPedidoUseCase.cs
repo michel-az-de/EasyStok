@@ -78,6 +78,10 @@ public class RegistrarPagamentoPedidoUseCase(
             var pedido = await repo.GetByIdWithDetailsAsync(cmd.EmpresaId, cmd.PedidoId);
             if (pedido == null || pedido.EmpresaId != cmd.EmpresaId) return null;
 
+            // #2813: o entregue do histórico já entrou quitado pelo import; pagamento novo não se registra nem mexe no caixa.
+            if (pedido.QuitadoHistorico)
+                throw new UseCaseValidationException("Não é possível registrar pagamento: o pedido do histórico já está quitado.");
+
             // Um takeover pode ter ocorrido enquanto o primeiro recebimento segurava este lock.
             // O recibo e o pagamento foram gravados juntos; releia antes de aplicar outro parcial.
             if (recuperarRecibo is not null && await recuperarRecibo(token) is { } recibo) return recibo;

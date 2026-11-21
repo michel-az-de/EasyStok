@@ -22,13 +22,18 @@ public record Pedido
     public DateTime? EntreguEm { get; init; }
     public DateTime? CanceladoEm { get; init; }
     public DateTime? AgendadoParaEm { get; init; }
+    // #2813: o que falta receber, decidido pelo servidor (zero no quitado do histórico, que não tem pagamento).
+    // Nulo em API antiga: cai na conta total menos pago.
+    public decimal? AReceber { get; init; }
 
     public bool IsScheduled => AgendadoParaEm.HasValue;
     public bool IsAtrasado => AgendadoParaEm.HasValue
         && AgendadoParaEm.Value < DateTime.UtcNow
         && Status != "entregue" && Status != "cancelado";
-    public decimal Pendente => Math.Max(0m, Total - TotalPago);
-    public bool Quitado => TotalPago >= Total && Total > 0;
+    // #2813: o servidor decide o que falta (zero no quitado do histórico, que não tem pagamento).
+    // Sem o campo (API antiga) vale a conta de antes: total menos pago.
+    public decimal Pendente => Math.Max(0m, AReceber ?? Total - TotalPago);
+    public bool Quitado => Total > 0 && Pendente == 0m;
     // #689/BUG-008b: pedido com total R$0 não tem cobrança. Sem isto caía em "Pendente"
     // (porque Quitado exige Total>0) exibindo "Pendente / Falta R$0,00" — contraditório.
     public bool SemCobranca => Total == 0m;

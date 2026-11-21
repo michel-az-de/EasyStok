@@ -102,7 +102,7 @@ async function preparar(quantidade = 1, abrirConfirmacao = true) {
   await page.getByRole('button', { name: 'Adicionar itens', exact: true }).first().click()
   for (let i = 0; i < quantidade; i++) await page.getByRole('button', { name: new RegExp(`^(Somar )?${rx(produto.nome).source}`, 'i') }).first().click()
   await fecharPaineis(); await page.getByRole('button', { name: /^Revisar comanda/ }).first().click()
-  await page.getByLabel('Dia da entrega (opcional)', { exact: true }).fill(fixture.dataEntrega)
+  await page.getByLabel('Ver janelas do dia', { exact: true }).fill(fixture.dataEntrega)
   const janela = page.getByRole('button', { name: /Manhã.*vagas? livres?/ }).first()
   const janelaExibida = await janela.innerText(); await janela.click()
   await page.locator('[data-simulacao-total]').waitFor()

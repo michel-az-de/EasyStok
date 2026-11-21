@@ -57,7 +57,7 @@ function EscolhaRascunho({ pedido, editavel, aoEscolher, dataInicial, aoLerJanel
   return (
     <div data-campo-ficha="janela" className={css.contents}>
     <Bloco titulo="Janela de entrega">
-      <CampoTexto rotulo="Dia da entrega (opcional)" tipo="date" value={data} disabled={!editavel}
+      <CampoTexto rotulo="Ver janelas do dia" tipo="date" value={data} disabled={!editavel}
         min={hoje} max={somarDiasIso(hoje, 14)}
         onChange={(e) => { setData(e.target.value); aoEscolher(null) }} />
       {janelas === null && !erro && <p className={css.corpoBloco}>Carregando janelas…</p>}

@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -85,11 +87,7 @@ public sealed class InternalCronJobAuthHandler : AuthenticationHandler<Authentic
     }
 
     private static bool CryptographicEquals(string a, string b)
-    {
-        if (a.Length != b.Length) return false;
-        var diff = 0;
-        for (var i = 0; i < a.Length; i++)
-            diff |= a[i] ^ b[i];
-        return diff == 0;
-    }
+        => CryptographicOperations.FixedTimeEquals(
+            SHA256.HashData(Encoding.UTF8.GetBytes(a)),
+            SHA256.HashData(Encoding.UTF8.GetBytes(b)));
 }

@@ -54,8 +54,17 @@ export const somaEhDaJanela = (conversa, montouNaJanela) => !comandaDeFora(conve
 export const mostrarAvisoDePedidoEmAndamento = ({ jaTemPedido, registrando }) => Boolean(jaTemPedido) && !registrando
 // #2941: o endereço "cadastrado" só vale como confirmação enquanto o campo ainda mostra o que foi salvo; editou, a linha some.
 export const enderecoVigente = (cadastrado, texto) => (cadastrado && cadastrado === (texto ?? '').trim() ? cadastrado : null)
+// #3076: o dossiê chega depois de a janela abrir; o endereço do cadastro preenche o campo só enquanto ninguém digitou.
+export const enderecoQueChegou = (digitado, doCadastro) => (!String(digitado ?? '').trim() && doCadastro ? doCadastro : null)
 // Sem cardápio carregado todo item pareceria "fora do cardápio".
 export const cardapioPronto = (cardapio) => Array.isArray(cardapio) && cardapio.length > 0
+// #3076: "carregando" só até a primeira leitura. Leu e veio vazio é pronto (a janela diz que não há item); a recusa
+// (vitrine desligada, falha) diz o motivo em vez de esperar para sempre. Itens já na tela valem mesmo com falha depois.
+export function situacaoDoCardapio(catalogo) {
+  if (cardapioPronto(catalogo?.cardapio)) return { tipo: 'pronto' }
+  if (catalogo?.cardapioFalha) return { tipo: 'falhou', mensagem: catalogo.cardapioFalha }
+  return catalogo?.cardapioLido ? { tipo: 'pronto' } : { tipo: 'carregando' }
+}
 
 // Entrega e endereço (como a comanda): a API usa o endereço do cadastro do cliente. Sem ele, 409 na simulação e no
 // Registrar. O caminho é cadastrar o endereço aqui, pelo mesmo `editarDadoCliente('endereco')` da Ficha.
@@ -70,10 +79,14 @@ export const podeAvancarDaEntrega = ({ pedido, entrega = 'entrega', erroSimulaca
   && !faltaFreteCombinado(simulacao, pedido)
 
 // Texto claro para qualquer recusa da API; a de endereço diz onde resolver.
-export function textoDoErro(erro) {
+// #3076: no próprio passo, aponta o campo em vez de mandar ir ao passo em que a pessoa já está.
+export function textoDoErro(erro, { noPassoDaEntrega = false } = {}) {
   const texto = erro?.message || 'Não foi possível calcular o pedido. Tente de novo.'
-  return faltaEndereco(erro) ? `${texto} Cadastre o endereço no passo Entrega e pagamento.` : texto
+  if (!faltaEndereco(erro)) return texto
+  return noPassoDaEntrega ? `${texto} Use o campo Endereço de entrega acima.` : `${texto} Cadastre o endereço no passo Entrega e pagamento.`
 }
+// #3076: com a recusa do formato já no campo, a falta de endereço da simulação não repete o aviso embaixo.
+export const erroDaSimulacaoNaEntrega = (erro, erroDoCampo) => (erroDoCampo && faltaEndereco(erro) ? null : erro ?? null)
 
 export async function cadastrarEnderecoDaJanela({ acoes, conversa, texto }) {
   const endereco = (texto ?? '').trim()
@@ -143,11 +156,13 @@ export const rotuloDoNovoPedido = (sessao, clienteId) => (temRascunhoDoPedido(se
 
 // #2944 (E1-01): por que Continuar/Registrar está parado. `null` quando nada bloqueia (mesma regra de `podeAvancarDaEntrega`).
 // #2978: o Revisar repete as regras da Entrega e ainda exige endereço válido (`enderecoValido`), para não registrar às cegas.
-export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null, simulacao = null, enderecoValido = true }) {
+export function motivoDeBloqueio({ passo, itens = [], pedido = null, entrega = 'entrega', erroSimulacao = null, simulacao = null, enderecoValido = true, calculando = false }) {
   if (itens.length === 0) return 'Some ao menos um item'
   if (passo === 'itens') return null
   if (!pedido?.janela) return 'Escolha a janela de entrega'
   if (!pedido?.meio) return 'Escolha a forma de pagamento'
+  // #3076: com o frete ainda calculando, o total não fecha; Continuar e Registrar esperam a resposta.
+  if (calculando) return 'Calculando o frete…'
   if (entrega !== 'retirada' && passo === 'revisar' && !enderecoValido) return 'Cadastre o endereço de entrega: o pedido usa o do cadastro, não o digitado'
   if (entrega !== 'retirada' && faltaEndereco(erroSimulacao)) return 'Falta o endereço de entrega'
   if (faltaFreteCombinado(simulacao, pedido)) return 'Informe o frete combinado'

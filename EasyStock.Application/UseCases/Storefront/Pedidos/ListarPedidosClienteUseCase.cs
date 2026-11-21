@@ -215,7 +215,9 @@ public sealed class ListarPedidosClienteUseCase(
             MotivoCancelamento: motivoCancelamento,
             Pagamento: pagamentoDto,
             Historico: historicoDto,
-            PagoCentavos: ToCentavos(pedido.TotalPago));
+            // #2813: o quitado do histórico não tem pagamento. Pago é o total menos o que falta pela regra do domínio
+            // (o site calcula o restante por TotalCentavos - PagoCentavos); o excedente deliberado segue valendo.
+            PagoCentavos: ToCentavos(Math.Max(pedido.TotalPago, pedido.Total.Valor - pedido.AReceberPelosPagamentos)));
     }
 
     /// <summary>
