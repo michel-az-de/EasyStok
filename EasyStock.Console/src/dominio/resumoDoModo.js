@@ -9,9 +9,10 @@ import { MODOS, PAUSA_POR_OUTRO, modoDoAtendimento, proximoPassoDepoisDeResponde
 import { AGUARDANDO_EQUIPE, origemDaPassagem } from './passagem'
 import { naFilaSemResponsavel } from './acoesDaConversa'
 import { automaticoDesligadoNaConversa } from './motivoDeEscalada'
+import { ROTULOS } from './rotulos'
 
 const ROTULO = {
-  [MODOS.LIGADO]: 'Assistente respondendo',
+  get [MODOS.LIGADO]() { return ROTULOS.ASSISTENTE_RESPONDENDO },
   [MODOS.PAUSADO]: 'Você respondendo',
   [MODOS.COM_VOCE]: 'Passou para você',
   [MODOS.ENCERRADO]: 'Concluída',
@@ -34,6 +35,8 @@ const LINHA_DO_PROXIMO = {
 // #2185: "Aguardando equipe" vale para a barra e o cartão (`modo.rotulo`), e quem é o outro atendente
 // aparece pelo nome. Sem responsável, a conversa nunca diz "Você respondendo".
 function rotuloDoModo(modo, conversa, outro) {
+  // #2944 (E1-16): com o Assistente desligado na loja ninguém responde sozinho: a conversa é da equipe.
+  if (modo.chave === MODOS.LIGADO && automaticoDesligadoNaConversa(conversa)) return ROTULOS.CONVERSA_ASSUMIDA_POR_VOCE
   if (outro) return conversa?.responsavel && conversa.responsavel !== 'Outro atendente' ? `Com ${conversa.responsavel}` : 'Outro atendente'
   if (modo.chave === MODOS.COM_VOCE) return modo.rotulo === AGUARDANDO_EQUIPE ? AGUARDANDO_EQUIPE : ROTULO[modo.chave]
   if (modo.chave === MODOS.PAUSADO && naFilaSemResponsavel(conversa)) return AGUARDANDO_EQUIPE

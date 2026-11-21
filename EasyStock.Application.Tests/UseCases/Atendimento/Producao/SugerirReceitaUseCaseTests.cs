@@ -6,6 +6,7 @@ namespace EasyStock.Application.Tests.UseCases.Atendimento.Producao;
 
 public class SugerirReceitaUseCaseTests
 {
+    private static readonly Guid Empresa = Guid.NewGuid();
     private const string ReceitaValida = """
         {"rendimento":10,"unidadeRendimento":"Un","linhas":[{"nome":"Farinha","quantidade":500,"unidade":"G"}],"observacoes":"Revisar antes de aplicar."}
         """;
@@ -27,7 +28,7 @@ public class SugerirReceitaUseCaseTests
     [InlineData("bolo\nruim")]
     public async Task Termo_invalido_nao_consulta_fontes_nem_ia(string? termo)
     {
-        var acao = () => Criar().ExecuteAsync(termo!, CancellationToken.None);
+        var acao = () => Criar().ExecuteAsync(Empresa, termo!, CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>();
         await _pesquisa.DidNotReceiveWithAnyArgs().BuscarReceitasAsync(default!, default);
         await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
@@ -36,7 +37,7 @@ public class SugerirReceitaUseCaseTests
     [Fact]
     public async Task Termo_acima_do_limite_nao_inicia_pesquisa()
     {
-        var acao = () => Criar().ExecuteAsync(new string('b', 101), CancellationToken.None);
+        var acao = () => Criar().ExecuteAsync(Empresa, new string('b', 101), CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>();
         await _pesquisa.DidNotReceiveWithAnyArgs().BuscarReceitasAsync(default!, default);
     }
@@ -45,7 +46,7 @@ public class SugerirReceitaUseCaseTests
     public async Task Ia_indisponivel_nao_inventa_receita_nem_consulta_fontes()
     {
         _llm.Disponivel.Returns(false);
-        var acao = () => Criar().ExecuteAsync("Bolo", CancellationToken.None);
+        var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*não está disponível*");
         await _pesquisa.DidNotReceiveWithAnyArgs().BuscarReceitasAsync(default!, default);
         await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
@@ -55,7 +56,7 @@ public class SugerirReceitaUseCaseTests
     public async Task Fontes_vazias_nao_geram_receita_sem_evidencia()
     {
         _pesquisa.BuscarReceitasAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<FonteProducaoWeb>>([]));
-        var acao = () => Criar().ExecuteAsync("Bolo", CancellationToken.None);
+        var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*fontes públicas*");
         await _llm.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default);
     }
@@ -70,7 +71,7 @@ public class SugerirReceitaUseCaseTests
             return Task.FromResult(Resposta(ReceitaValida));
         });
 
-        var resultado = await Criar().ExecuteAsync("  Bolo  ", CancellationToken.None);
+        var resultado = await Criar().ExecuteAsync(Empresa, "  Bolo  ", CancellationToken.None);
 
         resultado.Fontes.Should().Equal(Fonte);
         resultado.Rendimento.Should().Be(10);
@@ -89,7 +90,7 @@ public class SugerirReceitaUseCaseTests
     public async Task Campo_sem_medida_permanece_null_para_revisao()
     {
         Responder("""{"rendimento":null,"unidadeRendimento":null,"linhas":[{"nome":"Farinha","quantidade":null,"unidade":null}],"observacoes":"A fonte usa xícaras."}""");
-        var resultado = await Criar().ExecuteAsync("Bolo", CancellationToken.None);
+        var resultado = await Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
         resultado.Rendimento.Should().BeNull();
         resultado.UnidadeRendimento.Should().BeNull();
         resultado.Linhas.Should().Equal(new LinhaReceitaSugerida("Farinha", null, null));
@@ -102,7 +103,7 @@ public class SugerirReceitaUseCaseTests
     public async Task Resposta_truncada_ou_sem_tool_use_nao_vira_sugestao(string? motivo)
     {
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(Resposta(ReceitaValida) with { StopReason = motivo }));
-        var acao = () => Criar().ExecuteAsync("Bolo", CancellationToken.None);
+        var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>();
     }
 
@@ -113,7 +114,7 @@ public class SugerirReceitaUseCaseTests
     {
         var blocos = Enumerable.Range(0, quantidade).Select(_ => (BlocoLlm)Uso(ReceitaValida)).ToArray();
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new RespostaLlm(RespostaLlm.StopToolUse, blocos, 10, 20)));
-        var acao = () => Criar().ExecuteAsync("Bolo", CancellationToken.None);
+        var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>();
     }
 
@@ -121,7 +122,7 @@ public class SugerirReceitaUseCaseTests
     public async Task Ferramenta_de_escrita_nao_e_aceita_como_receita()
     {
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new RespostaLlm(RespostaLlm.StopToolUse, [Uso(ReceitaValida) with { Nome = "registrar_producao" }], 10, 20)));
-        var acao = () => Criar().ExecuteAsync("Bolo", CancellationToken.None);
+        var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>();
     }
 
@@ -135,7 +136,7 @@ public class SugerirReceitaUseCaseTests
     public async Task Propriedades_ausentes_ou_com_tipo_invalido_sao_rejeitadas(string json)
     {
         Responder(json);
-        var acao = () => Criar().ExecuteAsync("Bolo", CancellationToken.None);
+        var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>();
     }
 
@@ -150,7 +151,7 @@ public class SugerirReceitaUseCaseTests
         foreach (var propriedade in new[] { "quantidade", "rendimento" })
         {
             Responder(ReceitaValida.Replace(propriedade == "quantidade" ? "\"quantidade\":500" : "\"rendimento\":10", $"\"{propriedade}\":{valor}", StringComparison.Ordinal));
-            var acao = () => Criar().ExecuteAsync("Bolo", CancellationToken.None);
+            var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
             await acao.Should().ThrowAsync<UseCaseValidationException>();
         }
     }
@@ -164,7 +165,7 @@ public class SugerirReceitaUseCaseTests
         foreach (var valorOriginal in new[] { "\"G\"", "\"Un\"" })
         {
             Responder(ReceitaValida.Replace(valorOriginal, JsonSerializer.Serialize(unidade), StringComparison.Ordinal));
-            var acao = () => Criar().ExecuteAsync("Bolo", CancellationToken.None);
+            var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
             await acao.Should().ThrowAsync<UseCaseValidationException>();
         }
     }
@@ -190,7 +191,7 @@ public class SugerirReceitaUseCaseTests
                 await Task.Delay(Timeout.InfiniteTimeSpan, info.Arg<CancellationToken>());
                 return (IReadOnlyList<FonteProducaoWeb>)[Fonte];
             });
-        var tarefa = Criar().ExecuteAsync("Bolo", cts.Token);
+        var tarefa = Criar().ExecuteAsync(Empresa, "Bolo", cts.Token);
         await iniciada.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
         var acao = () => tarefa.WaitAsync(TimeSpan.FromSeconds(5));

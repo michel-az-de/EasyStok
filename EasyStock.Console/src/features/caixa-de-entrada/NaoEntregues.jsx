@@ -178,7 +178,7 @@ export function NaoEntregues({ aoAbrir }) {
       )}
       {aberto && (
         <Modal
-          titulo="Não entregues"
+          titulo="Mensagens não entregues"
           largura="md"
           descricao="Mensagens que o WhatsApp não entregou. Falha temporária tenta de novo sozinha por até 6 h."
           aoFechar={fechar}

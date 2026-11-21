@@ -1,21 +1,19 @@
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { Botao } from '../../componentes/Botao'
-import { CampoArea, CampoTexto } from '../../componentes/Campo'
+import { CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
 import { useAcoes, useAtendimento, useCatalogo } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { automacoesEditaveis } from '../../dominio/acessoModulos'
-import {
-  VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, avisoDeValorFaltando, bloqueioDaAutomatica, contextoDePrevia,
-  previaDoServidor, textoDaRegra,
-} from '../../dominio/automacao'
+import { analisarAutomatica, bloqueioDaAutomatica, contextoDePrevia } from '../../dominio/automacao'
 import { NOME_RESPOSTAS_AUTOMATICAS } from '../../dominio/modulos'
 import { ROTULO_DO_SOM, listaDeEventosDeSom } from '../../dominio/automatico'
 import { canalDaConversa } from '../../dominio/canal'
 import { DIAS_DA_SEMANA, chaveDoDiaNaLoja, descreverProximaAbertura } from '../../dominio/funcionamento'
 import { faixaDaJanela } from '../../dominio/entrega'
 import { permissaoDeEscrita } from '../../dominio/janela'
+import { EditorDeAutomatica } from '../../componentes/EditorDeAutomatica'
 import css from './automacoes.module.css'
 
 const AVISOS_DE_SOM = listaDeEventosDeSom().map((e) => ROTULO_DO_SOM[e]).join(', ')
@@ -33,44 +31,8 @@ const valoresDaPreviaApi = (conversa, faixa) => ({
 function Regra({
   regra, contexto, valoresApi, aoAlternar, aoEditar, nomeConversa, podeEnviar, aoEnviar, fonteApi, avisoApi, editavel,
 }) {
-  const [rascunho, setRascunho] = useState(null)
-  // ocioso | salvando | salvo | erro: o resultado aparece aqui dentro, não atrás do modal.
-  const [gravacao, setGravacao] = useState('ocioso')
-
-  const valor = rascunho ?? { texto: regra.texto }
-  const editando = valor.texto !== regra.texto
-  const partesApi = fonteApi ? previaDoServidor(valor.texto, valoresApi) : null
-  const previa = partesApi ? partesApi.map((p) => p.texto).join('') : textoDaRegra({ ...regra, texto: valor.texto }, contexto)
-  const semValor = fonteApi ? avisoDeValorFaltando(regra.gatilho, valor.texto) : null
-  const variaveis = fonteApi ? VARIAVEIS_DA_API : VARIAVEIS
-  // #2476 (U8): variável que o EasyStok não preenche sairia escrita para o cliente: não salva nem liga.
-  const bloqueio = fonteApi ? bloqueioDaAutomatica(valor.texto, editavel) : null
   const idBloqueio = useId()
   const naoLiga = !regra.ativa && fonteApi && Boolean(bloqueioDaAutomatica(regra.texto))
-  const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
-
-  const mudar = (campo, novo) => {
-    setGravacao('ocioso')
-    setRascunho({ ...valor, [campo]: novo })
-  }
-
-  // Espera a API: só limpa o rascunho quando gravou. A ação do modo API devolve `false` quando
-  // recusou (o motivo vai para o aviso da faixa); a da demonstração não devolve nada.
-  const salvar = async () => {
-    setGravacao('salvando')
-    let ok
-    try {
-      ok = await aoEditar(regra.id, { texto: valor.texto.trim() })
-    } catch {
-      ok = false
-    }
-    if (ok === false) {
-      setGravacao('erro')
-      return
-    }
-    setRascunho(null)
-    setGravacao('salvo')
-  }
 
   return (
     <li className={`${css.regra} ${regra.ativa ? '' : css.desligada}`}>
@@ -92,60 +54,19 @@ function Regra({
       </div>
       <p className={css.descricao}>{regra.descricao}</p>
 
-      <CampoArea
-        rotulo={`Texto de ${regra.nome}`}
-        value={valor.texto}
-        readOnly={!editavel}
-        onChange={(e) => mudar('texto', e.target.value)}
-      />
-      <p className={css.variaveis}>
-        <span>Campos automáticos:</span>
-        {variaveis.map((v) => <span key={v.chave} className={css.tokenVariavel}>{`{${v.chave}}`}</span>)}
-      </p>
-      {bloqueio && <p id={idBloqueio} className={css.alerta} role="alert">{bloqueio}</p>}
-      {avisoEntrada && <p className={css.alerta}>{avisoEntrada}</p>}
-      {semValor && <p className={css.alerta}>{semValor}</p>}
-
-      {/* Prévia em bolha: é o que o cliente lê agora, com os dados desta conversa. */}
-      <p className={css.rotuloPrevia}>{fonteApi ? 'Prévia para o cliente (com valores de exemplo)' : 'Prévia para o cliente'}</p>
-      <p className={css.bolha}>
-        {partesApi
-          ? partesApi.map((parte, i) => (parte.tipo === 'erro'
-            ? <mark key={i} className={css.previaErro}>{parte.texto}</mark>
-            : <span key={i}>{parte.texto}</span>))
-          : previa}
-      </p>
-
-      {editando && gravacao !== 'erro' && (
-        <p className={css.editando}>
-          <Pilula tom="aviso" fina>Alterações não salvas</Pilula>
-        </p>
-      )}
-      {gravacao === 'erro' && (
-        <p className={css.alerta} role="alert">
-          Não foi possível confirmar o salvamento. {avisoApi ?? 'Tente novamente.'} Sua edição foi mantida.
-        </p>
-      )}
-      {gravacao === 'salvo' && !editando && (
-        <output className={css.editando}><Pilula tom="ok" fina>Salvo</Pilula></output>
-      )}
-
-      {/* #1966: salvar é da gerência do atendimento; para o Operador o texto fica só para ler. */}
-      {editavel && (
-      <div className={css.acoes}>
-        <Botao variante="primario" className={css.toque} disabled={!editando || gravacao === 'salvando' || Boolean(bloqueio)} aria-describedby={bloqueio ? idBloqueio : undefined} onClick={salvar}>
-          {gravacao === 'salvando' ? 'Salvando…' : 'Salvar texto'}
-        </Botao>
-        <Botao className={css.toque} disabled={!editando || gravacao === 'salvando'} onClick={() => { setRascunho(null); setGravacao('ocioso') }}>
-          Desfazer
-        </Botao>
-        {/* Achado 1, P0 (banca 10): a tela que o dono já achou (trilho,
+      {/* #2783: o mesmo editor de Respostas (texto, variáveis, prévia, erro do servidor). */}
+      <EditorDeAutomatica
+        regra={regra} editavel={editavel} avisoApi={avisoApi} idBloqueio={idBloqueio}
+        analisar={(texto) => analisarAutomatica({ regra, texto, fonteApi, editavel, valores: valoresApi, contexto })}
+        aoSalvar={(texto) => aoEditar(regra.id, { texto })}
+      >
+        {({ previa }) => (!fonteApi && (
+          /* Achado 1, P0 (banca 10): a tela que o dono já achou (trilho,
             rótulo por extenso) não deixava enviar; quem enviava de fato era
             outro ícone, escondido dentro da conversa. Mesma ação `enviar` de
             useAcoes() que features/respostas/ModalBiblioteca.jsx já usa.
             #1474: no modo API este envio não está ligado (ENVIOS_NAO_LIGADOS.automatica)
-            e o modal fechava como se tivesse enviado; some até ligar. */}
-        {!fonteApi && (
+            e o modal fechava como se tivesse enviado; some até ligar. */
           <Botao
             icone="enviar"
             className={css.toque}
@@ -155,9 +76,8 @@ function Regra({
           >
             {nomeConversa ? `Enviar para ${nomeConversa.split(' ')[0]}` : 'Enviar'}
           </Botao>
-        )}
-      </div>
-      )}
+        ))}
+      </EditorDeAutomatica>
     </li>
   )
 }

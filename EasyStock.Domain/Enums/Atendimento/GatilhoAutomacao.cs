@@ -17,5 +17,10 @@ public enum GatilhoAutomacao
     /// #1610: link de pagamento pendente da conversa perto de vencer. Só avisa: não reemite nem cancela. Único gatilho
     /// que nasce ligado (<see cref="Entities.Atendimento.RegraAutomatica.Padrao"/>).
     /// </summary>
-    CobrancaVencendo = 7
+    CobrancaVencendo = 7,
+
+    /// <summary>
+    /// #2885 (S75): cumprimento solto ("oi", "bom dia") em conversa parada. Nasce desligada, e o Assistente responde sem IA.
+    /// </summary>
+    SaudacaoSolta = 8
 }

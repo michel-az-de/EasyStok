@@ -2,22 +2,35 @@ using System.Globalization;
 using EasyStock.Application.Ports.Output.Pdf;
 using EasyStock.Application.Services.Notifications.Anexos;
 using QuestPDF.Fluent;
-using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
 namespace EasyStock.Infra.Async.Pdf;
 
 /// <summary>
 /// O resumo do pedido para o cliente conferir no WhatsApp (#2544, S73, D2): 90 mm de largura e altura contínua, PNG em
-/// 200 dpi, numa imagem só. Mesmo desenho do canhoto (<see cref="CanhotoDocumentoRenderer"/>), com valores.
+/// 200 dpi, numa imagem só. Desde a #2929 sai com a marca: Lora nos títulos, Nunito Sans no corpo e as cores da marca
+/// (<see cref="MarcaDaCasa"/>). As fontes vão embutidas no assembly, porque o servidor não as tem instaladas.
 /// </summary>
 public sealed class ResumoPedidoRenderer : IRenderizadorResumoPedido
 {
     private const float LarguraMm = 90;
     private const int DpiImagem = 200;
+    private const string FonteTitulo = MarcaDaCasa.FonteTitulo;
+    private const string FonteCorpo = MarcaDaCasa.FonteCorpo;
+    private const string Marca = MarcaDaCasa.Marca;
+    private const string MarcaForte = MarcaDaCasa.MarcaForte;
+    private const string MarcaClaro = MarcaDaCasa.MarcaClaro;
+    private const string Tinta = MarcaDaCasa.Cacau;
+    private const string Tinta3 = MarcaDaCasa.CacauSuave;
+    private const string Papel = MarcaDaCasa.Papel;
+
     private static readonly CultureInfo PtBr = new("pt-BR");
 
-    static ResumoPedidoRenderer() => QuestPDF.Settings.License = LicenseType.Community;
+    static ResumoPedidoRenderer()
+    {
+        QuestPDF.Settings.License = LicenseType.Community;
+        FontesDaMarca.Registrar();
+    }
 
     public Task<AnexoGerado> RenderizarAsync(ResumoPedidoDto resumo, CancellationToken ct = default)
     {
@@ -33,41 +46,51 @@ public sealed class ResumoPedidoRenderer : IRenderizadorResumoPedido
     private static void Desenhar(PageDescriptor page, ResumoPedidoDto r)
     {
         page.ContinuousSize(LarguraMm, Unit.Millimetre);
-        page.Margin(5, Unit.Millimetre);
-        page.PageColor(Colors.White);
-        page.DefaultTextStyle(t => t.FontSize(11).FontColor(Colors.Black));
+        page.Margin(6, Unit.Millimetre);
+        page.PageColor(Papel);
+        page.DefaultTextStyle(t => t.FontFamily(FonteCorpo).FontSize(11).FontColor(Tinta));
 
         page.Content().Column(col =>
         {
             col.Spacing(3);
             if (!string.IsNullOrWhiteSpace(r.NomeLoja))
-                col.Item().AlignCenter().Text(r.NomeLoja).FontSize(13).Bold();
-            col.Item().AlignCenter().Text($"Resumo do pedido {r.Codigo}").FontSize(15).Bold();
-            col.Item().PaddingTop(4).LineHorizontal(0.8f);
+                col.Item().AlignCenter().Text(r.NomeLoja).FontFamily(FonteTitulo).FontSize(17).Bold().FontColor(Marca);
+            col.Item().AlignCenter().Text($"Resumo do pedido {r.Codigo}").FontSize(10).FontColor(Tinta3);
+            Divisor(col);
 
             foreach (var item in r.Itens)
             {
                 col.Item().Row(row =>
                 {
                     row.RelativeItem().Text($"{item.Quantidade.ToString("0.###", PtBr)} × {item.Nome}").SemiBold();
-                    row.AutoItem().Text(Reais(item.Subtotal));
+                    row.AutoItem().PaddingLeft(6).Text(Reais(item.Subtotal));
                 });
                 if (!string.IsNullOrWhiteSpace(item.Observacao))
-                    col.Item().PaddingLeft(8).Text($"obs: {item.Observacao}").FontSize(9).Italic();
+                    col.Item().PaddingLeft(8).Text($"obs: {item.Observacao}").FontSize(9).Italic().FontColor(Tinta3);
             }
 
-            col.Item().PaddingTop(4).LineHorizontal(0.8f);
+            Divisor(col);
             Valor(col, "Entrega", Reais(r.Frete));
             col.Item().Row(row =>
             {
-                row.RelativeItem().Text("Total").FontSize(13).Bold();
-                row.AutoItem().Text(Reais(r.Total)).FontSize(13).Bold();
+                row.RelativeItem().AlignMiddle().Text("Total").FontFamily(FonteTitulo).FontSize(15).Bold();
+                if (r.Pago)
+                    row.AutoItem().AlignMiddle().PaddingRight(6).Background(Marca).PaddingVertical(1).PaddingHorizontal(6)
+                        .Text("Pago").FontSize(9).Bold().FontColor(Papel);
+                row.AutoItem().AlignMiddle().Text(Reais(r.Total)).FontFamily(FonteTitulo).FontSize(15).Bold().FontColor(MarcaForte);
             });
-            col.Item().PaddingTop(4).LineHorizontal(0.8f);
+            Divisor(col);
             Linha(col, "Data", r.Entrega);
             Linha(col, "Endereço", r.Endereco);
+
+            if (!string.IsNullOrWhiteSpace(r.Fecho))
+                col.Item().PaddingTop(8).Background(MarcaClaro).PaddingVertical(5).AlignCenter()
+                    .Text(r.Fecho.Trim()).FontFamily(FonteTitulo).FontSize(14).Italic().FontColor(MarcaForte);
         });
     }
+
+    private static void Divisor(ColumnDescriptor col) =>
+        col.Item().PaddingVertical(4).LineHorizontal(0.8f).LineColor(MarcaClaro);
 
     private static void Valor(ColumnDescriptor col, string rotulo, string valor) =>
         col.Item().Row(row =>

@@ -1,14 +1,14 @@
 import {
-  Archive, ArrowDown, ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellPlus, Bike, BookOpen,
+  Archive, ArrowDown, ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpDown, Ban, Bell, BellOff, BellPlus, Bike, BookOpen, Bot,
   Calendar, Camera, Car, ChartColumn, ChartLine, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleQuestionMark, CircleX,
   ClipboardList, Clock, CookingPot, Copy, CreditCard, DollarSign, Download, EllipsisVertical, ExternalLink, EyeOff,
   FlaskConical, Frown, Gift, Globe, GripVertical, Hand, History, Hourglass, House, Image, Inbox,
   LayoutDashboard, LayoutTemplate, Lightbulb, Link, ListFilter, Lock, LogOut, Mail, MapPin,
   Maximize2, Meh, MessageSquareText, MessageSquareWarning, Mic, Minimize2, Minus, Moon, NotepadText, Package,
   PanelLeft, PanelRight, Paperclip, Pause, Pencil, Phone, PictureInPicture2, Play, Plug, Plus, Printer, Radio, Receipt,
-  RefreshCw, ScrollText, Search, SendHorizontal, Settings, ShoppingCart, Smile, Sparkles, Star, Sticker,
+  RefreshCw, ScrollText, Search, SendHorizontal, Settings, ShoppingCart, Smile, Star, Sticker,
   StickyNote, Sun, Sunset, Tag, Target, Thermometer, ThumbsDown, ThumbsUp, Trash, TriangleAlert, Truck, Undo2, UserRound,
-  UserRoundPlus, Users, X, Zap,
+  UserRoundPlus, Users, VolumeX, X, Zap,
   createLucideIcon,
 } from 'lucide-react'
 import css from './Icone.module.css'
@@ -57,7 +57,9 @@ const ICONES = {
   'circle-check': CircleCheck,
   'log-out': LogOut,
   relogio: Clock,
-  agente: Sparkles, sparkles: Sparkles,
+  // #2864: a faísca é o clichê de "feito por IA"; o Assistente é um ator da conversa e ganha o robô.
+  // `sparkles` fica só como apelido antigo enquanto o fluxo da #2857 não migra.
+  agente: Bot, sparkles: Bot,
   ajuda: CircleQuestionMark,
 
   // Atendimento e conversa.
@@ -108,7 +110,7 @@ const ICONES = {
   bloqueio: Ban,
   lock: Lock,
   'circle-x': CircleX,
-  bell: Bell, 'bell-plus': BellPlus,
+  bell: Bell, 'bell-off': BellOff, 'bell-plus': BellPlus, 'volume-x': VolumeX,
   estrela: Star,
   presente: Gift,
 

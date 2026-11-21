@@ -18,7 +18,8 @@ namespace EasyStock.Application.Services.Atendimento.Ferramentas;
 public sealed class EnviarLinkPagamentoFerramenta(
     IPedidoRepository pedidoRepository,
     GerarCobrancaPedidoUseCase gerarCobranca,
-    IConversaRepository conversaRepository) : IFerramentaAgente, IFerramentaForaDaTransacao
+    IConversaRepository conversaRepository,
+    LinkCardapioConversaService? linkCardapio = null) : IFerramentaAgente, IFerramentaForaDaTransacao
 {
     public string Nome => "enviar_link_pagamento";
 
@@ -27,18 +28,18 @@ public sealed class EnviarLinkPagamentoFerramenta(
         "dar o ok ao resumo de enviar_resumo_pedido, ou quando ele disser que o link venceu. O link sai como sua resposta.";
 
     public string SchemaJson =>
-        """{"type":"object","properties":{"pedidoId":{"type":"string","description":"id devolvido por criar_pedido"}},"required":["pedidoId"],"additionalProperties":false}""";
+        """{"type":"object","properties":{"pedido_id":{"type":"string","description":"id devolvido por criar_pedido"}},"required":["pedido_id"],"additionalProperties":false}""";
 
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
-        if (entrada.ValueKind != JsonValueKind.Object
-            || !Guid.TryParse(FerramentaJson.LerTexto(entrada, "pedidoId"), out var pedidoId))
-            return Recusa("pedido_nao_encontrado", "Use o pedidoId que criar_pedido devolveu.");
+        // A grafia nova (pedido_id) é a que o modelo recebe; a antiga (pedidoId) segue aceita.
+        if (!Guid.TryParse(FerramentaJson.LerTexto(entrada, "pedido_id") ?? FerramentaJson.LerTexto(entrada, "pedidoId"), out var pedidoId))
+            return Recusa("pedido_nao_encontrado", "Use o pedido_id que criar_pedido devolveu.");
 
         // Só pedido do cliente desta conversa: id inventado ou de outra pessoa não gera cobrança.
         var pedido = await pedidoRepository.GetByIdAsync(contexto.EmpresaId, pedidoId);
         if (pedido is null || contexto.ClienteIdEsperado is not { } clienteId || pedido.ClienteId != clienteId)
-            return Recusa("pedido_nao_encontrado", "Use o pedidoId que criar_pedido devolveu.");
+            return Recusa("pedido_nao_encontrado", "Use o pedido_id que criar_pedido devolveu.");
         if (PedidoStateMachine.EstaFinalizado(pedido.StatusEnum))
             return Recusa("pedido_finalizado",
                 "O pedido foi cancelado ou já foi entregue. Se o cliente ainda quiser, monte de novo com criar_pedido.");
@@ -73,7 +74,7 @@ public sealed class EnviarLinkPagamentoFerramenta(
         }
         catch (CobrancaPedidoNaoEncontradoException)
         {
-            return Recusa("pedido_nao_encontrado", "Use o pedidoId que criar_pedido devolveu.");
+            return Recusa("pedido_nao_encontrado", "Use o pedido_id que criar_pedido devolveu.");
         }
         catch (MercadoPagoIndisponivelException)
         {
@@ -85,11 +86,15 @@ public sealed class EnviarLinkPagamentoFerramenta(
             return Recusa("sem_link", "O pedido não tem link de pagamento; use escalar_para_dona.");
 
         var valor = FerramentaJson.FormatarReais(cobranca.Valor);
+        // #2876: no site o widget só abre URL da comanda; ela já mostra o pagamento. Sem comanda enviada, segue o link do Mercado Pago.
+        var linkNoTexto = SaidaDoChatSite.Eh(contexto.Conversa)
+            ? await UrlDaComandaEnviadaAsync(contexto, ct) ?? cobranca.LinkPagamento
+            : cobranca.LinkPagamento;
         var validoAte = cobranca.ExpiraEm is { } expira
             ? HorarioBrasil.ConverterParaBrasilia(expira).ToString("HH:mm", CultureInfo.InvariantCulture)
             : null;
         contexto.RegistrarRespostaVerificada(
-            $"{QuantoCobra(pedido.Total.Valor, cobranca.Valor)} Pague por Pix ou cartão neste link{(validoAte is null ? "" : $", válido até {validoAte}")}: {cobranca.LinkPagamento}");
+            $"{QuantoCobra(pedido.Total.Valor, cobranca.Valor)} Pague por Pix ou cartão neste link{(validoAte is null ? "" : $", válido até {validoAte}")}: {linkNoTexto}");
         return FerramentaJson.Serializar(new
         {
             linkGerado = true,
@@ -97,6 +102,16 @@ public sealed class EnviarLinkPagamentoFerramenta(
             validoAte,
             orientacao = "O link sai ao cliente como sua resposta deste turno.",
         });
+    }
+
+    private async Task<string?> UrlDaComandaEnviadaAsync(ContextoTurnoAgente contexto, CancellationToken ct)
+    {
+        if (linkCardapio is null || await linkCardapio.VigenteAsync(contexto.EmpresaId, contexto.Conversa.Id, contexto.Agora, ct) is not { } vigente)
+            return null;
+        var mensagens = await conversaRepository.ListarMensagensDepoisAsync(
+            contexto.EmpresaId, contexto.Conversa.Id, vigente.CriadoEm.AddSeconds(-1), 500, ct);
+        return LinkCardapioConversaService.UrlEnviada(
+            mensagens.Where(m => m.Direcao == DirecaoMensagem.Saida && m.Status != StatusMensagem.Falhou).Select(m => m.Texto), vigente);
     }
 
     // #2544: na encomenda com sinal o link cobra só uma parte; chamar a parte de "Total" engana o cliente.

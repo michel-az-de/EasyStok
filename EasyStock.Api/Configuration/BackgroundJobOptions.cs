@@ -120,6 +120,9 @@ public sealed class BackgroundJobOptions
 
     /// <summary>Apaga, de hora em hora, as sessões do chat do site vencidas há mais de um dia (S36).</summary>
     public bool EnableLimpezaSessoesChatSite { get; set; } = true;
+
+    /// <summary>Poda diária (04:00 UTC) do id de clique de anúncio com mais de 90 dias, em pedidos e conversas (#2928, S6).</summary>
+    public bool EnablePodaIdCliqueAnuncio { get; set; } = true;
 }
 
 /// <summary>

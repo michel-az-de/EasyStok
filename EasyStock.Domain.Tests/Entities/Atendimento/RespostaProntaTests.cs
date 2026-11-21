@@ -93,6 +93,30 @@ public class RegraAutomaticaTests
             .Should().Throw<RegraDeDominioVioladaException>();
     }
 
+    // #2781: regra antiga com chave que o servidor não preenche; desligar (o rollback) manda o texto já gravado.
+    [Fact]
+    public void DesligarRegraComTextoAntigoSalva()
+    {
+        var regra = RegraAutomatica.Criar(Empresa, GatilhoAutomacao.PosEntrega, "Oi, {nome}", true, Agora);
+        typeof(RegraAutomatica).GetProperty(nameof(RegraAutomatica.Texto))!.SetValue(regra, "Oi {loja}");
+
+        regra.Alterar("Oi {loja}", false, Agora);
+
+        regra.Ligada.Should().BeFalse();
+        ((Action)(() => regra.Alterar("Oi {outra}", false, Agora))).Should().Throw<RegraDeDominioVioladaException>();
+    }
+
+    [Fact]
+    public void EditarRespostaComTextoAntigoMantemSalva()
+    {
+        var r = RespostaPronta.Criar(Empresa, "Titulo", "atalho", "Oi, {nome}", Agora);
+        typeof(RespostaPronta).GetProperty(nameof(RespostaPronta.Texto))!.SetValue(r, "Oi {loja}");
+
+        r.Editar("Novo titulo", "atalho", "Oi {loja}", Agora);
+
+        r.Titulo.Should().Be("Novo titulo");
+    }
+
     /// <summary>
     /// #1610: o lembrete do link nasce ligado com texto padrão, sem regra gravada. Os gatilhos antigos continuam
     /// desligados até a dona salvar.
@@ -108,8 +132,20 @@ public class RegraAutomaticaTests
 
         // "Pagamento confirmado" também nasce ligada (#1765-4); os demais seguem desligados.
         foreach (var antigo in Enum.GetValues<GatilhoAutomacao>()
-                     .Where(g => g is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado)))
+                     .Where(g => g is not (GatilhoAutomacao.CobrancaVencendo or GatilhoAutomacao.PagamentoConfirmado
+                         or GatilhoAutomacao.SaudacaoSolta)))
             RegraAutomatica.Padrao(Empresa, antigo, Agora).Should().BeNull();
+    }
+
+    /// <summary>#2885 (S75, D3): a saudação solta nasce desligada, com o texto sugerido.</summary>
+    [Fact]
+    public void SaudacaoSoltaNasceDesligadaComTextoSugerido()
+    {
+        var padrao = RegraAutomatica.Padrao(Empresa, GatilhoAutomacao.SaudacaoSolta, Agora);
+
+        padrao.Should().NotBeNull();
+        padrao!.Ligada.Should().BeFalse();
+        padrao.Texto.Should().Be("Oi! Como a Casa pode ajudar?");
     }
 
     [Theory]
@@ -129,7 +165,7 @@ public class RegraAutomaticaTests
         padrao!.Ligada.Should().BeTrue();
         padrao.Texto.Should().Be(RegraAutomatica.TextoPadraoPagamentoConfirmado);
         padrao.Renderizar(new Dictionary<string, string?> { ["nome"] = "Ana", ["faixa"] = "01/10 às 14:00" })
-            .Should().Be("Oi, Ana! Recebemos seu pagamento e seu pedido está confirmado para 01/10 às 14:00. Obrigada pela preferência!");
+            .Should().Be("Oi, Ana! Pagamento recebido. Seu pedido está confirmado para 01/10 às 14:00.");
     }
 
     [Theory]

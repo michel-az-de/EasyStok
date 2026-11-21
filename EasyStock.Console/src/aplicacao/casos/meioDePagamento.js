@@ -1,9 +1,10 @@
 import {
-  cobrancaTrocada, criarCobranca, estadoDepoisDaTroca, nomeDoMeio, podeAlterarMeio, textoDaCobranca,
+  codigoDaCobranca, cobrancaTrocada, criarCobranca, estadoDepoisDaTroca, nomeDoMeio, podeAlterarMeio,
+  textoDaCobranca,
 } from '../../dominio/cobranca'
 import { indiceDoPasso } from '../../dominio/esteira'
 import * as acao from '../acoes'
-import { comMensagem, mapear } from '../reducer/auxiliares'
+import { comBaloesDaCobranca, comMensagem, mapear } from '../reducer/auxiliares'
 import { ATENDENTE } from '../reducer/estadoInicial'
 
 // Meio de pagamento, troco e andamento da esteira sem link. O modo API também despacha estes casos
@@ -80,12 +81,10 @@ export const casosMeioDePagamento = {
     }
     const registro = `Forma de pagamento alterada de ${nomeDoMeio(anterior.meio)} para `
       + `${nomeDoMeio(cobranca.meio)} por ${ATENDENTE}. A cobrança anterior foi cancelada.`
-    return mapear(estado, id, (c) => comMensagem(
+    const texto = textoDaCobranca(cobranca, novoPedido, estado.catalogo.cardapio)
+    return mapear(estado, id, (c) => comBaloesDaCobranca(
       comMensagem({ ...c, pedido: novoPedido }, { dir: 'sistema', texto: registro }, { id: sistemaId, agora }),
-      {
-        dir: 'out', texto: textoDaCobranca(cobranca, novoPedido, estado.catalogo.cardapio),
-        status: 'lida', automatica: true, regra: 'cobranca-pix',
-      },
+      { texto, codigo: codigoDaCobranca(cobranca) },
       { id: mensagemId, agora },
     ))
   },

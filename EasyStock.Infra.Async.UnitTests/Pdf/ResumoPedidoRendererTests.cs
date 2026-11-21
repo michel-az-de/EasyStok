@@ -32,4 +32,37 @@ public sealed class ResumoPedidoRendererTests
         Assert.Equal(AssinaturaPng, longo.Conteudo.Take(8));
         Assert.True(longo.Conteudo.Length > curto.Conteudo.Length);
     }
+
+    [Theory]
+    [InlineData("Lora.ttf")]
+    [InlineData("NunitoSans-Regular.ttf")]
+    [InlineData("NunitoSans-SemiBold.ttf")]
+    [InlineData("NunitoSans-Bold.ttf")]
+    public void FonteDaMarcaVaiEmbutidaNoAssembly(string arquivo)
+    {
+        // #2929: o servidor não tem Lora nem Nunito Sans instaladas; sem o recurso, o QuestPDF cai na fonte padrão.
+        var recursos = typeof(ResumoPedidoRenderer).Assembly.GetManifestResourceNames();
+
+        Assert.Contains($"EasyStock.Infra.Async.Pdf.Fontes.{arquivo}", recursos);
+    }
+
+    [Fact]
+    public async Task PedidoPagoMostraPago()
+    {
+        var aberto = await new ResumoPedidoRenderer().RenderizarAsync(Resumo());
+        var pago = await new ResumoPedidoRenderer().RenderizarAsync(Resumo() with { Pago = true });
+
+        Assert.NotEqual(aberto.Conteudo, pago.Conteudo);
+    }
+
+    [Fact]
+    public async Task FechoApareceQuandoInformado()
+    {
+        var semFecho = await new ResumoPedidoRenderer().RenderizarAsync(Resumo());
+        var comFecho = await new ResumoPedidoRenderer().RenderizarAsync(Resumo() with { Fecho = "Boa massa!" });
+        var emBranco = await new ResumoPedidoRenderer().RenderizarAsync(Resumo() with { Fecho = "  " });
+
+        Assert.NotEqual(semFecho.Conteudo, comFecho.Conteudo);
+        Assert.Equal(semFecho.Conteudo, emBranco.Conteudo);
+    }
 }

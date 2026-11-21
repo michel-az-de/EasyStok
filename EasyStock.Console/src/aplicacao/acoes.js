@@ -269,6 +269,9 @@ export const RESGATAR_RECOMPENSA = 'resgatar-recompensa'
 // Modo API (ADR-0054, F01): a lista vem do EasyStok por polling e o envio da dona
 // é confirmado ou recusado pela API depois do balão otimista.
 export const SINCRONIZAR_CONVERSAS = 'sincronizar-conversas'
+// #2921: janela "Novo pedido" na tela; a conversa por baixo não aparece na fila.
+export const ABRIR_JANELA_DO_PEDIDO = 'abrir-janela-do-pedido'
+export const FECHAR_JANELA_DO_PEDIDO = 'fechar-janela-do-pedido'
 export const CONFIRMAR_REABERTURA_API = 'confirmar-reabertura-api'
 export const CONFIRMAR_RESPONSAVEL_API = 'confirmar-responsavel-api'
 // #2005 (console-09): mensagens mais antigas que a página lida pela polling, abertas pela atendente.

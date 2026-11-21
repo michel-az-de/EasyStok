@@ -15,7 +15,7 @@
 
 import { moduloCongelado, telaCongelada } from './congelados'
 import { podeAjustarEntrega } from './acessoModulos'
-import { partesNoFuso } from './formato'
+import { FUSO } from './formato'
 
 // #2258 (auditoria de UX, dicionário de nomes): um nome por conceito, em constante única. A tela
 // inicial é "Início" em todo lugar; as respostas e mensagens que saem sozinhas são "Respostas automáticas".
@@ -195,6 +195,21 @@ export function modulosDoHall({ fonteApi = false, acoes = null } = {}) {
   })
 }
 
+// #2870 (teste da Tatiana, 19/11): Clientes e Pedidos são o trabalho de toda hora do atendimento e moravam só no menu
+// de Cadastros. O atalho leva direto à tela, no Início e nos dois trilhos. Aparece só onde a tela aparece: mesmo modo,
+// mesma matriz de ações e o módulo liberado para o perfil.
+const ATALHOS_DIRETOS = [
+  { id: 'clientes', nome: 'Clientes', resumo: 'Ficha, histórico e pedidos', moduloId: 'cadastros', telaId: 'clientes' },
+  { id: 'pedidos', nome: 'Pedidos', resumo: 'Todos os pedidos da loja', moduloId: 'cadastros', telaId: 'pedidos' },
+]
+export function atalhosDiretos({ fonteApi = false, acoes = null, permite = () => true } = {}) {
+  return ATALHOS_DIRETOS
+    .filter((atalho) => permite(atalho.moduloId)
+      && telasDoMenu(moduloPorId(atalho.moduloId), { fonteApi, acoes }).some((tela) => tela.id === atalho.telaId))
+    .map((atalho) => ({ ...atalho, modulo: moduloPorId(atalho.moduloId), href: hashDoModulo(atalho.moduloId, atalho.telaId) }))
+}
+export const ehAtalhoDireto = (moduloId, telaId) => ATALHOS_DIRETOS.some((a) => a.moduloId === moduloId && a.telaId === telaId)
+
 // Busca somente no catálogo de navegação, sem consultar dados de clientes.
 const textoDeBusca = (valor) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
 export function filtrarModulos(modulos, busca) {
@@ -220,10 +235,8 @@ export function buscarDestinosDoConsole(modulos, busca) {
   })
 }
 
-// Saudação do topo do hall, pela hora da loja (não a do navegador nem a UTC).
-export function saudacaoDoHall(agora, nome) {
-  const { horas } = partesNoFuso(agora)
-  const periodo = horas < 12 ? 'Bom dia' : horas < 18 ? 'Boa tarde' : 'Boa noite'
-  const primeiro = (nome ?? '').trim().split(/\s+/)[0]
-  return primeiro ? `${periodo}, ${primeiro}` : periodo
+// Título do hall (#2859): o dia da loja por extenso, pelo fuso da loja. Saudação genérica não informa nada.
+export function tituloDoHall(agora) {
+  const dia = new Date(agora).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: FUSO })
+  return dia.charAt(0).toUpperCase() + dia.slice(1)
 }

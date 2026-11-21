@@ -14,6 +14,7 @@ registerHooks({ resolve(spec, contexto, proximo) {
 const { MODULOS, hashDoModulo, telasDoMenu } = await import('../src/dominio/modulos.js')
 const { telaCongelada, moduloCongelado } = await import('../src/dominio/congelados.js')
 const { HASH_HALL } = await import('../src/dominio/rota.js')
+const { itensDoTrilho } = await import('../src/dominio/trilhoDoConsole.js')
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
 const origem = process.env.CONSOLE_URL ?? 'http://127.0.0.1:5186'
 const evidencias = process.env.EVIDENCIAS_UX ?? 'builds/prova-financeiro'
@@ -41,7 +42,7 @@ function chip(page, nome, pressionado) {
 }
 
 function moduloAtivoNoTrilho(page, modulo) {
-  return page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).locator(`a[href="${hashDoModulo(modulo.id)}"][aria-current="true"]`)
+  return page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).locator(`a[href="${hashDoModulo(modulo.id)}"][aria-current="page"]`)
 }
 
 async function capturarTela(page, modulo, tela, tema) {
@@ -92,6 +93,7 @@ contaReceber.descricao = 'Venda de encomenda'
 contaReceber.parcelas[0].id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 // #2395: a Dona da navegação recebe as leituras de Cadastros expostas por /auth/me/modulos.
 const acoes = Object.fromEntries(['visualizarContasPagar', 'visualizarContasReceber', 'gerenciarContasPagar', 'gerenciarContasReceber', 'gerenciarCategoriasFinanceiras', 'gerenciarCentrosCusto', 'gerenciarCaixa', 'editarProducao', 'editarCardapio', 'editarAtendimento', 'verCadastrosProdutos', 'verCadastrosFornecedores', 'verCadastrosFinanceiros', 'verPedidos'].map((nome) => [nome, true]))
+const linksDoTrilho = (moduloId, telaId) => itensDoTrilho({ permite: (id) => modulosPermitidos.has(id), acoes, fonteApi: true, simulacoes: false, onde: { moduloId, telaId } }).filter((item) => item.href).length
 let modulosPermitidos = new Set(MODULOS.map(modulo => modulo.id))
 const escritas = []
 const erros = []
@@ -201,7 +203,8 @@ try {
         await moduloAtivoNoTrilho(page, modulo).waitFor()
         assert.equal(await page.getByRole('navigation', { name: `Telas de ${modulo.nome}`, exact: true }).count(), 0)
       }
-      assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), MODULOS.length + 1)
+      assert.equal(await page.getByRole('navigation', { name: 'Módulos da loja', exact: true }).getByRole('link').count(), linksDoTrilho(modulo.id, telaId))
+      // #3004: os links vêm da mesma fonte do trilho (`itensDoTrilho`): Início, áreas, atalhos e os itens que só existem no Balcão (que fora dele viram link para ele).
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
       if (modulo.id === MODULOS[0].id && telaId === undefined) await escolherTema(page, 'Claro')
       if (telaId) await capturarTela(page, modulo, telas.find(tela => tela.id === telaId), 'light')
@@ -259,9 +262,9 @@ try {
   assert.equal(await page.getByRole('navigation', { name: 'Telas de Financeiro', exact: true }).getByRole('link').count(), 8)
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   let modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
-  await modal.getByLabel('Descrição', { exact: true }).fill('Conta criada pela prova')
-  await modal.getByLabel('Categoria financeira', { exact: true }).selectOption(categoriaId)
-  await modal.getByLabel('Valor total', { exact: true }).fill('100')
+  await modal.getByRole('textbox', { name: 'Descrição', exact: true }).fill('Conta criada pela prova')
+  await modal.getByRole('combobox', { name: 'Categoria financeira', exact: true }).selectOption(categoriaId)
+  await modal.getByRole('textbox', { name: 'Valor total', exact: true }).fill('100')
   await page.screenshot({ path: join(evidencias, 'financeiro-modal-nova-conta.png') })
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.waitFor({ state: 'hidden' })
@@ -279,7 +282,7 @@ try {
   assert.equal(await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).count(), 0)
   await modal.getByRole('button', { name: 'Estornar', exact: true }).click()
   const estorno = page.getByRole('dialog', { name: 'Estornar registro', exact: true })
-  await estorno.getByLabel('Motivo', { exact: true }).fill('Registro de teste incorreto')
+  await estorno.getByRole('textbox', { name: 'Motivo', exact: true }).fill('Registro de teste incorreto')
   await estorno.getByRole('button', { name: 'Confirmar', exact: true }).click()
   await estorno.waitFor({ state: 'hidden' })
   await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).waitFor()
@@ -318,7 +321,7 @@ try {
   assert.equal(await modal.getByRole('button', { name: 'Registrar recebimento', exact: true }).count(), 0)
   await modal.getByRole('button', { name: 'Estornar', exact: true }).click()
   const estornoRecebimento = page.getByRole('dialog', { name: 'Estornar registro', exact: true })
-  await estornoRecebimento.getByLabel('Motivo', { exact: true }).fill('Recebimento de teste incorreto')
+  await estornoRecebimento.getByRole('textbox', { name: 'Motivo', exact: true }).fill('Recebimento de teste incorreto')
   await estornoRecebimento.getByRole('button', { name: 'Confirmar', exact: true }).click()
   await estornoRecebimento.waitFor({ state: 'hidden' })
   await modal.getByRole('button', { name: 'Registrar recebimento', exact: true }).waitFor()
@@ -370,30 +373,30 @@ try {
   falhaDeGravacao = true
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
-  await modal.getByLabel('Descrição', { exact: true }).fill('Conta recusada')
-  await modal.getByLabel('Categoria financeira', { exact: true }).selectOption(categoriaId)
-  await modal.getByLabel('Valor total', { exact: true }).fill('100')
+  await modal.getByRole('textbox', { name: 'Descrição', exact: true }).fill('Conta recusada')
+  await modal.getByRole('combobox', { name: 'Categoria financeira', exact: true }).selectOption(categoriaId)
+  await modal.getByRole('textbox', { name: 'Valor total', exact: true }).fill('100')
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).waitFor()
   assert.equal(await modal.getByRole('alert').filter({ hasText: 'Categoria de teste indisponível' }).isVisible(), true)
   await page.screenshot({ path: join(evidencias, 'financeiro-erro-preservado.png') })
-  assert.equal(await modal.getByLabel('Descrição', { exact: true }).inputValue(), 'Conta recusada')
+  assert.equal(await modal.getByRole('textbox', { name: 'Descrição', exact: true }).inputValue(), 'Conta recusada')
   await descartarDigitado(page, modal)
   falhaDeGravacao = false
   // Revisão #2105 (3): "Já foi paga" com falha no registro: a lista recarrega, a conta trava e, ao fechar, abre.
   falhaDoPagamento = true
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
-  await modal.getByLabel('Descrição', { exact: true }).fill('Conta paga sem rede')
-  await modal.getByLabel('Categoria financeira', { exact: true }).selectOption(categoriaId)
-  await modal.getByLabel('Valor total', { exact: true }).fill('100')
+  await modal.getByRole('textbox', { name: 'Descrição', exact: true }).fill('Conta paga sem rede')
+  await modal.getByRole('combobox', { name: 'Categoria financeira', exact: true }).selectOption(categoriaId)
+  await modal.getByRole('textbox', { name: 'Valor total', exact: true }).fill('100')
   await modal.getByLabel('Já foi paga', { exact: true }).check()
   const criacoesAntes = escritas.filter((item) => item.caminho === '/api/contas-a-pagar').length
   const recarga = page.waitForRequest((pedido) => pedido.method() === 'GET' && new URL(pedido.url()).pathname === '/api/contas-a-pagar')
   await modal.getByRole('button', { name: 'Salvar', exact: true }).click()
   await modal.getByRole('alert').filter({ hasText: 'A conta foi salva' }).waitFor()
   await recarga
-  assert.equal(await modal.getByLabel('Descrição', { exact: true }).isDisabled(), true, 'campos da conta criada travados')
+  assert.equal(await modal.getByRole('textbox', { name: 'Descrição', exact: true }).isDisabled(), true, 'campos da conta criada travados')
   await modal.getByRole('button', { name: 'Registrar pagamento', exact: true }).click()
   await modal.getByRole('alert').filter({ hasText: 'A conta foi salva' }).waitFor()
   assert.equal(escritas.filter((item) => item.caminho === '/api/contas-a-pagar').length, criacoesAntes + 1, 'a nova tentativa não cria outra conta')
@@ -465,7 +468,7 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).count(), 0)
   await page.getByRole('button', { name: 'Nova conta a pagar', exact: true }).click()
   modal = page.getByRole('dialog', { name: 'Nova conta a pagar', exact: true })
-  await modal.getByLabel('Descrição', { exact: true }).fill('Rascunho preservado durante publicação')
+  await modal.getByRole('textbox', { name: 'Descrição', exact: true }).fill('Rascunho preservado durante publicação')
   const consultarVersao = async () => {
     await page.waitForTimeout(5100)
     const consulta = page.waitForResponse(resposta => new URL(resposta.url()).pathname === '/versao.json')
@@ -479,7 +482,7 @@ try {
   versaoPublicada = shaDoDocumento === 'b'.repeat(40) ? 'c'.repeat(40) : 'b'.repeat(40)
   await consultarVersao()
   await page.getByRole('button', { name: 'Atualizar sistema', exact: true }).waitFor({ state: 'attached' })
-  assert.equal(await modal.getByLabel('Descrição', { exact: true }).inputValue(), 'Rascunho preservado durante publicação')
+  assert.equal(await modal.getByRole('textbox', { name: 'Descrição', exact: true }).inputValue(), 'Rascunho preservado durante publicação')
   assert.equal(new URL(page.url()).searchParams.has('versao'), false)
   await descartarDigitado(page, modal)
   await page.setViewportSize({ width: 390, height: 844 })

@@ -84,6 +84,8 @@ module.exports = function ({ test, sandbox, assert }) {
     sandbox.URLSearchParams = URLSearchParams;
     sandbox.fetch = async (url) => {
       if (String(url).indexOf('/sync/pull') >= 0) return fakeResp(200, { serverTime: 0, mutations: [] });
+      // #2877: relato de diagnostico nao e envio da fila.
+      if (String(url).indexOf('/diagnostics/') >= 0) return fakeResp(204, null);
       log.push('envio');
       return responder();
     };

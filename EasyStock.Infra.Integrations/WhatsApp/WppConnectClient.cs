@@ -126,15 +126,19 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
     public Task<EnvioWhatsAppResult> EnviarImagemAsync(string waId, string urlPublica, string? legenda = null, CancellationToken ct = default) =>
         EnviarArquivoAsync(waId, urlPublica, legenda, false, ct);
 
+    public Task<EnvioWhatsAppResult> EnviarDocumentoAsync(
+        string waId, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default) =>
+        EnviarArquivoAsync(waId, urlPublica, legenda, false, ct, nomeArquivo);
+
     public Task<EnvioWhatsAppResult> EnviarAudioAsync(string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default) =>
         EnviarArquivoAsync(waId, urlPublica, null, notaDeVoz, ct);
 
-    private Task<EnvioWhatsAppResult> EnviarArquivoAsync(string waId, string url, string? legenda, bool voz, CancellationToken ct)
+    private Task<EnvioWhatsAppResult> EnviarArquivoAsync(string waId, string url, string? legenda, bool voz, CancellationToken ct, string? nomeArquivo = null)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
             throw new ArgumentException("A mídia precisa de URL HTTP(S) acessível pelo conector.", nameof(url));
         return EnviarAsync(voz ? "send-voice" : "send-file-base64",
-            new { phone = waId, isGroup = false, path = url, caption = legenda, filename = voz ? "audio.ogg" : System.IO.Path.GetFileName(uri.AbsolutePath) }, ct);
+            new { phone = waId, isGroup = false, path = url, caption = legenda, filename = voz ? "audio.ogg" : nomeArquivo ?? System.IO.Path.GetFileName(uri.AbsolutePath) }, ct);
     }
 
     private async Task<EnvioWhatsAppResult> EnviarAsync(string acao, object corpo, CancellationToken ct)

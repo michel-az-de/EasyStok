@@ -60,7 +60,12 @@ const pagina = await contexto.newPage()
 pagina.setDefaultTimeout(10000)
 pagina.on('pageerror', e => erros.push(e.message))
 const perguntas = []
-pagina.on('dialog', d => { perguntas.push(d.message()); d.accept() })
+// #3011: a pergunta é o ModalConfirmar (o diálogo de cima), não mais o window.confirm: lê o texto e clica no verbo.
+const confirmar = async (verbo) => {
+  const dialogo = pagina.locator('dialog[open]').last()
+  perguntas.push(await dialogo.locator('p').first().textContent())
+  await dialogo.getByRole('button', { name: verbo, exact: true }).click()
+}
 const endereco = `${process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'}/.build/2496/checagem-assistente/index.html`
 try {
   await pagina.goto(endereco)
@@ -90,6 +95,7 @@ try {
   // Desligar a loja toda pergunta antes, grava só `ativo` e checa de novo.
   const antes = pedidos.length
   await chave.click()
+  await confirmar('Desligar o Assistente')
   await modal.getByRole('switch', { name: 'Assistente desligado na loja' }).waitFor()
   assert.equal(perguntas.length, 1, 'pergunta antes de desligar a loja toda')
   const novos = pedidos.slice(antes)

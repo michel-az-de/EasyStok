@@ -23,9 +23,61 @@ for (const [entrada, segredo] of casos) {
     assert.ok(!s.includes(segredo), `vazou: ${s}`);
   });
 }
+// LGPD (ADR-0069): nome, endereco e CEP por chave, antes do primeiro token remoto.
+const pessoais = [
+  ['{"Nome":"Maria da Silva","Pedido":42}', 'Maria'],
+  ['nomeCliente=Joao Pereira; total=10', 'Pereira'],
+  ['"ClienteNome": "Ana Souza"', 'Souza'],
+  ['"Endereco": "Rua das Flores, 100"', 'Flores'],
+  ['enderecoEntrega: Av Brasil', 'Brasil'],
+  ['logradouro: Av Paulista', 'Paulista'],
+  ['bairro=Centro Velho', 'Centro'],
+  ['"Complemento":"apto 12 bloco B"', 'bloco'],
+  ['"Cep":"01310100"', '01310100'],
+  ['entrega no 01310-100 amanha', '01310-100'],
+  // revisao da #3066: JSON escapado dentro do log, virgula dentro do valor entre aspas, snake_case
+  ['Body: {\\"nome\\":\\"Maria Silva\\",\\"cep\\":\\"01310100\\"}', 'Silva'],
+  ['Body: {\\"nome\\":\\"Maria Silva\\",\\"cep\\":\\"01310100\\"}', '01310100'],
+  ['"Endereco": "Rua das Flores, 100 - Jardim Paulista, Sao Paulo"', 'Jardim'],
+  ["{'endereco': 'Rua A, 5 - Vila Nova'}", 'Vila'],
+  ['nome_cliente=Joao Pereira', 'Pereira'],
+];
+for (const [entrada, dado] of pessoais) {
+  test(`redige pessoal: ${entrada.slice(0, 30)}`, () => assert.ok(!redigir(entrada).includes(dado), `vazou: ${redigir(entrada)}`));
+}
+test('pessoal: preserva ids, produto e numeros de diagnostico', () => {
+  for (const t of ['"ClienteId":"3f2a9c1e-0000-4000-8000-000000000001"', '"NomeProduto":"Bolo de cenoura"', 'total=10', '2026-11-21T14:09:19.1234567-03:00', 'Pedido 42 confirmado'])
+    assert.equal(redigir(t), t);
+  assert.match(redigir('{"Nome":"Maria","Pedido":42}'), /"Pedido":42/);
+  // chave=valor sem aspas para antes da proxima chave: o diagnostico da linha fica
+  assert.match(redigir('cep=01310100 pedido=42 status=500 rota=/api/x'), /pedido=42 status=500 rota=\/api\/x$/);
+  assert.match(redigir('Body: {\\"nome\\":\\"Maria\\",\\"pedido\\":42}'), /\\"pedido\\":42/);
+});
+
 test('texto comum fica igual', () => assert.equal(redigir('Pedido 42 confirmado'), 'Pedido 42 confirmado'));
 test('linha gigante nao trava (sem ReDoS)', () => {
   const t0 = Date.now();
   redigir('a'.repeat(400_000));
   assert.ok(Date.now() - t0 < 1000);
+});
+
+// #3078: Basic leva a credencial inteira; valor entre aspas com espaco nao sai pela metade.
+test('redige Authorization de qualquer esquema inteiro', () => {
+  for (const [e, dado] of [
+    ['Authorization: Basic dXNlcjpwYXNz', 'dXNlcjpwYXNz'],
+    ['Authorization: Token abc123xyz', 'abc123xyz'],
+    ['Authorization: AWS4-HMAC-SHA256 Credential=AKIAXX/x, SignedHeaders=host, Signature=deadbeef', 'deadbeef'],
+    ['"Authorization":"Basic dXNlcjpwYXNz","x":1', 'dXNlcjpwYXNz'],
+  ]) {
+    const s = redigir(e);
+    assert.ok(!s.includes(dado), `vazou: ${s}`);
+  }
+  assert.match(redigir('"Authorization":"Basic dXNlcjpwYXNz","x":1'), /"x":1$/);
+});
+test('redige segredo entre aspas com espaco', () => {
+  for (const [e, dado] of [['password="abc def ghi" ok=1', 'def ghi'], ['"token": "a b c"', 'b c'], ["senha='x y'", 'y']]) {
+    const s = redigir(e);
+    assert.ok(!s.includes(dado), `vazou: ${s}`);
+  }
+  assert.match(redigir('password="abc def" ok=1'), /ok=1$/);
 });

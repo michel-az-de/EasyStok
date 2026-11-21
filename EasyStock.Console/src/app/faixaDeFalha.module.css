@@ -33,8 +33,37 @@
   gap: var(--e-1);
 }
 
+/* #3005: os botões herdam o alvo do Botao (var(--toque): 40 px no desktop, 48 px no toque e abaixo de 760 px).
+   Som e notificações bloqueados são condição comum, não falha: uma linha neutra (sem --erro), até 48 px
+   com a margem. Contorno uniforme de 1px e fundo tingido, nunca barra de um lado só. */
+.aparelho {
+  flex-shrink: 0;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  box-sizing: border-box;
+  width: min(720px, calc(100% - 2 * var(--e-3)));
+  margin: var(--e-1) var(--e-3);
+  padding: 0 var(--e-1) 0 var(--e-2);
+  font-size: var(--t-micro);
+  color: var(--tinta-2);
+  background: var(--preenchimento);
+  border: var(--b-1) solid var(--linha);
+  border-radius: var(--r-2);
+}
+.aparelho > svg { flex-shrink: 0; }
+.aparelhoTexto { flex: 1; min-width: 0; font-weight: 600; }
+.aparelhoPasso { display: flex; align-items: center; gap: var(--e-1); width: 100%; min-height: var(--toque); padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; text-align: left; }
+.aparelhoRotulo { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: underline dotted; text-underline-offset: 3px; }
+.aparelhoPasso > svg { flex-shrink: 0; }
+/* #3043: o passo a passo fica fora da faixa (a altura de uma linha não muda); contorno uniforme e fundo tingido. */
+.aparelhoPassoTexto { align-self: center; box-sizing: border-box; width: min(720px, calc(100% - 2 * var(--e-3))); margin: 0 var(--e-3) var(--e-1); padding: var(--e-2); font-size: var(--t-micro); line-height: 1.4; color: var(--tinta-2); background: var(--preenchimento); border: var(--b-1) solid var(--linha); border-radius: var(--r-2); }
+.aparelhoBotao { flex-shrink: 0; padding: 0 var(--e-2); white-space: nowrap; }
+
 .quadro { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .conteudo { flex: 1; min-height: 0; }
+.conteudo:focus { outline: none; } /* recebe o foco só por código, depois de Dispensar */
 
 /* FaixaApi é irmã da moldura dentro deste contêiner, não mais de #root. */
 .conteudo:has(> :global([data-conteudo-console])) { display: flex; flex-direction: column; }

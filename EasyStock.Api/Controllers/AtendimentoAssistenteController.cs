@@ -93,6 +93,12 @@ public class AtendimentoAssistenteController(
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
     }
 
+    /// <summary>#2853: o fluxo do Assistente da loja (etapas, roteiro, ferramentas e prompt) para o mapa do console.</summary>
+    [HttpGet("fluxo")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> Fluxo([FromServices] ObterFluxoAssistenteUseCase fluxo) =>
+        DataOk(await fluxo.ExecuteAsync(currentUser.EmpresaId));
+
     /// <summary>S68 (#2597, ADR-0066): modelos que a loja pode escolher, com o modelo atual em primeiro.</summary>
     [HttpGet("modelos")]
     [ProducesResponseType(StatusCodes.Status200OK)]

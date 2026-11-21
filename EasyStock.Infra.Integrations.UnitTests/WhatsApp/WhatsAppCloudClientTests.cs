@@ -59,6 +59,35 @@ public class WhatsAppCloudClientTests
         """{"messaging_product":"whatsapp","contacts":[{"wa_id":"5511999998888"}],"messages":[{"id":"wamid.X"}]}""";
 
     [Fact]
+    public async Task DocumentoSaiComoTypeDocumentComLinkNomeELegenda()
+    {
+        var handler = new SequenceHandler();
+        handler.Enfileirar(HttpStatusCode.OK, RespostaEnvioOk);
+        var client = BuildClient(handler);
+
+        await client.EnviarDocumentoAsync("5511999998888", "https://loja.exemplo/files/assinado/x?sig=1", "Pedido-A1B2C3.pdf", "Pedido A1B2C3");
+
+        using var corpo = System.Text.Json.JsonDocument.Parse(handler.UltimoCorpo!);
+        corpo.RootElement.GetProperty("type").GetString().Should().Be("document");
+        corpo.RootElement.GetProperty("to").GetString().Should().Be("5511999998888");
+        var documento = corpo.RootElement.GetProperty("document");
+        documento.GetProperty("link").GetString().Should().Be("https://loja.exemplo/files/assinado/x?sig=1");
+        documento.GetProperty("filename").GetString().Should().Be("Pedido-A1B2C3.pdf");
+        documento.GetProperty("caption").GetString().Should().Be("Pedido A1B2C3");
+    }
+
+    [Fact]
+    public async Task DocumentoComUrlNaoAbsolutaFalhaAntesDaRede()
+    {
+        var client = CreateClient(HttpStatusCode.OK, RespostaEnvioOk, out var handler);
+
+        var acao = async () => await client.EnviarDocumentoAsync("5511999998888", "/files/x.pdf", "x.pdf");
+
+        await acao.Should().ThrowAsync<ArgumentException>();
+        handler.Chamadas.Should().Be(0);
+    }
+
+    [Fact]
     public async Task EnviaPeloPhoneNumberIdDaEmpresaDoTenant()
     {
         var handler = new SequenceHandler();

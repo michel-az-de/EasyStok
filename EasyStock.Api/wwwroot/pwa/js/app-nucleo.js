@@ -1,0 +1,15022 @@
+
+// =========================
+// STATE
+// =========================
+
+// Catalogo operacional padrao do app.
+// Stock inicia em 0. Usuário produz lotes pra popular o estoque.
+const defaultProducts = [
+  { id: 'talharim',  name: 'Talharim Fresco',            emoji: '🍝', category: 'massa', unit: '300g',  price: 12, stock: 0 },
+  { id: 'lasanha',   name: 'Lasanha Bolonhesa',          emoji: '🍲', category: 'massa', unit: '300g',  price: 30, stock: 0 },
+  { id: 'rav-muss',  name: 'Ravioli Mussarela & Limão',  emoji: '🍋', category: 'massa', unit: '300g',  price: 28, stock: 0 },
+  { id: 'rav-esp',   name: 'Ravioli Espinafre & Ricota', emoji: '🥬', category: 'massa', unit: '300g',  price: 28, stock: 0 },
+  { id: 'pomodoro',  name: 'Molho Pomodoro',             emoji: '🍅', category: 'molho', unit: '250ml', price: 15, stock: 0 },
+  { id: 'bechamel',  name: 'Molho Bechamel',             emoji: '🥛', category: 'molho', unit: '250ml', price: 15, stock: 0 },
+  { id: 'bolonhesa', name: 'Molho Bolonhesa',            emoji: '🥩', category: 'molho', unit: '250ml', price: 18, stock: 0 }
+];
+
+// Clientes/pedidos/caixa começam vazios. Tudo que aparece veio do próprio usuário.
+const defaultClients = [];
+function seedOrders()  { return []; }
+function seedCash()    { return []; }
+function seedBatches() { return []; }
+
+function load(key, fallback) {
+  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch(e) { return fallback; }
+}
+function save(key, data) {
+  try { localStorage.setItem(key, JSON.stringify(data)); return true; } catch(e) { return false; }
+}
+
+// ================================================================
+// DOMAIN UTILS (Onda 4) — saneamento e validacao centralizada
+// Pequeno por design. Cada caminho de escrita/display que precisar
+// das mesmas regras deve usar essas funcoes para evitar duplicatas
+// e bugs sutis (espacos duplos, acentos, CPF vazado, peso absurdo).
+// ================================================================
+
+function normalizeName(s) {
+  // "  Maria  Jose  " -> "Maria Jose"
+  // Tambem normaliza NFC para evitar variantes Unicode (compostas vs
+  // decompostas) gerarem duplicatas no CRM ("José" U+00E9 vs "José").
+  return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').normalize('NFC');
+}
+
+function normalizeSearch(s) {
+  // toLowerCase + remove acentos (NFD + strip combining marks).
+  // Busca tolerante: "maria jose" -> match em "Maria Jose"/"María José".
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function maskCpf(cpf) {
+  // "111.444.777-35" ou "11144477735" -> "***.444.777-**"
+  // Preserva digitos do meio (suficiente para conferencia visual em
+  // contextos opt-in como picker), oculta inicio e final.
+  if (!cpf) return '';
+  const digits = String(cpf).replace(/\D/g, '');
+  if (digits.length !== 11) return cpf;
+  return '***.' + digits.slice(3, 6) + '.' + digits.slice(6, 9) + '-**';
+}
+
+function isCpfOrCnpjLike(s) {
+  // Detecta strings no formato CPF (xxx.xxx.xxx-xx) ou CNPJ
+  // (xx.xxx.xxx/xxxx-xx). Usado para sanear snapshots antigos
+  // que vazaram CPF no campo "ref" do pedido (pre-fix LGPD).
+  if (!s) return false;
+  const t = String(s).trim();
+  return /^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(t) || /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(t);
+}
+
+function safeRefDisplay(ref) {
+  // Backward-compat: snapshots antigos podem ter CPF/CNPJ em ref
+  // porque clientReference() retornava document como fallback.
+  // Agora o display omite (string vazia) e os call sites decidem
+  // se mostram "sem referência" ou nada.
+  if (!ref) return '';
+  return isCpfOrCnpjLike(ref) ? '' : ref;
+}
+
+function parseProductWeightG(unit) {
+  // "300g" / "1.5 kg" / "500 ml" / "1L" -> gramas/ml.
+  // Retorna null se nao identificavel (ex: "unidade", "kit", "caixa").
+  if (!unit) return null;
+  const m = String(unit).match(/^\s*([\d.,]+)\s*(g|kg|ml|l)\s*$/i);
+  if (!m) return null;
+  const num = parseFloat(m[1].replace(',', '.'));
+  if (!isFinite(num) || num <= 0) return null;
+  const u = m[2].toLowerCase();
+  if (u === 'g' || u === 'ml') return num;
+  if (u === 'kg' || u === 'l')  return num * 1000;
+  return null;
+}
+
+// #1474: peso por unidade pre-preenchido no "Registrar produção". Usa o peso
+// padrao do cadastro; sem ele, o peso declarado na unidade em g/kg ("300g").
+// ml/L ficam de fora: volume nao e peso, o operador informa.
+function pesoPadraoDoProduto(product) {
+  if (!product) return null;
+  const def = Number(product.defaultWeightG);
+  if (isFinite(def) && def > 0) return Math.round(def);
+  if (!/^\s*[\d.,]+\s*(g|kg)\s*$/i.test(String(product.unit || ''))) return null;
+  const g = parseProductWeightG(product.unit);
+  return g && g > 0 ? Math.round(g) : null;
+}
+
+function isProductWeightInsane(product, batchWeightG) {
+  // Cross-check produto.unit ("300g") vs lote.weightG (999999).
+  // Insano se ratio > 2x ou < 0.5x. Retorna { insane, declared, ratio }
+  // para o call site decidir UX (confirm dialog com numeros).
+  if (!product || !batchWeightG) return { insane: false, declared: null, ratio: null };
+  const declared = parseProductWeightG(product.unit);
+  if (!declared) return { insane: false, declared: null, ratio: null };
+  const ratio = batchWeightG / declared;
+  return { insane: ratio > 2 || ratio < 0.5, declared, ratio };
+}
+
+function shortenName(name) {
+  // "Maria Jose da Silva" -> "Maria Silva"
+  // Mantem primeiro + ultimo sobrenome quando >1 palavra; preserva
+  // identidade do cliente em cards apertados sem cortar para so o
+  // primeiro nome (varias "Marias" viram indistinguiveis).
+  if (!name) return '';
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] || '';
+  return parts[0] + ' ' + parts[parts.length - 1];
+}
+
+function clientOrderCount(clientId) {
+  // Conta pedidos nao-cancelados de um cliente diretamente do array
+  // de orders (fonte da verdade). Evita o bug do contador c.orderCount
+  // que crescia em saveOrder mas podia divergir do estado real.
+  if (!clientId) return 0;
+  return (orders || []).filter(o => o.clientId === clientId && o.status !== STATUS.CANCELADO).length;
+}
+
+function isCalmUx() {
+  try { return (localStorage.getItem('cdb-ux-density') || 'calm') !== 'full'; }
+  catch (e) { return true; }
+}
+function applyUxDensity() {
+  const calm = isCalmUx();
+  if (document.body) document.body.classList.toggle('ux-calm', calm);
+  const btn = document.getElementById('uxDensityToggle');
+  if (btn) btn.textContent = calm ? 'Simples' : 'Completo';
+}
+function toggleUxDensity(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const next = isCalmUx() ? 'full' : 'calm';
+  try { localStorage.setItem('cdb-ux-density', next); } catch (e) {}
+  applyUxDensity();
+  if (typeof renderHome === 'function' && currentScreen === 'home') renderHome();
+  showToast(next === 'full' ? 'Modo completo ativado' : 'Modo simples ativado');
+}
+applyUxDensity();
+
+// #2316 (SYNC-4): aparelho pareado com o ERP recebe o catalogo pelo pull; semear o
+// catalogo local duplicava os produtos (7 sementes + 9 do ERP).
+function catalogoLocalInicial(armazenado, sementes, ctx) {
+  const lista = armazenado ? armazenado : (ctx.isPilot || ctx.paired ? [] : sementes.map(p => ({...p})));
+  // Garante que o catálogo oficial sempre está presente mesmo após limpar custom
+  if (!ctx.isPilot && !ctx.paired) sementes.forEach(dp => {
+    if (!lista.find(p => p.id === dp.id)) lista.unshift({...dp});
+  });
+  return lista;
+}
+function aparelhoPareadoComErp() {
+  try { const pr = JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); return !!(pr && pr.apiKey); }
+  catch (_) { return false; }
+}
+let products = catalogoLocalInicial(load('cdb-products', null), defaultProducts,
+  { isPilot: !!window.CDB_CONFIG?.isPilot, paired: aparelhoPareadoComErp() });
+products = products.map(p => ({...p, count: 0, photo: null, stock: p.stock || 0}));
+
+let clients = load('cdb-clients', window.CDB_CONFIG?.isPilot ? [] : defaultClients);
+// Migration silenciosa do legado "apt" -> "address". Clientes que tinham
+// apenas apartamento (do toggle "Aqui no predio" antigo) ganham endereco
+// formatado "Apto X". O campo apt fica preservado pra retrocompat com
+// snapshots de pedidos antigos. Roda 1x na carga.
+(function migrateClientsApt() {
+  let migrated = 0;
+  (clients || []).forEach(c => {
+    if (c.apt && !c.address) { c.address = 'Apto ' + c.apt; migrated++; }
+  });
+  if (migrated > 0) {
+    try { save('cdb-clients', clients); } catch (e) {}
+    try { console.log('[migration] ' + migrated + ' cliente(s) com apt -> address'); } catch (e) {}
+  }
+})();
+let orders = load('cdb-orders', null) || seedOrders();
+let cashEntries = load('cdb-cash', null) || seedCash();
+let cashClosings = load('cdb-cash-closings', null) || [];
+let batches = load('cdb-batches', null) || seedBatches();
+let shoppingItems = load('cdb-shopping', null) || [];
+if (!Array.isArray(shoppingItems)) shoppingItems = [];
+// Migração: lotes legados passam a ter status aberto por padrão.
+(function migrateBatchStatus() {
+  let changed = 0;
+  (batches || []).forEach(b => {
+    if (!b.status) { b.status = 'open'; changed++; }
+  });
+  if (changed > 0) {
+    try { save('cdb-batches', batches); } catch (e) {}
+  }
+})();
+
+let selectedClient = null;
+let currentOrderItems = []; // itens sendo adicionados no pedido em construção
+let pendingSync = 0; // atualizado por sync.js assim que carrega
+let lastAction = null;
+let holdTimer = null;
+let currentPhotoDataUrl = null;
+let selectedCat = 'massa';
+let selectedEmoji = '🍝';
+let cashType = 'expense';
+let cashMetodo = null; // #1493 — forma do lancamento aberto no modal
+
+// ================================================================
+// OPERADOR (nome informado no primeiro boot; usado para auditoria)
+// Nota: usa localStorage.getItem DIRETO (sem load/save que fazem
+// JSON.parse). Salvar 'Felipe' cru e tentar JSON.parse quebra e devolve
+// string vazia — bug que fazia o welcome aparecer toda vez.
+// ================================================================
+let operatorName = (() => {
+  try { return localStorage.getItem('cdb-operator-name') || ''; }
+  catch (e) { return ''; }
+})();
+
+function saveOperatorName(name) {
+  // Sanitiza: remove control chars, < > " \ pra evitar que nome corrompa
+  // log do servidor ou seja usado em payload de injection. Mantem letras
+  // (incl. acentos PT-BR), digitos, espaco, hifen, ponto e apostrofo.
+  const clean = String(name || '')
+    .replace(/[\x00-\x1F\x7F<>"\\]/g, '')
+    .trim()
+    .slice(0, 32);
+  operatorName = clean;
+  try { localStorage.setItem('cdb-operator-name', clean); } catch (e) {}
+  renderOperatorBadge();
+  // Expõe para sync.js injetar no header do POST
+  window.CDB_OPERATOR = clean;
+}
+
+function renderOperatorBadge() {
+  const el = document.getElementById('opName');
+  const greet = document.getElementById('greetingText');
+  if (el) el.textContent = operatorName || 'operador';
+  if (greet) {
+    const h = new Date().getHours();
+    greet.textContent = h < 12 ? 'Bom dia,' : h < 18 ? 'Boa tarde,' : 'Boa noite,';
+  }
+}
+
+function renderBrandName() {
+  const el = document.getElementById('brandName');
+  const name = (getEmpresaName() || '').trim();
+  if (el) el.textContent = window.CDB_CONFIG?.isPilot && (!name || name === 'Minha empresa') ? 'Casa da Baba' : name || 'Minha empresa';
+  const logo = document.getElementById('brandLogo');
+  if (logo) {
+    const src = getStoreLogo();
+    // src vazio em <img> resolve a URL do documento e dispara um GET
+    // extra desnecessario. removeAttribute evita o request.
+    if (src) logo.src = src;
+    else logo.removeAttribute('src');
+    logo.classList.toggle('hidden', !src);
+  }
+}
+
+function renderLogoPreview() {
+  const preview = document.getElementById('logoPreview');
+  if (!preview) return;
+  const src = getStoreLogo();
+  if (src) {
+    preview.outerHTML = `<img class="logo-preview" id="logoPreview" src="${src}" alt="Logo da loja">`;
+  } else if (preview.tagName === 'IMG') {
+    preview.outerHTML = '<div class="logo-preview empty" id="logoPreview">Logo</div>';
+  } else {
+    preview.className = 'logo-preview empty';
+    preview.textContent = 'Logo';
+  }
+}
+
+function handleLogoFile(event) {
+  const input = event.target;
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  // Whitelist raster: SVG inline pode conter script e o storeLogoHtml
+  // injeta via innerHTML em recibos/etiquetas.
+  if (!/^image\/(png|jpe?g|webp)$/i.test(file.type || '')) {
+    showToast('Use PNG, JPG ou WEBP'); return;
+  }
+  if (file.size > 900 * 1024) { showToast('Logo muito grande. Use até 900 KB.'); return; }
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      localStorage.setItem('cdb-store-logo', String(e.target.result || ''));
+      renderBrandName();
+      renderLogoPreview();
+      showToast('Logo da loja atualizado');
+    } catch (err) {
+      // QuotaExceededError é o cenário comum: localStorage ~5MB no Android,
+      // 900KB de imagem vira ~1.2MB em base64 e empurra outras chaves.
+      if (err && (err.name === 'QuotaExceededError' || err.code === 22)) {
+        showToast('Sem espaço no celular. Use uma imagem menor.');
+      } else {
+        showToast('Não foi possível salvar a logo');
+      }
+    }
+  };
+  reader.onerror = function () { showToast('Falha ao ler imagem'); };
+  reader.readAsDataURL(file);
+}
+
+function removeStoreLogo() {
+  try { localStorage.removeItem('cdb-store-logo'); } catch (e) {}
+  renderBrandName();
+  renderLogoPreview();
+  showToast('Logo removido');
+}
+
+function showWelcome() {
+  document.getElementById('welcomeScreen').classList.remove('hidden');
+  setTimeout(() => document.getElementById('welcomeName').focus(), 200);
+}
+function hideWelcome() {
+  document.getElementById('welcomeScreen').classList.add('hidden');
+}
+function changeOperator() {
+  const newName = prompt('Seu nome:', operatorName);
+  if (newName !== null && newName.trim()) {
+    saveOperatorName(newName);
+    showToast('Nome atualizado');
+  }
+}
+
+// ================================================================
+// TEMA CLARO/ESCURO
+// ================================================================
+function applyTheme(theme) {
+  if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  const icon = document.getElementById('themeIcon');
+  // Troca o SVG do botão de tema: sol (claro) ou lua (escuro)
+  if (icon) icon.innerHTML = theme === 'light'
+    ? '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>'
+    : '<path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z"/>';
+  try { localStorage.setItem('cdb-theme', theme); } catch (e) {}
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  applyTheme(current === 'light' ? 'dark' : 'light');
+}
+// Tabs do modal Ajustes (Loja / Equipamento / Manutenção)
+// Toggleia visibilidade dos .ajustes-section por data-group.
+function setAjustesTab(group) {
+  document.querySelectorAll('.ajustes-tabs .screen-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.group === group));
+  document.querySelectorAll('.ajustes-section[data-group]').forEach(s =>
+    s.style.display = s.dataset.group === group ? '' : 'none');
+  // Scrolla pro topo dentro do modal pra dar contexto
+  try { document.querySelector('.ajustes-sheet').scrollTop = 0; } catch (e) {}
+}
+
+// Atualiza label do botao de tema dentro do modal Ajustes pra refletir
+// estado atual (texto descreve PARA ONDE vai mudar, nao o estado atual).
+function refreshAjustesThemeLabel() {
+  const label = document.getElementById('themeToggleLabel');
+  if (!label) return;
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  label.textContent = isLight ? '🌙 Mudar pra modo escuro' : '☀️ Mudar pra modo claro';
+}
+// Aplica tema salvo antes de renderizar (evita flash) — getItem direto
+// para não passar por JSON.parse do load().
+// Tema inicial: no APK acompanha o claro/escuro do Android (sem seletor
+// próprio); no PWA vale a escolha salva, com escuro como padrão.
+function resolveTheme() {
+  if (window.CDB_CONFIG?.isPilot) return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  try { return localStorage.getItem('cdb-theme') || 'dark'; } catch (e) { return 'dark'; }
+}
+applyTheme(resolveTheme());
+if (window.CDB_CONFIG?.isPilot) window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme(resolveTheme()));
+// Fim do tema inicial
+
+// Mini-stats <details>: persiste estado collapsed/expanded em localStorage.
+// Default: collapsed (mostra so summary "N em aberto").
+function setupPersistentDetails(id, storageKey, opts) {
+  const det = document.getElementById(id);
+  if (!det) return;
+  const defaultOpen = !!(opts && opts.defaultOpen);
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw === '1') det.open = true;
+    else if (raw === '0') det.open = false;
+    else det.open = defaultOpen;
+  } catch (e) {
+    det.open = defaultOpen;
+  }
+  det.addEventListener('toggle', function () {
+    try { localStorage.setItem(storageKey, det.open ? '1' : '0'); } catch (e) {}
+  });
+}
+
+function setupPersistentDisclosures() {
+  setupPersistentDetails('homeOpsDisclosure', 'cdb-home-ops-open', { defaultOpen: false });
+  setupPersistentDetails('miniStatsDetails', 'cdb-stats-open', { defaultOpen: false });
+}
+document.addEventListener('DOMContentLoaded', setupPersistentDisclosures);
+// Tambem inicia se DOMContentLoaded ja disparou
+if (document.readyState !== 'loading') setupPersistentDisclosures();
+
+// ================================================================
+// TUTORIAL / ONBOARDING (4 steps, mostrado só na primeira abertura)
+// ================================================================
+const TOUR_STEPS = [
+  {
+    emoji: '🏠',
+    title: 'Tela Hoje',
+    body: 'Veja pedidos em aberto, caixa do dia e atalhos. É sua base de comando.'
+  },
+  {
+    emoji: '🍝',
+    title: 'Produção',
+    body: 'Toque num produto para contar o que saiu do forno. Use os botões − e + para ajustar. Ao confirmar, vira um lote e entra no estoque.'
+  },
+  {
+    emoji: '📋',
+    title: 'Pedidos',
+    body: 'Crie pedidos: escolha o cliente (ou "avulso"), adicione itens e salve. Avance o status: Aguardando → Preparando → Pronto → Entregue. "Pronto" desconta do estoque.'
+  },
+  {
+    emoji: '📦',
+    title: 'Histórico',
+    body: 'Acompanhe pedidos, produção, impressões e ajustes num só lugar. Clique em "Histórico" no menu inferior para revisar a operação.'
+  }
+];
+let tourStep = 0;
+
+function startTour() {
+  tourStep = 0;
+  document.getElementById('tourOverlay').classList.remove('hidden');
+  renderTour();
+}
+function renderTour() {
+  const s = TOUR_STEPS[tourStep];
+  document.getElementById('tourEmoji').textContent = s.emoji;
+  document.getElementById('tourTitle').textContent = s.title;
+  document.getElementById('tourBody').textContent  = s.body;
+  // Dots
+  const dots = document.getElementById('tourDots');
+  dots.innerHTML = '';
+  TOUR_STEPS.forEach((_, i) => {
+    const d = document.createElement('span');
+    d.className = 'dot' + (i === tourStep ? ' active' : '');
+    dots.appendChild(d);
+  });
+  document.getElementById('tourNext').textContent =
+    tourStep === TOUR_STEPS.length - 1 ? 'Começar' : 'Próximo';
+}
+function nextTour() {
+  tourStep++;
+  if (tourStep >= TOUR_STEPS.length) { endTour(); return; }
+  renderTour();
+}
+function endTour() {
+  document.getElementById('tourOverlay').classList.add('hidden');
+  try { localStorage.setItem('cdb-onboarding-done', '1'); } catch (e) {}
+}
+
+function persistAll() {
+  // Salva catálogo sem contadores (são runtime)
+  const toSaveProducts = products.map(({count, photo, ...rest}) => rest);
+  const values = { 'cdb-products': toSaveProducts, 'cdb-clients': clients,
+    'cdb-orders': orders, 'cdb-cash': cashEntries, 'cdb-cash-closings': cashClosings,
+    'cdb-batches': batches, 'cdb-shopping': shoppingItems };
+  const previous = new Map();
+  const written = [];
+  try {
+    const entries = Object.entries(values).map(([key, value]) => [key, JSON.stringify(value)]);
+    entries.forEach(([key]) => previous.set(key, localStorage.getItem(key)));
+    entries.forEach(([key, value]) => { localStorage.setItem(key, value); written.push(key); });
+  } catch (error) {
+    written.reverse().forEach(key => {
+      try {
+        const value = previous.get(key);
+        if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+      } catch (rollbackError) { console.error('Falha ao restaurar dados locais', rollbackError); }
+    });
+    showToast('Não foi possível salvar neste aparelho. Confira o espaço disponível e tente novamente.');
+    return false;
+  }
+  // Hook de sync: sync.js sobrescreve esse callback
+  if (typeof window.cdbOnPersist === 'function') {
+    try { window.cdbOnPersist({ products, clients, orders, cashEntries, batches }); } catch (e) { console.warn(e); }
+  }
+  // Conta acoes pra disparar backup automatico (a cada 50 ou 7 dias)
+  try { incrementActionCounter(); } catch (e) {}
+  return true;
+}
+
+// =========================
+// MODO APRESENTACAO
+// =========================
+const DEMO_PREFIX = 'demo-';
+const DEMO_MODE_KEY = 'cdb-demo-mode';
+
+function isDemoRecord(item) {
+  if (!item) return false;
+  return item.demo === true && String(item.id || '').startsWith(DEMO_PREFIX);
+}
+
+function demoCount() {
+  return [products, clients, orders, cashEntries, cashClosings, batches]
+    .reduce((sum, list) => sum + ((list || []).filter(isDemoRecord).length), 0);
+}
+
+function savePresentationStateOnly() {
+  const toSaveProducts = (products || []).map(({count, photo, ...rest}) => rest);
+  save('cdb-products', toSaveProducts);
+  save('cdb-clients', clients || []);
+  save('cdb-orders', orders || []);
+  save('cdb-cash', cashEntries || []);
+  save('cdb-cash-closings', cashClosings || []);
+  save('cdb-batches', batches || []);
+}
+
+function updateDemoModeBanner() {
+  const el = document.getElementById('demoModeBanner');
+  if (!el) return;
+  const active = localStorage.getItem(DEMO_MODE_KEY) === '1' || demoCount() > 0;
+  el.classList.toggle('show', active);
+}
+
+function refreshAfterPresentationChange() {
+  updateDemoModeBanner();
+  if (typeof renderHome === 'function') renderHome();
+  if (typeof renderProductGrid === 'function') renderProductGrid();
+  if (typeof renderOrdersFeed === 'function') renderOrdersFeed();
+  if (typeof renderCatalogList === 'function') renderCatalogList();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderFinalizadosScreen === 'function') renderFinalizadosScreen();
+  if (typeof renderCashDetails === 'function') renderCashDetails();
+}
+
+function removePresentationData(silent) {
+  const before = demoCount();
+  products = (products || []).filter(x => !isDemoRecord(x));
+  clients = (clients || []).filter(x => !isDemoRecord(x));
+  orders = (orders || []).filter(x => !isDemoRecord(x));
+  cashEntries = (cashEntries || []).filter(x => !isDemoRecord(x));
+  cashClosings = (cashClosings || []).filter(x => !isDemoRecord(x));
+  batches = (batches || []).filter(x => !isDemoRecord(x));
+  try { localStorage.removeItem(DEMO_MODE_KEY); } catch (e) {}
+  savePresentationStateOnly();
+  refreshAfterPresentationChange();
+  if (!silent) {
+    showToast(before ? `Carga de apresentacao removida (${before} registro(s))` : 'Nenhuma carga de apresentacao ativa');
+  }
+  return before;
+}
+
+function clearPresentationMode() {
+  const total = demoCount();
+  if (!total) { showToast('Nenhuma carga de apresentacao ativa'); return; }
+  if (!confirm(`Remover somente a carga de apresentacao?\n\nIsso apaga ${total} registro(s) marcados como demo e preserva seus dados reais.`)) return;
+  removePresentationData(false);
+}
+
+function demoOrder(id, client, status, items, minutesAgo, notes, confirmation) {
+  const createdAt = Date.now() - minutesAgo * 60 * 1000;
+  const total = items.reduce((sum, it) => sum + Number(it.qty || 0) * Number(it.unitPrice || 0), 0);
+  const history = [
+    { at: createdAt, op: 'Apresentacao', action: STATUS.CRIADO, change: 'Pedido criado no modo apresentacao' }
+  ];
+  if (status !== STATUS.AGUARDANDO) {
+    history.push({ at: createdAt + 18 * 60 * 1000, op: 'Apresentacao', action: status, change: 'Fluxo demonstrativo' });
+  }
+  return {
+    id,
+    demo: true,
+    clientId: client.id,
+    clientSnapshot: { name: client.name, ref: client.address || client.ref || '' },
+    items,
+    notes: notes || '',
+    total,
+    status,
+    createdAt,
+    updatedAt: createdAt + 24 * 60 * 1000,
+    lastOperatorName: 'Apresentacao',
+    history,
+    confirmation: confirmation || null
+  };
+}
+
+function loadPresentationMode() {
+  const existing = demoCount();
+  if (existing && !confirm(`Ja existe uma carga de apresentacao com ${existing} registro(s).\n\nSubstituir por uma carga nova?`)) return;
+  if (existing) removePresentationData(true);
+
+  const now = Date.now();
+  const day = new Date(now);
+  const lote = 'DEMO-' + String(day.getFullYear()).slice(2) + String(day.getMonth() + 1).padStart(2, '0') + String(day.getDate()).padStart(2, '0');
+  const validity = d => d + 35 * 24 * 60 * 60 * 1000;
+
+  const demoProducts = [
+    { id: 'demo-talharim', demo: true, name: 'Talharim fresco', emoji: '🍝', category: 'massa', unit: '300g', price: 18, stock: 12, sku: 'DTAL' },
+    { id: 'demo-ravioli', demo: true, name: 'Ravioli quatro queijos', emoji: '🧀', category: 'massa', unit: '300g', price: 34, stock: 8, sku: 'DRAV' },
+    { id: 'demo-nhoque', demo: true, name: 'Nhoque de batata', emoji: '🥔', category: 'massa', unit: '400g', price: 26, stock: 6, sku: 'DNHO' },
+    { id: 'demo-pomodoro', demo: true, name: 'Pomodoro artesanal', emoji: '🍅', category: 'molho', unit: '250ml', price: 16, stock: 10, sku: 'DPOM' }
+  ];
+
+  const demoClients = [
+    { id: 'demo-cliente-ana', demo: true, name: 'Ana Paula', phone: '(11) 99999-1020', address: 'Condominio Jardim, bloco B', ref: 'Bloco B', lastOrder: now - 80 * 60 * 1000, orderCount: 2 },
+    { id: 'demo-cliente-bistro', demo: true, name: 'Bistro Santa Massa', phone: '(11) 98888-4433', address: 'Rua das Cantinas, 120', ref: 'Retirada balcao', lastOrder: now - 140 * 60 * 1000, orderCount: 4 },
+    { id: 'demo-cliente-luiz', demo: true, name: 'Luiz Fernando', phone: '(11) 97777-2211', address: 'Apto 54 - Torre 2', ref: 'Entregar na portaria', lastOrder: now - 210 * 60 * 1000, orderCount: 1 }
+  ];
+
+  const item = (productId, qty) => {
+    const p = demoProducts.find(x => x.id === productId);
+    if (!p) return null;
+    return { productId: p.id, name: p.name, emoji: p.emoji, unit: p.unit, qty, unitPrice: p.price, price: p.price };
+  };
+  // Filtra nulls em cada lista de itens (caso algum id seja renomeado).
+  const items = (...arr) => arr.filter(Boolean);
+
+  products = products.concat(demoProducts);
+  clients = clients.concat(demoClients);
+  orders = [
+    demoOrder('demo-order-001', demoClients[0], STATUS.PRONTO, items(item('demo-talharim', 2), item('demo-pomodoro', 1)), 55, 'Sem queijo ralado.', { status: CONFER_STATUS.CONFERIDO, type: 'ok', by: 'Apresentacao', at: now - 22 * 60 * 1000 }),
+    demoOrder('demo-order-002', demoClients[1], STATUS.PREPARANDO, items(item('demo-ravioli', 3), item('demo-nhoque', 2)), 125, 'Pedido para vitrine de hoje.', null),
+    demoOrder('demo-order-003', demoClients[2], STATUS.AGUARDANDO, items(item('demo-nhoque', 1), item('demo-pomodoro', 2)), 185, 'Avisar quando sair para entrega.', null),
+    demoOrder('demo-order-004', demoClients[1], STATUS.ENTREGUE, items(item('demo-talharim', 4), item('demo-ravioli', 2)), 260, 'Entrega concluida para demonstrar caixa.', { status: CONFER_STATUS.CONFERIDO, type: 'ok', by: 'Apresentacao', at: now - 210 * 60 * 1000 })
+  ].concat(orders || []);
+
+  cashEntries = (cashEntries || []).concat([
+    { id: 'demo-cash-entrada', demo: true, type: 'income', amount: 48, description: 'Sinal recebido - encomenda demo', createdAt: now - 95 * 60 * 1000, lastOperatorName: 'Apresentacao' },
+    { id: 'demo-cash-saida', demo: true, type: 'expense', amount: 32, description: 'Embalagens para lote demo', createdAt: now - 160 * 60 * 1000, lastOperatorName: 'Apresentacao' }
+  ]);
+
+  batches = (batches || []).concat([
+    {
+      id: 'demo-batch-001',
+      demo: true,
+      code: 'BATCH-' + lote,
+      lote,
+      createdAt: now - 190 * 60 * 1000,
+      lastOperatorName: 'Apresentacao',
+      items: [
+        { productId: 'demo-talharim', name: 'Talharim fresco', emoji: '🍝', unit: '300g', qty: 6, weightG: 300, validityDays: 35, expiresAt: validity(now) },
+        { productId: 'demo-ravioli', name: 'Ravioli quatro queijos', emoji: '🧀', unit: '300g', qty: 4, weightG: 300, validityDays: 35, expiresAt: validity(now) }
+      ],
+      unitConfirmations: {
+        '001': { status: CONFER_STATUS.CONFERIDO, type: 'ok', by: 'Apresentacao', at: now - 120 * 60 * 1000 },
+        '002': { status: CONFER_STATUS.CONFERIDO, type: 'ok', by: 'Apresentacao', at: now - 118 * 60 * 1000 },
+        '007': { status: CONFER_STATUS.DIVERGENCIA, type: 'problem', problem: 'etiqueta-errada', by: 'Apresentacao', at: now - 94 * 60 * 1000 }
+      }
+    }
+  ]);
+
+  try { localStorage.setItem(DEMO_MODE_KEY, '1'); } catch (e) {}
+  savePresentationStateOnly();
+  refreshAfterPresentationChange();
+  closeAjustes();
+  go('home');
+  showToast('Modo apresentacao carregado com dados removiveis');
+}
+
+// =========================
+// LOGS DE AUDITORIA (HISTORICO)
+// =========================
+// Cada acao relevante chama logAction(...). Salvo em localStorage com
+// rotacao automatica em ~1000 entradas (evita encher os 5MB do storage).
+// Operador (cdb-operator-name) e deviceId capturados aqui.
+const AUDIT_LOG_KEY = 'cdb-audit-log';
+const AUDIT_LOG_MAX = 1000;
+
+function loadAuditLog() {
+  try { return JSON.parse(localStorage.getItem(AUDIT_LOG_KEY) || '[]') || []; }
+  catch (e) { return []; }
+}
+
+function logAction(opts) {
+  try {
+    const entry = {
+      id: 'log-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      ts: Date.now(),
+      operator: operatorName || 'desconhecido',
+      deviceId: localStorage.getItem('cdb-device-id') || '',
+      action: opts.action,
+      entityType: opts.entityType || '',
+      entityId: opts.entityId || '',
+      summary: opts.summary || '',
+      diff: opts.diff || null
+    };
+    const log = loadAuditLog();
+    log.unshift(entry); // mais recentes primeiro
+    // F5: ao ultrapassar o limite, arquiva os mais antigos em
+    // cdb-audit-log-archive (cap 5000) ao inves de dropar. Operador
+    // recupera via export. Diagnostico mostra contagem do archive.
+    if (log.length > AUDIT_LOG_MAX) {
+      const overflow = log.splice(AUDIT_LOG_MAX);
+      try {
+        let archive = JSON.parse(localStorage.getItem('cdb-audit-log-archive') || '[]') || [];
+        archive = overflow.concat(archive);
+        if (archive.length > 5000) archive.length = 5000;
+        localStorage.setItem('cdb-audit-log-archive', JSON.stringify(archive));
+      } catch (e) { /* archive cheio/corrupto: dropa silencioso (igual antes) */ }
+    }
+    localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(log));
+  } catch (e) {
+    console.warn('[logAction] falhou:', e);
+  }
+}
+
+// Helpers pra calcular diff leve entre dois objetos (so campos que mudaram)
+function diffObjects(before, after, fields) {
+  const out = {};
+  fields.forEach(f => {
+    if (before[f] !== after[f]) {
+      out[f] = { from: before[f], to: after[f] };
+    }
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+// =========================
+// BACKUP AUTOMATICO
+// =========================
+// A cada 50 acoes (persistAll) OU 7 dias desde o ultimo prompt, mostra modal
+// pedindo pro operador exportar backup. Nao interrompe trabalho ativo (so
+// exibe DEPOIS da acao terminar). Operador pode pular — counter zera mesmo
+// assim pra nao ficar repetindo no mesmo dia.
+const AUTO_BACKUP_ACTION_THRESHOLD = 50;
+const AUTO_BACKUP_DAYS_THRESHOLD   = 7;
+
+function incrementActionCounter() {
+  let count = parseInt(localStorage.getItem('cdb-action-count') || '0', 10) || 0;
+  count++;
+  try { localStorage.setItem('cdb-action-count', String(count)); } catch (e) {}
+  // Defer pra nao bloquear o fluxo da acao em andamento (ex: criar pedido)
+  setTimeout(maybeTriggerAutoBackup, 800);
+  // Offline-first: agenda backup local em arquivo (silencioso, throttle 60s).
+  // Sobrevive sem rede, sem servidor, sem subscription Azure ativa. Se o
+  // operador desinstalar e reinstalar, no boot a gente detecta e restaura.
+  try {
+    if (window.cdbSync && typeof window.cdbSync.scheduleLocalBackup === 'function') {
+      window.cdbSync.scheduleLocalBackup('action');
+    }
+  } catch (e) {}
+}
+
+function maybeTriggerAutoBackup() {
+  if (window.CDB_CONFIG?.isPilot && operationalModalOpen()) return;
+  // Nao dispara se ja tem outro modal aberto — evita pilha de modais
+  const overlays = ['updateModal','autoBackupModal','noPrinterModal','productActionsModal','ajustarModal','problemaModal','conferProdModal','prodProblemaModal','cashCloseModal','etiquetasPreview','ajustesModal'];
+  for (const id of overlays) {
+    const el = document.getElementById(id);
+    if (el && (el.classList.contains('show') || el.classList.contains('open'))) return;
+  }
+
+  const count = parseInt(localStorage.getItem('cdb-action-count') || '0', 10) || 0;
+  const last  = parseInt(localStorage.getItem('cdb-last-backup-prompt') || '0', 10) || 0;
+  if (window.CDB_CONFIG?.isPilot && !last) {
+    try { localStorage.setItem('cdb-last-backup-prompt', String(Date.now())); } catch (_) {}
+    if (count < AUTO_BACKUP_ACTION_THRESHOLD) return;
+  }
+  const daysSince = last ? (Date.now() - last) / (1000 * 60 * 60 * 24) : Infinity;
+
+  const triggerByCount = count >= AUTO_BACKUP_ACTION_THRESHOLD;
+  const triggerByTime  = daysSince >= AUTO_BACKUP_DAYS_THRESHOLD && count > 0;
+
+  if (triggerByCount || triggerByTime) {
+    document.getElementById('autoBackupModal').classList.add('show');
+  }
+}
+
+function autoBackupAction(choice) {
+  document.getElementById('autoBackupModal').classList.remove('show');
+  // Em ambos os casos, zera counter e atualiza timestamp pra nao re-disparar
+  try {
+    localStorage.setItem('cdb-action-count', '0');
+    localStorage.setItem('cdb-last-backup-prompt', String(Date.now()));
+  } catch (e) {}
+  if (choice === 'save') {
+    // exportBackup() ja existe — abre share sheet com o JSON
+    setTimeout(exportBackup, 200);
+  }
+}
+
+// =========================
+// AUTO-RESTORE NO BOOT (offline-first)
+// =========================
+// Quando o app abre e detecta que NAO TEM dados locais (localStorage virgem
+// — primeira instalacao OU reinstalacao), procura em /Documents/casa-da-baba/
+// um backup-latest.json deixado pela sessao anterior. Se achar, oferece
+// restaurar automaticamente. Resolve o caso do cliente que desinstala+reinstala
+// e perde tudo, sem depender de servidor.
+async function maybeOfferLocalRestore() {
+  try {
+    // Se ja tem dados, nao oferece restore (nao sobrescreve trabalho atual)
+    var hasData = false;
+    try {
+      var keys = ['cdb-products','cdb-clients','cdb-orders','cdb-cash','cdb-batches'];
+      for (var i = 0; i < keys.length; i++) {
+        var raw = localStorage.getItem(keys[i]);
+        if (raw && raw.length > 5 && raw !== '[]' && raw !== '{}') { hasData = true; break; }
+      }
+    } catch (e) {}
+    if (hasData) return;
+
+    // Sem cdbSync (browser puro fora do APK): nada a fazer
+    if (!window.cdbSync || typeof window.cdbSync.readLocalBackup !== 'function') return;
+    var backup = await window.cdbSync.readLocalBackup();
+
+    // Plugin disponível não prova que existe backup nem que houve reinstalação.
+    // Sem arquivo lido, a seleção manual continua disponível em Ajustes.
+    if (!backup || !backup.data) return;
+
+    var capturedAt = backup.capturedAt ? new Date(backup.capturedAt).toLocaleString('pt-BR') : '?';
+    var snap = backup.data;
+    var counts = {
+      pedidos: 0, produtos: 0, clientes: 0, lotes: 0, caixa: 0
+    };
+    try {
+      var arr;
+      if (snap['cdb-orders'])   { arr = JSON.parse(snap['cdb-orders']);   counts.pedidos  = Array.isArray(arr) ? arr.length : 0; }
+      if (snap['cdb-products']) { arr = JSON.parse(snap['cdb-products']); counts.produtos = Array.isArray(arr) ? arr.length : 0; }
+      if (snap['cdb-clients'])  { arr = JSON.parse(snap['cdb-clients']);  counts.clientes = Array.isArray(arr) ? arr.length : 0; }
+      if (snap['cdb-batches'])  { arr = JSON.parse(snap['cdb-batches']);  counts.lotes    = Array.isArray(arr) ? arr.length : 0; }
+      if (snap['cdb-cash'])     { arr = JSON.parse(snap['cdb-cash']);     counts.caixa    = Array.isArray(arr) ? arr.length : 0; }
+    } catch (e) {}
+    var total = counts.pedidos + counts.produtos + counts.clientes + counts.lotes + counts.caixa;
+    if (total === 0) return; // backup vazio, nada a oferecer
+
+    var msg = 'Achei um backup automatico do app (' + capturedAt + ') com:\n\n'
+            + '  ' + counts.pedidos  + ' pedidos\n'
+            + '  ' + counts.produtos + ' produtos\n'
+            + '  ' + counts.clientes + ' clientes\n'
+            + '  ' + counts.lotes    + ' lotes\n'
+            + '  ' + counts.caixa    + ' lancamentos de caixa\n\n'
+            + 'Deseja RESTAURAR esses dados? (Recomendado se voce reinstalou o app)';
+    if (!confirm(msg)) return;
+
+    await applyBackupPayload(backup);
+    try {
+      localStorage.setItem('cdb-restore-source', 'local-file');
+      localStorage.setItem('cdb-restore-at', String(Date.now()));
+    } catch (e) {}
+    alert('Dados restaurados! Recarregando o app...');
+    setTimeout(function () { location.reload(); }, 600);
+  } catch (e) {
+    console.warn('[autoRestore] falhou:', e);
+  }
+}
+
+// ============================================================
+// HEALTH CHECK — diagnostico defensivo no boot
+// ============================================================
+// Felipe pediu (Semana 2 do roadmap, 03/05/2026): "verificar BT e
+// imprimora antes do 1o pedido — descobrir tarde no meio do servico
+// e horrivel". Roda no DOMContentLoaded + cada visibilitychange (app
+// vira visivel = pode ter ficado horas em background sem checar).
+//
+// Detecta:
+//  - Bluetooth desligado (mas tem impressora salva)
+//  - Impressora pareada mas nao detectada (saiu de range / desligada)
+//  - Backup local nunca feito (dados em risco se fechar app)
+//  - Backup local muito velho (>7 dias)
+//
+// Mostra banner unico no topo (se algo errado). Click abre Diagnostico.
+
+var _healthBannerDismissedAt = 0;
+var HEALTH_DISMISS_TTL = 60 * 60 * 1000; // 1h: depois desse tempo o banner reaparece
+
+function showHealthBanner(level, msg, actionLabel) {
+  var el = document.getElementById('healthBanner');
+  if (!el) return;
+  // Se foi descartado recentemente, respeita o silencio temporario
+  if (Date.now() - _healthBannerDismissedAt < HEALTH_DISMISS_TTL) return;
+  el.classList.remove('warn','error','info');
+  el.classList.add(level || 'warn');
+  document.getElementById('hbIcon').textContent =
+    level === 'error' ? '🔴' : level === 'info' ? 'ℹ️' : '⚠️';
+  document.getElementById('hbMsg').textContent = msg;
+  var actBtn = document.getElementById('hbAction');
+  actBtn.textContent = actionLabel || 'Resolver';
+  el.hidden = false;
+  // #408: o banner e position:fixed top:0; sem reservar espaco, cobre o cabecalho
+  // ("Boa noite, ..."). Empurra o conteudo do frame .phone (box-sizing border-box:
+  // nao aumenta a altura do frame; o topo desce e o resto rola). Desfeito ao fechar.
+  try {
+    var ph = document.querySelector('.phone');
+    if (ph) ph.style.paddingTop = el.offsetHeight + 'px';
+  } catch (_) {}
+}
+function dismissHealthBanner() {
+  var el = document.getElementById('healthBanner');
+  if (el) el.hidden = true;
+  try { var ph = document.querySelector('.phone'); if (ph) ph.style.paddingTop = ''; } catch (_) {}
+  _healthBannerDismissedAt = Date.now();
+}
+function hideHealthBanner() {
+  var el = document.getElementById('healthBanner');
+  if (el) el.hidden = true;
+  try { var ph = document.querySelector('.phone'); if (ph) ph.style.paddingTop = ''; } catch (_) {}
+}
+
+async function runHealthCheck() {
+  try {
+    var saved = (typeof getSavedPrinter === 'function') ? getSavedPrinter() : null;
+    var bs    = window.bluetoothSerial;
+
+    // 1. Tem impressora salva? Checa se ainda da pra usar
+    if (saved && saved.address && bs && bs.list) {
+      // Tenta ver se Bluetooth esta ligado
+      if (bs.isEnabled) {
+        var btEnabled = await new Promise(function (resolve) {
+          var done = false;
+          bs.isEnabled(
+            function () { if (!done) { done = true; resolve(true); } },
+            function () { if (!done) { done = true; resolve(false); } }
+          );
+          // Timeout: se nao responder em 3s, assume desligado
+          setTimeout(function () { if (!done) { done = true; resolve(false); } }, 3000);
+        });
+        if (!btEnabled) {
+          showHealthBanner('warn',
+            'Bluetooth desligado. Ative pra usar a impressora.',
+            'Resolver');
+          return;
+        }
+      }
+      // BT ligado — checa se a impressora salva ainda esta na lista de pareadas
+      var found = await new Promise(function (resolve) {
+        var done = false;
+        bs.list(
+          function (devs) {
+            if (done) return; done = true;
+            var match = (devs || []).some(function (d) {
+              return d && (d.address === saved.address || d.id === saved.address);
+            });
+            resolve(match);
+          },
+          function () { if (!done) { done = true; resolve(true); /* nao bloqueia se list falhou */ } }
+        );
+        setTimeout(function () { if (!done) { done = true; resolve(true); } }, 4000);
+      });
+      if (!found) {
+        showHealthBanner('warn',
+          'Impressora "' + (saved.name || saved.address) + '" não está disponível agora. Religue ela ou re-emparelhe.',
+          'Diagnóstico');
+        return;
+      }
+    }
+
+    // 2. Backup local — quanto tempo desde ultimo?
+    var lastBackup = 0;
+    try {
+      lastBackup = parseInt(localStorage.getItem('cdb-last-local-backup-at') || '0', 10) || 0;
+    } catch (e) {}
+    var hasData = false;
+    try {
+      var pCount = JSON.parse(localStorage.getItem('cdb-products') || '[]').length;
+      var oCount = JSON.parse(localStorage.getItem('cdb-orders')   || '[]').length;
+      hasData = pCount > 0 || oCount > 0;
+    } catch (e) {}
+    if (hasData && lastBackup === 0) {
+      showHealthBanner('info',
+        'Recomendo fazer um backup. Em Ajustes > Backup, toque em "Exportar".',
+        'Backup');
+      return;
+    }
+    var ageDays = lastBackup ? (Date.now() - lastBackup) / (1000 * 60 * 60 * 24) : 999;
+    if (hasData && ageDays > 7) {
+      showHealthBanner('info',
+        'Seu último backup foi há ' + Math.round(ageDays) + ' dias. Vale fazer um novo.',
+        'Backup');
+      return;
+    }
+
+    // Tudo OK: garante banner escondido
+    hideHealthBanner();
+  } catch (e) {
+    console.warn('[healthcheck] falhou:', e);
+  }
+}
+
+// Boot e cada vez que o app vira visivel (vindo de background)
+document.addEventListener('DOMContentLoaded', function () {
+  // Espera 2.5s pra garantir que cdbSync e plugins de BT estao prontos
+  setTimeout(runHealthCheck, 2500);
+  // Auto-share semanal: 4s pra nao competir com health-check + restore
+  setTimeout(maybePromptWeeklyShare, 4000);
+});
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) {
+    setTimeout(runHealthCheck, 600);
+  }
+});
+
+// ============================================================
+// AUTO-SHARE SEMANAL — defesa #3 contra perda total
+// ============================================================
+// Felipe pediu (Semana 2 do roadmap, 03/05/2026): "uma vez por semana
+// pode lembrar de mandar backup pro meu WhatsApp". Estrategia:
+//
+// - Detecta dias desde ultimo SHARE (nao desde ultimo backup local — esse
+//   ja roda automatico). Share = quando o user efetivamente exportou +
+//   compartilhou pra fora do celular.
+// - A cada 7 dias, mostra confirm() amigavel oferecendo abrir o share.
+// - "Pular dessa vez" reseta o timer pra +3 dias (evita spam mas nao
+//   esquece pra sempre).
+// - "Salvar agora" chama exportBackup() (que com fix do v5 abre share
+//   sheet nativo via plugin Capacitor — usuario escolhe Drive/WhatsApp).
+//
+// Chave de timer: cdb-last-share-prompt (ms epoch).
+
+var WEEKLY_SHARE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;  // 7 dias
+var WEEKLY_SHARE_SKIP_PENALTY = 3 * 24 * 60 * 60 * 1000; // pular = volta em 3d
+
+function maybePromptWeeklyShare() {
+  try {
+    if (window.CDB_CONFIG?.isPilot && operationalModalOpen()) return;
+    // So roda em APK Capacitor (browser PWA usa share desktop, menos util)
+    if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.App) return;
+
+    // So oferece se ja tem dados — app virgem nao precisa
+    var hasData = false;
+    try {
+      var oCount = JSON.parse(localStorage.getItem('cdb-orders') || '[]').length;
+      var pCount = JSON.parse(localStorage.getItem('cdb-products') || '[]').length;
+      hasData = oCount > 0 && pCount > 0;
+    } catch (e) {}
+    if (!hasData) return;
+
+    var last = 0;
+    try { last = parseInt(localStorage.getItem('cdb-last-share-prompt') || '0', 10) || 0; } catch (e) {}
+    if (window.CDB_CONFIG?.isPilot && !last) {
+      try { localStorage.setItem('cdb-last-share-prompt', String(Date.now())); } catch (_) {}
+      return;
+    }
+    if (Date.now() - last < WEEKLY_SHARE_INTERVAL_MS) return;
+
+    // Pergunta: oferece abrir share. Mensagem amigavel — Felipe disse que
+    // "feedback positivo importa", entao usa tom encorajador, nao alarmista.
+    var ok = confirm(
+      'Já faz uma semana. Quer mandar uma cópia do backup pro seu WhatsApp '
+      + '(ou Drive/email) agora?\n\n'
+      + 'É só um arquivo JSON pequeno — nada quebra se você só fechar.'
+    );
+    if (ok) {
+      // Marca o prompt como satisfeito (volta em 7 dias)
+      try { localStorage.setItem('cdb-last-share-prompt', String(Date.now())); } catch (e) {}
+      // Dispara exportBackup com pequeno delay pra UI fechar o confirm
+      setTimeout(function () { try { exportBackup(); } catch (e) {} }, 200);
+    } else {
+      // Pulou: penaliza pra volta em 3 dias (em vez de 7)
+      try {
+        var skipUntil = Date.now() - WEEKLY_SHARE_INTERVAL_MS + WEEKLY_SHARE_SKIP_PENALTY;
+        localStorage.setItem('cdb-last-share-prompt', String(skipUntil));
+      } catch (e) {}
+    }
+  } catch (e) {
+    console.warn('[weekly share] falhou:', e);
+  }
+}
+
+// Splash: remove apos UI montar. Mantem visivel ate ter algo concreto pra
+// mostrar (DOMContentLoaded + ~700ms = init do app rodou). Se algo demorar
+// MUITO (ex: 5s), forca remocao mesmo assim pra nao prender o usuario.
+function _cdbHideSplash() {
+  var el = document.getElementById('cdbSplash');
+  if (!el || el.classList.contains('cdb-splash-fade-out')) return;
+  el.classList.add('cdb-splash-fade-out');
+  setTimeout(function () { try { el.parentNode && el.parentNode.removeChild(el); } catch (e) {} }, 500);
+}
+document.addEventListener('DOMContentLoaded', function () {
+  // Tempo minimo de 600ms pra animacao "respirar" + splash nao piscar.
+  setTimeout(_cdbHideSplash, 700);
+});
+// Hard-fallback: se algo bloqueou o boot, sumir o splash em 5s no maximo.
+setTimeout(_cdbHideSplash, 5000);
+
+// Dispara a oferta de restore logo apos o app montar — espera 1.5s pra UI
+// estabilizar e o cdbSync (que carrega Filesystem plugin) ficar pronto.
+document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(maybeOfferLocalRestore, 1500);
+  // Mostra o botao "Restaurar do celular (auto)" em Ajustes apenas se o
+  // plugin custom PublicBackup estiver presente (APK Capacitor moderno).
+  // Em browser ou APK antigo, o botao fica escondido pra nao confundir.
+  setTimeout(function () {
+    try {
+      var btn = document.getElementById('restorePublicBtn');
+      if (btn && window.cdbSync && window.cdbSync.hasPublicBackupPlugin && window.cdbSync.hasPublicBackupPlugin()) {
+        btn.style.display = '';
+      }
+    } catch (e) {}
+  }, 2000);
+});
+
+// Restauracao manual via Ajustes: usa SAF picker pra user selecionar
+// o backup-latest.json em Documentos/casa-da-baba ou Downloads. Usa
+// applyBackupPayload (export manual) ou aplica snapshot direto (auto).
+async function restoreFromPublicStorage() {
+  try {
+    if (!window.cdbSync || typeof window.cdbSync.pickBackupViaSAF !== 'function') {
+      alert('Recurso indisponível nesta versão do app.');
+      return;
+    }
+    var picked = await window.cdbSync.pickBackupViaSAF();
+    if (!picked) {
+      showToast && showToast('Nenhum arquivo selecionado');
+      return;
+    }
+    if (picked.kind === 'export' && typeof applyBackupPayload === 'function') {
+      if (!confirm('Restaurar dados do arquivo "' + (picked.filename || 'backup') + '"?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
+      await applyBackupPayload(picked.payload);
+      try {
+        localStorage.setItem('cdb-restore-source', 'manual-saf-export');
+        localStorage.setItem('cdb-restore-at', String(Date.now()));
+      } catch (e) {}
+      alert('Backup restaurado · recarregando...');
+      setTimeout(function () { location.reload(); }, 600);
+      return;
+    }
+    if (picked.kind === 'snapshot' && picked.payload && picked.payload.data) {
+      if (!confirm('Restaurar a cópia automática de ' + new Date(picked.payload.capturedAt || Date.now()).toLocaleString('pt-BR') + '?\n\nIsso vai SUBSTITUIR os dados atuais.')) return;
+      await applyBackupPayload(picked.payload);
+      try {
+        localStorage.setItem('cdb-restore-source', 'manual-saf-snapshot');
+        localStorage.setItem('cdb-restore-at', String(Date.now()));
+      } catch (e) {}
+      alert('Snapshot restaurado · recarregando...');
+      setTimeout(function () { location.reload(); }, 600);
+      return;
+    }
+    alert('Arquivo não reconhecido como backup do app.');
+  } catch (e) {
+    console.error('[restoreFromPublicStorage]', e);
+    alert('Erro ao restaurar: ' + (e && e.message || e));
+  }
+}
+
+// =========================
+// BACKUP / RESTAURAÇÃO
+// =========================
+// Exporta coleções, preferências permitidas, fila e anexos operacionais.
+// Identidade do aparelho, credenciais e cursores não são transferidos.
+const BACKUP_COLLECTIONS = { products: 'cdb-products', clients: 'cdb-clients', orders: 'cdb-orders', cashEntries: 'cdb-cash', cashClosings: 'cdb-cash-closings', batches: 'cdb-batches' };
+const BACKUP_PREFERENCES = ['cdb-operator-name', 'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-pix-type', 'cdb-printer', 'cdb-printers', 'cdb-impressoras.v2', 'cdb-regra-impressao.v1', 'cdb-theme', 'cdb-onboarding-done'];
+// A restauração não sobrescreve preferência do aparelho. O v2 sem impressora
+// nenhuma conta como ausente: é o que uma versão antiga gravava ao só ler.
+function preferenciaAusente(key) {
+  const atual = localStorage.getItem(key);
+  if (atual === null) return true;
+  if (key !== 'cdb-impressoras.v2') return false;
+  try {
+    const v = JSON.parse(atual);
+    return !v || !v.impressoras || !Object.keys(v.impressoras).length;
+  } catch (e) { return true; }
+}
+const BACKUP_ARCHIVE_KEYS = ['cdb-shopping', 'cdb-audit-log', 'cdb-audit-log-archive'];
+function backupArchiveEntries(entries, legacyStorage = {}) {
+  if (!Array.isArray(entries)) throw new Error('Anexos do backup inválidos.');
+  const result = [], seen = new Set();
+  const append = entry => {
+    if (!entry || !BACKUP_ARCHIVE_KEYS.includes(entry.key) || typeof entry.value !== 'string') throw new Error('Anexo operacional inválido no backup.');
+    const identity = JSON.stringify([entry.key, entry.value]);
+    if (!seen.has(identity)) { seen.add(identity); result.push({ key: entry.key, value: entry.value }); }
+  };
+  entries.forEach(append);
+  BACKUP_ARCHIVE_KEYS.forEach(key => { if (typeof legacyStorage[key] === 'string' && legacyStorage[key] !== '[]') append({ key, value: legacyStorage[key] }); });
+  return result;
+}
+function buildBackupPayload() {
+  const ls = {};
+  BACKUP_PREFERENCES.forEach(k => { const value = localStorage.getItem(k); if (value !== null) ls[k] = value; });
+  const sync = window.cdbSync;
+  const pairing = sync && sync.getPairing ? sync.getPairing() : null;
+  return {
+    version: 3, exportedAt: new Date().toISOString(), appId: 'casa-da-baba',
+    state: { products: products.map(({count, ...rest}) => rest), clients, orders, cashEntries, cashClosings, batches },
+    localStorage: ls,
+    localArchive: backupArchiveEntries(JSON.parse(localStorage.getItem('cdb-import-archives') || '[]'), Object.fromEntries(BACKUP_ARCHIVE_KEYS.map(key => [key, localStorage.getItem(key)]))),
+    sync: { context: pairing && pairing.empresaId && pairing.lojaId ? { empresaId: pairing.empresaId, lojaId: pairing.lojaId } : null,
+      queue: sync && sync.getBackupQueue ? sync.getBackupQueue() : JSON.parse(localStorage.getItem('cdb-sync-queue') || '[]') }
+  };
+}
+
+async function buildTransferBackupPayload() {
+  const sync = window.cdbSync;
+  if (!sync || !sync.localReady) throw new Error('A fila local ainda não está disponível.');
+  await sync.localReady;
+  const payload = buildBackupPayload();
+  const store = window.cdbQueueStore;
+  if (store && store.ready && !store.degraded) {
+    payload.sync.deadletter = await store.getDeadletter();
+    payload.sync.conflicts = await store.getConflicts();
+  }
+  const review = sync.importReview && sync.importReview();
+  payload.sync.queueComplete = !!payload.sync.context && !!store && store.ready && !store.degraded && !(review && (review.invalid || review.requiresReconciliation));
+  if (review) payload.sync.importReview = review;
+  const migrationSource = localStorage.getItem('cdb-import-source');
+  if (review && migrationSource) payload.sync.legacyImportSource = JSON.parse(migrationSource);
+  if (sync.getLegacyHistoryRules) payload.sync.legacyHistoryRules = sync.getLegacyHistoryRules();
+  const photos = window.cdbPhotoStore;
+  if (photos && photos.ready) payload.photos = (await photos.listPending()).concat(await photos.listUploaded());
+  else payload.photos = [];
+  return payload;
+}
+
+function backupComparable(value) {
+  if (Array.isArray(value)) return '[' + value.map(backupComparable).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).filter(k => k !== 'count').sort().map(k => JSON.stringify(k) + ':' + backupComparable(value[k])).join(',') + '}';
+  return JSON.stringify(value);
+}
+
+function prepareBackupImport(input) {
+  let payload = input;
+  if (input && input.schema === 'cdb-backup-v1' && input.data && typeof input.data === 'object') {
+    const state = {};
+    Object.entries(BACKUP_COLLECTIONS).forEach(([name, key]) => { state[name] = JSON.parse(input.data[key] || '[]'); });
+    payload = { appId: 'casa-da-baba', version: 2, exportedAt: input.capturedAtIso, state, localStorage: input.data };
+  }
+  if (!payload || payload.appId !== 'casa-da-baba' || ![1, 2, 3].includes(payload.version) || !payload.state || typeof payload.state !== 'object') throw new Error('Arquivo não reconhecido como backup da Casa da Baba.');
+  const current = { products, clients, orders, cashEntries, cashClosings, batches };
+  const merged = {}, conflicts = [], counts = {};
+  let added = 0, repeated = 0;
+  const incomingKeys = [];
+  function mergeRecords(existing, incoming, name) {
+    if (!Array.isArray(existing) || !Array.isArray(incoming) || incoming.length > 50000) throw new Error('Coleção inválida no backup: ' + name + '.');
+    const result = existing.slice();
+    const byId = new Map();
+    existing.forEach(row => { if (!row || !['string', 'number'].includes(typeof row.id) || !String(row.id).trim()) throw new Error('Registro atual sem identificação: ' + name + '.'); byId.set(String(row.id), row); });
+    incoming.forEach(row => {
+      if (!row || typeof row !== 'object' || Array.isArray(row) || !['string', 'number'].includes(typeof row.id) || !String(row.id).trim()) throw new Error('Registro sem identificação no backup: ' + name + '.');
+      const id = String(row.id), present = byId.get(id);
+      if (name !== 'fila') incomingKeys.push(name + ':' + id);
+      const comparable = item => name === 'fila' ? { type: item.type, payload: item.payload, schemaVersion: item.schemaVersion } : item;
+      if (present) {
+        if (backupComparable(comparable(present)) !== backupComparable(comparable(row))) conflicts.push(name + ': ' + id);
+        else repeated++;
+      } else { const copy = JSON.parse(JSON.stringify(row)); result.push(copy); byId.set(id, copy); added++; }
+    });
+    return result;
+  }
+  Object.keys(BACKUP_COLLECTIONS).forEach(name => {
+    const incoming = payload.state[name] === undefined ? [] : payload.state[name];
+    const before = added;
+    merged[name] = mergeRecords(current[name], incoming, name);
+    counts[name] = added - before;
+  });
+  const ls = payload.localStorage || {};
+  if (typeof ls !== 'object' || Array.isArray(ls)) throw new Error('Preferências do backup inválidas.');
+  const sourceArchive = backupArchiveEntries(payload.localArchive || [], ls);
+  const existingArchive = backupArchiveEntries(JSON.parse(localStorage.getItem('cdb-import-archives') || '[]'));
+  const localArchive = backupArchiveEntries(existingArchive.concat(sourceArchive));
+  const archiveChanged = JSON.stringify(localArchive) !== JSON.stringify(existingArchive);
+  const exportedSync = payload.sync || {};
+  if ((exportedSync.deadletter || []).length || (exportedSync.conflicts || []).length) throw new Error('Este backup tem alterações recusadas ou conflitos de sincronização. A equipe precisa revisá-los no PWA antigo antes da migração.');
+  const preparedOrigin = exportedSync.legacyImportSource && exportedSync.legacyImportSource.preparedRequest;
+  let sourceContext = exportedSync.context || (preparedOrigin && preparedOrigin.expectedEmpresaId && preparedOrigin.expectedLojaId ? { empresaId: preparedOrigin.expectedEmpresaId, lojaId: preparedOrigin.expectedLojaId } : null);
+  if (!sourceContext && ls['cdb-pairing']) {
+    const oldPairing = JSON.parse(ls['cdb-pairing']);
+    if (oldPairing && oldPairing.empresaId && oldPairing.lojaId) sourceContext = { empresaId: oldPairing.empresaId, lojaId: oldPairing.lojaId };
+  }
+  if (sourceContext && (!sourceContext.empresaId || !sourceContext.lojaId)) throw new Error('Empresa ou loja ausente no contexto do backup.');
+  const pairing = window.cdbSync && window.cdbSync.getPairing ? window.cdbSync.getPairing() : null;
+  const previousReview = window.cdbSync && window.cdbSync.importReview ? window.cdbSync.importReview() : null;
+  const bound = pairing || JSON.parse(localStorage.getItem('cdb-pilot-data-context') || 'null') || (previousReview && previousReview.sourceContext);
+  if (sourceContext && bound && (String(sourceContext.empresaId) !== String(bound.empresaId) || String(sourceContext.lojaId) !== String(bound.lojaId))) throw new Error('O backup pertence a outra empresa ou loja. Nenhum dado foi alterado.');
+  const sourceQueue = exportedSync.queue || JSON.parse(ls['cdb-sync-queue'] || '[]');
+  const currentQueue = window.cdbSync && window.cdbSync.getBackupQueue ? window.cdbSync.getBackupQueue() : JSON.parse(localStorage.getItem('cdb-sync-queue') || '[]');
+  if (!Array.isArray(sourceQueue)) throw new Error('Fila do backup inválida.');
+  sourceQueue.forEach(m => { if (!m || typeof m.id !== 'string' || !m.id.trim() || typeof m.type !== 'string' || !m.payload || typeof m.payload !== 'object') throw new Error('Alteração pendente inválida no backup.'); });
+  const queueBefore = added;
+  const queue = mergeRecords(currentQueue, sourceQueue, 'fila');
+  const queueAdded = added - queueBefore;
+  added -= queueAdded;
+  const preferences = {};
+  BACKUP_PREFERENCES.forEach(key => { if (typeof ls[key] === 'string' && preferenciaAusente(key)) preferences[key] = ls[key]; });
+  const photos = payload.photos || [];
+  if (!Array.isArray(photos) || photos.length > 10000) throw new Error('Fotos do backup inválidas.');
+  const photoBytes = new Map();
+  photos.forEach(p => {
+    if (!p || typeof p.hash !== 'string' || typeof p.dataUrl !== 'string' || !/^data:image\/(png|jpeg|webp);base64,/.test(p.dataUrl)) throw new Error('Foto inválida no backup.');
+    if (photoBytes.has(p.hash) && photoBytes.get(p.hash) !== p.dataUrl) throw new Error('Fotos diferentes usam o mesmo código no backup.');
+    photoBytes.set(p.hash, p.dataUrl);
+  });
+  const availablePhotos = new Set(photos.map(p => p.hash));
+  const missingPhotos = new Set();
+  (payload.state.batches || []).forEach(batch => {
+    if (batch.batchPhotoHash && !availablePhotos.has(batch.batchPhotoHash) && !batch.batchPhoto) missingPhotos.add(batch.batchPhotoHash);
+    (batch.items || []).forEach(item => { if (item.photoHash && !availablePhotos.has(item.photoHash) && !item.photo) missingPhotos.add(item.photoHash); });
+  });
+  if (previousReview && previousReview.invalid) throw new Error('A revisão da importação anterior está inválida. Preserve os backups e peça ajuda à equipe.');
+  const complete = !!sourceContext && payload.version >= 3 && exportedSync.queueComplete === true && !(exportedSync.importReview && (exportedSync.importReview.invalid || exportedSync.importReview.requiresReconciliation));
+  const unresolved = new Set((previousReview && previousReview.unreconciledRecords) || []);
+  incomingKeys.forEach(key => { if (!complete) unresolved.add(key); });
+  const requiresReconciliation = !complete || !!preparedOrigin || unresolved.size > 0 || !!(previousReview && previousReview.requiresReconciliation);
+  const reviewUpdated = !!previousReview && (previousReview.requiresReconciliation !== requiresReconciliation || backupComparable(previousReview.unreconciledRecords || []) !== backupComparable(Array.from(unresolved)));
+  return { merged, queue, preferences, photos, sourceArchive, localArchive, archiveChanged, sourceContext: sourceContext || (previousReview && previousReview.sourceContext) || null, conflicts, added, repeated, queueAdded, counts,
+    missingPhotos: missingPhotos.size, exportedAt: payload.exportedAt || null, legacy: payload.version < 3,
+    requiresReconciliation, unreconciledRecords: Array.from(unresolved), reviewUpdated, sourceState: payload.state, sourceQueue, sourceCapsule: exportedSync.legacyImportSource || null, historyRules: exportedSync.legacyHistoryRules || null };
+}
+
+async function backupRawDigest(text) {
+  if (!window.crypto || !window.crypto.subtle) throw new Error('Este navegador não permite validar a restauração com segurança. Atualize o aplicativo antes de importar.');
+  const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function backupDigest(value) { return backupRawDigest(backupComparable(value)); }
+
+function canonicalImportJson(value) {
+  if (Array.isArray(value)) return '[' + value.map(canonicalImportJson).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonicalImportJson(value[key])).join(',') + '}';
+  return JSON.stringify(value);
+}
+
+async function prepareLegacyImportSource(plan) {
+  const review = window.cdbSync.importReview();
+  if (!plan.added && !plan.queueAdded && !plan.archiveChanged && !review && !plan.sourceCapsule) return null;
+  const raw = localStorage.getItem('cdb-import-source');
+  const previous = review && raw ? JSON.parse(raw) : null;
+  if (plan.sourceCapsule) {
+    const source = JSON.parse(JSON.stringify(plan.sourceCapsule));
+    if (source.schema !== 1 || typeof source.importId !== 'string' || typeof source.snapshotJson !== 'string' || !Array.isArray(source.originMutationIds)
+      || source.originMutationIds.some(id => typeof id !== 'string' || !id) || await backupRawDigest(source.snapshotJson) !== source.snapshotSha256) throw new Error('A captura de migração do backup está inválida. Preserve o arquivo original.');
+    const captured = JSON.parse(source.snapshotJson);
+    if (Object.keys(BACKUP_COLLECTIONS).some(name => !Array.isArray(captured[name]))) throw new Error('A captura não contém todas as coleções do histórico.');
+    source.counts = Object.fromEntries(Object.keys(BACKUP_COLLECTIONS).map(name => [name, captured[name].length]));
+    source.archivedStorageKeys = Array.from(new Set(backupArchiveEntries(captured.localArchive || []).map(entry => entry.key)));
+    if (previous && (previous.importId !== source.importId || previous.snapshotSha256 !== source.snapshotSha256)) throw new Error('Este aparelho já tem outra captura de migração. Preserve os arquivos e peça revisão à equipe.');
+    const request = source.preparedRequest;
+    if (request && (request.importId !== source.importId || request.snapshotJson !== source.snapshotJson || request.snapshotSha256 !== source.snapshotSha256
+      || request.sourceNeverSynced !== true || JSON.stringify(request.originMutationIds) !== JSON.stringify(source.originMutationIds)
+      || !request.expectedEmpresaId || !request.expectedLojaId)) throw new Error('A solicitação guardada no backup difere da captura original.');
+    if (request && plan.sourceContext && (String(request.expectedEmpresaId) !== String(plan.sourceContext.empresaId) || String(request.expectedLojaId) !== String(plan.sourceContext.lojaId))) throw new Error('A solicitação guardada pertence a outra empresa ou loja.');
+    return { source, changed: !previous || JSON.stringify(previous) !== JSON.stringify(source) };
+  }
+  if (previous && previous.preparedRequest) throw new Error('A migração já foi preparada para o EasyStok. Retome essa mesma migração antes de importar outro arquivo.');
+  if (previous && (!previous.importId || typeof previous.snapshotJson !== 'string' || await backupRawDigest(previous.snapshotJson) !== previous.snapshotSha256)) throw new Error('A captura anterior está inválida. Preserve os arquivos e peça revisão à equipe.');
+  const state = previous ? JSON.parse(previous.snapshotJson) : {};
+  Object.keys(BACKUP_COLLECTIONS).forEach(name => {
+    const byId = new Map((state[name] || []).map(row => [String(row.id), row]));
+    (plan.sourceState[name] || []).forEach(row => {
+      const copy = JSON.parse(JSON.stringify(row)); if (name === 'products') delete copy.count;
+      const existing = byId.get(String(copy.id));
+      if (existing && canonicalImportJson(existing) !== canonicalImportJson(copy)) throw new Error('Um registro difere da captura original da migração. A equipe precisa conferir antes de prosseguir.');
+      byId.set(String(copy.id), copy);
+    });
+    state[name] = Array.from(byId.values());
+  });
+  if (plan.photos.length) {
+    const photos = new Map((state.photos || []).map(photo => [photo.hash, photo]));
+    plan.photos.forEach(photo => { const previousPhoto = photos.get(photo.hash); if (previousPhoto && previousPhoto.dataUrl !== photo.dataUrl) throw new Error('Uma foto difere da captura original da migração.'); if (!previousPhoto) photos.set(photo.hash, photo); });
+    state.photos = Array.from(photos.values());
+  }
+  if (plan.sourceArchive.length) state.localArchive = backupArchiveEntries((state.localArchive || []).concat(plan.sourceArchive));
+  const snapshotJson = canonicalImportJson(state);
+  const originMutationIds = Array.from(new Set((previous ? previous.originMutationIds : []).concat(plan.sourceQueue.map(m => m.id))));
+  const source = { schema: 1, importId: previous ? previous.importId : window.crypto.randomUUID(), snapshotJson,
+    snapshotSha256: await backupRawDigest(snapshotJson), originMutationIds, archivedStorageKeys: Array.from(new Set((state.localArchive || []).map(entry => entry.key))), historyRules: plan.historyRules || (previous && previous.historyRules) || window.cdbSync.getLegacyHistoryRules(),
+    counts: Object.fromEntries(Object.keys(BACKUP_COLLECTIONS).map(name => [name, state[name].length])) };
+  return { source, changed: !previous || source.snapshotSha256 !== previous.snapshotSha256 || JSON.stringify(originMutationIds) !== JSON.stringify(previous.originMutationIds) };
+}
+
+async function backupCheckpoint(payload, persistedState) {
+  const stored = persistedState || Object.fromEntries(Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [name, JSON.parse(localStorage.getItem(key) || '[]')]));
+  return backupDigest({ state: payload.state, persistedState: stored, preferences: payload.localStorage, localArchive: payload.localArchive, queue: payload.sync.queue, context: payload.sync.context });
+}
+
+function writeBackupImportEntries(entries) {
+  const previous = new Map(entries.map(([key]) => [key, localStorage.getItem(key)])), written = [];
+  try { entries.forEach(([key, value]) => { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); written.push(key); }); }
+  catch (error) { written.reverse().forEach(key => { const value = previous.get(key); if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); }); throw error; }
+}
+
+async function getBackupImportUndoState() {
+  const review = window.cdbSync && window.cdbSync.importReview();
+  if (!review) return { available: false, reason: 'Não há importação em revisão.' };
+  try {
+    const saved = JSON.parse(localStorage.getItem('cdb-before-import-backup') || 'null');
+    if (review.migrationStartedAt) return { available: false, reason: 'A migração já foi iniciada e pode ter sido gravada no EasyStok. Retome a conferência antes de desfazer; os dados locais estão preservados.' };
+    if (review.undoBlocked) return { available: false, reason: 'Houve trabalho após o início desta importação. Exporte os dados atuais e peça revisão à equipe; nada será apagado.' };
+    if (!saved || !saved.rollback || !review.undoCheckpoint || !review.undoBackupHash) return { available: false, reason: 'A cópia necessária para desfazer não está disponível. Preserve os dados e peça revisão à equipe.' };
+    if (await backupDigest(saved) !== review.undoBackupHash) return { available: false, reason: 'A cópia anterior foi alterada. Preserve os dados e peça revisão à equipe; nada será apagado.' };
+    if (await backupCheckpoint(buildBackupPayload()) !== review.undoCheckpoint) return { available: false, reason: 'Há alterações ou conexão diferente após a importação. Exporte os dados atuais e peça revisão à equipe; nada será apagado.' };
+    return { available: true, reason: '' };
+  } catch (_) { return { available: false, reason: 'Não foi possível conferir a cópia anterior. Preserve os dados e peça revisão à equipe.' }; }
+}
+
+async function undoBackupImport() {
+  const sync = window.cdbSync;
+  await sync.beginBackupImport();
+  try {
+    const status = await getBackupImportUndoState();
+    if (!status.available) throw new Error(status.reason);
+    const saved = JSON.parse(localStorage.getItem('cdb-before-import-backup'));
+    if (!saved.state || !saved.sync || !Array.isArray(saved.sync.queue) || Object.keys(BACKUP_COLLECTIONS).some(key => !Array.isArray(saved.state[key]))) throw new Error('A cópia anterior está inválida. Nenhum dado foi alterado.');
+    const entries = Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [key, JSON.stringify(saved.state[name])]);
+    BACKUP_PREFERENCES.forEach(key => entries.push([key, saved.rollback.preferences[key] === undefined ? null : saved.rollback.preferences[key]]));
+    entries.push(['cdb-sync-queue', JSON.stringify(saved.sync.queue)], ['cdb-import-review', saved.rollback.review || null], ['cdb-import-source', saved.rollback.source || null], ['cdb-import-archives', saved.rollback.archives || null]);
+    writeBackupImportEntries(entries);
+    products = saved.state.products.map(p => ({ ...p, count: 0 })); clients = saved.state.clients; orders = saved.state.orders;
+    cashEntries = saved.state.cashEntries; cashClosings = saved.state.cashClosings; batches = saved.state.batches;
+    sync.finishBackupImport(saved.sync.queue, { products, clients, orders, cashEntries, batches });
+    return { restored: true };
+  } finally { sync.endBackupImport(); }
+}
+
+async function applyBackupPayload(payload, askConfirmation = false) {
+  const sync = window.cdbSync;
+  if (!sync || !sync.beginBackupImport || !sync.finishBackupImport) throw new Error('Sincronização ainda está iniciando. Aguarde e tente novamente.');
+  await sync.beginBackupImport();
+  try {
+    const plan = prepareBackupImport(payload);
+    if (plan.conflicts.length) throw new Error('Importação bloqueada: ' + plan.conflicts.length + ' registros têm o mesmo código e dados diferentes. A equipe precisa revisar. Exemplos: ' + plan.conflicts.slice(0, 3).join(', ') + '. Nenhum registro foi substituído.');
+    const captured = await prepareLegacyImportSource(plan);
+    const newPhotos = [];
+    if (plan.photos.length) {
+      const store = window.cdbPhotoStore;
+      if (!store || !store.ready) throw new Error('Armazenamento de fotos indisponível. Nenhum registro foi importado.');
+      for (const photo of plan.photos) {
+        const existing = await store.get(photo.hash);
+        if (existing && existing.dataUrl !== photo.dataUrl) throw new Error('Uma foto conflita com a já guardada neste aparelho.');
+        if (!existing) newPhotos.push(photo);
+      }
+    }
+    if (!plan.added && !plan.queueAdded && !newPhotos.length && !plan.reviewUpdated && !plan.archiveChanged && !(captured && captured.changed)) return { added: 0, repeated: plan.repeated, queueAdded: 0 };
+    const undoAllowed = !sync.importReview() || (await getBackupImportUndoState()).available;
+    // Uma cópia recuperável é exigida antes da confirmação e de qualquer troca.
+    if (!sync.importReview() || !localStorage.getItem('cdb-before-import-backup')) {
+      const original = buildBackupPayload();
+      original.rollback = { preferences: Object.fromEntries(BACKUP_PREFERENCES.map(key => [key, localStorage.getItem(key)])), review: localStorage.getItem('cdb-import-review'), source: localStorage.getItem('cdb-import-source'), archives: localStorage.getItem('cdb-import-archives') };
+      const safety = JSON.stringify(original);
+      localStorage.setItem('cdb-before-import-backup', safety);
+      if (localStorage.getItem('cdb-before-import-backup') !== safety) throw new Error('Não foi possível guardar a cópia de segurança.');
+    }
+    const expected = buildBackupPayload();
+    expected.state = plan.merged; expected.sync.queue = plan.queue;
+    expected.localArchive = backupArchiveEntries(plan.localArchive, Object.fromEntries(BACKUP_ARCHIVE_KEYS.map(key => [key, localStorage.getItem(key)])));
+    Object.assign(expected.localStorage, plan.preferences);
+    const undoCheckpoint = undoAllowed ? await backupCheckpoint(expected, plan.merged) : null;
+    const undoBackupHash = undoAllowed ? await backupDigest(JSON.parse(localStorage.getItem('cdb-before-import-backup'))) : null;
+    const warning = (plan.requiresReconciliation ? '\nEste arquivo não comprova a fila completa. Os registros serão preservados offline, mas o envio ficará bloqueado até a equipe conferir a origem e concluir a migração inicial segura para o EasyStok.' : '') + (plan.missingPhotos ? '\n' + plan.missingPhotos + ' fotos não estão neste arquivo. Preserve o PWA antigo.' : '') + (plan.sourceArchive.length ? '\nCompras e auditoria antigas serão preservadas como anexos no backup; não alteram as listas atuais deste app.' : '');
+    if (askConfirmation && !confirm('Importar ' + plan.added + ' registros e ' + plan.queueAdded + ' alterações pendentes?\n' + plan.repeated + ' registros repetidos serão ignorados.\nOs dados atuais serão mantidos. Uma cópia de segurança local já foi guardada.' + warning + '\n\nA sincronização ficará pausada para revisar esta importação.')) return null;
+    for (const photo of newPhotos) await window.cdbPhotoStore.save(photo.hash, photo.dataUrl, photo.batchId || '', photo.field || '');
+    const entries = Object.entries(BACKUP_COLLECTIONS).map(([name, key]) => [key, JSON.stringify(plan.merged[name])]);
+    Object.entries(plan.preferences).forEach(entry => entries.push(entry));
+    entries.push(['cdb-sync-queue', JSON.stringify(plan.queue)], ['cdb-import-archives', JSON.stringify(plan.localArchive)]);
+    if (captured) entries.push(['cdb-import-source', JSON.stringify(captured.source)]);
+    entries.push(['cdb-import-review', JSON.stringify({ sourceContext: plan.sourceContext, importedAt: Date.now(), importedRecords: plan.added, missingPhotos: plan.missingPhotos, legacy: plan.legacy, requiresReconciliation: plan.requiresReconciliation, unreconciledRecords: plan.unreconciledRecords, undoCheckpoint, undoBackupHash, undoBlocked: !undoAllowed || !!(captured && captured.source.preparedRequest), migrationStartedAt: captured && captured.source.preparedRequest ? Date.now() : undefined })]);
+    writeBackupImportEntries(entries);
+    products = plan.merged.products.map(p => ({ ...p, count: 0 })); clients = plan.merged.clients; orders = plan.merged.orders;
+    cashEntries = plan.merged.cashEntries; cashClosings = plan.merged.cashClosings; batches = plan.merged.batches;
+    sync.finishBackupImport(plan.queue, { products, clients, orders, cashEntries, batches });
+    return { added: plan.added, repeated: plan.repeated, queueAdded: plan.queueAdded, missingPhotos: plan.missingPhotos, updated: true, requiresReconciliation: plan.requiresReconciliation };
+  } finally { sync.endBackupImport(); }
+}
+
+async function exportBackup() {
+  try {
+    const payload = await buildTransferBackupPayload();
+    const json = JSON.stringify(payload, null, 2);
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    const filename = `casa-da-baba-backup-${stamp}.json`;
+    // Audit log: backup exportado (registra antes do share — se cancelar
+    // ainda assim conta como tentativa)
+    logAction({
+      action: 'backup.export',
+      entityType: 'backup',
+      summary: 'Backup exportado · ' + filename
+    });
+    try {
+      localStorage.setItem('cdb-last-backup-at', String(Date.now()));
+      localStorage.setItem('cdb-last-backup-prompt', String(Date.now()));
+      if (typeof renderTrustBadges === 'function') renderTrustBadges();
+      if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
+    } catch (e) {}
+
+    // CAMINHO 1 (PRIORITARIO): plugin nativo Capacitor — escreve o arquivo
+    // via Filesystem em Cache e abre o share sheet apontando pra URI nativa.
+    // No WebView Capacitor, navigator.share({files}) e <a download> NAO
+    // funcionam confiavelmente (Web Share retorna canShare:true mas falha
+    // silenciosamente; <a download> ignora o atributo). Plugin nativo SEMPRE
+    // funciona porque vai pelo intent ACTION_SEND nativo do Android.
+    const blob = new Blob([json], { type: 'application/json' });
+    (async function () {
+      try {
+        const Cap = window.Capacitor;
+        const FS    = Cap && Cap.Plugins && Cap.Plugins.Filesystem;
+        const Share = Cap && Cap.Plugins && Cap.Plugins.Share;
+        if (FS && Share) {
+          // Documents = sobrevive (mesmo quando o app fecha) e fica visivel
+          // pelo Files do Android; cliente pode abrir, copiar pra Drive, etc.
+          // Se o operador apenas quer compartilhar, o Share.share faz isso.
+          const writeRes = await FS.writeFile({
+            path: filename,
+            data: json,
+            directory: 'DOCUMENTS',
+            encoding: 'utf8',
+            recursive: true
+          });
+          showToast('Backup salvo · abrindo compartilhar...');
+          try {
+            await Share.share({
+              title: 'Backup Casa da Baba',
+              text: filename,
+              url: writeRes.uri,
+              dialogTitle: 'Onde quer enviar o backup?'
+            });
+          } catch (shareErr) {
+            // Cliente pode ter cancelado — arquivo ja esta salvo em Documents,
+            // entao mostra toast informativo com o caminho exato.
+            showToast('Backup salvo em Documentos: ' + filename);
+          }
+          return;
+        }
+      } catch (eNative) {
+        console.warn('[backup] caminho nativo falhou:', eNative);
+      }
+
+      // CAMINHO 2 (fallback browser): Web Share API. Funciona em PWA real
+      // (Chrome desktop/mobile) mas e instavel em WebView Capacitor.
+      try {
+        if (navigator.canShare && typeof File !== 'undefined') {
+          const file = new File([blob], filename, { type: 'application/json' });
+          if (navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({ files: [file], title: filename });
+              showToast('Backup exportado');
+              return;
+            } catch (e) { /* cai pro fallback */ }
+          }
+        }
+      } catch (eShare) {}
+
+      // CAMINHO 3 (sempre funciona — overlay de copy/paste): mostra textarea
+      // fullscreen com o JSON. Cliente segura e cola onde quiser. Garantia
+      // de ultimo recurso — funciona em qualquer WebView, sem permissao,
+      // sem plugin. Lentamente, mas funciona SEMPRE.
+      showBackupTextForCopy(json, filename);
+    })();
+  } catch (e) {
+    console.error('Backup falhou:', e);
+    showToast('Erro ao gerar backup');
+  }
+}
+
+function fallbackBackupDownload(blob, filename, json) {
+  // Sem Web Share API: tenta <a download>; se ainda assim falhar (alguns
+  // WebViews ignoram), abre tela cheia com JSON pra copy/paste manual.
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Backup baixado');
+  } catch (e) {
+    showBackupTextForCopy(json, filename);
+  }
+}
+
+function showBackupTextForCopy(json, filename) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;padding:12px';
+  overlay.innerHTML = `
+    <div style="color:#fff;font-size:13px;font-weight:700;margin-bottom:8px;text-align:center">
+      Selecione todo o texto e copie para um lugar seguro<br/>(Drive, e-mail, anotações)
+    </div>
+    <div style="color:#aaa;font-size:var(--fs-micro);margin-bottom:8px;text-align:center">${escapeHtml(filename)}</div>
+    <textarea readonly style="flex:1;width:100%;font-family:monospace;font-size:var(--fs-micro);background:#111;color:#0f0;border:1px solid #333;padding:8px;border-radius:4px"></textarea>
+    <button id="closeBackupTxt" style="margin-top:10px;padding:12px;background:#d4af37;color:#000;border:0;border-radius:8px;font-weight:700">Fechar</button>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('textarea').value = json;
+  overlay.querySelector('#closeBackupTxt').onclick = () => overlay.remove();
+}
+
+function importBackup(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  if (file.size > 25 * 1024 * 1024) { showToast('Backup maior que 25 MB. Peça ajuda à equipe para migrar com segurança.'); return; }
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const result = await applyBackupPayload(JSON.parse(String(e.target.result || '')), true);
+      if (!result) return;
+      showToast(result.updated ? (result.requiresReconciliation ? 'Dados preservados. A fila precisa ser conferida no PWA de origem.' : 'Dados importados. Confira a loja antes de sincronizar.') : 'Este backup já está no aparelho. Nenhum registro foi duplicado.');
+      if (result.updated) setTimeout(() => location.reload(), 800);
+    } catch (error) { console.error('Import falhou:', error); alert(error.message || 'Não foi possível importar. Os dados atuais foram mantidos.'); }
+  };
+  reader.onerror = () => showToast('Não foi possível ler o arquivo de backup.');
+  reader.readAsText(file);
+}
+
+// =========================
+// NAVEGAÇÃO
+// =========================
+// FAB — acao principal por tela. Mapeia screen -> { icon, label, fn }.
+// Telas sem entrada (producao, finalizados, historico) escondem o FAB.
+const FAB_CONFIG = {
+  home:        { icon: '+',  label: 'Pedido',     fn: function () { go('pedidos'); setTimeout(function () { try { goPedidosTab('novo'); } catch (e) {} }, 50); } },
+  caixa:       { icon: '+',  label: 'Lançamento', fn: function () { try { openCashModal(); } catch (e) {} } },
+  compras:     { icon: '+',  label: 'Item',       fn: function () { try { document.getElementById('shopInput').focus(); } catch (e) {} } },
+  clientes:    { icon: '+',  label: 'Cliente',    fn: function () { try { openClientModal(); } catch (e) {} } },
+  conferencia: { icon: '📷', label: 'Escanear',   fn: function () { try { openScanner('tela'); } catch (e) {} } }
+  // pedidos: tratado dinamicamente abaixo (so mostra FAB na aba Andamento)
+};
+let _currentFabAction = null;
+function updateFab(screen) {
+  const fab = document.getElementById('fab');
+  if (!fab) return;
+  if (screen === 'pedidos' && window.CDB_CONFIG?.isPilot) {
+    fab.classList.remove('show'); _currentFabAction = null; return;
+  }
+  let cfg = FAB_CONFIG[screen] || null;
+  // Caso especial: na tela Pedidos, FAB so aparece na aba Andamento
+  // (na aba Novo o operador ja esta no formulario).
+  if (screen === 'pedidos') {
+    const novoActive = document.querySelector('[data-screen="pedidos"] .pedidos-tab-section[data-tab="novo"]');
+    const isNovoVisible = novoActive && novoActive.style.display !== 'none';
+    cfg = isNovoVisible ? null : { icon: '+', label: 'Pedido', fn: function () { try { goPedidosTab('novo'); } catch (e) {} } };
+  }
+  if (!cfg) { fab.classList.remove('show'); _currentFabAction = null; return; }
+  document.getElementById('fabIcon').textContent = cfg.icon;
+  document.getElementById('fabLabel').textContent = cfg.label;
+  _currentFabAction = cfg.fn;
+  fab.classList.add('show');
+}
+function onFabClick() { if (typeof _currentFabAction === 'function') _currentFabAction(); }
+
+function closeMoreMenu() {
+  const menu = document.getElementById('moreMenu');
+  menu?.classList.remove('show');
+  menu?.setAttribute('aria-hidden', 'true');
+  document.querySelector('.nav-btn[data-nav="more"]')?.classList.remove('active');
+  // #434 — esconde o backdrop junto com o menu.
+  const bd = document.getElementById('moreMenuBackdrop');
+  if (bd) bd.style.display = 'none';
+  if (typeof updateNavA11y === 'function') updateNavA11y();
+}
+
+function toggleMoreMenu() {
+  const menu = document.getElementById('moreMenu');
+  if (!menu) return;
+  if (typeof applyUxDensity === 'function') applyUxDensity();
+  const willOpen = !menu.classList.contains('show');
+  menu.classList.toggle('show', willOpen);
+  menu.setAttribute('aria-hidden', willOpen ? 'false' : 'true');
+  // #434 — mostra/esconde o backdrop junto com o menu.
+  const bd = document.getElementById('moreMenuBackdrop');
+  if (bd) bd.style.display = willOpen ? 'block' : 'none';
+  document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
+  document.querySelector('.nav-btn[data-nav="more"]')?.classList.toggle('active', willOpen);
+  if (typeof updateNavA11y === 'function') updateNavA11y();
+}
+
+document.addEventListener('click', function (ev) {
+  const menu = document.getElementById('moreMenu');
+  if (!menu || !menu.classList.contains('show')) return;
+  if (menu.contains(ev.target) || ev.target.closest('.nav-btn[data-nav="more"]')) return;
+  closeMoreMenu();
+});
+document.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Escape') return;
+  // Esc fecha o overlay topmost: o scanner (fullscreen, camera ligada) tem
+  // prioridade e libera a camera no closeScanner; senao fecha o more-menu. (issue 611)
+  if (scannerActive) { closeScanner(); return; }
+  closeMoreMenu();
+});
+
+let currentScreen = 'home';
+let screenHistory = ['home'];
+function syncScreenHistory(nextScreen) {
+  const prev = screenHistory[screenHistory.length - 1];
+  if (prev !== nextScreen) screenHistory.push(nextScreen);
+  if (screenHistory.length > 20) screenHistory.shift();
+  currentScreen = nextScreen;
+}
+function goBack() {
+  if (screenHistory.length > 1) screenHistory.pop();
+  const target = screenHistory[screenHistory.length - 1] || 'home';
+  go(target, { preserveHistory: true });
+}
+function go(screen, opts) {
+  opts = opts || {};
+  closeMoreMenu();
+  if (!opts.preserveHistory) syncScreenHistory(screen);
+  currentScreen = screen;
+  document.querySelectorAll('.screen').forEach(s => {
+    const active = s.dataset.screen === screen;
+    s.classList.toggle('active', active);
+    s.setAttribute('aria-hidden', active ? 'false' : 'true');
+  });
+  const moreScreens = ['historico', 'estoque', 'clientes', 'compras', 'caixa', 'finalizados', 'suporte'];
+  document.querySelectorAll('.nav-btn').forEach(n => {
+    const nav = n.dataset.nav;
+    n.classList.toggle('active', nav === screen || (nav === 'more' && moreScreens.includes(screen)));
+  });
+  if (typeof updateNavA11y === 'function') updateNavA11y();
+  document.getElementById('content').scrollTop = 0;
+  if (screen === 'home')         renderHome();
+  if (screen === 'pedidos') {
+    renderOrdersFeed();
+    // Default inteligente: se tem pedido em construcao, abre "Novo";
+    // senao "Andamento" (operador chega vendo o que ta rolando).
+    const hasDraft = (currentOrderItems && currentOrderItems.length > 0);
+    goPedidosTab(hasDraft ? 'novo' : 'andamento');
+  }
+  if (screen === 'historico')    renderHistoricoScreen();
+  if (screen === 'estoque')      renderStockScreen();
+  if (screen === 'clientes')     renderClientesScreen();
+  if (screen === 'suporte')      renderSupportScreen();
+  if (screen === 'compras')      renderShoppingList();
+  if (screen === 'producao')     goProducaoTab(producaoTab || 'catalogo');
+  if (screen === 'conferencia')  renderConferenciaScreen();
+  if (screen === 'finalizados')  renderFinalizadosScreen();
+  if (screen === 'caixa')        renderCashDetails();
+  if (typeof updateFab === 'function') updateFab(screen);
+}
+
+function updateNavA11y() {
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    const isActive = btn.classList.contains('active');
+    if (isActive) btn.setAttribute('aria-current', 'page');
+    else btn.removeAttribute('aria-current');
+    btn.setAttribute('aria-pressed', String(isActive));
+  });
+}
+
+// Tabs da tela Pedidos: alterna entre "novo" (form) e "andamento" (kanban)
+function goPedidosTab(tab) {
+  if (window.CDB_CONFIG?.isPilot) {
+    const header = document.querySelector('.pilot-orders-header');
+    if (header) {
+      header.dataset.view = tab;
+      const title = header.querySelector('h2');
+      if (title) title.textContent = tab === 'novo' ? 'Novo pedido' : 'Pedidos';
+    }
+  }
+  document.querySelectorAll('#content [data-screen="pedidos"] .screen-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('#content [data-screen="pedidos"] .pedidos-tab-section').forEach(s =>
+    s.style.display = s.dataset.tab === tab ? '' : 'none');
+  if (tab === 'novo') renderOrderDraftSummary();
+  // Atualiza FAB pra refletir aba ativa (esconde em "novo")
+  if (typeof updateFab === 'function') updateFab('pedidos');
+}
+// Atualiza badge "Andamento ●N" sempre que kanban re-renderizar
+function updatePedidosTabBadge() {
+  const el = document.getElementById('pedidosTabBadge');
+  if (!el) return;
+  const n = openOrders().length;
+  el.textContent = String(n);
+  el.style.display = n > 0 ? '' : 'none';
+}
+
+// =========================
+// SYNC
+// =========================
+async function syncNow() {
+  if (navigator.onLine === false) {
+    updateSync();
+    showToast('Sem internet. As alterações continuam neste aparelho. O envio depende de conexão e vínculo válido com o EasyStok.');
+    return 'offline';
+  }
+  const sync = window.cdbSync;
+  if (!sync || typeof sync.flush !== 'function') {
+    showToast('Sincronização indisponível. As alterações continuam neste aparelho.');
+    return 'unavailable';
+  }
+  try {
+    const result = await sync.flush();
+    updateSync();
+    const messages = {
+      auth: 'Vincule ou reconecte este aparelho ao EasyStok para enviar as alterações.',
+      review: 'Envio pausado. Confira a origem dos dados importados antes de sincronizar.',
+      empty: 'Nenhuma alteração na fila de envio deste aparelho.',
+      offline: 'Sem internet. As alterações continuam neste aparelho.',
+      retry: 'O envio não foi confirmado. As alterações continuam neste aparelho para nova tentativa.'
+    };
+    // HTTP 200 pode conter recusas. Só cdb-sync-success confirma os IDs aceitos.
+    if (messages[result]) showToast(messages[result]);
+    else if (result !== 'ok') showToast('O envio não foi confirmado. Confira a fila de envio.');
+    return result;
+  } catch (_) {
+    updateSync();
+    showToast('O envio não foi confirmado. As alterações continuam neste aparelho para nova tentativa.');
+    return 'retry';
+  }
+}
+function updateSync() {
+  const chip = document.getElementById('syncChip');
+  const txt = document.getElementById('syncText');
+  const banner = document.getElementById('offlineBanner');
+  const bannerCount = document.getElementById('offlineBannerCount');
+  const offline = navigator.onLine === false;
+  if (chip) chip.classList.toggle('offline', offline);
+  // F4 — banner offline visivel quando sem rede; some sozinho ao voltar.
+  if (banner) {
+    banner.classList.toggle('show', offline);
+    if (bannerCount) {
+      if (offline && pendingSync > 0) {
+        bannerCount.textContent = pendingSync + (pendingSync === 1 ? ' na fila' : ' na fila');
+        bannerCount.hidden = false;
+      } else {
+        bannerCount.hidden = true;
+      }
+    }
+  }
+  if (window.CDB_CONFIG?.isPilot && (!window.cdbSync?.getPairing?.() || window.cdbSync?.isPairingInvalid?.())) {
+    chip.classList.add('pending');
+    txt.textContent = 'Neste aparelho · não conectado';
+    if (typeof renderTrustBadges === 'function') renderTrustBadges();
+    if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
+    return;
+  }
+  if (offline) {
+    chip.classList.add('pending');
+    txt.textContent = pendingSync > 0
+      ? pendingSync + (pendingSync === 1 ? ' pendente offline' : ' pendentes offline')
+      : 'Offline';
+    if (typeof renderTrustBadges === 'function') renderTrustBadges();
+    if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
+    return;
+  }
+  if (pendingSync > 0) {
+    chip.classList.add('pending');
+    txt.textContent = pendingSync + (pendingSync === 1 ? ' item pra sincronizar' : ' itens pra sincronizar');
+  } else {
+    chip.classList.remove('pending');
+    txt.textContent = 'Nenhuma alteração na fila de envio';
+  }
+  if (typeof renderTrustBadges === 'function') renderTrustBadges();
+  if (typeof renderPremiumOpsPanel === 'function') renderPremiumOpsPanel();
+}
+window.addEventListener('online', updateSync);
+window.addEventListener('offline', updateSync);
+
+// F4 — feedback visual proativo de sync. sync.js dispara cdb-sync-success
+// com {count} sempre que mutações foram aceitas pelo servidor.
+// Felipe não via NADA quando o app sincronizava — agora vê toast claro.
+window.addEventListener('cdb-sync-success', function (ev) {
+  const n = (ev.detail && ev.detail.count) || 0;
+  if (n <= 0) return;
+  pendingSync = Math.max(0, pendingSync - n);
+  updateSync();
+  showToast('✓ ' + n + (n === 1 ? ' item sincronizado' : ' itens sincronizados'));
+});
+
+// =========================
+// UTILS
+// =========================
+function money(v) {
+  // #405: separador de milhar (faltava: money(1000) dava "R$ 1000,00" em vez de
+  // "R$ 1.000,00"). Manual de proposito: Intl pt-BR poe NBSP entre R$ e o numero
+  // e quebra impressao termica (ESC/POS, DANFE 80mm). Nao-finito fica gritante.
+  var n = Math.round(v * 100) / 100;
+  if (!isFinite(n)) return 'R$ ' + n;
+  var abs = Math.abs(n).toFixed(2);
+  var dot = abs.indexOf('.');
+  var intSep = abs.slice(0, dot).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return 'R$ ' + (n < 0 ? '-' : '') + intSep + ',' + abs.slice(dot + 1);
+}
+// #2735: contagem de itens em português. O sufixo montado à mão dava "2 items" e "2 itemns".
+function contaItens(n) {
+  const qtd = Number(n) || 0;
+  return qtd + (qtd === 1 ? ' item' : ' itens');
+}
+// #2735: total do pedido em construção, arredondado ao centavo. A soma crua gravava
+// 3 x 19,90 como 59,699999999999996 e esse valor seguia para a sincronização.
+function orderItemsTotal(items) {
+  const soma = (items || []).reduce((s, i) => s + (Number(i && i.qty) || 0) * (Number(i && i.unitPrice) || 0), 0);
+  return Math.round(soma * 100) / 100;
+}
+function haptic() { if (navigator.vibrate) navigator.vibrate(8); }
+// #409: rotulos do canal/origem do pedido.
+// 'whatsapp' fica só para ler pedido antigo: o seletor passou a separar loja e pessoal (#409).
+const CHANNEL_LABELS = { balcao: 'Balcão', whatsapp: 'WhatsApp', 'whatsapp-loja': 'WhatsApp da loja', 'whatsapp-pessoal': 'WhatsApp pessoal', ifood: 'iFood', telefone: 'Telefone' };
+function channelLabel(c) { return CHANNEL_LABELS[c] || c || ''; }
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function jsString(str) {
+  return escapeHtml(JSON.stringify(String(str == null ? '' : str)));
+}
+// Normaliza telefone BR pra E.164 sem '+', ou retorna null se invalido.
+// Aceita 11 digitos (DDD+9+8) ou 13 digitos (55+DDD+9+8). Rejeita fixo
+// antigo (10 dig), 12 dig (55+fixo) e qualquer outro tamanho.
+function normalizePhoneBr(input) {
+  if (!input) return null;
+  const d = String(input).replace(/\D/g, '');
+  if (d.length === 11) return '55' + d;
+  if (d.length === 13 && d.startsWith('55')) return d;
+  return null;
+}
+// Formata pra "(11) 99999-8888" pra exibicao. Fallback: devolve original.
+function formatPhoneBr(input) {
+  const d = normalizePhoneBr(input);
+  if (!d) return String(input || '');
+  const ddd = d.slice(2, 4);
+  const n   = d.slice(4);
+  return n.length === 9
+    ? `(${ddd}) ${n.slice(0, 5)}-${n.slice(5)}`
+    : `(${ddd}) ${n.slice(0, 4)}-${n.slice(4)}`;
+}
+function timeOf(ts) {
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function isToday(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+// F5 — Badge "📅 ter 14:00" pra pedidos agendados. Vermelho/atrasado se a data
+// agendada já passou e o pedido continua aberto. Usa Intl pra formato pt-BR
+// curto (3 letras do dia da semana minusculas).
+function renderScheduledBadge(ms) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  const isLate = ms < Date.now();
+  const today = isToday(ms);
+  // Formato: "hoje 14:00" se hoje, senão "ter 14:00"
+  const horario = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  let label;
+  if (today) {
+    label = 'hoje ' + horario;
+  } else {
+    const dias = ['dom','seg','ter','qua','qui','sex','sáb'];
+    const dia = d.getDate() + ' ' + dias[d.getDay()];
+    label = dia + ' ' + horario;
+  }
+  const cls = isLate ? 'scheduled-badge atrasado' : 'scheduled-badge';
+  const titulo = isLate ? 'Atrasado: agendado para ' : 'Agendado: ';
+  return `<span class="${cls}" title="${titulo}${d.toLocaleString('pt-BR')}">📅 ${label}</span>`;
+}
+
+// =========================
+// HOME
+// =========================
+const ORDER_FLOW = ['aguardando','preparando','pronto','entregue'];
+const NEXT_LABEL = {
+  aguardando: 'Iniciar preparo',
+  preparando: 'Marcar pronto',
+  pronto: 'Marcar entregue'
+};
+const STATE_LABEL = {
+  aguardando:'Aguardando', preparando:'Preparando', pronto:'Pronto', entregue:'Entregue', cancelado:'Cancelado'
+};
+
+// F2 — Acoes contextuais por status. Retorna array com a(s) acao(oes)
+// primaria(s) recomendada(s) pra um pedido. Tipo de retorno:
+//   [{ key, label, icon, handler, primary: true|false }]
+// `primary: true` = acao destacada (gold cheio), false = secundaria.
+// Renderizadores usam as primeiras 1-2 acoes; o resto fica disponivel
+// pelos botoes/menus existentes (cobrar, imprimir, historico, cancelar).
+// Status desconhecido → retorna [] (callers caem no layout antigo).
+function getOrderPrimaryActions(o) {
+  if (!o || typeof o !== 'object') return [];
+  const acoes = acoesDoPedidoPorEtapa(o);
+  return pedidoQuitado(o) ? acoes.filter(a => a.key !== 'charge') : acoes;
+}
+
+function acoesDoPedidoPorEtapa(o) {
+  const id = o.id;
+  switch (o.status) {
+    case 'aguardando':
+      return [{ key: 'start', label: 'Iniciar preparo', icon: '▶', primary: true,
+        handler: 'applyAdvanceTransition', args: [id, 'preparando'] }];
+    case 'preparando':
+      return [{ key: 'ready', label: 'Marcar pronto', icon: '✓', primary: true,
+        handler: 'applyAdvanceTransition', args: [id, 'pronto'] }];
+    case 'pronto': {
+      // Se conferencia ainda nao foi feita, prioriza conferir antes de entregar.
+      // CONFER_STATUS.CONFERIDO = 'conferido'; getConferStatus retorna esse string
+      // se confirmation OK ou se o.confirmedBy/At (compat legado).
+      const conferido = (typeof getConferStatus === 'function')
+        ? getConferStatus(o) === (typeof CONFER_STATUS !== 'undefined' ? CONFER_STATUS.CONFERIDO : 'conferido')
+        : !!o.confirmedAt;
+      if (!conferido) {
+        return [
+          { key: 'confer', label: 'Conferir', icon: '✅', primary: true,
+            handler: 'openConfer', args: [id] },
+          { key: 'charge', label: 'Preparar cobrança', icon: '💰', primary: false,
+            handler: 'openCobranca', args: [id] }
+        ];
+      }
+      return [
+        { key: 'deliver', label: 'Marcar entregue', icon: '✓', primary: true,
+          handler: 'applyAdvanceTransition', args: [id, 'entregue'] },
+        { key: 'charge', label: 'Preparar cobrança', icon: '💰', primary: false,
+          handler: 'openCobranca', args: [id] }
+      ];
+    }
+    case 'entregue':
+      return [{ key: 'reprint', label: 'Reimprimir', icon: '🖨', primary: true,
+        handler: 'printEtiqueta', args: [id] }];
+    default:
+      return [];
+  }
+}
+
+// Wrapper que executa a acao via lookup global — handlers nao podem
+// ser fechados em template literal (nao serializaveis). Mantem ZERO
+// lógica nova: invoca funcoes existentes pelo nome.
+function runOrderAction(orderId, key) {
+  const o = (typeof getOrderById === 'function') ? getOrderById(orderId) : null;
+  if (!o) return;
+  const actions = getOrderPrimaryActions(o);
+  const a = actions.find(x => x.key === key);
+  if (!a) return;
+  const fn = window[a.handler];
+  if (typeof fn === 'function') {
+    try { fn.apply(null, a.args || []); }
+    catch (e) { try { logError(e, 'orderAction:' + key); } catch (_) {} }
+  }
+}
+// STATUS: chaves de status do pedido (ORDER_FLOW) + ações de histórico.
+// Usar esse objeto em comparações evita typo silencioso ('entrege' etc.).
+const STATUS = {
+  AGUARDANDO: 'aguardando', PREPARANDO: 'preparando', PRONTO: 'pronto',
+  ENTREGUE: 'entregue', CANCELADO: 'cancelado',
+  CRIADO: 'criado', CONFERIDO: 'conferido'
+};
+
+// ── Cache curto-circuito por render ──────────────────────────────────
+// renderHome chama 10 sub-renders, e varios deles invocam os mesmos
+// derivadores (openOrders, buildAttentionItems, getShoppingRows,
+// getDayBusinessSummary). Antes: 6+ filtros redundantes sobre orders por
+// render, 2+ walks em batches, 2+ varreduras DOM da lista de compras.
+//
+// Solucao: cache OPT-IN ativo so durante renderHome (try/finally garante
+// limpeza). Fora de renderHome, comportamento original — evita servir
+// cache stale se algo mutar orders/products entre eventos.
+let _derivBatching = false;
+let _derivCache = Object.create(null);
+function _memoByNonce(key, fn) {
+  if (!_derivBatching) return fn();
+  if (!(key in _derivCache)) _derivCache[key] = fn();
+  return _derivCache[key];
+}
+function _openOrdersImpl() {
+  return orders.filter(o => o.status !== 'entregue' && o.status !== 'cancelado');
+}
+function openOrders() { return _memoByNonce('openOrders', _openOrdersImpl); }
+
+function renderHome() {
+  // Liga cache de derivadores apenas durante este render.
+  _derivBatching = true;
+  _derivCache = Object.create(null);
+  try {
+    renderMiniStats();
+    renderHomeFocusCard();
+    renderOpenOrders();
+    renderCash();
+    renderTrustBadges();
+    renderPremiumOpsPanel();
+    renderOpenCashDaysBanner();
+    renderHomeInsights();
+    renderAttentionCenter();
+    renderHomeShopping();
+    renderHomeOpsDisclosure();
+    renderHomeSummaryBar();  // #423
+    renderHomeChecklist();   // #424
+    renderHomeExpiryBar();   // #440
+  } finally {
+    _derivBatching = false;
+    _derivCache = Object.create(null);
+  }
+}
+
+function trustRelativeTime(ts) {
+  if (!ts) return 'sem registro';
+  const diff = Math.max(0, Date.now() - Number(ts));
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return min + ' min';
+  const h = Math.floor(min / 60);
+  if (h < 24) return h + 'h';
+  const d = Math.floor(h / 24);
+  return d + 'd';
+}
+
+function renderHomeFocusCard() {
+  const el = document.getElementById('homeFocusCard');
+  if (!el) return;
+  const open = typeof openOrders === 'function' ? openOrders() : [];
+  el.style.display = open.length ? 'none' : '';
+  const ready = open.filter(o => o.status === STATUS.PRONTO);
+  const preparing = open.filter(o => o.status === STATUS.PREPARANDO);
+  // #429 — exclui conferidos do contador de aguardando (as 2 dimensoes sao separadas).
+  const waiting = open.filter(o => o.status === STATUS.AGUARDANDO &&
+    (typeof getConferStatus !== 'function' || getConferStatus(o) !== CONFER_STATUS.CONFERIDO));
+  const pendingConfer = open.filter(o => typeof getConferStatus === 'function' && getConferStatus(o) === CONFER_STATUS.PENDENTE);
+  const shopping = typeof getShoppingRows === 'function' ? getShoppingRows().filter(x => !x.done) : [];
+  const sum = typeof calcCashSummaryToday === 'function' ? calcCashSummaryToday() : { sold: 0, balance: 0 };
+  let title = 'Comece pelo pedido certo';
+  let sub = `${open.length} em aberto · ${money(sum.balance || 0)} no caixa hoje`;
+  let primaryLabel = 'Novo pedido';
+  let primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('novo'); } catch(e){} }, 50)";
+
+  if (pendingConfer.length) {
+    const o = pendingConfer[0];
+    title = 'Conferir antes de entregar';
+    sub = `${o.clientSnapshot?.name || 'Pedido'} · ${money(o.total || 0)} · evita erro na saida`;
+    primaryLabel = 'Conferir agora';
+    primaryAction = `go('conferencia')`;
+  } else if (ready.length) {
+    const o = ready[0];
+    title = 'Pedido pronto para sair';
+    sub = `${o.clientSnapshot?.name || 'Cliente'} · ${money(o.total || 0)} a receber/entregar`;
+    primaryLabel = 'Ver pedidos';
+    primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)";
+  } else if (preparing.length) {
+    const o = preparing[0];
+    title = 'Preparo em andamento';
+    sub = `${o.clientSnapshot?.name || 'Cliente'} · marque pronto quando finalizar`;
+    primaryLabel = 'Continuar';
+    primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)";
+  } else if (waiting.length) {
+    title = 'Pedidos aguardando preparo';
+    sub = `${waiting.length} pedido${waiting.length === 1 ? '' : 's'} para iniciar`;
+    primaryLabel = 'Iniciar fila';
+    primaryAction = "go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)";
+  } else if (shopping.length) {
+    title = 'Compras pendentes';
+    sub = `${contaItens(shopping.length)} para destravar a produção`;
+    primaryLabel = 'Abrir compras';
+    primaryAction = "go('compras')";
+  }
+
+  const score = Math.max(0, 100 - Math.min(40, pendingConfer.length * 10) - Math.min(20, shopping.length * 4) - Math.min(18, waiting.length * 3));
+  el.innerHTML = `
+    <div class="home-focus-top">
+      <div>
+        <div class="home-focus-kicker">Proximo passo</div>
+        <div class="home-focus-title">${escapeHtml(title)}</div>
+        <div class="home-focus-sub">${escapeHtml(sub)}</div>
+      </div>
+      <div class="home-focus-score"><strong>${score}</strong><span>controle</span></div>
+    </div>
+    <div class="home-focus-actions">
+      <button class="primary" onclick="${primaryAction}">${escapeHtml(primaryLabel)}</button>
+      <button onclick="go('producao')">Produzir</button>
+      <button onclick="go('conferencia')">Conferir</button>
+    </div>`;
+}
+
+function renderTrustBadges() {
+  const el = document.getElementById('trustBadges');
+  if (!el) return;
+  const lastSync = Number(localStorage.getItem('cdb-last-sync')) || 0;
+  const closing = typeof getActiveCashClosing === 'function' ? getActiveCashClosing() : null;
+  const lastClose = closing ? closing.closedAt : (cashClosings || [])
+    .filter(c => c.closedAt)
+    .sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0))[0]?.closedAt;
+  const storageOk = (function () {
+    try {
+      const k = 'cdb-trust-check';
+      localStorage.setItem(k, '1');
+      localStorage.removeItem(k);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })();
+  const syncPending = Number(pendingSync) || 0;
+  const badges = [
+    {
+      tone: syncPending ? 'warn' : '',
+      text: syncPending ? `${syncPending} pendente${syncPending === 1 ? '' : 's'}` : `Sync ${trustRelativeTime(lastSync)}`
+    },
+    {
+      tone: storageOk ? '' : 'err',
+      text: storageOk ? 'Dados salvos neste aparelho' : 'Armazenamento indisponivel'
+    },
+    {
+      tone: closing ? '' : 'warn',
+      text: closing ? `Caixa fechado ${trustRelativeTime(closing.closedAt)}` : (lastClose ? `Ultimo fechamento ${trustRelativeTime(lastClose)}` : 'Caixa sem fechamento')
+    }
+  ];
+  el.innerHTML = badges.map(b =>
+    `<span class="trust-badge ${b.tone}"><span class="tb-dot"></span><strong>${escapeHtml(b.text)}</strong></span>`
+  ).join('');
+}
+
+function _getDayBusinessSummaryImpl() {
+  const sum = typeof calcCashSummaryToday === 'function' ? calcCashSummaryToday() : { sold: 0, in: 0, out: 0, balance: 0, ordersCount: 0 };
+  const open = typeof openOrders === 'function' ? openOrders() : [];
+  const receivable = open
+    .filter(o => o.status === 'pronto')
+    .reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const lowStock = (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2);
+  const pendingConfer = open.filter(o => typeof getConferStatus === 'function' && getConferStatus(o) === CONFER_STATUS.PENDENTE).length;
+  return { ...sum, openCount: open.length, receivable, lowStockCount: lowStock.length, pendingConfer };
+}
+function getDayBusinessSummary() { return _memoByNonce('daySummary', _getDayBusinessSummaryImpl); }
+
+function buildDaySummaryText() {
+  const d = getDayBusinessSummary();
+  const empresa = getEmpresaName();
+  const closed = typeof isCashClosedToday === 'function' && isCashClosedToday();
+  const lowNames = (products || []).filter(p => !p.archived && (Number(p.stock) || 0) <= 2)
+    .slice(0, 4).map(p => `${p.name} (${Number(p.stock) || 0})`).join(', ');
+  return [
+    `*Resumo do dia - ${empresa}*`,
+    `Vendido: ${money(d.sold)} (${d.ordersCount} pedido${d.ordersCount === 1 ? '' : 's'})`,
+    `Entradas extras: ${money(d.in)} | Saidas: ${money(d.out)}`,
+    `Saldo: ${money(d.balance)} | A receber: ${money(d.receivable)}`,
+    `Pedidos em aberto: ${d.openCount} | Conferencias pendentes: ${d.pendingConfer}`,
+    `Estoque critico: ${d.lowStockCount}${lowNames ? ' - ' + lowNames : ''}`,
+    `Caixa: ${closed ? 'fechado' : 'aberto'}`,
+    `Sync: ${(Number(pendingSync) || 0) ? pendingSync + ' pendente(s)' : 'em dia'}`
+  ].join('\n');
+}
+
+function copyDaySummary() {
+  copyToClipboard(buildDaySummaryText(), 'Resumo do dia copiado');
+}
+
+// Override visual do painel premium: mantem todos os comandos, mas deixa
+// o detalhamento colapsado quando a operacao esta saudavel.
+function renderPremiumOpsPanel() {
+  const el = document.getElementById('premiumOpsPanel');
+  if (!el) return;
+  const d = getDayBusinessSummary();
+  const lastBackup = Number(localStorage.getItem('cdb-last-backup-at') || localStorage.getItem('cdb-last-backup-prompt')) || 0;
+  const queue = Number(pendingSync) || 0;
+  const closed = typeof isCashClosedToday === 'function' && isCashClosedToday();
+  const score = Math.max(0, 100 - (queue ? 15 : 0) - (closed ? 0 : 12) - Math.min(24, d.lowStockCount * 6) - Math.min(18, d.pendingConfer * 6));
+  const scoreTone = score >= 80 ? 'ok' : (score >= 60 ? 'warn' : 'err');
+  const userOpen = localStorage.getItem('cdb-premium-panel-open') === '1';
+  const openAttr = userOpen ? ' open' : '';
+  el.innerHTML = `
+    <details class="premium-disclosure"${openAttr} ontoggle="try{localStorage.setItem('cdb-premium-panel-open', this.open ? '1' : '0')}catch(e){}">
+      <summary>
+        <div class="premium-panel-head">
+          <div>
+            <div class="premium-panel-title">Seguranca e resumo do dia</div>
+            <div class="premium-panel-sub">Backup ${trustRelativeTime(lastBackup)} · ${queue ? queue + ' pendente(s)' : 'sincronizacao em dia'} · ${closed ? 'caixa fechado' : 'caixa aberto'}</div>
+          </div>
+          <div class="premium-score ${scoreTone}">${score}/100</div>
+        </div>
+      </summary>
+      <div class="premium-disclosure-body">
+        <div class="premium-grid">
+          <div class="premium-metric"><span class="k">Vendido</span><span class="v">${money(d.sold)}</span></div>
+          <div class="premium-metric"><span class="k">A receber</span><span class="v">${money(d.receivable)}</span></div>
+          <div class="premium-metric"><span class="k">Alertas</span><span class="v">${d.lowStockCount + d.pendingConfer}</span></div>
+        </div>
+        <div class="premium-actions">
+          <button class="primary" onclick="copyDaySummary()">Copiar resumo</button>
+          <button onclick="exportBackup()">Backup</button>
+          <button onclick="openDiagnostics()">Diagnostico</button>
+        </div>
+      </div>
+    </details>`;
+}
+
+// ============================================================
+// F1 — CENTRO DE ATENCAO
+// Lista priorizada (max 5) do que o operador deve fazer agora.
+// Deriva de estado ja carregado, sem nova storage. Severidades:
+// err > warn > info. Estado vazio = "Operacao estavel".
+// ============================================================
+const ATTENTION_SEVERITY_ORDER = { err: 0, warn: 1, info: 2 };
+const ATTENTION_TRAVADO_MS = 30 * 60 * 1000; // 30min em preparando
+
+// Helper: tempo decorrido em formato curto pt-BR (ex: "1h 25", "45 min")
+function _attentionFmtElapsed(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  const min = Math.floor(ms / 60000);
+  if (min < 60) return min + ' min';
+  const h = Math.floor(min / 60);
+  const r = min % 60;
+  return h + 'h' + (r ? ' ' + r : '');
+}
+
+// BUG #14: fonte unica pra "estoque critico" — centro de atencao e card
+// da home liam o mesmo filtro inline, abrindo brecha pra desync futuro.
+function getCriticalProducts() {
+  // #425: usa product.minStock se definido, senao fallback para <=2.
+  return (products || []).filter(function (p) {
+    if (p.archived) return false;
+    const threshold = (p.minStock != null && isFinite(Number(p.minStock))) ? Number(p.minStock) : 2;
+    return (Number(p.stock) || 0) <= threshold;
+  });
+}
+
+// #423 — summary bar: faturamento + ticket medio + produto mais pedido hoje.
+// Visivel sem expandir o details. Aparece so quando ha pedidos entregues.
+function renderHomeSummaryBar() {
+  const bar = document.getElementById('homeSummaryBar');
+  if (!bar) return;
+  const sum = calcCashSummaryToday();
+  if (sum.ordersCount === 0) { bar.style.display = 'none'; return; }
+  const ticket = sum.ordersCount > 0 ? sum.sold / sum.ordersCount : 0;
+  // Produto mais pedido hoje: agrega itens dos pedidos entregues hoje por nome.
+  const freq = {};
+  (orders || []).filter(function (o) { return o.status === 'entregue' && isToday(o.updatedAt); })
+    .forEach(function (o) {
+      (o.items || []).forEach(function (it) {
+        const k = it.name || 'Item';
+        freq[k] = (freq[k] || 0) + (Number(it.qty) || 1);
+      });
+    });
+  const top = Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a]; })[0] || null;
+  const metricCss = 'flex:1;min-width:80px;text-align:center;padding:4px 8px;border-right:1px solid var(--line)';
+  const lastCss  = 'flex:1;min-width:80px;text-align:center;padding:4px 8px';
+  bar.style.display = 'flex';
+  bar.innerHTML =
+    '<div style="' + metricCss + '">'
+      + '<div style="font-size:var(--fs-micro);color:var(--ink-mute)">Faturado hoje</div>'
+      + '<div style="font-size:15px;font-weight:800">' + money(sum.sold) + '</div>'
+    + '</div>'
+    + '<div style="' + metricCss + '">'
+      + '<div style="font-size:var(--fs-micro);color:var(--ink-mute)">Ticket médio</div>'
+      + '<div style="font-size:15px;font-weight:800">' + money(ticket) + '</div>'
+    + '</div>'
+    + '<div style="' + lastCss + '">'
+      + '<div style="font-size:var(--fs-micro);color:var(--ink-mute)">+ pedido</div>'
+      + '<div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(top || '—') + '</div>'
+    + '</div>';
+}
+
+function _buildAttentionItemsImpl() {
+  const items = [];
+  try {
+    const now = Date.now();
+
+    // 1. #2319: sem "Fechar caixa" no PWA, o card de caixa de dia anterior em
+    // aberto levaria a uma tela sem acao. O fechamento fica no console.
+
+    // 2. ESTOQUE CRITICO — mostra produtos especificos pra dar contexto util
+    const lowStock = getCriticalProducts();
+    if (lowStock.length) {
+      // Top 3 mais criticos (stock=0 primeiro)
+      const sortedLow = lowStock.slice().sort((a, b) => (Number(a.stock) || 0) - (Number(b.stock) || 0));
+      const namesDetailed = sortedLow.slice(0, 3).map(p => `${p.name} (${Number(p.stock) || 0})`).join(', ');
+      items.push({
+        kind: 'stock',
+        severity: lowStock.length >= 3 ? 'err' : 'warn',
+        icon: '⚠',
+        title: 'Estoque crítico',
+        reason: namesDetailed + (lowStock.length > 3 ? ` · +${lowStock.length - 3}` : ''),
+        count: lowStock.length,
+        cta: 'Produção',
+        action: function () { go('producao'); }
+      });
+    }
+
+    // 3. VALIDADE PROXIMA — lotes com items vencendo em <=7 dias e nao vencidos
+    const sevenDays = 7 * 24 * 3600 * 1000;
+    const expiringItems = [];
+    (batches || []).forEach(b => {
+      if (b.deleted) return;
+      (b.items || []).forEach(it => {
+        if (it.expiresAt && it.expiresAt > now && (it.expiresAt - now) < sevenDays) {
+          expiringItems.push({ name: it.name, expires: it.expiresAt, lote: b.lote || b.code });
+        }
+      });
+    });
+    if (expiringItems.length) {
+      expiringItems.sort((a, b) => a.expires - b.expires);
+      const top = expiringItems.slice(0, 2).map(e => {
+        const days = Math.max(0, Math.ceil((e.expires - now) / (24 * 3600 * 1000)));
+        return `${e.name} (${days}d)`;
+      }).join(', ');
+      items.push({
+        kind: 'expiring',
+        severity: 'warn',
+        icon: '🕒',
+        title: 'Validade próxima',
+        reason: top + (expiringItems.length > 2 ? ` · +${expiringItems.length - 2}` : ''),
+        count: expiringItems.length,
+        cta: 'Conferência',
+        action: function () { go('conferencia'); if (typeof setConferTab === 'function') setConferTab('producao'); }
+      });
+    }
+
+    // 4. CONFERENCIA PENDENTE — mostra clientes especificos
+    const open = (typeof openOrders === 'function') ? openOrders() : [];
+    const pendingConfer = open.filter(o => {
+      if (o.status !== 'pronto') return false;
+      if (typeof getConferStatus === 'function') {
+        const cs = getConferStatus(o);
+        return cs !== (typeof CONFER_STATUS !== 'undefined' ? CONFER_STATUS.CONFERIDO : 'conferido');
+      }
+      return !o.confirmedAt;
+    });
+    if (pendingConfer.length) {
+      const names = pendingConfer.slice(0, 2)
+        .map(o => (o.clientSnapshot && o.clientSnapshot.name) || 'sem cliente')
+        .join(', ');
+      items.push({
+        kind: 'confer',
+        severity: 'warn',
+        icon: '✅',
+        title: 'Conferência pendente',
+        reason: names + (pendingConfer.length > 2 ? ` · +${pendingConfer.length - 2}` : ''),
+        count: pendingConfer.length,
+        cta: 'Conferir',
+        action: function () { go('conferencia'); }
+      });
+    }
+
+    // 5. PEDIDOS TRAVADOS — em preparando ha >30min, mostra cliente + tempo do mais antigo
+    const stuck = open.filter(o => o.status === 'preparando' && (now - (o.updatedAt || o.createdAt || now)) > ATTENTION_TRAVADO_MS);
+    if (stuck.length) {
+      stuck.sort((a, b) => (a.updatedAt || a.createdAt || 0) - (b.updatedAt || b.createdAt || 0));
+      const oldest = stuck[0];
+      const elapsed = now - (oldest.updatedAt || oldest.createdAt || now);
+      const oldestName = (oldest.clientSnapshot && oldest.clientSnapshot.name) || 'sem cliente';
+      items.push({
+        kind: 'stuck',
+        severity: 'warn',
+        icon: '⏱',
+        title: 'Pedidos travados',
+        reason: `${oldestName} há ${_attentionFmtElapsed(elapsed)}` + (stuck.length > 1 ? ` · +${stuck.length - 1}` : ''),
+        count: stuck.length,
+        cta: 'Pedidos',
+        action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('andamento'); }
+      });
+    }
+
+    // 6. A RECEBER — pedidos prontos hoje (estoque ja descontado, falta entrar grana)
+    const todayMs = (function () { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+    const receivable = open.filter(o => o.status === 'pronto' && (o.createdAt || 0) >= todayMs);
+    if (receivable.length) {
+      const total = receivable.reduce((s, o) => s + (Number(o.total) || 0), 0);
+      const moneyFn = typeof money === 'function' ? money : (v => 'R$ ' + (v || 0).toFixed(2));
+      items.push({
+        kind: 'receivable',
+        severity: 'info',
+        icon: '💰',
+        title: 'A receber',
+        reason: receivable.length + ' pedido' + (receivable.length === 1 ? '' : 's') + ' pronto · ' + moneyFn(total),
+        count: receivable.length,
+        cta: 'Pedidos',
+        action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('andamento'); }
+      });
+    }
+
+    // 7. ERROS RECENTES — entradas no log das ultimas 24h
+    if (typeof getErrorLog === 'function') {
+      const day = 24 * 3600 * 1000;
+      const recentErrors = getErrorLog().filter(e => e && (now - (e.t || 0)) < day);
+      if (recentErrors.length) {
+        items.push({
+          kind: 'errors',
+          severity: recentErrors.length >= 5 ? 'err' : 'warn',
+          icon: '🐞',
+          title: 'Erros recentes',
+          reason: recentErrors.length + ' nas últimas 24h · veja o diagnóstico',
+          count: recentErrors.length,
+          cta: 'Diagnóstico',
+          action: function () { if (typeof openDiagnostics === 'function') openDiagnostics(); }
+        });
+      }
+    }
+
+    // 8. COMPRAS PENDENTES — mostra primeiros itens
+    const shopping = (typeof getShoppingRows === 'function') ? getShoppingRows() : [];
+    const shopPending = shopping.filter(r => !r.done);
+    if (shopPending.length) {
+      items.push({
+        kind: 'shopping',
+        severity: 'info',
+        icon: '🛒',
+        title: 'Compras pendentes',
+        reason: shopPending.slice(0, 2).map(r => r.name).join(', ') + (shopPending.length > 2 ? ` · +${shopPending.length - 2}` : ''),
+        count: shopPending.length,
+        cta: 'Compras',
+        action: function () { go('compras'); }
+      });
+    }
+  } catch (e) {
+    try { logError(e, 'buildAttentionItems'); } catch (_) {}
+  }
+  // Ordena por severidade e limita a 5. NB: usa ?? (nao ||) porque
+  // err === 0 e seria erroneamente substituido pelo fallback.
+  items.sort((a, b) => (ATTENTION_SEVERITY_ORDER[a.severity] ?? 9) - (ATTENTION_SEVERITY_ORDER[b.severity] ?? 9));
+  return items.slice(0, 5);
+}
+function buildAttentionItems() { return _memoByNonce('attention', _buildAttentionItemsImpl); }
+
+function renderAttentionCenter() {
+  const host = document.getElementById('attentionCenter');
+  if (!host) return;
+  let items = [];
+  try { items = buildAttentionItems(); }
+  catch (e) { try { logError(e, 'renderAttentionCenter'); } catch (_) {} }
+  if (!items.length) {
+    host.innerHTML = '<div class="attention-empty">'
+      + '<span class="ae-check">✓</span>'
+      + '<div><strong>Operação estável.</strong> Nenhuma pendência crítica agora.</div>'
+      + '</div>';
+    return;
+  }
+  // Atribui handlers via delegacao — evita inline function em onclick
+  const html = items.map((it, i) => `
+    <button class="attention-card ${it.severity}" data-attention-idx="${i}" type="button">
+      <span class="ac-icon" aria-hidden="true">${escapeHtml(it.icon)}</span>
+      <span>
+        <span class="ac-title">${escapeHtml(it.title)} <span class="ac-count">${it.count}</span></span>
+        <span class="ac-reason">${escapeHtml(it.reason)}</span>
+      </span>
+      <span class="ac-cta">${escapeHtml(it.cta)} →</span>
+    </button>`).join('');
+  host.innerHTML = html;
+  // Liga clicks ao action via delegacao (handlers nao serializaveis em HTML)
+  host._attentionItems = items;
+  host.onclick = function (ev) {
+    const card = ev.target.closest('.attention-card');
+    if (!card) return;
+    const idx = parseInt(card.dataset.attentionIdx, 10);
+    const item = host._attentionItems && host._attentionItems[idx];
+    if (item && typeof item.action === 'function') {
+      try { item.action(); } catch (e) { try { logError(e, 'attention.action'); } catch (_) {} }
+    }
+  };
+}
+
+// ============================================================
+// F3 — BUSCA GLOBAL INSTANTANEA
+// Indexa em tempo de query sobre arrays ja em memoria. Normaliza
+// acentos + caixa pra match tolerante. Debounce 150ms. Atalhos
+// rapidos sempre presentes pra estado vazio util.
+// ============================================================
+
+function _normalizeSearch(s) {
+  // toLowerCase + remove acentos via Unicode normalization
+  // NB: o range usa caracteres de combining marks U+0300-U+036F
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+const GS_SHORTCUTS = [
+  { key: 'novo-pedido', label: 'Novo pedido', icon: '➕', kind: 'shortcut',
+    keywords: 'novo pedido criar adicionar', action: function () { go('pedidos'); if (typeof goPedidosTab === 'function') goPedidosTab('novo'); } },
+  { key: 'producao', label: 'Produção', icon: '🏭', kind: 'shortcut',
+    keywords: 'producao lote registrar', action: function () { go('producao'); } },
+  { key: 'conferencia', label: 'Abrir conferência', icon: '✅', kind: 'shortcut',
+    keywords: 'conferencia conferir scanner qr', action: function () { go('conferencia'); } },
+  { key: 'compras', label: 'Ir pra compras', icon: '🛒', kind: 'shortcut',
+    keywords: 'compras lista comprar shopping', action: function () { go('compras'); } },
+  { key: 'clientes', label: 'Clientes e recorrência', icon: '👤', kind: 'shortcut',
+    keywords: 'clientes recorrencia cliente retorno whatsapp vendas', action: function () { go('clientes'); } },
+  { key: 'suporte', label: 'Abrir suporte', icon: '🛟', kind: 'shortcut',
+    keywords: 'suporte chamado ajuda erro problema atendimento diagnostico', action: function () { go('suporte'); } },
+  { key: 'caixa', label: 'Abrir caixa', icon: '💰', kind: 'shortcut',
+    keywords: 'caixa fechamento dia saldo', action: function () { go('caixa'); } },
+  { key: 'diagnostico', label: 'Diagnóstico', icon: '🔍', kind: 'shortcut',
+    keywords: 'diagnostico erros sync ajuda problema', action: function () { if (typeof openDiagnostics === 'function') openDiagnostics(); } }
+];
+
+function _gsMatchOrder(o, nq) {
+  if (!o) return false;
+  const ref = ((o.id || '').slice(-8));
+  const name = (o.clientSnapshot && o.clientSnapshot.name) || '';
+  if (_normalizeSearch(name).indexOf(nq) >= 0) return true;
+  if (_normalizeSearch(ref).indexOf(nq) >= 0) return true;
+  if (Array.isArray(o.items)) {
+    for (const it of o.items) {
+      if (_normalizeSearch(it.name || '').indexOf(nq) >= 0) return true;
+    }
+  }
+  return false;
+}
+function _gsMatchClient(c, nq) {
+  if (!c) return false;
+  return _normalizeSearch(c.name || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.phone || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.doc || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.ref || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.address || '').indexOf(nq) >= 0
+      || _normalizeSearch(c.apt || '').indexOf(nq) >= 0;
+}
+function _gsMatchCashEntry(e, nq) {
+  if (!e) return false;
+  return _normalizeSearch(e.description || '').indexOf(nq) >= 0
+      || _normalizeSearch(e.note || '').indexOf(nq) >= 0
+      || _normalizeSearch(e.type || '').indexOf(nq) >= 0;
+}
+function _gsMatchProduct(p, nq) {
+  if (!p) return false;
+  return _normalizeSearch(p.name || '').indexOf(nq) >= 0
+      || _normalizeSearch(p.emoji || '').indexOf(nq) >= 0
+      || _normalizeSearch(p.categoria || '').indexOf(nq) >= 0;
+}
+function _gsMatchBatch(b, nq) {
+  if (!b) return false;
+  if (_normalizeSearch(b.lote || '').indexOf(nq) >= 0) return true;
+  if (_normalizeSearch(b.code || '').indexOf(nq) >= 0) return true;
+  if (Array.isArray(b.items)) {
+    for (const it of b.items) {
+      if (_normalizeSearch(it.name || '').indexOf(nq) >= 0) return true;
+    }
+  }
+  return false;
+}
+function _gsMatchShortcuts(nq) {
+  if (!nq) return GS_SHORTCUTS.slice();
+  return GS_SHORTCUTS.filter(s =>
+    _normalizeSearch(s.label).indexOf(nq) >= 0 ||
+    _normalizeSearch(s.keywords).indexOf(nq) >= 0
+  );
+}
+
+// Score de relevancia: nome no inicio > nome em meio > metadata.
+// Estabiliza ordenacao em listas grandes — match prefix vence sempre.
+function _gsScore(s, nq) {
+  const n = _normalizeSearch(s || '');
+  if (!n || !nq) return 999;
+  const idx = n.indexOf(nq);
+  if (idx < 0) return 999;
+  if (idx === 0) return 0;     // prefix match — top
+  if (n[idx - 1] === ' ') return 1; // word boundary — segundo lugar
+  return 2 + idx;              // mid-word — pelo offset
+}
+
+// Retorna o objeto agrupado de resultados — testavel sem DOM.
+// Inclui pedidos abertos E finalizados (entregues/cancelados), separados
+// pra clareza, e lancamentos de caixa.
+function buildSearchGroups(q) {
+  const nq = _normalizeSearch(String(q || '').trim());
+  const empty = nq.length < 2;
+  const groups = {
+    pedidos: [],
+    finalizados: [],
+    clientes: [],
+    produtos: [],
+    lotes: [],
+    lancamentos: [],
+    acoes: empty ? GS_SHORTCUTS.slice(0, 5) : _gsMatchShortcuts(nq).slice(0, 5)
+  };
+  if (empty) return groups;
+  try {
+    const orderMatches = (orders || []).filter(o => _gsMatchOrder(o, nq));
+    // Separa abertos vs finalizados pra smart routing
+    const isFinal = (o) => o.status === 'entregue' || o.status === 'cancelado';
+    const open = orderMatches.filter(o => !isFinal(o));
+    const finals = orderMatches.filter(isFinal);
+    // Ordena por relevancia (cliente.name) e recencia
+    const byRelevance = (a, b) => {
+      const sa = _gsScore((a.clientSnapshot && a.clientSnapshot.name) || '', nq);
+      const sb = _gsScore((b.clientSnapshot && b.clientSnapshot.name) || '', nq);
+      if (sa !== sb) return sa - sb;
+      return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+    };
+    groups.pedidos     = open.sort(byRelevance).slice(0, 5);
+    groups.finalizados = finals.sort(byRelevance).slice(0, 5);
+
+    groups.clientes = (clients || []).filter(c => _gsMatchClient(c, nq))
+      .sort((a, b) => _gsScore(a.name, nq) - _gsScore(b.name, nq))
+      .slice(0, 5);
+    groups.produtos = (products || []).filter(p => !p.archived && _gsMatchProduct(p, nq))
+      .sort((a, b) => _gsScore(a.name, nq) - _gsScore(b.name, nq))
+      .slice(0, 5);
+    groups.lotes    = (batches || []).filter(b => !b.deleted && _gsMatchBatch(b, nq)).slice(0, 5);
+    groups.lancamentos = (cashEntries || []).filter(e => _gsMatchCashEntry(e, nq))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 5);
+  } catch (e) {
+    try { logError(e, 'buildSearchGroups'); } catch (_) {}
+  }
+  return groups;
+}
+
+let _gsDebounceTimer = null;
+function openGlobalSearch() {
+  toggleModal('globalSearchModal', true);
+  const inp = document.getElementById('globalSearchInput');
+  if (inp) {
+    inp.value = '';
+    inp.oninput = function () {
+      if (_gsDebounceTimer) clearTimeout(_gsDebounceTimer);
+      const v = inp.value;
+      _gsDebounceTimer = setTimeout(() => { _gsDebounceTimer = null; runGlobalSearch(v); }, 150);
+    };
+    inp.onkeydown = function (ev) { if (ev.key === 'Escape') closeGlobalSearch(); };
+    setTimeout(() => { try { inp.focus(); } catch (e) {} }, 80);
+  }
+  runGlobalSearch(''); // mostra atalhos
+}
+function closeGlobalSearch() {
+  if (_gsDebounceTimer) { clearTimeout(_gsDebounceTimer); _gsDebounceTimer = null; }
+  toggleModal('globalSearchModal', false);
+}
+
+function runGlobalSearch(q) {
+  const host = document.getElementById('globalSearchResults');
+  if (!host) return;
+  const groups = buildSearchGroups(q);
+  const nq = _normalizeSearch(String(q || '').trim());
+  const isEmpty = nq.length === 0;
+  const isShort = !isEmpty && nq.length < 2;
+  const totalReal = groups.pedidos.length + groups.finalizados.length + groups.clientes.length
+                  + groups.produtos.length + groups.lotes.length + groups.lancamentos.length;
+  // BUG #19: separa empty state inicial (sem texto) de "sem resultado" (com texto).
+  // Antes, qualquer input <2 chars mostrava "O que voce quer encontrar?" junto
+  // dos atalhos, deixando o operador confuso ao digitar nome de cliente.
+  if (!isEmpty && !isShort && totalReal === 0 && groups.acoes.length === 0) {
+    host.innerHTML = '<div class="gs-empty"><strong>Nenhum resultado pra "' + escapeHtml(q) + '"</strong>Tente outro termo ou um nome parcial.</div>';
+    return;
+  }
+  let html = '';
+  if (isEmpty) {
+    html += '<div class="gs-empty"><strong>O que voce quer encontrar?</strong>Comece a digitar pra buscar pedidos, clientes, produtos ou lotes.</div>';
+  } else if (isShort) {
+    html += '<div class="gs-empty"><strong>Digite ao menos 2 caracteres</strong>pra ver resultados.</div>';
+  }
+  // Atalhos so aparecem com input vazio (foco no termo digitado).
+  if (isEmpty && groups.acoes.length) {
+    html += '<div><div class="gs-group-title">Atalhos rápidos</div>';
+    html += groups.acoes.map((s, i) => _gsRenderShortcut(s, i)).join('');
+    html += '</div>';
+  }
+  if (groups.pedidos.length) {
+    html += '<div><div class="gs-group-title">Pedidos em aberto</div>';
+    html += groups.pedidos.map(o => _gsRenderOrder(o, 'open')).join('');
+    html += '</div>';
+  }
+  if (groups.finalizados.length) {
+    html += '<div><div class="gs-group-title">Pedidos finalizados</div>';
+    html += groups.finalizados.map(o => _gsRenderOrder(o, 'final')).join('');
+    html += '</div>';
+  }
+  if (groups.clientes.length) {
+    html += '<div><div class="gs-group-title">Clientes</div>';
+    html += groups.clientes.map(c => _gsRenderClient(c)).join('');
+    html += '</div>';
+  }
+  if (groups.produtos.length) {
+    html += '<div><div class="gs-group-title">Produtos</div>';
+    html += groups.produtos.map(p => _gsRenderProduct(p)).join('');
+    html += '</div>';
+  }
+  if (groups.lotes.length) {
+    html += '<div><div class="gs-group-title">Lotes</div>';
+    html += groups.lotes.map(b => _gsRenderBatch(b)).join('');
+    html += '</div>';
+  }
+  if (groups.lancamentos.length) {
+    html += '<div><div class="gs-group-title">Lançamentos do caixa</div>';
+    html += groups.lancamentos.map(e => _gsRenderCashEntry(e)).join('');
+    html += '</div>';
+  }
+  host.innerHTML = html;
+  // Delegacao de clicks
+  host.onclick = function (ev) {
+    const item = ev.target.closest('.gs-result-item');
+    if (!item) return;
+    const type = item.dataset.gsType;
+    const id   = item.dataset.gsId;
+    globalSearchSelect(type, id);
+  };
+}
+
+function _gsRenderShortcut(s) {
+  return `<button class="gs-result-item" data-gs-type="shortcut" data-gs-id="${escapeHtml(s.key)}" type="button">
+    <span class="gs-icon">${escapeHtml(s.icon)}</span>
+    <span><span class="gs-label">${escapeHtml(s.label)}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderOrder(o, kind) {
+  const ref = (o.id || '').slice(-8);
+  const name = (o.clientSnapshot && o.clientSnapshot.name) || 'Cliente';
+  const dt = o.updatedAt || o.createdAt;
+  const dateStr = dt ? new Date(dt).toLocaleDateString('pt-BR') : '';
+  const meta = (STATE_LABEL[o.status] || o.status) + ' · ' + money(Number(o.total) || 0) + (dateStr ? ' · ' + dateStr : '');
+  // kind 'open' → smart route pra cobranca; 'final' → historico
+  const dataKind = kind === 'final' ? 'order-final' : 'order-open';
+  const icon = kind === 'final' ? (o.status === 'cancelado' ? '✕' : '✓') : '📋';
+  return `<button class="gs-result-item" data-gs-type="${dataKind}" data-gs-id="${escapeHtml(o.id)}" type="button">
+    <span class="gs-icon">${icon}</span>
+    <span><span class="gs-label">${escapeHtml(name)} · #${escapeHtml(ref)}</span><span class="gs-meta">${escapeHtml(meta)}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderCashEntry(e) {
+  const dt = e.createdAt ? new Date(e.createdAt).toLocaleString('pt-BR') : '';
+  const sign = e.type === 'expense' ? '-' : '+';
+  const desc = e.description || (e.type === 'expense' ? 'Saída' : 'Entrada');
+  const meta = sign + money(Number(e.amount) || 0) + (dt ? ' · ' + dt : '');
+  return `<button class="gs-result-item" data-gs-type="cash" data-gs-id="${escapeHtml(e.id)}" type="button">
+    <span class="gs-icon">💸</span>
+    <span><span class="gs-label">${escapeHtml(desc)}</span><span class="gs-meta">${escapeHtml(meta)}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderClient(c) {
+  // Formata telefone se valido; senao mantem campo original. Item inteiro
+  // e um <button> (abre detalhe do cliente), por isso nao aninhamos botoes
+  // de WA/Mapa aqui — a tela Clientes ja oferece essas acoes.
+  const phoneDisplay = c.phone ? formatPhoneBr(c.phone) : '';
+  const meta = phoneDisplay || c.doc || c.ref || '';
+  return `<button class="gs-result-item" data-gs-type="client" data-gs-id="${escapeHtml(c.id)}" type="button">
+    <span class="gs-icon">👤</span>
+    <span><span class="gs-label">${escapeHtml(c.name || '(sem nome)')}</span>${meta ? '<span class="gs-meta">' + escapeHtml(meta) + '</span>' : ''}</span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderProduct(p) {
+  const meta = 'Estoque: ' + (Number(p.stock) || 0) + (p.unit ? ' · ' + p.unit : '');
+  return `<button class="gs-result-item" data-gs-type="product" data-gs-id="${escapeHtml(p.id)}" type="button">
+    <span class="gs-icon">${escapeHtml(p.emoji || '📦')}</span>
+    <span><span class="gs-label">${escapeHtml(p.name)}</span><span class="gs-meta">${escapeHtml(meta)}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+function _gsRenderBatch(b) {
+  const lote = b.lote || b.code || (b.id || '').slice(-8);
+  const qty = (Array.isArray(b.items) ? b.items.reduce((s, i) => s + (Number(i.qty) || 0), 0) : 0);
+  const dt = b.createdAt ? new Date(b.createdAt).toLocaleDateString('pt-BR') : '';
+  return `<button class="gs-result-item" data-gs-type="batch" data-gs-id="${escapeHtml(b.id)}" type="button">
+    <span class="gs-icon">📦</span>
+    <span><span class="gs-label">Lote ${escapeHtml(lote)}</span><span class="gs-meta">${qty} unid.${dt ? ' · ' + dt : ''}</span></span>
+    <span class="gs-arrow">›</span>
+  </button>`;
+}
+
+// Smart routing: cada tipo abre a acao MAIS PROVAVEL pro caso de uso real.
+// - Pedido aberto → openCobranca (acao mais comum: ver/copiar PIX, mandar pro cliente)
+// - Pedido finalizado → openHistorico (timeline + reimpressao)
+// - Cliente → vai pra novo pedido e ja seleciona o cliente (selectClient)
+// - Produto → openProductModalForEdit (ver/editar/ajustar estoque)
+// - Lote → reprintFromBatchId (reimpressao de etiquetas)
+// - Lancamento caixa → go('caixa') (ver no contexto do dia)
+function globalSearchSelect(type, id) {
+  closeGlobalSearch();
+  try {
+    if (type === 'shortcut') {
+      const s = GS_SHORTCUTS.find(x => x.key === id);
+      if (s && typeof s.action === 'function') s.action();
+      return;
+    }
+    if (type === 'order-open' || type === 'order') {
+      const o = (typeof getOrderById === 'function') ? getOrderById(id) : null;
+      if (!o) { showToast('Pedido não encontrado'); return; }
+      // Pedido aberto: abre cobranca direto (ação mais comum)
+      if (typeof openCobranca === 'function') {
+        openCobranca(id);
+      } else {
+        go('pedidos');
+        if (typeof goPedidosTab === 'function') goPedidosTab('andamento');
+      }
+      return;
+    }
+    if (type === 'order-final') {
+      const o = (typeof getOrderById === 'function') ? getOrderById(id) : null;
+      if (!o) { showToast('Pedido não encontrado'); return; }
+      // Pedido finalizado: abre historico (timeline + opcao reimprimir)
+      if (typeof openHistorico === 'function') {
+        openHistorico(id);
+      } else if (typeof goFinalizados === 'function') {
+        goFinalizados();
+      } else {
+        go('finalizados');
+      }
+      return;
+    }
+    if (type === 'client') {
+      const c = (clients || []).find(x => x.id === id);
+      if (!c) { showToast('Cliente não encontrado'); return; }
+      // Vai pra novo pedido e pre-seleciona — fluxo mais util na operacao.
+      go('pedidos');
+      if (typeof goPedidosTab === 'function') goPedidosTab('novo');
+      if (typeof selectClient === 'function') {
+        // Pequeno timeout pra garantir que a tab Novo esta pronta no DOM
+        setTimeout(() => { try { selectClient(c); } catch (e) {} }, 50);
+      }
+      return;
+    }
+    if (type === 'product') {
+      if (typeof openProductModalForEdit === 'function') {
+        openProductModalForEdit(id);
+      } else {
+        go('producao');
+      }
+      return;
+    }
+    if (type === 'batch') {
+      if (typeof reprintFromBatchId === 'function') {
+        reprintFromBatchId(id);
+      } else {
+        go('conferencia');
+      }
+      return;
+    }
+    if (type === 'cash') {
+      // Lancamento de caixa: abre tela de caixa (operador identifica pelo dia)
+      go('caixa');
+      return;
+    }
+  } catch (e) {
+    try { logError(e, 'globalSearchSelect:' + type); } catch (_) {}
+    showToast('Erro ao abrir resultado');
+  }
+}
+
+function renderHomeInsights() {
+  const host = document.getElementById('homeInsights');
+  if (!host) return;
+  const todayStart = new Date();
+  todayStart.setHours(0,0,0,0);
+  const open = openOrders();
+  const ready = open.filter(o => o.status === 'pronto').length;
+  const preparing = open.filter(o => o.status === 'preparando').length;
+  // BUG #14: usa fonte unica de "estoque critico" (compartilhada com centro
+  // de atencao) pra evitar contagens divergentes entre views.
+  const critical = getCriticalProducts().length;
+  const pendingConfer = typeof getConferStatus === 'function'
+    ? open.filter(o => getConferStatus(o) === 'pendente').length
+    : 0;
+  // BUG #16+#10: agrega etiquetas pendentes ao card de conferência, pra
+  // diferenciar "conferência de pedido" de "conferência de etiqueta de lote".
+  let totalEtiquetas = 0, etiquetasConferidas = 0;
+  if (typeof etiquetasFromBatch === 'function' && typeof getUnitStatus === 'function') {
+    (batches || []).filter(b => !b.deleted).forEach(b => {
+      const ets = etiquetasFromBatch(b);
+      totalEtiquetas += ets.length;
+      ets.forEach(et => {
+        const st = getUnitStatus(b, et.idxStr);
+        if (typeof CONFER_STATUS !== 'undefined' ? st === CONFER_STATUS.CONFERIDO : st === 'conferido') {
+          etiquetasConferidas++;
+        }
+      });
+    });
+  }
+  const etiquetasPendentes = Math.max(0, totalEtiquetas - etiquetasConferidas);
+  const producedUnits = batches
+    .filter(b => !b.deleted && (b.createdAt || 0) >= todayStart.getTime())
+    .reduce((sum, b) => sum + (b.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0), 0);
+  const soldToday = orders
+    .filter(o => o.status === 'entregue' && isToday(o.updatedAt))
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+  const conferWarn = pendingConfer > 0 || etiquetasPendentes > 0;
+  const conferNote = `${ready} pronto · ${preparing} preparo` +
+    (totalEtiquetas > 0 ? ` · ${etiquetasPendentes}/${totalEtiquetas} etq` : '');
+
+  // #440/#441 — perda: confirmada (descartada pelo operador) + estimada (expirada sem descarte)
+  const waste = typeof calcWasteLoss === 'function'
+    ? calcWasteLoss()
+    : { confLoss: 0, confCount: 0, estLoss: 0, estCount: 0, semCusto: 0, totalLoss: 0, itemCount: 0 };
+  const hasWaste = waste.itemCount > 0 || waste.semCusto > 0;
+  const wasteCard = hasWaste
+    ? (function() {
+        const hasConf = waste.confCount > 0;
+        const hasEst  = waste.estCount > 0;
+        const label   = hasConf && !hasEst ? 'Perda' : 'Perda ~';
+        const value   = waste.totalLoss > 0 ? money(waste.totalLoss).replace(',00','') : '—';
+        const parts = [];
+        if (hasConf) parts.push(waste.confCount + ' un. descartada' + (waste.confCount === 1 ? '' : 's'));
+        if (hasEst)  parts.push(waste.estCount  + ' un. expirada'  + (waste.estCount  === 1 ? '' : 's') + ' ~');
+        if (waste.semCusto > 0) parts.push(waste.semCusto + ' sem custo');
+        return `<div class="home-insight${waste.totalLoss > 0 ? ' warn' : ''}">
+          <div class="hi-label">${label}</div>
+          <div class="hi-value">${value}</div>
+          <div class="hi-note">${parts.join(' · ')}</div>
+        </div>`;
+      })()
+    : '';
+  host.innerHTML = `
+    <div class="home-insight${critical ? ' warn' : ''}">
+      <div class="hi-label">Estoque crítico</div>
+      <div class="hi-value">${critical}</div>
+      <div class="hi-note">${critical ? 'itens precisam atenção' : 'sem alerta agora'}</div>
+    </div>
+    <div class="home-insight">
+      <div class="hi-label">Produzido hoje</div>
+      <div class="hi-value">${producedUnits}</div>
+      <div class="hi-note">unidades registradas</div>
+    </div>
+    <div class="home-insight${conferWarn ? ' warn' : ''}">
+      <div class="hi-label">Conferência pendente</div>
+      <div class="hi-value">${pendingConfer}</div>
+      <div class="hi-note">${conferNote}</div>
+    </div>
+    <div class="home-insight">
+      <div class="hi-label">Vendido hoje</div>
+      <div class="hi-value">${money(soldToday).replace(',00', '')}</div>
+      <div class="hi-note">pedidos entregues</div>
+    </div>
+    ${wasteCard}
+  `;
+}
+
+function _getShoppingRowsImpl() {
+  if (!Array.isArray(shoppingItems)) shoppingItems = [];
+  return (shoppingItems || [])
+    .map(it => ({
+      id: it.id,
+      name: String(it.name || '').trim(),
+      done: !!it.done,
+      createdAt: Number(it.createdAt) || 0,
+      doneAt: Number(it.doneAt) || 0
+    }))
+    .filter(item => item.name)
+    .sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+}
+function getShoppingRows() { return _memoByNonce('shopRows', _getShoppingRowsImpl); }
+
+function normalizeShoppingItem(item) {
+  if (!item) return null;
+  if (typeof item === 'string') {
+    const name = item.trim();
+    return name ? { id: 'shop-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, done: false, createdAt: Date.now(), doneAt: 0 } : null;
+  }
+  const name = String(item.name || '').trim();
+  if (!name) return null;
+  return {
+    id: item.id || ('shop-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)),
+    name,
+    done: !!item.done,
+    createdAt: Number(item.createdAt) || Date.now(),
+    doneAt: Number(item.doneAt) || 0
+  };
+}
+
+function ensureShoppingState() {
+  if (!Array.isArray(shoppingItems)) shoppingItems = [];
+  let changed = false;
+  const normalized = shoppingItems.map((item) => {
+    const next = normalizeShoppingItem(item);
+    if (!next) { changed = true; return null; }
+    if (typeof item === 'string' || !item.id || !item.name) changed = true;
+    return next;
+  }).filter(Boolean);
+  if (changed || normalized.length !== shoppingItems.length) {
+    shoppingItems = normalized;
+    try { save('cdb-shopping', shoppingItems); } catch (e) {}
+  }
+}
+
+function renderShoppingList() {
+  ensureShoppingState();
+  const list = document.getElementById('shopList');
+  if (!list) return;
+  const rows = getShoppingRows();
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty"><span class="big">🛒</span>Lista vazia. Adicione o primeiro item acima.</div>';
+    return;
+  }
+  list.innerHTML = rows.map(r => `
+    <div class="shop-row${r.done ? ' done' : ''}">
+      <button class="check" onclick="toggleShop(${jsString(r.id)})" aria-label="Marcar item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+      <div class="name-field">${escapeHtml(r.name)}</div>
+      <div class="meta">${r.done ? '✓ ' + timeOf(r.doneAt || r.createdAt) : timeOf(r.createdAt)}</div>
+      <button class="shop-del" onclick="removeShopItem(${jsString(r.id)})" aria-label="Remover">×</button>
+    </div>
+  `).join('');
+}
+
+function renderHomeShopping() {
+  const card = document.getElementById('homeShoppingCard');
+  if (!card) return;
+  const pending = getShoppingRows().filter(item => !item.done);
+  const shown = pending.slice(0, 3);
+  const extra = pending.length - shown.length;
+  const empty = pending.length === 0;
+  card.classList.toggle('is-empty', empty);
+  const countLabel = empty
+    ? 'em dia'
+    : `${pending.length} pendente${pending.length === 1 ? '' : 's'}`;
+  const listHtml = empty
+    ? `<div class="home-shopping-empty"><span class="home-shopping-check">✓</span> Sem compras pendentes</div>`
+    : shown.map(item => `<div class="home-shopping-item">${escapeHtml(item.name)}</div>`).join('')
+      + (extra > 0 ? `<div class="home-shopping-item home-shopping-more">+${contaItens(extra)}</div>` : '');
+  card.innerHTML = `
+    <div class="home-shopping-head">
+      <div class="home-shopping-title">${empty ? 'Lista de compras' : 'Itens para comprar'}</div>
+      <div class="home-shopping-count">${countLabel}</div>
+    </div>
+    <div class="home-shopping-list">${listHtml}</div>
+  `;
+}
+
+// #424 — checklist de operacao: 3 checkmarks derivados de estado existente.
+// Zero localStorage novo; tudo calculado em tempo real.
+// #440 — widget de validade: itens vencendo hoje ou amanha, visiveis sem expandir o details.
+function renderHomeExpiryBar() {
+  const bar = document.getElementById('homeExpiryBar');
+  if (!bar) return;
+  const now = Date.now();
+  const H24 = 24 * 3600 * 1000;
+  const H48 = 48 * 3600 * 1000;
+  const hoje = [], amanha = [];
+  (batches || []).filter(function (b) { return !b.deleted && !b.discarded; }).forEach(function (b) {
+    (b.items || []).forEach(function (it) {
+      if (!it.expiresAt) return;
+      const diff = it.expiresAt - now;
+      if (diff <= 0) return; // ja venceu — vai pro indicador de perda, nao aqui
+      const entry = { name: it.name, qty: Number(it.qty) || 0, expires: it.expiresAt, lote: b.lote || b.code };
+      if (diff < H24) hoje.push(entry);
+      else if (diff < H48) amanha.push(entry);
+    });
+  });
+  if (hoje.length === 0 && amanha.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  const chips = [];
+  if (hoje.length > 0) {
+    const nomes = hoje.slice(0, 2).map(function (e) { return escapeHtml(e.name); }).join(', ');
+    chips.push('<span onclick="go(\'conferencia\'); setTimeout(function(){if(typeof setConferTab===\'function\')setConferTab(\'producao\');},50)" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:rgba(231,104,69,0.12);color:var(--accent);border:1px solid rgba(231,104,69,0.3);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700">🔴 Vence hoje: ' + hoje.length + (hoje.length <= 2 ? ' · ' + nomes : '') + '</span>');
+  }
+  if (amanha.length > 0) {
+    const nomes = amanha.slice(0, 2).map(function (e) { return escapeHtml(e.name); }).join(', ');
+    chips.push('<span onclick="go(\'conferencia\'); setTimeout(function(){if(typeof setConferTab===\'function\')setConferTab(\'producao\');},50)" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:rgba(240,184,74,0.12);color:var(--gold);border:1px solid rgba(240,184,74,0.3);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700">🟡 Vence amanhã: ' + amanha.length + (amanha.length <= 2 ? ' · ' + nomes : '') + '</span>');
+  }
+  bar.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">' + chips.join('') + '</div>';
+}
+
+// #440/#441 — calcula perda: separa confirmado (batch.discarded=true) de estimado (so expirado).
+function calcWasteLoss() {
+  const now = Date.now();
+  let confLoss = 0, confCount = 0;
+  let estLoss = 0, estCount = 0, semCusto = 0;
+  (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
+    (b.items || []).forEach(function (it) {
+      const qty = Number(it.qty) || 0;
+      const p = (products || []).find(function (x) { return x.id === it.productId; });
+      const cost = p && p.cost != null && isFinite(Number(p.cost)) ? Number(p.cost) : null;
+      if (b.discarded) {
+        // Confirmado pelo operador — independe de expiresAt
+        if (cost != null) { confLoss += qty * cost; confCount += qty; }
+        else { semCusto += qty; }
+      } else if (it.expiresAt && it.expiresAt <= now) {
+        // Estimado: expirou mas nao foi descartado manualmente
+        if (cost != null) { estLoss += qty * cost; estCount += qty; }
+        else { semCusto += qty; }
+      }
+    });
+  });
+  return {
+    confLoss: confLoss, confCount: confCount,
+    estLoss: estLoss, estCount: estCount,
+    semCusto: semCusto,
+    totalLoss: confLoss + estLoss,
+    itemCount: confCount + estCount
+  };
+}
+
+let _homeChecklistAutoOpened = false; // flag: abre so uma vez por sessao.
+function renderHomeChecklist() {
+  const host = document.getElementById('homeChecklist');
+  if (!host) return;
+  const now = Date.now();
+  const open = (typeof openOrders === 'function') ? openOrders() : [];
+  // 1. Caixa do dia
+  const cashFechado = isCashClosedToday();
+  const temMovimento = (calcCashSummaryToday().ordersCount > 0 || (cashEntries || []).some(function (e) { return isToday(e.createdAt); }));
+  const cashOk = !temMovimento || cashFechado; // ok se nao tem movimento OU caixa fechado
+  // 2. Pedidos fluindo (nenhum em preparando ha >30min)
+  const stuck = open.filter(function (o) { return o.status === 'preparando' && (now - (o.updatedAt || o.createdAt || now)) > ATTENTION_TRAVADO_MS; });
+  const pedidosOk = stuck.length === 0;
+  // 3. Estoque
+  const estoqueOk = getCriticalProducts().length === 0;
+  const items = [
+    { ok: cashOk,    icon: cashFechado ? '🔒' : '🟡', label: 'Caixa do dia',    sub: cashFechado ? 'fechado' : (temMovimento ? 'aberto' : 'sem movimento'), cta: null, ctaLabel: '' },
+    { ok: pedidosOk, icon: pedidosOk ? '✅' : '⏱',   label: 'Pedidos fluindo', sub: pedidosOk ? 'sem travados' : stuck.length + ' parado' + (stuck.length > 1 ? 's' : '') + ' >30min', cta: pedidosOk ? null : function () { go('pedidos'); }, ctaLabel: 'Ver' },
+    { ok: estoqueOk, icon: estoqueOk ? '📦' : '⚠',   label: 'Estoque',         sub: estoqueOk ? 'sem críticos' : getCriticalProducts().length + ' item(ns) crítico(s)', cta: estoqueOk ? null : function () { go('producao'); }, ctaLabel: 'Produção' }
+  ];
+  host.style.display = 'flex';
+  host.innerHTML = items.map(function (it) {
+    const ctaHtml = (!it.ok && it.cta)
+      ? '<button onclick="(function(){' + it.ctaLabel.toLowerCase().replace(/[^a-z]/g,'') + '})()" style="font-size:var(--fs-micro);padding:2px 8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;margin-left:auto" onclick="void(0)">' + escapeHtml(it.ctaLabel) + '</button>'
+      : '';
+    return '<div style="display:flex;align-items:center;gap:8px;' + (it.ok ? '' : 'color:var(--accent)') + '">'
+      + '<span style="font-size:16px">' + it.icon + '</span>'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:700">' + escapeHtml(it.label) + '</div>'
+        + '<div style="font-size:var(--fs-apoio);color:var(--ink-mute)">' + escapeHtml(it.sub) + '</div>'
+      + '</div>'
+      + ((!it.ok && it.cta) ? '<button onclick="(' + it.cta.toString() + ')()" style="font-size:var(--fs-micro);padding:2px 8px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer">' + escapeHtml(it.ctaLabel) + '</button>' : '')
+    + '</div>';
+  }).join('');
+}
+
+function renderHomeOpsDisclosure() {
+  const box = document.getElementById('homeOpsDisclosure');
+  if (!box) return;
+  const sub = document.getElementById('homeOpsSub');
+  const chip = document.getElementById('homeOpsChip');
+  let attention = [];
+  try { attention = buildAttentionItems(); } catch (e) { attention = []; }
+  const shopping = getShoppingRows().filter(item => !item.done).length;
+  const urgent = attention.filter(item => item.severity === 'err' || item.severity === 'warn').length;
+  const shouldOpen = urgent > 0 || shopping > 0;
+  // #424: auto-expand quando ha pendencias urgentes (so uma vez por sessao).
+  if (shouldOpen && !_homeChecklistAutoOpened && !box.open) {
+    box.open = true;
+    _homeChecklistAutoOpened = true;
+  }
+  box.ontoggle = function () {
+    if (chip) chip.textContent = box.open ? 'ocultar' : (shouldOpen ? 'pendente' : 'ver');
+  };
+  if (sub) {
+    const parts = [];
+    parts.push(attention.length ? `${attention.length} ponto${attention.length === 1 ? '' : 's'} de atencao` : 'operacao estavel');
+    parts.push(shopping ? `${shopping} compra${shopping === 1 ? '' : 's'} pendente${shopping === 1 ? '' : 's'}` : 'compras em dia');
+    sub.textContent = parts.join(' · ');
+  }
+  if (chip) chip.textContent = box.open ? 'ocultar' : (shouldOpen ? 'pendente' : 'ver');
+}
+
+// Banner de dias com caixa em aberto (anteriores a hoje, com movimentacao
+// e sem fechamento). Felipe pode fechar de la sem precisar voltar no tempo.
+function renderOpenCashDaysBanner() {
+  const banner = document.getElementById('openCashDaysBanner');
+  if (!banner) return;
+  // #2319: sem botão local de fechar caixa, o aviso de dias em aberto não teria ação.
+  const days = [];
+  if (!days.length) {
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+    return;
+  }
+  // Mostra os 5 mais recentes pra evitar lista gigante
+  const showing = days.slice(0, 5);
+  const rows = showing.map(k => {
+    const sum = calcCashSummary(k);
+    const movs = sum.ordersCount + sum.entriesCount;
+    return `<div class="od-row">
+      <div class="od-info">
+        <div class="od-date">${escapeHtml(fmtDateKey(k))}</div>
+        <div class="od-meta">${movs} movimento(s) · saldo ${money(sum.balance)}</div>
+      </div>
+      <button class="od-btn" onclick="openCashCloseModal(${jsString(k)})">Fechar</button>
+    </div>`;
+  }).join('');
+  const moreHint = days.length > 5 ? `<div style="font-size:var(--fs-apoio);color:var(--ink-mute);margin-top:6px">+ ${days.length - 5} dia(s) anteriores também em aberto</div>` : '';
+  banner.innerHTML = `
+    <div class="od-title">⚠️ Caixa de dia(s) anterior(es) ainda em aberto</div>
+    <div style="font-size:12px;opacity:.85">Sem fechamento, esses dias ficam sem snapshot. Recomendado fechar.</div>
+    <div class="od-list">${rows}</div>
+    ${moreHint}
+  `;
+  banner.style.display = 'block';
+}
+
+function renderMiniStats() {
+  const openCount = openOrders().length;
+  document.getElementById('msOpen').textContent = openCount;
+  const summaryEl = document.getElementById('msOpenSummary');
+  if (summaryEl) summaryEl.textContent = openCount;
+
+  // total produzido hoje (soma dos counts nos batches de hoje)
+  const todayBatches = batches.filter(b => isToday(b.createdAt));
+  const totalProduced = todayBatches.reduce((sum, b) => sum + b.items.reduce((s, i) => s + i.qty, 0), 0);
+  document.getElementById('msProduced').textContent = totalProduced;
+
+  // vendido hoje = soma dos pedidos entregues hoje
+  const sold = orders.filter(o => o.status === 'entregue' && isToday(o.updatedAt)).reduce((s, o) => s + o.total, 0);
+  document.getElementById('msRevenue').textContent = money(sold).replace(',00','');
+}
+
+function renderOpenOrders() {
+  const list = document.getElementById('openOrdersList');
+  const counter = document.getElementById('openCount');
+  const open = openOrders();
+  const calm = typeof isCalmUx === 'function' && isCalmUx();
+  counter.textContent = open.length;
+  list.innerHTML = '';
+  if (open.length === 0) {
+    list.innerHTML = '<div class="empty"><span class="big">🍃</span>Nenhum pedido em aberto</div>';
+    return;
+  }
+  // ordena por status (aguardando primeiro, pronto por último) depois por createdAt
+  const order = { aguardando: 0, preparando: 1, pronto: 2 };
+  open.sort((a,b) => (order[a.status] - order[b.status]) || a.createdAt - b.createdAt);
+  const lanes = [
+    { key: STATUS.AGUARDANDO, label: 'Aguardando' },
+    { key: STATUS.PREPARANDO, label: 'Preparando' },
+    { key: STATUS.PRONTO, label: 'Pronto' }
+  ];
+  const board = document.createElement('div');
+  board.className = 'home-pipeline';
+  lanes.forEach(lane => {
+    const items = open.filter(o => o.status === lane.key);
+    if (calm && !items.length) return;
+    const visibleItems = items.slice(0, calm ? 1 : 2);
+    const hiddenCount = items.length - visibleItems.length;
+    const laneEl = document.createElement('section');
+    laneEl.className = 'home-lane';
+    laneEl.dataset.status = lane.key;
+    // #429 — badge de aguardando exclui conferidos (sem esconder os cards, so o numero).
+    const laneCount = lane.key === STATUS.AGUARDANDO
+      ? items.filter(o => typeof getConferStatus !== 'function' || getConferStatus(o) !== CONFER_STATUS.CONFERIDO).length
+      : items.length;
+    laneEl.innerHTML = `<div class="home-lane-head"><span>${lane.label}</span><span class="count">${laneCount}</span></div>`;
+    const body = document.createElement('div');
+    body.className = 'home-lane-body';
+    if (!items.length) {
+      body.innerHTML = '<div class="home-lane-empty">Nada aqui agora</div>';
+    }
+    visibleItems.forEach(o => {
+      const card = document.createElement('div');
+      card.className = 'home-order-card';
+      const itemsLine = o.items.map(i => `${i.qty}× ${escapeHtml(i.name)}`).join(' · ');
+      const primaryActions = (typeof getOrderPrimaryActions === 'function')
+        ? getOrderPrimaryActions(o) : [];
+      const primaryAction = primaryActions.find(a => a.primary) || null;
+      const advanceLabel = primaryAction
+        ? `${primaryAction.icon} ${escapeHtml(primaryAction.label)}`
+        : (NEXT_LABEL[o.status] || '');
+      const advanceClick = primaryAction
+        ? `runOrderAction(${jsString(o.id)}, ${jsString(primaryAction.key)})`
+        : `advanceOrder(${jsString(o.id)})`;
+      const secondaryActions = calm
+        ? `<button class="open-full" onclick="go('pedidos'); setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50)">Abrir</button>`
+        : `${pedidoQuitado(o) ? '' : `<button onclick="openCobranca(${jsString(o.id)})" title="Preparar cobrança">Preparar cobrança</button>`}
+          <button onclick="printEtiqueta(${jsString(o.id)})" title="Imprimir etiqueta">Etiqueta</button>`;
+      card.innerHTML = `
+        <div class="home-order-top">
+          <div class="home-order-who">
+            ${escapeHtml(o.clientSnapshot.name)}
+            <span class="ref">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref) || timeOf(o.createdAt))}</span>
+          </div>
+          <div class="home-order-total">${money(o.total)}</div>
+        </div>
+        <div class="home-order-items">${itemsLine || '<span style="font-style:italic;color:var(--ink-mute)">sem itens estruturados</span>'}</div>
+        <div class="home-order-actions">
+          ${advanceLabel ? `<button class="primary" onclick="${advanceClick}">${advanceLabel}</button>` : `<button class="primary" onclick="openHistorico(${jsString(o.id)})">Abrir</button>`}
+          ${secondaryActions}
+        </div>
+      `;
+      body.appendChild(card);
+    });
+    if (hiddenCount > 0) {
+      const more = document.createElement('button');
+      more.className = 'home-lane-more';
+      more.type = 'button';
+      more.textContent = calm ? `+${hiddenCount} no kanban` : `Ver mais ${hiddenCount} no kanban completo`;
+      more.onclick = function () {
+        go('pedidos');
+        setTimeout(function(){ try { goPedidosTab('andamento'); } catch(e){} }, 50);
+      };
+      body.appendChild(more);
+    }
+    laneEl.appendChild(body);
+    board.appendChild(laneEl);
+  });
+  list.appendChild(board);
+}
+
+function renderCash() {
+  // Vendas: pedidos entregues hoje (o momento da entrega é quando o
+  // dinheiro entra de fato — o que vai pro saldo).
+  const sold = orders
+    .filter(o => o.status === 'entregue' && isToday(o.updatedAt))
+    .reduce((s, o) => s + (Number(o.total) || 0), 0);
+
+  // A receber: pedidos em "pronto" hoje (já produzidos, aguardando
+  // retirada/entrega). Estoque já foi descontado, falta só entrar
+  // o dinheiro. NÃO entra no saldo — é informativo.
+  const receivable = orders
+    .filter(o => o.status === 'pronto' && (isToday(o.updatedAt) || isToday(o.createdAt)))
+    .reduce((s, o) => s + (Number(o.total) || 0), 0);
+
+  // Lançamentos manuais do dia.
+  const extraIn = cashEntries
+    .filter(c => c.type === 'income' && isToday(c.createdAt))
+    .reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const out = cashEntries
+    .filter(c => c.type === 'expense' && isToday(c.createdAt))
+    .reduce((s, c) => s + (Number(c.amount) || 0), 0);
+
+  const balance = (sold + extraIn) - out;
+
+  document.getElementById('cashSold').textContent     = money(sold);
+  document.getElementById('cashExtraIn').textContent  = money(extraIn);
+  document.getElementById('cashOut').textContent      = money(out);
+  document.getElementById('cashBalance').textContent  = money(balance);
+
+  // Linha "A receber" só aparece quando há algo pra receber — senão polui.
+  const receivableRow = document.getElementById('cashReceivableRow');
+  if (receivable > 0) {
+    document.getElementById('cashReceivable').textContent = money(receivable);
+    receivableRow.style.display = '';
+  } else {
+    receivableRow.style.display = 'none';
+  }
+
+  // Estado de fechamento: badge + botoes de fechar/reabrir (modal).
+  const closing = getActiveCashClosing();
+  const homeBalance = document.getElementById('cashHomeBalance');
+  if (homeBalance) homeBalance.textContent = money(balance);
+  const homeStatus = document.getElementById('cashHomeStatus');
+  if (homeStatus) {
+    if (closing) {
+      const t = new Date(closing.closedAt).toLocaleTimeString('pt-BR').slice(0,5);
+      homeStatus.textContent = `🔒 Fechado ${t} por ${closing.closedBy || '—'}`;
+      homeStatus.className = 'ccc-status closed';
+    } else {
+      homeStatus.textContent = 'Aberto';
+      homeStatus.className = 'ccc-status open';
+    }
+  }
+  // Botoes do modal de detalhes (alterna entre Fechar/Reabrir)
+  const closeDayBtn = document.getElementById('cashDetailsCloseDayBtn');
+  const reopenDayBtn = document.getElementById('cashDetailsReopenBtn');
+  if (closeDayBtn && reopenDayBtn) {
+    if (closing) {
+      closeDayBtn.style.display = 'none';
+      reopenDayBtn.style.display = 'block';
+    } else {
+      closeDayBtn.style.display = 'none';
+      reopenDayBtn.style.display = 'none';
+    }
+  }
+}
+
+function advanceOrder(id) {
+  const o = getOrderById(id);
+  if (!o) return;
+  // Bloqueia pedido cancelado de ser avancado (cancelado nao esta em
+  // ORDER_FLOW entao cairia no return abaixo, mas explicitamos pra
+  // o operador receber feedback claro caso UI mostre botao por engano).
+  if (o.status === STATUS.CANCELADO) { showToast('Pedido cancelado não pode avançar'); return; }
+  const idx = ORDER_FLOW.indexOf(o.status);
+  if (idx < 0 || idx === ORDER_FLOW.length - 1) return;
+  const nextStatus = ORDER_FLOW[idx + 1];
+  if (window.CDB_CONFIG?.isPilot
+      && document.querySelector('[data-screen="pedidos"].active .pedidos-tab-section[data-tab="andamento"]')?.style.display === ''
+      && document.querySelector('[data-screen="pedidos"].active')) {
+    pilotOrderAdvance = { id, from: o.status };
+  }
+  // 'entregue' exige conferência manual primeiro — confirmConfer() retoma.
+  if (nextStatus === STATUS.ENTREGUE && !window.CDB_CONFIG?.isPilot) { openConfer(id); return; }
+  applyAdvanceTransition(id, nextStatus);
+}
+
+function assertImportedBatchAction(batchId) {
+  const batch = getBatchById(batchId);
+  const rules = window.cdbSync && window.cdbSync.getLegacyHistoryRules ? window.cdbSync.getLegacyHistoryRules() : null;
+  if (batch && (batch.legacyImported === true || (rules && rules.batchIds.includes(batchId)))) {
+    showToast('Lote histórico preservado. Para alterar estoque, peça revisão à equipe. As etiquetas continuam disponíveis.');
+    return false;
+  }
+  return true;
+}
+
+function assertImportedOrderAction(orderId, action) {
+  const order = getOrderById(orderId);
+  const rules = window.cdbSync && window.cdbSync.getLegacyHistoryRules ? window.cdbSync.getLegacyHistoryRules() : null;
+  const status = order && (order.legacyHistoryStatus || (rules && rules.orderStates[orderId]));
+  if (!status) return true;
+  if (status === STATUS.PRONTO && order.status === STATUS.PRONTO && (action === STATUS.ENTREGUE || action === 'confer-ok')) return true;
+  showToast('Pedido histórico preservado. Alterações de estoque ou valores precisam de revisão da equipe.');
+  return false;
+}
+
+function cancelOrder(id) {
+  if (!assertImportedOrderAction(id, 'cancelar')) return;
+  const o = getOrderById(id);
+  if (!o) return;
+  // Idempotencia: pedido ja cancelado nao re-executa devolucao de estoque.
+  if (o.status === STATUS.CANCELADO) { showToast('Pedido já está cancelado'); return; }
+  // Confirmacao mais forte se ja foi entregue (afeta caixa do dia).
+  const prev = o.status;
+  const wasDelivered = prev === STATUS.ENTREGUE;
+  // Trava se cancela pedido entregue de um dia com caixa ja fechado
+  if (wasDelivered && o.updatedAt) {
+    const orderDay = dateKeyOf(o.updatedAt);
+    if (isCashClosedFor(orderDay)) {
+      showToast(`Caixa de ${fmtDateKey(orderDay)} fechado. Reabra primeiro pra cancelar este pedido.`);
+      return;
+    }
+  }
+  // Estoque ja' decrementado em PRONTO/ENTREGUE → cancelar tem consequencia
+  // financeira (caixa) ou de estoque ja' "saido". Mantem confirm() forte.
+  // Em AGUARDANDO/PREPARANDO o estoque ainda nao foi tocado → undo toast.
+  const stockAlreadyTaken = (prev === STATUS.PRONTO || prev === STATUS.ENTREGUE);
+  if (stockAlreadyTaken) {
+    const promptMsg = wasDelivered
+      ? `Cancelar pedido JÁ ENTREGUE de ${money(o.total)}?\n\nEstoque será devolvido e o valor sai do caixa de hoje.`
+      : 'Cancelar pedido pronto? Estoque será devolvido.';
+    if (!confirm(promptMsg)) return;
+    o.items.forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) p.stock = (p.stock || 0) + it.qty;
+    });
+    o.status = STATUS.CANCELADO;
+    o.updatedAt = Date.now();
+    o.lastOperatorName = operatorName || null;
+    addHistoryEvent(o, STATUS.CANCELADO, prev + ' → cancelado' + (wasDelivered ? ' (estornado do caixa)' : ''));
+    logAction({
+      action: 'order.delete', entityType: 'order', entityId: id,
+      summary: `Pedido cancelado · ${money(o.total)} · vinha de ${prev}` + (wasDelivered ? ' (caixa estornado)' : '')
+    });
+    persistAll();
+    updateSync();
+    renderHome();
+    renderOrdersFeed();
+    if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+    if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+    showToast(wasDelivered ? `Pedido entregue cancelado · ${money(o.total)} estornado` : 'Pedido cancelado');
+    return;
+  }
+
+  // Caso reversivel (estoque intacto): executa direto + undo toast 5s.
+  o.status = STATUS.CANCELADO;
+  o.updatedAt = Date.now();
+  o.lastOperatorName = operatorName || null;
+  addHistoryEvent(o, STATUS.CANCELADO, prev + ' → cancelado');
+  persistAll();
+  renderHome();
+  renderOrdersFeed();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  showUndoToast(
+    '<span class="hi">Pedido</span> cancelado · ' + money(o.total),
+    function () {
+      // Reverte status, remove ultimo history event de cancelamento.
+      const cur = getOrderById(id);
+      if (!cur) return;
+      cur.status = prev;
+      cur.updatedAt = Date.now();
+      if (Array.isArray(cur.history) && cur.history.length) {
+        const last = cur.history[cur.history.length - 1];
+        if (last && last.status === STATUS.CANCELADO) cur.history.pop();
+      }
+      persistAll();
+      renderHome();
+      renderOrdersFeed();
+      if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+      if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+      showToast('Cancelamento desfeito');
+    },
+    {
+      onCommit: function () {
+        updateSync();
+        logAction({
+          action: 'order.delete', entityType: 'order', entityId: id,
+          summary: `Pedido cancelado · ${money(o.total)} · vinha de ${prev}`
+        });
+      }
+    }
+  );
+}
+
+// =========================
+// PRODUÇÃO - grid
+// =========================
+const CATEGORIES = [
+  { key: 'massa', label: 'Massas' },
+  { key: 'molho', label: 'Molhos' },
+  { key: 'extra', label: 'Extras' }
+];
+let productionCategoryFilter = 'all';
+function categoriaDoGrid(p) {
+  return CATEGORIES.some(function (c) { return c.key === p.category; }) ? p.category : 'extra';
+}
+
+function setProductionCategory(cat) {
+  productionCategoryFilter = cat || 'all';
+  document.querySelectorAll('#prodCategoryFilter [data-pcat]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.pcat === productionCategoryFilter);
+  });
+  renderProductGrid();
+}
+
+// F6 — Resumo de demanda dos pedidos abertos. Agrega items por productId e
+// renderiza chips clicáveis. Tap pré-popula a quantidade do produto no grid
+// (operador só revisa e toca "Registrar produção"). Update em tempo real via
+// SSE: outro device sincroniza → cdb-mutations-applied → re-render.
+function aggregateProductionDemand() {
+  const open = orders.filter(o => o.status === 'aguardando' || o.status === 'preparando');
+  const byProduct = new Map();
+  open.forEach(o => {
+    (o.items || []).forEach(i => {
+      const key = i.productId || ('adhoc:' + (i.name || ''));
+      const prev = byProduct.get(key) || { productId: i.productId || null, name: i.name, emoji: i.emoji || '', unit: i.unit || 'Un', qty: 0 };
+      prev.qty += Number(i.qty) || 0;
+      byProduct.set(key, prev);
+    });
+  });
+  return { items: Array.from(byProduct.values()).sort((a,b) => b.qty - a.qty), pedidos: open.length };
+}
+
+function renderProductionDemand() {
+  const wrap = document.getElementById('prodDemand');
+  if (!wrap) return;
+  const { items, pedidos } = aggregateProductionDemand();
+  if (pedidos === 0 || items.length === 0) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  document.getElementById('prodDemandCount').textContent =
+    pedidos + (pedidos === 1 ? ' pedido' : ' pedidos');
+  document.getElementById('prodDemandChips').innerHTML = items.map(i => {
+    // Só permite tap se o produto existe no catálogo (productId resolve)
+    const inCatalog = i.productId && products.some(p => p.id === i.productId);
+    const dataAttr = inCatalog ? `data-pid="${escapeHtml(i.productId)}" data-qty="${i.qty}"` : 'aria-disabled="true"';
+    const onclick = inCatalog ? `onclick="prefillFromDemand(${jsString(i.productId)}, ${i.qty})"` : '';
+    const emoji = i.emoji ? `<span class="pd-emoji">${escapeHtml(i.emoji)}</span>` : '';
+    const title = inCatalog ? `Tocar pra pré-selecionar ${i.qty} no catálogo` : 'Item não está no catálogo de produção';
+    return `<button type="button" class="pd-chip" ${dataAttr} ${onclick} title="${title}" style="${inCatalog ? '' : 'opacity:0.5;cursor:default'}">
+      <span class="pd-qty">${i.qty}×</span>${emoji}<span>${escapeHtml(i.name)}</span>
+    </button>`;
+  }).join('');
+}
+
+function prefillFromDemand(productId, qty) {
+  const p = products.find(x => x.id === productId);
+  if (!p) { showToast('Produto não está no catálogo'); return; }
+  p.count = Math.max(p.count || 0, Number(qty) || 0);
+  renderProductGrid();
+  haptic();
+  showToast(`✓ Pré-selecionado ${p.count}× ${p.name}`);
+}
+
+// Re-render quando o sync trouxer mutations de outros devices.
+window.addEventListener('cdb-mutations-applied', function () {
+  // Só faz sentido se a tela Producao está visível.
+  if (document.querySelector('[data-screen="producao"].active')) renderProductionDemand();
+});
+
+function attachTileHandlers(tile, p) {
+  // Tap curto: +1. Press 500ms: prompt de qty exata. Press 1500ms: abre
+  // menu de ações (Editar / Arquivar). O menu cancela o prompt setando
+  // dataset.held — quando o pointerup dispara depois, o click handler
+  // checa esse flag e não incrementa.
+  tile.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    if (tile.dataset.held === '1') { tile.dataset.held = '0'; return; }
+    p.count++;
+    renderProductGrid();
+    haptic();
+  });
+  let qtyTimer = null, menuTimer = null;
+  tile.addEventListener('pointerdown', () => {
+    qtyTimer = setTimeout(() => {
+      tile.dataset.held = '1';
+      const v = prompt(`${p.name}: quantidade exata?`, p.count);
+      if (v === null) return;
+      // parseInt aceita "-10abc" -> -10. Validacao explicita: numero finito
+      // e nao-negativo. Limite max 9999 pra evitar overflow acidental.
+      const n = parseInt(v, 10);
+      if (!isFinite(n) || n < 0) { showToast('Quantidade inválida'); return; }
+      p.count = Math.min(9999, Math.max(0, n));
+      renderProductGrid();
+    }, 500);
+    menuTimer = setTimeout(() => {
+      // Menu sobrescreve o prompt: cancela qtyTimer e marca held pra
+      // bloquear o +1 do click subsequente.
+      clearTimeout(qtyTimer);
+      tile.dataset.held = '1';
+      try { haptic(); } catch (e) {}
+      openProductActionsMenu(p.id);
+    }, 1500);
+  });
+  const cancelTimers = () => { clearTimeout(qtyTimer); clearTimeout(menuTimer); };
+  tile.addEventListener('pointerup', cancelTimers);
+  tile.addEventListener('pointerleave', cancelTimers);
+  tile.addEventListener('pointercancel', cancelTimers);
+}
+
+// #2886: markup do card de produção. Rótulos levam o nome do produto para o leitor de tela.
+function productTileHtml(p) {
+  const qty = Number(p.count) || 0;
+  const stock = Number(p.stock) || 0;
+  const hasPhoto = p.photo ? ' has-photo' : '';
+  const name = escapeHtml(p.name);
+  return `
+        <div class="pt-main">
+          <div class="emoji">${escapeHtml(p.emoji || '📦')}</div>
+          <div class="pt-info">
+            <div class="pname">${name}</div>
+            <div class="punit">
+              ${escapeHtml(p.unit || '')}
+              <span class="stock-badge ${stock <= 0 ? 'empty' : ''}">${stock} no estoque</span>
+              ${qty > 0 ? `<span class="stock-after-prod" title="Saldo previsto após registrar essa producao">&rarr; ${stock + qty} após</span>` : ''}
+              <span class="prod-tap-hint">${qty > 0 ? qty + ' selecionado' : 'selecionar'}</span>
+            </div>
+          </div>
+        </div>
+        <div class="qty-controls">
+          <button class="qty-btn minus" ${p.count <= 0 ? 'disabled' : ''} onclick="event.stopPropagation(); decProduct(${jsString(p.id)})" aria-label="Diminuir ${name}">−</button>
+          <span class="qty-readout">${p.count || 0}</span>
+          <button class="qty-btn plus" onclick="event.stopPropagation(); incProduct(${jsString(p.id)})" aria-label="Aumentar ${name}">+</button>
+        </div>
+        <div class="prod-tile-actions">
+          <button class="prod-tile-action" onclick="event.stopPropagation(); openProductModalForEdit(${jsString(p.id)})">Editar</button>
+          <button class="prod-tile-action danger" onclick="event.stopPropagation(); archiveProduct(${jsString(p.id)})">Excluir</button>
+        </div>
+        <div class="pcount">${p.count}</div>
+        <button class="camera-btn${hasPhoto}" onclick="event.stopPropagation(); pickPhotoFor(${jsString(p.id)})" aria-label="${p.photo ? 'Trocar foto de ' : 'Foto de '}${name}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+`;
+}
+
+function renderProductGrid() {
+  const grid = document.getElementById('productGrid');
+  grid.innerHTML = '';
+  let anyCounted = false;
+  let totalUnits = 0;
+  let totalSkus = 0;
+  let anyActive = false;
+
+  const visibleCategories = productionCategoryFilter === 'all'
+    ? CATEGORIES
+    : CATEGORIES.filter(cat => cat.key === productionCategoryFilter);
+
+  visibleCategories.forEach(cat => {
+    // Filtra arquivados — ficam visiveis so no Catalogo (Ajustes)
+    // #1469: categoria fora da lista (ex.: produto vindo do ERP) aparece em Extras, nao some.
+    const items = products.filter(p => categoriaDoGrid(p) === cat.key && !p.archived);
+    if (items.length === 0) return;
+    anyActive = true;
+
+    const header = document.createElement('div');
+    header.className = 'grid-section';
+    header.textContent = cat.label;
+    grid.appendChild(header);
+
+    items.forEach(p => {
+      const qty = Number(p.count) || 0;
+      const stock = Number(p.stock) || 0;
+      if (qty > 0) {
+        anyCounted = true;
+        totalSkus++;
+        totalUnits += qty;
+      }
+      const tile = document.createElement('div');
+      tile.className = 'product-tile' + (p.count > 0 ? ' counted' : '') + (p.custom ? ' custom' : '');
+      tile.dataset.productId = String(p.id);
+      tile.innerHTML = productTileHtml(p);
+      attachTileHandlers(tile, p);
+      grid.appendChild(tile);
+    });
+  });
+
+  if (!anyActive) {
+    const empty = document.createElement('div');
+    empty.className = 'prod-empty-state';
+    empty.innerHTML = '<strong>Nenhum produto ativo</strong>Cadastre o primeiro produto para liberar produção, pedidos e estoque.';
+    grid.appendChild(empty);
+  }
+  const addTile = document.createElement('button');
+  addTile.type = 'button';
+  addTile.className = 'product-tile add-tile';
+  addTile.onclick = () => openProductModal('massa');
+  addTile.innerHTML = '<span class="add-icon">+</span><span class="pname">Cadastrar produto</span><span class="punit">massa, molho ou extra</span>';
+  grid.appendChild(addTile);
+
+  const summary = document.getElementById('prodScreenSummary');
+  const summaryMain = document.getElementById('prodScreenSummaryMain');
+  const summaryItems = document.getElementById('prodScreenSummaryItems');
+  if (summary && summaryMain) {
+    summary.style.display = anyCounted ? 'flex' : 'none';
+    summaryMain.textContent = `${totalUnits} unidade${totalUnits === 1 ? '' : 's'} · ${totalSkus} produto${totalSkus === 1 ? '' : 's'}`;
+    if (summaryItems) {
+      summaryItems.textContent = products
+        .filter(p => (Number(p.count) || 0) > 0)
+        .map(p => `${p.count}x ${p.name}`)
+        .join(' · ');
+    }
+  }
+  const activeProducts = products.filter(p => !p.archived);
+  const stockTotal = activeProducts.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
+  const lowStock = activeProducts.filter(p => (Number(p.stock) || 0) <= 2).length;
+  const prodMetricProducts = document.getElementById('prodMetricProducts');
+  const prodMetricStock = document.getElementById('prodMetricStock');
+  const prodMetricLow = document.getElementById('prodMetricLow');
+  if (prodMetricProducts) prodMetricProducts.textContent = activeProducts.length;
+  if (prodMetricStock) prodMetricStock.textContent = stockTotal;
+  if (prodMetricLow) prodMetricLow.textContent = lowStock;
+  const saveBtn = document.getElementById('saveProdBtn');
+  saveBtn.disabled = !anyCounted;
+  saveBtn.textContent = window.CDB_CONFIG?.isPilot ? 'Produzir' : anyCounted
+    ? `Conferir ${totalUnits} unidade${totalUnits === 1 ? '' : 's'}`
+    : 'Conferir produção';
+}
+
+function clearProduction(productIds = null) {
+  products.filter(p => !productIds || productIds.includes(p.id)).forEach(p => { p.count = 0; p.photo = null; });
+  renderProductGrid();
+}
+
+// Foto por item (produção)
+let photoTargetProductId = null;
+function pickPhotoFor(productId) {
+  photoTargetProductId = productId;
+  document.getElementById('prodPhoto').click();
+}
+function onPhotoPicked(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const url = ev.target.result;
+    if (photoTargetProductId) {
+      const p = products.find(x => x.id === photoTargetProductId);
+      if (p) p.photo = url;
+      photoTargetProductId = null;
+      renderProductGrid();
+      showToast('Foto anexada ao item');
+    } else {
+      // foto do lote inteiro
+      currentPhotoDataUrl = url;
+      renderBatchPhotoPreview();
+    }
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+// =========================
+// PRODUÇÃO - confirmação/lote
+// =========================
+let currentBatchCode = '';
+// #1474: id do batch nasce na abertura do modal pra tela mostrar o MESMO
+// codigo de lote (codigoDoLote) que vai pra etiqueta e pro ERP. Consumido
+// (zerado) no confirmProduction pra nunca reaproveitar id entre lotes.
+let currentBatchId = '';
+
+function buildBatchCode(items) {
+  const first = items[0];
+  const key = (first.name.toUpperCase().replace(/[^A-Z]/g,'').substring(0,4) || 'LOTE');
+  const d = new Date();
+  const datePart = String(d.getDate()).padStart(2,'0') + String(d.getMonth()+1).padStart(2,'0') + String(d.getFullYear()).substring(2);
+  const seq = String(batches.length + 1).padStart(3,'0');
+  return `${key}-${datePart}-${seq}`;
+}
+
+function buildBarcodePattern(seed) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const barW = (Math.abs(hash >> (i % 28)) % 3) + 1;
+    const gapW = (Math.abs(hash >> ((i + 7) % 28)) % 2) + 1;
+    html += `<span class="bar" style="width:${barW}px"></span><span class="gap" style="width:${gapW}px"></span>`;
+  }
+  return html;
+}
+
+let productionSelectionIds = null;
+function openProductionConfirm(productIds = null) {
+  const items = products.filter(p => p.count > 0 && (!productIds || productIds.includes(p.id)));
+  if (items.length === 0) return;
+  productionSelectionIds = productIds;
+
+  currentPhotoDataUrl = null;
+  renderBatchPhotoPreview();
+
+  // Código do batch fica em variável — não aparece mais na tela de revisão.
+  // É usado só internamente pra identificar o batch no banco.
+  currentBatchCode = buildBatchCode(items);
+  currentBatchId = 'b2-' + calcGerarUuid();
+
+  const summary = document.getElementById('prodSummary');
+  summary.innerHTML = items.map(i => {
+    const stockAtual = Number(i.stock) || 0;
+    const apos = stockAtual + (Number(i.count) || 0);
+    return `
+    <div class="ps-item" data-pid="${escapeHtml(i.id)}">
+      <div class="n">
+        <span class="e">${escapeHtml(i.emoji || '📦')}</span>
+        <span style="display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25">
+          <span>${escapeHtml(i.name)} <span style="color:var(--ink-mute);font-size:12px">${escapeHtml(i.unit||'')}</span></span>
+          <span class="ps-after">${stockAtual} no estoque &rarr; ${apos} após</span>
+        </span>
+      </div>
+      <div class="q">×${i.count}</div>
+    </div>`;
+  }).join('');
+
+  // Lista de validade/peso por produto. Pré-preenche com defaults do cadastro.
+  populateProdDetailList(items);
+  const manufactureInput = document.getElementById('prodManufacturedDate');
+  manufactureInput.value = localProductionDate(Date.now());
+  manufactureInput.max = manufactureInput.value;
+
+  document.getElementById('batchDate').textContent = subtituloDoLote(new Date(), currentBatchId);
+
+  rememberOperationalFocus('productionConfirmModal');
+  document.getElementById('productionConfirmModal').classList.add('show');
+  document.getElementById('prodManufacturedDate').focus();
+}
+
+function localProductionDate(ms) {
+  const date = new Date(ms);
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+}
+
+function productionTimestamp(value, nowMs) {
+  if (!value) return null;
+  if (value === localProductionDate(nowMs)) return nowMs;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value > localProductionDate(nowMs)) return null;
+  const ms = new Date(value + 'T12:00:00').getTime();
+  return Number.isFinite(ms) && localProductionDate(ms) === value ? ms : null;
+}
+
+const VALIDITY_OPTIONS = [3, 5, 7, 10, 15];
+
+function populateProdDetailList(items) {
+  const host = document.getElementById('prodDetailList');
+  if (!host) return;
+  host.innerHTML = items.map(p => {
+    const defWeight   = pesoPadraoDoProduto(p) ?? '';
+    // Pré-seleciona 5d se o produto não tem default — evita o operador travar
+    // em "Finalizar" achando que precisa preencher manualmente.
+    const defValidity = p.defaultValidityDays ?? 5;
+    const pills = VALIDITY_OPTIONS.map(d =>
+      `<button type="button" data-d="${d}" class="${defValidity === d ? 'active' : ''}">${d}d</button>`
+    ).join('');
+    const customVal = (defValidity && !VALIDITY_OPTIONS.includes(defValidity)) ? defValidity : '';
+    return `
+      <div class="pd-row" data-pid="${escapeHtml(p.id)}">
+        <div class="pd-name">
+          <span>${p.emoji || '📦'} ${escapeHtml(p.name)}</span>
+          <label class="pd-qty">Qtd. <input type="number" class="pd-quantity" aria-label="Quantidade de ${escapeHtml(p.name)}" min="1" max="9999" step="1" value="${p.count}" style="width:70px" oninput="updateProductionQuantityPreview(this)"></label>
+        </div>
+        <div class="pd-fields">
+          <input type="number" class="pd-weight" aria-label="Peso por unidade em gramas de ${escapeHtml(p.name)}" placeholder="Peso por unidade (g)" min="0" max="9999" value="${defWeight}" />
+          <div class="pd-validity-pills">
+            ${pills}
+            <input type="number" class="pd-validity-custom" aria-label="Validade em dias de ${escapeHtml(p.name)}" placeholder="Dias" min="1" max="365" value="${customVal}" />
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Pills: ao clicar, marca ativa e limpa custom. Custom: ao digitar, desmarca pills.
+  host.querySelectorAll('.pd-validity-pills').forEach(group => {
+    const pills  = group.querySelectorAll('button[data-d]');
+    const custom = group.querySelector('.pd-validity-custom');
+    pills.forEach(btn => {
+      btn.addEventListener('click', () => {
+        pills.forEach(b => b.classList.toggle('active', b === btn));
+        if (custom) custom.value = '';
+      });
+    });
+    if (custom) {
+      custom.addEventListener('input', () => {
+        if (custom.value) pills.forEach(b => b.classList.remove('active'));
+      });
+    }
+  });
+}
+
+/**
+ * Lê valores de validade/peso da seção do modal. Marca .invalid em rows
+ * sem validade. Retorna { valid, perProduct: Map<productId, {weightG, validityDays}> }.
+ */
+function readProdDetailValues() {
+  const rows = Array.from(document.querySelectorAll('#prodDetailList .pd-row'));
+  const perProduct = new Map();
+  let valid = true;
+  rows.forEach(row => {
+    row.classList.remove('invalid');
+    row.querySelector('.pd-weight')?.classList.remove('invalid');
+    row.querySelector('.pd-weight')?.removeAttribute('aria-invalid');
+    const pid = row.dataset.pid;
+    const weightRaw = row.querySelector('.pd-weight')?.value || '';
+    const quantityRaw = row.querySelector('.pd-quantity')?.value;
+    const qty = quantityRaw == null ? null : Number(quantityRaw);
+    if (qty !== null && (!Number.isInteger(qty) || qty < 1 || qty > 9999)) { valid = false; row.classList.add('invalid'); }
+    const customRaw = row.querySelector('.pd-validity-custom')?.value || '';
+    const activePill = row.querySelector('.pd-validity-pills button.active');
+    let validityDays = null;
+    if (customRaw) validityDays = Number(customRaw);
+    else if (activePill) validityDays = Number(activePill.dataset.d);
+    if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365) { valid = false; row.classList.add('invalid'); }
+    const weightG = weightRaw ? Number(weightRaw) : null;
+    if (weightG !== null && (!Number.isInteger(weightG) || weightG < 0 || weightG > 9999)) { valid = false; row.classList.add('invalid'); }
+    perProduct.set(pid, { weightG, validityDays, qty });
+  });
+  return { valid, perProduct };
+}
+
+function marcarPesoFaltando(productIds) {
+  const rows = Array.from(document.querySelectorAll('#prodDetailList .pd-row'));
+  let primeiro = null;
+  rows.forEach(row => {
+    if (!productIds.includes(row.dataset.pid)) return;
+    row.classList.add('invalid');
+    const input = row.querySelector('.pd-weight');
+    if (input) {
+      input.classList.add('invalid');
+      input.setAttribute('aria-invalid', 'true');
+      if (!primeiro) primeiro = input;
+    }
+  });
+  if (primeiro) {
+    try { primeiro.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+    try { primeiro.focus(); } catch (_) {}
+  }
+}
+
+function updateProductionQuantityPreview(input) {
+  const id = input.closest('.pd-row')?.dataset.pid;
+  const product = products.find(p => p.id === id);
+  const row = Array.from(document.querySelectorAll('#prodSummary .ps-item')).find(item => item.dataset.pid === id);
+  if (!product || !row) return;
+  const quantity = Number(input.value);
+  const valid = Number.isInteger(quantity) && quantity > 0 && quantity <= 9999;
+  row.querySelector('.q').textContent = valid ? '×' + quantity : 'Confira a quantidade';
+  row.querySelector('.ps-after').textContent = valid
+    ? (Number(product.stock) || 0) + ' no estoque → ' + ((Number(product.stock) || 0) + quantity) + ' após'
+    : 'Quantidade entre 1 e 9999';
+}
+
+function closeProductionConfirm() {
+  document.getElementById('productionConfirmModal').classList.remove('show');
+  currentPhotoDataUrl = null;
+  productionSelectionIds = null;
+  restoreOperationalFocus('productionConfirmModal');
+}
+
+function renderBatchPhotoPreview() {
+  const wrap = document.getElementById('photoPickerWrap');
+  if (currentPhotoDataUrl) {
+    wrap.innerHTML = `
+      <div class="photo-preview">
+        <img src="${currentPhotoDataUrl}" alt="Foto do lote">
+        <button class="remove-photo" onclick="removeBatchPhoto()" aria-label="Remover foto">&times;</button>
+      </div>
+    `;
+  } else {
+    wrap.innerHTML = `
+      <label class="photo-picker" for="prodPhoto">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <div>Tirar foto do lote</div>
+      </label>
+    `;
+  }
+}
+
+function removeBatchPhoto() {
+  currentPhotoDataUrl = null;
+  renderBatchPhotoPreview();
+}
+
+// ================================================================
+// MOVIMENTAÇÃO (timeline de entradas + saídas)
+// ================================================================
+// Filtro do Histórico — substituiu o antigo movFilter (entry/exit) por
+// filtros mais amplos: produto, batch, order, cash, settings, backup.
+let histFilter = 'all';
+let histPageSize = 100;
+let histShown = histPageSize;
+let stockFilter = 'all';
+
+function setHistFilter(f) {
+  histFilter = f;
+  histShown = histPageSize;
+  document.querySelectorAll('#histFilter button').forEach(b => {
+    b.classList.toggle('active', b.dataset.f === f);
+  });
+  renderHistoricoScreen();
+}
+
+function histLoadMore() {
+  histShown += histPageSize;
+  renderHistoricoScreen();
+}
+
+function setStockFilter(f) {
+  stockFilter = f;
+  document.querySelectorAll('#stockFilter button').forEach(b => {
+    b.classList.toggle('active', b.dataset.f === f);
+  });
+  renderStockScreen();
+}
+
+function getOrderSalesMovement(order) {
+  const items = (order.items || []).map(i => ({
+    kind: 'sales',
+    ts: order.updatedAt || order.factAt || order.createdAt || Date.now(),
+    title: `${i.qty || 0}× ${i.name}`,
+    detail: `Pedido #${String(order.id || '').slice(-8)} · ${order.clientSnapshot?.name || 'Sem cliente'}`,
+    productId: i.productId || '',
+    productName: i.name || '',
+    qty: -(Number(i.qty) || 0),
+    ref: order.id,
+    refType: 'order'
+  }));
+  return items;
+}
+
+function buildStockMovements() {
+  const moves = [];
+  (batches || []).filter(b => !b.deleted).forEach(batch => {
+    const ts = batch.closedAt || batch.createdAt || Date.now();
+    (batch.items || []).forEach(it => {
+      moves.push({
+        kind: 'batch',
+        ts,
+        title: `Produção ${batch.lote || batch.code || batch.id}`,
+        detail: `${it.qty}× ${it.name}`,
+        productId: it.productId || '',
+        productName: it.name || '',
+        qty: Number(it.qty) || 0,
+        ref: batch.id,
+        refType: 'batch'
+      });
+    });
+  });
+  (orders || []).forEach(order => {
+    const status = order.status;
+    if (status === STATUS.PRONTO || status === STATUS.ENTREGUE) {
+      moves.push(...getOrderSalesMovement(order));
+    }
+  });
+  (cashEntries || []).forEach(entry => {
+    moves.push({
+      kind: entry.type === 'expense' ? 'out' : 'in',
+      ts: entry.createdAt || Date.now(),
+      title: entry.type === 'expense' ? 'Saída de caixa' : 'Entrada de caixa',
+      detail: entry.description || '',
+      productId: '',
+      productName: '',
+      qty: 0,
+      ref: entry.id || '',
+      refType: 'cash'
+    });
+  });
+  return moves.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+}
+
+function renderStockScreen() {
+  const summaryHost = document.getElementById('stockSummaryGrid');
+  const timelineHost = document.getElementById('stockTimeline');
+  if (!summaryHost || !timelineHost) return;
+
+  const prods = (products || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const total = prods.length;
+  const withStock = prods.filter(p => (p.stock || 0) > 0).length;
+  const empty = prods.filter(p => (p.stock || 0) <= 0).length;
+  summaryHost.innerHTML = `
+    <div class="stock-stat"><strong>${total}</strong><span>produtos</span></div>
+    <div class="stock-stat"><strong>${withStock}</strong><span>com saldo</span></div>
+    <div class="stock-stat"><strong>${empty}</strong><span>em falta</span></div>
+  `;
+
+  const moves = buildStockMovements();
+  const buckets = new Map();
+  prods.forEach(p => buckets.set(p.id, { product: p, in: 0, out: 0, last: null, refs: [] }));
+  moves.forEach(m => {
+    if (!m.productId || !buckets.has(m.productId)) return;
+    const b = buckets.get(m.productId);
+    if (m.qty > 0) b.in += m.qty;
+    if (m.qty < 0) b.out += Math.abs(m.qty);
+    if (!b.last || (m.ts || 0) > (b.last.ts || 0)) b.last = m;
+    const refLabel = `${m.refType || 'mov'}:${m.ref || ''}`;
+    if (m.ref && !b.refs.includes(refLabel) && b.refs.length < 3) b.refs.push(refLabel);
+  });
+
+  const highlighted = prods
+    .filter(p => (p.stock || 0) > 0 || (buckets.get(p.id)?.last))
+    .sort((a, b) => {
+      const sa = Number(a.stock) || 0;
+      const sb = Number(b.stock) || 0;
+      const ta = buckets.get(a.id)?.last?.ts || 0;
+      const tb = buckets.get(b.id)?.last?.ts || 0;
+      return (sb - sa) || (tb - ta);
+    })
+    .slice(0, 6);
+
+  const ledgerHtml = highlighted.length ? `
+    <div class="stock-ledger">
+      ${highlighted.map(p => {
+        const bucket = buckets.get(p.id) || { in: 0, out: 0, last: null, refs: [] };
+        const stock = Number(p.stock) || 0;
+        const last = bucket.last;
+        const lastType = last ? (last.kind === 'batch' ? 'produção' : last.kind === 'sales' ? 'venda' : last.kind === 'in' ? 'entrada' : 'saída') : 'sem histórico';
+        const lastLabel = last ? `${lastType} · ${new Date(last.ts).toLocaleDateString('pt-BR')} ${String(new Date(last.ts).getHours()).padStart(2,'0')}:${String(new Date(last.ts).getMinutes()).padStart(2,'0')}` : 'sem histórico';
+        const badgeClass = stock <= 0 ? 'low' : 'ok';
+        const sourceChips = bucket.refs.length ? bucket.refs.map(ref => {
+          const kind = ref.split(':')[0];
+          const txt = kind === 'batch' ? 'produção' : kind === 'sales' ? 'venda' : kind === 'in' ? 'entrada' : 'saída';
+          return `<span class="stock-source-chip ${kind}">${txt}</span>`;
+        }).join('') : '<span class="stock-source-chip">sem origem recente</span>';
+        return `
+          <div class="stock-ledger-card">
+            <div class="stock-ledger-top">
+              <div>
+                <div class="stock-ledger-name">${escapeHtml(p.emoji || '•')} ${escapeHtml(p.name || '')}</div>
+                <div class="stock-ledger-meta">${escapeHtml(p.unit || '')} · saldo atual e trilha recente</div>
+              </div>
+              <span class="stock-ledger-badge ${badgeClass}">${stock > 0 ? `${stock} disp.` : 'sem saldo'}</span>
+            </div>
+            <div class="stock-ledger-progress">
+              <div class="mini"><strong>${bucket.in}</strong><span>entradas</span></div>
+              <div class="mini"><strong>${bucket.out}</strong><span>saídas</span></div>
+              <div class="mini"><strong>${bucket.in - bucket.out}</strong><span>líquido</span></div>
+            </div>
+            <div class="stock-ledger-tail">
+              <span class="stock-source-chip">${escapeHtml(lastLabel)}</span>
+              ${sourceChips}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+  ` : '';
+  const filtered = stockFilter === 'all' ? moves : moves.filter(m => {
+    if (stockFilter === 'batch') return m.kind === 'batch';
+    if (stockFilter === 'sales') return m.kind === 'sales';
+    if (stockFilter === 'in') return m.kind === 'in' || m.kind === 'batch';
+    if (stockFilter === 'out') return m.kind === 'out' || m.kind === 'sales';
+    return true;
+  });
+
+  if (!filtered.length) {
+    timelineHost.innerHTML = ledgerHtml + '<div class="empty"><span class="big">📦</span>Sem movimentações para este filtro</div>';
+    return;
+  }
+
+  timelineHost.innerHTML = ledgerHtml + filtered.slice(0, 80).map(m => {
+    const dt = new Date(m.ts);
+    const dateStr = dt.toLocaleDateString('pt-BR') + ' ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+    const qty = m.qty > 0 ? `+${m.qty}` : (m.qty < 0 ? `${m.qty}` : '•');
+    const badge = m.kind === 'batch' ? 'Produção' : m.kind === 'sales' ? 'Venda' : m.kind === 'in' ? 'Entrada' : 'Saída';
+    const productName = m.productId ? (products.find(p => p.id === m.productId)?.name || m.productName || '') : (m.productName || '');
+    return `<div class="mov-item ${m.kind}">
+      <div class="mov-head">
+        <span class="mov-type">${badge}</span>
+        <span>${dateStr}</span>
+      </div>
+      <div class="mov-items">
+        ${escapeHtml(m.title)}
+        ${m.detail ? `<span class="muted">${escapeHtml(m.detail)}</span>` : ''}
+      </div>
+      <div class="mov-ref"><span class="op">${escapeHtml(qty)}${productName ? ' · ' + escapeHtml(productName) : ''}</span></div>
+    </div>`;
+  }).join('');
+}
+
+/**
+ * Monta timeline unificada:
+ *  - Entradas: cada Batch produzido (stock+)
+ *  - Saídas: cada Order que foi para 'pronto' ou 'entregue' (stock-)
+ *             (exclui cancelados e que ainda não desceram estoque)
+ * Ordena por data desc.
+ */
+function buildMovimentos() {
+  const events = [];
+
+  batches.forEach(b => {
+    events.push({
+      type: 'entry',
+      at: b.createdAt,
+      label: 'Lote ' + (b.code || b.id),
+      ref: b.code || b.id,
+      items: b.items.map(i => ({ name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit })),
+      opName: b.lastOperatorName || null
+    });
+  });
+
+  orders.forEach(o => {
+    // Só contam como saída de estoque pedidos que passaram por 'pronto' ou 'entregue'
+    if (o.status !== 'pronto' && o.status !== 'entregue') return;
+    events.push({
+      type: 'exit',
+      at: o.updatedAt || o.createdAt,
+      label: (o.clientSnapshot?.name || 'Pedido') + (safeRefDisplay(o.clientSnapshot?.ref) ? ' — ' + safeRefDisplay(o.clientSnapshot.ref) : ''),
+      ref: '#' + (o.id || '').slice(-8),
+      items: (o.items || []).map(i => ({ name: i.name, emoji: i.emoji, qty: i.qty, unit: i.unit })),
+      status: o.status,
+      opName: o.lastOperatorName || null
+    });
+  });
+
+  return events.sort((a, b) => b.at - a.at);
+}
+
+// Mapa de label/icone por tipo de acao do audit log
+const HIST_ACTION_META = {
+  'product.create':       { icon: '➕', label: 'Cadastro de produto', type: 'product' },
+  'product.update':       { icon: '✏️', label: 'Edição de produto',  type: 'product' },
+  'product.archive':      { icon: '🗑️', label: 'Produto arquivado',  type: 'product' },
+  'product.restore':      { icon: '↺',  label: 'Produto restaurado', type: 'product' },
+  'batch.create':         { icon: '🍳', label: 'Produção registrada', type: 'batch' },
+  'order.create':         { icon: '📋', label: 'Pedido criado',       type: 'order' },
+  'order.status_change':  { icon: '🔄', label: 'Status do pedido',    type: 'order' },
+  'order.delete':         { icon: '❌', label: 'Pedido excluído',     type: 'order' },
+  'order.confirm_ok':     { icon: '✅', label: 'Conferido',           type: 'order' },
+  'order.confirm_adjust': { icon: '✏️', label: 'Conferido com ajuste', type: 'order' },
+  'order.confirm_problem':{ icon: '⚠️', label: 'Divergência reportada', type: 'order' },
+  'batch.unit_confirm_ok':     { icon: '✅', label: 'Unidade conferida',  type: 'batch' },
+  'batch.unit_confirm_problem':{ icon: '⚠️', label: 'Unidade c/ problema', type: 'batch' },
+  'batch.unit_confirm_adjust': { icon: '✏️', label: 'Unidade ajustada',  type: 'batch' },
+  'batch.delete':              { icon: '🗑️', label: 'Lote excluído',     type: 'batch' },
+  'batch.restore':             { icon: '↩️', label: 'Lote recuperado',   type: 'batch' },
+  'etiqueta.print':             { icon: '🖨️', label: 'Etiqueta impressa', type: 'label' },
+  'order.purge':               { icon: '⌫', label: 'Registro removido', type: 'order' },
+  'cash.entry_delete':         { icon: '🗑️', label: 'Lançamento excluído', type: 'cash' },
+  'cash.entry_edit':           { icon: '✏️', label: 'Lançamento editado', type: 'cash' },
+  'cash.day_close':            { icon: '🔒', label: 'Caixa fechado',     type: 'cash' },
+  'cash.day_reopen':           { icon: '🔓', label: 'Caixa reaberto',    type: 'cash' },
+  'op.purge_old':              { icon: '🧹', label: 'Dados antigos limpos', type: 'settings' },
+  'op.clear_tests':            { icon: '🧪', label: 'Dados de teste limpos', type: 'settings' },
+  'op.factory_reset':          { icon: '💣', label: 'Reset total', type: 'settings' },
+  'cash.manual_entry':    { icon: '💰', label: 'Lançamento de caixa', type: 'cash' },
+  'settings.update':      { icon: '⚙️', label: 'Ajustes alterados',  type: 'settings' },
+  'backup.export':        { icon: '⬇️', label: 'Backup exportado',    type: 'backup' },
+  'backup.restore':       { icon: '⬆️', label: 'Backup restaurado',   type: 'backup' }
+};
+
+// Normaliza eventos legacy (lotes/pedidos antigos sem entrada de log)
+// pra aparecerem no Histórico mesmo sem audit log gerado.
+function buildHistoryEvents() {
+  const log = loadAuditLog();
+  const events = log.map(entry => {
+    const meta = HIST_ACTION_META[entry.action] || { icon: '•', label: entry.action, type: 'other' };
+    return {
+      id: entry.id,
+      ts: entry.ts,
+      operator: entry.operator,
+      icon: meta.icon,
+      label: meta.label,
+      type: meta.type,
+      summary: entry.summary,
+      diff: entry.diff,
+      action: entry.action,
+      entityId: entry.entityId
+    };
+  });
+
+  // Backfill: lotes/pedidos sem audit log (criados antes do feature) ainda
+  // aparecem como entrada generica usando timestamp + operador da entidade.
+  const seenIds = new Set(log.map(e => e.entityId).filter(Boolean));
+  batches.forEach(b => {
+    if (seenIds.has(b.id)) return;
+    events.push({
+      id: 'legacy-b-' + b.id,
+      ts: b.createdAt,
+      operator: b.lastOperatorName || '—',
+      icon: '🍳',
+      label: 'Produção registrada',
+      type: 'batch',
+      summary: 'Lote ' + (b.code || b.id) + ' (' + (b.items?.length || 0) + ' produto(s))',
+      action: 'batch.create',
+      entityId: b.id
+    });
+  });
+  orders.forEach(o => {
+    if (seenIds.has(o.id)) return;
+    events.push({
+      id: 'legacy-o-' + o.id,
+      ts: o.createdAt,
+      operator: o.lastOperatorName || '—',
+      icon: '📋',
+      label: 'Pedido criado',
+      type: 'order',
+      summary: 'Pedido para ' + (o.clientSnapshot?.name || 'cliente') + ' · R$ ' + Number(o.total || 0).toFixed(2).replace('.', ','),
+      action: 'order.create',
+      entityId: o.id
+    });
+  });
+
+  return events.sort((a, b) => b.ts - a.ts);
+}
+
+function renderHistoricoScreen() {
+  const list = document.getElementById('histList');
+  if (!list) return;
+  const all = buildHistoryEvents().filter(e => !window.CDB_CONFIG?.isPilot
+    || (['product', 'batch', 'order', 'label'].includes(e.type) && !/^(order\.confirm|batch\.unit_confirm)/.test(e.action || '')));
+  const filtered = histFilter === 'all' ? all : all.filter(e => e.type === histFilter);
+  const batchCount = all.filter(e => e.type === 'batch').length;
+  const orderCount = all.filter(e => e.type === 'order').length;
+  const cashCount = all.filter(e => e.type === 'cash').length;
+  const otherCount = all.length - batchCount - orderCount - cashCount;
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty"><span class="big">📜</span>Nada por aqui ainda.<br><span style="font-size:12px;color:var(--ink-mute)">Cada produção, pedido, edição de cadastro etc. aparece aqui automaticamente.</span></div>`;
+    document.getElementById('histLoadMore').style.display = 'none';
+    return;
+  }
+
+  const visible = filtered.slice(0, histShown);
+  const summaryHtml = `
+    <div class="stock-ledger" style="margin-bottom:12px">
+      <div class="stock-ledger-card">
+        <div class="stock-ledger-top">
+          <div>
+            <div class="stock-ledger-name">${window.CDB_CONFIG?.isPilot ? 'Histórico' : 'Auditoria operacional'}</div>
+            <div class="stock-ledger-meta">${window.CDB_CONFIG?.isPilot ? 'Produtos, lotes e pedidos' : 'Eventos rastreáveis, lotes, pedidos e caixa'}</div>
+          </div>
+          <span class="stock-ledger-badge ok">${all.length} eventos</span>
+        </div>
+        <div class="detail-kpis">
+          <div class="detail-kpi"><strong>${batchCount}</strong><span>produção</span></div>
+          <div class="detail-kpi"><strong>${orderCount}</strong><span>pedidos</span></div>
+          <div class="detail-kpi"><strong>${cashCount + otherCount}</strong><span>outros</span></div>
+        </div>
+      </div>
+    </div>`;
+  list.innerHTML = summaryHtml + visible.map(e => {
+    const dt = new Date(e.ts);
+    const dateStr = dt.toLocaleDateString('pt-BR') + ' ' +
+      String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+    // Acoes contextuais por tipo de evento. Batch -> Reimprimir + Excluir/Recuperar.
+    let actions = '';
+    let extra = '';
+    if (e.type === 'batch' && e.entityId) {
+      const batch = batches.find(b => b.id === e.entityId);
+      if (batch) {
+        const btns = [];
+        if (!batch.deleted) {
+          btns.push(`<button class="hist-action" onclick="reprintFromBatchId(${jsString(e.entityId)})"><span data-op-icon="printer" aria-hidden="true">🖨️</span> Reimprimir</button>`);
+          btns.push(`<button class="hist-action" onclick="openBatchDetails(${jsString(e.entityId)})"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
+          btns.push(`<button class="hist-action danger" onclick="deleteBatch(${jsString(e.entityId)})"><span data-op-icon="lixeira" aria-hidden="true">🗑️</span> Excluir lote</button>`);
+        } else {
+          btns.push(`<button class="hist-action" onclick="restoreBatch(${jsString(e.entityId)})"><span data-op-icon="undo-2" aria-hidden="true">↩️</span> Recuperar lote</button>`);
+          btns.push(`<button class="hist-action" onclick="openBatchDetails(${jsString(e.entityId)})"><span data-op-icon="ficha" aria-hidden="true"></span> Detalhes</button>`);
+        }
+        actions = `<div class="mov-actions">${btns.join('')}</div>`;
+      }
+    }
+    if (e.type === 'order' && e.entityId) {
+      extra = `<div class="mov-more"><button class="hist-action" onclick="go('finalizados'); setTimeout(function(){ try { goFinalizadosTab('todos'); } catch(e){} }, 50)">Ver pedidos</button></div>`;
+    }
+    return `
+      <div class="mov-item ${e.type}">
+        <div class="mov-head">
+          <span class="mov-type"><span data-op-icon="${e.type === 'batch' ? 'producao' : 'historico'}" aria-hidden="true">${e.icon}</span> ${escapeHtml(e.label)}</span>
+          <span>${dateStr}</span>
+        </div>
+        <div class="mov-items">${escapeHtml(e.summary || '')}</div>
+        <div class="mov-ref"><span class="op">por ${escapeHtml(e.operator || '—')}</span></div>
+        ${actions}
+        ${extra}
+      </div>
+    `;
+  }).join('');
+
+  // Mostra "Carregar mais" se ainda tem itens depois do shown atual
+  document.getElementById('histLoadMore').style.display =
+    filtered.length > histShown ? 'block' : 'none';
+}
+
+// Reimprime etiquetas de um lote ja registrado. Usado no Historico pra
+// recuperar etiquetas perdidas / imprimir copia adicional.
+// ===== OPERACIONAL (Ajustes > seção danger zone) =====
+// purgeOldData: remove orders/batches/cashEntries criados ha mais de 30 dias.
+// clearTestData: remove orders/batches/cashEntries criados HOJE (testes ops).
+// factoryReset: oferece backup automatico, depois apaga TUDO + reload.
+
+function purgeOldData() {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const oldOrders  = (orders || []).filter(o => (o.createdAt || 0) < cutoff);
+  const oldBatches = (batches || []).filter(b => (b.createdAt || 0) < cutoff);
+  const oldEntries = (cashEntries || []).filter(e => (e.createdAt || 0) < cutoff);
+  const total = oldOrders.length + oldBatches.length + oldEntries.length;
+  if (!total) { showToast('Nada com mais de 30 dias pra limpar'); return; }
+  if (!confirm(`Limpar ${oldOrders.length} pedido(s), ${oldBatches.length} lote(s), ${oldEntries.length} lançamento(s) com mais de 30 dias?\n\nIrreversível (faça backup antes se precisar).`)) return;
+  orders      = orders.filter(o => (o.createdAt || 0) >= cutoff);
+  batches     = batches.filter(b => (b.createdAt || 0) >= cutoff);
+  cashEntries = cashEntries.filter(e => (e.createdAt || 0) >= cutoff);
+  persistAll();
+  logAction({
+    action: 'op.purge_old', entityType: 'settings',
+    summary: `Removido ${oldOrders.length} pedidos, ${oldBatches.length} lotes, ${oldEntries.length} lançamentos > 30 dias`
+  });
+  renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  showToast(`${total} registro(s) antigo(s) removidos`);
+}
+
+function clearTestData() {
+  const todayOrders  = (orders || []).filter(o => isToday(o.createdAt));
+  const todayBatches = (batches || []).filter(b => isToday(b.createdAt));
+  const todayEntries = (cashEntries || []).filter(e => isToday(e.createdAt));
+  const total = todayOrders.length + todayBatches.length + todayEntries.length;
+  if (!total) { showToast('Nenhum dado de hoje pra limpar'); return; }
+  if (!confirm(`🧪 Limpar dados de TESTE criados HOJE?\n\n- ${todayOrders.length} pedido(s)\n- ${todayBatches.length} lote(s)\n- ${todayEntries.length} lançamento(s)\n\nÚtil pra demo após testes. Irreversível.`)) return;
+  if (!confirm('Tem certeza? Última chance — não há como desfazer.')) return;
+  // Reverte estoque dos batches removidos (efeito colateral igual a deleteBatch)
+  todayBatches.forEach(b => {
+    (b.items || []).forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) p.stock = Math.max(0, (p.stock || 0) - (Number(it.qty) || 0));
+    });
+  });
+  // Reverte estoque dos pedidos pronto/entregue de hoje
+  todayOrders.forEach(o => {
+    if (o.status === STATUS.PRONTO || o.status === STATUS.ENTREGUE) {
+      (o.items || []).forEach(it => {
+        const p = products.find(x => x.id === it.productId);
+        if (p) p.stock = (p.stock || 0) + (Number(it.qty) || 0);
+      });
+    }
+  });
+  orders      = orders.filter(o => !isToday(o.createdAt));
+  batches     = batches.filter(b => !isToday(b.createdAt));
+  cashEntries = cashEntries.filter(e => !isToday(e.createdAt));
+  persistAll();
+  logAction({
+    action: 'op.clear_tests', entityType: 'settings',
+    summary: `Limpou ${todayOrders.length} pedidos, ${todayBatches.length} lotes, ${todayEntries.length} lançamentos de hoje (estoque revertido)`
+  });
+  renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderFinalizadosScreen === 'function') renderFinalizadosScreen();
+  showToast(`${total} registro(s) de hoje limpos`);
+}
+
+async function factoryReset() {
+  // Passo 1: oferece backup (recomendado)
+  const wantBackup = confirm('💣 RESET TOTAL\n\nIsso vai apagar TUDO:\n- Produtos\n- Pedidos\n- Lotes\n- Clientes\n- Caixa\n- Histórico\n- Configurações\n\nFazer backup antes? (RECOMENDADO)');
+  if (wantBackup) {
+    try { await exportBackup(); } catch (e) {}
+  }
+  // Passo 2: confirmação 1
+  if (!confirm('Apagar TUDO mesmo? Esta ação não pode ser desfeita.')) return;
+  // Passo 3: confirmação 2
+  if (!confirm('Tem certeza? Última chance!')) return;
+  // Audit log antes de apagar (depois ele some)
+  logAction({
+    action: 'op.factory_reset', entityType: 'settings',
+    summary: 'Reset total realizado pelo operador'
+  });
+  // F2: snapshot do estado atual (TTL 24h) — rede de seguranca caso o
+  // operador se arrependa. Nao substitui backup mas ajuda quando esquecem.
+  try {
+    const snap = {
+      ts: Date.now(),
+      ttlMs: 24 * 60 * 60 * 1000,
+      data: {}
+    };
+    Object.keys(localStorage).filter(k => k.indexOf('cdb-') === 0)
+      .forEach(k => { snap.data[k] = localStorage.getItem(k); });
+    localStorage.setItem('cdb-pre-reset-backup', JSON.stringify(snap));
+  } catch (e) { /* localStorage cheio: aceita perder snapshot */ }
+  // Limpa tudo
+  products = [];
+  clients  = [];
+  orders   = [];
+  batches  = [];
+  cashEntries = [];
+  cashClosings = [];
+  // localStorage: mantém device-id (pra sync), tema e o snapshot pre-reset.
+  const keep = ['cdb-device-id', 'cdb-theme', 'cdb-pre-reset-backup'];
+  const allKeys = Object.keys(localStorage).filter(k => k.startsWith('cdb-'));
+  allKeys.forEach(k => { if (!keep.includes(k)) try { localStorage.removeItem(k); } catch (e) {} });
+  showToast('App resetado · recarregando...');
+  setTimeout(() => location.reload(), 1200);
+}
+
+// ===== FECHAMENTO DE CAIXA DO DIA =====
+// cashClosings[]: { id, dateKey, closedAt, closedBy, summary, notes, reopenedAt?, reopenedBy? }
+// dateKey: 'YYYY-MM-DD' do fuso local. Snapshot do dia preservado.
+// reopenedAt setado != null indica que esta closing foi reaberta (nao bloqueia).
+function dateKeyOf(ms) {
+  const d = new Date(ms || Date.now());
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+// Meia-noite local do dia de ms, em ms.
+function startOfLocalDay(ms) {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+function getActiveCashClosing(dateKey) {
+  const k = dateKey || dateKeyOf();
+  return (cashClosings || []).find(c => c.dateKey === k && !c.reopenedAt) || null;
+}
+function isCashClosedFor(dateKey) { return !!getActiveCashClosing(dateKey); }
+function isCashClosedToday() { return isCashClosedFor(dateKeyOf()); }
+
+// Calcula sumario de caixa pra um dateKey especifico (default = hoje).
+// Usado pra: card home (hoje), modal fechamento (dia especifico), modal
+// detalhes (dia especifico), banner de dias em aberto.
+function calcCashSummary(dateKey) {
+  const k = dateKey || dateKeyOf();
+  const dayOrders = (orders || []).filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && dateKeyOf(o.updatedAt) === k);
+  const dayEntries = (cashEntries || []).filter(e => dateKeyOf(e.createdAt) === k);
+  const sold = dayOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const inX = dayEntries.filter(e => e.type === 'income').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const out = dayEntries.filter(e => e.type === 'expense').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  // #421 — custo dos produtos vendidos (COGS): qty * product.cost por item.
+  // Itens sem custo cadastrado nao entram no calculo mas sao contados em semCusto.
+  let cogs = 0;
+  let semCusto = 0;
+  dayOrders.forEach(function (o) {
+    (o.items || []).forEach(function (it) {
+      const p = (typeof products !== 'undefined' && products) ? products.find(function (x) { return x.id === it.productId; }) : null;
+      const cost = p && p.cost != null && isFinite(Number(p.cost)) ? Number(p.cost) : null;
+      if (cost != null) {
+        cogs += (Number(it.qty) || 0) * cost;
+      } else {
+        semCusto++;
+      }
+    });
+  });
+  const margem = sold - cogs - out;
+  return {
+    sold, in: inX, out, balance: sold + inX - out,
+    cogs, margem, semCusto,
+    ordersCount: dayOrders.length,
+    entriesCount: dayEntries.length
+  };
+}
+function calcCashSummaryToday() { return calcCashSummary(dateKeyOf()); }
+
+// Retorna lista de dateKeys com movimentacao anterior a hoje E sem
+// fechamento ativo. Usado pra banner "caixa de DD/MM ainda aberto".
+function getOpenPriorDays() {
+  const today = dateKeyOf();
+  const seen = new Set();
+  // Coleta dateKeys com movimentacao
+  (orders || []).forEach(o => {
+    if (o.status === STATUS.ENTREGUE && o.updatedAt) {
+      const k = dateKeyOf(o.updatedAt);
+      if (k !== today) seen.add(k);
+    }
+  });
+  (cashEntries || []).forEach(e => {
+    const k = dateKeyOf(e.createdAt);
+    if (k !== today) seen.add(k);
+  });
+  // Filtra os que NAO tem closing ativo
+  const open = [];
+  seen.forEach(k => {
+    if (!isCashClosedFor(k)) open.push(k);
+  });
+  // Ordena descendente (mais recentes primeiro)
+  return open.sort((a, b) => b.localeCompare(a));
+}
+function fmtDateKey(k) {
+  // YYYY-MM-DD -> DD/MM
+  const parts = k.split('-');
+  if (parts.length !== 3) return k;
+  return parts[2] + '/' + parts[1];
+}
+
+// dateKey opcional — se omitido, fecha caixa de HOJE.
+// Permite fechar dias anteriores em aberto via banner.
+let pendingCloseDateKey = null;
+function openCashCloseModal(dateKey) {
+  const k = dateKey || dateKeyOf();
+  if (isCashClosedFor(k)) { showToast(`Caixa de ${fmtDateKey(k)} já está fechado`); return; }
+  const sum = calcCashSummary(k);
+  if (sum.ordersCount === 0 && sum.entriesCount === 0) {
+    if (!confirm(`Nenhuma movimentação em ${fmtDateKey(k)}. Fechar mesmo assim?`)) return;
+  }
+  pendingCloseDateKey = k;
+  // Atualiza titulo
+  const titleEl = document.querySelector('#cashCloseModal .np-title');
+  if (titleEl) {
+    titleEl.textContent = k === dateKeyOf() ? 'Fechar caixa do dia' : `Fechar caixa de ${fmtDateKey(k)}`;
+  }
+  // #421 — linha de margem: so aparece quando ha pedidos no dia.
+  const margemLabel = sum.ordersCount > 0
+    ? (() => {
+        const approx = sum.semCusto > 0;
+        const cor = sum.margem >= 0 ? 'var(--basil)' : 'var(--accent)';
+        const suf = approx ? ` <span style="font-size:var(--fs-micro);color:var(--ink-mute)">(${contaItens(sum.semCusto)} sem custo)</span>` : '';
+        return `<div style="display:flex;justify-content:space-between;margin-top:4px"><span>Margem${approx ? ' ~' : ''}</span><span style="font-weight:800;color:${cor}">${money(sum.margem)}${suf}</span></div>`;
+      })()
+    : '';
+  document.getElementById('cashCloseSummary').innerHTML = `
+    <div style="display:flex;justify-content:space-between"><span>Vendas</span><span style="font-weight:800">${money(sum.sold)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Entradas extras</span><span>${money(sum.in)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Saídas</span><span style="color:var(--accent)">-${money(sum.out)}</span></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px;margin-top:4px"><span>Saldo</span><span style="font-weight:800;color:var(--gold)">${money(sum.balance)}</span></div>
+    ${margemLabel}
+  `;
+  document.getElementById('cashCloseConferred').value = '';
+  document.getElementById('cashCloseDiff').textContent = '';
+  document.getElementById('cashCloseNotes').value = '';
+  document.getElementById('cashCloseModal').classList.add('show');
+  document.getElementById('cashCloseConferred').oninput = function () {
+    const conf = parseMoneyInput(this.value);
+    const diffEl = document.getElementById('cashCloseDiff');
+    if (isNaN(conf)) { diffEl.textContent = ''; return; }
+    const diff = conf - sum.balance;
+    if (Math.abs(diff) < 0.005) {
+      diffEl.innerHTML = '<span style="color:var(--basil)">✓ Bate com o calculado</span>';
+    } else {
+      diffEl.innerHTML = `<span style="color:var(--accent)">⚠ Diferença de ${money(Math.abs(diff))} ${diff > 0 ? 'a mais' : 'a menos'}</span>`;
+    }
+  };
+}
+function closeCashCloseModal() { document.getElementById('cashCloseModal').classList.remove('show'); }
+
+function confirmCloseCashDay() {
+  const k = pendingCloseDateKey || dateKeyOf();
+  const sum = calcCashSummary(k);
+  const conferredRaw = (document.getElementById('cashCloseConferred').value || '').trim();
+  const conf = conferredRaw ? parseMoneyInput(conferredRaw) : null;
+  const notes = (document.getElementById('cashCloseNotes').value || '').trim() || null;
+  if (conferredRaw && isNaN(conf)) { showToast('Saldo conferido inválido'); return; }
+  const closing = {
+    id: 'close-' + Date.now(),
+    dateKey: k,
+    closedAt: Date.now(),
+    closedBy: operatorName || null,
+    summary: { ...sum, conferredBalance: isNaN(conf) ? null : conf },
+    notes
+  };
+  if (!cashClosings) cashClosings = [];
+  cashClosings.push(closing);
+  persistAll();
+  closeCashCloseModal();
+  pendingCloseDateKey = null;
+  renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  // Undo toast (5s pra reverter). Audit log so dispara apos commit
+  // (onCommit) — se operador desfez, o fechamento nem entra no log.
+  const closingId = closing.id;
+  showUndoToast(
+    `<span class="hi">🔒 Caixa de ${escapeHtml(fmtDateKey(k))}</span> fechado · saldo ${money(sum.balance)}`,
+    function () {
+      // Undo: remove o closing recem criado
+      cashClosings = (cashClosings || []).filter(c => c.id !== closingId);
+      persistAll();
+      renderHome();
+      if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+      if (typeof renderCashDetails === 'function') renderCashDetails();
+    },
+    {
+      onCommit: function () {
+        logAction({
+          action: 'cash.day_close', entityType: 'cash', entityId: closingId,
+          summary: `Caixa fechado · ${closing.dateKey} · saldo ${money(sum.balance)}` + (notes ? ' · ' + notes : '')
+        });
+      }
+    }
+  );
+}
+
+function reopenCashDay() {
+  const c = getActiveCashClosing();
+  if (!c) { showToast('Caixa não está fechado'); return; }
+  if (!confirm(`Reabrir caixa do dia ${c.dateKey}?\n\nIsso permitirá editar lançamentos novamente.`)) return;
+  if (!confirm('Tem certeza? Audit log vai registrar a reabertura.')) return;
+  c.reopenedAt = Date.now();
+  c.reopenedBy = operatorName || null;
+  persistAll();
+  logAction({
+    action: 'cash.day_reopen', entityType: 'cash', entityId: c.id,
+    summary: `Caixa do dia ${c.dateKey} reaberto`
+  });
+  renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderCashDetails === 'function') renderCashDetails();
+  showToast('🔓 Caixa reaberto');
+}
+
+// ===== DETALHES DO CAIXA DO DIA =====
+// (Onda 2.3) Caixa virou screen dedicada — alias mantidos pra nao quebrar
+// referencias antigas (botao do card da home, callbacks de outros lugares).
+function openCashDetails() { go('caixa'); }
+function closeCashDetails() { /* no-op: navegacao pela back button */ }
+function renderCashDetails() {
+  const sum = calcCashSummaryToday();
+  // #421 — mesma logica do fechamento; mostra margem quando ha pedidos.
+  const margemDetailLabel = sum.ordersCount > 0
+    ? (() => {
+        const approx = sum.semCusto > 0;
+        const cor = sum.margem >= 0 ? 'var(--basil)' : 'var(--accent)';
+        const suf = approx ? ` <span style="font-size:var(--fs-micro);color:var(--ink-mute)">(${sum.semCusto} sem custo)</span>` : '';
+        return `<div style="display:flex;justify-content:space-between;margin-top:4px"><span>Margem${approx ? ' ~' : ''}</span><span style="font-weight:800;color:${cor}">${money(sum.margem)}${suf}</span></div>`;
+      })()
+    : '';
+  document.getElementById('cashDetailsSummary').innerHTML = `
+    <div style="display:flex;justify-content:space-between"><span>Vendas (${sum.ordersCount})</span><span style="font-weight:800">${money(sum.sold)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Entradas extras</span><span style="color:var(--basil)">+${money(sum.in)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Saídas</span><span style="color:var(--accent)">-${money(sum.out)}</span></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px;margin-top:4px;font-weight:800"><span>Saldo</span><span style="color:var(--gold)">${money(sum.balance)}</span></div>
+    ${margemDetailLabel}
+  `;
+  const closed = isCashClosedToday();
+  document.getElementById('cashDetailsClosedBanner').style.display = closed ? 'block' : 'none';
+
+  const todayEntries = (cashEntries || [])
+    .filter(e => isToday(e.createdAt))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const listHost = document.getElementById('cashDetailsList');
+  if (!todayEntries.length) {
+    listHost.innerHTML = '<div class="confer-empty">Nenhum lançamento manual hoje.</div>';
+  } else {
+    listHost.innerHTML = todayEntries.map(e => {
+      const sign = e.type === 'expense' ? '-' : '+';
+      const color = e.type === 'expense' ? 'var(--accent)' : 'var(--basil)';
+      const time = new Date(e.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
+      const acoes = closed ? ''
+        : `<button class="fin-action" onclick="openCashModal(${jsString(e.id)})" aria-label="Editar lançamento" title="Editar">✏️</button>
+           <button class="fin-action danger" onclick="deleteCashEntry(${jsString(e.id)})" aria-label="Excluir lançamento" title="Excluir">🗑️</button>`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-elev);border-radius:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${escapeHtml(e.description)}</div>
+          <div style="font-size:var(--fs-micro);color:var(--ink-mute)">${time} · ${escapeHtml(e.lastOperatorName || '—')}</div>
+        </div>
+        <div style="font-weight:800;color:${color};white-space:nowrap">${sign}${money(e.amount)}</div>
+        ${acoes}
+      </div>`;
+    }).join('');
+  }
+
+  const todayOrders = (orders || [])
+    .filter(o => o.status === STATUS.ENTREGUE && isToday(o.updatedAt))
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const ordHost = document.getElementById('cashDetailsOrders');
+  if (!todayOrders.length) {
+    ordHost.innerHTML = '<div class="confer-empty">Nenhum pedido entregue hoje.</div>';
+  } else {
+    ordHost.innerHTML = todayOrders.map(o => {
+      const time = new Date(o.updatedAt).toLocaleTimeString('pt-BR').slice(0,5);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-elev);border-radius:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
+          <div style="font-size:var(--fs-micro);color:var(--ink-mute)">${time} · #${(o.id||'').slice(-8)}</div>
+        </div>
+        <div style="font-weight:800;color:var(--basil);white-space:nowrap">+${money(o.total)}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ===== TELA FINALIZADOS (data-screen=finalizados) =====
+// Lista pedidos status entregue + cancelado, com filtros de periodo e status.
+// Permite cancelar um entregue (estorna estoque + caixa) ou apagar do
+// registro um cancelado (hard delete + audit).
+let finPeriod = 'hoje';
+let finStatusFilter = 'todos';
+function setFinFilter(p) {
+  finPeriod = p;
+  document.querySelectorAll('#finFilter button').forEach(b => {
+    b.classList.toggle('active', b.dataset.f === p);
+    b.setAttribute('aria-pressed', String(b.dataset.f === p));
+  });
+  renderFinalizadosScreen();
+}
+function setFinStatus(s) {
+  finStatusFilter = s;
+  document.querySelectorAll('#finStatus button').forEach(b => {
+    b.classList.toggle('active', b.dataset.s === s);
+    b.setAttribute('aria-pressed', String(b.dataset.s === s));
+  });
+  renderFinalizadosScreen();
+}
+// #2735: "Hoje" começa à meia-noite local. Com as últimas 24 h, o que foi entregue
+// ontem à tarde aparecia como de hoje. Os outros períodos seguem como janelas corridas.
+function finCutoffMs(period, now) {
+  if (period === 'hoje') return startOfLocalDay(now);
+  if (period === '7d') return now - 7 * 24 * 60 * 60 * 1000;
+  if (period === '30d') return now - 30 * 24 * 60 * 60 * 1000;
+  return 0;
+}
+function renderFinalizadosScreen() {
+  const host = document.getElementById('finList');
+  if (!host) return;
+  const now = Date.now();
+  const cutoffMs = finCutoffMs(finPeriod, now);
+  const list = (orders || []).filter(o => {
+    if (o.status !== STATUS.ENTREGUE && o.status !== STATUS.CANCELADO) return false;
+    if (finStatusFilter !== 'todos' && o.status !== finStatusFilter) return false;
+    const ts = o.updatedAt || o.createdAt || 0;
+    return ts >= cutoffMs;
+  }).sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+
+  if (!list.length) {
+    host.innerHTML = '<div class="confer-empty">Nenhum pedido finalizado nesse período.</div>';
+    return;
+  }
+  host.innerHTML = list.map(o => {
+    const ts = new Date(o.updatedAt || o.createdAt);
+    const dateStr = ts.toLocaleDateString('pt-BR') + ' ' + String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0');
+    const cliente = o.clientSnapshot?.name || 'Sem cliente';
+    const refClean = safeRefDisplay(o.clientSnapshot?.ref);
+    const ref = refClean ? ' · ' + refClean : '';
+    const orderRef = (o.id || '').slice(-8);
+    const statusBadge = o.status === STATUS.ENTREGUE
+      ? '<span class="fin-badge entregue">Entregue</span>'
+      : '<span class="fin-badge cancelado">Cancelado</span>';
+    const acoes = o.status === STATUS.ENTREGUE
+      ? `<button class="fin-action danger" onclick="cancelOrder(${jsString(o.id)})">Cancelar</button>`
+      : `<button class="fin-action danger" onclick="purgeOrderRecord(${jsString(o.id)})">Excluir do registro</button>`;
+    return `<div class="fin-card ${o.status}">
+      <div class="fin-row">
+        <div class="fin-info">
+          <div class="fin-code">#${escapeHtml(orderRef)}</div>
+          <div class="fin-name">${escapeHtml(cliente)}${escapeHtml(ref)}</div>
+          <div class="fin-meta">${escapeHtml(dateStr)} · ${money(o.total)}</div>
+        </div>
+        ${statusBadge}
+      </div>
+      <div class="fin-actions">
+        <button class="fin-action" onclick="openHistorico(${jsString(o.id)})">Ver detalhes</button>
+        ${acoes}
+      </div>
+    </div>`;
+  }).join('');
+}
+// Hard delete de pedido CANCELADO (apaga do array, audit registra).
+// Pra entregue, o operador deve cancelar primeiro.
+function purgeOrderRecord(id) {
+  if (!assertImportedOrderAction(id, 'excluir')) return;
+  const o = (orders || []).find(x => x.id === id);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  if (o.status !== STATUS.CANCELADO) {
+    showToast('Apenas pedidos cancelados podem ser excluidos do registro');
+    return;
+  }
+  if (!confirm(`Apagar PERMANENTEMENTE o registro do pedido #${(o.id||'').slice(-8)}?\n\nIsso NAO pode ser desfeito (apenas via backup).`)) return;
+  const ref = (o.id||'').slice(-8);
+  orders = orders.filter(x => x.id !== id);
+  persistAll();
+  logAction({
+    action: 'order.purge', entityType: 'order', entityId: id,
+    summary: `Registro do pedido #${ref} apagado · ${money(o.total)} · ${o.clientSnapshot?.name || 'sem cliente'}`
+  });
+  if (typeof renderFinalizadosScreen === 'function') renderFinalizadosScreen();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  showToast(`Pedido #${ref} apagado`);
+}
+
+// ===== CLIENTES E RECORRENCIA =====
+let clientFilter = 'todos';
+
+function setClientFilter(filter) {
+  clientFilter = filter || 'todos';
+  document.querySelectorAll('#clientFilter button').forEach(b => b.classList.toggle('active', b.dataset.f === clientFilter));
+  renderClientesScreen();
+}
+
+function clientRecencyLabel(ts) {
+  if (!ts) return 'sem pedido';
+  const days = Math.floor((Date.now() - Number(ts)) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return 'hoje';
+  if (days === 1) return 'ontem';
+  return days + ' dias';
+}
+
+function buildClientInsights() {
+  const byId = new Map();
+  (clients || []).forEach(c => {
+    byId.set(c.id, {
+      client: c, orders: 0, total: 0,
+      ordersDelivered: 0, totalDelivered: 0,
+      lastAt: Number(c.lastOrder) || 0,
+      products: new Map(),
+      distinctDays: new Set()
+    });
+  });
+  (orders || []).forEach(o => {
+    if (o.status === STATUS.CANCELADO) return;
+    const key = o.clientId || ('snapshot:' + (o.clientSnapshot?.name || 'sem cliente'));
+    if (!byId.has(key)) {
+      byId.set(key, {
+        client: { id: key, name: o.clientSnapshot?.name || 'Cliente sem cadastro', ref: o.clientSnapshot?.ref || '' },
+        orders: 0, total: 0, ordersDelivered: 0, totalDelivered: 0,
+        lastAt: 0, products: new Map(), distinctDays: new Set()
+      });
+    }
+    const row = byId.get(key);
+    row.orders += 1;
+    row.total += Number(o.total) || 0;
+    // Bug 7 (Onda 4): ticket medio so conta entregues. Pedidos em
+    // "Pronto/Divergencia" ou aguardando nao representam receita realizada.
+    if (o.status === STATUS.ENTREGUE) {
+      row.ordersDelivered += 1;
+      row.totalDelivered += Number(o.total) || 0;
+    }
+    // Bug 6 (Onda 4): coleta dias distintos para usar como sinal de
+    // recorrencia real. 2 pedidos no mesmo dia (ou mesmo minuto) NAO
+    // configuram cliente recorrente — recorrencia exige retorno.
+    const orderTime = Number(o.factAt || o.createdAt) || 0;
+    if (orderTime) {
+      // #2735: dia do fuso local. Em UTC, dois pedidos na mesma noite viravam dois dias.
+      const dayKey = dateKeyOf(orderTime); // YYYY-MM-DD
+      row.distinctDays.add(dayKey);
+    }
+    row.lastAt = Math.max(row.lastAt || 0, Number(o.factAt || o.updatedAt || o.createdAt) || 0);
+    (o.items || []).forEach(it => {
+      const name = it.name || 'Produto';
+      row.products.set(name, (row.products.get(name) || 0) + (Number(it.qty) || 1));
+    });
+  });
+  return Array.from(byId.values()).map(row => {
+    const favorite = Array.from(row.products.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'sem favorito';
+    // Bug 7: avg = ticket medio s/ pedidos entregues. Fallback: se ainda
+    // nao ha entregue, usa media geral pra nao zerar o card no comeco.
+    const avg = row.ordersDelivered > 0
+      ? row.totalDelivered / row.ordersDelivered
+      : (row.orders ? row.total / row.orders : 0);
+    const days = row.lastAt ? Math.floor((Date.now() - row.lastAt) / (24 * 60 * 60 * 1000)) : 9999;
+    const distinctDayCount = row.distinctDays.size;
+    const score = clientScore(row.ordersDelivered || row.orders, avg, days);
+    const category = clientCategory(row.orders, days, distinctDayCount);
+    return { ...row, favorite, avg, days, distinctDayCount, score, category };
+  }).sort((a, b) => (b.score - a.score) || (b.totalDelivered - a.totalDelivered) || (b.total - a.total) || (b.lastAt - a.lastAt));
+}
+
+function buildClientReturnMessage(row) {
+  const first = (row.client?.name || '').split(' ')[0] || 'Oi';
+  const favorite = row.favorite && row.favorite !== 'sem favorito' ? row.favorite : 'uma massa fresca';
+  return `${first}, tudo bem? Aqui é da ${getEmpresaName()}. Passando pra avisar que estamos organizando a produção da semana. Posso reservar ${favorite} pra você?`;
+}
+
+function copyClientReturnMessage(clientId) {
+  const row = buildClientInsights().find(x => x.client.id === clientId);
+  if (!row) { showToast('Cliente não encontrado'); return; }
+  copyToClipboard(buildClientReturnMessage(row), 'Mensagem de retorno copiada');
+}
+
+// Categoria de cliente — matriz orders × days × distinctDays.
+// Recencia > 30d sobrescreve frequencia: ex-top sumido vira "risco"/"inativo"
+// porque o que importa no card e estado atual ("perdemos esse cliente,
+// mande mensagem"), nao trofeu historico.
+//
+// Bug 6 (Onda 4): "recorrente" e "top" agora exigem janela temporal real
+// (dias distintos), nao apenas contagem de pedidos. 2 pedidos no mesmo
+// minuto NAO configuram cliente recorrente — fidelizacao implica retorno
+// em datas separadas. distinctDays=0 ou ausente cai pra "novo".
+//
+// Janelas baseadas em ciclo semanal tipico de massas frescas; calibrar
+// com SQL apos 2 semanas de uso real.
+function clientCategory(orders, days, distinctDays) {
+  const o = Number(orders) || 0;
+  const d = days == null ? 9999 : Number(days);
+  const dd = Number(distinctDays) || 0;
+  if (o === 0) return null;
+  if (d > 60) return 'inativo';
+  if (d > 30) return 'risco';
+  if (o >= 5 && dd >= 3) return 'top';
+  if (o >= 2 && dd >= 2) return 'recorrente';
+  return 'novo';
+}
+
+const CLIENT_BADGE_META = {
+  top:        { label: 'Top',          cls: 'client-badge-top' },
+  recorrente: { label: 'Recorrente',   cls: 'client-badge-recorrente' },
+  novo:       { label: 'Novo',         cls: 'client-badge-novo' },
+  risco:      { label: 'Risco',        cls: 'client-badge-risco' },
+  inativo:    { label: 'Inativo 30d+', cls: 'client-badge-inativo' }
+};
+
+// Score 0..100 — frequencia (0..40) + ticket (0..30) + recencia (0..30).
+// Usado APENAS pra sort default (mais valiosos primeiro). UI mostra
+// categoria/badge, nao o numero.
+function clientScore(orders, avg, days) {
+  const freq = Math.min(40, (Number(orders) || 0) * 8);
+  const ticketRef = 50;
+  const ticket = Math.min(30, ((Number(avg) || 0) / ticketRef) * 30);
+  const d = days == null ? 9999 : Number(days);
+  const rec = d <= 7 ? 30 : d <= 30 ? 20 : d <= 60 ? 10 : d <= 120 ? 5 : 0;
+  return Math.round(freq + ticket + rec);
+}
+
+function renderClientesScreen() {
+  const summary = document.getElementById('clientValueGrid');
+  const host = document.getElementById('clientRecurrenceList');
+  if (!summary || !host) return;
+  const rows = buildClientInsights();
+  const activeRows = rows.filter(r => r.orders > 0);
+  const recurring = activeRows.filter(r => r.orders >= 2);
+  const top = activeRows[0];
+  summary.innerHTML = `
+    <div class="client-value-card"><span class="k">Clientes</span><span class="v">${clients.length}</span></div>
+    <div class="client-value-card"><span class="k">Recorrentes</span><span class="v">${recurring.length}</span></div>
+    <div class="client-value-card"><span class="k">Top cliente</span><span class="v">${top ? escapeHtml(shortenName(top.client.name)) : '—'}</span></div>
+  `;
+  let filtered = rows;
+  if (clientFilter === 'recorrentes') filtered = rows.filter(r => r.orders >= 2);
+  if (clientFilter === 'sumidos') filtered = rows.filter(r => r.orders > 0 && r.days >= 21);
+  if (!filtered.length) {
+    host.innerHTML = '<div class="empty"><span class="big">👤</span>Nenhum cliente nesse filtro</div>';
+    return;
+  }
+  host.innerHTML = filtered.slice(0, 20).map((row, idx) => {
+    const c = row.client || {};
+    const name = c.name || 'Cliente sem nome';
+    const idArg = jsString(c.id || '');
+    const nameArg = jsString(name);
+    const isRegistered = !!(c.id && (clients || []).some(x => x.id === c.id));
+    const clientAction = isRegistered ? `openClientModal({editId: ${idArg}})` : `openClientModal(${nameArg})`;
+    const clientActionLabel = isRegistered ? 'Editar' : 'Cadastrar';
+
+    const meta = row.category ? CLIENT_BADGE_META[row.category] : null;
+    const badgeHtml = meta
+      ? ` <span class="client-badge ${meta.cls}">${meta.label}</span>`
+      : '';
+
+    const recencyTxt = clientRecencyLabel(row.lastAt);
+    const pedidosTxt = `${row.orders} ${row.orders === 1 ? 'pedido' : 'pedidos'}`;
+
+    const phoneRaw = c.phone || '';
+    const phoneNorm = normalizePhoneBr(phoneRaw);
+    const phoneFmt = phoneNorm ? formatPhoneBr(phoneRaw) : phoneRaw;
+    const phoneHtml = phoneRaw
+      ? (phoneNorm
+          ? `<button type="button" class="client-wa-btn" onclick="event.stopPropagation(); openWhatsAppCliente(${idArg}); return false;" aria-label="Abrir WhatsApp com ${escapeHtml(name)}, telefone ${escapeHtml(phoneFmt)}"><span aria-hidden="true">💬</span> ${escapeHtml(phoneFmt)}</button>`
+          : `<span class="client-meta-phone-invalid" title="Telefone fora do padrão brasileiro">${escapeHtml(phoneRaw)}</span>`)
+      : '';
+
+    const addrRaw = c.address || c.ref || '';
+    const addrValid = addrRaw.trim().length >= 5 && /\d/.test(addrRaw);
+    const mapHtml = addrRaw
+      ? (addrValid
+          ? `${phoneHtml ? ' · ' : ''}<button type="button" class="client-map-btn" onclick="event.stopPropagation(); openMapsCliente(${idArg}); return false;" aria-label="Abrir endereço de ${escapeHtml(name)} no Google Maps"><span aria-hidden="true">📍</span> ${escapeHtml(addrRaw)}</button>`
+          : `${phoneHtml ? ' · ' : ''}<span class="client-meta-addr-invalid" title="Endereço incompleto — edite o cliente para adicionar número e logradouro">${escapeHtml(addrRaw)}</span>`)
+      : '';
+
+    return `<div class="client-card">
+      <div class="client-card-top">
+        <div>
+          <div class="client-name">${escapeHtml(name)}${badgeHtml}</div>
+          <div class="client-recency">${escapeHtml(recencyTxt)} · ${escapeHtml(pedidosTxt)}</div>
+          ${phoneHtml || mapHtml ? `<div class="client-meta">${phoneHtml}${mapHtml}</div>` : ''}
+        </div>
+        <div class="client-rank">#${idx + 1}</div>
+      </div>
+      <div class="client-stats">
+        <div class="client-stat" title="Ticket medio dos pedidos ENTREGUES"><span>Ticket médio</span><strong>${money(row.avg)}</strong></div>
+        <div class="client-stat" title="Soma de TODOS os pedidos do cliente (qualquer status)"><span>Total acumulado</span><strong>${money(row.total)}</strong></div>
+        <div class="client-stat"><span>Favorito</span><strong>${escapeHtml(row.favorite)}</strong></div>
+      </div>
+      <div class="client-card-foot">
+        <button class="primary" onclick="copyClientReturnMessage(${idArg})">Mensagem</button>
+        <button onclick="${clientAction}">${clientActionLabel}</button>
+        <button onclick="openGlobalSearch(); setTimeout(function(){ try { document.getElementById('globalSearchInput').value=${nameArg}; onGlobalSearchInput(); } catch(e){} }, 80)">Histórico</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// #1466: o lote conta no saldo local enquanto nao esta excluido nem descartado.
+// Descarte anterior ao #1466 nunca baixou o saldo, entao continua contando.
+const DESCARTE_BAIXA_SALDO_DESDE = Date.UTC(2026, 9, 8);
+function loteContaNoSaldo(batch) {
+  if (batch.deleted) return false;
+  if (batch.discarded) return !((batch.discardedAt || 0) >= DESCARTE_BAIXA_SALDO_DESDE);
+  return true;
+}
+// Aplica no saldo a diferenca entre contar antes e contar agora. Nunca fica negativo.
+function ajustarSaldoDoLote(batch, contavaAntes) {
+  const contaAgora = loteContaNoSaldo(batch);
+  if (contavaAntes === contaAgora) return;
+  const sinal = contaAgora ? 1 : -1;
+  (batch.items || []).forEach(it => {
+    const p = products.find(x => x.id === it.productId);
+    if (p) p.stock = Math.max(0, (p.stock || 0) + sinal * (Number(it.qty) || 0));
+  });
+}
+
+// Soft delete de batch — marca como deletado, reverte estoque, audit log.
+// Recuperavel via restoreBatch. NAO bloqueia se estoque ja foi consumido em
+// vendas: usa Math.max(0, ...) pra evitar negativo (rastreado em audit log).
+function deleteBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch) { showToast('Lote não encontrado'); return; }
+  if (batch.deleted) { showToast('Lote já está excluído'); return; }
+  const total = (batch.items || []).reduce((s, i) => s + (Number(i.qty)||0), 0);
+  // Soft-delete + undo toast (5s pra reverter sem confirm bloqueante).
+  // Reverte estoque imediatamente; restoreBatch via undo restaura.
+  const contavaAntes = loteContaNoSaldo(batch);
+  batch.deleted = true;
+  batch.deletedAt = Date.now();
+  batch.deletedBy = operatorName || null;
+  ajustarSaldoDoLote(batch, contavaAntes);
+  persistAll();
+  if (typeof renderHome === 'function') renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  const lote = batch.lote || batch.code;
+  showUndoToast(
+    `<span class="hi">Lote ${escapeHtml(lote)}</span> excluído · ${total} unid. estornadas`,
+    function () { _silentRestoreBatch(batchId); },
+    {
+      onCommit: function () {
+        // Audit log so dispara apos confirmacao (operador nao desfez)
+        logAction({
+          action: 'batch.delete', entityType: 'batch', entityId: batchId,
+          summary: `Lote ${lote} excluído · ${total} unidades estornadas`
+        });
+      }
+    }
+  );
+}
+// Restore silencioso pra ser chamado pelo undo (sem confirm modal).
+function _silentRestoreBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch || !batch.deleted) return;
+  const contavaAntes = loteContaNoSaldo(batch);
+  batch.deleted = false;
+  batch.deletedAt = null;
+  batch.deletedBy = null;
+  ajustarSaldoDoLote(batch, contavaAntes);
+  persistAll();
+  if (typeof renderHome === 'function') renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  // F1 (Onda diagnostico): undo nao mostra toast — a action-toast com a
+  // barra ainda esta dispensando, e o handleUndoClick ja deu o feedback.
+  // Evita 2 toasts visualmente empilhados.
+}
+function restoreBatch(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch) { showToast('Lote não encontrado'); return; }
+  if (!batch.deleted) { showToast('Lote não está excluído'); return; }
+  const total = (batch.items || []).reduce((s, i) => s + (Number(i.qty)||0), 0);
+  if (!confirm(`Recuperar lote ${batch.lote || batch.code}?\n\n${total} unidade(s) volta(m) ao estoque.`)) return;
+  const contavaAntes = loteContaNoSaldo(batch);
+  batch.deleted = false;
+  batch.deletedAt = null;
+  batch.deletedBy = null;
+  ajustarSaldoDoLote(batch, contavaAntes);
+  persistAll();
+  logAction({
+    action: 'batch.restore', entityType: 'batch', entityId: batchId,
+    summary: `Lote ${batch.lote || batch.code} recuperado · ${total} unidades estornadas`
+  });
+  if (typeof renderHome === 'function') renderHome();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  showToast(`Lote ${batch.lote || batch.code} recuperado`);
+}
+
+function reprintFromBatchId(batchId) {
+  const batch = batches.find(b => b.id === batchId);
+  if (!batch) { showToast('Lote não encontrado neste aparelho'); return; }
+  const etiquetas = etiquetasFromBatch(batch);
+  if (!etiquetas.length) { showToast('Lote sem itens pra etiquetar'); return; }
+  // #1474: titulo com o mesmo codigo impresso na etiqueta (LOT-AAMMDD-xxxxxx).
+  const lote = codigoDoLote(batch);
+  showEtiquetasPreview(
+    etiquetas,
+    'producao',
+    `Lote ${lote} · ${etiquetas.length} etiqueta${etiquetas.length > 1 ? 's' : ''}`,
+    null
+  );
+}
+
+// Exporta o audit log inteiro como JSON via Share sheet (reusa plugin
+// @capacitor/share que ja foi adicionado pras etiquetas).
+async function exportAuditLog() {
+  try {
+    const log = loadAuditLog();
+    if (!log.length) { showToast('Sem histórico pra exportar'); return; }
+    const json = JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      operator: operatorName,
+      count: log.length,
+      entries: log
+    }, null, 2);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const filename = `historico-${stamp}.json`;
+    const blob = new Blob([json], { type: 'application/json' });
+
+    const FS    = window.Capacitor?.Plugins?.Filesystem;
+    const Share = window.Capacitor?.Plugins?.Share;
+    if (FS && Share) {
+      const base64 = (await blobToDataUrl(blob)).split(',')[1] || '';
+      const written = await FS.writeFile({
+        path: filename, data: base64, directory: 'CACHE', recursive: true
+      });
+      await Share.share({ title: 'Historico Easy Stock Mobile', files: [written.uri], dialogTitle: 'Compartilhar histórico' });
+      return;
+    }
+    // Fallback browser: download direto
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    showToast('Histórico baixado');
+  } catch (e) {
+    console.error('exportAuditLog', e);
+    showToast('Erro ao exportar: ' + (e?.message || e));
+  }
+}
+
+// ================================================================
+// EXPORT JSON → formato POST /api/mobile/sync do EasyStock
+// ================================================================
+function exportSnapshot() {
+  const ts = Date.now();
+  const deviceId = localStorage.getItem('cdb-device-id') || 'export';
+  const mutations = [];
+
+  products.forEach(p => {
+    mutations.push({
+      id: 'exp-p-' + p.id, deviceId, type: 'product.upsert',
+      payload: {
+        id: p.id, name: p.name, emoji: p.emoji ?? null,
+        category: p.category, unit: p.unit ?? null,
+        price: p.price ?? null, stock: p.stock ?? 0,
+        custom: !!p.custom
+      },
+      ts
+    });
+  });
+
+  clients.forEach(c => {
+    mutations.push({
+      id: 'exp-c-' + c.id, deviceId, type: 'client.upsert',
+      payload: {
+        id: c.id, name: c.name,
+        apt: c.apt ?? null, address: c.address ?? null, phone: c.phone ?? null,
+        lastOrder: c.lastOrder ?? ts, orderCount: c.orderCount || 0
+      },
+      ts
+    });
+  });
+
+  orders.forEach(o => {
+    mutations.push({
+      id: 'exp-o-' + o.id, deviceId, type: 'order.upsert',
+      payload: {
+        id: o.id, clientId: o.clientId ?? null,
+        clientSnapshot: {
+          name: o.clientSnapshot?.name || '',
+          ref:  o.clientSnapshot?.ref  || null
+        },
+        items: (o.items || []).map(i => ({
+          productId: i.productId, name: i.name,
+          emoji: i.emoji ?? null, unit: i.unit ?? null,
+          qty: i.qty, unitPrice: i.unitPrice
+        })),
+        notes: o.notes ?? null, total: o.total || 0,
+        status: o.status, metodo: o.metodo ?? null,
+        createdAt: o.createdAt, updatedAt: o.updatedAt
+      },
+      ts
+    });
+  });
+
+  batches.forEach(b => {
+    mutations.push({
+      id: 'exp-b-' + b.id, deviceId, type: 'batch.upsert',
+      payload: {
+        id: b.id, code: b.code,
+        items: (b.items || []).map(i => ({
+          productId: i.productId, name: i.name,
+          emoji: i.emoji ?? null, unit: i.unit ?? null,
+          qty: i.qty, photo: i.photo ?? null
+        })),
+        batchPhoto: b.batchPhoto ?? null,
+        createdAt: b.createdAt
+      },
+      ts
+    });
+  });
+
+  cashEntries.forEach(c => {
+    mutations.push({
+      id: 'exp-cash-' + c.id, deviceId, type: 'cashEntry.upsert',
+      payload: {
+        id: c.id, type: c.type, amount: c.amount,
+        description: c.description, metodo: c.metodo ?? null, createdAt: c.createdAt
+      },
+      ts
+    });
+  });
+
+  if (mutations.length === 0) {
+    showToast('Nada para exportar ainda.');
+    return;
+  }
+
+  const payload = {
+    deviceId,
+    operatorName: operatorName || null,
+    exportedAt: ts,
+    mutations
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const d = new Date();
+  const stamp = d.getFullYear() +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0') + '-' +
+    String(d.getHours()).padStart(2, '0') +
+    String(d.getMinutes()).padStart(2, '0');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `casa-da-baba-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+
+  showToast(`Exportou ${mutations.length} registros — envie pro EasyStock.`);
+}
+
+// ================================================================
+// IMPORT JSON → restaura estado a partir de backup exportado
+// Merge por id (last-write-wins via ts/updatedAt). Útil para migrar
+// pra outro celular ou recuperar depois de reinstalar o APK.
+// ================================================================
+function importSnapshot(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (!confirm('Importar dados deste arquivo? Registros serão mesclados com os locais (mais recente vence).')) {
+    event.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || !Array.isArray(data.mutations)) {
+        showToast('Arquivo inválido: faltam mutations.');
+        return;
+      }
+      const result = applyImportedMutations(data.mutations);
+      persistAll();
+      renderProductGrid();
+      renderHome();
+      renderKanban();
+      renderRecents();
+      renderHistoricoScreen();
+      showToast(`Importou ${result.applied} registros (${result.skipped} pulados).`);
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao ler arquivo: ' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+function applyImportedMutations(mutations) {
+  let applied = 0, skipped = 0;
+  const upsertById = (arr, item, newerFn) => {
+    const idx = arr.findIndex(x => x.id === item.id);
+    if (idx < 0) { arr.push(item); applied++; return; }
+    if (newerFn(arr[idx], item)) { arr[idx] = { ...arr[idx], ...item }; applied++; }
+    else skipped++;
+  };
+
+  mutations.forEach(m => {
+    const p = m.payload || {};
+    switch (m.type) {
+      case 'product.upsert':
+        upsertById(products, {
+          id: p.id, name: p.name, emoji: p.emoji, category: p.category,
+          unit: p.unit, price: p.price, stock: p.stock ?? 0,
+          custom: !!p.custom, count: 0, photo: null,
+          // C2 (RDC 727/2022): "Avulso" (default) | "Embalado". Vindo do
+          // ProductDto do server. exigePesoPara() trata undefined/null como
+          // Embalado conservadoramente (fallback seguro pra sync antigo).
+          tipoEmbalagem: p.tipoEmbalagem || 'Avulso'
+        }, (cur, inc) => (m.ts || 0) >= 0); // sempre upserta produto
+        break;
+      case 'client.upsert':
+        upsertById(clients, {
+          id: p.id, name: p.name, apt: p.apt, address: p.address,
+          phone: p.phone, lastOrder: p.lastOrder, orderCount: p.orderCount || 0,
+          // CLI-3/5: so leva o documento quando o servidor mandou; ausente nao apaga o do aparelho.
+          ...(p.document ? { document: p.document } : {})
+        }, (cur, inc) => (inc.lastOrder || 0) >= (cur.lastOrder || 0));
+        break;
+      case 'order.upsert':
+        upsertById(orders, {
+          id: p.id, clientId: p.clientId,
+          clientSnapshot: p.clientSnapshot || { name: 'Sem cliente', ref: null },
+          items: p.items || [], notes: p.notes,
+          total: p.total || 0, status: p.status || 'aguardando',
+          metodo: p.metodo ?? null,
+          createdAt: p.createdAt, updatedAt: p.updatedAt || p.createdAt
+        }, (cur, inc) => (inc.updatedAt || 0) >= (cur.updatedAt || 0));
+        break;
+      case 'batch.upsert':
+        upsertById(batches, {
+          id: p.id, code: p.code, items: p.items || [],
+          batchPhoto: p.batchPhoto, createdAt: p.createdAt
+        }, () => false); // batches imutáveis — se já existe, skip
+        break;
+      case 'cashEntry.upsert':
+        upsertById(cashEntries, {
+          id: p.id, type: p.type, amount: p.amount,
+          description: p.description, metodo: p.metodo ?? null, createdAt: p.createdAt
+        }, () => false); // cash imutável
+        break;
+      default:
+        skipped++;
+    }
+  });
+  return { applied, skipped };
+}
+
+// ================================================================
+// KANBAN da esteira de produção (substitui renderOrdersFeed)
+// ================================================================
+const KANBAN_COLS = [
+  { key: 'aguardando', label: 'Aguardando', next: 'Iniciar preparo' },
+  { key: 'preparando', label: 'Preparando', next: 'Marcar pronto' },
+  { key: 'pronto',     label: 'Pronto',     next: 'Marcar entregue' }
+];
+
+let highlightOrderId = null; // id do pedido que acabou de ser criado (pisca)
+let pilotOrderStatus = null;
+let pilotHighlightedOrder = null;
+let pilotOrderAdvance = null;
+
+function selectPilotOrderStatus(status) {
+  if (!window.CDB_CONFIG?.isPilot || !KANBAN_COLS.some(col => col.key === status)) return;
+  pilotOrderStatus = status;
+  pilotOrderAdvance = null;
+  renderKanban();
+  document.querySelector(`#kanban [data-order-status="${status}"]`)?.focus({ preventScroll: true });
+}
+
+function renderKanban() {
+  const root = document.getElementById('kanban');
+  if (!root) return;
+
+  // Atualiza badge da aba "Andamento" com contador de pedidos abertos
+  if (typeof updatePedidosTabBadge === 'function') updatePedidosTabBadge();
+
+  const openItems = orders.filter(o =>
+    o.status === 'aguardando' || o.status === 'preparando' || o.status === 'pronto'
+  );
+
+  if (openItems.length === 0 && !window.CDB_CONFIG?.isPilot) {
+    root.innerHTML = '<div class="empty"><span class="big">📭</span>Nenhum pedido em aberto</div><button class="export-btn" onclick="goPedidosTab(\'novo\')">Criar pedido</button>';
+    return;
+  }
+
+  // Por coluna, ordenar por scheduledDeliveryAt (se houver) ou createdAt asc.
+  // F5 — pedidos agendados aparecem na ordem da entrega, não da criação.
+  const byStatus = { aguardando: [], preparando: [], pronto: [] };
+  openItems.forEach(o => { byStatus[o.status].push(o); });
+  Object.keys(byStatus).forEach(k => byStatus[k].sort((a, b) =>
+    (a.scheduledDeliveryAt || a.createdAt) - (b.scheduledDeliveryAt || b.createdAt)
+  ));
+
+  if (window.CDB_CONFIG?.isPilot) {
+    if (!pilotOrderStatus && openItems.length) pilotOrderStatus = KANBAN_COLS.find(col => byStatus[col.key].length).key;
+    if (highlightOrderId && highlightOrderId !== pilotHighlightedOrder) {
+      const highlighted = openItems.find(o => o.id === highlightOrderId);
+      if (highlighted) pilotOrderStatus = highlighted.status;
+    }
+    pilotHighlightedOrder = highlightOrderId;
+    if (pilotOrderAdvance) {
+      const moved = orders.find(o => o.id === pilotOrderAdvance.id);
+      if (!moved || moved.status !== pilotOrderAdvance.from) {
+        if (moved && byStatus[moved.status]
+            && document.querySelector('[data-screen="pedidos"].active .pedidos-tab-section[data-tab="andamento"]')?.style.display === ''
+            && document.querySelector('[data-screen="pedidos"].active')) pilotOrderStatus = moved.status;
+        pilotOrderAdvance = null;
+      }
+    }
+    const selected = KANBAN_COLS.find(col => col.key === pilotOrderStatus) || KANBAN_COLS[0];
+    const list = byStatus[selected.key];
+    root.innerHTML = `<div class="pilot-order-filters" role="group" aria-label="Etapas dos pedidos">${KANBAN_COLS.map(col =>
+      `<button type="button" data-order-status="${col.key}" aria-pressed="${col.key === selected.key}" onclick="selectPilotOrderStatus(${jsString(col.key)})"><span>${col.label}</span><strong>${byStatus[col.key].length}</strong></button>`).join('')}</div>`
+      + `<div class="pilot-order-list" aria-label="Pedidos: ${selected.label}">${list.length
+        ? list.map(o => renderKanbanCard(o, selected)).join('')
+        : `<div class="pilot-order-empty">${openItems.length ? 'Nenhum pedido nesta etapa.' : 'Nenhum pedido em aberto.'}</div>`}</div>`;
+    return;
+  }
+
+  const overview = `
+    <div class="kanban-overview" aria-label="Resumo da esteira">
+      ${KANBAN_COLS.map(col => `<button type="button" data-kjump="${col.key}" onclick="jumpKanban(${jsString(col.key)})"><strong>${byStatus[col.key].length}</strong><span>${col.label}</span></button>`).join('')}
+    </div>`;
+
+  root.innerHTML = overview + KANBAN_COLS.map(col => {
+    const list = byStatus[col.key];
+    const body = list.length === 0
+      ? '<div class="kanban-col-empty">— vazio —</div>'
+      : list.map(o => renderKanbanCard(o, col)).join('');
+    return `
+      <div class="kanban-col col-${col.key}" id="kanban-col-${col.key}">
+        <div class="kanban-col-header">
+          <span>${col.label}</span>
+          <span class="count">${list.length}</span>
+        </div>
+        <div class="kanban-col-body">${body}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function jumpKanban(status) {
+  const el = document.getElementById('kanban-col-' + status);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderKanbanCard(o, col) {
+  const pilot = window.CDB_CONFIG?.isPilot === true;
+  const isHighlight = highlightOrderId === o.id;
+  // Bug 5 (Onda 4): filtra items com qty=0 (resultado de ajuste). Sem isso,
+  // o card mostrava "0× Talharim Fresco" ate o pedido ser cancelado.
+  const visibleItems = (o.items || []).filter(i => (Number(i.qty) || 0) > 0);
+  const itemsLine = visibleItems.length
+    ? visibleItems.map(i => `${i.qty}× ${escapeHtml(i.name)}${i.note ? ' ('+escapeHtml(i.note)+')' : ''}`).join(' · ')
+    : '<em style="color:var(--ink-mute)">sem itens (ajustado para 0)</em>';
+  const notes = o.notes ? `<div class="k-note">${escapeHtml(o.notes)}</div>` : '';
+  // Bug 1 (Onda 4): banner persistente quando o pedido foi marcado pronto
+  // com estoque negativo. Substitui o toast efemero que sumia em 3s.
+  const negStockBanner = o.negativeStockNote
+    ? `<div class="k-warning-banner" style="margin-top:6px;padding:6px 8px;background:rgba(231,104,69,0.12);border:1px solid var(--accent);border-radius:6px;font-size:12px;color:var(--ink-dim);line-height:1.4">⚠️ Estoque negativo: ${escapeHtml(o.negativeStockNote)}</div>`
+    : '';
+  const itemCount = visibleItems.reduce((acc, i) => acc + (Number(i.qty) || 0), 0);
+  // Selo de status de conferência ao lado do status do kanban
+  const cs = getConferStatus(o);
+  const badgeLabel = cs === CONFER_STATUS.PENDENTE ? (pilot ? 'Conferência pendente' : 'Conf. pendente') : conferStatusLabel(cs);
+  const conferBadge = pilot ? '' : `<span class="k-confer-badge ${cs}">${badgeLabel}</span>`;
+  const conferBtnLabel = cs === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Reconferir';
+
+  // Quick-actions WA + Mapa pro entregador. Phone vem do cliente cadastrado
+  // (lookup por clientId); pedidos sem cliente ou cliente sem phone valido
+  // omitem o botao WA. Mapa usa o ref do snapshot quando valido.
+  const cliente = o.clientId ? (clients || []).find(x => x.id === o.clientId) : null;
+  const waPhone = cliente ? normalizePhoneBr(cliente.phone) : null;
+  const waBtn = waPhone
+    ? `<button type="button" class="k-quick-wa" onclick="event.stopPropagation(); openWhatsAppCliente(${jsString(o.clientId)}); return false;" aria-label="Abrir WhatsApp com ${escapeHtml(o.clientSnapshot?.name || 'cliente')}" title="WhatsApp"><span aria-hidden="true">💬</span></button>`
+    : '';
+  // Bug 11 (Onda 4): impede que CPF antigo (em snapshots pre-fix) vire
+  // query string do Google Maps. safeRefDisplay filtra documentos.
+  const refForMap = safeRefDisplay(o.clientSnapshot?.ref);
+  const mapValid = refForMap.trim().length >= 5 && /\d/.test(refForMap);
+  const mapBtn = mapValid
+    ? `<button type="button" class="k-quick-map" onclick="event.stopPropagation(); openMapsPedidoRef(${jsString(refForMap)}); return false;" aria-label="Abrir endereço do pedido no Google Maps" title="Mapa"><span aria-hidden="true">📍</span></button>`
+    : '';
+  const quickActions = (waBtn || mapBtn) ? `<div class="k-quick-actions">${waBtn}${mapBtn}</div>` : '';
+
+  return `
+    <div class="k-card status-${col.key} ${isHighlight ? 'blink' : ''}">
+      <div class="k-topline">
+        ${pilot ? '' : `<span class="k-status">${col.label}</span>`}${conferBadge}${seloPagamentoPedido(o)}${o.channel ? `<span class="k-confer-badge" title="Canal">${escapeHtml(channelLabel(o.channel))}</span>` : ''}
+        ${pilot ? '' : `<div class="k-time">${timeOf(o.createdAt)}</div>`}
+      </div>
+      <div class="k-head">
+        <div class="k-who">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}${!pilot || safeRefDisplay(o.clientSnapshot?.ref) ? `<span class="apt">${escapeHtml(safeRefDisplay(o.clientSnapshot?.ref))}</span>` : ''}</div>
+        <span class="k-total">${money(o.total)}</span>
+      </div>
+      ${quickActions}
+      ${pilot ? `<div class="k-meta pilot-order-meta"><span>${contaItens(itemCount)}</span>${o.id ? `<span>Pedido ${escapeHtml(o.id.slice(-8))}</span>` : ''}${o.createdAt ? `<span>${timeOf(o.createdAt)}</span>` : ''}${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}</div>` : `<div class="k-meta">
+        <span class="k-chip">${contaItens(itemCount)}</span>
+        <span class="k-chip">Pedido ${(o.id || '').slice(-8)}</span>
+        ${o.scheduledDeliveryAt ? renderScheduledBadge(o.scheduledDeliveryAt) : ''}
+      </div>`}
+      <div class="k-items">${itemsLine}</div>
+      ${negStockBanner}
+      ${notes}
+      <div class="k-progress">${renderProgressDots(o.status, { small: true, showLabel: false })}</div>
+      <div class="k-foot">
+        <div class="k-primary-actions">
+          <button type="button" class="k-advance" onclick="advanceOrder(${jsString(o.id)})">${pilot ? (o.status === 'pronto' ? 'Entregar' : o.status === 'preparando' ? 'Finalizar' : 'Preparar') : o.status === 'pronto' ? 'Conferir entrega' : col.next}</button>
+        </div>
+        <div class="k-support-actions">
+          ${(Number(o.total) || 0) > 0 && !pedidoQuitado(o) ? `<button type="button" class="btn-cobrar" onclick="openCobranca(${jsString(o.id)})" title="Preparar cobrança">Preparar cobrança</button>` : ''}
+          <details class="k-more-actions">
+            <summary aria-label="Mais ações do pedido ${escapeHtml((o.id || '').slice(-8))}">Mais ações</summary>
+            <div class="k-secondary-actions">
+              ${!pilot ? `<button type="button" class="k-confer-btn" onclick="openConfer(${jsString(o.id)})" title="Conferência">${conferBtnLabel}</button>` : ''}
+              ${!pilot && (o.status === 'aguardando' || o.status === 'preparando') ? `<button type="button" class="k-confer-btn" onclick="openCestaCalcFromOrder(${jsString(o.id)})" title="Conferir insumos">Insumos</button>` : ''}
+              <button type="button" class="btn-imprimir" onclick="printEtiqueta(${jsString(o.id)})" title="Imprimir etiqueta">Imprimir etiqueta</button>
+              <button type="button" class="btn-historico" onclick="openHistorico(${jsString(o.id)})" title="Histórico">Histórico</button>
+              <button type="button" class="k-cancel" onclick="cancelOrder(${jsString(o.id)})">Cancelar pedido</button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Mantemos a antiga renderOrdersFeed apontando para renderKanban para
+// não quebrar quem chama pelo nome antigo.
+function renderOrdersFeed() { renderKanban(); }
+
+// #2307: o servidor manda quanto falta receber (aReceber). Sem o campo (servidor antigo), nada muda.
+function saldoAReceber(o) {
+  if (!o || o.aReceber === undefined || o.aReceber === null) return null;
+  const n = Number(o.aReceber);
+  return Number.isFinite(n) ? Math.max(0, n) : null;
+}
+function pedidoQuitado(o) {
+  const falta = saldoAReceber(o);
+  return falta !== null && falta < 0.005 && (Number(o.total) || 0) > 0;
+}
+function seloPagamentoPedido(o) {
+  const falta = saldoAReceber(o);
+  if (falta === null || (Number(o.total) || 0) <= 0) return '';
+  if (falta < 0.005) return '<span class="k-confer-badge conferido" title="Pagamento recebido">Pago</span>';
+  if (falta < (Number(o.total) || 0) - 0.005) return `<span class="k-confer-badge pendente" title="Parte já paga">Falta ${money(falta)}</span>`;
+  return '';
+}
+
+// ================================================================
+// Progress dots (status visual 4-etapas) — usado na Home e no Kanban
+// ================================================================
+function renderProgressDots(currentStatus, opts) {
+  opts = opts || {};
+  const stages = ORDER_FLOW; // aguardando, preparando, pronto, entregue
+  const idx = stages.indexOf(currentStatus);
+  const parts = [];
+  stages.forEach((st, i) => {
+    const cls = i < idx ? 'pd done' : (i === idx ? 'pd active' : 'pd');
+    parts.push(`<span class="${cls}" title="${st}"></span>`);
+    if (i < stages.length - 1) {
+      parts.push(`<span class="pd-sep${i < idx ? ' done' : ''}"></span>`);
+    }
+  });
+  const label = opts.showLabel !== false
+    ? `<span class="pd-label">${STATE_LABEL[currentStatus] || currentStatus}</span>`
+    : '';
+  return `<div class="progress-dots">${parts.join('')}${label}</div>`;
+}
+
+// ================================================================
+// Action Toast (pós criar pedido, com próximas ações)
+// ================================================================
+let actionToastTimer = null;
+function showActionToast(msgHtml, actions) {
+  const el   = document.getElementById('actionToast');
+  const msg  = document.getElementById('actionToastMsg');
+  const btns = document.getElementById('actionToastActions');
+  if (!el) return;
+
+  msg.innerHTML = msgHtml;
+  btns.innerHTML = '';
+  actions.forEach((a, i) => {
+    const b = document.createElement('button');
+    b.className = i === 0 ? 'at-primary' : 'at-secondary';
+    b.textContent = a.label;
+    b.onclick = () => { hideActionToast(); try { a.fn(); } catch (e) { console.warn(e); } };
+    btns.appendChild(b);
+  });
+
+  el.classList.add('show');
+  clearTimeout(actionToastTimer);
+  actionToastTimer = setTimeout(hideActionToast, 6000);
+}
+function hideActionToast() {
+  document.getElementById('actionToast').classList.remove('show');
+}
+
+// ================================================================
+// COBRANÇA — gera mensagem de WhatsApp + PIX pra o cliente pagar
+// Config: tipo, chave, nome do titular, nome da empresa em localStorage.
+// Tipos suportados: telefone, email, cpf, cnpj, aleatoria.
+// Trocar via console: cdbSetPix(key, holder, type) ou pela tela Ajustes.
+// ================================================================
+const DEFAULT_PIX_KEY = '';
+const DEFAULT_PIX_HOLDER = '';
+const DEFAULT_PIX_TYPE = 'telefone';
+const DEFAULT_EMPRESA_NAME = 'Minha empresa';
+const PIX_TYPES = {
+  telefone:  { label: 'Telefone',         placeholder: '(11) 99999-9999',     short: 'Cel' },
+  email:     { label: 'E-mail',           placeholder: 'seu@email.com',        short: 'E-mail' },
+  cpf:       { label: 'CPF',              placeholder: '123.456.789-00',       short: 'CPF' },
+  cnpj:      { label: 'CNPJ',             placeholder: '12.345.678/0001-90',   short: 'CNPJ' },
+  aleatoria: { label: 'Chave aleatória',  placeholder: 'cole a chave UUID',    short: 'Aleatória' }
+};
+
+function getPixKey()      { try { return localStorage.getItem('cdb-pix-key')      || DEFAULT_PIX_KEY;      } catch (e) { return DEFAULT_PIX_KEY; } }
+function getPixHolder()   { try { return localStorage.getItem('cdb-pix-holder')   || DEFAULT_PIX_HOLDER;   } catch (e) { return DEFAULT_PIX_HOLDER; } }
+function getPixType()     { try { return localStorage.getItem('cdb-pix-type')     || DEFAULT_PIX_TYPE;     } catch (e) { return DEFAULT_PIX_TYPE; } }
+function getEmpresaName() {
+  const fallback = window.CDB_CONFIG?.isPilot ? 'Casa da Baba' : DEFAULT_EMPRESA_NAME;
+  try { const name = localStorage.getItem('cdb-empresa-name'); return !name || name === DEFAULT_EMPRESA_NAME ? fallback : name; }
+  catch (e) { return fallback; }
+}
+const DEFAULT_EMPRESA_CIDADE = 'São Paulo';
+function getEmpresaCidade() { try { return localStorage.getItem('cdb-empresa-cidade') || DEFAULT_EMPRESA_CIDADE; } catch (e) { return DEFAULT_EMPRESA_CIDADE; } }
+function getStoreLogo()   { try { return localStorage.getItem('cdb-store-logo') || ''; } catch (e) { return ''; } }
+const SCAN_MODES = ['both', 'barcode', 'qr', 'none'];
+// #2247 (v3): a regra efetiva da produção (loja, senão aparelho, senão só QR,
+// D4 da v2). A 58 mm, a TSPL e Ajustes leem a mesma.
+function regraDaProducao() {
+  const I = window.cdbImpressoras;
+  try { if (I && I.regraEfetiva) return I.regraEfetiva(localStorage, 'etiqueta-producao'); } catch (e) {}
+  return null;
+}
+function getProdScanMode() {
+  const r = regraDaProducao();
+  if (r) return window.cdbImpressoras.modoDosCodigos(r.codigos);
+  try {
+    const mode = localStorage.getItem('cdb-prod-scan-mode') || 'qr';
+    return SCAN_MODES.includes(mode) ? mode : 'qr';
+  } catch (e) { return 'qr'; }
+}
+// Helper: dado um modo, retorna { showQr, showBars }. Centraliza a logica
+// usada em 3 paths de render (HTML do recibo, canvas do recibo, canvas/HTML
+// de producao) — antes ficava espalhada com flags _csm/_cshowQr/_cshowBars.
+function scanModeFlags(mode) {
+  const m = mode || getProdScanMode();
+  return { mode: m, showQr: m === 'both' || m === 'qr', showBars: m === 'both' || m === 'barcode' };
+}
+
+// Helper de console: cdbSetPix(key, holder, type, empresa).
+window.cdbSetPix = function (key, holder, type, empresa) {
+  if (key)     localStorage.setItem('cdb-pix-key',      String(key));
+  if (holder)  localStorage.setItem('cdb-pix-holder',   String(holder));
+  if (type)    localStorage.setItem('cdb-pix-type',     String(type));
+  if (empresa) localStorage.setItem('cdb-empresa-name', String(empresa));
+  // Não logar chave/holder — confirmação sem expor dado sensível.
+  console.log('[PIX] configurado:', getPixType() || '(sem tipo)', '·', getEmpresaName() || '(sem empresa)');
+};
+
+/**
+ * Migração suave da versão antiga (só key + holder, sem type).
+ * Detecta tipo pelo formato; quando estoura, marca como 'aleatoria'.
+ * Roda 1× no boot — idempotente (skip se cdb-pix-type já existe).
+ */
+function migratePixIfNeeded() {
+  try {
+    if (localStorage.getItem('cdb-pix-type')) return;
+    const raw = (localStorage.getItem('cdb-pix-key') || '').trim();
+    if (!raw) return; // nada a migrar — vai usar defaults
+    const digits = raw.replace(/\D/g, '');
+    let type = 'aleatoria';
+    if (raw.includes('@'))                       type = 'email';
+    else if (digits.length === 14)               type = 'cnpj';
+    else if (digits.length === 11 && digits === raw) type = 'cpf'; // 11 puros sem máscara → CPF
+    else if (digits.length === 10 || digits.length === 11) type = 'telefone';
+    localStorage.setItem('cdb-pix-type', type);
+  } catch (e) {}
+}
+migratePixIfNeeded();
+
+/**
+ * Formata chave PIX conforme o tipo. Se inválido pra aquele tipo, retorna como veio.
+ */
+function formatPixByType(raw, type) {
+  const v = String(raw || '').trim();
+  type = type || getPixType();
+  if (type === 'telefone') {
+    const d = v.replace(/\D/g, '');
+    if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+    if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    return v;
+  }
+  if (type === 'cpf') {
+    const d = v.replace(/\D/g, '');
+    if (d.length === 11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+    return v;
+  }
+  if (type === 'cnpj') {
+    const d = v.replace(/\D/g, '');
+    if (d.length === 14) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+    return v;
+  }
+  // email e aleatoria: sem formatação
+  return v;
+}
+
+/**
+ * Validação básica por tipo. Não checa dígito verificador de CPF/CNPJ —
+ * só formato. Suficiente pra impedir digitar nome no campo errado.
+ */
+function validatePixKey(raw, type) {
+  const v = String(raw || '').trim();
+  if (!v) return false;
+  type = type || getPixType();
+  const d = v.replace(/\D/g, '');
+  if (type === 'telefone')  return d.length === 10 || d.length === 11;
+  if (type === 'cpf')       return d.length === 11;
+  if (type === 'cnpj')      return d.length === 14;
+  if (type === 'email')     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  if (type === 'aleatoria') return v.length >= 8; // UUID ou similar
+  return true;
+}
+
+// Compat: chamadas antigas a formatPixCelular passam por formatPixByType.
+function formatPixCelular(raw) { return formatPixByType(raw, 'telefone'); }
+
+// Identificador do dia pra agrupar produções: LOT-YYMMDD.
+function getLoteDoDia(dt = new Date()) {
+  const y = String(dt.getFullYear()).slice(-2);
+  const m = String(dt.getMonth()+1).padStart(2,'0');
+  const d = String(dt.getDate()).padStart(2,'0');
+  return `LOT-${y}${m}${d}`;
+}
+
+// #1474 W6: subtitulo do modal de producao. O confirmar recalcula com o mesmo
+// instante que grava no batch: aberto antes da meia-noite e confirmado depois,
+// o subtitulo, o batch e a etiqueta ficam com o lote do dia novo.
+function subtituloDoLote(now, batchId) {
+  const codigo = codigoDoLote({ id: batchId, lote: getLoteDoDia(now), createdAt: now.getTime() });
+  return `lote ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} às ${timeOf(now.getTime())} · ${codigo}`;
+}
+
+// Código igual ao ERP (BatchLinker). O formato legado #1471 mantém dia e sufixo;
+// b2 preserva o UUID inteiro sem alterar reimpressões antigas.
+function codigoDoLote(batch) {
+  const id = String(batch.id || '');
+  // #2317: o namespace novo preserva o UUID inteiro; etiquetas antigas mantêm seu código.
+  const uuid = id.length === 39 && id.match(/^b2-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/);
+  if (uuid) return uuid[1].replace(/-/g, '').toUpperCase();
+  const base = batch.lote || batch.code || getLoteDoDia(new Date(batch.createdAt));
+  const sufixo = (id.length >= 6 ? id.slice(-6) : id).replace(/[^\p{L}\p{N}]/gu, '');
+  return sufixo ? base + '-' + sufixo : base;
+}
+
+// SKU pra etiqueta (prefixo do código de barras). Lê do produto se cadastrado;
+// senão deriva do id (slug uppercase, max 8 caracteres).
+function getProductSku(product) {
+  if (product?.sku) return product.sku;
+  const raw = String(product?.id || product?.name || 'XXX');
+  return raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'XXX';
+}
+
+/**
+ * Monta a mensagem de cobrança em texto puro (boa pra WhatsApp).
+ * Shape: cabeçalho + itens + total + obs + chave PIX + assinatura.
+ */
+function hasConfiguredPix() { return !!getPixHolder().trim() && validatePixKey(getPixKey(), getPixType()); }
+function buildCobrancaMessage(order, template) {
+  template = template || currentCobrancaTemplate || 'cobranca';
+  const nome = order.clientSnapshot?.name || 'Cliente';
+  // Bug 11 (Onda 4): mensagem WhatsApp NUNCA inclui CPF/CNPJ. Backward-compat
+  // sanea snapshots antigos (pre-fix) que tinham document em ref.
+  // Risco LGPD: o texto vai pro celular do cliente, backup da operadora,
+  // screenshots — manter document fora dele e mandatorio.
+  const refClean = safeRefDisplay(order.clientSnapshot?.ref);
+  const ref  = refClean ? ` (${refClean})` : '';
+  const total = Number(order.total) || 0;
+  const itensLinhas = (order.items || [])
+    .map(i => `• ${i.qty}× ${i.name}${i.unit ? ' (' + i.unit + ')' : ''}${i.note ? ' - ' + i.note : ''}`)
+    .join('\n');
+  const obsBloco = order.notes ? `\n📝 Obs: ${order.notes}\n` : '';
+  const pixType    = getPixType();
+  const pixLabel   = (PIX_TYPES[pixType]?.short) || 'Chave';
+  const pixDisplay = formatPixByType(getPixKey(), pixType);
+  const pixHolder  = getPixHolder();
+  const empresa    = getEmpresaName();
+  const pedidoRef  = (order.id || '').slice(-8);
+  const pixBlock = hasConfiguredPix()
+    ? `\n💳 *Pagamento via PIX*\n${pixLabel}: *${pixDisplay}*\nTitular: ${pixHolder}\n\nPor favor, confirme o pagamento pra a gente finalizar seu pedido 💛\n\n`
+    : '\n\n';
+
+  if (template === 'pronto') {
+    return (
+      `Oi *${nome}*${ref}! Seu pedido da *${empresa}* está pronto.\n\n` +
+      `${itensLinhas}\n\n` +
+      `Total: *${money(total)}*\n` +
+      `Pode retirar/combinar entrega quando preferir.\n\n` +
+      `_Pedido ${pedidoRef}_`
+    );
+  }
+
+  if (template === 'agradecimento') {
+    return (
+      `Oi *${nome}*${ref}, obrigada pelo pedido! 💛\n\n` +
+      `A *${empresa}* agradece a confiança.\n` +
+      `Qualquer ajuste ou novo pedido, é só chamar.\n\n` +
+      `_Pedido ${pedidoRef} · ${money(total)}_`
+    );
+  }
+
+  return (
+    `🍝 *${empresa}*\n\n` +
+    `Oi *${nome}*${ref}! Seu pedido está anotado:\n\n` +
+    `${itensLinhas}\n\n` +
+    `💰 *Total: ${money(total)}*` +
+    `${obsBloco}` +
+    pixBlock +
+    `_Pedido ${pedidoRef}_`
+  );
+}
+
+/**
+ * Etiqueta curta (impressão/colar embalagem). Formato: cliente, itens,
+ * total, horário, número do pedido. Sem PIX.
+ */
+function buildEtiqueta(order) {
+  const nome = order.clientSnapshot?.name || 'Cliente';
+  // Bug 11 (Onda 4): etiqueta impressa colada na embalagem nao deve ter
+  // CPF do cliente — sai do fluxo operacional e poderia ser fotografado
+  // por terceiros. Backward-compat com snapshots antigos.
+  const ref  = safeRefDisplay(order.clientSnapshot?.ref);
+  const itensLinhas = (order.items || [])
+    .map(i => `${i.qty}× ${i.name}`)
+    .join('\n');
+  const horario = timeOf(order.createdAt);
+  const obs = order.notes ? `\nObs: ${order.notes}` : '';
+  return (
+    `== EASY STOCK MOBILE ==\n` +
+    `Cliente: ${nome}${ref ? ' · ' + ref : ''}\n` +
+    `${itensLinhas}\n` +
+    `Total: ${money(Number(order.total) || 0)}\n` +
+    `Horário: ${horario}${obs}\n` +
+    `#${order.id.slice(-8)}`
+  );
+}
+
+let currentCobrancaOrderId = null;
+let currentCobrancaTemplate = 'cobranca';
+
+function openCobranca(orderId) {
+  const o = orders.find(x => x.id === orderId);
+  if (!o) return;
+  currentCobrancaOrderId = orderId;
+  currentCobrancaTemplate = o.status === STATUS.PRONTO ? 'pronto' : 'cobranca';
+  const pixReady = hasConfiguredPix();
+  document.getElementById('cobrancaTitle').textContent = pixReady ? 'Cobrança' : 'Resumo do pedido';
+  document.getElementById('cobrancaPixWarning').hidden = pixReady;
+  const pixPanel = document.querySelector('#cobrancaModal .cobranca-pix');
+  if (pixPanel) pixPanel.style.display = pixReady ? '' : 'none';
+  const chargeTemplate = document.querySelector('#cobrancaModal [data-template="cobranca"]');
+  if (chargeTemplate) chargeTemplate.textContent = pixReady ? 'Cobrança' : 'Resumo';
+
+  const msg = buildCobrancaMessage(o, currentCobrancaTemplate);
+  document.getElementById('cobrancaPreview').textContent = msg;
+  document.getElementById('cobrancaPixValue').textContent  = formatPixByType(getPixKey(), getPixType());
+  document.getElementById('cobrancaPixHolder').textContent = getPixHolder();
+  // Atualiza o label "PIX — celular" pro tipo certo (CPF/CNPJ/email/aleatória).
+  const labelEl = document.querySelector('#cobrancaModal .pix-label');
+  if (labelEl) labelEl.textContent = '💳 PIX — ' + ((PIX_TYPES[getPixType()]?.short) || 'Chave');
+  document.querySelectorAll('#cobrancaModal .msg-template-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.template === currentCobrancaTemplate));
+  rememberOperationalFocus('cobrancaModal');
+  document.getElementById('cobrancaModal').classList.add('show');
+  document.getElementById('cobrancaTitle').focus();
+}
+function closeCobranca() {
+  document.getElementById('cobrancaModal').classList.remove('show');
+  currentCobrancaOrderId = null;
+  restoreOperationalFocus('cobrancaModal');
+}
+
+function setCobrancaTemplate(template) {
+  const o = orders.find(x => x.id === currentCobrancaOrderId);
+  if (!o) return;
+  currentCobrancaTemplate = template || 'cobranca';
+  document.querySelectorAll('#cobrancaModal .msg-template-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.template === currentCobrancaTemplate));
+  document.getElementById('cobrancaPreview').textContent = buildCobrancaMessage(o, currentCobrancaTemplate);
+}
+
+/**
+ * Compartilha via Web Share API (se disponível — quase sempre no Android).
+ * Fallback: abre URL wa.me em nova janela.
+ */
+async function shareCobranca() {
+  const o = orders.find(x => x.id === currentCobrancaOrderId);
+  if (!o) return;
+  const msg = buildCobrancaMessage(o, currentCobrancaTemplate);
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'Easy Stock Mobile - Pedido', text: msg });
+      return;
+    }
+    // Fallback: wa.me/?text=... abre o WhatsApp direto
+    const url = 'https://wa.me/?text=' + encodeURIComponent(msg);
+    window.open(url, '_blank');
+  } catch (e) {
+    // Usuário cancelou o share — silencioso
+    if (e && e.name !== 'AbortError') console.warn('Share falhou:', e);
+  }
+}
+
+function copyCobranca() {
+  const o = orders.find(x => x.id === currentCobrancaOrderId);
+  if (!o) return;
+  const msg = buildCobrancaMessage(o, currentCobrancaTemplate);
+  copyToClipboard(msg, 'Mensagem copiada — cole no WhatsApp');
+}
+
+function copyPixKey() {
+  // Copia a chave no formato esperado pelo banco: telefone/cpf/cnpj só dígitos,
+  // email/aleatória como veio. App de banco aceita os dois formatos pra telefone.
+  const type = getPixType();
+  const raw  = String(getPixKey());
+  const toCopy = (type === 'email' || type === 'aleatoria') ? raw : raw.replace(/\D/g, '');
+  copyToClipboard(toCopy, 'Chave PIX copiada: ' + formatPixByType(raw, type));
+}
+
+function copyToClipboard(text, successMsg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast(successMsg || 'Copiado'),
+      () => fallbackCopy(text, successMsg)
+    );
+  } else {
+    fallbackCopy(text, successMsg);
+  }
+}
+function fallbackCopy(text, successMsg) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    if (!document.execCommand('copy')) throw new Error('Cópia recusada');
+    showToast(successMsg || 'Copiado');
+  }
+  catch (e) { showToast('Não consegui copiar — selecione manualmente'); }
+  finally { document.body.removeChild(ta); }
+}
+
+function storeLogoHtml() {
+  const src = getStoreLogo();
+  // Whitelist explícita de raster — SVG inline pode conter <script> e
+  // como esse HTML vai pra etiqueta/recibo impresso (innerHTML real),
+  // bloqueamos. Aceita PNG/JPEG/WEBP em base64.
+  if (!src || !/^data:image\/(png|jpe?g|webp);base64,/i.test(src)) return '';
+  return `<div class="pa-logo"><img src="${src}" alt="Logo da loja"></div>`;
+}
+
+// ================================================================
+// HELPERS locais: acesso a pedido e toggle de modal
+// ================================================================
+function getOrderById(id) { return orders.find(x => x.id === id); }
+function toggleModal(id, show) {
+  document.getElementById(id)?.classList.toggle('show', !!show);
+  // Atualiza body class pra esconder FAB quando algum modal aberto
+  if (typeof refreshBodyModalClass === 'function') refreshBodyModalClass();
+}
+// Verifica se ha algum overlay aberto e atualiza body.modal-open.
+// Usado pelo FAB pra sumir quando modal/scanner ativo.
+function refreshBodyModalClass() {
+  const anyOpen = document.querySelector(
+    '.modal-overlay.show, .np-overlay.show, .confer-overlay.show, .ajustes-overlay.show, .upd-overlay.show, .etq-overlay.show, .historico-overlay.show, .scan-overlay.show'
+  );
+  document.body.classList.toggle('modal-open', !!anyOpen);
+}
+// Observa mutações de classe nos overlays (alguns abrem direto via classList,
+// não passando por toggleModal). MutationObserver eh mais simples que
+// reescrever 30 callsites.
+(function watchOverlayClasses() {
+  if (typeof MutationObserver !== 'function') return;
+  const obs = new MutationObserver(function () { refreshBodyModalClass(); });
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll(
+      '.modal-overlay, .np-overlay, .confer-overlay, .ajustes-overlay, .upd-overlay, .etq-overlay, .historico-overlay, .scan-overlay'
+    ).forEach(function (el) { obs.observe(el, { attributes: true, attributeFilter: ['class'] }); });
+  });
+})();
+
+// ================================================================
+// AJUSTES — operador, PIX, impressora térmica
+// ================================================================
+let ajustesListenersBound = false;
+
+// Getter centralizado com whitelist + warn (problema N do plano)
+function getEtqOrient() {
+  const r = regraDaProducao();
+  if (r) return r.orientacao;
+  const raw = localStorage.getItem('cdb-etq-orient');
+  if (raw && raw !== 'vertical' && raw !== 'horizontal') {
+    console.warn('cdb-etq-orient invalido, fallback para vertical:', raw);
+    return 'vertical';
+  }
+  return raw || 'vertical';
+}
+
+// Toast unificado mostrando estado completo das etiquetas
+function showToastEtiquetaState() {
+  const mode = getProdScanMode();
+  const orient = getEtqOrient();
+  showToast('Etiquetas: ' + prodScanModeLabel(mode) + ', ' + (orient === 'horizontal' ? 'horizontal' : 'vertical'));
+}
+
+// Miniatura em Ajustes: a mesma prévia da produção (#2247), reduzida para caber.
+function redrawAjustesEtqThumb() {
+  const canvas = document.getElementById('ajustesEtqThumb');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 160, 80);
+  const sample = {
+    productName: 'Bolo de Cenoura',
+    unit: '500g',
+    productionDate: Date.now(),
+    expiresAt: Date.now() + 7 * 86400000,
+    lote: 'L260514',
+    codigoBarras: '7891234567890',
+    weightG: 480
+  };
+  let p = null;
+  try { p = previaDaEtiquetaProducao(sample, null); } catch (e) { p = null; }
+  const src = p && p.canvas;
+  if (!src || !src.width || !src.height) return;
+  const k = Math.min(160 / src.width, 80 / src.height);
+  const w = Math.round(src.width * k), h = Math.round(src.height * k);
+  ctx.drawImage(src, Math.round((160 - w) / 2), Math.round((80 - h) / 2), w, h);
+}
+
+// O que a regra da loja define aparece marcado e travado, com o aviso.
+function travarPelaLoja(cards, controle, avisoId, daLoja) {
+  cards.forEach(card => {
+    card.disabled = daLoja;
+    if (daLoja) card.setAttribute('aria-disabled', 'true'); else card.removeAttribute('aria-disabled');
+  });
+  if (controle) controle.disabled = daLoja;
+  const aviso = document.getElementById(avisoId);
+  if (aviso) { aviso.textContent = AVISO_DA_LOJA; aviso.hidden = !daLoja; }
+}
+const AVISO_DA_LOJA = 'Definido pela loja no Console, em Configurações › Impressão.';
+
+function setScanModeChoice(mode, persistNow = false) {
+  const prev = getProdScanMode();
+  const daLoja = !!(regraDaProducao()?.daLoja.codigos);
+  if (daLoja && persistNow) { showToast(AVISO_DA_LOJA); mode = prev; persistNow = false; }
+  const normalized = SCAN_MODES.includes(mode) ? mode : 'qr';
+  const select = document.getElementById('ajusteProdScanMode');
+  if (select) select.value = normalized;
+  // Escopo: so os cards de scan mode, nao os de orientacao (bug A)
+  const cards = Array.from(document.querySelectorAll('#scanModeOptions .scan-mode-card'));
+  cards.forEach(card => {
+    const isActive = card.dataset.mode === normalized;
+    card.classList.toggle('active', isActive);
+    card.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+  travarPelaLoja(cards, select, 'scanModeDaLoja', daLoja);
+  if (persistNow) { try { localStorage.setItem('cdb-prod-scan-mode', normalized); } catch (e) {} }
+  redrawAjustesEtqThumb();
+  if (persistNow) {
+    const modeChip = document.getElementById('etqModeChip');
+    if (modeChip && currentEtiquetasKind === 'producao') modeChip.textContent = prodScanModeLabel(normalized);
+    const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
+    if (previewOpen && currentEtiquetas.length) refreshEtqPreview();
+    showToastEtiquetaState();
+    // Audit inline (mitigacao L) — corrige bug retroativo: antes ficava preso ao saveAjustes
+    if (prev !== normalized) {
+      logAction({
+        action: 'settings.update',
+        entityType: 'settings',
+        summary: 'Codigo da etiqueta: ' + prodScanModeLabel(normalized),
+        diff: { prodScanMode: { from: prev, to: normalized } }
+      });
+    }
+  }
+}
+
+function setOrientChoice(orient, persistNow = false) {
+  const prev = currentEtqOrient;
+  const daLoja = !!(regraDaProducao()?.daLoja.orientacao);
+  if (daLoja && persistNow) { showToast(AVISO_DA_LOJA); orient = getEtqOrient(); persistNow = false; }
+  const normalized = ['vertical','horizontal'].includes(orient) ? orient : 'vertical';
+  currentEtqOrient = normalized;
+  // Atualiza cards em Ajustes (escopo: #orientModeOptions)
+  const cards = Array.from(document.querySelectorAll('#orientModeOptions .scan-mode-card'));
+  cards.forEach(card => {
+    const isActive = card.dataset.orient === normalized;
+    card.classList.toggle('active', isActive);
+    card.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+  travarPelaLoja(cards, null, 'orientDaLoja', daLoja);
+  if (persistNow) { try { localStorage.setItem('cdb-etq-orient', normalized); } catch (e) {} }
+  // Atualiza chips na Preview overlay
+  document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim() === (normalized === 'horizontal' ? 'Horizontal' : 'Vertical'))
+  );
+  redrawAjustesEtqThumb();
+  if (persistNow) {
+    const previewOpen = document.getElementById('etiquetasPreview')?.classList.contains('show');
+    if (previewOpen && currentEtiquetas.length) refreshEtqPreview();
+    showToastEtiquetaState();
+    if (prev !== normalized) {
+      logAction({
+        action: 'settings.update',
+        entityType: 'settings',
+        summary: 'Orientacao da etiqueta: ' + normalized,
+        diff: { orientation: { from: prev, to: normalized } }
+      });
+    }
+  }
+}
+function openAjustes() {
+  document.getElementById('ajusteOperator').value  = operatorName || '';
+  document.getElementById('ajusteEmpresa').value   = getEmpresaName();
+  document.getElementById('ajustePixType').value   = getPixType();
+  document.getElementById('ajustePixKey').value    = getPixKey();
+  document.getElementById('ajustePixHolder').value = getPixHolder();
+  setScanModeChoice(getProdScanMode());
+  setOrientChoice(getEtqOrient());
+  redrawAjustesEtqThumb();
+  if (!ajustesListenersBound) {
+    document.getElementById('ajustePixType').addEventListener('change', updatePixHint);
+    document.getElementById('ajustePixKey').addEventListener('input', updatePixHint);
+    ajustesListenersBound = true;
+  }
+  updatePixHint();
+  renderPrinterStatus();
+  renderCatalogList();
+  renderLogoPreview();
+  refreshAjustesThemeLabel();
+  setAjustesTab('loja'); // default ao abrir
+  toggleModal('ajustesModal', true);
+}
+function closeAjustes() { toggleModal('ajustesModal', false); }
+
+// Renderiza lista de produtos cadastrados (Ajustes > Catalogo de produtos)
+// Mostra TODOS — inclusive arquivados (com badge), pra operador poder
+// reverter um arquivamento se errou.
+function renderCatalogList() {
+  const box = document.getElementById('catalogList');
+  if (!box) return;
+  if (!products.length) {
+    box.innerHTML = '<div class="cat-empty">Nenhum produto cadastrado</div>';
+    return;
+  }
+  // Ordem: ativos primeiro, depois arquivados
+  const sorted = [...products].sort((a, b) => {
+    if (!!a.archived !== !!b.archived) return a.archived ? 1 : -1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  box.innerHTML = sorted.map(p => {
+    const meta = [
+      p.category || 'sem categoria',
+      p.unit || '',
+      p.price != null ? 'R$ ' + Number(p.price).toFixed(2).replace('.', ',') : ''
+    ].filter(Boolean).join(' · ');
+    const archivedTag = p.archived ? ' <span style="color:#e87a7a">(arquivado)</span>' : '';
+    const archiveBtn = p.archived
+      ? `<button class="cat-btn" title="Restaurar" aria-label="Restaurar produto ${escapeHtml(p.name)}" onclick="restoreProduct(${jsString(p.id)})">↺</button>`
+      : `<button class="cat-btn danger" title="Arquivar" aria-label="Arquivar produto ${escapeHtml(p.name)}" onclick="archiveProduct(${jsString(p.id)})">🗑️</button>`;
+    return `
+      <div class="cat-row">
+        <div class="cat-emoji">${p.emoji || '📦'}</div>
+        <div class="cat-info">
+          <div class="cat-name">${escapeHtml(p.name)}${archivedTag}</div>
+          <div class="cat-meta">${escapeHtml(meta)}</div>
+        </div>
+        <div class="cat-actions">
+          <button class="cat-btn" title="Editar" aria-label="Editar produto ${escapeHtml(p.name)}" onclick="if (closeAjustes() !== false) openProductModalForEdit(${jsString(p.id)})">✏️</button>
+          ${archiveBtn}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function restoreProduct(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  p.archived = false;
+  persistAll();
+  renderProductGrid();
+  renderCatalogList();
+  logAction({
+    action: 'product.restore',
+    entityType: 'product',
+    entityId: productId,
+    summary: 'Restaurou produto ' + p.name
+  });
+  showToast(p.name + ' restaurado');
+}
+
+// Reage à troca do tipo de chave: ajusta placeholder e mostra preview formatado.
+function updatePixHint() {
+  const sel  = document.getElementById('ajustePixType');
+  const inp  = document.getElementById('ajustePixKey');
+  const hint = document.getElementById('ajustePixHint');
+  if (!sel || !inp || !hint) return;
+  const type = sel.value;
+  const cfg  = PIX_TYPES[type] || {};
+  inp.placeholder = cfg.placeholder || '';
+  const v = inp.value.trim();
+  if (!v) { hint.textContent = ''; return; }
+  const ok = validatePixKey(v, type);
+  hint.textContent = ok
+    ? '✓ ' + formatPixByType(v, type)
+    : 'Formato inválido pra ' + (cfg.label || type);
+  hint.style.color = ok ? '#4ade80' : '#ef6b6b';
+}
+
+function saveAjustes() {
+  const op      = (document.getElementById('ajusteOperator').value  || '').trim().slice(0,32);
+  const empresa = (document.getElementById('ajusteEmpresa').value   || '').trim().slice(0,48);
+  const type    = document.getElementById('ajustePixType').value;
+  const key     = (document.getElementById('ajustePixKey').value    || '').trim();
+  const holder  = (document.getElementById('ajustePixHolder').value || '').trim().slice(0,64);
+  if (key && !validatePixKey(key, type)) {
+    showToast('Chave PIX inválida pra esse tipo');
+    return;
+  }
+  // Calcula diff antes de salvar pra registrar no log o que mudou
+  // (prodScanMode e orientation tem audit inline no setScanModeChoice / setOrientChoice)
+  const before = {
+    operator: operatorName,
+    empresa: getEmpresaName(),
+    pixType: getPixType(),
+    pixKey: getPixKey(),
+    pixHolder: getPixHolder()
+  };
+  if (op) saveOperatorName(op);
+  cdbSetPix(key || null, holder || null, type, empresa || null);
+  renderBrandName();
+  const after = {
+    operator: operatorName,
+    empresa: getEmpresaName(),
+    pixType: getPixType(),
+    pixKey: getPixKey(),
+    pixHolder: getPixHolder()
+  };
+  const diff = diffObjects(before, after, ['operator','empresa','pixType','pixKey','pixHolder']);
+  if (diff) {
+    logAction({
+      action: 'settings.update',
+      entityType: 'settings',
+      summary: 'Ajustes alterados (' + Object.keys(diff).join(', ') + ')',
+      diff
+    });
+  }
+  closeAjustes();
+  showToast('Ajustes salvos');
+}
+
+// ================================================================
+// THERMAL PRINTER NATIVE SHIM
+// Substitui cordova-plugin-bluetooth-serial 0.4.7 (abandonware, crashes
+// JNI em Android 12+) por plugin Capacitor proprio escrito em Java
+// (com.casadababa.app.printer.ThermalPrinterPlugin). Mantem API
+// window.bluetoothSerial.* identica pra preservar todo codigo existente.
+// O plugin nativo:
+//  - Pede BLUETOOTH_CONNECT/SCAN runtime corretamente (Android 12+).
+//  - Filtra dispositivos sem SPP (fones BLE-only somem da lista).
+//  - Roda I/O em thread separada (nada bloqueia main thread).
+//  - Converte excecoes Java em Promise rejection -> JS recebe erro,
+//    nao crash nativo.
+// ================================================================
+window.cdbInstallThermalShim = function () {
+  try {
+    const Cap = window.Capacitor;
+    if (!Cap || !Cap.Plugins) return false;
+    const TP = Cap.Plugins.ThermalPrinter;
+    if (!TP) return false;
+    if (window.bluetoothSerial && window.bluetoothSerial.__cdbNative) return true;
+
+    function bytesToBase64(data) {
+      if (typeof data === 'string') data = new TextEncoder().encode(data);
+      const u = data instanceof Uint8Array ? data : Uint8Array.from(data);
+      let bin = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < u.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, u.subarray(i, i + CHUNK));
+      }
+      return btoa(bin);
+    }
+    function errStr(e) {
+      if (!e) return '(sem detalhe)';
+      if (typeof e === 'string') return e;
+      return e.message || e.errorMessage || JSON.stringify(e);
+    }
+
+    window.bluetoothSerial = {
+      __cdbNative: true,
+      list: function (success, fail) {
+        TP.requestPermissions()
+          .then(function () { return TP.listPaired(); })
+          .then(function (res) { success && success(res && res.devices ? res.devices : []); })
+          .catch(function (err) { fail && fail(errStr(err)); });
+      },
+      isEnabled: function (success, fail) {
+        TP.isEnabled()
+          .then(function (res) { if (res && res.enabled) success && success(); else fail && fail('disabled'); })
+          .catch(function (err) { fail && fail(errStr(err)); });
+      },
+      isConnected: function (success, fail) {
+        TP.isConnected()
+          .then(function (res) { if (res && res.connected) success && success(); else fail && fail('not connected'); })
+          .catch(function () { fail && fail('not connected'); });
+      },
+      connect: function (address, success, fail) {
+        TP.requestPermissions()
+          .then(function () { return TP.connect({ address: address }); })
+          .then(function () { success && success(); })
+          .catch(function (err) { fail && fail(errStr(err)); });
+      },
+      connectInsecure: function (address, success, fail) {
+        // Mesmo connect — o impl ja faz fallback insecure se o seguro falhar.
+        this.connect(address, success, fail);
+      },
+      disconnect: function (success, fail) {
+        TP.disconnect()
+          .then(function () { success && success(); })
+          .catch(function (err) { fail && fail(errStr(err)); });
+      },
+      write: function (data, success, fail) {
+        try {
+          const b64 = bytesToBase64(data);
+          TP.write({ base64: b64 })
+            .then(function () { success && success(); })
+            .catch(function (err) { fail && fail(errStr(err)); });
+        } catch (ex) {
+          fail && fail((ex && ex.message) || String(ex));
+        }
+      }
+    };
+    return true;
+  } catch (e) {
+    try { console.error('ThermalPrinter shim install failed:', e); } catch (_) {}
+    return false;
+  }
+};
+// Instala em varios momentos — Capacitor.Plugins fica disponivel cedo,
+// mas em alguns paths (LiveUpdater/cold start) chega depois.
+if (!window.cdbInstallThermalShim()) {
+  document.addEventListener('deviceready', window.cdbInstallThermalShim, false);
+  document.addEventListener('DOMContentLoaded', window.cdbInstallThermalShim, false);
+  setTimeout(window.cdbInstallThermalShim, 500);
+  setTimeout(window.cdbInstallThermalShim, 2000);
+}
+
+// ================================================================
+// PERMISSAO BLUETOOTH RUNTIME — Android 12+ exige BLUETOOTH_CONNECT.
+// Com o plugin nativo ThermalPrinter, a propria chamada *.connect/.list
+// ja pede a permissao. Mantemos esse helper como facade pra nao quebrar
+// chamadas existentes; quando rodando com o plugin nativo, delega pra
+// TP.requestPermissions(). Caso contrario (browser dev), faz fallback
+// pro cordova-plugin-android-permissions.
+// ================================================================
+function ensureBluetoothPermission(cb) {
+  // Plugin nativo presente: delega
+  try {
+    const TP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter;
+    if (TP && TP.requestPermissions) {
+      TP.requestPermissions().then(function () { cb(true); }).catch(function () { cb(false); });
+      return;
+    }
+  } catch (e) {}
+  // Fallback legado (sem Cordova/plugin: assume ok)
+  const perms = window.cordova && window.cordova.plugins && window.cordova.plugins.permissions;
+  if (!perms || !perms.BLUETOOTH_CONNECT) { cb(true); return; }
+  // Pede BLUETOOTH_CONNECT (mandatorio Android 12+) e SCAN (alguns OEMs
+  // exigem pra getBondedDevices). requestPermissions aceita array e
+  // mostra um unico dialog combinado pro usuario.
+  const list = [perms.BLUETOOTH_CONNECT];
+  if (perms.BLUETOOTH_SCAN) list.push(perms.BLUETOOTH_SCAN);
+  try {
+    perms.checkPermission(perms.BLUETOOTH_CONNECT, (res) => {
+      if (res && res.hasPermission) { cb(true); return; }
+      perms.requestPermissions(list,
+        (r) => cb(!!(r && r.hasPermission)),
+        () => cb(false)
+      );
+    }, () => {
+      try {
+        perms.requestPermissions(list,
+          (r) => cb(!!(r && r.hasPermission)),
+          () => cb(false)
+        );
+      } catch (e) { cb(false); }
+    });
+  } catch (e) { cb(false); }
+}
+
+// #2193: perfil por impressora. TSPL (etiqueta) não entende ESC/POS: a
+// Oasis OIA-8381-B recebia bytes ESC/POS, confirmava o envio e não imprimia.
+const TSPL_NOMES = /^(OIA|OASIS)|TSPL|\bTSC\b|^TTP|^XP-?(3|4)\d\dB|^L42/i;
+function perfilPorNome(name) { return TSPL_NOMES.test(String(name || '')) ? 'tspl' : 'escpos'; }
+function normalizarImpressora(p) {
+  if (!p || typeof p !== 'object') return p;
+  const out = Object.assign({}, p);
+  if (out.profile === 'oasis-pending') out.profile = 'tspl';
+  if (!out.perfilManual && (!out.profile || out.profile === 'escpos')) out.profile = perfilPorNome(out.name);
+  if (out.profile !== 'tspl') out.profile = 'escpos';
+  return out;
+}
+function perfilImpressora(p) { return (normalizarImpressora(p) || {}).profile || 'escpos'; }
+// #2202 (D1): sem altura a mídia é rolo contínuo. A mídia do v2 (midia) manda.
+function tsplConfig(p) {
+  const e = (p && p.etiqueta) || {};
+  const m = p && p.midia;
+  if (m && Number(m.larguraMm) > 0 && m.tipo !== 'bobina') {
+    const cont = m.tipo !== 'etiqueta';
+    return { larguraMm: Number(m.larguraMm), alturaMm: cont ? 0 : Number(m.alturaMm), gapMm: cont ? 0 : (Number(m.gapMm) || 2), continuo: cont, inverter: !!(p.inverter || e.inverter) };
+  }
+  // O master gravava 80 x 40 recortada sem o operador escolher (era o padrão
+  // do seletor). Sem midia, esse registro vale o padrão D1: rolo contínuo.
+  const padraoDoMaster = !m && Number(e.larguraMm) === 80 && Number(e.alturaMm) === 40 && (e.gapMm == null || Number(e.gapMm) === 2) && e.continuo !== true;
+  const continuo = padraoDoMaster || e.continuo === true || !(Number(e.alturaMm) > 0);
+  return { larguraMm: e.larguraMm || 80, alturaMm: continuo ? 0 : e.alturaMm, gapMm: continuo ? 0 : (e.gapMm === 0 ? 0 : (e.gapMm || 2)), continuo, inverter: !!e.inverter };
+}
+// Ações da Oasis: alinhamento para qualquer papel TSPL; calibrar só na
+// etiqueta recortada (rolo contínuo não tem recorte para medir).
+function acoesTspl(p) {
+  const tspl = !!p && !!p.address && perfilImpressora(p) === 'tspl';
+  return { alinhar: tspl, calibrar: tspl && !tsplConfig(p).continuo };
+}
+function descreverPerfil(p) {
+  if (perfilImpressora(p) !== 'tspl') { const l = Number(p && p.midia && p.midia.larguraMm); return 'ESC/POS ' + (l > 0 ? l : 58) + ' mm'; }
+  const c = tsplConfig(p);
+  return 'TSPL ' + (c.continuo ? 'bobina contínua' : c.larguraMm + ' x ' + c.alturaMm + ' mm');
+}
+// #2329: pedido, teste e recibo saem na cabeça como a produção (SIZE da
+// cabeça, papel onde está, ajuste fino e SHIFT sempre). Sem o SHIFT, a Oasis
+// usava o do último trabalho.
+function tsplBytesDoCanvas(canvas, printer, copias) {
+  const T = window.cdbTspl, P = window.cdbPapeis;
+  const posicao = T.posicaoNaCabeca ? T.posicaoNaCabeca(printer, P && printer && printer.midia ? P.daMidia(printer.midia) : null) : {};
+  return T.paraEtiqueta(canvas, Object.assign(tsplConfig(printer), posicao, { copias: copias || 1 }));
+}
+// #2202 (F1): impressoras no modelo v2 (impressoras.js): cada papel tem a sua.
+// cdb-printer e cdb-printers seguem espelhadas para quem ainda as lê.
+// Os dois módulos juntos: um impressoras.js novo com o catálogo antigo no
+// cache quebraria a leitura e a impressão cairia sem impressora.
+function impressorasV2() { return window.cdbImpressoras && window.cdbPapeis ? window.cdbImpressoras.ler(localStorage) : null; }
+function legadoDaV2(imp) { return imp ? normalizarImpressora(window.cdbImpressoras.paraLegado(imp)) : null; }
+function getSavedPrinter() {
+  const v2 = impressorasV2();
+  if (!v2) return normalizarImpressora(load('cdb-printer', null));
+  return legadoDaV2(v2.impressoras[v2.papeis.etiqueta] || v2.impressoras[v2.papeis.cupom] || null);
+}
+// Impressora do documento: produção vai para a de etiqueta; pedido, recibo e
+// teste, para a de cupom. Sem v2, a selecionada.
+function impressoraPara(documento) {
+  const I = window.cdbImpressoras;
+  const v2 = impressorasV2();
+  if (!v2) return getSavedPrinter();
+  return legadoDaV2(I.resolver(v2, I.papelDoDocumento(documento)));
+}
+function getPrinterProfiles() {
+  const v2 = impressorasV2();
+  if (v2) return Object.values(v2.impressoras).map(legadoDaV2);
+  const stored = load('cdb-printers', []);
+  const profiles = (Array.isArray(stored) ? stored : []).map(normalizarImpressora);
+  const saved = normalizarImpressora(load('cdb-printer', null));
+  if (saved && saved.address && !profiles.some(p => p.address === saved.address)) profiles.push(saved);
+  return profiles;
+}
+// Cadastra a impressora no v2; papeis diz o que ela imprime (padrão: tudo,
+// como a seleção antiga). Mídia só muda quando a escolha traz mídia.
+function registrarImpressora(p, papeis) {
+  const I = window.cdbImpressoras;
+  let v2 = I.ler(localStorage);
+  const imp = I.deLegado(normalizarImpressora(p));
+  if (!imp) return v2;
+  const dados = { address: imp.address, nome: imp.nome, linguagem: imp.linguagem, linguagemManual: imp.linguagemManual };
+  if (p.midia || p.etiqueta) { dados.midia = imp.midia; dados.midiaConfirmada = imp.midiaConfirmada; dados.inverter = imp.inverter; }
+  if (p.apelido !== undefined) dados.apelido = imp.apelido;
+  v2 = I.cadastrar(v2, dados);
+  I.PAPEIS.forEach(papel => {
+    if (!papeis || papeis.indexOf(papel) >= 0) v2 = I.definirPapel(v2, papel, imp.address);
+    else if (v2.papeis[papel] === imp.address) v2 = I.definirPapel(v2, papel, null);
+  });
+  return I.salvar(localStorage, v2);
+}
+function printerReady(printer) {
+  return !!printer && !!printer.address && (perfilImpressora(printer) !== 'tspl' || !!window.cdbTspl);
+}
+function renderSavedPrinters() {
+  const host = document.getElementById('savedPrinterProfiles');
+  if (!host) return;
+  host.innerHTML = '';
+  getPrinterProfiles().forEach(p => {
+    const button = document.createElement('button');
+    button.className = 'np-btn np-secondary';
+    button.textContent = p.name + ' · ' + descreverPerfil(p);
+    button.onclick = () => escolherNoSeletor(p.address, p.name);
+    host.appendChild(button);
+  });
+}
+function setSavedPrinter(p, papeis) {
+  const I = window.cdbImpressoras;
+  if (I) {
+    if (p && p.address) registrarImpressora(p, papeis);
+    else {
+      let v2 = I.ler(localStorage);
+      I.PAPEIS.forEach(papel => { v2 = I.definirPapel(v2, papel, null); });
+      I.salvar(localStorage, v2);
+    }
+  } else if (p) {
+    const profiles = getPrinterProfiles().filter(item => item.address !== p.address);
+    profiles.push(p);
+    save('cdb-printers', profiles);
+    save('cdb-printer', p);
+  }
+  else   { try { localStorage.removeItem('cdb-printer'); } catch (e) {} }
+  renderPrinterStatus();
+}
+function renderPrinterStatus() {
+  const el  = document.getElementById('printerStatus');
+  const lab = document.getElementById('printerStatusLabel');
+  const p   = getSavedPrinter();
+  if (!el || !lab) return;
+  const v2Status = impressorasV2();
+  renderImpressorasLista(v2Status);
+  const tspls = v2Status ? Object.values(v2Status.impressoras).map(legadoDaV2).filter(x => acoesTspl(x).alinhar) : [];
+  const dicaTspl = document.getElementById('printerTsplDica');
+  if (dicaTspl) {
+    dicaTspl.style.display = tspls.length ? '' : 'none';
+    dicaTspl.textContent = 'O teste de alinhamento imprime uma moldura na borda do papel, uma cruz no centro e uma régua de 10 mm. Moldura cortada: toque Ajustar e confira o papel.'
+      + (tspls.some(x => acoesTspl(x).calibrar) ? ' Calibrar mede a etiqueta recortada e o espaço entre uma e outra.' : '');
+  }
+
+  const bs = window.bluetoothSerial;
+  if (!bs) {
+    // Plugin Cordova nao carregado: rodando no browser ou APK sem o plugin
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.innerHTML = '⚠️ Bluetooth indisponível<br><span style="font-size:var(--fs-micro);opacity:.7">Use o APK Android (não funciona no navegador)</span>';
+    return;
+  }
+
+  const v2 = impressorasV2();
+  if (v2 && Object.keys(v2.impressoras).length) {
+    el.classList.add('none'); el.classList.remove('ok');
+    const linha = (rotulo, papel) => {
+      const imp = window.cdbImpressoras.resolver(v2, papel);
+      if (!imp) return rotulo + ': nenhuma';
+      const aviso = imp.midiaConfirmada === false ? ' · <b>confirme o papel</b>' : '';
+      return rotulo + ': ' + escapeHtml(imp.apelido || imp.nome) + ' · ' + escapeHtml(window.cdbPapeis.descrever(window.cdbPapeis.daMidia(imp.midia))) + aviso;
+    };
+    lab.innerHTML = linha('Etiqueta', 'etiqueta') + '<br>' + linha('Cupom', 'cupom') + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
+  } else if (p && p.address) {
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.innerHTML = 'Selecionada: ' + escapeHtml(p.name || p.address) + ' · ' + escapeHtml(descreverPerfil(p)) + '<br><span style="font-size:12px">A conexão será verificada ao imprimir.</span>';
+  } else {
+    el.classList.add('none'); el.classList.remove('ok');
+    lab.innerHTML = 'Nenhuma impressora selecionada<br><span style="font-size:var(--fs-micro);opacity:.7">Bluetooth disponível — toque "Buscar impressora"</span>';
+  }
+}
+// #2202 (F1): uma linha por impressora em Ajustes, com o que ela imprime, o
+// papel e as ações. Calibrar e alinhar só existem na de etiqueta (TSPL).
+function renderImpressorasLista(v2) {
+  const host = document.getElementById('impressorasLista');
+  if (!host) return;
+  host.innerHTML = '';
+  if (!v2 || !window.cdbPapeis) return;
+  const I = window.cdbImpressoras;
+  Object.values(v2.impressoras).forEach(imp => {
+    // O mesmo critério da impressão: a escolhida, a única da classe ou a única.
+    const usos = I.PAPEIS.filter(p => I.resolver(v2, p) === imp).map(p => (p === 'etiqueta' ? 'etiqueta' : 'cupom'));
+    const papel = window.cdbPapeis.daMidia(imp.midia);
+    const card = document.createElement('div');
+    card.className = 'impressora-card';
+    card.style.cssText = 'border:1px solid var(--line,#ddd);border-radius:10px;padding:10px;margin-top:8px;font-size:14px';
+    const nomeTecnico = imp.apelido && imp.apelido !== imp.nome ? ' <span style="opacity:.7">' + escapeHtml(imp.nome) + '</span>' : '';
+    card.innerHTML = '<b>' + escapeHtml(imp.apelido || imp.nome) + '</b>' + nomeTecnico
+      + '<div>Imprime: ' + escapeHtml(usos.length ? usos.join(' e ') : 'nada ainda') + '</div>'
+      + '<div>Papel: ' + escapeHtml(window.cdbPapeis.descrever(papel)) + (imp.midiaConfirmada === false ? ' · <b>confirme o papel</b>' : '') + '</div>';
+    const acoes = document.createElement('div');
+    acoes.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px';
+    const botao = (texto, fn) => { const b = document.createElement('button'); b.className = 'btn-ajustes-printer subtle'; b.textContent = texto; b.onclick = fn; acoes.appendChild(b); };
+    botao('Ajustar', () => { openPrinterPicker(); escolherNoSeletor(imp.address, imp.nome); });
+    botao('Testar', () => testPrint(imp.address));
+    const acoesImp = acoesTspl(legadoDaV2(imp));
+    if (acoesImp.calibrar) botao('Calibrar', () => calibrarImpressora(imp.address));
+    if (acoesImp.alinhar) botao('Teste de alinhamento', () => alinharImpressora(imp.address));
+    botao('Esquecer', () => esquecerImpressora(imp.address));
+    card.appendChild(acoes);
+    // Depois do botão Teste de alinhamento, que a dica do painel cita.
+    if (acoesImp.alinhar) card.appendChild(painelDeAjuste(imp));
+    host.appendChild(card);
+  });
+}
+// Linha do ajuste fino no cartão: o valor salvo e as setas de 0,5 mm.
+function painelDeAjuste(imp) {
+  const box = document.createElement('div');
+  box.className = 'ajuste-fino';
+  const texto = document.createElement('div');
+  texto.className = 'ajuste-fino-texto';
+  texto.textContent = descreverAjuste(imp.offsetMm);
+  box.appendChild(texto);
+  const setas = document.createElement('div');
+  setas.className = 'ajuste-fino-setas';
+  const seta = (simbolo, rotulo, dx, dy) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn-ajustes-printer'; b.textContent = simbolo;
+    b.setAttribute('aria-label', rotulo);
+    b.onclick = () => ajustarPosicao(imp.address, dx, dy);
+    setas.appendChild(b);
+  };
+  seta('←', 'Mover 0,5 mm para a esquerda', -0.5, 0);
+  seta('→', 'Mover 0,5 mm para a direita', 0.5, 0);
+  seta('↑', 'Mover 0,5 mm para cima', 0, -0.5);
+  seta('↓', 'Mover 0,5 mm para baixo', 0, 0.5);
+  const zerar = document.createElement('button');
+  zerar.type = 'button'; zerar.className = 'btn-ajustes-printer subtle'; zerar.textContent = 'Zerar';
+  zerar.onclick = () => zerarAjuste(imp.address);
+  setas.appendChild(zerar);
+  box.appendChild(setas);
+  const dica = document.createElement('p');
+  dica.className = 'hint';
+  dica.textContent = 'Imprima o Teste de alinhamento. Moldura fora do centro: mova até ela ficar centrada e teste de novo. Vale para tudo o que esta impressora imprime.';
+  box.appendChild(dica);
+  return box;
+}
+function midiaTspl(imp) {
+  const m = imp.midia || {};
+  return { larguraMm: m.larguraMm, alturaMm: m.alturaMm, gapMm: m.gapMm, continuo: m.tipo !== 'etiqueta', densidade: imp.densidade, velocidade: imp.velocidade };
+}
+// Recortada: GAPDETECT mede etiqueta e gap. Contínua: grava GAP 0,0 para a
+// Oasis parar de procurar o recorte.
+// O printViaBluetooth já explica falha de conexão e permissão; aqui só
+// falta o caso sem Bluetooth (PWA no navegador).
+function semBluetoothNoAjuste() {
+  if (!window.bluetoothSerial) showToast('Bluetooth indisponível neste aparelho');
+}
+function tsplAtual(funcao) {
+  if (window.cdbTspl && typeof window.cdbTspl[funcao] === 'function') return true;
+  showToast('Feche e abra o app para atualizar a impressão');
+  return false;
+}
+// Sem mac, a impressora de etiqueta salva.
+function impressoraDoAjuste(mac) {
+  const v2 = impressorasV2();
+  if (!v2) return null;
+  return v2.impressoras[mac || v2.papeis.etiqueta || v2.papeis.cupom] || null;
+}
+function calibrarImpressora(mac) {
+  const I = window.cdbImpressoras;
+  const imp = impressoraDoAjuste(mac);
+  if (!imp || !acoesTspl(legadoDaV2(imp)).calibrar || !tsplAtual('calibracao')) return;
+  printViaBluetooth(window.cdbTspl.calibracao(midiaTspl(imp)), semBluetoothNoAjuste, null, legadoDaV2(imp), () => {
+    const atual = I.ler(localStorage);
+    I.salvar(localStorage, I.cadastrar(atual, { address: imp.address, calibradaEm: new Date().toISOString(), midiaConfirmada: true }));
+    renderPrinterStatus();
+  });
+}
+// #2247 (v3): o teste sai como a etiqueta, onde o papel está na cabeça e com
+// o ajuste fino salvo. Moldura torta aqui = etiqueta torta.
+function alinharImpressora(mac) {
+  const imp = impressoraDoAjuste(mac);
+  if (!imp || !acoesTspl(legadoDaV2(imp)).alinhar || !tsplAtual('alinhamento') || !tsplAtual('posicaoNaCabeca')) return;
+  const P = window.cdbPapeis || {};
+  const papel = P.daMidia ? P.daMidia(imp.midia) : null;
+  printViaBluetooth(window.cdbTspl.alinhamento(midiaTspl(imp), window.cdbTspl.posicaoNaCabeca(imp, papel)), semBluetoothNoAjuste, null, legadoDaV2(imp));
+}
+// Ajuste fino: setas de 0,5 mm no cartão, salvo na impressora deste aparelho.
+function mmTexto(v) { return String(Math.abs(v)).replace('.', ','); }
+function descreverAjuste(off) {
+  const x = Number(off && off.x) || 0, y = Number(off && off.y) || 0;
+  const partes = [];
+  if (x) partes.push(mmTexto(x) + ' mm ' + (x > 0 ? 'à direita' : 'à esquerda'));
+  if (y) partes.push(mmTexto(y) + ' mm ' + (y > 0 ? 'para baixo' : 'para cima'));
+  return 'Ajuste fino: ' + (partes.length ? partes.join(', ') : 'nenhum');
+}
+function gravarAjuste(mac, offsetMm) {
+  const I = window.cdbImpressoras;
+  const imp = impressoraDoAjuste(mac);
+  if (!I || !imp) return;
+  I.salvar(localStorage, I.cadastrar(I.ler(localStorage), { address: imp.address, offsetMm }));
+  renderPrinterStatus();
+}
+function ajustarPosicao(mac, dx, dy) {
+  const imp = impressoraDoAjuste(mac);
+  if (!imp) return;
+  const novo = window.cdbImpressoras.ajusteFino(imp.offsetMm, dx, dy);
+  gravarAjuste(mac, novo);
+  showToast(descreverAjuste(novo));
+}
+function zerarAjuste(mac) { gravarAjuste(mac, { x: 0, y: 0 }); showToast(descreverAjuste(null)); }
+function esquecerImpressora(mac) {
+  const I = window.cdbImpressoras;
+  if (!confirm('Esquecer esta impressora neste aparelho?')) return;
+  I.salvar(localStorage, I.esquecer(I.ler(localStorage), mac));
+  renderPrinterStatus();
+}
+
+// Seletor em 3 passos: qual impressora, o que ela imprime, qual papel.
+let seletorEscolha = null;
+function irPassoSeletor(n) {
+  [1, 2, 3].forEach(i => { const el = document.getElementById('printerPickerPasso' + i); if (el) el.style.display = i === n ? '' : 'none'; });
+  const titulo = document.getElementById('printerPickerTitle');
+  if (titulo) titulo.textContent = ['', 'Passo 1 de 3 · Qual impressora?', 'Passo 2 de 3 · O que ela imprime?', 'Passo 3 de 3 · Qual papel está nela?'][n];
+}
+function linguagemDoSeletor() {
+  const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
+  return escolha === 'auto' ? perfilPorNome(seletorEscolha && seletorEscolha.name) : escolha;
+}
+function escolherNoSeletor(addr, name) {
+  const v2 = impressorasV2();
+  const imp = v2 && v2.impressoras[addr];
+  seletorEscolha = { addr, name, imp };
+  const perfil = document.getElementById('printerProfile');
+  if (perfil) perfil.value = imp && imp.linguagemManual ? imp.linguagem : 'auto';
+  const inverter = document.getElementById('printerInvert');
+  if (inverter) inverter.checked = !!(imp && imp.inverter);
+  const usos = v2 ? window.cdbImpressoras.PAPEIS.filter(p => v2.papeis[p] === addr) : [];
+  const padrao = usos.length === 2 ? 'ambos' : usos[0] || (linguagemDoSeletor() === 'tspl' ? 'etiqueta' : 'cupom');
+  document.querySelectorAll('#printerPickerPasso2 [data-uso]').forEach(b => { b.className = 'np-btn ' + (b.dataset.uso === padrao ? 'np-primary' : 'np-secondary'); });
+  irPassoSeletor(2);
+}
+function escolherUso(uso) {
+  if (!seletorEscolha) return;
+  seletorEscolha.uso = uso;
+  preencherPapeisSeletor();
+  irPassoSeletor(3);
+}
+function preencherPapeisSeletor() {
+  const sel = document.getElementById('printerLabelSize');
+  if (!sel || !window.cdbPapeis || !seletorEscolha) return;
+  const P = window.cdbPapeis;
+  const tspl = linguagemDoSeletor() === 'tspl';
+  const papeis = tspl ? P.lista({ classe: 'etiqueta' }) : [P.porId(P.PADRAO_ESCPOS)];
+  const atual = seletorEscolha.imp && P.daMidia(seletorEscolha.imp.midia);
+  const escolhido = atual && papeis.some(p => p.id === atual.id) ? atual.id : (tspl ? P.PADRAO_TSPL : P.PADRAO_ESCPOS);
+  sel.innerHTML = papeis.map(p => '<option value="' + escapeHtml(p.id) + '"' + (p.id === escolhido ? ' selected' : '') + '>' + escapeHtml(p.rotulo) + '</option>').join('');
+  const dica = document.getElementById('printerPapelDica');
+  if (dica) dica.textContent = tspl ? 'Escolha o papel que está na impressora. Rolo contínuo gasta só o tamanho da etiqueta. Etiqueta recortada: depois de salvar, toque Calibrar no cartão dela em Ajustes.' : 'Bobina de cupom de 58 mm, a mesma da maquininha.';
+}
+function salvarSeletor() {
+  const e = seletorEscolha;
+  if (!e) return;
+  const papeis = e.uso === 'ambos' ? ['etiqueta', 'cupom'] : [e.uso || 'etiqueta'];
+  selectPrinter(impressoraDoSeletor(e.addr, e.name), papeis);
+}
+// Callback chamado apos o operador selecionar uma impressora no modal.
+// Usado tanto pra Ajustes > Buscar impressora (callback null = so salvar)
+// quanto pra Imprimir direto (callback dispara a impressao).
+let printerPickerOnSelect = null;
+
+function pickPrinter() {
+  // Ajustes -> Buscar impressora: so seleciona, sem disparar impressao
+  printerPickerOnSelect = null;
+  openPrinterPicker();
+}
+
+function openPrinterPicker() {
+  const modal = document.getElementById('printerPickerModal');
+  modal.classList.add('show');
+  seletorEscolha = null;
+  irPassoSeletor(1);
+  renderSavedPrinters();
+  loadPrinterDevices();
+}
+
+function closePrinterPicker() {
+  document.getElementById('printerPickerModal').classList.remove('show');
+  printerPickerOnSelect = null;
+}
+
+// Lista os dispositivos Bluetooth ja pareados (bs.list — nao escaneia,
+// usa apenas o que ja foi pareado pelas configuracoes do Android).
+//
+// IMPORTANTE: Android 12+ exige permissao runtime BLUETOOTH_CONNECT pra
+// listar pareados. O plugin cordova-plugin-bluetooth-serial 0.4.7 (2019)
+// NAO requisita essa permissao automaticamente — entao bs.list() lanca
+// SecurityException se o usuario nao concedeu manualmente. Por isso
+// surfaceamos o erro VISIVEL com instrucoes claras (o operador concede
+// em Configuracoes > Apps > Easy Stock Mobile > Permissoes > Dispositivos
+// proximos / Nearby devices).
+function loadPrinterDevices() {
+  const list = document.getElementById('printerPickerList');
+  const hint = document.getElementById('printerPickerHint');
+  const appName = window.CDB_CONFIG?.isPilot ? 'Casa da Baba Piloto' : 'Easy Stock Mobile';
+  list.innerHTML = '<div class="cat-empty">Buscando...</div>';
+
+  const bs = window.bluetoothSerial;
+  if (!bs || !bs.list) {
+    list.innerHTML = '';
+    hint.innerHTML = '<b>Impressão Bluetooth indisponível</b><br>'
+                   + 'Abra o ' + appName + ' no Android. Se já estiver no app, feche e abra novamente.';
+    return;
+  }
+
+  const showError = (where, err) => {
+    const detail = err && (err.message || err.toString && err.toString()) || JSON.stringify(err) || '(sem detalhe)';
+    list.innerHTML = '';
+    hint.innerHTML = '<b>' + (where === 'permission' ? 'Permita usar dispositivos próximos' : 'Não foi possível buscar as impressoras') + '</b>'
+                   + '<ol style="text-align:left;padding-left:20px">'
+                   + '<li>No Android, abra Configurações → Apps → <b>' + appName + '</b> → Permissões.</li>'
+                   + '<li>Permita <b>Dispositivos próximos</b> e confira se o Bluetooth está ligado.</li>'
+                   + '<li>Volte ao app e toque em <b>Buscar de novo</b>.</li></ol>'
+                   + '<details><summary>Detalhes técnicos</summary><p style="overflow-wrap:anywhere">['
+                   + escapeHtml(String(where)) + '] ' + escapeHtml(String(detail)) + '</p></details>';
+  };
+
+  const doList = () => {
+    try {
+      bs.list((devices) => {
+        list.innerHTML = '';
+        if (!devices || devices.length === 0) {
+          hint.innerHTML = '⚠️ <b>Nenhum dispositivo pareado</b><br>'
+                         + '<span style="font-size:12px">Pareie a impressora térmica pelas <b>Configurações do Android → Bluetooth</b>, '
+                         + 'depois volte aqui e toque "Buscar de novo".</span>';
+          return;
+        }
+        hint.textContent = devices.length + ' dispositivo(s) pareado(s). Toque na impressora.';
+        const saved = getSavedPrinter();
+        devices.forEach((d) => {
+          const addr = d.address || d.id;
+          const name = d.name || addr;
+          const isSaved = saved && saved.address === addr;
+          const row = document.createElement('button');
+          row.className = 'np-btn ' + (isSaved ? 'np-primary' : 'np-secondary');
+          row.style.textAlign = 'left';
+          row.innerHTML = (isSaved ? '✓ ' : '') + escapeHtml(name)
+                        + '<br><span style="font-size:var(--fs-micro);opacity:.7">' + escapeHtml(addr) + ' · ' + escapeHtml(avisoDispositivo(d, name)) + '</span>';
+          row.onclick = () => escolherNoSeletor(addr, name);
+          list.appendChild(row);
+        });
+      }, (err) => showError('list', err));
+    } catch (ex) {
+      showError('list-throw', ex);
+    }
+  };
+
+  // Pede permissao BLUETOOTH_CONNECT ANTES de qualquer bs.* — sem isso,
+  // Android 12+ lanca SecurityException nativo nao tratado (crash do app).
+  ensureBluetoothPermission((granted) => {
+    if (!granted) {
+      showError('permission', 'BLUETOOTH_CONNECT negada ou indisponivel');
+      return;
+    }
+    doList();
+  });
+}
+
+// =====================================================================
+// DIAGNOSTICO OPERACIONAL
+// =====================================================================
+// Substitui o alert() antigo por modal scrollavel com 6 secoes (App, Sync,
+// Storage, Integridade, Impressora, Camera) + atalhos de emergencia. Util
+// em campo: operador toca, ve por que sync trava / storage cheio / refs
+// orfas / camera silenciosa / impressora desconectada.
+// printerDiagnostics() vira alias que abre o modal (compat com botao em
+// Ajustes > Equipamento).
+
+const DIAG_KNOWN_KEYS = [
+  'cdb-products', 'cdb-orders', 'cdb-clients', 'cdb-cash', 'cdb-cash-closings',
+  'cdb-batches', 'cdb-audit-log', 'cdb-audit-log-archive', 'cdb-sync-queue',
+  'cdb-cam-errors', 'cdb-bt-trail', 'cdb-printer', 'cdb-printers', 'cdb-impressoras.v2', 'cdb-regra-impressao.v1', 'cdb-operator-name',
+  'cdb-empresa-name', 'cdb-store-logo', 'cdb-pix-key', 'cdb-pix-holder', 'cdb-device-id',
+  'cdb-last-sync', 'cdb-theme', 'cdb-prod-scan-mode', 'cdb-demo-mode', 'cdb-schema-version',
+  'cdb-pre-reset-backup'
+];
+
+function _fmtRelTime(ts) {
+  if (!ts) return 'nunca';
+  const dt = Date.now() - Number(ts);
+  if (dt < 0 || !isFinite(dt)) return 'nunca';
+  const s = Math.floor(dt / 1000);
+  if (s < 60) return 'há ' + s + 's';
+  const m = Math.floor(s / 60);
+  if (m < 60) return 'há ' + m + ' min';
+  const h = Math.floor(m / 60);
+  if (h < 24) return 'há ' + h + 'h';
+  const d = Math.floor(h / 24);
+  return 'há ' + d + ' dia' + (d > 1 ? 's' : '');
+}
+function _fmtBytes(n) {
+  if (!isFinite(n) || n < 0) return '?';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+function estimateStorageUsage() {
+  let total = 0;
+  const breakdown = {};
+  DIAG_KNOWN_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    const len = v ? v.length : 0;
+    breakdown[k] = len;
+    total += len;
+  });
+  // Soma tambem qualquer outra chave cdb-* nao listada (futuro-proof)
+  let extra = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.indexOf('cdb-') === 0 && DIAG_KNOWN_KEYS.indexOf(k) === -1) {
+      extra += (localStorage.getItem(k) || '').length;
+    }
+  }
+  total += extra;
+  return { total, breakdown, extra };
+}
+
+// Detecta inconsistencias que confundem operador / dificultam debug.
+// Severidade: warn (cosmetico/historico) | err (bloqueante / corrupcao).
+function checkIntegrity() {
+  const issues = [];
+  const productIds = new Set((products || []).map(p => p.id));
+  // 1. Orders com produtos inexistentes
+  let orphanOrders = 0;
+  (orders || []).forEach(o => {
+    (o.items || []).forEach(it => {
+      if (it.productId && !productIds.has(it.productId)) {
+        orphanOrders++;
+      }
+    });
+  });
+  if (orphanOrders) issues.push({ severity: 'warn', type: 'orphan-order-items',
+    msg: orphanOrders + ' item(ns) de pedido referencia(m) produto inexistente' });
+
+  // 2. Batches com produtos inexistentes
+  let orphanBatches = 0;
+  (batches || []).forEach(b => {
+    (b.items || []).forEach(it => {
+      if (it.productId && !productIds.has(it.productId)) orphanBatches++;
+    });
+  });
+  if (orphanBatches) issues.push({ severity: 'warn', type: 'orphan-batch-items',
+    msg: orphanBatches + ' item(ns) de lote referencia(m) produto inexistente' });
+
+  // 3. Pedidos sem clientSnapshot
+  const noSnap = (orders || []).filter(o => !o.clientSnapshot || !o.clientSnapshot.name).length;
+  if (noSnap) issues.push({ severity: 'warn', type: 'no-snapshot',
+    msg: noSnap + ' pedido(s) sem snapshot de cliente' });
+
+  // 4. cashEntries com amount nao-numerico
+  const badCash = (cashEntries || []).filter(e => !isFinite(Number(e.amount))).length;
+  if (badCash) issues.push({ severity: 'err', type: 'bad-cash',
+    msg: badCash + ' lancamento(s) de caixa com valor invalido' });
+
+  // 5. Audit log proximo do limite
+  const log = loadAuditLog();
+  if (log.length >= AUDIT_LOG_MAX) {
+    issues.push({ severity: 'warn', type: 'audit-full',
+      msg: 'Audit log atingiu limite (' + AUDIT_LOG_MAX + ') — mais antigos serao descartados' });
+  }
+  return issues;
+}
+
+function collectDiagnostics() {
+  const ver = (window.CDB_CONFIG?.isPilot && window.CDB_CONFIG.bundleVersion) || (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || '(desconhecida)';
+  const platform = window.Capacitor
+    ? (window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'capacitor')
+    : 'web';
+  const deviceId = localStorage.getItem('cdb-device-id') || '(sem id)';
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+
+  // Sync state via cdbSync
+  const cs = window.cdbSync || {};
+  const queueSize = (typeof cs.queueSize === 'function') ? cs.queueSize() : (pendingSync || 0);
+  const lastSync = Number(localStorage.getItem('cdb-last-sync')) || 0;
+  const apiBase = cs.apiBaseUrl || '(mesmo host)';
+  const online = navigator.onLine;
+
+  const storage = estimateStorageUsage();
+  const issues = checkIntegrity();
+
+  // Impressora
+  const bs = window.bluetoothSerial;
+  const TP = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter;
+  const printer = (typeof getSavedPrinter === 'function') ? getSavedPrinter() : null;
+  let btTrail = [];
+  try { btTrail = JSON.parse(localStorage.getItem('cdb-bt-trail') || '[]'); } catch (e) {}
+
+  // Camera
+  const camErrors = getCameraErrors();
+  const detectorAvailable = ('BarcodeDetector' in window);
+  const scanMode = localStorage.getItem('cdb-prod-scan-mode') || 'both';
+
+  // Caixa hoje
+  let cashTodayCount = 0;
+  let cashTodayBalance = 0;
+  try {
+    const today = (typeof dateKeyOf === 'function') ? dateKeyOf(Date.now()) : null;
+    (cashEntries || []).forEach(e => {
+      if (today && (typeof dateKeyOf === 'function') && dateKeyOf(e.createdAt) === today) {
+        cashTodayCount++;
+        const sig = e.type === 'expense' ? -1 : 1;
+        cashTodayBalance += sig * (Number(e.amount) || 0);
+      }
+    });
+  } catch (e) {}
+
+  // Backup local: ultimo timestamp + plugin publico disponivel
+  const lastLocalBackup = Number(localStorage.getItem('cdb-last-local-backup-at')) || 0;
+  const hasPublicBackup = !!(cs.hasPublicBackupPlugin && cs.hasPublicBackupPlugin());
+
+  return {
+    app: { ver, platform, theme, operator: operatorName || '(sem operador)', deviceId },
+    sync: { queueSize, lastSync, apiBase, online },
+    storage: {
+      total: storage.total,
+      products: (products || []).length,
+      orders: (orders || []).length,
+      batches: (batches || []).length,
+      clients: (clients || []).length,
+      cashEntries: (cashEntries || []).length,
+      auditLog: loadAuditLog().length,
+      auditMax: AUDIT_LOG_MAX
+    },
+    backup: {
+      lastLocalAt: lastLocalBackup,
+      hasPublicPlugin: hasPublicBackup,
+      surviveUninstall: hasPublicBackup
+    },
+    integrity: { issues, cashTodayCount, cashTodayBalance },
+    printer: { plugin: !!TP, shim: !!bs, native: !!(bs && bs.__cdbNative),
+      saved: printer, trailLen: btTrail.length },
+    camera: { detectorAvailable, scanMode, errors: camErrors },
+    errors: getErrorLog(),
+    server: collectServerInfo()
+  };
+}
+
+// Onda 0/1: lê info do servidor (pingVersion) + pareamento (Onda 1).
+function collectServerInfo() {
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('cdb-server-version') || 'null'); } catch (e) {}
+  let pairing = null;
+  try {
+    if (window.cdbSync && typeof window.cdbSync.getPairing === 'function') {
+      pairing = window.cdbSync.getPairing();
+    }
+  } catch (e) {}
+
+  // Onda 5: status do realtime (SSE)
+  const realtime = !!(window.cdbSync && typeof window.cdbSync.realtimeConnected === 'function' && window.cdbSync.realtimeConnected());
+
+  // Onda 8: timestamp do ultimo backup
+  const lastBackupAt = (window.cdbSync && typeof window.cdbSync.lastBackupAt === 'function')
+    ? window.cdbSync.lastBackupAt()
+    : 0;
+
+  if (!cached) {
+    return {
+      status: navigator.onLine ? 'unknown' : 'offline',
+      statusLabel: navigator.onLine ? 'aguardando primeira checagem' : 'offline',
+      fetchedAt: 0,
+      apiVersion: null,
+      mobileSchemaVersion: null,
+      apiKeyEnforced: null,
+      pairing,
+      realtime,
+      lastBackupAt
+    };
+  }
+  return {
+    status: cached.Status === 'ok' ? 'ok' : (cached.Status || 'unknown'),
+    statusLabel: cached.Status === 'ok' ? 'online' : (cached.Status || 'desconhecido'),
+    fetchedAt: cached.fetchedAt || 0,
+    apiVersion: cached.ApiVersion || null,
+    mobileSchemaVersion: cached.MobileSchemaVersion ?? null,
+    apiKeyEnforced: cached.Features ? !!cached.Features.ApiKeyEnforced : null,
+    pairing,
+    realtime,
+    lastBackupAt
+  };
+}
+
+// Onda 1: dispara dialog pra digitar codigo de 6 digitos. Em dispositivos
+// sem prompt() decente (alguns WebView Android), ainda funciona — quem
+// quiser UI premium evolui pra modal HTML proprio.
+// #1474: o operador ve o nome da loja (ou da empresa), nunca o id.
+function nomeDoPareamento(data) {
+  const d = data || {};
+  return String(d.lojaNome || d.empresaNome || d.label || '').trim();
+}
+function textoPareadoCom(data) {
+  const nome = nomeDoPareamento(data);
+  return nome ? 'Pareado com ' + nome + ' ✓' : 'Pareado ✓';
+}
+
+async function pairDevicePrompt() {
+  const pilot = !!window.CDB_CONFIG?.isPilot;
+  const code = (window.prompt('Digite o código de pareamento (6 dígitos):') || '').trim();
+  if (!code) return { cancelled: true };
+  if (pilot && !/^\d{6}$/.test(code)) throw new Error('Informe o código de 6 dígitos fornecido pela equipe.');
+  if (!window.cdbSync || typeof window.cdbSync.pairWithCode !== 'function') {
+    if (pilot) throw new Error('Sincronização indisponível. Tente novamente.');
+    showToast('Sincronização indisponível'); return;
+  }
+  if (!pilot) showToast('Pareando…');
+  try {
+    const data = await window.cdbSync.pairWithCode(code, null);
+    if (!pilot) {
+      showToast(textoPareadoCom(data));
+      if (typeof openDiagnostics === 'function') openDiagnostics();
+    }
+    updateSync();
+    return { paired: true, data };
+  } catch (e) {
+    try { logError(e, 'pairDevicePrompt'); } catch (_) {}
+    if (pilot) throw e;
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
+  }
+}
+
+function unpairDevice() {
+  if (!confirm('Desparear este dispositivo?\n\nApós desparear o app não vai conseguir sincronizar até parear de novo.')) return;
+  if (window.cdbSync && typeof window.cdbSync.clearPairing === 'function') {
+    window.cdbSync.clearPairing();
+    // #2401: o render de etiqueta autenticado fica no cache do SW; sai junto com o pareamento.
+    try { if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'LOGOUT_CLEAR' }); } catch (_) {}
+    showToast('Dispositivo despareado');
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  }
+}
+
+// Onda 6 — modal de conflito de sincronização. Em vez de toast efêmero,
+// operador vê o que aconteceu, qual o motivo, e pode escolher recarregar
+// (força pull) ou só fechar. Nunca apaga dados locais — server já
+// alinhou via pull automático em background.
+function showConflictModal(conflicts) {
+  if (!Array.isArray(conflicts) || conflicts.length === 0) return;
+
+  // Cria o overlay on-the-fly se não existir (módulo isolado, evita
+  // poluir HTML estático). Reaproveita estilos .historico-overlay.
+  let overlay = document.getElementById('conflictModal');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'conflictModal';
+    overlay.className = 'historico-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML = `
+      <div class="historico-sheet">
+        <div class="cobranca-head">
+          <h3 style="font-family:'Fraunces',serif;font-size:20px;margin:0;">Conflitos de sincronização</h3>
+          <button class="cobranca-close" onclick="closeConflictModal()" aria-label="Fechar">×</button>
+        </div>
+        <div id="conflictBody"></div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="diag-action" onclick="diagPingServer && diagPingServer()">Verificar servidor</button>
+          <button class="diag-action" onclick="closeConflictModal()">OK, entendi</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+  }
+
+  const body = document.getElementById('conflictBody');
+  const items = conflicts.slice(0, 10).map(c => {
+    const reason = (c.reason || '').replace(/^conflict:\s*/i, '');
+    return `
+      <div class="diag-section">
+        <div class="diag-section-head">
+          <div class="diag-section-title">⚠ ${escapeHtml((c.mutationId || c.id || '').slice(-12))}</div>
+          <span class="diag-status warn">conflito</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-dim);line-height:1.5;padding:6px 0">
+          ${escapeHtml(reason || 'Outra pessoa editou primeiro.')}
+        </div>
+      </div>`;
+  }).join('');
+  const extra = conflicts.length > 10
+    ? `<div style="font-size:var(--fs-micro);color:var(--ink-mute);text-align:center;padding:8px">+${conflicts.length - 10} mais. Veja em Diagnóstico → Erros do sistema.</div>`
+    : '';
+  body.innerHTML = `
+    <div style="font-size:12.5px;color:var(--ink-dim);margin-bottom:10px;line-height:1.5">
+      <strong style="color:var(--ink)">${conflicts.length}</strong> edição${conflicts.length === 1 ? '' : 'ões'} foram rejeitadas porque
+      outro dispositivo modificou os mesmos itens depois de você.
+      A versão do servidor já foi carregada automaticamente — sua tela está atualizada.
+    </div>
+    ${items}${extra}`;
+  toggleModal('conflictModal', true);
+}
+function closeConflictModal() { toggleModal('conflictModal', false); }
+
+// Onda 8: dispara backup manual on-demand do localStorage pro servidor.
+async function diagBackupNow() {
+  if (!window.cdbSync || typeof window.cdbSync.uploadBackup !== 'function') {
+    showToast('Sincronização indisponível'); return;
+  }
+  showToast('Enviando backup…');
+  try {
+    const r = await window.cdbSync.uploadBackup('manual');
+    const kb = Math.round((r && r.sizeBytes ? r.sizeBytes : 0) / 1024);
+    showToast('Backup OK — ' + kb + ' KB enviados');
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro'));
+    try { logError(e, 'diagBackupNow'); } catch (_) {}
+  }
+}
+
+// Bootstrap pós-pareamento: enfileira todo o state como upserts e dispara
+// flush. Idempotente no servidor (last-write-wins por (Id, EmpresaId)).
+// Pré-condição operacional: device deve estar pareado E backup local
+// recente — confirmação dupla aqui pra evitar acidente.
+// CONTINGÊNCIA — Diagnostico estendido: copia trace, envia ao server,
+// força pareamento manual quando auto-pair não rolou.
+async function diagCopyTrace() {
+  try {
+    const text = (window.cdbSync && window.cdbSync.exportTraceText)
+      ? window.cdbSync.exportTraceText()
+      : '(sync.js sem trace exportável)';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast('Trace copiado pro clipboard. Cole no chat/ticket pro suporte.');
+    } else {
+      // Fallback: prompt com texto pra operador copiar manualmente
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('Trace copiado (fallback).');
+    }
+  } catch (e) {
+    try { logError(e, 'diagCopyTrace'); } catch (_) {}
+    showToast('Falha ao copiar trace: ' + (e.message || e));
+  }
+}
+
+async function diagSendTrace() {
+  try {
+    if (!window.cdbSync || !window.cdbSync.getTrace) {
+      showToast('Trace indisponível (sync.js antigo).');
+      return;
+    }
+    const cfg = window.CDB_CONFIG || {};
+    const apiBase = cfg.apiBaseUrl || '';
+    if (!apiBase) {
+      showToast('apiBaseUrl ausente — APK sem config. Use "Copiar trace" e envie manualmente.');
+      return;
+    }
+    const pair = (function () {
+      try { return JSON.parse(localStorage.getItem('cdb-pairing') || 'null'); }
+      catch (_) { return null; }
+    })();
+    const body = {
+      deviceId: localStorage.getItem('cdb-device-id') || '(unknown)',
+      apiBaseUrl: apiBase,
+      hasConfig: typeof window.CDB_CONFIG !== 'undefined',
+      hasProvisioning: !!cfg.forcedProvisioningSecret,
+      hasPairing: !!pair,
+      userAgent: (navigator.userAgent || '').slice(0, 300),
+      trace: window.cdbSync.getTrace(),
+      notes: prompt('Descreva rapido o problema (opcional):') || null
+    };
+    const r = await fetch(apiBase + '/api/mobile/diag/trace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (r.ok) showToast('Trace enviado ao suporte. Ref: device ' + (body.deviceId || '').slice(-8));
+    else showToast('Servidor rejeitou (status ' + r.status + '). Tente "Copiar trace" e envie pelo chat.');
+  } catch (e) {
+    try { logError(e, 'diagSendTrace'); } catch (_) {}
+    showToast('Falha ao enviar trace: ' + (e.message || e) + '. Use "Copiar trace".');
+  }
+}
+
+async function diagForcePairNow() {
+  try {
+    if (!window.cdbSync || !window.cdbSync.forcePairNow) {
+      showToast('sync.js antigo — atualize o app.');
+      return;
+    }
+    showToast('Tentando parear...');
+    const result = await window.cdbSync.forcePairNow();
+    if (result && result.apiKey) {
+      showToast(textoPareadoCom(result));
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast('O pareamento não respondeu. Tente de novo em instantes.');
+    }
+  } catch (e) {
+    try { logError(e, 'diagForcePairNow'); } catch (_) {}
+    showToast('O pareamento falhou: ' + (e.message || e) + '. Tente de novo em instantes.');
+  }
+}
+
+async function diagPushAll() {
+  if (!window.cdbSync || typeof window.cdbSync.pushAllAndFlush !== 'function') {
+    showToast('Sincronização indisponível'); return;
+  }
+  const p = window.cdbSync.getPairing && window.cdbSync.getPairing();
+  if (!p) {
+    alert('Este aparelho não está pareado.\n\nFaça o pareamento primeiro pelo botão "Parear dispositivo".');
+    return;
+  }
+  const lastLocal = window.cdbSync.lastLocalBackupAt ? window.cdbSync.lastLocalBackupAt() : 0;
+  const ageMin = lastLocal ? Math.round((Date.now() - lastLocal) / 60000) : null;
+  const warn = !lastLocal || ageMin > 60;
+  const msg = (warn
+      ? '⚠ ATENÇÃO: backup local ' + (lastLocal ? ('com ' + ageMin + ' min — recomendado fazer um novo ANTES.') : 'NÃO foi feito nesta sessão.')
+      : '✓ Backup local foi feito há ' + ageMin + ' min.')
+    + '\n\nVai enfileirar TODOS os produtos, clientes, pedidos, lotes e caixa pra subir ao servidor.'
+    + '\n\nO app continua funcional durante o processo.\n\nProsseguir?';
+  if (!confirm(msg)) return;
+  showToast('Enfileirando tudo…');
+  try {
+    const r = await window.cdbSync.pushAllAndFlush();
+    const msg2 = 'Push: ' + r.enqueued + ' itens enfileirados. Fila: ' + r.queueSizeBefore + '→' + r.queueSizeAfter + '.';
+    showToast(msg2);
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro'));
+    try { logError(e, 'diagPushAll'); } catch (_) {}
+  }
+}
+
+// Onda 6: troca de loja sem re-parear. Empresa fixa.
+async function switchLojaPrompt() {
+  if (!window.cdbSync || typeof window.cdbSync.listLojasDisponiveis !== 'function') {
+    showToast('Sincronização indisponível'); return;
+  }
+  showToast('Carregando lojas…');
+  let lojas;
+  try {
+    lojas = await window.cdbSync.listLojasDisponiveis();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro'));
+    return;
+  }
+  if (!Array.isArray(lojas) || lojas.length === 0) {
+    alert('Nenhuma loja ativa disponível pra esta empresa.');
+    return;
+  }
+  if (lojas.length === 1) {
+    alert('Esta empresa só tem 1 loja ("' + lojas[0].nome + '"). Sem opções pra trocar.');
+    return;
+  }
+  // Diálogo simples — modal HTML dedicado fica na próxima evolução.
+  const linhas = lojas.map((l, i) =>
+    (i + 1) + ') ' + l.nome + (l.atual ? ' [atual]' : '') + (l.endereco ? ' · ' + l.endereco : '')
+  ).join('\n');
+  const escolha = window.prompt(
+    'Escolha o número da loja:\n\n' + linhas + '\n\n(digite 0 pra cancelar)'
+  );
+  const idx = parseInt(escolha, 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= lojas.length) return;
+  const loja = lojas[idx];
+  if (loja.atual) { showToast('Já está nesta loja'); return; }
+  if (!confirm('Trocar pra ' + loja.nome + '?\n\nDados da loja anterior serão sincronizados antes da troca.')) return;
+  showToast('Trocando…');
+  try {
+    const r = await window.cdbSync.switchLoja(loja.id);
+    if (r && r.changed) {
+      showToast('Agora você está em ' + (r.lojaNome || loja.nome));
+    } else {
+      showToast('Sem mudança');
+    }
+    if (typeof openDiagnostics === 'function') openDiagnostics();
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro'));
+    try { logError(e, 'switchLojaPrompt'); } catch (_) {}
+  }
+}
+
+// Calcula severidade da secao Backup do diagnostico:
+//  - sem plugin publico: warn (pode perder dados em uninstall)
+//  - sem auto-backup: warn (nunca rodou)
+//  - mais de 7 dias: warn
+//  - tudo ok: ok
+function _backupLevel(b) {
+  if (!b) return 'warn';
+  if (!b.hasPublicPlugin) return 'warn';
+  if (!b.lastLocalAt) return 'warn';
+  var ageDays = (Date.now() - b.lastLocalAt) / (1000 * 60 * 60 * 24);
+  if (ageDays > 7) return 'warn';
+  return 'ok';
+}
+
+function _diagBadge(level) {
+  if (level === 'err') return '<span class="diag-status err">erro</span>';
+  if (level === 'warn') return '<span class="diag-status warn">atenção</span>';
+  return '<span class="diag-status ok">ok</span>';
+}
+function _diagRow(k, v, klass) {
+  return '<div class="diag-row"><span class="k">' + k + '</span><span class="v ' + (klass || '') + '">' + v + '</span></div>';
+}
+
+function openDiagnostics() {
+  const d = collectDiagnostics();
+  const body = document.getElementById('diagnosticsBody');
+  if (!body) return;
+
+  // Determinar severidades por seção
+  const syncLevel = !d.sync.online ? 'warn' : (d.sync.queueSize > 0 ? 'warn' : 'ok');
+  const storLevel = (d.storage.auditLog >= d.storage.auditMax) ? 'warn' : 'ok';
+  const integrityErr = d.integrity.issues.some(i => i.severity === 'err');
+  const integrityWarn = d.integrity.issues.some(i => i.severity === 'warn');
+  const integrityLevel = integrityErr ? 'err' : (integrityWarn ? 'warn' : 'ok');
+  const printerLevel = d.printer.saved ? (d.printer.plugin ? 'ok' : 'warn') : 'warn';
+  const camLevel = !d.camera.detectorAvailable ? 'err'
+    : (d.camera.errors.length > 0 ? 'warn' : 'ok');
+
+  const escIssues = d.integrity.issues.length
+    ? '<div class="diag-issues">' + d.integrity.issues.map(i =>
+        '<div class="issue ' + i.severity + '">• ' + escapeHtml(i.msg) + '</div>'
+      ).join('') + '</div>'
+    : '';
+
+  const camErrorsHtml = d.camera.errors.length
+    ? '<div class="diag-issues">' + d.camera.errors.slice(-5).reverse().map(e =>
+        '<div class="issue warn">• ' + _fmtRelTime(e.t) + ' — ' + escapeHtml(e.msg) + '</div>'
+      ).join('') + '</div>'
+    : '';
+
+  const btTrailRows = d.printer.trailLen
+    ? _diagRow('Trail BT', d.printer.trailLen + ' eventos')
+    : '';
+
+  function section(title, level, rows, actions, extra) {
+    return ''
+      + '<div class="diag-section">'
+      + '<div class="diag-section-head">'
+      + '<div class="diag-section-title">' + title + '</div>'
+      + _diagBadge(level)
+      + '</div>'
+      + rows
+      + (actions ? '<div class="diag-actions">' + actions + '</div>' : '')
+      + (extra || '')
+      + '</div>';
+  }
+  const friendlyLevel = (!d.sync.online || d.sync.queueSize > 0 || d.server.status !== 'ok') ? 'warn' : 'ok';
+  const friendlyText = !d.sync.online
+    ? 'Sem internet agora. O app continua funcionando e guarda as alterações para sincronizar depois.'
+    : d.sync.queueSize > 0 && !d.server.pairing
+      ? `Existem ${d.sync.queueSize} item(ns) só neste aparelho. Conecte o aparelho à loja para enviar.`
+    : d.sync.queueSize > 0
+      ? `Existem ${d.sync.queueSize} item(ns) aguardando envio. Toque em Forçar flush se quiser tentar agora.`
+      : `Tudo em dia. Última sincronização ${_fmtRelTime(d.sync.lastSync)}.`;
+
+  body.innerHTML = ''
+    + '<div class="diag-friendly">'
+      + '<div class="df-title">' + (friendlyLevel === 'ok' ? 'Sincronização saudável' : 'Sincronização com atenção') + '</div>'
+      + '<div class="df-text">' + escapeHtml(friendlyText) + '</div>'
+    + '</div>'
+    + section('App', 'ok', ''
+        + _diagRow('Bundle', escapeHtml(d.app.ver))
+        + _diagRow('Plataforma', escapeHtml(d.app.platform))
+        + _diagRow('Tema', d.app.theme === 'light' ? 'Claro' : 'Escuro')
+        + _diagRow('Operador', escapeHtml(d.app.operator))
+      , '', '')
+    + section('Sync', syncLevel, ''
+        + _diagRow('Última sync', _fmtRelTime(d.sync.lastSync))
+        + _diagRow('Fila pendente', d.sync.queueSize, d.sync.queueSize > 0 ? 'warn' : '')
+        + _diagRow('Online', d.sync.online ? 'sim' : 'não', d.sync.online ? '' : 'warn')
+        + _diagRow('Endpoint', escapeHtml(d.sync.apiBase || '(mesmo host)'))
+      , ''
+        + '<button class="diag-action" onclick="diagForceFlush()">Forçar flush</button>'
+        + '<button class="diag-action" onclick="diagForcePull()">Forçar pull</button>'
+      , '')
+    + section('Storage', storLevel, ''
+        + _diagRow('Uso total', _fmtBytes(d.storage.total))
+        + _diagRow('Produtos', d.storage.products)
+        + _diagRow('Pedidos', d.storage.orders)
+        + _diagRow('Lotes', d.storage.batches)
+        + _diagRow('Clientes', d.storage.clients)
+        + _diagRow('Caixa', d.storage.cashEntries + ' lançamentos')
+        + _diagRow('Audit log', d.storage.auditLog + ' / ' + d.storage.auditMax,
+            d.storage.auditLog >= d.storage.auditMax ? 'warn' : '')
+      , ''
+        + '<button class="diag-action" onclick="diagCompactAuditLog()">Compactar audit</button>'
+        + '<button class="diag-action" onclick="closeDiagnostics(); exportBackup()">Exportar backup</button>'
+      , '')
+    + section('Backup', _backupLevel(d.backup), ''
+        + _diagRow('Último auto-backup',
+            d.backup.lastLocalAt ? _fmtRelTime(d.backup.lastLocalAt) : 'nunca',
+            d.backup.lastLocalAt ? '' : 'warn')
+        + _diagRow('Sobrevive desinstalação',
+            d.backup.surviveUninstall ? 'SIM ✓' : 'NÃO',
+            d.backup.surviveUninstall ? '' : 'warn')
+        + _diagRow('Plugin público',
+            d.backup.hasPublicPlugin ? 'OK' : 'ausente (atualize o APK)',
+            d.backup.hasPublicPlugin ? '' : 'warn')
+      , ''
+        + '<button class="diag-action" onclick="closeDiagnostics(); window.cdbSync && window.cdbSync.localBackupToFile && window.cdbSync.localBackupToFile(\'manual\').then(r => showToast(r.ok ? \'Backup salvo no celular\' : \'Falha: \' + r.reason))">Salvar agora</button>'
+        + (d.backup.hasPublicPlugin
+            ? '<button class="diag-action" onclick="restoreFromPublicStorage()">Restaurar de arquivo</button>'
+            : '')
+      , '')
+    + section('Integridade', integrityLevel, ''
+        + _diagRow('Caixa de hoje', d.integrity.cashTodayCount + ' lançamentos · ' + money(d.integrity.cashTodayBalance))
+        + _diagRow('Alertas', d.integrity.issues.length || 'nenhum',
+            d.integrity.issues.length ? (integrityErr ? 'err' : 'warn') : '')
+      , '', escIssues)
+    + section('Impressora', printerLevel, ''
+        + _diagRow('Plugin nativo', d.printer.plugin ? 'CARREGADO' : 'NÃO CARREGADO',
+            d.printer.plugin ? '' : 'warn')
+        + _diagRow('Shim BluetoothSerial', d.printer.shim
+            ? (d.printer.native ? 'NATIVO ✓' : 'LEGADO')
+            : 'AUSENTE', d.printer.shim ? '' : 'warn')
+        + _diagRow('Salva', d.printer.saved
+            ? escapeHtml(d.printer.saved.name + ' / ' + d.printer.saved.address)
+            : '(nenhuma)', d.printer.saved ? '' : 'warn')
+        + btTrailRows
+      , (d.printer.saved ? '<button class="diag-action" onclick="closeDiagnostics(); testPrint()">Testar impressão</button>' : '')
+      , '')
+    + section('Câmera', camLevel, ''
+        + _diagRow('BarcodeDetector', d.camera.detectorAvailable ? 'disponível' : 'AUSENTE',
+            d.camera.detectorAvailable ? '' : 'err')
+        + _diagRow('Modo scan', escapeHtml(d.camera.scanMode))
+        + _diagRow('Erros recentes', d.camera.errors.length || 'nenhum',
+            d.camera.errors.length ? 'warn' : '')
+      , '', camErrorsHtml)
+    + (function() {
+        // Status do servidor + pareamento (Onda 1).
+        // Severidade:
+        //   - err  = pairing invalidado (revogado/expirado no server) — operador precisa re-parear
+        //   - warn = sem rede OU sem pareamento mas auth obrigatória
+        //   - ok   = pareado e respondendo
+        const p = d.server.pairing;
+        const invalidated = !!(window.cdbSync && window.cdbSync.isPairingInvalid && window.cdbSync.isPairingInvalid());
+        let level = 'ok';
+        let label = d.server.statusLabel;
+        if (invalidated) { level = 'err'; label = 'pareamento revogado — parear de novo'; }
+        else if (d.server.status === 'offline') { level = 'warn'; }
+        else if (d.server.status !== 'ok') { level = 'warn'; }
+        else if (d.server.apiKeyEnforced && !p) { level = 'warn'; label = 'sem pareamento (server exige)'; }
+
+        return section('Servidor', level, ''
+          + _diagRow('Status', label, level === 'ok' ? '' : level)
+          + (d.server.apiVersion ? _diagRow('Versão API', escapeHtml(d.server.apiVersion)) : '')
+          + (d.server.mobileSchemaVersion != null ? _diagRow('Contrato Mobile', 'v' + d.server.mobileSchemaVersion) : '')
+          + (d.server.fetchedAt ? _diagRow('Última checagem', _fmtRelTime(d.server.fetchedAt)) : '')
+          + (d.server.apiKeyEnforced != null ? _diagRow('Auth obrigatória', d.server.apiKeyEnforced ? 'sim' : 'não') : '')
+          // Pareamento — Onda 1
+          + (p
+              ? (_diagRow('Pareamento', '✓ pareado')
+                + (p.label ? _diagRow('Apelido', escapeHtml(p.label)) : '')
+                + (p.empresaId ? _diagRow('Empresa', escapeHtml(String(p.empresaId).slice(0, 8) + '…')) : '')
+                + (p.lojaId ? _diagRow('Loja', escapeHtml(String(p.lojaId).slice(0, 8) + '…')) : '')
+                + (p.defaultOperatorName ? _diagRow('Operador padrão', escapeHtml(p.defaultOperatorName)) : '')
+                + (p.pairedAt ? _diagRow('Pareado em', _fmtRelTime(new Date(p.pairedAt).getTime())) : ''))
+              : _diagRow('Pareamento', 'não pareado (modo offline)', d.server.apiKeyEnforced ? 'warn' : ''))
+          // Onda 5: status do realtime (SSE) — verde quando conectado.
+          + (p
+              ? _diagRow('Tempo real', d.server.realtime ? '🟢 conectado' : 'desconectado',
+                         d.server.realtime ? '' : 'warn')
+              : '')
+          // Onda 8: ultimo backup
+          + (p
+              ? _diagRow('Último backup',
+                  d.server.lastBackupAt > 0 ? _fmtRelTime(d.server.lastBackupAt) : 'nunca',
+                  d.server.lastBackupAt > 0 ? '' : 'warn')
+              : '')
+        , ''
+          + '<button class="diag-action" onclick="diagPingServer()">Verificar agora</button>'
+          + (p
+              ? '<button class="diag-action" onclick="switchLojaPrompt()">Trocar loja</button>'
+              : '')
+          + (p
+              ? '<button class="diag-action" onclick="diagBackupNow()">Backup agora</button>'
+              : '')
+          + (p
+              ? '<button class="diag-action" onclick="diagPushAll()">Sincronizar tudo agora</button>'
+              : '')
+          + (p
+              ? '<button class="diag-action danger" onclick="unpairDevice()">Desparear</button>'
+              : '<button class="diag-action" onclick="diagForcePairNow()">Forçar pareamento agora</button>'
+              + '<button class="diag-action" onclick="pairDevicePrompt().catch(e => showToast(\'Falha: \' + (e && e.message ? e.message : \'erro desconhecido\')))">Parear com código</button>')
+        , '');
+      })()
+    + section('Erros do sistema', d.errors.length ? 'warn' : 'ok', ''
+        + _diagRow('Total registrado', d.errors.length || 'nenhum',
+            d.errors.length ? 'warn' : '')
+        + (d.errors.length ? _diagRow('Mais recente', _fmtRelTime(d.errors[d.errors.length-1].t)) : '')
+      , ''
+        + (d.errors.length ? '<button class="diag-action" onclick="exportErrorLog()">Compartilhar</button>' : '')
+        + (d.errors.length ? '<button class="diag-action" onclick="uploadErrorLogToServer()">Enviar ao servidor</button>' : '')
+        + (d.errors.length ? '<button class="diag-action danger" onclick="diagClearErrorLog()">Limpar</button>' : '')
+      , (d.errors.length
+          ? '<div class="diag-issues">' + d.errors.slice(-5).reverse().map(e =>
+              '<div class="issue warn">• ' + _fmtRelTime(e.t) + ' — ' + escapeHtml(e.ctx || '') + ': ' + escapeHtml(e.msg) + '</div>'
+            ).join('') + '</div>'
+          : ''))
+    // F10-C-6: Seção "Fila Avançada" com dead-letter, conflitos, export/import
+    + (function () {
+        var qs = window.cdbQueueStore;
+        if (!qs || !qs.ready) return '';
+        var level = 'ok';
+        // Será atualizado async — por agora mostra placeholder
+        return section('Fila Avançada', level, ''
+          + _diagRow('Storage', qs.degraded ? 'localStorage (degradado)' : 'IndexedDB', qs.degraded ? 'warn' : '')
+          + '<div id="diagQueueStatsBody"><em style="font-size:var(--fs-micro);color:var(--ink-mute)">Carregando stats...</em></div>'
+        , ''
+          + '<button class="diag-action" onclick="diagExportQueue()">Exportar fila JSON</button>'
+          + '<button class="diag-action" onclick="diagImportQueue()">Importar fila</button>'
+          + '<button class="diag-action" onclick="diagViewDeadletter()">Ver dead-letter</button>'
+          + '<button class="diag-action" onclick="diagViewConflicts()">Ver conflitos</button>'
+        , '');
+      })()
+    + section('Atalhos de emergência', 'ok',
+        '<div style="font-size:var(--fs-micro);color:var(--ink-mute);line-height:1.5;margin-bottom:8px">Use só se algo estiver claramente travado.</div>'
+      , ''
+        + '<button class="diag-action danger" onclick="diagClearSyncQueue()">Limpar fila sync</button>'
+        + '<button class="diag-action" onclick="location.reload()">Recarregar app</button>'
+      , '')
+    // #1474: id do aparelho e trace sao para o suporte; ficam recolhidos,
+    // fora do caminho do operador comum.
+    + '<details class="diag-advanced"><summary>Diagnóstico avançado</summary>'
+    + section('Suporte técnico', 'ok', ''
+        + _diagRow('Device', escapeHtml(String(d.app.deviceId).slice(-12)))
+      , ''
+        + '<button class="diag-action" onclick="diagCopyTrace()">Copiar trace</button>'
+        + '<button class="diag-action" onclick="diagSendTrace()">Enviar trace ao suporte</button>'
+      , '')
+    + '</details>';
+
+  toggleModal('diagnosticsModal', true);
+
+  // F10-C-6: carrega stats async do queue-store
+  (async function () {
+    try {
+      if (!window.cdbSync || !window.cdbSync.getQueueStats) return;
+      var stats = await window.cdbSync.getQueueStats();
+      var el = document.getElementById('diagQueueStatsBody');
+      if (!el) return;
+      el.innerHTML = ''
+        + _diagRow('Fila principal', stats.queueCount + ' mutations')
+        + _diagRow('Dead-letter', stats.deadletterCount || 0, stats.deadletterCount > 0 ? 'warn' : '')
+        + _diagRow('Conflitos', stats.conflictCount || 0, stats.conflictCount > 0 ? 'warn' : '')
+        + (stats.oldestItemAge > 0 ? _diagRow('Item mais antigo', _fmtRelTime(Date.now() - stats.oldestItemAge),
+            stats.oldestItemAge > 86400000 ? 'warn' : '') : '')
+        + (stats.criticalPending > 0 ? _diagRow('Criticas pendentes', stats.criticalPending, 'warn') : '');
+    } catch (e) {}
+  })();
+}
+function diagClearErrorLog() {
+  if (!confirm('Limpar log de erros?\n\nIrreversivel — exporte antes se precisar investigar.')) return;
+  clearErrorLog();
+  showToast('Log de erros limpo');
+  openDiagnostics();
+}
+
+// F10-C-6: Funções de export/import/dead-letter/conflitos
+async function diagExportQueue() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.exportAll) { showToast('Fila local indisponível'); return; }
+    var bundle = await qs.exportAll();
+    var json = JSON.stringify(bundle, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'cdb-export-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Fila exportada (' + (bundle.queue || []).length + ' mutations)');
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagImportQueue() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.importBundle) { showToast('Fila local indisponível'); return; }
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async function () {
+      try {
+        var file = input.files[0];
+        if (!file) return;
+        var text = await file.text();
+        var bundle = JSON.parse(text);
+        var result = await qs.importBundle(bundle);
+        showToast('Importado: ' + result.imported + ' itens');
+        openDiagnostics();
+      } catch (e) { showToast('Erro import: ' + (e && e.message)); }
+    };
+    input.click();
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagViewDeadletter() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.getDeadletter) { showToast('Fila local indisponível'); return; }
+    var items = await qs.getDeadletter();
+    if (items.length === 0) { showToast('Dead-letter vazia'); return; }
+    var msg = items.slice(0, 20).map(function (i) {
+      return i.type + ' (' + (i.deadletterReason || '?') + ') — ' + (i.id || '').slice(-8);
+    }).join('\n');
+    alert('Dead-letter (' + items.length + '):\n\n' + msg + (items.length > 20 ? '\n\n... e mais ' + (items.length - 20) : ''));
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+async function diagViewConflicts() {
+  try {
+    var qs = window.cdbQueueStore;
+    if (!qs || !qs.getConflicts) { showToast('Fila local indisponível'); return; }
+    var items = await qs.getConflicts();
+    if (items.length === 0) { showToast('Nenhum conflito pendente'); return; }
+    var msg = items.slice(0, 20).map(function (i) {
+      return i.type + ' — ' + (i.id || '').slice(-8);
+    }).join('\n');
+    alert('Conflitos (' + items.length + '):\n\n' + msg);
+  } catch (e) { showToast('Erro: ' + (e && e.message)); }
+}
+
+// Onda 0: pinga /api/mobile/version e re-renderiza diagnostico com resposta
+async function diagPingServer() {
+  if (!window.cdbSync || typeof window.cdbSync.pingVersion !== 'function') {
+    showToast('Sincronização indisponível'); return;
+  }
+  showToast('Verificando servidor…');
+  const r = await window.cdbSync.pingVersion();
+  if (r) {
+    showToast('Servidor: ' + (r.Status || 'ok') + ' · API ' + (r.ApiVersion || '?'));
+  } else {
+    showToast('Sem resposta do servidor');
+  }
+  openDiagnostics();
+}
+function closeDiagnostics() { toggleModal('diagnosticsModal', false); }
+
+// Acoes do diagnostico — todas chamam window.cdbSync (existente).
+function diagForceFlush() {
+  if (window.CDB_CONFIG?.isPilot) return syncNow().finally(() => openDiagnostics());
+  if (window.cdbSync && typeof window.cdbSync.flush === 'function') {
+    window.cdbSync.flush().then(() => { showToast('Sync forçado'); openDiagnostics(); });
+  } else { showToast('Sincronização indisponível'); }
+}
+function diagForcePull() {
+  if (window.cdbSync && typeof window.cdbSync.pull === 'function') {
+    window.cdbSync.pull().then(() => { showToast('Pull forçado'); openDiagnostics(); });
+  } else { showToast('Pull indisponível'); }
+}
+function diagClearSyncQueue() {
+  if (!confirm('Apagar fila de sincronização local?\n\nMutações pendentes nunca chegarão ao servidor. Use só se a fila estiver claramente corrompida.')) return;
+  if (window.cdbSync && typeof window.cdbSync.clearQueue === 'function') {
+    window.cdbSync.clearQueue();
+    showToast('Fila de sync limpa');
+    openDiagnostics();
+  }
+}
+function diagCompactAuditLog() {
+  if (!confirm('Compactar audit log?\n\nMantém os 200 mais recentes; arquiva o resto em cdb-audit-log-archive (recuperável via export).')) return;
+  compactAuditLog();
+  showToast('Audit log compactado');
+  openDiagnostics();
+}
+
+// Mantem so os ultimos 200 do audit log; move o restante pra archive.
+// Archive cresce indefinidamente mas tem cap em 5000.
+function compactAuditLog() {
+  try {
+    const log = loadAuditLog();
+    if (log.length <= 200) return;
+    const keep = log.slice(0, 200);
+    const overflow = log.slice(200);
+    let archive = [];
+    try { archive = JSON.parse(localStorage.getItem('cdb-audit-log-archive') || '[]') || []; }
+    catch (e) {}
+    archive = overflow.concat(archive);
+    if (archive.length > 5000) archive.length = 5000;
+    localStorage.setItem('cdb-audit-log-archive', JSON.stringify(archive));
+    localStorage.setItem(AUDIT_LOG_KEY, JSON.stringify(keep));
+  } catch (e) { console.warn('compactAuditLog falhou', e); }
+}
+
+function copyDiagnosticsToClipboard() {
+  const d = collectDiagnostics();
+  const lines = [];
+  lines.push('=== EASY STOCK MOBILE — DIAGNOSTICO ===');
+  lines.push('Gerado em: ' + new Date().toISOString());
+  lines.push('');
+  lines.push('[APP]');
+  lines.push('Bundle: ' + d.app.ver);
+  lines.push('Plataforma: ' + d.app.platform + ' · Tema: ' + (d.app.theme === 'light' ? 'Claro' : 'Escuro'));
+  lines.push('Operador: ' + d.app.operator + ' · Device: ' + d.app.deviceId);
+  lines.push('');
+  lines.push('[SYNC]');
+  lines.push('Online: ' + (d.sync.online ? 'sim' : 'nao') + ' · Fila: ' + d.sync.queueSize);
+  lines.push('Ultima sync: ' + _fmtRelTime(d.sync.lastSync) + ' · Endpoint: ' + d.sync.apiBase);
+  lines.push('Leitura: ' + (d.sync.online
+    ? (d.sync.queueSize > 0 ? d.sync.queueSize + ' item(ns) aguardando envio' : 'sincronizacao em dia')
+    : 'offline, dados ficam salvos no aparelho'));
+  lines.push('');
+  lines.push('[STORAGE] total ' + _fmtBytes(d.storage.total));
+  lines.push('Produtos: ' + d.storage.products + ' · Pedidos: ' + d.storage.orders + ' · Lotes: ' + d.storage.batches);
+  lines.push('Clientes: ' + d.storage.clients + ' · Caixa: ' + d.storage.cashEntries);
+  lines.push('Audit: ' + d.storage.auditLog + '/' + d.storage.auditMax);
+  lines.push('');
+  lines.push('[INTEGRIDADE]');
+  lines.push('Caixa hoje: ' + d.integrity.cashTodayCount + ' lanc · ' + money(d.integrity.cashTodayBalance));
+  if (d.integrity.issues.length) {
+    d.integrity.issues.forEach(i => lines.push('- [' + i.severity + '] ' + i.msg));
+  } else {
+    lines.push('- nenhum alerta');
+  }
+  lines.push('');
+  lines.push('[IMPRESSORA]');
+  lines.push('Plugin: ' + (d.printer.plugin ? 'CARREGADO' : 'AUSENTE') + ' · Shim: ' + (d.printer.shim ? (d.printer.native ? 'NATIVO' : 'LEGADO') : 'AUSENTE'));
+  lines.push('Salva: ' + (d.printer.saved ? (d.printer.saved.name + ' / ' + d.printer.saved.address) : 'nenhuma'));
+  lines.push('Trail BT: ' + d.printer.trailLen + ' eventos');
+  lines.push('');
+  lines.push('[CAMERA]');
+  lines.push('BarcodeDetector: ' + (d.camera.detectorAvailable ? 'disponivel' : 'AUSENTE'));
+  lines.push('Modo scan: ' + d.camera.scanMode + ' · Erros: ' + d.camera.errors.length);
+  if (d.camera.errors.length) {
+    d.camera.errors.slice(-5).forEach(e => lines.push('- ' + new Date(e.t).toISOString() + ' ' + e.msg));
+  }
+  const text = lines.join('\n');
+  // Tenta clipboard API primeiro; fallback execCommand pra WebView antigo.
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => showToast('Diagnóstico copiado'))
+      .catch(() => _copyFallback(text));
+  } else {
+    _copyFallback(text);
+  }
+}
+function _copyFallback(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Diagnóstico copiado');
+  } catch (e) { showToast('Falha ao copiar'); }
+}
+
+// ===== SUPORTE / ABERTURA DE CHAMADO =====
+let supportType = 'erro';
+
+function setSupportType(type) {
+  supportType = type || 'erro';
+  document.querySelectorAll('#supportTypeGrid .support-type').forEach(b => b.classList.toggle('active', b.dataset.type === supportType));
+  renderSupportPreview();
+}
+
+function supportTypeLabel() {
+  return {
+    erro: 'Erro ou travamento',
+    impressao: 'Impressao / etiquetas',
+    sync: 'Sync / backup',
+    duvida: 'Duvida de uso'
+  }[supportType] || 'Erro ou travamento';
+}
+
+function buildSupportTicketText() {
+  const desc = (document.getElementById('supportDescription')?.value || '').trim();
+  const d = typeof collectDiagnostics === 'function' ? collectDiagnostics() : null;
+  const open = typeof openOrders === 'function' ? openOrders().length : 0;
+  const queue = Number(pendingSync) || 0;
+  const issues = d?.integrity?.issues || [];
+  return [
+    '=== CHAMADO EASY STOCK ===',
+    'Tipo: ' + supportTypeLabel(),
+    'Empresa: ' + getEmpresaName(),
+    'Operador: ' + (operatorName || 'sem operador'),
+    'Quando: ' + new Date().toLocaleString('pt-BR'),
+    '',
+    '[DESCRICAO]',
+    desc || '(descreva aqui o que aconteceu)',
+    '',
+    '[CONTEXTO]',
+    'Pedidos em aberto: ' + open,
+    'Sync pendente: ' + queue,
+    'Produtos: ' + ((products || []).length),
+    'Clientes: ' + ((clients || []).length),
+    'Lotes: ' + ((batches || []).length),
+    '',
+    '[TECNICO]',
+    'Plataforma: ' + (d?.app?.platform || 'web'),
+    'Bundle: ' + (d?.app?.ver || 'desconhecido'),
+    'Device: ' + (d?.app?.deviceId || localStorage.getItem('cdb-device-id') || 'sem id'),
+    'Storage: ' + (d?.storage?.approxKb || 0) + ' KB',
+    'Online: ' + (d?.sync?.online ? 'sim' : 'nao'),
+    'Integridade: ' + (issues.length ? issues.map(i => i.title || i.msg || i.severity).join('; ') : 'sem alerta')
+  ].join('\n');
+}
+
+function renderSupportScreen() {
+  const grid = document.getElementById('supportStatusGrid');
+  if (grid) {
+    const d = typeof collectDiagnostics === 'function' ? collectDiagnostics() : null;
+    const queue = Number(pendingSync) || 0;
+    const issues = d?.integrity?.issues?.length || 0;
+    grid.innerHTML = `
+      <div class="support-status"><span>Sync</span><strong>${queue ? queue + ' pend.' : 'em dia'}</strong></div>
+      <div class="support-status"><span>Dados</span><strong>${issues ? issues + ' alerta(s)' : 'ok'}</strong></div>
+      <div class="support-status"><span>Storage</span><strong>${d?.storage?.approxKb || 0} KB</strong></div>
+    `;
+  }
+  setSupportType(supportType);
+}
+
+function renderSupportPreview() {
+  const host = document.getElementById('supportPreview');
+  if (!host) return;
+  host.textContent = buildSupportTicketText();
+}
+
+function copySupportTicket() {
+  copyToClipboard(buildSupportTicketText(), 'Chamado copiado com diagnostico');
+}
+
+// Onda 1.5 — deep link para WhatsApp da EasyStok com contexto pre-preenchido.
+// SUBSTITUIR placeholder antes de buildar APK pra producao.
+// Formato wa.me: numero em E.164 sem '+' nem espaços (ex: 5511999999999).
+const CDB_EASYSTOK_WHATSAPP_NUMERO = '5511997573992';
+function openWhatsAppSuporte() {
+  try {
+    const tipo = (typeof currentSupportType !== 'undefined' && currentSupportType) ? currentSupportType : 'duvida';
+    const desc = (document.getElementById('supportDescription')?.value || '').trim();
+    const deviceId = (window.cdbSync && typeof window.cdbSync.getDeviceId === 'function')
+      ? window.cdbSync.getDeviceId() : 'sem-device-id';
+    const versao = (typeof CDB_BUILD_INFO !== 'undefined' && CDB_BUILD_INFO?.version) ? CDB_BUILD_INFO.version : 'unknown';
+    const linhas = [
+      'Suporte Casa da Baba',
+      'Tipo: ' + tipo,
+      'Device: ' + deviceId,
+      'Versao: ' + versao
+    ];
+    if (desc) linhas.push('---', desc);
+    const texto = encodeURIComponent(linhas.join('\n'));
+    const url = 'https://wa.me/' + CDB_EASYSTOK_WHATSAPP_NUMERO + '?text=' + texto;
+    window.open(url, '_blank') || (window.location.href = url);
+  } catch (e) {
+    showToast('Falha ao abrir WhatsApp: ' + (e.message || e));
+  }
+}
+
+// Mensagem template pro cliente — primeiro nome + nome da empresa.
+function buildClientWhatsTemplate(clientName) {
+  const first = (clientName || '').trim().split(/\s+/)[0] || 'Olá';
+  return `Oi ${first}, aqui é da ${getEmpresaName()}.`;
+}
+
+function openWhatsAppCliente(clientId) {
+  try {
+    const c = (clients || []).find(x => x.id === clientId);
+    if (!c) { showToast('Cliente não encontrado'); return; }
+    const phone = normalizePhoneBr(c.phone);
+    if (!phone) { showToast('Telefone fora do padrão brasileiro (use DDD + 9 + 8 dígitos)'); return; }
+    const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(buildClientWhatsTemplate(c.name));
+    window.open(url, '_blank') || (window.location.href = url);
+  } catch (e) {
+    showToast('Falha ao abrir WhatsApp: ' + (e.message || e));
+  }
+}
+
+// CEP brasileiro (com ou sem hifen). CEP da resultado muito mais preciso
+// no Maps que endereco livre — por isso priorizamos o match quando existe.
+const CEP_BR_REGEX = /(\d{5})-?(\d{3})/;
+
+function buildMapsUrlCliente(address) {
+  const a = String(address || '').trim();
+  if (a.length < 5 || !/\d/.test(a)) return null;
+  const cidade = getEmpresaCidade();
+  const cepMatch = a.match(CEP_BR_REGEX);
+  const query = cepMatch
+    ? `${cepMatch[1]}-${cepMatch[2]}, ${cidade}`
+    : `${a}, ${cidade}`;
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);
+}
+
+function openMapsCliente(clientId) {
+  try {
+    const c = (clients || []).find(x => x.id === clientId);
+    if (!c) { showToast('Cliente não encontrado'); return; }
+    const url = buildMapsUrlCliente(c.address || c.ref || '');
+    if (!url) { showToast('Endereço incompleto'); return; }
+    window.open(url, '_blank') || (window.location.href = url);
+  } catch (e) {
+    showToast('Falha ao abrir mapa: ' + (e.message || e));
+  }
+}
+
+// Variante pra pedidos: ref vem direto do clientSnapshot (pode ser cliente
+// sem cadastro). Mesma logica de CEP-priority + cidade da empresa.
+function openMapsPedidoRef(ref) {
+  try {
+    const url = buildMapsUrlCliente(ref || '');
+    if (!url) { showToast('Endereço incompleto'); return; }
+    window.open(url, '_blank') || (window.location.href = url);
+  } catch (e) {
+    showToast('Falha ao abrir mapa: ' + (e.message || e));
+  }
+}
+
+// Compat com botao existente em Ajustes > Equipamento.
+// Antes era alert(); agora abre o modal completo (operador encontra a
+// secao Impressora rolando, mas tambem ve o resto do estado do app).
+// #2431: fora do piloto não há Ajustes a fechar; só o piloto respeita o "Descartar?" cancelado.
+function printerDiagnostics() { if (window.CDB_CONFIG?.isPilot && closeAjustes() === false) return; openDiagnostics(); }
+
+// Step logger persistente — sobrevive a native crash (JNI), permite ver
+// onde o app morreu reabrindo Ajustes > Diagnóstico apos restart.
+function btStep(label) {
+  try {
+    const trail = JSON.parse(localStorage.getItem('cdb-bt-trail') || '[]');
+    trail.push({ t: Date.now(), s: label });
+    if (trail.length > 30) trail.splice(0, trail.length - 30);
+    localStorage.setItem('cdb-bt-trail', JSON.stringify(trail));
+  } catch (e) {}
+}
+
+// Aviso por aparelho a partir da classificação do plugin nativo (#2193).
+function avisoDispositivo(d, name) {
+  if (d && d.supported === false) return 'só Bluetooth LE: o app imprime por Bluetooth clássico';
+  const perfil = perfilPorNome(name) === 'tspl' ? 'TSPL' : 'ESC/POS';
+  if (d && d.spp === false) return perfil + ' · sem serviço serial anunciado, pode falhar';
+  return perfil + (d && d.printerClass ? ' · impressora' : '');
+}
+// #2202 (F0): o papel vem do catálogo único (impressao-papeis.js). Sem
+// escolha, o padrão da linguagem: rolo contínuo de 80 mm ou bobina de 58 mm.
+function impressoraDoSeletor(addr, name) {
+  const escolha = (document.getElementById('printerProfile') || {}).value || 'auto';
+  const preset = (document.getElementById('printerLabelSize') || {}).value || '';
+  const inverter = !!(document.getElementById('printerInvert') || {}).checked;
+  const profile = escolha === 'auto' ? perfilPorNome(name) : escolha;
+  const P = window.cdbPapeis;
+  // Papel que não serve à linguagem (etiqueta na de cupom) cai no padrão dela.
+  const serve = x => !!x && (x.tipo !== 'bobina') === (profile === 'tspl');
+  const escolhido = P ? P.porId(preset) : null;
+  const papel = P ? (serve(escolhido) ? escolhido : P.porId(profile === 'tspl' ? P.PADRAO_TSPL : P.PADRAO_ESCPOS)) : null;
+  const etiqueta = papel && papel.tipo === 'etiqueta'
+    ? { larguraMm: papel.larguraMm, alturaMm: papel.alturaMm, gapMm: papel.gapMm, continuo: false, inverter }
+    : { larguraMm: papel ? papel.larguraMm : 80, alturaMm: 0, gapMm: 0, continuo: true, inverter };
+  const out = { address: addr, name, profile, perfilManual: escolha !== 'auto', etiqueta, inverter };
+  if (papel) { out.midia = P.paraMidia(papel); out.midiaConfirmada = serve(escolhido); }
+  return out;
+}
+
+function selectPrinter(printer, papeis) {
+  btStep('select:start ' + (printer && printer.address));
+  try {
+    setSavedPrinter(printer, papeis);
+    btStep('select:saved');
+    showToast('Impressora selecionada: ' + printer.name + ' (' + descreverPerfil(printer) + '). Toque Imprimir novamente.');
+    logAction({
+      action: 'settings.update',
+      entityType: 'settings',
+      summary: 'Impressora selecionada · ' + printer.name
+    });
+    btStep('select:logged');
+    // Sempre limpa o callback — exige toque manual em Imprimir depois.
+    // Auto-print apos select estava crashando o app (BLE devices na lista
+    // de pareados quebram bs.connect SPP).
+    printerPickerOnSelect = null;
+    closePrinterPicker();
+    btStep('select:closed');
+  } catch (e) {
+    btStep('select:ERR ' + (e && e.message || e));
+    showToast('Erro ao salvar: ' + (e.message || e));
+  }
+}
+// Sem mac: a impressora selecionada (a de etiqueta, senão a de cupom).
+function testPrint(mac) {
+  const v2 = mac ? impressorasV2() : null;
+  const printer = v2 && v2.impressoras[mac] ? legadoDaV2(v2.impressoras[mac]) : getSavedPrinter();
+  const nome = (printer && printer.name) || 'Impressora';
+  const linhas = [getEmpresaName() || 'Easy Stock Mobile', nome + ' · ' + descreverPerfil(printer),
+    'Impressão OK ' + new Date().toLocaleTimeString('pt-BR').slice(0,5)];
+  let bytes;
+  try {
+    bytes = perfilImpressora(printer) === 'tspl' && window.cdbTspl
+      ? tsplBytesDoCanvas(window.cdbTspl.linhasParaCanvas('TESTE', linhas), printer)
+      : escPosTextLines('TESTE', linhas);
+  } catch (e) { showToast('Falha ao montar o teste: ' + ((e && e.message) || e)); return; }
+  // Falha já explicada (conexão, permissão): o erro fica na tela, sem impressão do sistema.
+  printViaBluetooth(bytes, explicado => {
+    if (explicado) return;
+    showToast('Bluetooth indisponível — usando impressão do sistema');
+    printAreaHtml('<div class="pa-title">TESTE</div><div class="pa-center">' + linhas.map(escapeHtml).join('<br>') + '</div>');
+  }, null, printer);
+}
+
+// ================================================================
+// HISTÓRICO — auditoria de eventos por pedido
+// Estrutura: order.history = [{ at: ms, op, action, change }]
+// ================================================================
+function addHistoryEvent(order, action, change) {
+  const arr = (order.history ||= []);
+  arr.push({ at: Date.now(), op: operatorName || null, action, change: change || null });
+  if (arr.length > 200) arr.splice(0, arr.length - 200);
+}
+function openHistorico(orderId) {
+  const o = getOrderById(orderId);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  renderHistorico(o);
+  toggleModal('historicoModal', true);
+}
+function closeHistorico() { toggleModal('historicoModal', false); }
+function renderHistorico(order) {
+  const host = document.getElementById('historicoEvents');
+  if (!host) return;
+  const events = (order.history || []).slice().reverse();
+  if (events.length === 0) {
+    host.innerHTML = '<p class="hint" style="padding:12px">Sem eventos registrados ainda.</p>';
+    return;
+  }
+  const ICONS = {
+    [STATUS.CRIADO]: '🆕', [STATUS.PREPARANDO]: '👨‍🍳', [STATUS.PRONTO]: '📦',
+    [STATUS.ENTREGUE]: '✅', [STATUS.CONFERIDO]: '🔍', [STATUS.CANCELADO]: '❌'
+  };
+  host.innerHTML = events.map(ev => {
+    const when = new Date(ev.at).toLocaleString('pt-BR');
+    const op   = ev.op ? `<span class="op">${escapeHtml(ev.op)}</span>` : '';
+    const ico  = ICONS[ev.action] || '🕐';
+    const ch   = ev.change ? `<div class="he-change">${escapeHtml(ev.change)}</div>` : '';
+    return `<div class="historico-event">
+      <div class="he-icon">${ico}</div>
+      <div class="he-body">
+        <div class="he-action">${escapeHtml(ev.action || '?')}</div>
+        <div class="he-meta">${when}${op ? ' · ' + op : ''}</div>
+        ${ch}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ================================================================
+// RETROATIVO — toggle de pedido já realizado
+// ================================================================
+const RETRO_LABEL_OFF = 'Pedido já realizado? (cadastrar retroativo)';
+const RETRO_LABEL_ON  = 'Pedido retroativo ativo (desativar)';
+
+function setRetroActive(active) {
+  const fields = document.getElementById('retroFields');
+  const toggle = document.getElementById('retroToggle');
+  const label  = document.getElementById('retroToggleLabel');
+  if (!fields || !toggle) return;
+  fields.classList.toggle('show', active);
+  toggle.classList.toggle('active', active);
+  toggle.setAttribute('aria-pressed', String(active));
+  if (label) label.textContent = active ? RETRO_LABEL_ON : RETRO_LABEL_OFF;
+  if (active) {
+    const dt = document.getElementById('retroDatetime');
+    if (dt) {
+      // BUG #20: limita range pra evitar "01/01/1900" e datas futuras.
+      // min: 365 dias atras  /  max: agora.
+      const tzOff = new Date().getTimezoneOffset() * 60000;
+      const minDate = new Date(Date.now() - 365*24*60*60*1000);
+      const maxDate = new Date();
+      dt.min = new Date(minDate - tzOff).toISOString().slice(0,16);
+      dt.max = new Date(maxDate - tzOff).toISOString().slice(0,16);
+      if (!dt.value) {
+        // #435: preenche com o horario atual (nao mais 1h atras).
+        // O operador ve a hora certa e ajusta se necessario.
+        dt.value = new Date(Date.now() - tzOff).toISOString().slice(0,16);
+      }
+    }
+  } else {
+    const dt = document.getElementById('retroDatetime');
+    if (dt) {
+      dt.value = '';
+      dt.min = '';
+      dt.max = '';
+    }
+    if (typeof updateSaveOrderBtn === 'function') updateSaveOrderBtn();
+  }
+}
+function toggleRetroactive() {
+  const fields = document.getElementById('retroFields');
+  setRetroActive(fields ? !fields.classList.contains('show') : true);
+}
+function resetRetroToggle() { setRetroActive(false); }
+
+// ================================================================
+// F5 — AGENDAMENTO (data/hora futura) — espelho do retroativo
+// ================================================================
+const SCHED_LABEL_OFF = 'Agendar para depois? (entrega futura)';
+const SCHED_LABEL_ON  = 'Agendamento ativo (desativar)';
+
+function setAgendaActive(active) {
+  const fields = document.getElementById('scheduleFields');
+  const toggle = document.getElementById('scheduleToggle');
+  const label  = document.getElementById('scheduleToggleLabel');
+  if (!fields || !toggle) return;
+  fields.classList.toggle('show', active);
+  toggle.classList.toggle('active', active);
+  toggle.setAttribute('aria-pressed', String(active));
+  if (label) label.textContent = active ? SCHED_LABEL_ON : SCHED_LABEL_OFF;
+  if (active) {
+    const dt = document.getElementById('scheduleDatetime');
+    if (dt) {
+      // #406: min = agora (entrega agendada nao pode ser no passado). Espelha o
+      // retroativo, que ja seta min/max. Antes o campo nao tinha min e aceitava
+      // data passada (ex 01/01/2020), so barrada depois no saveOrder.
+      const tzOff = new Date().getTimezoneOffset() * 60000;
+      dt.min = new Date(Date.now() - tzOff).toISOString().slice(0,16);
+      if (!dt.value) {
+        // default 1h adiante pra forçar operador a confirmar quando
+        const future = new Date(Date.now() + 60*60*1000);
+        const off = future.getTimezoneOffset() * 60000;
+        dt.value = new Date(future - off).toISOString().slice(0,16);
+      }
+    }
+  } else {
+    const dt = document.getElementById('scheduleDatetime');
+    if (dt) {
+      dt.value = '';
+      // #435: limpa min/max para nao deixar browser em estado invalido
+      // (min violado bloqueia silenciosamente em alguns mobiles mesmo com value='').
+      dt.min = '';
+      dt.max = '';
+    }
+    // #435: reavalia o botao salvar (pode ter ficado desabilitado por validacao
+    // de data invalida enquanto o toggle estava ativo).
+    if (typeof updateSaveOrderBtn === 'function') updateSaveOrderBtn();
+  }
+}
+function toggleAgendamento() {
+  const fields = document.getElementById('scheduleFields');
+  setAgendaActive(fields ? !fields.classList.contains('show') : true);
+}
+function resetAgendaToggle() { setAgendaActive(false); }
+
+// ================================================================
+// CONFERÊNCIA — antes de marcar entregue, abre modal de revisão
+// ================================================================
+// CONFERÊNCIA — modal de 3 blocos (identificação / itens / decisão)
+// 3 ações: Confere tudo / Ajustar / Reportar problema.
+// Estado guardado em order.confirmation = { status, by, at, type, notes, adjustments, problem }
+//   status: 'pendente' | 'conferido' | 'divergencia'
+//   type: 'ok' | 'adjust' | 'problem'  (ação que mudou o estado)
+const CONFER_STATUS = { PENDENTE: 'pendente', CONFERIDO: 'conferido', DIVERGENCIA: 'divergencia' };
+const PROBLEMA_OPCOES = [
+  { key: 'item-ausente',     label: 'Item ausente' },
+  { key: 'etiqueta-errada',  label: 'Etiqueta errada' },
+  { key: 'volume-trocado',   label: 'Volume trocado' },
+  { key: 'avariado',         label: 'Produto avariado' },
+  { key: 'outro',            label: 'Outro' }
+];
+
+function getConferStatus(o) {
+  if (!o) return CONFER_STATUS.PENDENTE;
+  if (o.confirmation && o.confirmation.status) return o.confirmation.status;
+  // Compat legado: se tem confirmedBy/At, ja foi conferido
+  if (o.confirmedBy || o.confirmedAt) return CONFER_STATUS.CONFERIDO;
+  return CONFER_STATUS.PENDENTE;
+}
+function conferStatusLabel(s) {
+  if (s === CONFER_STATUS.CONFERIDO)   return '✓ Conferido';
+  if (s === CONFER_STATUS.DIVERGENCIA) return '⚠ Divergência';
+  return 'Aguardando conferência';
+}
+
+let pendingConferOrderId = null;
+function openConfer(orderId) {
+  const o = getOrderById(orderId);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  pendingConferOrderId = orderId;
+  const orderRef = (o.id || '').slice(-8);
+  const cliente = o.clientSnapshot?.name || 'Sem cliente';
+  // Bug 10 (Onda 4): tela de conferencia nao mostra CPF — operadores de
+  // balcao nao tem motivo operacional pra ver documento do cliente.
+  const refConfer = safeRefDisplay(o.clientSnapshot?.ref);
+  const ref = refConfer ? ' · ' + refConfer : '';
+  const data = new Date(o.factAt || o.createdAt).toLocaleString('pt-BR');
+  // Bloco 1: identificação
+  const status = getConferStatus(o);
+  const badge = document.getElementById('conferStatusBadge');
+  badge.textContent = conferStatusLabel(status);
+  badge.className = 'cf-badge ' + status;
+  document.getElementById('conferTitle').textContent = 'Pedido #' + orderRef;
+  document.getElementById('conferMeta').textContent = cliente + ref + ' · ' + data;
+  // Bloco 2: itens + obs
+  document.getElementById('conferTotal').textContent = money(o.total);
+  document.getElementById('conferItems').innerHTML = (o.items || []).map(it =>
+    `<div class="ci-row"><span class="ci-qty">${it.qty}×</span><span class="ci-name">${escapeHtml(it.name)}${it.note ? ' ('+escapeHtml(it.note)+')' : ''}</span><span>${money(it.qty*it.unitPrice)}</span></div>`
+  ).join('');
+  const notesEl = document.getElementById('conferNotes');
+  if (o.notes) {
+    notesEl.style.display = 'block';
+    notesEl.innerHTML = '<b>Obs:</b> ' + escapeHtml(o.notes);
+  } else {
+    notesEl.style.display = 'none';
+  }
+  toggleModal('conferModal', true);
+}
+function closeConfer() {
+  pendingConferOrderId = null;
+  toggleModal('conferModal', false);
+}
+
+// Aplica resultado da conferência: atualiza order.confirmation, registra
+// audit log e history do pedido. NÃO avança status automaticamente —
+// operador mantém controle do kanban (assim divergência fica visível
+// até ele decidir entregar mesmo assim ou cancelar).
+function applyConfirmation(orderId, type, payload) {
+  if (!assertImportedOrderAction(orderId, type === 'ok' ? 'confer-ok' : 'confer-adjust')) return;
+  const o = getOrderById(orderId);
+  if (!o) return;
+  const status = type === 'ok' ? CONFER_STATUS.CONFERIDO : CONFER_STATUS.DIVERGENCIA;
+  const conf = {
+    status, type,
+    by: operatorName || null,
+    at: Date.now(),
+    notes: payload && payload.notes || null,
+    adjustments: payload && payload.adjustments || null,
+    problem: payload && payload.problem || null
+  };
+  o.confirmation = conf;
+  // Compat legado
+  o.confirmedBy = conf.by;
+  o.confirmedAt = conf.at;
+  // History do pedido
+  let change = 'Confere tudo';
+  if (type === 'adjust') change = 'Ajustou: ' + (conf.notes || (conf.adjustments || []).map(a => a.name + '→' + a.correctedQty).join(', '));
+  if (type === 'problem') change = 'Problema: ' + (PROBLEMA_OPCOES.find(p => p.key === conf.problem)?.label || conf.problem) + (conf.notes ? ' · ' + conf.notes : '');
+  addHistoryEvent(o, STATUS.CONFERIDO, change);
+  // Audit log global
+  const action = type === 'ok' ? 'order.confirm_ok' : (type === 'adjust' ? 'order.confirm_adjust' : 'order.confirm_problem');
+  logAction({
+    action, entityType: 'order', entityId: orderId,
+    summary: `Pedido ${(o.id||'').slice(-8)} · ${conferStatusLabel(status)} · ${change}`
+  });
+  persistAll();
+  // Re-render kanban, historico e tela de conferencia se abertos
+  if (typeof renderKanban === 'function') renderKanban();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHome === 'function') renderHome();
+}
+
+function confirmConfer() {
+  const id = pendingConferOrderId;
+  if (!id) return;
+  closeConfer();
+  const o = getOrderById(id);
+  applyConfirmation(id, 'ok', null);
+  // Se o pedido ja estava em "pronto", confere = finaliza e avanca pra
+  // entregue (fluxo natural: kanban -> Proximo -> conferencia -> entregue).
+  // Em outros status, so registra a conferencia e mantem o pedido no fluxo.
+  if (o && o.status === STATUS.PRONTO) {
+    applyAdvanceTransition(id, STATUS.ENTREGUE);
+    // #1493: sem forma, o modal de pagamento fica aberto e a entrega espera.
+    showToast(o.status === STATUS.ENTREGUE
+      ? '✓ Conferido e entregue por ' + (operatorName || 'operador')
+      : '✓ Conferido por ' + (operatorName || 'operador') + '. Como foi pago?');
+  } else {
+    showToast('✓ Conferido por ' + (operatorName || 'operador'));
+  }
+}
+
+// ===== AJUSTAR =====
+function openAjustar() {
+  const id = pendingConferOrderId;
+  if (!id) return;
+  const o = getOrderById(id);
+  if (!o) return;
+  const host = document.getElementById('ajustarItems');
+  host.innerHTML = (o.items || []).map((it, idx) =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg-elev);border-radius:8px">
+       <div style="flex:1;font-size:14px">${escapeHtml(it.name)}</div>
+       <input type="number" min="0" step="1" value="${it.qty}" data-idx="${idx}" data-original="${it.qty}"
+              class="ajustar-qty"
+              style="width:64px;text-align:center;background:var(--bg-card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px;font-size:15px;font-weight:700">
+     </div>`
+  ).join('');
+  document.getElementById('ajustarNotes').value = '';
+  toggleModal('ajustarModal', true);
+}
+function closeAjustar() { toggleModal('ajustarModal', false); }
+function saveAjustar() {
+  const id = pendingConferOrderId;
+  if (!id) { closeAjustar(); return; }
+  const o = getOrderById(id);
+  if (!o) { closeAjustar(); return; }
+  const adjustments = [];
+  document.querySelectorAll('#ajustarItems .ajustar-qty').forEach(inp => {
+    const idx = parseInt(inp.dataset.idx, 10);
+    const original = parseInt(inp.dataset.original, 10);
+    const corrected = Math.max(0, parseInt(inp.value || '0', 10) || 0);
+    if (corrected !== original) {
+      const it = o.items[idx];
+      adjustments.push({ idx, name: it.name, productId: it.productId, originalQty: original, correctedQty: corrected });
+    }
+  });
+  const notes = (document.getElementById('ajustarNotes').value || '').trim() || null;
+  if (!adjustments.length && !notes) {
+    showToast('Nenhum ajuste informado');
+    return;
+  }
+  closeAjustar();
+  closeConfer();
+  // Bug 5 (Onda 4): aplica de fato as quantidades ajustadas em o.items e
+  // recalcula o total. Sem isso, o card seguia mostrando qty/valor antigos
+  // e o botao "Cobrar" gerava mensagem WhatsApp com valor desatualizado.
+  // A divergencia ficava registrada em o.confirmation.adjustments mas
+  // invisivel ao operador, criando duvida operacional.
+  adjustments.forEach(adj => {
+    if (o.items[adj.idx]) o.items[adj.idx].qty = adj.correctedQty;
+  });
+  o.total = (o.items || []).reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0);
+  applyConfirmation(id, 'adjust', { adjustments, notes });
+  showToast('✏️ Ajuste aplicado · novo total ' + money(o.total));
+}
+
+// ===== REPORTAR PROBLEMA =====
+function openProblema() {
+  const id = pendingConferOrderId;
+  if (!id) return;
+  const host = document.getElementById('problemaCategorias');
+  host.innerHTML = PROBLEMA_OPCOES.map((opt, i) =>
+    `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-elev);border-radius:10px;cursor:pointer;font-size:14px">
+       <input type="radio" name="probCat" value="${opt.key}"${i===0?' checked':''} style="accent-color:var(--accent)">
+       <span>${opt.label}</span>
+     </label>`
+  ).join('');
+  document.getElementById('problemaNotes').value = '';
+  toggleModal('problemaModal', true);
+}
+function closeProblema() { toggleModal('problemaModal', false); }
+function saveProblema() {
+  const id = pendingConferOrderId;
+  if (!id) { closeProblema(); return; }
+  const sel = document.querySelector('#problemaCategorias input[name="probCat"]:checked');
+  const problem = sel ? sel.value : 'outro';
+  const notes = (document.getElementById('problemaNotes').value || '').trim() || null;
+  closeProblema();
+  closeConfer();
+  applyConfirmation(id, 'problem', { problem, notes });
+  showToast('⚠️ Problema reportado');
+}
+
+// ===== BUSCA POR CÓDIGO CURTO (helper compartilhado) =====
+// O modal de busca foi removido (Onda 2.1) — entrada unica via tela
+// Conferencia (data-screen=conferencia). findOrderByShortCode continua
+// porque e usada por handleScannedCode (scanner) e pela tela Conferencia.
+function findOrderByShortCode(code) {
+  const c = String(code || '').trim().toLowerCase();
+  if (!c) return null;
+  // Tenta match nos ultimos 8 chars (orderRef impresso)
+  return orders.find(o => (o.id || '').toLowerCase().slice(-8) === c)
+      || orders.find(o => (o.id || '').toLowerCase() === c)
+      || null;
+}
+
+// ===== CONFERENCIA DE PRODUCAO (etiquetas de lote) =====
+// Cada batch.unitConfirmations[idxStr] guarda o status de uma unidade
+// individual produzida. Estrutura igual a order.confirmation:
+//   { status, type, by, at, notes, problem }
+const PROD_PROBLEMA_OPCOES = [
+  { key: 'avariado',         label: 'Produto avariado' },
+  { key: 'etiqueta-errada',  label: 'Etiqueta errada' },
+  { key: 'peso-incorreto',   label: 'Peso incorreto' },
+  { key: 'validade',         label: 'Problema de validade' },
+  { key: 'outro',            label: 'Outro' }
+];
+
+function getUnitConfirmation(batch, idxStr) {
+  if (!batch || !batch.unitConfirmations) return null;
+  return batch.unitConfirmations[idxStr] || null;
+}
+function getUnitStatus(batch, idxStr) {
+  const c = getUnitConfirmation(batch, idxStr);
+  return c ? c.status : CONFER_STATUS.PENDENTE;
+}
+
+// Busca unidade especifica de qualquer batch pelo codigo de barras impresso.
+// Format: SKU-LOT-NNN-IDX (ex CUSTOM17-LOT-260427-001).
+function findUnitByCode(code) {
+  const c = String(code || '').trim().toUpperCase();
+  if (!c) return null;
+  const allBatches = batches || [];
+  // #2209: o QR traz o código longo; a barra, a chave do número curto. O número só é único na
+  // loja (o lote sem loja tem contador próprio), então a chave que bate em dois lotes não escolhe
+  // um: o operador lê o QR.
+  let pelaChave = null;
+  let chaveAmbigua = false;
+  for (const batch of allBatches) {
+    const ets = etiquetasFromBatch(batch);
+    for (const et of ets) {
+      if (String(et.codigoBarras || '').toUpperCase() === c) return { batch, et, idxStr: et.idxStr };
+      if (et.chaveCurta && et.chaveCurta === c) {
+        if (!pelaChave) pelaChave = { batch, et, idxStr: et.idxStr };
+        else if (pelaChave.batch !== batch) chaveAmbigua = true;
+      }
+    }
+  }
+  if (pelaChave) return chaveAmbigua ? null : pelaChave;
+  // Etiqueta impressa antes do #1471 (sem sufixo do lote). Pode colidir entre lotes
+  // do mesmo dia; devolve o primeiro, como antes.
+  for (const batch of allBatches) {
+    for (const et of etiquetasFromBatch(batch)) {
+      if (String(et.codigoBarrasLegado || '').toUpperCase() === c) {
+        return { batch, et, idxStr: et.idxStr };
+      }
+    }
+  }
+  return null;
+}
+
+let pendingProdBatchId = null;
+let pendingProdIdxStr = null;
+let pendingProdEt = null;
+
+function openConferProducao(batchId, idxStr) {
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch) { showToast('Lote não encontrado'); return; }
+  const ets = etiquetasFromBatch(batch);
+  const et = ets.find(e => e.idxStr === idxStr);
+  if (!et) { showToast('Unidade não encontrada no lote'); return; }
+  pendingProdBatchId = batchId;
+  pendingProdIdxStr = idxStr;
+  pendingProdEt = et;
+
+  // Bloco 1: identificacao
+  const status = getUnitStatus(batch, idxStr);
+  const badge = document.getElementById('conferProdStatusBadge');
+  badge.textContent = conferStatusLabel(status);
+  badge.className = 'cf-badge ' + status;
+  document.getElementById('conferProdTitle').textContent = et.productName + (et.unit ? ' (' + et.unit + ')' : '');
+  document.getElementById('conferProdMeta').textContent =
+    'Lote ' + et.lote + ' · Unidade ' + et.idxStr + ' · ' + (batch.lastOperatorName || '—');
+
+  // Bloco 2: dados da etiqueta
+  const dadosHtml = [];
+  if (et.weightG) dadosHtml.push(`<div class="ci-row"><span class="ci-name">Peso</span><span>${escapeHtml(fmtPesoG(et.weightG))}</span></div>`);
+  dadosHtml.push(`<div class="ci-row"><span class="ci-name">Produção</span><span>${escapeHtml(fmtDateBR(et.productionDate))}</span></div>`);
+  dadosHtml.push(`<div class="ci-row"><span class="ci-name">Validade</span><span>${et.expiresAt ? escapeHtml(fmtDateBR(et.expiresAt)) : '—'}</span></div>`);
+  dadosHtml.push(`<div class="ci-row"><span class="ci-name">Código</span><span style="font-family:monospace;font-size:13px">${escapeHtml(et.codigoBarras)}</span></div>`);
+  document.getElementById('conferProdDados').innerHTML = dadosHtml.join('');
+
+  // Foto se houver
+  const photoWrap = document.getElementById('conferProdPhoto');
+  const fotoSegura = et.photo ? safePhotoUrl(et.photo) : '';
+  if (fotoSegura) {
+    photoWrap.style.display = 'block';
+    photoWrap.innerHTML = '<img ' + fotoImgSrcAttr(fotoSegura) + ' alt="Foto" style="max-width:100%;max-height:180px;object-fit:contain;border:1px solid var(--line);border-radius:8px"/>';
+    if (window.cdbPhotoUpload) window.cdbPhotoUpload.hidratarFotos(photoWrap);
+  } else {
+    photoWrap.style.display = 'none';
+  }
+
+  // Validade expirada? alerta
+  const warn = document.getElementById('conferProdWarn');
+  if (et.expiresAt && et.expiresAt < Date.now()) {
+    warn.style.display = 'block';
+    warn.textContent = '⚠️ Validade vencida em ' + fmtDateBR(et.expiresAt);
+  } else {
+    warn.style.display = 'none';
+  }
+
+  toggleModal('conferProdModal', true);
+}
+function closeConferProd() {
+  pendingProdBatchId = null;
+  pendingProdIdxStr = null;
+  pendingProdEt = null;
+  toggleModal('conferProdModal', false);
+}
+
+function applyProductionConfirmation(batchId, idxStr, type, payload) {
+  const batch = (batches || []).find(b => b.id === batchId);
+  if (!batch) return;
+  if (!batch.unitConfirmations) batch.unitConfirmations = {};
+  const status = type === 'ok' ? CONFER_STATUS.CONFERIDO : CONFER_STATUS.DIVERGENCIA;
+  batch.unitConfirmations[idxStr] = {
+    status, type,
+    by: operatorName || null,
+    at: Date.now(),
+    notes: payload && payload.notes || null,
+    problem: payload && payload.problem || null
+  };
+  // Audit log
+  const action = type === 'ok' ? 'batch.unit_confirm_ok'
+                : type === 'problem' ? 'batch.unit_confirm_problem'
+                : 'batch.unit_confirm_adjust';
+  const probLabel = type === 'problem'
+    ? (PROD_PROBLEMA_OPCOES.find(p => p.key === (payload && payload.problem))?.label || 'Problema')
+    : '';
+  logAction({
+    action, entityType: 'batch', entityId: batchId,
+    summary: `Lote ${batch.lote || batch.code} · Un ${idxStr} · ${conferStatusLabel(status)}${probLabel ? ' (' + probLabel + ')' : ''}`
+  });
+  persistAll();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+}
+
+function confirmProdConfer() {
+  const bid = pendingProdBatchId, ix = pendingProdIdxStr;
+  if (!bid || !ix) return;
+  closeConferProd();
+  applyProductionConfirmation(bid, ix, 'ok', null);
+  showToast('✓ Unidade ' + ix + ' conferida');
+}
+function openProdProblema() {
+  const host = document.getElementById('prodProblemaCategorias');
+  host.innerHTML = PROD_PROBLEMA_OPCOES.map((opt, i) =>
+    `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-elev);border-radius:10px;cursor:pointer;font-size:14px">
+       <input type="radio" name="prodProb" value="${opt.key}"${i===0?' checked':''} style="accent-color:var(--accent)">
+       <span>${opt.label}</span>
+     </label>`
+  ).join('');
+  document.getElementById('prodProblemaNotes').value = '';
+  toggleModal('prodProblemaModal', true);
+}
+function closeProdProblema() { toggleModal('prodProblemaModal', false); }
+function saveProdProblema() {
+  const bid = pendingProdBatchId, ix = pendingProdIdxStr;
+  if (!bid || !ix) { closeProdProblema(); return; }
+  const sel = document.querySelector('#prodProblemaCategorias input[name="prodProb"]:checked');
+  const problem = sel ? sel.value : 'outro';
+  const notes = (document.getElementById('prodProblemaNotes').value || '').trim() || null;
+  closeProdProblema();
+  closeConferProd();
+  applyProductionConfirmation(bid, ix, 'problem', { problem, notes });
+  showToast('⚠️ Problema reportado na unidade ' + ix);
+}
+
+// Busca unificada — primeiro tenta produção, depois pedido.
+// Usado pelo scanner pra rotear automaticamente.
+function findAnyByCode(code) {
+  const unit = findUnitByCode(code);
+  if (unit) return { kind: 'production', unit };
+  const order = findOrderByShortCode(code);
+  if (order) return { kind: 'order', order };
+  return null;
+}
+
+// ===== SCANNER DE CAMERA (BarcodeDetector API nativa) =====
+// Lê QR Code + CODE128 + EAN13 + CODE39 direto da câmera, sem plugin
+// Capacitor. Usa getUserMedia + BarcodeDetector (Chromium 83+).
+// Pra abrir: openScanner('busca' | 'tela').
+let scannerStream = null;
+let scannerRaf = null;
+let scannerDetector = null;
+// Sobe a cada fechar: laco e timer de uma abertura anterior nao mexem na seguinte.
+let scannerGeracao = 0;
+const SCAN_INTERVALO_MS = 100;
+let scannerActive = false;
+let scannerOrigin = null;
+// Ring buffer dos ultimos erros do BarcodeDetector — antes era catch{} mudo,
+// operador nao tinha como saber que cam falhou. Agora persiste em localStorage
+// (visivel via Diagnostico) e fecha scanner se acumular muitos erros seguidos.
+// ============================================================
+// ERROR LOG GLOBAL — captura window.onerror + unhandledrejection
+// + try/catch dos fluxos criticos. Expostos em Ajustes -> Diagnostico
+// (Ver / Exportar / Limpar). Ring buffer em localStorage.
+// ============================================================
+const ERROR_LOG_KEY = 'cdb-error-log';
+const ERROR_LOG_MAX = 500;
+
+function logError(err, context) {
+  try {
+    const arr = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+    const entry = {
+      t: Date.now(),
+      ctx: String(context || '').slice(0, 80),
+      msg: String((err && (err.message || err.toString())) || err || '').slice(0, 400),
+      stack: String((err && err.stack) || '').split('\n').slice(0, 8).join('\n').slice(0, 800),
+      screen: (typeof currentScreen !== 'undefined' && currentScreen) || '',
+      operator: (typeof operatorName !== 'undefined' && operatorName) || ''
+    };
+    arr.push(entry);
+    if (arr.length > ERROR_LOG_MAX) arr.splice(0, arr.length - ERROR_LOG_MAX);
+    localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(arr));
+  } catch (e) { /* localStorage cheio: silencioso */ }
+  try { console.warn('[cdb-error]', context, err); } catch (e) {}
+}
+function getErrorLog() {
+  try { return JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function clearErrorLog() {
+  try { localStorage.removeItem(ERROR_LOG_KEY); } catch (e) {}
+}
+function exportErrorLog() {
+  const arr = getErrorLog();
+  if (!arr.length) { showToast('Sem erros pra exportar'); return; }
+  const lines = ['=== ERROR LOG ==='];
+  lines.push((typeof getEmpresaName === 'function' ? getEmpresaName() : '') || 'Easy Stock Mobile');
+  lines.push('Exportado: ' + new Date().toLocaleString('pt-BR'));
+  lines.push('Total: ' + arr.length);
+  lines.push('');
+  arr.slice().reverse().forEach(e => {
+    lines.push('[' + new Date(e.t).toLocaleString('pt-BR') + '] ' + (e.ctx || '-') + (e.screen ? ' (' + e.screen + ')' : ''));
+    lines.push('  ' + e.msg);
+    if (e.stack) e.stack.split('\n').forEach(l => lines.push('    ' + l));
+    lines.push('');
+  });
+  if (typeof shareTextNative === 'function') {
+    shareTextNative('Error log Easy Stock', lines.join('\n'));
+  } else {
+    alert(lines.join('\n').slice(0, 4000));
+  }
+}
+
+// Onda 0: envia error log pro servidor via /api/mobile/diagnostics/errors.
+// Opt-in (operador clica). Serve pra time de plantao investigar sem precisar
+// que o operador abra o WhatsApp + cole texto.
+async function uploadErrorLogToServer() {
+  const arr = getErrorLog();
+  if (!arr.length) { showToast('Sem erros pra enviar'); return; }
+  if (!navigator.onLine) { showToast('Sem rede — tente mais tarde'); return; }
+  if (!window.cdbSync || typeof window.cdbSync.uploadErrorLog !== 'function') {
+    showToast('Sincronização indisponível'); return;
+  }
+  showToast('Enviando ' + arr.length + ' erro(s)…');
+  try {
+    const meta = {
+      operatorName: (typeof operatorName !== 'undefined' && operatorName) || null,
+      bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null
+    };
+    const r = await window.cdbSync.uploadErrorLog(arr, meta);
+    showToast('Enviado: ' + (r && r.received != null ? r.received : arr.length) + ' erro(s) recebidos');
+  } catch (e) {
+    showToast('Falha: ' + (e && e.message ? e.message : 'erro desconhecido'));
+    try { logError(e, 'uploadErrorLogToServer'); } catch (_) {}
+  }
+}
+
+// Hooks globais — sao registrados no boot (init block) via setupGlobalErrorHandlers
+function setupGlobalErrorHandlers() {
+  if (window.__cdbErrorHooked) return;
+  window.__cdbErrorHooked = true;
+  window.addEventListener('error', function (ev) {
+    const err = ev && ev.error ? ev.error : (ev && ev.message ? new Error(ev.message) : new Error('window.onerror'));
+    const ctx = 'window.onerror' + (ev && ev.filename ? ' ' + ev.filename + ':' + ev.lineno : '');
+    logError(err, ctx);
+    _maybeOpenTicketForException(err, ctx);
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    const reason = ev && ev.reason;
+    const err = reason instanceof Error ? reason : new Error(String(reason || 'unhandled rejection'));
+    logError(err, 'unhandledrejection');
+    _maybeOpenTicketForException(err, 'unhandledrejection');
+  });
+}
+
+// Abre ticket automatico em exception grave — anti-spam controlado pelo
+// proprio openTicketAuto (cooldown 1h + max 5/dia/device).
+function _maybeOpenTicketForException(err, ctx) {
+  try {
+    if (!window.cdbSync || typeof window.cdbSync.openTicketAuto !== 'function') return;
+    const msg = String((err && err.message) || err || '').slice(0, 300);
+    const stack = String((err && err.stack) || '').split('\n').slice(0, 6).join('\n');
+    window.cdbSync.openTicketAuto(
+      'Exceção não capturada no app',
+      'Contexto: ' + ctx + '\n\nMensagem: ' + msg + '\n\nStack:\n' + stack,
+      'Bug',
+      'unhandled-exception'
+    );
+  } catch (_) {}
+}
+// Toast discreto quando ticket auto eh aberto pelo sync.js.
+window.addEventListener('cdb-ticket-opened', function (ev) {
+  try {
+    const id = ev && ev.detail && ev.detail.ticketId;
+    const titulo = ev && ev.detail && ev.detail.titulo;
+    if (!id) return;
+    const shortId = String(id).slice(0, 8);
+    showToast('Ticket #' + shortId + ' aberto — ' + (titulo || 'suporte avisado'));
+  } catch (_) {}
+});
+
+const CAM_ERRORS_KEY = 'cdb-cam-errors';
+const CAM_ERRORS_MAX = 10;
+let _scannerConsecutiveErrors = 0;
+function recordCameraError(msg) {
+  // Continua especifico — mantem feedback visual proprio do scanner
+  try { logError(new Error(msg || 'camera error'), 'scanner'); } catch (e) {}
+  try {
+    const arr = JSON.parse(localStorage.getItem(CAM_ERRORS_KEY) || '[]');
+    arr.push({ t: Date.now(), msg: String(msg || '').slice(0, 200) });
+    if (arr.length > CAM_ERRORS_MAX) arr.splice(0, arr.length - CAM_ERRORS_MAX);
+    localStorage.setItem(CAM_ERRORS_KEY, JSON.stringify(arr));
+  } catch (e) { /* localStorage cheio: silencioso */ }
+}
+function getCameraErrors() {
+  try { return JSON.parse(localStorage.getItem(CAM_ERRORS_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+
+function ensureCameraPermission() {
+  return new Promise(resolve => {
+    try {
+      const perms = window.cordova && window.cordova.plugins && window.cordova.plugins.permissions;
+      if (!perms || !perms.CAMERA) { resolve(true); return; }
+      perms.checkPermission(perms.CAMERA, function (res) {
+        if (res && res.hasPermission) { resolve(true); return; }
+        perms.requestPermission(perms.CAMERA,
+          function (r) { resolve(!!(r && r.hasPermission)); },
+          function () { resolve(false); }
+        );
+      }, function () {
+        try {
+          perms.requestPermission(perms.CAMERA,
+            function (r) { resolve(!!(r && r.hasPermission)); },
+            function () { resolve(false); }
+          );
+        } catch (e) { resolve(false); }
+      });
+    } catch (e) { resolve(false); }
+  });
+}
+
+// Formatos que queremos detectar.
+//   qr_code  -> recibo de pedido (orderRef 8 chars)
+//   code_128 -> etiqueta de producao (SKU-LOT-IDX, gerado pelo escPosBarcode128)
+//   ean_13/code_39/ean_8/upc_a -> bonus pra outros barcodes que possam aparecer
+const SCAN_FORMATS_WANTED = ['qr_code', 'code_128', 'ean_13', 'code_39', 'ean_8', 'upc_a'];
+let scanFormatsAvailable = null; // setado uma vez via getSupportedFormats()
+
+async function getActiveScanFormats() {
+  if (scanFormatsAvailable) return scanFormatsAvailable;
+  try {
+    if (typeof window.BarcodeDetector.getSupportedFormats === 'function') {
+      const supported = await window.BarcodeDetector.getSupportedFormats();
+      scanFormatsAvailable = SCAN_FORMATS_WANTED.filter(f => supported.includes(f));
+    } else {
+      scanFormatsAvailable = SCAN_FORMATS_WANTED.slice();
+    }
+  } catch (e) {
+    scanFormatsAvailable = ['qr_code']; // fallback minimo
+  }
+  if (!scanFormatsAvailable.length) scanFormatsAvailable = ['qr_code'];
+  return scanFormatsAvailable;
+}
+
+function fmtScanFormatsLabel(list) {
+  const human = { qr_code: 'QR', code_128: 'CODE128', ean_13: 'EAN13', code_39: 'CODE39', ean_8: 'EAN8', upc_a: 'UPC' };
+  return list.map(f => human[f] || f).join(' + ');
+}
+
+async function openScanner(origin) {
+  if (scannerActive) return;
+  scannerOrigin = origin || 'tela';
+  const overlay = document.getElementById('scannerOverlay');
+  const video = document.getElementById('scannerVideo');
+  const statusEl = document.getElementById('scannerStatus');
+  overlay.classList.add('show');
+  statusEl.className = 'scan-status';
+  statusEl.textContent = 'Pedindo permissão de câmera…';
+  scannerActive = true;
+
+  // Verifica suporte
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    statusEl.className = 'scan-status error';
+    statusEl.textContent = 'Câmera não disponível neste dispositivo';
+    return;
+  }
+  if (!('BarcodeDetector' in window)) {
+    statusEl.className = 'scan-status error';
+    statusEl.textContent = 'Scanner não suportado — atualize Android System WebView';
+    return;
+  }
+
+  // Pede permissao runtime CAMERA via cordova-plugin-android-permissions
+  // (Android 12+ exige). Sem isso, getUserMedia falha silencioso.
+  const granted = await ensureCameraPermission();
+  if (!granted) {
+    statusEl.className = 'scan-status error';
+    statusEl.textContent = 'Permissão negada — Configurações > Apps > Easy Stock > Permissões > Câmera';
+    return;
+  }
+  statusEl.textContent = 'Iniciando câmera…';
+
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = scannerStream;
+    await video.play();
+    const active = await getActiveScanFormats();
+    if (!active.includes('code_128')) {
+      // Avisa que device nao decoda CODE128 (etiqueta de producao nao funciona)
+      statusEl.className = 'scan-status error';
+      statusEl.textContent = '⚠ Este device só lê: ' + fmtScanFormatsLabel(active) + '. Atualize "Android System WebView" pra ler barcode da produção.';
+      // Continua mesmo assim — QR de pedido ainda funciona
+      setTimeout(() => {
+        if (scannerActive) { statusEl.className = 'scan-status'; statusEl.textContent = 'Lendo: ' + fmtScanFormatsLabel(active); }
+      }, 3500);
+    } else {
+      statusEl.textContent = 'Lendo: ' + fmtScanFormatsLabel(active);
+    }
+    scannerDetector = new window.BarcodeDetector({ formats: active });
+    _scannerConsecutiveErrors = 0;
+    startScanLoop();
+  } catch (err) {
+    statusEl.className = 'scan-status error';
+    const msg = (err && err.message) || String(err);
+    if (/permission|denied/i.test(msg)) {
+      statusEl.textContent = 'Permissão negada — Configurações > Apps > Easy Stock > Câmera';
+    } else {
+      statusEl.textContent = 'Erro câmera: ' + msg;
+    }
+  }
+}
+
+// Laco de leitura do scanner (#1565). Ao achar um codigo ele para e zera `scannerRaf`:
+// handleScannedCode fecha o scanner ou, se o codigo nao bate, religa por aqui. Com o id antigo
+// no ar o religar nunca rodava e a camera ficava ligada sem ler nada.
+// detect() roda no maximo a cada SCAN_INTERVALO_MS: a cada quadro (60/s) gastava bateria a toa.
+function startScanLoop() {
+  const video = document.getElementById('scannerVideo');
+  const statusEl = document.getElementById('scannerStatus');
+  const detector = scannerDetector;
+  const geracao = scannerGeracao;
+  let ultimaLeitura = 0;
+  const loop = async () => {
+    if (geracao !== scannerGeracao) return;
+    if (!scannerActive) { scannerRaf = null; return; }
+    const agora = Date.now();
+    if (agora - ultimaLeitura >= SCAN_INTERVALO_MS) {
+      ultimaLeitura = agora;
+      try {
+        const codes = await detector.detect(video);
+        if (geracao !== scannerGeracao) return;
+        if (!scannerActive) { scannerRaf = null; return; }
+        _scannerConsecutiveErrors = 0;
+        if (codes && codes.length > 0 && codes[0].rawValue) {
+          scannerRaf = null;
+          handleScannedCode(codes[0].rawValue, codes[0].format);
+          return;
+        }
+      } catch (e) {
+        if (geracao !== scannerGeracao) return;
+        // Frames isolados podem falhar legitimamente (autofocus, frame
+        // truncado). Mas se cair em sequencia, tem algo de errado: cam
+        // ocupada por outro app, permissao revogada mid-scan, OOM.
+        recordCameraError((e && e.message) || String(e));
+        _scannerConsecutiveErrors++;
+        if (_scannerConsecutiveErrors >= 5) {
+          scannerRaf = null;
+          statusEl.className = 'scan-status error';
+          statusEl.textContent = 'Câmera com erro · veja Diagnóstico';
+          // Fecha apos 1.5s pra operador ler a mensagem
+          setTimeout(function () { if (scannerActive) closeScanner(); }, 1500);
+          return;
+        }
+      }
+    }
+    scannerRaf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+function closeScanner() {
+  scannerActive = false;
+  if (scannerRaf) cancelAnimationFrame(scannerRaf);
+  scannerRaf = null;
+  scannerDetector = null;
+  scannerGeracao++;
+  const video = document.getElementById('scannerVideo');
+  if (video) { try { video.pause(); } catch (e) {} video.srcObject = null; }
+  if (scannerStream) {
+    try { scannerStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    scannerStream = null;
+  }
+  document.getElementById('scannerOverlay').classList.remove('show');
+}
+
+function handleScannedCode(rawValue, format) {
+  if (!rawValue) return;
+  const statusEl = document.getElementById('scannerStatus');
+  let code = String(rawValue || '').trim();
+  // Se for um URI tipo cdb-confirm:XXX, pega o final
+  const m = code.match(/[a-z0-9-]+$/i);
+  const candidate = m ? m[0] : code;
+  const fmtLabel = format === 'qr_code' ? 'QR' : (format === 'code_128' ? 'CODE128' : (format || ''));
+  // Busca unificada: tenta unidade de produção primeiro (codigo SKU-LOT-IDX),
+  // depois pedido (orderRef 8 chars).
+  const found = findAnyByCode(candidate) || findAnyByCode(code);
+  if (found && found.kind === 'production') {
+    const u = found.unit;
+    statusEl.className = 'scan-status found';
+    statusEl.textContent = '✓ ' + (fmtLabel ? '['+fmtLabel+'] ' : '') + u.et.productName + ' · Un ' + u.idxStr;
+    try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {}
+    setTimeout(() => {
+      closeScanner();
+      _clearConferInputs();
+      openConferProducao(u.batch.id, u.idxStr);
+    }, 350);
+    return;
+  }
+  if (found && found.kind === 'order') {
+    const o = found.order;
+    statusEl.className = 'scan-status found';
+    statusEl.textContent = '✓ ' + (fmtLabel ? '['+fmtLabel+'] ' : '') + (o.clientSnapshot?.name || 'Pedido encontrado');
+    try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {}
+    setTimeout(() => {
+      closeScanner();
+      _clearConferInputs();
+      openConfer(o.id);
+    }, 350);
+    return;
+  }
+  // Não achou — não fecha; continua tentando.
+  statusEl.className = 'scan-status error';
+  statusEl.textContent = (fmtLabel ? '['+fmtLabel+'] ' : '') + 'Código "' + candidate + '" não bate com pedido ou lote deste aparelho';
+  const geracao = scannerGeracao;
+  setTimeout(async () => {
+    if (!scannerActive || geracao !== scannerGeracao) return;
+    statusEl.className = 'scan-status';
+    const active = await getActiveScanFormats();
+    if (!scannerActive || geracao !== scannerGeracao) return;
+    statusEl.textContent = 'Lendo: ' + fmtScanFormatsLabel(active);
+    if (!scannerRaf && scannerStream && scannerDetector) startScanLoop();
+  }, 1500);
+}
+function _clearConferInputs() {
+  // O modal de busca foi removido na Onda 2.1; agora unico ponto e a tela
+  // de conferencia. Limpa o input dela apos scan bem-sucedido.
+  try { document.getElementById('conferScreenInput').value = ''; } catch (e) {}
+}
+
+// ===== TELA DE CONFERENCIA (data-screen=conferencia) =====
+// Tabs: Pedidos / Produção. Cada tab tem listas separadas.
+let conferTab = 'pedidos';
+function setConferTab(tab) {
+  conferTab = tab;
+  document.querySelectorAll('.confer-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('conferTabPedidos').style.display = tab === 'pedidos' ? '' : 'none';
+  document.getElementById('conferTabProducao').style.display = tab === 'producao' ? '' : 'none';
+  renderConferenciaScreen();
+}
+
+function renderConferenciaScreen() {
+  renderConferProPanel();
+  // ABA PEDIDOS
+  const pendingHost = document.getElementById('conferPendingList');
+  const doneHost = document.getElementById('conferDoneList');
+  if (pendingHost && doneHost) {
+    const today0 = new Date(); today0.setHours(0,0,0,0);
+    const todayMs = today0.getTime();
+    const allOrders = orders || [];
+    const pending = allOrders.filter(o =>
+      o.status !== STATUS.CANCELADO &&
+      getConferStatus(o) === CONFER_STATUS.PENDENTE
+    ).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const done = allOrders.filter(o =>
+      o.confirmation && o.confirmation.at >= todayMs
+    ).sort((a, b) => (b.confirmation.at || 0) - (a.confirmation.at || 0));
+
+    pendingHost.innerHTML = pending.length
+      ? pending.map(o => conferRowHtml(o)).join('')
+      : '<div class="confer-empty">Nenhum pedido pendente. ✓</div>';
+    doneHost.innerHTML = done.length
+      ? done.map(o => conferRowHtml(o)).join('')
+      : '<div class="confer-empty">Nada conferido hoje ainda.</div>';
+  }
+  // ABA PRODUCAO
+  const batchHost = document.getElementById('conferBatchesList');
+  if (batchHost) {
+    const allBatches = (batches || []).filter(b => !b.deleted).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (!allBatches.length) {
+      batchHost.innerHTML = '<div class="confer-empty">Nenhum lote registrado ainda.</div>';
+    } else {
+      batchHost.innerHTML = allBatches.slice(0, 10).map(b => batchCardHtml(b)).join('');
+    }
+  }
+}
+
+function renderConferProPanel() {
+  const el = document.getElementById('conferProPanel');
+  if (!el) return;
+  const allOrders = orders || [];
+  const pendingOrders = allOrders.filter(function (o) {
+    return o.status !== STATUS.CANCELADO &&
+      typeof getConferStatus === 'function' &&
+      getConferStatus(o) === CONFER_STATUS.PENDENTE;
+  }).length;
+  let totalUnits = 0, doneUnits = 0, problemUnits = 0;
+  (batches || []).filter(function (b) { return !b.deleted; }).forEach(function (b) {
+    const ets = etiquetasFromBatch(b);
+    totalUnits += ets.length;
+    ets.forEach(function (et) {
+      const st = getUnitStatus(b, et.idxStr);
+      if (st === CONFER_STATUS.CONFERIDO)   doneUnits++;
+      if (st === CONFER_STATUS.DIVERGENCIA) problemUnits++;
+    });
+  });
+  // #433 — quando sem lotes (totalUnits=0), mostra pedidos conferidos hoje em vez de '—'.
+  // Sem lotes, 'Etiquetas conferidas' e sempre vazio e confunde quem confere so pedidos.
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const conferidosHoje = totalUnits === 0
+    ? allOrders.filter(function (o) { return o.confirmation && (o.confirmation.at || 0) >= today0.getTime(); }).length
+    : 0;
+  const etqValue = totalUnits ? (doneUnits + '/' + totalUnits) : String(conferidosHoje);
+  const etqLabel = totalUnits ? 'Etiquetas conferidas' : 'Conferidos hoje';
+  el.innerHTML =
+    '<div class="confer-pro-stat"><span class="v">' + pendingOrders + '</span><span class="k">Pedidos pendentes</span></div>' +
+    '<div class="confer-pro-stat"><span class="v">' + etqValue + '</span><span class="k">' + etqLabel + '</span></div>' +
+    '<div class="confer-pro-stat"><span class="v">' + problemUnits + '</span><span class="k">Divergências</span></div>';
+}
+
+// #2735: rótulo de validade pelo dia do calendário local. Antes "vence hoje" valia para
+// qualquer vencimento nas 24 h seguintes (amanhã cedo saía como hoje) e 30 h virava "2d".
+// A janela de 7 dias e o destaque de urgência (vencido ou a menos de 24 h) não mudaram.
+function validadeRotulo(expiresAt, agora) {
+  const fim = Number(expiresAt) || 0;
+  if (!fim) return null;
+  const now = agora == null ? Date.now() : Number(agora);
+  const diff = fim - now;
+  if (diff <= 0) return { texto: 'vencido', urgente: true, vencido: true };
+  if (diff >= 7 * 24 * 3600 * 1000) return null;
+  const dias = Math.round((startOfLocalDay(fim) - startOfLocalDay(now)) / (24 * 3600 * 1000));
+  const texto = dias === 0 ? 'vence hoje' : (dias === 1 ? 'vence amanhã' : 'vence em ' + dias + ' dias');
+  return { texto: texto, urgente: diff < 24 * 3600 * 1000, vencido: false };
+}
+
+function batchCardHtml(batch) {
+  const pilot = window.CDB_CONFIG?.isPilot === true;
+  const isClosed = getBatchStatus(batch) === 'closed';
+  const ets = etiquetasFromBatch(batch);
+  const total = ets.length;
+  const conferidos = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.CONFERIDO).length;
+  const divergencias = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.DIVERGENCIA).length;
+  const items = (batch.items || []).map(i => `${i.qty}× ${i.name}`).join(' · ');
+  // #440 — validade: badge de urgência por item
+  const validadeHtml = (batch.items || []).map(function(i) {
+    const v = validadeRotulo(i.expiresAt);
+    if (!v) return '';
+    // No piloto a cor já diz a urgência: sem emoji, como no resto do app.
+    const marca = pilot ? '' : (v.vencido ? '⛔ ' : (v.urgente ? '🔴 ' : '🟡 '));
+    const cor = v.urgente ? 'var(--accent)' : 'var(--gold)';
+    return '<span style="font-size:12px;color:'+cor+';font-weight:700">'+marca+v.texto+' · '+escapeHtml(i.name)+'</span>';
+  }).filter(Boolean).join(' · ');
+  const dateStr = new Date(batch.createdAt).toLocaleDateString('pt-BR') + ' ' +
+    new Date(batch.createdAt).toLocaleTimeString('pt-BR').slice(0,5);
+  const progress = pilot ? '' : `Controle de etiquetas · ${conferidos}/${total} conferido${conferidos === 1 ? '' : 's'}` +
+    (divergencias ? ` · ${divergencias} divergência${divergencias === 1 ? '' : 's'}` : '');
+  const unitsHtml = pilot ? '' : ets.map(et => {
+    const st = getUnitStatus(batch, et.idxStr);
+    const statusBadge = `<span class="u-status ${st}">${conferStatusLabel(st)}</span>`;
+    const actionLabel = st === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Ver';
+    return `<div class="batch-unit-row">
+      <span class="u-idx">${escapeHtml(et.idxStr)}</span>
+      <span style="flex:1;font-size:13px">${escapeHtml(et.codigoBarras)}</span>
+      ${statusBadge}
+      <button class="u-action" onclick="event.stopPropagation();openConferProducao(${jsString(batch.id)},${jsString(et.idxStr)})">${actionLabel}</button>
+    </div>`;
+  }).join('');
+  const isDiscarded = !!batch.discarded;
+  const statusBadge = isDiscarded
+    ? `<span class="u-status divergencia">⛔ Descartado</span>`
+    : isClosed
+      ? `<span class="u-status divergencia">Fechado</span>`
+      : `<span class="u-status conferido">Aberto</span>`;
+  // #441 — botao Descartar/Reverter em todas as acoes
+  const discardBtn = isDiscarded
+    ? `<button class="batch-action" onclick="event.stopPropagation();revertBatchDiscard(${jsString(batch.id)})">↩ Reverter</button>`
+    : `<button class="batch-action" style="color:var(--accent)" onclick="event.stopPropagation();openBatchDiscardModal(${jsString(batch.id)})"><span data-op-icon="lixeira" aria-hidden="true">⛔</span> Descartar</button>`;
+  const actionsHtml = isDiscarded ? `
+    <div class="batch-actions closed-actions">
+      <span style="font-size:12px;color:var(--ink-mute);flex:1">${escapeHtml(batch.discardReason || 'descartado')}</span>
+      ${discardBtn}
+    </div>` : isClosed ? `
+    <div class="batch-actions closed-actions">
+      <button class="batch-action primary" onclick="event.stopPropagation();toggleBatchStatus(${jsString(batch.id)})">Reabrir</button>
+      <button class="batch-action info" onclick="event.stopPropagation();openBatchHistory(${jsString(batch.id)})">Histórico</button>
+      <button class="batch-action" onclick="event.stopPropagation();openBatchDetails(${jsString(batch.id)})">Detalhes</button>
+      ${discardBtn}
+    </div>` : `
+    <div class="batch-actions">
+      <button class="batch-action primary" onclick="event.stopPropagation();appendProductionToBatch(${jsString(batch.id)})">+ Produção</button>
+      <button class="batch-action info" onclick="event.stopPropagation();editBatchFlow(${jsString(batch.id)})">Editar</button>
+      <button class="batch-action" onclick="event.stopPropagation();toggleBatchStatus(${jsString(batch.id)})">Fechar</button>
+      ${discardBtn}
+    </div>`;
+  return `<div class="batch-card${isClosed ? ' closed' : ''}" id="bc-${batch.id}">
+    <div class="batch-card-head" ${pilot ? '' : `onclick="document.getElementById(${jsString('bc-' + batch.id)}).classList.toggle('open')"`}>
+      <div class="bc-info">
+        <div class="bc-lote">${escapeHtml(codigoDoLote(batch))} · ${escapeHtml(dateStr)} ${statusBadge}</div>
+        <div class="bc-summary">${escapeHtml(items)}</div>
+        ${validadeHtml ? '<div class="bc-progress">' + validadeHtml + '</div>' : ''}
+        ${progress ? `<div class="bc-progress">${escapeHtml(progress)}</div>` : ''}
+        ${(function(){
+          // #437 — historico de impressoes: le do audit log as entradas 'etiqueta.print' do lote.
+          try {
+            const log = (typeof loadAuditLog === 'function' ? loadAuditLog() : []) || [];
+            const prints = log.filter(e => e.action === 'etiqueta.print' && e.entityId === batch.id).slice(0, 3);
+            if (!prints.length) return '';
+            return prints.map(p => {
+              const ts = p.ts ? new Date(p.ts).toLocaleTimeString('pt-BR').slice(0,5) : '';
+              return '<div style="font-size:var(--fs-micro);color:var(--ink-mute)">🖨 ' + escapeHtml(p.summary || '') + (p.operator ? ' · ' + escapeHtml(p.operator) : '') + (ts ? ' às ' + ts : '') + '</div>';
+            }).join('');
+          } catch(_) { return ''; }
+        })()}
+      </div>
+      ${pilot ? '' : '<span class="bc-toggle">›</span>'}
+    </div>
+    ${actionsHtml}
+    <div class="batch-units">${unitsHtml}</div>
+  </div>`;
+}
+
+function getBatchById(batchId) {
+  return (batches || []).find(b => b.id === batchId);
+}
+function getBatchStatus(batch) {
+  return String(batch && batch.status ? batch.status : 'open').trim().toLowerCase() === 'closed' ? 'closed' : 'open';
+}
+function isBatchClosed(batch) {
+  return getBatchStatus(batch) === 'closed';
+}
+function assertBatchEditable(batch) {
+  if (!batch) { showToast('Lote não encontrado'); return false; }
+  if (!assertImportedBatchAction(batch.id)) return false;
+  if (batch.deleted) { showToast('Lote excluído'); return false; }
+  if (isBatchClosed(batch)) { showToast('Lote fechado não pode ser alterado'); return false; }
+  return true;
+}
+function rerenderBatchUx() {
+  persistAll();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHistoricoScreen === 'function') renderHistoricoScreen();
+  if (typeof renderHome === 'function') renderHome();
+}
+function toggleBatchStatus(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
+  const batch = getBatchById(batchId);
+  if (!batch || batch.deleted) { showToast('Lote não encontrado'); return; }
+  if (isBatchClosed(batch)) {
+    batch.status = 'open';
+    batch.closedAt = null;
+    batch.closedBy = null;
+    logAction({
+      action: 'batch.reopen',
+      entityType: 'batch',
+      entityId: batch.id,
+      summary: `Lote ${batch.lote || batch.code} reaberto`
+    });
+    showToast('Lote reaberto');
+  } else {
+    batch.status = 'closed';
+    batch.closedAt = Date.now();
+    batch.closedBy = operatorName || null;
+    logAction({
+      action: 'batch.close',
+      entityType: 'batch',
+      entityId: batch.id,
+      summary: `Lote ${batch.lote || batch.code} fechado`
+    });
+    showToast('Lote fechado');
+  }
+  rerenderBatchUx();
+  if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
+}
+function editBatchFlow(batchId) {
+  const batch = getBatchById(batchId);
+  if (!assertBatchEditable(batch)) return;
+  const nextLote = prompt('Editar nome/código do lote:', batch.lote || batch.code || '');
+  if (nextLote == null) return;
+  const trimmed = String(nextLote).trim();
+  if (!trimmed) { showToast('Lote inválido'); return; }
+  const before = batch.lote || batch.code;
+  batch.lote = trimmed;
+  batch.code = batch.code || ('BATCH-' + trimmed);
+  batch.lastOperatorName = operatorName || batch.lastOperatorName || null;
+  logAction({
+    action: 'batch.edit',
+    entityType: 'batch',
+    entityId: batch.id,
+    summary: `Lote ${before} atualizado para ${trimmed}`
+  });
+  rerenderBatchUx();
+  showToast('Lote atualizado');
+}
+function appendProductionToBatch(batchId) {
+  const batch = getBatchById(batchId);
+  if (!assertBatchEditable(batch)) return;
+  const mode = prompt('Adicionar produção:\n1 = Repetir item existente\n2 = Item avulso', '1');
+  if (mode == null) return;
+  if (mode !== '1' && mode !== '2') { showToast('Escolha 1 ou 2'); return; }
+  if (mode === '1') {
+    const lines = (batch.items || []).map((it, idx) => `${idx + 1} - ${it.name}`).join('\n');
+    const pick = prompt('Qual item do lote?\n' + lines, '1');
+    if (pick == null) return;
+    const i = parseInt(pick, 10) - 1;
+    const base = batch.items[i];
+    if (!base) { showToast('Item inválido'); return; }
+    const qtyRaw = prompt(`Quantidade adicional para ${base.name}:`, '1');
+    if (qtyRaw == null) return;
+    const addQty = parseInt(qtyRaw, 10);
+    if (!isFinite(addQty) || addQty <= 0) { showToast('Quantidade inválida'); return; }
+    base.qty += addQty;
+    const p = products.find(x => x.id === base.productId);
+    if (p) p.stock = (p.stock || 0) + addQty;
+    batch.lastOperatorName = operatorName || batch.lastOperatorName || null;
+    logAction({
+      action: 'batch.append',
+      entityType: 'batch',
+      entityId: batch.id,
+      summary: `Lote ${batch.lote || batch.code} +${addQty} ${base.name}`
+    });
+    rerenderBatchUx();
+    showToast('Produção adicionada ao lote');
+    return;
+  }
+  const name = prompt('Nome do item produzido:', '');
+  if (name == null) return;
+  const itemName = String(name).trim();
+  if (!itemName) { showToast('Nome obrigatório'); return; }
+  const qtyRaw = prompt(`Quantidade para ${itemName}:`, '1');
+  if (qtyRaw == null) return;
+  const addQty = parseInt(qtyRaw, 10);
+  if (!isFinite(addQty) || addQty <= 0) { showToast('Quantidade inválida'); return; }
+  const product = (products || []).find(p => (p.name || '').toLowerCase() === itemName.toLowerCase());
+  const item = {
+    productId: product ? product.id : ('manual-' + Date.now()),
+    name: product ? product.name : itemName,
+    emoji: product ? product.emoji : '🍽️',
+    unit: product ? product.unit : 'un',
+    qty: addQty,
+    photo: null,
+    weightG: null,
+    validityDays: null,
+    expiresAt: null
+  };
+  batch.items.push(item);
+  if (product) product.stock = (product.stock || 0) + addQty;
+  batch.lastOperatorName = operatorName || batch.lastOperatorName || null;
+  logAction({
+    action: 'batch.append_manual',
+    entityType: 'batch',
+    entityId: batch.id,
+    summary: `Lote ${batch.lote || batch.code} recebeu item manual ${item.name} (${addQty})`
+  });
+  rerenderBatchUx();
+  showToast('Item adicionado ao lote');
+}
+
+let producaoTab = 'catalogo';
+let batchFilter = 'open';
+function goProducaoTab(tab) {
+  producaoTab = tab || 'catalogo';
+  document.querySelectorAll('#producaoTabs .screen-tab').forEach(b => b.classList.toggle('active', b.dataset.ptab === producaoTab));
+  document.querySelectorAll('[data-screen="producao"] .producao-tab-section').forEach(s => s.classList.toggle('active', s.dataset.ptab === producaoTab));
+  if (producaoTab === 'lotes') renderProducaoBatches();
+  if (producaoTab === 'catalogo') renderProductionDemand(); // F6
+  if (producaoTab === 'calculadora') calcOnEntrarTab(); // Onda 3.1
+}
+
+// === Calculadora de Producao (Onda 3.1) ===
+// Estado em memoria — produto selecionado, ultimo resultado, debounce timer
+let calcProdutoSelecionado = null;
+let calcUltimoResultado = null;
+let calcSearchTimer = null;
+// Cache de produtos da busca atual (chave = id) para event-delegation segura,
+// evitando JSON.stringify embutido em onclick= (XSS persistente quando nome
+// do produto contem aspas/HTML). Reescrito a cada nova busca.
+let calcProdutosBusca = {};
+
+// Escape HTML helper — evita XSS persistente em pontos que ainda usam innerHTML
+// com dados vindos do servidor (nome de produto, nome de insumo, aviso, etc).
+// Sempre que possivel, prefira textContent ou createElement. Use este helper
+// apenas quando a estrutura HTML precisar ser montada inline.
+function calcEscapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[c]);
+}
+
+function calcOnEntrarTab() {
+  // Pre-fill via prod-demand chip (G1): se localStorage tem flag, popula form
+  try {
+    const prefillRaw = localStorage.getItem('cdb-calc-prefill');
+    if (prefillRaw) {
+      const prefill = JSON.parse(prefillRaw);
+      localStorage.removeItem('cdb-calc-prefill');
+      if (prefill.produtoId && prefill.produtoNome) {
+        calcSelecionarProduto({ id: prefill.produtoId, nome: prefill.produtoNome,
+          unidadeMedidaBase: prefill.unidadeMedidaBase || 'Un',
+          rendimentoBase: prefill.rendimentoBase, rendimentoUnidade: prefill.rendimentoUnidade });
+        if (prefill.qty) {
+          document.getElementById('calcQtd').value = prefill.qty;
+          calcOnQtdChange();
+        }
+      }
+    }
+  } catch (_) { /* silent */ }
+}
+
+function calcApiBase() {
+  return (window.CDB_CONFIG && window.CDB_CONFIG.apiBaseUrl) || '';
+}
+
+function calcAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const token = localStorage.getItem('cdb-auth-token') || localStorage.getItem('authToken');
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+  } catch (_) {}
+  // #1474: o aparelho pareado nao tem JWT. Sem a api key do device a
+  // calculadora respondia 401 (produtos-com-receita, calcular, cesta).
+  try {
+    const pairing = window.cdbSync && typeof window.cdbSync.getPairing === 'function'
+      ? window.cdbSync.getPairing() : null;
+    if (pairing && pairing.apiKey) headers['X-Mobile-Api-Key'] = pairing.apiKey;
+    if (window.cdbSync && window.cdbSync.deviceId) headers['X-Device-Id'] = window.cdbSync.deviceId;
+  } catch (_) {}
+  return headers;
+}
+
+// #407: parse defensivo. Corpo vazio (200/204) fazia res.json() jogar
+// "Unexpected end of JSON input", poluindo o console e podendo derrubar a
+// calculadora. Le como texto e so parseia se houver corpo.
+async function calcParse(res) {
+  const t = await res.text();
+  return t ? JSON.parse(t) : {};
+}
+
+async function calcBuscarProdutos() {
+  if (calcSearchTimer) clearTimeout(calcSearchTimer);
+  calcSearchTimer = setTimeout(async () => {
+    const q = document.getElementById('calcProdSearch').value.trim();
+    const box = document.getElementById('calcProdSuggestions');
+    if (!q) { box.classList.remove('show'); box.innerHTML = ''; return; }
+    if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
+    try {
+      const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+      const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?q=${encodeURIComponent(q)}&limit=10${empresaId ? '&empresaId=' + empresaId : ''}`;
+      const res = await fetch(url, { headers: calcAuthHeaders() });
+      const json = await calcParse(res);
+      const produtos = (json && json.data) || [];
+      if (produtos.length === 0) {
+        box.classList.add('show');
+        box.innerHTML = '<div style="padding:10px;color:var(--ink-mute);font-size:13px;">Nenhum produto com receita encontrado.</div>';
+        return;
+      }
+      box.classList.add('show');
+      // Cache produtos para event-delegation segura (sem JSON.stringify em onclick=)
+      calcProdutosBusca = {};
+      produtos.forEach(p => { if (p && p.id) calcProdutosBusca[String(p.id)] = p; });
+      box.innerHTML = produtos.map(p => {
+        const rendNum = Number(p.rendimentoBase);
+        const rendimento = isFinite(rendNum) ? rendNum : 0;
+        return `
+        <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);"
+             data-calc-prod-id="${calcEscapeHtml(p.id)}">
+          <div style="font-weight:600;">${calcEscapeHtml(p.nome)}</div>
+          <div style="font-size:var(--fs-micro);color:var(--ink-mute);">Rende ${rendimento} ${calcEscapeHtml(p.rendimentoUnidade)}</div>
+        </div>
+      `;
+      }).join('');
+      // Event-delegation: substitui onclick='calcSelecionarProduto(...)' inline
+      box.querySelectorAll('[data-calc-prod-id]').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.getAttribute('data-calc-prod-id');
+          const prod = calcProdutosBusca[id];
+          if (prod) calcSelecionarProduto(prod);
+        });
+      });
+    } catch (e) {
+      // Reseta sugestoes para nao deixar estado "preso" do termo anterior.
+      box.classList.remove('show');
+      box.innerHTML = '';
+      try { console.error('[calculadora]', e); } catch (_) {}
+      showToast('Erro ao buscar produtos. Verifique sua conexão.');
+    }
+  }, 300);
+}
+
+function calcSelecionarProduto(p) {
+  calcProdutoSelecionado = p;
+  document.getElementById('calcProdSearch').value = '';
+  document.getElementById('calcProdSuggestions').classList.remove('show');
+  document.getElementById('calcProdSelected').style.display = 'block';
+  document.getElementById('calcProdSelected').textContent = `${p.nome} (rende ${p.rendimentoBase} ${p.rendimentoUnidade})`;
+  document.getElementById('calcEmptyState').style.display = 'none';
+
+  // G7: chips de unidade contextual — filtra por compativeis.
+  // calcUnidadesCompativeis retorna constantes do enum (Un/G/Kg/...) mas escapamos
+  // por defesa em profundidade — assim qualquer regressao futura nao vira XSS.
+  const unidadeBase = p.unidadeMedidaBase || 'Un';
+  const select = document.getElementById('calcUnidade');
+  const compativeis = calcUnidadesCompativeis(unidadeBase);
+  select.innerHTML = compativeis.map(u => {
+    const safe = calcEscapeHtml(u);
+    return `<option value="${safe}"${u === unidadeBase ? ' selected' : ''}>${safe}</option>`;
+  }).join('');
+
+  calcOnQtdChange();
+}
+
+function calcUnidadesCompativeis(base) {
+  const massa = ['Mg', 'G', 'Kg'];
+  const volume = ['Ml', 'L'];
+  const contagem = ['Un', 'Dz'];
+  if (massa.includes(base)) return massa;
+  if (volume.includes(base)) return volume;
+  if (contagem.includes(base)) return contagem;
+  return [base];
+}
+
+function calcOnQtdChange() {
+  const qtdStr = document.getElementById('calcQtd').value.replace(',', '.');
+  const qtd = parseFloat(qtdStr);
+  const hint = document.getElementById('calcQtdHint');
+  const btn = document.getElementById('calcCalcularBtn');
+  hint.classList.remove('invalid');
+  hint.textContent = '';
+  if (!calcProdutoSelecionado) { btn.disabled = true; return; }
+  if (!isFinite(qtd) || qtd < 0.0001) {
+    if (qtdStr) {
+      hint.classList.add('invalid');
+      hint.textContent = 'Quantidade minima 0.0001.';
+    }
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+}
+
+function calcOnUnidadeChange() {
+  // Recalcula valido novamente quando troca unidade
+  calcOnQtdChange();
+}
+
+async function calcExecutar() {
+  if (!calcProdutoSelecionado) return;
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
+
+  const qtd = parseFloat(document.getElementById('calcQtd').value.replace(',', '.'));
+  const unidade = document.getElementById('calcUnidade').value;
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  const box = document.getElementById('calcResultadoBox');
+  box.setAttribute('aria-busy', 'true');
+  box.style.display = 'block';
+  document.getElementById('calcResultadoBadge').textContent = 'Calculando...';
+  document.getElementById('calcResultadoBadge').style.background = 'var(--bg-elev)';
+  document.getElementById('calcInsumosList').innerHTML = '';
+  document.getElementById('calcResultadoCustoTotal').textContent = '';
+
+  try {
+    const url = `${calcApiBase()}/api/mobile/calculadora/calcular${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        produtoFinalId: calcProdutoSelecionado.id,
+        quantidadeDesejada: qtd,
+        unidadeDesejada: unidade,
+        lojaId
+      })
+    });
+    const json = await calcParse(res);
+    if (!res.ok) {
+      const code = (json && json.error && json.error.code) || 'ERROR';
+      const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
+      showToast(`${code}: ${msg}`);
+      box.style.display = 'none';
+      return;
+    }
+    calcUltimoResultado = json.data;
+    calcRenderResultado(json.data);
+    calcSalvarHistorico(calcProdutoSelecionado, qtd, unidade);
+  } catch (e) {
+    showToast('Erro de conexão');
+    box.style.display = 'none';
+  } finally {
+    box.setAttribute('aria-busy', 'false');
+  }
+}
+
+function calcRenderResultado(r) {
+  const badge = document.getElementById('calcResultadoBadge');
+  const editarBtn = document.getElementById('calcEditarReceitaBtn');
+  const gerarBtn = document.getElementById('calcGerarCompraBtn');
+  const addBtn = document.getElementById('calcAddComprasBtn');
+
+  if (r.tudoDisponivel) {
+    badge.innerHTML = '<span>✓ TUDO DISPONIVEL</span><div style="font-size:var(--fs-micro);font-weight:400;margin-top:4px;">Voce pode produzir agora.</div>';
+    badge.style.background = 'var(--basil-soft)';
+    badge.style.color = 'var(--basil)';
+    badge.style.border = '1px solid var(--basil)';
+    editarBtn.style.display = 'inline-block';
+    gerarBtn.style.display = 'none';
+    if (addBtn) addBtn.style.display = 'none';
+  } else {
+    const faltantes = r.insumos.filter(i => i.falta != null && i.falta > 0).length;
+    badge.innerHTML = `<span>⚠ FALTAM ${faltantes} INSUMO${faltantes > 1 ? 'S' : ''}</span><div style="font-size:var(--fs-micro);font-weight:400;margin-top:4px;">Gere lista de compras pra repor.</div>`;
+    badge.style.background = 'rgba(239, 107, 107, 0.16)';
+    badge.style.color = '#ef6b6b';
+    badge.style.border = '1px solid #ef6b6b';
+    editarBtn.style.display = 'inline-block';
+    gerarBtn.style.display = 'inline-block';
+    if (addBtn) addBtn.style.display = 'inline-block';
+  }
+
+  if (r.custoEstimadoTotal != null) {
+    document.getElementById('calcResultadoCustoTotal').textContent = `Custo estimado total: R$ ${r.custoEstimadoTotal.toFixed(2).replace('.', ',')}`;
+  }
+
+  const list = document.getElementById('calcInsumosList');
+  list.innerHTML = r.insumos.map(i => {
+    // Cor e literal — escolha entre constantes seguras de tema. Nao escapar aqui.
+    let cor = 'var(--basil)';
+    // Status texto pode conter unidade vinda do servidor — escapar abaixo na injecao.
+    const unidadeReceitaSafe = calcEscapeHtml(i.unidadeReceita);
+    const unidadeSaldoSafe = calcEscapeHtml(i.unidadeSaldo);
+    let status = 'Cobre';
+    if (i.conversaoFalhou) { cor = '#ef6b6b'; status = 'Unidade incompativel'; }
+    else if (i.falta != null && i.falta > 0) {
+      cor = '#ef6b6b';
+      const faltaNum = Number(i.falta);
+      status = `Falta ${isFinite(faltaNum) ? faltaNum.toFixed(3) : '0'} ${unidadeReceitaSafe}`;
+    }
+
+    const custoNum = Number(i.custoEstimadoLinha);
+    const custoTxt = (i.custoEstimadoLinha != null && isFinite(custoNum))
+      ? `R$ ${custoNum.toFixed(2).replace('.', ',')}`
+      : '—';
+
+    const qtdNum = Number(i.quantidadeNecessaria);
+    const saldoNum = Number(i.saldoAtual);
+    const qtdNec = isFinite(qtdNum) ? qtdNum.toFixed(3) : '0';
+    const saldo = isFinite(saldoNum) ? saldoNum.toFixed(3) : '0';
+
+    return `
+      <div style="background:var(--bg-elev);border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid ${cor};">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <strong style="font-size:14px;">${calcEscapeHtml(i.insumoNome)}</strong>
+          <span style="font-size:var(--fs-micro);color:var(--ink-mute);">${custoTxt}</span>
+        </div>
+        <div style="font-size:12px;color:var(--ink-dim);margin-top:4px;">
+          Precisa ${qtdNec} ${unidadeReceitaSafe} • Saldo ${saldo} ${unidadeSaldoSafe}
+        </div>
+        <div style="font-size:var(--fs-micro);color:${cor};margin-top:4px;font-weight:600;">${status}</div>
+        ${i.aviso ? `<div style="font-size:var(--fs-micro);color:var(--gold);margin-top:4px;">${calcEscapeHtml(i.aviso)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function calcGerarCompra() {
+  if (!calcUltimoResultado) return;
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
+
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  // Coleta insumos faltantes
+  const insumosFaltantes = calcUltimoResultado.insumos
+    .filter(i => i.falta != null && i.falta > 0 && !i.conversaoFalhou)
+    .map(i => ({
+      insumoId: i.insumoId,
+      quantidadeFaltante: i.falta,
+      unidade: i.unidadeReceita
+    }));
+
+  if (insumosFaltantes.length === 0) {
+    showToast('Sem insumos faltantes pra comprar.');
+    return;
+  }
+
+  // Step 1: preview (sem idempotency, livre pra refazer)
+  try {
+    const previewUrl = `${calcApiBase()}/api/mobile/calculadora/preview-compra${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(previewUrl, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({ empresaId: empresaId || null, lojaId, insumos: insumosFaltantes })
+    });
+    const json = await calcParse(res);
+    if (!res.ok) {
+      const code = (json && json.error && json.error.code) || 'ERROR';
+      showToast(`${code}: ${json.error?.message || ''}`);
+      return;
+    }
+    const preview = json.data;
+    // Mostra resumo via confirm nativo (padrao do PWA pra confirmacoes destrutivas)
+    const grupos = preview.porFornecedor || [];
+    const semFornecedor = grupos.find(g => !g.fornecedorId);
+    if (semFornecedor) {
+      showToast('Alguns insumos não têm fornecedor preferido. Cadastre antes ou edite manualmente no admin.');
+      return;
+    }
+    const resumo = grupos.map(g => `${g.fornecedorNome}: ${g.linhas.length} itens (R$ ${(g.subtotalEstimado || 0).toFixed(2)})`).join('\n');
+    const total = preview.totalEstimado != null ? `\nTotal: R$ ${preview.totalEstimado.toFixed(2)}` : '';
+    if (!confirm(`Criar ${grupos.length} pedido(s) de compra?\n\n${resumo}${total}`)) return;
+
+    // Step 2: criar com idempotency-key
+    const idempotencyKey = calcGerarUuid();
+    const fornecedores = grupos.map(g => ({
+      fornecedorId: g.fornecedorId,
+      itens: g.linhas.map(l => ({
+        insumoId: l.insumoId,
+        nome: l.insumoNome,
+        quantidade: l.quantidade,
+        unidade: l.unidade,
+        custoUnitario: l.custoUnitarioReferencia || 0,
+        observacao: null
+      }))
+    }));
+
+    const criarUrl = `${calcApiBase()}/api/mobile/calculadora/criar-compra${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res2 = await fetch(criarUrl, {
+      method: 'POST',
+      headers: { ...calcAuthHeaders(), 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        lojaId,
+        canal: 'calculadora-pwa',
+        observacoes: null,
+        fornecedores
+      })
+    });
+    const json2 = await calcParse(res2);
+    if (!res2.ok) {
+      const code = (json2 && json2.error && json2.error.code) || 'ERROR';
+      showToast(`${code}: ${json2.error?.message || ''}`);
+      return;
+    }
+    showToast(`${json2.data?.pedidosCriados?.length || 0} pedido(s) de compra criado(s).`);
+  } catch (e) {
+    showToast('Erro de conexão');
+  }
+}
+
+// Fecha o ciclo no PWA: joga os insumos FALTANTES (ja calculados vs estoque pelo
+// /calcular) direto na tela Compras (cdb-shopping). Caminho simples e offline,
+// alternativo ao calcGerarCompra (que cria pedido de compra no ERP e exige
+// fornecedor preferido). Elimina o trabalho manual de "ver o que falta".
+// Helper compartilhado (#412): recebe a lista de insumos faltantes ja filtrada
+// (cada um com insumoNome, falta, unidadeReceita) e joga na lista de Compras
+// com dedup leve. Usado pela calc de 1 produto (#411) e pela cesta/demanda (#412).
+function adicionarFaltantesNaCompra(faltantes) {
+  if (!Array.isArray(faltantes) || faltantes.length === 0) {
+    showToast('Sem insumos faltantes pra comprar.');
+    return 0;
+  }
+  if (!Array.isArray(shoppingItems)) shoppingItems = [];
+  const now = Date.now();
+  let added = 0;
+  faltantes.forEach((i, k) => {
+    const faltaNum = Number(i.falta);
+    const qtdTxt = isFinite(faltaNum)
+      ? (faltaNum % 1 === 0 ? String(faltaNum) : faltaNum.toFixed(2)).replace('.', ',')
+      : '';
+    const un = (i.unidadeReceita || '').trim();
+    const nome = i.insumoNome + (qtdTxt ? ` (faltam ${qtdTxt}${un ? ' ' + un : ''})` : '');
+    // dedup leve: nao repete item identico ainda nao comprado.
+    if (shoppingItems.some(s => !s.done && s.name === nome)) return;
+    shoppingItems.unshift({
+      id: 'shop-' + now + '-' + k + '-' + Math.random().toString(36).slice(2, 6),
+      name: nome,
+      done: false,
+      createdAt: now,
+      doneAt: 0
+    });
+    added++;
+  });
+  if (added === 0) { showToast('Os faltantes já estão na lista de Compras.'); return 0; }
+  persistAll();
+  updateSync();
+  if (typeof renderShoppingList === 'function') renderShoppingList();
+  if (typeof renderHomeShopping === 'function') renderHomeShopping();
+  showToast(added + ' insumo(s) na lista de Compras.');
+  return added;
+}
+
+function calcAdicionarFaltantesCompras() {
+  if (!calcUltimoResultado) return;
+  const faltantes = (calcUltimoResultado.insumos || [])
+    .filter(i => i.falta != null && Number(i.falta) > 0 && !i.conversaoFalhou);
+  adicionarFaltantesNaCompra(faltantes);
+}
+
+// #412 — joga os faltantes do consolidado da cesta (demanda/pedido/draft) em
+// Compras. O consolidado expoe insumoNome/falta/unidadeReceita, o mesmo shape
+// que o helper espera.
+function cestaCalcAdicionarFaltantesCompras() {
+  if (!cestaCalcResultadoAtual) return;
+  const faltantes = (cestaCalcResultadoAtual.consolidado || [])
+    .filter(c => c.falta != null && Number(c.falta) > 0 && !c.conversaoFalhou);
+  adicionarFaltantesNaCompra(faltantes);
+}
+
+function calcAbrirAjusteReceita() {
+  // MVP: para versao 1 deixamos esse fluxo no admin web. Aqui apenas redireciona com toast.
+  showToast('Edicao de receita: acesse o admin web por enquanto.');
+}
+
+function calcLimpar() {
+  // Confirm so se ja ha resultado ou produto selecionado (evita ruido
+  // quando ainda nao calculou nada).
+  const temTrabalho = !!calcProdutoSelecionado || !!calcUltimoResultado;
+  if (temTrabalho && !confirm('Limpar o produto e o resultado atual?')) return;
+  calcProdutoSelecionado = null;
+  calcUltimoResultado = null;
+  document.getElementById('calcProdSearch').value = '';
+  document.getElementById('calcProdSelected').style.display = 'none';
+  document.getElementById('calcQtd').value = '';
+  document.getElementById('calcQtdHint').textContent = '';
+  document.getElementById('calcCalcularBtn').disabled = true;
+  document.getElementById('calcResultadoBox').style.display = 'none';
+  document.getElementById('calcEmptyState').style.display = 'block';
+}
+
+function calcSalvarHistorico(produto, qtd, unidade) {
+  try {
+    const raw = localStorage.getItem('cdb-calc-history') || '[]';
+    let history = JSON.parse(raw);
+    if (!Array.isArray(history)) history = [];
+    history.unshift({ produto: { id: produto.id, nome: produto.nome }, qtd, unidade, ts: Date.now() });
+    history = history.slice(0, 5);
+    localStorage.setItem('cdb-calc-history', JSON.stringify(history));
+  } catch (_) {}
+}
+
+function calcGerarUuid() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  // Fallback UUID v4 pseudo (suficiente p/ idempotency)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// === Calculadora de Cesta (Onda 1) — in-context a partir de Pedido ===
+// Read-only: calcula consumo de insumos para a cesta do pedido, agrupa por produto
+// e consolida total. Onda 1 entrega so leitura — sem "lista de compras" nem PF.
+let cestaCalcContexto = null; // { tipo: 'draft'|'order', orderId?, label, items: [...] }
+let cestaCalcResultadoAtual = null;
+let produtosComReceitaCacheSet = null; // Set<produtoId> — populado 1x por sessao
+
+async function cestaCalcCarregarCacheReceitas() {
+  if (produtosComReceitaCacheSet !== null) return;
+  try {
+    const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+    const url = `${calcApiBase()}/api/mobile/calculadora/produtos-com-receita?limit=200${empresaId ? '&empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, { headers: calcAuthHeaders() });
+    const json = await calcParse(res);
+    const ids = ((json && json.data) || []).map(p => String(p.id));
+    produtosComReceitaCacheSet = new Set(ids);
+  } catch (_) {
+    produtosComReceitaCacheSet = new Set();
+  }
+}
+
+function cestaCalcInstalarObservadorDraft() {
+  const list = document.getElementById('orderItemsList');
+  if (!list) return;
+  const sync = () => {
+    const el = document.getElementById('odsActions');
+    if (!el) return;
+    el.style.display = list.children.length > 0 ? '' : 'none';
+  };
+  try {
+    new MutationObserver(sync).observe(list, { childList: true });
+  } catch (_) {}
+  sync();
+}
+
+async function openCestaCalcFromDraft() {
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
+  const items = (typeof currentOrderItems !== 'undefined' && Array.isArray(currentOrderItems)) ? currentOrderItems : [];
+  if (items.length === 0) { showToast('Adicione itens ao pedido primeiro'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  cestaCalcContexto = {
+    tipo: 'draft',
+    orderId: null,
+    label: 'Pedido em montagem',
+    items: items.map(i => ({
+      produtoId: i.productId || (i.product && i.product.id) || i.id,
+      nome: i.name || (i.product && i.product.name) || 'Item',
+      qty: Number(i.qty || i.quantity || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
+async function openCestaCalcFromOrder(orderId) {
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
+  const ordersList = (typeof orders !== 'undefined' && Array.isArray(orders)) ? orders : [];
+  const order = ordersList.find(o => o.id === orderId);
+  if (!order || !Array.isArray(order.items)) { showToast('Pedido não encontrado'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  const idShort = (order.id || '').slice(-8);
+  cestaCalcContexto = {
+    tipo: 'order',
+    orderId: order.id,
+    label: 'Pedido ' + idShort,
+    items: order.items.map(i => ({
+      produtoId: i.productId || i.product_id || (i.product && i.product.id),
+      nome: i.name || (i.product && i.product.name) || 'Item',
+      qty: Number(i.qty || i.quantity || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
+// #412 — alimenta a cesta com a demanda agregada dos pedidos abertos (todos de
+// uma vez). Reusa /calcular-cesta, que consolida insumos e desconta o estoque
+// UMA vez no servidor (somar faltas de /calcular por produto double-contaria o
+// estoque compartilhado). So produtos do catalogo; itens ad-hoc sao ignorados.
+async function openCestaCalcFromDemand() {
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
+  const { items: demanda } = aggregateProductionDemand();
+  const items = (demanda || []).filter(i => i.productId && products.some(p => p.id === i.productId));
+  if (items.length === 0) { showToast('Nenhum produto do catálogo na demanda'); return; }
+  await cestaCalcCarregarCacheReceitas();
+  cestaCalcContexto = {
+    tipo: 'demanda',
+    orderId: null,
+    label: 'Demanda dos pedidos abertos',
+    items: items.map(i => ({
+      produtoId: i.productId,
+      nome: i.name || 'Item',
+      qty: Number(i.qty || 1),
+      unidade: i.unit || 'Un'
+    }))
+  };
+  cestaCalcAbrirModal();
+}
+
+function cestaCalcAbrirModal() {
+  const modal = document.getElementById('cestaCalcModal');
+  const ctx = cestaCalcContexto;
+  if (!ctx) return;
+
+  const semReceitaCount = produtosComReceitaCacheSet
+    ? ctx.items.filter(i => !produtosComReceitaCacheSet.has(String(i.produtoId))).length
+    : 0;
+  const sub = ctx.label + ' · ' + ctx.items.length + ' iten' + (ctx.items.length === 1 ? '' : 's') +
+              (semReceitaCount > 0 ? ' · ' + semReceitaCount + ' sem receita' : '');
+  document.getElementById('cestaCalcSub').textContent = sub;
+
+  const list = document.getElementById('cestaCalcItensList');
+  list.innerHTML = '';
+  ctx.items.forEach(item => {
+    const semReceita = produtosComReceitaCacheSet !== null && !produtosComReceitaCacheSet.has(String(item.produtoId));
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:10px;background:var(--bg-elev);margin-bottom:6px;' + (semReceita ? 'opacity:0.6;' : '');
+    const left = document.createElement('div');
+    left.style.cssText = 'flex:1;min-width:0;';
+    const nm = document.createElement('div');
+    nm.style.cssText = 'font-weight:600;';
+    nm.textContent = item.nome;
+    left.appendChild(nm);
+    if (semReceita) {
+      const sr = document.createElement('div');
+      sr.style.cssText = 'font-size:var(--fs-micro);color:var(--ink-mute);';
+      sr.textContent = 'sem receita';
+      left.appendChild(sr);
+    }
+    const right = document.createElement('div');
+    right.style.cssText = 'font-weight:600;color:var(--ink-dim);font-size:13px;';
+    right.textContent = item.qty + ' ' + item.unidade;
+    row.appendChild(left);
+    row.appendChild(right);
+    list.appendChild(row);
+  });
+
+  document.getElementById('cestaCalcResultadoBox').style.display = 'none';
+  document.getElementById('cestaCalcItensWrap').style.display = '';
+  const btnCalcular = document.getElementById('cestaCalcBtnCalcular');
+  btnCalcular.style.display = '';
+  btnCalcular.disabled = ctx.items.length === 0;
+  const btnCompras = document.getElementById('cestaCalcBtnCompras');
+  if (btnCompras) btnCompras.style.display = 'none';
+
+  modal.classList.add('show');
+}
+
+async function cestaCalcCalcular() {
+  if (!navigator.onLine) { showToast('A calculadora precisa de internet'); return; }
+  if (!cestaCalcContexto || cestaCalcContexto.items.length === 0) return;
+
+  const btn = document.getElementById('cestaCalcBtnCalcular');
+  btn.disabled = true;
+
+  const resultBox = document.getElementById('cestaCalcResultadoBox');
+  resultBox.setAttribute('aria-busy', 'true');
+  resultBox.style.display = 'block';
+  const badge = document.getElementById('cestaCalcBadge');
+  badge.textContent = 'Calculando...';
+  badge.style.background = 'var(--bg-elev)';
+  badge.style.color = 'var(--ink)';
+  document.getElementById('cestaCalcPorProduto').innerHTML = '';
+  document.getElementById('cestaCalcConsolidado').innerHTML = '';
+  document.getElementById('cestaCalcCustoTotal').textContent = '';
+
+  const empresaId = (window.CDB_CONFIG && window.CDB_CONFIG.empresaId) || '';
+  const lojaId = (window.CDB_CONFIG && window.CDB_CONFIG.lojaId) || null;
+
+  try {
+    const url = `${calcApiBase()}/api/mobile/calculadora/calcular-cesta${empresaId ? '?empresaId=' + empresaId : ''}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: calcAuthHeaders(),
+      body: JSON.stringify({
+        empresaId: empresaId || null,
+        lojaId: lojaId,
+        itens: cestaCalcContexto.items.map(i => ({
+          produtoFinalId: i.produtoId,
+          quantidade: i.qty,
+          unidade: i.unidade
+        }))
+      })
+    });
+    const json = await calcParse(res);
+    if (!res.ok) {
+      const msg = (json && json.error && json.error.message) || 'Erro ao calcular';
+      badge.textContent = msg;
+      badge.style.background = 'rgba(231,104,69,0.15)';
+      badge.style.color = 'var(--accent)';
+      btn.disabled = false;
+      return;
+    }
+    cestaCalcResultadoAtual = json.data;
+    cestaCalcRender(json.data);
+    document.getElementById('cestaCalcItensWrap').style.display = 'none';
+    btn.style.display = 'none';
+  } catch (e) {
+    badge.textContent = 'Erro ao calcular';
+    badge.style.background = 'rgba(231,104,69,0.15)';
+    badge.style.color = 'var(--accent)';
+    btn.disabled = false;
+  } finally {
+    resultBox.setAttribute('aria-busy', 'false');
+  }
+}
+
+function cestaCalcRender(data) {
+  const badge = document.getElementById('cestaCalcBadge');
+  if (data.tudoDisponivel) {
+    badge.textContent = '✓ Tudo certo, pode produzir';
+    badge.style.background = 'rgba(79,191,159,0.15)';
+    badge.style.color = 'var(--basil)';
+  } else {
+    const faltaCount = (data.consolidado || []).filter(c => (c.falta != null && Number(c.falta) > 0) || c.conversaoFalhou).length;
+    badge.textContent = '⚠ Faltam ' + faltaCount + ' insumo' + (faltaCount === 1 ? '' : 's');
+    badge.style.background = 'rgba(231,104,69,0.15)';
+    badge.style.color = 'var(--accent)';
+  }
+
+  const custo = document.getElementById('cestaCalcCustoTotal');
+  if (data.custoEstimadoTotal != null) {
+    const v = Number(data.custoEstimadoTotal);
+    custo.textContent = 'Custo estimado: R$ ' + v.toFixed(2).replace('.', ',');
+  } else {
+    custo.textContent = '';
+  }
+
+  const porProd = document.getElementById('cestaCalcPorProduto');
+  porProd.innerHTML = '';
+  (data.itens || []).forEach(item => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--bg-elev);border-radius:12px;padding:10px 12px;margin-bottom:8px;';
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:6px;';
+    const nm = document.createElement('span');
+    nm.textContent = item.produtoNome;
+    head.appendChild(nm);
+
+    const statusStr = String(item.status || '').toLowerCase();
+    if (statusStr === 'semreceita' || statusStr === '1') {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:var(--fs-micro);color:var(--ink-mute);';
+      tag.textContent = 'sem receita';
+      head.appendChild(tag);
+      card.appendChild(head);
+      // #428 — botao acionavel em vez de texto plano.
+      const note = document.createElement('button');
+      note.style.cssText = 'font-size:12px;color:var(--accent);background:none;border:none;padding:2px 0;cursor:pointer;text-decoration:underline;text-align:left;';
+      note.textContent = 'Cadastrar receita →';
+      note.onclick = function () { cestaCalcFechar(); go('producao'); };
+      card.appendChild(note);
+    } else if (statusStr === 'erro' || statusStr === '2') {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:var(--fs-micro);color:var(--accent);';
+      tag.textContent = 'erro';
+      head.appendChild(tag);
+      card.appendChild(head);
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:12px;color:var(--accent);';
+      note.textContent = item.erro || 'Erro ao calcular';
+      card.appendChild(note);
+    } else {
+      card.appendChild(head);
+      const lista = document.createElement('div');
+      ((item.resultado && item.resultado.insumos) || []).forEach(ins => {
+        lista.appendChild(cestaCalcRenderInsumoLinha(ins));
+      });
+      card.appendChild(lista);
+    }
+    porProd.appendChild(card);
+  });
+
+  const cons = document.getElementById('cestaCalcConsolidado');
+  cons.innerHTML = '';
+  (data.consolidado || []).forEach(c => {
+    cons.appendChild(cestaCalcRenderInsumoLinha({
+      insumoNome: c.insumoNome,
+      quantidadeNecessaria: c.precisa,
+      unidadeReceita: c.unidadeReceita,
+      saldoAtual: c.saldo,
+      unidadeSaldo: c.unidadeSaldo,
+      falta: c.falta,
+      conversaoFalhou: c.conversaoFalhou,
+      aviso: c.aviso
+    }));
+  });
+  if ((data.consolidado || []).length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-size:12px;color:var(--ink-mute);text-align:center;padding:8px;';
+    empty.textContent = 'Nenhum insumo a consolidar.';
+    cons.appendChild(empty);
+  }
+
+  // #412 — botao "jogar faltantes em Compras" so aparece quando ha falta real
+  // (conversao incompativel nao entra: nao da pra quantificar a compra).
+  const btnCompras = document.getElementById('cestaCalcBtnCompras');
+  if (btnCompras) {
+    const temFalta = (data.consolidado || []).some(c => c.falta != null && Number(c.falta) > 0 && !c.conversaoFalhou);
+    btnCompras.style.display = temFalta ? '' : 'none';
+  }
+}
+
+function cestaCalcRenderInsumoLinha(ins) {
+  const row = document.createElement('div');
+  let borderColor = 'var(--basil)';
+  let statusText = 'ok';
+  let statusColor = 'var(--basil)';
+  if (ins.conversaoFalhou) {
+    borderColor = 'var(--gold)';
+    statusText = 'unidade incompativel';
+    statusColor = 'var(--gold)';
+  } else if (ins.falta != null && Number(ins.falta) > 0) {
+    borderColor = 'var(--accent)';
+    statusText = 'faltam ' + Number(ins.falta).toFixed(2).replace('.', ',') + ' ' + (ins.unidadeReceita || '');
+    statusColor = 'var(--accent)';
+  }
+  row.style.cssText = 'padding:8px 10px;border:1px solid ' + borderColor + ';background:rgba(0,0,0,0.04);border-radius:8px;margin-bottom:4px;';
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;font-size:13px;';
+  const nm = document.createElement('span');
+  nm.style.cssText = 'font-weight:600;';
+  nm.textContent = ins.insumoNome;
+  const qt = document.createElement('span');
+  qt.style.cssText = 'color:var(--ink-dim);';
+  qt.textContent = Number(ins.quantidadeNecessaria || 0).toFixed(3).replace('.', ',') + ' ' + (ins.unidadeReceita || '');
+  head.appendChild(nm);
+  head.appendChild(qt);
+  row.appendChild(head);
+  const sub = document.createElement('div');
+  sub.style.cssText = 'font-size:var(--fs-micro);color:' + statusColor + ';margin-top:2px;';
+  sub.textContent = statusText;
+  row.appendChild(sub);
+  if (ins.aviso) {
+    const av = document.createElement('div');
+    av.style.cssText = 'font-size:var(--fs-micro);color:var(--gold);margin-top:2px;';
+    av.textContent = ins.aviso;
+    row.appendChild(av);
+  }
+  return row;
+}
+
+function cestaCalcFechar() {
+  document.getElementById('cestaCalcModal').classList.remove('show');
+  cestaCalcContexto = null;
+  cestaCalcResultadoAtual = null;
+}
+
+// #2735: o piloto esconde a calculadora de cesta (pilot-ui.js). Sem ela, a carga das receitas era um
+// pedido a mais em toda abertura do APK, e um 401 no aparelho ainda sem sessão.
+function cestaCalcIniciar() {
+  cestaCalcInstalarObservadorDraft();
+  if (window.CDB_CONFIG?.isPilot !== true) cestaCalcCarregarCacheReceitas();
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', cestaCalcIniciar);
+}
+
+function setBatchFilter(next) {
+  batchFilter = next || 'open';
+  document.querySelectorAll('[data-bfilter]').forEach(b => b.classList.toggle('active', b.dataset.bfilter === batchFilter));
+  renderProducaoBatches();
+}
+function renderProducaoBatches() {
+  const host = document.getElementById('producaoBatchList');
+  if (!host) return;
+  let rows = (batches || []).filter(b => !b.deleted);
+  if (batchFilter === 'open') rows = rows.filter(b => getBatchStatus(b) === 'open');
+  if (batchFilter === 'closed') rows = rows.filter(b => getBatchStatus(b) === 'closed');
+  rows = rows.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  if (!rows.length) {
+    host.innerHTML = '<div class="empty"><span class="big">📦</span>Nenhum lote nesse filtro</div>';
+    return;
+  }
+  host.innerHTML = rows.map(batchCardHtml).join('');
+}
+function mergeBatchesFlow() {
+  const opens = (batches || []).filter(b => !b.deleted && getBatchStatus(b) === 'open');
+  if (opens.length < 2) { showToast('Precisa de 2 lotes abertos para mesclar'); return; }
+  const list = opens.map((b, i) => `${i + 1} - ${b.lote || b.code} (${contaItens((b.items || []).length)})`).join('\n');
+  const aRaw = prompt('Lote origem (número):\n' + list, '1');
+  if (aRaw == null) return;
+  const bRaw = prompt('Lote destino (número):\n' + list, '2');
+  if (bRaw == null) return;
+  const a = opens[parseInt(aRaw, 10) - 1];
+  const d = opens[parseInt(bRaw, 10) - 1];
+  if (!a || !d || a.id === d.id) { showToast('Escolha inválida'); return; }
+  if (!assertImportedBatchAction(a.id) || !assertImportedBatchAction(d.id)) return;
+  d.items = (d.items || []).concat((a.items || []).map(x => ({ ...x })));
+  a.status = 'closed';
+  a.closedAt = Date.now();
+  a.closedBy = operatorName || null;
+  a.mergedInto = d.id;
+  d.lastOperatorName = operatorName || d.lastOperatorName || null;
+  logAction({
+    action: 'batch.merge',
+    entityType: 'batch',
+    entityId: d.id,
+    summary: `Lote ${a.lote || a.code} mesclado em ${d.lote || d.code}`
+  });
+  rerenderBatchUx();
+  renderProducaoBatches();
+  showToast('Lotes mesclados');
+}
+function openBatchHistory(batchId) {
+  const batch = getBatchById(batchId);
+  if (!batch) { showToast('Lote não encontrado'); return; }
+  openBatchDetails(batchId);
+}
+function closeBatchDetails() { toggleModal('batchDetailsModal', false); }
+
+// ===== DESCARTE DE LOTE =====================================================
+let _discardingBatchId = null;
+
+function openBatchDiscardModal(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
+  const batch = (batches || []).find(function (b) { return b.id === batchId; });
+  if (!batch) return;
+  _discardingBatchId = batchId;
+  const lote = batch.lote || batch.code || batchId.slice(-6);
+  const sub = document.getElementById('batchDiscardSub');
+  if (sub) sub.textContent = 'Lote ' + lote + ' · ' + (batch.items || []).map(function(i){ return i.qty + '× ' + i.name; }).join(', ');
+  document.querySelectorAll('#batchDiscardChips .cash-type-pill').forEach(function (b) { b.classList.remove('active'); });
+  const first = document.querySelector('#batchDiscardChips .cash-type-pill');
+  if (first) first.classList.add('active');
+  const note = document.getElementById('batchDiscardNote');
+  if (note) note.value = '';
+  toggleModal('batchDiscardModal', true);
+}
+function closeBatchDiscardModal() { toggleModal('batchDiscardModal', false); _discardingBatchId = null; }
+
+function selectDiscardReason(el) {
+  document.querySelectorAll('#batchDiscardChips .cash-type-pill').forEach(function (b) { b.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+function confirmBatchDiscard() {
+  if (!_discardingBatchId || !assertImportedBatchAction(_discardingBatchId)) return;
+  const batch = (batches || []).find(function (b) { return b.id === _discardingBatchId; });
+  if (!batch) { closeBatchDiscardModal(); return; }
+  const activeChip = document.querySelector('#batchDiscardChips .cash-type-pill.active');
+  const reason = activeChip ? (activeChip.dataset.reason || 'outro') : 'outro';
+  const note = (document.getElementById('batchDiscardNote')?.value || '').trim();
+  const contavaAntes = loteContaNoSaldo(batch);
+  batch.discarded = true;
+  batch.discardedAt = Date.now();
+  batch.discardedBy = operatorName || null;
+  batch.discardReason = reason + (note ? ' · ' + note : '');
+  ajustarSaldoDoLote(batch, contavaAntes);
+  const lote = batch.lote || batch.code || batch.id;
+  logAction({ action: 'batch.discard', entityType: 'batch', entityId: batch.id, summary: 'Descarte: lote ' + lote + ' · ' + reason + (note ? ' · ' + note : '') });
+  persistAll();
+  updateSync();
+  closeBatchDiscardModal();
+  if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHome === 'function') renderHome();
+  showToast('Lote ' + lote + ' descartado');
+}
+
+function revertBatchDiscard(batchId) {
+  if (!assertImportedBatchAction(batchId)) return;
+  const batch = (batches || []).find(function (b) { return b.id === batchId; });
+  if (!batch) return;
+  const contavaAntes = loteContaNoSaldo(batch);
+  delete batch.discarded; delete batch.discardedAt; delete batch.discardedBy; delete batch.discardReason;
+  ajustarSaldoDoLote(batch, contavaAntes);
+  logAction({ action: 'batch.discard_revert', entityType: 'batch', entityId: batch.id, summary: 'Descarte revertido: lote ' + (batch.lote || batch.code || batch.id) });
+  persistAll();
+  updateSync();
+  if (typeof renderProducaoBatches === 'function') renderProducaoBatches();
+  if (typeof renderConferenciaScreen === 'function') renderConferenciaScreen();
+  if (typeof renderHome === 'function') renderHome();
+  showToast('Descarte revertido');
+}
+function openBatchDetails(batchId) {
+  const batch = getBatchById(batchId);
+  if (!batch) { showToast('Lote não encontrado'); return; }
+  const host = document.getElementById('batchDetailsBody');
+  if (!host) return;
+  const status = getBatchStatus(batch);
+  const ets = etiquetasFromBatch(batch);
+  const conferidos = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.CONFERIDO).length;
+  const divergencias = ets.filter(et => getUnitStatus(batch, et.idxStr) === CONFER_STATUS.DIVERGENCIA).length;
+  const items = (batch.items || []).slice();
+  const logsForBatch = (logs || []).filter(l => l.entityType === 'batch' && l.entityId === batch.id).slice(-10).reverse();
+  const created = new Date(batch.createdAt || Date.now()).toLocaleString('pt-BR');
+  const closed = batch.closedAt ? new Date(batch.closedAt).toLocaleString('pt-BR') : '—';
+  host.innerHTML = `
+    <div class="detail-kpis">
+      <div class="detail-kpi"><strong>${items.reduce((s, i) => s + (Number(i.qty) || 0), 0)}</strong><span>unidades</span></div>
+      <div class="detail-kpi"><strong>${conferidos}/${ets.length}</strong><span>conferidas</span></div>
+      <div class="detail-kpi"><strong>${divergencias}</strong><span>divergências</span></div>
+    </div>
+    <div class="detail-section">
+      <h4>Resumo</h4>
+      <div class="detail-list">
+        <div class="detail-row"><div><strong>${escapeHtml(batch.lote || batch.code || batch.id)}</strong><span>${status === 'closed' ? 'Fechado' : 'Aberto'}</span></div><div class="right"><strong>${created}</strong><span>criado</span></div></div>
+        <div class="detail-row"><div><strong>${escapeHtml(batch.lastOperatorName || batch.closedBy || '—')}</strong><span>operador</span></div><div class="right"><strong>${closed}</strong><span>fechado</span></div></div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Itens do lote</h4>
+      <div class="detail-list">
+        ${items.length ? items.map(it => `<div class="detail-row"><div><strong>${escapeHtml(it.name)}</strong><span>${escapeHtml(it.unit || '')}</span></div><div class="right"><strong>${Number(it.qty) || 0}</strong><span>qtd</span></div></div>`).join('') : '<div class="hint">Sem itens.</div>'}
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Rastreabilidade</h4>
+      <div class="detail-list">
+        ${logsForBatch.length ? logsForBatch.map(l => `<div class="detail-row"><div><strong>${escapeHtml(l.summary || l.action)}</strong><span>${new Date(l.ts || Date.now()).toLocaleString('pt-BR')}</span></div><div class="right"><strong>${escapeHtml(l.action || '')}</strong><span>${escapeHtml(l.operator || '—')}</span></div></div>`).join('') : '<div class="hint">Sem eventos de auditoria.</div>'}
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="hist-action" onclick="reprintFromBatchId(${jsString(batch.id)})">Reimprimir</button>
+      <button class="hist-action danger" onclick="deleteBatch(${jsString(batch.id)})">Excluir</button>
+      <button class="hist-action" onclick="go('estoque'); setStockFilter('batch'); closeBatchDetails()">Ir ao estoque</button>
+    </div>
+  `;
+  toggleModal('batchDetailsModal', true);
+}
+function conferRowHtml(o) {
+  const code = (o.id || '').slice(-8);
+  const cliente = o.clientSnapshot?.name || 'Sem cliente';
+  // Bug 10 (Onda 4): lista de conferencia nao mostra CPF (LGPD).
+  const refConfer = safeRefDisplay(o.clientSnapshot?.ref);
+  const ref = refConfer ? ' · ' + refConfer : '';
+  const status = getConferStatus(o);
+  const qty = (o.items || []).reduce((acc, i) => acc + (Number(i.qty)||0), 0);
+  const cls = status === CONFER_STATUS.CONFERIDO ? 'done'
+            : status === CONFER_STATUS.DIVERGENCIA ? 'problem' : '';
+  const meta = status === CONFER_STATUS.PENDENTE
+    ? `${contaItens(qty)} · ${money(o.total)}`
+    : `${conferStatusLabel(status)} · ${o.confirmation?.by || '—'}`;
+  return `<div class="confer-row ${cls}">
+    <div class="cr-main">
+      <div class="cr-code">${escapeHtml(code)}</div>
+      <div class="cr-name">${escapeHtml(cliente)}${escapeHtml(ref)}</div>
+      <div class="cr-meta">${escapeHtml(meta)}</div>
+    </div>
+    <button class="cr-action" onclick="openConfer(${jsString(o.id)})">${status === CONFER_STATUS.PENDENTE ? 'Conferir' : 'Ver'}</button>
+  </div>`;
+}
+function onConferScreenInput() {
+  const code = document.getElementById('conferScreenInput').value;
+  const hint = document.getElementById('conferScreenHint');
+  if (!code) { hint.textContent = ''; return; }
+  const found = findAnyByCode(code);
+  if (found && found.kind === 'production') {
+    const u = found.unit;
+    hint.innerHTML = `<span style="color:var(--basil)">✓ Lote · ${escapeHtml(u.et.productName)} · Un ${u.idxStr}</span>`;
+  } else if (found && found.kind === 'order') {
+    const o = found.order;
+    const cliente = o.clientSnapshot?.name || 'Sem cliente';
+    const status = getConferStatus(o);
+    hint.innerHTML = `<span style="color:var(--basil)">✓ Pedido · ${escapeHtml(cliente)} · ${conferStatusLabel(status)}</span>`;
+  } else if (code.length >= 4) {
+    hint.innerHTML = '<span style="color:var(--accent)">Nenhum pedido ou lote com esse código</span>';
+  } else {
+    hint.textContent = 'Continue digitando…';
+  }
+}
+function doConferScreenSearch() {
+  const code = document.getElementById('conferScreenInput').value;
+  const found = findAnyByCode(code);
+  if (!found) { showToast('Não encontrado'); return; }
+  document.getElementById('conferScreenInput').value = '';
+  document.getElementById('conferScreenHint').textContent = '';
+  if (found.kind === 'production') openConferProducao(found.unit.batch.id, found.unit.idxStr);
+  else openConfer(found.order.id);
+}
+
+// 'entregue' exige passar por conferência antes; todos os outros vêm direto.
+function applyAdvanceTransition(id, nextStatus) {
+  if (!assertImportedOrderAction(id, nextStatus)) return;
+  const o = getOrderById(id);
+  if (!o) return;
+  // #1493: entregar = receber. Sem a forma o servidor assumia dinheiro.
+  if (nextStatus === STATUS.ENTREGUE && !normalizarFormaPagamento(o.metodo)) {
+    openPagamentoEntrega(id);
+    return;
+  }
+  // Bug 1 (Onda 4): se vai descontar estoque (transicao pra PRONTO) e o
+  // resultado seria negativo, abre dialog explicito de 3 opcoes ao inves
+  // de um confirm() simples que era ignoravel demais. Estoque negativo
+  // significa que vendemos o que nao produzimos — operador precisa
+  // decidir conscientemente entre Produzir / Ajustar pedido / Continuar.
+  if (nextStatus === STATUS.PRONTO) {
+    const missing = [];
+    o.items.forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) {
+        const currentStock = p.stock || 0;
+        if (currentStock < it.qty) {
+          missing.push({
+            productId: it.productId,
+            name: p.name,
+            currentStock,
+            requestedQty: it.qty,
+            gap: it.qty - currentStock
+          });
+        }
+      }
+    });
+    if (missing.length > 0) {
+      showStockNegativeDialog(id, missing);
+      return;
+    }
+  }
+  _proceedAdvance(id, nextStatus);
+}
+
+// Aplica a transicao de status de fato (decrementa estoque, registra
+// banner persistente em caso de negativo, persiste, re-renderiza).
+// Separado de applyAdvanceTransition para permitir o dialog de bug 1
+// chamar diretamente quando o operador escolhe "continuar mesmo assim".
+function _proceedAdvance(id, nextStatus) {
+  if (!assertImportedOrderAction(id, nextStatus)) return;
+  const o = getOrderById(id);
+  if (!o) return;
+  let negatives = [];
+  if (nextStatus === STATUS.PRONTO) {
+    o.items.forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) {
+        p.stock = (p.stock || 0) - it.qty;
+        if (p.stock < 0) negatives.push(`${p.name} (${p.stock})`);
+      }
+    });
+    // Banner persistente no card: enquanto o pedido existir com estoque
+    // negativo registrado, o operador ve o alerta toda vez que olha o card,
+    // nao apenas no toast efemero que sumia em 3s.
+    if (negatives.length > 0) {
+      o.negativeStockNote = negatives.join(', ');
+    } else if (o.negativeStockNote) {
+      // Cobre regularizacao: se algum motivo apos producao o estoque
+      // voltou positivo, limpa o banner (improvavel mas defensivo).
+      delete o.negativeStockNote;
+    }
+  }
+  const prev = o.status;
+  o.status = nextStatus;
+  o.updatedAt = Date.now();
+  o.lastOperatorName = operatorName || null;
+  addHistoryEvent(o, nextStatus, prev + ' → ' + nextStatus);
+  persistAll();
+  updateSync();
+  renderHome();
+  renderOrdersFeed();
+  haptic();
+  if (nextStatus === STATUS.ENTREGUE) showToast(window.CDB_CONFIG?.isPilot ? 'Pedido entregue' : 'Pedido entregue, entrou no caixa');
+  else if (nextStatus === STATUS.PRONTO && negatives.length > 0) showToast('Pronto. Estoque negativo: ' + negatives.join(', '));
+  else if (nextStatus === STATUS.PRONTO) showToast('Marcado como pronto');
+  else if (nextStatus === STATUS.PREPARANDO) showToast('Preparo iniciado');
+}
+
+// Bug 1: dialog modal de 3 opcoes para conflito de estoque.
+// Construido dinamicamente para evitar poluir o HTML inicial com
+// outro modal estatico. Usa as classes ja existentes (.modal, .show)
+// e tokens de design do tema.
+function showStockNegativeDialog(orderId, missing) {
+  const id = 'stockNegativeModal';
+  let modal = document.getElementById(id);
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = id;
+  modal.className = 'modal show';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'stockNegativeTitle');
+  const itemsHtml = missing.map(m =>
+    `<li style="margin:4px 0"><strong>${escapeHtml(m.name)}</strong>: estoque ${m.currentStock}, pedido ${m.requestedQty} <span style="color:var(--accent);font-weight:700">(faltam ${m.gap})</span></li>`
+  ).join('');
+  modal.innerHTML =
+    '<div class="modal-content" style="max-width:440px">' +
+      '<h3 id="stockNegativeTitle" style="margin:0 0 12px;font-size:17px;color:var(--accent);display:flex;align-items:center;gap:8px">' +
+        '<span aria-hidden="true">⚠️</span> Estoque insuficiente' +
+      '</h3>' +
+      '<p style="margin:0 0 10px;font-size:14px;color:var(--ink-dim)">Para marcar como pronto, falta:</p>' +
+      '<ul style="margin:0 0 14px;padding-left:20px;font-size:14px;line-height:1.5">' + itemsHtml + '</ul>' +
+      '<p style="margin:0 0 14px;font-size:12.5px;color:var(--ink-mute)">Estoque negativo significa que voce esta vendendo o que ainda nao produziu. Escolha como prosseguir:</p>' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<button class="btn-primary" data-act="produzir" style="width:100%;padding:12px;border-radius:10px;background:var(--accent);color:white;border:0;font-weight:700;font-size:14px;cursor:pointer">Produzir agora</button>' +
+        '<button data-act="ajustar" style="width:100%;padding:12px;border-radius:10px;background:var(--bg-elev-2);color:var(--ink);border:1px solid var(--border-strong);font-weight:600;font-size:14px;cursor:pointer">Ajustar pedido</button>' +
+        '<button data-act="continuar" style="width:100%;padding:10px;border-radius:10px;background:transparent;color:var(--ink-dim);border:1px solid var(--border);font-weight:500;font-size:13px;cursor:pointer">Continuar mesmo assim (estoque ficara negativo)</button>' +
+        '<button data-act="cancel" style="width:100%;padding:8px;border-radius:10px;background:transparent;color:var(--ink-mute);border:0;font-weight:500;font-size:12px;cursor:pointer">Cancelar</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelector('[data-act="produzir"]').onclick = () => {
+    // Pre-preenche a quantidade faltante em cada produto e leva o
+    // operador pra tela de Producao. Ele pode ajustar antes de
+    // confirmar o lote; pedido fica esperando ele voltar pra marcar pronto.
+    missing.forEach(m => {
+      const p = products.find(x => x.id === m.productId);
+      if (p) p.count = (p.count || 0) + m.gap;
+    });
+    close();
+    go('producao');
+    showToast('Quantidade pre-preenchida para completar o pedido');
+  };
+  modal.querySelector('[data-act="ajustar"]').onclick = () => {
+    close();
+    pendingConferOrderId = orderId;
+    openAjustar();
+  };
+  modal.querySelector('[data-act="continuar"]').onclick = () => {
+    close();
+    _proceedAdvance(orderId, STATUS.PRONTO);
+  };
+  modal.querySelector('[data-act="cancel"]').onclick = () => {
+    close();
+    showToast('Avanco cancelado');
+  };
+}
+
+// ================================================================
+// IMPRESSÃO TÉRMICA — Hipertech WTP05 (58mm, 32 colunas em fonte A,
+// ESC/POS via plugin Capacitor nativo ThermalPrinter).
+//
+// Diretrizes de layout primoroso:
+//   - PRINT_COLS = 32 (largura natural da WTP05). Texto cabe sem cortar.
+//   - bold() em vez de big() pros titulos (TOTAL, empresa) — big() dobra
+//     altura e fica esticado/feio na fonte da WTP05.
+//   - asciiNorm() em todo texto pra eliminar acentos (impressora termica
+//     basica imprime caixinhas no lugar de char com diacritico).
+//   - padLine(left, right) alinha label esquerda com valor direita,
+//     truncando ou quebrando se exceder PRINT_COLS.
+//   - divider() linha de hifens da largura completa pra separar secoes.
+//   - Sem QR no recibo de pedido (limpeza visual). Etiqueta de producao
+//     usa CODE128 nativo (escPosBarcode128) pra leitura por scanner.
+// ================================================================
+const PRINT_COLS = 32;
+const PRINT_ENCODER = new TextEncoder();
+
+// Acentos fora porque a WTP05 com CP default imprime caixinhas.
+function asciiNorm(s) { return String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, ''); }
+function padLine(left, right) {
+  left  = asciiNorm(left);
+  right = asciiNorm(right);
+  const space = Math.max(1, PRINT_COLS - left.length - right.length);
+  if (left.length + right.length >= PRINT_COLS) {
+    return left.slice(0, PRINT_COLS) + '\n' + ' '.repeat(Math.max(0, PRINT_COLS - right.length)) + right;
+  }
+  return left + ' '.repeat(space) + right;
+}
+function divider() { return '-'.repeat(PRINT_COLS); }
+// Versão pra modo "big" (caracteres dobrados) — metade das colunas.
+// Mantida pra compatibilidade; o layout principal agora usa bold() em vez
+// de big() porque big() fica esticado e feio na WTP05.
+function padLineBig(left, right) {
+  const COLS = Math.floor(PRINT_COLS / 2);
+  left  = asciiNorm(left);
+  right = asciiNorm(right);
+  if (left.length + right.length >= COLS) {
+    return left.slice(0, COLS) + '\n' + ' '.repeat(Math.max(0, COLS - right.length)) + right;
+  }
+  return left + ' '.repeat(Math.max(1, COLS - left.length - right.length)) + right;
+}
+// Quebra texto em N linhas preservando palavras inteiras. Se uma palavra
+// individual exceder cols, ela é cortada (último recurso). Usado pra nomes
+// de produto longos no recibo de produção e no canvas de preview.
+function wordWrap(text, cols) {
+  const words = asciiNorm(text).split(/\s+/).filter(Boolean);
+  const out = [];
+  let line = '';
+  for (const w of words) {
+    if (!line) {
+      line = w.length > cols ? w.slice(0, cols) : w;
+      if (w.length > cols) { out.push(line); line = ''; }
+      continue;
+    }
+    if ((line + ' ' + w).length <= cols) {
+      line += ' ' + w;
+    } else {
+      out.push(line);
+      line = w.length > cols ? w.slice(0, cols) : w;
+      if (w.length > cols) { out.push(line); line = ''; }
+    }
+  }
+  if (line) out.push(line);
+  return out.length ? out : [''];
+}
+
+// Builder de bytes ESC/POS com operações básicas (init, align, bold, text, LF).
+function escPosBuilder() {
+  const ESC = 0x1B, LF = 0x0A;
+  const out = [];
+  const api = {
+    push: (...b) => { b.forEach(x => out.push(x)); return api; },
+    text: (s) => { PRINT_ENCODER.encode(asciiNorm(s)).forEach(b => out.push(b)); return api; },
+    line: (s) => api.text(s || '').push(LF),
+    init:    () => api.push(ESC, 0x40),
+    center:  () => api.push(ESC, 0x61, 0x01),
+    left:    () => api.push(ESC, 0x61, 0x00),
+    big:     () => api.push(ESC, 0x21, 0x10),
+    normal:  () => api.push(ESC, 0x21, 0x00),
+    // Negrito (ESC E n). Mais elegante que big — mantem altura/largura
+    // padrao mas escurece os tracos. Usado pra titulo da empresa e TOTAL.
+    bold:    () => api.push(ESC, 0x45, 0x01),
+    boldOff: () => api.push(ESC, 0x45, 0x00),
+    bytes:   () => new Uint8Array(out)
+  };
+  return api;
+}
+
+function escPosTextLines(title, lines) {
+  const b = escPosBuilder().init().center();
+  if (title) b.bold().line(title).boldOff();
+  b.push(0x0A);
+  (lines || []).forEach(l => b.line(l));
+  return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
+}
+
+/**
+ * Comandos GS ( k pra QR code em ESC/POS (suportado pela Hipertech WTP05).
+ * Sequencia: setModelo -> setSize -> setErrorCorrection -> store -> print.
+ *
+ * Modulo default = 8 dots (em 203 DPI ~ 1mm/modulo). Em modulos menores
+ * (4-5) a tinta termica borra e leitor de smartphone nao decodifica.
+ * 8 dots com ECL=M aguenta o bleed natural da WTP05 e mantem QR ~25-30mm
+ * \u2014 confortavel pra leitura por camera, ainda cabe em 58mm (384 dots uteis).
+ *
+ * ECL=M (~15%) e o ponto doce em termica: L (~7%) e fragil demais com
+ * bleed; Q/H aumentam o numero de modulos demais e podem apertar a etiqueta.
+ */
+function escPosQrCommands(data, moduleSize) {
+  const enc = PRINT_ENCODER.encode(data || '');
+  const len = enc.length + 3; // +3 do header (cn, fn, m)
+  const pL = len & 0xFF;
+  const pH = (len >> 8) & 0xFF;
+  const out = [];
+  // Modelo 2 (mais comum)
+  out.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00);
+  // Tamanho do modulo em dots (1-16). Default 8 = ~25-30mm em QR tipico.
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, moduleSize || 0x08);
+  // Error correction M (49) \u2014 robusto contra bleed termico
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31);
+  // Store data
+  out.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30);
+  enc.forEach(byte => out.push(byte));
+  // Print
+  out.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30);
+  return out;
+}
+
+/**
+ * Comandos GS k pra barcode CODE128 em ESC/POS (formato 2: GS k m n d1..dn).
+ * Subset B (caracteres ASCII printable, suficiente pra letras+digitos+hifens).
+ * HRI (texto legivel) abaixo do barcode.
+ *
+ * IMPORTANTE: largura modular 1 (GS w 1) — em width 2 a WTP05 estoura os
+ * 384 dots uteis com codigos de ~20+ chars e imprime literal "wide error!"
+ * em cima do barcode. Width 1 reduz pela metade, cabe folgado.
+ *
+ * Tamanho maximo do payload: 32 chars (apos prefixo {B). Acima disso,
+ * trunca + warn. Em width 1, 32 chars * 11 modulos = 352 dots — cabe.
+ */
+const ESCPOS_BARCODE_MAX = 32;
+function escPosBarcode128(data) {
+  const out = [];
+  // HRI: caracteres legiveis ABAIXO do barcode (GS H 2)
+  out.push(0x1D, 0x48, 0x02);
+  // Fonte HRI: A (default, GS f 0)
+  out.push(0x1D, 0x66, 0x00);
+  // Altura barcode em dots (GS h n) — 90 melhora leitura sem estourar a etiqueta
+  out.push(0x1D, 0x68, 0x5A);
+  // Largura modular (GS w 1) — 1 dot por modulo, evita estouro de largura
+  out.push(0x1D, 0x77, 0x01);
+  let raw = String(data || '');
+  if (raw.length > ESCPOS_BARCODE_MAX) {
+    try { console.warn('escPosBarcode128: truncando payload', raw.length, '->', ESCPOS_BARCODE_MAX); } catch (e) {}
+    raw = raw.slice(0, ESCPOS_BARCODE_MAX);
+  }
+  // Prefixo {B forca subset B (ASCII printable)
+  const payload = '{B' + raw;
+  const enc = PRINT_ENCODER.encode(payload);
+  // GS k m n d1..dn — m=73 (CODE128 formato 2), n=length
+  out.push(0x1D, 0x6B, 0x49, enc.length);
+  enc.forEach(byte => out.push(byte));
+  return out;
+}
+
+function escPosOrderLabel(o, nota) {
+  const empresa = (getEmpresaName() || 'EASY STOCK MOBILE').toUpperCase();
+  const pixType = getPixType();
+  const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
+  const orderRef = (o.id || '').slice(-8);
+  const cliente = (o.clientSnapshot?.name || 'Sem cliente');
+  const data = new Date(o.factAt || o.createdAt).toLocaleString('pt-BR');
+  const b = escPosBuilder().init();
+  // Cabecalho: nome da empresa em negrito centralizado, depois pedido.
+  b.center().bold().line(empresa).boldOff();
+  b.line('Pedido ' + orderRef);
+  b.left();
+  b.line(divider());
+  // Dados do cliente — truncados se passarem da largura
+  b.line(asciiNorm('Cliente: ' + cliente).slice(0, PRINT_COLS));
+  // Bug 11 (Onda 4): cupom impresso nao deve conter CPF (LGPD).
+  const refPrint = safeRefDisplay(o.clientSnapshot?.ref);
+  if (refPrint) b.line(asciiNorm(refPrint).slice(0, PRINT_COLS));
+  b.line(data);
+  b.line(divider());
+  // Itens (qty x nome | preco) com truncamento via padLine
+  (o.items || []).forEach(it => {
+    b.line(padLine(it.qty + 'x ' + it.name, money(it.qty * it.unitPrice)));
+    // #417 — observacao por item (ex "sem cebola"), indentada sob o item.
+    const inote = (it.note || '').trim();
+    if (inote) b.line(asciiNorm('  obs: ' + inote).slice(0, PRINT_COLS));
+  });
+  b.line(divider());
+  // TOTAL em negrito (sem big — elegante, cabe na linha)
+  b.bold().line(padLine('TOTAL', money(o.total))).boldOff();
+  // Observacao em ate 2 linhas (32+32 chars max — evita poluir a impressao)
+  if (o.notes) {
+    const obs = asciiNorm(o.notes);
+    b.line('Obs: ' + obs.slice(0, PRINT_COLS - 5));
+    if (obs.length > PRINT_COLS - 5) b.line(obs.slice(PRINT_COLS - 5, PRINT_COLS - 5 + PRINT_COLS));
+  }
+  // Nota rapida digitada na hora (campo da tela de preview)
+  if (nota) {
+    const n = asciiNorm(String(nota));
+    b.bold().line('* NOTA: ' + n.slice(0, PRINT_COLS - 8)).boldOff();
+    if (n.length > PRINT_COLS - 8) b.line('  ' + n.slice(PRINT_COLS - 8, PRINT_COLS - 8 + PRINT_COLS - 2));
+  }
+  b.line(divider());
+  // QR de conferencia (orderRef = 8 chars) + codigo curto visivel embaixo.
+  // moduleSize=8 dots (~25mm em v1) garante leitura por camera apesar do
+  // bleed termico. 2 LFs criam quiet zone inferior antes do texto.
+  b.center();
+  b.push(...escPosQrCommands(orderRef, 0x08));
+  b.push(0x0A, 0x0A);
+  b.bold().line('Codigo: ' + orderRef).boldOff();
+  b.line('Confira no app pelo codigo ou QR');
+  b.left();
+  b.line(divider());
+  // PIX e titular (cada um em sua linha pra leitura clara)
+  b.line('PIX (' + pixLabel + '): ' + formatPixByType(getPixKey(), pixType));
+  b.line('Titular: ' + asciiNorm(getPixHolder()).slice(0, PRINT_COLS - 9));
+  if (o.confirmedBy) b.line('Conferido: ' + asciiNorm(o.confirmedBy).slice(0, PRINT_COLS - 11));
+  return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
+}
+
+// Flag impede reentrância: spam de botão imprimir não dispara múltiplos connect.
+// Watchdog libera após 15s caso o plugin Bluetooth nunca dispare callback
+// (BT travado, dispositivo desligado mid-write) — evita app preso sem imprimir.
+let isPrinting = false;
+let printWatchdog = null;
+function releasePrinting() {
+  isPrinting = false;
+  if (printWatchdog) { clearTimeout(printWatchdog); printWatchdog = null; }
+}
+// #2141: etiqueta em imagem tem ~25 KB; o write só volta quando a WTP05
+// consome tudo. Prazo de 15 s mais 1 s a cada 8 KB (Bluetooth SPP lento).
+function printWriteTimeoutMs(length) {
+  return 15000 + Math.ceil((length || 0) / 8000) * 1000;
+}
+
+// #2202 (F1): printerArg escolhe a impressora do documento. Trabalho para
+// outra impressora enquanto uma imprime entra na fila (até 4) e sai em
+// seguida: desconecta uma, conecta a outra. Impressora já ocupada (a que
+// imprime ou uma que espera na fila) segue descartada: toque duplo não
+// gera dois trabalhos. onFallback(explicado): true quando o erro já foi
+// mostrado ao operador; false quando não há Bluetooth nem impressora.
+const FILA_IMPRESSAO_MAX = 4;
+function printViaBluetooth(bytes, onFallback, printJob, printerArg, onSent) {
+  btStep('print:start');
+  const bs = window.bluetoothSerial;
+  const printer = printerArg || getSavedPrinter();
+  if (!bs || !printer || !printer.address) {
+    btStep('print:no-printer-or-bs bs=' + !!bs + ' p=' + !!printer);
+    if (typeof onFallback === 'function') onFallback(false);
+    return;
+  }
+  // drenando: o próximo da fila já tem a vez, nos 300 ms até ele começar.
+  if (isPrinting || printViaBluetooth.drenando) {
+    const fila = printViaBluetooth.fila || (printViaBluetooth.fila = []);
+    const ocupada = printViaBluetooth.ativa === printer.address || fila.some(t => t[3] && t[3].address === printer.address);
+    if (!ocupada && fila.length < FILA_IMPRESSAO_MAX) {
+      fila.push([bytes, onFallback, printJob, printer, onSent]);
+      showToast('Na fila: imprime em seguida na ' + (printer.apelido || printer.name || 'outra impressora'));
+      return;
+    }
+    showToast(ocupada ? 'Impressão em andamento: toque de novo quando terminar' : 'Fila cheia: toque de novo em instantes'); return;
+  }
+
+  // Reserva o envio antes do diálogo Android: dois toques não geram dois trabalhos.
+  const job = {};
+  printViaBluetooth.activeJob = job;
+  printViaBluetooth.ativa = printer.address;
+  isPrinting = true;
+  const active = () => isPrinting && printViaBluetooth.activeJob === job;
+  const finish = () => {
+    if (!active()) return;
+    printViaBluetooth.activeJob = null;
+    printViaBluetooth.ativa = null;
+    releasePrinting();
+    const fila = printViaBluetooth.fila;
+    if (fila && fila.length) {
+      const proximo = fila.shift();
+      printViaBluetooth.ativa = proximo[3].address;
+      printViaBluetooth.drenando = true;
+      setTimeout(() => {
+        printViaBluetooth.drenando = false;
+        printViaBluetooth.ativa = null;
+        printViaBluetooth.apply(null, proximo);
+      }, 300);
+    }
+  };
+  const failed = (err, fallback) => {
+    if (!active()) return;
+    showError(err, 'print');
+    finish();
+    if (fallback && typeof onFallback === 'function') onFallback(true);
+  };
+  printWatchdog = setTimeout(() => {
+    if (!active()) return;
+    showToast('A autorização do Bluetooth não terminou. Confira a permissão e tente imprimir novamente.');
+    finish();
+  }, 60000);
+  btStep('print:perm-check');
+  try {
+  ensureBluetoothPermission((granted) => {
+    if (!active()) return;
+    btStep('print:perm-result granted=' + granted);
+    if (!granted) {
+      showToast('Permissão Bluetooth negada. Ative Dispositivos próximos nas permissões deste app.');
+      finish();
+      if (typeof onFallback === 'function') onFallback(true);
+      return;
+    }
+    if (printWatchdog) clearTimeout(printWatchdog);
+    printWatchdog = setTimeout(() => {
+      if (!active()) return;
+      showToast('A impressora não confirmou o envio. Confira as etiquetas antes de tentar novamente.');
+      finish();
+      // Tenta fechar socket pra evitar leak — se o write travou, o socket
+      // pode estar zumbi. Disconnect e silencioso (callbacks vazios).
+      try { bs.disconnect(function () {}, function () {}); } catch (_) {}
+    }, printWriteTimeoutMs(bytes.length));
+    const send = () => {
+      if (!active()) return;
+      btStep('print:send-write');
+      try {
+        bs.write(bytes,
+          () => {
+            if (!active()) return;
+            btStep('print:write-ok');
+            showToast('Enviado pra impressora');
+            finish();
+            if (typeof onSent === 'function') { try { onSent(); } catch (e) { console.warn('onSent falhou:', e); } }
+            if (printJob && printJob.entityId) {
+              logAction({
+                action: 'etiqueta.print', entityType: printJob.entityType, entityId: printJob.entityId,
+                summary: printJob.quantity + ' etiqueta(s), ' + printJob.copies + ' cópia(s) · enviada(s) para ' + printer.name,
+                diff: { copies: printJob.copies, quantity: printJob.quantity, printer: { name: printer.name, address: printer.address, profile: printer.profile || 'escpos' }, delivery: 'sent' }
+              });
+            }
+          },
+          (err) => {
+            if (!active()) return;
+            const msg = (err && err.message) || err;
+            btStep('print:write-err ' + msg);
+            // Um write pode ter enviado parte do lote. Repetir automaticamente duplicaria etiquetas.
+            failed(err, false);
+            showToast('Confira as etiquetas na impressora antes de tentar novamente.');
+          }
+        );
+      } catch (ex) {
+        btStep('print:write-throw ' + (ex.message || ex));
+        failed(ex, false);
+      }
+    };
+    // Sempre abre a conexão escolhida; um socket existente pode ser da outra impressora.
+    const connectSelected = () => {
+      if (!active()) return;
+      try {
+        bs.connect(printer.address, send, err => failed(err, true));
+      } catch (err) {
+        failed(err, true);
+      }
+    };
+    try { bs.disconnect(connectSelected, connectSelected); }
+    catch (_) { connectSelected(); }
+  });
+  } catch (err) { failed(err, true); }
+}
+
+let printAreaTimer = null;
+function printAreaHtml(html) {
+  const area = document.getElementById('printArea');
+  if (!area) return;
+  area.innerHTML = html;
+  // Cancela print pendente antes de re-agendar — evita disparar window.print()
+  // múltiplas vezes se o botão for clicado em rajada.
+  if (printAreaTimer) clearTimeout(printAreaTimer);
+  printAreaTimer = setTimeout(() => {
+    printAreaTimer = null;
+    try { window.print(); } catch (e) { showToast('Print indisponível'); }
+  }, 80);
+}
+
+// ================================================================
+// ETIQUETAS — produção (N por batch) e pedido (1 por order).
+// Tela única de preview com 3 ações: imprimir BT, salvar PNG, compartilhar.
+// ================================================================
+
+function fmtDateBR(ms)   { return new Date(ms).toLocaleDateString('pt-BR'); }
+function fmtPesoG(g)     { return g >= 1000 ? (g/1000).toFixed(2).replace('.',',') + 'kg' : g + 'g'; }
+
+/**
+ * Gera SVG de QR code via lib qrcode-generator (Kazuhiko Arase, MIT).
+ * Tipo 0 = auto, error correction L. Pra textos curtos (orderId, codigoBarras).
+ * Retorna string SVG inline com width/height fixos pra controlar layout.
+ */
+function generateQrSvg(data, size = 96) {
+  if (!data) return '';
+  if (typeof qrcode !== 'function') return ''; // lib não carregada — silencioso
+  try {
+    const qr = qrcode(0, 'L');
+    qr.addData(String(data || ''));
+    qr.make();
+    const cells = qr.getModuleCount();
+    const quiet = 4;
+    const cellSize = Math.max(1, Math.floor(size / (cells + quiet * 2)));
+    const realSize = cellSize * (cells + quiet * 2);
+    let rects = '';
+    for (let r = 0; r < cells; r++) {
+      for (let c = 0; c < cells; c++) {
+        if (qr.isDark(r, c)) {
+          rects += `<rect x="${(c + quiet)*cellSize}" y="${(r + quiet)*cellSize}" width="${cellSize}" height="${cellSize}" fill="#000"/>`;
+        }
+      }
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${realSize}" height="${realSize}" viewBox="0 0 ${realSize} ${realSize}" style="background:#fff"><rect width="100%" height="100%" fill="#fff"/>${rects}</svg>`;
+  } catch (e) { console.warn('QR falhou:', e); return ''; }
+}
+
+const CODE128_PATTERNS = [
+  '212222','222122','222221','121223','121322','131222','122213','122312','132212','221213',
+  '221312','231212','112232','122132','122231','113222','123122','123221','223211','221132',
+  '221231','213212','223112','312131','311222','321122','321221','312212','322112','322211',
+  '212123','212321','232121','111323','131123','131321','112313','132113','132311','211313',
+  '231113','231311','112133','112331','132131','113123','113321','133121','313121','211331',
+  '231131','213113','213311','213131','311123','311321','331121','312113','312311','332111',
+  '314111','221411','431111','111224','111422','121124','121421','141122','141221','112214',
+  '112412','122114','122411','142112','142211','241211','221114','413111','241112','134111',
+  '111242','121142','121241','114212','124112','124211','411212','421112','421211','212141',
+  '214121','412121','111143','111341','131141','114113','114311','411113','411311','113141',
+  '114131','311141','411131','211412','211214','211232','2331112'
+];
+
+function code128Values(data) {
+  const raw = asciiNorm(String(data || '')).replace(/[^\x20-\x7E]/g, '').slice(0, ESCPOS_BARCODE_MAX);
+  const values = [104]; // Start B
+  for (let i = 0; i < raw.length; i++) values.push(raw.charCodeAt(i) - 32);
+  let checksum = values[0];
+  for (let i = 1; i < values.length; i++) checksum += values[i] * i;
+  values.push(checksum % 103, 106);
+  return values;
+}
+
+function code128Modules(data) {
+  return code128Values(data).map(v => CODE128_PATTERNS[v] || '').join('');
+}
+
+function generateCode128Svg(data, width = 260, height = 58) {
+  const modules = code128Modules(data);
+  if (!modules) return '';
+  const total = modules.split('').reduce((s, n) => s + Number(n || 0), 0);
+  const quiet = 10;
+  const scale = Math.max(1, Math.floor((width - quiet * 2) / total));
+  const realW = total * scale + quiet * 2;
+  let x = quiet;
+  let rects = '';
+  for (let i = 0; i < modules.length; i++) {
+    const w = Number(modules[i]) * scale;
+    if (i % 2 === 0) rects += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="#000"/>`;
+    x += w;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${realW}" height="${height}" viewBox="0 0 ${realW} ${height}" style="background:#fff"><rect width="100%" height="100%" fill="#fff"/>${rects}</svg>`;
+}
+
+// #2209 (F4): a unidade vai na barra com 4 dígitos, então um lote numera até 9.999.
+const UNIDADES_MAX_DA_BARRA = 9999;
+const RECUSA_BARRA_EXCEDIDA = 'Escolha só o QR em Ajustes. A barra numera até '
+  + UNIDADES_MAX_DA_BARRA.toLocaleString('pt-BR') + ' etiquetas por lote, e este lote passa disso.';
+/**
+ * Expande um batch em N etiquetas (1 por unidade produzida) com todos os
+ * dados que cada etiqueta precisa pra ser renderizada/impressa.
+ */
+function etiquetasFromBatch(batch) {
+  const out = [];
+  const lote = codigoDoLote(batch);
+  // Formato antigo (so o lote do dia): etiquetas ja impressas continuam achaveis.
+  const loteLegado = batch.lote || getLoteDoDia(new Date(batch.createdAt));
+  const empresa = getEmpresaName();
+  const numeroCurto = batch.numeroCurto ? String(batch.numeroCurto).replace(/\D/g, '') : '';
+  let serial = 1;
+  (batch.items || []).forEach(it => {
+    const product = products.find(p => p.id === it.productId);
+    const sku = getProductSku(product || { id: it.productId, name: it.name });
+    for (let i = 0; i < it.qty; i++) {
+      const idxStr = String(serial).padStart(3, '0');
+      out.push({
+        batchId: batch.id,
+        empresa,
+        productName: it.name,
+        emoji: it.emoji || '',
+        unit: it.unit || '',
+        sku,
+        lote,
+        idx: serial,
+        idxStr,
+        codigoBarras: `${sku}-${lote}-${idxStr}`,
+        codigoBarrasLegado: `${sku}-${loteLegado}-${idxStr}`,
+        // #2202 (D4): Code128 C só com o número curto do lote; sem ele, sem barra.
+        // #2209: número curto + unidade com 4 dígitos (12 ou 14 dígitos, par). O QR fica com 3.
+        chaveCurta: numeroCurto ? numeroCurto + String(serial).padStart(4, '0') : null,
+        barraExcedida: false,
+        weightG: it.weightG ?? null,
+        productionDate: batch.createdAt,
+        expiresAt: it.expiresAt ?? null,
+        validityDays: it.validityDays ?? null,
+        // Foto opcional do produto (data URL). Aparece no preview HTML e
+        // no PNG salvo, mas NAO é enviada pra impressora térmica (ESC/POS
+        // imprimiria com qualidade ruim em monocromatico).
+        photo: it.photo || null
+      });
+      serial++;
+    }
+  });
+  // #2209: o teto conta as etiquetas geradas. Acima dele a chave não cabe, e
+  // nenhuma etiqueta leva chave truncada.
+  if (out.length > UNIDADES_MAX_DA_BARRA) out.forEach(et => { et.chaveCurta = null; et.barraExcedida = true; });
+  return out;
+}
+
+function safePhotoUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  // #2459: foto de lote do servidor; a <img> nasce com data-foto-auth (fotoImgSrcAttr).
+  if (window.cdbPhotoUpload && window.cdbPhotoUpload.ehFotoAutenticada(url)) return url;
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'https:' || u.protocol === 'data:') ? url : '';
+  } catch { return ''; }
+}
+
+// #2459: a rota autenticada não aceita <img src> (sem header); hidratarFotos preenche depois.
+function fotoImgSrcAttr(url) {
+  return window.cdbPhotoUpload && window.cdbPhotoUpload.ehFotoAutenticada(url)
+    ? `data-foto-auth="${escapeHtml(url)}"`
+    : `src="${escapeHtml(url)}"`;
+}
+
+function etiquetaProducaoHtml(et, nota) {
+  const venc = et.expiresAt ? fmtDateBR(et.expiresAt) : '—';
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  const photoSrc = safePhotoUrl(et.photo);
+  const photo = photoSrc ? `<div class="et-photo-wrap"><img class="et-photo" ${fotoImgSrcAttr(photoSrc)} alt="Foto do produto"/></div>` : '';
+  const hasCodes = showQr || showBarcode;
+  const horiz = currentEtqOrient === 'horizontal';
+
+  const brand = window.CDB_CONFIG?.isPilot
+    ? `<div class="et-brand"><span class="et-brand-name">${escapeHtml(et.empresa || getEmpresaName())}</span></div>`
+    : `<div class="et-brand">
+    <img src="etiqueta/assets/logo-easystok.svg" alt="">
+    <span class="et-brand-name">Easy<b>Stok</b></span>
+  </div>`;
+  // #437: emoji antes do nome (dado já existe, nunca foi renderizado)
+  const prodBlock = `<div class="et-prod">${et.emoji ? escapeHtml(et.emoji) + ' ' : ''}${escapeHtml(et.productName)}</div>
+    ${et.unit ? `<div class="et-unit">${escapeHtml(et.unit)}</div>` : ''}`;
+  const infoBlock = `<div class="et-info">
+    <div class="et-info-row"><span class="et-lbl">FAB:</span><span class="et-val">${fmtDateBR(et.productionDate)}</span></div>
+    <div class="et-info-row"><span class="et-lbl">VAL:</span><span class="et-val">${escapeHtml(venc)}</span></div>
+    <div class="et-info-row"><span class="et-lbl">LOTE:</span><span class="et-val">${escapeHtml(et.lote)}</span></div>
+    ${et.weightG ? `<div class="et-info-row"><span class="et-lbl">PESO:</span><span class="et-val">${fmtPesoG(et.weightG)}</span></div>` : ''}
+  </div>`;
+  const scanBlock = hasCodes ? `<div class="et-scan">
+    ${showQr ? `<div class="et-qr">${generateQrSvg(et.codigoBarras, horiz ? 90 : 110)}</div>` : ''}
+    ${showBarcode ? `<div class="et-bars">${generateCode128Svg(et.codigoBarras, horiz ? 160 : 260, 50)}</div>` : ''}
+    <div class="et-code">${escapeHtml(et.codigoBarras)}</div>
+  </div>` : '';
+  const notaBlock = nota
+    ? `<div class="pa-nota-rapida"><div class="pa-label">Nota</div><div>${escapeHtml(nota)}</div></div>`
+    : '';
+
+  if (horiz) {
+    // #438: brand DENTRO do et-main (nao irmao flex) — sem isso o brand
+    // ocupa ~104px de largura horizontal e et-main fica com ~105px, fazendo
+    // overflow-wrap:anywhere quebrar "Talharim" caractere a caractere.
+    // Espelha o canvas horizontal onde logo fica na mesma coluna que o nome.
+    return `<div class="et-main">${brand}${prodBlock}${photo}${infoBlock}${notaBlock}</div><div class="et-side">${scanBlock}</div>`;
+  }
+  return `${brand}${prodBlock}${photo}${infoBlock}${scanBlock}${notaBlock}`;
+}
+
+// #2141: etiqueta de produção da térmica como imagem (etiqueta-termica.js).
+// O mesmo bitmap é prévia, PNG e impressão; o texto ESC/POS fica de reserva.
+function etiquetaTermica(et) {
+  const T = window.cdbEtiquetaTermica;
+  if (!T) return null;
+  try {
+    return T.gerar(Object.assign({}, et, { empresa: et.empresa || getEmpresaName() }), {
+      formatar: { data: fmtDateBR, peso: fmtPesoG },
+      codigos: getProdScanMode(),
+      code128: code128TermicaLegivel,
+      nota: et._nota || null
+    });
+  } catch (e) { console.warn('Etiqueta térmica em imagem falhou:', e); return null; }
+}
+
+// Barras de 1 ponto não leem na térmica: só desenha com módulo >= 2.
+function code128TermicaLegivel(ctx, data, x, y, w, h) {
+  const modules = code128Modules(data);
+  const total = modules ? modules.split('').reduce((s, n) => s + Number(n || 0), 0) : 0;
+  if (!total || total * 2 > w) return false;
+  drawCode128OnCanvas(ctx, data, x, y, w, h);
+  return true;
+}
+
+// #2193: TSPL imprime a mesma imagem da prévia. Produção usa o bitmap da
+// etiqueta térmica; pedido usa o PNG da prévia. Uma etiqueta TSPL por item.
+async function canvasDoBlob(blob) {
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  if (typeof bmp.close === 'function') bmp.close();
+  return c;
+}
+// #2202 (F2): etiqueta de produção na TSPL pelo LayoutJson no tamanho final
+// (etiqueta-canvas.js). Não cabe: recusa com o motivo, sem encolher.
+function camposDaEtiqueta(et, nota) {
+  return {
+    empresa: et.empresa || getEmpresaName(),
+    nome: et.productName + (et.unit ? ' (' + et.unit + ')' : ''),
+    validade: et.expiresAt ? fmtDateBR(et.expiresAt) : '',
+    fabricacao: et.productionDate ? fmtDateBR(et.productionDate) : '',
+    lote: et.lote || '',
+    peso: et.weightG ? 'PESO ' + fmtPesoG(et.weightG) : '',
+    nota: nota || '',
+    qr: et.codigoBarras,
+    barras: et.chaveCurta || ''
+  };
+}
+function midiaDaImpressora(printer) {
+  if (printer && printer.midia && printer.midia.tipo !== 'bobina' && Number(printer.midia.larguraMm) > 0) return printer.midia;
+  const c = tsplConfig(printer);
+  return { tipo: c.continuo ? 'continuo' : 'etiqueta', larguraMm: c.larguraMm, alturaMm: c.alturaMm, gapMm: c.gapMm };
+}
+// Entrada do motor para a etiqueta de produção. A prévia e a impressão usam a
+// mesma, então a tela mostra o que a térmica recebe. undefined: módulos novos
+// ausentes. { recusa }: a regra pede barra e a chave não cabe nela.
+function entradaDaEtiquetaV2(et, nota, printer) {
+  const C = window.cdbEtiquetaCanvas, P = window.cdbPapeis, I = window.cdbImpressoras;
+  if (!C || !P || !I || !window.cdbResolverEtiqueta) return undefined;
+  const regra = I.regra(localStorage, 'etiqueta-producao');
+  if (et.barraExcedida && regra.codigos.indexOf('barras') >= 0) return { recusa: RECUSA_BARRA_EXCEDIDA };
+  return {
+    campos: camposDaEtiqueta(et, nota), papel: P.daMidia(midiaDaImpressora(printer)),
+    orientacao: regra.orientacao, codigos: regra.codigos, impressora: printer, document
+  };
+}
+// #2247 (v3): prévia da produção. Na TSPL é o canvas do motor; fora dela, a
+// térmica de 58 mm, que imprime o etiquetaTermica. Devolve { canvas } ou { recusa }.
+function previaDaEtiquetaProducao(et, nota) {
+  const printer = impressoraPara('etiqueta-producao');
+  const entrada = printer && perfilImpressora(printer) === 'tspl' ? entradaDaEtiquetaV2(et, nota, printer) : undefined;
+  if (entrada === undefined) return etiquetaTermica(Object.assign({}, et, { _nota: nota || null }));
+  if (entrada.recusa) return entrada;
+  const r = window.cdbEtiquetaCanvas.previa(entrada);
+  return r.recusa ? { recusa: r.recusa } : { canvas: r.canvas };
+}
+// undefined: módulos novos ausentes (segue o caminho antigo). null: recusa.
+function etiquetaProducaoTsplV2(et, nota, printer, copias) {
+  const entrada = entradaDaEtiquetaV2(et, nota, printer);
+  if (entrada === undefined) return undefined;
+  if (entrada.recusa) { etiquetasTspl.recusa = entrada.recusa; return null; }
+  const r = window.cdbEtiquetaCanvas.tspl(Object.assign(entrada, { copias }));
+  if (r.recusa) { etiquetasTspl.recusa = r.recusa; return null; }
+  if (!etiquetasTspl.aviso) etiquetasTspl.aviso = window.cdbResolverEtiqueta.resumo ? window.cdbResolverEtiqueta.resumo(r) : '';
+  return r.bytes;
+}
+// Frase do envio: o que mudou na etiqueta e, com papel nunca confirmado, o
+// papel que o app está usando para o operador conferir.
+function avisoDaImpressao(printer, aviso) {
+  const partes = aviso ? [aviso] : [];
+  const P = window.cdbPapeis;
+  if (printer && printer.midiaConfirmada === false && P) {
+    const papel = P.daMidia(midiaDaImpressora(printer));
+    if (papel) partes.push('Confira o papel em Ajustes: o app usa ' + P.descrever(papel) + '.');
+  }
+  return partes.join(' ');
+}
+// A recusa já diz o motivo e o que fazer; o toast começa pelo que fazer.
+function avisoDaRecusa(recusa) {
+  // #2209: a recusa que já começa pelo que fazer sai como está.
+  if (/^Escolha /.test(String(recusa || ''))) return String(recusa);
+  const acao = 'Escolha um papel maior em Ajustes';
+  const motivo = String(recusa || '').replace('. ' + acao, '');
+  return acao + '. ' + motivo.charAt(0).toUpperCase() + motivo.slice(1) + '.';
+}
+// #2209: a etiqueta do lote recém-lançado é montada antes de o servidor responder ao push com o
+// número do lote. Com a barra na regra, espera o envio em andamento (até 5 s) e refaz as chaves;
+// sem resposta, a etiqueta sai só com o QR, como sem rede.
+const ESPERA_DO_NUMERO_MS = 5000;
+async function completarChavesDaBarra(etiquetas) {
+  const faltam = (etiquetas || []).filter(et => et && et.batchId && !et.chaveCurta && !et.barraExcedida);
+  const I = window.cdbImpressoras, S = window.cdbSync;
+  if (!faltam.length || !I || !S || typeof S.flush !== 'function') return;
+  if (I.regra(localStorage, 'etiqueta-producao').codigos.indexOf('barras') < 0) return;
+  const loteDe = id => (batches || []).find(b => b && b.id === id);
+  const semNumero = () => faltam.some(et => { const b = loteDe(et.batchId); return b && !b.numeroCurto; });
+  // O flush devolve o envio em andamento, que pode ser anterior ao lote: sem o número, um segundo
+  // envio dentro do mesmo prazo leva o lote.
+  const ate = Date.now() + ESPERA_DO_NUMERO_MS;
+  for (let envio = 0; envio < 2 && semNumero() && Date.now() < ate; envio++) {
+    let limite = null;
+    try {
+      await Promise.race([
+        Promise.resolve().then(() => S.flush()).catch(() => {}),
+        new Promise(r => { limite = setTimeout(r, Math.max(0, ate - Date.now())); })
+      ]);
+    } finally { clearTimeout(limite); }
+  }
+  const refeitas = {};
+  faltam.forEach(et => {
+    const b = loteDe(et.batchId);
+    if (!b || !b.numeroCurto) return;
+    const nova = (refeitas[b.id] || (refeitas[b.id] = etiquetasFromBatch(b))).find(n => n.idx === et.idx);
+    if (nova) { et.chaveCurta = nova.chaveCurta; et.barraExcedida = nova.barraExcedida; }
+  });
+}
+async function etiquetasTspl(etiquetas, kind, nota, printer, copias) {
+  if (!window.cdbTspl) return null;
+  etiquetasTspl.recusa = null;
+  etiquetasTspl.aviso = '';
+  if (kind !== 'order') await completarChavesDaBarra(etiquetas);
+  const partes = [];
+  for (const et of etiquetas) {
+    let canvas = null;
+    if (kind !== 'order') {
+      const v2 = etiquetaProducaoTsplV2(et, nota, printer, copias);
+      if (v2 === null) return null;
+      if (v2) { partes.push(v2); continue; }
+    }
+    if (kind === 'order') {
+      const blob = await etiquetasToPng([et], 'order', nota);
+      if (blob) canvas = await canvasDoBlob(blob);
+    } else {
+      if (nota) et._nota = nota;
+      try { const t = etiquetaTermica(et); canvas = t && t.canvas; } finally { delete et._nota; }
+    }
+    if (!canvas) return null;
+    partes.push(tsplBytesDoCanvas(canvas, printer, copias));
+  }
+  const total = partes.reduce((n, b) => n + b.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const b of partes) { out.set(b, off); off += b.length; }
+  return out;
+}
+
+function escPosEtiquetaProducao(et) {
+  const termica = etiquetaTermica(et);
+  return termica ? termica.bytes() : escPosLabelProducao(et);
+}
+
+function escPosLabelProducao(et) {
+  // Layout de etiqueta de pote (cola na embalagem):
+  //   - Empresa em negrito centralizado (fonte normal, sem big — evita esticado).
+  //   - Nome do produto em negrito, truncado se passar das 32 colunas.
+  //   - Barcode CODE128 com HRI (texto sob as barras automatico).
+  //   - Bloco final: Peso/Producao/Validade/Lote em padLine 32 cols, alinhamento
+  //     direito limpo. Sem big() pra nao ficar esticado / quebrar em 2 linhas.
+  const empresa = (et.empresa || 'Minha empresa');
+  const prod = et.productName + (et.unit ? ' (' + et.unit + ')' : '');
+  const b = escPosBuilder().init();
+  b.center().bold().line(empresa).boldOff();
+  b.line(divider());
+  // Nome do produto centralizado em negrito, quebrando em palavras se exceder.
+  b.bold();
+  wordWrap(prod, PRINT_COLS).forEach(l => b.line(l));
+  b.boldOff();
+  b.line(divider());
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  if (showQr) {
+    b.push(...escPosQrCommands(et.codigoBarras, 0x08));
+    b.push(0x0A, 0x0A);
+  }
+  if (showQr || showBarcode) {
+    b.bold().line(et.codigoBarras).boldOff();
+    b.line('Escaneie no app para conferir');
+  }
+  if (showBarcode) {
+    b.line(divider());
+    b.push(...escPosBarcode128(et.codigoBarras));
+    b.push(0x0A);
+  }
+  // Dados do lote alinhados em 2 colunas
+  b.left();
+  if (et.weightG) b.line(padLine('Peso',     fmtPesoG(et.weightG)));
+  b.line(padLine('Producao', fmtDateBR(et.productionDate)));
+  b.line(padLine('Validade', et.expiresAt ? fmtDateBR(et.expiresAt) : '-'));
+  b.line(padLine('Lote',     et.lote));
+  if (et._nota) {
+    b.line(divider());
+    b.bold().line('* NOTA: ' + asciiNorm(String(et._nota)).slice(0, PRINT_COLS - 8)).boldOff();
+  }
+  return b.push(0x0A, 0x0A, 0x0A, 0x0A).bytes();
+}
+
+/**
+ * Renderiza etiquetas em um canvas vertical e retorna Promise<Blob> PNG.
+ * Largura fixa 384px (= 58mm a 200dpi). Cada etiqueta ocupa ~280px + 20px gap.
+ * Não usa biblioteca externa: só Canvas API + fillText/fillRect.
+ */
+function etiquetasToPng(etiquetas, kind, note) {
+  if (kind !== 'order') {
+    const termicas = etiquetas.map(et => etiquetaTermica(Object.assign({}, et, { _nota: note || null })));
+    if (termicas.every(Boolean)) {
+      const gap = 24;
+      const canvas = document.createElement('canvas');
+      canvas.width = window.cdbEtiquetaTermica.LARGURA;
+      canvas.height = termicas.reduce((h, t) => h + t.altura + gap, gap);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      let y = gap;
+      termicas.forEach(t => { ctx.drawImage(t.canvas, 0, y); y += t.altura + gap; });
+      return new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob retornou null')), 'image/png'));
+    }
+  }
+  const horizOrder = kind === 'order' && currentEtqOrient === 'horizontal';
+  const W = horizOrder ? 620 : 384;
+  const GAP = 20;
+  const NOTA_H = note ? 44 : 0; // altura extra por etiqueta quando nota presente
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  const hasCodes = showQr || showBarcode;
+
+  function calcRowH(et) {
+    if (kind === 'order') {
+      const o = et.order || {};
+      const itemsH = (o.items || []).reduce((s, it) => s + (it.unit ? 34 : 24) + ((it.note || '').trim() ? 16 : 0), 0); // #417: +16 por item com obs
+      if (horizOrder) {
+        // Horizontal: duas colunas. Altura = max(left, right).
+        // Left: brand(30)+kicker(14)+title(24)+ref(18)+date(16)+cliente(70)+items+ITENS(12)+total(48)+notes+nota
+        const leftH = 30 + 14 + 24 + 18 + 16 + 70 + 12 + itemsH + 48 + (o.notes ? 50 : 0) + NOTA_H;
+        // Right: 18 top + codeBox(QR106+bars46+38) + pixSpacer(10) + pix(76)
+        const codeBoxH = (showQr ? 106 : 0) + (showBarcode ? 46 : 0) + 38;
+        const rightH = 18 + codeBoxH + 10 + 76;
+        return Math.max(leftH, rightH) + 28;
+      }
+      const notesH = o.notes ? 64 : 0;
+      const codesH = (showQr ? 148 : 0) + (showBarcode ? 74 : 0) + (hasCodes ? 46 : 0);
+      const refTextH = 38;
+      const pixH = 84;
+      return 340 + itemsH + notesH + codesH + refTextH + pixH + NOTA_H;
+    }
+    const horiz = currentEtqOrient === 'horizontal';
+    const hasPhoto = et && et.photo;
+    if (horiz) {
+      return hasPhoto ? 360 + NOTA_H : 240 + NOTA_H;
+    }
+    return (hasPhoto ? 670 : (hasCodes ? 510 : 340)) + NOTA_H;
+  }
+
+  const rowHeights = etiquetas.map(et => calcRowH(et));
+  const labelsH = rowHeights.reduce((s, h) => s + h + GAP, GAP);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = labelsH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas ctx unavailable');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, labelsH);
+  ctx.fillStyle = '#000';
+  ctx.textBaseline = 'top';
+
+  const photoPromises = etiquetas.map(et => {
+    if (!et || !et.photo) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      // #2459: foto de lote do servidor vem por fetch com a chave do aparelho.
+      const fonte = window.cdbPhotoUpload ? window.cdbPhotoUpload.srcAutenticado(et.photo) : Promise.resolve(et.photo);
+      fonte.then(src => { if (src) img.src = src; else resolve(null); });
+    });
+  });
+
+  return Promise.all(photoPromises).then(images => {
+    let yTop = GAP;
+    etiquetas.forEach((et, i) => {
+      if (kind === 'order') {
+        drawOrderEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i], horizOrder, note);
+      } else {
+        drawProducaoEtiquetaCanvas(ctx, et, W, yTop, rowHeights[i], images[i], note);
+      }
+      yTop += rowHeights[i] + GAP;
+    });
+    return new Promise((resolve, reject) => {
+      try {
+        canvas.toBlob(b => {
+          if (b) resolve(b);
+          else reject(new Error('toBlob retornou null'));
+        }, 'image/png');
+      } catch (e) { reject(e); }
+    });
+  });
+}
+
+function drawProducaoEtiquetaCanvas(ctx, et, W, y0, H, photoImg, nota) {
+  const horiz = currentEtqOrient === 'horizontal';
+  const { showQr, showBars: showBarcode } = scanModeFlags();
+  const hasCodes = showQr || showBarcode;
+
+  if (horiz) {
+    // ── Layout horizontal: info esquerda, códigos direita ──
+    const sideW = hasCodes ? 140 : 0;
+    const mainW = W - sideW;
+    const lx = 24;
+    let y = y0 + 16;
+
+    // Logo EasyStok
+    ctx.fillStyle = '#1A2E5A';
+    if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx, y, 22, 22);
+    ctx.fillStyle = '#E85814';
+    if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx + 4, y + 4, 14, 6);
+    ctx.fillStyle = '#1A2E5A';
+    ctx.textAlign = 'left';
+    ctx.font = '800 16px Inter, Arial, sans-serif';
+    ctx.fillText(window.CDB_CONFIG?.isPilot ? et.empresa || getEmpresaName() : 'EasyStok', lx + (window.CDB_CONFIG?.isPilot ? 0 : 30), y + 14, mainW - lx - 8);
+    y += 34;
+
+    // Nome do produto + emoji (#437)
+    ctx.fillStyle = '#000';
+    ctx.font = '800 18px Inter, Arial, sans-serif';
+    const maxChars = Math.max(8, Math.floor((mainW - lx - 8) / 10));
+    const prodLineHoriz = (et.emoji ? et.emoji + ' ' : '') + et.productName;
+    wordWrap(prodLineHoriz, maxChars).forEach(l => { ctx.fillText(l, lx, y); y += 22; });
+    if (et.unit) {
+      ctx.fillStyle = '#000';
+      ctx.font = '700 13px Inter, Arial, sans-serif';
+      ctx.fillText(et.unit, lx, y); y += 16;
+    }
+
+    // Foto (menor na coluna esquerda)
+    if (photoImg && photoImg.width && photoImg.height) {
+      const maxPW = mainW - lx - 16, maxPH = 80;
+      const ratio = Math.min(maxPW / photoImg.width, maxPH / photoImg.height);
+      const dw = Math.floor(photoImg.width * ratio);
+      const dh = Math.floor(photoImg.height * ratio);
+      ctx.drawImage(photoImg, lx, y, dw, dh);
+      ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+      ctx.strokeRect(lx, y, dw, dh);
+      y += dh + 6;
+    }
+    y += 4;
+
+    // Info rows
+    const infoX = lx + 48;
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('FAB:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(fmtDateBR(et.productionDate), infoX, y); y += 18;
+
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('VAL:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 18;
+
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('LOTE:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+    ctx.fillText(et.lote, infoX, y); y += 18;
+
+    if (et.weightG) {
+      ctx.fillStyle = '#1A2E5A'; ctx.font = '800 12px JetBrains Mono, Courier New, monospace';
+      ctx.fillText('PESO:', lx, y);
+      ctx.fillStyle = '#000'; ctx.font = '600 13px Inter, Arial, sans-serif';
+      ctx.fillText(fmtPesoG(et.weightG), infoX, y); y += 18;
+    }
+
+    // Coluna direita: códigos
+    if (hasCodes) {
+      const sx = mainW + 8;
+      const sideCenter = mainW + sideW / 2;
+      let sy = y0 + 16;
+
+      ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(sx - 4, y0 + 8, sideW - 8, H - 16);
+
+      if (showQr) {
+        const qrSz = 90;
+        drawQrOnCanvas(ctx, et.codigoBarras, sideCenter - qrSz / 2, sy, qrSz);
+        sy += qrSz + 8;
+      }
+      if (showBarcode) {
+        drawCode128OnCanvas(ctx, et.codigoBarras, sx, sy, sideW - 16, 40);
+        sy += 48;
+      }
+      ctx.fillStyle = '#333'; ctx.textAlign = 'center';
+      ctx.font = '700 10px JetBrains Mono, Courier New, monospace';
+      ctx.fillText(et.codigoBarras, sideCenter, sy);
+      ctx.textAlign = 'left';
+    }
+    if (nota) {
+      const ny = y0 + H - 44;
+      const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+      ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(lx, ny, W - lx - 24, 36);
+      ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+      ctx.fillText('NOTA', lx + 6, ny + 6);
+      ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+      ctx.fillText(String(nota).slice(0, 42), lx + 6, ny + 20);
+      ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+    }
+    return;
+  }
+
+  // ── Layout vertical (original) ──
+  const cx = W / 2;
+  const lx = 24;
+  let y = y0 + 16;
+  // Logo EasyStok
+  ctx.fillStyle = '#1A2E5A';
+  if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  if (!window.CDB_CONFIG?.isPilot) ctx.fillRect(lx + 4, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
+  ctx.textAlign = 'left';
+  ctx.font = '800 18px Inter, Arial, sans-serif';
+  ctx.fillText(window.CDB_CONFIG?.isPilot ? et.empresa || getEmpresaName() : 'EasyStok', lx + (window.CDB_CONFIG?.isPilot ? 0 : 30), y + 16, W - lx - 8);
+  y += 36;
+  // Product name + emoji (#437)
+  ctx.fillStyle = '#000';
+  ctx.font = '800 22px Inter, Arial, sans-serif';
+  const prodLineVert = (et.emoji ? et.emoji + ' ' : '') + et.productName;
+  wordWrap(prodLineVert, 22).forEach(l => { ctx.fillText(l, lx, y); y += 26; });
+  if (et.unit) {
+    ctx.fillStyle = '#000';
+    ctx.font = '700 14px Inter, Arial, sans-serif';
+    ctx.fillText(et.unit, lx, y); y += 18;
+  }
+  // Photo
+  if (photoImg && photoImg.width && photoImg.height) {
+    const maxW = W - 60, maxH = 120;
+    const ratio = Math.min(maxW / photoImg.width, maxH / photoImg.height);
+    const dw = Math.floor(photoImg.width * ratio);
+    const dh = Math.floor(photoImg.height * ratio);
+    ctx.drawImage(photoImg, lx, y, dw, dh);
+    ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+    ctx.strokeRect(lx, y, dw, dh);
+    y += dh + 8;
+  }
+  y += 6;
+  // Info rows: FAB, VAL, LOTE
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  const infoX = lx + 52;
+  ctx.fillText('FAB:', lx, y);
+  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+  ctx.fillText(fmtDateBR(et.productionDate), infoX, y); y += 20;
+  ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  ctx.fillText('VAL:', lx, y);
+  // #437: VAL em destaque (900 16px) — é a info mais consultada na geladeira
+  ctx.fillStyle = '#000'; ctx.font = '900 16px Inter, Arial, sans-serif';
+  ctx.fillText(et.expiresAt ? fmtDateBR(et.expiresAt) : '—', infoX, y); y += 22;
+  ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+  ctx.fillText('LOTE:', lx, y);
+  ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+  ctx.fillText(et.lote, infoX, y); y += 20;
+  if (et.weightG) {
+    ctx.fillStyle = '#1A2E5A'; ctx.font = '800 13px JetBrains Mono, Courier New, monospace';
+    ctx.fillText('PESO:', lx, y);
+    ctx.fillStyle = '#000'; ctx.font = '600 14px Inter, Arial, sans-serif';
+    ctx.fillText(fmtPesoG(et.weightG), infoX, y); y += 20;
+  }
+  y += 6;
+  // Scan area
+  ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1.5;
+  const scanY = y;
+  const qrSize = showQr ? 100 : 0;
+  const barsH = showBarcode ? 50 : 0;
+  const scanH = (showQr ? qrSize + 10 : 0) + (showBarcode ? barsH + 10 : 0) + 30;
+  if (hasCodes) {
+    ctx.strokeRect(lx - 4, scanY, W - 40, scanH);
+    y = scanY + 8;
+    if (showQr) {
+      drawQrOnCanvas(ctx, et.codigoBarras, (W - qrSize) / 2, y, qrSize);
+      y += qrSize + 8;
+    }
+    if (showBarcode) {
+      drawCode128OnCanvas(ctx, et.codigoBarras, lx, y, W - 48, barsH);
+      y += barsH + 8;
+    }
+    ctx.fillStyle = '#333'; ctx.textAlign = 'center';
+    ctx.font = '700 11px JetBrains Mono, Courier New, monospace';
+    ctx.fillText(et.codigoBarras, cx, y); y += 16;
+    ctx.textAlign = 'left';
+  }
+  if (nota) {
+    const lx2 = 24;
+    const ny = y0 + H - 44;
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx2, ny, W - lx2 * 2, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', lx2 + 6, ny + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 42), lx2 + 6, ny + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
+}
+
+function drawOrderEtiquetaCanvas(ctx, et, W, y0, H, horizontal, nota) {
+  const o = et.order;
+  const pixText = formatPixByType(getPixKey(), getPixType()) || 'Nao configurado';
+  const orderRef = (o.id || '').slice(-8);
+  const { showQr, showBars } = scanModeFlags();
+
+  if (horizontal) {
+    drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showBars, nota);
+    return;
+  }
+
+  const cx = W / 2;
+  const lx = 24;
+  let y = y0 + 16;
+  // Logo EasyStok
+  ctx.fillStyle = '#1A2E5A';
+  ctx.fillRect(cx - 11, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  ctx.fillRect(cx - 7, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
+  ctx.textAlign = 'center';
+  ctx.font = '800 16px Inter, Arial, sans-serif';
+  ctx.fillText('EasyStok', cx, y + 38); y += 52;
+  // Header
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 10px Inter, Arial, sans-serif';
+  ctx.fillText('RECIBO DE PEDIDO', cx, y); y += 16;
+  ctx.fillStyle = '#000';
+  ctx.font = '800 24px Inter, Arial, sans-serif';
+  ctx.fillText((getEmpresaName() || 'EasyStok').toUpperCase().slice(0, 22), cx, y); y += 28;
+  ctx.font = '700 16px Inter, Arial, sans-serif';
+  ctx.fillText('Pedido ' + orderRef, cx, y); y += 20;
+  ctx.fillStyle = '#888';
+  ctx.font = '500 12px Inter, Arial, sans-serif';
+  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), cx, y); y += 18;
+  ctx.fillStyle = '#e2e5ea';
+  ctx.fillRect(lx, y, W - 48, 1); y += 10;
+  ctx.textAlign = 'left';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, y, W - 40, 54);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '900 11px Arial, sans-serif';
+  ctx.fillText('CLIENTE', 30, y + 8);
+  ctx.fillStyle = '#000';
+  ctx.font = '900 18px Arial, sans-serif';
+  ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 24), 30, y + 24);
+  // Bug 11 (Onda 4): canvas etiqueta (photo print) sem CPF.
+  const refCanvas1 = safeRefDisplay(o.clientSnapshot?.ref);
+  if (refCanvas1) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '700 12px Arial, sans-serif';
+    ctx.fillText(refCanvas1.slice(0, 18), W - 30, y + 10);
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'left';
+  }
+  y += 70;
+  ctx.fillRect(24, y, W - 48, 2); y += 10;
+  (o.items || []).forEach(it => {
+    ctx.fillStyle = '#000';
+    ctx.font = '900 15px Arial, sans-serif';
+    ctx.fillText((it.qty + 'x ' + it.name).slice(0, 24), 24, y);
+    if (it.unit) {
+      ctx.fillStyle = '#4b5563';
+      ctx.font = '700 11px Arial, sans-serif';
+      ctx.fillText(String(it.unit).slice(0, 20), 44, y + 16);
+    }
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#000';
+    ctx.font = '900 15px Arial, sans-serif';
+    ctx.fillText(money(it.qty * it.unitPrice), W - 24, y);
+    ctx.textAlign = 'left';
+    let adv = it.unit ? 34 : 24;
+    // #417 — observacao por item, abaixo do item (altura reservada em calcRowH).
+    const inote = (it.note || '').trim();
+    if (inote) {
+      ctx.fillStyle = '#c2410c';
+      ctx.font = 'italic 700 11px Arial, sans-serif';
+      ctx.fillText(('obs: ' + inote).slice(0, 40), 30, y + adv - 6);
+      adv += 16;
+    }
+    y += adv;
+  });
+  ctx.fillRect(24, y, W - 48, 2); y += 12;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, y - 2, W - 40, 44);
+  ctx.font = '900 22px Arial, sans-serif';
+  ctx.fillText('TOTAL', 34, y + 27);
+  ctx.textAlign = 'right'; ctx.fillText(money(o.total), W - 34, y + 27); ctx.textAlign = 'left';
+  y += 56;
+  if (o.notes) {
+    ctx.strokeRect(20, y, W - 40, 52);
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '900 11px Arial, sans-serif';
+    ctx.fillText('OBSERVACAO', 30, y + 8);
+    ctx.fillStyle = '#000';
+    ctx.font = '700 13px Arial, sans-serif';
+    ctx.fillText(String(o.notes).slice(0, 34), 30, y + 24);
+    y += 64;
+  }
+  // QR / codigo de barras de conferencia (respeita modo configurado)
+  if (showQr || showBars) {
+    const qrSize = showQr ? 130 : 0;
+    const barsH = showBars ? 56 : 0;
+    const boxH = (showQr ? qrSize + 10 : 0) + (showBars ? barsH + 10 : 0) + 46;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(20, y - 4, W - 40, boxH);
+    if (showQr) {
+      drawQrOnCanvas(ctx, orderRef, (W - qrSize) / 2, y, qrSize);
+      y += qrSize + 8;
+    }
+    if (showBars) {
+      drawCode128OnCanvas(ctx, orderRef, 24, y, W - 48, barsH);
+      y += barsH + 8;
+    }
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.font = '900 16px Arial, sans-serif';
+    ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '700 11px Arial, sans-serif';
+    ctx.fillText('Confira no app pelo codigo' + (showQr ? ' ou QR' : ''), cx, y); y += 18;
+    ctx.textAlign = 'left';
+  } else {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.font = '700 13px Arial, sans-serif';
+    ctx.fillText('Codigo: ' + orderRef, cx, y); y += 20;
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '500 11px Arial, sans-serif';
+    ctx.fillText('Confira no app pelo codigo', cx, y); y += 18;
+    ctx.textAlign = 'left';
+  }
+  ctx.fillStyle = '#000';
+  ctx.strokeRect(20, y, W - 40, 68);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '900 11px Arial, sans-serif';
+  ctx.fillText('PAGAMENTO PIX', 30, y + 8);
+  ctx.fillStyle = '#000';
+  ctx.font = '900 14px Arial, sans-serif';
+  ctx.fillText(pixText.slice(0, 28), 30, y + 24);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '700 12px Arial, sans-serif';
+  ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 22), 30, y + 44);
+  ctx.fillStyle = '#000';
+  if (nota) {
+    const ny = y0 + H - 44;
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(20, ny, W - 40, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', 28, ny + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 50), 28, ny + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
+}
+
+// Pedido em formato landscape — coluna esquerda com info, coluna direita com QR + PIX.
+// Usado quando o operador escolhe Orientação: Horizontal no preview do recibo.
+function drawOrderHorizCanvas(ctx, o, W, y0, H, orderRef, pixText, showQr, showBars, nota) {
+  const sideW = 180;
+  const lx = 18;
+  const mainW = W - sideW - 36;
+  const sx = lx + mainW + 18;
+  let y = y0 + 16;
+
+  // Separador vertical entre colunas
+  ctx.strokeStyle = '#d0d4db';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(sx - 8, y0 + 12);
+  ctx.lineTo(sx - 8, y0 + H - 12);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── COLUNA ESQUERDA ──
+  // Logo + brand
+  ctx.fillStyle = '#1A2E5A';
+  ctx.fillRect(lx, y, 22, 22);
+  ctx.fillStyle = '#E85814';
+  ctx.fillRect(lx + 4, y + 4, 14, 6);
+  ctx.fillStyle = '#1A2E5A';
+  ctx.textAlign = 'left';
+  ctx.font = '800 16px Inter, Arial, sans-serif';
+  ctx.fillText('EasyStok', lx + 28, y + 14);
+  y += 30;
+
+  // Kicker + título
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 10px Inter, Arial, sans-serif';
+  ctx.fillText('RECIBO DE PEDIDO', lx, y); y += 14;
+  ctx.fillStyle = '#000';
+  ctx.font = '800 22px Inter, Arial, sans-serif';
+  ctx.fillText((getEmpresaName() || 'EasyStok').toUpperCase().slice(0, 26), lx, y); y += 24;
+  ctx.font = '700 14px Inter, Arial, sans-serif';
+  ctx.fillText('Pedido ' + orderRef, lx, y); y += 18;
+  ctx.fillStyle = '#888';
+  ctx.font = '500 11px Inter, Arial, sans-serif';
+  ctx.fillText(new Date(o.factAt || o.createdAt).toLocaleString('pt-BR'), lx, y); y += 16;
+
+  // Cliente — box com 3 linhas; fillText usa baseline, logo +10/+24/+38 dentro de 52px
+  // Bug 11 (Onda 4): segunda variante de canvas etiqueta — sem CPF tambem.
+  const refCanvas2 = safeRefDisplay(o.clientSnapshot?.ref);
+  const clientH = refCanvas2 ? 58 : 44;
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+  ctx.strokeRect(lx, y, mainW, clientH);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '700 9px Arial, sans-serif';
+  ctx.fillText('CLIENTE', lx + 8, y + 10);
+  ctx.fillStyle = '#000';
+  ctx.font = '800 14px Arial, sans-serif';
+  ctx.fillText((o.clientSnapshot?.name || 'Sem cliente').slice(0, 32), lx + 8, y + 26);
+  if (refCanvas2) {
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '500 11px Arial, sans-serif';
+    ctx.fillText(refCanvas2.slice(0, 36), lx + 8, y + 42);
+  }
+  y += clientH + 12;
+
+  // Itens
+  ctx.fillStyle = '#1A2E5A';
+  ctx.font = '700 9px Arial, sans-serif';
+  ctx.fillText('ITENS', lx, y); y += 12;
+  (o.items || []).forEach(it => {
+    ctx.fillStyle = '#000';
+    ctx.font = '700 12px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText((it.qty + 'x  ' + it.name).slice(0, 30), lx, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(money(it.qty * it.unitPrice), lx + mainW - 4, y);
+    if (it.unit) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#888';
+      ctx.font = '400 10px Arial, sans-serif';
+      ctx.fillText(String(it.unit).slice(0, 24), lx + 20, y + 13);
+    }
+    let adv = it.unit ? 28 : 18;
+    // #417 — observacao por item (altura reservada em calcRowH via itemsH).
+    const inote = (it.note || '').trim();
+    if (inote) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#c2410c';
+      ctx.font = 'italic 700 9px Arial, sans-serif';
+      ctx.fillText(('obs: ' + inote).slice(0, 32), lx + 8, y + (it.unit ? 24 : 13));
+      adv += 16;
+    }
+    y += adv;
+  });
+  ctx.textAlign = 'left';
+  ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx + mainW, y); ctx.stroke();
+  y += 8;
+
+  // Total
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+  ctx.strokeRect(lx, y, mainW, 38);
+  ctx.fillStyle = '#000';
+  ctx.font = '900 18px Arial, sans-serif';
+  // textBaseline='top': 18px font em caixa 38px → topo em y+10 centraliza (38-18)/2=10
+  ctx.fillText('TOTAL', lx + 10, y + 10);
+  ctx.textAlign = 'right';
+  ctx.fillText(money(o.total), lx + mainW - 10, y + 10);
+  ctx.textAlign = 'left';
+  y += 48;
+
+  if (o.notes) {
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx, y, mainW, 40);
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '900 10px Arial, sans-serif';
+    ctx.fillText('OBSERVACAO', lx + 8, y + 6);
+    ctx.fillStyle = '#000';
+    ctx.font = '700 11px Arial, sans-serif';
+    ctx.fillText(String(o.notes).slice(0, 40), lx + 8, y + 20);
+    y += 50;
+  }
+  if (nota) {
+    const _ss = ctx.strokeStyle, _lw = ctx.lineWidth;
+    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(lx, y, mainW, 36);
+    ctx.fillStyle = '#c2410c'; ctx.font = '700 9px Arial, sans-serif';
+    ctx.fillText('NOTA', lx + 6, y + 6);
+    ctx.fillStyle = '#000'; ctx.font = '500 12px Arial, sans-serif';
+    ctx.fillText(String(nota).slice(0, 40), lx + 6, y + 20);
+    ctx.strokeStyle = _ss; ctx.lineWidth = _lw;
+  }
+
+  // ── COLUNA DIREITA ──
+  let sy = y0 + 18;
+  const sCenter = sx + sideW / 2;
+  // codeBoxH: 106 por QR (96 drawável + 10 gap), 46 por barcode (38 + 8 gap), 38 fixo pra "Codigo" + hint
+  const codeBoxH = (showQr ? 106 : 0) + (showBars ? 46 : 0) + 38;
+
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
+  ctx.strokeRect(sx, sy, sideW, codeBoxH);
+  sy += 8; // padding interno topo
+
+  if (showQr) {
+    drawQrOnCanvas(ctx, orderRef, sCenter - 48, sy, 96);
+    sy += 106; // avança 106 (alocação do codeBoxH para QR)
+  }
+  if (showBars) {
+    drawCode128OnCanvas(ctx, orderRef, sx + 4, sy, sideW - 8, 38);
+    sy += 46;
+  }
+  // Texto "Codigo" e "Confira" dentro do box — sem offset extra para caber nos 38px finais
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#000';
+  ctx.font = '700 12px Arial, sans-serif';
+  ctx.fillText('Codigo: ' + orderRef, sCenter, sy); sy += 14;
+  ctx.fillStyle = '#888';
+  ctx.font = '400 9px Arial, sans-serif';
+  ctx.fillText(showQr || showBars ? 'Confira no app' : 'Ref. do pedido', sCenter, sy);
+  sy = y0 + 18 + codeBoxH + 10; // avança para depois do box + gap
+  ctx.textAlign = 'left';
+
+  // PIX (sempre na base da coluna direita — equivale ao margin-top:auto do CSS)
+  const pixY = y0 + H - 76;
+  ctx.strokeStyle = '#d0d4db'; ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(sx, pixY - 4);
+  ctx.lineTo(sx + sideW, pixY - 4);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '900 10px Arial, sans-serif';
+  ctx.fillText('PAGAMENTO PIX', sx, pixY + 6);
+  ctx.fillStyle = '#000';
+  ctx.font = '800 12px Arial, sans-serif';
+  ctx.fillText(pixText.slice(0, 26), sx, pixY + 22);
+  ctx.fillStyle = '#4b5563';
+  ctx.font = '500 10px Arial, sans-serif';
+  ctx.fillText('Titular: ' + String(getPixHolder() || '').slice(0, 24), sx, pixY + 38);
+}
+
+/**
+ * Desenha QR code direto num canvas (pra geracao de PNG da etiqueta).
+ * Usa lib qrcode-generator (Kazuhiko Arase) ja carregada no head.
+ */
+function drawQrOnCanvas(ctx, data, x, y, size) {
+  if (typeof qrcode !== 'function') return;
+  try {
+    const qr = qrcode(0, 'L');
+    qr.addData(String(data || ''));
+    qr.make();
+    const cells = qr.getModuleCount();
+    const quiet = 4;
+    const cellSize = Math.max(1, Math.floor(size / (cells + quiet * 2)));
+    const realSize = cellSize * (cells + quiet * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x, y, realSize, realSize);
+    ctx.fillStyle = '#000';
+    for (let r = 0; r < cells; r++) {
+      for (let c = 0; c < cells; c++) {
+        if (qr.isDark(r, c)) ctx.fillRect(x + (c + quiet) * cellSize, y + (r + quiet) * cellSize, cellSize, cellSize);
+      }
+    }
+  } catch (e) { console.warn('QR canvas falhou:', e); }
+}
+
+function drawBarcodeOnCanvas(ctx, seed, x, y, w, h) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+
+  // Pre-calcula larguras pra saber largura total do barcode (42 barras+gaps).
+  // Sem isso o barcode fica colado a esquerda, deixando espaco vazio a direita.
+  const widths = [];
+  let totalW = 0;
+  for (let i = 0; i < 42; i++) {
+    const barW = (Math.abs(hash >> (i % 28)) % 3) + 1;
+    const gapW = (Math.abs(hash >> ((i + 7) % 28)) % 2) + 1;
+    widths.push([barW, gapW]);
+    totalW += barW + gapW;
+  }
+
+  // Escala se total exceder espaco disponivel; senao centraliza no slot.
+  const scale = totalW > w ? w / totalW : 1;
+  const renderedW = totalW * scale;
+  let cur = x + Math.max(0, (w - renderedW) / 2);
+  ctx.fillStyle = '#000';
+  for (const [barW, gapW] of widths) {
+    ctx.fillRect(cur, y, barW * scale, h);
+    cur += (barW + gapW) * scale;
+  }
+}
+
+function drawCode128OnCanvas(ctx, data, x, y, w, h) {
+  const modules = code128Modules(data);
+  if (!modules) return;
+  const total = modules.split('').reduce((s, n) => s + Number(n || 0), 0);
+  const scale = Math.max(1, Math.floor(w / total));
+  const renderedW = total * scale;
+  let cur = x + Math.max(0, (w - renderedW) / 2);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#000';
+  for (let i = 0; i < modules.length; i++) {
+    const bw = Number(modules[i]) * scale;
+    if (i % 2 === 0) ctx.fillRect(cur, y, bw, h);
+    cur += bw;
+  }
+}
+
+// Estado do preview de etiquetas
+let currentEtiquetas = [];
+let currentEtiquetasKind = 'producao'; // 'producao' | 'order'
+let currentEtqOrient = 'vertical';     // 'vertical' | 'horizontal'
+
+function setEtqCode(mode) {
+  setScanModeChoice(mode, true);
+  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => b.classList.toggle('active', b.getAttribute?.('onclick')?.includes("setEtqCode('" + mode + "')") || b.textContent.trim() === prodScanModeLabel(mode)));
+  refreshEtqPreview();
+}
+// Alias: chama o setOrientChoice unificado que cuida de Ajustes + Preview + state + audit
+function setEtqOrient(orient) { setOrientChoice(orient, true); }
+
+function getEtqNota() {
+  return (document.getElementById('etqNoteInput')?.value || '').trim();
+}
+
+let _etqNoteDebounce;
+function onEtqNoteInput() {
+  clearTimeout(_etqNoteDebounce);
+  _etqNoteDebounce = setTimeout(refreshEtqPreview, 150);
+}
+
+function refreshEtqPreview() {
+  const body = document.getElementById('etqBody');
+  if (!body || !currentEtiquetas.length) return;
+  const horiz = currentEtqOrient === 'horizontal';
+  const isOrder = currentEtiquetasKind === 'order';
+  // etq-order-horiz: classe explicita para pedido horizontal (sem :has() que nao roda em WebView antigo)
+  const cls = horiz
+    ? (isOrder ? 'etq-card etq-order-horiz' : 'etq-card etq-horiz')
+    : 'etq-card';
+  const nota = getEtqNota();
+  if (isOrder) {
+    body.innerHTML = currentEtiquetas.map(et =>
+      `<div class="etq-card-wrap"><div class="${cls}">${orderLabelHtml(et.order, horiz, nota)}</div></div>`
+    ).join('');
+  } else {
+    const termicas = currentEtiquetas.map(et => previaDaEtiquetaProducao(et, nota));
+    // A térmica recusa: a tela mostra o motivo, não uma etiqueta que não vai sair.
+    const recusa = termicas.find(t => t && t.recusa);
+    if (recusa) {
+      body.innerHTML = `<div class="etq-recusa" role="alert">${escapeHtml(avisoDaRecusa(recusa.recusa))}</div>`;
+      return;
+    }
+    if (termicas.every(t => t && t.canvas)) {
+      body.innerHTML = '';
+      termicas.forEach((t, i) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'etq-termica';
+        t.canvas.setAttribute('role', 'img');
+        t.canvas.setAttribute('aria-label', `Etiqueta ${i + 1} de ${termicas.length}: ${currentEtiquetas[i].productName || ''}`);
+        wrap.appendChild(t.canvas);
+        body.appendChild(wrap);
+      });
+      return;
+    }
+    body.innerHTML = currentEtiquetas.map(et =>
+      `<div class="etq-card-wrap"><div class="${cls}">${etiquetaProducaoHtml(et, nota)}</div></div>`
+    ).join('');
+    if (window.cdbPhotoUpload) window.cdbPhotoUpload.hidratarFotos(body);
+  }
+  // setTimeout em vez de rAF: garante que o layout ja foi calculado antes de medir
+  setTimeout(scaleEtqCards, 0);
+}
+
+function scaleEtqCards() {
+  const body = document.getElementById('etqBody');
+  if (!body) return;
+  const avail = body.clientWidth - 32;
+  if (avail <= 0) return;
+  body.querySelectorAll('.etq-card-wrap').forEach(wrap => {
+    const card = wrap.firstElementChild;
+    if (!card) return;
+    // Reset all inline styles so we read natural dimensions below
+    card.style.transform = '';
+    card.style.transformOrigin = '';
+    card.style.position = '';
+    card.style.top = '';
+    card.style.left = '';
+    wrap.style.position = '';
+    wrap.style.width = '';
+    wrap.style.height = '';
+    wrap.style.overflow = '';
+    const cardW = card.offsetWidth;
+    const cardH = card.offsetHeight;
+    if (!cardH || !cardW) return; // guard: not yet rendered
+    const isHorizOrder = card.classList.contains('etq-order-horiz');
+    if (isHorizOrder) {
+      // Rotaciona +90deg (CW): coluna ESQUERDA (empresa/itens) vai para o TOPO.
+      // Scale limita AMBAS as dimensões: largura (avail) e altura (body.clientHeight)
+      // para caber na tela sem precisar de scroll.
+      // Após rotate(90°): largura na tela = cardH*s, altura na tela = cardW*s.
+      const availH = Math.max(200, body.clientHeight - 64);
+      const s = Math.min(1, avail / cardH, availH / cardW);
+      // position:absolute tira o card do fluxo — sem isso o card de 620px causa overflow
+      // no etqBody e quebra o layout flex, travando a tela.
+      card.style.position = 'absolute';
+      card.style.top = '0';
+      card.style.left = '0';
+      wrap.style.position = 'relative';
+      wrap.style.width  = Math.ceil(cardH * s) + 'px';
+      wrap.style.height = Math.ceil(cardW * s) + 'px';
+      wrap.style.overflow = 'hidden';
+      card.style.transformOrigin = '0 0';
+      card.style.transform = `translate(${Math.ceil(cardH * s)}px, 0) rotate(90deg) scale(${s})`;
+    } else {
+      wrap.style.width = Math.min(cardW, avail) + 'px';
+      if (cardW <= avail) {
+        wrap.style.height = cardH + 'px';
+      } else {
+        const s = avail / cardW;
+        card.style.transformOrigin = '0 0';
+        card.style.transform = `scale(${s})`;
+        wrap.style.height = Math.ceil(cardH * s) + 'px';
+      }
+    }
+  });
+}
+
+function prodScanModeLabel(mode) {
+  return mode === 'barcode' ? 'Só barras'
+       : mode === 'qr' ? 'Só QR'
+       : mode === 'none' ? 'Sem código'
+       : 'QR + barras';
+}
+
+function showEtiquetasPreview(etiquetas, kind, subtitle, successMsg) {
+  if (!etiquetas || !etiquetas.length) return;
+  currentEtiquetas = etiquetas.map(e => Object.assign({}, e));
+  currentEtiquetasKind = kind || 'producao';
+  try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
+  try { currentEtqOrient = getEtqOrient(); } catch(e) {}
+  document.getElementById('etqTitle').textContent = kind === 'order' ? 'Etiqueta do pedido' : 'Etiquetas geradas';
+  document.getElementById('etqSubtitle').textContent = subtitle || '';
+  // A térmica de produção é um rolo de 58 mm: orientação só muda a etiqueta de pedido.
+  const orientRow = document.getElementById('etqOrientChips')?.closest?.('.etq-config-row');
+  if (orientRow) orientRow.style.display = kind === 'order' ? '' : 'none';
+
+  // Sync config chips
+  const curMode = getProdScanMode();
+  document.querySelectorAll('#etqCodeChips .etq-chip').forEach(b => {
+    const lbl = b.textContent.trim();
+    b.classList.toggle('active', b.getAttribute?.('onclick')?.includes("setEtqCode('" + curMode + "')") || lbl === prodScanModeLabel(curMode));
+  });
+  document.querySelectorAll('#etqOrientChips .etq-chip').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === (currentEtqOrient === 'horizontal' ? 'Horizontal' : 'Vertical'));
+  });
+
+  const banner = document.getElementById('etqSuccessBanner');
+  if (successMsg) {
+    document.getElementById('etqSuccessText').textContent = successMsg;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  refreshEtqPreview();
+  if (kind !== 'order' && typeof window !== 'undefined' && window.cdbEtiquetaTermica) {
+    window.cdbEtiquetaTermica.fontes().then(refreshEtqPreview);
+  }
+  rememberOperationalFocus('etiquetasPreview');
+  document.getElementById('etiquetasPreview').classList.add('show');
+  document.getElementById('etqTitle').focus();
+}
+
+function closeEtiquetasPreview() {
+  document.getElementById('etiquetasPreview').classList.remove('show');
+  try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
+  try { document.getElementById('etqCopiesSelect').value = '1'; } catch (_) {}
+  try { document.getElementById('etqRetryBtn').style.display = 'none'; } catch (_) {}
+  // Se veio de produção, volta pra home (fluxo natural pós-finalizar).
+  if (currentEtiquetasKind === 'producao') {
+    go(window.CDB_CONFIG?.isPilot ? 'producao' : 'home');
+    if (window.CDB_CONFIG?.isPilot) document.querySelector('[data-screen="producao"] button:not([disabled])')?.focus();
+  } else restoreOperationalFocus('etiquetasPreview');
+  operationalFocus.delete('etiquetasPreview');
+  currentEtiquetas = [];
+}
+
+// #437 — guarda os ultimos bytes impressos para retry em caso de falha BT.
+let _etqLastPrintBytes = null;
+let _etqLastPrintKind  = null;
+let _etqLastPrintJob = null;
+let _etqLastPrinter = null;
+function etiquetaPrintJob(etiquetas, kind, copies) {
+  const first = etiquetas[0];
+  return first ? {
+    entityType: kind === 'order' ? 'order' : 'batch',
+    entityId: kind === 'order' ? first.order?.id : first.batchId,
+    quantity: etiquetas.length * copies, copies
+  } : null;
+}
+
+function _etqShowRetry() {
+  const btn = document.getElementById('etqRetryBtn');
+  if (btn) btn.style.display = '';
+}
+function _etqHideRetry() {
+  const btn = document.getElementById('etqRetryBtn');
+  if (btn) btn.style.display = 'none';
+}
+// Falha de envio: com o erro já explicado (permissão, conexão) o toast dele
+// fica; sem Bluetooth ou impressora, sugere salvar ou compartilhar.
+function _etqSemConexao(explicado) {
+  if (!explicado) showToast('Sem conexão BT — use Salvar ou Compartilhar');
+  _etqShowRetry();
+}
+function etqRetry() {
+  if (!_etqLastPrintBytes) { showToast('Nada para reimprimir'); return; }
+  _etqHideRetry();
+  printViaBluetooth(_etqLastPrintBytes, _etqSemConexao, _etqLastPrintJob, _etqLastPrinter);
+}
+
+function getEtqCopies() {
+  const sel = document.getElementById('etqCopiesSelect');
+  const n = sel ? parseInt(sel.value, 10) : 1;
+  return (!isNaN(n) && n >= 1) ? n : 1;
+}
+
+/**
+ * "Salvar": exibe a imagem em uma nova tela full-screen, e o operador
+ * pressiona-e-segura pra salvar na galeria. WebView Android não respeita
+ * `<a download>` em nenhuma configuração padrão — esse caminho de press-hold
+ * é o único método 100% confiável que não exige Web Share API nem plugin.
+ */
+function showImageForSaving(dataUrl, filename) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;overflow:auto';
+  overlay.innerHTML = `
+    <div style="color:#fff;font-size:14px;margin:8px 0 4px;text-align:center;line-height:1.4;font-weight:700">
+      Pressione e segure a imagem<br/>e escolha "Salvar imagem"
+    </div>
+    <div style="color:#aaa;font-size:var(--fs-micro);margin-bottom:12px">${escapeHtml(filename)}</div>
+    <img src="${dataUrl}" style="max-width:100%;background:#fff;border-radius:4px"/>
+    <button id="closeSaveImg" style="margin-top:16px;padding:12px 24px;background:#d4af37;color:#000;border:0;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer">Fechar</button>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#closeSaveImg').onclick = () => overlay.remove();
+}
+
+/**
+ * Salva a imagem direto no Android via Capacitor Filesystem plugin (Documents).
+ * No browser, faz <a download> nativo (vai pra pasta Downloads do navegador).
+ * Sem fallback de press-and-hold — o save tem que SALVAR.
+ */
+/**
+ * Salva a imagem em Documentos via @capacitor/filesystem e abre no
+ * visualizador padrao via @capacitor-community/file-opener (galeria/Fotos).
+ * Fallback browser: <a download>.
+ */
+async function saveImageToDevice(blob, filename) {
+  const FS = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+  const FO = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FileOpener;
+
+  if (FS) {
+    try {
+      const base64 = (await blobToDataUrl(blob)).split(',')[1] || '';
+      const written = await FS.writeFile({
+        path: filename, data: base64, directory: 'DOCUMENTS', recursive: true
+      });
+      // Abre no app padrao (galeria/Fotos) se o plugin FileOpener estiver
+      // disponivel. Falha em abrir nao falha o save: a imagem ja esta salva.
+      if (FO && written && written.uri) {
+        showToast('Salvo · abrindo...');
+        try {
+          await FO.open({ filePath: written.uri, contentType: 'image/png' });
+          return true;
+        } catch (e) {
+          console.warn('[save] FileOpener falhou:', e);
+          alert('Salvo em Documentos:\n\n' + filename
+                + '\n\nNão foi possível abrir automaticamente — abra pelo app Files.');
+          return true;
+        }
+      }
+      // Sem FileOpener (APK antigo ou browser): so confirma o save
+      alert('Imagem salva em Documentos:\n\n' + filename);
+      return true;
+    } catch (e) {
+      console.warn('[save] Filesystem falhou:', e);
+      // cai pro fallback abaixo
+    }
+  }
+
+  // Fallback browser: <a download>
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    showToast('Salvo em Downloads (' + filename + ')');
+    return true;
+  } catch (e) {
+    alert('Erro ao salvar:\n\n' + (e && e.message ? e.message : e));
+    return false;
+  }
+}
+
+/**
+ * Compartilha a imagem via sheet nativa do Android usando o plugin
+ * @capacitor/share. Salva o PNG temporariamente em CACHE e passa o file://
+ * URI pro Share. Resultado: WhatsApp, Drive, Gmail, "Salvar nos arquivos"...
+ * Web Share API (navigator.share) e usada como fallback no browser.
+ */
+async function shareImageNative(blob, filename) {
+  if (!blob) { alert('Sem imagem pra compartilhar'); return false; }
+
+  const FS    = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
+  const Share = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+
+  if (FS && Share) {
+    try {
+      const base64 = (await blobToDataUrl(blob)).split(',')[1] || '';
+      // CACHE: dados temporarios — Android limpa quando precisar de espaco.
+      const written = await FS.writeFile({
+        path: filename, data: base64, directory: 'CACHE', recursive: true
+      });
+      await Share.share({
+        title: 'Etiqueta',
+        files: [written.uri],
+        dialogTitle: 'Compartilhar etiqueta'
+      });
+      // Share resolve mesmo quando o usuario cancela — nao da pra distinguir
+      // confiavelmente, entao nao mostro toast "compartilhado" pra evitar
+      // confirmacao incorreta.
+      return true;
+    } catch (e) {
+      // "Share canceled" e similar nao sao erros reais
+      var msg = (e && e.message ? String(e.message) : '').toLowerCase();
+      if (msg.indexOf('cancel') >= 0 || msg.indexOf('dismiss') >= 0) return false;
+      console.warn('[share] plugin falhou:', e);
+      alert('Erro ao compartilhar:\n\n' + (e && e.message ? e.message : e));
+      return false;
+    }
+  }
+
+  // Fallback browser: Web Share API
+  const file = new File([blob], filename, { type: blob.type || 'image/png' });
+  if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
+    alert('Compartilhamento não disponível neste dispositivo.\n\n'
+          + 'Use o botão Salvar.');
+    return false;
+  }
+  try {
+    await navigator.share({ files: [file], title: filename });
+    return true;
+  } catch (e) {
+    if (e && e.name === 'AbortError') return false;
+    alert('Erro ao compartilhar:\n\n' + (e && e.message ? e.message : e));
+    return false;
+  }
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+async function etqAction(action) {
+  if (!currentEtiquetas.length) { showToast('Sem etiquetas'); return; }
+  try {
+    if (action === 'print') {
+      // Tenta (re)instalar o shim do plugin nativo on-demand. Cobre o caso
+      // de Capacitor.Plugins.ThermalPrinter ter ficado disponivel DEPOIS do
+      // boot inicial (LiveUpdater bundle, race em deviceready, etc).
+      try { if (typeof window.cdbInstallThermalShim === 'function') window.cdbInstallThermalShim(); } catch (_) {}
+
+      let bs = window.bluetoothSerial;
+      // #2202 (F1): produção vai para a impressora de etiqueta; pedido, para a de cupom.
+      const printer = impressoraPara(currentEtiquetasKind === 'order' ? 'etiqueta-pedido' : 'etiqueta-producao') || getSavedPrinter();
+      _etqLastPrinter = printer;
+      const hasCapacitor = !!(window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() !== 'web');
+      const hasNativePlugin = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ThermalPrinter);
+
+      // No APK (Capacitor) o shim DEVE estar pronto. Se nao esta, plugin
+      // nativo nao foi registrado — situacao de erro real, instrui usuario.
+      if (hasCapacitor && !hasNativePlugin) {
+        showToast('Plugin Bluetooth não registrou — feche e reabra o app');
+        return;
+      }
+      // Sem plugin Bluetooth no browser puro: oferece configurar/share
+      if (!bs && !hasCapacitor) { openNoPrinterModal(); return; }
+      // Capacitor presente, plugin nativo presente, mas shim ainda undefined
+      // (timing): re-tenta instalar e segue com a referencia recem-criada.
+      if (!bs && hasNativePlugin) {
+        if (typeof window.cdbInstallThermalShim === 'function') window.cdbInstallThermalShim();
+        bs = window.bluetoothSerial;
+      }
+      if (!bs) { showToast('Bluetooth indisponível — tente de novo em 2s'); return; }
+      // Tem plugin mas operador nao selecionou impressora ainda: abre picker
+      // direto e SALVA a escolha no localStorage. Apos selecionar, ele toca
+      // Imprimir de novo (selectPrinter nao auto-dispara mais).
+      if (!printer || !printer.address) {
+        printerPickerOnSelect = null;
+        openPrinterPicker();
+        return;
+      }
+      if (!printerReady(printer)) { showToast('A impressão de etiqueta não carregou: feche e reabra o app'); return; }
+      if (perfilImpressora(printer) === 'tspl') {
+        const copiasTspl = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
+        _etqHideRetry();
+        _etqLastPrintJob = etiquetaPrintJob(currentEtiquetas, currentEtiquetasKind, copiasTspl);
+        const bytesTspl = await etiquetasTspl(currentEtiquetas, currentEtiquetasKind, getEtqNota() || null, printer, copiasTspl);
+        if (!bytesTspl) { showToast(etiquetasTspl.recusa ? avisoDaRecusa(etiquetasTspl.recusa) : 'Falha ao montar a etiqueta'); return; }
+        _etqLastPrintBytes = bytesTspl;
+        const avisoEnvio = avisoDaImpressao(printer, etiquetasTspl.aviso);
+        printViaBluetooth(bytesTspl, _etqSemConexao, _etqLastPrintJob, printer, avisoEnvio ? () => showToast('Enviado. ' + avisoEnvio) : undefined);
+        return;
+      }
+      // #437: cópias (1/2/5/10) e retry
+      const copies = typeof getEtqCopies === 'function' ? getEtqCopies() : 1;
+      _etqHideRetry();
+      _etqLastPrintJob = etiquetaPrintJob(currentEtiquetas, currentEtiquetasKind, copies);
+      if (currentEtiquetasKind === 'order') {
+        const et = currentEtiquetas[0];
+        const printNota = getEtqNota() || null;
+        const oneShot = escPosOrderLabel(et.order, printNota);
+        // Repete os bytes N vezes para N cópias
+        const totalBytes = new Uint8Array(oneShot.length * copies);
+        for (let ci = 0; ci < copies; ci++) totalBytes.set(oneShot, ci * oneShot.length);
+        _etqLastPrintBytes = totalBytes;
+        printViaBluetooth(totalBytes, _etqSemConexao, _etqLastPrintJob, printer);
+      } else {
+        // Concatena bytes em uma unica passada O(n) — antes era O(n^2)
+        // (Uint8Array.from([...acc, ...b]) re-copiava acc inteiro a cada
+        // etiqueta, travando o app pra batches de 100+ unidades).
+        // #2209: o ESC/POS imprime o código do QR, não a chave curta; não espera o número do lote.
+        const prodNota = getEtqNota() || null;
+        let singleLen = 0;
+        const parts = currentEtiquetas.map(et => {
+          if (prodNota) et._nota = prodNota;
+          try {
+            const b = escPosEtiquetaProducao(et);
+            singleLen += b.length;
+            return b;
+          } finally {
+            delete et._nota;
+          }
+        });
+        const singleRun = new Uint8Array(singleLen);
+        let off = 0;
+        for (const b of parts) { singleRun.set(b, off); off += b.length; }
+        // Repete N vezes para N cópias de cada etiqueta
+        const totalBytes = new Uint8Array(singleLen * copies);
+        for (let ci = 0; ci < copies; ci++) totalBytes.set(singleRun, ci * singleLen);
+        _etqLastPrintBytes = totalBytes;
+        printViaBluetooth(totalBytes, _etqSemConexao, _etqLastPrintJob, printer);
+      }
+      return;
+    }
+    if (action === 'save' || action === 'share') {
+      const note = getEtqNota();
+      const label = action === 'save' ? 'Gerando imagem…' : 'Preparando…';
+      showToast(label);
+      const blob = await etiquetasToPng(currentEtiquetas, currentEtiquetasKind, note || null);
+      if (!blob) { showToast('Falha ao gerar imagem'); return; }
+      const filename = `${currentEtiquetasKind === 'order' ? 'pedido' : 'etiquetas'}-${Date.now()}.png`;
+      if (action === 'save') {
+        await saveImageToDevice(blob, filename);
+      } else {
+        await shareImageNative(blob, filename);
+      }
+      // Limpa o campo de observação após uso
+      try { document.getElementById('etqNoteInput').value = ''; } catch (_) {}
+      return;
+    }
+  } catch (e) {
+    console.error('etqAction', action, e);
+    showToast('Erro: ' + (e?.message || e));
+  }
+}
+
+// Refactor: bot 🖨️ no kanban abre tela de preview com 1 etiqueta de pedido,
+// em vez de tentar window.print direto (que falhava em alguns Android).
+function printEtiqueta(orderId) {
+  const o = getOrderById(orderId);
+  if (!o) { showToast('Pedido não encontrado'); return; }
+  showEtiquetasPreview([{ order: o }], 'order', `Pedido ${(o.id||'').slice(-8)}`);
+}
+
+function orderLabelHtml(o, horizontal, nota) {
+  const items = (o.items || []).map(it =>
+    `<div class="pa-item">
+      <span class="pi-qty">${it.qty}×</span>
+      <span class="pi-main">
+        <span class="pi-name">${escapeHtml(it.name)}</span>
+        ${it.unit ? `<span class="pi-unit">${escapeHtml(it.unit)}</span>` : ''}
+        ${(it.note || '').trim() ? `<span class="pi-note" style="display:block;font-size:0.82em;color:#c2410c;font-style:italic">obs: ${escapeHtml(it.note.trim())}</span>` : ''}
+      </span>
+      <span class="pi-price">${money(it.qty*it.unitPrice)}</span>
+    </div>`
+  ).join('');
+  const empresa  = (getEmpresaName() || 'Easy Stock Mobile').toUpperCase();
+  const pixType  = getPixType();
+  const pixLabel = (PIX_TYPES[pixType]?.short) || 'Chave';
+  const pixVal   = formatPixByType(getPixKey(), pixType) || 'Nao configurado';
+  const orderRef = (o.id || '').slice(-8);
+  const { showQr, showBars } = scanModeFlags();
+  const hasCodes = showQr || showBars;
+
+  const brandBlock = `
+    <div class="et-brand" style="justify-content:center">
+      <img src="etiqueta/assets/logo-easystok.svg" alt="">
+      <span class="et-brand-name">Easy<b>Stok</b></span>
+    </div>
+    <div class="pa-kicker">Recibo de pedido</div>
+    <div class="pa-title">${escapeHtml(empresa)}</div>
+    <div class="pa-center"><span class="pa-order-ref pa-bold">Pedido ${escapeHtml(orderRef)}</span></div>
+    <div class="pa-meta">${new Date(o.factAt||o.createdAt).toLocaleString('pt-BR')}</div>
+    ${o.scheduledDeliveryAt ? `<div class="pa-meta pa-meta-scheduled" style="font-weight:800">📅 Entregar em: ${new Date(o.scheduledDeliveryAt).toLocaleString('pt-BR')}</div>` : ''}`;
+
+  const clientBlock = `
+    <div class="pa-grid">
+      <div class="pa-label">Cliente</div>
+      <div class="pa-bold">${escapeHtml(o.clientSnapshot?.name || 'Sem cliente')}</div>
+      ${(() => { const r = safeRefDisplay(o.clientSnapshot?.ref); return r ? `<div>${escapeHtml(r)}</div>` : ''; })()}
+    </div>`;
+
+  const notaRapidaBlock = nota
+    ? `<div class="pa-nota-rapida"><div class="pa-label">Nota</div><div>${escapeHtml(nota)}</div></div>`
+    : '';
+
+  const itemsBlock = `
+    <div class="pa-block">
+      <div class="pa-label">Itens</div>
+      ${items}
+    </div>
+    <div class="pa-total-box">
+      <div class="pa-row pa-bold pa-large"><span>TOTAL</span><span>${money(o.total)}</span></div>
+    </div>
+    ${o.notes ? `<div class="pa-note"><div class="pa-label">Observacao</div><div>${escapeHtml(o.notes)}</div></div>` : ''}
+    ${notaRapidaBlock}`;
+
+  const conferBlock = `
+    <div class="pa-confer">
+      ${showQr ? `<div class="pa-confer-qr">${generateQrSvg(orderRef, horizontal ? 96 : 120)}</div>` : ''}
+      ${showBars ? `<div class="pa-confer-bars">${generateCode128Svg(orderRef, horizontal ? 180 : 268, horizontal ? 42 : 54)}</div>` : ''}
+      <div class="pa-confer-code">Codigo: <b>${escapeHtml(orderRef)}</b></div>
+      <div class="pa-confer-hint">${hasCodes ? ('Confira no app pelo codigo' + (showQr ? ' ou QR' : '')) : 'Referencia do pedido'}</div>
+    </div>`;
+
+  const pixBlock = `
+    <div class="pa-grid pa-pix">
+      <div class="pa-label">Pagamento PIX</div>
+      <div class="pa-bold">${escapeHtml(pixLabel)}: ${escapeHtml(pixVal)}</div>
+      <div>Titular: ${escapeHtml(getPixHolder())}</div>
+      ${o.confirmedBy ? `<div>Conferido por: ${escapeHtml(o.confirmedBy)}</div>` : ''}
+    </div>`;
+
+  if (horizontal) {
+    return `
+      <div class="pa-receipt pa-horiz">
+        <div class="pa-receipt-main">
+          ${brandBlock}
+          ${clientBlock}
+          ${itemsBlock}
+        </div>
+        <div class="pa-receipt-side">
+          ${conferBlock}
+          ${pixBlock}
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="pa-receipt">
+      ${brandBlock}
+      ${clientBlock}
+      ${itemsBlock}
+      ${conferBlock}
+      ${pixBlock}
+    </div>`;
+}
+
+// ================================================================
+// IMPRESSAO — Fechamento de caixa (recibo Z) e Lista de compras
+// Reusa printAreaHtml (mesmo pipeline das etiquetas/recibos: 58mm, fonte
+// Manrope, @media print). Visualmente alinhado ao recibo de pedido.
+// ================================================================
+
+// ----------------------------------------------------------------
+// shareTextNative: compartilha texto puro via Capacitor Share -> Web Share
+// API -> clipboard. Funciona em APK (manda pro WhatsApp/Drive/email),
+// browser desktop (Web Share quando disponivel) e fallback clipboard.
+// ----------------------------------------------------------------
+async function shareTextNative(title, text) {
+  const Share = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  if (Share) {
+    try {
+      await Share.share({ title: title || 'Compartilhar', text: text, dialogTitle: title });
+      return true;
+    } catch (e) {
+      const msg = (e && e.message ? String(e.message) : '').toLowerCase();
+      if (msg.indexOf('cancel') >= 0 || msg.indexOf('dismiss') >= 0) return false;
+      console.warn('[share text] plugin falhou:', e);
+    }
+  }
+  if (navigator.share) {
+    try { await navigator.share({ title: title, text: text }); return true; }
+    catch (e) { if (!e || e.name !== 'AbortError') console.warn('[share text] navigator.share falhou:', e); return false; }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Copiado — cole onde quiser');
+    return true;
+  } catch (e) {
+    alert(text); // ultimo fallback
+    return true;
+  }
+}
+
+function cashClosingPlainText(dateKey) {
+  const k = dateKey || dateKeyOf();
+  const sum = calcCashSummary(k);
+  const closing = getActiveCashClosing(k);
+  const empresa = getEmpresaName() || 'Easy Stock Mobile';
+  const dayOrders = (orders || []).filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && dateKeyOf(o.updatedAt) === k);
+  const dayEntries = (cashEntries || []).filter(e => dateKeyOf(e.createdAt) === k);
+  const lines = [];
+  lines.push('=== FECHAMENTO DE CAIXA ===');
+  lines.push(empresa);
+  lines.push('Dia: ' + fmtDateKey(k));
+  if (closing) {
+    lines.push('Fechado em: ' + new Date(closing.closedAt).toLocaleString('pt-BR'));
+    if (closing.closedBy) lines.push('Operador: ' + closing.closedBy);
+  } else {
+    lines.push('(Caixa ainda aberto)');
+  }
+  lines.push('');
+  lines.push('--- Resumo ---');
+  lines.push(`Vendas (${sum.ordersCount}): ${money(sum.sold)}`);
+  lines.push(`Entradas extras: +${money(sum.in)}`);
+  lines.push(`Saidas: -${money(sum.out)}`);
+  lines.push(`SALDO: ${money(sum.balance)}`);
+  // #421 — margem so quando ha pedidos no dia.
+  if (sum.ordersCount > 0) {
+    const approx = sum.semCusto > 0 ? ' (aprox - ' + sum.semCusto + ' item(ns) sem custo)' : '';
+    lines.push(`Margem${sum.semCusto > 0 ? ' ~' : ''}: ${money(sum.margem)}${approx}`);
+  }
+  const conf = closing && closing.summary && closing.summary.conferredBalance;
+  if (typeof conf === 'number' && !isNaN(conf)) {
+    const diff = conf - sum.balance;
+    lines.push(`Conferido: ${money(conf)}`);
+    lines.push(`Diferenca: ${diff > 0 ? '+' : ''}${money(diff)}`);
+  }
+  if (dayOrders.length) {
+    lines.push('');
+    lines.push(`--- Pedidos entregues (${dayOrders.length}) ---`);
+    dayOrders.forEach(o => {
+      const ref = (o.id || '').slice(-8);
+      const nm = (o.clientSnapshot && o.clientSnapshot.name) || 'Cliente';
+      lines.push(`#${ref} ${nm}: ${money(o.total)}`);
+    });
+  }
+  if (dayEntries.length) {
+    lines.push('');
+    lines.push(`--- Lancamentos manuais (${dayEntries.length}) ---`);
+    dayEntries.forEach(e => {
+      const sign = e.type === 'expense' ? '-' : '+';
+      lines.push(`${sign} ${e.description || (e.type === 'expense' ? 'Saida' : 'Entrada')}: ${money(e.amount)}`);
+    });
+  }
+  if (closing && closing.notes) {
+    lines.push('');
+    lines.push('Obs: ' + closing.notes);
+  }
+  return lines.join('\n');
+}
+
+function shoppingListPlainText() {
+  const rows = getShoppingRows();
+  const empresa = getEmpresaName() || 'Easy Stock Mobile';
+  const pending = rows.filter(r => !r.done);
+  const done = rows.filter(r => r.done);
+  const lines = [];
+  lines.push('=== LISTA DE COMPRAS ===');
+  lines.push(empresa);
+  lines.push(new Date().toLocaleString('pt-BR'));
+  lines.push('');
+  lines.push(`--- A comprar (${pending.length}) ---`);
+  if (pending.length) pending.forEach(r => lines.push('[ ] ' + r.name));
+  else lines.push('(nenhum item pendente)');
+  if (done.length) {
+    lines.push('');
+    lines.push(`--- Ja comprados (${done.length}) ---`);
+    done.forEach(r => lines.push('[x] ' + r.name));
+  }
+  return lines.join('\n');
+}
+
+function cashClosingPrintHtml(dateKey) {
+  const k = dateKey || dateKeyOf();
+  const sum = calcCashSummary(k);
+  const closing = getActiveCashClosing(k);
+  const empresa = (getEmpresaName() || 'Easy Stock Mobile').toUpperCase();
+  const dayOrders = (orders || []).filter(o => o.status === STATUS.ENTREGUE && o.updatedAt && dateKeyOf(o.updatedAt) === k);
+  const dayEntries = (cashEntries || []).filter(e => dateKeyOf(e.createdAt) === k);
+  const ordersHtml = dayOrders.length
+    ? dayOrders.map(o => `<div class="pa-item"><span class="pi-main"><span class="pi-name">#${escapeHtml((o.id||'').slice(-8))} ${escapeHtml(o.clientSnapshot?.name || 'Cliente')}</span></span><span class="pi-price">${money(o.total)}</span></div>`).join('')
+    : '<div class="pa-item"><span class="pi-main"><span class="pi-unit">Sem vendas no dia</span></span></div>';
+  const entriesHtml = dayEntries.length
+    ? dayEntries.map(e => {
+        const sign = e.type === 'expense' ? '-' : '+';
+        return `<div class="pa-item"><span class="pi-main"><span class="pi-name">${sign} ${escapeHtml(e.description || (e.type === 'expense' ? 'Saída' : 'Entrada'))}</span></span><span class="pi-price">${money(e.amount)}</span></div>`;
+      }).join('')
+    : '<div class="pa-item"><span class="pi-main"><span class="pi-unit">Sem lançamentos manuais</span></span></div>';
+  const conf = closing?.summary?.conferredBalance;
+  const diff = (typeof conf === 'number' && !isNaN(conf)) ? (conf - sum.balance) : null;
+  return `
+    <div class="pa-receipt">
+    <div class="pa-kicker">Fechamento de caixa</div>
+    <div class="pa-title">${escapeHtml(empresa)}</div>
+    <div class="pa-center"><span class="pa-order-ref pa-bold">Dia ${escapeHtml(fmtDateKey(k))}</span></div>
+    <div class="pa-meta">${closing ? '🔒 Fechado ' + new Date(closing.closedAt).toLocaleString('pt-BR') + (closing.closedBy ? ' · ' + escapeHtml(closing.closedBy) : '') : '⚠ Caixa ainda aberto'}</div>
+
+    <div class="pa-grid">
+      <div class="pa-label">Resumo do dia</div>
+      <div class="pa-row"><span>Vendas (${sum.ordersCount})</span><span class="pa-bold">${money(sum.sold)}</span></div>
+      <div class="pa-row"><span>Entradas extras</span><span class="pa-bold">+${money(sum.in)}</span></div>
+      <div class="pa-row"><span>Saídas</span><span class="pa-bold">-${money(sum.out)}</span></div>
+    </div>
+
+    <div class="pa-total-box">
+      <div class="pa-row pa-bold pa-large"><span>SALDO</span><span>${money(sum.balance)}</span></div>
+      ${typeof conf === 'number' && !isNaN(conf) ? `
+        <div class="pa-row" style="margin-top:4px"><span>Conferido</span><span class="pa-bold">${money(conf)}</span></div>
+        <div class="pa-row"><span>Diferença</span><span class="pa-bold">${diff > 0 ? '+' : ''}${money(diff)}</span></div>
+      ` : ''}
+    </div>
+
+    <div class="pa-block">
+      <div class="pa-label">Pedidos entregues (${sum.ordersCount})</div>
+      ${ordersHtml}
+    </div>
+
+    <div class="pa-block">
+      <div class="pa-label">Lançamentos manuais (${sum.entriesCount})</div>
+      ${entriesHtml}
+    </div>
+
+    ${closing?.notes ? `<div class="pa-note"><div class="pa-label">Observação</div><div>${escapeHtml(closing.notes)}</div></div>` : ''}
+
+    <div class="pa-meta" style="margin-top:8px;text-align:center">${operatorName ? 'Operador: ' + escapeHtml(operatorName) : ''}</div>
+    </div>`;
+}
+
+// Em Capacitor Android, window.print() nao tem integracao nativa
+// confiavel. Usa Share plugin pra mandar o fechamento como texto pra
+// WhatsApp/Drive/email — operador escolhe destino. Fallback: clipboard.
+function printCashClosing(dateKey) {
+  const k = dateKey || dateKeyOf();
+  const text = cashClosingPlainText(k);
+  shareTextNative('Fechamento ' + fmtDateKey(k), text);
+}
+
+function shoppingListPrintHtml() {
+  const rows = getShoppingRows();
+  if (!rows.length) { showToast('Lista de compras vazia'); return null; }
+  const empresa = (getEmpresaName() || 'Easy Stock Mobile').toUpperCase();
+  const pending = rows.filter(r => !r.done);
+  const done = rows.filter(r => r.done);
+  const pendingHtml = pending.length
+    ? pending.map((r, idx) => `<div class="pa-item" style="background:${idx % 2 ? '#f5f5f5' : '#fff'};padding:2.1mm 1.6mm;border-bottom:1px solid #e5e5e5"><span class="pi-main"><span class="pi-name">[ ] ${escapeHtml(r.name)}</span></span></div>`).join('')
+    : '<div class="pa-item"><span class="pi-main"><span class="pi-unit">Nenhum item pendente</span></span></div>';
+  const doneHtml = done.length
+    ? done.map((r, idx) => `<div class="pa-item" style="background:${idx % 2 ? '#f5f5f5' : '#fff'};padding:2.1mm 1.6mm;border-bottom:1px solid #e5e5e5"><span class="pi-main"><span class="pi-name">[x] <s>${escapeHtml(r.name)}</s></span></span></div>`).join('')
+    : '';
+  return `
+    <div class="pa-receipt">
+    <div class="pa-kicker">Lista de compras</div>
+    <div class="pa-title">${escapeHtml(empresa)}</div>
+    <div class="pa-meta">${new Date().toLocaleString('pt-BR')}</div>
+    <div class="pa-block">
+      <div class="pa-label">A comprar (${pending.length})</div>
+      <div style="border:1px solid #111;border-radius:2.6mm;overflow:hidden">${pendingHtml}</div>
+    </div>
+    ${done.length ? `<div class="pa-block"><div class="pa-label">Ja comprados (${done.length})</div><div style="border:1px solid #111;border-radius:2.6mm;overflow:hidden">${doneHtml}</div></div>` : ''}
+    <div class="pa-meta" style="margin-top:8px;text-align:center">${operatorName ? 'Operador: ' + escapeHtml(operatorName) : ''}</div>
+    </div>`;
+}
+
+function printShoppingList() {
+  const html = shoppingListPrintHtml();
+  if (!html) return;
+  printAreaHtml(html);
+}
+function shareShoppingList() {
+  const rows = getShoppingRows();
+  if (!rows.length) { showToast('Lista de compras vazia'); return; }
+  shareTextNative('Lista de compras', shoppingListPlainText());
+}
+
+function incProduct(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  const keepFocus = focusInsideProductGrid();
+  p.count = (p.count || 0) + 1;
+  renderProductGrid();
+  afterQtyChange(p, 'plus', keepFocus);
+  haptic();
+}
+function decProduct(id) {
+  const p = products.find(x => x.id === id);
+  if (!p || (p.count || 0) <= 0) return;
+  const keepFocus = focusInsideProductGrid();
+  p.count = p.count - 1;
+  renderProductGrid();
+  afterQtyChange(p, 'minus', keepFocus);
+  haptic();
+}
+// #2886: renderProductGrid refaz a grade e o foco caía no BODY. Devolve o foco ao mesmo botão
+// (ou ao "+" quando o "-" fica desativado) e anuncia a nova quantidade.
+function focusInsideProductGrid() {
+  const active = document.activeElement;
+  return !!(active && active.closest && active.closest('#productGrid'));
+}
+function afterQtyChange(p, kind, keepFocus) {
+  if (keepFocus) {
+    const tile = Array.from(document.querySelectorAll('#productGrid .product-tile'))
+      .find(t => t.dataset && t.dataset.productId === String(p.id));
+    const wanted = tile && tile.querySelector('.qty-btn.' + kind);
+    const target = wanted && !wanted.disabled ? wanted : tile && tile.querySelector('.qty-btn.plus');
+    if (target) try { target.focus({ preventScroll: true }); } catch (e) {}
+  }
+  announce(`${p.name}: ${p.count || 0}`);
+}
+
+let _isSavingProduction = false;
+// C2 (R2): fallback conservador — exige peso quando produto NAO esta
+// explicitamente marcado como Avulso. Cobre sync antigo sem campo
+// tipoEmbalagem (default seguro = exige peso para qualquer Embalado real).
+function exigePesoPara(p) {
+  if (!p) return true;                       // sem produto: bloqueia
+  return p.tipoEmbalagem !== 'Avulso';       // undefined/null/'Embalado' = exige
+}
+
+function confirmProduction() {
+  // Guard contra duplo-clique: bloqueia execucao concorrente que poderia
+  // gerar 2 batches duplicados + dobrar estoque.
+  if (_isSavingProduction) return;
+  const itemsRaw = products.filter(p => p.count > 0 && (!productionSelectionIds || productionSelectionIds.includes(p.id)));
+  if (itemsRaw.length === 0) return;
+
+  // Validação: todo produto precisa de validade. Peso é opcional.
+  const detail = readProdDetailValues();
+  if (!detail.valid) {
+    showToast('Confira a quantidade e a validade de cada produto');
+    return;
+  }
+
+  // C2 (RDC 727/2022): peso obrigatorio para produtos Embalados.
+  // Server tambem valida (SyncController.ApplyBatch) mas falhar aqui
+  // antes evita feedback ruim apos sync no background.
+  const semPeso = [];
+  for (const p of itemsRaw) {
+    const d = detail.perProduct.get(p.id) || {};
+    if (exigePesoPara(p) && (!d.weightG || d.weightG <= 0)) {
+      semPeso.push(p.name);
+    }
+  }
+  if (semPeso.length > 0) {
+    // #1474: destaca o campo que falta (nao so o toast) e leva o foco pra ele.
+    marcarPesoFaltando(itemsRaw.filter(p => semPeso.includes(p.name)).map(p => p.id));
+    showToast(`Falta o peso de: ${semPeso.join(', ')} (vai na etiqueta)`);
+    return;
+  }
+  for (const p of itemsRaw) {
+    const qty = detail.perProduct.get(p.id)?.qty;
+    if (qty != null) p.count = qty;
+  }
+  // Sanitiza qty pra inteiro positivo (impede NaN/negativo escapando do prompt)
+  for (const p of itemsRaw) {
+    const q = parseInt(p.count, 10);
+    if (!isFinite(q) || q <= 0) { showToast('Quantidade inválida em ' + p.name); return; }
+    p.count = q;
+  }
+  // Bug 2 (Onda 4): valida peso/unid do lote contra o peso declarado na
+  // unidade do produto (ex: produto.unit = "300g"). Evita typos
+  // catastroficos como digitar 999999g/unid em produto declarado 300g
+  // (gerou etiqueta com "PESO: 1000kg" para 11 unidades = 11 toneladas).
+  for (const p of itemsRaw) {
+    const d = detail.perProduct.get(p.id) || {};
+    if (!d.weightG) continue;
+    const check = isProductWeightInsane(p, d.weightG);
+    if (check.insane) {
+      const ratioTxt = check.ratio > 2
+        ? `${check.ratio.toFixed(1)}x maior`
+        : `${(1 / check.ratio).toFixed(1)}x menor`;
+      const proceed = confirm(
+        'Verificar peso de ' + p.name + '?\n\n' +
+        'Produto declarado: ' + p.unit + ' por unidade\n' +
+        'Lote registrado: ' + d.weightG + 'g por unidade\n' +
+        '(' + ratioTxt + ' que o declarado)\n\n' +
+        'Confirmar mesmo assim?'
+      );
+      if (!proceed) return;
+    }
+  }
+  const nowMs = productionTimestamp(document.getElementById('prodManufacturedDate')?.value, Date.now());
+  if (nowMs === null) { showToast('Informe uma data de fabricação válida, até hoje'); return; }
+  _isSavingProduction = true;
+  const lote  = getLoteDoDia(new Date(nowMs));
+
+  const items = itemsRaw.map(p => {
+    const d = detail.perProduct.get(p.id) || {};
+    const expiresAt = d.validityDays ? nowMs + d.validityDays * 24*60*60*1000 : null;
+    return {
+      productId: p.id, name: p.name, emoji: p.emoji, unit: p.unit, qty: p.count,
+      photo: p.photo || null,
+      weightG: d.weightG ?? null,
+      validityDays: d.validityDays ?? null,
+      expiresAt: expiresAt
+    };
+  });
+
+  const code = currentBatchCode || buildBatchCode(itemsRaw);
+  const batchId = currentBatchId || ('b2-' + calcGerarUuid());
+  // #1474 W6: mesmo lote/codigo do batch e da etiqueta, mesmo virando o dia.
+  try { document.getElementById('batchDate').textContent = subtituloDoLote(new Date(nowMs), batchId); } catch (_) {}
+  const batch = {
+    id: batchId,
+    code,
+    items,
+    batchPhoto: currentPhotoDataUrl,
+    createdAt: nowMs,
+    lote,
+    status: 'open',
+    lastOperatorName: operatorName || null
+  };
+  // Persiste o batch ANTES de mexer no estoque pra cobrir crash entre
+  // os dois passos: se persist falhar, estoque nem incrementa.
+  const previousStocks = new Map(items.map(it => [it.productId, products.find(p => p.id === it.productId)?.stock]));
+  batches.push(batch);
+  // Incrementa o estoque DEPOIS — mesma persistAll cobre os dois.
+  items.forEach(it => {
+    const p = products.find(x => x.id === it.productId);
+    if (p) p.stock = (p.stock || 0) + it.qty;
+  });
+  if (!persistAll()) {
+    batches.splice(batches.indexOf(batch), 1);
+    items.forEach(it => { const p = products.find(x => x.id === it.productId); if (p) p.stock = previousStocks.get(it.productId); });
+    _isSavingProduction = false;
+    return false;
+  }
+  currentBatchId = '';
+  _isSavingProduction = false;
+
+  clearProduction(productionSelectionIds);
+  closeProductionConfirm();
+  updateSync();
+
+  // Audit log: produção registrada
+  const itemsSummary = items.map(i => `${i.qty}x ${i.name}`).join(', ');
+  // #1474: mesmo codigo da etiqueta e do ERP (LOT-AAMMDD-xxxxxx), nao o do dia.
+  const codigoLote = codigoDoLote(batch);
+  logAction({
+    action: 'batch.create',
+    entityType: 'batch',
+    entityId: batch.id,
+    summary: `Lote ${codigoLote} · ${itemsSummary}`
+  });
+
+  // Fluxo: confirmar -> registrar -> informar cadastrado (banner + toast)
+  // -> oferecer imprimir/salvar/compartilhar etiquetas.
+  // O registro JÁ aconteceu acima (batches.push + persistAll); o preview
+  // é apenas um passo opcional de impressão. Fechar o modal preserva o registro.
+  const etiquetas = etiquetasFromBatch(batch);
+  if (etiquetas.length > 0) {
+    showEtiquetasPreview(
+      etiquetas,
+      'producao',
+      `Lote ${codigoLote} · ${etiquetas.length} etiqueta${etiquetas.length>1?'s':''}`,
+      `Produção cadastrada · imprima as etiquetas abaixo`
+    );
+  } else {
+    showToast(`✓ Produção cadastrada · Lote ${codigoLote}`);
+    go('home');
+  }
+  return true;
+}
+
+// =========================
+// CLIENTES
+// =========================
+
+// ===== Validacao de CPF/CNPJ (algoritmo oficial Receita Federal) =====
+function isValidCPF(cpf) {
+  const s = String(cpf||'').replace(/\D/g, '');
+  if (s.length !== 11 || /^(\d)\1+$/.test(s)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(s[i], 10) * (10 - i);
+  let dv1 = 11 - (sum % 11); if (dv1 >= 10) dv1 = 0;
+  if (dv1 !== parseInt(s[9], 10)) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(s[i], 10) * (11 - i);
+  let dv2 = 11 - (sum % 11); if (dv2 >= 10) dv2 = 0;
+  return dv2 === parseInt(s[10], 10);
+}
+function isValidCNPJ(cnpj) {
+  const s = String(cnpj||'').replace(/\D/g, '');
+  if (s.length !== 14 || /^(\d)\1+$/.test(s)) return false;
+  const w1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += parseInt(s[i], 10) * w1[i];
+  let dv1 = sum % 11; dv1 = dv1 < 2 ? 0 : 11 - dv1;
+  if (dv1 !== parseInt(s[12], 10)) return false;
+  const w2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+  sum = 0;
+  for (let i = 0; i < 13; i++) sum += parseInt(s[i], 10) * w2[i];
+  let dv2 = sum % 11; dv2 = dv2 < 2 ? 0 : 11 - dv2;
+  return dv2 === parseInt(s[13], 10);
+}
+function formatCPF(s) {
+  const d = String(s||'').replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return d.slice(0,3) + '.' + d.slice(3);
+  if (d.length <= 9) return d.slice(0,3) + '.' + d.slice(3,6) + '.' + d.slice(6);
+  return d.slice(0,3) + '.' + d.slice(3,6) + '.' + d.slice(6,9) + '-' + d.slice(9);
+}
+function formatCNPJ(s) {
+  const d = String(s||'').replace(/\D/g, '').slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return d.slice(0,2) + '.' + d.slice(2);
+  if (d.length <= 8) return d.slice(0,2) + '.' + d.slice(2,5) + '.' + d.slice(5);
+  if (d.length <= 12) return d.slice(0,2) + '.' + d.slice(2,5) + '.' + d.slice(5,8) + '/' + d.slice(8);
+  return d.slice(0,2) + '.' + d.slice(2,5) + '.' + d.slice(5,8) + '/' + d.slice(8,12) + '-' + d.slice(12);
+}
+// Classifica raw input — detecta CPF (≤11 dígitos) ou CNPJ (>11), valida.
+function classifyDocument(raw) {
+  const digits = String(raw||'').replace(/\D/g, '');
+  if (digits.length === 0)  return { type: null,  valid: true,  formatted: '', digits };
+  if (digits.length === 11) return { type: 'cpf', valid: isValidCPF(digits),  formatted: formatCPF(digits),  digits };
+  if (digits.length === 14) return { type: 'cnpj', valid: isValidCNPJ(digits), formatted: formatCNPJ(digits), digits };
+  // Parcial — provisoriamente formata como o tipo provavel
+  if (digits.length < 11)   return { type: 'cpf', valid: false, formatted: formatCPF(digits), digits, partial: true };
+  return { type: 'cnpj', valid: false, formatted: formatCNPJ(digits), digits, partial: true };
+}
+// Listener do input de CPF/CNPJ — auto-format + hint live
+function onClientDocInput(ev) {
+  const inp = ev.target;
+  const cls = classifyDocument(inp.value);
+  inp.value = cls.formatted;
+  const hint = document.getElementById('newClientDocHint');
+  if (!hint) { updateClientSaveState(); return; }
+  if (cls.digits.length === 0) {
+    hint.textContent = '';
+    hint.className = 'doc-hint';
+    updateClientSaveState();
+    return;
+  }
+  if (cls.partial) {
+    hint.textContent = 'Continue digitando…';
+    hint.className = 'doc-hint partial';
+    updateClientSaveState();
+    return;
+  }
+  if (cls.valid) {
+    hint.textContent = '✓ ' + (cls.type === 'cpf' ? 'CPF' : 'CNPJ') + ' válido';
+    hint.className = 'doc-hint valid';
+  } else {
+    hint.textContent = '⚠ ' + (cls.type === 'cpf' ? 'CPF' : 'CNPJ') + ' inválido';
+    hint.className = 'doc-hint invalid';
+  }
+  updateClientSaveState();
+}
+
+function updateClientSaveState() {
+  const btn = document.getElementById('saveClientBtn');
+  if (!btn) return;
+  const name = document.getElementById('newClientName')?.value?.trim() || '';
+  const docRaw = document.getElementById('newClientDoc')?.value?.trim() || '';
+  const docOk = !docRaw || classifyDocument(docRaw).valid;
+  btn.disabled = !name || !docOk;
+}
+
+function clientReference(c) {
+  // Bug 10/11 (Onda 4): CPF/CNPJ NAO e referencia operacional.
+  // Antes, document era fallback quando address/phone faltavam — isso
+  // vazava CPF em telas operacionais (conferencia, kanban) e ate em
+  // mensagens WhatsApp (cobranca). LGPD: document e dado fiscal,
+  // sai do fluxo operacional. Para forms de edicao, ler c.document direto.
+  if (!c) return 'sem referência';
+  if (c.address) return c.address;
+  if (c.apt)     return 'apto ' + c.apt;        // legado pra clientes pré-migration
+  if (c.phone)   return c.phone;
+  return 'sem referência';
+}
+
+function renderRecents() {
+  const box = document.getElementById('recentsChips');
+  const recents = [...clients].sort((a,b) => b.lastOrder - a.lastOrder).slice(0, 4);
+  box.innerHTML = '';
+  recents.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    // Mostra address (novo padrao) ou apt (legado pre-migration) como hint
+    const hint = c.address || (c.apt ? 'Apto ' + c.apt : '');
+    btn.innerHTML = escapeHtml(c.name) + (hint ? `<span class="apt">${escapeHtml(hint.length > 16 ? hint.slice(0, 14) + '…' : hint)}</span>` : '');
+    btn.onclick = () => selectClient(c);
+    box.appendChild(btn);
+  });
+  const avulso = document.createElement('button');
+  avulso.className = 'chip avulso';
+  avulso.textContent = 'Avulso';
+  avulso.onclick = () => selectClient('avulso');
+  box.appendChild(avulso);
+}
+
+function selectClient(c) {
+  selectedClient = c;
+  document.getElementById('clientPicker').style.display = 'none';
+  document.getElementById('clientSelected').style.display = 'block';
+  document.getElementById('clientSearch').value = '';
+  document.getElementById('clientSuggestions').classList.remove('show');
+  document.getElementById('clientSuggestions').innerHTML = '';
+  renderSelectedClient();
+  updateSaveOrderBtn();
+  renderOrderDraftSummary();
+}
+
+function renderSelectedClient() {
+  const wrap = document.getElementById('clientSelected');
+  if (selectedClient === 'avulso') {
+    wrap.innerHTML = `
+      <div class="client-pill">
+        <div class="cp-avatar anon">?</div>
+        <div class="cp-info">
+          <div class="cp-name">Avulso <span class="muted">sem cadastro</span></div>
+          <div class="cp-ref">só o pedido vai ser salvo</div>
+        </div>
+        <button class="cp-clear" onclick="clearClient()" aria-label="Remover cliente">&times;</button>
+      </div>
+    `;
+  } else {
+    const c = selectedClient;
+    wrap.innerHTML = `
+      <div class="client-pill">
+        <div class="cp-avatar">${escapeHtml(c.name.charAt(0).toUpperCase())}</div>
+        <div class="cp-info">
+          <div class="cp-name">${escapeHtml(c.name)}</div>
+          <div class="cp-ref">${escapeHtml(clientReference(c))}${(() => {
+            // Bug 22 (Onda 4): conta pedidos a partir do array global orders[]
+            // em vez de usar c.orderCount mutavel. Antes, o contador podia
+            // divergir do estado real (incrementado antes do pedido salvar
+            // de fato, ou nao incrementado em fluxos retroativos).
+            const n = clientOrderCount(c.id);
+            return n ? ' · ' + n + ' ' + (n === 1 ? 'pedido' : 'pedidos') : '';
+          })()}</div>
+        </div>
+        <button class="cp-edit" onclick="openClientModal({editId: ${jsString(c.id)}})" title="Editar cliente" aria-label="Editar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+        <button class="cp-clear" onclick="clearClient()" aria-label="Remover cliente">&times;</button>
+      </div>
+    `;
+  }
+}
+
+function clearClient() {
+  selectedClient = null;
+  document.getElementById('clientPicker').style.display = 'block';
+  document.getElementById('clientSelected').style.display = 'none';
+  updateSaveOrderBtn();
+  renderOrderDraftSummary();
+}
+
+function searchClient() {
+  const raw = document.getElementById('clientSearch').value;
+  // Bug 8 (Onda 4): normaliza com NFD + remove acentos + lowercase pra
+  // que "maria jose" ache "Maria José". Antes, o picker era case-insensitive
+  // mas accent-sensitive, gerando duplicatas no CRM (clientes nao encontrados
+  // viravam cadastros novos).
+  const nq = normalizeSearch(raw);
+  const qDigits = nq.replace(/\D/g, '');
+  const box = document.getElementById('clientSuggestions');
+  if (!nq) { box.classList.remove('show'); box.innerHTML = ''; return; }
+  const matches = clients.filter(c =>
+    normalizeSearch(c.name || '').includes(nq) ||
+    normalizeSearch(c.address || '').includes(nq) ||
+    normalizeSearch(c.apt || '').includes(nq) ||
+    (qDigits && c.document && c.document.replace(/\D/g, '').includes(qDigits)) ||
+    (qDigits && c.phone && c.phone.replace(/\D/g, '').includes(qDigits))
+  ).slice(0, 5);
+  box.innerHTML = '';
+  matches.forEach(c => {
+    const item = document.createElement('button');
+    item.className = 'sug-item';
+    // Bug 10 (Onda 4): clientReference nao retorna mais CPF.
+    // Se o operador buscou por digitos e o match veio do document,
+    // mostra CPF MASCARADO no secundario pra ele confirmar visualmente
+    // que e o cliente certo. Em outros casos, document nao aparece.
+    const matchedByDoc = !!(qDigits && c.document && c.document.replace(/\D/g, '').includes(qDigits));
+    const ref = clientReference(c);
+    const secondary = matchedByDoc
+      ? ref + ' · CPF ' + maskCpf(c.document)
+      : ref;
+    item.innerHTML = `<div class="sn">${escapeHtml(c.name)}</div><div class="sr">${escapeHtml(secondary)}</div>`;
+    item.onclick = () => selectClient(c);
+    box.appendChild(item);
+  });
+  const exactMatch = clients.some(c => normalizeSearch(c.name || '') === nq);
+  if (!exactMatch) {
+    const create = document.createElement('button');
+    create.className = 'sug-item create';
+    create.innerHTML = `<div class="sn">+ Cadastrar "${escapeHtml(raw.trim())}"</div><div class="sr">cliente novo</div>`;
+    create.onclick = () => openClientModal(raw.trim());
+    box.appendChild(create);
+  }
+  box.classList.add('show');
+}
+
+// Modal de cliente — modo cadastro OU edicao (passa editId pra editar).
+let editingClientId = null;
+function openClientModal(prefillOrEditId) {
+  const isEdit = prefillOrEditId && typeof prefillOrEditId === 'object' && prefillOrEditId.editId;
+  const editId = isEdit ? prefillOrEditId.editId : null;
+  const prefill = (typeof prefillOrEditId === 'string') ? prefillOrEditId : '';
+  editingClientId = editId;
+  // Titulo dinamico
+  const title = document.getElementById('newClientModalTitle');
+  if (title) title.innerHTML = editId
+    ? 'Editar <span class="accent">cliente</span>'
+    : 'Novo <span class="accent">cliente</span>';
+  const saveBtn = document.getElementById('saveClientBtn');
+  if (saveBtn) saveBtn.textContent = editId ? 'Salvar alterações' : 'Salvar cliente';
+
+  if (editId) {
+    const c = clients.find(x => x.id === editId);
+    if (c) {
+      document.getElementById('newClientName').value  = c.name || '';
+      document.getElementById('newClientAddr').value  = c.address || (c.apt ? 'Apto ' + c.apt : '');
+      document.getElementById('newClientPhone').value = c.phone || '';
+      document.getElementById('newClientDoc').value   = c.document || '';
+    }
+  } else {
+    document.getElementById('newClientName').value  = prefill;
+    document.getElementById('newClientAddr').value  = '';
+    document.getElementById('newClientPhone').value = '';
+    document.getElementById('newClientDoc').value   = '';
+  }
+  // Reseta hint
+  const hint = document.getElementById('newClientDocHint');
+  if (hint) {
+    if (editingClientId && document.getElementById('newClientDoc').value) {
+      // Reavalia o hint pro doc preenchido
+      onClientDocInput({ target: document.getElementById('newClientDoc') });
+    } else {
+      hint.textContent = '';
+      hint.className = 'doc-hint';
+    }
+  }
+  updateClientSaveState();
+  rememberOperationalFocus('newClientModal');
+  document.getElementById('newClientModal').classList.add('show');
+  document.getElementById('newClientName').focus();
+}
+function closeClientModal() {
+  editingClientId = null;
+  document.getElementById('newClientModal').classList.remove('show');
+  restoreOperationalFocus('newClientModal');
+}
+function saveNewClient() {
+  // Bug 9 (Onda 4): normalizeName em vez de so trim() — colapsa espacos
+  // duplos internos ("  Maria  José  " vira "Maria José") e aplica
+  // normalize NFC. Antes, o input cosmetico escondia espacos extras
+  // que vazavam pra WhatsApp ("Oi *Maria  José*"), tela de edicao e busca.
+  const name = normalizeName(document.getElementById('newClientName').value);
+  if (!name) {
+    showToast('Nome é obrigatório');
+    document.getElementById('newClientName').focus();
+    return;
+  }
+  const address = document.getElementById('newClientAddr').value.trim() || null;
+  const phone   = document.getElementById('newClientPhone').value.trim() || null;
+  // CPF/CNPJ: opcional. Se preenchido, DEVE ser valido.
+  const docRaw = document.getElementById('newClientDoc').value.trim();
+  let document_ = null, documentType = null;
+  if (docRaw) {
+    const cls = classifyDocument(docRaw);
+    if (!cls.valid || !cls.type) {
+      showToast(cls.type === 'cnpj' ? 'CNPJ inválido' : 'CPF inválido');
+      document.getElementById('newClientDoc').focus();
+      return;
+    }
+    document_ = cls.formatted;
+    documentType = cls.type;
+  }
+
+  if (editingClientId) {
+    // Modo edicao — atualiza in-place
+    const c = clients.find(x => x.id === editingClientId);
+    if (!c) { closeClientModal(); return; }
+    c.name = name;
+    c.address = address;
+    c.phone = phone;
+    c.document = document_;
+    c.documentType = documentType;
+    persistAll();
+    renderRecents();
+    // Re-renderiza pill se cliente editado e o atualmente selecionado
+    if (selectedClient && typeof selectedClient === 'object' && selectedClient.id === editingClientId) {
+      selectedClient = c;
+      renderSelectedClient();
+    }
+    if (typeof renderClientesScreen === 'function') renderClientesScreen();
+    closeClientModal();
+    showToast(name + ' atualizado');
+    logAction({
+      action: 'settings.update', entityType: 'client', entityId: c.id,
+      summary: 'Cliente editado · ' + name
+    });
+    return;
+  }
+
+  // Modo cadastro
+  const c = {
+    id: 'c-' + Date.now(),
+    name, address, phone,
+    document: document_, documentType,
+    apt: null,
+    lastOrder: Date.now(),
+    orderCount: 0
+  };
+  clients.push(c);
+  persistAll();
+  renderRecents();
+  if (typeof renderClientesScreen === 'function') renderClientesScreen();
+  closeClientModal();
+  selectClient(c);
+  showToast(name + ' cadastrado');
+}
+
+// =========================
+// ITENS DO PEDIDO
+// =========================
+function openItemPicker() {
+  document.getElementById('itemSearch').value = '';
+  document.getElementById('itemPickerList').innerHTML = '';
+  document.getElementById('itemPickerModal').classList.add('show');
+  renderItemPickerList('');
+  setTimeout(() => document.getElementById('itemSearch').focus(), 300);
+}
+function closeItemPicker() {
+  document.getElementById('itemPickerModal').classList.remove('show');
+}
+function searchItem() {
+  // #2735: busca sem acento nem caixa, para "pao" achar "Pão".
+  const q = normalizeSearch(document.getElementById('itemSearch').value.trim());
+  renderItemPickerList(q);
+}
+function renderItemPickerList(q) {
+  const list = document.getElementById('itemPickerList');
+  const matches = products
+    .filter(p => !p.archived && (!q || normalizeSearch(p.name).includes(q)))
+    .sort((a, b) => {
+      const pa = Number(a.price) > 0 ? 0 : 1;
+      const pb = Number(b.price) > 0 ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR');
+    });
+  list.innerHTML = '';
+  matches.forEach(p => {
+    const item = document.createElement('button');
+    const hasPrice = Number(p.price) > 0;
+    item.className = 'sug-item' + (hasPrice ? '' : ' needs-price');
+    const priceLabel = p.price ? money(p.price).replace(',00','') : '';
+    // #2735: produto sem o campo de estoque caía em "faltam NaN".
+    const stock = Number(p.stock) || 0;
+    const stockLabel = stock > 0
+      ? `${stock} disp.`
+      : (stock === 0 ? 'em falta' : `faltam ${Math.abs(stock)}`);
+    const stockClass = stock <= 0 ? 'sr-warn' : '';
+    // #2735: produto sem unidade começava a linha com o separador solto (" · R$ 28").
+    const meta = [escapeHtml(p.unit || ''), priceLabel || 'sem preço'].filter(Boolean).join(' · ');
+    item.innerHTML = `<div class="sn">${escapeHtml(p.emoji || '📦')} ${escapeHtml(p.name)}</div><div class="sr">${meta} · <span class="${stockClass}">${stockLabel}</span></div>`;
+    item.onclick = () => {
+      if (!hasPrice) { closeItemPicker(); openProductModalForEdit(p.id); return; }
+      addItemToOrder(p);
+    };
+    list.appendChild(item);
+  });
+  if (!matches.length && !q) {
+    list.innerHTML = '<div class="gs-empty"><strong>Nenhum produto ativo</strong>Cadastre produtos no catálogo para montar pedidos.</div>';
+  }
+  if (q) {
+    const exact = products.some(p => !p.archived && normalizeSearch(p.name) === q);
+    if (!exact) {
+      const create = document.createElement('button');
+      create.className = 'sug-item create';
+      create.innerHTML = `<div class="sn">+ Cadastrar "${escapeHtml(document.getElementById('itemSearch').value.trim())}"</div><div class="sr">produto novo no catálogo</div>`;
+      create.onclick = () => { closeItemPicker(); openProductModal('massa', document.getElementById('itemSearch').value.trim(), true); };
+      list.appendChild(create);
+    }
+  }
+}
+
+function addItemToOrder(product) {
+  // Guarda contra preco invalido — pedido com unitPrice=0 entra no caixa
+  // como R$ 0 e zera relatorios de venda.
+  const price = Number(product.price);
+  if (!isFinite(price) || price <= 0) {
+    showToast(`"${product.name}" sem preço cadastrado — defina em Ajustes > Catálogo`);
+    return;
+  }
+  // #410: mescla so com a linha SEM observacao do mesmo produto. Assim 2x o mesmo
+  // item mescla (qty++), mas se ja existe uma linha COM obs (ex: "sem cebola"),
+  // um novo add cria linha nova sem obs — permitindo unidades distintas do produto.
+  const existing = currentOrderItems.find(i => i.productId === product.id && !(i.note || '').trim());
+  if (existing) {
+    existing.qty++;
+  } else {
+    currentOrderItems.push({
+      productId: product.id,
+      name: product.name,
+      emoji: product.emoji,
+      unit: product.unit,
+      qty: 1,
+      unitPrice: price,
+      note: ''
+    });
+  }
+  closeItemPicker();
+  renderOrderItems();
+  updateSaveOrderBtn();
+  haptic();
+}
+
+function renderOrderItems() {
+  const list = document.getElementById('orderItemsList');
+  const counter = document.getElementById('itemsCount');
+  const totalWrap = document.getElementById('totalLine');
+
+  list.innerHTML = '';
+  if (currentOrderItems.length === 0) {
+    counter.textContent = '';
+    totalWrap.style.display = 'none';
+    renderOrderDraftSummary();
+    return;
+  }
+  const total = orderItemsTotal(currentOrderItems);
+  currentOrderItems.forEach((it, idx) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <div class="item-emoji">${escapeHtml(it.emoji || '📦')}</div>
+      <div class="item-info">
+        <div class="item-name">${escapeHtml(it.name)}</div>
+        <div class="item-price">${it.unitPrice ? money(it.unitPrice).replace(',00','') + ' un' : 'sem preço'}${it.unit ? ' · ' + escapeHtml(it.unit) : ''}</div>
+        <input class="item-note-input" type="text" placeholder="+ obs (ex: sem cebola)" value="${escapeHtml(it.note || '')}" onchange="setItemNote(${idx}, this.value)" style="margin-top:4px;width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--ink-dim);font-size:12px;padding:2px 0;" />
+      </div>
+      <div class="item-subtotal">${money(it.qty * it.unitPrice).replace(',00','')}</div>
+      <div class="qty-stepper" role="group" aria-label="Ajustar quantidade de ${escapeHtml(it.name)}">
+        <button onclick="changeItemQty(${idx}, -1)" aria-label="Diminuir quantidade">−</button>
+        <div class="q" aria-live="polite">${it.qty}</div>
+        <button onclick="changeItemQty(${idx}, 1)" aria-label="Aumentar quantidade">+</button>
+      </div>
+      <button class="remove" onclick="removeItem(${idx})" aria-label="Remover">&times;</button>
+    `;
+    list.appendChild(row);
+  });
+  counter.textContent = currentOrderItems.reduce((s,i) => s + i.qty, 0) + ' un';
+  totalWrap.style.display = 'flex';
+  document.getElementById('orderTotal').textContent = money(total);
+  renderOrderDraftSummary();
+}
+
+function changeItemQty(idx, delta) {
+  const it = currentOrderItems[idx];
+  if (!it) return;
+  // Calcula nova qty sem aplicar — evita estado momentaneo negativo que
+  // poderia gerar render intermediario com qty < 0.
+  const next = (it.qty || 0) + delta;
+  if (next <= 0) currentOrderItems.splice(idx, 1);
+  else it.qty = next;
+  renderOrderItems();
+  updateSaveOrderBtn();
+  haptic();
+}
+function removeItem(idx) {
+  currentOrderItems.splice(idx, 1);
+  renderOrderItems();
+  updateSaveOrderBtn();
+}
+// #410: observacao por item. Nao re-renderiza a lista (evita perder o foco do
+// input enquanto digita); a obs nao muda qty/total. saveOrder copia o item
+// inteiro, entao a obs vai pro pedido (e pro sync quando o backend tiver a coluna).
+function setItemNote(idx, val) {
+  const it = currentOrderItems[idx];
+  if (!it) return;
+  it.note = (val || '').trim();
+  renderOrderDraftSummary();
+}
+
+function updateSaveOrderBtn() {
+  const btn = document.getElementById('saveOrderBtn');
+  const notes = document.getElementById('orderNotes').value.trim();
+  // Pra salvar: precisa ter cliente + (pelo menos 1 item OU observação preenchida)
+  btn.disabled = !selectedClient || (currentOrderItems.length === 0 && !notes);
+  btn.textContent = 'Salvar pedido';
+  renderOrderDraftSummary();
+}
+document.getElementById('orderNotes').addEventListener('input', updateSaveOrderBtn);
+
+function renderOrderDraftSummary() {
+  const wrap = document.getElementById('orderDraftSummary');
+  if (!wrap) return;
+  const title = document.getElementById('odsTitle');
+  const sub = document.getElementById('odsSub');
+  const totalEl = document.getElementById('odsTotal');
+  const qty = currentOrderItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
+  const total = orderItemsTotal(currentOrderItems);
+  const hasClient = !!selectedClient;
+  const hasItems = qty > 0;
+  wrap.classList.toggle('ready', hasClient && hasItems);
+  title.textContent = hasClient
+    ? (selectedClient === 'avulso' ? 'Cliente avulso' : selectedClient.name)
+    : 'Escolha o cliente';
+  sub.textContent = hasItems
+    ? qty + ' un. em ' + currentOrderItems.length + ' produto' + (currentOrderItems.length === 1 ? '' : 's')
+    : (hasClient ? 'Adicione itens ao pedido' : '0 itens');
+  // #2735: com centavos, igual ao total da folha logo abaixo.
+  totalEl.textContent = money(total);
+}
+
+function saveOrder() {
+  // #435: returns silenciosos viraram toasts para o operador saber o que falta.
+  if (!selectedClient) { showToast('Escolha o cliente antes de salvar'); return; }
+  const notes = document.getElementById('orderNotes').value.trim();
+  if (currentOrderItems.length === 0 && !notes) { showToast('Adicione pelo menos 1 item ao pedido'); return; }
+
+  const total = orderItemsTotal(currentOrderItems);
+
+  const previousClientLastOrder = selectedClient === 'avulso' ? null : selectedClient.lastOrder;
+  let snapshot;
+  if (selectedClient === 'avulso') {
+    snapshot = { name: 'Avulso', ref: 'sem cadastro' };
+  } else {
+    snapshot = { name: selectedClient.name, ref: clientReference(selectedClient) };
+    selectedClient.lastOrder = Date.now();
+    // Bug 22 (Onda 4): nao mantemos mais orderCount manualmente — o picker
+    // agora deriva o numero direto de orders[] via clientOrderCount.
+    // Mantemos o campo nos clientes antigos por compat, mas nao escrevemos
+    // mais nele para evitar divergencia com o estado real.
+  }
+
+  // Retroativo: data/hora passada → pedido entra como 'entregue', desconta
+  // estoque imediatamente e pula a esteira. factAt = quando aconteceu de fato;
+  // createdAt continua sendo o momento do cadastro.
+  const retroFields = document.getElementById('retroFields');
+  const isRetro = retroFields && retroFields.classList.contains('show');
+  let retroAtMs = null;
+  let retroMetodo = null;
+  if (isRetro) {
+    const dtRaw = (document.getElementById('retroDatetime')?.value || '').trim();
+    if (!dtRaw) { showToast('Data retroativa em branco'); return; }
+    const t = new Date(dtRaw).getTime();
+    if (!isFinite(t) || isNaN(t)) { showToast('Data retroativa inválida'); return; }
+    if (t > Date.now()) { showToast('Data retroativa não pode ser no futuro'); return; }
+    // BUG #20: bloqueio hard pra data >1 ano atras (evita 01/01/1900 quebrando
+    // relatorios temporais). UI ja restringe via min/max, mas defesa em profundidade.
+    const oneYear = 365 * 24 * 60 * 60 * 1000;
+    if (Date.now() - t > oneYear) {
+      showToast('Data retroativa muito antiga (mais de 1 ano). Use o admin web.');
+      return;
+    }
+    // Aviso se data for muito antiga (> 90 dias) — passa, mas sinaliza
+    const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+    if (Date.now() - t > ninetyDays) {
+      if (!confirm('Data retroativa é mais de 90 dias atrás.\n\nConfirmar?')) return;
+    }
+    retroAtMs = t;
+    retroMetodo = normalizarFormaPagamento(document.getElementById('retroMetodo')?.value);
+    if (!retroMetodo) { showToast('Escolha como o pedido retroativo foi pago'); return; }
+  }
+
+  // F5 — Agendamento: data/hora FUTURA. Pedido entra como 'aguardando' normal,
+  // mas com scheduledDeliveryAt preenchido — UI ordena/badge no card e KDS.
+  // Mutuamente exclusivo com retroativo (faz sentido um OU outro).
+  const scheduleFields = document.getElementById('scheduleFields');
+  const isScheduled = scheduleFields && scheduleFields.classList.contains('show');
+  let scheduledAtMs = null;
+  if (isScheduled && isRetro) {
+    showToast('Não dá pra agendar e cadastrar retroativo ao mesmo tempo'); return;
+  }
+  if (isScheduled) {
+    const dtRaw = (document.getElementById('scheduleDatetime')?.value || '').trim();
+    if (!dtRaw) { showToast('Data de entrega em branco'); return; }
+    const t = new Date(dtRaw).getTime();
+    if (!isFinite(t) || isNaN(t)) { showToast('Data de entrega inválida'); return; }
+    if (t <= Date.now()) { showToast('Data agendada precisa ser no futuro'); return; }
+    scheduledAtMs = t;
+  }
+
+  const nowMs = Date.now();
+  const order = {
+    id: 'o-' + calcGerarUuid(),
+    clientId: selectedClient === 'avulso' ? null : selectedClient.id,
+    clientSnapshot: snapshot,
+    items: currentOrderItems.map(i => ({...i})),
+    notes,
+    // #409: canal/origem do pedido (balcao/whatsapp/ifood/telefone). Persiste no
+    // backend so quando a coluna mobile_orders.channel existir (fatia backend).
+    channel: document.getElementById('orderChannel')?.value || null,
+    total,
+    status: retroAtMs ? STATUS.ENTREGUE : STATUS.AGUARDANDO,
+    createdAt: nowMs,
+    updatedAt: nowMs,
+    lastOperatorName: operatorName || null,
+    history: [],
+    factAt: retroAtMs || null,
+    scheduledDeliveryAt: scheduledAtMs || null,
+    confirmedBy: retroAtMs ? (operatorName || null) : null,
+    confirmedAt: retroAtMs ? nowMs : null,
+    metodo: retroMetodo
+  };
+  addHistoryEvent(order, STATUS.CRIADO, retroAtMs
+    ? 'pedido retroativo (' + new Date(retroAtMs).toLocaleString('pt-BR') + ') já entregue'
+    : 'pedido criado');
+
+  const previousOrderStocks = new Map();
+  if (retroAtMs) {
+    order.items.forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (p) { previousOrderStocks.set(p.id, p.stock); p.stock = (p.stock || 0) - it.qty; }
+    });
+  }
+
+  orders.unshift(order);
+  if (!persistAll()) {
+    orders.splice(orders.indexOf(order), 1);
+    previousOrderStocks.forEach((stock, id) => { const p = products.find(x => x.id === id); if (p) p.stock = stock; });
+    if (selectedClient !== 'avulso') selectedClient.lastOrder = previousClientLastOrder;
+    return;
+  }
+  renderRecents();
+
+  // Audit log: pedido criado
+  logAction({
+    action: 'order.create',
+    entityType: 'order',
+    entityId: order.id,
+    summary: `Pedido para ${snapshot.name} · ${contaItens(order.items.length)} · R$ ${total.toFixed(2).replace('.', ',')}` + (retroAtMs ? ' (retroativo)' : '')
+  });
+
+  if (isRetro) resetRetroToggle();
+  if (isScheduled) resetAgendaToggle();
+
+  currentOrderItems = [];
+  document.getElementById('orderNotes').value = '';
+  { const _ch = document.getElementById('orderChannel'); if (_ch) _ch.value = ''; }
+  clearClient();
+  renderOrderItems();
+  updateSaveOrderBtn();
+
+  // Esteira: destaca o card recém-criado por ~3s
+  highlightOrderId = order.id;
+  renderKanban();
+  setTimeout(() => { highlightOrderId = null; renderKanban(); }, 3200);
+  // Apos salvar, vai automatico pra aba Andamento (kanban com o card novo)
+  if (typeof goPedidosTab === 'function') goPedidosTab('andamento');
+  updateSync();
+
+  // Toast com próximas ações — cobrar é destaque no pedido normal.
+  // Retroativo pula esteira, então oferece imprimir em vez de iniciar preparo.
+  const nomeCli = snapshot.name || 'cliente';
+  const msg = retroAtMs
+    ? `<span class="hi">✓ Pedido retroativo</span> pra ${escapeHtml(nomeCli)} · ${money(total)} · já entregue`
+    : `<span class="hi">✓ Pedido criado</span> pra ${escapeHtml(nomeCli)} · ${money(total)}`;
+  const actions = retroAtMs ? [
+    { label: '🖨️ Imprimir',     fn: () => printEtiqueta(order.id) },
+    { label: '💳 Preparar cobrança',       fn: () => openCobranca(order.id) },
+    { label: 'Ver caixa',       fn: () => go('movimento') }
+  ] : [
+    { label: '💳 Preparar cobrança',       fn: () => openCobranca(order.id) },
+    { label: 'Iniciar preparo', fn: () => { advanceOrder(order.id); go('pedidos'); } },
+    { label: 'Ver esteira',     fn: () => {
+        go('pedidos');
+        setTimeout(() => {
+          const el = document.querySelector('.col-aguardando');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+    }}
+  ];
+  showActionToast(msg, actions);
+  if (!retroAtMs && window.CDB_CONFIG?.isPilot) openCobranca(order.id);
+  lastAction = { type: 'pedido' };
+}
+
+// (Antiga renderOrdersFeed removida — substituída pelo kanban via alias
+//  definido junto com renderKanban, que renderiza no #kanban.)
+
+// =========================
+// MODAL NOVO PRODUTO
+// =========================
+let productModalCallback = null; // se presente, ao salvar adiciona direto no pedido
+let productSubmitCompleted = false;
+
+function updateNewProductExpiry() {
+  const value = document.getElementById('newProdManufacturedDate')?.value;
+  const days = Number(document.getElementById('newProdValidity')?.value);
+  const stamp = productionTimestamp(value, Date.now());
+  const label = document.getElementById('newProdExpiry');
+  if (label) label.textContent = value && stamp !== null && Number.isInteger(days) && days > 0 && days <= 365
+    ? 'Validade na etiqueta: ' + new Date(stamp + days * 86400000).toLocaleDateString('pt-BR') : '';
+}
+
+function updateProductSaveState() {
+  const btn = document.getElementById('saveProductBtn');
+  if (!btn) return;
+  const name = document.getElementById('newProdName')?.value?.trim() || '';
+  btn.disabled = !name;
+}
+
+function openProductModal(cat = 'massa', prefillName = '', fromOrder = false) {
+  productSubmitCompleted = false;
+  editingProductId = null;
+  document.getElementById('newProdName').value = prefillName;
+  document.getElementById('newProdUnit').value = '';
+  document.getElementById('newProdPrice').value = '';
+  const costEl = document.getElementById('newProdCost');
+  if (costEl) costEl.value = '';
+  document.getElementById('newProdMinStock').value = '';
+  document.getElementById('newProdValidity').value = '5';
+  document.getElementById('newProdBatchFields').hidden = !window.CDB_CONFIG?.isPilot || fromOrder;
+  document.getElementById('newProdQuantity').value = '1';
+  document.getElementById('newProdWeight').value = '';
+  const manufacture = document.getElementById('newProdManufacturedDate');
+  manufacture.value = localProductionDate(Date.now());
+  manufacture.max = manufacture.value;
+  updateNewProductExpiry();
+  selectedCat = cat;
+  selectedEmoji = '🍝';
+  document.querySelectorAll('#catPills .cat-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
+  document.querySelectorAll('#emojiGrid .emoji-pick').forEach((e, i) => {
+    const active = i === 0;
+    e.classList.toggle('active', active);
+    e.setAttribute('aria-checked', String(active));
+  });
+  productModalCallback = fromOrder;
+  const saveBtn = document.getElementById('saveProductBtn');
+  if (saveBtn) saveBtn.textContent = fromOrder ? 'Criar e adicionar' : 'Criar e usar';
+  rememberOperationalFocus('newProductModal');
+  document.getElementById('newProductModal').classList.add('show');
+  setTimeout(() => document.getElementById(prefillName ? 'newProdUnit' : 'newProdName').focus(), 300);
+  updateMarginPreview();
+  updateProductSaveState();
+}
+function closeProductModal() {
+  document.getElementById('newProductModal').classList.remove('show');
+  productModalCallback = null;
+  editingProductId = null;
+  // Restaura titulo (caso tenha sido alterado pra "Editar")
+  const titleEl = document.querySelector('#newProductModal .modal-title');
+  if (titleEl) titleEl.innerHTML = 'Novo <span class="accent">produto</span>';
+  restoreOperationalFocus('newProductModal');
+}
+
+// Calcula e exibe lucro absoluto + margem % entre os campos preço e custo
+// no modal de produto. Felipe pediu (02/05/2026): "calculadora de
+// precificação". Helper: chamado em todo onInput de preço e custo, e em
+// open()/openEdit(). Color-coded (verde / ambar / vermelho) pra dar
+// feedback visual rapido sobre saude da margem.
+function updateMarginPreview() {
+  const previewEl = document.getElementById('marginPreview');
+  if (!previewEl) return;
+  const priceStr = document.getElementById('newProdPrice')?.value?.trim() || '';
+  const costStr  = document.getElementById('newProdCost')?.value?.trim() || '';
+  const price = priceStr ? parseMoneyInput(priceStr) : NaN;
+  const cost  = costStr  ? parseMoneyInput(costStr)  : NaN;
+  // Sem ambos os valores => esconde
+  if (isNaN(price) || isNaN(cost) || price <= 0) {
+    previewEl.style.display = 'none';
+    return;
+  }
+  const profit = price - cost;
+  const marginPct = (profit / price) * 100;
+  document.getElementById('mpProfit').textContent = money(profit);
+  document.getElementById('mpMargin').textContent = (marginPct >= 0 ? '+' : '') + marginPct.toFixed(1) + '%';
+
+  // Classifica saude. Foodservice tipico tem margem 50-65% saudavel.
+  previewEl.classList.remove('healthy','warn','bad');
+  let hint = '';
+  if (marginPct < 0) {
+    previewEl.classList.add('bad');
+    hint = 'Está vendendo abaixo do custo — você perde dinheiro a cada unidade.';
+  } else if (marginPct < 25) {
+    previewEl.classList.add('bad');
+    hint = 'Margem baixa pra foodservice. Mira em pelo menos 50%.';
+  } else if (marginPct < 50) {
+    previewEl.classList.add('warn');
+    hint = 'Margem ok mas apertada. Foodservice saudável fica 50-65%.';
+  } else if (marginPct < 75) {
+    previewEl.classList.add('healthy');
+    hint = 'Margem saudável.';
+  } else {
+    previewEl.classList.add('healthy');
+    hint = 'Margem excelente — confira se o custo está real (incluindo embalagem, gás).';
+  }
+  document.getElementById('mpHint').textContent = hint;
+  previewEl.style.display = '';
+}
+function saveNewProduct() {
+  if (productSubmitCompleted) return;
+  // Bug 9 (Onda 4): normalizeName em vez de so trim() — mesma motivacao
+  // do saveNewClient, evita "  Talharim  Fresco  " virar duplicata
+  // de "Talharim Fresco" no catalogo de produtos.
+  const name = normalizeName(document.getElementById('newProdName').value);
+  if (!name) { showToast('Nome do produto é obrigatório'); document.getElementById('newProdName').focus(); return; }
+  const unit = document.getElementById('newProdUnit').value.trim();
+  const priceStr = document.getElementById('newProdPrice').value.trim();
+  const priceParsed = priceStr ? parseMoneyInput(priceStr) : NaN;
+  const price = isNaN(priceParsed) ? null : priceParsed;
+  const costStr = (document.getElementById('newProdCost')?.value || '').trim();
+  const costParsed = costStr ? parseMoneyInput(costStr) : NaN;
+  const cost = isNaN(costParsed) ? null : costParsed;
+  // #425 — estoque minimo configuravel
+  const minStockStr = (document.getElementById('newProdMinStock')?.value || '').trim();
+  const minStockParsed = minStockStr ? parseInt(minStockStr, 10) : NaN;
+  const minStock = (!isNaN(minStockParsed) && minStockParsed >= 0) ? minStockParsed : null;
+
+  const validityInput = document.getElementById('newProdValidity');
+  const defaultValidityDays = Number(validityInput.value);
+  if (!Number.isInteger(defaultValidityDays) || defaultValidityDays < 1 || defaultValidityDays > 365) {
+    showToast('Informe a validade do produto entre 1 e 365 dias'); validityInput.focus(); return;
+  }
+  const fastProduction = !!window.CDB_CONFIG?.isPilot && !editingProductId && !productModalCallback;
+  const quantity = Number(document.getElementById('newProdQuantity').value);
+  const manufactureDate = document.getElementById('newProdManufacturedDate').value;
+  const weightInput = document.getElementById('newProdWeight');
+  const weight = weightInput.value.trim() ? Number(weightInput.value) : pesoPadraoDoProduto({ unit });
+  if (fastProduction) {
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 9999) {
+      showToast('Informe a quantidade produzida entre 1 e 9999'); document.getElementById('newProdQuantity').focus(); return;
+    }
+    if (!manufactureDate || productionTimestamp(manufactureDate, Date.now()) === null) {
+      showToast('Informe uma data de fabricação válida, até hoje'); document.getElementById('newProdManufacturedDate').focus(); return;
+    }
+    if (!Number.isInteger(weight) || weight < 1 || weight > 9999) {
+      showToast('Informe o peso por unidade em gramas para a etiqueta'); weightInput.focus(); return;
+    }
+  }
+
+  // Modo edit: editingProductId setado por openProductModalForEdit
+  if (editingProductId) {
+    const idx = products.findIndex(p => p.id === editingProductId);
+    if (idx === -1) { closeProductModal(); return; }
+    const before = { ...products[idx] };
+    products[idx] = {
+      ...products[idx],
+      name, emoji: selectedEmoji, category: selectedCat,
+      unit: unit || '', price, cost, minStock, defaultValidityDays
+    };
+    const diff = diffObjects(before, products[idx], ['name','emoji','category','unit','price','cost','minStock','defaultValidityDays']);
+    if (!persistAll()) { products[idx] = before; return; }
+    productSubmitCompleted = true;
+    renderProductGrid();
+    if (typeof renderCatalogList === 'function') renderCatalogList();
+    logAction({
+      action: 'product.update',
+      entityType: 'product',
+      entityId: editingProductId,
+      summary: 'Editou produto ' + name,
+      diff
+    });
+    closeProductModal();
+    showToast(`${name} atualizado`);
+    haptic();
+    return;
+  }
+
+  // Modo create
+  const product = {
+    id: 'custom-' + Date.now(),
+    name, emoji: selectedEmoji, category: selectedCat,
+    unit: unit || '', price, cost, minStock, defaultValidityDays, count: 0, photo: null, stock: 0, custom: true
+  };
+  if (fastProduction) { product.count = quantity; product.defaultWeightG = weight; }
+  products.push(product);
+  if (fastProduction) {
+    openProductionConfirm([product.id]);
+    document.getElementById('prodManufacturedDate').value = manufactureDate;
+    if (confirmProduction() !== true) {
+      products.splice(products.indexOf(product), 1);
+      closeProductionConfirm();
+      return;
+    }
+    productSubmitCompleted = true;
+    logAction({ action: 'product.create', entityType: 'product', entityId: product.id, summary: 'Cadastrou produto ' + name });
+    closeProductModal();
+    renderProductGrid();
+    haptic();
+    return;
+  }
+  if (!persistAll()) { products.splice(products.indexOf(product), 1); return; }
+  productSubmitCompleted = true;
+  renderProductGrid();
+
+  logAction({
+    action: 'product.create',
+    entityType: 'product',
+    entityId: product.id,
+    summary: 'Cadastrou produto ' + name
+  });
+
+  const fromOrder = !!productModalCallback;
+  if (fromOrder) {
+    // Adiciona direto no pedido em construção
+    addItemToOrder(product);
+  } else {
+    product.count = 1;
+    renderProductGrid();
+  }
+
+  closeProductModal();
+  showToast(`${name} criado`);
+  if (!fromOrder) openProductionConfirm();
+  haptic();
+}
+
+// Abre o modal em modo EDIT (reaproveita newProductModal). Pre-preenche campos
+// e setta editingProductId pra saveNewProduct() saber se cria ou atualiza.
+let editingProductId = null;
+function openProductModalForEdit(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  productSubmitCompleted = false;
+  document.getElementById('newProdBatchFields').hidden = true;
+  editingProductId = productId;
+  document.getElementById('newProdName').value = p.name || '';
+  document.getElementById('newProdUnit').value = p.unit || '';
+  document.getElementById('newProdValidity').value = p.defaultValidityDays ?? 5;
+  document.getElementById('newProdPrice').value = p.price != null ? formatMoneyInput(p.price) : '';
+  const costEl = document.getElementById('newProdCost');
+  if (costEl) costEl.value = (p.cost != null ? formatMoneyInput(p.cost) : '');
+  const minStockEl = document.getElementById('newProdMinStock');
+  if (minStockEl) minStockEl.value = (p.minStock != null ? String(p.minStock) : '');
+  selectedCat = p.category || 'massa';
+  selectedEmoji = p.emoji || '🍝';
+  document.querySelectorAll('#catPills .cat-pill').forEach(x => {
+    x.classList.toggle('active', x.dataset.cat === selectedCat);
+  });
+  document.querySelectorAll('#emojiGrid .emoji-pick').forEach(x => {
+    const active = x.textContent === selectedEmoji;
+    x.classList.toggle('active', active);
+    x.setAttribute('aria-checked', String(active));
+  });
+  // Muda titulo do modal
+  const titleEl = document.querySelector('#newProductModal .modal-title');
+  if (titleEl) titleEl.innerHTML = 'Editar <span class="accent">produto</span>';
+  const saveBtn = document.getElementById('saveProductBtn');
+  if (saveBtn) saveBtn.textContent = 'Salvar alterações';
+  rememberOperationalFocus('newProductModal');
+  document.getElementById('newProductModal').classList.add('show');
+  document.getElementById('newProdName').focus();
+  updateMarginPreview();
+  updateProductSaveState();
+}
+
+// Long-press num tile de produto (tela de Producao) abre esse menu pra
+// editar ou arquivar/restaurar sem precisar ir até Ajustes > Catalogo.
+function openProductActionsMenu(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  document.getElementById('productActionsEmoji').textContent = p.emoji || '📦';
+  document.getElementById('productActionsTitle').textContent = p.name;
+  document.getElementById('productActionsSubtitle').textContent =
+    p.archived ? 'Produto arquivado. O que deseja fazer?' : 'O que deseja fazer?';
+
+  const editBtn = document.getElementById('productActionsEdit');
+  editBtn.onclick = function () {
+    closeProductActionsMenu();
+    try { openProductModalForEdit(productId); }
+    catch (e) { showToast('Erro: ' + (e && e.message || e)); }
+  };
+
+  const archBtn = document.getElementById('productActionsArchive');
+  if (p.archived) {
+    archBtn.textContent = '↩️ Restaurar';
+    archBtn.onclick = function () {
+      closeProductActionsMenu();
+      p.archived = false;
+      persistAll();
+      renderProductGrid();
+      if (typeof renderCatalogList === 'function') renderCatalogList();
+      logAction({
+        action: 'product.update', entityType: 'product', entityId: productId,
+        summary: 'Restaurou produto ' + p.name, diff: { archived: { before: true, after: false } }
+      });
+      showToast(p.name + ' restaurado');
+    };
+  } else {
+    archBtn.textContent = '🗑️ Arquivar';
+    archBtn.onclick = function () {
+      closeProductActionsMenu();
+      archiveProduct(productId);
+    };
+  }
+
+  document.getElementById('productActionsModal').classList.add('show');
+}
+function closeProductActionsMenu() {
+  document.getElementById('productActionsModal').classList.remove('show');
+}
+
+// Soft-delete: marca produto como archived (mantem em pedidos antigos).
+// Executa direto + showUndoToast (5s pra desfazer). Audit log so' apos commit.
+function archiveProduct(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  if (p.archived) { showToast('Produto já arquivado'); return; }
+  p.archived = true;
+  persistAll();
+  renderProductGrid();
+  if (typeof renderCatalogList === 'function') renderCatalogList();
+  const name = p.name;
+  showUndoToast(
+    '<span class="hi">' + escapeHtml(name) + '</span> arquivado',
+    function () { _silentRestoreProduct(productId); },
+    {
+      onCommit: function () {
+        logAction({
+          action: 'product.archive',
+          entityType: 'product',
+          entityId: productId,
+          summary: 'Arquivou produto ' + name
+        });
+      }
+    }
+  );
+}
+// Reverte archive sem confirm/log/toast — usado pelo undo.
+// F1: sem showToast — evita stacking visual com a action-toast da barra.
+function _silentRestoreProduct(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  p.archived = false;
+  persistAll();
+  renderProductGrid();
+  if (typeof renderCatalogList === 'function') renderCatalogList();
+}
+
+// Helper pra formatar preco no input (R$ nao tem cifrao no input)
+function formatMoneyInput(val) {
+  if (val == null) return '';
+  return Number(val).toFixed(2).replace('.', ',');
+}
+
+document.querySelectorAll('#catPills .cat-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    selectedCat = pill.dataset.cat;
+    document.querySelectorAll('#catPills .cat-pill').forEach(x => x.classList.toggle('active', x === pill));
+  });
+});
+document.querySelectorAll('#emojiGrid .emoji-pick').forEach(em => {
+  em.addEventListener('click', () => {
+    selectedEmoji = em.textContent;
+    document.querySelectorAll('#emojiGrid .emoji-pick').forEach(x => {
+      const active = x === em;
+      x.classList.toggle('active', active);
+      x.setAttribute('aria-checked', String(active));
+    });
+  });
+});
+
+// =========================
+// FORMA DE PAGAMENTO (#1493)
+// =========================
+// Mesma lista do servidor (FormaPagamentoMobile). O objeto (pedido ou
+// lancamento) carrega `metodo`, que viaja inteiro na mutacao do sync.
+const FORMAS_PAGAMENTO = [
+  { key: 'pix', label: 'Pix' },
+  { key: 'dinheiro', label: 'Dinheiro' },
+  { key: 'credito', label: 'Crédito' },
+  { key: 'debito', label: 'Débito' },
+  { key: 'transferencia', label: 'Transferência' },
+  { key: 'outro', label: 'Outro' }
+];
+function normalizarFormaPagamento(key) {
+  const k = String(key == null ? '' : key).trim().toLowerCase();
+  return FORMAS_PAGAMENTO.some(f => f.key === k) ? k : null;
+}
+function renderFormaPills(hostId, selected, onPick) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  host.innerHTML = FORMAS_PAGAMENTO.map(f =>
+    `<button type="button" class="forma-pill${f.key === selected ? ' active' : ''}" role="radio"` +
+    ` aria-checked="${f.key === selected}" onclick="${onPick}(${jsString(f.key)})">${f.label}</button>`
+  ).join('');
+}
+
+// Entregar pedido pergunta a forma antes; escolherFormaEntrega retoma a entrega.
+let pendingPagamentoEntregaId = null;
+function openPagamentoEntrega(orderId) {
+  if (!assertImportedOrderAction(orderId, STATUS.ENTREGUE)) return;
+  const o = getOrderById(orderId);
+  if (!o) return;
+  pendingPagamentoEntregaId = orderId;
+  const sub = document.getElementById('pagamentoEntregaSub');
+  if (sub) sub.textContent = (o.clientSnapshot?.name || 'Pedido') + ' · ' + money(o.total || 0);
+  renderFormaPills('pagamentoEntregaPills', null, 'escolherFormaEntrega');
+  toggleModal('pagamentoEntregaModal', true);
+}
+function closePagamentoEntrega() {
+  pendingPagamentoEntregaId = null;
+  toggleModal('pagamentoEntregaModal', false);
+}
+function escolherFormaEntrega(key) {
+  const id = pendingPagamentoEntregaId;
+  const metodo = normalizarFormaPagamento(key);
+  closePagamentoEntrega();
+  const o = id ? getOrderById(id) : null;
+  if (!o || !metodo || !assertImportedOrderAction(id, STATUS.ENTREGUE)) return;
+  o.metodo = metodo;
+  applyAdvanceTransition(id, STATUS.ENTREGUE);
+}
+
+function selectCashMetodo(key) {
+  cashMetodo = normalizarFormaPagamento(key);
+  renderFormaPills('cashMetodoPills', cashMetodo, 'selectCashMetodo');
+  updateCashSaveState();
+}
+
+// =========================
+// MODAL CAIXA
+// =========================
+// editingCashEntryId: se setado, openCashModal abre em modo edicao
+// (preenche valores + altera saveCashEntry pra atualizar em vez de criar).
+let editingCashEntryId = null;
+function openCashModal(editId) {
+  // Bloqueia se caixa fechado pra hoje (sem reopen ativo)
+  if (isCashClosedToday() && !editId /* permite ver detalhes */) {
+    showToast('Caixa do dia fechado. Reabra primeiro.');
+    return;
+  }
+  editingCashEntryId = editId || null;
+  let desc = '', amount = '', type = 'expense', metodo = null;
+  if (editId) {
+    const e = (cashEntries || []).find(x => x.id === editId);
+    if (e) {
+      desc = e.description || '';
+      amount = String(e.amount || '').replace('.', ',');
+      type = e.type || 'expense';
+      metodo = normalizarFormaPagamento(e.metodo);
+    }
+  }
+  cashMetodo = metodo;
+  renderFormaPills('cashMetodoPills', cashMetodo, 'selectCashMetodo');
+  document.getElementById('cashDesc').value = desc;
+  document.getElementById('cashAmount').value = amount;
+  cashType = type;
+  document.querySelectorAll('#cashTypePills .cash-type-pill').forEach(p => {
+    p.classList.remove('active', 'expense', 'income');
+    if (p.dataset.type === type) p.classList.add('active', type);
+  });
+  const saveBtn = document.getElementById('cashSaveBtn');
+  if (saveBtn) saveBtn.textContent = editId ? 'Salvar alteração' : 'Lançar';
+  document.getElementById('cashEntryModal').classList.add('show');
+  updateCashSaveState();
+  setTimeout(() => document.getElementById('cashDesc').focus(), 300);
+}
+function closeCashModal() {
+  editingCashEntryId = null;
+  document.getElementById('cashEntryModal').classList.remove('show');
+}
+/**
+ * Parse robusto de valor monetário vindo do input (Android/pt-BR).
+ * Aceita "12", "12.5", "12,50", "R$ 12,50", "12.345,67".
+ * Retorna NaN se não conseguir extrair um número válido.
+ */
+function parseMoneyInput(raw) {
+  if (raw == null) return NaN;
+  let s = String(raw).trim();
+  if (!s) return NaN;
+  // Remove tudo que não for dígito, vírgula ou ponto (tira "R$", espaços).
+  s = s.replace(/[^\d.,-]/g, '');
+  // Se tem vírgula E ponto, assume formato pt-BR (1.234,56) → remove pontos, troca vírgula por ponto.
+  if (s.indexOf(',') >= 0 && s.indexOf('.') >= 0) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.indexOf(',') >= 0) {
+    // Só vírgula → separador decimal pt-BR
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+
+// #416 — mascara de moeda "de centavos": usuario digita digitos e o campo
+// formata da direita pra esquerda (4500 -> 45,00; 450000 -> 4.500,00). Sempre
+// produz formato pt-BR valido que parseMoneyInput le no salvar. Limite de 11
+// digitos (ate 999.999.999,99) evita overflow. Sem digito -> campo vazio.
+function maskMoneyInput(el) {
+  if (!el) return;
+  const digits = String(el.value || '').replace(/\D/g, '').slice(0, 11);
+  if (!digits) { el.value = ''; return; }
+  const cents = parseInt(digits, 10);
+  const intPart = Math.floor(cents / 100);
+  const centPart = String(cents % 100).padStart(2, '0');
+  const intStr = String(intPart).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  el.value = intStr + ',' + centPart;
+}
+
+function updateCashSaveState() {
+  const btn = document.getElementById('cashSaveBtn');
+  if (!btn) return;
+  const desc = document.getElementById('cashDesc')?.value?.trim() || '';
+  const amount = parseMoneyInput(document.getElementById('cashAmount')?.value || '');
+  btn.disabled = !desc || isNaN(amount) || amount <= 0 || !cashMetodo;
+}
+
+function saveCashEntry() {
+  // Bloqueia edicao se a entry sendo editada e de um dia ja fechado.
+  // Pra criacao nova, sempre é hoje — checa hoje.
+  if (editingCashEntryId) {
+    const existing = (cashEntries || []).find(x => x.id === editingCashEntryId);
+    if (existing) {
+      const day = dateKeyOf(existing.createdAt);
+      if (isCashClosedFor(day)) {
+        showToast(`Caixa de ${fmtDateKey(day)} fechado. Reabra primeiro.`);
+        return;
+      }
+    }
+  } else if (isCashClosedToday()) {
+    showToast('Caixa de hoje já está fechado. Reabra primeiro.');
+    return;
+  }
+  const desc = document.getElementById('cashDesc').value.trim();
+  const amount = parseMoneyInput(document.getElementById('cashAmount').value);
+
+  if (!desc) { showToast('Informe a descrição.'); return; }
+  if (isNaN(amount) || amount <= 0) {
+    showToast('Valor inválido. Use 12 ou 12,50.');
+    return;
+  }
+  if (!cashMetodo) { showToast('Escolha a forma de pagamento.'); return; }
+
+  // Modo edicao
+  if (editingCashEntryId) {
+    const entry = (cashEntries || []).find(x => x.id === editingCashEntryId);
+    if (!entry) { showToast('Lançamento não encontrado'); closeCashModal(); return; }
+    const before = { type: entry.type, amount: entry.amount, description: entry.description, metodo: entry.metodo || null };
+    entry.type = cashType;
+    entry.amount = Math.abs(Number(amount));
+    entry.description = desc;
+    entry.metodo = cashMetodo;
+    entry.lastOperatorName = operatorName || null;
+    persistAll();
+    updateSync();
+    logAction({
+      action: 'cash.entry_edit', entityType: 'cash', entityId: entry.id,
+      summary: 'Lançamento editado · ' + (entry.type === 'expense' ? 'Saída ' : 'Entrada ') + money(entry.amount) + ' · ' + desc,
+      diff: { before, after: { type: entry.type, amount: entry.amount, description: entry.description, metodo: entry.metodo } }
+    });
+    closeCashModal();
+    renderHome();
+    if (typeof renderCashDetails === 'function') renderCashDetails();
+    showToast('Lançamento atualizado');
+    return;
+  }
+
+  // Modo criacao
+  const entry = {
+    id: 'cash-' + Date.now(),
+    type: cashType,
+    amount: Math.abs(Number(amount)),
+    description: desc,
+    metodo: cashMetodo,
+    createdAt: Date.now(),
+    lastOperatorName: operatorName || null
+  };
+  cashEntries.push(entry);
+  persistAll();
+  updateSync();
+
+  // Audit log: lancamento manual no caixa
+  logAction({
+    action: 'cash.manual_entry',
+    entityType: 'cash',
+    entityId: entry.id,
+    summary: (cashType === 'expense' ? 'Saída' : 'Entrada') + ' R$ ' + amount.toFixed(2).replace('.', ',') + ' · ' + desc
+  });
+
+  closeCashModal();
+  renderHome();
+  if (typeof renderCashDetails === 'function') renderCashDetails();
+  showToast((cashType === 'expense' ? 'Saída' : 'Entrada') + ' de ' + money(amount) + ' registrada');
+}
+
+function deleteCashEntry(id) {
+  const e = (cashEntries || []).find(x => x.id === id);
+  if (!e) return;
+  // Trava se o caixa do DIA da entry ja esta fechado
+  const entryDay = dateKeyOf(e.createdAt);
+  if (isCashClosedFor(entryDay)) {
+    showToast(`Caixa de ${fmtDateKey(entryDay)} fechado. Reabra primeiro.`);
+    return;
+  }
+  // Soft-delete via undo toast: guarda copia da entry, remove agora, reinsere se desfazer.
+  const savedEntry = Object.assign({}, e);
+  cashEntries = cashEntries.filter(x => x.id !== id);
+  persistAll();
+  // #1520: a exclusao sobe ao servidor como mutation propria, so depois do "Desfazer".
+  try { window.cdbSync.agendarExclusaoLancamento(savedEntry); } catch (_) {}
+  renderHome();
+  if (typeof renderCashDetails === 'function') renderCashDetails();
+  const label = (e.type === 'expense' ? 'Saída' : 'Entrada') + ' de ' + money(e.amount);
+  showUndoToast(
+    '<span class="hi">' + escapeHtml(label) + '</span> excluída',
+    function () {
+      try { window.cdbSync.cancelarExclusaoLancamento(savedEntry.id); } catch (_) {}
+      // Reinsere na lista (renderCashDetails ordena por createdAt desc)
+      if (!cashEntries.find(x => x.id === savedEntry.id)) {
+        cashEntries.push(savedEntry);
+        persistAll();
+        renderHome();
+        if (typeof renderCashDetails === 'function') renderCashDetails();
+      }
+      showToast('Lançamento restaurado');
+    },
+    {
+      onCommit: function () {
+        // Sync e audit log so' depois do delay (commit definitivo)
+        try { window.cdbSync.confirmarExclusaoLancamento(id); } catch (_) {}
+        updateSync();
+        logAction({
+          action: 'cash.entry_delete', entityType: 'cash', entityId: id,
+          summary: 'Excluído ' + (e.type === 'expense' ? 'saída' : 'entrada') + ' de ' + money(e.amount) + ' · ' + e.description
+        });
+      }
+    }
+  );
+}
+
+document.querySelectorAll('#cashTypePills .cash-type-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    cashType = pill.dataset.type;
+    document.querySelectorAll('#cashTypePills .cash-type-pill').forEach(p => {
+      p.classList.remove('active','expense','income');
+    });
+    pill.classList.add('active', cashType);
+  });
+});
+
+// =========================
+// COMPRAS
+// =========================
+function suggestShop(name) {
+  const input = document.getElementById('shopInput');
+  if (input) input.value = name;
+  addShop(name);
+}
+function addShop(forcedName) {
+  const input = document.getElementById('shopInput');
+  const val = String(forcedName || input?.value || '').trim();
+  if (!val) return;
+  if (!Array.isArray(shoppingItems)) shoppingItems = [];
+  const now = Date.now();
+  shoppingItems.unshift({
+    id: 'shop-' + now + '-' + Math.random().toString(36).slice(2, 7),
+    name: val,
+    done: false,
+    createdAt: now,
+    doneAt: 0
+  });
+  persistAll();
+  if (input) input.value = '';
+  updateSync();
+  renderShoppingList();
+  renderHomeShopping();
+  showToast('Adicionado à lista');
+}
+function toggleShop(id) {
+  ensureShoppingState();
+  const item = (shoppingItems || []).find(x => x.id === id);
+  if (!item) return;
+  item.done = !item.done;
+  item.doneAt = item.done ? Date.now() : 0;
+  persistAll();
+  renderShoppingList();
+  renderHomeShopping();
+  haptic();
+}
+function removeShopItem(id) {
+  ensureShoppingState();
+  const before = shoppingItems.length;
+  shoppingItems = shoppingItems.filter(x => x.id !== id);
+  if (shoppingItems.length === before) return;
+  persistAll();
+  renderShoppingList();
+  renderHomeShopping();
+  showToast('Item removido');
+}
+function clearBoughtShoppingItems() {
+  ensureShoppingState();
+  const count = shoppingItems.filter(x => x.done).length;
+  if (!count) { showToast('Sem itens comprados'); return; }
+  shoppingItems = shoppingItems.filter(x => !x.done);
+  persistAll();
+  renderShoppingList();
+  renderHomeShopping();
+  showToast(count === 1 ? '1 item removido' : count + ' itens removidos');
+}
+document.addEventListener('DOMContentLoaded', function () {
+  ensureShoppingState();
+  renderShoppingList();
+  renderHomeShopping();
+});
+
+// =========================
+// TOAST
+// =========================
+let toastTimer = null;
+// #2886: região viva única (#srStatus). Repetir a mesma frase troca um espaço rígido no fim
+// para o leitor de tela anunciar de novo.
+function announce(msg) {
+  const live = document.getElementById('srStatus');
+  if (!live) return;
+  const text = String(msg == null ? '' : msg);
+  live.textContent = live.textContent === text ? text + ' ' : text;
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  announce(msg);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// ============================================================
+// MODAL DE RELATORIO PULL INICIAL
+// ============================================================
+// Disparado por sync.js apos pareamento (pairAuto/pairWithCode) ter feito
+// pull inicial. Le contadores atuais do state, mostra modal com auto-dismiss
+// 3s. Botao "Detalhes" expande info de pareamento. Botao "OK" fecha imediato.
+let _iprDismissTimer = null;
+function iprShow() {
+  const el = document.getElementById('initialPullReport');
+  if (!el) return;
+  const state = (typeof window.cdbApp !== 'undefined' && window.cdbApp.getState)
+    ? window.cdbApp.getState() : {};
+  document.getElementById('iprProducts').textContent = (state.products || []).length;
+  document.getElementById('iprClients').textContent  = (state.clients || []).length;
+  document.getElementById('iprOrders').textContent   = (state.orders || []).length;
+  document.getElementById('iprBatches').textContent  = (state.batches || []).length;
+  document.getElementById('iprCash').textContent     = (state.cashEntries || []).length;
+  // Preenche detalhes (visiveis so apos click)
+  try {
+    const pairing = window.cdbSync && window.cdbSync.getPairing && window.cdbSync.getPairing();
+    if (pairing) {
+      document.getElementById('iprLoja').textContent = String(pairing.label || pairing.lojaId || '—').slice(0, 40);
+      document.getElementById('iprPairedAt').textContent = pairing.pairedAt
+        ? new Date(pairing.pairedAt).toLocaleString('pt-BR') : '—';
+    }
+    const cfg = window.CDB_CONFIG || {};
+    document.getElementById('iprEndpoint').textContent = cfg.apiBaseUrl || '(mesmo host)';
+  } catch (_) {}
+  el.hidden = false;
+  // Auto-dismiss em 3s
+  if (_iprDismissTimer) clearTimeout(_iprDismissTimer);
+  _iprDismissTimer = setTimeout(iprDismiss, 3000);
+}
+function iprDismiss() {
+  if (_iprDismissTimer) { clearTimeout(_iprDismissTimer); _iprDismissTimer = null; }
+  const el = document.getElementById('initialPullReport');
+  if (el) el.hidden = true;
+  try { localStorage.removeItem('cdb-pull-report-pending'); } catch (_) {}
+}
+function iprToggleDetails() {
+  // Click em Detalhes cancela auto-dismiss e mostra info estendida
+  if (_iprDismissTimer) { clearTimeout(_iprDismissTimer); _iprDismissTimer = null; }
+  const d = document.getElementById('iprDetails');
+  if (d) d.hidden = !d.hidden;
+}
+// Boot: se a flag estiver setada (pull causou reload), mostra o modal.
+// Espera 600ms pro cdbApp inicializar antes de ler state.
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    if (localStorage.getItem('cdb-pull-report-pending') !== '1') return;
+    setTimeout(iprShow, 600);
+  } catch (_) {}
+});
+// Evento sincronizo do sync.js quando pull rodou sem causar reload
+// (nenhuma mutation nova) — UI ainda quer mostrar o modal.
+window.addEventListener('cdb-initial-pull-done', function () {
+  if (document.getElementById('initialPullReport') && document.getElementById('initialPullReport').hidden === false) return;
+  iprShow();
+});
+
+// ============================================================
+// MENSAGENS DE ERRO HUMANIZADAS
+// ============================================================
+// Felipe reportou que erros do app vinham crípticos ("Broken pipe",
+// "EPIPE", "Connection reset"). humanizeError mapeia o raw da exception
+// pra { titulo, dica } em portugues, com ação sugerida quando tem
+// procedimento conhecido. Use no lugar de showToast('Erro: ' + e.message).
+//
+// Padrões cobertos:
+//  - Bluetooth/impressora (broken pipe, EPIPE, not connected)
+//  - Rede (timeout, fetch failed, ERR_NETWORK)
+//  - Backup/Filesystem
+//  - Permissão (denied, not granted)
+//  - Servidor (401, 403, 404, 500, 503)
+function humanizeError(raw, context) {
+  var msg = String(raw && (raw.message || raw) || '').toLowerCase();
+  var ctx = (context || '').toLowerCase();
+
+  // === Impressora Bluetooth ===
+  if (msg.includes('broken pipe') || msg.includes('epipe')) {
+    return {
+      title: 'Impressora travou',
+      hint: 'A impressora pode ter saído de alcance ou entrado em modo de economia. ' +
+            'Religue ela e tente imprimir de novo — o app reconecta sozinho.'
+    };
+  }
+  if (msg.includes('not connected') && (ctx.includes('print') || ctx.includes('bluetooth'))) {
+    return {
+      title: 'Impressora desconectada',
+      hint: 'Toque em Imprimir de novo. Se persistir, vá em Ajustes > Impressora e reconecte.'
+    };
+  }
+  if (msg.includes('bluetooth') && msg.includes('disabled')) {
+    return {
+      title: 'Bluetooth desligado',
+      hint: 'Ative o Bluetooth nas Configurações do celular pra usar a impressora.'
+    };
+  }
+  if (msg.includes('permiss') || msg.includes('not granted') || msg.includes('denied')) {
+    return {
+      title: 'Permissão negada',
+      hint: 'Vá em Configurações > Apps > Casa da Baba > Permissões e libere o que está bloqueado.'
+    };
+  }
+  if (msg.includes('falha ao conectar') || msg.includes('failed to connect')) {
+    return {
+      title: 'Não conectou na impressora',
+      hint: 'Confira se ela está ligada e perto do celular. Tente desemparelhar e parear de novo nas Configurações de Bluetooth.'
+    };
+  }
+
+  // === Rede / Servidor ===
+  if (msg.includes('timeout') || msg.includes('aborted')) {
+    return {
+      title: 'Servidor demorou demais',
+      hint: 'Sua internet pode estar lenta. O app continua funcionando offline — ele sincroniza quando voltar.'
+    };
+  }
+  if (msg.includes('failed to fetch') || msg.includes('err_network')
+      || msg.includes('network request') || msg.includes('sem rede')) {
+    return {
+      title: 'Sem internet',
+      hint: 'Tudo bem, o app funciona offline. Suas ações ficam salvas e sincronizam quando a internet voltar.'
+    };
+  }
+  if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('pareamento invalido')) {
+    return {
+      title: 'Pareamento expirou',
+      hint: 'Vá em Ajustes > Diagnóstico e refaça o pareamento com o servidor.'
+    };
+  }
+  if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('servidor recusou')) {
+    return {
+      title: 'Servidor com problema',
+      hint: 'Tenta de novo em alguns minutos. Suas ações continuam salvas no celular.'
+    };
+  }
+
+  // === Backup / Storage ===
+  if (msg.includes('snapshot muito grande')) {
+    return {
+      title: 'Backup grande demais',
+      hint: 'Tem muitos dados acumulados. Vá em Ajustes > Backup e exporte um JSON pra arquivar.'
+    };
+  }
+  if (msg.includes('arquivo invalido') || msg.includes('schema')) {
+    return {
+      title: 'Arquivo de backup inválido',
+      hint: 'O arquivo selecionado não é um backup do Casa da Baba. Confira se você selecionou o JSON certo.'
+    };
+  }
+  if (msg.includes('storage') || msg.includes('quota')) {
+    return {
+      title: 'Sem espaço',
+      hint: 'O celular está com pouca memória. Libere algum espaço e tente de novo.'
+    };
+  }
+
+  // === Genérico — fallback que não expõe stack trace ===
+  // Retorna a mensagem original mas EM CIMA de um título amigavel,
+  // pra ainda dar pista pro Felipe debugar se precisar.
+  var raw_clean = String(raw && (raw.message || raw) || 'Erro desconhecido').slice(0, 140);
+  return {
+    title: 'Algo deu errado',
+    hint: raw_clean
+  };
+}
+
+// Atalho que chama humanizeError + showToast no formato consistente.
+// Usa "·" pra separar titulo da dica (compacto).
+function showError(raw, context) {
+  var h = humanizeError(raw, context);
+  // Toast curto = titulo. Hint vai junto se couber, senao só titulo.
+  var msg = h.hint && h.hint.length < 120
+    ? h.title + ' · ' + h.hint
+    : h.title;
+  showToast(msg);
+  return h; // retorna pra quem quiser usar (ex: alert detalhado)
+}
+// undoLast() removida 2026-05-16 (correcao C3): era stub vazio que enganava
+// o usuario. Botao .undo do #toast tambem removido do DOM. Para acao
+// reversivel real, use showUndoToast(msg, undoFn, onCommit) que escreve
+// no #actionToast (DIV separado) com callbacks reais.
+
+// ===== Toast com botao Desfazer (substitui confirm() em acoes reversiveis) =====
+// Padrao mobile-native: a acao executa imediatamente; operador tem N segundos
+// pra clicar "Desfazer". Se nao desfaz, executa o commit definitivo (callback
+// onCommit) — usado pra disparar audit log so quando a acao "vinga".
+let _undoToastTimer = null;
+let _undoToastFired = false;
+function showUndoToast(msg, undoFn, opts) {
+  opts = opts || {};
+  const delayMs = opts.delayMs || 5000;
+  const onCommit = opts.onCommit; // chamado se NAO foi desfeito (audit log etc)
+  const el = document.getElementById('actionToast');
+  if (!el) return;
+  // Se ha um undo toast pendente de outra acao, commit imediato dele
+  if (_undoToastTimer) {
+    clearTimeout(_undoToastTimer);
+    if (!_undoToastFired && typeof window._pendingCommit === 'function') {
+      try { window._pendingCommit(); } catch (e) {}
+    }
+  }
+  _undoToastFired = false;
+  window._pendingCommit = onCommit || null;
+  document.getElementById('actionToastMsg').innerHTML = msg;
+  document.getElementById('actionToastActions').innerHTML =
+    '<button class="at-undo" onclick="window._handleUndoClick()">Desfazer</button>';
+  // Barra regressiva — re-cria pra reiniciar animacao
+  let bar = el.querySelector('.at-progress');
+  if (bar) bar.remove();
+  bar = document.createElement('div');
+  bar.className = 'at-progress';
+  bar.style.animation = 'at-countdown ' + delayMs + 'ms linear forwards';
+  el.appendChild(bar);
+  el.classList.add('show');
+  // Handler do botao Desfazer (window scope pra onclick inline funcionar)
+  window._handleUndoClick = function () {
+    if (_undoToastFired) return;
+    _undoToastFired = true;
+    if (_undoToastTimer) { clearTimeout(_undoToastTimer); _undoToastTimer = null; }
+    el.classList.remove('show');
+    window._pendingCommit = null;
+    try { undoFn(); } catch (e) { try { console.warn('undo falhou', e); } catch (_) {} showToast('Erro ao desfazer'); }
+  };
+  // Auto-hide + commit definitivo apos delay
+  _undoToastTimer = setTimeout(function () {
+    _undoToastTimer = null;
+    if (!_undoToastFired) {
+      _undoToastFired = true;
+      el.classList.remove('show');
+      const commit = window._pendingCommit;
+      window._pendingCommit = null;
+      if (typeof commit === 'function') { try { commit(); } catch (e) { try { console.warn('commit falhou', e); } catch (_) {} } }
+    }
+  }, delayMs);
+}
+
+// =========================
+// Fechar modais clicando fora
+// =========================
+const operationalFocus = new Map();
+function rememberOperationalFocus(id) { operationalFocus.set(id, document.activeElement); }
+function restoreOperationalFocus(id) {
+  const target = operationalFocus.get(id);
+  operationalFocus.delete(id);
+  if (!document.querySelector('.modal-overlay.show, .cobranca-overlay.show, #etiquetasPreview.show, dialog[open]') && target?.isConnected && target.offsetParent !== null) target.focus();
+}
+function operationalModalOpen() {
+  return !!document.querySelector('.modal-overlay.show, .historico-overlay.show, .cobranca-overlay.show, #etiquetasPreview.show, dialog[open], .welcome:not(.hidden), .tour:not(.hidden)');
+}
+['newProductModal', 'newClientModal', 'productionConfirmModal', 'etiquetasPreview', 'noPrinterModal', 'cobrancaModal'].forEach(id => {
+  const modal = document.getElementById(id);
+  modal.addEventListener('keydown', event => {
+    if (!modal.classList.contains('show')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopPropagation();
+      if (id === 'newProductModal') closeProductModal();
+      else if (id === 'newClientModal') closeClientModal();
+      else if (id === 'noPrinterModal') closeNoPrinterModal();
+      else if (id === 'cobrancaModal') closeCobranca();
+      else if (id === 'productionConfirmModal') closeProductionConfirm();
+      else closeEtiquetasPreview();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'))
+      .filter(element => element.offsetParent !== null);
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (!focusable.includes(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); return; }
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  });
+});
+['newProductModal','newClientModal','itemPickerModal','productionConfirmModal','cashEntryModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', (e) => {
+    if (e.target.id === id) {
+      if (id === 'newProductModal') closeProductModal();
+      else if (id === 'newClientModal') closeClientModal();
+      else if (id === 'itemPickerModal') closeItemPicker();
+      else if (id === 'productionConfirmModal') closeProductionConfirm();
+      else if (id === 'cashEntryModal') closeCashModal();
+    }
+  });
+});
+
+// =========================
+// INIT
+// =========================
+renderProductGrid();
+renderRecents();
+renderOrderItems();
+renderOrderDraftSummary();
+renderHome();
+renderOrdersFeed();
+updateSync();
+renderOperatorBadge();
+renderBrandName();
+updateDemoModeBanner();
+document.querySelectorAll('.screen').forEach(s => s.setAttribute('aria-hidden', s.classList.contains('active') ? 'false' : 'true'));
+updateNavA11y();
+window.CDB_OPERATOR = operatorName;
+
+// F4: pivô de versionamento de schema. Se ausente, marca como '2' (atual).
+// Migracao 'apt → address' no load() ja roda independente. Proxima mudanca
+// de shape de entity vai ler esse pivo e migrar incrementalmente.
+try {
+  if (!localStorage.getItem('cdb-schema-version')) {
+    localStorage.setItem('cdb-schema-version', '2');
+  }
+} catch (e) {}
+
+// Welcome flow: se ainda não informou o nome, bloqueia o app até preencher.
+// Depois, se é primeira vez (sem flag onboarding), inicia o tour.
+(function bootstrapOnboarding() {
+  const input   = document.getElementById('welcomeName');
+  const btn     = document.getElementById('welcomeContinue');
+  const hasName = operatorName && operatorName.trim().length > 0;
+  const pilot = !!window.CDB_CONFIG?.isPilot;
+  if (pilot) document.getElementById('welcomeTitle').textContent = 'Bem-vinda à Casa da Baba';
+  const hasTour = (() => {
+    try { return localStorage.getItem('cdb-onboarding-done') === '1'; }
+    catch (e) { return false; }
+  })();
+
+  input.addEventListener('input', () => { btn.disabled = input.value.trim().length === 0; });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !btn.disabled) btn.click(); });
+  btn.addEventListener('click', () => {
+    saveOperatorName(input.value);
+    hideWelcome();
+    if (!pilot && !hasTour) startTour();
+    if (pilot) window.dispatchEvent(new Event('cdb-operator-ready'));
+  });
+
+  if (!hasName) {
+    showWelcome();
+  } else if (!pilot && !hasTour) {
+    // Já tem nome mas nunca viu tour (ex: atualizou o app) → mostra tour.
+    startTour();
+  }
+})();
+
+// Exposição pro sync.js
+// #2735: no piloto não existe Ajustes > Diagnóstico; quem reconecta o aparelho é o Início.
+function pairingInvalidMessage() {
+  return window.CDB_CONFIG?.isPilot === true
+    ? 'Conexão do aparelho inválida. Abra o Início para conectar de novo.'
+    : 'Pareamento invalidado. Abra Ajustes > Diagnóstico para parear de novo.';
+}
+window.cdbApp = {
+  getState: () => ({ products, clients, orders, cashEntries, batches, cashClosings }),
+  setPendingSync: (n) => { pendingSync = n; updateSync(); },
+  bumpPendingSync: () => { updateSync(); }, // #2316: contador deriva so da fila (sync.js)
+  markAllSynced: () => { pendingSync = 0; try { localStorage.setItem('cdb-last-sync', String(Date.now())); } catch (e) {} updateSync(); },
+  getOperator: () => operatorName,
+  showToast: function (msg) { if (typeof showToast === 'function') showToast(msg); },
+  // Onda 1: pairing revogado pelo servidor — operador precisa re-parear.
+  onPairingInvalid: function () {
+    try { showToast(pairingInvalidMessage()); } catch (e) {}
+    try { logError(new Error('pairing invalidated by server'), 'sync.pairing'); } catch (_) {}
+  },
+  // Onda 5/6: edits conflitaram com versão mais nova no servidor.
+  // Onda 6: UX rica — em vez de só toast, abre modal claro com lista
+  // dos conflitos + opção de "Recarregar do servidor" pra alinhar UI.
+  onSyncConflict: function (conflicts) {
+    (conflicts || []).forEach(c => {
+      try { logError(new Error(c.reason || 'conflict'), 'sync.conflict:' + (c.mutationId || c.id || '?')); } catch (_) {}
+    });
+    try { showConflictModal(conflicts); } catch (e) {
+      const n = (conflicts || []).length;
+      try { showToast(n + ' edicao' + (n === 1 ? '' : 'es') + ' conflitou'); } catch (_) {}
+    }
+  }
+};

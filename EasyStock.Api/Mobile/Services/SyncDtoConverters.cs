@@ -53,7 +53,8 @@ internal static class SyncDtoConverters
             ScheduledDeliveryAt: o.ScheduledDeliveryAt.HasValue
                 ? new DateTimeOffset(o.ScheduledDeliveryAt.Value).ToUnixTimeMilliseconds()
                 : (long?)null,
-            Metodo: o.Metodo);
+            Metodo: o.Metodo,
+            Channel: o.Channel);
 
     internal static BatchDto ToDto(Batch b) =>
         new(b.Id, b.Code,

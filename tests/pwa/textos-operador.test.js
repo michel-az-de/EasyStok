@@ -7,12 +7,13 @@
 // W6: codigo do lote no subtitulo do modal de producao vinha da abertura do
 // modal; atravessando a meia-noite diferia do lote gravado e da etiqueta.
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 const fs = require('fs');
 const path = require('path');
 
 module.exports = function ({ test, sandbox, runInSandbox, assert }) {
-  const HTML = fs.readFileSync(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const HTML = lerPwaMontada(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
 
   // Captura showToast/alert durante fn e devolve as mensagens.
   async function capturando(fn) {

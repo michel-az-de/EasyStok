@@ -22,7 +22,17 @@ export const casosApi = {
   // `lidaEm`: id da conversa -> instante em que saiu a leitura do resumo dela (console-08).
   [acao.SINCRONIZAR_CONVERSAS]: (estado, { conversas, semMensagens, lidaEm }) => {
     const locais = new Map(estado.conversas.map((c) => [c.id, c]))
-    const lidas = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c, semMensagens?.includes(c.id), lidaEm?.[c.id]))
+    const doServidor = conversas.map((c) => mesclarDoServidor(locais.get(c.id), c, semMensagens?.includes(c.id), lidaEm?.[c.id]))
+    // #2921: a conversa da janela "Novo pedido" não está na fila (o servidor a esconde até a cliente escrever);
+    // a volta de 5 s não pode descartá-la com a montagem dentro.
+    const daJanela = locais.get(estado.janelaDoPedido?.conversaId)
+    // #2921: a conversa que a equipe iniciou (Iniciar / Chamar no WhatsApp) e está selecionada também fica escondida
+    // até a cliente responder; fica na lista enquanto selecionada e sai quando a atendente sai dela.
+    // A retenção vale só enquanto o servidor ainda não a lista; depois, a cópia dele manda (encerrar/arquivar de outra atendente).
+    const listadaPeloServidor = conversas.some((c) => c.id === estado.selecaoRetida)
+    const selecaoRetida = estado.selecaoRetida && !listadaPeloServidor ? estado.selecaoRetida : null
+    const retida = selecaoRetida && selecaoRetida === estado.selecionadaId ? locais.get(estado.selecionadaId) : null
+    const lidas = [daJanela, retida].reduce((lista, c) => (c && !lista.some((x) => x.id === c.id) ? [...lista, c] : lista), doServidor)
     const mescladas = mesmaLista(estado.conversas, lidas) ? estado.conversas : lidas
     const aindaExiste = mescladas.some((c) => c.id === estado.selecionadaId)
     // #2005 (console-07): "Chamar no WhatsApp" seleciona a conversa nova antes de a lista conhecê-la. A volta que
@@ -42,9 +52,13 @@ export const casosApi = {
     }
     // #1565: volta sem novidade devolve o mesmo estado; o Provider não recalcula nem a tela re-renderiza.
     if (mescladas === estado.conversas && selecionadaId === estado.selecionadaId && selecaoPendente === (estado.selecaoPendente ?? null)
+      && selecaoRetida === (estado.selecaoRetida ?? null)
       && automaticoPausado === estado.automaticoPausado && sincronizacao === estado.sincronizacao) return estado
-    return { ...estado, conversas: mescladas, selecionadaId, selecaoPendente, automaticoPausado, sincronizacao }
+    return { ...estado, conversas: mescladas, selecionadaId, selecaoPendente, selecaoRetida, automaticoPausado, sincronizacao }
   },
+
+  [acao.ABRIR_JANELA_DO_PEDIDO]: (estado, { janela }) => ({ ...estado, janelaDoPedido: janela }),
+  [acao.FECHAR_JANELA_DO_PEDIDO]: (estado) => (estado.janelaDoPedido ? { ...estado, janelaDoPedido: null } : estado),
 
   // #1276: cliente da conversa como o EasyStok tem (cadastro pelo console ou dossiê ao abrir).
   // #2185 (F4): o cadastro é um só. Bloqueio, nome e notas lidos numa conversa valem em todas as do mesmo

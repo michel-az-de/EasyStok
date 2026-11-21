@@ -34,6 +34,9 @@ registerHooks({
 })
 
 const { MODULOS } = await import('../src/dominio/modulos.js')
+const { TETO_ITENS_DO_TRILHO } = await import('../src/dominio/trilhoDoConsole.js')
+const TETO_CONTEUDO = 20 // #1810
+const CONTROLES_DA_CONTA = 1
 const { moduloCongelado } = await import('../src/dominio/congelados.js')
 const { normalizarPreferenciasHall, ordenarPaineisDoHall, moverPainelDoHall, aplicarFocoDoHall } = await import('../src/dominio/preferenciasHall.js')
 const { gravarPreferenciasHall, lerPreferenciasHall } = await import('../src/aplicacao/preferenciasHall.js')
@@ -145,25 +148,20 @@ provar('leitura falha, ausente ou módulo sem fonte não inventa linha', () => {
 const { createElement: h } = await import('react')
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { HallDeModulos } = await import('../src/features/hall/HallDeModulos.jsx')
-const { IlustracaoDoModulo } = await import('../src/features/hall/IlustracaoDoModulo.jsx')
 const { ContextoAcessoModulos } = await import('../src/aplicacao/acessoModulos.jsx')
 globalThis.document ??= { documentElement: { dataset: { theme: 'light' } } }
 const html = renderToStaticMarkup(h(ContextoAcessoModulos.Provider, { value: { permite: () => true, acoes: {}, aoSair: () => {} } },
   h(HallDeModulos, { fonteApi: true, sessao: null, agora: Date.parse('2026-10-15T18:00:00Z') })))
 
-// #1891: módulo congelado conserva a ilustração no catálogo, mas não tem cartão no hall.
-provar('os oito módulos têm ilustração própria, decorativa e no tema; só os vivos têm cartão', () => {
+// #2859: cartão leva o ícone do módulo, sem ilustração de 88 px (grade de cartões ilustrados lia como modelo pronto).
+// #1891: módulo congelado não tem cartão; #2232 (H10): Configurações fica no rodapé.
+provar('cartão de cada módulo vivo leva só ícone e nome; nenhum traz ilustração', () => {
+  assert.doesNotMatch(html, /data-ilustracao=/, 'sem ilustração no hall')
   for (const { id } of MODULOS) {
-    const svg = renderToStaticMarkup(h(IlustracaoDoModulo, { id }))
-    assert.match(svg, /aria-hidden="true"/, `${id} decorativa`)
-    assert.match(svg, /var\(--il-tinta\)/, `${id} usa as cores do tema`)
-    assert.doesNotMatch(svg, /#[0-9a-f]{6}/i, `${id} sem cor fixa`)
-    if (moduloCongelado(id)) assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} congelado sem cartão`)
-    // #2232 (H10): Configurações sai da grade e vira link de rodapé, sem cartão ilustrado.
-    else if (id === 'configuracoes') assert.doesNotMatch(html, new RegExp(`data-ilustracao="${id}"`), `${id} no rodapé, sem cartão`)
-    else assert.match(html, new RegExp(`data-ilustracao="${id}"`), `${id} no cartão`)
+    const cartao = new RegExp(`<li[^>]*data-modulo="${id}"`)
+    if (moduloCongelado(id) || id === 'configuracoes') assert.doesNotMatch(html, cartao, `${id} sem cartão`)
+    else assert.match(html, cartao, `${id} no cartão`)
   }
-  assert.equal(renderToStaticMarkup(h(IlustracaoDoModulo, { id: 'privado' })), '')
 })
 
 provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue sendo link', () => {
@@ -176,8 +174,28 @@ provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue send
 })
 
 provar('#1810 continua valendo: até 20 controles na primeira vista', () => {
-  const controles = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
-  assert.ok(controles <= 20, `${controles} controles`)
+  // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta de conteúdo.
+  const semTrilho = html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '')
+  const contar = (trecho) => (trecho.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+  // #3013: a faixa de atalhos (nav "Atalhos dos módulos") só existe no celular (display none acima de 640 px, atalhosCelular.module.css) e repete os cartões disponíveis da grade.
+  // É contada de forma explícita: um link por cartão disponível da grade, derivado do mesmo HTML que monta a grade, e nada além de links.
+  const faixa = semTrilho.match(/<nav [^>]*aria-label="Atalhos dos módulos"[^>]*>[\s\S]*?<\/nav>/)?.[0] ?? ''
+  // Mesmo filtro da FaixaDeAtalhos (modulo.disponivel): o cartão "Em breve" (classe emBreve) fica fora da faixa.
+  const ITENS_DA_FAIXA = (html.match(/<li[^>]*data-modulo="[^>]*>/g) ?? []).filter((li) => !/emBreve/.test(li)).length
+  assert.ok(ITENS_DA_FAIXA > 0, 'a grade tem cartões de módulo')
+  assert.equal(contar(faixa), ITENS_DA_FAIXA, 'a faixa tem um link por cartão da grade')
+  assert.equal((faixa.match(/<a[\s>]/g) ?? []).length, ITENS_DA_FAIXA, 'a faixa só tem links')
+  // Desktop: a faixa sai da árvore de acessibilidade e do Tab por display none (prova-3013), então o conteúdo cabe em TETO_CONTEUDO (#1810).
+  const controles = contar(semTrilho.replace(faixa, ''))
+  assert.ok(controles <= TETO_CONTEUDO, `${controles} controles sem a faixa`)
+  // Celular: exceção explícita e contada à #1810; a faixa repete a grade para encurtar a rolagem a 390 px (#3013).
+  const noCelular = contar(semTrilho)
+  assert.ok(noCelular <= TETO_CONTEUDO + ITENS_DA_FAIXA, `${noCelular} controles no celular (teto ${TETO_CONTEUDO + ITENS_DA_FAIXA})`)
+  // Total: conteúdo (#1810) + trilho (mesmo teto da prova-3004) + controle da conta + faixa. A renderização é estática, igual em qualquer
+  // largura, então a faixa entra no HTML mesmo escondida. Medido hoje no Início a 1440 px: 40 controles no total (17 de conteúdo, 7 da faixa, 16 do trilho e conta).
+  const total = contar(html)
+  const teto = TETO_CONTEUDO + TETO_ITENS_DO_TRILHO + CONTROLES_DA_CONTA + ITENS_DA_FAIXA
+  assert.ok(total <= teto, `${total} controles na primeira vista, contando trilho e faixa (teto ${teto})`)
 })
 
 provar('teclado: Espaço pega, Enter abre (Enter fora das teclas de arrasto)', () => {

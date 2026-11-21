@@ -114,11 +114,19 @@ public static class BackgroundJobServiceCollectionExtensions
 
         // Atendimento WhatsApp (S06): drena a fila do turno do agente, mesmo motivo (fila em memoria).
         if (options.EnableAtendimentoTurnoAgente)
+        {
             services.AddHostedService<AtendimentoFilaTurnoAgenteBackgroundService>();
+            // #3068: acha a conversa parada com a equipe e põe o turno de retomada na mesma fila.
+            services.AddHostedService<AtendimentoRetomadaAssistenteBackgroundService>();
+        }
 
         // Chat do site (S36): apaga as sessões vencidas.
         if (options.EnableLimpezaSessoesChatSite)
             services.AddHostedService<LimpezaSessoesChatSiteBackgroundService>();
+
+        // PodaIdCliqueAnuncioJob (#2928, S6) — diário 04:00 UTC, anula o id de clique com mais de 90 dias.
+        if (options.EnablePodaIdCliqueAnuncio)
+            services.AddHostedService<PodaIdCliqueAnuncioJob>();
 
         return services;
     }

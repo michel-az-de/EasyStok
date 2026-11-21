@@ -68,3 +68,11 @@ export function comMensagem(conversa, mensagem, { id, agora }) {
     mensagens: [...conversa.mensagens, { id, em: new Date(agora).toISOString(), ...mensagem }],
   }
 }
+
+// Cobrança que sai para o cliente: a legenda e, no Pix, o balão só com o copia e cola (#2962). O
+// código ganha id derivado da legenda, porque o caso de uso recebe um id só por mensagem.
+export function comBaloesDaCobranca(conversa, { texto, codigo = null }, { id, agora }) {
+  const mensagem = { dir: 'out', status: 'lida', automatica: true, regra: 'cobranca-pix' }
+  const comLegenda = comMensagem(conversa, { ...mensagem, texto }, { id, agora })
+  return codigo ? comMensagem(comLegenda, { ...mensagem, texto: codigo }, { id: `${id}-codigo`, agora }) : comLegenda
+}

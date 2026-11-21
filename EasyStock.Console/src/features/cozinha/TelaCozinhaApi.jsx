@@ -23,6 +23,7 @@ import { Icone } from '../../componentes/Icone'
 import { Vazio } from '../../componentes/Vazio'
 import { CartaoKds, CartaoKdsErguido } from './CartaoKds'
 import { ComandaKds } from './ComandaKds'
+import { FaixaColunas } from './FaixaColunas'
 import { FeedbackArrasto } from './FeedbackArrasto'
 import { colisaoPorColuna, coordenadasEntreColunas } from './arrastoEntreColunas'
 import css from './cozinha.module.css'
@@ -107,6 +108,8 @@ export function TelaCozinhaApi({ linhas }) {
   const respostaSobre = sobreId ? respostaPara(sobreId) : null
   const fantasmas = reduzMovimento() ? [] : saindo
   const visiveis = filtrarPorLinha(lista, linhaFiltro)
+  const quadroRef = useRef(null)
+  const cartoesPorColuna = new Map(COLUNAS_KDS.map((coluna) => [coluna.status, filtrarPorColunaKds(visiveis, coluna.status)]))
   const vazia = pedidos !== null && lista.length === 0
   const filtroVazio = !vazia && linhaFiltro !== null && visiveis.length === 0
 
@@ -230,9 +233,10 @@ export function TelaCozinhaApi({ linhas }) {
                   <Botao variante="secundario" onClick={() => setLinhaFiltro(null)}>Ver todas as linhas</Botao>
                 </div>
               )}
-              <div className={css.colunas}>
+              <FaixaColunas quadroRef={quadroRef} itens={COLUNAS_KDS.map((c) => ({ id: c.status, rotulo: c.rotulo, contagem: cartoesPorColuna.get(c.status).length }))} />
+              <div ref={quadroRef} className={css.colunas}>
                 {COLUNAS_KDS.map((coluna) => {
-                  const cartoes = filtrarPorColunaKds(visiveis, coluna.status)
+                  const cartoes = cartoesPorColuna.get(coluna.status)
                   const saindoDaqui = filtrarPorColunaKds(fantasmas, coluna.status)
                   return (
                     <ColunaKds
@@ -325,7 +329,7 @@ function ColunaKds({ coluna, resposta, arrastando, acao, children }) {
     arrastando && !aceita && !isOver && css.colunaQuieta,
   ].filter(Boolean).join(' ')
   return (
-    <section ref={setNodeRef} className={classes} aria-label={coluna.rotulo} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
+    <section ref={setNodeRef} className={classes} aria-label={coluna.rotulo} data-coluna={coluna.status} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
       {children}
       {aceita && (
         <p className={css.dicaColuna} aria-hidden="true">

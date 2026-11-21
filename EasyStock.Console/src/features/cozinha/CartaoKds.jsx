@@ -7,7 +7,7 @@ import { DesfazerComPrazo } from '../../componentes/DesfazerComPrazo'
 import { impressaoDoPedido } from '../../aplicacao/impressos'
 import {
   avisoDeInicio, colunaDoStatusKds, gruposDoKds, leituraDasObservacoes, nomeNaComanda, proximoStatusKds, rotuloDoDestinoKds, rotuloDoStatusKds,
-  tempoAteInicio, urgenciaDoPedido,
+  tempoAteInicio, tempoNaCozinha, urgenciaDoPedido,
 } from '../../dominio/kds'
 import { nomeDoPedido } from '../../dominio/pedido'
 import css from './cozinha.module.css'
@@ -88,7 +88,7 @@ export function CartaoKds({
       )}
       {!saindo && (
         <div className={css.acoesCartao}>
-          <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)} aria-label={doPedido('Ver comanda')}>Ver comanda</Botao>
+          <Botao variante="texto" icone="nota" onClick={() => aoAbrir(pedido.id)} aria-label={doPedido('Ver pedido')}>Ver pedido</Botao>
           {/* #1839: um caminho só, o impresso da API com o papel na tela (o PDF próprio saiu). */}
           <ImprimirPedido {...impressaoDoPedido(pedido.id, null, nomeNaComanda(pedido))} documentoInicial="cozinha" variante="texto" rotulo="Imprimir pedido"
             aria-label={doPedido('Imprimir pedido')} />
@@ -118,6 +118,7 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
   const leitura = leituraDasObservacoes(pedido.observacoes)
   const grupos = linhaFiltro ? todos.filter((g) => g.chave === linhaFiltro) : todos
   const fracao = tempoAteInicio(pedido, agora)
+  const decorrido = tempoNaCozinha(pedido, agora)
 
   return (
     <>
@@ -125,7 +126,10 @@ function CorpoKds({ pedido, agora, linhas, linhaFiltro, urgencia, alca }) {
         <span className={css.numeroCartao} title={nome.titulo || undefined}>{nome.principal}{nome.referencia && <small className={css.referencia}>{nome.referencia}</small>} · {nomeNaComanda(pedido)}</span>
         {alca}
       </div>
-      <p className={css.rotuloSituacao}>{aviso ? aviso.texto : rotuloDoStatusKds(pedido)}</p>
+      <p className={css.rotuloSituacao}>
+        {aviso ? aviso.texto : rotuloDoStatusKds(pedido)}
+        {decorrido && <> · <span data-tempo className={css.tempoDecorrido}>{decorrido}</span></>}
+      </p>
       {fracao !== null && (
         <div
           className={`${css.barraTempo} ${urgencia ? css[`barra-${urgencia}`] : ''}`}

@@ -59,6 +59,21 @@ public sealed class WhatsAppCloudClient(
         return EnviarEExtrairWamidAsync(payload, ct);
     }
 
+    public Task<EnvioWhatsAppResult> EnviarDocumentoAsync(
+        string waId, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default)
+    {
+        ExigirUrlAbsoluta(urlPublica);
+        var payload = new
+        {
+            messaging_product = "whatsapp",
+            to = waId,
+            type = "document",
+            document = new { link = urlPublica, filename = nomeArquivo, caption = legenda }
+        };
+
+        return EnviarEExtrairWamidAsync(payload, ct);
+    }
+
     public Task<EnvioWhatsAppResult> EnviarAudioAsync(
         string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default)
     {

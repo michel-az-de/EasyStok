@@ -73,7 +73,7 @@ export function ModalCanhoto({
   if (pedidoIdApi) {
     return (
       <ImprimirPedido
-        {...impressaoDoPedido(pedidoIdApi, null, nomeCliente)} semGatilho titulo={`Imprimir comanda ${numeroCurto(pedido.numero)}`} contexto={null}
+        {...impressaoDoPedido(pedidoIdApi, null, nomeCliente)} semGatilho titulo={`Imprimir pedido ${numeroCurto(pedido.numero)}`} contexto={null}
         documentoInicial="cozinha" aoFechar={aoFechar}
         aoAbrirImpressao={(documento) => { if (documento === 'pedido' || documento === 'cozinha') aoImprimir?.() }}
       />

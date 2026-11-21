@@ -185,8 +185,34 @@ public class NotificarClienteStatusPedidoHandlerTests
             $"{_pedido.Id:N}|{StatusPedidoMapper.SaiuParaEntrega}", CanalNotificacao.WhatsApp));
     }
 
+    [Fact]
+    public async Task ProntoAvisaQueOPedidoEstaPronto()
+    {
+        // #2880: o Pronto avisa pela comanda atualizada (modelo `pedido_atualizado` fora da janela de 24 h).
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+
+        await MudarStatusAsync(StatusPedidoMapper.Preparando, StatusPedidoMapper.Pronto);
+        await MudarStatusAsync(StatusPedidoMapper.Preparando, StatusPedidoMapper.Pronto);
+
+        var mensagem = _outbox.Should().ContainSingle().Subject;
+        mensagem.CorpoRenderizado.Should().Be("Seu pedido está pronto.");
+        mensagem.IdempotencyKey.Should().Be(OutboxMensagemNotificacao.ComputarIdempotencyKey(
+            $"{_pedido.Id:N}|{StatusPedidoMapper.Pronto}", CanalNotificacao.WhatsApp));
+    }
+
+    [Fact]
+    public async Task ProntoRespeitaAvisosDesligados()
+    {
+        Configurar(TipoEventoNotificacao.ComandaAtualizada, "comanda_atualizada_whatsapp_v1", "{{ mensagem }}");
+        _cliente.DefinirAvisosStatus(false, DateTime.UtcNow);
+
+        await MudarStatusAsync(StatusPedidoMapper.Preparando, StatusPedidoMapper.Pronto);
+
+        _eventos.Should().BeEmpty();
+        _outbox.Should().BeEmpty();
+    }
+
     [Theory]
-    [InlineData(StatusPedidoMapper.Pronto)]
     [InlineData(StatusPedidoMapper.Aguardando)]
     public async Task StatusSemAvisoNaoGeraNada(string statusNovo)
     {
@@ -424,7 +450,7 @@ public class NotificarClienteStatusPedidoHandlerTests
         await handler.HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
         await AvaliarEventosAsync();
 
-        _gravadas.Should().ContainSingle().Which.Texto.Should().StartWith("Oi, Maria! Recebemos seu pagamento e seu pedido está confirmado");
+        _gravadas.Should().ContainSingle().Which.Texto.Should().StartWith("Oi, Maria! Pagamento recebido. Seu pedido está confirmado");
         _eventos.Should().BeEmpty("o aviso S13 só sai quando a automática não sai");
     }
 
@@ -457,7 +483,9 @@ public class NotificarClienteStatusPedidoHandlerTests
 
         await HandlerDoPago(AvisoComChat(), new CanalChatSite()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
 
-        _gravadas.Should().ContainSingle().Which.Texto.Should().Contain("Recebemos seu pagamento").And.Contain("Tarde (14h às 18h), 01/10");
+        _gravadas.Should().ContainSingle(m => m.Texto!.Contains("Recebemos seu pagamento")).Which.Texto.Should().Contain("Tarde (14h às 18h), 01/10");
+        // #2781: o aviso S13 cobre o gatilho, então não há nota de "não saiu" no fio.
+        _gravadas.Should().NotContain(m => m.Texto!.Contains("não saiu"));
     }
 
     [Fact]

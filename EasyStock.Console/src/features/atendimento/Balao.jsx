@@ -203,11 +203,11 @@ export const Balao = memo(function Balao({
             title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}
             onClick={() => aoAbrirDefinicaoAutomatica?.(mensagem.regra)}
           >
-            <Icone nome="sparkles" /> Assistente
+            <Icone nome="agente" /> Assistente
           </button>
         ) : (
           <span className={css.selo} title={TITULO_DO_ASSISTENTE[mensagem.origemAutomatica] ?? TITULO_DO_ASSISTENTE.regra}>
-            <Icone nome="sparkles" /> Assistente
+            <Icone nome="agente" /> Assistente
           </span>
         ))}
         {mensagem.modelo && <span className={css.selo} title={mensagem.modeloNome}><Icone nome="modelo" /> modelo</span>}

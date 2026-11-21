@@ -1,5 +1,6 @@
 using System.Text;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
@@ -36,7 +37,9 @@ public sealed class ConsumoGeracaoAgente
 
     internal void Somar(RespostaLlm resposta)
     {
-        TokensEntrada += resposta.TokensEntrada;
+        // #2862: a escrita de cache entra na entrada, sem migração. A cota do mês soma entrada, saída e cache lido e
+        // a escrita não pode sumir dela. O custo estimado fica um pouco abaixo: a escrita custa mais que a entrada comum.
+        TokensEntrada += resposta.TokensEntrada + resposta.TokensCacheEscrito;
         TokensSaida += resposta.TokensSaida;
         TokensCacheLido += resposta.TokensCacheLido;
         Modelo = resposta.Modelo ?? Modelo;
@@ -54,14 +57,20 @@ public sealed class ConsumoGeracaoAgente
 /// (<see cref="AgenteAtendimentoService"/>) envia a resposta verificada das ferramentas ou o texto que passar pela
 /// <see cref="GuardaRespostaAgente"/>; a sugestão da dona (#1420) só devolve.
 /// </summary>
+/// <summary>System do turno em duas partes (#2862). <see cref="Texto"/> junta as duas, como o modelo recebia antes.</summary>
+public sealed record SystemTurnoAgente(string Estavel, string Volatil)
+{
+    public string Texto => Estavel + Volatil;
+}
+
 public static class GeracaoAgenteAtendimento
 {
     /// <summary>
-    /// System prompt do turno. S54: caderno da loja (núcleo + índice) logo depois do prompt base e antes do
-    /// dossiê, para o começo do prompt ser igual entre conversas da mesma empresa e aproveitar o cache do
-    /// provedor. S25: histórico do cadastro (tags, pedidos, favorito, notas [interno]) quando há cliente.
+    /// System prompt do turno em duas partes (#2862). <see cref="SystemTurnoAgente.Estavel"/>: prompt fixo e caderno da
+    /// loja (S54), iguais entre turnos da empresa, para o cache do provedor reaproveitar o prefixo.
+    /// <see cref="SystemTurnoAgente.Volatil"/>: data e hora, dossiê e histórico do cadastro (S25), que mudam a cada turno.
     /// </summary>
-    public static async Task<string> MontarSystemAsync(
+    public static async Task<SystemTurnoAgente> MontarSystemTurnoAsync(
         Guid empresaId,
         ConfiguracaoAtendimento configuracao,
         Conversa conversa,
@@ -73,16 +82,29 @@ public static class GeracaoAgenteAtendimento
         CancellationToken ct)
     {
         var blocoCaderno = CadernoParaAgente.Montar(await caderno.ListarAsync(empresaId, incluirArquivados: false, ct));
-        var system = PromptAtendimento.Montar(configuracao)
-            + (blocoCaderno.Length > 0 ? "\n\n" + blocoCaderno : string.Empty)
-            + "\n\n" + MontarDossie(conversa, cliente, historico, agora);
+        var estavel = PromptAtendimento.Montar(configuracao)
+            + (blocoCaderno.Length > 0 ? "\n\n" + blocoCaderno : string.Empty);
 
+        var volatil = "\n\n" + MontarDossie(conversa, cliente, historico, agora);
         if (cliente is not null
             && await dossieUseCase.ExecuteAsync(new ObterDossieClienteQuery(empresaId, cliente.Id), ct) is { } dossie)
-            system += "\n\n" + ResumoDossieParaAgente.Montar(dossie);
+            volatil += "\n\n" + ResumoDossieParaAgente.Montar(dossie);
 
-        return system;
+        return new SystemTurnoAgente(estavel, volatil);
     }
+
+    /// <summary>System do turno como texto único, para quem não usa cache: as duas partes, na ordem de sempre.</summary>
+    public static async Task<string> MontarSystemAsync(
+        Guid empresaId,
+        ConfiguracaoAtendimento configuracao,
+        Conversa conversa,
+        Cliente? cliente,
+        IReadOnlyList<Mensagem> historico,
+        DateTime agora,
+        ICadernoRepository caderno,
+        ObterDossieClienteUseCase dossieUseCase,
+        CancellationToken ct) =>
+        (await MontarSystemTurnoAsync(empresaId, configuracao, conversa, cliente, historico, agora, caderno, dossieUseCase, ct)).Texto;
 
     /// <summary>
     /// Laço do LLM com as <paramref name="ferramentas"/>: executa as ferramentas pedidas e repete até a
@@ -98,9 +120,12 @@ public static class GeracaoAgenteAtendimento
         int maximoIteracoes,
         ILogger logger,
         CancellationToken ct,
-        string? modelo = null)
+        string? modelo = null,
+        string? systemVolatil = null)
     {
+        // #2862: ordem fixa (ordinal, não de cultura) para o prefixo de ferramentas ser igual entre turnos.
         var definicoes = ferramentas.Values
+            .OrderBy(f => f.Nome, StringComparer.Ordinal)
             .Select(f => new FerramentaLlm(f.Nome, f.Descricao, f.SchemaJson))
             .ToList();
         var tokens = 0;
@@ -113,7 +138,9 @@ public static class GeracaoAgenteAtendimento
             try
             {
                 resposta = await EnviarComUmaNovaTentativaAsync(
-                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes, modelo), contexto.Conversa.Id, logger, ct);
+                    llm, new RequisicaoLlm(system, [.. mensagens], definicoes, modelo, systemVolatil)
+                    { EmpresaId = contexto.Conversa.EmpresaId, Finalidade = FinalidadeIa.Atendimento },
+                    contexto.Conversa.Id, logger, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -123,7 +150,8 @@ public static class GeracaoAgenteAtendimento
                 return new GeracaoAgente(null, tokens, false, "o agente não conseguiu responder (falha ao chamar o LLM)", consumo);
             }
 
-            tokens += resposta.TokensEntrada + resposta.TokensSaida;
+            // #2862: cache lido e escrito contam no total da cota (UsoIa); sem eles o número cai com o cache ligado.
+            tokens += resposta.TokensEntrada + resposta.TokensSaida + resposta.TokensCacheLido + resposta.TokensCacheEscrito;
             consumo.Somar(resposta);
 
             if (resposta.StopReason != RespostaLlm.StopToolUse)

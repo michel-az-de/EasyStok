@@ -1,6 +1,6 @@
 # ADR-0055 — Spec de plano aprovado entra no verde; CHANGELOG por fragmento
 
-- Status: Aceito
+- Status: Aceito; ampliado pela ADR-0070 (quem aplica a label `aprovado`)
 - Data: 2026-09-30
 - Amplia: ADR-0043 (policy v4.0), no item de tiers de merge. O resto da ADR-0043 continua valendo.
 - Relacionados: issue #1175; `docs/plan/atendimento-whatsapp/README.md`

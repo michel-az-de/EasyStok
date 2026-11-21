@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Services.Ia;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Infra.Integrations.DependencyInjection;
 using EasyStock.Infra.Integrations.Ia;
@@ -190,6 +191,25 @@ public class ClaudeCliMontagemFichaClientTests
         using var provider = services.BuildServiceProvider();
         provider.GetRequiredService<IMontagemFichaLlmClient>().Should().BeOfType<ClaudeCliMontagemFichaClient>();
         provider.GetRequiredService<IAgenteLlmClient>().Should().BeOfType<AnthropicMessagesClient>().Which.Disponivel.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    public void ComRegistroDeUsoOsDoisCaminhosGravamChamadaIa(string cli)
+    {
+        // #3063: com a persistência registrada, agente e montagem (inclusive pelo CLI) passam pelo registro de uso.
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+            ["MontagemFicha:Cli:Enabled"] = cli, ["MontagemFicha:Cli:ExecutablePath"] = Environment.ProcessPath,
+            ["Anthropic:Enabled"] = "false" }).Build();
+        var services = new ServiceCollection(); services.AddLogging(); services.AddEasyStockAgenteLlm(config);
+        services.AddSingleton(NSubstitute.Substitute.For<IRegistroChamadaIa>());
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<IAgenteLlmClient>().Should().BeOfType<RegistroChamadaIaLlmClient>();
+        provider.GetRequiredService<IMontagemFichaLlmClient>()
+            .Should().BeOfType<AgenteLlmServiceCollectionExtensions.MontagemFichaApiClient>()
+            .Which.Interno.Should().BeOfType<RegistroChamadaIaLlmClient>()
+            .Which.Interno.Should().BeOfType(cli == "true" ? typeof(ClaudeCliMontagemFichaClient) : typeof(AnthropicMessagesClient));
     }
 
     [Fact]

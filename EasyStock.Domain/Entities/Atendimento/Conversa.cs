@@ -28,6 +28,8 @@ public class Conversa
     public const int MotivoEscaladaTamanhoMaximo = 500;
     public const string ChaveAjudaComandaSolicitadaEm = "comandaAjudaSolicitadaEm";
     public const string ChaveAutomaticoLiberadoPelaEquipe = "automaticoLiberadoPelaEquipe";
+    public const string ChaveClienteDesistiuPedidoId = "clienteDesistiuPedidoId";
+    public const string ChaveRetomadaPorTempoEntradaId = "retomadaPorTempoEntradaId";
 
     public Guid Id { get; private set; }
     public long NumeroComanda { get; private set; }
@@ -67,6 +69,9 @@ public class Conversa
     public SituacaoConversa Situacao { get; private set; }
     public Guid? PedidoEmAndamentoId { get; private set; }
 
+    /// <summary>#2928: anúncio que trouxe a conversa (o último vence, D2). Nula quando não veio de anúncio.</summary>
+    public OrigemAnuncio? OrigemAnuncio { get; private set; }
+
     /// <summary>Objeto JSON com o estado do atendimento (carrinho em montagem, endereco extraido, etapa).</summary>
     public string ContextoJson { get; private set; } = "{}";
 
@@ -96,10 +101,10 @@ public class Conversa
         EstaAberta && UltimaMensagemEntradaEm is { } entrada && entrada >= UltimaMensagemEm;
 
     /// <summary>
-    /// O agente so responde no WhatsApp (envia pelo cliente da Cloud API). Nos demais canais quem
-    /// atende e sempre a dona (#1288).
+    /// O agente responde no WhatsApp (envia pelo cliente da Cloud API) e no chat do site (#2876: grava a saida
+    /// que o stream do widget le). Nos demais canais quem atende e sempre a dona (#1288).
     /// </summary>
-    public bool TemAgente => Canal == CanalConversa.WhatsApp;
+    public bool TemAgente => Canal is CanalConversa.WhatsApp or CanalConversa.ChatSite;
 
     // EF Core ctor sem parametros
     private Conversa() { }
@@ -295,8 +300,8 @@ public class Conversa
     }
 
     /// <summary>
-    /// Devolve ao agente por decisao da dona (D4). Nunca por tempo. Canal sem agente recusa: a
-    /// conversa ficaria sem ninguem e fora do lembrete (#1288).
+    /// Devolve ao agente por decisao da dona (D4). A volta por tempo e <see cref="RetomarPorTempo"/>. Canal sem
+    /// agente recusa: a conversa ficaria sem ninguem e fora do lembrete (#1288).
     /// </summary>
     public void LiberarAutomatico()
     {
@@ -322,6 +327,56 @@ public class Conversa
         JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson) is { } contexto
         && contexto.TryGetValue(ChaveAutomaticoLiberadoPelaEquipe, out var valor)
         && valor.ValueKind == JsonValueKind.True;
+
+    /// <summary>
+    /// #3068: a equipe não respondeu no prazo e o Assistente retoma. Vale para conversa na fila e para a que tem
+    /// responsável. Guarda a entrada do cliente que motivou a volta, para valer uma vez só por mensagem
+    /// (<see cref="RetomadaPorTempoDecidida(Guid)"/>). Não liga <see cref="AutomaticoLiberadoPelaEquipe"/>: quem devolve ali é a
+    /// equipe, e o sinal faria o robô responder o contato da equipe para sempre.
+    /// </summary>
+    public void RetomarPorTempo(Guid entradaId)
+    {
+        GarantirAberta("retomar");
+        if (entradaId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("A retomada precisa da mensagem do cliente que ficou sem resposta.");
+        if (Situacao != SituacaoConversa.Assumida)
+            throw new RegraDeDominioVioladaException("Só a conversa que está com a equipe volta ao Assistente por tempo.");
+        if (!TemAgente)
+            throw new RegraDeDominioVioladaException($"O canal {Canal} não tem atendimento automático: a conversa continua com você.");
+        Situacao = SituacaoConversa.Automatica;
+        AssumidaPorUsuarioId = null;
+        MotivoEscalada = null;
+        MarcarRetomadaPorTempoDecidida(entradaId);
+    }
+
+    /// <summary>
+    /// #3068: a retomada desta entrada foi avaliada e recusada (um portão do Assistente barrou). A conversa fica como a
+    /// equipe deixou; a marca só impede a varredura de reavaliar a mesma mensagem a cada passada.
+    /// </summary>
+    public void DispensarRetomadaPorTempo(Guid entradaId)
+    {
+        if (entradaId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("A retomada precisa da mensagem do cliente que ficou sem resposta.");
+        MarcarRetomadaPorTempoDecidida(entradaId);
+    }
+
+    private void MarcarRetomadaPorTempoDecidida(Guid entradaId)
+    {
+        var contexto = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson)!;
+        contexto[ChaveRetomadaPorTempoEntradaId] = JsonSerializer.SerializeToElement(entradaId);
+        ContextoJson = JsonSerializer.Serialize(contexto);
+    }
+
+    /// <summary>#3068: a retomada por causa desta entrada do cliente já foi decidida (retomou ou foi dispensada).</summary>
+    public bool RetomadaPorTempoDecidida(Guid entradaId) => RetomadaPorTempoDecidida(ContextoJson, entradaId);
+
+    /// <summary>A mesma leitura para quem tem só a coluna do contexto, sem a entidade (varredura entre lojas).</summary>
+    public static bool RetomadaPorTempoDecidida(string contextoJson, Guid entradaId) =>
+        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(contextoJson) is { } contexto
+        && contexto.TryGetValue(ChaveRetomadaPorTempoEntradaId, out var valor)
+        && valor.ValueKind == JsonValueKind.String
+        && Guid.TryParse(valor.GetString(), out var retomada)
+        && retomada == entradaId;
 
     /// <summary>Idempotente: preserva o carimbo até uma reabertura explícita.</summary>
     public void Encerrar(DateTime agora)
@@ -385,6 +440,28 @@ public class Conversa
         ContextoJson = contextoJson.Trim();
     }
 
+    /// <summary>
+    /// #2992: o cliente desistiu do pedido. Marca só na conversa assumida pela equipe e uma vez por pedido. Devolve
+    /// false se a conversa é automática ou se a desistência desse pedido já estava marcada.
+    /// </summary>
+    public bool MarcarClienteDesistiuDoPedido(Guid pedidoId)
+    {
+        if (Situacao != SituacaoConversa.Assumida || pedidoId == Guid.Empty || ClienteDesistiuDoPedido(pedidoId))
+            return false;
+        var contexto = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson)!;
+        contexto[ChaveClienteDesistiuPedidoId] = JsonSerializer.SerializeToElement(pedidoId);
+        ContextoJson = JsonSerializer.Serialize(contexto);
+        return true;
+    }
+
+    /// <summary>#2992: a desistência vale só para o pedido marcado; outro pedido da conversa segue normal.</summary>
+    public bool ClienteDesistiuDoPedido(Guid pedidoId) =>
+        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson) is { } contexto
+        && contexto.TryGetValue(ChaveClienteDesistiuPedidoId, out var valor)
+        && valor.ValueKind == JsonValueKind.String
+        && Guid.TryParse(valor.GetString(), out var marcado)
+        && marcado == pedidoId;
+
     public void DefinirPedidoEmAndamento(Guid? pedidoId)
     {
         if (pedidoId == Guid.Empty)
@@ -392,6 +469,13 @@ public class Conversa
         PedidoEmAndamentoId = pedidoId;
         if (pedidoId is { } id && !PedidosHistoricoIds.Contains(id))
             PedidosHistoricoIds = [.. PedidosHistoricoIds, id];
+    }
+
+    /// <summary>#2928, D2: um anúncio novo substitui o anterior. Null não apaga a origem já gravada.</summary>
+    public void RegistrarOrigemAnuncio(OrigemAnuncio? origem)
+    {
+        if (origem is not null)
+            OrigemAnuncio = origem;
     }
 
     public CapacidadesCanal Capacidades => CapacidadesCanal.Para(Canal);

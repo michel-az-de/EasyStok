@@ -10,7 +10,7 @@ const ICONE_DA_ABA = { balcao: 'inbox', atendimento: 'conversa', ficha: 'ficha' 
 // #2232 (X1/X3): `aba.nome` é o nome acessível composto com o número ("Conversas, 11 precisam de você");
 // o contador visível é a `Pilula contagem` do app e fica fora da leitura quando o nome já o traz.
 // #2734: `rotulo` é o nome da barra para o leitor de tela; cada tela diz o que as suas abas escolhem.
-export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba', prefixoId = 'aba', desabilitada = false, rotulo = 'Painéis' }) {
+export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba', prefixoId = 'aba', desabilitada = false, rotulo = 'Painéis', rolavel = false, className }) {
   const [focada, setFocada] = useState(null)
   const entrada = abas.some((aba) => aba.id === focada) ? focada : ativa
 
@@ -29,7 +29,7 @@ export function BarraDeAbas({ abas, ativa, aoTrocar, idPainel = 'painel-da-aba',
   }
 
   return (
-    <nav className={css.barra} aria-label={rotulo}>
+    <nav className={[css.barra, rolavel ? css.rolavel : '', className].filter(Boolean).join(' ')} aria-label={rotulo}>
       {/* role tab mais aria-selected: leitor de tela anuncia "aba 2 de 3,
           selecionada", que é o que a barra realmente é. */}
       <div className={css.trilho} role="tablist" aria-label={rotulo}

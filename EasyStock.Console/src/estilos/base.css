@@ -34,6 +34,8 @@ time, data, output { font-variant-numeric: tabular-nums; }
 
 button { font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
 input, select, textarea { font: inherit; letter-spacing: inherit; color: inherit; }
+/* #3009: o placeholder padrão do navegador (#757575) dá 3,1:1 no tema escuro. Especificidade zero: regra de módulo vence. */
+:where(input, textarea)::placeholder { color: var(--tinta-3); opacity: 1; }
 :where(input[type='checkbox'], input[type='radio']) { accent-color: var(--marca); }
 :where(label:has(> input[type='checkbox']), label:has(> input[type='radio'])) {
   display: inline-flex; align-items: center; min-height: var(--toque); gap: var(--e-2); cursor: pointer;

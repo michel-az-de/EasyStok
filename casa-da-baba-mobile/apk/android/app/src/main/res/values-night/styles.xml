@@ -10,4 +10,12 @@
         <item name="android:navigationBarColor">#24221D</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
+    <!-- #2886: diálogos no tema escuro do app. -->
+    <style name="PilotDialog" parent="android:Theme.DeviceDefault.Dialog.Alert">
+        <item name="android:colorAccent">#A5C3AD</item>
+        <item name="android:colorControlActivated">#A5C3AD</item>
+        <item name="android:textColorHighlight">#5CA5C3AD</item>
+        <item name="android:colorBackground">#302D26</item>
+        <item name="android:textColorPrimary">#FAF3E7</item>
+    </style>
 </resources>

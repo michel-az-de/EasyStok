@@ -19,14 +19,26 @@ public interface IAgenteLlmClient
     Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default);
 }
 
+/// <summary>
+/// <paramref name="System"/> é a parte estável do prompt (a que o provedor pode guardar em cache). <paramref name="SystemVolatil"/>
+/// é o que muda a cada turno (data, hora, dossiê): vai num bloco à parte, depois do breakpoint de cache. Nulo ou vazio
+/// mantém o corpo de antes, com <c>system</c> como texto único.
+/// </summary>
 public sealed record RequisicaoLlm(
     string System,
     IReadOnlyList<MensagemLlm> Mensagens,
     IReadOnlyList<FerramentaLlm> Ferramentas,
-    string? Modelo = null)
+    string? Modelo = null,
+    string? SystemVolatil = null)
 {
     /// <summary>Modelo do agente quando a configuração não diz outro (<c>Anthropic:ModeloAgente</c> ausente).</summary>
     public const string ModeloPadrao = "claude-sonnet-5";
+
+    /// <summary>#3063: loja que paga a chamada. Vazio não grava <c>chamada_ia</c> (só testes antigos).</summary>
+    public Guid EmpresaId { get; init; }
+
+    /// <summary>#3063: para que a chamada serve, no registro de uso.</summary>
+    public EasyStock.Domain.Enums.Ia.FinalidadeIa Finalidade { get; init; } = EasyStock.Domain.Enums.Ia.FinalidadeIa.Outra;
 }
 
 /// <summary><paramref name="Papel"/> é <c>user</c> ou <c>assistant</c>.</summary>
@@ -63,7 +75,8 @@ public sealed record RespostaLlm(
     int TokensEntrada,
     int TokensSaida,
     int TokensCacheLido = 0,
-    string? Modelo = null)
+    string? Modelo = null,
+    int TokensCacheEscrito = 0)
 {
     public const string StopToolUse = "tool_use";
 }

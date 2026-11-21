@@ -95,7 +95,8 @@ assert.deepEqual(erroDoModelo(outraFalha), { texto: 'A Meta não respondeu.', in
 const modal = readFileSync(new URL('../src/features/atendimento/ModalEnviarModelo.jsx', import.meta.url), 'utf8')
 assert.doesNotMatch(modal, /Ao tentar novamente/, 'a frase do envio mora no domínio, não no modal')
 assert.match(modal, /erroDoModelo\(e, \{ envio: true, podeIntegrar \}\)/)
-assert.match(modal, /erroDoModelo\(e, \{ podeIntegrar \}\)/)
+// #2783: a lista de modelos e o erro dela moram no seletor compartilhado.
+assert.match(readFileSync(new URL('../src/features/atendimento/SeletorDeModelo.jsx', import.meta.url), 'utf8'), /erroDoModelo\(e, \{ podeIntegrar \}\)/)
 // #2007 (11c): quem não tem acesso a Integrações não lê "Configure a conexão em Integrações".
 const semAcesso = erroDoModelo(semConexaoNoEnvio, { envio: true, podeIntegrar: false })
 assert.deepEqual(semAcesso, { texto: 'O WhatsApp da loja não está conectado. Peça à gerência para conectar o WhatsApp.', integracoes: true })

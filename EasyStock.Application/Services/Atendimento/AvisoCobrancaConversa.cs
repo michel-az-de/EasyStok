@@ -116,9 +116,9 @@ public sealed class AvisoCobrancaConversa(
         }
     }
 
-    private static AutorMensagem AutorDe(Guid? usuarioId) => usuarioId is null ? AutorMensagem.Sistema : AutorMensagem.Dona;
+    internal static AutorMensagem AutorDe(Guid? usuarioId) => usuarioId is null ? AutorMensagem.Sistema : AutorMensagem.Dona;
 
-    private static Mensagem Assinada(Mensagem mensagem, Guid? usuarioId)
+    internal static Mensagem Assinada(Mensagem mensagem, Guid? usuarioId)
     {
         if (usuarioId is { } quem) mensagem.RegistrarEnviadaPor(quem);
         return mensagem;

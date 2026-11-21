@@ -59,7 +59,7 @@ await caso('A4/H7/T9: nenhum "Automáticas" solto nos arquivos da moldura, do me
     assert.doesNotMatch(ler(arquivo), solto, `${arquivo} tem "Automáticas" sozinho`)
   }
   assert.doesNotMatch(ler('features/gestao/respostas/AbaRespostas.jsx'), /<h3[^>]*>Mensagens automáticas<\/h3>/)
-  assert.match(ler('features/hall/MenuDosModulos.jsx'), /NOME_RESPOSTAS_AUTOMATICAS/)
+  assert.match(ler('dominio/trilhoDoConsole.js'), /NOME_RESPOSTAS_AUTOMATICAS/) // #3004: o trilho único (Início, Balcão, módulos) nomeia o item
   assert.match(ler('app/Moldura.jsx'), /NOME_RESPOSTAS_AUTOMATICAS/)
 })
 
@@ -116,7 +116,7 @@ await caso('A2: o menu lista os módulos na ordem única do Início, da Ajuda e 
   const { modulosDoHall, ORDEM_DOS_MODULOS } = await importar('dominio/modulos.js')
   const ids = modulosDoHall({ fonteApi: true }).map((modulo) => modulo.id)
   assert.deepEqual(ids, ORDEM_DOS_MODULOS.filter((id) => ids.includes(id)))
-  assert.match(ler('features/hall/MenuDosModulos.jsx'), /emOrdemDosModulos\(MODULOS\)/)
+  assert.match(ler('dominio/trilhoDoConsole.js'), /emOrdemDosModulos\(MODULOS\)/) // #3004: a lista única do trilho segue a ordem única
 })
 
 await caso('A9/G4: Tema e Sair só atrás do avatar, nas barras dos módulos e do Balcão', () => {
@@ -127,7 +127,8 @@ await caso('A9/G4: Tema e Sair só atrás do avatar, nas barras dos módulos e d
   assert.doesNotMatch(solto, /css\.sair|>\s*\{?sessaoPersistente \? 'Sair|>Sair</, 'Sair solto na barra do módulo')
   const cabecalho = entre(ler('app/Moldura.jsx'), 'function Cabecalho(', 'function DisposicaoConversas')
   assert.doesNotMatch(semAvatar(cabecalho), /<InterruptorTema/, 'tema solto no topo do Balcão')
-  assert.match(ler('features/hall/MenuDosModulos.jsx'), /<MenuDaConta[\s\S]*<InterruptorTema \/>[\s\S]*<\/MenuDaConta>/)
+  assert.match(ler('componentes/MenuDaConta.jsx'), /<InterruptorTema \/>/) // #3004: o tema mora dentro do MenuDaConta, em toda rota
+  assert.match(ler('features/hall/TrilhoDoConsole.jsx'), /<MenuDaConta /)
 })
 
 await caso('G3/F6: o botão Menu só aparece onde o menu lateral some (até 759 px)', () => {

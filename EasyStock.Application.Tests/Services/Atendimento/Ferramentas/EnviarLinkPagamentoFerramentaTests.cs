@@ -2,6 +2,8 @@ using System.Text.Json;
 using EasyStock.Application.Ports.Output.Pagamentos;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.UseCases.Atendimento.ChatSite;
 using EasyStock.Application.Tests.UseCases.Pedidos.Cobranca;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
@@ -24,18 +26,31 @@ public class EnviarLinkPagamentoFerramentaTests
         public Conversa Conversa { get; }
         public List<Mensagem> Mensagens { get; } = [];
         private readonly EnviarLinkPagamentoFerramenta _ferramenta;
+        public static readonly string TokenComanda = new('a', 43);
+        public static readonly string UrlComanda = "https://casadababa.com.br/comanda.html?c=" + TokenComanda;
 
-        public Cenario()
+        public Cenario(CanalConversa canal = CanalConversa.WhatsApp, bool comandaEnviada = false)
         {
             var clienteId = Guid.NewGuid();
             Cobranca.Pedido.ClienteId = clienteId;
             Cobranca.Pedido.CriadoEm = Agora.AddMinutes(-10);
             Cobranca.PedidoRepo.GetByIdAsync(Cobranca.EmpresaId, Cobranca.Pedido.Id).Returns(Cobranca.Pedido);
-            Conversa = Conversa.Abrir(Cobranca.EmpresaId, "5511999998888", Agora.AddMinutes(-20), "Maria", clienteId);
+            Conversa = Conversa.Abrir(Cobranca.EmpresaId, "5511999998888", Agora.AddMinutes(-20), "Maria", clienteId, canal);
             Cobranca.ConversaRepo.ListarMensagensDepoisAsync(Cobranca.EmpresaId, Conversa.Id, Arg.Any<DateTime?>(),
                     Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(_ => (IReadOnlyList<Mensagem>)Mensagens.ToList());
-            _ferramenta = new EnviarLinkPagamentoFerramenta(Cobranca.PedidoRepo, Cobranca.Gerar(), Cobranca.ConversaRepo);
+            LinkCardapioConversaService? links = null;
+            if (comandaEnviada)
+            {
+                var repo = Substitute.For<ILinkCardapioConversaRepository>();
+                var link = LinkCardapioConversa.Gerar(Cobranca.EmpresaId, Conversa.Id, AcessoChatSite.HashDoToken(TokenComanda), Agora.AddMinutes(-15));
+                repo.ListarDaConversaAsync(Cobranca.EmpresaId, Conversa.Id, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+                    .Returns([link]);
+                links = new LinkCardapioConversaService(repo, null!);
+                Mensagens.Add(Mensagem.Saida(Cobranca.EmpresaId, Conversa.Id, AutorMensagem.Agente, Agora.AddMinutes(-15),
+                    TipoConteudoMensagem.Texto, $"Sua comanda: {UrlComanda}", CanalChatSite.PrefixoIdExterno + "x"));
+            }
+            _ferramenta = new EnviarLinkPagamentoFerramenta(Cobranca.PedidoRepo, Cobranca.Gerar(), Cobranca.ConversaRepo, links);
         }
 
         public void ResumoEnviado(bool clienteRespondeu)
@@ -48,6 +63,13 @@ public class EnviarLinkPagamentoFerramentaTests
         }
 
         public ContextoTurnoAgente Contexto { get; private set; } = null!;
+
+        public async Task<JsonElement> ExecutarComEntradaAsync(object entrada)
+        {
+            Contexto = new ContextoTurnoAgente(Cobranca.EmpresaId, Conversa, Agora);
+            var resultado = await _ferramenta.ExecutarAsync(Contexto, JsonSerializer.SerializeToElement(entrada));
+            return JsonDocument.Parse(resultado).RootElement.Clone();
+        }
 
         public async Task<JsonElement> ExecutarAsync(Guid? pedidoId = null)
         {
@@ -94,6 +116,40 @@ public class EnviarLinkPagamentoFerramentaTests
         resultado.GetProperty("linkGerado").GetBoolean().Should().BeTrue();
         c.Cobranca.Cobrancas.Should().ContainSingle().Which.ConversaId.Should().Be(c.Conversa.Id);
         c.Contexto.RespostaVerificada.Should().Contain("https://mp.test/pref-1").And.Contain("R$ 25,00").And.Contain("Pix");
+    }
+
+    [Fact]
+    public async Task NoChatDoSite_ComComandaEnviada_Manda_AUrlDaComandaEmVezDoLinkCru()
+    {
+        var c = new Cenario(CanalConversa.ChatSite, comandaEnviada: true);
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        var resultado = await c.ExecutarAsync();
+
+        resultado.GetProperty("linkGerado").GetBoolean().Should().BeTrue();
+        c.Contexto.RespostaVerificada.Should().Contain(Cenario.UrlComanda).And.NotContain("mp.test").And.Contain("R$ 25,00");
+    }
+
+    [Fact]
+    public async Task NoChatDoSite_SemComandaEnviada_MantemOLinkDoMercadoPago()
+    {
+        var c = new Cenario(CanalConversa.ChatSite);
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        await c.ExecutarAsync();
+
+        c.Contexto.RespostaVerificada.Should().Contain("https://mp.test/pref-1");
+    }
+
+    [Fact]
+    public async Task ResumoComOk_AceitaPedidoIdNovaGrafia()
+    {
+        var c = new Cenario();
+        c.ResumoEnviado(clienteRespondeu: true);
+
+        var resultado = await c.ExecutarComEntradaAsync(new { pedido_id = c.Cobranca.Pedido.Id });
+
+        resultado.GetProperty("linkGerado").GetBoolean().Should().BeTrue();
     }
 
     [Fact]

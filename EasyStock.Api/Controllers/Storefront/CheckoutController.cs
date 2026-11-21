@@ -93,7 +93,8 @@ public sealed class CheckoutController(
             Cep: body.Cep,
             Observacoes: body.Observacoes,
             IdempotencyKey: idempotencyKey,
-            ContentHash: contentHash, Numero: body.Endereco?.Numero ?? body.Numero);
+            ContentHash: contentHash, Numero: body.Endereco?.Numero ?? body.Numero,
+            Campanha: body.Campanha);
 
         try
         {
@@ -149,7 +150,8 @@ public sealed class CheckoutController(
                 .ToList(),
             JanelaId: body.JanelaId,
             DataEntrega: body.DataEntrega,
-            Observacoes: body.Observacoes);
+            Observacoes: body.Observacoes,
+            Campanha: body.Campanha);
 
         try
         {
@@ -254,7 +256,8 @@ public sealed record CheckoutRequestBody(
     string Cep,
     string? Observacoes = null,
     EnderecoCheckout? Endereco = null,
-    string? Numero = null);
+    string? Numero = null,
+    CampanhaInput? Campanha = null);
 
 public sealed record CheckoutItemRequestBody(Guid CardapioItemId, int Qtd);
 
@@ -268,4 +271,5 @@ public sealed record CheckoutGuestRequestBody(
     Guid? JanelaId = null,
     DateOnly? DataEntrega = null,
     string? Observacoes = null,
-    EnderecoCheckout? Endereco = null);
+    EnderecoCheckout? Endereco = null,
+    CampanhaInput? Campanha = null);

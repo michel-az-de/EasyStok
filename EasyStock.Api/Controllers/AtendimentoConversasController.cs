@@ -175,6 +175,18 @@ public class AtendimentoConversasController(
             currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId, body.TentativaId, body.Nome, body.Idioma, body.Parametros,
             body.Confirmar), ct)));
 
+    [SwaggerOperation(Summary = "Open the WhatsApp conversation of a registered client without sending (#2871)",
+        Description = "Novo pedido pela Ficha, por Pedidos ou pelo Atendimento: abre (ou reaproveita) a conversa do celular do cliente, sem mandar mensagem. A comanda nasce nela.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [HttpPost("do-cliente")]
+    [ValidateEmpresaId]
+    public Task<IActionResult> AbrirDoCliente([FromBody] AbrirConversaDoClienteBody body,
+        [FromServices] AbrirConversaDoClienteUseCase useCase, CancellationToken ct = default)
+        => Atendendo(async () => DataOk(await useCase.ExecuteAsync(
+            new AbrirConversaDoClienteCommand(currentUser.EmpresaId, currentUser.UsuarioId, body.ClienteId, body.Celular), ct)));
+
     [SwaggerOperation(Summary = "Messages that did not reach the customer (S59)",
         Description = "Saída que falhou, mais recente primeiro: inclui a que espera o cliente responder ao modelo de retomada e a que saiu por SMS.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -482,6 +494,8 @@ public sealed record EnviarModeloConversaBody(Guid TentativaId, string Nome, str
 public sealed record IniciarConversaClienteBody(
     Guid ClienteId, Guid TentativaId, string Nome, string Idioma, IReadOnlyList<string> Parametros, Guid? EmpresaId = null,
     bool Confirmar = false);
+
+public sealed record AbrirConversaDoClienteBody(Guid ClienteId, Guid? EmpresaId = null, [property: MaxLength(32)] string? Celular = null);
 
 public sealed record EnviarImagemCardapioBody(Guid CardapioItemId, int Indice, string? Legenda, bool Confirmar = false);
 

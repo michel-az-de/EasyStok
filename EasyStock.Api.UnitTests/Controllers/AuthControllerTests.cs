@@ -293,6 +293,8 @@ public class AuthControllerTests
         var acoes = System.Text.Json.JsonSerializer.SerializeToElement(resposta.Value,
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)).GetProperty("data").GetProperty("acoes");
         acoes.GetProperty("reabrirConversa").GetBoolean().Should().Be(esperado);
+        // Revisão da #2874: o "Novo pedido" só aparece para quem a rota `do-cliente` (policy Atendendo) aceita.
+        acoes.GetProperty("atenderConversas").GetBoolean().Should().Be(esperado);
     }
 
     // #1921 / #1940 (frente C da #1889): o console da atendente pedia desacertos, integrações e o

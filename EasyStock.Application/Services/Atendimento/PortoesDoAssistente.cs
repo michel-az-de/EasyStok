@@ -32,6 +32,9 @@ public sealed record EtapaAssistente(
         new(codigo, titulo, EstadoEtapaAssistente.NaoSeAplica, detalhe);
 }
 
+/// <summary>#2853: uma etapa do turno descrita para o mapa do fluxo, sem estado de conversa.</summary>
+public sealed record PortaoDoFluxo(string Codigo, string Titulo, string Checa, bool Escala, string? QuemMuda);
+
 /// <summary>
 /// #2496: as etapas que decidem se o robô responde, na ordem do turno. O <see cref="AgenteAtendimentoService"/> para
 /// na primeira que barra; a checagem da conversa no console mostra todas. Uma classe só, para a tela nunca dizer uma
@@ -53,6 +56,53 @@ public sealed class PortoesDoAssistente(
     public const string Bloqueado = "bloqueado";
     public const string Pausado = "pausado";
     public const string Limite = "limite";
+    public const string Cota = "cota";
+
+    public const string MotivoCotaEsgotada = "cota mensal de tokens do Assistente esgotada: a equipe responde até virar o mês";
+
+    /// <summary>
+    /// #2853: as etapas na ordem do turno, para o mapa do fluxo no console. <c>Escala</c>: barrando, a conversa passa para a
+    /// equipe (as três primeiras só não respondem). <c>QuemMuda</c>: onde a etapa se ajusta, ou nulo quando é regra fixa.
+    /// </summary>
+    public static readonly IReadOnlyList<PortaoDoFluxo> Catalogo =
+    [
+        new(Situacao, "Quem atende", "A conversa está com o Assistente, não com a equipe.", false, "Assumir ou devolver na conversa"),
+        new(Vinculo, "Cadastro da conversa", "Nenhuma troca de cliente em revisão.", false, null),
+        new(Janela, "Janela de 24 h", "O cliente escreveu nas últimas 24 h (regra da Meta).", false, null),
+        new(Chave, "Assistente na loja", "A chave do Assistente está ligada.", true, "Chave nesta tela"),
+        new(Modelo, "Modelo de IA", "O servidor tem modelo e chave de API.", true, "Configuração do servidor"),
+        new(Canal, "Canal", "A conversa é do WhatsApp ou do chat do site.", true, null),
+        new(Equipe, "Contato da equipe", "Quem escreve não é contato que recebe os avisos da equipe.", true, "Devolver na conversa"),
+        new(Bloqueado, "Cliente bloqueado", "O cadastro do cliente não está bloqueado.", true, "Cadastro do cliente"),
+        new(Pausado, "Encaminhado à responsável", "O cliente não foi encaminhado à responsável.", true, "Devolver na conversa"),
+        new(Limite, "Respostas na última hora", "O robô não passou do limite de respostas por hora na conversa.", true, "Configuração do servidor"),
+        new(Cota, "Cota do mês", "A loja não gastou a cota mensal de tokens.", true, "Cota na aba Uso"),
+    ];
+
+    /// <summary>
+    /// S69 (#2853): cota mensal de tokens da loja. Soma o mesmo registro dos turnos que o painel de uso mostra, no mês de
+    /// Brasília. Barrando, o turno não chama o modelo e a conversa passa para a equipe.
+    /// </summary>
+    public static async Task<EtapaAssistente> DaCotaAsync(
+        ITurnoAgenteRepository? turnos, Guid empresaId, ConfiguracaoAtendimento configuracao, DateTime agora, CancellationToken ct)
+    {
+        if (configuracao.CotaTokensMes is not { } cota || cota <= 0)
+            return EtapaAssistente.Fora(Cota, "Cota do mês", "Sem cota mensal de tokens.");
+        if (turnos is null)
+            return EtapaAssistente.Fora(Cota, "Cota do mês", "Consumo indisponível.");
+
+        var usados = await UsadosNoMesAsync(turnos, empresaId, agora, ct);
+        var detalhe = $"{usados:N0} de {cota:N0} tokens usados no mês.";
+        return usados >= cota
+            ? EtapaAssistente.Barrou(Cota, "Cota do mês", detalhe + " Cota esgotada: a equipe atende.", MotivoCotaEsgotada)
+            : EtapaAssistente.Passou(Cota, "Cota do mês", detalhe);
+    }
+
+    public static async Task<long> UsadosNoMesAsync(ITurnoAgenteRepository turnos, Guid empresaId, DateTime agora, CancellationToken ct)
+    {
+        var (de, ate) = HorarioBrasil.JanelaMesUtc(HorarioBrasil.DataOperacional(agora));
+        return (await turnos.SomarAsync(empresaId, de, ate, ct)).TotalTokens;
+    }
 
     /// <summary>Estado da conversa. Barrando, o turno não chama o modelo nem escala: só não responde.</summary>
     public static IReadOnlyList<EtapaAssistente> DaConversa(Conversa conversa, DateTime agora) =>
@@ -90,7 +140,7 @@ public sealed class PortoesDoAssistente(
                 : EtapaAssistente.Barrou(Modelo, "Modelo de IA", "Desligado ou sem chave no servidor.",
                     AgenteAtendimentoService.MotivoAgenteDesligado),
             conversa.TemAgente
-                ? EtapaAssistente.Passou(Canal, "Canal", "O Assistente atende no WhatsApp.")
+                ? EtapaAssistente.Passou(Canal, "Canal", $"O Assistente atende no canal {(conversa.Canal == CanalConversa.ChatSite ? "chat do site" : "WhatsApp")}.")
                 : EtapaAssistente.Barrou(Canal, "Canal", $"O Assistente não atende no canal {conversa.Canal}.",
                     $"o canal {conversa.Canal} não tem agente"),
         };

@@ -13,7 +13,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-using Testcontainers.PostgreSql;
 
 namespace EasyStock.Api.IntegrationTests.Atendimento;
 
@@ -24,7 +23,7 @@ namespace EasyStock.Api.IntegrationTests.Atendimento;
 /// </summary>
 public sealed class SemVitrineIntegrationTests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
     private static readonly Guid UsuarioId = Guid.NewGuid();
 
@@ -36,11 +35,7 @@ public sealed class SemVitrineIntegrationTests : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_sem_vitrine_tests")
-                .WithUsername("postgres")
-                .WithPassword("Sem-Vitrine-" + Guid.NewGuid().ToString("N"))
-                .Build();
+            _pg = new BancoDeTeste();
             await _pg.StartAsync();
             _isAvailable = true;
         }

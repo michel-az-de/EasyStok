@@ -26,6 +26,10 @@ public sealed class CanalWhatsAppPonte(IWhatsAppCloudClient cloud)
     public Task<string> EnviarImagemAsync(string contatoIdExterno, string urlPublica, string? legenda = null, CancellationToken ct = default) =>
         _canal.EnviarImagemAsync(contatoIdExterno, urlPublica, legenda, ct);
 
+    public Task<string> EnviarDocumentoAsync(
+        string contatoIdExterno, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default) =>
+        _canal.EnviarDocumentoAsync(contatoIdExterno, urlPublica, nomeArquivo, legenda, ct);
+
     public Task<string> EnviarAudioAsync(string contatoIdExterno, string urlPublica, bool notaDeVoz, CancellationToken ct = default) =>
         _canal.EnviarAudioAsync(contatoIdExterno, urlPublica, notaDeVoz, ct);
 

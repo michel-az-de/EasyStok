@@ -6,7 +6,7 @@ closes #<N>
 <!-- Resumo objetivo da mudanca. -->
 
 ## Tier
-<!-- baixo (chore/docs/test/fix-trivial, ou spec S/P de plano aprovado -> merge no verde, ADR-0055) | alto (migracao/auth/RLS/policy, ou feat/refactor sem spec -> aguarda label `aprovado`) -->
+<!-- baixo (chore/docs/test/fix-trivial, ou spec S/P de plano aprovado -> merge no verde, ADR-0055) | alto (migracao/auth/RLS/policy, ou feat/refactor sem spec -> aguarda label `aprovado`, que o agente aplica nas condicoes da ADR-0070) -->
 <!-- Spec: S__ (docs/plan/...) -->
 
 ## Verificacao

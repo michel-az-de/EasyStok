@@ -26,16 +26,15 @@ const caso = (nome, fn) => {
   try { fn(); ok++; console.log(`ok  ${nome}`) } catch (erro) { falhas.push(nome); console.log(`FALHA  ${nome}\n      ${String(erro.message).split('\n')[0]}`) }
 }
 
-const moldura = readFileSync(new URL('../src/app/Moldura.jsx', import.meta.url), 'utf8')
-const inicio = moldura.indexOf('\nfunction Trilho(')
-const trilho = moldura.slice(inicio, moldura.indexOf('\nfunction ', inicio + 1))
-// Ordem em que os módulos aparecem no trilho: o item atual (Atendimento) e os que dependem de permite().
-const modulosNoTrilho = [...trilho.matchAll(/modulo=\{MODULO_ATENDIMENTO\} \/>|permite\('([a-z]+)'\)/g)]
-  .map(([, id]) => id ?? 'atendimento')
-  .filter((id) => ORDEM_DOS_MODULOS.includes(id))
+// #3004: o trilho é um só (dominio/trilhoDoConsole.js); a ordem dos módulos vem da lista única, em toda rota.
+const { itensDoTrilho } = await import('../src/dominio/trilhoDoConsole.js')
+const itens = itensDoTrilho({ onde: 'balcao' })
+// Ordem em que os módulos aparecem no trilho: só as áreas de módulo da lista única.
+const modulosNoTrilho = itens.map((item) => item.id).filter((id) => ORDEM_DOS_MODULOS.includes(id))
+const inicio = itens.length
 
 caso('o trilho do Atendimento tem Atendimento, Cozinha e Entregas', () => {
-  assert.ok(inicio > 0, 'function Trilho não encontrada em Moldura.jsx')
+  assert.ok(inicio > 0, 'itensDoTrilho não devolveu itens')
   for (const id of ['atendimento', 'cozinha', 'entregas']) assert.ok(modulosNoTrilho.includes(id), id)
 })
 caso('os módulos do trilho do Atendimento seguem ORDEM_DOS_MODULOS', () => {

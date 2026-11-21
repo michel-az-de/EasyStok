@@ -47,7 +47,7 @@ await provar('a Ficha mantém o cliente, identifica a comanda ativa e abre o ext
   const painel = ler('features/ficha-cliente/PainelFicha.jsx')
   // #2258 (auditoria T11): o painel lateral passou de "Ficha" para "Cliente".
   assert.match(painel, /<h2>Cliente<\/h2>/)
-  assert.match(painel, /<h3>\{!editavel \? 'Conversa concluída' : numero \? `Comanda \$\{numero\}` : 'Comanda'\}<\/h3>/)
+  assert.match(painel, /<h3>\{!editavel \? 'Conversa concluída' : numero \? rotuloDoPedido\(numero\) : ROTULOS\.PEDIDO\}<\/h3>/)
   assert.match(painel, /<CartaoDoCliente conversa=\{selecionada\}/)
   assert.match(painel, /\{secao === 'pagamento' && editavel && pedido && <Modal[\s\S]*?\{fonteApi && <ExtratoDoPedido pedido=\{pedido\} aDevolver=\{aDevolver\} \/>\}/)
 })

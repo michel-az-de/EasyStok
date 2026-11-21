@@ -3,9 +3,11 @@ import {
   closestCenter, DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
 import { AtendimentoProvider } from '../aplicacao/AtendimentoProvider'
-import { anunciarAberturaDeConversa } from '../aplicacao/aberturaDeConversa'
+import { NovoPedidoJanela } from './NovoPedidoJanela'
+import { anunciarAberturaDeConversa, destinoDoNovoPedido, useAoAbrirConversa, VALIDADE_DO_NOVO_PEDIDO_MS } from '../aplicacao/aberturaDeConversa'
 import { criarMemoriaDoLaco } from '../aplicacao/cicloDeSincronizacao'
 import { ContextoRascunhosDosAjustes, useGravacoesDosAjustes } from '../aplicacao/rascunhosDosAjustes'
+import { useEsquecerCadastrosAoSair } from '../aplicacao/cadastros'
 import { useAcoes, useAtendimento, useCatalogo } from '../aplicacao/contextos'
 import { CHAVE_CARDAPIO, usePreferenciaDePainel } from '../aplicacao/preferenciaDosPaineis'
 import { CARDAPIO, larguraDoCardapio, larguraMaxima, normalizarCardapio } from '../dominio/paineis'
@@ -26,6 +28,8 @@ import { identidadeDaAssistencia, useContextoAssistencia } from '../aplicacao/co
 import { useAvisosNoAparelho } from '../aplicacao/useAvisosNoAparelho'
 import { SinoDaSessao } from '../features/notificacoes/SinoDaSessao'
 import { ContextoAcessoModulos, useAcessoModulos, useModulosDaSessao } from '../aplicacao/acessoModulos'
+import { ContextoFichaUnicaDoCliente } from '../aplicacao/fichaUnicaDoCliente'
+import { ContextoPainelDoAssistente } from '../aplicacao/painelDoAssistente'
 import { moduloDaRota, permiteModulo, permiteRota } from '../dominio/acessoModulos'
 import { Vazio } from '../componentes/Vazio'
 import { Botao } from '../componentes/Botao'
@@ -58,6 +62,7 @@ import { HallDeModulos } from '../features/hall/HallDeModulos'
 import { BuscaNaCasa } from '../features/busca/BuscaNaCasa'
 import { EditorCadastro } from '../features/gestao/cadastros/EditorCadastro'
 import { DetalhePedido } from '../features/gestao/cadastros/DetalhePedido'
+import { PainelAssistente } from '../features/gestao/atendimento/PainelAssistente'
 import { PainelAgora } from '../features/agora/PainelAgora'
 import { avisoDeResponder, filasDoAgora } from '../dominio/agora'
 import { hashDoModulo } from '../dominio/modulos'
@@ -78,12 +83,17 @@ import { Moldura } from './Moldura'
 import { PilhaDeAvisos } from './PilhaDeAvisos'
 import { AvisosDoDispositivo } from './AvisosDoDispositivo'
 import { AjudaDoConsole } from '../features/ajuda/AjudaDoConsole'
+import { useQuandoPedirAjuda } from '../aplicacao/pedirAjuda'
 import { NavegacaoDoConsole } from './NavegacaoDoConsole'
 import css from './moldura.module.css'
 
 // Modo demonstração (laboratório local, issue #2017): as telas e os ganchos dele só existem fora do build de
 // produção (`VITE_FONTE_DADOS=api`). Com `demonstracao` nulo viram vazio, e os ramos `!FONTE_API` abaixo nem rodam.
 const semEfeito = () => {}
+// #2849: a ficha única do cliente. A Busca e o Atendimento desenham o cliente por esta mesma função.
+const renderizarFichaUnica = props => <EditorCadastro {...props} restricoes={RESTRICOES} />
+// #2855: o painel do Assistente também abre no modal da conversa.
+const renderizarPainelDoAssistente = props => <PainelAssistente {...props} />
 const { useReacaoClienteSimulado = semEfeito, useDigitacaoAutomatica = semEfeito } = demonstracao ?? {}
 const {
   TelaCardapioLink = null, TelaCozinha = null, GavetaEntregas = null, TelaEntregas = null,
@@ -280,6 +290,18 @@ function Composicao({ rota }) {
     if (tela === 'comanda' && selecionada?.pedido) { solicitarPainel('ficha', 'comanda'); return }
     setModal('cardapio')
   }
+  // #2871: o "Novo pedido" do cliente (Clientes, Pedidos, busca do Balcão) abre a comanda na conversa dele, depois que a
+  // seleção chega a esta tela: sem pedido, o cardápio; com pedido em andamento, a comanda dele na Ficha.
+  const [novoPedidoNaConversa, pedirNovoPedido] = useState(null)
+  useAoAbrirConversa((id, detalhe) => {
+    if (detalhe?.novoPedido) pedirNovoPedido({ id, ate: Date.now() + VALIDADE_DO_NOVO_PEDIDO_MS })
+  })
+  useEffect(() => {
+    const destino = destinoDoNovoPedido(novoPedidoNaConversa, selecionada?.id)
+    if (destino === 'nada' || destino === 'esperar') return
+    pedirNovoPedido(null)
+    if (destino === 'abrir') abrirTelaDoAssistente('comanda')
+  }, [novoPedidoNaConversa, selecionada?.id])
 
   return (
     <DndContext
@@ -536,6 +558,7 @@ function AppPrincipal({ rota, sessao, ultimaConversa, aoLembrarConversa, lerComa
       <LimparAvisoAoNavegar />
       <AvisosDoDispositivo visitaSoNaMemoria={visitaSoNaMemoria}><TelaDaRota rota={rota} /></AvisosDoDispositivo>
       {permite('atendimento') && <PilhaDeAvisos />}
+      <NovoPedidoJanela />
     </AtendimentoProvider>
   )
 }
@@ -550,6 +573,8 @@ function NoModulo({ rota, children }) {
 
 function ControleAjuda({ rota }) {
   const [aberta, setAberta] = useState(false)
+  // #3004: o menu da conta (pé do trilho) também abre a Ajuda; este controle está sempre montado na moldura.
+  useQuandoPedirAjuda(useCallback(() => setAberta(true), []))
   return <><Botao variante="texto" icone="ajuda" data-ajuda-console aria-label="Ajuda" title="Ajuda" aria-haspopup="dialog" onClick={() => setAberta(true)}>Ajuda</Botao>
     {aberta && <AjudaDoConsole rota={rota} fonteApi={FONTE_API} aoFechar={() => setAberta(false)} />}</>
 }
@@ -581,6 +606,7 @@ export function App() {
   const hash = useHash()
   const { sessao, entrarNaEmpresa, entrarPorCodigo, google, encerrarSessao, avisoSaida, retomando, erroRetomada } = useSessaoApi()
   const rota = rotaDaHash(hash, { fonteApi: FONTE_API })
+  useEsquecerCadastrosAoSair(moduloDaRota(rota))
   // #1582: cada tela diz o próprio nome na aba. No Balcão quem escreve é a `Composicao`, com a contagem.
   useTituloDaAba(FONTE_API && !sessao ? TITULO_BASE : rota.tipo === ROTA_PRINCIPAL ? null : tituloDaAba(rota))
   // #1753: o token sai da barra de endereço assim que é lido, para não ficar no histórico do navegador.
@@ -712,8 +738,8 @@ function AppComAcesso({ rota, sessao, aoSair }) {
   else tela = <AppPrincipal rota={rota} sessao={sessao} ultimaConversa={ultimaConversa} aoLembrarConversa={lembrarConversa} lerComandasDaVisita={lerComandasDaVisita} aoGuardarComandas={guardarComandas} lerFiltrosDaVisita={lerFiltrosDaVisita} aoGuardarFiltros={guardarFiltrosDaVisita} lerRascunhosDaVisita={lerRascunhosDaVisita} aoGuardarRascunhos={guardarRascunhosDaVisita} memoriaDoLaco={memoriaDoLaco} visitaSoNaMemoria={visitaSoNaMemoria} conversaEncontrada={conversaEncontrada} aoConsumirConversa={consumirConversaEncontrada} />
   return <ContextoAcessoModulos.Provider value={acesso}>
     <ContextoRascunhosDosAjustes.Provider value={{ rascunhos: rascunhosDosAjustes, definir: definirRascunho, ...gravacoesDosAjustes }}>
-      {tela}{confirmacaoSaida}
-      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={props => <EditorCadastro {...props} restricoes={RESTRICOES} />} renderizarPedido={props => <DetalhePedido {...props} />} aoAbrirConversa={resumo => {
+      <ContextoFichaUnicaDoCliente.Provider value={renderizarFichaUnica}><ContextoPainelDoAssistente.Provider value={renderizarPainelDoAssistente}>{tela}</ContextoPainelDoAssistente.Provider></ContextoFichaUnicaDoCliente.Provider>{confirmacaoSaida}
+      {buscaAberta && <BuscaNaCasa aoFechar={() => abrirBusca(false)} renderizarCadastro={renderizarFichaUnica} renderizarPedido={props => <DetalhePedido {...props} />} aoAbrirConversa={resumo => {
         memoriaDoLaco.dono = sessao.usuario?.id ?? null
         memoriaDoLaco.resumos.set(resumo.id, resumo)
         guardarConversaEncontrada(resumo)

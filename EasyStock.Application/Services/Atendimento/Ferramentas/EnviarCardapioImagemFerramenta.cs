@@ -61,6 +61,13 @@ public sealed class EnviarCardapioImagemFerramenta(
         var conversa = contexto.Conversa;
         var titulo = conversa.NumeroComanda > 0 ? $"Comanda #{conversa.NumeroComanda}" : "Sua comanda pessoal";
         var texto = $"{titulo}. Escolha os itens e acompanhe seu pedido e pagamento por aqui: {link}";
+        if (SaidaDoChatSite.Eh(conversa))
+        {
+            // #2876: no site a comanda sai como texto; o widget transforma a URL em botão.
+            await SaidaDoChatSite.GravarTextoAsync(contexto, conversaRepository, texto, ct);
+            contexto.RegistrarEnvioVerificado();
+            return FerramentaJson.Serializar(new { enviado = true, link });
+        }
         var temImagem = !string.IsNullOrWhiteSpace(storefront?.CardapioImagemUrl);
         var envio = temImagem
             ? await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, storefront!.CardapioImagemUrl!, texto, ct)

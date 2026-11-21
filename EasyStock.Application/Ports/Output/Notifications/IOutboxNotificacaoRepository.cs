@@ -22,8 +22,8 @@ public interface IOutboxNotificacaoRepository
     /// Roda antes da reserva, na mesma transação: não há janela em que o backlog velho seja elegível. Cross-tenant: o
     /// chamador liga o bypass pela porta; o commit é dele.
     /// </summary>
-    /// <returns>Quantas mensagens expiraram.</returns>
-    Task<int> ExpirarPendentesAsync(PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default);
+    /// <returns>As mensagens que expiraram, com o tipo do evento (#2875).</returns>
+    Task<IReadOnlyList<NotificacaoExpirada>> ExpirarPendentesAsync(PoliticaValidadeNotificacao politica, int limitePorPrazo, CancellationToken ct = default);
 
     /// <summary>
     /// Lease (N1): as mensagens <c>EmEnvio</c> com o lease vencido saem do limbo (<c>FOR UPDATE SKIP LOCKED</c>). E-mail,

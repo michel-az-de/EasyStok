@@ -40,6 +40,7 @@ public class InteligenciaController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         var (items, totalCount) = await obterEstoqueBaixoUseCase.ExecuteAsync(
             new ObterEstoqueBaixoCommand(empresaId, lojaId, limite, page, pageSize));
         return DataPaged(items, totalCount, page, pageSize);
@@ -56,6 +57,7 @@ public class InteligenciaController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         var (items, totalCount) = await obterProximoVencimentoUseCase.ExecuteAsync(
             new ObterProximoVencimentoCommand(empresaId, lojaId, dias, page, pageSize));
         return DataPaged(items, totalCount, page, pageSize);
@@ -72,6 +74,7 @@ public class InteligenciaController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         var (items, totalCount) = await obterItensParadosUseCase.ExecuteAsync(
             new ObterItensParadosCommand(empresaId, lojaId, diasSemMovimento, page, pageSize));
         return DataPaged(items, totalCount, page, pageSize);
@@ -88,6 +91,7 @@ public class InteligenciaController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         var (items, totalCount) = await obterSugestaoReposicaoUseCase.ExecuteAsync(
             new ObterSugestaoReposicaoCommand(empresaId, lojaId, limiteQuantidade, page, pageSize));
         return DataPaged(items, totalCount, page, pageSize);
@@ -130,6 +134,7 @@ public class InteligenciaController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         var (items, totalCount) = await calcProjecaoRupturaUseCase.ExecuteAsync(
             new CalcularProjecaoRupturaCommand(empresaId, page, pageSize));
         return DataPaged(items, totalCount, page, pageSize);

@@ -26,11 +26,11 @@ public class ConfiguracaoAtendimento
     /// <summary>Com <c>{nome}</c> — cliente já conhecido, identificado pelo telefone (S05). Sem link (#2544).</summary>
     public string SaudacaoRetorno { get; set; } = SaudacaoRetornoPadrao;
 
-    public const string SaudacaoPrimeiroContatoPadrao = "Oi! Seja bem-vindo(a) à Casa da Baba 🍝";
-    public const string SaudacaoRetornoPadrao = "Oi, {nome}! Que bom te ver de novo por aqui.";
+    public const string SaudacaoPrimeiroContatoPadrao = "Oi! Aqui é a Casa da Baba.";
+    public const string SaudacaoRetornoPadrao = "Oi, {nome}! Que bom ter você de volta.";
 
     /// <summary>Frase de espera enviada junto da saudação, antes do agente responder (RN-01).</summary>
-    public string FraseEspera { get; set; } = "Só um instante que já te ajudo!";
+    public string FraseEspera { get; set; } = "Um instante, a Casa já responde.";
 
     public string MensagemForaArea { get; set; } = "Por enquanto a gente só entrega em algumas regiões.";
 
@@ -105,6 +105,9 @@ public class ConfiguracaoAtendimento
     public ModeloRetomada? ModeloRetomada =>
         ModeloRetomadaNome is null ? null : new ModeloRetomada(ModeloRetomadaNome, ModeloRetomadaIdioma);
 
+    /// <summary>#2957: modelo de IA escolhido para o atendimento; nulo segue o padrão da loja. Só coluna na S1.</summary>
+    public Guid? ModeloIaId { get; private set; }
+
     public DateTime CriadoEm { get; set; }
     public DateTime AlteradoEm { get; set; }
 
@@ -174,7 +177,7 @@ public class ConfiguracaoAtendimento
     /// <summary>S68 (ADR-0066): modelo do Assistente da loja, conferido na lista aprovada pelo caso de uso. Nulo: o padrão.</summary>
     public string? ModeloAgente { get; private set; }
 
-    /// <summary>S68: limite mensal de tokens do Assistente (a regra entra na S69). Nulo: sem cota.</summary>
+    /// <summary>S68: limite mensal de tokens do Assistente, aplicado pela etapa da cota (S69, #2853). Nulo: sem cota.</summary>
     public long? CotaTokensMes { get; private set; }
 
     /// <summary>S68: etapas do roteiro em JSON, no formato da aplicação. Nulo: o roteiro padrão.</summary>
@@ -182,6 +185,26 @@ public class ConfiguracaoAtendimento
 
     /// <summary>S68: orientação livre da loja para o Assistente, abaixo das regras. Nulo: nenhuma.</summary>
     public string? ObservacoesLoja { get; private set; }
+
+    public const int FraseFechoCanhotoTamanhoMaximo = 60;
+
+    /// <summary>#2937: frase que fecha o canhoto em imagem mandado à cliente (ex.: "Boa massa!"). Nula: sem fecho.</summary>
+    public string? FraseFechoCanhoto { get; private set; }
+
+    public const int FerramentasDesligadasTamanhoMaximo = 4_000;
+
+    /// <summary>#2853: nomes das ferramentas do Assistente que a loja desligou, em JSON. Nulo: todas ligadas.</summary>
+    public string? FerramentasDesligadasJson { get; private set; }
+
+    /// <summary>#2853: nulo mantém; vazio liga todas de novo. Quem valida os nomes é o caso de uso.</summary>
+    public void DefinirFerramentasDesligadas(string? json)
+    {
+        if (json is null) return;
+        if (json.Length > FerramentasDesligadasTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"A lista de ferramentas desligadas passa de {FerramentasDesligadasTamanhoMaximo} caracteres.");
+        FerramentasDesligadasJson = Vazio(json);
+        AlteradoEm = DateTime.UtcNow;
+    }
 
     /// <summary>
     /// S68 (#2597): nulo mantém o valor; vazio (ou cota 0) volta ao padrão. Valida tudo antes de mudar qualquer campo.
@@ -211,6 +234,18 @@ public class ConfiguracaoAtendimento
         if (cotaTokensMes.HasValue) CotaTokensMes = cotaTokensMes == 0 ? null : cotaTokensMes;
         if (roteiro is not null) RoteiroJson = Vazio(roteiro);
         if (observacoes is not null) ObservacoesLoja = Vazio(observacoes);
+        AlteradoEm = DateTime.UtcNow;
+    }
+
+    /// <summary>#2937: nulo mantém; vazio tira o fecho. Uma linha curta, que cabe na faixa do canhoto.</summary>
+    public void DefinirFraseFechoCanhoto(string? frase)
+    {
+        if (frase is null) return;
+        var limpa = frase.Trim();
+        if (limpa.Length > FraseFechoCanhotoTamanhoMaximo || limpa.Contains(Convert.ToChar(10)) || limpa.Contains(Convert.ToChar(13)))
+            throw new RegraDeDominioVioladaException(
+                $"A frase de fecho tem de caber em uma linha de até {FraseFechoCanhotoTamanhoMaximo} caracteres.");
+        FraseFechoCanhoto = Vazio(limpa);
         AlteradoEm = DateTime.UtcNow;
     }
 

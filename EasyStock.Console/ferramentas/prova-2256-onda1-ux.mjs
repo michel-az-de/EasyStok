@@ -37,9 +37,9 @@ caso('grade: 3 ou 4 colunas, a que deixa menos vagas vazias', () => {
 })
 
 caso('grade: o Início marca as colunas e o CSS só as aplica no desktop', () => {
-  assert.match(ler('features/hall/HallDeModulos.jsx'), /data-colunas=\{colunasDaGrade\(modulos\.length\)\}/)
+  assert.match(ler('features/hall/HallDeModulos.jsx'), /data-colunas=\{colunasDaGrade\(modulos\.length \+ atalhos\.length\)\}/)
   const hall = ler('features/hall/hall.module.css')
-  assert.match(hall, /@media \(min-width: 1280px\) \{\s*\.grade\[data-colunas='3'\] \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/)
+  assert.match(hall, /@media \(min-width: 1001px\) \{\s*\.grade\[data-colunas='3'\] \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \}/)
 })
 
 caso('cartões de número: mesma altura na mesma linha, sem esticar até o maior da grade', () => {

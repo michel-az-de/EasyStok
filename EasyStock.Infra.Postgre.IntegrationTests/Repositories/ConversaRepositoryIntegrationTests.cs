@@ -248,6 +248,7 @@ public class ConversaRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixtur
         var daAna = Conversa.Abrir(empresa, "5511999990021", Agora, "Rita");
         daAna.Assumir(Agora, ana);
         var livre = Conversa.Abrir(empresa, "5511999990022", Agora, "Joana");
+        daAna.RegistrarEntrada(Agora); livre.RegistrarEntrada(Agora); // #2921: conversa sem entrada da cliente fica fora da fila
         db.AtendimentoConversas.AddRange(daAna, livre);
         await db.SaveChangesAsync();
 

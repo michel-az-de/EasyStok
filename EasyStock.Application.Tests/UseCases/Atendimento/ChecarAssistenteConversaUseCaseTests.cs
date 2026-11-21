@@ -69,8 +69,9 @@ public class ChecarAssistenteConversaUseCaseTests
         checagem.Etapas.Select(e => e.Codigo).Should().Equal(
             PortoesDoAssistente.Situacao, PortoesDoAssistente.Vinculo, PortoesDoAssistente.Janela,
             PortoesDoAssistente.Chave, PortoesDoAssistente.Modelo, PortoesDoAssistente.Canal, PortoesDoAssistente.Equipe,
-            PortoesDoAssistente.Bloqueado, PortoesDoAssistente.Pausado, PortoesDoAssistente.Limite);
+            PortoesDoAssistente.Bloqueado, PortoesDoAssistente.Pausado, PortoesDoAssistente.Limite, PortoesDoAssistente.Cota);
         checagem.Etapas.Should().NotContain(e => e.Barra);
+        Etapa(checagem, PortoesDoAssistente.Cota).Estado.Should().Be(EstadoEtapaAssistente.NaoSeAplica);
         Etapa(checagem, PortoesDoAssistente.Bloqueado).Estado.Should().Be(EstadoEtapaAssistente.NaoSeAplica);
         checagem.Prompt.Should().StartWith(PromptAtendimento.Montar(_configuracao));
         checagem.Ferramentas.Should().ContainSingle().Which.Should().Be(new FerramentaDoAssistente("consultar_pedido", "Consulta o pedido"));
@@ -115,7 +116,7 @@ public class ChecarAssistenteConversaUseCaseTests
         checagem.Ativo.Should().BeFalse();
         checagem.Responde.Should().BeFalse();
         Etapa(checagem, PortoesDoAssistente.Chave).MotivoEscalada.Should().Be(AgenteAtendimentoService.MotivoAtendimentoAutomaticoDesligado);
-        checagem.Etapas.Should().HaveCount(10);
+        checagem.Etapas.Should().HaveCount(11);
     }
 
     [Fact]

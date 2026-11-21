@@ -82,13 +82,13 @@ export function ModalCliente({ conversa, aoFechar, children }) {
 
   // Um só caminho para "texto não salvo": confirmarDescarte (a pergunta do Modal), o mesmo do resto do sistema.
   // O segurarFechamento da PR (que travava Esc e fundo sem perguntar) saiu: a pergunta já protege o digitado.
-  return <Modal titulo="Cadastro do cliente" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : fechar}
+  return <Modal titulo="Ficha do cliente" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : fechar}
     confirmarDescarte={sujo}
     rodape={<div className={css.acoes}>
       {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
       <Botao variante="texto" disabled={ocupado} onClick={pedirFechamento}>Fechar</Botao>
       {podeAbrirCadastro && <Botao variante="secundario" icone="usuarios" disabled={ocupado || sujo}
-        motivo={sujo ? 'Salve ou descarte o que foi digitado para abrir o cadastro completo.' : undefined} onClick={abrirCadastroCompleto}>Abrir cadastro completo</Botao>}
+        motivo={sujo ? 'Salve ou descarte o que foi digitado para abrir a ficha completa.' : undefined} onClick={abrirCadastroCompleto}>Abrir ficha completa</Botao>}
       <Botao variante="secundario" icone="download" disabled={ocupado || !podeBaixarPdf} onClick={baixarFicha}>{baixandoPdf ? 'Preparando PDF…' : 'Baixar PDF'}</Botao>
       <span ref={setRodapeDoCadastro} className={css.lugarDoSalvar} />
     </div>}>

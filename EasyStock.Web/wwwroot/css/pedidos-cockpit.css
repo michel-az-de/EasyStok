@@ -12,10 +12,9 @@
    estreitas em vez de espremer; em desktop largo a tabela já passa disso (sem efeito). */
 .ped-table { min-width: 920px; }
 
-/* Linha: acento de atraso à esquerda (crit), sem banho de cor na linha toda. */
+/* Linha atrasada: fundo crit na linha (#2894: sem faixa lateral). */
 .ped-table td { vertical-align: middle; }
 .ped-row--atrasado td { background: var(--crit-50); }
-.ped-row--atrasado td:first-child { box-shadow: inset 3px 0 0 var(--crit-600); }
 html.theme-dark .ped-row--atrasado td { background: rgba(192, 59, 42, .12); }
 
 .ped-cliente { font-weight: 600; color: var(--text-strong); text-decoration: none; }
@@ -63,11 +62,10 @@ a.ped-verificar { text-decoration: none; }
     background: var(--bg-surface); border: 1px solid var(--border-soft);
     border-radius: var(--radius); padding: 12px 16px;
     display: flex; flex-direction: column; gap: 4px;
-    border-top: 3px solid var(--ink-300);
 }
-.ped-kpi--accent { border-top-color: var(--orange-600); }
-.ped-kpi--crit   { border-top-color: var(--crit-600); }
-.ped-kpi--warn   { border-top-color: var(--warn-600); }
+.ped-kpi--accent { border-color: var(--orange-600); }
+.ped-kpi--crit   { border-color: var(--crit-600); }
+.ped-kpi--warn   { border-color: var(--warn-600); }
 .ped-kpi__eyebrow {
     font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
     text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted);

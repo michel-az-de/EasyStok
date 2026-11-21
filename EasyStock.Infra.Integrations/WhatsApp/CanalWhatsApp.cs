@@ -20,6 +20,10 @@ public sealed class CanalWhatsApp(IWhatsAppCloudClient cloud) : ICanalMensageria
     public async Task<string> EnviarImagemAsync(string contatoIdExterno, string urlPublica, string? legenda = null, CancellationToken ct = default) =>
         (await cloud.EnviarImagemAsync(contatoIdExterno, urlPublica, legenda, ct)).Wamid;
 
+    public async Task<string> EnviarDocumentoAsync(
+        string contatoIdExterno, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default) =>
+        (await cloud.EnviarDocumentoAsync(contatoIdExterno, urlPublica, nomeArquivo, legenda, ct)).Wamid;
+
     public async Task<string> EnviarAudioAsync(string contatoIdExterno, string urlPublica, bool notaDeVoz, CancellationToken ct = default) =>
         (await cloud.EnviarAudioAsync(contatoIdExterno, urlPublica, notaDeVoz, ct)).Wamid;
 

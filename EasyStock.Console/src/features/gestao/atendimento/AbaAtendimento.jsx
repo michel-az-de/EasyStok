@@ -10,10 +10,13 @@ import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { Pilula } from '../../../componentes/Pilula'
 import { useAcoes, useAtendimento } from '../../../aplicacao/contextos'
 import css from './abaAtendimento.module.css'
+import { PainelAssistente } from './PainelAssistente'
+import { ROTULOS } from '../../../dominio/rotulos'
 
 const TAMANHO_MENSAGEM = 500
 // #2792: limites que espelham o servidor; passar deles avisa no campo e trava o Salvar (sem `maxLength`).
 const TAMANHO_NOME_DONA = 60
+const TAMANHO_FECHO_CANHOTO = 60
 const TAMANHO_MODELO_RETOMADA = 512
 
 const NIVEIS_DE_SUGESTAO = [
@@ -24,7 +27,7 @@ const NIVEIS_DE_SUGESTAO = [
 const OCIOSO = { estado: 'ocioso' }
 const CAMPOS_CONFIGURACAO = [
   'ativo', 'tom', 'nivelSugestao', 'saudacaoPrimeiroContato', 'saudacaoRetorno',
-  'fraseEspera', 'mensagemForaArea', 'mensagemEscalada', 'mensagemEncaminhamento', 'nomeDona', 'modeloRetomadaNome', 'respiroMinutos',
+  'fraseEspera', 'mensagemForaArea', 'mensagemEscalada', 'mensagemEncaminhamento', 'nomeDona', 'fraseFechoCanhoto', 'modeloRetomadaNome', 'respiroMinutos',
   'tempoPreparoPadraoMinutos', 'slaRespostaMinutos',
 ]
 const valorComparavel = (valor) => String(valor ?? '')
@@ -235,7 +238,7 @@ function ConfiguracaoDoAtendimento() {
   }
   const pendente = camposMudaram(form, gravado, CAMPOS_CONFIGURACAO)
   const passaDoLimite = algumPassaDoLimite(
-    [form.nomeDona, TAMANHO_NOME_DONA], [form.mensagemEscalada, TAMANHO_MENSAGEM],
+    [form.nomeDona, TAMANHO_NOME_DONA], [form.fraseFechoCanhoto, TAMANHO_FECHO_CANHOTO], [form.mensagemEscalada, TAMANHO_MENSAGEM],
     [form.mensagemEncaminhamento, TAMANHO_MENSAGEM], [form.modeloRetomadaNome, TAMANHO_MODELO_RETOMADA],
   )
 
@@ -318,6 +321,13 @@ function ConfiguracaoDoAtendimento() {
           required
           onChange={mudar('fraseEspera')}
         />
+        <CampoTexto
+          rotulo="Frase de fecho do canhoto"
+          dica="Fecha a imagem do pedido que a cliente recebe quando paga, por exemplo Boa massa! Em branco, a imagem sai sem fecho."
+          value={form.fraseFechoCanhoto ?? ''}
+          limite={TAMANHO_FECHO_CANHOTO}
+          onChange={mudar('fraseFechoCanhoto')}
+        />
         <CampoArea rotulo="Mensagem para endereço fora da área" value={form.mensagemForaArea} required onChange={mudar('mensagemForaArea')} />
         <CampoArea
           rotulo="Ao passar o cliente para a equipe"
@@ -337,7 +347,7 @@ function ConfiguracaoDoAtendimento() {
         />
         <CampoTexto
           rotulo="Modelo de retomada (WhatsApp)"
-          dica="Nome do modelo aprovado pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa."
+          dica={`Nome da ${ROTULOS.MENSAGEM_PADRAO} aprovada pela Meta, com uma variável: primeiro nome do cliente. Retoma o contato quando um envio é bloqueado pelo limite de 24 h. A mensagem pendente segue quando o cliente responder. Vazio desativa.`}
           value={form.modeloRetomadaNome ?? ''}
           limite={TAMANHO_MODELO_RETOMADA}
           pattern="[a-z0-9_]+"
@@ -399,6 +409,7 @@ export function AbaAtendimento({ horariosAtendimento = null }) {
   return (
     <div className={css.aba}>
       <LojaAgora horariosAtendimento={horariosAtendimento} />
+      <PainelAssistente podeEditar={acoes.editarAtendimento === true} />
       {acoes.editarAtendimento === true ? <>
         <MensagensDoExpediente />
         <ConfiguracaoDoAtendimento />

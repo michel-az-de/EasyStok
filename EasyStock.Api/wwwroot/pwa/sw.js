@@ -21,6 +21,10 @@ const CACHE_VERSION = 'cdb-v29-harmonia';
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './css/app.css',
+  './js/app-nucleo.js',
+  './js/app-fonte-etiqueta.js',
+  './js/app-arranque.js',
   './manifest.json',
   './harmonia.css',
   './fontes/NunitoSans-400.woff2',

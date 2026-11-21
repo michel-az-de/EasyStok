@@ -89,6 +89,39 @@ public class PedidoImpressoHtmlTests
         new PedidoImpressoHtml(new ScribanRenderer(NullLogger<ScribanRenderer>.Instance), configuracao)
             .RenderizarAsync(dto, documento, modelo, BaseUrl, opcoes);
 
+    private static readonly EasyStock.Application.Ports.Output.Pdf.PixPdfDto PixExemplo =
+        new("00020126CODIGOFICTICIO", 173.30m, 0m, "Thatiane");
+
+    [Theory]
+    [InlineData(ImpressoHtml.Cupom80)]
+    [InlineData(ImpressoHtml.A5)]
+    public async Task PedidoComPixMostraOQrDoPixNoLugarDoConviteDoWhatsApp(string modelo)
+    {
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(
+            Exemplo(), PedidoImpressoHtml.Pedido, modelo, new ImpressoOpcoes(Pix: PixExemplo)));
+
+        corpo.Should().ContainAll("class=\"pixl\"", "Pague com Pix", "R$ 173,30", "Thatiane", "Pague com o Pix abaixo.");
+        corpo.Should().NotContainAny("Faltou algo? Quer repetir?", "A acertar na entrega", "na entrega", "CODIGOFICTICIO");
+        Regex.Matches(corpo, "<svg class=\"qr\"").Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task PedidoComPixERestanteMostraOQueFicaParaAEntrega()
+    {
+        var pix = PixExemplo with { ValorDoPix = 100m, RestanteNaEntrega = 73.30m };
+        var corpo = SnapshotImpresso.Corpo(await Renderizar(
+            Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80, new ImpressoOpcoes(Pix: pix)));
+
+        corpo.Should().ContainAll("Pix de R$ 100,00 agora; R$ 73,30 na entrega.", "Restante na entrega");
+    }
+
+    [Fact]
+    public async Task SnapshotPedidoCupom80ComPix()
+    {
+        var html = await Renderizar(Exemplo(), PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80, new ImpressoOpcoes(Pix: PixExemplo));
+        SnapshotImpresso.Conferir("pedido.cupom-80.pix.html", html);
+    }
+
     [Theory]
     [InlineData(PedidoImpressoHtml.Pedido, ImpressoHtml.A5)]
     [InlineData(PedidoImpressoHtml.Pedido, ImpressoHtml.Cupom80)]

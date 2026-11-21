@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Domain.Enums.Ia;
 
 namespace EasyStock.Application.UseCases.Atendimento.Producao;
 
@@ -21,7 +22,7 @@ public sealed class SugerirReceitaUseCase(IPesquisaProducaoWeb pesquisa, IAgente
         return termo;
     }
 
-    public async Task<ReceitaSugerida> ExecuteAsync(string nome, CancellationToken ct)
+    public async Task<ReceitaSugerida> ExecuteAsync(Guid empresaId, string nome, CancellationToken ct)
     {
         nome = ValidarTermo(nome);
         using var prazo = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -36,7 +37,8 @@ public sealed class SugerirReceitaUseCase(IPesquisaProducaoWeb pesquisa, IAgente
             "Se a fonte não informa um número ou a unidade não é G/Kg/Ml/L/Un, use null. Não misture receitas distintas. " +
             "Não estime custo, preço, conservação, validade, alergênicos ou estoque. Observações devem explicar os campos não informados e a receita escolhida. Responda em português.",
             [new(MensagemLlm.Usuario, [new BlocoTextoLlm(JsonSerializer.Serialize(new { prato = nome, fontes }))])],
-            [new("sugerir_receita", "Extrair uma receita para revisão humana, sem gravar nada.", Schema)]), ct);
+            [new("sugerir_receita", "Extrair uma receita para revisão humana, sem gravar nada.", Schema)])
+        { EmpresaId = empresaId, Finalidade = FinalidadeIa.SugestaoReceita }, ct);
         var usos = resposta.Conteudo.OfType<BlocoUsoFerramentaLlm>().ToArray();
         if (resposta.StopReason != RespostaLlm.StopToolUse || usos.Length != 1 || usos[0].Nome != "sugerir_receita")
             throw new UseCaseValidationException("A IA não retornou uma receita completa para revisão. Tente novamente ou monte manualmente.");

@@ -129,8 +129,8 @@
    reabre o mesmo atendimento, o fio precisa mostrar onde um terminou e o
    próximo começou. Linha fina com rótulo, sem virar balão de mensagem. */
 .divisoriaAtendimento {
-  display: flex; align-items: center; gap: var(--e-2); margin: var(--e-4) 0;
-  color: var(--tinta-3); font-size: var(--t-micro); text-transform: uppercase; letter-spacing: .04em;
+ display: flex; align-items: center; gap: var(--e-2); margin: var(--e-4) 0;
+ color: var(--tinta-3); font-size: var(--t-micro); 
 }
 .divisoriaAtendimento::before, .divisoriaAtendimento::after {
   content: ''; flex: 1 1 auto; height: var(--b-1); background: var(--linha);
@@ -572,10 +572,13 @@
   font-size: var(--t-apoio); font-weight: 600; color: var(--tinta-2);
 }
 .chamarCliente {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--e-2);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2);
   padding: var(--e-2) var(--e-3); border-top: var(--b-1) solid var(--linha);
 }
 .chamarClienteNome { min-width: 0; overflow-wrap: anywhere; font-size: var(--t-apoio); color: var(--tinta-2); }
+/* #2871: "Novo pedido" ao lado de "Chamar no WhatsApp"; na lista estreita os dois descem juntos para a linha de baixo. */
+.chamarClienteAcoes { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.chamarClienteErro { margin: 0; padding: var(--e-2) var(--e-3); color: var(--alerta); font-size: var(--t-apoio); font-weight: 600; }
 
 /* #2232 (A2): a transferência diz quem passou e por quê; a frase longa fica no title.
    #2420: a faixa vira um cartão âmbar com ícone, título, motivo e o Assumir dentro dele, à direita.

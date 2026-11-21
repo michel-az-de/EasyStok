@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 // Prova da issue #2246: cantos arredondados no Console, pela regra da banca UX/UI de 04/11.
-// 8 px em cartões e botões, 999 px em chips, avatares e contadores, e canto de direção no balão.
+// Raio por papel (#2864: 6 px controle, 10 px cartão, 14 px painel), 999 px em chips, avatares e contadores, e canto de direção no balão.
 //
 //   node ferramentas/prova-2246-cantos.mjs
 
@@ -23,8 +23,8 @@ const confere = (descricao, fn) => {
 const tokens = fonte('estilos/tokens.css')
 const atendimento = fonte('features/atendimento/atendimento.module.css')
 
-confere('tokens: 8 px em controle, cartão e painel; 999 px na pílula; 2 px na ponta', () => {
-  for (const nome of ['r-1', 'r-2', 'r-3']) assert.equal(token(tokens, nome), '8px', `--${nome}`)
+confere('tokens: raio por papel (#2864: 6, 10 e 14 px); 999 px na pílula; 2 px na ponta', () => {
+  for (const [nome, valor] of [['r-1', '6px'], ['r-2', '10px'], ['r-3', '14px']]) assert.equal(token(tokens, nome), valor, `--${nome}`)
   assert.equal(token(tokens, 'r-pilula'), '999px')
   assert.equal(token(tokens, 'r-ponta'), '2px')
 })
@@ -53,7 +53,7 @@ confere('avatar e chip seguem em pílula', () => {
 confere('contadores, pontos, chips, selos e tags dos módulos em pílula', () => {
   const pilulas = [
     ['features/caixa-de-entrada/caixa.module.css', ['.pontoOrdem', '.chipFiltro', '.pontoPrecisa']],
-    ['features/cozinha/cozinha.module.css', ['.pontoVivo', '.aoVivoLigado .pontoVivo::after']],
+    ['features/cozinha/cozinha.module.css', ['.pontoVivo']],
     ['features/ficha-cliente/cliente.module.css', ['.seloCaptado', '.seloPontos', '.seloInformado']],
     ['features/ficha-cliente/ficha.module.css', ['.tagsCliente li']],
     ['features/lembretes/lembretes.module.css', ['.ponto', 'button.pilula']],

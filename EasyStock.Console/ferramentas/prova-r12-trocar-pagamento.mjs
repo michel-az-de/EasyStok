@@ -169,8 +169,10 @@ confere('trilha: nota de sistema na conversa e cobrança nova ao cliente', () =>
   const msgs = valeParaPix.conversas[0].mensagens
   const sistema = msgs.filter((m) => m.dir === 'sistema').at(-1)
   assert.match(sistema.texto, /Forma de pagamento alterada de vale para Pix/)
-  const cliente = msgs.filter((m) => m.dir === 'out').at(-1)
-  assert.match(cliente.texto, /https:\/\/pix\.exemplo\/1/)
+  // #2962: o Pix sai em dois balões. A legenda diz o prazo; o último balão é SÓ o copia e cola.
+  const [legenda, codigo] = msgs.filter((m) => m.dir === 'out').slice(-2)
+  assert.match(legenda.texto, /Pague em até 30 min pelo Pix abaixo/)
+  assert.equal(codigo.texto, 'copia-pix')
 })
 
 confere('Pix pendente vira vale: cobra na entrega e o pedido entra na cozinha', () => {

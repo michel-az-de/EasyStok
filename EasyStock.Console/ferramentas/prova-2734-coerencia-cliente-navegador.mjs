@@ -96,7 +96,7 @@ const base = `${process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'}/.build/
 try {
   // O atalho da Ficha do Atendimento abre o cadastro e sai do endereço.
   await pagina.goto(`${base}#/m/cadastros/clientes/${ID}`)
-  let editor = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  let editor = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   assert.equal(new URL(pagina.url()).hash, '#/m/cadastros/clientes', 'o atalho sai do endereço depois de abrir o cadastro')
   await pagina.locator('table > caption').waitFor({ state: 'attached' })
   assert.equal(await pagina.locator('table > caption').textContent(), 'Leads e clientes', 'a tabela tem nome')
@@ -250,7 +250,7 @@ try {
 
   // Salvar o cadastro relê a conversa carregada desse cliente, mesmo sem ela estar selecionada.
   await pagina.evaluate(id => { window.location.hash = `#/m/cadastros/clientes/${id}` }, ID)
-  editor = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  editor = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   await editor.getByRole('textbox', { name: 'Observações', exact: true }).fill('Portão verde.')
   await editor.getByRole('button', { name: 'Salvar cadastro', exact: true }).click()
   await editor.waitFor({ state: 'detached' })
@@ -261,7 +261,7 @@ try {
   // A primeira leitura que falha diz o que houve e deixa tentar de novo; o resto do cadastro continua na tela.
   falharDossie = true
   await pagina.evaluate(id => { window.location.hash = `#/m/cadastros/clientes/${id}` }, ID)
-  editor = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  editor = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   const falha = editor.getByRole('alert').filter({ hasText: 'Fora do ar.' }); await falha.waitFor()
   assert.equal(await editor.getByRole('textbox', { name: 'Nome', exact: true }).inputValue(), 'Marina Teste')
   falharDossie = false

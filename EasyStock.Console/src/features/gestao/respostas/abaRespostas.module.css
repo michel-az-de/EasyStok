@@ -39,6 +39,7 @@
   grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2);
   overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere;
 }
+.textoDaLinha { grid-column: 1 / -1; display: flex; flex-direction: column; gap: var(--e-1); }
 .textoInteiro { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--tinta-2); white-space: pre-line; }
 .quando { grid-column: 1 / -1; font-size: var(--t-micro); color: var(--tinta-3); }
 .semTexto { grid-column: 1 / -1; font-size: var(--t-apoio); color: var(--alerta); }
@@ -52,6 +53,7 @@
 .form { display: grid; gap: var(--e-3); padding: var(--e-2) 0; }
 .duas { display: grid; gap: var(--e-3); grid-template-columns: 2fr 1fr; }
 .acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.rotuloPrevia { margin: 0; font-size: var(--t-apoio); color: var(--tinta-3); }
 .alerta { grid-column: 1 / -1; margin: 0; font-size: var(--t-apoio); color: var(--alerta); }
 .vazio { margin: 0; font-size: var(--t-apoio); color: var(--tinta-2); }
 

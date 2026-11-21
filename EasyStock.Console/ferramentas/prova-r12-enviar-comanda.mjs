@@ -131,7 +131,8 @@ confere('reducer: enviar com vale põe o pedido na cozinha na hora', () => {
 confere('reducer: enviar com Pix manda resumo e cobrança ao cliente e espera o pagamento', () => {
   const depois = enviar(inicio, { identificador: 'tx1', copiaECola: 'cc', link: 'https://pix', meio: 'pix' })
   const c = depois.conversas[0]
-  assert.equal(c.mensagens.filter((m) => m.dir === 'out').length, 2)
+  // #2962: resumo, legenda da cobrança e o balão só com o copia e cola.
+  assert.equal(c.mensagens.filter((m) => m.dir === 'out').length, 3)
   assert.equal(pedidosNaCozinha(depois.conversas).length, 0)
   assert.equal(situacaoDoEnvio(c.pedido).chave, 'enviada')
 })

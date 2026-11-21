@@ -72,7 +72,7 @@ await confere('2. automático ligado: "Automático"', () => {
   const e = linha.estadoDaLinha(conversa(), { pausado: false })
   assert.equal(e.chave, 'automatico')
   assert.equal(e.texto, 'Assistente')
-  assert.equal(e.icone, 'sparkles')
+  assert.equal(e.icone, 'agente')
 })
 await confere('2. ela assumiu ou escreveu: "Com você"', () => {
   assert.equal(linha.estadoDaLinha(conversa(), { pausado: PAUSA_POR_ASSUMIR }).texto, 'Com você')
@@ -207,6 +207,14 @@ await confere('6. alternar recolhe e abre de novo, sem mexer nas outras seções
   const um = recolhidos.alternarRecolhido({ historico: true }, 'tags')
   assert.deepEqual(um, { historico: true, tags: true })
   assert.deepEqual(recolhidos.alternarRecolhido(um, 'tags'), { historico: true, tags: false })
+})
+
+// --- 7. Vazio da busca (#2923) ----------------------------------------------------
+// O vazio mede só as conversas; o cliente cadastrado sem conversa aparece logo abaixo (ChamarClientes).
+await confere('7. vazio da busca diz "Nenhuma conversa com", não "Nada com"', () => {
+  const painel = readFileSync(new URL('../src/features/caixa-de-entrada/PainelConversas.jsx', import.meta.url), 'utf8')
+  assert.match(painel, /`Nenhuma conversa com "\$\{filtros\.busca\.trim\(\)\}"\.`/)
+  assert.doesNotMatch(painel, /Nada com "/)
 })
 
 console.log(`\n${passou} ok, ${falhas.length} falha(s)`)

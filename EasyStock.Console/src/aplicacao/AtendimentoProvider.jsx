@@ -398,6 +398,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
   const valor = useMemo(() => {
     const selecionada = estado.conversas.find((c) => c.id === estado.selecionadaId) ?? null
     const usuario = FONTE_API ? sessao?.usuario : { nome: ATENDENTE }
+    const idDaJanela = estado.janelaDoPedido?.conversaId
+    const conversasDaFila = idDaJanela ? estado.conversas.filter((c) => c.id !== idDaJanela) : estado.conversas
     return {
       conversas: estado.conversas,
       selecionadaId: estado.selecionadaId,
@@ -411,6 +413,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       agente: estado.agente,
       automaticoPausado: estado.automaticoPausado,
       alertasEstoque: estado.alertasEstoque,
+      // #2921: a conversa da janela "Novo pedido" não entra na fila do Balcão.
+      janelaDoPedido: estado.janelaDoPedido ?? null,
       rascunho: estado.rascunhos[estado.selecionadaId] ?? '',
       rascunhosSoNaMemoria, tentarGuardarRascunhos,
       // #1577: carimbo de escrita de fora do campo; é por ele que o campo adota o rascunho global.
@@ -421,7 +425,7 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       // diferente da que está no topo da lista (achado da auditoria QA5).
       visiveis: ordenarBalcao(
         conversasDoBalcao(
-          estado.conversas, estado.filtros, agoraEfetivo, estado.automaticoPausado, aberta, estado.catalogo.janelas,
+          conversasDaFila, estado.filtros, agoraEfetivo, estado.automaticoPausado, aberta, estado.catalogo.janelas,
           horarioDaLoja, usuario,
         ),
         agoraEfetivo,
@@ -437,8 +441,8 @@ export function AtendimentoProvider({ agora, sessao = null, atendimentoAtivo = t
       // Os dois grupos recolhidos do fim de "Todas" (seção 1): mesmo canal e
       // busca da lista de cima, sem aba, porque nenhum dos dois existe em
       // "Precisa de você".
-      encerradasDoBalcao: conversasEncerradasDoBalcao(estado.conversas, estado.filtros, usuario),
-      bloqueadasDoBalcao: conversasBloqueadasDoBalcao(estado.conversas, estado.filtros, usuario),
+      encerradasDoBalcao: conversasEncerradasDoBalcao(conversasDaFila, estado.filtros, usuario),
+      bloqueadasDoBalcao: conversasBloqueadasDoBalcao(conversasDaFila, estado.filtros, usuario),
       historico: selecionada ? historicoComPedidoVivo(selecionada.cliente?.historico ?? (demonstracao ? demonstracao.carregarHistorico(selecionada.id) : []), selecionada.pedido) : [],
       ultimoAvanco: estado.ultimoAvanco,
       // Lote de papel (US-042): banner de queda e a modal de lançamento leem
