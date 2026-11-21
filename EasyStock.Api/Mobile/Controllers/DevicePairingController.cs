@@ -54,9 +54,15 @@ public class DevicePairingController(
         return await unitOfWork.ExecuteInTransactionSemRetryAsync<IActionResult>(async token =>
         {
             // Ordem única: aparelho, depois família. A revogação administrativa usa a mesma ordem.
-            var device = await _db.Set<MobileDevice>()
-                .FromSqlInterpolated($"SELECT * FROM mobile_devices WHERE \"Id\" = {req.DispositivoId} FOR UPDATE")
-                .IgnoreQueryFilters().SingleOrDefaultAsync(token);
+            // O id do aparelho é global: o lock enxerga o vínculo de outra empresa para responder
+            // CONTEXTO_DIVERGENTE em vez de tentar um INSERT que a PK recusa (#2180). Bypass só neste lookup.
+            MobileDevice? device;
+            await using (await _db.UseRowLevelSecurityBypassAsync(token))
+            {
+                device = await _db.Set<MobileDevice>()
+                    .FromSqlInterpolated($"SELECT * FROM mobile_devices WHERE \"Id\" = {req.DispositivoId} FOR UPDATE")
+                    .IgnoreQueryFilters().SingleOrDefaultAsync(token);
+            }
             var sessao = await tokens.ObterSessaoNativaComLockAsync(sid);
             if (sessao is null || sessao.RevogadaEm is not null || sessao.UsuarioId != usuarioId
                 || sessao.EmpresaId != _currentUser.EmpresaId || sessao.DispositivoId != req.DispositivoId)
@@ -779,6 +785,10 @@ public class DevicePairingController(
 
         return await _db.ExecuteInTransactionSemRetryAsync<IActionResult>(async token =>
         {
+            // A autorização acima já limitou o gerente à própria empresa. O SuperAdmin revoga aparelho de
+            // outra (#2184), que a RLS de mobile_devices (#2180) esconderia: bypass só nesta transação,
+            // com leitura e escrita presas ao id do aparelho.
+            await using var rlsDoAparelho = await _db.UseRowLevelSecurityBypassAsync(token);
             var device = await _db.Set<MobileDevice>()
                 .FromSqlInterpolated($"SELECT * FROM mobile_devices WHERE \"Id\" = {id} FOR UPDATE").SingleOrDefaultAsync(token);
             if (device == null) return NotFound();

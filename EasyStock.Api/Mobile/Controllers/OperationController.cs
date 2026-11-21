@@ -396,6 +396,9 @@ public class OperationController(
         }
         if (device.SessaoNativaId is { } sessaoId)
         {
+            // Stream anônimo: sem o tenant do aparelho, a RLS de mobile_devices (#2180) zera a revalidação
+            // abaixo e todo SSE de sessão nativa cairia em 401.
+            _db.SetMobileTenantContext(device.EmpresaId);
             var validador = HttpContext.RequestServices.GetRequiredService<EasyStock.Api.Authentication.ValidadorSessaoUsuario>();
             async Task<bool> AindaValida(CancellationToken cancelamento) =>
                 await validador.ValidarNativaAsync(sessaoId, device.Id, device.EmpresaId)

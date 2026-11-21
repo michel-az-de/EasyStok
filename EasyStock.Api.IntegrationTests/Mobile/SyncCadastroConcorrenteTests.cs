@@ -33,6 +33,7 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
         using (var scope = fixture.Factory!.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
             db.AddRange(
                 new Product { Id = id, Name = "Cadastro protegido", Stock = 7, EmpresaId = empresaA, LojaId = lojaA },
                 new Product { Id = saldoId, Name = "Saldo local", Stock = 5, EmpresaId = empresaB, LojaId = lojaB });
@@ -52,6 +53,7 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
         resultado.AcceptedIds.Should().Equal(deltaDoSaldo);
         using var check = fixture.Factory!.Services.CreateScope();
         var leitura = check.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls_leitura = leitura.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         var protegido = await leitura.Set<Product>().IgnoreQueryFilters().SingleAsync(p => p.Id == id);
         protegido.EmpresaId.Should().Be(empresaA);
         protegido.LojaId.Should().Be(lojaA);
@@ -86,6 +88,7 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
         aplicacoes.Should().Be(1, "o dispatcher nao pode ser reaplicado automaticamente");
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         (await db.Set<Product>().IgnoreQueryFilters().AnyAsync(p => p.Id == id)).Should().BeFalse();
         (await db.MobileProcessedMutations.IgnoreQueryFilters().AnyAsync(m => m.MutationId == mutation.Id)).Should().BeFalse();
     }
@@ -107,6 +110,7 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
             empresaB = empresaA;
             using var scope = fixture.Factory!.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
             var loja = new Loja { Id = Guid.NewGuid(), EmpresaId = empresaA, Nome = "Segunda loja da corrida", Ativa = true };
             db.Lojas.Add(loja);
             await db.SaveChangesAsync();
@@ -120,6 +124,7 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
         using (var scope = fixture.Factory!.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
             db.AddRange(
                 new Product { Id = saldoA, Name = "Saldo A", Stock = 5, EmpresaId = empresaA, LojaId = lojaA },
                 new Product { Id = saldoB, Name = "Saldo B", Stock = 5, EmpresaId = empresaB, LojaId = lojaB });
@@ -182,6 +187,7 @@ public sealed class SyncCadastroConcorrenteTests(MobileE2EFixture fixture)
         {
             using var scope = fixture.Factory!.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+            using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
             var saldos = await db.Set<Product>().IgnoreQueryFilters().AsNoTracking()
                 .Where(p => p.Id == saldoA || p.Id == saldoB).ToDictionaryAsync(p => p.Id);
             saldos[saldoA].Stock.Should().Be(7);

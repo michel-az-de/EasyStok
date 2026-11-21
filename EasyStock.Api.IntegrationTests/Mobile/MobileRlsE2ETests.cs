@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using EasyStock.Domain.Entities;
+using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +26,7 @@ public class MobileRlsE2ETests(MobileE2EFixture fixture)
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
 
         var privilegiado = await db.Database.SqlQueryRaw<bool>(
             "SELECT rolsuper OR rolbypassrls AS \"Value\" FROM pg_roles WHERE rolname = current_user").SingleAsync();
@@ -71,6 +74,60 @@ public class MobileRlsE2ETests(MobileE2EFixture fixture)
         Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
         var resp = await fixture.CreateMobileClient("tk-inexistente").GetAsync("/api/mobile/sync/pull?since=0&deviceId=x");
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    /// <summary>
+    /// Aparelho com sessão nativa (login pelo app, #2184): o filtro da API key e o SSE revalidam a
+    /// família e o aparelho antes de existir tenant. Sob RLS essa revalidação não pode cair em 401 nem
+    /// deixar passar a sessão revogada.
+    /// </summary>
+    [SkippableFact]
+    public async Task Aparelho_com_sessao_nativa_sincroniza_abre_o_SSE_e_cai_quando_a_sessao_e_revogada()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresa, loja) = await fixture.SeedEmpresaELojaAsync();
+        var aparelho = await fixture.SeedMobileDeviceAsync(empresa, loja);
+        var sessao = Guid.NewGuid();
+        await ComoSuporteAsync(async db =>
+        {
+            var usuario = Usuario.Criar("Ana", $"ana-{Guid.NewGuid():N}@rls.test", "hash");
+            usuario.Empresas.Add(new UsuarioEmpresa { UsuarioId = usuario.Id, EmpresaId = empresa, Ativo = true });
+            db.AddRange(usuario, new SessaoNativa
+            {
+                Id = sessao, UsuarioId = usuario.Id, EmpresaId = empresa, DispositivoId = aparelho.DeviceId,
+                CriadaEm = DateTime.UtcNow.AddMinutes(-1),
+            });
+            await db.SaveChangesAsync();
+            await db.Set<MobileDevice>().Where(d => d.Id == aparelho.DeviceId)
+                .ExecuteUpdateAsync(u => u.SetProperty(d => d.SessaoNativaId, sessao));
+        });
+
+        (await PullIdsAsync(aparelho)).Should().BeEmpty();
+        (await AbrirSseAsync(aparelho)).Should().Be(HttpStatusCode.OK, "o SSE da sessão nativa revalida o aparelho sob RLS");
+
+        await ComoSuporteAsync(async db => (await db.Set<SessaoNativa>().IgnoreQueryFilters().Where(s => s.Id == sessao)
+            .ExecuteUpdateAsync(u => u.SetProperty(s => s.RevogadaEm, DateTime.UtcNow))).Should().Be(1));
+
+        (await fixture.CreateMobileClient(aparelho.ApiKey).GetAsync($"/api/mobile/sync/pull?since=0&deviceId={aparelho.DeviceId}"))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized, "sessão revogada derruba a API key nativa");
+        (await AbrirSseAsync(aparelho)).Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task<HttpStatusCode> AbrirSseAsync(MobileDeviceCredentials device)
+    {
+        using var limite = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var http = fixture.CreateClient();
+        using var resp = await http.GetAsync($"/api/mobile/operation/stream?apiKey={device.ApiKey}",
+            HttpCompletionOption.ResponseHeadersRead, limite.Token);
+        return resp.StatusCode;
+    }
+
+    private async Task ComoSuporteAsync(Func<EasyStockDbContext, Task> acao)
+    {
+        using var scope = fixture.Factory!.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste semeia entre empresas
+        await acao(db);
     }
 
     private async Task<List<string>> PullIdsAsync(MobileDeviceCredentials device)

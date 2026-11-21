@@ -8,6 +8,7 @@ using EasyStock.Application.UseCases.EstornarMovimentoCaixa;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Security;
 
 namespace EasyStock.Api.Mobile.Services;
 
@@ -137,6 +138,17 @@ public class SyncMutationDispatcher(
         throw new InvalidOperationException("LEGACY_HISTORY_READ_ONLY: pedido historico importado; apenas conferencia e entrega de um pedido pronto, sem alterar itens/cliente e com pagamento informado na entrega, podem continuar automaticamente.");
     }
 
+    /// <summary>
+    /// O id do cadastro é global e a RLS (#2180) esconde a linha de outra empresa. Sem esta checagem sob
+    /// bypass o INSERT bate na PK e o lote inteiro volta 409. Só a existência sai do bypass, nenhum dado.
+    /// </summary>
+    private async Task<bool> ExisteEmOutraEmpresaAsync<T>(string id, Guid? empresaId) where T : class
+    {
+        await using var rls = await _db.UseRowLevelSecurityBypassAsync();
+        return await _db.Set<T>().AsNoTracking()
+            .AnyAsync(x => EF.Property<string>(x, "Id") == id && EF.Property<Guid?>(x, "EmpresaId") != empresaId);
+    }
+
     private async Task ApplyProduct(MutationDto m, string deviceId, string? operatorName,
         Guid? empresaId, Guid? lojaId)
     {
@@ -147,7 +159,8 @@ public class SyncMutationDispatcher(
         // Auditoria 2026-04-30 (CRITICAL fix): tenant guard.
         // FindAsync enxerga o produto criado neste mesmo lote, ainda nao salvo.
         var existing = await _db.Set<Product>().FindAsync(dto.Id);
-        if (existing != null && existing.EmpresaId != empresaId)
+        if (existing != null && existing.EmpresaId != empresaId
+            || existing is null && await ExisteEmOutraEmpresaAsync<Product>(dto.Id, empresaId))
             throw new CadastroDeOutraEmpresaException();
 
         // Onda 5: conflict detection. Tolerância de 2s pra clock skew.
@@ -236,7 +249,7 @@ public class SyncMutationDispatcher(
         var existing = await _db.Set<Client>()
             .FirstOrDefaultAsync(c => c.Id == dto.Id && c.EmpresaId == empresaId);
         // Id global: verifica apenas a existencia, sem carregar dados de outro tenant.
-        if (existing is null && await _db.Set<Client>().AnyAsync(c => c.Id == dto.Id && c.EmpresaId != empresaId))
+        if (existing is null && await ExisteEmOutraEmpresaAsync<Client>(dto.Id, empresaId))
             throw new CadastroDeOutraEmpresaException();
         var lastOrderDate = DateTimeOffset.FromUnixTimeMilliseconds(dto.LastOrder).UtcDateTime;
         if (existing == null)

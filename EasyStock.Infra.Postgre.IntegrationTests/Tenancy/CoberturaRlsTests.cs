@@ -70,33 +70,35 @@ public sealed class CoberturaRlsTests(PostgreSqlDatabaseFixture fixture)
     }
 
     /// <summary>
-    /// Tabelas <c>mobile_*</c> sem coluna de empresa (#2180): filhas por FK dos lotes e pedidos. Ficam fora
-    /// da policy por não terem como filtrar; tabela Mobile nova sem empresa precisa entrar aqui de propósito.
-    /// As <c>mobile_push_*</c> (avisos pré-pareamento, também sem empresa) nascem só pelo SQL
-    /// <c>013_AddPushReceipts.sql</c> do Mobile, fora das migrations, e não aparecem neste banco.
+    /// Tabelas <c>mobile_*</c> sem coluna de empresa e sem policy (#2180). Só as <c>mobile_push_*</c>:
+    /// avisos pré-pareamento por instalação (chave pública, token e recibo assinado), sem dado de loja.
+    /// As filhas <c>mobile_order_items</c> e <c>mobile_batch_items</c> guardam dado de loja e recebem a
+    /// policy pela tabela mãe. Tabela Mobile nova sem policy precisa entrar aqui de propósito.
     /// </summary>
-    private static readonly string[] MobileSemEmpresa = ["mobile_batch_items", "mobile_order_items"];
+    private static readonly string[] MobileGlobaisSemPolicy =
+        ["mobile_push_installations", "mobile_push_messages", "mobile_push_provider_events", "mobile_push_receipts"];
 
     [SkippableFact]
-    public async Task TabelaMobileSemEmpresaEstaNaListaExplicita()
+    public async Task TabelaMobileSemPolicyEstaNaListaExplicita()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
         await using var db = fixture.CreateDbContext();
 
-        var semEmpresa = await db.Database.SqlQueryRaw<string>("""
+        var semPolicy = await db.Database.SqlQueryRaw<string>("""
             SELECT c.relname AS "Value"
             FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
             WHERE n.nspname = current_schema()
               AND c.relkind = 'r'
               AND c.relname LIKE 'mobile\_%'
-              AND NOT EXISTS (SELECT 1 FROM information_schema.columns col
-                              WHERE col.table_schema = n.nspname AND col.table_name = c.relname
-                                AND col.column_name IN ('EmpresaId', 'empresa_id'))
+              AND NOT (c.relrowsecurity AND c.relforcerowsecurity
+                       AND EXISTS (SELECT 1 FROM pg_policies p
+                                   WHERE p.schemaname = n.nspname AND p.tablename = c.relname
+                                     AND p.policyname = 'tenant_isolation'))
             ORDER BY c.relname
             """).ToListAsync();
 
-        semEmpresa.Should().BeEquivalentTo(MobileSemEmpresa,
-            "tabela mobile_ sem coluna de empresa fica sem RLS e precisa ser decisão explícita");
+        semPolicy.Should().BeSubsetOf(MobileGlobaisSemPolicy,
+            "tabela mobile_ sem RLS forçada e tenant_isolation precisa ser decisão explícita");
     }
 }

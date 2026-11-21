@@ -81,6 +81,74 @@ public class MobileRowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
         await inserirEmB.Should().ThrowAsync<Npgsql.PostgresException>().Where(ex => ex.SqlState == "42501");
     }
 
+    /// <summary>
+    /// Itens de pedido e de lote não têm coluna de empresa, mas guardam dado de loja (nome, quantidade,
+    /// preço). A policy deles segue a tabela mãe: só aparece o item cujo pedido ou lote o tenant enxerga.
+    /// </summary>
+    [SkippableTheory]
+    [InlineData("mobile_order_items", "order_id", "ped")]
+    [InlineData("mobile_batch_items", "batch_id", "lote")]
+    public async Task Itens_sem_coluna_de_empresa_seguem_a_tabela_mae(string tabela, string fk, string prefixo)
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        var (a, _) = await SeedDuasEmpresasComDadosMobileAsync();
+
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
+        (await ContarAsync(ctx, tabela)).Should().Be(0, $"{tabela} é fail-closed sem app.empresa_id");
+
+        await DefinirTenantAsync(ctx, a);
+        var ler = $"SELECT {fk} AS \"Value\" FROM {tabela}";
+        var maes = await ctx.Database.SqlQueryRaw<string>(ler).ToListAsync();
+        maes.Should().Equal([$"{prefixo}-a"], $"{tabela} não pode devolver item de outra empresa");
+
+        var invadir = $"INSERT INTO {tabela} ({fk}, product_id, \"Name\", \"Qty\") VALUES ('{prefixo}-b', 'prod-b', 'Invasor', 1)";
+        var inserirEmB = async () => await ctx.Database.ExecuteSqlRawAsync(invadir);
+        await inserirEmB.Should().ThrowAsync<Npgsql.PostgresException>().Where(ex => ex.SqlState == "42501");
+
+        await ctx.Database.ExecuteSqlRawAsync("SET app.bypass_rls = 'true'");
+        (await ContarAsync(ctx, tabela)).Should().Be(2, $"o bypass da allowlist lê {tabela} das duas empresas");
+    }
+
+    /// <summary>
+    /// A validação da sessão nativa roda antes do tenant (hook do JWT e filtro da API key). Sem bypass,
+    /// a RLS esconde o aparelho e a revogação deixaria de valer em silêncio.
+    /// </summary>
+    [SkippableFact]
+    public async Task Sessao_nativa_enxerga_o_aparelho_revogado_sem_tenant()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await SeedDuasEmpresasComDadosMobileAsync();
+        await using (var seed = fixture.CreateDbContext())
+            await seed.Database.ExecuteSqlRawAsync("UPDATE mobile_devices SET revoked = true WHERE \"Id\" = 'dev-a'");
+
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
+        var tokens = new EasyStock.Infra.Postgre.Repositories.RefreshTokenRepository(ctx);
+
+        (await tokens.DispositivoRevogadoAsync("dev-a")).Should().BeTrue("o aparelho revogado não pode passar por invisível");
+        (await tokens.DispositivoRevogadoAsync("dev-b")).Should().BeFalse();
+        (await ContarAsync(ctx, "mobile_devices")).Should().Be(0, "o bypass acaba junto com a leitura");
+    }
+
+    [SkippableFact]
+    public async Task Trava_do_aparelho_no_login_nativo_pega_a_linha_sem_tenant()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL unavailable");
+        await SeedDuasEmpresasComDadosMobileAsync();
+
+        await using var ctx = fixture.CreateRlsClientDbContext();
+        await ctx.Database.OpenConnectionAsync();
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        await new EasyStock.Infra.Postgre.Repositories.RefreshTokenRepository(ctx).TravarDispositivoAsync("dev-a");
+
+        await using var outro = fixture.CreateDbContext();
+        var concorrente = async () => await outro.Database.ExecuteSqlRawAsync(
+            "SELECT 1 FROM mobile_devices WHERE \"Id\" = 'dev-a' FOR UPDATE NOWAIT");
+
+        await concorrente.Should().ThrowAsync<Npgsql.PostgresException>().Where(ex => ex.SqlState == "55P03");
+    }
+
     [SkippableFact]
     public async Task Down_da_migracao_desliga_a_RLS_das_tabelas_mobile()
     {
@@ -146,6 +214,16 @@ public class MobileRowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
             seed.Set<DeviceCommand>().Add(new DeviceCommand
             {
                 Id = Guid.NewGuid(), DeviceId = $"dev-{sufixo}", EmpresaId = empresa, CommandType = "ping",
+            });
+            seed.Set<Order>().Add(new Order
+            {
+                Id = $"ped-{sufixo}", ClientSnapshotName = $"Cliente {sufixo}", EmpresaId = empresa,
+                Items = [new OrderItem { ProductId = $"prod-{sufixo}", Name = $"Produto {sufixo}", Qty = 1, UnitPrice = 10 }],
+            });
+            seed.Set<Batch>().Add(new Batch
+            {
+                Id = $"lote-{sufixo}", Code = $"L-{sufixo}", EmpresaId = empresa,
+                Items = [new BatchItem { ProductId = $"prod-{sufixo}", Name = $"Produto {sufixo}", Qty = 1 }],
             });
         }
 

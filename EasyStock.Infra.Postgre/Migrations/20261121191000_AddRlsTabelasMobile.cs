@@ -11,8 +11,9 @@ namespace EasyStock.Infra.Postgre.Migrations
     /// coluna de cada tabela: <c>empresa_id</c> nas oito do SQL do Mobile e <c>"EmpresaId"</c> em
     /// <c>mobile_processed_mutations</c>. Idempotente (ENABLE/FORCE no-op se ligados, DROP IF EXISTS
     /// antes do CREATE) e fail-closed sem tenant: linha com empresa NULL só aparece com bypass.
-    /// Tabelas <c>mobile_*</c> sem empresa (itens e push) ficam fora; a lista explícita está em
-    /// <c>CoberturaRlsTests</c>.
+    /// As filhas sem coluna de empresa (<c>mobile_order_items</c> e <c>mobile_batch_items</c>) guardam
+    /// dado de loja e recebem a policy pela tabela mãe. Só as <c>mobile_push_*</c> ficam fora (avisos
+    /// pré-pareamento, sem dado de loja); a lista explícita está em <c>CoberturaRlsTests</c>.
     /// </summary>
     public partial class AddRlsTabelasMobile : Migration
     {
@@ -51,6 +52,23 @@ BEGIN
                 )
         $pol$, rec.table_schema, rec.table_name, rec.column_name, rec.column_name);
     END LOOP;
+
+    -- Filhas sem coluna de empresa, com dado de loja: a linha só aparece se a mãe aparece. O EXISTS
+    -- passa pela policy da mãe (tenant ou bypass), então não repete a regra aqui.
+    FOR rec IN
+        SELECT * FROM (VALUES ('mobile_order_items', 'order_id', 'mobile_orders'),
+                              ('mobile_batch_items', 'batch_id', 'mobile_batches')) AS f(table_name, column_name, mae)
+        WHERE to_regclass(format('%I.%I', current_schema(), f.table_name)) IS NOT NULL
+    LOOP
+        EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY', current_schema(), rec.table_name);
+        EXECUTE format('ALTER TABLE %I.%I FORCE ROW LEVEL SECURITY', current_schema(), rec.table_name);
+        EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I.%I', current_schema(), rec.table_name);
+        EXECUTE format($pol$
+            CREATE POLICY tenant_isolation ON %1$I.%2$I
+                USING (EXISTS (SELECT 1 FROM %1$I.%4$I m WHERE m."Id" = %3$I))
+                WITH CHECK (EXISTS (SELECT 1 FROM %1$I.%4$I m WHERE m."Id" = %3$I))
+        $pol$, current_schema(), rec.table_name, rec.column_name, rec.mae);
+    END LOOP;
 END
 $rls$;
 """);
@@ -78,6 +96,15 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I.%I', rec.table_schema, rec.table_name);
         EXECUTE format('ALTER TABLE %I.%I NO FORCE ROW LEVEL SECURITY', rec.table_schema, rec.table_name);
         EXECUTE format('ALTER TABLE %I.%I DISABLE ROW LEVEL SECURITY', rec.table_schema, rec.table_name);
+    END LOOP;
+
+    FOR rec IN
+        SELECT c.relname AS table_name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = current_schema() AND c.relkind = 'r' AND c.relname IN ('mobile_order_items', 'mobile_batch_items')
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I.%I', current_schema(), rec.table_name);
+        EXECUTE format('ALTER TABLE %I.%I NO FORCE ROW LEVEL SECURITY', current_schema(), rec.table_name);
+        EXECUTE format('ALTER TABLE %I.%I DISABLE ROW LEVEL SECURITY', current_schema(), rec.table_name);
     END LOOP;
 END
 $rls_down$;

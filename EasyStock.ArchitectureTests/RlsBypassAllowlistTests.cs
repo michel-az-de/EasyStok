@@ -90,6 +90,11 @@ public class RlsBypassAllowlistTests
         // #2184: após autorização de SuperAdmin, revoga só famílias do aparelho+empresa alvo.
         "EasyStock.Api/Mobile/Controllers/DevicePairingController.cs",
         "EasyStock.Infra.Postgre/DependencyInjection/ServiceCollectionExtensions.cs",
+        // #2180: id de cadastro do aparelho é global; o sync só pergunta se ele já existe em outra empresa
+        // para recusar a mutação (#2440) em vez de bater na PK. Nenhum dado de outra empresa sai da checagem.
+        "EasyStock.Api/Mobile/Services/SyncMutationDispatcher.cs",
+        // #2180: a primeira carga legada exige id inédito no servidor inteiro; só a existência é consultada.
+        "EasyStock.Api/Mobile/Services/LegacySnapshotImportService.cs",
 
         // #2184: login Google nativo, renovação e logout são pré-auth; o tenant vem da identidade/segredo
         // validado. O escopo cobre a transação e o INSERT diferido da família, nunca uma requisição tenant genérica.

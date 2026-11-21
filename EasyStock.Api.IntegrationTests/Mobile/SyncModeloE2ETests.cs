@@ -126,6 +126,7 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
         var ontem = DateTime.UtcNow.AddDays(-1);
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste lê e semeia entre empresas
         await db.Set<Product>().IgnoreQueryFilters().Where(p => p.Id == produto)
             .ExecuteUpdateAsync(u => u.SetProperty(p => p.ServerUpdatedAt, ontem));
         await db.Set<Produto>().IgnoreQueryFilters().Where(p => p.Id == produtoErp)

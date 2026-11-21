@@ -7,6 +7,7 @@ using EasyStock.Api.Mobile.Services.Linkers;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Domain.ValueObjects;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Security;
 using MobileOrder = EasyStock.Domain.Entities.Mobile.Order;
 
 namespace EasyStock.Api.Mobile.Services;
@@ -147,6 +148,9 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
     private async Task RequireAbsentAsync<T>(List<JsonElement> rows, CancellationToken ct) where T : class
     {
         var ids = rows.Select(Id).ToList();
+        // Id global: a RLS (#2180) esconderia o id de outra empresa e a carga cairia na guarda do sync
+        // com outro erro. Bypass só nesta checagem de existência, dentro da transação já aberta.
+        await using var rls = await db.UseRowLevelSecurityBypassAsync(ct);
         if (await db.Set<T>().IgnoreQueryFilters().AnyAsync(x => ids.Contains(EF.Property<string>(x, "Id")), ct))
             throw Conflict("Um ou mais IDs do arquivo ja existem no servidor. Nada foi substituido.");
     }
