@@ -31,7 +31,10 @@ public class RegraAutomatica
 
     public void Alterar(string texto, bool ligada, DateTime agora)
     {
-        Texto = RespostaPronta.Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        var novo = RespostaPronta.Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        if (ModeloTextoAtendimento.ChavesDesconhecidas(novo) is { } desconhecidas)
+            throw new RegraDeDominioVioladaException(desconhecidas);
+        Texto = novo;
         Ligada = ligada;
         AlteradaEm = agora;
     }

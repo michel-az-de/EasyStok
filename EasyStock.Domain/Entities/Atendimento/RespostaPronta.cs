@@ -33,9 +33,14 @@ public partial class RespostaPronta
 
     public void Editar(string titulo, string atalho, string texto, DateTime agora)
     {
-        Titulo = Obrigatorio(titulo, "Título", TituloTamanhoMaximo);
-        Atalho = NormalizarAtalho(atalho);
-        Texto = Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        var novoTitulo = Obrigatorio(titulo, "Título", TituloTamanhoMaximo);
+        var novoAtalho = NormalizarAtalho(atalho);
+        var novoTexto = Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
+        if (ModeloTextoAtendimento.ChavesDesconhecidas(novoTexto) is { } desconhecidas)
+            throw new RegraDeDominioVioladaException(desconhecidas);
+        Titulo = novoTitulo;
+        Atalho = novoAtalho;
+        Texto = novoTexto;
         AlteradaEm = agora;
     }
 

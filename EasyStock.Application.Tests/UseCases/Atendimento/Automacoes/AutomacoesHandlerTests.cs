@@ -165,6 +165,26 @@ public class AutomacoesHandlerTests
         await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
 
+    // #2781: a automática que não saiu por falta de valor deixa na conversa uma nota interna que a API devolve.
+    [Fact]
+    public async Task VariavelSemValorDeixaNotaDoMotivoNaConversa()
+    {
+        Regra(GatilhoAutomacao.PagamentoConfirmado, "Pedido {pedido} pago.");
+        Mensagem? gravada = null;
+        await _conversas.AddMensagemAsync(Arg.Do<Mensagem>(m => gravada = m), Arg.Any<CancellationToken>());
+
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, null, null)))
+            .Should().Be(ResultadoAutomacao.VariavelSemValor);
+
+        gravada.Should().NotBeNull("o motivo precisa ficar na conversa, não só no log");
+        gravada!.Autor.Should().Be(AutorMensagem.Sistema);
+        gravada.ExternoId.Should().BeNull("nota interna: nada vai ao canal e o cliente do chat do site não a vê");
+        gravada.Texto.Should().Contain("não saiu").And.Contain("{pedido}");
+        gravada.PodeReenviar.Should().BeFalse();
+        _uow.CommitCount.Should().Be(1);
+        await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
+    }
+
     [Fact]
     public async Task SemConversaPeloIdUsaAMaisRecenteDoCliente()
     {

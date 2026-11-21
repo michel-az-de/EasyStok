@@ -483,7 +483,9 @@ public class NotificarClienteStatusPedidoHandlerTests
 
         await HandlerDoPago(AvisoComChat(), new CanalChatSite()).HandleAsync(Evento(PedidoPagoEvent.TipoEvento, Pago(conversa.Id)), CancellationToken.None);
 
-        _gravadas.Should().ContainSingle().Which.Texto.Should().Contain("Recebemos seu pagamento").And.Contain("Tarde (14h às 18h), 01/10");
+        _gravadas.Should().ContainSingle(m => m.Texto!.Contains("Recebemos seu pagamento")).Which.Texto.Should().Contain("Tarde (14h às 18h), 01/10");
+        // #2781: a automática que não saiu deixa a nota interna do motivo (sem envio ao canal) ao lado do aviso S13.
+        _gravadas.Should().ContainSingle(m => m.Texto!.Contains("não saiu")).Which.ExternoId.Should().BeNull();
     }
 
     [Fact]
