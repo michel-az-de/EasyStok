@@ -31,7 +31,7 @@ scp -r scripts/espelho hostinger:espelho-src
 ssh hostinger 'bash ~/espelho-src/instalar.sh && rm -rf ~/espelho-src'
 ```
 
-A primeira sincronização baixa cerca de 60 MB. Sem o linger (`sudo loginctl enable-linger felipe`), o timer só roda com sessão aberta. O instalador avisa se o linger estiver desligado.
+A primeira sincronização baixa cerca de 60 MB. Sem o linger (`loginctl enable-linger`, sem sudo), o timer só roda com sessão aberta. O instalador avisa se o linger estiver desligado.
 
 ## Deploy com o GitHub fora
 
