@@ -16,7 +16,7 @@ import { horaMono } from '../../dominio/formato'
 import { horaDaLista } from '../../dominio/horaDaLista'
 import css from './caixa.module.css'
 import { classesDoCartao } from './classesDoCartao'
-import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto } from './apresentacaoDoCartao'
+import { marcaDoPedido, mostraEtiquetaDoEstado, motivoResumido, nomeDoCartao, origemNoCartao, rotuloDoCartao, temLinhaDeContexto, ehSeloDeDinheiro } from './apresentacaoDoCartao'
 
 // DEN-06: cobrança vencida repete o aviso do pedido e do lembrete de
 // pagamento em outro lugar da tela, então não pede o vermelho de alarme aqui
@@ -156,7 +156,7 @@ export const CartaoConversa = memo(function CartaoConversa({
         {temLinhaDeContexto({ etiqueta, contexto }) && <span className={css.contextoLinha} title={[etiqueta ? estado.texto : null, ...contexto.map((item) => item.texto)].filter(Boolean).join(' · ')}>
           {etiqueta && <Pilula tamanho="inline" tom={estado.tom} icone={estado.icone ?? undefined} titulo={estado.titulo ?? undefined}>{estado.texto}</Pilula>}
           {contexto.map((item) => (
-            <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined}>{item.texto}</Pilula>
+            <Pilula key={item.chave} tamanho="inline" tom={item.tom ?? 'neutro'} icone={item.icone ?? undefined} className={ehSeloDeDinheiro(item) ? css.seloDinheiro : undefined}>{item.texto}</Pilula>
           ))}
         </span>}
       </span>

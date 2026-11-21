@@ -77,6 +77,9 @@
   font-size: var(--t-micro); line-height: 1.35; height: 1.5em; color: var(--tinta-3); white-space: nowrap;
 }
 
+/* #3009: o selo de dinheiro vai à frente da fileira visível (a etiqueta de estado e o resto seguem, e o que não cabe some, L16). */
+.seloDinheiro { order: -1; }
+
 /* Rodada 10, item 2: selo "novo, não visto" do pagamento, independente do
    sinal verde (RN-25) já ter expirado. Some assim que ela abre a conversa. */
 .pontoNaoVisto {
