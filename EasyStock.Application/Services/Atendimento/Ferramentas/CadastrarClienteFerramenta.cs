@@ -16,6 +16,7 @@ public sealed class CadastrarClienteFerramenta(
     public const string Origem = "assistente";
 
     private const int NomeTamanhoMaximo = 150;
+    private const int NomeMaximoDePalavras = 8;
     private const int EmailTamanhoMaximo = 255;
 
     public string Nome => "cadastrar_cliente";
@@ -49,9 +50,10 @@ public sealed class CadastrarClienteFerramenta(
             return Erro("cliente_nao_identificado");
 
         var gravarEmail = !string.IsNullOrEmpty(email) && string.IsNullOrWhiteSpace(cliente.Email);
-        // O e-mail recebido pela loja é ligado ao cadastro que tem o endereço: o de outra pessoa não entra aqui.
+        // O e-mail recebido pela loja é ligado ao cadastro que tem o endereço: o de outra pessoa não entra aqui. A
+        // resposta é a mesma de "o cadastro já tem e-mail", para a conversa não servir de consulta a quem é cliente.
         if (gravarEmail && await emails.ObterClienteIdPorEmailAsync(contexto.EmpresaId, email!, ct) is { } dono && dono != cliente.Id)
-            return Erro("email_em_uso");
+            gravarEmail = false;
 
         string? situacaoNome = null, situacaoEmail = null;
         if (!string.IsNullOrEmpty(nome))
@@ -85,8 +87,14 @@ public sealed class CadastrarClienteFerramenta(
         || string.Equals(atual!.Trim(), ConversaChatSiteService.NomeSemFormulario, StringComparison.OrdinalIgnoreCase)
         || (!string.IsNullOrWhiteSpace(nomeDoPerfil) && string.Equals(atual.Trim(), nomeDoPerfil.Trim(), StringComparison.Ordinal));
 
+    /// <summary>
+    /// O nome volta no prompt dos próximos turnos e nas mensagens à equipe: quebra de linha, pontuação de frase e
+    /// texto longo não entram, para o campo não carregar instrução.
+    /// </summary>
     private static bool EhNomeDePessoa(string nome) =>
-        nome.Length <= NomeTamanhoMaximo && nome.Count(char.IsLetter) >= 2 && !nome.Any(char.IsDigit) && !nome.Contains('@');
+        nome.Length <= NomeTamanhoMaximo && nome.Count(char.IsLetter) >= 2
+        && nome.All(c => char.IsLetter(c) || c is ' ' or '\'' or '-' or '.')
+        && nome.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= NomeMaximoDePalavras;
 
     private static bool EhEmailValido(string email)
     {
