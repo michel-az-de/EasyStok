@@ -75,8 +75,10 @@ public sealed class AgenteAtendimentoService(
         Mensagem? entradaRetomada = null;
         if (retomada)
         {
-            entradaRetomada = await TentarRetomarAsync(empresaId, conversa, dados.Mensagens, agora, prazoRetomada, ct);
-            if (entradaRetomada is null) return ResultadoTurnoAgente.Ignorado;
+            if (await TentarRetomarAsync(empresaId, dados, agora, prazoRetomada, ct) is not var (relido, entrada))
+                return ResultadoTurnoAgente.Ignorado;
+            // O turno segue com o que foi lido sob o lock: é o histórico em que a retomada foi decidida.
+            (dados, conversa, entradaRetomada) = (relido, relido.Conversa, entrada);
         }
 
         if (PortoesDoAssistente.DaConversa(conversa, agora).Any(e => e.Barra))
@@ -285,14 +287,40 @@ public sealed class AgenteAtendimentoService(
     /// #3068: devolve ao Assistente a conversa que a equipe deixou sem resposta além do prazo. Confere antes todos os
     /// portões menos "quem atende" (é o que a retomada muda): barrando, a conversa fica como a equipe deixou, sem nova
     /// escalada nem aviso. Grava a retomada e a nota interna antes do modelo, porque a proteção do turno relê a situação
-    /// no banco a cada envio.
+    /// no banco a cada envio. Decide com a conversa travada: a equipe responde e assume sob o mesmo lock
+    /// (<see cref="UseCases.Atendimento.Inbox.EnviarMensagemConsoleUseCase"/>), então quem chega depois relê e desiste.
     /// </summary>
-    private async Task<Mensagem?> TentarRetomarAsync(
-        Guid empresaId, Conversa conversa, IReadOnlyList<Mensagem> historico, DateTime agora, TimeSpan prazo, CancellationToken ct)
+    private async Task<(ConversaComMensagens Dados, Mensagem Entrada)?> TentarRetomarAsync(
+        Guid empresaId, ConversaComMensagens lido, DateTime agora, TimeSpan prazo, CancellationToken ct)
     {
-        if (RetomadaDoAssistente.EntradaSemResposta(conversa, historico, agora, prazo) is not { } entrada)
+        // Triagem sem lock: a varredura reenfileira a conversa a cada passada até o prazo vencer.
+        if (RetomadaDoAssistente.EntradaSemResposta(lido.Conversa, lido.Mensagens, agora, prazo) is null)
             return null;
 
+        try
+        {
+            return await unitOfWork.ExecuteInTransactionSemRetryAsync<(ConversaComMensagens, Mensagem)?>(async token =>
+            {
+                if (await conversaRepository.ObterPorIdComLockAsync(empresaId, lido.Conversa.Id, token) is null)
+                    return null;
+                var dados = await conversaRepository.ObterComMensagensAsync(empresaId, lido.Conversa.Id, UltimasMensagens, token);
+                if (dados is null
+                    || RetomadaDoAssistente.EntradaSemResposta(dados.Conversa, dados.Mensagens, agora, prazo) is not { } entrada)
+                    return null;
+                return await RetomarTravadaAsync(empresaId, dados.Conversa, entrada, agora, prazo, token) ? (dados, entrada) : null;
+            }, ct);
+        }
+        catch
+        {
+            // Rollback SQL não limpa as entidades rastreadas: a retomada desfeita não pode vazar para outro commit.
+            unitOfWork.DescartarAlteracoesPendentes();
+            throw;
+        }
+    }
+
+    private async Task<bool> RetomarTravadaAsync(
+        Guid empresaId, Conversa conversa, Mensagem entrada, DateTime agora, TimeSpan prazo, CancellationToken ct)
+    {
         var configuracao = await configuracaoRepository.GetByEmpresaIdAsync(empresaId)
             ?? ConfiguracaoAtendimento.CriarPadrao(empresaId);
         var cliente = conversa.ClienteId is { } clienteId
@@ -311,7 +339,7 @@ public sealed class AgenteAtendimentoService(
             // A marca evita a varredura reavaliar a mesma mensagem a cada passada; a próxima do cliente abre outra chance.
             conversa.DispensarRetomadaPorTempo(entrada.Id);
             await unitOfWork.CommitAsync();
-            return null;
+            return false;
         }
 
         var motivoAnterior = conversa.MotivoEscalada;
@@ -324,7 +352,7 @@ public sealed class AgenteAtendimentoService(
         // Warning: produção só grava de Warning para cima, e a retomada precisa aparecer no log.
         logger.LogWarning("Agente: conversa {ConversaId} retomada pelo Assistente após {Segundos} s sem resposta da equipe.",
             conversa.Id, prazo.TotalSeconds);
-        return entrada;
+        return true;
     }
 
     // A correção e cada efeito disputam a mesma linha. O LLM roda fora da transação;

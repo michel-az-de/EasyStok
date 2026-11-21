@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
@@ -21,12 +22,19 @@ public partial class AgenteAtendimentoServiceTests
 
     private const string Encaminhamento = "Vou encaminhar sua mensagem para a equipe conferir e responder por aqui.";
 
-    private AgenteAtendimentoService CriarServicoComRetomada(int segundos = 60, params IFerramentaAgente[] adicionais) => new(
-        _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
-        [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
-        new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
-        retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = segundos }));
+    private AgenteAtendimentoService CriarServicoComRetomada(int segundos = 60, params IFerramentaAgente[] adicionais)
+    {
+        // A retomada decide dentro de uma transação, com a conversa travada.
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>(), Arg.Any<CancellationToken>())
+            .Returns(c => c.Arg<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>()(c.Arg<CancellationToken>()));
+        return new(
+            _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
+            [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
+            new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
+            _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
+            retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = segundos }));
+    }
 
     private Task<ResultadoTurnoAgente> Retomar(int segundos = 60) =>
         CriarServicoComRetomada(segundos).ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora, retomada: true);
@@ -245,5 +253,45 @@ public partial class AgenteAtendimentoServiceTests
 
         resultado.Should().Be(ResultadoTurnoAgente.Ignorado, "só a varredura da retomada devolve a conversa");
         _conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+    }
+
+    [Fact]
+    public async Task Retomada_EquipeRespondeEnquantoOTurnoDecide_NaoRetomaNemResponde()
+    {
+        var entrada = ClienteEscreveuComAEquipeHa(AlemDoPrazo);
+        // A resposta da atendente entra no banco depois da leitura do turno; quem trava a conversa já a enxerga.
+        var respondeu = false;
+        _conversaRepository.When(r => r.ObterPorIdComLockAsync(_empresaId, _conversa.Id, Arg.Any<CancellationToken>()))
+            .Do(_ =>
+            {
+                if (respondeu) return;
+                respondeu = true;
+                _historico.Add(Mensagem.Saida(_empresaId, _conversa.Id, AutorMensagem.Atendente, Agora,
+                    TipoConteudoMensagem.Texto, "Oi, já te respondo.", "wamid.out11"));
+            });
+
+        var resultado = await Retomar();
+
+        resultado.Should().Be(ResultadoTurnoAgente.Ignorado);
+        _conversa.Situacao.Should().Be(SituacaoConversa.Assumida);
+        _conversa.RetomadaPorTempoDecidida(entrada.Id).Should().BeFalse();
+        _requisicoes.Should().BeEmpty();
+        NotasGravadas().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Retomada_FalhaAoGravar_DescartaOQueFicouPendente()
+    {
+        ClienteEscreveuComAEquipeHa(AlemDoPrazo);
+        var servico = CriarServicoComRetomada();
+        _unitOfWork.ExecuteInTransactionSemRetryAsync(
+                Arg.Any<Func<CancellationToken, Task<(ConversaComMensagens, Mensagem)?>>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<(ConversaComMensagens, Mensagem)?>(new InvalidOperationException("banco fora")));
+
+        var acao = () => servico.ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora, retomada: true);
+
+        await acao.Should().ThrowAsync<InvalidOperationException>();
+        _unitOfWork.Received().DescartarAlteracoesPendentes();
+        _requisicoes.Should().BeEmpty();
     }
 }

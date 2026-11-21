@@ -331,7 +331,7 @@ public class Conversa
     /// <summary>
     /// #3068: a equipe não respondeu no prazo e o Assistente retoma. Vale para conversa na fila e para a que tem
     /// responsável. Guarda a entrada do cliente que motivou a volta, para valer uma vez só por mensagem
-    /// (<see cref="RetomadaPorTempoDecidida"/>). Não liga <see cref="AutomaticoLiberadoPelaEquipe"/>: quem devolve ali é a
+    /// (<see cref="RetomadaPorTempoDecidida(Guid)"/>). Não liga <see cref="AutomaticoLiberadoPelaEquipe"/>: quem devolve ali é a
     /// equipe, e o sinal faria o robô responder o contato da equipe para sempre.
     /// </summary>
     public void RetomarPorTempo(Guid entradaId)
