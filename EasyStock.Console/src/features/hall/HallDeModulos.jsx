@@ -24,6 +24,7 @@ import { usePulsoDoHall } from '../../aplicacao/usePulsoDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
 import { alcaDoLink, transicaoDoArrasto, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
+import { FaixaDeAtalhos } from './FaixaDeAtalhos'
 import { PulsoDoHall } from './PulsoDoHall'
 import { ResumoDoDia } from './ResumoDoDia'
 import { PersonalizarHall } from './PersonalizarHall'
@@ -221,6 +222,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             {buscando && destinos.length > 0 && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
           </div>
         </div>
+        {/* #3013: no celular os módulos ficam logo abaixo da busca, com a linha de estado do cartão. */}
+        {!buscando && !organizar && <FaixaDeAtalhos modulos={modulos} estadoDe={(id) => estadoDoCartao(id, fontes)} />}
         {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos}
           podeFecharCaixa={acoes?.gerenciarCaixa === true} aoMover={moverPainel} />}
         {/* #1608: o que fazer agora vem antes da lista de módulos. Quem compõe é o App. */}

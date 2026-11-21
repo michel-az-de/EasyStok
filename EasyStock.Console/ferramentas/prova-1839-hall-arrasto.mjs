@@ -171,7 +171,9 @@ provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue send
 })
 
 provar('#1810 continua valendo: até 20 controles na primeira vista', () => {
-  const controles = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+  // #3013: a faixa de atalhos do celular repete os destinos dos cartões (só até 640 px); não é controle novo.
+  const semFaixa = html.replace(/<nav[^>]*aria-label="Atalhos dos módulos"[\s\S]*?<\/nav>/, '')
+  const controles = (semFaixa.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
   assert.ok(controles <= 20, `${controles} controles`)
 })
 
