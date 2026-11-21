@@ -3,7 +3,7 @@
 - Data: 2026-11-20
 - Base medida: `master` `6c93bfe0a`; última migração `20261120123520_OrigemDoAnuncio`
 - Issue: #2944 (plano). Relacionadas: #2919, #2921 (fase 2), #2776, #2835.
-- Status: proposta. Tier alto (migração, contrato de API). PR aberta até a label `aprovado`, que só o Felipe aplica.
+- Status: proposta. Tier alto (migração, contrato de API). PR aberta até a label `aprovado`, que o agente aplica nas condições da ADR-0070.
 - Pré-requisito: E1 mergeada (reaproveita `motivo`, `rotulos.js` e `nomeExibido`) e a decisão da secção 2.
 - Uma PR completa, com as 3 funções juntas, porque compartilham o passo Entrega e o contrato.
 
