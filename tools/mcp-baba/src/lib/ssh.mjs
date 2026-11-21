@@ -17,7 +17,8 @@ export function argvSsh(comando, alvo = ALVO) {
 export function executarRemoto(comando, { timeoutMs = 30_000, ssh = 'ssh', stdin = null } = {}) {
   return new Promise((resolve, reject) => {
     const p = spawn(ssh, argvSsh(comando), { stdio: [stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'], windowsHide: true });
-    if (stdin != null) p.stdin.end(stdin);
+    // ssh que sai antes de ler (chave recusada, host fora) da EPIPE no stdin; o 'close' ja rejeita com o codigo (#3078)
+    if (stdin != null) { p.stdin.on('error', () => {}); p.stdin.end(stdin); }
     let out = '', err = '';
     const t = setTimeout(() => { p.kill(); reject(new Error(`timeout de ${timeoutMs} ms`)); }, timeoutMs);
     p.stdout.on('data', d => { out += d; if (out.length > 4_000_000) p.kill(); });
