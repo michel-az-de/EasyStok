@@ -15,10 +15,10 @@ public class InternalCronJobAuthHandlerTests
 {
     private const string Esperado = "token-do-cron-123";
 
-    private static async Task<AuthenticateResult> Autenticar(string? enviado, string? configurado = Esperado)
+    private static async Task<AuthenticateResult> Autenticar(string? enviado, string? configurado = Esperado, bool habilitado = true)
     {
         var cron = Substitute.For<IOptionsMonitor<InternalCronJobOptions>>();
-        cron.CurrentValue.Returns(new InternalCronJobOptions { Habilitado = true, Token = configurado });
+        cron.CurrentValue.Returns(new InternalCronJobOptions { Habilitado = habilitado, Token = configurado });
         var schemeOpts = Substitute.For<IOptionsMonitor<AuthenticationSchemeOptions>>();
         schemeOpts.Get(Arg.Any<string>()).Returns(new AuthenticationSchemeOptions());
 
@@ -45,16 +45,30 @@ public class InternalCronJobAuthHandlerTests
     public async Task Token_de_outro_tamanho_falha(string enviado)
         => (await Autenticar(enviado)).Succeeded.Should().BeFalse();
 
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public async Task Token_configurado_vazio_ou_ausente_falha(string? configurado)
+        => (await Autenticar(Esperado, configurado)).Failure.Should().NotBeNull();
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    public async Task Header_ausente_ou_em_branco_nao_decide(string? enviado)
+        => (await Autenticar(enviado)).None.Should().BeTrue();
+
     [Fact]
-    public async Task Token_configurado_vazio_falha()
-        => (await Autenticar(Esperado, configurado: "")).Succeeded.Should().BeFalse();
+    public async Task Cron_desabilitado_falha_mesmo_com_token_certo()
+        => (await Autenticar(Esperado, habilitado: false)).Failure.Should().NotBeNull();
 
     [Fact]
     public void Comparacao_usa_FixedTimeEquals_sobre_hashes_de_tamanho_fixo()
     {
+        // Unico teste que falharia na versao antiga (saida antecipada por tamanho): os de comportamento passam nas duas.
         var metodo = typeof(InternalCronJobAuthHandler)
-            .GetMethod("CryptographicEquals", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var il = metodo.GetMethodBody()!.GetILAsByteArray()!;
+            .GetMethod("CryptographicEquals", BindingFlags.NonPublic | BindingFlags.Static);
+        metodo.Should().NotBeNull("o helper de comparacao do token foi renomeado; ajuste este teste");
+        var il = metodo!.GetMethodBody()!.GetILAsByteArray()!;
         var chamados = new List<MethodBase>();
         for (var i = 0; i < il.Length - 4; i++)
         {
