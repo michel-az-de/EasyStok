@@ -13,7 +13,8 @@ para baixo, no PowerShell da estação.
 ## 0. Crie o client ID OAuth (uma vez)
 
 No projeto `easystok-backup`, console do Google Cloud: **APIs e serviços > Tela de consentimento
-OAuth** (tipo externo ou interno, nome `EasyStok Backup`). Depois **Credenciais > Criar credenciais
+OAuth** (tipo **interno**, só a organização FMA, nome `EasyStok Backup`; nunca externo: em status de teste
+o refresh token expira em 7 dias e o backup pararia em silêncio). Depois **Credenciais > Criar credenciais
 > ID do cliente OAuth > Aplicativo para computador**. Anote o **ID do cliente** e o **segredo do
 cliente** no cofre de senhas. Não cole esses valores no chat.
 
