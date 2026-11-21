@@ -56,6 +56,22 @@ public class PublicadorDocumentoPedidoTests
         doc.NomeArquivo.Should().Be("Pedido-" + Codigo + ".pdf");
     }
 
+    // #3021: o PublicUploadFileProvider da Api só serve arquivo de atendimento/ com nome Guid no formato D; com :N o
+    // /files/... dava 404 e o WPPConnect recusava ("Empty or invalid file or base64").
+    [Fact]
+    public async Task PedidoEComprovanteSobemComNomeGuidFormatoD()
+    {
+        var nomes = new List<string>();
+        _armazenamento.UploadAsync(Arg.Do<FileUploadRequest>(r => nomes.Add(r.FileName)), Arg.Any<CancellationToken>())
+            .Returns(new StoredFileResult("k", "/files/atendimento/documentos/abc/xyz.pdf", "application/pdf", 4));
+
+        await Publicador().PublicarPedidoAsync(EmpresaId, Resumo, Pix, default);
+        await Publicador().PublicarComprovanteAsync(EmpresaId, Resumo, DateTime.UtcNow, default);
+
+        nomes.Should().HaveCount(2);
+        nomes.Select(n => Guid.TryParseExact(Path.GetFileNameWithoutExtension(n), "D", out var _)).Should().AllBeEquivalentTo(true);
+    }
+
     [Fact]
     public async Task ComprovanteSobeComNomeAleatorioPublicoENaoUsaLinkAssinado()
     {

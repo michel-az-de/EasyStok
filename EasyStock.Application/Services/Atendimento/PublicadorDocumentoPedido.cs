@@ -45,7 +45,7 @@ public sealed class PublicadorDocumentoPedido(
         // Como o canhoto (#2544): nome aleatório em atendimento/*, URL pública porque o WhatsApp baixa por ela.
         // O link assinado do armazenamento local (/api/files/local-signed/...) não existe na API e dava 404.
         var salvo = await armazenamento.UploadAsync(new FileUploadRequest(
-            $"atendimento/documentos/{empresaId:N}", $"{Guid.NewGuid():N}.pdf", pdf.ContentType, pdf.Conteudo), ct);
+            $"atendimento/documentos/{empresaId:N}", $"{Guid.NewGuid():D}.pdf", pdf.ContentType, pdf.Conteudo), ct);
         var url = MidiaPublica.Url(salvo.Url, configuration)
             ?? throw new InvalidOperationException("O PDF não ficou em link HTTPS público.");
         return new DocumentoPublicado(url, nomeArquivo);
