@@ -35,7 +35,7 @@ O botão NÃO ganha caminho novo. Ele reaproveita o `receber` da conversa (`apli
 
 | Regra | Onde hoje |
 |---|---|
-| Idempotência: uma chave por envio; repetir após queda não lança duas vezes | `comanda.js:56,288`; `Idempotency-Key` em `infra/api/pagamentosPedidoApi.js:9-11`; `POST /api/pedidos/{id}/pagamentos` em `PedidosController.cs:201-203` |
+| Idempotência: uma chave por envio; repetir após queda não lança duas vezes | `comanda.js:56,288`; `Idempotency-Key` em `infra/api/pagamentosPedidoApi.js:9-11`; `POST /api/pedidos/{id}/pagamentos` em `PedidosController.cs:201-203` (`EasyStock.Api/Controllers`) |
 | Aprovação: pedido que espera aprovação recusa a baixa ("Aprove o pedido antes de registrar o pagamento.") | `comanda.js:283-286`; `dominio/cobranca.js:430-434` |
 | Link do Mercado Pago pendente: a forma vira "na entrega" (cancela o link) e só então registra | `comanda.js:287,289`; `cobranca.js:436-438` |
 | `pedido_ja_pago`: mostra a mensagem da API, não o erro genérico | `comanda.js:298`; `CobrancaPedidoConflitoException.cs:10` |
@@ -45,7 +45,7 @@ O detalhe só tem o `PedidoResult` (`PedidoResult.cs:5-26`), sem `cobranca` nem 
 
 ### L2. Coluna Entrega, ordem e filtro "Entrega hoje"
 
-Hoje `GET /api/pedidos` aceita `page, pageSize, status, clienteId, desde, ate, search, sort, order` (`PedidosController.cs:45-56`). `desde` e `ate` filtram `CriadoEm` (`PedidoRepository.cs:76-77`). `sort` aceita `urgencia`, `total`, `status`, `cliente` e, por padrão, `criadoem` (`PedidoRepository.cs:100-109`). A resposta já traz `agendadoParaEm` (`PedidoResult.cs:19`). O pedido não tem campo de fim de janela (`Pedido.cs` só tem `AgendadoParaEm:129` e `InicioPrevistoEm:200`), então a coluna mostra dia e hora, não faixa.
+Hoje `GET /api/pedidos` (`EasyStock.Api/Controllers/PedidosController.cs`) aceita `page, pageSize, status, clienteId, desde, ate, search, sort, order` (`PedidosController.cs:45-56`). `desde` e `ate` filtram `CriadoEm` (`PedidoRepository.cs:76-77`). `sort` aceita `urgencia`, `total`, `status`, `cliente` e, por padrão, `criadoem` (`PedidoRepository.cs:100-109`). A resposta já traz `agendadoParaEm` (`PedidoResult.cs:19`). O pedido não tem campo de fim de janela (`Pedido.cs` só tem `AgendadoParaEm:129` e `InicioPrevistoEm:199`), então a coluna mostra dia e hora, não faixa.
 
 Contrato novo, tudo opcional e aditivo em `GET /api/pedidos`:
 
@@ -69,7 +69,7 @@ Mudam: `PedidosController.cs:45-63`, `ListarPedidosQuery` (`ListarPedidosUseCase
 1. Status fora de `cancelado` e fora do pré-operacional (`rascunho`, `aguardando_pagamento`, `aguardando_aprovacao_baba`). É a regra do cockpit (`pedidos-cockpit.js:92`) e do detalhe (`pedidosCadastro.js:148-159`).
 2. Saldo maior que zero, com saldo = `Total` menos a soma dos `Pagamentos` (`Pedido.TotalPago`, `Pedido.cs:428-436`). Pago, pago a mais e total zero ficam fora. Estorno e cupom não entram na v1 (`SaldoFinanceiroPedido.cs:9,34-35` os considera; fica como limite declarado).
 3. Sem `ContaReceber` de origem Pedido com `OrigemRefId` igual ao pedido e status diferente de `Cancelada`. Conta cancelada não está no card, então o pedido volta a contar.
-4. Dia da entrega (definição da L2) antes de hoje mais 31 dias, no dia civil de Brasília: o mesmo corte do card (`FluxoCaixaQueries.cs:21`). Sem limite inferior: pedido já entregue e não pago segue a receber, e pedido não tem "Vencidas". Entregue e não pago conta, como no cockpit.
+4. Dia da entrega (definição da L2) antes de hoje mais 31 dias. `AgendadoParaEm` é um instante UTC: converte-se para o dia civil de Brasília (`HorarioBrasil`) ANTES de comparar com o corte do card (`FluxoCaixaQueries.cs:21`). <!-- L3-LIMITE-INFERIOR: aguarda decisão do Felipe --> Sem limite inferior: pedido já entregue e não pago segue a receber, e pedido não tem "Vencidas". Entregue e não pago conta, como no cockpit.
 
 **Contrato.** Sai pelo `GET /api/financeiro/dashboard` (`FinanceiroController.cs:18-25`). `DashboardFinanceiroDto` ganha dois campos opcionais com padrão, como `QtdContasReceberAVencer30d` (`IFluxoCaixaQueries.cs:33-49`):
 
@@ -100,8 +100,10 @@ O cálculo entra em `FluxoCaixaQueries.KpisDashboardAsync` (`FluxoCaixaQueries.c
 - [ ] L1 usa a função compartilhada com a conversa. Teste prova a mesma chave de idempotência no reenvio, a recusa por aprovação, o cancelamento do link e a mensagem de `pedido_ja_pago`. Pedido pré-operacional mostra o botão desligado com o motivo.
 - [ ] Lista de Pedidos com a data da entrega visível em 1440 e 390 px. `sort=entrega` ordena pelo dia da entrega. "Entrega hoje" lista só pedidos com entrega hoje (inclui o pedido para agora criado hoje).
 - [ ] L3, exemplo verificável, loja com a flag da conta automática DESLIGADA: conta a receber de R$ 120 vencendo em 10 dias e pedido operacional sem conta, total R$ 132,30, sem pagamento, entrega em 5 dias. O card mostra R$ 120,00 e a linha mostra "Pedidos a receber: R$ 132,30 (1 pedido)".
-- [ ] L3, mesma loja com a flag LIGADA e o pedido já entregue: ele ganha a conta de R$ 132,30. O card passa a R$ 252,30 (conta com vencimento em 7 dias, dentro dos 30) e o pedido NÃO aparece na linha, que some por zerar.
+- [ ] L3, mesma loja com a flag ligada ANTES da entrega e o pedido já entregue: ele ganha a conta de R$ 132,30. O card passa a R$ 252,30 (conta com vencimento em 7 dias, dentro dos 30) e o pedido NÃO aparece na linha, que some por zerar.
 - [ ] L3, exclusões: pedido cancelado, pré-operacional, pago, com entrega além de 31 dias ou com conta ativa não entra na linha. Pagamento parcial entra só com o saldo. Pedido com conta cancelada volta à linha.
+- [ ] L3, borda de fuso: pedido agendado às 21h de Brasília do 30º dia (já é o dia seguinte em UTC) conta como 30º dia e ENTRA na linha; às 21h do 31º dia NÃO entra.
+- [ ] RASCUNHO, aguarda decisão do Felipe: pedido entregue há mais de 30 dias e ainda não pago: [comportamento conforme a decisão].
 - [ ] `GET /api/financeiro/dashboard` sem os campos novos (API antiga) não quebra o Console: a linha não aparece.
 - [ ] Prova Red→Green por lacuna e roteiro de navegador com as 4 tarefas, antes e depois.
 - [ ] `npm run qualidade` verde; CI verde; `/code-review` sem Critical.
