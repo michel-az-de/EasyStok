@@ -492,7 +492,7 @@ export function trocasDeFormaNoEasyStok(cobranca, nomeCliente, { pixDireto = fal
     meio: MEIO_PIX_DIRETO,
     rotulo: nomeDoMeio(MEIO_PIX_DIRETO),
     texto: cobranca?.link
-      ? `O link de pagamento é cancelado e ${envio} Com o link em aberto, o EasyStok confere o Mercado Pago antes e recusa a troca se houver pagamento em andamento.`
+      ? `O link de pagamento é cancelado e ${envio} Com o link em aberto, o EasyStok confere o Mercado Pago antes e recusa a troca se houver pagamento em andamento ou se não conseguir conferir.`
       : `A cobrança atual é cancelada e ${envio}`,
   }]
 }

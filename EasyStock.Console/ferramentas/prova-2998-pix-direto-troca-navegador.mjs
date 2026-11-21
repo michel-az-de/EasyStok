@@ -50,7 +50,7 @@ function Tela() {
       <ContextoEstado value={{ fonteApi: true, fidelidade: { cupons: [] }, conversas: [], agora: Date.now() }}>
         <ContextoCatalogo value={{ cardapio: [], entregadores: [] }}>
           <ContextoAcoes value={acoes}>
-            <main style={{ maxWidth: 420, margin: '24px auto', padding: 16 }}>
+            <main style={{ maxWidth: 420, margin: '0 auto', padding: 16, height: '100vh', overflowY: 'auto', boxSizing: 'border-box' }}>
               {aviso && <p role="alert">{aviso}</p>}
               <BlocoCobranca pedido={pedido} conversaId="conversa-controlada" nomeCliente="Cliente de teste" agora={Date.now()} editavel
                 aoAlterarMeio={(meio) => acoes.alterarMeioPagamento('conversa-controlada', meio)} />
