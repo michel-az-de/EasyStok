@@ -317,3 +317,20 @@ export function avisoDeValorFaltando(gatilho, texto) {
 export const enviosAutomaticos = (mensagens) => (mensagens ?? [])
   .filter((m) => m.dir === 'out' && m.automatica)
   .sort((a, b) => new Date(b.em) - new Date(a.em))
+
+// #2783: tudo que o editor da mensagem automática mostra sobre o texto digitado, igual em Respostas e em Automações.
+// `valores` são os de exemplo da prévia; `contexto` (só demonstração) é o da conversa escolhida, que preenche as
+// cinco variáveis como a conversa de verdade. Devolve as variáveis aceitas, o que impede salvar (`bloqueio`), os
+// avisos e a prévia em partes (`tipo: 'erro'` é a chave que o servidor deixaria escrita).
+export function analisarAutomatica({ regra, texto, fonteApi, editavel, valores, contexto = null }) {
+  const variaveis = fonteApi ? VARIAVEIS_DA_API : VARIAVEIS
+  return {
+    variaveis,
+    bloqueio: fonteApi ? bloqueioDaAutomatica(texto, editavel) : null,
+    semValor: fonteApi ? avisoDeValorFaltando(regra.gatilho, texto) : null,
+    avisoEntrada: fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null,
+    partes: !fonteApi && contexto
+      ? [{ texto: textoDaRegra({ ...regra, texto }, contexto), tipo: 'texto' }]
+      : previaDoServidor(texto, valores, variaveis),
+  }
+}

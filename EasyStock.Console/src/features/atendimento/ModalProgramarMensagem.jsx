@@ -3,14 +3,14 @@ import { Botao } from '../../componentes/Botao'
 import { CampoArea, CampoSelecao, CampoTexto } from '../../componentes/Campo'
 import { Modal } from '../../componentes/Modal'
 import { Pilula } from '../../componentes/Pilula'
+import { SeletorDeModelo } from './SeletorDeModelo'
 import { useAcoes, useAtendimento } from '../../aplicacao/contextos'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { respostasEditaveis } from '../../dominio/acessoModulos'
 import { dataHora } from '../../dominio/formato'
 import { primeiroNomeDaConversa } from '../../dominio/nomeDoContato'
 import {
-  FINALIDADES, SITUACOES, faltaParaProgramar, horarioLocalPadrao, horarioLocalParaUtc,
-  parametrosDoTexto, podeCancelar,
+  FINALIDADES, SITUACOES, faltaParaProgramar, horarioLocalPadrao, horarioLocalParaUtc, podeCancelar,
 } from '../../dominio/mensagemProgramada'
 import css from './atendimento.module.css'
 import { ROTULOS } from '../../dominio/rotulos'
@@ -31,9 +31,8 @@ export function ModalProgramarMensagem({
   const [texto, setTexto] = useState(rascunho ?? '')
   const [finalidade, setFinalidade] = useState(FINALIDADES[0].valor)
   const [usarModelo, setUsarModelo] = useState(false)
-  const [nomeModelo, setNomeModelo] = useState('')
-  const [idioma, setIdioma] = useState('pt_BR')
-  const [parametros, setParametros] = useState('')
+  // #2783: o modelo vem da lista de aprovados (SeletorDeModelo), nunca digitado.
+  const [selecao, setSelecao] = useState({ modelo: null, parametros: [], falta: true, sujo: false })
   const [erro, setErro] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const [sucesso, setSucesso] = useState(null)
@@ -65,11 +64,11 @@ export function ModalProgramarMensagem({
   const bloqueado = Boolean(conversa.bloqueio)
   const fechar = () => { if (!ocupado.current) aoFechar() }
   // #2185 (F16): horário, texto ou modelo mexidos e ainda não programados: Esc e toque no fundo não descartam.
-  const sujo = quando !== quandoInicial || texto !== (rascunho ?? '') || usarModelo || nomeModelo !== '' || parametros !== ''
+  const sujo = quando !== quandoInicial || texto !== (rascunho ?? '') || usarModelo || selecao.sujo
 
   async function programar() {
     if (ocupado.current || bloqueado || !editavel) return
-    const falta = faltaParaProgramar({ agendadaPara, agoraMs: Date.now(), usarModelo: comModelo, texto, nomeModelo })
+    const falta = faltaParaProgramar({ agendadaPara, agoraMs: Date.now(), usarModelo: comModelo, texto, modeloPronto: !selecao.falta })
     if (falta) { setErro(falta); return }
     setErro(null)
     setSucesso(null)
@@ -80,7 +79,7 @@ export function ModalProgramarMensagem({
         finalidade,
         agendadaPara,
         ...(comModelo
-          ? { modelo: { nome: nomeModelo, idioma, parametros: parametrosDoTexto(parametros) } }
+          ? { modelo: { nome: selecao.modelo.nome, idioma: selecao.modelo.idioma, parametros: selecao.parametros } }
           : { texto }),
       })
       if (!montada.current) return
@@ -161,20 +160,7 @@ export function ModalProgramarMensagem({
 
         {comModelo ? (
           <>
-            <CampoTexto
-              rotulo="Nome do modelo na Meta"
-              dica="Exatamente como aprovado no WhatsApp Business (ex.: lembrete_pedido)."
-              value={nomeModelo}
-              onChange={(e) => setNomeModelo(e.target.value)}
-            />
-            <CampoTexto rotulo="Idioma do modelo" value={idioma} onChange={(e) => setIdioma(e.target.value)} />
-            <CampoArea
-              rotulo="Parâmetros do modelo"
-              dica="Um por linha, na ordem {{1}}, {{2}}… do modelo."
-              rows={3}
-              value={parametros}
-              onChange={(e) => setParametros(e.target.value)}
-            />
+            <SeletorDeModelo desabilitado={salvando} aoMudar={setSelecao} aoFalhar={(falha) => setErro(falha?.texto ?? null)} />
           </>
         ) : (
           <CampoArea rotulo="Mensagem" rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} />

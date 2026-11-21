@@ -50,11 +50,11 @@ export const parametrosDoTexto = (texto) =>
 
 // O que falta para agendar (null quando está tudo certo). A API confere o resto
 // (janela do canal no horário do envio, consentimento, telefone do cliente).
-export function faltaParaProgramar({ agendadaPara, agoraMs, usarModelo, texto, nomeModelo }) {
+export function faltaParaProgramar({ agendadaPara, agoraMs, usarModelo, texto, modeloPronto }) {
   if (!agendadaPara || !Number.isFinite(new Date(agendadaPara).getTime())) return 'Escolha a data e a hora do envio.'
   if (new Date(agendadaPara).getTime() <= agoraMs) return 'Escolha um horário depois de agora.'
-  if (usarModelo ? !nomeModelo?.trim() : !texto?.trim()) {
-    return usarModelo ? `Informe o nome da ${ROTULOS.MENSAGEM_PADRAO}.` : 'Escreva a mensagem.'
+  if (usarModelo ? !modeloPronto : !texto?.trim()) {
+    return usarModelo ? `Escolha a ${ROTULOS.MENSAGEM_PADRAO} da lista e preencha os campos.` : 'Escreva a mensagem.'
   }
   return usarModelo ? null : avisoDeVariaveisNaoResolvidas(texto)
 }
