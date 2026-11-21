@@ -117,7 +117,7 @@ await provar('hash/histórico usam rotas existentes; origem inválida volta ao c
 await provar('produção antiga da Cozinha congelada: a rota avisa e a ajuda é a do Início', () => {
   const caminho = rotaDaHash('#/m/cozinha/producao', { fonteApi: true })
   assert.equal(caminho.tipo, 'hall')
-  assert.match(caminho.aviso, /não existe ou não está disponível/)
+  assert.match(caminho.aviso, /Produção e cardápio do dia ainda está em preparo/) // #3012
   const api = contextoDaAjuda(caminho, true)
   assert.equal(api.titulo, 'Início')
   assert.equal(api.atalho, null)

@@ -1,3 +1,4 @@
+using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Pagamentos;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Sales;
@@ -25,7 +26,7 @@ public sealed record LembreteCobrancaResult(SituacaoLembreteCobranca Situacao, R
 /// <para>
 /// Só avisa (decisão do Felipe para link vencido, #1889): não reemite nem cancela. Não avisa se a cobrança já não está
 /// pendente (paga, cancelada ou substituída por outra), se o pedido saiu de <c>AguardandoPagamento</c> (inclusive pago
-/// no balcão com o link ainda aberto) ou se o link não é da conversa.
+/// no balcão com o link ainda aberto), se o cliente desistiu do pedido na conversa (#2992) ou se o link não é da conversa.
 /// </para>
 ///
 /// <para>
@@ -38,6 +39,7 @@ public sealed class LembrarCobrancaVencendoUseCase(
     ITenantContextAccessor tenant,
     ICobrancaPedidoRepository cobrancas,
     IPedidoRepository pedidos,
+    IConversaRepository conversas,
     IIdempotencyKeyRepository idempotencia,
     DispararAutomacaoUseCase disparo,
     TimeProvider relogio,
@@ -61,6 +63,10 @@ public sealed class LembrarCobrancaVencendoUseCase(
 
         var pedido = await pedidos.GetByIdAsync(item.EmpresaId, item.PedidoId);
         if (pedido is null || pedido.StatusEnum != StatusPedido.AguardandoPagamento)
+            return new(SituacaoLembreteCobranca.Ignorada);
+
+        // #2992: quem desistiu do pedido na conversa assumida não recebe lembrete; a equipe já foi avisada.
+        if ((await conversas.ObterPorIdAsync(item.EmpresaId, conversaId, ct))?.ClienteDesistiuDoPedido(pedido.Id) == true)
             return new(SituacaoLembreteCobranca.Ignorada);
 
         var (reserva, reservada) = await idempotencia.TryBeginAsync(

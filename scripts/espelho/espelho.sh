@@ -48,19 +48,22 @@ log "espelho em ${MASTER:0:8}"
 # Issues e PRs: o bundle guarda o codigo, nao a conversa. Uma vez por dia, porque a API sem
 # token permite 60 chamadas por hora e cada pagina traz 100 itens.
 exporta_meta() {
-  local tmp pagina=1 n
+  local tmp pagina=1 n url arq
   tmp="$(mktemp -d)"
-  while :; do
-    curl -fsS -H 'Accept: application/vnd.github+json' \
-      "$META_API/issues?state=all&per_page=100&page=$pagina" -o "$tmp/issues-$(printf %03d "$pagina").json" \
+  url="$META_API/issues?state=all&per_page=100"
+  while [ -n "$url" ]; do   # cursor do Link rel="next": o GitHub recusa page= acima de 1000 itens
+    arq="$tmp/issues-$(printf %03d "$pagina").json"
+    curl -fsS -H 'Accept: application/vnd.github+json' -D "$tmp/cabecalho" "$url" -o "$arq" \
       || { rm -rf "$tmp"; mkdir -p "$META_DIR"; touch "$META_DIR"   # tenta de novo amanha: a API sem token da 60/h
            log "aviso: exportacao de issues falhou na pagina $pagina (mantida a anterior)"; return 0; }
-    n="$(grep -c '"number":' "$tmp/issues-$(printf %03d "$pagina").json" || true)"
-    [ "$n" -gt 0 ] || { rm -f "$tmp/issues-$(printf %03d "$pagina").json"; break; }
+    n="$(grep -c '"number":' "$arq" || true)"
+    [ "$n" -gt 0 ] || { rm -f "$arq"; break; }
+    url="$(tr -d '\r' < "$tmp/cabecalho" | sed -n 's/^[Ll]ink:.*<\([^>]*\)>; rel="next".*/\1/p')"
     pagina=$((pagina + 1))
   done
+  rm -f "$tmp/cabecalho"
   rm -rf "$META_DIR"; mv "$tmp" "$META_DIR"
-  log "issues e PRs exportados em $((pagina - 1)) pagina(s)"
+  log "issues e PRs exportados em $(ls "$META_DIR" | wc -l) pagina(s)"
 }
 if [ "$META_HORAS" != 0 ] && ! find "$META_DIR" -maxdepth 0 -mmin "-$((META_HORAS * 60))" 2>/dev/null | grep -q .; then
   exporta_meta

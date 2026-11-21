@@ -221,8 +221,7 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
                 onChange={(evento) => setBusca(evento.target.value)} />
               <MarcaIcone nome="buscar" tamanho={20} className={css.lupa} />
             </div>
-            {/* #2258 (A10): sem resultado o aviso traz o único botão de limpar. */}
-            {buscando && destinos.length > 0 && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
+            {/* #2258 (A10): sem resultado o aviso traz o único botão de limpar. #3012: com resultado, o X do campo limpa. */}
           </div>
         </div>
         {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos}

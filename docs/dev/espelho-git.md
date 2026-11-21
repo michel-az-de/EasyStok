@@ -11,9 +11,9 @@ necessário porque o repositório é público.
 
 | Peça | Onde | Quando |
 |---|---|---|
-| `espelho.sh` (`git remote update --prune`) | VPS, `~/git/espelho.sh`, timer de usuário `easystok-espelho.timer` | a cada 15 min |
+| `espelho.sh` (`git fetch --prune` de branches e tags) | VPS, `~/git/espelho.sh`, timer de usuário `easystok-espelho.timer` | a cada 15 min |
 | Espelho bare | `~/git/EasyStok.git` | sempre |
-| Issues e PRs (API pública, 100 por página) | `~/git/EasyStok-meta/issues-NNN.json` | 1 vez por dia |
+| Issues e PRs (API pública, 100 por página, cursor do `Link`) | `~/git/EasyStok-meta/issues-NNN.json` | 1 vez por dia |
 | Estado da última execução | `~/git/estado-espelho` (`rc=0` é sucesso, `master=` é o SHA) | a cada execução |
 
 O espelho fica em `~/git`, e não em `/srv/git` como a issue sugeria, porque o usuário `felipe`
@@ -31,7 +31,7 @@ scp -r scripts/espelho hostinger:espelho-src
 ssh hostinger 'bash ~/espelho-src/instalar.sh && rm -rf ~/espelho-src'
 ```
 
-A primeira sincronização baixa cerca de 70 MB. O instalador avisa se o linger estiver desligado.
+A primeira sincronização baixa cerca de 60 MB. Sem o linger (`loginctl enable-linger`, sem sudo), o timer só roda com sessão aberta. O instalador avisa se o linger estiver desligado.
 
 ## Deploy com o GitHub fora
 
