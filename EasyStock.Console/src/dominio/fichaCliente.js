@@ -1,7 +1,7 @@
 // #2495 (S6, I4): regras da ficha do cliente no editor de Cadastros. A API só adiciona e remove endereço e
 // telefone extra (`POST` e `DELETE` em /api/clientes/{id}/enderecos e /telefones): não há edição de item gravado.
-import { chaveDaTag } from './cliente'
-import { dataHora, moeda, plural } from './formato'
+import { chaveDaTag, recusaDoEndereco } from './cliente'
+import { dataHora, moeda, partesDoEndereco, plural } from './formato'
 import { erroDoCep, erroDoTelefone } from './validacaoDoCadastro'
 
 const texto = (valor) => String(valor ?? '').trim() || null
@@ -125,3 +125,23 @@ export function quadroDoCliente(relacionamento) {
 
 export const avisoDasNotas =(quantas) => (quantas >= NOTAS_DO_DOSSIE
   ? `Aqui aparecem as ${NOTAS_DO_DOSSIE} notas mais recentes. As anteriores estão na Ficha do Atendimento.` : null)
+
+// #3076 (#2776): o Endereço do Cadastro de clientes ia só como texto solto; a Ficha dizia "Nenhum endereço cadastrado" e o
+// Novo pedido abria sem endereço. O Cadastro segue a regra do pedido (CEP no fim) e grava o endereço estruturado padrão.
+// Só confere quando mudou: cadastro antigo sem CEP continua salvando os outros campos. Sem `inicial`, é cadastro novo.
+const enderecoMudou = (dados, inicial) => String(dados.endereco ?? '').trim() !== String(inicial?.endereco ?? '').trim()
+export const erroDoEnderecoDoCadastro = (dados, inicial) => (enderecoMudou(dados, inicial) ? recusaDoEndereco(dados.endereco) : null)
+
+export const gravaEnderecoDoCadastro = (dados, inicial) => Boolean(texto(dados.endereco)) && enderecoMudou(dados, inicial) && !erroDoEnderecoDoCadastro(dados, inicial)
+
+// Endereço novo ou mudado, com CEP, vira o padrão de quem ainda não tem um. Quem já tem padrão escolhe na Ficha.
+// A API não desmarca o padrão anterior: em cadastro existente, `enderecos` é a lista relida da API logo antes de gravar
+// (a Ficha abaixo do formulário pode ter gravado um depois que o editor abriu); sem ela, não grava.
+export function enderecoDeEntregaDoCadastro(dados, { empresaId, inicial, enderecos } = {}) {
+  if (!gravaEnderecoDoCadastro(dados, inicial)) return null
+  if (inicial?.id && !Array.isArray(enderecos)) return null
+  if (!enderecoVaiComoPadrao(enderecos ?? [])) return null
+  const p = partesDoEndereco(dados.endereco)
+  const complemento = [p.complemento, texto(dados.apt)].filter(Boolean).join(', ')
+  return corpoDoEndereco({ logradouro: p.rua, numero: p.numero, complemento, bairro: p.bairro, cidade: p.cidade, estado: p.uf, cep: p.cep }, empresaId, true)
+}
