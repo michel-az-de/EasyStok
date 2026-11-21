@@ -97,7 +97,11 @@ install -m 600 "$SRC/scripts/deploy/mcp/compose.yaml" "$STACK/compose.yaml"
 echo "==> [3/5] build easystok-mcp:vps-$SHA"
 docker build -q --build-arg GIT_SHA="$SHA_FULL" -t "easystok-mcp:vps-$SHA" "$SRC/tools/mcp-baba" >/dev/null || exit 4
 rm -rf "$SRC"
-if docker image inspect easystok-mcp:vps >/dev/null 2>&1; then docker tag easystok-mcp:vps easystok-mcp:vps-prev; fi
+# so vira vps-prev a imagem que esta healthy agora: rollback para imagem quebrada repetiria o loop (#3072)
+if docker image inspect easystok-mcp:vps >/dev/null 2>&1 \
+  && [ "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' ez-mcp 2>/dev/null)" = healthy ]; then
+  docker tag easystok-mcp:vps easystok-mcp:vps-prev
+fi
 docker tag "easystok-mcp:vps-$SHA" easystok-mcp:vps
 
 echo "==> [4/5] up e healthy"
@@ -113,7 +117,12 @@ docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' ez-mcp | grep -qx 
 if [ "$st" != healthy ] || [ "$sha_ok" != 1 ]; then
   echo "ERRO: ez-mcp health=$st sha_ok=$sha_ok" >&2
   docker logs --tail 30 ez-mcp >&2 2>&1 || true
-  if docker image inspect easystok-mcp:vps-prev >/dev/null 2>&1; then docker tag easystok-mcp:vps-prev easystok-mcp:vps; docker compose up -d >/dev/null; echo "voltou para a imagem anterior" >&2; fi
+  if docker image inspect easystok-mcp:vps-prev >/dev/null 2>&1; then
+    docker tag easystok-mcp:vps-prev easystok-mcp:vps; docker compose up -d >/dev/null; echo "voltou para a imagem anterior" >&2
+  else
+    # sem imagem anterior saudavel nada fica em loop: o container sai (rede, chave e tokens ficam)
+    docker compose down >/dev/null 2>&1 || true; echo "sem imagem anterior saudavel: ez-mcp derrubado" >&2
+  fi
   exit 6
 fi
 
