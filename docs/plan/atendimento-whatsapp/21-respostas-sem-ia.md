@@ -153,9 +153,10 @@ Ordem: S75 → S78 → S76 → S77. S75 e S78 juntas já entregam o ganho medido
 | Valor novo de enum pedir migration | Conferido: `TurnoAgenteConfiguration` e `RegraAutomaticaConfiguration` não têm check constraint. Se o Red mostrar o contrário, a S75 ganha migration e a PR diz isso |
 | Ganho menor que o esperado | É o cenário provável em volume baixo: 7 turnos em 45 dias. O ganho que não depende de volume é a mensagem duplicada que some. A S78 mede antes de S76 e S77 |
 
-Fora de escopo: devolver a conversa ao Assistente por tempo. `Conversa.LiberarAutomatico` diz "nunca por tempo"
-(`Conversa.cs:298`) e foi isso que deixou a conversa `6bb73f77` 13 dias sem resposta automática. É decisão de produto separada, com issue
-própria.
+Fora de escopo desta onda: devolver a conversa ao Assistente por tempo. `Conversa.LiberarAutomatico` dizia "nunca por
+tempo" e foi isso que deixou a conversa `6bb73f77` 13 dias sem resposta automática. A decisão de produto veio depois
+(Felipe, 21/11/2026) e está na #3068: a equipe tem 60 s para responder; passado o prazo, o Assistente retoma
+(`Conversa.RetomarPorTempo`, `RetomadaDoAssistente`). Prazo em `Atendimento:RetomadaAssistente:Segundos`; 0 desliga.
 
 ## Decisões do Felipe
 

@@ -29,6 +29,7 @@ public class Conversa
     public const string ChaveAjudaComandaSolicitadaEm = "comandaAjudaSolicitadaEm";
     public const string ChaveAutomaticoLiberadoPelaEquipe = "automaticoLiberadoPelaEquipe";
     public const string ChaveClienteDesistiuPedidoId = "clienteDesistiuPedidoId";
+    public const string ChaveRetomadaPorTempoEntradaId = "retomadaPorTempoEntradaId";
 
     public Guid Id { get; private set; }
     public long NumeroComanda { get; private set; }
@@ -299,8 +300,8 @@ public class Conversa
     }
 
     /// <summary>
-    /// Devolve ao agente por decisao da dona (D4). Nunca por tempo. Canal sem agente recusa: a
-    /// conversa ficaria sem ninguem e fora do lembrete (#1288).
+    /// Devolve ao agente por decisao da dona (D4). A volta por tempo e <see cref="RetomarPorTempo"/>. Canal sem
+    /// agente recusa: a conversa ficaria sem ninguem e fora do lembrete (#1288).
     /// </summary>
     public void LiberarAutomatico()
     {
@@ -326,6 +327,56 @@ public class Conversa
         JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson) is { } contexto
         && contexto.TryGetValue(ChaveAutomaticoLiberadoPelaEquipe, out var valor)
         && valor.ValueKind == JsonValueKind.True;
+
+    /// <summary>
+    /// #3068: a equipe não respondeu no prazo e o Assistente retoma. Vale para conversa na fila e para a que tem
+    /// responsável. Guarda a entrada do cliente que motivou a volta, para valer uma vez só por mensagem
+    /// (<see cref="RetomadaPorTempoDecidida(Guid)"/>). Não liga <see cref="AutomaticoLiberadoPelaEquipe"/>: quem devolve ali é a
+    /// equipe, e o sinal faria o robô responder o contato da equipe para sempre.
+    /// </summary>
+    public void RetomarPorTempo(Guid entradaId)
+    {
+        GarantirAberta("retomar");
+        if (entradaId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("A retomada precisa da mensagem do cliente que ficou sem resposta.");
+        if (Situacao != SituacaoConversa.Assumida)
+            throw new RegraDeDominioVioladaException("Só a conversa que está com a equipe volta ao Assistente por tempo.");
+        if (!TemAgente)
+            throw new RegraDeDominioVioladaException($"O canal {Canal} não tem atendimento automático: a conversa continua com você.");
+        Situacao = SituacaoConversa.Automatica;
+        AssumidaPorUsuarioId = null;
+        MotivoEscalada = null;
+        MarcarRetomadaPorTempoDecidida(entradaId);
+    }
+
+    /// <summary>
+    /// #3068: a retomada desta entrada foi avaliada e recusada (um portão do Assistente barrou). A conversa fica como a
+    /// equipe deixou; a marca só impede a varredura de reavaliar a mesma mensagem a cada passada.
+    /// </summary>
+    public void DispensarRetomadaPorTempo(Guid entradaId)
+    {
+        if (entradaId == Guid.Empty)
+            throw new RegraDeDominioVioladaException("A retomada precisa da mensagem do cliente que ficou sem resposta.");
+        MarcarRetomadaPorTempoDecidida(entradaId);
+    }
+
+    private void MarcarRetomadaPorTempoDecidida(Guid entradaId)
+    {
+        var contexto = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson)!;
+        contexto[ChaveRetomadaPorTempoEntradaId] = JsonSerializer.SerializeToElement(entradaId);
+        ContextoJson = JsonSerializer.Serialize(contexto);
+    }
+
+    /// <summary>#3068: a retomada por causa desta entrada do cliente já foi decidida (retomou ou foi dispensada).</summary>
+    public bool RetomadaPorTempoDecidida(Guid entradaId) => RetomadaPorTempoDecidida(ContextoJson, entradaId);
+
+    /// <summary>A mesma leitura para quem tem só a coluna do contexto, sem a entidade (varredura entre lojas).</summary>
+    public static bool RetomadaPorTempoDecidida(string contextoJson, Guid entradaId) =>
+        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(contextoJson) is { } contexto
+        && contexto.TryGetValue(ChaveRetomadaPorTempoEntradaId, out var valor)
+        && valor.ValueKind == JsonValueKind.String
+        && Guid.TryParse(valor.GetString(), out var retomada)
+        && retomada == entradaId;
 
     /// <summary>Idempotente: preserva o carimbo até uma reabertura explícita.</summary>
     public void Encerrar(DateTime agora)
