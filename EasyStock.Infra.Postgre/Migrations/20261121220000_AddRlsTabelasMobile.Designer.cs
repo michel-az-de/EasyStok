@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EasyStock.Infra.Postgre.Migrations
 {
     [DbContext(typeof(EasyStockDbContext))]
-    [Migration("20261121191000_AddRlsTabelasMobile")]
+    [Migration("20261121220000_AddRlsTabelasMobile")]
     partial class AddRlsTabelasMobile
     {
         /// <inheritdoc />
@@ -5900,6 +5900,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("metodo");
 
+                    b.Property<DateTime?>("NaoPromoverEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nao_promover_em");
+
                     b.Property<DateTime>("ServerUpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -8378,6 +8382,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                     b.Property<string>("Origem")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("QuitadoHistoricoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("quitado_historico_em");
 
                     b.Property<DateTime?>("RecusadoEm")
                         .HasColumnType("timestamp with time zone")

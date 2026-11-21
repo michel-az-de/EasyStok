@@ -55,6 +55,8 @@ public class MarcasDoHistoricoImportadoMigrationTests(PostgreSqlDatabaseFixture 
         (await ColunaAsync(db, "mobile_cash_entries", "nao_promover_em")).Should().BeNull();
         (await ColunaAsync(db, "pedidos", "quitado_historico_em")).Should().BeNull();
         (await ContarAsync(db, $"""SELECT count(*) AS "Value" FROM mobile_cash_entries WHERE "Id" = {id}""")).Should().Be(1);
+        // A linha deste teste não tem empresa, e a migração da RLS do Mobile (#2180) recusa subir com órfã.
+        await db.Database.ExecuteSqlAsync($"""DELETE FROM mobile_cash_entries WHERE "Id" = {id}""");
         await db.Database.MigrateAsync();
         (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
     }

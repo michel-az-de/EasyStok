@@ -243,6 +243,7 @@ public class LegacyFechamentosLeituraE2ETests(MobileE2EFixture fixture)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var semRls = db.UseRowLevelSecurityBypass(); // teste semeia sem tenant; a API roda sob RLS (#2180)
         var loja = new Loja { Id = Guid.NewGuid(), EmpresaId = empresa, Nome = "Segunda Loja Teste", Ativa = true, CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow };
         db.Lojas.Add(loja);
         await db.SaveChangesAsync();
