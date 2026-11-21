@@ -66,6 +66,19 @@ try {
     await pagina.keyboard.press('Shift+Tab')
     const contorno = await comoLigar.evaluate(e => getComputedStyle(e).outlineStyle !== 'none' && parseFloat(getComputedStyle(e).outlineWidth) > 0)
     assert.ok(contorno, 'foco visível')
+    assert.equal(await pagina.evaluate(() => document.activeElement?.hasAttribute('aria-expanded')), true, 'o foco por teclado está no botão')
+    // O estilo calculado existe mesmo com o anel cortado: nenhum ancestral pode cortar o retângulo do anel.
+    const cortado = await comoLigar.evaluate(e => {
+      const c = getComputedStyle(e), r = e.getBoundingClientRect(), g = parseFloat(c.outlineWidth) + Math.max(0, parseFloat(c.outlineOffset))
+      for (let a = e.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+        const o = getComputedStyle(a)
+        if ([o.overflowX, o.overflowY].every(v => v === 'visible')) continue
+        const b = a.getBoundingClientRect()
+        if (r.left - g < b.left - 0.5 || r.right + g > b.right + 0.5 || r.top - g < b.top - 0.5 || r.bottom + g > b.bottom + 0.5) return a.className || a.tagName
+      }
+      return ''
+    })
+    assert.equal(cortado, '', `o anel de foco não pode ser cortado por um ancestral (${cortado})`)
     assert.deepEqual(erros, [])
     resultados.push({ largura, tema, fechada, alvo: alvo.height, painel: caixaPainel.height })
     await contexto.close()
