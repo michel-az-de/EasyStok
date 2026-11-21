@@ -12,7 +12,7 @@ public class RegistrarSaidaEstoqueTenantTests
     private readonly IUsuarioEmpresaRepository _usuariosEmpresa = Substitute.For<IUsuarioEmpresaRepository>();
     private readonly IItemEstoqueRepository _itens = Substitute.For<IItemEstoqueRepository>();
 
-    private RegistrarSaidaEstoqueUseCase BuildUseCase()
+    private RegistrarSaidaEstoqueUseCase BuildUseCase(bool semRepositorios = false)
     {
         var unitOfWork = Substitute.For<IUnitOfWork>();
         unitOfWork.SetupExecuteInTransactionSemRetryForward<RegistrarSaidaEstoqueResult>();
@@ -27,8 +27,8 @@ public class RegistrarSaidaEstoqueTenantTests
             Substitute.For<IPublicadorEventos>(),
             null,
             null,
-            _lojas,
-            _usuariosEmpresa);
+            semRepositorios ? null : _lojas,
+            semRepositorios ? null : _usuariosEmpresa);
     }
 
     private static RegistrarSaidaEstoqueCommand Command(Guid empresaId, Guid? lojaId, Guid? vendedorId) =>
@@ -77,5 +77,37 @@ public class RegistrarSaidaEstoqueTenantTests
         // Passa pelos guards de tenant e falha só adiante: o item de estoque não existe.
         (await act.Should().ThrowAsync<UseCaseValidationException>())
             .Where(e => !e.Message.Contains("loja") && !e.Message.Contains("vendedor"));
+        await _lojas.Received(1).GetByIdAsync(empresaId, lojaId);
+        await _usuariosEmpresa.Received(1).GetByUsuarioEEmpresaAsync(vendedorId, empresaId);
+    }
+
+    [Fact]
+    public async Task Vendedor_com_vinculo_inativo_na_mesma_empresa_e_aceito()
+    {
+        var empresaId = Guid.NewGuid();
+        var vendedorId = Guid.NewGuid();
+        _usuariosEmpresa.GetByUsuarioEEmpresaAsync(vendedorId, empresaId)
+            .Returns(new UsuarioEmpresa { UsuarioId = vendedorId, EmpresaId = empresaId, Ativo = false });
+
+        var act = () => BuildUseCase().ExecuteAsync(Command(empresaId, null, vendedorId));
+
+        (await act.Should().ThrowAsync<UseCaseValidationException>())
+            .Where(e => !e.Message.Contains("vendedor"));
+    }
+
+    [Fact]
+    public async Task Loja_informada_sem_repositorio_falha_fechado()
+    {
+        var act = () => BuildUseCase(semRepositorios: true).ExecuteAsync(Command(Guid.NewGuid(), Guid.NewGuid(), null));
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*ILojaRepository*");
+    }
+
+    [Fact]
+    public async Task Vendedor_informado_sem_repositorio_falha_fechado()
+    {
+        var act = () => BuildUseCase(semRepositorios: true).ExecuteAsync(Command(Guid.NewGuid(), null, Guid.NewGuid()));
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*IUsuarioEmpresaRepository*");
     }
 }

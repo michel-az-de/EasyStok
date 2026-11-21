@@ -34,7 +34,16 @@ public class BaixaDeInsumosDaProducaoTests
 
     private BaixaDeInsumosDaProducao Sut() => new(_composicao, _itens, new RegistrarSaidaEstoqueUseCase(
         _produtos, _itens, _vendas, _itensVenda, _movs, _uow,
-        Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(), publicadorEventos: Substitute.For<IPublicadorEventos>()), _produtos);
+        Substitute.For<ILogger<RegistrarSaidaEstoqueUseCase>>(), publicadorEventos: Substitute.For<IPublicadorEventos>(),
+        lojaRepository: LojasDaEmpresa()), _produtos);
+
+    // #3099: a saída valida a loja contra a empresa; aqui toda loja consultada pertence a ela.
+    private ILojaRepository LojasDaEmpresa()
+    {
+        var lojas = Substitute.For<ILojaRepository>();
+        lojas.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns(ci => Loja.Criar(ci.ArgAt<Guid>(0), "Loja"));
+        return lojas;
+    }
 
     private Produto Prato(bool marcado, decimal rendimento = 6, UnidadeMedida unidade = UnidadeMedida.Un) => new()
     {
