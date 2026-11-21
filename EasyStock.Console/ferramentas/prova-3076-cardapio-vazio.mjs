@@ -30,3 +30,11 @@ assert.equal(voltou.catalogo.cardapioFalha, null)
 // Modo demonstração: a massa já vem com itens e nunca passa pela leitura da API.
 assert.equal(situacaoDoCardapio({ cardapio: comItens.catalogo.cardapio }).tipo, 'pronto', 'demonstração')
 console.log('ok prova-3076-cardapio-vazio')
+
+// Revisão da #3076: leu vazio e depois a vitrine desligou: vale o motivo da recusa, não "cardápio vazio".
+{
+  const { situacaoDoCardapio: s } = await import('../src/aplicacao/janelaDoPedido.js')
+  const assert2 = (await import('node:assert/strict')).default
+  assert2.deepEqual(s({ cardapio: [], cardapioLido: true, cardapioFalha: 'A loja online está desligada.' }), { tipo: 'falhou', mensagem: 'A loja online está desligada.' })
+  assert2.deepEqual(s({ cardapio: [{ sku: 'a' }], cardapioLido: true, cardapioFalha: 'x' }), { tipo: 'pronto' }, 'itens na tela valem mesmo com falha depois')
+}

@@ -55,3 +55,13 @@ const dossie = {
 }
 
 console.log('prova-3076-dossie-da-janela: ok')
+
+// 3. Ligação na janela (revisão da #3076): o endereço que chega do dossiê passa por `enderecoQueChegou` e vai ao campo;
+// "Cadastrar endereço" só trava quando o endereço do cadastro vale (não quando a simulação diz que falta).
+{
+  const { readFileSync } = await import('node:fs')
+  const jsx = readFileSync(new URL('../src/app/NovoPedidoJanela.jsx', import.meta.url), 'utf8')
+  assert.match(jsx, /const chegou = enderecoQueChegou\(enderecoTexto, enderecoDoCadastro\)\s*\n\s*if \(chegou\) setEnderecoTexto\(chegou\)/, 'o endereço do dossiê não chega ao campo')
+  assert.match(jsx, /disabled=\{cadastrando \|\| !enderecoTexto\.trim\(\) \|\| enderecoValido\}/, 'Cadastrar endereço trava sem o endereço valer')
+}
+console.log('prova-3076-dossie-da-janela: ligação ok')

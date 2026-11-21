@@ -237,7 +237,7 @@ function Montagem({ janela, conversa }) {
           <SeletorJanelaApi key={janela.conversaId} pedido={pedido} editavel aoLerJanelas={lerJanelas} aoEscolher={(j, avisar) => acoes.escolherJanela(janela.conversaId, j, avisar)} />
           <h3 className={css.subtitulo}>Endereço de entrega</h3>
           <CampoTexto rotulo="Endereço de entrega" value={enderecoTexto} erro={erroEndereco} onChange={(e) => { setEnderecoTexto(e.target.value); setErroEndereco(null) }} />
-          <Botao disabled={cadastrando || !enderecoTexto.trim() || Boolean(enderecoDoPedido)} motivo={cadastrando ? 'Cadastrando…' : enderecoDoPedido ? 'Este já é o endereço do cadastro' : 'Escreva o endereço de entrega'} onClick={cadastrarEndereco}>{cadastrando ? 'Cadastrando…' : 'Cadastrar endereço'}</Botao>
+          <Botao disabled={cadastrando || !enderecoTexto.trim() || enderecoValido} motivo={cadastrando ? 'Cadastrando…' : enderecoValido ? 'Este já é o endereço do cadastro' : 'Escreva o endereço de entrega'} onClick={cadastrarEndereco}>{cadastrando ? 'Cadastrando…' : 'Cadastrar endereço'}</Botao>
           {enderecoValido && <p className={css.aviso} role="status">Entrega no endereço do cadastro: {enderecoDoPedido}</p>}
           {erroDaSimulacaoNaEntrega(erroSimulacao, erroEndereco) && <p className={css.erro} role="alert">{textoDoErro(erroSimulacao, { noPassoDaEntrega: true })}</p>}
           {/* #2974: fora da área o frete é combinado com a cliente, como na comanda do Atendimento (#2219). */}

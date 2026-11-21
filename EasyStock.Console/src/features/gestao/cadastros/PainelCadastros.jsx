@@ -7,7 +7,7 @@ import { useConviteDeRecompra } from '../../../aplicacao/conviteDeRecompra'
 import { useGravacaoDoAjuste, useRascunhoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
 import { contextoCadastro, obterCadastro, salvarCadastro, useContextoVisualCadastro, useListaCadastros } from '../../../aplicacao/cadastros'
 import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
-import { useAviso } from '../../../componentes/Aviso'
+import { DURACAO_COM_ACAO_MS, useAviso } from '../../../componentes/Aviso'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { BuscaComSugestoes } from '../../../componentes/BuscaComSugestoes'
@@ -87,7 +87,8 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const consulta = useListaCadastros(tela, { busca, pagina, filtro: emRecompra ? '' : filtro, ordem: emRecompra ? 'sem-comprar' : ordem, relacionamento: emRecompra ? 'recompra' : tela === 'clientes' && ['lead', 'cliente'].includes(tipo) ? tipo : '' }, contexto, !soLeads)
   // #3076: o sucesso vai ao Aviso, que some sozinho; só o que pede ação (endereço não gravado) fica na tela.
   const avisoDaTela = useAviso()
-  const avisar = (texto) => avisoDaTela.mostrar({ texto, tom: 'sucesso' })
+  // Orientação ("Volte à conversa…") pede leitura: fica o tempo do aviso com ação.
+  const avisar = (texto, { orienta = false } = {}) => avisoDaTela.mostrar({ texto, tom: 'sucesso', ...(orienta ? { duracao: DURACAO_COM_ACAO_MS } : {}) })
   const [pendencia, anotarPendencia] = useState(null)
   const recompra = useConviteDeRecompra({ aoMudar: () => consulta.recarregar() })
   const [reversao, prepararReversao] = useState(null)
@@ -141,7 +142,8 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
   const salvo = ({ anterior, atual, aviso } = {}) => {
     prepararReversao(tela === 'bancos' && anterior?.id && atual?.id === anterior.id && Number.isInteger(atual.revisao)
       ? { ...anterior, revisao: atual.revisao, requestId: crypto.randomUUID() } : null)
-    definir({ editor: null }); aoFixarContexto(false); anotarPendencia(aviso ?? null); if (!aviso) avisar((editor?.origemConversa ? 'Cadastro salvo. Volte à conversa e confira o vínculo com a pessoa.' : 'Cadastro salvo.')); consulta.recarregar()
+    definir({ editor: null }); aoFixarContexto(false); const volta = editor?.origemConversa ? ' Volte à conversa e confira o vínculo com a pessoa.' : ''
+    anotarPendencia(aviso ? aviso + volta : null); if (!aviso) avisar(`Cadastro salvo.${volta}`, { orienta: Boolean(volta) }); consulta.recarregar()
     relerConversasDoCliente(editor?.dados.id)
   }
   // #2495 (S2): inativar ou reativar fecha o editor, avisa e relê a lista (e as conversas desse cliente).

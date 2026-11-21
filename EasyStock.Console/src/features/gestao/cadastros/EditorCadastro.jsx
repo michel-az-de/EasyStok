@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { enderecoDeEntregaDoCadastro, erroDoEnderecoDoCadastro } from '../../../dominio/fichaCliente'
+import { enderecoDeEntregaDoCadastro, erroDoEnderecoDoCadastro, gravaEnderecoDoCadastro } from '../../../dominio/fichaCliente'
 import { adicionarEnderecoCliente, alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro, useRelacionamentoCliente } from '../../../aplicacao/cadastros'
 import { useSugestaoCadastro } from '../../../aplicacao/useSugestaoCadastro'
 import { useGravacaoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
@@ -141,11 +141,14 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     try {
       const atual = await salvarCadastro(tela, dados, contexto)
       // #3076 (#2776): o pedido entrega no endereço estruturado; o cadastro já salvo não volta atrás se só este falhar.
-      const entrega = tela === 'clientes' && atual?.id ? enderecoDeEntregaDoCadastro(dados, { empresaId: contexto.empresaId, inicial }) : null
+      // A Ficha abaixo do formulário pode ter gravado um endereço depois que o editor abriu: relê antes de decidir o Padrão.
       let aviso
-      if (entrega) {
-        try { await adicionarEnderecoCliente(atual.id, entrega, contexto) }
-        catch (e) { aviso = `Cadastro salvo, mas o endereço de entrega não foi gravado: ${e.message} Adicione em Endereços, na ficha.` }
+      if (tela === 'clientes' && atual?.id && gravaEnderecoDoCadastro(dados, inicial)) {
+        try {
+          const enderecos = inicial?.id ? (await obterCadastro('clientes', atual.id, contexto)).detalhe?.enderecos : []
+          const entrega = enderecoDeEntregaDoCadastro(dados, { empresaId: contexto.empresaId, inicial, enderecos })
+          if (entrega) await adicionarEnderecoCliente(atual.id, entrega, contexto)
+        } catch (e) { aviso = `Cadastro salvo, mas o endereço de entrega não foi gravado: ${e.message} Adicione em Endereços, na ficha.` }
       }
       if (montado.current) aoSalvo({ anterior: inicial, atual, aviso })
     } catch (e) {

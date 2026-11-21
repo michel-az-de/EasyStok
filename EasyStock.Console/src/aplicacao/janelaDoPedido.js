@@ -61,9 +61,9 @@ export const cardapioPronto = (cardapio) => Array.isArray(cardapio) && cardapio.
 // #3076: "carregando" só até a primeira leitura. Leu e veio vazio é pronto (a janela diz que não há item); a recusa
 // (vitrine desligada, falha) diz o motivo em vez de esperar para sempre. Itens já na tela valem mesmo com falha depois.
 export function situacaoDoCardapio(catalogo) {
-  if (cardapioPronto(catalogo?.cardapio) || catalogo?.cardapioLido) return { tipo: 'pronto' }
+  if (cardapioPronto(catalogo?.cardapio)) return { tipo: 'pronto' }
   if (catalogo?.cardapioFalha) return { tipo: 'falhou', mensagem: catalogo.cardapioFalha }
-  return { tipo: 'carregando' }
+  return catalogo?.cardapioLido ? { tipo: 'pronto' } : { tipo: 'carregando' }
 }
 
 // Entrega e endereço (como a comanda): a API usa o endereço do cadastro do cliente. Sem ele, 409 na simulação e no
