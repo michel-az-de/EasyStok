@@ -33,6 +33,12 @@ public sealed record RequisicaoLlm(
 {
     /// <summary>Modelo do agente quando a configuração não diz outro (<c>Anthropic:ModeloAgente</c> ausente).</summary>
     public const string ModeloPadrao = "claude-sonnet-5";
+
+    /// <summary>#3063: loja que paga a chamada. Vazio não grava <c>chamada_ia</c> (só testes antigos).</summary>
+    public Guid EmpresaId { get; init; }
+
+    /// <summary>#3063: para que a chamada serve, no registro de uso.</summary>
+    public EasyStock.Domain.Enums.Ia.FinalidadeIa Finalidade { get; init; } = EasyStock.Domain.Enums.Ia.FinalidadeIa.Outra;
 }
 
 /// <summary><paramref name="Papel"/> é <c>user</c> ou <c>assistant</c>.</summary>

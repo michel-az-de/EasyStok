@@ -27,7 +27,7 @@ public class AtendimentoProducaoPesquisaController(IPesquisaProducaoWeb pesquisa
     public async Task<IActionResult> Sugerir([FromBody] PesquisaReceitaRequest request, CancellationToken ct)
     {
         if (!currentUser.TemPermissao(Permissao.GerenciarEstoque)) return Forbid();
-        try { return DataOk(await sugestao.ExecuteAsync(request.Nome, ct)); }
+        try { return DataOk(await sugestao.ExecuteAsync(currentUser.EmpresaId, request.Nome, ct)); }
         catch (UseCaseValidationException ex) { return DataBadRequest(ex); }
         catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException || ex is OperationCanceledException && !ct.IsCancellationRequested)
         { return StatusCode(503, new { error = new { message = "A IA ou a pesquisa pública está indisponível. Sua receita foi preservada." } }); }

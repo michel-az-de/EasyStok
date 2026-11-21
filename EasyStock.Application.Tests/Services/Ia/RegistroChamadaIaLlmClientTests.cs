@@ -1,0 +1,127 @@
+using System.Net;
+using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Services.Ia;
+using EasyStock.Domain.Entities.Ia;
+using EasyStock.Domain.Enums.Ia;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
+
+namespace EasyStock.Application.Tests.Services.Ia;
+
+/// <summary>#3063 (S2a de #2948): cada chamada ao LLM vira uma linha de chamada_ia, sem mudar a resposta.</summary>
+public class RegistroChamadaIaLlmClientTests
+{
+    private static readonly Guid Empresa = Guid.NewGuid();
+    private readonly IAgenteLlmClient _interno = Substitute.For<IAgenteLlmClient>();
+    private readonly IRegistroChamadaIa _registro = Substitute.For<IRegistroChamadaIa>();
+    private readonly List<ChamadaIa> _gravadas = [];
+
+    public RegistroChamadaIaLlmClientTests()
+    {
+        _registro.RegistrarAsync(Arg.Do<ChamadaIa>(_gravadas.Add), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+    }
+
+    private RegistroChamadaIaLlmClient Cliente() =>
+        new(_interno, _registro, new FakeTimeProvider(new DateTimeOffset(2026, 11, 21, 17, 0, 0, TimeSpan.Zero)),
+            NullLogger<RegistroChamadaIaLlmClient>.Instance);
+
+    private static RequisicaoLlm Requisicao(FinalidadeIa finalidade = FinalidadeIa.ResumoCliente, Guid? empresa = null) =>
+        new("s", [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm("oi")])], [])
+        {
+            EmpresaId = empresa ?? Empresa,
+            Finalidade = finalidade,
+        };
+
+    [Fact]
+    public async Task SucessoGravaTokensModeloEFinalidadeEDevolveAMesmaResposta()
+    {
+        var resposta = new RespostaLlm("end_turn", [new BlocoTextoLlm("ok")], 100, 20, 5, "deepseek-flash", 3);
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(resposta);
+
+        var devolvida = await Cliente().EnviarAsync(Requisicao());
+
+        devolvida.Should().BeSameAs(resposta);
+        var c = _gravadas.Should().ContainSingle().Subject;
+        c.EmpresaId.Should().Be(Empresa);
+        c.Finalidade.Should().Be(FinalidadeIa.ResumoCliente);
+        c.Desfecho.Should().Be(DesfechoChamadaIa.Ok);
+        (c.TokensEntrada, c.TokensSaida, c.TokensCacheLido, c.TokensCacheEscrito).Should().Be((100, 20, 5, 3));
+        c.ModeloRespondido.Should().Be("deepseek-flash");
+        c.ProvedorId.Should().BeNull();
+        c.ModeloId.Should().BeNull();
+        c.CustoUsd.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.PaymentRequired, DesfechoChamadaIa.SemSaldo402)]
+    [InlineData(HttpStatusCode.TooManyRequests, DesfechoChamadaIa.Limite429)]
+    [InlineData(HttpStatusCode.InternalServerError, DesfechoChamadaIa.Erro)]
+    public async Task FalhaHttpGravaODesfechoERelanca(HttpStatusCode status, DesfechoChamadaIa desfecho)
+    {
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new HttpRequestException("falhou", null, status));
+
+        var act = () => Cliente().EnviarAsync(Requisicao());
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+        var c = _gravadas.Should().ContainSingle().Subject;
+        c.Desfecho.Should().Be(desfecho);
+        c.TokensEntrada.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task OutraExcecaoGravaErro()
+    {
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new InvalidOperationException("cli caiu"));
+
+        var act = () => Cliente().EnviarAsync(Requisicao(FinalidadeIa.Ficha));
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        _gravadas.Should().ContainSingle().Which.Desfecho.Should().Be(DesfechoChamadaIa.Erro);
+    }
+
+    [Fact]
+    public async Task CancelamentoNaoGrava()
+    {
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new OperationCanceledException());
+
+        var act = () => Cliente().EnviarAsync(Requisicao());
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _gravadas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FalhaAoGravarNaoInterrompeAResposta()
+    {
+        var resposta = new RespostaLlm("end_turn", [], 1, 1);
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(resposta);
+        _registro.RegistrarAsync(Arg.Any<ChamadaIa>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("banco fora"));
+
+        var devolvida = await Cliente().EnviarAsync(Requisicao());
+
+        devolvida.Should().BeSameAs(resposta);
+    }
+
+    [Fact]
+    public async Task SemEmpresaNaoGravaMasResponde()
+    {
+        var resposta = new RespostaLlm("end_turn", [], 1, 1);
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(resposta);
+
+        var devolvida = await Cliente().EnviarAsync(Requisicao(empresa: Guid.Empty));
+
+        devolvida.Should().BeSameAs(resposta);
+        _gravadas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DisponivelVemDoClienteInterno()
+    {
+        _interno.Disponivel.Returns(true);
+        Cliente().Disponivel.Should().BeTrue();
+    }
+}
