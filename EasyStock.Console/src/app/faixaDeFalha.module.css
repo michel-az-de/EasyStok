@@ -33,7 +33,8 @@
   gap: var(--e-1);
 }
 
-/* #3005: som e notificações bloqueados são condição comum, não falha: uma linha neutra (sem --erro), até 48 px
+/* #3005: os botões herdam o alvo do Botao (var(--toque): 40 px no desktop, 48 px no toque e abaixo de 760 px).
+   Som e notificações bloqueados são condição comum, não falha: uma linha neutra (sem --erro), até 48 px
    com a margem. Contorno uniforme de 1px e fundo tingido, nunca barra de um lado só. */
 .aparelho {
   flex-shrink: 0;
@@ -53,10 +54,11 @@
 }
 .aparelho > svg { flex-shrink: 0; }
 .aparelhoTexto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.aparelhoBotao { flex-shrink: 0; min-height: 34px; padding: 0 var(--e-2); white-space: nowrap; }
+.aparelhoBotao { flex-shrink: 0; padding: 0 var(--e-2); white-space: nowrap; }
 
 .quadro { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .conteudo { flex: 1; min-height: 0; }
+.conteudo:focus { outline: none; } /* recebe o foco só por código, depois de Dispensar */
 
 /* FaixaApi é irmã da moldura dentro deste contêiner, não mais de #root. */
 .conteudo:has(> :global([data-conteudo-console])) { display: flex; flex-direction: column; }
