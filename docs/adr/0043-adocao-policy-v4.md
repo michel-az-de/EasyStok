@@ -1,6 +1,6 @@
 # ADR-0043 — Adocao da Policy v4.0 (PR-first, issue-driven)
 
-- Status: Aceito; ampliado pela ADR-0070 (quem aplica a label `aprovado`)
+- Status: Aceito; ampliado pela ADR-0070 (quem aplica a label `aprovado`; aceite de pós-merge)
 - Data: 2026-07-09
 - Supersede: ADR-0022 (master-first trunk-based)
 - Relacionado: ADR-0040 (gate unico pre-commit), ADR-0029 (poka-yoke / worktree-status)

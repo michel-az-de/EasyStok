@@ -3,7 +3,7 @@
 - Status: Aceito
 - Data: 2026-11-21
 - Decisor: Felipe
-- Amplia: ADR-0043 e ADR-0055, nos tiers de merge (quem aplica a label de tier ALTO). A lista do que é tier ALTO não muda.
+- Amplia: ADR-0043 e ADR-0055, nos tiers de merge (quem aplica a label de tier ALTO) e no aceite de pós-merge (item 6, qualquer tier). A lista do que é tier ALTO não muda.
 - Relacionados: issues #3069 e #3077; `CLAUDE.md`, seção Autorizações
 
 ## Contexto
@@ -27,7 +27,8 @@ condição "aceite todo marcado" tornava a label impossível, e as sessões já 
 abertos sem regra escrita. À pergunta "Ajusto a ADR-0070 para aceitar item de pós-deploy aberto na
 hora da label?", o Felipe respondeu "Sim, ajuste". O item 6 da Decisão registra o ajuste. A
 pergunta dizia "pós-deploy"; a regra cobre também o CI do master no commit mergeado, que tem a
-mesma natureza e antecede o deploy (precedente: PR #3070, issue #3063).
+mesma natureza e antecede o deploy (precedente: PR #3070, issue #3063). Essa leitura é da sessão
+gestora, não frase do Felipe; ele pode restringir a regra ao pós-deploy.
 
 ## Decisão
 
@@ -49,18 +50,19 @@ mesma natureza e antecede o deploy (precedente: PR #3070, issue #3063).
 5. **Migração.** Migração mergeada sob esta delegação vai à produção pelo `vps-deploy.sh`, que faz
    `pg_dump` e deixa a migration rodar no startup da API. Isso está dentro da delegação. O
    `dotnet ef database update` manual continua exigindo GO.
-6. **Aceite de pós-merge (ajuste de 21/11/2026, issue #3077).** Fica aberto na hora da label o item
-   de aceite que, por natureza, só se mede depois do merge: CI do master no commit mergeado, deploy
-   e validação em produção. O que dá para medir na PR (teste, build, revisão, prova local) não é
-   pós-merge e continua barrando a label. Validação em produção não dispensa a prova na PR: o
-   mesmo comportamento precisa estar provado por teste ou prova local antes da label.
-   Salvaguardas: a prova da label lista cada item aberto e por que só se mede depois; a PR usa
-   `refs #N`, não `closes #N`, para o merge não fechar a issue; a sessão que mergeou mede cada
-   item, marca com a prova e fecha a issue antes de se declarar concluída. Item que falhar depois
-   do merge mantém a issue aberta: a sessão corrige por nova PR no mesmo ciclo ou volta a imagem
-   anterior com `vps-deploy.sh --rollback` e o motivo, que não reverte o banco. O `revert` no
-   master continua exigindo GO. O mecanismo (`refs #N`, issue aberta até a prova) vale para
-   qualquer tier.
+6. **Aceite de pós-merge (ajuste de 21/11/2026, issue #3077).** Fica aberto na hora da label (ou do
+   merge, no tier baixo) o item de aceite que, por natureza, só se mede depois do merge: CI do
+   master no commit mergeado, deploy e validação em produção. O que dá para medir na PR (teste,
+   build, revisão, prova local) não é pós-merge e continua barrando a label. Validação em produção
+   não dispensa a prova na PR: o mesmo comportamento precisa estar provado por teste ou prova local
+   antes da label. Salvaguardas: a prova da label lista cada item aberto e por que só se mede
+   depois; a PR usa `refs #N`, não `closes #N`, para o merge não fechar a issue; no merge, a sessão
+   comenta na issue os itens pendentes; ela mede cada item, marca com a prova e fecha a issue antes
+   de se declarar concluída. Se ela cair antes de medir, qualquer sessão retoma pela issue aberta.
+   Item que falhar depois do merge mantém a issue aberta e a sessão corrige por nova PR no mesmo
+   ciclo. O `vps-deploy.sh --rollback` (sha, motivo e confirmação; não reverte o banco) só segura a
+   produção até essa correção, que vem antes do próximo deploy. O `revert` no master continua
+   exigindo GO. O mecanismo (`refs #N`, issue aberta até a prova) vale para qualquer tier.
 
 ## Alternativas descartadas
 
