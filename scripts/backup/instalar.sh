@@ -4,7 +4,7 @@
 # Roda NA VPS como felipe, a partir da pasta com backup.sh e systemd/ (o instalar.ps1
 # copia para ~/backup-restic/src e chama este script).
 #
-# Nunca le nem imprime segredo: so confere que a senha e o rclone.conf existem, com
+# Nunca le nem imprime segredo: so confere que a senha e o ezdrive.conf existem, com
 # permissao 600 e as chaves esperadas. Sem eles, para antes de ligar o timer.
 # Uso: bash instalar.sh [--sem-timer]
 # =============================================================================
@@ -43,19 +43,19 @@ modo() { stat -c %a "$1" 2>/dev/null; }
 [ -d "$CONF_DIR" ] && [ "$(modo "$CONF_DIR")" = 700 ] || { echo "    falta $CONF_DIR com modo 700"; falta=1; }
 [ -s "$CONF_DIR/restic.senha" ] && [ "$(modo "$CONF_DIR/restic.senha")" = 600 ] \
   || { echo "    falta restic.senha (modo 600): docs/dev/backup-drive.md, passo da senha"; falta=1; }
-if [ -s "$CONF_DIR/rclone.conf" ] && [ "$(modo "$CONF_DIR/rclone.conf")" = 600 ]; then
-  for chave in '^\[ezdrive\]' '^type = drive' '^scope = drive$' '^service_account_file = ' '^team_drive = '; do
-    grep -q "$chave" "$CONF_DIR/rclone.conf" || { echo "    rclone.conf sem '$chave'"; falta=1; }
+# Login OAuth do rclone, em arquivo proprio (nao o rclone.conf do backup antigo). So chaves,
+# nunca valores. client_id vazio cai no compartilhado do rclone, que para em 2026: recusa.
+if [ -s "$CONF_DIR/ezdrive.conf" ] && [ "$(modo "$CONF_DIR/ezdrive.conf")" = 600 ]; then
+  for chave in '^\[ezdrive\]' '^type = drive$' '^scope = drive\.file$' '^team_drive = ' '^client_id = .' '^token = '; do
+    grep -q "$chave" "$CONF_DIR/ezdrive.conf" || { echo "    ezdrive.conf sem a chave $chave (client_id precisa ter valor)"; falta=1; }
   done
-  sa="$(sed -n 's/^service_account_file = //p' "$CONF_DIR/rclone.conf")"
-  [ -s "$sa" ] && [ "$(modo "$sa")" = 600 ] || { echo "    chave da conta de servico ausente ou sem modo 600"; falta=1; }
 else
-  echo "    falta rclone.conf (modo 600): docs/dev/backup-drive.md, passo do rclone"; falta=1
+  echo "    falta ezdrive.conf (modo 600): docs/dev/backup-drive.md, passo do rclone"; falta=1
 fi
 [ "$falta" = 0 ] || erro "configuracao incompleta; nada foi ligado"
 
 passo "repositorio"
-export RESTIC_REPOSITORY="rclone:ezdrive:easystok-restic" RESTIC_PASSWORD_FILE="$CONF_DIR/restic.senha" RCLONE_CONFIG="$CONF_DIR/rclone.conf"
+export RESTIC_REPOSITORY="rclone:ezdrive:easystok-restic" RESTIC_PASSWORD_FILE="$CONF_DIR/restic.senha" RCLONE_CONFIG="$CONF_DIR/ezdrive.conf"
 set +e; "$BIN/restic" -o rclone.program="$BIN/rclone" cat config >/dev/null 2>&1; rc=$?; set -e
 case "$rc" in
   0)  echo "    ja existe" ;;

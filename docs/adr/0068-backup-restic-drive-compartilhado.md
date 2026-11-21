@@ -73,3 +73,7 @@ com issue.
 
 Desligar o timer (`systemctl --user disable --now easystok-backup.timer`) e as tarefas da estação. O
 repositório no Drive e o local seguem legíveis com a senha. Nada muda na produção.
+
+## Atualização (#3027)
+
+A autenticação do remote `ezdrive` passou de chave JSON de conta de serviço para login OAuth do rclone, em arquivo próprio (`ezdrive.conf`). VPS e estação compartilham o mesmo login; o risco é aceito pelo dono e descrito em `docs/dev/backup-drive.md`.

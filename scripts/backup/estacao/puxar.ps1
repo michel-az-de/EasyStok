@@ -1,6 +1,6 @@
 # Copia puxada do backup (E3, #2977, ADR-0068): traz os snapshots do Drive para o repositorio
 # local, que a VPS nao alcanca, e so entao aplica a retencao com prune nos dois lados.
-# A conta de servico desta estacao e a unica com papel de Manager no Drive compartilhado.
+# Login OAuth da estacao (ezdrive.conf), o mesmo login da VPS: risco aceito em backup-drive.md.
 # Agendada por registrar-tarefas.ps1 (06:30). Uso: pwsh estacao/puxar.ps1 [-SemPrune]
 param([switch]$SemPrune)
 . "$PSScriptRoot\comum.ps1"
