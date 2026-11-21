@@ -84,13 +84,28 @@ public class RegistroChamadaIaLlmClientTests
     [Fact]
     public async Task CancelamentoNaoGrava()
     {
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
         _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
-            .Returns<RespostaLlm>(_ => throw new OperationCanceledException());
+            .Returns<RespostaLlm>(_ => throw new OperationCanceledException(cts.Token));
 
-        var act = () => Cliente().EnviarAsync(Requisicao());
+        var act = () => Cliente().EnviarAsync(Requisicao(), cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
         _gravadas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TimeoutDoClienteComTokenDoChamadorVivoGravaErro()
+    {
+        // HttpClient.Timeout e o prazo do CLI lançam TaskCanceledException sem que quem chamou tenha cancelado.
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new TaskCanceledException("timeout"));
+
+        var act = () => Cliente().EnviarAsync(Requisicao(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<TaskCanceledException>();
+        _gravadas.Should().ContainSingle().Which.Desfecho.Should().Be(DesfechoChamadaIa.Erro);
     }
 
     [Fact]

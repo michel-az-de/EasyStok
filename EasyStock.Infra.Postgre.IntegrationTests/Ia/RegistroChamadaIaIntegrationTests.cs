@@ -20,6 +20,8 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Ia;
 public class RegistroChamadaIaIntegrationTests(PostgreSqlDatabaseFixture fixture)
     : IClassFixture<PostgreSqlDatabaseFixture>
 {
+    private static readonly DateTimeOffset Agora = new(2026, 11, 21, 15, 0, 0, TimeSpan.Zero);
+
     private ServiceProvider Provedor()
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection([]).Build();
@@ -40,7 +42,7 @@ public class RegistroChamadaIaIntegrationTests(PostgreSqlDatabaseFixture fixture
         var interno = Substitute.For<IAgenteLlmClient>();
         interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
             .Returns(new RespostaLlm("end_turn", [], 100, 20, 0, "deepseek-flash"));
-        return new RegistroChamadaIaLlmClient(interno, sp.GetRequiredService<IRegistroChamadaIa>(), TimeProvider.System,
+        return new RegistroChamadaIaLlmClient(interno, sp.GetRequiredService<IRegistroChamadaIa>(), new RelogioFixo(),
             NullLogger<RegistroChamadaIaLlmClient>.Instance);
     }
 
@@ -65,7 +67,12 @@ public class RegistroChamadaIaIntegrationTests(PostgreSqlDatabaseFixture fixture
             .Should().HaveCount(3).And.OnlyContain(f => f == FinalidadeIa.ResumoCliente);
         (await db.ChamadasIa.IgnoreQueryFilters().CountAsync(c => c.EmpresaId == empresaB)).Should().Be(1);
 
-        var uso = await sp.GetRequiredService<IRegistroChamadaIa>().SomarMesAsync(empresaA, DateTime.UtcNow);
+        var uso = await sp.GetRequiredService<IRegistroChamadaIa>().SomarMesAsync(empresaA, Agora.UtcDateTime);
         uso.Should().Be(new UsoMensalIa(3, 300, 60, 0m));
+    }
+
+    private sealed class RelogioFixo : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => Agora;
     }
 }

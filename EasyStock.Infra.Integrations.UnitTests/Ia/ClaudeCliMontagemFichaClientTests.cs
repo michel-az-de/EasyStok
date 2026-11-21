@@ -208,7 +208,8 @@ public class ClaudeCliMontagemFichaClientTests
         provider.GetRequiredService<IAgenteLlmClient>().Should().BeOfType<RegistroChamadaIaLlmClient>();
         provider.GetRequiredService<IMontagemFichaLlmClient>()
             .Should().BeOfType<AgenteLlmServiceCollectionExtensions.MontagemFichaApiClient>()
-            .Which.Interno.Should().BeOfType<RegistroChamadaIaLlmClient>();
+            .Which.Interno.Should().BeOfType<RegistroChamadaIaLlmClient>()
+            .Which.Interno.Should().BeOfType(cli == "true" ? typeof(ClaudeCliMontagemFichaClient) : typeof(AnthropicMessagesClient));
     }
 
     [Fact]

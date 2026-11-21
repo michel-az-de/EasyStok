@@ -19,6 +19,8 @@ public sealed class RegistroChamadaIaLlmClient(
 {
     public bool Disponivel => interno.Disponivel;
 
+    public IAgenteLlmClient Interno => interno;
+
     public async Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default)
     {
         var cronometro = Stopwatch.StartNew();
@@ -27,8 +29,9 @@ public sealed class RegistroChamadaIaLlmClient(
         {
             resposta = await interno.EnviarAsync(requisicao, ct);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            // Só o cancelamento de quem chamou não grava; timeout do cliente (HttpClient, prazo do CLI) é Erro.
             throw;
         }
         catch (Exception ex)
