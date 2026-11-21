@@ -136,7 +136,7 @@ try {
       await contexto.close()
     }
   }
-  // Desmontar a tela com a pergunta aberta recusa: a ação rejeita com o erro original, não fica pendurada.
+  // Desmontar a tela com a pergunta aberta recusa: a ação rejeita com CONFIRMACAO_RECUSADA, não fica pendurada.
   {
     const { contexto, page, chamadas, nativos } = await preparar('Automatica')
     await page.evaluate(async () => {
@@ -150,7 +150,7 @@ try {
       page.evaluate(() => window.__acao),
       new Promise((r) => setTimeout(() => r('pendurada'), 5000)),
     ])
-    assert.equal(fim, 'rejeitou:CONVERSA_DE_OUTRA', 'desmontado com pergunta pendente: a ação rejeita com o erro original')
+    assert.equal(fim, 'rejeitou:CONFIRMACAO_RECUSADA', 'desmontado com pergunta pendente: a ação rejeita com CONFIRMACAO_RECUSADA')
     assert.equal(chamadas.length, 1, 'desmontar não repete a chamada')
     await contexto.close()
   }

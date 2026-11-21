@@ -55,12 +55,21 @@ export const definirPerguntaDeOutra = (pergunta) => {
   return () => { const i = perguntadores.lastIndexOf(pergunta); if (i >= 0) perguntadores.splice(i, 1) }
 }
 
+export const CONFIRMACAO_RECUSADA = 'CONFIRMACAO_RECUSADA'
+
 export const comConfirmacaoDeOutra = async (chamada) => {
   try {
     return await chamada(false)
   } catch (erro) {
     const perguntar = perguntadores.at(-1)
-    if (erro?.codigo !== 'CONVERSA_DE_OUTRA' || !perguntar || !(await perguntar(erro.message))) throw erro
+    if (erro?.codigo !== 'CONVERSA_DE_OUTRA' || !perguntar) throw erro
+    if (!(await perguntar(erro.message))) {
+      // #3039: recusou a pergunta; o aviso diz o estado verdadeiro, não pede uma confirmação que já foi negada.
+      const recusa = new Error('A conversa continua com a outra atendente.', { cause: erro })
+      recusa.codigo = CONFIRMACAO_RECUSADA
+      recusa.status = erro.status
+      throw recusa
+    }
     return chamada(true)
   }
 }

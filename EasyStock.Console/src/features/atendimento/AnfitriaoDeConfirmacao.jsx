@@ -25,7 +25,7 @@ export function AnfitriaoDeConfirmacao() {
     document.addEventListener('focusin', guardar)
     return () => {
       document.removeEventListener('focusin', guardar)
-      // Desmontado com pergunta pendente: recusa, senão a ação fica sem erro e sem fim (a recusa repassa o erro original).
+      // Desmontado com pergunta pendente: recusa, senão a ação fica sem erro e sem fim (a recusa rejeita com CONFIRMACAO_RECUSADA).
       const resolver = resolverRef.current
       resolverRef.current = null
       resolver?.(false)
