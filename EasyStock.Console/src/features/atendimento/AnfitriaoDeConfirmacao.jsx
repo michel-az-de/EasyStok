@@ -23,7 +23,13 @@ export function AnfitriaoDeConfirmacao() {
   useEffect(() => {
     const guardar = (e) => { if (!e.target.closest?.('dialog')) ultimoFocoRef.current = e.target }
     document.addEventListener('focusin', guardar)
-    return () => document.removeEventListener('focusin', guardar)
+    return () => {
+      document.removeEventListener('focusin', guardar)
+      // Desmontado com pergunta pendente: recusa, senão a ação fica sem erro e sem fim (a recusa repassa o erro original).
+      const resolver = resolverRef.current
+      resolverRef.current = null
+      resolver?.(false)
+    }
   }, [])
 
   const perguntar = useCallback((mensagem) => new Promise((resolver) => {

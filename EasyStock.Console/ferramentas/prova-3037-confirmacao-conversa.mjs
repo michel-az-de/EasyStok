@@ -136,6 +136,24 @@ try {
       await contexto.close()
     }
   }
+  // Desmontar a tela com a pergunta aberta recusa: a ação rejeita com o erro original, não fica pendurada.
+  {
+    const { contexto, page, chamadas, nativos } = await preparar('Automatica')
+    await page.evaluate(async () => {
+      const api = await import('/src/infra/api/conversasApi.js')
+      window.__acao = api.assumir('conv-bia').then(() => 'resolveu', (e) => `rejeitou:${e?.codigo}`)
+    })
+    await perguntaAberta(page, nativos)
+    await page.evaluate(() => { location.hash = '#/m/inicio' })
+    await page.getByRole('dialog', { name: 'Conversa de outra atendente' }).waitFor({ state: 'detached' })
+    const fim = await Promise.race([
+      page.evaluate(() => window.__acao),
+      new Promise((r) => setTimeout(() => r('pendurada'), 5000)),
+    ])
+    assert.equal(fim, 'rejeitou:CONVERSA_DE_OUTRA', 'desmontado com pergunta pendente: a ação rejeita com o erro original')
+    assert.equal(chamadas.length, 1, 'desmontar não repete a chamada')
+    await contexto.close()
+  }
   // A camada de API não pergunta pelo navegador: nenhum window.confirm sobra em src.
   const comConfirmNativo = fontes(join(raiz, 'src')).filter((c) => /window\.confirm\(/.test(readFileSync(c, 'utf8')))
   assert.deepEqual(comConfirmNativo, [], `window.confirm em src: ${comConfirmNativo.map((c) => c.slice(raiz.length + 1)).join(', ')}`)
