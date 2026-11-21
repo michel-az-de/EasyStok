@@ -107,7 +107,9 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         ILogger<RegistrarSaidaEstoqueUseCase> logger,
         IPublicadorEventos? publicadorEventos = null,
         EasyStock.Application.Ports.Output.ICurrentUserAccessor? currentUser = null,
-        IConfiguracaoLojaRepository? configuracaoLojaRepository = null)
+        IConfiguracaoLojaRepository? configuracaoLojaRepository = null,
+        ILojaRepository? lojaRepository = null,
+        IUsuarioEmpresaRepository? usuarioEmpresaRepository = null)
     {
         // #306: publicador opcional na assinatura (DI o registra); se um evento precisa
         // ser publicado e ele esta null, falha explicito em vez de descartar em silencio.
@@ -119,6 +121,13 @@ namespace EasyStock.Application.UseCases.RegistrarSaidaEstoque
         {
             UseCaseGuards.EnsureEmpresaId(command.EmpresaId);
             if (command.Itens is null || command.Itens.Count == 0) throw new VendaSemItensException(Guid.Empty);
+            // #3099: loja e vendedor vêm do corpo; só valem se pertencerem à empresa do JWT.
+            if (command.LojaId is { } lojaId && lojaRepository is not null
+                && await lojaRepository.GetByIdAsync(command.EmpresaId, lojaId) is null)
+                throw new UseCaseValidationException("A loja informada nao pertence a empresa.");
+            if (command.VendedorId is { } vendedorId && usuarioEmpresaRepository is not null
+                && await usuarioEmpresaRepository.GetByUsuarioEEmpresaAsync(vendedorId, command.EmpresaId) is not { Ativo: true })
+                throw new UseCaseValidationException("O vendedor informado nao pertence a empresa.");
 
             logger.LogInformation("Iniciando registro de sa�da de estoque. EmpresaId: {EmpresaId}, Itens: {QuantidadeItens}, Natureza: {Natureza}",
                 command.EmpresaId, command.Itens.Count, command.Natureza);
