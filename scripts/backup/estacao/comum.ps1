@@ -10,7 +10,7 @@ function Get-EzbkConfig {
         Dados        = $dados
         Restic       = if ($env:EZBK_RESTIC) { $env:EZBK_RESTIC } else { Join-Path $dados 'bin/restic.exe' }
         Rclone       = $rclone
-        RcloneConf   = Join-Path $dados 'rclone.conf'
+        RcloneConf   = Join-Path $dados 'ezdrive.conf'
         SenhaArquivo = Join-Path $dados 'restic.senha.dpapi'
         RepoRemoto   = 'rclone:ezdrive:easystok-restic'
         RepoLocal    = if ($env:EZBK_REPO_LOCAL) { $env:EZBK_REPO_LOCAL } else { 'C:\backups\restic-easystok' }
@@ -48,8 +48,9 @@ function Test-SnapshotRecente([datetime]$Quando, [datetime]$Agora, [int]$MaxHora
     ($Agora.ToUniversalTime() - $Quando.ToUniversalTime()).TotalHours -le $MaxHoras
 }
 
-# Guarda do prune remoto: um token roubado da VPS pode esquecer snapshots; o prune da
-# estacao so roda se o remoto nao encolheu demais desde a ultima vez.
+# Guarda contra bug de codigo, nao contra invasao: VPS e estacao usam o mesmo login OAuth,
+# entao um token roubado tem o mesmo poder. O prune so roda se o remoto nao encolheu demais
+# desde a ultima vez. Risco aceito pelo dono, ver docs/dev/backup-drive.md.
 function Test-GuardaPrune([int]$Atual, [int]$Anterior, [int]$Minimo = 7, [int]$QuedaMax = 3) {
     if ($Atual -lt $Minimo) { return "remoto com $Atual snapshots (< $Minimo)" }
     if ($Anterior -gt 0 -and ($Anterior - $Atual) -gt $QuedaMax) { return "remoto caiu de $Anterior para $Atual snapshots" }
