@@ -85,6 +85,12 @@ public static class ApiServiceCollectionExtensions
         services.AddSingleton<EasyStock.Api.Services.Impressao.PedidoImpressoHtml>(); // S49: impresso do pedido
         services.AddSingleton<EasyStock.Api.Services.Impressao.ComandaHtml>(); // S52: comanda de cozinha
         services.AddSingleton<EasyStock.Api.Services.Impressao.ResumoAtendimentoHtml>(); // #1839: resumo do atendimento
+        // #3017: balão 1 da cobrança Pix = PNG do impresso. Sem Impressao:Renderizador:Url nada disso entra e a conversa segue como hoje.
+        if (!string.IsNullOrWhiteSpace(configuration[EasyStock.Infra.Async.Pdf.GotenbergRenderizadorHtml.ChaveUrl]))
+        {
+            services.AddScoped<EasyStock.Application.Ports.Output.Impressao.IImpressoDoPedido, EasyStock.Api.Services.Impressao.ImpressoDoPedidoApi>();
+            services.AddScoped<EasyStock.Application.Services.Atendimento.PublicadorImpressoPedido>();
+        }
         services.AddScoped<EasyStock.Api.Services.IJwtTokenService, JwtTokenService>();
         services.AddScoped<EasyStock.Application.Ports.Output.IJwtTokenService>(sp =>
             sp.GetRequiredService<EasyStock.Api.Services.IJwtTokenService>());

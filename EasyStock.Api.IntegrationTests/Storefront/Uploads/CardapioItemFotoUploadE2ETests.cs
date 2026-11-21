@@ -16,7 +16,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-using Testcontainers.PostgreSql;
 using DotNet.Testcontainers.Builders;
 using StorefrontEntity = EasyStock.Domain.Entities.Storefront.Storefront;
 
@@ -33,7 +32,7 @@ namespace EasyStock.Api.IntegrationTests.Storefront.Uploads;
 /// </summary>
 public sealed partial class CardapioItemFotoUploadE2ETests : IAsyncLifetime
 {
-    private PostgreSqlContainer? _pg;
+    private BancoDeTeste? _pg;
     private bool _isAvailable;
     private static readonly Guid UsuarioTesteId = Guid.NewGuid();
 
@@ -50,11 +49,7 @@ public sealed partial class CardapioItemFotoUploadE2ETests : IAsyncLifetime
     {
         try
         {
-            _pg = new PostgreSqlBuilder("postgres:17-alpine")
-                .WithDatabase("easystock_upload_e2e_tests")
-                .WithUsername("postgres")
-                .WithPassword("Upload-E2E-" + Guid.NewGuid().ToString("N"))
-                .Build();
+            _pg = new BancoDeTeste();
 
             await _pg.StartAsync();
             _isAvailable = true;

@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Storefront.Menu;
 using EasyStock.Domain.Entities.Atendimento;
@@ -29,7 +30,7 @@ public class EnviarFotoProdutoFerramentaTests
         public List<Mensagem> Mensagens { get; } = [];
         public Conversa Conversa { get; }
 
-        public Cenario()
+        public Cenario(CanalConversa canal = CanalConversa.WhatsApp)
         {
             _storefront.Ativar();
             var storefrontRepo = Substitute.For<IStorefrontRepository>();
@@ -48,7 +49,7 @@ public class EnviarFotoProdutoFerramentaTests
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["App:BaseUrl"] = "https://loja.exemplo/" }).Build();
 
             _ferramenta = new EnviarFotoProdutoFerramenta(storefrontRepo, listar, Cloud, conversas, configuracao);
-            Conversa = Conversa.Abrir(_storefront.EmpresaId, "5511999998888", Agora, "Maria", Guid.NewGuid());
+            Conversa = Conversa.Abrir(_storefront.EmpresaId, "5511999998888", Agora, "Maria", Guid.NewGuid(), canal);
         }
 
         public CardapioItem Item(string nome, string? foto)
@@ -61,6 +62,12 @@ public class EnviarFotoProdutoFerramentaTests
         }
 
         public ContextoTurnoAgente NovoContexto() => new(_storefront.EmpresaId, Conversa, Agora);
+
+        public async Task<JsonElement> ExecutarComEntradaAsync(object entrada)
+        {
+            var resultado = await _ferramenta.ExecutarAsync(NovoContexto(), JsonSerializer.SerializeToElement(entrada));
+            return JsonDocument.Parse(resultado).RootElement.Clone();
+        }
 
         public async Task<JsonElement> ExecutarAsync(Guid itemId, ContextoTurnoAgente? contexto = null)
         {
@@ -87,6 +94,44 @@ public class EnviarFotoProdutoFerramentaTests
         // A foto não é a resposta: o texto do agente sai depois dela.
         contexto.HouveEnvio.Should().BeTrue();
         contexto.EnvioVerificado.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task NoChatDoSite_CaiParaTextoComNomeEPreco()
+    {
+        var c = new Cenario(CanalConversa.ChatSite);
+        var item = c.Item("lasanha bolonhesa", "https://cdn.exemplo/files/cardapios/lasanha.jpg");
+
+        var resultado = await c.ExecutarAsync(item.Id);
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeTrue();
+        await c.Cloud.DidNotReceiveWithAnyArgs().EnviarImagemAsync(default!, default!, default, default);
+        var mensagem = c.Mensagens.Should().ContainSingle().Subject;
+        mensagem.TipoConteudo.Should().Be(TipoConteudoMensagem.Texto);
+        mensagem.ExternoId.Should().StartWith(CanalChatSite.PrefixoIdExterno);
+        mensagem.Texto.Should().Contain("Lasanha Bolonhesa").And.Contain("R$ 30,00");
+    }
+
+    [Fact]
+    public async Task EntradaCardapioItemId_NovaGrafia_MandaAFoto()
+    {
+        var c = new Cenario();
+        var item = c.Item("lasanha bolonhesa", "https://cdn.exemplo/files/cardapios/lasanha.jpg");
+
+        var resultado = await c.ExecutarComEntradaAsync(new { cardapio_item_id = item.Id });
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task EntradaItemId_GrafiaAntiga_AindaMandaAFoto()
+    {
+        var c = new Cenario();
+        var item = c.Item("lasanha bolonhesa", "https://cdn.exemplo/files/cardapios/lasanha.jpg");
+
+        var resultado = await c.ExecutarComEntradaAsync(new { itemId = item.Id });
+
+        resultado.GetProperty("enviado").GetBoolean().Should().BeTrue();
     }
 
     [Fact]

@@ -104,6 +104,13 @@ namespace EasyStock.Application.Ports.Output.Persistence
         decimal TicketMedio,
         decimal PercentualReceita);
 
+    /// <summary>#2928 (S5): pedidos válidos agrupados por plataforma e campanha; nulos = sem origem ou sem campanha.</summary>
+    public sealed record PedidoPorAnuncio(
+        string? Plataforma,
+        string? Campanha,
+        int TotalPedidos,
+        decimal ValorTotal);
+
     // ── Store Intelligence DTOs ──────────────────────────────────────────
 
     public sealed record LojaResumoInteligencia(
@@ -375,6 +382,9 @@ namespace EasyStock.Application.Ports.Output.Persistence
 
         /// <summary>Vendas agrupadas por canal de venda.</summary>
         Task<IReadOnlyList<VendaPorCanal>> GetVendasPorCanalAsync(Guid empresaId, DateTime de, DateTime ate, Guid? lojaId = null);
+
+        /// <summary>#2928 (S5): pedidos (não cancelados nem rascunhos, por <c>CriadoEm</c>) por plataforma e campanha do anúncio.</summary>
+        Task<IReadOnlyList<PedidoPorAnuncio>> GetPedidosPorAnuncioAsync(Guid empresaId, DateTime de, DateTime ate);
 
         // ── Receita × Custo ─────────────────────────────────────────────
 

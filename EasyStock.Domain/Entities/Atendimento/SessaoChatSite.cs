@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using EasyStock.Domain.ValueObjects;
 
 namespace EasyStock.Domain.Entities.Atendimento;
 
@@ -18,6 +19,10 @@ public class SessaoChatSite
     public Guid StorefrontId { get; private set; }
     public string TokenHash { get; private set; } = null!;
     public Guid? ConversaId { get; private set; }
+
+    /// <summary>#2928: anúncio que trouxe o visitante; a conversa só nasce na primeira mensagem e o copia dela. Nula sem anúncio.</summary>
+    public OrigemAnuncio? OrigemAnuncio { get; private set; }
+
     public DateTime CriadaEm { get; private set; }
     public DateTime UltimoUsoEm { get; private set; }
     public DateTime ExpiraEm { get; private set; }
@@ -38,7 +43,8 @@ public class SessaoChatSite
     // EF Core ctor sem parametros
     private SessaoChatSite() { }
 
-    public static SessaoChatSite Abrir(Guid empresaId, Guid storefrontId, string tokenHash, DateTime agora)
+    public static SessaoChatSite Abrir(Guid empresaId, Guid storefrontId, string tokenHash, DateTime agora,
+        OrigemAnuncio? origemAnuncio = null)
     {
         if (empresaId == Guid.Empty)
             throw new RegraDeDominioVioladaException("EmpresaId e obrigatorio.");
@@ -57,6 +63,7 @@ public class SessaoChatSite
             CriadaEm = instante,
             UltimoUsoEm = instante,
             ExpiraEm = instante + Validade,
+            OrigemAnuncio = origemAnuncio,
         };
     }
 

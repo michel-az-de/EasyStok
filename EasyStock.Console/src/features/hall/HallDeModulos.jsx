@@ -9,10 +9,12 @@ import { CampoTexto } from '../../componentes/Campo'
 import { useAcessoModulos } from '../../aplicacao/acessoModulos'
 import { chaveDasPreferenciasHall, gravarPreferenciasHall, lerPreferenciasHall } from '../../aplicacao/preferenciasHall'
 import { Botao } from '../../componentes/Botao'
-import { InterruptorTema } from '../../componentes/InterruptorTema'
 import { MenuDaConta } from '../../componentes/MenuDaConta'
+import { rotuloDoSair } from '../../componentes/contaDoMenu'
+import { pedirAjuda } from '../../aplicacao/pedirAjuda'
+import { TrilhoDoConsole } from './TrilhoDoConsole'
 import { Vazio } from '../../componentes/Vazio'
-import { buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, saudacaoDoHall } from '../../dominio/modulos'
+import { atalhosDiretos, buscarDestinosDoConsole, filtrarModulos, hashDoModulo, modulosDoHall, NOME_RESPOSTAS_AUTOMATICAS, tituloDoHall } from '../../dominio/modulos'
 import {
   alternarFavoritoDoHall, favoritosDoHall, moverModuloDoHall, moverPainelDoHall,
   ordenarModulosDoHall, ordenarPaineisDoHall, FOCOS_DO_HALL,
@@ -22,9 +24,9 @@ import {
 } from '../../dominio/estadoDoHall'
 import { usePulsoDoHall } from '../../aplicacao/usePulsoDoHall'
 import { IconeDoModulo } from './IconeDoModulo'
-import { IlustracaoDoModulo } from './IlustracaoDoModulo'
 import { alcaDoLink, transicaoDoArrasto, useCliqueAposArrasto, useSensoresDoHall } from './arrastoDoHall'
 import { colisoesDoHall } from './colisoesDoHall'
+import { FaixaDeAtalhos } from './FaixaDeAtalhos'
 import { PulsoDoHall } from './PulsoDoHall'
 import { ResumoDoDia } from './ResumoDoDia'
 import { PersonalizarHall } from './PersonalizarHall'
@@ -46,7 +48,7 @@ function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, ind
     <li ref={setNodeRef} data-modulo={modulo.id}
       className={[css.cartao, !modulo.disponivel && css.emBreve, isDragging && css.arrastando, organizar && css.organizando].filter(Boolean).join(' ')}
       style={{ transform: CSS.Transform.toString(transform), transition: arrastavel ? transition : undefined }}>
-      <IlustracaoDoModulo id={modulo.id} className={css.ilustracaoCartao} />
+      <span className={css.iconeCartao} aria-hidden="true"><IconeDoModulo modulo={modulo} tamanho={24} /></span>
       {organizar && <div className={css.cabecaCartao}>
         <div className={css.controlesCartao}>
           {organizar && modulo.disponivel && <button type="button" className={css.favoritar} aria-pressed={favorito}
@@ -81,6 +83,17 @@ function CartaoModulo({ modulo, favorito, organizar, arrastavel, movimentos, ind
         <button type="button" className={css.mover} aria-label={`Descer ${modulo.nome}`}
           disabled={indice === total - 1} onClick={(evento) => mover(1, evento)}><MarcaIcone nome="abaixo" tamanho={20} /></button>
       </div>}
+    </li>
+  )
+}
+
+// #2870: atalho para uma tela (Clientes, Pedidos), com o mesmo desenho do cartão de área e a linha do que ela tem.
+function CartaoAtalho({ atalho }) {
+  return (
+    <li data-atalho={atalho.id} className={css.cartao}>
+      <span className={css.iconeCartao} aria-hidden="true"><IconeDoModulo modulo={atalho.modulo} telaId={atalho.telaId} tamanho={24} /></span>
+      <a className={css.abrir} href={atalho.href} draggable={false}><span className={css.nome}>{atalho.nome}</span></a>
+      <span className={css.pendencia}>{atalho.resumo}</span>
     </li>
   )
 }
@@ -123,11 +136,12 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   const permitidosDaGrade = modulosPermitidos.filter((modulo) => !linksDoRodape.some((link) => link.id === modulo.id))
   const modulos = filtrarModulos(daGrade, busca)
   const moduloArrastando = modulos.find((modulo) => modulo.id === arrastando)
+  // #2870: Clientes e Pedidos entram na grade como cartões fixos, depois das áreas. Não arrastam nem viram favorito.
+  const atalhos = organizar ? [] : atalhosDiretos({ fonteApi, acoes, permite })
   const favoritos = favoritosDoHall(permitidosDaGrade, preferencia)
   const buscando = Boolean(busca.trim())
   const destinos = buscarDestinosDoConsole(todos, busca)
   const foco = FOCOS_DO_HALL.find((item) => item.id === preferencia.foco)
-  const destaque = foco.ordem.map((id) => modulosPermitidos.find((modulo) => modulo.id === id && modulo.disponivel)).find(Boolean) ?? todos.find((modulo) => modulo.disponivel)
   const idsDoPulso = ordenarPaineisDoHall(preferencia, modulosPermitidos.map((modulo) => modulo.id))
   const podeOrganizar = organizar && !buscando
   const sensores = useSensoresDoHall()
@@ -173,6 +187,8 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
   }
   const anuncio = (id) => modulos.find((modulo) => modulo.id === id)?.nome ?? 'Módulo'
   return (
+    <div className={css.raiz}>
+    <aside className={css.lateral}><TrilhoDoConsole onde="hall" fonteApi={fonteApi} rotuloNav="Navegação" aoAbrirAjuda={pedirAjuda} /></aside>
     <div className={[css.hall, !preferencia.movimentos && css.semMovimentos].filter(Boolean).join(' ')}>
       <header className={css.topo}>
         {/* #2232 (H1): uma marca só no canto, a da loja. */}
@@ -183,16 +199,16 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           {notificacoes && <div className={css.avisos}>{notificacoes}</div>}
           {/* #1870: o Sair fica atrás do avatar, como no pé do trilho do Balcão e dos módulos.
               #2232 (H2): o tema mora no mesmo menu, como no Balcão, e sai do topo do Início. */}
-          {aoSair && <MenuDaConta lado="abaixo" nome={conta?.nome ?? sessao?.usuario?.nome} detalhe={conta?.casa} aoSair={aoSair}
-            rotuloSair={sessao?.persistente ? 'Sair deste aparelho' : 'Sair'}>
-            <InterruptorTema />
-          </MenuDaConta>}
+          <div className={css.contaNoTopo}>
+            <MenuDaConta lado="abaixo" nome={conta?.nome ?? sessao?.usuario?.nome} detalhe={conta?.casa} aoSair={aoSair} aoAbrirAjuda={pedirAjuda}
+              rotuloSair={rotuloDoSair(sessao?.persistente)} />
+          </div>
         </div>
       </header>
       <main className={css.conteudo}>
         <div className={css.abertura}>
           <div className={css.cabeca}>
-            <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{saudacaoDoHall(agora, sessao?.usuario?.nome)}</h1>
+            <h1 className={css.titulo} tabIndex={-1} data-inicio-tela id="conteudo-principal">{tituloDoHall(agora)}</h1>
             {/* #2232 (M3): o resumo do dia saiu do menu do Atendimento e mora aqui. */}
             {fonteApi && <ResumoDoDia fontes={fontes} ids={idsDoPulso} />}
             {sessao?.persistente && <p className={css.apoio}>A Cozinha permanece conectada. Ao trocar de pessoa, use Sair no menu da conta.</p>}
@@ -206,18 +222,13 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
                 onChange={(evento) => setBusca(evento.target.value)} />
               <MarcaIcone nome="buscar" tamanho={20} className={css.lupa} />
             </div>
-            {/* #2258 (A10): sem resultado o aviso traz o único botão de limpar. */}
-            {buscando && destinos.length > 0 && <Botao variante="texto" onClick={() => { setBusca(''); buscaRef.current?.focus() }}>Limpar busca</Botao>}
+            {/* #2258 (A10): sem resultado o aviso traz o único botão de limpar. #3012: com resultado, o X do campo limpa. */}
           </div>
         </div>
+        {/* #3013: no celular os módulos ficam logo abaixo da busca, com a linha de estado do cartão. */}
+        {!buscando && !organizar && <FaixaDeAtalhos modulos={modulos} estadoDe={(id) => estadoDoCartao(id, fontes)} />}
         {!buscando && fonteApi && <PulsoDoHall ids={idsDoPulso} foco={foco.nome} fontes={fontes} movimentos={preferencia.movimentos}
           podeFecharCaixa={acoes?.gerenciarCaixa === true} aoMover={moverPainel} />}
-        {/* #1810: no modo API o destaque repetia um cartão de área; ficam só os números e as áreas. */}
-        {!buscando && destaque && !fonteApi && <section className={css.destaque} aria-labelledby="destaque-hall">
-          <div className={css.ilustracao} aria-hidden="true"><IconeDoModulo modulo={destaque} tamanho={40} /></div>
-          <div className={css.textoDestaque}><h2 id="destaque-hall">{destaque.nome}</h2></div>
-          <a className={css.acaoDestaque} href={destaque.href}>Abrir {destaque.nome}<MarcaIcone nome="proximo" tamanho={22} /></a>
-        </section>}
         {/* #1608: o que fazer agora vem antes da lista de módulos. Quem compõe é o App. */}
         {!buscando && painel}
         {!buscando && favoritos.length > 0 && <nav className={css.rotina} aria-label="Favoritos da sua rotina">
@@ -272,11 +283,12 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
             },
           }} onDragEnd={({ active, over }) => { clique.aoTerminar(); setArrastando(null); if (over) mover(active.id, over.id) }}>
           <SortableContext items={modulos.map((modulo) => modulo.id)} strategy={rectSortingStrategy}>
-            <ul className={css.grade} data-colunas={colunasDaGrade(modulos.length)} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
+            <ul className={css.grade} data-colunas={colunasDaGrade(modulos.length + atalhos.length)} aria-label="Módulos" onClickCapture={clique.onClickCapture}>
               {modulos.map((modulo, indice) => <CartaoModulo key={modulo.id} modulo={modulo}
                 favorito={preferencia.favoritos.includes(modulo.id)} organizar={podeOrganizar} arrastavel={!buscando} movimentos={preferencia.movimentos}
                 indice={indice} total={modulos.length} pendencia={estadoDoCartao(modulo.id, fontes)}
                 aoFavoritar={favoritar} aoMover={moverPorBotao} />)}
+              {atalhos.map((atalho) => <CartaoAtalho key={`atalho-${atalho.id}`} atalho={atalho} />)}
             </ul>
           </SortableContext>
           <DragOverlay dropAnimation={null}>
@@ -294,15 +306,15 @@ function HallPersonalizado({ fonteApi = false, sessao = null, agora, ajuda, pain
           {permite('atendimento') && <Botao variante="texto" onClick={() => { window.location.hash = hashDoModulo('atendimento', 'respostas') }}>
             <Icone nome="raio" tamanho={20} />{NOME_RESPOSTAS_AUTOMATICAS}
           </Botao>}
-          {/* #2232 (H10): Configurações é link de rodapé. (H2): sem menu da conta, o tema fica aqui, discreto. */}
+          {/* #2232 (H10): Configurações é link de rodapé. */}
           {linksDoRodape.map((modulo) => <a key={modulo.id} className={css.linkRodape} href={modulo.href}>
             <IconeDoModulo modulo={modulo} tamanho={20} />{modulo.nome}
           </a>)}
-          {!aoSair && <InterruptorTema />}
         </div>}
       </main>
       {personalizando && <PersonalizarHall preferencia={preferencia} modulos={modulosPermitidos} aoFechar={() => setPersonalizando(false)}
         aoOrganizar={todos.length > 0 ? () => { setPersonalizando(false); setOrganizar(true); setMensagem(''); focoAposOrganizar.current = 'organizar' } : null} aoSalvar={(proxima) => { gravar(proxima, 'Painel personalizado.'); setPersonalizando(false) }} />}
+    </div>
     </div>
   )
 }

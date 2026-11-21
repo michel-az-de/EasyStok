@@ -4,13 +4,11 @@
       {
          "name": "poka-yoke-gate",
          "group": "pre-commit",
-         "command": "powershell.exe",
+         "command": "wscript.exe",
          "args": [
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            "scripts/poka-yoke/gate.ps1"
+            "//B",
+            "//Nologo",
+            "scripts/poka-yoke/gate-oculto.vbs"
          ]
       }
    ]

@@ -35,9 +35,12 @@ public sealed class MobileQuickReportsController(
     /// Retorna total, quantidade de vendas, ticket médio e top-5 produtos.
     /// Timeout soft: 1 s (query indexada).
     /// </summary>
+    // #2823: valor de venda é relatório, como no site (#2821).
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("vendas-hoje")]
     [ProducesResponseType(typeof(VendasHojeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> VendasHoje(
         [FromQuery] Guid? lojaId,
         CancellationToken ct)
@@ -70,9 +73,12 @@ public sealed class MobileQuickReportsController(
     /// Retorna entradas, saídas, vendas e saldo atual.
     /// Timeout soft: 1 s (query indexada).
     /// </summary>
+    // #2823: valor de venda é relatório, como no site (#2821).
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("caixa-turno")]
     [ProducesResponseType(typeof(CaixaTurnoResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CaixaTurno(
         [FromQuery] Guid? lojaId,
         CancellationToken ct)
@@ -180,9 +186,12 @@ public sealed class MobileQuickReportsController(
     /// Ranking de vendas por vendedor no dia atual.
     /// Útil para o app do vendedor ("como estou hoje?") e para o gerente de loja.
     /// </summary>
+    // #2823: valor de venda é relatório, como no site (#2821).
+    [Authorize(Policy = EasyStock.Api.Authorization.PoliticasPermissao.VisualizarRelatorios)]
     [HttpGet("vendas-vendedor-turno")]
     [ProducesResponseType(typeof(VendasVendedorTurnoResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> VendasVendedorTurno(
         [FromQuery] Guid? lojaId,
         CancellationToken ct)

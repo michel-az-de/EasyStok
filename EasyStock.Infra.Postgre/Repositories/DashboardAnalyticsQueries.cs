@@ -164,7 +164,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
 
         // Receita via Vendas (fonte canônica — fix BUG 1)
         var vendasQuery = dbContext.Vendas.AsNoTracking()
-            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.DataVenda <= ate);
+            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.DataVenda <= ate && v.Natureza == NaturezaMovimentacaoEstoque.Venda); // #2844
         if (lojaId.HasValue)
             vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
 
@@ -392,7 +392,7 @@ internal sealed class DashboardAnalyticsQueries(EasyStockDbContext dbContext, ID
 
         // Receita por dia ou mês
         var vendasQuery = dbContext.Vendas.AsNoTracking()
-            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.DataVenda <= ate);
+            .Where(v => v.EmpresaId == empresaId && v.DataVenda >= de && v.DataVenda <= ate && v.Natureza == NaturezaMovimentacaoEstoque.Venda); // #2844
         if (lojaId.HasValue)
             vendasQuery = vendasQuery.Where(v => v.LojaId == lojaId.Value);
 

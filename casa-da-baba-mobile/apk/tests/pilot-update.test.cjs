@@ -1,4 +1,5 @@
 'use strict';
+const { lerPwaMontada } = require('../scripts/pwa-montagem.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { validateManifest } = require('../pilot.js');
@@ -104,7 +105,7 @@ function realAndroidListener() {
 }
 
 function installPwaBack(root, doc) {
-  const html = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
   const start = html.indexOf('(function setupBackButton() {');
   const end = html.indexOf('\n})();', start) + '\n})();'.length;
   assert.ok(start >= 0 && end > start);
@@ -146,7 +147,7 @@ for (const pilot of [true, false]) {
     const context = installPwaBack(root, doc); context.currentScreen = 'pedidos';
     nodes.set('orderNotes', { value: 'Separar amanhã' }); let historyCalls = 0;
     context.goBack = () => { historyCalls++; };
-    const source = fs.readFileSync(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+    const source = lerPwaMontada(path.resolve(__dirname, '../../../EasyStock.Api/wwwroot/pwa/index.html'));
     const bindings = ['selectedClient', 'currentOrderItems'].map(name => {
       const declaration = source.match(new RegExp('^let ' + name + ' = [^;]+;', 'm'))?.[0];
       assert.ok(declaration); return declaration;

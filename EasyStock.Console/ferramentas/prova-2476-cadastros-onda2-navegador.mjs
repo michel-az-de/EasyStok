@@ -58,15 +58,15 @@ try {
   await pagina.screenshot({ path: resolve(pasta, 'lista-1280.png'), fullPage: true })
 
   // U2: documento gravado só em dígitos aparece na máscara; o digitado também.
-  await pagina.getByRole('button', { name: 'Editar Pessoa Cliente', exact: true }).click()
-  let modal = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await modal.waitFor()
+  await pagina.getByRole('button', { name: 'Abrir ficha de Pessoa Cliente', exact: true }).click()
+  let modal = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await modal.waitFor(); await modal.getByRole('button', { name: 'Editar dados', exact: true }).click()
   assert.equal(await modal.getByRole('textbox', { name: 'CPF ou documento', exact: true }).inputValue(), '987.654.321-00')
   assert.equal(await modal.getByRole('button', { name: 'Salvar cadastro', exact: true }).isDisabled(), true, 'Abrir não muda nada')
   await modal.getByRole('button', { name: 'Cancelar', exact: true }).click()
   await modal.waitFor({ state: 'detached' })
 
-  await pagina.getByRole('button', { name: 'Editar Pessoa Lead', exact: true }).click()
-  modal = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await modal.waitFor()
+  await pagina.getByRole('button', { name: 'Abrir ficha de Pessoa Lead', exact: true }).click()
+  modal = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await modal.waitFor(); await modal.getByRole('button', { name: 'Editar dados', exact: true }).click()
   const doc = modal.getByRole('textbox', { name: 'CPF ou documento', exact: true })
   await doc.pressSequentially('12345678900')
   assert.equal(await doc.inputValue(), '123.456.789-00')

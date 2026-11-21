@@ -40,8 +40,8 @@ const a = await contexto.newPage(), b = await contexto.newPage()
 for (const pagina of [a, b]) { pagina.setDefaultTimeout(10000); pagina.on('pageerror', e => erros.push(e.message)) }
 const url = `${process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'}/.build/2395/clientes-concorrencia/index.html`
 async function abrir(pagina, nome) {
-  await pagina.getByRole('button', { name: `Editar ${nome}`, exact: true }).tap()
-  const modal = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await modal.waitFor(); return modal
+  await pagina.getByRole('button', { name: `Abrir ficha de ${nome}`, exact: true }).tap()
+  const modal = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await modal.waitFor(); await modal.getByRole('button', { name: 'Editar dados', exact: true }).click(); return modal
 }
 async function salvar(modal, conflito = false) {
   await modal.getByRole('button', { name: 'Salvar cadastro', exact: true }).tap()

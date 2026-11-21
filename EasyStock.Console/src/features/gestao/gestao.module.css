@@ -94,3 +94,5 @@
   .tituloArea { display: none; }
   .subtelasGestao { margin-inline: -2px; }
 }
+/* #2832: Agora e Todas as telas no início da Gestão. */
+.vistasGestao { display: flex; flex-wrap: wrap; gap: var(--e-2); }

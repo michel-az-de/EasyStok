@@ -62,6 +62,19 @@ public class CriarPedidoUseCaseTests
     }
 
     [Fact]
+    public async Task Criacao_grava_o_canal_informado_e_nao_o_confunde_com_a_origem()
+    {
+        // #409: canal é por onde a cliente pediu; origem é o sistema que gravou.
+        Pedido? salvo = null;
+        _pedidoRepo.When(r => r.AddAsync(Arg.Any<Pedido>())).Do(ci => salvo = ci.Arg<Pedido>());
+
+        await Sut().ExecuteAsync(new CriarPedidoCommand(Guid.NewGuid(), Origem: "mobile", Canal: "whatsapp"));
+
+        salvo!.Canal.Should().Be("whatsapp");
+        salvo.Origem.Should().Be("mobile");
+    }
+
+    [Fact]
     public async Task PedidoAgendadoCriadoNoErp_GravaInicioPrevisto()
     {
         // #1230: pedido criado no ERP (ou pela sync do mobile) já nasce na fila; com agendamento, ganha

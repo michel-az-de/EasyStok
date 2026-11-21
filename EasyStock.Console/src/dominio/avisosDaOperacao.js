@@ -13,7 +13,12 @@ const DIA = { singular: 'dia', plural: 'dias', curta: 'dias' }
 export const GRUPOS_DE_AVISOS = [
   {
     id: 'atendimento', titulo: 'Atendimento',
-    avisos: [ligado('clienteSemResposta', 'Cliente esperando resposta')],
+    avisos: [
+      ligado('clienteSemResposta', 'Cliente esperando resposta'),
+      // #2836: a vigia confere o cadastro de quem tem pedido em aberto.
+      ligado('cadastroComProblema', 'Cliente com pedido e cadastro com problema',
+        'Sem cadastro ligado, telefone, nome, foto ou endereço de entrega confirmado. Um aviso por cliente por dia.'),
+    ],
   },
   {
     id: 'pedidos', titulo: 'Pedidos e cozinha',

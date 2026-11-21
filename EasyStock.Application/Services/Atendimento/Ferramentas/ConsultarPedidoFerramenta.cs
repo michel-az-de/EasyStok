@@ -53,7 +53,7 @@ public sealed class ConsultarPedidoFerramenta(
                     erro = "sem_pedido_em_andamento",
                     ultimoPedido = new
                     {
-                        pedidoId = ultimo.Id,
+                        pedido_id = ultimo.Id,
                         situacao = StatusPedidoVocabulario.RotuloLojista(ultimo.StatusEnum),
                         criadoEm = Brasilia(ultimo.CriadoEm),
                         canceladoEm = ultimo.CanceladoEm is { } canceladoUltimo ? Brasilia(canceladoUltimo) : null,
@@ -127,7 +127,7 @@ public sealed class ConsultarPedidoFerramenta(
 
         return FerramentaJson.Serializar(new
         {
-            pedidoId = p.Id,
+            pedido_id = p.Id,
             numeroComanda = conversa.NumeroComanda,
             status = p.Status,
             total = FerramentaJson.FormatarReais(p.Total),

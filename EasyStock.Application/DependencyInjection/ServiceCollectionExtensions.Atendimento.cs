@@ -34,13 +34,18 @@ public static partial class ServiceCollectionExtensions
         // S38: consentimento do cliente final por canal e opt-out por palavra.
         services.AddScoped<PoliticaEnvioCliente>();
         services.AddScoped<AvisoStatusPedidoCliente>(); // S13: aviso de status ao cliente
+        services.AddScoped<CanhotoPedidoCliente>(); // #2937: canhoto em imagem no pagamento
         // #2007: o registro de pagamento (muitos hosts) só materializa o aviso no ramo do sinal manual.
         services.AddScoped(sp => new Lazy<AvisoStatusPedidoCliente>(() => sp.GetRequiredService<AvisoStatusPedidoCliente>()));
         services.AddScoped<AvisoPedidoNaConversa>(); // #1991-1: o mesmo aviso no chat do site
+        services.AddScoped<ResumoPedidoForaDaJanela>(); // #2871: resumo do pedido pela fila fora da janela de 24 h
+        services.AddScoped<ConversaWhatsAppDoCliente>(); // #1408/#2871: conversa do WhatsApp com cliente cadastrado
         services.AddScoped<AvisoEquipeNoAparelho>(); // #1807: avisos do Balcão no aparelho (Web Push)
         services.AddScoped<OptOutPorPalavra>();
+        services.AddScoped<RespostaSemIa>(); // #2885: saudação solta respondida sem o modelo
         services.AddScoped<SaudacaoAtendimento>();
         services.AddScoped<PerfilClienteWhatsApp>(); // #2155: nome, e-mail e localização no cadastro
+        services.AddSingleton<JanelaFotoPerfilWhatsApp>(); // #2838: uma consulta da foto por cliente a cada 12 h
 
         // S42: variáveis e CRUDs agrupados (*UseCases, fora do sufixo da convenção).
         services.AddScoped<VariaveisAtendimento>();
@@ -59,6 +64,9 @@ public static partial class ServiceCollectionExtensions
                 if (int.TryParse(configuracao[LimiteRespostasAgenteOptions.ChaveMaximoPorHora], out var maximo))
                     opcoes.MaximoPorHora = maximo;
             });
+        // #3068: prazo da equipe antes de o Assistente retomar; o padrão (60 s) vale sem a seção na configuração.
+        services.AddOptions<RetomadaAssistenteOptions>()
+            .Configure<IConfiguration>((opcoes, configuracao) => opcoes.Ler(configuracao));
         // S67: custo estimado do turno pela tabela Anthropic:Precos; sem a tabela, custo nulo.
         services.AddOptions<PrecosModelosAgenteOptions>()
             .Configure<IConfiguration>((opcoes, configuracao) => opcoes.Ler(configuracao));

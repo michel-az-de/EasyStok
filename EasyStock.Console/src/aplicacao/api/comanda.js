@@ -8,8 +8,10 @@ import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
 import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao, situacaoDaCobranca } from '../../dominio/cobranca'
 import { pedeConfirmacaoDoSaldo, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
+import { ERRO_MOTIVO_CANCELAMENTO, motivoDoCancelamentoValido } from '../../dominio/pedidosCadastro'
 import { criarChaveDeEnvio } from '../chaveDeEnvio'
 import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Comanda e cobrança no modo API (F03, S10/S11). Montar a comanda (itens, observação,
 // janela, meio) continua local até o envio; "Gerar cobrança e enviar" cria o pedido no
@@ -27,13 +29,16 @@ import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
 const NAO_LIGADO = 'esta ação ainda não está disponível nesta tela.'
 const SEM_PEDIDO = 'o pedido ainda não foi criado. Gere a cobrança ou envie ao cliente primeiro.'
 // #1924: textos do link novo pela Ficha.
-export const LINK_NOVO_SEM_ENVIO = 'Link novo gerado, mas não saiu na conversa (fora da janela de 24 h ou canal fora do ar). '
+export const LINK_NOVO_SEM_ENVIO = 'Link novo gerado, mas não saiu na conversa (fora do prazo de 24 h ou canal fora do ar). '
   + 'Copie o link em Pagamento e mande ao cliente.'
 export const LINK_AINDA_VALE = 'O link desta cobrança ainda vale. Para mandar de novo, copie o link em Pagamento.'
 const LINK_CANCELADO_ESPERA_APROVACAO = 'O link foi cancelado e o pedido agora espera aprovação. '
   + 'Use "Aprovar pedido" na Ficha e registre o pagamento de novo.'
 
 const MESMA_FORMA = 'A cobrança já está nessa forma de pagamento. Nada mudou.'
+
+// #2871: fora do prazo de 24 h o resumo do pedido vai pela fila de avisos, no mensagem padrão do WhatsApp.
+const RESUMO_NA_FILA = 'O resumo sai pelo WhatsApp em instantes (conversa fora do prazo de 24 h).'
 
 // #1942 (#1923): 409 que o EasyStok recusou antes de criar o pedido. Mostra o motivo, sem reler. O resto dos
 // 409 (PEDIDO_EM_ANDAMENTO, a corrida do clique duplo, e código desconhecido) pode ter criado: relê.
@@ -135,13 +140,33 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
   // "Enviar ao cliente", ou gerar a cobrança antes dele: o EasyStok cria o pedido, cobra e
   // manda o resumo pela conversa. Só o POST decide "não criado" (#1287): a recarga que
   // falha depois dele é só a tela atrasada, a polling traz o pedido.
+  // #2941: POST ok e recarga que falhou deixa a tela sem `pedidoId`; sem esta marca um novo clique postaria de novo e
+  // duplicaria o pedido. A marca faz a nova tentativa só reler o pedido. Devolve `{ pedidoId, atualizando: true }`
+  // enquanto a leitura não volta: o pedido existe, só a tela está atrasada.
+  const criadoSemRecarga = new Map()
+  const aindaAtualizando = (id, pedidoId) => {
+    avisar('Pedido criado no EasyStok, atualizando a tela…')
+    return { pedidoId, atualizando: true }
+  }
   const criarPedido = (id, meio = null, enviarAoCliente = true, pedido = pedidoDe(id)) => umaPorConversa(id, 'criarPedido', () => {
+    if (pedidoCriado(id)) criadoSemRecarga.delete(id)
+    // A marca vale só para a comanda que foi postada: comanda nova (outro número) depois do pedido entregue posta de novo.
+    if (criadoSemRecarga.get(id)?.numero !== pedidoDe(id)?.numero) criadoSemRecarga.delete(id)
+    if (!pedidoCriado(id) && criadoSemRecarga.has(id)) {
+      const { pedidoId } = criadoSemRecarga.get(id)
+      return recarregar(id).then((atual) => {
+        if (!atual?.pedidoId) return aindaAtualizando(id, pedidoId)
+        criadoSemRecarga.delete(id)
+        limparAviso()
+        return atual
+      }, () => aindaAtualizando(id, pedidoId))
+    }
     if (!pedido || pedidoCriado(id)) return undefined
     const conversa = estadoRef.current.conversas.find(c => c.id === id)
     const identidade = pedido.identidadeProposta
     if (!identidade?.clienteId || !Number.isInteger(identidade.vinculoRevisao) || identidade.vinculoRevisao < 0
       || identidade.clienteId !== conversa?.clienteId || identidade.vinculoRevisao !== conversa?.vinculoRevisao) {
-      const erro = 'Confira a pessoa da comanda na ficha antes de gerar a cobrança. Os itens foram preservados.'
+      const erro = 'Confira a pessoa do pedido na ficha antes de gerar a cobrança. Os itens foram preservados.'
       avisar(erro)
       return { erro }
     }
@@ -157,19 +182,26 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
         // Mercado Pago fora: o pedido nasce sem link e nada o emite sozinho (#1287).
         const faltas = []
         if (!gerado?.cobranca && corpo.forma === FORMA_ONLINE) {
-          faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "Gerar cobrança" para emitir o link')
+          faltas.push('a cobrança não saiu (Mercado Pago fora do ar). Use "' + ROTULOS.GERAR_COBRANCA + '" para emitir o link')
         }
-        if (!gerado?.enviadoAoCliente) {
+        // #2871: fora do prazo de 24 h o resumo vai pela fila de avisos (mensagem padrão do WhatsApp) e sai em instantes.
+        const resumoNaFila = Boolean(gerado?.resumoNaFila)
+        if (!gerado?.enviadoAoCliente && !resumoNaFila) {
           if (gerado?.pedidoId) semResumo.add(gerado.pedidoId)
-          if (enviarAoCliente) faltas.push('o resumo não saiu ao cliente (conversa fora da janela de 24 h ou canal fora do ar)')
+          if (enviarAoCliente) faltas.push('o cliente não foi avisado: o resumo não saiu (conversa fora do prazo de 24 h sem mensagem padrão do WhatsApp, ou canal fora do ar)')
         }
         const aviso = faltas.length > 0 ? `Pedido criado no EasyStok, mas ${faltas.join('; e ')}.` : null
         limparAviso()
-        if (aviso) avisar(aviso)
+        if (aviso) avisar(resumoNaFila ? `${aviso} ${RESUMO_NA_FILA}` : aviso)
+        else if (resumoNaFila) avisar(`Pedido criado. ${RESUMO_NA_FILA}`)
         else if (!enviarAoCliente) avisar(gerado?.cobranca?.linkPagamento
-          ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar um modelo aprovado.'
+          ? 'Pedido e cobrança criados sem envio. Abra Pagamento para copiar o link ou usar uma mensagem padrão do WhatsApp.'
           : 'Pedido e cobrança criados sem envio. Confira a forma de recebimento em Pagamento.')
-        return recarregar(id).catch(() => avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…'))
+        return recarregar(id).catch(() => {
+          if (gerado?.pedidoId) criadoSemRecarga.set(id, { pedidoId: gerado.pedidoId, numero: pedido.numero })
+          avisar(aviso ? `${aviso} Atualizando a tela…` : 'Pedido criado no EasyStok, atualizando a tela…')
+          return gerado?.pedidoId ? { pedidoId: gerado.pedidoId, atualizando: true } : undefined
+        })
       },
       (erro) => {
         if (!erro.status || erro.status >= 500 || (erro.status === 409 && !RECUSA_DEFINITIVA.has(erro.codigo))) {
@@ -340,8 +372,7 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
     },
     cancelarPedido: (id, motivo) => {
       if (!pedidoCriado(id)) return soNoEasyStok('Cancelar pedido')(id)
-      if (!motivo?.trim() || motivo.trim().length < 3 || motivo.trim().length > 500)
-        return Promise.resolve({ erro: 'Informe um motivo entre 3 e 500 caracteres.' })
+      if (!motivoDoCancelamentoValido(motivo)) return Promise.resolve({ erro: ERRO_MOTIVO_CANCELAMENTO })
       return umaPorConversa(id, 'cancelar', async () => {
         try {
           await cancelarPedido(pedidoCriado(id), motivo.trim())

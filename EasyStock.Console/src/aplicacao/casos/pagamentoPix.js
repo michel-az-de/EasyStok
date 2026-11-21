@@ -1,7 +1,7 @@
 import { contextoDePrevia, GATILHOS, regraDoGatilho, textoDaRegra } from '../../dominio/automacao'
 import {
   aceitarDivergencia, aplicarPagamento, cancelarCobranca, criarCobranca, estornarCobranca, liberaEsteira,
-  marcarComprovante, reemitirCobranca, TEXTO_DE_CONFERENCIA, textoDaCobranca,
+  codigoDaCobranca, marcarComprovante, reemitirCobranca, TEXTO_DE_CONFERENCIA, textoDaCobranca,
 } from '../../dominio/cobranca'
 import { ehLead } from '../../dominio/conversa'
 import { janelaPorId } from '../../dominio/entrega'
@@ -14,7 +14,7 @@ import { pedidoEncerrado } from '../../dominio/pedido'
 import { MARCA_DE_CONVERSAO } from '../../dominio/resumoAtendimento'
 import { resumoParaCliente } from '../../dominio/resumoPedido'
 import * as acao from '../acoes'
-import { comMensagem, mapear, recusaEnvio } from '../reducer/auxiliares'
+import { comBaloesDaCobranca, comMensagem, mapear, recusaEnvio } from '../reducer/auxiliares'
 import { ATENDENTE } from '../reducer/estadoInicial'
 
 // SÓ DA DEMONSTRAÇÃO (carregado por `src/demonstracao/`, fora do build de produção): cobrança Pix simulada,
@@ -94,11 +94,7 @@ export const casosPagamentoPix = {
         { dir: 'out', texto: resumo, status: 'lida', automatica: true, regra: 'resumo' },
         { id: mensagemId, agora },
       )
-      return comMensagem(
-        comResumo,
-        { dir: 'out', texto, status: 'lida', automatica: true, regra: 'cobranca-pix' },
-        { id: cobrancaId, agora },
-      )
+      return comBaloesDaCobranca(comResumo, { texto, codigo: codigoDaCobranca(cobranca) }, { id: cobrancaId, agora })
     })
   },
 
@@ -112,9 +108,9 @@ export const casosPagamentoPix = {
     // `criarCobranca`.
     const cobranca = criarCobranca(conversa.pedido, estado.catalogo.cardapio, agora, emissao)
     const texto = textoDaCobranca(cobranca, conversa.pedido, estado.catalogo.cardapio)
-    return mapear(estado, id, (c) => comMensagem(
+    return mapear(estado, id, (c) => comBaloesDaCobranca(
       { ...c, pedido: { ...c.pedido, cobranca } },
-      { dir: 'out', texto, status: 'lida', automatica: true, regra: 'cobranca-pix' },
+      { texto, codigo: codigoDaCobranca(cobranca) },
       { id: mensagemId, agora },
     ))
   },
@@ -136,9 +132,9 @@ export const casosPagamentoPix = {
     const pagamentos = anterior.pagaEm
       ? [...(conversa.pedido.pagamentos ?? []), registroDaCobranca(anterior)]
       : (conversa.pedido.pagamentos ?? [])
-    return mapear(estado, id, (c) => comMensagem(
+    return mapear(estado, id, (c) => comBaloesDaCobranca(
       { ...c, pedido: { ...c.pedido, cobranca, pagamentos } },
-      { dir: 'out', texto, status: 'lida', automatica: true, regra: 'cobranca-pix' },
+      { texto, codigo: codigoDaCobranca(cobranca) },
       { id: mensagemId, agora },
     ))
   },

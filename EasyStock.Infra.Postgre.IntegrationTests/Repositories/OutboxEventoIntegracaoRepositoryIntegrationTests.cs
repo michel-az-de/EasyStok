@@ -6,8 +6,7 @@ using FluentAssertions;
 namespace EasyStock.Infra.Postgre.IntegrationTests.Repositories;
 
 /// <summary>
-/// #1575: o dispatcher do outbox de integração busca os pendentes numa consulta só. Ela devolve o mesmo
-/// lote, na mesma ordem e com o mesmo limite das quatro consultas por shard que o laço fazia.
+/// #1575: o dispatcher do outbox de integração busca os pendentes numa consulta só, em ordem FIFO global.
 /// </summary>
 [Collection("PostgreSqlTestCollection")]
 public sealed class OutboxEventoIntegracaoRepositoryIntegrationTests(PostgreSqlDatabaseFixture fixture)
@@ -16,7 +15,7 @@ public sealed class OutboxEventoIntegracaoRepositoryIntegrationTests(PostgreSqlD
     private static readonly DateTime Base = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     [SkippableFact]
-    public async Task PendentesDeTodosOsShards_MesmoLoteDasQuatroConsultasPorShard()
+    public async Task PendentesDeTodosOsShards_OrdemFifoGlobalNoLimite()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
         var empresa = Empresa.Criar("Outbox integração", null);
@@ -55,16 +54,47 @@ public sealed class OutboxEventoIntegracaoRepositoryIntegrationTests(PostgreSqlD
         {
             var novo = await repo.ProximosPendentesDeTodosOsShardsAsync(lote);
 
-            var antigo = new List<OutboxEventoIntegracao>();
-            for (var shard = 0; shard < 4 && antigo.Count < lote; shard++)
-                antigo.AddRange(await repo.ProximosPendentesAsync(shard, lote - antigo.Count));
-
-            novo.Select(e => e.Id).Should().Equal(antigo.Select(e => e.Id), "lote de {0}", lote);
+            novo.Select(e => e.CriadoEm).Should().BeInAscendingOrder("lote de {0}", lote);
         }
 
         var todos = await repo.ProximosPendentesDeTodosOsShardsAsync(1000);
-        Guid[] meus = [s0a.Id, s0b.Id, s1.Id, s2.Id, s3.Id];
-        todos.Select(e => e.Id).Where(meus.Contains).Should().Equal(meus, "por shard e, dentro dele, do mais antigo para o mais novo");
+        Guid[] meus = [s3.Id, s2.Id, s0a.Id, s0b.Id, s1.Id];
+        todos.Select(e => e.Id).Where(meus.Contains).Should().Equal(meus, "do mais antigo para o mais novo, sem agrupar por shard");
         todos.Select(e => e.Id).Should().NotContain([agendado.Id, enviado.Id, emEnvio.Id]);
+    }
+
+    [SkippableFact]
+    public async Task PendentesDeTodosOsShards_DevolveNaOrdemDeCriacao()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponível");
+        var empresa = Empresa.Criar("Outbox ordem 2903", null);
+
+        OutboxEventoIntegracao Evento(int shard, int minuto)
+        {
+            var e = OutboxEventoIntegracao.Criar(empresa.Id, "pedido.ordem2903", "Pedido", Guid.NewGuid(), "{}");
+            e.ShardKey = shard;
+            e.CriadoEm = Base.AddMinutes(minuto);
+            e.ProximaTentativaEm = Base.AddMinutes(minuto);
+            return e;
+        }
+        // Criados nesta ordem, em shards 2, 0 e 1. Agrupar por shard devolveria 0, 1, 2.
+        var primeiro = Evento(2, 0);
+        var segundo = Evento(0, 1);
+        var terceiro = Evento(1, 2);
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.SetMobileTenantContext(empresa.Id);
+            seed.Empresas.Add(empresa);
+            seed.OutboxEventosIntegracao.AddRange(terceiro, primeiro, segundo);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var db = fixture.CreateDbContext();
+        var repo = new OutboxEventoIntegracaoRepository(db);
+
+        var lote = await repo.ProximosPendentesDeTodosOsShardsAsync(1000);
+
+        Guid[] meus = [primeiro.Id, segundo.Id, terceiro.Id];
+        lote.Select(e => e.Id).Where(meus.Contains).Should().Equal(meus, "na ordem de CriadoEm, não por shard");
     }
 }

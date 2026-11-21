@@ -936,6 +936,7 @@
   // #2184: backup 'pre-sync' antes de enviar a fila (ver _flushInner).
   let _chaveBackupPreSync = null;
   let _ultimoAvisoBackupFalhou = 0;
+  let _ultimoRelatoBackupFalhou = 0;
   function _temCanalDeBackupNativo() {
     return !!(_getPublicBackupPlugin() || _getFilesystemPlugin());
   }
@@ -948,6 +949,31 @@
       if (window.cdbApp && window.cdbApp.showToast) {
         window.cdbApp.showToast('Não foi possível salvar o backup deste aparelho. Nada foi enviado; as alterações continuam na fila.');
       }
+    } catch (_) {}
+  }
+
+  // #2877: sem relato o servidor nao via por que a fila parou, nem que o
+  // backup ficou so na memoria interna (some se o app for desinstalado).
+  // Best effort, janela de 5 min, sem nome do operador (endpoint anonimo).
+  function _relatarBackup(situacao, backup, excecao, tamanhoFila) {
+    const agora = Date.now();
+    if (agora - _ultimoRelatoBackupFalhou < 300000) return;
+    _ultimoRelatoBackupFalhou = agora;
+    try {
+      const partes = [situacao, 'fila=' + tamanhoFila];
+      if (backup && backup.reason) partes.push(backup.reason);
+      const falhas = (backup && (backup.falhas || backup.avisos)) || [];
+      if (falhas.length) partes.push(falhas.join(' | '));
+      if (excecao) partes.push('excecao: ' + _mensagemDeErro(excecao));
+      fetch(API_BASE_URL + API_PREFIX + '/diagnostics/errors', {
+        method: 'POST',
+        headers: baseHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          deviceId: deviceId,
+          bundleVersion: (window.__BUNDLE_INFO__ && window.__BUNDLE_INFO__.version) || null,
+          errors: [{ timestamp: agora, context: 'backup-pre-sync', message: partes.join('; ').slice(0, 500), screen: null }]
+        })
+      }).catch(() => {});
     } catch (_) {}
   }
 
@@ -976,11 +1002,14 @@
       const chaveFila = queue.map((m) => m.id).join('|');
       if (chaveFila !== _chaveBackupPreSync) {
         let backup = null;
-        try { backup = await localBackupToFile('pre-sync'); } catch (_) { backup = null; }
+        let excecao = null;
+        try { backup = await localBackupToFile('pre-sync'); } catch (e) { backup = null; excecao = e; }
         if (!backup || !backup.ok) {
           _avisarBackupFalhou();
+          _relatarBackup('falhou', backup, excecao, queue.length);
           return 'backup-failed';
         }
+        if (backup.details && backup.details.internalUri) _relatarBackup('so-interno', backup, null, queue.length);
         _chaveBackupPreSync = chaveFila;
       }
     }
@@ -1712,26 +1741,25 @@
   async function localBackupToFile(note) {
     var json = JSON.stringify(_buildBackupPayload(note));
 
-    // Sanity-check de espaco antes de tentar escrever. StorageEstimate
-    // reporta quota da origin (IndexedDB/localStorage) — nao reflete
-    // exatamente o filesystem do device, mas se quota esta cheia
-    // tipicamente indica pouco espaco geral. Aborta cedo em vez de
-    // explodir no Filesystem.writeFile silenciosamente.
+    // Estimativa de espaco: so aviso (#2877). StorageEstimate mede a quota da
+    // origin, nao o disco do aparelho; abortar aqui travava o envio da fila
+    // (#2184) mesmo com disco livre. Quem decide e a gravacao real abaixo.
+    var falhas = [];
     try {
       if (navigator.storage && navigator.storage.estimate) {
         var est = await navigator.storage.estimate();
         if (est && typeof est.quota === 'number' && typeof est.usage === 'number') {
           var livre = est.quota - est.usage;
           if (livre < Math.max(json.length * 4, 1024 * 1024)) {
-            console.warn('[localBackup] espaco insuficiente (livre=' + livre + 'B). Abortando.');
-            return { ok: false, reason: 'insufficient-storage' };
+            console.warn('[localBackup] estimativa de espaco baixa (livre=' + livre + 'B). Tentando gravar.');
+            falhas.push('estimativa: livre=' + livre + 'B');
           }
         }
       }
     } catch (_) { /* nao bloqueia se API indisponivel */ }
 
     var anyOk = false;
-    var details = { publicUris: null, scopedUri: null };
+    var details = { publicUris: null, scopedUri: null, internalUri: null };
 
     // CAMINHO 1 (PRIORITARIO): MediaStore publico via plugin custom.
     // Sobrevive uninstall — esse e o ponto crucial.
@@ -1750,6 +1778,7 @@
         console.log('[localBackup] publico OK', details.publicUris);
       } catch (e) {
         console.warn('[localBackup] publico falhou:', e && e.message);
+        falhas.push('publico: ' + _mensagemDeErro(e));
       }
     }
 
@@ -1771,14 +1800,41 @@
         anyOk = true;
       } catch (e) {
         console.warn('[localBackup] scoped falhou:', e && e.message);
+        falhas.push('documents: ' + _mensagemDeErro(e));
+      }
+    }
+
+    // CAMINHO 3 (#2877): memoria interna do app (Directory.Data). So quando
+    // os anteriores falharam. Nao precisa de permissao nem de MediaStore, e
+    // garante que o backup pre-sync (#2184) nao trave a fila para sempre.
+    if (!anyOk && FS) {
+      try {
+        var resInterno = await FS.writeFile({
+          path: LOCAL_BACKUP_FILE,
+          data: json,
+          directory: 'DATA',
+          encoding: 'utf8',
+          recursive: true
+        });
+        details.internalUri = resInterno && resInterno.uri;
+        anyOk = true;
+        console.log('[localBackup] memoria interna OK', details.internalUri);
+      } catch (e) {
+        console.warn('[localBackup] memoria interna falhou:', e && e.message);
+        falhas.push('interno: ' + _mensagemDeErro(e));
       }
     }
 
     if (anyOk) {
       try { localStorage.setItem(LAST_LOCAL_BACKUP_KEY, String(Date.now())); } catch (e) {}
-      return { ok: true, details: details };
+      return { ok: true, details: details, avisos: falhas };
     }
-    return { ok: false, reason: 'no-storage-available' };
+    return { ok: false, reason: 'no-storage-available', falhas: falhas };
+  }
+
+  function _mensagemDeErro(e) {
+    var m = (e && (e.message || e.code)) || String(e);
+    return String(m).slice(0, 200);
   }
 
   // Le backup local existente. Retorna o JSON parseado ou null.
@@ -3145,7 +3201,8 @@
       swSupported: () => _swSupported,                    // D2
       initQueueStore: _initQueueStore,                    // #1509
       bloquearMutations: (v) => { _mutationsBlocked = !!v; }, // #1520 (teste do bloqueio de OTA)
-      confirmarExclusoesPendentes: confirmarExclusoesPendentes // #1520
+      confirmarExclusoesPendentes: confirmarExclusoesPendentes, // #1520
+      resetAvisosBackup: () => { _ultimoAvisoBackupFalhou = 0; _ultimoRelatoBackupFalhou = 0; } // #2877
     },
     hasPublicBackupPlugin: () => !!_getPublicBackupPlugin(),
     lastLocalBackupAt: () => parseInt(localStorage.getItem(LAST_LOCAL_BACKUP_KEY) || '0', 10) || 0,

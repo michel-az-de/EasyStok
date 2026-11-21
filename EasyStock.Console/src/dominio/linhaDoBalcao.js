@@ -16,7 +16,7 @@ const ESTADOS = {
   encerrada: { chave: 'encerrada', texto: 'Concluída', tom: 'neutro', icone: 'circle-check' },
   outro: { chave: 'outro', texto: 'Outro atendente', tom: 'neutro', icone: null },
   voce: { chave: 'voce', texto: 'Com você', tom: 'ok', icone: 'hand' },
-  automatico: { chave: 'automatico', texto: 'Assistente', tom: 'neutro', icone: 'sparkles' },
+  automatico: { chave: 'automatico', texto: 'Assistente', tom: 'neutro', icone: 'agente' },
 }
 
 // Um estado por linha, por precedência: bloqueio e encerramento calam o resto;

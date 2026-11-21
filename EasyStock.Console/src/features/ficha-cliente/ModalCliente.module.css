@@ -40,3 +40,9 @@
   .acoes small { flex-basis: 100%; }
   .cadastro [data-dados-cliente] { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* #2849: o que só a conversa sabe, dentro da ficha única do cliente. */
+.complemento { display: grid; gap: var(--e-3, 12px); }
+.complemento:empty { display: none; }
+.avisosDaFicha { display: grid; gap: var(--e-2, 8px); }
+.avisosDaFicha h3 { margin: 0; }

@@ -31,12 +31,12 @@ public sealed class EnviarFotoProdutoFerramenta(
         "a foto, com o id de um item de consultar_cardapio que tenha temFoto=true. Depois da foto, responda normalmente.";
 
     public string SchemaJson =>
-        """{"type":"object","properties":{"itemId":{"type":"string","description":"id do item em consultar_cardapio"}},"required":["itemId"],"additionalProperties":false}""";
+        """{"type":"object","properties":{"cardapio_item_id":{"type":"string","description":"id do item em consultar_cardapio"}},"required":["cardapio_item_id"],"additionalProperties":false}""";
 
     public async Task<string> ExecutarAsync(ContextoTurnoAgente contexto, JsonElement entrada, CancellationToken ct = default)
     {
-        if (entrada.ValueKind != JsonValueKind.Object || !entrada.TryGetProperty("itemId", out var id)
-            || !Guid.TryParse(id.GetString(), out var itemId))
+        // A grafia nova (cardapio_item_id) é a que o modelo recebe; a antiga (itemId) segue aceita.
+        if (!Guid.TryParse(FerramentaJson.LerTexto(entrada, "cardapio_item_id") ?? FerramentaJson.LerTexto(entrada, "itemId"), out var itemId))
             return Recusa("item_nao_encontrado", "Use o id de um item que consultar_cardapio devolveu.");
         if (contexto.FotosEnviadas >= LimitePorTurno)
             return Recusa("limite_do_turno", $"Já saíram {LimitePorTurno} fotos nesta resposta; pergunte qual o cliente prefere.");
@@ -48,12 +48,20 @@ public sealed class EnviarFotoProdutoFerramenta(
         if (item is null) return Recusa("item_nao_encontrado", "Use o id de um item que consultar_cardapio devolveu.");
 
         var url = MidiaPublica.Url(item.ImagemUrl, configuration);
-        if (url is null) return Recusa("sem_foto", "Este item não tem foto; descreva-o com o que consultar_cardapio devolveu.");
+        var noSite = SaidaDoChatSite.Eh(contexto.Conversa);
+        if (url is null && !noSite) return Recusa("sem_foto", "Este item não tem foto; descreva-o com o que consultar_cardapio devolveu.");
 
         var preco = FerramentaJson.FormatarReais(item.PrecoCentavos / 100m);
         var legenda = $"{item.Nome}, {preco}";
+        if (noSite)
+        {
+            // #2876: sem mídia no site, o item vai por texto (nome e preço).
+            await SaidaDoChatSite.GravarTextoAsync(contexto, conversaRepository, legenda, ct);
+            contexto.RegistrarFotoEnviada();
+            return FerramentaJson.Serializar(new { enviado = true, item = item.Nome, preco });
+        }
         var conversa = contexto.Conversa;
-        var envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, url, legenda, ct);
+        var envio = await cloudClient.EnviarImagemAsync(conversa.ContatoIdExterno, url!, legenda, ct);
         contexto.RegistrarFotoEnviada();
 
         if (conversa.EstaAberta) conversa.RegistrarSaida(contexto.Agora);

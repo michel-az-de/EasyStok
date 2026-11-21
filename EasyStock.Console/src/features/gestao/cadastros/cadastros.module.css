@@ -16,6 +16,8 @@
 .lista th { position: sticky; top: 0; z-index: 1; }
 /* #2734 (A12): a lista que está na tela espera a nova chegar, mais apagada, em vez de sumir a cada busca. */
 .lista[aria-busy='true'] { opacity: 0.6; }
+/* #3016: os cartões (Formas de pagamento, Modelos, Etiquetas) esperam do mesmo jeito na recarga. */
+.cartoes[aria-busy='true'] { opacity: 0.6; }
 .lista table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--t-apoio); }
 .lista th { padding: var(--e-3) var(--e-4); color: var(--tinta-2); font-size: var(--t-micro); font-weight: 600; background: var(--elevado); }
 .lista td { border-top: 1px solid var(--linha); padding: var(--e-4); vertical-align: middle; overflow-wrap: anywhere; }
@@ -26,11 +28,11 @@
 .ordenar:focus-visible { outline: var(--b-3) solid var(--marca); outline-offset: 2px; border-radius: var(--r-1); }
 .lista td small { display: block; margin-top: var(--e-1); color: var(--tinta-2); font-size: var(--t-micro); }
 .clicavel { cursor: pointer; }
-.clicavel:hover td { background: var(--elevado); }
+.clicavel:hover td, .clicavel:focus-within td { background: var(--elevado); }
 .identidade { display: flex; gap: var(--e-3); align-items: center; }
 .icone { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: var(--r-1); background: var(--preenchimento); color: var(--marca-forte); }
 .acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
-.lista .acoes button { white-space: nowrap; }
+@media (min-width: 701px) { .lista .acoes button { white-space: nowrap; } }
 /* #2476 (U6): situação sem ação pendente é texto, não pílula (Pilula.module.css). */
 .situacao { color: var(--tinta-2); font-size: var(--t-apoio); }
 .rodape { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--e-3); padding: var(--e-3) var(--e-4); border-top: 1px solid var(--linha); color: var(--tinta-2); font-size: var(--t-micro); }
@@ -122,3 +124,26 @@
 .itensFicha li { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; padding: var(--e-2) var(--e-3); background: var(--fundo); border: 1px solid var(--linha); border-radius: var(--r-1); }
 .itensFicha li > span:first-child { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .itensFicha small { color: var(--tinta-2); font-size: var(--t-micro); }
+
+/* #2849: topo da ficha do cliente, em leitura. Mesma ordem em Cadastros, na Busca e a partir do Atendimento. */
+.resumoCliente { display: grid; gap: var(--e-4); margin-block-end: var(--e-4); min-width: 0; }
+.identidadeCliente { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
+.identidadeCliente > div { flex: 1; min-width: 0; display: grid; gap: var(--e-1); justify-items: start; }
+.identidadeCliente strong { font-size: var(--t-titulo); overflow-wrap: anywhere; }
+.quadroCliente { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-3); margin: 0; padding: var(--e-3); background: var(--elevado); border-radius: var(--r-2); }
+.quadroCliente > div { display: flex; flex-direction: column-reverse; gap: var(--e-1); min-width: 0; }
+.quadroCliente dd { margin: 0; font-family: var(--f-dado); font-size: var(--t-valor); font-weight: 700; font-variant-numeric: tabular-nums; }
+.quadroCliente dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.contatoCliente { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3) var(--e-4); margin: 0; }
+.contatoCliente > div { display: grid; gap: var(--e-1); min-width: 0; }
+.contatoCliente dt { font-size: var(--t-apoio); color: var(--tinta-2); }
+.contatoCliente dd { margin: 0; overflow-wrap: anywhere; }
+.contatoCliente .naoInformado { color: var(--tinta-3); font-style: italic; }
+@media (max-width: 480px) {
+  .quadroCliente { grid-template-columns: minmax(0, 1fr); }
+  .contatoCliente { grid-template-columns: minmax(0, 1fr); }
+}
+.acoesDoResumo { display: flex; flex-wrap: wrap; gap: var(--e-2, 8px); }
+/* #2946: o convite é um link (abre outra aba), com a cara de ação da linha. */
+.chamar { display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--e-3); font-weight: 600; color: var(--sucesso); border: 1px solid currentColor; border-radius: var(--r-1); text-decoration: none; white-space: nowrap; }
+.chamar:hover { background: var(--sucesso-pastel); }

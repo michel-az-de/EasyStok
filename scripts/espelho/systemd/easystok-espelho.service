@@ -1,0 +1,10 @@
+# Unit de usuario (felipe) instalada por scripts/espelho/instalar.sh (#2958).
+[Unit]
+Description=Espelho bare do repositorio do EasyStok
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/git/espelho.sh
+TimeoutStartSec=20min
+Nice=10

@@ -89,6 +89,15 @@ namespace EasyStock.Domain.Entities
         public string? Origem { get; set; }
 
         /// <summary>
+        /// #409: por onde a cliente pediu, marcado por quem lançou o pedido. Não é a <see cref="Origem"/>,
+        /// que diz qual sistema gravou. NULL = não informado.
+        /// </summary>
+        public string? Canal { get; set; }
+
+        /// <summary>#2928: anúncio que valia quando o pedido nasceu; não muda depois. Nula sem anúncio.</summary>
+        public OrigemAnuncio? OrigemAnuncio { get; private set; }
+
+        /// <summary>
         /// ID do pedido no app mobile (mobile_orders.id) quando o pedido foi
         /// originado lá. Permite linkar reverso e evitar duplicação na sync.
         /// </summary>
@@ -209,6 +218,12 @@ namespace EasyStock.Domain.Entities
             InicioPrevistoEm = inicioPrevistoEm;
             AtrasoNotificadoEm = null;
             AlteradoEm = DateTime.UtcNow;
+        }
+
+        /// <summary>#2928: grava a origem do anúncio uma vez só; a primeira que chega vale.</summary>
+        public void DefinirOrigemAnuncio(OrigemAnuncio? origem)
+        {
+            OrigemAnuncio ??= origem;
         }
 
         /// <summary>Atrasado = ainda aguardando e o início previsto já passou (US-037, UC-04 E2).</summary>

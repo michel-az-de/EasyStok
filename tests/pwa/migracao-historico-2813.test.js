@@ -271,7 +271,8 @@ module.exports = function ({ test, sandbox, reset, assert, runInSandbox }) {
 
   // ---------- B6: lista de clientes cortada em 20 ----------
   const fs = require('fs'), path = require('path');
-  const PAGINA = fs.readFileSync(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const { lerPwaMontada } = require(path.resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
+  const PAGINA = lerPwaMontada(process.env.PWA_HTML || path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
   const clienteN = n => { const s = String(n).padStart(3, '0'); return { id: 'cli-' + s, name: 'Cliente ' + s + ' Ávila', phone: '119' + String(n).padStart(8, '0') }; };
   function abrirTelaClientes(total) {
     const cache = {}, original = sandbox.document.getElementById;

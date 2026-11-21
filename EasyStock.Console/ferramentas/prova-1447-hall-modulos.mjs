@@ -22,7 +22,7 @@ registerHooks({
 })
 
 const {
-  MODULOS, modulosDoHall, moduloPorId, hashDoModulo, telasDoMenu, saudacaoDoHall,
+  MODULOS, modulosDoHall, moduloPorId, hashDoModulo, telasDoMenu, tituloDoHall,
 } = await import('../src/dominio/modulos.js')
 const {
   ROTA_HALL, ROTA_MODULO, ROTA_PRINCIPAL, ROTA_COZINHA, ROTA_ENTREGAS, ROTA_CARDAPIO_LINK, rotaDaHash,
@@ -98,11 +98,12 @@ confere('hash do módulo e da tela', () => {
   assert.equal(hashDoModulo('cozinha', 'producao'), '#/m/cozinha/producao')
 })
 
-confere('saudação do hall pelo relógio da loja (São Paulo), com o primeiro nome', () => {
-  assert.equal(saudacaoDoHall(Date.parse('2026-10-07T11:00:00Z'), 'Thatiane Souza'), 'Bom dia, Thatiane')
-  assert.equal(saudacaoDoHall(Date.parse('2026-10-07T17:00:00Z'), 'Felipe'), 'Boa tarde, Felipe')
-  // 22h em São Paulo já é dia seguinte no UTC: vale a hora da loja.
-  assert.equal(saudacaoDoHall(Date.parse('2026-10-08T01:00:00Z'), null), 'Boa noite')
+// #2859: o topo do hall diz o dia da loja, não uma saudação genérica.
+confere('título do hall é o dia da loja (São Paulo), por extenso', () => {
+  assert.equal(tituloDoHall(Date.parse('2026-10-07T11:00:00Z')), 'Quarta-feira, 7 de outubro')
+  // 22h em São Paulo já é dia seguinte no UTC: vale o dia da loja.
+  assert.equal(tituloDoHall(Date.parse('2026-10-08T01:00:00Z')), 'Quarta-feira, 7 de outubro')
+  assert.equal(tituloDoHall(Date.parse('2026-10-08T03:30:00Z')), 'Quinta-feira, 8 de outubro')
 })
 
 // ---------------------------------------------------------------- rota

@@ -84,11 +84,15 @@ const MOTIVOS = [
   [`${UC}Comanda/ComandaClienteUseCase.cs`, '"Entrega e frete a combinar.',
     'Entrega e frete a combinar. Confira o endereço e a seleção da comanda.', 'Entrega e frete a combinar'],
   [`${UC}Comanda/ComandaClienteUseCase.cs`, '"Cliente pediu ajuda pela comanda.',
-    'Cliente pediu ajuda pela comanda. Confira a conversa e a seleção antes de continuar.', 'Ajuda na comanda'],
+    'Cliente pediu ajuda pela comanda. Confira a conversa e a seleção antes de continuar.', 'Ajuda no pedido'],
   [`${UC}Ocorrencias/AbrirOcorrenciaUseCase.cs`, '$"ocorrência aberta ({OcorrenciaDto.Snake(',
     'ocorrência aberta (atraso): o bolo não chegou', 'Ocorrência aberta'],
   ['EasyStock.Domain/Entities/Atendimento/Conversa.cs', '"Conversa reaberta para atendimento."',
     'Conversa reaberta para atendimento.', 'Conversa reaberta'],
+  [`${ATD}PortoesDoAssistente.cs`, '"cota mensal de tokens do Assistente esgotada:',
+    'cota mensal de tokens do Assistente esgotada: a equipe responde até virar o mês', 'Cota do mês esgotada'],
+  [`${UC}ChatSite/ChatSiteUseCases.cs`, '"Telefone do formulário do site já tem cadastro:',
+    'Telefone do formulário do site já tem cadastro: confira a pessoa antes de atender.', 'Conferir cadastro'],
 ]
 
 for (const [arquivo, trecho, gravado, esperado] of MOTIVOS) {
@@ -111,7 +115,7 @@ caso('nenhum ponto de escalada novo na API sem rótulo curto', () => {
   const saida = execSync('git grep -c -E "EscalarAsync\\(|\\.Escalar\\(" -- "EasyStock.Application/*.cs" "EasyStock.Domain/*.cs"',
     { cwd: new URL(raiz).pathname.replace(/^\/([A-Za-z]:)/, '$1'), encoding: 'utf8' })
   const total = saida.trim().split('\n').reduce((soma, linha) => soma + Number(linha.split(':').pop()), 0)
-  assert.equal(total, 22, 'mudou o número de chamadas de escalada: mapeie o motivo novo em motivoDeEscalada.js e ajuste este número')
+  assert.equal(total, 24, 'mudou o número de chamadas de escalada: mapeie o motivo novo em motivoDeEscalada.js e ajuste este número')
 })
 
 console.log(`\n${ok} ok, ${falhas.length} falha(s)`)

@@ -235,7 +235,7 @@ confere('F8  a comanda não cola nas Notas quando a lista de acessos está vazia
 confere('F8  Nova comanda fica dentro do cartão da comanda, como a ação de montar (#2427)', () => {
   const painel = fonte('features/ficha-cliente/PainelFicha.jsx')
   const cartao = painel.match(/<section ref=\{receberPrato\} className=\{css\.resumoAtual\}[\s\S]*?<\/section>/)?.[0] ?? ''
-  assert.match(cartao, />Nova comanda<\/Botao>/)
+  assert.match(cartao, />Novo pedido<\/Botao>/)
   assert.match(cartao, /editavel && acaoMontar && <div className=\{css\.acaoMontar\}>/)
 })
 confere('F7  as ações do pedido moram no menu do cabeçalho e abrem a mesma confirmação da barra', () => {

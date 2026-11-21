@@ -1,0 +1,13 @@
+# Unit de usuario (felipe) instalada por scripts/backup/instalar.sh (E3, #2977, ADR-0068).
+[Unit]
+Description=Backup do EasyStok no Google Drive (restic)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/backup-restic/backup.sh
+# Morto por timeout ou kill, o systemd encerra o cgroup inteiro; a trava flock some com o
+# processo e o lock velho do restic sai no proximo `restic unlock`.
+TimeoutStartSec=3h
+Nice=10
+IOSchedulingClass=idle

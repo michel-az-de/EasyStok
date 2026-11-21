@@ -22,6 +22,12 @@ public interface IWhatsAppCloudClient
     Task<EnvioWhatsAppResult> EnviarAudioAsync(
         string waId, string urlPublica, bool notaDeVoz, CancellationToken ct = default);
 
+    /// <summary>
+    /// Documento (PDF) pelo link HTTPS (#2962). <paramref name="nomeArquivo"/> é o nome que a cliente vê no WhatsApp.
+    /// </summary>
+    Task<EnvioWhatsAppResult> EnviarDocumentoAsync(
+        string waId, string urlPublica, string nomeArquivo, string? legenda = null, CancellationToken ct = default);
+
     /// <summary>No máximo 3 botões; título até 20 caracteres; id até 256. Lança <see cref="ArgumentException"/> antes de chamar a rede quando violado.</summary>
     Task<EnvioWhatsAppResult> EnviarBotoesAsync(
         string waId, string corpo, IReadOnlyList<(string Id, string Titulo)> botoes, CancellationToken ct = default);

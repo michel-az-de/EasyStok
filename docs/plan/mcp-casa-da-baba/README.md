@@ -19,7 +19,7 @@ Premissa refutada: `DiagnosticoController` (`/api/diagnostico/logs`) citado em `
 ## Decisões
 
 1. **Um pacote, vários servidores** em `tools/mcp-baba/` (Node 24, SDK oficial `@modelcontextprotocol/sdk`, transporte stdio). Um processo por servidor, ligados só quando usados. Custo zero, sem SaaS.
-2. **"SHA privado daqui"**: o servidor roda na máquina de cada pessoa, a partir deste repo privado, em commit conhecido (`git rev-parse HEAD` impresso no `hello` de cada servidor). Acesso à VPS só por SSH com a chave da pessoa. Nenhuma porta de banco nem de MCP exposta na internet.
+2. **"SHA privado daqui"**: o servidor roda na máquina de cada pessoa, a partir deste repo privado, em commit conhecido (`git rev-parse HEAD` impresso no `hello` de cada servidor). Acesso à VPS só por SSH com a chave da pessoa. Nenhuma porta de banco nem de MCP exposta na internet. **Revisada para o `baba-diag`:** a [ADR-0069](../../adr/0069-mcp-baba-diag-remoto-com-token.md) (aceita) publica só ele em `mcp.easystok.online/diag`, com token por pessoa (#3062). Os demais seguem locais.
 3. **Sem segredo no repo**: credenciais em variável de ambiente ou arquivo local em `.gitignore` (`tools/mcp-baba/.env.local`).
 4. **Leitura por padrão.** Escrita em servidor separado, desligado por padrão.
 5. **Escrita de negócio passa pela API**, nunca por SQL, para manter regra e auditoria do domínio. SQL de escrita só no `baba-db-admin`.

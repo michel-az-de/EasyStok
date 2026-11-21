@@ -27,9 +27,8 @@ public interface IOutboxEventoIntegracaoRepository
         CancellationToken ct = default);
 
     /// <summary>
-    /// Próximos N pendentes de todos os shards numa consulta só (#1575), na ordem em que o dispatcher
-    /// percorria os shards: por shard e, dentro dele, FIFO por CriadoEm. Cross-tenant, como o método
-    /// por shard.
+    /// Próximos N pendentes de todos os shards numa consulta só (#1575), em ordem FIFO global por CriadoEm
+    /// (desempate por Id). Cross-tenant, como o método por shard.
     /// </summary>
     Task<IReadOnlyList<OutboxEventoIntegracao>> ProximosPendentesDeTodosOsShardsAsync(
         int max,

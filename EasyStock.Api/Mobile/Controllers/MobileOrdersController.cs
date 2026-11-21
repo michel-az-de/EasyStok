@@ -21,7 +21,9 @@ public class MobileOrdersController(
     ICurrentUserAccessor currentUser,
     ILogger<MobileOrdersController> log) : MobileManagementControllerBase(currentUser)
 {
+    // #2828: traz total; mesma regra da leitura dos pedidos do ERP.
     [HttpGet]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> List(
         [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,
@@ -121,7 +123,8 @@ public class MobileOrdersController(
                 CriadoPorUserId: ResolveUserId(),
                 CriadoPorNome: mobile.LastOperatorName,
                 // F5 — propaga agendamento do mobile pro ERP.
-                AgendadoParaEm: mobile.ScheduledDeliveryAt
+                AgendadoParaEm: mobile.ScheduledDeliveryAt,
+                Canal: mobile.Channel
             ));
             erpPedidoId = result.Id;
         }

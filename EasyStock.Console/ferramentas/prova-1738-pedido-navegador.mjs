@@ -64,7 +64,7 @@ try {
   await page.getByRole('button', { name: 'Adicionar itens', exact: true }).click()
   for (let i = 1; i <= 5; i++) await page.getByRole('button', { name: new RegExp('^Prato ' + i + '\\b') }).click()
   // #2437: os itens, a anotação e o horário moram no painel "Revisar comanda" desde a #2232.
-  await page.getByRole('button', { name: /^Revisar comanda/ }).click()
+  await page.getByRole('button', { name: /^Revisar pedido/ }).click()
   await page.getByRole('button', { name: 'Anotação para Prato 1', exact: true }).click()
   await page.getByRole('textbox', { name: 'Observação de Prato 1', exact: true }).fill('Molho à parte')
   await page.getByRole('textbox', { name: 'Observação de Prato 1', exact: true }).press('Tab')
@@ -80,7 +80,7 @@ try {
   const estavel = async () => (await anotacao.isVisible()) && (await page.waitForTimeout(1000), await anotacao.isVisible())
   for (let tentativa = 0; tentativa < 15 && !(await estavel()); tentativa++) {
     const aba = page.getByRole('tab', { name: 'Cliente', exact: true })
-    const revisar = page.getByRole('button', { name: /^Revisar comanda/ })
+    const revisar = page.getByRole('button', { name: /^Revisar pedido/ })
     if (await revisar.isVisible()) await revisar.click()
     else if ((await aba.getAttribute('aria-selected')) !== 'true') await aba.click()
     else {

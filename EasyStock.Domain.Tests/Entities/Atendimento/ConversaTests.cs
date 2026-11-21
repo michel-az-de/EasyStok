@@ -209,7 +209,6 @@ public class ConversaTests
     [Theory]
     [InlineData(CanalConversa.Instagram, "17841400000000001")]
     [InlineData(CanalConversa.Messenger, "6543210987654321")]
-    [InlineData(CanalConversa.ChatSite, "sessao-abc")]
     public void LiberarAutomatico_EmCanalSemAgente_Lanca(CanalConversa canal, string contato)
     {
         // #1288: sem agente no canal, "automatico" deixaria a conversa sem ninguem e fora do lembrete.
@@ -224,9 +223,33 @@ public class ConversaTests
     }
 
     [Fact]
-    public void TemAgente_SoNoWhatsApp()
+    public void TemAgente_ConversaDoWhatsApp()
     {
         Nova().TemAgente.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(CanalConversa.WhatsApp, "5511999998888", true)]
+    [InlineData(CanalConversa.ChatSite, "sessao-abc", true)]
+    [InlineData(CanalConversa.Instagram, "17841400000000001", false)]
+    [InlineData(CanalConversa.Messenger, "6543210987654321", false)]
+    [InlineData(CanalConversa.Email, "fulana@exemplo.com", false)]
+    [InlineData(CanalConversa.Sms, "+5511999998888", false)]
+    public void TemAgente_WhatsAppEChatSite(CanalConversa canal, string contato, bool esperado)
+    {
+        // #2876: o Assistente atende o chat do site além do WhatsApp; os demais canais seguem só com a equipe.
+        Conversa.Abrir(Empresa, contato, Agora, canal: canal).TemAgente.Should().Be(esperado);
+    }
+
+    [Fact]
+    public void LiberarAutomatico_NoChatSite_DevolveAoAssistente()
+    {
+        var conversa = Conversa.Abrir(Empresa, "sessao-abc", Agora, canal: CanalConversa.ChatSite);
+        conversa.Assumir(Agora.AddMinutes(1), Guid.NewGuid());
+
+        conversa.LiberarAutomatico();
+
+        conversa.Situacao.Should().Be(SituacaoConversa.Automatica);
     }
 
     [Fact]

@@ -144,7 +144,7 @@ await confere('A na Ficha, contador, anotação, arrasto e "Adicionar itens" seg
   assert.match(blocoPedido, /\{itensTravados && <p className=\{css\.situacaoEnvio\}>\{LINHA_COMANDA_TRAVADA\}<\/p>\}/)
   // O cardápio segue abrindo (ingredientes, foto do prato), só que sem prometer que adiciona.
   assert.match(blocoPedido, /<Botao largo onClick=\{aoAbrirCardapio\}>\{itensTravados \? 'Ver cardápio' : 'Adicionar itens'\}<\/Botao>/)
-  assert.match(blocoPedido, /!itensTravados && <p className=\{css\.situacaoEnvio\}>\{gerarSemEnviar \? [^\n]+ : LINHA_COMANDA_VAI_JUNTO\}<\/p>/)
+  assert.match(blocoPedido, /!itensTravados && <p className=\{css\.situacaoEnvio\}>\{foraDaJanela \? [^\n]+ : LINHA_COMANDA_VAI_JUNTO\}<\/p>/)
 })
 await confere('A trocar a janela de pedido criado continua de pé (não depende da trava dos itens)', () => {
   // #1875: o seletor virou `seletorDeJanela` (antes ou depois da comanda); a condição de existir não mudou.
@@ -164,9 +164,9 @@ await confere('A no cardápio, somar e tirar prato ficam desligados com o motivo
 // ── B. De quem é a comanda ───────────────────────────────────────────────────────────────
 await confere('B o painel do cardápio mostra o primeiro nome do cliente no cabeçalho e no rodapé', () => {
   assert.match(painelCardapio, /const nomeCliente = selecionada\?\.nome \? primeiroNome\(selecionada\.nome\) : ''/)
-  assert.match(painelCardapio, /<h2>\{travada && papel === 'escolher' \? 'Consulta do cardápio' : 'Cardápio de hoje'\}<\/h2>\s*\{nomeCliente && <p className=\{css\.donoDaComanda\} aria-live="polite">Comanda de <b>\{nomeCliente\}<\/b><\/p>\}/)
+  assert.match(painelCardapio, /<h2>\{travada && papel === 'escolher' \? 'Consulta do cardápio' : 'Cardápio de hoje'\}<\/h2>\s*\{nomeCliente && <p className=\{css\.donoDaComanda\} aria-live="polite">Pedido de <b>\{nomeCliente\}<\/b><\/p>\}/)
   assert.match(painelCardapio, /<RodapeComanda pedido=\{pedido\} cardapio=\{cardapio\} linhas=\{linhas\} nomeCliente=\{nomeCliente\} \/>/)
-  assert.match(painelCardapio, /Comanda\{nomeCliente \? ` de \$\{nomeCliente\}` : ''\} · /)
+  assert.match(painelCardapio, /Pedido{nomeCliente \? ` de \$\{nomeCliente\}` : ''\} · /)
 })
 
 // ── C. Mídia ─────────────────────────────────────────────────────────────────────────────

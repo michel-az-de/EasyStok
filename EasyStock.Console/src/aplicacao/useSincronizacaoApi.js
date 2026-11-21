@@ -167,8 +167,12 @@ export function useSincronizacaoApi({
     ciclo()
     if (comConversas) conectar()
     globalThis.document?.addEventListener('visibilitychange', aoMudarVisibilidade)
+    // #2944 (E1-10): "Tentar de novo" da fila refaz a leitura agora, sem esperar o próximo ciclo.
+    const aoPedirAgora = () => { ciclos = 0; ciclo() }
+    globalThis.addEventListener?.('easystok:sincronizar-agora', aoPedirAgora)
     return () => {
       vivo = false
+      globalThis.removeEventListener?.('easystok:sincronizar-agora', aoPedirAgora)
       globalThis.document?.removeEventListener('visibilitychange', aoMudarVisibilidade)
       clearTimeout(proximo)
       clearTimeout(esperaPedidos)

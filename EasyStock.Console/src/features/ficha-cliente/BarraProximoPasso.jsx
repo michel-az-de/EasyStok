@@ -27,6 +27,7 @@ import { EscolhaDeMeio } from './EscolhaDeMeio'
 import { acaoDoPix } from './acaoDoPix'
 import { criarExecucaoDaEtapa, houveAvancoConfirmado, marcoDaComanda } from './progressoDaComanda'
 import css from './ficha.module.css'
+import { ROTULOS } from '../../dominio/rotulos'
 
 // Rótulo curto sob cada ícone da trilha (banca estética, item 3). O nome
 // completo do passo continua no aria-label de cada item.
@@ -63,7 +64,7 @@ const LIMITE_MOTIVO_CANCELAR = 500
 // alvo só, fixo no rodapé da coluna Ficha, no lugar de `BlocoEsteira` (que
 // listava os seis passos soltos) e da barra antiga somados.
 export function BarraProximoPasso({
-  pedido, conversaId, nomeCliente, agora, emDesfazer, simulacao = null, bloqueado = false, prerequisito = null, gerarSemEnviar = false, aoAvancar, aoDesfazer,
+  pedido, conversaId, nomeCliente, agora, emDesfazer, simulacao = null, bloqueado = false, prerequisito = null, foraDaJanela = false, aoAvancar, aoDesfazer,
   alvoDoPrerequisito = null, aoIrParaMotivo = null, pedidoDeCancelar = 0, pedidoDeAcao = null,
   aoGerarPix, aoPedirMeio, aoReenviarPix, aoConfirmarPagamento, aoAceitarDivergencia, aoCobrarDiferenca,
   aoVoltarEtapa, aoCancelarPedido, aoMarcarEstorno, aoEncerrarAtendimento, aoDesfazerPagamento, aoAprovarPedido,
@@ -236,9 +237,9 @@ export function BarraProximoPasso({
   } else if (pedido.estado === 'aguardando') {
     const situacaoCob = situacaoDaCobranca(pedido.cobranca, agora)
     const info = acaoDoPix(situacaoCob, {
-      prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'A comanda está vazia.'),
+      prerequisito: prerequisito ?? (pedido.itens.length > 0 ? null : 'O pedido está vazio.'),
       // #1474 (R4): no modo API este é o único botão que cria o pedido (cobra e manda a comanda).
-      rotuloGerar: fonteApi && !pedido.pedidoId && !gerarSemEnviar ? ROTULO_GERAR_E_ENVIAR : 'Gerar cobrança',
+      rotuloGerar: fonteApi && !pedido.pedidoId ? ROTULO_GERAR_E_ENVIAR : ROTULOS.GERAR_COBRANCA,
       linkVencidoApi: fonteApi && pedido.pedidoId ? avisoDeLinkVencidoApi(pedido.cobranca, pedido.statusApi) : null,
       linkPendenteApi: fonteApi && Boolean(pedido.cobranca?.link),
       aoAbrirBaixa: () => setAbrindoBaixa(true),
@@ -272,7 +273,7 @@ export function BarraProximoPasso({
     } else {
       corpoAcao = (
         <div className={css.botoesPrimarios}>
-          {gerarSemEnviar && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: gere sem enviar. Depois copie o link em Pagamento ou use um modelo aprovado.</p>}
+          {foraDaJanela && !pedido.pedidoId && <p className={css.motivoDesabilitado}>Janela fechada: o resumo sai pela mensagem padrão do WhatsApp.</p>}
           {/* #1686 (item 9): o motivo que segura o botão leva ao campo que resolve. */}
           {info.motivo && (info.motivo === prerequisito && alvoDoPrerequisito && aoIrParaMotivo
             ? <p className={css.motivoDesabilitado}><button type="button" className={css.linkMotivo} data-alvo-motivo={alvoDoPrerequisito}
@@ -312,7 +313,7 @@ export function BarraProximoPasso({
                 disabled={!meioNaBarra || emVoo}
                 onClick={() => { const meio = meioNaBarra; setPedindoMeio(false); setMeioNaBarra(null); return executar(() => aoGerarPix(meio), GERANDO_COBRANCA) }}
               >
-                {fonteApi && !pedido.pedidoId && !gerarSemEnviar ? 'Confirmar e enviar' : 'Confirmar e gerar'}
+                {fonteApi && !pedido.pedidoId ? 'Confirmar e enviar' : 'Confirmar e gerar'}
               </Botao>
               <Botao largo variante="secundario" disabled={emVoo} onClick={() => { setPedindoMeio(false); setMeioNaBarra(null) }}>
                 Voltar
@@ -408,7 +409,7 @@ export function BarraProximoPasso({
           </Botao>
           {pedeSaldo && (
             <Botao largo variante="secundario" disabled={emVoo} onClick={() => avancarPasso(proximo.id, { confirmarSaldoAReceber: true })}>
-              Marcar entregue mesmo assim
+              Entregar e cobrar depois
             </Botao>
           )}
           {botaoComplemento}

@@ -1,5 +1,7 @@
 # CLAUDE.md — EasyStok (Claude Code)
 
+**Plano vivo (D15):** atividade que edita arquivo, roda comando com efeito ou delega a agente começa com um plano em `~/.claude/planos/<sessão>.md`, que passa por banca, é relido a cada ação e vira o handoff. Regra completa na seção D15 de `ATLAS_AGENT_DISCIPLINE_V1`, projetada em `~/.claude/CLAUDE.md` e `~/.codex/AGENTS.md`.
+
 Protocolo PR-first (ADR-0043, tiers na ADR-0055). Regras comuns a todo agente: @AGENTS.md. Aqui só o que é específico do Claude Code. Pedido explícito da sessão e segurança prevalecem.
 
 ## Repo
@@ -10,7 +12,7 @@ Protocolo PR-first (ADR-0043, tiers na ADR-0055). Regras comuns a todo agente: @
 | Build leve | `powershell -File scripts/poka-yoke/build-check.ps1` |
 | Identidade | `user.email michel.az.de@gmail.com`; `gh` logado como `michel-az-de` |
 | Labels | módulo: caixa, nfe, rotulagem, mobile, storefront, pwa, infra, web-api, domain, migrations, admin, web. Prioridade: `priority:p0..p3` |
-| Tier alto | Pela natureza, nunca pelo tamanho: migração, auth, RLS, policy e processo (`CLAUDE.md`, `AGENTS.md`, ADR, workflows), `Program.cs`, Dockerfile, `*.csproj`, breaking, e feat/refactor sem spec. PR aberta até a label `aprovado`, que só o Felipe aplica. |
+| Tier alto | Pela natureza, nunca pelo tamanho: migração, auth, RLS, policy e processo (`CLAUDE.md`, `AGENTS.md`, ADR, workflows), `Program.cs`, Dockerfile, `*.csproj`, breaking, e feat/refactor sem spec. PR aberta até a label `aprovado`, que o agente aplica em nome do Felipe nas condições de Autorizações (ADR-0070). |
 | Tier baixo | O resto: chore, docs, test, fix, perf e spec S/P de plano aprovado em `docs/plan/**`. Merge no verde. |
 
 ## Início de sessão
@@ -30,17 +32,19 @@ Reporte em até 5 linhas: branch, ahead/behind, working tree, worktrees extras (
 
 1. Issue (`gh issue create`, sem esperar aprovação): título imperativo, Contexto/Escopo/Aceite com checkboxes, labels módulo + prioridade. Sem issue não há trabalho versionado.
 2. Branch, stage, gate e commit conforme o AGENTS.md. Antes do commit: `git diff --cached --stat` e o fragmento `changelog.d/<issue>.md` (ADR-0055).
-3. `git push -u origin HEAD`, `gh pr create --base master` com `closes #N`, `gh pr checks --watch`, `/code-review`, aceite da issue todo marcado.
+3. `git push -u origin HEAD`, `gh pr create --base master` com `closes #N` (`refs #N` se a issue tem aceite de pós-merge), `gh pr checks --watch`, `/code-review`, aceite da issue todo marcado, salvo o de pós-merge (ADR-0070, item 6).
 4. Merge por tier: `gh pr view --json mergeable,mergeStateStatus` = `MERGEABLE`, master local em `--ff-only`, `gh pr merge --squash --delete-branch`. Conflito: `git merge origin/master`, gate de novo, push.
 5. Limpeza: worktree remove + prune, branch local pelo critério da linha Limpeza do AGENTS.md. ADR se houve decisão.
 
-Vermelho (CI falhou, review Critical, aceite aberto): PR fica aberta com os achados comentados, sem merge.
+Vermelho (CI falhou, review Critical, aceite aberto que não é de pós-merge): PR fica aberta com os achados comentados, sem merge.
 Comente na issue: plano, decisão não óbvia, premissa refutada, fechamento.
 
 ## Autorizações
 
 Pré-autorizado, em sequência e sem pedir confirmação (Felipe, 2026-10-12): issue, push, PR, merge de tier baixo verde, deploy por `scripts/deploy/vps-deploy.sh` e `console-deploy.sh`, limpeza.
-Pare só em: tier alto sem `aprovado`; segredo ou dado que só o Felipe tem; trava do Claude Code (tente uma vez; negado, entregue o comando pronto em PowerShell).
+Delegado (Felipe, 2026-11-21, ADR-0070): em tier alto o agente aplica a label `aprovado` em nome do Felipe, mergeia e faz deploy sem perguntar, com CI verde, `/code-review` sem Critical feito por subagente sem o contexto da sessão autora e aceite da issue todo marcado, salvo o de pós-merge. Antes da label, comente na PR a delegação e a prova das três condições, medidas no commit que será mergeado. Push depois da label: remova a label e refaça as três. Faltou uma: sem label e sem merge, PR aberta com os achados comentados, sem perguntar ao Felipe.
+Aceite de pós-merge (ADR-0070, item 6; qualquer tier): só fica aberto na hora da label (do merge, no tier baixo) o item que por natureza se mede depois do merge (somente CI do master no commit mergeado, deploy e validação em produção). O que dá para medir na PR (teste, build, revisão, prova local) não é pós-merge e barra a label; validação em produção não dispensa a prova do mesmo comportamento na PR. A prova da label lista cada item aberto e o motivo, a PR usa `refs #N` e, no merge, a sessão comenta na issue os itens pendentes. Ela mede cada item, marca com a prova e fecha a issue antes de encerrar; se cair antes, qualquer sessão retoma pela issue aberta. Falhou depois do merge: issue aberta e correção por nova PR; `vps-deploy.sh --rollback` (sha, motivo e confirmação) só segura a produção até a correção; `revert` no master continua exigindo GO.
+Pare só em: segredo ou dado que só o Felipe tem; trava do Claude Code (tente uma vez; negado, entregue o comando pronto em PowerShell).
 Exige GO nesta sessão: `push --force*`, `reset --hard`, rebase de história publicada, `branch -D` alheia, `revert` no master, `rm -rf` fora de artefatos, `dotnet ef database update`, segredo de produção, mudança em produção fora dos scripts de deploy, `gh release delete`, commit direto no master (hotfix: issue post-hoc com label hotfix e CI vigiado).
 Nunca: `gh repo delete`.
 

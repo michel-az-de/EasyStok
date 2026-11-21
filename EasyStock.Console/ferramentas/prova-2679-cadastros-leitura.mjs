@@ -35,7 +35,7 @@ caso('K1 domínio: leitura falha é estado próprio, não lista vazia', () => {
 })
 
 caso('K1 tela: com a leitura falha não há estado vazio', () => {
-  const corpo = painel.slice(painel.indexOf("titulo=\"Carregando cadastros\""))
+  const corpo = painel.slice(painel.indexOf("Carregando cadastros…"))
   const falhou = corpo.indexOf("leitura === 'falhou'")
   const vazio = corpo.indexOf('lista.length === 0')
   assert.ok(falhou >= 0 && vazio > falhou, 'o ramo da falha vem antes do estado vazio')

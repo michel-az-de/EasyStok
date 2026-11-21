@@ -129,7 +129,8 @@ if (paineis && preferencia && larguras) {
     assert.match(molduraCss, /\.palcoTres > \.centro \{ min-width: (\d+)px; \}/)
     assert.equal(Number(molduraCss.match(/\.palcoTres > \.centro \{ min-width: (\d+)px; \}/)[1]), CONVERSA_MINIMA)
     // #1870/#1872: o trilho é o CSS e o token compartilhados com os módulos; o token nasce de TRILHO.
-    assert.match(molduraCss, /\.trilho \{\s*composes: trilho from '\.\.\/componentes\/Trilho\.module\.css'/)
+    // #3004: o trilho do Balcão é o `TrilhoDoConsole`; o CSS dele compõe do módulo compartilhado.
+    assert.match(fonte('features/hall/trilhoDoConsole.module.css'), /\.trilho \{\s*composes: trilho from '\.\.\/\.\.\/componentes\/Trilho\.module\.css'/)
     assert.match(fonte('componentes/Trilho.module.css'), /\.trilho \{\s*flex: 0 0 var\(--largura-trilho\)/)
     assert.deepEqual(paineis.tokensDaGeometria(), { '--largura-trilho': `${TRILHO}px` }, 'trilho = token gerado da constante')
     assert.doesNotMatch(fonte('estilos/tokens.css'), /--largura-trilho:/, 'o token não tem segunda cópia em tokens.css')

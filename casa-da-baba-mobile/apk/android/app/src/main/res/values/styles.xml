@@ -29,4 +29,12 @@
         <item name="android:navigationBarColor">#FBF6EC</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+    <!-- #2886: alert/confirm/prompt do JavaScript na cor da marca, sem o teal padrão do Android. -->
+    <style name="PilotDialog" parent="android:Theme.DeviceDefault.Light.Dialog.Alert">
+        <item name="android:colorAccent">#496B56</item>
+        <item name="android:colorControlActivated">#496B56</item>
+        <item name="android:textColorHighlight">#47496B56</item>
+        <item name="android:colorBackground">#FFFAF2</item>
+        <item name="android:textColorPrimary">#352D25</item>
+    </style>
 </resources>

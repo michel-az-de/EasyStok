@@ -137,6 +137,10 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
   // #2227: antes da primeira leitura a lista vazia não é "nenhuma conversa".
   const carga = cargaDaLista({ fonteApi, estado: sincronizacao?.estado, total: conversas.length })
   const vazia = lista.length === 0 && !carga
+  // #2944 (E1-10): a entrada animada é só do cartão que chegou depois da primeira lista, não de todo remonte.
+  const vistas = useRef(null)
+  const novas = vistas.current ? new Set(lista.map((c) => c.id).filter((id) => !vistas.current.has(id))) : new Set()
+  useEffect(() => { if (!carga) vistas.current = new Set(lista.map((c) => c.id)) })
   const rolagem = useRef(null)
   const chaveDaLista = JSON.stringify([filtros.busca, filtros.aba, filtros.canais, filtros.ordenacao, filtros.responsavel])
   useLayoutEffect(() => {
@@ -161,13 +165,13 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
           <EsqueletoDeLista linhas={6} altura="calc(var(--toque) * 1.8)">Carregando as conversas…</EsqueletoDeLista>
         )}
         {carga === 'erro' && (
-          <VazioEmLinha texto="Não consegui carregar as conversas. Tento de novo em instantes." />
+          <VazioEmLinha texto="Não consegui carregar as conversas. Tento de novo em instantes." acao="Tentar de novo" aoAgir={() => globalThis.dispatchEvent(new Event('easystok:sincronizar-agora'))} />
         )}
         {/* #1442: vazio em uma linha, com o atalho certo. O bloco grande
             "Ninguém esperando você" ocupava a coluna e escondia o resto. */}
         {vazia && !semBusca
           && (filtros.aba === 'precisa' || encerradasDoBalcao.length + bloqueadasDoBalcao.length === 0) && (
-          <VazioEmLinha texto={`Nada com "${filtros.busca.trim()}".`} acao="Limpar busca" aoAgir={() => mudarFiltro('busca', '')} />
+          <VazioEmLinha texto={`Nenhuma conversa com "${filtros.busca.trim()}".`} acao="Limpar busca" aoAgir={() => mudarFiltro('busca', '')} />
         )}
         {vazia && semBusca && !semCanal && (
           <VazioEmLinha
@@ -189,6 +193,7 @@ export function PainelConversas({ aoAbrir, buscaDeClientes: BuscaDeClientes = nu
           <CartaoConversa
             key={conversa.id}
             conversa={conversa}
+            novo={novas.has(conversa.id)}
             selecionada={conversa.id === selecionadaId}
             agora={agora}
             pausado={automaticoPausado?.[conversa.id] ?? false}

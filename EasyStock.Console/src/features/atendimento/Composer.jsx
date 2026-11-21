@@ -306,7 +306,7 @@ export function Composer({
                 aria-controls={sugestoesNoCampo ? idListaRespostas : undefined}
                 aria-activedescendant={sugestoesNoCampo && barra.itens[barra.destaque] ? `${idListaRespostas}-${barra.destaque}` : undefined}
                 placeholder={!podeEscrever
-                  ? (podeEnviarModelo ? 'Janela fechada: escolha um modelo aprovado em Respostas' : 'Mensagem indisponível nesta conversa')
+                  ? (podeEnviarModelo ? 'Janela fechada: escolha uma mensagem padrão do WhatsApp em Respostas' : 'Mensagem indisponível nesta conversa')
                   : anexo
                     ? 'Legenda (opcional)'
                     // O atalho / continua valendo, mas a dica não o repete: o botão
@@ -393,7 +393,7 @@ export function Composer({
                   // #2134: chave do completar com Tab. Só existe no modo API (é lá que a sugestão chama
                   // o provedor). Desligada, nenhuma chamada sai; vale por usuário, neste navegador.
                   fonteApi && {
-                    chave: 'sugestoes', rotulo: 'Sugestões do Assistente', icone: 'sparkles', marcado: complementoLigado,
+                    chave: 'sugestoes', rotulo: 'Sugestões do Assistente', icone: 'agente', marcado: complementoLigado,
                     aoEscolher: alternarComplemento,
                   },
                 ]}

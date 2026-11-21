@@ -396,7 +396,7 @@ try {
     await botao.waitFor()
     assert.equal(await botao.isDisabled(), true)
     const id = await botao.getAttribute('aria-describedby')
-    assert.equal(await p.locator(`[id="${id}"]`).innerText(), 'Conversa concluída: não há comanda para montar.')
+    assert.equal(await p.locator(`[id="${id}"]`).innerText(), 'Conversa concluída: não há pedido para montar.')
     await ctx.close()
   })
 
@@ -513,7 +513,7 @@ try {
   })
   await confere('F16. Ficha: cadastro rápido pela metade não fecha com Esc; sem digitar, fecha', async () => {
     const { ctx, p } = await abrir('cena=ficha&inicial=lead')
-    const janela = p.getByRole('dialog', { name: 'Cadastro do cliente' })
+    const janela = p.getByRole('dialog', { name: 'Ficha do cliente' })
     await janela.waitFor()
     await janela.getByLabel('Endereço', { exact: true }).first().fill('Rua das Flores, 120, Centro')
     await p.keyboard.press('Escape')
@@ -521,7 +521,7 @@ try {
     assert.deepEqual((await chamadasDe(p)).filter((c) => c[0] === 'fecharFicha'), [])
     await ctx.close()
     const outra = await abrir('cena=ficha&inicial=lead')
-    const fresca = outra.p.getByRole('dialog', { name: 'Cadastro do cliente' })
+    const fresca = outra.p.getByRole('dialog', { name: 'Ficha do cliente' })
     await fresca.waitFor()
     await outra.p.keyboard.press('Escape')
     await outra.p.waitForFunction(() => window.chamadas.some((c) => c[0] === 'fecharFicha'))
@@ -529,7 +529,7 @@ try {
   })
   await confere('F16. Ficha: dado que chega da sincronização sem ninguém digitar não segura a janela', async () => {
     const { ctx, p } = await abrir('cena=ficha&inicial=lead')
-    const janela = p.getByRole('dialog', { name: 'Cadastro do cliente' })
+    const janela = p.getByRole('dialog', { name: 'Ficha do cliente' })
     await janela.waitFor()
     await p.evaluate(() => window.sincronizarNome('Nome que veio do WhatsApp'))
     await janela.getByText('Nome que veio do WhatsApp').first().waitFor()
@@ -710,6 +710,8 @@ try {
     await p.getByRole('button', { name: 'Mais opções', exact: true }).tap()
     await p.getByRole('menuitem', { name: 'Gestão', exact: true }).tap()
     const gestao = p.getByRole('dialog', { name: 'Gestão da loja', exact: true })
+    // #2832: no modo API a Gestão abre no painel Agora; a busca das telas fica em Todas as telas.
+    await gestao.getByRole('button', { name: 'Todas as telas', exact: true }).tap()
     await gestao.getByRole('button', { name: 'Leads e clientes', exact: true }).tap()
     await gestao.getByRole('button', { name: 'Voltar à conversa', exact: true }).tap()
     assert.equal(await gestao.count(), 0)

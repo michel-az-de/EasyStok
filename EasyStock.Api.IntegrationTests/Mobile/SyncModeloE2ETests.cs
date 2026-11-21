@@ -342,6 +342,30 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
         (await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters()
             .CountAsync(p => p.MobileOrderId == pedido))).Should().Be(1);
     }
+
+    [SkippableFact]
+    public async Task CanalMarcadoNoApk_ChegaAoPedidoDoErp_EReenvioSemCanalNaoApaga()
+    {
+        // #409: pedidos.Canal é onde a medição lê; origem continua "mobile".
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (apk, _, _) = await TresAparelhosAsync();
+        var produto = NovoId("p");
+        var pedido = NovoId("o");
+        await PushAsync(apk, Cadastro(produto, saldoNoAparelho: 10, porMovimento: true));
+
+        (await PushAsync(apk, Pedido(pedido, produto, "aguardando", qtd: 1, canal: "whatsapp"))).Rejeitadas.Should().BeEmpty();
+
+        var registro = await PedidoAsync(pedido);
+        registro.Channel.Should().Be("whatsapp");
+        var noErp = await LerAsync(db => db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(p => p.Id == registro.ErpPedidoId));
+        noErp.Canal.Should().Be("whatsapp");
+        noErp.Origem.Should().Be("mobile");
+
+        (await PushAsync(apk, Pedido(pedido, produto, "aguardando", qtd: 1,
+            horaDoAparelho: DateTime.UtcNow.AddSeconds(5)))).Rejeitadas.Should().BeEmpty();
+        (await PedidoAsync(pedido)).Channel.Should().Be("whatsapp");
+    }
     [SkippableFact]
     public async Task Sincronizacao_ChaveDoAparelhoIsolaEmpresaMesmoComDeviceIdForjado()
     {
@@ -433,14 +457,15 @@ public class SyncModeloE2ETests(MobileE2EFixture fixture)
     private static Envio Movimento(string produto, int qtd) => Mutation("stock.delta",
         new { id = "sd_" + Guid.NewGuid(), productId = produto, qty = qtd });
 
-    private static Envio Pedido(string id, string produto, string status, int qtd, DateTime? horaDoAparelho = null)
+    private static Envio Pedido(string id, string produto, string status, int qtd, DateTime? horaDoAparelho = null,
+        string? canal = null)
     {
         var hora = Ms(horaDoAparelho ?? DateTime.UtcNow);
         return Mutation("order.upsert", new
         {
             id, clientId = (string?)null, clientSnapshot = new { name = "Ana", @ref = (string?)null },
             items = new[] { new { productId = produto, name = "Lasanha", emoji = (string?)null, unit = "300g", qty = qtd, unitPrice = 30m } },
-            notes = (string?)null, total = 30m * qtd, status, createdAt = hora, updatedAt = hora
+            notes = (string?)null, total = 30m * qtd, status, createdAt = hora, updatedAt = hora, channel = canal
         });
     }
 

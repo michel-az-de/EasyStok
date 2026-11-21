@@ -44,7 +44,7 @@
 //   h. botao so de icone fora do `BotaoIcone` (#2185, R02): `<Botao>` ou `<button>` cujo unico
 //      filho e um `<Icone/>`, ou `<Botao icone=... />` sem texto. O BotaoIcone da o nome acessivel,
 //      a dica e o alvo de `--toque`.
-//   o. icone do ator na tela do Atendimento (#2185, plano secao 3.2): o Assistente e `sparkles`,
+//   o. icone do ator na tela do Atendimento (#2185, plano secao 3.2): o Assistente e `agente` (robo, #2864),
 //      concluir e `circle-check`. `raio` fica com o modulo Automaticas e `log-out` com sair da conta.
 //
 // Le o codigo como texto, sem dependencia. As contagens b, c e d sao heuristicas de

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
@@ -80,7 +81,8 @@ public sealed class AssistenteDonaUseCase(
         var requisicao = new RequisicaoLlm(
             SystemPrompt,
             [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm(texto)])],
-            contexto is null ? [] : PropostasAssistenteDona.Ferramentas);
+            contexto is null ? [] : PropostasAssistenteDona.Ferramentas)
+        { EmpresaId = command.EmpresaId, Finalidade = FinalidadeIa.AssistenteDona };
 
         var cronometro = Stopwatch.StartNew();
         var resposta = await llm.EnviarAsync(requisicao, ct);

@@ -139,7 +139,7 @@ export function AbaCategoriasApi() {
       </p>}
       {/* #2424: descrição curta e "Nova categoria" secundário no topo; a regra de ocultar e excluir mora no "Sobre". */}
       <div className={css.topo}>
-        <p className={css.descricao}>Organize os pratos no site e na comanda.</p>
+        <p className={css.descricao}>Organize os pratos no site e no pedido.</p>
         <div className={css.acoesDireita}>
           {!antigas && !gestao.previa && (
             <Botao variante="texto" disabled={convertendo} onClick={converter}>{convertendo ? 'Convertendo…' : 'Converter as categorias antigas'}</Botao>
@@ -206,7 +206,7 @@ export function AbaCategoriasApi() {
       )}
       <details className={css.saibaMais}>
         <summary>Sobre ocultar e excluir categorias</summary>
-        <p>A ordem desta lista é a do site e da comanda. Ocultar tira a categoria inteira do site sem apagar os pratos. Só dá para excluir categoria vazia.</p>
+        <p>A ordem desta lista é a do site e do pedido. Ocultar tira a categoria inteira do site sem apagar os pratos. Só dá para excluir categoria vazia.</p>
       </details>
     </div>
   )

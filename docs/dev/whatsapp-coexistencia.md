@@ -101,7 +101,10 @@ do webhook deve ter pelo menos 16 caracteres. O cofre também exige a KEK já do
 docker compose --env-file .env.local -f docker-compose.local.yml -f docker-compose.wppconnect.yml up -d --build
 ```
 
-O servidor está fixado em `2.10.68`, com digest no compose. A porta 21465 não é publicada:
+O servidor está fixado em `2.10.81`, com digest no compose (#2824). Não use `latest` nem
+subir de versão sem conferir a data: em 15 e 16/11/2026 saíram releases maliciosas no npm
+(`@wppconnect/server` 2.10.82 e `@wppconnect-team/wppconnect` 2.4.1) que roubam `.env` e
+sessões. A 2.10.81 foi publicada em 13/11/2026. A porta 21465 não é publicada:
 somente a API acessa o gateway na rede Docker. Volumes de `tokens` e `userDataDir` preservam
 o vínculo no reinício. O pré-carregador `scripts/wppconnect/configurar.cjs` desliga a mídia
 inline, recupera mensagens não lidas na partida e mantém a sessão de QR disponível para leitura.

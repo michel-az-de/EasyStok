@@ -92,7 +92,7 @@ try {
   await editor.getByRole('button', { name: 'Abrir cadastro de Bia Lima', exact: true }).click()
   confirmar = pagina.getByRole('dialog', { name: 'Abrir o cadastro de Bia Lima?', exact: true }); await confirmar.waitFor()
   await confirmar.getByRole('button', { name: 'Abrir cadastro', exact: true }).click()
-  editor = pagina.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  editor = pagina.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   assert.equal(await editor.getByRole('textbox', { name: 'Nome', exact: true }).inputValue(), 'Bia Lima')
 
   // O próprio cliente não conta.

@@ -1,5 +1,6 @@
 using EasyStock.Application.UseCases.Cliente;
 using EasyStock.Application.UseCases.CriarCliente;
+using EasyStock.Domain.Sales;
 
 namespace EasyStock.Application.UseCases.ListarClientes;
 
@@ -24,8 +25,8 @@ public class ListarClientesUseCase(IClienteRepository repo)
     public async Task<ListarClientesResult> ExecuteAsync(ListarClientesQuery q)
     {
         UseCaseGuards.EnsureEmpresaId(q.EmpresaId);
-        if (q.Relacionamento is not (null or "lead" or "cliente"))
-            throw new UseCaseValidationException("Relacionamento deve ser lead ou cliente.");
+        if (q.Relacionamento is not (null or "lead" or "cliente" or RegraDeRecompra.Relacionamento))
+            throw new UseCaseValidationException("Relacionamento deve ser lead, cliente ou recompra.");
         var page = Math.Max(1, q.Page);
         var size = Math.Clamp(q.PageSize, 1, 200);
 

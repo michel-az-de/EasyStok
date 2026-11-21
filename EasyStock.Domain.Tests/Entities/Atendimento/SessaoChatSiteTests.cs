@@ -93,4 +93,21 @@ public class SessaoChatSiteTests
         sessao.EstaValida(Agora.AddDays(2)).Should().BeFalse();
     }
 
+    [Fact]
+    public void Abrir_GuardaAOrigemDoAnuncioParaACopiarNaConversa()
+    {
+        var origem = EasyStock.Domain.ValueObjects.OrigemAnuncio.DoSite(
+            new("google", "cpc", "natal", null, null), new(null, null, null, null),
+            EasyStock.Domain.ValueObjects.OrigemAnuncio.ViaSiteChat, false, Agora);
+
+        var sessao = SessaoChatSite.Abrir(Empresa, Loja, Hash, Agora, origem);
+
+        sessao.OrigemAnuncio.Should().BeSameAs(origem);
+    }
+
+    [Fact]
+    public void Abrir_SemOrigem_NaoTemOrigem()
+    {
+        SessaoChatSite.Abrir(Empresa, Loja, Hash, Agora).OrigemAnuncio.Should().BeNull();
+    }
 }

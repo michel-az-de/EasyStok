@@ -62,9 +62,9 @@ export function clienteDoDossie(dossie) {
 export function relacionamentoDoDossie(dossie) {
   const lido = clienteDoDossie(dossie)
   if (!lido) return null
-  const { notas, tags, totalGasto, favorito, pedidos } = lido.cliente
+  const { notas, tags, totalGasto, favorito, pedidos, fotoUrl } = lido.cliente
   return {
-    bloqueio: lido.bloqueio, notas, tags, totalGasto, favorito, pedidos,
+    bloqueio: lido.bloqueio, notas, tags, totalGasto, favorito, pedidos, fotoUrl: fotoUrl ?? null,
     conversas: (dossie.conversasRecentes ?? []).map((c) => ({
       id: c.id, canal: nomeDoCanal(c.canal), estado: estadoDaSituacao(c.situacao),
       em: quando(instante(c.ultimaMensagemEm ?? c.iniciadaEm)),

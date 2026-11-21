@@ -59,7 +59,7 @@ public class IniciarConversaClienteUseCaseTests
     private IniciarConversaClienteUseCase UseCase()
     {
         var envio = new EnviarModeloConversaUseCase(_conversas, _clientes, _catalogo, new(_consentimentos), new([_canal]), _uow, TimeProvider.System);
-        return new(_conversas, _clientes, _catalogo, new(_consentimentos), envio, _uow, TimeProvider.System);
+        return new(_clientes, _catalogo, new(_consentimentos), envio, new ConversaWhatsAppDoCliente(_conversas, _uow, TimeProvider.System));
     }
 
     private IniciarConversaClienteCommand Command(Guid? tentativa = null, string modelo = "boas_vindas", bool confirmada = false) =>

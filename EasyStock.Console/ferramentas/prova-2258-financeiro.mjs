@@ -103,12 +103,12 @@ caso('F12: "+ Nova categoria" existe na escolha, só para quem gerencia categori
   assert.doesNotMatch(modais, /em Categorias financeiras para criar esta conta/)
 })
 
-// ---- F15 / F14: opcionais marcados, erro de cada campo embaixo dele
-caso('F15: opcionais marcados e erros no próprio campo', () => {
-  assert.match(modais, /rotulo="Centro de custo \(opcional\)"/)
-  assert.match(modais, /rotulo="Observações \(opcional\)"/)
+// ---- F15 / F14: obrigatório com "*" e opcional sem marca (#3016), erro de cada campo embaixo dele
+caso('F15: obrigatório marcado, opcional sem marca e erros no próprio campo', () => {
+  assert.match(modais, /rotulo="Centro de custo" value/)
+  assert.match(modais, /rotulo="Observações" rows/)
   // #2792: o teto de 200 passou de maxLength (cortava em silêncio) para a prop `limite` do campo.
-  assert.match(modais, /rotulo="Descrição" required limite=\{200\}[^>]*erro=/)
+  assert.match(modais, /rotulo="Descrição" obrigatorio required limite=\{200\}[^>]*erro=/)
 })
 
 caso('F14: erro do vencimento fica colado ao campo de vencimento', () => {

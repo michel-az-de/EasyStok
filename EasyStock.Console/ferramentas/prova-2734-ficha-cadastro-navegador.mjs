@@ -120,8 +120,8 @@ try {
 
   // 3. A Ficha leva ao cadastro completo: o endereço muda para o da pessoa em Cadastros e a janela fecha.
   p = await abrir('cena=cadastro')
-  let janela = p.getByRole('dialog', { name: 'Cadastro do cliente', exact: true })
-  const atalho = () => janela.getByRole('button', { name: 'Abrir cadastro completo', exact: true })
+  let janela = p.getByRole('dialog', { name: 'Ficha do cliente', exact: true })
+  const atalho = () => janela.getByRole('button', { name: 'Abrir ficha completa', exact: true })
   await atalho().waitFor()
   assert.equal(await atalho().isEnabled(), true)
   await atalho().click()
@@ -132,11 +132,11 @@ try {
 
   // 4. Com texto por salvar, o atalho espera e diz por quê; nada é descartado em silêncio.
   p = await abrir('cena=cadastro')
-  janela = p.getByRole('dialog', { name: 'Cadastro do cliente', exact: true })
+  janela = p.getByRole('dialog', { name: 'Ficha do cliente', exact: true })
   await atalho().waitFor()
   await janela.getByRole('tab', { name: /^Notas/ }).click()
   await p.getByRole('textbox', { name: 'Nova nota', exact: true }).fill('Ligar depois das 14h')
-  const motivo = 'Salve ou descarte o que foi digitado para abrir o cadastro completo.'
+  const motivo = 'Salve ou descarte o que foi digitado para abrir a ficha completa.'
   await janela.getByText(motivo, { exact: true }).waitFor()
   assert.equal(await atalho().isDisabled(), true)
   assert.equal(await atalho().getAttribute('title'), motivo)
@@ -147,7 +147,7 @@ try {
   // 5. Quem não tem acesso a Cadastros e o contato sem cadastro não veem o atalho; o resto do rodapé segue.
   for (const consulta of ['cena=cadastro&acesso=nao', 'cena=lead']) {
     p = await abrir(consulta)
-    janela = p.getByRole('dialog', { name: 'Cadastro do cliente', exact: true })
+    janela = p.getByRole('dialog', { name: 'Ficha do cliente', exact: true })
     await janela.getByRole('button', { name: 'Baixar PDF', exact: true }).waitFor()
     assert.equal(await atalho().count(), 0, consulta)
     await p.close()

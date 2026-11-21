@@ -4,6 +4,8 @@
 # Instalacao (Felipe, uma vez, como root): ver tools/mcp-baba/README.md.
 #   authorized_keys do usuario baba-mcp:
 #     command="/opt/baba-mcp/gate.sh",restrict ssh-ed25519 AAAA... pessoa@maquina
+#   chave do container remoto (ADR-0069), so da rede mcp e sem banco:
+#     from="172.16.8.0/24",command="/opt/baba-mcp/gate.sh --sem-banco",restrict ssh-ed25519 AAAA... ez-mcp
 #
 # Contrato: o cliente manda UM comando de lista fixa em SSH_ORIGINAL_COMMAND.
 #   logs <ez-api|ez-worker|ez-web> <since: 5m|2h> <tail: 1..5000>
@@ -119,10 +121,20 @@ if [ "${1:-}" = "--root" ]; then
   executa "$@"; exit 0
 fi
 
+# Modo da chave: vem do command= do authorized_keys, nunca do cliente. Desconhecido fecha a porta.
+#   --sem-banco: chave do container remoto ez-mcp (ADR-0069), sem psql_ro.
+SEM_BANCO=
+case "${1:-}" in
+  "") ;;
+  --sem-banco) SEM_BANCO=1; shift; [ "$#" -eq 0 ] || nega "argumento extra no command=" ;;
+  *) nega "modo desconhecido" ;;
+esac
+
 cmd="${SSH_ORIGINAL_COMMAND:-${GATE_CMD:-}}"
 [ -n "$cmd" ] || nega "sem comando"
 [[ "$cmd" =~ ^[a-z_]+(\ [A-Za-z0-9-]+)*$ ]] || nega "caracteres invalidos"
 read -r -a partes <<<"$cmd"
 valida "${partes[@]}"
+[ -z "$SEM_BANCO" ] || [ "${partes[0]}" != "psql_ro" ] || nega "psql_ro bloqueado nesta chave"
 if [ -n "$GATE_DRY" ] || [ -n "${GATE_LOCAL:-}" ] || [ "${partes[0]}" = "deploy_historico" ]; then executa "${partes[@]}"; exit 0; fi
 exec sudo -n "$0" --root "${partes[@]}"

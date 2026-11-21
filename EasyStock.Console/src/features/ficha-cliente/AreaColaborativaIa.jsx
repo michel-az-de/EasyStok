@@ -40,7 +40,7 @@ export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAb
     finally { executando.current = false; if (aindaAtual()) setOcupado(false) }
   }
   const comanda = bloco.tipo === 'comanda' && valido ? comandaDaFichaIa(selecionada, cardapio, fonteApi) : null
-  const acao = bloco.tipo === 'comanda' ? { rotulo: 'Ver comanda', callback: aoAbrirComanda, args: [] }
+  const acao = bloco.tipo === 'comanda' ? { rotulo: 'Ver pedido', callback: aoAbrirComanda, args: [] }
     : bloco.tipo === 'nota' ? { rotulo: 'Revisar nota', callback: aoProporNota, args: [bloco.texto] }
       : bloco.tipo === 'frete' ? { rotulo: 'Consultar frete', callback: aoCalcularFrete, args: [] }
         : bloco.acao === 'abrir_cardapio' ? { rotulo: 'Abrir cardápio', callback: aoAbrirCardapio, args: [] }
@@ -57,9 +57,9 @@ export function BlocoColaborativoIa({ bloco, conversaId = bloco.conversaId, aoAb
     </header>
     <p className={bloco.tipo === 'nota' ? css.nota : css.texto}>{bloco.texto}</p>
     {bloco.tipo === 'comanda' && (comanda ? <div className={css.comanda}>
-      <strong>{comanda.numero ? `Comanda ${comanda.numero}` : 'Pedido em montagem'} · {comanda.nome}</strong>
+      <strong>{comanda.numero ? `Pedido ${comanda.numero}` : 'Pedido em montagem'} · {comanda.nome}</strong>
       <ul>{comanda.itens.slice(0, 4).map((item, i) => <li key={`${item.id}:${i}`}>{item.quantidade} × {item.nome}</li>)}</ul>
-      {comanda.itens.length > 4 && <p>{comanda.itens.length - 4} outros itens na comanda.</p>}
+      {comanda.itens.length > 4 && <p>{comanda.itens.length - 4} outros itens no pedido.</p>}
       {comanda.total != null && <p className={css.total}>{comanda.rotuloTotal} <strong>{moeda(comanda.total)}</strong></p>}
     </div> : <p>Nenhum pedido nesta conversa.</p>)}
     {bloco.tipo === 'frete' && <p className={css.endereco}>{selecionada.cliente?.endereco || 'Confira o endereço do cliente para consultar o frete.'}</p>}

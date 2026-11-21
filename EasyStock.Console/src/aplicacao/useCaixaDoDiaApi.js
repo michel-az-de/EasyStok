@@ -10,7 +10,8 @@ const CONFERE_O_DIA_MS = 60000
 // reducer, porque o saldo esperado é conta da API, não do navegador.
 //
 // estado: carregando | ok | erro
-export function useCaixaDoDiaApi({ fechamentos: quantosFechamentos = 7 } = {}) {
+// `ligado` falso (#2832): quem não tem a tela do caixa não lê nada.
+export function useCaixaDoDiaApi({ fechamentos: quantosFechamentos = 7, ligado = true } = {}) {
   const [carga, setCarga] = useState({ estado: 'carregando', dia: null, fechamentos: [], erro: null })
   const [geracao] = useState(criarGeracaoDeLeitura)
 
@@ -26,13 +27,15 @@ export function useCaixaDoDiaApi({ fechamentos: quantosFechamentos = 7 } = {}) {
   }, [quantosFechamentos, geracao])
 
   useEffect(() => {
+    if (!ligado) return undefined
     recarregar()
     return () => { geracao.nova() }
-  }, [recarregar, geracao])
+  }, [ligado, recarregar, geracao])
 
   // #2378: o caixa muda sem o operador tocar nele. Relê a cada evento de pedido/pagamento, ao voltar para a
   // aba e na virada do dia no fuso da loja; sem isso "Na gaveta" e "Hoje" ficam velhos.
   useEffect(() => {
+    if (!ligado) return undefined
     const vigia = criarVigiaDoDia()
     const desligar = ligarRecargaAoVivo({ recarregar, recarregaCom: recarregaCaixaCom })
     const aoVoltar = () => { if (document.visibilityState !== 'hidden') recarregar() }
@@ -45,7 +48,7 @@ export function useCaixaDoDiaApi({ fechamentos: quantosFechamentos = 7 } = {}) {
       document.removeEventListener('visibilitychange', aoVoltar)
       window.removeEventListener('focus', aoVoltar)
     }
-  }, [recarregar])
+  }, [ligado, recarregar])
 
   return { ...carga, recarregar }
 }

@@ -37,7 +37,7 @@ export function AcoesPropostas({ acoes, nomeCliente, aoExecutar, motivoDeEnvio, 
         const impedimento = ((rotulo.saiParaCliente || acao.tipo === ACOES_DO_ASSISTENTE.RASCUNHO) && motivoDeEnvio)
           || (acao.tipo === ACOES_DO_ASSISTENTE.NOTA_INTERNA && semCadastro && 'Salve o cadastro do cliente na Ficha antes de anotar.')
           // #2185 (E10): conversa concluída não monta comanda; o cartão diz isso em vez de abrir um painel que não adiciona nada.
-          || (acao.tipo === ACOES_DO_ASSISTENTE.ABRIR_TELA && encerrada && 'Conversa concluída: não há comanda para montar.')
+          || (acao.tipo === ACOES_DO_ASSISTENTE.ABRIR_TELA && encerrada && 'Conversa concluída: não há pedido para montar.')
         const erroId = `${prefixoId}-${indice}-erro`
         return (
           <li key={acao.chave} className={css.acaoProposta}>

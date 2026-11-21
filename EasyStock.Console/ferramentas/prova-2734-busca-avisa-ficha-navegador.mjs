@@ -76,7 +76,7 @@ try {
   const dialogo = page.getByRole('dialog', { name: 'Buscar na Casa', exact: true })
   await dialogo.getByRole('combobox', { name: 'Buscar na Casa', exact: true }).fill('joao')
   await page.getByRole('option').filter({ hasText: 'Pessoas' }).click()
-  const editor = page.getByRole('dialog', { name: 'Editar cliente', exact: true }); await editor.waitFor()
+  const editor = page.getByRole('dialog', { name: 'Ficha do cliente', exact: true }); await editor.waitFor(); await editor.getByRole('button', { name: 'Editar dados', exact: true }).click()
   assert.equal(leiturasDaFicha.length, antes, 'abrir o cadastro não relê a Ficha')
 
   // Nota fixada no cadastro: a Ficha da conversa relê o dossiê depois da gravação.

@@ -48,7 +48,7 @@ try {
   resultados.push('390px: Leads e busca escolhidos antes de restaurar contexto continuam ativos')
   await page.reload(); await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByText('Ana Fixture', { exact: true }).waitFor()
-  await page.getByRole('button', { name: 'Editar Ana Fixture' }).click()
+  await page.getByRole('button', { name: 'Abrir ficha de Ana Fixture' }).click()
   while (!detalhePendente) await new Promise(resolve => setTimeout(resolve, 10))
   await page.getByRole('button', { name: 'Novo cliente', exact: true }).click()
   await page.getByRole('textbox', { name: 'Nome', exact: true }).fill('Novo preservado')

@@ -33,6 +33,8 @@ EOF
 chmod +x "$W/bin/ssh"
 
 # local <env...> -- <args...>: roda o script no clone; imprime rc, saida e se o ssh foi chamado
+# Git Bash: pwd -W da o caminho Windows e MSYS_NO_PATHCONV impede converter /tmp/... no -e.
+DIR_T="$(pwd -W 2>/dev/null || pwd)"; export MSYS_NO_PATHCONV=1
 local_run() {
   local envs=() rc
   while [ "$1" != -- ]; do envs+=("$1"); shift; done; shift
@@ -70,6 +72,23 @@ r=$(local_run X=0 -- --dry-run --rollback "$A" --motivo "API quebrou no boot")
 r=$(local_run "ROLLBACK_CONFIRMA=${C:0:8}" -- --rollback "$C" --motivo "fora do master")
                                           confere "rollback fora do master: exit 7"     "rc=7" "$r"
 r=$(local_run X=0 -- --nao-existe);      confere "opcao desconhecida: exit 2"          "rc=2" "$r"
+r=$(local_run X=0 -- --origem outra);    confere "origem invalida: exit 2"             "rc=2" "$r"
+# #2958: GitHub fora. origin aponta para lugar inexistente; o espelho da VPS e o origin.git
+# (caminho Windows no Git Bash: o git nativo nao entende /tmp com MSYS_NO_PATHCONV)
+W_T="$(cd "$W" && (pwd -W 2>/dev/null || pwd))"
+g remote set-url origin "$W_T/github-fora.git"
+r=$(local_run X=0 -- "$B");              confere "github fora: exit 7"                 "rc=7" "$r"
+                                          confere "github fora: aponta o espelho"       "--origem espelho" "$r"
+                                          confere "github fora: nao chama ssh"          "ssh=nao" "$r"
+r=$(local_run "ESPELHO_URL=$W_T/origin.git" -- --origem espelho "$B")
+                                          confere "espelho: exit 0"                     "rc=0" "$r"
+                                          confere "espelho: avisa a origem"             "origem: ESPELHO" "$r"
+                                          confere "espelho: chama ssh"                  "ssh=sim" "$r"
+r=$(local_run "ESPELHO_URL=$W_T/origin.git" -- --origem espelho "$A")
+                                          confere "espelho: SHA antigo exit 7"          "rc=7" "$r"
+r=$(local_run "ESPELHO_URL=$W_T/nao-ha.git" -- --origem espelho "$B")
+                                          confere "espelho inacessivel: exit 7"         "rc=7" "$r"
+g remote set-url origin "$W_T/origin.git"
 # copia do script diferente da do origin/master: recusa o deploy de verdade
 mkdir -p "$W/c/scripts/deploy"; echo "# outra versao" > "$W/c/scripts/deploy/vps-deploy.sh"
 g add scripts/deploy/vps-deploy.sh; g commit -q -m D; g push -q origin HEAD:master; D=$(g rev-parse HEAD)
@@ -116,6 +135,14 @@ export STATE=$(mktemp -d); : > "$STATE/calls"; export BUILD_ROOT=$(mktemp -d) BA
 export SHA=novo0001 SHA_FULL=novo0001novo TS=T0 DB_CONTAINER=pg DB_NAME=db HEALTH_TIMEOUT=1 SERVICES="api worker web"
 export MODO=deploy QUEM="Teste <t@t> em t@maquina" MOTIVO=
 mkdir -p /tmp/bin && cp /t/.fake-docker /tmp/bin/docker && chmod +x /tmp/bin/docker
+# E3: gancho do backup falso; grava os argumentos. FAKE_HOOK_RC simula o backup falhando.
+cat > /tmp/hook.sh <<'HOOK'
+#!/bin/sh
+echo "$*" > "$STATE/hook"
+exit ${FAKE_HOOK_RC:-0}
+HOOK
+chmod +x /tmp/hook.sh
+export BACKUP_HOOK=${BACKUP_HOOK:-/nao/existe}
 export PATH=/tmp/bin:$PATH
 for s in api worker web; do
   echo "easystok-$s:vps easystok-$s:vps-antiga" >> "$STATE/tags"
@@ -138,9 +165,10 @@ echo "prev_velha=$(grep -c '^easystok-web:vps-prev-2026110[123]T' $STATE/tags)"
 echo "prev_nova=$(grep -c '^easystok-web:vps-prev-\(T0\|2026110[45]T\)' $STATE/tags)"
 echo "shas=$(grep -c '^easystok-web:vps-[0-9a-f]\{8\} ' $STATE/tags)"
 echo "poda=$(grep -c 'builder prune' $STATE/calls)"
+sleep 1; echo "hook=$(cat $STATE/hook 2>/dev/null)"
 EOF
 
-run() { docker run --rm -e "$1" -v "$(pwd -W):/t" bash:5 sh -c 'apk add -q util-linux >/dev/null 2>&1; bash /t/.caso.sh'; }
+run() { docker run --rm -e "$1" -v "$DIR_T:/t" bash:5 sh -c 'apk add -q util-linux >/dev/null 2>&1; bash /t/.caso.sh'; }
 
 r=$(run X=0);                confere "sucesso: exit 0"                  "rc=0" "$r"
                               confere "sucesso: promove vps-<sha>"       "imagem=easystok-api:vps-novo0001" "$r"
@@ -175,6 +203,11 @@ r=$(run FAKE_BAD=1);         confere "falha de health: exit 6"          "rc=6" "
 r=$(run SEGURA_TRAVA=1);     confere "trava ocupada: exit 3"            "rc=3" "$r"
                               confere "trava ocupada: nao sobe nada"     "up=0" "$r"
                               confere "trava ocupada: historico rc=3"    "hist=.*rc=3" "$r"
+r=$(run BACKUP_HOOK=/tmp/hook.sh); confere "backup: entrega o dump ao restic" "hook=pre-deploy .*/db-predeploy-T0.dump" "$r"
+                              confere "backup: deploy segue exit 0"     "rc=0" "$r"
+r=$(run FAKE_HOOK_RC=1 2>/dev/null; docker run --rm -e BACKUP_HOOK=/tmp/hook.sh -e FAKE_HOOK_RC=1 -v "$DIR_T:/t" bash:5 sh -c 'apk add -q util-linux >/dev/null 2>&1; bash /t/.caso.sh'); confere "backup falha: deploy segue exit 0" "rc=0" "$r"
+r=$(run X=0);                confere "sem backup instalado: exit 0"     "rc=0" "$r"
+                              confere "sem backup instalado: nao chama" "hook=$" "$r"
 r=$(run FAKE_BUILD_FAIL=1);  confere "build falho: exit 4"              "rc=4" "$r"
                               confere "build falho: nao faz dump"        "dump=0" "$r"
                               confere "build falho: imagem intacta"      "imagem=easystok-api:vps-antiga" "$r"

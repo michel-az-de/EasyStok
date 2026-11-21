@@ -20,7 +20,9 @@ public class MobileCashController(
     ICurrentUserAccessor currentUser,
     ILogger<MobileCashController> log) : MobileManagementControllerBase(currentUser)
 {
+    // #2828: traz valor; mesma regra da leitura do caixa do ERP.
     [HttpGet]
+    [Authorize(Policy = "Operador")]
     public async Task<IActionResult> List(
         [FromQuery] Guid? empresaId,
         [FromQuery] bool? pendingOnly,

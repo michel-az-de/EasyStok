@@ -339,7 +339,8 @@ public class SyncReversePullService(
                 ScheduledDeliveryAt: p.AgendadoParaEm.HasValue
                     ? new DateTimeOffset(p.AgendadoParaEm.Value).ToUnixTimeMilliseconds()
                     : null,
-                AReceber: aReceber);
+                AReceber: aReceber,
+                Channel: p.Canal);
             mutations.Add(new MutationDto(Guid.NewGuid().ToString(), "web",
                 "order.upsert", SyncDtoConverters.Serialize(dto), new DateTimeOffset(p.AlteradoEm).ToUnixTimeMilliseconds()));
         }

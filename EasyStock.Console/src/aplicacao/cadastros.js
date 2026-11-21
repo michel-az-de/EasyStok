@@ -1,17 +1,29 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as api from '../infra/api/cadastrosApi'
+import { contextoVisualEsquecidoAoSair } from '../dominio/cadastros'
 export { adicionarEnderecoCliente, adicionarNotaCadastro, adicionarTagCadastro, adicionarTelefoneCliente, alternarAtividadeCadastro, obterRelacionamentoCliente, removerTagCadastro, removerEnderecoCliente, removerTelefoneCliente, atualizarCategoriaCadastro, buscarClientesParecidos, contextoCadastro, criarCategoriaCadastro, excluirCategoriaCadastro, obterCadastro, listarCategoriasCadastro, salvarCadastro, ativarMetodoCadastro, previaModeloCadastro, variaveisDoModeloCadastro, aprovarModeloCadastro, definirEtiquetaPadrao, duplicarEtiquetaCadastro, editarEtiquetaCadastro } from '../infra/api/cadastrosApi'
 
 // Preferências visuais da visita, sem entidades nem dados para persistir. Não contam como formulário sujo.
 const contextosVisuais = new Map()
 export function useContextoVisualCadastro(chave, identidade, inicial) {
   const escopo = `${identidade}:${chave}`
-  const [valor, definir] = useState(() => contextosVisuais.get(escopo) ?? inicial)
+  const [valor, definir] = useState(() => contextosVisuais.get(escopo)?.valor ?? inicial)
   return [valor, proximo => {
-    contextosVisuais.set(escopo, proximo)
+    contextosVisuais.set(escopo, { chave, valor: proximo })
     if (contextosVisuais.size > 100) contextosVisuais.delete(contextosVisuais.keys().next().value)
     definir(proximo)
   }]
+}
+
+// #2870: quem sai do módulo Cadastros volta para listas limpas. Chamado na troca de rota, depois que a tela saiu.
+export function useEsquecerCadastrosAoSair(moduloId) {
+  const anterior = useRef(moduloId)
+  useEffect(() => {
+    if (anterior.current === 'cadastros' && moduloId !== 'cadastros') {
+      for (const [escopo, { chave }] of contextosVisuais) if (contextoVisualEsquecidoAoSair(chave)) contextosVisuais.delete(escopo)
+    }
+    anterior.current = moduloId
+  }, [moduloId])
 }
 
 // #2495 (S4): a árvore de categorias de produto. Ao recarregar, a lista atual fica na tela até a nova chegar.

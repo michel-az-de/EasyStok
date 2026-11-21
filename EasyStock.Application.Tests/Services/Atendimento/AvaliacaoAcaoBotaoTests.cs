@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Atendimento;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
 using EasyStock.Application.Ports.Output.Persistence.Storefront;
 using EasyStock.Application.Services.Atendimento;
@@ -24,6 +25,7 @@ public class AvaliacaoAcaoBotaoTests
     private readonly IConversaRepository _conversas = Substitute.For<IConversaRepository>();
     private readonly IEscaladorConversa _escalador = Substitute.For<IEscaladorConversa>();
     private readonly ICanalMensageria _canal = Substitute.For<ICanalMensageria>();
+    private readonly IConfiguracaoAtendimentoRepository _configuracoes = Substitute.For<IConfiguracaoAtendimentoRepository>();
 
     public AvaliacaoAcaoBotaoTests() => _canal.Canal.Returns(CanalConversa.WhatsApp);
 
@@ -48,7 +50,7 @@ public class AvaliacaoAcaoBotaoTests
 
     private RoteadorAcoesBotao Roteador() => new(
         [new AvaliacaoAcaoBotao(new RegistrarAvaliacaoSimplesUseCase(_pedidos, _avaliacoes), _escalador,
-            new ResolvedorCanal([_canal]), _conversas, NullLogger<AvaliacaoAcaoBotao>.Instance)],
+            new ResolvedorCanal([_canal]), _conversas, _configuracoes, NullLogger<AvaliacaoAcaoBotao>.Instance)],
         NullLogger<RoteadorAcoesBotao>.Instance);
 
     [Fact]
@@ -63,7 +65,35 @@ public class AvaliacaoAcaoBotaoTests
         await _avaliacoes.Received(1).AddAsync(
             Arg.Is<PedidoAvaliacao>(a => a.PedidoId == pedido.Id && a.Resultado == ResultadoAvaliacao.Negativa), Arg.Any<CancellationToken>());
         await _escalador.Received(1).EscalarAsync(_empresaId, conversa, Arg.Any<string>(), Agora, Arg.Any<CancellationToken>());
-        await _canal.Received(1).EnviarTextoAsync(conversa.ContatoIdExterno, AvaliacaoAcaoBotao.RespostaNegativa, Arg.Any<CancellationToken>());
+        await _canal.Received(1).EnviarTextoAsync(conversa.ContatoIdExterno, AvaliacaoAcaoBotao.RespostaNegativa(null), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NegativaNomeiaADonaConfiguradaNaLoja()
+    {
+        var pedido = PedidoEntregue();
+        var conversa = NovaConversa();
+        var configuracao = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        configuracao.DefinirAssistente("Pilar", null, null, null, null);
+        _configuracoes.GetOrDefaultAsync(_empresaId).Returns(configuracao);
+
+        await Roteador().ExecutarAsync(_empresaId, conversa, $"acao:avaliacao:negativa:{pedido.Id}", Agora);
+
+        await _canal.Received(1).EnviarTextoAsync(conversa.ContatoIdExterno,
+            "Sinto muito que não foi como esperado. A Pilar vai falar com você.", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NegativaSemNomeDaDonaUsaOTermoGenerico()
+    {
+        var pedido = PedidoEntregue();
+        var conversa = NovaConversa();
+        _configuracoes.GetOrDefaultAsync(_empresaId).Returns(ConfiguracaoAtendimento.CriarPadrao(_empresaId));
+
+        await Roteador().ExecutarAsync(_empresaId, conversa, $"acao:avaliacao:negativa:{pedido.Id}", Agora);
+
+        await _canal.Received(1).EnviarTextoAsync(conversa.ContatoIdExterno,
+            "Sinto muito que não foi como esperado. A dona vai falar com você.", Arg.Any<CancellationToken>());
     }
 
     [Fact]

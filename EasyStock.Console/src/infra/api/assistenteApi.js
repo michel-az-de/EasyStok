@@ -18,3 +18,14 @@ export async function perguntarAssistente(pergunta, conversaId = null, { sinal, 
   })
   return { texto: resultado?.resposta ?? '', acoes: resultado?.acoes ?? [] }
 }
+
+// #2853: painel do Assistente na Gestão. Uso do mês contra a cota, o fluxo do turno (etapas, roteiro,
+// ferramentas e prompt) e o histórico de turnos. Leitura de Operador; mudar é pelo PUT da configuração (Admin).
+const PAINEL = '/api/atendimento/assistente'
+export const obterUsoAssistente = (sinal) => chamarApi(`${PAINEL}/uso`, { sinal, prazoComCancelamento: true })
+export const obterFluxoAssistente = (sinal) => chamarApi(`${PAINEL}/fluxo`, { sinal, prazoComCancelamento: true })
+export const listarHistoricoAssistente = ({ pagina = 1, tamanhoPagina = 20, resultado = null } = {}, sinal) => {
+  const busca = new URLSearchParams({ pagina: String(pagina), tamanhoPagina: String(tamanhoPagina) })
+  if (resultado) busca.set('resultado', resultado)
+  return chamarApi(`${PAINEL}/historico?${busca}`, { sinal, prazoComCancelamento: true })
+}

@@ -1,6 +1,6 @@
 import * as acao from './acoes'
 import {
-  assumir, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
+  CONFIRMACAO_RECUSADA, abrirConversaDoCliente, assumir, buscarConversaPorId, encerrar, enviarTexto, gerarLinkCardapio, liberarAutomatico, listarAtendentes, listarNaoEntregues, marcarLida, reabrir, reenviarMensagem,
   transferir,
 } from '../infra/api/conversasApi'
 import { conversaDaApi, mensagemDaApi, naoEntregueDaApi, situacaoConversaDaApi } from '../infra/api/traducaoConversas'
@@ -85,12 +85,24 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
       despachar({ tipo: acao.CONFIRMAR_RESPONSAVEL_API, id, confirmadaEm: proximoInstante(), situacao: situacaoConversaDaApi(resumo, lerSessao()?.usuario) })
       return true
     })
-    .catch((erro) => { avisar(erro); return false })
+    // #3039: recusar a pergunta não é falha: sem aviso, a faixa fica limpa.
+    .catch((erro) => { if (erro?.codigo !== CONFIRMACAO_RECUSADA) avisar(erro); return false })
   // #2185 (F12, E09): o botão Assumir, o campo e todo envio humano assumem pelo mesmo caminho.
   const assumirDaConversa = criarAssumirAntesDeEnviar({
     despachar, estadoRef, agoraRef, assumirNaApi: (id) => confirmarResponsavel(id, assumir),
   })
 
+  const selecionar = (id, resumoEncontrado = null, { reter = false } = {}) => {
+    if (resumoEncontrado?.id === id && !estadoRef.current.conversas.some(c => c.id === id)) {
+      const encontrada = conversaDaApi(resumoEncontrado, null, lerSessao()?.usuario)
+      despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [...estadoRef.current.conversas, encontrada], semMensagens: [id] })
+    }
+    despachar({ tipo: acao.SELECIONAR_CONVERSA, id, reter })
+    marcarLida(id).catch(() => {})
+    // Conversa com cliente e Ficha ainda não lida do EasyStok: o dossiê preenche (#1276).
+    const c = estadoRef.current.conversas.find((x) => x.id === id)
+    if (precisaLerFicha(c)) clienteApi.carregarClienteDaConversa(id)
+  }
   return {
     ...acoes,
     listarAtendentes,
@@ -178,18 +190,30 @@ export function comApi(acoes, { despachar, agoraRef, estadoRef, comItensForaRef 
         avisar(erro)
         return null
       }),
+    // #2871: só no modo API; sem a ação (demonstração) o "Novo pedido" do cliente não aparece.
+    abrirConversaDoCliente,
+    // #2921: a janela "Novo pedido" prepara a conversa SEM selecioná-la (nada de hash nem anúncio): entra no estado
+    // para guardar a montagem, fica fora da fila e a volta de 5 s a retém enquanto a janela estiver aberta.
+    abrirJanelaDoPedido: (resumo, { clienteId, nome } = {}) => {
+      if (!estadoRef.current.conversas.some((c) => c.id === resumo.id)) {
+        const encontrada = conversaDaApi(resumo, null, lerSessao()?.usuario)
+        despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [...estadoRef.current.conversas, encontrada], semMensagens: [resumo.id] })
+      }
+      despachar({ tipo: acao.ABRIR_JANELA_DO_PEDIDO, janela: { conversaId: resumo.id, clienteId: clienteId ?? resumo.clienteId ?? null, nome: nome ?? resumo.nome ?? '' } })
+    },
+    fecharJanelaDoPedido: () => despachar({ tipo: acao.FECHAR_JANELA_DO_PEDIDO }),
     // S59: painel "Não entregues", direto da API (não passa pelo reducer).
     listarNaoEntregues: () => listarNaoEntregues().then((linhas) => (linhas ?? []).map(naoEntregueDaApi)),
-    selecionar: (id, resumoEncontrado = null) => {
-      if (resumoEncontrado?.id === id && !estadoRef.current.conversas.some(c => c.id === id)) {
-        const encontrada = conversaDaApi(resumoEncontrado, null, lerSessao()?.usuario)
-        despachar({ tipo: acao.SINCRONIZAR_CONVERSAS, conversas: [...estadoRef.current.conversas, encontrada], semMensagens: [id] })
-      }
-      despachar({ tipo: acao.SELECIONAR_CONVERSA, id })
-      marcarLida(id).catch(() => {})
-      // Conversa com cliente e Ficha ainda não lida do EasyStok: o dossiê preenche (#1276).
-      const c = estadoRef.current.conversas.find((x) => x.id === id)
-      if (precisaLerFicha(c)) clienteApi.carregarClienteDaConversa(id)
+    selecionar,
+    // #2921: "Iniciar" e "Chamar no WhatsApp": a conversa nova some da fila até a cliente responder; busca-a pelo id e
+    // a retém enquanto selecionada. Sem achá-la, cai no caminho antigo (espera a sincronização).
+    selecionarIniciada: async (id) => {
+      const antes = estadoRef.current.selecionadaId
+      const resumo = await buscarConversaPorId(id).catch(() => null)
+      // Vigência: se a usuária escolheu outra conversa durante a espera, o GET tardio não rouba a seleção.
+      const agora = estadoRef.current.selecionadaId
+      if (agora != null && agora !== antes && agora !== id) return undefined
+      return selecionar(id, resumo, { reter: true })
     },
     assumirAtendimento: assumirDaConversa.assumir,
     devolverAutomatico: (id) => confirmarResponsavel(id, liberarAutomatico),

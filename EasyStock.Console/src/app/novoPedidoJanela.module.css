@@ -1,0 +1,26 @@
+.passos { display: flex; gap: var(--e-3); list-style: none; margin: 0 0 var(--e-3); padding: 0; font-size: var(--t-corpo); }
+.passos li { color: var(--tinta-2); }
+.atual { color: var(--tinta); font-weight: 700; border-bottom: var(--b-2) solid currentColor; }
+.colunas { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-4); }
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.lista li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); }
+.lista small { font-size: var(--t-micro); color: var(--tinta-2); }
+.obs { flex: 1 1 100%; }
+.selo { display: inline-block; min-width: 1.6em; padding: 0 var(--e-2); text-align: center; font-variant-numeric: tabular-nums; color: var(--marca-forte); background: var(--alerta-pastel); border: var(--b-1) solid var(--marca-forte); border-radius: var(--r-1); }
+.contador { display: inline-flex; align-items: center; gap: var(--e-2); font-variant-numeric: tabular-nums; }
+.contador output { min-width: 2ch; text-align: center; font-weight: 700; }
+.toque44 { min-width: 44px; min-height: 44px; }
+.linhaRevisao { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: var(--e-2); }
+.linhaRevisao dt { color: var(--tinta-2); }
+.pendente { color: var(--erro); }
+.resumo { display: grid; grid-template-columns: 1fr auto; gap: var(--e-2); margin: var(--e-3) 0 0; font-size: var(--t-forte); }
+.resumo dd { margin: 0; font-weight: 700; }
+.subtitulo { margin: var(--e-4) 0 var(--e-2); font-size: var(--t-forte); }
+.enviar { display: flex; gap: var(--e-2); align-items: center; margin-right: auto; min-height: var(--toque); }
+.enviar input { width: 20px; height: 20px; accent-color: var(--marca); }
+.faixa { margin: 0 auto 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.erro, .aviso { margin: 0 0 var(--e-2); flex: 1 0 100%; }
+.aviso { padding: var(--e-3); color: var(--tinta); background: var(--alerta-pastel); border: var(--b-1) solid var(--alerta); border-radius: var(--r-1); }
+.erro { color: var(--erro); }
+.vazio { margin: 0; color: var(--tinta-2); }
+@media (max-width: 759px) { .colunas { grid-template-columns: 1fr; } .faixa { flex: 1 0 100%; } }

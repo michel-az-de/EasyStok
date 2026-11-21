@@ -110,7 +110,7 @@ public sealed class ConsultarPedidoFerramentaTests
         using var json = JsonDocument.Parse(await ferramenta.ExecutarAsync(contexto, JsonSerializer.SerializeToElement(new { })));
 
         json.RootElement.GetProperty("erro").GetString().Should().Be("sem_pedido_em_andamento");
-        json.RootElement.GetProperty("ultimoPedido").GetProperty("pedidoId").GetGuid().Should().Be(pedido.Id);
+        json.RootElement.GetProperty("ultimoPedido").GetProperty("pedido_id").GetGuid().Should().Be(pedido.Id);
         contexto.RespostaVerificada.Should().BeNull();
     }
 

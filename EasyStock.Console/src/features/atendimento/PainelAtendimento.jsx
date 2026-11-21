@@ -16,16 +16,28 @@ import { apresentacaoDoNome, nomeDaConversa } from '../../dominio/nomeDoContato'
 import { cargaDaLista } from '../../dominio/cargaDaLista'
 import { NomeDoContato } from '../../componentes/NomeDoContato'
 import { itemDaBibliotecaPelaRegra } from '../../dominio/respostas'
+import { AnfitriaoDeConfirmacao } from './AnfitriaoDeConfirmacao'
 import { BarraModo } from './BarraModo'
 import { Composer } from './Composer'
 import { ModalCompartilharComanda } from './CompartilharComanda'
 import { ModalAssistente } from './ModalAssistente'
 import { ModalDevolverAssistente } from './ModalDevolverAssistente'
 import { ModalPassarConversa } from './PassarConversa'
+import { rotuloDoPedido } from '../../dominio/rotulos'
 import { Thread } from './Thread'
 import css from './atendimento.module.css'
 
-export function PainelAtendimento({
+// #3037: o anfitrião da confirmação de "conversa de outra" vale para todo o Painel, com ou sem conversa aberta.
+export function PainelAtendimento(props) {
+  return (
+    <>
+      <AnfitriaoDeConfirmacao />
+      <PainelDaConversa {...props} />
+    </>
+  )
+}
+
+function PainelDaConversa({
   aoAbrirNota, aoAbrirGaleria, aoAbrirBiblioteca,
   focarAoTrocar = false,
   slotEditorNota, editorNotaVisivel = false, notaEmRascunho = false, visivel = true,
@@ -179,7 +191,7 @@ export function PainelAtendimento({
                 #1761 (L4): a quantidade de pedidos saiu (está em Histórico) e o prazo só aparece
                 perto do fim (`prazoNoCabecalho`); a linha quebrava em duas. */}
             <small>
-              {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>Comanda {selecionada.numeroComanda} · </>}
+              {selecionada.numeroComanda && apresentacao.capsula?.texto !== `#${selecionada.numeroComanda}` && <>{rotuloDoPedido(selecionada.numeroComanda)} · </>}
               <Icone nome={canal.icone} className={css['canal_' + canal.icone]} /> {canal.nome}
               {prazo && <>{' · '}<span title={canal.explicacao[0]}>{prazo}</span></>}
             </small>
@@ -195,7 +207,7 @@ export function PainelAtendimento({
             itens={[
               acoesTela.enviarCardapio && { chave: 'cardapio', rotulo: 'Enviar cardápio', icone: 'cardapio', abreJanela: true, aoEscolher: () => abrirModal('cardapio') },
               acoesTela.passar && { chave: 'passar', rotulo: 'Passar conversa', icone: 'user-plus', abreJanela: true, aoEscolher: () => abrirModal('passar') },
-              acoesTela.devolver && { chave: 'devolver', rotulo: 'Devolver ao Assistente', icone: 'sparkles', abreJanela: true, aoEscolher: () => abrirModal('devolver') },
+              acoesTela.devolver && { chave: 'devolver', rotulo: 'Devolver ao Assistente', icone: 'agente', abreJanela: true, aoEscolher: () => abrirModal('devolver') },
               // #2496: só a API sabe as etapas do robô; na demonstração não há o que checar. Conversa concluída
               // fica sem menu (#2185): a próxima mensagem abre outra, que começa com o robô.
               fonteApi && !encerrada && { chave: 'assistente', rotulo: 'Checar o Assistente', icone: 'settings', abreJanela: true, aoEscolher: () => abrirModal('assistente') },

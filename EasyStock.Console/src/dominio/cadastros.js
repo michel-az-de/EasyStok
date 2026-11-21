@@ -4,6 +4,10 @@ const campos = (dados, nomes) => Object.fromEntries(nomes.map(nome => [nome, tex
 export const normalizarBuscaCadastro = (valor) => String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
 export const termoBuscaCadastro = (valor) => /^[+\d\s().-]+$/.test(String(valor).trim()) ? String(valor).replace(/\D/g, '') : String(valor).trim()
 export const chaveContextoCadastro = (tela, conversaId) => `cadastros:${tela}:${conversaId ?? 'geral'}`
+// #2870 (teste da Tatiana): a busca, o filtro e a página das listas de Cadastros valem enquanto a pessoa está no módulo
+// (abrir a ficha e voltar, trocar de tela); ao sair dele, a próxima visita começa limpa. Pedidos (chave `pedidos`)
+// guarda os filtros de propósito: abre a conversa do pedido e volta para a mesma lista (#2478).
+export const contextoVisualEsquecidoAoSair = (chave) => String(chave).startsWith('cadastros:')
 export const telefoneCadastro = (c) => c.telefone || c.contatoInformado?.telefone || c.cliente?.telefoneCanal || (['WhatsApp', 'SMS'].includes(c.canal) ? c.contato : null)
 export const emailCadastro = (c) => c.email || c.contatoInformado?.email || (c.canal === 'E-mail' ? c.contato : null)
 export const filtrarSemCadastro = (conversas, busca) => {
@@ -133,6 +137,26 @@ export function mensagemDeAtividade(tela, ativar, erro) {
   if (erro?.status === 403) return `Seu acesso não permite ${ativar ? 'reativar' : 'inativar'} ${SINGULAR_ATIVIDADE[tela]}. Peça a quem administra a loja.`
   if (tela === 'fornecedores' && !ativar && /pedido aberto/i.test(erro?.message ?? '')) return 'Este fornecedor tem pedido de compra aberto ou em trânsito. Conclua ou cancele o pedido antes de inativar.'
   return erro?.message || 'Não deu para concluir agora. Tente de novo.'
+}
+// #2849: os dados de contato da ficha em leitura. Telefone, e-mail e documento aparecem sempre (vazio vira
+// null e a tela diz "Não informado"); o resto só entra preenchido. Com endereço na lista do cadastro, o
+// campo plano não aparece: seriam dois endereços para a mesma pessoa (#2776).
+export function dadosDeContato(dados) {
+  const texto = valor => String(valor ?? '').trim() || null
+  const juridica = dados.tipoPessoa === 'juridica'
+  const temLista = (dados.detalhe?.enderecos ?? []).length > 0
+  const endereco = temLista ? null : [texto(dados.endereco), texto(dados.apt)].filter(Boolean).join(', ') || null
+  return [
+    { rotulo: 'Telefone', valor: texto(dados.telefone) && telefoneNaTela(dados.telefone) },
+    { rotulo: 'E-mail', valor: texto(dados.email) },
+    { rotulo: juridica ? 'CNPJ' : 'CPF ou documento', valor: texto(dados.documento) && documentoNaTela(dados.documento) },
+    ...[
+      { rotulo: 'Nome fantasia', valor: juridica ? texto(dados.nomeFantasia) : null },
+      { rotulo: 'Inscrição estadual', valor: juridica ? texto(dados.inscricaoEstadual) : null },
+      { rotulo: 'Endereço', valor: endereco },
+      { rotulo: 'Observações', valor: texto(dados.observacoes) },
+    ].filter(dado => dado.valor),
+  ]
 }
 export function situacaoDaLinha(tela, item, soLeads) {
   if (soLeads) return { texto: 'Sem cadastro', tom: 'aviso' }

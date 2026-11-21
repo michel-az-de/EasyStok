@@ -18,14 +18,15 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
     public const string CaminhoCardapio = "/cardapio";
 
     public async Task<string> MontarAsync(
-        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao, CancellationToken ct = default)
+        Guid empresaId, ConfiguracaoAtendimento configuracao, IdentificacaoCliente identificacao,
+        bool semFraseEspera = false, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(configuracao);
         ArgumentNullException.ThrowIfNull(identificacao);
 
         var link = await ResolverLinkCardapioAsync(empresaId, ct);
         var primeiroNome = identificacao.EhNovo ? null : NomesDeContato.PrimeiroNome(identificacao.Cliente?.Nome);
-        return Montar(configuracao, primeiroNome, link);
+        return Montar(configuracao, primeiroNome, link, semFraseEspera);
     }
 
     /// <summary>
@@ -33,7 +34,9 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
     /// senão <see cref="ConfiguracaoAtendimento.SaudacaoPrimeiroContato"/>. <c>{link}</c> vira o link do cardápio; sem
     /// ele, nada é anexado: a comanda é recurso que o Assistente oferece (#2544).
     /// </summary>
-    public static string Montar(ConfiguracaoAtendimento configuracao, string? primeiroNome, string linkCardapio)
+    /// <param name="semFraseEspera">#2885: quando a saudação responde sozinha (sem o modelo), não promete resposta depois.</param>
+    public static string Montar(ConfiguracaoAtendimento configuracao, string? primeiroNome, string linkCardapio,
+        bool semFraseEspera = false)
     {
         var modelo = string.IsNullOrWhiteSpace(primeiroNome)
             ? configuracao.SaudacaoPrimeiroContato
@@ -42,7 +45,7 @@ public sealed class SaudacaoAtendimento(IStorefrontRepository storefrontReposito
         var saudacao = modelo.Replace("{nome}", primeiroNome ?? string.Empty, StringComparison.Ordinal);
         saudacao = saudacao.Replace("{link}", linkCardapio, StringComparison.Ordinal);
 
-        return string.IsNullOrWhiteSpace(configuracao.FraseEspera)
+        return semFraseEspera || string.IsNullOrWhiteSpace(configuracao.FraseEspera)
             ? saudacao
             : $"{saudacao}\n\n{configuracao.FraseEspera}";
     }

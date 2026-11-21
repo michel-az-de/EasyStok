@@ -303,7 +303,7 @@ public class SyncController(
                 await _autoLinker.RunAsync(
                     autoLinkProductIds, autoLinkClientIds,
                     autoLinkOrderIds, autoLinkBatchIds, autoLinkCashIds,
-                    empresaId, documentosDosClientes);
+                    empresaId, documentosDosClientes, req.DeviceId);
             }
             catch (Exception ex)
             {

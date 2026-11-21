@@ -3,12 +3,13 @@
 // 1. printerDiagnostics: fora do piloto o botão Diagnóstico não abria nada.
 // 2. Handler inline com id cru ('${x}') que o #2401 deixou passar.
 'use strict';
+const { lerPwaMontada } = require(require('path').resolve(__dirname, '../../casa-da-baba-mobile/apk/scripts/pwa-montagem.cjs'));
 
 const fs = require('fs');
 const path = require('path');
 
 module.exports = function ({ test, runInSandbox, assert }) {
-  const html = fs.readFileSync(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'), 'utf8');
+  const html = lerPwaMontada(path.resolve(__dirname, '../../EasyStock.Api/wwwroot/pwa/index.html'));
 
   const chamar = (pilot, retornoClose) => JSON.parse(runInSandbox(`
     (function () {

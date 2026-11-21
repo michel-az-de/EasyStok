@@ -1,4 +1,5 @@
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Domain.Enums.Ia;
 using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Inbox;
 using EasyStock.Application.UseCases.Cliente.Dossie;
@@ -42,7 +43,8 @@ public sealed class ResumirClienteUseCase(
             var resposta = await llm.EnviarAsync(new RequisicaoLlm(
                 SystemPrompt,
                 [new MensagemLlm(MensagemLlm.Usuario, [new BlocoTextoLlm(ResumoDossieParaAgente.Montar(dossie))])],
-                []), ct);
+                [])
+            { EmpresaId = empresaId, Finalidade = FinalidadeIa.ResumoCliente }, ct);
             var texto = TextoWhatsApp.SemTravessao(
                 string.Join(" ", resposta.Conteudo.OfType<BlocoTextoLlm>().Select(b => b.Texto)).Trim());
             logger.LogInformation("Resumo do cliente por IA: empresa {EmpresaId}, conversa {ConversaId}, {TokensEntrada}+{TokensSaida} tokens",

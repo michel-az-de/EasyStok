@@ -17,7 +17,7 @@ import css from './ModalCliente.module.css'
 
 export function ModalCliente({ conversa, aoFechar, children }) {
   const { fonteApi, historico = [], agora } = useAtendimento()
-  const { carregarClienteDaConversa } = useAcoes()
+  const { relerClienteDaConversa } = useAcoes()
   const { permite } = useAcessoModulos()
   const [salvandoNota, setSalvandoNota] = useState(false)
   const [baixandoPdf, setBaixandoPdf] = useState(false)
@@ -62,7 +62,8 @@ export function ModalCliente({ conversa, aoFechar, children }) {
     try {
       if (arquivo) await enviarFotoCliente(conversa.clienteId, arquivo)
       else await removerFotoCliente(conversa.clienteId)
-      if (await carregarClienteDaConversa(conversa.id) === false) {
+      // #2838: a leitura em voo pode ter saído antes da gravação e traria a foto anterior.
+      if (await relerClienteDaConversa(conversa.id) === false) {
         setErro('A alteração da foto foi salva. Reabra a ficha para atualizar a imagem.')
       }
     } catch (falha) {
@@ -81,13 +82,13 @@ export function ModalCliente({ conversa, aoFechar, children }) {
 
   // Um só caminho para "texto não salvo": confirmarDescarte (a pergunta do Modal), o mesmo do resto do sistema.
   // O segurarFechamento da PR (que travava Esc e fundo sem perguntar) saiu: a pergunta já protege o digitado.
-  return <Modal titulo="Cadastro do cliente" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : fechar}
+  return <Modal titulo="Ficha do cliente" largura="lg" className={css.modal} aoFechar={ocupado ? undefined : fechar}
     confirmarDescarte={sujo}
     rodape={<div className={css.acoes}>
       {!podeBaixarPdf && <small>{!fonteApi ? 'Conecte-se à loja para baixar a ficha.' : 'Cadastre o cliente para baixar a ficha.'}</small>}
       <Botao variante="texto" disabled={ocupado} onClick={pedirFechamento}>Fechar</Botao>
       {podeAbrirCadastro && <Botao variante="secundario" icone="usuarios" disabled={ocupado || sujo}
-        motivo={sujo ? 'Salve ou descarte o que foi digitado para abrir o cadastro completo.' : undefined} onClick={abrirCadastroCompleto}>Abrir cadastro completo</Botao>}
+        motivo={sujo ? 'Salve ou descarte o que foi digitado para abrir a ficha completa.' : undefined} onClick={abrirCadastroCompleto}>Abrir ficha completa</Botao>}
       <Botao variante="secundario" icone="download" disabled={ocupado || !podeBaixarPdf} onClick={baixarFicha}>{baixandoPdf ? 'Preparando PDF…' : 'Baixar PDF'}</Botao>
       <span ref={setRodapeDoCadastro} className={css.lugarDoSalvar} />
     </div>}>

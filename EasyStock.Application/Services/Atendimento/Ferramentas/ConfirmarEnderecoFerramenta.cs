@@ -17,7 +17,7 @@ public sealed class ConfirmarEnderecoFerramenta(ConfirmarEnderecoPendente confir
     {
         var r = await confirmar.ExecutarAsync(contexto.EmpresaId, contexto.Conversa, ct);
         return r.EnderecoId is { } id
-            ? FerramentaJson.Serializar(new { enderecoId = id, endereco = r.Endereco })
+            ? FerramentaJson.Serializar(new { endereco_id = id, endereco = r.Endereco })
             : FerramentaJson.Serializar(new { erro = r.Erro });
     }
 }

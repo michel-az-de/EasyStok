@@ -83,8 +83,11 @@ confere('H1  uma marca só no canto: o logo da loja, sem o "EasyStok" ao lado', 
 confere('H2  o tema sai do topo: fica no menu da conta e, sem conta, num lugar discreto do rodapé', () => {
   assert.doesNotMatch(topo(html), /role="radiogroup"/)
   assert.doesNotMatch(jsxHall.slice(jsxHall.indexOf('<header'), jsxHall.indexOf('</header>')).replace(/<MenuDaConta[\s\S]*<\/MenuDaConta>/, ''), /InterruptorTema/)
-  assert.match(jsxHall, /<MenuDaConta[^>]*>[\s\S]*<InterruptorTema \/>[\s\S]*<\/MenuDaConta>/)
-  assert.match(rodape(htmlSemConta), /role="radiogroup"/, 'sem menu da conta o tema continua alcançável')
+  // #3004: a conta existe em toda rota (com ou sem sessão nomeada), então o tema mora só no menu dela e o pé do Início não o repete.
+  assert.match(fonte('componentes/MenuDaConta.jsx'), /<InterruptorTema \/>/, 'o tema mora no menu da conta')
+  assert.match(jsxHall, /<MenuDaConta /)
+  assert.match(htmlSemConta, /Sua conta/, 'sem sessão nomeada o gatilho "Sua conta" aparece no HTML renderizado')
+  assert.doesNotMatch(rodape(htmlSemConta), /role="radiogroup"/, 'sem sessão nomeada o menu da conta segue à mão: o tema não volta ao rodapé')
   assert.doesNotMatch(rodape(html), /role="radiogroup"/, 'com menu da conta o tema não aparece duas vezes')
   assert.doesNotMatch(corpo('.acoes > [role=\'radiogroup\']', celular), /grid-row/)
 })
@@ -157,7 +160,8 @@ confere('H6  KPIs em grade 2×2 e o alerta do caixa vira estado do cartão com a
 
 confere('H7  o cartão todo clicável perde a seta ">"', () => {
   const abrir = html.match(/<a [^>]*class="abrir"[^>]*>[^]*?<\/a>/g) ?? []
-  assert.equal(abrir.length, 7)
+  // #2870: 7 áreas + o atalho Clientes (com `acoes: {}` o perfil não vê Pedidos, então esse atalho não entra).
+  assert.equal(abrir.length, 8)
   for (const link of abrir) assert.doesNotMatch(link, /<svg/, link.slice(0, 80))
   assert.doesNotMatch(css, /\.abrir > svg/)
   assert.doesNotMatch(jsxHall.slice(jsxHall.indexOf('<a className={css.abrir}'), jsxHall.indexOf('</a>', jsxHall.indexOf('<a className={css.abrir}'))), /MarcaIcone/)

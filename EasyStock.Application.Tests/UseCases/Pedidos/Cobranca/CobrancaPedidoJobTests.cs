@@ -38,6 +38,33 @@ public class CobrancaPedidoJobTests
     }
 
     /// <summary>
+    /// #2992: quem desistiu do pedido na conversa assumida não recebe link novo nem aviso de link vencido. O
+    /// pedido segue aguardando pagamento sem cancelamento automático, e a equipe já foi avisada da desistência.
+    /// </summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task ClienteQueDesistiuNaoReemiteNemAvisa(int tentativa)
+    {
+        var f = new CobrancaPedidoFixture();
+        f.Relogio.Agora = CobrancaPedidoFixture.Agora.AddMinutes(31);
+        var conversa = Conversa.Abrir(f.EmpresaId, "5511999990001", f.Relogio.Agora.AddMinutes(-5));
+        conversa.RegistrarEntrada(f.Relogio.Agora.AddMinutes(-5));
+        conversa.Assumir(f.Relogio.Agora.AddMinutes(-4), Guid.NewGuid());
+        conversa.DefinirPedidoEmAndamento(f.Pedido.Id);
+        conversa.MarcarClienteDesistiuDoPedido(f.Pedido.Id);
+        f.ConversaRepo.ObterPorIdAsync(f.EmpresaId, conversa.Id, Arg.Any<CancellationToken>()).Returns(conversa);
+        var vencida = f.AdicionarOnline(tentativa: tentativa, conversaId: conversa.Id);
+
+        var r = await f.ProcessarVencida().ExecuteAsync(Item(f, vencida.Id));
+
+        r.Should().Be(ResultadoExpiracaoCobranca.ClienteDesistiu);
+        f.Cobrancas.Should().NotContain(c => c.Status == StatusCobrancaPedido.Pendente, "sem link novo");
+        f.Pedido.Status.Should().Be(StatusPedidoMapper.AguardandoPagamento, "sem cancelamento automático");
+        await f.ConversaRepo.DidNotReceiveWithAnyArgs().AddMensagemAsync(default!, default);
+    }
+
+    /// <summary>
     /// #1719: a cobrança da comanda é complementar (saldo depois do cupom). Reemitida como cobrança comum, o
     /// link novo saía pelo total e o cliente pagava de novo o que o cupom já tinha abatido.
     /// </summary>

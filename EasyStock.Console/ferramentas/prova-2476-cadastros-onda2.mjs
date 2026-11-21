@@ -76,7 +76,7 @@ assert.equal(bloqueioDaAutomatica('Cardápio: {linkCardapio}', false), 'Tem {lin
 const modalAutomacoes = ler('features/automacoes/ModalAutomacoes.jsx')
 assert.match(modalAutomacoes, /const naoLiga = !regra\.ativa && fonteApi && Boolean\(bloqueioDaAutomatica\(regra\.texto\)\)/, 'Só trava ligar; desligar segue livre')
 assert.match(modalAutomacoes, /disabled=\{!editavel \|\| naoLiga\}/, 'Chave travada com variável solta')
-assert.match(modalAutomacoes, /disabled=\{!editando \|\| gravacao === 'salvando' \|\| Boolean\(bloqueio\)\}/, 'Salvar travado com variável solta')
+assert.match(ler('componentes/EditorDeAutomatica.jsx'), /disabled=\{!alterado \|\| !rascunho\.trim\(\) \|\| salvando \|\| Boolean\(bloqueio\)\}/, 'Salvar travado com variável solta')
 assert.match(modalAutomacoes, /aria-describedby=\{naoLiga \? idBloqueio : undefined\}/, 'A chave travada aponta o motivo')
 
 // A4: uma constante de página para a API e para as listas.

@@ -6,7 +6,7 @@
 //   3  a camada da conta sai do bloco de contenção do ancestral (popover), com o `fixed` de reserva.
 //
 // Leitura do fonte onde só existe composição. Com CONSOLE_URL (console em modo API contra o
-// laboratório) e PLAYWRIGHT_MODULE a prova também mede na tela real: trilho 76, item 68 e 54 px
+// laboratório) e PLAYWRIGHT_MODULE a prova também mede na tela real: trilho 76, item 72 e 54 px
 // de altura mínima nos dois trilhos em 1280/1440/1920, e a camada da conta colada ao avatar dentro
 // do menu do tablet (1024 px), com a animação do Modal correndo e depois dela. Sem as variáveis,
 // essa parte é pulada e dita.
@@ -45,17 +45,22 @@ const COMPOE = "composes: (\\w+) from '(?:\\.\\./)+componentes/Trilho\\.module\\
 
 // --- 1. Um CSS só ------------------------------------------------------------------------------
 
-await confere('1  as duas molduras compõem trilho, início, item, ativo e espaço do mesmo módulo', () => {
+await confere('1  os dois trilhos compõem do mesmo módulo: trilho, início, item, ativo e avatar', () => {
   const trilho = fonte('componentes/Trilho.module.css')
-  for (const classe of ['trilho', 'inicio', 'item', 'ativo', 'espaco', 'avatar']) {
-    assert.match(trilho, new RegExp(`\\.${classe}[ ,:{]`), `Trilho.module.css sem .${classe}`)
+  for (const classe of ['trilho', 'inicio', 'item', 'ativo', 'espaco', 'avatar', 'filhos']) {
+    assert.match(trilho, new RegExp(String.raw`\.${classe}[ ,:{]`), `Trilho.module.css sem .${classe}`)
   }
   const usos = (css) => [...css.matchAll(new RegExp(COMPOE, 'g'))].map((m) => m[1])
-  const balcao = usos(fonte('app/moldura.module.css'))
-  const modulos = usos(fonte('features/hall/moldura.module.css'))
-  for (const classe of ['trilho', 'inicio', 'item', 'ativo', 'espaco', 'avatar']) {
-    assert.ok(balcao.includes(classe), `Balcão não compõe ${classe}`)
-    assert.ok(modulos.includes(classe), `módulos não compõem ${classe}`)
+  // #3004: Início, Balcão e módulos desenham o mesmo `TrilhoDoConsole`; o CSS dele compõe tudo do módulo único.
+  assert.match(fonte('app/Moldura.jsx'), /<TrilhoDoConsole/, 'o Balcão usa o trilho único')
+  const unico = usos(fonte('features/hall/trilhoDoConsole.module.css'))
+  for (const classe of ['trilho', 'inicio', 'item', 'ativo', 'avatar']) assert.ok(unico.includes(classe), `o trilho único não compõe ${classe}`)
+  // Os itens que o Balcão desenha por conta própria (loja, Entregas, Lembretes) compõem o mesmo item e os mesmos filhos.
+  const balcaoCss = fonte('app/moldura.module.css')
+  const balcao = usos(balcaoCss)
+  for (const classe of ['item', 'filhos']) assert.ok(balcao.includes(classe), `o Balcão não compõe ${classe}`)
+  for (const morta of ['trilho', 'inicioTrilho', 'itemAtual', 'espacoTrilho']) {
+    assert.doesNotMatch(balcaoCss, new RegExp(String.raw`^\.${morta}[ ,:{]`, 'm'), `app/moldura.module.css ainda declara .${morta}, que nenhum JSX usa`)
   }
 })
 
@@ -77,7 +82,7 @@ await confere('2  TRILHO é a fonte: o token nasce dele, tokens.css não tem seg
   assert.doesNotMatch(tokens, /--largura-trilho:/)
   const respiro = Number(tokens.match(/--respiro-trilho: (\d+)px;/)[1])
   assert.match(tokens, /--largura-item-trilho: calc\(var\(--largura-trilho\) - 2 \* var\(--respiro-trilho\)\);/)
-  assert.equal(TRILHO - 2 * respiro, 68, 'item de 68 px com trilho de 76')
+  assert.equal(TRILHO - 2 * respiro, 72, 'item de 72 px com trilho de 76')
   assert.match(fonte('componentes/Trilho.module.css'), /padding: var\(--e-3\) var\(--respiro-trilho\)/, 'o respiro é o do padding do trilho')
   assert.match(fonte('main.jsx'), /Object\.entries\(tokensDaGeometria\(\)\)[^\n]*style\.setProperty\(nome, valor\)/)
 })
@@ -119,7 +124,7 @@ if (!origem || !usuario || !senha || !process.env.PLAYWRIGHT_MODULE) {
   }, rotulo)
   try {
     for (const [largura, altura] of [[1280, 720], [1440, 900], [1920, 1080]]) {
-      await confere(`4  ${largura}: trilho 76, item 68 e altura mínima 54 px no Balcão e nos módulos`, async () => {
+      await confere(`4  ${largura}: trilho 76, item 72 e altura mínima 54 px no Balcão e nos módulos`, async () => {
         const { contexto, pagina } = await abrir(largura, altura)
         try {
           await pagina.goto(origem + '/#/m/atendimento', { waitUntil: 'networkidle' })
@@ -132,7 +137,7 @@ if (!origem || !usuario || !senha || !process.env.PLAYWRIGHT_MODULE) {
             assert.equal(medida.trilho, 76, `${nome}: trilho ${medida.trilho}`)
             assert.ok(medida.itens.length >= 5, `${nome}: itens ${medida.itens.length}`)
             for (const item of medida.itens) {
-              assert.equal(item.w, 68, `${nome}: item ${item.w} px`)
+              assert.equal(item.w, 72, `${nome}: item ${item.w} px`)
               assert.ok(item.h >= 54, `${nome}: item com ${item.h} px de altura`)
             }
           }
