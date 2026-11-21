@@ -6,7 +6,7 @@
 // precisa saber o que a casa falou em nome dela.
 import { faixaParaCliente, preencherFaixa } from './entrega'
 import { rotaDoCardapioLink } from './cardapioLink'
-import { descreverProximaAbertura } from './funcionamento'
+import { descreverProximaAbertura, proximaAbertura } from './funcionamento'
 
 export const GATILHOS = {
   PRIMEIRO_CONTATO: 'primeiro-contato',
@@ -143,7 +143,8 @@ export function exemploDaPrevia({ agora, funcionamento, origem = '' } = {}) {
     nome: 'Maria',
     faixa: 'amanhã às 14:00',
     pedido: '12',
-    abre: agora ? descreverProximaAbertura(agora, funcionamento) : 'amanhã às 11:00',
+    // Sem próxima abertura a frase de aviso do funcionamento não cabe dentro do texto do cliente: usa o horário-exemplo.
+    abre: agora && proximaAbertura(agora, funcionamento) ? descreverProximaAbertura(agora, funcionamento) : 'amanhã às 11:00',
     linkCardapio: origem + rotaDoCardapioLink('exemplo'),
   }
 }

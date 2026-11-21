@@ -26,7 +26,7 @@ const TITULO_MAXIMO = 120
 const TEXTO_MAXIMO = 4096
 
 // #3010: onde se edita, cada variável é um selo com o que ela vira; na prévia e na lista o texto sai preenchido.
-function SelosDeVariaveis({ variaveis }) {
+export function SelosDeVariaveis({ variaveis }) {
   return (
     <ul className={css.variaveis} aria-label="Variáveis que o texto aceita">
       {variaveis.map((v) => (
@@ -36,11 +36,14 @@ function SelosDeVariaveis({ variaveis }) {
   )
 }
 
-function TextoPreenchido({ texto, exemplo, fonteApi, className }) {
+// `rotuloId` liga a bolha ao rótulo "exemplo"; a chave desconhecida ganha o motivo em texto, não só a cor.
+export function TextoPreenchido({ texto, exemplo, fonteApi, className, rotuloId }) {
   const partes = previaDoServidor(texto, exemplo, fonteApi ? VARIAVEIS_DA_API : VARIAVEIS)
   return (
-    <span className={className}>
-      {partes.map((p, i) => (p.tipo === 'erro' ? <mark key={i} className={css.previaErro}>{p.texto}</mark> : <span key={i}>{p.texto}</span>))}
+    <span className={className} role={rotuloId ? 'group' : undefined} aria-labelledby={rotuloId}>
+      {partes.map((p, i) => (p.tipo === 'erro'
+        ? <mark key={i} className={css.previaErro}>{p.texto}<span className={css.oculto}> (variável desconhecida)</span></mark>
+        : <span key={i}>{p.texto}</span>))}
     </span>
   )
 }
@@ -253,6 +256,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
   // #2476 (U8): variável que o EasyStok não preenche sairia escrita para o cliente: não salva nem liga.
   const bloqueio = fonteApi ? bloqueioDaAutomatica(rascunho ?? regra.texto, editavel) : null
   const idBloqueio = useId()
+  const idExemplo = useId()
   const naoLiga = !regra.ativa && fonteApi && Boolean(bloqueioDaAutomatica(regra.texto))
   // #1474: no modo API a saudação de Horários e mensagens sai sempre na primeira mensagem.
   const avisoEntrada = fonteApi ? avisoDaAutomaticaDeEntrada(regra) : null
@@ -291,7 +295,12 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
         <span className={css.quando}>{regra.descricao}</span>
         {!editando && (
           regra.texto
-            ? <TextoPreenchido texto={regra.texto} exemplo={exemplo} fonteApi={fonteApi} className={css.textoInteiro} />
+            ? (
+              <span className={css.textoDaLinha}>
+                <span id={idExemplo} className={css.rotuloPrevia}>Exemplo de como o cliente lê</span>
+                <TextoPreenchido texto={regra.texto} exemplo={exemplo} fonteApi={fonteApi} className={css.textoInteiro} rotuloId={idExemplo} />
+              </span>
+            )
             : !avisoEntrada && <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
         )}
         {avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
@@ -310,8 +319,8 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
             autoFocus
           />
           <SelosDeVariaveis variaveis={fonteApi ? VARIAVEIS_DA_API : VARIAVEIS} />
-          <p className={css.rotuloPrevia}>Como o cliente lê (exemplo)</p>
-          <TextoPreenchido texto={rascunho} exemplo={exemplo} fonteApi={fonteApi} className={css.bolha} />
+          <p id={idExemplo} className={css.rotuloPrevia}>Como o cliente lê (exemplo)</p>
+          <TextoPreenchido texto={rascunho} exemplo={exemplo} fonteApi={fonteApi} className={css.bolha} rotuloId={idExemplo} />
           <div className={css.acoes}>
             <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando || Boolean(bloqueio)} aria-describedby={bloqueio ? idBloqueio : undefined} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
             <Botao variante="texto" disabled={salvando} onClick={() => setRascunho(null)}>Cancelar</Botao>
