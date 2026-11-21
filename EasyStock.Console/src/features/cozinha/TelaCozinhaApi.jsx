@@ -23,6 +23,7 @@ import { Icone } from '../../componentes/Icone'
 import { Vazio } from '../../componentes/Vazio'
 import { CartaoKds, CartaoKdsErguido } from './CartaoKds'
 import { ComandaKds } from './ComandaKds'
+import { FaixaColunas } from './FaixaColunas'
 import { FeedbackArrasto } from './FeedbackArrasto'
 import { colisaoPorColuna, coordenadasEntreColunas } from './arrastoEntreColunas'
 import css from './cozinha.module.css'
@@ -230,6 +231,7 @@ export function TelaCozinhaApi({ linhas }) {
                   <Botao variante="secundario" onClick={() => setLinhaFiltro(null)}>Ver todas as linhas</Botao>
                 </div>
               )}
+              <FaixaColunas itens={COLUNAS_KDS.map((c) => ({ id: c.status, rotulo: c.rotulo, contagem: filtrarPorColunaKds(visiveis, c.status).length }))} />
               <div className={css.colunas}>
                 {COLUNAS_KDS.map((coluna) => {
                   const cartoes = filtrarPorColunaKds(visiveis, coluna.status)
@@ -325,7 +327,7 @@ function ColunaKds({ coluna, resposta, arrastando, acao, children }) {
     arrastando && !aceita && !isOver && css.colunaQuieta,
   ].filter(Boolean).join(' ')
   return (
-    <section ref={setNodeRef} className={classes} aria-label={coluna.rotulo} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
+    <section ref={setNodeRef} className={classes} aria-label={coluna.rotulo} data-coluna={coluna.status} data-destino-arrasto={aceita ? (isOver ? 'sobre' : 'disponivel') : undefined}>
       {children}
       {aceita && (
         <p className={css.dicaColuna} aria-hidden="true">
