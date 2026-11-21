@@ -48,7 +48,7 @@ const COMPOE = "composes: (\\w+) from '(?:\\.\\./)+componentes/Trilho\\.module\\
 await confere('1  os dois trilhos compõem do mesmo módulo: trilho, início, item, ativo e avatar', () => {
   const trilho = fonte('componentes/Trilho.module.css')
   for (const classe of ['trilho', 'inicio', 'item', 'ativo', 'espaco', 'avatar', 'filhos']) {
-    assert.match(trilho, new RegExp(`\.${classe}[ ,:{]`), `Trilho.module.css sem .${classe}`)
+    assert.match(trilho, new RegExp(String.raw`\.${classe}[ ,:{]`), `Trilho.module.css sem .${classe}`)
   }
   const usos = (css) => [...css.matchAll(new RegExp(COMPOE, 'g'))].map((m) => m[1])
   // #3004: Início, Balcão e módulos desenham o mesmo `TrilhoDoConsole`; o CSS dele compõe tudo do módulo único.
@@ -60,7 +60,7 @@ await confere('1  os dois trilhos compõem do mesmo módulo: trilho, início, it
   const balcao = usos(balcaoCss)
   for (const classe of ['item', 'filhos']) assert.ok(balcao.includes(classe), `o Balcão não compõe ${classe}`)
   for (const morta of ['trilho', 'inicioTrilho', 'itemAtual', 'espacoTrilho']) {
-    assert.doesNotMatch(balcaoCss, new RegExp(`^\.${morta}[ ,:{]`, 'm'), `app/moldura.module.css ainda declara .${morta}, que nenhum JSX usa`)
+    assert.doesNotMatch(balcaoCss, new RegExp(String.raw`^\.${morta}[ ,:{]`, 'm'), `app/moldura.module.css ainda declara .${morta}, que nenhum JSX usa`)
   }
 })
 
