@@ -68,7 +68,7 @@ public class ChatSiteAssistenteTests
         var configuracao = ConfiguracaoAtendimento.CriarPadrao(_loja.EmpresaId);
         configuracao.Ativo = true;
         _configuracoes.GetOrDefaultAsync(_loja.EmpresaId).Returns(configuracao);
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
     }
 
     private EnviarMensagemVisitanteUseCase Enviar() => new(

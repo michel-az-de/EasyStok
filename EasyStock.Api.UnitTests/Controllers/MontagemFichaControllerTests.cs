@@ -55,7 +55,7 @@ public class MontagemFichaControllerTests
     public async Task ActionUsaEmpresaDoJwtEEntregaAComposicaoTipada()
     {
         var conversa = ConversaPropria();
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(new RespostaLlm(RespostaLlm.StopToolUse,
             [new BlocoUsoFerramentaLlm("tool1", BlocosMontagemFicha.NomeFerramenta,
                 JsonDocument.Parse("""{"blocos":[{"tipo":"resumo","texto":"Confira o pedido com a cliente."}]}""").RootElement.Clone())], 30, 10));
@@ -71,7 +71,7 @@ public class MontagemFichaControllerTests
     public async Task DesligadoDevolve503SemInventarBlocos()
     {
         var conversa = ConversaPropria();
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         var resultado = await Controller().MontarFicha(new(conversa.Id), Caso());
         var resposta = resultado.Should().BeOfType<ObjectResult>().Subject;
         resposta.StatusCode.Should().Be(503);

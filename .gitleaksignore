@@ -20,3 +20,6 @@ d12b2eaef83cc4b0bc86f6892287e56ad6ff4a4e:casa-da-baba-mobile/apk/android/app/src
 2e2468a6d9d6d04c9fc7e7261cfa7f2920c80008:EasyStock.Api/wwwroot/pwa/js/app-arranque.js:generic-api-key:526
 # Falso positivo (token de teste do baba-diag remoto, ja montado em execucao no commit seguinte da mesma PR #3066).
 6991bf265621cd2f90e3386c3c6ed2c9daa3715b:tools/mcp-baba/test/http.test.mjs:generic-api-key:12
+# Falsos positivos (valores de teste da S2b, #3064, trocados por texto sem cara de chave no commit seguinte da mesma PR #3112).
+b55d20f2f0e7371a306777aee6c23c4d1a98dbf9:EasyStock.Infra.Integrations.UnitTests/Ia/ClienteProvedorIaTests.cs:generic-api-key:158
+b55d20f2f0e7371a306777aee6c23c4d1a98dbf9:EasyStock.Application.Tests/Services/Ia/RoteadorIaLlmClientTests.cs:generic-api-key:19

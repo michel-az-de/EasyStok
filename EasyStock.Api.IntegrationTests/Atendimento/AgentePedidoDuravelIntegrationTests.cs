@@ -26,7 +26,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         var falha = new FalhaSqlAposPreferencia();
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(true);
+        llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         var cloud = Substitute.For<IWhatsAppCloudClient>();
         var mp = Substitute.For<IMercadoPagoClient>();
         IServiceProvider? servicos = null;

@@ -107,6 +107,12 @@ public static class FeatureCatalogo
     /// </summary>
     public const string PagamentoPixDireto = "pagamento.pix_direto";
 
+    /// <summary>
+    /// #3064 (S2b de #2948): a IA da loja sai pelo provedor, modelo, chave e cota cadastrados nela, não pelo <c>.env</c>.
+    /// Desligada, a loja segue no <c>.env</c>; desligar é o rollback.
+    /// </summary>
+    public const string IaProvedorPorLoja = "ia.provedor_por_loja";
+
     /// <summary>Features conhecidas, na ordem em que aparecem no back-office.</summary>
     public static IReadOnlyList<FeatureConhecida> Conhecidas { get; } =
     [
@@ -117,6 +123,7 @@ public static class FeatureCatalogo
         new(CanalMessenger, "Messenger: a loja atende as mensagens da página do Facebook pelo console."),
         new(CanalChatSite, "Chat do site: o visitante conversa com a loja pela vitrine."),
         new(PagamentoPixDireto, "Pix direto: cobra pela chave Pix da loja, sem Mercado Pago; a equipe confere e dá baixa."),
+        new(IaProvedorPorLoja, "IA pelo provedor da loja: chave, modelo e cota em US$ cadastrados na loja, em vez do servidor."),
     ];
 
     /// <summary>

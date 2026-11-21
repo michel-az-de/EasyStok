@@ -46,7 +46,7 @@ public partial class AgenteAtendimentoServiceTests
 
     public AgenteAtendimentoServiceTests()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _llm.When(l => l.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()))
             .Do(ci => _requisicoes.Add(ci.Arg<RequisicaoLlm>()));
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto("ok"));
@@ -829,7 +829,7 @@ public partial class AgenteAtendimentoServiceTests
     [Fact]
     public async Task NaoChamaLlmQuandoDesligadoEEscalaParaADona()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
 
         var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
@@ -912,6 +912,21 @@ public partial class AgenteAtendimentoServiceTests
 
         resultado.Escalou.Should().BeTrue();
         await _llm.Received(2).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ChamadaQueNemSaiuEscalaSemNovaTentativa()
+    {
+        // #3064: cota estourada ou disjuntor aberto não se repetem (a segunda tentativa gravaria outra cota_estourada).
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<RespostaLlm>(_ => throw new EasyStock.Application.Ports.Output.Ai.ProvedorIaIndisponivelException("cota estourada"));
+        _escalador.When(e => e.EscalarAsync(Arg.Any<Guid>(), Arg.Any<Conversa>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>()))
+            .Do(ci => ci.Arg<Conversa>().Assumir(ci.Arg<DateTime>()));
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Escalou.Should().BeTrue();
+        await _llm.Received(1).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

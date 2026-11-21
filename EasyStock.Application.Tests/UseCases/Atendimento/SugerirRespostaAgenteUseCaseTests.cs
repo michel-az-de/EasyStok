@@ -49,7 +49,7 @@ public class SugerirRespostaAgenteUseCaseTests
             .Returns(new ConversaComMensagens(_conversa, historico));
         _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns((ConfiguracaoAtendimento?)null);
 
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _llm.When(l => l.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()))
             .Do(ci => _requisicoes.Add(ci.Arg<RequisicaoLlm>()));
         _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(
@@ -123,7 +123,7 @@ public class SugerirRespostaAgenteUseCaseTests
     [Fact]
     public async Task AgenteDesligado503()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
 
         var acao = () => Criar().ExecuteAsync(new SugerirRespostaAgenteCommand(_empresaId, _conversa.Id));
 

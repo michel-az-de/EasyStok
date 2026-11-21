@@ -1,4 +1,6 @@
 using EasyStock.Application.Ports.Output.Ai;
+using EasyStock.Application.Ports.Output.Integration.Crypto;
+using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Services.Ia;
 using Microsoft.Extensions.Logging;
 using EasyStock.Infra.Integrations.Ia;
@@ -42,8 +44,16 @@ public static class AgenteLlmServiceCollectionExtensions
             client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSegundos);
         });
-        // #3063 (S2a de #2948): toda chamada passa pelo registro de uso em chamada_ia.
-        services.AddTransient<IAgenteLlmClient>(sp => ComRegistro(sp, sp.GetRequiredService<AnthropicMessagesClient>()));
+        // #3064 (S2b de #2948): o provedor da loja tem cliente HTTP próprio, com as travas da spec §6; o do .env fica igual.
+        services.AddHttpClient(ClienteProvedorIa.NomeHttp, client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan; // o prazo vem por chamada, em ClienteProvedorIa
+            client.MaxResponseContentBufferSize = ClienteProvedorIa.RespostaMaximaBytes;
+        }).ConfigurePrimaryHttpMessageHandler(ClienteProvedorIa.Handler);
+        services.AddSingleton<IClienteProvedorIa, ClienteProvedorIa>();
+        // #3063 (S2a): toda chamada do .env passa pelo registro de uso em chamada_ia. #3064: por fora, o roteador por loja,
+        // scoped para a flag e a rota ficarem em memória durante a requisição.
+        services.AddScoped<IAgenteLlmClient>(sp => ComRoteador(sp, ComRegistro(sp, sp.GetRequiredService<AnthropicMessagesClient>())));
 
         // #1398: transcrição de áudio no faster-whisper da VPS (ADR-0058); a Fireworks desativou o áudio.
         services.Configure<TranscricaoAudioOptions>(configuration.GetSection(TranscricaoAudioOptions.Secao));
@@ -64,10 +74,24 @@ public static class AgenteLlmServiceCollectionExtensions
                 sp.GetRequiredService<ILogger<RegistroChamadaIaLlmClient>>())
             : interno;
 
+    /// <summary>
+    /// #3064: com o banco (flag, tenant, rota, cofre e registro), o roteador por loja vai por fora; sem ele, o do <c>.env</c>.
+    /// </summary>
+    private static IAgenteLlmClient ComRoteador(IServiceProvider sp, IAgenteLlmClient doEnv) =>
+        sp.GetService<ITenantFeatureFlagRepository>() is { } flags
+        && sp.GetService<ITenantAtual>() is { } tenant
+        && sp.GetService<IRotasIa>() is { } rotas
+        && sp.GetService<IIntegrationCredentialResolver>() is { } cofre
+        && sp.GetService<IRegistroChamadaIa>() is { } registro
+            ? new RoteadorIaLlmClient(doEnv, flags, tenant, rotas, cofre, sp.GetRequiredService<IClienteProvedorIa>(), registro,
+                sp.GetService<TimeProvider>() ?? TimeProvider.System, sp.GetRequiredService<ILogger<RoteadorIaLlmClient>>())
+            : doEnv;
+
     internal sealed class MontagemFichaApiClient(IAgenteLlmClient client) : IMontagemFichaLlmClient
     {
         internal IAgenteLlmClient Interno => client;
         public bool Disponivel => client.Disponivel;
+        public Task<bool> DisponivelAsync(Guid empresaId, CancellationToken ct = default) => client.DisponivelAsync(empresaId, ct);
         public Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default) => client.EnviarAsync(requisicao, ct);
     }
 }

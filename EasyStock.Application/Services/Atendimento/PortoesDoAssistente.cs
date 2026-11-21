@@ -135,7 +135,7 @@ public sealed class PortoesDoAssistente(
                 ? EtapaAssistente.Passou(Chave, "Assistente na loja", "Ligado: o Assistente responde sozinho.")
                 : EtapaAssistente.Barrou(Chave, "Assistente na loja", "Desligado: toda conversa vai para a equipe.",
                     AgenteAtendimentoService.MotivoAtendimentoAutomaticoDesligado),
-            llm.Disponivel
+            await llm.DisponivelAsync(empresaId, ct)
                 ? EtapaAssistente.Passou(Modelo, "Modelo de IA", "Disponível no servidor.")
                 : EtapaAssistente.Barrou(Modelo, "Modelo de IA", "Desligado ou sem chave no servidor.",
                     AgenteAtendimentoService.MotivoAgenteDesligado),

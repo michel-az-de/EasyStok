@@ -16,7 +16,7 @@ public class SugerirReceitaUseCaseTests
 
     public SugerirReceitaUseCaseTests()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         _pesquisa.BuscarReceitasAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<FonteProducaoWeb>>([Fonte]));
         Responder(ReceitaValida);
     }
@@ -45,7 +45,7 @@ public class SugerirReceitaUseCaseTests
     [Fact]
     public async Task Ia_indisponivel_nao_inventa_receita_nem_consulta_fontes()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         var acao = () => Criar().ExecuteAsync(Empresa, "Bolo", CancellationToken.None);
         await acao.Should().ThrowAsync<UseCaseValidationException>().WithMessage("*não está disponível*");
         await _pesquisa.DidNotReceiveWithAnyArgs().BuscarReceitasAsync(default!, default);

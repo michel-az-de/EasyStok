@@ -39,7 +39,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
     private async Task ExercitarAcaoVerificada(string caso)
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
-        var llm = Substitute.For<IAgenteLlmClient>(); llm.Disponivel.Returns(true);
+        var llm = Substitute.For<IAgenteLlmClient>(); llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         var mensagens = new ConcurrentQueue<string>(); var cloud = Substitute.For<IWhatsAppCloudClient>();
         cloud.EnviarTextoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(c => { mensagens.Enqueue(c.ArgAt<string>(1)); return new EnvioWhatsAppResult($"wamid.guard.{Guid.NewGuid():N}"); });
@@ -172,7 +172,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
     public async Task Comanda_AgenteUsaLedgerDeEstornoSemPrometerCreditoBancario(string modo)
     {
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
-        var llm = Substitute.For<IAgenteLlmClient>(); llm.Disponivel.Returns(true);
+        var llm = Substitute.For<IAgenteLlmClient>(); llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(c =>
             c.Arg<RequisicaoLlm>().Mensagens.Last().Conteudo.OfType<BlocoResultadoFerramentaLlm>().Any()
                 ? new RespostaLlm("end_turn", [new BlocoTextoLlm("Seu estorno já caiu na conta.")], 1, 1)
@@ -259,7 +259,7 @@ public sealed partial class PedidoConversaConcorrenciaTests
         Skip.If(!_isAvailable, "Docker/PostgreSQL unavailable");
         const string falso = "Seu estorno ja caiu na conta.";
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(true);
+        llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         var final = new RespostaLlm("end_turn", [new BlocoTextoLlm(falso)], 1, 1);
         var consulta = new RespostaLlm(RespostaLlm.StopToolUse,
             [new BlocoUsoFerramentaLlm("toolu.consulta", "consultar_pedido", JsonSerializer.SerializeToElement(new { }))], 1, 1);
