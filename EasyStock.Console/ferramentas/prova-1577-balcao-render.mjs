@@ -151,7 +151,9 @@ await Promise.all(arquivosDe(raiz).filter((a) => a.endsWith('.jsx')).map(async (
   // Conta também o pai e o fio reais, sem trocar componentes por doubles nem alterar o `memo`.
   const componente = ['PainelAtendimento', 'Thread'].find((nome) => arquivo.endsWith(`${nome}.jsx`))
   if (componente) {
-    const inicio = new RegExp(`export function ${componente}\\([\\s\\S]*?\\) \\{`)
+    // #3037: o Painel exportado é um invólucro com o anfitrião da confirmação; o pai do campo é o PainelDaConversa.
+    const declaracao = componente === 'PainelAtendimento' ? 'function PainelDaConversa' : `export function ${componente}`
+    const inicio = new RegExp(`${declaracao}\\([\\s\\S]*?\\) \\{`)
     assert.match(codigo, inicio, `entrada de ${componente} encontrada para contar renders`)
     codigo = codigo.replace(inicio, (cabecalho) => `${cabecalho}\n  globalThis.__prova1577.${componente} += 1;`)
   }
