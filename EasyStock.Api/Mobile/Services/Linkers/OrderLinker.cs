@@ -1,3 +1,5 @@
+using EasyStock.Application.Events.Pedidos;
+using EasyStock.Application.Ports.Output.Integration;
 using EasyStock.Application.Services;
 using EasyStock.Application.UseCases.AtualizarStatusPedido;
 using EasyStock.Application.UseCases.CriarPedido;
@@ -34,8 +36,12 @@ public sealed class OrderLinker(
     MobileSaleSyncService saleSync,
     CriarPedidoUseCase criarPedidoUseCase,
     ILogger<OrderLinker> log,
-    AtualizarStatusPedidoUseCase? atualizarStatus = null)
+    AtualizarStatusPedidoUseCase? atualizarStatus = null,
+    IPublicadorEventoIntegracao? publicadorEventos = null)
 {
+    /// <summary>Até quanto tempo depois a entrega feita no aparelho ainda avisa o cliente (#3075).</summary>
+    public static readonly TimeSpan JanelaDoAvisoDeEntrega = TimeSpan.FromHours(2);
+
     public async Task ExecuteAsync(IEnumerable<string> mobileOrderIds, Guid? empresaId)
     {
         var idsList = mobileOrderIds as ICollection<string> ?? mobileOrderIds.ToList();
@@ -56,6 +62,8 @@ public sealed class OrderLinker(
                     .Include(o => o.Items)
                     .FirstOrDefaultAsync(o => o.Id == oid && o.EmpresaId == empresaId);
                 if (mobileO == null) continue;
+                // O vínculo regrava UpdatedAt ao criar o pedido; a hora que o aparelho mandou é esta.
+                var carimboDoAparelho = mobileO.UpdatedAt;
                 processed++;
 
                 Guid? pedidoIdResolvido = null;
@@ -217,8 +225,11 @@ public sealed class OrderLinker(
                 // F8-F: o status do aparelho chega ao Pedido do ERP.
                 var erpAcompanhou = true;
                 if (nasceuNoErp) erpAcompanhou = await LevarStatusAEsteiraAsync(pedidoIdResolvido.Value, mobileO);
-                else await EnsureStatusSyncAsync(pedidoIdResolvido.Value, mobileO);
+                var espelhado = nasceuNoErp ? null : await EnsureStatusSyncAsync(pedidoIdResolvido.Value, mobileO);
                 await EnsureClienteLinkAsync(pedidoIdResolvido.Value, mobileO);
+                // Depois do vínculo do cliente: sem ClienteId o aviso não tem para quem ir.
+                if (espelhado is var (statusAnterior, lojaId))
+                    await PublicarEntregaAsync(pedidoIdResolvido.Value, mobileO, statusAnterior, lojaId, carimboDoAparelho);
 
                 // F7-A — Pagamento auto quando mobileO.Status == "entregue" (entregar no aparelho e receber).
                 // Se a esteira recusou a entrega do pedido do ERP, ele não está entregue: não recebe.
@@ -370,13 +381,18 @@ public sealed class OrderLinker(
         }
     }
 
-    /// <summary>F8-F — espelha no Pedido do ERP o status do pedido que nasceu no aparelho. Idempotente.</summary>
-    private async Task EnsureStatusSyncAsync(Guid pedidoId, Order mobileO)
+    /// <summary>
+    /// F8-F — espelha no Pedido do ERP o status do pedido que nasceu no aparelho. Idempotente.
+    /// Devolve o status que havia antes e a loja quando a troca aconteceu; nulo se nada mudou.
+    /// </summary>
+    private async Task<(string StatusAnterior, Guid? LojaId)?> EnsureStatusSyncAsync(Guid pedidoId, Order mobileO)
     {
         var alvo = (mobileO.Status ?? "").ToLowerInvariant();
-        if (!StatusQueOAparelhoManda.Contains(alvo)) return;
+        if (!StatusQueOAparelhoManda.Contains(alvo)) return null;
         try
         {
+            var antes = await db.Set<Pedido>().IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.Id == pedidoId).Select(p => new { p.Status, p.LojaId }).FirstOrDefaultAsync();
             var rows = await db.Set<Pedido>().IgnoreQueryFilters()
                 .Where(p => p.Id == pedidoId && p.Status != alvo)
                 .ExecuteUpdateAsync(s => s
@@ -386,12 +402,52 @@ public sealed class OrderLinker(
                         alvo == "entregue" ? (DateTime?)mobileO.UpdatedAt : p.EntreguEm)
                     .SetProperty(p => p.CanceladoEm, p =>
                         alvo == "cancelado" ? (DateTime?)mobileO.UpdatedAt : p.CanceladoEm));
-            if (rows > 0)
-                log.LogInformation("F8-F Status sincronizado: pedido={ErpId} → {Status}", pedidoId, alvo);
+            if (rows == 0 || antes is null) return null;
+            log.LogInformation("F8-F Status sincronizado: pedido={ErpId} → {Status}", pedidoId, alvo);
+            return (antes.Status, antes.LojaId);
         }
         catch (Exception ex)
         {
             log.LogWarning(ex, "F8-F Status sync falhou pedido={ErpId}: {Msg}", pedidoId, ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// #3075: o espelho grava o status por fora da esteira, então é ele quem publica a entrega. Sem o evento o
+    /// cliente não recebe o agradecimento nem o pedido de avaliação. Só a entrega, e só a recente: pedido
+    /// sincronizado dias depois não avisa fora de hora. O instante é o da chegada ao servidor, como na esteira.
+    /// </summary>
+    private async Task PublicarEntregaAsync(Guid pedidoId, Order mobileO, string statusAnterior, Guid? lojaId, DateTime carimboDoAparelho)
+    {
+        if (publicadorEventos is null || mobileO.EmpresaId is not { } empresaId
+            || !string.Equals(mobileO.Status, StatusPedidoMapper.Entregue, StringComparison.OrdinalIgnoreCase)
+            // Cancelado não volta: quem cancelou não recebe agradecimento nem pedido de avaliação.
+            || string.Equals(statusAnterior, StatusPedidoMapper.Cancelado, StringComparison.OrdinalIgnoreCase))
+            return;
+        // O carimbo do aparelho é o da última edição do pedido, não o do toque em "entregue": editar um pedido já
+        // entregue há dias e sincronizar reabre a janela. Aceito: o espelho só chega aqui quando o status muda.
+        var agora = DateTime.UtcNow;
+        if ((agora - carimboDoAparelho).Duration() > JanelaDoAvisoDeEntrega)
+        {
+            log.LogInformation("Pedido do ERP {ErpId}: entregue no aparelho em {Quando:o}, fora da janela do aviso. O cliente não é avisado.",
+                pedidoId, carimboDoAparelho);
+            return;
+        }
+        try
+        {
+            await publicadorEventos.PublicarAsync(empresaId, "pedido.mudou_status", "pedido", pedidoId,
+                new PedidoMudouStatusEvent(pedidoId, empresaId, lojaId, statusAnterior, StatusPedidoMapper.Entregue,
+                    SyncMutationDispatcher.OrigemDoPwa, null, mobileO.LastOperatorName, agora),
+                correlationId: pedidoId.ToString());
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            db.DescartarMudancasPendentes();
+            // O status já foi espelhado em outra gravação e o espelho não roda de novo: esta perda é definitiva.
+            log.LogError(ex, "Pedido do ERP {ErpId}: a entrega feita no aparelho não foi publicada e não será reenviada; "
+                + "o cliente fica sem o agradecimento e sem o pedido de avaliação: {Msg}", pedidoId, ex.Message);
         }
     }
 
