@@ -17,7 +17,7 @@ namespace EasyStock.Infra.Integrations.UnitTests.Ia;
 /// </summary>
 public class ClienteProvedorIaTests
 {
-    private const string Chave = "sk-loja-segredo-987";
+    private const string Chave = "valor-de-teste-do-provedor";
     private const string BaseDeepSeek = "https://api.deepseek.com/anthropic";
 
     private const string RespostaToolUseDeepSeek = """
@@ -156,7 +156,7 @@ public class ClienteProvedorIaTests
     [Theory]
     [InlineData("http://api.deepseek.com/anthropic")]
     [InlineData("https://api.deepseek.com:8443/anthropic")]
-    [InlineData("https://user:senha@api.deepseek.com/anthropic")]
+    [InlineData("https://usuario@api.deepseek.com/anthropic")]
     [InlineData("https://evil.example.com/anthropic")]
     [InlineData("https://169.254.169.254/latest")]
     [InlineData("https://localhost/anthropic")]

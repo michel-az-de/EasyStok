@@ -16,7 +16,7 @@ namespace EasyStock.Application.Tests.Services.Ia;
 /// <summary>#3064 (S2b de #2948): roteador por loja atrás de flag, cota suave em US$ e custo pela faixa horária.</summary>
 public class RoteadorIaLlmClientTests
 {
-    private const string ChaveSecreta = "sk-segredo-da-loja-123";
+    private const string ChaveSecreta = "valor-de-teste-da-loja";
     private static readonly Guid Empresa = Guid.NewGuid();
     private static readonly Guid Provedor = Guid.NewGuid();
 
