@@ -85,9 +85,10 @@ public sealed class AgenteAtendimentoService(
             return ResultadoTurnoAgente.Ignorado;
 
         var pendentes = EntradasPendentes(dados.Mensagens);
-        // #3068: a entrada que o robô já tinha processado ao escalar volta como entrada nova do turno retomado.
-        if (pendentes.Count == 0 && entradaRetomada is not null)
-            pendentes = [entradaRetomada];
+        // #3068: a entrada que o robô já tinha processado ao escalar volta como entrada nova do turno retomado, mesmo
+        // com reação ou figurinha pendente depois dela: sem isso o modelo responderia à reação e não à pergunta.
+        if (entradaRetomada is not null && pendentes.All(m => m.Id != entradaRetomada.Id))
+            pendentes = [.. pendentes.Append(entradaRetomada).OrderBy(m => m.EnviadaEm)];
         if (pendentes.Count == 0)
             return ResultadoTurnoAgente.Ignorado;
 

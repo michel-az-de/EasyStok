@@ -105,6 +105,20 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Fact]
+    public async Task Retomada_ReacaoPendenteDepoisDaPergunta_APerguntaVoltaComoEntradaNova()
+    {
+        EscaladaPeloRoboHa(TimeSpan.FromMinutes(3));
+        // A reação fica gravada sem ser processada: sozinha, ela seria a única entrada nova do turno.
+        _historico.Add(Mensagem.Entrada(_empresaId, _conversa.Id, Agora - AlemDoPrazo, TipoConteudoMensagem.Outro, null, "wamid.in16"));
+
+        await Retomar();
+
+        var requisicao = _requisicoes.Should().ContainSingle().Subject;
+        var novas = TextoDe(requisicao.Mensagens[^1]);
+        novas[novas.IndexOf("[entrada nova", StringComparison.Ordinal)..].Should().Contain("quero falar com uma pessoa");
+    }
+
+    [Fact]
     public async Task Retomada_ClienteEscreveuComAEquipeESemResposta_AssistenteAssume()
     {
         var entrada = ClienteEscreveuComAEquipeHa(AlemDoPrazo);
