@@ -6,7 +6,7 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contex
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { automacoesEditaveis, respostasEditaveis } from '../../../dominio/acessoModulos'
 import {
-  VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica,
+  VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica, exemploDaPrevia, previaDoServidor,
 } from '../../../dominio/automacao'
 import { plural } from '../../../dominio/formato'
 import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
@@ -25,7 +25,25 @@ const depois = (resultado, fechar) => Promise.resolve(resultado).then((ok) => { 
 const TITULO_MAXIMO = 120
 const TEXTO_MAXIMO = 4096
 
-const VARIAVEIS_TEXTO = VARIAVEIS_DA_API.map((v) => `{${v.chave}} ${v.descricao}`).join(' · ')
+// #3010: onde se edita, cada variável é um selo com o que ela vira; na prévia e na lista o texto sai preenchido.
+function SelosDeVariaveis({ variaveis }) {
+  return (
+    <ul className={css.variaveis} aria-label="Variáveis que o texto aceita">
+      {variaveis.map((v) => (
+        <li key={v.chave}><span className={css.selo}>{`{${v.chave}}`}</span> {v.descricao}</li>
+      ))}
+    </ul>
+  )
+}
+
+function TextoPreenchido({ texto, exemplo, fonteApi, className }) {
+  const partes = previaDoServidor(texto, exemplo, fonteApi ? VARIAVEIS_DA_API : VARIAVEIS)
+  return (
+    <span className={className}>
+      {partes.map((p, i) => (p.tipo === 'erro' ? <mark key={i} className={css.previaErro}>{p.texto}</mark> : <span key={i}>{p.texto}</span>))}
+    </span>
+  )
+}
 
 // #2792: o motivo do Salvar pede só o que falta.
 function faltando(titulo, texto) {
@@ -74,7 +92,8 @@ function FormResposta({ inicial, aoSalvar, aoCancelar }) {
           onChange={(e) => setAtalho(e.target.value.replace(/\s/g, '-'))}
         />
       </div>
-      <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} limite={TEXTO_MAXIMO} onChange={(e) => setTexto(e.target.value)} dica={VARIAVEIS_TEXTO} />
+      <CampoArea disabled={salvando} rotulo="Texto" rows={3} value={texto} limite={TEXTO_MAXIMO} onChange={(e) => setTexto(e.target.value)} />
+      <SelosDeVariaveis variaveis={VARIAVEIS_DA_API} />
       {descartando && (
         <div className={css.descarte} role="alert">
           <p>Descartar o que foi digitado?</p>
@@ -225,7 +244,7 @@ function SecaoRespostas() {
   )
 }
 
-function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
+function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
   const { alternarRegra, editarRegra } = useAcoes()
   const linhaRef = useRef(null)
   const [rascunho, setRascunho] = useState(null)
@@ -272,7 +291,7 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
         <span className={css.quando}>{regra.descricao}</span>
         {!editando && (
           regra.texto
-            ? <span className={css.textoInteiro}>{regra.texto}</span>
+            ? <TextoPreenchido texto={regra.texto} exemplo={exemplo} fonteApi={fonteApi} className={css.textoInteiro} />
             : !avisoEntrada && <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
         )}
         {avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
@@ -288,9 +307,11 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
             value={rascunho}
             disabled={salvando}
             onChange={(e) => setRascunho(e.target.value)}
-            dica={fonteApi ? VARIAVEIS_TEXTO : null}
             autoFocus
           />
+          <SelosDeVariaveis variaveis={fonteApi ? VARIAVEIS_DA_API : VARIAVEIS} />
+          <p className={css.rotuloPrevia}>Como o cliente lê (exemplo)</p>
+          <TextoPreenchido texto={rascunho} exemplo={exemplo} fonteApi={fonteApi} className={css.bolha} />
           <div className={css.acoes}>
             <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando || Boolean(bloqueio)} aria-describedby={bloqueio ? idBloqueio : undefined} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
             <Botao variante="texto" disabled={salvando} onClick={() => setRascunho(null)}>Cancelar</Botao>
@@ -308,7 +329,8 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel }) {
 }
 
 function SecaoAutomaticas({ focoInicial }) {
-  const { regras, fonteApi, cargaDasRegras } = useAtendimento()
+  const { regras, fonteApi, cargaDasRegras, agora, funcionamento } = useAtendimento()
+  const exemplo = useMemo(() => exemploDaPrevia({ agora, funcionamento, origem: window.location.origin }), [agora, funcionamento])
   const { acoes } = useAcessoModulos()
   // #1966: ligar, desligar e editar é da gerência do atendimento (a API recusa o Operador).
   const editavel = automacoesEditaveis({ fonteApi, acoes })
@@ -322,7 +344,7 @@ function SecaoAutomaticas({ focoInicial }) {
     <section className={css.secao} aria-labelledby="gestao-automaticas">
       <header className={css.topo}>
         <div>
-          <h3 id="gestao-automaticas">{NOME_RESPOSTAS_AUTOMATICAS}</h3>
+          <h3 id="gestao-automaticas">Mensagens que saem sozinhas</h3>
           <p className={css.descricao}>
             Saem sozinhas, só até 24 h depois da última mensagem do cliente e nunca para cliente bloqueado.
             Na conversa aparecem com a etiqueta automática.
@@ -336,7 +358,7 @@ function SecaoAutomaticas({ focoInicial }) {
         <p className={css.vazio} role={cargaDasRegras?.estado === 'erro' ? 'alert' : undefined}>{vazio}</p>
       ) : (
         <ul className={css.lista}>
-          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} editavel={editavel} emFoco={focoInicial === `regra-${r.id}`} />)}
+          {regras.map((r) => <LinhaAutomatica key={r.id} regra={r} fonteApi={fonteApi} editavel={editavel} exemplo={exemplo} emFoco={focoInicial === `regra-${r.id}`} />)}
         </ul>
       )}
     </section>
