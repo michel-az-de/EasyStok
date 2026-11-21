@@ -8,7 +8,8 @@
 #   subir    guarda do vps-deploy (SHA = origin/master ou descendente), git archive so de tools/mcp-baba e da
 #            stack, trava /tmp/easystok-deploy.lock, rede mcp (172.16.8.0/24, nunca apagada), chave SSH propria,
 #            known_hosts do host, build easystok-mcp:vps-<sha>, up, healthy e GIT_SHA conferidos, shared-caddy
-#            conectado a rede mcp, linha no deploy-history.log. Se nao ficar healthy, volta a imagem anterior.
+#            conectado a rede mcp, linha no deploy-history.log. Se nao ficar healthy, volta a imagem anterior
+#            quando ela fica healthy de novo; senao derruba o ez-mcp (nunca fica em loop de reinicio).
 #   caddy    confere o DNS, reconecta o shared-caddy e aplica o bloco do dominio (idempotente; valida e recarrega,
 #            restaura o backup se falhar). Rodar de novo depois de recriar o shared-caddy.
 #   chave    copia o gate.sh do origin/master para ~/build e imprime o passo root unico do Felipe.
@@ -97,31 +98,39 @@ install -m 600 "$SRC/scripts/deploy/mcp/compose.yaml" "$STACK/compose.yaml"
 echo "==> [3/5] build easystok-mcp:vps-$SHA"
 docker build -q --build-arg GIT_SHA="$SHA_FULL" -t "easystok-mcp:vps-$SHA" "$SRC/tools/mcp-baba" >/dev/null || exit 4
 rm -rf "$SRC"
-# so vira vps-prev a imagem que esta healthy agora: rollback para imagem quebrada repetiria o loop (#3072)
-if docker image inspect easystok-mcp:vps >/dev/null 2>&1 \
-  && [ "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' ez-mcp 2>/dev/null)" = healthy ]; then
-  docker tag easystok-mcp:vps easystok-mcp:vps-prev
+# rollback (#3072): espera devolve o health final do ez-mcp (ate 120 s); derruba confirma que nada ficou em loop
+espera() { local st=ausente; for _ in $(seq 1 40); do
+  st="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' ez-mcp 2>/dev/null || echo ausente)"
+  [ "$st" = healthy ] && break; sleep 3; done; echo "$st"; }
+derruba() {
+  docker compose down >/dev/null || true
+  if docker inspect ez-mcp >/dev/null 2>&1; then echo "ERRO: ez-mcp continua de pe depois do down" >&2
+  else echo "$1: ez-mcp derrubado (rede, chave e tokens ficam)" >&2; fi
+}
+# so vira vps-prev a imagem do container healthy agora, pelo ID real; sem container healthy o prev obsoleto sai
+if [ "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' ez-mcp 2>/dev/null)" = healthy ]; then
+  docker tag "$(docker inspect -f '{{.Image}}' ez-mcp)" easystok-mcp:vps-prev
+else
+  docker image rm easystok-mcp:vps-prev >/dev/null 2>&1 || true
 fi
 docker tag "easystok-mcp:vps-$SHA" easystok-mcp:vps
 
 echo "==> [4/5] up e healthy"
 cd "$STACK"
 docker compose up -d >/dev/null
-st=ausente
-for _ in $(seq 1 40); do
-  st="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' ez-mcp 2>/dev/null || echo ausente)"
-  [ "$st" = healthy ] && break; sleep 3
-done
+st="$(espera)"
 sha_ok=0
 docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' ez-mcp | grep -qx "GIT_SHA=$SHA_FULL" && sha_ok=1
 if [ "$st" != healthy ] || [ "$sha_ok" != 1 ]; then
   echo "ERRO: ez-mcp health=$st sha_ok=$sha_ok" >&2
   docker logs --tail 30 ez-mcp >&2 2>&1 || true
-  if docker image inspect easystok-mcp:vps-prev >/dev/null 2>&1; then
-    docker tag easystok-mcp:vps-prev easystok-mcp:vps; docker compose up -d >/dev/null; echo "voltou para a imagem anterior" >&2
+  # volta so para um prev que fique healthy de novo; senao derruba e descarta o prev (repetir o rollback daria loop)
+  if docker image inspect easystok-mcp:vps-prev >/dev/null 2>&1 && docker tag easystok-mcp:vps-prev easystok-mcp:vps \
+    && docker compose up -d >/dev/null && [ "$(espera)" = healthy ]; then
+    echo "voltou para a imagem anterior (healthy)" >&2
   else
-    # sem imagem anterior saudavel nada fica em loop: o container sai (rede, chave e tokens ficam)
-    docker compose down >/dev/null 2>&1 || true; echo "sem imagem anterior saudavel: ez-mcp derrubado" >&2
+    docker image rm easystok-mcp:vps-prev >/dev/null 2>&1 || true
+    derruba "sem imagem anterior saudavel"
   fi
   exit 6
 fi
