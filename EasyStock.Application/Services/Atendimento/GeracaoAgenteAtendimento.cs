@@ -243,7 +243,8 @@ public static class GeracaoAgenteAtendimento
     {
         var resultado = new List<MensagemLlm>();
         var ordenado = historico.Where(m => !pendentes.Contains(m)).Concat(pendentes);
-        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema && !FalhouDeVez(m)))
+        // #2833: a apagada para todos sai junto: o cliente não a vê mais, e o agente não pode se apoiar nela.
+        foreach (var msg in ordenado.Where(m => m.Autor != AutorMensagem.Sistema && !FalhouDeVez(m) && m.ApagadaEm is null))
         {
             var papel = msg.Autor == AutorMensagem.Cliente ? MensagemLlm.Usuario : MensagemLlm.Assistente;
             var texto = msg.Autor switch
