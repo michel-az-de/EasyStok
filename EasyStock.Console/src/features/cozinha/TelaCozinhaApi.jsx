@@ -108,6 +108,8 @@ export function TelaCozinhaApi({ linhas }) {
   const respostaSobre = sobreId ? respostaPara(sobreId) : null
   const fantasmas = reduzMovimento() ? [] : saindo
   const visiveis = filtrarPorLinha(lista, linhaFiltro)
+  const quadroRef = useRef(null)
+  const cartoesPorColuna = new Map(COLUNAS_KDS.map((coluna) => [coluna.status, filtrarPorColunaKds(visiveis, coluna.status)]))
   const vazia = pedidos !== null && lista.length === 0
   const filtroVazio = !vazia && linhaFiltro !== null && visiveis.length === 0
 
@@ -231,10 +233,10 @@ export function TelaCozinhaApi({ linhas }) {
                   <Botao variante="secundario" onClick={() => setLinhaFiltro(null)}>Ver todas as linhas</Botao>
                 </div>
               )}
-              <FaixaColunas itens={COLUNAS_KDS.map((c) => ({ id: c.status, rotulo: c.rotulo, contagem: filtrarPorColunaKds(visiveis, c.status).length }))} />
-              <div className={css.colunas}>
+              <FaixaColunas quadroRef={quadroRef} itens={COLUNAS_KDS.map((c) => ({ id: c.status, rotulo: c.rotulo, contagem: cartoesPorColuna.get(c.status).length }))} />
+              <div ref={quadroRef} className={css.colunas}>
                 {COLUNAS_KDS.map((coluna) => {
-                  const cartoes = filtrarPorColunaKds(visiveis, coluna.status)
+                  const cartoes = cartoesPorColuna.get(coluna.status)
                   const saindoDaqui = filtrarPorColunaKds(fantasmas, coluna.status)
                   return (
                     <ColunaKds

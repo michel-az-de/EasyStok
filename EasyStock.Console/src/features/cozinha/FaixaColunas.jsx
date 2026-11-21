@@ -7,16 +7,15 @@ import css from './cozinha.module.css'
 const reduzMovimento = () => typeof window !== 'undefined'
   && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-const frasePedidos = (n) => `${n} ${n === 1 ? 'pedido' : 'pedidos'}`
-
-// itens: [{ id, rotulo, contagem }]. Cada coluna do quadro leva data-coluna={id}.
-export function FaixaColunas({ itens }) {
+// itens: [{ id, rotulo, contagem }]. quadroRef é a ref do elemento que renderiza o quadro; cada coluna dele leva
+// data-coluna={id}. O nome acessível começa pelo texto visível (WCAG 2.5.3): "14 Na fila".
+export function FaixaColunas({ itens, quadroRef }) {
   const faixa = useRef(null)
   const chave = itens.map((i) => i.id).join('|')
 
   // Marca o botão da coluna à vista direto no DOM (aria-current), sem estado duplicado.
   useEffect(() => {
-    const quadro = faixa.current?.nextElementSibling
+    const quadro = quadroRef.current
     if (!quadro || typeof IntersectionObserver === 'undefined') return undefined
     const marcar = (id, aVista) => {
       const botao = faixa.current?.querySelector(`[data-alvo="${id}"]`)
@@ -29,10 +28,10 @@ export function FaixaColunas({ itens }) {
     }, { root: quadro, threshold: 0.6 })
     quadro.querySelectorAll('[data-coluna]').forEach((no) => olho.observe(no))
     return () => olho.disconnect()
-  }, [chave])
+  }, [chave, quadroRef])
 
   const ir = (id) => {
-    const alvo = faixa.current?.nextElementSibling?.querySelector(`[data-coluna="${id}"]`)
+    const alvo = quadroRef.current?.querySelector(`[data-coluna="${id}"]`)
     alvo?.scrollIntoView({ behavior: reduzMovimento() ? 'auto' : 'smooth', inline: 'start', block: 'nearest' })
   }
 
@@ -41,7 +40,7 @@ export function FaixaColunas({ itens }) {
       {itens.map(({ id, rotulo, contagem }) => (
         <button
           key={id} type="button" className={css.faixaItem} data-alvo={id}
-          aria-label={`${rotulo}, ${frasePedidos(contagem)}`} onClick={() => ir(id)}
+          aria-label={`${contagem} ${rotulo}`} onClick={() => ir(id)}
         >
           <span className={css.faixaContagem} aria-hidden="true">{contagem}</span>
           <span className={css.faixaRotulo} aria-hidden="true">{rotulo}</span>

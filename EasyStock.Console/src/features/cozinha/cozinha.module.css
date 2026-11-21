@@ -304,7 +304,8 @@ escritos e desliga as animações, inclusive a volta do overlay. */
   }
   .faixaItem[aria-current='true'] { background: var(--marca-claro); border-color: var(--marca); font-weight: 700; }
   .faixaContagem { font-family: var(--f-dado); font-size: var(--t-apoio); font-weight: 700; }
-  .faixaRotulo { font-size: var(--t-micro); line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+  .faixaRotulo { font-size: var(--t-micro); line-height: 1.15; text-align: center; overflow-wrap: normal; }
+  .coluna { scroll-margin-inline-start: var(--e-3); }
 }
 .gavetaCanhotos {
   display: inline-flex; align-items: center; gap: var(--e-2);

@@ -62,27 +62,50 @@ async function provar(browser, origem, modo) {
     const toque = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--toque')) || 40)
     const faixa = []
     for (const n of nomes) {
-      const botao = page.getByRole('button', { name: new RegExp(`^${n}, \\d+ pedidos?$`) })
-      assert.equal(await botao.count(), 1, `[${modo}] a contagem de "${n}" não está visível sem rolar: falta o botão "${n}, N pedidos" na faixa`)
+      const botao = page.getByRole('button', { name: new RegExp(`^\\d+ ${n}$`) })
+      assert.equal(await botao.count(), 1, `[${modo}] a contagem de "${n}" não está visível sem rolar: falta o botão "N ${n}" na faixa`)
       const caixa = await botao.boundingBox()
       assert.ok(caixa && caixa.x >= 0 && caixa.x + caixa.width <= 390 && caixa.y >= 0 && caixa.y + caixa.height <= 844,
         `[${modo}] "${n}" fora do viewport: ${JSON.stringify(caixa)}`)
       assert.ok(caixa.height >= toque - 0.5, `[${modo}] alvo de toque de "${n}" ${caixa.height}px < ${toque}px`)
       faixa.push(await botao.getAttribute('aria-label'))
     }
-    if (modo === 'api') assert.deepEqual(faixa, ['Na fila, 3 pedidos', 'Em preparo, 2 pedidos', 'Pronto, 1 pedido', 'Saiu para entrega, 1 pedido'])
+    if (modo === 'api') assert.deepEqual(faixa, ['3 Na fila', '2 Em preparo', '1 Pronto', '1 Saiu para entrega'])
+    // WCAG 2.5.3: o nome acessível de cada botão começa pelo texto visível.
+    const visiveis = await page.locator('nav[aria-label="Colunas do quadro"] button').evaluateAll((bs) => bs.map((b) => ({
+      nome: b.getAttribute('aria-label'), texto: b.innerText.replace(/\s+/g, ' ').trim() })))
+    assert.equal(visiveis.length, nomes.length, `[${modo}] um botão por coluna`)
+    for (const { nome, texto } of visiveis) assert.ok(nome.startsWith(texto), `[${modo}] o nome "${nome}" começa pelo texto visível "${texto}"`)
     if (capturas) await page.screenshot({ path: join(capturas, `${modo}-390-claro.png`) })
     // 2. Tocar rola o carrossel até a coluna e a faixa marca a coluna à vista.
     const ultimo = nomes.at(-1)
-    await page.getByRole('button', { name: new RegExp(`^${ultimo}, \\d+ pedidos?$`) }).click()
+    await page.getByRole('button', { name: new RegExp(`^\\d+ ${ultimo}$`) }).click()
     await page.waitForFunction((i) => {
       const c = document.querySelectorAll('section[data-coluna]')[i]?.getBoundingClientRect()
       return c && c.left >= -1 && c.left < innerWidth - 40
     }, nomes.length - 1, { timeout: 5000 })
     await page.waitForFunction((n) => document.querySelector('nav[aria-label="Colunas do quadro"] [aria-current="true"]')
-      ?.getAttribute('aria-label')?.startsWith(n), ultimo, { timeout: 5000 })
+      ?.getAttribute('aria-label')?.endsWith(n), ultimo, { timeout: 5000 })
     if (capturas) await page.screenshot({ path: join(capturas, `${modo}-390-claro-ultima.png`) })
   } finally { await context.close() }
+  // 2b. 320x568: nenhuma palavra do rótulo parte no meio e a página não rola na horizontal.
+  const estreita = await abrir(browser, origem, modo, 320, 568, 'light')
+  try {
+    const sobra = await estreita.page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+    assert.ok(sobra <= 0, `[${modo}] a 320 px a página não rola na horizontal (sobra ${sobra}px)`)
+    const partidas = await estreita.page.locator('nav[aria-label="Colunas do quadro"] button span:last-child').evaluateAll((els) => els.flatMap((e) => {
+      const r = document.createRange(); const palavras = []
+      const no = e.firstChild; if (!no) return []
+      const texto = no.textContent; let i = 0
+      for (const palavra of texto.split(/\s+/)) {
+        const ini = texto.indexOf(palavra, i); i = ini + palavra.length
+        r.setStart(no, ini); r.setEnd(no, ini + palavra.length)
+        if (new Set([...r.getClientRects()].map((c) => Math.round(c.top))).size > 1) palavras.push(palavra)
+      }
+      return palavras
+    }))
+    assert.deepEqual(partidas, [], `[${modo}] palavra partida no meio a 320 px: ${partidas}`)
+  } finally { await estreita.context.close() }
   // 3. 1440x900: faixa oculta e as quatro colunas lado a lado.
   const larga = await abrir(browser, origem, modo, 1440, 900, 'dark')
   try {
