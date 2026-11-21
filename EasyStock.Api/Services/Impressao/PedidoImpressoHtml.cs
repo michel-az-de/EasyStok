@@ -33,7 +33,8 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
 
     /// <param name="baseUrl">Origem da Api (ex.: <c>https://api.casadababa.com.br</c>), para as fontes.</param>
     public async Task<string> RenderizarAsync(
-        PedidoImpressoDto pedido, string documento, string modelo, string baseUrl, ImpressoOpcoes? opcoes = null, CancellationToken ct = default)
+        PedidoImpressoDto pedido, string documento, string modelo, string baseUrl, ImpressoOpcoes? opcoes = null, CancellationToken ct = default,
+        bool fontesRelativas = false)
     {
         ArgumentNullException.ThrowIfNull(pedido);
         if (!Documentos.Contains(documento))
@@ -46,7 +47,9 @@ public sealed class PedidoImpressoHtml(IRendererTemplate renderer, IConfiguratio
             new Dictionary<string, object?> { ["m"] = Modelo(pedido, documento, modelo, baseUrl, opcoes ?? new ImpressoOpcoes()) },
             htmlEscape: false,
             ct);
-        return CodigoImpresso.AjustarPagina(Pagina(Titulo(documento) + " #" + pedido.Numero, modelo, baseUrl, corpo), opcoes?.Codigo ?? "qr");
+        var titulo = Titulo(documento) + " #" + pedido.Numero;
+        var pagina = fontesRelativas ? PaginaComFontesRelativas(titulo, modelo, corpo) : Pagina(titulo, modelo, baseUrl, corpo);
+        return CodigoImpresso.AjustarPagina(pagina, opcoes?.Codigo ?? "qr");
     }
 
     private Dictionary<string, object?> Modelo(PedidoImpressoDto p, string documento, string modelo, string baseUrl, ImpressoOpcoes opcoes)

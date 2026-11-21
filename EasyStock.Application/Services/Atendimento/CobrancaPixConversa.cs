@@ -34,7 +34,7 @@ public sealed class CobrancaPixConversa(
     IStorefrontRepository storefronts,
     IConfiguration configuration,
     ILogger<CobrancaPixConversa> logger,
-    PublicadorDocumentoPedido? documentos = null)
+    PublicadorImpressoPedido? impressos = null)
 {
     public const string TextoFalhaResumo = "A cobrança Pix não foi enviada. Gere a cobrança de novo pela Ficha do pedido.";
     public const string TextoFalhaCodigo = "O código Pix não foi enviado. Gere a cobrança de novo pela Ficha do pedido.";
@@ -58,7 +58,7 @@ public sealed class CobrancaPixConversa(
             }
 
             var canal = resolvedorCanal.Obter(conversa.Canal);
-            return documentos is not null && PublicadorDocumentoPedido.PdfLigado(configuration)
+            return impressos is not null && PublicadorDocumentoPedido.PdfLigado(configuration)
                 ? await EnviarEmBaloesAsync(aviso, conversa, canal, agora, enviadaPorUsuarioId, ct)
                 : await EnviarTextoUnicoAsync(aviso, conversa, canal, agora, enviadaPorUsuarioId, ct);
         }
@@ -95,26 +95,27 @@ public sealed class CobrancaPixConversa(
         var resumo = await ResumoAsync(aviso, ct);
         if (resumo is null) return await EnviarTextoUnicoAsync(aviso, conversa, canal, agora, usuarioId, ct);
         var legenda = TextoCobrancaPix.Legenda(resumo, aviso.Pix);
-        string? externoPdf = null;
+        string? externoImagem = null;
         try
         {
-            var documento = await documentos!.PublicarPedidoAsync(aviso.EmpresaId, resumo, aviso.Pix, ct);
-            externoPdf = await canal.EnviarDocumentoAsync(
-                conversa.ContatoIdExterno, documento.Url, documento.NomeArquivo, legenda, ct);
+            var url = await impressos!.PublicarPixAsync(aviso.EmpresaId, aviso.PedidoId, aviso.Pix, ct);
+            if (url is not null)
+                externoImagem = await canal.EnviarImagemAsync(conversa.ContatoIdExterno, url, legenda, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // O PDF é o enfeite: sem ele a legenda sai em texto e o código segue (a cliente nunca fica sem o Pix).
-            logger.LogWarning("PDF da cobranca Pix nao saiu conversaId={ConversaId} erro={Erro}", aviso.ConversaId, ex.GetType().Name);
+            // A imagem é o enfeite: sem ela a legenda sai em texto e o código segue (a cliente nunca fica sem o Pix).
+            // Sem o corpo do impresso no log: ele leva o código Pix.
+            logger.LogWarning("Impresso da cobranca Pix nao saiu conversaId={ConversaId} erro={Erro}", aviso.ConversaId, ex.GetType().Name);
         }
 
-        var tipoDoBalao1 = TipoConteudoMensagem.Documento;
-        if (externoPdf is null)
+        var tipoDoBalao1 = TipoConteudoMensagem.Imagem;
+        if (externoImagem is null)
         {
             tipoDoBalao1 = TipoConteudoMensagem.Texto;
             try
             {
-                externoPdf = await canal.EnviarTextoAsync(conversa.ContatoIdExterno, legenda, ct);
+                externoImagem = await canal.EnviarTextoAsync(conversa.ContatoIdExterno, legenda, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -123,7 +124,7 @@ public sealed class CobrancaPixConversa(
             }
         }
 
-        await GravarEnviadaAsync(conversa, tipoDoBalao1, legenda, externoPdf, agora, usuarioId, ct);
+        await GravarEnviadaAsync(conversa, tipoDoBalao1, legenda, externoImagem, agora, usuarioId, ct);
 
         var codigo = TextoCobrancaPix.BalaoDoCodigo(aviso.Pix);
         string externoCodigo;
