@@ -1,5 +1,5 @@
 # Prepara a estacao local do backup (E3, #2977, ADR-0068): instala o restic 0.19.1 conferindo
-# o SHA256 e registra as tarefas agendadas do usuario. Nao toca na senha nem no rclone.conf.
+# o SHA256 e registra as tarefas agendadas do usuario. Nao toca na senha nem no ezdrive.conf.
 #   EasyStok-Backup-Puxar      diaria 06:30   puxar.ps1 (copy, retencao, prune guardado, check)
 #   EasyStok-Backup-Vigiar     diaria 08:00   vigiar.ps1 (batimento: snapshot <= 26 h)
 #   EasyStok-Backup-Restaurar  dia 1, 09:00   restaurar.ps1 (4 itens da S3.5)

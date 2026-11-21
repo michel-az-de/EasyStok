@@ -34,10 +34,12 @@ R
 }
 config() {
   su felipe -c 'set -e; d=~/.config/easystok-backup; mkdir -p $d; chmod 700 $d
-    echo s > $d/restic.senha; echo "{}" > $d/sa.json; chmod 600 $d/restic.senha $d/sa.json
-    printf "[ezdrive]\ntype = drive\nscope = drive\nservice_account_file = %s\nteam_drive = X\n" $d/sa.json > $d/rclone.conf
-    chmod 600 $d/rclone.conf'
+    echo s > $d/restic.senha; chmod 600 $d/restic.senha
+    printf "[ezdrive]\ntype = drive\nscope = drive.file\nteam_drive = 0AOtKvTkSaRWCUk9PVA\nclient_id = cid-teste\nclient_secret = segredo-teste\ntoken = token-teste\n" > $d/ezdrive.conf
+    chmod 600 $d/ezdrive.conf'
 }
+# altera o ezdrive.conf de teste: $1 = expressao sed
+altera() { su felipe -c "sed -i '$1' ~/.config/easystok-backup/ezdrive.conf"; }
 roda() { set +e; out="$(su felipe -c "FAKE_CAT=${1:-0} bash ~/src/instalar.sh --sem-timer" 2>&1)"; echo "rc=$?"; echo "$out"; set -e
   echo "calls:"; cat /home/felipe/restic.calls 2>/dev/null || true; }
 
@@ -58,5 +60,29 @@ confere "repo existente: sem init"        "ja existe" "$r"
 prepara; config; r="$(roda 12)"
 confere "senha errada: exit 2"            "rc=2" "$r"
 confere "nunca imprime a senha"           "^0$" "$(grep -c '^s$' <<<"$r" || true)"
+
+prepara; config; r="$(roda)"
+confere "ezdrive.conf completo: exit 0"   "rc=0" "$r"
+prepara; config; altera '/^client_id/d'; r="$(roda)"
+confere "sem client_id: recusa"           "rc=2" "$r"
+confere "sem client_id: nomeia a chave"  "client_id" "$r"
+prepara; config; altera 's/^client_id = .*/client_id = /'; r="$(roda)"
+confere "client_id vazio: recusa"         "rc=2" "$r"
+confere "client_id vazio: nomeia a chave" "client_id" "$r"
+prepara; config; altera 's/^client_id = .*/client_id =    /'; r="$(roda)"
+confere "client_id so com espacos: recusa" "rc=2" "$r"
+prepara; config; altera 's/^token = .*/token = /'; r="$(roda)"
+confere "token vazio: recusa"             "rc=2" "$r"
+prepara; config; altera 's/drive\.file/drive/'; r="$(roda)"
+confere "scope = drive (sem .file): recusa" "rc=2" "$r"
+confere "scope: nomeia a chave"         "scope" "$r"
+prepara; config; altera '/^token/d'; r="$(roda)"
+confere "sem token: recusa"               "rc=2" "$r"
+confere "sem token: nomeia a chave"      "token" "$r"
+prepara; config; su felipe -c "printf '[gdrive]\ntype = drive\ntoken = antigo\n' > ~/.config/easystok-backup/rclone.conf; chmod 600 ~/.config/easystok-backup/rclone.conf"
+antes="$(su felipe -c 'sha256sum ~/.config/easystok-backup/rclone.conf ~/.config/easystok-backup/ezdrive.conf')"; r="$(roda)"
+depois="$(su felipe -c 'sha256sum ~/.config/easystok-backup/rclone.conf ~/.config/easystok-backup/ezdrive.conf')"
+confere "rclone.conf antigo e ezdrive.conf intocados" "rc=0" "$r"
+[ "$antes" = "$depois" ] && echo "ok   checksums iguais antes e depois" || { echo "FAIL checksums mudaram"; falhas=$((falhas+1)); }
 
 [ "$falhas" = 0 ] && echo "TODOS OS CASOS PASSARAM" || { echo "$falhas FALHA(S)"; exit 1; }

@@ -17,8 +17,9 @@
 #   git/      bundle do espelho da #2958 e o JSON de issues e PRs (ESPELHO_META), quando existirem
 # Depois apaga o stage: dado em claro nao fica no disco entre execucoes.
 #
-# Retencao: forget por tag, SEM --prune. Quem apaga dado do Drive e a estacao (puxar.ps1),
-# com credencial que a VPS nao tem; um token roubado daqui so consegue esquecer snapshots.
+# Retencao: forget por tag, SEM --prune. Quem apaga dado do Drive e a estacao (puxar.ps1).
+# VPS e estacao usam o mesmo login OAuth (ezdrive.conf): um token roubado daqui apaga tudo
+# no Drive. Risco aceito pelo dono, ver docs/dev/backup-drive.md.
 #
 # Saidas: 0 ok; 2 configuracao; 3 outro backup em andamento; 4 banco; 5 arquivos;
 #         6 restic backup; 7 forget.
@@ -38,7 +39,7 @@ RCLONE="${RCLONE:-$HOME/bin/rclone}"
 CONF_DIR="${CONF_DIR:-$HOME/.config/easystok-backup}"
 export RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-rclone:ezdrive:easystok-restic}"
 export RESTIC_PASSWORD_FILE="${RESTIC_PASSWORD_FILE:-$CONF_DIR/restic.senha}"
-export RCLONE_CONFIG="${RCLONE_CONFIG:-$CONF_DIR/rclone.conf}"
+export RCLONE_CONFIG="${RCLONE_CONFIG:-$CONF_DIR/ezdrive.conf}"
 DB_CONTAINER="${DB_CONTAINER:-shared-postgres}"
 DB_NAME="${DB_NAME:-easystock}"
 STACK_DIR="${STACK_DIR:-/opt/stacks/easystok}"
@@ -68,7 +69,7 @@ preflight() {
   [ -x "$RESTIC" ] || falha 2 "restic ausente em $RESTIC (rode instalar.ps1)"
   [ -x "$RCLONE" ] || falha 2 "rclone ausente em $RCLONE"
   [ -r "$RESTIC_PASSWORD_FILE" ] || falha 2 "senha do restic ausente em $RESTIC_PASSWORD_FILE"
-  [ -r "$RCLONE_CONFIG" ] || falha 2 "rclone.conf ausente em $RCLONE_CONFIG"
+  [ -r "$RCLONE_CONFIG" ] || falha 2 "ezdrive.conf ausente em $RCLONE_CONFIG"
 }
 
 # pg_dump e contagens no mesmo snapshot exportado: o manifesto descreve exatamente o dump,
