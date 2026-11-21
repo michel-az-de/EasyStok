@@ -36,7 +36,7 @@ public partial class RespostaPronta
         var novoTitulo = Obrigatorio(titulo, "Título", TituloTamanhoMaximo);
         var novoAtalho = NormalizarAtalho(atalho);
         var novoTexto = Obrigatorio(texto, "Texto", TextoTamanhoMaximo);
-        if (ModeloTextoAtendimento.ChavesDesconhecidas(novoTexto) is { } desconhecidas)
+        if (novoTexto != Texto && ModeloTextoAtendimento.ChavesDesconhecidas(novoTexto) is { } desconhecidas)
             throw new RegraDeDominioVioladaException(desconhecidas);
         Titulo = novoTitulo;
         Atalho = novoAtalho;

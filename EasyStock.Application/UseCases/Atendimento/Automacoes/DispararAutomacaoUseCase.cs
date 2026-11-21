@@ -258,10 +258,16 @@ public sealed class DispararAutomacaoUseCase(
         catch (VariavelSemValorException ex)
         {
             logger.LogWarning("Automática {Gatilho} não saiu: {Motivo}", disparo.Gatilho, ex.Message);
-            await RegistrarNotaSemValorAsync(conversa, ex.Variavel, agora, disparo.Gatilho);
+            // Com reserva (S13 do pago, saudação do webhook) o cliente já recebe o aviso: a nota seria ruído no fio.
+            if (!TemReserva(disparo.Gatilho))
+                await RegistrarNotaSemValorAsync(conversa, ex.Variavel, agora, disparo.Gatilho);
             return new NaoSai(ResultadoAutomacao.VariavelSemValor);
         }
     }
+
+    private static bool TemReserva(GatilhoAutomacao gatilho) =>
+        gatilho is GatilhoAutomacao.PagamentoConfirmado or GatilhoAutomacao.PrimeiroContato
+            or GatilhoAutomacao.ForaDoHorario or GatilhoAutomacao.LojaFechada;
 
     private async Task<Conversa?> ConversaAsync(DisparoAutomacao disparo, CancellationToken ct)
     {

@@ -165,15 +165,29 @@ public class AutomacoesHandlerTests
         await _whats.DidNotReceiveWithAnyArgs().EnviarTextoAsync(default!, default!, default);
     }
 
-    // #2781: a automática que não saiu por falta de valor deixa na conversa uma nota interna que a API devolve.
+    // #2781: o pago tem o aviso S13 como reserva; a nota de "não saiu" seria ruído.
     [Fact]
-    public async Task VariavelSemValorDeixaNotaDoMotivoNaConversa()
+    public async Task VariavelSemValorNoPagoNaoDeixaNota()
     {
         Regra(GatilhoAutomacao.PagamentoConfirmado, "Pedido {pedido} pago.");
         Mensagem? gravada = null;
         await _conversas.AddMensagemAsync(Arg.Do<Mensagem>(m => gravada = m), Arg.Any<CancellationToken>());
 
         (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PagamentoConfirmado, _conversa.Id, null, null)))
+            .Should().Be(ResultadoAutomacao.VariavelSemValor);
+
+        gravada.Should().BeNull();
+    }
+
+    // #2781: a automática sem reserva (pós-entrega) que não saiu por falta de valor deixa na conversa uma nota interna que a API devolve.
+    [Fact]
+    public async Task VariavelSemValorDeixaNotaDoMotivoNaConversa()
+    {
+        Regra(GatilhoAutomacao.PosEntrega, "Pedido {pedido} pago.");
+        Mensagem? gravada = null;
+        await _conversas.AddMensagemAsync(Arg.Do<Mensagem>(m => gravada = m), Arg.Any<CancellationToken>());
+
+        (await UseCase().ExecuteAsync(new DisparoAutomacao(_empresaId, GatilhoAutomacao.PosEntrega, _conversa.Id, null, null)))
             .Should().Be(ResultadoAutomacao.VariavelSemValor);
 
         gravada.Should().NotBeNull("o motivo precisa ficar na conversa, não só no log");
