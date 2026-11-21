@@ -47,7 +47,7 @@ for (const arquivo of ['features/atendimento/ModalEnviarModelo.jsx', 'features/g
   assert.match(texto, /ROTULOS\.MENSAGEM_PADRAO/, `${arquivo} usa o glossário`)
 }
 const { faltaParaProgramar } = await import('../src/dominio/mensagemProgramada.js')
-assert.match(faltaParaProgramar({ agendadaPara: '2999-01-01T10:00', agoraMs: 0, usarModelo: true, nomeModelo: '' }), /mensagem padrão do WhatsApp/)
+assert.match(faltaParaProgramar({ agendadaPara: '2999-01-01T10:00', agoraMs: 0, usarModelo: true, modeloPronto: false }), /mensagem padrão do WhatsApp/)
 
 // Item 3: o campo do celular da cliente diz "Celular (com DDD)".
 assert.equal(ROTULOS.CELULAR, 'Celular (com DDD)')

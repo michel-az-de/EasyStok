@@ -53,13 +53,15 @@ export function EditorDeAutomatica({
   const salvar = async () => {
     if (gravacao === 'salvando' || !rascunho.trim() || bloqueio) return
     setGravacao('salvando')
+    const texto = rascunho.trim()
     let ok
     try {
-      ok = await aoSalvar(rascunho.trim())
+      ok = await aoSalvar(texto)
     } catch {
       ok = false
     }
     if (ok === false) { setGravacao('erro'); return }
+    setRascunho(texto)
     setGravacao('salvo')
     aoSalvou?.()
   }

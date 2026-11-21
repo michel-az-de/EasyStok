@@ -48,11 +48,14 @@ const estado={regras:[regra],fonteApi:false,cargaDasRegras:{estado:'pronto'},ago
 const acoes={alternarRegra(){},editarRegra:async(id,c)=>{window.__salvas.push([id,c.texto])},incluirRespostaPronta(){},editarRespostaPronta(){},alternarArquivamentoRespostaPronta(){},
   listarModelos:async()=>MODELOS,listarProgramadas:async()=>[],cancelarProgramada:async()=>({}),
   programarMensagem:async(id,d)=>{window.__programadas.push(d);return {id:'p1',situacao:'Agendada',agendadaPara:d.agendadaPara,modelo:d.modelo}}};
+const acoesFalha={...acoes,listarModelos:async()=>{throw new Error('falhou')}};
 const conversa={id:'c1',nome:'Maria Souza'};
 const canal={nome:'WhatsApp',aceitaModelo:true};
 const cena=new URLSearchParams(location.search).get('c');
 function Cena(){return <ContextoEstado.Provider value={estado}><ContextoAcoes.Provider value={acoes}><ContextoCatalogo.Provider value={{respostasProntas:[]}}>
   {cena==='editor'&&<section id="editor"><EditorDeAutomatica regra={regra} analisar={(texto)=>analisarAutomatica({regra,texto,fonteApi:true,editavel:true,valores:{nome:'Maria'}})} editavel avisoApi='A variável {xyz} não existe. Use {nome}, {pedido} ou {faixa}.' aoSalvar={async()=>false}/></section>}
+  {cena==='salvou'&&<section id="salvou"><EditorDeAutomatica regra={regra} analisar={(texto)=>analisarAutomatica({regra,texto,fonteApi:false,editavel:true,valores:{nome:'Maria'}})} editavel aoSalvar={async()=>true}/></section>}
+  {cena==='falha'&&<ContextoAcoes.Provider value={acoesFalha}><section id="falha"><ModalProgramarMensagem conversa={conversa} canal={canal} rascunho="" aoAgendar={()=>{}} aoFechar={()=>{}}/></section></ContextoAcoes.Provider>}
   {cena==='aba'&&<section id="aba"><AbaRespostas comAutomaticas/></section>}
   {cena==='programar'&&<section id="programar"><ModalProgramarMensagem conversa={conversa} canal={canal} rascunho="" aoAgendar={()=>{}} aoFechar={()=>{}}/></section>}
 </ContextoCatalogo.Provider></ContextoAcoes.Provider></ContextoEstado.Provider>}
@@ -74,6 +77,15 @@ try {
   await editor.getByRole('alert').filter({ hasText: 'A variável {xyz} não existe' }).waitFor()
   assert.equal(await area.inputValue(), 'Oi, {nome}, de novo!', 'a edição é mantida depois da recusa')
 
+  // Salvar com espaço no fim: o servidor grava sem ele, então o rascunho não pode ficar "não salvo".
+  await pagina.goto(`${base}?c=salvou`)
+  const salvou = pagina.locator('#salvou')
+  await salvou.getByRole('textbox', { name: 'Texto de Primeira resposta' }).fill('Oi, {nome}!  \n')
+  await salvou.getByText('Alterações não salvas').waitFor()
+  await salvou.getByRole('button', { name: 'Salvar', exact: true }).click()
+  await salvou.getByText('Salvo', { exact: true }).waitFor()
+  assert.equal(await salvou.getByText('Alterações não salvas').count(), 0, 'salvo com espaço no fim não fica como não salvo')
+
   // 3. Respostas: o editor traz selos e prévia, e a chave desconhecida vira erro marcado.
   await pagina.goto(`${base}?c=aba`)
   const abaEl = pagina.locator('#aba')
@@ -88,6 +100,13 @@ try {
   await editorAba.getByRole('button', { name: 'Salvar', exact: true }).click()
   await pagina.waitForFunction(() => window.__salvas.length === 1)
   assert.deepEqual(await pagina.evaluate(() => window.__salvas[0]), ['r1', 'Oi, {nome}, tudo bem?'])
+
+  // Falha ao carregar a lista: o erro real aparece e a frase de "nenhuma mensagem padrão" não.
+  await pagina.goto(`${base}?c=falha`)
+  const falha = pagina.getByRole('dialog', { name: 'Programar mensagem' })
+  await falha.getByRole('checkbox', { name: /Usar mensagem padrão/ }).check()
+  await falha.getByRole('alert').first().waitFor()
+  assert.equal(await falha.locator('[data-vazio]').count(), 0, 'com erro ao carregar, não diz que a conta não tem mensagem padrão')
 
   // 4. Programar mensagem: lista dos aprovados, sem nome livre, e o modelo escolhido vai para a API.
   await pagina.goto(`${base}?c=programar`)

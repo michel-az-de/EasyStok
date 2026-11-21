@@ -26,7 +26,7 @@ const depois = (resultado, fechar) => Promise.resolve(resultado).then((ok) => { 
 const TITULO_MAXIMO = 120
 const TEXTO_MAXIMO = 4096
 
-// #2783: o editor da automática e as peças da prévia vivem em features/automacoes; daqui saem como sempre.
+// #2783: o editor da automática e as peças da prévia vivem em componentes/EditorDeAutomatica; daqui saem como sempre.
 export { SelosDeVariaveis }
 export function TextoPreenchido({ texto, exemplo, fonteApi, ...resto }) {
   return <TextoDaPrevia partes={previaDoServidor(texto, exemplo, fonteApi ? VARIAVEIS_DA_API : VARIAVEIS)} {...resto} />
@@ -288,8 +288,8 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
             )
             : !avisoEntrada && <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
         )}
-        {avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
-        {bloqueio && <span id={idBloqueio} className={css.alerta} role={editando ? 'alert' : undefined}>{bloqueio}</span>}
+        {!editando && avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
+        {bloqueio && <span id={idBloqueio} className={css.alerta}>{bloqueio}</span>}
       </div>
 
       {editando ? (

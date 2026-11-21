@@ -21,18 +21,19 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
   // #2007 (11c): sem acesso a Integrações, a frase manda pedir à gerência em vez de apontar a tela que ela não vê.
   const podeIntegrar = podeVerIntegracoes(acoes)
   const [lista, setLista] = useState(null)
+  const [falhou, setFalhou] = useState(false)
   const [escolha, setEscolha] = useState('')
   const [parametros, setParametros] = useState([])
   const consulta = useRef(0)
 
   async function carregar(atualizar = false) {
     const versao = ++consulta.current
-    setLista(null); aoFalhar?.(null); setEscolha(''); setParametros([])
+    setLista(null); setFalhou(false); aoFalhar?.(null); setEscolha(''); setParametros([])
     try {
       const modelos = await listarModelos(atualizar)
       if (versao === consulta.current) setLista(modelos)
     } catch (e) {
-      if (versao === consulta.current) { setLista([]); aoFalhar?.(erroDoModelo(e, { podeIntegrar })) }
+      if (versao === consulta.current) { setLista([]); setFalhou(true); aoFalhar?.(erroDoModelo(e, { podeIntegrar })) }
     }
   }
   useEffect(() => {
@@ -47,7 +48,7 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
     || algumPassaDoLimite(...parametros.map((p) => [p, LIMITE_PARAMETRO]))
   const sujo = escolha !== '' || parametros.some((p) => p.trim())
   useEffect(() => {
-    aoMudar?.({ modelo: modelo ?? null, parametros, falta, sujo })
+    aoMudar?.({ modelo: modelo ?? null, parametros: parametros.map((p) => p.trim()), falta, sujo })
     // `aoMudar` troca a cada render do pai; só a escolha e os campos o chamam de novo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [escolha, parametros, lista])
@@ -59,7 +60,7 @@ export function SeletorDeModelo({ desabilitado = false, aoMudar, aoFalhar }) {
     <>
       <Botao onClick={() => carregar(true)} disabled={desabilitado}>Atualizar modelos</Botao>
       {lista === null && <output>Carregando as opções de {ROTULOS.MENSAGEM_PADRAO}…</output>}
-      {lista?.length === 0 && <p data-vazio>Nenhuma {ROTULOS.MENSAGEM_PADRAO} nesta conta. Crie e aprove o modelo no Gerenciador da Meta.</p>}
+      {lista?.length === 0 && !falhou && <p data-vazio>Nenhuma {ROTULOS.MENSAGEM_PADRAO} nesta conta. Crie e aprove o modelo no Gerenciador da Meta.</p>}
       {Boolean(lista?.length) && (
         <fieldset className={css.programarCampos} disabled={desabilitado}>
           <CampoSelecao rotulo={ROTULOS.MENSAGEM_PADRAO_INICIAL} value={escolha} opcoes={[
