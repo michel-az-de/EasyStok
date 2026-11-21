@@ -46,7 +46,8 @@ public sealed class AgenteAtendimentoService(
     IOptions<LimiteRespostasAgenteOptions>? limiteRespostas = null,
     ITurnoAgenteRepository? turnos = null,
     IOptions<PrecosModelosAgenteOptions>? precos = null,
-    IOptions<ModelosAprovadosAgenteOptions>? modelos = null)
+    IOptions<ModelosAprovadosAgenteOptions>? modelos = null,
+    IOptions<RetomadaAssistenteOptions>? retomadaOpcoes = null)
 {
     public const int MaximoIteracoes = 6;
     public const int UltimasMensagens = 20;
@@ -61,17 +62,30 @@ public sealed class AgenteAtendimentoService(
     public static string MotivoLimiteRespostas(int maximo) =>
         $"o robô respondeu {maximo} vezes nesta conversa na última hora; parou para não gastar sem limite (possível loop)";
 
-    public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default)
+    /// <param name="retomada">#3068: turno da varredura de conversa parada com a equipe; o turno decide se retoma.</param>
+    public async Task<ResultadoTurnoAgente> ProcessarTurnoAsync(
+        Guid empresaId, Guid conversaId, DateTime agora, CancellationToken ct = default, bool retomada = false)
     {
         var cronometro = Stopwatch.StartNew();
         var dados = await conversaRepository.ObterComMensagensAsync(empresaId, conversaId, UltimasMensagens, ct);
         if (dados is null) return ResultadoTurnoAgente.Ignorado;
 
         var conversa = dados.Conversa;
+        var prazoRetomada = (retomadaOpcoes?.Value ?? new RetomadaAssistenteOptions()).Prazo;
+        Mensagem? entradaRetomada = null;
+        if (retomada)
+        {
+            entradaRetomada = await TentarRetomarAsync(empresaId, conversa, dados.Mensagens, agora, prazoRetomada, ct);
+            if (entradaRetomada is null) return ResultadoTurnoAgente.Ignorado;
+        }
+
         if (PortoesDoAssistente.DaConversa(conversa, agora).Any(e => e.Barra))
             return ResultadoTurnoAgente.Ignorado;
 
         var pendentes = EntradasPendentes(dados.Mensagens);
+        // #3068: a entrada que o robô já tinha processado ao escalar volta como entrada nova do turno retomado.
+        if (pendentes.Count == 0 && entradaRetomada is not null)
+            pendentes = [entradaRetomada];
         if (pendentes.Count == 0)
             return ResultadoTurnoAgente.Ignorado;
 
@@ -163,7 +177,8 @@ public sealed class AgenteAtendimentoService(
         var geracao = await GeracaoAgenteAtendimento.GerarAsync(
             llm, system.Estavel, mensagens, ferramentasProtegidas, contexto, MaximoIteracoes, logger, ct,
             modelos?.Value.DoTurno(configuracao.ModeloAgente), // S68: modelo da loja só se aprovado
-            systemVolatil: system.Volatil); // #2862: data e dossiê fora do bloco cacheado
+            // #2862: data e dossiê fora do bloco cacheado. #3068: a orientação da retomada vai junto, só neste turno.
+            systemVolatil: system.Volatil + (entradaRetomada is null ? string.Empty : RetomadaDoAssistente.Orientacao(prazoRetomada)));
         var tokens = geracao.Tokens;
         var motivoEscalada = geracao.MotivoFalha;
         var concluiu = geracao.Concluiu;
@@ -198,7 +213,10 @@ public sealed class AgenteAtendimentoService(
         // #2249: o texto de cada ação é molde da loja; quem não é cliente recebe o de encaminhamento.
         var primeiroNome = NomesDeContato.PrimeiroNome(cliente?.Nome) ?? NomesDeContato.PrimeiroNome(conversa.ContatoNome);
         var encaminhamento = MoldeMensagemContato.Preencher(configuracao.MoldeEscalada(), primeiroNome, configuracao.NomeDona);
-        if (conversa.Situacao == SituacaoConversa.Assumida)
+        // #3068: no turno retomado o cliente já pode ter recebido o encaminhamento da escalada anterior; não se repete.
+        var jaAvisado = entradaRetomada is not null && dados.Mensagens.SkipWhile(m => m.Id != entradaRetomada.Id)
+            .Any(m => m.Autor == AutorMensagem.Agente && m.Status != StatusMensagem.Falhou);
+        if (conversa.Situacao == SituacaoConversa.Assumida && !jaAvisado)
         {
             var aoContato = contexto.Encaminhou
                 ? MoldeMensagemContato.Preencher(configuracao.MensagemEncaminhamento, primeiroNome, configuracao.NomeDona)
@@ -261,6 +279,52 @@ public sealed class AgenteAtendimentoService(
         await unitOfWork.CommitAsync();
         return new ResultadoTurnoAgente(true, respondeu, escalou);
         }
+    }
+
+    /// <summary>
+    /// #3068: devolve ao Assistente a conversa que a equipe deixou sem resposta além do prazo. Confere antes todos os
+    /// portões menos "quem atende" (é o que a retomada muda): barrando, a conversa fica como a equipe deixou, sem nova
+    /// escalada nem aviso. Grava a retomada e a nota interna antes do modelo, porque a proteção do turno relê a situação
+    /// no banco a cada envio.
+    /// </summary>
+    private async Task<Mensagem?> TentarRetomarAsync(
+        Guid empresaId, Conversa conversa, IReadOnlyList<Mensagem> historico, DateTime agora, TimeSpan prazo, CancellationToken ct)
+    {
+        if (RetomadaDoAssistente.EntradaSemResposta(conversa, historico, agora, prazo) is not { } entrada)
+            return null;
+
+        var configuracao = await configuracaoRepository.GetByEmpresaIdAsync(empresaId)
+            ?? ConfiguracaoAtendimento.CriarPadrao(empresaId);
+        var cliente = conversa.ClienteId is { } clienteId
+            ? await clienteRepository.GetByIdAsync(empresaId, clienteId)
+            : null;
+        var portoes = new PortoesDoAssistente(llm, conversaRepository, equipe, limiteRespostas);
+        var barra = PortoesDoAssistente.DaConversa(conversa, agora).Where(e => e.Codigo != PortoesDoAssistente.Situacao)
+            .Concat(await portoes.DaLojaAsync(empresaId, configuracao, conversa, ct))
+            .Concat(PortoesDoAssistente.DaPessoa(cliente))
+            .Append(await portoes.DoLimiteAsync(empresaId, conversa.Id, agora, ct))
+            .Append(await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agora, ct))
+            .FirstOrDefault(e => e.Barra);
+        if (barra is not null)
+        {
+            logger.LogInformation("Agente: conversa {ConversaId} segue com a equipe, sem retomada ({Portao}).", conversa.Id, barra.Codigo);
+            // A marca evita a varredura reavaliar a mesma mensagem a cada passada; a próxima do cliente abre outra chance.
+            conversa.DispensarRetomadaPorTempo(entrada.Id);
+            await unitOfWork.CommitAsync();
+            return null;
+        }
+
+        var motivoAnterior = conversa.MotivoEscalada;
+        conversa.RetomarPorTempo(entrada.Id);
+        await conversaRepository.AddMensagemAsync(
+            Mensagem.Saida(empresaId, conversa.Id, AutorMensagem.Sistema, agora, TipoConteudoMensagem.Texto,
+                RetomadaDoAssistente.Nota(prazo, motivoAnterior)),
+            ct);
+        await unitOfWork.CommitAsync();
+        // Warning: produção só grava de Warning para cima, e a retomada precisa aparecer no log.
+        logger.LogWarning("Agente: conversa {ConversaId} retomada pelo Assistente após {Segundos} s sem resposta da equipe.",
+            conversa.Id, prazo.TotalSeconds);
+        return entrada;
     }
 
     // A correção e cada efeito disputam a mesma linha. O LLM roda fora da transação;

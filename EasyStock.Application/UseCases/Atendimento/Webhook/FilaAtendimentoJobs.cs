@@ -11,8 +11,9 @@ public static class FilaAtendimentoNomes
 /// <summary>
 /// Enfileirado pelo webhook (S03/S05) para o agente (S06) responder fora da requisição. Consumido por
 /// <c>AtendimentoFilaTurnoAgenteBackgroundService</c> (Api), que chama <c>ProcessarTurnoAgenteUseCase</c>.
+/// <see cref="Retomada"/> (#3068): turno da varredura de conversa parada com a equipe; o turno decide se retoma.
 /// </summary>
-public sealed record ProcessarTurnoAgenteJob(Guid EmpresaId, Guid ConversaId);
+public sealed record ProcessarTurnoAgenteJob(Guid EmpresaId, Guid ConversaId, bool Retomada = false);
 
 /// <summary>Enfileirado pelo webhook (S03) para <c>ArmazenadorMidiaWhatsApp</c> (S02) baixar a mídia fora da requisição.</summary>
 public sealed record ArmazenarMidiaWhatsAppJob(Guid EmpresaId, Guid ConversaId, string Wamid, string MediaId);
