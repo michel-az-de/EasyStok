@@ -37,6 +37,7 @@ const EXCECOES = new Map([
   ['prova-2395-jornada-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; altera a jornada de teste'],
   ['prova-2395-mensagem-navegador.mjs', 'opt-in: Playwright, Vite e fixture R4 com API/PostgreSQL reais; envia mensagens ao transporte de teste'],
   ['prova-r12-cardapio-cliente.mjs', 'prova velha em camadas (#2701): Dinheiro na entrega (#1998), frase depois do link (#1679) e o chip Pix que virou o link do MP (#1943); reescrever o cenário 2'],
+  ['prova-3076-cadastro-pedido-navegador.mjs', 'opt-in: Playwright e API local semeada (SEED_DEMO_DATA, vitrine e cardápio); grava clientes e rascunho de teste'],
   ['prova-producao-ia-navegador.mjs', 'prova velha em camadas (#2701): pelo Vite do script cai no nome "Editar receita de …" (#2242) e depois no Cadastrar insumo; chama a API em 5245 e grava evidência em builds/ do checkout'],
 ])
 
