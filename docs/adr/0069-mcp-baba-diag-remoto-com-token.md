@@ -37,8 +37,9 @@
 4. **Acesso ao host continua pelo `gate.sh`.** O container faz SSH para `baba-mcp` no host com uma
    chave própria, fora da imagem, em `/opt/stacks/mcp/ssh` (dono felipe, uid 1000 como o usuário do
    container, 600, montada só leitura). A linha no `authorized_keys` leva
-   `from="172.16.8.0/24",command="/opt/baba-mcp/gate.sh --sem-banco",restrict`. O modo `--sem-banco`
-   recusa o `psql_ro`: a chave do container só alcança `logs`, `containers` e `deploy_historico`. Sem
+   `from="172.16.8.0/24",command="/opt/baba-mcp/gate.sh --sem-banco",restrict`. A allowlist do
+   `gate.sh` inclui `psql_ro` (usado pelo `baba-db` local); o modo `--sem-banco` o recusa com saída 64,
+   e a chave do container só alcança `logs`, `containers` e `deploy_historico`. Sem
    `docker.sock`, sem acesso ao banco, sem grupo docker. `known_hosts` fixo, montado junto.
 5. **Rede própria.** O `ez-mcp` fica só numa rede `mcp`, compartilhada com o Caddy, e não entra na
    `edge`. Sem acesso lateral a `shared-postgres`, `ez-redis` e à porta interna do `ez-api`. A saúde
@@ -75,7 +76,7 @@
 | Risco | Tratamento |
 |---|---|
 | Token vazado | só leitura de diagnóstico, validade de 90 dias, revogação sem reinício, auditoria por pessoa |
-| Furo no servidor HTTP | sem `docker.sock`, sem banco, rede própria; o único caminho ao host é o `gate.sh` com allowlist |
+| Furo no servidor HTTP | sem `docker.sock`, sem banco, rede própria; o único caminho ao host é o `gate.sh` em modo `--sem-banco` (sem `psql_ro`) |
 | Chave SSH do container | `from=` preso à subnet, `command=` no gate, `restrict`; segredo fora da imagem |
 | Varredura do endpoint | 401 sem detalhe, limite por token e por IP, Host e Origin validados |
 | Identidade por pessoa no SSH some | a chave do container é uma só; quem chamou vem do token e fica na auditoria |

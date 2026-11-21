@@ -60,7 +60,9 @@ exec 9>/tmp/easystok-deploy.lock
 flock -n 9 || { echo "ERRO: outro deploy em andamento (trava /tmp/easystok-deploy.lock)" >&2; exit 3; }
 
 SRC="$BUILD_ROOT/easystok-mcp-$SHA"
-rm -rf "$SRC"; mkdir -p "$SRC"; tar -x -C "$SRC"
+rm -rf "$SRC"; mkdir -p "$SRC"
+# fonte com umask 022: com o 077 do COMUM, src/diag sai 700 root na imagem e o uid node nao le (visto em 21/11)
+(umask 022; tar -x -C "$SRC")
 
 echo "==> [1/5] rede $REDE"
 docker network inspect "$REDE" >/dev/null 2>&1 || docker network create --driver bridge --subnet "$SUBNET" --gateway "$GW" "$REDE" >/dev/null
