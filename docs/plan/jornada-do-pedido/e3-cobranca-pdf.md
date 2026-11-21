@@ -2,7 +2,7 @@
 
 - Data: 2026-11-20
 - Tier: baixo (sem migração, sem auth, sem `Program.cs`, Dockerfile ou `.csproj`)
-- Decisões do Felipe (2026-11-20): produção usa WAHA (`sendFile`); o comprovante PDF substitui o canhoto em imagem; o link do PDF é assinado e expira, porque o PDF leva a chave Pix da loja.
+- Decisões do Felipe (2026-11-20): produção usa WAHA (`sendFile`); o comprovante PDF substitui o canhoto em imagem; o link do PDF é público com nome aleatório, como o canhoto (o link assinado local dava 404, #3000).
 
 ## 1. Problema
 
