@@ -9,6 +9,15 @@ agente gera, vê ou cola estes segredos. Rode de cima para baixo, no PowerShell 
 | Conta da VPS | `ez-backup-vps@easystok-backup.iam.gserviceaccount.com` |
 | Conta da estação | `ez-backup-estacao@easystok-backup.iam.gserviceaccount.com` |
 
+## 0. Libere a criação de chave no projeto
+
+A organização FMA aplica a política herdada `iam.managed.disableServiceAccountKeyCreation`. Com ela
+ativa, o console recusa criar a chave do passo 1. Só quem tem o papel **Administrador de políticas
+da organização** pode abrir uma exceção, de preferência só no projeto `easystok-backup`: **IAM e
+administrador > Políticas da organização**, essa política, **Gerenciar política**. Sem a exceção, o
+desenho com conta de serviço não anda. Uma alternativa (OAuth, por exemplo) é decisão nova, tomada
+antes de seguir.
+
 ## 1. Gere as 2 chaves JSON
 
 No console do Google Cloud, projeto `easystok-backup`: **IAM e administrador > Contas de serviço**.
@@ -24,20 +33,31 @@ ssh hostinger 'install -d -m 700 ~/.config/easystok-backup'
 scp $HOME\Downloads\sa-vps.json hostinger:.config/easystok-backup/sa.json
 ```
 ```powershell
-ssh hostinger 'chmod 600 ~/.config/easystok-backup/sa.json && printf "[ezdrive]\ntype = drive\nscope = drive\nservice_account_file = /home/felipe/.config/easystok-backup/sa.json\nteam_drive = 0AOtKvTkSaRWCUk9PVA\n" > ~/.config/easystok-backup/rclone.conf && chmod 600 ~/.config/easystok-backup/rclone.conf'
+ssh hostinger 'chmod 600 ~/.config/easystok-backup/sa.json'
+```
+
+O `rclone.conf` da VPS **já existe**, com os remotos `[gdrive]` e `[gdrive-crypt]` do backup antigo,
+e é a única cópia da senha do crypt. Nunca use `>` nele. O comando abaixo guarda uma cópia datada,
+acrescenta o `[ezdrive]` só se ele não existir e lista os remotos. A saída precisa mostrar
+`[gdrive]`, `[gdrive-crypt]` e `[ezdrive]`.
+
+```powershell
+ssh hostinger 'f=~/.config/easystok-backup/rclone.conf; [ -f $f ] && cp -p $f $f.antes-$(date +%Y%m%d-%H%M%S); grep -q "^\[ezdrive\]" $f 2>/dev/null || printf "\n[ezdrive]\ntype = drive\nscope = drive\nservice_account_file = /home/felipe/.config/easystok-backup/sa.json\nteam_drive = 0AOtKvTkSaRWCUk9PVA\n" >> $f; chmod 600 $f; grep -n "^\[" $f'
 ```
 
 Senha do repositório restic: gere no cofre de senhas (32 caracteres ou mais) e cole no prompt. Ela
 não aparece na tela. Anote também em papel guardado fora do escritório.
 
 ```powershell
-ssh -t hostinger "umask 077; read -rs -p 'senha: ' s; printf '%s\n' `"`$s`" > ~/.config/easystok-backup/restic.senha; unset s; echo"
+ssh -t hostinger "f=~/.config/easystok-backup/restic.senha; [ -e `$f ] && { echo 'restic.senha ja existe: nada feito'; exit 1; }; umask 077; read -rs -p 'senha: ' s; printf '%s\n' `"`$s`" > `$f; unset s; echo"
 ```
 
-## 3. Linger (pede a senha do sudo)
+## 3. Linger
+
+Já ligado na VPS desde 2026-11-20 (`Linger=yes`). Não precisa de sudo. Para conferir ou religar:
 
 ```powershell
-ssh -t hostinger 'sudo loginctl enable-linger felipe'
+ssh hostinger 'loginctl enable-linger; loginctl show-user felipe -p Linger'
 ```
 
 ## 4. Instale na VPS e tire o primeiro snapshot
@@ -57,7 +77,7 @@ ssh hostinger 'systemctl --user start easystok-backup.service; cat ~/backup-rest
 $d = "$env:LOCALAPPDATA\easystok-backup"; New-Item -ItemType Directory -Force $d | Out-Null; Move-Item $HOME\Downloads\sa-estacao.json "$d\sa.json"
 ```
 ```powershell
-$d = "$env:LOCALAPPDATA\easystok-backup"; "[ezdrive]`ntype = drive`nscope = drive`nservice_account_file = $($d -replace '\\','/')/sa.json`nteam_drive = 0AOtKvTkSaRWCUk9PVA`n" | Set-Content -NoNewline "$d\rclone.conf"
+$d = "$env:LOCALAPPDATA\easystok-backup"; $f = "$d\rclone.conf"; if (Test-Path $f) { Copy-Item $f "$f.antes-$(Get-Date -Format yyyyMMdd-HHmmss)" }; if (-not ((Test-Path $f) -and (Select-String -Quiet '^\[ezdrive\]' $f))) { "`n[ezdrive]`ntype = drive`nscope = drive`nservice_account_file = $($d -replace '\\','/')/sa.json`nteam_drive = 0AOtKvTkSaRWCUk9PVA`n" | Add-Content -NoNewline $f }; Select-String '^\[' $f
 ```
 ```powershell
 pwsh scripts/backup/estacao/guardar-senha.ps1
@@ -71,6 +91,7 @@ pwsh scripts/backup/estacao/puxar.ps1
 
 ## 6. Limpe e avise
 
-Apague `sa-vps.json` de Downloads e esvazie a lixeira. Copie para o cofre os valores de
+Apague `sa-vps.json` de Downloads e esvazie a lixeira. As cópias `rclone.conf.antes-*` têm segredo:
+apague só depois de o backup novo estar provado e de a senha do crypt antigo estar no cofre. Copie para o cofre os valores de
 `EZ_CRYPTO_KEK_ID`, `EZ_CRYPTO_KEK` e, se houver, os `_ANTERIOR`. Depois avise o agente, que confere
 sem ler segredo: o `estado-diario` e o `restic snapshots` pela estação.

@@ -76,7 +76,8 @@ caso('o salvar trava pelos três limites, e o botão diz o motivo', () => {
 })
 
 caso('a dica de variáveis do Texto continua à vista', () => {
-  assert.match(respostas, /rotulo="Texto"[\s\S]{0,200}dica=\{VARIAVEIS_TEXTO\}/)
+  // #3010: a dica virou selos legíveis, logo abaixo do campo.
+  assert.match(respostas, /rotulo="Texto"[\s\S]{0,200}<SelosDeVariaveis variaveis=\{VARIAVEIS_DA_API\} \/>/)
 })
 
 caso('cabeçalho Notas sem o que abrir é título (h3), sem aria-disabled nem botão inerte', () => {

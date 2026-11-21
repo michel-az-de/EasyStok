@@ -66,6 +66,8 @@ export function FluxoExpandido({
 
     const aoTecla = (evento) => {
       if (evento.key === 'Escape') {
+        // #3011: Esc de um ModalConfirmar aberto por cima (irmão deste diálogo) é dele, não fecha o Expandir.
+        if (!dialogo.contains(evento.target)) return
         evento.preventDefault()
         evento.stopPropagation()
         if (fecharLegenda(dialogo)) return

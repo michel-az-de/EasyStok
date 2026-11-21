@@ -147,22 +147,12 @@
 .appTrilho { flex-direction: row; }
 .appTrilho > .palco { flex: 1; min-width: 0; }
 .appTrilho > .palcoTres { padding-left: 0; }
-/* #1872: item, ativo, início, espaço e avatar vêm do CSS único do trilho (`componentes/Trilho.module.css`),
-   o mesmo dos módulos; aqui ficam só z-index, contadores e o que é do Balcão. */
-.trilho {
-  composes: trilho from '../componentes/Trilho.module.css';
-  padding-top: calc(var(--e-3) + env(safe-area-inset-top, 0px));
-  position: relative; z-index: 20;
-  overflow-y: auto; overflow-x: hidden;
-  /* Reserva espaço para a barra sem comprimir os alvos de toque. */
-  padding-inline: 0;
-}
-.inicioTrilho { composes: inicio from '../componentes/Trilho.module.css'; }
+/* #1872, #3004: o desenho do trilho é de `features/hall/TrilhoDoConsole` (CSS em `componentes/Trilho.module.css`); aqui ficam só
+   os itens que o Balcão desenha por conta própria, contadores e o estado da loja. */
 .itemTrilho { composes: item from '../componentes/Trilho.module.css'; }
 .avisosTrilho { composes: filhos from '../componentes/Trilho.module.css'; }
 /* #2762: o hover do trilho responde por cor (fundo e tinta, em `Trilho.module.css`); o ícone não sobe nem
    cresce, porque transformação é do arraste e da camada, e no toque o hover grudava. */
-.itemAtual { composes: ativo from '../componentes/Trilho.module.css'; cursor: default; }
 .itemTrilho[aria-pressed='true'] { color: var(--tinta); background: var(--preenchimento-forte); }
 /* #2762: o pulso do selo roda 3 vezes ao surgir a pendência e para; laço infinito distraía o atendimento. */
 @keyframes seloPulso {
@@ -174,7 +164,6 @@
    painel abre para a direita em vez de para baixo. */
 .sinoTrilho { composes: filhos from '../componentes/Trilho.module.css'; position: relative; }
 .sinoTrilho section[aria-label='Lembretes'] { top: 0; left: calc(100% + 10px); right: auto; transform-origin: top left; }
-.espacoTrilho { composes: espaco from '../componentes/Trilho.module.css'; }
 /* Controles compactos do Balcão. */
 @media (max-width: 759px) {
   .topo { flex-wrap: nowrap; }
@@ -219,8 +208,6 @@
 .tituloColuna { min-height: var(--altura-regiao); gap: 10px; }
 .tituloColuna > svg { color: var(--tinta-3); }
 /* 15: divisor fino antes do Simular e quem atende no pé do trilho. */
-.espacoTrilho { display: flex; align-items: flex-end; justify-content: center; }
-.espacoTrilho::after { content: none; }
 .atendente { composes: avatar from '../componentes/Trilho.module.css'; }
 /* 12: no celular, o painel que entra aparece com esmaecimento. #2762: o alvo é o filho real do painel
    (o invólucro ativo é `display: contents` e não gera caixa, então a animação nele era morta); só a

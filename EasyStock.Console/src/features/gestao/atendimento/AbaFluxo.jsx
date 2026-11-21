@@ -3,6 +3,7 @@ import { Botao } from '../../../componentes/Botao'
 import { BotaoIcone } from '../../../componentes/BotaoIcone'
 import { CampoArea, CampoTexto } from '../../../componentes/Campo'
 import { Icone } from '../../../componentes/Icone'
+import { ModalConfirmar } from '../../../componentes/ModalConfirmar'
 import {
   ROTEIRO_ETAPAS_MAXIMO, ROTEIRO_INSTRUCAO_MAXIMO, ROTEIRO_NOME_MAXIMO, desligadasDoFluxo, erroDoRoteiro, mesmoRoteiro, moverEtapa,
 } from '../../../dominio/painelAssistente'
@@ -84,9 +85,16 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
     setFoco({ ids: null })
   }
 
+  // #3011: desligar ferramenta e voltar ao roteiro padrão perguntam no ModalConfirmar, não no diálogo nativo.
+  const [pergunta, setPergunta] = useState(null)
+  function mudarFerramenta(ferramenta) {
+    if (ferramenta.ligada) setPergunta({ tipo: 'ferramenta', ferramenta })
+    else gravarFerramenta(ferramenta, fluxo, painel)
+  }
+
   function alternarNo(dados) {
     // A chave liga ou desliga sem escolher o nó nem tirar o foco dela.
-    if (dados.tipo === 'ferramenta') alternarFerramenta({ nome: dados.nome, ligada: dados.ligada }, fluxo, painel)
+    if (dados.tipo === 'ferramenta') mudarFerramenta({ nome: dados.nome, ligada: dados.ligada })
     else if (dados.tipo === 'roteiro') setRoteiro(roteiro.map((e, i) => (i === dados.indice ? { ...e, ativo: !e.ativo } : e)))
   }
 
@@ -109,6 +117,7 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
         id={selecionado} fluxo={fluxo} podeEditar={podeEditar} painel={painel}
         roteiro={roteiro} setRoteiro={setRoteiro} roteiroMudou={roteiroMudou} aoSelecionar={selecionar}
         observacoes={observacoes} setObservacoes={setObservacoes}
+        aoMudarFerramenta={mudarFerramenta} aoVoltarAoPadrao={() => setPergunta({ tipo: 'roteiro' })}
       />
     </>
   )
@@ -140,6 +149,14 @@ export function AbaFluxo({ fluxo, podeEditar, painel }) {
           ajuste={ajuste} aviso={aviso}
         />
       )}
+      {pergunta?.tipo === 'ferramenta' && (
+        <ModalConfirmar titulo="Desligar a ferramenta?" descricao={perguntaDeDesligar(pergunta.ferramenta)} rotuloConfirmar="Desligar ferramenta"
+          aoConfirmar={() => gravarFerramenta(pergunta.ferramenta, fluxo, painel)} aoFechar={() => setPergunta(null)} />
+      )}
+      {pergunta?.tipo === 'roteiro' && (
+        <ModalConfirmar titulo="Voltar ao roteiro padrão?" descricao="Voltar ao roteiro padrão do EasyStok? As etapas que a loja escreveu saem do roteiro." rotuloConfirmar="Voltar ao padrão"
+          aoConfirmar={() => painel.salvar('roteiro', { roteiro: [] })} aoFechar={() => setPergunta(null)} />
+      )}
     </div>
   )
 }
@@ -169,7 +186,7 @@ function rolarAte(el) {
   raiz.scrollTo({ top: destino, behavior: suave ? 'smooth' : 'auto' })
 }
 
-function Detalhe({ id, fluxo, podeEditar, painel, roteiro, setRoteiro, roteiroMudou, aoSelecionar, observacoes, setObservacoes }) {
+function Detalhe({ id, fluxo, podeEditar, painel, roteiro, setRoteiro, roteiroMudou, aoSelecionar, observacoes, setObservacoes, aoMudarFerramenta, aoVoltarAoPadrao }) {
   if (id === 'entrada') {
     return <Bloco titulo="Mensagem do cliente chega">
       <p>Cada mensagem nova no WhatsApp abre um turno. O Assistente passa pelas etapas em ordem e para na primeira que barra.</p>
@@ -220,13 +237,13 @@ function Detalhe({ id, fluxo, podeEditar, painel, roteiro, setRoteiro, roteiroMu
   if (id === 'prompt') return <DetalhePrompt fluxo={fluxo} podeEditar={podeEditar} painel={painel} observacoes={observacoes} setObservacoes={setObservacoes} />
   if (id.startsWith('ferramenta:')) {
     const f = fluxo.ferramentas.find((x) => `ferramenta:${x.nome}` === id)
-    return f ? <DetalheFerramenta ferramenta={f} fluxo={fluxo} podeEditar={podeEditar} painel={painel} /> : null
+    return f ? <DetalheFerramenta ferramenta={f} podeEditar={podeEditar} painel={painel} aoMudarFerramenta={aoMudarFerramenta} /> : null
   }
   if (id.startsWith('roteiro:')) {
     const indice = Number(id.slice('roteiro:'.length))
     if (!roteiro[indice]) return null
     return <DetalheRoteiro indice={indice} roteiro={roteiro} setRoteiro={setRoteiro} roteiroMudou={roteiroMudou}
-      fluxo={fluxo} podeEditar={podeEditar} painel={painel} aoSelecionar={aoSelecionar} />
+      fluxo={fluxo} podeEditar={podeEditar} painel={painel} aoSelecionar={aoSelecionar} aoVoltarAoPadrao={aoVoltarAoPadrao} />
   }
   return null
 }
@@ -267,17 +284,17 @@ function DetalhePrompt({ fluxo, podeEditar, painel, observacoes, setObservacoes 
   )
 }
 
-// Liga ou desliga uma ferramenta da loja: pergunta antes de desligar e grava só a lista de desligadas.
-function alternarFerramenta(ferramenta, fluxo, painel) {
+// Liga ou desliga uma ferramenta da loja e grava só a lista de desligadas. Desligar pergunta antes (#3011).
+const perguntaDeDesligar = (ferramenta) => `Desligar ${ferramenta.nome}? O Assistente deixa de usar em todas as conversas e passa à equipe o que dependia dela.`
+function gravarFerramenta(ferramenta, fluxo, painel) {
   const ligar = !ferramenta.ligada
-  if (!ligar && !window.confirm(`Desligar ${ferramenta.nome}? O Assistente deixa de usar em todas as conversas e passa à equipe o que dependia dela.`)) return
   const desligadas = new Set(desligadasDoFluxo(fluxo.ferramentas))
   if (ligar) desligadas.delete(ferramenta.nome); else desligadas.add(ferramenta.nome)
   painel.salvar('ferramentas', { ferramentasDesligadas: [...desligadas].sort() })
 }
 
-function DetalheFerramenta({ ferramenta, fluxo, podeEditar, painel }) {
-  const alternar = () => alternarFerramenta(ferramenta, fluxo, painel)
+function DetalheFerramenta({ ferramenta, podeEditar, painel, aoMudarFerramenta }) {
+  const alternar = () => aoMudarFerramenta(ferramenta)
   return (
     <Bloco titulo={rotuloDaFerramenta(ferramenta.nome)} icone={ferramenta.travada ? 'lock' : null}>
       {ferramenta.descricao && <p>{ferramenta.descricao}</p>}
@@ -296,7 +313,7 @@ function DetalheFerramenta({ ferramenta, fluxo, podeEditar, painel }) {
   )
 }
 
-function DetalheRoteiro({ indice, roteiro, setRoteiro, roteiroMudou, fluxo, podeEditar, painel, aoSelecionar }) {
+function DetalheRoteiro({ indice, roteiro, setRoteiro, roteiroMudou, fluxo, podeEditar, painel, aoSelecionar, aoVoltarAoPadrao }) {
   const etapa = roteiro[indice]
   const erro = useMemo(() => erroDoRoteiro(roteiro), [roteiro])
   const mudar = (campos) => setRoteiro(roteiro.map((e, i) => (i === indice ? { ...e, ...campos } : e)))
@@ -335,7 +352,7 @@ function DetalheRoteiro({ indice, roteiro, setRoteiro, roteiroMudou, fluxo, pode
               </>
             )}
             {fluxo.roteiroPersonalizado && !roteiroMudou && (
-              <Botao variante="secundario" onClick={() => { if (window.confirm('Voltar ao roteiro padrão do EasyStok?')) painel.salvar('roteiro', { roteiro: [] }) }}>Voltar ao padrão</Botao>
+              <Botao variante="secundario" onClick={aoVoltarAoPadrao}>Voltar ao padrão</Botao>
             )}
             <Retorno gravacao={painel.gravacao} qual="roteiro" />
           </div>

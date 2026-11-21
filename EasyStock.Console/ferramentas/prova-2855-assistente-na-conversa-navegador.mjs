@@ -80,7 +80,12 @@ const pagina = await contexto.newPage()
 pagina.setDefaultTimeout(10000)
 pagina.on('pageerror', e => erros.push(e.message))
 const perguntas = []
-pagina.on('dialog', d => { perguntas.push(d.message()); d.accept() })
+// #3011: a pergunta é o ModalConfirmar (o diálogo de cima), não mais o window.confirm: lê o texto e clica no verbo.
+const confirmar = async (verbo) => {
+  const dialogo = pagina.locator('dialog[open]').last()
+  perguntas.push(await dialogo.locator('p').first().textContent())
+  await dialogo.getByRole('button', { name: verbo, exact: true }).click()
+}
 const base = `${process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'}/.build/2855/assistente-na-conversa/index.html`
 try {
   await pagina.goto(base)
@@ -177,6 +182,7 @@ try {
   await pagina.screenshot({ path: resolve(pasta, 'fluxo-ferramentas-1280.png') })
   const marca = pedidos.length
   await modal.locator('[data-no="ferramenta:consultar_pedido"]').getByRole('switch').click()
+  await confirmar('Desligar ferramenta')
   await modal.getByText('21 de 22 ligadas').first().waitFor()
   assert.equal(perguntas.length, 1, 'pergunta antes de desligar')
   assert.deepEqual(pedidos.slice(marca).filter(p => p.metodo === 'PUT').map(p => p.corpo), [{ ferramentasDesligadas: ['consultar_pedido'] }])

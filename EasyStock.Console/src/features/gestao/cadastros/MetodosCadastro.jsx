@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { ativarMetodoCadastro, useListaCadastros } from '../../../aplicacao/cadastros'
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { Botao } from '../../../componentes/Botao'
+import { EsqueletoDeLista } from '../../../componentes/Esqueleto'
 import { Modal } from '../../../componentes/Modal'
 import { Vazio } from '../../../componentes/Vazio'
 import css from './cadastros.module.css'
@@ -28,7 +29,8 @@ export function MetodosCadastro({ contexto }) {
     <header className={css.cabecalho}><div><h2>Formas de pagamento</h2><p>Escolha os meios aceitos pela loja.</p></div><Botao icone="refresh-cw" onClick={consulta.recarregar} disabled={consulta.carregando}>Atualizar</Botao></header>
     {sucesso && <p className={css.sucesso} role="status">{sucesso}</p>}
     {consulta.erro && <div className={css.erro} role="alert"><p>{consulta.erro}</p><Botao onClick={consulta.recarregar}>Tentar de novo</Botao></div>}
-    {consulta.carregando ? <Vazio titulo="Carregando formas de pagamento">Aguarde um instante.</Vazio> : !consulta.erro && consulta.itens.length === 0 ? <Vazio titulo="Nenhuma forma de pagamento cadastrada">A Casa ainda não tem formas de pagamento para ativar.</Vazio> : <ul className={css.cartoes}>{consulta.itens.map(m => <li key={m.codigo}>
+    {/* #3016: na recarga a lista fica (aria-busy); o esqueleto é só da primeira carga. */}
+    {consulta.carregando && consulta.itens.length === 0 ? <EsqueletoDeLista linhas={3}>Carregando formas de pagamento…</EsqueletoDeLista> : !consulta.erro && consulta.itens.length === 0 ? <Vazio titulo="Nenhuma forma de pagamento cadastrada">A Casa ainda não tem formas de pagamento para ativar.</Vazio> : <ul className={css.cartoes} aria-busy={consulta.carregando}>{consulta.itens.map(m => <li key={m.codigo}>
       <div><h3>{m.nome}</h3><span className={css.situacao}>{m.ativo ? 'Ativa' : 'Inativa'}</span></div>
       {acoes.gerenciarCadastrosFinanceiros && <Botao aria-label={`${m.ativo ? 'Inativar' : 'Ativar'} ${m.nome}`} onClick={() => { falhar(null); escolher({ metodo: m, ativo: !m.ativo, requestId: crypto.randomUUID() }) }}>{m.ativo ? 'Inativar' : 'Ativar'}</Botao>}
     </li>)}</ul>}

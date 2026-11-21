@@ -105,6 +105,9 @@ const ICONE_DO_PASSO = {
   embalado: 'package', entrega: 'moto', entregue: 'house',
 }
 
+// #3009: selo de dinheiro ("Falta R$ 68,00") do contexto da linha: ele passa à frente na fileira visível.
+export const ehSeloDeDinheiro = (item) => /R\$/.test(item?.texto ?? '')
+
 export const MARCA_EM_MONTAGEM = { texto: 'Em montagem', icone: 'shopping-cart', tom: 'neutro' }
 
 // Passo do pedido no contexto da linha (com o sinal verde do pagamento, RN-25,

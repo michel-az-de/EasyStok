@@ -69,7 +69,7 @@ try {
     await grade.getByRole('link', { name: 'Clientes', exact: true }).click()
     await page.getByRole('row').filter({ hasText: 'Ana Paula' }).waitFor()
     const trilho = page.getByRole('navigation', { name: 'Módulos da loja', exact: true })
-    assert.equal(await trilho.getByRole('link', { name: 'Clientes', exact: true }).getAttribute('aria-current'), 'true')
+    assert.equal(await trilho.getByRole('link', { name: 'Clientes', exact: true }).getAttribute('aria-current'), 'page')
     assert.equal(await hrefDe(trilho.getByRole('link', { name: 'Pedidos', exact: true })), '#/m/cadastros/pedidos')
 
     // 3. Dentro de Cadastros a busca fica: vai a Pedidos e volta a Clientes com o mesmo texto.

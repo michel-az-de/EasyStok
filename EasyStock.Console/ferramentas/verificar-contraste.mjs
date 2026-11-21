@@ -32,6 +32,8 @@ const superficies = ['fundo', 'papel', 'elevado', 'creme', 'marca-claro', 'coman
 for (const texto of ['tinta', 'tinta-2', 'tinta-3', 'marca', 'sucesso', 'alerta', 'erro', 'info', 'c-whatsapp', 'c-instagram', 'c-messenger', 'c-site', 'c-email', 'c-sms']) {
   for (const fundo of superficies) conferir(texto, fundo)
 }
+// #3009: o placeholder dos campos usa --tinta-3 (base.css) sobre o fundo do campo em repouso e com foco.
+for (const fundo of ['preenchimento', 'preenchimento-forte']) conferir('tinta-3', fundo)
 for (const estado of ['sucesso', 'alerta', 'erro', 'info', 'entregue']) conferir(estado, `${estado}-pastel`)
 for (const pastel of ['sucesso-pastel', 'alerta-pastel', 'erro-pastel', 'info-pastel']) {
   for (const texto of ['tinta', 'tinta-2', 'tinta-3', 'marca-forte']) conferir(texto, pastel)

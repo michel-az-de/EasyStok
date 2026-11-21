@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { AlcaLargura } from '../componentes/AlcaLargura'
 import { MenuDaConta } from '../componentes/MenuDaConta'
 import { Marca } from '../componentes/Marca'
-import { InterruptorTema } from '../componentes/InterruptorTema'
 import { trocarTema, useTema } from '../hooks/useTema'
 import { balcaoComCardapio, fichaComCardapio } from '../hooks/larguras'
 import { BarraDeAbas } from '../componentes/BarraDeAbas'
@@ -26,13 +25,15 @@ import { CompartilharComanda } from '../features/atendimento/CompartilharComanda
 import { ChamarClientes } from '../features/atendimento/ChamarClientes'
 import { PainelFicha } from '../features/ficha-cliente/PainelFicha'
 import { MesaDeNotas } from '../features/ficha-cliente/MesaDeNotas'
+import { simularEscondido } from '../aplicacao/simularEscondido'
+import { TrilhoDoConsole } from '../features/hall/TrilhoDoConsole'
 import { ResumoEntregas } from '../features/entregas/ResumoEntregas'
 import { Sininho } from '../features/lembretes/Sininho'
 import { MenuDeAcoes } from '../componentes/MenuDeAcoes'
 import { Popover } from '../componentes/Popover'
 import { FONTE_API } from '../infra/fonteDados'
 import { HASH_HALL, HASH_MODULO_COZINHA } from '../dominio/rota'
-import { NOME_INICIO, NOME_RESPOSTAS_AUTOMATICAS, atalhosDiretos, moduloPorId } from '../dominio/modulos'
+import { NOME_INICIO, NOME_RESPOSTAS_AUTOMATICAS, moduloPorId } from '../dominio/modulos'
 import { IconeDoModulo } from '../componentes/IconeDoModulo'
 import { JANELA_COZINHA } from '../dominio/janelaAvulsa'
 import { AvisoDaAcaoApi } from './FaixaApi'
@@ -204,7 +205,7 @@ function Cabecalho({
             <Botao variante="texto" icone="ajuda" aria-haspopup="dialog" onClick={aoAbrirAjuda}>Ajuda</Botao>
             {/* #1242 (D1): no tablet largo o Sair mora no avatar, como no trilho do desktop. */}
             <MenuDaConta nome={atendente} detalhe={conta?.casa} aoSair={aoSair} lado="abaixo"
-              rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}><InterruptorTema /></MenuDaConta></>
+              rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}/></>
         )}
       </div>
     </header>
@@ -238,20 +239,17 @@ function DisposicaoConversas({ larguras, padrao, aoRedimensionar }) {
   </span>
 }
 
+// #3004: o trilho é o `TrilhoDoConsole`, o mesmo do Início e dos módulos. Aqui só o que o Balcão desenha por conta
+// própria (estado da loja, Entregas com resumo, Lembretes, Disposição, Simular), entregue por id.
 function Trilho({
   regras, aberta, aoAlternarLoja, aoAbrirAutomacoes, aoAbrirGestao, aoAbrirEntregas, simulando, aoAlternarSimulacoes,
   atendente, aoAbrirAjuda, disposicao,
 }) {
-  const { permite, notificacoes, busca, aoSair, sessaoPersistente, conta, acoes } = useAcessoModulos()
-  return (
-    <nav className={css.trilho} aria-label="Navegação">
-      <a className={css.inicioTrilho} href={HASH_HALL} aria-label={`Ir para o ${NOME_INICIO}`} title={NOME_INICIO}>
-        <Marca compacta /><span>{NOME_INICIO}</span>
-      </a>
-      <h1 className="sr">Casa da Baba</h1>
-      {/* Estado da loja logo abaixo da marca: é o que vale para tudo embaixo.
-          Mesmo texto e mesmo nome do controle do topo da main ("Loja aberta"
-          ou "Loja fechada"), que as provas procuram pelo nome exato. */}
+  const { permite, notificacoes, busca } = useAcessoModulos()
+  const itens = {
+    // Estado da loja logo abaixo da marca: é o que vale para tudo embaixo. Mesmo texto e mesmo nome do controle
+    // do topo da main ("Loja aberta" ou "Loja fechada"), que as provas procuram pelo nome exato.
+    loja: (
       <button
         type="button"
         className={`${css.itemTrilho} ${css.lojaTrilho} ${aberta ? css.lojaAberta : css.lojaFechada}`}
@@ -262,60 +260,43 @@ function Trilho({
         <Icone nome={aberta ? 'circle-check' : 'lock'} tamanho={24} />
         <span>{aberta ? 'Loja aberta' : 'Loja fechada'}</span>
       </button>
-      {/* #1870: o mesmo nome e o mesmo ícone do trilho dos módulos; a tela continua sendo o Balcão. */}
-      <span className={`${css.itemTrilho} ${css.itemAtual}`} aria-current="page" title="Atendimento">
-        <IconeDoModulo modulo={MODULO_ATENDIMENTO} />
-        <span>{MODULO_ATENDIMENTO.nome}</span>
-      </span>
-      {/* #2870: a ficha, o histórico e os pedidos do cliente a um clique da conversa, sem passar por Cadastros. */}
-      {atalhosDiretos({ fonteApi: FONTE_API, acoes, permite }).map((atalho) => <a key={atalho.id} className={css.itemTrilho} href={atalho.href} title={atalho.nome}>
-        <IconeDoModulo modulo={atalho.modulo} telaId={atalho.telaId} tamanho={24} />
-        <span>{atalho.nome}</span>
-      </a>)}
-      {/* #2559 (Q11): Cozinha antes de Entregas, como ORDEM_DOS_MODULOS no trilho da gestão. */}
-      {permite('cozinha') && <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
+    ),
+    // #2559 (Q11): Cozinha antes de Entregas, como ORDEM_DOS_MODULOS. No Balcão abre em outra janela.
+    cozinha: (
+      <Botao variante="texto" className={css.itemTrilho} onClick={abrirCozinha} title="Cozinha (abre em outra janela)">
         <IconeDoModulo modulo={MODULO_COZINHA} tamanho={24} />
         <span>Cozinha</span>
-      </Botao>}
-      {permite('entregas') && <ResumoEntregas
-        aoAbrir={aoAbrirEntregas}
-        noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho}
-      />}
+      </Botao>
+    ),
+    entregas: permite('entregas') && <ResumoEntregas aoAbrir={aoAbrirEntregas} noTrilho classeItem={css.itemTrilho} classeSelo={css.seloTrilho} />,
+    respostas: (
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAutomacoes} aria-label={nomeDasAutomaticas(regras)} title={NOME_RESPOSTAS_AUTOMATICAS}>
         <IconeDoModulo modulo={MODULO_ATENDIMENTO} telaId="respostas" tamanho={24} />
         <span>{NOME_RESPOSTAS_AUTOMATICAS}</span>
         {regras && <Pilula contagem={contarAtivas(regras)} className={css.contaTrilho} aria-hidden="true" />}
       </Botao>
+    ),
+    gestao: (
       <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirGestao} title="Gestão" aria-haspopup="dialog">
         <Icone nome="painel" tamanho={24} />
         <span>Gestão</span>
       </Botao>
-      {/* #1807: Avisos (sino) e Lembretes (relógio) com ícone e rótulo próprios, cada rótulo
-          dentro do próprio botão. Antes o "Lembretes" vinha de CSS e ficava colado ao sino de
-          Avisos logo abaixo, e quem clicava em Avisos abria Lembretes. */}
+    ),
+    // #1807: Avisos (sino) e Lembretes (relógio) com ícone e rótulo próprios, cada rótulo dentro do próprio botão.
+    lembretes: <>
       <div className={css.avisosTrilho}>{busca}{notificacoes}</div>
       <div className={css.sinoTrilho}><Sininho comRotulo /></div>
-      <Botao variante="texto" className={css.itemTrilho} onClick={aoAbrirAjuda} aria-haspopup="dialog" title="Ajuda">
-        <Icone nome="ajuda" tamanho={24} /><span>Ajuda</span>
+    </>,
+    disposicao,
+    simular: aoAlternarSimulacoes && (
+      <Botao variante="texto" className={css.itemTrilho} aria-pressed={simulando} onClick={aoAlternarSimulacoes} title="Simular (F2)">
+        <Icone nome="flask-conical" tamanho={24} />
+        <span>Simular</span>
       </Botao>
-      {disposicao}
-      <span className={css.espacoTrilho} />
-      {aoAlternarSimulacoes && !simularEscondido() && (
-        <Botao variante="texto" className={css.itemTrilho} aria-pressed={simulando} onClick={aoAlternarSimulacoes} title="Simular (F2)">
-          <Icone nome="flask-conical" tamanho={24} />
-          <span>Simular</span>
-        </Botao>
-      )}
-      {/* #1870: o Sair saiu do rodapé fixo e mora aqui, atrás do avatar, como nos módulos. O tema
-          vem junto: em 1280x720 o trilho tinha 861 px e tema e avatar ficavam abaixo da dobra. */}
-      <div className={css.atendente}>
-        <MenuDaConta nome={atendente} detalhe={conta?.casa} aoSair={aoSair}
-          rotuloSair={sessaoPersistente ? 'Sair deste aparelho' : 'Sair'}>
-          <InterruptorTema />
-        </MenuDaConta>
-      </div>
-    </nav>
-  )
+    ),
+  }
+  return <TrilhoDoConsole onde="balcao" fonteApi={FONTE_API} rotuloNav="Navegação" atendente={atendente} aoAbrirAjuda={aoAbrirAjuda}
+    balcao={{ itens: Object.fromEntries(Object.entries(itens).filter(([, no]) => no)) }} />
 }
 
 function Gaveta({ titulo, aoFechar, children }) {
@@ -348,16 +329,6 @@ function Gaveta({ titulo, aoFechar, children }) {
 // F2 abre e fecha de qualquer lugar da tela. O corpo do painel é vazio de
 // propósito (F7 constrói); aqui só o gatilho e a persistência de "esconder
 // botão" (o painel ainda não tem esse controle, então só a leitura existe).
-const CHAVE_SIMULAR_ESCONDIDO = 'casa-da-baba:simular-escondido'
-
-function simularEscondido() {
-  try {
-    return window.localStorage.getItem(CHAVE_SIMULAR_ESCONDIDO) === '1'
-  } catch {
-    return false
-  }
-}
-
 function BotaoSimular({ ativo, aoAlternar }) {
   if (!aoAlternar || simularEscondido()) return null
   return (

@@ -34,6 +34,9 @@ registerHooks({
 })
 
 const { MODULOS } = await import('../src/dominio/modulos.js')
+const { TETO_ITENS_DO_TRILHO } = await import('../src/dominio/trilhoDoConsole.js')
+const TETO_CONTEUDO = 20 // #1810
+const CONTROLES_DA_CONTA = 1
 const { moduloCongelado } = await import('../src/dominio/congelados.js')
 const { normalizarPreferenciasHall, ordenarPaineisDoHall, moverPainelDoHall, aplicarFocoDoHall } = await import('../src/dominio/preferenciasHall.js')
 const { gravarPreferenciasHall, lerPreferenciasHall } = await import('../src/aplicacao/preferenciasHall.js')
@@ -171,8 +174,13 @@ provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue send
 })
 
 provar('#1810 continua valendo: até 20 controles na primeira vista', () => {
-  const controles = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
-  assert.ok(controles <= 20, `${controles} controles`)
+  // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta: o limite vale para o conteúdo do Início.
+  const controles = (html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '').match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+  assert.ok(controles <= TETO_CONTEUDO, `${controles} controles`)
+  // #3004: a primeira vista inteira soma o conteúdo (<= TETO_CONTEUDO, da #1810), o trilho (<= TETO_ITENS_DO_TRILHO, o mesmo da prova-3004) e o controle da conta. Medido hoje no Início a 1440 px: 33 controles no total (a renderização é estática, igual em qualquer largura).
+  const total = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+  const teto = TETO_CONTEUDO + TETO_ITENS_DO_TRILHO + CONTROLES_DA_CONTA
+  assert.ok(total <= teto, `${total} controles na primeira vista, contando o trilho (teto ${teto})`)
 })
 
 provar('teclado: Espaço pega, Enter abre (Enter fora das teclas de arrasto)', () => {
