@@ -1,0 +1,13 @@
+/* #2783: um editor só para a mensagem automática, em Respostas e em Automações. */
+.editor { display: grid; gap: var(--e-3); padding: var(--e-2) 0; }
+.variaveis { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3); margin: 0; padding: 0; list-style: none; font-size: var(--t-apoio); color: var(--tinta-3); }
+.selo { display: inline-flex; padding: 1px var(--e-2); border-radius: var(--r-pilula); background: var(--elevado); color: var(--tinta-2); font-weight: 600; }
+.rotuloPrevia { margin: 0; font-size: var(--t-apoio); color: var(--tinta-3); }
+.bolha { margin: 0; padding: var(--e-2) var(--e-3); background: var(--marca-claro); color: var(--tinta); border-radius: var(--r-1); border-bottom-right-radius: var(--r-ponta); font-size: var(--t-corpo); white-space: pre-wrap; }
+.previaErro { background: var(--erro-pastel); color: var(--erro); border-radius: var(--r-1); padding: 0 var(--e-1); font-weight: 600; }
+.oculto { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.alerta { margin: 0; font-size: var(--t-apoio); color: var(--alerta); }
+.erro { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-1); background: var(--erro-pastel); color: var(--erro); font-size: var(--t-apoio); }
+.estado { display: block; margin: 0; }
+.acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.toque { min-height: var(--toque); }

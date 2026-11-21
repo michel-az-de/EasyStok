@@ -6,8 +6,9 @@ import { useAcoes, useAtendimento, useCatalogo } from '../../../aplicacao/contex
 import { useAcessoModulos } from '../../../aplicacao/acessoModulos'
 import { automacoesEditaveis, respostasEditaveis } from '../../../dominio/acessoModulos'
 import {
-  VARIAVEIS, VARIAVEIS_DA_API, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica, exemploDaPrevia, previaDoServidor,
+  VARIAVEIS, VARIAVEIS_DA_API, analisarAutomatica, avisoDaAutomaticaDeEntrada, bloqueioDaAutomatica, exemploDaPrevia, previaDoServidor,
 } from '../../../dominio/automacao'
+import { EditorDeAutomatica, SelosDeVariaveis, TextoDaPrevia } from '../../../componentes/EditorDeAutomatica'
 import { plural } from '../../../dominio/formato'
 import { algumPassaDoLimite } from '../../../componentes/limiteDoCampo'
 import { ATALHO_MAXIMO, gerarAtalho, normalizarBusca } from '../../../dominio/respostas'
@@ -25,27 +26,10 @@ const depois = (resultado, fechar) => Promise.resolve(resultado).then((ok) => { 
 const TITULO_MAXIMO = 120
 const TEXTO_MAXIMO = 4096
 
-// #3010: onde se edita, cada variável é um selo com o que ela vira; na prévia e na lista o texto sai preenchido.
-export function SelosDeVariaveis({ variaveis }) {
-  return (
-    <ul className={css.variaveis} aria-label="Variáveis que o texto aceita">
-      {variaveis.map((v) => (
-        <li key={v.chave}><span className={css.selo}>{`{${v.chave}}`}</span> {v.descricao}</li>
-      ))}
-    </ul>
-  )
-}
-
-// `rotuloId` liga a bolha ao rótulo "exemplo"; a chave desconhecida ganha o motivo em texto, não só a cor.
-export function TextoPreenchido({ texto, exemplo, fonteApi, className, rotuloId }) {
-  const partes = previaDoServidor(texto, exemplo, fonteApi ? VARIAVEIS_DA_API : VARIAVEIS)
-  return (
-    <span className={className} role={rotuloId ? 'group' : undefined} aria-labelledby={rotuloId}>
-      {partes.map((p, i) => (p.tipo === 'erro'
-        ? <mark key={i} className={css.previaErro}>{p.texto}<span className={css.oculto}> (variável desconhecida)</span></mark>
-        : <span key={i}>{p.texto}</span>))}
-    </span>
-  )
+// #2783: o editor da automática e as peças da prévia vivem em componentes/EditorDeAutomatica; daqui saem como sempre.
+export { SelosDeVariaveis }
+export function TextoPreenchido({ texto, exemplo, fonteApi, ...resto }) {
+  return <TextoDaPrevia partes={previaDoServidor(texto, exemplo, fonteApi ? VARIAVEIS_DA_API : VARIAVEIS)} {...resto} />
 }
 
 // #2792: o motivo do Salvar pede só o que falta.
@@ -249,12 +233,13 @@ function SecaoRespostas() {
 
 function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
   const { alternarRegra, editarRegra } = useAcoes()
+  const { sincronizacao } = useAtendimento()
   const linhaRef = useRef(null)
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const editando = rascunho !== null
   // #2476 (U8): variável que o EasyStok não preenche sairia escrita para o cliente: não salva nem liga.
-  const bloqueio = fonteApi ? bloqueioDaAutomatica(rascunho ?? regra.texto, editavel) : null
+  const bloqueio = fonteApi && !editando ? bloqueioDaAutomatica(regra.texto, editavel) : null
   const idBloqueio = useId()
   const idExemplo = useId()
   const naoLiga = !regra.ativa && fonteApi && Boolean(bloqueioDaAutomatica(regra.texto))
@@ -270,10 +255,10 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
     return () => cancelAnimationFrame(quadro)
   }, [emFoco])
 
-  function salvar() {
-    if (salvando || !rascunho?.trim() || bloqueio) return
+  // A chave da linha fica parada enquanto o editor grava (o motivo de uma recusa aparece dentro dele).
+  const gravar = (texto) => {
     setSalvando(true)
-    depois(editarRegra(regra.id, { texto: rascunho.trim() }), () => setRascunho(null)).finally(() => setSalvando(false))
+    return Promise.resolve(editarRegra(regra.id, { texto })).finally(() => setSalvando(false))
   }
 
   return (
@@ -303,29 +288,17 @@ function LinhaAutomatica({ regra, fonteApi, emFoco, editavel, exemplo }) {
             )
             : !avisoEntrada && <span className={css.semTexto}>Sem texto: não sai nada para o cliente.</span>
         )}
-        {avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
-        {bloqueio && <span id={idBloqueio} className={css.alerta} role={editando ? 'alert' : undefined}>{bloqueio}</span>}
+        {!editando && avisoEntrada && <span className={css.semTexto}>{avisoEntrada}</span>}
+        {bloqueio && <span id={idBloqueio} className={css.alerta}>{bloqueio}</span>}
       </div>
 
       {editando ? (
-        <div className={css.form}>
-          <CampoArea
-            rotulo={`Texto de ${regra.nome}`}
-            rotuloOculto
-            rows={3}
-            value={rascunho}
-            disabled={salvando}
-            onChange={(e) => setRascunho(e.target.value)}
-            autoFocus
-          />
-          <SelosDeVariaveis variaveis={fonteApi ? VARIAVEIS_DA_API : VARIAVEIS} />
-          <p id={idExemplo} className={css.rotuloPrevia}>Como o cliente lê (exemplo)</p>
-          <TextoPreenchido texto={rascunho} exemplo={exemplo} fonteApi={fonteApi} className={css.bolha} rotuloId={idExemplo} />
-          <div className={css.acoes}>
-            <Botao variante="primario" icone="check" disabled={!rascunho.trim() || salvando || Boolean(bloqueio)} aria-describedby={bloqueio ? idBloqueio : undefined} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
-            <Botao variante="texto" disabled={salvando} onClick={() => setRascunho(null)}>Cancelar</Botao>
-          </div>
-        </div>
+        <EditorDeAutomatica
+          regra={regra} inicial={rascunho} editavel={editavel}
+          analisar={(texto) => analisarAutomatica({ regra, texto, fonteApi, editavel, valores: exemplo })}
+          avisoApi={sincronizacao?.aviso ?? null} idBloqueio={idBloqueio} aoSalvar={gravar}
+          aoSalvou={() => setRascunho(null)} aoCancelar={() => setRascunho(null)} autoFocus
+        />
       ) : editavel && (
         <div className={css.acoesLinha}>
           <Botao variante="texto" icone="lapis" onClick={() => setRascunho(regra.texto || regra.sugestao || '')}>

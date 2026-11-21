@@ -75,34 +75,8 @@
 .amostras { display: flex; flex-wrap: wrap; gap: var(--e-2); margin-top: var(--e-2); }
 .amostra { min-height: var(--toque); font-size: var(--t-apoio); }
 
-/* Chip por variável (achado 2, pendência 21 da banca 64): substitui o texto
-   corrido "Variáveis: {a}, {b}". Sem fonte mono: T5 do auditor visual só
-   libera mono na comanda e no canhoto. */
-.variaveis {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1);
-  margin: var(--e-1) 0 0; font-size: var(--t-apoio); color: var(--tinta-3);
-}
-.tokenVariavel {
-  display: inline-flex; padding: 1px var(--e-2);
-  border-radius: var(--r-pilula); background: var(--elevado); color: var(--tinta-2);
-  font-size: var(--t-apoio); font-weight: 600;
-}
-
-/* Prévia em bolha, do jeito que o cliente recebe, com os dados da conversa. */
-.rotuloPrevia {
-  margin: var(--e-3) 0 var(--e-1); font-size: var(--t-apoio); color: var(--tinta-3);
-}
-.bolha {
-  margin: 0; padding: var(--e-2) var(--e-3);
-  background: var(--marca-claro); color: var(--tinta);
-  border-radius: var(--r-1); border-bottom-right-radius: var(--r-ponta);
-  font-size: var(--t-corpo); white-space: pre-wrap;
-}
-
 .editando { display: block; margin: var(--e-2) 0 0; }
-.previaErro { background: var(--erro-pastel); color: var(--erro); border-radius: var(--r-1); padding: 0 var(--e-1); font-weight: 600; }
 .alerta { margin: var(--e-1) 0; font-size: var(--t-apoio); color: var(--alerta); }
-.acoes { display: flex; gap: var(--e-2); flex-wrap: wrap; margin-top: var(--e-3); }
 .toque { min-height: var(--toque); }
 
 /* Rodada 6d (banca estética, item 9): liga e desliga em cápsula, como os
