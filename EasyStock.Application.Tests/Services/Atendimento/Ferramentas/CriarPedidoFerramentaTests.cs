@@ -96,7 +96,7 @@ public class CriarPedidoFerramentaTests
             data_entrega = c.Checkout.DataEntrega.ToString("yyyy-MM-dd"), janela_id = c.Checkout.JanelaId,
         });
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(true);
+        llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
             .Returns(new RespostaLlm("tool_use", [new BlocoUsoFerramentaLlm("tool-1", "criar_pedido", entrada)], 5, 5));
         var cloud = Substitute.For<IWhatsAppCloudClient>();

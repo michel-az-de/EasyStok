@@ -166,7 +166,7 @@ public partial class AtendimentoConversasControllerTests
         conversa.RegistrarEntrada(agora);
         _repositorio.Mensagens.Add(Mensagem.Entrada(_empresaId, conversa.Id, agora, TipoConteudoMensagem.Texto, "e aí?", "wamid.in2"));
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(true);
+        llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         var agente = new AgenteAtendimentoService(
             llm, _repositorio, Substitute.For<IConfiguracaoAtendimentoRepository>(), Substitute.For<IClienteRepository>(),
             Array.Empty<IFerramentaAgente>(), Substitute.For<IEscaladorConversa>(), Substitute.For<IWhatsAppCloudClient>(),
@@ -902,7 +902,7 @@ public partial class AtendimentoConversasControllerTests
     private static IAgenteLlmClient LlmQueResponde(string texto)
     {
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(true);
+        llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
             .Returns(new RespostaLlm("end_turn", [new BlocoTextoLlm(texto)], 100, 20));
         return llm;
@@ -930,7 +930,7 @@ public partial class AtendimentoConversasControllerTests
     {
         var conversa = ConversaComClienteAgora();
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(false);
+        llm.Disponivel.Returns(false); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
 
         var result = await _controller.Sugestao(conversa.Id, Sugestao(llm), default);
 

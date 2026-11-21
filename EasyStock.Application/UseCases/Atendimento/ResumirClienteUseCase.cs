@@ -34,7 +34,7 @@ public sealed class ResumirClienteUseCase(
         var dossie = await dossies.ObterPorConversaAsync(empresaId, conversaId, ct)
             ?? throw new ConversaNaoEncontradaException(conversaId);
         if (dossie.TotalPedidos == 0 && dossie.Notas.Count == 0) return new(SemCompra, false);
-        if (!llm.Disponivel) return new(null, false);
+        if (!await llm.DisponivelAsync(empresaId, ct)) return new(null, false);
         var notas = string.Join(',', dossie.Notas.Select(n => $"{n.Id:N}:{n.CriadoEm:O}"));
         var chave = $"resumo-cliente:{empresaId:N}:{dossie.Cliente.Id ?? conversaId:N}:{dossie.TotalPedidos}:{dossie.UltimaCompraEm:O}:{notas}";
         if (await cache.GetAsync<ResumoClienteResult>(chave) is { } guardado) return guardado;

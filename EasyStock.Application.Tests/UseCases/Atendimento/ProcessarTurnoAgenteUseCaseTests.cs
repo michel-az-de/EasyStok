@@ -30,7 +30,7 @@ public class ProcessarTurnoAgenteUseCaseTests
     private ProcessarTurnoAgenteUseCase CriarUseCase()
     {
         var llm = Substitute.For<IAgenteLlmClient>();
-        llm.Disponivel.Returns(true);
+        llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         var clientes = Substitute.For<IClienteRepository>();
         var agente = new AgenteAtendimentoService(
             llm, _conversaRepository, Substitute.For<IConfiguracaoAtendimentoRepository>(), clientes,

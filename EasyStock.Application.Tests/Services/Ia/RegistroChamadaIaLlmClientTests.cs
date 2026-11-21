@@ -183,7 +183,27 @@ public class RegistroChamadaIaLlmClientTests
     [Fact]
     public void DisponivelVemDoClienteInterno()
     {
-        _interno.Disponivel.Returns(true);
+        _interno.Disponivel.Returns(true); _interno.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         Cliente().Disponivel.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task OQueNaoSaiuNaoGravaComoErro()
+    {
+        // #3064 (A1): disjuntor aberto ou cliente desligado não são chamada; só log, sem inflar a contagem.
+        _interno.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>())
+            .Returns<Task<RespostaLlm>>(_ => throw new ProvedorIaIndisponivelException("disjuntor aberto"));
+
+        await FluentActions.Awaiting(() => Cliente().EnviarAsync(Requisicao()))
+            .Should().ThrowAsync<ProvedorIaIndisponivelException>();
+
+        _gravadas.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DisponivelAsyncEncaminhaAoInterno()
+    {
+        _interno.DisponivelAsync(Empresa, Arg.Any<CancellationToken>()).Returns(true);
+        (await Cliente().DisponivelAsync(Empresa)).Should().BeTrue();
     }
 }

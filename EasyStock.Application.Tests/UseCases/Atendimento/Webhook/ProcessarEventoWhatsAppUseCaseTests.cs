@@ -1238,7 +1238,7 @@ public class ProcessarEventoWhatsAppUseCaseTests
         configuracao.Ativo = true;
         _configuracaoRepository.GetByEmpresaIdAsync(_empresaId).Returns(configuracao);
         var llm =Substitute.For<EasyStock.Application.Ports.Output.Ai.IAgenteLlmClient>();
-        llm.Disponivel.Returns(true);
+        llm.Disponivel.Returns(true); llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         return new RespostaSemIa(_regrasAutomaticas, _configuracaoRepository, _conversaRepository, _clienteRepository, _turnos,
             llm, new ResolvedorCanal([_canalWhatsApp]), _unitOfWork, NullLogger<RespostaSemIa>.Instance);
     }

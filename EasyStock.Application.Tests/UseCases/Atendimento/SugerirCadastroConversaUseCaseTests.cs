@@ -24,7 +24,7 @@ public class SugerirCadastroConversaUseCaseTests
             "Sou Ana Silva. Meu telefone é (11) 99999-8888 e meu e-mail é ana@example.com.", "wamid.cadastro");
         _conversas.ObterComMensagensAsync(_empresa, _conversa.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new ConversaComMensagens(_conversa, [_mensagem]));
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
     }
 
     private SugerirCadastroConversaUseCase Criar() => new(_llm, _conversas, NullLogger<SugerirCadastroConversaUseCase>.Instance);
@@ -78,7 +78,7 @@ public class SugerirCadastroConversaUseCaseTests
     [Fact]
     public async Task ProvedorDesligadoNaoInventaSugestao()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         await Criar().Invoking(c => c.ExecuteAsync(new(_empresa, _conversa.Id))).Should().ThrowAsync<AssistenteDonaIndisponivelException>();
     }
 

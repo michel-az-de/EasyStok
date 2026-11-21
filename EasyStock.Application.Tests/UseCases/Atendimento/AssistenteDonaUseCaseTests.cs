@@ -14,7 +14,7 @@ public class AssistenteDonaUseCaseTests
     [Fact]
     public async Task PedidoParaIAAssumir_PropoeAcaoExecutavelSemPrometerExecucao()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         Responder(new RespostaLlm(RespostaLlm.StopToolUse,
             [Uso(PropostasAssistenteDona.RetomarAutomatico, "{}")], 100, 20));
         var resposta = await Criar().ExecuteAsync(new(_empresaId, "assuma o atendimento deste cliente", _conversa.Id));
@@ -56,7 +56,7 @@ public class AssistenteDonaUseCaseTests
     [Fact]
     public async Task NaoGravaMensagem()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
 
         var resultado = await Criar().ExecuteAsync(
             new PerguntarAssistenteDonaCommand(_empresaId, "Preciso devolver o dinheiro?", _conversa.Id));
@@ -73,7 +73,7 @@ public class AssistenteDonaUseCaseTests
     [Fact]
     public async Task ComConversa_OfereceSoFerramentasDeProposta()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
 
         await Criar().ExecuteAsync(new PerguntarAssistenteDonaCommand(_empresaId, "manda o cardápio", _conversa.Id));
 
@@ -85,7 +85,7 @@ public class AssistenteDonaUseCaseTests
     [Fact]
     public async Task SemConversa_NaoOfereceFerramentas()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
 
         await Criar().ExecuteAsync(new PerguntarAssistenteDonaCommand(_empresaId, "Posso cobrar taxa?", null));
 
@@ -95,7 +95,7 @@ public class AssistenteDonaUseCaseTests
     [Fact]
     public async Task UsoDeFerramenta_ViraAcaoPropostaSemExecutar()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         Responder(new RespostaLlm(RespostaLlm.StopToolUse,
         [
             new BlocoTextoLlm("Preparei o envio do cardápio."),
@@ -122,7 +122,7 @@ public class AssistenteDonaUseCaseTests
     [Fact]
     public async Task EntradaInvalida_EhDescartada()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         Responder(new RespostaLlm(RespostaLlm.StopToolUse,
         [
             Uso("criar_pedido", """{"itens":[]}"""),
@@ -142,7 +142,7 @@ public class AssistenteDonaUseCaseTests
     [Fact]
     public async Task Rascunho_SaiSemTravessao()
     {
-        _llm.Disponivel.Returns(true);
+        _llm.Disponivel.Returns(true); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         Responder(new RespostaLlm(RespostaLlm.StopToolUse,
             [Uso("propor_rascunho", """{"texto":"Oi Maria — tudo certo, chega hoje."}""")], 100, 20));
 
@@ -166,7 +166,7 @@ public class AssistenteDonaUseCaseTests
     [Fact]
     public async Task SemChave503()
     {
-        _llm.Disponivel.Returns(false);
+        _llm.Disponivel.Returns(false); _llm.DisponivelAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
 
         var acao = () => Criar().ExecuteAsync(new PerguntarAssistenteDonaCommand(_empresaId, "Posso cobrar taxa?", null));
 
