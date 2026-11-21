@@ -174,13 +174,28 @@ provar('arrasto direto: sem modo Organizar, sem botão Mover e o link segue send
 })
 
 provar('#1810 continua valendo: até 20 controles na primeira vista', () => {
-  // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta: o limite vale para o conteúdo do Início.
-  const controles = (html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '').match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
-  assert.ok(controles <= TETO_CONTEUDO, `${controles} controles`)
-  // #3004: a primeira vista inteira soma o conteúdo (<= TETO_CONTEUDO, da #1810), o trilho (<= TETO_ITENS_DO_TRILHO, o mesmo da prova-3004) e o controle da conta. Medido hoje no Início a 1440 px: 33 controles no total (a renderização é estática, igual em qualquer largura).
-  const total = (html.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
-  const teto = TETO_CONTEUDO + TETO_ITENS_DO_TRILHO + CONTROLES_DA_CONTA
-  assert.ok(total <= teto, `${total} controles na primeira vista, contando o trilho (teto ${teto})`)
+  // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta de conteúdo.
+  const semTrilho = html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '')
+  const contar = (trecho) => (trecho.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+  // #3013: a faixa de atalhos (nav "Atalhos dos módulos") só existe no celular (display none acima de 640 px, atalhosCelular.module.css) e repete os cartões disponíveis da grade.
+  // É contada de forma explícita: um link por cartão disponível da grade, derivado do mesmo HTML que monta a grade, e nada além de links.
+  const faixa = semTrilho.match(/<nav [^>]*aria-label="Atalhos dos módulos"[^>]*>[\s\S]*?<\/nav>/)?.[0] ?? ''
+  // Mesmo filtro da FaixaDeAtalhos (modulo.disponivel): o cartão "Em breve" (classe emBreve) fica fora da faixa.
+  const ITENS_DA_FAIXA = (html.match(/<li[^>]*data-modulo="[^>]*>/g) ?? []).filter((li) => !/emBreve/.test(li)).length
+  assert.ok(ITENS_DA_FAIXA > 0, 'a grade tem cartões de módulo')
+  assert.equal(contar(faixa), ITENS_DA_FAIXA, 'a faixa tem um link por cartão da grade')
+  assert.equal((faixa.match(/<a[\s>]/g) ?? []).length, ITENS_DA_FAIXA, 'a faixa só tem links')
+  // Desktop: a faixa sai da árvore de acessibilidade e do Tab por display none (prova-3013), então o conteúdo cabe em TETO_CONTEUDO (#1810).
+  const controles = contar(semTrilho.replace(faixa, ''))
+  assert.ok(controles <= TETO_CONTEUDO, `${controles} controles sem a faixa`)
+  // Celular: exceção explícita e contada à #1810; a faixa repete a grade para encurtar a rolagem a 390 px (#3013).
+  const noCelular = contar(semTrilho)
+  assert.ok(noCelular <= TETO_CONTEUDO + ITENS_DA_FAIXA, `${noCelular} controles no celular (teto ${TETO_CONTEUDO + ITENS_DA_FAIXA})`)
+  // Total: conteúdo (#1810) + trilho (mesmo teto da prova-3004) + controle da conta + faixa. A renderização é estática, igual em qualquer
+  // largura, então a faixa entra no HTML mesmo escondida. Medido hoje no Início a 1440 px: 40 controles no total (17 de conteúdo, 7 da faixa, 16 do trilho e conta).
+  const total = contar(html)
+  const teto = TETO_CONTEUDO + TETO_ITENS_DO_TRILHO + CONTROLES_DA_CONTA + ITENS_DA_FAIXA
+  assert.ok(total <= teto, `${total} controles na primeira vista, contando trilho e faixa (teto ${teto})`)
 })
 
 provar('teclado: Espaço pega, Enter abre (Enter fora das teclas de arrasto)', () => {

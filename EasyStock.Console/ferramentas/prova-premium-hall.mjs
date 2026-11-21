@@ -274,7 +274,9 @@ provar('JSX final do Hall compila com o mesmo transformador do Vite', () => asse
   })
   provar('#1810: hall mínimo cabe em até 20 controles (eram 54 em 1280x720)', () => {
     // #3004: o trilho do Console (nav "Navegação") é igual em toda rota e fica fora da conta: o limite vale para o conteúdo do Início.
-  const controles = (html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '').match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
+    // #3013: a faixa de atalhos (só celular, display none no desktop) repete a grade e é contada à parte na prova-1839; fora daqui.
+    const semFaixa = html.replace(/<nav [^>]*aria-label="Navegação"[^>]*>[\s\S]*?<\/nav>/, '').replace(/<nav [^>]*aria-label="Atalhos dos módulos"[^>]*>[\s\S]*?<\/nav>/, '')
+    const controles = (semFaixa.match(/<(a|button|input|summary|select)[\s>]/g) ?? []).length
     assert.ok(controles <= 20, `${controles} controles`)
   })
 }
