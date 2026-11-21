@@ -17,6 +17,8 @@ public sealed class RegistroChamadaIaLlmClient(
     TimeProvider relogio,
     ILogger<RegistroChamadaIaLlmClient> logger) : IAgenteLlmClient
 {
+    private static readonly TimeSpan PrazoRegistro = TimeSpan.FromSeconds(3);
+
     public bool Disponivel => interno.Disponivel;
 
     public IAgenteLlmClient Interno => interno;
@@ -65,8 +67,9 @@ public sealed class RegistroChamadaIaLlmClient(
                 resposta?.TokensEntrada ?? 0, resposta?.TokensSaida ?? 0, resposta?.TokensCacheLido ?? 0,
                 resposta?.TokensCacheEscrito ?? 0, null, (int)Math.Min(duracaoMs, int.MaxValue), desfecho,
                 relogio.GetUtcNow().UtcDateTime);
-            // Sem o token de quem chamou: a resposta já veio, o registro não deve cair junto com um cancelamento tardio.
-            await registro.RegistrarAsync(chamada, CancellationToken.None);
+            // Sem o token de quem chamou (a resposta já veio), mas com prazo próprio: banco lento não segura a IA.
+            using var prazo = new CancellationTokenSource(PrazoRegistro);
+            await registro.RegistrarAsync(chamada, prazo.Token);
         }
         catch (Exception ex)
         {
