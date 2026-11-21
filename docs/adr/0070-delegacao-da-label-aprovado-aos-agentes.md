@@ -4,7 +4,7 @@
 - Data: 2026-11-21
 - Decisor: Felipe
 - Amplia: ADR-0043 e ADR-0055, nos tiers de merge (quem aplica a label de tier ALTO). A lista do que é tier ALTO não muda.
-- Relacionados: issue #3069; `CLAUDE.md`, seção Autorizações
+- Relacionados: issues #3069 e #3077; `CLAUDE.md`, seção Autorizações
 
 ## Contexto
 
@@ -21,17 +21,27 @@ Decisão dita pelo Felipe na sessão gestora, em 21/11/2026 às 14:39 (horário 
 Em seguida, à pergunta "Gravo essa autorização no CLAUDE.md para nenhuma conversa perguntar de
 novo?", respondeu "Sim, grave".
 
+Ajuste do mesmo dia, às 15:45: as primeiras PRs sob a delegação tinham itens de aceite que só
+existem depois do merge (CI no commit mergeado, validação em produção). Lida ao pé da letra, a
+condição "aceite todo marcado" tornava a label impossível, e as sessões já deixavam esses itens
+abertos sem regra escrita. À pergunta "Ajusto a ADR-0070 para aceitar item de pós-deploy aberto na
+hora da label?", o Felipe respondeu "Sim, ajuste". O item 6 da Decisão registra o ajuste. A
+pergunta dizia "pós-deploy"; a regra cobre também o CI do master no commit mergeado, que tem a
+mesma natureza e antecede o deploy (precedente: PR #3070, issue #3063).
+
 ## Decisão
 
 1. **A label `aprovado` passa a ser aplicada pelo agente, em nome do Felipe.** Vale para toda PR de
    tier ALTO. Depois da label, o agente mergeia e faz deploy sem perguntar.
 2. **Condições, todas medidas no commit que será mergeado:** CI verde, `/code-review` sem achado Critical e
-   aceite da issue todo marcado. O review é de subagente revisor sem o contexto da sessão autora,
-   porque a ADR-0043 já registra que autor, revisor e merger são a mesma conta. Faltou uma, a PR
-   fica aberta com os achados comentados, sem label, sem merge e sem perguntar ao Felipe. Push
-   novo depois da label remove a label e refaz as três condições.
+   aceite da issue todo marcado, salvo o aceite de pós-merge do item 6. O review é de subagente
+   revisor sem o contexto da sessão autora, porque a ADR-0043 já registra que autor, revisor e
+   merger são a mesma conta. Faltou uma, a PR fica aberta com os achados comentados, sem label,
+   sem merge e sem perguntar ao Felipe. Push novo depois da label remove a label e refaz as três
+   condições.
 3. **Registro.** Antes da label, o agente comenta na PR que aplica por delegação desta ADR e cola a
-   prova das três condições, com o link ou a saída que prova cada item do aceite.
+   prova das três condições, com o link ou a saída que prova cada item do aceite e a lista dos
+   itens de pós-merge que ficam abertos, cada um com o motivo.
 4. **O que não muda.** A lista "Exige GO nesta sessão" do `CLAUDE.md` (force push, `reset --hard`,
    `dotnet ef database update`, segredo de produção, mudança em produção fora dos scripts de deploy
    e as demais) continua exigindo o GO do Felipe. Segredo ou dado que só ele tem continua parando o
@@ -39,6 +49,18 @@ novo?", respondeu "Sim, grave".
 5. **Migração.** Migração mergeada sob esta delegação vai à produção pelo `vps-deploy.sh`, que faz
    `pg_dump` e deixa a migration rodar no startup da API. Isso está dentro da delegação. O
    `dotnet ef database update` manual continua exigindo GO.
+6. **Aceite de pós-merge (ajuste de 21/11/2026, issue #3077).** Fica aberto na hora da label o item
+   de aceite que, por natureza, só se mede depois do merge: CI do master no commit mergeado, deploy
+   e validação em produção. O que dá para medir na PR (teste, build, revisão, prova local) não é
+   pós-merge e continua barrando a label. Validação em produção não dispensa a prova na PR: o
+   mesmo comportamento precisa estar provado por teste ou prova local antes da label.
+   Salvaguardas: a prova da label lista cada item aberto e por que só se mede depois; a PR usa
+   `refs #N`, não `closes #N`, para o merge não fechar a issue; a sessão que mergeou mede cada
+   item, marca com a prova e fecha a issue antes de se declarar concluída. Item que falhar depois
+   do merge mantém a issue aberta: a sessão corrige por nova PR no mesmo ciclo ou volta a imagem
+   anterior com `vps-deploy.sh --rollback` e o motivo, que não reverte o banco. O `revert` no
+   master continua exigindo GO. O mecanismo (`refs #N`, issue aberta até a prova) vale para
+   qualquer tier.
 
 ## Alternativas descartadas
 
@@ -53,5 +75,7 @@ novo?", respondeu "Sim, grave".
 
 - O portão de tier ALTO deixa de ser humano e passa a ser CI, review independente e aceite. Erro que
   passar pelos três chega à produção sem o olho do Felipe. Ele aceitou esse risco ao delegar.
+- Com o aceite de pós-merge aberto na label, o erro que só aparece em produção é descoberto depois
+  do merge. A issue aberta e a lista de itens na prova da PR registram o que falta medir.
 - A label continua existindo: marca na PR que as condições foram conferidas e por quem.
 - O Felipe revoga quando quiser, revertendo esta ADR e a seção Autorizações do `CLAUDE.md`.

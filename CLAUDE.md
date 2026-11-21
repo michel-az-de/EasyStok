@@ -32,17 +32,18 @@ Reporte em até 5 linhas: branch, ahead/behind, working tree, worktrees extras (
 
 1. Issue (`gh issue create`, sem esperar aprovação): título imperativo, Contexto/Escopo/Aceite com checkboxes, labels módulo + prioridade. Sem issue não há trabalho versionado.
 2. Branch, stage, gate e commit conforme o AGENTS.md. Antes do commit: `git diff --cached --stat` e o fragmento `changelog.d/<issue>.md` (ADR-0055).
-3. `git push -u origin HEAD`, `gh pr create --base master` com `closes #N`, `gh pr checks --watch`, `/code-review`, aceite da issue todo marcado.
+3. `git push -u origin HEAD`, `gh pr create --base master` com `closes #N` (`refs #N` se a issue tem aceite de pós-merge), `gh pr checks --watch`, `/code-review`, aceite da issue todo marcado, salvo o de pós-merge (ADR-0070, item 6).
 4. Merge por tier: `gh pr view --json mergeable,mergeStateStatus` = `MERGEABLE`, master local em `--ff-only`, `gh pr merge --squash --delete-branch`. Conflito: `git merge origin/master`, gate de novo, push.
 5. Limpeza: worktree remove + prune, branch local pelo critério da linha Limpeza do AGENTS.md. ADR se houve decisão.
 
-Vermelho (CI falhou, review Critical, aceite aberto): PR fica aberta com os achados comentados, sem merge.
+Vermelho (CI falhou, review Critical, aceite aberto que não é de pós-merge): PR fica aberta com os achados comentados, sem merge.
 Comente na issue: plano, decisão não óbvia, premissa refutada, fechamento.
 
 ## Autorizações
 
 Pré-autorizado, em sequência e sem pedir confirmação (Felipe, 2026-10-12): issue, push, PR, merge de tier baixo verde, deploy por `scripts/deploy/vps-deploy.sh` e `console-deploy.sh`, limpeza.
-Delegado (Felipe, 2026-11-21, ADR-0070): em tier alto o agente aplica a label `aprovado` em nome do Felipe, mergeia e faz deploy sem perguntar, com CI verde, `/code-review` sem Critical feito por subagente sem o contexto da sessão autora e aceite da issue todo marcado. Antes da label, comente na PR a delegação e a prova das três condições, medidas no commit que será mergeado. Push depois da label: remova a label e refaça as três. Faltou uma: sem label e sem merge, PR aberta com os achados comentados, sem perguntar ao Felipe.
+Delegado (Felipe, 2026-11-21, ADR-0070): em tier alto o agente aplica a label `aprovado` em nome do Felipe, mergeia e faz deploy sem perguntar, com CI verde, `/code-review` sem Critical feito por subagente sem o contexto da sessão autora e aceite da issue todo marcado, salvo o de pós-merge. Antes da label, comente na PR a delegação e a prova das três condições, medidas no commit que será mergeado. Push depois da label: remova a label e refaça as três. Faltou uma: sem label e sem merge, PR aberta com os achados comentados, sem perguntar ao Felipe.
+Aceite de pós-merge (ADR-0070, item 6; qualquer tier): só fica aberto na label o item que por natureza se mede depois do merge (CI do master no commit mergeado, deploy, validação em produção). O que dá para medir na PR (teste, build, revisão, prova local) não é pós-merge e barra a label; validação em produção não dispensa a prova do mesmo comportamento na PR. A prova da label lista cada item aberto e o motivo, a PR usa `refs #N`, e a sessão que mergeou mede cada item, marca com a prova e fecha a issue antes de encerrar. Falhou depois do merge: issue aberta, correção por nova PR ou `vps-deploy.sh --rollback` com motivo; `revert` no master continua exigindo GO.
 Pare só em: segredo ou dado que só o Felipe tem; trava do Claude Code (tente uma vez; negado, entregue o comando pronto em PowerShell).
 Exige GO nesta sessão: `push --force*`, `reset --hard`, rebase de história publicada, `branch -D` alheia, `revert` no master, `rm -rf` fora de artefatos, `dotnet ef database update`, segredo de produção, mudança em produção fora dos scripts de deploy, `gh release delete`, commit direto no master (hotfix: issue post-hoc com label hotfix e CI vigiado).
 Nunca: `gh repo delete`.
