@@ -28,6 +28,7 @@ public class Conversa
     public const int MotivoEscaladaTamanhoMaximo = 500;
     public const string ChaveAjudaComandaSolicitadaEm = "comandaAjudaSolicitadaEm";
     public const string ChaveAutomaticoLiberadoPelaEquipe = "automaticoLiberadoPelaEquipe";
+    public const string ChaveClienteDesistiuPedidoId = "clienteDesistiuPedidoId";
 
     public Guid Id { get; private set; }
     public long NumeroComanda { get; private set; }
@@ -387,6 +388,28 @@ public class Conversa
 
         ContextoJson = contextoJson.Trim();
     }
+
+    /// <summary>
+    /// #2992: o cliente desistiu do pedido. Marca só na conversa assumida pela equipe e uma vez por pedido. Devolve
+    /// false se a conversa é automática ou se a desistência desse pedido já estava marcada.
+    /// </summary>
+    public bool MarcarClienteDesistiuDoPedido(Guid pedidoId)
+    {
+        if (Situacao != SituacaoConversa.Assumida || pedidoId == Guid.Empty || ClienteDesistiuDoPedido(pedidoId))
+            return false;
+        var contexto = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson)!;
+        contexto[ChaveClienteDesistiuPedidoId] = JsonSerializer.SerializeToElement(pedidoId);
+        ContextoJson = JsonSerializer.Serialize(contexto);
+        return true;
+    }
+
+    /// <summary>#2992: a desistência vale só para o pedido marcado; outro pedido da conversa segue normal.</summary>
+    public bool ClienteDesistiuDoPedido(Guid pedidoId) =>
+        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ContextoJson) is { } contexto
+        && contexto.TryGetValue(ChaveClienteDesistiuPedidoId, out var valor)
+        && valor.ValueKind == JsonValueKind.String
+        && Guid.TryParse(valor.GetString(), out var marcado)
+        && marcado == pedidoId;
 
     public void DefinirPedidoEmAndamento(Guid? pedidoId)
     {

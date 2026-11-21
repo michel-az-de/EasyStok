@@ -86,7 +86,7 @@ public class LembrarCobrancaVencendoUseCaseTests
         var disparo = new DispararAutomacaoUseCase(_regras, _conversas, _clientes, Substitute.For<IExpedienteLojaRepository>(),
             variaveis, new PoliticaEnvioCliente(_consentimentos), new ResolvedorCanal([_whats]), new FakeUnitOfWork(), _relogio,
             NullLogger<DispararAutomacaoUseCase>.Instance);
-        return new LembrarCobrancaVencendoUseCase(_tenant, _cobrancaRepo, _pedidos, _idempotencia, disparo, _relogio,
+        return new LembrarCobrancaVencendoUseCase(_tenant, _cobrancaRepo, _pedidos, _conversas, _idempotencia, disparo, _relogio,
             NullLogger<LembrarCobrancaVencendoUseCase>.Instance);
     }
 
@@ -131,6 +131,37 @@ public class LembrarCobrancaVencendoUseCaseTests
         Envios().Should().Be(1);
         await _cobrancaRepo.DidNotReceive().AddAsync(Arg.Any<CobrancaPedido>(), Arg.Any<CancellationToken>());
         link.Status.Should().Be(Domain.Enums.Pagamentos.StatusCobrancaPedido.Pendente, "só avisa: não reemite nem cancela");
+    }
+
+    /// <summary>#2992: quem desistiu do pedido na conversa assumida não recebe o lembrete do link.</summary>
+    [Fact]
+    public async Task ClienteQueDesistiuDoPedidoNaoRecebeLembrete()
+    {
+        var link = Link();
+        _conversa.Assumir(Emitida.AddMinutes(10), Guid.NewGuid());
+        _conversa.DefinirPedidoEmAndamento(_pedido.Id);
+        _conversa.MarcarClienteDesistiuDoPedido(_pedido.Id);
+
+        Minuto(21);
+        var r = await UseCase().ExecuteAsync(Item(link));
+
+        r.Situacao.Should().Be(SituacaoLembreteCobranca.Ignorada, "a equipe já sabe da desistência: sem lembrete");
+        Envios().Should().Be(0);
+    }
+
+    /// <summary>#2992: a mensagem comum na conversa assumida não pausa o lembrete.</summary>
+    [Fact]
+    public async Task ConversaAssumidaSemDesistenciaRecebeLembrete()
+    {
+        var link = Link();
+        _conversa.Assumir(Emitida.AddMinutes(10), Guid.NewGuid());
+        _conversa.DefinirPedidoEmAndamento(_pedido.Id);
+
+        Minuto(21);
+        var r = await UseCase().ExecuteAsync(Item(link));
+
+        r.Situacao.Should().Be(SituacaoLembreteCobranca.Disparada);
+        Envios().Should().Be(1);
     }
 
     [Fact]
