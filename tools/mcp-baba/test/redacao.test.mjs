@@ -60,3 +60,24 @@ test('linha gigante nao trava (sem ReDoS)', () => {
   redigir('a'.repeat(400_000));
   assert.ok(Date.now() - t0 < 1000);
 });
+
+// #3078: Basic leva a credencial inteira; valor entre aspas com espaco nao sai pela metade.
+test('redige Authorization de qualquer esquema inteiro', () => {
+  for (const [e, dado] of [
+    ['Authorization: Basic dXNlcjpwYXNz', 'dXNlcjpwYXNz'],
+    ['Authorization: Token abc123xyz', 'abc123xyz'],
+    ['Authorization: AWS4-HMAC-SHA256 Credential=AKIAXX/x, SignedHeaders=host, Signature=deadbeef', 'deadbeef'],
+    ['"Authorization":"Basic dXNlcjpwYXNz","x":1', 'dXNlcjpwYXNz'],
+  ]) {
+    const s = redigir(e);
+    assert.ok(!s.includes(dado), `vazou: ${s}`);
+  }
+  assert.match(redigir('"Authorization":"Basic dXNlcjpwYXNz","x":1'), /"x":1$/);
+});
+test('redige segredo entre aspas com espaco', () => {
+  for (const [e, dado] of [['password="abc def ghi" ok=1', 'def ghi'], ['"token": "a b c"', 'b c'], ["senha='x y'", 'y']]) {
+    const s = redigir(e);
+    assert.ok(!s.includes(dado), `vazou: ${s}`);
+  }
+  assert.match(redigir('password="abc def" ok=1'), /ok=1$/);
+});
