@@ -113,13 +113,13 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
   return <FormularioFinanceiro titulo={conta ? 'Editar conta' : `Nova conta a ${lado}`} aoFechar={fechar} operacao={operacao} aoEnviar={salvar} valido={valido} motivo={motivo} digitado={digitado} salvar={travada ? `Registrar ${palavras.registro}` : 'Salvar'}>
     {travada && <output className={css.aviso}>A conta já foi criada e aparece na lista. Falta só registrar o {palavras.registro}; para mudar a conta, feche e abra o detalhe.</output>}
     <fieldset disabled={travada} className={css.campos}>
-    <CampoTexto rotulo="Descrição" required limite={200} dica="Até 200 caracteres." erro={descricao && !descricao.trim() ? 'Escreva a descrição da conta.' : null} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+    <CampoTexto rotulo="Descrição" obrigatorio required limite={200} dica="Até 200 caracteres." erro={descricao && !descricao.trim() ? 'Escreva a descrição da conta.' : null} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
     <div className={css.grade}>
       <div className={css.categoria}>
-        <CampoSelecao rotulo="Categoria financeira" required value={categoria} onChange={(e) => setCategoria(e.target.value)} opcoes={[{ valor: '', rotulo: 'Escolha a categoria' }, ...categorias.map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
+        <CampoSelecao rotulo="Categoria financeira" obrigatorio required value={categoria} onChange={(e) => setCategoria(e.target.value)} opcoes={[{ valor: '', rotulo: 'Escolha a categoria' }, ...categorias.map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
         {podeCriarCategoria && !criandoCategoria && <Botao variante="texto" onClick={() => setCriandoCategoria(true)}>+ Nova categoria</Botao>}
       </div>
-      <CampoSelecao rotulo="Centro de custo (opcional)" value={centro} onChange={(e) => setCentro(e.target.value)} opcoes={[...(!conta?.centroCustoId ? [{ valor: '', rotulo: 'Sem centro de custo' }] : []), ...cadastros.centros.filter((item) => item.ativo || item.id === centro).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
+      <CampoSelecao rotulo="Centro de custo" value={centro} onChange={(e) => setCentro(e.target.value)} opcoes={[...(!conta?.centroCustoId ? [{ valor: '', rotulo: 'Sem centro de custo' }] : []), ...cadastros.centros.filter((item) => item.ativo || item.id === centro).map((item) => ({ valor: item.id, rotulo: item.nome }))]} />
     </div>
     {podeCriarCategoria && criandoCategoria && <fieldset className={css.novaCategoria}><legend className="sr">Nova categoria</legend>
       <CampoTexto ref={campoNovaCategoria} rotulo={`Nome da nova categoria de ${tipo.toLowerCase()}`} limite={100} erro={criacao.erro ? mensagemFinanceira(criacao.erro) : null} value={nomeNovaCategoria} onChange={(e) => setNomeNovaCategoria(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criarCategoria() } }} />
@@ -128,16 +128,16 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
     </fieldset>}
     {!categorias.length && !criandoCategoria && <p className={css.aviso}>{podeCriarCategoria ? `Ainda não há categoria de ${tipo.toLowerCase()}. Use "+ Nova categoria" para criar a primeira.` : `Ainda não há categoria de ${tipo.toLowerCase()}. Peça a quem administra a loja para cadastrar uma.`}</p>}
     {!conta && <>
-      <div className={css.grade}><DinheiroFinanceiro rotulo="Valor total" centavos={centavos} aoMudar={setCentavos} /><CampoTexto rotulo="Data de emissão" tipo="date" required value={emissao} onChange={(e) => setEmissao(e.target.value)} /></div>
-      <div className={css.grade}><CampoTexto rotulo="Quantidade de parcelas" inputMode="numeric" autoComplete="off" dica="De 1 a 60" required erro={parcelasLidas.erro} value={parcelasTexto} onChange={(e) => setParcelasTexto(lerParcelas(e.target.value).texto)} /><CampoTexto rotulo="Primeiro vencimento" tipo="date" required min={emissao || undefined} erro={vencimento && emissao && vencimento < emissao ? 'O primeiro vencimento não pode ser antes da emissão.' : null} value={vencimento} onChange={(e) => setVencimento(e.target.value)} /></div>
+      <div className={css.grade}><DinheiroFinanceiro rotulo="Valor total" centavos={centavos} aoMudar={setCentavos} /><CampoTexto rotulo="Data de emissão" tipo="date" obrigatorio required value={emissao} onChange={(e) => setEmissao(e.target.value)} /></div>
+      <div className={css.grade}><CampoTexto rotulo="Quantidade de parcelas" inputMode="numeric" autoComplete="off" dica="De 1 a 60" obrigatorio required erro={parcelasLidas.erro} value={parcelasTexto} onChange={(e) => setParcelasTexto(lerParcelas(e.target.value).texto)} /><CampoTexto rotulo="Primeiro vencimento" tipo="date" obrigatorio required min={emissao || undefined} erro={vencimento && emissao && vencimento < emissao ? 'O primeiro vencimento não pode ser antes da emissão.' : null} value={vencimento} onChange={(e) => setVencimento(e.target.value)} /></div>
       <ol className={css.parcelas}>{parcelas.map((item) => <li key={item.numero}>Parcela {item.numero}: {moeda(item.valor)} · {diaFinanceiro(item.dataVencimento).split('-').reverse().join('/')}</li>)}</ol>
       <label className={css.escolha}><input type="checkbox" checked={emitir} onChange={(e) => { setEmitir(e.target.checked); if (!e.target.checked) setJaFeito(false) }} /> Emitir a conta ao salvar</label>
       {parcelaUnica && emitir && <label className={css.escolha}><input type="checkbox" checked={jaFeito} onChange={(e) => setJaFeito(e.target.checked)} /> {palavras.jaFeito}</label>}
     </>}
-    <CampoArea rotulo="Observações (opcional)" rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
+    <CampoArea rotulo="Observações" rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
     </fieldset>
     {!conta && <>
-      {registrarJunto && <div className={css.grade}><CampoSelecao rotulo={palavras.forma} value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={METODOS_CAIXA.map((item) => ({ valor: item, rotulo: nomeDoMetodoCaixa(item) }))} /><CampoTexto rotulo={palavras.data} tipo="date" required max={diaFinanceiro()} value={dataFeito} onChange={(e) => setDataFeito(e.target.value)} /></div>}
+      {registrarJunto && <div className={css.grade}><CampoSelecao rotulo={palavras.forma} value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={METODOS_CAIXA.map((item) => ({ valor: item, rotulo: nomeDoMetodoCaixa(item) }))} /><CampoTexto rotulo={palavras.data} tipo="date" obrigatorio required max={diaFinanceiro()} value={dataFeito} onChange={(e) => setDataFeito(e.target.value)} /></div>}
     </>}
   </FormularioFinanceiro>
 }
@@ -159,7 +159,7 @@ export function ModalPagamentoFinanceiro({ lado, conta, parcela, aoFechar, aoGra
     <p className={css.aviso}>Registre o valor já {lado === 'pagar' ? 'pago' : 'recebido'}. A confirmação também gera o movimento correspondente no Caixa.</p>
     <DinheiroFinanceiro rotulo="Valor" centavos={centavos} aoMudar={setCentavos} />
     {centavos > Math.round(parcela.saldo * 100) && <ErroFinanceiro erro="O valor ultrapassa o saldo da parcela." />}
-    <div className={css.grade}><CampoSelecao rotulo={palavras.forma} value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={METODOS_CAIXA.map((item) => ({ valor: item, rotulo: nomeDoMetodoCaixa(item) }))} /><CampoTexto rotulo={palavras.data} tipo="date" required max={diaFinanceiro()} value={data} onChange={(e) => setData(e.target.value)} /></div>
+    <div className={css.grade}><CampoSelecao rotulo={palavras.forma} value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={METODOS_CAIXA.map((item) => ({ valor: item, rotulo: nomeDoMetodoCaixa(item) }))} /><CampoTexto rotulo={palavras.data} tipo="date" obrigatorio required max={diaFinanceiro()} value={data} onChange={(e) => setData(e.target.value)} /></div>
     <CampoArea rotulo="Observação" rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} />
   </FormularioFinanceiro>
 }
@@ -168,7 +168,7 @@ export function ModalConfirmacaoFinanceira({ titulo, descricao, exigirMotivo = f
   const [motivo, setMotivo] = useState('')
   const operacao = useOperacaoFinanceira(aoGravar)
   return <FormularioFinanceiro titulo={titulo} aoFechar={aoFechar} operacao={operacao} valido={!exigirMotivo || motivo.trim().length >= 3} motivo="Escreva o motivo (3 letras ou mais)." salvar={salvar} fechar={fechar} aoEnviar={async () => { if (await operacao.executar(() => acao(motivo.trim()))) aoFechar() }}>
-    <p>{descricao}</p>{exigirMotivo && <CampoArea rotulo="Motivo" required minLength={3} rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} />}
+    <p>{descricao}</p>{exigirMotivo && <CampoArea rotulo="Motivo" obrigatorio required minLength={3} rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} />}
   </FormularioFinanceiro>
 }
 
@@ -183,8 +183,8 @@ export function ModalCadastroFinanceiro({ tipo, item, aoFechar, aoGravar }) {
     const corpo = categoria ? { nome: nome.trim(), ...(item ? { cor: item.cor, icone: item.icone } : { tipo: tipoCategoria }) } : { nome: nome.trim(), descricao, ...(item ? {} : { codigo: codigo.trim() }) }
     if (await operacao.executar(() => salvarCadastroFinanceiro(tipo === 'centros' ? 'centros-custo' : tipo, corpo, item?.id))) aoFechar()
   }}>
-    <CampoTexto rotulo="Nome" required value={nome} onChange={(e) => setNome(e.target.value)} />
-    {categoria ? <CampoSelecao rotulo="Tipo" disabled={Boolean(item)} value={tipoCategoria} onChange={(e) => setTipoCategoria(e.target.value)} opcoes={['Despesa', 'Receita', 'Ambas'].map((valor) => ({ valor, rotulo: valor }))} /> : <><CampoTexto rotulo="Código" required disabled={Boolean(item)} value={codigo} onChange={(e) => setCodigo(e.target.value)} /><CampoArea rotulo="Descrição" rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
+    <CampoTexto rotulo="Nome" obrigatorio required value={nome} onChange={(e) => setNome(e.target.value)} />
+    {categoria ? <CampoSelecao rotulo="Tipo" disabled={Boolean(item)} value={tipoCategoria} onChange={(e) => setTipoCategoria(e.target.value)} opcoes={['Despesa', 'Receita', 'Ambas'].map((valor) => ({ valor, rotulo: valor }))} /> : <><CampoTexto rotulo="Código" obrigatorio required disabled={Boolean(item)} value={codigo} onChange={(e) => setCodigo(e.target.value)} /><CampoArea rotulo="Descrição" rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
   </FormularioFinanceiro>
 }
 
@@ -195,5 +195,5 @@ export function ModalParcelaFinanceira({ lado, conta, aoFechar, aoGravar }) {
   const numero = Math.max(0, ...conta.parcelas.map((item) => item.numero)) + 1
   return <FormularioFinanceiro titulo="Adicionar parcela" aoFechar={aoFechar} operacao={operacao} valido={centavos > 0 && vencimento && !moedaAltaDemais(centavos)} aoEnviar={async () => {
     if (await operacao.executar(() => adicionarParcelaFinanceira(lado, conta.id, { numero, valor: centavos / 100, dataVencimento: instanteFinanceiro(vencimento) }))) aoFechar()
-  }}><DinheiroFinanceiro rotulo="Valor da parcela" centavos={centavos} aoMudar={setCentavos} /><CampoTexto rotulo="Vencimento" tipo="date" required value={vencimento} onChange={(e) => setVencimento(e.target.value)} /></FormularioFinanceiro>
+  }}><DinheiroFinanceiro rotulo="Valor da parcela" centavos={centavos} aoMudar={setCentavos} /><CampoTexto rotulo="Vencimento" tipo="date" obrigatorio required value={vencimento} onChange={(e) => setVencimento(e.target.value)} /></FormularioFinanceiro>
 }
