@@ -210,6 +210,7 @@ public class ClienteProvedorIaTests
     {
         using var handler = ClienteProvedorIa.Handler();
         handler.AllowAutoRedirect.Should().BeFalse();
+        handler.UseProxy.Should().BeFalse();
         handler.ConnectCallback.Should().NotBeNull();
     }
 

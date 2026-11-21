@@ -31,6 +31,7 @@ public sealed class RoteadorIaLlmClient(
 
     private readonly Dictionary<Guid, bool> _flag = [];
     private readonly Dictionary<(Guid, string), RotaIa?> _rotas = [];
+    private readonly HashSet<(Guid, Guid)> _cotaGravada = [];
 
     public IAgenteLlmClient DoEnv => doEnv;
 
@@ -42,7 +43,8 @@ public sealed class RoteadorIaLlmClient(
         if (!await PorLojaAsync(empresaId, ct)) return await doEnv.DisponivelAsync(empresaId, ct);
         try
         {
-            await AvaliarAsync(empresaId, null, FinalidadeIa.Outra, gravarCota: false, ct);
+            // Os chamadores checam a disponibilidade antes de enviar: é aqui que a cota estourada costuma aparecer.
+            await AvaliarAsync(empresaId, null, FinalidadeIa.Outra, ct);
             return true;
         }
         catch (ProvedorIaIndisponivelException)
@@ -62,7 +64,19 @@ public sealed class RoteadorIaLlmClient(
         ArgumentNullException.ThrowIfNull(requisicao);
         if (!await PorLojaAsync(requisicao.EmpresaId, ct)) return await doEnv.EnviarAsync(requisicao, ct);
 
-        var (rota, chave) = await AvaliarAsync(requisicao.EmpresaId, requisicao.Modelo, requisicao.Finalidade, gravarCota: true, ct);
+        RotaIa rota;
+        string chave;
+        try
+        {
+            (rota, chave) = await AvaliarAsync(requisicao.EmpresaId, requisicao.Modelo, requisicao.Finalidade, ct);
+        }
+        catch (Exception ex) when (ex is not ProvedorIaIndisponivelException && !ct.IsCancellationRequested)
+        {
+            // Banco ou cofre com falha antes de sair: a chamada não saiu, e quem chamou trata como IA indisponível.
+            logger.LogError(ex, "IA da empresa {EmpresaId}: falha ao checar provedor, gasto ou chave; nada foi enviado.",
+                requisicao.EmpresaId);
+            throw new ProvedorIaIndisponivelException("Não foi possível checar o provedor de IA da loja.", ex);
+        }
         var destino = new DestinoIa(rota.ProvedorId, rota.BaseUrl, rota.Autenticacao, chave, rota.Modelo.IdExterno);
         var cronometro = Stopwatch.StartNew();
         RespostaLlm resposta;
@@ -104,7 +118,7 @@ public sealed class RoteadorIaLlmClient(
 
     /// <summary>Passos 0 a 3 da spec §5. Qualquer barreira lança <see cref="ProvedorIaIndisponivelException"/>.</summary>
     private async Task<(RotaIa Rota, string Chave)> AvaliarAsync(
-        Guid empresaId, string? modeloPedido, FinalidadeIa finalidade, bool gravarCota, CancellationToken ct)
+        Guid empresaId, string? modeloPedido, FinalidadeIa finalidade, CancellationToken ct)
     {
         if (tenant.EmpresaId == Guid.Empty || tenant.EmpresaId != empresaId)
         {
@@ -134,7 +148,8 @@ public sealed class RoteadorIaLlmClient(
             {
                 logger.LogWarning("Cota de IA estourada: empresa {EmpresaId}, provedor {ProvedorId}, gasto US$ {Gasto} de US$ {Orcamento}.",
                     empresaId, rota.ProvedorId, gasto, orcamento);
-                if (gravarCota)
+                // Uma linha por escopo e provedor: o portão e o envio da mesma requisição não duplicam.
+                if (_cotaGravada.Add((empresaId, rota.ProvedorId)))
                     await GravacaoChamadaIa.GravarAsync(registro, Chamada(empresaId, finalidade, rota, null,
                         DesfechoChamadaIa.CotaEstourada, 0), null, logger);
                 throw new ProvedorIaIndisponivelException("O orçamento de IA do mês acabou.");

@@ -226,20 +226,47 @@ public class RoteadorIaLlmClientTests
     [Theory]
     [InlineData("10")]
     [InlineData("10.5")]
-    public async Task OrcamentoDe10DolaresEstouradoFicaIndisponivelEGravaCotaEstourada(string gasto)
+    public async Task OrcamentoDe10DolaresEstouradoFicaIndisponivelEGravaCotaEstouradaUmaVezPorEscopo(string gasto)
     {
         _rotas.GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
             .Returns(decimal.Parse(gasto, System.Globalization.CultureInfo.InvariantCulture));
+        var roteador = Roteador();
 
-        (await Roteador().DisponivelAsync(Empresa)).Should().BeFalse();
-        _gravadas.Should().BeEmpty("checar disponibilidade não é chamada");
+        // Como os chamadores reais: checam o portão e, com false, a equipe atende sem chamar EnviarAsync.
+        (await roteador.DisponivelAsync(Empresa)).Should().BeFalse();
+        (await roteador.DisponivelAsync(Empresa)).Should().BeFalse();
+        var c = _gravadas.Should().ContainSingle("o portão grava cota_estourada uma vez por escopo").Subject;
+        c.Desfecho.Should().Be(DesfechoChamadaIa.CotaEstourada);
+        (c.TokensEntrada, c.TokensSaida, c.CustoUsd).Should().Be((0, 0, (decimal?)null));
+        c.ProvedorId.Should().Be(Provedor);
 
+        // Corrida entre o portão e o envio, no mesmo escopo: não sai e não duplica a linha.
+        await FluentActions.Awaiting(() => roteador.EnviarAsync(Requisicao()))
+            .Should().ThrowAsync<ProvedorIaIndisponivelException>();
+        _gravadas.Should().ContainSingle();
+
+        // Outro escopo (outra requisição) que só envia também grava.
         await FluentActions.Awaiting(() => Roteador().EnviarAsync(Requisicao()))
             .Should().ThrowAsync<ProvedorIaIndisponivelException>();
-        var c = _gravadas.Should().ContainSingle().Subject;
-        c.Desfecho.Should().Be(DesfechoChamadaIa.CotaEstourada);
-        (c.TokensEntrada, c.TokensSaida).Should().Be((0, 0));
-        c.ProvedorId.Should().Be(Provedor);
+        _gravadas.Should().HaveCount(2).And.OnlyContain(g => g.Desfecho == DesfechoChamadaIa.CotaEstourada);
+        await _provedores.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task ComFlagFalhaDeBancoOuCofreNoEnvioViraIndisponivelSemGravar()
+    {
+        _rotas.GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns<Task<decimal>>(_ => throw new TimeoutException("banco lento"));
+        await FluentActions.Awaiting(() => Roteador().EnviarAsync(Requisicao()))
+            .Should().ThrowAsync<ProvedorIaIndisponivelException>().WithInnerException(typeof(TimeoutException));
+
+        _rotas.GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(0m);
+        _cofre.ObterAsync<ChaveProvedorIa>(Empresa, Arg.Any<string>(), Arg.Any<AmbienteIntegracao>(), Arg.Any<CancellationToken>())
+            .Returns<Task<ChaveProvedorIa?>>(_ => throw new ChaveMestraAusenteException("KEK ausente"));
+        await FluentActions.Awaiting(() => Roteador().EnviarAsync(Requisicao()))
+            .Should().ThrowAsync<ProvedorIaIndisponivelException>();
+
+        _gravadas.Should().BeEmpty();
         await _provedores.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default!, default);
     }
 

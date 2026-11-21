@@ -116,6 +116,7 @@ public sealed class ClienteProvedorIa(
     internal static SocketsHttpHandler Handler() => new()
     {
         AllowAutoRedirect = false,
+        UseProxy = false, // o ConnectCallback valida o IP do provedor; com proxy validaria o do proxy
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
         ConnectCallback = ConectarAsync,
     };
