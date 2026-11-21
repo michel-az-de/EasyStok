@@ -14,12 +14,16 @@ public class UploadsController(
     GerenciarUploadsUseCase gerenciarUploadsUseCase,
     ICurrentUserAccessor currentUserAccessor) : EasyStockControllerBase
 {
+    private const long TetoImagemBytes = 6 * 1024 * 1024;
+
     [SwaggerOperation(Summary = "Upload product photo (Gerente only)")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     // #1508: mesma autorização do POST /api/produtos/{id}/fotos (Gerente + módulo Cardápio, ver ModulosConvention).
     [Authorize(Policy = "Gerente")]
+    [RequestSizeLimit(TetoImagemBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = TetoImagemBytes)]
     [HttpPost("produto/{id}/foto")]
     public async Task<IActionResult> UploadFotoProduto(Guid id, [FromQuery] Guid empresaId, IFormFile file, CancellationToken cancellationToken)
     {
@@ -31,6 +35,8 @@ public class UploadsController(
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [RequestSizeLimit(TetoImagemBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = TetoImagemBytes)]
     [HttpPost("usuario/avatar")]
     public async Task<IActionResult> UploadAvatar(IFormFile file, CancellationToken cancellationToken)
     {
@@ -50,6 +56,8 @@ public class UploadsController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [Authorize(Policy = "Admin")]
+    [RequestSizeLimit(TetoImagemBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = TetoImagemBytes)]
     [HttpPost("loja/logo")]
     public async Task<IActionResult> UploadLogoLoja([FromQuery] Guid lojaId, IFormFile file, CancellationToken cancellationToken)
     {
@@ -140,6 +148,9 @@ public class UploadsController(
     {
         if (file is null || file.Length == 0)
             throw new UseCaseValidationException("Arquivo nao informado ou vazio.");
+        // #3082: recusa antes de bufferizar; o use case valida 5 MB depois, sobre o array ja em memoria.
+        if (file.Length > TetoImagemBytes)
+            throw new UseCaseValidationException("A imagem nao pode ser maior que 6 MB.");
 
         await using var memoryStream = new MemoryStream();
         await file.CopyToAsync(memoryStream, cancellationToken);

@@ -14,7 +14,8 @@ namespace EasyStock.Api.Controllers;
 [Route("api/ia")]
 [Authorize]
 public class IaAutoPreenchimentoController(
-    IGeradorAutoPreenchimento geradorAutoPreenchimento) : EasyStockControllerBase
+    IGeradorAutoPreenchimento geradorAutoPreenchimento,
+    ILogger<IaAutoPreenchimentoController> logger) : EasyStockControllerBase
 {
     /// <summary>
     /// Preenche automaticamente os campos de um produto novo via SSE (streaming).
@@ -26,6 +27,7 @@ public class IaAutoPreenchimentoController(
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [HttpPost("completar-produto")]
     [Authorize(Policy = "Operador")]
+    [RequestSizeLimit(16 * 1024)]
     public async Task CompletarProdutoSse([FromBody] CompletarProdutoRequest request, CancellationToken ct)
     {
         Response.ContentType = "text/event-stream; charset=utf-8";
@@ -49,17 +51,24 @@ public class IaAutoPreenchimentoController(
             await Response.WriteAsync("data: [DONE]\n\n", Encoding.UTF8, ct);
             await Response.Body.FlushAsync(ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // cliente fechou o stream: nada a responder
+        }
         catch (Exception ex)
         {
-            var err = JsonSerializer.Serialize(new { error = ex.Message });
+            // #3082: a mensagem do provedor fica no log; o cliente recebe texto generico
+            logger.LogWarning(ex, "Auto-preenchimento de produto falhou");
+            var err = JsonSerializer.Serialize(new { error = "Nao foi possivel completar o produto agora. Tente de novo em instantes." });
             await Response.WriteAsync($"event: erro\ndata: {err}\n\n", Encoding.UTF8, ct);
             await Response.Body.FlushAsync(ct);
         }
     }
 }
 
+// #3082: os campos entram no prompt pago; teto alinhado ao Nome do produto (180)
 public sealed record CompletarProdutoRequest(
-    string NomeProduto,
-    string? Categoria,
-    string? Marca,
-    string? Instrucoes);
+    [StringLength(180)] string NomeProduto,
+    [StringLength(120)] string? Categoria,
+    [StringLength(120)] string? Marca,
+    [StringLength(1000)] string? Instrucoes);

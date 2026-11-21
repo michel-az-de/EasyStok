@@ -103,6 +103,7 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
@@ -121,6 +122,7 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
@@ -154,6 +156,7 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
@@ -234,6 +237,7 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
@@ -260,6 +264,7 @@ public class AnalyticsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        (page, pageSize) = NormalisePage(page, pageSize); // #3082: teto de pagina
         if (!TryResolveEmpresaId(currentUser, empresaId, out var resolvedEmpresaId, out var error))
             return error!;
 
