@@ -133,12 +133,10 @@ export function ModalContaFinanceira({ lado, conta, cadastros, aoFechar, aoGrava
       <ol className={css.parcelas}>{parcelas.map((item) => <li key={item.numero}>Parcela {item.numero}: {moeda(item.valor)} · {diaFinanceiro(item.dataVencimento).split('-').reverse().join('/')}</li>)}</ol>
       <label className={css.escolha}><input type="checkbox" checked={emitir} onChange={(e) => { setEmitir(e.target.checked); if (!e.target.checked) setJaFeito(false) }} /> Emitir a conta ao salvar</label>
       {parcelaUnica && emitir && <label className={css.escolha}><input type="checkbox" checked={jaFeito} onChange={(e) => setJaFeito(e.target.checked)} /> {palavras.jaFeito}</label>}
+      {registrarJunto && <div className={css.grade}><CampoSelecao rotulo={palavras.forma} value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={METODOS_CAIXA.map((item) => ({ valor: item, rotulo: nomeDoMetodoCaixa(item) }))} /><CampoTexto rotulo={palavras.data} tipo="date" obrigatorio required max={diaFinanceiro()} value={dataFeito} onChange={(e) => setDataFeito(e.target.value)} /></div>}
     </>}
     <CampoArea rotulo="Observações" rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
     </fieldset>
-    {!conta && <>
-      {registrarJunto && <div className={css.grade}><CampoSelecao rotulo={palavras.forma} value={metodo} onChange={(e) => setMetodo(e.target.value)} opcoes={METODOS_CAIXA.map((item) => ({ valor: item, rotulo: nomeDoMetodoCaixa(item) }))} /><CampoTexto rotulo={palavras.data} tipo="date" obrigatorio required max={diaFinanceiro()} value={dataFeito} onChange={(e) => setDataFeito(e.target.value)} /></div>}
-    </>}
   </FormularioFinanceiro>
 }
 

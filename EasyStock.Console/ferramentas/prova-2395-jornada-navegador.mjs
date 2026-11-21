@@ -130,7 +130,7 @@ try {
     await somar.click(); await somar.click()
     await fecharPaineis()
     await page.getByRole('button', { name: /^Revisar comanda/ }).first().click()
-    await page.getByLabel('Dia da entrega (opcional)', { exact: true }).fill(fixture.dataEntrega)
+    await page.getByLabel('Ver janelas do dia', { exact: true }).fill(fixture.dataEntrega)
     await page.getByRole('button', { name: /Manhã.*vagas? livres?/ }).first().click()
     await fecharPaineis()
     const dispensarAvisos = page.getByRole('button', { name: 'Dispensar avisos do aparelho', exact: true })

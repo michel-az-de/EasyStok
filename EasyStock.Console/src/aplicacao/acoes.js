@@ -285,6 +285,8 @@ export const AVISO_API = 'aviso-api'
 export const SINCRONIZAR_EXPEDIENTE = 'sincronizar-expediente'
 // F03: cardápio da vitrine da empresa e o pedido da conversa (S10/S11) como a API devolveu.
 export const SINCRONIZAR_CARDAPIO = 'sincronizar-cardapio'
+// #3076: a leitura do cardápio foi recusada (vitrine desligada, falha); o Novo pedido diz o motivo em vez de esperar.
+export const CARDAPIO_INDISPONIVEL = 'cardapio-indisponivel'
 export const SINCRONIZAR_PEDIDO = 'sincronizar-pedido'
 // F06 (#1236): o aviso de ação fica na faixa até a dona fechar; a sincronização não o apaga.
 export const FECHAR_AVISO_API = 'fechar-aviso-api'
