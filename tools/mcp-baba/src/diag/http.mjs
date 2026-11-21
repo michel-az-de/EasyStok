@@ -45,9 +45,11 @@ function janela(mapa, chave, agora, ms) {
   if (!e || agora - e.inicio >= ms) { e = { inicio: agora, n: 0 }; mapa.set(chave, e); }
   return e;
 }
-function podar(mapa, agora, ms) {
-  if (mapa.size < 5000) return;
+function podar(mapa, agora, ms, teto = 5000) {
+  if (mapa.size < teto) return;
   for (const [k, e] of mapa) if (agora - e.inicio >= ms) mapa.delete(k);
+  // rotacao de IP (IPv6) sem nada vencido: descarta os mais antigos ate a metade, para o custo nao crescer por pedido
+  for (const k of mapa.keys()) { if (mapa.size < teto / 2) break; mapa.delete(k); }
 }
 
 function lerCorpo(req, max) {

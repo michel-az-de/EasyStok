@@ -12,14 +12,15 @@
 #   caddy    confere o DNS, reconecta o shared-caddy e aplica o bloco do dominio (idempotente; valida e recarrega,
 #            restaura o backup se falhar). Rodar de novo depois de recriar o shared-caddy.
 #   chave    copia o gate.sh do origin/master para ~/build e imprime o passo root unico do Felipe.
-#   token-*  arquivo /opt/stacks/mcp/auth/tokens (pessoa:sha256:validade). O token sai so no stdout, uma vez.
+#   token-*  arquivo /opt/stacks/mcp/auth/tokens (pessoa:sha256:validade). O token emitido vai so para um
+#            arquivo local 600 (padrao ~/.mcp-token-<pessoa>), nunca para a tela.
 #   descer   tira o bloco do Caddy, desconecta o shared-caddy e derruba a stack. Rede, chave e tokens ficam.
 #
 # Uso:
 #   scripts/deploy/mcp-deploy.sh subir [sha]
 #   scripts/deploy/mcp-deploy.sh caddy
 #   scripts/deploy/mcp-deploy.sh chave
-#   scripts/deploy/mcp-deploy.sh token-emitir <pessoa> [dias, padrao 90]
+#   scripts/deploy/mcp-deploy.sh token-emitir <pessoa> [dias, padrao 90] [arquivo, padrao ~/.mcp-token-<pessoa>]
 #   scripts/deploy/mcp-deploy.sh token-revogar <pessoa>
 #   scripts/deploy/mcp-deploy.sh tokens
 #   scripts/deploy/mcp-deploy.sh status
@@ -43,6 +44,8 @@ remoto() { local s="$1"; shift; ssh -o BatchMode=yes "$VPS_HOST" "$ENVS $* bash 
 read -r -d '' COMUM <<'EOF' || true
 set -euo pipefail
 umask 077
+# mesma trava do vps-deploy: subir, caddy e descer nunca correm junto com outro deploy nem entre si
+trava() { exec 9>/tmp/easystok-deploy.lock; flock -n 9 || { echo "ERRO: outro deploy em andamento (trava /tmp/easystok-deploy.lock)" >&2; exit 3; }; }
 recarrega() { docker exec shared-caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 \
   && docker exec shared-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; }
 restaura() { cat "$1" > "$CADDYFILE"; recarrega || true; }   # cat preserva o inode do bind de arquivo
@@ -56,8 +59,9 @@ read -r -d '' SUBIR <<'EOF' || true
 registra() { local rc=$?; printf '%s\tmcp\t%s\trc=%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SHA" "$rc" "$QUEM" "ADR-0069 baba-diag remoto" \
   >>"$BUILD_ROOT/deploy-history.log" 2>/dev/null || true; }
 trap registra EXIT
-exec 9>/tmp/easystok-deploy.lock
-flock -n 9 || { echo "ERRO: outro deploy em andamento (trava /tmp/easystok-deploy.lock)" >&2; exit 3; }
+trava
+# o compose roda como 1000:1000, dono da chave e dos tokens; outro uid daria healthy com 401 para todos
+[ "$(id -u)" = 1000 ] || { echo "ERRO: rode como o uid 1000 (felipe); este e $(id -u)" >&2; exit 4; }
 
 SRC="$BUILD_ROOT/easystok-mcp-$SHA"
 rm -rf "$SRC"; mkdir -p "$SRC"
@@ -124,6 +128,7 @@ ip="$( (command -v dig >/dev/null 2>&1 && dig +short A "$DOMINIO" @1.1.1.1 | tai
 [ -n "$ip" ] || ip="$(getent ahostsv4 "$DOMINIO" | awk 'NR==1{print $1}' || true)"
 [ "$ip" = "$IP_VPS" ] || { echo "ERRO: $DOMINIO resolve para '${ip:-nada}', esperado $IP_VPS. Crie o registro A e espere propagar." >&2; exit 9; }
 docker inspect ez-mcp >/dev/null 2>&1 || { echo "ERRO: ez-mcp nao existe; rode subir antes" >&2; exit 9; }
+trava
 conecta
 if grep -q "^$DOMINIO {" "$CADDYFILE"; then echo "Caddy: bloco ja existe"; else
   bak="$CADDYFILE.antes-mcp-$(date -u +%Y%m%dT%H%M%SZ)"; cp -p "$CADDYFILE" "$bak"
@@ -146,6 +151,7 @@ echo "ERRO: https://$DOMINIO/saude nao respondeu 200 (ultimo: $c). Ver: docker l
 EOF
 
 read -r -d '' DESCER <<'EOF' || true
+trava
 if grep -q "^$DOMINIO {" "$CADDYFILE"; then
   bak="$CADDYFILE.antes-mcp-descer-$(date -u +%Y%m%dT%H%M%SZ)"; cp -p "$CADDYFILE" "$bak"
   python3 - "$CADDYFILE" "$DOMINIO" <<'PY'
@@ -225,13 +231,22 @@ case "$acao" in
     PUB="$(ssh -o BatchMode=yes "$VPS_HOST" 'cat /opt/stacks/mcp/ssh/id_ed25519.pub')" || uso "sem chave; rode subir antes"
     [[ "$PUB" =~ ^ssh-ed25519\ [A-Za-z0-9+/=]+\ ez-mcp$ ]] || uso "chave publica fora do formato esperado"
     LINHA="from=\"172.16.8.0/24\",command=\"/opt/baba-mcp/gate.sh --sem-banco\",restrict $PUB"
-    git show origin/master:scripts/mcp/gate.sh | ssh -o BatchMode=yes "$VPS_HOST" 'umask 022; cat > ~/build/gate.sh.mcp'
+    # gate sem o modo --sem-banco ignora o argumento e entrega psql_ro a esta chave: so com o gate da #3062 no master
+    GATE="$(git show origin/master:scripts/mcp/gate.sh)"
+    grep -qF -- '--sem-banco) SEM_BANCO=1' <<<"$GATE" || recusa "o gate.sh do origin/master nao tem --sem-banco; mergeie a #3062 antes"
+    printf '%s\n' "$GATE" | ssh -o BatchMode=yes "$VPS_HOST" 'umask 022; cat > ~/build/gate.sh.mcp'
     # o passo root vira arquivo na VPS: o comando do Felipe fica curto e sem aspas aninhadas (PowerShell)
     ssh -o BatchMode=yes "$VPS_HOST" 'umask 022; cat > ~/build/mcp-root.sh' <<FIM
 #!/usr/bin/env bash
 # Passo root unico do MCP remoto (ADR-0069), gerado por scripts/deploy/mcp-deploy.sh chave. Idempotente.
 set -euo pipefail
 install -o root -g root -m 755 /home/felipe/build/gate.sh.mcp /opt/baba-mcp/gate.sh
+# prova antes de liberar a chave: --sem-banco nega psql_ro (64) e deixa containers passar (0)
+# SQL valido de proposito: sem --sem-banco o gate aceitaria (0); so o modo novo nega (64)
+rc=0; echo 'select 1' | GATE_DRY=1 SSH_ORIGINAL_COMMAND=psql_ro /opt/baba-mcp/gate.sh --sem-banco >/dev/null 2>&1 || rc=\$?
+[ "\$rc" -eq 64 ] || { echo "ERRO: gate instalado nao nega psql_ro em --sem-banco (saiu \$rc); chave NAO liberada" >&2; exit 1; }
+GATE_DRY=1 SSH_ORIGINAL_COMMAND=containers /opt/baba-mcp/gate.sh --sem-banco >/dev/null
+echo "gate --sem-banco: psql_ro negado (64), containers ok"
 grep -qF '$PUB' /home/baba-mcp/.ssh/authorized_keys || printf '%s\n' '$LINHA' >> /home/baba-mcp/.ssh/authorized_keys
 sha256sum /opt/baba-mcp/gate.sh
 grep -F ' ez-mcp' /home/baba-mcp/.ssh/authorized_keys
@@ -241,9 +256,11 @@ FIM
     echo "  ssh -t $VPS_HOST \"sudo bash /home/felipe/build/mcp-root.sh\""
     ;;
   token-emitir)
-    pessoa_ok "${1:-}"; DIAS="${2:-90}"
+    pessoa_ok "${1:-}"; DIAS="${2:-90}"; SAIDA="${3:-$HOME/.mcp-token-$1}"
     [[ "$DIAS" =~ ^[0-9]{1,3}$ ]] && [ "$DIAS" -ge 1 ] && [ "$DIAS" -le 365 ] || uso "dias: 1 a 365"
-    remoto "$COMUM"$'\n'"$TOKEN_EMITIR" "PESSOA=$1 DIAS=$DIAS" </dev/null ;;
+    # o token vai so para um arquivo 600 local: nunca para a tela, log ou transcript de agente
+    ( umask 077; remoto "$COMUM"$'\n'"$TOKEN_EMITIR" "PESSOA=$1 DIAS=$DIAS" </dev/null > "$SAIDA" )
+    echo "token gravado em $SAIDA (so voce le); use com: --header \"Authorization: Bearer \$(cat $SAIDA)\"" >&2 ;;
   token-revogar) pessoa_ok "${1:-}"; remoto "$COMUM"$'\n'"$TOKEN_REVOGAR" "PESSOA=$1" </dev/null ;;
   tokens) remoto "$COMUM"$'\n'"$TOKENS" </dev/null ;;
   status) remoto "$COMUM"$'\n'"$STATUS" </dev/null ;;

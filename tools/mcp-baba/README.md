@@ -4,7 +4,7 @@ Servidores MCP da Casa da Baba. Spec: [docs/plan/mcp-casa-da-baba](../../docs/pl
 
 ## Usar o baba-diag remoto (outro computador, so Claude Code)
 
-1. O Felipe emite o token (aparece uma vez): `scripts/deploy/mcp-deploy.sh token-emitir <pessoa>` (validade de 90 dias).
+1. O Felipe emite o token: `scripts/deploy/mcp-deploy.sh token-emitir <pessoa>` (validade de 90 dias). O token nao aparece na tela: vai para o arquivo `~/.mcp-token-<pessoa>` (permissao 600), que ele entrega a pessoa por canal privado.
 2. Na maquina da pessoa:
 
 ```bash
