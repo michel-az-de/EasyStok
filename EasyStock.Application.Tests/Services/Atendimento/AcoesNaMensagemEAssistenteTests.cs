@@ -62,4 +62,22 @@ public class AcoesNaMensagemEAssistenteTests
 
         pendente.Should().BeSameAs(entrada);
     }
+
+    [Fact]
+    public void ApagarAResposta_DaOPrazoInteiroAQuemApagou()
+    {
+        var prazo = TimeSpan.FromSeconds(60);
+        var conversa = Conversa.Abrir(Empresa, "5511999990009", Agora, contatoNome: "Tatiana");
+        conversa.RegistrarEntrada(Agora);
+        conversa.Assumir(Agora.AddSeconds(2), Guid.NewGuid());
+        var entrada = Mensagem.Entrada(Empresa, conversa.Id, Agora, TipoConteudoMensagem.Texto, "Quanto fica o frete?", "wamid.7");
+        var resposta = Mensagem.Saida(Empresa, conversa.Id, AutorMensagem.Atendente, Agora.AddSeconds(5), TipoConteudoMensagem.Texto,
+            "R$ 5", "wamid.8");
+        var apagouEm = Agora.AddMinutes(3);
+        resposta.ApagarParaTodos(Guid.NewGuid(), apagouEm);
+
+        // Quem apagou está corrigindo a resposta: o relógio recomeça no apagar, não no envio da mensagem apagada.
+        RetomadaDoAssistente.EntradaSemResposta(conversa, [entrada, resposta], apagouEm.AddSeconds(30), prazo).Should().BeNull();
+        RetomadaDoAssistente.EntradaSemResposta(conversa, [entrada, resposta], apagouEm.AddSeconds(61), prazo).Should().BeSameAs(entrada);
+    }
 }
