@@ -160,7 +160,12 @@ public sealed class ClienteProvedorIa(
             if (endereco.Equals(IPAddress.IPv6None) || endereco.Equals(IPAddress.IPv6Any)) return false;
             if (endereco.IsIPv6LinkLocal || endereco.IsIPv6SiteLocal || endereco.IsIPv6Multicast) return false;
             var b = endereco.GetAddressBytes();
-            return (b[0] & 0xFE) != 0xFC; // fc00::/7, endereço local único
+            if ((b[0] & 0xFE) == 0xFC) return false; // fc00::/7, endereço local único
+            // Prefixos que embutem IPv4 (podem esconder um privado): 6to4 2002::/16, Teredo 2001::/32, NAT64 64:ff9b::/96.
+            if (b[0] == 0x20 && b[1] == 0x02) return false;
+            if (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0 && b[3] == 0) return false;
+            if (b[0] == 0 && b[1] == 0x64 && b[2] == 0xff && b[3] == 0x9b) return false;
+            return true;
         }
         return false;
     }

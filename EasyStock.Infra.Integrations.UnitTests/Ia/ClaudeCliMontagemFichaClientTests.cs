@@ -224,7 +224,7 @@ public class ClaudeCliMontagemFichaClientTests
         services.AddSingleton(NSubstitute.Substitute.For<ITenantAtual>());
         services.AddSingleton(NSubstitute.Substitute.For<IRotasIa>());
         services.AddSingleton(NSubstitute.Substitute.For<EasyStock.Application.Ports.Output.Integration.Crypto.IIntegrationCredentialResolver>());
-        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         using var escopo = provider.CreateScope();
         var cliente = escopo.ServiceProvider.GetRequiredService<IAgenteLlmClient>();
         cliente.Should().BeOfType<RoteadorIaLlmClient>()

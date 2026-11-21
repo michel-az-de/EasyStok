@@ -49,6 +49,12 @@ public sealed class RoteadorIaLlmClient(
         {
             return false;
         }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            // Banco ou cofre com falha: indisponível (a equipe atende), nunca 500 no portão.
+            logger.LogError(ex, "IA da empresa {EmpresaId}: falha ao checar provedor, gasto ou chave; fica indisponível.", empresaId);
+            return false;
+        }
     }
 
     public async Task<RespostaLlm> EnviarAsync(RequisicaoLlm requisicao, CancellationToken ct = default)
@@ -81,7 +87,17 @@ public sealed class RoteadorIaLlmClient(
     {
         if (empresaId == Guid.Empty) return false;
         if (_flag.TryGetValue(empresaId, out var ligada)) return ligada;
-        ligada = (await flags.ListarAtivasAsync(empresaId, ct)).Contains(FeatureCatalogo.IaProvedorPorLoja);
+        try
+        {
+            ligada = (await flags.ListarAtivasAsync(empresaId, ct)).Contains(FeatureCatalogo.IaProvedorPorLoja);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            // Sem conseguir ler a flag, a loja segue no .env, como antes da S2b: a leitura nunca derruba o turno.
+            logger.LogError(ex, "IA da empresa {EmpresaId}: falha ao ler a flag {Flag}; segue pelo .env.", empresaId,
+                FeatureCatalogo.IaProvedorPorLoja);
+            ligada = false;
+        }
         _flag[empresaId] = ligada;
         return ligada;
     }

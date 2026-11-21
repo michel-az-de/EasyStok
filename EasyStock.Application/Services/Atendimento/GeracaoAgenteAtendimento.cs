@@ -195,7 +195,9 @@ public static class GeracaoAgenteAtendimento
         {
             return await llm.EnviarAsync(requisicao, ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        // #3064: o que nem saiu (disjuntor aberto, cota estourada, sem chave) não se repete: daria outra linha de cota_estourada.
+        catch (Exception ex) when (ex is not ProvedorIaIndisponivelException
+                                   && (ex is not OperationCanceledException || !ct.IsCancellationRequested))
         {
             logger.LogWarning(ex, "Agente de atendimento: a chamada ao LLM falhou na conversa {ConversaId}; tenta de novo uma vez.", conversaId);
             await Task.Delay(EsperaAntesDaNovaTentativa, ct);

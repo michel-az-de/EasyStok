@@ -91,6 +91,35 @@ public class RoteadorIaLlmClientTests
     }
 
     [Fact]
+    public async Task FalhaAoLerAFlagSegueNoEnvSemDerrubarOTurno()
+    {
+        _flags.ListarAtivasAsync(Empresa, Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<string>>>(_ => throw new TimeoutException("banco lento"));
+        _doEnv.DisponivelAsync(Empresa, Arg.Any<CancellationToken>()).Returns(true);
+
+        (await Roteador().DisponivelAsync(Empresa)).Should().BeTrue();
+        await Roteador().EnviarAsync(Requisicao());
+
+        await _doEnv.Received(1).EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>());
+        await _provedores.DidNotReceiveWithAnyArgs().EnviarAsync(default!, default!, default);
+        _log.Erros.Should().Contain(e => e.Contains("falha ao ler a flag"));
+    }
+
+    [Fact]
+    public async Task ComFlagFalhaDeBancoOuCofreFicaIndisponivelSemLancar()
+    {
+        _rotas.GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns<Task<decimal>>(_ => throw new TimeoutException("banco lento"));
+        (await Roteador().DisponivelAsync(Empresa)).Should().BeFalse();
+
+        _rotas.GastoDoMesAsync(Empresa, Provedor, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(0m);
+        _cofre.ObterAsync<ChaveProvedorIa>(Empresa, Arg.Any<string>(), Arg.Any<AmbienteIntegracao>(), Arg.Any<CancellationToken>())
+            .Returns<Task<ChaveProvedorIa?>>(_ => throw new ChaveMestraAusenteException("KEK ausente"));
+        (await Roteador().DisponivelAsync(Empresa)).Should().BeFalse();
+        _gravadas.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SemEmpresaDelegaAoEnvSemLerFlag()
     {
         await Roteador().EnviarAsync(Requisicao(Guid.Empty));
