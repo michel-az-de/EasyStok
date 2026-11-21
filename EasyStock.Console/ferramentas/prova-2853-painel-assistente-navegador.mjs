@@ -69,7 +69,12 @@ const pagina = await contexto.newPage()
 pagina.setDefaultTimeout(10000)
 pagina.on('pageerror', e => erros.push(e.message))
 const perguntas = []
-pagina.on('dialog', d => { perguntas.push(d.message()); d.accept() })
+// #3011: a pergunta é o ModalConfirmar (o diálogo de cima), não mais o window.confirm: lê o texto e clica no verbo.
+const confirmar = async (verbo) => {
+  const dialogo = pagina.locator('dialog[open]').last()
+  perguntas.push(await dialogo.locator('p').first().textContent())
+  await dialogo.getByRole('button', { name: verbo, exact: true }).click()
+}
 const endereco = `${process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'}/.build/2853/painel-assistente/index.html`
 const putsDesde = (i) => pedidos.slice(i).filter(p => p.metodo === 'PUT').map(p => p.corpo)
 try {
@@ -124,6 +129,7 @@ try {
   await painel.locator('[data-no="grupo:ferramentas"]').click()
   await painel.locator('[data-no="ferramenta:consultar_pedido"]').click()
   await painel.getByRole('switch', { name: 'Ligada na loja' }).click()
+  await confirmar('Desligar ferramenta')
   await painel.getByRole('switch', { name: 'Desligada na loja' }).waitFor()
   assert.equal(perguntas.length, 1, 'pergunta antes de desligar')
   assert.deepEqual(putsDesde(marca), [{ ferramentasDesligadas: ['consultar_pedido'] }])
