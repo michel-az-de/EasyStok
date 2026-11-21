@@ -95,6 +95,10 @@ public class RlsBypassAllowlistTests
         "EasyStock.Api/Mobile/Services/SyncMutationDispatcher.cs",
         // #2180: a primeira carga legada exige id inédito no servidor inteiro; só a existência é consultada.
         "EasyStock.Api/Mobile/Services/LegacySnapshotImportService.cs",
+        // #2180: MutationId é global (índice único); o sync só confere se ele já foi processado em qualquer empresa.
+        "EasyStock.Api/Mobile/Controllers/SyncController.cs",
+        // #2180: SuperAdmin já autorizado descobre a empresa do aparelho; o resto da requisição segue isolado nela.
+        "EasyStock.Api/Mobile/Security/EmpresaDoSuperAdmin.cs",
 
         // #2184: login Google nativo, renovação e logout são pré-auth; o tenant vem da identidade/segredo
         // validado. O escopo cobre a transação e o INSERT diferido da família, nunca uma requisição tenant genérica.

@@ -123,7 +123,13 @@ public class DevicePairingController(
     /// </summary>
     private bool RequestedEmpresaMatchesCurrentUser(Guid requestedEmpresaId)
     {
-        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) return true;
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin)
+        {
+            // #2180: a RLS das mobile_* segue o tenant da conexão; sem isto o SuperAdmin em outra
+            // empresa lia vazio e o INSERT caía no WITH CHECK (500).
+            _db.SetMobileTenantContext(requestedEmpresaId);
+            return true;
+        }
         return _currentUser.EmpresaId != Guid.Empty
             && _currentUser.EmpresaId == requestedEmpresaId;
     }
@@ -631,6 +637,7 @@ public class DevicePairingController(
 
         // Auditoria 2026-04-30 (CRITICAL fix): só comanda devices da própria empresa.
         if (!await DeviceBelongsToCurrentTenantAsync(id, ct)) return Forbid();
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) await _db.UsarEmpresaDoAparelhoAsync(id, ct);
 
         var device = await _db.Set<MobileDevice>().AsNoTracking().FirstOrDefaultAsync(d => d.Id == id, ct);
         if (device == null) return NotFound();

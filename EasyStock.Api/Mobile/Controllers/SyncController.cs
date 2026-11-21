@@ -6,6 +6,7 @@ using EasyStock.Api.Services.Operacao;
 using EasyStock.Application.Services.Pedidos;
 using EasyStock.Domain.Entities.Mobile;
 using EasyStock.Infra.Postgre.Data;
+using EasyStock.Infra.Postgre.Security;
 using Npgsql;
 
 namespace EasyStock.Api.Mobile.Controllers;
@@ -115,10 +116,16 @@ public class SyncController(
             var alreadyProcessed = new Dictionary<string, MobileProcessedMutation>(StringComparer.Ordinal);
             if (mutationIds.Count > 0)
             {
-                var existing = await _db.MobileProcessedMutations
-                    .AsNoTracking()
-                    .Where(p => mutationIds.Contains(p.MutationId))
-                    .ToListAsync();
+                // O id é global e o índice único também: sob a RLS (#2180) a leitura só veria a empresa
+                // do aparelho, a mutation já gravada por outra empresa seria reaplicada e o lote bateria
+                // no índice em toda nova tentativa. Bypass só nesta leitura.
+                List<MobileProcessedMutation> existing;
+                await using (await _db.UseRowLevelSecurityBypassAsync(ct))
+                    existing = await _db.MobileProcessedMutations
+                        .IgnoreQueryFilters()
+                        .AsNoTracking()
+                        .Where(p => mutationIds.Contains(p.MutationId))
+                        .ToListAsync(ct);
                 foreach (var e in existing)
                     alreadyProcessed[e.MutationId] = e;
             }

@@ -59,6 +59,8 @@ public class OperationController(
         if (_currentUser.Nivel != NivelAcesso.SuperAdmin &&
             _currentUser.EmpresaId != empresaId)
             return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
+        // #2180: a RLS das mobile_* segue o tenant da conexão; o SuperAdmin em outra empresa lia vazio.
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) _db.SetMobileTenantContext(empresaId);
 
         var now = DateTime.UtcNow;
         var (todayStart, _) = HorarioBrasil.JanelaDiaUtc();
@@ -219,6 +221,8 @@ public class OperationController(
         if (_currentUser.Nivel != NivelAcesso.SuperAdmin &&
             _currentUser.EmpresaId != empresaId)
             return StatusCode(403, new { error = "Acesso negado à empresa solicitada." });
+        // #2180: a RLS das mobile_* segue o tenant da conexão; o SuperAdmin em outra empresa lia vazio.
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) _db.SetMobileTenantContext(empresaId);
 
         var devices = await _db.Set<MobileDevice>().AsNoTracking()
             .Where(d => d.EmpresaId == empresaId)

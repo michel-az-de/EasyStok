@@ -85,6 +85,25 @@ public class MobileRowLevelSecurityTests(PostgreSqlDatabaseFixture fixture)
     /// Itens de pedido e de lote não têm coluna de empresa, mas guardam dado de loja (nome, quantidade,
     /// preço). A policy deles segue a tabela mãe: só aparece o item cujo pedido ou lote o tenant enxerga.
     /// </summary>
+    [SkippableFact]
+    public async Task Migracao_aborta_se_houver_linha_sem_empresa()
+    {
+        Skip.IfNot(fixture.IsAvailable, fixture.UnavailableReason);
+        await fixture.ResetDatabaseAsync();
+        await using var db = fixture.CreateDbContext();
+        var guarda = EasyStock.Infra.Postgre.Migrations.AddRlsTabelasMobile.GuardaDeLinhasSemEmpresa;
+
+        await db.Database.ExecuteSqlRawAsync(guarda); // banco sem órfã: passa
+
+        var orfa = "orfa-" + Guid.NewGuid().ToString("N")[..12];
+        db.Set<EasyStock.Domain.Entities.Mobile.Client>().Add(new() { Id = orfa, Name = "Sem empresa", EmpresaId = null });
+        await db.SaveChangesAsync();
+
+        var erro = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => db.Database.ExecuteSqlRawAsync(guarda));
+        Assert.Equal("P0001", erro.SqlState);
+        Assert.Contains("mobile_clients", erro.MessageText);
+    }
+
     [SkippableTheory]
     [InlineData("mobile_order_items", "order_id", "ped")]
     [InlineData("mobile_batch_items", "batch_id", "lote")]

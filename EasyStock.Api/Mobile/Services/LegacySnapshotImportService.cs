@@ -72,7 +72,15 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
             var lockKey = BitConverter.ToInt64(SHA256.HashData(Encoding.UTF8.GetBytes($"legacy:{device.EmpresaId}:{device.LojaId}")), 0);
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", ct);
             var key = ReceiptKey(request.ImportId);
-            var previous = await db.MobileProcessedMutations.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(x => x.MutationId == key, ct);
+            // MutationId é global (índice único): sob a RLS (#2180) o recibo ou a fila de outra empresa
+            // ficaria invisível e o 409 viraria 23505. Bypass só nestas duas leituras.
+            MobileProcessedMutation? previous;
+            bool filaJaProcessada;
+            await using (await db.UseRowLevelSecurityBypassAsync(ct))
+            {
+                previous = await db.MobileProcessedMutations.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(x => x.MutationId == key, ct);
+                filaJaProcessada = await db.MobileProcessedMutations.IgnoreQueryFilters().AnyAsync(x => originIds.Contains(x.MutationId), ct);
+            }
             if (previous is not null)
             {
                 if (previous.Outcome != "accepted:legacy" || string.IsNullOrWhiteSpace(previous.ResponseMeta))
@@ -88,7 +96,7 @@ public sealed class LegacySnapshotImportService(EasyStockDbContext db, SyncMutat
                 .Where(x => x.EmpresaId == device.EmpresaId && x.Outcome == "accepted:legacy").Select(x => x.ResponseMeta).ToListAsync(ct);
             if (earlier.Any(x => JsonSerializer.Deserialize<LegacySnapshotResponse>(x!, Json)!.LojaId == device.LojaId))
                 throw Conflict("Esta loja ja recebeu uma primeira carga. Um novo arquivo exige reconciliacao, nao outra abertura de saldo.");
-            if (await db.MobileProcessedMutations.IgnoreQueryFilters().AnyAsync(x => originIds.Contains(x.MutationId), ct))
+            if (filaJaProcessada)
                 throw Conflict("Parte da fila ja foi processada. A origem nao pode ser tratada como nunca sincronizada.");
             await RequireAbsentAsync<Product>(rows["products"], ct);
             await RequireAbsentAsync<Client>(rows["clients"], ct);

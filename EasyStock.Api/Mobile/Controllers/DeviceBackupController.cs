@@ -34,7 +34,11 @@ public class DeviceBackupController(
     /// </summary>
     private async Task<bool> DeviceBelongsToCurrentTenantAsync(string deviceId, CancellationToken ct)
     {
-        if (_currentUser.Nivel == NivelAcesso.SuperAdmin) return true;
+        if (_currentUser.Nivel == NivelAcesso.SuperAdmin)
+        {
+            await _db.UsarEmpresaDoAparelhoAsync(deviceId, ct); // #2180: a RLS segue o tenant da conexão
+            return true;
+        }
         if (_currentUser.EmpresaId == Guid.Empty) return false;
 
         var deviceEmpresa = await _db.Set<MobileDevice>().AsNoTracking()

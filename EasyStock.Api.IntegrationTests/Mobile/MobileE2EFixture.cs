@@ -32,8 +32,9 @@ public class MobileE2EFixture : IAsyncLifetime
 
     public const string TestCiKey = "test-ci-key-do-fixture-min-32-chars-please";
     public static readonly Guid OwnerEmpresaId = Guid.Parse("e0e0e0e0-0000-0000-0000-0000000000ce");
-    // O cluster é compartilhado entre as classes de teste: nome único por fixture.
-    private static readonly string AppRole = "mobile_e2e_" + Guid.NewGuid().ToString("N");
+    // O cluster é compartilhado entre as classes de teste e cada classe sobe a sua fixture: o nome é
+    // por instância. Estático, a segunda classe recebia 42710 (role already exists).
+    private readonly string AppRole = "mobile_e2e_" + Guid.NewGuid().ToString("N");
     private const string AppRolePassword = "senha-do-app-descartavel";
 
     public async Task InitializeAsync()

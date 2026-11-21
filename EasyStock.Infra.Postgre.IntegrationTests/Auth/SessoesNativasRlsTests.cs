@@ -342,6 +342,70 @@ public sealed class SessoesNativasRlsTests(PostgreSqlDatabaseFixture fixture)
     private static ValidadorSessaoUsuario Validador(IServiceProvider sp) => new(Substitute.For<ICacheService>(), sp.GetRequiredService<IUsuarioRepository>(),
         Config, NullLogger<ValidadorSessaoUsuario>.Instance, sp.GetRequiredService<IRefreshTokenRepository>());
 
+    /// <summary>
+    /// #2180: a policy das mobile_* segue o tenant da conexao, nao o nivel do usuario. O SuperAdmin de A
+    /// operando a empresa B precisa parear, listar, comandar e ler backup de B, sem 500 e sem lista vazia.
+    /// </summary>
+    [SkippableFact]
+    public async Task SuperAdminDeAOperaOsAparelhosDeB_PareiaListaComandaELeBackup()
+    {
+        var d = await Semear();
+        Guid lojaB;
+        const string aparelho = "rls-b-2180";
+        await using (var seed = fixture.CreateDbContext())
+        {
+            var loja = Loja.Criar(d.B, "Loja B");
+            lojaB = loja.Id;
+            seed.AddRange(loja,
+                new EasyStock.Domain.Entities.Mobile.MobileDevice { Id = aparelho, EmpresaId = d.B, LojaId = loja.Id, ApiKeyHash = new string('2', 64), CreatedAt = DateTime.UtcNow },
+                new EasyStock.Domain.Entities.Mobile.DeviceBackup { Id = Guid.NewGuid(), DeviceId = aparelho, EmpresaId = d.B, SnapshotJson = "{}", SizeBytes = 2 });
+            await seed.SaveChangesAsync();
+        }
+        var admin = Substitute.For<ICurrentUserAccessor>();
+        admin.EmpresaId.Returns(d.A);
+        admin.Nivel.Returns(NivelAcesso.SuperAdmin);
+        var http = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", d.Usuario.ToString())], "teste")) } };
+        using var provider = Servicos(d.A);
+
+        // Cada chamada e uma requisicao: escopo e DbContext proprios, como na API.
+        async Task<T> Requisicao<T>(Func<EasyStockDbContext, Task<T>> chamada)
+        {
+            using var scope = provider.CreateScope();
+            return await chamada(scope.ServiceProvider.GetRequiredService<EasyStockDbContext>());
+        }
+        EasyStock.Api.Mobile.Controllers.DevicePairingController Painel(EasyStockDbContext db) => new(db, admin, Config,
+            NullLogger<EasyStock.Api.Mobile.Controllers.DevicePairingController>.Instance) { ControllerContext = http };
+
+        static List<object> Itens(object? retorno) => ((System.Collections.IEnumerable)retorno!).Cast<object>().ToList();
+        var codigo = await Requisicao(db => Painel(db).CreatePairCode(new(d.B, lojaB, null, "novo", null), CancellationToken.None));
+        Assert.NotNull(codigo.Value ?? (codigo.Result as OkObjectResult)?.Value);
+
+        var lista = await Requisicao(db => Painel(db).List(d.B, CancellationToken.None));
+        Assert.Equal(2, Itens(lista.Value ?? (lista.Result as OkObjectResult)?.Value).Count);
+
+        var comando = await Requisicao(db => Painel(db).EnqueueCommand(aparelho, new("pull_now", null), CancellationToken.None));
+        Assert.IsType<OkObjectResult>(comando.Result);
+
+        var todos = await Requisicao(db => Painel(db).BroadcastCommand(new(d.B, null, "pull_now", null), CancellationToken.None));
+        Assert.IsType<OkObjectResult>(todos.Result);
+
+        var saude = await Requisicao(db => new EasyStock.Api.Mobile.Controllers.OperationController(db,
+            new EasyStock.Api.Services.Operacao.OperacaoEventBroker(NullLogger<EasyStock.Api.Services.Operacao.OperacaoEventBroker>.Instance),
+            admin, Config, NullLogger<EasyStock.Api.Mobile.Controllers.OperationController>.Instance) { ControllerContext = http }
+            .GetDevicesHealth(d.B, CancellationToken.None));
+        Assert.NotEmpty(Itens(saude.Value ?? (saude.Result as OkObjectResult)?.Value));
+
+        var backups = await Requisicao(db => new EasyStock.Api.Mobile.Controllers.DeviceBackupController(db, admin,
+            NullLogger<EasyStock.Api.Mobile.Controllers.DeviceBackupController>.Instance) { ControllerContext = http }
+            .List(aparelho, CancellationToken.None));
+        Assert.Single(Itens(backups.Value ?? (backups.Result as OkObjectResult)?.Value));
+
+        await using var conferir = fixture.CreateDbContext();
+        Assert.Equal(2, await conferir.Set<EasyStock.Domain.Entities.Mobile.DeviceCommand>().IgnoreQueryFilters().CountAsync(c => c.DeviceId == aparelho && c.EmpresaId == d.B));
+        // A empresa do proprio SuperAdmin nao ganhou nada.
+        Assert.False(await conferir.Set<EasyStock.Domain.Entities.Mobile.MobileDevice>().IgnoreQueryFilters().AnyAsync(x => x.EmpresaId == d.A));
+    }
+
     private static ClaimsPrincipal ValidarAssinatura(string token) => new JwtSecurityTokenHandler { MapInboundClaims = false }.ValidateToken(token,
         new TokenValidationParameters { ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(ChaveJwt)),
             ValidIssuer = "rls2184", ValidAudience = "rls2184", ValidateLifetime = true, ClockSkew = TimeSpan.Zero }, out _);

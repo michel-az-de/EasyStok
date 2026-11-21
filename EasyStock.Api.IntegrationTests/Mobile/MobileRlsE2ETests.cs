@@ -68,6 +68,51 @@ public class MobileRlsE2ETests(MobileE2EFixture fixture)
         (await PullIdsAsync(b)).Should().NotContain(produto, "o aparelho da outra empresa não enxerga a linha");
     }
 
+    /// <summary>
+    /// MutationId é global (índice único). Sob a RLS a checagem de "já processada" só via a empresa do
+    /// aparelho: a mutation gravada por outra empresa era reaplicada e o lote batia no índice em toda
+    /// nova tentativa. O reenvio precisa responder sem erro e sem gravar nada na segunda empresa.
+    /// </summary>
+    [SkippableFact]
+    public async Task Mutation_ja_processada_em_outra_empresa_nao_trava_o_lote()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresaA, lojaA) = await fixture.SeedEmpresaELojaAsync();
+        var (empresaB, lojaB) = await fixture.SeedEmpresaELojaAsync();
+        var a = await fixture.SeedMobileDeviceAsync(empresaA, lojaA);
+        var b = await fixture.SeedMobileDeviceAsync(empresaB, lojaB);
+        var outroDeB = await fixture.SeedMobileDeviceAsync(empresaB, lojaB);
+        var mutation = "mut_" + Guid.NewGuid();
+        var produto = $"p-{Guid.NewGuid():N}"[..24];
+
+        Task<HttpResponseMessage> Enviar(MobileDeviceCredentials de) => fixture.CreateMobileClient(de.ApiKey).PostAsJsonAsync("/api/mobile/sync", new
+        {
+            deviceId = de.DeviceId,
+            operatorName = "Thati",
+            mutations = new[]
+            {
+                new
+                {
+                    id = mutation, deviceId = de.DeviceId, type = "product.upsert",
+                    payload = JsonSerializer.SerializeToElement(
+                        new { id = produto, name = "Lasanha", category = "massa", unit = "300g", price = 30m, stock = 4, custom = true }, Json),
+                    ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                },
+            },
+        }, Json);
+
+        (await Enviar(a)).StatusCode.Should().Be(HttpStatusCode.OK);
+        for (var tentativa = 1; tentativa <= 2; tentativa++)
+        {
+            var reenvio = await Enviar(b);
+            reenvio.StatusCode.Should().Be(HttpStatusCode.OK, $"tentativa {tentativa}: {await reenvio.Content.ReadAsStringAsync()}");
+        }
+
+        (await PullIdsAsync(outroDeB)).Should().NotContain(produto, "a mutation de outra empresa não vira dado da segunda");
+        await ComoSuporteAsync(async db =>
+            (await db.MobileProcessedMutations.IgnoreQueryFilters().CountAsync(m => m.MutationId == mutation)).Should().Be(1));
+    }
+
     [SkippableFact]
     public async Task Api_key_desconhecida_continua_401()
     {

@@ -17,9 +17,45 @@ namespace EasyStock.Infra.Postgre.Migrations
     /// </summary>
     public partial class AddRlsTabelasMobile : Migration
     {
+        /// <summary>
+        /// Linha com empresa NULL some para todo aparelho quando a policy liga, e o sync deixa de adotá-la.
+        /// Havendo alguma, a migração aborta antes de mexer em qualquer tabela (a transação desfaz tudo e o
+        /// deploy volta a imagem anterior): a órfã é tratada com dado na mão, não escondida.
+        /// </summary>
+        public const string GuardaDeLinhasSemEmpresa = """
+DO $orfas$
+DECLARE
+    rec RECORD;
+    orfas BIGINT;
+BEGIN
+    FOR rec IN
+        SELECT c.table_schema, c.table_name, c.column_name
+        FROM information_schema.columns c
+        JOIN information_schema.tables t
+          ON t.table_schema = c.table_schema
+         AND t.table_name   = c.table_name
+        WHERE c.column_name IN ('empresa_id', 'EmpresaId')
+          AND c.is_nullable = 'YES'
+          AND c.table_schema = current_schema()
+          AND t.table_type   = 'BASE TABLE'
+          AND c.table_name LIKE 'mobile\_%' ESCAPE '\'
+        ORDER BY c.table_name
+    LOOP
+        EXECUTE format('SELECT count(*) FROM %I.%I WHERE %I IS NULL', rec.table_schema, rec.table_name, rec.column_name) INTO orfas;
+        IF orfas > 0 THEN
+            RAISE EXCEPTION 'RLS do Mobile (#2180): % linha(s) sem empresa em %; trate antes de ligar a policy', orfas, rec.table_name;
+        END IF;
+    END LOOP;
+END
+$orfas$;
+""";
+
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // ENABLE/FORCE pedem lock exclusivo: melhor falhar o deploy do que enfileirar o app atrás dele.
+            migrationBuilder.Sql("SET LOCAL lock_timeout = '5s';");
+            migrationBuilder.Sql(GuardaDeLinhasSemEmpresa);
             migrationBuilder.Sql("""
 DO $rls$
 DECLARE
