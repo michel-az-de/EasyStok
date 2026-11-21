@@ -479,6 +479,24 @@ export function trocaDeFormaNoEasyStok(cobranca, nomeCliente) {
   }
 }
 
+// #2998: com o Pix direto disponível (flag `pagamento.pix_direto` e loja com chave), a troca também oferece o
+// Pix na chave da loja, inclusive com o link vencido ou pendente. A API confere o link aberto no Mercado Pago
+// antes de cancelar e recusa com pagamento em andamento; a frase dela aparece no aviso da tela.
+const ROTULO_DA_TROCA = { maquininha: 'Receber na entrega', 'cartao-link': 'Link de pagamento (Pix ou cartão)' }
+export function trocasDeFormaNoEasyStok(cobranca, nomeCliente, { pixDireto = false } = {}) {
+  const troca = trocaDeFormaNoEasyStok(cobranca, nomeCliente)
+  const opcoes = [{ ...troca, rotulo: ROTULO_DA_TROCA[troca.meio] }]
+  if (!pixDireto || cobranca?.meio === MEIO_PIX_DIRETO) return opcoes
+  const envio = `${nomeCliente} recebe o Pix na chave da loja (QR em PDF e copia e cola) se a conversa estiver aberta.`
+  return [...opcoes, {
+    meio: MEIO_PIX_DIRETO,
+    rotulo: nomeDoMeio(MEIO_PIX_DIRETO),
+    texto: cobranca?.link
+      ? `O link de pagamento é cancelado e ${envio} Com o link em aberto, o EasyStok confere o Mercado Pago antes e recusa a troca se houver pagamento em andamento.`
+      : `A cobrança atual é cancelada e ${envio}`,
+  }]
+}
+
 // "Como recebeu" já preenchido com o meio da cobrança quando ele é um dos métodos
 // da baixa; link de cartão não diz se foi crédito ou débito, então fica em branco.
 const METODOS_DA_BAIXA = new Set(['pix', 'dinheiro', 'credito', 'debito', 'transferencia'])
