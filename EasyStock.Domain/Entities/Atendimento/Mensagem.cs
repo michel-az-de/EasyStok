@@ -382,7 +382,6 @@ public class Mensagem
         ChaveEnvio = normalizada;
     }
 
-    /// <summary>Autoria de ação humana registrada como nota interna, sem envio ao canal.</summary>
     /// <summary>#2833: emoji com que a loja reagiu a esta mensagem; nulo sem reação.</summary>
     public string? Reacao { get; private set; }
 
@@ -435,6 +434,7 @@ public class Mensagem
             throw new RegraDeDominioVioladaException("A mensagem ainda não tem identificação no WhatsApp.");
     }
 
+    /// <summary>Autoria de ação humana registrada como nota interna, sem envio ao canal.</summary>
     public void RegistrarAutorNotaInterna(Guid usuarioId)
     {
         if (Autor != AutorMensagem.Sistema || Direcao != DirecaoMensagem.Saida

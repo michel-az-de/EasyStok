@@ -214,6 +214,16 @@ public class WppConnectClientTests
     }
 
     [Fact]
+    public async Task Mensagem_que_saiu_pela_Meta_nao_tem_a_acao_na_ponte()
+    {
+        var daMeta = "wamid.HBgNNTUxMTk5OTk5OTk5ORUCABEYEjdB";
+
+        await ((Func<Task>)(() => Client.ReagirAsync("5511999999999", daMeta, "👍"))).Should().ThrowAsync<AcaoNaoSuportadaWhatsAppException>();
+        await ((Func<Task>)(() => Client.ApagarParaTodosAsync("5511999999999", daMeta))).Should().ThrowAsync<AcaoNaoSuportadaWhatsAppException>();
+        _http.Chamadas.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Mensagem_de_outra_sessao_nao_e_apagada_nem_reagida()
     {
         var alheia = "wpp:ez-00000000000000000000000000000000:true_5511999999999@c.us_ABC";

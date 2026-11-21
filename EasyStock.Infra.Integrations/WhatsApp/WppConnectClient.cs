@@ -200,7 +200,8 @@ public sealed class WppConnectClient(HttpClient http, IOptions<WppConnectOptions
 
     private async Task<(CredencialWppConnect Sessao, IdMensagemWpp Msg)> MensagemDaSessaoAsync(string wamid, CancellationToken ct)
     {
-        var msg = LerIdMensagem(wamid) ?? throw Falha("Esta mensagem não veio da conexão por QR.", permanente: true);
+        var msg = LerIdMensagem(wamid)
+                  ?? throw new AcaoNaoSuportadaWhatsAppException("Esta mensagem não saiu pela conexão por QR; por ela não dá para reagir nem apagar.");
         var sessao = await SessaoAsync(ct);
         if (msg.Sessao != sessao.Sessao) throw Falha("A mensagem não pertence à sessão desta empresa.", permanente: true);
         return (sessao, msg);

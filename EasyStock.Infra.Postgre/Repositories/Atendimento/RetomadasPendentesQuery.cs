@@ -36,13 +36,14 @@ public sealed class RetomadasPendentesQuery(EasyStockDbContext db) : IRetomadasP
                 .FirstOrDefault()
             // A faixa vale para a entrada que espera: reação recente não traz de volta pergunta velha.
             where entrada != null && entrada.EnviadaEm >= desde
-            // A equipe já respondeu a essa mensagem: o atendimento é dela.
+            // A equipe já respondeu a essa mensagem: o atendimento é dela. Resposta apagada para todos não conta (#2833), como no turno.
             where !db.AtendimentoMensagens.IgnoreQueryFilters().Any(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id
-                && m.EnviadaEm > entrada.EnviadaEm && m.Status != StatusMensagem.Falhou
+                && m.EnviadaEm > entrada.EnviadaEm && m.Status != StatusMensagem.Falhou && m.ApagadaEm == null
                 && (m.Autor == AutorMensagem.Dona || m.Autor == AutorMensagem.Atendente))
             // O robô respondeu e não passou para a equipe: ninguém espera, a equipe só assumiu a conversa.
             where !db.AtendimentoMensagens.IgnoreQueryFilters().Any(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id
-                    && m.EnviadaEm > entrada.EnviadaEm && m.Status != StatusMensagem.Falhou && m.Autor == AutorMensagem.Agente)
+                    && m.EnviadaEm > entrada.EnviadaEm && m.Status != StatusMensagem.Falhou && m.ApagadaEm == null
+                    && m.Autor == AutorMensagem.Agente)
                 || db.AtendimentoMensagens.IgnoreQueryFilters().Any(m => m.EmpresaId == c.EmpresaId && m.ConversaId == c.Id
                     && m.EnviadaEm > entrada.EnviadaEm && m.Autor == AutorMensagem.Sistema
                     && m.Texto!.StartsWith(EscalarConversaUseCase.PrefixoMotivo))

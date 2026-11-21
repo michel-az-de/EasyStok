@@ -46,4 +46,20 @@ public class AcoesNaMensagemEAssistenteTests
 
         pendente.Should().BeSameAs(entrada);
     }
+
+    [Fact]
+    public void RespostaApagadaParaTodos_NaoContaComoRespostaParaARetomada()
+    {
+        var conversa = Conversa.Abrir(Empresa, "5511999990008", Agora, contatoNome: "Tatiana");
+        conversa.RegistrarEntrada(Agora);
+        conversa.Assumir(Agora.AddSeconds(5), Guid.NewGuid());
+        var entrada = Mensagem.Entrada(Empresa, conversa.Id, Agora, TipoConteudoMensagem.Texto, "Quanto fica o frete?", "wamid.5");
+        var resposta = Mensagem.Saida(Empresa, conversa.Id, AutorMensagem.Atendente, Agora.AddSeconds(20), TipoConteudoMensagem.Texto,
+            "R$ 5", "wamid.6");
+        resposta.ApagarParaTodos(Guid.NewGuid(), Agora.AddSeconds(30));
+
+        var pendente = RetomadaDoAssistente.EntradaSemResposta(conversa, [entrada, resposta], Agora.AddMinutes(5), TimeSpan.FromSeconds(60));
+
+        pendente.Should().BeSameAs(entrada);
+    }
 }

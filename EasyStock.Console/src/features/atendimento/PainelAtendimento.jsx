@@ -150,6 +150,8 @@ function PainelDaConversa({
   const reabrindo = reabrindoDe.has(selecionada.id)
   const abrindoAnteriores = anterioresDe.has(selecionada.id)
   const canal = canalDaConversa(canais, selecionada)
+  // #2833: reagir e apagar só existem no WhatsApp; em outro canal a API responde 409 e o menu não oferece.
+  const noWhatsApp = selecionada.canal === 'WhatsApp'
   // #2258 (T4): o mesmo nome do cartão, do cabeçalho, da ficha e dos botões "Abrir".
   const apresentacao = apresentacaoDoNome(nomeDaConversa(selecionada), { comanda: selecionada.numeroComanda })
   const { pode, janela, motivo } = permissaoDeEscrita(selecionada, agora, canal)
@@ -242,8 +244,8 @@ function PainelDaConversa({
           agora={agora}
           aoAbrirDefinicaoAutomatica={(regra) => aoAbrirBiblioteca(itemDaBibliotecaPelaRegra(regra))}
           aoReenviar={reenviar ? (mensagemId) => reenviar(selecionada.id, mensagemId) : undefined}
-          aoReagir={reagir ? (mensagemId, emoji) => reagir(selecionada.id, mensagemId, emoji) : undefined}
-          aoApagar={apagar && !encerrada ? (mensagemId) => apagar(selecionada.id, mensagemId) : undefined}
+          aoReagir={reagir && noWhatsApp ? (mensagemId, emoji) => reagir(selecionada.id, mensagemId, emoji) : undefined}
+          aoApagar={apagar && noWhatsApp && !encerrada ? (mensagemId) => apagar(selecionada.id, mensagemId) : undefined}
           aoAbrirModelos={podeEnviarModelo ? () => setModelosDe(selecionada.id) : undefined}
           digitando={digitando}
           visivel={visivel}

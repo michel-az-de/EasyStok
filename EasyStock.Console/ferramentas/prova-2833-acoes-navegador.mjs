@@ -125,13 +125,26 @@ try {
 
   // 3. Apagar para todos.
   await abrirMenuDa('Sai sim! Mando o Pix?')
-  let perguntou = null
-  page.once('dialog', (dialogo) => { perguntou = dialogo.message(); dialogo.accept() })
+  // A pergunta é o modal do Console (#3011), nunca o window.confirm nativo; cancelar não chama a API.
+  const nativos = []
+  page.on('dialog', (dialogo) => { nativos.push(dialogo.message()); dialogo.dismiss() })
+  const apagarNoMenu = () => page.getByRole('menu', { name: 'Mais opções da mensagem' }).getByRole('menuitem', { name: /^Apagar para todos/ }).click()
+  const pergunta = page.getByRole('dialog', { name: 'Apagar para todos?' })
+  const apagou = []
+  page.on('request', (r) => { if (r.url().endsWith('/mensagens/p-loja') && r.method() === 'DELETE') apagou.push(r.url()) })
+  await apagarNoMenu()
+  await pergunta.waitFor()
+  assert.match(await pergunta.innerText(), /não se desfaz/, 'pergunta antes de apagar')
+  await pergunta.getByRole('button', { name: 'Cancelar' }).click()
+  await pergunta.waitFor({ state: 'detached' })
+  assert.equal(apagou.length, 0, 'cancelar não apaga')
+  await abrirMenuDa('Sai sim! Mando o Pix?')
+  await apagarNoMenu()
   await Promise.all([
     page.waitForRequest((r) => r.url().endsWith('/mensagens/p-loja') && r.method() === 'DELETE'),
-    page.getByRole('menu', { name: 'Mais opções da mensagem' }).getByRole('menuitem', { name: /^Apagar para todos/ }).click(),
+    pergunta.getByRole('button', { name: 'Apagar para todos' }).click(),
   ])
-  assert.match(perguntou ?? '', /não se desfaz/, 'pergunta antes de apagar')
+  assert.deepEqual(nativos, [], 'nenhum diálogo nativo do navegador')
   await page.getByText(/^Você apagou esta mensagem para todos · \d{2}:\d{2}$/).waitFor()
   assert.equal(await page.getByText('Sai sim! Mando o Pix?', { exact: true }).count(), 0, 'o texto apagado some da bolha')
   await umaVoltaDoLaco()

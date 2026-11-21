@@ -69,7 +69,8 @@ public static class RetomadaDoAssistente
         var entrada = historico[indice];
         if (conversa.RetomadaPorTempoDecidida(entrada.Id)) return null;
 
-        var depois = historico.Skip(indice + 1).Where(m => m.Status != StatusMensagem.Falhou).ToList();
+        // #2833: a apagada para todos não é resposta: o cliente não a vê mais e continua esperando.
+        var depois = historico.Skip(indice + 1).Where(m => m.Status != StatusMensagem.Falhou && m.ApagadaEm is null).ToList();
         if (depois.Any(m => m.Autor.EhHumanoDaEmpresa())) return null;
 
         // Resposta do robô sem escalada depois dela: o cliente foi atendido e a equipe só assumiu a conversa.
