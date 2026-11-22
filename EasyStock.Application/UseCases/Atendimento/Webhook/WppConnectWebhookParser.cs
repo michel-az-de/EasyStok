@@ -14,8 +14,8 @@ public static class WppConnectWebhookParser
         if (CredencialWppConnect.EmpresaDaSessao(sessao) is null)
             throw new FormatException("Sessão WPPConnect inválida.");
         var evento = Texto(root, "event");
-        if (evento is not ("onmessage" or "unreadmessages" or "onselfmessage" or "onack")) return new([]);
-        if (evento != "onack" && Grupo(root)) return new([]);
+        if (evento is not ("onmessage" or "unreadmessages" or "onselfmessage" or "onack")) return new([], WebhookSemEfeito.EventoIgnorado);
+        if (evento != "onack" && Grupo(root)) return new([], WebhookSemEfeito.Grupo);
         var id = Id(root);
         // #2590: só os nomes das chaves vão para o log, nunca os valores (telefone e texto do cliente).
         if (string.IsNullOrWhiteSpace(id))
@@ -26,7 +26,7 @@ public static class WppConnectWebhookParser
         {
             var ack = root.TryGetProperty("ack", out var valor) && valor.TryGetInt32(out var numero) ? numero : 0;
             var status = ack switch { 1 => "sent", 2 => "delivered", 3 or 4 => "read", -1 => "failed", _ => null };
-            return status is null ? new([]) : new([new(sessao, rawBody, [], [],
+            return status is null ? new([], WebhookSemEfeito.AckDesconhecido) : new([new(sessao, rawBody, [], [],
                 [new(externo, status, null, ack == -1 ? "O WhatsApp recusou a mensagem." : null)], [])]);
         }
 
@@ -63,7 +63,7 @@ public static class WppConnectWebhookParser
         if (!root.TryGetProperty("t", out var t) || !t.TryGetInt64(out var segundos))
             throw new FormatException("Mensagem WPPConnect sem data.");
         var quando = DateTimeOffset.FromUnixTimeSeconds(segundos);
-        if (!eco && inicioDaCaptura != default && quando < inicioDaCaptura) return new([]);
+        if (!eco && inicioDaCaptura != default && quando < inicioDaCaptura) return new([], WebhookSemEfeito.AnteriorACaptura);
         var nome = root.TryGetProperty("sender", out var remetente) ? Texto(remetente, "pushname") : null;
         var contatos = new ContatoWhatsApp[] { new(telefone, nome) };
         return new([new(sessao, rawBody, contatos,

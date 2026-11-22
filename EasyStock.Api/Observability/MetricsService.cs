@@ -12,6 +12,7 @@ namespace EasyStock.Api.Observability;
 public sealed class MetricsService : IOperationalMetrics
 {
     private readonly Counter<long> _falhasOperacaoCounter;
+    private readonly Counter<long> _webhookSemEfeitoCounter;
 
     public MetricsService(IMeterFactory meterFactory)
     {
@@ -19,8 +20,14 @@ public sealed class MetricsService : IOperationalMetrics
         _falhasOperacaoCounter = meter.CreateCounter<long>(
             MetricNames.FalhasOperacaoTotal,
             description: "Total de falhas de operação (respostas 5xx tratadas pelo GlobalExceptionHandler)");
+        _webhookSemEfeitoCounter = meter.CreateCounter<long>(
+            MetricNames.WebhookSemEfeitoTotal,
+            description: "Total de webhooks aceitos (200) que não gravaram nada, por motivo");
     }
 
     public void IncrementFalhasOperacao(string code) =>
         _falhasOperacaoCounter.Add(1, new KeyValuePair<string, object?>("code", code));
+
+    public void IncrementWebhookSemEfeito(string motivo) =>
+        _webhookSemEfeitoCounter.Add(1, new KeyValuePair<string, object?>("motivo", motivo));
 }
