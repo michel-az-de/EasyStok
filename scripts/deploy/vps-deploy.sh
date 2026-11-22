@@ -44,6 +44,7 @@
 # BUILD_ROOT (/home/felipe/build), BACKUP_DIR (/home/felipe/backups; /opt/backups e do root), DB_CONTAINER
 # (shared-postgres), DB_NAME (easystock), HEALTH_TIMEOUT (180 s), RETEM_PREV (3
 # imagens de rollback por servico), CACHE_TETO (10GB de cache de build),
+# WPP_CONTAINER (easystok-wppconnect-1, a ponte que o deploy so verifica, #3117),
 # ESPELHO_URL ($VPS_HOST:git/EasyStok.git, espelho bare da #2958).
 # =============================================================================
 set -euo pipefail
@@ -55,6 +56,7 @@ BACKUP_DIR="${BACKUP_DIR:-/home/felipe/backups}"
 # E3 (#2977, ADR-0068): o dump pre-deploy tambem vai para o restic, em segundo plano.
 BACKUP_HOOK="${BACKUP_HOOK:-/home/felipe/backup-restic/backup.sh}"
 DB_CONTAINER="${DB_CONTAINER:-shared-postgres}"
+WPP_CONTAINER="${WPP_CONTAINER:-easystok-wppconnect-1}"
 DB_NAME="${DB_NAME:-easystock}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
 RETEM_PREV="${RETEM_PREV:-3}"
@@ -181,12 +183,34 @@ faxina() {
   docker builder prune -af --reserved-space "${CACHE_TETO:-10GB}" >/dev/null
 }
 
+# #3117: em 21/11/2026 a ponte WPPConnect ficou conectada sem entregar mensagem por cinco horas. O deploy so
+# VERIFICA e avisa: nao reinicia a ponte (reiniciar sessao de WhatsApp arrisca QR e bloqueio do numero) e nao
+# muda o codigo de saida (cada leitura tem teto de 10 s). Le o estado do container e o sinal do vigia (endpoint_health_state, wppconnect/<loja>
+# com incidente aberto). Sem a ponte na VPS, sai calado. O que fazer: docs/dev/incidentes/2026-11-21-ponte-wppconnect-muda.md
+verifica_ponte() {
+  local c="${WPP_CONTAINER:-easystok-wppconnect-1}" estado mudas
+  estado=$(timeout 10 docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}sem{{end}}' "$c" 2>/dev/null) || return 0
+  case "$estado" in
+    "running healthy"|"running sem") ;;
+    *) echo "AVISO: ponte WPPConnect ($c) esta '$estado'. O deploy NAO reinicia a ponte; veja docs/dev/incidentes/2026-11-21-ponte-wppconnect-muda.md" >&2 ;;
+  esac
+  mudas=$(timeout 10 docker exec "$DB_CONTAINER" psql -U postgres -d "$DB_NAME" -Atc \
+    "select count(*) from endpoint_health_state where endpoint_name like 'wppconnect/%' and last_alerted_at is not null" 2>/dev/null) || mudas=
+  case "$mudas" in
+    0) ;;
+    ''|*[!0-9]*) echo "AVISO: sinal de ponte muda nao foi lido (a consulta ao banco falhou); confira a ponte pelo runbook." >&2 ;;
+    *) echo "AVISO: ponte WPPConnect muda em $mudas loja(s): conectada e sem entregar mensagem ao webhook. O deploy NAO reinicia a ponte; veja docs/dev/incidentes/2026-11-21-ponte-wppconnect-muda.md" >&2 ;;
+  esac
+  return 0
+}
+
 echo "==> [5/6] compose up"
 up
 if healthy && [ "$(sha_no_ar)" = "$SHA_FULL" ]; then
   echo "$SHA" >"$BUILD_ROOT/easystok-current"
   echo "==> [6/6] OK: $SHA no ar. Dump pre-deploy: $DUMP"
   faxina || echo "AVISO: faxina de imagens e cache falhou; o deploy esta no ar" >&2
+  verifica_ponte || true
   exit 0
 fi
 
@@ -205,6 +229,7 @@ if healthy; then
 else
   echo "ROLLBACK NAO FICOU HEALTHY: intervencao manual. Dump: $DUMP" >&2
 fi
+verifica_ponte || true
 exit 6
 REMOTE_EOF
 
@@ -279,7 +304,7 @@ fi
 
 ENVS="SHA=$SHA SHA_FULL=$SHA_FULL TS=$TS STACK_DIR=$STACK_DIR BUILD_ROOT=$BUILD_ROOT"
 ENVS="$ENVS BACKUP_DIR=$BACKUP_DIR DB_CONTAINER=$DB_CONTAINER DB_NAME=$DB_NAME"
-ENVS="$ENVS BACKUP_HOOK=$BACKUP_HOOK"
+ENVS="$ENVS BACKUP_HOOK=$BACKUP_HOOK WPP_CONTAINER=$WPP_CONTAINER"
 ENVS="$ENVS HEALTH_TIMEOUT=$HEALTH_TIMEOUT SERVICES='$SERVICES'"
 ENVS="$ENVS RETEM_PREV=$RETEM_PREV CACHE_TETO=$CACHE_TETO"
 ENVS="$ENVS MODO=$MODO QUEM=$(printf '%q' "$QUEM") MOTIVO=$(printf '%q' "$MOTIVO")"

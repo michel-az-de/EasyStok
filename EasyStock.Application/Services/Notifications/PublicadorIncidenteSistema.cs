@@ -73,6 +73,9 @@ public sealed class PublicadorIncidenteSistema(
         {
             // N12: o índice único (EmpresaId, CorrelationId) recusa o mesmo incidente na mesma janela. É a dedupe.
             logger.LogDebug("Incidente {Componente} {Estado} já publicado nesta janela ({Chave}).", componente, estado, chave);
+            // #3117: o commit recusado não gravou nada e o evento segue pendente; sem o descarte, o próximo commit da
+            // mesma unidade de trabalho (outro coletor da rodada) o reenvia e falha.
+            unitOfWork.DescartarAlteracoesPendentes();
         }
     }
 

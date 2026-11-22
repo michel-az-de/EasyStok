@@ -122,7 +122,7 @@ public class LegacySnapshotImportColisaoE2ETests(MobileE2EFixture fixture)
         var comSaldo = await SeedProdutoAsync(empresa, loja, "Pao de queijo", saldo: 4);
         var comLote = await SeedProdutoAsync(empresa, loja, "Nhoque", comLote: true);
         var raviolA = await SeedProdutoAsync(empresa, loja, "Ravioli");
-        var raviolB = await SeedProdutoAsync(empresa, loja, "RAVIOLI"); // o índice único é por nome exato: só a caixa difere, e o vínculo ignora a caixa
+        var raviolB = await SeedProdutoAsync(empresa, loja, "RAVIOLI "); // #3101: o índice único ignora a caixa mas não o espaço na ponta; o vínculo ignora os dois
         var livre = await SeedProdutoAsync(empresa, loja, "Tapioca");
         var request = Pedir(c.Device,
             [Produto(Id("p"), "pao de queijo"), Produto(Id("p"), "NHOQUE"), Produto(Id("p"), "ravioli"), Produto(Id("p"), "Tapioca"), Produto(Id("p"), "Sorvete de uva")], [], []);

@@ -53,7 +53,7 @@ public sealed class ProcessarEventoWhatsAppUseCase(
     INotificadorService? notificador = null,
     Ports.Output.Observability.IOperationalMetrics? metricas = null)
 {
-    private const string Provedor = "meta_whatsapp";
+    public const string Provedor = "meta_whatsapp";
 
     /// <summary>Tipos gravados para a dona ver, mas que não pedem resposta: o agente não responde a um emoji.</summary>
     private static readonly HashSet<string> TiposSemTurnoDoAgente = new(StringComparer.Ordinal) { "reaction", "unsupported", "system" };
