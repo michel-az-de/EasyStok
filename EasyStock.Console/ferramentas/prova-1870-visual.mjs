@@ -35,7 +35,7 @@ confere('1  a faixa ocupa espaço só com aviso, falha, integração parada ou s
   assert.match(faixa, /if \(!fonteApi\) return null/)
   assert.match(faixa, /if \(!falhou && !aviso && !integracaoParada && !vencimento\) return null/)
   assert.match(faixa, /sincronizacao\?\.estado === 'erro'/)
-  assert.match(faixa, /avisoDeAcao \?\? sincronizacao\?\.avisoFixo/)
+  assert.match(faixa, /avisoDeAcao \?\? avisoFixo/)
   assert.match(faixa, /\$\{falhou \? css\.falha : aviso \? css\.aviso : ''\}/)
   assert.match(faixa, /\{\(falhou \|\| aviso\) && <span className=\{css\.texto\}>\s*\{texto\}/)
   assert.match(faixa, /fecharAvisoApi\(\{ fixo: !avisoDeAcao \}\)/, 'fechar aviso de ação não apaga o persistente')
