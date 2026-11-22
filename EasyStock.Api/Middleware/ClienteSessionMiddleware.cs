@@ -38,7 +38,7 @@ public class ClienteSessionMiddleware(RequestDelegate next)
                 if (session is not null && session.EstaValida(timeProvider))
                 {
                     session.RegistrarUso(timeProvider);
-                    // Renovação pós-resposta: o cliente já foi embora e a gravação não pode ser cancelada por ele (ADR-0013).
+                    // Se o cliente abortou, a leitura acima já cancelou e a renovação fica para a próxima requisição; UpdateAsync não faz I/O (ADR-0013).
                     await sessionRepo.UpdateAsync(session, CancellationToken.None);
                     await unitOfWork.CommitAsync();
                 }
