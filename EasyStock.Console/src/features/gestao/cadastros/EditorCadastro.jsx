@@ -14,7 +14,7 @@ import { ResumoDoCliente } from './ResumoDoCliente'
 import { RelacionamentoCliente } from './RelacionamentoCliente'
 import { lerMoeda } from '../../../dominio/formato'
 import { avisoDeDuplicado, duplicadosDoCliente, termoDeDuplicado } from '../../../dominio/clienteDuplicado'
-import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, categoriasRaiz, subcategoriasDe, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
+import { bloqueiaRepeticaoDoCadastro, CAMPOS_CLIENTE, categoriasRaiz, subcategoriasDe, confirmacaoDeAtividade, emAtividadeCadastro, mensagemDeAtividade, temAtividadeNoEditor, errosDoFormularioCadastro, MENSAGEM_CADASTRO_REPETIDO, motivoDoCadastroVazio, mudarDadosCadastro, OBRIGATORIOS_CADASTRO, reconferirCadastroCliente, documentoNaTela, telefoneNaTela } from '../../../dominio/cadastros'
 import css from './cadastros.module.css'
 
 const pessoa = [{ valor: 'fisica', rotulo: 'Pessoa física' }, { valor: 'juridica', rotulo: 'Pessoa jurídica' }]
@@ -181,7 +181,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     {/* #2871: o pedido que o cliente fez pelo WhatsApp pessoal da dona nasce na conversa dele, no Atendimento. */}
     {novoPedido && id && emAtividadeCadastro(dados) && <Botao icone="mais" disabled={salvando || alterado || Boolean(novoPedido.abrindo)} motivo="Salve ou descarte as alterações antes de registrar um pedido." onClick={() => novoPedido.iniciar(id)}>{novoPedido.abrindo ? 'Abrindo…' : novoPedido.rotulo(id)}</Botao>}
     <Botao onClick={e => e.currentTarget.closest('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))} disabled={salvando}>{podeEditar && formularioAberto ? 'Cancelar' : 'Fechar'}</Botao>
-    {podeEditar && formularioAberto && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : !alterado ? id ? 'Nada mudou para salvar.' : 'Preencha o cadastro para salvar.' : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
+    {podeEditar && formularioAberto && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : !alterado ? id ? 'Nada mudou para salvar.' : motivoDoCadastroVazio(tela) : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
   </>}>
     {erro && <p className={css.erro} role="alert">{erro}</p>}
     {novoPedido?.erro && <p className={css.erro} role="alert">{novoPedido.erro}</p>}
