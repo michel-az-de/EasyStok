@@ -112,7 +112,8 @@ public static class RetomadaDoAssistente
         + "Não use escalar_para_dona nem encaminhar_para_responsavel de novo pelo mesmo motivo, e não diga que a equipe vai responder, "
         + "ligar, combinar, confirmar, verificar ou resolver, nem dê prazo. Se o assunto depender só da equipe (dinheiro, "
         + "cancelamento, reclamação, entrega ou frete a combinar), acolha, anote o que o cliente quer com registrar_nota quando a "
-        + "ferramenta existir e continue disponível. Entrega ou frete a combinar segue pendente: não diga que o frete ou a taxa "
-        + "foi, está ou será combinado ou acertado, nem valor, prazo ou gratuidade; se o cliente perguntar, diga só que o frete "
-        + "ainda não foi definido. Se a mensagem dele for só uma saudação, cumprimente e pergunte em que pode ajudar.";
+        + "ferramenta existir, sem dizer que anotou ou registrou o pedido, e continue disponível. Se o motivo for entrega ou "
+        + "frete a combinar, isso segue pendente: não diga que o frete ou a taxa foi, está ou será combinado ou acertado, nem "
+        + "prazo, gratuidade ou valor que não venha de ferramenta; se o cliente perguntar, diga só que o frete ainda não foi "
+        + "definido. Se a mensagem dele for só uma saudação, cumprimente e pergunte em que pode ajudar.";
 }

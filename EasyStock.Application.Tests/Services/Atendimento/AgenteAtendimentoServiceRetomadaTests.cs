@@ -105,6 +105,8 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     // #3111: em produção a retomada de "frete a combinar" afirmou frete, a guarda barrou e a conversa voltou à equipe.
+    // O modelo é simulado: o que este teste prova é o texto que vai no prompt e que a frase ensinada atravessa o turno
+    // sem escalar. Que o modelo real segue a orientação só se mede em produção.
     [Fact]
     public async Task Retomada_FreteACombinarESaudacao_OrientaSemAfirmarFreteERespondeSemEscalar()
     {
@@ -133,9 +135,11 @@ public partial class AgenteAtendimentoServiceTests
 
         orientacao.Should().Contain("o frete ainda não foi definido").And.Contain("a equipe já foi avisada");
         Guarda("Oi! A equipe já foi avisada e eu sigo com você por aqui. O frete ainda não foi definido.").Should().BeNull();
-        Guarda("A equipe vai combinar o frete com você.").Should().NotBeNull();
-        Guarda("O frete será combinado com a equipe.").Should().NotBeNull();
-        Guarda("O frete já está acertado.").Should().NotBeNull();
+        orientacao.Should().Contain("sem dizer que anotou ou registrou o pedido").And.Contain("valor que não venha de ferramenta");
+        Guarda("A equipe vai combinar o frete com você.").Should().Be("promete encaminhamento sem acionar a equipe");
+        Guarda("O frete será combinado com a equipe.").Should().Be("afirma frete combinado sem a ferramenta confirmar");
+        Guarda("O frete já está acertado.").Should().Be("afirma frete combinado sem a ferramenta confirmar");
+        Guarda("Anotei seu pedido aqui.").Should().Be("afirma situação do pedido sem a ferramenta confirmar");
     }
 
     [Fact]
