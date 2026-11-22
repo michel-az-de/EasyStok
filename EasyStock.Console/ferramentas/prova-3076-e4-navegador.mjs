@@ -113,6 +113,8 @@ const abrirDe = (painel, numero) => painel.getByRole('button', { name: new RegEx
   await page.screenshot({ path: `${pasta}/detalhe-pronto-1440.png` })
   await botao.click(); cliques++
   assert.equal(norm(await detalhe.getByLabel('Valor recebido').inputValue()), '80,00', 'valor preenchido com o saldo')
+  // Re-pontuação da #3076: o foco ia para "Pular para o conteúdo" quando o botão virava formulário.
+  assert.equal(await detalhe.getByLabel('Valor recebido').evaluate((el) => el === document.activeElement), true, 'foco vai para o valor ao abrir o pagamento')
   await detalhe.getByLabel('Como recebeu').selectOption('pix'); cliques++
   const consultasAntes = estado.consultas.length, leiturasAntes = estado.leituras.length
   await detalhe.getByRole('button', { name: 'Confirmar pagamento', exact: true }).click(); cliques++

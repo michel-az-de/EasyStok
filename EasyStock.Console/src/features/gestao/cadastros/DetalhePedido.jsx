@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { contextoCadastro } from '../../../aplicacao/cadastros'
 import { impressaoDoPedido } from '../../../aplicacao/impressos'
 import { obterPedido, registrarPagamentoDoDetalhe } from '../../../aplicacao/pedidosCadastro'
@@ -24,6 +24,10 @@ export function DetalhePedido({ dados: inicial, aoFechar, abrirConversa, aoMudar
   const id = useId()
   const [dados, atualizar] = useState(inicial)
   const [recebendo, receber] = useState(false)
+  // Re-pontuação da #3076: o botão vira formulário e some; o foco vai para o valor e, no Voltar, volta ao botão.
+  const botaoReceber = useRef(null)
+  const voltou = useRef(false)
+  useEffect(() => { if (!recebendo && voltou.current) { voltou.current = false; botaoReceber.current?.focus() } }, [recebendo])
   const { pedido, itens = [], eventos = [], pagamentos = [] } = dados
   const pagamento = situacaoDoPagamento(pedido)
   const saldo = pagamentoNoDetalhe(pedido)
@@ -55,8 +59,8 @@ export function DetalhePedido({ dados: inicial, aoFechar, abrirConversa, aoMudar
       </dl>
 
       {saldo.botao && <section className={css.receber} aria-label="Receber pagamento">
-        {recebendo ? <ReceberNoDetalhe pedido={pedido} sugerido={saldo.botao.valor ?? saldo.falta} temConversa={Boolean(abrirConversa)} aoVoltar={() => receber(false)} aoRegistrar={async () => { receber(false); await reler() }} aoConferir={reler} />
-          : <Botao variante={saldo.botao.ligado ? 'primario' : 'secundario'} icone="circle-check" disabled={!saldo.botao.ligado} motivo={motivo ?? undefined} onClick={() => receber(true)}>Registrar pagamento</Botao>}
+        {recebendo ? <ReceberNoDetalhe pedido={pedido} sugerido={saldo.botao.valor ?? saldo.falta} temConversa={Boolean(abrirConversa)} aoVoltar={() => { voltou.current = true; receber(false) }} aoRegistrar={async () => { receber(false); await reler() }} aoConferir={reler} />
+          : <Botao ref={botaoReceber} variante={saldo.botao.ligado ? 'primario' : 'secundario'} icone="circle-check" disabled={!saldo.botao.ligado} motivo={motivo ?? undefined} onClick={() => receber(true)}>Registrar pagamento</Botao>}
       </section>}
 
       <section aria-labelledby={`${id}-itens`}>
@@ -111,6 +115,8 @@ function ReceberNoDetalhe({ pedido, sugerido, temConversa, aoVoltar, aoRegistrar
   const [enviando, enviar] = useState(false)
   const [recusa, recusar] = useState(null)
   const formas = useMetodosPagamento()
+  const campo = useRef(null)
+  useEffect(() => { campo.current?.focus() }, [])
   const alto = moedaAltaDemais(centavos)
   const valido = centavos > 0 && !alto && Boolean(metodo) && !formas.carregando && !formas.erro
   async function confirmar(e) {
@@ -124,7 +130,7 @@ function ReceberNoDetalhe({ pedido, sugerido, temConversa, aoVoltar, aoRegistrar
     if (r.semConfirmacao) aoConferir()
   }
   return <form className={css.formReceber} onSubmit={confirmar} noValidate aria-label="Registrar pagamento">
-    <CampoReais rotulo="Valor recebido" centavos={centavos} ler={lerMoeda} erro={alto ? 'Valor alto demais.' : centavos <= 0 ? 'Informe um valor maior que zero.' : null} aoMudar={(v) => mudar(v ?? 0)} />
+    <CampoReais ref={campo} rotulo="Valor recebido" centavos={centavos} ler={lerMoeda} erro={alto ? 'Valor alto demais.' : centavos <= 0 ? 'Informe um valor maior que zero.' : null} aoMudar={(v) => mudar(v ?? 0)} />
     <CampoSelecao rotulo="Como recebeu" value={metodo} disabled={formas.carregando || enviando} onChange={(e) => escolher(e.target.value)}
       opcoes={[{ valor: '', rotulo: formas.carregando ? 'Carregando formas…' : 'Selecione' }, ...formas.opcoes]} />
     {formas.erro && <p className={css.recusa} role="alert">{formas.erro}</p>}
