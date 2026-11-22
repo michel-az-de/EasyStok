@@ -36,7 +36,7 @@ public sealed class TurnoAgenteRepository(EasyStockDbContext db) : ITurnoAgenteR
         return new PaginaTurnosAgente(
             linhas.Select(l => new TurnoAgenteLido(l.Turno.Id, l.Turno.ConversaId, l.Turno.CriadoEm, l.Turno.Modelo,
                 l.Turno.TokensEntrada, l.Turno.TokensSaida, l.Turno.TokensCacheLido, l.Turno.CustoEstimado, l.Turno.Ferramentas,
-                l.Turno.Passos, l.Turno.Desfecho, l.Turno.DuracaoMs, l.Pergunta, l.Resposta)).ToList(),
+                l.Turno.Passos, l.Turno.Desfecho, l.Turno.DuracaoMs, l.Pergunta, l.Resposta, l.Turno.Motivo)).ToList(),
             total);
     }
 
@@ -44,6 +44,8 @@ public sealed class TurnoAgenteRepository(EasyStockDbContext db) : ITurnoAgenteR
     {
         var soma = await db.TurnosAgente.AsNoTracking()
             .Where(t => t.EmpresaId == empresaId && t.CriadoEm >= deUtc && t.CriadoEm < ateUtc)
+            // #3175: turno de portão não chama o modelo; fica no histórico e fora do uso do mês.
+            .Where(t => t.Motivo == null || !t.Motivo.StartsWith("portao:"))
             .GroupBy(_ => 1)
             .Select(g => new
             {

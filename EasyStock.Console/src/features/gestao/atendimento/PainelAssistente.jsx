@@ -4,6 +4,7 @@ import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
 import { Chip } from '../../../componentes/Chip'
+import { motivoDoTurno } from '../../../dominio/motivoDoTurno'
 import { Pilula } from '../../../componentes/Pilula'
 import {
   cotaDoCampo, cotaParaCampo, desfechoDoTurno, formatarTokens, linhaDoUso, resumoDoUso, semIaDoUso,
@@ -124,6 +125,7 @@ function AbaHistorico({ conversaId }) {
                 <time dateTime={t.criadoEm}>{new Date(t.criadoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</time>
                 <span className={css.nota}>{formatarTokens(t.tokensEntrada + t.tokensSaida)} tokens · {(t.duracaoMs / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} s</span>
               </div>
+              {t.motivo && <p className={css.nota}>Motivo: {motivoDoTurno(t.motivo)}</p>}
               {t.perguntaCliente && <p><strong>Cliente:</strong> {t.perguntaCliente}</p>}
               {t.resposta && <p><strong>Assistente:</strong> {t.resposta}</p>}
               {t.ferramentas?.length > 0 && <p className={css.nota}>Ferramentas: {t.ferramentas.map((f) => f.nome).join(', ')}</p>}

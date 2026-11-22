@@ -32,6 +32,8 @@ public static partial class LogsDoAssistente
         CategoriaFerramentaFalhou,
     };
 
+    public static IReadOnlyCollection<string> CategoriasDaGuarda => CategoriasFixas;
+
     [LoggerMessage(EventoPortaoBarrou, LogLevel.Warning,
         "Assistente: conversa {ConversaId} não segue no automático, portão {Portao}.")]
     public static partial void PortaoBarrou(ILogger logger, Guid conversaId, string portao);

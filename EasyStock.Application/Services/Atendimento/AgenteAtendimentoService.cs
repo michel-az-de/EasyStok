@@ -117,6 +117,7 @@ public sealed class AgenteAtendimentoService(
         {
             LogsDoAssistente.PortaoBarrou(logger, conversaId, portaoDaLoja!.Codigo);
             await escalador.EscalarAsync(empresaId, conversa, motivoSemAgente, agora, ct);
+            await RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente.Escalou, portaoDaLoja.Codigo);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
@@ -135,6 +136,7 @@ public sealed class AgenteAtendimentoService(
         {
             LogsDoAssistente.PortaoBarrou(logger, conversaId, portaoDaPessoa.Codigo);
             await escalador.EscalarAsync(empresaId, conversa, motivoPessoa, agora, ct);
+            await RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente.Escalou, portaoDaPessoa.Codigo);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
@@ -145,6 +147,7 @@ public sealed class AgenteAtendimentoService(
         {
             LogsDoAssistente.PortaoBarrou(logger, conversaId, PortoesDoAssistente.Limite);
             await escalador.EscalarAsync(empresaId, conversa, motivoLimite, agora, ct);
+            await RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente.Escalou, PortoesDoAssistente.Limite);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
@@ -154,8 +157,7 @@ public sealed class AgenteAtendimentoService(
         {
             LogsDoAssistente.PortaoBarrou(logger, conversaId, PortoesDoAssistente.Cota);
             await escalador.EscalarAsync(empresaId, conversa, motivoCota, agora, ct);
-            await turnos!.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, null, null, 0, 0, 0, null, [], 0,
-                DesfechoTurnoAgente.Cota, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora), ct);
+            await RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente.Cota, PortoesDoAssistente.Cota);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
         }
@@ -201,24 +203,36 @@ public sealed class AgenteAtendimentoService(
         if (tokens > 0) await RegistrarUsoAsync(empresaId, tokens, agora);
         var desfechoSemResposta = geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro : DesfechoTurnoAgente.Interrompido;
         LogsDoAssistente.TurnoInterrompido(logger, conversaId, desfechoSemResposta.ToString());
-        await RegistrarTurnoAsync(desfechoSemResposta, ct);
+        await RegistrarTurnoAsync(desfechoSemResposta, geracao.Consumo?.FalhaLlm == true ? MotivoDoTurno.FalhaLlm : MotivoDoTurno.Interrompido, ct);
         await unitOfWork.CommitAsync();
         return new ResultadoTurnoAgente(true, contexto.HouveEnvio, false);
 
         // S67 (#2534): um registro por turno que chamou o modelo, só com números e ids; vai no mesmo commit do consumo.
-        async Task RegistrarTurnoAsync(DesfechoTurnoAgente desfecho, CancellationToken token)
+        // #3175: turno de portao que escala nao chama o modelo: 0 tokens e o codigo do portao como motivo.
+        async Task RegistrarTurnoDoPortaoAsync(DesfechoTurnoAgente desfecho, string codigoDoPortao)
+        {
+            if (turnos is null) return;
+            await turnos.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, null, null, 0, 0, 0, null, [], 0,
+                desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora, MotivoDoTurno.DoPortao(codigoDoPortao)), ct);
+        }
+
+        async Task RegistrarTurnoAsync(DesfechoTurnoAgente desfecho, string? motivo, CancellationToken token)
         {
             if (turnos is null) return;
             var consumo = geracao.Consumo ?? new ConsumoGeracaoAgente();
             await turnos.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, gravacao.UltimaSaidaId,
                 consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido,
                 precos?.Value.Estimar(consumo.Modelo, consumo.TokensEntrada, consumo.TokensSaida, consumo.TokensCacheLido),
-                consumo.Ferramentas, consumo.Passos, desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora), token);
+                consumo.Ferramentas, consumo.Passos, desfecho, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora, motivo), token);
         }
 
         async Task<ResultadoTurnoAgente> Finalizar(CancellationToken token)
         {
         ct = token;
+
+        // #3175: o codigo do motivo, nunca o texto dele nem o que o modelo escreveu.
+        var codigoDoMotivo = geracao.MotivoFalha is null ? null
+            : MotivoDoTurno.DaFalhaDaGeracao(geracao.MotivoFalha, geracao.Consumo?.FalhaLlm == true);
 
         // As entradas que foram ao LLM ficam processadas: um job repetido não responde de novo e a
         // mensagem que chegar durante o turno continua pendente para o próximo (#1288).
@@ -260,7 +274,13 @@ public sealed class AgenteAtendimentoService(
                 else
                 {
                     respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct) || respondeu;
-                    if (barrada is not null) LogsDoAssistente.GuardaBarrou(logger, conversaId, LogsDoAssistente.CategoriaDaGuarda(barrada));
+                    if (barrada is not null)
+                    {
+                        var categoria = LogsDoAssistente.CategoriaDaGuarda(barrada);
+                        LogsDoAssistente.GuardaBarrou(logger, conversaId, categoria);
+                        codigoDoMotivo ??= MotivoDoTurno.DaGuarda(categoria);
+                    }
+                    else if (!concluiu) codigoDoMotivo ??= MotivoDoTurno.Iteracoes;
                     motivoEscalada ??= concluiu ? $"resposta do agente barrada ({barrada}); precisa de conferência humana"
                         : $"o agente atingiu o limite de {MaximoIteracoes} iterações sem concluir a resposta";
                 }
@@ -279,6 +299,7 @@ public sealed class AgenteAtendimentoService(
                 if (!respondeu)
                     respondeu = await EnviarRespostaAsync(gravacao, conversa, encaminhamento, ct);
                 motivoEscalada = "o menu de janelas não saiu ao cliente; precisa de conferência humana";
+                codigoDoMotivo = MotivoDoTurno.Menu;
             }
         }
 
@@ -289,8 +310,10 @@ public sealed class AgenteAtendimentoService(
             await RegistrarUsoAsync(empresaId, tokens, agora);
 
         var escalou = motivoEscalada is not null || conversa.Situacao == SituacaoConversa.Assumida;
+        // Escalou sem codigo de falha, guarda, iteracao ou menu: foi o modelo, pela ferramenta escalar_para_dona.
         await RegistrarTurnoAsync(geracao.Consumo?.FalhaLlm == true ? DesfechoTurnoAgente.Erro
-            : escalou ? DesfechoTurnoAgente.Escalou : DesfechoTurnoAgente.Respondeu, ct);
+            : escalou ? DesfechoTurnoAgente.Escalou : DesfechoTurnoAgente.Respondeu,
+            codigoDoMotivo ?? (escalou ? MotivoDoTurno.EscaladaModelo : null), ct);
 
         await unitOfWork.CommitAsync();
         return new ResultadoTurnoAgente(true, respondeu, escalou);

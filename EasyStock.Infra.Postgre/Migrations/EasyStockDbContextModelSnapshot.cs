@@ -1968,6 +1968,10 @@ namespace EasyStock.Infra.Postgre.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("Motivo")
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)");
+
                     b.Property<int>("Passos")
                         .HasColumnType("integer");
 
@@ -1984,6 +1988,9 @@ namespace EasyStock.Infra.Postgre.Migrations
 
                     b.HasIndex("EmpresaId", "CriadoEm")
                         .HasDatabaseName("ix_atendimento_turnos_agente_empresa_criado");
+
+                    b.HasIndex("EmpresaId", "ConversaId", "CriadoEm")
+                        .HasDatabaseName("ix_atendimento_turnos_agente_empresa_conversa_criado");
 
                     b.ToTable("atendimento_turnos_agente", (string)null);
                 });

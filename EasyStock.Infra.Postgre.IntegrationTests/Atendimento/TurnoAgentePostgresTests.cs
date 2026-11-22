@@ -64,6 +64,52 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
     }
 
     [SkippableFact]
+    public async Task Soma_do_uso_deixa_de_fora_o_turno_de_portao()
+    {
+        // #3175: turno de portão não chama o modelo. No uso do mês ele não é turno nem "falta de preço": se entrasse só
+        // num dos dois, a tela deixaria de avisar que o modelo está sem preço. Motivo que não é de portão continua contando.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var conversa = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        await Gravar(empresa,
+            Turno(empresa, conversa, em, 100, 20, 0, null, DesfechoTurnoAgente.Respondeu),
+            TurnoAgente.Registrar(empresa, conversa, null, null, "claude-sonnet-5", 100, 20, 0, null, [], 1, DesfechoTurnoAgente.Escalou, 0, em, "guarda:outro"),
+            TurnoAgente.Registrar(empresa, conversa, null, null, null, 0, 0, 0, null, [], 0, DesfechoTurnoAgente.Escalou, 0, em, "portao:chave"),
+            TurnoAgente.Registrar(empresa, conversa, null, null, null, 0, 0, 0, null, [], 0, DesfechoTurnoAgente.Cota, 0, em, "portao:cota"));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        soma.Turnos.Should().Be(2, "os dois que chamaram o modelo");
+        soma.TurnosSemPreco.Should().Be(2, "sem preço é todo turno contado: a tela compara os dois números");
+    }
+
+    [SkippableFact]
+    public async Task Historico_grava_e_le_o_motivo_do_turno()
+    {
+        // #3175: coluna nova, anulavel: o turno que respondeu normalmente fica sem motivo.
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid();
+        var agora = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        var conversa = Guid.NewGuid();
+        var barrado = TurnoAgente.Registrar(empresa, conversa, null, null, null, 0, 0, 0, null, [], 0,
+            DesfechoTurnoAgente.Escalou, 0, agora.AddMinutes(1), "portao:limite");
+        var normal = Turno(empresa, conversa, agora, 10, 0, 0, null, DesfechoTurnoAgente.Respondeu);
+
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            db.TurnosAgente.AddRange(barrado, normal);
+            await db.SaveChangesAsync();
+        }
+
+        await using var leitura = fixture.CreateDbContext(); leitura.SetMobileTenantContext(empresa);
+        var pagina = await new TurnoAgenteRepository(leitura).ListarAsync(empresa, new FiltroTurnosAgente(conversa, null, 1, 10));
+
+        pagina.Itens.Select(t => t.Motivo).Should().Equal("portao:limite", null);
+    }
+
+    [SkippableFact]
     public async Task Historico_traz_pergunta_e_resposta_do_mais_novo_ao_mais_velho_com_filtros()
     {
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
