@@ -59,7 +59,8 @@ export const MODULOS = [
     // M1.1 (#1481): a gestão do cardápio lê e grava no EasyStok; no modo demonstração o
     // cardápio continua no Gerir do balcão.
     telas: [
-      { id: 'itens', rotulo: 'Itens do cardápio', tipo: TELA_AJUSTE, aba: 'cardapio', soApi: true },
+      // #3154: quem busca a loja online desligada chega aqui, onde a tela diz quem liga.
+      { id: 'itens', rotulo: 'Itens do cardápio', tipo: TELA_AJUSTE, aba: 'cardapio', soApi: true, palavras: ['loja online', 'vitrine'] },
       // M1.3 (#1483): as categorias (seções) que o cliente vê.
       { id: 'categorias', rotulo: 'Categorias', tipo: TELA_AJUSTE, aba: 'categorias', soApi: true },
       { id: 'imagens', rotulo: 'Banco de imagens', tipo: TELA_AJUSTE, aba: 'acervo', soApi: true },
@@ -218,10 +219,12 @@ export const ehAtalhoDireto = (moduloId, telaId) => ATALHOS_DIRETOS.some((a) => 
 
 // Busca somente no catálogo de navegação, sem consultar dados de clientes.
 const textoDeBusca = (valor) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()
+// #3154: `palavras` são sinônimos que a tela atende sem mostrar no rótulo.
+const textoDaTela = (tela) => [tela.rotulo, ...(tela.palavras ?? [])].join(' ')
 export function filtrarModulos(modulos, busca) {
   const termos = textoDeBusca(busca).split(/\s+/).filter(Boolean)
   return modulos.filter((modulo) => {
-    const texto = textoDeBusca([modulo.nome, modulo.resumo, ...modulo.telas.map((t) => t.rotulo)].join(' '))
+    const texto = textoDeBusca([modulo.nome, modulo.resumo, ...modulo.telas.map(textoDaTela)].join(' '))
     return termos.every((termo) => texto.includes(termo))
   })
 }
@@ -232,7 +235,7 @@ export function buscarDestinosDoConsole(modulos, busca) {
   if (!termos.length) return []
   return filtrarModulos(modulos, busca).flatMap((modulo) => {
     const correspondentes = modulo.telas.filter((tela) => {
-      const texto = textoDeBusca(`${modulo.nome} ${tela.rotulo}`)
+      const texto = textoDeBusca(`${modulo.nome} ${textoDaTela(tela)}`)
       return termos.every((termo) => texto.includes(termo))
     })
     // Uma busca pelo resumo continua útil, oferecendo as telas daquela área.

@@ -292,7 +292,8 @@ await confere('C13 vitrine desligada vira aviso acionável', () => {
   // #2598: o código decide, não a mensagem (a leitura chega como 200 e vira VITRINE_DESLIGADA em lerDaLoja).
   const texto = plano.avisoDoCardapio({ status: 200, codigo: 'VITRINE_DESLIGADA', message: 'A empresa não tem vitrine ativa.' })
   assert.equal(plano.lojaDesligada({ status: 404, codigo: 'NOT_FOUND', message: 'A empresa não tem vitrine ativa.' }), false)
-  assert.equal(texto, 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.')
+  // #3154: diz quem liga, sem o termo interno "vitrine".
+  assert.equal(texto, 'Loja online desligada: sem cardápio. Peça ao suporte do EasyStok para ligar.')
   assert.equal(plano.avisoDoCardapio({ status: 500, message: 'Fora' }), 'Cardápio: Fora')
 })
 await confere('C13 escolher janela e criar pedido limpam o aviso velho', async () => {
