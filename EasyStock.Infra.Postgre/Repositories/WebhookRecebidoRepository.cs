@@ -38,6 +38,11 @@ public sealed class WebhookRecebidoRepository(EasyStockDbContext db) : IWebhookR
         db.WebhookRecebidos.FirstOrDefaultAsync(
             w => w.Provedor == provedor && w.EventIdExterno == eventIdExterno, ct);
 
+    public Task<DateTime?> UltimoRecebidoEmAsync(string provedor, string prefixoEventId, CancellationToken ct = default) =>
+        db.WebhookRecebidos.AsNoTracking()
+            .Where(w => w.Provedor == provedor && w.EventIdExterno.StartsWith(prefixoEventId))
+            .MaxAsync(w => (DateTime?)w.RecebidoEm, ct);
+
     public async Task MarcarProcessadoAsync(Guid id, bool sucesso, string? erro = null, CancellationToken ct = default)
     {
         // Falhou: o que o processamento deixou rastreado pertence a uma transação revertida. Sem descartar, o

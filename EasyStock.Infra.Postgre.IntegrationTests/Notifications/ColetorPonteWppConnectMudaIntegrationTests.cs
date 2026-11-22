@@ -2,6 +2,7 @@ using EasyStock.Api.Data;
 using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration.Crypto;
 using EasyStock.Application.Services.Notifications.Orchestrators;
+using EasyStock.Application.Services.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities;
@@ -64,6 +65,7 @@ public class ColetorPonteWppConnectMudaIntegrationTests(PostgreSqlDatabaseFixtur
         await db.SaveChangesAsync();
 
         var sessao = new CredencialWppConnect(CredencialWppConnect.NomeSessao(loja.Id), "t", DateTimeOffset.UtcNow.AddDays(-30));
+        _sessoes.Add(sessao.Sessao);
         _credenciais.ObterAsync<CredencialWppConnect>(loja.Id, CredencialWppConnect.ProviderKey, AmbienteIntegracao.Production,
             Arg.Any<CancellationToken>()).Returns(sessao);
         _ponte.Habilitado.Returns(true);
@@ -75,7 +77,21 @@ public class ColetorPonteWppConnectMudaIntegrationTests(PostgreSqlDatabaseFixtur
         return (padrao.Id, loja.Id);
     }
 
-    private ServiceProvider Provider(bool habilitado = true) => _s.ConstruirProviderDoWorker(
+    private readonly List<string> _sessoes = [];
+
+    /// <summary>
+    /// O caso comum: o processo já via a ponte conectada muito antes das mensagens em jogo (#3138). Sem isto, toda
+    /// mensagem do teste seria anterior à primeira observação e a rodada ficaria sem conclusão.
+    /// </summary>
+    private ServiceProvider Provider(bool habilitado = true)
+    {
+        var provider = ConstruirProvider(habilitado);
+        var memoria = provider.GetRequiredService<MemoriaVigiaPonteWppConnect>();
+        foreach (var sessao in _sessoes) memoria.ObservarConectada(sessao, DateTimeOffset.UtcNow.AddHours(-12));
+        return provider;
+    }
+
+    private ServiceProvider ConstruirProvider(bool habilitado) => _s.ConstruirProviderDoWorker(
         papelRls: true,
         configuracao: new Dictionary<string, string?>
         {
@@ -137,6 +153,7 @@ public class ColetorPonteWppConnectMudaIntegrationTests(PostgreSqlDatabaseFixtur
             await db.SaveChangesAsync();
         }
         var sessao = new CredencialWppConnect(CredencialWppConnect.NomeSessao(outra.Id), "t", DateTimeOffset.UtcNow.AddDays(-30));
+        _sessoes.Add(sessao.Sessao);
         _credenciais.ObterAsync<CredencialWppConnect>(outra.Id, CredencialWppConnect.ProviderKey, AmbienteIntegracao.Production,
             Arg.Any<CancellationToken>()).Returns(sessao);
         _ponte.ObterEstadoAsync(sessao, Arg.Any<CancellationToken>()).Returns(new EstadoWppConnect(true, true, true, "CONNECTED"));
@@ -180,6 +197,52 @@ public class ColetorPonteWppConnectMudaIntegrationTests(PostgreSqlDatabaseFixtur
 
         (await EstadoAsync(loja)).Should().BeNull();
         (await _s.LerEventosDaEmpresaAsync(padrao)).Should().HaveCount(2);
+    }
+
+    /// <summary>
+    /// #3138 (c): QR expirado não é ponte muda. Desconectada de vez, o incidente fecha e a linha some de
+    /// <c>endpoint_health_state</c>, que é o que o <c>vps-deploy.sh</c> lê para dizer "muda".
+    /// </summary>
+    [SkippableFact]
+    public async Task PonteDesconectadaDeVezFechaOIncidenteEApagaOEstado()
+    {
+        var (padrao, loja) = await PrepararAsync();
+        await using var provider = Provider();
+        await ColetarAsync(provider);
+        (await EstadoAsync(loja))!.LastAlertedAt.Should().NotBeNull();
+
+        _ponte.ObterEstadoAsync(default!, default).ReturnsForAnyArgs(new EstadoWppConnect(true, true, false, "DISCONNECTED"));
+        var memoria = provider.GetRequiredService<MemoriaVigiaPonteWppConnect>();
+        var haMeiaHora = DateTimeOffset.UtcNow - VigiaPonteWppConnect.PrazoDesconectada - TimeSpan.FromMinutes(1);
+        for (var i = 1; i < VigiaPonteWppConnect.ObservacoesDesconectada; i++)
+            memoria.ObservarDesconectada(CredencialWppConnect.NomeSessao(loja), haMeiaHora);
+
+        await ColetarAsync(provider);
+
+        (await EstadoAsync(loja)).Should().BeNull();
+        (await _s.LerEventosDaEmpresaAsync(padrao)).Should().HaveCount(2);
+    }
+
+    /// <summary>#3138 (b): a ponte entregou outra mensagem depois da que ficou sem registro. Buraco antigo, não ponte muda.</summary>
+    [SkippableFact]
+    public async Task MensagemPerdidaComEntregaPosteriorNaoAbre()
+    {
+        var (padrao, loja) = await PrepararAsync();
+        await using (var db = fixture.CreateDbContext())
+        {
+            using var bypass = db.UseRowLevelSecurityBypass();
+            db.Set<WebhookRecebido>().Add(WebhookRecebido.Criar(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
+                $"wpp:{CredencialWppConnect.NomeSessao(loja)}:outra-mensagem", "hash"));
+            db.Set<WebhookRecebido>().Add(WebhookRecebido.Criar(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
+                $"wpp:{CredencialWppConnect.NomeSessao(Guid.NewGuid())}:de-outra-loja", "hash"));
+            await db.SaveChangesAsync();
+        }
+        await using var provider = Provider();
+
+        await ColetarAsync(provider);
+
+        (await _s.LerEventosDaEmpresaAsync(padrao)).Should().BeEmpty();
+        (await EstadoAsync(loja))!.LastAlertedAt.Should().BeNull();
     }
 
     [SkippableFact]
