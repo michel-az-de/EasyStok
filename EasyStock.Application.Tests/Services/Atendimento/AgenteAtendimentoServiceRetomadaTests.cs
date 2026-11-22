@@ -6,7 +6,6 @@ using EasyStock.Application.Services.Atendimento.Ferramentas;
 using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
-using Microsoft.Extensions.Logging.Abstractions;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 
 namespace EasyStock.Application.Tests.Services.Atendimento;
@@ -32,8 +31,8 @@ public partial class AgenteAtendimentoServiceTests
             _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
             [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
             new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-            _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
-            retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = segundos }));
+            _caderno, _log, _pedidos,
+            eventos: _eventos, retomadaOpcoes: Microsoft.Extensions.Options.Options.Create(new RetomadaAssistenteOptions { Segundos = segundos }));
     }
 
     private Task<ResultadoTurnoAgente> Retomar(int segundos = 60) =>

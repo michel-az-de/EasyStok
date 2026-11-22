@@ -167,7 +167,19 @@ internal sealed class LoggerQueGuarda<T> : ILogger<T>
 {
     public List<string> Linhas { get; } = [];
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    /// <summary>#3121: nível, evento e o escopo aberto na hora de cada linha.</summary>
+    public List<(LogLevel Nivel, EventId Evento, IReadOnlyDictionary<string, object?> Escopo)> Eventos { get; } = [];
+
+    private readonly Stack<IReadOnlyDictionary<string, object?>> _escopos = new();
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+    {
+        _escopos.Push(state is IEnumerable<KeyValuePair<string, object?>> pares
+            ? pares.ToDictionary(p => p.Key, p => p.Value)
+            : new Dictionary<string, object?>());
+        return new Fecha(_escopos);
+    }
+
     public bool IsEnabled(LogLevel logLevel) => true;
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
@@ -177,5 +189,11 @@ internal sealed class LoggerQueGuarda<T> : ILogger<T>
             ? string.Join(";", pares.Select(p => $"{p.Key}={p.Value}"))
             : string.Empty;
         Linhas.Add(formatter(state, exception) + "|" + valores);
+        Eventos.Add((logLevel, eventId, _escopos.Count > 0 ? _escopos.Peek() : new Dictionary<string, object?>()));
+    }
+
+    private sealed class Fecha(Stack<IReadOnlyDictionary<string, object?>> escopos) : IDisposable
+    {
+        public void Dispose() => escopos.Pop();
     }
 }

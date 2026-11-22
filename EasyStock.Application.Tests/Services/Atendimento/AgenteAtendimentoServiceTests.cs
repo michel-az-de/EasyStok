@@ -83,7 +83,7 @@ public partial class AgenteAtendimentoServiceTests
         _llm, _conversaRepository, _configuracaoRepository, _clienteRepository,
         [_consultarPedido, .. adicionais], _escalador, _cloudClient, _usoIaRepository, _unitOfWork,
         new ObterDossieClienteUseCase(_clienteRepository, _crm, _historicoPedidos, _domicilio, _conversaRepository),
-        _caderno, NullLogger<AgenteAtendimentoService>.Instance, _pedidos,
+        _caderno, _log, _pedidos,
         turnos: _turnos, precos: Microsoft.Extensions.Options.Options.Create(_precos),
         modelos: Microsoft.Extensions.Options.Options.Create(_modelos));
 

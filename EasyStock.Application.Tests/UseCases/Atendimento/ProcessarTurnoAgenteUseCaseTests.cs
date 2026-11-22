@@ -9,6 +9,8 @@ using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.Cliente.Dossie;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
+using EasyStock.Application.Tests.Services.Auth;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento;
@@ -39,7 +41,27 @@ public class ProcessarTurnoAgenteUseCaseTests
             new ObterDossieClienteUseCase(clientes, Substitute.For<IClienteCrmRepository>(),
                 Substitute.For<IHistoricoPedidosClienteQueries>(), Substitute.For<IDomicilioQueries>(), _conversaRepository),
             Substitute.For<ICadernoRepository>(), NullLogger<AgenteAtendimentoService>.Instance);
-        return new ProcessarTurnoAgenteUseCase(agente, _tenant, _conversaRepository, _escalador, _unitOfWork, NullLogger<ProcessarTurnoAgenteUseCase>.Instance);
+        return new ProcessarTurnoAgenteUseCase(agente, _tenant, _conversaRepository, _escalador, _unitOfWork, _logger);
+    }
+
+    private readonly LoggerQueGuarda<ProcessarTurnoAgenteUseCase> _logger = new();
+
+    // #3121: as linhas de um mesmo turno, inclusive a da falha, saem com a conversa e uma correlação própria.
+    [Fact]
+    public async Task FalhaDoTurnoLogaDentroDoEscopoDoTurno()
+    {
+        _conversaRepository.ObterComMensagensAsync(_empresaId, _conversaId, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns<ConversaComMensagens?>(_ => throw new InvalidOperationException("banco"));
+
+        var useCase = CriarUseCase();
+        await useCase.ExecuteAsync(new ProcessarTurnoAgenteJob(_empresaId, _conversaId));
+        await useCase.ExecuteAsync(new ProcessarTurnoAgenteJob(_empresaId, _conversaId));
+
+        var falhas = _logger.Eventos.Where(e => e.Nivel == LogLevel.Error).Select(e => e.Escopo).ToList();
+        falhas.Should().HaveCountGreaterThanOrEqualTo(2);
+        falhas.Should().OnlyContain(e => Equals(e["ConversaId"], _conversaId) && Equals(e["EmpresaId"], _empresaId));
+        falhas.Select(e => e["TurnoCorrelacao"]).Distinct().Should().HaveCountGreaterThanOrEqualTo(2, "cada turno tem a sua correlação");
+        falhas.Should().OnlyContain(e => e.Count == 3, "o escopo não leva texto, nome nem telefone");
     }
 
     [Fact]
