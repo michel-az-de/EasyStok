@@ -19,12 +19,14 @@ const PERFIS = [
 const pessoa = (n, extra = {}) => ({
   usuarioId: `u-${String(n).padStart(2, '0')}`, nome: `Pessoa ${String(n).padStart(2, '0')}`, email: `pessoa${n}@teste.demo`,
   ativo: true, ultimoAcessoEm: null, criadoEm: '2026-11-15T12:00:00Z', nivel: 'Operador',
-  convite: { estado: 'pendente', aceitoEm: null, via: null }, perfilId: 'p-operador', perfil: 'Operador', ...extra,
+  convite: { estado: 'pendente', aceitoEm: null, via: null }, perfilId: 'p-operador', perfil: 'Operador',
+  // #3174: os botões da linha vêm de `acoes`, que a API devolve por pessoa.
+  acoes: { trocarPerfil: true, reenviarConvite: true, desativar: true }, ...extra,
 })
 // Doze pessoas: a última fica bem abaixo da dobra numa janela de 700 px.
 const USUARIOS = [
   ...Array.from({ length: 11 }, (_, i) => pessoa(i + 1)),
-  pessoa(12, { ativo: false, convite: { estado: 'nenhum', aceitoEm: null, via: null } }),
+  pessoa(12, { ativo: false, convite: { estado: 'nenhum', aceitoEm: null, via: null }, acoes: { reativar: true } }),
 ]
 
 const browser = await chromium.launch({ headless: true })
