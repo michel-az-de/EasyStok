@@ -2,7 +2,7 @@
 // `GET api/pedidos/{id}`: consulta, situação no vocabulário da Cozinha, canal legível, número do dia,
 // saldo e linha do tempo. A tela só desenha; nada aqui conhece React nem a API.
 import { nomeDoMetodoCaixa, normalizarMetodoCaixa } from './caixa'
-import { dataIsoNoFuso, diaMes, moeda, somarDiasIso } from './formato'
+import { dataIsoNoFuso, diaMes, horaCurta, moeda, somarDiasIso } from './formato'
 import { COLUNAS_KDS } from './kds'
 import { numeroDoDiaNaTela } from './pedido'
 
@@ -104,11 +104,19 @@ export const ORDENS_PEDIDO = [
   { valor: 'mais-antigos', rotulo: 'Mais antigos', sort: 'criadoem', order: 'asc' },
   { valor: 'maior-valor', rotulo: 'Maior valor', sort: 'total', order: 'desc' },
   { valor: 'cliente', rotulo: 'Cliente (A a Z)', sort: 'cliente', order: 'asc' },
+  // #3076 (E4, L2): pelo dia da entrega (agendado ou, sem agendamento, o dia em que foi feito), a mais cedo primeiro.
+  { valor: 'entrega', rotulo: 'Entrega (mais cedo)', sort: 'entrega', order: 'asc' },
+]
+
+// #3076 (E4, L2): "Entrega hoje" é o pedido cuja entrega cai hoje no dia da loja, inclusive o pedido para agora feito hoje.
+export const ENTREGAS_PEDIDO = [
+  { valor: 'tudo', rotulo: 'Qualquer dia' },
+  { valor: 'hoje', rotulo: 'Hoje' },
 ]
 
 // Parâmetros de `GET api/pedidos`. O período conta hoje e usa o dia da loja (a API lê `desde` puro como dia
 // de Brasília). Campo vazio não vai na URL.
-export function consultaDePedidos({ busca = '', pagina = 1, situacao = '', periodo = 'tudo', ordem = 'mais-recentes' } = {}, agoraMs = Date.now()) {
+export function consultaDePedidos({ busca = '', pagina = 1, situacao = '', periodo = 'tudo', ordem = 'mais-recentes', entrega = 'tudo' } = {}, agoraMs = Date.now()) {
   const escolhida = ORDENS_PEDIDO.find((o) => o.valor === ordem)
   if (!escolhida) throw new Error(`Pedidos: ordem desconhecida (${ordem}).`)
   const dias = PERIODOS_PEDIDO.find((p) => p.valor === periodo)?.dias ?? null
@@ -119,6 +127,7 @@ export function consultaDePedidos({ busca = '', pagina = 1, situacao = '', perio
     ...(termo ? { search: termo } : {}),
     ...(situacao ? { status: situacao } : {}),
     ...(dias ? { desde: somarDiasIso(dataIsoNoFuso(agoraMs), 1 - dias) } : {}),
+    ...(entrega === 'hoje' ? { entregaDesde: dataIsoNoFuso(agoraMs), entregaAte: dataIsoNoFuso(agoraMs) } : {}),
     sort: escolhida.sort,
     order: escolhida.order,
   }
@@ -195,4 +204,42 @@ export function linhaDoTempoDoPedido(eventos) {
       texto: (TEXTO_DO_EVENTO[e.tipo] ?? ((x) => comDetalhe(legivel(x.tipo) || 'Evento', x.detalhes)))(e),
       quem: [e.usuarioNome, rotuloDoCanal(e.origem)].filter(Boolean).join(' · ') || null,
     }))
+}
+
+// #3076 (E4, L2): quando o pedido sai, na lista e no detalhe. Agendado mostra dia e hora de início (a faixa fica
+// fora da v1); sem agendamento é o pedido para agora.
+export function quandoEntregar(pedido, agoraMs = Date.now()) {
+  if (!pedido?.agendadoParaEm) return 'Na hora'
+  const ms = new Date(pedido.agendadoParaEm).getTime()
+  if (Number.isNaN(ms)) return 'Na hora'
+  const hoje = dataIsoNoFuso(agoraMs), dia = dataIsoNoFuso(ms)
+  const rotulo = dia === hoje ? 'Hoje' : dia === somarDiasIso(hoje, 1) ? 'Amanhã' : dia === somarDiasIso(hoje, -1) ? 'Ontem' : diaMes(pedido.agendadoParaEm)
+  return `${rotulo}, ${horaCurta(pedido.agendadoParaEm)}`
+}
+
+// #3076 (E4, L1): motivo do "Registrar pagamento" desligado no pedido pré-operacional com saldo (tabela da spec).
+// `aguardando_pagamento` não diz que a API recusa: ela aceita o sinal manual; o atalho completa a frase.
+export const MOTIVOS_SEM_BAIXA_NO_DETALHE = {
+  rascunho: 'A cliente ainda não terminou este pedido no cardápio.',
+  aguardando_aprovacao_baba: 'Aprove o pedido em Entregas, no dia da entrega, antes de registrar o pagamento.',
+  aguardando_pagamento: 'Este pedido espera o pagamento do link ou o sinal combinado.',
+}
+export const COMPLEMENTO_COM_CONVERSA = 'Registre pela conversa do pedido.'
+
+// #3076 (E4, L1): o pagamento no cabeçalho do detalhe e o botão. O saldo vem de `aReceber` da API (cupom, estorno e
+// quitado do histórico já contados); sem ele (API antiga), total menos pago. Cancelado não lê `aReceber`: saldo zero
+// e o texto de sempre. `botao`: null (não aparece), `{ ligado: true, valor }` ou `{ ligado: false, motivo }`.
+export function pagamentoNoDetalhe(pedido) {
+  if (!pedido) return null
+  if (pedido.status === 'cancelado') {
+    const texto = situacaoDoPagamento(pedido)?.texto ?? 'Cancelado'
+    return { texto, falta: 0, botao: null }
+  }
+  const falta = typeof pedido.aReceber === 'number' ? Math.max(pedido.aReceber, 0) : (situacaoDoPagamento(pedido)?.falta ?? 0)
+  if (centavos(falta) === 0) {
+    const pago = centavos(pedido.totalPago), total = centavos(pedido.total)
+    return { texto: total > 0 && pago < total ? 'Quitado' : pago > total ? `Recebido ${moeda((pago - total) / 100)} a mais` : 'Pago', falta: 0, botao: null }
+  }
+  const motivo = MOTIVOS_SEM_BAIXA_NO_DETALHE[pedido.status]
+  return { texto: `Falta receber ${moeda(falta)}`, falta, botao: motivo ? { ligado: false, motivo } : { ligado: true, valor: falta } }
 }

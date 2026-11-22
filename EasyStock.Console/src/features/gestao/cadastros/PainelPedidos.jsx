@@ -16,8 +16,8 @@ import { telefoneNaTela } from '../../../dominio/cadastros'
 import { horaCurta, moeda } from '../../../dominio/formato'
 import { hashDoModulo } from '../../../dominio/modulos'
 import {
-  ERRO_MOTIVO_CANCELAMENTO, MOTIVO_CANCELAMENTO_MAXIMO, motivoDoCancelamentoValido, motivoParaNaoCancelarPedido, numeroDoPedido, ORDENS_PEDIDO, PAGINA_PEDIDOS, PERIODOS_PEDIDO, rotuloDaSituacao, rotuloDoCanal, SITUACOES_PEDIDO,
-  situacaoDoPagamento, situacaoPedeAcao, tituloDoPedido,
+  ENTREGAS_PEDIDO, ERRO_MOTIVO_CANCELAMENTO, MOTIVO_CANCELAMENTO_MAXIMO, motivoDoCancelamentoValido, motivoParaNaoCancelarPedido, numeroDoPedido, ORDENS_PEDIDO, PAGINA_PEDIDOS, PERIODOS_PEDIDO, rotuloDaSituacao, rotuloDoCanal, SITUACOES_PEDIDO,
+  quandoEntregar, situacaoDoPagamento, situacaoPedeAcao, tituloDoPedido,
 } from '../../../dominio/pedidosCadastro'
 import { DetalhePedido } from './DetalhePedido'
 import { EscolherClienteDoPedido } from './EscolherClienteDoPedido'
@@ -26,8 +26,8 @@ import base from './cadastros.module.css'
 import css from './pedidos.module.css'
 
 const SITUACOES = [{ valor: '', rotulo: 'Todas' }, ...SITUACOES_PEDIDO]
-const INICIAL = { busca: '', pagina: 1, situacao: '', periodo: 'tudo', ordem: 'mais-recentes', posicao: 0 }
-const FILTROS = ['busca', 'situacao', 'periodo', 'ordem']
+const INICIAL = { busca: '', pagina: 1, situacao: '', periodo: 'tudo', entrega: 'tudo', ordem: 'mais-recentes', posicao: 0 }
+const FILTROS = ['busca', 'situacao', 'periodo', 'entrega', 'ordem']
 
 // #2478: todos os pedidos da loja, de qualquer canal e dia, em Cadastros. Daqui não se altera pedido; o detalhe abre num modal
 // e a lista guarda filtros, página e rolagem enquanto a pessoa navega pelo console.
@@ -41,9 +41,10 @@ export function PainelPedidos({ aoAbrirConversa }) {
 function ListaPedidos({ contexto, aoAbrirConversa }) {
   const [memoria, guardar] = useContextoVisualCadastro('pedidos', contexto.identidade, INICIAL)
   const { busca, pagina, situacao, periodo, ordem } = memoria
+  const entrega = memoria.entrega ?? INICIAL.entrega
   const definir = (valores) => guardar({ ...memoria, ...valores })
   const filtrar = (valores) => definir({ ...valores, pagina: 1, posicao: 0 })
-  const consulta = useListaPedidos({ busca, pagina, situacao, periodo, ordem }, contexto)
+  const consulta = useListaPedidos({ busca, pagina, situacao, periodo, ordem, entrega }, contexto)
   const [detalhe, mostrar] = useState(null)
   const [abrindo, abrir] = useState(null)
   const [erro, falhar] = useState(null)
@@ -87,10 +88,11 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
     } catch (e) { cancelar({ ...cancelando, ocupado: false, erro: e.message || 'Não foi possível cancelar o pedido. Tente de novo.' }) }
   }
 
-  // A conversa da cliente já carregada no Atendimento; sem ela o detalhe não oferece o atalho.
+  // #3130: só a conversa DESTE pedido, já carregada no Atendimento. A conversa da cliente sem este pedido abriria a
+  // comanda de outro pedido; sem a conversa dele, o detalhe não oferece o atalho e diz o motivo.
   const abridorDaConversa = (pedido) => {
     const lista = conversas ?? []
-    const conversa = lista.find((c) => c.pedido?.pedidoId === pedido.id) ?? (pedido.clienteId ? lista.find((c) => c.clienteId === pedido.clienteId) : null)
+    const conversa = lista.find((c) => c.pedido?.pedidoId === pedido.id)
     if (!conversa) return null
     return () => { selecionar(conversa.id); window.location.hash = hashDoModulo('atendimento', 'balcao'); anunciarAberturaDeConversa(conversa.id); aoAbrirConversa?.(conversa.id) }
   }
@@ -107,18 +109,19 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
       <div className={css.filtros}>
         <CampoTexto rotulo="Buscar pedido" tipo="search" placeholder="Nº, nome ou telefone" value={busca} onChange={(e) => filtrar({ busca: e.target.value })} />
         <Combobox rotulo="Feito em" valor={periodo} opcoes={PERIODOS_PEDIDO} aoMudar={(valor) => filtrar({ periodo: valor })} />
+        <Combobox rotulo="Entrega" valor={entrega} opcoes={ENTREGAS_PEDIDO} aoMudar={(valor) => filtrar({ entrega: valor })} />
         <Combobox rotulo="Situação" valor={situacao} opcoes={SITUACOES} aoMudar={(valor) => filtrar({ situacao: valor })} />
         <Combobox rotulo="Ordem" valor={ordem} opcoes={ORDENS_PEDIDO} aoMudar={(valor) => filtrar({ ordem: valor })} />
         <Botao icone="refresh-cw" disabled={consulta.carregando} onClick={consulta.recarregar}>Atualizar</Botao>
       </div>
       {primeiraCarga ? <Vazio titulo="Carregando pedidos">Aguarde um instante.</Vazio>
         : lista.length === 0 && !consulta.erro ? <Vazio titulo={comFiltro ? 'Nenhum pedido com estes filtros' : 'Nenhum pedido ainda'}
-          acao={comFiltro ? <Botao onClick={() => filtrar({ busca: '', situacao: '', periodo: 'tudo', ordem: 'mais-recentes' })}>Limpar filtros</Botao> : <Botao onClick={() => { window.location.hash = hashDoModulo('atendimento', 'balcao') }}>Abrir Conversas</Botao>}>
+          acao={comFiltro ? <Botao onClick={() => filtrar({ busca: '', situacao: '', periodo: 'tudo', entrega: 'tudo', ordem: 'mais-recentes' })}>Limpar filtros</Botao> : <Botao onClick={() => { window.location.hash = hashDoModulo('atendimento', 'balcao') }}>Abrir Conversas</Botao>}>
           {comFiltro ? 'Tente outro número, nome ou período.' : 'Os pedidos do site, do WhatsApp e do balcão aparecem aqui.'}</Vazio>
         : lista.length > 0 && <div ref={tabela} className={`${base.lista} ${css.tabela}`} aria-busy={consulta.carregando}>
           <table>
             <caption className="sr">Pedidos, página {pagina} de {paginas}</caption>
-            <thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Situação</th><th scope="col" className={css.valor}>Total</th><th scope="col"><span className="sr">Ações</span></th></tr></thead>
+            <thead><tr><th scope="col">Pedido</th><th scope="col">Cliente</th><th scope="col">Situação</th><th scope="col">Entrega</th><th scope="col" className={css.valor}>Total</th><th scope="col"><span className="sr">Ações</span></th></tr></thead>
             <tbody>{lista.map((item) => {
               const pagamento = situacaoDoPagamento(item)
               const telefone = telefoneNaTela(item.clienteTelefone)
@@ -128,9 +131,10 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
               const situacaoNaLinha = situacaoPedeAcao(item.status) ? <Pilula tom="aviso">{rotulo}</Pilula> : rotulo
               return <tr key={item.id} className={`${base.clicavel} ${item.id === consulta.novoId ? css.linhaNova : ''}`.trim()} onClick={(e) => { if (!e.target.closest('button, a')) verPedido(item) }}>
                 <td><strong>{numeroDoPedido(item)}</strong><small>{[item.criadoEm && horaCurta(item.criadoEm), canal].filter(Boolean).join(' · ')}</small>
-                  <span className={css.soCelular}><small>{nome}</small><small>{situacaoNaLinha}</small></span></td>
+                  <span className={css.soCelular}><small>{nome}</small><small>{situacaoNaLinha}</small><small>Entrega: {quandoEntregar(item)}</small></span></td>
                 <td><span>{nome}</span>{(telefone || item.clienteApt) && <small>{[telefone, item.clienteApt && `Apto ${item.clienteApt}`].filter(Boolean).join(' · ')}</small>}</td>
                 <td>{situacaoNaLinha}</td>
+                <td className={css.entrega}>{quandoEntregar(item)}</td>
                 <td className={css.valor}><span>{moeda(item.total)}</span>{(pagamento?.falta > 0 || pagamento?.sobra > 0) && <small className={css.falta}>{pagamento.texto}</small>}</td>
                 <td><Botao disabled={Boolean(abrindo)} onClick={() => verPedido(item)} aria-label={`Abrir ${tituloDoPedido(item)}, ${nome}`}>{abrindo === item.id ? 'Abrindo…' : 'Abrir'}</Botao>
                   <Botao variante="texto" disabled={Boolean(semCancelar(item))} motivo={semCancelar(item) ?? undefined} onClick={() => cancelar({ item, motivo: '' })} aria-label={`Cancelar pedido ${tituloDoPedido(item)}, ${nome}`}>Cancelar pedido</Botao></td>
@@ -157,6 +161,6 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
       {cancelando.erro && <p className={base.erro} role="alert">{cancelando.erro}</p>}
       <CampoTexto rotulo="Motivo do cancelamento" limite={MOTIVO_CANCELAMENTO_MAXIMO} value={cancelando.motivo} onChange={(e) => cancelar({ ...cancelando, motivo: e.target.value })} />
     </Modal>}
-    {detalhe && <DetalhePedido dados={detalhe} aoFechar={() => mostrar(null)} abrirConversa={abridorDaConversa(detalhe.pedido)} />}
+    {detalhe && <DetalhePedido dados={detalhe} aoFechar={() => mostrar(null)} abrirConversa={abridorDaConversa(detalhe.pedido)} aoMudar={consulta.recarregar} />}
   </section>
 }

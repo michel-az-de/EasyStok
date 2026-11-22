@@ -15,6 +15,8 @@
 .indicadoresTres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .indicador { display: grid; gap: var(--e-2); padding: var(--e-4); border: 0; border-radius: var(--r-2); background: var(--preenchimento); }
 .indicador > span { color: var(--tinta-2); font-size: var(--t-apoio); }
+/* #3076 (E4, L3): a linha dos pedidos, separada das contas por um divisor neutro de 1px. */
+.pedidosAReceber { padding-top: var(--e-2); border-top: 1px solid var(--linha); color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
 .indicador > strong { font-family: var(--f-dado); font-size: var(--t-titulo); }
 .indicador > small { color: var(--tinta-2); }
 .atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--e-3); }

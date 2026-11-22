@@ -2,6 +2,7 @@
 // consulta velha), mas a lista anterior fica na tela enquanto a nova chega: trocar de página não pisca.
 import { useEffect, useState } from 'react'
 import * as api from '../infra/api/pedidosCadastroApi'
+import { criarRegistroDePagamento } from './pagamentoDoPedido'
 import { inscreverPedidoRegistrado } from './pedidoRegistrado'
 export { listarPedidosDoCliente, obterPedido } from '../infra/api/pedidosCadastroApi'
 export { cancelarPedido } from '../infra/api/comandaApi'
@@ -12,15 +13,22 @@ export function useListaPedidos(filtros, contexto) {
   const [novoId, destacar] = useState(null)
   // #2944 (E1-19): pedido registrado na janela aparece aqui sem recarregar a página, destacado.
   useEffect(() => inscreverPedidoRegistrado((id) => { destacar(id); recarregar((r) => r + 1) }), [])
-  const { busca, pagina, situacao, periodo, ordem } = filtros
+  const { busca, pagina, situacao, periodo, ordem, entrega } = filtros
   useEffect(() => {
     const abortar = new AbortController()
     definir((r) => ({ ...r, carregando: true, erro: null }))
-    const timer = setTimeout(() => api.listarPedidos({ busca, pagina, situacao, periodo, ordem }, contexto, abortar.signal).then(
+    const timer = setTimeout(() => api.listarPedidos({ busca, pagina, situacao, periodo, ordem, entrega }, contexto, abortar.signal).then(
       (r) => { if (!abortar.signal.aborted) definir({ ...r, carregando: false, erro: null, carregado: true }) },
       (e) => { if (!abortar.signal.aborted) definir({ itens: [], total: 0, carregando: false, erro: e.message, carregado: true }) },
     ), busca ? 250 : 0)
     return () => { clearTimeout(timer); abortar.abort() }
-  }, [busca, pagina, situacao, periodo, ordem, contexto.empresaId, contexto.identidade, revisao])
+  }, [busca, pagina, situacao, periodo, ordem, entrega, contexto.empresaId, contexto.identidade, revisao])
   return { ...resultado, novoId, recarregar: () => recarregar((r) => r + 1) }
 }
+
+// #3076 (E4, L1): o "Registrar pagamento" do detalhe de Pedidos é a mesma baixa da conversa. O detalhe só tem o
+// `PedidoResult` (sem cobrança nem `requerAprovacao`): o botão só liga em pedido operacional, e o registro vale
+// para a vida da aba, para o reenvio depois de uma queda reusar a chave.
+const registrarNoDetalhe = criarRegistroDePagamento()
+export const registrarPagamentoDoDetalhe = (pedido, valor, metodo) =>
+  registrarNoDetalhe({ pedidoId: pedido.id, pedido: { pedidoId: pedido.id, statusApi: pedido.status }, valor, metodo })
