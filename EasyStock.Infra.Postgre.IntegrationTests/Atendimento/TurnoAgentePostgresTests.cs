@@ -64,6 +64,25 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
     }
 
     [SkippableFact]
+    public async Task Soma_nao_conta_turno_de_portao_como_sem_preco()
+    {
+        // #3175: turno de portão não chama o modelo; sem custo ali não é "falta de preço do modelo".
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
+        var empresa = Guid.NewGuid(); var conversa = Guid.NewGuid();
+        var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
+        await Gravar(empresa,
+            Turno(empresa, conversa, em, 100, 20, 0, null, DesfechoTurnoAgente.Respondeu),
+            TurnoAgente.Registrar(empresa, conversa, null, null, null, 0, 0, 0, null, [], 0, DesfechoTurnoAgente.Escalou, 0, em, "portao:chave"),
+            TurnoAgente.Registrar(empresa, conversa, null, null, null, 0, 0, 0, null, [], 0, DesfechoTurnoAgente.Cota, 0, em, "portao:cota"));
+
+        await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
+        var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
+
+        soma.Turnos.Should().Be(3);
+        soma.TurnosSemPreco.Should().Be(1, "só o turno que chamou o modelo e ficou sem custo");
+    }
+
+    [SkippableFact]
     public async Task Historico_grava_e_le_o_motivo_do_turno()
     {
         // #3175: coluna nova, anulavel: o turno que respondeu normalmente fica sem motivo.

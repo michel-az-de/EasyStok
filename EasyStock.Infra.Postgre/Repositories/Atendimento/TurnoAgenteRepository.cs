@@ -52,7 +52,8 @@ public sealed class TurnoAgenteRepository(EasyStockDbContext db) : ITurnoAgenteR
                 Saida = g.Sum(t => (long)t.TokensSaida),
                 CacheLido = g.Sum(t => (long)t.TokensCacheLido),
                 Custo = g.Sum(t => t.CustoEstimado ?? 0m),
-                SemPreco = g.Count(t => t.CustoEstimado == null),
+                // #3175: turno de portão não chama o modelo; sem custo ali não é falta de preço.
+                SemPreco = g.Count(t => t.CustoEstimado == null && (t.Motivo == null || !t.Motivo.StartsWith("portao:"))),
                 SemIa = g.Count(t => t.Desfecho == DesfechoTurnoAgente.SemIa),
                 ComTokens = g.Count(t => t.TokensEntrada + t.TokensSaida + t.TokensCacheLido > 0),
             })

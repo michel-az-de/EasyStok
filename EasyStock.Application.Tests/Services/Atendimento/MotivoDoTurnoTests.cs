@@ -43,6 +43,15 @@ public class MotivoDoTurnoTests
         MotivoDoTurno.DaFalhaDaGeracao("qualquer coisa com R$ 59", false).Should().Be("guarda:outro");
     }
 
+    // Código de portão que o domínio recusasse derrubaria o turno depois de escalar e antes do commit.
+    [Fact]
+    public void TodoPortaoDoCatalogoViraMotivoQueODominioAceita()
+    {
+        foreach (var portao in PortoesDoAssistente.Catalogo)
+            FluentActions.Invoking(() => TurnoAgente.Registrar(Guid.NewGuid(), Guid.NewGuid(), null, null, null, 0, 0, 0, null, [], 0,
+                DesfechoTurnoAgente.Escalou, 0, DateTime.UtcNow, MotivoDoTurno.DoPortao(portao.Codigo))).Should().NotThrow(portao.Codigo);
+    }
+
     [Theory]
     [InlineData("limite")]
     [InlineData("bloqueado")]
