@@ -164,7 +164,7 @@ os registros.
 
 **Tier.** BAIXO (spec aprovada, sem migração).
 
-**Estado (18/11/2026, #2853).** O painel entrou como bloco "Painel do Assistente" em Gestão › Atendimento, com 3 abas.
+**Estado (18/11/2026, #2853).** O painel entrou como bloco "Painel do Assistente" em Gestão › Atendimento, com 4 abas: Uso e cota, Fluxo, Histórico e, desde #3149, Dicionário (os termos da loja que o Assistente aprende).
 - **Uso e cota:** barra contra a cota, alerta em 80% e custo honesto sem preço configurado.
 - **Fluxo:** mapa do turno. Etapas fixas, instruções com observações editáveis, roteiro editável, reordenável e com chave por etapa, e ferramentas com chave.
 - **Histórico:** turno a turno.

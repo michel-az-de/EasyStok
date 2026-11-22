@@ -10,7 +10,38 @@ namespace EasyStock.Application.Services.Atendimento;
 public sealed class MemoriaVigiaPonteWppConnect
 {
     private const int Teto = 5_000;
+    public const int ObservacoesParaQueda = 2;
     private readonly ConcurrentDictionary<string, byte> _descartadas = new(StringComparer.Ordinal);
+
+    private readonly ConcurrentDictionary<string, (DateTimeOffset Desde, bool AposQueda)> _conectada = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, (DateTimeOffset Desde, int Observacoes)> _desconectada = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _anterioresAoProcesso = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// #3138: desde quando este processo vê a sessão conectada sem interrupção (a observação, não a conexão real), e se
+    /// antes disso ele a viu desconectada ou sem resposta. Uma sessão por loja: estes dicionários não têm teto.
+    /// </summary>
+    public (DateTimeOffset Desde, bool AposQueda) ObservarConectada(string sessao, DateTimeOffset agora)
+    {
+        // Uma leitura desconectada só é oscilação do check-connection: não vira queda nem apaga o que já se sabia.
+        var caiu = _desconectada.TryRemove(sessao, out var fora) && fora.Observacoes >= ObservacoesParaQueda;
+        return caiu ? _conectada[sessao] = (agora, true) : _conectada.GetOrAdd(sessao, (agora, false));
+    }
+
+    /// <summary>#3138: desde quando, e por quantas observações seguidas, este processo vê a sessão desconectada ou sem resposta.</summary>
+    public (DateTimeOffset Desde, int Observacoes) ObservarDesconectada(string sessao, DateTimeOffset agora)
+    {
+        return _desconectada.AddOrUpdate(sessao, (agora, 1), (_, a) => (a.Desde, a.Observacoes + 1));
+    }
+
+    /// <summary>Mensagem sem entrega e anterior à primeira observação deste processo: lembrada com a data, para não gastar consulta de novo.</summary>
+    public bool AnteriorAoProcesso(string idExterno, out DateTimeOffset quando) => _anterioresAoProcesso.TryGetValue(idExterno, out quando);
+
+    public void LembrarAnteriorAoProcesso(string idExterno, DateTimeOffset quando)
+    {
+        if (_anterioresAoProcesso.Count >= Teto) _anterioresAoProcesso.Clear();
+        _anterioresAoProcesso[idExterno] = quando;
+    }
 
     public bool JaDescartada(string idExterno) => _descartadas.ContainsKey(idExterno);
 

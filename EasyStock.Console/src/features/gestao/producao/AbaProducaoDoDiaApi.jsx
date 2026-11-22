@@ -10,6 +10,7 @@ import { useCatalogo } from '../../../aplicacao/contextos'
 import { useEstoqueDoDiaApi } from '../../../aplicacao/useEstoqueDoDiaApi'
 import { aoLancarLote, dispensarLote, guardarRascunho, linhasDoRascunho, lotesLancados, marcarPassosVistos, producaoDoDia } from '../../../aplicacao/producaoDoDia'
 import { lerSugestao, retirarProducaoPlanejada } from '../../../aplicacao/planejamento'
+import { AVISO_LOJA_DESLIGADA } from '../../../aplicacao/planoDeSincronizacao'
 import { estaRemovido } from '../../../dominio/cardapio'
 import { plural } from '../../../dominio/formato'
 import {
@@ -358,7 +359,7 @@ export function AbaProducaoDoDiaApi() {
               <Vazio icone="cardapio" titulo="Nenhum prato para produzir"
                 acao={<a className={css.link} href={hashDoModulo('cardapio', 'itens')}>Abrir Itens do cardápio</a>}>
                 {estoque.semLoja
-                  ? 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.'
+                  ? AVISO_LOJA_DESLIGADA
                   : 'Cadastre um prato no cardápio para começar.'}
               </Vazio>
             ) : visiveis.length === 0 ? (

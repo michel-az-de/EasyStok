@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listarHistoricoAssistente, obterFluxoAssistente, obterUsoAssistente } from '../infra/api/assistenteApi'
-import { salvarAjusteDoAssistente } from '../infra/api/configuracaoApi'
+import { obterConfiguracao, salvarAjusteDoAssistente } from '../infra/api/configuracaoApi'
 
 // #2853: painel do Assistente. Lê uso e fluxo ao abrir e depois de cada ajuste salvo, para a tela mostrar
 // o que o robô usa de fato (o fluxo vem da mesma fonte que o turno). Cada ajuste é um PUT só com o campo dele.
@@ -53,4 +53,26 @@ export function useHistoricoAssistente(ativo) {
   }, [chave, pagina])
 
   return { carregando: Boolean(chave) && estado.chave !== chave, dados: estado.dados, erro: estado.erro, pagina, setPagina }
+}
+
+// #3149: dicionário da loja. Só lê quando `ativo` (o GET da configuração é de quem administra) e não relê ao voltar à
+// aba: `recarregar` é quem pede outra leitura, depois de salvar. `leitura` conta as leituras feitas, para a aba
+// recomeçar o rascunho do que a API devolveu.
+export function useDicionarioDaLoja(ativo) {
+  const [versao, setVersao] = useState(0)
+  const [estado, setEstado] = useState({ versaoLida: -1, leitura: 0, dicionario: null, erro: null })
+
+  useEffect(() => {
+    if (!ativo) return undefined
+    const controle = new AbortController()
+    obterConfiguracao()
+      .then((configuracao) => { if (!controle.signal.aborted) setEstado((a) => ({ versaoLida: versao, leitura: a.leitura + 1, dicionario: configuracao?.dicionario ?? [], erro: null })) })
+      .catch((erro) => { if (!controle.signal.aborted) setEstado((a) => ({ ...a, versaoLida: versao, erro: erro.message })) })
+    return () => controle.abort()
+  }, [ativo, versao])
+
+  const recarregar = useCallback(() => setVersao((v) => v + 1), [])
+  // `definir`: o que o PUT acabou de gravar vira o valor salvo, sem outra leitura.
+  const definir = useCallback((dicionario) => setEstado((a) => ({ ...a, dicionario })), [])
+  return { carregando: ativo && estado.versaoLida !== versao, dicionario: estado.dicionario, leitura: estado.leitura, erro: estado.versaoLida === versao ? estado.erro : null, recarregar, definir }
 }

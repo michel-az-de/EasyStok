@@ -27,16 +27,22 @@ namespace EasyStock.Infra.Postgre.Notifications.Collectors;
 /// <para>
 /// A listagem das empresas é a única leitura de dado de loja entre tenants e pede o <see cref="IRowLevelSecurityBypass"/>
 /// por conta própria (o orquestrador já roda cada coletor sob bypass; o estado e o aviso, que não são dado de loja, também
-/// rodam sob ele). A avaliação de cada empresa abre um escopo próprio com o tenant ligado; erro numa empresa, ou a ponte
-/// fora do ar, não derruba as outras nem muda o estado (ponte que não responde não é "muda"). O estado vive em
-/// <c>endpoint_health_state</c> com o nome <c>wppconnect/{empresa}</c>. Nada de telefone ou texto sai daqui: o aviso só
-/// leva enums (ADR-0057).
+/// rodam sob ele). A avaliação de cada empresa abre um escopo próprio com o tenant ligado; erro numa empresa não derruba
+/// as outras. O estado vive em <c>endpoint_health_state</c> com o nome <c>wppconnect/{empresa}</c>. Nada de telefone ou
+/// texto sai daqui: o aviso só leva enums (ADR-0057).
+/// </para>
+/// <para>
+/// Rodada sem conclusão mantém o estado como está: erro, ponte desconectada ou sem resposta há pouco (o
+/// <c>check-connection</c> oscila), suspeita anterior à primeira observação do processo, processo sem a configuração da
+/// ponte (este avisa em log, uma vez por rodada). Ponte desconectada ou sem resposta por
+/// <see cref="VigiaPonteWppConnect.PrazoDesconectada"/> seguidos não é ponte muda (#3138): o estado é apagado e o
+/// incidente fecha; a desconexão aparece na tela de integração.
 /// </para>
 /// <para>
 /// O aviso é um por rodada, não um por loja: a chave de dedupe do publicador é por componente, e lojas costumam ficar
 /// mudas juntas. Abre se alguma loja abriu ou segue muda; normaliza só quando nenhuma loja tem incidente aberto. Loja que
-/// sai do escopo (desconectou, desligou o módulo, perdeu a credencial) tem o estado apagado, para o incidente não ficar
-/// aberto para sempre.
+/// sai do escopo (módulo desligado, sem credencial, desconectada de vez) tem o estado apagado, para o incidente não
+/// ficar aberto para sempre.
 /// </para>
 /// </summary>
 public sealed class ColetorPonteWppConnectMuda(
@@ -56,9 +62,12 @@ public sealed class ColetorPonteWppConnectMuda(
 
     public static string NomeDoEstado(Guid empresaId) => $"{PrefixoDoEstado}{empresaId:N}";
 
+    private bool _avisouSemConfiguracao;
+
     public async Task ColetarAsync(CancellationToken ct = default)
     {
         if (!configuration.GetValue<bool>(ChaveHabilitado)) return;
+        _avisouSemConfiguracao = false;
 
         List<Guid> empresas;
         using (bypassRls.Begin())
@@ -77,6 +86,14 @@ public sealed class ColetorPonteWppConnectMuda(
             var sinal = await AvaliarAsync(empresaId, ct);
             if (sinal is null) { mantidos.Add(NomeDoEstado(empresaId)); continue; } // não avaliou: o estado fica como está
             if (sinal == SinalPonteWppConnect.NaoAvaliada) continue;                  // fora do escopo: fecha abaixo
+            if (sinal == SinalPonteWppConnect.Desconectada)
+            {
+                if (estados.Exists(s => s.EndpointName == NomeDoEstado(empresaId)))
+                    logger.LogWarning(
+                        "Ponte WPPConnect da empresa {EmpresaId} está desconectada ou sem resposta há mais de {Minutos} min: sai do vigia de ponte muda e o incidente fecha. A desconexão aparece na tela de integração.",
+                        empresaId, (int)VigiaPonteWppConnect.PrazoDesconectada.TotalMinutes);
+                continue;
+            }
 
             var nome = NomeDoEstado(empresaId);
             mantidos.Add(nome);
@@ -130,8 +147,9 @@ public sealed class ColetorPonteWppConnectMuda(
     private static DateTime MaisAntigo(DateTime? atual, DateTime novo) => atual is { } a && a < novo ? a : novo;
 
     /// <summary>
-    /// <c>null</c>: não deu para avaliar (erro, ponte fora do ar ou desconectada, processo sem a configuração da ponte).
-    /// <c>NaoAvaliada</c>: não há o que vigiar nesta empresa (módulo desligado, sem credencial).
+    /// <c>null</c>: rodada sem conclusão (erro, ponte desconectada ou sem resposta há pouco, suspeita anterior à primeira
+    /// observação do processo, processo sem a configuração da ponte). <c>NaoAvaliada</c>: não há o que vigiar nesta
+    /// empresa (módulo desligado, sem credencial). <c>Desconectada</c>: desconectada de vez, sai do escopo.
     /// </summary>
     private async Task<SinalPonteWppConnect?> AvaliarAsync(Guid empresaId, CancellationToken ct)
     {
@@ -152,11 +170,13 @@ public sealed class ColetorPonteWppConnectMuda(
             if (!sp.GetRequiredService<IWppConnectSessaoClient>().Habilitado)
             {
                 // Falso verde: o vigia está ligado e este processo não tem a configuração da ponte (Atendimento:WppConnect).
-                logger.LogWarning("Vigia da ponte WPPConnect ligado sem a configuração da ponte neste processo: nada é avaliado.");
+                if (!_avisouSemConfiguracao)
+                    logger.LogWarning("Vigia da ponte WPPConnect ligado sem a configuração da ponte neste processo: nada é avaliado.");
+                _avisouSemConfiguracao = true;
                 return null;
             }
 
-            // Ponte desconectada nesta rodada: nada se conclui e o estado fica como está (o check-connection oscila).
+            // Sem conclusão nesta rodada (desconectada há pouco, suspeita anterior ao processo): o estado fica como está.
             var sinal = await sp.GetRequiredService<VigiaPonteWppConnect>().AvaliarAsync(sessao, ct);
             return sinal == SinalPonteWppConnect.NaoAvaliada ? null : sinal;
         }

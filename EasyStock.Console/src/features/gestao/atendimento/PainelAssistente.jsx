@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useHistoricoAssistente, usePainelAssistente } from '../../../aplicacao/usePainelAssistente'
+import { useDicionarioDaLoja, useHistoricoAssistente, usePainelAssistente } from '../../../aplicacao/usePainelAssistente'
 import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
@@ -7,6 +7,7 @@ import { Pilula } from '../../../componentes/Pilula'
 import {
   cotaDoCampo, cotaParaCampo, desfechoDoTurno, formatarTokens, linhaDoUso, resumoDoUso, semIaDoUso,
 } from '../../../dominio/painelAssistente'
+import { AbaDicionario } from './AbaDicionario'
 import { AbaFluxo } from './AbaFluxo'
 import { Retorno } from './Retorno'
 import css from './painelAssistente.module.css'
@@ -15,6 +16,7 @@ const ABAS = [
   { id: 'uso', nome: 'Uso e cota', rotulo: 'Uso e cota' },
   { id: 'fluxo', nome: 'Fluxo', rotulo: 'Fluxo' },
   { id: 'historico', nome: 'Histórico', rotulo: 'Histórico' },
+  { id: 'dicionario', nome: 'Dicionário', rotulo: 'Dicionário' },
 ]
 
 // #2853: painel do Assistente na Gestão › Atendimento. Uso do mês contra a cota, o fluxo do turno como mapa
@@ -25,6 +27,10 @@ const ABAS = [
 export function PainelAssistente({ podeEditar, abaAntes = null, sinalRecarregar = 0 }) {
   const [aba, setAba] = useState(abaAntes?.id ?? 'uso')
   const painel = usePainelAssistente()
+  // #3149: o dicionário só é lido (GET de quem administra) na primeira vez que a aba abre, e não é relido ao voltar.
+  const [dicionarioAberto, setDicionarioAberto] = useState(false)
+  const dicionarioDaLoja = useDicionarioDaLoja(podeEditar && dicionarioAberto)
+  const trocarAba = (id) => { setAba(id); if (id === 'dicionario') setDicionarioAberto(true) }
   const recarregar = painel.recarregar
   const ultimoSinal = useRef(sinalRecarregar)
   useEffect(() => {
@@ -40,14 +46,15 @@ export function PainelAssistente({ podeEditar, abaAntes = null, sinalRecarregar 
           <Botao icone="refresh-cw" onClick={painel.recarregar} disabled={painel.carregando}>Atualizar</Botao>
         </div>
       )}
-      <BarraDeAbas rolavel className={css.abas} abas={abas} ativa={aba} aoTrocar={setAba} idPainel="painel-assistente-conteudo" prefixoId="painel-assistente" rotulo="Partes do painel do Assistente" />
-      <div id="painel-assistente-conteudo" role="tabpanel" aria-labelledby={`painel-assistente-${aba}`} className={css.conteudo} aria-busy={painel.carregando}>
-        {painel.erro && aba !== abaAntes?.id && <p role="alert" className={css.erro}>Não consegui ler o Assistente agora: {painel.erro}</p>}
-        {!painel.uso && painel.carregando && aba !== abaAntes?.id && <output className={css.nota}>Carregando…</output>}
+      <BarraDeAbas rolavel className={css.abas} abas={abas} ativa={aba} aoTrocar={trocarAba} idPainel="painel-assistente-conteudo" prefixoId="painel-assistente" rotulo="Partes do painel do Assistente" />
+      <div id="painel-assistente-conteudo" role="tabpanel" aria-labelledby={`painel-assistente-${aba}`} className={css.conteudo} aria-busy={painel.carregando || (aba === 'dicionario' && dicionarioDaLoja.carregando)}>
+        {painel.erro && aba !== abaAntes?.id && aba !== 'dicionario' && <p role="alert" className={css.erro}>Não consegui ler o Assistente agora: {painel.erro}</p>}
+        {!painel.uso && painel.carregando && aba !== abaAntes?.id && aba !== 'dicionario' && <output className={css.nota}>Carregando…</output>}
         {abaAntes && aba === abaAntes.id && abaAntes.conteudo}
         {aba === 'uso' && painel.uso && <AbaUso uso={painel.uso} podeEditar={podeEditar} painel={painel} />}
         {aba === 'fluxo' && painel.fluxo && <AbaFluxo fluxo={painel.fluxo} podeEditar={podeEditar} painel={painel} />}
         {aba === 'historico' && <AbaHistorico />}
+        {aba === 'dicionario' && <AbaDicionario podeEditar={podeEditar} painel={painel} dicionarioDaLoja={dicionarioDaLoja} />}
       </div>
     </section>
   )

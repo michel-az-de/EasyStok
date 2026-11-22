@@ -101,7 +101,7 @@ function ListaPedidos({ contexto, aoAbrirConversa }) {
   return <section className={base.painel} aria-label="Pedidos">
     <header className={base.cabecalho}>
       <div><h2>Pedidos</h2><p>Todos os pedidos da loja, de qualquer canal e de qualquer dia.</p></div>
-      {novoPedido.disponivel && <Botao variante="primario" icone="mais" onClick={() => { novoPedido.limparErro(); escolherCliente(true) }}>Novo pedido</Botao>}
+      {novoPedido.disponivel && <Botao variante="primario" icone="mais" disabled={Boolean(novoPedido.motivo)} motivo={novoPedido.motivo ?? undefined} onClick={() => { novoPedido.limparErro(); escolherCliente(true) }}>Novo pedido</Botao>}
     </header>
     {(erro || consulta.erro) && <div className={base.erro} role="alert"><p>{erro || consulta.erro}</p>
       <Botao onClick={() => { falhar(null); if (consulta.erro) consulta.recarregar() }}>{consulta.erro ? 'Tentar de novo' : 'Entendi'}</Botao></div>}
