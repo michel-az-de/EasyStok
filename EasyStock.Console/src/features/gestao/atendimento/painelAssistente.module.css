@@ -117,3 +117,13 @@
 @media (max-width: 599px) {
   .barraDoFluxo { flex-wrap: wrap; overflow-x: visible; }
 }
+
+/* #3149: dicionário da loja. Termo, significado e a lixeira numa linha; abaixo de 600 px do painel, uma coluna só. */
+.dicionario { display: grid; gap: var(--e-3); max-width: 860px; }
+.termos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.termo { display: grid; gap: var(--e-2); align-items: start; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; padding: var(--e-3); border: 1px solid var(--linha); border-radius: var(--r-2); background: var(--papel); }
+.termo > :last-child { margin-top: var(--e-5); }
+@container (max-width: 599px) {
+  .termo { grid-template-columns: minmax(0, 1fr); }
+  .termo > :last-child { margin-top: 0; justify-self: end; }
+}
