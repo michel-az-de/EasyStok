@@ -28,7 +28,7 @@ export function PedirCelularDoPedido({ cliente, novoPedido, aoFechar }) {
   return <Modal titulo={`Novo pedido de ${cliente.nome}`} descricao="O cadastro está sem telefone. O pedido segue pelo WhatsApp da loja, então falta o celular."
     aoFechar={ocupado ? undefined : aoFechar} segurarFechamento={ocupado} focarCampo
     rodape={<Botao disabled={ocupado} onClick={aoFechar}>Cancelar</Botao>}>
-    {novoPedido.erro && <p className={css.falta} role="alert">{novoPedido.erro}</p>}
+    {novoPedido.erro && <p ref={novoPedido.refDoErro} tabIndex={-1} className={css.falta} role="alert">{novoPedido.erro}</p>}
     <CelularDoPedido clienteId={cliente.id} novoPedido={novoPedido} />
   </Modal>
 }

@@ -37,6 +37,16 @@ export function erroDoTelefone(telefone, { aceitaDeFora = false } = {}) {
   return !aceitaDeFora && nacional.startsWith('0') ? 'O DDD não começa com zero. Confira o número.' : null
 }
 
+// #3155: a regra do Novo pedido (`NormalizadorTelefone.EhCelularBr`): celular do Brasil, DDD de 1 a 9, 9 e depois 6 a 9
+// (Anatel). Todo número que não casa (fixo, 0800, de outro país, "12" gravado antes da regra) avisa sem bloquear; quem
+// mostra o aviso decide quando (o editor, só depois de sair do campo e sem erro por cima).
+export const CELULAR_BR = /^[1-9][0-9]9[6-9]\d{7}$/
+export const AVISO_NAO_CELULAR = 'Este número não recebe Novo pedido: o pedido pelo WhatsApp só aceita celular do Brasil com DDD.'
+export function avisoDeCelularBr(telefone) {
+  const { digitos, deFora, nacional } = partesDoTelefone(telefone)
+  return !digitos.length || (!deFora && CELULAR_BR.test(nacional)) ? null : AVISO_NAO_CELULAR
+}
+
 // O CEP é opcional; preenchido, tem 8 dígitos.
 export function erroDoCep(cep) {
   const quantos = digitos(cep).length

@@ -197,7 +197,7 @@ function ListaCadastro({ tela, contexto, conversa, conversas, acoes, aoFixarCont
     {emRecompra && recompra.convite && <div className={css.contexto} role="status"><span>Convite aberto para <strong>{recompra.convite.nome}</strong>. Sai da lista por 30 dias.</span><Botao variante="texto" onClick={recompra.desfazer} aria-label={`Desfazer o convite de ${recompra.convite.nome}`}>Desfazer</Botao></div>}
     {emRecompra && recompra.erro && <div className={css.erro} role="alert"><p>{recompra.erro}</p></div>}
     {reversao && podeEditar && <div className={css.contexto}><span>Desfazer restaura somente a edição da conta <strong>{reversao.nome}</strong> e registra uma nova alteração.</span><Botao disabled={desfazendo} onClick={desfazer}>{desfazendo ? 'Desfazendo…' : 'Desfazer edição desta conta'}</Botao></div>}
-    {novoPedido.erro && !editor && !celularDe && <div className={css.erro} role="alert"><p>{novoPedido.erro}</p><Botao onClick={novoPedido.limparErro}>Entendi</Botao></div>}
+    {novoPedido.erro && !editor && !celularDe && <div ref={novoPedido.refDoErro} tabIndex={-1} className={css.erro} role="alert"><p>{novoPedido.erro}</p><Botao onClick={novoPedido.limparErro}>Entendi</Botao></div>}
     {(erro || consulta.erro) && <div className={css.erro} role="alert"><p>{erro || consulta.erro}</p><Botao onClick={() => { falhar(null); consulta.recarregar() }}>Tentar de novo</Botao></div>}
     <div className={css.superficie}>
       {/* #2792: abas de verdade (tablist, aria-selected e setas), como em Modelos. */}

@@ -45,7 +45,7 @@ export function ChamarClientes({ busca, conversas, aoAbrir }) {
     <section className={css.chamarClientes} aria-label="Clientes cadastrados sem conversa aberta">
       <AnfitriaoDeConfirmacao />
       {lista.length > 0 && <p className={css.chamarClientesTitulo}>Clientes cadastrados sem conversa aberta</p>}
-      {novoPedido.erro && <p className={css.chamarClienteErro} role="alert">{novoPedido.erro}</p>}
+      {novoPedido.erro && <p ref={novoPedido.refDoErro} tabIndex={-1} className={css.chamarClienteErro} role="alert">{novoPedido.erro}</p>}
       {lista.map((cliente) => (
         <div key={cliente.id} className={css.chamarCliente}>
           <span className={css.chamarClienteNome}>{cliente.nome} · {telefoneDoE164(cliente.telefone)}</span>

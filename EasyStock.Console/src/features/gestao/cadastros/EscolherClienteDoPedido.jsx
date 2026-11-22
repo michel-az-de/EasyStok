@@ -43,7 +43,7 @@ export function EscolherClienteDoPedido({ novoPedido, aoFechar }) {
     rodape={<Botao disabled={ocupado} onClick={aoFechar}>Cancelar</Botao>}>
     <div className={css.escolha}>
       <CampoTexto rotulo="Cliente" tipo="search" placeholder="Nome ou telefone" value={termo} onChange={(e) => digitar(e.target.value)} />
-      {novoPedido.erro && <p className={css.falta} role="alert">{novoPedido.erro}</p>}
+      {novoPedido.erro && <p ref={novoPedido.refDoErro} tabIndex={-1} className={css.falta} role="alert">{novoPedido.erro}</p>}
       {!ativa ? <p className={css.apoio}>Digite ao menos 3 letras do nome ou números do telefone.</p>
         : !atual ? <p className={css.apoio} role="status">Buscando clientes…</p>
           : achados.erro ? <p className={css.falta} role="alert">{achados.erro}</p>

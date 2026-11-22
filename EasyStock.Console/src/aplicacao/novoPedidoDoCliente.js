@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAcoes, useAtendimento, useCatalogoOpcional } from './contextos'
 import { lerSessao } from '../infra/api/sessao'
 import { useAcessoModulos } from './acessoModulos'
@@ -22,6 +22,14 @@ export function useNovoPedidoDoCliente({ aoAbrir } = {}) {
   const [abrindo, marcarAbrindo] = useState(null)
   const [erro, falhar] = useState(null)
   const emVoo = useRef(false)
+  // #3155: o botão desligado durante o "Abrindo…" perde o foco; a recusa (celular que não é celular, 400 da API) recebe o
+  // foco para quem usa teclado ou leitor de tela não ficar sem saber. Quem mostra `erro` liga `refDoErro` e `tabIndex={-1}`.
+  // Quem deu Enter no campo do celular fica nele: é o campo que precisa corrigir.
+  const refDoErro = useRef(null)
+  useEffect(() => {
+    if (!erro || document.activeElement?.matches?.('input:enabled, textarea:enabled, select:enabled')) return
+    refDoErro.current?.focus()
+  }, [erro])
   // #2930: `celular` vem do campo da escolha do cliente quando o cadastro está sem telefone.
   const iniciar = async (clienteId, { celular, nome } = {}) => {
     if (!disponivel || !clienteId || emVoo.current) return false
@@ -41,5 +49,5 @@ export function useNovoPedidoDoCliente({ aoAbrir } = {}) {
     }
   }
   const rotulo = (clienteId) => rotuloDoNovoPedido(lerSessao(), clienteId)
-  return { disponivel, motivo, abrindo, erro, iniciar, rotulo, limparErro: () => falhar(null) }
+  return { disponivel, motivo, abrindo, erro, refDoErro, iniciar, rotulo, limparErro: () => falhar(null) }
 }
