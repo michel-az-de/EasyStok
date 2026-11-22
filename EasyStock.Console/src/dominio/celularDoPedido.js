@@ -5,6 +5,7 @@ export function erroDoCelular(texto) {
   if (digitos.length > 11 && digitos.startsWith('55')) digitos = digitos.slice(2)
   if (!digitos) return 'Digite o celular com DDD.'
   if (digitos.length < 10) return 'Falta o DDD: digite o celular com DDD, como (11) 98888-7777.'
-  if (digitos.length !== 11 || digitos[2] !== '9') return 'Este número não é de celular. O pedido segue pelo WhatsApp: digite um celular com DDD.'
+  // #3155: depois do 9 vem 6 a 9 (Anatel), a mesma regra da API (`NormalizadorTelefone.EhCelularBr`).
+  if (digitos.length !== 11 || digitos[2] !== '9' || !/[6-9]/.test(digitos[3])) return 'Este número não é de celular. O pedido segue pelo WhatsApp: digite um celular com DDD.'
   return null
 }

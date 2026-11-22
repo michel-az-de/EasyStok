@@ -8,6 +8,7 @@ import { Modal } from '../../../componentes/Modal'
 import { Pilula } from '../../../componentes/Pilula'
 import { Vazio } from '../../../componentes/Vazio'
 import { telefoneNaTela } from '../../../dominio/cadastros'
+import { AVISO_NAO_CELULAR, avisoDeCelularBr } from '../../../dominio/validacaoDoCadastro'
 import { aplicarNaFicha, corpoDoEndereco, corpoDoTelefone, ENDERECO_VAZIO, enderecoVaiComoPadrao, erroDoTelefoneExtra, errosDoEndereco, linhaDoEndereco, mensagemDaFicha, numerosDoRelacionamento, resumoDePedidos, telefonesDaFicha } from '../../../dominio/fichaCliente'
 import { dataHora, mascaraCep, moeda } from '../../../dominio/formato'
 import { rotuloDaSituacao, tituloDoPedido } from '../../../dominio/pedidosCadastro'
@@ -173,9 +174,11 @@ export function FichaCliente({ cliente, detalhe, contexto, podeEditar, relaciona
       {telefones.length === 0 ? <Vazio variante="linha" titulo="Nenhum telefone extra." />
         : <ul className={css.itensFicha}>{telefones.map(t => { const numero = telefoneNaTela(t.numero) || t.numero; return <li key={t.id}>
           <span><strong>{numero}</strong></span>
-          <span className={css.acoes}>{t.principal && <Pilula fina>Principal</Pilula>}{t.whatsapp && <Pilula fina>WhatsApp</Pilula>}{podeEditar && t.removivel && <Botao variante="texto" aria-label={`Remover telefone ${numero}`} onClick={() => abrir('removerTelefone', t)}>Remover</Botao>}</span>
+          <span className={css.acoes}>{t.principal && <Pilula fina>Principal</Pilula>}{t.principal && avisoDeCelularBr(t.numero) && <Pilula tom="aviso" fina>Sem Novo pedido</Pilula>}{t.whatsapp && <Pilula fina>WhatsApp</Pilula>}{podeEditar && t.removivel && <Botao variante="texto" aria-label={`Remover telefone ${numero}`} onClick={() => abrir('removerTelefone', t)}>Remover</Botao>}</span>
         </li> })}</ul>}
       {telefones.some(t => t.principal) && <p className={css.legenda}>O telefone principal identifica a pessoa no Atendimento e não sai por esta lista.</p>}
+      {/* #3155: o principal que o Novo pedido recusa (fixo, de outro país) ganha selo e a frase do motivo. */}
+      {telefones.some(t => t.principal && avisoDeCelularBr(t.numero)) && <p className={css.legenda}>{AVISO_NAO_CELULAR}</p>}
     </section>
     {relacionamento && <section aria-labelledby={ids.conversas}>
       <div className={css.barra}><h3 id={ids.conversas}>Conversas recentes</h3></div>

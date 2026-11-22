@@ -51,13 +51,15 @@ function AbaPedidos({ historico, pedidosAnteriores, aberta, clienteId = null, no
     const acao = !aberta && comAcao
       ? <Botao variante="primario" disabled={Boolean(novoPedido.abrindo || novoPedido.motivo)} motivo={novoPedido.motivo ?? undefined} onClick={() => novoPedido.iniciar(clienteId, { nome })}>Novo pedido</Botao>
       : null
-    return (
+    // #3155: a recusa do Novo pedido aparece aqui (antes sumia) e recebe o foco.
+    return (<>
       <Vazio acao={acao} titulo={aberta ? textoDaComandaAberta(aberta) : `Nenhum pedido ainda${comAcao ? '. Use Novo pedido para começar.' : ''}`}>
         {aberta ? 'Ela entra no histórico quando o pedido for concluído.' : pedidosAnteriores > 0
           ? `${pedidosAnteriores} ${pedidosAnteriores === 1 ? 'pedido anterior' : 'pedidos anteriores'}, sem detalhe para mostrar aqui.`
           : 'Primeira vez na casa.'}
       </Vazio>
-    )
+      {novoPedido.erro && <p ref={novoPedido.refDoErro} tabIndex={-1} className={css.avisoErro} role="alert">{novoPedido.erro}</p>}
+    </>)
   }
   return (
     <ul className={css.listaPedidos}>

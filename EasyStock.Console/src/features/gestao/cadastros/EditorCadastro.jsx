@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { enderecoDeEntregaDoCadastro, erroDoEnderecoDoCadastro, gravaEnderecoDoCadastro } from '../../../dominio/fichaCliente'
+import { enderecoDeEntregaDoCadastro, erroDoEnderecoDoCadastro, erroDoTelefoneExtra, gravaEnderecoDoCadastro } from '../../../dominio/fichaCliente'
+import { avisoDeCelularBr } from '../../../dominio/validacaoDoCadastro'
 import { adicionarEnderecoCliente, alternarAtividadeCadastro, buscarClientesParecidos, listarCategoriasCadastro, obterCadastro, salvarCadastro, useRelacionamentoCliente } from '../../../aplicacao/cadastros'
 import { useSugestaoCadastro } from '../../../aplicacao/useSugestaoCadastro'
 import { useGravacaoDoAjuste } from '../../../aplicacao/rascunhosDosAjustes'
@@ -89,8 +90,12 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const mesmoTelefone = (valor) => telefoneNaTela(valor) === telefoneNaTela(inicial.telefone)
   // #2476 (U2): CPF e CNPJ na máscara; digitar o mesmo número de volta não conta como mudança.
   const mesmoDocumento = (valor) => documentoNaTela(valor) === documentoNaTela(inicial.documento)
+  // #3155: o telefone que mudou passa pela regra da rota (a do telefone extra: Telefone.cs); o gravado não trava outro campo.
+  // Só em clientes: fornecedores usam o mesmo campo. O aviso diz quando o número não recebe Novo pedido, sem bloquear.
+  const erroDoTelefoneNovo = tela === 'clientes' && String(dados.telefone ?? '').trim() && dados.telefone !== inicial.telefone ? erroDoTelefoneExtra(dados.telefone) : null
+  const avisoDoTelefone = tela === 'clientes' && !erroDo('telefone') ? avisoDeCelularBr(dados.telefone) : null
   const naTela = (campo, valor) => (campo === 'telefone' ? telefoneNaTela(valor) : campo === 'documento' ? documentoNaTela(valor) : String(valor ?? '')) || 'Vazio'
-  const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => mudar('telefone', mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value)} onBlur={() => conferirDuplicado('telefone')} erro={erroDo('telefone')} />
+  const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => mudar('telefone', mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value)} onBlur={() => { conferirDuplicado('telefone'); if (erroDoTelefoneNovo) definirErros(a => ({ ...a, telefone: erroDoTelefoneNovo })) }} erro={erroDo('telefone')} aviso={avisoDoTelefone ?? undefined} />
   const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => mudar('documento', mesmoDocumento(e.target.value) ? inicial.documento : e.target.value)} onBlur={() => conferirDuplicado('documento')} erro={erroDo('documento')} />
   const area = (chave, rotulo) => <div className={css.larguraTotal}><CampoArea rotulo={rotulo} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} erro={erroDo(chave)} /></div>
   const selecao = (chave, rotulo, opcoes) => <Combobox rotulo={rotulo} obrigatorio={obrigatorio(chave)} valor={dados[chave]} aoMudar={valor => mudar(chave, valor)} opcoes={opcoes} erro={erros[chave]} disabled={salvando || !podeEditar} />
@@ -135,6 +140,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     const faltas = errosDoFormularioCadastro(tela, dados)
     const recusaDoEndereco = tela === 'clientes' ? erroDoEnderecoDoCadastro(dados, inicial) : null
     if (recusaDoEndereco) faltas.endereco = recusaDoEndereco
+    if (erroDoTelefoneNovo) faltas.telefone = erroDoTelefoneNovo
     if (Object.keys(faltas).length) { definirErros(faltas); focarPrimeiroErro(); return }
     const concluir = iniciar(); if (!concluir) return
     falhar(null)
@@ -184,7 +190,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     {podeEditar && formularioAberto && <Botao tipo="submit" form={idForm} variante="primario" disabled={salvando || editor.semConfirmacao || editor.conflito || !alterado} motivo={editor.conflito ? 'Confira a versão atual antes de salvar novamente.' : editor.semConfirmacao ? 'Confira a lista antes de repetir um cadastro sem confirmação.' : !alterado ? id ? 'Nada mudou para salvar.' : motivoDoCadastroVazio(tela) : undefined}>{salvando ? 'Salvando…' : 'Salvar cadastro'}</Botao>}
   </>}>
     {erro && <p className={css.erro} role="alert">{erro}</p>}
-    {novoPedido?.erro && <p className={css.erro} role="alert">{novoPedido.erro}</p>}
+    {novoPedido?.erro && <p ref={novoPedido.refDoErro} tabIndex={-1} className={css.erro} role="alert">{novoPedido.erro}</p>}
     {tela === 'clientes' && editor.conflito && <section className={css.assistente} aria-label="Conferir versão do cadastro">
       <p>Outra edição foi salva para esta pessoa. Conferir a versão atual não grava nem descarta o que você digitou.</p>
       <Botao disabled={conferindo} onClick={carregarVersaoAtual}>{conferindo ? 'Carregando versão…' : 'Conferir versão atual'}</Botao>
