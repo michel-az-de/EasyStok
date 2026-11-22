@@ -22,8 +22,11 @@ assert.deepEqual(
   { logradouro: 'Rua das Flores', numero: '100', complemento: 'apto 12', bairro: 'Pinheiros', cep: '05422010', padrao: true, empresaId: 'e1' })
 assert.equal(enderecoDeEntregaDoCadastro({ endereco: 'Rua sem CEP, 1' }, { empresaId: 'e1' }), null, 'sem CEP não vira endereço de entrega')
 assert.equal(enderecoDeEntregaDoCadastro({ endereco: 'Rua A, 1, Centro, 01001-000' }, { empresaId: 'e1', inicial: { endereco: 'Rua A, 1, Centro, 01001-000' } }), null, 'sem mudança, nada a gravar')
-assert.equal(enderecoDeEntregaDoCadastro({ endereco: 'Rua B, 2, Centro, 01001-000' }, { empresaId: 'e1', inicial: { id: 'c1', endereco: 'x' }, enderecos: [{ id: 'a', padrao: true }] }), null, 'quem já tem padrão (relido da API) escolhe na Ficha')
+assert.equal(enderecoDeEntregaDoCadastro({ endereco: 'Rua B, 2, Centro, 01001-000' }, { empresaId: 'e1', inicial: { id: 'c1', endereco: 'x' }, enderecos: [{ id: 'a', padrao: true }] })?.padrao, true, '#2776: quem já tem padrão ganha o endereço novo como padrão; a API desmarca o antigo')
 assert.ok(enderecoDeEntregaDoCadastro({ endereco: 'Rua B, 2, Centro, 01001-000' }, { empresaId: 'e1', inicial: { id: 'c1', endereco: 'x' }, enderecos: [] }), 'editou e não tem padrão: grava')
+assert.equal(enderecoDeEntregaDoCadastro({ endereco: 'Rua B, 2, Centro, 01001-000', apt: 'apto 3' }, { empresaId: 'e1', inicial: { id: 'c1', endereco: 'Rua B, 2, Centro, 01001-000', apt: 'apto 1' }, enderecos: [{ id: 'a', padrao: true }] })?.complemento, 'apto 3', '#2776: mudar só o complemento regrava o Padrão')
+assert.equal(enderecoDeEntregaDoCadastro({ endereco: 'Rua sem CEP, 1', apt: 'apto 3' }, { empresaId: 'e1', inicial: { id: 'c1', endereco: 'Rua sem CEP, 1', apt: 'apto 1' }, enderecos: [] }), null, '#2776: só o complemento em endereço antigo sem CEP não grava')
+assert.equal(erroDoEnderecoDoCadastro({ endereco: 'Rua sem CEP, 1', apt: 'apto 3' }, { endereco: 'Rua sem CEP, 1', apt: 'apto 1' }), null, '#2776: só o complemento não recusa o endereço antigo')
 assert.equal(enderecoDeEntregaDoCadastro({ endereco: 'Rua B, 2, Centro, 01001-000' }, { empresaId: 'e1', inicial: { id: 'c1', endereco: 'x' } }), null, 'cadastro existente sem os endereços relidos não arrisca um segundo padrão')
 
 // Só vale a pena reler e gravar quando o endereço mudou e tem CEP.

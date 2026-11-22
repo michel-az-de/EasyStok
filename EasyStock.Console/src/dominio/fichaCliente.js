@@ -132,15 +132,15 @@ export const avisoDasNotas =(quantas) => (quantas >= NOTAS_DO_DOSSIE
 const enderecoMudou = (dados, inicial) => String(dados.endereco ?? '').trim() !== String(inicial?.endereco ?? '').trim()
 export const erroDoEnderecoDoCadastro = (dados, inicial) => (enderecoMudou(dados, inicial) ? recusaDoEndereco(dados.endereco) : null)
 
-export const gravaEnderecoDoCadastro = (dados, inicial) => Boolean(texto(dados.endereco)) && enderecoMudou(dados, inicial) && !erroDoEnderecoDoCadastro(dados, inicial)
+const aptMudou = (dados, inicial) => String(dados.apt ?? '').trim() !== String(inicial?.apt ?? '').trim()
+// #2776: o complemento também é do endereço de entrega; mudar só ele regrava o Padrão (sem CEP no endereço, não grava nem recusa).
+export const gravaEnderecoDoCadastro = (dados, inicial) => Boolean(texto(dados.endereco)) && (enderecoMudou(dados, inicial) || aptMudou(dados, inicial)) && !recusaDoEndereco(dados.endereco)
 
-// Endereço novo ou mudado, com CEP, vira o padrão de quem ainda não tem um. Quem já tem padrão escolhe na Ficha.
-// A API não desmarca o padrão anterior: em cadastro existente, `enderecos` é a lista relida da API logo antes de gravar
-// (a Ficha abaixo do formulário pode ter gravado um depois que o editor abriu); sem ela, não grava.
+// Endereço novo ou mudado, com CEP, vira o padrão do cliente (#2776: também de quem já tem um; a API desmarca o anterior).
+// Em cadastro existente, `enderecos` é a lista relida da API logo antes de gravar; sem ela, não grava.
 export function enderecoDeEntregaDoCadastro(dados, { empresaId, inicial, enderecos } = {}) {
   if (!gravaEnderecoDoCadastro(dados, inicial)) return null
   if (inicial?.id && !Array.isArray(enderecos)) return null
-  if (!enderecoVaiComoPadrao(enderecos ?? [])) return null
   const p = partesDoEndereco(dados.endereco)
   const complemento = [p.complemento, texto(dados.apt)].filter(Boolean).join(', ')
   return corpoDoEndereco({ logradouro: p.rua, numero: p.numero, complemento, bairro: p.bairro, cidade: p.cidade, estado: p.uf, cep: p.cep }, empresaId, true)
