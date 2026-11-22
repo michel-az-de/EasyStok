@@ -223,6 +223,13 @@ export function subcategoriasDe(categorias, categoriaId) {
   return filhas.length ? [{ valor: '', rotulo: 'Sem subcategoria' }, ...filhas.map(s => ({ valor: s.id, rotulo: s.nome }))] : []
 }
 export const OBRIGATORIOS_CADASTRO = { clientes: ['nome'], fornecedores: ['nome'], produtos: ['nome', 'categoriaId'], bancos: ['nome'] }
+// #3152: o Salvar de um cadastro novo e vazio diz o que falta, não só "preencha". Nome do campo como a pessoa lê.
+const CAMPO_OBRIGATORIO = { nome: 'o nome', categoriaId: 'a categoria' }
+export function motivoDoCadastroVazio(tela) {
+  const faltam = (OBRIGATORIOS_CADASTRO[tela] ?? []).map(c => CAMPO_OBRIGATORIO[c]).filter(Boolean)
+  if (faltam.length === 0) return 'Preencha o cadastro para salvar.'
+  return `Informe ${faltam.length === 1 ? faltam[0] : `${faltam.slice(0, -1).join(', ')} e ${faltam.at(-1)}`} para salvar.`
+}
 export function errosDoFormularioCadastro(tela, dados) {
   const erros = {}
   for (const [campo, limite] of Object.entries(LIMITES_CADASTRO[tela] ?? {})) {
