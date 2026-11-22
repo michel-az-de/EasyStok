@@ -115,6 +115,23 @@ public class WebhookWppConnectSemEfeitoTests
             $"wpp:{Sessao}:{id}", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>Revisão da #3169: evento sem id vindo de LID cujo telefone não resolve também foi entregue pela ponte.</summary>
+    [Fact]
+    public async Task Evento_sem_id_de_lid_sem_telefone_tambem_deixa_a_marca_de_entrega()
+    {
+        const string lid = "123456789012345@lid", id = "false_123456789012345@lid_XYZ";
+        _ponte.ListarMensagensRecentesAsync(default!, default!, default).ReturnsForAnyArgs(
+            [new MensagemRecenteWppConnect(id, 1793000100, false, "chat", Texto)]);
+        _ponte.ResolverTelefoneAsync(default!, default!, default).ThrowsAsyncForAnyArgs(new HttpRequestException("503"));
+        var raw = $$$"""{"event":"onmessage","session":"{{{Sessao}}}","from":"{{{lid}}}","to":"{{{lid}}}","fromMe":false,"type":"chat","body":"{{{Texto}}}","t":1793000100}""";
+
+        var agir = () => _useCase.ExecuteAsync(raw);
+
+        await agir.Should().ThrowAsync<HttpRequestException>();
+        await _recebidos.Received(1).TryRegistrarAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
+            $"wpp:{Sessao}:{id}", Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Mensagem_com_id_grava_a_marca_de_entrega_uma_vez_so()
     {

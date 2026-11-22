@@ -132,6 +132,7 @@ public class ColetorPicoDeErros5xxIntegrationTests(PostgreSqlDatabaseFixture fix
             await scope.ServiceProvider.GetRequiredService<IPublicadorIncidenteSistema>().PublicarAsync(
                 ComponenteIncidente.Erros5xx, EstadoIncidente.ComProblema, SeveridadeIncidente.Alta, DateTime.UtcNow);
         }
+        (await _s.LerEventosDaEmpresaAsync(empresaId)).Should().ContainSingle("o aviso prévio tem de existir para a dedupe agir");
         await SemearErrosAsync(4);
 
         await ColetarAsync(provider);
