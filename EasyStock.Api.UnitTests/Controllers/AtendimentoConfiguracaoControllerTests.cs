@@ -144,10 +144,41 @@ public class AtendimentoConfiguracaoControllerTests
         await _unitOfWork.DidNotReceive().CommitAsync();
     }
 
+    // #3139: o dicionário de termos da loja vai no PUT e volta no GET; campo ausente mantém.
+    [Fact]
+    public async Task PutRepassaODicionarioEOGetDevolve()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+        _repository.GetOrDefaultAsync(_empresaId).Returns(config);
+
+        var put = await _controller.Put(Corpo(Dicionario: [new TermoDoDicionario(" pote ", "bolo no copo")]));
+
+        put.Should().BeOfType<OkObjectResult>();
+        await _unitOfWork.Received(1).CommitAsync();
+        DadosDe(await _controller.Get()).Dicionario.Should().Equal(new TermoDoDicionario("pote", "bolo no copo"));
+        (await _controller.Put(Corpo())).Should().BeOfType<OkObjectResult>();
+        DadosDe(await _controller.Get()).Dicionario.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task PutComDicionarioInvalido400ENaoGrava()
+    {
+        var config = ConfiguracaoAtendimento.CriarPadrao(_empresaId);
+        _repository.GetByEmpresaIdAsync(_empresaId).Returns(config);
+
+        (await _controller.Put(Corpo(Dicionario: [new TermoDoDicionario("a", "x"), new TermoDoDicionario("A", "y")])))
+            .Should().BeOfType<BadRequestObjectResult>();
+
+        config.DicionarioJson.Should().BeNull();
+        await _unitOfWork.DidNotReceive().CommitAsync();
+    }
+
     private static AtualizarConfiguracaoAtendimentoBody Corpo(string? NomeDona = null, string? ModeloAgente = null,
-        long? CotaTokensMes = null, IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null, string? ObservacoesLoja = null) =>
+        long? CotaTokensMes = null, IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null, string? ObservacoesLoja = null,
+        IReadOnlyList<TermoDoDicionario>? Dicionario = null) =>
         new(null, null, null, null, null, null, null, null, null, NomeDona: NomeDona, ModeloAgente: ModeloAgente,
-            CotaTokensMes: CotaTokensMes, Roteiro: Roteiro, ObservacoesLoja: ObservacoesLoja);
+            CotaTokensMes: CotaTokensMes, Roteiro: Roteiro, ObservacoesLoja: ObservacoesLoja, Dicionario: Dicionario);
 
     private static ConfiguracaoAtendimentoResult DadosDe(IActionResult resultado) =>
         resultado.Should().BeOfType<OkObjectResult>().Subject.Value.Should()

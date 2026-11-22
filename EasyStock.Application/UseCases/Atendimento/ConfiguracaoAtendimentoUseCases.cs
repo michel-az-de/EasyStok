@@ -31,7 +31,8 @@ public sealed record ConfiguracaoAtendimentoResult(
     bool RoteiroPersonalizado = false,
     string? ObservacoesLoja = null,
     IReadOnlyList<string>? FerramentasDesligadas = null,
-    string? FraseFechoCanhoto = null);
+    string? FraseFechoCanhoto = null,
+    IReadOnlyList<TermoDoDicionario>? Dicionario = null);
 
 public sealed record ObterConfiguracaoAtendimentoQuery(Guid EmpresaId);
 
@@ -59,7 +60,7 @@ public sealed class ObterConfiguracaoAtendimentoUseCase(IConfiguracaoAtendimento
         c.NomeDona, c.ModeloAgente, c.CotaTokensMes, RoteiroAtendimento.DaLoja(c.RoteiroJson),
         !ReferenceEquals(RoteiroAtendimento.DaLoja(c.RoteiroJson), RoteiroAtendimento.Padrao), c.ObservacoesLoja,
         FerramentasDaLoja.DaLoja(c.FerramentasDesligadasJson).Order(StringComparer.Ordinal).ToList(),
-        c.FraseFechoCanhoto);
+        c.FraseFechoCanhoto, DicionarioDaLoja.DaLoja(c.DicionarioJson));
 }
 
 public sealed record AtualizarConfiguracaoAtendimentoCommand(
@@ -82,7 +83,8 @@ public sealed record AtualizarConfiguracaoAtendimentoCommand(
     IReadOnlyList<EtapaRoteiroAtendimento>? Roteiro = null,
     string? ObservacoesLoja = null,
     IReadOnlyList<string>? FerramentasDesligadas = null,
-    string? FraseFechoCanhoto = null);
+    string? FraseFechoCanhoto = null,
+    IReadOnlyList<TermoDoDicionario>? Dicionario = null);
 
 /// <remarks>
 /// S68 (#2597): nulo mantém cada campo do Assistente; vazio volta ao padrão (roteiro vazio, modelo vazio, cota 0). O
@@ -104,6 +106,7 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         var modeloAgente = ModeloValidado(command.ModeloAgente, configuracao.ModeloAgente);
         var roteiroJson = RoteiroValidado(command.Roteiro);
         var desligadasJson = DesligadasValidadas(command.FerramentasDesligadas);
+        var dicionarioJson = DicionarioValidado(command.Dicionario);
 
         try
         {
@@ -122,6 +125,7 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
             configuracao.DefinirAssistente(command.NomeDona, modeloAgente, command.CotaTokensMes, roteiroJson,
                 command.ObservacoesLoja);
             configuracao.DefinirFerramentasDesligadas(desligadasJson);
+            configuracao.DefinirDicionario(dicionarioJson);
             configuracao.DefinirFraseFechoCanhoto(command.FraseFechoCanhoto);
         }
         catch (Exception ex) when (ex is ArgumentOutOfRangeException or RegraDeDominioVioladaException)
@@ -166,6 +170,15 @@ public sealed class AtualizarConfiguracaoAtendimentoUseCase(
         var conhecidas = ferramentas?.Select(f => f.Nome) ?? nomes.Select(n => n.Trim());
         if (FerramentasDaLoja.Erro(nomes, conhecidas) is { } erro) throw new UseCaseValidationException(erro);
         return FerramentasDaLoja.Serializar(nomes);
+    }
+
+    // #3139: nulo mantém (o console grava a configuração aos pedaços); lista vazia apaga.
+    private static string? DicionarioValidado(IReadOnlyList<TermoDoDicionario>? termos)
+    {
+        if (termos is null) return null;
+        if (termos.Count == 0) return string.Empty;
+        if (DicionarioDaLoja.Erro(termos) is { } erro) throw new UseCaseValidationException(erro);
+        return DicionarioDaLoja.Serializar(termos);
     }
 
     private static string? RoteiroValidado(IReadOnlyList<EtapaRoteiroAtendimento>? roteiro)
