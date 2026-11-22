@@ -28,14 +28,17 @@ namespace EasyStock.Infra.Postgre.Repositories
         public Task<bool> ExisteProdutosNaCategoriaAsync(Guid categoriaId) =>
             dbContext.Produtos.AnyAsync(p => p.CategoriaId == categoriaId || p.SubcategoriaId == categoriaId);
 
-        // BUG-08: match exato case-insensitive via lower() — não usa ILike pra não tratar
+        // BUG-08: match exato case-insensitive por igualdade — não usa ILike pra não tratar
         // '%'/'_' de nomes (ex.: "Promo 50%") como curinga.
+        // #3101: compara a coluna gerada nome_lower = lower("Nome") (migração 20260622200256),
+        // que é a do índice único (EmpresaId, nome_lower). Ela fica fora do modelo EF de
+        // propósito, por isso o FromSql; lower("Nome") em LINQ não casa com o índice.
         public Task<bool> ExisteNomeAsync(Guid empresaId, string nome, Guid? ignorarId = null)
         {
             var n = nome.Trim().ToLower();
             return dbContext.Categorias
+                .FromSql($"""SELECT * FROM categorias WHERE "EmpresaId" = {empresaId} AND nome_lower = {n}""")
                 .AsNoTracking()
-                .Where(c => c.EmpresaId == empresaId && c.Nome.ToLower() == n)
                 .Where(c => !ignorarId.HasValue || c.Id != ignorarId.Value)
                 .AnyAsync();
         }
