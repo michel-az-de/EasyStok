@@ -53,6 +53,7 @@ public class ConfiguracaoAtendimentoConfiguration : IEntityTypeConfiguration<Con
         builder.Property(x => x.ObservacoesLoja).HasMaxLength(ConfiguracaoAtendimento.ObservacoesLojaTamanhoMaximo);
         // #2853: ferramentas desligadas pela loja; nulo = todas ligadas.
         builder.Property(x => x.FerramentasDesligadasJson).HasColumnType("jsonb");
+        builder.Property(x => x.DicionarioJson).HasColumnType("jsonb");
         builder.Property(x => x.CriadoEm).IsRequired();
         builder.Property(x => x.AlteradoEm).IsRequired();
 

@@ -114,6 +114,66 @@ public class ConfiguracaoAtendimentoTests
         config.ObservacoesLoja.Should().Be("Sem glúten só por encomenda.");
     }
 
+    // #3139: dicionário de termos da loja. Nulo mantém, vazio apaga; quem confere os termos é o caso de uso.
+    [Fact]
+    public void DefinirDicionario_grava_e_muda_AlteradoEm()
+    {
+        var config = Padrao();
+        var antes = config.AlteradoEm;
+        Thread.Sleep(20);
+        config.DicionarioJson.Should().BeNull();
+
+        config.DefinirDicionario("""[{"termo":"brigadeiro","significado":"docinho"}]""");
+
+        config.DicionarioJson.Should().Be("""[{"termo":"brigadeiro","significado":"docinho"}]""");
+        config.AlteradoEm.Should().BeAfter(antes);
+    }
+
+    [Fact]
+    public void DefinirDicionario_nulo_mantem()
+    {
+        var config = Padrao();
+        config.DefinirDicionario("""[{"termo":"a","significado":"b"}]""");
+
+        config.DefinirDicionario(null);
+
+        config.DicionarioJson.Should().Be("""[{"termo":"a","significado":"b"}]""");
+    }
+
+    [Fact]
+    public void DefinirDicionario_vazio_apaga()
+    {
+        var config = Padrao();
+        config.DefinirDicionario("""[{"termo":"a","significado":"b"}]""");
+
+        config.DefinirDicionario("");
+
+        config.DicionarioJson.Should().BeNull();
+    }
+
+    [Fact]
+    public void DefinirDicionario_acima_do_teto_lanca_e_nao_muda()
+    {
+        var config = Padrao();
+        config.DefinirDicionario("""[{"termo":"a","significado":"b"}]""");
+
+        var acao = () => config.DefinirDicionario(new string('x', ConfiguracaoAtendimento.DicionarioTamanhoMaximo + 1));
+
+        acao.Should().Throw<RegraDeDominioVioladaException>();
+        config.DicionarioJson.Should().Be("""[{"termo":"a","significado":"b"}]""");
+    }
+
+    [Fact]
+    public void DefinirDicionario_no_teto_grava()
+    {
+        var config = Padrao();
+        var json = new string('x', ConfiguracaoAtendimento.DicionarioTamanhoMaximo);
+
+        config.DefinirDicionario(json);
+
+        config.DicionarioJson.Should().Be(json);
+    }
+
     [Fact]
     public void DefinirAssistente_vazio_ou_cota_zero_volta_ao_padrao()
     {

@@ -57,4 +57,29 @@ public class ConfiguracaoAtendimentoIntegrationTests(PostgreSqlDatabaseFixture f
         salva.ObservacoesLoja.Should().Be("Sem glúten só por encomenda.");
         salva.MensagemEscalada.Should().Be(ConfiguracaoAtendimento.MensagemEscaladaPadrao);
     }
+
+    /// <summary>#3139: o dicionário de termos da loja fica em jsonb e volta igual, com acento.</summary>
+    [SkippableFact]
+    public async Task DicionarioDaLojaVaiEVoltaDoBanco()
+    {
+        Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "Docker/PostgreSQL indisponivel");
+        var empresa = Guid.NewGuid();
+        var json = EasyStock.Application.Services.Atendimento.DicionarioDaLoja.Serializar(
+            [new("açaí", "fruta roxa servida gelada"), new("pote", "bolo no copo")]);
+        await using (var db = fixture.CreateDbContext())
+        {
+            db.SetMobileTenantContext(empresa);
+            db.Empresas.Add(new Empresa { Id = empresa, Nome = "Casa", Documento = empresa.ToString("N")[..14], CriadoEm = DateTime.UtcNow, AlteradoEm = DateTime.UtcNow });
+            var configuracao = ConfiguracaoAtendimento.CriarPadrao(empresa);
+            configuracao.DefinirDicionario(json);
+            db.ConfiguracoesAtendimento.Add(configuracao);
+            await db.SaveChangesAsync();
+        }
+
+        await using var conferir = fixture.CreateDbContext();
+        conferir.SetMobileTenantContext(empresa);
+        var salva = await conferir.ConfiguracoesAtendimento.AsNoTracking().SingleAsync(c => c.EmpresaId == empresa);
+        EasyStock.Application.Services.Atendimento.DicionarioDaLoja.DaLoja(salva.DicionarioJson).Select(t => t.Termo)
+            .Should().Equal("açaí", "pote");
+    }
 }

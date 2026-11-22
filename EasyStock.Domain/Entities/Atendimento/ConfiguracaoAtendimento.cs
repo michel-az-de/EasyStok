@@ -206,6 +206,21 @@ public class ConfiguracaoAtendimento
         AlteradoEm = DateTime.UtcNow;
     }
 
+    public const int DicionarioTamanhoMaximo = 16_000;
+
+    /// <summary>#3139: termos da loja e seus significados, em JSON, para o prompt do Assistente. Nulo: sem dicionário.</summary>
+    public string? DicionarioJson { get; private set; }
+
+    /// <summary>#3139: nulo mantém; vazio apaga. Quem valida os termos é o caso de uso.</summary>
+    public void DefinirDicionario(string? json)
+    {
+        if (json is null) return;
+        if (json.Length > DicionarioTamanhoMaximo)
+            throw new RegraDeDominioVioladaException($"O dicionário passa de {DicionarioTamanhoMaximo} caracteres.");
+        DicionarioJson = Vazio(json);
+        AlteradoEm = DateTime.UtcNow;
+    }
+
     /// <summary>
     /// S68 (#2597): nulo mantém o valor; vazio (ou cota 0) volta ao padrão. Valida tudo antes de mudar qualquer campo.
     /// </summary>
