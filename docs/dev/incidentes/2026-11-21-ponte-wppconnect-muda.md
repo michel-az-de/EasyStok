@@ -31,9 +31,12 @@ Limites conhecidos:
 - Se a página do WhatsApp dentro da ponte congelar inteira, a listagem congela junto e o vigia não vê nada.
 - O aviso vai para a empresa padrão (dono da plataforma), não para o dono da loja, e é um por rodada: não diz
   qual loja. A loja está no log `Ponte WPPConnect muda` e em `endpoint_health_state`.
-- Mensagem que a ponte entregou e a API recusou com 400 (telefone sem resolver) também abre o incidente: a recusa
-  não deixa registro de entrega. O passo 2 abaixo separa os dois casos.
-- Loja que desconecta, desliga o módulo ou perde a credencial tem o estado apagado e o incidente fechado.
+- Mensagem que a ponte entregou e a API recusou (400 do parser, 503 do telefone do LID) NÃO é ponte muda: o webhook
+  grava a marca de entrega (`webhooks_recebidos`, provedor `wppconnect_entrega`) antes do parser.
+- Loja que desliga o módulo ou perde a credencial tem o estado apagado e o incidente fechado. Ponte desconectada ou
+  fora do ar numa rodada não muda o estado.
+- Desligar a flag com incidente aberto deixa o estado `wppconnect/<empresa>` parado e o deploy segue avisando: antes
+  de desligar, espere normalizar ou apague essas linhas (mudança de produção: com GO).
 - Nada aqui recupera as mensagens da parada: isso está em issue própria.
 
 ## Ligar o vigia (nasce DESLIGADO)
@@ -52,6 +55,15 @@ curl -s -X POST "http://localhost:21465/api/<sessao>/list-chats" \
 Esperado: `ultima` contém `_serialized` e `fromMe`. Se não contiver, NÃO ligue: o cliente devolve lista vazia e o
 vigia nunca abriria incidente (falso verde). Abra issue com os nomes de campo vistos.
 
+O Worker precisa da configuração da ponte. O `scripts/deploy/wppconnect/compose.yaml` versionado já a entrega ao
+`api` e ao `worker` pela âncora `x-wppconnect-cliente`; confira na VPS, contando sem imprimir valor:
+
+```bash
+docker exec ez-worker printenv | grep -c '^Atendimento__WppConnect__'   # esperado: 4 ou mais
+```
+
+Sem ela o vigia não avalia nada e o Worker registra `Vigia da ponte WPPConnect ligado sem a configuração da ponte`.
+
 Conferido, ligue no Worker com `Atendimento__WppConnect__VigiaPonteMuda__Habilitado=true` (mudança de
 produção: exige GO do Felipe) e acompanhe por um dia o log `Ponte WPPConnect muda`.
 
@@ -59,7 +71,7 @@ produção: exige GO do Felipe) e acompanhe por um dia o log `Ponte WPPConnect m
 
 1. Contêiner: `docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' easystok-wppconnect-1`.
 2. Entrega: no log da API, procure `POST /api/webhooks/wppconnect` nos últimos minutos e os motivos em
-   `Webhook sem efeito`. Requisição chegando com motivo `evento_ignorado` ou `duplicata` não é ponte muda.
+   `Webhook sem efeito`. Requisição chegando (mesmo com 400, 503 ou motivo `evento_ignorado`) não é ponte muda.
 3. Ponte: no log dela, conte `Error calling Webhook.` no intervalo.
 4. Estado do vigia: `select endpoint_name, last_alerted_at from endpoint_health_state where endpoint_name like 'wppconnect/%'`.
 5. Se a ponte está conectada e nada chega, o remédio usado em 21/11 foi `docker restart easystok-wppconnect-1`.

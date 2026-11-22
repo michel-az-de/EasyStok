@@ -15,17 +15,17 @@ public enum SinalPonteWppConnect
 /// <summary>
 /// #3117: em 21/11/2026 a ponte ficou <c>CONNECTED</c> por cinco horas sem entregar mensagem. O estado não mede a entrega,
 /// e o silêncio também não (madrugada sem tráfego é silêncio saudável). Aqui se compara o que a ponte enxerga com o que o
-/// webhook recebeu: a última mensagem recebida de cada conversa individual tem de ter registro em <c>webhooks_recebidos</c>,
-/// que é gravado na chegada, mesmo quando a mensagem acaba não sendo gravada (duplicata, regra de domínio).
+/// webhook recebeu: a última mensagem recebida de cada conversa individual tem de ter registro em <c>webhooks_recebidos</c>
+/// (marca de entrega, gravada na chegada, ou o registro do processamento).
 /// <para>
 /// Carga na ponte por rodada: o estado, uma listagem de conversas e, só para conversa suspeita, até
 /// <see cref="MaximoDeConsultas"/> leituras de mensagens (para saber a data e o tipo, que a listagem não traz).
 /// </para>
 /// <para>
 /// Limites conhecidos: se a página do WhatsApp dentro da ponte congelar inteira, a listagem congela junto e nada é
-/// detectado; e mensagem que a ponte entregou mas a API recusou (400, telefone sem resolver) também conta como não
-/// entregue, porque a recusa não deixa registro. Telefone e texto passam por aqui só para a comparação; nada disso sai
-/// em log nem no retorno.
+/// detectado. Mensagem que a ponte entregou e a API recusou (400, telefone sem resolver) não é ponte muda: o webhook
+/// grava a marca de entrega antes do parser. Telefone e texto passam por aqui só para a comparação; nada disso sai em
+/// log nem no retorno.
 /// </para>
 /// </summary>
 public sealed class VigiaPonteWppConnect(
@@ -55,7 +55,9 @@ public sealed class VigiaPonteWppConnect(
         {
             var idExterno = sessao.IdExterno(ultima.MensagemId);
             if (memoria.JaDescartada(idExterno)) continue;
-            if (await recebidos.ObterAsync(ProcessarEventoWhatsAppUseCase.Provedor, idExterno, ct) is not null) continue;
+            // A marca de entrega é gravada na chegada; o registro do processamento cobre o que chegou antes dela existir.
+            if (await recebidos.ObterAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega, idExterno, ct) is not null
+                || await recebidos.ObterAsync(ProcessarEventoWhatsAppUseCase.Provedor, idExterno, ct) is not null) continue;
             if (++consultas > MaximoDeConsultas) break;
 
             var mensagem = (await cliente.ListarMensagensRecentesAsync(sessao, ultima.Chat, ct))

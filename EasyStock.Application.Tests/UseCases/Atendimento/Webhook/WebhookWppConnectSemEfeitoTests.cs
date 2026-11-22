@@ -64,7 +64,32 @@ public class WebhookWppConnectSemEfeitoTests
             tenant, _unitOfWork, null!, null!, null!, null!, null!, null!, TimeProvider.System, _logEvento,
             metricas: _metricas);
         _useCase = new ProcessarWebhookWppConnectUseCase(_credenciais, tenant, Substitute.For<IWppConnectSessaoClient>(),
-            evento, logger: _logPonte, metricas: _metricas);
+            evento, logger: _logPonte, metricas: _metricas, recebidos: _recebidos);
+    }
+
+    /// <summary>
+    /// Revisão da #3132: o vigia da ponte muda precisa saber que a ponte ENTREGOU mesmo quando a API recusa a mensagem
+    /// (LID sem telefone resolvido). A marca de entrega é gravada antes do parser, com provedor próprio para não se
+    /// confundir com a idempotência do processamento.
+    /// </summary>
+    [Fact]
+    public async Task Mensagem_recusada_pelo_parser_deixa_a_marca_de_que_a_ponte_entregou()
+    {
+        var agir = () => _useCase.ExecuteAsync(Mensagem("onmessage", "123456789012345@lid", 1793000100));
+
+        await agir.Should().ThrowAsync<FormatException>();
+        await _recebidos.Received(1).TryRegistrarAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
+            $"wpp:{Sessao}:false_123456789012345@lid_ABC", Arg.Is<string>(h => h.Length == 64), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Grupo_e_evento_que_nao_e_mensagem_recebida_nao_deixam_marca_de_entrega()
+    {
+        await _useCase.ExecuteAsync(Mensagem("onmessage", "120363000000000000@g.us", 1793000100));
+        await _useCase.ExecuteAsync($$$"""{"event":"onack","session":"{{{Sessao}}}","id":"true_{{{Telefone}}}@c.us_ABC","ack":9}""");
+
+        await _recebidos.DidNotReceive().TryRegistrarAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega,
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     private string Mensagem(string evento, string de, long quando, bool deMim = false) =>
@@ -119,7 +144,9 @@ public class WebhookWppConnectSemEfeitoTests
         (await _useCase.ExecuteAsync(raw)).Should().BeTrue();
 
         DeveTerRegistrado(WebhookSemEfeito.AnteriorACaptura);
-        await _recebidos.DidNotReceiveWithAnyArgs().TryRegistrarAsync(default!, default!, default!, default);
+        // A marca de entrega (provedor proprio) existe; o que nao pode existir e o registro do processamento.
+        await _recebidos.DidNotReceive().TryRegistrarAsync(ProcessarEventoWhatsAppUseCase.Provedor,
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

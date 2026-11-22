@@ -162,6 +162,12 @@ public class ColetorPonteWppConnectMudaIntegrationTests(PostgreSqlDatabaseFixtur
         await ColetarAsync(provider);
         (await EstadoAsync(loja))!.LastAlertedAt.Should().NotBeNull();
 
+        // Ponte desconectada numa rodada (oscilação do check-connection): também não se conclui nada.
+        _ponte.ObterEstadoAsync(default!, default).ReturnsForAnyArgs(new EstadoWppConnect(true, true, false, "DISCONNECTED"));
+        await ColetarAsync(provider);
+        (await EstadoAsync(loja))!.LastAlertedAt.Should().NotBeNull();
+        (await _s.LerEventosDaEmpresaAsync(padrao)).Should().ContainSingle();
+
         // Ponte fora do ar: não se conclui nada, o incidente segue aberto.
         _ponte.ObterEstadoAsync(default!, default).ThrowsAsyncForAnyArgs(new HttpRequestException("recusou"));
         await ColetarAsync(provider);

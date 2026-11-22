@@ -129,7 +129,10 @@ public sealed class ColetorPonteWppConnectMuda(
 
     private static DateTime MaisAntigo(DateTime? atual, DateTime novo) => atual is { } a && a < novo ? a : novo;
 
-    /// <summary><c>null</c>: não deu para avaliar (erro, ponte fora do ar). <c>NaoAvaliada</c>: não há o que vigiar nesta empresa.</summary>
+    /// <summary>
+    /// <c>null</c>: não deu para avaliar (erro, ponte fora do ar ou desconectada, processo sem a configuração da ponte).
+    /// <c>NaoAvaliada</c>: não há o que vigiar nesta empresa (módulo desligado, sem credencial).
+    /// </summary>
     private async Task<SinalPonteWppConnect?> AvaliarAsync(Guid empresaId, CancellationToken ct)
     {
         try
@@ -145,10 +148,17 @@ public sealed class ColetorPonteWppConnectMuda(
 
             var sessao = await sp.GetRequiredService<IIntegrationCredentialResolver>().ObterAsync<CredencialWppConnect>(
                 empresaId, CredencialWppConnect.ProviderKey, AmbienteIntegracao.Production, ct);
-            if (sessao is null || !sp.GetRequiredService<IWppConnectSessaoClient>().Habilitado)
-                return SinalPonteWppConnect.NaoAvaliada;
+            if (sessao is null) return SinalPonteWppConnect.NaoAvaliada;
+            if (!sp.GetRequiredService<IWppConnectSessaoClient>().Habilitado)
+            {
+                // Falso verde: o vigia está ligado e este processo não tem a configuração da ponte (Atendimento:WppConnect).
+                logger.LogWarning("Vigia da ponte WPPConnect ligado sem a configuração da ponte neste processo: nada é avaliado.");
+                return null;
+            }
 
-            return await sp.GetRequiredService<VigiaPonteWppConnect>().AvaliarAsync(sessao, ct);
+            // Ponte desconectada nesta rodada: nada se conclui e o estado fica como está (o check-connection oscila).
+            var sinal = await sp.GetRequiredService<VigiaPonteWppConnect>().AvaliarAsync(sessao, ct);
+            return sinal == SinalPonteWppConnect.NaoAvaliada ? null : sinal;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

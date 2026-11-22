@@ -58,6 +58,18 @@ public class VigiaPonteWppConnectTests
     }
 
     [Fact]
+    public async Task Mensagem_entregue_e_recusada_pela_api_nao_e_ponte_muda()
+    {
+        // Revisão da #3132: a recusa (400 do parser, 503 do telefone) não grava a idempotência, mas a marca de entrega sim.
+        PonteEnxerga(TimeSpan.FromMinutes(6));
+        _recebidos.ObterAsync(ProcessarWebhookWppConnectUseCase.ProvedorEntrega, Sessao.IdExterno(Id), Arg.Any<CancellationToken>())
+            .Returns(WebhookRecebido.Criar(ProcessarWebhookWppConnectUseCase.ProvedorEntrega, Sessao.IdExterno(Id), "h"));
+
+        (await _vigia.AvaliarAsync(Sessao)).Should().Be(SinalPonteWppConnect.Entregando);
+        await _cliente.DidNotReceiveWithAnyArgs().ListarMensagensRecentesAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task Madrugada_sem_trafego_nao_e_ponte_muda()
     {
         _cliente.ListarUltimasRecebidasAsync(default!, default, default).ReturnsForAnyArgs([]);
