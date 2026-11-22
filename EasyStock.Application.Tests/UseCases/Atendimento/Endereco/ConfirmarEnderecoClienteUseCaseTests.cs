@@ -153,6 +153,21 @@ public class ConfirmarEnderecoClienteUseCaseTests
     }
 
     [Fact]
+    public async Task ConfirmarComCepSemMascaraAchaOSalvoEPreservaOComplemento()
+    {
+        // #3186: o salvo com máscara e a conversa sem ela são o mesmo endereço; complemento nulo não apaga o salvo.
+        var salvo = new ClienteEndereco { Id = Guid.NewGuid(), Cep = "05500-000", Logradouro = "Rua Alvarenga", Numero = "120", Complemento = "apto 12" };
+        var cliente = ClienteCom(salvo);
+        var endereco = new EnderecoNormalizado("05500000", "Rua Alvarenga", "120", null, "Butantã", "São Paulo", "SP", null);
+
+        var id = await UseCase().ExecuteAsync(new ConfirmarEnderecoClienteCommand(_empresaId, cliente.Id, endereco));
+
+        id.Should().Be(salvo.Id);
+        salvo.Complemento.Should().Be("apto 12");
+        await _clientes.DidNotReceive().AddEnderecoAsync(Arg.Any<ClienteEndereco>());
+    }
+
+    [Fact]
     public async Task AdicionarSemLogradouroNaoFundeComOutroVazio()
     {
         var vazio = new ClienteEndereco { Id = Guid.NewGuid(), Referencia = "portaria" };
