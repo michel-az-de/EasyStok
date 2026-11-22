@@ -16,6 +16,7 @@ public static partial class LogsDoAssistente
 
     public const string CategoriaValor = "valor sem origem em ferramenta";
     public const string CategoriaOutra = "outro motivo";
+    public const string CategoriaFerramentaFalhou = "ferramenta falhou no turno";
 
     /// <summary>Motivos fixos da guarda e do turno. Lista fechada: motivo novo com conteúdo não chega ao log por descuido.</summary>
     private static readonly HashSet<string> CategoriasFixas = new(StringComparer.Ordinal)
@@ -28,7 +29,7 @@ public static partial class LogsDoAssistente
         "promete frete grátis ou desconto, que é decisão da equipe",
         "afirma frete combinado sem a ferramenta confirmar",
         "link sem origem em ferramenta",
-        "ferramenta falhou no turno",
+        CategoriaFerramentaFalhou,
     };
 
     [LoggerMessage(EventoPortaoBarrou, LogLevel.Warning,

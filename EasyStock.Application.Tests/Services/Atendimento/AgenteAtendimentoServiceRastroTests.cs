@@ -45,24 +45,26 @@ public partial class AgenteAtendimentoServiceTests
     }
 
     [Theory]
-    [InlineData("Seu estorno já caiu na conta.")]
-    [InlineData("O frete já está acertado.")]
-    [InlineData("Vou pedir para a dona verificar isso com você.")]
-    [InlineData("Veja em https://exemplo.com/x")]
-    [InlineData("   ")]
-    [InlineData("Vou chamar escalar_para_dona agora.")]
-    [InlineData("Seu pedido já está registrado.")]
-    [InlineData("Sem problema, o frete é grátis para você.")]
-    public void Rastro_MotivoFixoDaGuardaTemCategoriaPropria(string resposta)
+    [InlineData("Seu estorno já caiu na conta.", "afirma pagamento ou devolução sem a ferramenta confirmar")]
+    [InlineData("O frete já está acertado.", "afirma frete combinado sem a ferramenta confirmar")]
+    [InlineData("Vou pedir para a dona verificar isso com você.", "promete encaminhamento sem acionar a equipe")]
+    [InlineData("Veja em https://exemplo.com/x", "link sem origem em ferramenta")]
+    [InlineData("   ", "o agente não produziu resposta")]
+    [InlineData("Vou chamar escalar_para_dona agora.", "texto com chamada de ferramenta no lugar da resposta")]
+    [InlineData("Seu pedido já está registrado.", "afirma situação do pedido sem a ferramenta confirmar")]
+    [InlineData("Sem problema, o frete é grátis para você.", "promete frete grátis ou desconto, que é decisão da equipe")]
+    public void Rastro_MotivoFixoDaGuardaTemCategoriaPropria(string resposta, string esperado)
     {
         var motivo = GuardaRespostaAgente.Avaliar(resposta, [], ["escalar_para_dona"]);
 
-        LogsDoAssistente.CategoriaDaGuarda(motivo!).Should().Be(motivo, "se o texto da guarda mudar, a lista do log acompanha");
+        motivo.Should().Be(esperado, "cada resposta cai no seu motivo, não em qualquer um da lista");
+        LogsDoAssistente.CategoriaDaGuarda(motivo!).Should().Be(esperado, "se o texto da guarda mudar, a lista do log acompanha");
     }
 
     [Fact]
     public void Rastro_FerramentaQueFalhouTemCategoriaPropria() =>
-        LogsDoAssistente.CategoriaDaGuarda("ferramenta falhou no turno").Should().Be("ferramenta falhou no turno");
+        LogsDoAssistente.CategoriaDaGuarda(LogsDoAssistente.CategoriaFerramentaFalhou)
+            .Should().Be(LogsDoAssistente.CategoriaFerramentaFalhou).And.NotBe(LogsDoAssistente.CategoriaOutra);
 
     [Fact]
     public void Rastro_MotivoDesconhecidoNaoVaiAoLog() =>
@@ -72,10 +74,52 @@ public partial class AgenteAtendimentoServiceTests
     public async Task Rastro_ConversaComAEquipeNaoLogaAviso_RodaACadaMensagemDoCliente()
     {
         _conversa.Assumir(Agora.AddMinutes(-5), Guid.NewGuid());
+        PortoesDoAssistente.DaConversa(_conversa, Agora).First(e => e.Barra).Codigo.Should().Be(PortoesDoAssistente.Situacao);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Should().Be(ResultadoTurnoAgente.Ignorado, "o turno parou no portão, não antes nem depois");
+        _requisicoes.Should().BeEmpty();
+        Avisos.Should().NotContain(LogsDoAssistente.EventoPortaoBarrou);
+    }
+
+    [Fact]
+    public async Task Rastro_VinculoEmRevisaoNaoLogaAviso_RodaACadaMensagemDoCliente()
+    {
+        _conversa.ExigirConferenciaCliente();
+        PortoesDoAssistente.DaConversa(_conversa, Agora).First(e => e.Barra).Codigo.Should().Be(PortoesDoAssistente.Vinculo);
+
+        var resultado = await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        resultado.Should().Be(ResultadoTurnoAgente.Ignorado, "o turno parou no portão, não antes nem depois");
+        _requisicoes.Should().BeEmpty();
+        Avisos.Should().NotContain(LogsDoAssistente.EventoPortaoBarrou);
+    }
+
+    // Limite e cota tiram a conversa do automático como os outros portões: mesmo evento, mesmo código de busca.
+    [Fact]
+    public async Task Rastro_PortaoDoLimiteLogaAvisoComOCodigo()
+    {
+        RespostasDoAgenteNaUltimaHora(LimiteRespostasAgenteOptions.PadraoPorHora);
 
         await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
 
-        Avisos.Should().NotContain(LogsDoAssistente.EventoPortaoBarrou);
+        _log.Eventos.Where(e => e.Nivel == LogLevel.Warning).Select(e => e.Evento.Id)
+            .Should().Equal(LogsDoAssistente.EventoPortaoBarrou);
+        _log.Linhas.Should().Contain(l => l.Contains("Portao=" + PortoesDoAssistente.Limite));
+    }
+
+    [Fact]
+    public async Task Rastro_PortaoDaCotaLogaAvisoComOCodigo()
+    {
+        LojaComCota(1_000);
+        UsoDoMes(1_000);
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        _log.Eventos.Where(e => e.Nivel == LogLevel.Warning).Select(e => e.Evento.Id)
+            .Should().Equal(LogsDoAssistente.EventoPortaoBarrou);
+        _log.Linhas.Should().Contain(l => l.Contains("Portao=" + PortoesDoAssistente.Cota));
     }
 
     [Fact]

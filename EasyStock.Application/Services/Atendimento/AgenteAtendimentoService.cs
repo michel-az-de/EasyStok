@@ -143,8 +143,7 @@ public sealed class AgenteAtendimentoService(
         // responder e gastar sem fim; no limite da hora, a conversa para nele e a escalada avisa a dona.
         if (await portoes.DoLimiteAsync(empresaId, conversaId, agora, ct) is { Barra: true, MotivoEscalada: { } motivoLimite })
         {
-            logger.LogWarning("Agente: conversa {ConversaId} chegou ao limite de respostas do robô na última hora; fica para a dona.",
-                conversaId);
+            LogsDoAssistente.PortaoBarrou(logger, conversaId, PortoesDoAssistente.Limite);
             await escalador.EscalarAsync(empresaId, conversa, motivoLimite, agora, ct);
             await unitOfWork.CommitAsync();
             return new ResultadoTurnoAgente(ChamouLlm: false, Respondeu: false, Escalou: true);
@@ -153,8 +152,7 @@ public sealed class AgenteAtendimentoService(
         // S69 (#2853): cota mensal esgotada. Não chama o modelo, passa para a equipe e deixa o turno no histórico como cota.
         if (await PortoesDoAssistente.DaCotaAsync(turnos, empresaId, configuracao, agora, ct) is { Barra: true, MotivoEscalada: { } motivoCota })
         {
-            logger.LogWarning("Agente: cota mensal da empresa {EmpresaId} esgotada; conversa {ConversaId} fica para a equipe.",
-                empresaId, conversaId);
+            LogsDoAssistente.PortaoBarrou(logger, conversaId, PortoesDoAssistente.Cota);
             await escalador.EscalarAsync(empresaId, conversa, motivoCota, agora, ct);
             await turnos!.AddAsync(TurnoAgente.Registrar(empresaId, conversaId, pendentes[^1].Id, null, null, 0, 0, 0, null, [], 0,
                 DesfechoTurnoAgente.Cota, (int)Math.Min(cronometro.ElapsedMilliseconds, int.MaxValue), agora), ct);
@@ -253,7 +251,7 @@ public sealed class AgenteAtendimentoService(
             {
                 // #1704: a conversa vai ao cliente; afirmação que nenhuma fonte do turno sustenta fica para a equipe.
                 var barrada = !concluiu || motivoEscalada is not null ? null
-                    : contexto.FerramentaFalhou ? "ferramenta falhou no turno"
+                    : contexto.FerramentaFalhou ? LogsDoAssistente.CategoriaFerramentaFalhou
                     : GuardaRespostaAgente.Avaliar(geracao.Texto,
                         contexto.ResultadosDasFerramentas,
                         _ferramentas.Keys);
