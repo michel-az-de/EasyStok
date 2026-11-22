@@ -137,7 +137,7 @@ const aptMudou = (dados, inicial) => String(dados.apt ?? '').trim() !== String(i
 export const gravaEnderecoDoCadastro = (dados, inicial) => Boolean(texto(dados.endereco)) && (enderecoMudou(dados, inicial) || aptMudou(dados, inicial)) && !recusaDoEndereco(dados.endereco)
 
 // Endereço novo ou mudado, com CEP, vira o padrão do cliente (#2776: também de quem já tem um; a API desmarca o anterior).
-// Em cadastro existente, `enderecos` é a lista relida da API logo antes de gravar; sem ela, não grava.
+// Em cadastro existente, sem a lista relida da API logo antes de gravar (`enderecos`), não grava.
 export function enderecoDeEntregaDoCadastro(dados, { empresaId, inicial, enderecos } = {}) {
   if (!gravaEnderecoDoCadastro(dados, inicial)) return null
   if (inicial?.id && !Array.isArray(enderecos)) return null

@@ -94,7 +94,7 @@ public class ConfirmarEnderecoClienteUseCaseTests
     }
 
     [Fact]
-    public async Task ComplementoQueNaoCabeNoAptFicaVazio()
+    public async Task ComplementoQueNaoCabeNoAptMantemODaLoja()
     {
         var cliente = ClienteCom();
         cliente.Apt = "casa 2";
@@ -103,8 +103,20 @@ public class ConfirmarEnderecoClienteUseCaseTests
 
         await UseCase().ExecuteAsync(new ConfirmarEnderecoClienteCommand(_empresaId, cliente.Id, endereco));
 
-        cliente.Apt.Should().BeNull();
+        cliente.Apt.Should().Be("casa 2");
         cliente.Complemento.Should().Be(longo);
+    }
+
+    [Fact]
+    public async Task ConfirmarSemComplementoMantemOAptDaLoja()
+    {
+        var cliente = ClienteCom();
+        cliente.Apt = "casa 2";
+        var endereco = new EnderecoNormalizado("05500000", "Rua Alvarenga", "120", null, "Butantã", "São Paulo", "SP", null);
+
+        await UseCase().ExecuteAsync(new ConfirmarEnderecoClienteCommand(_empresaId, cliente.Id, endereco));
+
+        cliente.Apt.Should().Be("casa 2");
     }
 
     [Fact]

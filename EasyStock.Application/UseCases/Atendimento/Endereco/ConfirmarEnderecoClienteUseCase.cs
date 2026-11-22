@@ -36,8 +36,9 @@ public sealed class ConfirmarEnderecoClienteUseCase(
         cliente.Bairro = e.Bairro;
         cliente.Cidade = e.Cidade;
         cliente.Complemento = e.Complemento;
-        // #2776: Cadastros mostra Apt como o complemento. Apt tem 32 caracteres (e desce para o mobile): o que não cabe fica vazio.
-        cliente.Apt = e.Complemento?.Trim() is { Length: > 0 and <= 32 } apt ? apt : null;
+        // #2776: Cadastros mostra Apt como o complemento. Apt tem 32 caracteres (e desce para o mobile): sem complemento
+        // ou com um que não cabe, fica o Apt que a loja digitou.
+        if (e.Complemento?.Trim() is { Length: > 0 and <= 32 } apt) cliente.Apt = apt;
         await clienteRepository.UpdateAsync(cliente);
 
         if (existente is not null)
