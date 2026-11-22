@@ -4,12 +4,14 @@ using EasyStock.Application.Ports.Output.Integration.Crypto;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Application.Ports.Output.Persistence;
 using EasyStock.Application.Ports.Output.Persistence.Atendimento;
+using EasyStock.Application.UseCases.Atendimento;
 using EasyStock.Application.UseCases.Atendimento.Webhook;
 using EasyStock.Application.UseCases.FeatureFlags;
 using EasyStock.Domain.Entities.Atendimento;
 using EasyStock.Domain.Enums.Atendimento;
 using EasyStock.Domain.Integration;
 using Microsoft.Extensions.Logging;
+using NSubstitute.ExceptionExtensions;
 
 namespace EasyStock.Application.Tests.UseCases.Atendimento.Webhook;
 
@@ -39,6 +41,7 @@ public class WebhookWppConnectSemEfeitoTests
     private readonly IWebhookRecebidoRepository _recebidos = Substitute.For<IWebhookRecebidoRepository>();
     private readonly IIntegrationCredentialResolver _credenciais = Substitute.For<IIntegrationCredentialResolver>();
     private readonly IOperationalMetrics _metricas = Substitute.For<IOperationalMetrics>();
+    private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly LoggerCapturado<ProcessarWebhookWppConnectUseCase> _logPonte = new();
     private readonly LoggerCapturado<ProcessarEventoWhatsAppUseCase> _logEvento = new();
     private readonly ProcessarWebhookWppConnectUseCase _useCase;
@@ -58,7 +61,7 @@ public class WebhookWppConnectSemEfeitoTests
         // Só o que os caminhos sem efeito tocam: nenhum deles chega a gravar, enfileirar ou responder.
         var tenant = Substitute.For<ITenantContextAccessor>();
         var evento = new ProcessarEventoWhatsAppUseCase(_empresas, _flags, null!, _conversas, _recebidos, null!, null!, null!,
-            tenant, Substitute.For<IUnitOfWork>(), null!, null!, null!, null!, null!, null!, TimeProvider.System, _logEvento,
+            tenant, _unitOfWork, null!, null!, null!, null!, null!, null!, TimeProvider.System, _logEvento,
             metricas: _metricas);
         _useCase = new ProcessarWebhookWppConnectUseCase(_credenciais, tenant, Substitute.For<IWppConnectSessaoClient>(),
             evento, logger: _logPonte, metricas: _metricas);
@@ -177,10 +180,25 @@ public class WebhookWppConnectSemEfeitoTests
     }
 
     [Fact]
-    public async Task Mensagem_valida_nao_registra_descarte()
+    public async Task Regra_de_dominio_que_nao_passa_num_reenvio_registra_o_motivo()
+    {
+        _recebidos.TryRegistrarAsync(default!, default!, default!, default)
+            .ReturnsForAnyArgs(c => WebhookRecebido.Criar(c.ArgAt<string>(0), c.ArgAt<string>(1), c.ArgAt<string>(2)));
+        _unitOfWork.ExecuteInTransactionSemRetryAsync<(Conversa, Mensagem, ConfiguracaoAtendimento, IdentificacaoCliente?)>(default!, default)
+            .ThrowsAsyncForAnyArgs(new RegraDeDominioVioladaException("contato inválido"));
+
+        (await _useCase.ExecuteAsync(Mensagem("onmessage", $"{Telefone}@c.us", 1793000100))).Should().BeTrue();
+
+        // A linha de erro que já existia ainda imprime o wamid (fora desta PR); a do motivo, não.
+        Linhas.Should().ContainSingle(l => l.Contains(WebhookSemEfeito.ErroDominio))
+            .Which.Should().Contain(Sessao).And.NotContain(Telefone).And.NotContain(Texto);
+        _metricas.Received(1).IncrementWebhookSemEfeito(WebhookSemEfeito.ErroDominio);
+    }
+
+    [Fact]
+    public void Mensagem_valida_nao_e_descarte()
     {
         WppConnectWebhookParser.Parse(Mensagem("onmessage", $"{Telefone}@c.us", 1793000100)).Descarte.Should().BeNull();
-        await Task.CompletedTask;
     }
 
     private Mensagem JaGravada() => EasyStock.Domain.Entities.Atendimento.Mensagem.Saida(_empresaId, Guid.NewGuid(),

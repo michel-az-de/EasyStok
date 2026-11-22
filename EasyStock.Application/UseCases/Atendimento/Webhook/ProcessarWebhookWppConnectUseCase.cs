@@ -3,6 +3,7 @@ using EasyStock.Application.Ports.Output.Atendimento;
 using EasyStock.Application.Ports.Output.Integration.Crypto;
 using EasyStock.Application.Ports.Output.Observability;
 using EasyStock.Domain.Integration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace EasyStock.Application.UseCases.Atendimento.Webhook;
 
@@ -30,8 +31,8 @@ public sealed class ProcessarWebhookWppConnectUseCase(
         rawBody = await IdAusenteWppConnect.CompletarAsync(rawBody, sessao, cliente, ct);
         var normalizado = WppConnectWebhookParser.Parse(rawBody, telefone, sessao.InicioDaCaptura);
         // #3117: aceito e sem o que gravar. Responde 200 como antes, mas agora diz por quê.
-        if (normalizado.Descarte is { } motivo && logger is not null)
-            WebhookSemEfeito.Registrar(logger, metricas, motivo, evento, nome);
+        if (normalizado.Descarte is { } motivo)
+            WebhookSemEfeito.Registrar((ILogger?)logger ?? NullLogger.Instance, metricas, motivo, evento, nome);
         // #2515: o "2" que responde ao menu numerado volta como o toque no botão.
         if (menus is not null)
             normalizado = await EscolhaMenuWppConnect.TraduzirAsync(normalizado, sessao.Sessao, menus, ct);
