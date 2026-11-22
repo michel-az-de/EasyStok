@@ -54,22 +54,25 @@ public class PedidosController(
         [FromQuery] DateTime? ate = null,
         [FromQuery] string? search = null,
         [FromQuery] string? sort = "criadoem",
-        [FromQuery] string? order = "desc")
+        [FromQuery] string? order = "desc",
+        [FromQuery] DateTime? entregaDesde = null,
+        [FromQuery] DateTime? entregaAte = null)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
         var (p, sz) = NormalisePage(page, pageSize);
         var result = await listarUseCase.ExecuteAsync(new ListarPedidosQuery(
-            emp, p, sz, status, clienteId, DataUtc.InicioDoPeriodoUtc(desde), DataUtc.FimDoPeriodoUtc(ate), search, sort, NormaliseOrder(order)));
+            emp, p, sz, status, clienteId, DataUtc.InicioDoPeriodoUtc(desde), DataUtc.FimDoPeriodoUtc(ate), search, sort, NormaliseOrder(order),
+            DataUtc.InicioDoPeriodoUtc(entregaDesde), DataUtc.FimDoPeriodoUtc(entregaAte)));
         return DataPaged(result.Items, result.Total, result.Page, result.PageSize);
     }
 
     [SwaggerOperation(Summary = "Get order details (items + events + payments)")]
     [HttpGet("{id}")]
     [Authorize(Policy = "Operador")]
-    public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid? empresaId)
+    public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid? empresaId, CancellationToken ct = default)
     {
         if (!TryResolveEmpresaId(currentUser, empresaId, out var emp, out var err)) return err!;
-        var result = await obterUseCase.ExecuteAsync(new ObterPedidoDetalhesQuery(emp, id));
+        var result = await obterUseCase.ExecuteAsync(new ObterPedidoDetalhesQuery(emp, id), ct);
         return result == null ? DataNotFound("Pedido não encontrado.") : DataOk(result);
     }
 

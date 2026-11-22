@@ -40,7 +40,14 @@ function EstadoFinanceiro({ consulta, children }) {
   if (consulta.carregando && !consulta.dados) return <EsqueletoDeLista linhas={4} altura="var(--toque)">Carregando financeiro…</EsqueletoDeLista>
   return <div className={css.estado} aria-busy={consulta.carregando}>{children}</div>
 }
-function Indicador({ nome, valor, detalhe }) { return <div className={css.indicador}><span>{nome}</span><strong>{moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}</div> }
+function Indicador({ nome, valor, detalhe, children }) { return <div className={css.indicador}><span>{nome}</span><strong>{moeda(valor)}</strong>{detalhe && <small>{detalhe}</small>}{children}</div> }
+// #3076 (E4, L3): pedidos sem conta a receber, em linha própria; o número do card segue só com as contas. Sem o campo
+// (API antiga) ou sem pedido, a linha não aparece.
+const SOBRE_PEDIDOS_A_RECEBER = 'Pedidos sem conta a receber e ainda não pagos, com dia da entrega até 30 dias à frente ou em qualquer dia passado. Saldo: total menos pagamentos. Não entra no valor acima.'
+function PedidosAReceber({ total, qtd }) {
+  if (!(qtd > 0)) return null
+  return <small className={css.pedidosAReceber} title={SOBRE_PEDIDOS_A_RECEBER}>Pedidos a receber: {moeda(total ?? 0)} ({qtd} {qtd === 1 ? 'pedido' : 'pedidos'})</small>
+}
 function SituacaoConta({ status, lado }) { return <Pilula tom={tomDoStatusConta(status)}>{nomeStatusConta(status, lado)}</Pilula> }
 
 // ------------------------------------------------------------------ visão geral: o que vence
@@ -84,7 +91,9 @@ function ResumoFinanceiro() {
     {/* Quem só vê um lado não vê os números do outro (#2105, achado 10). */}
     <div className={css.indicadores}>
       {verPagar && <Indicador nome="A pagar nos próximos 30 dias" valor={resumo.totalAVencer30dPagar} detalhe={`${resumo.qtdContasPagarAVencer30d} ${resumo.qtdContasPagarAVencer30d === 1 ? 'conta' : 'contas'}`} />}
-      {verReceber && <Indicador nome="A receber nos próximos 30 dias" valor={resumo.totalAVencer30dReceber} detalhe={`${resumo.qtdContasReceberAVencer30d} ${resumo.qtdContasReceberAVencer30d === 1 ? 'conta' : 'contas'}`} />}
+      {verReceber && <Indicador nome="A receber nos próximos 30 dias" valor={resumo.totalAVencer30dReceber} detalhe={`${resumo.qtdContasReceberAVencer30d} ${resumo.qtdContasReceberAVencer30d === 1 ? 'conta' : 'contas'}`}>
+        <PedidosAReceber total={resumo.totalPedidosAReceber} qtd={resumo.qtdPedidosAReceber} />
+      </Indicador>}
       {verPagar && <Indicador nome="Pago no mês" valor={resumo.totalPagoMes} detalhe="Contas, pedidos e Caixa" />}
       {verReceber && <Indicador nome="Recebido no mês" valor={resumo.totalRecebidoMes} detalhe="Contas, pedidos e Caixa" />}
     </div>

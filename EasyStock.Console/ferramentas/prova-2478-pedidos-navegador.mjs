@@ -51,9 +51,10 @@ async function preparar({ largura = 1280, altura = 800, verPedidos = true } = {}
     }
     const unico = path.match(/^\/api\/pedidos\/([^/]+)$/)
     if (unico) return ok(detalheDe(pedidos.find((p) => p.id === unico[1])))
-    if (path === '/api/atendimento/conversas') return ok([{ id: 'conversa-ana', contatoNome: 'Ana Paula', contatoIdExterno: '5511999990000', clienteId: 'cli-0', canal: 'WhatsApp', situacao: 'Assumida', ultimaMensagemEm: hoje.toISOString(), naoLidas: 0 }])
+    if (path === '/api/atendimento/conversas') return ok([{ id: 'conversa-ana', contatoNome: 'Ana Paula', contatoIdExterno: '5511999990000', clienteId: 'cli-0', canal: 'WhatsApp', situacao: 'Assumida', ultimaMensagemEm: hoje.toISOString(), naoLidas: 0, pedidoEmAndamentoId: 'pedido-1', pedidoStatus: 'aguardando_pagamento' }])
     if (path.endsWith('/mensagens')) return ok([])
-    if (path.endsWith('/pedido')) return ok(null)
+    // #3130: a conversa carregada traz o pedido-1 (o do Nº 001); só ele ganha o atalho "Abrir conversa".
+    if (path.endsWith('/pedido')) return ok({ pedidoId: 'pedido-1', numeroComanda: '001', status: 'aguardando_pagamento', total: 40, totalPago: 0, itens: [], observacoes: '' })
     if (path === '/api/atendimento/configuracao') return ok({ slaRespostaMinutos: 5 })
     if (path === '/api/atendimento/agenda') return ok({ lojaDisponivel: true, dias: [] })
     if (path === '/api/atendimento/comanda/cardapio') return ok({ itens: [], porcoes: {} })

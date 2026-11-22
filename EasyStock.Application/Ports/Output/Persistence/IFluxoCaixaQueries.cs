@@ -46,7 +46,10 @@ public sealed record DashboardFinanceiroDto(
     int QtdContasReceberAVencer30d = 0,
     // #2268: parte de TotalPagoMes/TotalRecebidoMes que veio do Caixa (pedido, venda, movimento avulso).
     decimal TotalPagoMesCaixa = 0m,
-    decimal TotalRecebidoMesCaixa = 0m);
+    decimal TotalRecebidoMesCaixa = 0m,
+    // E4 L3 (#3076): saldo dos pedidos operacionais sem conta a receber ativa (linha "Pedidos a receber"); o card das contas segue so com contas.
+    decimal TotalPedidosAReceber = 0m,
+    int QtdPedidosAReceber = 0);
 
 public sealed record FluxoBucketDto(
     DateTime InicioBucket,

@@ -27,7 +27,9 @@ public sealed record PedidoResult(
     // #2478: dia de produção a que o número pertence (encomenda feita num dia, numerada para outro).
     DateOnly? DataNumero = null,
     // #2813: o que falta receber pela regra do domínio (zero no quitado do histórico). A tela lê daqui e não refaz total menos pago.
-    decimal? AReceber = null
+    decimal? AReceber = null,
+    // E4 L1 (#3076): endereço de entrega (ou nulo na retirada); o detalhe mostra no cabeçalho.
+    string? EnderecoEntrega = null
 );
 
 public sealed record PedidoDetalheResult(

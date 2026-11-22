@@ -13,7 +13,10 @@ public sealed record ListarPedidosQuery(
     DateTime? Ate = null,
     string? Search = null,
     string? Sort = "criadoem",
-    string? Order = "desc");
+    string? Order = "desc",
+    // E4 L2 (#3076): dia da entrega = AgendadoParaEm, ou CriadoEm no pedido para agora.
+    DateTime? EntregaDesde = null,
+    DateTime? EntregaAte = null);
 
 public sealed record ListarPedidosResult(
     IReadOnlyList<PedidoResult> Items,
@@ -32,7 +35,7 @@ public class ListarPedidosUseCase(IPedidoRepository repo)
         var (items, total) = await repo.GetByEmpresaAsync(
             q.EmpresaId, page, size,
             q.Status, q.ClienteId, q.Desde, q.Ate,
-            q.Search, q.Sort, q.Order);
+            q.Search, q.Sort, q.Order, q.EntregaDesde, q.EntregaAte);
 
         return new ListarPedidosResult(
             items.Select(CriarPedidoUseCase.Map).ToList(),

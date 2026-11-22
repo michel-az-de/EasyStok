@@ -1,15 +1,15 @@
 import * as acao from '../acoes'
 import {
   FORMA_NA_ENTREGA, FORMA_ONLINE, corpoDoPedido, formaDoMeio, gerarPedido, janelaDoId, listarJanelas, obterPedido, pedidoDaApi,
-  reemitirCobranca, conferirPagamentoOnline, trocarFormaPagamento, registrarPagamentoManual, desfazerPagamentoManual, cancelarPedido, trocarJanelaPedido, STATUS_DO_PASSO,
+  reemitirCobranca, conferirPagamentoOnline, trocarFormaPagamento, desfazerPagamentoManual, cancelarPedido, trocarJanelaPedido, STATUS_DO_PASSO,
 } from '../../infra/api/comandaApi'
 import { mudarStatusKds } from '../../infra/api/kdsApi'
 import { aprovarPedido as aprovarPedidoApi } from '../../infra/api/entregasApi'
-import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaCancelaCobrancaOnline, baixaEsperaAprovacao, situacaoDaCobranca } from '../../dominio/cobranca'
+import { MOTIVO_BAIXA_SEM_APROVACAO, aguardaAprovacao, baixaEsperaAprovacao, situacaoDaCobranca } from '../../dominio/cobranca'
 import { pedeConfirmacaoDoSaldo, ultimoPagamentoApi } from '../../dominio/pagamento'
 import { motivoDoPedidoNaoCriado } from '../../dominio/pedido'
 import { ERRO_MOTIVO_CANCELAMENTO, motivoDoCancelamentoValido } from '../../dominio/pedidosCadastro'
-import { criarChaveDeEnvio } from '../chaveDeEnvio'
+import { criarRegistroDePagamento } from '../pagamentoDoPedido'
 import { SO_NO_EASYSTOK, textoNaoLigado } from './naoLigadas'
 import { ROTULOS } from '../../dominio/rotulos'
 
@@ -52,8 +52,8 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
   const limparAviso = () => despachar({ tipo: acao.FECHAR_AVISO_API })
   const pedidoDe = (id) => estadoRef.current.conversas.find((c) => c.id === id)?.pedido ?? null
   const pedidoCriado = (id) => pedidoDe(id)?.pedidoId ?? null
-  // Pagamento parcial repetido depois de "sem conexão" não pode entrar duas vezes.
-  const envioDoPagamento = criarChaveDeEnvio()
+  // Pagamento parcial repetido depois de "sem conexão" não pode entrar duas vezes: a chave vive no registro.
+  const registrarPagamentoDoPedido = criarRegistroDePagamento()
 
   // O meio escolhido na tela vai junto: a API devolve a forma, não o meio (F07, item 5).
   // #1683: o POST diz se o resumo saiu ao cliente; a leitura do pedido não diz. A marca fica
@@ -280,36 +280,29 @@ export function criarAcoesComandaApi(acoes, { despachar, estadoRef, antesDeEnvia
     if (!metodo) { avisar('Selecione como recebeu o pagamento.'); return undefined }
     // #1474 (R8): pedido que exige aprovação (fora da área liberado) é pré-operacional até a
     // dona aprovar; o EasyStok recusaria a baixa. Nada sai antes disso.
-    if (baixaEsperaAprovacao(pedidoDe(id))) {
+    // #3076 (E4): a baixa em si é a mesma do detalhe de Pedidos (`aplicacao/pagamentoDoPedido.js`).
+    const pedido = pedidoDe(id)
+    if (baixaEsperaAprovacao(pedido)) {
       avisar(MOTIVO_BAIXA_SEM_APROVACAO)
       return Promise.resolve({ erro: MOTIVO_BAIXA_SEM_APROVACAO })
     }
-    const cancelarLink = baixaCancelaCobrancaOnline(pedidoDe(id))
-    const chave = envioDoPagamento.para({ pedidoId, valor, metodo })
-    return umaPorConversa(id, 'receber', () => (cancelarLink ? trocarFormaPagamento(pedidoId, FORMA_NA_ENTREGA) : Promise.resolve())
-      .then(() => registrarPagamentoManual(pedidoId, valor, metodo, chave))
-      .then(
-        () => {
-          envioDoPagamento.confirmar(chave)
+    return umaPorConversa(id, 'receber', () => registrarPagamentoDoPedido({ pedidoId, pedido, valor, metodo })
+      .then((resultado) => {
+        if (resultado.ok) {
           limparAviso()
           return recarregar(id).catch(() => avisar('Pagamento registrado. Atualizando a tela…'))
-        },
-        (erro) => {
-          const naoRegistrado = erro.codigo === 'pedido_ja_pago' ? erro.message
-            : semConfirmacao(erro)
-              ? 'Não foi possível confirmar o registro do pagamento. Conferindo o pedido; veja o saldo antes de tentar novamente.'
-              : `Pagamento não registrado: ${erro.message}`
-          if (!cancelarLink && semConfirmacao(erro)) { avisar(naoRegistrado); return conferir(id).then(() => ({ erro: naoRegistrado })) }
-          const recusar = (mensagem) => { avisar(mensagem); return { erro: mensagem } }
-          if (!cancelarLink) return recusar(naoRegistrado)
-          // O link pode já ter sido cancelado: a tela mostra o pedido como o EasyStok ficou. Sem
-          // o `requerAprovacao` no pedido da conversa, só depois da troca se sabe que ele passou
-          // a esperar aprovação; o aviso diz o próximo passo em vez do erro cru.
-          return recarregar(id)
-            .then((atual) => recusar(aguardaAprovacao(atual) ? LINK_CANCELADO_ESPERA_APROVACAO : naoRegistrado))
-            .catch(() => recusar(naoRegistrado))
-        },
-      ))
+        }
+        const { erro: naoRegistrado, semConfirmacao: semRede, linkCancelado } = resultado
+        if (!linkCancelado && semRede) { avisar(naoRegistrado); return conferir(id).then(() => ({ erro: naoRegistrado })) }
+        const recusar = (mensagem) => { avisar(mensagem); return { erro: mensagem } }
+        if (!linkCancelado) return recusar(naoRegistrado)
+        // O link pode já ter sido cancelado: a tela mostra o pedido como o EasyStok ficou. Sem
+        // o `requerAprovacao` no pedido da conversa, só depois da troca se sabe que ele passou
+        // a esperar aprovação; o aviso diz o próximo passo em vez do erro cru.
+        return recarregar(id)
+          .then((atual) => recusar(aguardaAprovacao(atual) ? LINK_CANCELADO_ESPERA_APROVACAO : naoRegistrado))
+          .catch(() => recusar(naoRegistrado))
+      }))
   }
 
   // #1474 (R1): a esteira da Ficha anda pelo mesmo PATCH da Cozinha (máquina de estados da

@@ -48,3 +48,19 @@ Sem essas respostas, um "serviço único de a-receber" só move a divergência p
 
 - Épico de unificação sob #868/#956, condicionado às 3 decisões de produto acima.
 - `GerarContaReceberDePedidoUseCase` usa `Total` cheio em vez de `Total - TotalPago` ao gerar `ContaReceber` — double-count quando a geração automática está ligada por loja.
+
+## Adendo de 2026-11-22 (#3076, E4 da jornada do pedido)
+
+Nada nesta ADR muda de valor: os quatro números seguem como estão e a unificação segue condicionada às três decisões de produto.
+
+**Quinta medida.** O Financeiro ganha, dentro do card "A receber nos próximos 30 dias", a linha "Pedidos a receber". O número do card segue só com as contas.
+
+| # | Onde | Fonte | Predicado | Janela | Inclui entregue? |
+|---|---|---|---|---|---|
+| 5 | Financeiro, linha "Pedidos a receber" | `Pedido.Total` menos a soma dos `Pagamentos` (`FluxoCaixaQueries.KpisDashboardAsync`), no banco | não cancelado, fora dos estados pré-operacionais, sem conta a receber de origem Pedido ativa, não quitado pelo import do histórico, saldo maior que zero | dia da entrega (`AgendadoParaEm`, ou `CriadoEm` sem agenda) até 30 dias à frente ou em qualquer dia passado | Sim |
+
+Na decisão 2, só no escopo desta linha: com conta, o dinheiro é o da conta; sem conta, é o do pedido. Isso evita a soma em dobro sem unificar nada. Cupom e estorno não entram na linha (limite declarado da v1); o detalhe do pedido os desconta.
+
+**Satélite corrigido.** O satélite do `Total` cheio já não vale: desde a #2095 (F10) `GerarContaReceberDePedidoUseCase` cobra o saldo (`SaldoFinanceiroPedido.AReceberAsync`, total menos pagamentos, estornos e cupons).
+
+**Satélite novo.** O pagamento feito no pedido depois de a conta a receber ser gerada não é reconciliado com a parcela. A linha 5 não o agrava, porque deixa de fora todo pedido com conta (#3130).

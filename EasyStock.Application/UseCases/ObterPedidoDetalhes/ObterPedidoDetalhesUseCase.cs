@@ -5,9 +5,9 @@ namespace EasyStock.Application.UseCases.ObterPedidoDetalhes;
 
 public sealed record ObterPedidoDetalhesQuery(Guid EmpresaId, Guid Id, int MaxEventos = 200);
 
-public class ObterPedidoDetalhesUseCase(IPedidoRepository repo)
+public class ObterPedidoDetalhesUseCase(IPedidoRepository repo, EasyStock.Application.Services.Pedidos.SaldoFinanceiroPedido? saldos = null)
 {
-    public async Task<PedidoDetalheResult?> ExecuteAsync(ObterPedidoDetalhesQuery q)
+    public async Task<PedidoDetalheResult?> ExecuteAsync(ObterPedidoDetalhesQuery q, CancellationToken ct = default)
     {
         UseCaseGuards.EnsureEmpresaId(q.EmpresaId);
         UseCaseGuards.EnsureNotEmpty(q.Id, "Id");
@@ -17,8 +17,13 @@ public class ObterPedidoDetalhesUseCase(IPedidoRepository repo)
 
         var eventos = await repo.GetEventosAsync(p.Id, q.MaxEventos);
 
+        // E4 L1 (#3076): o que falta receber pela conta da baixa (cupom e estorno; zero no quitado do histórico).
+        var pedido = CriarPedidoUseCase.Map(p);
+        if (saldos is not null)
+            pedido = pedido with { AReceber = await saldos.AReceberAsync(p, ct) };
+
         return new PedidoDetalheResult(
-            CriarPedidoUseCase.Map(p),
+            pedido,
             p.Itens.OrderBy(i => i.CriadoEm).Select(i => new PedidoItemResult(
                 i.Id, i.PedidoId, i.ProdutoId, i.Nome, i.Emoji, i.Unidade,
                 i.Quantidade, i.PrecoUnitario, i.Subtotal,

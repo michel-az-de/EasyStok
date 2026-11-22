@@ -65,7 +65,7 @@ public sealed class ConsultarPedidoFerramenta(
             pedidoId = ultimo.Id;
         }
 
-        var detalhe = await obterPedidoDetalhes.ExecuteAsync(new ObterPedidoDetalhesQuery(contexto.EmpresaId, pedidoId.Value, MaxEventos: 20));
+        var detalhe = await obterPedidoDetalhes.ExecuteAsync(new ObterPedidoDetalhesQuery(contexto.EmpresaId, pedidoId.Value, MaxEventos: 20), ct);
         if (detalhe is null || detalhe.Pedido.ClienteId != clienteId)
             return FerramentaJson.Serializar(new { erro = "pedido_nao_encontrado" });
 

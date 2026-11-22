@@ -1,5 +1,5 @@
 /* #2478: Pedidos em Cadastros. A base (painel, superfície, lista, rodapé) vem de cadastros.module.css. */
-.filtros { display: grid; grid-template-columns: minmax(200px, 1fr) repeat(3, minmax(150px, 190px)) auto; gap: var(--e-3); align-items: end; padding: var(--e-4); }
+.filtros { display: grid; grid-template-columns: minmax(200px, 1fr) repeat(4, minmax(140px, 180px)) auto; gap: var(--e-3); align-items: end; padding: var(--e-4); }
 .tabela th:first-child { width: 26%; }
 .tabela td > strong { display: block; font-variant-numeric: tabular-nums; }
 .tabela[aria-busy='true'] tbody { opacity: 0.6; transition: opacity var(--dur-curta) var(--ease-padrao); }
@@ -42,6 +42,14 @@
 .historico ol { margin: var(--e-3) 0 0; padding-left: var(--e-5); display: grid; gap: var(--e-3); }
 .historico li { overflow-wrap: anywhere; }
 
+/* #3076 (E4, L1): receber no detalhe. Contorno uniforme de 1px, sem barra lateral colorida. */
+.receber { display: grid; gap: var(--e-3); justify-items: start; padding: var(--e-4); border: 1px solid var(--linha); border-radius: var(--r-2); }
+.formReceber { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: var(--e-3); align-items: end; width: 100%; }
+.formReceber > [role='alert'], .acoesReceber { grid-column: 1 / -1; }
+.acoesReceber { display: flex; flex-wrap: wrap; gap: var(--e-3); }
+.recusa { margin: 0; color: var(--alerta); font-weight: 600; }
+/* #3076 (E4, L2): quando entregar, na coluna própria (no celular vai para baixo do número). */
+.entrega { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 1100px) {
   .filtros { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .filtros > :first-child { grid-column: 1 / -1; }
@@ -49,11 +57,12 @@
 @media (max-width: 700px) {
   /* Busca na linha toda; período, situação, ordem e Atualizar dois a dois, para a lista aparecer sem rolar. */
   .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-2); padding: var(--e-3); }
-  /* Pedido (com cliente e situação embaixo), Total e Abrir: as colunas Cliente e Situação saem. */
+  /* Pedido (com cliente, situação e entrega embaixo), Total e Abrir: as colunas Cliente, Situação e Entrega saem. */
   .tabela table { table-layout: fixed; }
   .tabela th:first-child { width: auto; }
-  .tabela th:nth-child(2), .tabela td:nth-child(2), .tabela th:nth-child(3), .tabela td:nth-child(3) { display: none; }
-  .tabela th:nth-child(4) { width: 6.5rem; }
+  .tabela th:nth-child(2), .tabela td:nth-child(2), .tabela th:nth-child(3), .tabela td:nth-child(3),
+  .tabela th:nth-child(4), .tabela td:nth-child(4) { display: none; }
+  .tabela th:nth-child(5) { width: 6.5rem; }
   .tabela th:last-child { width: 5.75rem; }
   .tabela .soCelular { display: grid; gap: var(--e-1); margin-top: var(--e-1); }
   .tabela .soCelular small:first-child { color: var(--tinta); }
