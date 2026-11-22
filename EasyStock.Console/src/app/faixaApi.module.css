@@ -53,8 +53,9 @@
   position: relative;
   transition: color var(--dur-micro) var(--ease-padrao);
 }
-/* #2762: a área de toque cresce sem engordar a faixa (o link tem altura de texto, abaixo de --toque). */
-.sair::after { content: ''; position: absolute; inset: calc(-1 * var(--e-3)) calc(-1 * var(--e-2)); }
+/* #2762, #3156: o alvo de toque mede 44x44 (era 83x21) por um pseudo-elemento centrado no botão: a área cresce
+   sem engordar a faixa, que no pé precisa gastar o mínimo. O aviso da janela (.avisoModal) não muda. */
+.sair::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); }
 .sair:hover { color: var(--marca); text-decoration-thickness: var(--b-2); }
 .sair:active { color: var(--marca-forte); }
 

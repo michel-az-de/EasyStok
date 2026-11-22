@@ -68,3 +68,10 @@
 /* FaixaApi é irmã da moldura dentro deste contêiner, não mais de #root. */
 .conteudo:has(> :global([data-conteudo-console])) { display: flex; flex-direction: column; }
 .conteudo > :global([data-conteudo-console]) { flex: 1; min-height: 0; height: auto; }
+
+/* #3156: a 390 só uma faixa fixa por vez. Com o aviso FECHÁVEL da loja à vista (`data-aviso-fechavel`), a de som e
+   notificações cede; fechado o aviso, ela volta. Falha e integração parada (sem fechar) não a escondem. */
+@media (max-width: 767px) {
+  .quadro:has([data-aviso-fechavel]) > .aparelho,
+  .quadro:has([data-aviso-fechavel]) > .aparelhoPassoTexto { display: none; }
+}

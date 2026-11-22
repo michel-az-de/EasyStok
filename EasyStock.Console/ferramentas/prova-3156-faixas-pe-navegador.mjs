@@ -1,0 +1,114 @@
+// #3156: Chromium e componentes reais (FaixaApi + AvisosDoDispositivo). A 390 só uma faixa por vez (a da loja
+// desligada na frente; "Notificações bloqueadas" cede), "Fechar aviso" tem alvo de clique de 44x44 sem engordar a faixa (1440 <= 72 px; 390 <= 84 px), e fechado ele não volta ao
+// recarregar enquanto o estado da loja não muda. Alturas das faixas medidas a 1440 e a 390.
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright')
+const pasta = resolve(import.meta.dirname, '../.build/3156/faixas-pe')
+mkdirSync(pasta, { recursive: true })
+writeFileSync(resolve(pasta, 'index.html'), '<html lang="pt-BR"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}</style><div id="root"></div><script type="module" src="./cena.jsx"></script></html>')
+writeFileSync(resolve(pasta, 'cena.jsx'), `
+import React,{useState} from 'react'; import {createRoot} from 'react-dom/client';
+import {ContextoEstado,ContextoAcoes,ContextoCatalogo} from '../../../src/aplicacao/contextos';
+import {ContextoAcessoModulos} from '../../../src/aplicacao/acessoModulos';
+import {FaixaApi} from '../../../src/app/FaixaApi';
+import {AvisosDoDispositivo} from '../../../src/app/AvisosDoDispositivo';
+import '../../../src/estilos/base.css';
+const busca=new URLSearchParams(location.search);
+const AVISO=busca.get('aviso')??'A loja online está desligada. Ligue a loja em Configurações para receber pedidos.';
+function Cena(){
+  const [avisoFixo,definir]=useState(busca.get('aviso')==='nenhum'?null:AVISO);
+  const acoes={fecharAvisoApi:({fixo}={})=>{if(fixo)definir(null)}};
+  const estado={fonteApi:true,sessao:{persistente:true,empresa:{id:busca.get('empresa')??'A'}},agora:Date.now(),sincronizacao:{estado:'ok',avisoFixo},som:false,audioBloqueado:false,permissaoNotificacao:'denied'};
+  const catalogo=busca.get('cardapio')==='lido'?{cardapioLido:true,cardapioFalha:null}:{cardapioLido:false};
+  return <ContextoAcessoModulos.Provider value={{acoes:busca.get('integracao')?{editarAtendimento:true}:{},permite:()=>false}}><ContextoEstado.Provider value={estado}><ContextoAcoes.Provider value={acoes}><ContextoCatalogo.Provider value={catalogo}>
+    <AvisosDoDispositivo><div data-conteudo-console style={{height:'100%'}}>tela<FaixaApi/></div></AvisosDoDispositivo>
+  </ContextoCatalogo.Provider></ContextoAcoes.Provider></ContextoEstado.Provider></ContextoAcessoModulos.Provider>
+}
+createRoot(document.getElementById('root')).render(<Cena/>);
+`)
+const erros = []
+const document_focoNoConteudo = (pagina) => pagina.evaluate(() => document.activeElement?.getAttribute('tabindex') === '-1' && document.activeElement.contains(document.querySelector('[data-conteudo-console]')))
+const browser = await chromium.launch({ headless: true })
+const base = `${process.env.CONSOLE_TEST_URL ?? 'http://localhost:5735'}/.build/3156/faixas-pe/index.html`
+const medidas = {}
+try {
+  for (const largura of [1440, 390]) {
+    // Contexto novo por largura: o localStorage é do aparelho e precisa nascer limpo.
+    const contexto = await browser.newContext({ viewport: { width: largura, height: largura === 390 ? 844 : 900 }, locale: 'pt-BR', reducedMotion: 'reduce', hasTouch: largura === 390 })
+    const pagina = await contexto.newPage()
+    pagina.setDefaultTimeout(10000)
+    pagina.on('pageerror', e => erros.push(e.message))
+    const faixaDaLoja = pagina.locator('output', { hasText: 'loja online' })
+    const aparelho = pagina.locator('[role="status"]', { hasText: 'Notificações bloqueadas' })
+    const altura = async (alvo) => (await alvo.count() && await alvo.first().isVisible()) ? Math.round((await alvo.first().boundingBox()).height) : 0
+    await pagina.goto(base)
+    await faixaDaLoja.waitFor()
+    await aparelho.waitFor({ state: 'attached' })
+    const faixaH = await altura(faixaDaLoja)
+    // A faixa de notificações é a div pai do status (ícone, rótulo e Dispensar).
+    const aparelhoH = await altura(aparelho.locator('xpath=..'))
+    medidas[largura] = { faixaDaLoja: faixaH, notificacoes: aparelhoH, total: faixaH + aparelhoH }
+    if (largura === 390) assert.ok(faixaH > 0 && aparelhoH === 0, `A 390 só uma faixa por vez: loja ${faixaH} px, notificações ${aparelhoH} px`)
+    else assert.ok(faixaH > 0 && aparelhoH > 0, 'No desktop as duas cabem e seguem à vista')
+    const fechar = pagina.getByRole('button', { name: 'Fechar aviso', exact: true })
+    const caixa = await fechar.boundingBox()
+    // Alvo real: o retângulo de 44x44 centrado no botão; cada canto (1 px para dentro) cai no próprio botão.
+    const alvo = await fechar.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const l = Math.max(44, r.width), a = Math.max(44, r.height)
+      const x0 = r.left + r.width / 2 - l / 2, y0 = r.top + r.height / 2 - a / 2
+      const cantos = [[x0 + 1, y0 + 1], [x0 + l - 1, y0 + 1], [x0 + 1, y0 + a - 1], [x0 + l - 1, y0 + a - 1]]
+      return cantos.map(([x, y]) => document.elementFromPoint(x, y)?.closest('button') === el)
+    })
+    assert.deepEqual(alvo, [true, true, true, true], `A ${largura} os cantos do alvo 44x44 do Fechar aviso não caem no botão: ${alvo}`)
+    // Meta do #3156: menos espaço fixo no pé. 1440 soma <= 72 px; 390 a faixa da loja <= 84 px.
+    if (largura === 1440) assert.ok(faixaH + aparelhoH <= 72, `A 1440 o pé soma ${faixaH + aparelhoH} px (máximo 72)`)
+    else assert.ok(faixaH <= 84, `A 390 a faixa da loja mede ${faixaH} px (máximo 84)`)
+    medidas[largura].fecharAviso = `${Math.round(caixa.width)}x${Math.round(caixa.height)}`
+    medidas[largura].alvo44 = alvo.every(Boolean)
+    await fechar.click()
+    await faixaDaLoja.waitFor({ state: 'detached' })
+    // Fechado o aviso, a faixa de notificações volta na mesma visita, sem recarregar.
+    await aparelho.waitFor()
+    assert.equal(await document_focoNoConteudo(pagina), true, 'Fechado o aviso, o foco volta ao conteúdo')
+    // Recarregar: o aviso da mesma loja desligada não volta; a faixa de notificações aparece no lugar.
+    await pagina.goto(base)
+    await aparelho.waitFor()
+    assert.equal(await faixaDaLoja.count(), 0, 'Fechado, o aviso não volta ao recarregar')
+    if (largura === 390) medidas[largura].depoisDeFechar = await altura(aparelho.locator('xpath=..'))
+    // Outra empresa no mesmo aparelho: a dispensa da A não esconde o aviso da B.
+    await pagina.goto(`${base}?empresa=B`)
+    await faixaDaLoja.waitFor()
+    // O estado da loja mudou (outro texto): o aviso novo aparece.
+    await pagina.goto(`${base}?aviso=${encodeURIComponent('Cardápio: não carregou.')}`)
+    await pagina.locator('output', { hasText: 'Cardápio: não carregou.' }).waitFor()
+    // A loja voltou (cardápio lido, sem aviso): a dispensa sai; se desligar de novo, o aviso aparece.
+    await pagina.goto(`${base}?aviso=nenhum&cardapio=lido`)
+    await aparelho.waitFor()
+    await pagina.goto(base)
+    await faixaDaLoja.waitFor()
+    if (largura === 390) {
+      // Integração parada (sem botão de fechar) ao lado do aviso da loja: a de notificações cede só ao aviso fechável.
+      // O cliente da API só chama com sessão guardada: uma sessão temporária de teste basta, a resposta é simulada.
+      await pagina.addInitScript(() => sessionStorage.setItem('easystok.sessao', JSON.stringify({ token: 't', expiraEm: Date.now() + 3_600_000, empresa: { id: 'C' } })))
+      await pagina.route('**/api/integracoes', (rota) => rota.fulfill({ json: { data: [{ provider: 'pix', nome: 'Pix', alerta: 'parada' }] } }))
+      await pagina.goto(`${base}?empresa=C&integracao=1`)
+      await faixaDaLoja.waitFor()
+      await pagina.getByText('Integração parada: Pix').waitFor()
+      assert.equal(await altura(aparelho.locator('xpath=..')), 0, 'Com o aviso fechável da loja à vista, as notificações cedem')
+      await pagina.getByRole('button', { name: 'Fechar aviso', exact: true }).click()
+      await faixaDaLoja.waitFor({ state: 'detached' })
+      await pagina.getByText('Integração parada: Pix').waitFor()
+      await aparelho.waitFor()
+      assert.ok(await altura(aparelho.locator('xpath=..')) > 0, 'Fechado o aviso, a integração parada não esconde as notificações (sem recarregar)')
+      medidas[largura].integracaoParada = 'notificacoes voltam ao fechar o aviso'
+    }
+    await contexto.close()
+  }
+  assert.deepEqual(erros, [], 'Sem erro de página')
+  writeFileSync(resolve(pasta, 'medidas.json'), JSON.stringify(medidas))
+  console.log('prova-3156-faixas-pe-navegador: ok', JSON.stringify(medidas))
+} finally { await browser.close() }
