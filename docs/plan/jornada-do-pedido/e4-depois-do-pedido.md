@@ -33,6 +33,8 @@ O detalhe ganha cabeçalho com entrega (`agendadoParaEm`, endereço ou retirada)
 
 O saldo e o botão leem `aReceber` do `PedidoResult` (`PedidoResult.cs:30`, #2813), que é zero no pedido quitado pelo import do histórico. A tela não refaz total menos pago. Sem `aReceber` (API antiga), cai em `situacaoDoPagamento(pedido).falta` (`dominio/pedidosCadastro.js:148-158`). O pedido quitado do histórico mostra que está quitado e não mostra o botão: a API recusa a baixa nele (`RegistrarPagamentoPedidoUseCase.cs:82`).
 
+`aReceber` vem de `AReceberPelosPagamentos` (`Pedido.cs:452`), que não olha o status nem o cupom. A API calcula o pendente pelo valor já alocado, e esse alocado inclui o cupom (`RegistrarPagamentoPedidoUseCase.cs:118-119`, `SaldoFinanceiroPedido.cs:8`). Limite da v1: em pedido com cupom, o valor sugerido pode passar do pendente. Nesse caso a recusa "excede o pendente" da API aparece no detalhe, ao lado de "Abrir conversa", onde a cobrança já lê o saldo com cupom (`dominio/pagamento.js:96-98`).
+
 O botão NÃO ganha caminho novo. Ele reaproveita o `receber` da conversa (`aplicacao/api/comanda.js:271-313`). O caminho `aplicacao/pagamento.js` não existe. O detalhe roda fora do `AtendimentoProvider` (`DetalhePedido.jsx:15-17`), então o corpo do `receber` sai para uma função de `aplicacao/` que recebe o `pedidoId` e o pedido, sem ler a conversa. Conversa e detalhe chamam a mesma função. Ela mantém:
 
 | Regra | Onde hoje |
@@ -43,7 +45,7 @@ O botão NÃO ganha caminho novo. Ele reaproveita o `receber` da conversa (`apli
 | `pedido_ja_pago`: mostra a mensagem da API, não o erro genérico | `comanda.js:298`; `CobrancaPedidoConflitoException.cs:10` |
 | Sem confirmação da rede: confere o pedido antes de aceitar nova tentativa | `comanda.js:299,302` |
 
-O detalhe só tem o `PedidoResult` (`PedidoResult.cs:4-31`), sem `cobranca` nem `requerAprovacao`. Por isso, em pedido pré-operacional (`rascunho`, `aguardando_pagamento`, `aguardando_aprovacao_baba`; `PedidoStateMachine.cs:112-116`, espelho em `pedidos-cockpit.js:33,143`) o botão fica desligado, com o motivo, e o detalhe aponta "Abrir conversa" (`DetalhePedido.jsx:26`), onde link e aprovação já se resolvem. Sem regra nova de valor.
+O detalhe só tem o `PedidoResult` (`PedidoResult.cs:4-31`), sem `cobranca` nem `requerAprovacao`. Por isso, em pedido pré-operacional (`rascunho`, `aguardando_pagamento`, `aguardando_aprovacao_baba`; `PedidoStateMachine.cs:112-116`, espelho em `pedidos-cockpit.js:33,143`) e em pedido `cancelado` (a API recusa: `RegistrarPagamentoPedidoUseCase.cs:103-110`) o botão fica desligado, com o motivo, e o detalhe aponta "Abrir conversa" (`DetalhePedido.jsx:26`), onde link e aprovação já se resolvem. Sem regra nova de valor.
 
 ### L2. Coluna Entrega, ordem e filtro "Entrega hoje"
 
@@ -83,7 +85,7 @@ O cálculo entra em `FluxoCaixaQueries.KpisDashboardAsync` (`FluxoCaixaQueries.c
 **Reconciliação com a ADR-0044** (`docs/adr/0044-definicoes-de-a-receber.md`). A ADR manda nomear honestamente e não unificar antes de resolver três decisões de produto. A E4 respeita:
 
 - Não unifica. O número do card não muda, e nenhum dos quatro números da tabela da ADR muda de valor.
-- A linha é a quinta medida, com rótulo próprio ("Pedidos a receber") e `title` que diz: pedidos sem conta a receber, com entrega até 30 dias à frente ou já entregues e não pagos, de qualquer data; saldo = total menos pagamentos. O rótulo não promete "próximos 30 dias".
+- A linha é a quinta medida, com rótulo próprio ("Pedidos a receber") e `title` que diz: pedidos sem conta a receber e ainda não pagos, com dia da entrega até 30 dias à frente ou em qualquer dia passado; saldo = total menos pagamentos. O rótulo não promete "próximos 30 dias".
 - Responde só no escopo da linha à decisão 2 (pedido e parcela são o mesmo dinheiro?): com conta, o dinheiro é o da conta; sem conta, é o do pedido. Isso evita a soma em dobro sem unificar nada. A decisão 1 a linha resolve como o cockpit (entregue e não pago conta). A decisão 3 segue em aberto.
 - A ADR cita como satélite que a conta gerada usa `Total` cheio. Desde a #2095 (F10) ela usa o saldo (`GerarContaReceberDePedidoUseCase.cs:65-69`). A PR de implementação põe um adendo datado na ADR: a quinta linha na tabela e a correção desse satélite.
 - Fica de fora da linha todo pedido com conta. O pagamento feito no pedido depois da conta gerada não é reconciliado com a parcela. É o satélite que a ADR já guarda, e a linha não o agrava.
@@ -99,12 +101,12 @@ O cálculo entra em `FluxoCaixaQueries.KpisDashboardAsync` (`FluxoCaixaQueries.c
 ## 4. Aceite
 
 - [ ] T3 em Pedidos: abrir o pedido (1), "Registrar pagamento" (2), escolher o método (3), confirmar (4); saldo zero. No máximo 4 cliques.
-- [ ] L1 usa a função compartilhada com a conversa. Teste prova a mesma chave de idempotência no reenvio, a recusa por aprovação, o cancelamento do link e a mensagem de `pedido_ja_pago`. Pedido pré-operacional mostra o botão desligado com o motivo.
+- [ ] L1 usa a função compartilhada com a conversa. Teste prova a mesma chave de idempotência no reenvio, a recusa por aprovação, o cancelamento do link e a mensagem de `pedido_ja_pago`. Pedido pré-operacional e pedido cancelado mostram o botão desligado com o motivo. Em pedido com cupom, a recusa "excede o pendente" aparece no detalhe com "Abrir conversa".
 - [ ] Lista de Pedidos com a data da entrega visível em 1440 e 390 px. `sort=entrega` ordena pelo dia da entrega. "Entrega hoje" lista só pedidos com entrega hoje (inclui o pedido para agora criado hoje).
 - [ ] L3, exemplo verificável, loja com a flag da conta automática DESLIGADA: conta a receber de R$ 120 vencendo em 10 dias e pedido operacional sem conta, total R$ 132,30, sem pagamento, entrega em 5 dias. O card mostra R$ 120,00 e a linha mostra "Pedidos a receber: R$ 132,30 (1 pedido)".
 - [ ] L3, mesma loja com a flag ligada ANTES da entrega e o pedido já entregue: ele ganha a conta de R$ 132,30. O card passa a R$ 252,30 (conta com vencimento em 7 dias, dentro dos 30) e o pedido NÃO aparece na linha, que some por zerar.
-- [ ] L3, exclusões: pedido cancelado, pré-operacional, pago, quitado do histórico, com entrega além de 31 dias ou com conta ativa não entra na linha. Pagamento parcial entra só com o saldo. Pedido com conta cancelada volta à linha.
-- [ ] L3, borda de fuso: pedido agendado às 21h de Brasília do 30º dia (já é o dia seguinte em UTC) conta como 30º dia e ENTRA na linha; às 21h do 31º dia NÃO entra.
+- [ ] L3, exclusões: pedido cancelado, pré-operacional, pago, quitado do histórico, com entrega além de 31 dias ou com conta não cancelada (inclusive a paga) não entra na linha. Pagamento parcial entra só com o saldo. Pedido com conta cancelada volta à linha.
+- [ ] L3, borda de fuso: pedido agendado às 21h de Brasília em hoje+30 (já é hoje+31 em UTC) conta como hoje+30 e ENTRA na linha; às 21h de hoje+31 NÃO entra.
 - [ ] L3, pedido antigo (decisão do Felipe, 2026-11-21): pedido operacional sem conta, entregue há 45 dias, total R$ 80,00, sem pagamento, ENTRA na linha com R$ 80,00; o card das contas não muda.
 - [ ] Quitado do histórico (#2813): pedido entregue de R$ 80,00, sem pagamento e sem conta, com `QuitadoHistoricoEm` preenchido pelo import, NÃO entra na linha da L3. No detalhe, aparece como quitado e sem "Registrar pagamento".
 - [ ] `GET /api/financeiro/dashboard` sem os campos novos (API antiga) não quebra o Console: a linha não aparece.
