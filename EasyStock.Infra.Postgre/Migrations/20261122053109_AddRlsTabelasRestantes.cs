@@ -54,8 +54,8 @@ BEGIN
         IF rec.column_name IS NULL THEN
             EXECUTE format($pol$
                 CREATE POLICY tenant_isolation ON %1$I.%2$I
-                    USING (EXISTS (SELECT 1 FROM %1$I.lojas l WHERE l."Id" = "LojaId"))
-                    WITH CHECK (EXISTS (SELECT 1 FROM %1$I.lojas l WHERE l."Id" = "LojaId"))
+                    USING (EXISTS (SELECT 1 FROM %1$I.lojas l WHERE l."Id" = %2$I."LojaId"))
+                    WITH CHECK (EXISTS (SELECT 1 FROM %1$I.lojas l WHERE l."Id" = %2$I."LojaId"))
             $pol$, current_schema(), rec.table_name);
         ELSE
             EXECUTE format($pol$

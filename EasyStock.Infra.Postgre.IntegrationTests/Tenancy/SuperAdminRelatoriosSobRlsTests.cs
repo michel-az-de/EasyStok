@@ -106,8 +106,27 @@ public sealed class SuperAdminRelatoriosSobRlsTests(PostgreSqlDatabaseFixture fi
             usuario);
         var repo = new ReportRunRepository(db);
 
-        (await new CancelReportRunUseCase(repo, usuario, new RowLevelSecurityBypass(db))
-                .ExecuteAsync(new CancelReportRunCommand(deOutraEmpresa.Id)))
+        // Espião no lugar do bypass real: nenhum dos quatro casos de uso pode sequer pedi-lo para quem não é SuperAdmin.
+        var espiao = Substitute.For<EasyStock.Application.Ports.Output.Security.IRowLevelSecurityBypass>();
+        var definicao = Substitute.For<IReportDefinition>();
+        definicao.Key.Returns("vendas.teste");
+        definicao.FormatosSuportados.Returns([ReportFormat.Csv]);
+        var registry = new ReportRegistry([definicao]);
+
+        (await new CancelReportRunUseCase(repo, usuario, espiao).ExecuteAsync(new CancelReportRunCommand(deOutraEmpresa.Id)))
             .Should().BeFalse("a policy esconde a run de outra empresa de quem não é SuperAdmin");
+        (await new GetReportRunUseCase(repo, registry, Substitute.For<IRelatorioDownloadLink>(), usuario, espiao)
+                .ExecuteAsync(new GetReportRunQuery(deOutraEmpresa.Id)))
+            .Should().BeNull("a policy esconde a run de outra empresa");
+        (await new ListMyReportRunsUseCase(repo, registry, usuario, espiao).ExecuteAsync(
+                new ListMyReportRunsQuery(new ReportListFilter())))
+            .Should().BeEmpty("o usuário não tem run na própria empresa");
+        var enfileirar = () => new EnqueueReportRunUseCase(repo, registry, usuario, espiao).ExecuteAsync(
+            new EnqueueReportRunCommand("vendas.teste", "{}", ReportFormat.Csv));
+        await enfileirar.Should().ThrowAsync<UnauthorizedAccessException>();
+
+        espiao.DidNotReceiveWithAnyArgs().Begin();
+        await espiao.DidNotReceiveWithAnyArgs().BeginAsync(default);
+        db.BypassRowLevelSecurity.Should().BeFalse();
     }
 }
