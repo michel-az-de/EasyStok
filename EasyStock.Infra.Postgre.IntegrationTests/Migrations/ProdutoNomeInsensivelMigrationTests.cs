@@ -14,9 +14,22 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Migrations;
 /// produto mais antigo e renomeia os demais, sem apagar nada. Roda em PostgreSQL de verdade.
 /// </summary>
 [Collection("PostgreSqlTestCollection")]
-public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixture)
+public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixture) : IAsyncLifetime
 {
     private const string Migracao = "AddUniqueProdutoNomeInsensivelPorEmpresa";
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    // O banco é da coleção inteira: volta ao topo mesmo quando o teste falha no meio do Down/Up (#3200).
+    public async Task DisposeAsync()
+    {
+        // Limpeza, não teste: sem Docker o teste já foi pulado por Skip.If e não há banco para voltar.
+        if (fixture.IsAvailable)
+        {
+            await using var db = fixture.CreateDbContext();
+            await db.Database.MigrateAsync();
+        }
+    }
 
     [SkippableFact]
     public async Task SobeComColisaoPrevia_RenomeiaOMaisNovo_EPassaARecusarNomeQueSoMudaNaCaixa()
