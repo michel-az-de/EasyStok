@@ -177,6 +177,8 @@ public sealed class AgenteAtendimentoService(
                 await unitOfWork.CommitAsync();
             }, ct);
 
+        // #3149: dicionário gravado que a leitura descarta não some calado (uma linha por turno, sem o conteúdo).
+        if (DicionarioDaLoja.Descartado(configuracao.DicionarioJson)) LogsDoAssistente.DicionarioDescartado(logger, conversaId);
         var system = await GeracaoAgenteAtendimento.MontarSystemTurnoAsync(
             empresaId, configuracao, conversa, cliente, dados.Mensagens, agora, caderno, dossieUseCase, ct);
         var gravacao = new GravacaoSaidaTurno(conversaRepository, unitOfWork, logger, empresaId, dados.Mensagens, agora);

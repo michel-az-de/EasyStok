@@ -12,6 +12,7 @@ public static partial class LogsDoAssistente
     public const int EventoRetomadaDispensada = 31212;
     public const int EventoGuardaBarrou = 31213;
     public const int EventoTurnoInterrompido = 31214;
+    public const int EventoDicionarioDescartado = 31215;
 
     public const string CategoriaValor = "valor sem origem em ferramenta";
     public const string CategoriaOutra = "outro motivo";
@@ -45,6 +46,10 @@ public static partial class LogsDoAssistente
     [LoggerMessage(EventoTurnoInterrompido, LogLevel.Warning,
         "Assistente: turno da conversa {ConversaId} interrompido sem resposta ({Desfecho}).")]
     public static partial void TurnoInterrompido(ILogger logger, Guid conversaId, string desfecho);
+
+    [LoggerMessage(EventoDicionarioDescartado, LogLevel.Warning,
+        "Assistente: dicionário da loja gravado não serve e ficou fora do turno da conversa {ConversaId}.")]
+    public static partial void DicionarioDescartado(ILogger logger, Guid conversaId);
 
     /// <summary>O motivo de valor carrega o número que o modelo escreveu; o log leva só a categoria.</summary>
     public static string CategoriaDaGuarda(string motivo) =>

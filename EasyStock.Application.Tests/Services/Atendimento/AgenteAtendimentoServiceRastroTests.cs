@@ -91,6 +91,30 @@ public partial class AgenteAtendimentoServiceTests
         _log.Linhas.Should().NotContain(l => l.Contains("R$") || l.Contains("lasanha"), "o log não leva trecho da resposta");
     }
 
+    // #3149: dicionário gravado que a leitura descarta não some calado; o log leva o fato, não o conteúdo.
+    [Fact]
+    public async Task Rastro_DicionarioDescartadoLogaAvisoSemOConteudo()
+    {
+        LojaLigada().DefinirDicionario("""[{"termo":"segredo da casa","significado":"linha\nforjada"}]""");
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto("Oi! Como posso ajudar?"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        Avisos.Should().ContainSingle(id => id == LogsDoAssistente.EventoDicionarioDescartado);
+        _log.Linhas.Should().NotContain(l => l.Contains("segredo da casa") || l.Contains("forjada"));
+    }
+
+    [Fact]
+    public async Task Rastro_DicionarioValidoOuAusenteNaoLogaAviso()
+    {
+        LojaLigada().DefinirDicionario(DicionarioDaLoja.Serializar([new("PF", "prato feito do dia")]));
+        _llm.EnviarAsync(Arg.Any<RequisicaoLlm>(), Arg.Any<CancellationToken>()).Returns(Texto("Oi! Como posso ajudar?"));
+
+        await CriarServico().ProcessarTurnoAsync(_empresaId, _conversa.Id, Agora);
+
+        Avisos.Should().NotContain(LogsDoAssistente.EventoDicionarioDescartado);
+    }
+
     [Fact]
     public async Task Rastro_TurnoInterrompidoLogaAviso()
     {
