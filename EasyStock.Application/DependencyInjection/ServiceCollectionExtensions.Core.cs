@@ -92,6 +92,7 @@ public static partial class ServiceCollectionExtensions
             () => sp.GetRequiredService<EasyStock.Application.Ports.Output.Pagamentos.IMercadoPagoClient>()));
         services.AddScoped<EasyStock.Application.Services.Pedidos.ExpiracaoPreferenciaMercadoPago>();
         services.AddScoped<EasyStock.Application.Services.Pedidos.QuitacaoPedido>();
+        services.AddScoped<EasyStock.Application.Services.Pedidos.CanhotoClienteDoApp>(); // #3190: canhoto pelo app
         services.AddScoped<RegistrarPagamentoPedidoUseCase>();
         services.AddScoped<RemoverPagamentoPedidoUseCase>();
         services.AddScoped<EasyStock.Application.UseCases.FinalizarVendaBalcao.FinalizarVendaBalcaoUseCase>();

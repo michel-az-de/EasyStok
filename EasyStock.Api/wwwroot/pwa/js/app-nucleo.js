@@ -6148,6 +6148,36 @@ async function shareCobranca() {
   }
 }
 
+/**
+ * #3190: canhoto da Casa em imagem, mandado pelo WhatsApp do celular da dona. O pedido só existe no ERP depois do
+ * sync (409). No APK vai pelo plugin nativo: navigator.share com arquivo falha calado no WebView (ver o backup).
+ * Fora do APK cai no texto da cobrança. O registro "aberto" só sai depois que o compartilhamento abriu.
+ */
+async function shareCanhotoCliente() {
+  const o = orders.find(x => x.id === currentCobrancaOrderId);
+  if (!o) return;
+  const FS    = window.Capacitor?.Plugins?.Filesystem;
+  const Share = window.Capacitor?.Plugins?.Share;
+  if (!FS || !Share) { showToast('Canhoto em imagem só no app. Segue a mensagem em texto.'); return shareCobranca(); }
+  if (!navigator.onLine) { showToast('O canhoto precisa de internet'); return; }
+  const url = `${calcApiBase()}/api/mobile/pedidos/${encodeURIComponent(o.id)}/canhoto-cliente`;
+  let res;
+  try { res = await fetch(url, { headers: calcAuthHeaders() }); }
+  catch (_) { showToast('Sem conexão com o servidor'); return; }
+  if (res.status === 409) { showToast('Pedido ainda não sincronizou. Sincronize e tente de novo.'); return; }
+  if (!res.ok) { showToast('Canhoto indisponível agora (' + res.status + ')'); return; }
+  try {
+    const base64 = (await blobToDataUrl(await res.blob())).split(',')[1] || '';
+    const written = await FS.writeFile({ path: 'canhoto-pedido.png', data: base64, directory: 'CACHE', recursive: true });
+    await Share.share({ title: 'Canhoto do pedido', text: 'Segue o canhoto do seu pedido. Boa massa!', files: [written.uri], dialogTitle: 'Enviar canhoto' });
+  } catch (e) {
+    // Cancelado no seletor ou falha do plugin: nada foi aberto para a cliente, então não registra.
+    if (e && !/cancel/i.test(String(e.message || e))) showToast('Não deu para abrir o canhoto');
+    return;
+  }
+  fetch(url + '/aberto', { method: 'POST', headers: calcAuthHeaders() }).catch(() => {});
+}
+
 function copyCobranca() {
   const o = orders.find(x => x.id === currentCobrancaOrderId);
   if (!o) return;
