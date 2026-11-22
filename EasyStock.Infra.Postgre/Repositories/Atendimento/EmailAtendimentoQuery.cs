@@ -24,8 +24,14 @@ public sealed class EmailAtendimentoQuery(EasyStockDbContext db) : IEmailAtendim
         if (alvo.Length == 0)
             return null;
 
-        return await db.Clientes.AsNoTracking()
-            .Where(c => c.EmpresaId == empresaId && c.Ativo && c.Email != null && c.Email.ToLower() == alvo)
+        // #3101: compara a coluna gerada email_lower (migração AddClienteEmailLower), do índice
+        // (EmpresaId, email_lower); lower("Email") em LINQ não usa índice sob RLS. Só o Id sai na
+        // projeção: xmin está mapeado em ClienteConfiguration e o SELECT * não o traz, então a
+        // entidade nunca pode ser materializada. O filtro global de tenant vale por cima do FromSql.
+        return await db.Clientes
+            .FromSql($"""SELECT * FROM clientes WHERE "EmpresaId" = {empresaId} AND email_lower = {alvo}""")
+            .AsNoTracking()
+            .Where(c => c.Ativo)
             .OrderBy(c => c.CriadoEm)
             .Select(c => (Guid?)c.Id)
             .FirstOrDefaultAsync(ct);
