@@ -3,6 +3,7 @@ import { useDicionarioDaLoja, useHistoricoAssistente, usePainelAssistente } from
 import { BarraDeAbas } from '../../../componentes/BarraDeAbas'
 import { Botao } from '../../../componentes/Botao'
 import { CampoTexto } from '../../../componentes/Campo'
+import { Chip } from '../../../componentes/Chip'
 import { Pilula } from '../../../componentes/Pilula'
 import {
   cotaDoCampo, cotaParaCampo, desfechoDoTurno, formatarTokens, linhaDoUso, resumoDoUso, semIaDoUso,
@@ -24,7 +25,7 @@ const ABAS = [
 // Quem não administra a loja vê tudo e não muda nada.
 // `abaAntes` ({ id, rotulo, conteudo }): aba extra na frente, aberta primeiro. O modal da conversa (#2855) põe
 // ali a checagem da conversa; as outras abas são as mesmas da Gestão.
-export function PainelAssistente({ podeEditar, abaAntes = null, sinalRecarregar = 0 }) {
+export function PainelAssistente({ podeEditar, abaAntes = null, sinalRecarregar = 0, conversaId = null }) {
   const [aba, setAba] = useState(abaAntes?.id ?? 'uso')
   const painel = usePainelAssistente()
   // #3149: o dicionário só é lido (GET de quem administra) na primeira vez que a aba abre, e não é relido ao voltar.
@@ -53,7 +54,7 @@ export function PainelAssistente({ podeEditar, abaAntes = null, sinalRecarregar 
         {abaAntes && aba === abaAntes.id && abaAntes.conteudo}
         {aba === 'uso' && painel.uso && <AbaUso uso={painel.uso} podeEditar={podeEditar} painel={painel} />}
         {aba === 'fluxo' && painel.fluxo && <AbaFluxo fluxo={painel.fluxo} podeEditar={podeEditar} painel={painel} />}
-        {aba === 'historico' && <AbaHistorico />}
+        {aba === 'historico' && <AbaHistorico conversaId={conversaId} />}
         {aba === 'dicionario' && <AbaDicionario podeEditar={podeEditar} painel={painel} dicionarioDaLoja={dicionarioDaLoja} />}
       </div>
     </section>
@@ -99,15 +100,20 @@ function AbaUso({ uso, podeEditar, painel }) {
   )
 }
 
-function AbaHistorico() {
-  const { carregando, dados, erro, pagina, setPagina } = useHistoricoAssistente(true)
+// #3175: dentro de uma conversa (`conversaId`) o histórico mostra só os turnos dela; "Todas as conversas" abre o da loja.
+function AbaHistorico({ conversaId }) {
+  const [todas, setTodas] = useState(false)
+  const daConversa = conversaId && !todas ? conversaId : null
+  const { carregando, dados, erro, pagina, setPagina } = useHistoricoAssistente(true, daConversa)
   const total = dados?.total ?? 0
   const paginas = Math.max(1, Math.ceil(total / 20))
+  const filtro = conversaId ? <div><Chip ativo={todas} onClick={() => setTodas(!todas)}>Todas as conversas</Chip></div> : null
   if (erro) return <p role="alert" className={css.erro}>Não consegui ler o histórico: {erro}</p>
   if (!dados) return <output className={css.nota}>Carregando…</output>
-  if (total === 0) return <p className={css.nota}>Nenhum turno do Assistente registrado ainda.</p>
+  if (total === 0) return <div className={css.historico}>{filtro}<p className={css.nota}>{daConversa ? 'Nenhum turno nesta conversa.' : 'Nenhum turno do Assistente registrado ainda.'}</p></div>
   return (
     <div className={css.historico} aria-busy={carregando}>
+      {filtro}
       <ul className={css.turnos}>
         {dados.itens.map((t) => {
           const desfecho = desfechoDoTurno(t.desfecho)
