@@ -61,6 +61,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const [duplicado, definirDuplicado] = useState(null)
   const [abrirOutro, confirmarAbrirOutro] = useState(null)
   const buscaDuplicado = useRef(null)
+  const termoBuscado = useRef(null)
   const [avisoDoTelefoneLiberado, liberarAvisoDoTelefone] = useState(false)
   useEffect(() => { montado.current = true; return () => { montado.current = false; leituraAtual.current?.abort(); buscaDuplicado.current?.abort() } }, [])
   const mudar = (campo, valor, manual = true) => {
@@ -69,7 +70,7 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
     if (campo === 'telefone') liberarAvisoDoTelefone(false)
     // Mudar o campo tira o aviso e cancela a busca em voo: resposta velha não avisa.
     definirDuplicado(atual => atual?.campo === campo ? null : atual)
-    if (campo === 'telefone' || campo === 'documento') buscaDuplicado.current?.abort()
+    if (campo === 'telefone' || campo === 'documento') { buscaDuplicado.current?.abort(); termoBuscado.current = null }
     if (manual) revisarFormulario(r => r + 1)
   }
   const sugestao = useSugestaoCadastro({ conversa, revisaoFormulario: `${id ?? 'novo'}:${revisaoManual}`, conversaId: conversa?.id, clienteId: conversa?.clienteId, vinculoRevisao: conversa?.vinculoRevisao, aoAplicar: (campo, valor) => mudar(campo, valor, false) })
@@ -101,26 +102,30 @@ export function EditorCadastro({ tela, editor, aoMudar, contexto, conversa, pode
   const erroDoEmailNovo = tela === 'clientes' && dados.email !== inicial.email ? erroDoEmailDoCadastro(dados.email) : null
   const erroDoDocumentoNovo = tela === 'clientes' && dados.documento !== inicial.documento ? erroDoDocumentoDoCadastro(dados.documento) : null
   const naTela = (campo, valor) => (campo === 'telefone' ? telefoneNaTela(valor) : campo === 'documento' ? documentoNaTela(valor) : String(valor ?? '')) || 'Vazio'
-  const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => mudar('telefone', mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value)} onBlur={() => { conferirDuplicado('telefone'); liberarAvisoDoTelefone(true); if (erroDoTelefoneNovo) definirErros(a => ({ ...a, telefone: erroDoTelefoneNovo })) }} erro={erroDo('telefone')} aviso={avisoDoTelefone ?? undefined} />
-  const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => mudar('documento', mesmoDocumento(e.target.value) ? inicial.documento : e.target.value)} onBlur={() => { conferirDuplicado('documento'); if (erroDoDocumentoNovo) definirErros(a => ({ ...a, documento: erroDoDocumentoNovo })) }} erro={erroDo('documento')} />
+  const telefone = () => <CampoTexto key="telefone" rotulo="Telefone" tipo="tel" inputMode="tel" autoComplete="tel" value={telefoneNaTela(dados.telefone)} onChange={e => { const v = mesmoTelefone(e.target.value) ? inicial.telefone : e.target.value; mudar('telefone', v); conferirDuplicado('telefone', v) }} onBlur={() => { conferirDuplicado('telefone'); liberarAvisoDoTelefone(true); if (erroDoTelefoneNovo) definirErros(a => ({ ...a, telefone: erroDoTelefoneNovo })) }} erro={erroDo('telefone')} aviso={avisoDoTelefone ?? undefined} />
+  const documento = (rotulo) => <CampoTexto key="documento" rotulo={rotulo} obrigatorio={obrigatorio('documento')} value={documentoNaTela(dados.documento)} onChange={e => { const v = mesmoDocumento(e.target.value) ? inicial.documento : e.target.value; mudar('documento', v); conferirDuplicado('documento', v) }} onBlur={() => { conferirDuplicado('documento'); if (erroDoDocumentoNovo) definirErros(a => ({ ...a, documento: erroDoDocumentoNovo })) }} erro={erroDo('documento')} />
   const area = (chave, rotulo) => <div className={css.larguraTotal}><CampoArea rotulo={rotulo} value={dados[chave] ?? ''} onChange={e => mudar(chave, e.target.value)} erro={erroDo(chave)} /></div>
   const selecao = (chave, rotulo, opcoes) => <Combobox rotulo={rotulo} obrigatorio={obrigatorio(chave)} valor={dados[chave]} aoMudar={valor => mudar(chave, valor)} opcoes={opcoes} erro={erros[chave]} disabled={salvando || !podeEditar} />
   const subcategorias = tela === 'produtos' ? subcategoriasDe(categorias, dados.categoriaId) : []
   const dinheiro = (chave, rotulo) => <CampoReais rotulo={rotulo} centavos={dados[chave] == null ? null : Math.round(dados[chave] * 100)} aoMudar={valor => mudar(chave, valor == null ? null : valor / 100)} ler={lerMoeda} erro={erros[chave]} />
 
-  async function conferirDuplicado(chave) {
+  // #3192: também ao digitar (com os dígitos completos): Enter e Salvar não passam pelo blur.
+  async function conferirDuplicado(chave, digitado = dados[chave]) {
     if (tela !== 'clientes' || !podeEditar) return
-    buscaDuplicado.current?.abort()
-    const valor = dados[chave]
+    const valor = digitado
     const termo = termoDeDuplicado(chave, valor)
-    if (!termo) return
+    if (!termo) { termoBuscado.current = null; return }
+    // O blur não repete a busca já feita ao digitar o mesmo número.
+    if (termoBuscado.current === `${chave}:${termo}`) return
+    termoBuscado.current = `${chave}:${termo}`
+    buscaDuplicado.current?.abort()
     const controlador = new AbortController(); buscaDuplicado.current = controlador
     try {
       const itens = await buscarClientesParecidos(termo, contexto, controlador.signal)
       if (controlador.signal.aborted || !montado.current) return
       const [cliente] = duplicadosDoCliente(chave, valor, itens, id)
       definirDuplicado(cliente ? { campo: chave, cliente } : null)
-    } catch { /* O aviso é ajuda: se a busca falhar, o cadastro segue normal. */ }
+    } catch { termoBuscado.current = null /* O aviso é ajuda: se a busca falhar, o cadastro segue normal. */ }
   }
   const pedirAbrirOutro = (cliente) => alterado ? confirmarAbrirOutro(cliente) : aoAbrirCadastro(cliente)
 

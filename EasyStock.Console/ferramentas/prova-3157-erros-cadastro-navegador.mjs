@@ -104,7 +104,11 @@ try {
 
     // 3. Telefone de quem já existe: aviso com o nome, no campo; o Salvar segue possível.
     const telefone = editor.getByRole('textbox', { name: 'Telefone', exact: true })
-    await telefone.fill('(11) 98765-4321'); await telefone.blur()
+    // 3a. #3192: o aviso aparece ao digitar, com o foco ainda no campo (Enter e Salvar não passam pelo blur).
+    await telefone.fill('(11) 98765-4321')
+    await editor.getByRole('status').filter({ hasText: 'Já existe Mariana Lopes Teste com este telefone' }).waitFor()
+    assert.equal(await telefone.evaluate(el => el === document.activeElement), true, 'O aviso veio sem sair do campo')
+    await telefone.blur()
     await editor.getByRole('status').filter({ hasText: 'Já existe Mariana Lopes Teste com este telefone' }).waitFor()
     await editor.getByRole('button', { name: 'Abrir cadastro de Mariana Lopes Teste' }).waitFor()
     assert.equal(await telefone.getAttribute('aria-invalid'), null, 'Duplicado avisa, não marca erro')
