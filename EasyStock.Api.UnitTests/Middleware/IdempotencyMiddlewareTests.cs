@@ -30,6 +30,7 @@ public class IdempotencyMiddlewareTests
 
     private static (IdempotencyMiddleware mw, HttpContext ctx, IIdempotencyKeyRepository repo, int[] called) Setup(
         Guid? empresaId = null,
+        Guid? usuarioId = null,
         string? idempotencyKey = DefaultKey,
         string path = DefaultPath,
         string body = DefaultBody,
@@ -51,6 +52,7 @@ public class IdempotencyMiddlewareTests
         var services = new ServiceCollection();
         var user = Substitute.For<ICurrentUserAccessor>();
         user.EmpresaId.Returns(empresaId ?? Guid.NewGuid());
+        if (usuarioId is not null) user.UsuarioId.Returns(usuarioId.Value);
         services.AddSingleton(user);
         services.AddSingleton(repo);
         var ctx = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
@@ -255,6 +257,46 @@ public class IdempotencyMiddlewareTests
 
         called[0].Should().Be(0);
         ctx.Response.StatusCode.Should().Be(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task Usuarios_diferentes_da_mesma_empresa_com_a_mesma_chave_nao_dividem_o_escopo()
+    {
+        // #3094: a chave e escopada por empresa+recurso; sem o usuario, B receberia o replay da resposta de A.
+        var empresaId = Guid.NewGuid();
+        var (mwA, ctxA, repoA, _) = Setup(empresaId: empresaId, usuarioId: Guid.NewGuid());
+        var (mwB, ctxB, repoB, _) = Setup(empresaId: empresaId, usuarioId: Guid.NewGuid());
+        string? escopoA = null, escopoB = null;
+        repoA.TryBeginAsync(DefaultKey, empresaId, Arg.Do<string>(m => escopoA = m), Arg.Any<string?>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(c => (IdempotencyKey.CriarPendente(DefaultKey, empresaId, c.ArgAt<string>(2), null, TimeSpan.FromHours(24)), true));
+        repoB.TryBeginAsync(DefaultKey, empresaId, Arg.Do<string>(m => escopoB = m), Arg.Any<string?>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(c => (IdempotencyKey.CriarPendente(DefaultKey, empresaId, c.ArgAt<string>(2), null, TimeSpan.FromHours(24)), true));
+
+        await mwA.InvokeAsync(ctxA);
+        await mwB.InvokeAsync(ctxB);
+
+        escopoA.Should().NotBeNull();
+        escopoB.Should().NotBeNull();
+        escopoA.Should().NotBe(escopoB);
+    }
+
+    [Fact]
+    public async Task Concluido_com_hash_nulo_do_corpo_grande_retorna_422_em_vez_de_replay()
+    {
+        // #3094: corpo acima de 256 KB nao tem hash; sem como provar que e o mesmo corpo, nao ha replay.
+        var empresaId = Guid.NewGuid();
+        var (mw, ctx, repo, called) = Setup(empresaId: empresaId);
+        ctx.Request.ContentLength = 300 * 1024;
+        var entry = IdempotencyKey.CriarPendente(DefaultKey, empresaId, $"POST {DefaultPath}", null, TimeSpan.FromHours(24));
+        entry.MarcarConcluido(201, "{\"cached\":true}", DateTime.UtcNow);
+        repo.TryBeginAsync(DefaultKey, empresaId, $"POST {DefaultPath}", null, Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns((entry, false));
+
+        await mw.InvokeAsync(ctx);
+
+        called[0].Should().Be(0);
+        ctx.Response.StatusCode.Should().Be(StatusCodes.Status422UnprocessableEntity);
+        ctx.Response.Headers.ContainsKey("X-Idempotent-Replay").Should().BeFalse();
     }
 
     [Fact]
