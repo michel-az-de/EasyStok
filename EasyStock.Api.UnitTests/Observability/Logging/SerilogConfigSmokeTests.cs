@@ -47,6 +47,24 @@ public class SerilogConfigSmokeTests
             "ao menos um sink RedactedFile precisa proteger logs at-rest");
     }
 
+    // #3175: o console é o log do contêiner em produção. Sem a correlação no template, as linhas de um turno do
+    // Assistente não se juntam. {Properties} fica de fora: despejaria tudo o que o escopo carrega.
+    [Theory]
+    [InlineData("appsettings.json")]
+    [InlineData("appsettings.Production.json")]
+    public void Console_ImprimeACorrelacaoDoTurno(string arquivo)
+    {
+        var path = Path.Combine(Path.GetDirectoryName(LocateAppSettingsJson())!, arquivo);
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+
+        var template = doc.RootElement.GetProperty("Serilog").GetProperty("WriteTo").EnumerateArray()
+            .Single(w => w.GetProperty("Name").GetString() == "Redigido")
+            .GetProperty("Args").GetProperty("configure")[0]
+            .GetProperty("Args").GetProperty("outputTemplate").GetString();
+
+        template.Should().Contain("{TurnoCorrelacao}").And.Contain("{ConversaId}").And.NotContain("{Properties");
+    }
+
     private static string LocateAppSettingsJson()
     {
         // Test bin -> volta ate achar EasyStock.Api/appsettings.json
