@@ -266,6 +266,8 @@ public class GlobalExceptionHandler(
             "O caixa deste dia/loja já foi aberto por outra operação. Recarregue a tela antes de tentar de novo.",
         "ux_viagem_paradas_pedido_ativo" =>
             "Pedido já está em outra viagem. Recarregue as viagens antes de tentar de novo.",
+        "uq_produtos_empresa_nome_lower" =>
+            "Já existe um produto com esse nome. Maiúsculas e minúsculas não diferenciam o nome.",
         _ => "Já existe um registro com esses dados (SKU, email, documento ou outro campo único).",
     };
 
