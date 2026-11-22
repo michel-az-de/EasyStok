@@ -166,7 +166,7 @@ public class WebhookGatewayController(
                 && ChaveMercadoPagoAssinada(root, headers) is { } chaveMp)
                 return chaveMp;
 
-            // Padrao 1: {"id": "evt_..."} (Stripe) ou {"id": 123456789} (Mercado Pago) no root
+            // Padrao 1: {"id": "evt_..."} (Stripe) no root; Mercado Pago so cai aqui sem os headers assinados (dev/sandbox)
             if (root.ValueKind == System.Text.Json.JsonValueKind.Object
                 && root.TryGetProperty("id", out var idEl))
             {
@@ -191,9 +191,10 @@ public class WebhookGatewayController(
         var dataId = idEl.ValueKind == System.Text.Json.JsonValueKind.String ? idEl.GetString() : idEl.ToString();
         headers.TryGetValue("x-request-id", out var requestId);
         headers.TryGetValue("x-signature", out var assinatura);
+        // Ultimo ts, como o MercadoPagoSignatureValidator (o loop dele sobrescreve): um ts extra na frente nao gera chave nova.
         var ts = assinatura?.Split(',')
             .Select(p => p.Split('=', 2))
-            .FirstOrDefault(p => p.Length == 2 && p[0].Trim() == "ts")?[1].Trim();
+            .LastOrDefault(p => p.Length == 2 && p[0].Trim() == "ts")?[1].Trim();
         if (string.IsNullOrWhiteSpace(dataId) || string.IsNullOrWhiteSpace(requestId) || string.IsNullOrWhiteSpace(ts)) return null;
 
         // request-id vem de header sem teto proprio; o hash mantem a chave dentro dos 200 caracteres da coluna.

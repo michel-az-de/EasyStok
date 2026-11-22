@@ -85,7 +85,7 @@ public class WebhookGatewayControllerTests
 
     private static WebhookGatewayController ControllerMercadoPago(
         MercadoPagoWebhookFixture f, IWebhookRecebidoRepository repo, string corpo, string? assinatura = null,
-        string? ts = null, string requestId = "req-1")
+        string? ts = null, string requestId = "req-1", string prefixoAssinatura = "")
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -104,7 +104,7 @@ public class WebhookGatewayControllerTests
 
         var ctx = new DefaultHttpContext();
         ctx.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(corpo));
-        ctx.Request.Headers["x-signature"] = $"ts={ts},v1={v1}";
+        ctx.Request.Headers["x-signature"] = $"{prefixoAssinatura}ts={ts},v1={v1}";
         ctx.Request.Headers["x-request-id"] = requestId;
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
         return controller;
@@ -167,6 +167,23 @@ public class WebhookGatewayControllerTests
 
         var primeiro = await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(111), ts: ts).Receber("mercadopago");
         var replay = await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(222), ts: ts).Receber("mercadopago");
+
+        primeiro.Should().BeOfType<OkResult>();
+        replay.Should().BeOfType<OkResult>();
+        await f.MpClient.Received(1).ConsultarPagamentoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    // #3095 (revisao): o validador usa o ULTIMO ts do x-signature; um ts extra na frente nao pode gerar chave nova.
+    [Fact]
+    public async Task MercadoPagoReplayComTsExtraNaAssinaturaEDuplicado()
+    {
+        var f = new MercadoPagoWebhookFixture();
+        f.PagamentoNaFonte("approved", 25m);
+        var repo = RepoComUnique();
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        var primeiro = await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(111), ts: ts).Receber("mercadopago");
+        var replay = await ControllerMercadoPago(f, repo, CorpoComIdDeRaiz(111), ts: ts, prefixoAssinatura: "ts=1,").Receber("mercadopago");
 
         primeiro.Should().BeOfType<OkResult>();
         replay.Should().BeOfType<OkResult>();
