@@ -105,7 +105,9 @@ public sealed class QuitacaoPedido(
             pedido.ClienteNome, pedido.Total.Valor, pedido.AgendadoParaEm), await PrepararCanhotoAsync(pedido, agora, ct));
     }
 
-    public async Task<ImpressaoPendenteOperacao?> PrepararCanhotoAsync(Pedido pedido, DateTime agora, CancellationToken ct)
+    /// <param name="aReceber">#3002: quanto falta receber quando o pedido entra na fila sem pagar; zero é quitado.</param>
+    public async Task<ImpressaoPendenteOperacao?> PrepararCanhotoAsync(
+        Pedido pedido, DateTime agora, CancellationToken ct, decimal aReceber = 0m)
     {
         if (await impressoes.ExisteCanhotoAsync(pedido.EmpresaId, pedido.Id, ct)) return null;
         var canhoto = ImpressaoPendente.CriarCanhoto(pedido.EmpresaId, pedido.LojaId, pedido.Id, agora);
@@ -113,7 +115,7 @@ public sealed class QuitacaoPedido(
         // #2211: todo pedido com canhoto avisa a equipe inscrita, com o canhoto em imagem.
         if (notificador is not null)
             await new PublicadorAvisoEquipe(notificador).PedidoComCanhotoAsync(
-                pedido.EmpresaId, pedido.Id, pedido.ClienteNome, pedido.Total.Valor, ct);
+                pedido.EmpresaId, pedido.Id, pedido.ClienteNome, pedido.Total.Valor, ct, aReceber);
         return new(canhoto.Id, pedido.Id);
     }
 

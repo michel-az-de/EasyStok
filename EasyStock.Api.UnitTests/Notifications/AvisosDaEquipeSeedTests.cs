@@ -67,4 +67,30 @@ public class AvisosDaEquipeSeedTests
 
         corpo.Should().Contain(esperado1).And.Contain(esperado2).And.NotContain("{{");
     }
+
+    [Theory]
+    [InlineData(null, "Pedido AB12CD34 pago: Marina, R$ 27,00.", "aviso_equipe_pedido", "R$ 27,00")]
+    [InlineData("R$ 20,00", "Pedido AB12CD34 na fila, a receber R$ 20,00: Marina, R$ 27,00.", "aviso_equipe_pedido_a_receber", "R$ 20,00")]
+    public async Task AvisoDoPedidoSoDizPagoQuandoNadaFaltaReceber(string? aReceber, string texto, string modelo, string param3)
+    {
+        // #3002: o pedido que só entrou na fila (Pix direto, na entrega) saía como "pago".
+        var template = NotificacoesGlobaisSeed.BuildDefaultTemplates()
+            .Single(t => t.Codigo == AvisosDaEquipe.PedidoComCanhoto.TemplateCodigo);
+        var vars = new Dictionary<string, object?>
+        {
+            ["numero"] = "AB12CD34", ["cliente"] = "Marina", ["total"] = "R$ 27,00",
+        };
+        // Quitado, a chave não vem: nula viraria texto vazio, que o Scriban lê como verdadeiro.
+        if (aReceber is not null) vars["aReceber"] = aReceber;
+        IRendererTemplate renderer = new ScribanRenderer(NullLogger<ScribanRenderer>.Instance);
+
+        var corpo = await renderer.RenderizarAsync(template.CorpoTemplate, vars);
+        var metadados = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(template.MetadadosJson!)!;
+
+        corpo.Should().StartWith(texto);
+        if (aReceber is not null) corpo.Should().NotContain("pago");
+        (await renderer.RenderizarAsync(metadados["template"], vars)).Should().Be(modelo);
+        (await renderer.RenderizarAsync(metadados["param3"], vars)).Should().Be(param3);
+        template.Versao.Should().BeGreaterThan(1, "o seed só republica o template quando a versão sobe");
+    }
 }
