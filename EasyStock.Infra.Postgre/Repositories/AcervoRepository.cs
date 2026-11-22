@@ -10,7 +10,7 @@ public sealed class AcervoRepository(EasyStockDbContext db) : IAcervoRepository
     public async Task<IReadOnlyList<AcervoImagem>> BuscarAsync(Guid empresaId, int pagina, string busca, string origem, string formato, string natureza, Guid? itemId, string canal, CancellationToken ct)
     {
         var q = db.Set<AcervoImagem>().Where(x => x.EmpresaId == empresaId);
-        if (busca.Length > 0) q = q.Where(x => x.Titulo.ToLower().Contains(busca.ToLower()));
+        if (busca.Length > 0) q = q.Where(x => EF.Functions.ILike(x.Titulo, PadraoILike.Contendo(busca), PadraoILike.Escape));
         if (origem.Length > 0) q = q.Where(x => x.Origem == origem);
         if (formato.Length > 0) q = q.Where(x => x.Formato == formato);
         if (natureza.Length > 0) q = q.Where(x => x.Natureza == natureza);

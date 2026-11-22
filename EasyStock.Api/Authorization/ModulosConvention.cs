@@ -23,7 +23,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         "Mobile.MobileCash", "Mobile.MobileClients", "Mobile.MobileDiagnostics", "Mobile.MobileDiagTrace",
         "Mobile.MobileEstoque", "Mobile.MobileOrders", "Mobile.MobileProducts", "Mobile.MobileQuickReports",
         "Mobile.MobileVendas", "Mobile.MobileVersion", "Mobile.Operation", "Mobile.Sync", "Mobile.LegacySnapshot",
-        "Mobile.PushReceipts", "Mobile.MobileImpressao", "Mobile.LegacyCashClosings"
+        "Mobile.PushReceipts", "Mobile.MobileImpressao", "Mobile.LegacyCashClosings", "Mobile.MobileCanhotoCliente"
     ];
     private static readonly HashSet<string> Bastidor =
     [
@@ -120,7 +120,7 @@ public sealed class ModulosConvention : IApplicationModelConvention
         Associar(Modulo.Caixa, "Caixa", "Venda");
         Associar(Modulo.Campanhas, "Campanhas", "CampanhasSugestoes");
         Associar(Modulo.Configuracoes, "Usuario", "Configuracoes", "Loja", "LojaImpressao", "LojaPix", "NotificacoesConfiguracao",
-            "Integracoes", "IntegracoesWhatsApp", "IntegracoesWppConnect", "IntegracoesEmail", "Storefront.StorefrontConfiguracao");
+            "Integracoes", "IntegracoesWhatsApp", "IntegracoesWppConnect", "IntegracoesEmail", "Storefront.StorefrontConfiguracao", "ConfiguracaoInicial");
         Associar(Modulo.Entregas, "AtendimentoEntregadores", "AtendimentoViagens", "AtendimentoAgenda", "AtendimentoRelatoriosEntrega", "AtendimentoCorridas", "AtendimentoRelatorioCustoDeEntrega",
             "Storefront.TenantVitrineEntrega");
         mapa.Add("Storefront.AprovacaoPedido", [Modulo.Atendimento, Modulo.Entregas]);

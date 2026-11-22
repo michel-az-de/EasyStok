@@ -14,9 +14,22 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Migrations;
 /// produto mais antigo e renomeia os demais, sem apagar nada. Roda em PostgreSQL de verdade.
 /// </summary>
 [Collection("PostgreSqlTestCollection")]
-public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixture)
+public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixture) : IAsyncLifetime
 {
     private const string Migracao = "AddUniqueProdutoNomeInsensivelPorEmpresa";
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    // O banco é da coleção inteira: volta ao topo mesmo quando o teste falha no meio do Down/Up (#3200).
+    public async Task DisposeAsync()
+    {
+        // Limpeza, não teste: sem Docker o teste já foi pulado por Skip.If e não há banco para voltar.
+        if (fixture.IsAvailable)
+        {
+            await using var db = fixture.CreateDbContext();
+            await db.Database.MigrateAsync();
+        }
+    }
 
     [SkippableFact]
     public async Task SobeComColisaoPrevia_RenomeiaOMaisNovo_EPassaARecusarNomeQueSoMudaNaCaixa()
@@ -41,7 +54,7 @@ public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixtu
 
             // Banco de antes: o índice antigo diferencia caixa, então os dois nomes coexistem.
             db.SetMobileTenantContext(empresaId);
-            db.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Colisao", Documento = empresaId.ToString("N")[..14], CriadoEm = antes, AlteradoEm = antes });
+            await InserirEmpresaAsync(db, empresaId, "Empresa Colisao", antes);
             db.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Limpeza", CriadoEm = antes, AlteradoEm = antes });
             db.Produtos.Add(NovoProduto(antigoId, empresaId, categoriaId, "Vassoura", antes));
             db.Produtos.Add(NovoProduto(novoId, empresaId, categoriaId, "vassoura", antes.AddDays(1)));
@@ -50,7 +63,7 @@ public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixtu
             // Outra empresa com o mesmo nome: a unicidade e o dedup sao por empresa.
             db.ChangeTracker.Clear();
             db.SetMobileTenantContext(outraEmpresaId);
-            db.Empresas.Add(new Empresa { Id = outraEmpresaId, Nome = "Outra Empresa", Documento = outraEmpresaId.ToString("N")[..14], CriadoEm = antes, AlteradoEm = antes });
+            await InserirEmpresaAsync(db, outraEmpresaId, "Outra Empresa", antes);
             db.Categorias.Add(new Categoria { Id = outraCategoriaId, EmpresaId = outraEmpresaId, Nome = "Limpeza", CriadoEm = antes, AlteradoEm = antes });
             db.Produtos.Add(NovoProduto(daOutraEmpresaId, outraEmpresaId, outraCategoriaId, "VASSOURA", antes.AddDays(1)));
             await db.SaveChangesAsync();
@@ -123,7 +136,7 @@ public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixtu
             await migrator.MigrateAsync(migracoes[migracoes.IndexOf(alvo) - 1]);
 
             db.SetMobileTenantContext(empresaId);
-            db.Empresas.Add(new Empresa { Id = empresaId, Nome = "Empresa Tres", Documento = empresaId.ToString("N")[..14], CriadoEm = antes, AlteradoEm = antes });
+            await InserirEmpresaAsync(db, empresaId, "Empresa Tres", antes);
             db.Categorias.Add(new Categoria { Id = categoriaId, EmpresaId = empresaId, Nome = "Doces", CriadoEm = antes, AlteradoEm = antes });
             db.Produtos.Add(NovoProduto(inativoAntigoId, empresaId, categoriaId, "Bolo", antes, StatusProduto.Inativo));
             db.Produtos.Add(NovoProduto(ativoId, empresaId, categoriaId, "bolo", antes.AddDays(1)));
@@ -149,6 +162,19 @@ public class ProdutoNomeInsensivelMigrationTests(PostgreSqlDatabaseFixture fixtu
             nomes[longoNovoId].Should().Be($"{new string('N', 160)} (dup {longoNovoId.ToString()[..8]})", "o nome é cortado para caber em 180");
             await leitura.Database.MigrateAsync();
         }
+    }
+
+    /// <summary>
+    /// A empresa entra por SQL com as colunas do esquema antigo: o modelo atual tem colunas mais novas (#3179:
+    /// configuração inicial em <c>empresas</c>) que o banco descido até antes da migração ainda não tem.
+    /// </summary>
+    private static Task InserirEmpresaAsync(DbContext db, Guid id, string nome, DateTime em)
+    {
+        var documento = id.ToString("N")[..14];
+        return db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO empresas ("Id", "Nome", "Documento", "CriadoEm", "AlteradoEm", "FinanceiroHabilitado", "OnboardingCompleto")
+            VALUES ({id}, {nome}, {documento}, {em}, {em}, false, false)
+            """);
     }
 
     private static Produto NovoProduto(Guid id, Guid empresaId, Guid categoriaId, string nome, DateTime criadoEm, StatusProduto status = StatusProduto.Ativo) => new()
