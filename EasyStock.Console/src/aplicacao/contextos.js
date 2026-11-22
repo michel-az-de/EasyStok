@@ -16,3 +16,5 @@ function useContexto(contexto, nome) {
 export const useAtendimento = () => useContexto(ContextoEstado, 'useAtendimento')
 export const useAcoes = () => useContexto(ContextoAcoes, 'useAcoes')
 export const useCatalogo = () => useContexto(ContextoCatalogo, 'useCatalogo')
+// #3154: para quem funciona com ou sem o catálogo (provas de Cadastros montam só estado e ações).
+export const useCatalogoOpcional = () => useContext(ContextoCatalogo)

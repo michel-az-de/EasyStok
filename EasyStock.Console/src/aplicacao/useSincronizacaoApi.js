@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as acao from './acoes'
 import { lerAlertasDeEstoque, lerCardapio } from './api/cardapio'
-import { abaVisivel, alvoDoEvento, avisoDoCardapio, criarRastroDaConexao, deveVarrerAoVoltar } from './planoDeSincronizacao'
+import { abaVisivel, alvoDoEvento, avisoDoCardapio, criarRastroDaConexao, deveVarrerAoVoltar, lojaDesligada } from './planoDeSincronizacao'
 import { criarCicloDeSincronizacao, criarMemoriaDoLaco } from './cicloDeSincronizacao'
 import { conectarEventosOperacao } from '../infra/api/eventosOperacao'
 import { criarEsperaDeReconexao } from './recargaAoVivo'
@@ -82,7 +82,8 @@ export function useSincronizacaoApi({
         if (!vivo) return
         avisouCardapio = true
         despachar({ tipo: acao.AVISO_API, mensagem: avisoDoCardapio(erro), persistente: true })
-        despachar({ tipo: acao.CARDAPIO_INDISPONIVEL, mensagem: avisoDoCardapio(erro) })
+        // #3154: a janela e o botão Novo pedido decidem pelo código (#2598), não pelo texto do aviso.
+        despachar({ tipo: acao.CARDAPIO_INDISPONIVEL, mensagem: avisoDoCardapio(erro), lojaDesligada: lojaDesligada(erro) })
       }
       if (!comDesacertosRef.current) return
       const alertas = await lerAlertasDeEstoque()

@@ -114,10 +114,13 @@ export const deveCarregarDossie = (conversa) => Boolean(conversa?.clienteId && !
 // #2598: a API diz pelo código, nunca pela mensagem. A escrita responde 404 VITRINE_DESLIGADA e a leitura 200 vazio com
 // meta.lojaDisponivel=false, que `lerDaLoja` (infra/api/cliente) transforma no mesmo erro.
 export const lojaDesligada = (erro) => erro?.codigo === 'VITRINE_DESLIGADA'
+// #3154: diz quem liga (o suporte do EasyStok, como Cardápio e Produção já dizem), sem o termo interno "vitrine", e
+// cabe na faixa fixa do rodapé na altura do texto antigo.
+export const AVISO_LOJA_DESLIGADA = 'Loja online desligada: sem cardápio. Peça ao suporte do EasyStok para ligar.'
 
 export function avisoDoCardapio(erro) {
   if (lojaDesligada(erro)) {
-    return 'A loja online está desligada: o cardápio não carrega até ligar a vitrine.'
+    return AVISO_LOJA_DESLIGADA
   }
   return `Cardápio: ${erro?.message ?? 'não carregou.'}`
 }

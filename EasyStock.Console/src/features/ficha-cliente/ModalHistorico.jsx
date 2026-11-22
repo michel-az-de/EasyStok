@@ -49,7 +49,7 @@ function AbaPedidos({ historico, pedidosAnteriores, aberta, clienteId = null, no
   if (historico.length === 0) {
     // #2944 (E1-14): o vazio da Ficha diz o que fazer e já traz o botão.
     const acao = !aberta && comAcao
-      ? <Botao variante="primario" disabled={Boolean(novoPedido.abrindo)} onClick={() => novoPedido.iniciar(clienteId, { nome })}>Novo pedido</Botao>
+      ? <Botao variante="primario" disabled={Boolean(novoPedido.abrindo || novoPedido.motivo)} motivo={novoPedido.motivo ?? undefined} onClick={() => novoPedido.iniciar(clienteId, { nome })}>Novo pedido</Botao>
       : null
     return (
       <Vazio acao={acao} titulo={aberta ? textoDaComandaAberta(aberta) : `Nenhum pedido ainda${comAcao ? '. Use Novo pedido para começar.' : ''}`}>
