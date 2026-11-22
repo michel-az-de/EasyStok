@@ -93,7 +93,7 @@ try {
   await modal.waitFor()
   await modal.getByRole('tab', { name: 'Esta conversa' }).waitFor()
   const abas = (await modal.getByRole('tab').allInnerTexts()).map(t => t.trim())
-  assert.deepEqual(abas, ['Esta conversa', 'Uso e cota', 'Fluxo', 'Histórico'], 'abas do painel dentro do modal')
+  assert.deepEqual(abas, ['Esta conversa', 'Uso e cota', 'Fluxo', 'Histórico', 'Dicionário'], 'abas do painel dentro do modal')
   assert.equal(await modal.getByRole('tab', { name: 'Esta conversa' }).getAttribute('aria-selected'), 'true', 'abre na conversa')
 
   // Esta conversa: veredito, chave da loja e só as etapas que barram; o resto fica recolhido.
