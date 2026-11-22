@@ -64,22 +64,24 @@ public sealed class TurnoAgentePostgresTests(PostgreSqlDatabaseFixture fixture)
     }
 
     [SkippableFact]
-    public async Task Soma_nao_conta_turno_de_portao_como_sem_preco()
+    public async Task Soma_do_uso_deixa_de_fora_o_turno_de_portao()
     {
-        // #3175: turno de portão não chama o modelo; sem custo ali não é "falta de preço do modelo".
+        // #3175: turno de portão não chama o modelo. No uso do mês ele não é turno nem "falta de preço": se entrasse só
+        // num dos dois, a tela deixaria de avisar que o modelo está sem preço. Motivo que não é de portão continua contando.
         Skip.If(!fixture.IsAvailable, fixture.UnavailableReason ?? "PostgreSQL indisponível");
         var empresa = Guid.NewGuid(); var conversa = Guid.NewGuid();
         var em = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc);
         await Gravar(empresa,
             Turno(empresa, conversa, em, 100, 20, 0, null, DesfechoTurnoAgente.Respondeu),
+            TurnoAgente.Registrar(empresa, conversa, null, null, "claude-sonnet-5", 100, 20, 0, null, [], 1, DesfechoTurnoAgente.Escalou, 0, em, "guarda:outro"),
             TurnoAgente.Registrar(empresa, conversa, null, null, null, 0, 0, 0, null, [], 0, DesfechoTurnoAgente.Escalou, 0, em, "portao:chave"),
             TurnoAgente.Registrar(empresa, conversa, null, null, null, 0, 0, 0, null, [], 0, DesfechoTurnoAgente.Cota, 0, em, "portao:cota"));
 
         await using var db = fixture.CreateDbContext(); db.SetMobileTenantContext(empresa);
         var soma = await new TurnoAgenteRepository(db).SomarAsync(empresa, InicioOutubroUtc, FimOutubroUtc);
 
-        soma.Turnos.Should().Be(3);
-        soma.TurnosSemPreco.Should().Be(1, "só o turno que chamou o modelo e ficou sem custo");
+        soma.Turnos.Should().Be(2, "os dois que chamaram o modelo");
+        soma.TurnosSemPreco.Should().Be(2, "sem preço é todo turno contado: a tela compara os dois números");
     }
 
     [SkippableFact]
