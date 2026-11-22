@@ -43,6 +43,9 @@ public sealed class WebhookRecebidoRepository(EasyStockDbContext db) : IWebhookR
             .Where(w => w.Provedor == provedor && w.EventIdExterno.StartsWith(prefixoEventId))
             .MaxAsync(w => (DateTime?)w.RecebidoEm, ct);
 
+    public Task<int> ExpurgarAsync(string provedor, DateTime antesDe, CancellationToken ct = default) =>
+        db.WebhookRecebidos.Where(w => w.Provedor == provedor && w.RecebidoEm < antesDe).ExecuteDeleteAsync(ct);
+
     public async Task MarcarProcessadoAsync(Guid id, bool sucesso, string? erro = null, CancellationToken ct = default)
     {
         // Falhou: o que o processamento deixou rastreado pertence a uma transação revertida. Sem descartar, o

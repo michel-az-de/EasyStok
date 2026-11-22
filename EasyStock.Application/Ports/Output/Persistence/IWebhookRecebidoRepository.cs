@@ -36,6 +36,12 @@ public interface IWebhookRecebidoRepository
     Task<DateTime?> UltimoRecebidoEmAsync(string provedor, string prefixoEventId, CancellationToken ct = default);
 
     /// <summary>
+    /// Apaga os registros do provedor recebidos antes do instante dado e devolve quantos saíram (#3138). Só para
+    /// provedor cujo registro não é idempotência de processamento: apagar esta última reabre o reprocessamento.
+    /// </summary>
+    Task<int> ExpurgarAsync(string provedor, DateTime antesDe, CancellationToken ct = default);
+
+    /// <summary>
     /// Marca processamento concluido (sucesso ou falha). Na falha, descarta antes as alteracoes pendentes do
     /// contexto: o processamento nao confirmou e nada dele pode ser gravado junto com a marca (#1562).
     /// </summary>

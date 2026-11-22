@@ -330,6 +330,8 @@ namespace EasyStock.Infra.Postgre.DependencyInjection
             services.TryAddScoped<PostgresAdvisoryLock>();
             // F10-B: Retention service — limpa entity_alteracoes antigas (1x/dia).
             services.AddHostedService<EntityAlteracaoRetentionService>();
+            // #3138: apaga a marca de entrega da ponte WPPConnect com mais de 7 dias (1x/dia).
+            services.AddHostedService<MarcaEntregaWppConnectRetentionService>();
             // F10-D: Mobile alert service — verifica devices offline a cada 30min.
             services.AddHostedService<MobileAlertService>();
             // ADR-0014: cancela pedidos Storefront em AguardandoPagamento há > 30 min.

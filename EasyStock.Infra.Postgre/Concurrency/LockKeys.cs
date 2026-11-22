@@ -75,6 +75,13 @@ public static class LockKeys
     public const long RetencaoAuditoria = 0x4175_6452_6574_6500L;
 
     /// <summary>
+    /// Expurgo da marca de entrega da ponte WPPConnect em <c>webhook_recebidos</c>
+    /// (MarcaEntregaWppConnectRetentionService, #3138), 1x/dia. API e Worker registram o serviço: uma rodada por vez.
+    /// "WppMarc" em hex ASCII.
+    /// </summary>
+    public const long RetencaoMarcaEntregaWppConnect = 0x5770_704D_6172_6300L;
+
+    /// <summary>
     /// Alerta de aparelho sem sinal (MobileAlertService), a cada 30 min. API e Worker registram o serviço
     /// (#1575): uma rodada por vez. "MobAler" em hex ASCII.
     /// </summary>
