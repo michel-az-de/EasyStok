@@ -6168,7 +6168,7 @@ async function shareCanhotoCliente() {
   if (!res.ok) { showToast('Canhoto indisponível agora (' + res.status + ')'); return; }
   try {
     const base64 = (await blobToDataUrl(await res.blob())).split(',')[1] || '';
-    const written = await FS.writeFile({ path: 'canhoto-pedido.png', data: base64, directory: 'CACHE', recursive: true });
+    const written = await FS.writeFile({ path: 'canhoto-' + String(o.id).replace(/[^\w-]/g, '') + '.png', data: base64, directory: 'CACHE', recursive: true });
     await Share.share({ title: 'Canhoto do pedido', text: 'Segue o canhoto do seu pedido. Boa massa!', files: [written.uri], dialogTitle: 'Enviar canhoto' });
   } catch (e) {
     // Cancelado no seletor ou falha do plugin: nada foi aberto para a cliente, então não registra.

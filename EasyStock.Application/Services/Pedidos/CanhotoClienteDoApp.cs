@@ -56,6 +56,11 @@ public sealed class CanhotoClienteDoApp(
     {
         if (string.IsNullOrWhiteSpace(mobileOrderId)) return null;
         var achado = await pedidos.FindByMobileOrderIdAsync(empresaId, mobileOrderId);
-        return achado is null || achado.EmpresaId != empresaId ? null : await pedidos.GetByIdWithDetailsAsync(empresaId, achado.Id);
+        if (achado is not null)
+            return achado.EmpresaId != empresaId ? null : await pedidos.GetByIdWithDetailsAsync(empresaId, achado.Id);
+        // Pedido da vitrine ou do Assistente desce ao app com o id do ERP e sem id do app.
+        if (!Guid.TryParse(mobileOrderId, out var pedidoId)) return null;
+        var doErp = await pedidos.GetByIdWithDetailsAsync(empresaId, pedidoId);
+        return doErp is not null && doErp.EmpresaId == empresaId && string.IsNullOrEmpty(doErp.MobileOrderId) ? doErp : null;
     }
 }

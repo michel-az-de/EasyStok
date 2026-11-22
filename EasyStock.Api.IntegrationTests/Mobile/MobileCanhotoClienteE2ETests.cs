@@ -80,13 +80,26 @@ public class MobileCanhotoClienteE2ETests(MobileE2EFixture fixture)
             .Should().Be(1, "o evento mede a intenção de compartilhar, uma vez por pedido");
     }
 
-    private async Task<(string MobileOrderId, Guid PedidoId)> SeedPedidoAsync(Guid empresaId, Guid lojaId)
+    [SkippableFact]
+    public async Task PedidoDaVitrine_SemIdDoApp_AchaPeloIdDoErp()
+    {
+        Skip.If(!fixture.IsAvailable, "Docker/PostgreSQL unavailable");
+        var (empresaId, lojaId) = await fixture.SeedEmpresaELojaAsync();
+        var aparelho = await fixture.SeedMobileDeviceAsync(empresaId, lojaId);
+        var (_, pedidoId) = await SeedPedidoAsync(empresaId, lojaId, doApp: false);
+
+        var resp = await fixture.CreateMobileClient(aparelho.ApiKey).GetAsync(Rota(pedidoId.ToString()));
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK, "pedido da vitrine desce ao app com o id do ERP, sem id do app");
+    }
+
+    private async Task<(string MobileOrderId, Guid PedidoId)> SeedPedidoAsync(Guid empresaId, Guid lojaId, bool doApp = true)
     {
         using var scope = fixture.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
         using var semRls = db.UseRowLevelSecurityBypass();
         var pedido = Pedido.Criar(empresaId, lojaId: lojaId, origem: "mobile");
-        pedido.MobileOrderId = "ord-" + Guid.NewGuid().ToString("N");
+        if (doApp) pedido.MobileOrderId = "ord-" + Guid.NewGuid().ToString("N");
         pedido.Itens.Add(new PedidoItem
         {
             Id = Guid.NewGuid(), PedidoId = pedido.Id, Nome = "Lasanha bolonhesa 800 g", Quantidade = 1,
@@ -95,6 +108,6 @@ public class MobileCanhotoClienteE2ETests(MobileE2EFixture fixture)
         pedido.RecalcularTotal();
         db.Pedidos.Add(pedido);
         await db.SaveChangesAsync();
-        return (pedido.MobileOrderId, pedido.Id);
+        return (pedido.MobileOrderId ?? "", pedido.Id);
     }
 }

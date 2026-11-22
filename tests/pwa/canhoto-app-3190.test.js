@@ -39,7 +39,7 @@ module.exports = function ({ test, sandbox, reset, assert, runInSandbox }) {
       await enviar(); await aguardar();
       assert.ok(log.fetch[0].url.endsWith('/api/mobile/pedidos/ord-3190/canhoto-cliente'), 'pede pelo id do app');
       assert.strictEqual(log.escrito[0].directory, 'CACHE');
-      assert.strictEqual(JSON.stringify(log.share[0].files), '["file:///cache/canhoto-pedido.png"]', 'vai como arquivo pelo plugin nativo');
+      assert.strictEqual(JSON.stringify(log.share[0].files), '["file:///cache/canhoto-ord-3190.png"]', 'vai como arquivo pelo plugin nativo');
       assert.ok(log.fetch.some((f) => f.method === 'POST' && f.url.endsWith('/canhoto-cliente/aberto')), 'registra a abertura');
     });
   });
