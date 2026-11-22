@@ -5,7 +5,7 @@ using Npgsql;
 namespace EasyStock.Infra.Postgre.Repositories;
 
 /// <summary>
-/// Regra de impressão da loja (#2199). <c>configuracoes_loja</c> não tem <c>EmpresaId</c> nem RLS, então toda consulta e
+/// Regra de impressão da loja (#2199). <c>configuracoes_loja</c> não tem <c>EmpresaId</c> (a RLS dela segue a loja, #3108), então toda consulta e
 /// toda gravação passam por <c>lojas</c> (filtro de tenant do EF e RLS do banco) com a empresa do token: loja de outra
 /// empresa não é lida nem gravada.
 /// </summary>

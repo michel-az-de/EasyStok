@@ -148,6 +148,7 @@ public sealed class DownloadArtefatoRelatorioE2ETests(MobileE2EFixture fx) : ICl
         run.MarkSucceeded(chave, Conteudo.Length, "sha", 1);
         using var scope = fx.Factory!.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EasyStockDbContext>();
+        using var bypass = db.UseRowLevelSecurityBypass(); // semeadura sem usuário: report_runs tem RLS (#3108)
         db.Add(run);
         await db.SaveChangesAsync();
         return run;

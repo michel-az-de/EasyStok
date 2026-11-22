@@ -37,14 +37,22 @@ Em SaaS pool multi-tenant, vazamento entre clientes é a falha mais cara (LGPD: 
 
 ## Skip list
 
-Quatro grupos isentos:
+Quatro tabelas isentas (lista revista na #3108; a guarda `CoberturaRlsTests.IsentasPorDesenho` é a cópia
+executável e falha se uma delas ganhar RLS sem sair de lá):
 
 | Tabela | Motivo |
 |---|---|
-| `admin_impersonation_logs` | Auditoria cross-tenant do SuperAdmin — leitura legítima sem tenant. |
-| `TenantFeatureFlags` | Toggles globais avaliados sem JWT contextual. |
-| `fatura_contador` | PK composta `(EmpresaId, Ano)` acessada via INSERT...ON CONFLICT em background — RLS zerá leituras de fallback. |
-| `mobile_*` | Módulo Casa da Baba tem isolamento por loja, não por empresa. |
+| `TenantFeatureFlags` | O SuperAdmin lista e altera a flag de outra empresa, e o roteador de IA lê sem tenant. |
+| `fatura_contador` | PK composta `(EmpresaId, Ano)` acessada via INSERT...ON CONFLICT em background. Com RLS a leitura de fallback zera. |
+| `admin_audit_logs` | Só tem `TenantId`, anulável, e ele guarda a empresa ALVO da ação do SuperAdmin (ou nada), não o tenant de quem grava. Com policy a gravação falharia no WITH CHECK. Sem leitor por tenant. |
+| `system_error_logs` | `TenantId` sempre nulo. É gravada pelo `GlobalExceptionHandler` em escopo próprio, que engole a própria falha: com policy os 5xx deixariam de ser registrados sem aviso. |
+
+Saíram da lista: `mobile_*` (policy na #2180) e `admin_impersonation_logs` (medida com RLS forçada e
+`tenant_isolation` na #3108). Na #3108 a guarda passou a enxergar também `TenantId` e `LojaId`, e ganharam policy
+`cliente_alteracoes`, `entity_alteracoes`, `etiqueta_templates`, `etiqueta_empresa_default`,
+`preferencias_menu_usuario`, `outbox_evento_integracao`, `report_runs` e `configuracoes_loja`. Duas têm regra
+própria: em `report_runs` a empresa é anulável (run de plataforma, AdminSaaS) e a linha sem empresa só aparece sob
+bypass; `configuracoes_loja` só tem a loja e a linha aparece se a loja aparece (EXISTS em `lojas`).
 
 ## Pontos cross-tenant que recebem bypass
 
@@ -60,6 +68,9 @@ Quatro grupos isentos:
 | Webhook fiscal (sem JWT) | `ProcessarWebhookFocusNFeUseCase` — fix B-054 |
 | Reprocessamento de contingência | `ReprocessarContingenciaUseCase` — fix B-053 |
 | **Registro de empresa** | `RegistrarEmpresaUseCase` — issue #1024 |
+| Outbox de integração: lote e reclamação de evento preso | `OutboxEventoIntegracaoRepository` (#3108). O evento em si roda com o tenant dele, sem bypass |
+| Relatórios: escolha, reserva, watchdog e GC de runs | `ReportRunRepository` (#3108). A execução roda com o tenant da run |
+| Retenção da auditoria | `EntityAlteracaoRetentionService.CleanupAsync` (#3108) |
 
 As duas linhas de fiscal já existiam no código e faltavam nesta tabela; entraram junto com a #1024,
 que as encontrou ao medir quem consome o port.

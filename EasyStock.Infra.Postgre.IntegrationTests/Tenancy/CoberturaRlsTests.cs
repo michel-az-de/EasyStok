@@ -5,7 +5,7 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Tenancy;
 
 /// <summary>
 /// Guarda da camada 2 do ADR-0010 (#1238): toda tabela com coluna <c>EmpresaId</c> (ou <c>empresa_id</c>,
-/// convenção das <c>mobile_*</c>, #2180) sai das migrations
+/// convenção das <c>mobile_*</c>, #2180; <c>TenantId</c> e <c>LojaId</c>, #3108) sai das migrations
 /// com RLS ligado e forçado e com a policy <c>tenant_isolation</c>. A <c>ocorrencias</c> nasceu sem o
 /// bloco <c>DO $rls$</c> e ninguém viu; este teste pega a próxima tabela que esquecer.
 /// </summary>
@@ -13,29 +13,12 @@ namespace EasyStock.Infra.Postgre.IntegrationTests.Tenancy;
 public sealed class CoberturaRlsTests(PostgreSqlDatabaseFixture fixture)
 {
     /// <summary>
-    /// Isentas por desenho, as mesmas de <c>skip_tables</c> na migration AddRowLevelSecurity. O prefixo
-    /// <c>mobile_</c> saiu daqui no #2180: as tabelas Mobile com empresa têm RLS como o núcleo.
+    /// Isentas por desenho, com o motivo na ADR-0010 (Skip list). As duas primeiras vêm da migration
+    /// AddRowLevelSecurity; as duas de log entraram no #3108, quando a guarda passou a enxergar <c>TenantId</c>.
+    /// O prefixo <c>mobile_</c> saiu daqui no #2180 e <c>admin_impersonation_logs</c> no #3108 (já tinha RLS).
     /// </summary>
-    private static readonly string[] IsentasPorDesenho = ["admin_impersonation_logs", "TenantFeatureFlags", "fatura_contador"];
-
-    /// <summary>
-    /// Dívida anterior a esta fatia, medida em 30/09/2026 (#1238) e fora do escopo dela: cada tabela pede
-    /// avaliação própria antes de ligar RLS (linha global, leitura sem tenant). Remova daqui ao corrigir;
-    /// tabela nova nunca entra nesta lista.
-    /// </summary>
-    private static readonly string[] SemRlsAntesDe1238 =
-    [
-        "cliente_alteracoes", "entity_alteracoes", "etiqueta_empresa_default", "etiqueta_templates",
-        "preferencias_menu_usuario",
-    ];
-
-    /// <summary>
-    /// Tabelas não-Mobile com <c>empresa_id</c> em snake_case que a guarda passou a enxergar no #2180 (antes
-    /// ela só procurava <c>EmpresaId</c>). <c>report_runs</c> tem empresa nula de propósito (AdminSaaS);
-    /// <c>outbox_evento_integracao</c> é lida pelo worker de todas as empresas. Cada uma pede avaliação
-    /// própria; remova daqui ao corrigir e nunca acrescente tabela nova.
-    /// </summary>
-    private static readonly string[] SnakeCaseSemRlsAntesDe2180 = ["outbox_evento_integracao", "report_runs"];
+    private static readonly string[] IsentasPorDesenho =
+        ["TenantFeatureFlags", "fatura_contador", "admin_audit_logs", "system_error_logs"];
 
     [SkippableFact]
     public async Task TodaTabelaComEmpresaIdTemRlsForcadoETenantIsolation()
@@ -49,7 +32,7 @@ public sealed class CoberturaRlsTests(PostgreSqlDatabaseFixture fixture)
             JOIN pg_namespace n ON n.oid = c.relnamespace
             JOIN information_schema.columns col
               ON col.table_schema = n.nspname AND col.table_name = c.relname
-             AND col.column_name IN ('EmpresaId', 'empresa_id')
+             AND col.column_name IN ('EmpresaId', 'empresa_id', 'TenantId', 'LojaId')
             WHERE n.nspname = current_schema()
               AND c.relkind = 'r'
               AND (NOT c.relrowsecurity
@@ -62,11 +45,13 @@ public sealed class CoberturaRlsTests(PostgreSqlDatabaseFixture fixture)
 
         var faltando = semRls
             .Except(IsentasPorDesenho)
-            .Except(SemRlsAntesDe1238)
-            .Except(SnakeCaseSemRlsAntesDe2180)
             .ToList();
         faltando.Should().BeEmpty(
             $"tabela com EmpresaId sem RLS vaza entre empresas se o filtro do EF falhar; sem RLS: {string.Join(", ", faltando)}");
+
+        // Lista de exceção que sobra é permissão sem dono: quem ganhou policy sai daqui.
+        IsentasPorDesenho.Should().BeSubsetOf(semRls,
+            "tabela que já tem RLS forçada e tenant_isolation não pode continuar listada como exceção");
     }
 
     /// <summary>
