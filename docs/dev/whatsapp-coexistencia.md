@@ -119,7 +119,13 @@ Em outro ambiente, configure na API:
 - `Atendimento__WppConnect__Habilitado=true`;
 - `Atendimento__WppConnect__BaseUrl=http://wppconnect:21465/`;
 - `Atendimento__WppConnect__SecretKey` e `Atendimento__WppConnect__WebhookToken`;
-- no gateway, `WEBHOOK_URL=http://api:8080/api/webhooks/wppconnect?token=<mesmo-token>`;
+- no gateway, `WEBHOOK_URL=http://api:8080/api/webhooks/wppconnect`, sem segredo na URL, e
+  `WPP_WEBHOOK_TOKEN=<mesmo-token>`: o preload assina o corpo com HMAC sha512 em `X-Webhook-Hmac` e
+  não sobe sem a chave (#3097);
+- `Atendimento__WppConnect__AceitarTokenNaQuery` (padrão `true`) ainda aceita o antigo `?token=`
+  enquanto a ponte instalada não for trocada; cada uso registra um Warning. Ordem da troca: API
+  nova no ar, depois compose e preload novos na VPS com restart da ponte, depois uma mensagem real
+  chegando. Sem Warning por 7 dias, desligue a flag;
 - `FileStorage__PublicBaseUrl` com URL HTTP(S) dos arquivos que o gateway consiga acessar,
   incluindo `/files` para o storage local. Não usar somente a raiz do host.
 
