@@ -11,8 +11,8 @@ export function nomeStatusConta(status, lado = 'pagar') {
 export const tomDoStatusConta = (status) => status === 'Vencida' ? 'perigo' : status === 'Paga' ? 'ok' : status === 'ParcialmentePaga' ? 'aviso' : 'neutro'
 export const nomeStatusPagamento = (status) => ({ Confirmado: 'Registrado', Estornado: 'Estornado', Pendente: 'Pendente' })[status] ?? status
 export const palavrasDoLado = (lado) => lado === 'receber'
-  ? { verbo: 'Receber', registro: 'recebimento', registros: 'recebimentos', feito: 'Recebido', forma: 'Forma de recebimento', data: 'Data do recebimento', jaFeito: 'Já foi recebida' }
-  : { verbo: 'Pagar', registro: 'pagamento', registros: 'pagamentos', feito: 'Pago', forma: 'Forma de pagamento', data: 'Data do pagamento', jaFeito: 'Já foi paga' }
+  ? { verbo: 'Receber', registro: 'recebimento', registros: 'recebimentos', feito: 'Recebido', forma: 'Forma de recebimento', data: 'Data do recebimento', jaFeito: 'Já foi recebida', emitir: 'Deixar a conta aberta ao salvar' }
+  : { verbo: 'Pagar', registro: 'pagamento', registros: 'pagamentos', feito: 'Pago', forma: 'Forma de pagamento', data: 'Data do pagamento', jaFeito: 'Já foi paga', emitir: 'Deixar a conta aberta ao salvar' }
 
 export function diaFinanceiro(instante = Date.now()) {
   const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instante))

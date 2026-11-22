@@ -163,7 +163,7 @@ export function situacaoDaLinha(tela, item, soLeads) {
   if (!emAtividadeCadastro(item)) return { texto: 'Inativo', tom: null }
   if (tela !== 'clientes') return { texto: 'Ativo', tom: null }
   const relacao = relacionamentoCadastro(item)
-  return { texto: relacao, tom: relacao === 'Lead' ? 'marca' : null }
+  return relacao === 'Lead' ? { texto: relacao, rotulo: 'Sem pedido ainda', tom: 'marca', titulo: 'Lead: pessoa cadastrada que ainda não fez nenhum pedido.' } : { texto: relacao, tom: null }
 }
 
 // #2476 (A4): um tamanho de página para o pedido à API e para o "Próxima" das listas.

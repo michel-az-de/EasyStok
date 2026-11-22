@@ -77,7 +77,7 @@ for (const { largura, movel } of [{ largura: 1440, movel: false }, { largura: 39
 
     // 3. Cancelar: volta ao "+ Nova categoria" que abriu o bloco.
     await nova.click(); await nome.fill('Água')
-    await janela.getByRole('button', { name: 'Cancelar', exact: true }).first().click()
+    await janela.getByRole('button', { name: 'Não criar categoria', exact: true }).click()
     await esperarFoco(nova, 'Cancelar')
 
     // 4. Falha da API: o foco volta ao nome, onde o erro aparece.

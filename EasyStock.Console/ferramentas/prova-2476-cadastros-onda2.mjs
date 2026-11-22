@@ -51,7 +51,7 @@ assert.equal(corpoCliente({ nome: 'Ana', documento: '123.456.789-00' }, 'e').doc
 assert.equal(corpoFornecedor({ nome: 'Moinho', documento: '12.345.678/0001-99' }, 'e').documento, '12345678000199')
 
 // U6: pílula só quando o estado pede ação; o resto é texto (Pilula.module.css).
-assert.deepEqual(situacaoDaLinha('clientes', { orderCount: 0, ativo: true }, false), { texto: 'Lead', tom: 'marca' })
+assert.deepEqual(situacaoDaLinha('clientes', { orderCount: 0, ativo: true }, false), { texto: 'Lead', rotulo: 'Sem pedido ainda', tom: 'marca', titulo: 'Lead: pessoa cadastrada que ainda não fez nenhum pedido.' })
 assert.deepEqual(situacaoDaLinha('clientes', { orderCount: 3, ativo: true }, false), { texto: 'Cliente', tom: null })
 assert.deepEqual(situacaoDaLinha('clientes', { orderCount: 0, ativo: false }, false), { texto: 'Inativo', tom: null })
 assert.deepEqual(situacaoDaLinha('clientes', {}, true), { texto: 'Sem cadastro', tom: 'aviso' })

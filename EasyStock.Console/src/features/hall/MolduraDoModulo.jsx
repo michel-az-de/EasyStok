@@ -47,6 +47,9 @@ function voltarAoBalcao(fonteApi) {
   setTimeout(() => { if (document.hasFocus()) window.close() }, 250)
 }
 
+// #3193: o título visível do Financeiro tem o tamanho do de Cadastros e Pedidos (--t-display; --t-valor no celular).
+const MODULOS_COM_TITULO_GRANDE = new Set(['financeiro'])
+
 export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, tituloVisivel = true, ajuda, children }) {
   const { permite, aoSair, sessaoPersistente, notificacoes, busca, acoes, conta } = useAcessoModulos()
   const modulo = moduloPorId(moduloId)
@@ -131,7 +134,7 @@ export function MolduraDoModulo({ moduloId, telaId, fonteApi, operacao = false, 
             <div className={css.folha}>
               {tela ? (
                 <>
-                  <h1 className={tituloVisivel ? css.titulo : 'sr'}>
+                  <h1 className={tituloVisivel ? `${css.titulo} ${MODULOS_COM_TITULO_GRANDE.has(moduloId) ? css.tituloGrande : ''}` : 'sr'}>
                     <IconeDoModulo modulo={modulo} telaId={tela.id} />
                     {tela.rotulo}
                   </h1>
